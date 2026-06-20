@@ -27,24 +27,75 @@ The current web app was reviewed in Chrome on `chessticize.com`, focused on Puzz
 - The web dashboard mixes summary stats, mode selection, and recent configs in one broad page. Mobile needs a tighter task-first hierarchy.
 - Settings exposes many ELO fields as editable inputs. Mobile should prefer explicit reset/adjust flows and avoid a dense form by default.
 
+## Complete App Design Board
+
+The design board below is an imagegen-rendered high-fidelity concept for reviewing the overall product shape. It is useful for visual direction, but the written specifications in this document are authoritative for exact copy, scoring behavior, licensing text, and implementation details.
+
+![Complete mobile design board](assets/mobile-full-design-board.png)
+
+The board covers these major screens:
+
+- Practice Home
+- Regular Sprint Active
+- Arrow Duel Active
+- Sprint Results
+- Review Queue
+- Arrow Duel Review
+- History
+- Custom Sprint Setup
+- Settings
+- Puzzle Packs
+
+Screen inventory:
+
+| Screen | Main layout | Primary actions | Navigates to |
+| --- | --- | --- | --- |
+| Practice Home | Mode list, progress summary, due review strip, bottom tabs | Start Standard, Arrow Duel, Blitz, Custom; resume interrupted session | Active Sprint, Custom Sprint, Review Queue |
+| Regular Sprint Active | Focused session shell, status bar, board, prompt | Make board move, abandon, complete/fail sprint | Sprint Results |
+| Arrow Duel Active | Focused shell, status bar, board, neutral candidate arrows, A/B chips | Choose candidate, abandon, complete/fail sprint | Sprint Results, Arrow Duel Review |
+| Sprint Results | Solved count, accuracy, rating change, mistakes, actions | Review mistakes, play again, done | Review Item, Practice Home |
+| Review Queue | Due/overdue summary, difficulty groups, start button | Start due review, filter queue | Review Item |
+| Arrow Duel Review | Board, green/red arrows, choice marker, playback controls | Play line, step line, finish review | Review Complete, History |
+| History | Filter chips, attempt rows, result/rating/review state | Filter Wrong 7d, open attempt | Attempt Detail, Review Item |
+| Custom Sprint Setup | Mode/theme/timing controls, estimate, rating range, start | Start sprint, save template | Active Sprint |
+| Settings | Sync, reset, export, local data, about | Toggle iCloud, reset ELO, export/delete | Confirm Sheet, Sync Disclosure |
+| Puzzle Packs | Installed/optional packs, metadata, source/license notes | Import, enable, remove, inspect license | Pack Detail |
+
 ## Mobile Information Architecture
 
-Use a four-tab app shell:
+Use a five-tab app shell:
 
 - Practice: quick start, active session, custom sprint setup, and Arrow Duel entry.
 - Review: due mistake reviews and spaced repetition queue.
 - History: attempts, sprint sessions, filters, and "Wrong in the last 7 days".
-- Settings: iCloud sync, local data, ELO reset, puzzle packs, licenses, and advanced rating adjustment.
+- Packs: bundled pack, optional packs, rating/theme coverage, imports, and license/source attribution.
+- Settings: iCloud sync, local data, ELO reset, export/delete data, and advanced rating adjustment.
 
 There should be no mobile Home tab and no Game Review tab in v1.
+
+![Mobile navigation flow](assets/mobile-navigation-flow.svg)
 
 Navigation rules:
 
 - Practice is the default launch tab.
 - Active practice sessions hide the tab bar and use a focused session shell.
 - Review and History both open the same board-based review surface, but with different entry context.
-- Settings is the only place for data-destructive actions such as ELO reset, history delete, and puzzle pack removal.
-- Any sync error or puzzle pack error should be recoverable from Settings without blocking offline practice.
+- Settings is the only place for data-destructive actions such as ELO reset and history delete.
+- Packs owns puzzle pack visibility, imports, removals, coverage, source attribution, and license notes.
+- Any sync error should be recoverable from Settings without blocking offline practice.
+- Any puzzle pack error should be recoverable from Packs without blocking already-installed offline practice.
+
+Primary flows:
+
+| Flow | Steps | Notes |
+| --- | --- | --- |
+| Standard or Blitz practice | Practice Home -> Regular Sprint Active -> Sprint Results -> Practice Home | Board moves submit answers directly. |
+| Arrow Duel practice | Practice Home -> Arrow Duel Active -> Sprint Results -> Arrow Duel Review | Candidate arrows are neutral until selection. |
+| Custom sprint | Practice Home -> Custom Sprint Setup -> Regular Sprint Active or Arrow Duel Active -> Sprint Results | The selected mode determines the active session shell. |
+| Due mistake review | Review Queue -> Review Item -> Review Complete -> Review Queue | Correct answers increase interval; failures shorten it. |
+| Recent wrong review | History -> Wrong 7d filter -> Attempt Detail -> Review Item | History preserves original attempt context. |
+| Puzzle pack management | Packs -> Pack Detail -> Import or Remove -> Packs | Installed packs remain usable offline. |
+| iCloud and local data | Settings -> Sync Disclosure or Confirm Sheet -> Settings | Practice must keep working when sync is off. |
 
 ## Design Principles
 
@@ -111,6 +162,7 @@ Core components:
 - `ReviewQueueHeader`: due count, overdue count, and next review estimate.
 - `HistoryFilterBar`: date/result/mode/theme chips with a persistent "Wrong in the last 7 days" shortcut.
 - `SettingsRow`: label, value, status, and disclosure or switch.
+- `PackCoverageCard`: pack name, installed state, puzzle count, rating range, theme coverage, Arrow Duel count, and attribution status.
 - `DestructiveActionSheet`: reset/delete confirmation with explicit copy.
 
 ## Core Screen Drafts
@@ -233,8 +285,16 @@ Custom sprint behavior:
 - iCloud sync toggle appears near the top with clear local-first copy.
 - ELO reset is explicit and separate from deleting history.
 - Advanced manual ELO adjustment should be hidden behind an "Advanced ratings" affordance.
-- Puzzle pack management and license notices are required for offline/open-source distribution.
 - iCloud sync default state should match the sync plan: default on for fresh iOS installs with disclosure, explicit prompt before uploading existing local-only progress.
+
+### Packs
+
+- Bundled core pack appears first and must show installed/active state.
+- Optional packs show estimated puzzle count, rating range, theme coverage, and Arrow Duel count.
+- Pack detail shows source attribution, presolve status, manifest hash, build date, and license notes.
+- Importing a pack uses a visible progress state and validates the manifest before activation.
+- Removing a pack is a destructive action and must not remove user attempt history.
+- If no optional packs are installed, the screen should still make clear that the bundled pack works fully offline.
 - Puzzle pack screen should show bundled pack, imported packs, rating coverage, theme coverage, Arrow Duel count, and license/source attribution.
 
 ## Accessibility And Automation Contracts
@@ -247,6 +307,7 @@ Required labels/test IDs:
 - `review-tab`
 - `history-tab`
 - `settings-tab`
+- `packs-tab`
 - `practice-mode-standard`
 - `practice-mode-arrow-duel`
 - `practice-mode-blitz`
@@ -262,7 +323,10 @@ Required labels/test IDs:
 - `history-filter-wrong-7-days`
 - `settings-icloud-sync-toggle`
 - `settings-reset-elo`
-- `settings-puzzle-packs`
+- `packs-installed-core`
+- `packs-import`
+- `packs-remove`
+- `packs-license-notes`
 
 Accessibility rules:
 
@@ -277,7 +341,7 @@ Accessibility rules:
 - Every core screen must expose stable accessibility labels for Detox.
 - Component tests should verify user-visible behavior, not component internals.
 - UI should receive view models from backend/domain packages; React components must not compute sprint outcomes, ELO updates, review scheduling, or Arrow Duel correctness.
-- E2E flows should cover Practice start, Arrow Duel choice, wrong-answer review, custom sprint setup, history filtering, ELO reset, and iCloud sync toggle.
+- E2E flows should cover Practice start, Arrow Duel choice, wrong-answer review, custom sprint setup, history filtering, pack management, ELO reset, and iCloud sync toggle.
 - Design QA should include iPhone SE-sized viewport, modern iPhone portrait, and at least one landscape/tablet sanity pass.
 - E2E assertions should target stable labels/test IDs from this document.
 

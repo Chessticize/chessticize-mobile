@@ -76,7 +76,7 @@ Puzzle attribution and licensing:
 - The puzzle corpus is derived from the Lichess puzzle database.
 - Chessticize adds presolved metadata such as Stockfish evaluation, Stockfish best move, and evaluation after the first move.
 - Puzzle packs must include source attribution, source dataset identifiers, generated manifest hashes, and license notices.
-- Public redistribution is blocked until the current Lichess puzzle database license terms are verified and included correctly.
+- The Lichess open database page currently lists database exports under CC0; public redistribution is still blocked until the current puzzle database license terms are verified and included correctly at release time.
 
 Core pack default:
 
@@ -182,11 +182,12 @@ The detailed mobile UI direction, sanitized current-web observation, palette, an
 The UI should be quiet, clean, and practice-focused.
 
 - No landing page in the app shell. Open directly into practice.
-- Use tabs or a compact navigation structure: Practice, Review, History, Settings.
+- Use a five-tab navigation structure: Practice, Review, History, Packs, Settings.
 - Practice screen contains mode selector, current ELO, timer, mistake count, board, and primary action area.
 - Review screen starts with due mistakes and supports filters.
 - History supports quick filters including "Wrong in the last 7 days".
-- Settings includes ELO reset, history delete, iCloud sync toggle, puzzle pack management, and license notices.
+- Packs includes bundled/imported puzzle packs, pack coverage, imports/removals, source attribution, and license notes.
+- Settings includes ELO reset, history delete, iCloud sync toggle, export/delete data, and about/version information.
 
 Visual design:
 
