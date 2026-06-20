@@ -121,7 +121,7 @@ export function PracticePocScreen({ practiceService }: Props): React.JSX.Element
         <TabButton active={tab === "review"} label="Review" onPress={() => setTab("review")} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView testID="practice-scroll" contentContainerStyle={styles.content}>
         {tab === "practice" ? (
           <>
             <View style={styles.modeRow}>
@@ -139,9 +139,18 @@ export function PracticePocScreen({ practiceService }: Props): React.JSX.Element
             </View>
 
             <SessionBar state={state} sprintView={sprintView} />
-            <BoardPanel currentPuzzle={currentPuzzle} fen={currentFen} />
-            <MoveControls currentPuzzle={currentPuzzle} onMove={submitMove} />
-            <FeedbackPanel feedback={feedback} error={error} />
+            {feedback || error ? (
+              <>
+                <FeedbackPanel feedback={feedback} error={error} />
+                <MoveControls currentPuzzle={currentPuzzle} onMove={submitMove} />
+                <BoardPanel currentPuzzle={currentPuzzle} fen={currentFen} />
+              </>
+            ) : (
+              <>
+                <BoardPanel currentPuzzle={currentPuzzle} fen={currentFen} />
+                <MoveControls currentPuzzle={currentPuzzle} onMove={submitMove} />
+              </>
+            )}
 
             <Pressable
               accessibilityRole="button"

@@ -11,7 +11,7 @@ The POC includes:
 - Component behavior tests with `react-test-renderer`.
 - Detox iOS E2E configuration and specs.
 
-The current Codex host has Command Line Tools but not full Xcode, `simctl`, or CocoaPods, so iOS simulator build and Detox execution cannot be completed on this machine yet. Metro iOS bundling, TypeScript, and component tests are verified.
+The current Codex host has full Xcode at `/Applications/Xcode.app`, but the Xcode license has not been accepted for this user session. iOS simulator build and Detox execution require the license to be accepted from a Terminal session before they can run. Metro iOS bundling, TypeScript, and component tests are verified.
 
 ## Commands
 
@@ -20,20 +20,21 @@ From the repository root:
 ```sh
 pnpm mobile:typecheck
 pnpm mobile:test
+pnpm mobile:doctor:ios
 pnpm --filter ChessticizeMobile exec react-native bundle --entry-file index.js --platform ios --dev true --bundle-output /tmp/chessticize-mobile-ios.jsbundle --assets-dest /tmp/chessticize-mobile-assets --reset-cache
 ```
 
-On a Mac with full Xcode and CocoaPods:
+On a Mac with full Xcode:
 
 ```sh
-cd apps/mobile/ios
-bundle install
-bundle exec pod install
-cd ..
-pnpm ios
-pnpm e2e:build:ios
-pnpm e2e:test:ios
+sudo DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -license accept
+pnpm mobile:doctor:ios
+pnpm mobile:ios
+pnpm mobile:e2e:build:ios
+pnpm mobile:e2e:test:ios
 ```
+
+The Detox build command runs `scripts/ios-build-for-detox.sh`. It checks Xcode simulator access, installs Ruby dependencies through Bundler when needed, runs CocoaPods, and then builds the iOS simulator app.
 
 ## GUI Automation
 
