@@ -24,6 +24,13 @@ All repository documentation must be written in English. User-facing GUI copy mu
 - Native services such as SQLite, Stockfish, and CloudKit must sit behind interfaces. Use real adapters in integration tests where practical and maintained fakes for deterministic failure or conflict scenarios.
 - Any new feature that adds business behavior must add backend/domain tests first or in the same commit as the behavior.
 
+## Scratch Workspace
+
+- `scratch/` is intentionally ignored by git.
+- Use `scratch/` for private screenshots, raw design references, generated exploratory mockups, local repo paths, and implementation notes that should not be published.
+- Do not link public docs to files under `scratch/`.
+- Do not commit raw screenshots that contain usernames, exact ratings, private stats, dates, or account details. Use sanitized schematics or generated mockups instead.
+
 ## Required Test Layers
 
 - Narrow unit tests may exercise implementation details and should cover pure business rules such as ELO, sprint end conditions, spaced repetition scheduling, Arrow Duel candidate selection, and puzzle pack filtering.

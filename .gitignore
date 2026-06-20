@@ -17,6 +17,7 @@ android/build/
 coverage/
 dist/
 build/
+scratch/
 
 # Tooling
 .env

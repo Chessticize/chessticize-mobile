@@ -71,6 +71,13 @@ Dependency direction:
 
 Build `puzzles_core.sqlite` from the presolved Lichess-derived CSV data. The core pack should be ELO-targeted instead of full-size by default.
 
+Puzzle attribution and licensing:
+
+- The puzzle corpus is derived from the Lichess puzzle database.
+- Chessticize adds presolved metadata such as Stockfish evaluation, Stockfish best move, and evaluation after the first move.
+- Puzzle packs must include source attribution, source dataset identifiers, generated manifest hashes, and license notices.
+- Public redistribution is blocked until the current Lichess puzzle database license terms are verified and included correctly.
+
 Core pack default:
 
 - Prefer lower and middle ELO ranges because most users need those first.
