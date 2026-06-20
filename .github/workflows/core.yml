@@ -45,3 +45,9 @@ jobs:
 
       - name: Full test suite
         run: pnpm test
+
+      - name: Mobile typecheck
+        run: pnpm mobile:typecheck
+
+      - name: Mobile component tests
+        run: pnpm mobile:test
