@@ -170,7 +170,7 @@ Sync must support offline writes. When connectivity returns, the app uploads pen
 
 ## 5. User Experience Direction
 
-The detailed mobile UI direction, current web screenshots, palette, and screen drafts live in [Mobile UI Design](ui-design/MOBILE_UI_DESIGN.md).
+The detailed mobile UI direction, sanitized current-web observation, palette, and screen drafts live in [Mobile UI Design](ui-design/MOBILE_UI_DESIGN.md).
 
 The UI should be quiet, clean, and practice-focused.
 
