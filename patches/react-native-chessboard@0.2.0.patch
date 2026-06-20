@@ -1,0 +1,91 @@
+diff --git a/src/components/skia/skia-board.tsx b/src/components/skia/skia-board.tsx
+index 759d04e3d374ee79388c2acddc541cfceb0ee7db..c46b6e4e785df632ae3361ac337cefab954d5892 100644
+--- a/src/components/skia/skia-board.tsx
++++ b/src/components/skia/skia-board.tsx
+@@ -42,12 +42,12 @@ export const SkiaBoard: React.FC<SkiaBoardProps> = React.memo(
+       <>
+         <BoardBackground config={config} />
+         <SkiaHighlights config={config} boardState={boardState} />
+-        <SkiaDots config={config} boardState={boardState} />
+         <SkiaPiecesAtlas
+           spriteImage={spriteImage}
+           boardState={boardState}
+           pieceSize={pieceSize}
+         />
++        <SkiaDots config={config} boardState={boardState} />
+       </>
+     );
+ 
+diff --git a/src/components/skia/skia-dots.tsx b/src/components/skia/skia-dots.tsx
+index 5032bfe81a485ff85d710e7d6e4c0a2e8d78347e..9946cb5db3dee32b4c62c58603fa23c398b7d8a1 100644
+--- a/src/components/skia/skia-dots.tsx
++++ b/src/components/skia/skia-dots.tsx
+@@ -9,29 +9,56 @@ interface SkiaDotsProps {
+   boardState: BoardState;
+ }
+ 
+-// All valid-move dots are built by ONE derived path that reads the shared
+-// `validMoves` once (a single subscription) and adds a circle per target —
+-// instead of 64 per-square components each subscribing to `validMoves` and
+-// scanning it. It re-runs ONLY when `validMoves` changes (not every frame),
+-// so it costs nothing at rest. Dots are binary (no per-square opacity), so
+-// one Path is a perfect fit.
++// Valid-move markers are built by two derived paths that read the shared
++// `validMoves` once. Empty targets use quiet dots; capture targets use a ring
++// so the marker remains visible when a piece already occupies the target.
+ export const SkiaDots: React.FC<SkiaDotsProps> = React.memo(
+   ({ config, boardState }) => {
+     const { pieceSize, flipped } = config;
+     const radius = pieceSize * 0.15;
++    const captureRadius = pieceSize * 0.38;
+     const half = pieceSize / 2;
+ 
+-    const path = useDerivedValue(() => {
+-      const p = Skia.Path.Make();
++    const quietPath = useDerivedValue(() => {
++      const path = Skia.Path.Make();
+       const moves = boardState.validMoves.get();
+       for (let i = 0; i < moves.length; i++) {
+-        const pos = squareToPosition(moves[i], pieceSize, flipped);
+-        p.addCircle(pos.x + half, pos.y + half, radius);
++        const target = moves[i];
++        if (boardState.squares[target].piece.get()) {
++          continue;
++        }
++        const pos = squareToPosition(target, pieceSize, flipped);
++        path.addCircle(pos.x + half, pos.y + half, radius);
+       }
+-      return p;
++      return path;
+     });
+ 
+-    return <Path path={path} color="rgba(0, 0, 0, 0.3)" opacity={0.5} />;
++    const capturePath = useDerivedValue(() => {
++      const path = Skia.Path.Make();
++      const moves = boardState.validMoves.get();
++      for (let i = 0; i < moves.length; i++) {
++        const target = moves[i];
++        if (!boardState.squares[target].piece.get()) {
++          continue;
++        }
++        const pos = squareToPosition(target, pieceSize, flipped);
++        path.addCircle(pos.x + half, pos.y + half, captureRadius);
++      }
++      return path;
++    });
++
++    return (
++      <>
++        <Path path={quietPath} color="rgba(0, 0, 0, 0.3)" opacity={0.5} />
++        <Path
++          path={capturePath}
++          color="rgba(0, 0, 0, 0.55)"
++          opacity={0.65}
++          style="stroke"
++          strokeWidth={Math.max(2, pieceSize * 0.05)}
++        />
++      </>
++    );
+   }
+ );
+ 

@@ -8,6 +8,7 @@ import {
 import type {
   AttemptEvent,
   Puzzle,
+  RatingRecord,
   SprintConfig,
   SprintMode,
   SprintState
@@ -173,6 +174,10 @@ export class PracticeService {
 
   getDueReviews(now = new Date().toISOString()): unknown {
     return this.store.getDueReviews(now);
+  }
+
+  getRating(ratingKey: string): RatingRecord {
+    return this.store.getRating(ratingKey);
   }
 
   resetRating(ratingKey: string): unknown {

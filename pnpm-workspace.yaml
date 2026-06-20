@@ -5,3 +5,5 @@ allowBuilds:
   detox: true
   dtrace-provider: true
   unrs-resolver: true
+patchedDependencies:
+  react-native-chessboard@0.2.0: patches/react-native-chessboard@0.2.0.patch

@@ -63,6 +63,20 @@ test("MemoryStore records due reviews for wrong Arrow Duel choices", async () =>
   assert.equal(reviews[0]?.lastResult, "wrong");
 });
 
+test("MemoryStore does not select duplicate puzzle positions for one sprint", async () => {
+  const store = new MemoryStore();
+  const puzzles = await loadFixturePuzzles();
+  store.seedPuzzles([
+    puzzles[0] as Puzzle,
+    { ...(puzzles[0] as Puzzle), id: "00008-copy" },
+    puzzles[1] as Puzzle
+  ]);
+
+  const selected = store.selectPuzzles({ mode: "standard", limit: 3 });
+
+  assert.deepEqual(selected.map((puzzle) => puzzle.id), ["000hf", "00008"]);
+});
+
 async function loadFixturePuzzles(): Promise<Puzzle[]> {
   const contents = await readFile(resolve("fixtures/puzzles/presolved-sample.json"), "utf8");
   return JSON.parse(contents) as Puzzle[];

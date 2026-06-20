@@ -78,6 +78,50 @@ test("three wrong puzzles fail the sprint and keep rating at the floor", () => {
   assert.equal(result.state.ratingAfter, 600);
 });
 
+test("a correct Arrow Duel move records the puzzle and advances to the next puzzle", () => {
+  const state = startSprint({
+    config: buildSprintConfig({
+      mode: "arrow_duel",
+      durationSeconds: 300,
+      perPuzzleSeconds: 30,
+      targetCorrect: 2,
+      maxMistakes: 3
+    }),
+    puzzles: [samplePuzzle("p1"), samplePuzzle("p2")],
+    ratingBefore: 600,
+    now: NOW
+  });
+
+  const result = submitSprintMove(state, "b2b1", "2026-06-20T00:00:05.000Z");
+
+  assert.equal(result.feedback?.result, "correct");
+  assert.equal(result.attempt?.result, "correct");
+  assert.equal(result.state.status, "active");
+  assert.equal(result.state.correctCount, 1);
+  assert.equal(result.state.currentPuzzle?.puzzle.id, "p2");
+});
+
+test("a target-one correct Arrow Duel sprint completes immediately", () => {
+  const state = startSprint({
+    config: buildSprintConfig({
+      mode: "arrow_duel",
+      durationSeconds: 300,
+      perPuzzleSeconds: 30,
+      targetCorrect: 1,
+      maxMistakes: 3
+    }),
+    puzzles: [samplePuzzle("p1"), samplePuzzle("p2")],
+    ratingBefore: 600,
+    now: NOW
+  });
+
+  const result = submitSprintMove(state, "b2b1", "2026-06-20T00:00:05.000Z");
+
+  assert.equal(result.state.status, "won");
+  assert.equal(result.state.endReason, "target_reached");
+  assert.equal(result.state.correctCount, 1);
+});
+
 test("expired sprint fails before accepting another move", () => {
   const state = startSprint({
     config: buildSprintConfig({ mode: "standard", durationSeconds: 1, perPuzzleSeconds: 1, targetCorrect: 1 }),
