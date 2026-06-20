@@ -1,0 +1,21 @@
+{
+  "name": "chessticize-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.1.2",
+  "scripts": {
+    "test": "node --experimental-strip-types --test packages/core/test/*.test.ts packages/storage/test/*.test.ts apps/cli/test/*.test.ts",
+    "test:unit": "node --experimental-strip-types --test packages/core/test/*.test.ts",
+    "test:integration": "node --experimental-strip-types --test packages/storage/test/*.test.ts",
+    "test:e2e": "node --experimental-strip-types --test apps/cli/test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "chess.js": "^1.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "typescript": "^5.9.0"
+  }
+}

@@ -8,7 +8,16 @@ The current repository starts with product and engineering planning only. The ap
 
 - [Phased Execution Plan](docs/PHASED_EXECUTION_PLAN.md)
 - [Mobile UI Design](docs/ui-design/MOBILE_UI_DESIGN.md)
+- [Core Library And CLI](docs/CORE_CLI.md)
 - [Agent Instructions](AGENTS.md)
+
+## Current Implementation
+
+The repository now includes the first GUI-independent backend core and a plain stdio CLI:
+
+- `packages/core` contains sprint, puzzle, Arrow Duel, ELO, and review scheduling rules.
+- `packages/storage` contains real SQLite migrations and repositories for puzzles, attempts, sprint sessions, ratings, history filters, and review queues.
+- `apps/cli` exposes the core through a machine-readable JSONL protocol for early E2E testing before the React Native UI exists.
 
 ## Product Direction
 

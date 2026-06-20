@@ -1,0 +1,47 @@
+name: Core Library
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test-core:
+    name: Typecheck and test core
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.1.2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26.x
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Unit tests
+        run: pnpm test:unit
+
+      - name: SQLite integration tests
+        run: pnpm test:integration
+
+      - name: CLI E2E tests
+        run: pnpm test:e2e
+
+      - name: Full test suite
+        run: pnpm test
