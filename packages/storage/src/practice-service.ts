@@ -1,4 +1,5 @@
 import {
+  abandonSprint as abandonSprintCore,
   buildSprintConfig,
   serializeSprintView,
   startSprint,
@@ -148,6 +149,18 @@ export class PracticeService {
       response.attempt = attemptToReturn;
     }
     return response;
+  }
+
+  abandonSprint(now = new Date().toISOString()): SprintState {
+    if (!this.activeSprint) {
+      throw new Error("No active sprint");
+    }
+    const completed = abandonSprintCore(this.activeSprint, now);
+    this.store.transaction(() => {
+      this.persistCompletedSprint(completed);
+    });
+    this.activeSprint = undefined;
+    return completed;
   }
 
   getState(): unknown {

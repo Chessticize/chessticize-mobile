@@ -75,7 +75,15 @@ test("Arrow Duel exposes two candidates and marks review arrows after a wrong ch
 test("Arrow Duel rejects moves outside the displayed candidates", () => {
   const state = beginArrowDuelPuzzle(samplePuzzle("00008"));
 
-  assert.throws(() => submitArrowDuelChoice(state, "a1a8"), /not an Arrow Duel candidate/);
+  const result = submitArrowDuelChoice(state, "a1a8");
+  assert.equal(result.feedback.result, "wrong");
+  assert.equal(result.feedback.puzzleSolved, false);
+  assert.equal(result.feedback.expectedMove, state.correctMove);
+  assert.deepEqual(result.state.selectedMove, "a1a8");
+  assert.deepEqual(result.feedback.review?.arrows, [
+    { move: "b2b1", role: "correct", color: "green", selected: false },
+    { move: "f2g3", role: "wrong", color: "red", selected: false }
+  ]);
 });
 
 function samplePuzzle(id: string): Puzzle {

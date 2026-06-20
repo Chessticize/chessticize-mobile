@@ -2,7 +2,7 @@
 
 Chessticize Mobile is the planned offline-first, open-source mobile app for Puzzle Sprint and Arrow Duel.
 
-The current repository starts with product and engineering planning only. The app implementation will be added after the architecture spike validates the React Native chessboard, local SQLite storage, embedded Stockfish, and iOS GUI test path.
+The current repository includes the offline backend core, CLI test harness, and a React Native mobile practice screen for local Standard Sprint and Arrow Duel iteration.
 
 ## Documents
 
@@ -13,11 +13,38 @@ The current repository starts with product and engineering planning only. The ap
 
 ## Current Implementation
 
-The repository now includes the first GUI-independent backend core and a plain stdio CLI:
+The repository now includes the GUI-independent backend core, a plain stdio CLI, and the first React Native practice UI:
 
 - `packages/core` contains sprint, puzzle, Arrow Duel, ELO, and review scheduling rules.
 - `packages/storage` contains real SQLite migrations and repositories for puzzles, attempts, sprint sessions, ratings, history filters, and review queues.
-- `apps/cli` exposes the core through a machine-readable JSONL protocol for early E2E testing before the React Native UI exists.
+- `apps/cli` exposes the core through a machine-readable JSONL protocol for E2E testing without a mobile simulator.
+- `apps/mobile` contains the React Native app shell and Practice screen that reuses `react-native-chessboard`.
+
+## Local Mobile Preview
+
+For normal UI work, do not use the iOS simulator as the default validation loop. Run component tests and type checks first:
+
+```sh
+pnpm mobile:test
+pnpm mobile:typecheck
+```
+
+To try the current app locally on iOS after Xcode and an iOS simulator runtime are installed:
+
+```sh
+cd /Users/shuz/Projects/Chessticize/chessticize-mobile
+pnpm install
+pnpm --filter ChessticizeMobile start -- --host 127.0.0.1 --port 8081
+```
+
+In a second terminal, replace the simulator name with one installed on your machine:
+
+```sh
+cd /Users/shuz/Projects/Chessticize/chessticize-mobile
+pnpm --filter ChessticizeMobile ios --terminal dumb --no-packager --simulator "iPhone 15"
+```
+
+Use the simulator only for native behavior or final GUI checks: real gesture rendering, safe areas, Skia/chessboard rendering, animation, native module behavior, iOS build issues, Detox, or critical end-to-end acceptance.
 
 ## Product Direction
 
