@@ -7,6 +7,7 @@ The current repository starts with product and engineering planning only. The ap
 ## Documents
 
 - [Phased Execution Plan](docs/PHASED_EXECUTION_PLAN.md)
+- [Mobile UI Design](docs/ui-design/MOBILE_UI_DESIGN.md)
 - [Agent Instructions](AGENTS.md)
 
 ## Product Direction

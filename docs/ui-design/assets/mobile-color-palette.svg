@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="520" viewBox="0 0 920 520" role="img" aria-labelledby="title desc">
+  <title id="title">Chessticize Mobile Color Palette</title>
+  <desc id="desc">Clean neutral mobile color palette for Chessticize Mobile.</desc>
+  <rect width="920" height="520" fill="#F8FAFC"/>
+  <text x="48" y="60" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="700" fill="#111827">Clean Mobile Palette</text>
+  <text x="48" y="94" font-family="Inter, Arial, sans-serif" font-size="15" fill="#64748B">Neutral UI, cool board tones, restrained state colors.</text>
+
+  <g transform="translate(48,130)">
+    <rect width="180" height="120" rx="8" fill="#FFFFFF" stroke="#E2E8F0"/>
+    <text x="20" y="42" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="700" fill="#111827">Surface</text>
+    <text x="20" y="70" font-family="Inter, Arial, sans-serif" font-size="14" fill="#64748B">#FFFFFF</text>
+  </g>
+  <g transform="translate(252,130)">
+    <rect width="180" height="120" rx="8" fill="#111827"/>
+    <text x="20" y="42" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="700" fill="#FFFFFF">Primary Text</text>
+    <text x="20" y="70" font-family="Inter, Arial, sans-serif" font-size="14" fill="#CBD5E1">#111827</text>
+  </g>
+  <g transform="translate(456,130)">
+    <rect width="180" height="120" rx="8" fill="#2563EB"/>
+    <text x="20" y="42" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="700" fill="#FFFFFF">Accent</text>
+    <text x="20" y="70" font-family="Inter, Arial, sans-serif" font-size="14" fill="#DBEAFE">#2563EB</text>
+  </g>
+  <g transform="translate(660,130)">
+    <rect width="180" height="120" rx="8" fill="#E2E8F0"/>
+    <text x="20" y="42" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="700" fill="#111827">Border</text>
+    <text x="20" y="70" font-family="Inter, Arial, sans-serif" font-size="14" fill="#475569">#E2E8F0</text>
+  </g>
+
+  <g transform="translate(48,286)">
+    <rect width="88" height="88" fill="#E6E8EB"/>
+    <rect x="88" width="88" height="88" fill="#7B8794"/>
+    <rect y="88" width="88" height="88" fill="#7B8794"/>
+    <rect x="88" y="88" width="88" height="88" fill="#E6E8EB"/>
+    <text x="210" y="48" font-family="Inter, Arial, sans-serif" font-size="17" font-weight="700" fill="#111827">Board</text>
+    <text x="210" y="76" font-family="Inter, Arial, sans-serif" font-size="14" fill="#64748B">Light #E6E8EB</text>
+    <text x="210" y="100" font-family="Inter, Arial, sans-serif" font-size="14" fill="#64748B">Dark #7B8794</text>
+    <text x="210" y="124" font-family="Inter, Arial, sans-serif" font-size="14" fill="#64748B">Avoid tan/brown dominance.</text>
+  </g>
+
+  <g transform="translate(456,286)">
+    <rect width="120" height="64" rx="8" fill="#16A34A"/>
+    <text x="20" y="40" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="700" fill="#FFFFFF">Correct</text>
+    <rect x="140" width="120" height="64" rx="8" fill="#DC2626"/>
+    <text x="160" y="40" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="700" fill="#FFFFFF">Wrong</text>
+    <rect y="88" width="120" height="64" rx="8" fill="#D97706"/>
+    <text x="20" y="128" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="700" fill="#FFFFFF">Warning</text>
+    <rect x="140" y="88" width="120" height="64" rx="8" fill="#FACC15"/>
+    <text x="160" y="128" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="700" fill="#111827">Highlight</text>
+  </g>
+</svg>

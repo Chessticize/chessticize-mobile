@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="760" viewBox="0 0 900 760" role="img" aria-labelledby="title desc">
+  <title id="title">Mobile Arrow Duel Review Wireframe</title>
+  <desc id="desc">Wireframe for Arrow Duel review with colored arrows and punishment line playback.</desc>
+  <rect width="900" height="760" fill="#F8FAFC"/>
+  <text x="48" y="54" font-family="Inter, Arial, sans-serif" font-size="26" font-weight="700" fill="#111827">Arrow Duel Review</text>
+  <text x="48" y="84" font-family="Inter, Arial, sans-serif" font-size="14" fill="#64748B">Both candidate arrows stay visible after review, with clear color semantics.</text>
+
+  <g transform="translate(278,110)">
+    <rect width="344" height="610" rx="32" fill="#111827"/>
+    <rect x="14" y="14" width="316" height="582" rx="24" fill="#F8FAFC"/>
+
+    <g transform="translate(32,50)">
+      <text x="0" y="18" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="700" fill="#111827">Why the move failed</text>
+      <text x="0" y="42" font-family="Inter, Arial, sans-serif" font-size="12" fill="#64748B">Your choice: Rxd8</text>
+    </g>
+
+    <g transform="translate(32,116)">
+      <rect width="280" height="280" rx="8" fill="#7B8794"/>
+      <g>
+        <rect width="70" height="70" fill="#E6E8EB"/>
+        <rect x="140" width="70" height="70" fill="#E6E8EB"/>
+        <rect x="70" y="70" width="70" height="70" fill="#E6E8EB"/>
+        <rect x="210" y="70" width="70" height="70" fill="#E6E8EB"/>
+        <rect y="140" width="70" height="70" fill="#E6E8EB"/>
+        <rect x="140" y="140" width="70" height="70" fill="#E6E8EB"/>
+        <rect x="70" y="210" width="70" height="70" fill="#E6E8EB"/>
+        <rect x="210" y="210" width="70" height="70" fill="#E6E8EB"/>
+      </g>
+      <line x1="70" y1="70" x2="210" y2="70" stroke="#16A34A" stroke-width="12" stroke-linecap="round"/>
+      <polygon points="210,70 190,58 190,82" fill="#16A34A"/>
+      <line x1="70" y1="210" x2="210" y2="140" stroke="#DC2626" stroke-width="12" stroke-linecap="round"/>
+      <polygon points="210,140 187,136 198,158" fill="#DC2626"/>
+    </g>
+
+    <g transform="translate(32,418)">
+      <rect width="132" height="48" rx="12" fill="#ECFDF5" stroke="#16A34A"/>
+      <text x="16" y="30" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="700" fill="#166534">Best move</text>
+      <rect x="148" width="132" height="48" rx="12" fill="#FEF2F2" stroke="#DC2626"/>
+      <text x="164" y="30" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="700" fill="#991B1B">Blunder</text>
+    </g>
+
+    <g transform="translate(32,492)">
+      <rect width="280" height="54" rx="14" fill="#2563EB"/>
+      <text x="88" y="34" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="700" fill="#FFFFFF">Play opponent line</text>
+    </g>
+  </g>
+
+  <g transform="translate(48,190)">
+    <text x="0" y="0" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="700" fill="#111827">Design notes</text>
+    <text x="0" y="30" font-family="Inter, Arial, sans-serif" font-size="13" fill="#64748B">1. Green always means best defense.</text>
+    <text x="0" y="56" font-family="Inter, Arial, sans-serif" font-size="13" fill="#64748B">2. Red always means inferior candidate.</text>
+    <text x="0" y="82" font-family="Inter, Arial, sans-serif" font-size="13" fill="#64748B">3. Wrong choice triggers automatic playback.</text>
+  </g>
+</svg>
