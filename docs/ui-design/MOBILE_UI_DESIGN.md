@@ -29,7 +29,7 @@ The current web app was reviewed in Chrome on `chessticize.com`, focused on Puzz
 
 ## Complete App Design Board
 
-The design board below is an imagegen-rendered high-fidelity concept for reviewing the overall product shape. It is useful for visual direction, but the written specifications in this document are authoritative for exact copy, scoring behavior, licensing text, and implementation details.
+The design board below is an imagegen-rendered high-fidelity concept for reviewing the overall product shape. It is useful for visual direction, but the written specifications in this document are authoritative for exact copy, scoring behavior, chart placement, licensing text, and implementation details.
 
 ![Complete mobile design board](assets/mobile-full-design-board.png)
 
@@ -53,10 +53,10 @@ Screen inventory:
 | Practice Home | Mode list, progress summary, due review strip, bottom tabs | Start Standard, Arrow Duel, Blitz, Custom; resume interrupted session | Active Sprint, Custom Sprint, Review Queue |
 | Regular Sprint Active | Focused session shell, status bar, board, prompt | Make board move, abandon, complete/fail sprint | Sprint Results |
 | Arrow Duel Active | Focused shell, status bar, board, neutral candidate arrows, A/B chips | Choose candidate, abandon, complete/fail sprint | Sprint Results, Arrow Duel Review |
-| Sprint Results | Solved count, accuracy, rating change, mistakes, actions | Review mistakes, play again, done | Review Item, Practice Home |
+| Sprint Results | Win/loss status, solved count, rating change, mistakes, actions | Review mistakes, play again, done | Review Item, Practice Home |
 | Review Queue | Due/overdue summary, difficulty groups, start button | Start due review, filter queue | Review Item |
 | Arrow Duel Review | Board, green/red arrows, choice marker, playback controls | Play line, step line, finish review | Review Complete, History |
-| History | Filter chips, attempt rows, result/rating/review state | Filter Wrong 7d, open attempt | Attempt Detail, Review Item |
+| History | Performance chart, range/type filters, attempt rows, result/rating/review state | Filter Wrong 7d, inspect sprint type/speed, open attempt | Attempt Detail, Review Item |
 | Custom Sprint Setup | Mode/theme/timing controls, estimate, rating range, start | Start sprint, save template | Active Sprint |
 | Settings | Sync, reset, export, local data, about | Toggle iCloud, reset ELO, export/delete | Confirm Sheet, Sync Disclosure |
 | Puzzle Packs | Installed/optional packs, metadata, source/license notes | Import, enable, remove, inspect license | Pack Detail |
@@ -89,8 +89,8 @@ Primary flows:
 
 | Flow | Steps | Notes |
 | --- | --- | --- |
-| Standard or Blitz practice | Practice Home -> Regular Sprint Active -> Sprint Results -> Practice Home | Board moves submit answers directly. |
-| Arrow Duel practice | Practice Home -> Arrow Duel Active -> Sprint Results -> Arrow Duel Review | Candidate arrows are neutral until selection. |
+| Standard or Blitz practice | Practice Home -> Regular Sprint Active -> Sprint Results -> Practice Home | Board moves submit answers directly. Win by solving the target count before time/mistake failure. |
+| Arrow Duel practice | Practice Home -> Arrow Duel Active -> Sprint Results -> Arrow Duel Review | Candidate arrows are neutral until selection. Win by solving the target count before time/mistake failure. |
 | Custom sprint | Practice Home -> Custom Sprint Setup -> Regular Sprint Active or Arrow Duel Active -> Sprint Results | The selected mode determines the active session shell. |
 | Due mistake review | Review Queue -> Review Item -> Review Complete -> Review Queue | Correct answers increase interval; failures shorten it. |
 | Recent wrong review | History -> Wrong 7d filter -> Attempt Detail -> Review Item | History preserves original attempt context. |
@@ -161,6 +161,7 @@ Core components:
 - `ModePicker`: compact list or segmented choice for Standard, Arrow Duel, Blitz, Custom.
 - `ReviewQueueHeader`: due count, overdue count, and next review estimate.
 - `HistoryFilterBar`: date/result/mode/theme chips with a persistent "Wrong in the last 7 days" shortcut.
+- `PerformanceChart`: rating, wins/losses, accuracy, mistake rate, and solved count over a selected time range.
 - `SettingsRow`: label, value, status, and disclosure or switch.
 - `PackCoverageCard`: pack name, installed state, puzzle count, rating range, theme coverage, Arrow Duel count, and attribution status.
 - `DestructiveActionSheet`: reset/delete confirmation with explicit copy.
@@ -188,6 +189,18 @@ Practice session states:
 - Sprint complete: summary sheet with rating change, accuracy, time, mistakes, and review queue impact.
 - Sprint failed: summary sheet with failure reason and a retry action.
 - Paused/backgrounded: timer paused only according to domain rules; UI must show paused state explicitly.
+
+Sprint scoring rules:
+
+- Standard Sprint default: 5 minutes, 20 seconds per puzzle, target 15 correct puzzles.
+- Blitz Sprint default: 5 minutes, 10 seconds per puzzle, target 30 correct puzzles.
+- Arrow Duel default: 5 minutes, 30 seconds per puzzle, target 10 correct puzzles.
+- Custom Sprint target count is `floor(durationSeconds / perPuzzleSeconds)`.
+- A sprint is won only when the target correct count is reached before time expires and before mistake failure.
+- A sprint is failed when time expires, the user abandons, or the user reaches 3 mistakes.
+- Winning a sprint increases that sprint ELO type.
+- Failing a sprint lowers that sprint ELO type.
+- Each sprint mode and custom speed has its own ELO/statistics bucket.
 
 Practice controls:
 
@@ -274,11 +287,22 @@ Custom sprint behavior:
 
 ### History
 
-- Quick filters include "Wrong in the last 7 days", mode, theme, rating range, and sprint config.
+- Quick range filters include 7 days, 30 days, 1 year, and all time.
+- Quick content filters include "Wrong in the last 7 days", mode, theme, rating range, sprint config, sprint speed, and Arrow Duel only.
 - Each row should show result, mode, puzzle rating, elapsed time, date, and review status.
 - Tapping a row opens review with original attempt context.
 - History filters should be horizontally scrollable chips on phones.
 - Failed attempts should clearly show whether they are already in the review queue.
+- Performance chart belongs in History, not primarily in Sprint Results.
+- Performance chart can switch between rating trend, wins/losses, accuracy, solved count, mistake rate, and review due volume.
+- Statistics are grouped separately for Standard, Blitz, Arrow Duel, theme sprint, and custom sprint speeds.
+- Mistake statistics are also grouped separately by sprint type, speed, theme, and review state.
+
+### Sprint Results
+
+- Results should stay action-oriented and compact.
+- Show win/loss, reason, solved count, mistakes, time, rating before/after, rating delta, review queue impact, Play Again, and Review Mistakes.
+- Do not make the rating performance chart the main result view; link to History for deeper trend analysis.
 
 ### Settings
 

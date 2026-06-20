@@ -103,6 +103,8 @@ The user database stores:
 
 - Keep separate ELO records per ELO type, for example `mixed 5/20`, `mixed 5/10`, `arrowduel 5/30`, and custom `{theme} {duration}/{perPuzzle}`.
 - Default rating is 600, rating deviation is 350, volatility is 0.06, and rating floor is 600.
+- Standard, Blitz, Arrow Duel, theme sprint, and each custom sprint speed keep separate statistics and rating buckets.
+- A sprint win increases the relevant ELO type; a failure by time, abandon, or three mistakes lowers it.
 - Reset ELO starts a new generation by default and preserves historical attempts. Deleting history is a separate destructive action.
 
 ### Spaced Repetition Review
@@ -186,6 +188,7 @@ The UI should be quiet, clean, and practice-focused.
 - Practice screen contains mode selector, current ELO, timer, mistake count, board, and primary action area.
 - Review screen starts with due mistakes and supports filters.
 - History supports quick filters including "Wrong in the last 7 days".
+- History owns performance charts and analytics with quick ranges for 7 days, 30 days, 1 year, and all time, segmented by sprint type, sprint speed, theme, result, and mistake/review status.
 - Packs includes bundled/imported puzzle packs, pack coverage, imports/removals, source attribution, and license notes.
 - Settings includes ELO reset, history delete, iCloud sync toggle, export/delete data, and about/version information.
 
