@@ -5,12 +5,24 @@ All repository documentation must be written in English. User-facing GUI copy mu
 ## Testing Philosophy
 
 - Business logic must be thoroughly tested before code is described as complete.
+- Business logic must live outside React components and React Native screens.
 - Prefer real implementations for internal dependencies whenever practical.
 - Avoid mocks and ad hoc stubs for internal code.
 - Use mocks only at boundaries the project does not control, such as CloudKit, App Store services, network failures, third-party APIs, or explicit latency/failure simulation.
 - When tests need isolation or deterministic setup, create maintained fakes behind the same public interface. A fake must be a drop-in implementation and should share behavior tests with the real implementation when possible.
 - Before changing test infrastructure, storage behavior, sync behavior, or repository fakes, look for and follow local testing guidelines and shared behavior tests.
 - End-to-end tests must start the real app on a simulator/emulator/device and interact through public UI. Do not call stores, repositories, handlers, or test-only helpers directly from E2E tests.
+
+## Architecture Boundary
+
+- The app must be split into a frontend UI shell and a local backend/domain core.
+- Frontend code owns rendering, navigation, accessibility, animations, and user input wiring.
+- Backend/domain code owns ELO, sprint rules, puzzle selection, Arrow Duel validation, spaced repetition, history filtering, sync merge, pack validation, and analysis orchestration.
+- React components may dispatch intents and render state, but must not make domain decisions directly.
+- The backend/domain core must not import React, React Native, navigation libraries, gesture libraries, or visual components.
+- The backend/domain core must expose typed public interfaces that can run in Node-based tests without a simulator.
+- Native services such as SQLite, Stockfish, and CloudKit must sit behind interfaces. Use real adapters in integration tests where practical and maintained fakes for deterministic failure or conflict scenarios.
+- Any new feature that adds business behavior must add backend/domain tests first or in the same commit as the behavior.
 
 ## Required Test Layers
 

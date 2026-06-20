@@ -8,13 +8,35 @@ The implementation choice is Bare React Native with TypeScript. This keeps the a
 
 The app must not maintain a custom chessboard widget. It will use an existing React Native chessboard library through a small adapter and an Arrow Duel overlay layer.
 
+The app must have a clear frontend/backend split inside the mobile codebase. The frontend is the React Native UI shell. The backend is the local domain and application core that owns rules, state transitions, persistence orchestration, sync merge, and analysis orchestration.
+
 ## 2. Key Architecture Decisions
 
 ### Platform
 
 - Use Bare React Native, not managed Expo, because the app needs native Stockfish, SQLite asset handling, CloudKit, and deeper build control.
 - Implement iOS first. Android remains part of the architecture, but Android release is a later phase.
-- Keep pure business logic in TypeScript modules independent from React components.
+- Keep all business logic in TypeScript backend/domain modules independent from React components and React Native APIs.
+
+### Frontend And Local Backend Split
+
+The repository must separate UI code from reusable local backend logic.
+
+Proposed structure:
+
+- `apps/mobile`: React Native app shell, screens, navigation, accessibility labels, visual state, and platform wiring.
+- `packages/core`: pure TypeScript domain core for ELO, sprint state machines, Arrow Duel rules, spaced repetition, history filtering, puzzle selection policies, sync merge rules, and deterministic clocks/randomness abstractions.
+- `packages/storage`: SQLite repositories, migrations, fixture database helpers, and repository contract tests.
+- `packages/engine`: Stockfish service interface, native bridge adapter, analysis orchestration, and engine contract tests.
+- `packages/sync`: sync event model, CloudKit adapter, fake sync transport, merge/rebuild logic, and sync contract tests.
+- `tools/puzzle-pack-builder`: presolved CSV to SQLite pack builder, manifest generation, validation, and pack-size reports.
+
+Dependency direction:
+
+- `apps/mobile` may depend on `packages/core`, `packages/storage`, `packages/engine`, and `packages/sync`.
+- `packages/core` must not depend on React, React Native, SQLite bindings, CloudKit, Stockfish native modules, navigation, gestures, or UI libraries.
+- React components may dispatch typed intents and render view models. They must not calculate ELO, decide sprint outcomes, schedule reviews, choose puzzles, merge sync events, or validate Arrow Duel answers.
+- Backend/domain behavior must be testable in Node without an iOS simulator or Android emulator.
 
 ### Chessboard
 
@@ -180,6 +202,9 @@ Use Jest or Vitest for pure TypeScript modules:
 - Puzzle pack filtering.
 - Spaced repetition scheduling.
 - Sync merge/rebuild rules.
+- View-model generation for frontend screens when it contains presentation-independent state mapping.
+
+Unit tests must primarily target `packages/core` and other backend/domain packages. UI-only state should stay thin enough that component and E2E tests can cover it.
 
 ### Integration Tests
 
@@ -254,6 +279,8 @@ Exit criteria:
 Deliverables:
 
 - Bare React Native app skeleton.
+- Initial workspace/package layout with `apps/mobile`, `packages/core`, `packages/storage`, `packages/engine`, `packages/sync`, and `tools/puzzle-pack-builder`.
+- First backend/domain APIs for sprint state, ELO type parsing, and Arrow Duel candidate validation with Node-based unit tests.
 - `react-native-chessboard` integration on iOS simulator.
 - Arrow Duel two-arrow overlay proof of concept.
 - SQLite fixture pack loaded from app bundle.
@@ -264,6 +291,7 @@ Exit criteria:
 
 - Reused chessboard is acceptable for orientation, drag/tap, highlights, and overlay alignment.
 - No custom board widget is introduced.
+- Frontend screens consume backend/domain public APIs instead of embedding business rules.
 - Stockfish can analyze a fixed FEN locally.
 - Fixture SQLite can be read offline.
 - E2E harness works on iOS simulator.
@@ -278,10 +306,12 @@ Deliverables:
 - Custom sprint configs.
 - History with filters.
 - Clean practice-focused UI.
+- Backend/domain implementation for all MVP rules with high-coverage unit tests and SQLite integration tests.
 
 Exit criteria:
 
 - App can be installed, opened in airplane mode, and used for complete Sprint and Arrow Duel sessions.
+- Core practice behavior can be tested without launching the mobile UI.
 - Focused unit, integration, component, and initial Detox tests pass.
 
 ### Phase 3: Review And Analysis

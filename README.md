@@ -15,6 +15,7 @@ The current repository starts with product and engineering planning only. The ap
 - Puzzle Sprint, Arrow Duel, mistake review, spaced repetition, local ELO, history filters, and optional iCloud sync.
 - Reuse an existing chessboard component instead of maintaining a custom board widget.
 - Embed Stockfish for offline analysis under GPL-compatible licensing.
+- Keep frontend UI code separate from a solid local backend/domain core so business logic is reusable and heavily automated-testable.
 
 ## License
 
