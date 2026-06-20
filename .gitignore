@@ -17,6 +17,7 @@ android/build/
 coverage/
 dist/
 build/
+apps/mobile/artifacts/
 scratch/
 
 # Tooling

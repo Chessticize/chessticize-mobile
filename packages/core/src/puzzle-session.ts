@@ -104,12 +104,29 @@ export function submitArrowDuelChoice(state: ArrowDuelState, move: string): {
   if (state.solved) {
     throw new Error("Puzzle is already solved");
   }
-  if (!state.candidates.some((candidate) => normalizeMove(candidate) === normalizeMove(move))) {
-    throw new Error(`Move ${move} is not an Arrow Duel candidate`);
+  const isCorrect = normalizeMove(move) === normalizeMove(state.correctMove);
+  const isCandidate = state.candidates.some((candidate) => normalizeMove(candidate) === normalizeMove(move));
+  const review = buildArrowDuelReview(state, move);
+
+  if (!isCandidate) {
+    return {
+      state: {
+        ...state,
+        selectedMove: move,
+        solved: false
+      },
+      feedback: {
+        result: "wrong",
+        puzzleSolved: false,
+        submittedMove: move,
+        expectedMove: state.correctMove,
+        autoPlayedMoves: [],
+        currentFen: state.currentFen,
+        review
+      }
+    };
   }
 
-  const isCorrect = normalizeMove(move) === normalizeMove(state.correctMove);
-  const review = buildArrowDuelReview(state, move);
   return {
     state: {
       ...state,

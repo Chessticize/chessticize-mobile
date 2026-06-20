@@ -2,6 +2,8 @@
 
 All repository documentation must be written in English. User-facing GUI copy must be planned and reviewed in English unless a localization task explicitly adds another locale.
 
+For development-loop decisions, use the repo-local skill at `.codex/skills/chessticize-mobile-dev-loop/SKILL.md`. It defines the preferred order for core/backend tests, CLI E2E checks, mobile component tests, and iOS simulator/Detox screenshot verification.
+
 ## Testing Philosophy
 
 - Business logic must be thoroughly tested before code is described as complete.
