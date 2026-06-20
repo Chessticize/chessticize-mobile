@@ -1,7 +1,13 @@
 module.exports = {
-  testEnvironment: 'node',
-  testRunner: 'jest-circus/runner',
+  rootDir: '..',
+  testMatch: ['<rootDir>/e2e/**/*.e2e.js'],
+  testPathIgnorePatterns: [],
   testTimeout: 120000,
+  maxWorkers: 1,
+  globalSetup: 'detox/runners/jest/globalSetup',
+  globalTeardown: 'detox/runners/jest/globalTeardown',
   reporters: ['detox/runners/jest/reporter'],
-  setupFilesAfterEnv: ['<rootDir>/init.js'],
+  testEnvironment: 'detox/runners/jest/testEnvironment',
+  setupFilesAfterEnv: ['<rootDir>/e2e/init.js'],
+  verbose: true,
 };

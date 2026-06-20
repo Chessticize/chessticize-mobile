@@ -1,0 +1,77 @@
+name: Mobile iOS
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/mobile-ios.yml"
+      - "apps/mobile/**"
+      - "fixtures/**"
+      - "package.json"
+      - "packages/**"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "tsconfig.json"
+
+permissions:
+  contents: read
+
+jobs:
+  detox-ios:
+    name: Build and test iOS POC
+    runs-on: macos-latest
+    timeout-minutes: 60
+    env:
+      DETOX_IOS_DEVICE: iPhone 16
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.1.2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26.x
+          cache: pnpm
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Show Xcode
+        run: xcodebuild -version
+
+      - name: Mobile typecheck
+        run: pnpm mobile:typecheck
+
+      - name: Mobile component tests
+        run: pnpm mobile:test
+
+      - name: Install Detox iOS utilities
+        run: |
+          brew tap wix/brew
+          brew install applesimutils
+
+      - name: Setup system Ruby Bundler
+        run: |
+          /usr/bin/ruby --version
+          /usr/bin/gem install --user-install bundler -v 2.4.22
+          ruby_user_bin="$(/usr/bin/ruby -rrubygems -e 'puts Gem.user_dir + "/bin"')"
+          echo "$ruby_user_bin" >> "$GITHUB_PATH"
+          "$ruby_user_bin/bundle" _2.4.22_ --version
+
+      - name: Install Ruby dependencies
+        working-directory: apps/mobile
+        run: bundle _2.4.22_ install
+
+      - name: iOS environment doctor
+        run: pnpm mobile:doctor:ios
+
+      - name: Build iOS simulator app
+        run: pnpm mobile:e2e:build:ios
+
+      - name: Run Detox iOS E2E
+        run: pnpm mobile:e2e:test:ios
