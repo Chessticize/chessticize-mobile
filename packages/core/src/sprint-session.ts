@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import type {
   AttemptEvent,
   CurrentPuzzleState,
@@ -25,7 +24,7 @@ export function startSprint(input: {
   const startedAt = new Date(input.now);
   const deadlineAt = new Date(startedAt.getTime() + input.config.durationSeconds * 1000).toISOString();
   const state: SprintState = {
-    id: input.id ?? randomUUID(),
+    id: input.id ?? generateId(),
     config: input.config,
     status: "active",
     startedAt: startedAt.toISOString(),
@@ -191,7 +190,7 @@ function buildAttemptEvent(state: SprintState, feedback: PuzzleFeedback, now: st
     throw new Error("Cannot build attempt without current puzzle");
   }
   return {
-    id: randomUUID(),
+    id: generateId(),
     sessionId: state.id,
     puzzleId: state.currentPuzzle.puzzle.id,
     mode: state.config.mode,
@@ -292,4 +291,12 @@ function puzzleDeadlineAt(startedAt: string, config: SprintConfig, sprintDeadlin
   const candidate = new Date(new Date(startedAt).getTime() + config.perPuzzleSeconds * 1000);
   const sprintDeadline = new Date(sprintDeadlineAt);
   return new Date(Math.min(candidate.getTime(), sprintDeadline.getTime())).toISOString();
+}
+
+function generateId(): string {
+  const cryptoLike = (globalThis as unknown as { crypto?: { randomUUID?: () => string } }).crypto;
+  if (cryptoLike?.randomUUID) {
+    return cryptoLike.randomUUID();
+  }
+  return `local-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }

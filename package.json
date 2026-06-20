@@ -9,7 +9,13 @@
     "test:unit": "node --experimental-strip-types --test packages/core/test/*.test.ts",
     "test:integration": "node --experimental-strip-types --test packages/storage/test/*.test.ts",
     "test:e2e": "node --experimental-strip-types --test apps/cli/test/*.test.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "mobile:start": "pnpm --filter ChessticizeMobile start",
+    "mobile:ios": "pnpm --filter ChessticizeMobile ios",
+    "mobile:test": "pnpm --filter ChessticizeMobile test",
+    "mobile:typecheck": "pnpm --filter ChessticizeMobile typecheck",
+    "mobile:e2e:build:ios": "pnpm --filter ChessticizeMobile e2e:build:ios",
+    "mobile:e2e:test:ios": "pnpm --filter ChessticizeMobile e2e:test:ios"
   },
   "dependencies": {
     "chess.js": "^1.4.0"

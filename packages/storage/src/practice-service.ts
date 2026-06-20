@@ -11,8 +11,8 @@ import type {
   SprintMode,
   SprintState
 } from "../../core/src/index.ts";
-import type { HistoryFilter } from "./sqlite-store.ts";
-import { SQLiteStore } from "./sqlite-store.ts";
+import type { HistoryFilter } from "./query-types.ts";
+import type { PracticeStore } from "./practice-store.ts";
 
 export interface StartSprintCommand {
   mode: SprintMode;
@@ -27,9 +27,9 @@ export interface StartSprintCommand {
 
 export class PracticeService {
   private activeSprint: SprintState | undefined;
-  private readonly store: SQLiteStore;
+  private readonly store: PracticeStore;
 
-  constructor(store: SQLiteStore) {
+  constructor(store: PracticeStore) {
     this.store = store;
   }
 

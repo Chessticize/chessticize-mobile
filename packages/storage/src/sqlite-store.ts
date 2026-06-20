@@ -15,34 +15,8 @@ import type {
   SprintMode,
   SprintState
 } from "../../core/src/index.ts";
-
-export interface PuzzleSelectionFilter {
-  mode: SprintMode;
-  limit: number;
-  minRating?: number;
-  maxRating?: number;
-  theme?: string;
-}
-
-export interface HistoryFilter {
-  result?: AttemptResult;
-  mode?: SprintMode;
-  since?: string;
-  puzzleId?: string;
-}
-
-export interface AttemptHistoryRow {
-  id: string;
-  sessionId: string;
-  puzzleId: string;
-  mode: SprintMode;
-  result: AttemptResult;
-  submittedMove: string;
-  expectedMove: string;
-  completedAt: string;
-  ratingBefore: number;
-  ratingAfter?: number;
-}
+import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./query-types.ts";
+import type { PracticeStore } from "./practice-store.ts";
 
 interface AttemptHistoryDbRow extends Omit<AttemptHistoryRow, "ratingAfter"> {
   ratingAfter: number | null;
@@ -83,7 +57,7 @@ interface ReviewRow {
   last_reviewed_at: string;
 }
 
-export class SQLiteStore {
+export class SQLiteStore implements PracticeStore {
   readonly db: DatabaseSync;
 
   constructor(path = ":memory:") {
