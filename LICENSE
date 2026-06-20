@@ -1,0 +1,5 @@
+SPDX-License-Identifier: GPL-3.0-or-later
+
+This project is intended to be licensed under the GNU General Public License v3.0 or later.
+
+The complete GPL license text and third-party notices must be included before the first source or binary release. This is a release gate because the planned app embeds Stockfish.

@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# React Native / native build outputs
+ios/Pods/
+ios/build/
+android/.gradle/
+android/app/build/
+android/build/
+
+# Local artifacts
+.DS_Store
+*.log
+*.sqlite-shm
+*.sqlite-wal
+coverage/
+dist/
+build/
+
+# Tooling
+.env
+.env.*
+!.env.example
