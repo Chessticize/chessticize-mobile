@@ -36,43 +36,47 @@ describe("PracticePocScreen", () => {
     const renderer = renderScreen();
 
     press(renderer, "start-sprint-button");
-    expectText(renderer, "000hf · 1485");
     expect(findByTestId(renderer, "session-board")).toBeTruthy();
     expect(findByTestId(renderer, "session-timer")).toBeTruthy();
     expect(findByTestId(renderer, "session-progress")).toBeTruthy();
-    expect(findByTestId(renderer, "session-mistakes")).toBeTruthy();
+    expect(findByTestId(renderer, "session-strikes")).toBeTruthy();
+    expect(collectText(renderer.root)).not.toContain("Expected move");
+    expect(collectText(renderer.root)).not.toContain("000hf · 1485");
 
     boardMove(renderer, "e2e6");
-    expectText(renderer, "correct · expected e2e6");
+    expectText(renderer, "Correct");
+    expect(countStyleValue(renderer.root, "rgba(245, 158, 11, 0.28)")).toBeGreaterThanOrEqual(2);
 
     boardMove(renderer, "e6f7");
 
     press(renderer, "session-abandon");
     press(renderer, "history-tab");
-    expectText(renderer, "000hf · standard · correct · e6f7");
+    expectText(renderer, "Standard · correct · e6f7");
+    expect(collectText(renderer.root)).not.toContain("000hf · standard");
   });
 
-  it("uses neutral Arrow Duel candidates and shows colored review after selection", () => {
+  it("uses neutral Arrow Duel board markers without candidate chips", () => {
     const renderer = renderScreen();
 
     press(renderer, "practice-mode-arrow-duel");
     press(renderer, "start-sprint-button");
 
-    expect(findByTestId(renderer, "arrow-duel-candidate-a")).toBeTruthy();
-    expect(findByTestId(renderer, "arrow-duel-candidate-b")).toBeTruthy();
+    expect(findByTestId(renderer, "mock-chessboard").props.flipped).toBe(true);
+    expect(collectText(renderer.root)).not.toContain("Choose one candidate move");
     expect(hasStyleValue(renderer.root, "#475569")).toBe(true);
     expect(hasStyleValue(renderer.root, "#DC2626")).toBe(false);
+  });
 
-    boardMove(renderer, "e8f7");
+  it("advances Arrow Duel after a correct board move", () => {
+    const renderer = renderScreen();
 
-    expectText(renderer, "correct · d8a5");
-    expectText(renderer, "wrong · e8f7 (selected)");
-    expect(hasStyleValue(renderer.root, "#16A34A")).toBe(true);
-    expect(hasStyleValue(renderer.root, "#DC2626")).toBe(true);
+    press(renderer, "practice-mode-arrow-duel");
+    press(renderer, "start-sprint-button");
 
-    press(renderer, "session-abandon");
-    press(renderer, "history-tab");
-    expectText(renderer, "000hf · arrow_duel · wrong · e8f7");
+    boardMove(renderer, "d8a5");
+
+    expectText(renderer, "1 / 10");
+    expectText(renderer, "Correct");
   });
 
   it("records non-candidate Arrow Duel board moves as wrong", () => {
@@ -82,12 +86,13 @@ describe("PracticePocScreen", () => {
     press(renderer, "start-sprint-button");
 
     boardMove(renderer, "a1a8");
-    expectText(renderer, "wrong · expected d8a5");
-    expectText(renderer, "Mistakes 1 / 3");
+    expectText(renderer, "Incorrect");
+    expect(collectText(renderer.root)).not.toContain("expected d8a5");
+    expect(findByTestId(renderer, "session-strikes")).toBeTruthy();
 
     press(renderer, "session-abandon");
     press(renderer, "history-tab");
-    expectText(renderer, "000hf · arrow_duel · wrong · a1a8");
+    expectText(renderer, "Arrow Duel · wrong · a1a8");
   });
 
   it("starts a custom sprint with the selected time control", () => {
@@ -105,9 +110,8 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "start-sprint-button");
 
-    expectText(renderer, "Mode · custom");
-    expectText(renderer, "Target 6");
-    expectText(renderer, "Progress 0 / 6");
+    expectText(renderer, "Custom");
+    expectText(renderer, "0 / 6");
   });
 
   it("settles an active sprint when the countdown expires", () => {
@@ -119,7 +123,7 @@ describe("PracticePocScreen", () => {
     });
 
     expectText(renderer, "Sprint failed");
-    expectText(renderer, "Result: time_expired");
+    expectText(renderer, "Result: Time expired");
   });
 
   it("filters history to wrong attempts from the recent window", () => {
@@ -133,13 +137,26 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "history-tab");
     expectText(renderer, "Accuracy 50% · Correct 1 · Wrong 1");
-    expectText(renderer, "000hf · standard · correct · e6f7");
-    expectText(renderer, "000hf~demo-01 · standard · wrong · a1a8");
+    expectText(renderer, "Standard · correct · e6f7");
+    expectText(renderer, "Standard · wrong · a1a8");
 
     press(renderer, "history-filter-wrong-7-days");
     expectText(renderer, "Accuracy 0% · Correct 0 · Wrong 1");
-    expectText(renderer, "000hf~demo-01 · standard · wrong · a1a8");
-    expect(collectText(renderer.root)).not.toContain("000hf · standard · correct · e6f7");
+    expectText(renderer, "Standard · wrong · a1a8");
+    expect(collectText(renderer.root)).not.toContain("Standard · correct · e6f7");
+  });
+
+  it("shows a review button after a failed sprint with mistakes", () => {
+    const renderer = renderScreen();
+
+    press(renderer, "start-sprint-button");
+    boardMove(renderer, "a1a8");
+    boardMove(renderer, "a1a8");
+    boardMove(renderer, "a1a8");
+
+    expectText(renderer, "Sprint failed");
+    expectText(renderer, "Result: Three strikes");
+    expect(findByTestId(renderer, "review-mistakes-button")).toBeTruthy();
   });
 
   it("keeps settings and packs screens locally reachable without a simulator", () => {
@@ -217,6 +234,14 @@ function hasStyleValue(node: TestRenderer.ReactTestInstance, value: string): boo
   return node.children
     .filter((child): child is TestRenderer.ReactTestInstance => typeof child !== "string")
     .some((child) => hasStyleValue(child, value));
+}
+
+function countStyleValue(node: TestRenderer.ReactTestInstance, value: string): number {
+  const style = node.props?.style;
+  const own = styleContains(style, value) ? 1 : 0;
+  return own + node.children
+    .filter((child): child is TestRenderer.ReactTestInstance => typeof child !== "string")
+    .reduce((sum, child) => sum + countStyleValue(child, value), 0);
 }
 
 function styleContains(style: unknown, value: string): boolean {

@@ -14,8 +14,7 @@ import Chessboard, { type ChessboardRef } from "react-native-chessboard";
 import {
   buildSprintConfig,
   currentExpectedMove,
-  defaultSprintConfig,
-  serializeSprintView
+  defaultSprintConfig
 } from "../../../../packages/core/src/index.ts";
 import type {
   AttemptEvent,
@@ -27,6 +26,7 @@ import type {
 } from "../../../../packages/core/src/index.ts";
 import type { PracticeService } from "../../../../packages/storage/src/practice-service.ts";
 import { createMobilePracticeService, seededPuzzleCount } from "../backend/mobilePractice.ts";
+import type { PieceSymbol, Square } from "chess.js";
 
 interface Props {
   practiceService?: PracticeService;
@@ -41,6 +41,12 @@ type ArrowDuelReviewArrow = {
   role: "correct" | "wrong";
   selected: boolean;
   color: "green" | "red";
+};
+
+type BoardMove = {
+  from: string;
+  to: string;
+  promotion?: string;
 };
 
 const UI_PADDING = 16;
@@ -62,6 +68,10 @@ export function PracticePocScreen({ practiceService }: Props): React.JSX.Element
   const [reviews, setReviews] = useState<Record<string, unknown>[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [currentRating, setCurrentRating] = useState(600);
+  const [boardFen, setBoardFen] = useState<string | null>(null);
+  const [lastBoardMove, setLastBoardMove] = useState<BoardMove | null>(null);
+  const [feedbackPuzzleId, setFeedbackPuzzleId] = useState<string | null>(null);
   const [historyWrongLast7Days, setHistoryWrongLast7Days] = useState(false);
   const [customDurationSeconds, setCustomDurationSeconds] = useState(5 * 60);
   const [customPerPuzzleSeconds, setCustomPerPuzzleSeconds] = useState(20);
@@ -77,6 +87,10 @@ export function PracticePocScreen({ practiceService }: Props): React.JSX.Element
     () => sprintConfigFor(mode, customDurationSeconds, customPerPuzzleSeconds),
     [customDurationSeconds, customPerPuzzleSeconds, mode]
   );
+
+  useEffect(() => {
+    setCurrentRating(readRating(service, selectedConfig.ratingKey));
+  }, [selectedConfig.ratingKey, service]);
 
   useEffect(() => {
     if (!isActive) {
@@ -119,6 +133,7 @@ export function PracticePocScreen({ practiceService }: Props): React.JSX.Element
   function refreshState(): void {
     setAttempts(service.listHistory() as AttemptEvent[]);
     setReviews(service.getDueReviews(nowIso()) as Record<string, unknown>[]);
+    setCurrentRating(readRating(service, selectedConfig.ratingKey));
   }
 
   function startSprint(nextMode: SprintMode = mode): void {
@@ -132,7 +147,11 @@ export function PracticePocScreen({ practiceService }: Props): React.JSX.Element
       });
       setMode(nextMode);
       setState(started);
+      setCurrentRating(started.ratingBefore);
+      setBoardFen(started.currentPuzzle?.currentFen ?? null);
+      setLastBoardMove(null);
       setFeedback(null);
+      setFeedbackPuzzleId(null);
       setTab("practice");
       refreshState();
     } catch (caught) {
@@ -148,6 +167,9 @@ export function PracticePocScreen({ practiceService }: Props): React.JSX.Element
       const nextState = service.abandonSprint(nowIso());
       setState(nextState);
       setFeedback(null);
+      setFeedbackPuzzleId(null);
+      setBoardFen(null);
+      setLastBoardMove(null);
       refreshState();
     } catch {
       // no-op; abandon is safe fallback
@@ -165,9 +187,13 @@ export function PracticePocScreen({ practiceService }: Props): React.JSX.Element
     }
 
     try {
+      const submittedPuzzleId = state?.currentPuzzle?.puzzle.id ?? null;
       const next = service.submitMove(move, nowIso());
+      const nextFeedback = (next.feedback as SessionFeedback) ?? null;
       setState(next.state);
-      setFeedback((next.feedback as SessionFeedback) ?? null);
+      setFeedback(nextFeedback);
+      setFeedbackPuzzleId(submittedPuzzleId);
+      syncBoardAfterMove(next.state, nextFeedback, submittedPuzzleId);
       refreshState();
     } catch (caught) {
       setError(errorMessage(caught));
@@ -191,18 +217,63 @@ export function PracticePocScreen({ practiceService }: Props): React.JSX.Element
   function resetToIdle(): void {
     setState(null);
     setFeedback(null);
+    setFeedbackPuzzleId(null);
     setError(null);
+    setBoardFen(null);
+    setLastBoardMove(null);
     refreshState();
+  }
+
+  function showReviewMistakes(): void {
+    setTab("review");
+    resetToIdle();
+  }
+
+  function syncBoardAfterMove(
+    nextState: SprintState,
+    nextFeedback: SessionFeedback,
+    submittedPuzzleId: string | null
+  ): void {
+    const nextPuzzle = nextState.currentPuzzle;
+    const nextFen = nextPuzzle?.currentFen ?? null;
+    const samePuzzle = nextPuzzle?.puzzle.id === submittedPuzzleId;
+    const autoMoves = nextFeedback?.autoPlayedMoves ?? [];
+
+    if (nextState.status === "active" && samePuzzle && autoMoves.length > 0) {
+      animateBoardMoves(autoMoves, nextFen);
+      return;
+    }
+
+    setBoardFen(nextFen);
+    setLastBoardMove(null);
+  }
+
+  async function animateBoardMoves(moves: string[], finalFen: string | null): Promise<void> {
+    const parsedMoves = moves.map(arrowFromTo).filter((move): move is BoardMove => Boolean(move));
+    if (!boardRef.current || parsedMoves.length === 0) {
+      setBoardFen(finalFen);
+      setLastBoardMove(parsedMoves[parsedMoves.length - 1] ?? null);
+      return;
+    }
+
+    for (const move of parsedMoves) {
+      await boardRef.current.move({
+        from: move.from as Square,
+        to: move.to as Square,
+        ...(move.promotion ? { promotion: move.promotion as PieceSymbol } : {})
+      });
+      setLastBoardMove(move);
+    }
+    setBoardFen(finalFen);
   }
 
   const currentPuzzle = state?.currentPuzzle;
   const sprintElapsedMs = state ? Math.max(0, nowMs - new Date(state.startedAt).getTime()) : 0;
   const remainingMs = state ? Math.max(0, new Date(state.deadlineAt).getTime() - nowMs) : 0;
   const timerText = formatDuration(Math.max(0, Math.floor(remainingMs / 1000)));
-  const sessionBar = state ? (serializeSprintView(state) as Record<string, unknown>) : null;
-  const puzzleHeader = currentPuzzle
-    ? `${currentPuzzle.puzzle.id} · ${currentPuzzle.puzzle.rating}`
-    : "No active puzzle";
+  const currentBoardFen = boardFen ?? currentPuzzle?.currentFen ?? null;
+  const boardFlipped = currentPuzzle ? shouldFlipBoard(currentPuzzle) : false;
+  const feedbackForCurrentPuzzle = feedbackPuzzleId && currentPuzzle?.puzzle.id === feedbackPuzzleId ? feedback : null;
   const displayedAttempts = historyWrongLast7Days
     ? attempts.filter((attempt) => {
       const completedAt = new Date(attempt.completedAt).getTime();
@@ -219,7 +290,7 @@ export function PracticePocScreen({ practiceService }: Props): React.JSX.Element
           <Text style={styles.title}>Puzzle Sprint</Text>
           <Text style={styles.subtitle}>Offline fixture · {seededPuzzleCount()} puzzles</Text>
         </View>
-        <Text testID="rating-label" style={styles.rating}>{`ELO ${formatRating(state)}`}</Text>
+        <Text testID="rating-label" style={styles.rating}>{`ELO ${formatRating(state, currentRating)}`}</Text>
       </View>
 
       {!isActive ? (
@@ -235,13 +306,16 @@ export function PracticePocScreen({ practiceService }: Props): React.JSX.Element
       <ScrollView contentContainerStyle={styles.content}>
         {tab === "practice" ? (
           <>
-            <SessionStatusBar
-              mode={mode}
-              state={state}
-              sessionBar={sessionBar}
-              timerText={timerText}
-              onAbandon={isActive ? abandonSprint : undefined}
-            />
+            {!isFinished ? (
+              <SessionStatusBar
+                mode={mode}
+                state={state}
+                config={selectedConfig}
+                timerText={timerText}
+                currentRating={currentRating}
+                onAbandon={isActive ? abandonSprint : undefined}
+              />
+            ) : null}
 
             {!isActive && state === null ? (
               <ModeRow
@@ -265,17 +339,19 @@ export function PracticePocScreen({ practiceService }: Props): React.JSX.Element
             {isActive ? (
               <View style={styles.boardWrapper}>
                 <View testID="session-board" style={[styles.boardSurface, { width: boardSize, height: boardSize }]}>
-                  {currentPuzzle?.currentFen ? (
+                  {currentBoardFen ? (
                     <Chessboard
-                      key={`${currentPuzzle.currentFen}-${state?.mistakeCount ?? 0}`}
+                      key={`${state?.id ?? "idle"}-${currentPuzzle?.puzzle.id ?? "none"}-${currentPuzzle?.kind ?? "line"}`}
                       ref={boardRef}
-                      fen={currentPuzzle.currentFen}
+                      fen={currentBoardFen}
                       onMove={onBoardMove}
                       onIllegalMove={onIllegalMove}
                       gestureEnabled
                       boardSize={boardSize}
+                      flipped={boardFlipped}
                       withLetters={false}
                       withNumbers={false}
+                      durations={{ move: 260 }}
                       colors={{
                         white: "#E6E8EB",
                         black: "#7B8794",
@@ -290,45 +366,24 @@ export function PracticePocScreen({ practiceService }: Props): React.JSX.Element
                     </View>
                   )}
 
+                  {lastBoardMove ? (
+                    <LastMoveOverlay
+                      boardSize={boardSize}
+                      flipped={boardFlipped}
+                      move={lastBoardMove}
+                    />
+                  ) : null}
+
                   {currentPuzzle?.kind === "arrow_duel" ? (
                     <ArrowCandidateOverlay
                       boardSize={boardSize}
+                      flipped={boardFlipped}
                       candidates={currentPuzzle.candidates}
-                      feedback={feedback}
+                      feedback={feedbackForCurrentPuzzle}
                     />
                   ) : null}
                 </View>
               </View>
-            ) : null}
-
-            <Text style={styles.puzzleMeta} testID="puzzle-id-label">
-              {puzzleHeader}
-            </Text>
-
-            {isActive ? (
-              <Text style={styles.prompt}>
-                {currentPuzzle?.kind === "arrow_duel"
-                  ? "Choose one candidate move"
-                  : `Expected move: ${currentExpectedMove(currentPuzzle as CurrentPuzzleState & { kind: "line" }) ?? "..."}`}
-              </Text>
-            ) : null}
-
-            {isActive && currentPuzzle?.kind === "arrow_duel" ? (
-              <ArrowDuelCandidateChips
-                candidates={currentPuzzle.candidates}
-                feedback={feedback}
-              />
-            ) : null}
-
-            {state ? (
-              <>
-                <Text testID="session-progress" style={styles.hiddenMetric}>
-                  Progress {state.correctCount} / {state.config.targetCorrect}
-                </Text>
-                <Text testID="session-mistakes" style={styles.hiddenMetric}>
-                  Mistakes {state.mistakeCount} / {state.config.maxMistakes}
-                </Text>
-              </>
             ) : null}
 
             {feedback ? <FeedbackPanel feedback={feedback} error={error} /> : null}
@@ -339,6 +394,7 @@ export function PracticePocScreen({ practiceService }: Props): React.JSX.Element
                 elapsedMs={Math.min(sprintElapsedMs, state ? state.config.durationSeconds * 1000 : sprintElapsedMs)}
                 onReplay={() => startSprint(mode)}
                 onBack={resetToIdle}
+                onReview={state.mistakeCount > 0 ? showReviewMistakes : undefined}
               />
             ) : null}
 
@@ -352,16 +408,6 @@ export function PracticePocScreen({ practiceService }: Props): React.JSX.Element
                   onPress={() => startSprint()}
                 >
                   <Text style={styles.primaryButtonText}>Start new sprint</Text>
-                </Pressable>
-
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Reset local session"
-                  testID="reset-session-button"
-                  style={styles.secondaryButton}
-                  onPress={resetToIdle}
-                >
-                  <Text style={styles.secondaryButtonText}>Reset</Text>
                 </Pressable>
               </>
             )}
@@ -496,28 +542,50 @@ function CustomSprintSetup({
 function SessionStatusBar({
   mode,
   state,
-  sessionBar,
+  config,
   timerText,
+  currentRating,
   onAbandon
 }: {
   mode: SprintMode;
   state: SprintState | null;
-  sessionBar: Record<string, unknown> | null;
+  config: SprintConfig;
   timerText: string;
+  currentRating: number;
   onAbandon?: () => void;
 }): React.JSX.Element {
+  if (!state) {
+    return (
+      <View style={styles.sessionBar} testID="mode-overview">
+        <View style={styles.sessionHeaderRow}>
+          <View>
+            <Text style={styles.sessionTitle}>{modeLabel(mode)}</Text>
+            <Text style={styles.helperText}>{formatDurationLabel(config.durationSeconds)} sprint · {config.perPuzzleSeconds}s per puzzle</Text>
+          </View>
+          <Text style={styles.ratingPill}>{currentRating}</Text>
+        </View>
+        <View style={styles.sessionMetrics}>
+          <Text style={styles.sessionMetric}>Target {config.targetCorrect}</Text>
+          <Text style={styles.sessionMetric}>Run {config.ratingKey}</Text>
+          <MistakeStrikes count={0} max={config.maxMistakes} />
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.sessionBar}>
-      <Text style={styles.sessionTitle}>Mode · {mode.replace("_", " ")}</Text>
-      <View style={styles.sessionMetrics}>
-        <Text style={styles.sessionMetric}>Status {state?.status ?? "idle"}</Text>
-        <Text style={styles.sessionMetric}>Correct {state?.correctCount ?? 0}</Text>
-        <Text style={styles.sessionMetric}>Mistakes {state?.mistakeCount ?? 0}</Text>
-        <Text style={styles.sessionMetric}>Target {String(sessionBar?.targetCorrect ?? "-")}</Text>
-        <Text style={styles.sessionMetric}>Rating {state?.ratingAfter ?? state?.ratingBefore ?? 600}</Text>
+      <View style={styles.sessionHeaderRow}>
+        <View>
+          <Text style={styles.sessionTitle}>{modeLabel(mode)}</Text>
+          <Text testID="session-progress" style={styles.sessionMetric}>
+            {state.correctCount} / {state.config.targetCorrect}
+          </Text>
+        </View>
+        <Text testID="session-timer" style={styles.timerText}>{timerText}</Text>
       </View>
       <View style={styles.sessionMetricRow}>
-        <Text testID="session-timer" style={styles.timerText}>Time {timerText}</Text>
+        <MistakeStrikes count={state.mistakeCount} max={state.config.maxMistakes} />
         {onAbandon ? (
           <Pressable
             accessibilityRole="button"
@@ -534,37 +602,25 @@ function SessionStatusBar({
   );
 }
 
-function ArrowDuelCandidateChips({
-  candidates,
-  feedback
+function MistakeStrikes({
+  count,
+  max
 }: {
-  candidates: string[];
-  feedback: SessionFeedback;
+  count: number;
+  max: number;
 }): React.JSX.Element {
   return (
-    <View style={styles.candidateRow}>
-      {candidates.slice(0, 2).map((candidate, index) => {
-        const review = feedback?.review?.arrows.find((arrow) => arrow.move === candidate);
-        const isCorrect = review?.role === "correct";
-        const isWrong = review?.role === "wrong";
-        const isSelected = review?.selected ?? false;
+    <View accessibilityLabel={`Strikes ${count} of ${max}`} testID="session-strikes" style={styles.strikeRow}>
+      {Array.from({ length: max }, (_, index) => {
+        const used = index < count;
         return (
           <View
-            accessibilityLabel={`Arrow Duel candidate ${index === 0 ? "A" : "B"}`}
-            key={candidate}
-            testID={index === 0 ? "arrow-duel-candidate-a" : "arrow-duel-candidate-b"}
-            style={[
-              styles.candidateButton,
-              isCorrect ? styles.candidateCorrect : null,
-              isWrong ? styles.candidateWrong : null,
-              isSelected ? styles.candidateSelected : null
-            ]}
-          >
-            <Text style={styles.candidateLabel}>{index === 0 ? "A" : "B"}</Text>
-            <Text style={styles.candidateMove}>{candidate}</Text>
-          </View>
+            key={index}
+            style={[styles.strikeMark, used ? styles.strikeMarkUsed : null]}
+          />
         );
       })}
+      <Text style={styles.strikeLabel}>Strikes</Text>
     </View>
   );
 }
@@ -573,15 +629,17 @@ function SprintSummary({
   state,
   elapsedMs,
   onReplay,
-  onBack
+  onBack,
+  onReview
 }: {
   state: SprintState;
   elapsedMs: number;
   onReplay: () => void;
   onBack: () => void;
+  onReview?: () => void;
 }): React.JSX.Element {
   const delta = (state.ratingAfter ?? state.ratingBefore) - state.ratingBefore;
-  const reason = state.endReason === "target_reached" ? "Target reached" : state.endReason;
+  const reason = formatEndReason(state.endReason);
 
   return (
     <View style={styles.summaryPanel} testID="sprint-summary-panel">
@@ -618,6 +676,17 @@ function SprintSummary({
           <Text style={styles.secondaryButtonText}>Back</Text>
         </Pressable>
       </View>
+      {onReview ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Review missed puzzles"
+          testID="review-mistakes-button"
+          style={styles.secondaryButton}
+          onPress={onReview}
+        >
+          <Text style={styles.secondaryButtonText}>Review missed puzzles</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -643,23 +712,13 @@ function FeedbackPanel({
   if (!feedbackValue) {
     return null;
   }
+  const feedbackLabel = feedbackValue.result === "correct" ? "Correct" : "Incorrect";
   return (
     <View style={styles.feedbackPanel} testID="feedback-panel">
-      <Text style={styles.feedbackText}>{feedbackValue.result} · expected {feedbackValue.expectedMove}</Text>
+      <Text style={styles.feedbackText}>{feedbackLabel}</Text>
       {feedbackValue.review ? (
         <View style={styles.arrowReview} testID="arrow-review-panel">
-          {feedbackValue.review.arrows.map((arrow) => (
-            <Text
-              key={arrow.move}
-              style={[
-                styles.arrowText,
-                arrow.color === "green" ? styles.correctArrow : styles.wrongArrow,
-                arrow.selected ? styles.selectedMarker : null
-              ]}
-            >
-              {arrow.role} · {arrow.move} {arrow.selected ? "(selected)" : null}
-            </Text>
-          ))}
+          <Text style={styles.helperText}>The board marks the stronger move and the punished line.</Text>
         </View>
       ) : null}
       {feedbackValue.puzzleSolved ? <Text style={styles.correctText}>Puzzle solved</Text> : null}
@@ -667,12 +726,47 @@ function FeedbackPanel({
   );
 }
 
+function LastMoveOverlay({
+  boardSize,
+  flipped,
+  move
+}: {
+  boardSize: number;
+  flipped: boolean;
+  move: BoardMove;
+}): React.JSX.Element {
+  const squareSize = boardSize / 8;
+  return (
+    <View style={[styles.arrowLayer, { width: boardSize, height: boardSize }]} pointerEvents="none">
+      {[move.from, move.to].map((square) => {
+        const pos = squareToTopLeft(square, squareSize, flipped);
+        return (
+          <View
+            key={square}
+            style={[
+              styles.lastMoveSquare,
+              {
+                height: squareSize,
+                left: pos.x,
+                top: pos.y,
+                width: squareSize
+              }
+            ]}
+          />
+        );
+      })}
+    </View>
+  );
+}
+
 function ArrowCandidateOverlay({
   boardSize,
+  flipped,
   candidates,
   feedback
 }: {
   boardSize: number;
+  flipped: boolean;
   candidates: string[];
   feedback: SessionFeedback;
 }): React.JSX.Element {
@@ -699,6 +793,7 @@ function ArrowCandidateOverlay({
             <ArrowHint
               boardSize={boardSize}
               squareSize={squareSize}
+              flipped={flipped}
               move={arrow.move}
               stroke={
                 arrow.role === "correct" ? "#16A34A" :
@@ -717,6 +812,7 @@ function ArrowCandidateOverlay({
 function ArrowHint({
   boardSize,
   squareSize,
+  flipped,
   move,
   stroke,
   selected,
@@ -724,20 +820,23 @@ function ArrowHint({
 }: {
   boardSize: number;
   squareSize: number;
+  flipped: boolean;
   move: string;
   stroke: string;
   selected: boolean;
   from: { from: string; to: string };
 }): React.JSX.Element {
-  const fromPos = squareToPixel(from.from, squareSize);
-  const toPos = squareToPixel(from.to, squareSize);
+  const fromPos = squareToPixel(from.from, squareSize, flipped);
+  const toPos = squareToPixel(from.to, squareSize, flipped);
+  const fromTopLeft = squareToTopLeft(from.from, squareSize, flipped);
   const dx = toPos.x - fromPos.x;
   const dy = toPos.y - fromPos.y;
   const len = Math.sqrt(dx * dx + dy * dy);
-  const angle = Math.atan2(dy, dx);
-  const segmentSize = selected ? 10 : 8;
-  const segmentCount = Math.max(3, Math.floor(len / (squareSize * 0.3)));
-  const endCapSize = selected ? 18 : 16;
+  const segmentSize = selected ? 7 : 5;
+  const segmentCount = Math.max(2, Math.floor(len / (squareSize * 0.42)));
+  const targetRingSize = squareSize * (selected ? 0.72 : 0.64);
+  const sourceBadgeSize = Math.max(16, squareSize * 0.26);
+  const opacity = selected ? 0.82 : 0.58;
 
   return (
     <View
@@ -749,8 +848,21 @@ function ArrowHint({
         }
       ]}
     >
+      <View
+        style={[
+          styles.arrowSourceBadge,
+          {
+            borderColor: stroke,
+            height: sourceBadgeSize,
+            left: fromTopLeft.x + squareSize * 0.08,
+            opacity,
+            top: fromTopLeft.y + squareSize * 0.08,
+            width: sourceBadgeSize
+          }
+        ]}
+      />
       {Array.from({ length: segmentCount }, (_, index) => {
-        const t = (index + 1) / (segmentCount + 1);
+        const t = (index + 1) / (segmentCount + 2);
         return (
           <View
             key={`${move}-${index}`}
@@ -761,6 +873,7 @@ function ArrowHint({
                 borderRadius: segmentSize / 2,
                 height: segmentSize,
                 left: fromPos.x + dx * t - segmentSize / 2,
+                opacity,
                 top: fromPos.y + dy * t - segmentSize / 2,
                 width: segmentSize
               }
@@ -770,14 +883,14 @@ function ArrowHint({
       })}
         <View
           style={[
-            styles.arrowEndCap,
+            styles.arrowTargetRing,
             {
-              backgroundColor: stroke,
-              height: endCapSize,
-              left: toPos.x - endCapSize / 2,
-              top: toPos.y - endCapSize / 2,
-              transform: [{ rotate: `${angle + Math.PI / 4}rad` }],
-              width: endCapSize
+              borderColor: stroke,
+              height: targetRingSize,
+              left: toPos.x - targetRingSize / 2,
+              opacity,
+              top: toPos.y - targetRingSize / 2,
+              width: targetRingSize
             }
           ]}
         />
@@ -822,7 +935,7 @@ function HistoryPanel({
       {attempts.length === 0 ? <Text style={styles.listText}>No attempts</Text> : null}
       {attempts.map((attempt) => (
         <Text key={attempt.id} style={styles.listText}>
-          {attempt.puzzleId} · {attempt.mode} · {attempt.result} · {attempt.submittedMove}
+          {modeLabel(attempt.mode)} · {attempt.result} · {attempt.submittedMove}
         </Text>
       ))}
     </View>
@@ -846,7 +959,7 @@ function ReviewPanel({ reviews }: { reviews: Record<string, unknown>[] }): React
         const row = review as { puzzleId: string; dueAt: string; lastResult: string };
         return (
           <Text key={`${row.puzzleId}-${row.dueAt}`} style={styles.listText}>
-            {row.puzzleId} · {row.lastResult} · {row.dueAt.slice(0, 10)}
+            {row.lastResult} · due {row.dueAt.slice(0, 10)}
           </Text>
         );
       })}
@@ -992,9 +1105,9 @@ function formatUci(move: MoveResult["move"]): string {
   return `${move.from}${move.to}${promotion}`;
 }
 
-function formatRating(state: SprintState | null): string {
+function formatRating(state: SprintState | null, currentRating: number): string {
   if (!state) {
-    return "600";
+    return String(currentRating);
   }
   return String(state.ratingAfter ?? state.ratingBefore);
 }
@@ -1029,6 +1142,36 @@ function sprintConfigFor(
   });
 }
 
+function readRating(service: PracticeService, ratingKey: string): number {
+  return service.getRating(ratingKey).rating;
+}
+
+function modeLabel(mode: SprintMode): string {
+  if (mode === "arrow_duel") {
+    return "Arrow Duel";
+  }
+  return mode.charAt(0).toUpperCase() + mode.slice(1);
+}
+
+function formatEndReason(reason: SprintState["endReason"]): string {
+  if (reason === "target_reached") {
+    return "Target reached";
+  }
+  if (reason === "max_mistakes") {
+    return "Three strikes";
+  }
+  if (reason === "time_expired") {
+    return "Time expired";
+  }
+  if (reason === "puzzles_exhausted") {
+    return "No more puzzles";
+  }
+  if (reason === "abandoned") {
+    return "Abandoned";
+  }
+  return "Completed";
+}
+
 function expectedMoveForCurrent(currentPuzzle: CurrentPuzzleState): string {
   if (currentPuzzle.kind === "arrow_duel") {
     return currentPuzzle.correctMove;
@@ -1036,31 +1179,50 @@ function expectedMoveForCurrent(currentPuzzle: CurrentPuzzleState): string {
   return currentExpectedMove(currentPuzzle) ?? "";
 }
 
+function shouldFlipBoard(currentPuzzle: CurrentPuzzleState): boolean {
+  return sideToMove(currentPuzzle.currentFen) === "b";
+}
+
+function sideToMove(fen: string): "w" | "b" {
+  return fen.split(" ")[1] === "b" ? "b" : "w";
+}
+
 function errorMessage(caught: unknown): string {
   return caught instanceof Error ? caught.message : String(caught);
 }
 
-function squareToPixel(square: string, squareSize: number): { x: number; y: number } {
+function squareToTopLeft(square: string, squareSize: number, flipped: boolean): { x: number; y: number } {
   if (!/^[a-h][1-8]$/.test(square)) {
     throw new Error(`Invalid square ${square}`);
   }
 
-  const col = square.charCodeAt(0) - "a".charCodeAt(0);
-  const row = 8 - Number(square[1]);
+  const file = square.charCodeAt(0) - "a".charCodeAt(0);
+  const rank = Number(square[1]) - 1;
+  const col = flipped ? 7 - file : file;
+  const row = flipped ? rank : 7 - rank;
   return {
-    x: col * squareSize + squareSize / 2,
-    y: row * squareSize + squareSize / 2
+    x: col * squareSize,
+    y: row * squareSize
   };
 }
 
-function arrowFromTo(move: string): { from: string; to: string } | null {
+function squareToPixel(square: string, squareSize: number, flipped: boolean): { x: number; y: number } {
+  const topLeft = squareToTopLeft(square, squareSize, flipped);
+  return {
+    x: topLeft.x + squareSize / 2,
+    y: topLeft.y + squareSize / 2
+  };
+}
+
+function arrowFromTo(move: string): BoardMove | null {
   const match = /^([a-h][1-8])([a-h][1-8])(?:[nbrqk]?)?$/.exec(move);
   if (!match) {
     return null;
   }
   return {
     from: match[1] ?? "",
-    to: match[2] ?? ""
+    to: match[2] ?? "",
+    ...(move.length > 4 ? { promotion: move.slice(4, 5).toLowerCase() } : {})
   };
 }
 
@@ -1132,6 +1294,12 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 10
   },
+  sessionHeaderRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12,
+    justifyContent: "space-between"
+  },
   sessionTitle: {
     color: "#111827",
     fontSize: 16,
@@ -1146,6 +1314,19 @@ const styles = StyleSheet.create({
     color: "#334155",
     fontSize: 12,
     fontWeight: "700"
+  },
+  ratingPill: {
+    backgroundColor: "#F8FAFC",
+    borderColor: "#CBD5E1",
+    borderRadius: 8,
+    borderWidth: 1,
+    color: "#111827",
+    fontSize: 18,
+    fontWeight: "800",
+    minWidth: 64,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    textAlign: "center"
   },
   sessionMetricRow: {
     alignItems: "center",
@@ -1179,19 +1360,6 @@ const styles = StyleSheet.create({
     color: "#64748B",
     fontSize: 18,
     fontWeight: "700"
-  },
-  puzzleMeta: {
-    color: "#334155",
-    fontSize: 12,
-    fontWeight: "700",
-    marginTop: 8,
-    textAlign: "center"
-  },
-  prompt: {
-    color: "#111827",
-    fontSize: 16,
-    marginTop: 10,
-    textAlign: "center"
   },
   modeRow: {
     flexDirection: "row",
@@ -1375,49 +1543,28 @@ const styles = StyleSheet.create({
     color: "#15803D",
     fontWeight: "700"
   },
-  hiddenMetric: {
+  strikeRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 6
+  },
+  strikeMark: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#94A3B8",
+    borderRadius: 3,
+    borderWidth: 1,
+    height: 14,
+    width: 14
+  },
+  strikeMarkUsed: {
+    backgroundColor: "#DC2626",
+    borderColor: "#DC2626"
+  },
+  strikeLabel: {
     color: "#64748B",
     fontSize: 12,
     fontWeight: "700",
-    textAlign: "center"
-  },
-  candidateRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 12
-  },
-  candidateButton: {
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#CBD5E1",
-    borderRadius: 8,
-    borderWidth: 1,
-    flex: 1,
-    minHeight: 52,
-    justifyContent: "center",
-    paddingHorizontal: 10,
-    paddingVertical: 8
-  },
-  candidateCorrect: {
-    borderColor: "#16A34A",
-    backgroundColor: "#F0FDF4"
-  },
-  candidateWrong: {
-    borderColor: "#DC2626",
-    backgroundColor: "#FEF2F2"
-  },
-  candidateSelected: {
-    borderWidth: 2
-  },
-  candidateLabel: {
-    color: "#64748B",
-    fontSize: 12,
-    fontWeight: "800"
-  },
-  candidateMove: {
-    color: "#111827",
-    fontSize: 14,
-    fontWeight: "800"
+    marginLeft: 2
   },
   arrowReview: {
     marginTop: 8,
@@ -1534,18 +1681,26 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0
   },
+  lastMoveSquare: {
+    backgroundColor: "rgba(245, 158, 11, 0.28)",
+    position: "absolute"
+  },
   arrowLineWrap: {
     left: 0,
     position: "absolute",
     top: 0
   },
-  arrowSegment: {
-    position: "absolute",
-    opacity: 0.9
+  arrowSourceBadge: {
+    borderRadius: 999,
+    borderWidth: 2,
+    position: "absolute"
   },
-  arrowEndCap: {
-    borderRadius: 3,
-    opacity: 0.95,
+  arrowSegment: {
+    position: "absolute"
+  },
+  arrowTargetRing: {
+    borderRadius: 999,
+    borderWidth: 3,
     position: "absolute"
   }
 });

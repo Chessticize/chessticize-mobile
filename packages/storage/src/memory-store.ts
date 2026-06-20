@@ -14,6 +14,7 @@ import type {
 } from "../../core/src/index.ts";
 import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./query-types.ts";
 import type { PracticeStore } from "./practice-store.ts";
+import { selectUniquePuzzles } from "./puzzle-selection.ts";
 
 export class MemoryStore implements PracticeStore {
   private readonly puzzles = new Map<string, Puzzle>();
@@ -37,18 +38,14 @@ export class MemoryStore implements PracticeStore {
   }
 
   selectPuzzles(filter: PuzzleSelectionFilter): Puzzle[] {
-    return [...this.puzzles.values()]
-      .filter((puzzle) => puzzle.rating >= (filter.minRating ?? 0) && puzzle.rating <= (filter.maxRating ?? 4000))
-      .filter((puzzle) => !filter.theme || puzzle.themes.includes(filter.theme))
-      .filter((puzzle) => {
-        if (filter.mode !== "arrow_duel") {
-          return true;
-        }
-        const firstMove = puzzle.solutionMoves[0];
-        return Boolean(firstMove && puzzle.stockfishBestMove && firstMove !== puzzle.stockfishBestMove);
-      })
-      .sort((left, right) => left.rating - right.rating || left.id.localeCompare(right.id))
-      .slice(0, filter.limit);
+    return selectUniquePuzzles({
+      puzzles: [...this.puzzles.values()].sort((left, right) => left.rating - right.rating || left.id.localeCompare(right.id)),
+      mode: filter.mode,
+      limit: filter.limit,
+      ...(filter.minRating === undefined ? {} : { minRating: filter.minRating }),
+      ...(filter.maxRating === undefined ? {} : { maxRating: filter.maxRating }),
+      ...(filter.theme === undefined ? {} : { theme: filter.theme })
+    });
   }
 
   getRating(key: string): RatingRecord {

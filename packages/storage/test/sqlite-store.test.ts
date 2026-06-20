@@ -22,6 +22,40 @@ test("SQLite store seeds fixture puzzles and filters Arrow Duel eligibility", as
   }
 });
 
+test("SQLite store does not select duplicate puzzle positions for one sprint", async () => {
+  const store = new SQLiteStore(":memory:");
+  store.migrate();
+  const puzzles = await loadFixturePuzzles();
+  try {
+    store.seedPuzzles([
+      puzzles[0] as Puzzle,
+      { ...(puzzles[0] as Puzzle), id: "00008-copy" },
+      puzzles[1] as Puzzle
+    ]);
+
+    const selected = store.selectPuzzles({ mode: "standard", limit: 3 });
+
+    assert.deepEqual(selected.map((puzzle) => puzzle.id), ["000hf", "00008"]);
+  } finally {
+    store.close();
+  }
+});
+
+test("PracticeService exposes the current rating for the selected sprint run", async () => {
+  const store = await seededStore();
+  const service = new PracticeService(store);
+  try {
+    assert.equal(service.getRating("standard 5/20").rating, 600);
+
+    const reset = service.resetRating("standard 5/20") as { generation: number; rating: number };
+
+    assert.equal(reset.rating, 600);
+    assert.equal(service.getRating("standard 5/20").generation, 1);
+  } finally {
+    store.close();
+  }
+});
+
 test("SQLite review result updates expand and contract the persisted review schedule", async () => {
   const store = await seededStore();
   try {

@@ -17,6 +17,7 @@ import type {
 } from "../../core/src/index.ts";
 import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./query-types.ts";
 import type { PracticeStore } from "./practice-store.ts";
+import { selectUniquePuzzles } from "./puzzle-selection.ts";
 
 interface AttemptHistoryDbRow extends Omit<AttemptHistoryRow, "ratingAfter"> {
   ratingAfter: number | null;
@@ -139,23 +140,14 @@ export class SQLiteStore implements PracticeStore {
       .prepare("SELECT * FROM puzzles WHERE rating >= ? AND rating <= ? ORDER BY rating ASC, id ASC")
       .all(filter.minRating ?? 0, filter.maxRating ?? 4000) as PuzzleRow[];
 
-    return rows
-      .map(puzzleFromRow)
-      .filter((puzzle) => {
-        if (filter.theme && !puzzle.themes.includes(filter.theme)) {
-          return false;
-        }
-        if (filter.mode === "arrow_duel") {
-          const firstMove = puzzle.solutionMoves[0];
-          return Boolean(
-            firstMove &&
-              puzzle.stockfishBestMove &&
-              normalizeMove(firstMove) !== normalizeMove(puzzle.stockfishBestMove)
-          );
-        }
-        return true;
-      })
-      .slice(0, filter.limit);
+    return selectUniquePuzzles({
+      puzzles: rows.map(puzzleFromRow),
+      mode: filter.mode,
+      limit: filter.limit,
+      ...(filter.minRating === undefined ? {} : { minRating: filter.minRating }),
+      ...(filter.maxRating === undefined ? {} : { maxRating: filter.maxRating }),
+      ...(filter.theme === undefined ? {} : { theme: filter.theme })
+    });
   }
 
   getRating(key: string): RatingRecord {
@@ -419,10 +411,6 @@ function reviewFromRow(row: ReviewRow): ReviewQueueState {
     lastResult: row.last_result,
     lastReviewedAt: row.last_reviewed_at
   };
-}
-
-function normalizeMove(move: string): string {
-  return move.trim().toLowerCase();
 }
 
 function cryptoRandomId(): string {
