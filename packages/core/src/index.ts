@@ -4,3 +4,6 @@ export * from "./ratings.ts";
 export * from "./puzzle-session.ts";
 export * from "./review-scheduler.ts";
 export * from "./sprint-session.ts";
+export * from "./puzzle-selection-strategy.ts";
+export * from "./session-review.ts";
+export * from "./history-query.ts";

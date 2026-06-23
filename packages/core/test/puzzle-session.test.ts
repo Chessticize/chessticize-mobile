@@ -1,5 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { Chess } from "chess.js";
 import {
   applyMovesToFen,
   beginArrowDuelPuzzle,
@@ -49,12 +52,46 @@ test("applyMovesToFen can replay UCI moves for board adapters", () => {
 
 test("line puzzle rejects a wrong move without advancing state", () => {
   const state = beginLinePuzzle(samplePuzzle("00008"));
-  const result = submitLineMove(state, "e6e8");
+  const result = submitLineMove(state, "e6d6");
 
   assert.equal(result.feedback.result, "wrong");
   assert.equal(result.feedback.expectedMove, "e6e7");
   assert.equal(result.state.cursor, 1);
   assert.deepEqual(result.state.playedMoves, ["f2g3"]);
+});
+
+test("line puzzle rejects illegal moves instead of recording them as wrong attempts", () => {
+  const state = beginLinePuzzle(samplePuzzle("00008"));
+
+  assert.throws(
+    () => submitLineMove(state, "a1a8"),
+    /not legal in the current position/
+  );
+  assert.equal(state.cursor, 1);
+  assert.deepEqual(state.playedMoves, ["f2g3"]);
+});
+
+test("line puzzle accepts any legal checkmate even when it is not the official move", () => {
+  const result = submitLineMove({
+    kind: "line",
+    puzzle: {
+      ...samplePuzzle("mate-alt"),
+      initialFen: "8/8/8/8/8/8/2Q5/k1K5 w - - 0 1",
+      solutionMoves: ["c2a4"]
+    },
+    currentFen: "8/8/8/8/8/8/2Q5/k1K5 w - - 0 1",
+    playedMoves: [],
+    cursor: 0,
+    autoPlayedMoves: [],
+    solved: false
+  }, "c2b1");
+
+  assert.equal(result.feedback.result, "correct");
+  assert.equal(result.feedback.puzzleSolved, true);
+  assert.equal(result.feedback.expectedMove, "c2a4");
+  assert.equal(result.feedback.submittedMove, "c2b1");
+  assert.equal(result.state.solved, true);
+  assert.deepEqual(result.state.playedMoves, ["c2b1"]);
 });
 
 test("Arrow Duel exposes two candidates and marks review arrows after a wrong choice", () => {
@@ -72,18 +109,46 @@ test("Arrow Duel exposes two candidates and marks review arrows after a wrong ch
   ]);
 });
 
-test("Arrow Duel rejects moves outside the displayed candidates", () => {
+test("Arrow Duel rejects moves outside the displayed candidates without creating feedback", () => {
   const state = beginArrowDuelPuzzle(samplePuzzle("00008"));
 
-  const result = submitArrowDuelChoice(state, "a1a8");
-  assert.equal(result.feedback.result, "wrong");
-  assert.equal(result.feedback.puzzleSolved, false);
-  assert.equal(result.feedback.expectedMove, state.correctMove);
-  assert.deepEqual(result.state.selectedMove, "a1a8");
-  assert.deepEqual(result.feedback.review?.arrows, [
-    { move: "b2b1", role: "correct", color: "green", selected: false },
-    { move: "f2g3", role: "wrong", color: "red", selected: false }
-  ]);
+  assert.throws(
+    () => submitArrowDuelChoice(state, "a1a8"),
+    /not one of the Arrow Duel candidates/
+  );
+  assert.equal(state.selectedMove, undefined);
+  assert.equal(state.solved, false);
+});
+
+test("offline regression sample manifest points at stable Standard puzzle shapes", () => {
+  const puzzles = loadOfflinePuzzles();
+  const samples = loadRegressionSamples();
+  const puzzleById = new Map(puzzles.map((puzzle) => [puzzle.id, puzzle]));
+
+  assert.deepEqual(samples.map((sample) => sample.id), ["00008", "00ueM", "00DkJ", "00LSv", "000hf"]);
+
+  for (const sample of samples) {
+    assert.ok(puzzleById.has(sample.id), `sample puzzle ${sample.id} must exist in the offline fixture`);
+  }
+
+  const multiMove = requiredPuzzle(puzzleById, "00008");
+  assert.ok(userMoveCount(multiMove) >= 3);
+  assert.equal(beginLinePuzzle(multiMove).cursor, 1);
+
+  const promotion = requiredPuzzle(puzzleById, "00ueM");
+  assert.ok(promotion.themes.includes("promotion"));
+  assert.ok(promotion.solutionMoves.some((move) => move.length > 4));
+  assert.equal(solveLinePuzzle(promotion).submittedPromotionMove, true);
+
+  const initialCheck = requiredPuzzle(puzzleById, "00DkJ");
+  assert.equal(new Chess(initialCheck.initialFen).isCheck(), true);
+
+  const userTurnCheck = requiredPuzzle(puzzleById, "00LSv");
+  assert.equal(new Chess(beginLinePuzzle(userTurnCheck).currentFen).isCheck(), true);
+
+  const shortMate = requiredPuzzle(puzzleById, "000hf");
+  assert.ok(shortMate.themes.includes("mate"));
+  assert.ok(shortMate.themes.includes("short"));
 });
 
 function samplePuzzle(id: string): Puzzle {
@@ -100,4 +165,41 @@ function samplePuzzle(id: string): Puzzle {
     stockfishBestMove: "b2b1",
     stockfishEvalAfterFirstMove: 693
   };
+}
+
+function loadOfflinePuzzles(): Puzzle[] {
+  return JSON.parse(readFileSync(resolve("fixtures/puzzles/presolved-1000.json"), "utf8")) as Puzzle[];
+}
+
+function loadRegressionSamples(): Array<{ id: string; label: string; notes: string }> {
+  const manifest = JSON.parse(readFileSync(resolve("fixtures/puzzles/regression-samples.json"), "utf8")) as {
+    samples: Array<{ id: string; label: string; notes: string }>;
+  };
+  return manifest.samples;
+}
+
+function requiredPuzzle(puzzleById: Map<string, Puzzle>, id: string): Puzzle {
+  const puzzle = puzzleById.get(id);
+  if (!puzzle) {
+    throw new Error(`Missing sample puzzle ${id}`);
+  }
+  return puzzle;
+}
+
+function userMoveCount(puzzle: Puzzle): number {
+  return puzzle.solutionMoves.filter((_, index) => index % 2 === 1).length;
+}
+
+function solveLinePuzzle(puzzle: Puzzle): { submittedPromotionMove: boolean } {
+  let state = beginLinePuzzle(puzzle);
+  let submittedPromotionMove = false;
+  while (!state.solved) {
+    const move = currentExpectedMove(state);
+    if (!move) {
+      throw new Error(`Puzzle ${puzzle.id} has no expected move at cursor ${state.cursor}`);
+    }
+    submittedPromotionMove = submittedPromotionMove || move.length > 4;
+    state = submitLineMove(state, move).state;
+  }
+  return { submittedPromotionMove };
 }

@@ -7,7 +7,7 @@ The current app includes:
 - A playable Practice screen for Standard Sprint and Arrow Duel.
 - Reused `react-native-chessboard` board rendering.
 - A local backend path using `PracticeService` plus `MemoryStore`, backed by the same core rules used by Node tests.
-- Offline demo puzzles derived from `fixtures/puzzles/presolved-sample.json`.
+- Offline demo puzzles derived from `fixtures/puzzles/presolved-1000.json`.
 - Component behavior tests with `react-test-renderer`.
 - Detox iOS E2E configuration and specs.
 

@@ -1,17 +1,27 @@
 import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import {
+  buildHistoryView,
+  buildSessionMistakeReview,
   createDefaultRating,
   resetRating as resetRatingRecord,
+  resolveHistoryRange,
   scheduleMistake,
-  scheduleReview
+  scheduleReview,
+  sideToMoveForHistoryPuzzle
 } from "../../core/src/index.ts";
 import type {
   AttemptEvent,
   AttemptResult,
+  HistoryAttemptView,
+  HistoryEloPoint,
+  HistoryQuery,
+  HistoryView,
   Puzzle,
   RatingRecord,
+  ReviewQueueItem,
   ReviewQueueState,
+  SessionMistakeReviewItem,
   SprintMode,
   SprintState
 } from "../../core/src/index.ts";
@@ -21,6 +31,27 @@ import { selectUniquePuzzles } from "./puzzle-selection.ts";
 
 interface AttemptHistoryDbRow extends Omit<AttemptHistoryRow, "ratingAfter"> {
   ratingAfter: number | null;
+}
+
+interface HistoryAttemptDbRow extends PuzzleRow {
+  attempt_id: string;
+  session_id: string;
+  mode: SprintMode;
+  result: AttemptResult;
+  submitted_move: string;
+  expected_move: string;
+  attempt_started_at: string;
+  completed_at: string;
+  rating_before: number;
+  rating_after: number | null;
+  rating_key: string;
+}
+
+interface HistoryEloDbRow {
+  session_id: string;
+  completed_at: string;
+  rating_before: number;
+  rating_after: number;
 }
 
 interface PuzzleRow {
@@ -34,7 +65,7 @@ interface PuzzleRow {
   themes_json: string;
   game_url: string | null;
   opening_tags_json: string;
-  source: "lichess";
+  source: "lichess" | "synthetic";
   stockfish_eval: number | null;
   stockfish_bestmove: string | null;
   stockfish_eval_after_first_move: number | null;
@@ -144,9 +175,12 @@ export class SQLiteStore implements PracticeStore {
       puzzles: rows.map(puzzleFromRow),
       mode: filter.mode,
       limit: filter.limit,
+      ...(filter.rating === undefined ? {} : { rating: filter.rating }),
       ...(filter.minRating === undefined ? {} : { minRating: filter.minRating }),
       ...(filter.maxRating === undefined ? {} : { maxRating: filter.maxRating }),
-      ...(filter.theme === undefined ? {} : { theme: filter.theme })
+      ...(filter.theme === undefined ? {} : { theme: filter.theme }),
+      ...(filter.excludeIds === undefined ? {} : { excludeIds: filter.excludeIds }),
+      ...(filter.randomSeed === undefined ? {} : { randomSeed: filter.randomSeed })
     });
   }
 
@@ -165,6 +199,54 @@ export class SQLiteStore implements PracticeStore {
       rating: row.rating,
       games: row.games
     };
+  }
+
+  listRatings(): RatingRecord[] {
+    const rows = this.db
+      .prepare(
+        `SELECT r.*
+         FROM ratings r
+         JOIN (
+           SELECT key, MAX(generation) AS generation
+           FROM ratings
+           GROUP BY key
+         ) latest ON latest.key = r.key AND latest.generation = r.generation
+         ORDER BY r.key ASC`
+      )
+      .all() as RatingRow[];
+    return rows.map((row) => ({
+      key: row.key,
+      generation: row.generation,
+      rating: row.rating,
+      games: row.games
+    }));
+  }
+
+  listPlayedRatings(): RatingRecord[] {
+    const rows = this.db
+      .prepare(
+        `SELECT r.*
+         FROM ratings r
+         JOIN (
+           SELECT key, MAX(generation) AS generation
+           FROM ratings
+           GROUP BY key
+         ) latest ON latest.key = r.key AND latest.generation = r.generation
+         JOIN (
+           SELECT key
+           FROM ratings
+           GROUP BY key
+           HAVING SUM(games) > 0
+         ) played ON played.key = r.key
+         ORDER BY r.key ASC`
+      )
+      .all() as RatingRow[];
+    return rows.map((row) => ({
+      key: row.key,
+      generation: row.generation,
+      rating: row.rating,
+      games: row.games
+    }));
   }
 
   saveRating(record: RatingRecord): void {
@@ -278,6 +360,7 @@ export class SQLiteStore implements PracticeStore {
           result,
           submitted_move AS submittedMove,
           expected_move AS expectedMove,
+          started_at AS startedAt,
           completed_at AS completedAt,
           rating_before AS ratingBefore,
           rating_after AS ratingAfter
@@ -286,6 +369,7 @@ export class SQLiteStore implements PracticeStore {
            AND (? IS NULL OR mode = ?)
            AND (? IS NULL OR completed_at >= ?)
            AND (? IS NULL OR puzzle_id = ?)
+           AND (? IS NULL OR session_id = ?)
          ORDER BY completed_at DESC, id DESC`
       )
       .all(
@@ -296,7 +380,9 @@ export class SQLiteStore implements PracticeStore {
         filter.since ?? null,
         filter.since ?? null,
         filter.puzzleId ?? null,
-        filter.puzzleId ?? null
+        filter.puzzleId ?? null,
+        filter.sessionId ?? null,
+        filter.sessionId ?? null
       ) as AttemptHistoryDbRow[];
 
     return rows.map((row) => {
@@ -306,6 +392,14 @@ export class SQLiteStore implements PracticeStore {
       }
       return row;
     });
+  }
+
+  getSessionMistakeReview(sessionId: string): SessionMistakeReviewItem[] {
+    const attempts = this.listAttempts({ sessionId, result: "wrong" }).map(attemptEventFromHistoryRow);
+    const puzzles = attempts
+      .map((attempt) => this.getPuzzle(attempt.puzzleId))
+      .filter((puzzle): puzzle is Puzzle => Boolean(puzzle));
+    return buildSessionMistakeReview({ sessionId, attempts, puzzles });
   }
 
   scheduleMistakeReview(puzzleId: string, now: string): ReviewQueueState {
@@ -352,6 +446,33 @@ export class SQLiteStore implements PracticeStore {
     return rows.map(reviewFromRow);
   }
 
+  getDueReviewItems(now: string): ReviewQueueItem[] {
+    return this.getDueReviews(now)
+      .map((review) => {
+        const puzzle = this.getPuzzle(review.puzzleId);
+        return puzzle ? { puzzle, review } : undefined;
+      })
+      .filter((item): item is ReviewQueueItem => Boolean(item));
+  }
+
+  getHistoryView(query: HistoryQuery): HistoryView {
+    const range = resolveHistoryRange(query.now, query.timeRange);
+    const allAttempts = this.selectHistoryAttempts(query.ratingKey, range.since, range.until);
+    const attempts = allAttempts
+      .filter((attempt) => !query.result || attempt.result === query.result)
+      .filter((attempt) => !query.mode || attempt.mode === query.mode)
+      .filter((attempt) => !query.side || attempt.side === query.side)
+      .filter((attempt) => !query.theme || attempt.themes.includes(query.theme));
+    return buildHistoryView({
+      query,
+      ratingKeys: this.listPlayedRatings(),
+      attempts,
+      elo: this.selectHistoryElo(query.ratingKey, range.since, range.until),
+      reviews: this.listAllReviewQueueStates(),
+      availableThemes: [...new Set(allAttempts.flatMap((attempt) => attempt.themes))].sort()
+    });
+  }
+
   private saveReviewQueueState(state: ReviewQueueState): void {
     this.db
       .prepare(
@@ -376,6 +497,84 @@ export class SQLiteStore implements PracticeStore {
         state.lastResult,
         state.lastReviewedAt
       );
+  }
+
+  private selectHistoryAttempts(ratingKey: string, since: string | undefined, until: string): HistoryAttemptView[] {
+    const rows = this.db
+      .prepare(
+        `SELECT
+          a.id AS attempt_id,
+          a.session_id,
+          a.mode,
+          a.result,
+          a.submitted_move,
+          a.expected_move,
+          a.started_at AS attempt_started_at,
+          a.completed_at,
+          a.rating_before,
+          a.rating_after,
+          s.rating_key,
+          p.*
+         FROM attempts a
+         JOIN sprint_sessions s ON s.id = a.session_id
+         JOIN puzzles p ON p.id = a.puzzle_id
+         WHERE s.rating_key = ?
+           AND (? IS NULL OR a.completed_at >= ?)
+           AND a.completed_at <= ?
+         ORDER BY a.completed_at DESC, a.id DESC`
+      )
+      .all(ratingKey, since ?? null, since ?? null, until) as HistoryAttemptDbRow[];
+
+    return rows.map((row) => {
+      const puzzle = puzzleFromRow(row);
+      return {
+        id: row.attempt_id,
+        sessionId: row.session_id,
+        puzzleId: puzzle.id,
+        mode: row.mode,
+        ratingKey: row.rating_key,
+        result: row.result,
+        submittedMove: row.submitted_move,
+        expectedMove: row.expected_move,
+        startedAt: row.attempt_started_at,
+        completedAt: row.completed_at,
+        ratingBefore: row.rating_before,
+        ...(row.rating_after === null ? {} : { ratingAfter: row.rating_after }),
+        puzzleRating: puzzle.rating,
+        side: sideToMoveForHistoryPuzzle({ puzzle, mode: row.mode }),
+        themes: puzzle.themes
+      };
+    });
+  }
+
+  private selectHistoryElo(ratingKey: string, since: string | undefined, until: string): HistoryEloPoint[] {
+    const rows = this.db
+      .prepare(
+        `SELECT
+          id AS session_id,
+          completed_at,
+          rating_before,
+          rating_after
+         FROM sprint_sessions
+         WHERE rating_key = ?
+           AND completed_at IS NOT NULL
+           AND rating_after IS NOT NULL
+           AND (? IS NULL OR completed_at >= ?)
+           AND completed_at <= ?
+         ORDER BY completed_at ASC, id ASC`
+      )
+      .all(ratingKey, since ?? null, since ?? null, until) as HistoryEloDbRow[];
+    return rows.map((row) => ({
+      sessionId: row.session_id,
+      completedAt: row.completed_at,
+      ratingBefore: row.rating_before,
+      ratingAfter: row.rating_after
+    }));
+  }
+
+  private listAllReviewQueueStates(): ReviewQueueState[] {
+    const rows = this.db.prepare("SELECT * FROM review_queue").all() as ReviewRow[];
+    return rows.map(reviewFromRow);
   }
 }
 
@@ -410,6 +609,22 @@ function reviewFromRow(row: ReviewRow): ReviewQueueState {
     lapseCount: row.lapse_count,
     lastResult: row.last_result,
     lastReviewedAt: row.last_reviewed_at
+  };
+}
+
+function attemptEventFromHistoryRow(row: AttemptHistoryRow): AttemptEvent {
+  return {
+    id: row.id,
+    sessionId: row.sessionId,
+    puzzleId: row.puzzleId,
+    mode: row.mode,
+    result: row.result,
+    submittedMove: row.submittedMove,
+    expectedMove: row.expectedMove,
+    startedAt: row.startedAt,
+    completedAt: row.completedAt,
+    ratingBefore: row.ratingBefore,
+    ...(row.ratingAfter === undefined ? {} : { ratingAfter: row.ratingAfter })
   };
 }
 
@@ -480,6 +695,8 @@ CREATE TABLE IF NOT EXISTS attempts (
 CREATE INDEX IF NOT EXISTS attempts_completed_at_idx ON attempts(completed_at);
 CREATE INDEX IF NOT EXISTS attempts_result_idx ON attempts(result);
 CREATE INDEX IF NOT EXISTS attempts_mode_idx ON attempts(mode);
+CREATE INDEX IF NOT EXISTS attempts_session_id_idx ON attempts(session_id);
+CREATE INDEX IF NOT EXISTS sprint_sessions_rating_key_completed_at_idx ON sprint_sessions(rating_key, completed_at);
 
 CREATE TABLE IF NOT EXISTS review_queue (
   puzzle_id TEXT PRIMARY KEY,
@@ -504,4 +721,6 @@ CREATE TABLE IF NOT EXISTS review_events (
   interval_hours INTEGER NOT NULL,
   FOREIGN KEY (puzzle_id) REFERENCES puzzles(id)
 );
+CREATE INDEX IF NOT EXISTS review_events_puzzle_id_idx ON review_events(puzzle_id);
+CREATE INDEX IF NOT EXISTS review_events_reviewed_at_idx ON review_events(reviewed_at);
 `;

@@ -12,8 +12,7 @@ test("SQLite store seeds fixture puzzles and filters Arrow Duel eligibility", as
     assert.equal(store.getPuzzle("00008")?.stockfishBestMove, "b2b1");
 
     const arrowPuzzles = store.selectPuzzles({ mode: "arrow_duel", limit: 10 });
-    assert.equal(arrowPuzzles.length, 4);
-    assert.equal(arrowPuzzles[0]?.id, "000hf");
+    assert.deepEqual(arrowPuzzles.map((puzzle) => puzzle.id).sort(), ["00008", "0018S", "001h8"]);
 
     const themePuzzles = store.selectPuzzles({ mode: "standard", limit: 10, theme: "hangingPiece" });
     assert.deepEqual(themePuzzles.map((puzzle) => puzzle.id), ["00008"]);
@@ -29,13 +28,160 @@ test("SQLite store does not select duplicate puzzle positions for one sprint", a
   try {
     store.seedPuzzles([
       puzzles[0] as Puzzle,
-      { ...(puzzles[0] as Puzzle), id: "00008-copy" },
+      {
+        ...(puzzles[0] as Puzzle),
+        id: "00008-copy",
+        initialFen: "r6k/pp2r2p/4Rp1Q/3p4/8/1N1P2R1/PqP2bPP/7K b - - 37 91"
+      },
       puzzles[1] as Puzzle
     ]);
 
     const selected = store.selectPuzzles({ mode: "standard", limit: 3 });
 
     assert.deepEqual(selected.map((puzzle) => puzzle.id), ["000hf", "00008"]);
+  } finally {
+    store.close();
+  }
+});
+
+test("PracticeService selects SQLite sprint puzzles from the current run ELO window", async () => {
+  const store = await seededStore();
+  const service = new PracticeService(store);
+  try {
+    store.saveRating({ key: "standard 5/20", generation: 0, rating: 1800, games: 3 });
+
+    const sprint = service.startSprint(
+      { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 1, maxMistakes: 3 },
+      "2026-06-20T00:00:00.000Z"
+    );
+
+    assert.equal(sprint.currentPuzzle?.puzzle.id, "00008");
+  } finally {
+    store.close();
+  }
+});
+
+test("PracticeService exposes current-session mistake review items from SQLite history", async () => {
+  const store = await seededStore();
+  const service = new PracticeService(store);
+  try {
+    const sprint = service.startSprint(
+      { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
+      "2026-06-20T00:00:00.000Z"
+    );
+    const result = service.submitMove("c4b5", "2026-06-20T00:00:05.000Z");
+
+    assert.equal(result.state.status, "failed");
+    assert.equal(store.listAttempts({ sessionId: sprint.id, result: "wrong" }).length, 1);
+    const review = service.getSessionMistakeReview(sprint.id);
+    assert.equal(review.length, 1);
+    assert.equal(review[0]?.puzzle.id, "000hf");
+    assert.equal(review[0]?.attempt.submittedMove, "c4b5");
+  } finally {
+    store.close();
+  }
+});
+
+test("PracticeService builds SQLite history view for a required time range and rating key", async () => {
+  const store = await seededStore();
+  const service = new PracticeService(store);
+  try {
+    assert.deepEqual(service.listPlayedRatings(), []);
+
+    service.startSprint(
+      { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
+      "2026-06-20T00:00:00.000Z"
+    );
+    service.submitMove("c4b5", "2026-06-20T00:00:05.000Z");
+
+    const view = service.getHistoryView({
+      now: "2026-06-21T00:00:00.000Z",
+      timeRange: "7d",
+      ratingKey: "standard 5/20",
+      result: "wrong",
+      theme: "mate"
+    });
+
+    assert.deepEqual(
+      view.ratingKeys.map((rating) => rating.key),
+      ["standard 5/20"]
+    );
+    assert.deepEqual(
+      service.listPlayedRatings().map((rating) => rating.key),
+      ["standard 5/20"]
+    );
+    assert.equal(view.attempts.length, 1);
+    assert.equal(view.attempts[0]?.ratingKey, "standard 5/20");
+    assert.equal(view.attempts[0]?.puzzleId, "000hf");
+    assert.ok(view.availableThemes.includes("mate"));
+    assert.equal(view.elo.length, 1);
+    assert.deepEqual(view.puzzleStats, [
+      {
+        puzzleId: "000hf",
+        correctCount: 0,
+        wrongCount: 1,
+        lastWrongAt: "2026-06-20T00:00:05.000Z",
+        nextReviewAt: "2026-06-21T00:00:05.000Z"
+      }
+    ]);
+
+    const oppositeSide = view.attempts[0]?.side === "white" ? "black" : "white";
+    assert.equal(service.getHistoryView({ ...view.query, side: oppositeSide }).attempts.length, 0);
+    assert.equal(service.getDueReviewItems("2026-06-21T00:00:05.000Z")[0]?.puzzle.id, "000hf");
+
+    service.recordReviewResult("000hf", "correct", "2026-06-21T00:00:05.000Z");
+    assert.equal(store.listAttempts({ result: "correct" }).length, 0);
+
+    service.resetRating("standard 5/20");
+    assert.deepEqual(
+      service.listPlayedRatings().map((rating) => rating.key),
+      ["standard 5/20"]
+    );
+  } finally {
+    store.close();
+  }
+});
+
+test("PracticeService pages SQLite history over all available sprint attempts", async () => {
+  const store = await seededStore();
+  const service = new PracticeService(store);
+  try {
+    service.startSprint(
+      { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
+      "2026-05-20T00:00:00.000Z"
+    );
+    service.submitMove("c4b5", "2026-05-20T00:00:05.000Z");
+    service.startSprint(
+      { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
+      "2026-06-20T00:00:00.000Z"
+    );
+    service.submitMove("c4b5", "2026-06-20T00:00:05.000Z");
+
+    const firstPage = service.getHistoryView({
+      now: "2026-06-21T00:00:00.000Z",
+      timeRange: "max",
+      ratingKey: "standard 5/20",
+      page: { limit: 1 }
+    });
+    assert.deepEqual(firstPage.page, {
+      limit: 1,
+      offset: 0,
+      total: 2,
+      hasMore: true
+    });
+    assert.equal(firstPage.attempts[0]?.completedAt, "2026-06-20T00:00:05.000Z");
+
+    const secondPage = service.getHistoryView({
+      ...firstPage.query,
+      page: { limit: 1, offset: 1 }
+    });
+    assert.deepEqual(secondPage.page, {
+      limit: 1,
+      offset: 1,
+      total: 2,
+      hasMore: false
+    });
+    assert.equal(secondPage.attempts[0]?.completedAt, "2026-05-20T00:00:05.000Z");
   } finally {
     store.close();
   }
@@ -115,7 +261,7 @@ test("PracticeService persists wrong attempts, history filters, review queue, an
       { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 3 },
       "2026-06-20T00:00:00.000Z"
     );
-    const result = service.submitMove("e6e8", "2026-06-20T00:00:05.000Z");
+    const result = service.submitMove("c4b5", "2026-06-20T00:00:05.000Z");
     assert.equal(result.attempt?.result, "wrong");
 
     const wrongHistory = store.listAttempts({

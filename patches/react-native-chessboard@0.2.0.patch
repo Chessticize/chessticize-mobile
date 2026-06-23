@@ -1,3 +1,966 @@
+diff --git a/lib/commonjs/components/promotion-dialog.js b/lib/commonjs/components/promotion-dialog.js
+index de72beac3b9cda50edb7a8f34b1630cfdd2bd8cf..b13003dd456b05ba619f3da0b5a6646d4650da30 100644
+--- a/lib/commonjs/components/promotion-dialog.js
++++ b/lib/commonjs/components/promotion-dialog.js
+@@ -13,28 +13,36 @@ function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e
+ const PROMOTION_PIECES = ['q', 'r', 'b', 'n'];
+ const styles = _reactNative.StyleSheet.create({
+   overlay: {
+-    ..._reactNative.StyleSheet.absoluteFillObject,
+-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
++    flex: 1,
++    backgroundColor: 'rgba(15, 23, 42, 0.38)',
+     justifyContent: 'center',
+-    alignItems: 'center'
++    alignItems: 'center',
++    zIndex: 20
+   },
+   container: {
+     flexDirection: 'row',
+-    backgroundColor: 'white',
++    backgroundColor: '#F8FAFC',
+     borderRadius: 8,
+-    padding: 8,
++    borderColor: '#D8E0E8',
++    borderWidth: 1,
++    padding: 10,
++    zIndex: 1,
+     shadowColor: '#000',
+     shadowOffset: {
+       width: 0,
+-      height: 2
++      height: 8
+     },
+-    shadowOpacity: 0.25,
+-    shadowRadius: 4,
++    shadowOpacity: 0.14,
++    shadowRadius: 18,
+     elevation: 5
+   },
+   pieceButton: {
++    alignItems: 'center',
++    justifyContent: 'center',
+     padding: 8,
+-    borderRadius: 4,
++    borderRadius: 7,
++    borderColor: '#CBD5E1',
++    borderWidth: 1,
+     marginHorizontal: 4
+   },
+   pieceImage: {
+@@ -56,13 +64,17 @@ const PromotionDialog = exports.PromotionDialog = /*#__PURE__*/_react.default.me
+     visible: true,
+     animationType: "fade",
+     onRequestClose: onCancel
+-  }, /*#__PURE__*/_react.default.createElement(_reactNative.Pressable, {
++  }, /*#__PURE__*/_react.default.createElement(_reactNative.View, {
+     style: styles.overlay,
++    testID: "promotion-dialog-overlay"
++  }, /*#__PURE__*/_react.default.createElement(_reactNative.Pressable, {
++    style: _reactNative.StyleSheet.absoluteFillObject,
+     onPress: onCancel
+-  }, /*#__PURE__*/_react.default.createElement(_reactNativeReanimated.default.View, {
++  }), /*#__PURE__*/_react.default.createElement(_reactNativeReanimated.default.View, {
+     entering: _reactNativeReanimated.FadeIn.duration(200),
+     exiting: _reactNativeReanimated.FadeOut.duration(200),
+-    style: styles.container
++    style: styles.container,
++    testID: "promotion-dialog-container"
+   }, PROMOTION_PIECES.map(piece => {
+     const pieceCode = `${color}${piece}`;
+     const source = _pieceImages.PIECE_SOURCES[pieceCode];
+@@ -71,6 +83,7 @@ const PromotionDialog = exports.PromotionDialog = /*#__PURE__*/_react.default.me
+       style: [styles.pieceButton, {
+         backgroundColor: colors.promotionPieceButton
+       }],
++      testID: `promotion-choice-${piece}`,
+       onPress: () => onSelect(piece),
+       activeOpacity: 0.7
+     }, /*#__PURE__*/_react.default.createElement(_reactNative.Image, {
+diff --git a/lib/commonjs/components/skia/gesture-board.js b/lib/commonjs/components/skia/gesture-board.js
+index 7ddc0516545a4e1e16774f520123aaa883c235c0..748653cf34925669683bd41c868e191c7f31cf26 100644
+--- a/lib/commonjs/components/skia/gesture-board.js
++++ b/lib/commonjs/components/skia/gesture-board.js
+@@ -20,7 +20,8 @@ var _promotionDialog = require("../promotion-dialog");
+ function _interopRequireWildcard(e, t) { if ("function" == typeof WeakMap) var r = new WeakMap(), n = new WeakMap(); return (_interopRequireWildcard = function (e, t) { if (!t && e && e.__esModule) return e; var o, i, f = { __proto__: null, default: e }; if (null === e || "object" != typeof e && "function" != typeof e) return f; if (o = t ? n : r) { if (o.has(e)) return o.get(e); o.set(e, f); } for (const t in e) "default" !== t && {}.hasOwnProperty.call(e, t) && ((i = (o = Object.defineProperty) && Object.getOwnPropertyDescriptor(e, t)) && (i.get || i.set) ? o(f, t, i) : f[t] = e[t]); return f; })(e, t); }
+ const styles = _reactNative.StyleSheet.create({
+   container: {
+-    aspectRatio: 1
++    aspectRatio: 1,
++    position: 'relative'
+   }
+ });
+ const GestureBoard = exports.GestureBoard = /*#__PURE__*/(0, _react.forwardRef)(({
+diff --git a/lib/commonjs/components/skia/skia-dots.js b/lib/commonjs/components/skia/skia-dots.js
+index 99152d0e193c3ff32b49cb57c78a5b09799a8617..24c27cf6c6a713472f3eb0d6e377a38ffab2f7f2 100644
+--- a/lib/commonjs/components/skia/skia-dots.js
++++ b/lib/commonjs/components/skia/skia-dots.js
+@@ -9,36 +9,58 @@ var _reactNativeSkia = require("@shopify/react-native-skia");
+ var _reactNativeReanimated = require("react-native-reanimated");
+ var _useBoardState = require("../../state/use-board-state");
+ function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+-// All valid-move dots are built by ONE derived path that reads the shared
+-// `validMoves` once (a single subscription) and adds a circle per target —
+-// instead of 64 per-square components each subscribing to `validMoves` and
+-// scanning it. It re-runs ONLY when `validMoves` changes (not every frame),
+-// so it costs nothing at rest. Dots are binary (no per-square opacity), so
+-// one Path is a perfect fit.
++// Valid-move markers are built by two derived paths that read the shared
++// `validMoves` once. Empty targets use quiet dots; capture targets use a ring
++// so the marker remains visible when a piece already occupies the target.
+ const SkiaDots = exports.SkiaDots = /*#__PURE__*/_react.default.memo(({
+   config,
+   boardState
+ }) => {
+   const {
++    colors,
+     pieceSize,
+     flipped
+   } = config;
+   const radius = pieceSize * 0.15;
++  const captureRadius = pieceSize * 0.38;
+   const half = pieceSize / 2;
+-  const path = (0, _reactNativeReanimated.useDerivedValue)(() => {
+-    const p = _reactNativeSkia.Skia.Path.Make();
++  const quietPath = (0, _reactNativeReanimated.useDerivedValue)(() => {
++    const path = _reactNativeSkia.Skia.Path.Make();
+     const moves = boardState.validMoves.get();
+     for (let i = 0; i < moves.length; i++) {
+-      const pos = (0, _useBoardState.squareToPosition)(moves[i], pieceSize, flipped);
+-      p.addCircle(pos.x + half, pos.y + half, radius);
++      const target = moves[i];
++      if (boardState.squares[target].piece.get()) {
++        continue;
++      }
++      const pos = (0, _useBoardState.squareToPosition)(target, pieceSize, flipped);
++      path.addCircle(pos.x + half, pos.y + half, radius);
+     }
+-    return p;
++    return path;
+   });
+-  return /*#__PURE__*/_react.default.createElement(_reactNativeSkia.Path, {
+-    path: path,
+-    color: "rgba(0, 0, 0, 0.3)",
+-    opacity: 0.5
++  const capturePath = (0, _reactNativeReanimated.useDerivedValue)(() => {
++    const path = _reactNativeSkia.Skia.Path.Make();
++    const moves = boardState.validMoves.get();
++    for (let i = 0; i < moves.length; i++) {
++      const target = moves[i];
++      if (!boardState.squares[target].piece.get()) {
++        continue;
++      }
++      const pos = (0, _useBoardState.squareToPosition)(target, pieceSize, flipped);
++      path.addCircle(pos.x + half, pos.y + half, captureRadius);
++    }
++    return path;
+   });
++  return /*#__PURE__*/_react.default.createElement(_react.default.Fragment, null, /*#__PURE__*/_react.default.createElement(_reactNativeSkia.Path, {
++    path: quietPath,
++    color: colors.validMoveDot,
++    opacity: 0.5
++  }), /*#__PURE__*/_react.default.createElement(_reactNativeSkia.Path, {
++    path: capturePath,
++    color: colors.validMoveCapture,
++    opacity: 0.65,
++    style: "stroke",
++    strokeWidth: Math.max(2, pieceSize * 0.05)
++  }));
+ });
+ SkiaDots.displayName = 'SkiaDots';
+ //# sourceMappingURL=skia-dots.js.map
+diff --git a/lib/commonjs/hooks/use-board-gesture.js b/lib/commonjs/hooks/use-board-gesture.js
+index 26deda8bb43c022624db07d6ea463a1028f082f9..cde89b65790dfb2f5b2f255485f50785b449832c 100644
+--- a/lib/commonjs/hooks/use-board-gesture.js
++++ b/lib/commonjs/hooks/use-board-gesture.js
+@@ -19,7 +19,8 @@ const useBoardGesture = ({
+   const {
+     pieceSize,
+     animations,
+-    flipped
++    flipped,
++    draggableColor
+   } = config;
+
+   // Track the currently dragged piece
+@@ -57,16 +58,21 @@ const useBoardGesture = ({
+       const square = (0, _useBoardState.positionToSquare)(x, y, pieceSize, flipped);
+       const squareState = boardState.squares[square];
+       const piece = squareState.piece.get();
+-      if (piece) {
+-        // Store drag start info (but don't start drag yet)
+-        draggedSquare.set(square);
+-        dragStartX.set(squareState.translateX.get());
+-        dragStartY.set(squareState.translateY.get());
+-        const pieceCenterX = squareState.translateX.get() + pieceSize / 2;
+-        const pieceCenterY = squareState.translateY.get() + pieceSize / 2;
+-        touchOffsetX.set(x - pieceCenterX);
+-        touchOffsetY.set(y - pieceCenterY);
++      const turn = boardState.turn.get();
++      const allowedDragColor = draggableColor ?? turn;
++      if (!piece || piece[0] !== allowedDragColor) {
++        draggedSquare.set(null);
++        return;
+       }
++
++      // Store drag start info (but don't start drag yet)
++      draggedSquare.set(square);
++      dragStartX.set(squareState.translateX.get());
++      dragStartY.set(squareState.translateY.get());
++      const pieceCenterX = squareState.translateX.get() + pieceSize / 2;
++      const pieceCenterY = squareState.translateY.get() + pieceSize / 2;
++      touchOffsetX.set(x - pieceCenterX);
++      touchOffsetY.set(y - pieceCenterY);
+     }).onStart(() => {
+       'worklet';
+
+@@ -76,16 +82,22 @@ const useBoardGesture = ({
+       const squareState = boardState.squares[square];
+       const piece = squareState.piece.get();
+       const turn = boardState.turn.get();
++      const allowedDragColor = draggableColor ?? turn;
++      const isOwnPiece = piece && piece[0] === allowedDragColor;
++
++      // Do not start dragging opponent pieces; otherwise onUpdate can visibly
++      // move them until onEnd snaps them back.
++      if (!isOwnPiece) {
++        draggedSquare.set(null);
++        return;
++      }
+
+       // Raise and scale the piece
+       squareState.zIndex.set(100);
+       squareState.scale.set((0, _reactNativeReanimated.withSpring)(1.1, animations.scale));
+
+       // Only show valid moves (dots) for own pieces
+-      const isOwnPiece = piece && piece[0] === turn;
+-      if (isOwnPiece) {
+-        (0, _reactNativeWorklets.scheduleOnRN)(handleSelectPiece, square);
+-      }
++      (0, _reactNativeWorklets.scheduleOnRN)(handleSelectPiece, square);
+     }).onUpdate(event => {
+       'worklet';
+
+@@ -115,7 +127,8 @@ const useBoardGesture = ({
+       // Check if this is own piece - only own pieces can make moves
+       const piece = squareState.piece.get();
+       const turn = boardState.turn.get();
+-      const isOwnPiece = piece && piece[0] === turn;
++      const allowedDragColor = draggableColor ?? turn;
++      const isOwnPiece = piece && piece[0] === allowedDragColor;
+
+       // If not own piece, just snap back (can't make moves with opponent's pieces)
+       if (!isOwnPiece) {
+@@ -187,7 +200,8 @@ const useBoardGesture = ({
+       const selectedSquare = boardState.selectedSquare.get();
+       const piece = boardState.squares[square].piece.get();
+       const turn = boardState.turn.get();
+-      const isOwnPiece = piece && piece[0] === turn;
++      const allowedDragColor = draggableColor ?? turn;
++      const isOwnPiece = piece && piece[0] === allowedDragColor;
+
+       // Case 1: No piece selected - try to select own piece
+       if (!selectedSquare) {
+@@ -224,7 +238,7 @@ const useBoardGesture = ({
+
+     // Combine gestures - pan takes precedence
+     return _reactNativeGestureHandler.Gesture.Simultaneous(tapGesture, panGesture);
+-  }, [boardState, pieceSize, flipped, draggedSquare, dragStartX, dragStartY, touchOffsetX, touchOffsetY, animations, gestureEnabled, handleTryMove, handleSelectPiece, handleIllegalMove]);
++  }, [boardState, pieceSize, flipped, draggedSquare, dragStartX, dragStartY, touchOffsetX, touchOffsetY, animations, gestureEnabled, draggableColor, handleTryMove, handleSelectPiece, handleIllegalMove]);
+   return gesture;
+ };
+ exports.useBoardGesture = useBoardGesture;
+diff --git a/lib/commonjs/index.js b/lib/commonjs/index.js
+index 360d75d327324795ca72a43b37965b1ea2bc19d9..d537244ea686338203b8d82d5bd20f8f2d472ba5 100644
+--- a/lib/commonjs/index.js
++++ b/lib/commonjs/index.js
+@@ -12,6 +12,7 @@ const Chessboard = exports.Chessboard = /*#__PURE__*/(0, _react.forwardRef)(({
+   fen,
+   boardSize,
+   gestureEnabled,
++  draggableColor,
+   flipped,
+   withLetters,
+   withNumbers,
+@@ -27,6 +28,7 @@ const Chessboard = exports.Chessboard = /*#__PURE__*/(0, _react.forwardRef)(({
+     fen: fen,
+     boardSize: boardSize,
+     gestureEnabled: gestureEnabled,
++    draggableColor: draggableColor,
+     flipped: flipped,
+     withLetters: withLetters,
+     withNumbers: withNumbers,
+diff --git a/lib/commonjs/state/board-state-context.js b/lib/commonjs/state/board-state-context.js
+index cfd52d5394e32d3972be93c85977c62f4ad30885..c053d8f58b807b27594c24a934c8537e58ddf75e 100644
+--- a/lib/commonjs/state/board-state-context.js
++++ b/lib/commonjs/state/board-state-context.js
+@@ -19,7 +19,9 @@ const defaultColors = {
+   black: '#62B1A8',
+   lastMoveHighlight: 'rgba(255,255,0, 0.5)',
+   checkmateHighlight: '#E84855',
+-  promotionPieceButton: '#FF9B71'
++  promotionPieceButton: '#FF9B71',
++  validMoveDot: 'rgba(0, 0, 0, 0.3)',
++  validMoveCapture: 'rgba(0, 0, 0, 0.55)'
+ };
+ const defaultDurations = {
+   move: 150
+@@ -34,6 +36,7 @@ const BoardStateProvider = ({
+   fen,
+   boardSize = DEFAULT_BOARD_SIZE,
+   gestureEnabled = true,
++  draggableColor = null,
+   flipped = false,
+   withLetters = true,
+   withNumbers = true,
+@@ -46,6 +49,7 @@ const BoardStateProvider = ({
+     boardSize,
+     pieceSize,
+     gestureEnabled,
++    draggableColor,
+     flipped,
+     withLetters,
+     withNumbers,
+@@ -59,7 +63,7 @@ const BoardStateProvider = ({
+     },
+     animations: defaultAnimations,
+     fontSource: fontSource ?? null
+-  }), [boardSize, pieceSize, gestureEnabled, flipped, withLetters, withNumbers, colors, durations, fontSource]);
++  }), [boardSize, pieceSize, gestureEnabled, draggableColor, flipped, withLetters, withNumbers, colors, durations, fontSource]);
+   const {
+     boardState,
+     chess
+diff --git a/lib/module/components/promotion-dialog.js b/lib/module/components/promotion-dialog.js
+index 5bf64b655079b16368383257bc53bc3bce4d8418..ca2a24307fa333129c93deb7f64a0197b31953b2 100644
+--- a/lib/module/components/promotion-dialog.js
++++ b/lib/module/components/promotion-dialog.js
+@@ -1,32 +1,40 @@
+ import React from 'react';
+-import { StyleSheet, TouchableOpacity, Image, Modal, Pressable } from 'react-native';
++import { StyleSheet, TouchableOpacity, Image, Modal, Pressable, View } from 'react-native';
+ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+ import { PIECE_SOURCES } from '../assets/piece-images';
+ const PROMOTION_PIECES = ['q', 'r', 'b', 'n'];
+ const styles = StyleSheet.create({
+   overlay: {
+-    ...StyleSheet.absoluteFillObject,
+-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
++    flex: 1,
++    backgroundColor: 'rgba(15, 23, 42, 0.38)',
+     justifyContent: 'center',
+-    alignItems: 'center'
++    alignItems: 'center',
++    zIndex: 20
+   },
+   container: {
+     flexDirection: 'row',
+-    backgroundColor: 'white',
++    backgroundColor: '#F8FAFC',
+     borderRadius: 8,
+-    padding: 8,
++    borderColor: '#D8E0E8',
++    borderWidth: 1,
++    padding: 10,
++    zIndex: 1,
+     shadowColor: '#000',
+     shadowOffset: {
+       width: 0,
+-      height: 2
++      height: 8
+     },
+-    shadowOpacity: 0.25,
+-    shadowRadius: 4,
++    shadowOpacity: 0.14,
++    shadowRadius: 18,
+     elevation: 5
+   },
+   pieceButton: {
++    alignItems: 'center',
++    justifyContent: 'center',
+     padding: 8,
+-    borderRadius: 4,
++    borderRadius: 7,
++    borderColor: '#CBD5E1',
++    borderWidth: 1,
+     marginHorizontal: 4
+   },
+   pieceImage: {
+@@ -48,13 +56,17 @@ export const PromotionDialog = /*#__PURE__*/React.memo(({
+     visible: true,
+     animationType: "fade",
+     onRequestClose: onCancel
+-  }, /*#__PURE__*/React.createElement(Pressable, {
++  }, /*#__PURE__*/React.createElement(View, {
+     style: styles.overlay,
++    testID: "promotion-dialog-overlay"
++  }, /*#__PURE__*/React.createElement(Pressable, {
++    style: StyleSheet.absoluteFillObject,
+     onPress: onCancel
+-  }, /*#__PURE__*/React.createElement(Animated.View, {
++  }), /*#__PURE__*/React.createElement(Animated.View, {
+     entering: FadeIn.duration(200),
+     exiting: FadeOut.duration(200),
+-    style: styles.container
++    style: styles.container,
++    testID: "promotion-dialog-container"
+   }, PROMOTION_PIECES.map(piece => {
+     const pieceCode = `${color}${piece}`;
+     const source = PIECE_SOURCES[pieceCode];
+@@ -63,6 +75,7 @@ export const PromotionDialog = /*#__PURE__*/React.memo(({
+       style: [styles.pieceButton, {
+         backgroundColor: colors.promotionPieceButton
+       }],
++      testID: `promotion-choice-${piece}`,
+       onPress: () => onSelect(piece),
+       activeOpacity: 0.7
+     }, /*#__PURE__*/React.createElement(Image, {
+diff --git a/lib/module/components/skia/gesture-board.js b/lib/module/components/skia/gesture-board.js
+index 79598f3cce08d079d2a004ed0563f1194fd7d31c..e9c4b9b6c3e29dfef7523ed53015031bb7c655f7 100644
+--- a/lib/module/components/skia/gesture-board.js
++++ b/lib/module/components/skia/gesture-board.js
+@@ -13,7 +13,8 @@ import { SkiaBoard } from './skia-board';
+ import { PromotionDialog } from '../promotion-dialog';
+ const styles = StyleSheet.create({
+   container: {
+-    aspectRatio: 1
++    aspectRatio: 1,
++    position: 'relative'
+   }
+ });
+ export const GestureBoard = /*#__PURE__*/forwardRef(({
+diff --git a/lib/module/components/skia/skia-dots.js b/lib/module/components/skia/skia-dots.js
+index 120f116f938d6bf19ed350321959c9c5a860b48a..5d8e884209b1142d6923281494c502f9a2f102eb 100644
+--- a/lib/module/components/skia/skia-dots.js
++++ b/lib/module/components/skia/skia-dots.js
+@@ -2,36 +2,58 @@ import React from 'react';
+ import { Path, Skia } from '@shopify/react-native-skia';
+ import { useDerivedValue } from 'react-native-reanimated';
+ import { squareToPosition } from '../../state/use-board-state';
+-// All valid-move dots are built by ONE derived path that reads the shared
+-// `validMoves` once (a single subscription) and adds a circle per target —
+-// instead of 64 per-square components each subscribing to `validMoves` and
+-// scanning it. It re-runs ONLY when `validMoves` changes (not every frame),
+-// so it costs nothing at rest. Dots are binary (no per-square opacity), so
+-// one Path is a perfect fit.
++// Valid-move markers are built by two derived paths that read the shared
++// `validMoves` once. Empty targets use quiet dots; capture targets use a ring
++// so the marker remains visible when a piece already occupies the target.
+ export const SkiaDots = /*#__PURE__*/React.memo(({
+   config,
+   boardState
+ }) => {
+   const {
++    colors,
+     pieceSize,
+     flipped
+   } = config;
+   const radius = pieceSize * 0.15;
++  const captureRadius = pieceSize * 0.38;
+   const half = pieceSize / 2;
+-  const path = useDerivedValue(() => {
+-    const p = Skia.Path.Make();
++  const quietPath = useDerivedValue(() => {
++    const path = Skia.Path.Make();
+     const moves = boardState.validMoves.get();
+     for (let i = 0; i < moves.length; i++) {
+-      const pos = squareToPosition(moves[i], pieceSize, flipped);
+-      p.addCircle(pos.x + half, pos.y + half, radius);
++      const target = moves[i];
++      if (boardState.squares[target].piece.get()) {
++        continue;
++      }
++      const pos = squareToPosition(target, pieceSize, flipped);
++      path.addCircle(pos.x + half, pos.y + half, radius);
+     }
+-    return p;
++    return path;
+   });
+-  return /*#__PURE__*/React.createElement(Path, {
+-    path: path,
+-    color: "rgba(0, 0, 0, 0.3)",
+-    opacity: 0.5
++  const capturePath = useDerivedValue(() => {
++    const path = Skia.Path.Make();
++    const moves = boardState.validMoves.get();
++    for (let i = 0; i < moves.length; i++) {
++      const target = moves[i];
++      if (!boardState.squares[target].piece.get()) {
++        continue;
++      }
++      const pos = squareToPosition(target, pieceSize, flipped);
++      path.addCircle(pos.x + half, pos.y + half, captureRadius);
++    }
++    return path;
+   });
++  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Path, {
++    path: quietPath,
++    color: colors.validMoveDot,
++    opacity: 0.5
++  }), /*#__PURE__*/React.createElement(Path, {
++    path: capturePath,
++    color: colors.validMoveCapture,
++    opacity: 0.65,
++    style: "stroke",
++    strokeWidth: Math.max(2, pieceSize * 0.05)
++  }));
+ });
+ SkiaDots.displayName = 'SkiaDots';
+ //# sourceMappingURL=skia-dots.js.map
+diff --git a/lib/module/hooks/use-board-gesture.js b/lib/module/hooks/use-board-gesture.js
+index 504126e4dc0a469cf5b00913e176e360322a1194..e34c0ae9b6ed8a0e1531d71437297d444c2e5c87 100644
+--- a/lib/module/hooks/use-board-gesture.js
++++ b/lib/module/hooks/use-board-gesture.js
+@@ -13,7 +13,8 @@ export const useBoardGesture = ({
+   const {
+     pieceSize,
+     animations,
+-    flipped
++    flipped,
++    draggableColor
+   } = config;
+
+   // Track the currently dragged piece
+@@ -51,16 +52,21 @@ export const useBoardGesture = ({
+       const square = positionToSquare(x, y, pieceSize, flipped);
+       const squareState = boardState.squares[square];
+       const piece = squareState.piece.get();
+-      if (piece) {
+-        // Store drag start info (but don't start drag yet)
+-        draggedSquare.set(square);
+-        dragStartX.set(squareState.translateX.get());
+-        dragStartY.set(squareState.translateY.get());
+-        const pieceCenterX = squareState.translateX.get() + pieceSize / 2;
+-        const pieceCenterY = squareState.translateY.get() + pieceSize / 2;
+-        touchOffsetX.set(x - pieceCenterX);
+-        touchOffsetY.set(y - pieceCenterY);
++      const turn = boardState.turn.get();
++      const allowedDragColor = draggableColor ?? turn;
++      if (!piece || piece[0] !== allowedDragColor) {
++        draggedSquare.set(null);
++        return;
+       }
++
++      // Store drag start info (but don't start drag yet)
++      draggedSquare.set(square);
++      dragStartX.set(squareState.translateX.get());
++      dragStartY.set(squareState.translateY.get());
++      const pieceCenterX = squareState.translateX.get() + pieceSize / 2;
++      const pieceCenterY = squareState.translateY.get() + pieceSize / 2;
++      touchOffsetX.set(x - pieceCenterX);
++      touchOffsetY.set(y - pieceCenterY);
+     }).onStart(() => {
+       'worklet';
+
+@@ -70,16 +76,22 @@ export const useBoardGesture = ({
+       const squareState = boardState.squares[square];
+       const piece = squareState.piece.get();
+       const turn = boardState.turn.get();
++      const allowedDragColor = draggableColor ?? turn;
++      const isOwnPiece = piece && piece[0] === allowedDragColor;
++
++      // Do not start dragging opponent pieces; otherwise onUpdate can visibly
++      // move them until onEnd snaps them back.
++      if (!isOwnPiece) {
++        draggedSquare.set(null);
++        return;
++      }
+
+       // Raise and scale the piece
+       squareState.zIndex.set(100);
+       squareState.scale.set(withSpring(1.1, animations.scale));
+
+       // Only show valid moves (dots) for own pieces
+-      const isOwnPiece = piece && piece[0] === turn;
+-      if (isOwnPiece) {
+-        scheduleOnRN(handleSelectPiece, square);
+-      }
++      scheduleOnRN(handleSelectPiece, square);
+     }).onUpdate(event => {
+       'worklet';
+
+@@ -109,7 +121,8 @@ export const useBoardGesture = ({
+       // Check if this is own piece - only own pieces can make moves
+       const piece = squareState.piece.get();
+       const turn = boardState.turn.get();
+-      const isOwnPiece = piece && piece[0] === turn;
++      const allowedDragColor = draggableColor ?? turn;
++      const isOwnPiece = piece && piece[0] === allowedDragColor;
+
+       // If not own piece, just snap back (can't make moves with opponent's pieces)
+       if (!isOwnPiece) {
+@@ -181,7 +194,8 @@ export const useBoardGesture = ({
+       const selectedSquare = boardState.selectedSquare.get();
+       const piece = boardState.squares[square].piece.get();
+       const turn = boardState.turn.get();
+-      const isOwnPiece = piece && piece[0] === turn;
++      const allowedDragColor = draggableColor ?? turn;
++      const isOwnPiece = piece && piece[0] === allowedDragColor;
+
+       // Case 1: No piece selected - try to select own piece
+       if (!selectedSquare) {
+@@ -218,7 +232,7 @@ export const useBoardGesture = ({
+
+     // Combine gestures - pan takes precedence
+     return Gesture.Simultaneous(tapGesture, panGesture);
+-  }, [boardState, pieceSize, flipped, draggedSquare, dragStartX, dragStartY, touchOffsetX, touchOffsetY, animations, gestureEnabled, handleTryMove, handleSelectPiece, handleIllegalMove]);
++  }, [boardState, pieceSize, flipped, draggedSquare, dragStartX, dragStartY, touchOffsetX, touchOffsetY, animations, gestureEnabled, draggableColor, handleTryMove, handleSelectPiece, handleIllegalMove]);
+   return gesture;
+ };
+ //# sourceMappingURL=use-board-gesture.js.map
+diff --git a/lib/module/index.js b/lib/module/index.js
+index 7cee33e75529b83bea5c7216e4b89be54c9fb520..fbb0128b96d0f1e305999253ea9257e9dbd49b3e 100644
+--- a/lib/module/index.js
++++ b/lib/module/index.js
+@@ -5,6 +5,7 @@ const Chessboard = /*#__PURE__*/forwardRef(({
+   fen,
+   boardSize,
+   gestureEnabled,
++  draggableColor,
+   flipped,
+   withLetters,
+   withNumbers,
+@@ -20,6 +21,7 @@ const Chessboard = /*#__PURE__*/forwardRef(({
+     fen: fen,
+     boardSize: boardSize,
+     gestureEnabled: gestureEnabled,
++    draggableColor: draggableColor,
+     flipped: flipped,
+     withLetters: withLetters,
+     withNumbers: withNumbers,
+diff --git a/lib/module/state/board-state-context.js b/lib/module/state/board-state-context.js
+index 9c5fc37c72a09fa6a338aba03bd0433d0c09573e..eeb34994e5b3d24aa21fcc8bd2e55ab4307fbbae 100644
+--- a/lib/module/state/board-state-context.js
++++ b/lib/module/state/board-state-context.js
+@@ -12,7 +12,9 @@ const defaultColors = {
+   black: '#62B1A8',
+   lastMoveHighlight: 'rgba(255,255,0, 0.5)',
+   checkmateHighlight: '#E84855',
+-  promotionPieceButton: '#FF9B71'
++  promotionPieceButton: '#FF9B71',
++  validMoveDot: 'rgba(0, 0, 0, 0.3)',
++  validMoveCapture: 'rgba(0, 0, 0, 0.55)'
+ };
+ const defaultDurations = {
+   move: 150
+@@ -27,6 +29,7 @@ export const BoardStateProvider = ({
+   fen,
+   boardSize = DEFAULT_BOARD_SIZE,
+   gestureEnabled = true,
++  draggableColor = null,
+   flipped = false,
+   withLetters = true,
+   withNumbers = true,
+@@ -39,6 +42,7 @@ export const BoardStateProvider = ({
+     boardSize,
+     pieceSize,
+     gestureEnabled,
++    draggableColor,
+     flipped,
+     withLetters,
+     withNumbers,
+@@ -52,7 +56,7 @@ export const BoardStateProvider = ({
+     },
+     animations: defaultAnimations,
+     fontSource: fontSource ?? null
+-  }), [boardSize, pieceSize, gestureEnabled, flipped, withLetters, withNumbers, colors, durations, fontSource]);
++  }), [boardSize, pieceSize, gestureEnabled, draggableColor, flipped, withLetters, withNumbers, colors, durations, fontSource]);
+   const {
+     boardState,
+     chess
+diff --git a/lib/typescript/state/board-state-context.d.ts b/lib/typescript/state/board-state-context.d.ts
+index 9df5d29a4e894d52f6ff4c7036342a60eb2529f7..a1179eda7258a44362521fceb030b5a2f3595fef 100644
+--- a/lib/typescript/state/board-state-context.d.ts
++++ b/lib/typescript/state/board-state-context.d.ts
+@@ -1,5 +1,6 @@
+ import React from 'react';
+ import { Chess } from 'chess.js';
++import type { Color } from 'chess.js';
+ import type { BoardState, BoardConfig } from './types';
+ import type { ImageSourcePropType } from 'react-native';
+ type BoardContextValue = {
+@@ -12,6 +13,7 @@ export type BoardStateProviderProps = {
+     fen?: string;
+     boardSize?: number;
+     gestureEnabled?: boolean;
++    draggableColor?: Color | null;
+     flipped?: boolean;
+     withLetters?: boolean;
+     withNumbers?: boolean;
+diff --git a/lib/typescript/state/types.d.ts b/lib/typescript/state/types.d.ts
+index eaac9e98118247d6e6776fe990fa7e10aa5b9227..2f896b9f44846bf23b0cbac42e69da0176304d9a 100644
+--- a/lib/typescript/state/types.d.ts
++++ b/lib/typescript/state/types.d.ts
+@@ -31,6 +31,7 @@ export interface BoardConfig {
+     boardSize: number;
+     pieceSize: number;
+     gestureEnabled: boolean;
++    draggableColor: Color | null;
+     flipped: boolean;
+     withLetters: boolean;
+     withNumbers: boolean;
+@@ -40,6 +41,8 @@ export interface BoardConfig {
+         lastMoveHighlight: string;
+         checkmateHighlight: string;
+         promotionPieceButton: string;
++        validMoveDot: string;
++        validMoveCapture: string;
+     };
+     durations: {
+         move: number;
+diff --git a/src/components/promotion-dialog.tsx b/src/components/promotion-dialog.tsx
+index a3f67bf02f45b674772813bdf03f4b25c56f070e..3c087c36b3935a3f821fee154613d2a04e1d7e3f 100644
+--- a/src/components/promotion-dialog.tsx
++++ b/src/components/promotion-dialog.tsx
+@@ -5,6 +5,7 @@ import {
+   Image,
+   Modal,
+   Pressable,
++  View,
+ } from 'react-native';
+ import type { PieceSymbol } from 'chess.js';
+ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+@@ -20,27 +21,45 @@ interface PromotionDialogProps {
+   config: BoardConfig;
+ }
+
++const debugChessboard = (event: string, details: Record<string, unknown>) => {
++  const globals = globalThis as unknown as {
++    __CHESSTICIZE_CHESSBOARD_DEBUG__?: boolean;
++    __CHESSTICIZE_CHESSBOARD_DEBUG_SINK__?: (event: string, details: Record<string, unknown>) => void;
++  };
++  if (!globals.__CHESSTICIZE_CHESSBOARD_DEBUG__) return;
++  globals.__CHESSTICIZE_CHESSBOARD_DEBUG_SINK__?.(event, details);
++  console.warn(`[ChessboardDebug] ${event} ${JSON.stringify(details)}`);
++};
++
+ const styles = StyleSheet.create({
+   overlay: {
+-    ...StyleSheet.absoluteFillObject,
+-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
++    flex: 1,
++    backgroundColor: 'rgba(15, 23, 42, 0.38)',
+     justifyContent: 'center',
+     alignItems: 'center',
++    zIndex: 20,
+   },
+   container: {
+     flexDirection: 'row',
+-    backgroundColor: 'white',
++    backgroundColor: '#F8FAFC',
+     borderRadius: 8,
+-    padding: 8,
++    borderColor: '#D8E0E8',
++    borderWidth: 1,
++    padding: 10,
++    zIndex: 1,
+     shadowColor: '#000',
+-    shadowOffset: { width: 0, height: 2 },
+-    shadowOpacity: 0.25,
+-    shadowRadius: 4,
++    shadowOffset: { width: 0, height: 8 },
++    shadowOpacity: 0.14,
++    shadowRadius: 18,
+     elevation: 5,
+   },
+   pieceButton: {
++    alignItems: 'center',
++    justifyContent: 'center',
+     padding: 8,
+-    borderRadius: 4,
++    borderRadius: 7,
++    borderColor: '#CBD5E1',
++    borderWidth: 1,
+     marginHorizontal: 4,
+   },
+   pieceImage: {
+@@ -55,11 +74,13 @@ export const PromotionDialog: React.FC<PromotionDialogProps> = React.memo(
+
+     return (
+       <Modal transparent visible animationType="fade" onRequestClose={onCancel}>
+-        <Pressable style={styles.overlay} onPress={onCancel}>
++        <View style={styles.overlay} testID="promotion-dialog-overlay">
++          <Pressable style={StyleSheet.absoluteFillObject} onPress={onCancel} />
+           <Animated.View
+             entering={FadeIn.duration(200)}
+             exiting={FadeOut.duration(200)}
+             style={styles.container}
++            testID="promotion-dialog-container"
+           >
+             {PROMOTION_PIECES.map((piece) => {
+               const pieceCode =
+@@ -73,7 +94,11 @@ export const PromotionDialog: React.FC<PromotionDialogProps> = React.memo(
+                     styles.pieceButton,
+                     { backgroundColor: colors.promotionPieceButton },
+                   ]}
+-                  onPress={() => onSelect(piece)}
++                  testID={`promotion-choice-${piece}`}
++                  onPress={() => {
++                    debugChessboard('promotionDialog:press', { piece });
++                    onSelect(piece);
++                  }}
+                   activeOpacity={0.7}
+                 >
+                   <Image source={source} style={styles.pieceImage} />
+@@ -81,7 +106,7 @@ export const PromotionDialog: React.FC<PromotionDialogProps> = React.memo(
+               );
+             })}
+           </Animated.View>
+-        </Pressable>
++        </View>
+       </Modal>
+     );
+   }
+diff --git a/src/components/skia/gesture-board.tsx b/src/components/skia/gesture-board.tsx
+index b4a278cc2ada84715a4916324b459952ab33c942..13084b25d8e9f36f52e24bbb4219db913fc2d941 100644
+--- a/src/components/skia/gesture-board.tsx
++++ b/src/components/skia/gesture-board.tsx
+@@ -2,6 +2,7 @@ import React, {
+   useMemo,
+   useCallback,
+   useState,
++  useEffect,
+   forwardRef,
+   useRef,
+ } from 'react';
+@@ -38,9 +39,20 @@ import type { EffectParams, EffectTrigger } from '../../types';
+ const styles = StyleSheet.create({
+   container: {
+     aspectRatio: 1,
++    position: 'relative',
+   },
+ });
+
++const debugChessboard = (event: string, details: Record<string, unknown>) => {
++  const globals = globalThis as unknown as {
++    __CHESSTICIZE_CHESSBOARD_DEBUG__?: boolean;
++    __CHESSTICIZE_CHESSBOARD_DEBUG_SINK__?: (event: string, details: Record<string, unknown>) => void;
++  };
++  if (!globals.__CHESSTICIZE_CHESSBOARD_DEBUG__) return;
++  globals.__CHESSTICIZE_CHESSBOARD_DEBUG_SINK__?.(event, details);
++  console.warn(`[ChessboardDebug] ${event} ${JSON.stringify(details)}`);
++};
++
+ interface PromotionInfo {
+   from: Square;
+   to: Square;
+@@ -71,30 +83,46 @@ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
+       'checkmate' | 'check' | 'stalemate' | ''
+     >('');
+
+-    // Use ref to store promotion info to avoid re-renders during drag
+-    // Only the boolean state triggers a render when dialog needs to show/hide
++    // Keep the pending promotion in React state so the dialog render is tied
++    // directly to the pending choice. The ref lets callbacks resolve the move
++    // promise without depending on render timing.
+     const promotionInfoRef = useRef<PromotionInfo | null>(null);
+-    const [showPromotion, setShowPromotion] = useState(false);
++    const [promotionInfo, setPromotionInfo] = useState<PromotionInfo | null>(null);
++    const showPromotion = promotionInfo !== null;
+
+     const handlePromotionRequired = useCallback((info: PromotionInfo) => {
+       // If a promotion is somehow already pending, abandon it (resolving its
+       // move() promise) before replacing it, so the old one never leaks.
+       promotionInfoRef.current?.cancel();
+       promotionInfoRef.current = info;
+-      setShowPromotion(true);
++      debugChessboard('promotionBoard:required', {
++        from: info.from,
++        to: info.to,
++        color: info.color,
++      });
++      setPromotionInfo(info);
+     }, []);
+
+     const handlePromotionSelect = useCallback((piece: PieceSymbol) => {
+       const info = promotionInfoRef.current;
++      debugChessboard('promotionBoard:select', {
++        piece,
++        hasInfo: !!info,
++      });
+       if (info) {
+         info.complete(piece);
+         promotionInfoRef.current = null;
+-        setShowPromotion(false);
++        setPromotionInfo(null);
+       }
+     }, []);
+
+     const handlePromotionCancel = useCallback(() => {
+       const info = promotionInfoRef.current;
++      debugChessboard('promotionBoard:cancel', {
++        hasInfo: !!info,
++        from: info?.from,
++        to: info?.to,
++      });
+       // The drag gesture animated the pawn into the back-rank target square
+       // and raised its zIndex; chess.move() was deferred until the user picked
+       // a promotion piece. Cancel means we never execute the move, so snap
+@@ -121,9 +149,19 @@ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
+         info.cancel();
+       }
+       promotionInfoRef.current = null;
+-      setShowPromotion(false);
++      setPromotionInfo(null);
+     }, [boardState, config]);
+
++    useEffect(() => {
++      debugChessboard('promotionBoard:state', {
++        showPromotion,
++        hasInfo: !!promotionInfo,
++        refHasInfo: !!promotionInfoRef.current,
++        from: promotionInfo?.from,
++        to: promotionInfo?.to,
++      });
++    }, [promotionInfo, showPromotion]);
++
+     // Trigger effect on game events
+     const triggerEffect = useCallback(
+       (trigger: EffectTrigger, kingColor: 'w' | 'b') => {
+@@ -244,25 +282,27 @@ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
+
+     return (
+       <GestureHandlerRootView style={containerStyle}>
+-        <GestureDetector gesture={gesture}>
+-          <View style={containerStyle}>
+-            <SkiaBoard
++        <View style={containerStyle}>
++          <GestureDetector gesture={gesture}>
++            <View style={containerStyle}>
++              <SkiaBoard
++                config={config}
++                boardState={boardState}
++                spriteImage={spriteImage}
++                renderEffect={renderEffect}
++                effectParams={effectParams}
++              />
++            </View>
++          </GestureDetector>
++          {promotionInfo && (
++            <PromotionDialog
++              color={promotionInfo.color}
++              onSelect={handlePromotionSelect}
++              onCancel={handlePromotionCancel}
+               config={config}
+-              boardState={boardState}
+-              spriteImage={spriteImage}
+-              renderEffect={renderEffect}
+-              effectParams={effectParams}
+             />
+-          </View>
+-        </GestureDetector>
+-        {showPromotion && promotionInfoRef.current && (
+-          <PromotionDialog
+-            color={promotionInfoRef.current.color}
+-            onSelect={handlePromotionSelect}
+-            onCancel={handlePromotionCancel}
+-            config={config}
+-          />
+-        )}
++          )}
++        </View>
+       </GestureHandlerRootView>
+     );
+   }
 diff --git a/src/components/skia/skia-board.tsx b/src/components/skia/skia-board.tsx
 index 759d04e3d374ee79388c2acddc541cfceb0ee7db..c46b6e4e785df632ae3361ac337cefab954d5892 100644
 --- a/src/components/skia/skia-board.tsx
@@ -15,15 +978,15 @@ index 759d04e3d374ee79388c2acddc541cfceb0ee7db..c46b6e4e785df632ae3361ac337cefab
 +        <SkiaDots config={config} boardState={boardState} />
        </>
      );
- 
+
 diff --git a/src/components/skia/skia-dots.tsx b/src/components/skia/skia-dots.tsx
-index 5032bfe81a485ff85d710e7d6e4c0a2e8d78347e..9946cb5db3dee32b4c62c58603fa23c398b7d8a1 100644
+index 5032bfe81a485ff85d710e7d6e4c0a2e8d78347e..041ff73a79b81185b4719c5e53c6e56ea7a31420 100644
 --- a/src/components/skia/skia-dots.tsx
 +++ b/src/components/skia/skia-dots.tsx
 @@ -9,29 +9,56 @@ interface SkiaDotsProps {
    boardState: BoardState;
  }
- 
+
 -// All valid-move dots are built by ONE derived path that reads the shared
 -// `validMoves` once (a single subscription) and adds a circle per target —
 -// instead of 64 per-square components each subscribing to `validMoves` and
@@ -35,11 +998,12 @@ index 5032bfe81a485ff85d710e7d6e4c0a2e8d78347e..9946cb5db3dee32b4c62c58603fa23c3
 +// so the marker remains visible when a piece already occupies the target.
  export const SkiaDots: React.FC<SkiaDotsProps> = React.memo(
    ({ config, boardState }) => {
-     const { pieceSize, flipped } = config;
+-    const { pieceSize, flipped } = config;
++    const { colors, pieceSize, flipped } = config;
      const radius = pieceSize * 0.15;
 +    const captureRadius = pieceSize * 0.38;
      const half = pieceSize / 2;
- 
+
 -    const path = useDerivedValue(() => {
 -      const p = Skia.Path.Make();
 +    const quietPath = useDerivedValue(() => {
@@ -58,7 +1022,7 @@ index 5032bfe81a485ff85d710e7d6e4c0a2e8d78347e..9946cb5db3dee32b4c62c58603fa23c3
 -      return p;
 +      return path;
      });
- 
+
 -    return <Path path={path} color="rgba(0, 0, 0, 0.3)" opacity={0.5} />;
 +    const capturePath = useDerivedValue(() => {
 +      const path = Skia.Path.Make();
@@ -76,10 +1040,10 @@ index 5032bfe81a485ff85d710e7d6e4c0a2e8d78347e..9946cb5db3dee32b4c62c58603fa23c3
 +
 +    return (
 +      <>
-+        <Path path={quietPath} color="rgba(0, 0, 0, 0.3)" opacity={0.5} />
++        <Path path={quietPath} color={colors.validMoveDot} opacity={0.5} />
 +        <Path
 +          path={capturePath}
-+          color="rgba(0, 0, 0, 0.55)"
++          color={colors.validMoveCapture}
 +          opacity={0.65}
 +          style="stroke"
 +          strokeWidth={Math.max(2, pieceSize * 0.05)}
@@ -88,4 +1052,200 @@ index 5032bfe81a485ff85d710e7d6e4c0a2e8d78347e..9946cb5db3dee32b4c62c58603fa23c3
 +    );
    }
  );
- 
+
+diff --git a/src/hooks/use-board-gesture.ts b/src/hooks/use-board-gesture.ts
+index 92df972f7ec3c671308e8cc0e6cd275469a7144d..b6d2f79887d7ec0209989673fe22ad2cedaf9506 100644
+--- a/src/hooks/use-board-gesture.ts
++++ b/src/hooks/use-board-gesture.ts
+@@ -22,7 +22,7 @@ export const useBoardGesture = ({
+   gestureEnabled,
+   onIllegalMove,
+ }: UseBoardGestureProps) => {
+-  const { pieceSize, animations, flipped } = config;
++  const { pieceSize, animations, flipped, draggableColor } = config;
+
+   // Track the currently dragged piece
+   const draggedSquare = useSharedValue<Square | null>(null);
+@@ -67,18 +67,23 @@ export const useBoardGesture = ({
+         const square = positionToSquare(x, y, pieceSize, flipped);
+         const squareState = boardState.squares[square];
+         const piece = squareState.piece.get();
++        const turn = boardState.turn.get();
++        const allowedDragColor = draggableColor ?? turn;
+
+-        if (piece) {
+-          // Store drag start info (but don't start drag yet)
+-          draggedSquare.set(square);
+-          dragStartX.set(squareState.translateX.get());
+-          dragStartY.set(squareState.translateY.get());
+-
+-          const pieceCenterX = squareState.translateX.get() + pieceSize / 2;
+-          const pieceCenterY = squareState.translateY.get() + pieceSize / 2;
+-          touchOffsetX.set(x - pieceCenterX);
+-          touchOffsetY.set(y - pieceCenterY);
++        if (!piece || piece[0] !== allowedDragColor) {
++          draggedSquare.set(null);
++          return;
+         }
++
++        // Store drag start info (but don't start drag yet)
++        draggedSquare.set(square);
++        dragStartX.set(squareState.translateX.get());
++        dragStartY.set(squareState.translateY.get());
++
++        const pieceCenterX = squareState.translateX.get() + pieceSize / 2;
++        const pieceCenterY = squareState.translateY.get() + pieceSize / 2;
++        touchOffsetX.set(x - pieceCenterX);
++        touchOffsetY.set(y - pieceCenterY);
+       })
+       .onStart(() => {
+         'worklet';
+@@ -89,16 +94,22 @@ export const useBoardGesture = ({
+         const squareState = boardState.squares[square];
+         const piece = squareState.piece.get();
+         const turn = boardState.turn.get();
++        const allowedDragColor = draggableColor ?? turn;
++        const isOwnPiece = piece && piece[0] === allowedDragColor;
++
++        // Do not start dragging opponent pieces; otherwise onUpdate can visibly
++        // move them until onEnd snaps them back.
++        if (!isOwnPiece) {
++          draggedSquare.set(null);
++          return;
++        }
+
+         // Raise and scale the piece
+         squareState.zIndex.set(100);
+         squareState.scale.set(withSpring(1.1, animations.scale));
+
+         // Only show valid moves (dots) for own pieces
+-        const isOwnPiece = piece && piece[0] === turn;
+-        if (isOwnPiece) {
+-          scheduleOnRN(handleSelectPiece, square);
+-        }
++        scheduleOnRN(handleSelectPiece, square);
+       })
+       .onUpdate((event) => {
+         'worklet';
+@@ -135,7 +146,8 @@ export const useBoardGesture = ({
+         // Check if this is own piece - only own pieces can make moves
+         const piece = squareState.piece.get();
+         const turn = boardState.turn.get();
+-        const isOwnPiece = piece && piece[0] === turn;
++        const allowedDragColor = draggableColor ?? turn;
++        const isOwnPiece = piece && piece[0] === allowedDragColor;
+
+         // If not own piece, just snap back (can't make moves with opponent's pieces)
+         if (!isOwnPiece) {
+@@ -221,7 +233,8 @@ export const useBoardGesture = ({
+         const selectedSquare = boardState.selectedSquare.get();
+         const piece = boardState.squares[square].piece.get();
+         const turn = boardState.turn.get();
+-        const isOwnPiece = piece && piece[0] === turn;
++        const allowedDragColor = draggableColor ?? turn;
++        const isOwnPiece = piece && piece[0] === allowedDragColor;
+
+         // Case 1: No piece selected - try to select own piece
+         if (!selectedSquare) {
+@@ -269,6 +282,7 @@ export const useBoardGesture = ({
+     touchOffsetY,
+     animations,
+     gestureEnabled,
++    draggableColor,
+     handleTryMove,
+     handleSelectPiece,
+     handleIllegalMove,
+diff --git a/src/index.tsx b/src/index.tsx
+index a50f36cba22769b8a484a1c4429a3135e661dcf3..5f73a26e0ac583683d28b039726ef8638bcf40ab 100644
+--- a/src/index.tsx
++++ b/src/index.tsx
+@@ -34,6 +34,7 @@ const Chessboard = forwardRef<ChessboardRef, ChessboardProps>(
+       fen,
+       boardSize,
+       gestureEnabled,
++      draggableColor,
+       flipped,
+       withLetters,
+       withNumbers,
+@@ -52,6 +53,7 @@ const Chessboard = forwardRef<ChessboardRef, ChessboardProps>(
+         fen={fen}
+         boardSize={boardSize}
+         gestureEnabled={gestureEnabled}
++        draggableColor={draggableColor}
+         flipped={flipped}
+         withLetters={withLetters}
+         withNumbers={withNumbers}
+diff --git a/src/state/board-state-context.tsx b/src/state/board-state-context.tsx
+index 2f2990b96a62e49047a101e225317ab1a01b20ae..222650a2f245f85e9f15eab121943056cf90668d 100644
+--- a/src/state/board-state-context.tsx
++++ b/src/state/board-state-context.tsx
+@@ -4,6 +4,7 @@ import type { BoardState, BoardConfig } from './types';
+ import { useBoardState } from './use-board-state';
+ import { Dimensions } from 'react-native';
+ import type { ImageSourcePropType } from 'react-native';
++import type { Color } from 'chess.js';
+ import {
+   MOVE_SPRING,
+   SCALE_SPRING,
+@@ -26,6 +27,7 @@ export type BoardStateProviderProps = {
+   fen?: string;
+   boardSize?: number;
+   gestureEnabled?: boolean;
++  draggableColor?: Color | null;
+   flipped?: boolean;
+   withLetters?: boolean;
+   withNumbers?: boolean;
+@@ -40,6 +42,8 @@ const defaultColors: BoardConfig['colors'] = {
+   lastMoveHighlight: 'rgba(255,255,0, 0.5)',
+   checkmateHighlight: '#E84855',
+   promotionPieceButton: '#FF9B71',
++  validMoveDot: 'rgba(0, 0, 0, 0.3)',
++  validMoveCapture: 'rgba(0, 0, 0, 0.55)',
+ };
+
+ const defaultDurations: BoardConfig['durations'] = {
+@@ -57,6 +61,7 @@ export const BoardStateProvider: React.FC<BoardStateProviderProps> = ({
+   fen,
+   boardSize = DEFAULT_BOARD_SIZE,
+   gestureEnabled = true,
++  draggableColor = null,
+   flipped = false,
+   withLetters = true,
+   withNumbers = true,
+@@ -71,6 +76,7 @@ export const BoardStateProvider: React.FC<BoardStateProviderProps> = ({
+       boardSize,
+       pieceSize,
+       gestureEnabled,
++      draggableColor,
+       flipped,
+       withLetters,
+       withNumbers,
+@@ -83,6 +89,7 @@ export const BoardStateProvider: React.FC<BoardStateProviderProps> = ({
+       boardSize,
+       pieceSize,
+       gestureEnabled,
++      draggableColor,
+       flipped,
+       withLetters,
+       withNumbers,
+diff --git a/src/state/types.ts b/src/state/types.ts
+index 2b02a76df0c9b736fe0c9f1089787dac919ae336..9b7139a692e2bdd344cc08284d36c4ab072fc6a2 100644
+--- a/src/state/types.ts
++++ b/src/state/types.ts
+@@ -49,6 +49,7 @@ export interface BoardConfig {
+   boardSize: number;
+   pieceSize: number;
+   gestureEnabled: boolean;
++  draggableColor: Color | null;
+   flipped: boolean;
+   withLetters: boolean;
+   withNumbers: boolean;
+@@ -58,6 +59,8 @@ export interface BoardConfig {
+     lastMoveHighlight: string;
+     checkmateHighlight: string;
+     promotionPieceButton: string;
++    validMoveDot: string;
++    validMoveCapture: string;
+   };
+   durations: {
+     move: number;

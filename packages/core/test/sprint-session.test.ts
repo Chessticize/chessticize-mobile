@@ -62,17 +62,17 @@ test("three wrong puzzles fail the sprint and keep rating at the floor", () => {
     now: NOW
   });
 
-  let result = submitSprintMove(state, "e6e8", "2026-06-20T00:00:01.000Z");
+  let result = submitSprintMove(state, "e6d6", "2026-06-20T00:00:01.000Z");
   assert.equal(result.state.status, "active");
   assert.equal(result.state.mistakeCount, 1);
   state = result.state;
 
-  result = submitSprintMove(state, "e6e8", "2026-06-20T00:00:02.000Z");
+  result = submitSprintMove(state, "e6d6", "2026-06-20T00:00:02.000Z");
   assert.equal(result.state.status, "active");
   assert.equal(result.state.mistakeCount, 2);
   state = result.state;
 
-  result = submitSprintMove(state, "e6e8", "2026-06-20T00:00:03.000Z");
+  result = submitSprintMove(state, "e6d6", "2026-06-20T00:00:03.000Z");
   assert.equal(result.state.status, "failed");
   assert.equal(result.state.endReason, "max_mistakes");
   assert.equal(result.state.ratingAfter, 600);
@@ -122,6 +122,29 @@ test("a target-one correct Arrow Duel sprint completes immediately", () => {
   assert.equal(result.state.correctCount, 1);
 });
 
+test("exhausting the local puzzle set completes the sprint as a pass", () => {
+  const state = startSprint({
+    config: buildSprintConfig({
+      mode: "arrow_duel",
+      durationSeconds: 300,
+      perPuzzleSeconds: 30,
+      targetCorrect: 2,
+      maxMistakes: 3
+    }),
+    puzzles: [samplePuzzle("p1")],
+    ratingBefore: 600,
+    now: NOW
+  });
+
+  const result = submitSprintMove(state, "b2b1", "2026-06-20T00:00:05.000Z");
+
+  assert.equal(result.state.status, "won");
+  assert.equal(result.state.endReason, "puzzles_exhausted");
+  assert.equal(result.state.correctCount, 1);
+  assert.ok((result.state.ratingAfter ?? 0) > 600);
+  assert.equal(result.attempt?.result, "correct");
+});
+
 test("expired sprint fails before accepting another move", () => {
   const state = startSprint({
     config: buildSprintConfig({ mode: "standard", durationSeconds: 1, perPuzzleSeconds: 1, targetCorrect: 1 }),
@@ -136,32 +159,39 @@ test("expired sprint fails before accepting another move", () => {
   assert.equal(result.attempt, undefined);
 });
 
-test("per-puzzle timeout counts as a wrong attempt and advances or fails by mistake limit", () => {
+test("per-puzzle pace does not reject correct moves before the sprint deadline", () => {
   const state = startSprint({
     config: buildSprintConfig({
       mode: "standard",
       durationSeconds: 300,
       perPuzzleSeconds: 1,
-      targetCorrect: 3,
+      targetCorrect: 1,
       maxMistakes: 2
     }),
-    puzzles: [samplePuzzle("p1"), samplePuzzle("p2"), samplePuzzle("p3")],
+    puzzles: [samplePuzzle("p1")],
     ratingBefore: 900,
     now: NOW
   });
 
-  let result = submitSprintMove(state, "e6e7", "2026-06-20T00:00:02.000Z");
-  assert.equal(result.feedback?.result, "wrong");
-  assert.equal(result.feedback?.submittedMove, "__timeout__");
-  assert.equal(result.attempt?.submittedMove, "__timeout__");
+  let result = submitSprintMove(state, "e6e7", "2026-06-20T00:00:10.000Z");
+  assert.equal(result.feedback?.result, "correct");
+  assert.equal(result.feedback?.submittedMove, "e6e7");
+  assert.equal(result.feedback?.puzzleSolved, false);
+  assert.equal(result.attempt, undefined);
   assert.equal(result.state.status, "active");
-  assert.equal(result.state.mistakeCount, 1);
-  assert.equal(result.state.currentPuzzle?.puzzle.id, "p2");
+  assert.equal(result.state.mistakeCount, 0);
 
-  result = submitSprintMove(result.state, "e6e7", "2026-06-20T00:00:04.000Z");
-  assert.equal(result.state.status, "failed");
-  assert.equal(result.state.endReason, "max_mistakes");
-  assert.equal(result.state.mistakeCount, 2);
+  result = submitSprintMove(result.state, "b3c1", "2026-06-20T00:00:20.000Z");
+  assert.equal(result.feedback?.result, "correct");
+  assert.equal(result.state.status, "active");
+  assert.equal(result.state.mistakeCount, 0);
+
+  result = submitSprintMove(result.state, "h6c1", "2026-06-20T00:00:30.000Z");
+  assert.equal(result.feedback?.result, "correct");
+  assert.equal(result.feedback?.submittedMove, "h6c1");
+  assert.equal(result.state.status, "won");
+  assert.equal(result.state.endReason, "target_reached");
+  assert.equal(result.state.correctCount, 1);
 });
 
 test("abandonSprint and serializeSprintView expose stable frontend-independent state", () => {

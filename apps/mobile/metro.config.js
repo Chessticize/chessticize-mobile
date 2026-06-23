@@ -8,12 +8,19 @@ const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
  * @type {import('@react-native/metro-config').MetroConfig}
  */
 const repoRoot = path.resolve(__dirname, '../..');
+const appNodeModules = path.resolve(__dirname, 'node_modules');
 const config = {
   projectRoot: __dirname,
   watchFolders: [repoRoot],
   resolver: {
+    extraNodeModules: {
+      react: path.resolve(appNodeModules, 'react'),
+      'react-native': path.resolve(appNodeModules, 'react-native'),
+      'react-native-reanimated': path.resolve(appNodeModules, 'react-native-reanimated'),
+      'react-native-worklets': path.resolve(appNodeModules, 'react-native-worklets'),
+    },
     nodeModulesPaths: [
-      path.resolve(__dirname, 'node_modules'),
+      appNodeModules,
       path.resolve(repoRoot, 'node_modules'),
     ],
   },

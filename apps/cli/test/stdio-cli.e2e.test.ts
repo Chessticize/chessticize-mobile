@@ -88,7 +88,7 @@ test("CLI supports Arrow Duel wrong-choice review arrows and review scheduling",
   await cli.stop();
 });
 
-test("CLI records non-candidate Arrow Duel moves as wrong attempts", async (t) => {
+test("CLI rejects non-candidate Arrow Duel moves without recording attempts", async (t) => {
   const cli = await startCli(t);
 
   await cli.command({
@@ -108,16 +108,15 @@ test("CLI records non-candidate Arrow Duel moves as wrong attempts", async (t) =
     move: "a1a8",
     now: "2026-06-20T00:00:05.000Z"
   });
-  assert.equal(invalid.ok, true);
-  assert.equal(invalid.feedback.result, "wrong");
-  assert.equal(invalid.feedback.submittedMove, "a1a8");
+  assert.equal(invalid.ok, false);
+  assert.equal(invalid.error.code, "command_failed");
+  assert.match(invalid.error.message, /not one of the Arrow Duel candidates/);
 
   const history = await cli.command({ command: "history" });
-  assert.equal(history.history.length, 1);
-  assert.equal(history.history[0].submittedMove, "a1a8");
+  assert.equal(history.history.length, 0);
 
   const reviews = await cli.command({ command: "dueReviews", now: "2026-06-22T00:00:00.000Z" });
-  assert.equal(reviews.dueReviews.length, 1);
+  assert.equal(reviews.dueReviews.length, 0);
 
   await cli.stop();
 });

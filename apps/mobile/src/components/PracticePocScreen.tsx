@@ -9,38 +9,70 @@ import {
   useWindowDimensions,
   View
 } from "react-native";
+import type { ImageSourcePropType } from "react-native";
 import type { MoveResult } from "react-native-chessboard";
 import Chessboard, { type ChessboardRef } from "react-native-chessboard";
 import {
+  beginArrowDuelPuzzle,
+  beginLinePuzzle,
   buildSprintConfig,
   currentExpectedMove,
-  defaultSprintConfig
+  defaultSprintConfig,
+  submitArrowDuelChoice,
+  submitLineMove
 } from "../../../../packages/core/src/index.ts";
 import type {
   AttemptEvent,
+  ArrowDuelState,
   CurrentPuzzleState,
+  Puzzle,
   PuzzleFeedback,
+  PuzzleLineState,
+  ReviewQueueItem,
+  SessionMistakeReviewItem,
   SprintConfig,
   SprintMode,
   SprintState
 } from "../../../../packages/core/src/index.ts";
 import type { PracticeService } from "../../../../packages/storage/src/practice-service.ts";
-import { createMobilePracticeService, seededPuzzleCount } from "../backend/mobilePractice.ts";
-import type { PieceSymbol, Square } from "chess.js";
+import {
+  createMobilePracticeService,
+  seededPuzzleCount,
+  shouldRandomizePuzzleSelection,
+  type MobilePuzzleSource
+} from "../backend/mobilePractice.ts";
+import { Chess, type PieceSymbol, type Square } from "chess.js";
 
 interface Props {
   practiceService?: PracticeService;
+  debugTrace?: (event: PracticeDebugTraceEvent) => void;
 }
 
 type Tab = "practice" | "review" | "history" | "settings" | "packs";
 
 type SessionFeedback = PuzzleFeedback | null;
 
-type ArrowDuelReviewArrow = {
-  move: string;
-  role: "correct" | "wrong";
-  selected: boolean;
-  color: "green" | "red";
+export type PracticeDebugTraceEvent = {
+  type:
+    | "board-lock"
+    | "board-reset"
+    | "feedback-snapshot"
+    | "fen-mismatch"
+    | "illegal-move"
+    | "move-ignored"
+    | "move-submitted";
+  move?: string;
+  reason?: string;
+  puzzleId?: string | null;
+  contextPuzzleId?: string | null;
+  nextPuzzleId?: string | null;
+  feedbackResult?: PuzzleFeedback["result"];
+  puzzleSolved?: boolean;
+  samePuzzle?: boolean;
+  locked?: boolean;
+  submittedFen?: string | null;
+  resultFen?: string | null;
+  expectedFen?: string | null;
 };
 
 type BoardMove = {
@@ -49,15 +81,49 @@ type BoardMove = {
   promotion?: string;
 };
 
+type BoardMoveContext = {
+  puzzleId: string | null;
+};
+
+type FeedbackBoardSnapshot = {
+  boardFen: string;
+  currentPuzzle: CurrentPuzzleState;
+  feedback: PuzzleFeedback;
+  puzzleId: string;
+};
+
 const UI_PADDING = 16;
 const MIN_BOARD = 280;
-const NEUTRAL_ARROW = "#475569";
+const NEUTRAL_ARROW = "#2563EB";
+const ARROW_VISUAL_STYLES = {
+  candidate: {
+    stroke: NEUTRAL_ARROW,
+    opacity: 0.68
+  }
+} as const;
+const FEEDBACK_SNAPSHOT_MS = 800;
+const USER_FEEDBACK_BEFORE_AUTO_MS = 260;
 const CUSTOM_DURATION_OPTIONS = [3 * 60, 5 * 60, 10 * 60] as const;
 const CUSTOM_PER_PUZZLE_OPTIONS = [10, 20, 30] as const;
+const TEST_PUZZLE_SOURCES: ReadonlyArray<{ source: MobilePuzzleSource; label: string }> = [
+  { source: "familiar15", label: "Familiar 15" },
+  { source: "random1000", label: "Random 1000" }
+];
+const CHESS_PIECE_SPRITE = require("../assets/chess-pieces-sprite.png") as ImageSourcePropType;
 
-export function PracticePocScreen({ practiceService }: Props): React.JSX.Element {
-  const service = useMemo(() => practiceService ?? createMobilePracticeService(), [practiceService]);
+export function PracticePocScreen({ practiceService, debugTrace }: Props): React.JSX.Element {
+  const [puzzleSource, setPuzzleSource] = useState<MobilePuzzleSource>("familiar15");
+  const service = useMemo(() => practiceService ?? createMobilePracticeService(puzzleSource), [practiceService, puzzleSource]);
   const boardRef = useRef<ChessboardRef | null>(null);
+  const suppressedBoardMovesRef = useRef<string[]>([]);
+  const boardSyncInProgressRef = useRef(false);
+  const boardInputLockedRef = useRef(false);
+  const boardVisualFenRef = useRef<string | null>(null);
+  const feedbackSnapshotTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stateRef = useRef<SprintState | null>(null);
+  const boardFenRef = useRef<string | null>(null);
+  const feedbackSnapshotRef = useRef<FeedbackBoardSnapshot | null>(null);
+  const nowMsRef = useRef<number>(Date.now());
   const { width } = useWindowDimensions();
 
   const [mode, setMode] = useState<SprintMode>("standard");
@@ -66,12 +132,17 @@ export function PracticePocScreen({ practiceService }: Props): React.JSX.Element
   const [feedback, setFeedback] = useState<SessionFeedback>(null);
   const [attempts, setAttempts] = useState<AttemptEvent[]>([]);
   const [reviews, setReviews] = useState<Record<string, unknown>[]>([]);
+  const [dueReviewItems, setDueReviewItems] = useState<ReviewQueueItem[]>([]);
+  const [sessionMistakeReviewItems, setSessionMistakeReviewItems] = useState<SessionMistakeReviewItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [currentRating, setCurrentRating] = useState(600);
   const [boardFen, setBoardFen] = useState<string | null>(null);
   const [lastBoardMove, setLastBoardMove] = useState<BoardMove | null>(null);
   const [feedbackPuzzleId, setFeedbackPuzzleId] = useState<string | null>(null);
+  const [feedbackSnapshot, setFeedbackSnapshot] = useState<FeedbackBoardSnapshot | null>(null);
+  const [boardInputLocked, setBoardInputLocked] = useState(false);
+  const [chessboardDebugEvents, setChessboardDebugEvents] = useState<string[]>([]);
   const [historyWrongLast7Days, setHistoryWrongLast7Days] = useState(false);
   const [customDurationSeconds, setCustomDurationSeconds] = useState(5 * 60);
   const [customPerPuzzleSeconds, setCustomPerPuzzleSeconds] = useState(20);
@@ -83,14 +154,25 @@ export function PracticePocScreen({ practiceService }: Props): React.JSX.Element
 
   const isActive = state?.status === "active";
   const isFinished = state !== null && state.status !== "active";
+  const isShowingFeedbackSnapshot = feedbackSnapshot !== null;
+  const shouldShowSessionBoard = isActive || isShowingFeedbackSnapshot;
   const selectedConfig = useMemo(
     () => sprintConfigFor(mode, customDurationSeconds, customPerPuzzleSeconds),
     [customDurationSeconds, customPerPuzzleSeconds, mode]
   );
+  stateRef.current = state;
+  boardFenRef.current = boardFen;
+  feedbackSnapshotRef.current = feedbackSnapshot;
+  boardInputLockedRef.current = boardInputLocked;
+  nowMsRef.current = nowMs;
 
   useEffect(() => {
     setCurrentRating(readRating(service, selectedConfig.ratingKey));
   }, [selectedConfig.ratingKey, service]);
+
+  useEffect(() => {
+    refreshState();
+  }, [service]);
 
   useEffect(() => {
     if (!isActive) {
@@ -118,7 +200,7 @@ export function PracticePocScreen({ practiceService }: Props): React.JSX.Element
 
     try {
       const expired = service.submitMove("__expired__", new Date(nowMs).toISOString());
-      setState(expired.state);
+      commitState(expired.state);
       setFeedback((expired.feedback as SessionFeedback) ?? null);
       refreshState();
     } catch (caught) {
@@ -126,14 +208,80 @@ export function PracticePocScreen({ practiceService }: Props): React.JSX.Element
     }
   }, [nowMs, service, state]);
 
+  useEffect(() => {
+    const globals = globalThis as unknown as {
+      __CHESSTICIZE_CHESSBOARD_DEBUG__?: boolean;
+      __CHESSTICIZE_CHESSBOARD_DEBUG_SINK__?: (event: string, details: Record<string, unknown>) => void;
+    };
+    globals.__CHESSTICIZE_CHESSBOARD_DEBUG__ = isPracticeDebugEnabled();
+    globals.__CHESSTICIZE_CHESSBOARD_DEBUG_SINK__ = (event, details) => {
+      const message = `${event} ${JSON.stringify(details)}`;
+      setChessboardDebugEvents((events) => [...events.slice(-7), message]);
+    };
+    return () => {
+      clearFeedbackSnapshotTimer();
+      globals.__CHESSTICIZE_CHESSBOARD_DEBUG__ = undefined;
+      globals.__CHESSTICIZE_CHESSBOARD_DEBUG_SINK__ = undefined;
+    };
+  }, []);
+
   function nowIso(): string {
-    return new Date(nowMs).toISOString();
+    return new Date(nowMsRef.current).toISOString();
   }
 
   function refreshState(): void {
     setAttempts(service.listHistory() as AttemptEvent[]);
     setReviews(service.getDueReviews(nowIso()) as Record<string, unknown>[]);
+    setDueReviewItems(service.getDueReviewItems(nowIso()));
     setCurrentRating(readRating(service, selectedConfig.ratingKey));
+  }
+
+  function commitState(nextState: SprintState | null): void {
+    stateRef.current = nextState;
+    setState(nextState);
+  }
+
+  function commitBoardFen(nextFen: string | null): void {
+    boardFenRef.current = nextFen;
+    boardVisualFenRef.current = nextFen;
+    setBoardFen(nextFen);
+  }
+
+  function commitFeedbackSnapshot(nextSnapshot: FeedbackBoardSnapshot | null): void {
+    feedbackSnapshotRef.current = nextSnapshot;
+    setFeedbackSnapshot(nextSnapshot);
+  }
+
+  function commitBoardInputLocked(nextLocked: boolean, reason: string, puzzleId?: string | null): void {
+    boardInputLockedRef.current = nextLocked;
+    setBoardInputLocked(nextLocked);
+    emitTrace({
+      type: "board-lock",
+      reason,
+      puzzleId,
+      locked: nextLocked
+    });
+  }
+
+  function resetBoardToFen(fen: string | null | undefined, reason: string, puzzleId?: string | null, move?: string): void {
+    if (!fen) {
+      return;
+    }
+    boardRef.current?.resetBoard(fen);
+    emitTrace({
+      type: "board-reset",
+      reason,
+      move,
+      puzzleId,
+      submittedFen: fen
+    });
+  }
+
+  function emitTrace(event: PracticeDebugTraceEvent): void {
+    debugTrace?.(event);
+    if (isPracticeDebugEnabled()) {
+      console.info("[PracticePoc]", JSON.stringify(event));
+    }
   }
 
   function startSprint(nextMode: SprintMode = mode): void {
@@ -143,20 +291,43 @@ export function PracticePocScreen({ practiceService }: Props): React.JSX.Element
       const started = service.startSprint({
         mode: nextMode,
         durationSeconds: config.durationSeconds,
-        perPuzzleSeconds: config.perPuzzleSeconds
+        perPuzzleSeconds: config.perPuzzleSeconds,
+        ...(shouldRandomizePuzzleSelection(puzzleSource) ? { puzzleSelectionSeed: `${Date.now()}-${Math.random()}` } : {})
       });
       setMode(nextMode);
-      setState(started);
+      commitState(started);
       setCurrentRating(started.ratingBefore);
-      setBoardFen(started.currentPuzzle?.currentFen ?? null);
+      commitBoardFen(started.currentPuzzle?.currentFen ?? null);
       setLastBoardMove(null);
       setFeedback(null);
       setFeedbackPuzzleId(null);
+      commitBoardInputLocked(false, "start", started.currentPuzzle?.puzzle.id ?? null);
+      clearFeedbackSnapshot();
       setTab("practice");
       refreshState();
     } catch (caught) {
       setError(errorMessage(caught));
     }
+  }
+
+  function changePuzzleSource(nextSource: MobilePuzzleSource): void {
+    if (isActive || practiceService) {
+      return;
+    }
+    setPuzzleSource(nextSource);
+    commitState(null);
+    setFeedback(null);
+    setFeedbackPuzzleId(null);
+    clearFeedbackSnapshot();
+    setError(null);
+    commitBoardInputLocked(false, "puzzle-source", null);
+    commitBoardFen(null);
+    setLastBoardMove(null);
+    setAttempts([]);
+    setReviews([]);
+    setDueReviewItems([]);
+    setSessionMistakeReviewItems([]);
+    setCurrentRating(600);
   }
 
   function abandonSprint(): void {
@@ -165,10 +336,12 @@ export function PracticePocScreen({ practiceService }: Props): React.JSX.Element
     }
     try {
       const nextState = service.abandonSprint(nowIso());
-      setState(nextState);
+      commitState(nextState);
       setFeedback(null);
       setFeedbackPuzzleId(null);
-      setBoardFen(null);
+      clearFeedbackSnapshot();
+      commitBoardInputLocked(false, "abandon", null);
+      commitBoardFen(null);
       setLastBoardMove(null);
       refreshState();
     } catch {
@@ -176,95 +349,388 @@ export function PracticePocScreen({ practiceService }: Props): React.JSX.Element
     }
   }
 
-  function onBoardMove(result: MoveResult): void {
-    if (!isActive) {
+  async function onBoardMove(result: MoveResult, context: BoardMoveContext): Promise<void> {
+    const activeState = stateRef.current;
+    const activeFeedbackSnapshot = feedbackSnapshotRef.current;
+    if (activeState?.status !== "active") {
+      emitTrace({
+        type: "move-ignored",
+        reason: "inactive",
+        contextPuzzleId: context.puzzleId
+      });
       return;
     }
-
     const move = formatUci(result.move);
-    if (!move) {
+    if (activeFeedbackSnapshot) {
+      resetBoardToFen(activeFeedbackSnapshot.boardFen, "feedback-snapshot", activeFeedbackSnapshot.puzzleId, move);
+      emitTrace({
+        type: "move-ignored",
+        reason: "feedback-snapshot",
+        contextPuzzleId: context.puzzleId,
+        puzzleId: activeState.currentPuzzle?.puzzle.id ?? null
+      });
       return;
     }
 
+    if (!move) {
+      emitTrace({
+        type: "move-ignored",
+        reason: "empty-move",
+        contextPuzzleId: context.puzzleId,
+        puzzleId: activeState.currentPuzzle?.puzzle.id ?? null
+      });
+      return;
+    }
+    if (consumeSuppressedBoardMove(move, suppressedBoardMovesRef.current)) {
+      emitTrace({
+        type: "move-ignored",
+        reason: "suppressed-auto-move",
+        move,
+        contextPuzzleId: context.puzzleId,
+        puzzleId: activeState.currentPuzzle?.puzzle.id ?? null
+      });
+      return;
+    }
+    if (boardSyncInProgressRef.current || boardInputLockedRef.current) {
+      resetBoardToFen(
+        boardVisualFenRef.current ?? activeState.currentPuzzle?.currentFen,
+        "board-locked",
+        activeState.currentPuzzle?.puzzle.id ?? null,
+        move
+      );
+      emitTrace({
+        type: "move-ignored",
+        reason: "board-locked",
+        move,
+        contextPuzzleId: context.puzzleId,
+        puzzleId: activeState.currentPuzzle?.puzzle.id ?? null
+      });
+      return;
+    }
+    setLastBoardMove(null);
+
+    const submittedPuzzleId = activeState.currentPuzzle?.puzzle.id ?? null;
+    if (context.puzzleId !== submittedPuzzleId) {
+      emitTrace({
+        type: "move-ignored",
+        reason: "context-puzzle-mismatch",
+        move,
+        contextPuzzleId: context.puzzleId,
+        puzzleId: submittedPuzzleId
+      });
+      return;
+    }
+    const submittedPuzzle = activeState.currentPuzzle;
+    const submittedFen = submittedPuzzle?.currentFen ?? boardFenRef.current ?? null;
+    if (submittedPuzzle?.kind === "arrow_duel" && !isArrowDuelCandidate(submittedPuzzle.candidates, move)) {
+      if (submittedFen) {
+        boardRef.current?.resetBoard(submittedFen);
+        commitBoardFen(submittedFen);
+      }
+      setFeedback(null);
+      setFeedbackPuzzleId(null);
+      emitTrace({
+        type: "move-ignored",
+        reason: "arrow-duel-non-candidate",
+        move,
+        contextPuzzleId: context.puzzleId,
+        puzzleId: submittedPuzzleId,
+        submittedFen
+      });
+      return;
+    }
+    const submittedMoveFen = submittedFen ? fenAfterMove(submittedFen, move) : null;
+    if (submittedFen && !submittedMoveFen) {
+      if (submittedFen) {
+        boardRef.current?.resetBoard(submittedFen);
+        commitBoardFen(submittedFen);
+      }
+      setFeedback(null);
+      setFeedbackPuzzleId(null);
+      emitTrace({
+        type: "move-ignored",
+        reason: "submitted-move-illegal-for-current-fen",
+        move,
+        puzzleId: submittedPuzzleId,
+        submittedFen
+      });
+      return;
+    }
+    if (!moveResultMatchesExpectedFen(result, submittedMoveFen)) {
+      emitTrace({
+        type: "fen-mismatch",
+        move,
+        puzzleId: submittedPuzzleId,
+        expectedFen: submittedMoveFen,
+        resultFen: result.state?.fen ?? null,
+        submittedFen
+      });
+      boardRef.current?.resetBoard(submittedMoveFen ?? submittedFen ?? undefined);
+    }
+
+    boardVisualFenRef.current = submittedMoveFen ?? result.state?.fen ?? submittedFen;
+    commitBoardInputLocked(true, "user-move", submittedPuzzleId);
+    await submitAcceptedMove({
+      move,
+      nextVisualFen: submittedMoveFen,
+      submittedFen,
+      submittedPuzzle,
+      submittedPuzzleId
+    });
+  }
+
+  async function submitAcceptedMove({
+    move,
+    nextVisualFen,
+    submittedFen,
+    submittedPuzzle,
+    submittedPuzzleId
+  }: {
+    move: string;
+    nextVisualFen: string | null;
+    submittedFen: string | null;
+    submittedPuzzle: CurrentPuzzleState | undefined;
+    submittedPuzzleId: string | null;
+  }): Promise<void> {
     try {
-      const submittedPuzzleId = state?.currentPuzzle?.puzzle.id ?? null;
       const next = service.submitMove(move, nowIso());
       const nextFeedback = (next.feedback as SessionFeedback) ?? null;
-      setState(next.state);
+      commitState(next.state);
       setFeedback(nextFeedback);
       setFeedbackPuzzleId(submittedPuzzleId);
+      emitTrace({
+        type: "move-submitted",
+        move,
+        puzzleId: submittedPuzzleId,
+        nextPuzzleId: next.state.currentPuzzle?.puzzle.id ?? null,
+        feedbackResult: nextFeedback?.result,
+        puzzleSolved: nextFeedback?.puzzleSolved,
+        samePuzzle: next.state.currentPuzzle?.puzzle.id === submittedPuzzleId,
+        submittedFen
+      });
+      if (shouldAnimateSamePuzzleReply(next.state, nextFeedback, submittedPuzzleId)) {
+        await animateSamePuzzleReply(next.state, nextFeedback);
+        refreshState();
+        return;
+      }
+      syncFeedbackSnapshot(next.state, nextFeedback, submittedPuzzle, submittedFen, submittedPuzzleId);
+      boardVisualFenRef.current = nextVisualFen;
       syncBoardAfterMove(next.state, nextFeedback, submittedPuzzleId);
       refreshState();
     } catch (caught) {
       setError(errorMessage(caught));
+      boardSyncInProgressRef.current = false;
+      commitBoardInputLocked(false, "submit-error", submittedPuzzleId);
     }
   }
 
-  function onIllegalMove(): void {
-    if (!state?.currentPuzzle) {
+  function onIllegalMove(from: Square, to: Square, context: BoardMoveContext): void {
+    const activeState = stateRef.current;
+    const move = `${from}${to}`;
+    if (boardSyncInProgressRef.current || boardInputLockedRef.current) {
+      const activePuzzle = activeState?.status === "active" ? activeState.currentPuzzle : undefined;
+      resetBoardToFen(
+        boardVisualFenRef.current ?? activePuzzle?.currentFen,
+        "board-locked-illegal-move",
+        activePuzzle?.puzzle.id ?? null,
+        move
+      );
+      emitTrace({
+        type: "move-ignored",
+        reason: "board-locked-illegal-move",
+        move,
+        contextPuzzleId: context.puzzleId,
+        puzzleId: activePuzzle?.puzzle.id ?? null,
+        submittedFen: boardVisualFenRef.current ?? activePuzzle?.currentFen ?? null
+      });
       return;
     }
-    setFeedback({
-      result: "wrong",
-      puzzleSolved: false,
-      submittedMove: "__illegal__",
-      expectedMove: expectedMoveForCurrent(state.currentPuzzle),
-      autoPlayedMoves: [],
-      currentFen: state.currentPuzzle.currentFen
+
+    const activePuzzle = activeState?.currentPuzzle;
+    if (!activePuzzle) {
+      return;
+    }
+    if (context.puzzleId !== activePuzzle.puzzle.id) {
+      emitTrace({
+        type: "move-ignored",
+        reason: "illegal-move-context-puzzle-mismatch",
+        move,
+        contextPuzzleId: context.puzzleId,
+        puzzleId: activePuzzle.puzzle.id
+      });
+      return;
+    }
+    setLastBoardMove(null);
+    setFeedback(null);
+    setFeedbackPuzzleId(null);
+    boardRef.current?.resetBoard(activePuzzle.currentFen);
+    commitBoardFen(activePuzzle.currentFen);
+    emitTrace({
+      type: "illegal-move",
+      move,
+      puzzleId: activePuzzle.puzzle.id,
+      submittedFen: activePuzzle.currentFen
     });
   }
 
   function resetToIdle(): void {
-    setState(null);
+    commitState(null);
     setFeedback(null);
     setFeedbackPuzzleId(null);
+    clearFeedbackSnapshot();
     setError(null);
-    setBoardFen(null);
+    commitBoardInputLocked(false, "reset", null);
+    commitBoardFen(null);
     setLastBoardMove(null);
     refreshState();
   }
 
   function showReviewMistakes(): void {
-    setTab("review");
+    const sessionId = stateRef.current?.id;
+    const reviewItems = sessionId ? service.getSessionMistakeReview(sessionId) : [];
     resetToIdle();
+    setSessionMistakeReviewItems(reviewItems);
+    setTab("review");
   }
 
   function syncBoardAfterMove(
     nextState: SprintState,
     nextFeedback: SessionFeedback,
-    submittedPuzzleId: string | null
+    submittedPuzzleId: string | null,
+    alreadyAnimated = false
   ): void {
     const nextPuzzle = nextState.currentPuzzle;
     const nextFen = nextPuzzle?.currentFen ?? null;
     const samePuzzle = nextPuzzle?.puzzle.id === submittedPuzzleId;
     const autoMoves = nextFeedback?.autoPlayedMoves ?? [];
 
-    if (nextState.status === "active" && samePuzzle && autoMoves.length > 0) {
-      animateBoardMoves(autoMoves, nextFen);
+    if (alreadyAnimated) {
       return;
     }
 
-    setBoardFen(nextFen);
+    if (nextState.status === "active" && samePuzzle && autoMoves.length > 0) {
+      void animateBoardMoves(autoMoves, nextFen);
+      return;
+    }
+
+    commitBoardFen(nextFen);
     setLastBoardMove(null);
+  }
+
+  function shouldAnimateSamePuzzleReply(
+    nextState: SprintState,
+    nextFeedback: SessionFeedback,
+    submittedPuzzleId: string | null
+  ): boolean {
+    const nextPuzzle = nextState.currentPuzzle;
+    const samePuzzle = nextState.status === "active" && nextPuzzle?.puzzle.id === submittedPuzzleId;
+    const autoMoves = nextFeedback?.autoPlayedMoves ?? [];
+    return samePuzzle && autoMoves.length > 0;
+  }
+
+  async function animateSamePuzzleReply(
+    nextState: SprintState,
+    nextFeedback: SessionFeedback
+  ): Promise<void> {
+    const nextFen = nextState.currentPuzzle?.currentFen ?? null;
+    const autoMoves = nextFeedback?.autoPlayedMoves ?? [];
+    boardSyncInProgressRef.current = true;
+    commitBoardInputLocked(true, "opponent-reply", nextState.currentPuzzle?.puzzle.id ?? null);
+    try {
+      await sleep(USER_FEEDBACK_BEFORE_AUTO_MS);
+      setFeedback(null);
+      setFeedbackPuzzleId(null);
+      await animateBoardMoves(autoMoves, nextFen);
+    } finally {
+      boardSyncInProgressRef.current = false;
+      commitBoardInputLocked(false, "opponent-reply-complete", nextState.currentPuzzle?.puzzle.id ?? null);
+    }
+  }
+
+  function syncFeedbackSnapshot(
+    nextState: SprintState,
+    nextFeedback: SessionFeedback,
+    submittedPuzzle: CurrentPuzzleState | undefined,
+    submittedFen: string | null,
+    submittedPuzzleId: string | null
+  ): void {
+    clearFeedbackSnapshotTimer();
+    const nextPuzzle = nextState.currentPuzzle;
+    const samePuzzle = nextPuzzle?.puzzle.id === submittedPuzzleId;
+    if (!nextFeedback || !submittedPuzzle || !submittedFen || samePuzzle) {
+      commitFeedbackSnapshot(null);
+      commitBoardInputLocked(false, "feedback-snapshot-clear", nextPuzzle?.puzzle.id ?? null);
+      emitTrace({
+        type: "feedback-snapshot",
+        reason: "clear",
+        puzzleId: submittedPuzzleId,
+        nextPuzzleId: nextPuzzle?.puzzle.id ?? null,
+        samePuzzle
+      });
+      return;
+    }
+
+    commitFeedbackSnapshot({
+      boardFen: submittedFen,
+      currentPuzzle: submittedPuzzle,
+      feedback: nextFeedback,
+      puzzleId: submittedPuzzle.puzzle.id
+    });
+    emitTrace({
+      type: "feedback-snapshot",
+      reason: "show",
+      move: nextFeedback.submittedMove,
+      puzzleId: submittedPuzzle.puzzle.id,
+      nextPuzzleId: nextPuzzle?.puzzle.id ?? null,
+      feedbackResult: nextFeedback.result,
+      puzzleSolved: nextFeedback.puzzleSolved,
+      samePuzzle
+    });
+    feedbackSnapshotTimerRef.current = setTimeout(() => {
+      const current = feedbackSnapshotRef.current;
+      if (current?.puzzleId === submittedPuzzle.puzzle.id) {
+        commitFeedbackSnapshot(null);
+        commitBoardInputLocked(false, "feedback-snapshot-complete", nextPuzzle?.puzzle.id ?? null);
+      }
+      feedbackSnapshotTimerRef.current = null;
+    }, FEEDBACK_SNAPSHOT_MS);
+  }
+
+  function clearFeedbackSnapshot(): void {
+    clearFeedbackSnapshotTimer();
+    commitFeedbackSnapshot(null);
+  }
+
+  function clearFeedbackSnapshotTimer(): void {
+    if (feedbackSnapshotTimerRef.current) {
+      clearTimeout(feedbackSnapshotTimerRef.current);
+      feedbackSnapshotTimerRef.current = null;
+    }
   }
 
   async function animateBoardMoves(moves: string[], finalFen: string | null): Promise<void> {
     const parsedMoves = moves.map(arrowFromTo).filter((move): move is BoardMove => Boolean(move));
     if (!boardRef.current || parsedMoves.length === 0) {
-      setBoardFen(finalFen);
+      commitBoardFen(finalFen);
       setLastBoardMove(parsedMoves[parsedMoves.length - 1] ?? null);
       return;
     }
 
     for (const move of parsedMoves) {
-      await boardRef.current.move({
+      const suppressedMove = boardMoveToUci(move);
+      suppressedBoardMovesRef.current.push(suppressedMove);
+      const playedMove = await boardRef.current.move({
         from: move.from as Square,
         to: move.to as Square,
         ...(move.promotion ? { promotion: move.promotion as PieceSymbol } : {})
       });
+      if (!playedMove) {
+        consumeSuppressedBoardMove(suppressedMove, suppressedBoardMovesRef.current);
+        commitBoardFen(finalFen);
+      }
       setLastBoardMove(move);
     }
-    setBoardFen(finalFen);
+    commitBoardFen(finalFen);
   }
 
   const currentPuzzle = state?.currentPuzzle;
@@ -272,8 +738,20 @@ export function PracticePocScreen({ practiceService }: Props): React.JSX.Element
   const remainingMs = state ? Math.max(0, new Date(state.deadlineAt).getTime() - nowMs) : 0;
   const timerText = formatDuration(Math.max(0, Math.floor(remainingMs / 1000)));
   const currentBoardFen = boardFen ?? currentPuzzle?.currentFen ?? null;
-  const boardFlipped = currentPuzzle ? shouldFlipBoard(currentPuzzle) : false;
+  const displayedPuzzle = feedbackSnapshot?.currentPuzzle ?? currentPuzzle;
+  const displayedBoardFen = feedbackSnapshot?.boardFen ?? currentBoardFen;
+  const boardFlipped = displayedPuzzle ? shouldFlipBoard(displayedPuzzle) : false;
   const feedbackForCurrentPuzzle = feedbackPuzzleId && currentPuzzle?.puzzle.id === feedbackPuzzleId ? feedback : null;
+  const boardFeedback = feedbackSnapshot?.feedback ?? feedbackForCurrentPuzzle;
+  const boardGestureEnabled = Boolean(isActive && !isShowingFeedbackSnapshot && !boardInputLocked);
+  const boardDraggableColor = boardGestureEnabled && currentPuzzle
+    ? sideToMove(currentPuzzle.currentFen)
+    : null;
+  const submittedMoveForCurrentPuzzle =
+    boardFeedback?.submittedMove && boardFeedback.submittedMove !== "__illegal__"
+      ? arrowFromTo(boardFeedback.submittedMove)
+      : null;
+  const displayedLastBoardMove = feedbackSnapshot || boardFeedback ? null : lastBoardMove;
   const displayedAttempts = historyWrongLast7Days
     ? attempts.filter((attempt) => {
       const completedAt = new Date(attempt.completedAt).getTime();
@@ -288,12 +766,12 @@ export function PracticePocScreen({ practiceService }: Props): React.JSX.Element
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>Puzzle Sprint</Text>
-          <Text style={styles.subtitle}>Offline fixture · {seededPuzzleCount()} puzzles</Text>
+          <Text style={styles.subtitle}>Offline fixture · {seededPuzzleCount(puzzleSource)} puzzles</Text>
         </View>
         <Text testID="rating-label" style={styles.rating}>{`ELO ${formatRating(state, currentRating)}`}</Text>
       </View>
 
-      {!isActive ? (
+      {!isActive && !isShowingFeedbackSnapshot ? (
         <View style={styles.tabs}>
           <TabButton active={tab === "practice"} label="Practice" testID="practice-tab" onPress={() => setTab("practice")} />
           <TabButton active={tab === "review"} label="Review" testID="review-tab" onPress={() => setTab("review")} />
@@ -325,6 +803,13 @@ export function PracticePocScreen({ practiceService }: Props): React.JSX.Element
               />
             ) : null}
 
+            {!isActive && state === null && isPracticeTestControlsEnabled() && !practiceService ? (
+              <TestPuzzleSourceControl
+                source={puzzleSource}
+                onChange={changePuzzleSource}
+              />
+            ) : null}
+
             {!isActive && state === null && mode === "custom" ? (
               <CustomSprintSetup
                 durationSeconds={customDurationSeconds}
@@ -336,28 +821,44 @@ export function PracticePocScreen({ practiceService }: Props): React.JSX.Element
               />
             ) : null}
 
-            {isActive ? (
+            {shouldShowSessionBoard ? (
+              <PracticePrompt currentPuzzle={displayedPuzzle} mode={mode} />
+            ) : null}
+
+            {shouldShowSessionBoard ? (
               <View style={styles.boardWrapper}>
                 <View testID="session-board" style={[styles.boardSurface, { width: boardSize, height: boardSize }]}>
-                  {currentBoardFen ? (
+                  {displayedBoardFen ? (
                     <Chessboard
-                      key={`${state?.id ?? "idle"}-${currentPuzzle?.puzzle.id ?? "none"}-${currentPuzzle?.kind ?? "line"}`}
+                      key={`${state?.id ?? "idle"}-${displayedPuzzle?.puzzle.id ?? "none"}-${displayedPuzzle?.kind ?? "line"}`}
                       ref={boardRef}
-                      fen={currentBoardFen}
-                      onMove={onBoardMove}
-                      onIllegalMove={onIllegalMove}
-                      gestureEnabled
+                      fen={displayedBoardFen}
+                      onMove={(result) => {
+                        void onBoardMove(result, {
+                          puzzleId: displayedPuzzle?.puzzle.id ?? null
+                        });
+                      }}
+                      onIllegalMove={(from, to) => {
+                        onIllegalMove(from, to, {
+                          puzzleId: displayedPuzzle?.puzzle.id ?? null
+                        });
+                      }}
+                      gestureEnabled={boardGestureEnabled}
+                      draggableColor={boardDraggableColor}
                       boardSize={boardSize}
                       flipped={boardFlipped}
                       withLetters={false}
                       withNumbers={false}
                       durations={{ move: 260 }}
+                      spriteSource={CHESS_PIECE_SPRITE}
                       colors={{
-                        white: "#E6E8EB",
-                        black: "#7B8794",
-                        lastMoveHighlight: "rgba(31, 41, 55, 0.2)",
-                        checkmateHighlight: "#DC2626",
-                        promotionPieceButton: "#2563EB"
+                        white: "#EEF2F5",
+                        black: "#A3ADB8",
+                        lastMoveHighlight: "rgba(0, 0, 0, 0)",
+                        checkmateHighlight: "rgba(0, 0, 0, 0)",
+                        promotionPieceButton: "#F8FAFC",
+                        validMoveDot: "rgba(15, 23, 42, 0.36)",
+                        validMoveCapture: "rgba(15, 23, 42, 0.56)"
                       }}
                     />
                   ) : (
@@ -366,29 +867,52 @@ export function PracticePocScreen({ practiceService }: Props): React.JSX.Element
                     </View>
                   )}
 
-                  {lastBoardMove ? (
+                  {!boardGestureEnabled ? (
+                    <Pressable
+                      accessibilityElementsHidden
+                      importantForAccessibility="no-hide-descendants"
+                      onPress={() => undefined}
+                      style={styles.boardInputBlocker}
+                      testID="board-input-blocker"
+                    />
+                  ) : null}
+
+                  {displayedLastBoardMove ? (
                     <LastMoveOverlay
                       boardSize={boardSize}
                       flipped={boardFlipped}
-                      move={lastBoardMove}
+                      move={displayedLastBoardMove}
                     />
                   ) : null}
 
-                  {currentPuzzle?.kind === "arrow_duel" ? (
+                  {submittedMoveForCurrentPuzzle ? (
+                    <MoveFeedbackOverlay
+                      boardSize={boardSize}
+                      flipped={boardFlipped}
+                      move={submittedMoveForCurrentPuzzle}
+                      result={boardFeedback?.result ?? "wrong"}
+                    />
+                  ) : null}
+
+                  {displayedPuzzle?.kind === "arrow_duel" && !boardFeedback ? (
                     <ArrowCandidateOverlay
                       boardSize={boardSize}
                       flipped={boardFlipped}
-                      candidates={currentPuzzle.candidates}
-                      feedback={feedbackForCurrentPuzzle}
+                      candidates={displayedPuzzle.candidates}
                     />
                   ) : null}
                 </View>
+                {isPracticeDebugEnabled() && chessboardDebugEvents.length > 0 ? (
+                  <Text style={styles.debugLog} testID="chessboard-debug-log">
+                    {chessboardDebugEvents.join("\n")}
+                  </Text>
+                ) : null}
               </View>
             ) : null}
 
-            {feedback ? <FeedbackPanel feedback={feedback} error={error} /> : null}
+            {error ? <ErrorPanel error={error} /> : null}
 
-            {isFinished ? (
+            {isFinished && !isShowingFeedbackSnapshot ? (
               <SprintSummary
                 state={state}
                 elapsedMs={Math.min(sprintElapsedMs, state ? state.config.durationSeconds * 1000 : sprintElapsedMs)}
@@ -398,7 +922,7 @@ export function PracticePocScreen({ practiceService }: Props): React.JSX.Element
               />
             ) : null}
 
-            {state?.status === "active" ? null : (
+            {state?.status === "active" || isShowingFeedbackSnapshot ? null : (
               <>
                 <Pressable
                   accessibilityRole="button"
@@ -421,7 +945,15 @@ export function PracticePocScreen({ practiceService }: Props): React.JSX.Element
             onToggleWrongLast7Days={() => setHistoryWrongLast7Days((current) => !current)}
           />
         ) : null}
-        {tab === "review" ? <ReviewPanel reviews={reviews} /> : null}
+        {tab === "review" ? (
+          <ReviewPanel
+            boardSize={boardSize}
+            dueReviewItems={dueReviewItems}
+            reviews={reviews}
+            service={service}
+            sessionMistakeReviewItems={sessionMistakeReviewItems}
+          />
+        ) : null}
         {tab === "settings" ? <SettingsPanel onResetRating={() => service.resetRating(selectedConfig.ratingKey)} /> : null}
         {tab === "packs" ? <PacksPanel /> : null}
       </ScrollView>
@@ -519,7 +1051,7 @@ function CustomSprintSetup({
           />
         ))}
       </View>
-      <Text style={styles.helperText}>Seconds per puzzle</Text>
+      <Text style={styles.helperText}>Target pace</Text>
       <View style={styles.optionRow}>
         {CUSTOM_PER_PUZZLE_OPTIONS.map((option) => (
           <OptionButton
@@ -534,6 +1066,31 @@ function CustomSprintSetup({
       <View style={styles.configSummary}>
         <Text style={styles.listText}>Miss 3 and the sprint fails</Text>
         <Text style={styles.helperText}>{ratingKey}</Text>
+      </View>
+    </View>
+  );
+}
+
+function TestPuzzleSourceControl({
+  source,
+  onChange
+}: {
+  source: MobilePuzzleSource;
+  onChange: (next: MobilePuzzleSource) => void;
+}): React.JSX.Element {
+  return (
+    <View style={styles.testPanel} testID="test-puzzle-source-control">
+      <Text style={styles.helperText}>Test puzzle source</Text>
+      <View style={styles.optionRow}>
+        {TEST_PUZZLE_SOURCES.map((option) => (
+          <OptionButton
+            key={option.source}
+            active={source === option.source}
+            label={option.label}
+            testID={`test-puzzle-source-${option.source}`}
+            onPress={() => onChange(option.source)}
+          />
+        ))}
       </View>
     </View>
   );
@@ -560,7 +1117,7 @@ function SessionStatusBar({
         <View style={styles.sessionHeaderRow}>
           <View>
             <Text style={styles.sessionTitle}>{modeLabel(mode)}</Text>
-            <Text style={styles.helperText}>{formatDurationLabel(config.durationSeconds)} sprint · {config.perPuzzleSeconds}s per puzzle</Text>
+        <Text style={styles.helperText}>{formatDurationLabel(config.durationSeconds)} sprint · {config.perPuzzleSeconds}s target pace</Text>
           </View>
           <Text style={styles.ratingPill}>{currentRating}</Text>
         </View>
@@ -610,7 +1167,7 @@ function MistakeStrikes({
   max: number;
 }): React.JSX.Element {
   return (
-    <View accessibilityLabel={`Strikes ${count} of ${max}`} testID="session-strikes" style={styles.strikeRow}>
+    <View accessibilityLabel={`Mistakes ${count} of ${max}`} testID="session-strikes" style={styles.strikeRow}>
       {Array.from({ length: max }, (_, index) => {
         const used = index < count;
         return (
@@ -620,7 +1177,7 @@ function MistakeStrikes({
           />
         );
       })}
-      <Text style={styles.strikeLabel}>Strikes</Text>
+      <Text style={styles.strikeLabel}>Mistakes</Text>
     </View>
   );
 }
@@ -691,37 +1248,41 @@ function SprintSummary({
   );
 }
 
-function FeedbackPanel({
-  feedback,
-  error
-}: {
-  feedback: SessionFeedback;
-  error: string | null;
-}): React.JSX.Element | null {
-  if (!feedback && !error) {
-    return null;
-  }
-  if (error) {
-    return (
-      <View style={styles.errorPanel} testID="error-panel">
-        <Text style={styles.errorText}>{error}</Text>
-      </View>
-    );
-  }
-  const feedbackValue = feedback;
-  if (!feedbackValue) {
-    return null;
-  }
-  const feedbackLabel = feedbackValue.result === "correct" ? "Correct" : "Incorrect";
+function ErrorPanel({ error }: { error: string }): React.JSX.Element {
   return (
-    <View style={styles.feedbackPanel} testID="feedback-panel">
-      <Text style={styles.feedbackText}>{feedbackLabel}</Text>
-      {feedbackValue.review ? (
-        <View style={styles.arrowReview} testID="arrow-review-panel">
-          <Text style={styles.helperText}>The board marks the stronger move and the punished line.</Text>
-        </View>
-      ) : null}
-      {feedbackValue.puzzleSolved ? <Text style={styles.correctText}>Puzzle solved</Text> : null}
+    <View style={styles.errorPanel} testID="error-panel">
+      <Text style={styles.errorText}>{error}</Text>
+    </View>
+  );
+}
+
+function PracticePrompt({
+  currentPuzzle,
+  mode
+}: {
+  currentPuzzle: CurrentPuzzleState | undefined;
+  mode: SprintMode;
+}): React.JSX.Element | null {
+  if (!currentPuzzle) {
+    return null;
+  }
+  const side = sideToMove(currentPuzzle.currentFen) === "b" ? "black" : "white";
+  const isArrowDuel = currentPuzzle.kind === "arrow_duel";
+
+  return (
+    <View style={styles.promptPanel} testID="practice-prompt">
+      <Text style={styles.promptIcon}>{isArrowDuel ? "⇄" : "♛"}</Text>
+      <View style={styles.promptCopy}>
+        <Text style={styles.promptTitle}>{isArrowDuel ? "Arrow Duel" : modeLabel(mode)}</Text>
+        <Text style={styles.promptText}>
+          {isArrowDuel
+            ? `Choose the better move for ${side} between the two arrows.`
+            : `Find the best move for ${side}.`}
+        </Text>
+        {isArrowDuel ? (
+          <Text style={styles.promptHint}>Watch for checks, captures, and attacks!</Text>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -759,22 +1320,55 @@ function LastMoveOverlay({
   );
 }
 
+function MoveFeedbackOverlay({
+  boardSize,
+  flipped,
+  move,
+  result
+}: {
+  boardSize: number;
+  flipped: boolean;
+  move: BoardMove;
+  result: "correct" | "wrong";
+}): React.JSX.Element {
+  const squareSize = boardSize / 8;
+  const backgroundColor = result === "correct" ? "rgba(22, 163, 74, 0.34)" : "rgba(220, 38, 38, 0.32)";
+
+  return (
+    <View style={[styles.arrowLayer, { width: boardSize, height: boardSize }]} pointerEvents="none" testID="move-feedback-overlay">
+      {[move.from, move.to].map((square) => {
+        const pos = squareToTopLeft(square, squareSize, flipped);
+        return (
+          <View
+            key={square}
+            style={[
+              styles.feedbackMoveSquare,
+              {
+                backgroundColor,
+                height: squareSize,
+                left: pos.x,
+                top: pos.y,
+                width: squareSize
+              }
+            ]}
+          />
+        );
+      })}
+    </View>
+  );
+}
+
 function ArrowCandidateOverlay({
   boardSize,
   flipped,
-  candidates,
-  feedback
+  candidates
 }: {
   boardSize: number;
   flipped: boolean;
   candidates: string[];
-  feedback: SessionFeedback;
 }): React.JSX.Element {
   const squareSize = boardSize / 8;
-  const reviewArrows = feedback?.review?.arrows ?? [];
-  const pieceMoves = reviewArrows.length
-    ? reviewArrows
-    : candidates.map((candidate) => ({
+  const pieceMoves = candidates.map((candidate) => ({
     move: candidate,
     role: "candidate",
     color: "neutral",
@@ -785,6 +1379,7 @@ function ArrowCandidateOverlay({
     <View style={[styles.arrowLayer, { width: boardSize, height: boardSize }]} pointerEvents="none">
       {pieceMoves.map((arrow) => {
         const from = arrowFromTo(arrow.move);
+        const arrowStyle = ARROW_VISUAL_STYLES.candidate;
         if (!from) {
           return null;
         }
@@ -795,10 +1390,8 @@ function ArrowCandidateOverlay({
               squareSize={squareSize}
               flipped={flipped}
               move={arrow.move}
-              stroke={
-                arrow.role === "correct" ? "#16A34A" :
-                  arrow.role === "wrong" ? "#DC2626" : NEUTRAL_ARROW
-              }
+              stroke={arrowStyle.stroke}
+              opacity={arrowStyle.opacity}
               selected={arrow.selected}
               from={from}
             />
@@ -815,6 +1408,7 @@ function ArrowHint({
   flipped,
   move,
   stroke,
+  opacity,
   selected,
   from
 }: {
@@ -823,20 +1417,20 @@ function ArrowHint({
   flipped: boolean;
   move: string;
   stroke: string;
+  opacity: number;
   selected: boolean;
   from: { from: string; to: string };
 }): React.JSX.Element {
   const fromPos = squareToPixel(from.from, squareSize, flipped);
   const toPos = squareToPixel(from.to, squareSize, flipped);
-  const fromTopLeft = squareToTopLeft(from.from, squareSize, flipped);
   const dx = toPos.x - fromPos.x;
   const dy = toPos.y - fromPos.y;
   const len = Math.sqrt(dx * dx + dy * dy);
-  const segmentSize = selected ? 7 : 5;
-  const segmentCount = Math.max(2, Math.floor(len / (squareSize * 0.42)));
-  const targetRingSize = squareSize * (selected ? 0.72 : 0.64);
-  const sourceBadgeSize = Math.max(16, squareSize * 0.26);
-  const opacity = selected ? 0.82 : 0.58;
+  const angle = Math.atan2(dy, dx);
+  const strokeWidth = Math.max(7, squareSize * (selected ? 0.18 : 0.14));
+  const headSize = Math.max(18, squareSize * (selected ? 0.34 : 0.3));
+  const bodyLength = Math.max(0, len - squareSize * 0.42);
+  const bodyStart = squareSize * 0.22;
 
   return (
     <View
@@ -850,50 +1444,33 @@ function ArrowHint({
     >
       <View
         style={[
-          styles.arrowSourceBadge,
+          styles.analysisArrowBody,
           {
-            borderColor: stroke,
-            height: sourceBadgeSize,
-            left: fromTopLeft.x + squareSize * 0.08,
+            backgroundColor: stroke,
+            height: strokeWidth,
+            left: fromPos.x + Math.cos(angle) * bodyStart,
             opacity,
-            top: fromTopLeft.y + squareSize * 0.08,
-            width: sourceBadgeSize
+            top: fromPos.y - strokeWidth / 2 + Math.sin(angle) * bodyStart,
+            transform: [{ rotateZ: `${angle}rad` }],
+            width: bodyLength
           }
         ]}
       />
-      {Array.from({ length: segmentCount }, (_, index) => {
-        const t = (index + 1) / (segmentCount + 2);
-        return (
-          <View
-            key={`${move}-${index}`}
-            style={[
-              styles.arrowSegment,
-              {
-                backgroundColor: stroke,
-                borderRadius: segmentSize / 2,
-                height: segmentSize,
-                left: fromPos.x + dx * t - segmentSize / 2,
-                opacity,
-                top: fromPos.y + dy * t - segmentSize / 2,
-                width: segmentSize
-              }
-            ]}
-          />
-        );
-      })}
-        <View
-          style={[
-            styles.arrowTargetRing,
-            {
-              borderColor: stroke,
-              height: targetRingSize,
-              left: toPos.x - targetRingSize / 2,
-              opacity,
-              top: toPos.y - targetRingSize / 2,
-              width: targetRingSize
-            }
-          ]}
-        />
+      <View
+        style={[
+          styles.analysisArrowHead,
+          {
+            borderLeftColor: stroke,
+            borderLeftWidth: headSize,
+            borderTopWidth: headSize * 0.52,
+            borderBottomWidth: headSize * 0.52,
+            left: toPos.x - headSize * 0.5,
+            opacity,
+            top: toPos.y - headSize * 0.52,
+            transform: [{ rotateZ: `${angle}rad` }]
+          }
+        ]}
+      />
     </View>
   );
 }
@@ -942,19 +1519,73 @@ function HistoryPanel({
   );
 }
 
-function ReviewPanel({ reviews }: { reviews: Record<string, unknown>[] }): React.JSX.Element {
+type ReviewEntry = {
+  puzzle: Puzzle;
+  mode: SprintMode;
+  source: "session" | "due";
+  attempt?: AttemptEvent;
+};
+
+type ReviewPuzzleState =
+  | { kind: "line"; line: PuzzleLineState }
+  | { kind: "arrow_duel"; duel: ArrowDuelState };
+
+type AnalysisLine = {
+  move: string;
+  san: string;
+  label: string;
+  score: string;
+};
+
+function ReviewPanel({
+  boardSize,
+  dueReviewItems,
+  reviews,
+  service,
+  sessionMistakeReviewItems
+}: {
+  boardSize: number;
+  dueReviewItems: ReviewQueueItem[];
+  reviews: Record<string, unknown>[];
+  service: PracticeService;
+  sessionMistakeReviewItems: SessionMistakeReviewItem[];
+}): React.JSX.Element {
+  const sessionEntries = sessionMistakeReviewItems.map((item): ReviewEntry => ({
+    puzzle: item.puzzle,
+    mode: item.attempt.mode,
+    source: "session",
+    attempt: item.attempt
+  }));
+  const dueEntries = dueReviewItems.map((item): ReviewEntry => ({
+    puzzle: item.puzzle,
+    mode: "standard",
+    source: "due"
+  }));
+  const preferredEntries = sessionEntries.length > 0 ? sessionEntries : dueEntries;
+  const preferredEntriesKey = preferredEntries.map((entry) => `${entry.source}:${entry.puzzle.id}:${entry.mode}`).join("|");
+  const [activeEntries, setActiveEntries] = useState<ReviewEntry[]>(preferredEntries);
+
+  useEffect(() => {
+    setActiveEntries(preferredEntries);
+  }, [preferredEntriesKey]);
+
+  if (activeEntries.length > 0) {
+    return (
+      <ReviewSession
+        key={activeEntries.map((entry) => `${entry.source}:${entry.puzzle.id}:${entry.mode}`).join("|")}
+        boardSize={boardSize}
+        entries={activeEntries}
+        service={service}
+        onExit={() => setActiveEntries([])}
+      />
+    );
+  }
+
   return (
     <View style={styles.listPanel} testID="review-panel">
       <Text style={styles.panelTitle}>Review</Text>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Start due review"
-        testID="review-start-due"
-        style={styles.primaryButton}
-      >
-        <Text style={styles.primaryButtonText}>Start due review</Text>
-      </Pressable>
-      {reviews.length === 0 ? <Text style={styles.listText}>No due reviews</Text> : null}
+      {sessionEntries.length === 0 ? <Text style={styles.listText}>No last sprint mistakes</Text> : null}
+      {dueEntries.length === 0 ? <Text style={styles.listText}>No reviews due today</Text> : null}
       {reviews.map((review) => {
         const row = review as { puzzleId: string; dueAt: string; lastResult: string };
         return (
@@ -965,6 +1596,621 @@ function ReviewPanel({ reviews }: { reviews: Record<string, unknown>[] }): React
       })}
     </View>
   );
+}
+
+function ReviewSession({
+  boardSize,
+  entries,
+  service,
+  onExit
+}: {
+  boardSize: number;
+  entries: ReviewEntry[];
+  service: PracticeService;
+  onExit: () => void;
+}): React.JSX.Element {
+  const boardRef = useRef<ChessboardRef | null>(null);
+  const reviewSuppressedBoardMovesRef = useRef<string[]>([]);
+  const reviewResultRecordedRef = useRef(false);
+  const [entryIndex, setEntryIndex] = useState(0);
+  const [reviewState, setReviewState] = useState<ReviewPuzzleState>(() => startReviewPuzzle(entries[0]));
+  const [feedback, setFeedback] = useState<SessionFeedback>(null);
+  const [lastMove, setLastMove] = useState<BoardMove | null>(null);
+  const [boardLocked, setBoardLocked] = useState(false);
+  const [wrongSeen, setWrongSeen] = useState(false);
+  const [analysisEnabled, setAnalysisEnabled] = useState(false);
+  const [analysisFen, setAnalysisFen] = useState<string | null>(null);
+  const [analysisBackStack, setAnalysisBackStack] = useState<string[]>([]);
+  const [analysisForwardStack, setAnalysisForwardStack] = useState<string[]>([]);
+  const [manualBoardFlip, setManualBoardFlip] = useState(false);
+  const [reviewResultRecorded, setReviewResultRecorded] = useState(false);
+  const currentEntry = entries[entryIndex];
+  const currentPuzzle = currentReviewPuzzleState(reviewState);
+  const currentFen = currentPuzzle.currentFen;
+  const displayFen = analysisEnabled ? (analysisFen ?? currentFen) : currentFen;
+  const baseBoardFlipped = reviewStartingPerspectiveFlipped(currentEntry);
+  const boardFlipped = manualBoardFlip ? !baseBoardFlipped : baseBoardFlipped;
+  const feedbackMove = feedback?.submittedMove && feedback.submittedMove !== "__illegal__" ? arrowFromTo(feedback.submittedMove) : null;
+  const analysisLines = analysisEnabled ? buildReviewAnalysisLines(displayFen, currentEntry.puzzle, currentPuzzle) : [];
+  const analysisBlunderMove =
+    analysisEnabled && reviewState.kind === "arrow_duel" && displayFen === currentEntry.puzzle.initialFen
+      ? reviewState.duel.wrongMove
+      : undefined;
+  const boardGestureEnabled = !boardLocked;
+  const boardDraggableColor = boardGestureEnabled ? sideToMove(displayFen) : null;
+  const isSessionReview = currentEntry.source === "session";
+  const canReviewPrevious = isSessionReview && entryIndex > 0 && !boardLocked;
+  const canReviewNext = isSessionReview && entryIndex < entries.length - 1 && !boardLocked;
+  const canAnalysisBack = analysisEnabled && analysisBackStack.length > 0;
+  const canAnalysisForward = analysisEnabled && analysisForwardStack.length > 0;
+
+  function resetCurrentReview(nextIndex = entryIndex): void {
+    const nextState = startReviewPuzzle(entries[nextIndex]);
+    setEntryIndex(nextIndex);
+    setReviewState(nextState);
+    setFeedback(null);
+    setLastMove(null);
+    setBoardLocked(false);
+    setWrongSeen(false);
+    setAnalysisEnabled(false);
+    setAnalysisFen(null);
+    setAnalysisBackStack([]);
+    setAnalysisForwardStack([]);
+    setManualBoardFlip(false);
+    setReviewResultRecorded(false);
+    reviewResultRecordedRef.current = false;
+    reviewSuppressedBoardMovesRef.current = [];
+  }
+
+  function advanceReview(result: "correct" | "wrong"): void {
+    recordCurrentReviewResult(result);
+    const nextIndex = entryIndex + 1;
+    if (nextIndex >= entries.length) {
+      onExit();
+      return;
+    }
+    resetCurrentReview(nextIndex);
+  }
+
+  function recordCurrentReviewResult(result: "correct" | "wrong"): void {
+    if (reviewResultRecordedRef.current || reviewResultRecorded) {
+      return;
+    }
+    reviewResultRecordedRef.current = true;
+    service.recordReviewResult(currentEntry.puzzle.id, result);
+    setReviewResultRecorded(true);
+  }
+
+  function navigateReview(nextIndex: number): void {
+    if (!isSessionReview || boardLocked || nextIndex < 0 || nextIndex >= entries.length) {
+      return;
+    }
+    resetCurrentReview(nextIndex);
+  }
+
+  async function onReviewBoardMove(result: MoveResult): Promise<void> {
+    const move = formatUci(result.move);
+    if (consumeSuppressedBoardMove(move, reviewSuppressedBoardMovesRef.current)) {
+      return;
+    }
+
+    if (analysisEnabled) {
+      onAnalysisBoardMove(move, result);
+      return;
+    }
+
+    if (boardLocked) {
+      boardRef.current?.resetBoard(currentFen);
+      return;
+    }
+    const submittedFen = currentFen;
+    const submittedMoveFen = fenAfterMove(submittedFen, move);
+    if (!submittedMoveFen) {
+      boardRef.current?.resetBoard(submittedFen);
+      return;
+    }
+    if (!moveResultMatchesExpectedFen(result, submittedMoveFen)) {
+      boardRef.current?.resetBoard(submittedMoveFen);
+    }
+
+    if (reviewState.kind === "arrow_duel") {
+      await submitReviewArrowMove(move, submittedFen);
+      return;
+    }
+    await submitReviewLineMove(move, submittedFen);
+  }
+
+  async function submitReviewLineMove(move: string, submittedFen: string): Promise<void> {
+    setBoardLocked(true);
+    try {
+      const result = submitLineMove(reviewState.kind === "line" ? reviewState.line : beginLinePuzzle(currentEntry.puzzle), move);
+      setFeedback(result.feedback);
+      if (result.feedback.result === "wrong") {
+        setWrongSeen(true);
+        await sleep(FEEDBACK_SNAPSHOT_MS);
+        boardRef.current?.resetBoard(submittedFen);
+        setFeedback(null);
+        setBoardLocked(false);
+        return;
+      }
+
+      if (result.feedback.autoPlayedMoves.length > 0) {
+        await sleep(USER_FEEDBACK_BEFORE_AUTO_MS);
+        setFeedback(null);
+        await animateReviewBoardMoves(result.feedback.autoPlayedMoves, result.state.currentFen);
+      }
+      setReviewState({ kind: "line", line: result.state });
+      if (result.feedback.puzzleSolved) {
+        await sleep(FEEDBACK_SNAPSHOT_MS);
+        advanceReview(wrongSeen ? "wrong" : "correct");
+        return;
+      }
+      setBoardLocked(false);
+    } catch {
+      boardRef.current?.resetBoard(submittedFen);
+      setBoardLocked(false);
+    }
+  }
+
+  function applyAnalysisMove(move: string, result?: MoveResult): void {
+    const baseFen = analysisFen ?? currentFen;
+    const nextFen = fenAfterMove(baseFen, move);
+    if (!nextFen) {
+      boardRef.current?.resetBoard(baseFen);
+      return;
+    }
+    if (result && !moveResultMatchesExpectedFen(result, nextFen)) {
+      boardRef.current?.resetBoard(nextFen);
+    }
+    setAnalysisBackStack((stack) => [...stack, baseFen]);
+    setAnalysisForwardStack([]);
+    setAnalysisFen(nextFen);
+    setLastMove(arrowFromTo(move));
+  }
+
+  function onAnalysisBoardMove(move: string, result: MoveResult): void {
+    applyAnalysisMove(move, result);
+  }
+
+  async function playAnalysisCandidateMove(move: string): Promise<void> {
+    if (!analysisEnabled || boardLocked) {
+      return;
+    }
+    const parsed = arrowFromTo(move);
+    if (!parsed) {
+      return;
+    }
+    const baseFen = analysisFen ?? currentFen;
+    if (!fenAfterMove(baseFen, move)) {
+      return;
+    }
+
+    if (boardRef.current) {
+      const suppressedMove = boardMoveToUci(parsed);
+      reviewSuppressedBoardMovesRef.current.push(suppressedMove);
+      const playedMove = await boardRef.current.move({
+        from: parsed.from as Square,
+        to: parsed.to as Square,
+        ...(parsed.promotion ? { promotion: parsed.promotion as PieceSymbol } : {})
+      });
+      if (!playedMove) {
+        consumeSuppressedBoardMove(suppressedMove, reviewSuppressedBoardMovesRef.current);
+      }
+    }
+
+    applyAnalysisMove(move);
+  }
+
+  async function submitReviewArrowMove(move: string, submittedFen: string): Promise<void> {
+    if (reviewState.kind !== "arrow_duel" || !isArrowDuelCandidate(reviewState.duel.candidates, move)) {
+      boardRef.current?.resetBoard(submittedFen);
+      return;
+    }
+    setBoardLocked(true);
+    const result = submitArrowDuelChoice(reviewState.duel, move);
+    setFeedback(result.feedback);
+    if (result.feedback.result === "correct") {
+      await sleep(FEEDBACK_SNAPSHOT_MS);
+      advanceReview("correct");
+      return;
+    }
+
+    setWrongSeen(true);
+    await sleep(FEEDBACK_SNAPSHOT_MS);
+    setFeedback(null);
+    const replyMoves = result.feedback.autoPlayedMoves.slice(1);
+    const finalFen = fenAfterMoves(submittedFen, result.feedback.autoPlayedMoves) ?? submittedFen;
+    if (replyMoves.length > 0) {
+      await animateReviewBoardMoves(replyMoves, finalFen);
+      await sleep(FEEDBACK_SNAPSHOT_MS);
+    }
+    advanceReview("wrong");
+    setBoardLocked(false);
+  }
+
+  async function animateReviewBoardMoves(moves: string[], finalFen: string): Promise<void> {
+    const parsedMoves = moves.map(arrowFromTo).filter((move): move is BoardMove => Boolean(move));
+    if (!boardRef.current || parsedMoves.length === 0) {
+      setLastMove(parsedMoves[parsedMoves.length - 1] ?? null);
+      boardRef.current?.resetBoard(finalFen);
+      return;
+    }
+
+    for (const move of parsedMoves) {
+      const suppressedMove = boardMoveToUci(move);
+      reviewSuppressedBoardMovesRef.current.push(suppressedMove);
+      const playedMove = await boardRef.current.move({
+        from: move.from as Square,
+        to: move.to as Square,
+        ...(move.promotion ? { promotion: move.promotion as PieceSymbol } : {})
+      });
+      if (!playedMove) {
+        consumeSuppressedBoardMove(suppressedMove, reviewSuppressedBoardMovesRef.current);
+        boardRef.current?.resetBoard(finalFen);
+      }
+      setLastMove(move);
+    }
+  }
+
+  function openAnalysis(): void {
+    recordCurrentReviewResult("wrong");
+    setWrongSeen(true);
+    setFeedback(null);
+    setAnalysisEnabled(true);
+    setAnalysisFen(currentFen);
+    setAnalysisBackStack([]);
+    setAnalysisForwardStack([]);
+  }
+
+  function closeAnalysis(): void {
+    setAnalysisEnabled(false);
+    setAnalysisFen(null);
+    setAnalysisBackStack([]);
+    setAnalysisForwardStack([]);
+    boardRef.current?.resetBoard(currentFen);
+  }
+
+  function resetAnalysis(): void {
+    const startFen = reviewStartingFen(currentEntry);
+    setAnalysisFen(startFen);
+    setAnalysisBackStack([]);
+    setAnalysisForwardStack([]);
+    boardRef.current?.resetBoard(startFen);
+  }
+
+  function stepAnalysisForward(): void {
+    const nextFen = analysisForwardStack[analysisForwardStack.length - 1];
+    if (!nextFen) {
+      return;
+    }
+    const baseFen = analysisFen ?? currentFen;
+    setAnalysisForwardStack((stack) => stack.slice(0, -1));
+    setAnalysisBackStack((stack) => [...stack, baseFen]);
+    setAnalysisFen(nextFen);
+    boardRef.current?.resetBoard(nextFen);
+  }
+
+  function stepAnalysisBack(): void {
+    const previous = analysisBackStack[analysisBackStack.length - 1];
+    if (!previous) {
+      return;
+    }
+    setAnalysisBackStack((stack) => stack.slice(0, -1));
+    setAnalysisForwardStack((stack) => [...stack, analysisFen ?? currentFen]);
+    setAnalysisFen(previous);
+    boardRef.current?.resetBoard(previous);
+  }
+
+  return (
+    <View style={styles.reviewSessionPanel} testID="review-session">
+      <View style={styles.reviewHeaderRow}>
+        <View>
+          <Text style={styles.panelTitle}>Review</Text>
+          <Text testID="review-progress" style={styles.helperText}>
+            {entryIndex + 1} / {entries.length} · {modeLabel(currentEntry.mode)}
+          </Text>
+        </View>
+        <View style={styles.iconButtonRow}>
+          {isSessionReview ? (
+            <>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Previous review puzzle"
+                accessibilityState={{ disabled: !canReviewPrevious }}
+                disabled={!canReviewPrevious}
+                testID="review-previous"
+                style={[styles.iconButton, !canReviewPrevious ? styles.disabledButton : null]}
+                onPress={() => navigateReview(entryIndex - 1)}
+              >
+                <Text style={styles.iconButtonText}>‹</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Next review puzzle"
+                accessibilityState={{ disabled: !canReviewNext }}
+                disabled={!canReviewNext}
+                testID="review-next"
+                style={[styles.iconButton, !canReviewNext ? styles.disabledButton : null]}
+                onPress={() => navigateReview(entryIndex + 1)}
+              >
+                <Text style={styles.iconButtonText}>›</Text>
+              </Pressable>
+            </>
+          ) : null}
+          <Pressable accessibilityRole="button" accessibilityLabel="Exit review" testID="review-exit" style={styles.iconButton} onPress={onExit}>
+            <Text style={styles.iconButtonText}>×</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      <PracticePrompt currentPuzzle={currentPuzzle} mode={currentEntry.mode} />
+
+      <View style={styles.reviewBoardLayout}>
+        <View style={styles.boardWrapper}>
+          <View testID="review-board" style={[styles.boardSurface, { width: boardSize, height: boardSize }]}>
+            <Chessboard
+              key={`${currentEntry.puzzle.id}-${entryIndex}`}
+              ref={boardRef}
+              fen={displayFen}
+              onMove={(result) => {
+                void onReviewBoardMove(result);
+              }}
+              onIllegalMove={() => {
+                boardRef.current?.resetBoard(displayFen);
+              }}
+              gestureEnabled={boardGestureEnabled}
+              draggableColor={boardDraggableColor}
+              boardSize={boardSize}
+              flipped={boardFlipped}
+              withLetters={false}
+              withNumbers={false}
+              durations={{ move: 260 }}
+              spriteSource={CHESS_PIECE_SPRITE}
+              colors={{
+                white: "#EEF2F5",
+                black: "#A3ADB8",
+                lastMoveHighlight: "rgba(0, 0, 0, 0)",
+                checkmateHighlight: "rgba(0, 0, 0, 0)",
+                promotionPieceButton: "#F8FAFC",
+                validMoveDot: "rgba(15, 23, 42, 0.36)",
+                validMoveCapture: "rgba(15, 23, 42, 0.56)"
+              }}
+            />
+            {lastMove && !feedback ? <LastMoveOverlay boardSize={boardSize} flipped={boardFlipped} move={lastMove} /> : null}
+            {feedbackMove ? (
+              <MoveFeedbackOverlay
+                boardSize={boardSize}
+                flipped={boardFlipped}
+                move={feedbackMove}
+                result={feedback?.result ?? "wrong"}
+              />
+            ) : null}
+            {reviewState.kind === "arrow_duel" && !feedback && !analysisEnabled ? (
+              <ArrowCandidateOverlay boardSize={boardSize} flipped={boardFlipped} candidates={reviewState.duel.candidates} />
+            ) : null}
+            {analysisEnabled ? (
+              <AnalysisArrowOverlay
+                boardSize={boardSize}
+                flipped={boardFlipped}
+                lines={analysisLines}
+                blunderMove={analysisBlunderMove}
+              />
+            ) : null}
+          </View>
+        </View>
+
+        <View style={styles.analysisPanel} testID="review-analysis-panel">
+          <View style={styles.summaryRow}>
+            {analysisEnabled ? (
+              <Pressable accessibilityRole="button" accessibilityLabel="Close analysis" testID="review-close-analysis" style={styles.iconButton} onPress={closeAnalysis}>
+                <Text style={styles.iconButtonText}>×</Text>
+              </Pressable>
+            ) : (
+              <Pressable accessibilityRole="button" accessibilityLabel="Analyze position" testID="review-analysis-button" style={styles.iconButton} onPress={openAnalysis}>
+                <Text style={styles.iconButtonText}>⌕</Text>
+              </Pressable>
+            )}
+          </View>
+          {analysisEnabled ? (
+            <>
+              <View style={styles.summaryRow}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Analysis back"
+                  accessibilityState={{ disabled: !canAnalysisBack }}
+                  disabled={!canAnalysisBack}
+                  testID="review-analysis-back"
+                  style={[styles.iconButton, !canAnalysisBack ? styles.disabledButton : null]}
+                  onPress={stepAnalysisBack}
+                >
+                  <Text style={styles.iconButtonText}>‹</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Analysis forward"
+                  accessibilityState={{ disabled: !canAnalysisForward }}
+                  disabled={!canAnalysisForward}
+                  testID="review-analysis-forward"
+                  style={[styles.iconButton, !canAnalysisForward ? styles.disabledButton : null]}
+                  onPress={stepAnalysisForward}
+                >
+                  <Text style={styles.iconButtonText}>›</Text>
+                </Pressable>
+                <Pressable accessibilityRole="button" accessibilityLabel="Analysis reset" testID="review-analysis-reset" style={styles.iconButton} onPress={resetAnalysis}>
+                  <Text style={styles.iconButtonText}>↺</Text>
+                </Pressable>
+                <Pressable accessibilityRole="button" accessibilityLabel="Flip board" testID="review-analysis-flip" style={styles.iconButton} onPress={() => setManualBoardFlip((current) => !current)}>
+                  <Text style={styles.iconButtonText}>⇄</Text>
+                </Pressable>
+              </View>
+              {analysisLines.map((line, index) => (
+                <Pressable
+                  key={`${line.move}-${index}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Play analysis line ${index + 1}: ${line.san}`}
+                  style={styles.analysisLineRow}
+                  testID={`review-analysis-line-${index}`}
+                  onPress={() => {
+                    void playAnalysisCandidateMove(line.move);
+                  }}
+                >
+                  <Text style={styles.analysisMoveText}>{index + 1}. {line.san}</Text>
+                  <Text style={styles.helperText}>{line.label} · {line.score}</Text>
+                </Pressable>
+              ))}
+            </>
+          ) : (
+            <Text style={styles.helperText}>Analyze this position without changing the review line.</Text>
+          )}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function AnalysisArrowOverlay({
+  boardSize,
+  flipped,
+  lines,
+  blunderMove
+}: {
+  boardSize: number;
+  flipped: boolean;
+  lines: AnalysisLine[];
+  blunderMove?: string;
+}): React.JSX.Element {
+  const squareSize = boardSize / 8;
+  const arrows = [
+    ...lines.slice(0, 1).map((line) => ({ move: line.move, stroke: "#16A34A", opacity: 0.72, selected: true })),
+    ...(blunderMove ? [{ move: blunderMove, stroke: "#DC2626", opacity: 0.68, selected: false }] : [])
+  ];
+
+  return (
+    <View style={[styles.arrowLayer, { width: boardSize, height: boardSize }]} pointerEvents="none" testID="analysis-arrow-overlay">
+      {arrows.map((arrow) => {
+        const from = arrowFromTo(arrow.move);
+        if (!from) {
+          return null;
+        }
+        return (
+          <ArrowHint
+            key={`${arrow.move}-${arrow.stroke}`}
+            boardSize={boardSize}
+            squareSize={squareSize}
+            flipped={flipped}
+            move={arrow.move}
+            stroke={arrow.stroke}
+            opacity={arrow.opacity}
+            selected={arrow.selected}
+            from={from}
+          />
+        );
+      })}
+    </View>
+  );
+}
+
+function startReviewPuzzle(entry: ReviewEntry | undefined): ReviewPuzzleState {
+  if (!entry) {
+    throw new Error("Cannot start an empty review session");
+  }
+  if (entry.mode === "arrow_duel") {
+    return { kind: "arrow_duel", duel: beginArrowDuelPuzzle(entry.puzzle) };
+  }
+  return { kind: "line", line: beginLinePuzzle(entry.puzzle) };
+}
+
+function reviewStartingFen(entry: ReviewEntry): string {
+  return currentReviewPuzzleState(startReviewPuzzle(entry)).currentFen;
+}
+
+function reviewStartingPerspectiveFlipped(entry: ReviewEntry): boolean {
+  return sideToMove(reviewStartingFen(entry)) === "b";
+}
+
+function currentReviewPuzzleState(state: ReviewPuzzleState): CurrentPuzzleState {
+  if (state.kind === "arrow_duel") {
+    return state.duel;
+  }
+  return state.line;
+}
+
+function buildReviewAnalysisLines(fen: string, puzzle: Puzzle, currentPuzzle: CurrentPuzzleState): AnalysisLine[] {
+  const legalMoves = legalUciMoves(fen);
+  const preferredMoves = [
+    currentPuzzle.kind === "line" ? currentExpectedMove(currentPuzzle) : currentPuzzle.correctMove,
+    puzzle.stockfishBestMove
+  ].filter((move): move is string => Boolean(move));
+  const orderedMoves = uniqueMoves([
+    ...preferredMoves.filter((move) => legalMoves.includes(normalizeUci(move))),
+    ...legalMoves
+  ]).slice(0, 4);
+
+  return orderedMoves.map((move, index) => ({
+    move,
+    san: sanForMove(fen, move),
+    label: index === 0 ? "Top move" : "Candidate",
+    score: scoreLabelForMove(move, puzzle)
+  }));
+}
+
+function sanForMove(fen: string, move: string): string {
+  try {
+    const chess = new Chess(fen);
+    const normalized = normalizeUci(move);
+    const played = chess.move({
+      from: normalized.slice(0, 2),
+      to: normalized.slice(2, 4),
+      ...(normalized.length > 4 ? { promotion: normalized.slice(4, 5) } : {})
+    });
+    return played?.san ?? move;
+  } catch {
+    return move;
+  }
+}
+
+function legalUciMoves(fen: string): string[] {
+  try {
+    const chess = new Chess(fen);
+    return chess.moves({ verbose: true }).map((move) => `${move.from}${move.to}${move.promotion ?? ""}`);
+  } catch {
+    return [];
+  }
+}
+
+function uniqueMoves(moves: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const move of moves) {
+    const normalized = normalizeUci(move);
+    if (!seen.has(normalized)) {
+      seen.add(normalized);
+      result.push(normalized);
+    }
+  }
+  return result;
+}
+
+function normalizeUci(move: string): string {
+  return move.trim().toLowerCase();
+}
+
+function scoreLabelForMove(move: string, puzzle: Puzzle): string {
+  if (puzzle.stockfishBestMove && normalizeUci(move) === normalizeUci(puzzle.stockfishBestMove)) {
+    return puzzle.stockfishEval === undefined ? "presolved best" : formatCentipawnScore(puzzle.stockfishEval);
+  }
+  if (puzzle.solutionMoves.some((solutionMove) => normalizeUci(solutionMove) === normalizeUci(move))) {
+    return puzzle.stockfishEvalAfterFirstMove === undefined ? "eval --" : formatCentipawnScore(puzzle.stockfishEvalAfterFirstMove);
+  }
+  return "eval --";
+}
+
+function formatCentipawnScore(score: number): string {
+  if (Math.abs(score) >= 10000) {
+    return score > 0 ? "mate+" : "mate-";
+  }
+  const pawns = score / 100;
+  return `${pawns >= 0 ? "+" : ""}${pawns.toFixed(2)}`;
 }
 
 function SettingsPanel({ onResetRating }: { onResetRating: () => void }): React.JSX.Element {
@@ -1105,6 +2351,25 @@ function formatUci(move: MoveResult["move"]): string {
   return `${move.from}${move.to}${promotion}`;
 }
 
+function boardMoveToUci(move: BoardMove): string {
+  return `${move.from}${move.to}${move.promotion?.toLowerCase() ?? ""}`;
+}
+
+function consumeSuppressedBoardMove(move: string, suppressedMoves: string[]): boolean {
+  const normalizedMove = move.toLowerCase();
+  const index = suppressedMoves.findIndex((suppressedMove) => suppressedMove.toLowerCase() === normalizedMove);
+  if (index === -1) {
+    return false;
+  }
+  suppressedMoves.splice(index, 1);
+  return true;
+}
+
+function isArrowDuelCandidate(candidates: string[], move: string): boolean {
+  const normalizedMove = move.trim().toLowerCase();
+  return candidates.some((candidate) => candidate.trim().toLowerCase() === normalizedMove);
+}
+
 function formatRating(state: SprintState | null, currentRating: number): string {
   if (!state) {
     return String(currentRating);
@@ -1158,7 +2423,7 @@ function formatEndReason(reason: SprintState["endReason"]): string {
     return "Target reached";
   }
   if (reason === "max_mistakes") {
-    return "Three strikes";
+    return "Three mistakes";
   }
   if (reason === "time_expired") {
     return "Time expired";
@@ -1172,11 +2437,41 @@ function formatEndReason(reason: SprintState["endReason"]): string {
   return "Completed";
 }
 
-function expectedMoveForCurrent(currentPuzzle: CurrentPuzzleState): string {
-  if (currentPuzzle.kind === "arrow_duel") {
-    return currentPuzzle.correctMove;
+function moveResultMatchesExpectedFen(result: MoveResult, expectedFen: string | null): boolean {
+  if (!expectedFen || !result.state?.fen) {
+    return true;
   }
-  return currentExpectedMove(currentPuzzle) ?? "";
+  return canonicalFen(result.state.fen) === canonicalFen(expectedFen);
+}
+
+function fenAfterMove(fen: string, move: string): string | null {
+  try {
+    const chess = new Chess(fen);
+    const normalized = move.trim().toLowerCase();
+    const played = chess.move({
+      from: normalized.slice(0, 2),
+      to: normalized.slice(2, 4),
+      ...(normalized.length > 4 ? { promotion: normalized.slice(4, 5) } : {})
+    });
+    return played ? chess.fen() : null;
+  } catch {
+    return null;
+  }
+}
+
+function fenAfterMoves(fen: string, moves: string[]): string | null {
+  let currentFen: string | null = fen;
+  for (const move of moves) {
+    if (!currentFen) {
+      return null;
+    }
+    currentFen = fenAfterMove(currentFen, move);
+  }
+  return currentFen;
+}
+
+function canonicalFen(fen: string): string {
+  return fen.trim().split(/\s+/).join(" ");
 }
 
 function shouldFlipBoard(currentPuzzle: CurrentPuzzleState): boolean {
@@ -1189,6 +2484,31 @@ function sideToMove(fen: string): "w" | "b" {
 
 function errorMessage(caught: unknown): string {
   return caught instanceof Error ? caught.message : String(caught);
+}
+
+function isPracticeDebugEnabled(): boolean {
+  const globals = globalThis as unknown as {
+    __CHESSTICIZE_PRACTICE_DEBUG__?: boolean;
+    process?: { env?: { NODE_ENV?: string } };
+  };
+  if (globals.__CHESSTICIZE_PRACTICE_DEBUG__) {
+    return true;
+  }
+  return globals.process?.env?.NODE_ENV === "test" && Boolean(globals.__CHESSTICIZE_PRACTICE_DEBUG__);
+}
+
+function isPracticeTestControlsEnabled(): boolean {
+  const globals = globalThis as unknown as {
+    __DEV__?: boolean;
+    process?: { env?: { NODE_ENV?: string } };
+  };
+  return Boolean(globals.__DEV__ || globals.process?.env?.NODE_ENV === "test");
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 function squareToTopLeft(square: string, squareSize: number, flipped: boolean): { x: number; y: number } {
@@ -1351,6 +2671,51 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     position: "relative"
   },
+  boardInputBlocker: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: "transparent",
+    zIndex: 50
+  },
+  promptPanel: {
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    padding: 12
+  },
+  promptIcon: {
+    backgroundColor: "#1F2937",
+    borderRadius: 999,
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "800",
+    height: 28,
+    lineHeight: 28,
+    textAlign: "center",
+    width: 28
+  },
+  promptCopy: {
+    flex: 1,
+    gap: 2
+  },
+  promptTitle: {
+    color: "#111827",
+    fontSize: 14,
+    fontWeight: "800"
+  },
+  promptText: {
+    color: "#334155",
+    fontSize: 12,
+    fontWeight: "600"
+  },
+  promptHint: {
+    color: "#2563EB",
+    fontSize: 12,
+    fontWeight: "800"
+  },
   emptyBoard: {
     alignItems: "center",
     backgroundColor: "#E6E8EB",
@@ -1390,6 +2755,14 @@ const styles = StyleSheet.create({
   customPanel: {
     backgroundColor: "#FFFFFF",
     borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 10,
+    padding: 12
+  },
+  testPanel: {
+    backgroundColor: "#F8FAFC",
+    borderColor: "#CBD5E1",
     borderRadius: 8,
     borderWidth: 1,
     gap: 10,
@@ -1469,6 +2842,30 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700"
   },
+  iconButtonRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8
+  },
+  iconButton: {
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderColor: "#CBD5E1",
+    borderRadius: 8,
+    borderWidth: 1,
+    height: 38,
+    justifyContent: "center",
+    width: 38
+  },
+  iconButtonText: {
+    color: "#334155",
+    fontSize: 18,
+    fontWeight: "800",
+    lineHeight: 22
+  },
+  disabledButton: {
+    opacity: 0.36
+  },
   ghostButton: {
     alignItems: "center",
     backgroundColor: "#EFF6FF",
@@ -1507,19 +2904,6 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 8
   },
-  feedbackPanel: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    borderWidth: 1,
-    marginTop: 8,
-    padding: 12
-  },
-  feedbackText: {
-    color: "#334155",
-    fontSize: 14,
-    fontWeight: "700"
-  },
   errorPanel: {
     backgroundColor: "#FEF2F2",
     borderColor: "#FCA5A5",
@@ -1530,12 +2914,6 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: "#991B1B",
-    fontSize: 14,
-    fontWeight: "700"
-  },
-  correctText: {
-    color: "#15803D",
-    marginTop: 8,
     fontSize: 14,
     fontWeight: "700"
   },
@@ -1566,23 +2944,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginLeft: 2
   },
-  arrowReview: {
-    marginTop: 8,
-    gap: 4
-  },
-  arrowText: {
-    fontSize: 14,
-    fontWeight: "700"
-  },
-  correctArrow: {
-    color: "#16A34A"
-  },
-  wrongArrow: {
-    color: "#DC2626"
-  },
-  selectedMarker: {
-    textDecorationLine: "underline"
-  },
   listPanel: {
     backgroundColor: "#FFFFFF",
     borderColor: "#E2E8F0",
@@ -1594,6 +2955,44 @@ const styles = StyleSheet.create({
   panelTitle: {
     color: "#111827",
     fontSize: 18,
+    fontWeight: "800"
+  },
+  reviewSessionPanel: {
+    gap: 12
+  },
+  reviewHeaderRow: {
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    padding: 12
+  },
+  reviewBoardLayout: {
+    gap: 12
+  },
+  analysisPanel: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 8,
+    padding: 12
+  },
+  analysisLineRow: {
+    backgroundColor: "#F8FAFC",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 2,
+    padding: 10
+  },
+  analysisMoveText: {
+    color: "#111827",
+    fontFamily: "Menlo",
+    fontSize: 13,
     fontWeight: "800"
   },
   listText: {
@@ -1682,25 +3081,34 @@ const styles = StyleSheet.create({
     left: 0
   },
   lastMoveSquare: {
-    backgroundColor: "rgba(245, 158, 11, 0.28)",
+    backgroundColor: "rgba(37, 99, 235, 0.3)",
     position: "absolute"
+  },
+  feedbackMoveSquare: {
+    position: "absolute"
+  },
+  debugLog: {
+    color: "#334155",
+    fontFamily: "Menlo",
+    fontSize: 9,
+    lineHeight: 12,
+    marginTop: 6
   },
   arrowLineWrap: {
     left: 0,
     position: "absolute",
     top: 0
   },
-  arrowSourceBadge: {
+  analysisArrowBody: {
     borderRadius: 999,
-    borderWidth: 2,
-    position: "absolute"
+    position: "absolute",
+    transformOrigin: "0 50%"
   },
-  arrowSegment: {
-    position: "absolute"
+  analysisArrowHead: {
+    borderBottomColor: "transparent",
+    borderTopColor: "transparent",
+    height: 0,
+    position: "absolute",
+    width: 0
   },
-  arrowTargetRing: {
-    borderRadius: 999,
-    borderWidth: 3,
-    position: "absolute"
-  }
 });

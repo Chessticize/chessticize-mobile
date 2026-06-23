@@ -7,8 +7,14 @@ import {
 } from "../../core/src/index.ts";
 import type {
   AttemptEvent,
+  AttemptResult,
+  HistoryQuery,
+  HistoryView,
   Puzzle,
   RatingRecord,
+  ReviewQueueItem,
+  ReviewQueueState,
+  SessionMistakeReviewItem,
   SprintConfig,
   SprintMode,
   SprintState
@@ -25,6 +31,7 @@ export interface StartSprintCommand {
   theme?: string;
   minRating?: number;
   maxRating?: number;
+  puzzleSelectionSeed?: string | number;
 }
 
 export class PracticeService {
@@ -65,12 +72,15 @@ export class PracticeService {
     const puzzleFilter: {
       mode: SprintMode;
       limit: number;
+      rating?: number;
       minRating?: number;
       maxRating?: number;
       theme?: string;
+      randomSeed?: string | number;
     } = {
       mode: config.mode,
-      limit: Math.max(config.targetCorrect + config.maxMistakes, config.targetCorrect)
+      limit: Math.max(config.targetCorrect + config.maxMistakes, config.targetCorrect),
+      rating: rating.rating
     };
     if (command.minRating !== undefined) {
       puzzleFilter.minRating = command.minRating;
@@ -80,6 +90,9 @@ export class PracticeService {
     }
     if (command.theme !== undefined) {
       puzzleFilter.theme = command.theme;
+    }
+    if (command.puzzleSelectionSeed !== undefined) {
+      puzzleFilter.randomSeed = command.puzzleSelectionSeed;
     }
     const puzzles = this.store.selectPuzzles(puzzleFilter);
     if (puzzles.length === 0) {
@@ -176,12 +189,36 @@ export class PracticeService {
     return this.store.getDueReviews(now);
   }
 
+  getDueReviewItems(now = new Date().toISOString()): ReviewQueueItem[] {
+    return this.store.getDueReviewItems(now);
+  }
+
+  getSessionMistakeReview(sessionId: string): SessionMistakeReviewItem[] {
+    return this.store.getSessionMistakeReview(sessionId);
+  }
+
+  getHistoryView(query: HistoryQuery): HistoryView {
+    return this.store.getHistoryView(query);
+  }
+
   getRating(ratingKey: string): RatingRecord {
     return this.store.getRating(ratingKey);
   }
 
+  listRatings(): RatingRecord[] {
+    return this.store.listRatings();
+  }
+
+  listPlayedRatings(): RatingRecord[] {
+    return this.store.listPlayedRatings();
+  }
+
   resetRating(ratingKey: string): unknown {
     return this.store.resetRating(ratingKey);
+  }
+
+  recordReviewResult(puzzleId: string, result: AttemptResult, now = new Date().toISOString()): ReviewQueueState {
+    return this.store.recordReviewResult(puzzleId, result, now);
   }
 
   loadFixturePuzzles(puzzles: Puzzle[]): void {
