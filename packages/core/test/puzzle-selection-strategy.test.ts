@@ -103,15 +103,22 @@ test("Arrow Duel eligibility mirrors server eval thresholds and requires same-si
 });
 
 function arrowPuzzle(overrides: Partial<Puzzle> & Pick<Puzzle, "id" | "initialFen" | "solutionMoves">): Puzzle {
-  return {
+  const puzzle: Puzzle = {
     id: overrides.id,
     initialFen: overrides.initialFen,
     solutionMoves: overrides.solutionMoves,
     rating: 1500,
     themes: ["tactics"],
-    source: "lichess",
-    stockfishBestMove: overrides.stockfishBestMove,
-    stockfishEval: overrides.stockfishEval,
-    stockfishEvalAfterFirstMove: overrides.stockfishEvalAfterFirstMove
+    source: "lichess"
   };
+  if (overrides.stockfishBestMove !== undefined) {
+    puzzle.stockfishBestMove = overrides.stockfishBestMove;
+  }
+  if (overrides.stockfishEval !== undefined) {
+    puzzle.stockfishEval = overrides.stockfishEval;
+  }
+  if (overrides.stockfishEvalAfterFirstMove !== undefined) {
+    puzzle.stockfishEvalAfterFirstMove = overrides.stockfishEvalAfterFirstMove;
+  }
+  return puzzle;
 }

@@ -21,8 +21,6 @@ jobs:
     name: Build and test iOS POC
     runs-on: macos-latest
     timeout-minutes: 60
-    env:
-      DETOX_IOS_DEVICE: iPhone 16
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -54,6 +52,29 @@ jobs:
         run: |
           brew tap wix/brew
           brew install applesimutils
+
+      - name: Select available iOS simulator
+        run: |
+          set -euo pipefail
+          available="$(xcrun simctl list devices available)"
+          echo "$available"
+
+          for device in "iPhone 17" "iPhone 16 Pro" "iPhone 16" "iPhone 15 Pro" "iPhone 15"; do
+            if grep -q "^[[:space:]]*$device (" <<<"$available"; then
+              echo "DETOX_IOS_DEVICE=$device" >> "$GITHUB_ENV"
+              echo "Selected Detox simulator: $device"
+              exit 0
+            fi
+          done
+
+          fallback="$(awk -F ' \\(' '/^[[:space:]]+iPhone / { gsub(/^[[:space:]]+|[[:space:]]+$/, "", $1); print $1; exit }' <<<"$available")"
+          if [ -z "$fallback" ]; then
+            echo "No available iPhone simulator found" >&2
+            exit 1
+          fi
+
+          echo "DETOX_IOS_DEVICE=$fallback" >> "$GITHUB_ENV"
+          echo "Selected Detox simulator: $fallback"
 
       - name: Setup system Ruby Bundler
         run: |
