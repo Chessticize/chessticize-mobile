@@ -189,6 +189,7 @@ function parseHistoryFilter(input: JsonCommand): HistoryFilter {
   }
   setOptional(filter, "since", optionalString(input.since));
   setOptional(filter, "puzzleId", optionalString(input.puzzleId));
+  setOptional(filter, "sessionId", optionalString(input.sessionId));
   return filter;
 }
 

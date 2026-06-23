@@ -33,7 +33,11 @@ export function submitLineMove(state: PuzzleLineState, move: string): {
     throw new Error("Puzzle has no expected move at current cursor");
   }
 
-  if (normalizeMove(move) !== normalizeMove(expectedMove)) {
+  const submittedMove = normalizeMove(move);
+  if (!isLegalMove(state.currentFen, submittedMove)) {
+    throw new Error(`Move ${move} is not legal in the current position`);
+  }
+  if (submittedMove !== normalizeMove(expectedMove) && !isLegalCheckmateMove(state.currentFen, submittedMove)) {
     return {
       state,
       feedback: {
@@ -47,15 +51,16 @@ export function submitLineMove(state: PuzzleLineState, move: string): {
     };
   }
 
-  const played = appendMove(state.currentFen, state.playedMoves, expectedMove);
+  const played = appendMove(state.currentFen, state.playedMoves, submittedMove);
+  const isCheckmate = isCheckmateFen(played.currentFen);
   const advanced: PuzzleLineState = {
     ...state,
     currentFen: played.currentFen,
     playedMoves: played.playedMoves,
-    cursor: state.cursor + 1,
+    cursor: isCheckmate ? state.puzzle.solutionMoves.length : state.cursor + 1,
     autoPlayedMoves: []
   };
-  const afterAuto = autoPlayOpponentMoves(advanced);
+  const afterAuto = isCheckmate ? advanced : autoPlayOpponentMoves(advanced);
   const solved = afterAuto.cursor >= state.puzzle.solutionMoves.length;
   const nextState = { ...afterAuto, solved };
 
@@ -109,22 +114,7 @@ export function submitArrowDuelChoice(state: ArrowDuelState, move: string): {
   const review = buildArrowDuelReview(state, move);
 
   if (!isCandidate) {
-    return {
-      state: {
-        ...state,
-        selectedMove: move,
-        solved: false
-      },
-      feedback: {
-        result: "wrong",
-        puzzleSolved: false,
-        submittedMove: move,
-        expectedMove: state.correctMove,
-        autoPlayedMoves: [],
-        currentFen: state.currentFen,
-        review
-      }
-    };
+    throw new Error(`Move ${move} is not one of the Arrow Duel candidates`);
   }
 
   return {
@@ -227,6 +217,32 @@ function appendMove(currentFen: string, playedMoves: string[], move: string): {
     currentFen: chess.fen(),
     playedMoves: [...playedMoves, move]
   };
+}
+
+function isLegalCheckmateMove(currentFen: string, move: string): boolean {
+  try {
+    return isCheckmateFen(appendMove(currentFen, [], move).currentFen);
+  } catch {
+    return false;
+  }
+}
+
+function isLegalMove(currentFen: string, move: string): boolean {
+  try {
+    const chess = new Chess(currentFen);
+    const normalizedMove = normalizeMove(move);
+    return Boolean(chess.move({
+      from: normalizedMove.slice(0, 2),
+      to: normalizedMove.slice(2, 4),
+      ...(normalizedMove.length > 4 ? { promotion: normalizedMove.slice(4, 5) } : {})
+    }));
+  } catch {
+    return false;
+  }
+}
+
+function isCheckmateFen(fen: string): boolean {
+  return new Chess(fen).isCheckmate();
 }
 
 function normalizeMove(move: string): string {

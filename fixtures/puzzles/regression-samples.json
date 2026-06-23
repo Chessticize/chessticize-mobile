@@ -1,0 +1,30 @@
+{
+  "sourceFixture": "fixtures/puzzles/presolved-1000.json",
+  "samples": [
+    {
+      "id": "00008",
+      "label": "multi_move_long_line",
+      "notes": "Long Standard line with three required user moves after opponent auto replies."
+    },
+    {
+      "id": "00ueM",
+      "label": "promotion_mate_line",
+      "notes": "Standard line containing both auto and user promotion moves."
+    },
+    {
+      "id": "00DkJ",
+      "label": "initial_fen_in_check",
+      "notes": "The source puzzle initial FEN starts with the side to move in check."
+    },
+    {
+      "id": "00LSv",
+      "label": "user_turn_starts_in_check_after_auto",
+      "notes": "After the first auto move, the user-facing Standard position starts in check."
+    },
+    {
+      "id": "000hf",
+      "label": "short_mate_line",
+      "notes": "Short mate line used by the mobile Standard sprint smoke flow."
+    }
+  ]
+}

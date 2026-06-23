@@ -22,7 +22,7 @@ export interface Puzzle {
   themes: string[];
   gameUrl?: string;
   openingTags?: string[];
-  source: "lichess";
+  source: "lichess" | "synthetic";
   stockfishEval?: number;
   stockfishBestMove?: string;
   stockfishEvalAfterFirstMove?: number;
@@ -124,6 +124,11 @@ export interface AttemptEvent {
   ratingAfter?: number;
 }
 
+export interface SessionMistakeReviewItem {
+  puzzle: Puzzle;
+  attempt: AttemptEvent;
+}
+
 export interface SprintCommandResult {
   state: SprintState;
   feedback?: PuzzleFeedback;
@@ -139,6 +144,11 @@ export interface ReviewQueueState {
   lapseCount: number;
   lastResult: AttemptResult;
   lastReviewedAt: string;
+}
+
+export interface ReviewQueueItem {
+  puzzle: Puzzle;
+  review: ReviewQueueState;
 }
 
 export interface ReviewScheduleInput {

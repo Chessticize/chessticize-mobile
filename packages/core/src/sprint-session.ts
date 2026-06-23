@@ -30,7 +30,6 @@ export function startSprint(input: {
     startedAt: startedAt.toISOString(),
     deadlineAt,
     currentPuzzleStartedAt: startedAt.toISOString(),
-    currentPuzzleDeadlineAt: puzzleDeadlineAt(startedAt.toISOString(), input.config, deadlineAt),
     correctCount: 0,
     mistakeCount: 0,
     currentPuzzleIndex: 0,
@@ -51,10 +50,6 @@ export function submitSprintMove(state: SprintState, move: string, now: string):
   if (!timedState.currentPuzzle) {
     throw new Error("Sprint has no current puzzle");
   }
-  if (isCurrentPuzzleExpired(timedState, now)) {
-    return applyPuzzleFeedback(timedState, buildTimeoutFeedback(timedState.currentPuzzle), now);
-  }
-
   if (timedState.currentPuzzle.kind === "arrow_duel") {
     const { state: puzzleState, feedback } = submitArrowDuelChoice(timedState.currentPuzzle, move);
     return applyPuzzleFeedback(
@@ -166,7 +161,7 @@ function applyPuzzleFeedback(state: SprintState, feedback: PuzzleFeedback, now: 
   const nextPuzzleIndex = state.currentPuzzleIndex + 1;
   if (nextPuzzleIndex >= state.puzzles.length) {
     return {
-      state: completeSprintWithRating(updated, "failed", "puzzles_exhausted", now),
+      state: completeSprintWithRating(updated, "won", "puzzles_exhausted", now),
       feedback,
       attempt
     };
@@ -177,7 +172,6 @@ function applyPuzzleFeedback(state: SprintState, feedback: PuzzleFeedback, now: 
       ...updated,
       currentPuzzleIndex: nextPuzzleIndex,
       currentPuzzleStartedAt: new Date(now).toISOString(),
-      currentPuzzleDeadlineAt: puzzleDeadlineAt(now, state.config, state.deadlineAt),
       currentPuzzle: buildCurrentPuzzle(state.config.mode, state.puzzles[nextPuzzleIndex], nextPuzzleIndex)
     },
     feedback,
@@ -211,30 +205,6 @@ function failIfExpired(state: SprintState, now: string): SprintState {
     return state;
   }
   return completeSprintWithRating(state, "failed", "time_expired", now);
-}
-
-function isCurrentPuzzleExpired(state: SprintState, now: string): boolean {
-  return Boolean(
-    state.currentPuzzleDeadlineAt &&
-      new Date(now).getTime() > new Date(state.currentPuzzleDeadlineAt).getTime()
-  );
-}
-
-function buildTimeoutFeedback(currentPuzzle: CurrentPuzzleState): PuzzleFeedback {
-  const expectedMove = currentPuzzle.kind === "arrow_duel"
-    ? currentPuzzle.correctMove
-    : currentPuzzle.puzzle.solutionMoves[currentPuzzle.cursor];
-  if (!expectedMove) {
-    throw new Error("Cannot time out puzzle without an expected move");
-  }
-  return {
-    result: "wrong",
-    puzzleSolved: false,
-    submittedMove: "__timeout__",
-    expectedMove,
-    autoPlayedMoves: [],
-    currentFen: currentPuzzle.currentFen
-  };
 }
 
 function completeSprintWithRating(
@@ -285,12 +255,6 @@ function buildCurrentPuzzle(mode: SprintConfig["mode"], puzzle: Puzzle | undefin
     return beginArrowDuelPuzzle(puzzle, seed);
   }
   return beginLinePuzzle(puzzle);
-}
-
-function puzzleDeadlineAt(startedAt: string, config: SprintConfig, sprintDeadlineAt: string): string {
-  const candidate = new Date(new Date(startedAt).getTime() + config.perPuzzleSeconds * 1000);
-  const sprintDeadline = new Date(sprintDeadlineAt);
-  return new Date(Math.min(candidate.getTime(), sprintDeadline.getTime())).toISOString();
 }
 
 function generateId(): string {
