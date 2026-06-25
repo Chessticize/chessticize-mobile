@@ -13,6 +13,7 @@ import type { ImageSourcePropType } from "react-native";
 import type { MoveResult } from "react-native-chessboard";
 import Chessboard, { type ChessboardRef } from "react-native-chessboard";
 import {
+  applyMovesToFen,
   beginArrowDuelPuzzle,
   beginLinePuzzle,
   buildSprintConfig,
@@ -1258,29 +1259,37 @@ function ErrorPanel({ error }: { error: string }): React.JSX.Element {
 
 function PracticePrompt({
   currentPuzzle,
-  mode
+  mode,
+  promptText,
+  promptHint
 }: {
   currentPuzzle: CurrentPuzzleState | undefined;
   mode: SprintMode;
+  promptText?: string | null;
+  promptHint?: string | null;
 }): React.JSX.Element | null {
   if (!currentPuzzle) {
     return null;
   }
   const side = sideToMove(currentPuzzle.currentFen) === "b" ? "black" : "white";
   const isArrowDuel = currentPuzzle.kind === "arrow_duel";
+  const displayedPromptText = promptText ?? (
+    isArrowDuel
+      ? `Choose the better move for ${side} between the two arrows.`
+      : `Find the best move for ${side}.`
+  );
+  const displayedPromptHint = promptHint === undefined
+    ? (isArrowDuel ? "Watch for checks, captures, and attacks!" : null)
+    : promptHint;
 
   return (
     <View style={styles.promptPanel} testID="practice-prompt">
-      <Text style={styles.promptIcon}>{isArrowDuel ? "⇄" : "♛"}</Text>
+      <Text style={styles.promptIcon}>{mode === "arrow_duel" ? "⇄" : "♛"}</Text>
       <View style={styles.promptCopy}>
-        <Text style={styles.promptTitle}>{isArrowDuel ? "Arrow Duel" : modeLabel(mode)}</Text>
-        <Text style={styles.promptText}>
-          {isArrowDuel
-            ? `Choose the better move for ${side} between the two arrows.`
-            : `Find the best move for ${side}.`}
-        </Text>
-        {isArrowDuel ? (
-          <Text style={styles.promptHint}>Watch for checks, captures, and attacks!</Text>
+        <Text style={styles.promptTitle}>{mode === "arrow_duel" ? "Arrow Duel" : modeLabel(mode)}</Text>
+        {displayedPromptText ? <Text style={styles.promptText}>{displayedPromptText}</Text> : null}
+        {displayedPromptHint ? (
+          <Text style={styles.promptHint}>{displayedPromptHint}</Text>
         ) : null}
       </View>
     </View>
@@ -1636,6 +1645,11 @@ function ReviewSession({
     analysisEnabled && reviewState.kind === "arrow_duel" && displayFen === currentEntry.puzzle.initialFen
       ? reviewState.duel.wrongMove
       : undefined;
+  const guidedReviewMove =
+    !analysisEnabled && !feedback && currentEntry.mode === "arrow_duel" && reviewState.kind === "line"
+      ? currentExpectedMove(reviewState.line)
+      : undefined;
+  const isArrowDuelFollowUpReview = currentEntry.mode === "arrow_duel" && reviewState.kind === "line";
   const boardGestureEnabled = !boardLocked;
   const boardDraggableColor = boardGestureEnabled ? sideToMove(displayFen) : null;
   const isSessionReview = currentEntry.source === "session";
@@ -1664,6 +1678,10 @@ function ReviewSession({
 
   function advanceReview(result: "correct" | "wrong"): void {
     recordCurrentReviewResult(result);
+    if (isSessionReview) {
+      setBoardLocked(false);
+      return;
+    }
     const nextIndex = entryIndex + 1;
     if (nextIndex >= entries.length) {
       onExit();
@@ -1673,6 +1691,9 @@ function ReviewSession({
   }
 
   function recordCurrentReviewResult(result: "correct" | "wrong"): void {
+    if (currentEntry.source === "session") {
+      return;
+    }
     if (reviewResultRecordedRef.current || reviewResultRecorded) {
       return;
     }
@@ -1686,6 +1707,13 @@ function ReviewSession({
       return;
     }
     resetCurrentReview(nextIndex);
+  }
+
+  function resetReviewPuzzle(): void {
+    if (boardLocked) {
+      return;
+    }
+    resetCurrentReview(entryIndex);
   }
 
   async function onReviewBoardMove(result: MoveResult): Promise<void> {
@@ -1715,6 +1743,10 @@ function ReviewSession({
 
     if (reviewState.kind === "arrow_duel") {
       await submitReviewArrowMove(move, submittedFen);
+      return;
+    }
+    if (currentEntry.mode === "arrow_duel" && reviewState.kind === "line") {
+      await submitReviewArrowFollowUpMove(move, submittedFen);
       return;
     }
     await submitReviewLineMove(move, submittedFen);
@@ -1817,15 +1849,53 @@ function ReviewSession({
 
     setWrongSeen(true);
     await sleep(FEEDBACK_SNAPSHOT_MS);
-    setFeedback(null);
     const replyMoves = result.feedback.autoPlayedMoves.slice(1);
     const finalFen = fenAfterMoves(submittedFen, result.feedback.autoPlayedMoves) ?? submittedFen;
     if (replyMoves.length > 0) {
       await animateReviewBoardMoves(replyMoves, finalFen);
       await sleep(FEEDBACK_SNAPSHOT_MS);
     }
-    advanceReview("wrong");
+    setReviewState({
+      kind: "line",
+      line: lineStateAfterMoves(currentEntry.puzzle, result.feedback.autoPlayedMoves)
+    });
+    setFeedback(null);
     setBoardLocked(false);
+  }
+
+  async function submitReviewArrowFollowUpMove(move: string, submittedFen: string): Promise<void> {
+    if (reviewState.kind !== "line") {
+      boardRef.current?.resetBoard(submittedFen);
+      return;
+    }
+    setBoardLocked(true);
+    try {
+      const result = submitArrowDuelFollowUpMove(reviewState.line, move);
+      setFeedback(result.feedback);
+      if (result.feedback.result === "wrong") {
+        await sleep(FEEDBACK_SNAPSHOT_MS);
+        boardRef.current?.resetBoard(submittedFen);
+        setFeedback(null);
+        setBoardLocked(false);
+        return;
+      }
+
+      if (result.feedback.autoPlayedMoves.length > 0) {
+        await sleep(USER_FEEDBACK_BEFORE_AUTO_MS);
+        setFeedback(null);
+        await animateReviewBoardMoves(result.feedback.autoPlayedMoves, result.state.currentFen);
+      }
+      setReviewState({ kind: "line", line: result.state });
+      if (result.feedback.puzzleSolved) {
+        await sleep(FEEDBACK_SNAPSHOT_MS);
+        advanceReview("wrong");
+        return;
+      }
+      setBoardLocked(false);
+    } catch {
+      boardRef.current?.resetBoard(submittedFen);
+      setBoardLocked(false);
+    }
   }
 
   async function animateReviewBoardMoves(moves: string[], finalFen: string): Promise<void> {
@@ -1870,14 +1940,6 @@ function ReviewSession({
     boardRef.current?.resetBoard(currentFen);
   }
 
-  function resetAnalysis(): void {
-    const startFen = reviewStartingFen(currentEntry);
-    setAnalysisFen(startFen);
-    setAnalysisBackStack([]);
-    setAnalysisForwardStack([]);
-    boardRef.current?.resetBoard(startFen);
-  }
-
   function stepAnalysisForward(): void {
     const nextFen = analysisForwardStack[analysisForwardStack.length - 1];
     if (!nextFen) {
@@ -1910,7 +1972,7 @@ function ReviewSession({
             {entryIndex + 1} / {entries.length} · {modeLabel(currentEntry.mode)}
           </Text>
         </View>
-        <View style={styles.iconButtonRow}>
+        <View style={styles.iconButtonRow} testID="review-header-actions">
           {isSessionReview ? (
             <>
               <Pressable
@@ -1937,13 +1999,37 @@ function ReviewSession({
               </Pressable>
             </>
           ) : null}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Reset puzzle"
+            accessibilityState={{ disabled: boardLocked }}
+            disabled={boardLocked}
+            testID="review-reset-puzzle"
+            style={[styles.iconButton, boardLocked ? styles.disabledButton : null]}
+            onPress={resetReviewPuzzle}
+          >
+            <Text style={styles.iconButtonText}>↺</Text>
+          </Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel="Exit review" testID="review-exit" style={styles.iconButton} onPress={onExit}>
             <Text style={styles.iconButtonText}>×</Text>
           </Pressable>
         </View>
       </View>
 
-      <PracticePrompt currentPuzzle={currentPuzzle} mode={currentEntry.mode} />
+      <PracticePrompt
+        currentPuzzle={currentPuzzle}
+        mode={currentEntry.mode}
+        promptText={
+          isArrowDuelFollowUpReview
+            ? null
+            : undefined
+        }
+        promptHint={
+          isArrowDuelFollowUpReview
+            ? "Blue arrows show the next move in the punishment line. Follow them to see why the choice is bad."
+            : undefined
+        }
+      />
 
       <View style={styles.reviewBoardLayout}>
         <View style={styles.boardWrapper}>
@@ -1996,24 +2082,23 @@ function ReviewSession({
                 blunderMove={analysisBlunderMove}
               />
             ) : null}
+            {guidedReviewMove ? (
+              <GuidedMoveOverlay
+                boardSize={boardSize}
+                flipped={boardFlipped}
+                move={guidedReviewMove}
+              />
+            ) : null}
           </View>
         </View>
 
         <View style={styles.analysisPanel} testID="review-analysis-panel">
-          <View style={styles.summaryRow}>
+          <View style={styles.analysisToolbar}>
             {analysisEnabled ? (
-              <Pressable accessibilityRole="button" accessibilityLabel="Close analysis" testID="review-close-analysis" style={styles.iconButton} onPress={closeAnalysis}>
-                <Text style={styles.iconButtonText}>×</Text>
-              </Pressable>
-            ) : (
-              <Pressable accessibilityRole="button" accessibilityLabel="Analyze position" testID="review-analysis-button" style={styles.iconButton} onPress={openAnalysis}>
-                <Text style={styles.iconButtonText}>⌕</Text>
-              </Pressable>
-            )}
-          </View>
-          {analysisEnabled ? (
-            <>
-              <View style={styles.summaryRow}>
+              <>
+                <Pressable accessibilityRole="button" accessibilityLabel="Close analysis" testID="review-close-analysis" style={styles.iconButton} onPress={closeAnalysis}>
+                  <Text style={styles.iconButtonText}>×</Text>
+                </Pressable>
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="Analysis back"
@@ -2036,13 +2121,21 @@ function ReviewSession({
                 >
                   <Text style={styles.iconButtonText}>›</Text>
                 </Pressable>
-                <Pressable accessibilityRole="button" accessibilityLabel="Analysis reset" testID="review-analysis-reset" style={styles.iconButton} onPress={resetAnalysis}>
-                  <Text style={styles.iconButtonText}>↺</Text>
-                </Pressable>
                 <Pressable accessibilityRole="button" accessibilityLabel="Flip board" testID="review-analysis-flip" style={styles.iconButton} onPress={() => setManualBoardFlip((current) => !current)}>
                   <Text style={styles.iconButtonText}>⇄</Text>
                 </Pressable>
-              </View>
+              </>
+            ) : (
+              <>
+                <Pressable accessibilityRole="button" accessibilityLabel="Analyze position" testID="review-analysis-button" style={styles.analysisIconButton} onPress={openAnalysis}>
+                  <Text style={styles.analysisIconButtonText}>⌕</Text>
+                </Pressable>
+                <Text style={styles.analysisTitle}>Analysis</Text>
+              </>
+            )}
+          </View>
+          {analysisEnabled ? (
+            <>
               {analysisLines.map((line, index) => (
                 <Pressable
                   key={`${line.move}-${index}`}
@@ -2054,14 +2147,13 @@ function ReviewSession({
                     void playAnalysisCandidateMove(line.move);
                   }}
                 >
-                  <Text style={styles.analysisMoveText}>{index + 1}. {line.san}</Text>
-                  <Text style={styles.helperText}>{line.label} · {line.score}</Text>
+                  <Text style={styles.analysisEvalText}>{line.score}</Text>
+                  <Text style={styles.analysisMoveText} numberOfLines={1}>{index + 1}. {line.san}</Text>
+                  <Text style={styles.analysisLineLabel} numberOfLines={1}>{line.label}</Text>
                 </Pressable>
               ))}
             </>
-          ) : (
-            <Text style={styles.helperText}>Analyze this position without changing the review line.</Text>
-          )}
+          ) : null}
         </View>
       </View>
     </View>
@@ -2110,6 +2202,35 @@ function AnalysisArrowOverlay({
   );
 }
 
+function GuidedMoveOverlay({
+  boardSize,
+  flipped,
+  move
+}: {
+  boardSize: number;
+  flipped: boolean;
+  move: string;
+}): React.JSX.Element {
+  const squareSize = boardSize / 8;
+  const from = arrowFromTo(move);
+  return (
+    <View style={[styles.arrowLayer, { width: boardSize, height: boardSize }]} pointerEvents="none" testID="review-guided-move-overlay">
+      {from ? (
+        <ArrowHint
+          boardSize={boardSize}
+          squareSize={squareSize}
+          flipped={flipped}
+          move={move}
+          stroke={NEUTRAL_ARROW}
+          opacity={0.7}
+          selected
+          from={from}
+        />
+      ) : null}
+    </View>
+  );
+}
+
 function startReviewPuzzle(entry: ReviewEntry | undefined): ReviewPuzzleState {
   if (!entry) {
     throw new Error("Cannot start an empty review session");
@@ -2118,6 +2239,85 @@ function startReviewPuzzle(entry: ReviewEntry | undefined): ReviewPuzzleState {
     return { kind: "arrow_duel", duel: beginArrowDuelPuzzle(entry.puzzle) };
   }
   return { kind: "line", line: beginLinePuzzle(entry.puzzle) };
+}
+
+function lineStateAfterMoves(puzzle: Puzzle, moves: string[]): PuzzleLineState {
+  const playedMoves = moves.map(normalizeUci);
+  return {
+    kind: "line",
+    puzzle,
+    currentFen: applyMovesToFen(puzzle.initialFen, playedMoves),
+    playedMoves,
+    cursor: playedMoves.length,
+    autoPlayedMoves: [],
+    solved: playedMoves.length >= puzzle.solutionMoves.length
+  };
+}
+
+function submitArrowDuelFollowUpMove(state: PuzzleLineState, move: string): {
+  state: PuzzleLineState;
+  feedback: PuzzleFeedback;
+} {
+  const expectedMove = state.puzzle.solutionMoves[state.cursor];
+  if (!expectedMove) {
+    throw new Error("Puzzle has no Arrow Duel follow-up move at current cursor");
+  }
+
+  const submittedMove = normalizeUci(move);
+  const submittedFen = fenAfterMove(state.currentFen, submittedMove);
+  if (!submittedFen) {
+    throw new Error(`Move ${move} is not legal in the current position`);
+  }
+  if (submittedMove !== normalizeUci(expectedMove)) {
+    return {
+      state,
+      feedback: {
+        result: "wrong",
+        puzzleSolved: false,
+        submittedMove: move,
+        expectedMove,
+        autoPlayedMoves: [],
+        currentFen: state.currentFen
+      }
+    };
+  }
+
+  let currentFen = submittedFen;
+  let cursor = state.cursor + 1;
+  const playedMoves = [...state.playedMoves, submittedMove];
+  const autoPlayedMoves: string[] = [];
+  const replyMove = state.puzzle.solutionMoves[cursor];
+  if (replyMove) {
+    const replyFen = fenAfterMove(currentFen, replyMove);
+    if (!replyFen) {
+      throw new Error(`Arrow Duel follow-up reply ${replyMove} is not legal`);
+    }
+    autoPlayedMoves.push(replyMove);
+    playedMoves.push(normalizeUci(replyMove));
+    currentFen = replyFen;
+    cursor += 1;
+  }
+
+  const nextState: PuzzleLineState = {
+    ...state,
+    currentFen,
+    playedMoves,
+    cursor,
+    autoPlayedMoves,
+    solved: cursor >= state.puzzle.solutionMoves.length
+  };
+
+  return {
+    state: nextState,
+    feedback: {
+      result: "correct",
+      puzzleSolved: nextState.solved,
+      submittedMove: move,
+      expectedMove,
+      autoPlayedMoves,
+      currentFen
+    }
+  };
 }
 
 function reviewStartingFen(entry: ReviewEntry): string {
@@ -2210,7 +2410,7 @@ function formatCentipawnScore(score: number): string {
     return score > 0 ? "mate+" : "mate-";
   }
   const pawns = score / 100;
-  return `${pawns >= 0 ? "+" : ""}${pawns.toFixed(2)}`;
+  return `${pawns >= 0 ? "+" : ""}${pawns.toFixed(1)}`;
 }
 
 function SettingsPanel({ onResetRating }: { onResetRating: () => void }): React.JSX.Element {
@@ -2684,6 +2884,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: "row",
     gap: 10,
+    minHeight: 72,
     padding: 12
   },
   promptIcon: {
@@ -2978,22 +3179,67 @@ const styles = StyleSheet.create({
     borderColor: "#E2E8F0",
     borderRadius: 8,
     borderWidth: 1,
-    gap: 8,
+    gap: 6,
     padding: 12
   },
+  analysisToolbar: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8
+  },
+  analysisIconButton: {
+    alignItems: "center",
+    backgroundColor: "#F8FAFC",
+    borderColor: "#CBD5E1",
+    borderRadius: 8,
+    borderWidth: 1,
+    height: 40,
+    justifyContent: "center",
+    width: 40
+  },
+  analysisIconButtonText: {
+    color: "#0F172A",
+    fontSize: 21,
+    fontWeight: "800",
+    lineHeight: 24
+  },
+  analysisTitle: {
+    color: "#334155",
+    fontSize: 13,
+    fontWeight: "800"
+  },
   analysisLineRow: {
+    alignItems: "center",
     backgroundColor: "#F8FAFC",
     borderColor: "#E2E8F0",
     borderRadius: 8,
     borderWidth: 1,
-    gap: 2,
-    padding: 10
+    flexDirection: "row",
+    gap: 8,
+    minHeight: 34,
+    paddingHorizontal: 9,
+    paddingVertical: 7
+  },
+  analysisEvalText: {
+    color: "#334155",
+    fontFamily: "Menlo",
+    fontSize: 12,
+    fontWeight: "800",
+    minWidth: 44
   },
   analysisMoveText: {
     color: "#111827",
     fontFamily: "Menlo",
     fontSize: 13,
-    fontWeight: "800"
+    fontWeight: "800",
+    flexShrink: 1
+  },
+  analysisLineLabel: {
+    color: "#64748B",
+    fontSize: 11,
+    fontWeight: "700",
+    marginLeft: "auto"
   },
   listText: {
     color: "#334155",
