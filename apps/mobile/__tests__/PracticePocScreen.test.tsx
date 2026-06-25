@@ -524,7 +524,9 @@ describe("PracticePocScreen", () => {
   });
 
   it("reviews missed puzzles from the completed sprint using the solving board", async () => {
-    const renderer = renderStandardSequenceScreen();
+    const service = createMobilePracticeService("random1000");
+    const recordReviewResult = jest.spyOn(service, "recordReviewResult");
+    const renderer = renderScreen({ practiceService: service });
 
     press(renderer, "start-sprint-button");
     await boardMove(renderer, "c4b5");
@@ -541,12 +543,14 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "1 / 3 · Standard");
     expect(findByTestId(renderer, "review-previous").props.disabled).toBe(true);
     expect(findByTestId(renderer, "review-next").props.disabled).toBe(false);
+    expect(findByTestId(renderer, "review-header-actions").findByProps({ testID: "review-reset-puzzle" })).toBeTruthy();
     press(renderer, "review-next");
     expectText(renderer, "2 / 3 · Standard");
     press(renderer, "review-previous");
     expectText(renderer, "1 / 3 · Standard");
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
     expect(findByTestId(renderer, "mock-chessboard").props.draggableColor).toBe("w");
+    const reviewFen = findByTestId(renderer, "mock-chessboard").props.fen;
 
     await boardMove(renderer, "e2e6");
 
@@ -563,6 +567,13 @@ describe("PracticePocScreen", () => {
     expect(hasStyleValue(renderer.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
 
     await settleFeedbackSnapshot();
+    expectText(renderer, "1 / 3 · Standard");
+    expect(findByTestId(renderer, "review-next").props.disabled).toBe(false);
+    expect(recordReviewResult).not.toHaveBeenCalled();
+    press(renderer, "review-reset-puzzle");
+    expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(reviewFen);
+    expectText(renderer, "1 / 3 · Standard");
+    press(renderer, "review-next");
     expectText(renderer, "2 / 3 · Standard");
   });
 
@@ -627,6 +638,9 @@ describe("PracticePocScreen", () => {
     press(renderer, "review-mistakes-button");
 
     const reviewFen = findByTestId(renderer, "mock-chessboard").props.fen;
+    expect(collectText(renderer.root)).toContain("Analysis");
+    expect(collectText(renderer.root)).not.toContain("Analyze this position without changing the review line.");
+    expect(findByTestId(renderer, "review-reset-puzzle")).toBeTruthy();
     press(renderer, "review-analysis-button");
 
     expect(findByTestId(renderer, "review-analysis-line-0")).toBeTruthy();
@@ -634,6 +648,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(renderer.root)).toContain("Qxe6+");
     expect(collectText(renderer.root)).toContain("mate+");
     expect(collectText(renderer.root)).not.toContain("1. e2e6");
+    expect(collectText(findByTestId(renderer, "review-analysis-line-0"))).toMatch(/^mate\+1\./);
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
     expect(findByTestId(renderer, "mock-chessboard").props.draggableColor).toBe(new Chess(reviewFen).turn());
     expect(findByTestId(renderer, "review-analysis-back").props.disabled).toBe(true);
@@ -663,10 +678,10 @@ describe("PracticePocScreen", () => {
     press(renderer, "review-analysis-forward");
     expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(analysisFen);
 
-    press(renderer, "review-analysis-reset");
+    press(renderer, "review-reset-puzzle");
     expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(reviewFen);
-
-    press(renderer, "review-close-analysis");
+    expect(() => findByTestId(renderer, "review-close-analysis")).toThrow();
+    expect(() => findByTestId(renderer, "review-analysis-line-0")).toThrow();
     expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(reviewFen);
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
   });
@@ -681,6 +696,7 @@ describe("PracticePocScreen", () => {
       targetCorrect: 10,
       maxMistakes: 3
     });
+    const firstPuzzleSolution = [...requireArrowDuelState(driverState).puzzle.solutionMoves];
     const wrongMoves: string[] = [];
 
     press(renderer, "practice-mode-arrow-duel");
@@ -713,8 +729,37 @@ describe("PracticePocScreen", () => {
 
     await settleFeedbackSnapshot();
     await settleFeedbackSnapshot();
-    expectText(renderer, "2 / 3 · Arrow Duel");
+    expectText(renderer, "1 / 3 · Arrow Duel");
+    expect(findByTestId(renderer, "review-guided-move-overlay")).toBeTruthy();
+    expect(countStyleEntry(findByTestId(renderer, "review-guided-move-overlay"), "backgroundColor", "#2563EB")).toBeGreaterThan(0);
+    expect(countStyleEntry(findByTestId(renderer, "review-guided-move-overlay"), "backgroundColor", "#16A34A")).toBe(0);
+    expect(collectText(renderer.root)).not.toContain("Choose the better move");
+    expect(collectText(renderer.root)).not.toContain("Follow the puzzle line");
+    expectText(renderer, "Blue arrows show the next move in the punishment line. Follow them to see why the choice is bad.");
+
+    const firstGuidedMove = firstPuzzleSolution[2];
+    const firstReplyMove = firstPuzzleSolution[3];
+    if (!firstGuidedMove) {
+      throw new Error("Expected the first Arrow Duel fixture to have a continuation move");
+    }
+    if (!firstReplyMove) {
+      throw new Error("Expected the first Arrow Duel fixture to have a reply after the continuation move");
+    }
+    const guidedStartFen = findByTestId(renderer, "mock-chessboard").props.fen;
+    const expectedAfterGuidedReply = mustFenAfterMove(
+      mustFenAfterMove(guidedStartFen, firstGuidedMove),
+      firstReplyMove
+    );
+    await boardMove(renderer, firstGuidedMove);
+    await settleFeedbackSnapshot();
+    expectText(renderer, "1 / 3 · Arrow Duel");
+    expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(expectedAfterGuidedReply);
+    if (firstPuzzleSolution[4]) {
+      expect(findByTestId(renderer, "review-guided-move-overlay")).toBeTruthy();
+    }
+    press(renderer, "review-reset-puzzle");
     expectText(renderer, "Choose the better move");
+    expect(() => findByTestId(renderer, "review-guided-move-overlay")).toThrow();
   });
 
   it("ignores stale board callbacks instead of recording a correct visible move as wrong", async () => {
