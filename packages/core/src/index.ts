@@ -7,3 +7,4 @@ export * from "./sprint-session.ts";
 export * from "./puzzle-selection-strategy.ts";
 export * from "./session-review.ts";
 export * from "./history-query.ts";
+export * from "./engine-analysis.ts";

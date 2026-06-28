@@ -644,11 +644,12 @@ describe("PracticePocScreen", () => {
     press(renderer, "review-analysis-button");
 
     expect(findByTestId(renderer, "review-analysis-line-0")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "review-analysis-engine-status"))).toBe("Local hint");
     expect(findByTestId(renderer, "analysis-arrow-overlay")).toBeTruthy();
     expect(collectText(renderer.root)).toContain("Qxe6+");
-    expect(collectText(renderer.root)).toContain("mate+");
+    expect(collectText(renderer.root)).toContain("M1");
     expect(collectText(renderer.root)).not.toContain("1. e2e6");
-    expect(collectText(findByTestId(renderer, "review-analysis-line-0"))).toMatch(/^mate\+1\./);
+    expect(collectText(findByTestId(renderer, "review-analysis-line-0"))).toMatch(/^M1.*Qxe6\+/);
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
     expect(findByTestId(renderer, "mock-chessboard").props.draggableColor).toBe(new Chess(reviewFen).turn());
     expect(findByTestId(renderer, "review-analysis-back").props.disabled).toBe(true);

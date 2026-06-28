@@ -13,9 +13,11 @@ import type { ImageSourcePropType } from "react-native";
 import type { MoveResult } from "react-native-chessboard";
 import Chessboard, { type ChessboardRef } from "react-native-chessboard";
 import {
+  analyzeFenWithUciEngine,
   applyMovesToFen,
   beginArrowDuelPuzzle,
   beginLinePuzzle,
+  buildPuzzleGuidedAnalysisLines,
   buildSprintConfig,
   currentExpectedMove,
   defaultSprintConfig,
@@ -26,9 +28,11 @@ import type {
   AttemptEvent,
   ArrowDuelState,
   CurrentPuzzleState,
+  EngineAnalysisLine,
   Puzzle,
   PuzzleFeedback,
   PuzzleLineState,
+  ReviewAnalysisLine,
   ReviewQueueItem,
   SessionMistakeReviewItem,
   SprintConfig,
@@ -42,6 +46,7 @@ import {
   shouldRandomizePuzzleSelection,
   type MobilePuzzleSource
 } from "../backend/mobilePractice.ts";
+import { createNativeStockfishTransport } from "../backend/nativeStockfishTransport.ts";
 import { Chess, type PieceSymbol, type Square } from "chess.js";
 
 interface Props {
@@ -52,6 +57,7 @@ interface Props {
 type Tab = "practice" | "review" | "history" | "settings" | "packs";
 
 type SessionFeedback = PuzzleFeedback | null;
+type AnalysisEngineStatus = "idle" | "thinking" | "stockfish" | "fallback" | "error";
 
 export type PracticeDebugTraceEvent = {
   type:
@@ -1539,13 +1545,6 @@ type ReviewPuzzleState =
   | { kind: "line"; line: PuzzleLineState }
   | { kind: "arrow_duel"; duel: ArrowDuelState };
 
-type AnalysisLine = {
-  move: string;
-  san: string;
-  label: string;
-  score: string;
-};
-
 function ReviewPanel({
   boardSize,
   dueReviewItems,
@@ -1629,6 +1628,8 @@ function ReviewSession({
   const [wrongSeen, setWrongSeen] = useState(false);
   const [analysisEnabled, setAnalysisEnabled] = useState(false);
   const [analysisFen, setAnalysisFen] = useState<string | null>(null);
+  const [engineAnalysisLines, setEngineAnalysisLines] = useState<EngineAnalysisLine[]>([]);
+  const [analysisEngineStatus, setAnalysisEngineStatus] = useState<AnalysisEngineStatus>("idle");
   const [analysisBackStack, setAnalysisBackStack] = useState<string[]>([]);
   const [analysisForwardStack, setAnalysisForwardStack] = useState<string[]>([]);
   const [manualBoardFlip, setManualBoardFlip] = useState(false);
@@ -1640,7 +1641,14 @@ function ReviewSession({
   const baseBoardFlipped = reviewStartingPerspectiveFlipped(currentEntry);
   const boardFlipped = manualBoardFlip ? !baseBoardFlipped : baseBoardFlipped;
   const feedbackMove = feedback?.submittedMove && feedback.submittedMove !== "__illegal__" ? arrowFromTo(feedback.submittedMove) : null;
-  const analysisLines = analysisEnabled ? buildReviewAnalysisLines(displayFen, currentEntry.puzzle, currentPuzzle) : [];
+  const analysisLines = analysisEnabled
+    ? buildPuzzleGuidedAnalysisLines({
+        fen: displayFen,
+        puzzle: currentEntry.puzzle,
+        currentPuzzle,
+        engineLines: engineAnalysisLines
+      })
+    : [];
   const analysisBlunderMove =
     analysisEnabled && reviewState.kind === "arrow_duel" && displayFen === currentEntry.puzzle.initialFen
       ? reviewState.duel.wrongMove
@@ -1657,6 +1665,52 @@ function ReviewSession({
   const canReviewNext = isSessionReview && entryIndex < entries.length - 1 && !boardLocked;
   const canAnalysisBack = analysisEnabled && analysisBackStack.length > 0;
   const canAnalysisForward = analysisEnabled && analysisForwardStack.length > 0;
+  const analysisEngineLabel =
+    analysisEngineStatus === "stockfish"
+      ? "SF 18 NNUE"
+      : analysisEngineStatus === "thinking"
+        ? "Analyzing..."
+        : analysisEngineStatus === "fallback" || analysisEngineStatus === "error"
+          ? "Local hint"
+          : "";
+
+  useEffect(() => {
+    if (!analysisEnabled) {
+      setEngineAnalysisLines([]);
+      setAnalysisEngineStatus("idle");
+      return;
+    }
+
+    const transport = createNativeStockfishTransport();
+    if (!transport) {
+      setEngineAnalysisLines([]);
+      setAnalysisEngineStatus("fallback");
+      return;
+    }
+
+    let cancelled = false;
+    setEngineAnalysisLines([]);
+    setAnalysisEngineStatus("thinking");
+    void analyzeFenWithUciEngine(transport, displayFen, { depth: 20, multiPv: 3 }).then(
+      (lines) => {
+        if (!cancelled) {
+          setEngineAnalysisLines(lines);
+          setAnalysisEngineStatus(lines.length > 0 ? "stockfish" : "fallback");
+        }
+      },
+      () => {
+        if (!cancelled) {
+          setEngineAnalysisLines([]);
+          setAnalysisEngineStatus("error");
+        }
+      }
+    );
+
+    return () => {
+      cancelled = true;
+      transport.send("stop");
+    };
+  }, [analysisEnabled, displayFen]);
 
   function resetCurrentReview(nextIndex = entryIndex): void {
     const nextState = startReviewPuzzle(entries[nextIndex]);
@@ -1668,6 +1722,8 @@ function ReviewSession({
     setWrongSeen(false);
     setAnalysisEnabled(false);
     setAnalysisFen(null);
+    setEngineAnalysisLines([]);
+    setAnalysisEngineStatus("idle");
     setAnalysisBackStack([]);
     setAnalysisForwardStack([]);
     setManualBoardFlip(false);
@@ -1797,6 +1853,8 @@ function ReviewSession({
     setAnalysisBackStack((stack) => [...stack, baseFen]);
     setAnalysisForwardStack([]);
     setAnalysisFen(nextFen);
+    setEngineAnalysisLines([]);
+    setAnalysisEngineStatus("thinking");
     setLastMove(arrowFromTo(move));
   }
 
@@ -1928,6 +1986,8 @@ function ReviewSession({
     setFeedback(null);
     setAnalysisEnabled(true);
     setAnalysisFen(currentFen);
+    setEngineAnalysisLines([]);
+    setAnalysisEngineStatus("thinking");
     setAnalysisBackStack([]);
     setAnalysisForwardStack([]);
   }
@@ -1935,6 +1995,8 @@ function ReviewSession({
   function closeAnalysis(): void {
     setAnalysisEnabled(false);
     setAnalysisFen(null);
+    setEngineAnalysisLines([]);
+    setAnalysisEngineStatus("idle");
     setAnalysisBackStack([]);
     setAnalysisForwardStack([]);
     boardRef.current?.resetBoard(currentFen);
@@ -1943,6 +2005,8 @@ function ReviewSession({
   function resetAnalysisPosition(): void {
     const startingFen = reviewStartingFen(currentEntry);
     setAnalysisFen(startingFen);
+    setEngineAnalysisLines([]);
+    setAnalysisEngineStatus("thinking");
     setAnalysisBackStack([]);
     setAnalysisForwardStack([]);
     boardRef.current?.resetBoard(startingFen);
@@ -1957,6 +2021,8 @@ function ReviewSession({
     setAnalysisForwardStack((stack) => stack.slice(0, -1));
     setAnalysisBackStack((stack) => [...stack, baseFen]);
     setAnalysisFen(nextFen);
+    setEngineAnalysisLines([]);
+    setAnalysisEngineStatus("thinking");
     boardRef.current?.resetBoard(nextFen);
   }
 
@@ -1968,6 +2034,8 @@ function ReviewSession({
     setAnalysisBackStack((stack) => stack.slice(0, -1));
     setAnalysisForwardStack((stack) => [...stack, analysisFen ?? currentFen]);
     setAnalysisFen(previous);
+    setEngineAnalysisLines([]);
+    setAnalysisEngineStatus("thinking");
     boardRef.current?.resetBoard(previous);
   }
 
@@ -2135,6 +2203,9 @@ function ReviewSession({
                 <Pressable accessibilityRole="button" accessibilityLabel="Flip board" testID="review-analysis-flip" style={styles.iconButton} onPress={() => setManualBoardFlip((current) => !current)}>
                   <Text style={styles.iconButtonText}>⇄</Text>
                 </Pressable>
+                <Text testID="review-analysis-engine-status" style={styles.analysisEngineStatus} numberOfLines={1}>
+                  {analysisEngineLabel}
+                </Text>
               </>
             ) : (
               <>
@@ -2179,7 +2250,7 @@ function AnalysisArrowOverlay({
 }: {
   boardSize: number;
   flipped: boolean;
-  lines: AnalysisLine[];
+  lines: ReviewAnalysisLine[];
   blunderMove?: string;
 }): React.JSX.Element {
   const squareSize = boardSize / 8;
@@ -2346,82 +2417,8 @@ function currentReviewPuzzleState(state: ReviewPuzzleState): CurrentPuzzleState 
   return state.line;
 }
 
-function buildReviewAnalysisLines(fen: string, puzzle: Puzzle, currentPuzzle: CurrentPuzzleState): AnalysisLine[] {
-  const legalMoves = legalUciMoves(fen);
-  const preferredMoves = [
-    currentPuzzle.kind === "line" ? currentExpectedMove(currentPuzzle) : currentPuzzle.correctMove,
-    puzzle.stockfishBestMove
-  ].filter((move): move is string => Boolean(move));
-  const orderedMoves = uniqueMoves([
-    ...preferredMoves.filter((move) => legalMoves.includes(normalizeUci(move))),
-    ...legalMoves
-  ]).slice(0, 4);
-
-  return orderedMoves.map((move, index) => ({
-    move,
-    san: sanForMove(fen, move),
-    label: index === 0 ? "Top move" : "Candidate",
-    score: scoreLabelForMove(move, puzzle)
-  }));
-}
-
-function sanForMove(fen: string, move: string): string {
-  try {
-    const chess = new Chess(fen);
-    const normalized = normalizeUci(move);
-    const played = chess.move({
-      from: normalized.slice(0, 2),
-      to: normalized.slice(2, 4),
-      ...(normalized.length > 4 ? { promotion: normalized.slice(4, 5) } : {})
-    });
-    return played?.san ?? move;
-  } catch {
-    return move;
-  }
-}
-
-function legalUciMoves(fen: string): string[] {
-  try {
-    const chess = new Chess(fen);
-    return chess.moves({ verbose: true }).map((move) => `${move.from}${move.to}${move.promotion ?? ""}`);
-  } catch {
-    return [];
-  }
-}
-
-function uniqueMoves(moves: string[]): string[] {
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const move of moves) {
-    const normalized = normalizeUci(move);
-    if (!seen.has(normalized)) {
-      seen.add(normalized);
-      result.push(normalized);
-    }
-  }
-  return result;
-}
-
 function normalizeUci(move: string): string {
   return move.trim().toLowerCase();
-}
-
-function scoreLabelForMove(move: string, puzzle: Puzzle): string {
-  if (puzzle.stockfishBestMove && normalizeUci(move) === normalizeUci(puzzle.stockfishBestMove)) {
-    return puzzle.stockfishEval === undefined ? "presolved best" : formatCentipawnScore(puzzle.stockfishEval);
-  }
-  if (puzzle.solutionMoves.some((solutionMove) => normalizeUci(solutionMove) === normalizeUci(move))) {
-    return puzzle.stockfishEvalAfterFirstMove === undefined ? "eval --" : formatCentipawnScore(puzzle.stockfishEvalAfterFirstMove);
-  }
-  return "eval --";
-}
-
-function formatCentipawnScore(score: number): string {
-  if (Math.abs(score) >= 10000) {
-    return score > 0 ? "mate+" : "mate-";
-  }
-  const pawns = score / 100;
-  return `${pawns >= 0 ? "+" : ""}${pawns.toFixed(1)}`;
 }
 
 function SettingsPanel({ onResetRating }: { onResetRating: () => void }): React.JSX.Element {
@@ -3219,6 +3216,13 @@ const styles = StyleSheet.create({
     color: "#334155",
     fontSize: 13,
     fontWeight: "800"
+  },
+  analysisEngineStatus: {
+    color: "#64748B",
+    fontFamily: "Menlo",
+    fontSize: 11,
+    fontWeight: "700",
+    marginLeft: "auto"
   },
   analysisLineRow: {
     alignItems: "center",
