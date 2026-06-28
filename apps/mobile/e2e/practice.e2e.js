@@ -63,14 +63,13 @@ describe('Practice POC', () => {
     await element(by.id('review-previous')).tap();
     await waitFor(element(by.text('1 / 3 · Standard'))).toBeVisible().withTimeout(30000);
 
-    await element(by.id('review-analysis-button')).tap();
-    await expect(element(by.id('review-analysis-back'))).toBeVisible();
-    await expect(element(by.id('review-analysis-forward'))).toBeVisible();
-    await expect(element(by.id('review-analysis-reset'))).toBeVisible();
-    await expect(element(by.id('review-analysis-flip'))).toBeVisible();
-
     await device.disableSynchronization();
     try {
+      await element(by.id('review-analysis-button')).tap();
+      await waitFor(element(by.id('review-analysis-back'))).toBeVisible().withTimeout(5000);
+      await waitFor(element(by.id('review-analysis-forward'))).toBeVisible().withTimeout(5000);
+      await waitFor(element(by.id('review-analysis-reset'))).toBeVisible().withTimeout(5000);
+      await waitFor(element(by.id('review-analysis-flip'))).toBeVisible().withTimeout(5000);
       await waitFor(element(by.text('SF 18 NNUE'))).toBeVisible().withTimeout(45000);
       await expect(element(by.text('M1')).atIndex(0)).toBeVisible();
 
