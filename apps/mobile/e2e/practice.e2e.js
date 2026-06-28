@@ -64,20 +64,16 @@ describe('Practice POC', () => {
     await waitFor(element(by.text('1 / 3 · Standard'))).toBeVisible().withTimeout(30000);
 
     await device.disableSynchronization();
-    try {
-      await element(by.id('review-analysis-button')).tap();
-      await waitFor(element(by.id('review-analysis-back'))).toBeVisible().withTimeout(5000);
-      await waitFor(element(by.id('review-analysis-forward'))).toBeVisible().withTimeout(5000);
-      await waitFor(element(by.id('review-analysis-reset'))).toBeVisible().withTimeout(5000);
-      await waitFor(element(by.id('review-analysis-flip'))).toBeVisible().withTimeout(5000);
-      await waitFor(element(by.text('SF 18 NNUE'))).toBeVisible().withTimeout(45000);
-      await expect(element(by.text('M1')).atIndex(0)).toBeVisible();
+    await element(by.id('review-analysis-button')).tap();
+    await waitFor(element(by.id('review-analysis-back'))).toBeVisible().withTimeout(5000);
+    await waitFor(element(by.id('review-analysis-forward'))).toBeVisible().withTimeout(5000);
+    await waitFor(element(by.id('review-analysis-reset'))).toBeVisible().withTimeout(5000);
+    await waitFor(element(by.id('review-analysis-flip'))).toBeVisible().withTimeout(5000);
+    await waitFor(element(by.text('SF 18 NNUE'))).toBeVisible().withTimeout(45000);
+    await expect(element(by.text('M1')).atIndex(0)).toBeVisible();
 
-      const screenshotPath = await device.takeScreenshot('review-analysis-arrows');
-      expectScreenshotContainsGreenAnalysisArrow(screenshotPath);
-    } finally {
-      await device.enableSynchronization();
-    }
+    const screenshotPath = await device.takeScreenshot('review-analysis-arrows');
+    expectScreenshotContainsGreenAnalysisArrow(screenshotPath);
   });
 });
 
