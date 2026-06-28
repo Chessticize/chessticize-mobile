@@ -55,6 +55,14 @@ Before declaring code work complete:
 - If a test layer is intentionally not updated, record the reason in the final response or PR notes.
 - Run the focused tests that prove the change, or state clearly why they could not be run.
 
+## Emulator Refresh Expectation
+
+- After completing any mobile UI, board interaction, navigation, animation, or review-flow change, update the iOS simulator before reporting the work as ready for manual testing.
+- The normal order is focused component tests, mobile typecheck, then simulator refresh.
+- Use `pnpm mobile:ios` to rebuild and relaunch the app when native or bundled code may have changed.
+- If Metro is not running or the simulator reports that it cannot connect to the development server, start Metro with `pnpm mobile:start` and then rerun the simulator refresh.
+- If simulator refresh is skipped because Xcode, Metro, or the simulator is unavailable, say that explicitly in the final response and include the exact command the next agent or developer should run.
+
 ## Mobile GUI Automation Direction
 
 - Use Detox as the primary React Native E2E framework because it is tailored for React Native and supports simulator/emulator automation.
