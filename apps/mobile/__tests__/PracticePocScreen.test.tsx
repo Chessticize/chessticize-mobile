@@ -653,6 +653,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "mock-chessboard").props.draggableColor).toBe(new Chess(reviewFen).turn());
     expect(findByTestId(renderer, "review-analysis-back").props.disabled).toBe(true);
     expect(findByTestId(renderer, "review-analysis-forward").props.disabled).toBe(true);
+    expect(findByTestId(renderer, "review-analysis-reset")).toBeTruthy();
     expect(() => press(renderer, "review-analysis-forward")).toThrow("review-analysis-forward is disabled");
 
     press(renderer, "review-analysis-line-1");
@@ -670,6 +671,15 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(analysisFen);
     expect(findByTestId(renderer, "review-analysis-back").props.disabled).toBe(false);
     expect(findByTestId(renderer, "review-analysis-forward").props.disabled).toBe(true);
+
+    press(renderer, "review-analysis-reset");
+    expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(reviewFen);
+    expect(findByTestId(renderer, "review-analysis-back").props.disabled).toBe(true);
+    expect(findByTestId(renderer, "review-analysis-forward").props.disabled).toBe(true);
+    expect(findByTestId(renderer, "review-analysis-line-0")).toBeTruthy();
+
+    await boardMove(renderer, analysisMove);
+    expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(analysisFen);
 
     press(renderer, "review-analysis-back");
     expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(reviewFen);

@@ -1940,6 +1940,14 @@ function ReviewSession({
     boardRef.current?.resetBoard(currentFen);
   }
 
+  function resetAnalysisPosition(): void {
+    const startingFen = reviewStartingFen(currentEntry);
+    setAnalysisFen(startingFen);
+    setAnalysisBackStack([]);
+    setAnalysisForwardStack([]);
+    boardRef.current?.resetBoard(startingFen);
+  }
+
   function stepAnalysisForward(): void {
     const nextFen = analysisForwardStack[analysisForwardStack.length - 1];
     if (!nextFen) {
@@ -2120,6 +2128,9 @@ function ReviewSession({
                   onPress={stepAnalysisForward}
                 >
                   <Text style={styles.iconButtonText}>›</Text>
+                </Pressable>
+                <Pressable accessibilityRole="button" accessibilityLabel="Reset analysis" testID="review-analysis-reset" style={styles.iconButton} onPress={resetAnalysisPosition}>
+                  <Text style={styles.iconButtonText}>↺</Text>
                 </Pressable>
                 <Pressable accessibilityRole="button" accessibilityLabel="Flip board" testID="review-analysis-flip" style={styles.iconButton} onPress={() => setManualBoardFlip((current) => !current)}>
                   <Text style={styles.iconButtonText}>⇄</Text>
