@@ -1,4 +1,4 @@
-import type { ReviewQueueState, ReviewScheduleInput } from "./types.ts";
+import type { ReviewContext, ReviewQueueState, ReviewScheduleInput } from "./types.ts";
 
 const SUCCESS_INTERVALS_HOURS = [24, 72, 168, 336, 720, 1440];
 
@@ -9,9 +9,10 @@ export function scheduleReview(input: ReviewScheduleInput): ReviewQueueState {
   }
 
   if (!input.previous) {
+    const context = input.context ?? defaultReviewContext();
     const intervalHours = input.result === "correct" ? successIntervalAt(1) : successIntervalAt(0);
     return {
-      puzzleId: "",
+      ...context,
       dueAt: addHours(nowDate, intervalHours).toISOString(),
       intervalHours,
       reviewCount: 1,
@@ -50,11 +51,11 @@ export function scheduleReview(input: ReviewScheduleInput): ReviewQueueState {
 }
 
 export function scheduleMistake(puzzleId: string, now: string): ReviewQueueState {
-  const scheduled = scheduleReview({ result: "wrong", now });
-  return {
-    ...scheduled,
-    puzzleId
-  };
+  return scheduleReview({ context: { puzzleId, mode: "standard", ratingKey: "standard 5/20" }, result: "wrong", now });
+}
+
+export function scheduleMistakeForContext(context: ReviewContext, now: string): ReviewQueueState {
+  return scheduleReview({ context, result: "wrong", now });
 }
 
 function addHours(date: Date, hours: number): Date {
@@ -63,4 +64,12 @@ function addHours(date: Date, hours: number): Date {
 
 function successIntervalAt(index: number): number {
   return SUCCESS_INTERVALS_HOURS[Math.min(index, SUCCESS_INTERVALS_HOURS.length - 1)] ?? SUCCESS_INTERVALS_HOURS[0]!;
+}
+
+function defaultReviewContext(): ReviewContext {
+  return {
+    puzzleId: "",
+    mode: "standard",
+    ratingKey: "standard 5/20"
+  };
 }

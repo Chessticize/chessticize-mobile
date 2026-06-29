@@ -185,9 +185,11 @@ function buildAttemptEvent(state: SprintState, feedback: PuzzleFeedback, now: st
   }
   return {
     id: generateId(),
+    source: "sprint",
     sessionId: state.id,
     puzzleId: state.currentPuzzle.puzzle.id,
     mode: state.config.mode,
+    ratingKey: state.config.ratingKey,
     result: feedback.result,
     submittedMove: feedback.submittedMove,
     expectedMove: feedback.expectedMove,

@@ -6,7 +6,7 @@ import {
   createDefaultRating,
   resetRating as resetRatingRecord,
   resolveHistoryRange,
-  scheduleMistake,
+  scheduleMistakeForContext,
   scheduleReview,
   sideToMoveForHistoryPuzzle
 } from "../../core/src/index.ts";
@@ -19,6 +19,7 @@ import type {
   HistoryView,
   Puzzle,
   RatingRecord,
+  ReviewContext,
   ReviewQueueItem,
   ReviewQueueState,
   SessionMistakeReviewItem,
@@ -35,6 +36,7 @@ interface AttemptHistoryDbRow extends Omit<AttemptHistoryRow, "ratingAfter"> {
 
 interface HistoryAttemptDbRow extends PuzzleRow {
   attempt_id: string;
+  attempt_source: "sprint" | "scheduled_review";
   session_id: string;
   mode: SprintMode;
   result: AttemptResult;
@@ -80,6 +82,8 @@ interface RatingRow {
 
 interface ReviewRow {
   puzzle_id: string;
+  mode: SprintMode;
+  rating_key: string;
   due_at: string;
   interval_hours: number;
   review_count: number;
@@ -318,13 +322,18 @@ export class SQLiteStore implements PracticeStore {
   }
 
   recordAttempt(attempt: AttemptEvent): void {
+    if (attempt.source === "scheduled_review") {
+      this.ensureSyntheticReviewSession(attempt);
+    }
     this.db
       .prepare(
         `INSERT INTO attempts (
           id,
+          source,
           session_id,
           puzzle_id,
           mode,
+          rating_key,
           result,
           submitted_move,
           expected_move,
@@ -332,13 +341,15 @@ export class SQLiteStore implements PracticeStore {
           completed_at,
           rating_before,
           rating_after
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         attempt.id,
+        attempt.source,
         attempt.sessionId,
         attempt.puzzleId,
         attempt.mode,
+        attempt.ratingKey,
         attempt.result,
         attempt.submittedMove,
         attempt.expectedMove,
@@ -354,9 +365,11 @@ export class SQLiteStore implements PracticeStore {
       .prepare(
         `SELECT
           id,
+          source,
           session_id AS sessionId,
           puzzle_id AS puzzleId,
           mode,
+          rating_key AS ratingKey,
           result,
           submitted_move AS submittedMove,
           expected_move AS expectedMove,
@@ -365,7 +378,8 @@ export class SQLiteStore implements PracticeStore {
           rating_before AS ratingBefore,
           rating_after AS ratingAfter
          FROM attempts
-         WHERE (? IS NULL OR result = ?)
+         WHERE (? IS NULL OR source = ?)
+           AND (? IS NULL OR result = ?)
            AND (? IS NULL OR mode = ?)
            AND (? IS NULL OR completed_at >= ?)
            AND (? IS NULL OR puzzle_id = ?)
@@ -373,6 +387,8 @@ export class SQLiteStore implements PracticeStore {
          ORDER BY completed_at DESC, id DESC`
       )
       .all(
+        filter.source ?? null,
+        filter.source ?? null,
         filter.result ?? null,
         filter.result ?? null,
         filter.mode ?? null,
@@ -402,46 +418,48 @@ export class SQLiteStore implements PracticeStore {
     return buildSessionMistakeReview({ sessionId, attempts, puzzles });
   }
 
-  scheduleMistakeReview(puzzleId: string, now: string): ReviewQueueState {
-    const previous = this.getReviewQueueState(puzzleId);
+  scheduleMistakeReview(context: ReviewContext, now: string): ReviewQueueState {
+    const previous = this.getReviewQueueState(context);
     const next = previous
       ? scheduleReview({ previous, result: "wrong", now })
-      : scheduleMistake(puzzleId, now);
+      : scheduleMistakeForContext(context, now);
     this.saveReviewQueueState(next);
     return next;
   }
 
-  recordReviewResult(puzzleId: string, result: AttemptResult, now: string): ReviewQueueState {
-    const previous = this.getReviewQueueState(puzzleId);
+  recordReviewResult(context: ReviewContext, result: AttemptResult, now: string): ReviewQueueState {
+    const previous = this.getReviewQueueState(context);
     const next = previous
       ? scheduleReview({ previous, result, now })
-      : { ...scheduleReview({ result, now }), puzzleId };
+      : scheduleReview({ context, result, now });
     this.saveReviewQueueState(next);
     this.db
       .prepare(
         `INSERT INTO review_events (
           id,
           puzzle_id,
+          mode,
+          rating_key,
           result,
           reviewed_at,
           next_due_at,
           interval_hours
-        ) VALUES (?, ?, ?, ?, ?, ?)`
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
       )
-      .run(cryptoRandomId(), puzzleId, result, now, next.dueAt, next.intervalHours);
+      .run(cryptoRandomId(), context.puzzleId, context.mode, context.ratingKey, result, now, next.dueAt, next.intervalHours);
     return next;
   }
 
-  getReviewQueueState(puzzleId: string): ReviewQueueState | undefined {
+  getReviewQueueState(context: ReviewContext): ReviewQueueState | undefined {
     const row = this.db
-      .prepare("SELECT * FROM review_queue WHERE puzzle_id = ?")
-      .get(puzzleId) as ReviewRow | undefined;
+      .prepare("SELECT * FROM review_queue WHERE puzzle_id = ? AND mode = ? AND rating_key = ?")
+      .get(context.puzzleId, context.mode, context.ratingKey) as ReviewRow | undefined;
     return row ? reviewFromRow(row) : undefined;
   }
 
   getDueReviews(now: string): ReviewQueueState[] {
     const rows = this.db
-      .prepare("SELECT * FROM review_queue WHERE due_at <= ? ORDER BY due_at ASC, puzzle_id ASC")
+      .prepare("SELECT * FROM review_queue WHERE due_at <= ? ORDER BY due_at ASC, puzzle_id ASC, mode ASC, rating_key ASC")
       .all(now) as ReviewRow[];
     return rows.map(reviewFromRow);
   }
@@ -460,6 +478,7 @@ export class SQLiteStore implements PracticeStore {
     const allAttempts = this.selectHistoryAttempts(query.ratingKey, range.since, range.until);
     const attempts = allAttempts
       .filter((attempt) => !query.result || attempt.result === query.result)
+      .filter((attempt) => !query.source || attempt.source === query.source)
       .filter((attempt) => !query.mode || attempt.mode === query.mode)
       .filter((attempt) => !query.side || attempt.side === query.side)
       .filter((attempt) => !query.theme || attempt.themes.includes(query.theme));
@@ -478,6 +497,8 @@ export class SQLiteStore implements PracticeStore {
       .prepare(
         `INSERT OR REPLACE INTO review_queue (
           puzzle_id,
+          mode,
+          rating_key,
           due_at,
           interval_hours,
           review_count,
@@ -485,10 +506,12 @@ export class SQLiteStore implements PracticeStore {
           lapse_count,
           last_result,
           last_reviewed_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         state.puzzleId,
+        state.mode,
+        state.ratingKey,
         state.dueAt,
         state.intervalHours,
         state.reviewCount,
@@ -504,6 +527,7 @@ export class SQLiteStore implements PracticeStore {
       .prepare(
         `SELECT
           a.id AS attempt_id,
+          a.source AS attempt_source,
           a.session_id,
           a.mode,
           a.result,
@@ -513,12 +537,12 @@ export class SQLiteStore implements PracticeStore {
           a.completed_at,
           a.rating_before,
           a.rating_after,
-          s.rating_key,
+          COALESCE(a.rating_key, s.rating_key) AS rating_key,
           p.*
          FROM attempts a
          JOIN sprint_sessions s ON s.id = a.session_id
          JOIN puzzles p ON p.id = a.puzzle_id
-         WHERE s.rating_key = ?
+         WHERE COALESCE(a.rating_key, s.rating_key) = ?
            AND (? IS NULL OR a.completed_at >= ?)
            AND a.completed_at <= ?
          ORDER BY a.completed_at DESC, a.id DESC`
@@ -529,6 +553,7 @@ export class SQLiteStore implements PracticeStore {
       const puzzle = puzzleFromRow(row);
       return {
         id: row.attempt_id,
+        source: row.attempt_source,
         sessionId: row.session_id,
         puzzleId: puzzle.id,
         mode: row.mode,
@@ -576,6 +601,40 @@ export class SQLiteStore implements PracticeStore {
     const rows = this.db.prepare("SELECT * FROM review_queue").all() as ReviewRow[];
     return rows.map(reviewFromRow);
   }
+
+  private ensureSyntheticReviewSession(attempt: AttemptEvent): void {
+    this.db
+      .prepare(
+        `INSERT OR IGNORE INTO sprint_sessions (
+          id,
+          mode,
+          rating_key,
+          config_json,
+          started_at,
+          deadline_at,
+          completed_at,
+          status,
+          correct_count,
+          mistake_count,
+          rating_before,
+          rating_after
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        attempt.sessionId,
+        attempt.mode,
+        attempt.ratingKey,
+        JSON.stringify({ source: "scheduled_review", mode: attempt.mode, ratingKey: attempt.ratingKey }),
+        attempt.startedAt,
+        attempt.completedAt,
+        attempt.completedAt,
+        "won",
+        attempt.result === "correct" ? 1 : 0,
+        attempt.result === "wrong" ? 1 : 0,
+        attempt.ratingBefore,
+        null
+      );
+  }
 }
 
 function puzzleFromRow(row: PuzzleRow): Puzzle {
@@ -602,6 +661,8 @@ function puzzleFromRow(row: PuzzleRow): Puzzle {
 function reviewFromRow(row: ReviewRow): ReviewQueueState {
   return {
     puzzleId: row.puzzle_id,
+    mode: row.mode,
+    ratingKey: row.rating_key,
     dueAt: row.due_at,
     intervalHours: row.interval_hours,
     reviewCount: row.review_count,
@@ -615,9 +676,11 @@ function reviewFromRow(row: ReviewRow): ReviewQueueState {
 function attemptEventFromHistoryRow(row: AttemptHistoryRow): AttemptEvent {
   return {
     id: row.id,
+    source: row.source,
     sessionId: row.sessionId,
     puzzleId: row.puzzleId,
     mode: row.mode,
+    ratingKey: row.ratingKey,
     result: row.result,
     submittedMove: row.submittedMove,
     expectedMove: row.expectedMove,
@@ -678,9 +741,11 @@ CREATE TABLE IF NOT EXISTS sprint_sessions (
 
 CREATE TABLE IF NOT EXISTS attempts (
   id TEXT PRIMARY KEY,
+  source TEXT NOT NULL DEFAULT 'sprint',
   session_id TEXT NOT NULL,
   puzzle_id TEXT NOT NULL,
   mode TEXT NOT NULL,
+  rating_key TEXT,
   result TEXT NOT NULL,
   submitted_move TEXT NOT NULL,
   expected_move TEXT NOT NULL,
@@ -699,7 +764,9 @@ CREATE INDEX IF NOT EXISTS attempts_session_id_idx ON attempts(session_id);
 CREATE INDEX IF NOT EXISTS sprint_sessions_rating_key_completed_at_idx ON sprint_sessions(rating_key, completed_at);
 
 CREATE TABLE IF NOT EXISTS review_queue (
-  puzzle_id TEXT PRIMARY KEY,
+  puzzle_id TEXT NOT NULL,
+  mode TEXT NOT NULL DEFAULT 'standard',
+  rating_key TEXT NOT NULL DEFAULT 'standard 5/20',
   due_at TEXT NOT NULL,
   interval_hours INTEGER NOT NULL,
   review_count INTEGER NOT NULL,
@@ -707,6 +774,7 @@ CREATE TABLE IF NOT EXISTS review_queue (
   lapse_count INTEGER NOT NULL,
   last_result TEXT NOT NULL,
   last_reviewed_at TEXT NOT NULL,
+  PRIMARY KEY (puzzle_id, mode, rating_key),
   FOREIGN KEY (puzzle_id) REFERENCES puzzles(id)
 );
 
@@ -715,6 +783,8 @@ CREATE INDEX IF NOT EXISTS review_queue_due_at_idx ON review_queue(due_at);
 CREATE TABLE IF NOT EXISTS review_events (
   id TEXT PRIMARY KEY,
   puzzle_id TEXT NOT NULL,
+  mode TEXT NOT NULL DEFAULT 'standard',
+  rating_key TEXT NOT NULL DEFAULT 'standard 5/20',
   result TEXT NOT NULL,
   reviewed_at TEXT NOT NULL,
   next_due_at TEXT NOT NULL,
