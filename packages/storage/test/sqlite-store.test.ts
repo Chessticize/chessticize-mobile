@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { PracticeService, SQLiteStore } from "../src/index.ts";
-import type { Puzzle } from "../../core/src/index.ts";
+import type { Puzzle, ReviewContext } from "../../core/src/index.ts";
 
 test("SQLite store seeds fixture puzzles and filters Arrow Duel eligibility", async () => {
   const store = await seededStore();
@@ -129,13 +129,66 @@ test("PracticeService builds SQLite history view for a required time range and r
     assert.equal(service.getHistoryView({ ...view.query, side: oppositeSide }).attempts.length, 0);
     assert.equal(service.getDueReviewItems("2026-06-21T00:00:05.000Z")[0]?.puzzle.id, "000hf");
 
-    service.recordReviewResult("000hf", "correct", "2026-06-21T00:00:05.000Z");
-    assert.equal(store.listAttempts({ result: "correct" }).length, 0);
+    service.recordReviewAttempt({
+      puzzleId: "000hf",
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      result: "correct",
+      submittedMove: "c4b5",
+      expectedMove: "c4b5",
+      startedAt: "2026-06-21T00:00:00.000Z"
+    }, "2026-06-21T00:00:05.000Z");
+    assert.equal(store.listAttempts({ source: "scheduled_review", result: "correct" }).length, 1);
 
     service.resetRating("standard 5/20");
     assert.deepEqual(
       service.listPlayedRatings().map((rating) => rating.key),
       ["standard 5/20"]
+    );
+  } finally {
+    store.close();
+  }
+});
+
+test("PracticeService records official SQLite reviews in history without mixing queue contexts", async () => {
+  const store = await seededStore();
+  const service = new PracticeService(store);
+  try {
+    service.startSprint(
+      { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
+      "2026-06-20T00:00:00.000Z"
+    );
+    service.submitMove("c4b5", "2026-06-20T00:00:05.000Z");
+
+    service.recordReviewAttempt({
+      puzzleId: "000hf",
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      result: "correct",
+      submittedMove: "c4b5",
+      expectedMove: "c4b5",
+      startedAt: "2026-06-21T00:00:00.000Z"
+    }, "2026-06-21T00:00:05.000Z");
+
+    const all = service.getHistoryView({
+      now: "2026-06-22T00:00:00.000Z",
+      timeRange: "7d",
+      ratingKey: "standard 5/20"
+    });
+    assert.deepEqual(all.attempts.map((attempt) => attempt.source), ["scheduled_review", "sprint"]);
+    assert.deepEqual(
+      service.getHistoryView({ ...all.query, source: "scheduled_review" }).attempts.map((attempt) => attempt.result),
+      ["correct"]
+    );
+    assert.deepEqual(
+      service.getHistoryView({ ...all.query, source: "sprint" }).attempts.map((attempt) => attempt.result),
+      ["wrong"]
+    );
+
+    store.recordReviewResult({ puzzleId: "000hf", mode: "arrow_duel", ratingKey: "arrow duel 5/30" }, "wrong", "2026-06-21T00:01:00.000Z");
+    assert.deepEqual(
+      store.getDueReviews("2026-06-25T00:00:00.000Z").map((review) => `${review.puzzleId}:${review.mode}:${review.ratingKey}`).sort(),
+      ["000hf:arrow_duel:arrow duel 5/30", "000hf:standard:standard 5/20"]
     );
   } finally {
     store.close();
@@ -205,13 +258,14 @@ test("PracticeService exposes the current rating for the selected sprint run", a
 test("SQLite review result updates expand and contract the persisted review schedule", async () => {
   const store = await seededStore();
   try {
-    store.scheduleMistakeReview("00008", "2026-06-20T00:00:00.000Z");
+    const context = reviewContext("00008");
+    store.scheduleMistakeReview(context, "2026-06-20T00:00:00.000Z");
 
-    const success = store.recordReviewResult("00008", "correct", "2026-06-21T00:00:00.000Z");
+    const success = store.recordReviewResult(context, "correct", "2026-06-21T00:00:00.000Z");
     assert.equal(success.dueAt, "2026-06-24T00:00:00.000Z");
     assert.equal(success.successStreak, 1);
 
-    const wrong = store.recordReviewResult("00008", "wrong", "2026-06-22T00:00:00.000Z");
+    const wrong = store.recordReviewResult(context, "wrong", "2026-06-22T00:00:00.000Z");
     assert.equal(wrong.dueAt, "2026-06-22T06:00:00.000Z");
     assert.equal(wrong.successStreak, 0);
     assert.equal(wrong.lapseCount, 2);
@@ -223,12 +277,12 @@ test("SQLite review result updates expand and contract the persisted review sche
 test("SQLite review result without an existing queue row is counted once", async () => {
   const store = await seededStore();
   try {
-    const wrong = store.recordReviewResult("00008", "wrong", "2026-06-20T00:00:00.000Z");
+    const wrong = store.recordReviewResult(reviewContext("00008"), "wrong", "2026-06-20T00:00:00.000Z");
     assert.equal(wrong.reviewCount, 1);
     assert.equal(wrong.lapseCount, 1);
     assert.equal(wrong.dueAt, "2026-06-21T00:00:00.000Z");
 
-    const correct = store.recordReviewResult("000hf", "correct", "2026-06-20T00:00:00.000Z");
+    const correct = store.recordReviewResult(reviewContext("000hf"), "correct", "2026-06-20T00:00:00.000Z");
     assert.equal(correct.reviewCount, 1);
     assert.equal(correct.successStreak, 1);
     assert.equal(correct.dueAt, "2026-06-23T00:00:00.000Z");
@@ -348,4 +402,12 @@ async function seededStore(): Promise<SQLiteStore> {
 async function loadFixturePuzzles(): Promise<Puzzle[]> {
   const contents = await readFile(resolve("fixtures/puzzles/presolved-sample.json"), "utf8");
   return JSON.parse(contents) as Puzzle[];
+}
+
+function reviewContext(puzzleId: string): ReviewContext {
+  return {
+    puzzleId,
+    mode: "standard",
+    ratingKey: "standard 5/20"
+  };
 }

@@ -63,7 +63,6 @@ describe('Practice POC', () => {
     await element(by.id('review-previous')).tap();
     await waitFor(element(by.text('1 / 3 · Standard'))).toBeVisible().withTimeout(30000);
 
-    await device.disableSynchronization();
     await element(by.id('review-analysis-button')).tap();
     await waitFor(element(by.id('review-analysis-back'))).toBeVisible().withTimeout(5000);
     await waitFor(element(by.id('review-analysis-forward'))).toBeVisible().withTimeout(5000);

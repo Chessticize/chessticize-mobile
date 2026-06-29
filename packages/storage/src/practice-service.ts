@@ -12,6 +12,7 @@ import type {
   HistoryView,
   Puzzle,
   RatingRecord,
+  ReviewContext,
   ReviewQueueItem,
   ReviewQueueState,
   SessionMistakeReviewItem,
@@ -32,6 +33,13 @@ export interface StartSprintCommand {
   minRating?: number;
   maxRating?: number;
   puzzleSelectionSeed?: string | number;
+}
+
+export interface RecordReviewAttemptCommand extends ReviewContext {
+  result: AttemptResult;
+  submittedMove: string;
+  expectedMove: string;
+  startedAt?: string;
 }
 
 export class PracticeService {
@@ -134,7 +142,7 @@ export class PracticeService {
       if (attemptToReturn) {
         this.store.recordAttempt(attemptToReturn);
         if (attemptToReturn.result === "wrong") {
-          this.store.scheduleMistakeReview(attemptToReturn.puzzleId, attemptToReturn.completedAt);
+          this.store.scheduleMistakeReview(reviewContextFromAttempt(attemptToReturn), attemptToReturn.completedAt);
         }
       }
 
@@ -197,6 +205,10 @@ export class PracticeService {
     return this.store.getSessionMistakeReview(sessionId);
   }
 
+  getPuzzle(id: string): Puzzle | undefined {
+    return this.store.getPuzzle(id);
+  }
+
   getHistoryView(query: HistoryQuery): HistoryView {
     return this.store.getHistoryView(query);
   }
@@ -217,8 +229,36 @@ export class PracticeService {
     return this.store.resetRating(ratingKey);
   }
 
-  recordReviewResult(puzzleId: string, result: AttemptResult, now = new Date().toISOString()): ReviewQueueState {
-    return this.store.recordReviewResult(puzzleId, result, now);
+  recordReviewAttempt(command: RecordReviewAttemptCommand, now = new Date().toISOString()): {
+    attempt: AttemptEvent;
+    review: ReviewQueueState;
+  } {
+    const completedAt = new Date(now).toISOString();
+    const rating = this.store.getRating(command.ratingKey);
+    const attempt: AttemptEvent = {
+      id: generateReviewAttemptId(command.puzzleId, completedAt),
+      source: "scheduled_review",
+      sessionId: generateReviewSessionId(command.puzzleId, completedAt),
+      puzzleId: command.puzzleId,
+      mode: command.mode,
+      ratingKey: command.ratingKey,
+      result: command.result,
+      submittedMove: command.submittedMove,
+      expectedMove: command.expectedMove,
+      startedAt: command.startedAt ?? completedAt,
+      completedAt,
+      ratingBefore: rating.rating
+    };
+    let review!: ReviewQueueState;
+    this.store.transaction(() => {
+      this.store.recordAttempt(attempt);
+      review = this.store.recordReviewResult(command, command.result, completedAt);
+    });
+    return { attempt, review };
+  }
+
+  recordReviewResult(context: ReviewContext, result: AttemptResult, now = new Date().toISOString()): ReviewQueueState {
+    return this.store.recordReviewResult(context, result, now);
   }
 
   loadFixturePuzzles(puzzles: Puzzle[]): void {
@@ -254,4 +294,20 @@ function defaultPerPuzzleSeconds(mode: SprintMode): number {
 
 export function fixtureNeedsAtLeast(config: SprintConfig): number {
   return Math.max(config.targetCorrect + config.maxMistakes, config.targetCorrect);
+}
+
+function reviewContextFromAttempt(attempt: AttemptEvent): ReviewContext {
+  return {
+    puzzleId: attempt.puzzleId,
+    mode: attempt.mode,
+    ratingKey: attempt.ratingKey
+  };
+}
+
+function generateReviewAttemptId(puzzleId: string, completedAt: string): string {
+  return `review-attempt:${puzzleId}:${completedAt}`;
+}
+
+function generateReviewSessionId(puzzleId: string, completedAt: string): string {
+  return `review-session:${puzzleId}:${completedAt}`;
 }

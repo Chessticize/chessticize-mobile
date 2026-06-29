@@ -88,6 +88,8 @@ test("history puzzle stats aggregate original sprint attempts and attach next re
     buildHistoryPuzzleStats(attempts, [
       {
         puzzleId: "p1",
+        mode: "standard",
+        ratingKey: "standard 5/20",
         dueAt: "2026-06-21T00:00:00.000Z",
         intervalHours: 24,
         reviewCount: 1,
@@ -127,6 +129,7 @@ function attempt(input: {
 }): HistoryAttemptView {
   return {
     id: input.id,
+    source: "sprint",
     sessionId: "s1",
     puzzleId: input.puzzleId,
     mode: "standard",

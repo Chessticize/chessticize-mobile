@@ -4,6 +4,8 @@ export type SprintStatus = "active" | "won" | "failed" | "abandoned";
 
 export type AttemptResult = "correct" | "wrong";
 
+export type AttemptSource = "sprint" | "scheduled_review";
+
 export type SprintEndReason =
   | "target_reached"
   | "max_mistakes"
@@ -112,9 +114,11 @@ export interface SprintState {
 
 export interface AttemptEvent {
   id: string;
+  source: AttemptSource;
   sessionId: string;
   puzzleId: string;
   mode: SprintMode;
+  ratingKey: string;
   result: AttemptResult;
   submittedMove: string;
   expectedMove: string;
@@ -137,6 +141,8 @@ export interface SprintCommandResult {
 
 export interface ReviewQueueState {
   puzzleId: string;
+  mode: SprintMode;
+  ratingKey: string;
   dueAt: string;
   intervalHours: number;
   reviewCount: number;
@@ -151,7 +157,14 @@ export interface ReviewQueueItem {
   review: ReviewQueueState;
 }
 
+export interface ReviewContext {
+  puzzleId: string;
+  mode: SprintMode;
+  ratingKey: string;
+}
+
 export interface ReviewScheduleInput {
+  context?: ReviewContext;
   previous?: ReviewQueueState;
   result: AttemptResult;
   now: string;
