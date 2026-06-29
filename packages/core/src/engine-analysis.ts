@@ -38,7 +38,10 @@ export interface UciEngineTransport {
 
 export interface UciAnalysisOptions {
   depth?: number;
+  shallowDelayMs?: number;
+  shallowDepth?: number;
   multiPv?: number;
+  onUpdate?: (lines: EngineAnalysisLine[]) => void;
   timeoutMs?: number;
 }
 
@@ -49,6 +52,9 @@ export async function analyzeFenWithUciEngine(
 ): Promise<EngineAnalysisLine[]> {
   const depth = options.depth ?? 20;
   const multiPv = options.multiPv ?? 3;
+  const shallowDepth = options.shallowDepth ?? (depth > 8 ? 8 : 0);
+  const useShallowThenFull = shallowDepth > 0 && shallowDepth < depth;
+  const shallowDelayMs = options.shallowDelayMs ?? 500;
   const timeoutMs = options.timeoutMs ?? 30000;
   const byMultiPv = new Map<number, EngineAnalysisLine>();
 
@@ -56,20 +62,47 @@ export async function analyzeFenWithUciEngine(
 
   return await new Promise((resolve, reject) => {
     let done = false;
+    let deepSearchStarted = !useShallowThenFull;
     const cleanup = transport.onLine((line) => {
       const parsed = parseStockfishInfoLine(line, fen);
       if (parsed) {
         byMultiPv.set(parsed.multipv, parsed);
+        emitUpdate();
         return;
       }
 
       if (line.startsWith("bestmove ")) {
+        if (!deepSearchStarted) {
+          return;
+        }
         finish();
       }
     });
     const timer = setTimeout(() => {
       finish();
     }, timeoutMs);
+    const shallowTimer = useShallowThenFull
+      ? setTimeout(() => {
+          if (done) {
+            return;
+          }
+          try {
+            deepSearchStarted = true;
+            transport.send("stop");
+            transport.send(`go depth ${depth}`);
+          } catch (error) {
+            fail(error);
+          }
+        }, shallowDelayMs)
+      : null;
+
+    function currentLines(): EngineAnalysisLine[] {
+      return sortEngineLines([...byMultiPv.values()]).slice(0, multiPv);
+    }
+
+    function emitUpdate(): void {
+      options.onUpdate?.(currentLines());
+    }
 
     function finish(): void {
       if (done) {
@@ -77,8 +110,24 @@ export async function analyzeFenWithUciEngine(
       }
       done = true;
       clearTimeout(timer);
+      if (shallowTimer) {
+        clearTimeout(shallowTimer);
+      }
       cleanup();
-      resolve(sortEngineLines([...byMultiPv.values()]).slice(0, multiPv));
+      resolve(currentLines());
+    }
+
+    function fail(error: unknown): void {
+      if (done) {
+        return;
+      }
+      done = true;
+      clearTimeout(timer);
+      if (shallowTimer) {
+        clearTimeout(shallowTimer);
+      }
+      cleanup();
+      reject(error);
     }
 
     try {
@@ -86,12 +135,11 @@ export async function analyzeFenWithUciEngine(
       transport.send("isready");
       transport.send(`setoption name MultiPV value ${multiPv}`);
       transport.send("ucinewgame");
+      transport.send("stop");
       transport.send(`position fen ${fen}`);
-      transport.send(`go depth ${depth}`);
+      transport.send(`go depth ${useShallowThenFull ? shallowDepth : depth}`);
     } catch (error) {
-      clearTimeout(timer);
-      cleanup();
-      reject(error);
+      fail(error);
     }
   });
 }

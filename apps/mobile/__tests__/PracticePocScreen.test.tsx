@@ -4,7 +4,7 @@ import TestRenderer, { act } from "react-test-renderer";
 import { PracticePocScreen, type PracticeDebugTraceEvent } from "../src/components/PracticePocScreen";
 import { createMobilePracticeService, seededPuzzleCount, seededUniquePositionCount } from "../src/backend/mobilePractice";
 import { fixtureNeedsAtLeast } from "../../../packages/storage/src/practice-service";
-import type { ArrowDuelState, SprintState } from "../../../packages/core/src/index";
+import type { ArrowDuelState, SprintState, UciEngineTransport } from "../../../packages/core/src/index";
 
 const renderers: TestRenderer.ReactTestRenderer[] = [];
 
@@ -697,6 +697,54 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
   });
 
+  it("streams native Stockfish depth updates into review analysis rows", async () => {
+    const stockfish = createScriptedStockfishTransport((command, emit) => {
+      if (command === "go depth 8") {
+        void Promise.resolve().then(() => {
+          emit("info depth 4 multipv 1 score mate 1 pv e2e6");
+        });
+      }
+      if (command === "go depth 20") {
+        void Promise.resolve().then(() => {
+          emit("info depth 12 multipv 1 score mate 1 pv e2e6");
+          emit("bestmove e2e6");
+        });
+      }
+    });
+    const renderer = renderStandardSequenceScreen({
+      stockfishTransportFactory: () => stockfish.transport
+    });
+
+    press(renderer, "start-sprint-button");
+    await boardMove(renderer, "c4b5");
+    await settleFeedbackSnapshot();
+    await boardMove(renderer, "g6g5");
+    await settleFeedbackSnapshot();
+    await boardMove(renderer, "a4b6");
+    await settleFeedbackSnapshot();
+    press(renderer, "review-mistakes-button");
+
+    press(renderer, "review-analysis-button");
+    await waitForAssertion(() => {
+      expect(stockfish.commands).toContain("go depth 8");
+      expect(collectText(findByTestId(renderer, "review-analysis-engine-status"))).toBe("SF 18 NNUE · Depth 4/20");
+      expect(collectText(findByTestId(renderer, "review-analysis-line-0"))).toMatch(/^M1.*Qxe6\+/);
+    });
+
+    await act(async () => {
+      jest.advanceTimersByTime(500);
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await waitForAssertion(() => {
+      expect(stockfish.commands).toContain("go depth 20");
+      expect(collectText(findByTestId(renderer, "review-analysis-engine-status"))).toBe("SF 18 NNUE · Depth 12");
+      expect(collectText(findByTestId(renderer, "review-analysis-line-0"))).toMatch(/^M1.*Qxe6\+/);
+    });
+  });
+
   it("reviews Arrow Duel mistakes with analysis blunder arrows and a forced punishment line", async () => {
     const renderer = renderScreen();
     const driver = createMobilePracticeService("familiar15");
@@ -835,6 +883,36 @@ describe("PracticePocScreen", () => {
   });
 });
 
+function createScriptedStockfishTransport(
+  onCommand: (command: string, emit: (line: string) => void) => void
+): { commands: string[]; transport: UciEngineTransport } {
+  const commands: string[] = [];
+  const listeners = new Set<(line: string) => void>();
+  const emit = (line: string) => {
+    for (const listener of listeners) {
+      listener(line);
+    }
+  };
+
+  return {
+    commands,
+    transport: {
+      start: jest.fn(async () => {}),
+      send: jest.fn((command: string) => {
+        commands.push(command);
+        onCommand(command, emit);
+      }),
+      onLine: (listener: (line: string) => void) => {
+        listeners.add(listener);
+        return () => {
+          listeners.delete(listener);
+        };
+      },
+      terminate: jest.fn()
+    }
+  };
+}
+
 function renderScreen(props: React.ComponentProps<typeof PracticePocScreen> = {}): TestRenderer.ReactTestRenderer {
   let renderer: TestRenderer.ReactTestRenderer | undefined;
   act(() => {
@@ -969,6 +1047,20 @@ async function flushMicrotasks(): Promise<void> {
     await Promise.resolve();
     await Promise.resolve();
   });
+}
+
+async function waitForAssertion(assertion: () => void, attempts = 10): Promise<void> {
+  let lastError: unknown;
+  for (let index = 0; index < attempts; index += 1) {
+    try {
+      assertion();
+      return;
+    } catch (error) {
+      lastError = error;
+      await flushMicrotasks();
+    }
+  }
+  throw lastError;
 }
 
 function findByTestId(renderer: TestRenderer.ReactTestRenderer, testID: string): TestRenderer.ReactTestInstance {

@@ -11,7 +11,7 @@ import {
   buildPuzzleGuidedAnalysisLines,
   parseStockfishInfoLine
 } from "../src/index.ts";
-import type { Puzzle, UciEngineTransport } from "../src/index.ts";
+import type { EngineAnalysisLine, Puzzle, UciEngineTransport } from "../src/index.ts";
 
 test("parses Stockfish mate scores from side-to-move and white perspectives", () => {
   const fen = "8/8/8/8/8/8/2Q5/k1K5 w - - 0 1";
@@ -51,12 +51,78 @@ test("analyzes UCI output through a maintained fake transport", async () => {
     "isready",
     "setoption name MultiPV value 2",
     "ucinewgame",
+    "stop",
     `position fen ${fen}`,
     "go depth 8"
   ]);
   assert.equal(lines.length, 2);
   assert.equal(lines[0]?.move, "c2b1");
   assert.equal(lines[0]?.score.kind, "mate");
+});
+
+test("streams Stockfish MultiPV updates before the final bestmove", async () => {
+  const fen = "8/8/8/8/8/8/2Q5/k1K5 w - - 0 1";
+  const engine = new FakeUciEngine([
+    "info depth 3 multipv 1 score cp 120 pv c2a4",
+    "info depth 3 multipv 2 score cp 80 pv c2b1",
+    "info depth 7 multipv 1 score mate 1 pv c2b1",
+    "bestmove c2b1"
+  ]);
+  const updates: EngineAnalysisLine[][] = [];
+
+  const lines = await analyzeFenWithUciEngine(engine, fen, {
+    depth: 8,
+    multiPv: 2,
+    timeoutMs: 1000,
+    onUpdate: (nextLines) => updates.push(nextLines)
+  });
+
+  assert.ok(updates.length >= 3);
+  assert.equal(updates[0]?.[0]?.move, "c2a4");
+  assert.equal(updates[0]?.[0]?.depth, 3);
+  assert.equal(updates.at(-1)?.[0]?.move, "c2b1");
+  assert.equal(updates.at(-1)?.[0]?.depth, 7);
+  assert.equal(lines[0]?.move, "c2b1");
+});
+
+test("starts with shallow analysis and then continues to the requested depth", async () => {
+  const fen = "8/8/8/8/8/8/2Q5/k1K5 w - - 0 1";
+  const engine = new StagedFakeUciEngine({
+    "go depth 4": [
+      "info depth 4 multipv 1 score cp 120 pv c2a4",
+      "bestmove c2a4"
+    ],
+    "go depth 10": [
+      "info depth 10 multipv 1 score mate 1 pv c2b1",
+      "bestmove c2b1"
+    ]
+  });
+  const updates: EngineAnalysisLine[][] = [];
+
+  const lines = await analyzeFenWithUciEngine(engine, fen, {
+    depth: 10,
+    shallowDepth: 4,
+    shallowDelayMs: 0,
+    multiPv: 1,
+    timeoutMs: 1000,
+    onUpdate: (nextLines) => updates.push(nextLines)
+  });
+
+  assert.deepEqual(engine.commands, [
+    "uci",
+    "isready",
+    "setoption name MultiPV value 1",
+    "ucinewgame",
+    "stop",
+    `position fen ${fen}`,
+    "go depth 4",
+    "stop",
+    "go depth 10"
+  ]);
+  assert.equal(updates[0]?.[0]?.depth, 4);
+  assert.equal(updates.at(-1)?.[0]?.depth, 10);
+  assert.equal(lines[0]?.move, "c2b1");
+  assert.equal(lines[0]?.depth, 10);
 });
 
 test("shows legal mate-in-one as M1 even when no engine output is available", () => {
@@ -195,6 +261,39 @@ class FakeUciEngine implements UciEngineTransport {
     if (command.startsWith("go ")) {
       queueMicrotask(() => {
         for (const line of this.lines) {
+          this.listener?.(line);
+        }
+      });
+    }
+  }
+
+  onLine(listener: (line: string) => void): () => void {
+    this.listener = listener;
+    return () => {
+      this.listener = null;
+    };
+  }
+
+  terminate(): void {}
+}
+
+class StagedFakeUciEngine implements UciEngineTransport {
+  readonly commands: string[] = [];
+  private listener: ((line: string) => void) | null = null;
+  private readonly linesByGoCommand: Record<string, string[]>;
+
+  constructor(linesByGoCommand: Record<string, string[]>) {
+    this.linesByGoCommand = linesByGoCommand;
+  }
+
+  async start(): Promise<void> {}
+
+  send(command: string): void {
+    this.commands.push(command);
+    const lines = this.linesByGoCommand[command];
+    if (lines) {
+      queueMicrotask(() => {
+        for (const line of lines) {
           this.listener?.(line);
         }
       });

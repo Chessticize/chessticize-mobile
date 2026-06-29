@@ -38,7 +38,8 @@ import type {
   SessionMistakeReviewItem,
   SprintConfig,
   SprintMode,
-  SprintState
+  SprintState,
+  UciEngineTransport
 } from "../../../../packages/core/src/index.ts";
 import type { PracticeService } from "../../../../packages/storage/src/practice-service.ts";
 import {
@@ -53,6 +54,7 @@ import { Chess, type PieceSymbol, type Square } from "chess.js";
 interface Props {
   practiceService?: PracticeService;
   debugTrace?: (event: PracticeDebugTraceEvent) => void;
+  stockfishTransportFactory?: () => UciEngineTransport | null;
 }
 
 type Tab = "practice" | "review" | "history" | "settings" | "packs";
@@ -111,6 +113,7 @@ const ARROW_VISUAL_STYLES = {
 } as const;
 const FEEDBACK_SNAPSHOT_MS = 800;
 const USER_FEEDBACK_BEFORE_AUTO_MS = 260;
+const ANALYSIS_DEPTH = 20;
 const CUSTOM_DURATION_OPTIONS = [3 * 60, 5 * 60, 10 * 60] as const;
 const CUSTOM_PER_PUZZLE_OPTIONS = [10, 20, 30] as const;
 const TEST_PUZZLE_SOURCES: ReadonlyArray<{ source: MobilePuzzleSource; label: string }> = [
@@ -119,7 +122,11 @@ const TEST_PUZZLE_SOURCES: ReadonlyArray<{ source: MobilePuzzleSource; label: st
 ];
 const CHESS_PIECE_SPRITE = require("../assets/chess-pieces-sprite.png") as ImageSourcePropType;
 
-export function PracticePocScreen({ practiceService, debugTrace }: Props): React.JSX.Element {
+export function PracticePocScreen({
+  practiceService,
+  debugTrace,
+  stockfishTransportFactory = createNativeStockfishTransport
+}: Props): React.JSX.Element {
   const [puzzleSource, setPuzzleSource] = useState<MobilePuzzleSource>("familiar15");
   const service = useMemo(() => practiceService ?? createMobilePracticeService(puzzleSource), [practiceService, puzzleSource]);
   const boardRef = useRef<ChessboardRef | null>(null);
@@ -961,6 +968,7 @@ export function PracticePocScreen({ practiceService, debugTrace }: Props): React
             service={service}
             sessionMistakeReviewItems={sessionMistakeReviewItems}
             onExitSessionReview={() => setTab("practice")}
+            stockfishTransportFactory={stockfishTransportFactory}
           />
         ) : null}
         {tab === "settings" ? <SettingsPanel onResetRating={() => service.resetRating(selectedConfig.ratingKey)} /> : null}
@@ -1553,7 +1561,8 @@ function ReviewPanel({
   onExitSessionReview,
   reviews,
   service,
-  sessionMistakeReviewItems
+  sessionMistakeReviewItems,
+  stockfishTransportFactory
 }: {
   boardSize: number;
   dueReviewItems: ReviewQueueItem[];
@@ -1561,6 +1570,7 @@ function ReviewPanel({
   reviews: Record<string, unknown>[];
   service: PracticeService;
   sessionMistakeReviewItems: SessionMistakeReviewItem[];
+  stockfishTransportFactory: () => UciEngineTransport | null;
 }): React.JSX.Element {
   const sessionEntries = sessionMistakeReviewItems.map((item): ReviewEntry => ({
     puzzle: item.puzzle,
@@ -1594,6 +1604,7 @@ function ReviewPanel({
             onExitSessionReview();
           }
         }}
+        stockfishTransportFactory={stockfishTransportFactory}
       />
     );
   }
@@ -1619,12 +1630,14 @@ function ReviewSession({
   boardSize,
   entries,
   service,
-  onExit
+  onExit,
+  stockfishTransportFactory
 }: {
   boardSize: number;
   entries: ReviewEntry[];
   service: PracticeService;
   onExit: (source: ReviewEntry["source"]) => void;
+  stockfishTransportFactory: () => UciEngineTransport | null;
 }): React.JSX.Element {
   const boardRef = useRef<ChessboardRef | null>(null);
   const reviewSuppressedBoardMovesRef = useRef<string[]>([]);
@@ -1639,6 +1652,7 @@ function ReviewSession({
   const [analysisFen, setAnalysisFen] = useState<string | null>(null);
   const [engineAnalysisLines, setEngineAnalysisLines] = useState<EngineAnalysisLine[]>([]);
   const [analysisEngineStatus, setAnalysisEngineStatus] = useState<AnalysisEngineStatus>("idle");
+  const [analysisIsRunning, setAnalysisIsRunning] = useState(false);
   const [analysisBackStack, setAnalysisBackStack] = useState<string[]>([]);
   const [analysisForwardStack, setAnalysisForwardStack] = useState<string[]>([]);
   const [manualBoardFlip, setManualBoardFlip] = useState(false);
@@ -1684,9 +1698,10 @@ function ReviewSession({
   const canReviewNext = isSessionReview && entryIndex < entries.length - 1 && !boardLocked;
   const canAnalysisBack = analysisEnabled && analysisBackStack.length > 0;
   const canAnalysisForward = analysisEnabled && analysisForwardStack.length > 0;
+  const analysisDepth = engineAnalysisLines.reduce((maxDepth, line) => Math.max(maxDepth, line.depth), 0);
   const analysisEngineLabel =
     analysisEngineStatus === "stockfish"
-      ? "SF 18 NNUE"
+      ? `SF 18 NNUE${analysisDepth > 0 ? ` · Depth ${analysisDepth}${analysisIsRunning ? `/${ANALYSIS_DEPTH}` : ""}` : ""}`
       : analysisEngineStatus === "thinking"
         ? "Analyzing..."
         : analysisEngineStatus === "fallback" || analysisEngineStatus === "error"
@@ -1697,30 +1712,45 @@ function ReviewSession({
     if (!analysisEnabled) {
       setEngineAnalysisLines([]);
       setAnalysisEngineStatus("idle");
+      setAnalysisIsRunning(false);
       return;
     }
 
-    const transport = createNativeStockfishTransport();
+    const transport = stockfishTransportFactory();
     if (!transport) {
       setEngineAnalysisLines([]);
       setAnalysisEngineStatus("fallback");
+      setAnalysisIsRunning(false);
       return;
     }
 
     let cancelled = false;
     setEngineAnalysisLines([]);
     setAnalysisEngineStatus("thinking");
-    void analyzeFenWithUciEngine(transport, displayFen, { depth: 20, multiPv: 3 }).then(
+    setAnalysisIsRunning(true);
+    void analyzeFenWithUciEngine(transport, displayFen, {
+      depth: ANALYSIS_DEPTH,
+      multiPv: 3,
+      onUpdate: (lines) => {
+        if (!cancelled) {
+          setEngineAnalysisLines(lines);
+          setAnalysisEngineStatus(lines.length > 0 ? "stockfish" : "thinking");
+          setAnalysisIsRunning(true);
+        }
+      }
+    }).then(
       (lines) => {
         if (!cancelled) {
           setEngineAnalysisLines(lines);
           setAnalysisEngineStatus(lines.length > 0 ? "stockfish" : "fallback");
+          setAnalysisIsRunning(false);
         }
       },
       () => {
         if (!cancelled) {
           setEngineAnalysisLines([]);
           setAnalysisEngineStatus("error");
+          setAnalysisIsRunning(false);
         }
       }
     );
@@ -1729,7 +1759,7 @@ function ReviewSession({
       cancelled = true;
       transport.send("stop");
     };
-  }, [analysisEnabled, displayFen]);
+  }, [analysisEnabled, displayFen, stockfishTransportFactory]);
 
   function resetCurrentReview(nextIndex = entryIndex): void {
     const nextState = startReviewPuzzle(entries[nextIndex]);
@@ -1743,6 +1773,7 @@ function ReviewSession({
     setAnalysisFen(null);
     setEngineAnalysisLines([]);
     setAnalysisEngineStatus("idle");
+    setAnalysisIsRunning(false);
     setAnalysisBackStack([]);
     setAnalysisForwardStack([]);
     setManualBoardFlip(false);
@@ -2016,6 +2047,7 @@ function ReviewSession({
     setAnalysisFen(null);
     setEngineAnalysisLines([]);
     setAnalysisEngineStatus("idle");
+    setAnalysisIsRunning(false);
     setAnalysisBackStack([]);
     setAnalysisForwardStack([]);
     boardRef.current?.resetBoard(currentFen);
