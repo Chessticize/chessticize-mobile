@@ -17,7 +17,7 @@ import {
   applyMovesToFen,
   beginArrowDuelPuzzle,
   beginLinePuzzle,
-  buildArrowDuelCandidateAnalysisLines,
+  buildCurrentPositionEvaluationLine,
   buildPuzzleGuidedAnalysisLines,
   buildSprintConfig,
   currentExpectedMove,
@@ -1779,13 +1779,11 @@ function ReviewSession({
     : [];
   const guidedEvalLines =
     !analysisEnabled && currentEntry.mode === "arrow_duel" && reviewState.kind === "line"
-      ? buildArrowDuelCandidateAnalysisLines({
+      ? [buildCurrentPositionEvaluationLine({
+          fen: currentFen,
           puzzle: currentEntry.puzzle,
-          candidates: [
-            currentEntry.puzzle.stockfishBestMove,
-            currentEntry.puzzle.solutionMoves[0]
-          ].filter((move): move is string => Boolean(move))
-        })
+          currentPuzzle
+        })]
       : [];
   const analysisBlunderMove =
     analysisEnabled && reviewState.kind === "arrow_duel" && displayFen === currentEntry.puzzle.initialFen
@@ -2415,7 +2413,9 @@ function ReviewSession({
                   testID={`review-guided-eval-line-${index}`}
                 >
                   <Text style={styles.analysisEvalText}>{line.score}</Text>
-                  <Text style={styles.analysisMoveText} numberOfLines={1}>{index + 1}. {line.san}</Text>
+                  <Text style={styles.analysisMoveText} numberOfLines={1}>
+                    {line.label === "Current position" ? line.san : `${index + 1}. ${line.san}`}
+                  </Text>
                   <Text style={styles.analysisLineLabel} numberOfLines={1}>{line.label}</Text>
                 </View>
               ))}

@@ -25,7 +25,7 @@ export interface EngineAnalysisLine {
 export interface ReviewAnalysisLine {
   move: string;
   san: string;
-  label: "Top move" | "Candidate";
+  label: "Top move" | "Candidate" | "Current position";
   score: string;
 }
 
@@ -309,6 +309,40 @@ export function buildArrowDuelCandidateAnalysisLines({
     });
 }
 
+export function buildCurrentPositionEvaluationLine({
+  fen,
+  puzzle,
+  currentPuzzle,
+  engineLines = []
+}: {
+  fen: string;
+  puzzle?: Puzzle;
+  currentPuzzle?: CurrentPuzzleState;
+  engineLines?: EngineAnalysisLine[];
+}): ReviewAnalysisLine {
+  const terminal = terminalPositionScore(fen);
+  if (terminal) {
+    return currentPositionLine(terminal.score, terminal.san);
+  }
+
+  const engineLine = sortEngineLines(engineLines)[0];
+  if (engineLine) {
+    return currentPositionLine(formatSideToMoveScore(engineLine.score), "Current position");
+  }
+
+  const forcedMate = forcedMateScoreForLineState(fen, currentPuzzle);
+  if (forcedMate) {
+    return currentPositionLine(formatSideToMoveScore(forcedMate), "Current position");
+  }
+
+  const knownPositionScore = puzzle ? scoreForKnownPuzzlePosition(fen, puzzle) : undefined;
+  if (knownPositionScore) {
+    return currentPositionLine(formatSideToMoveScore(knownPositionScore), "Current position");
+  }
+
+  return currentPositionLine("eval --", "Current position");
+}
+
 export function formatSideToMoveScore(score: AnalysisScore): string {
   if (score.kind === "mate") {
     return score.sideToMoveMate > 0 ? `M${Math.abs(score.sideToMoveMate)}` : `-M${Math.abs(score.sideToMoveMate)}`;
@@ -316,6 +350,61 @@ export function formatSideToMoveScore(score: AnalysisScore): string {
 
   const pawns = score.sideToMoveCentipawns / 100;
   return `${pawns >= 0 ? "+" : ""}${pawns.toFixed(1)}`;
+}
+
+function currentPositionLine(score: string, san: string): ReviewAnalysisLine {
+  return {
+    move: "",
+    san,
+    label: "Current position",
+    score
+  };
+}
+
+function terminalPositionScore(fen: string): { score: string; san: string } | undefined {
+  const chess = new Chess(fen);
+  if (chess.isCheckmate()) {
+    return {
+      score: chess.turn() === "b" ? "1-0" : "0-1",
+      san: "Checkmate"
+    };
+  }
+  if (chess.isStalemate()) {
+    return {
+      score: "1/2-1/2",
+      san: "Stalemate"
+    };
+  }
+  if (chess.isDraw()) {
+    return {
+      score: "1/2-1/2",
+      san: "Draw"
+    };
+  }
+  return undefined;
+}
+
+function forcedMateScoreForLineState(fen: string, currentPuzzle?: CurrentPuzzleState): AnalysisScore | undefined {
+  if (!currentPuzzle || currentPuzzle.kind !== "line" || !samePosition(fen, currentPuzzle.currentFen)) {
+    return undefined;
+  }
+  const remainingMoves = currentPuzzle.puzzle.solutionMoves.slice(currentPuzzle.cursor);
+  if (remainingMoves.length === 0) {
+    return undefined;
+  }
+  const finalFen = applyMovesQuietly(fen, remainingMoves);
+  if (!finalFen || !new Chess(finalFen).isCheckmate()) {
+    return undefined;
+  }
+  const activeColor = sideToMove(fen);
+  const checkmatedColor = sideToMove(finalFen);
+  const mateDistance = Math.max(1, Math.ceil(remainingMoves.length / 2));
+  const sideToMoveMate = checkmatedColor === activeColor ? -mateDistance : mateDistance;
+  return {
+    kind: "mate",
+    sideToMoveMate,
+    whiteMate: activeColor === "w" ? sideToMoveMate : -sideToMoveMate
+  };
 }
 
 function puzzleGuidedMoveForFen(
@@ -376,6 +465,20 @@ function puzzleScoreForMove(fen: string, puzzle: Puzzle, move: string): Analysis
     return undefined;
   }
   return whitePerspectiveScoreForFen(fen, score);
+}
+
+function scoreForKnownPuzzlePosition(fen: string, puzzle: Puzzle): AnalysisScore | undefined {
+  if (samePosition(fen, puzzle.initialFen) && puzzle.stockfishEval !== undefined) {
+    return whitePerspectiveScoreForFen(fen, puzzle.stockfishEval);
+  }
+
+  const firstMove = puzzle.solutionMoves[0];
+  const afterFirstMove = firstMove ? fenAfterMove(puzzle.initialFen, firstMove) : null;
+  if (afterFirstMove && samePosition(fen, afterFirstMove) && puzzle.stockfishEvalAfterFirstMove !== undefined) {
+    return whitePerspectiveScoreForFen(fen, puzzle.stockfishEvalAfterFirstMove);
+  }
+
+  return undefined;
 }
 
 function arrowDuelCandidateScoreForMove(fen: string, puzzle: Puzzle, move: string): AnalysisScore | undefined {
@@ -489,6 +592,17 @@ function fenAfterMove(fen: string, move: string): string | null {
   } catch {
     return null;
   }
+}
+
+function applyMovesQuietly(fen: string, moves: string[]): string | null {
+  let currentFen: string | null = fen;
+  for (const move of moves) {
+    if (!currentFen) {
+      return null;
+    }
+    currentFen = fenAfterMove(currentFen, move);
+  }
+  return currentFen;
 }
 
 function samePosition(leftFen: string, rightFen: string): boolean {

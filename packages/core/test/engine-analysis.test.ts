@@ -8,6 +8,7 @@ import {
   applyMovesToFen,
   beginLinePuzzle,
   buildArrowDuelCandidateAnalysisLines,
+  buildCurrentPositionEvaluationLine,
   buildPuzzleGuidedAnalysisLines,
   parseStockfishInfoLine
 } from "../src/index.ts";
@@ -190,6 +191,50 @@ test("formats Arrow Duel candidate evals from presolved best and blunder scores"
   assert.equal(lines[1]?.move, "f2g3");
   assert.equal(lines[1]?.label, "Candidate");
   assert.equal(lines[1]?.score, "-6.9");
+});
+
+test("formats Arrow Duel punishment review as the current position instead of initial candidates", () => {
+  const puzzle = arrowDuelMatePuzzle();
+  const currentFen = applyMovesToFen(puzzle.initialFen, puzzle.solutionMoves.slice(0, 2));
+  const line = buildCurrentPositionEvaluationLine({
+    fen: currentFen,
+    puzzle,
+    currentPuzzle: {
+      kind: "line",
+      puzzle,
+      currentFen,
+      playedMoves: puzzle.solutionMoves.slice(0, 2),
+      cursor: 2,
+      autoPlayedMoves: [],
+      solved: false
+    }
+  });
+
+  assert.equal(line.score, "-M1");
+  assert.equal(line.san, "Current position");
+  assert.equal(line.label, "Current position");
+});
+
+test("formats a checkmated review position as the game result", () => {
+  const puzzle = arrowDuelMatePuzzle();
+  const finalFen = applyMovesToFen(puzzle.initialFen, puzzle.solutionMoves);
+  const line = buildCurrentPositionEvaluationLine({
+    fen: finalFen,
+    puzzle,
+    currentPuzzle: {
+      kind: "line",
+      puzzle,
+      currentFen: finalFen,
+      playedMoves: puzzle.solutionMoves,
+      cursor: puzzle.solutionMoves.length,
+      autoPlayedMoves: [],
+      solved: true
+    }
+  });
+
+  assert.equal(line.score, "1-0");
+  assert.equal(line.san, "Checkmate");
+  assert.equal(line.label, "Current position");
 });
 
 test("keeps the puzzle move highest only on the puzzle solver side", () => {
@@ -379,6 +424,20 @@ function blackToMovePuzzle(): Puzzle {
     themes: ["mate", "mateIn1"],
     source: "synthetic",
     stockfishBestMove: "e2e4"
+  };
+}
+
+function arrowDuelMatePuzzle(): Puzzle {
+  return {
+    id: "000hf",
+    initialFen: "r1bqk2r/pp1nbNp1/2p1p2p/8/2BP4/1PN3P1/P3QP1P/3R1RK1 b kq - 0 19",
+    solutionMoves: ["e8f7", "e2e6", "f7f8", "e6f7"],
+    rating: 1485,
+    themes: ["mate", "mateIn2", "middlegame", "short"],
+    source: "lichess",
+    stockfishEval: 623,
+    stockfishBestMove: "d8a5",
+    stockfishEvalAfterFirstMove: 10000
   };
 }
 

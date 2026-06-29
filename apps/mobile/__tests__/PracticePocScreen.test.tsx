@@ -849,14 +849,13 @@ describe("PracticePocScreen", () => {
     expect(collectText(renderer.root)).not.toContain("Choose the better move");
     expect(collectText(renderer.root)).not.toContain("Follow the puzzle line");
     expectText(renderer, "Blue arrows show the next move in the punishment line. Follow them to see why the choice is bad.");
-    const guidedBestEval = collectText(findByTestId(renderer, "review-guided-eval-line-0"));
-    const guidedBlunderEval = collectText(findByTestId(renderer, "review-guided-eval-line-1"));
-    expect(guidedBestEval).toMatch(/^(?:[+-]\d|M|-M)/);
-    expect(guidedBestEval).toContain("Top move");
-    expect(guidedBestEval).not.toContain("eval --");
-    expect(guidedBlunderEval).toMatch(/^(?:[+-]\d|M|-M)/);
-    expect(guidedBlunderEval).toContain("Candidate");
-    expect(guidedBlunderEval).not.toContain("eval --");
+    const guidedCurrentEval = collectText(findByTestId(renderer, "review-guided-eval-line-0"));
+    expect(guidedCurrentEval).toMatch(/-M\d/);
+    expect(guidedCurrentEval).toContain("Current position");
+    expect(guidedCurrentEval).not.toContain("Top move");
+    expect(guidedCurrentEval).not.toContain("Candidate");
+    expect(guidedCurrentEval).not.toContain("eval --");
+    expect(() => findByTestId(renderer, "review-guided-eval-line-1")).toThrow();
 
     const firstGuidedMove = firstPuzzleSolution[2];
     const firstReplyMove = firstPuzzleSolution[3];
@@ -875,9 +874,28 @@ describe("PracticePocScreen", () => {
     await settleFeedbackSnapshot();
     expectText(renderer, "1 / 3 · Arrow Duel");
     expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(expectedAfterGuidedReply);
-    if (firstPuzzleSolution[4]) {
+    let expectedCurrentFen = expectedAfterGuidedReply;
+    for (let cursor = 4; cursor < firstPuzzleSolution.length; cursor += 2) {
       expect(findByTestId(renderer, "review-guided-move-overlay")).toBeTruthy();
+      const guidedMove = firstPuzzleSolution[cursor];
+      if (!guidedMove) {
+        break;
+      }
+      expectedCurrentFen = mustFenAfterMove(expectedCurrentFen, guidedMove);
+      const replyMove = firstPuzzleSolution[cursor + 1];
+      if (replyMove) {
+        expectedCurrentFen = mustFenAfterMove(expectedCurrentFen, replyMove);
+      }
+      await boardMove(renderer, guidedMove);
+      await settleFeedbackSnapshot();
+      expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(expectedCurrentFen);
     }
+    const finalCurrentEval = collectText(findByTestId(renderer, "review-guided-eval-line-0"));
+    expect(finalCurrentEval).toMatch(/(?:1-0|0-1)/);
+    expect(finalCurrentEval).toContain("Checkmate");
+    expect(finalCurrentEval).toContain("Current position");
+    expect(() => findByTestId(renderer, "review-guided-eval-line-1")).toThrow();
+    await settleFeedbackSnapshot();
     press(renderer, "review-reset-puzzle");
     expectText(renderer, "Choose the better move");
     expect(() => findByTestId(renderer, "review-guided-move-overlay")).toThrow();
