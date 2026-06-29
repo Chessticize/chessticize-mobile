@@ -70,7 +70,7 @@ describe('Practice POC', () => {
     await waitFor(element(by.id('review-analysis-reset'))).toBeVisible().withTimeout(5000);
     await waitFor(element(by.id('review-analysis-flip'))).toBeVisible().withTimeout(5000);
     await waitForElementTextContaining('review-analysis-engine-status', 'SF 18 NNUE', 45000);
-    await expect(element(by.text('M1')).atIndex(0)).toBeVisible();
+    await waitForElementTextContaining('review-analysis-line-0', 'M1', 45000);
 
     const screenshotPath = await device.takeScreenshot('review-analysis-arrows');
     expectScreenshotContainsGreenAnalysisArrow(screenshotPath);

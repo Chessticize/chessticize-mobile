@@ -2390,7 +2390,7 @@ function ReviewSession({
                 <Pressable
                   key={`${line.move}-${index}`}
                   accessibilityRole="button"
-                  accessibilityLabel={`Play analysis line ${index + 1}: ${line.san}`}
+                  accessibilityLabel={`${line.score} ${index + 1}. ${line.san} ${line.label}`}
                   style={styles.analysisLineRow}
                   testID={`review-analysis-line-${index}`}
                   onPress={() => {
