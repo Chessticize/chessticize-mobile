@@ -107,6 +107,15 @@ The user database stores:
 - A sprint win increases the relevant ELO type; a failure by time, abandon, or three mistakes lowers it.
 - Reset ELO starts a new generation by default and preserves historical attempts. Deleting history is a separate destructive action.
 
+### Review Terminology
+
+The product has two different review concepts and they must remain separate in the domain model, storage schema, UI copy, and tests.
+
+- **Analysis Review** is an unscored exploration surface opened immediately after a sprint, immediately after a scheduled review batch, or from a History row. It is used to replay, retry, and analyze puzzles the user wants to inspect. It does not create attempt history, does not change ELO, and does not update spaced repetition scheduling.
+- **Scheduled Review** is the official spaced repetition flow for previously missed puzzles. It is scored per puzzle, updates the review queue, records review attempts in History, and advances or resets the spaced repetition schedule.
+
+If UI copy must use the shorter word "Review", the implementation context must disambiguate which concept is active. Internal APIs should use explicit names such as `analysisReview`, `scheduledReview`, `reviewAttempt`, or `reviewQueue` instead of ambiguous names.
+
 ### Spaced Repetition Review
 
 Wrong puzzles enter a review queue.
@@ -118,7 +127,11 @@ Default intervals:
 - Subsequent successful reviews: 7 days, 14 days, 30 days, then 60 days.
 - Failed review: shorten the next interval to the next quick review window, default 6 hours or 1 day depending on prior history.
 
-The scheduler stores due date, interval, review count, success streak, lapse count, last result, and last reviewed time. The review screen starts with due items, then overdue items, then optional recent mistakes.
+The scheduler stores due date, interval, review count, success streak, lapse count, last result, and last reviewed time. A failed scheduled review resets or contracts the schedule for that puzzle. A successful scheduled review advances the interval according to the curve.
+
+Scheduled reviews are tracked per puzzle and per practice context. Standard, Blitz, Arrow Duel, theme sprint, and custom sprint speeds should not be mixed into one undifferentiated queue when their training intent differs. A puzzle missed in a 20-second Standard Sprint should be reviewed with the same normal puzzle solving flow and a 20-second target pace. A puzzle missed in Arrow Duel should be reviewed through the Arrow Duel flow.
+
+Scheduled review sessions can be stopped or exited at any time. Completed items are recorded immediately. Unseen items remain in the queue with their existing due state.
 
 ### Arrow Duel Review
 
@@ -129,6 +142,27 @@ Arrow Duel review must show both original candidate arrows:
 - User's original selection: highlighted with an additional marker.
 
 If the user selected the wrong move, the app should automatically play the opponent response or punishment line. Prefer the puzzle solution line when it explains the tactic. Fall back to local Stockfish short analysis when the stored line is insufficient.
+
+During the punishment line, the analysis panel should describe the current position, not the original two candidates. If the current position is checkmate, show the game result such as `1-0` or `0-1`. If it is not terminal, show the current-position evaluation or forced mate distance. The original green/red candidate arrows remain useful at the initial Arrow Duel review position, but they must not be reused as if they evaluated later punishment-line positions.
+
+### History
+
+History is an event browser for all solved puzzle work that should be remembered:
+
+- Sprint attempts, including correct and wrong attempts.
+- Official scheduled review attempts, including correct and wrong review results.
+
+Analysis Review sessions are intentionally excluded from History because they are exploratory. Retrying or analyzing a puzzle from a sprint result, scheduled review result, or History row must not create another history row unless the user starts an official Scheduled Review item.
+
+History filters must support:
+
+- Time range: 7 days, 30 days, 90 days, 1 year, and all time.
+- Mode and sprint type: Standard, Blitz, Arrow Duel, theme sprint, and custom sprint speeds.
+- Attempt source: sprint attempt or scheduled review attempt.
+- Result: correct, wrong, or all.
+- Side to move, puzzle theme, puzzle rating, rating key, and review status when available.
+
+Tapping a History row opens Analysis Review with the original attempt context. The user can retry the puzzle, analyze with Stockfish, and navigate previous/next rows within the active History filter without changing official history or review scheduling.
 
 ## 4. iCloud Sync Strategy
 

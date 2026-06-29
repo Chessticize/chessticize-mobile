@@ -31,6 +31,24 @@ Arrow Duel uses the original pre-puzzle FEN. The candidate moves are:
 
 When the user chooses the wrong Arrow Duel move, the review payload includes both colored arrows plus the stored punishment line prefix.
 
+## Review And History Semantics
+
+The backend distinguishes two concepts that are both easy to call "review" in casual product discussion:
+
+- **Analysis Review**: an unscored replay/analyze surface opened from sprint results, scheduled review results, or History. It supports retrying moves, stepping through lines, and Stockfish analysis. It must not create attempts, change ELO, or update spaced repetition scheduling.
+- **Scheduled Review**: the official spaced repetition flow for puzzles that were previously missed. It records review attempts, updates the review queue, and appears in History.
+
+Attempt history must preserve source type:
+
+- `sprint`: an attempt made during a sprint.
+- `scheduled_review`: an attempt made during official spaced repetition review.
+
+History queries should be able to include both source types, filter by either source type, and include correct as well as wrong attempts. Analysis Review exploration is excluded from History.
+
+Scheduled review items keep puzzle-specific scheduling state. A correct scheduled review advances the interval. A failed scheduled review resets or contracts the interval and keeps the puzzle in the review cycle. Review queues may be partitioned by mode or sprint type so that Standard, Blitz, Arrow Duel, theme sprint, and custom sprint speeds do not get mixed into a single training context.
+
+Opening a History row should produce an Analysis Review context with the original attempt metadata and a filtered previous/next cursor. It should not create a Scheduled Review attempt unless the user explicitly starts an official due review item.
+
 ## CLI Protocol
 
 Run the CLI with:
@@ -60,7 +78,7 @@ Supported commands:
 - `move`: submits a normal puzzle move, with optional deterministic `now`.
 - `chooseArrow`: submits an Arrow Duel candidate, with optional deterministic `now`. It uses the same backend path as `move`; the active puzzle type decides validation.
 - `state`: returns the active sprint view, or `null` when no sprint is active.
-- `history`: filters attempts by `result`, `mode`, `since`, and `puzzleId`.
+- `history`: filters attempts by `result`, `mode`, `since`, `puzzleId`, and attempt source when available.
 - `dueReviews`: lists review items due by `now`, or by the current clock when omitted.
 - `resetRating`: creates a new rating generation for a rating key while preserving history.
 - `exit`: closes the process cleanly.
@@ -83,4 +101,4 @@ Coverage focus:
 
 - Core unit tests cover multi-step puzzle progression, Arrow Duel review arrows, candidate rejection, sprint success/failure, ELO floor/update behavior, default sprint rules, total and per-puzzle timeout behavior, and spaced repetition intervals.
 - Storage integration tests use real `node:sqlite` databases for fixture seeding, puzzle selection, attempt history filters, due review queries, rating reset generations, transaction rollback, active sprint protection, and completed sprint persistence.
-- CLI E2E tests spawn the real CLI process, communicate only through stdio, and verify normal multi-step sprint behavior, Arrow Duel wrong-choice review output, and invalid command handling.
+- CLI E2E tests spawn the real CLI process, communicate only through stdio, and verify normal multi-step sprint behavior, Arrow Duel wrong-choice review output, history/review source semantics, and invalid command handling.
