@@ -38,9 +38,11 @@ export interface UciEngineTransport {
 
 export interface UciAnalysisOptions {
   depth?: number;
+  initialize?: boolean;
   shallowDelayMs?: number;
   shallowDepth?: number;
   multiPv?: number;
+  newGame?: boolean;
   onUpdate?: (lines: EngineAnalysisLine[]) => void;
   timeoutMs?: number;
 }
@@ -51,7 +53,9 @@ export async function analyzeFenWithUciEngine(
   options: UciAnalysisOptions = {}
 ): Promise<EngineAnalysisLine[]> {
   const depth = options.depth ?? 20;
+  const initialize = options.initialize ?? true;
   const multiPv = options.multiPv ?? 3;
+  const newGame = options.newGame ?? initialize;
   const shallowDepth = options.shallowDepth ?? (depth > 8 ? 8 : 0);
   const useShallowThenFull = shallowDepth > 0 && shallowDepth < depth;
   const shallowDelayMs = options.shallowDelayMs ?? 500;
@@ -131,10 +135,14 @@ export async function analyzeFenWithUciEngine(
     }
 
     try {
-      transport.send("uci");
-      transport.send("isready");
-      transport.send(`setoption name MultiPV value ${multiPv}`);
-      transport.send("ucinewgame");
+      if (initialize) {
+        transport.send("uci");
+        transport.send("isready");
+        transport.send(`setoption name MultiPV value ${multiPv}`);
+      }
+      if (newGame) {
+        transport.send("ucinewgame");
+      }
       transport.send("stop");
       transport.send(`position fen ${fen}`);
       transport.send(`go depth ${useShallowThenFull ? shallowDepth : depth}`);
@@ -193,12 +201,14 @@ export function buildPuzzleGuidedAnalysisLines({
   fen,
   puzzle,
   currentPuzzle,
-  engineLines = []
+  engineLines = [],
+  includeUnscoredLegalMoves = true
 }: {
   fen: string;
   puzzle: Puzzle;
   currentPuzzle?: CurrentPuzzleState;
   engineLines?: EngineAnalysisLine[];
+  includeUnscoredLegalMoves?: boolean;
 }): ReviewAnalysisLine[] {
   const legalMoves = legalUciMoves(fen);
   const legalMoveSet = new Set(legalMoves);
@@ -229,7 +239,7 @@ export function buildPuzzleGuidedAnalysisLines({
     });
   }
 
-  if (linesByMove.size < 4) {
+  if (includeUnscoredLegalMoves && linesByMove.size < 4) {
     for (const move of legalMoves) {
       if (linesByMove.has(move)) {
         continue;

@@ -60,6 +60,30 @@ test("analyzes UCI output through a maintained fake transport", async () => {
   assert.equal(lines[0]?.score.kind, "mate");
 });
 
+test("can analyze against an already warmed UCI engine without repeating initialization", async () => {
+  const fen = "8/8/8/8/8/8/2Q5/k1K5 w - - 0 1";
+  const engine = new FakeUciEngine([
+    "info depth 8 multipv 1 score mate 1 pv c2b1",
+    "bestmove c2b1"
+  ]);
+
+  const lines = await analyzeFenWithUciEngine(engine, fen, {
+    depth: 8,
+    initialize: false,
+    multiPv: 1,
+    newGame: false,
+    timeoutMs: 1000
+  });
+
+  assert.deepEqual(engine.commands, [
+    "stop",
+    `position fen ${fen}`,
+    "go depth 8"
+  ]);
+  assert.equal(lines[0]?.move, "c2b1");
+  assert.equal(lines[0]?.score.kind, "mate");
+});
+
 test("streams Stockfish MultiPV updates before the final bestmove", async () => {
   const fen = "8/8/8/8/8/8/2Q5/k1K5 w - - 0 1";
   const engine = new FakeUciEngine([
@@ -218,6 +242,28 @@ test("uses current puzzle state as the direct guided move during a review line",
 
   assert.equal(lines[0]?.move, "e6e7");
   assert.equal(lines[0]?.score, "+6.9");
+});
+
+test("does not pad live engine analysis with unscored legal moves", () => {
+  const puzzle = samplePuzzle("00008");
+  const lines = buildPuzzleGuidedAnalysisLines({
+    fen: puzzle.initialFen,
+    puzzle,
+    engineLines: [
+      {
+        move: "b2b1",
+        pv: ["b2b1"],
+        multipv: 1,
+        depth: 12,
+        score: { kind: "cp", sideToMoveCentipawns: 453, whiteCentipawns: -453 }
+      }
+    ],
+    includeUnscoredLegalMoves: false
+  });
+
+  assert.equal(lines.length, 1);
+  assert.equal(lines[0]?.move, "b2b1");
+  assert.equal(lines[0]?.score, "+4.5");
 });
 
 test("offline puzzles put the expected move first only on the puzzle solver side", () => {

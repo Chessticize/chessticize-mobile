@@ -22,6 +22,7 @@ import {
   buildSprintConfig,
   currentExpectedMove,
   defaultSprintConfig,
+  formatSideToMoveScore,
   submitArrowDuelChoice,
   submitLineMove
 } from "../../../../packages/core/src/index.ts";
@@ -48,7 +49,7 @@ import {
   shouldRandomizePuzzleSelection,
   type MobilePuzzleSource
 } from "../backend/mobilePractice.ts";
-import { createNativeStockfishTransport } from "../backend/nativeStockfishTransport.ts";
+import { createNativeStockfishTransport, prewarmNativeStockfishTransport } from "../backend/nativeStockfishTransport.ts";
 import { Chess, type PieceSymbol, type Square } from "chess.js";
 
 interface Props {
@@ -57,7 +58,7 @@ interface Props {
   stockfishTransportFactory?: () => UciEngineTransport | null;
 }
 
-type Tab = "practice" | "review" | "history" | "settings" | "packs";
+type Tab = "practice" | "review" | "history" | "settings" | "packs" | "analysis";
 
 type SessionFeedback = PuzzleFeedback | null;
 type AnalysisEngineStatus = "idle" | "thinking" | "stockfish" | "fallback" | "error";
@@ -125,6 +126,23 @@ const BOARD_FILES_FLIPPED = ["h", "g", "f", "e", "d", "c", "b", "a"] as const;
 const BOARD_RANKS = ["8", "7", "6", "5", "4", "3", "2", "1"] as const;
 const BOARD_RANKS_FLIPPED = ["1", "2", "3", "4", "5", "6", "7", "8"] as const;
 const CHESS_PIECE_SPRITE = require("../assets/chess-pieces-sprite.png") as ImageSourcePropType;
+const ANALYSIS_DIAGNOSTIC_POSITIONS = [
+  {
+    id: "queen-capture",
+    label: "Queen capture",
+    fen: "r1bq1k1r/pp2b1p1/2pQ3p/8/2BP4/1PN3P1/P4P1P/3R1RK1 b - - 0 1"
+  },
+  {
+    id: "mate-net",
+    label: "Mate net",
+    fen: "8/8/8/8/8/8/2Q5/k1K5 w - - 0 1"
+  },
+  {
+    id: "middlegame",
+    label: "Middlegame",
+    fen: "r1bq1rk1/pp1n1pbp/2pp1np1/4p3/2PPP3/2N2N2/PP3PPP/R1BQ1RK1 w - - 0 9"
+  }
+] as const;
 
 export function PracticePocScreen({
   practiceService,
@@ -170,6 +188,12 @@ export function PracticePocScreen({
     const available = Math.max(width - UI_PADDING * 2, MIN_BOARD);
     return Math.max(MIN_BOARD, Math.min(available, 560));
   }, [width]);
+
+  useEffect(() => {
+    if (stockfishTransportFactory === createNativeStockfishTransport) {
+      void prewarmNativeStockfishTransport();
+    }
+  }, [stockfishTransportFactory]);
 
   const isActive = state?.status === "active";
   const isFinished = state !== null && state.status !== "active";
@@ -797,6 +821,9 @@ export function PracticePocScreen({
           <TabButton active={tab === "history"} label="History" testID="history-tab" onPress={() => setTab("history")} />
           <TabButton active={tab === "settings"} label="Settings" testID="settings-tab" onPress={() => setTab("settings")} />
           <TabButton active={tab === "packs"} label="Packs" testID="packs-tab" onPress={() => setTab("packs")} />
+          {isPracticeTestControlsEnabled() ? (
+            <TabButton active={tab === "analysis"} label="Analysis" testID="analysis-tab" onPress={() => setTab("analysis")} />
+          ) : null}
         </View>
       ) : null}
 
@@ -984,6 +1011,9 @@ export function PracticePocScreen({
         ) : null}
         {tab === "settings" ? <SettingsPanel onResetRating={() => service.resetRating(selectedConfig.ratingKey)} /> : null}
         {tab === "packs" ? <PacksPanel /> : null}
+        {tab === "analysis" && isPracticeTestControlsEnabled() ? (
+          <StockfishDiagnosticsPanel stockfishTransportFactory={stockfishTransportFactory} />
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -1739,11 +1769,12 @@ function ReviewSession({
   const boardFlipped = manualBoardFlip ? !baseBoardFlipped : baseBoardFlipped;
   const feedbackMove = feedback?.submittedMove && feedback.submittedMove !== "__illegal__" ? arrowFromTo(feedback.submittedMove) : null;
   const analysisLines = analysisEnabled
-    ? buildPuzzleGuidedAnalysisLines({
+      ? buildPuzzleGuidedAnalysisLines({
         fen: displayFen,
         puzzle: currentEntry.puzzle,
         currentPuzzle,
-        engineLines: engineAnalysisLines
+        engineLines: engineAnalysisLines,
+        includeUnscoredLegalMoves: false
       })
     : [];
   const guidedEvalLines =
@@ -1802,9 +1833,13 @@ function ReviewSession({
     setEngineAnalysisLines([]);
     setAnalysisEngineStatus("thinking");
     setAnalysisIsRunning(true);
-    void analyzeFenWithUciEngine(transport, displayFen, {
+    const usePrewarmedNativeEngine = stockfishTransportFactory === createNativeStockfishTransport;
+    const prewarm = usePrewarmedNativeEngine ? prewarmNativeStockfishTransport() : Promise.resolve(false);
+    void prewarm.then((prewarmed) => analyzeFenWithUciEngine(transport, displayFen, {
       depth: ANALYSIS_DEPTH,
       multiPv: 3,
+      initialize: !prewarmed,
+      newGame: !prewarmed,
       onUpdate: (lines) => {
         if (!cancelled) {
           setEngineAnalysisLines(lines);
@@ -1812,7 +1847,7 @@ function ReviewSession({
           setAnalysisIsRunning(true);
         }
       }
-    }).then(
+    })).then(
       (lines) => {
         if (!cancelled) {
           setEngineAnalysisLines(lines);
@@ -2629,6 +2664,174 @@ function PacksPanel(): React.JSX.Element {
   );
 }
 
+function StockfishDiagnosticsPanel({
+  stockfishTransportFactory
+}: {
+  stockfishTransportFactory: () => UciEngineTransport | null;
+}): React.JSX.Element {
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [runId, setRunId] = useState(0);
+  const [status, setStatus] = useState("Starting");
+  const [lines, setLines] = useState<EngineAnalysisLine[]>([]);
+  const [commands, setCommands] = useState<string[]>([]);
+  const [rawLines, setRawLines] = useState<string[]>([]);
+  const [firstEvalMs, setFirstEvalMs] = useState<number | null>(null);
+  const selectedPosition = ANALYSIS_DIAGNOSTIC_POSITIONS[selectedIndex] ?? ANALYSIS_DIAGNOSTIC_POSITIONS[0];
+
+  useEffect(() => {
+    const transport = stockfishTransportFactory();
+    let cancelled = false;
+    let firstUpdateSeen = false;
+    const startedAt = Date.now();
+
+    setLines([]);
+    setCommands([]);
+    setRawLines([]);
+    setFirstEvalMs(null);
+    setStatus("Starting");
+
+    if (!transport) {
+      setStatus("Native Stockfish unavailable");
+      return;
+    }
+
+    const tracedTransport: UciEngineTransport = {
+      start: () => transport.start(),
+      send: (command: string) => {
+        if (!cancelled) {
+          setCommands((current) => [...current.slice(-7), command]);
+        }
+        transport.send(command);
+      },
+      onLine: (listener: (line: string) => void) => transport.onLine((line) => {
+        if (!cancelled) {
+          setRawLines((current) => [...current.slice(-5), line]);
+        }
+        listener(line);
+      }),
+      terminate: () => transport.terminate()
+    };
+
+    const usePrewarmedNativeEngine = stockfishTransportFactory === createNativeStockfishTransport;
+    const prewarm = usePrewarmedNativeEngine ? prewarmNativeStockfishTransport() : Promise.resolve(false);
+    void prewarm.then((prewarmed) => analyzeFenWithUciEngine(tracedTransport, selectedPosition.fen, {
+      depth: ANALYSIS_DEPTH,
+      initialize: !prewarmed,
+      multiPv: 4,
+      newGame: !prewarmed,
+      onUpdate: (nextLines) => {
+        if (cancelled) {
+          return;
+        }
+        if (!firstUpdateSeen && nextLines.length > 0) {
+          firstUpdateSeen = true;
+          setFirstEvalMs(Date.now() - startedAt);
+        }
+        setLines(nextLines);
+        const depth = nextLines.reduce((maxDepth, line) => Math.max(maxDepth, line.depth), 0);
+        setStatus(depth > 0 ? `Depth ${depth}/${ANALYSIS_DEPTH}` : "Analyzing");
+      },
+      shallowDelayMs: 500,
+      shallowDepth: 8,
+      timeoutMs: 30000
+    })).then(
+      (finalLines) => {
+        if (cancelled) {
+          return;
+        }
+        setLines(finalLines);
+        const depth = finalLines.reduce((maxDepth, line) => Math.max(maxDepth, line.depth), 0);
+        setStatus(depth > 0 ? `Done · Depth ${depth}` : "No engine lines");
+      },
+      (caught) => {
+        if (!cancelled) {
+          setStatus(`Error · ${errorMessage(caught)}`);
+        }
+      }
+    );
+
+    return () => {
+      cancelled = true;
+      transport.send("stop");
+    };
+  }, [runId, selectedPosition, stockfishTransportFactory]);
+
+  return (
+    <View style={styles.listPanel} testID="stockfish-diagnostics-panel">
+      <View style={styles.diagnosticHeader}>
+        <View style={styles.diagnosticHeaderCopy}>
+          <Text style={styles.panelTitle}>Stockfish Analysis</Text>
+          <Text testID="stockfish-diagnostics-status" style={styles.helperText}>
+            {firstEvalMs === null ? status : `${status} · first eval ${firstEvalMs}ms`}
+          </Text>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Run Stockfish diagnostics"
+          testID="stockfish-diagnostics-run"
+          style={styles.secondaryButton}
+          onPress={() => setRunId((current) => current + 1)}
+        >
+          <Text style={styles.secondaryButtonText}>Run</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.optionRow}>
+        {ANALYSIS_DIAGNOSTIC_POSITIONS.map((position, index) => (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Analyze ${position.label}`}
+            key={position.id}
+            testID={`stockfish-diagnostics-position-${position.id}`}
+            style={[styles.optionButton, index === selectedIndex ? styles.optionButtonActive : null]}
+            onPress={() => {
+              setSelectedIndex(index);
+              setRunId((current) => current + 1);
+            }}
+          >
+            <Text style={[styles.optionButtonText, index === selectedIndex ? styles.optionButtonTextActive : null]}>{position.label}</Text>
+          </Pressable>
+        ))}
+      </View>
+
+      <Text testID="stockfish-diagnostics-fen" style={styles.diagnosticFen}>{selectedPosition.fen}</Text>
+
+      <View style={styles.analysisPanel}>
+        {lines.length > 0 ? (
+          lines.map((line, index) => (
+            <View key={`${line.multipv}-${line.move}-${line.depth}`} style={styles.analysisLineRow} testID={`stockfish-diagnostics-line-${index}`}>
+              <Text style={styles.analysisEvalText}>{formatSideToMoveScore(line.score)}</Text>
+              <Text style={styles.analysisMoveText} numberOfLines={1}>
+                {line.multipv}. {sanForDiagnosticMove(selectedPosition.fen, line.move)}
+              </Text>
+              <Text style={styles.analysisLineLabel} numberOfLines={1}>d{line.depth}</Text>
+            </View>
+          ))
+        ) : (
+          <Text style={styles.helperText}>Waiting for scored engine lines.</Text>
+        )}
+      </View>
+
+      {lines.length > 0 ? (
+        <View style={styles.diagnosticPvPanel}>
+          {lines.map((line) => (
+            <Text key={`${line.multipv}-${line.move}-pv`} style={styles.diagnosticPvText} testID={`stockfish-diagnostics-pv-${line.multipv}`}>
+              {formatSideToMoveScore(line.score)} · d{line.depth} · {line.multipv}. {diagnosticPvSan(selectedPosition.fen, line.pv)}
+            </Text>
+          ))}
+        </View>
+      ) : null}
+
+      <View style={styles.diagnosticLogPanel}>
+        <Text style={styles.helperText}>Commands</Text>
+        <Text testID="stockfish-diagnostics-commands" style={styles.diagnosticLogText}>{commands.join("\n") || "none"}</Text>
+        <Text style={styles.helperText}>Latest UCI lines</Text>
+        <Text testID="stockfish-diagnostics-raw-lines" style={styles.diagnosticLogText}>{rawLines.join("\n") || "none"}</Text>
+      </View>
+    </View>
+  );
+}
+
 function ModeButton({
   active,
   label,
@@ -2826,6 +3029,43 @@ function fenAfterMoves(fen: string, moves: string[]): string | null {
     currentFen = fenAfterMove(currentFen, move);
   }
   return currentFen;
+}
+
+function sanForDiagnosticMove(fen: string, move: string): string {
+  try {
+    const chess = new Chess(fen);
+    const normalized = normalizeUci(move);
+    const played = chess.move({
+      from: normalized.slice(0, 2),
+      to: normalized.slice(2, 4),
+      ...(normalized.length > 4 ? { promotion: normalized.slice(4, 5) } : {})
+    });
+    return played?.san ?? move;
+  } catch {
+    return move;
+  }
+}
+
+function diagnosticPvSan(fen: string, pv: string[]): string {
+  const chess = new Chess(fen);
+  const sanMoves: string[] = [];
+  for (const move of pv.slice(0, 8)) {
+    try {
+      const normalized = normalizeUci(move);
+      const played = chess.move({
+        from: normalized.slice(0, 2),
+        to: normalized.slice(2, 4),
+        ...(normalized.length > 4 ? { promotion: normalized.slice(4, 5) } : {})
+      });
+      if (!played) {
+        break;
+      }
+      sanMoves.push(played.san);
+    } catch {
+      break;
+    }
+  }
+  return sanMoves.join(" ") || pv.join(" ");
 }
 
 function canonicalFen(fen: string): string {
@@ -3434,6 +3674,49 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
     marginLeft: "auto"
+  },
+  diagnosticHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "space-between"
+  },
+  diagnosticHeaderCopy: {
+    flex: 1
+  },
+  diagnosticFen: {
+    color: "#475569",
+    fontFamily: "Menlo",
+    fontSize: 11,
+    lineHeight: 16
+  },
+  diagnosticPvPanel: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 5,
+    padding: 10
+  },
+  diagnosticPvText: {
+    color: "#334155",
+    fontFamily: "Menlo",
+    fontSize: 11,
+    lineHeight: 16
+  },
+  diagnosticLogPanel: {
+    backgroundColor: "#F8FAFC",
+    borderColor: "#CBD5E1",
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 6,
+    padding: 10
+  },
+  diagnosticLogText: {
+    color: "#334155",
+    fontFamily: "Menlo",
+    fontSize: 10,
+    lineHeight: 14
   },
   listText: {
     color: "#334155",

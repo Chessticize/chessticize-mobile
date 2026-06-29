@@ -30,6 +30,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-tab")).toBeTruthy();
     expect(findByTestId(renderer, "settings-tab")).toBeTruthy();
     expect(findByTestId(renderer, "packs-tab")).toBeTruthy();
+    expect(findByTestId(renderer, "analysis-tab")).toBeTruthy();
     expect(findByTestId(renderer, "practice-mode-standard")).toBeTruthy();
     expect(findByTestId(renderer, "practice-mode-arrow-duel")).toBeTruthy();
     expect(findByTestId(renderer, "practice-mode-blitz")).toBeTruthy();
@@ -665,7 +666,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "review-analysis-reset")).toBeTruthy();
     expect(() => press(renderer, "review-analysis-forward")).toThrow("review-analysis-forward is disabled");
 
-    press(renderer, "review-analysis-line-1");
+    press(renderer, "review-analysis-line-0");
     await flushMicrotasks();
     const candidateLineFen = findByTestId(renderer, "mock-chessboard").props.fen;
     expect(candidateLineFen).not.toBe(reviewFen);
@@ -750,6 +751,51 @@ describe("PracticePocScreen", () => {
       expect(stockfish.commands).toContain("go depth 20");
       expect(collectText(findByTestId(renderer, "review-analysis-engine-status"))).toBe("SF 18 NNUE · Depth 12");
       expect(collectText(findByTestId(renderer, "review-analysis-line-0"))).toMatch(/^M1.*Qxe6\+/);
+    });
+  });
+
+  it("isolates Stockfish diagnostics with scored live rows whose order can change by depth", async () => {
+    const stockfish = createScriptedStockfishTransport((command, emit) => {
+      if (command === "go depth 8") {
+        void Promise.resolve().then(() => {
+          emit("info depth 4 multipv 1 score cp 20 pv d8e8");
+          emit("info depth 4 multipv 2 score cp 10 pv d8d6");
+        });
+      }
+      if (command === "go depth 20") {
+        void Promise.resolve().then(() => {
+          emit("info depth 12 multipv 1 score cp 360 pv d8d6");
+          emit("info depth 12 multipv 2 score cp -120 pv d8e8");
+          emit("bestmove d8d6");
+        });
+      }
+    });
+    const renderer = renderScreen({
+      stockfishTransportFactory: () => stockfish.transport
+    });
+
+    press(renderer, "analysis-tab");
+    await waitForAssertion(() => {
+      expect(stockfish.commands).toContain("go depth 8");
+      expect(collectText(findByTestId(renderer, "stockfish-diagnostics-status"))).toContain("Depth 4/20");
+      expect(collectText(findByTestId(renderer, "stockfish-diagnostics-line-0"))).toMatch(/^\+0\.2.*Qe8/);
+      expect(collectText(findByTestId(renderer, "stockfish-diagnostics-line-1"))).toMatch(/^\+0\.1.*Qxd6/);
+      expect(collectText(findByTestId(renderer, "stockfish-diagnostics-panel"))).not.toContain("eval --");
+    });
+
+    await act(async () => {
+      jest.advanceTimersByTime(500);
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await waitForAssertion(() => {
+      expect(stockfish.commands).toContain("go depth 20");
+      expect(collectText(findByTestId(renderer, "stockfish-diagnostics-status"))).toContain("Done · Depth 12");
+      expect(collectText(findByTestId(renderer, "stockfish-diagnostics-line-0"))).toMatch(/^\+3\.6.*Qxd6/);
+      expect(collectText(findByTestId(renderer, "stockfish-diagnostics-line-1"))).toMatch(/^-1\.2.*Qe8/);
+      expect(collectText(findByTestId(renderer, "stockfish-diagnostics-raw-lines"))).toContain("info depth 12 multipv 1 score cp 360 pv d8d6");
     });
   });
 
