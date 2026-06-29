@@ -215,6 +215,42 @@ export function buildPuzzleGuidedAnalysisLines({
     }));
 }
 
+export function buildArrowDuelCandidateAnalysisLines({
+  fen,
+  puzzle,
+  candidates
+}: {
+  fen?: string;
+  puzzle: Puzzle;
+  candidates?: string[];
+}): ReviewAnalysisLine[] {
+  const positionFen = fen ?? puzzle.initialFen;
+  const legalMoveSet = new Set(legalUciMoves(positionFen));
+  const bestMove = puzzle.stockfishBestMove ? normalizeUci(puzzle.stockfishBestMove) : undefined;
+  const wrongMove = puzzle.solutionMoves[0] ? normalizeUci(puzzle.solutionMoves[0]) : undefined;
+  const candidateMoves = candidates ?? [bestMove, wrongMove].filter((move): move is string => Boolean(move));
+  const seen = new Set<string>();
+
+  return candidateMoves
+    .map(normalizeUci)
+    .filter((move) => {
+      if (seen.has(move) || !legalMoveSet.has(move)) {
+        return false;
+      }
+      seen.add(move);
+      return true;
+    })
+    .map((move, index) => {
+      const score = arrowDuelCandidateScoreForMove(positionFen, puzzle, move);
+      return {
+        move,
+        san: sanForMove(positionFen, move),
+        label: move === bestMove || (!bestMove && index === 0) ? "Top move" : "Candidate",
+        score: score ? formatSideToMoveScore(score) : "eval --"
+      };
+    });
+}
+
 export function formatSideToMoveScore(score: AnalysisScore): string {
   if (score.kind === "mate") {
     return score.sideToMoveMate > 0 ? `M${Math.abs(score.sideToMoveMate)}` : `-M${Math.abs(score.sideToMoveMate)}`;
@@ -281,17 +317,39 @@ function puzzleScoreForMove(fen: string, puzzle: Puzzle, move: string): Analysis
   if (score === undefined) {
     return undefined;
   }
-  if (Math.abs(score) >= 10000) {
+  return whitePerspectiveScoreForFen(fen, score);
+}
+
+function arrowDuelCandidateScoreForMove(fen: string, puzzle: Puzzle, move: string): AnalysisScore | undefined {
+  const checkmate = checkmateScoreForMove(fen, move);
+  if (checkmate) {
+    return checkmate;
+  }
+
+  const bestMove = puzzle.stockfishBestMove ? normalizeUci(puzzle.stockfishBestMove) : undefined;
+  const wrongMove = puzzle.solutionMoves[0] ? normalizeUci(puzzle.solutionMoves[0]) : undefined;
+  const whiteCentipawns =
+    move === bestMove
+      ? puzzle.stockfishEval
+      : move === wrongMove
+        ? puzzle.stockfishEvalAfterFirstMove
+        : undefined;
+  return whiteCentipawns === undefined ? undefined : whitePerspectiveScoreForFen(fen, whiteCentipawns);
+}
+
+function whitePerspectiveScoreForFen(fen: string, whiteCentipawns: number): AnalysisScore {
+  if (Math.abs(whiteCentipawns) >= 10000) {
+    const whiteMate = whiteCentipawns > 0 ? 1 : -1;
     return {
       kind: "mate",
-      sideToMoveMate: score > 0 === (sideToMove(fen) === "w") ? 1 : -1,
-      whiteMate: score > 0 ? 1 : -1
+      sideToMoveMate: sideToMove(fen) === "w" ? whiteMate : -whiteMate,
+      whiteMate
     };
   }
   return {
     kind: "cp",
-    whiteCentipawns: score,
-    sideToMoveCentipawns: sideToMove(fen) === "w" ? score : -score
+    whiteCentipawns,
+    sideToMoveCentipawns: sideToMove(fen) === "w" ? whiteCentipawns : -whiteCentipawns
   };
 }
 

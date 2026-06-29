@@ -17,6 +17,7 @@ import {
   applyMovesToFen,
   beginArrowDuelPuzzle,
   beginLinePuzzle,
+  buildArrowDuelCandidateAnalysisLines,
   buildPuzzleGuidedAnalysisLines,
   buildSprintConfig,
   currentExpectedMove,
@@ -959,6 +960,7 @@ export function PracticePocScreen({ practiceService, debugTrace }: Props): React
             reviews={reviews}
             service={service}
             sessionMistakeReviewItems={sessionMistakeReviewItems}
+            onExitSessionReview={() => setTab("practice")}
           />
         ) : null}
         {tab === "settings" ? <SettingsPanel onResetRating={() => service.resetRating(selectedConfig.ratingKey)} /> : null}
@@ -1548,12 +1550,14 @@ type ReviewPuzzleState =
 function ReviewPanel({
   boardSize,
   dueReviewItems,
+  onExitSessionReview,
   reviews,
   service,
   sessionMistakeReviewItems
 }: {
   boardSize: number;
   dueReviewItems: ReviewQueueItem[];
+  onExitSessionReview: () => void;
   reviews: Record<string, unknown>[];
   service: PracticeService;
   sessionMistakeReviewItems: SessionMistakeReviewItem[];
@@ -1584,7 +1588,12 @@ function ReviewPanel({
         boardSize={boardSize}
         entries={activeEntries}
         service={service}
-        onExit={() => setActiveEntries([])}
+        onExit={(source) => {
+          setActiveEntries([]);
+          if (source === "session") {
+            onExitSessionReview();
+          }
+        }}
       />
     );
   }
@@ -1615,7 +1624,7 @@ function ReviewSession({
   boardSize: number;
   entries: ReviewEntry[];
   service: PracticeService;
-  onExit: () => void;
+  onExit: (source: ReviewEntry["source"]) => void;
 }): React.JSX.Element {
   const boardRef = useRef<ChessboardRef | null>(null);
   const reviewSuppressedBoardMovesRef = useRef<string[]>([]);
@@ -1649,6 +1658,16 @@ function ReviewSession({
         engineLines: engineAnalysisLines
       })
     : [];
+  const guidedEvalLines =
+    !analysisEnabled && currentEntry.mode === "arrow_duel" && reviewState.kind === "line"
+      ? buildArrowDuelCandidateAnalysisLines({
+          puzzle: currentEntry.puzzle,
+          candidates: [
+            currentEntry.puzzle.stockfishBestMove,
+            currentEntry.puzzle.solutionMoves[0]
+          ].filter((move): move is string => Boolean(move))
+        })
+      : [];
   const analysisBlunderMove =
     analysisEnabled && reviewState.kind === "arrow_duel" && displayFen === currentEntry.puzzle.initialFen
       ? reviewState.duel.wrongMove
@@ -1740,7 +1759,7 @@ function ReviewSession({
     }
     const nextIndex = entryIndex + 1;
     if (nextIndex >= entries.length) {
-      onExit();
+      onExit(currentEntry.source);
       return;
     }
     resetCurrentReview(nextIndex);
@@ -2086,7 +2105,13 @@ function ReviewSession({
           >
             <Text style={styles.iconButtonText}>↺</Text>
           </Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel="Exit review" testID="review-exit" style={styles.iconButton} onPress={onExit}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Exit review"
+            testID="review-exit"
+            style={styles.iconButton}
+            onPress={() => onExit(currentEntry.source)}
+          >
             <Text style={styles.iconButtonText}>×</Text>
           </Pressable>
         </View>
@@ -2233,6 +2258,21 @@ function ReviewSession({
                   <Text style={styles.analysisMoveText} numberOfLines={1}>{index + 1}. {line.san}</Text>
                   <Text style={styles.analysisLineLabel} numberOfLines={1}>{line.label}</Text>
                 </Pressable>
+              ))}
+            </>
+          ) : null}
+          {!analysisEnabled && guidedEvalLines.length > 0 ? (
+            <>
+              {guidedEvalLines.map((line, index) => (
+                <View
+                  key={`${line.move}-${index}`}
+                  style={styles.analysisLineRow}
+                  testID={`review-guided-eval-line-${index}`}
+                >
+                  <Text style={styles.analysisEvalText}>{line.score}</Text>
+                  <Text style={styles.analysisMoveText} numberOfLines={1}>{index + 1}. {line.san}</Text>
+                  <Text style={styles.analysisLineLabel} numberOfLines={1}>{line.label}</Text>
+                </View>
               ))}
             </>
           ) : null}

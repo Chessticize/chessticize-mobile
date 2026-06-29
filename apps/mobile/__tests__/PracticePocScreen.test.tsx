@@ -747,6 +747,14 @@ describe("PracticePocScreen", () => {
     expect(collectText(renderer.root)).not.toContain("Choose the better move");
     expect(collectText(renderer.root)).not.toContain("Follow the puzzle line");
     expectText(renderer, "Blue arrows show the next move in the punishment line. Follow them to see why the choice is bad.");
+    const guidedBestEval = collectText(findByTestId(renderer, "review-guided-eval-line-0"));
+    const guidedBlunderEval = collectText(findByTestId(renderer, "review-guided-eval-line-1"));
+    expect(guidedBestEval).toMatch(/^(?:[+-]\d|M|-M)/);
+    expect(guidedBestEval).toContain("Top move");
+    expect(guidedBestEval).not.toContain("eval --");
+    expect(guidedBlunderEval).toMatch(/^(?:[+-]\d|M|-M)/);
+    expect(guidedBlunderEval).toContain("Candidate");
+    expect(guidedBlunderEval).not.toContain("eval --");
 
     const firstGuidedMove = firstPuzzleSolution[2];
     const firstReplyMove = firstPuzzleSolution[3];
@@ -771,6 +779,9 @@ describe("PracticePocScreen", () => {
     press(renderer, "review-reset-puzzle");
     expectText(renderer, "Choose the better move");
     expect(() => findByTestId(renderer, "review-guided-move-overlay")).toThrow();
+    press(renderer, "review-exit");
+    expect(findByTestId(renderer, "start-sprint-button")).toBeTruthy();
+    expect(() => findByTestId(renderer, "review-session")).toThrow();
   });
 
   it("ignores stale board callbacks instead of recording a correct visible move as wrong", async () => {

@@ -7,6 +7,7 @@ import {
   analyzeFenWithUciEngine,
   applyMovesToFen,
   beginLinePuzzle,
+  buildArrowDuelCandidateAnalysisLines,
   buildPuzzleGuidedAnalysisLines,
   parseStockfishInfoLine
 } from "../src/index.ts";
@@ -86,6 +87,19 @@ test("formats presolved black best move eval from the side-to-move perspective",
 
   assert.equal(lines[0]?.move, "b2b1");
   assert.equal(lines[0]?.score, "+4.5");
+});
+
+test("formats Arrow Duel candidate evals from presolved best and blunder scores", () => {
+  const puzzle = samplePuzzle("00008");
+  const lines = buildArrowDuelCandidateAnalysisLines({ puzzle });
+
+  assert.equal(lines[0]?.move, "b2b1");
+  assert.equal(lines[0]?.san, "Qb1+");
+  assert.equal(lines[0]?.label, "Top move");
+  assert.equal(lines[0]?.score, "+4.5");
+  assert.equal(lines[1]?.move, "f2g3");
+  assert.equal(lines[1]?.label, "Candidate");
+  assert.equal(lines[1]?.score, "-6.9");
 });
 
 test("keeps the puzzle move highest only on the puzzle solver side", () => {
