@@ -112,6 +112,10 @@ describe("PracticePocScreen", () => {
     expect(board.props.colors.validMoveDot).toBe("rgba(15, 23, 42, 0.36)");
     expect(board.props.colors.validMoveCapture).toBe("rgba(15, 23, 42, 0.56)");
     expect(board.props.draggableColor).toBe("w");
+    expect(board.props.withLetters).toBe(false);
+    expect(board.props.withNumbers).toBe(false);
+    expect(collectText(findByTestId(renderer, "board-coordinate-overlay"))).toContain("abcdefgh");
+    expect(collectText(findByTestId(renderer, "board-coordinate-overlay"))).toContain("87654321");
     expect(findByTestId(renderer, "session-timer")).toBeTruthy();
     expect(findByTestId(renderer, "session-progress")).toBeTruthy();
     expect(findByTestId(renderer, "session-strikes")).toBeTruthy();
@@ -550,6 +554,10 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "1 / 3 · Standard");
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
     expect(findByTestId(renderer, "mock-chessboard").props.draggableColor).toBe("w");
+    expect(findByTestId(renderer, "mock-chessboard").props.withLetters).toBe(false);
+    expect(findByTestId(renderer, "mock-chessboard").props.withNumbers).toBe(false);
+    expect(collectText(findByTestId(renderer, "board-coordinate-overlay"))).toContain("abcdefgh");
+    expect(collectText(findByTestId(renderer, "board-coordinate-overlay"))).toContain("87654321");
     const reviewFen = findByTestId(renderer, "mock-chessboard").props.fen;
 
     await boardMove(renderer, "e2e6");

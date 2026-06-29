@@ -120,6 +120,10 @@ const TEST_PUZZLE_SOURCES: ReadonlyArray<{ source: MobilePuzzleSource; label: st
   { source: "familiar15", label: "Familiar 15" },
   { source: "random1000", label: "Random 1000" }
 ];
+const BOARD_FILES = ["a", "b", "c", "d", "e", "f", "g", "h"] as const;
+const BOARD_FILES_FLIPPED = ["h", "g", "f", "e", "d", "c", "b", "a"] as const;
+const BOARD_RANKS = ["8", "7", "6", "5", "4", "3", "2", "1"] as const;
+const BOARD_RANKS_FLIPPED = ["1", "2", "3", "4", "5", "6", "7", "8"] as const;
 const CHESS_PIECE_SPRITE = require("../assets/chess-pieces-sprite.png") as ImageSourcePropType;
 
 export function PracticePocScreen({
@@ -882,6 +886,13 @@ export function PracticePocScreen({
                     </View>
                   )}
 
+                  {displayedBoardFen ? (
+                    <BoardCoordinateOverlay
+                      boardSize={boardSize}
+                      flipped={boardFlipped}
+                    />
+                  ) : null}
+
                   {!boardGestureEnabled ? (
                     <Pressable
                       accessibilityElementsHidden
@@ -1310,6 +1321,69 @@ function PracticePrompt({
       </View>
     </View>
   );
+}
+
+function BoardCoordinateOverlay({
+  boardSize,
+  flipped
+}: {
+  boardSize: number;
+  flipped: boolean;
+}): React.JSX.Element {
+  const squareSize = boardSize / 8;
+  const fontSize = Math.max(9, Math.min(12, squareSize * 0.22));
+  const files = flipped ? BOARD_FILES_FLIPPED : BOARD_FILES;
+  const ranks = flipped ? BOARD_RANKS_FLIPPED : BOARD_RANKS;
+
+  return (
+    <View
+      pointerEvents="none"
+      style={[styles.coordinateOverlay, { width: boardSize, height: boardSize }]}
+      testID="board-coordinate-overlay"
+    >
+      {files.map((file, index) => (
+        <Text
+          key={`file-${file}-${index}`}
+          style={[
+            styles.coordinateText,
+            styles.coordinateFileText,
+            coordinateTextStyle(7, index),
+            {
+              bottom: 2,
+              fontSize,
+              left: index * squareSize,
+              width: squareSize
+            }
+          ]}
+          testID={`board-coordinate-file-${file}`}
+        >
+          {file}
+        </Text>
+      ))}
+      {ranks.map((rank, index) => (
+        <Text
+          key={`rank-${rank}-${index}`}
+          style={[
+            styles.coordinateText,
+            styles.coordinateRankText,
+            coordinateTextStyle(index, 0),
+            {
+              fontSize,
+              left: 3,
+              top: index * squareSize + 2
+            }
+          ]}
+          testID={`board-coordinate-rank-${rank}`}
+        >
+          {rank}
+        </Text>
+      ))}
+    </View>
+  );
+}
+
+function coordinateTextStyle(row: number, col: number): object {
+  return (row + col) % 2 === 0 ? styles.coordinateTextOnLight : styles.coordinateTextOnDark;
 }
 
 function LastMoveOverlay({
@@ -2195,6 +2269,10 @@ function ReviewSession({
                 validMoveCapture: "rgba(15, 23, 42, 0.56)"
               }}
             />
+            <BoardCoordinateOverlay
+              boardSize={boardSize}
+              flipped={boardFlipped}
+            />
             {lastMove && !feedback ? <LastMoveOverlay boardSize={boardSize} flipped={boardFlipped} move={lastMove} /> : null}
             {feedbackMove ? (
               <MoveFeedbackOverlay
@@ -2955,6 +3033,35 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     backgroundColor: "transparent",
     zIndex: 50
+  },
+  coordinateOverlay: {
+    left: 0,
+    position: "absolute",
+    top: 0,
+    zIndex: 8
+  },
+  coordinateText: {
+    fontWeight: "900",
+    lineHeight: 12,
+    position: "absolute",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 1
+  },
+  coordinateFileText: {
+    paddingRight: 3,
+    textAlign: "right"
+  },
+  coordinateRankText: {
+    textAlign: "left",
+    width: 16
+  },
+  coordinateTextOnLight: {
+    color: "#334155",
+    textShadowColor: "rgba(248, 250, 252, 0.85)"
+  },
+  coordinateTextOnDark: {
+    color: "#F8FAFC",
+    textShadowColor: "rgba(15, 23, 42, 0.55)"
   },
   promptPanel: {
     alignItems: "center",
