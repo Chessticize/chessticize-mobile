@@ -28,9 +28,13 @@ import {
 } from "../../../../packages/core/src/index.ts";
 import type {
   AttemptEvent,
+  AttemptSource,
   ArrowDuelState,
   CurrentPuzzleState,
   EngineAnalysisLine,
+  HistoryAttemptView,
+  HistoryTimeRange,
+  PuzzleSide,
   Puzzle,
   PuzzleFeedback,
   PuzzleLineState,
@@ -105,6 +109,7 @@ type FeedbackBoardSnapshot = {
 
 const UI_PADDING = 16;
 const MIN_BOARD = 280;
+const HISTORY_PAGE_LIMIT = 20;
 const NEUTRAL_ARROW = "#2563EB";
 const ARROW_VISUAL_STYLES = {
   candidate: {
@@ -181,6 +186,16 @@ export function PracticePocScreen({
   const [boardInputLocked, setBoardInputLocked] = useState(false);
   const [chessboardDebugEvents, setChessboardDebugEvents] = useState<string[]>([]);
   const [historyWrongLast7Days, setHistoryWrongLast7Days] = useState(false);
+  const [historyTimeRange, setHistoryTimeRange] = useState<HistoryTimeRange>("7d");
+  const [historySourceFilter, setHistorySourceFilter] = useState<"all" | AttemptSource>("all");
+  const [historyResultFilter, setHistoryResultFilter] = useState<"all" | "correct" | "wrong">("all");
+  const [historyModeFilter, setHistoryModeFilter] = useState<"all" | SprintMode>("all");
+  const [historySideFilter, setHistorySideFilter] = useState<"all" | PuzzleSide>("all");
+  const [historyThemeFilter, setHistoryThemeFilter] = useState<string>("all");
+  const [historyPageOffset, setHistoryPageOffset] = useState(0);
+  const [historyRatingKey, setHistoryRatingKey] = useState<string | null>(null);
+  const [historyReviewEntries, setHistoryReviewEntries] = useState<ReviewEntry[]>([]);
+  const [historyReviewInitialIndex, setHistoryReviewInitialIndex] = useState(0);
   const [customDurationSeconds, setCustomDurationSeconds] = useState(5 * 60);
   const [customPerPuzzleSeconds, setCustomPerPuzzleSeconds] = useState(20);
 
@@ -216,6 +231,12 @@ export function PracticePocScreen({
   useEffect(() => {
     refreshState();
   }, [service]);
+
+  useEffect(() => {
+    if (!isActive && !isShowingFeedbackSnapshot) {
+      refreshState();
+    }
+  }, [tab, service]);
 
   useEffect(() => {
     if (!isActive) {
@@ -636,6 +657,29 @@ export function PracticePocScreen({
     setTab("review");
   }
 
+  function openHistoryReview(attemptId: string): void {
+    const entries = historyReviewAttempts
+      .map((attempt): ReviewEntry | null => {
+        const puzzle = service.getPuzzle(attempt.puzzleId);
+        return puzzle
+          ? {
+              puzzle,
+              mode: attempt.mode,
+              ratingKey: attempt.ratingKey,
+              source: "history",
+              attempt
+            }
+          : null;
+      })
+      .filter((entry): entry is ReviewEntry => Boolean(entry));
+    const nextIndex = Math.max(0, entries.findIndex((entry) => entry.attempt?.id === attemptId));
+    if (entries.length === 0) {
+      return;
+    }
+    setHistoryReviewEntries(entries);
+    setHistoryReviewInitialIndex(nextIndex);
+  }
+
   function syncBoardAfterMove(
     nextState: SprintState,
     nextFeedback: SessionFeedback,
@@ -795,13 +839,40 @@ export function PracticePocScreen({
       ? arrowFromTo(boardFeedback.submittedMove)
       : null;
   const displayedLastBoardMove = feedbackSnapshot || boardFeedback ? null : lastBoardMove;
-  const displayedAttempts = historyWrongLast7Days
-    ? attempts.filter((attempt) => {
-      const completedAt = new Date(attempt.completedAt).getTime();
-      const sevenDaysAgo = nowMs - 7 * 24 * 60 * 60 * 1000;
-      return attempt.result === "wrong" && completedAt >= sevenDaysAgo;
-    })
-    : attempts;
+  const historyRatingKeys = useMemo(
+    () => [...new Set([...service.listPlayedRatings().map((rating) => rating.key), ...attempts.map((attempt) => attempt.ratingKey)])].sort(),
+    [attempts, service]
+  );
+  const activeHistoryRatingKey = historyRatingKey ?? historyRatingKeys[0] ?? null;
+  const historyView = activeHistoryRatingKey
+    ? service.getHistoryView({
+        now: nowIso(),
+        timeRange: historyTimeRange,
+        ratingKey: activeHistoryRatingKey,
+        ...(historySourceFilter === "all" ? {} : { source: historySourceFilter }),
+        ...(historyResultFilter === "all" ? {} : { result: historyResultFilter }),
+        ...(historyModeFilter === "all" ? {} : { mode: historyModeFilter }),
+        ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
+        ...(historyThemeFilter === "all" ? {} : { theme: historyThemeFilter }),
+        page: { limit: HISTORY_PAGE_LIMIT, offset: historyPageOffset }
+      })
+    : null;
+  const fullHistoryReviewView = activeHistoryRatingKey
+    ? service.getHistoryView({
+        now: nowIso(),
+        timeRange: historyTimeRange,
+        ratingKey: activeHistoryRatingKey,
+        ...(historySourceFilter === "all" ? {} : { source: historySourceFilter }),
+        ...(historyResultFilter === "all" ? {} : { result: historyResultFilter }),
+        ...(historyModeFilter === "all" ? {} : { mode: historyModeFilter }),
+        ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
+        ...(historyThemeFilter === "all" ? {} : { theme: historyThemeFilter })
+      })
+    : null;
+  const displayedAttempts = historyView?.attempts ?? [];
+  const historyReviewAttempts = fullHistoryReviewView?.attempts ?? displayedAttempts;
+  const historyAvailableThemes = historyView?.availableThemes ?? [];
+  const historyPage = historyView?.page ?? { limit: HISTORY_PAGE_LIMIT, offset: 0, total: 0, hasMore: false };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -992,11 +1063,68 @@ export function PracticePocScreen({
         ) : null}
 
         {tab === "history" ? (
-          <HistoryPanel
-            attempts={displayedAttempts}
-            wrongLast7Days={historyWrongLast7Days}
-            onToggleWrongLast7Days={() => setHistoryWrongLast7Days((current) => !current)}
-          />
+          historyReviewEntries.length > 0 ? (
+            <ReviewSession
+              key={`history:${historyReviewEntries.map((entry) => entry.attempt?.id ?? entry.puzzle.id).join("|")}:${historyReviewInitialIndex}`}
+              boardSize={boardSize}
+              entries={historyReviewEntries}
+              initialIndex={historyReviewInitialIndex}
+              service={service}
+              onExit={() => setHistoryReviewEntries([])}
+              stockfishTransportFactory={stockfishTransportFactory}
+            />
+          ) : (
+            <HistoryPanel
+              attempts={displayedAttempts}
+              ratingKeys={historyRatingKeys}
+              selectedRatingKey={activeHistoryRatingKey}
+              timeRange={historyTimeRange}
+              sourceFilter={historySourceFilter}
+              resultFilter={historyResultFilter}
+              modeFilter={historyModeFilter}
+              sideFilter={historySideFilter}
+              themeFilter={historyThemeFilter}
+              availableThemes={historyAvailableThemes}
+              page={historyPage}
+              wrongLast7Days={historyWrongLast7Days}
+              onRatingKeyChange={(ratingKey) => {
+                setHistoryRatingKey(ratingKey);
+                setHistoryPageOffset(0);
+              }}
+              onTimeRangeChange={(range) => {
+                setHistoryTimeRange(range);
+                setHistoryPageOffset(0);
+              }}
+              onSourceFilterChange={(source) => {
+                setHistorySourceFilter(source);
+                setHistoryPageOffset(0);
+              }}
+              onResultFilterChange={(result) => {
+                setHistoryResultFilter(result);
+                setHistoryPageOffset(0);
+              }}
+              onModeFilterChange={(nextMode) => {
+                setHistoryModeFilter(nextMode);
+                setHistoryPageOffset(0);
+              }}
+              onSideFilterChange={(side) => {
+                setHistorySideFilter(side);
+                setHistoryPageOffset(0);
+              }}
+              onThemeFilterChange={(theme) => {
+                setHistoryThemeFilter(theme);
+                setHistoryPageOffset(0);
+              }}
+              onPageOffsetChange={setHistoryPageOffset}
+              onOpenAttempt={openHistoryReview}
+              onToggleWrongLast7Days={() => {
+                setHistoryWrongLast7Days((current) => !current);
+                setHistoryTimeRange("7d");
+                setHistoryPageOffset(0);
+                setHistoryResultFilter((current) => current === "wrong" ? "all" : "wrong");
+              }}
+            />
+          )
         ) : null}
         {tab === "review" ? (
           <ReviewPanel
@@ -1606,11 +1734,49 @@ function ArrowHint({
 
 function HistoryPanel({
   attempts,
+  ratingKeys,
+  selectedRatingKey,
+  timeRange,
+  sourceFilter,
+  resultFilter,
+  modeFilter,
+  sideFilter,
+  themeFilter,
+  availableThemes,
+  page,
   wrongLast7Days,
+  onRatingKeyChange,
+  onTimeRangeChange,
+  onSourceFilterChange,
+  onResultFilterChange,
+  onModeFilterChange,
+  onSideFilterChange,
+  onThemeFilterChange,
+  onPageOffsetChange,
+  onOpenAttempt,
   onToggleWrongLast7Days
 }: {
-  attempts: AttemptEvent[];
+  attempts: HistoryAttemptView[];
+  ratingKeys: string[];
+  selectedRatingKey: string | null;
+  timeRange: HistoryTimeRange;
+  sourceFilter: "all" | AttemptSource;
+  resultFilter: "all" | "correct" | "wrong";
+  modeFilter: "all" | SprintMode;
+  sideFilter: "all" | PuzzleSide;
+  themeFilter: string;
+  availableThemes: string[];
+  page: { limit: number; offset: number; total: number; hasMore: boolean };
   wrongLast7Days: boolean;
+  onRatingKeyChange: (ratingKey: string) => void;
+  onTimeRangeChange: (range: HistoryTimeRange) => void;
+  onSourceFilterChange: (source: "all" | AttemptSource) => void;
+  onResultFilterChange: (result: "all" | "correct" | "wrong") => void;
+  onModeFilterChange: (mode: "all" | SprintMode) => void;
+  onSideFilterChange: (side: "all" | PuzzleSide) => void;
+  onThemeFilterChange: (theme: string) => void;
+  onPageOffsetChange: (offset: number) => void;
+  onOpenAttempt: (attemptId: string) => void;
   onToggleWrongLast7Days: () => void;
 }): React.JSX.Element {
   const correct = attempts.filter((attempt) => attempt.result === "correct").length;
@@ -1625,9 +1791,15 @@ function HistoryPanel({
         <Text style={styles.listText}>Accuracy {accuracy}% · Correct {correct} · Wrong {wrong}</Text>
       </View>
       <View style={styles.filterRow}>
-        <Text style={styles.filterPill}>7 days</Text>
-        <Text style={styles.filterPill}>30 days</Text>
-        <Text style={styles.filterPill}>1 year</Text>
+        {(["7d", "30d", "90d", "1y", "max"] as const).map((range) => (
+          <FilterButton
+            key={range}
+            active={timeRange === range}
+            label={historyRangeLabel(range)}
+            testID={`history-range-${range}`}
+            onPress={() => onTimeRangeChange(range)}
+          />
+        ))}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Wrong in the last 7 days"
@@ -1638,21 +1810,164 @@ function HistoryPanel({
           <Text style={[styles.filterButtonText, wrongLast7Days ? styles.filterButtonTextActive : null]}>Wrong 7d</Text>
         </Pressable>
       </View>
+      {ratingKeys.length > 0 ? (
+        <View style={styles.filterRow}>
+          {ratingKeys.map((ratingKey) => (
+            <FilterButton
+              key={ratingKey}
+              active={selectedRatingKey === ratingKey}
+              label={ratingKey}
+              testID={`history-rating-${ratingKey}`}
+              onPress={() => onRatingKeyChange(ratingKey)}
+            />
+          ))}
+        </View>
+      ) : null}
+      <View style={styles.filterRow}>
+        <FilterButton active={sourceFilter === "all"} label="All" testID="history-source-all" onPress={() => onSourceFilterChange("all")} />
+        <FilterButton active={sourceFilter === "sprint"} label="Sprint" testID="history-source-sprint" onPress={() => onSourceFilterChange("sprint")} />
+        <FilterButton active={sourceFilter === "scheduled_review"} label="Review" testID="history-source-review" onPress={() => onSourceFilterChange("scheduled_review")} />
+      </View>
+      <View style={styles.filterRow}>
+        <FilterButton active={resultFilter === "all"} label="All" testID="history-result-all" onPress={() => onResultFilterChange("all")} />
+        <FilterButton active={resultFilter === "correct"} label="Correct" testID="history-result-correct" onPress={() => onResultFilterChange("correct")} />
+        <FilterButton active={resultFilter === "wrong"} label="Wrong" testID="history-result-wrong" onPress={() => onResultFilterChange("wrong")} />
+      </View>
+      <View style={styles.filterRow}>
+        <FilterButton active={modeFilter === "all"} label="All modes" testID="history-mode-all" onPress={() => onModeFilterChange("all")} />
+        <FilterButton active={modeFilter === "standard"} label="Standard" testID="history-mode-standard" onPress={() => onModeFilterChange("standard")} />
+        <FilterButton active={modeFilter === "blitz"} label="Blitz" testID="history-mode-blitz" onPress={() => onModeFilterChange("blitz")} />
+        <FilterButton active={modeFilter === "arrow_duel"} label="Arrow Duel" testID="history-mode-arrow-duel" onPress={() => onModeFilterChange("arrow_duel")} />
+        <FilterButton active={modeFilter === "custom"} label="Custom" testID="history-mode-custom" onPress={() => onModeFilterChange("custom")} />
+      </View>
+      <View style={styles.filterRow}>
+        <FilterButton active={sideFilter === "all"} label="Both sides" testID="history-side-all" onPress={() => onSideFilterChange("all")} />
+        <FilterButton active={sideFilter === "white"} label="White" testID="history-side-white" onPress={() => onSideFilterChange("white")} />
+        <FilterButton active={sideFilter === "black"} label="Black" testID="history-side-black" onPress={() => onSideFilterChange("black")} />
+      </View>
+      {availableThemes.length > 0 ? (
+        <View style={styles.filterRow}>
+          <FilterButton active={themeFilter === "all"} label="All themes" testID="history-theme-all" onPress={() => onThemeFilterChange("all")} />
+          {availableThemes.slice(0, 8).map((theme) => (
+            <FilterButton
+              key={theme}
+              active={themeFilter === theme}
+              label={theme}
+              testID={`history-theme-${theme}`}
+              onPress={() => onThemeFilterChange(theme)}
+            />
+          ))}
+        </View>
+      ) : null}
+      <View style={styles.historyPageRow}>
+        <Text style={styles.helperText}>
+          {page.total === 0 ? "0 results" : `${page.offset + 1}-${Math.min(page.offset + attempts.length, page.total)} of ${page.total}`}
+        </Text>
+        <View style={styles.iconButtonRow}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Previous history page"
+            accessibilityState={{ disabled: page.offset === 0 }}
+            disabled={page.offset === 0}
+            testID="history-page-previous"
+            style={[styles.iconButton, page.offset === 0 ? styles.disabledButton : null]}
+            onPress={() => onPageOffsetChange(Math.max(0, page.offset - page.limit))}
+          >
+            <Text style={styles.iconButtonText}>‹</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Next history page"
+            accessibilityState={{ disabled: !page.hasMore }}
+            disabled={!page.hasMore}
+            testID="history-page-next"
+            style={[styles.iconButton, !page.hasMore ? styles.disabledButton : null]}
+            onPress={() => onPageOffsetChange(page.offset + page.limit)}
+          >
+            <Text style={styles.iconButtonText}>›</Text>
+          </Pressable>
+        </View>
+      </View>
       {attempts.length === 0 ? <Text style={styles.listText}>No attempts</Text> : null}
       {attempts.map((attempt) => (
-        <Text key={attempt.id} style={styles.listText}>
-          {modeLabel(attempt.mode)} · {attempt.result} · {attempt.submittedMove}
-        </Text>
+        <Pressable
+          key={attempt.id}
+          accessibilityRole="button"
+          accessibilityLabel={`Open ${modeLabel(attempt.mode)} ${attempt.result} puzzle review`}
+          testID={`history-attempt-${attempt.id}`}
+          style={styles.historyRow}
+          onPress={() => onOpenAttempt(attempt.id)}
+        >
+          <Text style={styles.historyRowTitle}>
+            {modeLabel(attempt.mode)} · {attempt.result} · {attempt.submittedMove}
+          </Text>
+          <Text style={styles.helperText}>
+            {attempt.source === "scheduled_review" ? "Review" : "Sprint"} · {attempt.side} · {attempt.completedAt.slice(0, 10)} · {attempt.ratingKey}
+          </Text>
+          <Text style={styles.helperText}>
+            {attempt.themes.join(", ")}
+          </Text>
+        </Pressable>
       ))}
     </View>
   );
 }
 
+function FilterButton({
+  active,
+  label,
+  testID,
+  onPress
+}: {
+  active: boolean;
+  label: string;
+  testID: string;
+  onPress: () => void;
+}): React.JSX.Element {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      testID={testID}
+      style={[styles.filterButton, active ? styles.filterButtonActive : null]}
+      onPress={onPress}
+    >
+      <Text style={[styles.filterButtonText, active ? styles.filterButtonTextActive : null]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function groupReviewEntriesByContext(entries: ReviewEntry[]): Array<{
+  key: string;
+  mode: SprintMode;
+  ratingKey: string;
+  entries: ReviewEntry[];
+}> {
+  const groups = new Map<string, { key: string; mode: SprintMode; ratingKey: string; entries: ReviewEntry[] }>();
+  for (const entry of entries) {
+    const key = `${entry.mode}:${entry.ratingKey}`;
+    const group = groups.get(key) ?? {
+      key,
+      mode: entry.mode,
+      ratingKey: entry.ratingKey,
+      entries: []
+    };
+    group.entries.push(entry);
+    groups.set(key, group);
+  }
+  return [...groups.values()].sort((left, right) => left.ratingKey.localeCompare(right.ratingKey));
+}
+
+function safeTestId(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
 type ReviewEntry = {
   puzzle: Puzzle;
   mode: SprintMode;
-  source: "session" | "due";
-  attempt?: AttemptEvent;
+  ratingKey: string;
+  source: "session" | "due" | "history";
+  attempt?: AttemptEvent | HistoryAttemptView;
 };
 
 type ReviewPuzzleState =
@@ -1679,15 +1994,22 @@ function ReviewPanel({
   const sessionEntries = sessionMistakeReviewItems.map((item): ReviewEntry => ({
     puzzle: item.puzzle,
     mode: item.attempt.mode,
+    ratingKey: item.attempt.ratingKey,
     source: "session",
     attempt: item.attempt
   }));
   const dueEntries = dueReviewItems.map((item): ReviewEntry => ({
     puzzle: item.puzzle,
-    mode: "standard",
+    mode: item.review.mode,
+    ratingKey: item.review.ratingKey,
     source: "due"
   }));
-  const preferredEntries = sessionEntries.length > 0 ? sessionEntries : dueEntries;
+  const dueContextGroups = groupReviewEntriesByContext(dueEntries);
+  const preferredEntries = sessionEntries.length > 0
+    ? sessionEntries
+    : dueContextGroups.length === 1
+      ? dueContextGroups[0]?.entries ?? []
+      : [];
   const preferredEntriesKey = preferredEntries.map((entry) => `${entry.source}:${entry.puzzle.id}:${entry.mode}`).join("|");
   const [activeEntries, setActiveEntries] = useState<ReviewEntry[]>(preferredEntries);
 
@@ -1718,14 +2040,31 @@ function ReviewPanel({
       <Text style={styles.panelTitle}>Review</Text>
       {sessionEntries.length === 0 ? <Text style={styles.listText}>No last sprint mistakes</Text> : null}
       {dueEntries.length === 0 ? <Text style={styles.listText}>No reviews due today</Text> : null}
-      {reviews.map((review) => {
+      {dueContextGroups.length > 1 ? (
+        <View style={styles.reviewContextList} testID="review-context-list">
+          {dueContextGroups.map((group) => (
+            <Pressable
+              key={group.key}
+              accessibilityRole="button"
+              accessibilityLabel={`Start ${modeLabel(group.mode)} reviews`}
+              testID={`review-context-${safeTestId(group.key)}`}
+              style={styles.historyRow}
+              onPress={() => setActiveEntries(group.entries)}
+            >
+              <Text style={styles.historyRowTitle}>{modeLabel(group.mode)}</Text>
+              <Text style={styles.helperText}>{group.ratingKey} · {group.entries.length} due</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+      {dueContextGroups.length <= 1 ? reviews.map((review) => {
         const row = review as { puzzleId: string; dueAt: string; lastResult: string };
         return (
           <Text key={`${row.puzzleId}-${row.dueAt}`} style={styles.listText}>
             {row.lastResult} · due {row.dueAt.slice(0, 10)}
           </Text>
         );
-      })}
+      }) : null}
     </View>
   );
 }
@@ -1733,12 +2072,14 @@ function ReviewPanel({
 function ReviewSession({
   boardSize,
   entries,
+  initialIndex = 0,
   service,
   onExit,
   stockfishTransportFactory
 }: {
   boardSize: number;
   entries: ReviewEntry[];
+  initialIndex?: number;
   service: PracticeService;
   onExit: (source: ReviewEntry["source"]) => void;
   stockfishTransportFactory: () => UciEngineTransport | null;
@@ -1746,8 +2087,8 @@ function ReviewSession({
   const boardRef = useRef<ChessboardRef | null>(null);
   const reviewSuppressedBoardMovesRef = useRef<string[]>([]);
   const reviewResultRecordedRef = useRef(false);
-  const [entryIndex, setEntryIndex] = useState(0);
-  const [reviewState, setReviewState] = useState<ReviewPuzzleState>(() => startReviewPuzzle(entries[0]));
+  const [entryIndex, setEntryIndex] = useState(initialIndex);
+  const [reviewState, setReviewState] = useState<ReviewPuzzleState>(() => startReviewPuzzle(entries[initialIndex] ?? entries[0]));
   const [feedback, setFeedback] = useState<SessionFeedback>(null);
   const [lastMove, setLastMove] = useState<BoardMove | null>(null);
   const [boardLocked, setBoardLocked] = useState(false);
@@ -1761,6 +2102,9 @@ function ReviewSession({
   const [analysisForwardStack, setAnalysisForwardStack] = useState<string[]>([]);
   const [manualBoardFlip, setManualBoardFlip] = useState(false);
   const [reviewResultRecorded, setReviewResultRecorded] = useState(false);
+  const [reviewStartedAtMs, setReviewStartedAtMs] = useState(() => Date.now());
+  const [reviewNowMs, setReviewNowMs] = useState(() => Date.now());
+  const [reviewTimedOut, setReviewTimedOut] = useState(false);
   const currentEntry = entries[entryIndex];
   const currentPuzzle = currentReviewPuzzleState(reviewState);
   const currentFen = currentPuzzle.currentFen;
@@ -1797,11 +2141,17 @@ function ReviewSession({
   const boardGestureEnabled = !boardLocked;
   const boardDraggableColor = boardGestureEnabled ? sideToMove(displayFen) : null;
   const isSessionReview = currentEntry.source === "session";
-  const canReviewPrevious = isSessionReview && entryIndex > 0 && !boardLocked;
-  const canReviewNext = isSessionReview && entryIndex < entries.length - 1 && !boardLocked;
+  const canNavigateReview = (currentEntry.source === "session" || currentEntry.source === "history") && !boardLocked;
+  const canReviewPrevious = canNavigateReview && entryIndex > 0;
+  const canReviewNext = canNavigateReview && entryIndex < entries.length - 1;
   const canAnalysisBack = analysisEnabled && analysisBackStack.length > 0;
   const canAnalysisForward = analysisEnabled && analysisForwardStack.length > 0;
   const analysisDepth = engineAnalysisLines.reduce((maxDepth, line) => Math.max(maxDepth, line.depth), 0);
+  const reviewPerPuzzleSeconds = perPuzzleSecondsForReviewEntry(currentEntry);
+  const reviewRemainingSeconds =
+    currentEntry.source === "due" && (!reviewResultRecorded || reviewTimedOut)
+      ? Math.max(0, reviewPerPuzzleSeconds - Math.floor((reviewNowMs - reviewStartedAtMs) / 1000))
+      : null;
   const analysisEngineLabel =
     analysisEngineStatus === "stockfish"
       ? `SF 18 NNUE${analysisDepth > 0 ? ` · Depth ${analysisDepth}${analysisIsRunning ? `/${ANALYSIS_DEPTH}` : ""}` : ""}`
@@ -1868,6 +2218,30 @@ function ReviewSession({
     };
   }, [analysisEnabled, displayFen, stockfishTransportFactory]);
 
+  useEffect(() => {
+    if (currentEntry.source !== "due" || reviewResultRecorded) {
+      return;
+    }
+    const timer = setInterval(() => {
+      setReviewNowMs(Date.now());
+    }, 500);
+    return () => {
+      clearInterval(timer);
+    };
+  }, [currentEntry.source, entryIndex, reviewResultRecorded]);
+
+  useEffect(() => {
+    if (currentEntry.source !== "due" || reviewResultRecorded || reviewTimedOut || reviewRemainingSeconds !== 0) {
+      return;
+    }
+    setReviewTimedOut(true);
+    setWrongSeen(true);
+    recordCurrentReviewResult("wrong", {
+      submittedMove: "__timeout__",
+      expectedMove: expectedReviewMove(currentPuzzle)
+    });
+  }, [currentEntry.source, currentPuzzle, reviewRemainingSeconds, reviewResultRecorded, reviewTimedOut]);
+
   function resetCurrentReview(nextIndex = entryIndex): void {
     const nextState = startReviewPuzzle(entries[nextIndex]);
     setEntryIndex(nextIndex);
@@ -1885,13 +2259,17 @@ function ReviewSession({
     setAnalysisForwardStack([]);
     setManualBoardFlip(false);
     setReviewResultRecorded(false);
+    const now = Date.now();
+    setReviewStartedAtMs(now);
+    setReviewNowMs(now);
+    setReviewTimedOut(false);
     reviewResultRecordedRef.current = false;
     reviewSuppressedBoardMovesRef.current = [];
   }
 
-  function advanceReview(result: "correct" | "wrong"): void {
-    recordCurrentReviewResult(result);
-    if (isSessionReview) {
+  function advanceReview(result: "correct" | "wrong", reviewMove?: { submittedMove: string; expectedMove: string }): void {
+    recordCurrentReviewResult(result, reviewMove);
+    if (currentEntry.source !== "due") {
       setBoardLocked(false);
       return;
     }
@@ -1903,20 +2281,27 @@ function ReviewSession({
     resetCurrentReview(nextIndex);
   }
 
-  function recordCurrentReviewResult(result: "correct" | "wrong"): void {
-    if (currentEntry.source === "session") {
+  function recordCurrentReviewResult(result: "correct" | "wrong", reviewMove?: { submittedMove: string; expectedMove: string }): void {
+    if (currentEntry.source !== "due") {
       return;
     }
     if (reviewResultRecordedRef.current || reviewResultRecorded) {
       return;
     }
     reviewResultRecordedRef.current = true;
-    service.recordReviewResult(currentEntry.puzzle.id, result);
+    service.recordReviewAttempt({
+      puzzleId: currentEntry.puzzle.id,
+      mode: currentEntry.mode,
+      ratingKey: currentEntry.ratingKey,
+      result,
+      submittedMove: reviewMove?.submittedMove ?? "__analysis__",
+      expectedMove: reviewMove?.expectedMove ?? expectedReviewMove(currentPuzzle)
+    });
     setReviewResultRecorded(true);
   }
 
   function navigateReview(nextIndex: number): void {
-    if (!isSessionReview || boardLocked || nextIndex < 0 || nextIndex >= entries.length) {
+    if (!canNavigateReview || nextIndex < 0 || nextIndex >= entries.length) {
       return;
     }
     resetCurrentReview(nextIndex);
@@ -1971,6 +2356,10 @@ function ReviewSession({
       const result = submitLineMove(reviewState.kind === "line" ? reviewState.line : beginLinePuzzle(currentEntry.puzzle), move);
       setFeedback(result.feedback);
       if (result.feedback.result === "wrong") {
+        recordCurrentReviewResult("wrong", {
+          submittedMove: result.feedback.submittedMove,
+          expectedMove: result.feedback.expectedMove
+        });
         setWrongSeen(true);
         await sleep(FEEDBACK_SNAPSHOT_MS);
         boardRef.current?.resetBoard(submittedFen);
@@ -1987,7 +2376,10 @@ function ReviewSession({
       setReviewState({ kind: "line", line: result.state });
       if (result.feedback.puzzleSolved) {
         await sleep(FEEDBACK_SNAPSHOT_MS);
-        advanceReview(wrongSeen ? "wrong" : "correct");
+        advanceReview(wrongSeen ? "wrong" : "correct", {
+          submittedMove: result.feedback.submittedMove,
+          expectedMove: result.feedback.expectedMove
+        });
         return;
       }
       setBoardLocked(false);
@@ -2058,11 +2450,18 @@ function ReviewSession({
     setFeedback(result.feedback);
     if (result.feedback.result === "correct") {
       await sleep(FEEDBACK_SNAPSHOT_MS);
-      advanceReview("correct");
+      advanceReview("correct", {
+        submittedMove: result.feedback.submittedMove,
+        expectedMove: result.feedback.expectedMove
+      });
       return;
     }
 
     setWrongSeen(true);
+    recordCurrentReviewResult("wrong", {
+      submittedMove: result.feedback.submittedMove,
+      expectedMove: result.feedback.expectedMove
+    });
     await sleep(FEEDBACK_SNAPSHOT_MS);
     const replyMoves = result.feedback.autoPlayedMoves.slice(1);
     const finalFen = fenAfterMoves(submittedFen, result.feedback.autoPlayedMoves) ?? submittedFen;
@@ -2088,6 +2487,10 @@ function ReviewSession({
       const result = submitArrowDuelFollowUpMove(reviewState.line, move);
       setFeedback(result.feedback);
       if (result.feedback.result === "wrong") {
+        recordCurrentReviewResult("wrong", {
+          submittedMove: result.feedback.submittedMove,
+          expectedMove: result.feedback.expectedMove
+        });
         await sleep(FEEDBACK_SNAPSHOT_MS);
         boardRef.current?.resetBoard(submittedFen);
         setFeedback(null);
@@ -2103,7 +2506,10 @@ function ReviewSession({
       setReviewState({ kind: "line", line: result.state });
       if (result.feedback.puzzleSolved) {
         await sleep(FEEDBACK_SNAPSHOT_MS);
-        advanceReview("wrong");
+        advanceReview("wrong", {
+          submittedMove: result.feedback.submittedMove,
+          expectedMove: result.feedback.expectedMove
+        });
         return;
       }
       setBoardLocked(false);
@@ -2205,9 +2611,14 @@ function ReviewSession({
           <Text testID="review-progress" style={styles.helperText}>
             {entryIndex + 1} / {entries.length} · {modeLabel(currentEntry.mode)}
           </Text>
+          {reviewRemainingSeconds !== null ? (
+            <Text testID="review-timer" style={[styles.helperText, reviewRemainingSeconds === 0 ? styles.errorText : null]}>
+              {reviewRemainingSeconds === 0 ? "Time expired" : formatDuration(reviewRemainingSeconds)}
+            </Text>
+          ) : null}
         </View>
         <View style={styles.iconButtonRow} testID="review-header-actions">
-          {isSessionReview ? (
+          {currentEntry.source === "session" || currentEntry.source === "history" ? (
             <>
               <Pressable
                 accessibilityRole="button"
@@ -2602,6 +3013,21 @@ function currentReviewPuzzleState(state: ReviewPuzzleState): CurrentPuzzleState 
   return state.line;
 }
 
+function expectedReviewMove(state: CurrentPuzzleState): string {
+  if (state.kind === "arrow_duel") {
+    return state.correctMove;
+  }
+  return currentExpectedMove(state) ?? "";
+}
+
+function perPuzzleSecondsForReviewEntry(entry: ReviewEntry): number {
+  const fromRatingKey = entry.ratingKey.match(/\/(\d+)$/)?.[1];
+  if (fromRatingKey) {
+    return Number(fromRatingKey);
+  }
+  return defaultSprintConfig(entry.mode).perPuzzleSeconds;
+}
+
 function normalizeUci(move: string): string {
   return move.trim().toLowerCase();
 }
@@ -2951,6 +3377,22 @@ function formatDurationLabel(seconds: number): string {
     return `${seconds / 60}m`;
   }
   return `${seconds}s`;
+}
+
+function historyRangeLabel(range: HistoryTimeRange): string {
+  if (range === "7d") {
+    return "7 days";
+  }
+  if (range === "30d") {
+    return "30 days";
+  }
+  if (range === "90d") {
+    return "90 days";
+  }
+  if (range === "1y") {
+    return "1 year";
+  }
+  return "Max";
 }
 
 function sprintConfigFor(
@@ -3771,6 +4213,28 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 10,
     gap: 4
+  },
+  historyRow: {
+    backgroundColor: "#F8FAFC",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 4,
+    padding: 10
+  },
+  historyRowTitle: {
+    color: "#1E293B",
+    fontSize: 13,
+    fontWeight: "800"
+  },
+  historyPageRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 8
+  },
+  reviewContextList: {
+    gap: 8
   },
   settingRow: {
     alignItems: "center",

@@ -180,6 +180,58 @@ test("PracticeService builds MemoryStore history view for a required time range 
   assert.equal(service.getDueReviewItems("2026-06-21T00:00:05.000Z")[0]?.puzzle.id, "000hf");
 });
 
+test("PracticeService records official MemoryStore reviews in history without mixing queue contexts", async () => {
+  const store = new MemoryStore();
+  store.seedPuzzles(await loadFixturePuzzles());
+  const service = new PracticeService(store);
+
+  service.startSprint(
+    { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
+    "2026-06-20T00:00:00.000Z"
+  );
+  service.submitMove("c4b5", "2026-06-20T00:00:05.000Z");
+
+  service.recordReviewAttempt({
+    puzzleId: "000hf",
+    mode: "standard",
+    ratingKey: "standard 5/20",
+    result: "correct",
+    submittedMove: "c4b5",
+    expectedMove: "c4b5",
+    startedAt: "2026-06-21T00:00:00.000Z"
+  }, "2026-06-21T00:00:05.000Z");
+
+  const all = service.getHistoryView({
+    now: "2026-06-22T00:00:00.000Z",
+    timeRange: "7d",
+    ratingKey: "standard 5/20"
+  });
+  assert.deepEqual(all.attempts.map((attempt) => attempt.source), ["scheduled_review", "sprint"]);
+  assert.deepEqual(
+    service.getHistoryView({ ...all.query, source: "scheduled_review" }).attempts.map((attempt) => attempt.result),
+    ["correct"]
+  );
+  assert.deepEqual(
+    service.getHistoryView({ ...all.query, source: "sprint" }).attempts.map((attempt) => attempt.result),
+    ["wrong"]
+  );
+  assert.deepEqual(all.puzzleStats, [
+    {
+      puzzleId: "000hf",
+      correctCount: 1,
+      wrongCount: 1,
+      lastWrongAt: "2026-06-20T00:00:05.000Z",
+      nextReviewAt: "2026-06-24T00:00:05.000Z"
+    }
+  ]);
+
+  store.recordReviewResult({ puzzleId: "000hf", mode: "arrow_duel", ratingKey: "arrow duel 5/30" }, "wrong", "2026-06-21T00:01:00.000Z");
+  assert.deepEqual(
+    store.getDueReviews("2026-06-25T00:00:00.000Z").map((review) => `${review.puzzleId}:${review.mode}:${review.ratingKey}`).sort(),
+    ["000hf:arrow_duel:arrow duel 5/30", "000hf:standard:standard 5/20"]
+  );
+});
+
 test("PracticeService pages MemoryStore history over all available sprint attempts", async () => {
   const store = new MemoryStore();
   store.seedPuzzles(await loadFixturePuzzles());

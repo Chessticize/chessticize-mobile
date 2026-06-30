@@ -3,6 +3,7 @@ import type {
   AttemptResult,
   Puzzle,
   RatingRecord,
+  ReviewContext,
   ReviewQueueItem,
   ReviewQueueState,
   SessionMistakeReviewItem,
@@ -26,9 +27,9 @@ export interface PracticeStore {
   recordAttempt(attempt: AttemptEvent): void;
   listAttempts(filter?: HistoryFilter): AttemptHistoryRow[];
   getSessionMistakeReview(sessionId: string): SessionMistakeReviewItem[];
-  scheduleMistakeReview(puzzleId: string, now: string): ReviewQueueState;
-  recordReviewResult(puzzleId: string, result: AttemptResult, now: string): ReviewQueueState;
-  getReviewQueueState(puzzleId: string): ReviewQueueState | undefined;
+  scheduleMistakeReview(context: ReviewContext, now: string): ReviewQueueState;
+  recordReviewResult(context: ReviewContext, result: AttemptResult, now: string): ReviewQueueState;
+  getReviewQueueState(context: ReviewContext): ReviewQueueState | undefined;
   getDueReviews(now: string): ReviewQueueState[];
   getDueReviewItems(now: string): ReviewQueueItem[];
   getHistoryView(query: HistoryQuery): HistoryView;

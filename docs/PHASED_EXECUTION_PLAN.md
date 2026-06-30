@@ -45,6 +45,15 @@ Dependency direction:
 - First fallback: `dawikk-chessboard`.
 - Last fallback: an iOS-native board such as ChessboardKit only if React Native board options fail and Android is explicitly postponed.
 
+Board interaction must be conservative and correctness-first:
+
+- The user may drag only their own side-to-move pieces while the board is unlocked.
+- Opponent pieces are never draggable by direct user input. Only puzzle playback, opponent replies, review playback, or analysis navigation may move opponent pieces.
+- After the user submits a move, the board is locked until the domain state and any opponent reply animation are complete.
+- Premove is out of scope for the current implementation. Any attempted input while the board is locked is ignored.
+- Illegal moves, legal-but-unintended puzzle moves, and Arrow Duel moves outside the displayed candidates must revert without mutating the puzzle state.
+- Valid move indicators, last-move highlights, correct/wrong feedback highlights, board coordinates, and Arrow Duel arrows are presentation features layered over this locked domain state. They must not loosen the move legality checks.
+
 ### Local Storage
 
 - Use two SQLite databases:
@@ -58,6 +67,15 @@ Dependency direction:
 - Expose a small UCI bridge to JavaScript: start, set option, position, go, stop, bestmove, info, and quit.
 - Default runtime profile: one thread, small hash, bounded depth/time, no tablebases.
 - Use precomputed puzzle metadata for sprint selection. Use Stockfish for review, explanation, and analysis, not for the hot path of selecting every puzzle.
+
+Analysis should behave like a live engine panel, not a static post-processing step:
+
+- Start with a shallow search so the first candidate lines and evaluations appear quickly.
+- Continue the same position to the target depth and stream `info` updates into the UI as Stockfish improves the lines.
+- Use MultiPV for candidate rows. Every displayed engine row must come from an engine line with a score; do not pad live engine analysis with unscored legal moves.
+- Preserve the current-position perspective for score formatting. Mate scores should show forced mate; terminal positions should show the game result instead of candidate rows.
+- Tapping an engine candidate in Analysis Review should make that move on the analysis board, push the previous position onto the back stack, and restart analysis from the new position.
+- Analysis is available only in unscored review/exploration contexts unless a future scoring mode explicitly allows it.
 
 ### Licensing
 
@@ -87,6 +105,14 @@ Core pack default:
 - If the pack is still too large, remove low-popularity puzzles, repeated near-duplicates, high-ELO puzzles, rare themes, and ambiguous Arrow Duel positions first.
 
 The pack manifest must include source dataset identifiers, build timestamp, row count, rating range, theme coverage, Arrow Duel count, filters, and source license notes.
+
+Developer and test builds may expose a local puzzle-source switch for reproducible manual testing:
+
+- Familiar regression set: a small fixed sequence used for board, review, and analysis debugging.
+- Random/offline pack sample: a larger fixture used to exercise rating-based puzzle selection.
+- Special-case fixtures only when needed for a focused bug, such as promotion or multiple mate-in-one validation.
+
+This switch is a debug/test-build control. It must not appear in release builds, and release puzzle selection must use the normal local pack and rating-aware selection policy.
 
 ### User Database
 
@@ -145,6 +171,8 @@ If the user selected the wrong move, the app should automatically play the oppon
 
 During the punishment line, the analysis panel should describe the current position, not the original two candidates. If the current position is checkmate, show the game result such as `1-0` or `0-1`. If it is not terminal, show the current-position evaluation or forced mate distance. The original green/red candidate arrows remain useful at the initial Arrow Duel review position, but they must not be reused as if they evaluated later punishment-line positions.
 
+Wrong Arrow Duel review does not auto-advance to the next puzzle. The review should stay on the current puzzle, play the punishment sequence, show the user's next expected move with an arrow when the stored line requires user participation, accept that move, continue the reply, and stop at the final line position. The user may then analyze, step backward/forward, reset, or navigate to another review puzzle manually.
+
 ### History
 
 History is an event browser for all solved puzzle work that should be remembered:
@@ -162,7 +190,9 @@ History filters must support:
 - Result: correct, wrong, or all.
 - Side to move, puzzle theme, puzzle rating, rating key, and review status when available.
 
-Tapping a History row opens Analysis Review with the original attempt context. The user can retry the puzzle, analyze with Stockfish, and navigate previous/next rows within the active History filter without changing official history or review scheduling.
+History queries must be pageable because the all-time range can grow without bound.
+
+Tapping a History row opens Analysis Review with the original attempt context. The user can retry the puzzle, analyze with Stockfish, and navigate previous/next rows within the active History filter without changing official history or review scheduling. When the user exits a post-sprint Analysis Review, the app should return to the Practice tab ready to start another sprint, not leave the user stranded in the Review tab.
 
 ## 4. iCloud Sync Strategy
 

@@ -1,5 +1,5 @@
 import { beginArrowDuelPuzzle, beginLinePuzzle } from "./puzzle-session.ts";
-import type { AttemptEvent, AttemptResult, Puzzle, RatingRecord, ReviewQueueState, SprintMode } from "./types.ts";
+import type { AttemptEvent, AttemptResult, AttemptSource, Puzzle, RatingRecord, ReviewQueueState, SprintMode } from "./types.ts";
 
 export type HistoryTimeRange = "7d" | "30d" | "90d" | "1y" | "max";
 export type PuzzleSide = "white" | "black";
@@ -13,6 +13,7 @@ export interface HistoryQuery {
   now: string;
   timeRange: HistoryTimeRange;
   ratingKey: string;
+  source?: AttemptSource;
   result?: AttemptResult;
   side?: PuzzleSide;
   theme?: string;
@@ -34,6 +35,7 @@ export interface HistoryPage {
 
 export interface HistoryAttemptView {
   id: string;
+  source: AttemptSource;
   sessionId: string;
   puzzleId: string;
   mode: SprintMode;

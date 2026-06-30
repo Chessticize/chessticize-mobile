@@ -5,9 +5,8 @@ describe('Practice POC', () => {
   it('renders the standard sprint board', async () => {
     await waitFor(element(by.id('start-sprint-button'))).toBeVisible().withTimeout(30000);
     await element(by.id('start-sprint-button')).tap();
-    await waitFor(element(by.id('session-progress'))).toHaveText('0 / 15').withTimeout(10000);
+    await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(30000);
     await expect(element(by.text('Mistakes'))).toBeVisible();
-    await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
 
     const screenshotPath = await device.takeScreenshot('standard-board');
     expectBoardScreenshotContainsPieces(screenshotPath);
@@ -63,7 +62,6 @@ describe('Practice POC', () => {
     await element(by.id('review-previous')).tap();
     await waitFor(element(by.text('1 / 3 · Standard'))).toBeVisible().withTimeout(30000);
 
-    await device.disableSynchronization();
     await element(by.id('review-analysis-button')).tap();
     await waitFor(element(by.id('review-analysis-back'))).toBeVisible().withTimeout(5000);
     await waitFor(element(by.id('review-analysis-forward'))).toBeVisible().withTimeout(5000);

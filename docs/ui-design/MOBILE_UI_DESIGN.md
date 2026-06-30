@@ -181,6 +181,7 @@ Practice session layout:
 - Prompt and action area live below the board.
 - Regular puzzles use board moves as the primary input.
 - Arrow Duel uses board arrows plus two candidate action chips below the board when needed.
+- Board coordinates should be visible enough for review/debug discussion without competing with pieces, arrows, or feedback highlights.
 
 Practice session states:
 
@@ -191,6 +192,17 @@ Practice session states:
 - Sprint complete: summary sheet with rating change, accuracy, time, mistakes, and review queue impact.
 - Sprint failed: summary sheet with failure reason and a retry action.
 - Paused/backgrounded: timer paused only according to domain rules; UI must show paused state explicitly.
+
+Board input rules:
+
+- The user can drag only their own side-to-move pieces while the board is unlocked.
+- Opponent pieces are never draggable by user input.
+- The board locks immediately after a submitted move and stays locked while the app validates the move, applies feedback, and plays any opponent reply animation.
+- Premove is not part of the current UX. Input during a locked board state is ignored.
+- Illegal moves and legal moves that are not accepted by the active puzzle state revert visually and do not mutate the domain state.
+- Valid move indicators remain available for selectable own pieces.
+- Correct feedback uses green cell highlights; wrong feedback uses red cell highlights; opponent or previous-line movement uses blue only when the user is not in an immediate correct/wrong feedback state.
+- Feedback cell highlights do not need borders. Avoid stacking blue last-move highlights over green or red feedback.
 
 Sprint scoring rules:
 
@@ -212,6 +224,14 @@ Practice controls:
 - Abandon is present but secondary and requires confirmation.
 - Analysis is available after the attempt/session, not during a scored puzzle unless the mode is explicitly non-scored.
 
+Developer/test-build controls:
+
+- Test builds may expose a puzzle source switch for manual QA.
+- The familiar fixed set is for deterministic regression testing and quick simulator repros.
+- The random larger fixture is for rating-based puzzle selection and pack coverage testing.
+- Special fixtures may be added temporarily for focused bugs, but should not become the default familiar set unless they are stable regression samples.
+- The puzzle source switch must be hidden in release builds.
+
 ### Arrow Duel Review
 
 ![Mobile Arrow Duel review wireframe](assets/mobile-arrow-duel-review-wireframe.svg)
@@ -227,6 +247,7 @@ Arrow Duel Analysis Review behavior:
 - While the punishment line is being replayed, show the current-position evaluation, not the original candidate evals.
 - If the punishment line reaches checkmate, show the game result (`1-0` or `0-1`) and "Checkmate".
 - The user can switch to analysis at any point. Analysis mode uses Stockfish, shows candidate lines, and does not mutate official review history.
+- A wrong Arrow Duel review stays on the same puzzle after the punishment line. It must not auto-advance to the next review puzzle.
 
 Arrow Duel active-session rules:
 
@@ -241,8 +262,35 @@ Arrow Duel review rules:
 - Red always means the inferior candidate.
 - User-selected wrong move receives an additional marker that is distinguishable without color alone.
 - Playback starts automatically after a wrong answer, but the user can pause, replay, or step through the line.
+- If the stored punishment line requires the user's next move, show that expected move with an arrow, wait for the user to make it, then play the next reply. Continue until the line ends, then stop.
 - Review copy should explain the tactical reason only when the data supports it; otherwise show engine line and evaluation shift.
 - In a Scheduled Review, selecting the wrong Arrow Duel candidate records a failed review attempt and resets or contracts that puzzle's schedule. The user may then enter Analysis Review to inspect the line without creating additional history.
+
+### Analysis Review Panel
+
+Analysis Review is the shared unscored board surface opened from sprint results, scheduled review results, and History.
+
+Toolbar:
+
+- Put close, previous, next, reset, flip, and Analysis controls on one compact row.
+- Use icon buttons for navigation and board actions.
+- The Analysis button should be visually prominent enough to scan quickly and should use the label "Analysis".
+- When Stockfish is running, show engine status in compact form, for example `SF 18 NNUE · Depth 8/20`.
+
+Engine line list:
+
+- Candidate rows are compact single-line rows.
+- Put the evaluation at the start of each row, then the row number and SAN move, then the label such as `Top move` or `Candidate`.
+- Every live Stockfish row should have an engine evaluation. Do not fill the list with unscored legal moves.
+- Rows are tappable. Tapping a row makes that move on the analysis board, adds the previous position to the back stack, clears the forward stack, and starts fresh analysis from the new position.
+- The row order and eval values may change as Stockfish searches deeper. The UI should stream updates rather than wait for final depth.
+- Back, forward, and reset affect only the analysis board and never create History rows, review attempts, ELO changes, or review schedule updates.
+- Reset returns to the puzzle's initial review position, not the current Stockfish line's start if the user has navigated away.
+
+Terminal and guided-line states:
+
+- If the current analysis/review position is checkmate, show the game result (`1-0` or `0-1`) instead of misleading candidate rows.
+- During Arrow Duel wrong-line playback, any eval shown under the board describes the current position. It must not reuse the original two candidate scores after the board has advanced.
 
 ### Custom Sprint Setup
 
@@ -295,10 +343,12 @@ Custom sprint behavior:
 - Review cards should show mode, theme, last wrong date, due state, current interval, and source sprint type.
 - The user can stop a Scheduled Review session at any time. Completed items are saved; unseen items remain due or overdue.
 - After a Scheduled Review batch, the user may open Analysis Review for missed items. That follow-up inspection does not create history rows and does not update the schedule.
+- Post-sprint Analysis Review is also unrecorded. It is for same-day exploration only; the scheduled memory-curve review still starts from the stored due date, normally the next day after the miss.
 
 ### History
 
-- Quick range filters include 7 days, 30 days, 1 year, and all time.
+- Quick range filters include 7 days, 30 days, 90 days, 1 year, and all time.
+- History data must be pageable, including the all-time range.
 - Quick content filters include "Wrong in the last 7 days", source type, mode, theme, rating range, sprint config, sprint speed, review status, and Arrow Duel only.
 - Source type distinguishes sprint attempts from official Scheduled Review attempts.
 - History includes correct and wrong sprint attempts.
@@ -307,6 +357,7 @@ Custom sprint behavior:
 - Each row should show result, source type, mode, puzzle rating, elapsed time, date, and review status.
 - Tapping a row opens Analysis Review with original attempt context.
 - Analysis Review launched from History supports retry, Stockfish analysis, and previous/next navigation through the current filtered History result set.
+- Previous/next navigation from History follows the active filter result order, not just the currently visible page.
 - History filters should be horizontally scrollable chips on phones.
 - Failed attempts should clearly show whether they are already in the review queue.
 - Performance chart belongs in History, not primarily in Sprint Results.

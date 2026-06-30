@@ -34,9 +34,11 @@ function attempt(input: {
 }): AttemptEvent {
   return {
     id: input.id,
+    source: "sprint",
     sessionId: input.sessionId,
     puzzleId: input.puzzleId,
     mode: "standard",
+    ratingKey: "standard 5/20",
     result: input.result,
     submittedMove: "a1a2",
     expectedMove: "a1a3",

@@ -4,7 +4,7 @@ import {
   resetRating as resetRatingRecord,
   buildSessionMistakeReview,
   resolveHistoryRange,
-  scheduleMistake,
+  scheduleMistakeForContext,
   scheduleReview,
   sideToMoveForHistoryPuzzle
 } from "../../core/src/index.ts";
@@ -17,6 +17,7 @@ import type {
   HistoryView,
   Puzzle,
   RatingRecord,
+  ReviewContext,
   ReviewQueueItem,
   ReviewQueueState,
   SessionMistakeReviewItem,
@@ -114,6 +115,7 @@ export class MemoryStore implements PracticeStore {
 
   listAttempts(filter: HistoryFilter = {}): AttemptHistoryRow[] {
     return this.attempts
+      .filter((attempt) => !filter.source || attempt.source === filter.source)
       .filter((attempt) => !filter.result || attempt.result === filter.result)
       .filter((attempt) => !filter.mode || attempt.mode === filter.mode)
       .filter((attempt) => !filter.since || attempt.completedAt >= filter.since)
@@ -121,9 +123,11 @@ export class MemoryStore implements PracticeStore {
       .filter((attempt) => !filter.sessionId || attempt.sessionId === filter.sessionId)
       .map((attempt) => ({
         id: attempt.id,
+        source: attempt.source,
         sessionId: attempt.sessionId,
         puzzleId: attempt.puzzleId,
         mode: attempt.mode,
+        ratingKey: attempt.ratingKey,
         result: attempt.result,
         submittedMove: attempt.submittedMove,
         expectedMove: attempt.expectedMove,
@@ -143,22 +147,22 @@ export class MemoryStore implements PracticeStore {
     });
   }
 
-  scheduleMistakeReview(puzzleId: string, now: string): ReviewQueueState {
-    const previous = this.getReviewQueueState(puzzleId);
-    const next = previous ? scheduleReview({ previous, result: "wrong", now }) : scheduleMistake(puzzleId, now);
-    this.reviewQueue.set(puzzleId, next);
+  scheduleMistakeReview(context: ReviewContext, now: string): ReviewQueueState {
+    const previous = this.getReviewQueueState(context);
+    const next = previous ? scheduleReview({ previous, result: "wrong", now }) : scheduleMistakeForContext(context, now);
+    this.reviewQueue.set(reviewQueueKey(context), next);
     return next;
   }
 
-  recordReviewResult(puzzleId: string, result: AttemptResult, now: string): ReviewQueueState {
-    const previous = this.getReviewQueueState(puzzleId);
-    const next = previous ? scheduleReview({ previous, result, now }) : { ...scheduleReview({ result, now }), puzzleId };
-    this.reviewQueue.set(puzzleId, next);
+  recordReviewResult(context: ReviewContext, result: AttemptResult, now: string): ReviewQueueState {
+    const previous = this.getReviewQueueState(context);
+    const next = previous ? scheduleReview({ previous, result, now }) : scheduleReview({ context, result, now });
+    this.reviewQueue.set(reviewQueueKey(context), next);
     return next;
   }
 
-  getReviewQueueState(puzzleId: string): ReviewQueueState | undefined {
-    return this.reviewQueue.get(puzzleId);
+  getReviewQueueState(context: ReviewContext): ReviewQueueState | undefined {
+    return this.reviewQueue.get(reviewQueueKey(context));
   }
 
   getDueReviews(now: string): ReviewQueueState[] {
@@ -181,6 +185,7 @@ export class MemoryStore implements PracticeStore {
     const allAttempts = this.historyAttemptsForRange(query.ratingKey, range.since, range.until);
     const attempts = allAttempts
       .filter((attempt) => !query.result || attempt.result === query.result)
+      .filter((attempt) => !query.source || attempt.source === query.source)
       .filter((attempt) => !query.mode || attempt.mode === query.mode)
       .filter((attempt) => !query.side || attempt.side === query.side)
       .filter((attempt) => !query.theme || attempt.themes.includes(query.theme));
@@ -210,12 +215,16 @@ export class MemoryStore implements PracticeStore {
   private toHistoryAttempt(attempt: AttemptEvent): HistoryAttemptView | undefined {
     const session = this.sessions.get(attempt.sessionId);
     const puzzle = this.puzzles.get(attempt.puzzleId);
-    if (!session || !puzzle) {
+    if (!puzzle) {
+      return undefined;
+    }
+    const ratingKey = attempt.ratingKey || session?.config.ratingKey;
+    if (!ratingKey) {
       return undefined;
     }
     return {
       ...attempt,
-      ratingKey: session.config.ratingKey,
+      ratingKey,
       puzzleRating: puzzle.rating,
       side: sideToMoveForHistoryPuzzle({ puzzle, mode: attempt.mode }),
       themes: puzzle.themes
@@ -235,4 +244,8 @@ export class MemoryStore implements PracticeStore {
       }))
       .sort((left, right) => left.completedAt.localeCompare(right.completedAt) || left.sessionId.localeCompare(right.sessionId));
   }
+}
+
+function reviewQueueKey(context: ReviewContext): string {
+  return `${context.puzzleId}\u0000${context.mode}\u0000${context.ratingKey}`;
 }

@@ -500,6 +500,85 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "Accuracy 0% · Correct 0 · Wrong 1");
     expectText(renderer, "Standard · wrong · g6g5");
     expect(collectText(renderer.root)).not.toContain("Standard · correct · e6f7");
+
+    press(renderer, "history-source-sprint");
+    expectText(renderer, "Standard · wrong · g6g5");
+    press(renderer, "history-mode-standard");
+    expectText(renderer, "Standard · wrong · g6g5");
+
+    const historyAttemptRow = renderer.root.findAll(
+      (node) => typeof node.props.testID === "string" && node.props.testID.startsWith("history-attempt-")
+    )[0];
+    expect(historyAttemptRow).toBeTruthy();
+    press(renderer, historyAttemptRow.props.testID);
+    expect(findByTestId(renderer, "review-session")).toBeTruthy();
+    expect(findByTestId(renderer, "review-progress").props.children.join("")).toBe("1 / 1 · Standard");
+    expect(findByTestId(renderer, "review-reset-puzzle")).toBeTruthy();
+    press(renderer, "review-exit");
+    expect(findByTestId(renderer, "history-panel")).toBeTruthy();
+  });
+
+  it("navigates history review across the full filtered result set, not just the visible page", () => {
+    const service = createMobilePracticeService("random1000");
+    for (let index = 0; index < 22; index += 1) {
+      service.recordReviewAttempt({
+        puzzleId: "000hf",
+        mode: "standard",
+        ratingKey: "standard 5/20",
+        result: index % 2 === 0 ? "correct" : "wrong",
+        submittedMove: `a${(index % 8) + 1}a${((index + 1) % 8) + 1}`,
+        expectedMove: "c4b5",
+        startedAt: new Date(Date.now() - index * 1000 - 100).toISOString()
+      }, new Date(Date.now() - index * 1000).toISOString());
+    }
+    const renderer = renderScreen({ practiceService: service });
+
+    press(renderer, "history-tab");
+    press(renderer, "history-source-review");
+    expectText(renderer, "1-20 of 22");
+    press(renderer, "history-page-next");
+    expectText(renderer, "21-22 of 22");
+
+    const historyAttemptRow = renderer.root.findAll(
+      (node) => typeof node.props.testID === "string" && node.props.testID.startsWith("history-attempt-")
+    )[0];
+    press(renderer, historyAttemptRow.props.testID);
+
+    expectText(renderer, "21 / 22 · Standard");
+    expect(findByTestId(renderer, "review-previous").props.disabled).toBe(false);
+    press(renderer, "review-previous");
+    expectText(renderer, "20 / 22 · Standard");
+  });
+
+  it("keeps history analysis review on the current puzzle after a retry is solved", async () => {
+    const service = createMobilePracticeService("random1000");
+    const renderer = renderScreen({ practiceService: service });
+
+    press(renderer, "start-sprint-button");
+    await boardMove(renderer, "e2e6");
+    await settleFeedbackSnapshot();
+    await boardMove(renderer, "e6f7");
+    await settleFeedbackSnapshot();
+    await boardMove(renderer, "g6g5");
+    press(renderer, "session-abandon");
+
+    press(renderer, "history-tab");
+    const historyAttemptRows = renderer.root.findAll(
+      (node) => typeof node.props.testID === "string" && node.props.testID.startsWith("history-attempt-")
+    );
+    const correctAttemptRow = historyAttemptRows.find((row) => collectText(row).includes("correct"));
+    expect(correctAttemptRow).toBeTruthy();
+    press(renderer, correctAttemptRow!.props.testID);
+
+    const progressBeforeRetry = collectText(findByTestId(renderer, "review-progress"));
+    await boardMove(renderer, "e2e6");
+    await settleFeedbackSnapshot();
+    await boardMove(renderer, "e6f7");
+    await settleFeedbackSnapshot();
+
+    expect(findByTestId(renderer, "review-session")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "review-progress"))).toBe(progressBeforeRetry);
+    expect(service.listHistory({ source: "scheduled_review" }) as unknown[]).toHaveLength(0);
   });
 
   it("shows a review button after a failed sprint with mistakes", async () => {
@@ -530,7 +609,7 @@ describe("PracticePocScreen", () => {
 
   it("reviews missed puzzles from the completed sprint using the solving board", async () => {
     const service = createMobilePracticeService("random1000");
-    const recordReviewResult = jest.spyOn(service, "recordReviewResult");
+    const recordReviewAttempt = jest.spyOn(service, "recordReviewAttempt");
     const renderer = renderScreen({ practiceService: service });
 
     press(renderer, "start-sprint-button");
@@ -578,7 +657,7 @@ describe("PracticePocScreen", () => {
     await settleFeedbackSnapshot();
     expectText(renderer, "1 / 3 · Standard");
     expect(findByTestId(renderer, "review-next").props.disabled).toBe(false);
-    expect(recordReviewResult).not.toHaveBeenCalled();
+    expect(recordReviewAttempt).not.toHaveBeenCalled();
     press(renderer, "review-reset-puzzle");
     expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(reviewFen);
     expectText(renderer, "1 / 3 · Standard");
@@ -628,10 +707,93 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "review-session")).toBeTruthy();
     expectText(renderer, "1 / 1 · Standard");
+    expect(collectText(findByTestId(renderer, "review-timer"))).toBe("00:20");
     expect(() => findByTestId(renderer, "review-next")).toThrow();
     expect(() => findByTestId(renderer, "review-previous")).toThrow();
     expect(() => findByTestId(renderer, "review-start-due")).toThrow();
     expect(() => findByTestId(renderer, "review-start-session-mistakes")).toThrow();
+  });
+
+  it("keeps official due review contexts separate by sprint run", () => {
+    const service = createMobilePracticeService("random1000");
+    service.startSprint(
+      { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
+      "2026-06-20T00:00:00.000Z"
+    );
+    service.submitMove("c4b5", "2026-06-20T00:00:05.000Z");
+    service.recordReviewResult(
+      { puzzleId: "00008", mode: "arrow_duel", ratingKey: "arrow duel 5/30" },
+      "wrong",
+      "2026-06-20T00:00:10.000Z"
+    );
+    const renderer = renderScreen({ practiceService: service });
+
+    press(renderer, "review-tab");
+
+    expect(findByTestId(renderer, "review-panel")).toBeTruthy();
+    expect(findByTestId(renderer, "review-context-list")).toBeTruthy();
+    expect(findByTestId(renderer, "review-context-standard-standard-5-20")).toBeTruthy();
+    expect(findByTestId(renderer, "review-context-arrow-duel-arrow-duel-5-30")).toBeTruthy();
+    expect(() => findByTestId(renderer, "review-session")).toThrow();
+
+    press(renderer, "review-context-standard-standard-5-20");
+
+    expect(findByTestId(renderer, "review-session")).toBeTruthy();
+    expectText(renderer, "1 / 1 · Standard");
+    expect(collectText(findByTestId(renderer, "review-timer"))).toBe("00:20");
+  });
+
+  it("records official due review mistakes immediately but keeps analysis reviews unrecorded", async () => {
+    const service = createMobilePracticeService("random1000");
+    service.startSprint(
+      { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
+      "2026-06-20T00:00:00.000Z"
+    );
+    service.submitMove("c4b5", "2026-06-20T00:00:05.000Z");
+    const renderer = renderScreen({ practiceService: service });
+
+    press(renderer, "review-tab");
+    await boardMove(renderer, "c4b5");
+
+    const officialReviewAttempts = service.listHistory({ source: "scheduled_review" }) as Array<{ result: string; submittedMove: string }>;
+    expect(officialReviewAttempts).toHaveLength(1);
+    expect(officialReviewAttempts[0]).toMatchObject({ result: "wrong", submittedMove: "c4b5" });
+
+    press(renderer, "review-exit");
+    press(renderer, "history-tab");
+    press(renderer, "history-source-review");
+    expectText(renderer, "Standard · wrong · c4b5");
+    const historyAttemptRow = renderer.root.findAll(
+      (node) => typeof node.props.testID === "string" && node.props.testID.startsWith("history-attempt-")
+    )[0];
+    press(renderer, historyAttemptRow.props.testID);
+    press(renderer, "review-analysis-button");
+
+    expect(service.listHistory({ source: "scheduled_review" }) as unknown[]).toHaveLength(1);
+  });
+
+  it("times official due reviews using the original sprint pace", () => {
+    const service = createMobilePracticeService("random1000");
+    service.startSprint(
+      { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
+      "2026-06-20T00:00:00.000Z"
+    );
+    service.submitMove("c4b5", "2026-06-20T00:00:05.000Z");
+    const renderer = renderScreen({ practiceService: service });
+
+    press(renderer, "review-tab");
+
+    expect(collectText(findByTestId(renderer, "review-timer"))).toBe("00:20");
+
+    act(() => {
+      jest.advanceTimersByTime(20_500);
+    });
+
+    expect(collectText(findByTestId(renderer, "review-timer"))).toBe("Time expired");
+    expect(service.listHistory({ source: "scheduled_review" }) as Array<{ result: string; submittedMove: string }>).toEqual([
+      expect.objectContaining({ result: "wrong", submittedMove: "__timeout__" })
+    ]);
+    expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
   });
 
   it("opens review analysis without mutating the active review line", async () => {
