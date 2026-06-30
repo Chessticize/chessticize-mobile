@@ -1,4 +1,6 @@
 PODS:
+  - ChessticizeStockfish (18.0.0):
+    - React-Core
   - FBLazyVector (0.86.0)
   - hermes-engine (250829098.0.14):
     - hermes-engine/Pre-built (= 250829098.0.14)
@@ -2086,6 +2088,7 @@ PODS:
   - Yoga (0.0.0)
 
 DEPENDENCIES:
+  - ChessticizeStockfish (from `./StockfishEngine`)
   - FBLazyVector (from `../node_modules/react-native/Libraries/FBLazyVector`)
   - hermes-engine (from `../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
   - RCTDeprecation (from `../node_modules/react-native/ReactApple/Libraries/RCTFoundation/RCTDeprecation`)
@@ -2169,6 +2172,8 @@ DEPENDENCIES:
   - Yoga (from `../node_modules/react-native/ReactCommon/yoga`)
 
 EXTERNAL SOURCES:
+  ChessticizeStockfish:
+    :path: "./StockfishEngine"
   FBLazyVector:
     :path: "../node_modules/react-native/Libraries/FBLazyVector"
   hermes-engine:
@@ -2332,6 +2337,7 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 
 SPEC CHECKSUMS:
+  ChessticizeStockfish: cf3958b77b79128ec9475777398aae8b40cbb917
   FBLazyVector: b3e7ad108f0d882e30445c5527d774e3fd432f3d
   hermes-engine: 6067667af1456a6dd1901a8749528efe2edb8062
   RCTDeprecation: 2a74a2c57675e64419bd89078efde81f7c1de90b
@@ -2413,6 +2419,6 @@ SPEC CHECKSUMS:
   RNWorklets: c54a183192cd0d6bda8a3361a56d14e4aac12eb1
   Yoga: 94172d87dd5d83fc929bf1ee53121b5d4490b5f2
 
-PODFILE CHECKSUM: e78c21ab3584be5d33124ea9c9b6401df6ac353a
+PODFILE CHECKSUM: 49ffc39409ca941b44c8c03f5ca3cd49ad7298e4
 
 COCOAPODS: 1.16.2

@@ -7,6 +7,21 @@ function component(name) {
 }
 
 module.exports = {
+  NativeModules: {},
+  NativeEventEmitter: class NativeEventEmitter {
+    constructor(nativeModule) {
+      this.nativeModule = nativeModule;
+    }
+
+    addListener(eventName, listener) {
+      if (this.nativeModule && typeof this.nativeModule.__addListener === 'function') {
+        return this.nativeModule.__addListener(eventName, listener);
+      }
+      return {
+        remove() {}
+      };
+    }
+  },
   Pressable: component('Pressable'),
   SafeAreaView: component('SafeAreaView'),
   ScrollView: component('ScrollView'),

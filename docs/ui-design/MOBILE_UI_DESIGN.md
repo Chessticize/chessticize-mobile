@@ -80,6 +80,7 @@ Navigation rules:
 - Practice is the default launch tab.
 - Active practice sessions hide the tab bar and use a focused session shell.
 - Review and History both open the same board-based review surface, but with different entry context.
+- The app has two review concepts. Analysis Review is an unscored replay/analyze surface. Scheduled Review is the official spaced repetition flow that records review attempts and updates the queue.
 - Settings is the only place for data-destructive actions such as ELO reset and history delete.
 - Packs owns puzzle pack visibility, imports, removals, coverage, source attribution, and license notes.
 - Any sync error should be recoverable from Settings without blocking offline practice.
@@ -92,8 +93,9 @@ Primary flows:
 | Standard or Blitz practice | Practice Home -> Regular Sprint Active -> Sprint Results -> Practice Home | Board moves submit answers directly. Win by solving the target count before time/mistake failure. |
 | Arrow Duel practice | Practice Home -> Arrow Duel Active -> Sprint Results -> Arrow Duel Review | Candidate arrows are neutral until selection. Win by solving the target count before time/mistake failure. |
 | Custom sprint | Practice Home -> Custom Sprint Setup -> Regular Sprint Active or Arrow Duel Active -> Sprint Results | The selected mode determines the active session shell. |
-| Due mistake review | Review Queue -> Review Item -> Review Complete -> Review Queue | Correct answers increase interval; failures shorten it. |
-| Recent wrong review | History -> Wrong 7d filter -> Attempt Detail -> Review Item | History preserves original attempt context. |
+| Due mistake review | Review Queue -> Scheduled Review Item -> Review Complete -> Review Queue | Correct answers increase interval; failures reset or shorten it. Official review attempts are recorded in History. |
+| Post-session analysis | Sprint Results or Scheduled Review Complete -> Analysis Review -> Results or Practice | Used to inspect mistakes immediately. It does not write History and does not change the spaced repetition schedule. |
+| History replay | History -> Filtered row -> Analysis Review | History preserves original attempt context. Previous/next navigation stays inside the active History filter. |
 | Puzzle pack management | Packs -> Pack Detail -> Import or Remove -> Packs | Installed packs remain usable offline. |
 | iCloud and local data | Settings -> Sync Disclosure or Confirm Sheet -> Settings | Practice must keep working when sync is off. |
 
@@ -214,7 +216,7 @@ Practice controls:
 
 ![Mobile Arrow Duel review wireframe](assets/mobile-arrow-duel-review-wireframe.svg)
 
-Arrow Duel review behavior:
+Arrow Duel Analysis Review behavior:
 
 - Always show both original candidate arrows after review.
 - Correct Stockfish best move is green.
@@ -222,6 +224,9 @@ Arrow Duel review behavior:
 - User's original choice gets an additional marker.
 - If the user chose wrong, automatically play the opponent response or punishment line.
 - Prefer stored puzzle solution lines for explanation; fall back to local Stockfish when the stored line is not enough.
+- While the punishment line is being replayed, show the current-position evaluation, not the original candidate evals.
+- If the punishment line reaches checkmate, show the game result (`1-0` or `0-1`) and "Checkmate".
+- The user can switch to analysis at any point. Analysis mode uses Stockfish, shows candidate lines, and does not mutate official review history.
 
 Arrow Duel active-session rules:
 
@@ -237,6 +242,7 @@ Arrow Duel review rules:
 - User-selected wrong move receives an additional marker that is distinguishable without color alone.
 - Playback starts automatically after a wrong answer, but the user can pause, replay, or step through the line.
 - Review copy should explain the tactical reason only when the data supports it; otherwise show engine line and evaluation shift.
+- In a Scheduled Review, selecting the wrong Arrow Duel candidate records a failed review attempt and resets or contracts that puzzle's schedule. The user may then enter Analysis Review to inspect the line without creating additional history.
 
 ### Custom Sprint Setup
 
@@ -278,19 +284,29 @@ Custom sprint behavior:
 
 ### Review
 
-- First screen shows due mistake count and starts review immediately.
-- Filters include due, overdue, failed again, Arrow Duel only, and theme.
-- Review should reuse the same board surface as Practice.
-- Correct reviews increase interval; failed reviews shorten interval.
+- The Review tab is for Scheduled Review, not free analysis.
+- First screen shows due mistake count and starts the official review flow.
+- Filters include due, overdue, failed again, mode, sprint speed, Arrow Duel only, and theme.
+- Scheduled Review should reuse the same board surface as Practice.
+- Standard and Blitz review items use the original puzzle-solving flow and preserve the relevant target pace, such as a 20-second item from a 20-second sprint.
+- Arrow Duel review items use the Arrow Duel choice flow.
+- Correct reviews increase interval; failed reviews reset or shorten interval.
 - Empty state should say when the next review is due and offer regular practice.
-- Review cards should show mode, theme, last wrong date, due state, and current interval.
+- Review cards should show mode, theme, last wrong date, due state, current interval, and source sprint type.
+- The user can stop a Scheduled Review session at any time. Completed items are saved; unseen items remain due or overdue.
+- After a Scheduled Review batch, the user may open Analysis Review for missed items. That follow-up inspection does not create history rows and does not update the schedule.
 
 ### History
 
 - Quick range filters include 7 days, 30 days, 1 year, and all time.
-- Quick content filters include "Wrong in the last 7 days", mode, theme, rating range, sprint config, sprint speed, and Arrow Duel only.
-- Each row should show result, mode, puzzle rating, elapsed time, date, and review status.
-- Tapping a row opens review with original attempt context.
+- Quick content filters include "Wrong in the last 7 days", source type, mode, theme, rating range, sprint config, sprint speed, review status, and Arrow Duel only.
+- Source type distinguishes sprint attempts from official Scheduled Review attempts.
+- History includes correct and wrong sprint attempts.
+- History includes correct and wrong Scheduled Review attempts.
+- History excludes Analysis Review exploration and retry moves.
+- Each row should show result, source type, mode, puzzle rating, elapsed time, date, and review status.
+- Tapping a row opens Analysis Review with original attempt context.
+- Analysis Review launched from History supports retry, Stockfish analysis, and previous/next navigation through the current filtered History result set.
 - History filters should be horizontally scrollable chips on phones.
 - Failed attempts should clearly show whether they are already in the review queue.
 - Performance chart belongs in History, not primarily in Sprint Results.

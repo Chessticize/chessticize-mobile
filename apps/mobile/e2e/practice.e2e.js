@@ -63,11 +63,14 @@ describe('Practice POC', () => {
     await element(by.id('review-previous')).tap();
     await waitFor(element(by.text('1 / 3 · Standard'))).toBeVisible().withTimeout(30000);
 
+    await device.disableSynchronization();
     await element(by.id('review-analysis-button')).tap();
-    await expect(element(by.id('review-analysis-back'))).toBeVisible();
-    await expect(element(by.id('review-analysis-forward'))).toBeVisible();
-    await expect(element(by.id('review-analysis-reset'))).toBeVisible();
-    await expect(element(by.id('review-analysis-flip'))).toBeVisible();
+    await waitFor(element(by.id('review-analysis-back'))).toBeVisible().withTimeout(5000);
+    await waitFor(element(by.id('review-analysis-forward'))).toBeVisible().withTimeout(5000);
+    await waitFor(element(by.id('review-analysis-reset'))).toBeVisible().withTimeout(5000);
+    await waitFor(element(by.id('review-analysis-flip'))).toBeVisible().withTimeout(5000);
+    await waitForElementTextContaining('review-analysis-engine-status', 'SF 18 NNUE', 45000);
+    await waitForElementTextContaining('review-analysis-line-0', 'M1', 45000);
 
     const screenshotPath = await device.takeScreenshot('review-analysis-arrows');
     expectScreenshotContainsGreenAnalysisArrow(screenshotPath);
@@ -92,6 +95,25 @@ async function playBoardMove(testID, move, flipped = false) {
   await board.tapAtPoint(boardPoint(boardFrame, move.slice(0, 2), flipped));
   await sleep(250);
   await board.tapAtPoint(boardPoint(boardFrame, move.slice(2, 4), flipped));
+}
+
+async function waitForElementTextContaining(testID, expected, timeoutMs) {
+  const startedAt = Date.now();
+  let lastText = '';
+  while (Date.now() - startedAt < timeoutMs) {
+    const attributes = await element(by.id(testID)).getAttributes();
+    lastText = textFromAttributes(attributes);
+    if (lastText.includes(expected)) {
+      return;
+    }
+    await sleep(500);
+  }
+  throw new Error(`Timed out waiting for ${testID} to contain "${expected}". Last text: "${lastText}"`);
+}
+
+function textFromAttributes(attributes) {
+  const first = Array.isArray(attributes) ? attributes[0] : attributes;
+  return String(first?.text ?? first?.label ?? first?.value ?? '');
 }
 
 function boardPoint(frame, square, flipped = false) {

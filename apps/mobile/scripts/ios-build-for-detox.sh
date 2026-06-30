@@ -14,12 +14,19 @@ bundle exec pod install --project-directory=ios
 
 export FORCE_BUNDLING=1
 
+destination_args=()
+if [[ -n "${DETOX_IOS_DEVICE:-}" ]]; then
+  destination_args=(-destination "platform=iOS Simulator,name=${DETOX_IOS_DEVICE}")
+fi
+
 xcodebuild \
   -workspace ios/ChessticizeMobile.xcworkspace \
   -scheme ChessticizeMobile \
   -configuration Debug \
   -sdk iphonesimulator \
-  -derivedDataPath ios/build
+  "${destination_args[@]}" \
+  -derivedDataPath ios/build \
+  ONLY_ACTIVE_ARCH=YES
 
 app_bundle="ios/build/Build/Products/Debug-iphonesimulator/ChessticizeMobile.app"
 js_bundle="$app_bundle/main.jsbundle"

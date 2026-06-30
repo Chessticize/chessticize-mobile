@@ -4,7 +4,7 @@ import TestRenderer, { act } from "react-test-renderer";
 import { PracticePocScreen, type PracticeDebugTraceEvent } from "../src/components/PracticePocScreen";
 import { createMobilePracticeService, seededPuzzleCount, seededUniquePositionCount } from "../src/backend/mobilePractice";
 import { fixtureNeedsAtLeast } from "../../../packages/storage/src/practice-service";
-import type { ArrowDuelState, SprintState } from "../../../packages/core/src/index";
+import type { ArrowDuelState, SprintState, UciEngineTransport } from "../../../packages/core/src/index";
 
 const renderers: TestRenderer.ReactTestRenderer[] = [];
 
@@ -30,6 +30,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-tab")).toBeTruthy();
     expect(findByTestId(renderer, "settings-tab")).toBeTruthy();
     expect(findByTestId(renderer, "packs-tab")).toBeTruthy();
+    expect(findByTestId(renderer, "analysis-tab")).toBeTruthy();
     expect(findByTestId(renderer, "practice-mode-standard")).toBeTruthy();
     expect(findByTestId(renderer, "practice-mode-arrow-duel")).toBeTruthy();
     expect(findByTestId(renderer, "practice-mode-blitz")).toBeTruthy();
@@ -112,6 +113,10 @@ describe("PracticePocScreen", () => {
     expect(board.props.colors.validMoveDot).toBe("rgba(15, 23, 42, 0.36)");
     expect(board.props.colors.validMoveCapture).toBe("rgba(15, 23, 42, 0.56)");
     expect(board.props.draggableColor).toBe("w");
+    expect(board.props.withLetters).toBe(false);
+    expect(board.props.withNumbers).toBe(false);
+    expect(collectText(findByTestId(renderer, "board-coordinate-overlay"))).toContain("abcdefgh");
+    expect(collectText(findByTestId(renderer, "board-coordinate-overlay"))).toContain("87654321");
     expect(findByTestId(renderer, "session-timer")).toBeTruthy();
     expect(findByTestId(renderer, "session-progress")).toBeTruthy();
     expect(findByTestId(renderer, "session-strikes")).toBeTruthy();
@@ -550,6 +555,10 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "1 / 3 · Standard");
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
     expect(findByTestId(renderer, "mock-chessboard").props.draggableColor).toBe("w");
+    expect(findByTestId(renderer, "mock-chessboard").props.withLetters).toBe(false);
+    expect(findByTestId(renderer, "mock-chessboard").props.withNumbers).toBe(false);
+    expect(collectText(findByTestId(renderer, "board-coordinate-overlay"))).toContain("abcdefgh");
+    expect(collectText(findByTestId(renderer, "board-coordinate-overlay"))).toContain("87654321");
     const reviewFen = findByTestId(renderer, "mock-chessboard").props.fen;
 
     await boardMove(renderer, "e2e6");
@@ -644,11 +653,12 @@ describe("PracticePocScreen", () => {
     press(renderer, "review-analysis-button");
 
     expect(findByTestId(renderer, "review-analysis-line-0")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "review-analysis-engine-status"))).toBe("Local hint");
     expect(findByTestId(renderer, "analysis-arrow-overlay")).toBeTruthy();
     expect(collectText(renderer.root)).toContain("Qxe6+");
-    expect(collectText(renderer.root)).toContain("mate+");
+    expect(collectText(renderer.root)).toContain("M1");
     expect(collectText(renderer.root)).not.toContain("1. e2e6");
-    expect(collectText(findByTestId(renderer, "review-analysis-line-0"))).toMatch(/^mate\+1\./);
+    expect(collectText(findByTestId(renderer, "review-analysis-line-0"))).toMatch(/^M1.*Qxe6\+/);
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
     expect(findByTestId(renderer, "mock-chessboard").props.draggableColor).toBe(new Chess(reviewFen).turn());
     expect(findByTestId(renderer, "review-analysis-back").props.disabled).toBe(true);
@@ -656,7 +666,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "review-analysis-reset")).toBeTruthy();
     expect(() => press(renderer, "review-analysis-forward")).toThrow("review-analysis-forward is disabled");
 
-    press(renderer, "review-analysis-line-1");
+    press(renderer, "review-analysis-line-0");
     await flushMicrotasks();
     const candidateLineFen = findByTestId(renderer, "mock-chessboard").props.fen;
     expect(candidateLineFen).not.toBe(reviewFen);
@@ -694,6 +704,99 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "review-analysis-line-0")).toThrow();
     expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(reviewFen);
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
+  });
+
+  it("streams native Stockfish depth updates into review analysis rows", async () => {
+    const stockfish = createScriptedStockfishTransport((command, emit) => {
+      if (command === "go depth 8") {
+        void Promise.resolve().then(() => {
+          emit("info depth 4 multipv 1 score mate 1 pv e2e6");
+        });
+      }
+      if (command === "go depth 20") {
+        void Promise.resolve().then(() => {
+          emit("info depth 12 multipv 1 score mate 1 pv e2e6");
+          emit("bestmove e2e6");
+        });
+      }
+    });
+    const renderer = renderStandardSequenceScreen({
+      stockfishTransportFactory: () => stockfish.transport
+    });
+
+    press(renderer, "start-sprint-button");
+    await boardMove(renderer, "c4b5");
+    await settleFeedbackSnapshot();
+    await boardMove(renderer, "g6g5");
+    await settleFeedbackSnapshot();
+    await boardMove(renderer, "a4b6");
+    await settleFeedbackSnapshot();
+    press(renderer, "review-mistakes-button");
+
+    press(renderer, "review-analysis-button");
+    await waitForAssertion(() => {
+      expect(stockfish.commands).toContain("go depth 8");
+      expect(collectText(findByTestId(renderer, "review-analysis-engine-status"))).toBe("SF 18 NNUE · Depth 4/20");
+      expect(collectText(findByTestId(renderer, "review-analysis-line-0"))).toMatch(/^M1.*Qxe6\+/);
+    });
+
+    await act(async () => {
+      jest.advanceTimersByTime(500);
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await waitForAssertion(() => {
+      expect(stockfish.commands).toContain("go depth 20");
+      expect(collectText(findByTestId(renderer, "review-analysis-engine-status"))).toBe("SF 18 NNUE · Depth 12");
+      expect(collectText(findByTestId(renderer, "review-analysis-line-0"))).toMatch(/^M1.*Qxe6\+/);
+    });
+  });
+
+  it("isolates Stockfish diagnostics with scored live rows whose order can change by depth", async () => {
+    const stockfish = createScriptedStockfishTransport((command, emit) => {
+      if (command === "go depth 8") {
+        void Promise.resolve().then(() => {
+          emit("info depth 4 multipv 1 score cp 20 pv d8e8");
+          emit("info depth 4 multipv 2 score cp 10 pv d8d6");
+        });
+      }
+      if (command === "go depth 20") {
+        void Promise.resolve().then(() => {
+          emit("info depth 12 multipv 1 score cp 360 pv d8d6");
+          emit("info depth 12 multipv 2 score cp -120 pv d8e8");
+          emit("bestmove d8d6");
+        });
+      }
+    });
+    const renderer = renderScreen({
+      stockfishTransportFactory: () => stockfish.transport
+    });
+
+    press(renderer, "analysis-tab");
+    await waitForAssertion(() => {
+      expect(stockfish.commands).toContain("go depth 8");
+      expect(collectText(findByTestId(renderer, "stockfish-diagnostics-status"))).toContain("Depth 4/20");
+      expect(collectText(findByTestId(renderer, "stockfish-diagnostics-line-0"))).toMatch(/^\+0\.2.*Qe8/);
+      expect(collectText(findByTestId(renderer, "stockfish-diagnostics-line-1"))).toMatch(/^\+0\.1.*Qxd6/);
+      expect(collectText(findByTestId(renderer, "stockfish-diagnostics-panel"))).not.toContain("eval --");
+    });
+
+    await act(async () => {
+      jest.advanceTimersByTime(500);
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await waitForAssertion(() => {
+      expect(stockfish.commands).toContain("go depth 20");
+      expect(collectText(findByTestId(renderer, "stockfish-diagnostics-status"))).toContain("Done · Depth 12");
+      expect(collectText(findByTestId(renderer, "stockfish-diagnostics-line-0"))).toMatch(/^\+3\.6.*Qxd6/);
+      expect(collectText(findByTestId(renderer, "stockfish-diagnostics-line-1"))).toMatch(/^-1\.2.*Qe8/);
+      expect(collectText(findByTestId(renderer, "stockfish-diagnostics-raw-lines"))).toContain("info depth 12 multipv 1 score cp 360 pv d8d6");
+    });
   });
 
   it("reviews Arrow Duel mistakes with analysis blunder arrows and a forced punishment line", async () => {
@@ -746,6 +849,13 @@ describe("PracticePocScreen", () => {
     expect(collectText(renderer.root)).not.toContain("Choose the better move");
     expect(collectText(renderer.root)).not.toContain("Follow the puzzle line");
     expectText(renderer, "Blue arrows show the next move in the punishment line. Follow them to see why the choice is bad.");
+    const guidedCurrentEval = collectText(findByTestId(renderer, "review-guided-eval-line-0"));
+    expect(guidedCurrentEval).toMatch(/-M\d/);
+    expect(guidedCurrentEval).toContain("Current position");
+    expect(guidedCurrentEval).not.toContain("Top move");
+    expect(guidedCurrentEval).not.toContain("Candidate");
+    expect(guidedCurrentEval).not.toContain("eval --");
+    expect(() => findByTestId(renderer, "review-guided-eval-line-1")).toThrow();
 
     const firstGuidedMove = firstPuzzleSolution[2];
     const firstReplyMove = firstPuzzleSolution[3];
@@ -764,12 +874,34 @@ describe("PracticePocScreen", () => {
     await settleFeedbackSnapshot();
     expectText(renderer, "1 / 3 · Arrow Duel");
     expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(expectedAfterGuidedReply);
-    if (firstPuzzleSolution[4]) {
+    let expectedCurrentFen = expectedAfterGuidedReply;
+    for (let cursor = 4; cursor < firstPuzzleSolution.length; cursor += 2) {
       expect(findByTestId(renderer, "review-guided-move-overlay")).toBeTruthy();
+      const guidedMove = firstPuzzleSolution[cursor];
+      if (!guidedMove) {
+        break;
+      }
+      expectedCurrentFen = mustFenAfterMove(expectedCurrentFen, guidedMove);
+      const replyMove = firstPuzzleSolution[cursor + 1];
+      if (replyMove) {
+        expectedCurrentFen = mustFenAfterMove(expectedCurrentFen, replyMove);
+      }
+      await boardMove(renderer, guidedMove);
+      await settleFeedbackSnapshot();
+      expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(expectedCurrentFen);
     }
+    const finalCurrentEval = collectText(findByTestId(renderer, "review-guided-eval-line-0"));
+    expect(finalCurrentEval).toMatch(/(?:1-0|0-1)/);
+    expect(finalCurrentEval).toContain("Checkmate");
+    expect(finalCurrentEval).toContain("Current position");
+    expect(() => findByTestId(renderer, "review-guided-eval-line-1")).toThrow();
+    await settleFeedbackSnapshot();
     press(renderer, "review-reset-puzzle");
     expectText(renderer, "Choose the better move");
     expect(() => findByTestId(renderer, "review-guided-move-overlay")).toThrow();
+    press(renderer, "review-exit");
+    expect(findByTestId(renderer, "start-sprint-button")).toBeTruthy();
+    expect(() => findByTestId(renderer, "review-session")).toThrow();
   });
 
   it("ignores stale board callbacks instead of recording a correct visible move as wrong", async () => {
@@ -822,6 +954,36 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "packs-license-notes")).toBeTruthy();
   });
 });
+
+function createScriptedStockfishTransport(
+  onCommand: (command: string, emit: (line: string) => void) => void
+): { commands: string[]; transport: UciEngineTransport } {
+  const commands: string[] = [];
+  const listeners = new Set<(line: string) => void>();
+  const emit = (line: string) => {
+    for (const listener of listeners) {
+      listener(line);
+    }
+  };
+
+  return {
+    commands,
+    transport: {
+      start: jest.fn(async () => {}),
+      send: jest.fn((command: string) => {
+        commands.push(command);
+        onCommand(command, emit);
+      }),
+      onLine: (listener: (line: string) => void) => {
+        listeners.add(listener);
+        return () => {
+          listeners.delete(listener);
+        };
+      },
+      terminate: jest.fn()
+    }
+  };
+}
 
 function renderScreen(props: React.ComponentProps<typeof PracticePocScreen> = {}): TestRenderer.ReactTestRenderer {
   let renderer: TestRenderer.ReactTestRenderer | undefined;
@@ -957,6 +1119,20 @@ async function flushMicrotasks(): Promise<void> {
     await Promise.resolve();
     await Promise.resolve();
   });
+}
+
+async function waitForAssertion(assertion: () => void, attempts = 10): Promise<void> {
+  let lastError: unknown;
+  for (let index = 0; index < attempts; index += 1) {
+    try {
+      assertion();
+      return;
+    } catch (error) {
+      lastError = error;
+      await flushMicrotasks();
+    }
+  }
+  throw lastError;
 }
 
 function findByTestId(renderer: TestRenderer.ReactTestRenderer, testID: string): TestRenderer.ReactTestInstance {
