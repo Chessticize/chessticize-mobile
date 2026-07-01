@@ -4,6 +4,7 @@ const zlib = require('zlib');
 describe('Practice POC', () => {
   beforeEach(async () => {
     await device.launchApp({ newInstance: true, delete: true });
+    await device.disableSynchronization();
   });
 
   it('renders the standard sprint board', async () => {
