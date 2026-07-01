@@ -631,7 +631,9 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "custom-per-puzzle-stepper-increase"))).toBe("");
     expect(collectText(findByTestId(renderer, "custom-config-list"))).not.toContain("−");
     expect(collectText(findByTestId(renderer, "custom-config-list"))).not.toContain("＋");
+    expect(collectText(findByTestId(renderer, "custom-config-list"))).not.toContain("›");
     expect(collectText(findByTestId(renderer, "custom-config-list"))).not.toContain("Allowed values");
+    expect(collectText(findByTestId(renderer, "custom-include-arrow-duel-toggle"))).toBe("");
     press(renderer, "custom-theme-mate");
     expectText(renderer, "Mate");
     press(renderer, "custom-include-arrow-duel-toggle");
@@ -718,6 +720,9 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "Sprint failed");
     expectText(renderer, "Result: Time expired");
     expect(findByTestId(renderer, "sprint-result-hero")).toBeTruthy();
+    expect(findByTestId(renderer, "sprint-result-status-glyph")).toBeTruthy();
+    expect(findByTestId(renderer, "sprint-result-failed-glyph")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "sprint-result-status-glyph"))).toBe("");
     expect(findByTestId(renderer, "sprint-result-solved")).toBeTruthy();
     expect(findByTestId(renderer, "sprint-result-accuracy")).toBeTruthy();
     expect(findByTestId(renderer, "sprint-result-rating-change")).toBeTruthy();
@@ -731,7 +736,15 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain("No new review items");
     expect(collectText(findByTestId(renderer, "sprint-result-mistakes"))).toBe("0");
     expect(() => findByTestId(renderer, "sprint-result-rating-snapshot")).toThrow();
-    expect(() => findByTestId(renderer, "sprint-result-history-trend")).toThrow();
+    expect(findByTestId(renderer, "sprint-result-history-trend")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "sprint-result-history-trend"))).toContain("Rating Progress");
+    expect(collectText(findByTestId(renderer, "sprint-result-history-trend"))).toContain("Start 600");
+    expect(collectText(findByTestId(renderer, "sprint-result-trend-current"))).not.toBe("");
+    expect(findByTestId(renderer, "sprint-result-trend-plot")).toBeTruthy();
+    expect(findByTestId(renderer, "sprint-result-trend-point-0")).toBeTruthy();
+    expect(findByTestId(renderer, "sprint-result-trend-point-4")).toBeTruthy();
+    expect(findByTestId(renderer, "sprint-result-trend-segment-0")).toBeTruthy();
+    expect(findByTestId(renderer, "sprint-result-trend-segment-3")).toBeTruthy();
     expectText(renderer, "Mistakes");
     expectText(renderer, "Done");
     expect(findByTestId(renderer, "sprint-result-history-button")).toBeTruthy();
@@ -832,6 +845,8 @@ describe("PracticePocScreen", () => {
     )[0];
     expect(historyAttemptRow).toBeTruthy();
     const historyAttemptId = historyAttemptRow.props.testID.replace("history-attempt-", "");
+    expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-badge`))).toBe("");
+    expect(findByTestId(renderer, "result-badge-wrong-glyph")).toBeTruthy();
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-result`))).toBe("Wrong move");
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-move`))).toBe("Wrong move · g6g5");
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-meta`))).toContain("Sprint · Rating");
@@ -1105,6 +1120,8 @@ describe("PracticePocScreen", () => {
       (node) => typeof node.props.testID === "string" && node.props.testID.startsWith("review-due-item-")
     );
     expect(dueItemRows.length).toBeGreaterThan(0);
+    expect(collectText(findByTestId(renderer, `${dueItemRows[0]!.props.testID}-badge`))).toBe("");
+    expect(findByTestId(renderer, "result-badge-alert-glyph")).toBeTruthy();
 
     press(renderer, "review-filter-arrow-duel");
     expect(findByTestId(renderer, "review-start-due").props.accessibilityState).toEqual({ disabled: true });
@@ -1613,6 +1630,7 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "Practice works offline · Waiting for upload approval");
     expectText(renderer, "Needs approval");
     expect(findByTestId(renderer, "settings-icloud-sync-toggle")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "settings-icloud-sync-toggle"))).toBe("");
     expect(findByTestId(renderer, "settings-sync-allow-upload")).toBeTruthy();
     expectText(renderer, "Required before this device uploads existing local progress.");
     press(renderer, "settings-sync-allow-upload");
@@ -1666,12 +1684,17 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "packs-installed-section")).toBeTruthy();
     expect(findByTestId(renderer, "packs-optional-section")).toBeTruthy();
     expect(findByTestId(renderer, "packs-installed-core")).toBeTruthy();
+    expect(findByTestId(renderer, "packs-active-core")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "packs-active-core"))).toBe("");
     expectText(renderer, "Active");
     expectText(renderer, "Rating 600 - 1600 · Mixed, mate, endgame · Arrow Duel ready");
     expect(() => findByTestId(renderer, "packs-coverage-core")).toThrow();
+    expect(collectText(findByTestId(renderer, "packs-detail-core"))).toBe("");
     expect(findByTestId(renderer, "packs-installed-tactics")).toBeTruthy();
     expect(findByTestId(renderer, "packs-optional-endgame")).toBeTruthy();
     expect(() => findByTestId(renderer, "packs-coverage-endgame")).toThrow();
+    expect(collectText(findByTestId(renderer, "packs-import-endgame"))).toBe("");
+    expect(findByTestId(renderer, "packs-import-endgame-glyph")).toBeTruthy();
     expect(findByTestId(renderer, "packs-optional-mate-in-n")).toBeTruthy();
     expect(findByTestId(renderer, "packs-import")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "packs-import"))).toBe("");
@@ -1700,12 +1723,18 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "packs-import-step-manifest")).toBeTruthy();
     expect(findByTestId(renderer, "packs-import-step-license")).toBeTruthy();
     expect(findByTestId(renderer, "packs-import-step-activate")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "packs-import-step-manifest-mark"))).toBe("");
+    expect(collectText(findByTestId(renderer, "packs-import-step-license-mark"))).toBe("");
+    expect(collectText(findByTestId(renderer, "packs-import-step-activate-mark"))).toBe("");
+    expect(collectText(findByTestId(renderer, "packs-import-progress"))).not.toContain("…");
     expectText(renderer, "Validating Imported Pack manifest");
     press(renderer, "packs-import-endgame");
     expectText(renderer, "Endgame Pack");
     expectText(renderer, "Validating Endgame Pack manifest");
     expect(findByTestId(renderer, "packs-remove-tactics")).toBeTruthy();
     expect(findByTestId(renderer, "packs-remove")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "packs-remove"))).toBe("");
+    expect(findByTestId(renderer, "packs-remove-tactics-glyph")).toBeTruthy();
     press(renderer, "packs-remove");
     expect(findByTestId(renderer, "packs-remove-confirmation")).toBeTruthy();
     expectText(renderer, "Remove Tactics Pack?");
