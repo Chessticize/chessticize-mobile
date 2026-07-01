@@ -604,7 +604,13 @@ describe("PracticePocScreen", () => {
 
     expectText(renderer, "Sprint failed");
     expectText(renderer, "Result: Three mistakes");
-    expect(findByTestId(renderer, "review-mistakes-button")).toBeTruthy();
+    expect(collectText(renderer.root)).not.toContain("Start new sprint");
+    const reviewButton = findByTestId(renderer, "review-mistakes-button");
+    const playAgainButton = findByTestId(renderer, "play-again-button");
+    expect(reviewButton).toBeTruthy();
+    expect(playAgainButton).toBeTruthy();
+    expect(hasStyleEntry(reviewButton, "backgroundColor", "#2563EB")).toBe(true);
+    expect(hasStyleEntry(playAgainButton, "backgroundColor", "#2563EB")).toBe(false);
   });
 
   it("reviews missed puzzles from the completed sprint using the solving board", async () => {
@@ -962,7 +968,6 @@ describe("PracticePocScreen", () => {
   });
 
   it("reviews Arrow Duel mistakes with analysis blunder arrows and a forced punishment line", async () => {
-    const renderer = renderScreen();
     const driver = createMobilePracticeService("familiar15");
     let driverState = driver.startSprint({
       mode: "arrow_duel",
@@ -972,6 +977,30 @@ describe("PracticePocScreen", () => {
       maxMistakes: 3
     });
     const firstPuzzleSolution = [...requireArrowDuelState(driverState).puzzle.solutionMoves];
+    const firstGuidedMove = firstPuzzleSolution[2];
+    const firstReplyMove = firstPuzzleSolution[3];
+    if (!firstGuidedMove) {
+      throw new Error("Expected the first Arrow Duel fixture to have a continuation move");
+    }
+    if (!firstReplyMove) {
+      throw new Error("Expected the first Arrow Duel fixture to have a reply after the continuation move");
+    }
+    const stockfish = createScriptedStockfishTransport((command, emit) => {
+      if (command === "go depth 8") {
+        void Promise.resolve().then(() => {
+          emit(`info depth 4 multipv 1 score cp 42 pv ${firstGuidedMove}`);
+        });
+      }
+      if (command === "go depth 20") {
+        void Promise.resolve().then(() => {
+          emit(`info depth 12 multipv 1 score cp 64 pv ${firstGuidedMove}`);
+          emit(`bestmove ${firstGuidedMove}`);
+        });
+      }
+    });
+    const renderer = renderScreen({
+      stockfishTransportFactory: () => stockfish.transport
+    });
     const wrongMoves: string[] = [];
 
     press(renderer, "practice-mode-arrow-duel");
@@ -1009,25 +1038,27 @@ describe("PracticePocScreen", () => {
     expect(countStyleEntry(findByTestId(renderer, "review-guided-move-overlay"), "backgroundColor", "#2563EB")).toBeGreaterThan(0);
     expect(countStyleEntry(findByTestId(renderer, "review-guided-move-overlay"), "backgroundColor", "#16A34A")).toBe(0);
     expect(collectText(renderer.root)).not.toContain("Choose the better move");
+    expect(collectText(renderer.root)).not.toContain("Find the best move");
     expect(collectText(renderer.root)).not.toContain("Follow the puzzle line");
     expectText(renderer, "Blue arrows show the next move in the punishment line. Follow them to see why the choice is bad.");
+    const guidedStartFen = findByTestId(renderer, "mock-chessboard").props.fen;
+    await waitForAssertion(() => {
+      expect(stockfish.commands).toContain(`position fen ${guidedStartFen}`);
+      const guidedCurrentEval = collectText(findByTestId(renderer, "review-guided-eval-line-0"));
+      expect(guidedCurrentEval).toMatch(/^\+0\.4.*Current position/);
+    });
+    const analysisPanel = findByTestId(renderer, "review-analysis-panel");
+    const panelOrder = analysisPanel.findAll((node) =>
+      node.props.testID === "review-guided-eval-list" || node.props.testID === "review-analysis-toolbar"
+    ).map((node) => node.props.testID);
+    expect(panelOrder.indexOf("review-guided-eval-list")).toBeLessThan(panelOrder.indexOf("review-analysis-toolbar"));
     const guidedCurrentEval = collectText(findByTestId(renderer, "review-guided-eval-line-0"));
-    expect(guidedCurrentEval).toMatch(/-M\d/);
     expect(guidedCurrentEval).toContain("Current position");
     expect(guidedCurrentEval).not.toContain("Top move");
     expect(guidedCurrentEval).not.toContain("Candidate");
     expect(guidedCurrentEval).not.toContain("eval --");
     expect(() => findByTestId(renderer, "review-guided-eval-line-1")).toThrow();
 
-    const firstGuidedMove = firstPuzzleSolution[2];
-    const firstReplyMove = firstPuzzleSolution[3];
-    if (!firstGuidedMove) {
-      throw new Error("Expected the first Arrow Duel fixture to have a continuation move");
-    }
-    if (!firstReplyMove) {
-      throw new Error("Expected the first Arrow Duel fixture to have a reply after the continuation move");
-    }
-    const guidedStartFen = findByTestId(renderer, "mock-chessboard").props.fen;
     const expectedAfterGuidedReply = mustFenAfterMove(
       mustFenAfterMove(guidedStartFen, firstGuidedMove),
       firstReplyMove
