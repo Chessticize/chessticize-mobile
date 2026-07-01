@@ -1046,7 +1046,7 @@ export function PracticePocScreen({
               />
             ) : null}
 
-            {state?.status === "active" || isShowingFeedbackSnapshot ? null : (
+            {state?.status === "active" || isShowingFeedbackSnapshot || isFinished ? null : (
               <>
                 <Pressable
                   accessibilityRole="button"
@@ -1383,6 +1383,7 @@ function SprintSummary({
 }): React.JSX.Element {
   const delta = (state.ratingAfter ?? state.ratingBefore) - state.ratingBefore;
   const reason = formatEndReason(state.endReason);
+  const shouldPrioritizeReview = state.status === "failed" && Boolean(onReview);
 
   return (
     <View style={styles.summaryPanel} testID="sprint-summary-panel">
@@ -1399,15 +1400,27 @@ function SprintSummary({
         {delta} → {state.ratingAfter ?? state.ratingBefore}
       </Text>
 
+      {onReview && shouldPrioritizeReview ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Review missed puzzles"
+          testID="review-mistakes-button"
+          style={[styles.primaryButton, styles.summaryPrimaryAction]}
+          onPress={onReview}
+        >
+          <Text style={styles.primaryButtonText}>Review missed puzzles</Text>
+        </Pressable>
+      ) : null}
+
       <View style={styles.summaryRow}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Play again"
           testID="play-again-button"
-          style={styles.primaryButton}
+          style={shouldPrioritizeReview ? styles.secondaryButton : styles.primaryButton}
           onPress={onReplay}
         >
-          <Text style={styles.primaryButtonText}>Play again</Text>
+          <Text style={shouldPrioritizeReview ? styles.secondaryButtonText : styles.primaryButtonText}>Play again</Text>
         </Pressable>
         <Pressable
           accessibilityRole="button"
@@ -1419,7 +1432,7 @@ function SprintSummary({
           <Text style={styles.secondaryButtonText}>Back</Text>
         </Pressable>
       </View>
-      {onReview ? (
+      {onReview && !shouldPrioritizeReview ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Review missed puzzles"
@@ -1458,11 +1471,13 @@ function PracticePrompt({
   }
   const side = sideToMove(currentPuzzle.currentFen) === "b" ? "black" : "white";
   const isArrowDuel = currentPuzzle.kind === "arrow_duel";
-  const displayedPromptText = promptText ?? (
-    isArrowDuel
-      ? `Choose the better move for ${side} between the two arrows.`
-      : `Find the best move for ${side}.`
-  );
+  const displayedPromptText = promptText === undefined
+    ? (
+      isArrowDuel
+        ? `Choose the better move for ${side} between the two arrows.`
+        : `Find the best move for ${side}.`
+    )
+    : promptText;
   const displayedPromptHint = promptHint === undefined
     ? (isArrowDuel ? "Watch for checks, captures, and attacks!" : null)
     : promptHint;
@@ -2112,6 +2127,13 @@ function ReviewSession({
   const baseBoardFlipped = reviewStartingPerspectiveFlipped(currentEntry);
   const boardFlipped = manualBoardFlip ? !baseBoardFlipped : baseBoardFlipped;
   const feedbackMove = feedback?.submittedMove && feedback.submittedMove !== "__illegal__" ? arrowFromTo(feedback.submittedMove) : null;
+  const shouldShowGuidedCurrentEval = !analysisEnabled && currentEntry.mode === "arrow_duel" && reviewState.kind === "line";
+  const shouldRunGuidedCurrentEval = shouldShowGuidedCurrentEval && !isTerminalPosition(currentFen);
+  const stockfishTargetFen = analysisEnabled
+    ? displayFen
+    : shouldRunGuidedCurrentEval
+      ? currentFen
+      : null;
   const analysisLines = analysisEnabled
       ? buildPuzzleGuidedAnalysisLines({
         fen: displayFen,
@@ -2122,12 +2144,15 @@ function ReviewSession({
       })
     : [];
   const guidedEvalLines =
-    !analysisEnabled && currentEntry.mode === "arrow_duel" && reviewState.kind === "line"
-      ? [buildCurrentPositionEvaluationLine({
-          fen: currentFen,
-          puzzle: currentEntry.puzzle,
-          currentPuzzle
-        })]
+    shouldShowGuidedCurrentEval
+      ? [formatGuidedCurrentEvalLine(
+          buildCurrentPositionEvaluationLine({
+            fen: currentFen,
+            engineLines: shouldRunGuidedCurrentEval ? engineAnalysisLines : []
+          }),
+          shouldRunGuidedCurrentEval,
+          analysisEngineStatus
+        )]
       : [];
   const analysisBlunderMove =
     analysisEnabled && reviewState.kind === "arrow_duel" && displayFen === currentEntry.puzzle.initialFen
@@ -2162,7 +2187,7 @@ function ReviewSession({
           : "";
 
   useEffect(() => {
-    if (!analysisEnabled) {
+    if (!stockfishTargetFen) {
       setEngineAnalysisLines([]);
       setAnalysisEngineStatus("idle");
       setAnalysisIsRunning(false);
@@ -2183,7 +2208,7 @@ function ReviewSession({
     setAnalysisIsRunning(true);
     const usePrewarmedNativeEngine = stockfishTransportFactory === createNativeStockfishTransport;
     const prewarm = usePrewarmedNativeEngine ? prewarmNativeStockfishTransport() : Promise.resolve(false);
-    void prewarm.then((prewarmed) => analyzeFenWithUciEngine(transport, displayFen, {
+    void prewarm.then((prewarmed) => analyzeFenWithUciEngine(transport, stockfishTargetFen, {
       depth: ANALYSIS_DEPTH,
       multiPv: 3,
       initialize: !prewarmed,
@@ -2216,7 +2241,7 @@ function ReviewSession({
       cancelled = true;
       transport.send("stop");
     };
-  }, [analysisEnabled, displayFen, stockfishTransportFactory]);
+  }, [analysisEnabled, stockfishTargetFen, stockfishTransportFactory]);
 
   useEffect(() => {
     if (currentEntry.source !== "due" || reviewResultRecorded) {
@@ -2748,7 +2773,24 @@ function ReviewSession({
         </View>
 
         <View style={styles.analysisPanel} testID="review-analysis-panel">
-          <View style={styles.analysisToolbar}>
+          {!analysisEnabled && guidedEvalLines.length > 0 ? (
+            <View testID="review-guided-eval-list">
+              {guidedEvalLines.map((line, index) => (
+                <View
+                  key={`${line.move}-${index}`}
+                  style={styles.analysisLineRow}
+                  testID={`review-guided-eval-line-${index}`}
+                >
+                  <Text style={styles.analysisEvalText}>{line.score}</Text>
+                  <Text style={styles.analysisMoveText} numberOfLines={1}>
+                    {line.label === "Current position" ? line.san : `${index + 1}. ${line.san}`}
+                  </Text>
+                  <Text style={styles.analysisLineLabel} numberOfLines={1}>{line.label}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+          <View style={styles.analysisToolbar} testID="review-analysis-toolbar">
             {analysisEnabled ? (
               <>
                 <Pressable accessibilityRole="button" accessibilityLabel="Close analysis" testID="review-close-analysis" style={styles.iconButton} onPress={closeAnalysis}>
@@ -2815,27 +2857,35 @@ function ReviewSession({
               ))}
             </>
           ) : null}
-          {!analysisEnabled && guidedEvalLines.length > 0 ? (
-            <>
-              {guidedEvalLines.map((line, index) => (
-                <View
-                  key={`${line.move}-${index}`}
-                  style={styles.analysisLineRow}
-                  testID={`review-guided-eval-line-${index}`}
-                >
-                  <Text style={styles.analysisEvalText}>{line.score}</Text>
-                  <Text style={styles.analysisMoveText} numberOfLines={1}>
-                    {line.label === "Current position" ? line.san : `${index + 1}. ${line.san}`}
-                  </Text>
-                  <Text style={styles.analysisLineLabel} numberOfLines={1}>{line.label}</Text>
-                </View>
-              ))}
-            </>
-          ) : null}
         </View>
       </View>
     </View>
   );
+}
+
+function formatGuidedCurrentEvalLine(
+  line: ReviewAnalysisLine,
+  isWaitingForStockfish: boolean,
+  status: AnalysisEngineStatus
+): ReviewAnalysisLine {
+  if (!isWaitingForStockfish || line.score !== "eval --") {
+    return line;
+  }
+  if (status === "fallback") {
+    return { ...line, score: "No SF" };
+  }
+  if (status === "error") {
+    return { ...line, score: "SF error" };
+  }
+  return { ...line, score: "..." };
+}
+
+function isTerminalPosition(fen: string): boolean {
+  try {
+    return new Chess(fen).isGameOver();
+  } catch {
+    return false;
+  }
 }
 
 function AnalysisArrowOverlay({
@@ -3897,6 +3947,10 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 13,
     fontWeight: "800"
+  },
+  summaryPrimaryAction: {
+    alignSelf: "stretch",
+    flex: 0
   },
   secondaryButton: {
     alignItems: "center",
