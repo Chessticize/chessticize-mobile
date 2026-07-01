@@ -7,7 +7,7 @@ describe('Practice POC', () => {
   });
 
   it('renders the standard sprint board', async () => {
-    await tapWhenVisible('start-sprint-button');
+    await tapWhenVisible('practice-mode-standard');
     await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(30000);
     await expect(element(by.text('Mistakes'))).toBeVisible();
 
@@ -19,7 +19,6 @@ describe('Practice POC', () => {
   it('renders Arrow Duel candidate arrows on the board', async () => {
     await waitFor(element(by.id('practice-mode-arrow-duel'))).toBeVisible().withTimeout(30000);
     await element(by.id('practice-mode-arrow-duel')).tap();
-    await tapWhenVisible('start-sprint-button');
     await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
     await expect(element(by.text('Watch for checks, captures, and attacks!'))).toBeVisible();
 
@@ -29,9 +28,7 @@ describe('Practice POC', () => {
   });
 
   it('accepts the fixed alternate mate-in-one puzzle', async () => {
-    await element(by.id('practice-mode-standard')).tap();
-    await waitForVisibleInPracticeScroll('test-puzzle-source-familiar15');
-    await tapWhenVisible('start-sprint-button');
+    await tapWhenVisible('practice-mode-standard');
     await waitFor(element(by.text('Find the best move for white.'))).toBeVisible().withTimeout(10000);
 
     const boardFrame = await frameFor(element(by.id('session-board')));
@@ -48,9 +45,7 @@ describe('Practice POC', () => {
   });
 
   it('opens last sprint mistake review with navigation and analysis arrows', async () => {
-    await element(by.id('practice-mode-standard')).tap();
-    await waitForVisibleInPracticeScroll('test-puzzle-source-familiar15');
-    await tapWhenVisible('start-sprint-button');
+    await tapWhenVisible('practice-mode-standard');
     await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
 
     await playBoardMove('session-board', 'c2b3');
