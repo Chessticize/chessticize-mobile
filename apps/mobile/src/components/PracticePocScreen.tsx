@@ -1564,6 +1564,7 @@ function CustomSprintSetup({
   const ratingRange = `${Math.max(400, currentRating - 200)} - ${currentRating + 200}`;
   const requiredPuzzleCount = targetCorrect + maxMistakes;
   const hasEnoughLocalPuzzles = availablePuzzleCount >= requiredPuzzleCount;
+  const canStartWithLocalPuzzles = availablePuzzleCount > 0;
   const previousConfigs: PreviousCustomConfig[] = [
     {
       id: "standard-5-20",
@@ -1601,10 +1602,10 @@ function CustomSprintSetup({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Start custom sprint"
-          accessibilityState={{ disabled: !hasEnoughLocalPuzzles }}
-          disabled={!hasEnoughLocalPuzzles}
+          accessibilityState={{ disabled: !canStartWithLocalPuzzles }}
+          disabled={!canStartWithLocalPuzzles}
           testID="start-sprint-button"
-          style={[styles.customHeaderStartButton, !hasEnoughLocalPuzzles ? styles.disabledButton : null]}
+          style={[styles.customHeaderStartButton, !canStartWithLocalPuzzles ? styles.disabledButton : null]}
           onPress={onStart}
         >
           <Text style={styles.primaryButtonText}>Start</Text>
@@ -2252,10 +2253,15 @@ function SprintSummary({
 
       <View style={styles.resultReviewRow} testID="sprint-result-review-impact">
         <View>
-          <Text style={styles.listText}>Review queue</Text>
-          <Text style={styles.helperText}>{reviewImpact}</Text>
+          <Text style={styles.listText}>Mistakes</Text>
+          <Text style={styles.helperText}>
+            {state.mistakeCount > 0 ? "Review your mistakes" : "No mistakes in this sprint"}
+          </Text>
         </View>
-        <Text style={[styles.resultReviewCount, state.mistakeCount > 0 ? styles.errorText : styles.positive]}>
+        <Text
+          testID="sprint-result-mistakes"
+          style={[styles.resultReviewCount, state.mistakeCount > 0 ? styles.errorText : styles.positive]}
+        >
           {state.mistakeCount}
         </Text>
       </View>
@@ -5416,15 +5422,17 @@ function PackRow({
           <Text style={styles.packActionText}>Import</Text>
         </Pressable>
       ) : onRemove ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Remove ${pack.title}`}
-          testID={`packs-remove-${pack.id}`}
-          style={styles.packActionButton}
-          onPress={onRemove}
-        >
-          <Text style={styles.packActionText}>Remove</Text>
-        </Pressable>
+        <View testID={`packs-remove-${pack.id}`}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Remove ${pack.title}`}
+            testID="packs-remove"
+            style={styles.packActionButton}
+            onPress={onRemove}
+          >
+            <Text style={styles.packActionText}>Remove</Text>
+          </Pressable>
+        </View>
       ) : (
         <Text style={styles.packActiveMark}>✓</Text>
       )}
