@@ -1068,6 +1068,7 @@ export function PracticePocScreen({
                 elapsedMs={Math.min(sprintElapsedMs, state ? state.config.durationSeconds * 1000 : sprintElapsedMs)}
                 onReplay={() => startSprint(mode)}
                 onBack={resetToIdle}
+                onOpenHistory={() => setTab("history")}
                 onReview={state.mistakeCount > 0 ? showReviewMistakes : undefined}
               />
             ) : null}
@@ -1290,29 +1291,60 @@ function PracticeModeCard({
   onStart: () => void;
 }): React.JSX.Element {
   const label = modeLabel(item.mode);
+  const modeDetails = practiceModeDetails(item.config);
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      accessibilityLabel={`${label} mode`}
-      testID={`practice-mode-${item.mode.replace("_", "-")}`}
+    <View
       style={[styles.practiceModeCard, active ? styles.practiceModeCardActive : null]}
-      onPress={onPress}
-      onLongPress={onStart}
     >
-      <View style={styles.practiceModeIcon}>
-        <Text style={styles.practiceModeIconText}>{PRACTICE_MODE_ICONS[item.mode]}</Text>
-      </View>
-      <View style={styles.practiceModeCopy}>
-        <Text style={styles.practiceModeTitle}>{label}</Text>
-        <Text style={styles.helperText}>{PRACTICE_MODE_DESCRIPTIONS[item.mode]}</Text>
-      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ selected: active }}
+        accessibilityLabel={`${label} mode`}
+        testID={`practice-mode-${item.mode.replace("_", "-")}`}
+        style={styles.practiceModeSelectArea}
+        onPress={onPress}
+      >
+        <View style={styles.practiceModeIcon}>
+          <Text style={styles.practiceModeIconText}>{PRACTICE_MODE_ICONS[item.mode]}</Text>
+        </View>
+        <View style={styles.practiceModeCopy}>
+          <View style={styles.practiceModeTitleRow}>
+            <Text style={styles.practiceModeTitle}>{label}</Text>
+            {active ? (
+              <Text style={styles.practiceModeSelectedBadge}>Selected</Text>
+            ) : null}
+          </View>
+          <Text style={styles.helperText}>{PRACTICE_MODE_DESCRIPTIONS[item.mode]}</Text>
+          <View style={styles.practiceModeDetailRow} testID={`practice-mode-${item.mode.replace("_", "-")}-details`}>
+            {modeDetails.map((detail) => (
+              <Text key={detail} style={styles.practiceModeDetailChip}>{detail}</Text>
+            ))}
+          </View>
+          <Text style={styles.practiceModeRatingKey}>{item.config.ratingKey}</Text>
+        </View>
+      </Pressable>
       <View style={styles.practiceModeMeta}>
-        <Text style={styles.practiceModeRating}>{item.rating}</Text>
-        <Text style={styles.practiceModeChevron}>›</Text>
+        <Text style={styles.practiceModeRating}>ELO {item.rating}</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Start ${label}`}
+          testID={`practice-mode-${item.mode.replace("_", "-")}-start`}
+          style={styles.practiceModeStartButton}
+          onPress={onStart}
+        >
+          <Text style={styles.practiceModeStartText}>Start</Text>
+        </Pressable>
       </View>
-    </Pressable>
+    </View>
   );
+}
+
+function practiceModeDetails(config: SprintConfig): string[] {
+  return [
+    `Target ${config.targetCorrect}`,
+    `${config.perPuzzleSeconds}s pace`,
+    `${config.maxMistakes} mistakes`
+  ];
 }
 
 function ModeRow({
@@ -1394,9 +1426,25 @@ function CustomSprintSetup({
   const [theme, setTheme] = useState("Mixed");
   const [includeArrowDuel, setIncludeArrowDuel] = useState(false);
   const ratingRange = `${Math.max(400, currentRating - 200)} - ${currentRating + 200}`;
-  const previousConfigs = [
-    { id: "standard-5-20", title: "Standard · Mixed", meta: "5 min · 20 sec · last played recently", rating: currentRating },
-    { id: "standard-3-30", title: "Focused accuracy", meta: "3 min · 30 sec · slower review pace", rating: readCustomPreviewRating("custom 3/30", ratingKey, currentRating) }
+  const previousConfigs: PreviousCustomConfig[] = [
+    {
+      id: "standard-5-20",
+      mode: "Standard",
+      theme: "Mixed",
+      timing: "5 min · 20s pace",
+      lastPlayed: "Recently",
+      ratingKey: "standard 5/20",
+      rating: currentRating
+    },
+    {
+      id: "standard-3-30",
+      mode: "Standard",
+      theme: "Mixed",
+      timing: "3 min · 30s pace",
+      lastPlayed: "Saved setup",
+      ratingKey: "custom 3/30",
+      rating: readCustomPreviewRating("custom 3/30", ratingKey, currentRating)
+    }
   ];
 
   return (
@@ -1487,6 +1535,7 @@ function CustomSprintSetup({
         <View style={styles.customSummaryMeta}>
           <Text style={styles.listText}>{ratingKey}</Text>
           <Text style={styles.helperText}>ELO {currentRating}</Text>
+          <Text testID="custom-separate-scoring" style={styles.customSeparateScoring}>Separate scoring bucket</Text>
         </View>
       </View>
 
@@ -1666,18 +1715,34 @@ function CustomToggleRow({
   );
 }
 
-function PreviousCustomConfigRow({
-  config
-}: {
-  config: { id: string; title: string; meta: string; rating: number };
-}): React.JSX.Element {
+type PreviousCustomConfig = {
+  id: string;
+  mode: string;
+  theme: string;
+  timing: string;
+  lastPlayed: string;
+  ratingKey: string;
+  rating: number;
+};
+
+function PreviousCustomConfigRow({ config }: { config: PreviousCustomConfig }): React.JSX.Element {
   return (
     <View style={styles.previousConfigRow} testID={`custom-previous-${config.id}`}>
       <View style={styles.previousConfigCopy}>
-        <Text style={styles.historyRowTitle}>{config.title}</Text>
-        <Text style={styles.helperText}>{config.meta}</Text>
+        <View style={styles.previousConfigHeader}>
+          <Text style={styles.historyRowTitle}>{config.mode}</Text>
+          <Text style={styles.previousConfigRatingKey}>{config.ratingKey}</Text>
+        </View>
+        <View style={styles.previousConfigMetaRow} testID={`custom-previous-${config.id}-meta`}>
+          <Text style={styles.practiceModeDetailChip}>{config.theme}</Text>
+          <Text style={styles.practiceModeDetailChip}>{config.timing}</Text>
+          <Text style={styles.practiceModeDetailChip}>Last {config.lastPlayed}</Text>
+        </View>
       </View>
-      <Text style={styles.practiceModeRating}>{config.rating}</Text>
+      <View style={styles.previousConfigRating}>
+        <Text style={styles.helperText}>ELO</Text>
+        <Text style={styles.practiceModeRating}>{config.rating}</Text>
+      </View>
     </View>
   );
 }
@@ -1722,6 +1787,8 @@ function SessionStatusBar({
   currentRating: number;
   onAbandon?: () => void;
 }): React.JSX.Element {
+  const [confirmAbandon, setConfirmAbandon] = useState(false);
+
   if (!state) {
     return (
       <View style={styles.sessionBar} testID="mode-overview">
@@ -1750,7 +1817,7 @@ function SessionStatusBar({
             accessibilityLabel="Abandon sprint"
             testID="session-abandon"
             style={styles.sessionNavButton}
-            onPress={onAbandon}
+            onPress={() => setConfirmAbandon(true)}
           >
             <Text style={styles.sessionNavButtonText}>×</Text>
           </Pressable>
@@ -1783,6 +1850,37 @@ function SessionStatusBar({
       <View style={styles.sessionMistakeRow}>
         <MistakeStrikes count={state.mistakeCount} max={state.config.maxMistakes} />
       </View>
+      {confirmAbandon ? (
+        <View style={styles.sessionAbandonConfirm} testID="session-abandon-confirmation">
+          <View style={styles.sessionAbandonCopy}>
+            <Text style={styles.listText}>Abandon sprint?</Text>
+            <Text style={styles.helperText}>This ends the run and records a failed sprint.</Text>
+          </View>
+          <View style={styles.sessionAbandonActions}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Cancel abandon sprint"
+              testID="session-abandon-cancel"
+              style={styles.secondaryButton}
+              onPress={() => setConfirmAbandon(false)}
+            >
+              <Text style={styles.secondaryButtonText}>Cancel</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Confirm abandon sprint"
+              testID="session-abandon-confirm"
+              style={styles.destructiveButton}
+              onPress={() => {
+                setConfirmAbandon(false);
+                onAbandon?.();
+              }}
+            >
+              <Text style={styles.destructiveButtonText}>Abandon</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -1815,12 +1913,14 @@ function SprintSummary({
   elapsedMs,
   onReplay,
   onBack,
+  onOpenHistory,
   onReview
 }: {
   state: SprintState;
   elapsedMs: number;
   onReplay: () => void;
   onBack: () => void;
+  onOpenHistory: () => void;
   onReview?: () => void;
 }): React.JSX.Element {
   const delta = (state.ratingAfter ?? state.ratingBefore) - state.ratingBefore;
@@ -1898,6 +1998,13 @@ function SprintSummary({
         </View>
       </View>
 
+      <View style={styles.resultDetailCard} testID="sprint-result-details">
+        <ResultDetailRow label="Mode" value={modeLabel(state.config.mode)} testID="sprint-result-detail-mode" />
+        <ResultDetailRow label="Reason" value={reason} testID="sprint-result-detail-reason" />
+        <ResultDetailRow label="Rating" value={`${state.ratingBefore} -> ${ratingAfter}`} testID="sprint-result-detail-rating" />
+        <ResultDetailRow label="Review impact" value={reviewImpact} testID="sprint-result-detail-review-impact" />
+      </View>
+
       <View style={styles.resultReviewRow} testID="sprint-result-review-impact">
         <View>
           <Text style={styles.listText}>Review queue</Text>
@@ -1932,6 +2039,15 @@ function SprintSummary({
         </Pressable>
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel="View history"
+          testID="sprint-result-history-button"
+          style={styles.secondaryButton}
+          onPress={onOpenHistory}
+        >
+          <Text style={styles.secondaryButtonText}>History</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
           accessibilityLabel="Back to practice"
           testID="back-practice-button"
           style={styles.secondaryButton}
@@ -1951,6 +2067,23 @@ function SprintSummary({
           <Text style={styles.secondaryButtonText}>Review missed puzzles</Text>
         </Pressable>
       ) : null}
+    </View>
+  );
+}
+
+function ResultDetailRow({
+  label,
+  testID,
+  value
+}: {
+  label: string;
+  testID: string;
+  value: string;
+}): React.JSX.Element {
+  return (
+    <View style={styles.resultDetailRow} testID={testID}>
+      <Text style={styles.resultMetricLabel}>{label}</Text>
+      <Text style={styles.resultDetailValue}>{value}</Text>
     </View>
   );
 }
@@ -2307,11 +2440,26 @@ function HistoryPanel({
   onToggleWrongLast7Days: () => void;
 }): React.JSX.Element {
   const [chartMetric, setChartMetric] = useState<HistoryChartMetric>("rating");
-  const correct = attempts.filter((attempt) => attempt.result === "correct").length;
-  const wrong = attempts.filter((attempt) => attempt.result === "wrong").length;
-  const accuracy = Math.round((correct / Math.max(1, correct + wrong)) * 100);
   const puzzleStatsById = new Map(puzzleStats.map((stats) => [stats.puzzleId, stats]));
-  const chartSummary = historyChartSummary(chartMetric, attempts, eloPoints, puzzleStats);
+  const [speedFilter, setSpeedFilter] = useState<"all" | number>("all");
+  const [reviewStatusFilter, setReviewStatusFilter] = useState<"all" | "queued" | "clear">("all");
+  const speedFilters = collectHistorySpeedFilters(attempts);
+  const visibleAttempts = attempts.filter((attempt) => {
+    if (speedFilter !== "all" && historyAttemptSpeedSeconds(attempt) !== speedFilter) {
+      return false;
+    }
+    if (reviewStatusFilter === "queued") {
+      return historyAttemptHasReviewQueued(attempt, puzzleStatsById);
+    }
+    if (reviewStatusFilter === "clear") {
+      return !historyAttemptHasReviewQueued(attempt, puzzleStatsById);
+    }
+    return true;
+  });
+  const correct = visibleAttempts.filter((attempt) => attempt.result === "correct").length;
+  const wrong = visibleAttempts.filter((attempt) => attempt.result === "wrong").length;
+  const accuracy = Math.round((correct / Math.max(1, correct + wrong)) * 100);
+  const chartSummary = historyChartSummary(chartMetric, visibleAttempts, eloPoints, puzzleStats);
 
   return (
     <View style={styles.historyPanel} testID="history-panel">
@@ -2339,7 +2487,7 @@ function HistoryPanel({
           ))}
         </HistoryChipRow>
         <HistoryMiniChart
-          attempts={attempts}
+          attempts={visibleAttempts}
           metric={chartMetric}
           points={eloPoints}
           puzzleStats={puzzleStats}
@@ -2396,6 +2544,25 @@ function HistoryPanel({
         <FilterButton active={modeFilter === "arrow_duel"} label="Arrow Duel" testID="history-mode-arrow-duel" onPress={() => onModeFilterChange("arrow_duel")} />
         <FilterButton active={modeFilter === "custom"} label="Custom" testID="history-mode-custom" onPress={() => onModeFilterChange("custom")} />
       </HistoryChipRow>
+      {speedFilters.length > 0 ? (
+        <HistoryChipRow testID="history-speed-filters">
+          <FilterButton active={speedFilter === "all"} label="All speeds" testID="history-speed-all" onPress={() => setSpeedFilter("all")} />
+          {speedFilters.map((speed) => (
+            <FilterButton
+              key={speed}
+              active={speedFilter === speed}
+              label={`${speed}s pace`}
+              testID={`history-speed-${speed}`}
+              onPress={() => setSpeedFilter(speed)}
+            />
+          ))}
+        </HistoryChipRow>
+      ) : null}
+      <HistoryChipRow testID="history-review-status-filters">
+        <FilterButton active={reviewStatusFilter === "all"} label="All review states" testID="history-review-status-all" onPress={() => setReviewStatusFilter("all")} />
+        <FilterButton active={reviewStatusFilter === "queued"} label="Queued" testID="history-review-status-queued" onPress={() => setReviewStatusFilter("queued")} />
+        <FilterButton active={reviewStatusFilter === "clear"} label="Clear" testID="history-review-status-clear" onPress={() => setReviewStatusFilter("clear")} />
+      </HistoryChipRow>
       <HistoryChipRow testID="history-side-filters">
         <FilterButton active={sideFilter === "all"} label="Both sides" testID="history-side-all" onPress={() => onSideFilterChange("all")} />
         <FilterButton active={sideFilter === "white"} label="White" testID="history-side-white" onPress={() => onSideFilterChange("white")} />
@@ -2444,8 +2611,8 @@ function HistoryPanel({
           </Pressable>
         </View>
       </View>
-      {attempts.length === 0 ? <Text style={styles.listText}>No attempts</Text> : null}
-      {attempts.map((attempt) => (
+      {visibleAttempts.length === 0 ? <Text style={styles.listText}>No attempts</Text> : null}
+      {visibleAttempts.map((attempt) => (
         <HistoryAttemptRow
           key={attempt.id}
           attempt={attempt}
@@ -2580,6 +2747,33 @@ function historyChartEmptyLabel(metric: HistoryChartMetric): string {
     return "review due";
   }
   return metric;
+}
+
+function collectHistorySpeedFilters(attempts: HistoryAttemptView[]): number[] {
+  const speeds = new Set<number>();
+  for (const attempt of attempts) {
+    const speed = historyAttemptSpeedSeconds(attempt);
+    if (speed !== null) {
+      speeds.add(speed);
+    }
+  }
+  return [...speeds].sort((left, right) => left - right);
+}
+
+function historyAttemptSpeedSeconds(attempt: HistoryAttemptView): number | null {
+  const match = attempt.ratingKey.match(/\/(\d+)\b/);
+  return match ? Number(match[1]) : null;
+}
+
+function historyAttemptHasReviewQueued(
+  attempt: HistoryAttemptView,
+  puzzleStatsById: Map<string, HistoryPuzzleStats>
+): boolean {
+  if (attempt.result !== "wrong") {
+    return false;
+  }
+  const stats = puzzleStatsById.get(attempt.puzzleId);
+  return stats?.nextReviewAt ? true : true;
 }
 
 function HistoryChipRow({
@@ -2733,6 +2927,22 @@ function collectReviewThemeFilters(items: ReviewQueueItem[]): string[] {
   return [...themes].sort((left, right) => left.localeCompare(right)).slice(0, 4);
 }
 
+function collectReviewSpeedFilters(items: ReviewQueueItem[]): number[] {
+  const speeds = new Set<number>();
+  for (const item of items) {
+    const speed = reviewItemSpeedSeconds(item);
+    if (speed !== null) {
+      speeds.add(speed);
+    }
+  }
+  return [...speeds].sort((left, right) => left - right);
+}
+
+function reviewItemSpeedSeconds(item: ReviewQueueItem): number | null {
+  const match = item.review.ratingKey.match(/\/(\d+)\b/);
+  return match ? Number(match[1]) : null;
+}
+
 function filterReviewQueueItems(items: ReviewQueueItem[], filter: ReviewQueueFilter): ReviewQueueItem[] {
   const now = Date.now();
   return items.filter((item) => {
@@ -2753,6 +2963,9 @@ function filterReviewQueueItems(items: ReviewQueueItem[], filter: ReviewQueueFil
     }
     if (filter.startsWith("theme:")) {
       return item.puzzle.themes.includes(filter.slice("theme:".length));
+    }
+    if (filter.startsWith("speed:")) {
+      return reviewItemSpeedSeconds(item) === Number(filter.slice("speed:".length));
     }
     return true;
   });
@@ -2777,7 +2990,29 @@ function reviewQueueFilterLabel(filter: ReviewQueueFilter): string {
   if (filter.startsWith("theme:")) {
     return filter.slice("theme:".length);
   }
+  if (filter.startsWith("speed:")) {
+    return `${filter.slice("speed:".length)}s pace`;
+  }
   return "All due";
+}
+
+function reviewQueueSummary(items: ReviewQueueItem[], filteredItems: ReviewQueueItem[]): {
+  filteredCount: number;
+  oldestDueLabel: string;
+  overdueCount: number;
+  totalCount: number;
+} {
+  const now = Date.now();
+  const dueTimes = items.map((item) => new Date(item.review.dueAt).getTime()).filter(Number.isFinite);
+  const oldestDueTime = dueTimes.length > 0 ? Math.min(...dueTimes) : null;
+  return {
+    filteredCount: filteredItems.length,
+    oldestDueLabel: oldestDueTime === null
+      ? "Next review appears after a missed puzzle reaches its due time"
+      : `Oldest due ${new Date(oldestDueTime).toISOString().slice(0, 10)}`,
+    overdueCount: items.filter((item) => new Date(item.review.dueAt).getTime() <= now).length,
+    totalCount: items.length
+  };
 }
 
 function formatIntervalHours(hours: number): string {
@@ -2806,6 +3041,7 @@ type ReviewQueueFilter =
   | "failed"
   | "arrow_duel"
   | `mode:${SprintMode}`
+  | `speed:${number}`
   | `theme:${string}`;
 
 type ReviewPuzzleState =
@@ -2841,6 +3077,7 @@ function ReviewPanel({
   const [activeEntries, setActiveEntries] = useState<ReviewEntry[]>(preferredEntries);
   const [queueFilter, setQueueFilter] = useState<ReviewQueueFilter>("all");
   const themeFilters = collectReviewThemeFilters(dueReviewItems);
+  const speedFilters = collectReviewSpeedFilters(dueReviewItems);
   const filteredDueReviewItems = filterReviewQueueItems(dueReviewItems, queueFilter);
   const filteredDueEntries = filteredDueReviewItems.map((item): ReviewEntry => ({
     puzzle: item.puzzle,
@@ -2850,6 +3087,7 @@ function ReviewPanel({
   }));
   const filteredContextGroups = groupReviewEntriesByContext(filteredDueEntries);
   const difficultySummary = reviewDifficultySummary(filteredDueReviewItems);
+  const queueSummary = reviewQueueSummary(dueReviewItems, filteredDueReviewItems);
 
   useEffect(() => {
     setActiveEntries(preferredEntries);
@@ -2877,12 +3115,17 @@ function ReviewPanel({
     <View style={styles.reviewQueuePanel} testID="review-panel">
       <View style={styles.reviewDueCard} testID="review-due-card">
         <View>
-          <Text style={styles.reviewDueTitle}>Due Today</Text>
-          <Text style={styles.helperText}>
-            {filteredDueEntries.length > 0 ? `${reviewQueueFilterLabel(queueFilter)} · Ready now` : "No reviews due today"}
+          <Text style={styles.reviewDueTitle}>Review Queue</Text>
+          <Text testID="review-due-summary" style={styles.helperText}>
+            {filteredDueEntries.length > 0 ? `${reviewQueueFilterLabel(queueFilter)} · Ready now` : "No matching scheduled reviews"}
           </Text>
+          <Text testID="review-next-due" style={styles.helperText}>{queueSummary.oldestDueLabel}</Text>
         </View>
-        <Text style={styles.reviewDueBigCount}>{filteredDueEntries.length}</Text>
+        <View style={styles.reviewDueMetrics}>
+          <Text testID="review-due-count" style={styles.reviewDueBigCount}>{queueSummary.filteredCount}</Text>
+          <Text testID="review-overdue-count" style={styles.reviewDueMetricText}>{queueSummary.overdueCount} overdue</Text>
+          <Text testID="review-total-count" style={styles.reviewDueMetricText}>{queueSummary.totalCount} total</Text>
+        </View>
       </View>
 
       <ScrollView
@@ -2898,6 +3141,15 @@ function ReviewPanel({
         <FilterButton active={queueFilter === "mode:standard"} label="Standard" testID="review-filter-mode-standard" onPress={() => setQueueFilter("mode:standard")} />
         <FilterButton active={queueFilter === "arrow_duel"} label="Arrow Duel only" testID="review-filter-arrow-duel" onPress={() => setQueueFilter("arrow_duel")} />
         <FilterButton active={queueFilter === "mode:blitz"} label="Blitz" testID="review-filter-mode-blitz" onPress={() => setQueueFilter("mode:blitz")} />
+        {speedFilters.map((speed) => (
+          <FilterButton
+            key={speed}
+            active={queueFilter === `speed:${speed}`}
+            label={`${speed}s pace`}
+            testID={`review-filter-speed-${speed}`}
+            onPress={() => setQueueFilter(`speed:${speed}`)}
+          />
+        ))}
         {themeFilters.map((theme) => (
           <FilterButton
             key={theme}
@@ -2958,8 +3210,12 @@ function ReviewPanel({
         </View>
       ) : (
         <View style={styles.emptyReviewPanel} testID="review-empty-state">
-          <Text style={styles.listText}>No reviews due today</Text>
-          <Text style={styles.helperText}>Regular practice keeps building the next queue.</Text>
+          <Text style={styles.listText}>{dueReviewItems.length === 0 ? "No reviews due today" : "No matching scheduled reviews"}</Text>
+          <Text style={styles.helperText}>
+            {dueReviewItems.length === 0
+              ? "Next scheduled review appears here when the memory curve reaches its due time."
+              : "Adjust filters or start the full due queue."}
+          </Text>
         </View>
       )}
 
@@ -4099,6 +4355,7 @@ function SettingsPanel({
   const [syncEnabled, setSyncEnabled] = useState(true);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<"reset-elo" | "delete-history" | null>(null);
+  const [advancedRatingsOpen, setAdvancedRatingsOpen] = useState(false);
 
   return (
     <View style={styles.settingsPanel} testID="settings-panel">
@@ -4118,10 +4375,12 @@ function SettingsPanel({
         />
         <SettingsRow
           label="Advanced ratings"
-          value="Hidden"
+          value={advancedRatingsOpen ? "Open" : "Hidden"}
           detail="Manual adjustment stays behind an advanced affordance"
           testID="settings-advanced-ratings"
+          onPress={() => setAdvancedRatingsOpen((current) => !current)}
         />
+        {advancedRatingsOpen ? <AdvancedRatingsPanel /> : null}
       </SettingsSection>
 
       <SettingsSection title="Sync" testID="settings-sync-section">
@@ -4243,6 +4502,42 @@ function SettingsPanel({
   );
 }
 
+function AdvancedRatingsPanel(): React.JSX.Element {
+  return (
+    <View style={styles.advancedRatingsPanel} testID="settings-advanced-ratings-panel">
+      <Text style={styles.sectionLabel}>Manual rating controls</Text>
+      <Text style={styles.helperText}>
+        Hidden by default. Use reset for the current bucket; manual edits need a data-layer implementation before they can write ratings.
+      </Text>
+      <View style={styles.advancedRatingRows}>
+        <AdvancedRatingRow label="Standard" value="standard 5/20" testID="settings-advanced-rating-standard" />
+        <AdvancedRatingRow label="Arrow Duel" value="arrow duel 5/30" testID="settings-advanced-rating-arrow-duel" />
+        <AdvancedRatingRow label="Blitz" value="blitz 5/10" testID="settings-advanced-rating-blitz" />
+      </View>
+    </View>
+  );
+}
+
+function AdvancedRatingRow({
+  label,
+  testID,
+  value
+}: {
+  label: string;
+  testID: string;
+  value: string;
+}): React.JSX.Element {
+  return (
+    <View style={styles.advancedRatingRow} testID={testID}>
+      <View>
+        <Text style={styles.listText}>{label}</Text>
+        <Text style={styles.helperText}>{value}</Text>
+      </View>
+      <Text style={styles.settingsRowValue}>Locked</Text>
+    </View>
+  );
+}
+
 function DestructiveConfirmationCard({
   confirmLabel,
   description,
@@ -4349,6 +4644,12 @@ type PackRowModel = {
   title: string;
   subtitle: string;
   detail: string;
+  coverage: {
+    puzzles: string;
+    rating: string;
+    themes: string;
+    arrowDuel: string;
+  };
   source: string;
   presolveStatus: string;
   manifestHash: string;
@@ -4375,6 +4676,12 @@ function PacksPanel(): React.JSX.Element {
       title: "Core Pack",
       subtitle: "~1,000 puzzles · offline",
       detail: "Rating 600 - 1600 · Mixed, mate, endgame · Arrow Duel ready",
+      coverage: {
+        puzzles: "~1k",
+        rating: "600-1600",
+        themes: "Mixed",
+        arrowDuel: "Ready"
+      },
       source: "Lichess puzzle database",
       presolveStatus: "Chessticize presolved",
       manifestHash: "core-2026-06-fixture",
@@ -4388,6 +4695,12 @@ function PacksPanel(): React.JSX.Element {
       title: "Tactics Pack",
       subtitle: "~50k puzzles · installed",
       detail: "Rating 800 - 2200 · tactics-heavy coverage",
+      coverage: {
+        puzzles: "~50k",
+        rating: "800-2200",
+        themes: "Tactics",
+        arrowDuel: "Partial"
+      },
       source: "Lichess puzzle database",
       presolveStatus: "Presolved locally",
       manifestHash: "tactics-preview-50k",
@@ -4403,6 +4716,12 @@ function PacksPanel(): React.JSX.Element {
       title: "Endgame Pack",
       subtitle: "~40k puzzles · optional",
       detail: "Rating 900 - 2400 · rook, pawn, conversion themes",
+      coverage: {
+        puzzles: "~40k",
+        rating: "900-2400",
+        themes: "Endgame",
+        arrowDuel: "Limited"
+      },
       source: "Lichess puzzle database",
       presolveStatus: "Manifest pending validation",
       manifestHash: "endgame-manifest-pending",
@@ -4416,6 +4735,12 @@ function PacksPanel(): React.JSX.Element {
       title: "Mate in N Pack",
       subtitle: "~30k puzzles · optional",
       detail: "Rating 700 - 2300 · mate themes · Arrow Duel candidates",
+      coverage: {
+        puzzles: "~30k",
+        rating: "700-2300",
+        themes: "Mate",
+        arrowDuel: "Ready"
+      },
       source: "Lichess puzzle database",
       presolveStatus: "Manifest pending validation",
       manifestHash: "mate-n-manifest-pending",
@@ -4618,6 +4943,12 @@ function PackRow({
         </View>
         <Text style={styles.helperText}>{pack.subtitle}</Text>
         <Text style={styles.helperText}>{pack.detail}</Text>
+        <View style={styles.packRowCoverage} testID={`packs-coverage-${pack.id}`}>
+          <PackRowCoverageChip label="Puzzles" value={pack.coverage.puzzles} />
+          <PackRowCoverageChip label="Rating" value={pack.coverage.rating} />
+          <PackRowCoverageChip label="Themes" value={pack.coverage.themes} />
+          <PackRowCoverageChip label="Arrow Duel" value={pack.coverage.arrowDuel} />
+        </View>
       </View>
       <View style={styles.packActionColumn}>
         <Pressable
@@ -4654,6 +4985,18 @@ function PackRow({
       )}
       </View>
     </View>
+  );
+}
+
+function PackRowCoverageChip({
+  label,
+  value
+}: {
+  label: string;
+  value: string;
+}): React.JSX.Element {
+  return (
+    <Text style={styles.packRowCoverageChip}>{label} {value}</Text>
   );
 }
 
@@ -5340,20 +5683,27 @@ const styles = StyleSheet.create({
     gap: 8
   },
   practiceModeCard: {
-    alignItems: "center",
+    alignItems: "stretch",
     backgroundColor: "#FFFFFF",
     borderColor: "#E2E8F0",
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
     gap: 10,
-    minHeight: 58,
+    minHeight: 92,
     paddingHorizontal: 12,
     paddingVertical: 10
   },
   practiceModeCardActive: {
     borderColor: "#BFDBFE",
     backgroundColor: "#F8FBFF"
+  },
+  practiceModeSelectArea: {
+    alignItems: "center",
+    flex: 1,
+    flexDirection: "row",
+    gap: 10,
+    minWidth: 0
   },
   practiceModeIcon: {
     alignItems: "center",
@@ -5371,22 +5721,75 @@ const styles = StyleSheet.create({
   },
   practiceModeCopy: {
     flex: 1,
-    gap: 2
+    gap: 4,
+    minWidth: 0
+  },
+  practiceModeTitleRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6
   },
   practiceModeTitle: {
     color: "#111827",
     fontSize: 15,
     fontWeight: "800"
   },
-  practiceModeMeta: {
-    alignItems: "center",
+  practiceModeSelectedBadge: {
+    backgroundColor: "#DBEAFE",
+    borderRadius: 999,
+    color: "#1D4ED8",
+    fontSize: 10,
+    fontWeight: "900",
+    overflow: "hidden",
+    paddingHorizontal: 7,
+    paddingVertical: 2
+  },
+  practiceModeDetailRow: {
     flexDirection: "row",
-    gap: 8
+    flexWrap: "wrap",
+    gap: 5
+  },
+  practiceModeDetailChip: {
+    backgroundColor: "#F8FAFC",
+    borderColor: "#E2E8F0",
+    borderRadius: 999,
+    borderWidth: 1,
+    color: "#475569",
+    fontSize: 10,
+    fontWeight: "800",
+    overflow: "hidden",
+    paddingHorizontal: 7,
+    paddingVertical: 3
+  },
+  practiceModeRatingKey: {
+    color: "#64748B",
+    fontSize: 11,
+    fontWeight: "700"
+  },
+  practiceModeMeta: {
+    alignItems: "flex-end",
+    gap: 8,
+    justifyContent: "center",
+    minWidth: 72
   },
   practiceModeRating: {
     color: "#64748B",
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "800"
+  },
+  practiceModeStartButton: {
+    alignItems: "center",
+    backgroundColor: "#2563EB",
+    borderRadius: 8,
+    minHeight: 34,
+    justifyContent: "center",
+    paddingHorizontal: 12
+  },
+  practiceModeStartText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "900"
   },
   practiceModeChevron: {
     color: "#111827",
@@ -5473,6 +5876,16 @@ const styles = StyleSheet.create({
   reviewDueBigCount: {
     color: "#2563EB",
     fontSize: 22,
+    fontWeight: "800"
+  },
+  reviewDueMetrics: {
+    alignItems: "flex-end",
+    gap: 2,
+    minWidth: 72
+  },
+  reviewDueMetricText: {
+    color: "#64748B",
+    fontSize: 11,
     fontWeight: "800"
   },
   reviewFilterScroller: {
@@ -5620,6 +6033,26 @@ const styles = StyleSheet.create({
   },
   sessionActiveMetricRight: {
     alignItems: "flex-end"
+  },
+  sessionAbandonConfirm: {
+    alignItems: "center",
+    backgroundColor: "#FEF2F2",
+    borderColor: "#FCA5A5",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "space-between",
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  sessionAbandonCopy: {
+    flex: 1,
+    gap: 2
+  },
+  sessionAbandonActions: {
+    flexDirection: "row",
+    gap: 8
   },
   sessionTimerBlock: {
     alignItems: "center",
@@ -5950,11 +6383,16 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     gap: 2
   },
+  customSeparateScoring: {
+    color: "#2563EB",
+    fontSize: 11,
+    fontWeight: "800"
+  },
   previousConfigList: {
     gap: 8
   },
   previousConfigRow: {
-    alignItems: "center",
+    alignItems: "flex-start",
     backgroundColor: "#FFFFFF",
     borderColor: "#E2E8F0",
     borderRadius: 8,
@@ -5968,7 +6406,29 @@ const styles = StyleSheet.create({
   },
   previousConfigCopy: {
     flex: 1,
-    gap: 2
+    gap: 6,
+    minWidth: 0
+  },
+  previousConfigHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6
+  },
+  previousConfigRatingKey: {
+    color: "#64748B",
+    fontSize: 11,
+    fontWeight: "800"
+  },
+  previousConfigMetaRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 5
+  },
+  previousConfigRating: {
+    alignItems: "flex-end",
+    gap: 2,
+    minWidth: 48
   },
   testPanel: {
     backgroundColor: "#F8FAFC",
@@ -6208,6 +6668,31 @@ const styles = StyleSheet.create({
     color: "#111827",
     fontSize: 15,
     fontWeight: "800"
+  },
+  resultDetailCard: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    overflow: "hidden"
+  },
+  resultDetailRow: {
+    alignItems: "center",
+    borderBottomColor: "#E2E8F0",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+    minHeight: 38,
+    paddingHorizontal: 12,
+    paddingVertical: 8
+  },
+  resultDetailValue: {
+    color: "#111827",
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "800",
+    textAlign: "right"
   },
   resultSparkline: {
     alignItems: "flex-end",
@@ -6737,6 +7222,29 @@ const styles = StyleSheet.create({
   settingsDestructiveText: {
     color: "#DC2626"
   },
+  advancedRatingsPanel: {
+    backgroundColor: "#F8FAFC",
+    borderBottomColor: "#E2E8F0",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  advancedRatingRows: {
+    gap: 6
+  },
+  advancedRatingRow: {
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    minHeight: 48,
+    paddingHorizontal: 10,
+    paddingVertical: 8
+  },
   settingsStatusText: {
     color: "#334155",
     fontSize: 13,
@@ -6837,6 +7345,24 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8
+  },
+  packRowCoverage: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 5,
+    paddingTop: 2
+  },
+  packRowCoverageChip: {
+    backgroundColor: "#F8FAFC",
+    borderColor: "#E2E8F0",
+    borderRadius: 999,
+    borderWidth: 1,
+    color: "#475569",
+    fontSize: 10,
+    fontWeight: "800",
+    overflow: "hidden",
+    paddingHorizontal: 7,
+    paddingVertical: 3
   },
   packStatusBadge: {
     backgroundColor: "#F8FAFC",
