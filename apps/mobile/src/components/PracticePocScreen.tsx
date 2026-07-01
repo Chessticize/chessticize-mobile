@@ -1036,6 +1036,8 @@ export function PracticePocScreen({
                 durationSeconds={customDurationSeconds}
                 perPuzzleSeconds={customPerPuzzleSeconds}
                 targetCorrect={selectedConfig.targetCorrect}
+                maxMistakes={selectedConfig.maxMistakes}
+                availablePuzzleCount={seededPuzzleCount(puzzleSource)}
                 ratingKey={selectedConfig.ratingKey}
                 currentRating={currentRating}
                 onDurationChange={setCustomDurationSeconds}
@@ -1524,9 +1526,11 @@ function ModeRow({
 }
 
 function CustomSprintSetup({
+  availablePuzzleCount,
   customMode,
   currentRating,
   durationSeconds,
+  maxMistakes,
   onClose,
   onCustomModeChange,
   perPuzzleSeconds,
@@ -1536,9 +1540,11 @@ function CustomSprintSetup({
   onPerPuzzleChange,
   onStart
 }: {
+  availablePuzzleCount: number;
   customMode: "custom" | "arrow_duel";
   currentRating: number;
   durationSeconds: number;
+  maxMistakes: number;
   onClose: () => void;
   onCustomModeChange: (next: "custom" | "arrow_duel") => void;
   perPuzzleSeconds: number;
@@ -1550,6 +1556,8 @@ function CustomSprintSetup({
 }): React.JSX.Element {
   const [theme, setTheme] = useState("Mixed");
   const ratingRange = `${Math.max(400, currentRating - 200)} - ${currentRating + 200}`;
+  const requiredPuzzleCount = targetCorrect + maxMistakes;
+  const hasEnoughLocalPuzzles = availablePuzzleCount >= requiredPuzzleCount;
   const previousConfigs: PreviousCustomConfig[] = [
     {
       id: "standard-5-20",
@@ -1595,7 +1603,7 @@ function CustomSprintSetup({
         </Pressable>
       </View>
 
-      <View style={styles.customConfigCard}>
+      <View style={styles.customConfigCard} testID="custom-config-list">
         <CustomModeChoiceRow
           value={customMode}
           testID="custom-mode-row"
@@ -1651,17 +1659,21 @@ function CustomSprintSetup({
         />
       </View>
 
+      <CustomEligibilityNotice
+        availablePuzzleCount={availablePuzzleCount}
+        hasEnoughLocalPuzzles={hasEnoughLocalPuzzles}
+        requiredPuzzleCount={requiredPuzzleCount}
+      />
+
       <View style={styles.customSummaryCard} testID="custom-summary-card">
-        <View>
-          <Text style={styles.helperText}>Summary</Text>
-          <Text testID="custom-target-count" style={styles.customTarget}>Target {targetCorrect}</Text>
-          <Text testID="custom-mode-summary" style={styles.helperText}>
-            {customMode === "arrow_duel" ? "Arrow Duel" : "Regular puzzles"}
-          </Text>
+        <View style={styles.customSummaryRows}>
+          <CustomSummaryMetric label="Target" testID="custom-target-count" value={`${targetCorrect} puzzles`} />
+          <CustomSummaryMetric label="ELO type" testID="custom-mode-summary" value={customMode === "arrow_duel" ? "Arrow Duel" : "Regular puzzles"} />
+          <CustomSummaryMetric label="Current rating" testID="custom-current-rating" value={`ELO ${currentRating}`} />
         </View>
         <View style={styles.customSummaryMeta}>
+          <Text style={styles.helperText}>Scoring history</Text>
           <Text style={styles.listText}>{ratingKey}</Text>
-          <Text style={styles.helperText}>ELO {currentRating}</Text>
           <Text testID="custom-separate-scoring" style={styles.customSeparateScoring}>Separate scoring bucket</Text>
         </View>
       </View>
@@ -1672,6 +1684,36 @@ function CustomSprintSetup({
           <PreviousCustomConfigRow key={config.id} config={config} />
         ))}
       </View>
+    </View>
+  );
+}
+
+function CustomEligibilityNotice({
+  availablePuzzleCount,
+  hasEnoughLocalPuzzles,
+  requiredPuzzleCount
+}: {
+  availablePuzzleCount: number;
+  hasEnoughLocalPuzzles: boolean;
+  requiredPuzzleCount: number;
+}): React.JSX.Element {
+  if (hasEnoughLocalPuzzles) {
+    return (
+      <View style={styles.customEligibilityCard} testID="custom-eligibility-ready">
+        <Text style={styles.sectionLabel}>Local pack ready</Text>
+        <Text style={styles.helperText}>
+          Current offline pack has {availablePuzzleCount} eligible puzzles for up to {requiredPuzzleCount} attempts.
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.customEligibilityCard, styles.customEligibilityWarning]} testID="custom-pack-warning">
+      <Text style={styles.sectionLabel}>Local pack warning</Text>
+      <Text style={styles.helperText}>
+        Current offline pack has {availablePuzzleCount} eligible puzzles; this setup may need up to {requiredPuzzleCount}. Broaden theme or rating coverage before a scored release pack.
+      </Text>
     </View>
   );
 }
@@ -1695,7 +1737,10 @@ function CustomModeChoiceRow({
   ];
   return (
     <View style={styles.customModeChoiceRow} testID={testID}>
-      <Text style={styles.listText}>Mode</Text>
+      <View style={styles.customChoiceHeader}>
+        <Text style={styles.listText}>Mode</Text>
+        <Text style={styles.customConfigValue}>{value === "arrow_duel" ? "Arrow Duel" : "Standard"} ›</Text>
+      </View>
       <View style={styles.customModeChoices}>
         {options.map((option) => (
           <Pressable
@@ -1756,7 +1801,10 @@ function CustomChoiceRow({
 }): React.JSX.Element {
   return (
     <View style={styles.customConfigRow} testID={testID}>
-      <Text style={styles.listText}>{label}</Text>
+      <View style={styles.customChoiceCopy}>
+        <Text style={styles.listText}>{label}</Text>
+        <Text style={styles.customConfigValue}>{value} ›</Text>
+      </View>
       <View style={styles.customInlineOptions}>
         {options.map((option) => (
           <Pressable
@@ -1798,6 +1846,10 @@ function CustomOptionRow<T extends number>({
     <View style={styles.customOptionRow}>
       <View style={styles.customOptionHeader}>
         <Text style={styles.listText}>{label}</Text>
+        <Text style={styles.customConfigValue}>{value}</Text>
+      </View>
+      <View style={styles.customOptionHeader}>
+        <Text style={styles.helperText}>Allowed values</Text>
         <View style={styles.customStepper} testID={stepperTestID}>
           <Pressable
             accessibilityRole="button"
@@ -1814,7 +1866,6 @@ function CustomOptionRow<T extends number>({
           >
             <Text style={styles.customStepperText}>−</Text>
           </Pressable>
-          <Text style={styles.customStepperValue}>{value}</Text>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Increase ${label.toLowerCase()}`}
@@ -1846,6 +1897,23 @@ function CustomOptionRow<T extends number>({
           </Pressable>
         ))}
       </View>
+    </View>
+  );
+}
+
+function CustomSummaryMetric({
+  label,
+  testID,
+  value
+}: {
+  label: string;
+  testID: string;
+  value: string;
+}): React.JSX.Element {
+  return (
+    <View style={styles.customSummaryMetric} testID={testID}>
+      <Text style={styles.helperText}>{label}</Text>
+      <Text style={styles.listText}>{value}</Text>
     </View>
   );
 }
@@ -6704,6 +6772,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10
   },
+  customChoiceHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between"
+  },
+  customChoiceCopy: {
+    flex: 1,
+    gap: 2,
+    minWidth: 0
+  },
   customModeChoices: {
     flexDirection: "row",
     gap: 8
@@ -6825,6 +6903,29 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     minHeight: 70,
     padding: 12
+  },
+  customSummaryRows: {
+    flex: 1,
+    gap: 8,
+    minWidth: 0
+  },
+  customSummaryMetric: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12,
+    justifyContent: "space-between"
+  },
+  customEligibilityCard: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 4,
+    padding: 12
+  },
+  customEligibilityWarning: {
+    backgroundColor: "#FFFBEB",
+    borderColor: "#FBBF24"
   },
   customSummaryMeta: {
     alignItems: "flex-end",
