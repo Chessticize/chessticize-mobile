@@ -43,6 +43,7 @@ import type {
   RatingRecord,
   ReviewAnalysisLine,
   ReviewQueueItem,
+  ReviewQueueState,
   SessionMistakeReviewItem,
   SprintConfig,
   SprintMode,
@@ -191,7 +192,8 @@ export function PracticePocScreen({
   const [state, setState] = useState<SprintState | null>(null);
   const [feedback, setFeedback] = useState<SessionFeedback>(null);
   const [attempts, setAttempts] = useState<AttemptEvent[]>([]);
-  const [reviews, setReviews] = useState<Record<string, unknown>[]>([]);
+  const [, setReviews] = useState<ReviewQueueState[]>([]);
+  const [reviewQueue, setReviewQueue] = useState<ReviewQueueState[]>([]);
   const [dueReviewItems, setDueReviewItems] = useState<ReviewQueueItem[]>([]);
   const [sessionMistakeReviewItems, setSessionMistakeReviewItems] = useState<SessionMistakeReviewItem[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -317,7 +319,8 @@ export function PracticePocScreen({
 
   function refreshState(): void {
     setAttempts(service.listHistory() as AttemptEvent[]);
-    setReviews(service.getDueReviews(nowIso()) as Record<string, unknown>[]);
+    setReviews(service.getDueReviews(nowIso()));
+    setReviewQueue(service.listReviewQueue());
     setDueReviewItems(service.getDueReviewItems(nowIso()));
     setCurrentRating(readRating(service, selectedConfig.ratingKey));
     const activeSprint = service.getActiveSprint();
@@ -1284,6 +1287,7 @@ export function PracticePocScreen({
           <ReviewPanel
             boardSize={boardSize}
             dueReviewItems={dueReviewItems}
+            reviewQueue={reviewQueue}
             service={service}
             sessionMistakeReviewItems={sessionMistakeReviewItems}
             onExitSessionReview={() => setTab("practice")}
@@ -1663,18 +1667,24 @@ function CustomSprintSetup({
   const canStartWithLocalPuzzles = availablePuzzleCount > 0;
   const previousConfigs: PreviousCustomConfig[] = [
     {
-      id: "standard-5-20",
-      mode: "Standard",
+      id: "custom-5-20",
+      mode: "Regular Puzzles",
+      customMode: "custom",
       theme: "Mixed",
+      durationSeconds: 5 * 60,
+      perPuzzleSeconds: 20,
       timing: "5 min · 20s pace",
       lastPlayed: "Recently",
-      ratingKey: "standard 5/20",
+      ratingKey: "custom 5/20",
       rating: currentRating
     },
     {
-      id: "standard-3-30",
-      mode: "Standard",
+      id: "custom-3-30",
+      mode: "Regular Puzzles",
+      customMode: "custom",
       theme: "Mixed",
+      durationSeconds: 3 * 60,
+      perPuzzleSeconds: 30,
       timing: "3 min · 30s pace",
       lastPlayed: "Saved setup",
       ratingKey: "custom 3/30",
@@ -1790,7 +1800,16 @@ function CustomSprintSetup({
       <View style={styles.previousConfigList} testID="custom-previous-configs">
         <Text style={styles.sectionLabel}>Previous configs</Text>
         {previousConfigs.map((config) => (
-          <PreviousCustomConfigRow key={config.id} config={config} />
+          <PreviousCustomConfigRow
+            key={config.id}
+            config={config}
+            onPress={() => {
+              onCustomModeChange(config.customMode);
+              onDurationChange(config.durationSeconds);
+              onPerPuzzleChange(config.perPuzzleSeconds);
+              setTheme(config.theme);
+            }}
+          />
         ))}
       </View>
     </View>
@@ -2033,8 +2052,11 @@ function CustomToggleRow({
 }
 
 type PreviousCustomConfig = {
+  customMode: "custom" | "arrow_duel";
+  durationSeconds: number;
   id: string;
   mode: string;
+  perPuzzleSeconds: number;
   theme: string;
   timing: string;
   lastPlayed: string;
@@ -2042,9 +2064,21 @@ type PreviousCustomConfig = {
   rating: number;
 };
 
-function PreviousCustomConfigRow({ config }: { config: PreviousCustomConfig }): React.JSX.Element {
+function PreviousCustomConfigRow({
+  config,
+  onPress
+}: {
+  config: PreviousCustomConfig;
+  onPress: () => void;
+}): React.JSX.Element {
   return (
-    <View style={styles.previousConfigRow} testID={`custom-previous-${config.id}`}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Use ${config.ratingKey} custom sprint`}
+      style={styles.previousConfigRow}
+      testID={`custom-previous-${config.id}`}
+      onPress={onPress}
+    >
       <View style={styles.previousConfigCopy}>
         <View style={styles.previousConfigHeader}>
           <Text style={styles.historyRowTitle}>{config.mode}</Text>
@@ -2060,7 +2094,7 @@ function PreviousCustomConfigRow({ config }: { config: PreviousCustomConfig }): 
         <Text style={styles.helperText}>ELO</Text>
         <Text style={styles.practiceModeRating}>{config.rating}</Text>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -2154,6 +2188,10 @@ function SessionStatusBar({
         <View style={styles.sessionTimerBlock}>
           <Text testID="session-timer" style={styles.timerText}>{timerText}</Text>
         </View>
+        <ActiveMistakeIndicator
+          count={state.mistakeCount}
+          max={state.config.maxMistakes}
+        />
         <View style={styles.sessionRatingBlock}>
           <Text testID="session-rating" style={styles.sessionRatingValue}>ELO {currentRating}</Text>
         </View>
@@ -2190,6 +2228,36 @@ function SessionStatusBar({
           </View>
         </View>
       ) : null}
+    </View>
+  );
+}
+
+function ActiveMistakeIndicator({
+  count,
+  max
+}: {
+  count: number;
+  max: number;
+}): React.JSX.Element {
+  return (
+    <View
+      accessibilityLabel={`Mistakes ${count} of ${max}`}
+      style={styles.activeMistakeIndicator}
+      testID="session-mistakes"
+    >
+      <View style={styles.activeMistakeDots}>
+        {Array.from({ length: max }, (_, index) => (
+          <View
+            key={index}
+            style={[
+              styles.activeMistakeDot,
+              index < count ? styles.activeMistakeDotUsed : null
+            ]}
+            testID={`session-mistake-dot-${index}`}
+          />
+        ))}
+      </View>
+      <Text style={styles.activeMistakeCount}>{count}/{max}</Text>
     </View>
   );
 }
@@ -3222,6 +3290,9 @@ function HistoryMiniChart({
       </View>
     );
   }
+  if (metric === "rating") {
+    return <HistoryRatingLineChart points={displayed} />;
+  }
   const values = displayed.map((point) => point.value);
   const min = Math.min(...values);
   const max = Math.max(...values);
@@ -3233,10 +3304,72 @@ function HistoryMiniChart({
         const height = 12 + ((point.value - min) / span) * 46;
         return (
           <View key={`${metric}-${point.key}-${index}`} style={styles.historyChartColumn}>
-            <View style={[styles.historyChartBar, { height }]} />
+            <View style={[styles.historyChartBar, { height }]} testID={`history-chart-bar-${index}`} />
           </View>
         );
       })}
+    </View>
+  );
+}
+
+function HistoryRatingLineChart({
+  points
+}: {
+  points: Array<{ key: string; value: number }>;
+}): React.JSX.Element {
+  const values = points.map((point) => point.value);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = Math.max(1, max - min);
+  const step = points.length > 1 ? 100 / (points.length - 1) : 0;
+
+  return (
+    <View style={styles.historyLineChart} testID="history-performance-chart">
+      <View style={styles.historyLineGrid} />
+      <View style={[styles.historyLineGrid, styles.historyLineGridMiddle]} />
+      <View style={[styles.historyLineGrid, styles.historyLineGridBottom]} />
+      <View style={styles.historyLineLayer} testID="history-chart-line">
+        {points.slice(0, -1).map((point, index) => {
+          const next = points[index + 1] ?? point;
+          const y = ((point.value - min) / span) * 42;
+          const nextY = ((next.value - min) / span) * 42;
+          return (
+            <View
+              key={`${point.key}-${next.key}-${index}`}
+              style={[
+                styles.historyLineSegment,
+                {
+                  left: `${index * step}%`,
+                  top: 48 - (y + nextY) / 2,
+                  transform: [{ rotate: `${Math.atan2(y - nextY, Math.max(24, step)) * (180 / Math.PI)}deg` }],
+                  width: `${Math.max(12, step + 4)}%`
+                }
+              ]}
+              testID={`history-chart-line-segment-${index}`}
+            />
+          );
+        })}
+      </View>
+      <View style={styles.historyLinePointLayer}>
+        {points.map((point, index) => {
+          const y = ((point.value - min) / span) * 42;
+          return (
+            <View
+              key={`${point.key}-${index}`}
+              style={[
+                styles.historyLinePointColumn,
+                {
+                  left: points.length > 1 ? `${index * step}%` : "50%",
+                  top: 48 - y
+                }
+              ]}
+              testID={`history-chart-line-point-${index}`}
+            >
+              <View style={[styles.historyLinePoint, index === points.length - 1 ? styles.historyLinePointCurrent : null]} />
+            </View>
+          );
+        })}
+      </View>
     </View>
   );
 }
@@ -3739,22 +3872,24 @@ function reviewQueueFilterLabel(filter: ReviewQueueFilter): string {
   return "All due";
 }
 
-function reviewQueueSummary(items: ReviewQueueItem[], filteredItems: ReviewQueueItem[]): {
+function reviewQueueSummary(queue: ReviewQueueState[], filteredItems: ReviewQueueItem[]): {
   filteredCount: number;
   oldestDueLabel: string;
   overdueCount: number;
   totalCount: number;
 } {
   const now = Date.now();
-  const dueTimes = items.map((item) => new Date(item.review.dueAt).getTime()).filter(Number.isFinite);
+  const dueTimes = queue.map((review) => new Date(review.dueAt).getTime()).filter(Number.isFinite);
   const oldestDueTime = dueTimes.length > 0 ? Math.min(...dueTimes) : null;
   return {
     filteredCount: filteredItems.length,
     oldestDueLabel: oldestDueTime === null
       ? "Next review appears after a missed puzzle reaches its due time"
-      : `Oldest due ${new Date(oldestDueTime).toISOString().slice(0, 10)}`,
-    overdueCount: items.filter((item) => new Date(item.review.dueAt).getTime() <= now).length,
-    totalCount: items.length
+      : oldestDueTime <= now
+        ? `Oldest due ${new Date(oldestDueTime).toISOString().slice(0, 10)}`
+        : `Next review due ${new Date(oldestDueTime).toISOString().slice(0, 10)}`,
+    overdueCount: queue.filter((review) => new Date(review.dueAt).getTime() <= now).length,
+    totalCount: queue.length
   };
 }
 
@@ -3799,6 +3934,7 @@ function ReviewPanel({
   dueReviewItems,
   onExitSessionReview,
   onOpenPractice,
+  reviewQueue,
   service,
   sessionMistakeReviewItems,
   stockfishTransportFactory
@@ -3807,6 +3943,7 @@ function ReviewPanel({
   dueReviewItems: ReviewQueueItem[];
   onExitSessionReview: () => void;
   onOpenPractice: () => void;
+  reviewQueue: ReviewQueueState[];
   service: PracticeService;
   sessionMistakeReviewItems: SessionMistakeReviewItem[];
   stockfishTransportFactory: () => UciEngineTransport | null;
@@ -3836,7 +3973,7 @@ function ReviewPanel({
   }));
   const filteredContextGroups = groupReviewEntriesByContext(filteredDueEntries);
   const difficultySummary = reviewDifficultySummary(dueReviewItems);
-  const queueSummary = reviewQueueSummary(dueReviewItems, filteredDueReviewItems);
+  const queueSummary = reviewQueueSummary(reviewQueue, filteredDueReviewItems);
 
   useEffect(() => {
     setActiveEntries(preferredEntries);
@@ -4014,7 +4151,7 @@ function ReviewPanel({
           <Text style={styles.listText}>{dueReviewItems.length === 0 ? "No reviews due today" : "No matching scheduled reviews"}</Text>
           <Text style={styles.helperText}>
             {dueReviewItems.length === 0
-              ? "Next scheduled review appears here when the memory curve reaches its due time."
+              ? queueSummary.oldestDueLabel
               : "Adjust filters or start the full due queue."}
           </Text>
           <Pressable
@@ -5584,98 +5721,136 @@ type PackImportProgress = {
   status: "validating" | "ready";
 };
 
+const PACK_CATALOG: PackRowModel[] = [
+  {
+    id: "core",
+    title: "Core Pack",
+    subtitle: "~1,000 puzzles · offline",
+    detail: "Rating 600 - 1600 · Mixed, mate, endgame · Arrow Duel ready",
+    coverage: {
+      puzzles: "~1k",
+      rating: "600-1600",
+      themes: "Mixed",
+      arrowDuel: "Ready"
+    },
+    source: "Lichess puzzle database",
+    presolveStatus: "Chessticize presolved",
+    manifestHash: "core-2026-06-fixture",
+    buildDate: "Bundled fixture",
+    licenseNote: "Derived from Lichess puzzle data with Chessticize presolve metadata.",
+    status: "active",
+    testID: "packs-installed-core"
+  },
+  {
+    id: "tactics",
+    title: "Tactics Pack",
+    subtitle: "~50k puzzles · installed",
+    detail: "Rating 800 - 2200 · tactics-heavy coverage",
+    coverage: {
+      puzzles: "~50k",
+      rating: "800-2200",
+      themes: "Tactics",
+      arrowDuel: "Partial"
+    },
+    source: "Lichess puzzle database",
+    presolveStatus: "Presolved locally",
+    manifestHash: "tactics-preview-50k",
+    buildDate: "Preview bundle",
+    licenseNote: "Imported packs keep source attribution and do not modify attempt history.",
+    status: "installed",
+    testID: "packs-installed-tactics"
+  },
+  {
+    id: "endgame",
+    title: "Endgame Pack",
+    subtitle: "~40k puzzles · optional",
+    detail: "Rating 900 - 2400 · rook, pawn, conversion themes",
+    coverage: {
+      puzzles: "~40k",
+      rating: "900-2400",
+      themes: "Endgame",
+      arrowDuel: "Limited"
+    },
+    source: "Lichess puzzle database",
+    presolveStatus: "Manifest pending validation",
+    manifestHash: "endgame-manifest-pending",
+    buildDate: "Remote optional pack",
+    licenseNote: "Activation requires manifest validation before offline use.",
+    status: "optional",
+    testID: "packs-optional-endgame"
+  },
+  {
+    id: "mate-in-n",
+    title: "Mate in N Pack",
+    subtitle: "~30k puzzles · optional",
+    detail: "Rating 700 - 2300 · mate themes · Arrow Duel candidates",
+    coverage: {
+      puzzles: "~30k",
+      rating: "700-2300",
+      themes: "Mate",
+      arrowDuel: "Ready"
+    },
+    source: "Lichess puzzle database",
+    presolveStatus: "Manifest pending validation",
+    manifestHash: "mate-n-manifest-pending",
+    buildDate: "Remote optional pack",
+    licenseNote: "Activation requires manifest validation before offline use.",
+    status: "optional",
+    testID: "packs-optional-mate-in-n"
+  },
+  {
+    id: "imported",
+    title: "Imported Pack",
+    subtitle: "~25k puzzles · imported",
+    detail: "Rating 900 - 2100 · mixed coverage · Arrow Duel partial",
+    coverage: {
+      puzzles: "~25k",
+      rating: "900-2100",
+      themes: "Mixed",
+      arrowDuel: "Partial"
+    },
+    source: "External pack manifest",
+    presolveStatus: "Validated and presolved",
+    manifestHash: "imported-preview-manifest",
+    buildDate: "Local import",
+    licenseNote: "Imported packs must include compatible source attribution before activation.",
+    status: "optional",
+    testID: "packs-optional-imported"
+  }
+];
+
+const INITIAL_INSTALLED_PACK_IDS = ["core", "tactics"];
+
 function PacksPanel(): React.JSX.Element {
+  const [installedPackIds, setInstalledPackIds] = useState(INITIAL_INSTALLED_PACK_IDS);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [importProgress, setImportProgress] = useState<PackImportProgress | null>(null);
   const [removalPack, setRemovalPack] = useState<PackRowModel | null>(null);
-  const [selectedPack, setSelectedPack] = useState<PackRowModel | null>(null);
-  const installedPacks: PackRowModel[] = [
-    {
-      id: "core",
-      title: "Core Pack",
-      subtitle: "~1,000 puzzles · offline",
-      detail: "Rating 600 - 1600 · Mixed, mate, endgame · Arrow Duel ready",
-      coverage: {
-        puzzles: "~1k",
-        rating: "600-1600",
-        themes: "Mixed",
-        arrowDuel: "Ready"
-      },
-      source: "Lichess puzzle database",
-      presolveStatus: "Chessticize presolved",
-      manifestHash: "core-2026-06-fixture",
-      buildDate: "Bundled fixture",
-      licenseNote: "Derived from Lichess puzzle data with Chessticize presolve metadata.",
-      status: "active",
-      testID: "packs-installed-core"
-    },
-    {
-      id: "tactics",
-      title: "Tactics Pack",
-      subtitle: "~50k puzzles · installed",
-      detail: "Rating 800 - 2200 · tactics-heavy coverage",
-      coverage: {
-        puzzles: "~50k",
-        rating: "800-2200",
-        themes: "Tactics",
-        arrowDuel: "Partial"
-      },
-      source: "Lichess puzzle database",
-      presolveStatus: "Presolved locally",
-      manifestHash: "tactics-preview-50k",
-      buildDate: "Preview bundle",
-      licenseNote: "Imported packs keep source attribution and do not modify attempt history.",
-      status: "installed",
-      testID: "packs-installed-tactics"
-    }
-  ];
-  const optionalPacks: PackRowModel[] = [
-    {
-      id: "endgame",
-      title: "Endgame Pack",
-      subtitle: "~40k puzzles · optional",
-      detail: "Rating 900 - 2400 · rook, pawn, conversion themes",
-      coverage: {
-        puzzles: "~40k",
-        rating: "900-2400",
-        themes: "Endgame",
-        arrowDuel: "Limited"
-      },
-      source: "Lichess puzzle database",
-      presolveStatus: "Manifest pending validation",
-      manifestHash: "endgame-manifest-pending",
-      buildDate: "Remote optional pack",
-      licenseNote: "Activation requires manifest validation before offline use.",
-      status: "optional",
-      testID: "packs-optional-endgame"
-    },
-    {
-      id: "mate-in-n",
-      title: "Mate in N Pack",
-      subtitle: "~30k puzzles · optional",
-      detail: "Rating 700 - 2300 · mate themes · Arrow Duel candidates",
-      coverage: {
-        puzzles: "~30k",
-        rating: "700-2300",
-        themes: "Mate",
-        arrowDuel: "Ready"
-      },
-      source: "Lichess puzzle database",
-      presolveStatus: "Manifest pending validation",
-      manifestHash: "mate-n-manifest-pending",
-      buildDate: "Remote optional pack",
-      licenseNote: "Activation requires manifest validation before offline use.",
-      status: "optional",
-      testID: "packs-optional-mate-in-n"
-    }
-  ];
-  function beginPackImport(packTitle: string): void {
+  const [selectedPackId, setSelectedPackId] = useState<string | null>(null);
+  const installedPacks = PACK_CATALOG
+    .filter((pack) => installedPackIds.includes(pack.id))
+    .map((pack) => packWithStatus(pack, pack.id === "core" ? "active" : "installed"));
+  const optionalPacks = PACK_CATALOG
+    .filter((pack) => pack.id !== "imported" && !installedPackIds.includes(pack.id))
+    .map((pack) => packWithStatus(pack, "optional"));
+  const firstRemovablePackId = installedPacks.find((pack) => pack.id !== "core")?.id ?? null;
+  const selectedPack = selectedPackId === null
+    ? null
+    : packWithStatus(
+      PACK_CATALOG.find((pack) => pack.id === selectedPackId) ?? PACK_CATALOG[0],
+      installedPackIds.includes(selectedPackId)
+        ? selectedPackId === "core" ? "active" : "installed"
+        : "optional"
+    );
+
+  function beginPackImport(pack: PackRowModel): void {
+    setInstalledPackIds((current) => current.includes(pack.id) ? current : [...current, pack.id]);
     setImportProgress({
-      packTitle,
-      progress: 72,
-      status: "validating"
+      packTitle: pack.title,
+      progress: 100,
+      status: "ready"
     });
-    setStatusMessage(`Validating ${packTitle} manifest`);
+    setStatusMessage(`${pack.title} validated and activated for offline use`);
   }
 
   return (
@@ -5687,7 +5862,7 @@ function PacksPanel(): React.JSX.Element {
           accessibilityLabel="Import puzzle pack"
           testID="packs-import"
           style={styles.packsIconButton}
-          onPress={() => beginPackImport("Imported Pack")}
+          onPress={() => beginPackImport(PACK_CATALOG.find((pack) => pack.id === "imported") ?? PACK_CATALOG[0])}
         >
           <PlusGlyph />
         </Pressable>
@@ -5702,25 +5877,44 @@ function PacksPanel(): React.JSX.Element {
           <PackRow
             key={pack.id}
             pack={pack}
-            onOpenDetail={() => setSelectedPack(pack)}
+            onOpenDetail={() => setSelectedPackId(pack.id)}
             onRemove={pack.id === "core" ? undefined : () => setRemovalPack(pack)}
+            removeTestID={pack.id === firstRemovablePackId ? "packs-remove" : `packs-remove-${pack.id}-button`}
           />
         ))}
       </PackSection>
 
       <PackSection title="Optional Packs" testID="packs-optional-section">
-        {optionalPacks.map((pack) => (
-          <PackRow
-            key={pack.id}
-            pack={pack}
-            onOpenDetail={() => setSelectedPack(pack)}
-            onImport={() => beginPackImport(pack.title)}
-          />
-        ))}
+        {optionalPacks.length > 0 ? (
+          optionalPacks.map((pack) => (
+            <PackRow
+              key={pack.id}
+              pack={pack}
+              onOpenDetail={() => setSelectedPackId(pack.id)}
+              onImport={() => beginPackImport(pack)}
+            />
+          ))
+        ) : (
+          <Text style={styles.helperText} testID="packs-no-optional-packs">All available packs are installed.</Text>
+        )}
       </PackSection>
 
+      {installedPacks.length === 1 ? (
+        <View style={styles.packInfoCard} testID="packs-offline-readiness">
+          <Text style={styles.sectionLabel}>Offline Ready</Text>
+          <Text style={styles.helperText}>
+            Core Pack remains installed and fully available offline. Removing optional packs does not delete history or review schedules.
+          </Text>
+        </View>
+      ) : null}
+
       {selectedPack ? (
-        <PackDetailPanel pack={selectedPack} onClose={() => setSelectedPack(null)} />
+        <PackDetailPanel
+          pack={selectedPack}
+          onClose={() => setSelectedPackId(null)}
+          onImport={selectedPack.status === "optional" ? () => beginPackImport(selectedPack) : undefined}
+          onRemove={selectedPack.status === "installed" ? () => setRemovalPack(selectedPack) : undefined}
+        />
       ) : null}
 
       <View style={styles.packInfoCard} testID="packs-info-section">
@@ -5742,8 +5936,12 @@ function PacksPanel(): React.JSX.Element {
           title={`Remove ${removalPack.title}?`}
           onCancel={() => setRemovalPack(null)}
           onConfirm={() => {
+            setInstalledPackIds((current) => current.filter((id) => id !== removalPack.id));
+            if (selectedPackId === removalPack.id) {
+              setSelectedPackId(null);
+            }
             setRemovalPack(null);
-            setStatusMessage(`${removalPack.title} removal queued; history retained`);
+            setStatusMessage(`${removalPack.title} removed; history retained`);
           }}
         />
       ) : null}
@@ -5753,6 +5951,22 @@ function PacksPanel(): React.JSX.Element {
       ) : null}
     </View>
   );
+}
+
+function packWithStatus(pack: PackRowModel, status: PackRowModel["status"]): PackRowModel {
+  const installedLabel = status === "active"
+    ? "offline"
+    : status === "installed"
+      ? "installed"
+      : "optional";
+  return {
+    ...pack,
+    subtitle: pack.subtitle.replace(/(offline|installed|optional|imported)$/, installedLabel),
+    presolveStatus: status === "optional" ? pack.presolveStatus : "Validated and presolved",
+    manifestHash: status === "optional" ? pack.manifestHash : pack.manifestHash.replace("pending", "validated"),
+    status,
+    testID: `packs-${status === "optional" ? "optional" : "installed"}-${pack.id}`
+  };
 }
 
 function PackSection({
@@ -5782,7 +5996,9 @@ function PackImportProgressCard({
       <View style={styles.packImportHeader}>
         <View>
           <Text style={styles.sectionLabel}>{progress.packTitle}</Text>
-          <Text style={styles.helperText}>Manifest validation in progress</Text>
+          <Text style={styles.helperText}>
+            {progress.status === "ready" ? "Manifest validated" : "Manifest validation in progress"}
+          </Text>
         </View>
         <Text style={styles.packImportPercent} testID="packs-import-progress-value">{progress.progress}%</Text>
       </View>
@@ -5836,12 +6052,14 @@ function PackRow({
   onImport,
   onOpenDetail,
   onRemove,
-  pack
+  pack,
+  removeTestID
 }: {
   onImport?: () => void;
   onOpenDetail: () => void;
   onRemove?: () => void;
   pack: PackRowModel;
+  removeTestID?: string;
 }): React.JSX.Element {
   const isOptional = pack.status === "optional";
   return (
@@ -5885,7 +6103,7 @@ function PackRow({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Remove ${pack.title}`}
-            testID="packs-remove"
+            testID={removeTestID}
             style={styles.packActionButton}
             onPress={onRemove}
           >
@@ -5911,9 +6129,13 @@ function PackActiveMark({ testID }: { testID: string }): React.JSX.Element {
 
 function PackDetailPanel({
   onClose,
+  onImport,
+  onRemove,
   pack
 }: {
   onClose: () => void;
+  onImport?: () => void;
+  onRemove?: () => void;
   pack: PackRowModel;
 }): React.JSX.Element {
   return (
@@ -5944,6 +6166,28 @@ function PackDetailPanel({
       <Text testID="pack-detail-license-notes" style={styles.packLicenseText}>
         License notes: {pack.licenseNote}
       </Text>
+      {onImport ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Import ${pack.title}`}
+          testID="pack-detail-import"
+          style={styles.primaryButton}
+          onPress={onImport}
+        >
+          <Text style={styles.primaryButtonText}>Import Pack</Text>
+        </Pressable>
+      ) : null}
+      {onRemove ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Remove ${pack.title}`}
+          testID="pack-detail-remove"
+          style={styles.secondaryButton}
+          onPress={onRemove}
+        >
+          <Text style={styles.secondaryButtonText}>Remove Pack</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -7207,6 +7451,34 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     minHeight: 32
+  },
+  activeMistakeIndicator: {
+    alignItems: "center",
+    gap: 3,
+    minWidth: 48
+  },
+  activeMistakeDots: {
+    flexDirection: "row",
+    gap: 3
+  },
+  activeMistakeDot: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#94A3B8",
+    borderRadius: 3,
+    borderWidth: 1,
+    height: 9,
+    width: 9
+  },
+  activeMistakeDotUsed: {
+    backgroundColor: "#DC2626",
+    borderColor: "#DC2626"
+  },
+  activeMistakeCount: {
+    color: "#64748B",
+    fontFamily: "menlo",
+    fontSize: 10,
+    fontWeight: "800",
+    lineHeight: 12
   },
   sessionAbandonConfirm: {
     alignItems: "center",
@@ -8499,6 +8771,72 @@ const styles = StyleSheet.create({
     backgroundColor: "#2563EB",
     borderRadius: 4,
     minHeight: 4
+  },
+  historyLineChart: {
+    backgroundColor: "#F8FAFC",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    height: 76,
+    overflow: "hidden",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    position: "relative"
+  },
+  historyLineGrid: {
+    backgroundColor: "#E2E8F0",
+    height: StyleSheet.hairlineWidth,
+    left: 12,
+    opacity: 0.75,
+    position: "absolute",
+    right: 12,
+    top: 16
+  },
+  historyLineGridMiddle: {
+    top: 38
+  },
+  historyLineGridBottom: {
+    top: 60
+  },
+  historyLineLayer: {
+    bottom: 8,
+    left: 18,
+    position: "absolute",
+    right: 18,
+    top: 8
+  },
+  historyLineSegment: {
+    backgroundColor: "#2563EB",
+    borderRadius: 999,
+    height: 2,
+    opacity: 0.82,
+    position: "absolute"
+  },
+  historyLinePointLayer: {
+    bottom: 8,
+    left: 18,
+    position: "absolute",
+    right: 18,
+    top: 8
+  },
+  historyLinePointColumn: {
+    alignItems: "center",
+    height: 10,
+    marginLeft: -5,
+    marginTop: -5,
+    position: "absolute",
+    width: 10
+  },
+  historyLinePoint: {
+    backgroundColor: "#93C5FD",
+    borderRadius: 999,
+    height: 7,
+    width: 7
+  },
+  historyLinePointCurrent: {
+    backgroundColor: "#2563EB",
+    height: 10,
+    width: 10
   },
   historyChipContent: {
     flexDirection: "row",

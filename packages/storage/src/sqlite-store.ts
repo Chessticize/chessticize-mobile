@@ -500,6 +500,10 @@ export class SQLiteStore implements PracticeStore {
     return row ? reviewFromRow(row) : undefined;
   }
 
+  listReviewQueue(): ReviewQueueState[] {
+    return this.listAllReviewQueueStates();
+  }
+
   getDueReviews(now: string): ReviewQueueState[] {
     const rows = this.db
       .prepare("SELECT * FROM review_queue WHERE due_at <= ? ORDER BY due_at ASC, puzzle_id ASC, mode ASC, rating_key ASC")
@@ -643,7 +647,7 @@ export class SQLiteStore implements PracticeStore {
   }
 
   private listAllReviewQueueStates(): ReviewQueueState[] {
-    const rows = this.db.prepare("SELECT * FROM review_queue").all() as ReviewRow[];
+    const rows = this.db.prepare("SELECT * FROM review_queue ORDER BY due_at ASC, puzzle_id ASC, mode ASC, rating_key ASC").all() as ReviewRow[];
     return rows.map(reviewFromRow);
   }
 

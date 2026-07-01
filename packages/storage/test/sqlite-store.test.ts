@@ -389,6 +389,10 @@ test("PracticeService persists wrong attempts, history filters, review queue, an
     const futureDue = store.getDueReviews("2026-06-22T00:00:00.000Z");
     assert.equal(futureDue.length, 1);
     assert.equal(futureDue[0]?.puzzleId, "000hf");
+    const fullQueue = service.listReviewQueue();
+    assert.equal(fullQueue.length, 1);
+    assert.equal(fullQueue[0]?.puzzleId, "000hf");
+    assert.equal(service.getDueReviews("2026-06-20T12:00:00.000Z").length, 0);
 
     const rating = store.getRating("standard 5/20");
     const reset = store.resetRating("standard 5/20");
