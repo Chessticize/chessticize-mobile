@@ -189,7 +189,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
     expect(hasStyleValue(renderer.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
     expectText(renderer, "1 / 15");
-    expect(findByTestId(renderer, "session-strikes").props.accessibilityLabel).toBe("Mistakes 0 of 3");
+    expectSessionMistakes(renderer, 0);
 
     await settleFeedbackSnapshot();
     expectText(renderer, "1 / 15");
@@ -230,8 +230,9 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "session-timer")).toBeTruthy();
     expect(findByTestId(renderer, "session-progress")).toBeTruthy();
     expect(findByTestId(renderer, "session-rating")).toBeTruthy();
-    expect(findByTestId(renderer, "session-strikes")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "session-mistakes"))).toBe("0 / 3");
+    expect(() => findByTestId(renderer, "session-strikes")).toThrow();
+    expect(() => findByTestId(renderer, "session-mistakes")).toThrow();
+    expectSessionMistakes(renderer, 0);
     expect(findByTestId(renderer, "session-abandon").props.accessibilityLabel).toBe("Abandon sprint");
     press(renderer, "session-abandon");
     expect(findByTestId(renderer, "session-abandon-confirmation")).toBeTruthy();
@@ -245,7 +246,7 @@ describe("PracticePocScreen", () => {
     await boardMove(renderer, "e2e6");
     expect(collectText(renderer.root)).not.toContain("Correct");
     expect(collectText(renderer.root)).not.toContain("Incorrect");
-    expect(findByTestId(renderer, "session-strikes").props.accessibilityLabel).toBe("Mistakes 0 of 3");
+    expectSessionMistakes(renderer, 0);
     expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(fenBeforeAutoReply);
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(false);
     expect(findByTestId(renderer, "mock-chessboard").props.draggableColor).toBe(null);
@@ -262,7 +263,7 @@ describe("PracticePocScreen", () => {
     expect(countStyleValue(renderer.root, "rgba(37, 99, 235, 0.3)")).toBeGreaterThanOrEqual(2);
 
     await boardMove(renderer, "e6f7");
-    expect(findByTestId(renderer, "session-strikes").props.accessibilityLabel).toBe("Mistakes 0 of 3");
+    expectSessionMistakes(renderer, 0);
     expect(hasStyleValue(renderer.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
     expect(countStyleValue(renderer.root, "rgba(37, 99, 235, 0.3)")).toBe(0);
     await settleFeedbackSnapshot();
@@ -307,7 +308,7 @@ describe("PracticePocScreen", () => {
     await boardMove(renderer, "e6f7");
 
     expectText(renderer, "1 / 15");
-    expect(findByTestId(renderer, "session-strikes").props.accessibilityLabel).toBe("Mistakes 0 of 3");
+    expectSessionMistakes(renderer, 0);
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
     expect(hasStyleValue(renderer.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
 
@@ -315,7 +316,7 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
     expect(findByTestId(renderer, "mock-chessboard").props.draggableColor).toBe("b");
-    expect(findByTestId(renderer, "session-strikes").props.accessibilityLabel).toBe("Mistakes 0 of 3");
+    expectSessionMistakes(renderer, 0);
   });
 
   it("discards opponent-piece drags during the opponent reply animation", async () => {
@@ -335,7 +336,7 @@ describe("PracticePocScreen", () => {
       mustFenAfterMove(mustFenAfterMove(firstPuzzleFen, "e2e6"), "f7e8")
     );
 
-    expect(findByTestId(renderer, "session-strikes").props.accessibilityLabel).toBe("Mistakes 0 of 3");
+    expectSessionMistakes(renderer, 0);
     expect(trace.some((event) =>
       event.type === "move-ignored" &&
       event.reason === "board-locked" &&
@@ -350,7 +351,7 @@ describe("PracticePocScreen", () => {
     await settleFeedbackSnapshot();
     await boardMove(renderer, "e6f7");
 
-    expect(findByTestId(renderer, "session-strikes").props.accessibilityLabel).toBe("Mistakes 0 of 3");
+    expectSessionMistakes(renderer, 0);
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
     expect(hasStyleValue(renderer.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
   });
@@ -368,7 +369,7 @@ describe("PracticePocScreen", () => {
       findByTestId(renderer, "mock-chessboard").props.onIllegalMove("d8", "a8");
     });
 
-    expect(findByTestId(renderer, "session-strikes").props.accessibilityLabel).toBe("Mistakes 0 of 3");
+    expectSessionMistakes(renderer, 0);
     expect(trace.some((event) =>
       event.type === "move-ignored" &&
       event.reason === "board-locked-illegal-move" &&
@@ -383,7 +384,7 @@ describe("PracticePocScreen", () => {
     await settleFeedbackSnapshot();
     await boardMove(renderer, "e6f7");
 
-    expect(findByTestId(renderer, "session-strikes").props.accessibilityLabel).toBe("Mistakes 0 of 3");
+    expectSessionMistakes(renderer, 0);
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
     expect(hasStyleValue(renderer.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
   });
@@ -396,7 +397,7 @@ describe("PracticePocScreen", () => {
 
     expect(collectText(renderer.root)).not.toContain("Correct");
     expect(collectText(renderer.root)).not.toContain("Incorrect");
-    expect(findByTestId(renderer, "session-strikes").props.accessibilityLabel).toBe("Mistakes 0 of 3");
+    expectSessionMistakes(renderer, 0);
 
     await settleFeedbackSnapshot();
 
@@ -415,7 +416,7 @@ describe("PracticePocScreen", () => {
 
     await boardMove(renderer, "e2e6");
 
-    expect(findByTestId(renderer, "session-strikes").props.accessibilityLabel).toBe("Mistakes 0 of 3");
+    expectSessionMistakes(renderer, 0);
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
     expect(hasStyleValue(renderer.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
     expect(hasStyleValue(renderer.root, "rgba(220, 38, 38, 0.32)")).toBe(false);
@@ -447,7 +448,7 @@ describe("PracticePocScreen", () => {
     for (const move of firstSevenStandardUserMoves) {
       expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
       await boardMove(renderer, move);
-      expect(findByTestId(renderer, "session-strikes").props.accessibilityLabel).toBe("Mistakes 0 of 3");
+      expectSessionMistakes(renderer, 0);
       expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
       expect(hasStyleValue(renderer.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
       expect(hasStyleValue(renderer.root, "rgba(220, 38, 38, 0.32)")).toBe(false);
@@ -474,7 +475,7 @@ describe("PracticePocScreen", () => {
 
     await boardMove(renderer, "e6d7");
 
-    expect(findByTestId(renderer, "session-strikes").props.accessibilityLabel).toBe("Mistakes 1 of 3");
+    expectSessionMistakes(renderer, 1);
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
     expect(hasStyleValue(renderer.root, "rgba(220, 38, 38, 0.32)")).toBe(true);
     expect(countStyleValue(renderer.root, "rgba(37, 99, 235, 0.3)")).toBe(0);
@@ -559,7 +560,7 @@ describe("PracticePocScreen", () => {
     await boardMove(renderer, nonCandidate);
 
     expectText(renderer, "0 / 10");
-    expect(findByTestId(renderer, "session-strikes").props.accessibilityLabel).toBe("Mistakes 0 of 3");
+    expectSessionMistakes(renderer, 0);
     expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(boardFen);
     expect(() => findByTestId(renderer, "move-feedback-overlay")).toThrow();
     expect(collectText(renderer.root)).not.toContain("Incorrect");
@@ -581,7 +582,7 @@ describe("PracticePocScreen", () => {
     await boardMove(renderer, "a1a8");
 
     expectText(renderer, "0 / 15");
-    expect(findByTestId(renderer, "session-strikes").props.accessibilityLabel).toBe("Mistakes 0 of 3");
+    expectSessionMistakes(renderer, 0);
     expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(boardFen);
     expect(() => findByTestId(renderer, "move-feedback-overlay")).toThrow();
     expect(hasStyleValue(renderer.root, "rgba(220, 38, 38, 0.32)")).toBe(false);
@@ -1587,7 +1588,7 @@ describe("PracticePocScreen", () => {
     await boardMoveWithCallback(firstBoardOnMove, "e6f7", staleSolvedFen);
 
     expectText(renderer, "1 / 15");
-    expect(findByTestId(renderer, "session-strikes").props.accessibilityLabel).toBe("Mistakes 0 of 3");
+    expectSessionMistakes(renderer, 0);
     expect(() => findByTestId(renderer, "move-feedback-overlay")).toThrow();
 
     abandonSprint(renderer);
@@ -1827,6 +1828,10 @@ function abandonSprint(renderer: TestRenderer.ReactTestRenderer): void {
   press(renderer, "session-abandon");
   expect(findByTestId(renderer, "session-abandon-confirmation")).toBeTruthy();
   press(renderer, "session-abandon-confirm");
+}
+
+function expectSessionMistakes(renderer: TestRenderer.ReactTestRenderer, count: number): void {
+  expect(findByTestId(renderer, "session-score-strip").props.accessibilityLabel).toContain(`mistakes ${count}`);
 }
 
 async function boardMove(
