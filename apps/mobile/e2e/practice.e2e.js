@@ -10,6 +10,8 @@ describe('Practice POC', () => {
 
     const screenshotPath = await device.takeScreenshot('standard-board');
     expectBoardScreenshotContainsPieces(screenshotPath);
+
+    await returnToPracticeHomeFromActiveSprint();
   });
 
   it('renders Arrow Duel candidate arrows on the board', async () => {
@@ -21,9 +23,12 @@ describe('Practice POC', () => {
 
     const screenshotPath = await device.takeScreenshot('arrow-duel-neutral-arrows');
     expectBoardScreenshotContainsNeutralArrows(screenshotPath);
+
+    await returnToPracticeHomeFromActiveSprint();
   });
 
   it('accepts the fixed alternate mate-in-one puzzle', async () => {
+    await element(by.id('practice-mode-standard')).tap();
     await waitFor(element(by.id('test-puzzle-source-familiar15'))).toBeVisible().withTimeout(30000);
     await element(by.id('start-sprint-button')).tap();
     await waitFor(element(by.text('Find the best move for white.'))).toBeVisible().withTimeout(10000);
@@ -38,9 +43,12 @@ describe('Practice POC', () => {
 
     await waitFor(element(by.id('session-progress'))).toHaveText('1 / 15').withTimeout(10000);
     await expect(element(by.text('Mistakes'))).toBeVisible();
+
+    await returnToPracticeHomeFromActiveSprint();
   });
 
   it('opens last sprint mistake review with navigation and analysis arrows', async () => {
+    await element(by.id('practice-mode-standard')).tap();
     await waitFor(element(by.id('test-puzzle-source-familiar15'))).toBeVisible().withTimeout(30000);
     await element(by.id('start-sprint-button')).tap();
     await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
@@ -93,6 +101,14 @@ async function playBoardMove(testID, move, flipped = false) {
   await board.tapAtPoint(boardPoint(boardFrame, move.slice(0, 2), flipped));
   await sleep(250);
   await board.tapAtPoint(boardPoint(boardFrame, move.slice(2, 4), flipped));
+}
+
+async function returnToPracticeHomeFromActiveSprint() {
+  await waitFor(element(by.id('session-abandon'))).toBeVisible().withTimeout(10000);
+  await element(by.id('session-abandon')).tap();
+  await waitFor(element(by.id('back-practice-button'))).toBeVisible().withTimeout(10000);
+  await element(by.id('back-practice-button')).tap();
+  await waitFor(element(by.id('start-sprint-button'))).toBeVisible().withTimeout(10000);
 }
 
 async function waitForElementTextContaining(testID, expected, timeoutMs) {
