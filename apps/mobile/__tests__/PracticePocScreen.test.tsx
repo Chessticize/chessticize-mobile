@@ -30,11 +30,14 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-tab")).toBeTruthy();
     expect(findByTestId(renderer, "settings-tab")).toBeTruthy();
     expect(findByTestId(renderer, "packs-tab")).toBeTruthy();
-    expect(findByTestId(renderer, "analysis-tab")).toBeTruthy();
+    expect(() => findByTestId(renderer, "analysis-tab")).toThrow();
     expect(findByTestId(renderer, "practice-mode-standard")).toBeTruthy();
     expect(findByTestId(renderer, "practice-mode-arrow-duel")).toBeTruthy();
     expect(findByTestId(renderer, "practice-mode-blitz")).toBeTruthy();
     expect(findByTestId(renderer, "practice-mode-custom")).toBeTruthy();
+    expect(findByTestId(renderer, "practice-home")).toBeTruthy();
+    expect(findByTestId(renderer, "practice-progress-summary")).toBeTruthy();
+    expect(findByTestId(renderer, "practice-review-strip")).toBeTruthy();
     expectText(renderer, "Offline fixture · 15 puzzles");
   });
 
@@ -97,7 +100,7 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "session-abandon");
     press(renderer, "history-tab");
-    expectText(renderer, "Standard · correct · c2b1");
+    expectText(renderer, "Correct · c2b1");
   });
 
   it("submits standard puzzle moves through the board and records attempt history", async () => {
@@ -150,7 +153,7 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "session-abandon");
     press(renderer, "history-tab");
-    expectText(renderer, "Standard · correct · e6f7");
+    expectText(renderer, "Correct · e6f7");
     expect(collectText(renderer.root)).not.toContain("000hf · standard");
   });
 
@@ -362,7 +365,7 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "session-abandon");
     press(renderer, "history-tab");
-    expectText(renderer, "Standard · wrong · e6d7");
+    expectText(renderer, "Wrong move · e6d7");
   });
 
   it("uses neutral Arrow Duel board markers without candidate chips", () => {
@@ -493,18 +496,21 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "history-tab");
     expectText(renderer, "Accuracy 50% · Correct 1 · Wrong 1");
-    expectText(renderer, "Standard · correct · e6f7");
-    expectText(renderer, "Standard · wrong · g6g5");
+    expect(findByTestId(renderer, "history-performance-card")).toBeTruthy();
+    expect(findByTestId(renderer, "history-performance-chart")).toBeTruthy();
+    expect(findByTestId(renderer, "history-range-filters")).toBeTruthy();
+    expectText(renderer, "Correct · e6f7");
+    expectText(renderer, "Wrong move · g6g5");
 
     press(renderer, "history-filter-wrong-7-days");
     expectText(renderer, "Accuracy 0% · Correct 0 · Wrong 1");
-    expectText(renderer, "Standard · wrong · g6g5");
-    expect(collectText(renderer.root)).not.toContain("Standard · correct · e6f7");
+    expectText(renderer, "Wrong move · g6g5");
+    expect(collectText(renderer.root)).not.toContain("Correct · e6f7");
 
     press(renderer, "history-source-sprint");
-    expectText(renderer, "Standard · wrong · g6g5");
+    expectText(renderer, "Wrong move · g6g5");
     press(renderer, "history-mode-standard");
-    expectText(renderer, "Standard · wrong · g6g5");
+    expectText(renderer, "Wrong move · g6g5");
 
     const historyAttemptRow = renderer.root.findAll(
       (node) => typeof node.props.testID === "string" && node.props.testID.startsWith("history-attempt-")
@@ -566,7 +572,7 @@ describe("PracticePocScreen", () => {
     const historyAttemptRows = renderer.root.findAll(
       (node) => typeof node.props.testID === "string" && node.props.testID.startsWith("history-attempt-")
     );
-    const correctAttemptRow = historyAttemptRows.find((row) => collectText(row).includes("correct"));
+    const correctAttemptRow = historyAttemptRows.find((row) => collectText(row).includes("Correct"));
     expect(correctAttemptRow).toBeTruthy();
     press(renderer, correctAttemptRow!.props.testID);
 
@@ -700,7 +706,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "mock-chessboard").props.draggableColor).toBe("w");
   });
 
-  it("opens due reviews directly without skip navigation", () => {
+  it("shows a review queue before starting due reviews", () => {
     const service = createMobilePracticeService("random1000");
     service.startSprint(
       { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
@@ -711,12 +717,20 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "review-tab");
 
+    expect(findByTestId(renderer, "review-panel")).toBeTruthy();
+    expect(findByTestId(renderer, "review-due-card")).toBeTruthy();
+    expectText(renderer, "Due Today");
+    expectText(renderer, "Start Review");
+    expect(findByTestId(renderer, "review-start-due")).toBeTruthy();
+    expect(() => findByTestId(renderer, "review-session")).toThrow();
+
+    press(renderer, "review-start-due");
+
     expect(findByTestId(renderer, "review-session")).toBeTruthy();
     expectText(renderer, "1 / 1 · Standard");
     expect(collectText(findByTestId(renderer, "review-timer"))).toBe("00:20");
     expect(() => findByTestId(renderer, "review-next")).toThrow();
     expect(() => findByTestId(renderer, "review-previous")).toThrow();
-    expect(() => findByTestId(renderer, "review-start-due")).toThrow();
     expect(() => findByTestId(renderer, "review-start-session-mistakes")).toThrow();
   });
 
@@ -737,6 +751,8 @@ describe("PracticePocScreen", () => {
     press(renderer, "review-tab");
 
     expect(findByTestId(renderer, "review-panel")).toBeTruthy();
+    expect(findByTestId(renderer, "review-difficulty-list")).toBeTruthy();
+    expect(findByTestId(renderer, "review-start-due")).toBeTruthy();
     expect(findByTestId(renderer, "review-context-list")).toBeTruthy();
     expect(findByTestId(renderer, "review-context-standard-standard-5-20")).toBeTruthy();
     expect(findByTestId(renderer, "review-context-arrow-duel-arrow-duel-5-30")).toBeTruthy();
@@ -759,6 +775,7 @@ describe("PracticePocScreen", () => {
     const renderer = renderScreen({ practiceService: service });
 
     press(renderer, "review-tab");
+    press(renderer, "review-start-due");
     await boardMove(renderer, "c4b5");
 
     const officialReviewAttempts = service.listHistory({ source: "scheduled_review" }) as Array<{ result: string; submittedMove: string }>;
@@ -768,7 +785,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "review-exit");
     press(renderer, "history-tab");
     press(renderer, "history-source-review");
-    expectText(renderer, "Standard · wrong · c4b5");
+    expectText(renderer, "Wrong move · c4b5");
     const historyAttemptRow = renderer.root.findAll(
       (node) => typeof node.props.testID === "string" && node.props.testID.startsWith("history-attempt-")
     )[0];
@@ -788,6 +805,7 @@ describe("PracticePocScreen", () => {
     const renderer = renderScreen({ practiceService: service });
 
     press(renderer, "review-tab");
+    press(renderer, "review-start-due");
 
     expect(collectText(findByTestId(renderer, "review-timer"))).toBe("00:20");
 
@@ -942,7 +960,8 @@ describe("PracticePocScreen", () => {
       stockfishTransportFactory: () => stockfish.transport
     });
 
-    press(renderer, "analysis-tab");
+    press(renderer, "settings-tab");
+    press(renderer, "settings-stockfish-diagnostics");
     await waitForAssertion(() => {
       expect(stockfish.commands).toContain("go depth 8");
       expect(collectText(findByTestId(renderer, "stockfish-diagnostics-status"))).toContain("Depth 4/20");
