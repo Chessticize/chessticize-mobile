@@ -997,7 +997,7 @@ export function PracticePocScreen({
   const appShellVisible = !isActive && !isShowingFeedbackSnapshot;
   const screenTitle = screenTitleFor(tab);
   const screenSubtitle = tab === "practice"
-    ? `Offline fixture · ${seededPuzzleCount(puzzleSource)} puzzles`
+    ? `Offline-ready · ${seededPuzzleCount(puzzleSource)} puzzles`
     : screenSubtitleFor(tab);
   const showHeaderRating = tab === "practice" && state === null && mode !== "custom";
   const practiceModeSummaries = (["standard", "arrow_duel", "blitz", "custom"] as const).map((nextMode) => {
@@ -1715,11 +1715,28 @@ function CustomSprintSetup({
           label="Estimated puzzles"
           value={`~${targetCorrect}`}
           testID="custom-target-row"
+          valueTestID="custom-target-count"
         />
         <CustomValueRow
           label="Rating range"
           value={ratingRange}
           testID="custom-rating-range"
+        />
+        <CustomValueRow
+          label="ELO type"
+          value={customMode === "arrow_duel" ? "Arrow Duel" : "Regular puzzles"}
+          testID="custom-mode-summary"
+        />
+        <CustomValueRow
+          label="Current rating"
+          value={`ELO ${currentRating}`}
+          testID="custom-current-rating"
+        />
+        <CustomValueRow
+          detail="Separate scoring bucket"
+          label="Scoring history"
+          value={ratingKey}
+          testID="custom-separate-scoring"
         />
         <CustomToggleRow
           detail="Switches this custom sprint to Arrow Duel scoring."
@@ -1735,19 +1752,6 @@ function CustomSprintSetup({
         hasEnoughLocalPuzzles={hasEnoughLocalPuzzles}
         requiredPuzzleCount={requiredPuzzleCount}
       />
-
-      <View style={styles.customSummaryCard} testID="custom-summary-card">
-        <View style={styles.customSummaryRows}>
-          <CustomSummaryMetric label="Target" testID="custom-target-count" value={`${targetCorrect} puzzles`} />
-          <CustomSummaryMetric label="ELO type" testID="custom-mode-summary" value={customMode === "arrow_duel" ? "Arrow Duel" : "Regular puzzles"} />
-          <CustomSummaryMetric label="Current rating" testID="custom-current-rating" value={`ELO ${currentRating}`} />
-        </View>
-        <View style={styles.customSummaryMeta}>
-          <Text style={styles.helperText}>Scoring history</Text>
-          <Text style={styles.listText}>{ratingKey}</Text>
-          <Text testID="custom-separate-scoring" style={styles.customSeparateScoring}>Separate scoring bucket</Text>
-        </View>
-      </View>
 
       <View style={styles.previousConfigList} testID="custom-previous-configs">
         <Text style={styles.sectionLabel}>Previous configs</Text>
@@ -1767,16 +1771,9 @@ function CustomEligibilityNotice({
   availablePuzzleCount: number;
   hasEnoughLocalPuzzles: boolean;
   requiredPuzzleCount: number;
-}): React.JSX.Element {
+}): React.JSX.Element | null {
   if (hasEnoughLocalPuzzles) {
-    return (
-      <View style={styles.customEligibilityCard} testID="custom-eligibility-ready">
-        <Text style={styles.sectionLabel}>Local pack ready</Text>
-        <Text style={styles.helperText}>
-          Current offline pack has {availablePuzzleCount} eligible puzzles for up to {requiredPuzzleCount} attempts.
-        </Text>
-      </View>
-    );
+    return null;
   }
 
   return (
@@ -1839,12 +1836,14 @@ function CustomValueRow({
   detail,
   label,
   testID,
-  value
+  value,
+  valueTestID
 }: {
   detail?: string;
   label: string;
   testID: string;
   value: string;
+  valueTestID?: string;
 }): React.JSX.Element {
   return (
     <View style={styles.customConfigRow} testID={testID}>
@@ -1852,7 +1851,7 @@ function CustomValueRow({
         <Text style={styles.listText}>{label}</Text>
         {detail ? <Text style={styles.helperText}>{detail}</Text> : null}
       </View>
-      <Text style={styles.customConfigValue}>{value}</Text>
+      <Text testID={valueTestID} style={styles.customConfigValue}>{value}</Text>
     </View>
   );
 }
@@ -1953,23 +1952,6 @@ function CustomOptionRow<T extends number>({
           </Pressable>
         </View>
       </View>
-    </View>
-  );
-}
-
-function CustomSummaryMetric({
-  label,
-  testID,
-  value
-}: {
-  label: string;
-  testID: string;
-  value: string;
-}): React.JSX.Element {
-  return (
-    <View style={styles.customSummaryMetric} testID={testID}>
-      <Text style={styles.helperText}>{label}</Text>
-      <Text style={styles.listText}>{value}</Text>
     </View>
   );
 }
@@ -2253,6 +2235,7 @@ function SprintSummary({
             {delta >= 0 ? "+" : ""}
             {delta}
           </Text>
+          <Text testID="sprint-result-rating-range" style={styles.resultMetricSubtext}>{state.ratingBefore} → {ratingAfter}</Text>
         </View>
         <View style={styles.resultMetric} testID="sprint-result-time">
           <Text style={styles.resultMetricLabel}>Time</Text>
@@ -2266,18 +2249,11 @@ function SprintSummary({
         </View>
       </View>
 
-      <View style={styles.resultDetailCard} testID="sprint-result-details">
-        <ResultDetailRow label="Mode" value={modeLabel(state.config.mode)} testID="sprint-result-detail-mode" />
-        <ResultDetailRow label="Reason" value={reason} testID="sprint-result-detail-reason" />
-        <ResultDetailRow label="Rating" value={`${state.ratingBefore} -> ${ratingAfter}`} testID="sprint-result-detail-rating" />
-        <ResultDetailRow label="Review impact" value={reviewImpact} testID="sprint-result-detail-review-impact" />
-      </View>
-
       <View style={styles.resultReviewRow} testID="sprint-result-review-impact">
         <View>
           <Text style={styles.listText}>Mistakes</Text>
           <Text style={styles.helperText}>
-            {state.mistakeCount > 0 ? "Review your mistakes" : "No mistakes in this sprint"}
+            {state.mistakeCount > 0 ? `Review your mistakes · ${reviewImpact}` : reviewImpact}
           </Text>
         </View>
         <Text
@@ -2340,23 +2316,6 @@ function SprintSummary({
           <Text style={styles.secondaryButtonText}>Review Mistakes</Text>
         </Pressable>
       ) : null}
-    </View>
-  );
-}
-
-function ResultDetailRow({
-  label,
-  testID,
-  value
-}: {
-  label: string;
-  testID: string;
-  value: string;
-}): React.JSX.Element {
-  return (
-    <View style={styles.resultDetailRow} testID={testID}>
-      <Text style={styles.resultMetricLabel}>{label}</Text>
-      <Text style={styles.resultDetailValue}>{value}</Text>
     </View>
   );
 }
@@ -2825,8 +2784,8 @@ function HistoryPanel({
 
   return (
     <View style={styles.historyPanel} testID="history-panel">
-      <View style={styles.reviewQueueHeader}>
-        <Text style={styles.panelTitle}>History</Text>
+      <View style={styles.reviewQueueHeader} testID="history-action-header">
+        <View style={styles.panelHeaderSpacer} />
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={filtersExpanded ? "Hide history filters" : "Show history filters"}
@@ -2866,12 +2825,6 @@ function HistoryPanel({
           >
             <Text style={[styles.filterButtonText, wrongLast7Days ? styles.filterButtonTextActive : null]}>Wrong 7d</Text>
           </Pressable>
-          <FilterButton
-            active={modeFilter === "arrow_duel"}
-            label="Arrow Duel only"
-            testID="history-filter-arrow-duel-only"
-            onPress={() => onModeFilterChange("arrow_duel")}
-          />
         </HistoryChipRow>
       </View>
 
@@ -3561,8 +3514,8 @@ function ReviewPanel({
 
   return (
     <View style={styles.reviewQueuePanel} testID="review-panel">
-      <View style={styles.reviewQueueHeader}>
-        <Text style={styles.panelTitle}>Review</Text>
+      <View style={styles.reviewQueueHeader} testID="review-action-header">
+        <View style={styles.panelHeaderSpacer} />
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={filtersExpanded ? "Hide review filters" : "Show review filters"}
@@ -3585,8 +3538,6 @@ function ReviewPanel({
         </View>
         <View style={styles.reviewDueMetrics}>
           <Text testID="review-due-count" style={styles.reviewDueBigCount}>{queueSummary.filteredCount}</Text>
-          <Text testID="review-overdue-count" style={styles.reviewDueMetricText}>{queueSummary.overdueCount} overdue</Text>
-          <Text testID="review-total-count" style={styles.reviewDueMetricText}>{queueSummary.totalCount} total</Text>
         </View>
       </View>
 
@@ -4901,56 +4852,57 @@ function SettingsPanel({
       </SettingsSection>
 
       <SettingsSection title="Sync" testID="settings-sync-section">
-        <View style={styles.syncDisclosureCard} testID="settings-sync-disclosure">
-          <View style={styles.syncDisclosureHeader}>
-            <Text style={styles.listText}>Local-first progress</Text>
-            <Text style={[styles.syncDisclosureStatus, syncEnabled ? styles.positive : styles.errorText]}>
-              {syncStatusLabel}
-            </Text>
-          </View>
-          <Text style={styles.helperText}>
-            Practice always works offline. iCloud only syncs after this device is allowed to upload local progress.
-          </Text>
-          {syncEnabled && !syncUploadAllowed ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Allow iCloud upload"
-              testID="settings-sync-allow-upload"
-              style={styles.syncDisclosureButton}
-              onPress={() => {
-                setSyncUploadAllowed(true);
-                setStatusMessage("iCloud upload allowed");
-              }}
-            >
-              <Text style={styles.syncDisclosureButtonText}>Allow upload</Text>
-            </Pressable>
-          ) : null}
-        </View>
         <View style={styles.settingsRow} testID="settings-icloud-sync-row">
           <View style={styles.settingsRowCopy}>
             <Text style={styles.listText}>iCloud Sync</Text>
             <Text testID="settings-sync-status" style={styles.helperText}>
               {syncEnabled
                 ? syncUploadAllowed
-                  ? "On · Last synced today, 09:28"
-                  : "On · Waiting for upload approval"
+                  ? "Practice works offline · Last synced today, 09:28"
+                  : "Practice works offline · Waiting for upload approval"
                 : "Off · Local-only progress"}
             </Text>
           </View>
+          <View style={styles.syncRowMeta}>
+            <Text
+              testID="settings-sync-disclosure"
+              style={[styles.syncStatusText, syncEnabled ? styles.positive : styles.errorText]}
+            >
+              {syncStatusLabel}
+            </Text>
+            <Pressable
+              accessibilityRole="switch"
+              accessibilityLabel="iCloud sync"
+              accessibilityState={{ checked: syncEnabled }}
+              testID="settings-icloud-sync-toggle"
+              style={[styles.switchButton, syncEnabled ? styles.switchButtonActive : null]}
+              onPress={() => {
+                setSyncEnabled((current) => !current);
+                setStatusMessage(syncEnabled ? "iCloud sync off" : "iCloud sync on");
+              }}
+            >
+              <Text style={[styles.switchText, syncEnabled ? styles.switchTextActive : null]}>{syncEnabled ? "On" : "Off"}</Text>
+            </Pressable>
+          </View>
+        </View>
+        {syncEnabled && !syncUploadAllowed ? (
           <Pressable
-            accessibilityRole="switch"
-            accessibilityLabel="iCloud sync"
-            accessibilityState={{ checked: syncEnabled }}
-            testID="settings-icloud-sync-toggle"
-            style={[styles.switchButton, syncEnabled ? styles.switchButtonActive : null]}
+            accessibilityRole="button"
+            accessibilityLabel="Allow iCloud upload"
+            testID="settings-sync-allow-upload"
+            style={styles.syncApprovalRow}
             onPress={() => {
-              setSyncEnabled((current) => !current);
-              setStatusMessage(syncEnabled ? "iCloud sync off" : "iCloud sync on");
+              setSyncUploadAllowed(true);
+              setStatusMessage("iCloud upload allowed");
             }}
           >
-            <Text style={[styles.switchText, syncEnabled ? styles.switchTextActive : null]}>{syncEnabled ? "On" : "Off"}</Text>
+            <View style={styles.settingsRowCopy}>
+              <Text style={styles.listText}>Allow upload</Text>
+              <Text style={styles.helperText}>Required before this device uploads existing local progress.</Text>
+            </View>
+            <Text style={styles.practiceModeChevron}>›</Text>
           </Pressable>
-        </View>
+        ) : null}
       </SettingsSection>
 
       <SettingsSection title="Data" testID="settings-data-section">
@@ -5296,8 +5248,8 @@ function PacksPanel(): React.JSX.Element {
 
   return (
     <View style={styles.packsPanel} testID="packs-panel">
-      <View style={styles.sectionHeaderRow}>
-        <Text style={styles.panelTitle}>Puzzle Packs</Text>
+      <View style={styles.sectionHeaderRow} testID="packs-action-header">
+        <View style={styles.panelHeaderSpacer} />
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Import puzzle pack"
@@ -5458,12 +5410,6 @@ function PackRow({
         </View>
         <Text style={styles.helperText}>{pack.subtitle}</Text>
         <Text style={styles.helperText}>{pack.detail}</Text>
-        <View style={styles.packRowCoverage} testID={`packs-coverage-${pack.id}`}>
-          <PackRowCoverageChip label="Puzzles" value={pack.coverage.puzzles} />
-          <PackRowCoverageChip label="Rating" value={pack.coverage.rating} />
-          <PackRowCoverageChip label="Themes" value={pack.coverage.themes} />
-          <PackRowCoverageChip label="Arrow Duel" value={pack.coverage.arrowDuel} />
-        </View>
       </View>
       <View style={styles.packActionColumn}>
         <Pressable
@@ -5505,18 +5451,6 @@ function PackRow({
   );
 }
 
-function PackRowCoverageChip({
-  label,
-  value
-}: {
-  label: string;
-  value: string;
-}): React.JSX.Element {
-  return (
-    <Text style={styles.packRowCoverageChip}>{label} {value}</Text>
-  );
-}
-
 function PackDetailPanel({
   onClose,
   pack
@@ -5541,6 +5475,10 @@ function PackDetailPanel({
           <Text style={styles.iconButtonText}>×</Text>
         </Pressable>
       </View>
+      <PackInfoRow label="Puzzles" value={pack.coverage.puzzles} testID="pack-detail-puzzles" />
+      <PackInfoRow label="Rating" value={pack.coverage.rating} testID="pack-detail-rating" />
+      <PackInfoRow label="Themes" value={pack.coverage.themes} testID="pack-detail-themes" />
+      <PackInfoRow label="Arrow Duel" value={pack.coverage.arrowDuel} testID="pack-detail-arrow-duel" />
       <PackInfoRow label="Source" value={pack.source} testID="pack-detail-source" />
       <PackInfoRow label="Presolve" value={pack.presolveStatus} testID="pack-detail-presolve" />
       <PackInfoRow label="Manifest hash" value={pack.manifestHash} testID="pack-detail-manifest-hash" />
@@ -6435,13 +6373,7 @@ const styles = StyleSheet.create({
   },
   reviewDueMetrics: {
     alignItems: "flex-end",
-    gap: 2,
     minWidth: 72
-  },
-  reviewDueMetricText: {
-    color: "#64748B",
-    fontSize: 11,
-    fontWeight: "800"
   },
   reviewFilterScroller: {
     marginHorizontal: -UI_PADDING
@@ -7048,28 +6980,6 @@ const styles = StyleSheet.create({
   customMiniChipTextActive: {
     color: "#1D4ED8"
   },
-  customSummaryCard: {
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    minHeight: 70,
-    padding: 12
-  },
-  customSummaryRows: {
-    flex: 1,
-    gap: 8,
-    minWidth: 0
-  },
-  customSummaryMetric: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 12,
-    justifyContent: "space-between"
-  },
   customEligibilityCard: {
     backgroundColor: "#FFFFFF",
     borderColor: "#E2E8F0",
@@ -7081,15 +6991,6 @@ const styles = StyleSheet.create({
   customEligibilityWarning: {
     backgroundColor: "#FFFBEB",
     borderColor: "#FBBF24"
-  },
-  customSummaryMeta: {
-    alignItems: "flex-end",
-    gap: 2
-  },
-  customSeparateScoring: {
-    color: "#2563EB",
-    fontSize: 11,
-    fontWeight: "800"
   },
   previousConfigList: {
     gap: 8
@@ -7356,30 +7257,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "800"
   },
-  resultDetailCard: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    borderWidth: 1,
-    overflow: "hidden"
-  },
-  resultDetailRow: {
-    alignItems: "center",
-    borderBottomColor: "#E2E8F0",
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 12,
-    minHeight: 38,
-    paddingHorizontal: 12,
-    paddingVertical: 8
-  },
-  resultDetailValue: {
-    color: "#111827",
-    flex: 1,
-    fontSize: 13,
-    fontWeight: "800",
-    textAlign: "right"
+  resultMetricSubtext: {
+    color: "#64748B",
+    fontSize: 11,
+    fontWeight: "700"
   },
   resultReviewRow: {
     alignItems: "center",
@@ -7469,6 +7350,9 @@ const styles = StyleSheet.create({
     color: "#111827",
     fontSize: 18,
     fontWeight: "800"
+  },
+  panelHeaderSpacer: {
+    flex: 1
   },
   reviewSessionPanel: {
     gap: 12
@@ -7868,40 +7752,27 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     overflow: "hidden"
   },
-  syncDisclosureCard: {
-    backgroundColor: "#F8FAFC",
-    borderBottomColor: "#E2E8F0",
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 10
-  },
-  syncDisclosureHeader: {
+  syncRowMeta: {
     alignItems: "center",
     flexDirection: "row",
     gap: 8,
-    justifyContent: "space-between"
+    justifyContent: "flex-end"
   },
-  syncDisclosureStatus: {
+  syncStatusText: {
     fontSize: 12,
     fontWeight: "900"
   },
-  syncDisclosureButton: {
+  syncApprovalRow: {
     alignItems: "center",
-    alignSelf: "flex-start",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#93C5FD",
-    borderRadius: 8,
-    borderWidth: 1,
-    minHeight: 34,
-    justifyContent: "center",
+    backgroundColor: "#F8FAFC",
+    borderBottomColor: "#E2E8F0",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: "row",
+    gap: 12,
+    justifyContent: "space-between",
+    minHeight: 52,
     paddingHorizontal: 12,
-    paddingVertical: 6
-  },
-  syncDisclosureButtonText: {
-    color: "#1D4ED8",
-    fontSize: 12,
-    fontWeight: "800"
+    paddingVertical: 9
   },
   settingsRow: {
     alignItems: "center",
@@ -8054,24 +7925,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8
-  },
-  packRowCoverage: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 5,
-    paddingTop: 2
-  },
-  packRowCoverageChip: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#E2E8F0",
-    borderRadius: 999,
-    borderWidth: 1,
-    color: "#475569",
-    fontSize: 10,
-    fontWeight: "800",
-    overflow: "hidden",
-    paddingHorizontal: 7,
-    paddingVertical: 3
   },
   packStatusBadge: {
     backgroundColor: "#F8FAFC",
