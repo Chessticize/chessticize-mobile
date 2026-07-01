@@ -77,6 +77,46 @@ test("history view validates paging and slices visible attempts", () => {
   );
 });
 
+test("history query validates optional puzzle rating bounds", () => {
+  assert.deepEqual(
+    validateHistoryQuery({
+      now: "2026-06-21T12:00:00.000Z",
+      timeRange: "max",
+      ratingKey: "standard 5/20",
+      minRating: 800,
+      maxRating: 1200
+    }),
+    {
+      now: "2026-06-21T12:00:00.000Z",
+      timeRange: "max",
+      ratingKey: "standard 5/20",
+      minRating: 800,
+      maxRating: 1200
+    }
+  );
+  assert.throws(
+    () =>
+      validateHistoryQuery({
+        now: "2026-06-21T12:00:00.000Z",
+        timeRange: "max",
+        ratingKey: "standard 5/20",
+        minRating: -1
+      }),
+    /minRating must be a non-negative integer/
+  );
+  assert.throws(
+    () =>
+      validateHistoryQuery({
+        now: "2026-06-21T12:00:00.000Z",
+        timeRange: "max",
+        ratingKey: "standard 5/20",
+        minRating: 1400,
+        maxRating: 1200
+      }),
+    /minRating must be less than or equal to maxRating/
+  );
+});
+
 test("history puzzle stats aggregate original sprint attempts and attach next review", () => {
   const attempts: HistoryAttemptView[] = [
     attempt({ id: "a1", puzzleId: "p1", result: "wrong", completedAt: "2026-06-20T00:00:00.000Z" }),

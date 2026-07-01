@@ -13,6 +13,8 @@ export interface HistoryQuery {
   now: string;
   timeRange: HistoryTimeRange;
   ratingKey: string;
+  minRating?: number;
+  maxRating?: number;
   source?: AttemptSource;
   result?: AttemptResult;
   side?: PuzzleSide;
@@ -100,6 +102,11 @@ export function validateHistoryQuery(query: HistoryQuery): HistoryQuery {
     throw new Error("ratingKey is required");
   }
   resolveHistoryRange(query.now, query.timeRange);
+  validateOptionalRatingBound("minRating", query.minRating);
+  validateOptionalRatingBound("maxRating", query.maxRating);
+  if (query.minRating !== undefined && query.maxRating !== undefined && query.minRating > query.maxRating) {
+    throw new Error("minRating must be less than or equal to maxRating");
+  }
   const page = query.page ? validateHistoryPageQuery(query.page) : undefined;
   const normalized: HistoryQuery = {
     ...query,
@@ -109,6 +116,15 @@ export function validateHistoryQuery(query: HistoryQuery): HistoryQuery {
     normalized.page = page;
   }
   return normalized;
+}
+
+function validateOptionalRatingBound(label: "minRating" | "maxRating", value: number | undefined): void {
+  if (value === undefined) {
+    return;
+  }
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error(`${label} must be a non-negative integer`);
+  }
 }
 
 export function resolveHistoryPage(page: HistoryPageQuery | undefined, total: number): HistoryPage {

@@ -189,6 +189,10 @@ export class PracticeService {
     return this.activeSprint ? serializeSprintView(this.activeSprint) : null;
   }
 
+  getActiveSprint(): SprintState | undefined {
+    return this.activeSprint;
+  }
+
   listHistory(filter: HistoryFilter = {}): unknown {
     return this.store.listAttempts(filter);
   }

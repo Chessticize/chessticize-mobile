@@ -113,6 +113,9 @@ test("PracticeService builds SQLite history view for a required time range and r
     assert.equal(view.attempts.length, 1);
     assert.equal(view.attempts[0]?.ratingKey, "standard 5/20");
     assert.equal(view.attempts[0]?.puzzleId, "000hf");
+    assert.equal(view.attempts[0]?.puzzleRating, 1485);
+    assert.equal(service.getHistoryView({ ...view.query, maxRating: 1485 }).attempts.length, 1);
+    assert.equal(service.getHistoryView({ ...view.query, minRating: 1486 }).attempts.length, 0);
     assert.ok(view.availableThemes.includes("mate"));
     assert.equal(view.elo.length, 1);
     assert.deepEqual(view.puzzleStats, [

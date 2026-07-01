@@ -68,6 +68,7 @@ type Tab = "practice" | "review" | "history" | "settings" | "packs" | "analysis"
 
 type SessionFeedback = PuzzleFeedback | null;
 type AnalysisEngineStatus = "idle" | "thinking" | "stockfish" | "fallback" | "error";
+type HistoryRatingRangeFilter = "all" | "under1000" | "1000-1399" | "1400-plus";
 
 export type PracticeDebugTraceEvent = {
   type:
@@ -129,11 +130,11 @@ const TEST_PUZZLE_SOURCES: ReadonlyArray<{ source: MobilePuzzleSource; label: st
   { source: "random1000", label: "Random 1000" }
 ];
 const PRIMARY_TABS: ReadonlyArray<{ tab: Exclude<Tab, "analysis">; label: string; icon: string; testID: string }> = [
-  { tab: "practice", label: "Practice", icon: "⌂", testID: "practice-tab" },
-  { tab: "review", label: "Review", icon: "✓", testID: "review-tab" },
-  { tab: "history", label: "History", icon: "◷", testID: "history-tab" },
-  { tab: "packs", label: "Packs", icon: "▣", testID: "packs-tab" },
-  { tab: "settings", label: "Settings", icon: "≡", testID: "settings-tab" }
+  { tab: "practice", label: "Practice", icon: "P", testID: "practice-tab" },
+  { tab: "review", label: "Review", icon: "R", testID: "review-tab" },
+  { tab: "history", label: "History", icon: "H", testID: "history-tab" },
+  { tab: "packs", label: "Packs", icon: "PK", testID: "packs-tab" },
+  { tab: "settings", label: "Settings", icon: "S", testID: "settings-tab" }
 ];
 const PRACTICE_MODE_DESCRIPTIONS: Record<SprintMode, string> = {
   standard: "Find the best move",
@@ -142,10 +143,10 @@ const PRACTICE_MODE_DESCRIPTIONS: Record<SprintMode, string> = {
   custom: "Time, theme, rating"
 };
 const PRACTICE_MODE_ICONS: Record<SprintMode, string> = {
-  standard: "⊙",
-  arrow_duel: "⌁",
-  blitz: "ϟ",
-  custom: "☷"
+  standard: "ST",
+  arrow_duel: "AD",
+  blitz: "BZ",
+  custom: "CU"
 };
 const BOARD_FILES = ["a", "b", "c", "d", "e", "f", "g", "h"] as const;
 const BOARD_FILES_FLIPPED = ["h", "g", "f", "e", "d", "c", "b", "a"] as const;
@@ -200,6 +201,7 @@ export function PracticePocScreen({
   const [error, setError] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [currentRating, setCurrentRating] = useState(600);
+  const [resumableSprint, setResumableSprint] = useState<SprintState | null>(null);
   const [boardFen, setBoardFen] = useState<string | null>(null);
   const [lastBoardMove, setLastBoardMove] = useState<BoardMove | null>(null);
   const [feedbackPuzzleId, setFeedbackPuzzleId] = useState<string | null>(null);
@@ -213,6 +215,7 @@ export function PracticePocScreen({
   const [historyModeFilter, setHistoryModeFilter] = useState<"all" | SprintMode>("all");
   const [historySideFilter, setHistorySideFilter] = useState<"all" | PuzzleSide>("all");
   const [historyThemeFilter, setHistoryThemeFilter] = useState<string>("all");
+  const [historyRatingRangeFilter, setHistoryRatingRangeFilter] = useState<HistoryRatingRangeFilter>("all");
   const [historyPageOffset, setHistoryPageOffset] = useState(0);
   const [historyRatingKey, setHistoryRatingKey] = useState<string | null>(null);
   const [historyReviewEntries, setHistoryReviewEntries] = useState<ReviewEntry[]>([]);
@@ -320,6 +323,8 @@ export function PracticePocScreen({
     setReviews(service.getDueReviews(nowIso()) as Record<string, unknown>[]);
     setDueReviewItems(service.getDueReviewItems(nowIso()));
     setCurrentRating(readRating(service, selectedConfig.ratingKey));
+    const activeSprint = service.getActiveSprint();
+    setResumableSprint(activeSprint?.status === "active" && stateRef.current?.id !== activeSprint.id ? activeSprint : null);
   }
 
   function commitState(nextState: SprintState | null): void {
@@ -382,6 +387,7 @@ export function PracticePocScreen({
       });
       setMode(nextMode);
       commitState(started);
+      setResumableSprint(null);
       setCurrentRating(started.ratingBefore);
       commitBoardFen(started.currentPuzzle?.currentFen ?? null);
       setLastBoardMove(null);
@@ -402,6 +408,7 @@ export function PracticePocScreen({
     }
     setPuzzleSource(nextSource);
     commitState(null);
+    setResumableSprint(null);
     setFeedback(null);
     setFeedbackPuzzleId(null);
     clearFeedbackSnapshot();
@@ -423,6 +430,7 @@ export function PracticePocScreen({
     try {
       const nextState = service.abandonSprint(nowIso());
       commitState(nextState);
+      setResumableSprint(null);
       setFeedback(null);
       setFeedbackPuzzleId(null);
       clearFeedbackSnapshot();
@@ -733,6 +741,7 @@ export function PracticePocScreen({
 
   function resetToIdle(): void {
     commitState(null);
+    setResumableSprint(null);
     setFeedback(null);
     setFeedbackPuzzleId(null);
     clearFeedbackSnapshot();
@@ -741,6 +750,21 @@ export function PracticePocScreen({
     commitBoardFen(null);
     setLastBoardMove(null);
     refreshState();
+  }
+
+  function resumeSprint(nextSprint: SprintState): void {
+    setError(null);
+    setMode(nextSprint.config.mode);
+    commitState(nextSprint);
+    setResumableSprint(null);
+    setCurrentRating(nextSprint.ratingBefore);
+    commitBoardFen(nextSprint.currentPuzzle?.currentFen ?? null);
+    setLastBoardMove(null);
+    setFeedback(null);
+    setFeedbackPuzzleId(null);
+    clearFeedbackSnapshot();
+    commitBoardInputLocked(false, "resume", nextSprint.currentPuzzle?.puzzle.id ?? null);
+    setTab("practice");
   }
 
   function showReviewMistakes(): void {
@@ -938,11 +962,13 @@ export function PracticePocScreen({
     [attempts, service]
   );
   const activeHistoryRatingKey = historyRatingKey ?? historyRatingKeys[0] ?? null;
+  const historyRatingRangeQuery = historyRatingRangeFilterToQuery(historyRatingRangeFilter);
   const historyView = activeHistoryRatingKey
     ? service.getHistoryView({
         now: nowIso(),
         timeRange: historyTimeRange,
         ratingKey: activeHistoryRatingKey,
+        ...historyRatingRangeQuery,
         ...(historySourceFilter === "all" ? {} : { source: historySourceFilter }),
         ...(historyResultFilter === "all" ? {} : { result: historyResultFilter }),
         ...(historyModeFilter === "all" ? {} : { mode: historyModeFilter }),
@@ -956,6 +982,7 @@ export function PracticePocScreen({
         now: nowIso(),
         timeRange: historyTimeRange,
         ratingKey: activeHistoryRatingKey,
+        ...historyRatingRangeQuery,
         ...(historySourceFilter === "all" ? {} : { source: historySourceFilter }),
         ...(historyResultFilter === "all" ? {} : { result: historyResultFilter }),
         ...(historyModeFilter === "all" ? {} : { mode: historyModeFilter }),
@@ -1025,8 +1052,10 @@ export function PracticePocScreen({
                 dueReviewCount={dueTodayCount}
                 overdueReviewCount={overdueCount}
                 progress={practiceProgress}
+                resumableSprint={resumableSprint}
                 onSelectMode={setMode}
                 onStartMode={(nextMode) => startSprint(nextMode)}
+                onResumeSprint={resumeSprint}
                 onOpenReview={() => setTab("review")}
               />
             ) : null}
@@ -1205,6 +1234,7 @@ export function PracticePocScreen({
               sourceFilter={historySourceFilter}
               resultFilter={historyResultFilter}
               modeFilter={historyModeFilter}
+              ratingRangeFilter={historyRatingRangeFilter}
               sideFilter={historySideFilter}
               themeFilter={historyThemeFilter}
               availableThemes={historyAvailableThemes}
@@ -1228,6 +1258,10 @@ export function PracticePocScreen({
               }}
               onModeFilterChange={(nextMode) => {
                 setHistoryModeFilter(nextMode);
+                setHistoryPageOffset(0);
+              }}
+              onRatingRangeFilterChange={(ratingRange) => {
+                setHistoryRatingRangeFilter(ratingRange);
                 setHistoryPageOffset(0);
               }}
               onSideFilterChange={(side) => {
@@ -1332,8 +1366,10 @@ function PracticeHome({
   dueReviewCount,
   overdueReviewCount,
   progress,
+  resumableSprint,
   onSelectMode,
   onStartMode,
+  onResumeSprint,
   onOpenReview
 }: {
   mode: SprintMode;
@@ -1342,8 +1378,10 @@ function PracticeHome({
   dueReviewCount: number;
   overdueReviewCount: number;
   progress: PracticeProgressSummary;
+  resumableSprint: SprintState | null;
   onSelectMode: (next: SprintMode) => void;
   onStartMode: (next: SprintMode) => void;
+  onResumeSprint: (sprint: SprintState) => void;
   onOpenReview: () => void;
 }): React.JSX.Element {
   const selected = modes.find((item) => item.mode === mode) ?? modes[0];
@@ -1353,6 +1391,13 @@ function PracticeHome({
 
   return (
     <View style={styles.practiceHome} testID="practice-home">
+      {resumableSprint ? (
+        <ResumeSprintCard
+          sprint={resumableSprint}
+          onResume={() => onResumeSprint(resumableSprint)}
+        />
+      ) : null}
+
       <View style={styles.sectionHeaderRow}>
         <Text style={styles.sectionLabel}>Start a Sprint</Text>
         <Text style={styles.sectionMeta}>Tap a row to begin</Text>
@@ -1415,6 +1460,36 @@ function PracticeHome({
   );
 }
 
+function ResumeSprintCard({
+  onResume,
+  sprint
+}: {
+  onResume: () => void;
+  sprint: SprintState;
+}): React.JSX.Element {
+  const remaining = Math.max(0, sprint.config.targetCorrect - sprint.correctCount);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Resume ${modeLabel(sprint.config.mode)} sprint`}
+      style={styles.resumeSprintCard}
+      testID="practice-resume-card"
+      onPress={onResume}
+    >
+      <View style={styles.practiceModeIcon}>
+        <Text style={styles.practiceModeIconText}>{PRACTICE_MODE_ICONS[sprint.config.mode]}</Text>
+      </View>
+      <View style={styles.resumeSprintCopy}>
+        <Text style={styles.sectionLabel}>Resume sprint</Text>
+        <Text style={styles.helperText}>
+          {modeLabel(sprint.config.mode)} · {sprint.correctCount} solved · {remaining} left · {sprint.mistakeCount} mistakes
+        </Text>
+      </View>
+      <Text style={styles.resumeSprintAction}>Resume</Text>
+    </Pressable>
+  );
+}
+
 function PracticeModeCard({
   active,
   item,
@@ -1436,7 +1511,7 @@ function PracticeModeCard({
       onPress={onPress}
     >
       <View style={styles.practiceModeSelectArea}>
-        <View style={styles.practiceModeIcon}>
+        <View style={styles.practiceModeIcon} testID={`practice-mode-${item.mode.replace("_", "-")}-icon`}>
           <Text style={styles.practiceModeIconText}>{PRACTICE_MODE_ICONS[item.mode]}</Text>
         </View>
         <View style={styles.practiceModeCopy}>
@@ -2377,6 +2452,7 @@ function PracticePrompt({
   }
   const side = sideToMove(currentPuzzle.currentFen) === "b" ? "black" : "white";
   const isArrowDuel = currentPuzzle.kind === "arrow_duel";
+  const promptBadge = mode === "arrow_duel" ? "AD" : "ST";
   const displayedPromptText = promptText === undefined
     ? (
       isArrowDuel
@@ -2390,7 +2466,7 @@ function PracticePrompt({
 
   return (
     <View style={styles.promptPanel} testID="practice-prompt">
-      <Text style={styles.promptIcon}>{mode === "arrow_duel" ? "⇄" : "♛"}</Text>
+      <Text style={styles.promptIcon} testID="practice-prompt-icon">{promptBadge}</Text>
       <View style={styles.promptCopy}>
         <Text style={styles.promptTitle}>{mode === "arrow_duel" ? "Arrow Duel" : modeLabel(mode)}</Text>
         {displayedPromptText ? <Text style={styles.promptText}>{displayedPromptText}</Text> : null}
@@ -2741,6 +2817,7 @@ function HistoryPanel({
   sourceFilter,
   resultFilter,
   modeFilter,
+  ratingRangeFilter,
   sideFilter,
   themeFilter,
   availableThemes,
@@ -2751,6 +2828,7 @@ function HistoryPanel({
   onSourceFilterChange,
   onResultFilterChange,
   onModeFilterChange,
+  onRatingRangeFilterChange,
   onSideFilterChange,
   onThemeFilterChange,
   onPageOffsetChange,
@@ -2766,6 +2844,7 @@ function HistoryPanel({
   sourceFilter: "all" | AttemptSource;
   resultFilter: "all" | "correct" | "wrong";
   modeFilter: "all" | SprintMode;
+  ratingRangeFilter: HistoryRatingRangeFilter;
   sideFilter: "all" | PuzzleSide;
   themeFilter: string;
   availableThemes: string[];
@@ -2776,6 +2855,7 @@ function HistoryPanel({
   onSourceFilterChange: (source: "all" | AttemptSource) => void;
   onResultFilterChange: (result: "all" | "correct" | "wrong") => void;
   onModeFilterChange: (mode: "all" | SprintMode) => void;
+  onRatingRangeFilterChange: (ratingRange: HistoryRatingRangeFilter) => void;
   onSideFilterChange: (side: "all" | PuzzleSide) => void;
   onThemeFilterChange: (theme: string) => void;
   onPageOffsetChange: (offset: number) => void;
@@ -2833,6 +2913,12 @@ function HistoryPanel({
           >
             <Text style={[styles.filterButtonText, wrongLast7Days ? styles.filterButtonTextActive : null]}>Wrong 7d</Text>
           </Pressable>
+          <FilterButton
+            active={modeFilter === "arrow_duel"}
+            label="Arrow Duel only"
+            testID="history-filter-arrow-duel-only"
+            onPress={() => onModeFilterChange("arrow_duel")}
+          />
         </HistoryChipRow>
       </View>
 
@@ -2904,6 +2990,17 @@ function HistoryPanel({
           ))}
         </HistoryChipRow>
       ) : null}
+      <HistoryChipRow testID="history-rating-range-filters">
+        {HISTORY_RATING_RANGE_FILTERS.map((ratingRange) => (
+          <FilterButton
+            key={ratingRange.id}
+            active={ratingRangeFilter === ratingRange.id}
+            label={ratingRange.label}
+            testID={`history-rating-range-${ratingRange.id}`}
+            onPress={() => onRatingRangeFilterChange(ratingRange.id)}
+          />
+        ))}
+      </HistoryChipRow>
       <HistoryChipRow testID="history-review-status-filters">
         <FilterButton active={reviewStatusFilter === "all"} label="All review states" testID="history-review-status-all" onPress={() => setReviewStatusFilter("all")} />
         <FilterButton active={reviewStatusFilter === "queued"} label="Queued" testID="history-review-status-queued" onPress={() => setReviewStatusFilter("queued")} />
@@ -2980,6 +3077,26 @@ const HISTORY_CHART_METRICS: ReadonlyArray<{ id: HistoryChartMetric; label: stri
   { id: "mistake-rate", label: "Mistakes" },
   { id: "review-due", label: "Reviews" }
 ];
+
+const HISTORY_RATING_RANGE_FILTERS: ReadonlyArray<{ id: HistoryRatingRangeFilter; label: string }> = [
+  { id: "all", label: "All ratings" },
+  { id: "under1000", label: "<1000" },
+  { id: "1000-1399", label: "1000-1399" },
+  { id: "1400-plus", label: "1400+" }
+];
+
+function historyRatingRangeFilterToQuery(filter: HistoryRatingRangeFilter): { minRating?: number; maxRating?: number } {
+  if (filter === "under1000") {
+    return { maxRating: 999 };
+  }
+  if (filter === "1000-1399") {
+    return { minRating: 1000, maxRating: 1399 };
+  }
+  if (filter === "1400-plus") {
+    return { minRating: 1400 };
+  }
+  return {};
+}
 
 function HistoryMiniChart({
   attempts,
@@ -5762,7 +5879,9 @@ function TabButton({
       style={[styles.tabButton, active ? styles.tabButtonActive : null]}
       onPress={onPress}
     >
-      <Text style={[styles.tabIconText, active ? styles.tabTextActive : null]}>{icon}</Text>
+      <View style={[styles.tabIconBadge, active ? styles.tabIconBadgeActive : null]} testID={`${testID}-icon`}>
+        <Text style={[styles.tabIconText, active ? styles.tabTextActive : null]}>{icon}</Text>
+      </View>
       <Text style={[styles.tabText, active ? styles.tabTextActive : null]}>{label}</Text>
     </Pressable>
   );
@@ -6098,11 +6217,22 @@ const styles = StyleSheet.create({
   tabButtonActive: {
     backgroundColor: "transparent"
   },
+  tabIconBadge: {
+    alignItems: "center",
+    borderRadius: 999,
+    height: 20,
+    justifyContent: "center",
+    minWidth: 24,
+    paddingHorizontal: 5
+  },
+  tabIconBadgeActive: {
+    backgroundColor: "#DBEAFE"
+  },
   tabIconText: {
     color: "#64748B",
-    fontSize: 15,
-    fontWeight: "800",
-    lineHeight: 18
+    fontSize: 10,
+    fontWeight: "900",
+    lineHeight: 14
   },
   tabText: {
     color: "#64748B",
@@ -6307,6 +6437,28 @@ const styles = StyleSheet.create({
     minHeight: 58,
     paddingHorizontal: 12,
     paddingVertical: 10
+  },
+  resumeSprintCard: {
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderColor: "#93C5FD",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    minHeight: 64,
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  resumeSprintCopy: {
+    flex: 1,
+    gap: 2,
+    minWidth: 0
+  },
+  resumeSprintAction: {
+    color: "#2563EB",
+    fontSize: 13,
+    fontWeight: "900"
   },
   reviewStripCounts: {
     alignItems: "flex-end",
@@ -6673,12 +6825,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#1F2937",
     borderRadius: 999,
     color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "800",
+    fontSize: 11,
+    fontWeight: "900",
     height: 28,
     lineHeight: 28,
     textAlign: "center",
-    width: 28
+    width: 32
   },
   promptCopy: {
     flex: 1,
