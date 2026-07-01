@@ -120,9 +120,15 @@ describe("PracticePocScreen", () => {
     expect(board.props.withNumbers).toBe(false);
     expect(collectText(findByTestId(renderer, "board-coordinate-overlay"))).toContain("abcdefgh");
     expect(collectText(findByTestId(renderer, "board-coordinate-overlay"))).toContain("87654321");
+    expect(findByTestId(renderer, "active-session-shell")).toBeTruthy();
+    expect(findByTestId(renderer, "session-shell-nav")).toBeTruthy();
+    expect(findByTestId(renderer, "session-status-metrics")).toBeTruthy();
+    expect(findByTestId(renderer, "session-overflow")).toBeTruthy();
     expect(findByTestId(renderer, "session-timer")).toBeTruthy();
     expect(findByTestId(renderer, "session-progress")).toBeTruthy();
+    expect(findByTestId(renderer, "session-rating")).toBeTruthy();
     expect(findByTestId(renderer, "session-strikes")).toBeTruthy();
+    expect(findByTestId(renderer, "session-abandon").props.accessibilityLabel).toBe("Abandon sprint");
     expect(collectText(renderer.root)).not.toContain("Expected move");
     expect(collectText(renderer.root)).not.toContain("000hf · 1485");
 
@@ -493,6 +499,15 @@ describe("PracticePocScreen", () => {
 
     expectText(renderer, "Sprint failed");
     expectText(renderer, "Result: Time expired");
+    expect(findByTestId(renderer, "sprint-result-hero")).toBeTruthy();
+    expect(findByTestId(renderer, "sprint-result-solved")).toBeTruthy();
+    expect(findByTestId(renderer, "sprint-result-accuracy")).toBeTruthy();
+    expect(findByTestId(renderer, "sprint-result-rating-change")).toBeTruthy();
+    expect(findByTestId(renderer, "sprint-result-time")).toBeTruthy();
+    expect(findByTestId(renderer, "sprint-result-mistakes")).toBeTruthy();
+    expect(findByTestId(renderer, "sprint-result-rating-snapshot")).toBeTruthy();
+    expect(findByTestId(renderer, "sprint-result-review-impact")).toBeTruthy();
+    expectText(renderer, "Review queue");
   });
 
   it("filters history to wrong attempts from the recent window", async () => {
@@ -531,6 +546,9 @@ describe("PracticePocScreen", () => {
     press(renderer, historyAttemptRow.props.testID);
     expect(findByTestId(renderer, "review-session")).toBeTruthy();
     expect(findByTestId(renderer, "review-progress").props.children.join("")).toBe("1 / 1 · Standard");
+    expect(findByTestId(renderer, "review-context-strip")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "review-source-pill"))).toBe("History replay");
+    expect(findByTestId(renderer, "review-theme-pill")).toBeTruthy();
     expect(findByTestId(renderer, "review-reset-puzzle")).toBeTruthy();
     press(renderer, "review-exit");
     expect(findByTestId(renderer, "history-panel")).toBeTruthy();
@@ -622,6 +640,7 @@ describe("PracticePocScreen", () => {
 
     expectText(renderer, "Sprint failed");
     expectText(renderer, "Result: Three mistakes");
+    expectText(renderer, "3 mistakes queued");
     expect(collectText(renderer.root)).not.toContain("Start new sprint");
     const reviewButton = findByTestId(renderer, "review-mistakes-button");
     const playAgainButton = findByTestId(renderer, "play-again-button");
@@ -731,15 +750,43 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "review-panel")).toBeTruthy();
     expect(findByTestId(renderer, "review-due-card")).toBeTruthy();
+    expect(findByTestId(renderer, "review-queue-filters")).toBeTruthy();
+    expect(findByTestId(renderer, "review-filter-all")).toBeTruthy();
+    expect(findByTestId(renderer, "review-filter-overdue")).toBeTruthy();
+    expect(findByTestId(renderer, "review-filter-failed")).toBeTruthy();
+    expect(findByTestId(renderer, "review-filter-mode-standard")).toBeTruthy();
+    expect(findByTestId(renderer, "review-filter-arrow-duel")).toBeTruthy();
+    expect(findByTestId(renderer, "review-due-items")).toBeTruthy();
     expectText(renderer, "Due Today");
+    expectText(renderer, "All due · Ready now");
+    expectText(renderer, "Last wrong 2026-06-20");
+    expectText(renderer, "1d interval");
+    expectText(renderer, "Review 1 · Lapses 1");
     expectText(renderer, "Start Review");
     expect(findByTestId(renderer, "review-start-due")).toBeTruthy();
     expect(() => findByTestId(renderer, "review-session")).toThrow();
+    const dueItemRows = renderer.root.findAll(
+      (node) => typeof node.props.testID === "string" && node.props.testID.startsWith("review-due-item-")
+    );
+    expect(dueItemRows.length).toBeGreaterThan(0);
 
-    press(renderer, "review-start-due");
+    press(renderer, "review-filter-arrow-duel");
+    expect(findByTestId(renderer, "review-start-due").props.accessibilityState).toEqual({ disabled: true });
+    expect(collectText(renderer.root)).not.toContain("Last wrong 2026-06-20");
+    press(renderer, "review-filter-all");
+
+    const filteredDueItemRows = renderer.root.findAll(
+      (node) => typeof node.props.testID === "string" && node.props.testID.startsWith("review-due-item-")
+    );
+    expect(filteredDueItemRows.length).toBeGreaterThan(0);
+    act(() => {
+      filteredDueItemRows[0]?.props.onPress();
+    });
 
     expect(findByTestId(renderer, "review-session")).toBeTruthy();
     expectText(renderer, "1 / 1 · Standard");
+    expect(findByTestId(renderer, "review-context-strip")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "review-source-pill"))).toBe("Scheduled review");
     expect(collectText(findByTestId(renderer, "review-timer"))).toBe("00:20");
     expect(() => findByTestId(renderer, "review-next")).toThrow();
     expect(() => findByTestId(renderer, "review-previous")).toThrow();
@@ -1052,6 +1099,8 @@ describe("PracticePocScreen", () => {
     press(renderer, "review-mistakes-button");
 
     expectText(renderer, "1 / 3 · Arrow Duel");
+    expect(findByTestId(renderer, "review-arrow-choice-marker")).toBeTruthy();
+    expectText(renderer, "Green = best move · Red = blunder");
     press(renderer, "review-analysis-button");
     expect(findByTestId(renderer, "analysis-arrow-overlay")).toBeTruthy();
     expect(countStyleEntry(findByTestId(renderer, "review-board"), "backgroundColor", "#16A34A")).toBeGreaterThan(0);
@@ -1065,6 +1114,8 @@ describe("PracticePocScreen", () => {
     await settleFeedbackSnapshot();
     await settleFeedbackSnapshot();
     expectText(renderer, "1 / 3 · Arrow Duel");
+    expect(findByTestId(renderer, "review-arrow-choice-marker")).toBeTruthy();
+    expectText(renderer, "You chose: Red (blunder)");
     expect(findByTestId(renderer, "review-guided-move-overlay")).toBeTruthy();
     expect(countStyleEntry(findByTestId(renderer, "review-guided-move-overlay"), "backgroundColor", "#2563EB")).toBeGreaterThan(0);
     expect(countStyleEntry(findByTestId(renderer, "review-guided-move-overlay"), "backgroundColor", "#16A34A")).toBe(0);
