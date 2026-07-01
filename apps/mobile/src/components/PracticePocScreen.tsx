@@ -2110,9 +2110,6 @@ function SessionStatusBar({
         </View>
       </View>
 
-      <View style={styles.sessionMistakeRow}>
-        <MistakeStrikes count={state.mistakeCount} max={state.config.maxMistakes} />
-      </View>
       {confirmAbandon ? (
         <View style={styles.sessionAbandonConfirm} testID="session-abandon-confirmation">
           <View style={styles.sessionAbandonCopy}>
@@ -6918,12 +6915,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "800",
     textAlign: "right"
-  },
-  sessionMistakeRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "center",
-    minHeight: 30
   },
   sessionHeaderRow: {
     alignItems: "center",
