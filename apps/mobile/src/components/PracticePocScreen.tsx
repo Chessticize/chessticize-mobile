@@ -1401,8 +1401,14 @@ function PracticeHome({
           <Text style={styles.helperText}>{dueReviewCount === 0 ? "No reviews due" : "Due today"}</Text>
         </View>
         <View style={styles.reviewStripCounts}>
-          <Text style={styles.reviewDueCount}>{dueReviewCount}</Text>
-          <Text style={styles.reviewOverdueCount}>Overdue {overdueReviewCount}</Text>
+          <View style={styles.reviewStripMetric} testID="practice-review-due-count">
+            <Text style={styles.reviewDueCount}>{dueReviewCount}</Text>
+            <Text style={styles.reviewStripMetricLabel}>Due today</Text>
+          </View>
+          <View style={styles.reviewStripMetric} testID="practice-review-overdue-count">
+            <Text style={styles.reviewOverdueCount}>{overdueReviewCount}</Text>
+            <Text style={styles.reviewStripMetricLabel}>Overdue</Text>
+          </View>
         </View>
       </Pressable>
     </View>
@@ -1595,8 +1601,10 @@ function CustomSprintSetup({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Start custom sprint"
+          accessibilityState={{ disabled: !hasEnoughLocalPuzzles }}
+          disabled={!hasEnoughLocalPuzzles}
           testID="start-sprint-button"
-          style={styles.customHeaderStartButton}
+          style={[styles.customHeaderStartButton, !hasEnoughLocalPuzzles ? styles.disabledButton : null]}
           onPress={onStart}
         >
           <Text style={styles.primaryButtonText}>Start</Text>
@@ -2139,6 +2147,7 @@ function MistakeStrikes({
           />
         );
       })}
+      <Text testID="session-mistakes" style={styles.strikeCount}>{count} / {max}</Text>
       <Text style={styles.strikeLabel}>Mistakes</Text>
     </View>
   );
@@ -2201,10 +2210,10 @@ function SprintSummary({
           <Text style={styles.resultMetricLabel}>Time</Text>
           <Text style={styles.resultMetricValue}>{formatDuration(Math.floor(elapsedMs / 1000))}</Text>
         </View>
-        <View style={styles.resultMetric} testID="sprint-result-mistakes">
-          <Text style={styles.resultMetricLabel}>Mistakes</Text>
-          <Text style={[styles.resultMetricValue, state.mistakeCount > 0 ? styles.errorText : styles.positive]}>
-            {state.mistakeCount} / {state.config.maxMistakes}
+        <View style={styles.resultMetric} testID="sprint-result-best-streak">
+          <Text style={styles.resultMetricLabel}>Best Streak</Text>
+          <Text style={styles.resultMetricValue}>
+            {state.bestStreak}
           </Text>
         </View>
       </View>
@@ -2955,10 +2964,11 @@ function HistoryPanel({
   );
 }
 
-type HistoryChartMetric = "rating" | "accuracy" | "solved" | "mistake-rate" | "review-due";
+type HistoryChartMetric = "rating" | "wins-losses" | "accuracy" | "solved" | "mistake-rate" | "review-due";
 
 const HISTORY_CHART_METRICS: ReadonlyArray<{ id: HistoryChartMetric; label: string }> = [
   { id: "rating", label: "Rating" },
+  { id: "wins-losses", label: "W/L" },
   { id: "accuracy", label: "Accuracy" },
   { id: "solved", label: "Solved" },
   { id: "mistake-rate", label: "Mistakes" },
@@ -3032,11 +3042,13 @@ function buildHistoryChartValues(
       wrong += 1;
     }
     const total = Math.max(1, correct + wrong);
-    const value = metric === "accuracy"
-      ? Math.round((correct / total) * 100)
-      : metric === "mistake-rate"
-        ? Math.round((wrong / total) * 100)
-        : correct;
+    const value = metric === "wins-losses"
+      ? correct - wrong
+      : metric === "accuracy"
+        ? Math.round((correct / total) * 100)
+        : metric === "mistake-rate"
+          ? Math.round((wrong / total) * 100)
+          : correct;
     return {
       key: `${attempt.id}-${index}`,
       value
@@ -3060,6 +3072,10 @@ function historyChartSummary(
   if (metric === "accuracy") {
     return { label: "Accuracy", value: `${Math.round((correct / total) * 100)}%` };
   }
+  if (metric === "wins-losses") {
+    const net = correct - wrong;
+    return { label: "Wins/Losses", value: `${net >= 0 ? "+" : ""}${net}` };
+  }
   if (metric === "solved") {
     return { label: "Solved", value: String(correct) };
   }
@@ -3076,6 +3092,9 @@ function historyChartEmptyLabel(metric: HistoryChartMetric): string {
   }
   if (metric === "review-due") {
     return "review due";
+  }
+  if (metric === "wins-losses") {
+    return "wins/losses";
   }
   return metric;
 }
@@ -3294,6 +3313,9 @@ function filterReviewQueueItems(items: ReviewQueueItem[], filter: ReviewQueueFil
     if (filter === "arrow_duel") {
       return item.review.mode === "arrow_duel";
     }
+    if (filter.startsWith("difficulty:")) {
+      return reviewItemDifficulty(item) === filter.slice("difficulty:".length);
+    }
     if (filter.startsWith("mode:")) {
       return item.review.mode === filter.slice("mode:".length);
     }
@@ -3319,6 +3341,9 @@ function reviewQueueFilterLabel(filter: ReviewQueueFilter): string {
   }
   if (filter === "arrow_duel") {
     return "Arrow Duel only";
+  }
+  if (filter.startsWith("difficulty:")) {
+    return `${difficultyLabel(filter.slice("difficulty:".length) as ReviewDifficulty)} reviews`;
   }
   if (filter.startsWith("mode:")) {
     return modeLabel(filter.slice("mode:".length) as SprintMode);
@@ -3376,9 +3401,12 @@ type ReviewQueueFilter =
   | "overdue"
   | "failed"
   | "arrow_duel"
+  | `difficulty:${ReviewDifficulty}`
   | `mode:${SprintMode}`
   | `speed:${number}`
   | `theme:${string}`;
+
+type ReviewDifficulty = "easy" | "medium" | "hard";
 
 type ReviewPuzzleState =
   | { kind: "line"; line: PuzzleLineState }
@@ -3424,7 +3452,7 @@ function ReviewPanel({
     source: "due"
   }));
   const filteredContextGroups = groupReviewEntriesByContext(filteredDueEntries);
-  const difficultySummary = reviewDifficultySummary(filteredDueReviewItems);
+  const difficultySummary = reviewDifficultySummary(dueReviewItems);
   const queueSummary = reviewQueueSummary(dueReviewItems, filteredDueReviewItems);
 
   useEffect(() => {
@@ -3467,9 +3495,30 @@ function ReviewPanel({
       </View>
 
       <View style={styles.reviewDifficultyList} testID="review-difficulty-list">
-        <ReviewDifficultyRow label="Easy" detail="All good" count={difficultySummary.easy} tone="easy" />
-        <ReviewDifficultyRow label="Medium" detail="Needs attention" count={difficultySummary.medium} tone="medium" />
-        <ReviewDifficultyRow label="Hard" detail={difficultySummary.hard > 0 ? "Overdue" : "Stable"} count={difficultySummary.hard} tone="hard" />
+        <ReviewDifficultyRow
+          active={queueFilter === "difficulty:easy"}
+          label="Easy"
+          detail="All good"
+          count={difficultySummary.easy}
+          tone="easy"
+          onPress={() => setQueueFilter("difficulty:easy")}
+        />
+        <ReviewDifficultyRow
+          active={queueFilter === "difficulty:medium"}
+          label="Medium"
+          detail="Needs attention"
+          count={difficultySummary.medium}
+          tone="medium"
+          onPress={() => setQueueFilter("difficulty:medium")}
+        />
+        <ReviewDifficultyRow
+          active={queueFilter === "difficulty:hard"}
+          label="Hard"
+          detail={difficultySummary.hard > 0 ? "Overdue" : "Stable"}
+          count={difficultySummary.hard}
+          tone="hard"
+          onPress={() => setQueueFilter("difficulty:hard")}
+        />
       </View>
 
       <Pressable
@@ -3635,31 +3684,45 @@ function ReviewQueueItemCard({
 }
 
 function ReviewDifficultyRow({
+  active,
   count,
   detail,
   label,
+  onPress,
   tone
 }: {
+  active: boolean;
   count: number;
   detail: string;
   label: string;
-  tone: "easy" | "medium" | "hard";
+  onPress: () => void;
+  tone: ReviewDifficulty;
 }): React.JSX.Element {
   return (
-    <View style={styles.reviewDifficultyRow} testID={`review-difficulty-${tone}`}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Filter ${label.toLowerCase()} reviews`}
+      accessibilityState={{ selected: active }}
+      style={[styles.reviewDifficultyRow, active ? styles.reviewDifficultyRowActive : null]}
+      testID={`review-difficulty-${tone}`}
+      onPress={onPress}
+    >
       <View>
         <Text style={styles.listText}>{label}</Text>
         <Text style={styles.helperText}>{detail}</Text>
       </View>
-      <Text style={[
-        styles.reviewDifficultyCount,
-        tone === "easy" ? styles.reviewDifficultyEasy : null,
-        tone === "medium" ? styles.reviewDifficultyMedium : null,
-        tone === "hard" ? styles.reviewDifficultyHard : null
-      ]}>
-        {count}
-      </Text>
-    </View>
+      <View style={styles.reviewDifficultyMeta}>
+        <Text style={[
+          styles.reviewDifficultyCount,
+          tone === "easy" ? styles.reviewDifficultyEasy : null,
+          tone === "medium" ? styles.reviewDifficultyMedium : null,
+          tone === "hard" ? styles.reviewDifficultyHard : null
+        ]}>
+          {count}
+        </Text>
+        <Text style={styles.practiceModeChevron}>›</Text>
+      </View>
+    </Pressable>
   );
 }
 
@@ -6239,6 +6302,11 @@ const styles = StyleSheet.create({
   },
   reviewStripCounts: {
     alignItems: "flex-end",
+    flexDirection: "row",
+    gap: 12
+  },
+  reviewStripMetric: {
+    alignItems: "flex-end",
     gap: 2
   },
   reviewDueCount: {
@@ -6248,7 +6316,12 @@ const styles = StyleSheet.create({
   },
   reviewOverdueCount: {
     color: "#DC2626",
-    fontSize: 12,
+    fontSize: 17,
+    fontWeight: "800"
+  },
+  reviewStripMetricLabel: {
+    color: "#64748B",
+    fontSize: 11,
     fontWeight: "800"
   },
   reviewQueuePanel: {
@@ -6306,6 +6379,15 @@ const styles = StyleSheet.create({
     minHeight: 58,
     paddingHorizontal: 12,
     paddingVertical: 10
+  },
+  reviewDifficultyRowActive: {
+    backgroundColor: "#EFF6FF",
+    borderColor: "#93C5FD"
+  },
+  reviewDifficultyMeta: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8
   },
   reviewDifficultyCount: {
     fontSize: 16,
@@ -7342,6 +7424,11 @@ const styles = StyleSheet.create({
   strikeMarkUsed: {
     backgroundColor: "#DC2626",
     borderColor: "#DC2626"
+  },
+  strikeCount: {
+    color: "#334155",
+    fontSize: 12,
+    fontWeight: "900"
   },
   strikeLabel: {
     color: "#64748B",

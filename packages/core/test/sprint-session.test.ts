@@ -44,8 +44,44 @@ test("a multi-step solved puzzle can win a target-one sprint and raise ELO", () 
   assert.equal(result.state.status, "won");
   assert.equal(result.state.endReason, "target_reached");
   assert.equal(result.state.correctCount, 1);
+  assert.equal(result.state.currentStreak, 1);
+  assert.equal(result.state.bestStreak, 1);
   assert.ok((result.state.ratingAfter ?? 0) > 600);
   assert.equal(result.attempt?.result, "correct");
+});
+
+test("sprint streak tracks consecutive solved puzzles and resets on mistakes", () => {
+  let state = startSprint({
+    config: buildSprintConfig({
+      mode: "standard",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      targetCorrect: 5,
+      maxMistakes: 3
+    }),
+    puzzles: [oneMovePuzzle("p1"), oneMovePuzzle("p2"), oneMovePuzzle("p3"), oneMovePuzzle("p4")],
+    ratingBefore: 900,
+    now: NOW
+  });
+
+  let result = submitSprintMove(state, "e6d6", "2026-06-20T00:00:01.000Z");
+  assert.equal(result.state.currentStreak, 0);
+  assert.equal(result.state.bestStreak, 0);
+  state = result.state;
+
+  result = submitSprintMove(state, "e6e7", "2026-06-20T00:00:02.000Z");
+  assert.equal(result.state.currentStreak, 1);
+  assert.equal(result.state.bestStreak, 1);
+  state = result.state;
+
+  result = submitSprintMove(state, "e6e7", "2026-06-20T00:00:03.000Z");
+  assert.equal(result.state.currentStreak, 2);
+  assert.equal(result.state.bestStreak, 2);
+  state = result.state;
+
+  result = submitSprintMove(state, "e6d6", "2026-06-20T00:00:04.000Z");
+  assert.equal(result.state.currentStreak, 0);
+  assert.equal(result.state.bestStreak, 2);
 });
 
 test("three wrong puzzles fail the sprint and keep rating at the floor", () => {
@@ -205,10 +241,12 @@ test("abandonSprint and serializeSprintView expose stable frontend-independent s
   const view = serializeSprintView(state) as {
     status: string;
     ratingBefore: number;
+    bestStreak: number;
     currentPuzzle: { puzzleId: string; playedMoves: string[] };
   };
   assert.equal(view.status, "active");
   assert.equal(view.ratingBefore, 750);
+  assert.equal(view.bestStreak, 0);
   assert.equal(view.currentPuzzle.puzzleId, "00008");
   assert.deepEqual(view.currentPuzzle.playedMoves, ["f2g3"]);
 
@@ -227,5 +265,12 @@ function samplePuzzle(id: string): Puzzle {
     themes: ["crushing", "hangingPiece", "long", "middlegame"],
     source: "lichess",
     stockfishBestMove: "b2b1"
+  };
+}
+
+function oneMovePuzzle(id: string): Puzzle {
+  return {
+    ...samplePuzzle(id),
+    solutionMoves: ["f2g3", "e6e7"]
   };
 }
