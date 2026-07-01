@@ -700,7 +700,6 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "sprint-result-time")).toBeTruthy();
     expect(findByTestId(renderer, "sprint-result-best-streak")).toBeTruthy();
     expect(findByTestId(renderer, "sprint-result-mistakes")).toBeTruthy();
-    expect(findByTestId(renderer, "sprint-result-rating-snapshot")).toBeTruthy();
     expect(findByTestId(renderer, "sprint-result-details")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "sprint-result-detail-mode"))).toContain("Standard");
     expect(collectText(findByTestId(renderer, "sprint-result-detail-reason"))).toContain("Time expired");
@@ -710,16 +709,10 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain("Mistakes");
     expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain("No mistakes in this sprint");
     expect(collectText(findByTestId(renderer, "sprint-result-mistakes"))).toBe("0");
-    expect(findByTestId(renderer, "sprint-result-history-trend")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "sprint-result-history-trend"))).toContain("Performance trend");
-    expect(collectText(findByTestId(renderer, "sprint-result-history-trend"))).toContain("Open History for rating, accuracy, mistakes, and review volume.");
+    expect(() => findByTestId(renderer, "sprint-result-rating-snapshot")).toThrow();
+    expect(() => findByTestId(renderer, "sprint-result-history-trend")).toThrow();
     expectText(renderer, "Mistakes");
     expectText(renderer, "Done");
-    press(renderer, "sprint-result-history-trend");
-    expect(findByTestId(renderer, "history-panel")).toBeTruthy();
-    expect(findByTestId(renderer, "history-performance-card")).toBeTruthy();
-    press(renderer, "practice-tab");
-    expectText(renderer, "Sprint failed");
     expect(findByTestId(renderer, "sprint-result-history-button")).toBeTruthy();
     press(renderer, "sprint-result-history-button");
     expect(findByTestId(renderer, "history-panel")).toBeTruthy();
@@ -928,6 +921,7 @@ describe("PracticePocScreen", () => {
     const playAgainButton = findByTestId(renderer, "play-again-button");
     expect(reviewButton).toBeTruthy();
     expect(playAgainButton).toBeTruthy();
+    expect(collectText(reviewButton)).toContain("Review Mistakes");
     expect(hasStyleEntry(reviewButton, "backgroundColor", "#2563EB")).toBe(true);
     expect(hasStyleEntry(playAgainButton, "backgroundColor", "#2563EB")).toBe(false);
   });

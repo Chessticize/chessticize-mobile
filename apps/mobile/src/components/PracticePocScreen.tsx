@@ -2294,31 +2294,6 @@ function SprintSummary({
         </View>
       </View>
 
-      <View style={styles.resultRatingCard} testID="sprint-result-rating-snapshot">
-        <View>
-          <Text style={styles.resultMetricLabel}>Rating</Text>
-          <Text style={styles.resultRatingText}>
-            {state.ratingBefore} → {ratingAfter}
-          </Text>
-        </View>
-        <View style={styles.resultSparkline} accessibilityLabel="Compact rating trend">
-          {[0, 1, 2, 3].map((index) => {
-            const isPositive = delta >= 0;
-            const height = isPositive ? 10 + index * 4 : 22 - index * 4;
-            return (
-              <View
-                key={index}
-                style={[
-                  styles.resultSparklineBar,
-                  { height },
-                  index === 3 ? (isPositive ? styles.resultSparklineBarUp : styles.resultSparklineBarDown) : null
-                ]}
-              />
-            );
-          })}
-        </View>
-      </View>
-
       <View style={styles.resultDetailCard} testID="sprint-result-details">
         <ResultDetailRow label="Mode" value={modeLabel(state.config.mode)} testID="sprint-result-detail-mode" />
         <ResultDetailRow label="Reason" value={reason} testID="sprint-result-detail-reason" />
@@ -2341,29 +2316,15 @@ function SprintSummary({
         </Text>
       </View>
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="View performance trend in History"
-        testID="sprint-result-history-trend"
-        style={styles.resultHistoryTrend}
-        onPress={onOpenHistory}
-      >
-        <View>
-          <Text style={styles.listText}>Performance trend</Text>
-          <Text style={styles.helperText}>Open History for rating, accuracy, mistakes, and review volume.</Text>
-        </View>
-        <Text style={styles.resultHistoryTrendArrow}>›</Text>
-      </Pressable>
-
       {onReview && shouldPrioritizeReview ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Review missed puzzles"
+          accessibilityLabel="Review mistakes"
           testID="review-mistakes-button"
           style={[styles.primaryButton, styles.summaryPrimaryAction]}
           onPress={onReview}
         >
-          <Text style={styles.primaryButtonText}>Review missed puzzles</Text>
+          <Text style={styles.primaryButtonText}>Review Mistakes</Text>
         </Pressable>
       ) : null}
 
@@ -2399,12 +2360,12 @@ function SprintSummary({
       {onReview && !shouldPrioritizeReview ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Review missed puzzles"
+          accessibilityLabel="Review mistakes"
           testID="review-mistakes-button"
           style={styles.secondaryButton}
           onPress={onReview}
         >
-          <Text style={styles.secondaryButtonText}>Review missed puzzles</Text>
+          <Text style={styles.secondaryButtonText}>Review Mistakes</Text>
         </Pressable>
       ) : null}
     </View>
@@ -7443,22 +7404,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "800"
   },
-  resultRatingCard: {
-    alignItems: "center",
-    backgroundColor: "#F8FAFC",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    minHeight: 58,
-    padding: 10
-  },
-  resultRatingText: {
-    color: "#111827",
-    fontSize: 15,
-    fontWeight: "800"
-  },
   resultDetailCard: {
     backgroundColor: "#FFFFFF",
     borderColor: "#E2E8F0",
@@ -7484,23 +7429,6 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     textAlign: "right"
   },
-  resultSparkline: {
-    alignItems: "flex-end",
-    flexDirection: "row",
-    gap: 4,
-    height: 28
-  },
-  resultSparklineBar: {
-    backgroundColor: "#CBD5E1",
-    borderRadius: 4,
-    width: 8
-  },
-  resultSparklineBarUp: {
-    backgroundColor: "#2563EB"
-  },
-  resultSparklineBarDown: {
-    backgroundColor: "#DC2626"
-  },
   resultReviewRow: {
     alignItems: "center",
     backgroundColor: "#FFFFFF",
@@ -7516,25 +7444,6 @@ const styles = StyleSheet.create({
   resultReviewCount: {
     fontSize: 18,
     fontWeight: "900"
-  },
-  resultHistoryTrend: {
-    alignItems: "center",
-    backgroundColor: "#F8FAFC",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 12,
-    justifyContent: "space-between",
-    minHeight: 58,
-    paddingHorizontal: 12,
-    paddingVertical: 10
-  },
-  resultHistoryTrendArrow: {
-    color: "#2563EB",
-    fontSize: 22,
-    fontWeight: "800",
-    lineHeight: 24
   },
   summaryTitle: {
     color: "#111827",
