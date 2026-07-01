@@ -2,35 +2,36 @@ const fs = require('fs');
 const zlib = require('zlib');
 
 describe('Practice POC', () => {
+  beforeEach(async () => {
+    await device.launchApp({ newInstance: true, delete: true });
+  });
+
   it('renders the standard sprint board', async () => {
-    await waitFor(element(by.id('start-sprint-button'))).toBeVisible().withTimeout(30000);
-    await element(by.id('start-sprint-button')).tap();
+    await tapWhenVisible('start-sprint-button');
     await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(30000);
     await expect(element(by.text('Mistakes'))).toBeVisible();
 
     const screenshotPath = await device.takeScreenshot('standard-board');
     expectBoardScreenshotContainsPieces(screenshotPath);
 
-    await returnToPracticeHomeFromActiveSprint();
   });
 
   it('renders Arrow Duel candidate arrows on the board', async () => {
     await waitFor(element(by.id('practice-mode-arrow-duel'))).toBeVisible().withTimeout(30000);
     await element(by.id('practice-mode-arrow-duel')).tap();
-    await element(by.id('start-sprint-button')).tap();
+    await tapWhenVisible('start-sprint-button');
     await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
     await expect(element(by.text('Watch for checks, captures, and attacks!'))).toBeVisible();
 
     const screenshotPath = await device.takeScreenshot('arrow-duel-neutral-arrows');
     expectBoardScreenshotContainsNeutralArrows(screenshotPath);
 
-    await returnToPracticeHomeFromActiveSprint();
   });
 
   it('accepts the fixed alternate mate-in-one puzzle', async () => {
     await element(by.id('practice-mode-standard')).tap();
-    await waitFor(element(by.id('test-puzzle-source-familiar15'))).toBeVisible().withTimeout(30000);
-    await element(by.id('start-sprint-button')).tap();
+    await waitForVisibleInPracticeScroll('test-puzzle-source-familiar15');
+    await tapWhenVisible('start-sprint-button');
     await waitFor(element(by.text('Find the best move for white.'))).toBeVisible().withTimeout(10000);
 
     const boardFrame = await frameFor(element(by.id('session-board')));
@@ -44,13 +45,12 @@ describe('Practice POC', () => {
     await waitFor(element(by.id('session-progress'))).toHaveText('1 / 15').withTimeout(10000);
     await expect(element(by.text('Mistakes'))).toBeVisible();
 
-    await returnToPracticeHomeFromActiveSprint();
   });
 
   it('opens last sprint mistake review with navigation and analysis arrows', async () => {
     await element(by.id('practice-mode-standard')).tap();
-    await waitFor(element(by.id('test-puzzle-source-familiar15'))).toBeVisible().withTimeout(30000);
-    await element(by.id('start-sprint-button')).tap();
+    await waitForVisibleInPracticeScroll('test-puzzle-source-familiar15');
+    await tapWhenVisible('start-sprint-button');
     await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
 
     await playBoardMove('session-board', 'c2b3');
@@ -103,12 +103,16 @@ async function playBoardMove(testID, move, flipped = false) {
   await board.tapAtPoint(boardPoint(boardFrame, move.slice(2, 4), flipped));
 }
 
-async function returnToPracticeHomeFromActiveSprint() {
-  await waitFor(element(by.id('session-abandon'))).toBeVisible().withTimeout(10000);
-  await element(by.id('session-abandon')).tap();
-  await waitFor(element(by.id('back-practice-button'))).toBeVisible().withTimeout(10000);
-  await element(by.id('back-practice-button')).tap();
-  await waitFor(element(by.id('start-sprint-button'))).toBeVisible().withTimeout(10000);
+async function tapWhenVisible(testID) {
+  await waitForVisibleInPracticeScroll(testID);
+  await element(by.id(testID)).tap();
+}
+
+async function waitForVisibleInPracticeScroll(testID) {
+  await waitFor(element(by.id(testID)))
+    .toBeVisible()
+    .whileElement(by.id('practice-main-scroll'))
+    .scroll(100, 'down');
 }
 
 async function waitForElementTextContaining(testID, expected, timeoutMs) {

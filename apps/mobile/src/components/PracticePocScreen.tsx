@@ -217,6 +217,7 @@ export function PracticePocScreen({
   const [historyRatingKey, setHistoryRatingKey] = useState<string | null>(null);
   const [historyReviewEntries, setHistoryReviewEntries] = useState<ReviewEntry[]>([]);
   const [historyReviewInitialIndex, setHistoryReviewInitialIndex] = useState(0);
+  const [customSprintMode, setCustomSprintMode] = useState<"custom" | "arrow_duel">("custom");
   const [customDurationSeconds, setCustomDurationSeconds] = useState(5 * 60);
   const [customPerPuzzleSeconds, setCustomPerPuzzleSeconds] = useState(20);
 
@@ -236,8 +237,8 @@ export function PracticePocScreen({
   const isShowingFeedbackSnapshot = feedbackSnapshot !== null;
   const shouldShowSessionBoard = isActive || isShowingFeedbackSnapshot;
   const selectedConfig = useMemo(
-    () => sprintConfigFor(mode, customDurationSeconds, customPerPuzzleSeconds),
-    [customDurationSeconds, customPerPuzzleSeconds, mode]
+    () => sprintConfigFor(mode === "custom" ? customSprintMode : mode, customDurationSeconds, customPerPuzzleSeconds, mode === "custom"),
+    [customDurationSeconds, customPerPuzzleSeconds, customSprintMode, mode]
   );
   stateRef.current = state;
   boardFenRef.current = boardFen;
@@ -369,10 +370,10 @@ export function PracticePocScreen({
     }
   }
 
-  function startSprint(nextMode: SprintMode = mode): void {
+  function startSprint(nextMode: SprintMode = mode, useCustomTiming = nextMode === "custom"): void {
     setError(null);
     try {
-      const config = sprintConfigFor(nextMode, customDurationSeconds, customPerPuzzleSeconds);
+      const config = sprintConfigFor(nextMode, customDurationSeconds, customPerPuzzleSeconds, useCustomTiming);
       const started = service.startSprint({
         mode: nextMode,
         durationSeconds: config.durationSeconds,
@@ -907,6 +908,7 @@ export function PracticePocScreen({
       rating: readRating(service, config.ratingKey)
     };
   });
+  const practiceProgress = buildPracticeProgressSummary(attempts, nowMs);
   const dueTodayCount = dueReviewItems.length;
   const overdueCount = dueReviewItems.filter((item) => new Date(item.review.dueAt).getTime() <= nowMs).length;
 
@@ -923,7 +925,10 @@ export function PracticePocScreen({
         </View>
       ) : null}
 
-      <ScrollView contentContainerStyle={[styles.content, appShellVisible ? styles.contentWithBottomTabs : null]}>
+      <ScrollView
+        testID="practice-main-scroll"
+        contentContainerStyle={[styles.content, appShellVisible ? styles.contentWithBottomTabs : null]}
+      >
         {tab === "practice" ? (
           <>
             {state?.status === "active" ? (
@@ -944,6 +949,7 @@ export function PracticePocScreen({
                 currentRating={currentRating}
                 dueReviewCount={dueTodayCount}
                 overdueReviewCount={overdueCount}
+                progress={practiceProgress}
                 onSelectMode={setMode}
                 onStartMode={(nextMode) => startSprint(nextMode)}
                 onOpenReview={() => setTab("review")}
@@ -959,8 +965,10 @@ export function PracticePocScreen({
                 currentRating={currentRating}
                 onDurationChange={setCustomDurationSeconds}
                 onClose={() => setMode("standard")}
+                customMode={customSprintMode}
+                onCustomModeChange={setCustomSprintMode}
                 onPerPuzzleChange={setCustomPerPuzzleSeconds}
-                onStart={() => startSprint("custom")}
+                onStart={() => startSprint(customSprintMode, true)}
               />
             ) : null}
 
@@ -1169,6 +1177,7 @@ export function PracticePocScreen({
             service={service}
             sessionMistakeReviewItems={sessionMistakeReviewItems}
             onExitSessionReview={() => setTab("practice")}
+            onOpenPractice={() => setTab("practice")}
             stockfishTransportFactory={stockfishTransportFactory}
           />
         ) : null}
@@ -1208,12 +1217,41 @@ type PracticeModeSummary = {
   rating: number;
 };
 
+type PracticeProgressSummary = {
+  correctThisWeek: number;
+  wrongThisWeek: number;
+  netThisWeek: number;
+};
+
+function buildPracticeProgressSummary(attempts: AttemptEvent[], nowMs: number): PracticeProgressSummary {
+  const weekStartMs = nowMs - 7 * 24 * 60 * 60 * 1000;
+  let correctThisWeek = 0;
+  let wrongThisWeek = 0;
+  for (const attempt of attempts) {
+    const completedMs = new Date(attempt.completedAt).getTime();
+    if (!Number.isFinite(completedMs) || completedMs < weekStartMs || completedMs > nowMs) {
+      continue;
+    }
+    if (attempt.result === "correct") {
+      correctThisWeek += 1;
+    } else {
+      wrongThisWeek += 1;
+    }
+  }
+  return {
+    correctThisWeek,
+    wrongThisWeek,
+    netThisWeek: correctThisWeek - wrongThisWeek
+  };
+}
+
 function PracticeHome({
   mode,
   modes,
   currentRating,
   dueReviewCount,
   overdueReviewCount,
+  progress,
   onSelectMode,
   onStartMode,
   onOpenReview
@@ -1223,11 +1261,15 @@ function PracticeHome({
   currentRating: number;
   dueReviewCount: number;
   overdueReviewCount: number;
+  progress: PracticeProgressSummary;
   onSelectMode: (next: SprintMode) => void;
   onStartMode: (next: SprintMode) => void;
   onOpenReview: () => void;
 }): React.JSX.Element {
   const selected = modes.find((item) => item.mode === mode) ?? modes[0];
+  const progressDelta = progress.correctThisWeek + progress.wrongThisWeek === 0
+    ? "Start training"
+    : `${progress.netThisWeek >= 0 ? "+" : ""}${progress.netThisWeek} net`;
 
   return (
     <View style={styles.practiceHome} testID="practice-home">
@@ -1254,8 +1296,8 @@ function PracticeHome({
         <View style={styles.progressDivider} />
         <View style={styles.progressMetric}>
           <Text style={styles.helperText}>This Week</Text>
-          <Text style={styles.progressValue}>0</Text>
-          <Text style={styles.progressDelta}>Start training</Text>
+          <Text testID="practice-progress-weekly-solved" style={styles.progressValue}>{progress.correctThisWeek}</Text>
+          <Text testID="practice-progress-weekly-delta" style={styles.progressDelta}>{progressDelta}</Text>
         </View>
       </View>
 
@@ -1403,9 +1445,11 @@ function ModeRow({
 }
 
 function CustomSprintSetup({
+  customMode,
   currentRating,
   durationSeconds,
   onClose,
+  onCustomModeChange,
   perPuzzleSeconds,
   targetCorrect,
   ratingKey,
@@ -1413,9 +1457,11 @@ function CustomSprintSetup({
   onPerPuzzleChange,
   onStart
 }: {
+  customMode: "custom" | "arrow_duel";
   currentRating: number;
   durationSeconds: number;
   onClose: () => void;
+  onCustomModeChange: (next: "custom" | "arrow_duel") => void;
   perPuzzleSeconds: number;
   targetCorrect: number;
   ratingKey: string;
@@ -1472,11 +1518,10 @@ function CustomSprintSetup({
       </View>
 
       <View style={styles.customConfigCard}>
-        <CustomValueRow
-          label="Mode"
-          value="Standard"
-          detail="Regular puzzles"
+        <CustomModeChoiceRow
+          value={customMode}
           testID="custom-mode-row"
+          onChange={onCustomModeChange}
         />
         <CustomChoiceRow
           label="Theme"
@@ -1531,6 +1576,9 @@ function CustomSprintSetup({
         <View>
           <Text style={styles.helperText}>Summary</Text>
           <Text testID="custom-target-count" style={styles.customTarget}>Target {targetCorrect}</Text>
+          <Text testID="custom-mode-summary" style={styles.helperText}>
+            {customMode === "arrow_duel" ? "Arrow Duel" : "Regular puzzles"}
+          </Text>
         </View>
         <View style={styles.customSummaryMeta}>
           <Text style={styles.listText}>{ratingKey}</Text>
@@ -1551,6 +1599,45 @@ function CustomSprintSetup({
 
 function readCustomPreviewRating(candidateKey: string, activeKey: string, currentRating: number): number {
   return candidateKey === activeKey ? currentRating : 600;
+}
+
+function CustomModeChoiceRow({
+  onChange,
+  testID,
+  value
+}: {
+  onChange: (next: "custom" | "arrow_duel") => void;
+  testID: string;
+  value: "custom" | "arrow_duel";
+}): React.JSX.Element {
+  const options: Array<{ value: "custom" | "arrow_duel"; label: string; detail: string; testID: string }> = [
+    { value: "custom", label: "Regular Puzzles", detail: "Board moves", testID: "custom-mode-regular" },
+    { value: "arrow_duel", label: "Arrow Duel", detail: "Two candidates", testID: "custom-mode-arrow-duel" }
+  ];
+  return (
+    <View style={styles.customModeChoiceRow} testID={testID}>
+      <Text style={styles.listText}>Mode</Text>
+      <View style={styles.customModeChoices}>
+        {options.map((option) => (
+          <Pressable
+            key={option.value}
+            accessibilityRole="button"
+            accessibilityState={{ selected: value === option.value }}
+            testID={option.testID}
+            style={[styles.customModeChoice, value === option.value ? styles.customModeChoiceActive : null]}
+            onPress={() => onChange(option.value)}
+          >
+            <Text style={[styles.customModeChoiceTitle, value === option.value ? styles.customModeChoiceTitleActive : null]}>
+              {option.label}
+            </Text>
+            <Text style={[styles.customModeChoiceDetail, value === option.value ? styles.customModeChoiceDetailActive : null]}>
+              {option.detail}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
 }
 
 function CustomValueRow({
@@ -2813,6 +2900,8 @@ function HistoryAttemptRow({
       ? `Review ${puzzleStats.nextReviewAt.slice(0, 10)}`
       : "Review queued"
     : "Correct";
+  const resultLabel = isWrong ? "Wrong move" : "Correct";
+  const sourceLabel = attempt.source === "scheduled_review" ? "Review" : "Sprint";
 
   return (
     <Pressable
@@ -2828,16 +2917,19 @@ function HistoryAttemptRow({
       <View style={styles.historyAttemptCopy}>
         <View style={styles.historyAttemptHeader}>
           <Text style={styles.historyRowTitle}>{modeLabel(attempt.mode)}</Text>
-          <Text style={[styles.historyRatingDelta, delta < 0 ? styles.errorText : styles.positive]}>
-            {delta >= 0 ? "+" : ""}{delta}
-          </Text>
+          <Text testID={`history-attempt-${attempt.id}-result`} style={styles.helperText}>{resultLabel}</Text>
         </View>
-        <Text style={styles.helperText}>{isWrong ? "Wrong move" : "Correct"} · {attempt.submittedMove}</Text>
-        <Text style={styles.helperText}>
-          {attempt.source === "scheduled_review" ? "Review" : "Sprint"} · {attempt.puzzleRating} · {elapsedSeconds}s · {attempt.completedAt.slice(0, 10)}
+        <Text testID={`history-attempt-${attempt.id}-move`} style={styles.helperText}>{resultLabel} · {attempt.submittedMove}</Text>
+        <Text testID={`history-attempt-${attempt.id}-meta`} style={styles.helperText}>
+          {sourceLabel} · Rating {attempt.puzzleRating} · {elapsedSeconds}s · {attempt.completedAt.slice(0, 10)}
         </Text>
-        <Text style={[styles.helperText, isWrong ? styles.reviewDifficultyHard : styles.reviewDifficultyEasy]}>
+      </View>
+      <View style={styles.historyAttemptStatus} testID={`history-attempt-${attempt.id}-status`}>
+        <Text style={[styles.historyReviewState, isWrong ? styles.reviewDifficultyHard : styles.reviewDifficultyEasy]}>
           {reviewLabel}
+        </Text>
+        <Text testID={`history-attempt-${attempt.id}-delta`} style={[styles.historyRatingDelta, delta < 0 ? styles.errorText : styles.positive]}>
+          {delta >= 0 ? "+" : ""}{delta}
         </Text>
       </View>
     </Pressable>
@@ -3052,6 +3144,7 @@ function ReviewPanel({
   boardSize,
   dueReviewItems,
   onExitSessionReview,
+  onOpenPractice,
   service,
   sessionMistakeReviewItems,
   stockfishTransportFactory
@@ -3059,6 +3152,7 @@ function ReviewPanel({
   boardSize: number;
   dueReviewItems: ReviewQueueItem[];
   onExitSessionReview: () => void;
+  onOpenPractice: () => void;
   service: PracticeService;
   sessionMistakeReviewItems: SessionMistakeReviewItem[];
   stockfishTransportFactory: () => UciEngineTransport | null;
@@ -3216,6 +3310,15 @@ function ReviewPanel({
               ? "Next scheduled review appears here when the memory curve reaches its due time."
               : "Adjust filters or start the full due queue."}
           </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Practice while waiting for reviews"
+            testID="review-empty-practice"
+            style={[styles.secondaryButton, styles.emptyReviewPracticeButton]}
+            onPress={onOpenPractice}
+          >
+            <Text style={styles.secondaryButtonText}>Practice now</Text>
+          </Pressable>
         </View>
       )}
 
@@ -4778,6 +4881,24 @@ function PacksPanel(): React.JSX.Element {
         <PackImportProgressCard progress={importProgress} />
       ) : null}
 
+      <View style={styles.packOfflineSummaryCard} testID="packs-offline-readiness">
+        <View style={styles.sectionHeaderRow}>
+          <View style={styles.packRowCopy}>
+            <Text style={styles.sectionLabel}>Ready offline</Text>
+            <Text testID="packs-offline-readiness-copy" style={styles.helperText}>
+              The bundled Core Pack is active and fully available without network access.
+            </Text>
+          </View>
+          <Text style={[styles.packStatusBadge, styles.packStatusActive]}>Active</Text>
+        </View>
+        <View style={styles.packRowCoverage} testID="packs-offline-readiness-metrics">
+          <PackRowCoverageChip label="Puzzles" value="~1k" />
+          <PackRowCoverageChip label="Rating" value="600-1600" />
+          <PackRowCoverageChip label="Themes" value="Mixed" />
+          <PackRowCoverageChip label="Arrow Duel" value="Ready" />
+        </View>
+      </View>
+
       <PackSection title="Installed" testID="packs-installed-section">
         {installedPacks.map((pack) => (
           <PackRow
@@ -5406,9 +5527,10 @@ function screenSubtitleFor(tab: Tab): string | null {
 function sprintConfigFor(
   mode: SprintMode,
   customDurationSeconds: number,
-  customPerPuzzleSeconds: number
+  customPerPuzzleSeconds: number,
+  useCustomTiming = mode === "custom"
 ): SprintConfig {
-  if (mode !== "custom") {
+  if (!useCustomTiming) {
     return defaultSprintConfig(mode);
   }
   return buildSprintConfig({
@@ -5973,8 +6095,13 @@ const styles = StyleSheet.create({
     borderColor: "#E2E8F0",
     borderRadius: 8,
     borderWidth: 1,
-    gap: 2,
+    gap: 8,
     padding: 12
+  },
+  emptyReviewPracticeButton: {
+    alignSelf: "flex-start",
+    flex: 0,
+    marginTop: 2
   },
   reviewStartButton: {
     flex: 0
@@ -6292,6 +6419,49 @@ const styles = StyleSheet.create({
     minHeight: 58,
     paddingHorizontal: 12,
     paddingVertical: 10
+  },
+  customModeChoiceRow: {
+    borderBottomColor: "#E2E8F0",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  customModeChoices: {
+    flexDirection: "row",
+    gap: 8
+  },
+  customModeChoice: {
+    backgroundColor: "#F8FAFC",
+    borderColor: "#CBD5E1",
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    gap: 2,
+    minHeight: 52,
+    justifyContent: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 8
+  },
+  customModeChoiceActive: {
+    backgroundColor: "#EFF6FF",
+    borderColor: "#2563EB"
+  },
+  customModeChoiceTitle: {
+    color: "#111827",
+    fontSize: 13,
+    fontWeight: "900"
+  },
+  customModeChoiceTitleActive: {
+    color: "#1D4ED8"
+  },
+  customModeChoiceDetail: {
+    color: "#64748B",
+    fontSize: 11,
+    fontWeight: "700"
+  },
+  customModeChoiceDetailActive: {
+    color: "#2563EB"
   },
   customOptionRow: {
     borderBottomColor: "#E2E8F0",
@@ -7134,12 +7304,23 @@ const styles = StyleSheet.create({
   historyAttemptHeader: {
     alignItems: "center",
     flexDirection: "row",
-    justifyContent: "space-between",
     gap: 8
+  },
+  historyAttemptStatus: {
+    alignItems: "flex-end",
+    gap: 4,
+    justifyContent: "center",
+    minWidth: 78
+  },
+  historyReviewState: {
+    fontSize: 12,
+    fontWeight: "900",
+    textAlign: "right"
   },
   historyRatingDelta: {
     fontSize: 12,
-    fontWeight: "900"
+    fontWeight: "900",
+    textAlign: "right"
   },
   historyRow: {
     backgroundColor: "#F8FAFC",
@@ -7276,6 +7457,14 @@ const styles = StyleSheet.create({
     height: 38,
     justifyContent: "center",
     width: 38
+  },
+  packOfflineSummaryCard: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 8,
+    padding: 12
   },
   packImportProgressCard: {
     backgroundColor: "#FFFFFF",
