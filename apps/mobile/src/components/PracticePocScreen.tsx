@@ -937,7 +937,7 @@ export function PracticePocScreen({
               />
             ) : null}
 
-            {!isActive && state === null ? (
+            {!isActive && state === null && mode !== "custom" ? (
               <PracticeHome
                 mode={mode}
                 modes={practiceModeSummaries}
@@ -956,8 +956,11 @@ export function PracticePocScreen({
                 perPuzzleSeconds={customPerPuzzleSeconds}
                 targetCorrect={selectedConfig.targetCorrect}
                 ratingKey={selectedConfig.ratingKey}
+                currentRating={currentRating}
                 onDurationChange={setCustomDurationSeconds}
+                onClose={() => setMode("standard")}
                 onPerPuzzleChange={setCustomPerPuzzleSeconds}
+                onStart={() => startSprint("custom")}
               />
             ) : null}
 
@@ -1069,7 +1072,7 @@ export function PracticePocScreen({
               />
             ) : null}
 
-            {state?.status === "active" || isShowingFeedbackSnapshot || isFinished ? null : (
+            {state?.status === "active" || isShowingFeedbackSnapshot || isFinished || mode === "custom" ? null : (
               <>
                 <Pressable
                   accessibilityRole="button"
@@ -1367,56 +1370,273 @@ function ModeRow({
 }
 
 function CustomSprintSetup({
+  currentRating,
   durationSeconds,
+  onClose,
   perPuzzleSeconds,
   targetCorrect,
   ratingKey,
   onDurationChange,
-  onPerPuzzleChange
+  onPerPuzzleChange,
+  onStart
 }: {
+  currentRating: number;
   durationSeconds: number;
+  onClose: () => void;
   perPuzzleSeconds: number;
   targetCorrect: number;
   ratingKey: string;
   onDurationChange: (next: number) => void;
   onPerPuzzleChange: (next: number) => void;
+  onStart: () => void;
+}): React.JSX.Element {
+  const [theme, setTheme] = useState("Mixed");
+  const [includeArrowDuel, setIncludeArrowDuel] = useState(false);
+  const ratingRange = `${Math.max(400, currentRating - 200)} - ${currentRating + 200}`;
+  const previousConfigs = [
+    { id: "standard-5-20", title: "Standard · Mixed", meta: "5 min · 20 sec · last played recently", rating: currentRating },
+    { id: "standard-3-30", title: "Focused accuracy", meta: "3 min · 30 sec · slower review pace", rating: readCustomPreviewRating("custom 3/30", ratingKey, currentRating) }
+  ];
+
+  return (
+    <View style={styles.customSetupPanel} testID="custom-sprint-setup">
+      <View style={styles.customScreenHeader}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Close custom sprint setup"
+          testID="custom-close"
+          style={styles.analysisIconButton}
+          onPress={onClose}
+        >
+          <Text style={styles.analysisIconButtonText}>×</Text>
+        </Pressable>
+        <Text style={styles.customScreenTitle}>Custom Sprint</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Start custom sprint"
+          testID="start-sprint-button"
+          style={styles.customHeaderStartButton}
+          onPress={onStart}
+        >
+          <Text style={styles.primaryButtonText}>Start</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.customConfigCard}>
+        <CustomValueRow
+          label="Mode"
+          value="Standard"
+          detail="Regular puzzles"
+          testID="custom-mode-row"
+        />
+        <CustomChoiceRow
+          label="Theme"
+          value={theme}
+          options={["Mixed", "Mate", "Endgame"]}
+          testID="custom-theme-row"
+          onChange={setTheme}
+        />
+        <CustomOptionRow
+          label="Duration"
+          value={formatDurationLabel(durationSeconds)}
+          options={CUSTOM_DURATION_OPTIONS.map((option) => ({
+            value: option,
+            label: formatDurationLabel(option),
+            testID: `custom-duration-${option}`
+          }))}
+          selected={durationSeconds}
+          onChange={onDurationChange}
+        />
+        <CustomOptionRow
+          label="Time per puzzle"
+          value={`${perPuzzleSeconds} sec`}
+          options={CUSTOM_PER_PUZZLE_OPTIONS.map((option) => ({
+            value: option,
+            label: `${option}s`,
+            testID: `custom-per-puzzle-${option}`
+          }))}
+          selected={perPuzzleSeconds}
+          onChange={onPerPuzzleChange}
+        />
+        <CustomValueRow
+          label="Estimated puzzles"
+          value={`~${targetCorrect}`}
+          testID="custom-target-row"
+        />
+        <CustomValueRow
+          label="Rating range"
+          value={ratingRange}
+          testID="custom-rating-range"
+        />
+        <CustomToggleRow
+          enabled={includeArrowDuel}
+          label="Include Arrow Duel"
+          testID="custom-include-arrow-duel"
+          onToggle={() => setIncludeArrowDuel((current) => !current)}
+        />
+      </View>
+
+      <View style={styles.customSummaryCard} testID="custom-summary-card">
+        <View>
+          <Text style={styles.helperText}>Summary</Text>
+          <Text testID="custom-target-count" style={styles.customTarget}>Target {targetCorrect}</Text>
+        </View>
+        <View style={styles.customSummaryMeta}>
+          <Text style={styles.listText}>{ratingKey}</Text>
+          <Text style={styles.helperText}>ELO {currentRating}</Text>
+        </View>
+      </View>
+
+      <View style={styles.previousConfigList} testID="custom-previous-configs">
+        <Text style={styles.sectionLabel}>Previous configs</Text>
+        {previousConfigs.map((config) => (
+          <PreviousCustomConfigRow key={config.id} config={config} />
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function readCustomPreviewRating(candidateKey: string, activeKey: string, currentRating: number): number {
+  return candidateKey === activeKey ? currentRating : 600;
+}
+
+function CustomValueRow({
+  detail,
+  label,
+  testID,
+  value
+}: {
+  detail?: string;
+  label: string;
+  testID: string;
+  value: string;
 }): React.JSX.Element {
   return (
-    <View style={styles.customPanel} testID="custom-sprint-setup">
-      <View style={styles.customHeader}>
-        <Text style={styles.panelTitle}>Custom sprint</Text>
-        <Text testID="custom-target-count" style={styles.customTarget}>
-          Target {targetCorrect}
-        </Text>
+    <View style={styles.customConfigRow} testID={testID}>
+      <View>
+        <Text style={styles.listText}>{label}</Text>
+        {detail ? <Text style={styles.helperText}>{detail}</Text> : null}
       </View>
-      <Text style={styles.helperText}>Time control</Text>
-      <View style={styles.optionRow}>
-        {CUSTOM_DURATION_OPTIONS.map((option) => (
-          <OptionButton
+      <Text style={styles.customConfigValue}>{value}</Text>
+    </View>
+  );
+}
+
+function CustomChoiceRow({
+  label,
+  onChange,
+  options,
+  testID,
+  value
+}: {
+  label: string;
+  onChange: (next: string) => void;
+  options: string[];
+  testID: string;
+  value: string;
+}): React.JSX.Element {
+  return (
+    <View style={styles.customConfigRow} testID={testID}>
+      <Text style={styles.listText}>{label}</Text>
+      <View style={styles.customInlineOptions}>
+        {options.map((option) => (
+          <Pressable
             key={option}
-            active={durationSeconds === option}
-            label={formatDurationLabel(option)}
-            testID={`custom-duration-${option}`}
-            onPress={() => onDurationChange(option)}
-          />
+            accessibilityRole="button"
+            accessibilityState={{ selected: value === option }}
+            testID={`custom-theme-${safeTestId(option)}`}
+            style={[styles.customMiniChip, value === option ? styles.customMiniChipActive : null]}
+            onPress={() => onChange(option)}
+          >
+            <Text style={[styles.customMiniChipText, value === option ? styles.customMiniChipTextActive : null]}>{option}</Text>
+          </Pressable>
         ))}
       </View>
-      <Text style={styles.helperText}>Target pace</Text>
-      <View style={styles.optionRow}>
-        {CUSTOM_PER_PUZZLE_OPTIONS.map((option) => (
-          <OptionButton
-            key={option}
-            active={perPuzzleSeconds === option}
-            label={`${option}s`}
-            testID={`custom-per-puzzle-${option}`}
-            onPress={() => onPerPuzzleChange(option)}
-          />
+    </View>
+  );
+}
+
+function CustomOptionRow<T extends number>({
+  label,
+  onChange,
+  options,
+  selected,
+  value
+}: {
+  label: string;
+  onChange: (next: T) => void;
+  options: Array<{ value: T; label: string; testID: string }>;
+  selected: T;
+  value: string;
+}): React.JSX.Element {
+  return (
+    <View style={styles.customOptionRow}>
+      <View style={styles.customOptionHeader}>
+        <Text style={styles.listText}>{label}</Text>
+        <Text style={styles.customConfigValue}>{value}</Text>
+      </View>
+      <View style={styles.customInlineOptions}>
+        {options.map((option) => (
+          <Pressable
+            key={option.value}
+            accessibilityRole="button"
+            accessibilityState={{ selected: selected === option.value }}
+            testID={option.testID}
+            style={[styles.customMiniChip, selected === option.value ? styles.customMiniChipActive : null]}
+            onPress={() => onChange(option.value)}
+          >
+            <Text style={[styles.customMiniChipText, selected === option.value ? styles.customMiniChipTextActive : null]}>{option.label}</Text>
+          </Pressable>
         ))}
       </View>
-      <View style={styles.configSummary}>
-        <Text style={styles.listText}>Miss 3 and the sprint fails</Text>
-        <Text style={styles.helperText}>{ratingKey}</Text>
+    </View>
+  );
+}
+
+function CustomToggleRow({
+  enabled,
+  label,
+  onToggle,
+  testID
+}: {
+  enabled: boolean;
+  label: string;
+  onToggle: () => void;
+  testID: string;
+}): React.JSX.Element {
+  return (
+    <View style={styles.customConfigRow} testID={testID}>
+      <View>
+        <Text style={styles.listText}>{label}</Text>
+        <Text style={styles.helperText}>Custom Arrow Duel scoring is planned after core support.</Text>
       </View>
+      <Pressable
+        accessibilityRole="switch"
+        accessibilityLabel={label}
+        accessibilityState={{ checked: enabled }}
+        testID={`${testID}-toggle`}
+        style={[styles.switchButton, enabled ? styles.switchButtonActive : null]}
+        onPress={onToggle}
+      >
+        <Text style={[styles.switchText, enabled ? styles.switchTextActive : null]}>{enabled ? "On" : "Off"}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function PreviousCustomConfigRow({
+  config
+}: {
+  config: { id: string; title: string; meta: string; rating: number };
+}): React.JSX.Element {
+  return (
+    <View style={styles.previousConfigRow} testID={`custom-previous-${config.id}`}>
+      <View style={styles.previousConfigCopy}>
+        <Text style={styles.historyRowTitle}>{config.title}</Text>
+        <Text style={styles.helperText}>{config.meta}</Text>
+      </View>
+      <Text style={styles.practiceModeRating}>{config.rating}</Text>
     </View>
   );
 }
@@ -3423,40 +3643,100 @@ function SettingsPanel({
   onResetRating: () => void;
 }): React.JSX.Element {
   const [syncEnabled, setSyncEnabled] = useState(true);
-  const [resetMessage, setResetMessage] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   return (
-    <View style={styles.listPanel} testID="settings-panel">
-      <Text style={styles.panelTitle}>Settings</Text>
-      <View style={styles.settingRow}>
-        <View>
-          <Text style={styles.listText}>iCloud sync</Text>
-          <Text style={styles.helperText}>{syncEnabled ? "Syncing enabled" : "Local only"}</Text>
+    <View style={styles.settingsPanel} testID="settings-panel">
+      <SettingsSection title="Profile" testID="settings-profile-section">
+        <SettingsRow
+          label="Puzzle ELO (Standard)"
+          value="Manage"
+          detail="Current sprint rating bucket"
+          testID="settings-standard-elo-row"
+        />
+        <SettingsRow
+          label="Reset ELO"
+          detail="Resets the current sprint rating only"
+          destructive
+          testID="settings-reset-elo"
+          onPress={() => {
+            onResetRating();
+            setStatusMessage("ELO reset");
+          }}
+        />
+        <SettingsRow
+          label="Advanced ratings"
+          value="Hidden"
+          detail="Manual adjustment stays behind an advanced affordance"
+          testID="settings-advanced-ratings"
+        />
+      </SettingsSection>
+
+      <SettingsSection title="Sync" testID="settings-sync-section">
+        <View style={styles.settingsRow} testID="settings-icloud-sync-row">
+          <View style={styles.settingsRowCopy}>
+            <Text style={styles.listText}>iCloud Sync</Text>
+            <Text testID="settings-sync-status" style={styles.helperText}>
+              {syncEnabled ? "On · Last synced today, 09:28" : "Off · Local-only progress"}
+            </Text>
+          </View>
+          <Pressable
+            accessibilityRole="switch"
+            accessibilityLabel="iCloud sync"
+            accessibilityState={{ checked: syncEnabled }}
+            testID="settings-icloud-sync-toggle"
+            style={[styles.switchButton, syncEnabled ? styles.switchButtonActive : null]}
+            onPress={() => {
+              setSyncEnabled((current) => !current);
+              setStatusMessage(syncEnabled ? "iCloud sync off" : "iCloud sync on");
+            }}
+          >
+            <Text style={[styles.switchText, syncEnabled ? styles.switchTextActive : null]}>{syncEnabled ? "On" : "Off"}</Text>
+          </Pressable>
         </View>
-        <Pressable
-          accessibilityRole="switch"
-          accessibilityLabel="iCloud sync"
-          accessibilityState={{ checked: syncEnabled }}
-          testID="settings-icloud-sync-toggle"
-          style={[styles.switchButton, syncEnabled ? styles.switchButtonActive : null]}
-          onPress={() => setSyncEnabled((current) => !current)}
-        >
-          <Text style={[styles.switchText, syncEnabled ? styles.switchTextActive : null]}>{syncEnabled ? "On" : "Off"}</Text>
-        </Pressable>
-      </View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Reset ELO"
-        testID="settings-reset-elo"
-        style={styles.secondaryButton}
-        onPress={() => {
-          onResetRating();
-          setResetMessage("ELO reset");
-        }}
-      >
-        <Text style={styles.secondaryButtonText}>Reset ELO</Text>
-      </Pressable>
-      {resetMessage ? <Text style={styles.listText}>{resetMessage}</Text> : null}
+      </SettingsSection>
+
+      <SettingsSection title="Data" testID="settings-data-section">
+        <SettingsRow
+          label="Export Data"
+          value="JSON"
+          detail="Prepare local progress for backup"
+          testID="settings-export-data"
+          onPress={() => setStatusMessage("Export prepared")}
+        />
+        <SettingsRow
+          label="Delete Local History"
+          detail="Requires confirmation before anything is removed"
+          destructive
+          testID="settings-delete-local-history"
+          onPress={() => setStatusMessage("Delete confirmation required")}
+        />
+      </SettingsSection>
+
+      <SettingsSection title="Packs" testID="settings-packs-section">
+        <SettingsRow
+          label="Manage Puzzle Packs"
+          value="Open Packs"
+          detail="Bundled and imported offline puzzle packs"
+          testID="settings-manage-packs"
+        />
+      </SettingsSection>
+
+      <SettingsSection title="About" testID="settings-about-section">
+        <SettingsRow
+          label="App Version"
+          value="1.0.0"
+          testID="settings-app-version"
+        />
+        <SettingsRow
+          label="License"
+          value="GPL"
+          detail="Stockfish integration keeps the app open source"
+          testID="settings-license"
+        />
+      </SettingsSection>
+
+      {statusMessage ? <Text style={styles.settingsStatusText} testID="settings-status-message">{statusMessage}</Text> : null}
       {onOpenDiagnostics ? (
         <Pressable
           accessibilityRole="button"
@@ -3472,20 +3752,281 @@ function SettingsPanel({
   );
 }
 
-function PacksPanel(): React.JSX.Element {
+function SettingsSection({
+  children,
+  testID,
+  title
+}: {
+  children: React.ReactNode;
+  testID: string;
+  title: string;
+}): React.JSX.Element {
   return (
-    <View style={styles.listPanel} testID="packs-panel">
-      <Text style={styles.panelTitle}>Puzzle Packs</Text>
-      <Text testID="packs-installed-core" style={styles.listText}>Core pack · installed · offline</Text>
-      <Text testID="packs-license-notes" style={styles.helperText}>Source: Lichess puzzle database, presolved for Chessticize.</Text>
-      <View style={styles.summaryRow}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Import pack" testID="packs-import" style={styles.secondaryButton}>
-          <Text style={styles.secondaryButtonText}>Import</Text>
-        </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="Remove pack" testID="packs-remove" style={styles.secondaryButton}>
-          <Text style={styles.secondaryButtonText}>Remove</Text>
+    <View style={styles.settingsSection} testID={testID}>
+      <Text style={styles.sectionLabel}>{title}</Text>
+      <View style={styles.settingsSectionCard}>
+        {children}
+      </View>
+    </View>
+  );
+}
+
+function SettingsRow({
+  destructive = false,
+  detail,
+  label,
+  onPress,
+  testID,
+  value
+}: {
+  destructive?: boolean;
+  detail?: string;
+  label: string;
+  onPress?: () => void;
+  testID: string;
+  value?: string;
+}): React.JSX.Element {
+  return (
+    <Pressable
+      accessibilityRole={onPress ? "button" : undefined}
+      accessibilityLabel={label}
+      testID={testID}
+      style={styles.settingsRow}
+      onPress={onPress}
+    >
+      <View style={styles.settingsRowCopy}>
+        <Text style={[styles.listText, destructive ? styles.settingsDestructiveText : null]}>{label}</Text>
+        {detail ? <Text style={styles.helperText}>{detail}</Text> : null}
+      </View>
+      <View style={styles.settingsRowMeta}>
+        {value ? <Text style={styles.settingsRowValue}>{value}</Text> : null}
+        <Text style={styles.practiceModeChevron}>›</Text>
+      </View>
+    </Pressable>
+  );
+}
+
+type PackRowModel = {
+  id: string;
+  title: string;
+  subtitle: string;
+  detail: string;
+  status: "active" | "installed" | "optional";
+  testID: string;
+};
+
+function PacksPanel(): React.JSX.Element {
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const installedPacks: PackRowModel[] = [
+    {
+      id: "core",
+      title: "Core Pack",
+      subtitle: "~1,000 puzzles · offline",
+      detail: "Rating 600 - 1600 · Mixed, mate, endgame · Arrow Duel ready",
+      status: "active",
+      testID: "packs-installed-core"
+    },
+    {
+      id: "tactics",
+      title: "Tactics Pack",
+      subtitle: "~50k puzzles · installed",
+      detail: "Rating 800 - 2200 · tactics-heavy coverage",
+      status: "installed",
+      testID: "packs-installed-tactics"
+    }
+  ];
+  const optionalPacks: PackRowModel[] = [
+    {
+      id: "endgame",
+      title: "Endgame Pack",
+      subtitle: "~40k puzzles · optional",
+      detail: "Rating 900 - 2400 · rook, pawn, conversion themes",
+      status: "optional",
+      testID: "packs-optional-endgame"
+    },
+    {
+      id: "mate-in-n",
+      title: "Mate in N Pack",
+      subtitle: "~30k puzzles · optional",
+      detail: "Rating 700 - 2300 · mate themes · Arrow Duel candidates",
+      status: "optional",
+      testID: "packs-optional-mate-in-n"
+    }
+  ];
+
+  return (
+    <View style={styles.packsPanel} testID="packs-panel">
+      <View style={styles.sectionHeaderRow}>
+        <Text style={styles.panelTitle}>Puzzle Packs</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Import puzzle pack"
+          testID="packs-import"
+          style={styles.packsIconButton}
+          onPress={() => setStatusMessage("Validating pack manifest")}
+        >
+          <Text style={styles.iconButtonText}>＋</Text>
         </Pressable>
       </View>
+
+      <PackSection title="Installed" testID="packs-installed-section">
+        {installedPacks.map((pack) => (
+          <PackRow
+            key={pack.id}
+            pack={pack}
+            onRemove={pack.id === "core" ? undefined : () => setStatusMessage(`${pack.title} removal requires confirmation`)}
+          />
+        ))}
+      </PackSection>
+
+      <PackSection title="Optional Packs" testID="packs-optional-section">
+        {optionalPacks.map((pack) => (
+          <PackRow
+            key={pack.id}
+            pack={pack}
+            onImport={() => setStatusMessage(`Validating ${pack.title} manifest`)}
+          />
+        ))}
+      </PackSection>
+
+      <View style={styles.packInfoCard} testID="packs-info-section">
+        <Text style={styles.sectionLabel}>Pack Info</Text>
+        <PackInfoRow label="Source" value="Lichess puzzle database" testID="packs-source" />
+        <PackInfoRow label="Processing" value="Pre-solved for Chessticize" testID="packs-processing" />
+        <PackInfoRow label="Manifest" value="Validated before activation" testID="packs-manifest" />
+        <PackInfoRow label="Build date" value="Bundled fixture" testID="packs-build-date" />
+        <Text testID="packs-license-notes" style={styles.packLicenseText}>
+          License notes: Puzzle data is derived from the Lichess puzzle database and bundled for offline use with Chessticize presolve metadata.
+        </Text>
+      </View>
+
+      <View style={styles.packCoverageCard} testID="packs-coverage-card">
+        <Text style={styles.sectionLabel}>Offline coverage</Text>
+        <View style={styles.packCoverageGrid}>
+          <PackCoverageMetric label="Puzzles" value="~1k" testID="packs-coverage-puzzles" />
+          <PackCoverageMetric label="Rating" value="600-1600" testID="packs-coverage-rating" />
+          <PackCoverageMetric label="Themes" value="Mixed" testID="packs-coverage-themes" />
+          <PackCoverageMetric label="Arrow Duel" value="Ready" testID="packs-coverage-arrow-duel" />
+        </View>
+      </View>
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Remove pack"
+        testID="packs-remove"
+        style={styles.secondaryButton}
+        onPress={() => setStatusMessage("Choose an installed optional pack to remove")}
+      >
+        <Text style={styles.secondaryButtonText}>Remove Optional Pack</Text>
+      </Pressable>
+
+      {statusMessage ? (
+        <Text style={styles.settingsStatusText} testID="packs-status-message">{statusMessage}</Text>
+      ) : null}
+    </View>
+  );
+}
+
+function PackSection({
+  children,
+  testID,
+  title
+}: {
+  children: React.ReactNode;
+  testID: string;
+  title: string;
+}): React.JSX.Element {
+  return (
+    <View style={styles.settingsSection} testID={testID}>
+      <Text style={styles.sectionLabel}>{title}</Text>
+      <View style={styles.settingsSectionCard}>{children}</View>
+    </View>
+  );
+}
+
+function PackRow({
+  onImport,
+  onRemove,
+  pack
+}: {
+  onImport?: () => void;
+  onRemove?: () => void;
+  pack: PackRowModel;
+}): React.JSX.Element {
+  const isOptional = pack.status === "optional";
+  return (
+    <View style={styles.packRow} testID={pack.testID}>
+      <View style={styles.packRowCopy}>
+        <View style={styles.packTitleRow}>
+          <Text style={styles.historyRowTitle}>{pack.title}</Text>
+          <Text style={[
+            styles.packStatusBadge,
+            pack.status === "active" ? styles.packStatusActive : null,
+            pack.status === "installed" ? styles.packStatusInstalled : null
+          ]}>
+            {pack.status === "active" ? "Active" : pack.status === "installed" ? "Installed" : "Optional"}
+          </Text>
+        </View>
+        <Text style={styles.helperText}>{pack.subtitle}</Text>
+        <Text style={styles.helperText}>{pack.detail}</Text>
+      </View>
+      {isOptional ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Import ${pack.title}`}
+          testID={`packs-import-${pack.id}`}
+          style={styles.packActionButton}
+          onPress={onImport}
+        >
+          <Text style={styles.packActionText}>Import</Text>
+        </Pressable>
+      ) : onRemove ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Remove ${pack.title}`}
+          testID={`packs-remove-${pack.id}`}
+          style={styles.packActionButton}
+          onPress={onRemove}
+        >
+          <Text style={styles.packActionText}>Remove</Text>
+        </Pressable>
+      ) : (
+        <Text style={styles.packActiveMark}>✓</Text>
+      )}
+    </View>
+  );
+}
+
+function PackInfoRow({
+  label,
+  testID,
+  value
+}: {
+  label: string;
+  testID: string;
+  value: string;
+}): React.JSX.Element {
+  return (
+    <View style={styles.packInfoRow} testID={testID}>
+      <Text style={styles.helperText}>{label}</Text>
+      <Text style={styles.listText}>{value}</Text>
+    </View>
+  );
+}
+
+function PackCoverageMetric({
+  label,
+  testID,
+  value
+}: {
+  label: string;
+  testID: string;
+  value: string;
+}): React.JSX.Element {
+  return (
+    <View style={styles.packCoverageMetric} testID={testID}>
+      <Text style={styles.packCoverageValue}>{value}</Text>
+      <Text style={styles.helperText}>{label}</Text>
     </View>
   );
 }
@@ -4484,6 +5025,130 @@ const styles = StyleSheet.create({
     gap: 10,
     padding: 12
   },
+  customSetupPanel: {
+    gap: 12
+  },
+  customScreenHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "space-between"
+  },
+  customScreenTitle: {
+    color: "#111827",
+    flex: 1,
+    fontSize: 17,
+    fontWeight: "800",
+    textAlign: "center"
+  },
+  customHeaderStartButton: {
+    alignItems: "center",
+    backgroundColor: "#2563EB",
+    borderRadius: 8,
+    height: 40,
+    justifyContent: "center",
+    paddingHorizontal: 14
+  },
+  customConfigCard: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    overflow: "hidden"
+  },
+  customConfigRow: {
+    alignItems: "center",
+    borderBottomColor: "#E2E8F0",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: "row",
+    gap: 12,
+    justifyContent: "space-between",
+    minHeight: 58,
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  customOptionRow: {
+    borderBottomColor: "#E2E8F0",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 8,
+    minHeight: 70,
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  customOptionHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between"
+  },
+  customConfigValue: {
+    color: "#475569",
+    fontSize: 13,
+    fontWeight: "800"
+  },
+  customInlineOptions: {
+    flexDirection: "row",
+    flexShrink: 1,
+    flexWrap: "wrap",
+    gap: 6,
+    justifyContent: "flex-end"
+  },
+  customMiniChip: {
+    alignItems: "center",
+    backgroundColor: "#F8FAFC",
+    borderColor: "#CBD5E1",
+    borderRadius: 8,
+    borderWidth: 1,
+    minHeight: 32,
+    justifyContent: "center",
+    paddingHorizontal: 10
+  },
+  customMiniChipActive: {
+    backgroundColor: "#EFF6FF",
+    borderColor: "#2563EB"
+  },
+  customMiniChipText: {
+    color: "#334155",
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  customMiniChipTextActive: {
+    color: "#1D4ED8"
+  },
+  customSummaryCard: {
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    minHeight: 70,
+    padding: 12
+  },
+  customSummaryMeta: {
+    alignItems: "flex-end",
+    gap: 2
+  },
+  previousConfigList: {
+    gap: 8
+  },
+  previousConfigRow: {
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "space-between",
+    minHeight: 58,
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  previousConfigCopy: {
+    flex: 1,
+    gap: 2
+  },
   testPanel: {
     backgroundColor: "#F8FAFC",
     borderColor: "#CBD5E1",
@@ -4996,6 +5661,177 @@ const styles = StyleSheet.create({
   },
   reviewContextList: {
     gap: 8
+  },
+  settingsPanel: {
+    gap: 12
+  },
+  settingsSection: {
+    gap: 8
+  },
+  settingsSectionCard: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    overflow: "hidden"
+  },
+  settingsRow: {
+    alignItems: "center",
+    borderBottomColor: "#E2E8F0",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: "row",
+    gap: 12,
+    justifyContent: "space-between",
+    minHeight: 58,
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  settingsRowCopy: {
+    flex: 1,
+    gap: 2
+  },
+  settingsRowMeta: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 4
+  },
+  settingsRowValue: {
+    color: "#64748B",
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  settingsDestructiveText: {
+    color: "#DC2626"
+  },
+  settingsStatusText: {
+    color: "#334155",
+    fontSize: 13,
+    fontWeight: "700",
+    paddingHorizontal: 2
+  },
+  packsPanel: {
+    gap: 12
+  },
+  packsIconButton: {
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderColor: "#CBD5E1",
+    borderRadius: 8,
+    borderWidth: 1,
+    height: 38,
+    justifyContent: "center",
+    width: 38
+  },
+  packRow: {
+    alignItems: "center",
+    borderBottomColor: "#E2E8F0",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "space-between",
+    minHeight: 78,
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  packRowCopy: {
+    flex: 1,
+    gap: 3
+  },
+  packTitleRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8
+  },
+  packStatusBadge: {
+    backgroundColor: "#F8FAFC",
+    borderColor: "#CBD5E1",
+    borderRadius: 999,
+    borderWidth: 1,
+    color: "#64748B",
+    fontSize: 10,
+    fontWeight: "900",
+    overflow: "hidden",
+    paddingHorizontal: 8,
+    paddingVertical: 3
+  },
+  packStatusActive: {
+    backgroundColor: "#DCFCE7",
+    borderColor: "#86EFAC",
+    color: "#15803D"
+  },
+  packStatusInstalled: {
+    backgroundColor: "#EFF6FF",
+    borderColor: "#BFDBFE",
+    color: "#1D4ED8"
+  },
+  packActiveMark: {
+    color: "#16A34A",
+    fontSize: 22,
+    fontWeight: "900"
+  },
+  packActionButton: {
+    alignItems: "center",
+    borderColor: "#93C5FD",
+    borderRadius: 8,
+    borderWidth: 1,
+    minHeight: 34,
+    justifyContent: "center",
+    paddingHorizontal: 10
+  },
+  packActionText: {
+    color: "#1D4ED8",
+    fontSize: 12,
+    fontWeight: "900"
+  },
+  packInfoCard: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 8,
+    padding: 12
+  },
+  packInfoRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12
+  },
+  packLicenseText: {
+    color: "#64748B",
+    fontSize: 12,
+    fontWeight: "600",
+    lineHeight: 17
+  },
+  packCoverageCard: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 10,
+    padding: 12
+  },
+  packCoverageGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8
+  },
+  packCoverageMetric: {
+    backgroundColor: "#F8FAFC",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexBasis: "47%",
+    flexGrow: 1,
+    gap: 2,
+    minHeight: 58,
+    padding: 10
+  },
+  packCoverageValue: {
+    color: "#111827",
+    fontSize: 16,
+    fontWeight: "900"
   },
   settingRow: {
     alignItems: "center",

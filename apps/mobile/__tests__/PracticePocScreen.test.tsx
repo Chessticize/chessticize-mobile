@@ -457,6 +457,18 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "practice-mode-custom");
     expect(findByTestId(renderer, "custom-sprint-setup")).toBeTruthy();
+    expect(() => findByTestId(renderer, "practice-home")).toThrow();
+    expect(findByTestId(renderer, "custom-mode-row")).toBeTruthy();
+    expect(findByTestId(renderer, "custom-theme-row")).toBeTruthy();
+    expect(findByTestId(renderer, "custom-target-row")).toBeTruthy();
+    expect(findByTestId(renderer, "custom-rating-range")).toBeTruthy();
+    expect(findByTestId(renderer, "custom-summary-card")).toBeTruthy();
+    expect(findByTestId(renderer, "custom-previous-configs")).toBeTruthy();
+    expect(findByTestId(renderer, "custom-include-arrow-duel")).toBeTruthy();
+    press(renderer, "custom-theme-mate");
+    expectText(renderer, "Mate");
+    press(renderer, "custom-include-arrow-duel-toggle");
+    expect(findByTestId(renderer, "custom-include-arrow-duel-toggle").props.accessibilityState).toEqual({ checked: true });
     expectText(renderer, "Target 15");
 
     press(renderer, "custom-duration-180");
@@ -1155,15 +1167,56 @@ describe("PracticePocScreen", () => {
     const renderer = renderScreen();
 
     press(renderer, "settings-tab");
+    expect(findByTestId(renderer, "settings-profile-section")).toBeTruthy();
+    expect(findByTestId(renderer, "settings-sync-section")).toBeTruthy();
+    expect(findByTestId(renderer, "settings-data-section")).toBeTruthy();
+    expect(findByTestId(renderer, "settings-packs-section")).toBeTruthy();
+    expect(findByTestId(renderer, "settings-about-section")).toBeTruthy();
+    expect(findByTestId(renderer, "settings-standard-elo-row")).toBeTruthy();
     expect(findByTestId(renderer, "settings-icloud-sync-toggle")).toBeTruthy();
+    expectText(renderer, "On · Last synced today, 09:28");
+    press(renderer, "settings-icloud-sync-toggle");
+    expect(findByTestId(renderer, "settings-icloud-sync-toggle").props.accessibilityState).toEqual({ checked: false });
+    expectText(renderer, "Off · Local-only progress");
     press(renderer, "settings-reset-elo");
     expectText(renderer, "ELO reset");
+    expect(findByTestId(renderer, "settings-export-data")).toBeTruthy();
+    press(renderer, "settings-export-data");
+    expectText(renderer, "Export prepared");
+    press(renderer, "settings-delete-local-history");
+    expectText(renderer, "Delete confirmation required");
+    expect(findByTestId(renderer, "settings-advanced-ratings")).toBeTruthy();
+    expect(findByTestId(renderer, "settings-manage-packs")).toBeTruthy();
+    expect(findByTestId(renderer, "settings-app-version")).toBeTruthy();
+    expect(findByTestId(renderer, "settings-license")).toBeTruthy();
 
     press(renderer, "packs-tab");
+    expect(findByTestId(renderer, "packs-installed-section")).toBeTruthy();
+    expect(findByTestId(renderer, "packs-optional-section")).toBeTruthy();
     expect(findByTestId(renderer, "packs-installed-core")).toBeTruthy();
+    expectText(renderer, "Active");
+    expectText(renderer, "Rating 600 - 1600 · Mixed, mate, endgame · Arrow Duel ready");
+    expect(findByTestId(renderer, "packs-installed-tactics")).toBeTruthy();
+    expect(findByTestId(renderer, "packs-optional-endgame")).toBeTruthy();
+    expect(findByTestId(renderer, "packs-optional-mate-in-n")).toBeTruthy();
     expect(findByTestId(renderer, "packs-import")).toBeTruthy();
+    press(renderer, "packs-import");
+    expectText(renderer, "Validating pack manifest");
+    press(renderer, "packs-import-endgame");
+    expectText(renderer, "Validating Endgame Pack manifest");
     expect(findByTestId(renderer, "packs-remove")).toBeTruthy();
+    press(renderer, "packs-remove");
+    expectText(renderer, "Choose an installed optional pack to remove");
     expect(findByTestId(renderer, "packs-license-notes")).toBeTruthy();
+    expect(findByTestId(renderer, "packs-source")).toBeTruthy();
+    expect(findByTestId(renderer, "packs-processing")).toBeTruthy();
+    expect(findByTestId(renderer, "packs-manifest")).toBeTruthy();
+    expect(findByTestId(renderer, "packs-build-date")).toBeTruthy();
+    expect(findByTestId(renderer, "packs-coverage-card")).toBeTruthy();
+    expect(findByTestId(renderer, "packs-coverage-puzzles")).toBeTruthy();
+    expect(findByTestId(renderer, "packs-coverage-rating")).toBeTruthy();
+    expect(findByTestId(renderer, "packs-coverage-themes")).toBeTruthy();
+    expect(findByTestId(renderer, "packs-coverage-arrow-duel")).toBeTruthy();
   });
 });
 
