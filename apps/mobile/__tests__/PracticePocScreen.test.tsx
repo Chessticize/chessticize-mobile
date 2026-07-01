@@ -73,6 +73,12 @@ describe("PracticePocScreen", () => {
     press(renderer, "practice-mode-blitz");
 
     expect(findByTestId(renderer, "session-board")).toBeTruthy();
+    expect(testIdOrder(renderer, "session-board", "session-score-strip")).toBeLessThan(0);
+    expect(testIdOrder(renderer, "session-score-strip", "practice-prompt")).toBeLessThan(0);
+    expect(findByTestId(renderer, "session-score-strip").props.accessibilityLabel).toBe("Session score: solved 0, mistakes 0, left 30");
+    expect(collectText(findByTestId(renderer, "session-score-strip"))).toContain("Solved");
+    expect(collectText(findByTestId(renderer, "session-score-strip"))).toContain("Mistakes");
+    expect(collectText(findByTestId(renderer, "session-score-strip"))).toContain("Left");
     expect(collectText(findByTestId(renderer, "session-progress"))).toBe("0 / 30");
     expectText(renderer, "Find the best move");
   });
@@ -426,7 +432,7 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "Wrong move · e6d7");
   });
 
-  it("uses neutral Arrow Duel board markers without candidate chips", () => {
+  it("uses neutral Arrow Duel board markers with non-revealing candidate chips", () => {
     const renderer = renderScreen();
     const arrow = firstArrowDuelPuzzleForTest();
 
@@ -434,12 +440,20 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "mock-chessboard").props.flipped).toBe(new Chess(arrow.currentFen).turn() === "b");
     expect(collectText(renderer.root)).not.toContain("Choose one candidate move");
+    expect(findByTestId(renderer, "arrow-duel-candidates")).toBeTruthy();
+    expect(findByTestId(renderer, "arrow-duel-candidate-a").props.accessibilityLabel).toBe("Choose Arrow Duel candidate A");
+    expect(findByTestId(renderer, "arrow-duel-candidate-b").props.accessibilityLabel).toBe("Choose Arrow Duel candidate B");
+    expect(collectText(findByTestId(renderer, "arrow-duel-candidates"))).toBe("ACandidateBCandidate");
+    expect(testIdOrder(renderer, "session-board", "session-score-strip")).toBeLessThan(0);
+    expect(testIdOrder(renderer, "session-score-strip", "practice-prompt")).toBeLessThan(0);
+    expect(testIdOrder(renderer, "practice-prompt", "arrow-duel-candidates")).toBeLessThan(0);
+    expect(findByTestId(renderer, "session-score-strip").props.accessibilityLabel).toBe("Session score: solved 0, mistakes 0, left 10");
     expectText(renderer, "Watch for checks, captures, and attacks!");
     const neutralArrowBodies = countStyleEntry(findByTestId(renderer, "session-board"), "backgroundColor", "#2563EB");
     expect(neutralArrowBodies).toBeGreaterThan(0);
     expect(countStyleEntry(findByTestId(renderer, "session-board"), "borderLeftColor", "#2563EB")).toBe(neutralArrowBodies);
     expect(countStyleEntry(findByTestId(renderer, "session-board"), "opacity", 0.68)).toBe(neutralArrowBodies * 2);
-    expect(hasStyleValue(renderer.root, "#DC2626")).toBe(false);
+    expect(hasStyleValue(findByTestId(renderer, "session-board"), "#DC2626")).toBe(false);
   });
 
   it("advances Arrow Duel after a correct board move", async () => {
@@ -459,6 +473,23 @@ describe("PracticePocScreen", () => {
     expect(countStyleEntry(findByTestId(renderer, "session-board"), "backgroundColor", "#DC2626")).toBe(0);
     expect(countStyleEntry(findByTestId(renderer, "session-board"), "borderLeftColor", "#DC2626")).toBe(0);
     expect(() => findByTestId(renderer, "feedback-panel")).toThrow();
+    await settleFeedbackSnapshot();
+  });
+
+  it("advances Arrow Duel after a correct candidate chip", async () => {
+    const renderer = renderScreen();
+    const arrow = firstArrowDuelPuzzleForTest();
+    const correctCandidateId = arrow.candidates[0]?.toLowerCase() === arrow.correctMove.toLowerCase()
+      ? "arrow-duel-candidate-a"
+      : "arrow-duel-candidate-b";
+
+    press(renderer, "practice-mode-arrow-duel");
+    await pressAsync(renderer, correctCandidateId);
+
+    expectText(renderer, "1 / 10");
+    expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
+    expect(hasStyleValue(renderer.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
+    expect(() => findByTestId(renderer, "arrow-duel-candidates")).toThrow();
     await settleFeedbackSnapshot();
   });
 
@@ -534,6 +565,14 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "Mate");
     press(renderer, "custom-include-arrow-duel-toggle");
     expect(findByTestId(renderer, "custom-include-arrow-duel-toggle").props.accessibilityState).toEqual({ checked: true });
+    expect(findByTestId(renderer, "custom-mode-regular").props.accessibilityState).toEqual({ selected: false });
+    expect(findByTestId(renderer, "custom-mode-arrow-duel").props.accessibilityState).toEqual({ selected: true });
+    expect(collectText(findByTestId(renderer, "custom-summary-card"))).toContain("Arrow Duel");
+    press(renderer, "custom-include-arrow-duel-toggle");
+    expect(findByTestId(renderer, "custom-include-arrow-duel-toggle").props.accessibilityState).toEqual({ checked: false });
+    expect(findByTestId(renderer, "custom-mode-regular").props.accessibilityState).toEqual({ selected: true });
+    expect(findByTestId(renderer, "custom-mode-arrow-duel").props.accessibilityState).toEqual({ selected: false });
+    expect(collectText(findByTestId(renderer, "custom-summary-card"))).toContain("Regular puzzles");
     expectText(renderer, "Target 15");
 
     press(renderer, "custom-duration-stepper-decrease");
@@ -591,8 +630,16 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "sprint-result-detail-rating"))).toContain("600 ->");
     expect(collectText(findByTestId(renderer, "sprint-result-detail-review-impact"))).toContain("No new review items");
     expect(findByTestId(renderer, "sprint-result-review-impact")).toBeTruthy();
+    expect(findByTestId(renderer, "sprint-result-history-trend")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "sprint-result-history-trend"))).toContain("Performance trend");
+    expect(collectText(findByTestId(renderer, "sprint-result-history-trend"))).toContain("Open History for rating, accuracy, mistakes, and review volume.");
     expectText(renderer, "Review queue");
     expectText(renderer, "Done");
+    press(renderer, "sprint-result-history-trend");
+    expect(findByTestId(renderer, "history-panel")).toBeTruthy();
+    expect(findByTestId(renderer, "history-performance-card")).toBeTruthy();
+    press(renderer, "practice-tab");
+    expectText(renderer, "Sprint failed");
     expect(findByTestId(renderer, "sprint-result-history-button")).toBeTruthy();
     press(renderer, "sprint-result-history-button");
     expect(findByTestId(renderer, "history-panel")).toBeTruthy();
@@ -1383,12 +1430,19 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "settings-about-section")).toBeTruthy();
     expect(findByTestId(renderer, "settings-standard-elo-row")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "settings-standard-elo-row"))).toContain("ELO 600");
+    expect(collectText(findByTestId(renderer, "settings-reset-elo"))).toContain("Standard puzzle rating only");
     expect(findByTestId(renderer, "settings-sync-disclosure")).toBeTruthy();
     expectText(renderer, "Local-first progress");
     expectText(renderer, "Practice always works offline.");
-    expectText(renderer, "Ready");
+    expectText(renderer, "Needs approval");
     expect(findByTestId(renderer, "settings-icloud-sync-toggle")).toBeTruthy();
+    expectText(renderer, "On · Waiting for upload approval");
+    expect(findByTestId(renderer, "settings-sync-allow-upload")).toBeTruthy();
+    press(renderer, "settings-sync-allow-upload");
+    expectText(renderer, "iCloud upload allowed");
+    expectText(renderer, "Ready");
     expectText(renderer, "On · Last synced today, 09:28");
+    expect(() => findByTestId(renderer, "settings-sync-allow-upload")).toThrow();
     press(renderer, "settings-icloud-sync-toggle");
     expect(findByTestId(renderer, "settings-icloud-sync-toggle").props.accessibilityState).toEqual({ checked: false });
     expectText(renderer, "Off · Local-only progress");
@@ -1576,6 +1630,17 @@ function press(renderer: TestRenderer.ReactTestRenderer, testID: string): void {
   });
 }
 
+async function pressAsync(renderer: TestRenderer.ReactTestRenderer, testID: string): Promise<void> {
+  await act(async () => {
+    const target = findByTestId(renderer, testID);
+    if (target.props.disabled) {
+      throw new Error(`${testID} is disabled`);
+    }
+    target.props.onPress();
+    await Promise.resolve();
+  });
+}
+
 function startStandardSprint(renderer: TestRenderer.ReactTestRenderer): void {
   press(renderer, "practice-mode-standard");
 }
@@ -1688,6 +1753,19 @@ function findByTestId(renderer: TestRenderer.ReactTestRenderer, testID: string):
 
 function expectText(renderer: TestRenderer.ReactTestRenderer, expected: string): void {
   expect(collectText(renderer.root)).toContain(expected);
+}
+
+function testIdOrder(renderer: TestRenderer.ReactTestRenderer, first: string, second: string): number {
+  const testIDs = collectTestIds(renderer.root);
+  return testIDs.indexOf(first) - testIDs.indexOf(second);
+}
+
+function collectTestIds(node: TestRenderer.ReactTestInstance): string[] {
+  const ownTestID = typeof node.props?.testID === "string" ? [node.props.testID] : [];
+  const childTestIDs = node.children
+    .filter((child): child is TestRenderer.ReactTestInstance => typeof child !== "string")
+    .flatMap((child) => collectTestIds(child));
+  return [...ownTestID, ...childTestIDs];
 }
 
 function collectText(node: TestRenderer.ReactTestInstance): string {
