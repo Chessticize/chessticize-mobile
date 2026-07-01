@@ -1801,7 +1801,7 @@ function CustomModeChoiceRow({
     <View style={styles.customModeChoiceRow} testID={testID}>
       <View style={styles.customChoiceHeader}>
         <Text style={styles.listText}>Mode</Text>
-        <Text style={styles.customConfigValue}>{value === "arrow_duel" ? "Arrow Duel" : "Standard"} ›</Text>
+        <CustomValueWithChevron value={value === "arrow_duel" ? "Arrow Duel" : "Standard"} />
       </View>
       <View style={styles.customModeChoices}>
         {options.map((option) => (
@@ -1867,7 +1867,7 @@ function CustomChoiceRow({
     <View style={styles.customConfigRow} testID={testID}>
       <View style={styles.customChoiceCopy}>
         <Text style={styles.listText}>{label}</Text>
-        <Text style={styles.customConfigValue}>{value} ›</Text>
+        <CustomValueWithChevron value={value} />
       </View>
       <View style={styles.customInlineOptions}>
         {options.map((option) => (
@@ -1883,6 +1883,15 @@ function CustomChoiceRow({
           </Pressable>
         ))}
       </View>
+    </View>
+  );
+}
+
+function CustomValueWithChevron({ value }: { value: string }): React.JSX.Element {
+  return (
+    <View style={styles.customValueWithChevron}>
+      <Text style={styles.customConfigValue}>{value}</Text>
+      <ChevronGlyph direction="right" />
     </View>
   );
 }
@@ -1977,7 +1986,7 @@ function CustomToggleRow({
         style={[styles.switchButton, enabled ? styles.switchButtonActive : null]}
         onPress={onToggle}
       >
-        <Text style={[styles.switchText, enabled ? styles.switchTextActive : null]}>{enabled ? "On" : "Off"}</Text>
+        <SwitchGlyph enabled={enabled} />
       </Pressable>
     </View>
   );
@@ -2197,9 +2206,7 @@ function SprintSummary({
     <View style={styles.summaryPanel} testID="sprint-summary-panel">
       <View style={styles.resultHero} testID="sprint-result-hero">
         <View style={[styles.resultIcon, state.status === "won" ? styles.resultIconWon : styles.resultIconFailed]}>
-          <Text style={[styles.resultIconText, state.status === "failed" ? styles.resultIconTextFailed : null]}>
-            {state.status === "won" ? "✓" : "!"}
-          </Text>
+          <SprintResultStatusGlyph status={state.status === "won" ? "won" : "failed"} />
         </View>
         <View style={styles.resultTitleBlock}>
           <Text style={styles.summaryTitle}>{state.status === "won" ? "Sprint complete" : "Sprint failed"}</Text>
@@ -2234,6 +2241,11 @@ function SprintSummary({
           </Text>
         </View>
       </View>
+
+      <SprintRatingProgressPreview
+        ratingBefore={state.ratingBefore}
+        ratingAfter={ratingAfter}
+      />
 
       <View style={styles.resultReviewRow} testID="sprint-result-review-impact">
         <View>
@@ -2304,6 +2316,100 @@ function SprintSummary({
       ) : null}
     </View>
   );
+}
+
+function SprintResultStatusGlyph({ status }: { status: "won" | "failed" }): React.JSX.Element {
+  if (status === "won") {
+    return (
+      <View style={styles.resultTrophyGlyph} testID="sprint-result-status-glyph">
+        <View style={styles.resultTrophyCup} testID="sprint-result-won-glyph">
+          <View style={[styles.resultTrophyHandle, styles.resultTrophyHandleLeft]} />
+          <View style={[styles.resultTrophyHandle, styles.resultTrophyHandleRight]} />
+        </View>
+        <View style={styles.resultTrophyStem} />
+        <View style={styles.resultTrophyBase} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.resultAlertGlyph} testID="sprint-result-status-glyph">
+      <View style={styles.resultAlertBar} testID="sprint-result-failed-glyph" />
+      <View style={styles.resultAlertDot} />
+    </View>
+  );
+}
+
+function SprintRatingProgressPreview({
+  ratingAfter,
+  ratingBefore
+}: {
+  ratingAfter: number;
+  ratingBefore: number;
+}): React.JSX.Element {
+  const samples = buildRatingPreviewSamples(ratingBefore, ratingAfter);
+  const minRating = Math.min(...samples);
+  const maxRating = Math.max(...samples);
+  const span = Math.max(1, maxRating - minRating);
+
+  return (
+    <View style={styles.resultTrendCard} testID="sprint-result-history-trend">
+      <View style={styles.resultTrendHeader}>
+        <View>
+          <Text style={styles.listText}>Rating Progress</Text>
+          <Text style={styles.helperText}>This sprint</Text>
+        </View>
+        <Text testID="sprint-result-trend-current" style={styles.resultTrendCurrent}>{ratingAfter}</Text>
+      </View>
+      <View style={styles.resultTrendPlot} testID="sprint-result-trend-plot">
+        <View style={styles.resultTrendGridLine} />
+        <View style={[styles.resultTrendGridLine, styles.resultTrendGridLineMiddle]} />
+        <View style={[styles.resultTrendGridLine, styles.resultTrendGridLineBottom]} />
+        <View style={styles.resultTrendLineLayer}>
+          {samples.slice(0, -1).map((rating, index) => {
+            const nextRating = samples[index + 1] ?? rating;
+            const y = ((rating - minRating) / span) * 30;
+            const nextY = ((nextRating - minRating) / span) * 30;
+            return (
+              <View
+                key={`${rating}-${nextRating}-${index}`}
+                style={[
+                  styles.resultTrendSegment,
+                  {
+                    left: `${index * 25}%`,
+                    top: 32 - (y + nextY) / 2,
+                    transform: [{ rotate: `${Math.atan2(y - nextY, 26) * (180 / Math.PI)}deg` }]
+                  }
+                ]}
+                testID={`sprint-result-trend-segment-${index}`}
+              />
+            );
+          })}
+        </View>
+        {samples.map((rating, index) => {
+          const y = ((rating - minRating) / span) * 30;
+          return (
+            <View
+              key={`${rating}-${index}`}
+              style={[styles.resultTrendPointColumn, { paddingTop: 32 - y }]}
+              testID={`sprint-result-trend-point-${index}`}
+            >
+              <View style={[styles.resultTrendDot, index === samples.length - 1 ? styles.resultTrendDotCurrent : null]} />
+            </View>
+          );
+        })}
+      </View>
+      <View style={styles.resultTrendFooter}>
+        <Text style={styles.resultMetricSubtext}>Start {ratingBefore}</Text>
+        <Text style={styles.resultMetricSubtext}>Now</Text>
+      </View>
+    </View>
+  );
+}
+
+function buildRatingPreviewSamples(ratingBefore: number, ratingAfter: number): number[] {
+  const delta = ratingAfter - ratingBefore;
+  return [0, 0.25, 0.5, 0.75, 1].map((step) => Math.round(ratingBefore + delta * step));
 }
 
 function ErrorPanel({ error }: { error: string }): React.JSX.Element {
@@ -3208,6 +3314,33 @@ function historyAttemptHasReviewQueued(
   return stats?.nextReviewAt ? true : true;
 }
 
+function ResultBadgeGlyph({ tone }: { tone: "correct" | "wrong" | "alert" }): React.JSX.Element {
+  if (tone === "correct") {
+    return (
+      <View style={styles.resultBadgeGlyphCanvas} testID="result-badge-correct-glyph">
+        <View style={[styles.resultBadgeGlyphLine, styles.resultBadgeCheckShort]} />
+        <View style={[styles.resultBadgeGlyphLine, styles.resultBadgeCheckLong]} />
+      </View>
+    );
+  }
+
+  if (tone === "wrong") {
+    return (
+      <View style={styles.resultBadgeGlyphCanvas} testID="result-badge-wrong-glyph">
+        <View style={[styles.resultBadgeGlyphLine, styles.resultBadgeCrossForward]} />
+        <View style={[styles.resultBadgeGlyphLine, styles.resultBadgeCrossBackward]} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.resultBadgeGlyphCanvas} testID="result-badge-alert-glyph">
+      <View style={styles.resultBadgeAlertBar} />
+      <View style={styles.resultBadgeAlertDot} />
+    </View>
+  );
+}
+
 function HistoryChipRow({
   children,
   testID
@@ -3256,8 +3389,11 @@ function HistoryAttemptRow({
       style={styles.historyAttemptCard}
       onPress={onOpen}
     >
-      <View style={[styles.historyResultBadge, isWrong ? styles.historyResultWrong : styles.historyResultCorrect]}>
-        <Text style={styles.historyResultBadgeText}>{isWrong ? "×" : "✓"}</Text>
+      <View
+        style={[styles.historyResultBadge, isWrong ? styles.historyResultWrong : styles.historyResultCorrect]}
+        testID={`history-attempt-${attempt.id}-badge`}
+      >
+        <ResultBadgeGlyph tone={isWrong ? "wrong" : "correct"} />
       </View>
       <View style={styles.historyAttemptCopy}>
         <View style={styles.historyAttemptHeader}>
@@ -3339,6 +3475,14 @@ function MinusGlyph(): React.JSX.Element {
   );
 }
 
+function SwitchGlyph({ enabled }: { enabled: boolean }): React.JSX.Element {
+  return (
+    <View style={styles.switchGlyph} testID="switch-glyph">
+      <View style={[styles.switchGlyphKnob, enabled ? styles.switchGlyphKnobEnabled : null]} />
+    </View>
+  );
+}
+
 function CloseGlyph(): React.JSX.Element {
   return (
     <View style={styles.closeGlyph} testID="close-glyph">
@@ -3362,6 +3506,31 @@ function ChevronGlyph({ direction }: { direction: "left" | "right" }): React.JSX
   return (
     <View style={styles.chevronGlyphCanvas} testID={`chevron-${direction}-glyph`}>
       <View style={[styles.chevronGlyph, direction === "left" ? styles.chevronGlyphLeft : styles.chevronGlyphRight]} />
+    </View>
+  );
+}
+
+function CloudDownloadGlyph({ testID = "cloud-download-glyph" }: { testID?: string }): React.JSX.Element {
+  return (
+    <View style={styles.cloudDownloadGlyph} testID={testID}>
+      <View style={styles.cloudDownloadArcLarge} />
+      <View style={styles.cloudDownloadArcSmall} />
+      <View style={styles.cloudDownloadBase} />
+      <View style={styles.cloudDownloadArrowStem} />
+      <View style={styles.cloudDownloadArrowHead} />
+    </View>
+  );
+}
+
+function TrashGlyph({ testID = "trash-glyph" }: { testID?: string }): React.JSX.Element {
+  return (
+    <View style={styles.trashGlyph} testID={testID}>
+      <View style={styles.trashGlyphLid} />
+      <View style={styles.trashGlyphHandle} />
+      <View style={styles.trashGlyphCan}>
+        <View style={styles.trashGlyphLine} />
+        <View style={styles.trashGlyphLine} />
+      </View>
     </View>
   );
 }
@@ -3838,17 +4007,21 @@ function ReviewQueueItemCard({
   const source = item.review.ratingKey.includes("/")
     ? item.review.ratingKey
     : `${modeLabel(item.review.mode)} sprint`;
+  const rowTestId = `review-due-item-${item.puzzle.id}-${safeTestId(item.review.mode)}`;
 
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`Start ${modeLabel(item.review.mode)} ${primaryTheme} review`}
-      testID={`review-due-item-${item.puzzle.id}-${safeTestId(item.review.mode)}`}
+      testID={rowTestId}
       style={styles.reviewItemCard}
       onPress={onPress}
     >
-      <View style={[styles.historyResultBadge, difficulty === "hard" ? styles.historyResultWrong : styles.historyResultCorrect]}>
-        <Text style={styles.historyResultBadgeText}>{difficulty === "hard" ? "!" : "✓"}</Text>
+      <View
+        style={[styles.historyResultBadge, difficulty === "hard" ? styles.historyResultWrong : styles.historyResultCorrect]}
+        testID={`${rowTestId}-badge`}
+      >
+        <ResultBadgeGlyph tone={difficulty === "hard" ? "alert" : "correct"} />
       </View>
       <View style={styles.reviewItemCopy}>
         <View style={styles.historyAttemptHeader}>
@@ -5020,7 +5193,7 @@ function SettingsPanel({
                 setStatusMessage(syncEnabled ? "iCloud sync off" : "iCloud sync on");
               }}
             >
-              <Text style={[styles.switchText, syncEnabled ? styles.switchTextActive : null]}>{syncEnabled ? "On" : "Off"}</Text>
+              <SwitchGlyph enabled={syncEnabled} />
             </Pressable>
           </View>
         </View>
@@ -5516,8 +5689,25 @@ function PackImportStep({
 }): React.JSX.Element {
   return (
     <View style={styles.packImportStep} testID={testID}>
-      <Text style={[styles.packImportStepMark, done ? styles.packImportStepDone : null]}>{done ? "✓" : "…"}</Text>
+      <PackImportStepMark done={done} testID={`${testID}-mark`} />
       <Text style={styles.helperText}>{label}</Text>
+    </View>
+  );
+}
+
+function PackImportStepMark({ done, testID }: { done: boolean; testID: string }): React.JSX.Element {
+  if (done) {
+    return (
+      <View style={[styles.packImportStepMark, styles.packImportStepDone]} testID={testID}>
+        <View style={[styles.packImportStepGlyphLine, styles.packImportStepCheckShort]} />
+        <View style={[styles.packImportStepGlyphLine, styles.packImportStepCheckLong]} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.packImportStepMark} testID={testID}>
+      <View style={styles.packImportStepPendingDot} />
     </View>
   );
 }
@@ -5558,7 +5748,7 @@ function PackRow({
           style={styles.packDetailButton}
           onPress={onOpenDetail}
         >
-          <Text style={styles.packDetailText}>Details</Text>
+          <ChevronGlyph direction="right" />
         </Pressable>
       {isOptional ? (
         <Pressable
@@ -5568,7 +5758,7 @@ function PackRow({
           style={styles.packActionButton}
           onPress={onImport}
         >
-          <Text style={styles.packActionText}>Import</Text>
+          <CloudDownloadGlyph testID={`packs-import-${pack.id}-glyph`} />
         </Pressable>
       ) : onRemove ? (
         <View testID={`packs-remove-${pack.id}`}>
@@ -5579,13 +5769,22 @@ function PackRow({
             style={styles.packActionButton}
             onPress={onRemove}
           >
-            <Text style={styles.packActionText}>Remove</Text>
+            <TrashGlyph testID={`packs-remove-${pack.id}-glyph`} />
           </Pressable>
         </View>
       ) : (
-        <Text style={styles.packActiveMark}>✓</Text>
+        <PackActiveMark testID={`packs-active-${pack.id}`} />
       )}
       </View>
+    </View>
+  );
+}
+
+function PackActiveMark({ testID }: { testID: string }): React.JSX.Element {
+  return (
+    <View style={styles.packActiveMark} testID={testID}>
+      <View style={[styles.packActiveGlyphLine, styles.packActiveGlyphShort]} />
+      <View style={[styles.packActiveGlyphLine, styles.packActiveGlyphLong]} />
     </View>
   );
 }
@@ -7318,6 +7517,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "800"
   },
+  customValueWithChevron: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 4
+  },
   customInlineOptions: {
     flexDirection: "row",
     flexShrink: 1,
@@ -7565,14 +7769,67 @@ const styles = StyleSheet.create({
   resultIconFailed: {
     backgroundColor: "#FEF2F2"
   },
-  resultIconText: {
-    color: "#2563EB",
-    fontSize: 22,
-    fontWeight: "900",
-    lineHeight: 26
+  resultTrophyGlyph: {
+    alignItems: "center",
+    height: 28,
+    justifyContent: "center",
+    position: "relative",
+    width: 28
   },
-  resultIconTextFailed: {
-    color: "#DC2626"
+  resultTrophyCup: {
+    backgroundColor: "#2563EB",
+    borderBottomLeftRadius: 7,
+    borderBottomRightRadius: 7,
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 4,
+    height: 13,
+    position: "relative",
+    width: 17
+  },
+  resultTrophyHandle: {
+    borderColor: "#2563EB",
+    borderRadius: 999,
+    borderWidth: 2,
+    height: 10,
+    position: "absolute",
+    top: 2,
+    width: 8
+  },
+  resultTrophyHandleLeft: {
+    left: -7
+  },
+  resultTrophyHandleRight: {
+    right: -7
+  },
+  resultTrophyStem: {
+    backgroundColor: "#2563EB",
+    height: 7,
+    width: 4
+  },
+  resultTrophyBase: {
+    backgroundColor: "#2563EB",
+    borderRadius: 999,
+    height: 3,
+    width: 17
+  },
+  resultAlertGlyph: {
+    alignItems: "center",
+    gap: 3,
+    height: 28,
+    justifyContent: "center",
+    width: 28
+  },
+  resultAlertBar: {
+    backgroundColor: "#DC2626",
+    borderRadius: 999,
+    height: 15,
+    width: 4
+  },
+  resultAlertDot: {
+    backgroundColor: "#DC2626",
+    borderRadius: 999,
+    height: 4,
+    width: 4
   },
   resultTitleBlock: {
     flex: 1,
@@ -7628,6 +7885,93 @@ const styles = StyleSheet.create({
     color: "#64748B",
     fontSize: 11,
     fontWeight: "700"
+  },
+  resultTrendCard: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  resultTrendHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between"
+  },
+  resultTrendCurrent: {
+    backgroundColor: "#EFF6FF",
+    borderRadius: 8,
+    color: "#2563EB",
+    fontFamily: "menlo",
+    fontSize: 12,
+    fontWeight: "900",
+    overflow: "hidden",
+    paddingHorizontal: 8,
+    paddingVertical: 4
+  },
+  resultTrendPlot: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 8,
+    flexDirection: "row",
+    height: 44,
+    justifyContent: "space-between",
+    overflow: "hidden",
+    paddingHorizontal: 10,
+    position: "relative"
+  },
+  resultTrendGridLine: {
+    backgroundColor: "#E2E8F0",
+    height: StyleSheet.hairlineWidth,
+    left: 10,
+    opacity: 0.72,
+    position: "absolute",
+    right: 10,
+    top: 8
+  },
+  resultTrendGridLineMiddle: {
+    top: 22
+  },
+  resultTrendGridLineBottom: {
+    top: 36
+  },
+  resultTrendLineLayer: {
+    bottom: 0,
+    left: 10,
+    position: "absolute",
+    right: 10,
+    top: 0,
+    zIndex: 1
+  },
+  resultTrendSegment: {
+    backgroundColor: "#2563EB",
+    borderRadius: 999,
+    height: 2,
+    opacity: 0.72,
+    position: "absolute",
+    width: "27%"
+  },
+  resultTrendPointColumn: {
+    alignItems: "center",
+    flex: 1,
+    zIndex: 2
+  },
+  resultTrendDot: {
+    backgroundColor: "#93C5FD",
+    borderRadius: 999,
+    height: 6,
+    width: 6
+  },
+  resultTrendDotCurrent: {
+    backgroundColor: "#2563EB",
+    height: 9,
+    width: 9
+  },
+  resultTrendFooter: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between"
   },
   resultReviewRow: {
     alignItems: "center",
@@ -8053,11 +8397,55 @@ const styles = StyleSheet.create({
   historyResultCorrect: {
     backgroundColor: "#DCFCE7"
   },
-  historyResultBadgeText: {
-    color: "#111827",
-    fontSize: 15,
-    fontWeight: "900",
-    lineHeight: 18
+  resultBadgeGlyphCanvas: {
+    alignItems: "center",
+    height: 18,
+    justifyContent: "center",
+    position: "relative",
+    width: 18
+  },
+  resultBadgeGlyphLine: {
+    backgroundColor: "#111827",
+    borderRadius: 999,
+    position: "absolute"
+  },
+  resultBadgeCheckShort: {
+    height: 2,
+    left: 4,
+    top: 9,
+    transform: [{ rotate: "45deg" }],
+    width: 5
+  },
+  resultBadgeCheckLong: {
+    height: 2,
+    right: 3,
+    top: 8,
+    transform: [{ rotate: "-48deg" }],
+    width: 10
+  },
+  resultBadgeCrossForward: {
+    height: 2,
+    transform: [{ rotate: "45deg" }],
+    width: 11
+  },
+  resultBadgeCrossBackward: {
+    height: 2,
+    transform: [{ rotate: "-45deg" }],
+    width: 11
+  },
+  resultBadgeAlertBar: {
+    backgroundColor: "#111827",
+    borderRadius: 999,
+    height: 11,
+    width: 3
+  },
+  resultBadgeAlertDot: {
+    backgroundColor: "#111827",
+    borderRadius: 999,
+    bottom: 1,
+    height: 3,
+    position: "absolute",
+    width: 3
   },
   historyAttemptCopy: {
     flex: 1,
@@ -8264,13 +8652,42 @@ const styles = StyleSheet.create({
     gap: 8
   },
   packImportStepMark: {
-    color: "#64748B",
-    fontSize: 12,
-    fontWeight: "900",
+    alignItems: "center",
+    borderColor: "#CBD5E1",
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 16,
+    justifyContent: "center",
+    position: "relative",
     width: 16
   },
   packImportStepDone: {
-    color: "#16A34A"
+    backgroundColor: "#DCFCE7",
+    borderColor: "#16A34A"
+  },
+  packImportStepGlyphLine: {
+    backgroundColor: "#16A34A",
+    borderRadius: 999,
+    height: 2,
+    position: "absolute"
+  },
+  packImportStepCheckShort: {
+    left: 4,
+    top: 8,
+    transform: [{ rotate: "45deg" }],
+    width: 4
+  },
+  packImportStepCheckLong: {
+    right: 3,
+    top: 7,
+    transform: [{ rotate: "-48deg" }],
+    width: 8
+  },
+  packImportStepPendingDot: {
+    backgroundColor: "#64748B",
+    borderRadius: 999,
+    height: 4,
+    width: 4
   },
   packRow: {
     alignItems: "center",
@@ -8316,9 +8733,31 @@ const styles = StyleSheet.create({
     color: "#1D4ED8"
   },
   packActiveMark: {
-    color: "#16A34A",
-    fontSize: 22,
-    fontWeight: "900"
+    alignItems: "center",
+    backgroundColor: "#16A34A",
+    borderRadius: 999,
+    height: 28,
+    justifyContent: "center",
+    position: "relative",
+    width: 28
+  },
+  packActiveGlyphLine: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 999,
+    height: 2.5,
+    position: "absolute"
+  },
+  packActiveGlyphShort: {
+    left: 7,
+    top: 15,
+    transform: [{ rotate: "45deg" }],
+    width: 7
+  },
+  packActiveGlyphLong: {
+    right: 6,
+    top: 13,
+    transform: [{ rotate: "-48deg" }],
+    width: 13
   },
   packActionColumn: {
     alignItems: "flex-end",
@@ -8330,14 +8769,10 @@ const styles = StyleSheet.create({
     borderColor: "#93C5FD",
     borderRadius: 8,
     borderWidth: 1,
-    minHeight: 34,
+    height: 34,
     justifyContent: "center",
-    paddingHorizontal: 10
-  },
-  packActionText: {
-    color: "#1D4ED8",
-    fontSize: 12,
-    fontWeight: "900"
+    minWidth: 34,
+    paddingHorizontal: 8
   },
   packDetailButton: {
     alignItems: "center",
@@ -8345,14 +8780,9 @@ const styles = StyleSheet.create({
     borderColor: "#CBD5E1",
     borderRadius: 8,
     borderWidth: 1,
-    minHeight: 32,
+    height: 34,
     justifyContent: "center",
-    paddingHorizontal: 10
-  },
-  packDetailText: {
-    color: "#334155",
-    fontSize: 12,
-    fontWeight: "900"
+    width: 34
   },
   packInfoCard: {
     backgroundColor: "#FFFFFF",
@@ -8457,6 +8887,107 @@ const styles = StyleSheet.create({
     borderRightWidth: 2.5,
     borderTopWidth: 2.5,
     transform: [{ rotate: "45deg" }]
+  },
+  cloudDownloadGlyph: {
+    height: 20,
+    position: "relative",
+    width: 22
+  },
+  cloudDownloadArcLarge: {
+    borderColor: "#1D4ED8",
+    borderRadius: 999,
+    borderWidth: 2,
+    height: 13,
+    left: 3,
+    position: "absolute",
+    top: 2,
+    width: 15
+  },
+  cloudDownloadArcSmall: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#1D4ED8",
+    borderRadius: 999,
+    borderWidth: 2,
+    height: 10,
+    left: 1,
+    position: "absolute",
+    top: 7,
+    width: 10
+  },
+  cloudDownloadBase: {
+    backgroundColor: "#FFFFFF",
+    borderBottomColor: "#1D4ED8",
+    borderBottomWidth: 2,
+    height: 7,
+    left: 3,
+    position: "absolute",
+    top: 10,
+    width: 17
+  },
+  cloudDownloadArrowStem: {
+    backgroundColor: "#1D4ED8",
+    borderRadius: 999,
+    height: 8,
+    left: 10,
+    position: "absolute",
+    top: 7,
+    width: 2
+  },
+  cloudDownloadArrowHead: {
+    borderBottomColor: "#1D4ED8",
+    borderBottomWidth: 2,
+    borderRightColor: "#1D4ED8",
+    borderRightWidth: 2,
+    height: 6,
+    left: 8,
+    position: "absolute",
+    top: 10,
+    transform: [{ rotate: "45deg" }],
+    width: 6
+  },
+  trashGlyph: {
+    height: 20,
+    position: "relative",
+    width: 18
+  },
+  trashGlyphLid: {
+    backgroundColor: "#DC2626",
+    borderRadius: 999,
+    height: 2,
+    left: 2,
+    position: "absolute",
+    top: 4,
+    width: 14
+  },
+  trashGlyphHandle: {
+    borderColor: "#DC2626",
+    borderRadius: 2,
+    borderTopWidth: 2,
+    height: 4,
+    left: 6,
+    position: "absolute",
+    top: 1,
+    width: 6
+  },
+  trashGlyphCan: {
+    alignItems: "center",
+    borderColor: "#DC2626",
+    borderRadius: 3,
+    borderWidth: 2,
+    flexDirection: "row",
+    gap: 3,
+    height: 13,
+    justifyContent: "center",
+    left: 3,
+    position: "absolute",
+    top: 6,
+    width: 12
+  },
+  trashGlyphLine: {
+    backgroundColor: "#DC2626",
+    borderRadius: 999,
+    height: 7,
+    width: 1.5
   },
   resetGlyph: {
     height: 18,
@@ -8580,23 +9111,35 @@ const styles = StyleSheet.create({
   switchButton: {
     alignItems: "center",
     borderColor: "#CBD5E1",
-    borderRadius: 8,
+    borderRadius: 999,
     borderWidth: 1,
-    height: 36,
+    height: 30,
     justifyContent: "center",
-    minWidth: 56
+    width: 52
   },
   switchButtonActive: {
     backgroundColor: "#2563EB",
     borderColor: "#2563EB"
   },
-  switchText: {
-    color: "#334155",
-    fontSize: 12,
-    fontWeight: "800"
+  switchGlyph: {
+    height: 24,
+    justifyContent: "center",
+    position: "relative",
+    width: 46
   },
-  switchTextActive: {
-    color: "#FFFFFF"
+  switchGlyphKnob: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#CBD5E1",
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 22,
+    left: 1,
+    position: "absolute",
+    width: 22
+  },
+  switchGlyphKnobEnabled: {
+    borderColor: "#FFFFFF",
+    left: 23
   },
   arrowLayer: {
     position: "absolute",
