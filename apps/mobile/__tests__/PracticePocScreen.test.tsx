@@ -43,8 +43,27 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "ELO 600");
     expect(findByTestId(renderer, "practice-home")).toBeTruthy();
     expect(findByTestId(renderer, "practice-progress-summary")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "practice-progress-weekly-solved"))).toBe("0");
+    expect(collectText(findByTestId(renderer, "practice-progress-weekly-delta"))).toBe("Start training");
     expect(findByTestId(renderer, "practice-review-strip")).toBeTruthy();
     expectText(renderer, "Offline fixture · 15 puzzles");
+  });
+
+  it("summarizes recent local practice progress on the Practice home", () => {
+    const service = createMobilePracticeService("familiar15");
+    const startedAt = new Date(Date.now() - 120_000).toISOString();
+    const completedAt = new Date(Date.now() - 60_000).toISOString();
+    service.startSprint(
+      { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 15, maxMistakes: 3 },
+      startedAt
+    );
+    service.submitMove("c2b1", completedAt);
+
+    const renderer = renderScreen({ practiceService: service });
+
+    expect(findByTestId(renderer, "practice-progress-summary")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "practice-progress-weekly-solved"))).toBe("1");
+    expect(collectText(findByTestId(renderer, "practice-progress-weekly-delta"))).toBe("+1 net");
   });
 
   it("starts a selected sprint directly from the mode row", () => {
@@ -487,6 +506,8 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "custom-sprint-setup")).toBeTruthy();
     expect(() => findByTestId(renderer, "practice-home")).toThrow();
     expect(findByTestId(renderer, "custom-mode-row")).toBeTruthy();
+    expect(findByTestId(renderer, "custom-mode-regular").props.accessibilityState).toEqual({ selected: true });
+    expect(findByTestId(renderer, "custom-mode-arrow-duel").props.accessibilityState).toEqual({ selected: false });
     expect(findByTestId(renderer, "custom-theme-row")).toBeTruthy();
     expect(findByTestId(renderer, "custom-target-row")).toBeTruthy();
     expect(findByTestId(renderer, "custom-rating-range")).toBeTruthy();
@@ -519,6 +540,24 @@ describe("PracticePocScreen", () => {
 
     expectText(renderer, "Custom");
     expectText(renderer, "0 / 6");
+  });
+
+  it("starts an Arrow Duel sprint from the custom mode selector", () => {
+    const renderer = renderScreen();
+
+    press(renderer, "practice-mode-custom");
+    press(renderer, "custom-mode-arrow-duel");
+
+    expect(findByTestId(renderer, "custom-mode-regular").props.accessibilityState).toEqual({ selected: false });
+    expect(findByTestId(renderer, "custom-mode-arrow-duel").props.accessibilityState).toEqual({ selected: true });
+    expect(collectText(findByTestId(renderer, "custom-mode-summary"))).toBe("Arrow Duel");
+    expectText(renderer, "arrow_duel 5/20");
+
+    press(renderer, "start-sprint-button");
+
+    expect(findByTestId(renderer, "session-board")).toBeTruthy();
+    expectText(renderer, "Arrow Duel");
+    expectText(renderer, "0 / 15");
   });
 
   it("settles an active sprint when the countdown expires", () => {
@@ -619,6 +658,13 @@ describe("PracticePocScreen", () => {
       (node) => typeof node.props.testID === "string" && node.props.testID.startsWith("history-attempt-")
     )[0];
     expect(historyAttemptRow).toBeTruthy();
+    const historyAttemptId = historyAttemptRow.props.testID.replace("history-attempt-", "");
+    expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-result`))).toBe("Wrong move");
+    expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-move`))).toBe("Wrong move · g6g5");
+    expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-meta`))).toContain("Sprint · Rating");
+    expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-meta`))).toContain("s ·");
+    expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-status`))).toContain("Review");
+    expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-delta`))).toMatch(/^[+-]\d+$/);
     press(renderer, historyAttemptRow.props.testID);
     expect(findByTestId(renderer, "review-session")).toBeTruthy();
     expect(findByTestId(renderer, "review-progress").props.children.join("")).toBe("1 / 1 · Standard");
@@ -876,6 +922,24 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "review-next")).toThrow();
     expect(() => findByTestId(renderer, "review-previous")).toThrow();
     expect(() => findByTestId(renderer, "review-start-session-mistakes")).toThrow();
+  });
+
+  it("offers regular practice from an empty review queue", () => {
+    const renderer = renderScreen();
+
+    press(renderer, "review-tab");
+
+    expect(findByTestId(renderer, "review-panel")).toBeTruthy();
+    expect(findByTestId(renderer, "review-empty-state")).toBeTruthy();
+    expectText(renderer, "No reviews due today");
+    expectText(renderer, "Next scheduled review appears here when the memory curve reaches its due time.");
+    expect(findByTestId(renderer, "review-empty-practice")).toBeTruthy();
+    expect(findByTestId(renderer, "review-start-due").props.accessibilityState).toEqual({ disabled: true });
+
+    press(renderer, "review-empty-practice");
+
+    expect(findByTestId(renderer, "practice-home")).toBeTruthy();
+    expect(findByTestId(renderer, "practice-mode-standard")).toBeTruthy();
   });
 
   it("keeps official due review contexts separate by sprint run", () => {
@@ -1354,6 +1418,10 @@ describe("PracticePocScreen", () => {
     press(renderer, "settings-manage-packs");
     expect(findByTestId(renderer, "packs-panel")).toBeTruthy();
     press(renderer, "packs-tab");
+    expect(findByTestId(renderer, "packs-offline-readiness")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "packs-offline-readiness-copy"))).toContain("fully available without network access");
+    expect(collectText(findByTestId(renderer, "packs-offline-readiness-metrics"))).toContain("Puzzles ~1k");
+    expect(collectText(findByTestId(renderer, "packs-offline-readiness-metrics"))).toContain("Arrow Duel Ready");
     expect(findByTestId(renderer, "packs-installed-section")).toBeTruthy();
     expect(findByTestId(renderer, "packs-optional-section")).toBeTruthy();
     expect(findByTestId(renderer, "packs-installed-core")).toBeTruthy();
