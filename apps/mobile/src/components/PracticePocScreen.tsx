@@ -1174,6 +1174,7 @@ export function PracticePocScreen({
         {tab === "settings" ? (
           <SettingsPanel
             onOpenDiagnostics={isPracticeTestControlsEnabled() ? () => setTab("analysis") : undefined}
+            onOpenPacks={() => setTab("packs")}
             onResetRating={() => service.resetRating(selectedConfig.ratingKey)}
           />
         ) : null}
@@ -1439,6 +1440,7 @@ function CustomSprintSetup({
         <CustomOptionRow
           label="Duration"
           value={formatDurationLabel(durationSeconds)}
+          stepperTestID="custom-duration-stepper"
           options={CUSTOM_DURATION_OPTIONS.map((option) => ({
             value: option,
             label: formatDurationLabel(option),
@@ -1450,6 +1452,7 @@ function CustomSprintSetup({
         <CustomOptionRow
           label="Time per puzzle"
           value={`${perPuzzleSeconds} sec`}
+          stepperTestID="custom-per-puzzle-stepper"
           options={CUSTOM_PER_PUZZLE_OPTIONS.map((option) => ({
             value: option,
             label: `${option}s`,
@@ -1561,20 +1564,58 @@ function CustomOptionRow<T extends number>({
   label,
   onChange,
   options,
+  stepperTestID,
   selected,
   value
 }: {
   label: string;
   onChange: (next: T) => void;
   options: Array<{ value: T; label: string; testID: string }>;
+  stepperTestID: string;
   selected: T;
   value: string;
 }): React.JSX.Element {
+  const selectedIndex = Math.max(0, options.findIndex((option) => option.value === selected));
+  const previousOption = options[selectedIndex - 1];
+  const nextOption = options[selectedIndex + 1];
+
   return (
     <View style={styles.customOptionRow}>
       <View style={styles.customOptionHeader}>
         <Text style={styles.listText}>{label}</Text>
-        <Text style={styles.customConfigValue}>{value}</Text>
+        <View style={styles.customStepper} testID={stepperTestID}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Decrease ${label.toLowerCase()}`}
+            accessibilityState={{ disabled: !previousOption }}
+            disabled={!previousOption}
+            testID={`${stepperTestID}-decrease`}
+            style={[styles.customStepperButton, !previousOption ? styles.disabledButton : null]}
+            onPress={() => {
+              if (previousOption) {
+                onChange(previousOption.value);
+              }
+            }}
+          >
+            <Text style={styles.customStepperText}>−</Text>
+          </Pressable>
+          <Text style={styles.customStepperValue}>{value}</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Increase ${label.toLowerCase()}`}
+            accessibilityState={{ disabled: !nextOption }}
+            disabled={!nextOption}
+            testID={`${stepperTestID}-increase`}
+            style={[styles.customStepperButton, !nextOption ? styles.disabledButton : null]}
+            onPress={() => {
+              if (nextOption) {
+                onChange(nextOption.value);
+              }
+            }}
+          >
+            <Text style={styles.customStepperText}>＋</Text>
+          </Pressable>
+        </View>
       </View>
       <View style={styles.customInlineOptions}>
         {options.map((option) => (
@@ -2265,10 +2306,12 @@ function HistoryPanel({
   onOpenAttempt: (attemptId: string) => void;
   onToggleWrongLast7Days: () => void;
 }): React.JSX.Element {
+  const [chartMetric, setChartMetric] = useState<HistoryChartMetric>("rating");
   const correct = attempts.filter((attempt) => attempt.result === "correct").length;
   const wrong = attempts.filter((attempt) => attempt.result === "wrong").length;
   const accuracy = Math.round((correct / Math.max(1, correct + wrong)) * 100);
   const puzzleStatsById = new Map(puzzleStats.map((stats) => [stats.puzzleId, stats]));
+  const chartSummary = historyChartSummary(chartMetric, attempts, eloPoints, puzzleStats);
 
   return (
     <View style={styles.historyPanel} testID="history-panel">
@@ -2278,10 +2321,29 @@ function HistoryPanel({
             <Text style={styles.panelTitle}>Performance</Text>
             <Text style={styles.helperText}>{selectedRatingKey ?? "No rating history"}</Text>
           </View>
-          <Text style={styles.historyAccuracy}>{accuracy}%</Text>
+          <View style={styles.historyMetricSummary}>
+            <Text testID="history-chart-value" style={styles.historyAccuracy}>{chartSummary.value}</Text>
+            <Text testID="history-chart-label" style={styles.helperText}>{chartSummary.label}</Text>
+          </View>
         </View>
         <Text style={styles.listText}>Accuracy {accuracy}% · Correct {correct} · Wrong {wrong}</Text>
-        <HistoryMiniChart points={eloPoints} />
+        <HistoryChipRow testID="history-chart-metric-filters">
+          {HISTORY_CHART_METRICS.map((metric) => (
+            <FilterButton
+              key={metric.id}
+              active={chartMetric === metric.id}
+              label={metric.label}
+              testID={`history-chart-${metric.id}`}
+              onPress={() => setChartMetric(metric.id)}
+            />
+          ))}
+        </HistoryChipRow>
+        <HistoryMiniChart
+          attempts={attempts}
+          metric={chartMetric}
+          points={eloPoints}
+          puzzleStats={puzzleStats}
+        />
       </View>
 
       <HistoryChipRow testID="history-range-filters">
@@ -2395,16 +2457,36 @@ function HistoryPanel({
   );
 }
 
-function HistoryMiniChart({ points }: { points: HistoryEloPoint[] }): React.JSX.Element {
-  const displayed = points.slice(-8);
+type HistoryChartMetric = "rating" | "accuracy" | "solved" | "mistake-rate" | "review-due";
+
+const HISTORY_CHART_METRICS: ReadonlyArray<{ id: HistoryChartMetric; label: string }> = [
+  { id: "rating", label: "Rating" },
+  { id: "accuracy", label: "Accuracy" },
+  { id: "solved", label: "Solved" },
+  { id: "mistake-rate", label: "Mistakes" },
+  { id: "review-due", label: "Reviews" }
+];
+
+function HistoryMiniChart({
+  attempts,
+  metric,
+  points,
+  puzzleStats
+}: {
+  attempts: HistoryAttemptView[];
+  metric: HistoryChartMetric;
+  points: HistoryEloPoint[];
+  puzzleStats: HistoryPuzzleStats[];
+}): React.JSX.Element {
+  const displayed = buildHistoryChartValues(metric, attempts, points, puzzleStats).slice(-8);
   if (displayed.length === 0) {
     return (
       <View style={styles.historyChartEmpty} testID="history-performance-chart">
-        <Text style={styles.helperText}>No rating movement in this range.</Text>
+        <Text style={styles.helperText}>No {historyChartEmptyLabel(metric)} data in this range.</Text>
       </View>
     );
   }
-  const values = displayed.map((point) => point.ratingAfter);
+  const values = displayed.map((point) => point.value);
   const min = Math.min(...values);
   const max = Math.max(...values);
   const span = Math.max(1, max - min);
@@ -2412,15 +2494,92 @@ function HistoryMiniChart({ points }: { points: HistoryEloPoint[] }): React.JSX.
   return (
     <View style={styles.historyChart} testID="history-performance-chart">
       {displayed.map((point, index) => {
-        const height = 12 + ((point.ratingAfter - min) / span) * 46;
+        const height = 12 + ((point.value - min) / span) * 46;
         return (
-          <View key={`${point.sessionId}-${point.completedAt}-${index}`} style={styles.historyChartColumn}>
+          <View key={`${metric}-${point.key}-${index}`} style={styles.historyChartColumn}>
             <View style={[styles.historyChartBar, { height }]} />
           </View>
         );
       })}
     </View>
   );
+}
+
+function buildHistoryChartValues(
+  metric: HistoryChartMetric,
+  attempts: HistoryAttemptView[],
+  points: HistoryEloPoint[],
+  puzzleStats: HistoryPuzzleStats[]
+): Array<{ key: string; value: number }> {
+  if (metric === "rating") {
+    return points.map((point, index) => ({
+      key: `${point.sessionId}-${point.completedAt}-${index}`,
+      value: point.ratingAfter
+    }));
+  }
+
+  if (metric === "review-due") {
+    return puzzleStats.map((stats, index) => ({
+      key: `${stats.puzzleId}-${index}`,
+      value: (stats.nextReviewAt ? 1 : 0) + Math.max(0, stats.wrongCount - stats.correctCount)
+    }));
+  }
+
+  let correct = 0;
+  let wrong = 0;
+  return [...attempts].reverse().map((attempt, index) => {
+    if (attempt.result === "correct") {
+      correct += 1;
+    } else {
+      wrong += 1;
+    }
+    const total = Math.max(1, correct + wrong);
+    const value = metric === "accuracy"
+      ? Math.round((correct / total) * 100)
+      : metric === "mistake-rate"
+        ? Math.round((wrong / total) * 100)
+        : correct;
+    return {
+      key: `${attempt.id}-${index}`,
+      value
+    };
+  });
+}
+
+function historyChartSummary(
+  metric: HistoryChartMetric,
+  attempts: HistoryAttemptView[],
+  points: HistoryEloPoint[],
+  puzzleStats: HistoryPuzzleStats[]
+): { label: string; value: string } {
+  const correct = attempts.filter((attempt) => attempt.result === "correct").length;
+  const wrong = attempts.filter((attempt) => attempt.result === "wrong").length;
+  const total = Math.max(1, correct + wrong);
+  if (metric === "rating") {
+    const latest = points[points.length - 1]?.ratingAfter;
+    return { label: "Rating", value: latest ? String(latest) : "—" };
+  }
+  if (metric === "accuracy") {
+    return { label: "Accuracy", value: `${Math.round((correct / total) * 100)}%` };
+  }
+  if (metric === "solved") {
+    return { label: "Solved", value: String(correct) };
+  }
+  if (metric === "mistake-rate") {
+    return { label: "Mistake rate", value: `${Math.round((wrong / total) * 100)}%` };
+  }
+  const dueVolume = puzzleStats.filter((stats) => Boolean(stats.nextReviewAt)).length;
+  return { label: "Review due", value: String(dueVolume) };
+}
+
+function historyChartEmptyLabel(metric: HistoryChartMetric): string {
+  if (metric === "mistake-rate") {
+    return "mistake rate";
+  }
+  if (metric === "review-due") {
+    return "review due";
+  }
+  return metric;
 }
 
 function HistoryChipRow({
@@ -3930,13 +4089,16 @@ function normalizeUci(move: string): string {
 
 function SettingsPanel({
   onOpenDiagnostics,
+  onOpenPacks,
   onResetRating
 }: {
   onOpenDiagnostics?: () => void;
+  onOpenPacks: () => void;
   onResetRating: () => void;
 }): React.JSX.Element {
   const [syncEnabled, setSyncEnabled] = useState(true);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [confirmation, setConfirmation] = useState<"reset-elo" | "delete-history" | null>(null);
 
   return (
     <View style={styles.settingsPanel} testID="settings-panel">
@@ -3952,10 +4114,7 @@ function SettingsPanel({
           detail="Resets the current sprint rating only"
           destructive
           testID="settings-reset-elo"
-          onPress={() => {
-            onResetRating();
-            setStatusMessage("ELO reset");
-          }}
+          onPress={() => setConfirmation("reset-elo")}
         />
         <SettingsRow
           label="Advanced ratings"
@@ -3966,6 +4125,17 @@ function SettingsPanel({
       </SettingsSection>
 
       <SettingsSection title="Sync" testID="settings-sync-section">
+        <View style={styles.syncDisclosureCard} testID="settings-sync-disclosure">
+          <View style={styles.syncDisclosureHeader}>
+            <Text style={styles.listText}>Local-first progress</Text>
+            <Text style={[styles.syncDisclosureStatus, syncEnabled ? styles.positive : styles.errorText]}>
+              {syncEnabled ? "Ready" : "Local only"}
+            </Text>
+          </View>
+          <Text style={styles.helperText}>
+            Practice always works offline. iCloud only syncs after this device is allowed to upload local progress.
+          </Text>
+        </View>
         <View style={styles.settingsRow} testID="settings-icloud-sync-row">
           <View style={styles.settingsRowCopy}>
             <Text style={styles.listText}>iCloud Sync</Text>
@@ -4002,7 +4172,7 @@ function SettingsPanel({
           detail="Requires confirmation before anything is removed"
           destructive
           testID="settings-delete-local-history"
-          onPress={() => setStatusMessage("Delete confirmation required")}
+          onPress={() => setConfirmation("delete-history")}
         />
       </SettingsSection>
 
@@ -4012,6 +4182,7 @@ function SettingsPanel({
           value="Open Packs"
           detail="Bundled and imported offline puzzle packs"
           testID="settings-manage-packs"
+          onPress={onOpenPacks}
         />
       </SettingsSection>
 
@@ -4030,6 +4201,33 @@ function SettingsPanel({
       </SettingsSection>
 
       {statusMessage ? <Text style={styles.settingsStatusText} testID="settings-status-message">{statusMessage}</Text> : null}
+      {confirmation === "reset-elo" ? (
+        <DestructiveConfirmationCard
+          confirmLabel="Reset ELO"
+          description="This resets only the current sprint rating bucket. Puzzle history and review schedules stay intact."
+          testID="settings-reset-elo-confirmation"
+          title="Reset Standard puzzle ELO?"
+          onCancel={() => setConfirmation(null)}
+          onConfirm={() => {
+            onResetRating();
+            setConfirmation(null);
+            setStatusMessage("ELO reset");
+          }}
+        />
+      ) : null}
+      {confirmation === "delete-history" ? (
+        <DestructiveConfirmationCard
+          confirmLabel="Delete History"
+          description="This would remove local attempt history after a final implementation pass. No data is removed from this preview."
+          testID="settings-delete-history-confirmation"
+          title="Delete local history?"
+          onCancel={() => setConfirmation(null)}
+          onConfirm={() => {
+            setConfirmation(null);
+            setStatusMessage("Delete requires data-layer implementation");
+          }}
+        />
+      ) : null}
       {onOpenDiagnostics ? (
         <Pressable
           accessibilityRole="button"
@@ -4041,6 +4239,53 @@ function SettingsPanel({
           <Text style={styles.secondaryButtonText}>Stockfish Diagnostics</Text>
         </Pressable>
       ) : null}
+    </View>
+  );
+}
+
+function DestructiveConfirmationCard({
+  confirmLabel,
+  description,
+  onCancel,
+  onConfirm,
+  testID,
+  title
+}: {
+  confirmLabel: string;
+  description: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+  testID: string;
+  title: string;
+}): React.JSX.Element {
+  return (
+    <View
+      accessibilityLabel={title}
+      testID={testID}
+      style={styles.destructiveConfirmationCard}
+    >
+      <Text style={styles.sectionLabel}>{title}</Text>
+      <Text style={styles.helperText}>{description}</Text>
+      <View style={styles.confirmationActionRow}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Cancel destructive action"
+          testID={`${testID}-cancel`}
+          style={styles.secondaryButton}
+          onPress={onCancel}
+        >
+          <Text style={styles.secondaryButtonText}>Cancel</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={confirmLabel}
+          testID={`${testID}-confirm`}
+          style={styles.destructiveButton}
+          onPress={onConfirm}
+        >
+          <Text style={styles.destructiveButtonText}>{confirmLabel}</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -4104,18 +4349,37 @@ type PackRowModel = {
   title: string;
   subtitle: string;
   detail: string;
+  source: string;
+  presolveStatus: string;
+  manifestHash: string;
+  buildDate: string;
+  licenseNote: string;
   status: "active" | "installed" | "optional";
   testID: string;
 };
 
+type PackImportProgress = {
+  packTitle: string;
+  progress: number;
+  status: "validating" | "ready";
+};
+
 function PacksPanel(): React.JSX.Element {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [importProgress, setImportProgress] = useState<PackImportProgress | null>(null);
+  const [removalPack, setRemovalPack] = useState<PackRowModel | null>(null);
+  const [selectedPack, setSelectedPack] = useState<PackRowModel | null>(null);
   const installedPacks: PackRowModel[] = [
     {
       id: "core",
       title: "Core Pack",
       subtitle: "~1,000 puzzles · offline",
       detail: "Rating 600 - 1600 · Mixed, mate, endgame · Arrow Duel ready",
+      source: "Lichess puzzle database",
+      presolveStatus: "Chessticize presolved",
+      manifestHash: "core-2026-06-fixture",
+      buildDate: "Bundled fixture",
+      licenseNote: "Derived from Lichess puzzle data with Chessticize presolve metadata.",
       status: "active",
       testID: "packs-installed-core"
     },
@@ -4124,6 +4388,11 @@ function PacksPanel(): React.JSX.Element {
       title: "Tactics Pack",
       subtitle: "~50k puzzles · installed",
       detail: "Rating 800 - 2200 · tactics-heavy coverage",
+      source: "Lichess puzzle database",
+      presolveStatus: "Presolved locally",
+      manifestHash: "tactics-preview-50k",
+      buildDate: "Preview bundle",
+      licenseNote: "Imported packs keep source attribution and do not modify attempt history.",
       status: "installed",
       testID: "packs-installed-tactics"
     }
@@ -4134,6 +4403,11 @@ function PacksPanel(): React.JSX.Element {
       title: "Endgame Pack",
       subtitle: "~40k puzzles · optional",
       detail: "Rating 900 - 2400 · rook, pawn, conversion themes",
+      source: "Lichess puzzle database",
+      presolveStatus: "Manifest pending validation",
+      manifestHash: "endgame-manifest-pending",
+      buildDate: "Remote optional pack",
+      licenseNote: "Activation requires manifest validation before offline use.",
       status: "optional",
       testID: "packs-optional-endgame"
     },
@@ -4142,10 +4416,23 @@ function PacksPanel(): React.JSX.Element {
       title: "Mate in N Pack",
       subtitle: "~30k puzzles · optional",
       detail: "Rating 700 - 2300 · mate themes · Arrow Duel candidates",
+      source: "Lichess puzzle database",
+      presolveStatus: "Manifest pending validation",
+      manifestHash: "mate-n-manifest-pending",
+      buildDate: "Remote optional pack",
+      licenseNote: "Activation requires manifest validation before offline use.",
       status: "optional",
       testID: "packs-optional-mate-in-n"
     }
   ];
+  function beginPackImport(packTitle: string): void {
+    setImportProgress({
+      packTitle,
+      progress: 72,
+      status: "validating"
+    });
+    setStatusMessage(`Validating ${packTitle} manifest`);
+  }
 
   return (
     <View style={styles.packsPanel} testID="packs-panel">
@@ -4156,18 +4443,23 @@ function PacksPanel(): React.JSX.Element {
           accessibilityLabel="Import puzzle pack"
           testID="packs-import"
           style={styles.packsIconButton}
-          onPress={() => setStatusMessage("Validating pack manifest")}
+          onPress={() => beginPackImport("Imported Pack")}
         >
           <Text style={styles.iconButtonText}>＋</Text>
         </Pressable>
       </View>
+
+      {importProgress ? (
+        <PackImportProgressCard progress={importProgress} />
+      ) : null}
 
       <PackSection title="Installed" testID="packs-installed-section">
         {installedPacks.map((pack) => (
           <PackRow
             key={pack.id}
             pack={pack}
-            onRemove={pack.id === "core" ? undefined : () => setStatusMessage(`${pack.title} removal requires confirmation`)}
+            onOpenDetail={() => setSelectedPack(pack)}
+            onRemove={pack.id === "core" ? undefined : () => setRemovalPack(pack)}
           />
         ))}
       </PackSection>
@@ -4177,10 +4469,15 @@ function PacksPanel(): React.JSX.Element {
           <PackRow
             key={pack.id}
             pack={pack}
-            onImport={() => setStatusMessage(`Validating ${pack.title} manifest`)}
+            onOpenDetail={() => setSelectedPack(pack)}
+            onImport={() => beginPackImport(pack.title)}
           />
         ))}
       </PackSection>
+
+      {selectedPack ? (
+        <PackDetailPanel pack={selectedPack} onClose={() => setSelectedPack(null)} />
+      ) : null}
 
       <View style={styles.packInfoCard} testID="packs-info-section">
         <Text style={styles.sectionLabel}>Pack Info</Text>
@@ -4213,6 +4510,20 @@ function PacksPanel(): React.JSX.Element {
         <Text style={styles.secondaryButtonText}>Remove Optional Pack</Text>
       </Pressable>
 
+      {removalPack ? (
+        <DestructiveConfirmationCard
+          confirmLabel="Remove Pack"
+          description={`${removalPack.title} will be disabled from offline selection. Attempt history and review schedules stay intact.`}
+          testID="packs-remove-confirmation"
+          title={`Remove ${removalPack.title}?`}
+          onCancel={() => setRemovalPack(null)}
+          onConfirm={() => {
+            setRemovalPack(null);
+            setStatusMessage(`${removalPack.title} removal queued; history retained`);
+          }}
+        />
+      ) : null}
+
       {statusMessage ? (
         <Text style={styles.settingsStatusText} testID="packs-status-message">{statusMessage}</Text>
       ) : null}
@@ -4237,12 +4548,57 @@ function PackSection({
   );
 }
 
+function PackImportProgressCard({
+  progress
+}: {
+  progress: PackImportProgress;
+}): React.JSX.Element {
+  return (
+    <View style={styles.packImportProgressCard} testID="packs-import-progress">
+      <View style={styles.packImportHeader}>
+        <View>
+          <Text style={styles.sectionLabel}>{progress.packTitle}</Text>
+          <Text style={styles.helperText}>Manifest validation in progress</Text>
+        </View>
+        <Text style={styles.packImportPercent} testID="packs-import-progress-value">{progress.progress}%</Text>
+      </View>
+      <View style={styles.packProgressTrack}>
+        <View style={[styles.packProgressFill, { width: `${progress.progress}%` }]} />
+      </View>
+      <View style={styles.packImportStepList}>
+        <PackImportStep done label="Read manifest" testID="packs-import-step-manifest" />
+        <PackImportStep done label="Validate source and license" testID="packs-import-step-license" />
+        <PackImportStep done={progress.status === "ready"} label="Activate after validation" testID="packs-import-step-activate" />
+      </View>
+    </View>
+  );
+}
+
+function PackImportStep({
+  done,
+  label,
+  testID
+}: {
+  done: boolean;
+  label: string;
+  testID: string;
+}): React.JSX.Element {
+  return (
+    <View style={styles.packImportStep} testID={testID}>
+      <Text style={[styles.packImportStepMark, done ? styles.packImportStepDone : null]}>{done ? "✓" : "…"}</Text>
+      <Text style={styles.helperText}>{label}</Text>
+    </View>
+  );
+}
+
 function PackRow({
   onImport,
+  onOpenDetail,
   onRemove,
   pack
 }: {
   onImport?: () => void;
+  onOpenDetail: () => void;
   onRemove?: () => void;
   pack: PackRowModel;
 }): React.JSX.Element {
@@ -4263,6 +4619,16 @@ function PackRow({
         <Text style={styles.helperText}>{pack.subtitle}</Text>
         <Text style={styles.helperText}>{pack.detail}</Text>
       </View>
+      <View style={styles.packActionColumn}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Open ${pack.title} details`}
+          testID={`packs-detail-${pack.id}`}
+          style={styles.packDetailButton}
+          onPress={onOpenDetail}
+        >
+          <Text style={styles.packDetailText}>Details</Text>
+        </Pressable>
       {isOptional ? (
         <Pressable
           accessibilityRole="button"
@@ -4286,6 +4652,42 @@ function PackRow({
       ) : (
         <Text style={styles.packActiveMark}>✓</Text>
       )}
+      </View>
+    </View>
+  );
+}
+
+function PackDetailPanel({
+  onClose,
+  pack
+}: {
+  onClose: () => void;
+  pack: PackRowModel;
+}): React.JSX.Element {
+  return (
+    <View style={styles.packInfoCard} testID="pack-detail-panel">
+      <View style={styles.sectionHeaderRow}>
+        <View style={styles.packRowCopy}>
+          <Text style={styles.sectionLabel}>{pack.title}</Text>
+          <Text style={styles.helperText}>{pack.subtitle}</Text>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Close pack details"
+          testID="pack-detail-close"
+          style={styles.packsIconButton}
+          onPress={onClose}
+        >
+          <Text style={styles.iconButtonText}>×</Text>
+        </Pressable>
+      </View>
+      <PackInfoRow label="Source" value={pack.source} testID="pack-detail-source" />
+      <PackInfoRow label="Presolve" value={pack.presolveStatus} testID="pack-detail-presolve" />
+      <PackInfoRow label="Manifest hash" value={pack.manifestHash} testID="pack-detail-manifest-hash" />
+      <PackInfoRow label="Build date" value={pack.buildDate} testID="pack-detail-build-date" />
+      <Text testID="pack-detail-license-notes" style={styles.packLicenseText}>
+        License notes: {pack.licenseNote}
+      </Text>
     </View>
   );
 }
@@ -5471,6 +5873,34 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between"
   },
+  customStepper: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 6
+  },
+  customStepperButton: {
+    alignItems: "center",
+    backgroundColor: "#F8FAFC",
+    borderColor: "#CBD5E1",
+    borderRadius: 8,
+    borderWidth: 1,
+    height: 32,
+    justifyContent: "center",
+    width: 36
+  },
+  customStepperText: {
+    color: "#111827",
+    fontSize: 15,
+    fontWeight: "900",
+    lineHeight: 18
+  },
+  customStepperValue: {
+    color: "#475569",
+    fontSize: 13,
+    fontWeight: "800",
+    minWidth: 48,
+    textAlign: "center"
+  },
   customConfigValue: {
     color: "#475569",
     fontSize: 13,
@@ -5625,6 +6055,19 @@ const styles = StyleSheet.create({
     color: "#334155",
     fontSize: 13,
     fontWeight: "700"
+  },
+  destructiveButton: {
+    alignItems: "center",
+    backgroundColor: "#DC2626",
+    borderRadius: 8,
+    height: 42,
+    justifyContent: "center",
+    paddingHorizontal: 14
+  },
+  destructiveButtonText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "800"
   },
   iconButtonRow: {
     alignItems: "center",
@@ -6123,6 +6566,10 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 12
   },
+  historyMetricSummary: {
+    alignItems: "flex-end",
+    minWidth: 74
+  },
   historyAccuracy: {
     color: "#111827",
     fontSize: 28,
@@ -6244,6 +6691,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     overflow: "hidden"
   },
+  syncDisclosureCard: {
+    backgroundColor: "#F8FAFC",
+    borderBottomColor: "#E2E8F0",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  syncDisclosureHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "space-between"
+  },
+  syncDisclosureStatus: {
+    fontSize: 12,
+    fontWeight: "900"
+  },
   settingsRow: {
     alignItems: "center",
     borderBottomColor: "#E2E8F0",
@@ -6278,6 +6743,19 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     paddingHorizontal: 2
   },
+  destructiveConfirmationCard: {
+    backgroundColor: "#FEF2F2",
+    borderColor: "#FCA5A5",
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 8,
+    padding: 12
+  },
+  confirmationActionRow: {
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "flex-end"
+  },
   packsPanel: {
     gap: 12
   },
@@ -6290,6 +6768,54 @@ const styles = StyleSheet.create({
     height: 38,
     justifyContent: "center",
     width: 38
+  },
+  packImportProgressCard: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#BFDBFE",
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 10,
+    padding: 12
+  },
+  packImportHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "space-between"
+  },
+  packImportPercent: {
+    color: "#2563EB",
+    fontFamily: "Menlo",
+    fontSize: 18,
+    fontWeight: "900"
+  },
+  packProgressTrack: {
+    backgroundColor: "#E2E8F0",
+    borderRadius: 999,
+    height: 8,
+    overflow: "hidden"
+  },
+  packProgressFill: {
+    backgroundColor: "#2563EB",
+    borderRadius: 999,
+    height: 8
+  },
+  packImportStepList: {
+    gap: 6
+  },
+  packImportStep: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8
+  },
+  packImportStepMark: {
+    color: "#64748B",
+    fontSize: 12,
+    fontWeight: "900",
+    width: 16
+  },
+  packImportStepDone: {
+    color: "#16A34A"
   },
   packRow: {
     alignItems: "center",
@@ -6339,6 +6865,11 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "900"
   },
+  packActionColumn: {
+    alignItems: "flex-end",
+    gap: 8,
+    justifyContent: "center"
+  },
   packActionButton: {
     alignItems: "center",
     borderColor: "#93C5FD",
@@ -6350,6 +6881,21 @@ const styles = StyleSheet.create({
   },
   packActionText: {
     color: "#1D4ED8",
+    fontSize: 12,
+    fontWeight: "900"
+  },
+  packDetailButton: {
+    alignItems: "center",
+    backgroundColor: "#F8FAFC",
+    borderColor: "#CBD5E1",
+    borderRadius: 8,
+    borderWidth: 1,
+    minHeight: 32,
+    justifyContent: "center",
+    paddingHorizontal: 10
+  },
+  packDetailText: {
+    color: "#334155",
     fontSize: 12,
     fontWeight: "900"
   },
