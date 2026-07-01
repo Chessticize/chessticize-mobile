@@ -544,6 +544,10 @@ describe("PracticePocScreen", () => {
     press(renderer, "practice-mode-custom");
     expect(findByTestId(renderer, "custom-sprint-setup")).toBeTruthy();
     expect(() => findByTestId(renderer, "practice-home")).toThrow();
+    expect(findByTestId(renderer, "custom-config-list")).toBeTruthy();
+    expect(findByTestId(renderer, "custom-pack-warning")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "custom-pack-warning"))).toContain("15 eligible puzzles");
+    expect(collectText(findByTestId(renderer, "custom-pack-warning"))).toContain("up to 18");
     expect(findByTestId(renderer, "custom-mode-row")).toBeTruthy();
     expect(findByTestId(renderer, "custom-mode-regular").props.accessibilityState).toEqual({ selected: true });
     expect(findByTestId(renderer, "custom-mode-arrow-duel").props.accessibilityState).toEqual({ selected: false });
@@ -553,6 +557,9 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "custom-summary-card")).toBeTruthy();
     expect(findByTestId(renderer, "custom-previous-configs")).toBeTruthy();
     expect(findByTestId(renderer, "custom-separate-scoring")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "custom-target-count"))).toContain("15 puzzles");
+    expect(collectText(findByTestId(renderer, "custom-current-rating"))).toContain("ELO 600");
+    expect(collectText(findByTestId(renderer, "custom-summary-card"))).toContain("Scoring history");
     expect(collectText(findByTestId(renderer, "custom-previous-standard-5-20-meta"))).toContain("Mixed");
     expect(collectText(findByTestId(renderer, "custom-previous-standard-5-20-meta"))).toContain("5 min · 20s pace");
     expect(collectText(findByTestId(renderer, "custom-previous-standard-5-20-meta"))).toContain("Last Recently");
@@ -573,20 +580,31 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "custom-mode-regular").props.accessibilityState).toEqual({ selected: true });
     expect(findByTestId(renderer, "custom-mode-arrow-duel").props.accessibilityState).toEqual({ selected: false });
     expect(collectText(findByTestId(renderer, "custom-summary-card"))).toContain("Regular puzzles");
-    expectText(renderer, "Target 15");
+    expect(collectText(findByTestId(renderer, "custom-target-count"))).toContain("15 puzzles");
 
     press(renderer, "custom-duration-stepper-decrease");
-    expectText(renderer, "Target 9");
+    expect(collectText(findByTestId(renderer, "custom-target-count"))).toContain("9 puzzles");
     expect(findByTestId(renderer, "custom-duration-stepper-decrease").props.accessibilityState).toEqual({ disabled: true });
     press(renderer, "custom-per-puzzle-stepper-increase");
 
-    expectText(renderer, "Target 6");
+    expect(collectText(findByTestId(renderer, "custom-target-count"))).toContain("6 puzzles");
     expectText(renderer, "custom 3/30");
 
     press(renderer, "start-sprint-button");
 
     expectText(renderer, "Custom");
     expectText(renderer, "0 / 6");
+  });
+
+  it("shows custom sprint local pack readiness when the selected fixture has enough puzzles", () => {
+    const renderer = renderScreen();
+
+    press(renderer, "test-puzzle-source-random1000");
+    press(renderer, "practice-mode-custom");
+
+    expect(findByTestId(renderer, "custom-eligibility-ready")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "custom-eligibility-ready"))).toContain("1000 eligible puzzles");
+    expect(() => findByTestId(renderer, "custom-pack-warning")).toThrow();
   });
 
   it("starts an Arrow Duel sprint from the custom mode selector", () => {
@@ -597,7 +615,7 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "custom-mode-regular").props.accessibilityState).toEqual({ selected: false });
     expect(findByTestId(renderer, "custom-mode-arrow-duel").props.accessibilityState).toEqual({ selected: true });
-    expect(collectText(findByTestId(renderer, "custom-mode-summary"))).toBe("Arrow Duel");
+    expect(collectText(findByTestId(renderer, "custom-mode-summary"))).toContain("Arrow Duel");
     expectText(renderer, "arrow_duel 5/20");
 
     press(renderer, "start-sprint-button");
