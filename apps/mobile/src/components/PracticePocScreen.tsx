@@ -130,11 +130,11 @@ const TEST_PUZZLE_SOURCES: ReadonlyArray<{ source: MobilePuzzleSource; label: st
   { source: "random1000", label: "Random 1000" }
 ];
 const PRIMARY_TABS: ReadonlyArray<{ tab: Exclude<Tab, "analysis">; label: string; icon: string; testID: string }> = [
-  { tab: "practice", label: "Practice", icon: "P", testID: "practice-tab" },
-  { tab: "review", label: "Review", icon: "R", testID: "review-tab" },
-  { tab: "history", label: "History", icon: "H", testID: "history-tab" },
-  { tab: "packs", label: "Packs", icon: "PK", testID: "packs-tab" },
-  { tab: "settings", label: "Settings", icon: "S", testID: "settings-tab" }
+  { tab: "practice", label: "Practice", icon: "⌂", testID: "practice-tab" },
+  { tab: "review", label: "Review", icon: "◇", testID: "review-tab" },
+  { tab: "history", label: "History", icon: "◷", testID: "history-tab" },
+  { tab: "packs", label: "Packs", icon: "□", testID: "packs-tab" },
+  { tab: "settings", label: "Settings", icon: "⚙", testID: "settings-tab" }
 ];
 const PRACTICE_MODE_DESCRIPTIONS: Record<SprintMode, string> = {
   standard: "Find the best move",
@@ -143,10 +143,10 @@ const PRACTICE_MODE_DESCRIPTIONS: Record<SprintMode, string> = {
   custom: "Time, theme, rating"
 };
 const PRACTICE_MODE_ICONS: Record<SprintMode, string> = {
-  standard: "ST",
-  arrow_duel: "AD",
-  blitz: "BZ",
-  custom: "CU"
+  standard: "◎",
+  arrow_duel: "↗",
+  blitz: "↯",
+  custom: "≡"
 };
 const BOARD_FILES = ["a", "b", "c", "d", "e", "f", "g", "h"] as const;
 const BOARD_FILES_FLIPPED = ["h", "g", "f", "e", "d", "c", "b", "a"] as const;
@@ -1500,7 +1500,6 @@ function PracticeModeCard({
   onPress: () => void;
 }): React.JSX.Element {
   const label = modeLabel(item.mode);
-  const modeDetails = practiceModeDetails(item.config);
   return (
     <Pressable
       accessibilityRole="button"
@@ -1519,15 +1518,12 @@ function PracticeModeCard({
             <Text style={styles.practiceModeTitle}>{label}</Text>
           </View>
           <Text style={styles.practiceModeDescription}>{PRACTICE_MODE_DESCRIPTIONS[item.mode]}</Text>
-          <View style={styles.practiceModeDetailRow} testID={`practice-mode-${item.mode.replace("_", "-")}-details`}>
-            {modeDetails.map((detail) => (
-              <Text key={detail} style={styles.practiceModeDetailChip}>{detail}</Text>
-            ))}
-          </View>
+          <Text style={styles.practiceModeRating} testID={`practice-mode-${item.mode.replace("_", "-")}-details`}>
+            ELO {item.rating}
+          </Text>
         </View>
       </View>
       <View style={styles.practiceModeMeta}>
-        <Text style={styles.practiceModeRating}>ELO {item.rating}</Text>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Start ${label}`}
@@ -1540,15 +1536,6 @@ function PracticeModeCard({
       </View>
     </Pressable>
   );
-}
-
-function practiceModeDetails(config: SprintConfig): string[] {
-  return [
-    `Target ${config.targetCorrect}`,
-    `${config.perPuzzleSeconds}s pace`,
-    `${config.maxMistakes} mistakes`,
-    config.ratingKey
-  ];
 }
 
 function ModeRow({
@@ -1927,14 +1914,13 @@ function CustomOptionRow<T extends number>({
   const nextOption = options[selectedIndex + 1];
 
   return (
-    <View style={styles.customOptionRow}>
-      <View style={styles.customOptionHeader}>
+    <View style={styles.customConfigRow}>
+      <View>
         <Text style={styles.listText}>{label}</Text>
-        <Text style={styles.customConfigValue}>{value}</Text>
       </View>
-      <View style={styles.customOptionHeader}>
-        <Text style={styles.helperText}>Allowed values</Text>
-        <View style={styles.customStepper} testID={stepperTestID}>
+      <View style={styles.customStepperGroup}>
+        <Text style={styles.customConfigValue}>{value}</Text>
+        <View style={styles.customStepperCompact} testID={stepperTestID}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Decrease ${label.toLowerCase()}`}
@@ -1966,20 +1952,6 @@ function CustomOptionRow<T extends number>({
             <Text style={styles.customStepperText}>＋</Text>
           </Pressable>
         </View>
-      </View>
-      <View style={styles.customInlineOptions}>
-        {options.map((option) => (
-          <Pressable
-            key={option.value}
-            accessibilityRole="button"
-            accessibilityState={{ selected: selected === option.value }}
-            testID={option.testID}
-            style={[styles.customMiniChip, selected === option.value ? styles.customMiniChipActive : null]}
-            onPress={() => onChange(option.value)}
-          >
-            <Text style={[styles.customMiniChipText, selected === option.value ? styles.customMiniChipTextActive : null]}>{option.label}</Text>
-          </Pressable>
-        ))}
       </View>
     </View>
   );
@@ -2413,7 +2385,7 @@ function PracticePrompt({
   }
   const side = sideToMove(currentPuzzle.currentFen) === "b" ? "black" : "white";
   const isArrowDuel = currentPuzzle.kind === "arrow_duel";
-  const promptBadge = mode === "arrow_duel" ? "AD" : "ST";
+  const promptBadge = mode === "arrow_duel" ? PRACTICE_MODE_ICONS.arrow_duel : PRACTICE_MODE_ICONS.standard;
   const displayedPromptText = promptText === undefined
     ? (
       isArrowDuel
@@ -2501,18 +2473,23 @@ function SessionScoreMetric({
   tone: "positive" | "negative" | "neutral";
   value: number;
 }): React.JSX.Element {
+  const icon = tone === "positive" ? "✓" : tone === "negative" ? "×" : "○";
   return (
-    <View style={styles.sessionScoreMetric}>
-      <View
+    <View
+      accessibilityLabel={`${label} ${value}`}
+      style={styles.sessionScoreMetric}
+    >
+      <Text
         style={[
-          styles.sessionScoreDot,
+          styles.sessionScoreIcon,
           tone === "positive" ? styles.sessionScoreDotPositive : null,
           tone === "negative" ? styles.sessionScoreDotNegative : null,
           tone === "neutral" ? styles.sessionScoreDotNeutral : null
         ]}
-      />
+      >
+        {icon}
+      </Text>
       <Text style={styles.sessionScoreValue}>{value}</Text>
-      <Text style={styles.sessionScoreLabel}>{label}</Text>
     </View>
   );
 }
@@ -2824,6 +2801,7 @@ function HistoryPanel({
   onToggleWrongLast7Days: () => void;
 }): React.JSX.Element {
   const [chartMetric, setChartMetric] = useState<HistoryChartMetric>("rating");
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
   const puzzleStatsById = new Map(puzzleStats.map((stats) => [stats.puzzleId, stats]));
   const [speedFilter, setSpeedFilter] = useState<"all" | number>("all");
   const [reviewStatusFilter, setReviewStatusFilter] = useState<"all" | "queued" | "clear">("all");
@@ -2847,6 +2825,20 @@ function HistoryPanel({
 
   return (
     <View style={styles.historyPanel} testID="history-panel">
+      <View style={styles.reviewQueueHeader}>
+        <Text style={styles.panelTitle}>History</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={filtersExpanded ? "Hide history filters" : "Show history filters"}
+          accessibilityState={{ expanded: filtersExpanded }}
+          testID="history-filter-toggle"
+          style={[styles.reviewFilterButton, filtersExpanded ? styles.reviewFilterButtonActive : null]}
+          onPress={() => setFiltersExpanded((current) => !current)}
+        >
+          <Text style={[styles.reviewFilterButtonText, filtersExpanded ? styles.reviewFilterButtonTextActive : null]}>≡</Text>
+        </Pressable>
+      </View>
+
       <View style={styles.historyTopFilterStack} testID="history-primary-filters">
         <HistoryChipRow testID="history-mode-filters">
           <FilterButton active={modeFilter === "all"} label="All" testID="history-mode-all" onPress={() => onModeFilterChange("all")} />
@@ -2914,78 +2906,83 @@ function HistoryPanel({
         />
       </View>
 
-      {ratingKeys.length > 0 ? (
-        <HistoryChipRow testID="history-rating-filters">
-          {ratingKeys.map((ratingKey) => (
-            <FilterButton
-              key={ratingKey}
-              active={selectedRatingKey === ratingKey}
-              label={ratingKey}
-              testID={`history-rating-${ratingKey}`}
-              onPress={() => onRatingKeyChange(ratingKey)}
-            />
-          ))}
-        </HistoryChipRow>
+      {filtersExpanded ? (
+        <View style={styles.historyAdvancedFilters} testID="history-advanced-filters">
+          {ratingKeys.length > 0 ? (
+            <HistoryChipRow testID="history-rating-filters">
+              {ratingKeys.map((ratingKey) => (
+                <FilterButton
+                  key={ratingKey}
+                  active={selectedRatingKey === ratingKey}
+                  label={ratingKey}
+                  testID={`history-rating-${ratingKey}`}
+                  onPress={() => onRatingKeyChange(ratingKey)}
+                />
+              ))}
+            </HistoryChipRow>
+          ) : null}
+          <HistoryChipRow testID="history-source-filters">
+            <FilterButton active={sourceFilter === "all"} label="All" testID="history-source-all" onPress={() => onSourceFilterChange("all")} />
+            <FilterButton active={sourceFilter === "sprint"} label="Sprint" testID="history-source-sprint" onPress={() => onSourceFilterChange("sprint")} />
+            <FilterButton active={sourceFilter === "scheduled_review"} label="Review" testID="history-source-review" onPress={() => onSourceFilterChange("scheduled_review")} />
+          </HistoryChipRow>
+          <HistoryChipRow testID="history-result-filters">
+            <FilterButton active={resultFilter === "all"} label="All" testID="history-result-all" onPress={() => onResultFilterChange("all")} />
+            <FilterButton active={resultFilter === "correct"} label="Correct" testID="history-result-correct" onPress={() => onResultFilterChange("correct")} />
+            <FilterButton active={resultFilter === "wrong"} label="Wrong" testID="history-result-wrong" onPress={() => onResultFilterChange("wrong")} />
+          </HistoryChipRow>
+          {speedFilters.length > 0 ? (
+            <HistoryChipRow testID="history-speed-filters">
+              <FilterButton active={speedFilter === "all"} label="All speeds" testID="history-speed-all" onPress={() => setSpeedFilter("all")} />
+              {speedFilters.map((speed) => (
+                <FilterButton
+                  key={speed}
+                  active={speedFilter === speed}
+                  label={`${speed}s pace`}
+                  testID={`history-speed-${speed}`}
+                  onPress={() => setSpeedFilter(speed)}
+                />
+              ))}
+            </HistoryChipRow>
+          ) : null}
+          <HistoryChipRow testID="history-rating-range-filters">
+            {HISTORY_RATING_RANGE_FILTERS.map((ratingRange) => (
+              <FilterButton
+                key={ratingRange.id}
+                active={ratingRangeFilter === ratingRange.id}
+                label={ratingRange.label}
+                testID={`history-rating-range-${ratingRange.id}`}
+                onPress={() => onRatingRangeFilterChange(ratingRange.id)}
+              />
+            ))}
+          </HistoryChipRow>
+          <HistoryChipRow testID="history-review-status-filters">
+            <FilterButton active={reviewStatusFilter === "all"} label="All review states" testID="history-review-status-all" onPress={() => setReviewStatusFilter("all")} />
+            <FilterButton active={reviewStatusFilter === "queued"} label="Queued" testID="history-review-status-queued" onPress={() => setReviewStatusFilter("queued")} />
+            <FilterButton active={reviewStatusFilter === "clear"} label="Clear" testID="history-review-status-clear" onPress={() => setReviewStatusFilter("clear")} />
+          </HistoryChipRow>
+          <HistoryChipRow testID="history-side-filters">
+            <FilterButton active={sideFilter === "all"} label="Both sides" testID="history-side-all" onPress={() => onSideFilterChange("all")} />
+            <FilterButton active={sideFilter === "white"} label="White" testID="history-side-white" onPress={() => onSideFilterChange("white")} />
+            <FilterButton active={sideFilter === "black"} label="Black" testID="history-side-black" onPress={() => onSideFilterChange("black")} />
+          </HistoryChipRow>
+          {availableThemes.length > 0 ? (
+            <HistoryChipRow testID="history-theme-filters">
+              <FilterButton active={themeFilter === "all"} label="All themes" testID="history-theme-all" onPress={() => onThemeFilterChange("all")} />
+              {availableThemes.slice(0, 8).map((theme) => (
+                <FilterButton
+                  key={theme}
+                  active={themeFilter === theme}
+                  label={theme}
+                  testID={`history-theme-${theme}`}
+                  onPress={() => onThemeFilterChange(theme)}
+                />
+              ))}
+            </HistoryChipRow>
+          ) : null}
+        </View>
       ) : null}
-      <HistoryChipRow testID="history-source-filters">
-        <FilterButton active={sourceFilter === "all"} label="All" testID="history-source-all" onPress={() => onSourceFilterChange("all")} />
-        <FilterButton active={sourceFilter === "sprint"} label="Sprint" testID="history-source-sprint" onPress={() => onSourceFilterChange("sprint")} />
-        <FilterButton active={sourceFilter === "scheduled_review"} label="Review" testID="history-source-review" onPress={() => onSourceFilterChange("scheduled_review")} />
-      </HistoryChipRow>
-      <HistoryChipRow testID="history-result-filters">
-        <FilterButton active={resultFilter === "all"} label="All" testID="history-result-all" onPress={() => onResultFilterChange("all")} />
-        <FilterButton active={resultFilter === "correct"} label="Correct" testID="history-result-correct" onPress={() => onResultFilterChange("correct")} />
-        <FilterButton active={resultFilter === "wrong"} label="Wrong" testID="history-result-wrong" onPress={() => onResultFilterChange("wrong")} />
-      </HistoryChipRow>
-      {speedFilters.length > 0 ? (
-        <HistoryChipRow testID="history-speed-filters">
-          <FilterButton active={speedFilter === "all"} label="All speeds" testID="history-speed-all" onPress={() => setSpeedFilter("all")} />
-          {speedFilters.map((speed) => (
-            <FilterButton
-              key={speed}
-              active={speedFilter === speed}
-              label={`${speed}s pace`}
-              testID={`history-speed-${speed}`}
-              onPress={() => setSpeedFilter(speed)}
-            />
-          ))}
-        </HistoryChipRow>
-      ) : null}
-      <HistoryChipRow testID="history-rating-range-filters">
-        {HISTORY_RATING_RANGE_FILTERS.map((ratingRange) => (
-          <FilterButton
-            key={ratingRange.id}
-            active={ratingRangeFilter === ratingRange.id}
-            label={ratingRange.label}
-            testID={`history-rating-range-${ratingRange.id}`}
-            onPress={() => onRatingRangeFilterChange(ratingRange.id)}
-          />
-        ))}
-      </HistoryChipRow>
-      <HistoryChipRow testID="history-review-status-filters">
-        <FilterButton active={reviewStatusFilter === "all"} label="All review states" testID="history-review-status-all" onPress={() => setReviewStatusFilter("all")} />
-        <FilterButton active={reviewStatusFilter === "queued"} label="Queued" testID="history-review-status-queued" onPress={() => setReviewStatusFilter("queued")} />
-        <FilterButton active={reviewStatusFilter === "clear"} label="Clear" testID="history-review-status-clear" onPress={() => setReviewStatusFilter("clear")} />
-      </HistoryChipRow>
-      <HistoryChipRow testID="history-side-filters">
-        <FilterButton active={sideFilter === "all"} label="Both sides" testID="history-side-all" onPress={() => onSideFilterChange("all")} />
-        <FilterButton active={sideFilter === "white"} label="White" testID="history-side-white" onPress={() => onSideFilterChange("white")} />
-        <FilterButton active={sideFilter === "black"} label="Black" testID="history-side-black" onPress={() => onSideFilterChange("black")} />
-      </HistoryChipRow>
-      {availableThemes.length > 0 ? (
-        <HistoryChipRow testID="history-theme-filters">
-          <FilterButton active={themeFilter === "all"} label="All themes" testID="history-theme-all" onPress={() => onThemeFilterChange("all")} />
-          {availableThemes.slice(0, 8).map((theme) => (
-            <FilterButton
-              key={theme}
-              active={themeFilter === theme}
-              label={theme}
-              testID={`history-theme-${theme}`}
-              onPress={() => onThemeFilterChange(theme)}
-            />
-          ))}
-        </HistoryChipRow>
-      ) : null}
+
       <View style={styles.historyPageRow}>
         <Text style={styles.helperText}>
           {page.total === 0 ? "0 results" : `${page.offset + 1}-${Math.min(page.offset + attempts.length, page.total)} of ${page.total}`}
@@ -3526,6 +3523,7 @@ function ReviewPanel({
   const preferredEntriesKey = preferredEntries.map((entry) => `${entry.source}:${entry.puzzle.id}:${entry.mode}`).join("|");
   const [activeEntries, setActiveEntries] = useState<ReviewEntry[]>(preferredEntries);
   const [queueFilter, setQueueFilter] = useState<ReviewQueueFilter>("all");
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
   const themeFilters = collectReviewThemeFilters(dueReviewItems);
   const speedFilters = collectReviewSpeedFilters(dueReviewItems);
   const filteredDueReviewItems = filterReviewQueueItems(dueReviewItems, queueFilter);
@@ -3563,6 +3561,20 @@ function ReviewPanel({
 
   return (
     <View style={styles.reviewQueuePanel} testID="review-panel">
+      <View style={styles.reviewQueueHeader}>
+        <Text style={styles.panelTitle}>Review</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={filtersExpanded ? "Hide review filters" : "Show review filters"}
+          accessibilityState={{ expanded: filtersExpanded }}
+          testID="review-filter-toggle"
+          style={[styles.reviewFilterButton, filtersExpanded ? styles.reviewFilterButtonActive : null]}
+          onPress={() => setFiltersExpanded((current) => !current)}
+        >
+          <Text style={[styles.reviewFilterButtonText, filtersExpanded ? styles.reviewFilterButtonTextActive : null]}>≡</Text>
+        </Pressable>
+      </View>
+
       <View style={styles.reviewDueCard} testID="review-due-card">
         <View>
           <Text style={styles.reviewDueTitle}>Due Today</Text>
@@ -3622,40 +3634,42 @@ function ReviewPanel({
         <Text style={styles.primaryButtonText}>Start Review</Text>
       </Pressable>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.reviewFilterScroller}
-        contentContainerStyle={styles.reviewFilterContent}
-        testID="review-queue-filters"
-      >
-        <FilterButton active={queueFilter === "all"} label="All due" testID="review-filter-all" onPress={() => setQueueFilter("all")} />
-        <FilterButton active={queueFilter === "overdue"} label="Overdue" testID="review-filter-overdue" onPress={() => setQueueFilter("overdue")} />
-        <FilterButton active={queueFilter === "failed"} label="Failed again" testID="review-filter-failed" onPress={() => setQueueFilter("failed")} />
-        <FilterButton active={queueFilter === "mode:standard"} label="Standard" testID="review-filter-mode-standard" onPress={() => setQueueFilter("mode:standard")} />
-        <FilterButton active={queueFilter === "arrow_duel"} label="Arrow Duel only" testID="review-filter-arrow-duel" onPress={() => setQueueFilter("arrow_duel")} />
-        <FilterButton active={queueFilter === "mode:blitz"} label="Blitz" testID="review-filter-mode-blitz" onPress={() => setQueueFilter("mode:blitz")} />
-        {speedFilters.map((speed) => (
-          <FilterButton
-            key={speed}
-            active={queueFilter === `speed:${speed}`}
-            label={`${speed}s pace`}
-            testID={`review-filter-speed-${speed}`}
-            onPress={() => setQueueFilter(`speed:${speed}`)}
-          />
-        ))}
-        {themeFilters.map((theme) => (
-          <FilterButton
-            key={theme}
-            active={queueFilter === `theme:${theme}`}
-            label={theme}
-            testID={`review-filter-theme-${safeTestId(theme)}`}
-            onPress={() => setQueueFilter(`theme:${theme}`)}
-          />
-        ))}
-      </ScrollView>
+      {filtersExpanded ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.reviewFilterScroller}
+          contentContainerStyle={styles.reviewFilterContent}
+          testID="review-queue-filters"
+        >
+          <FilterButton active={queueFilter === "all"} label="All due" testID="review-filter-all" onPress={() => setQueueFilter("all")} />
+          <FilterButton active={queueFilter === "overdue"} label="Overdue" testID="review-filter-overdue" onPress={() => setQueueFilter("overdue")} />
+          <FilterButton active={queueFilter === "failed"} label="Failed again" testID="review-filter-failed" onPress={() => setQueueFilter("failed")} />
+          <FilterButton active={queueFilter === "mode:standard"} label="Standard" testID="review-filter-mode-standard" onPress={() => setQueueFilter("mode:standard")} />
+          <FilterButton active={queueFilter === "arrow_duel"} label="Arrow Duel only" testID="review-filter-arrow-duel" onPress={() => setQueueFilter("arrow_duel")} />
+          <FilterButton active={queueFilter === "mode:blitz"} label="Blitz" testID="review-filter-mode-blitz" onPress={() => setQueueFilter("mode:blitz")} />
+          {speedFilters.map((speed) => (
+            <FilterButton
+              key={speed}
+              active={queueFilter === `speed:${speed}`}
+              label={`${speed}s pace`}
+              testID={`review-filter-speed-${speed}`}
+              onPress={() => setQueueFilter(`speed:${speed}`)}
+            />
+          ))}
+          {themeFilters.map((theme) => (
+            <FilterButton
+              key={theme}
+              active={queueFilter === `theme:${theme}`}
+              label={theme}
+              testID={`review-filter-theme-${safeTestId(theme)}`}
+              onPress={() => setQueueFilter(`theme:${theme}`)}
+            />
+          ))}
+        </ScrollView>
+      ) : null}
 
-      {filteredDueReviewItems.length > 0 ? (
+      {filtersExpanded && filteredDueReviewItems.length > 0 ? (
         <View style={styles.reviewItemList} testID="review-due-items">
           <Text style={styles.sectionLabel}>Due items</Text>
           {filteredDueReviewItems.slice(0, 4).map((item) => (
@@ -3673,7 +3687,7 @@ function ReviewPanel({
         </View>
       ) : null}
 
-      {filteredContextGroups.length > 0 ? (
+      {filtersExpanded && filteredContextGroups.length > 0 ? (
         <View style={styles.reviewContextList} testID="review-context-list">
           <Text style={styles.sectionLabel}>Review groups</Text>
           {filteredContextGroups.map((group) => (
@@ -3696,7 +3710,7 @@ function ReviewPanel({
             </Pressable>
           ))}
         </View>
-      ) : (
+      ) : filteredDueReviewItems.length === 0 ? (
         <View style={styles.emptyReviewPanel} testID="review-empty-state">
           <Text style={styles.listText}>{dueReviewItems.length === 0 ? "No reviews due today" : "No matching scheduled reviews"}</Text>
           <Text style={styles.helperText}>
@@ -3714,7 +3728,7 @@ function ReviewPanel({
             <Text style={styles.secondaryButtonText}>Practice now</Text>
           </Pressable>
         </View>
-      )}
+      ) : null}
 
     </View>
   );
@@ -5299,24 +5313,6 @@ function PacksPanel(): React.JSX.Element {
         <PackImportProgressCard progress={importProgress} />
       ) : null}
 
-      <View style={styles.packOfflineSummaryCard} testID="packs-offline-readiness">
-        <View style={styles.sectionHeaderRow}>
-          <View style={styles.packRowCopy}>
-            <Text style={styles.sectionLabel}>Ready offline</Text>
-            <Text testID="packs-offline-readiness-copy" style={styles.helperText}>
-              The bundled Core Pack is active and fully available without network access.
-            </Text>
-          </View>
-          <Text style={[styles.packStatusBadge, styles.packStatusActive]}>Active</Text>
-        </View>
-        <View style={styles.packRowCoverage} testID="packs-offline-readiness-metrics">
-          <PackRowCoverageChip label="Puzzles" value="~1k" />
-          <PackRowCoverageChip label="Rating" value="600-1600" />
-          <PackRowCoverageChip label="Themes" value="Mixed" />
-          <PackRowCoverageChip label="Arrow Duel" value="Ready" />
-        </View>
-      </View>
-
       <PackSection title="Installed" testID="packs-installed-section">
         {installedPacks.map((pack) => (
           <PackRow
@@ -5352,16 +5348,6 @@ function PacksPanel(): React.JSX.Element {
         <Text testID="packs-license-notes" style={styles.packLicenseText}>
           License notes: Puzzle data is derived from the Lichess puzzle database and bundled for offline use with Chessticize presolve metadata.
         </Text>
-      </View>
-
-      <View style={styles.packCoverageCard} testID="packs-coverage-card">
-        <Text style={styles.sectionLabel}>Offline coverage</Text>
-        <View style={styles.packCoverageGrid}>
-          <PackCoverageMetric label="Puzzles" value="~1k" testID="packs-coverage-puzzles" />
-          <PackCoverageMetric label="Rating" value="600-1600" testID="packs-coverage-rating" />
-          <PackCoverageMetric label="Themes" value="Mixed" testID="packs-coverage-themes" />
-          <PackCoverageMetric label="Arrow Duel" value="Ready" testID="packs-coverage-arrow-duel" />
-        </View>
       </View>
 
       {removalPack ? (
@@ -5579,23 +5565,6 @@ function PackInfoRow({
     <View style={styles.packInfoRow} testID={testID}>
       <Text style={styles.helperText}>{label}</Text>
       <Text style={styles.listText}>{value}</Text>
-    </View>
-  );
-}
-
-function PackCoverageMetric({
-  label,
-  testID,
-  value
-}: {
-  label: string;
-  testID: string;
-  value: string;
-}): React.JSX.Element {
-  return (
-    <View style={styles.packCoverageMetric} testID={testID}>
-      <Text style={styles.packCoverageValue}>{value}</Text>
-      <Text style={styles.helperText}>{label}</Text>
     </View>
   );
 }
@@ -6290,22 +6259,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600"
   },
-  practiceModeSelectedBadge: {
-    backgroundColor: "#DBEAFE",
-    borderRadius: 999,
-    color: "#1D4ED8",
-    fontSize: 10,
-    fontWeight: "900",
-    overflow: "hidden",
-    paddingHorizontal: 7,
-    paddingVertical: 2
-  },
-  practiceModeDetailRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    columnGap: 7,
-    rowGap: 2
-  },
   practiceModeDetailChip: {
     backgroundColor: "transparent",
     color: "#475569",
@@ -6314,11 +6267,6 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     paddingHorizontal: 0,
     paddingVertical: 1
-  },
-  practiceModeRatingKey: {
-    color: "#64748B",
-    fontSize: 11,
-    fontWeight: "700"
   },
   practiceModeMeta: {
     alignItems: "flex-end",
@@ -6330,19 +6278,6 @@ const styles = StyleSheet.create({
     color: "#64748B",
     fontSize: 11,
     fontWeight: "800"
-  },
-  practiceModeStartButton: {
-    alignItems: "center",
-    backgroundColor: "#2563EB",
-    borderRadius: 8,
-    minHeight: 34,
-    justifyContent: "center",
-    paddingHorizontal: 12
-  },
-  practiceModeStartText: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "900"
   },
   practiceModeChevronButton: {
     alignItems: "center",
@@ -6447,6 +6382,35 @@ const styles = StyleSheet.create({
   },
   reviewQueuePanel: {
     gap: 12
+  },
+  reviewQueueHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    minHeight: 44
+  },
+  reviewFilterButton: {
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderColor: "#CBD5E1",
+    borderRadius: 8,
+    borderWidth: 1,
+    height: 38,
+    justifyContent: "center",
+    width: 38
+  },
+  reviewFilterButtonActive: {
+    backgroundColor: "#EFF6FF",
+    borderColor: "#2563EB"
+  },
+  reviewFilterButtonText: {
+    color: "#334155",
+    fontSize: 18,
+    fontWeight: "900",
+    lineHeight: 20
+  },
+  reviewFilterButtonTextActive: {
+    color: "#1D4ED8"
   },
   reviewDueCard: {
     alignItems: "center",
@@ -6847,20 +6811,27 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: "row",
     justifyContent: "space-around",
-    minHeight: 54,
+    minHeight: 46,
     paddingHorizontal: 12,
-    paddingVertical: 8
+    paddingVertical: 7
   },
   sessionScoreMetric: {
     alignItems: "center",
     flex: 1,
-    gap: 2,
+    flexDirection: "row",
+    gap: 8,
     justifyContent: "center"
   },
-  sessionScoreDot: {
+  sessionScoreIcon: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "900",
+    height: 20,
+    lineHeight: 20,
+    overflow: "hidden",
+    textAlign: "center",
+    width: 20,
     borderRadius: 999,
-    height: 9,
-    width: 9
   },
   sessionScoreDotPositive: {
     backgroundColor: "#16A34A"
@@ -6873,14 +6844,9 @@ const styles = StyleSheet.create({
   },
   sessionScoreValue: {
     color: "#111827",
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: "900",
-    lineHeight: 19
-  },
-  sessionScoreLabel: {
-    color: "#64748B",
-    fontSize: 10,
-    fontWeight: "700"
+    lineHeight: 20
   },
   emptyBoard: {
     alignItems: "center",
@@ -7021,20 +6987,13 @@ const styles = StyleSheet.create({
   customModeChoiceDetailActive: {
     color: "#2563EB"
   },
-  customOptionRow: {
-    borderBottomColor: "#E2E8F0",
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    gap: 8,
-    minHeight: 70,
-    paddingHorizontal: 12,
-    paddingVertical: 10
-  },
-  customOptionHeader: {
+  customStepperGroup: {
     alignItems: "center",
     flexDirection: "row",
-    justifyContent: "space-between"
+    flexShrink: 0,
+    gap: 10
   },
-  customStepper: {
+  customStepperCompact: {
     alignItems: "center",
     flexDirection: "row",
     gap: 6
@@ -7054,13 +7013,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "900",
     lineHeight: 18
-  },
-  customStepperValue: {
-    color: "#475569",
-    fontSize: 13,
-    fontWeight: "800",
-    minWidth: 48,
-    textAlign: "center"
   },
   customConfigValue: {
     color: "#475569",
@@ -7763,6 +7715,9 @@ const styles = StyleSheet.create({
   historyTopFilterStack: {
     gap: 8
   },
+  historyAdvancedFilters: {
+    gap: 8
+  },
   historyPerformanceCard: {
     backgroundColor: "#FFFFFF",
     borderColor: "#E2E8F0",
@@ -8031,14 +7986,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 38
   },
-  packOfflineSummaryCard: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 8,
-    padding: 12
-  },
   packImportProgressCard: {
     backgroundColor: "#FFFFFF",
     borderColor: "#BFDBFE",
@@ -8206,35 +8153,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     lineHeight: 17
-  },
-  packCoverageCard: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 10,
-    padding: 12
-  },
-  packCoverageGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8
-  },
-  packCoverageMetric: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    borderWidth: 1,
-    flexBasis: "47%",
-    flexGrow: 1,
-    gap: 2,
-    minHeight: 58,
-    padding: 10
-  },
-  packCoverageValue: {
-    color: "#111827",
-    fontSize: 16,
-    fontWeight: "900"
   },
   settingRow: {
     alignItems: "center",
