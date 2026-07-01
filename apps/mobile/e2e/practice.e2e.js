@@ -97,20 +97,36 @@ async function playBoardMove(testID, move, flipped = false) {
   await board.tapAtPoint(boardPoint(boardFrame, move.slice(2, 4), flipped));
 }
 
-async function tapWhenVisible(testID) {
-  await waitForVisibleInPracticeScroll(testID);
-  await element(by.id(testID)).tap();
-}
-
 async function startPracticeMode(mode) {
-  await tapWhenVisible(`practice-mode-${mode}-start`);
+  const startButtonId = `practice-mode-${mode}-start`;
+  await waitForVisibleInPracticeScroll(startButtonId);
+  await tapUntilExists(startButtonId, 'session-board', 3);
 }
 
 async function waitForVisibleInPracticeScroll(testID) {
+  await waitFor(element(by.id(testID))).toExist().withTimeout(30000);
   await waitFor(element(by.id(testID)))
     .toBeVisible()
     .whileElement(by.id('practice-main-scroll'))
     .scroll(100, 'down');
+}
+
+async function tapUntilExists(tapTestID, expectedTestID, attempts) {
+  let lastError;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    await element(by.id(tapTestID)).tap();
+    try {
+      await waitFor(element(by.id(expectedTestID))).toExist().withTimeout(15000);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt + 1 < attempts) {
+        await waitForVisibleInPracticeScroll(tapTestID);
+        await sleep(500);
+      }
+    }
+  }
+  throw lastError;
 }
 
 async function waitForElementTextContaining(testID, expected, timeoutMs) {
