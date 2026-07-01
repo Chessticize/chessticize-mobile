@@ -2465,23 +2465,41 @@ function SessionScoreMetric({
   tone: "positive" | "negative" | "neutral";
   value: number;
 }): React.JSX.Element {
-  const icon = tone === "positive" ? "✓" : tone === "negative" ? "×" : "○";
   return (
     <View
       accessibilityLabel={`${label} ${value}`}
       style={styles.sessionScoreMetric}
     >
-      <Text
-        style={[
-          styles.sessionScoreIcon,
-          tone === "positive" ? styles.sessionScoreDotPositive : null,
-          tone === "negative" ? styles.sessionScoreDotNegative : null,
-          tone === "neutral" ? styles.sessionScoreDotNeutral : null
-        ]}
-      >
-        {icon}
-      </Text>
+      <SessionScoreGlyph tone={tone} />
       <Text style={styles.sessionScoreValue}>{value}</Text>
+    </View>
+  );
+}
+
+function SessionScoreGlyph({ tone }: { tone: "positive" | "negative" | "neutral" }): React.JSX.Element {
+  return (
+    <View
+      style={[
+        styles.sessionScoreIcon,
+        tone === "positive" ? styles.sessionScoreDotPositive : null,
+        tone === "negative" ? styles.sessionScoreDotNegative : null,
+        tone === "neutral" ? styles.sessionScoreDotNeutral : null
+      ]}
+      testID={`session-score-${tone}-glyph`}
+    >
+      {tone === "positive" ? (
+        <>
+          <View style={[styles.sessionScoreGlyphLine, styles.sessionScoreCheckShort]} />
+          <View style={[styles.sessionScoreGlyphLine, styles.sessionScoreCheckLong]} />
+        </>
+      ) : null}
+      {tone === "negative" ? (
+        <>
+          <View style={[styles.sessionScoreGlyphLine, styles.sessionScoreCrossForward]} />
+          <View style={[styles.sessionScoreGlyphLine, styles.sessionScoreCrossBackward]} />
+        </>
+      ) : null}
+      {tone === "neutral" ? <View style={styles.sessionScoreNeutralLine} /> : null}
     </View>
   );
 }
@@ -7084,15 +7102,13 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   sessionScoreIcon: {
-    color: "#FFFFFF",
-    fontSize: 11,
-    fontWeight: "900",
+    alignItems: "center",
     height: 20,
-    lineHeight: 20,
+    justifyContent: "center",
     overflow: "hidden",
-    textAlign: "center",
-    width: 20,
     borderRadius: 999,
+    position: "relative",
+    width: 20
   },
   sessionScoreDotPositive: {
     backgroundColor: "#16A34A"
@@ -7101,7 +7117,44 @@ const styles = StyleSheet.create({
     backgroundColor: "#DC2626"
   },
   sessionScoreDotNeutral: {
-    backgroundColor: "#CBD5E1"
+    backgroundColor: "#F8FAFC",
+    borderColor: "#94A3B8",
+    borderWidth: 1.5
+  },
+  sessionScoreGlyphLine: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 999,
+    position: "absolute"
+  },
+  sessionScoreCheckShort: {
+    height: 2,
+    left: 5,
+    top: 10,
+    transform: [{ rotate: "45deg" }],
+    width: 6
+  },
+  sessionScoreCheckLong: {
+    height: 2,
+    right: 4,
+    top: 9,
+    transform: [{ rotate: "-48deg" }],
+    width: 10
+  },
+  sessionScoreCrossForward: {
+    height: 2.25,
+    transform: [{ rotate: "45deg" }],
+    width: 10
+  },
+  sessionScoreCrossBackward: {
+    height: 2.25,
+    transform: [{ rotate: "-45deg" }],
+    width: 10
+  },
+  sessionScoreNeutralLine: {
+    backgroundColor: "#64748B",
+    borderRadius: 999,
+    height: 2.25,
+    width: 8
   },
   sessionScoreValue: {
     color: "#111827",

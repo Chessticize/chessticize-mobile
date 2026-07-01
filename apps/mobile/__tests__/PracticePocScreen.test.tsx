@@ -93,7 +93,13 @@ describe("PracticePocScreen", () => {
     expect(testIdOrder(renderer, "session-board", "session-score-strip")).toBeLessThan(0);
     expect(testIdOrder(renderer, "session-score-strip", "practice-prompt")).toBeLessThan(0);
     expect(findByTestId(renderer, "session-score-strip").props.accessibilityLabel).toBe("Session score: solved 0, mistakes 0, left 30");
-    expect(collectText(findByTestId(renderer, "session-score-strip"))).toBe("✓0×0○30");
+    expect(findByTestId(renderer, "session-score-positive-glyph")).toBeTruthy();
+    expect(findByTestId(renderer, "session-score-negative-glyph")).toBeTruthy();
+    expect(findByTestId(renderer, "session-score-neutral-glyph")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "session-score-strip"))).toBe("0030");
+    expect(collectText(findByTestId(renderer, "session-score-strip"))).not.toContain("✓");
+    expect(collectText(findByTestId(renderer, "session-score-strip"))).not.toContain("×");
+    expect(collectText(findByTestId(renderer, "session-score-strip"))).not.toContain("○");
     expect(collectText(findByTestId(renderer, "session-progress"))).toBe("0 / 30");
     expect(collectText(findByTestId(renderer, "practice-prompt-icon"))).toBe("");
     expectText(renderer, "Find the best move");
