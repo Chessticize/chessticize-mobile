@@ -17,7 +17,7 @@ test("MemoryStore supports the practice service contract used by the mobile POC"
     ["00008"]
   );
 
-  service.startSprint(
+  const sprint = service.startSprint(
     {
       mode: "standard",
       durationSeconds: 300,
@@ -28,11 +28,13 @@ test("MemoryStore supports the practice service contract used by the mobile POC"
     },
     "2026-06-20T00:00:00.000Z"
   );
+  assert.equal(service.getActiveSprint()?.id, sprint.id);
   service.submitMove("e6e7", "2026-06-20T00:00:05.000Z");
   service.submitMove("b3c1", "2026-06-20T00:00:10.000Z");
   const result = service.submitMove("h6c1", "2026-06-20T00:00:15.000Z");
 
   assert.equal(result.state.status, "won");
+  assert.equal(service.getActiveSprint(), undefined);
   assert.ok((result.state.ratingAfter ?? 0) > 600);
   assert.equal(store.getRating("hangingPiece standard 5/20").games, 1);
   assert.equal(store.listAttempts({ result: "correct" }).length, 1);
@@ -155,6 +157,9 @@ test("PracticeService builds MemoryStore history view for a required time range 
   assert.equal(view.attempts.length, 1);
   assert.equal(view.attempts[0]?.ratingKey, "standard 5/20");
   assert.equal(view.attempts[0]?.puzzleId, "000hf");
+  assert.equal(view.attempts[0]?.puzzleRating, 1485);
+  assert.equal(service.getHistoryView({ ...view.query, maxRating: 1485 }).attempts.length, 1);
+  assert.equal(service.getHistoryView({ ...view.query, minRating: 1486 }).attempts.length, 0);
   assert.ok(view.availableThemes.includes("mate"));
   assert.equal(view.elo.length, 1);
   assert.deepEqual(view.puzzleStats, [

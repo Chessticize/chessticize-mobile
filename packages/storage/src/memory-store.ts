@@ -188,6 +188,8 @@ export class MemoryStore implements PracticeStore {
       .filter((attempt) => !query.source || attempt.source === query.source)
       .filter((attempt) => !query.mode || attempt.mode === query.mode)
       .filter((attempt) => !query.side || attempt.side === query.side)
+      .filter((attempt) => query.minRating === undefined || attempt.puzzleRating >= query.minRating)
+      .filter((attempt) => query.maxRating === undefined || attempt.puzzleRating <= query.maxRating)
       .filter((attempt) => !query.theme || attempt.themes.includes(query.theme));
     return buildHistoryView({
       query,

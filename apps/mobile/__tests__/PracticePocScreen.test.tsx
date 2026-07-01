@@ -30,11 +30,20 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-tab")).toBeTruthy();
     expect(findByTestId(renderer, "settings-tab")).toBeTruthy();
     expect(findByTestId(renderer, "packs-tab")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "practice-tab-icon"))).toBe("P");
+    expect(collectText(findByTestId(renderer, "review-tab-icon"))).toBe("R");
+    expect(collectText(findByTestId(renderer, "history-tab-icon"))).toBe("H");
+    expect(collectText(findByTestId(renderer, "packs-tab-icon"))).toBe("PK");
+    expect(collectText(findByTestId(renderer, "settings-tab-icon"))).toBe("S");
     expect(() => findByTestId(renderer, "analysis-tab")).toThrow();
     expect(findByTestId(renderer, "practice-mode-standard")).toBeTruthy();
     expect(findByTestId(renderer, "practice-mode-arrow-duel")).toBeTruthy();
     expect(findByTestId(renderer, "practice-mode-blitz")).toBeTruthy();
     expect(findByTestId(renderer, "practice-mode-custom")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "practice-mode-standard-icon"))).toBe("ST");
+    expect(collectText(findByTestId(renderer, "practice-mode-arrow-duel-icon"))).toBe("AD");
+    expect(collectText(findByTestId(renderer, "practice-mode-blitz-icon"))).toBe("BZ");
+    expect(collectText(findByTestId(renderer, "practice-mode-custom-icon"))).toBe("CU");
     expect(findByTestId(renderer, "practice-mode-standard-start")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "practice-mode-standard-details"))).toContain("Target 15");
     expect(collectText(findByTestId(renderer, "practice-mode-standard-details"))).toContain("20s pace");
@@ -84,7 +93,29 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "session-score-strip"))).toContain("Mistakes");
     expect(collectText(findByTestId(renderer, "session-score-strip"))).toContain("Left");
     expect(collectText(findByTestId(renderer, "session-progress"))).toBe("0 / 30");
+    expect(collectText(findByTestId(renderer, "practice-prompt-icon"))).toBe("ST");
     expectText(renderer, "Find the best move");
+  });
+
+  it("offers resume before starting a new sprint when the service has an active session", () => {
+    const service = createMobilePracticeService("familiar15");
+    service.startSprint(
+      { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 15, maxMistakes: 3 },
+      new Date(Date.now()).toISOString()
+    );
+    const renderer = renderScreen({ practiceService: service });
+
+    expect(findByTestId(renderer, "practice-resume-card")).toBeTruthy();
+    expect(testIdOrder(renderer, "practice-resume-card", "practice-mode-standard")).toBeLessThan(0);
+    expect(collectText(findByTestId(renderer, "practice-resume-card"))).toContain("Resume sprint");
+    expect(collectText(findByTestId(renderer, "practice-resume-card"))).toContain("Standard · 0 solved · 15 left · 0 mistakes");
+    expect(() => findByTestId(renderer, "session-board")).toThrow();
+
+    press(renderer, "practice-resume-card");
+
+    expect(findByTestId(renderer, "session-board")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "session-progress"))).toBe("0 / 15");
+    expect(() => findByTestId(renderer, "practice-resume-card")).toThrow();
   });
 
   it("opens custom setup from the compact custom row instead of starting a scored sprint", () => {
@@ -449,6 +480,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "arrow-duel-candidate-a").props.accessibilityLabel).toBe("Choose Arrow Duel candidate A");
     expect(findByTestId(renderer, "arrow-duel-candidate-b").props.accessibilityLabel).toBe("Choose Arrow Duel candidate B");
     expect(collectText(findByTestId(renderer, "arrow-duel-candidates"))).toBe("ACandidateBCandidate");
+    expect(collectText(findByTestId(renderer, "practice-prompt-icon"))).toBe("AD");
     expect(testIdOrder(renderer, "session-board", "session-score-strip")).toBeLessThan(0);
     expect(testIdOrder(renderer, "session-score-strip", "practice-prompt")).toBeLessThan(0);
     expect(testIdOrder(renderer, "practice-prompt", "arrow-duel-candidates")).toBeLessThan(0);
@@ -719,12 +751,19 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-chart-review-due")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "history-chart-label"))).toBe("Rating");
     expect(findByTestId(renderer, "history-range-filters")).toBeTruthy();
+    expect(findByTestId(renderer, "history-filter-arrow-duel-only")).toBeTruthy();
     expect(findByTestId(renderer, "history-speed-filters")).toBeTruthy();
     expect(findByTestId(renderer, "history-speed-20")).toBeTruthy();
     expect(findByTestId(renderer, "history-review-status-filters")).toBeTruthy();
     expect(findByTestId(renderer, "history-review-status-queued")).toBeTruthy();
     expect(findByTestId(renderer, "history-review-status-clear")).toBeTruthy();
     expectText(renderer, "Correct · e6f7");
+    expectText(renderer, "Wrong move · g6g5");
+
+    press(renderer, "history-filter-arrow-duel-only");
+    expectText(renderer, "0 results");
+    expect(collectText(renderer.root)).not.toContain("Wrong move · g6g5");
+    press(renderer, "history-mode-standard");
     expectText(renderer, "Wrong move · g6g5");
 
     press(renderer, "history-speed-20");
@@ -802,6 +841,15 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "history-tab");
     press(renderer, "history-source-review");
+    expectText(renderer, "1-20 of 22");
+    expect(findByTestId(renderer, "history-rating-range-filters")).toBeTruthy();
+    expect(findByTestId(renderer, "history-rating-range-all")).toBeTruthy();
+    expect(findByTestId(renderer, "history-rating-range-under1000")).toBeTruthy();
+    expect(findByTestId(renderer, "history-rating-range-1000-1399")).toBeTruthy();
+    expect(findByTestId(renderer, "history-rating-range-1400-plus")).toBeTruthy();
+    press(renderer, "history-rating-range-1000-1399");
+    expectText(renderer, "0 results");
+    press(renderer, "history-rating-range-1400-plus");
     expectText(renderer, "1-20 of 22");
     press(renderer, "history-page-next");
     expectText(renderer, "21-22 of 22");
