@@ -129,24 +129,18 @@ const TEST_PUZZLE_SOURCES: ReadonlyArray<{ source: MobilePuzzleSource; label: st
   { source: "familiar15", label: "Familiar 15" },
   { source: "random1000", label: "Random 1000" }
 ];
-const PRIMARY_TABS: ReadonlyArray<{ tab: Exclude<Tab, "analysis">; label: string; icon: string; testID: string }> = [
-  { tab: "practice", label: "Practice", icon: "⌂", testID: "practice-tab" },
-  { tab: "review", label: "Review", icon: "◇", testID: "review-tab" },
-  { tab: "history", label: "History", icon: "◷", testID: "history-tab" },
-  { tab: "packs", label: "Packs", icon: "□", testID: "packs-tab" },
-  { tab: "settings", label: "Settings", icon: "⚙", testID: "settings-tab" }
+const PRIMARY_TABS: ReadonlyArray<{ tab: Exclude<Tab, "analysis">; label: string; testID: string }> = [
+  { tab: "practice", label: "Practice", testID: "practice-tab" },
+  { tab: "review", label: "Review", testID: "review-tab" },
+  { tab: "history", label: "History", testID: "history-tab" },
+  { tab: "packs", label: "Packs", testID: "packs-tab" },
+  { tab: "settings", label: "Settings", testID: "settings-tab" }
 ];
 const PRACTICE_MODE_DESCRIPTIONS: Record<SprintMode, string> = {
   standard: "Find the best move",
   arrow_duel: "Choose the best move",
   blitz: "Fast time control",
   custom: "Time, theme, rating"
-};
-const PRACTICE_MODE_ICONS: Record<SprintMode, string> = {
-  standard: "◎",
-  arrow_duel: "↗",
-  blitz: "↯",
-  custom: "≡"
 };
 const BOARD_FILES = ["a", "b", "c", "d", "e", "f", "g", "h"] as const;
 const BOARD_FILES_FLIPPED = ["h", "g", "f", "e", "d", "c", "b", "a"] as const;
@@ -1313,8 +1307,8 @@ export function PracticePocScreen({
             <TabButton
               key={item.tab}
               active={tab === item.tab}
-              icon={item.icon}
               label={item.label}
+              tab={item.tab}
               testID={item.testID}
               onPress={() => setTab(item.tab)}
             />
@@ -1477,7 +1471,7 @@ function ResumeSprintCard({
       onPress={onResume}
     >
       <View style={styles.practiceModeIcon}>
-        <Text style={styles.practiceModeIconText}>{PRACTICE_MODE_ICONS[sprint.config.mode]}</Text>
+        <PracticeModeGlyph mode={sprint.config.mode} />
       </View>
       <View style={styles.resumeSprintCopy}>
         <Text style={styles.sectionLabel}>Resume sprint</Text>
@@ -1511,7 +1505,7 @@ function PracticeModeCard({
     >
       <View style={styles.practiceModeSelectArea}>
         <View style={styles.practiceModeIcon} testID={`practice-mode-${item.mode.replace("_", "-")}-icon`}>
-          <Text style={styles.practiceModeIconText}>{PRACTICE_MODE_ICONS[item.mode]}</Text>
+          <PracticeModeGlyph mode={item.mode} />
         </View>
         <View style={styles.practiceModeCopy}>
           <View style={styles.practiceModeTitleRow}>
@@ -2344,7 +2338,7 @@ function PracticePrompt({
   }
   const side = sideToMove(currentPuzzle.currentFen) === "b" ? "black" : "white";
   const isArrowDuel = currentPuzzle.kind === "arrow_duel";
-  const promptBadge = mode === "arrow_duel" ? PRACTICE_MODE_ICONS.arrow_duel : PRACTICE_MODE_ICONS.standard;
+  const promptMode = mode === "arrow_duel" ? "arrow_duel" : "standard";
   const displayedPromptText = promptText === undefined
     ? (
       isArrowDuel
@@ -2358,7 +2352,9 @@ function PracticePrompt({
 
   return (
     <View style={styles.promptPanel} testID="practice-prompt">
-      <Text style={styles.promptIcon} testID="practice-prompt-icon">{promptBadge}</Text>
+      <View style={styles.promptIcon} testID="practice-prompt-icon">
+        <PracticeModeGlyph mode={promptMode} inverse />
+      </View>
       <View style={styles.promptCopy}>
         <Text style={styles.promptTitle}>{mode === "arrow_duel" ? "Arrow Duel" : modeLabel(mode)}</Text>
         {displayedPromptText ? <Text style={styles.promptText}>{displayedPromptText}</Text> : null}
@@ -2366,6 +2362,48 @@ function PracticePrompt({
           <Text style={styles.promptHint}>{displayedPromptHint}</Text>
         ) : null}
       </View>
+    </View>
+  );
+}
+
+function PracticeModeGlyph({
+  inverse = false,
+  mode
+}: {
+  inverse?: boolean;
+  mode: SprintMode;
+}): React.JSX.Element {
+  const color = inverse ? "#FFFFFF" : "#2563EB";
+  if (mode === "standard") {
+    return (
+      <View style={styles.modeGlyphCanvas}>
+        <View style={[styles.modeTargetOuter, { borderColor: color }]} />
+        <View style={[styles.modeTargetInner, { borderColor: color }]} />
+      </View>
+    );
+  }
+  if (mode === "arrow_duel") {
+    return (
+      <View style={styles.modeGlyphCanvas}>
+        <View style={[styles.modeArrowStem, { backgroundColor: color }]} />
+        <View style={[styles.modeArrowHeadTop, { backgroundColor: color }]} />
+        <View style={[styles.modeArrowHeadBottom, { backgroundColor: color }]} />
+      </View>
+    );
+  }
+  if (mode === "blitz") {
+    return (
+      <View style={styles.modeGlyphCanvas}>
+        <View style={[styles.modeBoltTop, { backgroundColor: color }]} />
+        <View style={[styles.modeBoltBottom, { backgroundColor: color }]} />
+      </View>
+    );
+  }
+  return (
+    <View style={styles.modeListGlyph}>
+      <View style={[styles.modeListBar, { backgroundColor: color }]} />
+      <View style={[styles.modeListBar, { backgroundColor: color }]} />
+      <View style={[styles.modeListBar, { backgroundColor: color }]} />
     </View>
   );
 }
@@ -5727,14 +5765,14 @@ function OptionButton({
 
 function TabButton({
   active,
-  icon,
   label,
+  tab,
   testID,
   onPress
 }: {
   active: boolean;
-  icon: string;
   label: string;
+  tab: Exclude<Tab, "analysis">;
   testID: string;
   onPress: () => void;
 }): React.JSX.Element {
@@ -5748,10 +5786,60 @@ function TabButton({
       onPress={onPress}
     >
       <View style={[styles.tabIconBadge, active ? styles.tabIconBadgeActive : null]} testID={`${testID}-icon`}>
-        <Text style={[styles.tabIconText, active ? styles.tabTextActive : null]}>{icon}</Text>
+        <TabGlyph tab={tab} active={active} />
       </View>
       <Text style={[styles.tabText, active ? styles.tabTextActive : null]}>{label}</Text>
     </Pressable>
+  );
+}
+
+function TabGlyph({
+  active,
+  tab
+}: {
+  active: boolean;
+  tab: Exclude<Tab, "analysis">;
+}): React.JSX.Element {
+  const color = active ? "#2563EB" : "#64748B";
+  if (tab === "practice") {
+    return (
+      <View style={styles.tabGlyphCanvas}>
+        <View style={[styles.tabHomeRoof, { borderColor: color }]} />
+        <View style={[styles.tabHomeBase, { borderColor: color }]} />
+      </View>
+    );
+  }
+  if (tab === "review") {
+    return <View style={[styles.tabDiamondGlyph, { borderColor: color }]} />;
+  }
+  if (tab === "history") {
+    return (
+      <View style={[styles.tabClockGlyph, { borderColor: color }]}>
+        <View style={[styles.tabClockHandVertical, { backgroundColor: color }]} />
+        <View style={[styles.tabClockHandDiagonal, { backgroundColor: color }]} />
+      </View>
+    );
+  }
+  if (tab === "packs") {
+    return (
+      <View style={styles.tabGlyphCanvas}>
+        <View style={[styles.tabPackHandle, { borderColor: color }]} />
+        <View style={[styles.tabPackBody, { borderColor: color }]} />
+      </View>
+    );
+  }
+  return (
+    <View style={styles.tabSliderGlyph}>
+      <View style={[styles.tabSliderLine, { backgroundColor: color }]}>
+        <View style={[styles.tabSliderKnob, styles.tabSliderKnobLeft, { backgroundColor: color }]} />
+      </View>
+      <View style={[styles.tabSliderLine, { backgroundColor: color }]}>
+        <View style={[styles.tabSliderKnob, styles.tabSliderKnobRight, { backgroundColor: color }]} />
+      </View>
+      <View style={[styles.tabSliderLine, { backgroundColor: color }]}>
+        <View style={[styles.tabSliderKnob, styles.tabSliderKnobMiddle, { backgroundColor: color }]} />
+      </View>
+    </View>
   );
 }
 
@@ -6096,12 +6184,6 @@ const styles = StyleSheet.create({
   tabIconBadgeActive: {
     backgroundColor: "#DBEAFE"
   },
-  tabIconText: {
-    color: "#64748B",
-    fontSize: 10,
-    fontWeight: "900",
-    lineHeight: 14
-  },
   tabText: {
     color: "#64748B",
     fontSize: 10,
@@ -6109,6 +6191,103 @@ const styles = StyleSheet.create({
   },
   tabTextActive: {
     color: "#2563EB"
+  },
+  tabGlyphCanvas: {
+    alignItems: "center",
+    height: 16,
+    justifyContent: "center",
+    width: 16
+  },
+  tabHomeRoof: {
+    borderLeftWidth: 2,
+    borderTopWidth: 2,
+    height: 10,
+    position: "absolute",
+    top: 2,
+    transform: [{ rotate: "45deg" }],
+    width: 10
+  },
+  tabHomeBase: {
+    borderRadius: 2,
+    borderWidth: 2,
+    bottom: 1,
+    height: 8,
+    position: "absolute",
+    width: 9
+  },
+  tabDiamondGlyph: {
+    borderRadius: 2,
+    borderWidth: 2,
+    height: 12,
+    transform: [{ rotate: "45deg" }],
+    width: 12
+  },
+  tabClockGlyph: {
+    alignItems: "center",
+    borderRadius: 999,
+    borderWidth: 2,
+    height: 15,
+    justifyContent: "center",
+    width: 15
+  },
+  tabClockHandVertical: {
+    borderRadius: 999,
+    height: 5,
+    position: "absolute",
+    top: 3,
+    width: 2
+  },
+  tabClockHandDiagonal: {
+    borderRadius: 999,
+    height: 2,
+    position: "absolute",
+    right: 3,
+    top: 7,
+    transform: [{ rotate: "25deg" }],
+    width: 5
+  },
+  tabPackHandle: {
+    borderBottomWidth: 0,
+    borderRadius: 2,
+    borderWidth: 2,
+    height: 4,
+    position: "absolute",
+    top: 2,
+    width: 8
+  },
+  tabPackBody: {
+    borderRadius: 3,
+    borderWidth: 2,
+    height: 12,
+    position: "absolute",
+    top: 4,
+    width: 14
+  },
+  tabSliderGlyph: {
+    gap: 3,
+    width: 16
+  },
+  tabSliderLine: {
+    borderRadius: 999,
+    height: 2,
+    position: "relative",
+    width: 16
+  },
+  tabSliderKnob: {
+    borderRadius: 999,
+    height: 5,
+    position: "absolute",
+    top: -1.5,
+    width: 5
+  },
+  tabSliderKnobLeft: {
+    left: 1
+  },
+  tabSliderKnobMiddle: {
+    left: 6
+  },
+  tabSliderKnobRight: {
+    right: 1
   },
   content: {
     gap: 12,
@@ -6170,11 +6349,77 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 34
   },
-  practiceModeIconText: {
-    color: "#2563EB",
-    fontSize: 16,
-    fontWeight: "900",
-    lineHeight: 20
+  modeGlyphCanvas: {
+    alignItems: "center",
+    height: 18,
+    justifyContent: "center",
+    width: 18
+  },
+  modeTargetOuter: {
+    borderRadius: 999,
+    borderWidth: 2,
+    height: 17,
+    position: "absolute",
+    width: 17
+  },
+  modeTargetInner: {
+    borderRadius: 999,
+    borderWidth: 2,
+    height: 10,
+    position: "absolute",
+    width: 10
+  },
+  modeArrowStem: {
+    borderRadius: 999,
+    height: 3,
+    position: "absolute",
+    transform: [{ rotate: "-45deg" }],
+    width: 19
+  },
+  modeArrowHeadTop: {
+    borderRadius: 999,
+    height: 3,
+    position: "absolute",
+    right: 0,
+    top: 3,
+    transform: [{ rotate: "45deg" }],
+    width: 9
+  },
+  modeArrowHeadBottom: {
+    borderRadius: 999,
+    bottom: 3,
+    height: 3,
+    position: "absolute",
+    right: 0,
+    transform: [{ rotate: "-45deg" }],
+    width: 9
+  },
+  modeBoltTop: {
+    borderRadius: 999,
+    height: 3,
+    left: 6,
+    position: "absolute",
+    top: 2,
+    transform: [{ rotate: "-72deg" }],
+    width: 14
+  },
+  modeBoltBottom: {
+    borderRadius: 999,
+    bottom: 2,
+    height: 3,
+    left: 1,
+    position: "absolute",
+    transform: [{ rotate: "-72deg" }],
+    width: 14
+  },
+  modeListGlyph: {
+    gap: 3,
+    width: 16
+  },
+  modeListBar: {
+    borderRadius: 999,
+    height: 3,
+    width: 16
   },
   practiceModeCopy: {
     flex: 1,
@@ -6679,14 +6924,11 @@ const styles = StyleSheet.create({
     padding: 12
   },
   promptIcon: {
+    alignItems: "center",
     backgroundColor: "#1F2937",
     borderRadius: 999,
-    color: "#FFFFFF",
-    fontSize: 11,
-    fontWeight: "900",
     height: 28,
-    lineHeight: 28,
-    textAlign: "center",
+    justifyContent: "center",
     width: 32
   },
   promptCopy: {
