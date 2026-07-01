@@ -1525,7 +1525,7 @@ function PracticeModeCard({
           style={styles.practiceModeChevronButton}
           onPress={onPress}
         >
-          <Text style={styles.practiceModeChevron}>›</Text>
+          <ChevronGlyph direction="right" />
         </Pressable>
       </View>
     </Pressable>
@@ -1652,7 +1652,7 @@ function CustomSprintSetup({
           style={styles.analysisIconButton}
           onPress={onClose}
         >
-          <Text style={styles.analysisIconButtonText}>×</Text>
+          <CloseGlyph />
         </Pressable>
         <Text style={styles.customScreenTitle}>Custom Sprint</Text>
         <Pressable
@@ -1927,7 +1927,7 @@ function CustomOptionRow<T extends number>({
               }
             }}
           >
-            <Text style={styles.customStepperText}>−</Text>
+            <MinusGlyph />
           </Pressable>
           <Pressable
             accessibilityRole="button"
@@ -1942,7 +1942,7 @@ function CustomOptionRow<T extends number>({
               }
             }}
           >
-            <Text style={styles.customStepperText}>＋</Text>
+            <PlusGlyph />
           </Pressable>
         </View>
       </View>
@@ -2087,30 +2087,25 @@ function SessionStatusBar({
             style={styles.sessionNavButton}
             onPress={() => setConfirmAbandon(true)}
           >
-            <Text style={styles.sessionNavButtonText}>×</Text>
+            <CloseGlyph />
           </Pressable>
         ) : (
           <View style={styles.sessionNavButton} />
         )}
         <Text style={styles.sessionNavTitle}>{modeLabel(mode)}</Text>
         <View style={styles.sessionNavButton} testID="session-overflow">
-          <Text style={styles.sessionOverflowText}>•••</Text>
+          <MoreGlyph />
         </View>
       </View>
 
       <View style={styles.sessionActiveMetricRow} testID="session-status-metrics">
-        <View style={styles.sessionActiveMetric}>
-          <Text style={styles.resultMetricLabel}>Solved</Text>
-          <Text testID="session-progress" style={styles.sessionProgressValue}>
-            {state.correctCount} / {state.config.targetCorrect}
-          </Text>
-        </View>
+        <Text testID="session-progress" style={styles.sessionProgressValue}>
+          {state.correctCount} / {state.config.targetCorrect}
+        </Text>
         <View style={styles.sessionTimerBlock}>
-          <Text style={styles.resultMetricLabel}>Time</Text>
           <Text testID="session-timer" style={styles.timerText}>{timerText}</Text>
         </View>
-        <View style={[styles.sessionActiveMetric, styles.sessionActiveMetricRight]}>
-          <Text style={styles.resultMetricLabel}>Rating</Text>
+        <View style={styles.sessionRatingBlock}>
           <Text testID="session-rating" style={styles.sessionRatingValue}>ELO {currentRating}</Text>
         </View>
       </View>
@@ -2832,7 +2827,7 @@ function HistoryPanel({
           style={[styles.reviewFilterButton, filtersExpanded ? styles.reviewFilterButtonActive : null]}
           onPress={() => setFiltersExpanded((current) => !current)}
         >
-          <Text style={[styles.reviewFilterButtonText, filtersExpanded ? styles.reviewFilterButtonTextActive : null]}>≡</Text>
+          <FilterGlyph active={filtersExpanded} />
         </Pressable>
       </View>
 
@@ -2988,7 +2983,7 @@ function HistoryPanel({
             style={[styles.iconButton, page.offset === 0 ? styles.disabledButton : null]}
             onPress={() => onPageOffsetChange(Math.max(0, page.offset - page.limit))}
           >
-            <Text style={styles.iconButtonText}>‹</Text>
+            <ChevronGlyph direction="left" />
           </Pressable>
           <Pressable
             accessibilityRole="button"
@@ -2999,7 +2994,7 @@ function HistoryPanel({
             style={[styles.iconButton, !page.hasMore ? styles.disabledButton : null]}
             onPress={() => onPageOffsetChange(page.offset + page.limit)}
           >
-            <Text style={styles.iconButtonText}>›</Text>
+            <ChevronGlyph direction="right" />
           </Pressable>
         </View>
       </View>
@@ -3295,6 +3290,97 @@ function FilterButton({
   );
 }
 
+function FilterGlyph({ active }: { active: boolean }): React.JSX.Element {
+  const color = active ? "#2563EB" : "#334155";
+  return (
+    <View style={styles.filterGlyph} testID="filter-glyph">
+      <View style={[styles.filterGlyphLine, { backgroundColor: color }]}>
+        <View style={[styles.filterGlyphKnob, styles.filterGlyphKnobRight, { backgroundColor: color }]} />
+      </View>
+      <View style={[styles.filterGlyphLine, { backgroundColor: color }]}>
+        <View style={[styles.filterGlyphKnob, styles.filterGlyphKnobLeft, { backgroundColor: color }]} />
+      </View>
+      <View style={[styles.filterGlyphLine, { backgroundColor: color }]}>
+        <View style={[styles.filterGlyphKnob, styles.filterGlyphKnobMiddle, { backgroundColor: color }]} />
+      </View>
+    </View>
+  );
+}
+
+function PlusGlyph(): React.JSX.Element {
+  return (
+    <View style={styles.plusGlyph} testID="plus-glyph">
+      <View style={[styles.plusGlyphLine, styles.plusGlyphHorizontal]} />
+      <View style={[styles.plusGlyphLine, styles.plusGlyphVertical]} />
+    </View>
+  );
+}
+
+function MinusGlyph(): React.JSX.Element {
+  return (
+    <View style={styles.minusGlyph} testID="minus-glyph">
+      <View style={styles.minusGlyphLine} />
+    </View>
+  );
+}
+
+function CloseGlyph(): React.JSX.Element {
+  return (
+    <View style={styles.closeGlyph} testID="close-glyph">
+      <View style={[styles.closeGlyphLine, styles.closeGlyphForward]} />
+      <View style={[styles.closeGlyphLine, styles.closeGlyphBackward]} />
+    </View>
+  );
+}
+
+function MoreGlyph(): React.JSX.Element {
+  return (
+    <View style={styles.moreGlyph} testID="more-glyph">
+      <View style={styles.moreGlyphDot} />
+      <View style={styles.moreGlyphDot} />
+      <View style={styles.moreGlyphDot} />
+    </View>
+  );
+}
+
+function ChevronGlyph({ direction }: { direction: "left" | "right" }): React.JSX.Element {
+  return (
+    <View style={styles.chevronGlyphCanvas} testID={`chevron-${direction}-glyph`}>
+      <View style={[styles.chevronGlyph, direction === "left" ? styles.chevronGlyphLeft : styles.chevronGlyphRight]} />
+    </View>
+  );
+}
+
+function ResetGlyph(): React.JSX.Element {
+  return (
+    <View style={styles.resetGlyph} testID="reset-glyph">
+      <View style={styles.resetArc} />
+      <View style={styles.resetArrowStem} />
+      <View style={styles.resetArrowHead} />
+    </View>
+  );
+}
+
+function FlipGlyph(): React.JSX.Element {
+  return (
+    <View style={styles.flipGlyph} testID="flip-glyph">
+      <View style={styles.flipGlyphTrackTop} />
+      <View style={styles.flipGlyphTrackBottom} />
+      <View style={styles.flipGlyphHeadRight} />
+      <View style={styles.flipGlyphHeadLeft} />
+    </View>
+  );
+}
+
+function SearchGlyph(): React.JSX.Element {
+  return (
+    <View style={styles.searchGlyph} testID="search-glyph">
+      <View style={styles.searchGlyphLens} />
+      <View style={styles.searchGlyphHandle} />
+    </View>
+  );
+}
+
 function groupReviewEntriesByContext(entries: ReviewEntry[]): Array<{
   key: string;
   mode: SprintMode;
@@ -3562,7 +3648,7 @@ function ReviewPanel({
           style={[styles.reviewFilterButton, filtersExpanded ? styles.reviewFilterButtonActive : null]}
           onPress={() => setFiltersExpanded((current) => !current)}
         >
-          <Text style={[styles.reviewFilterButtonText, filtersExpanded ? styles.reviewFilterButtonTextActive : null]}>≡</Text>
+          <FilterGlyph active={filtersExpanded} />
         </Pressable>
       </View>
 
@@ -3694,7 +3780,7 @@ function ReviewPanel({
               </View>
               <View style={styles.reviewContextMeta}>
                 <Text style={styles.reviewContextCount}>{group.entries.length}</Text>
-                <Text style={styles.practiceModeChevron}>›</Text>
+                <ChevronGlyph direction="right" />
               </View>
             </Pressable>
           ))}
@@ -3765,7 +3851,7 @@ function ReviewQueueItemCard({
         <Text style={styles.helperText}>{dueState} · {formatIntervalHours(item.review.intervalHours)} interval</Text>
         <Text style={styles.helperText}>{source} · Review {item.review.reviewCount} · Lapses {item.review.lapseCount}</Text>
       </View>
-      <Text style={styles.practiceModeChevron}>›</Text>
+      <ChevronGlyph direction="right" />
     </Pressable>
   );
 }
@@ -3807,7 +3893,7 @@ function ReviewDifficultyRow({
         ]}>
           {count}
         </Text>
-        <Text style={styles.practiceModeChevron}>›</Text>
+        <ChevronGlyph direction="right" />
       </View>
     </Pressable>
   );
@@ -4379,7 +4465,7 @@ function ReviewSession({
             style={styles.iconButton}
             onPress={() => onExit(currentEntry.source)}
           >
-            <Text style={styles.iconButtonText}>×</Text>
+            <CloseGlyph />
           </Pressable>
           <View style={styles.reviewTitleBlock}>
             <Text style={styles.panelTitle}>Review</Text>
@@ -4399,7 +4485,7 @@ function ReviewSession({
                 style={[styles.iconButton, !canReviewPrevious ? styles.disabledButton : null]}
                 onPress={() => navigateReview(entryIndex - 1)}
               >
-                <Text style={styles.iconButtonText}>‹</Text>
+                <ChevronGlyph direction="left" />
               </Pressable>
               <Pressable
                 accessibilityRole="button"
@@ -4410,7 +4496,7 @@ function ReviewSession({
                 style={[styles.iconButton, !canReviewNext ? styles.disabledButton : null]}
                 onPress={() => navigateReview(entryIndex + 1)}
               >
-                <Text style={styles.iconButtonText}>›</Text>
+                <ChevronGlyph direction="right" />
               </Pressable>
             </>
           ) : null}
@@ -4423,7 +4509,7 @@ function ReviewSession({
             style={[styles.iconButton, boardLocked ? styles.disabledButton : null]}
             onPress={resetReviewPuzzle}
           >
-            <Text style={styles.iconButtonText}>↺</Text>
+            <ResetGlyph />
           </Pressable>
           </View>
         </View>
@@ -4553,7 +4639,7 @@ function ReviewSession({
             {analysisEnabled ? (
               <>
                 <Pressable accessibilityRole="button" accessibilityLabel="Close analysis" testID="review-close-analysis" style={styles.iconButton} onPress={closeAnalysis}>
-                  <Text style={styles.iconButtonText}>×</Text>
+                  <CloseGlyph />
                 </Pressable>
                 <Pressable
                   accessibilityRole="button"
@@ -4564,7 +4650,7 @@ function ReviewSession({
                   style={[styles.iconButton, !canAnalysisBack ? styles.disabledButton : null]}
                   onPress={stepAnalysisBack}
                 >
-                  <Text style={styles.iconButtonText}>‹</Text>
+                  <ChevronGlyph direction="left" />
                 </Pressable>
                 <Pressable
                   accessibilityRole="button"
@@ -4575,13 +4661,13 @@ function ReviewSession({
                   style={[styles.iconButton, !canAnalysisForward ? styles.disabledButton : null]}
                   onPress={stepAnalysisForward}
                 >
-                  <Text style={styles.iconButtonText}>›</Text>
+                  <ChevronGlyph direction="right" />
                 </Pressable>
                 <Pressable accessibilityRole="button" accessibilityLabel="Reset analysis" testID="review-analysis-reset" style={styles.iconButton} onPress={resetAnalysisPosition}>
-                  <Text style={styles.iconButtonText}>↺</Text>
+                  <ResetGlyph />
                 </Pressable>
                 <Pressable accessibilityRole="button" accessibilityLabel="Flip board" testID="review-analysis-flip" style={styles.iconButton} onPress={() => setManualBoardFlip((current) => !current)}>
-                  <Text style={styles.iconButtonText}>⇄</Text>
+                  <FlipGlyph />
                 </Pressable>
                 <Text testID="review-analysis-engine-status" style={styles.analysisEngineStatus} numberOfLines={1}>
                   {analysisEngineLabel}
@@ -4590,7 +4676,7 @@ function ReviewSession({
             ) : (
               <>
                 <Pressable accessibilityRole="button" accessibilityLabel="Analyze position" testID="review-analysis-button" style={styles.analysisIconButton} onPress={openAnalysis}>
-                  <Text style={styles.analysisIconButtonText}>⌕</Text>
+                  <SearchGlyph />
                 </Pressable>
                 <Text style={styles.analysisTitle}>Analysis</Text>
               </>
@@ -4938,7 +5024,7 @@ function SettingsPanel({
               <Text style={styles.listText}>Allow upload</Text>
               <Text style={styles.helperText}>Required before this device uploads existing local progress.</Text>
             </View>
-            <Text style={styles.practiceModeChevron}>›</Text>
+            <ChevronGlyph direction="right" />
           </Pressable>
         ) : null}
       </SettingsSection>
@@ -5158,7 +5244,7 @@ function SettingsRow({
       </View>
       <View style={styles.settingsRowMeta}>
         {value ? <Text style={styles.settingsRowValue}>{value}</Text> : null}
-        <Text style={styles.practiceModeChevron}>›</Text>
+        <ChevronGlyph direction="right" />
       </View>
     </Pressable>
   );
@@ -5295,7 +5381,7 @@ function PacksPanel(): React.JSX.Element {
           style={styles.packsIconButton}
           onPress={() => beginPackImport("Imported Pack")}
         >
-          <Text style={styles.iconButtonText}>＋</Text>
+          <PlusGlyph />
         </Pressable>
       </View>
 
@@ -5510,7 +5596,7 @@ function PackDetailPanel({
           style={styles.packsIconButton}
           onPress={onClose}
         >
-          <Text style={styles.iconButtonText}>×</Text>
+          <CloseGlyph />
         </Pressable>
       </View>
       <PackInfoRow label="Puzzles" value={pack.coverage.puzzles} testID="pack-detail-puzzles" />
@@ -6468,12 +6554,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 28
   },
-  practiceModeChevron: {
-    color: "#111827",
-    fontSize: 20,
-    fontWeight: "700",
-    lineHeight: 22
-  },
   practiceProgressCard: {
     alignItems: "center",
     backgroundColor: "#FFFFFF",
@@ -6586,14 +6666,31 @@ const styles = StyleSheet.create({
     backgroundColor: "#EFF6FF",
     borderColor: "#2563EB"
   },
-  reviewFilterButtonText: {
-    color: "#334155",
-    fontSize: 18,
-    fontWeight: "900",
-    lineHeight: 20
+  filterGlyph: {
+    gap: 4,
+    width: 17
   },
-  reviewFilterButtonTextActive: {
-    color: "#1D4ED8"
+  filterGlyphLine: {
+    borderRadius: 999,
+    height: 2,
+    position: "relative",
+    width: 17
+  },
+  filterGlyphKnob: {
+    borderRadius: 999,
+    height: 5,
+    position: "absolute",
+    top: -1.5,
+    width: 5
+  },
+  filterGlyphKnobLeft: {
+    left: 1
+  },
+  filterGlyphKnobMiddle: {
+    left: 6
+  },
+  filterGlyphKnobRight: {
+    right: 1
   },
   reviewDueCard: {
     alignItems: "center",
@@ -6734,25 +6831,22 @@ const styles = StyleSheet.create({
     gap: 10
   },
   activeSessionShell: {
-    gap: 10
+    gap: 8
   },
   sessionNavRow: {
     alignItems: "center",
+    borderBottomColor: "#E2E8F0",
+    borderBottomWidth: 1,
     flexDirection: "row",
     justifyContent: "space-between",
-    minHeight: 44
+    minHeight: 42,
+    paddingBottom: 4
   },
   sessionNavButton: {
     alignItems: "center",
     height: 40,
     justifyContent: "center",
     width: 40
-  },
-  sessionNavButtonText: {
-    color: "#111827",
-    fontSize: 24,
-    fontWeight: "500",
-    lineHeight: 28
   },
   sessionNavTitle: {
     color: "#111827",
@@ -6761,24 +6855,11 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     textAlign: "center"
   },
-  sessionOverflowText: {
-    color: "#111827",
-    fontSize: 16,
-    fontWeight: "900",
-    letterSpacing: 1,
-    lineHeight: 20
-  },
   sessionActiveMetricRow: {
     alignItems: "center",
     flexDirection: "row",
-    justifyContent: "space-between"
-  },
-  sessionActiveMetric: {
-    flex: 1,
-    gap: 2
-  },
-  sessionActiveMetricRight: {
-    alignItems: "flex-end"
+    justifyContent: "space-between",
+    minHeight: 32
   },
   sessionAbandonConfirm: {
     alignItems: "center",
@@ -6802,24 +6883,29 @@ const styles = StyleSheet.create({
   },
   sessionTimerBlock: {
     alignItems: "center",
-    flex: 1,
-    gap: 2
+    flex: 1
+  },
+  sessionRatingBlock: {
+    alignItems: "flex-end",
+    minWidth: 72
   },
   sessionProgressValue: {
     color: "#111827",
-    fontSize: 14,
-    fontWeight: "800"
+    fontSize: 13,
+    fontWeight: "800",
+    minWidth: 72
   },
   sessionRatingValue: {
     color: "#334155",
     fontSize: 12,
-    fontWeight: "800"
+    fontWeight: "800",
+    textAlign: "right"
   },
   sessionMistakeRow: {
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "center",
-    minHeight: 36
+    minHeight: 30
   },
   sessionHeaderRow: {
     alignItems: "center",
@@ -6863,7 +6949,8 @@ const styles = StyleSheet.create({
   timerText: {
     color: "#111827",
     fontFamily: "menlo",
-    fontSize: 20,
+    fontSize: 22,
+    fontWeight: "800",
     fontVariant: ["tabular-nums"],
     letterSpacing: 0.2
   },
@@ -7181,12 +7268,6 @@ const styles = StyleSheet.create({
     height: 32,
     justifyContent: "center",
     width: 36
-  },
-  customStepperText: {
-    color: "#111827",
-    fontSize: 15,
-    fontWeight: "900",
-    lineHeight: 18
   },
   customConfigValue: {
     color: "#475569",
@@ -8248,6 +8329,204 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     lineHeight: 17
+  },
+  plusGlyph: {
+    alignItems: "center",
+    height: 18,
+    justifyContent: "center",
+    width: 18
+  },
+  plusGlyphLine: {
+    backgroundColor: "#2563EB",
+    borderRadius: 999,
+    position: "absolute"
+  },
+  plusGlyphHorizontal: {
+    height: 2.5,
+    width: 15
+  },
+  plusGlyphVertical: {
+    height: 15,
+    width: 2.5
+  },
+  minusGlyph: {
+    alignItems: "center",
+    height: 18,
+    justifyContent: "center",
+    width: 18
+  },
+  minusGlyphLine: {
+    backgroundColor: "#111827",
+    borderRadius: 999,
+    height: 2.5,
+    width: 15
+  },
+  closeGlyph: {
+    alignItems: "center",
+    height: 18,
+    justifyContent: "center",
+    width: 18
+  },
+  closeGlyphLine: {
+    backgroundColor: "#111827",
+    borderRadius: 999,
+    height: 2.25,
+    position: "absolute",
+    width: 16
+  },
+  closeGlyphForward: {
+    transform: [{ rotate: "45deg" }]
+  },
+  closeGlyphBackward: {
+    transform: [{ rotate: "-45deg" }]
+  },
+  moreGlyph: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 3,
+    justifyContent: "center",
+    width: 18
+  },
+  moreGlyphDot: {
+    backgroundColor: "#111827",
+    borderRadius: 999,
+    height: 4,
+    width: 4
+  },
+  chevronGlyphCanvas: {
+    alignItems: "center",
+    height: 18,
+    justifyContent: "center",
+    width: 18
+  },
+  chevronGlyph: {
+    borderColor: "#334155",
+    height: 9,
+    width: 9
+  },
+  chevronGlyphLeft: {
+    borderBottomWidth: 2.5,
+    borderLeftWidth: 2.5,
+    transform: [{ rotate: "45deg" }]
+  },
+  chevronGlyphRight: {
+    borderRightWidth: 2.5,
+    borderTopWidth: 2.5,
+    transform: [{ rotate: "45deg" }]
+  },
+  resetGlyph: {
+    height: 18,
+    position: "relative",
+    width: 18
+  },
+  resetArc: {
+    borderColor: "#334155",
+    borderLeftColor: "transparent",
+    borderRadius: 999,
+    borderWidth: 2,
+    height: 15,
+    left: 1.5,
+    position: "absolute",
+    top: 1.5,
+    transform: [{ rotate: "-35deg" }],
+    width: 15
+  },
+  resetArrowStem: {
+    backgroundColor: "#334155",
+    borderRadius: 999,
+    height: 2,
+    left: 2,
+    position: "absolute",
+    top: 5,
+    transform: [{ rotate: "-22deg" }],
+    width: 7
+  },
+  resetArrowHead: {
+    borderBottomColor: "transparent",
+    borderBottomWidth: 4,
+    borderRightColor: "#334155",
+    borderRightWidth: 6,
+    borderTopColor: "transparent",
+    borderTopWidth: 4,
+    height: 0,
+    left: 1,
+    position: "absolute",
+    top: 1,
+    width: 0
+  },
+  flipGlyph: {
+    height: 18,
+    position: "relative",
+    width: 18
+  },
+  flipGlyphTrackTop: {
+    backgroundColor: "#334155",
+    borderRadius: 999,
+    height: 2,
+    left: 3,
+    position: "absolute",
+    top: 5,
+    width: 11
+  },
+  flipGlyphTrackBottom: {
+    backgroundColor: "#334155",
+    borderRadius: 999,
+    height: 2,
+    left: 4,
+    position: "absolute",
+    top: 11,
+    width: 11
+  },
+  flipGlyphHeadRight: {
+    borderBottomColor: "transparent",
+    borderBottomWidth: 4,
+    borderLeftColor: "#334155",
+    borderLeftWidth: 5,
+    borderTopColor: "transparent",
+    borderTopWidth: 4,
+    height: 0,
+    position: "absolute",
+    right: 1,
+    top: 2,
+    width: 0
+  },
+  flipGlyphHeadLeft: {
+    borderBottomColor: "transparent",
+    borderBottomWidth: 4,
+    borderRightColor: "#334155",
+    borderRightWidth: 5,
+    borderTopColor: "transparent",
+    borderTopWidth: 4,
+    height: 0,
+    left: 1,
+    position: "absolute",
+    top: 8,
+    width: 0
+  },
+  searchGlyph: {
+    height: 18,
+    position: "relative",
+    width: 18
+  },
+  searchGlyphLens: {
+    borderColor: "#0F172A",
+    borderRadius: 999,
+    borderWidth: 2,
+    height: 10,
+    left: 3,
+    position: "absolute",
+    top: 3,
+    width: 10
+  },
+  searchGlyphHandle: {
+    backgroundColor: "#0F172A",
+    borderRadius: 999,
+    height: 2.5,
+    left: 11,
+    position: "absolute",
+    top: 12,
+    transform: [{ rotate: "45deg" }],
+    width: 6
   },
   settingRow: {
     alignItems: "center",
