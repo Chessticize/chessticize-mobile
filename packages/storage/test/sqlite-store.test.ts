@@ -153,6 +153,58 @@ test("PracticeService builds SQLite history view for a required time range and r
   }
 });
 
+test("PracticeService clears SQLite local history without resetting ratings or puzzles", async () => {
+  const store = await seededStore();
+  const service = new PracticeService(store);
+  try {
+    service.startSprint(
+      { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
+      "2026-06-20T00:00:00.000Z"
+    );
+    service.submitMove("c4b5", "2026-06-20T00:00:05.000Z");
+    service.recordReviewAttempt({
+      puzzleId: "000hf",
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      result: "correct",
+      submittedMove: "c4b5",
+      expectedMove: "c4b5",
+      startedAt: "2026-06-21T00:00:00.000Z"
+    }, "2026-06-21T00:00:05.000Z");
+
+    assert.equal(store.countPuzzles(), 4);
+    assert.equal((service.listHistory() as unknown[]).length, 2);
+    assert.equal(service.getDueReviewItems("2026-06-25T00:00:00.000Z").length, 1);
+    const exported = service.exportLocalData();
+    assert.equal(exported.schemaVersion, 1);
+    assert.equal(exported.attempts.length, 2);
+    assert.equal(exported.reviewQueue.length, 1);
+    assert.equal(exported.sprintSessions.length, 2);
+    assert.deepEqual(exported.ratings.map((rating) => rating.key), ["standard 5/20"]);
+    const ratingBefore = service.getRating("standard 5/20");
+
+    const result = service.clearLocalHistory();
+
+    assert.deepEqual(result, {
+      attempts: 2,
+      reviewEvents: 1,
+      reviewQueue: 1,
+      sprintSessions: 2
+    });
+    assert.equal(store.countPuzzles(), 4);
+    assert.deepEqual(service.listHistory(), []);
+    assert.deepEqual(service.getDueReviewItems("2026-06-21T00:00:05.000Z"), []);
+    assert.deepEqual(service.getHistoryView({
+      now: "2026-06-21T00:00:00.000Z",
+      timeRange: "max",
+      ratingKey: "standard 5/20"
+    }).attempts, []);
+    assert.deepEqual(service.getRating("standard 5/20"), ratingBefore);
+  } finally {
+    store.close();
+  }
+});
+
 test("PracticeService records official SQLite reviews in history without mixing queue contexts", async () => {
   const store = await seededStore();
   const service = new PracticeService(store);
@@ -253,6 +305,12 @@ test("PracticeService exposes the current rating for the selected sprint run", a
 
     assert.equal(reset.rating, 600);
     assert.equal(service.getRating("standard 5/20").generation, 1);
+    const adjusted = service.setRating("standard 5/20", 725);
+    assert.equal(adjusted.rating, 725);
+    assert.equal(adjusted.generation, 2);
+    assert.equal(service.getRating("standard 5/20").rating, 725);
+    assert.throws(() => service.setRating("standard 5/20", 599), /at least 600/);
+    assert.throws(() => service.setRating("standard 5/20", 700.5), /integer/);
   } finally {
     store.close();
   }

@@ -1,6 +1,7 @@
 import {
   abandonSprint as abandonSprintCore,
   buildSprintConfig,
+  RATING_FLOOR,
   serializeSprintView,
   startSprint,
   submitSprintMove
@@ -21,7 +22,7 @@ import type {
   SprintState
 } from "../../core/src/index.ts";
 import type { HistoryFilter } from "./query-types.ts";
-import type { PracticeStore } from "./practice-store.ts";
+import type { ClearLocalHistoryResult, LocalDataExport, PracticeStore } from "./practice-store.ts";
 
 export interface StartSprintCommand {
   mode: SprintMode;
@@ -197,6 +198,14 @@ export class PracticeService {
     return this.store.listAttempts(filter);
   }
 
+  exportLocalData(): LocalDataExport {
+    return this.store.exportLocalData();
+  }
+
+  clearLocalHistory(): ClearLocalHistoryResult {
+    return this.store.transaction(() => this.store.clearLocalHistory());
+  }
+
   getDueReviews(now = new Date().toISOString()): unknown {
     return this.store.getDueReviews(now);
   }
@@ -231,6 +240,23 @@ export class PracticeService {
 
   resetRating(ratingKey: string): unknown {
     return this.store.resetRating(ratingKey);
+  }
+
+  setRating(ratingKey: string, rating: number): RatingRecord {
+    if (!Number.isInteger(rating)) {
+      throw new Error("Rating must be an integer");
+    }
+    if (rating < RATING_FLOOR) {
+      throw new Error(`Rating must be at least ${RATING_FLOOR}`);
+    }
+    const current = this.store.getRating(ratingKey);
+    const next: RatingRecord = {
+      ...current,
+      generation: current.generation + 1,
+      rating
+    };
+    this.store.saveRating(next);
+    return next;
   }
 
   recordReviewAttempt(command: RecordReviewAttemptCommand, now = new Date().toISOString()): {

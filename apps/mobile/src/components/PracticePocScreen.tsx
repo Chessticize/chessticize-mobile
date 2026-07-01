@@ -40,6 +40,7 @@ import type {
   Puzzle,
   PuzzleFeedback,
   PuzzleLineState,
+  RatingRecord,
   ReviewAnalysisLine,
   ReviewQueueItem,
   SessionMistakeReviewItem,
@@ -49,6 +50,7 @@ import type {
   UciEngineTransport
 } from "../../../../packages/core/src/index.ts";
 import type { PracticeService } from "../../../../packages/storage/src/practice-service.ts";
+import type { ClearLocalHistoryResult, LocalDataExport } from "../../../../packages/storage/src/practice-store.ts";
 import {
   createMobilePracticeService,
   seededPuzzleCount,
@@ -217,6 +219,7 @@ export function PracticePocScreen({
   const [customSprintMode, setCustomSprintMode] = useState<"custom" | "arrow_duel">("custom");
   const [customDurationSeconds, setCustomDurationSeconds] = useState(5 * 60);
   const [customPerPuzzleSeconds, setCustomPerPuzzleSeconds] = useState(20);
+  const [, setSettingsRevision] = useState(0);
 
   const boardSize = useMemo(() => {
     const available = Math.max(width - UI_PADDING * 2, MIN_BOARD);
@@ -1291,9 +1294,28 @@ export function PracticePocScreen({
         {tab === "settings" ? (
           <SettingsPanel
             standardRating={readRating(service, defaultSprintConfig("standard").ratingKey)}
+            ratings={[
+              { label: "Standard", record: service.getRating(defaultSprintConfig("standard").ratingKey) },
+              { label: "Arrow Duel", record: service.getRating(defaultSprintConfig("arrow_duel").ratingKey) },
+              { label: "Blitz", record: service.getRating(defaultSprintConfig("blitz").ratingKey) }
+            ]}
             onOpenDiagnostics={isPracticeTestControlsEnabled() ? () => setTab("analysis") : undefined}
             onOpenPacks={() => setTab("packs")}
-            onResetRating={() => service.resetRating(defaultSprintConfig("standard").ratingKey)}
+            onExportData={() => service.exportLocalData()}
+            onDeleteLocalHistory={() => {
+              const result = service.clearLocalHistory();
+              refreshState();
+              return result;
+            }}
+            onAdjustRating={(ratingKey, nextRating) => {
+              const next = service.setRating(ratingKey, nextRating);
+              setSettingsRevision((current) => current + 1);
+              return next;
+            }}
+            onResetRating={() => {
+              service.resetRating(defaultSprintConfig("standard").ratingKey);
+              setSettingsRevision((current) => current + 1);
+            }}
           />
         ) : null}
         {tab === "packs" ? <PacksPanel /> : null}
@@ -1327,6 +1349,7 @@ type PracticeModeSummary = {
 
 type PracticeProgressSummary = {
   correctThisWeek: number;
+  accuracyThisWeek: number | null;
   wrongThisWeek: number;
   netThisWeek: number;
 };
@@ -1348,6 +1371,9 @@ function buildPracticeProgressSummary(attempts: AttemptEvent[], nowMs: number): 
   }
   return {
     correctThisWeek,
+    accuracyThisWeek: correctThisWeek + wrongThisWeek === 0
+      ? null
+      : Math.round((correctThisWeek / (correctThisWeek + wrongThisWeek)) * 100),
     wrongThisWeek,
     netThisWeek: correctThisWeek - wrongThisWeek
   };
@@ -1382,6 +1408,19 @@ function PracticeHome({
   const progressDelta = progress.correctThisWeek + progress.wrongThisWeek === 0
     ? "Start training"
     : `${progress.netThisWeek >= 0 ? "+" : ""}${progress.netThisWeek} net`;
+  const progressTone = progress.netThisWeek < 0
+    ? styles.progressDeltaNegative
+    : progress.correctThisWeek + progress.wrongThisWeek > 0
+      ? styles.progressDeltaPositive
+      : styles.progressDeltaNeutral;
+  const progressContext = progress.accuracyThisWeek === null
+    ? "No attempts yet"
+    : `${progress.accuracyThisWeek}% accuracy · ${progress.wrongThisWeek} ${progress.wrongThisWeek === 1 ? "mistake" : "mistakes"}`;
+  const reviewStatusLabel = overdueReviewCount > 0
+    ? "Overdue"
+    : dueReviewCount > 0
+      ? "Due today"
+      : "No reviews due";
 
   return (
     <View style={styles.practiceHome} testID="practice-home">
@@ -1423,7 +1462,8 @@ function PracticeHome({
         <View style={styles.progressMetric}>
           <Text style={styles.helperText}>This Week</Text>
           <Text testID="practice-progress-weekly-solved" style={styles.progressValue}>{progress.correctThisWeek}</Text>
-          <Text testID="practice-progress-weekly-delta" style={styles.progressDelta}>{progressDelta}</Text>
+          <Text testID="practice-progress-weekly-delta" style={[styles.progressDelta, progressTone]}>{progressDelta}</Text>
+          <Text testID="practice-progress-weekly-context" style={styles.progressContext}>{progressContext}</Text>
         </View>
       </View>
 
@@ -1437,7 +1477,7 @@ function PracticeHome({
       >
         <View>
           <Text style={styles.listText}>Review</Text>
-          <Text style={styles.helperText}>{dueReviewCount === 0 ? "No reviews due" : "Due today"}</Text>
+          <Text style={styles.helperText}>{reviewStatusLabel}</Text>
         </View>
         <View style={styles.reviewStripCounts}>
           <View style={styles.reviewStripMetric} testID="practice-review-due-count">
@@ -5116,14 +5156,22 @@ function normalizeUci(move: string): string {
 }
 
 function SettingsPanel({
+  onDeleteLocalHistory,
+  onExportData,
   onOpenDiagnostics,
   onOpenPacks,
+  onAdjustRating,
   onResetRating,
+  ratings,
   standardRating
 }: {
+  onDeleteLocalHistory: () => ClearLocalHistoryResult;
+  onExportData: () => LocalDataExport;
   onOpenDiagnostics?: () => void;
   onOpenPacks: () => void;
+  onAdjustRating: (ratingKey: string, nextRating: number) => RatingRecord;
   onResetRating: () => void;
+  ratings: Array<{ label: string; record: RatingRecord }>;
   standardRating: number;
 }): React.JSX.Element {
   const [syncEnabled, setSyncEnabled] = useState(true);
@@ -5160,7 +5208,15 @@ function SettingsPanel({
           testID="settings-advanced-ratings"
           onPress={() => setAdvancedRatingsOpen((current) => !current)}
         />
-        {advancedRatingsOpen ? <AdvancedRatingsPanel /> : null}
+        {advancedRatingsOpen ? (
+          <AdvancedRatingsPanel
+            ratings={ratings}
+            onAdjust={(ratingKey, nextRating) => {
+              const next = onAdjustRating(ratingKey, nextRating);
+              setStatusMessage(`${ratingLabelFromKey(ratingKey)} rating set to ${next.rating}`);
+            }}
+          />
+        ) : null}
       </SettingsSection>
 
       <SettingsSection title="Sync" testID="settings-sync-section">
@@ -5223,7 +5279,7 @@ function SettingsPanel({
           value="JSON"
           detail="Prepare local progress for backup"
           testID="settings-export-data"
-          onPress={() => setStatusMessage("Export prepared")}
+          onPress={() => setStatusMessage(exportDataStatusMessage(onExportData()))}
         />
         <SettingsRow
           label="Delete Local History"
@@ -5276,13 +5332,14 @@ function SettingsPanel({
       {confirmation === "delete-history" ? (
         <DestructiveConfirmationCard
           confirmLabel="Delete History"
-          description="This would remove local attempt history after a final implementation pass. No data is removed from this preview."
+          description="This removes local attempts, sprint history, and scheduled review queue data. Ratings and puzzle packs stay intact."
           testID="settings-delete-history-confirmation"
           title="Delete local history?"
           onCancel={() => setConfirmation(null)}
           onConfirm={() => {
+            const result = onDeleteLocalHistory();
             setConfirmation(null);
-            setStatusMessage("Delete requires data-layer implementation");
+            setStatusMessage(deleteHistoryStatusMessage(result));
           }}
         />
       ) : null}
@@ -5301,17 +5358,45 @@ function SettingsPanel({
   );
 }
 
-function AdvancedRatingsPanel(): React.JSX.Element {
+function deleteHistoryStatusMessage(result: ClearLocalHistoryResult): string {
+  if (result.attempts === 0 && result.reviewQueue === 0 && result.sprintSessions === 0) {
+    return "No local history to delete";
+  }
+  const attemptText = result.attempts === 1 ? "1 attempt" : `${result.attempts} attempts`;
+  const reviewText = result.reviewQueue === 1 ? "1 review" : `${result.reviewQueue} reviews`;
+  return `Local history deleted · ${attemptText} · ${reviewText}`;
+}
+
+function exportDataStatusMessage(data: LocalDataExport): string {
+  const attemptText = data.attempts.length === 1 ? "1 attempt" : `${data.attempts.length} attempts`;
+  const reviewText = data.reviewQueue.length === 1 ? "1 review" : `${data.reviewQueue.length} reviews`;
+  const ratingText = data.ratings.length === 1 ? "1 rating" : `${data.ratings.length} ratings`;
+  return `Export ready · ${attemptText} · ${reviewText} · ${ratingText}`;
+}
+
+function AdvancedRatingsPanel({
+  onAdjust,
+  ratings
+}: {
+  onAdjust: (ratingKey: string, nextRating: number) => void;
+  ratings: Array<{ label: string; record: RatingRecord }>;
+}): React.JSX.Element {
   return (
     <View style={styles.advancedRatingsPanel} testID="settings-advanced-ratings-panel">
       <Text style={styles.sectionLabel}>Manual rating controls</Text>
       <Text style={styles.helperText}>
-        Hidden by default. Use reset for the current bucket; manual edits need a data-layer implementation before they can write ratings.
+        Hidden by default. Adjust only when you need to repair a local rating bucket.
       </Text>
       <View style={styles.advancedRatingRows}>
-        <AdvancedRatingRow label="Standard" value="standard 5/20" testID="settings-advanced-rating-standard" />
-        <AdvancedRatingRow label="Arrow Duel" value="arrow duel 5/30" testID="settings-advanced-rating-arrow-duel" />
-        <AdvancedRatingRow label="Blitz" value="blitz 5/10" testID="settings-advanced-rating-blitz" />
+        {ratings.map(({ label, record }) => (
+          <AdvancedRatingRow
+            key={record.key}
+            label={label}
+            record={record}
+            testID={`settings-advanced-rating-${safeTestId(label)}`}
+            onAdjust={onAdjust}
+          />
+        ))}
       </View>
     </View>
   );
@@ -5319,22 +5404,57 @@ function AdvancedRatingsPanel(): React.JSX.Element {
 
 function AdvancedRatingRow({
   label,
+  onAdjust,
+  record,
   testID,
-  value
 }: {
   label: string;
+  onAdjust: (ratingKey: string, nextRating: number) => void;
+  record: RatingRecord;
   testID: string;
-  value: string;
 }): React.JSX.Element {
+  const decrementDisabled = record.rating <= 600;
   return (
     <View style={styles.advancedRatingRow} testID={testID}>
-      <View>
+      <View style={styles.advancedRatingCopy}>
         <Text style={styles.listText}>{label}</Text>
-        <Text style={styles.helperText}>{value}</Text>
+        <Text style={styles.helperText}>{record.key}</Text>
       </View>
-      <Text style={styles.settingsRowValue}>Locked</Text>
+      <View style={styles.advancedRatingControls}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Decrease ${label} rating`}
+          accessibilityState={{ disabled: decrementDisabled }}
+          disabled={decrementDisabled}
+          testID={`${testID}-decrease`}
+          style={[styles.customStepperButton, decrementDisabled ? styles.disabledButton : null]}
+          onPress={() => onAdjust(record.key, Math.max(600, record.rating - 25))}
+        >
+          <MinusGlyph />
+        </Pressable>
+        <Text style={styles.settingsRowValue} testID={`${testID}-value`}>ELO {record.rating}</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Increase ${label} rating`}
+          testID={`${testID}-increase`}
+          style={styles.customStepperButton}
+          onPress={() => onAdjust(record.key, record.rating + 25)}
+        >
+          <PlusGlyph />
+        </Pressable>
+      </View>
     </View>
   );
+}
+
+function ratingLabelFromKey(ratingKey: string): string {
+  if (ratingKey.startsWith("arrow duel")) {
+    return "Arrow Duel";
+  }
+  if (ratingKey.startsWith("blitz")) {
+    return "Blitz";
+  }
+  return "Standard";
 }
 
 function DestructiveConfirmationCard({
@@ -6795,9 +6915,22 @@ const styles = StyleSheet.create({
     lineHeight: 26
   },
   progressDelta: {
-    color: "#16A34A",
     fontSize: 12,
     fontWeight: "800"
+  },
+  progressDeltaPositive: {
+    color: "#16A34A"
+  },
+  progressDeltaNegative: {
+    color: "#DC2626"
+  },
+  progressDeltaNeutral: {
+    color: "#64748B"
+  },
+  progressContext: {
+    color: "#64748B",
+    fontSize: 11,
+    fontWeight: "700"
   },
   practiceReviewStrip: {
     alignItems: "center",
@@ -8579,6 +8712,16 @@ const styles = StyleSheet.create({
     minHeight: 48,
     paddingHorizontal: 10,
     paddingVertical: 8
+  },
+  advancedRatingCopy: {
+    flex: 1,
+    gap: 2,
+    minWidth: 0
+  },
+  advancedRatingControls: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8
   },
   settingsStatusText: {
     color: "#334155",

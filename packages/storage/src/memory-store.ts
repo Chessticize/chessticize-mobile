@@ -24,7 +24,7 @@ import type {
   SprintState
 } from "../../core/src/index.ts";
 import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./query-types.ts";
-import type { PracticeStore } from "./practice-store.ts";
+import type { ClearLocalHistoryResult, LocalDataExport, PracticeStore } from "./practice-store.ts";
 import { selectUniquePuzzles } from "./puzzle-selection.ts";
 
 export class MemoryStore implements PracticeStore {
@@ -137,6 +137,52 @@ export class MemoryStore implements PracticeStore {
         ...(attempt.ratingAfter === undefined ? {} : { ratingAfter: attempt.ratingAfter })
       }))
       .sort((left, right) => right.completedAt.localeCompare(left.completedAt) || right.id.localeCompare(left.id));
+  }
+
+  exportLocalData(): LocalDataExport {
+    return {
+      schemaVersion: 1,
+      ratings: this.listRatings(),
+      attempts: this.listAttempts(),
+      reviewQueue: [...this.reviewQueue.values()]
+        .sort((left, right) =>
+          left.dueAt.localeCompare(right.dueAt) ||
+          left.puzzleId.localeCompare(right.puzzleId) ||
+          left.mode.localeCompare(right.mode) ||
+          left.ratingKey.localeCompare(right.ratingKey)
+        ),
+      sprintSessions: [...this.sessions.values()]
+        .map((session) => ({
+          id: session.id,
+          mode: session.config.mode,
+          ratingKey: session.config.ratingKey,
+          startedAt: session.startedAt,
+          ...(session.completedAt === undefined ? {} : { completedAt: session.completedAt }),
+          status: session.status,
+          correctCount: session.correctCount,
+          mistakeCount: session.mistakeCount,
+          ratingBefore: session.ratingBefore,
+          ...(session.ratingAfter === undefined ? {} : { ratingAfter: session.ratingAfter })
+        }))
+        .sort((left, right) => right.startedAt.localeCompare(left.startedAt) || right.id.localeCompare(left.id))
+    };
+  }
+
+  clearLocalHistory(): ClearLocalHistoryResult {
+    const result: ClearLocalHistoryResult = {
+      attempts: this.attempts.length,
+      reviewEvents: 0,
+      reviewQueue: this.reviewQueue.size,
+      sprintSessions: [...this.sessions.values()].filter((session) => session.status !== "active").length
+    };
+    this.attempts.splice(0, this.attempts.length);
+    this.reviewQueue.clear();
+    for (const [id, session] of this.sessions) {
+      if (session.status !== "active") {
+        this.sessions.delete(id);
+      }
+    }
+    return result;
   }
 
   getSessionMistakeReview(sessionId: string): SessionMistakeReviewItem[] {
