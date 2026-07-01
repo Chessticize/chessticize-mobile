@@ -105,6 +105,8 @@ export interface SprintState {
   endReason?: SprintEndReason;
   correctCount: number;
   mistakeCount: number;
+  currentStreak: number;
+  bestStreak: number;
   currentPuzzleIndex: number;
   puzzles: Puzzle[];
   currentPuzzle?: CurrentPuzzleState;
