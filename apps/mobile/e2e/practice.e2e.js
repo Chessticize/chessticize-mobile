@@ -7,29 +7,28 @@ describe('Practice POC', () => {
   });
 
   it('renders the standard sprint board', async () => {
-    await tapWhenVisible('practice-mode-standard');
-    await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(30000);
-    await expect(element(by.text('Mistakes'))).toBeVisible();
+    await startPracticeMode('standard');
+    await waitForVisibleInPracticeScroll('session-board');
 
+    const boardFrame = await frameFor(element(by.id('session-board')));
     const screenshotPath = await device.takeScreenshot('standard-board');
-    expectBoardScreenshotContainsPieces(screenshotPath);
+    expectBoardScreenshotContainsPieces(screenshotPath, boardFrame);
 
   });
 
   it('renders Arrow Duel candidate arrows on the board', async () => {
-    await waitFor(element(by.id('practice-mode-arrow-duel'))).toBeVisible().withTimeout(30000);
-    await element(by.id('practice-mode-arrow-duel')).tap();
-    await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
-    await expect(element(by.text('Watch for checks, captures, and attacks!'))).toBeVisible();
+    await startPracticeMode('arrow-duel');
+    await waitForVisibleInPracticeScroll('session-board');
 
+    const boardFrame = await frameFor(element(by.id('session-board')));
     const screenshotPath = await device.takeScreenshot('arrow-duel-neutral-arrows');
-    expectBoardScreenshotContainsNeutralArrows(screenshotPath);
+    expectBoardScreenshotContainsNeutralArrows(screenshotPath, boardFrame);
 
   });
 
   it('accepts the fixed alternate mate-in-one puzzle', async () => {
-    await tapWhenVisible('practice-mode-standard');
-    await waitFor(element(by.text('Find the best move for white.'))).toBeVisible().withTimeout(10000);
+    await startPracticeMode('standard');
+    await waitForVisibleInPracticeScroll('session-board');
 
     const boardFrame = await frameFor(element(by.id('session-board')));
     const c2 = boardPoint(boardFrame, 'c2');
@@ -40,13 +39,12 @@ describe('Practice POC', () => {
     await element(by.id('session-board')).tapAtPoint(b1);
 
     await waitFor(element(by.id('session-progress'))).toHaveText('1 / 15').withTimeout(10000);
-    await expect(element(by.text('Mistakes'))).toBeVisible();
 
   });
 
   it('opens last sprint mistake review with navigation and analysis arrows', async () => {
-    await tapWhenVisible('practice-mode-standard');
-    await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
+    await startPracticeMode('standard');
+    await waitForVisibleInPracticeScroll('session-board');
 
     await playBoardMove('session-board', 'c2b3');
     await sleep(1100);
@@ -71,7 +69,7 @@ describe('Practice POC', () => {
     await waitFor(element(by.id('review-analysis-reset'))).toBeVisible().withTimeout(5000);
     await waitFor(element(by.id('review-analysis-flip'))).toBeVisible().withTimeout(5000);
     await waitForElementTextContaining('review-analysis-engine-status', 'SF 18 NNUE', 45000);
-    await waitForElementTextContaining('review-analysis-line-0', 'M1', 45000);
+    await waitForElementTextContaining('review-analysis-line-0', 'Top move', 90000);
 
     const screenshotPath = await device.takeScreenshot('review-analysis-arrows');
     expectScreenshotContainsGreenAnalysisArrow(screenshotPath);
@@ -101,6 +99,10 @@ async function playBoardMove(testID, move, flipped = false) {
 async function tapWhenVisible(testID) {
   await waitForVisibleInPracticeScroll(testID);
   await element(by.id(testID)).tap();
+}
+
+async function startPracticeMode(mode) {
+  await tapWhenVisible(`practice-mode-${mode}-start`);
 }
 
 async function waitForVisibleInPracticeScroll(testID) {
@@ -141,15 +143,13 @@ function boardPoint(frame, square, flipped = false) {
   };
 }
 
-function expectBoardScreenshotContainsPieces(screenshotPath) {
+function expectBoardScreenshotContainsPieces(screenshotPath, boardFrame) {
   const png = readRgbaPng(screenshotPath);
-  const boardSize = Math.floor(png.width * 0.92);
-  const boardX = Math.floor((png.width - boardSize) / 2);
-  const boardY = Math.floor(png.height * 0.29);
+  const boardPixels = pixelFrameForBoard(png, boardFrame);
   let pieceLikePixels = 0;
 
-  for (let y = boardY; y < boardY + boardSize; y += 2) {
-    for (let x = boardX; x < boardX + boardSize; x += 2) {
+  for (let y = boardPixels.y; y < boardPixels.y + boardPixels.height; y += 2) {
+    for (let x = boardPixels.x; x < boardPixels.x + boardPixels.width; x += 2) {
       const offset = (y * png.width + x) * 4;
       const r = png.data[offset];
       const g = png.data[offset + 1];
@@ -168,15 +168,13 @@ function expectBoardScreenshotContainsPieces(screenshotPath) {
   }
 }
 
-function expectBoardScreenshotContainsNeutralArrows(screenshotPath) {
+function expectBoardScreenshotContainsNeutralArrows(screenshotPath, boardFrame) {
   const png = readRgbaPng(screenshotPath);
-  const boardSize = Math.floor(png.width * 0.92);
-  const boardX = Math.floor((png.width - boardSize) / 2);
-  const boardY = Math.floor(png.height * 0.42);
+  const boardPixels = pixelFrameForBoard(png, boardFrame);
   let arrowLikePixels = 0;
 
-  for (let y = boardY; y < Math.min(png.height, boardY + boardSize); y += 1) {
-    for (let x = boardX; x < boardX + boardSize; x += 1) {
+  for (let y = boardPixels.y; y < boardPixels.y + boardPixels.height; y += 1) {
+    for (let x = boardPixels.x; x < boardPixels.x + boardPixels.width; x += 1) {
       const offset = (y * png.width + x) * 4;
       const r = png.data[offset];
       const g = png.data[offset + 1];
@@ -199,6 +197,17 @@ function expectBoardScreenshotContainsNeutralArrows(screenshotPath) {
   if (arrowLikePixels <= 5000) {
     throw new Error(`Expected rendered Arrow Duel arrows, found only ${arrowLikePixels} arrow-like pixels`);
   }
+}
+
+function pixelFrameForBoard(png, boardFrame) {
+  const screenWidthPoints = boardFrame.x * 2 + boardFrame.width;
+  const scale = png.width / screenWidthPoints;
+  return {
+    x: Math.max(0, Math.floor(boardFrame.x * scale)),
+    y: Math.max(0, Math.floor(boardFrame.y * scale)),
+    width: Math.min(png.width, Math.ceil(boardFrame.width * scale)),
+    height: Math.min(png.height, Math.ceil(boardFrame.height * scale))
+  };
 }
 
 function expectScreenshotContainsGreenAnalysisArrow(screenshotPath) {

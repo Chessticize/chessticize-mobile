@@ -565,6 +565,78 @@ export function PracticePocScreen({
     });
   }
 
+  async function onArrowDuelCandidatePress(move: string, context: BoardMoveContext): Promise<void> {
+    const activeState = stateRef.current;
+    const activeFeedbackSnapshot = feedbackSnapshotRef.current;
+    if (activeState?.status !== "active") {
+      emitTrace({
+        type: "move-ignored",
+        reason: "inactive",
+        move,
+        contextPuzzleId: context.puzzleId
+      });
+      return;
+    }
+    if (activeFeedbackSnapshot || boardSyncInProgressRef.current || boardInputLockedRef.current) {
+      emitTrace({
+        type: "move-ignored",
+        reason: activeFeedbackSnapshot ? "feedback-snapshot" : "board-locked",
+        move,
+        contextPuzzleId: context.puzzleId,
+        puzzleId: activeState.currentPuzzle?.puzzle.id ?? null
+      });
+      return;
+    }
+
+    const submittedPuzzle = activeState.currentPuzzle;
+    const submittedPuzzleId = submittedPuzzle?.puzzle.id ?? null;
+    if (context.puzzleId !== submittedPuzzleId || submittedPuzzle?.kind !== "arrow_duel") {
+      emitTrace({
+        type: "move-ignored",
+        reason: "context-puzzle-mismatch",
+        move,
+        contextPuzzleId: context.puzzleId,
+        puzzleId: submittedPuzzleId
+      });
+      return;
+    }
+    if (!isArrowDuelCandidate(submittedPuzzle.candidates, move)) {
+      emitTrace({
+        type: "move-ignored",
+        reason: "arrow-duel-non-candidate",
+        move,
+        contextPuzzleId: context.puzzleId,
+        puzzleId: submittedPuzzleId,
+        submittedFen: submittedPuzzle.currentFen
+      });
+      return;
+    }
+
+    const submittedFen = submittedPuzzle.currentFen ?? boardFenRef.current ?? null;
+    const submittedMoveFen = submittedFen ? fenAfterMove(submittedFen, move) : null;
+    if (submittedFen && !submittedMoveFen) {
+      emitTrace({
+        type: "move-ignored",
+        reason: "submitted-move-illegal-for-current-fen",
+        move,
+        puzzleId: submittedPuzzleId,
+        submittedFen
+      });
+      return;
+    }
+
+    setLastBoardMove(null);
+    boardVisualFenRef.current = submittedMoveFen ?? submittedFen;
+    commitBoardInputLocked(true, "candidate-chip", submittedPuzzleId);
+    await submitAcceptedMove({
+      move,
+      nextVisualFen: submittedMoveFen,
+      submittedFen,
+      submittedPuzzle,
+      submittedPuzzleId
+    });
+  }
+
   async function submitAcceptedMove({
     move,
     nextVisualFen,
@@ -976,10 +1048,6 @@ export function PracticePocScreen({
             ) : null}
 
             {shouldShowSessionBoard ? (
-              <PracticePrompt currentPuzzle={displayedPuzzle} mode={mode} />
-            ) : null}
-
-            {shouldShowSessionBoard ? (
               <View style={styles.boardWrapper}>
                 <View testID="session-board" style={[styles.boardSurface, { width: boardSize, height: boardSize }]}>
                   {displayedBoardFen ? (
@@ -1069,6 +1137,26 @@ export function PracticePocScreen({
                   </Text>
                 ) : null}
               </View>
+            ) : null}
+
+            {state?.status === "active" ? (
+              <SessionScoreStrip state={state} />
+            ) : null}
+
+            {shouldShowSessionBoard ? (
+              <PracticePrompt currentPuzzle={displayedPuzzle} mode={mode} />
+            ) : null}
+
+            {displayedPuzzle?.kind === "arrow_duel" && !boardFeedback ? (
+              <ArrowDuelCandidateChips
+                candidates={displayedPuzzle.candidates}
+                disabled={!boardGestureEnabled}
+                onChoose={(move) => {
+                  void onArrowDuelCandidatePress(move, {
+                    puzzleId: displayedPuzzle.puzzle.id
+                  });
+                }}
+              />
             ) : null}
 
             {error ? <ErrorPanel error={error} /> : null}
@@ -1461,7 +1549,6 @@ function CustomSprintSetup({
   onStart: () => void;
 }): React.JSX.Element {
   const [theme, setTheme] = useState("Mixed");
-  const [includeArrowDuel, setIncludeArrowDuel] = useState(false);
   const ratingRange = `${Math.max(400, currentRating - 200)} - ${currentRating + 200}`;
   const previousConfigs: PreviousCustomConfig[] = [
     {
@@ -1556,10 +1643,11 @@ function CustomSprintSetup({
           testID="custom-rating-range"
         />
         <CustomToggleRow
-          enabled={includeArrowDuel}
+          detail="Switches this custom sprint to Arrow Duel scoring."
+          enabled={customMode === "arrow_duel"}
           label="Include Arrow Duel"
           testID="custom-include-arrow-duel"
-          onToggle={() => setIncludeArrowDuel((current) => !current)}
+          onToggle={() => onCustomModeChange(customMode === "arrow_duel" ? "custom" : "arrow_duel")}
         />
       </View>
 
@@ -1763,11 +1851,13 @@ function CustomOptionRow<T extends number>({
 }
 
 function CustomToggleRow({
+  detail,
   enabled,
   label,
   onToggle,
   testID
 }: {
+  detail?: string;
   enabled: boolean;
   label: string;
   onToggle: () => void;
@@ -1777,7 +1867,7 @@ function CustomToggleRow({
     <View style={styles.customConfigRow} testID={testID}>
       <View>
         <Text style={styles.listText}>{label}</Text>
-        <Text style={styles.helperText}>Custom Arrow Duel scoring is planned after core support.</Text>
+        {detail ? <Text style={styles.helperText}>{detail}</Text> : null}
       </View>
       <Pressable
         accessibilityRole="switch"
@@ -2093,6 +2183,20 @@ function SprintSummary({
         </Text>
       </View>
 
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="View performance trend in History"
+        testID="sprint-result-history-trend"
+        style={styles.resultHistoryTrend}
+        onPress={onOpenHistory}
+      >
+        <View>
+          <Text style={styles.listText}>Performance trend</Text>
+          <Text style={styles.helperText}>Open History for rating, accuracy, mistakes, and review volume.</Text>
+        </View>
+        <Text style={styles.resultHistoryTrendArrow}>›</Text>
+      </Pressable>
+
       {onReview && shouldPrioritizeReview ? (
         <Pressable
           accessibilityRole="button"
@@ -2211,6 +2315,84 @@ function PracticePrompt({
           <Text style={styles.promptHint}>{displayedPromptHint}</Text>
         ) : null}
       </View>
+    </View>
+  );
+}
+
+function ArrowDuelCandidateChips({
+  candidates,
+  disabled,
+  onChoose
+}: {
+  candidates: string[];
+  disabled: boolean;
+  onChoose: (move: string) => void;
+}): React.JSX.Element | null {
+  const visibleCandidates = candidates.slice(0, 2);
+  if (visibleCandidates.length < 2) {
+    return null;
+  }
+  return (
+    <View style={styles.arrowDuelCandidateRow} testID="arrow-duel-candidates">
+      {visibleCandidates.map((candidate, index) => {
+        const label = index === 0 ? "A" : "B";
+        const testID = index === 0 ? "arrow-duel-candidate-a" : "arrow-duel-candidate-b";
+        return (
+          <Pressable
+            key={`${label}-${candidate}`}
+            accessibilityRole="button"
+            accessibilityLabel={`Choose Arrow Duel candidate ${label}`}
+            accessibilityState={{ disabled }}
+            disabled={disabled}
+            testID={testID}
+            style={[styles.arrowDuelCandidateChip, disabled ? styles.disabledButton : null]}
+            onPress={() => onChoose(candidate)}
+          >
+            <Text style={styles.arrowDuelCandidateLabel}>{label}</Text>
+            <Text style={styles.arrowDuelCandidateMeta}>Candidate</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function SessionScoreStrip({ state }: { state: SprintState }): React.JSX.Element {
+  const leftCount = Math.max(0, state.config.targetCorrect - state.correctCount);
+  return (
+    <View
+      accessibilityLabel={`Session score: solved ${state.correctCount}, mistakes ${state.mistakeCount}, left ${leftCount}`}
+      style={styles.sessionScoreStrip}
+      testID="session-score-strip"
+    >
+      <SessionScoreMetric label="Solved" tone="positive" value={state.correctCount} />
+      <SessionScoreMetric label="Mistakes" tone="negative" value={state.mistakeCount} />
+      <SessionScoreMetric label="Left" tone="neutral" value={leftCount} />
+    </View>
+  );
+}
+
+function SessionScoreMetric({
+  label,
+  tone,
+  value
+}: {
+  label: string;
+  tone: "positive" | "negative" | "neutral";
+  value: number;
+}): React.JSX.Element {
+  return (
+    <View style={styles.sessionScoreMetric}>
+      <View
+        style={[
+          styles.sessionScoreDot,
+          tone === "positive" ? styles.sessionScoreDotPositive : null,
+          tone === "negative" ? styles.sessionScoreDotNegative : null,
+          tone === "neutral" ? styles.sessionScoreDotNeutral : null
+        ]}
+      />
+      <Text style={styles.sessionScoreValue}>{value}</Text>
+      <Text style={styles.sessionScoreLabel}>{label}</Text>
     </View>
   );
 }
@@ -4453,9 +4635,15 @@ function SettingsPanel({
   standardRating: number;
 }): React.JSX.Element {
   const [syncEnabled, setSyncEnabled] = useState(true);
+  const [syncUploadAllowed, setSyncUploadAllowed] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<"reset-elo" | "delete-history" | null>(null);
   const [advancedRatingsOpen, setAdvancedRatingsOpen] = useState(false);
+  const syncStatusLabel = syncEnabled
+    ? syncUploadAllowed
+      ? "Ready"
+      : "Needs approval"
+    : "Local only";
 
   return (
     <View style={styles.settingsPanel} testID="settings-panel">
@@ -4468,7 +4656,7 @@ function SettingsPanel({
         />
         <SettingsRow
           label="Reset ELO"
-          detail="Resets the current sprint rating only"
+          detail="Resets the Standard puzzle rating only"
           destructive
           testID="settings-reset-elo"
           onPress={() => setConfirmation("reset-elo")}
@@ -4488,18 +4676,36 @@ function SettingsPanel({
           <View style={styles.syncDisclosureHeader}>
             <Text style={styles.listText}>Local-first progress</Text>
             <Text style={[styles.syncDisclosureStatus, syncEnabled ? styles.positive : styles.errorText]}>
-              {syncEnabled ? "Ready" : "Local only"}
+              {syncStatusLabel}
             </Text>
           </View>
           <Text style={styles.helperText}>
             Practice always works offline. iCloud only syncs after this device is allowed to upload local progress.
           </Text>
+          {syncEnabled && !syncUploadAllowed ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Allow iCloud upload"
+              testID="settings-sync-allow-upload"
+              style={styles.syncDisclosureButton}
+              onPress={() => {
+                setSyncUploadAllowed(true);
+                setStatusMessage("iCloud upload allowed");
+              }}
+            >
+              <Text style={styles.syncDisclosureButtonText}>Allow upload</Text>
+            </Pressable>
+          ) : null}
         </View>
         <View style={styles.settingsRow} testID="settings-icloud-sync-row">
           <View style={styles.settingsRowCopy}>
             <Text style={styles.listText}>iCloud Sync</Text>
             <Text testID="settings-sync-status" style={styles.helperText}>
-              {syncEnabled ? "On · Last synced today, 09:28" : "Off · Local-only progress"}
+              {syncEnabled
+                ? syncUploadAllowed
+                  ? "On · Last synced today, 09:28"
+                  : "On · Waiting for upload approval"
+                : "Off · Local-only progress"}
             </Text>
           </View>
           <Pressable
@@ -4563,7 +4769,7 @@ function SettingsPanel({
       {confirmation === "reset-elo" ? (
         <DestructiveConfirmationCard
           confirmLabel="Reset ELO"
-          description="This resets only the current sprint rating bucket. Puzzle history and review schedules stay intact."
+          description="This resets only the Standard puzzle rating bucket. Puzzle history and review schedules stay intact."
           testID="settings-reset-elo-confirmation"
           title="Reset Standard puzzle ELO?"
           onCancel={() => setConfirmation(null)}
@@ -6335,6 +6541,76 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "800"
   },
+  arrowDuelCandidateRow: {
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "center"
+  },
+  arrowDuelCandidateChip: {
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderColor: "#2563EB",
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    gap: 2,
+    minHeight: 48,
+    justifyContent: "center"
+  },
+  arrowDuelCandidateLabel: {
+    color: "#2563EB",
+    fontSize: 16,
+    fontWeight: "900",
+    lineHeight: 20
+  },
+  arrowDuelCandidateMeta: {
+    color: "#64748B",
+    fontSize: 10,
+    fontWeight: "700"
+  },
+  sessionScoreStrip: {
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    justifyContent: "space-around",
+    minHeight: 54,
+    paddingHorizontal: 12,
+    paddingVertical: 8
+  },
+  sessionScoreMetric: {
+    alignItems: "center",
+    flex: 1,
+    gap: 2,
+    justifyContent: "center"
+  },
+  sessionScoreDot: {
+    borderRadius: 999,
+    height: 9,
+    width: 9
+  },
+  sessionScoreDotPositive: {
+    backgroundColor: "#16A34A"
+  },
+  sessionScoreDotNegative: {
+    backgroundColor: "#DC2626"
+  },
+  sessionScoreDotNeutral: {
+    backgroundColor: "#CBD5E1"
+  },
+  sessionScoreValue: {
+    color: "#111827",
+    fontSize: 15,
+    fontWeight: "900",
+    lineHeight: 19
+  },
+  sessionScoreLabel: {
+    color: "#64748B",
+    fontSize: 10,
+    fontWeight: "700"
+  },
   emptyBoard: {
     alignItems: "center",
     backgroundColor: "#E6E8EB",
@@ -6898,6 +7174,25 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "900"
   },
+  resultHistoryTrend: {
+    alignItems: "center",
+    backgroundColor: "#F8FAFC",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 12,
+    justifyContent: "space-between",
+    minHeight: 58,
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  resultHistoryTrendArrow: {
+    color: "#2563EB",
+    fontSize: 22,
+    fontWeight: "800",
+    lineHeight: 24
+  },
   summaryTitle: {
     color: "#111827",
     fontSize: 18,
@@ -7378,6 +7673,23 @@ const styles = StyleSheet.create({
   syncDisclosureStatus: {
     fontSize: 12,
     fontWeight: "900"
+  },
+  syncDisclosureButton: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: "#FFFFFF",
+    borderColor: "#93C5FD",
+    borderRadius: 8,
+    borderWidth: 1,
+    minHeight: 34,
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 6
+  },
+  syncDisclosureButtonText: {
+    color: "#1D4ED8",
+    fontSize: 12,
+    fontWeight: "800"
   },
   settingsRow: {
     alignItems: "center",
