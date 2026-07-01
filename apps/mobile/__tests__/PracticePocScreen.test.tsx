@@ -553,8 +553,8 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "custom-pack-warning")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "custom-pack-warning"))).toContain("15 eligible puzzles");
     expect(collectText(findByTestId(renderer, "custom-pack-warning"))).toContain("up to 18");
-    expect(findByTestId(renderer, "start-sprint-button").props.accessibilityState).toEqual({ disabled: true });
-    expect(findByTestId(renderer, "start-sprint-button").props.disabled).toBe(true);
+    expect(findByTestId(renderer, "start-sprint-button").props.accessibilityState).toEqual({ disabled: false });
+    expect(findByTestId(renderer, "start-sprint-button").props.disabled).toBe(false);
     expect(findByTestId(renderer, "custom-mode-row")).toBeTruthy();
     expect(findByTestId(renderer, "custom-mode-regular").props.accessibilityState).toEqual({ selected: true });
     expect(findByTestId(renderer, "custom-mode-arrow-duel").props.accessibilityState).toEqual({ selected: false });
@@ -616,6 +616,21 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "start-sprint-button").props.accessibilityState).toEqual({ disabled: false });
   });
 
+  it("allows custom sprint start with a local pack warning when eligible puzzles exist", () => {
+    const renderer = renderScreen();
+
+    press(renderer, "practice-mode-custom");
+
+    expect(findByTestId(renderer, "custom-pack-warning")).toBeTruthy();
+    expect(findByTestId(renderer, "start-sprint-button").props.accessibilityState).toEqual({ disabled: false });
+
+    press(renderer, "start-sprint-button");
+
+    expectText(renderer, "Custom");
+    expectText(renderer, "0 / 15");
+    expect(findByTestId(renderer, "session-board")).toBeTruthy();
+  });
+
   it("starts an Arrow Duel sprint from the custom mode selector", () => {
     const renderer = renderScreen();
 
@@ -652,6 +667,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "sprint-result-rating-change")).toBeTruthy();
     expect(findByTestId(renderer, "sprint-result-time")).toBeTruthy();
     expect(findByTestId(renderer, "sprint-result-best-streak")).toBeTruthy();
+    expect(findByTestId(renderer, "sprint-result-mistakes")).toBeTruthy();
     expect(findByTestId(renderer, "sprint-result-rating-snapshot")).toBeTruthy();
     expect(findByTestId(renderer, "sprint-result-details")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "sprint-result-detail-mode"))).toContain("Standard");
@@ -659,10 +675,13 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "sprint-result-detail-rating"))).toContain("600 ->");
     expect(collectText(findByTestId(renderer, "sprint-result-detail-review-impact"))).toContain("No new review items");
     expect(findByTestId(renderer, "sprint-result-review-impact")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain("Mistakes");
+    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain("No mistakes in this sprint");
+    expect(collectText(findByTestId(renderer, "sprint-result-mistakes"))).toBe("0");
     expect(findByTestId(renderer, "sprint-result-history-trend")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "sprint-result-history-trend"))).toContain("Performance trend");
     expect(collectText(findByTestId(renderer, "sprint-result-history-trend"))).toContain("Open History for rating, accuracy, mistakes, and review volume.");
-    expectText(renderer, "Review queue");
+    expectText(renderer, "Mistakes");
     expectText(renderer, "Done");
     press(renderer, "sprint-result-history-trend");
     expect(findByTestId(renderer, "history-panel")).toBeTruthy();
@@ -853,6 +872,9 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "Sprint failed");
     expectText(renderer, "Result: Three mistakes");
     expectText(renderer, "3 mistakes queued");
+    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain("Mistakes");
+    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain("Review your mistakes");
+    expect(collectText(findByTestId(renderer, "sprint-result-mistakes"))).toBe("3");
     expect(collectText(renderer.root)).not.toContain("Start new sprint");
     const reviewButton = findByTestId(renderer, "review-mistakes-button");
     const playAgainButton = findByTestId(renderer, "play-again-button");
@@ -1571,16 +1593,18 @@ describe("PracticePocScreen", () => {
     press(renderer, "packs-import-endgame");
     expectText(renderer, "Endgame Pack");
     expectText(renderer, "Validating Endgame Pack manifest");
-    press(renderer, "packs-remove-tactics");
+    expect(findByTestId(renderer, "packs-remove-tactics")).toBeTruthy();
+    expect(findByTestId(renderer, "packs-remove")).toBeTruthy();
+    press(renderer, "packs-remove");
     expect(findByTestId(renderer, "packs-remove-confirmation")).toBeTruthy();
     expectText(renderer, "Remove Tactics Pack?");
     expectText(renderer, "Attempt history and review schedules stay intact.");
     press(renderer, "packs-remove-confirmation-cancel");
     expect(() => findByTestId(renderer, "packs-remove-confirmation")).toThrow();
-    press(renderer, "packs-remove-tactics");
+    press(renderer, "packs-remove");
     press(renderer, "packs-remove-confirmation-confirm");
     expectText(renderer, "Tactics Pack removal queued; history retained");
-    expect(() => findByTestId(renderer, "packs-remove")).toThrow();
+    expect(findByTestId(renderer, "packs-remove")).toBeTruthy();
     expect(findByTestId(renderer, "packs-license-notes")).toBeTruthy();
     expect(findByTestId(renderer, "packs-source")).toBeTruthy();
     expect(findByTestId(renderer, "packs-processing")).toBeTruthy();
