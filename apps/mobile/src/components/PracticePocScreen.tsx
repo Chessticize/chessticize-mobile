@@ -1701,29 +1701,46 @@ function SessionStatusBar({
   }
 
   return (
-    <View style={styles.sessionBar}>
-      <View style={styles.sessionHeaderRow}>
-        <View>
-          <Text style={styles.sessionTitle}>{modeLabel(mode)}</Text>
-          <Text testID="session-progress" style={styles.sessionMetric}>
-            {state.correctCount} / {state.config.targetCorrect}
-          </Text>
-        </View>
-        <Text testID="session-timer" style={styles.timerText}>{timerText}</Text>
-      </View>
-      <View style={styles.sessionMetricRow}>
-        <MistakeStrikes count={state.mistakeCount} max={state.config.maxMistakes} />
+    <View style={styles.activeSessionShell} testID="active-session-shell">
+      <View style={styles.sessionNavRow} testID="session-shell-nav">
         {onAbandon ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Abandon sprint"
             testID="session-abandon"
-            style={styles.ghostButton}
+            style={styles.sessionNavButton}
             onPress={onAbandon}
           >
-            <Text style={styles.ghostText}>Abandon</Text>
+            <Text style={styles.sessionNavButtonText}>×</Text>
           </Pressable>
-        ) : null}
+        ) : (
+          <View style={styles.sessionNavButton} />
+        )}
+        <Text style={styles.sessionNavTitle}>{modeLabel(mode)}</Text>
+        <View style={styles.sessionNavButton} testID="session-overflow">
+          <Text style={styles.sessionOverflowText}>•••</Text>
+        </View>
+      </View>
+
+      <View style={styles.sessionActiveMetricRow} testID="session-status-metrics">
+        <View style={styles.sessionActiveMetric}>
+          <Text style={styles.resultMetricLabel}>Solved</Text>
+          <Text testID="session-progress" style={styles.sessionProgressValue}>
+            {state.correctCount} / {state.config.targetCorrect}
+          </Text>
+        </View>
+        <View style={styles.sessionTimerBlock}>
+          <Text style={styles.resultMetricLabel}>Time</Text>
+          <Text testID="session-timer" style={styles.timerText}>{timerText}</Text>
+        </View>
+        <View style={[styles.sessionActiveMetric, styles.sessionActiveMetricRight]}>
+          <Text style={styles.resultMetricLabel}>Rating</Text>
+          <Text testID="session-rating" style={styles.sessionRatingValue}>ELO {currentRating}</Text>
+        </View>
+      </View>
+
+      <View style={styles.sessionMistakeRow}>
+        <MistakeStrikes count={state.mistakeCount} max={state.config.maxMistakes} />
       </View>
     </View>
   );
@@ -1768,21 +1785,87 @@ function SprintSummary({
   const delta = (state.ratingAfter ?? state.ratingBefore) - state.ratingBefore;
   const reason = formatEndReason(state.endReason);
   const shouldPrioritizeReview = state.status === "failed" && Boolean(onReview);
+  const accuracy = Math.round((state.correctCount / Math.max(1, state.correctCount + state.mistakeCount)) * 100);
+  const ratingAfter = state.ratingAfter ?? state.ratingBefore;
+  const reviewImpact = state.mistakeCount > 0
+    ? `${state.mistakeCount} ${state.mistakeCount === 1 ? "mistake" : "mistakes"} queued`
+    : "No new review items";
 
   return (
     <View style={styles.summaryPanel} testID="sprint-summary-panel">
-      <Text style={styles.summaryTitle}>{state.status === "won" ? "Sprint complete" : "Sprint failed"}</Text>
-      <Text style={styles.summaryText}>Result: {reason}</Text>
-      <Text style={styles.summaryText}>Solved: {state.correctCount} / {state.config.targetCorrect}</Text>
-      <Text style={styles.summaryText}>Mistakes: {state.mistakeCount} / {state.config.maxMistakes}</Text>
-      <Text style={styles.summaryText}>Accuracy: {Math.round((state.correctCount / Math.max(1, state.correctCount + state.mistakeCount)) * 100)}%</Text>
-      <Text style={styles.summaryText}>
-        Time: {formatDuration(Math.floor(elapsedMs / 1000))}
-      </Text>
-      <Text style={[styles.summaryText, delta >= 0 ? styles.positive : styles.errorText]}>
-        ELO {delta >= 0 ? "+" : ""}
-        {delta} → {state.ratingAfter ?? state.ratingBefore}
-      </Text>
+      <View style={styles.resultHero} testID="sprint-result-hero">
+        <View style={[styles.resultIcon, state.status === "won" ? styles.resultIconWon : styles.resultIconFailed]}>
+          <Text style={[styles.resultIconText, state.status === "failed" ? styles.resultIconTextFailed : null]}>
+            {state.status === "won" ? "✓" : "!"}
+          </Text>
+        </View>
+        <View style={styles.resultTitleBlock}>
+          <Text style={styles.summaryTitle}>{state.status === "won" ? "Sprint complete" : "Sprint failed"}</Text>
+          <Text style={styles.summaryText}>Result: {reason}</Text>
+        </View>
+        <View style={styles.resultScoreBlock}>
+          <Text style={styles.resultSolvedCount} testID="sprint-result-solved">
+            {state.correctCount}
+            <Text style={styles.resultSolvedTarget}> / {state.config.targetCorrect}</Text>
+          </Text>
+          <Text style={styles.resultAccuracy} testID="sprint-result-accuracy">{accuracy}% Accuracy</Text>
+        </View>
+      </View>
+
+      <View style={styles.resultMetricGrid}>
+        <View style={styles.resultMetric} testID="sprint-result-rating-change">
+          <Text style={styles.resultMetricLabel}>Rating Change</Text>
+          <Text style={[styles.resultMetricValue, delta >= 0 ? styles.positive : styles.errorText]}>
+            {delta >= 0 ? "+" : ""}
+            {delta}
+          </Text>
+        </View>
+        <View style={styles.resultMetric} testID="sprint-result-time">
+          <Text style={styles.resultMetricLabel}>Time</Text>
+          <Text style={styles.resultMetricValue}>{formatDuration(Math.floor(elapsedMs / 1000))}</Text>
+        </View>
+        <View style={styles.resultMetric} testID="sprint-result-mistakes">
+          <Text style={styles.resultMetricLabel}>Mistakes</Text>
+          <Text style={[styles.resultMetricValue, state.mistakeCount > 0 ? styles.errorText : styles.positive]}>
+            {state.mistakeCount} / {state.config.maxMistakes}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.resultRatingCard} testID="sprint-result-rating-snapshot">
+        <View>
+          <Text style={styles.resultMetricLabel}>Rating</Text>
+          <Text style={styles.resultRatingText}>
+            {state.ratingBefore} → {ratingAfter}
+          </Text>
+        </View>
+        <View style={styles.resultSparkline} accessibilityLabel="Compact rating trend">
+          {[0, 1, 2, 3].map((index) => {
+            const isPositive = delta >= 0;
+            const height = isPositive ? 10 + index * 4 : 22 - index * 4;
+            return (
+              <View
+                key={index}
+                style={[
+                  styles.resultSparklineBar,
+                  { height },
+                  index === 3 ? (isPositive ? styles.resultSparklineBarUp : styles.resultSparklineBarDown) : null
+                ]}
+              />
+            );
+          })}
+        </View>
+      </View>
+
+      <View style={styles.resultReviewRow} testID="sprint-result-review-impact">
+        <View>
+          <Text style={styles.listText}>Review queue</Text>
+          <Text style={styles.helperText}>{reviewImpact}</Text>
+        </View>
+        <Text style={[styles.resultReviewCount, state.mistakeCount > 0 ? styles.errorText : styles.positive]}>
+          {state.mistakeCount}
+        </Text>
+      </View>
 
       {onReview && shouldPrioritizeReview ? (
         <Pressable
@@ -2455,15 +2538,95 @@ function groupReviewEntriesByContext(entries: ReviewEntry[]): Array<{
 
 function reviewDifficultySummary(items: ReviewQueueItem[]): { easy: number; medium: number; hard: number } {
   return items.reduce((summary, item) => {
-    if (item.review.lapseCount > 0 || item.review.lastResult === "wrong") {
+    const difficulty = reviewItemDifficulty(item);
+    if (difficulty === "hard") {
       summary.hard += 1;
-    } else if (item.review.reviewCount > 1) {
+    } else if (difficulty === "medium") {
       summary.medium += 1;
     } else {
       summary.easy += 1;
     }
     return summary;
   }, { easy: 0, medium: 0, hard: 0 });
+}
+
+function reviewItemDifficulty(item: ReviewQueueItem): "easy" | "medium" | "hard" {
+  if (item.review.lapseCount > 0 || item.review.lastResult === "wrong") {
+    return "hard";
+  }
+  if (item.review.reviewCount > 1) {
+    return "medium";
+  }
+  return "easy";
+}
+
+function difficultyLabel(difficulty: "easy" | "medium" | "hard"): string {
+  return difficulty[0].toUpperCase() + difficulty.slice(1);
+}
+
+function collectReviewThemeFilters(items: ReviewQueueItem[]): string[] {
+  const themes = new Set<string>();
+  for (const item of items) {
+    for (const theme of item.puzzle.themes.slice(0, 2)) {
+      themes.add(theme);
+    }
+  }
+  return [...themes].sort((left, right) => left.localeCompare(right)).slice(0, 4);
+}
+
+function filterReviewQueueItems(items: ReviewQueueItem[], filter: ReviewQueueFilter): ReviewQueueItem[] {
+  const now = Date.now();
+  return items.filter((item) => {
+    if (filter === "all") {
+      return true;
+    }
+    if (filter === "overdue") {
+      return new Date(item.review.dueAt).getTime() <= now;
+    }
+    if (filter === "failed") {
+      return item.review.lastResult === "wrong" || item.review.lapseCount > 0;
+    }
+    if (filter === "arrow_duel") {
+      return item.review.mode === "arrow_duel";
+    }
+    if (filter.startsWith("mode:")) {
+      return item.review.mode === filter.slice("mode:".length);
+    }
+    if (filter.startsWith("theme:")) {
+      return item.puzzle.themes.includes(filter.slice("theme:".length));
+    }
+    return true;
+  });
+}
+
+function reviewQueueFilterLabel(filter: ReviewQueueFilter): string {
+  if (filter === "all") {
+    return "All due";
+  }
+  if (filter === "overdue") {
+    return "Overdue";
+  }
+  if (filter === "failed") {
+    return "Failed again";
+  }
+  if (filter === "arrow_duel") {
+    return "Arrow Duel only";
+  }
+  if (filter.startsWith("mode:")) {
+    return modeLabel(filter.slice("mode:".length) as SprintMode);
+  }
+  if (filter.startsWith("theme:")) {
+    return filter.slice("theme:".length);
+  }
+  return "All due";
+}
+
+function formatIntervalHours(hours: number): string {
+  if (hours < 24) {
+    return `${hours}h`;
+  }
+  const days = Math.round(hours / 24);
+  return `${days}d`;
 }
 
 function safeTestId(value: string): string {
@@ -2477,6 +2640,14 @@ type ReviewEntry = {
   source: "session" | "due" | "history";
   attempt?: AttemptEvent | HistoryAttemptView;
 };
+
+type ReviewQueueFilter =
+  | "all"
+  | "overdue"
+  | "failed"
+  | "arrow_duel"
+  | `mode:${SprintMode}`
+  | `theme:${string}`;
 
 type ReviewPuzzleState =
   | { kind: "line"; line: PuzzleLineState }
@@ -2504,19 +2675,22 @@ function ReviewPanel({
     source: "session",
     attempt: item.attempt
   }));
-  const dueEntries = dueReviewItems.map((item): ReviewEntry => ({
-    puzzle: item.puzzle,
-    mode: item.review.mode,
-    ratingKey: item.review.ratingKey,
-    source: "due"
-  }));
-  const dueContextGroups = groupReviewEntriesByContext(dueEntries);
   const preferredEntries = sessionEntries.length > 0
     ? sessionEntries
     : [];
   const preferredEntriesKey = preferredEntries.map((entry) => `${entry.source}:${entry.puzzle.id}:${entry.mode}`).join("|");
   const [activeEntries, setActiveEntries] = useState<ReviewEntry[]>(preferredEntries);
-  const difficultySummary = reviewDifficultySummary(dueReviewItems);
+  const [queueFilter, setQueueFilter] = useState<ReviewQueueFilter>("all");
+  const themeFilters = collectReviewThemeFilters(dueReviewItems);
+  const filteredDueReviewItems = filterReviewQueueItems(dueReviewItems, queueFilter);
+  const filteredDueEntries = filteredDueReviewItems.map((item): ReviewEntry => ({
+    puzzle: item.puzzle,
+    mode: item.review.mode,
+    ratingKey: item.review.ratingKey,
+    source: "due"
+  }));
+  const filteredContextGroups = groupReviewEntriesByContext(filteredDueEntries);
+  const difficultySummary = reviewDifficultySummary(filteredDueReviewItems);
 
   useEffect(() => {
     setActiveEntries(preferredEntries);
@@ -2546,11 +2720,35 @@ function ReviewPanel({
         <View>
           <Text style={styles.reviewDueTitle}>Due Today</Text>
           <Text style={styles.helperText}>
-            {dueEntries.length > 0 ? "Ready now" : "No reviews due today"}
+            {filteredDueEntries.length > 0 ? `${reviewQueueFilterLabel(queueFilter)} · Ready now` : "No reviews due today"}
           </Text>
         </View>
-        <Text style={styles.reviewDueBigCount}>{dueEntries.length}</Text>
+        <Text style={styles.reviewDueBigCount}>{filteredDueEntries.length}</Text>
       </View>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.reviewFilterScroller}
+        contentContainerStyle={styles.reviewFilterContent}
+        testID="review-queue-filters"
+      >
+        <FilterButton active={queueFilter === "all"} label="All due" testID="review-filter-all" onPress={() => setQueueFilter("all")} />
+        <FilterButton active={queueFilter === "overdue"} label="Overdue" testID="review-filter-overdue" onPress={() => setQueueFilter("overdue")} />
+        <FilterButton active={queueFilter === "failed"} label="Failed again" testID="review-filter-failed" onPress={() => setQueueFilter("failed")} />
+        <FilterButton active={queueFilter === "mode:standard"} label="Standard" testID="review-filter-mode-standard" onPress={() => setQueueFilter("mode:standard")} />
+        <FilterButton active={queueFilter === "arrow_duel"} label="Arrow Duel only" testID="review-filter-arrow-duel" onPress={() => setQueueFilter("arrow_duel")} />
+        <FilterButton active={queueFilter === "mode:blitz"} label="Blitz" testID="review-filter-mode-blitz" onPress={() => setQueueFilter("mode:blitz")} />
+        {themeFilters.map((theme) => (
+          <FilterButton
+            key={theme}
+            active={queueFilter === `theme:${theme}`}
+            label={theme}
+            testID={`review-filter-theme-${safeTestId(theme)}`}
+            onPress={() => setQueueFilter(`theme:${theme}`)}
+          />
+        ))}
+      </ScrollView>
 
       <View style={styles.reviewDifficultyList} testID="review-difficulty-list">
         <ReviewDifficultyRow label="Easy" detail="All good" count={difficultySummary.easy} tone="easy" />
@@ -2558,10 +2756,28 @@ function ReviewPanel({
         <ReviewDifficultyRow label="Hard" detail={difficultySummary.hard > 0 ? "Overdue" : "Stable"} count={difficultySummary.hard} tone="hard" />
       </View>
 
-      {dueContextGroups.length > 0 ? (
+      {filteredDueReviewItems.length > 0 ? (
+        <View style={styles.reviewItemList} testID="review-due-items">
+          <Text style={styles.sectionLabel}>Due items</Text>
+          {filteredDueReviewItems.slice(0, 4).map((item) => (
+            <ReviewQueueItemCard
+              key={`${item.review.puzzleId}:${item.review.mode}:${item.review.ratingKey}`}
+              item={item}
+              onPress={() => setActiveEntries([{
+                puzzle: item.puzzle,
+                mode: item.review.mode,
+                ratingKey: item.review.ratingKey,
+                source: "due"
+              }])}
+            />
+          ))}
+        </View>
+      ) : null}
+
+      {filteredContextGroups.length > 0 ? (
         <View style={styles.reviewContextList} testID="review-context-list">
           <Text style={styles.sectionLabel}>Review groups</Text>
-          {dueContextGroups.map((group) => (
+          {filteredContextGroups.map((group) => (
             <Pressable
               key={group.key}
               accessibilityRole="button"
@@ -2591,12 +2807,12 @@ function ReviewPanel({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Start due review"
-        accessibilityState={{ disabled: dueEntries.length === 0 }}
-        disabled={dueEntries.length === 0}
+        accessibilityState={{ disabled: filteredDueEntries.length === 0 }}
+        disabled={filteredDueEntries.length === 0}
         testID="review-start-due"
-        style={[styles.primaryButton, styles.reviewStartButton, dueEntries.length === 0 ? styles.disabledButton : null]}
+        style={[styles.primaryButton, styles.reviewStartButton, filteredDueEntries.length === 0 ? styles.disabledButton : null]}
         onPress={() => {
-          const firstGroup = dueContextGroups[0];
+          const firstGroup = filteredContextGroups[0];
           if (firstGroup) {
             setActiveEntries(firstGroup.entries);
           }
@@ -2605,6 +2821,53 @@ function ReviewPanel({
         <Text style={styles.primaryButtonText}>Start Review</Text>
       </Pressable>
     </View>
+  );
+}
+
+function ReviewQueueItemCard({
+  item,
+  onPress
+}: {
+  item: ReviewQueueItem;
+  onPress: () => void;
+}): React.JSX.Element {
+  const difficulty = reviewItemDifficulty(item);
+  const primaryTheme = item.puzzle.themes[0] ?? "mixed";
+  const lastWrongDate = item.review.lastReviewedAt.slice(0, 10);
+  const dueState = new Date(item.review.dueAt).getTime() <= Date.now() ? "Due now" : `Due ${item.review.dueAt.slice(0, 10)}`;
+  const source = item.review.ratingKey.includes("/")
+    ? item.review.ratingKey
+    : `${modeLabel(item.review.mode)} sprint`;
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Start ${modeLabel(item.review.mode)} ${primaryTheme} review`}
+      testID={`review-due-item-${item.puzzle.id}-${safeTestId(item.review.mode)}`}
+      style={styles.reviewItemCard}
+      onPress={onPress}
+    >
+      <View style={[styles.historyResultBadge, difficulty === "hard" ? styles.historyResultWrong : styles.historyResultCorrect]}>
+        <Text style={styles.historyResultBadgeText}>{difficulty === "hard" ? "!" : "✓"}</Text>
+      </View>
+      <View style={styles.reviewItemCopy}>
+        <View style={styles.historyAttemptHeader}>
+          <Text style={styles.historyRowTitle}>{modeLabel(item.review.mode)}</Text>
+          <Text style={[
+            styles.reviewItemDifficulty,
+            difficulty === "easy" ? styles.reviewDifficultyEasy : null,
+            difficulty === "medium" ? styles.reviewDifficultyMedium : null,
+            difficulty === "hard" ? styles.reviewDifficultyHard : null
+          ]}>
+            {difficultyLabel(difficulty)}
+          </Text>
+        </View>
+        <Text style={styles.helperText}>{primaryTheme} · Last wrong {lastWrongDate}</Text>
+        <Text style={styles.helperText}>{dueState} · {formatIntervalHours(item.review.intervalHours)} interval</Text>
+        <Text style={styles.helperText}>{source} · Review {item.review.reviewCount} · Lapses {item.review.lapseCount}</Text>
+      </View>
+      <Text style={styles.practiceModeChevron}>›</Text>
+    </Pressable>
   );
 }
 
@@ -2726,6 +2989,17 @@ function ReviewSession({
   const canAnalysisForward = analysisEnabled && analysisForwardStack.length > 0;
   const analysisDepth = engineAnalysisLines.reduce((maxDepth, line) => Math.max(maxDepth, line.depth), 0);
   const reviewPerPuzzleSeconds = perPuzzleSecondsForReviewEntry(currentEntry);
+  const reviewPrimaryTheme = currentEntry.puzzle.themes[0] ?? "mixed";
+  const reviewSourceLabel = currentEntry.source === "session"
+    ? "Sprint review"
+    : currentEntry.source === "history"
+      ? "History replay"
+      : "Scheduled review";
+  const arrowReviewChoiceLabel = currentEntry.mode === "arrow_duel"
+    ? wrongSeen || isArrowDuelFollowUpReview
+      ? "You chose: Red (blunder)"
+      : "Green = best move · Red = blunder"
+    : null;
   const reviewRemainingSeconds =
     currentEntry.source === "due" && (!reviewResultRecorded || reviewTimedOut)
       ? Math.max(0, reviewPerPuzzleSeconds - Math.floor((reviewNowMs - reviewStartedAtMs) / 1000))
@@ -3184,18 +3458,23 @@ function ReviewSession({
   return (
     <View style={styles.reviewSessionPanel} testID="review-session">
       <View style={styles.reviewHeaderRow}>
-        <View>
-          <Text style={styles.panelTitle}>Review</Text>
-          <Text testID="review-progress" style={styles.helperText}>
-            {entryIndex + 1} / {entries.length} · {modeLabel(currentEntry.mode)}
-          </Text>
-          {reviewRemainingSeconds !== null ? (
-            <Text testID="review-timer" style={[styles.helperText, reviewRemainingSeconds === 0 ? styles.errorText : null]}>
-              {reviewRemainingSeconds === 0 ? "Time expired" : formatDuration(reviewRemainingSeconds)}
+        <View style={styles.reviewTopNav}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Exit review"
+            testID="review-exit"
+            style={styles.iconButton}
+            onPress={() => onExit(currentEntry.source)}
+          >
+            <Text style={styles.iconButtonText}>×</Text>
+          </Pressable>
+          <View style={styles.reviewTitleBlock}>
+            <Text style={styles.panelTitle}>Review</Text>
+            <Text testID="review-progress" style={styles.helperText}>
+              {entryIndex + 1} / {entries.length} · {modeLabel(currentEntry.mode)}
             </Text>
-          ) : null}
-        </View>
-        <View style={styles.iconButtonRow} testID="review-header-actions">
+          </View>
+          <View style={styles.iconButtonRow} testID="review-header-actions">
           {currentEntry.source === "session" || currentEntry.source === "history" ? (
             <>
               <Pressable
@@ -3233,15 +3512,29 @@ function ReviewSession({
           >
             <Text style={styles.iconButtonText}>↺</Text>
           </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Exit review"
-            testID="review-exit"
-            style={styles.iconButton}
-            onPress={() => onExit(currentEntry.source)}
-          >
-            <Text style={styles.iconButtonText}>×</Text>
-          </Pressable>
+          </View>
+        </View>
+        <View style={styles.reviewContextStrip} testID="review-context-strip">
+          <View style={styles.reviewContextPill} testID="review-source-pill">
+            <Text style={styles.reviewContextPillText}>{reviewSourceLabel}</Text>
+          </View>
+          <View style={styles.reviewContextPill} testID="review-theme-pill">
+            <Text style={styles.reviewContextPillText}>{reviewPrimaryTheme}</Text>
+          </View>
+          {reviewRemainingSeconds !== null ? (
+            <View style={[styles.reviewContextPill, reviewRemainingSeconds === 0 ? styles.reviewContextPillDanger : null]}>
+              <Text testID="review-timer" style={[styles.reviewContextPillText, reviewRemainingSeconds === 0 ? styles.errorText : null]}>
+                {reviewRemainingSeconds === 0 ? "Time expired" : formatDuration(reviewRemainingSeconds)}
+              </Text>
+            </View>
+          ) : null}
+          {arrowReviewChoiceLabel ? (
+            <View style={styles.reviewArrowLegendPill} testID="review-arrow-choice-marker">
+              <View style={styles.reviewLegendSwatchGreen} />
+              <View style={styles.reviewLegendSwatchRed} />
+              <Text style={styles.reviewContextPillText}>{arrowReviewChoiceLabel}</Text>
+            </View>
+          ) : null}
         </View>
       </View>
 
@@ -4780,6 +5073,13 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "800"
   },
+  reviewFilterScroller: {
+    marginHorizontal: -UI_PADDING
+  },
+  reviewFilterContent: {
+    gap: 8,
+    paddingHorizontal: UI_PADDING
+  },
   reviewDifficultyList: {
     gap: 8
   },
@@ -4807,6 +5107,29 @@ const styles = StyleSheet.create({
   },
   reviewDifficultyHard: {
     color: "#DC2626"
+  },
+  reviewItemList: {
+    gap: 8
+  },
+  reviewItemCard: {
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    minHeight: 82,
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  reviewItemCopy: {
+    flex: 1,
+    gap: 2
+  },
+  reviewItemDifficulty: {
+    fontSize: 12,
+    fontWeight: "800"
   },
   reviewContextCard: {
     alignItems: "center",
@@ -4848,6 +5171,74 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 12,
     gap: 10
+  },
+  activeSessionShell: {
+    gap: 10
+  },
+  sessionNavRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    minHeight: 44
+  },
+  sessionNavButton: {
+    alignItems: "center",
+    height: 40,
+    justifyContent: "center",
+    width: 40
+  },
+  sessionNavButtonText: {
+    color: "#111827",
+    fontSize: 24,
+    fontWeight: "500",
+    lineHeight: 28
+  },
+  sessionNavTitle: {
+    color: "#111827",
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "800",
+    textAlign: "center"
+  },
+  sessionOverflowText: {
+    color: "#111827",
+    fontSize: 16,
+    fontWeight: "900",
+    letterSpacing: 1,
+    lineHeight: 20
+  },
+  sessionActiveMetricRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between"
+  },
+  sessionActiveMetric: {
+    flex: 1,
+    gap: 2
+  },
+  sessionActiveMetricRight: {
+    alignItems: "flex-end"
+  },
+  sessionTimerBlock: {
+    alignItems: "center",
+    flex: 1,
+    gap: 2
+  },
+  sessionProgressValue: {
+    color: "#111827",
+    fontSize: 14,
+    fontWeight: "800"
+  },
+  sessionRatingValue: {
+    color: "#334155",
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  sessionMistakeRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    minHeight: 36
   },
   sessionHeaderRow: {
     alignItems: "center",
@@ -5279,12 +5670,138 @@ const styles = StyleSheet.create({
     borderColor: "#E2E8F0",
     borderRadius: 8,
     borderWidth: 1,
-    padding: 12,
-    gap: 8
+    gap: 12,
+    padding: 12
+  },
+  resultHero: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12
+  },
+  resultIcon: {
+    alignItems: "center",
+    borderRadius: 999,
+    height: 40,
+    justifyContent: "center",
+    width: 40
+  },
+  resultIconWon: {
+    backgroundColor: "#EFF6FF"
+  },
+  resultIconFailed: {
+    backgroundColor: "#FEF2F2"
+  },
+  resultIconText: {
+    color: "#2563EB",
+    fontSize: 22,
+    fontWeight: "900",
+    lineHeight: 26
+  },
+  resultIconTextFailed: {
+    color: "#DC2626"
+  },
+  resultTitleBlock: {
+    flex: 1,
+    gap: 2
+  },
+  resultScoreBlock: {
+    alignItems: "flex-end",
+    gap: 2
+  },
+  resultSolvedCount: {
+    color: "#111827",
+    fontSize: 28,
+    fontWeight: "900",
+    lineHeight: 32
+  },
+  resultSolvedTarget: {
+    color: "#64748B",
+    fontSize: 14,
+    fontWeight: "700"
+  },
+  resultAccuracy: {
+    color: "#334155",
+    fontSize: 12,
+    fontWeight: "700"
+  },
+  resultMetricGrid: {
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    overflow: "hidden"
+  },
+  resultMetric: {
+    borderRightColor: "#E2E8F0",
+    borderRightWidth: 1,
+    flex: 1,
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 10
+  },
+  resultMetricLabel: {
+    color: "#64748B",
+    fontSize: 11,
+    fontWeight: "700"
+  },
+  resultMetricValue: {
+    color: "#111827",
+    fontFamily: "menlo",
+    fontSize: 16,
+    fontWeight: "800"
+  },
+  resultRatingCard: {
+    alignItems: "center",
+    backgroundColor: "#F8FAFC",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    minHeight: 58,
+    padding: 10
+  },
+  resultRatingText: {
+    color: "#111827",
+    fontSize: 15,
+    fontWeight: "800"
+  },
+  resultSparkline: {
+    alignItems: "flex-end",
+    flexDirection: "row",
+    gap: 4,
+    height: 28
+  },
+  resultSparklineBar: {
+    backgroundColor: "#CBD5E1",
+    borderRadius: 4,
+    width: 8
+  },
+  resultSparklineBarUp: {
+    backgroundColor: "#2563EB"
+  },
+  resultSparklineBarDown: {
+    backgroundColor: "#DC2626"
+  },
+  resultReviewRow: {
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    minHeight: 58,
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  resultReviewCount: {
+    fontSize: 18,
+    fontWeight: "900"
   },
   summaryTitle: {
     color: "#111827",
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "800"
   },
   summaryText: {
@@ -5354,14 +5871,66 @@ const styles = StyleSheet.create({
     gap: 12
   },
   reviewHeaderRow: {
+    gap: 8
+  },
+  reviewTopNav: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "space-between"
+  },
+  reviewTitleBlock: {
+    alignItems: "center",
+    flex: 1,
+    gap: 2
+  },
+  reviewContextStrip: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    justifyContent: "center"
+  },
+  reviewContextPill: {
     alignItems: "center",
     backgroundColor: "#FFFFFF",
     borderColor: "#E2E8F0",
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
-    justifyContent: "space-between",
-    padding: 12
+    minHeight: 30,
+    paddingHorizontal: 10
+  },
+  reviewContextPillDanger: {
+    borderColor: "#FCA5A5"
+  },
+  reviewContextPillText: {
+    color: "#334155",
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  reviewArrowLegendPill: {
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 6,
+    minHeight: 30,
+    paddingHorizontal: 10
+  },
+  reviewLegendSwatchGreen: {
+    backgroundColor: "#16A34A",
+    borderRadius: 999,
+    height: 8,
+    width: 8
+  },
+  reviewLegendSwatchRed: {
+    backgroundColor: "#DC2626",
+    borderRadius: 999,
+    height: 8,
+    width: 8
   },
   reviewBoardLayout: {
     gap: 12
