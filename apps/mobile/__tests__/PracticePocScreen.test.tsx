@@ -47,6 +47,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "practice-progress-weekly-delta"))).toBe("Start training");
     expect(findByTestId(renderer, "practice-review-strip")).toBeTruthy();
     expectText(renderer, "Offline fixture · 15 puzzles");
+    expectText(renderer, "Tap a row to begin");
   });
 
   it("summarizes recent local practice progress on the Practice home", () => {
@@ -69,11 +70,21 @@ describe("PracticePocScreen", () => {
   it("starts a selected sprint directly from the mode row", () => {
     const renderer = renderScreen();
 
-    press(renderer, "practice-mode-blitz-start");
+    press(renderer, "practice-mode-blitz");
 
     expect(findByTestId(renderer, "session-board")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "session-progress"))).toBe("0 / 30");
     expectText(renderer, "Find the best move");
+  });
+
+  it("opens custom setup from the compact custom row instead of starting a scored sprint", () => {
+    const renderer = renderScreen();
+
+    press(renderer, "practice-mode-custom");
+
+    expect(findByTestId(renderer, "custom-sprint-setup")).toBeTruthy();
+    expect(() => findByTestId(renderer, "session-board")).toThrow();
+    expect(() => findByTestId(renderer, "rating-label")).toThrow();
   });
 
   it("seeds enough offline demo puzzles in random test mode to avoid exhausted fixture sprints", () => {
@@ -118,7 +129,7 @@ describe("PracticePocScreen", () => {
   it("accepts a non-official legal checkmate in the fixed first familiar puzzle", async () => {
     const renderer = renderScreen();
 
-    press(renderer, "start-sprint-button");
+    startStandardSprint(renderer);
     expectText(renderer, "Find the best move for white.");
     expectText(renderer, "0 / 15");
 
@@ -141,7 +152,7 @@ describe("PracticePocScreen", () => {
   it("submits standard puzzle moves through the board and records attempt history", async () => {
     const renderer = renderStandardSequenceScreen();
 
-    press(renderer, "start-sprint-button");
+    startStandardSprint(renderer);
     const board = findByTestId(renderer, "mock-chessboard");
     const fenBeforeAutoReply = board.props.fen;
     expect(findByTestId(renderer, "session-board")).toBeTruthy();
@@ -208,7 +219,7 @@ describe("PracticePocScreen", () => {
     const trace: PracticeDebugTraceEvent[] = [];
     const renderer = renderStandardSequenceScreen({ debugTrace: (event) => trace.push(event) });
 
-    press(renderer, "start-sprint-button");
+    startStandardSprint(renderer);
 
     await boardMove(renderer, "e2e6");
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(false);
@@ -253,7 +264,7 @@ describe("PracticePocScreen", () => {
     const trace: PracticeDebugTraceEvent[] = [];
     const renderer = renderStandardSequenceScreen({ debugTrace: (event) => trace.push(event) });
 
-    press(renderer, "start-sprint-button");
+    startStandardSprint(renderer);
     const firstBoard = findByTestId(renderer, "mock-chessboard");
     const firstPuzzleFen = firstBoard.props.fen;
     await boardMove(renderer, "e2e6");
@@ -290,7 +301,7 @@ describe("PracticePocScreen", () => {
     const trace: PracticeDebugTraceEvent[] = [];
     const renderer = renderStandardSequenceScreen({ debugTrace: (event) => trace.push(event) });
 
-    press(renderer, "start-sprint-button");
+    startStandardSprint(renderer);
     await boardMove(renderer, "e2e6");
 
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(false);
@@ -322,7 +333,7 @@ describe("PracticePocScreen", () => {
   it("does not count animated opponent replies as user mistakes", async () => {
     const renderer = renderStandardSequenceScreen();
 
-    press(renderer, "start-sprint-button");
+    startStandardSprint(renderer);
     await boardMove(renderer, "e2e6");
 
     expect(collectText(renderer.root)).not.toContain("Correct");
@@ -339,7 +350,7 @@ describe("PracticePocScreen", () => {
   it("treats per-puzzle seconds as target pace rather than a hard timeout", async () => {
     const renderer = renderStandardSequenceScreen();
 
-    press(renderer, "start-sprint-button");
+    startStandardSprint(renderer);
     act(() => {
       jest.advanceTimersByTime(25_000);
     });
@@ -373,7 +384,7 @@ describe("PracticePocScreen", () => {
       "b8f8"
     ];
 
-    press(renderer, "start-sprint-button");
+    startStandardSprint(renderer);
 
     for (const move of firstSevenStandardUserMoves) {
       expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
@@ -399,7 +410,7 @@ describe("PracticePocScreen", () => {
   it("shows red feedback for a wrong second move in a multi-step standard puzzle", async () => {
     const renderer = renderStandardSequenceScreen();
 
-    press(renderer, "start-sprint-button");
+    startStandardSprint(renderer);
     await boardMove(renderer, "e2e6");
     await settleFeedbackSnapshot();
 
@@ -420,7 +431,6 @@ describe("PracticePocScreen", () => {
     const arrow = firstArrowDuelPuzzleForTest();
 
     press(renderer, "practice-mode-arrow-duel");
-    press(renderer, "start-sprint-button");
 
     expect(findByTestId(renderer, "mock-chessboard").props.flipped).toBe(new Chess(arrow.currentFen).turn() === "b");
     expect(collectText(renderer.root)).not.toContain("Choose one candidate move");
@@ -437,7 +447,6 @@ describe("PracticePocScreen", () => {
     const arrow = firstArrowDuelPuzzleForTest();
 
     press(renderer, "practice-mode-arrow-duel");
-    press(renderer, "start-sprint-button");
 
     await boardMove(renderer, arrow.correctMove);
 
@@ -459,7 +468,6 @@ describe("PracticePocScreen", () => {
     const arrow = firstArrowDuelPuzzleForTest();
 
     press(renderer, "practice-mode-arrow-duel");
-    press(renderer, "start-sprint-button");
 
     const boardFen = findByTestId(renderer, "mock-chessboard").props.fen;
     const nonCandidate = firstLegalNonCandidate(boardFen, arrow.candidates);
@@ -482,7 +490,7 @@ describe("PracticePocScreen", () => {
   it("ignores illegal Standard board moves without recording attempts", async () => {
     const renderer = renderStandardSequenceScreen();
 
-    press(renderer, "start-sprint-button");
+    startStandardSprint(renderer);
 
     const boardFen = findByTestId(renderer, "mock-chessboard").props.fen;
 
@@ -563,7 +571,7 @@ describe("PracticePocScreen", () => {
   it("settles an active sprint when the countdown expires", () => {
     const renderer = renderStandardSequenceScreen();
 
-    press(renderer, "start-sprint-button");
+    startStandardSprint(renderer);
     act(() => {
       jest.advanceTimersByTime(301_000);
     });
@@ -584,6 +592,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "sprint-result-detail-review-impact"))).toContain("No new review items");
     expect(findByTestId(renderer, "sprint-result-review-impact")).toBeTruthy();
     expectText(renderer, "Review queue");
+    expectText(renderer, "Done");
     expect(findByTestId(renderer, "sprint-result-history-button")).toBeTruthy();
     press(renderer, "sprint-result-history-button");
     expect(findByTestId(renderer, "history-panel")).toBeTruthy();
@@ -593,7 +602,7 @@ describe("PracticePocScreen", () => {
   it("filters history to wrong attempts from the recent window", async () => {
     const renderer = renderStandardSequenceScreen();
 
-    press(renderer, "start-sprint-button");
+    startStandardSprint(renderer);
     await boardMove(renderer, "e2e6");
     await settleFeedbackSnapshot();
     await boardMove(renderer, "e6f7");
@@ -603,6 +612,7 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "history-tab");
     expectText(renderer, "Accuracy 50% · Correct 1 · Wrong 1");
+    expect(findByTestId(renderer, "history-primary-filters")).toBeTruthy();
     expect(findByTestId(renderer, "history-performance-card")).toBeTruthy();
     expect(findByTestId(renderer, "history-performance-chart")).toBeTruthy();
     expect(findByTestId(renderer, "history-chart-metric-filters")).toBeTruthy();
@@ -712,7 +722,7 @@ describe("PracticePocScreen", () => {
     const service = createMobilePracticeService("random1000");
     const renderer = renderScreen({ practiceService: service });
 
-    press(renderer, "start-sprint-button");
+    startStandardSprint(renderer);
     await boardMove(renderer, "e2e6");
     await settleFeedbackSnapshot();
     await boardMove(renderer, "e6f7");
@@ -742,7 +752,7 @@ describe("PracticePocScreen", () => {
   it("shows a review button after a failed sprint with mistakes", async () => {
     const renderer = renderStandardSequenceScreen();
 
-    press(renderer, "start-sprint-button");
+    startStandardSprint(renderer);
     await boardMove(renderer, "c4b5");
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
     expect(hasStyleValue(renderer.root, "rgba(220, 38, 38, 0.32)")).toBe(true);
@@ -777,7 +787,7 @@ describe("PracticePocScreen", () => {
     const recordReviewAttempt = jest.spyOn(service, "recordReviewAttempt");
     const renderer = renderScreen({ practiceService: service });
 
-    press(renderer, "start-sprint-button");
+    startStandardSprint(renderer);
     await boardMove(renderer, "c4b5");
     await settleFeedbackSnapshot();
     await boardMove(renderer, "g6g5");
@@ -833,7 +843,7 @@ describe("PracticePocScreen", () => {
   it("suppresses review auto-move callbacks so opponent replies animate without board resets", async () => {
     const renderer = renderStandardSequenceScreen();
 
-    press(renderer, "start-sprint-button");
+    startStandardSprint(renderer);
     await boardMove(renderer, "c4b5");
     await settleFeedbackSnapshot();
     await boardMove(renderer, "g6g5");
@@ -880,7 +890,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "review-filter-arrow-duel")).toBeTruthy();
     expect(findByTestId(renderer, "review-filter-speed-20")).toBeTruthy();
     expect(findByTestId(renderer, "review-due-items")).toBeTruthy();
-    expectText(renderer, "Review Queue");
+    expectText(renderer, "Due Today");
     expectText(renderer, "All due · Ready now");
     expect(collectText(findByTestId(renderer, "review-due-count"))).toBe("1");
     expect(collectText(findByTestId(renderer, "review-overdue-count"))).toBe("1 overdue");
@@ -1031,7 +1041,7 @@ describe("PracticePocScreen", () => {
   it("opens review analysis without mutating the active review line", async () => {
     const renderer = renderStandardSequenceScreen();
 
-    press(renderer, "start-sprint-button");
+    startStandardSprint(renderer);
     await boardMove(renderer, "c4b5");
     await settleFeedbackSnapshot();
     await boardMove(renderer, "g6g5");
@@ -1118,7 +1128,7 @@ describe("PracticePocScreen", () => {
       stockfishTransportFactory: () => stockfish.transport
     });
 
-    press(renderer, "start-sprint-button");
+    startStandardSprint(renderer);
     await boardMove(renderer, "c4b5");
     await settleFeedbackSnapshot();
     await boardMove(renderer, "g6g5");
@@ -1231,7 +1241,6 @@ describe("PracticePocScreen", () => {
     const wrongMoves: string[] = [];
 
     press(renderer, "practice-mode-arrow-duel");
-    press(renderer, "start-sprint-button");
 
     wrongMoves.push(currentArrowWrongMove(driverState));
     await boardMove(renderer, wrongMoves[0] as string);
@@ -1324,14 +1333,14 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "Choose the better move");
     expect(() => findByTestId(renderer, "review-guided-move-overlay")).toThrow();
     press(renderer, "review-exit");
-    expect(findByTestId(renderer, "start-sprint-button")).toBeTruthy();
+    expect(findByTestId(renderer, "practice-mode-standard")).toBeTruthy();
     expect(() => findByTestId(renderer, "review-session")).toThrow();
   });
 
   it("ignores stale board callbacks instead of recording a correct visible move as wrong", async () => {
     const renderer = renderStandardSequenceScreen();
 
-    press(renderer, "start-sprint-button");
+    startStandardSprint(renderer);
     const firstBoard = findByTestId(renderer, "mock-chessboard");
     const firstPuzzleFen = firstBoard.props.fen;
     const firstBoardOnMove = firstBoard.props.onMove;
@@ -1373,6 +1382,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "settings-packs-section")).toBeTruthy();
     expect(findByTestId(renderer, "settings-about-section")).toBeTruthy();
     expect(findByTestId(renderer, "settings-standard-elo-row")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "settings-standard-elo-row"))).toContain("ELO 600");
     expect(findByTestId(renderer, "settings-sync-disclosure")).toBeTruthy();
     expectText(renderer, "Local-first progress");
     expectText(renderer, "Practice always works offline.");
@@ -1468,9 +1478,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "packs-remove-tactics");
     press(renderer, "packs-remove-confirmation-confirm");
     expectText(renderer, "Tactics Pack removal queued; history retained");
-    expect(findByTestId(renderer, "packs-remove")).toBeTruthy();
-    press(renderer, "packs-remove");
-    expectText(renderer, "Choose an installed optional pack to remove");
+    expect(() => findByTestId(renderer, "packs-remove")).toThrow();
     expect(findByTestId(renderer, "packs-license-notes")).toBeTruthy();
     expect(findByTestId(renderer, "packs-source")).toBeTruthy();
     expect(findByTestId(renderer, "packs-processing")).toBeTruthy();
@@ -1566,6 +1574,10 @@ function press(renderer: TestRenderer.ReactTestRenderer, testID: string): void {
     }
     target.props.onPress();
   });
+}
+
+function startStandardSprint(renderer: TestRenderer.ReactTestRenderer): void {
+  press(renderer, "practice-mode-standard");
 }
 
 function abandonSprint(renderer: TestRenderer.ReactTestRenderer): void {

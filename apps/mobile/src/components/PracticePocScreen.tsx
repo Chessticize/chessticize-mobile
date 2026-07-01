@@ -142,10 +142,10 @@ const PRACTICE_MODE_DESCRIPTIONS: Record<SprintMode, string> = {
   custom: "Time, theme, rating"
 };
 const PRACTICE_MODE_ICONS: Record<SprintMode, string> = {
-  standard: "◎",
-  arrow_duel: "×",
-  blitz: "↯",
-  custom: "≡"
+  standard: "⊙",
+  arrow_duel: "⌁",
+  blitz: "ϟ",
+  custom: "☷"
 };
 const BOARD_FILES = ["a", "b", "c", "d", "e", "f", "g", "h"] as const;
 const BOARD_FILES_FLIPPED = ["h", "g", "f", "e", "d", "c", "b", "a"] as const;
@@ -900,6 +900,7 @@ export function PracticePocScreen({
   const screenSubtitle = tab === "practice"
     ? `Offline fixture · ${seededPuzzleCount(puzzleSource)} puzzles`
     : screenSubtitleFor(tab);
+  const showHeaderRating = tab === "practice" && state === null && mode !== "custom";
   const practiceModeSummaries = (["standard", "arrow_duel", "blitz", "custom"] as const).map((nextMode) => {
     const config = sprintConfigFor(nextMode, customDurationSeconds, customPerPuzzleSeconds);
     return {
@@ -921,7 +922,9 @@ export function PracticePocScreen({
             <Text style={styles.title}>{screenTitle}</Text>
             {screenSubtitle ? <Text style={styles.subtitle}>{screenSubtitle}</Text> : null}
           </View>
-          <Text testID="rating-label" style={styles.rating}>{`ELO ${formatRating(state, currentRating)}`}</Text>
+          {showHeaderRating ? (
+            <Text testID="rating-label" style={styles.rating}>{`ELO ${formatRating(state, currentRating)}`}</Text>
+          ) : null}
         </View>
       ) : null}
 
@@ -1081,20 +1084,6 @@ export function PracticePocScreen({
               />
             ) : null}
 
-            {state?.status === "active" || isShowingFeedbackSnapshot || isFinished || mode === "custom" ? null : (
-              <>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Start sprint"
-                  testID="start-sprint-button"
-                  style={styles.primaryButton}
-                  onPress={() => startSprint()}
-                >
-                  <Text style={styles.primaryButtonText}>Start new sprint</Text>
-                </Pressable>
-              </>
-            )}
-
             {!isActive && state === null && isPracticeTestControlsEnabled() && !practiceService ? (
               <TestPuzzleSourceControl
                 source={puzzleSource}
@@ -1183,9 +1172,10 @@ export function PracticePocScreen({
         ) : null}
         {tab === "settings" ? (
           <SettingsPanel
+            standardRating={readRating(service, defaultSprintConfig("standard").ratingKey)}
             onOpenDiagnostics={isPracticeTestControlsEnabled() ? () => setTab("analysis") : undefined}
             onOpenPacks={() => setTab("packs")}
-            onResetRating={() => service.resetRating(selectedConfig.ratingKey)}
+            onResetRating={() => service.resetRating(defaultSprintConfig("standard").ratingKey)}
           />
         ) : null}
         {tab === "packs" ? <PacksPanel /> : null}
@@ -1275,6 +1265,7 @@ function PracticeHome({
     <View style={styles.practiceHome} testID="practice-home">
       <View style={styles.sectionHeaderRow}>
         <Text style={styles.sectionLabel}>Start a Sprint</Text>
+        <Text style={styles.sectionMeta}>Tap a row to begin</Text>
       </View>
       <View style={styles.modeList}>
         {modes.map((item) => (
@@ -1282,12 +1273,18 @@ function PracticeHome({
             key={item.mode}
             active={mode === item.mode}
             item={item}
-            onPress={() => onSelectMode(item.mode)}
-            onStart={() => onStartMode(item.mode)}
+            onPress={() => {
+              if (item.mode === "custom") {
+                onSelectMode(item.mode);
+              } else {
+                onStartMode(item.mode);
+              }
+            }}
           />
         ))}
       </View>
 
+      <Text style={styles.sectionLabel}>Progress</Text>
       <View style={styles.practiceProgressCard} testID="practice-progress-summary">
         <View style={styles.progressMetric}>
           <Text style={styles.helperText}>ELO ({selected ? modeLabel(selected.mode) : "Standard"})</Text>
@@ -1301,6 +1298,7 @@ function PracticeHome({
         </View>
       </View>
 
+      <Text style={styles.sectionLabel}>Review</Text>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Open scheduled reviews"
@@ -1310,7 +1308,7 @@ function PracticeHome({
       >
         <View>
           <Text style={styles.listText}>Review</Text>
-          <Text style={styles.helperText}>Due today</Text>
+          <Text style={styles.helperText}>{dueReviewCount === 0 ? "No reviews due" : "Due today"}</Text>
         </View>
         <View style={styles.reviewStripCounts}>
           <Text style={styles.reviewDueCount}>{dueReviewCount}</Text>
@@ -1324,60 +1322,52 @@ function PracticeHome({
 function PracticeModeCard({
   active,
   item,
-  onPress,
-  onStart
+  onPress
 }: {
   active: boolean;
   item: PracticeModeSummary;
   onPress: () => void;
-  onStart: () => void;
 }): React.JSX.Element {
   const label = modeLabel(item.mode);
   const modeDetails = practiceModeDetails(item.config);
   return (
-    <View
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      accessibilityLabel={`${label} mode`}
+      testID={`practice-mode-${item.mode.replace("_", "-")}`}
       style={[styles.practiceModeCard, active ? styles.practiceModeCardActive : null]}
+      onPress={onPress}
     >
-      <Pressable
-        accessibilityRole="button"
-        accessibilityState={{ selected: active }}
-        accessibilityLabel={`${label} mode`}
-        testID={`practice-mode-${item.mode.replace("_", "-")}`}
-        style={styles.practiceModeSelectArea}
-        onPress={onPress}
-      >
+      <View style={styles.practiceModeSelectArea}>
         <View style={styles.practiceModeIcon}>
           <Text style={styles.practiceModeIconText}>{PRACTICE_MODE_ICONS[item.mode]}</Text>
         </View>
         <View style={styles.practiceModeCopy}>
           <View style={styles.practiceModeTitleRow}>
             <Text style={styles.practiceModeTitle}>{label}</Text>
-            {active ? (
-              <Text style={styles.practiceModeSelectedBadge}>Selected</Text>
-            ) : null}
           </View>
-          <Text style={styles.helperText}>{PRACTICE_MODE_DESCRIPTIONS[item.mode]}</Text>
+          <Text style={styles.practiceModeDescription}>{PRACTICE_MODE_DESCRIPTIONS[item.mode]}</Text>
           <View style={styles.practiceModeDetailRow} testID={`practice-mode-${item.mode.replace("_", "-")}-details`}>
             {modeDetails.map((detail) => (
               <Text key={detail} style={styles.practiceModeDetailChip}>{detail}</Text>
             ))}
           </View>
-          <Text style={styles.practiceModeRatingKey}>{item.config.ratingKey}</Text>
         </View>
-      </Pressable>
+      </View>
       <View style={styles.practiceModeMeta}>
         <Text style={styles.practiceModeRating}>ELO {item.rating}</Text>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Start ${label}`}
           testID={`practice-mode-${item.mode.replace("_", "-")}-start`}
-          style={styles.practiceModeStartButton}
-          onPress={onStart}
+          style={styles.practiceModeChevronButton}
+          onPress={onPress}
         >
-          <Text style={styles.practiceModeStartText}>Start</Text>
+          <Text style={styles.practiceModeChevron}>›</Text>
         </Pressable>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -1385,7 +1375,8 @@ function practiceModeDetails(config: SprintConfig): string[] {
   return [
     `Target ${config.targetCorrect}`,
     `${config.perPuzzleSeconds}s pace`,
-    `${config.maxMistakes} mistakes`
+    `${config.maxMistakes} mistakes`,
+    config.ratingKey
   ];
 }
 
@@ -2135,12 +2126,12 @@ function SprintSummary({
         </Pressable>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Back to practice"
+          accessibilityLabel="Done"
           testID="back-practice-button"
           style={styles.secondaryButton}
           onPress={onBack}
         >
-          <Text style={styles.secondaryButtonText}>Back</Text>
+          <Text style={styles.secondaryButtonText}>Done</Text>
         </Pressable>
       </View>
       {onReview && !shouldPrioritizeReview ? (
@@ -2550,6 +2541,36 @@ function HistoryPanel({
 
   return (
     <View style={styles.historyPanel} testID="history-panel">
+      <View style={styles.historyTopFilterStack} testID="history-primary-filters">
+        <HistoryChipRow testID="history-mode-filters">
+          <FilterButton active={modeFilter === "all"} label="All" testID="history-mode-all" onPress={() => onModeFilterChange("all")} />
+          <FilterButton active={modeFilter === "standard"} label="Standard" testID="history-mode-standard" onPress={() => onModeFilterChange("standard")} />
+          <FilterButton active={modeFilter === "arrow_duel"} label="Arrow Duel" testID="history-mode-arrow-duel" onPress={() => onModeFilterChange("arrow_duel")} />
+          <FilterButton active={modeFilter === "blitz"} label="Blitz" testID="history-mode-blitz" onPress={() => onModeFilterChange("blitz")} />
+          <FilterButton active={modeFilter === "custom"} label="Custom" testID="history-mode-custom" onPress={() => onModeFilterChange("custom")} />
+        </HistoryChipRow>
+        <HistoryChipRow testID="history-range-filters">
+          {(["7d", "30d", "90d", "1y", "max"] as const).map((range) => (
+            <FilterButton
+              key={range}
+              active={timeRange === range}
+              label={historyRangeLabel(range)}
+              testID={`history-range-${range}`}
+              onPress={() => onTimeRangeChange(range)}
+            />
+          ))}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Wrong in the last 7 days"
+            testID="history-filter-wrong-7-days"
+            style={[styles.filterButton, wrongLast7Days ? styles.filterButtonActive : null]}
+            onPress={onToggleWrongLast7Days}
+          >
+            <Text style={[styles.filterButtonText, wrongLast7Days ? styles.filterButtonTextActive : null]}>Wrong 7d</Text>
+          </Pressable>
+        </HistoryChipRow>
+      </View>
+
       <View style={styles.historyPerformanceCard} testID="history-performance-card">
         <View style={styles.historyPerformanceHeader}>
           <View>
@@ -2581,26 +2602,6 @@ function HistoryPanel({
         />
       </View>
 
-      <HistoryChipRow testID="history-range-filters">
-        {(["7d", "30d", "90d", "1y", "max"] as const).map((range) => (
-          <FilterButton
-            key={range}
-            active={timeRange === range}
-            label={historyRangeLabel(range)}
-            testID={`history-range-${range}`}
-            onPress={() => onTimeRangeChange(range)}
-          />
-        ))}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Wrong in the last 7 days"
-          testID="history-filter-wrong-7-days"
-          style={[styles.filterButton, wrongLast7Days ? styles.filterButtonActive : null]}
-          onPress={onToggleWrongLast7Days}
-        >
-          <Text style={[styles.filterButtonText, wrongLast7Days ? styles.filterButtonTextActive : null]}>Wrong 7d</Text>
-        </Pressable>
-      </HistoryChipRow>
       {ratingKeys.length > 0 ? (
         <HistoryChipRow testID="history-rating-filters">
           {ratingKeys.map((ratingKey) => (
@@ -2623,13 +2624,6 @@ function HistoryPanel({
         <FilterButton active={resultFilter === "all"} label="All" testID="history-result-all" onPress={() => onResultFilterChange("all")} />
         <FilterButton active={resultFilter === "correct"} label="Correct" testID="history-result-correct" onPress={() => onResultFilterChange("correct")} />
         <FilterButton active={resultFilter === "wrong"} label="Wrong" testID="history-result-wrong" onPress={() => onResultFilterChange("wrong")} />
-      </HistoryChipRow>
-      <HistoryChipRow testID="history-mode-filters">
-        <FilterButton active={modeFilter === "all"} label="All modes" testID="history-mode-all" onPress={() => onModeFilterChange("all")} />
-        <FilterButton active={modeFilter === "standard"} label="Standard" testID="history-mode-standard" onPress={() => onModeFilterChange("standard")} />
-        <FilterButton active={modeFilter === "blitz"} label="Blitz" testID="history-mode-blitz" onPress={() => onModeFilterChange("blitz")} />
-        <FilterButton active={modeFilter === "arrow_duel"} label="Arrow Duel" testID="history-mode-arrow-duel" onPress={() => onModeFilterChange("arrow_duel")} />
-        <FilterButton active={modeFilter === "custom"} label="Custom" testID="history-mode-custom" onPress={() => onModeFilterChange("custom")} />
       </HistoryChipRow>
       {speedFilters.length > 0 ? (
         <HistoryChipRow testID="history-speed-filters">
@@ -3209,7 +3203,7 @@ function ReviewPanel({
     <View style={styles.reviewQueuePanel} testID="review-panel">
       <View style={styles.reviewDueCard} testID="review-due-card">
         <View>
-          <Text style={styles.reviewDueTitle}>Review Queue</Text>
+          <Text style={styles.reviewDueTitle}>Due Today</Text>
           <Text testID="review-due-summary" style={styles.helperText}>
             {filteredDueEntries.length > 0 ? `${reviewQueueFilterLabel(queueFilter)} · Ready now` : "No matching scheduled reviews"}
           </Text>
@@ -3221,6 +3215,29 @@ function ReviewPanel({
           <Text testID="review-total-count" style={styles.reviewDueMetricText}>{queueSummary.totalCount} total</Text>
         </View>
       </View>
+
+      <View style={styles.reviewDifficultyList} testID="review-difficulty-list">
+        <ReviewDifficultyRow label="Easy" detail="All good" count={difficultySummary.easy} tone="easy" />
+        <ReviewDifficultyRow label="Medium" detail="Needs attention" count={difficultySummary.medium} tone="medium" />
+        <ReviewDifficultyRow label="Hard" detail={difficultySummary.hard > 0 ? "Overdue" : "Stable"} count={difficultySummary.hard} tone="hard" />
+      </View>
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Start due review"
+        accessibilityState={{ disabled: filteredDueEntries.length === 0 }}
+        disabled={filteredDueEntries.length === 0}
+        testID="review-start-due"
+        style={[styles.primaryButton, styles.reviewStartButton, filteredDueEntries.length === 0 ? styles.disabledButton : null]}
+        onPress={() => {
+          const firstGroup = filteredContextGroups[0];
+          if (firstGroup) {
+            setActiveEntries(firstGroup.entries);
+          }
+        }}
+      >
+        <Text style={styles.primaryButtonText}>Start Review</Text>
+      </Pressable>
 
       <ScrollView
         horizontal
@@ -3254,12 +3271,6 @@ function ReviewPanel({
           />
         ))}
       </ScrollView>
-
-      <View style={styles.reviewDifficultyList} testID="review-difficulty-list">
-        <ReviewDifficultyRow label="Easy" detail="All good" count={difficultySummary.easy} tone="easy" />
-        <ReviewDifficultyRow label="Medium" detail="Needs attention" count={difficultySummary.medium} tone="medium" />
-        <ReviewDifficultyRow label="Hard" detail={difficultySummary.hard > 0 ? "Overdue" : "Stable"} count={difficultySummary.hard} tone="hard" />
-      </View>
 
       {filteredDueReviewItems.length > 0 ? (
         <View style={styles.reviewItemList} testID="review-due-items">
@@ -3322,22 +3333,6 @@ function ReviewPanel({
         </View>
       )}
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Start due review"
-        accessibilityState={{ disabled: filteredDueEntries.length === 0 }}
-        disabled={filteredDueEntries.length === 0}
-        testID="review-start-due"
-        style={[styles.primaryButton, styles.reviewStartButton, filteredDueEntries.length === 0 ? styles.disabledButton : null]}
-        onPress={() => {
-          const firstGroup = filteredContextGroups[0];
-          if (firstGroup) {
-            setActiveEntries(firstGroup.entries);
-          }
-        }}
-      >
-        <Text style={styles.primaryButtonText}>Start Review</Text>
-      </Pressable>
     </View>
   );
 }
@@ -4449,11 +4444,13 @@ function normalizeUci(move: string): string {
 function SettingsPanel({
   onOpenDiagnostics,
   onOpenPacks,
-  onResetRating
+  onResetRating,
+  standardRating
 }: {
   onOpenDiagnostics?: () => void;
   onOpenPacks: () => void;
   onResetRating: () => void;
+  standardRating: number;
 }): React.JSX.Element {
   const [syncEnabled, setSyncEnabled] = useState(true);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -4465,7 +4462,7 @@ function SettingsPanel({
       <SettingsSection title="Profile" testID="settings-profile-section">
         <SettingsRow
           label="Puzzle ELO (Standard)"
-          value="Manage"
+          value={`ELO ${standardRating}`}
           detail="Current sprint rating bucket"
           testID="settings-standard-elo-row"
         />
@@ -4945,16 +4942,6 @@ function PacksPanel(): React.JSX.Element {
           <PackCoverageMetric label="Arrow Duel" value="Ready" testID="packs-coverage-arrow-duel" />
         </View>
       </View>
-
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Remove pack"
-        testID="packs-remove"
-        style={styles.secondaryButton}
-        onPress={() => setStatusMessage("Choose an installed optional pack to remove")}
-      >
-        <Text style={styles.secondaryButtonText}>Remove Optional Pack</Text>
-      </Pressable>
 
       {removalPack ? (
         <DestructiveConfirmationCard
@@ -5801,6 +5788,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "800"
   },
+  sectionMeta: {
+    color: "#64748B",
+    fontSize: 12,
+    fontWeight: "700"
+  },
   modeList: {
     gap: 8
   },
@@ -5811,39 +5803,39 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
-    gap: 10,
-    minHeight: 92,
-    paddingHorizontal: 12,
-    paddingVertical: 10
+    gap: 8,
+    minHeight: 62,
+    paddingHorizontal: 10,
+    paddingVertical: 8
   },
   practiceModeCardActive: {
-    borderColor: "#BFDBFE",
-    backgroundColor: "#F8FBFF"
+    borderColor: "#D7DEE8",
+    backgroundColor: "#FFFFFF"
   },
   practiceModeSelectArea: {
     alignItems: "center",
     flex: 1,
     flexDirection: "row",
-    gap: 10,
+    gap: 9,
     minWidth: 0
   },
   practiceModeIcon: {
     alignItems: "center",
     backgroundColor: "#EFF6FF",
-    borderRadius: 999,
-    height: 34,
+    borderRadius: 8,
+    height: 32,
     justifyContent: "center",
     width: 34
   },
   practiceModeIconText: {
     color: "#2563EB",
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "900",
-    lineHeight: 22
+    lineHeight: 20
   },
   practiceModeCopy: {
     flex: 1,
-    gap: 4,
+    gap: 2,
     minWidth: 0
   },
   practiceModeTitleRow: {
@@ -5854,8 +5846,13 @@ const styles = StyleSheet.create({
   },
   practiceModeTitle: {
     color: "#111827",
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "800"
+  },
+  practiceModeDescription: {
+    color: "#64748B",
+    fontSize: 12,
+    fontWeight: "600"
   },
   practiceModeSelectedBadge: {
     backgroundColor: "#DBEAFE",
@@ -5870,19 +5867,17 @@ const styles = StyleSheet.create({
   practiceModeDetailRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 5
+    columnGap: 7,
+    rowGap: 2
   },
   practiceModeDetailChip: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#E2E8F0",
-    borderRadius: 999,
-    borderWidth: 1,
+    backgroundColor: "transparent",
     color: "#475569",
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: "800",
     overflow: "hidden",
-    paddingHorizontal: 7,
-    paddingVertical: 3
+    paddingHorizontal: 0,
+    paddingVertical: 1
   },
   practiceModeRatingKey: {
     color: "#64748B",
@@ -5891,13 +5886,13 @@ const styles = StyleSheet.create({
   },
   practiceModeMeta: {
     alignItems: "flex-end",
-    gap: 8,
+    gap: 4,
     justifyContent: "center",
     minWidth: 72
   },
   practiceModeRating: {
     color: "#64748B",
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "800"
   },
   practiceModeStartButton: {
@@ -5912,6 +5907,12 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 12,
     fontWeight: "900"
+  },
+  practiceModeChevronButton: {
+    alignItems: "center",
+    height: 28,
+    justifyContent: "center",
+    width: 28
   },
   practiceModeChevron: {
     color: "#111827",
@@ -7206,6 +7207,9 @@ const styles = StyleSheet.create({
   },
   historyPanel: {
     gap: 10
+  },
+  historyTopFilterStack: {
+    gap: 8
   },
   historyPerformanceCard: {
     backgroundColor: "#FFFFFF",
