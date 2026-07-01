@@ -27,7 +27,7 @@ import type {
   SprintState
 } from "../../core/src/index.ts";
 import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./query-types.ts";
-import type { PracticeStore } from "./practice-store.ts";
+import type { ClearLocalHistoryResult, ExportedSprintSession, LocalDataExport, PracticeStore } from "./practice-store.ts";
 import { selectUniquePuzzles } from "./puzzle-selection.ts";
 
 interface AttemptHistoryDbRow extends Omit<AttemptHistoryRow, "ratingAfter"> {
@@ -91,6 +91,19 @@ interface ReviewRow {
   lapse_count: number;
   last_result: AttemptResult;
   last_reviewed_at: string;
+}
+
+interface SprintSessionExportRow {
+  id: string;
+  mode: SprintMode;
+  ratingKey: string;
+  startedAt: string;
+  completedAt: string | null;
+  status: SprintState["status"];
+  correctCount: number;
+  mistakeCount: number;
+  ratingBefore: number;
+  ratingAfter: number | null;
 }
 
 export class SQLiteStore implements PracticeStore {
@@ -410,6 +423,36 @@ export class SQLiteStore implements PracticeStore {
     });
   }
 
+  exportLocalData(): LocalDataExport {
+    return {
+      schemaVersion: 1,
+      ratings: this.listRatings(),
+      attempts: this.listAttempts(),
+      reviewQueue: this.listAllReviewQueueStates()
+        .sort((left, right) =>
+          left.dueAt.localeCompare(right.dueAt) ||
+          left.puzzleId.localeCompare(right.puzzleId) ||
+          left.mode.localeCompare(right.mode) ||
+          left.ratingKey.localeCompare(right.ratingKey)
+        ),
+      sprintSessions: this.listExportedSprintSessions()
+    };
+  }
+
+  clearLocalHistory(): ClearLocalHistoryResult {
+    const result: ClearLocalHistoryResult = {
+      attempts: countRows(this.db, "attempts"),
+      reviewEvents: countRows(this.db, "review_events"),
+      reviewQueue: countRows(this.db, "review_queue"),
+      sprintSessions: countRows(this.db, "sprint_sessions", "status != 'active'")
+    };
+    this.db.prepare("DELETE FROM attempts").run();
+    this.db.prepare("DELETE FROM review_events").run();
+    this.db.prepare("DELETE FROM review_queue").run();
+    this.db.prepare("DELETE FROM sprint_sessions WHERE status != 'active'").run();
+    return result;
+  }
+
   getSessionMistakeReview(sessionId: string): SessionMistakeReviewItem[] {
     const attempts = this.listAttempts({ sessionId, result: "wrong" }).map(attemptEventFromHistoryRow);
     const puzzles = attempts
@@ -604,6 +647,39 @@ export class SQLiteStore implements PracticeStore {
     return rows.map(reviewFromRow);
   }
 
+  private listExportedSprintSessions(): ExportedSprintSession[] {
+    const rows = this.db
+      .prepare(
+        `SELECT
+          id,
+          mode,
+          rating_key AS ratingKey,
+          started_at AS startedAt,
+          completed_at AS completedAt,
+          status,
+          correct_count AS correctCount,
+          mistake_count AS mistakeCount,
+          rating_before AS ratingBefore,
+          rating_after AS ratingAfter
+         FROM sprint_sessions
+         ORDER BY started_at DESC, id DESC`
+      )
+      .all() as SprintSessionExportRow[];
+
+    return rows.map((row) => ({
+      id: row.id,
+      mode: row.mode,
+      ratingKey: row.ratingKey,
+      startedAt: row.startedAt,
+      ...(row.completedAt === null ? {} : { completedAt: row.completedAt }),
+      status: row.status,
+      correctCount: row.correctCount,
+      mistakeCount: row.mistakeCount,
+      ratingBefore: row.ratingBefore,
+      ...(row.ratingAfter === null ? {} : { ratingAfter: row.ratingAfter })
+    }));
+  }
+
   private ensureSyntheticReviewSession(attempt: AttemptEvent): void {
     this.db
       .prepare(
@@ -695,6 +771,11 @@ function attemptEventFromHistoryRow(row: AttemptHistoryRow): AttemptEvent {
 
 function cryptoRandomId(): string {
   return randomUUID();
+}
+
+function countRows(db: DatabaseSync, table: string, where?: string): number {
+  const sql = `SELECT COUNT(*) AS count FROM ${table}${where ? ` WHERE ${where}` : ""}`;
+  return (db.prepare(sql).get() as { count: number }).count;
 }
 
 const SCHEMA_SQL = `

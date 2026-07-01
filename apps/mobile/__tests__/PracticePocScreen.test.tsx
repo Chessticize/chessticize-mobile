@@ -58,6 +58,8 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "practice-progress-summary")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "practice-progress-weekly-solved"))).toBe("0");
     expect(collectText(findByTestId(renderer, "practice-progress-weekly-delta"))).toBe("Start training");
+    expect(collectText(findByTestId(renderer, "practice-progress-weekly-context"))).toBe("No attempts yet");
+    expect(hasStyleEntry(findByTestId(renderer, "practice-progress-weekly-delta"), "color", "#64748B")).toBe(true);
     expect(findByTestId(renderer, "practice-review-strip")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "practice-review-due-count"))).toContain("0");
     expect(collectText(findByTestId(renderer, "practice-review-due-count"))).toContain("Due today");
@@ -82,6 +84,24 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "practice-progress-summary")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "practice-progress-weekly-solved"))).toBe("1");
     expect(collectText(findByTestId(renderer, "practice-progress-weekly-delta"))).toBe("+1 net");
+    expect(collectText(findByTestId(renderer, "practice-progress-weekly-context"))).toBe("100% accuracy · 0 mistakes");
+    expect(hasStyleEntry(findByTestId(renderer, "practice-progress-weekly-delta"), "color", "#16A34A")).toBe(true);
+  });
+
+  it("surfaces negative weekly practice progress without hiding mistakes", () => {
+    const service = createMobilePracticeService("random1000");
+    service.startSprint(
+      { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 15, maxMistakes: 3 },
+      new Date(Date.now() - 120_000).toISOString()
+    );
+    service.submitMove("c4b5", new Date(Date.now() - 60_000).toISOString());
+
+    const renderer = renderScreen({ practiceService: service });
+
+    expect(collectText(findByTestId(renderer, "practice-progress-weekly-solved"))).toBe("0");
+    expect(collectText(findByTestId(renderer, "practice-progress-weekly-delta"))).toBe("-1 net");
+    expect(collectText(findByTestId(renderer, "practice-progress-weekly-context"))).toBe("0% accuracy · 1 mistake");
+    expect(hasStyleEntry(findByTestId(renderer, "practice-progress-weekly-delta"), "color", "#DC2626")).toBe(true);
   });
 
   it("starts a selected sprint directly from the mode row", () => {
@@ -1653,12 +1673,13 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "ELO reset");
     expect(findByTestId(renderer, "settings-export-data")).toBeTruthy();
     press(renderer, "settings-export-data");
-    expectText(renderer, "Export prepared");
+    expectText(renderer, "Export ready · 0 attempts · 0 reviews · 4 ratings");
     press(renderer, "settings-delete-local-history");
     expect(findByTestId(renderer, "settings-delete-history-confirmation")).toBeTruthy();
     expectText(renderer, "Delete local history?");
+    expectText(renderer, "Ratings and puzzle packs stay intact.");
     press(renderer, "settings-delete-history-confirmation-confirm");
-    expectText(renderer, "Delete requires data-layer implementation");
+    expectText(renderer, "No local history to delete");
     expect(findByTestId(renderer, "settings-advanced-ratings")).toBeTruthy();
     expect(() => findByTestId(renderer, "settings-advanced-ratings-panel")).toThrow();
     press(renderer, "settings-advanced-ratings");
@@ -1667,7 +1688,19 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "settings-advanced-rating-standard")).toBeTruthy();
     expect(findByTestId(renderer, "settings-advanced-rating-arrow-duel")).toBeTruthy();
     expect(findByTestId(renderer, "settings-advanced-rating-blitz")).toBeTruthy();
-    expectText(renderer, "Locked");
+    expect(collectText(findByTestId(renderer, "settings-advanced-rating-standard-value"))).toBe("ELO 600");
+    expect(collectText(findByTestId(renderer, "settings-advanced-rating-standard-increase"))).toBe("");
+    expect(collectText(findByTestId(renderer, "settings-advanced-rating-standard-decrease"))).toBe("");
+    expect(findByTestId(renderer, "settings-advanced-rating-standard-decrease").props.accessibilityState).toEqual({ disabled: true });
+    expect(collectText(renderer.root)).not.toContain("Locked");
+    press(renderer, "settings-advanced-rating-standard-increase");
+    expectText(renderer, "Standard rating set to 625");
+    expect(collectText(findByTestId(renderer, "settings-advanced-rating-standard-value"))).toBe("ELO 625");
+    expect(collectText(findByTestId(renderer, "settings-standard-elo-row"))).toContain("ELO 625");
+    expect(findByTestId(renderer, "settings-advanced-rating-standard-decrease").props.accessibilityState).toEqual({ disabled: false });
+    press(renderer, "settings-advanced-rating-standard-decrease");
+    expectText(renderer, "Standard rating set to 600");
+    expect(collectText(findByTestId(renderer, "settings-advanced-rating-standard-value"))).toBe("ELO 600");
     press(renderer, "settings-advanced-ratings");
     expect(() => findByTestId(renderer, "settings-advanced-ratings-panel")).toThrow();
     expect(findByTestId(renderer, "settings-manage-packs")).toBeTruthy();
@@ -1751,6 +1784,36 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "packs-manifest")).toBeTruthy();
     expect(findByTestId(renderer, "packs-build-date")).toBeTruthy();
     expect(() => findByTestId(renderer, "packs-coverage-card")).toThrow();
+  });
+
+  it("deletes local history and review queue from Settings while preserving rating", () => {
+    const service = createMobilePracticeService("random1000");
+    service.startSprint(
+      { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
+      new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 - 120_000).toISOString()
+    );
+    service.submitMove("c4b5", new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 - 60_000).toISOString());
+    const ratingBefore = service.getRating("standard 5/20");
+    const renderer = renderScreen({ practiceService: service });
+
+    press(renderer, "history-tab");
+    expectText(renderer, "Wrong move · c4b5");
+    press(renderer, "review-tab");
+    expect(findByTestId(renderer, "review-due-card")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "review-due-count"))).toBe("1");
+
+    press(renderer, "settings-tab");
+    press(renderer, "settings-export-data");
+    expectText(renderer, "Export ready · 1 attempt · 1 review · 4 ratings");
+    press(renderer, "settings-delete-local-history");
+    press(renderer, "settings-delete-history-confirmation-confirm");
+
+    expectText(renderer, "Local history deleted · 1 attempt · 1 review");
+    expect(service.getRating("standard 5/20")).toEqual(ratingBefore);
+    press(renderer, "history-tab");
+    expectText(renderer, "No attempts");
+    press(renderer, "review-tab");
+    expectText(renderer, "No reviews due today");
   });
 });
 

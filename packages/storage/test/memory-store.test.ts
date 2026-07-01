@@ -185,6 +185,60 @@ test("PracticeService builds MemoryStore history view for a required time range 
   assert.equal(service.getDueReviewItems("2026-06-21T00:00:05.000Z")[0]?.puzzle.id, "000hf");
 });
 
+test("PracticeService clears MemoryStore local history without resetting ratings or puzzles", async () => {
+  const store = new MemoryStore();
+  store.seedPuzzles(await loadFixturePuzzles());
+  const service = new PracticeService(store);
+
+  service.startSprint(
+    { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
+    "2026-06-20T00:00:00.000Z"
+  );
+  service.submitMove("c4b5", "2026-06-20T00:00:05.000Z");
+
+  assert.equal(store.countPuzzles(), 4);
+  assert.equal((service.listHistory({ result: "wrong" }) as unknown[]).length, 1);
+  assert.equal(service.getDueReviewItems("2026-06-21T00:00:05.000Z").length, 1);
+  const exported = service.exportLocalData();
+  assert.equal(exported.schemaVersion, 1);
+  assert.equal(exported.attempts.length, 1);
+  assert.equal(exported.reviewQueue.length, 1);
+  assert.equal(exported.sprintSessions.length, 1);
+  assert.deepEqual(exported.ratings.map((rating) => rating.key), ["standard 5/20"]);
+  const ratingBefore = service.getRating("standard 5/20");
+
+  const result = service.clearLocalHistory();
+
+  assert.deepEqual(result, {
+    attempts: 1,
+    reviewEvents: 0,
+    reviewQueue: 1,
+    sprintSessions: 1
+  });
+  assert.equal(store.countPuzzles(), 4);
+  assert.deepEqual(service.listHistory(), []);
+  assert.deepEqual(service.getDueReviewItems("2026-06-21T00:00:05.000Z"), []);
+  assert.deepEqual(service.getHistoryView({
+    now: "2026-06-21T00:00:00.000Z",
+    timeRange: "max",
+    ratingKey: "standard 5/20"
+  }).attempts, []);
+  assert.deepEqual(service.getRating("standard 5/20"), ratingBefore);
+});
+
+test("PracticeService manually adjusts MemoryStore ratings behind the service boundary", async () => {
+  const store = new MemoryStore();
+  const service = new PracticeService(store);
+
+  const adjusted = service.setRating("standard 5/20", 725);
+
+  assert.equal(adjusted.rating, 725);
+  assert.equal(adjusted.generation, 1);
+  assert.equal(service.getRating("standard 5/20").rating, 725);
+  assert.throws(() => service.setRating("standard 5/20", 599), /at least 600/);
+  assert.throws(() => service.setRating("standard 5/20", 700.5), /integer/);
+});
+
 test("PracticeService records official MemoryStore reviews in history without mixing queue contexts", async () => {
   const store = new MemoryStore();
   store.seedPuzzles(await loadFixturePuzzles());
