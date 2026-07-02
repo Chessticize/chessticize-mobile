@@ -1016,10 +1016,13 @@ export function PracticePocScreen({
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" />
       {appShellVisible ? (
-        <View style={styles.header}>
+        <View
+          accessibilityLabel={screenSubtitle ? `${screenTitle}, ${screenSubtitle}` : screenTitle}
+          style={styles.header}
+          testID="app-shell-header"
+        >
           <View>
             <Text style={styles.title}>{screenTitle}</Text>
-            {screenSubtitle ? <Text style={styles.subtitle}>{screenSubtitle}</Text> : null}
           </View>
           {showHeaderRating ? (
             <Text testID="rating-label" style={styles.rating}>{`ELO ${formatRating(state, currentRating)}`}</Text>
@@ -1455,7 +1458,11 @@ function PracticeHome({
       </View>
 
       <Text style={styles.sectionLabel}>Progress</Text>
-      <View style={styles.practiceProgressCard} testID="practice-progress-summary">
+      <View
+        accessibilityLabel={`Progress summary, ELO ${currentRating}, this week ${progress.correctThisWeek}, ${progressDelta}, ${progressContext}`}
+        style={styles.practiceProgressCard}
+        testID="practice-progress-summary"
+      >
         <View style={styles.progressMetric}>
           <Text style={styles.helperText}>ELO ({selected ? modeLabel(selected.mode) : "Standard"})</Text>
           <Text style={styles.progressValue}>{currentRating}</Text>
@@ -1465,21 +1472,19 @@ function PracticeHome({
           <Text style={styles.helperText}>This Week</Text>
           <Text testID="practice-progress-weekly-solved" style={styles.progressValue}>{progress.correctThisWeek}</Text>
           <Text testID="practice-progress-weekly-delta" style={[styles.progressDelta, progressTone]}>{progressDelta}</Text>
-          <Text testID="practice-progress-weekly-context" style={styles.progressContext}>{progressContext}</Text>
         </View>
       </View>
 
       <Text style={styles.sectionLabel}>Review</Text>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Open scheduled reviews"
+        accessibilityLabel={`Open scheduled mistake reviews, ${dueReviewCount} due today, ${overdueReviewCount} overdue`}
         testID="practice-review-strip"
         style={styles.practiceReviewStrip}
         onPress={onOpenReview}
       >
         <View>
           <Text style={styles.listText}>{reviewStatusLabel}</Text>
-          <Text style={styles.helperText}>Scheduled mistake reviews</Text>
         </View>
         <View style={styles.reviewStripCounts}>
           <View style={styles.reviewStripMetric} testID="practice-review-due-count">
@@ -1666,7 +1671,6 @@ function CustomSprintSetup({
         </Pressable>
         <View style={styles.customHeaderTitleBlock}>
           <Text style={styles.customScreenTitle}>Custom Sprint</Text>
-          <Text style={styles.helperText}>Time, theme, rating</Text>
         </View>
         <Pressable
           accessibilityRole="button"
@@ -2976,8 +2980,7 @@ function HistoryPanel({
   });
   return (
     <View style={styles.historyPanel} testID="history-panel">
-      <View style={styles.actionOnlyHeader} testID="history-action-header">
-        <Text style={styles.sectionLabel}>Filters</Text>
+      <View style={[styles.actionOnlyHeader, styles.rightAlignedActionHeader]} testID="history-action-header">
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={filtersExpanded ? "Hide history filters" : "Show history filters"}
@@ -4106,6 +4109,12 @@ function ReviewPanel({
   const queueSummary = reviewQueueSummary(reviewQueue, filteredDueReviewItems);
   const activeFilterLabels = reviewActiveFilterLabels(queueFilter, queueSummary);
   const showActiveFilterStrip = filtersExpanded || queueFilter !== "all";
+  const reviewDueSummaryLabel = filteredDueEntries.length > 0
+    ? queueSummary.oldestDueLabel
+    : "No matching scheduled reviews";
+  const reviewDueFilterLabel = filteredDueEntries.length > 0
+    ? `${reviewQueueFilterLabel(queueFilter)} · Ready now`
+    : "No matching scheduled reviews";
 
   useEffect(() => {
     setActiveEntries(preferredEntries);
@@ -4131,8 +4140,7 @@ function ReviewPanel({
 
   return (
     <View style={styles.reviewQueuePanel} testID="review-panel">
-      <View style={styles.actionOnlyHeader} testID="review-action-header">
-        <Text style={styles.sectionLabel}>Due reviews</Text>
+      <View style={[styles.actionOnlyHeader, styles.rightAlignedActionHeader]} testID="review-action-header">
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={filtersExpanded ? "Hide review filters" : "Show review filters"}
@@ -4145,20 +4153,23 @@ function ReviewPanel({
         </Pressable>
       </View>
 
-      <View style={styles.reviewDueCard} testID="review-due-card">
+      <View
+        accessibilityLabel={`Due today, ${queueSummary.filteredCount} due, ${queueSummary.overdueCount} overdue, ${queueSummary.totalCount} total, ${reviewDueFilterLabel}`}
+        style={styles.reviewDueCard}
+        testID="review-due-card"
+      >
         <View style={styles.reviewDueCopy}>
           <Text style={styles.reviewDueTitle}>Due Today</Text>
           <Text testID="review-due-summary" style={styles.helperText}>
-            {filteredDueEntries.length > 0 ? `${reviewQueueFilterLabel(queueFilter)} · Ready now` : "No matching scheduled reviews"}
+            {reviewDueSummaryLabel}
           </Text>
-          <Text testID="review-next-due" style={styles.helperText}>{queueSummary.oldestDueLabel}</Text>
-          <Text testID="review-due-secondary-summary" style={styles.reviewDueSecondarySummary}>
+          <Text testID="review-next-due" style={styles.reviewDueHiddenMetric}>{queueSummary.oldestDueLabel}</Text>
+          <Text testID="review-due-secondary-summary" style={styles.reviewDueHiddenMetric}>
             {queueSummary.overdueCount} overdue · {queueSummary.totalCount} total
           </Text>
         </View>
         <View style={styles.reviewDueCountBlock}>
           <Text testID="review-due-count" style={styles.reviewDueBigCount}>{queueSummary.filteredCount}</Text>
-          <Text style={styles.reviewStripMetricLabel}>Due</Text>
           <Text
             testID="review-overdue-count"
             style={[styles.reviewDueHiddenMetric, queueSummary.overdueCount > 0 ? styles.reviewDifficultyHard : null]}
@@ -5633,6 +5644,7 @@ function SettingsPanel({
           label="License"
           value="GPL"
           detail="Stockfish integration keeps the app open source"
+          showDetail={false}
           testID="settings-license"
         />
       </SettingsSection>
@@ -5859,6 +5871,7 @@ function SettingsRow({
   detail,
   label,
   onPress,
+  showDetail = true,
   testID,
   value
 }: {
@@ -5866,20 +5879,29 @@ function SettingsRow({
   detail?: string;
   label: string;
   onPress?: () => void;
+  showDetail?: boolean;
   testID: string;
   value?: string;
 }): React.JSX.Element {
+  const accessibilityLabel = [label, value, detail].filter(Boolean).join(", ");
   return (
     <Pressable
+      accessible
       accessibilityRole={onPress ? "button" : undefined}
-      accessibilityLabel={label}
+      accessibilityLabel={accessibilityLabel}
       testID={testID}
       style={styles.settingsRow}
       onPress={onPress}
     >
       <View style={styles.settingsRowCopy}>
         <Text style={[styles.listText, destructive ? styles.settingsDestructiveText : null]}>{label}</Text>
-        {detail ? <Text style={styles.helperText}>{detail}</Text> : null}
+        {detail && showDetail ? <Text style={styles.helperText}>{detail}</Text> : null}
+        {detail && !showDetail ? (
+          <View
+            accessibilityLabel={detail}
+            testID={`${testID}-detail`}
+          />
+        ) : null}
       </View>
       <View style={styles.settingsRowMeta}>
         {value ? <Text style={styles.settingsRowValue}>{value}</Text> : null}
@@ -6317,18 +6339,16 @@ function PackRow({
   removeTestID?: string;
 }): React.JSX.Element {
   const isOptional = pack.status === "optional";
+  const statusLabel = pack.status === "active" ? "Active" : pack.status === "installed" ? "Installed" : "Optional";
   return (
-    <View style={styles.packRow} testID={pack.testID}>
+    <View
+      accessibilityLabel={`${pack.title}, ${statusLabel.toLowerCase()} puzzle pack`}
+      style={styles.packRow}
+      testID={pack.testID}
+    >
       <View style={styles.packRowCopy}>
         <View style={styles.packTitleRow}>
           <Text style={styles.historyRowTitle}>{pack.title}</Text>
-          <Text style={[
-            styles.packStatusBadge,
-            pack.status === "active" ? styles.packStatusActive : null,
-            pack.status === "installed" ? styles.packStatusInstalled : null
-          ]}>
-            {pack.status === "active" ? "Active" : pack.status === "installed" ? "Installed" : "Optional"}
-          </Text>
         </View>
         <Text style={styles.helperText}>{pack.subtitle}</Text>
         <PackCoverageSummary pack={pack} />
@@ -7053,11 +7073,6 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "700"
   },
-  subtitle: {
-    color: "#64748B",
-    fontSize: 12,
-    marginTop: 2
-  },
   rating: {
     color: "#111827",
     fontSize: 18,
@@ -7219,6 +7234,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     minHeight: 38
+  },
+  rightAlignedActionHeader: {
+    justifyContent: "flex-end"
   },
   sectionLabel: {
     color: "#111827",
@@ -7419,11 +7437,6 @@ const styles = StyleSheet.create({
   progressDeltaNeutral: {
     color: "#64748B"
   },
-  progressContext: {
-    color: "#64748B",
-    fontSize: 11,
-    fontWeight: "700"
-  },
   practiceReviewStrip: {
     alignItems: "center",
     backgroundColor: "#FFFFFF",
@@ -7551,12 +7564,6 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "900",
     lineHeight: 28
-  },
-  reviewDueSecondarySummary: {
-    color: "#64748B",
-    fontSize: 11,
-    fontWeight: "700",
-    paddingTop: 2
   },
   reviewDueCountBlock: {
     alignItems: "flex-end",
@@ -7702,16 +7709,12 @@ const styles = StyleSheet.create({
   },
   sessionActiveMetricRow: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    borderWidth: 1,
     flexDirection: "row",
     gap: 6,
     justifyContent: "space-between",
-    minHeight: 58,
+    minHeight: 44,
     paddingHorizontal: 8,
-    paddingVertical: 7
+    paddingVertical: 2
   },
   sessionMetricBlock: {
     alignItems: "center",
@@ -7839,14 +7842,11 @@ const styles = StyleSheet.create({
   },
   promptPanel: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    borderWidth: 1,
     flexDirection: "row",
     gap: 10,
-    minHeight: 72,
-    padding: 12
+    minHeight: 44,
+    paddingHorizontal: 8,
+    paddingVertical: 4
   },
   promptIcon: {
     alignItems: "center",
@@ -7999,7 +7999,7 @@ const styles = StyleSheet.create({
   customHeaderTitleBlock: {
     alignItems: "center",
     flex: 1,
-    gap: 2
+    justifyContent: "center"
   },
   customScreenTitle: {
     color: "#111827",
@@ -8916,10 +8916,10 @@ const styles = StyleSheet.create({
     width: 28
   },
   historyResultWrong: {
-    backgroundColor: "#FEE2E2"
+    backgroundColor: "#DC2626"
   },
   historyResultCorrect: {
-    backgroundColor: "#DCFCE7"
+    backgroundColor: "#16A34A"
   },
   resultBadgeGlyphCanvas: {
     alignItems: "center",
@@ -8929,7 +8929,7 @@ const styles = StyleSheet.create({
     width: 18
   },
   resultBadgeGlyphLine: {
-    backgroundColor: "#111827",
+    backgroundColor: "#FFFFFF",
     borderRadius: 999,
     position: "absolute"
   },
@@ -8958,13 +8958,13 @@ const styles = StyleSheet.create({
     width: 11
   },
   resultBadgeAlertBar: {
-    backgroundColor: "#111827",
+    backgroundColor: "#FFFFFF",
     borderRadius: 999,
     height: 11,
     width: 3
   },
   resultBadgeAlertDot: {
-    backgroundColor: "#111827",
+    backgroundColor: "#FFFFFF",
     borderRadius: 999,
     bottom: 1,
     height: 3,
@@ -9254,28 +9254,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8
-  },
-  packStatusBadge: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#CBD5E1",
-    borderRadius: 999,
-    borderWidth: 1,
-    color: "#64748B",
-    fontSize: 10,
-    fontWeight: "900",
-    overflow: "hidden",
-    paddingHorizontal: 8,
-    paddingVertical: 3
-  },
-  packStatusActive: {
-    backgroundColor: "#DCFCE7",
-    borderColor: "#86EFAC",
-    color: "#15803D"
-  },
-  packStatusInstalled: {
-    backgroundColor: "#EFF6FF",
-    borderColor: "#BFDBFE",
-    color: "#1D4ED8"
   },
   packCoverageCard: {
     backgroundColor: "#FFFFFF",
