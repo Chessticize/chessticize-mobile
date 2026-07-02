@@ -69,6 +69,11 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "practice-review-due-count"))).toContain("Due today");
     expect(collectText(findByTestId(renderer, "practice-review-overdue-count"))).toContain("0");
     expect(collectText(findByTestId(renderer, "practice-review-overdue-count"))).toContain("Overdue");
+    press(renderer, "review-tab");
+    expect(collectText(findByTestId(renderer, "review-difficulty-easy"))).toContain("No easy reviews");
+    expect(collectText(findByTestId(renderer, "review-difficulty-medium"))).toContain("No medium reviews");
+    expect(collectText(findByTestId(renderer, "review-difficulty-hard"))).toContain("Stable");
+    press(renderer, "practice-tab");
     expectText(renderer, "Offline-ready · 15 puzzles");
     expectText(renderer, "Tap a row to begin");
   });
@@ -120,10 +125,15 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "session-score-positive-glyph")).toBeTruthy();
     expect(findByTestId(renderer, "session-score-negative-glyph")).toBeTruthy();
     expect(findByTestId(renderer, "session-score-neutral-glyph")).toBeTruthy();
+    expect(findByTestId(renderer, "session-progress-block")).toBeTruthy();
+    expect(findByTestId(renderer, "session-timer-block")).toBeTruthy();
+    expect(findByTestId(renderer, "session-rating-block")).toBeTruthy();
+    expect(findByTestId(renderer, "session-mistakes-block")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "session-score-strip"))).toBe("0030");
     expect(collectText(findByTestId(renderer, "session-score-strip"))).not.toContain("✓");
     expect(collectText(findByTestId(renderer, "session-score-strip"))).not.toContain("×");
     expect(collectText(findByTestId(renderer, "session-score-strip"))).not.toContain("○");
+    expect(collectText(findByTestId(renderer, "session-progress-block"))).toContain("Progress");
     expect(collectText(findByTestId(renderer, "session-progress"))).toBe("0 / 30");
     expect(collectText(findByTestId(renderer, "practice-prompt-icon"))).toBe("");
     expectText(renderer, "Find the best move");
@@ -244,9 +254,10 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "active-session-shell")).toBeTruthy();
     expect(findByTestId(renderer, "session-shell-nav")).toBeTruthy();
     expect(findByTestId(renderer, "session-status-metrics")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "session-status-metrics"))).not.toContain("Solved");
-    expect(collectText(findByTestId(renderer, "session-status-metrics"))).not.toContain("Time");
-    expect(collectText(findByTestId(renderer, "session-status-metrics"))).not.toContain("Rating");
+    expect(collectText(findByTestId(renderer, "session-status-metrics"))).toContain("Progress");
+    expect(collectText(findByTestId(renderer, "session-status-metrics"))).toContain("Timer");
+    expect(collectText(findByTestId(renderer, "session-status-metrics"))).toContain("ELO");
+    expect(collectText(findByTestId(renderer, "session-status-metrics"))).toContain("Mistakes");
     expect(findByTestId(renderer, "session-overflow")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "session-abandon"))).toBe("");
     expect(collectText(findByTestId(renderer, "session-overflow"))).toBe("");
@@ -789,8 +800,11 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain("No new review items");
     expect(collectText(findByTestId(renderer, "sprint-result-mistakes"))).toBe("0");
     expect(() => findByTestId(renderer, "sprint-result-rating-snapshot")).toThrow();
-    expect(() => findByTestId(renderer, "sprint-result-history-trend")).toThrow();
-    expect(() => findByTestId(renderer, "sprint-result-trend-plot")).toThrow();
+    expect(findByTestId(renderer, "sprint-result-history-trend")).toBeTruthy();
+    expect(findByTestId(renderer, "sprint-result-trend-plot")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "sprint-result-history-trend"))).toContain("Rating Progress");
+    expect(collectText(findByTestId(renderer, "sprint-result-trend-start"))).toBe("600");
+    expect(collectText(findByTestId(renderer, "sprint-result-trend-current"))).toBe("600");
     expectText(renderer, "Mistakes");
     expectText(renderer, "Done");
     expect(findByTestId(renderer, "sprint-result-history-button")).toBeTruthy();
@@ -940,6 +954,8 @@ describe("PracticePocScreen", () => {
       /Sprint · Rating \d+ · \d+s · (Today|Yesterday|\d+ days ago|\d+w ago|\d+mo ago|\d+y ago|Scheduled) · \d{4}-\d{2}-\d{2}/
     );
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-status`))).toContain("Review");
+    expect(findByTestId(renderer, `history-attempt-${historyAttemptId}-status-summary`)).toBeTruthy();
+    expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-status-summary`))).toContain("Hard");
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-difficulty`))).toBe("Hard");
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-review-state`))).toContain("Review");
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-delta`))).toMatch(/^[+-]\d+$/);
@@ -1189,7 +1205,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "review-overdue-count"))).toBe("1");
     expect(collectText(findByTestId(renderer, "review-total-count"))).toBe("1");
     expect(collectText(findByTestId(renderer, "review-due-secondary-summary"))).toBe("1 overdue · 1 total");
-    expect(collectText(findByTestId(renderer, "review-difficulty-hard"))).toContain("Overdue");
+    expect(collectText(findByTestId(renderer, "review-difficulty-hard"))).toContain("Overdue now");
     expectText(renderer, "Oldest due 2026-06-21");
     expectText(renderer, "Start Review");
     expect(findByTestId(renderer, "review-start-due")).toBeTruthy();
@@ -1733,6 +1749,10 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "settings-sync-summary-card")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "settings-sync-summary-value"))).toBe("On · Needs approval");
     expect(collectText(findByTestId(renderer, "settings-sync-summary-detail"))).toContain("Practice stays local");
+    expect(findByTestId(renderer, "settings-data-summary-card")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "settings-data-summary-ratings"))).toContain("3 buckets");
+    expect(collectText(findByTestId(renderer, "settings-data-summary-sync"))).toContain("iCloud ready");
+    expect(collectText(findByTestId(renderer, "settings-data-summary-export"))).toContain("Export ready");
     expect(findByTestId(renderer, "settings-profile-section")).toBeTruthy();
     expect(findByTestId(renderer, "settings-sync-section")).toBeTruthy();
     expect(findByTestId(renderer, "settings-data-section")).toBeTruthy();
@@ -1764,6 +1784,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "settings-icloud-sync-toggle").props.accessibilityState).toEqual({ checked: false });
     expect(collectText(findByTestId(renderer, "settings-sync-summary-value"))).toBe("Off · Local only");
     expect(collectText(findByTestId(renderer, "settings-sync-summary-detail"))).toContain("Progress remains on this device");
+    expect(collectText(findByTestId(renderer, "settings-data-summary-sync"))).toContain("Local only");
     expectText(renderer, "Off · Local-only progress");
     expectText(renderer, "Local only");
     expect(collectText(findByTestId(renderer, "settings-sync-last-synced"))).toContain("Sync is disabled for this device");
