@@ -4038,6 +4038,7 @@ function reviewQueueFilterLabel(filter: ReviewQueueFilter): string {
 }
 
 function reviewQueueSummary(queue: ReviewQueueState[], filteredItems: ReviewQueueItem[]): {
+  dueStatusLabel: string;
   filteredCount: number;
   oldestDueLabel: string;
   overdueCount: number;
@@ -4046,7 +4047,13 @@ function reviewQueueSummary(queue: ReviewQueueState[], filteredItems: ReviewQueu
   const now = Date.now();
   const dueTimes = queue.map((review) => new Date(review.dueAt).getTime()).filter(Number.isFinite);
   const oldestDueTime = dueTimes.length > 0 ? Math.min(...dueTimes) : null;
+  const filteredOverdueCount = filteredItems.filter((item) => new Date(item.review.dueAt).getTime() <= now).length;
   return {
+    dueStatusLabel: filteredItems.length === 0
+      ? "No matching scheduled reviews"
+      : filteredOverdueCount > 0
+        ? "Overdue now"
+        : "Ready now",
     filteredCount: filteredItems.length,
     oldestDueLabel: oldestDueTime === null
       ? "Next review appears after a missed puzzle reaches its due time"
@@ -4142,7 +4149,7 @@ function ReviewPanel({
   const activeFilterLabels = reviewActiveFilterLabels(queueFilter, queueSummary);
   const showActiveFilterStrip = filtersExpanded || queueFilter !== "all";
   const reviewDueSummaryLabel = filteredDueEntries.length > 0
-    ? queueSummary.oldestDueLabel
+    ? queueSummary.dueStatusLabel
     : "No matching scheduled reviews";
   const reviewDueFilterLabel = filteredDueEntries.length > 0
     ? `${reviewQueueFilterLabel(queueFilter)} · Ready now`
