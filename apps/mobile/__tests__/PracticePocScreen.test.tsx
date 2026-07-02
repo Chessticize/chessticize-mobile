@@ -1832,7 +1832,8 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "settings-standard-elo-row"))).toContain("3 buckets");
     expect(collectText(findByTestId(renderer, "settings-reset-elo"))).toContain("Standard puzzle rating only");
     expect(findByTestId(renderer, "settings-sync-disclosure")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "settings-sync-status"))).toContain("Practice stays local");
+    expect(collectText(findByTestId(renderer, "settings-sync-status"))).toContain("On · Upload approval needed");
+    expect(findByTestId(renderer, "settings-sync-status").props.accessibilityLabel).toBe("Practice stays local until you approve uploading existing progress.");
     expectText(renderer, "Needs approval");
     expect(findByTestId(renderer, "settings-sync-last-synced")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "settings-sync-last-synced"))).toContain("Pending approval");
@@ -1843,14 +1844,16 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "Required before this device uploads existing local progress.");
     press(renderer, "settings-sync-allow-upload");
     expectText(renderer, "iCloud upload allowed");
-    expect(collectText(findByTestId(renderer, "settings-sync-status"))).toContain("Progress can sync through iCloud");
+    expect(collectText(findByTestId(renderer, "settings-sync-status"))).toContain("On · Local-first");
+    expect(findByTestId(renderer, "settings-sync-status").props.accessibilityLabel).toBe("Progress can sync through iCloud. Offline practice still works.");
     expectText(renderer, "Ready");
     expect(collectText(findByTestId(renderer, "settings-sync-last-synced"))).toContain("Today, 09:28");
     expect(collectText(findByTestId(renderer, "settings-sync-last-synced"))).toContain("This device is ready for iCloud sync");
     expect(() => findByTestId(renderer, "settings-sync-allow-upload")).toThrow();
     press(renderer, "settings-icloud-sync-toggle");
     expect(findByTestId(renderer, "settings-icloud-sync-toggle").props.accessibilityState).toEqual({ checked: false });
-    expect(collectText(findByTestId(renderer, "settings-sync-status"))).toContain("Progress remains on this device");
+    expect(collectText(findByTestId(renderer, "settings-sync-status"))).toContain("Off · Local only");
+    expect(findByTestId(renderer, "settings-sync-status").props.accessibilityLabel).toBe("Progress remains on this device until sync is turned back on.");
     expectText(renderer, "Local only");
     expect(collectText(findByTestId(renderer, "settings-sync-last-synced"))).toContain("Sync is disabled for this device");
     press(renderer, "settings-reset-elo");
