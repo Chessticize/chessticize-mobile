@@ -2,7 +2,12 @@ import React from "react";
 import { Chess } from "chess.js";
 import TestRenderer, { act } from "react-test-renderer";
 import { PracticePocScreen, type PracticeDebugTraceEvent } from "../src/components/PracticePocScreen";
-import { createMobilePracticeService, seededPuzzleCount, seededUniquePositionCount } from "../src/backend/mobilePractice";
+import {
+  createMobilePracticeService,
+  getBundledCorePackManifest,
+  seededPuzzleCount,
+  seededUniquePositionCount
+} from "../src/backend/mobilePractice";
 import { fixtureNeedsAtLeast } from "../../../packages/storage/src/practice-service";
 import type { ArrowDuelState, SprintState, UciEngineTransport } from "../../../packages/core/src/index";
 
@@ -103,8 +108,8 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "review-difficulty-medium"))).toContain("No medium reviews");
     expect(collectText(findByTestId(renderer, "review-difficulty-hard"))).toContain("Stable");
     press(renderer, "practice-tab");
-    expect(collectText(renderer.root)).not.toContain("Offline-ready · 15 puzzles");
-    expect(findByTestId(renderer, "app-shell-header").props.accessibilityLabel).toContain("Offline-ready · 15 puzzles");
+    expect(collectText(renderer.root)).not.toContain("Offline-ready · 3000 puzzles");
+    expect(findByTestId(renderer, "app-shell-header").props.accessibilityLabel).toContain("Offline-ready · 3000 puzzles");
     expect(collectText(findByTestId(renderer, "practice-action-header"))).toBe("Start a Sprint");
   });
 
@@ -152,7 +157,7 @@ describe("PracticePocScreen", () => {
   });
 
   it("starts a selected sprint directly from the mode row", () => {
-    const renderer = renderScreen();
+    const renderer = renderScreen({ practiceService: createMobilePracticeService("familiar15") });
 
     press(renderer, "practice-mode-blitz");
 
@@ -198,7 +203,7 @@ describe("PracticePocScreen", () => {
   });
 
   it("offers resume before starting a new sprint when the service has an active session", () => {
-    const service = createMobilePracticeService("familiar15");
+    const service = createMobilePracticeService("random1000");
     service.startSprint(
       { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 15, maxMistakes: 3 },
       new Date(Date.now()).toISOString()
@@ -218,7 +223,7 @@ describe("PracticePocScreen", () => {
   });
 
   it("opens custom setup from the compact custom row instead of starting a scored sprint", () => {
-    const renderer = renderScreen();
+    const renderer = renderScreen({ practiceService: createMobilePracticeService("familiar15") });
 
     press(renderer, "practice-mode-custom");
 
@@ -230,11 +235,15 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "custom-sprint-setup"))).not.toContain("Time, theme, rating");
   });
 
-  it("seeds enough offline demo puzzles in random test mode to avoid exhausted fixture sprints", () => {
-    const service = createMobilePracticeService("random1000");
+  it("seeds the release bundled core pack by default to avoid exhausted fixture sprints", () => {
+    const service = createMobilePracticeService();
+    const manifest = getBundledCorePackManifest();
 
-    expect(seededPuzzleCount("random1000")).toBeGreaterThanOrEqual(1000);
-    expect(seededUniquePositionCount("random1000")).toBe(seededPuzzleCount("random1000"));
+    expect(seededPuzzleCount()).toBe(3000);
+    expect(seededPuzzleCount()).toBe(manifest.puzzleCount);
+    expect(seededUniquePositionCount()).toBe(seededPuzzleCount());
+    expect(manifest.rating).toEqual({ min: 600, max: 1600 });
+    expect(manifest.arrowDuelCount).toBeGreaterThanOrEqual(2000);
 
     const state = service.startSprint({
       mode: "custom",
@@ -256,7 +265,11 @@ describe("PracticePocScreen", () => {
     const renderer = renderScreen();
 
     expect(findByTestId(renderer, "test-puzzle-source-control")).toBeTruthy();
-    expect(collectText(renderer.root)).not.toContain("Offline-ready · 15 puzzles");
+    expect(collectText(renderer.root)).not.toContain("Offline-ready · 3000 puzzles");
+    expect(findByTestId(renderer, "app-shell-header").props.accessibilityLabel).toContain("Offline-ready · 3000 puzzles");
+    expect(hasStyleEntry(findByTestId(renderer, "test-puzzle-source-bundledCore"), "borderColor", "#2563EB")).toBe(true);
+
+    press(renderer, "test-puzzle-source-familiar15");
     expect(findByTestId(renderer, "app-shell-header").props.accessibilityLabel).toContain("Offline-ready · 15 puzzles");
     expect(hasStyleEntry(findByTestId(renderer, "test-puzzle-source-familiar15"), "borderColor", "#2563EB")).toBe(true);
     expect(() => findByTestId(renderer, "test-puzzle-source-promotionSample")).toThrow();
@@ -272,7 +285,7 @@ describe("PracticePocScreen", () => {
   });
 
   it("accepts a non-official legal checkmate in the fixed first familiar puzzle", async () => {
-    const renderer = renderScreen();
+    const renderer = renderScreen({ practiceService: createMobilePracticeService("familiar15") });
 
     startStandardSprint(renderer);
     expect(collectText(findByTestId(renderer, "practice-prompt"))).toContain("Find the best move");
@@ -596,7 +609,7 @@ describe("PracticePocScreen", () => {
   });
 
   it("uses neutral Arrow Duel board markers with non-revealing candidate chips", () => {
-    const renderer = renderScreen();
+    const renderer = renderScreen({ practiceService: createMobilePracticeService("familiar15") });
     const arrow = firstArrowDuelPuzzleForTest();
 
     press(renderer, "practice-mode-arrow-duel");
@@ -627,7 +640,7 @@ describe("PracticePocScreen", () => {
   });
 
   it("advances Arrow Duel after a correct board move", async () => {
-    const renderer = renderScreen();
+    const renderer = renderScreen({ practiceService: createMobilePracticeService("familiar15") });
     const arrow = firstArrowDuelPuzzleForTest();
 
     press(renderer, "practice-mode-arrow-duel");
@@ -647,7 +660,7 @@ describe("PracticePocScreen", () => {
   });
 
   it("advances Arrow Duel after a correct candidate chip", async () => {
-    const renderer = renderScreen();
+    const renderer = renderScreen({ practiceService: createMobilePracticeService("familiar15") });
     const arrow = firstArrowDuelPuzzleForTest();
     const correctCandidateId = arrow.candidates[0]?.toLowerCase() === arrow.correctMove.toLowerCase()
       ? "arrow-duel-candidate-a"
@@ -665,7 +678,10 @@ describe("PracticePocScreen", () => {
 
   it("ignores non-candidate Arrow Duel board moves without recording attempts", async () => {
     const trace: PracticeDebugTraceEvent[] = [];
-    const renderer = renderScreen({ debugTrace: (event) => trace.push(event) });
+    const renderer = renderScreen({
+      debugTrace: (event) => trace.push(event),
+      practiceService: createMobilePracticeService("familiar15")
+    });
     const arrow = firstArrowDuelPuzzleForTest();
 
     press(renderer, "practice-mode-arrow-duel");
@@ -711,6 +727,7 @@ describe("PracticePocScreen", () => {
   it("starts a custom sprint with the selected time control", () => {
     const renderer = renderScreen();
 
+    press(renderer, "test-puzzle-source-familiar15");
     press(renderer, "practice-mode-custom");
     expect(findByTestId(renderer, "custom-sprint-setup")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "custom-sprint-setup"))).not.toContain("Time, theme, rating");
@@ -831,6 +848,7 @@ describe("PracticePocScreen", () => {
   it("allows custom sprint start with a local pack warning when eligible puzzles exist", () => {
     const renderer = renderScreen();
 
+    press(renderer, "test-puzzle-source-familiar15");
     press(renderer, "practice-mode-custom");
 
     expect(findByTestId(renderer, "custom-pack-warning")).toBeTruthy();
@@ -1700,6 +1718,7 @@ describe("PracticePocScreen", () => {
       }
     });
     const renderer = renderScreen({
+      practiceService: createMobilePracticeService("familiar15"),
       stockfishTransportFactory: () => stockfish.transport
     });
 
@@ -1730,15 +1749,15 @@ describe("PracticePocScreen", () => {
   });
 
   it("reviews Arrow Duel mistakes with analysis blunder arrows and a forced punishment line", async () => {
-    const driver = createMobilePracticeService("familiar15");
-    let driverState = driver.startSprint({
+    const preview = createMobilePracticeService("familiar15");
+    const previewState = preview.startSprint({
       mode: "arrow_duel",
       durationSeconds: 300,
       perPuzzleSeconds: 30,
       targetCorrect: 10,
       maxMistakes: 3
     });
-    const firstPuzzleSolution = [...requireArrowDuelState(driverState).puzzle.solutionMoves];
+    const firstPuzzleSolution = [...requireArrowDuelState(previewState).puzzle.solutionMoves];
     const firstGuidedMove = firstPuzzleSolution[2];
     const firstReplyMove = firstPuzzleSolution[3];
     if (!firstGuidedMove) {
@@ -1760,22 +1779,22 @@ describe("PracticePocScreen", () => {
         });
       }
     });
+    const service = createMobilePracticeService("familiar15");
     const renderer = renderScreen({
+      practiceService: service,
       stockfishTransportFactory: () => stockfish.transport
     });
     const wrongMoves: string[] = [];
 
     press(renderer, "practice-mode-arrow-duel");
 
-    wrongMoves.push(currentArrowWrongMove(driverState));
+    wrongMoves.push(currentArrowWrongMove(activeSprintForTest(service)));
     await boardMove(renderer, wrongMoves[0] as string);
-    driverState = driver.submitMove(wrongMoves[0] as string).state;
     await settleFeedbackSnapshot();
-    wrongMoves.push(currentArrowWrongMove(driverState));
+    wrongMoves.push(currentArrowWrongMove(activeSprintForTest(service)));
     await boardMove(renderer, wrongMoves[1] as string);
-    driverState = driver.submitMove(wrongMoves[1] as string).state;
     await settleFeedbackSnapshot();
-    wrongMoves.push(currentArrowWrongMove(driverState));
+    wrongMoves.push(currentArrowWrongMove(activeSprintForTest(service)));
     await boardMove(renderer, wrongMoves[2] as string);
     await settleFeedbackSnapshot();
 
@@ -1868,7 +1887,7 @@ describe("PracticePocScreen", () => {
   });
 
   it("keeps a wrong due Arrow Duel review on the same puzzle until Continue is pressed", async () => {
-    const service = createMobilePracticeService("familiar15");
+    const service = createMobilePracticeService("random1000");
     let sprintState = service.startSprint(
       {
         mode: "arrow_duel",
@@ -2070,9 +2089,9 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "packs-coverage-summary")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "packs-coverage-header"))).toBe("Coverage");
     expect(collectText(findByTestId(renderer, "packs-summary-installed"))).toContain("1 pack");
-    expect(collectText(findByTestId(renderer, "packs-summary-puzzles"))).toContain("~1k");
+    expect(collectText(findByTestId(renderer, "packs-summary-puzzles"))).toContain("3,000");
     expect(collectText(findByTestId(renderer, "packs-summary-rating"))).toContain("600-1600");
-    expect(collectText(findByTestId(renderer, "packs-summary-arrow-duel"))).toContain("Ready");
+    expect(collectText(findByTestId(renderer, "packs-summary-arrow-duel"))).toContain("2,399");
     expect(findByTestId(renderer, "packs-installed-section")).toBeTruthy();
     expect(findByTestId(renderer, "packs-installed-core")).toBeTruthy();
     expect(findByTestId(renderer, "packs-installed-core").props.accessibilityLabel).toContain("Core Pack, active puzzle pack");
@@ -2080,26 +2099,26 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "packs-active-core")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "packs-active-core"))).toBe("");
     expect(collectText(findByTestId(renderer, "packs-installed-core"))).not.toContain("Active");
-    expect(collectText(findByTestId(renderer, "packs-meta-core"))).toBe("600-1600 · Mixed · Arrow Duel Ready");
-    expect(collectText(findByTestId(renderer, "packs-subtitle-core"))).toBe("~1k puzzles");
+    expect(collectText(findByTestId(renderer, "packs-meta-core"))).toBe("600-1600 · 59 themes · Arrow Duel 2,399");
+    expect(collectText(findByTestId(renderer, "packs-subtitle-core"))).toBe("3,000 puzzles");
     expect(findByTestId(renderer, "packs-coverage-core")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "packs-coverage-core"))).toBe("");
-    expect(findByTestId(renderer, "packs-coverage-core").props.accessibilityLabel).toBe("Rating 600-1600, themes Mixed, Arrow Duel Ready");
+    expect(findByTestId(renderer, "packs-coverage-core").props.accessibilityLabel).toBe("Rating 600-1600, themes 59 themes, Arrow Duel 2,399");
     expect(findByTestId(renderer, "packs-offline-readiness")).toBeTruthy();
     expectText(renderer, "The bundled Core Pack ships with the app and works fully offline. This version does not download additional packs.");
     press(renderer, "packs-detail-core");
     expect(findByTestId(renderer, "pack-detail-panel")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "pack-detail-close"))).toBe("");
-    expect(collectText(findByTestId(renderer, "pack-detail-puzzles"))).toContain("~1k");
+    expect(collectText(findByTestId(renderer, "pack-detail-puzzles"))).toContain("3,000");
     expect(collectText(findByTestId(renderer, "pack-detail-rating"))).toContain("600-1600");
-    expect(collectText(findByTestId(renderer, "pack-detail-themes"))).toContain("Mixed");
-    expect(collectText(findByTestId(renderer, "pack-detail-arrow-duel"))).toContain("Ready");
+    expect(collectText(findByTestId(renderer, "pack-detail-themes"))).toContain("59 themes");
+    expect(collectText(findByTestId(renderer, "pack-detail-arrow-duel"))).toContain("2,399");
     expect(findByTestId(renderer, "pack-detail-source")).toBeTruthy();
     expect(findByTestId(renderer, "pack-detail-presolve")).toBeTruthy();
     expect(findByTestId(renderer, "pack-detail-manifest-hash")).toBeTruthy();
     expect(findByTestId(renderer, "pack-detail-build-date")).toBeTruthy();
     expect(findByTestId(renderer, "pack-detail-license-notes")).toBeTruthy();
-    expectText(renderer, "core-2026-06-fixture");
+    expectText(renderer, getBundledCorePackManifest().manifestHash);
     expectText(renderer, "Derived from Lichess puzzle data with Chessticize presolve metadata.");
     expect(() => findByTestId(renderer, "pack-detail-import")).toThrow();
     expect(() => findByTestId(renderer, "pack-detail-remove")).toThrow();
@@ -2243,6 +2262,14 @@ function firstArrowDuelPuzzleForTest(): ArrowDuelState {
 
 function currentArrowWrongMove(state: SprintState): string {
   return requireArrowDuelState(state).wrongMove;
+}
+
+function activeSprintForTest(service: ReturnType<typeof createMobilePracticeService>): SprintState {
+  const state = service.getActiveSprint();
+  if (!state) {
+    throw new Error("Expected an active sprint");
+  }
+  return state;
 }
 
 function requireArrowDuelState(state: SprintState): ArrowDuelState {

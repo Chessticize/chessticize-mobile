@@ -1,10 +1,13 @@
-import type { Puzzle } from "../../../../packages/core/src/index.ts";
+import type { Puzzle, PuzzlePackManifest } from "../../../../packages/core/src/index.ts";
 import { MemoryStore } from "../../../../packages/storage/src/memory-store.ts";
 import { PracticeService } from "../../../../packages/storage/src/practice-service.ts";
 
-const fixturePuzzles = require("../../../../fixtures/puzzles/presolved-1000.json") as Puzzle[];
+const bundledCorePuzzles = require("../../../../fixtures/puzzles/bundled-core-pack.json") as Puzzle[];
+const bundledCoreManifest = require("../../../../fixtures/puzzles/bundled-core-pack.manifest.json") as PuzzlePackManifest;
+const regressionPuzzles = require("../../../../fixtures/puzzles/presolved-1000.json") as Puzzle[];
 
-export type MobilePuzzleSource = "familiar15" | "random1000";
+export type MobilePuzzleSource = "bundledCore" | "familiar15" | "random1000";
+const DEFAULT_PUZZLE_SOURCE: MobilePuzzleSource = "bundledCore";
 
 const FAMILIAR_PUZZLE_IDS = [
   "000hf",
@@ -24,33 +27,40 @@ const FAMILIAR_PUZZLE_IDS = [
   "04Phf"
 ] as const;
 
-export function createMobilePracticeService(source: MobilePuzzleSource = "familiar15"): PracticeService {
+export function createMobilePracticeService(source: MobilePuzzleSource = DEFAULT_PUZZLE_SOURCE): PracticeService {
   const store = new MemoryStore();
   store.seedPuzzles(puzzlesForSource(source));
   return new PracticeService(store);
 }
 
-export function seededPuzzleCount(source: MobilePuzzleSource = "familiar15"): number {
+export function seededPuzzleCount(source: MobilePuzzleSource = DEFAULT_PUZZLE_SOURCE): number {
   return puzzlesForSource(source).length;
 }
 
-export function seededUniquePositionCount(source: MobilePuzzleSource = "familiar15"): number {
+export function seededUniquePositionCount(source: MobilePuzzleSource = DEFAULT_PUZZLE_SOURCE): number {
   return new Set(puzzlesForSource(source).map((puzzle) => canonicalPositionFen(puzzle.initialFen))).size;
 }
 
+export function getBundledCorePackManifest(): PuzzlePackManifest {
+  return bundledCoreManifest;
+}
+
 export function shouldRandomizePuzzleSelection(source: MobilePuzzleSource): boolean {
-  return source === "random1000";
+  return source !== "familiar15";
 }
 
 function puzzlesForSource(source: MobilePuzzleSource): Puzzle[] {
+  if (source === "bundledCore") {
+    return bundledCorePuzzles;
+  }
   if (source === "familiar15") {
     return familiarPuzzles();
   }
-  return fixturePuzzles;
+  return regressionPuzzles;
 }
 
 function familiarPuzzles(): Puzzle[] {
-  const byId = new Map(fixturePuzzles.map((puzzle) => [puzzle.id, puzzle]));
+  const byId = new Map(regressionPuzzles.map((puzzle) => [puzzle.id, puzzle]));
   const classicPuzzles = FAMILIAR_PUZZLE_IDS.slice(0, 14).flatMap((id) => {
     const puzzle = byId.get(id);
     return puzzle === undefined ? [] : [puzzle];
