@@ -1538,11 +1538,12 @@ function PracticeModeCard({
   onPress: () => void;
 }): React.JSX.Element {
   const label = modeLabel(item.mode);
+  const detail = practiceModeDetailLabel(item);
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
-      accessibilityLabel={`${label} mode`}
+      accessibilityLabel={`${label} mode, ${detail}`}
       testID={`practice-mode-${item.mode.replace("_", "-")}`}
       style={[styles.practiceModeCard, active ? styles.practiceModeCardActive : null]}
       onPress={onPress}
@@ -1557,7 +1558,7 @@ function PracticeModeCard({
           </View>
           <Text style={styles.practiceModeDescription}>{PRACTICE_MODE_DESCRIPTIONS[item.mode]}</Text>
           <Text style={styles.practiceModeRating} testID={`practice-mode-${item.mode.replace("_", "-")}-details`}>
-            ELO {item.rating}
+            {detail}
           </Text>
         </View>
       </View>
@@ -1574,6 +1575,21 @@ function PracticeModeCard({
       </View>
     </Pressable>
   );
+}
+
+function practiceModeDetailLabel(item: PracticeModeSummary): string {
+  return `${formatSprintTimingLabel(item.config)} · ELO ${item.rating}`;
+}
+
+function formatSprintTimingLabel(config: SprintConfig): string {
+  return `${formatSprintDurationLabel(config.durationSeconds)} · ${config.perPuzzleSeconds}s pace`;
+}
+
+function formatSprintDurationLabel(seconds: number): string {
+  if (seconds % 60 === 0) {
+    return `${seconds / 60} min`;
+  }
+  return `${seconds}s`;
 }
 
 function ModeRow({
@@ -1779,7 +1795,7 @@ function CustomSprintSetup({
         <CustomValueRow
           detail="Separate scoring bucket"
           label="Scoring history"
-          value={ratingKey}
+          value={historyRatingKeyLabel(ratingKey)}
           testID="custom-separate-scoring"
         />
         <CustomToggleRow
@@ -2305,7 +2321,7 @@ function SprintSummary({
 }): React.JSX.Element {
   const delta = (state.ratingAfter ?? state.ratingBefore) - state.ratingBefore;
   const reason = formatEndReason(state.endReason);
-  const shouldPrioritizeReview = state.status === "failed" && Boolean(onReview);
+  const shouldPrioritizeReview = Boolean(onReview);
   const accuracy = Math.round((state.correctCount / Math.max(1, state.correctCount + state.mistakeCount)) * 100);
   const ratingAfter = state.ratingAfter ?? state.ratingBefore;
   const reviewImpact = state.mistakeCount > 0
@@ -5361,9 +5377,9 @@ function SettingsPanel({
         <SettingsRow
           label="Puzzle ELO (Standard)"
           value={`ELO ${standardRating}`}
-          detail="Open rating buckets and manual controls"
+          detail="Advanced ratings"
           testID="settings-standard-elo-row"
-          onPress={() => setAdvancedRatingsOpen(true)}
+          onPress={() => setAdvancedRatingsOpen((current) => !current)}
         />
         <SettingsRow
           label="Reset ELO"
@@ -5371,13 +5387,6 @@ function SettingsPanel({
           destructive
           testID="settings-reset-elo"
           onPress={() => setConfirmation("reset-elo")}
-        />
-        <SettingsRow
-          label="Advanced ratings"
-          value={advancedRatingsOpen ? "Open" : "Hidden"}
-          detail="Manual adjustment stays behind an advanced affordance"
-          testID="settings-advanced-ratings"
-          onPress={() => setAdvancedRatingsOpen((current) => !current)}
         />
         {advancedRatingsOpen ? (
           <AdvancedRatingsPanel
@@ -5635,7 +5644,7 @@ function AdvancedRatingRow({
 }
 
 function ratingLabelFromKey(ratingKey: string): string {
-  if (ratingKey.startsWith("arrow duel")) {
+  if (ratingKey.startsWith("arrow duel") || ratingKey.startsWith("arrow_duel")) {
     return "Arrow Duel";
   }
   if (ratingKey.startsWith("blitz")) {
@@ -6134,7 +6143,6 @@ function PackRow({
           </Text>
         </View>
         <Text style={styles.helperText}>{pack.subtitle}</Text>
-        <Text style={styles.helperText}>{pack.detail}</Text>
         <PackCoverageSummary pack={pack} />
       </View>
       <View style={styles.packActionColumn}>
