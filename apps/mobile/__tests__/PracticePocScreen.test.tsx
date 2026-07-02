@@ -56,8 +56,10 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "practice-mode-standard-details").props.accessibilityLabel).toBe("5 min · 20s pace · ELO 600");
     expect(findByTestId(renderer, "practice-mode-arrow-duel-details").props.accessibilityLabel).toBe("5 min · 30s pace · ELO 600");
     expect(collectText(findByTestId(renderer, "practice-mode-standard-rating"))).toBe("ELO 600");
-    expect(collectText(findByTestId(renderer, "practice-mode-standard"))).not.toContain("5 min");
-    expect(collectText(findByTestId(renderer, "practice-mode-standard"))).not.toContain("20s pace");
+    expect(collectText(findByTestId(renderer, "practice-mode-standard"))).toContain("Find the best move · 5 min · 20s pace");
+    expect(collectText(findByTestId(renderer, "practice-mode-arrow-duel"))).toContain("Choose the best move · 5 min · 30s pace");
+    expect(collectText(findByTestId(renderer, "practice-mode-blitz"))).toContain("Fast time control · 5 min · 10s pace");
+    expect(collectText(findByTestId(renderer, "practice-mode-custom"))).toContain("Time, theme, rating · 5 min · 20s pace");
     expect(findByTestId(renderer, "practice-mode-standard").props.accessibilityLabel).toBe("Standard mode, 5 min · 20s pace · ELO 600");
     expect(findByTestId(renderer, "practice-mode-arrow-duel").props.accessibilityLabel).toBe("Arrow Duel mode, 5 min · 30s pace · ELO 600");
     expect(collectText(renderer.root)).not.toContain("Target 15");
