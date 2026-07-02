@@ -1781,6 +1781,23 @@ function CustomSprintSetup({
           selected={perPuzzleSeconds}
           onChange={onPerPuzzleChange}
         />
+        <View style={styles.customSummaryCard} testID="custom-summary-card">
+          <CustomSummaryMetric
+            label="Estimated puzzles"
+            value={`~${targetCorrect}`}
+            testID="custom-summary-target"
+          />
+          <CustomSummaryMetric
+            label="Rating range"
+            value={ratingRange}
+            testID="custom-summary-rating-range"
+          />
+          <CustomSummaryMetric
+            label="ELO type"
+            value={customMode === "arrow_duel" ? "Arrow Duel" : "Regular puzzles"}
+            testID="custom-summary-mode"
+          />
+        </View>
         <CustomValueRow
           label="Estimated puzzles"
           value={`~${targetCorrect}`}
@@ -1838,6 +1855,23 @@ function CustomSprintSetup({
           />
         ))}
       </View>
+    </View>
+  );
+}
+
+function CustomSummaryMetric({
+  label,
+  testID,
+  value
+}: {
+  label: string;
+  testID: string;
+  value: string;
+}): React.JSX.Element {
+  return (
+    <View style={styles.customSummaryMetric} testID={testID}>
+      <Text style={styles.customSummaryLabel}>{label}</Text>
+      <Text style={styles.customSummaryValue}>{value}</Text>
     </View>
   );
 }
@@ -2340,6 +2374,28 @@ function SprintSummary({
 
   return (
     <View style={styles.summaryPanel} testID="sprint-summary-panel">
+      <View style={styles.resultTopBar} testID="sprint-result-top-bar">
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Done"
+          testID="back-practice-button"
+          style={styles.resultTopBarButton}
+          onPress={onBack}
+        >
+          <ChevronGlyph direction="left" />
+        </Pressable>
+        <Text style={styles.resultTopBarTitle}>Sprint Result</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="View history trends"
+          testID="sprint-result-history-button"
+          style={styles.resultTopBarButton}
+          onPress={onOpenHistory}
+        >
+          <Text style={styles.resultTopBarActionText}>History</Text>
+        </Pressable>
+      </View>
+
       <View style={styles.resultHero} testID="sprint-result-hero">
         <View style={[styles.resultIcon, state.status === "won" ? styles.resultIconWon : styles.resultIconFailed]}>
           <SprintResultStatusGlyph status={state.status === "won" ? "won" : "failed"} />
@@ -2357,6 +2413,17 @@ function SprintSummary({
         </View>
       </View>
 
+      <View style={styles.resultRatingCard} testID="sprint-result-rating-card">
+        <View>
+          <Text style={styles.resultMetricLabel}>Rating</Text>
+          <Text testID="sprint-result-rating-range" style={styles.resultRatingText}>{state.ratingBefore} → {ratingAfter}</Text>
+        </View>
+        <Text style={[styles.resultRatingDelta, delta >= 0 ? styles.positive : styles.errorText]}>
+          {delta >= 0 ? "+" : ""}
+          {delta}
+        </Text>
+      </View>
+
       <View style={styles.resultMetricGrid}>
         <View style={styles.resultMetric} testID="sprint-result-rating-change">
           <Text style={styles.resultMetricLabel}>Rating Change</Text>
@@ -2364,7 +2431,7 @@ function SprintSummary({
             {delta >= 0 ? "+" : ""}
             {delta}
           </Text>
-          <Text testID="sprint-result-rating-range" style={styles.resultMetricSubtext}>{state.ratingBefore} → {ratingAfter}</Text>
+          <Text style={styles.resultMetricSubtext}>History keeps the trend</Text>
         </View>
         <View style={styles.resultMetric} testID="sprint-result-time">
           <Text style={styles.resultMetricLabel}>Time</Text>
@@ -2417,17 +2484,8 @@ function SprintSummary({
         </Pressable>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="View history trends"
-          testID="sprint-result-history-button"
-          style={styles.secondaryButton}
-          onPress={onOpenHistory}
-        >
-          <Text style={styles.secondaryButtonText}>History</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
           accessibilityLabel="Done"
-          testID="back-practice-button"
+          testID="sprint-result-done-button"
           style={styles.secondaryButton}
           onPress={onBack}
         >
@@ -2993,6 +3051,15 @@ function HistoryPanel({
   const wrong = visibleAttempts.filter((attempt) => attempt.result === "wrong").length;
   const accuracy = Math.round((correct / Math.max(1, correct + wrong)) * 100);
   const chartSummary = historyChartSummary(chartMetric, visibleAttempts, eloPoints, puzzleStats);
+  const filterSummary = historyFilterSummary({
+    modeFilter,
+    resultFilter,
+    selectedRatingKey,
+    sourceFilter,
+    speedFilter,
+    timeRange,
+    wrongLast7Days
+  });
 
   return (
     <View style={styles.historyPanel} testID="history-panel">
@@ -3045,6 +3112,18 @@ function HistoryPanel({
             </View>
           </Pressable>
         </HistoryChipRow>
+      </View>
+
+      <View style={styles.historyFilterSummaryCard} testID="history-filter-summary-card">
+        <Text style={styles.sectionLabel}>Showing</Text>
+        <View style={styles.historyFilterSummaryChips}>
+          {filterSummary.map((item) => (
+            <View key={item.testID} style={styles.historyFilterSummaryChip} testID={item.testID}>
+              <Text style={styles.historyFilterSummaryLabel}>{item.label}</Text>
+              <Text style={styles.historyFilterSummaryValue}>{item.value}</Text>
+            </View>
+          ))}
+        </View>
       </View>
 
       <View style={styles.historyPerformanceCard} testID="history-performance-card">
@@ -3227,6 +3306,57 @@ function historyRatingRangeFilterToQuery(filter: HistoryRatingRangeFilter): { mi
     return { minRating: 1400 };
   }
   return {};
+}
+
+function historyFilterSummary({
+  modeFilter,
+  resultFilter,
+  selectedRatingKey,
+  sourceFilter,
+  speedFilter,
+  timeRange,
+  wrongLast7Days
+}: {
+  modeFilter: "all" | SprintMode;
+  resultFilter: "all" | "correct" | "wrong";
+  selectedRatingKey: string | null;
+  sourceFilter: "all" | AttemptSource;
+  speedFilter: "all" | number;
+  timeRange: HistoryTimeRange;
+  wrongLast7Days: boolean;
+}): Array<{ label: string; value: string; testID: string }> {
+  return [
+    {
+      label: "Range",
+      value: wrongLast7Days ? "Wrong 7d" : historyRangeLabel(timeRange),
+      testID: "history-filter-summary-range"
+    },
+    {
+      label: "ELO",
+      value: selectedRatingKey ? historyRatingKeyLabel(selectedRatingKey) : "No history",
+      testID: "history-filter-summary-elo"
+    },
+    {
+      label: "Type",
+      value: modeFilter === "all" ? "All modes" : modeLabel(modeFilter),
+      testID: "history-filter-summary-mode"
+    },
+    {
+      label: "Result",
+      value: resultFilter === "all" ? "All results" : resultFilter === "wrong" ? "Wrong only" : "Correct only",
+      testID: "history-filter-summary-result"
+    },
+    {
+      label: "Source",
+      value: sourceFilter === "all" ? "Sprint + review" : sourceFilter === "scheduled_review" ? "Review" : "Sprint",
+      testID: "history-filter-summary-source"
+    },
+    {
+      label: "Speed",
+      value: speedFilter === "all" ? "All speeds" : `${speedFilter}s pace`,
+      testID: "history-filter-summary-speed"
+    }
+  ];
 }
 
 function HistoryMiniChart({
@@ -4072,26 +4202,26 @@ function ReviewPanel({
       </View>
 
       <View style={styles.reviewDueCard} testID="review-due-card">
-        <View>
+        <View style={styles.reviewDueCopy}>
           <Text style={styles.reviewDueTitle}>Due Today</Text>
           <Text testID="review-due-summary" style={styles.helperText}>
             {filteredDueEntries.length > 0 ? `${reviewQueueFilterLabel(queueFilter)} · Ready now` : "No matching scheduled reviews"}
           </Text>
           <Text testID="review-next-due" style={styles.helperText}>{queueSummary.oldestDueLabel}</Text>
+          <Text testID="review-due-secondary-summary" style={styles.reviewDueSecondarySummary}>
+            {queueSummary.overdueCount} overdue · {queueSummary.totalCount} total
+          </Text>
         </View>
-        <View style={styles.reviewDueMetrics}>
-          <View style={styles.reviewDueMetricBlock}>
-            <Text testID="review-due-count" style={styles.reviewDueBigCount}>{queueSummary.filteredCount}</Text>
-            <Text style={styles.reviewStripMetricLabel}>Due</Text>
-          </View>
-          <View style={styles.reviewDueMetricBlock}>
-            <Text testID="review-overdue-count" style={[styles.reviewDueSmallCount, queueSummary.overdueCount > 0 ? styles.reviewDifficultyHard : null]}>{queueSummary.overdueCount}</Text>
-            <Text style={styles.reviewStripMetricLabel}>Overdue</Text>
-          </View>
-          <View style={styles.reviewDueMetricBlock}>
-            <Text testID="review-total-count" style={styles.reviewDueSmallCount}>{queueSummary.totalCount}</Text>
-            <Text style={styles.reviewStripMetricLabel}>Total</Text>
-          </View>
+        <View style={styles.reviewDueCountBlock}>
+          <Text testID="review-due-count" style={styles.reviewDueBigCount}>{queueSummary.filteredCount}</Text>
+          <Text style={styles.reviewStripMetricLabel}>Due</Text>
+          <Text
+            testID="review-overdue-count"
+            style={[styles.reviewDueHiddenMetric, queueSummary.overdueCount > 0 ? styles.reviewDifficultyHard : null]}
+          >
+            {queueSummary.overdueCount}
+          </Text>
+          <Text testID="review-total-count" style={styles.reviewDueHiddenMetric}>{queueSummary.totalCount}</Text>
         </View>
       </View>
 
@@ -5388,6 +5518,16 @@ function SettingsPanel({
       ? "Ready"
       : "Needs approval"
     : "Local only";
+  const syncSummaryValue = syncEnabled
+    ? syncUploadAllowed
+      ? "On · Ready"
+      : "On · Needs approval"
+    : "Off · Local only";
+  const syncSummaryDetail = syncEnabled
+    ? syncUploadAllowed
+      ? "Progress can sync through iCloud. Offline practice still works."
+      : "Practice stays local until you approve uploading existing progress."
+    : "Progress remains on this device until sync is turned back on.";
 
   return (
     <View style={styles.settingsPanel} testID="settings-panel">
@@ -5396,6 +5536,19 @@ function SettingsPanel({
           <Text style={styles.panelTitle}>Settings</Text>
           <Text style={styles.helperText}>Local-first data and sync controls</Text>
         </View>
+      </View>
+
+      <View style={styles.settingsSyncSummaryCard} testID="settings-sync-summary-card">
+        <View style={styles.settingsRowCopy}>
+          <Text style={styles.sectionLabel}>iCloud Sync</Text>
+          <Text testID="settings-sync-summary-detail" style={styles.helperText}>{syncSummaryDetail}</Text>
+        </View>
+        <Text
+          testID="settings-sync-summary-value"
+          style={[styles.settingsSyncSummaryValue, syncEnabled ? styles.positive : styles.errorText]}
+        >
+          {syncSummaryValue}
+        </Text>
       </View>
 
       <SettingsSection title="Profile" testID="settings-profile-section">
@@ -5934,6 +6087,7 @@ function PacksPanel(): React.JSX.Element {
         ? selectedPackId === "core" ? "active" : "installed"
         : "optional"
     );
+  const coverageSummary = summarizeInstalledPackCoverage(installedPacks);
 
   function beginPackImport(pack: PackRowModel): void {
     setInstalledPackIds((current) => current.includes(pack.id) ? current : [...current, pack.id]);
@@ -5966,6 +6120,20 @@ function PacksPanel(): React.JSX.Element {
       {importProgress ? (
         <PackImportProgressCard progress={importProgress} />
       ) : null}
+
+      <View style={styles.packCoverageCard} testID="packs-coverage-summary">
+        <Text style={styles.sectionLabel}>Coverage</Text>
+        <View style={styles.packCoverageGrid}>
+          <PackCoverageMetric
+            label="Installed"
+            value={`${installedPacks.length} ${installedPacks.length === 1 ? "pack" : "packs"}`}
+            testID="packs-summary-installed"
+          />
+          <PackCoverageMetric label="Puzzles" value={coverageSummary.puzzles} testID="packs-summary-puzzles" />
+          <PackCoverageMetric label="Rating" value={coverageSummary.rating} testID="packs-summary-rating" />
+          <PackCoverageMetric label="Arrow Duel" value={coverageSummary.arrowDuel} testID="packs-summary-arrow-duel" />
+        </View>
+      </View>
 
       <PackSection title="Installed" testID="packs-installed-section">
         {installedPacks.map((pack) => (
@@ -6062,6 +6230,54 @@ function packWithStatus(pack: PackRowModel, status: PackRowModel["status"]): Pac
     status,
     testID: `packs-${status === "optional" ? "optional" : "installed"}-${pack.id}`
   };
+}
+
+function summarizeInstalledPackCoverage(packs: PackRowModel[]): { puzzles: string; rating: string; arrowDuel: string } {
+  const puzzleTotal = packs.reduce((sum, pack) => sum + parsePuzzleCountK(pack.coverage.puzzles), 0);
+  const ratingRanges = packs
+    .map((pack) => parseRatingRange(pack.coverage.rating))
+    .filter((range): range is { min: number; max: number } => range !== null);
+  const rating = ratingRanges.length > 0
+    ? `${Math.min(...ratingRanges.map((range) => range.min))}-${Math.max(...ratingRanges.map((range) => range.max))}`
+    : "n/a";
+  const arrowDuel = packs.some((pack) => pack.coverage.arrowDuel === "Ready")
+    ? "Ready"
+    : packs.some((pack) => pack.coverage.arrowDuel === "Partial")
+      ? "Partial"
+      : "Limited";
+
+  return {
+    puzzles: puzzleTotal > 0 ? `~${puzzleTotal}k` : "0",
+    rating,
+    arrowDuel
+  };
+}
+
+function parsePuzzleCountK(value: string): number {
+  const match = value.match(/~?(\d+)k/i);
+  return match ? Number(match[1]) : 0;
+}
+
+function parseRatingRange(value: string): { min: number; max: number } | null {
+  const match = value.match(/(\d+)-(\d+)/);
+  return match ? { min: Number(match[1]), max: Number(match[2]) } : null;
+}
+
+function PackCoverageMetric({
+  label,
+  testID,
+  value
+}: {
+  label: string;
+  testID: string;
+  value: string;
+}): React.JSX.Element {
+  return (
+    <View style={styles.packCoverageMetric} testID={testID}>
+      <Text style={styles.packCoverageLabel}>{label}</Text>
+      <Text style={styles.packCoverageMetricValue}>{value}</Text>
+    </View>
+  );
 }
 
 function PackSection({
@@ -7408,6 +7624,11 @@ const styles = StyleSheet.create({
     minHeight: 76,
     padding: 12
   },
+  reviewDueCopy: {
+    flex: 1,
+    gap: 2,
+    minWidth: 0
+  },
   reviewDueTitle: {
     color: "#111827",
     fontSize: 15,
@@ -7415,23 +7636,27 @@ const styles = StyleSheet.create({
   },
   reviewDueBigCount: {
     color: "#2563EB",
-    fontSize: 22,
-    fontWeight: "800"
+    fontSize: 24,
+    fontWeight: "900",
+    lineHeight: 28
   },
-  reviewDueSmallCount: {
-    color: "#334155",
-    fontSize: 16,
-    fontWeight: "800"
+  reviewDueSecondarySummary: {
+    color: "#64748B",
+    fontSize: 11,
+    fontWeight: "700",
+    paddingTop: 2
   },
-  reviewDueMetrics: {
+  reviewDueCountBlock: {
     alignItems: "flex-end",
-    flexDirection: "row",
-    gap: 10,
-    minWidth: 112
+    gap: 2,
+    justifyContent: "center",
+    minWidth: 52
   },
-  reviewDueMetricBlock: {
-    alignItems: "flex-end",
-    gap: 2
+  reviewDueHiddenMetric: {
+    fontSize: 0,
+    height: 0,
+    opacity: 0,
+    width: 0
   },
   reviewFilterScroller: {
     marginHorizontal: -UI_PADDING
@@ -8025,6 +8250,37 @@ const styles = StyleSheet.create({
   customModeChoiceDetailActive: {
     color: "#2563EB"
   },
+  customSummaryCard: {
+    backgroundColor: "#F8FAFC",
+    borderBottomColor: "#E2E8F0",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  customSummaryMetric: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    gap: 3,
+    minHeight: 52,
+    justifyContent: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 7
+  },
+  customSummaryLabel: {
+    color: "#64748B",
+    fontSize: 10,
+    fontWeight: "800"
+  },
+  customSummaryValue: {
+    color: "#111827",
+    fontSize: 12,
+    fontWeight: "900"
+  },
   customStepperGroup: {
     alignItems: "center",
     flexDirection: "row",
@@ -8285,6 +8541,32 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 12
   },
+  resultTopBar: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    minHeight: 44
+  },
+  resultTopBarButton: {
+    alignItems: "center",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    height: 36,
+    justifyContent: "center",
+    minWidth: 44,
+    paddingHorizontal: 10
+  },
+  resultTopBarTitle: {
+    color: "#111827",
+    fontSize: 16,
+    fontWeight: "800"
+  },
+  resultTopBarActionText: {
+    color: "#2563EB",
+    fontSize: 12,
+    fontWeight: "800"
+  },
   resultHero: {
     alignItems: "center",
     flexDirection: "row",
@@ -8419,6 +8701,28 @@ const styles = StyleSheet.create({
     color: "#64748B",
     fontSize: 11,
     fontWeight: "700"
+  },
+  resultRatingCard: {
+    alignItems: "center",
+    backgroundColor: "#F8FAFC",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    minHeight: 58,
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  resultRatingText: {
+    color: "#111827",
+    fontFamily: "menlo",
+    fontSize: 17,
+    fontWeight: "900"
+  },
+  resultRatingDelta: {
+    fontSize: 18,
+    fontWeight: "900"
   },
   resultReviewRow: {
     alignItems: "center",
@@ -8765,6 +9069,39 @@ const styles = StyleSheet.create({
   historyAdvancedFilters: {
     gap: 8
   },
+  historyFilterSummaryCard: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 8,
+    padding: 12
+  },
+  historyFilterSummaryChips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8
+  },
+  historyFilterSummaryChip: {
+    backgroundColor: "#F8FAFC",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 2,
+    minHeight: 42,
+    paddingHorizontal: 9,
+    paddingVertical: 6
+  },
+  historyFilterSummaryLabel: {
+    color: "#64748B",
+    fontSize: 9,
+    fontWeight: "800"
+  },
+  historyFilterSummaryValue: {
+    color: "#111827",
+    fontSize: 12,
+    fontWeight: "900"
+  },
   historyPerformanceCard: {
     backgroundColor: "#FFFFFF",
     borderColor: "#E2E8F0",
@@ -9020,6 +9357,24 @@ const styles = StyleSheet.create({
   settingsPanel: {
     gap: 12
   },
+  settingsSyncSummaryCard: {
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 12,
+    justifyContent: "space-between",
+    minHeight: 72,
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  settingsSyncSummaryValue: {
+    fontSize: 12,
+    fontWeight: "900",
+    textAlign: "right"
+  },
   settingsSection: {
     gap: 8
   },
@@ -9265,6 +9620,31 @@ const styles = StyleSheet.create({
     borderColor: "#BFDBFE",
     color: "#1D4ED8"
   },
+  packCoverageCard: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 10,
+    padding: 12
+  },
+  packCoverageGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8
+  },
+  packCoverageMetric: {
+    backgroundColor: "#F8FAFC",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexBasis: "47%",
+    flexGrow: 1,
+    gap: 2,
+    minHeight: 50,
+    paddingHorizontal: 10,
+    paddingVertical: 8
+  },
   packCoverageSummary: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -9289,6 +9669,11 @@ const styles = StyleSheet.create({
   packCoverageValue: {
     color: "#334155",
     fontSize: 11,
+    fontWeight: "900"
+  },
+  packCoverageMetricValue: {
+    color: "#111827",
+    fontSize: 15,
     fontWeight: "900"
   },
   packActiveMark: {
