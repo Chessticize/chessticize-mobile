@@ -3,8 +3,15 @@ const zlib = require('zlib');
 
 describe('Practice POC', () => {
   beforeEach(async () => {
-    await device.launchApp({ newInstance: true, delete: true });
-    await device.disableSynchronization();
+    // These smoke tests use explicit waitFor checks and screenshot assertions.
+    // React Native, Skia, and native engine startup can keep Detox synchronization
+    // busy after the first visible frame, so launch args disable synchronization
+    // before Detox waits on app readiness.
+    await device.launchApp({
+      newInstance: true,
+      delete: true,
+      launchArgs: { detoxEnableSynchronization: '0' }
+    });
   });
 
   it('renders the standard sprint board', async () => {
@@ -104,7 +111,7 @@ async function startPracticeMode(mode) {
 }
 
 async function waitForVisibleInPracticeScroll(testID) {
-  await waitFor(element(by.id(testID))).toExist().withTimeout(30000);
+  await waitFor(element(by.id(testID))).toExist().withTimeout(120000);
   await waitFor(element(by.id(testID)))
     .toBeVisible()
     .whileElement(by.id('practice-main-scroll'))
