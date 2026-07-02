@@ -1337,6 +1337,13 @@ export function PracticePocScreen({
             <TabButton
               key={item.tab}
               active={tab === item.tab}
+              badgeAccessibilityLabel={
+                item.tab === "review" && dueTodayCount > 0
+                  ? `${dueTodayCount} due reviews${overdueCount > 0 ? `, ${overdueCount} overdue` : ""}`
+                  : undefined
+              }
+              badgeCount={item.tab === "review" ? dueTodayCount : 0}
+              badgeTone={item.tab === "review" && overdueCount > 0 ? "danger" : "default"}
               label={item.label}
               tab={item.tab}
               testID={item.testID}
@@ -1506,14 +1513,19 @@ function PracticeHome({
         <View>
           <Text style={styles.listText}>{reviewStatusLabel}</Text>
         </View>
-        <View style={styles.reviewStripCounts}>
-          <View style={styles.reviewStripMetric} testID="practice-review-due-count">
-            <Text style={styles.reviewDueCount}>{dueReviewCount}</Text>
-            <Text style={styles.reviewStripMetricLabel}>Due today</Text>
+        <View style={styles.reviewStripActionArea}>
+          <View style={styles.reviewStripCounts}>
+            <View style={styles.reviewStripMetric} testID="practice-review-due-count">
+              <Text style={styles.reviewDueCount}>{dueReviewCount}</Text>
+              <Text style={styles.reviewStripMetricLabel}>Due today</Text>
+            </View>
+            <View style={styles.reviewStripMetric} testID="practice-review-overdue-count">
+              <Text style={styles.reviewOverdueCount}>{overdueReviewCount}</Text>
+              <Text style={styles.reviewStripMetricLabel}>Overdue</Text>
+            </View>
           </View>
-          <View style={styles.reviewStripMetric} testID="practice-review-overdue-count">
-            <Text style={styles.reviewOverdueCount}>{overdueReviewCount}</Text>
-            <Text style={styles.reviewStripMetricLabel}>Overdue</Text>
+          <View style={styles.reviewStripChevron} testID="practice-review-strip-chevron">
+            <ChevronGlyph direction="right" />
           </View>
         </View>
       </Pressable>
@@ -1562,7 +1574,6 @@ function PracticeModeCard({
 }): React.JSX.Element {
   const label = modeLabel(item.mode);
   const detail = practiceModeDetailLabel(item);
-  const timingLabel = formatSprintTimingLabel(item.config);
   const ratingLabel = `ELO ${item.rating}`;
   return (
     <Pressable
@@ -1570,11 +1581,11 @@ function PracticeModeCard({
       accessibilityState={{ selected: active }}
       accessibilityLabel={`${label} mode, ${detail}`}
       testID={`practice-mode-${item.mode.replace("_", "-")}`}
-      style={styles.practiceModeCard}
+      style={[styles.practiceModeCard, active ? styles.practiceModeCardActive : null]}
       onPress={onPress}
     >
       <View style={styles.practiceModeSelectArea}>
-        <View style={styles.practiceModeIcon} testID={`practice-mode-${item.mode.replace("_", "-")}-icon`}>
+        <View style={[styles.practiceModeIcon, active ? styles.practiceModeIconActive : null]} testID={`practice-mode-${item.mode.replace("_", "-")}-icon`}>
           <PracticeModeGlyph mode={item.mode} />
         </View>
         <View style={styles.practiceModeCopy}>
@@ -2125,9 +2136,14 @@ function PreviousCustomConfigRow({
           {metaLabel}
         </Text>
       </View>
-      <View style={styles.previousConfigRating}>
-        <Text style={styles.helperText}>ELO</Text>
-        <Text style={styles.practiceModeRating}>{config.rating}</Text>
+      <View style={styles.previousConfigTrailing}>
+        <View style={styles.previousConfigRating}>
+          <Text style={styles.helperText}>ELO</Text>
+          <Text style={styles.practiceModeRating}>{config.rating}</Text>
+        </View>
+        <View style={styles.previousConfigChevron} testID={`custom-previous-${config.id}-chevron`}>
+          <ChevronGlyph direction="right" />
+        </View>
       </View>
     </Pressable>
   );
@@ -3690,24 +3706,29 @@ function HistoryAttemptRow({
         <Text testID={`history-attempt-${attempt.id}-context`} style={styles.helperText}>{compactContext}</Text>
         <Text testID={`history-attempt-${attempt.id}-meta`} style={styles.helperText}>{compactMeta}</Text>
       </View>
-      <View style={styles.historyAttemptStatus} testID={`history-attempt-${attempt.id}-status`}>
-        <View style={styles.historyAttemptStatusSummary} testID={`history-attempt-${attempt.id}-status-summary`}>
+      <View style={styles.historyAttemptTrailing}>
+        <View style={styles.historyAttemptStatus} testID={`history-attempt-${attempt.id}-status`}>
+          <View style={styles.historyAttemptStatusSummary} testID={`history-attempt-${attempt.id}-status-summary`}>
+            <Text
+              testID={`history-attempt-${attempt.id}-difficulty`}
+              style={[styles.historyReviewState, difficultyStyle]}
+            >
+              {difficultyLabel(difficulty)}
+            </Text>
+            <Text testID={`history-attempt-${attempt.id}-delta`} style={[styles.historyRatingDelta, delta < 0 ? styles.errorText : styles.positive]}>
+              {delta >= 0 ? "+" : ""}{delta}
+            </Text>
+          </View>
           <Text
-            testID={`history-attempt-${attempt.id}-difficulty`}
-            style={[styles.historyReviewState, difficultyStyle]}
+            testID={`history-attempt-${attempt.id}-review-state`}
+            style={[styles.historyReviewStateDetail, isWrong ? styles.reviewDifficultyHard : styles.reviewDifficultyEasy]}
           >
-            {difficultyLabel(difficulty)}
-          </Text>
-          <Text testID={`history-attempt-${attempt.id}-delta`} style={[styles.historyRatingDelta, delta < 0 ? styles.errorText : styles.positive]}>
-            {delta >= 0 ? "+" : ""}{delta}
+            {reviewLabel}
           </Text>
         </View>
-        <Text
-          testID={`history-attempt-${attempt.id}-review-state`}
-          style={[styles.historyReviewStateDetail, isWrong ? styles.reviewDifficultyHard : styles.reviewDifficultyEasy]}
-        >
-          {reviewLabel}
-        </Text>
+        <View style={styles.historyAttemptChevron} testID={`history-attempt-${attempt.id}-chevron`}>
+          <ChevronGlyph direction="right" />
+        </View>
       </View>
     </Pressable>
   );
@@ -6855,28 +6876,46 @@ function OptionButton({
 
 function TabButton({
   active,
+  badgeAccessibilityLabel,
+  badgeCount = 0,
+  badgeTone = "default",
   label,
   tab,
   testID,
   onPress
 }: {
   active: boolean;
+  badgeAccessibilityLabel?: string;
+  badgeCount?: number;
+  badgeTone?: "default" | "danger";
   label: string;
   tab: Exclude<Tab, "analysis">;
   testID: string;
   onPress: () => void;
 }): React.JSX.Element {
+  const hasBadge = badgeCount > 0;
+  const badgeText = badgeCount > 99 ? "99+" : `${badgeCount}`;
   return (
     <Pressable
       accessibilityRole="tab"
       accessibilityState={{ selected: active }}
-      accessibilityLabel={`${label} tab`}
+      accessibilityLabel={[`${label} tab`, hasBadge ? badgeAccessibilityLabel : null].filter(Boolean).join(", ")}
       testID={testID}
       style={[styles.tabButton, active ? styles.tabButtonActive : null]}
       onPress={onPress}
     >
       <View style={styles.tabIconBadge} testID={`${testID}-icon`}>
         <TabGlyph tab={tab} active={active} />
+        {hasBadge ? (
+          <Text
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={[styles.tabCountBadge, badgeTone === "danger" ? styles.tabCountBadgeDanger : null]}
+            testID={`${testID}-badge`}
+          >
+            {badgeText}
+          </Text>
+        ) : null}
       </View>
       <Text style={[styles.tabText, active ? styles.tabTextActive : null]}>{label}</Text>
     </Pressable>
@@ -7259,7 +7298,28 @@ const styles = StyleSheet.create({
     height: 20,
     justifyContent: "center",
     minWidth: 24,
-    paddingHorizontal: 5
+    paddingHorizontal: 5,
+    position: "relative"
+  },
+  tabCountBadge: {
+    backgroundColor: "#2563EB",
+    borderColor: "#FFFFFF",
+    borderRadius: 999,
+    borderWidth: 1,
+    color: "#FFFFFF",
+    fontSize: 9,
+    fontWeight: "900",
+    lineHeight: 12,
+    minWidth: 14,
+    overflow: "hidden",
+    paddingHorizontal: 3,
+    position: "absolute",
+    right: -4,
+    textAlign: "center",
+    top: -5
+  },
+  tabCountBadgeDanger: {
+    backgroundColor: "#DC2626"
   },
   tabText: {
     color: "#64748B",
@@ -7418,6 +7478,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8
   },
+  practiceModeCardActive: {
+    backgroundColor: "#EFF6FF",
+    borderColor: "#93C5FD"
+  },
   practiceModeSelectArea: {
     alignItems: "center",
     flex: 1,
@@ -7432,6 +7496,9 @@ const styles = StyleSheet.create({
     height: 32,
     justifyContent: "center",
     width: 32
+  },
+  practiceModeIconActive: {
+    backgroundColor: "#DBEAFE"
   },
   modeGlyphCanvas: {
     alignItems: "center",
@@ -7606,6 +7673,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10
   },
+  reviewStripActionArea: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8
+  },
   resumeSprintCard: {
     alignItems: "center",
     backgroundColor: "#FFFFFF",
@@ -7632,6 +7704,12 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     flexDirection: "row",
     gap: 12
+  },
+  reviewStripChevron: {
+    alignItems: "center",
+    height: 32,
+    justifyContent: "center",
+    width: 18
   },
   reviewStripMetric: {
     alignItems: "flex-end",
@@ -8307,6 +8385,17 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     gap: 2,
     minWidth: 48
+  },
+  previousConfigTrailing: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 6
+  },
+  previousConfigChevron: {
+    alignItems: "center",
+    height: 32,
+    justifyContent: "center",
+    width: 14
   },
   testPanel: {
     backgroundColor: "#F8FAFC",
@@ -9166,11 +9255,22 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8
   },
+  historyAttemptTrailing: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 6
+  },
   historyAttemptStatus: {
     alignItems: "flex-end",
     gap: 4,
     justifyContent: "center",
     minWidth: 78
+  },
+  historyAttemptChevron: {
+    alignItems: "center",
+    height: 32,
+    justifyContent: "center",
+    width: 14
   },
   historyAttemptStatusSummary: {
     alignItems: "center",
