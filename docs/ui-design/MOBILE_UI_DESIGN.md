@@ -261,7 +261,7 @@ Arrow Duel review rules:
 - Green always means the best move.
 - Red always means the inferior candidate.
 - User-selected wrong move receives an additional marker that is distinguishable without color alone.
-- Playback starts automatically after a wrong answer, but the user can pause, replay, or step through the line.
+- After a wrong answer, the opponent's refutation reply plays automatically, then the punishment line continues as a guided interaction: the user plays each expected move themselves by following the guide arrow, so no pause/step transport controls are needed. Replay is available by resetting the puzzle. Throughout the line, show the live Stockfish evaluation of the current position. (This guided interaction supersedes the playback transport bar drawn on the design board.)
 - If the stored punishment line requires the user's next move, show that expected move with an arrow, wait for the user to make it, then play the next reply. Continue until the line ends, then stop.
 - Review copy should explain the tactical reason only when the data supports it; otherwise show engine line and evaluation shift.
 - In a Scheduled Review, selecting the wrong Arrow Duel candidate records a failed review attempt and resets or contracts that puzzle's schedule. The user may then enter Analysis Review to inspect the line without creating additional history.

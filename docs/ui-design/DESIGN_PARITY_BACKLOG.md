@@ -65,8 +65,12 @@ Strongly at parity (audited, no action needed):
 
 6. **No paused/backgrounded session state.** Spec requires an explicit paused UI
    driven by domain rules; session status is only active/won/failed (~L241).
-7. **Punishment-line playback has no pause/step controls.** Only replay-via-reset
-   exists (~L4988-5023). Spec requires pause, replay, and step.
+7. **Punishment-line playback has no pause/step controls.** *(Resolved
+   2026-07-02: the current guided interaction is the intended behavior — the
+   opponent's refutation auto-plays, then the user plays each punishment-line
+   move themselves following the guide arrow, with live Stockfish evaluation
+   of the current position, until the line ends. Replay is reset-based. The
+   spec was updated; no transport controls are wanted.)*
 8. **Green/red candidate arrows do not render on the review surface itself.**
    They appear only in Analysis mode at the initial FEN (~L4666, L5455). Spec:
    both original candidates always shown after review, green=best, red=inferior,

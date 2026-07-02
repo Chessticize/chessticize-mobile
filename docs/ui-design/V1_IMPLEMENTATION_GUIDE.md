@@ -58,7 +58,6 @@ behind the dev-only source switch.
 ### 3. Required behavior not yet implemented (backlog P1)
 
 - Paused/backgrounded session state with explicit UI, driven by domain rules.
-- Punishment-line playback pause/step controls in Arrow Duel review.
 - Green/red candidate arrows on the Arrow Duel review surface itself (not only
   inside Analysis mode), plus a non-color marker on the user's choice.
 - Randomized, attempt-persisted Arrow Duel candidate ordering (domain change;
