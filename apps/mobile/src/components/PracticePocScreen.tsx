@@ -128,6 +128,10 @@ const USER_FEEDBACK_BEFORE_AUTO_MS = 260;
 const ANALYSIS_DEPTH = 20;
 const CUSTOM_DURATION_OPTIONS = [3 * 60, 5 * 60, 10 * 60] as const;
 const CUSTOM_PER_PUZZLE_OPTIONS = [10, 20, 30] as const;
+const BOARD_COLOR_TOKENS = {
+  white: "#E6E8EB",
+  black: "#7B8794"
+} as const;
 const TEST_PUZZLE_SOURCES: ReadonlyArray<{ source: MobilePuzzleSource; label: string }> = [
   { source: "familiar15", label: "Familiar 15" },
   { source: "random1000", label: "Random 1000" }
@@ -1107,8 +1111,8 @@ export function PracticePocScreen({
                       durations={{ move: 260 }}
                       spriteSource={CHESS_PIECE_SPRITE}
                       colors={{
-                        white: "#EEF2F5",
-                        black: "#A3ADB8",
+                        white: BOARD_COLOR_TOKENS.white,
+                        black: BOARD_COLOR_TOKENS.black,
                         lastMoveHighlight: "rgba(0, 0, 0, 0)",
                         checkmateHighlight: "rgba(0, 0, 0, 0)",
                         promotionPieceButton: "#F8FAFC",
@@ -1876,11 +1880,21 @@ function CustomValueRow({
   value: string;
   valueTestID?: string;
 }): React.JSX.Element {
+  const accessibilityLabel = [label, value, detail].filter(Boolean).join(", ");
   return (
-    <View style={styles.customConfigRow} testID={testID}>
+    <View
+      accessibilityLabel={accessibilityLabel}
+      style={styles.customConfigRow}
+      testID={testID}
+    >
       <View>
         <Text style={styles.listText}>{label}</Text>
-        {detail ? <Text style={styles.helperText}>{detail}</Text> : null}
+        {detail ? (
+          <View
+            accessibilityLabel={detail}
+            testID={`${testID}-detail`}
+          />
+        ) : null}
       </View>
       <Text testID={valueTestID} style={styles.customConfigValue}>{value}</Text>
     </View>
@@ -2009,11 +2023,21 @@ function CustomToggleRow({
   onToggle: () => void;
   testID: string;
 }): React.JSX.Element {
+  const accessibilityLabel = [label, detail].filter(Boolean).join(", ");
   return (
-    <View style={styles.customConfigRow} testID={testID}>
+    <View
+      accessibilityLabel={accessibilityLabel}
+      style={styles.customConfigRow}
+      testID={testID}
+    >
       <View>
         <Text style={styles.listText}>{label}</Text>
-        {detail ? <Text style={styles.helperText}>{detail}</Text> : null}
+        {detail ? (
+          <View
+            accessibilityLabel={detail}
+            testID={`${testID}-detail`}
+          />
+        ) : null}
       </View>
       <Pressable
         accessibilityRole="switch"
@@ -2398,23 +2422,21 @@ function ResultHistoryShortcut({
   ratingAfter: number;
   ratingBefore: number;
 }): React.JSX.Element {
-  const trendLabel = delta === 0 ? "Trend in History" : delta > 0 ? "Improved" : "Dropped";
+  const deltaLabel = `${delta >= 0 ? "+" : ""}${delta}`;
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel="Open rating trend in history"
+      accessibilityLabel={`Open performance trend in history, rating ${ratingBefore} to ${ratingAfter}, ${deltaLabel}`}
       style={styles.resultTrendCard}
       testID="sprint-result-history-trend"
       onPress={onPress}
     >
       <View style={styles.resultTrendCopy}>
-        <View>
-          <Text style={styles.resultMetricLabel}>Rating Trend</Text>
-          <Text style={styles.helperText}>History keeps the full performance chart</Text>
-        </View>
-        <Text style={[styles.resultTrendBadge, delta < 0 ? styles.resultTrendBadgeDown : null]}>{trendLabel}</Text>
+        <Text style={styles.listText}>History</Text>
+        <Text style={styles.helperText}>View performance trend</Text>
       </View>
       <View style={styles.resultTrendRange}>
+        <Text style={[styles.resultTrendDelta, delta < 0 ? styles.errorText : styles.positive]}>{deltaLabel}</Text>
         <Text testID="sprint-result-trend-start" style={styles.resultTrendRangeText}>{ratingBefore}</Text>
         <ChevronGlyph direction="right" />
         <Text testID="sprint-result-trend-current" style={styles.resultTrendRangeText}>{ratingAfter}</Text>
@@ -2604,7 +2626,10 @@ function SessionScoreMetric({
       style={styles.sessionScoreMetric}
     >
       <SessionScoreGlyph tone={tone} />
-      <Text style={styles.sessionScoreValue}>{value}</Text>
+      <View style={styles.sessionScoreCopy}>
+        <Text style={styles.sessionScoreValue}>{value}</Text>
+        <Text style={styles.sessionScoreLabel}>{label}</Text>
+      </View>
     </View>
   );
 }
@@ -5123,8 +5148,8 @@ function ReviewSession({
               durations={{ move: 260 }}
               spriteSource={CHESS_PIECE_SPRITE}
               colors={{
-                white: "#EEF2F5",
-                black: "#A3ADB8",
+                white: BOARD_COLOR_TOKENS.white,
+                black: BOARD_COLOR_TOKENS.black,
                 lastMoveHighlight: "rgba(0, 0, 0, 0)",
                 checkmateHighlight: "rgba(0, 0, 0, 0)",
                 promotionPieceButton: "#F8FAFC",
@@ -6150,11 +6175,12 @@ function PacksPanel(): React.JSX.Element {
         <Text style={styles.sectionLabel}>Pack Info</Text>
         <PackInfoRow label="Source" value="Lichess puzzle database" testID="packs-source" />
         <PackInfoRow label="Processing" value="Pre-solved for Chessticize" testID="packs-processing" />
-        <PackInfoRow label="Manifest" value="Validated before activation" testID="packs-manifest" />
-        <PackInfoRow label="Build date" value="Bundled fixture" testID="packs-build-date" />
-        <Text testID="packs-license-notes" style={styles.packLicenseText}>
-          License notes: Puzzle data is derived from the Lichess puzzle database and bundled for offline use with Chessticize presolve metadata.
-        </Text>
+        <PackInfoRow
+          label="License notes"
+          value="Lichess-derived"
+          detail="Puzzle data is derived from the Lichess puzzle database and bundled for offline use with Chessticize presolve metadata."
+          testID="packs-license-notes"
+        />
       </View>
 
       {removalPack ? (
@@ -6486,18 +6512,31 @@ function PackDetailPanel({
 }
 
 function PackInfoRow({
+  detail,
   label,
   testID,
   value
 }: {
+  detail?: string;
   label: string;
   testID: string;
   value: string;
 }): React.JSX.Element {
+  const accessibilityLabel = [label, value, detail].filter(Boolean).join(", ");
   return (
-    <View style={styles.packInfoRow} testID={testID}>
+    <View
+      accessibilityLabel={accessibilityLabel}
+      style={styles.packInfoRow}
+      testID={testID}
+    >
       <Text style={styles.helperText}>{label}</Text>
       <Text style={styles.listText}>{value}</Text>
+      {detail ? (
+        <View
+          accessibilityLabel={detail}
+          testID={`${testID}-detail`}
+        />
+      ) : null}
     </View>
   );
 }
@@ -6717,7 +6756,7 @@ function TabButton({
       style={[styles.tabButton, active ? styles.tabButtonActive : null]}
       onPress={onPress}
     >
-      <View style={[styles.tabIconBadge, active ? styles.tabIconBadgeActive : null]} testID={`${testID}-icon`}>
+      <View style={styles.tabIconBadge} testID={`${testID}-icon`}>
         <TabGlyph tab={tab} active={active} />
       </View>
       <Text style={[styles.tabText, active ? styles.tabTextActive : null]}>{label}</Text>
@@ -7107,9 +7146,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     minWidth: 24,
     paddingHorizontal: 5
-  },
-  tabIconBadgeActive: {
-    backgroundColor: "#DBEAFE"
   },
   tabText: {
     color: "#64748B",
@@ -7913,8 +7949,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flex: 1,
     flexDirection: "row",
-    gap: 8,
+    gap: 7,
     justifyContent: "center"
+  },
+  sessionScoreCopy: {
+    gap: 1,
+    minWidth: 34
   },
   sessionScoreIcon: {
     alignItems: "center",
@@ -7973,9 +8013,15 @@ const styles = StyleSheet.create({
   },
   sessionScoreValue: {
     color: "#111827",
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "900",
-    lineHeight: 20
+    lineHeight: 17
+  },
+  sessionScoreLabel: {
+    color: "#64748B",
+    fontSize: 9,
+    fontWeight: "800",
+    lineHeight: 11
   },
   emptyBoard: {
     alignItems: "center",
@@ -8433,39 +8479,27 @@ const styles = StyleSheet.create({
   },
   resultTrendCard: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    borderWidth: 1,
     flexDirection: "row",
     gap: 12,
     justifyContent: "space-between",
-    minHeight: 58,
-    paddingHorizontal: 12,
-    paddingVertical: 10
+    minHeight: 44,
+    paddingHorizontal: 4,
+    paddingVertical: 2
   },
   resultTrendCopy: {
     flex: 1,
     gap: 2,
     minWidth: 0
   },
-  resultTrendBadge: {
-    backgroundColor: "#2563EB",
-    borderRadius: 999,
-    color: "#FFFFFF",
-    fontSize: 10,
-    fontWeight: "900",
-    overflow: "hidden",
-    paddingHorizontal: 8,
-    paddingVertical: 4
-  },
-  resultTrendBadgeDown: {
-    backgroundColor: "#DC2626"
-  },
   resultTrendRange: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 4
+    gap: 5
+  },
+  resultTrendDelta: {
+    fontFamily: "menlo",
+    fontSize: 12,
+    fontWeight: "900"
   },
   resultTrendRangeText: {
     color: "#64748B",
