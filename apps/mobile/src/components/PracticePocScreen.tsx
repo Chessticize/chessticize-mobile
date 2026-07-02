@@ -5544,6 +5544,11 @@ function SettingsPanel({
       ? "Ready"
       : "Needs approval"
     : "Local only";
+  const syncVisibleStatus = syncEnabled
+    ? syncUploadAllowed
+      ? "On · Local-first"
+      : "On · Upload approval needed"
+    : "Off · Local only";
   const syncSummaryDetail = syncEnabled
     ? syncUploadAllowed
       ? "Progress can sync through iCloud. Offline practice still works."
@@ -5582,8 +5587,12 @@ function SettingsPanel({
         <View style={styles.settingsRow} testID="settings-icloud-sync-row">
           <View style={styles.settingsRowCopy}>
             <Text style={styles.listText}>iCloud Sync</Text>
-            <Text testID="settings-sync-status" style={styles.helperText}>
-              {syncSummaryDetail}
+            <Text
+              accessibilityLabel={syncSummaryDetail}
+              testID="settings-sync-status"
+              style={styles.helperText}
+            >
+              {syncVisibleStatus}
             </Text>
           </View>
           <View style={styles.syncRowMeta}>
