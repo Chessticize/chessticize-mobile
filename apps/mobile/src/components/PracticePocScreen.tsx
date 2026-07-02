@@ -2071,10 +2071,12 @@ function PreviousCustomConfigRow({
   config: PreviousCustomConfig;
   onPress: () => void;
 }): React.JSX.Element {
+  const ratingLabel = historyRatingKeyLabel(config.ratingKey);
+
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Use ${config.ratingKey} custom sprint`}
+      accessibilityLabel={`Use ${ratingLabel} custom sprint`}
       style={styles.previousConfigRow}
       testID={`custom-previous-${config.id}`}
       onPress={onPress}
@@ -2082,7 +2084,7 @@ function PreviousCustomConfigRow({
       <View style={styles.previousConfigCopy}>
         <View style={styles.previousConfigHeader}>
           <Text style={styles.historyRowTitle}>{config.mode}</Text>
-          <Text style={styles.previousConfigRatingKey}>{config.ratingKey}</Text>
+          <Text style={styles.previousConfigRatingKey}>{ratingLabel}</Text>
         </View>
         <View style={styles.previousConfigMetaRow} testID={`custom-previous-${config.id}-meta`}>
           <Text style={styles.practiceModeDetailChip}>{config.theme}</Text>
@@ -3003,12 +3005,16 @@ function HistoryPanel({
           ))}
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Wrong in the last 7 days"
+            accessibilityLabel={wrongLast7Days ? "Clear wrong in the last 7 days filter" : "Wrong in the last 7 days"}
+            accessibilityState={{ selected: wrongLast7Days }}
             testID="history-filter-wrong-7-days"
             style={[styles.filterButton, wrongLast7Days ? styles.filterButtonActive : null]}
             onPress={onToggleWrongLast7Days}
           >
-            <Text style={[styles.filterButtonText, wrongLast7Days ? styles.filterButtonTextActive : null]}>Wrong 7d</Text>
+            <View style={styles.filterButtonContent}>
+              <Text style={[styles.filterButtonText, wrongLast7Days ? styles.filterButtonTextActive : null]}>Wrong 7d</Text>
+              {wrongLast7Days ? <CloseGlyph color="#FFFFFF" testID="history-filter-wrong-7-days-clear-glyph" /> : null}
+            </View>
           </Pressable>
         </HistoryChipRow>
       </View>
@@ -3017,7 +3023,7 @@ function HistoryPanel({
         <View style={styles.historyPerformanceHeader}>
           <View>
             <Text style={styles.panelTitle}>Performance</Text>
-            <Text style={styles.helperText}>{selectedRatingKey ?? "No rating history"}</Text>
+            <Text style={styles.helperText}>{selectedRatingKey ? historyRatingKeyLabel(selectedRatingKey) : "No rating history"}</Text>
           </View>
           <View style={styles.historyMetricSummary}>
             <Text testID="history-chart-value" style={styles.historyAccuracy}>{chartSummary.value}</Text>
@@ -3052,7 +3058,7 @@ function HistoryPanel({
                 <FilterButton
                   key={ratingKey}
                   active={selectedRatingKey === ratingKey}
-                  label={ratingKey}
+                  label={historyRatingKeyLabel(ratingKey)}
                   testID={`history-rating-${ratingKey}`}
                   onPress={() => onRatingKeyChange(ratingKey)}
                 />
@@ -3400,6 +3406,12 @@ function historyAttemptSpeedSeconds(attempt: HistoryAttemptView): number | null 
   return match ? Number(match[1]) : null;
 }
 
+function historyRatingKeyLabel(ratingKey: string): string {
+  const speed = ratingKey.match(/\/(\d+)\b/)?.[1];
+  const speedLabel = speed ? ` · ${speed}s pace` : "";
+  return `${ratingLabelFromKey(ratingKey)}${speedLabel}`;
+}
+
 function historyAttemptHasReviewQueued(
   attempt: HistoryAttemptView,
   puzzleStatsById: Map<string, HistoryPuzzleStats>
@@ -3469,7 +3481,12 @@ function HistoryAttemptRow({
 }): React.JSX.Element {
   const isWrong = attempt.result === "wrong";
   const delta = (attempt.ratingAfter ?? attempt.ratingBefore) - attempt.ratingBefore;
-  const elapsedSeconds = Math.max(0, Math.round((new Date(attempt.completedAt).getTime() - new Date(attempt.startedAt).getTime()) / 1000));
+  const completedAtMs = new Date(attempt.completedAt).getTime();
+  const elapsedSeconds = Math.max(0, Math.round((completedAtMs - new Date(attempt.startedAt).getTime()) / 1000));
+  const dateLabel = `${historyAttemptRecencyLabel(completedAtMs)} · ${attempt.completedAt.slice(0, 10)}`;
+  const primaryTheme = historyAttemptThemeLabel(attempt);
+  const pace = historyAttemptSpeedSeconds(attempt);
+  const paceLabel = pace === null ? null : `${pace}s pace`;
   const reviewLabel = isWrong
     ? puzzleStats?.nextReviewAt
       ? `Review ${puzzleStats.nextReviewAt.slice(0, 10)}`
@@ -3477,6 +3494,12 @@ function HistoryAttemptRow({
     : "Correct";
   const resultLabel = isWrong ? "Wrong move" : "Correct";
   const sourceLabel = attempt.source === "scheduled_review" ? "Review" : "Sprint";
+  const difficulty = historyAttemptDifficulty(attempt, puzzleStats);
+  const difficultyStyle = difficulty === "hard"
+    ? styles.reviewDifficultyHard
+    : difficulty === "medium"
+      ? styles.reviewDifficultyMedium
+      : styles.reviewDifficultyEasy;
 
   return (
     <Pressable
@@ -3498,20 +3521,85 @@ function HistoryAttemptRow({
           <Text testID={`history-attempt-${attempt.id}-result`} style={styles.helperText}>{resultLabel}</Text>
         </View>
         <Text testID={`history-attempt-${attempt.id}-move`} style={styles.helperText}>{resultLabel} · {attempt.submittedMove}</Text>
+        <Text testID={`history-attempt-${attempt.id}-context`} style={styles.helperText}>
+          {[primaryTheme, paceLabel].filter(Boolean).join(" · ")}
+        </Text>
         <Text testID={`history-attempt-${attempt.id}-meta`} style={styles.helperText}>
-          {sourceLabel} · Rating {attempt.puzzleRating} · {elapsedSeconds}s · {attempt.completedAt.slice(0, 10)}
+          {sourceLabel} · Rating {attempt.puzzleRating} · {elapsedSeconds}s · {dateLabel}
         </Text>
       </View>
       <View style={styles.historyAttemptStatus} testID={`history-attempt-${attempt.id}-status`}>
-        <Text style={[styles.historyReviewState, isWrong ? styles.reviewDifficultyHard : styles.reviewDifficultyEasy]}>
-          {reviewLabel}
+        <Text
+          testID={`history-attempt-${attempt.id}-difficulty`}
+          style={[styles.historyReviewState, difficultyStyle]}
+        >
+          {difficultyLabel(difficulty)}
         </Text>
         <Text testID={`history-attempt-${attempt.id}-delta`} style={[styles.historyRatingDelta, delta < 0 ? styles.errorText : styles.positive]}>
           {delta >= 0 ? "+" : ""}{delta}
         </Text>
+        <Text
+          testID={`history-attempt-${attempt.id}-review-state`}
+          style={[styles.historyReviewStateDetail, isWrong ? styles.reviewDifficultyHard : styles.reviewDifficultyEasy]}
+        >
+          {reviewLabel}
+        </Text>
       </View>
     </Pressable>
   );
+}
+
+function historyAttemptRecencyLabel(completedAtMs: number): string {
+  const nowMs = Date.now();
+  if (!Number.isFinite(completedAtMs) || completedAtMs > nowMs) {
+    return "Scheduled";
+  }
+  const elapsedDays = Math.floor((nowMs - completedAtMs) / (24 * 60 * 60 * 1000));
+  if (elapsedDays === 0) {
+    return "Today";
+  }
+  if (elapsedDays === 1) {
+    return "Yesterday";
+  }
+  if (elapsedDays < 7) {
+    return `${elapsedDays} days ago`;
+  }
+  if (elapsedDays < 30) {
+    const weeks = Math.floor(elapsedDays / 7);
+    return `${weeks}w ago`;
+  }
+  if (elapsedDays < 365) {
+    const months = Math.floor(elapsedDays / 30);
+    return `${months}mo ago`;
+  }
+  const years = Math.floor(elapsedDays / 365);
+  return `${years}y ago`;
+}
+
+function historyAttemptThemeLabel(attempt: HistoryAttemptView): string {
+  const theme = attempt.themes[0];
+  return theme ? titleCase(theme) : "Mixed";
+}
+
+function titleCase(value: string): string {
+  return value
+    .split(/[\s_-]+/)
+    .filter(Boolean)
+    .map((word) => word[0]?.toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+function historyAttemptDifficulty(
+  attempt: HistoryAttemptView,
+  puzzleStats?: HistoryPuzzleStats
+): ReviewDifficulty {
+  if (attempt.result === "correct") {
+    return "easy";
+  }
+  if (puzzleStats?.nextReviewAt || (puzzleStats?.wrongCount ?? 0) > 1) {
+    return "hard";
+  }
+  return "medium";
 }
 
 function FilterButton({
@@ -3580,11 +3668,17 @@ function SwitchGlyph({ enabled }: { enabled: boolean }): React.JSX.Element {
   );
 }
 
-function CloseGlyph(): React.JSX.Element {
+function CloseGlyph({
+  color = "#111827",
+  testID = "close-glyph"
+}: {
+  color?: string;
+  testID?: string;
+} = {}): React.JSX.Element {
   return (
-    <View style={styles.closeGlyph} testID="close-glyph">
-      <View style={[styles.closeGlyphLine, styles.closeGlyphForward]} />
-      <View style={[styles.closeGlyphLine, styles.closeGlyphBackward]} />
+    <View style={styles.closeGlyph} testID={testID}>
+      <View style={[styles.closeGlyphLine, styles.closeGlyphForward, { backgroundColor: color }]} />
+      <View style={[styles.closeGlyphLine, styles.closeGlyphBackward, { backgroundColor: color }]} />
     </View>
   );
 }
@@ -5302,9 +5396,7 @@ function SettingsPanel({
             <Text style={styles.listText}>iCloud Sync</Text>
             <Text testID="settings-sync-status" style={styles.helperText}>
               {syncEnabled
-                ? syncUploadAllowed
-                  ? "Practice works offline · Last synced today, 09:28"
-                  : "Practice works offline · Waiting for upload approval"
+                ? "Practice works offline"
                 : "Off · Local-only progress"}
             </Text>
           </View>
@@ -5330,6 +5422,24 @@ function SettingsPanel({
             </Pressable>
           </View>
         </View>
+        <SettingsRow
+          label="Last synced"
+          value={
+            syncEnabled
+              ? syncUploadAllowed
+                ? "Today, 09:28"
+                : "Pending approval"
+              : "Local only"
+          }
+          detail={
+            syncEnabled
+              ? syncUploadAllowed
+                ? "This device is ready for iCloud sync"
+                : "Approve upload before existing progress leaves this device"
+              : "Sync is disabled for this device"
+          }
+          testID="settings-sync-last-synced"
+        />
         {syncEnabled && !syncUploadAllowed ? (
           <Pressable
             accessibilityRole="button"
@@ -5495,7 +5605,7 @@ function AdvancedRatingRow({
     <View style={styles.advancedRatingRow} testID={testID}>
       <View style={styles.advancedRatingCopy}>
         <Text style={styles.listText}>{label}</Text>
-        <Text style={styles.helperText}>{record.key}</Text>
+        <Text style={styles.helperText}>{advancedRatingBucketLabel(label, record.key)}</Text>
       </View>
       <View style={styles.advancedRatingControls}>
         <Pressable
@@ -5531,7 +5641,15 @@ function ratingLabelFromKey(ratingKey: string): string {
   if (ratingKey.startsWith("blitz")) {
     return "Blitz";
   }
+  if (ratingKey.startsWith("custom")) {
+    return "Custom";
+  }
   return "Standard";
+}
+
+function advancedRatingBucketLabel(label: string, ratingKey: string): string {
+  const speed = ratingKey.match(/\/(\d+)\b/)?.[1];
+  return speed ? `${label} · ${speed}s pace` : label;
 }
 
 function DestructiveConfirmationCard({
@@ -6526,7 +6644,7 @@ function historyRangeLabel(range: HistoryTimeRange): string {
   if (range === "1y") {
     return "1 year";
   }
-  return "Max";
+  return "All Time";
 }
 
 function screenTitleFor(tab: Tab): string {
@@ -8577,6 +8695,11 @@ const styles = StyleSheet.create({
   filterButtonActive: {
     backgroundColor: "#2563EB"
   },
+  filterButtonContent: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 4
+  },
   filterButtonText: {
     color: "#2563EB",
     fontSize: 12,
@@ -8820,6 +8943,11 @@ const styles = StyleSheet.create({
   historyReviewState: {
     fontSize: 12,
     fontWeight: "900",
+    textAlign: "right"
+  },
+  historyReviewStateDetail: {
+    fontSize: 10,
+    fontWeight: "800",
     textAlign: "right"
   },
   historyRatingDelta: {

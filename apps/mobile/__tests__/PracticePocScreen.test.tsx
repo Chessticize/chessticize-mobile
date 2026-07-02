@@ -646,7 +646,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "custom-previous-custom-5-20-meta"))).toContain("Mixed");
     expect(collectText(findByTestId(renderer, "custom-previous-custom-5-20-meta"))).toContain("5 min · 20s pace");
     expect(collectText(findByTestId(renderer, "custom-previous-custom-5-20-meta"))).toContain("Last Recently");
-    expect(collectText(findByTestId(renderer, "custom-previous-custom-3-30"))).toContain("custom 3/30");
+    expect(collectText(findByTestId(renderer, "custom-previous-custom-3-30"))).toContain("Custom · 30s pace");
     expect(collectText(findByTestId(renderer, "custom-previous-custom-3-30"))).toContain("ELO");
     expect(findByTestId(renderer, "custom-previous-custom-3-30").props.accessibilityRole).toBe("button");
     press(renderer, "custom-previous-custom-3-30");
@@ -806,6 +806,8 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-filter-toggle").props.accessibilityState).toEqual({ expanded: false });
     expect(findByTestId(renderer, "history-primary-filters")).toBeTruthy();
     expect(findByTestId(renderer, "history-performance-card")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "history-performance-card"))).toContain("Standard · 20s pace");
+    expect(collectText(findByTestId(renderer, "history-performance-card"))).not.toContain("standard 5/20");
     expect(findByTestId(renderer, "history-performance-chart")).toBeTruthy();
     expect(findByTestId(renderer, "history-chart-metric-filters")).toBeTruthy();
     expect(findByTestId(renderer, "history-chart-rating")).toBeTruthy();
@@ -816,6 +818,9 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-chart-review-due")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "history-chart-label"))).toBe("Rating");
     expect(findByTestId(renderer, "history-range-filters")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "history-range-max"))).toBe("All Time");
+    expect(findByTestId(renderer, "history-filter-wrong-7-days").props.accessibilityState).toEqual({ selected: false });
+    expect(() => findByTestId(renderer, "history-filter-wrong-7-days-clear-glyph")).toThrow();
     expect(() => findByTestId(renderer, "history-filter-arrow-duel-only")).toThrow();
     expect(() => findByTestId(renderer, "history-advanced-filters")).toThrow();
     expect(() => findByTestId(renderer, "history-speed-filters")).toThrow();
@@ -823,6 +828,8 @@ describe("PracticePocScreen", () => {
     press(renderer, "history-filter-toggle");
     expect(findByTestId(renderer, "history-filter-toggle").props.accessibilityState).toEqual({ expanded: true });
     expect(findByTestId(renderer, "history-advanced-filters")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "history-rating-filters"))).toContain("Standard · 20s pace");
+    expect(collectText(findByTestId(renderer, "history-rating-filters"))).not.toContain("standard 5/20");
     expect(findByTestId(renderer, "history-speed-filters")).toBeTruthy();
     expect(findByTestId(renderer, "history-speed-20")).toBeTruthy();
     expect(findByTestId(renderer, "history-review-status-filters")).toBeTruthy();
@@ -868,9 +875,18 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "history-chart-value"))).toBe("50%");
 
     press(renderer, "history-filter-wrong-7-days");
+    expect(findByTestId(renderer, "history-filter-wrong-7-days").props.accessibilityLabel).toBe("Clear wrong in the last 7 days filter");
+    expect(findByTestId(renderer, "history-filter-wrong-7-days").props.accessibilityState).toEqual({ selected: true });
+    expect(findByTestId(renderer, "history-filter-wrong-7-days-clear-glyph")).toBeTruthy();
     expectText(renderer, "Accuracy 0% · Correct 0 · Wrong 1");
     expectText(renderer, "Wrong move · g6g5");
     expect(collectText(renderer.root)).not.toContain("Correct · e6f7");
+    press(renderer, "history-filter-wrong-7-days");
+    expect(findByTestId(renderer, "history-filter-wrong-7-days").props.accessibilityLabel).toBe("Wrong in the last 7 days");
+    expect(findByTestId(renderer, "history-filter-wrong-7-days").props.accessibilityState).toEqual({ selected: false });
+    expect(() => findByTestId(renderer, "history-filter-wrong-7-days-clear-glyph")).toThrow();
+    expectText(renderer, "Accuracy 50% · Correct 1 · Wrong 1");
+    press(renderer, "history-filter-wrong-7-days");
 
     press(renderer, "history-source-sprint");
     expectText(renderer, "Wrong move · g6g5");
@@ -886,9 +902,15 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "result-badge-wrong-glyph")).toBeTruthy();
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-result`))).toBe("Wrong move");
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-move`))).toBe("Wrong move · g6g5");
+    expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-context`))).toContain("20s pace");
+    expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-context`))).toMatch(/^[A-Z]/);
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-meta`))).toContain("Sprint · Rating");
-    expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-meta`))).toContain("s ·");
+    expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-meta`))).toMatch(
+      /Sprint · Rating \d+ · \d+s · (Today|Yesterday|\d+ days ago|\d+w ago|\d+mo ago|\d+y ago|Scheduled) · \d{4}-\d{2}-\d{2}/
+    );
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-status`))).toContain("Review");
+    expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-difficulty`))).toBe("Hard");
+    expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-review-state`))).toContain("Review");
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-delta`))).toMatch(/^[+-]\d+$/);
     press(renderer, historyAttemptRow.props.testID);
     expect(findByTestId(renderer, "review-session")).toBeTruthy();
@@ -1682,8 +1704,11 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "settings-standard-elo-row"))).toContain("ELO 600");
     expect(collectText(findByTestId(renderer, "settings-reset-elo"))).toContain("Standard puzzle rating only");
     expect(findByTestId(renderer, "settings-sync-disclosure")).toBeTruthy();
-    expectText(renderer, "Practice works offline · Waiting for upload approval");
+    expectText(renderer, "Practice works offline");
     expectText(renderer, "Needs approval");
+    expect(findByTestId(renderer, "settings-sync-last-synced")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "settings-sync-last-synced"))).toContain("Pending approval");
+    expect(collectText(findByTestId(renderer, "settings-sync-last-synced"))).toContain("Approve upload before existing progress leaves this device");
     expect(findByTestId(renderer, "settings-icloud-sync-toggle")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "settings-icloud-sync-toggle"))).toBe("");
     expect(findByTestId(renderer, "settings-sync-allow-upload")).toBeTruthy();
@@ -1691,12 +1716,15 @@ describe("PracticePocScreen", () => {
     press(renderer, "settings-sync-allow-upload");
     expectText(renderer, "iCloud upload allowed");
     expectText(renderer, "Ready");
-    expectText(renderer, "Practice works offline · Last synced today, 09:28");
+    expectText(renderer, "Practice works offline");
+    expect(collectText(findByTestId(renderer, "settings-sync-last-synced"))).toContain("Today, 09:28");
+    expect(collectText(findByTestId(renderer, "settings-sync-last-synced"))).toContain("This device is ready for iCloud sync");
     expect(() => findByTestId(renderer, "settings-sync-allow-upload")).toThrow();
     press(renderer, "settings-icloud-sync-toggle");
     expect(findByTestId(renderer, "settings-icloud-sync-toggle").props.accessibilityState).toEqual({ checked: false });
     expectText(renderer, "Off · Local-only progress");
     expectText(renderer, "Local only");
+    expect(collectText(findByTestId(renderer, "settings-sync-last-synced"))).toContain("Sync is disabled for this device");
     press(renderer, "settings-reset-elo");
     expect(findByTestId(renderer, "settings-reset-elo-confirmation")).toBeTruthy();
     expectText(renderer, "Reset Standard puzzle ELO?");
@@ -1723,6 +1751,10 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "settings-advanced-rating-standard")).toBeTruthy();
     expect(findByTestId(renderer, "settings-advanced-rating-arrow-duel")).toBeTruthy();
     expect(findByTestId(renderer, "settings-advanced-rating-blitz")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "settings-advanced-rating-standard"))).toContain("Standard · 20s pace");
+    expect(collectText(findByTestId(renderer, "settings-advanced-rating-standard"))).not.toContain("standard 5/20");
+    expect(collectText(findByTestId(renderer, "settings-advanced-rating-arrow-duel"))).toContain("Arrow Duel · 30s pace");
+    expect(collectText(findByTestId(renderer, "settings-advanced-rating-arrow-duel"))).not.toContain("arrow duel 5/30");
     expect(collectText(findByTestId(renderer, "settings-advanced-rating-standard-value"))).toBe("ELO 600");
     expect(collectText(findByTestId(renderer, "settings-advanced-rating-standard-increase"))).toBe("");
     expect(collectText(findByTestId(renderer, "settings-advanced-rating-standard-decrease"))).toBe("");
