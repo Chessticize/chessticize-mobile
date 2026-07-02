@@ -1867,6 +1867,63 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "review-session")).toThrow();
   });
 
+  it("keeps a wrong due Arrow Duel review on the same puzzle until Continue is pressed", async () => {
+    const service = createMobilePracticeService("familiar15");
+    let sprintState = service.startSprint(
+      {
+        mode: "arrow_duel",
+        durationSeconds: 300,
+        perPuzzleSeconds: 30,
+        targetCorrect: 10,
+        maxMistakes: 3
+      },
+      "2026-06-20T00:00:00.000Z"
+    );
+    const firstPuzzleSolution = [...requireArrowDuelState(sprintState).puzzle.solutionMoves];
+    const wrongMoves: string[] = [];
+    wrongMoves.push(currentArrowWrongMove(sprintState));
+    sprintState = service.submitMove(wrongMoves[0] as string, "2026-06-20T00:00:05.000Z").state;
+    wrongMoves.push(currentArrowWrongMove(sprintState));
+    sprintState = service.submitMove(wrongMoves[1] as string, "2026-06-20T00:00:10.000Z").state;
+    wrongMoves.push(currentArrowWrongMove(sprintState));
+    service.submitMove(wrongMoves[2] as string, "2026-06-20T00:00:15.000Z");
+    const stockfish = createScriptedStockfishTransport(() => {});
+    const renderer = renderScreen({
+      practiceService: service,
+      stockfishTransportFactory: () => stockfish.transport
+    });
+
+    press(renderer, "review-tab");
+    press(renderer, "review-start-due");
+
+    expectText(renderer, "1 / 3 · Arrow Duel");
+    expect(() => findByTestId(renderer, "review-line-continue")).toThrow();
+
+    await boardMove(renderer, wrongMoves[0] as string);
+    await settleFeedbackSnapshot();
+    await settleFeedbackSnapshot();
+    expectText(renderer, "1 / 3 · Arrow Duel");
+
+    for (let cursor = 2; cursor < firstPuzzleSolution.length; cursor += 2) {
+      const guidedMove = firstPuzzleSolution[cursor];
+      if (!guidedMove) {
+        break;
+      }
+      await boardMove(renderer, guidedMove);
+      await settleFeedbackSnapshot();
+    }
+    await settleFeedbackSnapshot();
+
+    expectText(renderer, "1 / 3 · Arrow Duel");
+    expect(findByTestId(renderer, "review-line-continue")).toBeTruthy();
+    expect(findByTestId(renderer, "review-line-continue").props.accessibilityLabel).toBe("Continue to next review");
+
+    press(renderer, "review-line-continue");
+
+    expectText(renderer, "2 / 3 · Arrow Duel");
+    expect(() => findByTestId(renderer, "review-line-continue")).toThrow();
+  });
+
   it("ignores stale board callbacks instead of recording a correct visible move as wrong", async () => {
     const renderer = renderStandardSequenceScreen();
 

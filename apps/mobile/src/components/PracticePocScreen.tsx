@@ -4629,6 +4629,7 @@ function ReviewSession({
   const [reviewStartedAtMs, setReviewStartedAtMs] = useState(() => Date.now());
   const [reviewNowMs, setReviewNowMs] = useState(() => Date.now());
   const [reviewTimedOut, setReviewTimedOut] = useState(false);
+  const [punishmentLineComplete, setPunishmentLineComplete] = useState(false);
   const currentEntry = entries[entryIndex];
   const currentPuzzle = currentReviewPuzzleState(reviewState);
   const currentFen = currentPuzzle.currentFen;
@@ -4795,6 +4796,7 @@ function ReviewSession({
     setLastMove(null);
     setBoardLocked(false);
     setWrongSeen(false);
+    setPunishmentLineComplete(false);
     setAnalysisEnabled(false);
     setAnalysisFen(null);
     setEngineAnalysisLines([]);
@@ -4818,6 +4820,10 @@ function ReviewSession({
       setBoardLocked(false);
       return;
     }
+    goToNextDueReview();
+  }
+
+  function goToNextDueReview(): void {
     const nextIndex = entryIndex + 1;
     if (nextIndex >= entries.length) {
       onExit(currentEntry.source);
@@ -5051,6 +5057,17 @@ function ReviewSession({
       setReviewState({ kind: "line", line: result.state });
       if (result.feedback.puzzleSolved) {
         await sleep(FEEDBACK_SNAPSHOT_MS);
+        if (currentEntry.source === "due") {
+          // A wrong Arrow Duel review stays on the same puzzle after the
+          // punishment line; the user advances with the Continue button.
+          recordCurrentReviewResult("wrong", {
+            submittedMove: result.feedback.submittedMove,
+            expectedMove: result.feedback.expectedMove
+          });
+          setPunishmentLineComplete(true);
+          setBoardLocked(false);
+          return;
+        }
         advanceReview("wrong", {
           submittedMove: result.feedback.submittedMove,
           expectedMove: result.feedback.expectedMove
@@ -5325,6 +5342,17 @@ function ReviewSession({
         </View>
 
         <View style={styles.analysisPanel} testID="review-analysis-panel">
+          {punishmentLineComplete && currentEntry.source === "due" && !analysisEnabled ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Continue to next review"
+              testID="review-line-continue"
+              style={[styles.primaryButton, styles.reviewContinueButton]}
+              onPress={goToNextDueReview}
+            >
+              <Text style={styles.primaryButtonText}>Continue</Text>
+            </Pressable>
+          ) : null}
           {!analysisEnabled && guidedEvalLines.length > 0 ? (
             <View testID="review-guided-eval-list">
               {guidedEvalLines.map((line, index) => (
@@ -7927,6 +7955,9 @@ const styles = StyleSheet.create({
   },
   reviewStartButton: {
     flex: 0
+  },
+  reviewContinueButton: {
+    marginBottom: 8
   },
   activeSessionShell: {
     gap: 8
