@@ -4,6 +4,14 @@ All repository documentation must be written in English. User-facing GUI copy mu
 
 For development-loop decisions, use the repo-local skill at `.codex/skills/chessticize-mobile-dev-loop/SKILL.md`. It defines the preferred order for core/backend tests, CLI E2E checks, mobile component tests, and iOS simulator/Detox screenshot verification.
 
+## Branch And PR Workflow
+
+- Prefer one feature-scoped PR per coherent goal (for example, one screen or one flow brought to design parity), not a separate PR per small polish tweak. Batch related polish into the active feature PR.
+- Open the PR as a draft and push to it frequently. Draft pushes run only the fast Core Library checks; the expensive Mobile iOS Detox job is skipped for drafts.
+- Mark the PR ready for review only when the goal for that PR is complete. That triggers the full Mobile iOS simulator suite once, instead of on every push.
+- Merge to main when the feature PR is complete and green, not after every increment. Do not create a new branch for each small follow-up while a feature PR is still open — push to the open PR instead.
+- Delete or reuse stale `codex/*` branches after their PR merges.
+
 ## Testing Philosophy
 
 - Business logic must be thoroughly tested before code is described as complete.
