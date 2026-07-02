@@ -72,9 +72,10 @@ Strongly at parity (audited, no action needed):
    of the current position, until the line ends. Replay is reset-based. The
    spec was updated; no transport controls are wanted.)*
 8. **Green/red candidate arrows do not render on the review surface itself.**
-   They appear only in Analysis mode at the initial FEN (~L4666, L5455). Spec:
-   both original candidates always shown after review, green=best, red=inferior,
-   plus a non-color marker on the user's wrong choice on the board.
+   *(Resolved 2026-07-02: current behavior accepted as intended — the review
+   surface uses the color legend and "You chose" text marker and keeps the
+   board clear for the guided punishment line; the colored candidate arrows
+   render in Analysis mode at the initial position. The spec was updated.)*
 9. **Arrow Duel candidate ordering is index-parity, not randomized/persisted.**
    `beginArrowDuelPuzzle(puzzle, seed)` with seed = puzzle index
    (`packages/core/src/sprint-session.ts` ~L183; first puzzle always shows the

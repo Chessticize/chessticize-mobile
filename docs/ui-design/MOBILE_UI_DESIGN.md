@@ -238,9 +238,8 @@ Developer/test-build controls:
 
 Arrow Duel Analysis Review behavior:
 
-- Always show both original candidate arrows after review.
-- Correct Stockfish best move is green.
-- Blunder or inferior candidate is red.
+- The colored candidate arrows render in Analysis mode at the puzzle's initial position: correct Stockfish best move is green, the blunder or inferior candidate is red.
+- The review surface itself communicates the outcome with a color legend and a "You chose" marker in text (readable without color); it does not redraw the candidate arrows, keeping the board clear for the guided punishment line.
 - User's original choice gets an additional marker.
 - If the user chose wrong, automatically play the opponent response or punishment line.
 - Prefer stored puzzle solution lines for explanation; fall back to local Stockfish when the stored line is not enough.
@@ -260,7 +259,7 @@ Arrow Duel review rules:
 
 - Green always means the best move.
 - Red always means the inferior candidate.
-- User-selected wrong move receives an additional marker that is distinguishable without color alone.
+- User-selected wrong move receives an additional marker that is distinguishable without color alone (currently the "You chose" text pill on the review surface).
 - After a wrong answer, the opponent's refutation reply plays automatically, then the punishment line continues as a guided interaction: the user plays each expected move themselves by following the guide arrow, so no pause/step transport controls are needed. Replay is available by resetting the puzzle. Throughout the line, show the live Stockfish evaluation of the current position. (This guided interaction supersedes the playback transport bar drawn on the design board.)
 - If the stored punishment line requires the user's next move, show that expected move with an arrow, wait for the user to make it, then play the next reply. Continue until the line ends, then stop.
 - Review copy should explain the tactical reason only when the data supports it; otherwise show engine line and evaluation shift.

@@ -58,8 +58,6 @@ behind the dev-only source switch.
 ### 3. Required behavior not yet implemented (backlog P1)
 
 - Paused/backgrounded session state with explicit UI, driven by domain rules.
-- Green/red candidate arrows on the Arrow Duel review surface itself (not only
-  inside Analysis mode), plus a non-color marker on the user's choice.
 - Randomized, attempt-persisted Arrow Duel candidate ordering (domain change;
   today it is puzzle-index parity, so the first puzzle always shows the best
   move as candidate A).
