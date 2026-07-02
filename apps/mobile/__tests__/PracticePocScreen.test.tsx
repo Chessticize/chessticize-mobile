@@ -251,7 +251,10 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "session-progress")).toBeTruthy();
     expect(findByTestId(renderer, "session-rating")).toBeTruthy();
     expect(() => findByTestId(renderer, "session-strikes")).toThrow();
-    expect(() => findByTestId(renderer, "session-mistakes")).toThrow();
+    expect(findByTestId(renderer, "session-mistakes")).toBeTruthy();
+    expect(findByTestId(renderer, "session-mistakes").props.accessibilityLabel).toBe("Mistakes 0 of 3");
+    expect(collectText(findByTestId(renderer, "session-mistakes"))).toBe("0/3");
+    expect(findByTestId(renderer, "session-mistake-dot-0")).toBeTruthy();
     expectSessionMistakes(renderer, 0);
     expect(findByTestId(renderer, "session-abandon").props.accessibilityLabel).toBe("Abandon sprint");
     press(renderer, "session-abandon");
@@ -496,6 +499,9 @@ describe("PracticePocScreen", () => {
     await boardMove(renderer, "e6d7");
 
     expectSessionMistakes(renderer, 1);
+    expect(findByTestId(renderer, "session-mistakes").props.accessibilityLabel).toBe("Mistakes 1 of 3");
+    expect(collectText(findByTestId(renderer, "session-mistakes"))).toBe("1/3");
+    expect(hasStyleEntry(findByTestId(renderer, "session-mistake-dot-0"), "backgroundColor", "#DC2626")).toBe(true);
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
     expect(hasStyleValue(renderer.root, "rgba(220, 38, 38, 0.32)")).toBe(true);
     expect(countStyleValue(renderer.root, "rgba(37, 99, 235, 0.3)")).toBe(0);
@@ -637,11 +643,20 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "custom-current-rating"))).toContain("ELO 600");
     expect(collectText(findByTestId(renderer, "custom-config-list"))).toContain("Scoring history");
     expect(collectText(findByTestId(renderer, "custom-config-list"))).toContain("Separate scoring bucket");
-    expect(collectText(findByTestId(renderer, "custom-previous-standard-5-20-meta"))).toContain("Mixed");
-    expect(collectText(findByTestId(renderer, "custom-previous-standard-5-20-meta"))).toContain("5 min · 20s pace");
-    expect(collectText(findByTestId(renderer, "custom-previous-standard-5-20-meta"))).toContain("Last Recently");
-    expect(collectText(findByTestId(renderer, "custom-previous-standard-3-30"))).toContain("custom 3/30");
-    expect(collectText(findByTestId(renderer, "custom-previous-standard-3-30"))).toContain("ELO");
+    expect(collectText(findByTestId(renderer, "custom-previous-custom-5-20-meta"))).toContain("Mixed");
+    expect(collectText(findByTestId(renderer, "custom-previous-custom-5-20-meta"))).toContain("5 min · 20s pace");
+    expect(collectText(findByTestId(renderer, "custom-previous-custom-5-20-meta"))).toContain("Last Recently");
+    expect(collectText(findByTestId(renderer, "custom-previous-custom-3-30"))).toContain("custom 3/30");
+    expect(collectText(findByTestId(renderer, "custom-previous-custom-3-30"))).toContain("ELO");
+    expect(findByTestId(renderer, "custom-previous-custom-3-30").props.accessibilityRole).toBe("button");
+    press(renderer, "custom-previous-custom-3-30");
+    expect(collectText(findByTestId(renderer, "custom-target-count"))).toBe("~6");
+    expect(collectText(findByTestId(renderer, "custom-separate-scoring"))).toContain("custom 3/30");
+    expect(collectText(findByTestId(renderer, "custom-config-list"))).toContain("3m");
+    expect(collectText(findByTestId(renderer, "custom-config-list"))).toContain("30 sec");
+    press(renderer, "custom-previous-custom-5-20");
+    expect(collectText(findByTestId(renderer, "custom-target-count"))).toBe("~15");
+    expect(collectText(findByTestId(renderer, "custom-separate-scoring"))).toContain("custom 5/20");
     expect(findByTestId(renderer, "custom-include-arrow-duel")).toBeTruthy();
     expect(findByTestId(renderer, "custom-duration-stepper")).toBeTruthy();
     expect(findByTestId(renderer, "custom-per-puzzle-stepper")).toBeTruthy();
@@ -771,6 +786,10 @@ describe("PracticePocScreen", () => {
     press(renderer, "sprint-result-history-button");
     expect(findByTestId(renderer, "history-panel")).toBeTruthy();
     expect(findByTestId(renderer, "history-performance-card")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "history-chart-label"))).toBe("Rating");
+    expect(findByTestId(renderer, "history-chart-line")).toBeTruthy();
+    expect(findByTestId(renderer, "history-chart-line-point-0")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-chart-bar-0")).toThrow();
   });
 
   it("filters history to wrong attempts from the recent window", async () => {
@@ -840,6 +859,8 @@ describe("PracticePocScreen", () => {
     press(renderer, "history-chart-wins-losses");
     expect(collectText(findByTestId(renderer, "history-chart-label"))).toBe("Wins/Losses");
     expect(collectText(findByTestId(renderer, "history-chart-value"))).toBe("+0");
+    expect(() => findByTestId(renderer, "history-chart-line")).toThrow();
+    expect(findByTestId(renderer, "history-chart-bar-0")).toBeTruthy();
     press(renderer, "history-chart-accuracy");
     expect(collectText(findByTestId(renderer, "history-chart-label"))).toBe("Accuracy");
     expect(collectText(findByTestId(renderer, "history-chart-value"))).toBe("50%");
@@ -1189,7 +1210,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "review-panel")).toBeTruthy();
     expect(findByTestId(renderer, "review-empty-state")).toBeTruthy();
     expectText(renderer, "No reviews due today");
-    expectText(renderer, "Next scheduled review appears here when the memory curve reaches its due time.");
+    expectText(renderer, "Next review appears after a missed puzzle reaches its due time");
     expect(findByTestId(renderer, "review-empty-practice")).toBeTruthy();
     expect(findByTestId(renderer, "review-start-due").props.accessibilityState).toEqual({ disabled: true });
 
@@ -1197,6 +1218,23 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "practice-home")).toBeTruthy();
     expect(findByTestId(renderer, "practice-mode-standard")).toBeTruthy();
+  });
+
+  it("shows the next scheduled review date when the queue has nothing due yet", () => {
+    const service = createMobilePracticeService("random1000");
+    service.startSprint(
+      { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
+      "2099-01-01T00:00:00.000Z"
+    );
+    service.submitMove("c4b5", "2099-01-01T00:00:05.000Z");
+    const renderer = renderScreen({ practiceService: service });
+
+    press(renderer, "review-tab");
+
+    expect(findByTestId(renderer, "review-empty-state")).toBeTruthy();
+    expectText(renderer, "No reviews due today");
+    expectText(renderer, "Next review due 2099-01-02");
+    expect(findByTestId(renderer, "review-start-due").props.accessibilityState).toEqual({ disabled: true });
   });
 
   it("keeps official due review contexts separate by sprint run", () => {
@@ -1746,13 +1784,23 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "pack-detail-license-notes")).toBeTruthy();
     expectText(renderer, "core-2026-06-fixture");
     expectText(renderer, "Derived from Lichess puzzle data with Chessticize presolve metadata.");
+    expect(() => findByTestId(renderer, "pack-detail-import")).toThrow();
+    expect(() => findByTestId(renderer, "pack-detail-remove")).toThrow();
     press(renderer, "pack-detail-close");
     expect(() => findByTestId(renderer, "pack-detail-panel")).toThrow();
+    press(renderer, "packs-detail-mate-in-n");
+    expect(findByTestId(renderer, "pack-detail-import")).toBeTruthy();
+    press(renderer, "pack-detail-import");
+    expectText(renderer, "Mate in N Pack validated and activated for offline use");
+    expect(findByTestId(renderer, "packs-installed-mate-in-n")).toBeTruthy();
+    expect(() => findByTestId(renderer, "packs-optional-mate-in-n")).toThrow();
+    expect(findByTestId(renderer, "pack-detail-remove")).toBeTruthy();
+    press(renderer, "pack-detail-close");
     press(renderer, "packs-import");
     expect(findByTestId(renderer, "packs-import-progress")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "packs-import-progress-value"))).toBe("72%");
+    expect(collectText(findByTestId(renderer, "packs-import-progress-value"))).toBe("100%");
     expectText(renderer, "Imported Pack");
-    expectText(renderer, "Manifest validation in progress");
+    expectText(renderer, "Manifest validated");
     expect(findByTestId(renderer, "packs-import-step-manifest")).toBeTruthy();
     expect(findByTestId(renderer, "packs-import-step-license")).toBeTruthy();
     expect(findByTestId(renderer, "packs-import-step-activate")).toBeTruthy();
@@ -1760,10 +1808,21 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "packs-import-step-license-mark"))).toBe("");
     expect(collectText(findByTestId(renderer, "packs-import-step-activate-mark"))).toBe("");
     expect(collectText(findByTestId(renderer, "packs-import-progress"))).not.toContain("…");
-    expectText(renderer, "Validating Imported Pack manifest");
+    expectText(renderer, "Imported Pack validated and activated for offline use");
+    expect(findByTestId(renderer, "packs-installed-imported")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "packs-installed-imported"))).toContain("Installed");
     press(renderer, "packs-import-endgame");
     expectText(renderer, "Endgame Pack");
-    expectText(renderer, "Validating Endgame Pack manifest");
+    expectText(renderer, "Endgame Pack validated and activated for offline use");
+    expect(findByTestId(renderer, "packs-installed-endgame")).toBeTruthy();
+    expect(() => findByTestId(renderer, "packs-optional-endgame")).toThrow();
+    press(renderer, "packs-detail-endgame");
+    expect(findByTestId(renderer, "pack-detail-remove")).toBeTruthy();
+    press(renderer, "pack-detail-remove");
+    expect(findByTestId(renderer, "packs-remove-confirmation")).toBeTruthy();
+    expectText(renderer, "Remove Endgame Pack?");
+    press(renderer, "packs-remove-confirmation-cancel");
+    press(renderer, "pack-detail-close");
     expect(findByTestId(renderer, "packs-remove-tactics")).toBeTruthy();
     expect(findByTestId(renderer, "packs-remove")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "packs-remove"))).toBe("");
@@ -1776,14 +1835,35 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "packs-remove-confirmation")).toThrow();
     press(renderer, "packs-remove");
     press(renderer, "packs-remove-confirmation-confirm");
-    expectText(renderer, "Tactics Pack removal queued; history retained");
-    expect(findByTestId(renderer, "packs-remove")).toBeTruthy();
+    expectText(renderer, "Tactics Pack removed; history retained");
+    expect(() => findByTestId(renderer, "packs-installed-tactics")).toThrow();
+    expect(findByTestId(renderer, "packs-installed-core")).toBeTruthy();
     expect(findByTestId(renderer, "packs-license-notes")).toBeTruthy();
     expect(findByTestId(renderer, "packs-source")).toBeTruthy();
     expect(findByTestId(renderer, "packs-processing")).toBeTruthy();
     expect(findByTestId(renderer, "packs-manifest")).toBeTruthy();
     expect(findByTestId(renderer, "packs-build-date")).toBeTruthy();
     expect(() => findByTestId(renderer, "packs-coverage-card")).toThrow();
+  });
+
+  it("keeps the bundled core pack visibly offline-ready after optional packs are removed", () => {
+    const renderer = renderScreen();
+
+    press(renderer, "packs-tab");
+    expect(findByTestId(renderer, "packs-installed-core")).toBeTruthy();
+    expect(findByTestId(renderer, "packs-installed-tactics")).toBeTruthy();
+    expect(() => findByTestId(renderer, "packs-offline-readiness")).toThrow();
+
+    press(renderer, "packs-remove");
+    expect(findByTestId(renderer, "packs-remove-confirmation")).toBeTruthy();
+    press(renderer, "packs-remove-confirmation-confirm");
+
+    expect(() => findByTestId(renderer, "packs-installed-tactics")).toThrow();
+    expect(findByTestId(renderer, "packs-installed-core")).toBeTruthy();
+    expect(findByTestId(renderer, "packs-offline-readiness")).toBeTruthy();
+    expectText(renderer, "Core Pack remains installed and fully available offline.");
+    expectText(renderer, "Removing optional packs does not delete history or review schedules.");
+    expectText(renderer, "Tactics Pack removed; history retained");
   });
 
   it("deletes local history and review queue from Settings while preserving rating", () => {

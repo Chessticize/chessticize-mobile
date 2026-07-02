@@ -61,6 +61,7 @@ export interface PracticeStore {
   scheduleMistakeReview(context: ReviewContext, now: string): ReviewQueueState;
   recordReviewResult(context: ReviewContext, result: AttemptResult, now: string): ReviewQueueState;
   getReviewQueueState(context: ReviewContext): ReviewQueueState | undefined;
+  listReviewQueue(): ReviewQueueState[];
   getDueReviews(now: string): ReviewQueueState[];
   getDueReviewItems(now: string): ReviewQueueItem[];
   getHistoryView(query: HistoryQuery): HistoryView;

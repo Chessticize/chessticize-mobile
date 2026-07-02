@@ -63,6 +63,10 @@ test("MemoryStore records due reviews for wrong Arrow Duel choices", async () =>
   assert.equal(reviews.length, 1);
   assert.equal(reviews[0]?.puzzleId, "00008");
   assert.equal(reviews[0]?.lastResult, "wrong");
+  const fullQueue = service.listReviewQueue();
+  assert.equal(fullQueue.length, 1);
+  assert.equal(fullQueue[0]?.puzzleId, "00008");
+  assert.equal(service.getDueReviews("2026-06-20T12:00:00.000Z").length, 0);
 });
 
 test("MemoryStore does not select duplicate puzzle positions for one sprint", async () => {

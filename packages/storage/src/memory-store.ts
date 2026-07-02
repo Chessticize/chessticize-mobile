@@ -211,10 +211,12 @@ export class MemoryStore implements PracticeStore {
     return this.reviewQueue.get(reviewQueueKey(context));
   }
 
+  listReviewQueue(): ReviewQueueState[] {
+    return [...this.reviewQueue.values()].sort(compareReviewQueueState);
+  }
+
   getDueReviews(now: string): ReviewQueueState[] {
-    return [...this.reviewQueue.values()]
-      .filter((review) => review.dueAt <= now)
-      .sort((left, right) => left.dueAt.localeCompare(right.dueAt) || left.puzzleId.localeCompare(right.puzzleId));
+    return this.listReviewQueue().filter((review) => review.dueAt <= now);
   }
 
   getDueReviewItems(now: string): ReviewQueueItem[] {
@@ -296,4 +298,11 @@ export class MemoryStore implements PracticeStore {
 
 function reviewQueueKey(context: ReviewContext): string {
   return `${context.puzzleId}\u0000${context.mode}\u0000${context.ratingKey}`;
+}
+
+function compareReviewQueueState(left: ReviewQueueState, right: ReviewQueueState): number {
+  return left.dueAt.localeCompare(right.dueAt) ||
+    left.puzzleId.localeCompare(right.puzzleId) ||
+    left.mode.localeCompare(right.mode) ||
+    left.ratingKey.localeCompare(right.ratingKey);
 }

@@ -206,8 +206,12 @@ export class PracticeService {
     return this.store.transaction(() => this.store.clearLocalHistory());
   }
 
-  getDueReviews(now = new Date().toISOString()): unknown {
+  getDueReviews(now = new Date().toISOString()): ReviewQueueState[] {
     return this.store.getDueReviews(now);
+  }
+
+  listReviewQueue(): ReviewQueueState[] {
+    return this.store.listReviewQueue();
   }
 
   getDueReviewItems(now = new Date().toISOString()): ReviewQueueItem[] {
