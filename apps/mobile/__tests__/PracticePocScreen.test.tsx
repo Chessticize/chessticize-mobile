@@ -57,6 +57,8 @@ describe("PracticePocScreen", () => {
     expect(collectText(renderer.root)).not.toContain("standard 5/20");
     expectText(renderer, "ELO 600");
     expect(findByTestId(renderer, "practice-home")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "practice-action-header"))).toContain("Practice");
+    expect(collectText(findByTestId(renderer, "practice-action-header"))).toContain("Offline puzzle training");
     expect(findByTestId(renderer, "practice-progress-summary")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "practice-progress-weekly-solved"))).toBe("0");
     expect(collectText(findByTestId(renderer, "practice-progress-weekly-delta"))).toBe("Start training");
@@ -156,6 +158,8 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "session-board")).toThrow();
     expect(() => findByTestId(renderer, "rating-label")).toThrow();
     expect(collectText(findByTestId(renderer, "custom-close"))).toBe("");
+    expectText(renderer, "Custom Sprint");
+    expectText(renderer, "Time, theme, rating");
   });
 
   it("seeds enough offline demo puzzles in random test mode to avoid exhausted fixture sprints", () => {
@@ -217,7 +221,7 @@ describe("PracticePocScreen", () => {
 
     abandonSprint(renderer);
     press(renderer, "history-tab");
-    expectText(renderer, "Correct · c2b1");
+    expectText(renderer, "Move c2b1");
   });
 
   it("submits standard puzzle moves through the board and records attempt history", async () => {
@@ -294,7 +298,7 @@ describe("PracticePocScreen", () => {
 
     abandonSprint(renderer);
     press(renderer, "history-tab");
-    expectText(renderer, "Correct · e6f7");
+    expectText(renderer, "Move e6f7");
     expect(collectText(renderer.root)).not.toContain("000hf · standard");
   });
 
@@ -509,7 +513,7 @@ describe("PracticePocScreen", () => {
 
     abandonSprint(renderer);
     press(renderer, "history-tab");
-    expectText(renderer, "Wrong move · e6d7");
+    expectText(renderer, "Played e6d7 · Best e6f7");
   });
 
   it("uses neutral Arrow Duel board markers with non-revealing candidate chips", () => {
@@ -523,7 +527,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "arrow-duel-candidates")).toBeTruthy();
     expect(findByTestId(renderer, "arrow-duel-candidate-a").props.accessibilityLabel).toBe("Choose Arrow Duel candidate A");
     expect(findByTestId(renderer, "arrow-duel-candidate-b").props.accessibilityLabel).toBe("Choose Arrow Duel candidate B");
-    expect(collectText(findByTestId(renderer, "arrow-duel-candidates"))).toBe("ACandidateBCandidate");
+    expect(collectText(findByTestId(renderer, "arrow-duel-candidates"))).toBe("AB");
     expect(collectText(findByTestId(renderer, "practice-prompt-icon"))).toBe("");
     expect(testIdOrder(renderer, "session-board", "session-score-strip")).toBeLessThan(0);
     expect(testIdOrder(renderer, "session-score-strip", "practice-prompt")).toBeLessThan(0);
@@ -804,7 +808,8 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "history-tab");
     expectText(renderer, "Accuracy 50% · Correct 1 · Wrong 1");
-    expect(collectText(findByTestId(renderer, "history-action-header"))).not.toContain("History");
+    expect(collectText(findByTestId(renderer, "history-action-header"))).toContain("History");
+    expect(collectText(findByTestId(renderer, "history-action-header"))).toContain("Performance and solved puzzles");
     expect(findByTestId(renderer, "history-filter-toggle")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "history-filter-toggle"))).toBe("");
     expect(collectText(findByTestId(renderer, "history-action-header"))).not.toContain("≡");
@@ -841,27 +846,27 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-review-status-queued")).toBeTruthy();
     expect(findByTestId(renderer, "history-review-status-clear")).toBeTruthy();
     expect(findByTestId(renderer, "history-filter-arrow-duel-only")).toBeTruthy();
-    expectText(renderer, "Correct · e6f7");
-    expectText(renderer, "Wrong move · g6g5");
+    expectText(renderer, "Move e6f7");
+    expectText(renderer, "Played g6g5 · Best f4g3");
 
     press(renderer, "history-filter-arrow-duel-only");
     expectText(renderer, "0 results");
-    expect(collectText(renderer.root)).not.toContain("Wrong move · g6g5");
+    expect(collectText(renderer.root)).not.toContain("Played g6g5 · Best f4g3");
     expect(findByTestId(renderer, "history-filter-arrow-duel-only")).toBeTruthy();
     press(renderer, "history-mode-standard");
-    expectText(renderer, "Wrong move · g6g5");
+    expectText(renderer, "Played g6g5 · Best f4g3");
 
     press(renderer, "history-speed-20");
-    expectText(renderer, "Correct · e6f7");
-    expectText(renderer, "Wrong move · g6g5");
+    expectText(renderer, "Move e6f7");
+    expectText(renderer, "Played g6g5 · Best f4g3");
     press(renderer, "history-review-status-queued");
     expectText(renderer, "Accuracy 0% · Correct 0 · Wrong 1");
-    expectText(renderer, "Wrong move · g6g5");
-    expect(collectText(renderer.root)).not.toContain("Correct · e6f7");
+    expectText(renderer, "Played g6g5 · Best f4g3");
+    expect(collectText(renderer.root)).not.toContain("Move e6f7");
     press(renderer, "history-review-status-clear");
     expectText(renderer, "Accuracy 100% · Correct 1 · Wrong 0");
-    expectText(renderer, "Correct · e6f7");
-    expect(collectText(renderer.root)).not.toContain("Wrong move · g6g5");
+    expectText(renderer, "Move e6f7");
+    expect(collectText(renderer.root)).not.toContain("Played g6g5 · Best f4g3");
     press(renderer, "history-review-status-all");
 
     press(renderer, "history-chart-wins-losses");
@@ -884,8 +889,8 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-filter-wrong-7-days").props.accessibilityState).toEqual({ selected: true });
     expect(findByTestId(renderer, "history-filter-wrong-7-days-clear-glyph")).toBeTruthy();
     expectText(renderer, "Accuracy 0% · Correct 0 · Wrong 1");
-    expectText(renderer, "Wrong move · g6g5");
-    expect(collectText(renderer.root)).not.toContain("Correct · e6f7");
+    expectText(renderer, "Played g6g5 · Best f4g3");
+    expect(collectText(renderer.root)).not.toContain("Move e6f7");
     press(renderer, "history-filter-wrong-7-days");
     expect(findByTestId(renderer, "history-filter-wrong-7-days").props.accessibilityLabel).toBe("Wrong in the last 7 days");
     expect(findByTestId(renderer, "history-filter-wrong-7-days").props.accessibilityState).toEqual({ selected: false });
@@ -894,9 +899,9 @@ describe("PracticePocScreen", () => {
     press(renderer, "history-filter-wrong-7-days");
 
     press(renderer, "history-source-sprint");
-    expectText(renderer, "Wrong move · g6g5");
+    expectText(renderer, "Played g6g5 · Best f4g3");
     press(renderer, "history-mode-standard");
-    expectText(renderer, "Wrong move · g6g5");
+    expectText(renderer, "Played g6g5 · Best f4g3");
 
     const historyAttemptRow = renderer.root.findAll(
       (node) => typeof node.props.testID === "string" && node.props.testID.startsWith("history-attempt-")
@@ -906,7 +911,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-badge`))).toBe("");
     expect(findByTestId(renderer, "result-badge-wrong-glyph")).toBeTruthy();
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-result`))).toBe("Wrong move");
-    expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-move`))).toBe("Wrong move · g6g5");
+    expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-move`))).toBe("Played g6g5 · Best f4g3");
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-context`))).toContain("20s pace");
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-context`))).toMatch(/^[A-Z]/);
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-meta`))).toContain("Sprint · Rating");
@@ -1142,7 +1147,8 @@ describe("PracticePocScreen", () => {
     press(renderer, "review-tab");
 
     expect(findByTestId(renderer, "review-panel")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "review-action-header"))).not.toContain("Review");
+    expect(collectText(findByTestId(renderer, "review-action-header"))).toContain("Review");
+    expect(collectText(findByTestId(renderer, "review-action-header"))).toContain("Scheduled mistake reviews");
     expect(findByTestId(renderer, "review-due-card")).toBeTruthy();
     expect(findByTestId(renderer, "review-filter-toggle")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "review-filter-toggle"))).toBe("");
@@ -1315,7 +1321,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "history-tab");
     press(renderer, "history-filter-toggle");
     press(renderer, "history-source-review");
-    expectText(renderer, "Wrong move · c4b5");
+    expectText(renderer, "Played c4b5 · Best e2e6");
     const historyAttemptRow = renderer.root.findAll(
       (node) => typeof node.props.testID === "string" && node.props.testID.startsWith("history-attempt-")
     )[0];
@@ -1700,6 +1706,8 @@ describe("PracticePocScreen", () => {
     const renderer = renderScreen();
 
     press(renderer, "settings-tab");
+    expect(collectText(findByTestId(renderer, "settings-action-header"))).toContain("Settings");
+    expect(collectText(findByTestId(renderer, "settings-action-header"))).toContain("Local-first data and sync controls");
     expect(findByTestId(renderer, "settings-profile-section")).toBeTruthy();
     expect(findByTestId(renderer, "settings-sync-section")).toBeTruthy();
     expect(findByTestId(renderer, "settings-data-section")).toBeTruthy();
@@ -1784,7 +1792,8 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "settings-manage-packs");
     expect(findByTestId(renderer, "packs-panel")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "packs-action-header"))).not.toContain("Puzzle Packs");
+    expect(collectText(findByTestId(renderer, "packs-action-header"))).toContain("Puzzle Packs");
+    expect(collectText(findByTestId(renderer, "packs-action-header"))).toContain("Offline-ready puzzle sources");
     press(renderer, "packs-tab");
     expect(() => findByTestId(renderer, "packs-offline-readiness")).toThrow();
     expect(findByTestId(renderer, "packs-installed-section")).toBeTruthy();
@@ -1934,7 +1943,7 @@ describe("PracticePocScreen", () => {
     const renderer = renderScreen({ practiceService: service });
 
     press(renderer, "history-tab");
-    expectText(renderer, "Wrong move · c4b5");
+    expectText(renderer, "Played c4b5 · Best e2e6");
     press(renderer, "review-tab");
     expect(findByTestId(renderer, "review-due-card")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "review-due-count"))).toBe("1");
