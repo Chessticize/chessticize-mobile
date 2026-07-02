@@ -2350,11 +2350,6 @@ function SprintSummary({
         </View>
       </View>
 
-      <SprintRatingProgressPreview
-        ratingBefore={state.ratingBefore}
-        ratingAfter={ratingAfter}
-      />
-
       <View style={styles.resultReviewRow} testID="sprint-result-review-impact">
         <View>
           <Text style={styles.listText}>Mistakes</Text>
@@ -2394,7 +2389,7 @@ function SprintSummary({
         </Pressable>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="View history"
+          accessibilityLabel="View history trends"
           testID="sprint-result-history-button"
           style={styles.secondaryButton}
           onPress={onOpenHistory}
@@ -2446,78 +2441,6 @@ function SprintResultStatusGlyph({ status }: { status: "won" | "failed" }): Reac
       <View style={styles.resultAlertDot} />
     </View>
   );
-}
-
-function SprintRatingProgressPreview({
-  ratingAfter,
-  ratingBefore
-}: {
-  ratingAfter: number;
-  ratingBefore: number;
-}): React.JSX.Element {
-  const samples = buildRatingPreviewSamples(ratingBefore, ratingAfter);
-  const minRating = Math.min(...samples);
-  const maxRating = Math.max(...samples);
-  const span = Math.max(1, maxRating - minRating);
-
-  return (
-    <View style={styles.resultTrendCard} testID="sprint-result-history-trend">
-      <View style={styles.resultTrendHeader}>
-        <View>
-          <Text style={styles.listText}>Rating Progress</Text>
-          <Text style={styles.helperText}>This sprint</Text>
-        </View>
-        <Text testID="sprint-result-trend-current" style={styles.resultTrendCurrent}>{ratingAfter}</Text>
-      </View>
-      <View style={styles.resultTrendPlot} testID="sprint-result-trend-plot">
-        <View style={styles.resultTrendGridLine} />
-        <View style={[styles.resultTrendGridLine, styles.resultTrendGridLineMiddle]} />
-        <View style={[styles.resultTrendGridLine, styles.resultTrendGridLineBottom]} />
-        <View style={styles.resultTrendLineLayer}>
-          {samples.slice(0, -1).map((rating, index) => {
-            const nextRating = samples[index + 1] ?? rating;
-            const y = ((rating - minRating) / span) * 30;
-            const nextY = ((nextRating - minRating) / span) * 30;
-            return (
-              <View
-                key={`${rating}-${nextRating}-${index}`}
-                style={[
-                  styles.resultTrendSegment,
-                  {
-                    left: `${index * 25}%`,
-                    top: 32 - (y + nextY) / 2,
-                    transform: [{ rotate: `${Math.atan2(y - nextY, 26) * (180 / Math.PI)}deg` }]
-                  }
-                ]}
-                testID={`sprint-result-trend-segment-${index}`}
-              />
-            );
-          })}
-        </View>
-        {samples.map((rating, index) => {
-          const y = ((rating - minRating) / span) * 30;
-          return (
-            <View
-              key={`${rating}-${index}`}
-              style={[styles.resultTrendPointColumn, { paddingTop: 32 - y }]}
-              testID={`sprint-result-trend-point-${index}`}
-            >
-              <View style={[styles.resultTrendDot, index === samples.length - 1 ? styles.resultTrendDotCurrent : null]} />
-            </View>
-          );
-        })}
-      </View>
-      <View style={styles.resultTrendFooter}>
-        <Text style={styles.resultMetricSubtext}>Start {ratingBefore}</Text>
-        <Text style={styles.resultMetricSubtext}>Now</Text>
-      </View>
-    </View>
-  );
-}
-
-function buildRatingPreviewSamples(ratingBefore: number, ratingAfter: number): number[] {
-  const delta = ratingAfter - ratingBefore;
-  return [0, 0.25, 0.5, 0.75, 1].map((step) => Math.round(ratingBefore + delta * step));
 }
 
 function ErrorPanel({ error }: { error: string }): React.JSX.Element {
@@ -3145,6 +3068,7 @@ function HistoryPanel({
             <FilterButton active={resultFilter === "all"} label="All" testID="history-result-all" onPress={() => onResultFilterChange("all")} />
             <FilterButton active={resultFilter === "correct"} label="Correct" testID="history-result-correct" onPress={() => onResultFilterChange("correct")} />
             <FilterButton active={resultFilter === "wrong"} label="Wrong" testID="history-result-wrong" onPress={() => onResultFilterChange("wrong")} />
+            <FilterButton active={modeFilter === "arrow_duel"} label="Arrow Duel only" testID="history-filter-arrow-duel-only" onPress={() => onModeFilterChange("arrow_duel")} />
           </HistoryChipRow>
           {speedFilters.length > 0 ? (
             <HistoryChipRow testID="history-speed-filters">
@@ -3813,6 +3737,12 @@ function reviewItemSpeedSeconds(item: ReviewQueueItem): number | null {
   return match ? Number(match[1]) : null;
 }
 
+function reviewItemSourceSprintLabel(item: ReviewQueueItem): string {
+  const speed = reviewItemSpeedSeconds(item);
+  const speedLabel = speed === null ? null : `${speed}s pace`;
+  return `Source sprint: ${modeLabel(item.review.mode)}${speedLabel ? ` · ${speedLabel}` : ""}`;
+}
+
 function filterReviewQueueItems(items: ReviewQueueItem[], filter: ReviewQueueFilter): ReviewQueueItem[] {
   const now = Date.now();
   return items.filter((item) => {
@@ -4022,7 +3952,18 @@ function ReviewPanel({
           <Text testID="review-next-due" style={styles.helperText}>{queueSummary.oldestDueLabel}</Text>
         </View>
         <View style={styles.reviewDueMetrics}>
-          <Text testID="review-due-count" style={styles.reviewDueBigCount}>{queueSummary.filteredCount}</Text>
+          <View style={styles.reviewDueMetricBlock}>
+            <Text testID="review-due-count" style={styles.reviewDueBigCount}>{queueSummary.filteredCount}</Text>
+            <Text style={styles.reviewStripMetricLabel}>Due</Text>
+          </View>
+          <View style={styles.reviewDueMetricBlock}>
+            <Text testID="review-overdue-count" style={[styles.reviewDueSmallCount, queueSummary.overdueCount > 0 ? styles.reviewDifficultyHard : null]}>{queueSummary.overdueCount}</Text>
+            <Text style={styles.reviewStripMetricLabel}>Overdue</Text>
+          </View>
+          <View style={styles.reviewDueMetricBlock}>
+            <Text testID="review-total-count" style={styles.reviewDueSmallCount}>{queueSummary.totalCount}</Text>
+            <Text style={styles.reviewStripMetricLabel}>Total</Text>
+          </View>
         </View>
       </View>
 
@@ -4181,9 +4122,7 @@ function ReviewQueueItemCard({
   const primaryTheme = item.puzzle.themes[0] ?? "mixed";
   const lastWrongDate = item.review.lastReviewedAt.slice(0, 10);
   const dueState = new Date(item.review.dueAt).getTime() <= Date.now() ? "Due now" : `Due ${item.review.dueAt.slice(0, 10)}`;
-  const source = item.review.ratingKey.includes("/")
-    ? item.review.ratingKey
-    : `${modeLabel(item.review.mode)} sprint`;
+  const source = reviewItemSourceSprintLabel(item);
   const rowTestId = `review-due-item-${item.puzzle.id}-${safeTestId(item.review.mode)}`;
 
   return (
@@ -5328,8 +5267,9 @@ function SettingsPanel({
         <SettingsRow
           label="Puzzle ELO (Standard)"
           value={`ELO ${standardRating}`}
-          detail="Current sprint rating bucket"
+          detail="Open rating buckets and manual controls"
           testID="settings-standard-elo-row"
+          onPress={() => setAdvancedRatingsOpen(true)}
         />
         <SettingsRow
           label="Reset ELO"
@@ -5689,7 +5629,7 @@ function SettingsRow({
       </View>
       <View style={styles.settingsRowMeta}>
         {value ? <Text style={styles.settingsRowValue}>{value}</Text> : null}
-        <ChevronGlyph direction="right" />
+        {onPress ? <ChevronGlyph direction="right" /> : null}
       </View>
     </Pressable>
   );
@@ -6077,6 +6017,7 @@ function PackRow({
         </View>
         <Text style={styles.helperText}>{pack.subtitle}</Text>
         <Text style={styles.helperText}>{pack.detail}</Text>
+        <PackCoverageSummary pack={pack} />
       </View>
       <View style={styles.packActionColumn}>
         <Pressable
@@ -6114,6 +6055,25 @@ function PackRow({
         <PackActiveMark testID={`packs-active-${pack.id}`} />
       )}
       </View>
+    </View>
+  );
+}
+
+function PackCoverageSummary({ pack }: { pack: PackRowModel }): React.JSX.Element {
+  const coverageItems = [
+    { id: "puzzles", label: "Puzzles", value: pack.coverage.puzzles },
+    { id: "rating", label: "Rating", value: pack.coverage.rating },
+    { id: "themes", label: "Themes", value: pack.coverage.themes },
+    { id: "arrow-duel", label: "Arrow Duel", value: pack.coverage.arrowDuel }
+  ];
+  return (
+    <View style={styles.packCoverageSummary} testID={`packs-coverage-${pack.id}`}>
+      {coverageItems.map((item) => (
+        <View key={item.id} style={styles.packCoverageChip} testID={`packs-coverage-${pack.id}-${item.id}`}>
+          <Text style={styles.packCoverageLabel}>{item.label}</Text>
+          <Text style={styles.packCoverageValue}>{item.value}</Text>
+        </View>
+      ))}
     </View>
   );
 }
@@ -7304,9 +7264,20 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "800"
   },
+  reviewDueSmallCount: {
+    color: "#334155",
+    fontSize: 16,
+    fontWeight: "800"
+  },
   reviewDueMetrics: {
     alignItems: "flex-end",
-    minWidth: 72
+    flexDirection: "row",
+    gap: 10,
+    minWidth: 112
+  },
+  reviewDueMetricBlock: {
+    alignItems: "flex-end",
+    gap: 2
   },
   reviewFilterScroller: {
     marginHorizontal: -UI_PADDING
@@ -8291,93 +8262,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "700"
   },
-  resultTrendCard: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10
-  },
-  resultTrendHeader: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between"
-  },
-  resultTrendCurrent: {
-    backgroundColor: "#EFF6FF",
-    borderRadius: 8,
-    color: "#2563EB",
-    fontFamily: "menlo",
-    fontSize: 12,
-    fontWeight: "900",
-    overflow: "hidden",
-    paddingHorizontal: 8,
-    paddingVertical: 4
-  },
-  resultTrendPlot: {
-    backgroundColor: "#F8FAFC",
-    borderRadius: 8,
-    flexDirection: "row",
-    height: 44,
-    justifyContent: "space-between",
-    overflow: "hidden",
-    paddingHorizontal: 10,
-    position: "relative"
-  },
-  resultTrendGridLine: {
-    backgroundColor: "#E2E8F0",
-    height: StyleSheet.hairlineWidth,
-    left: 10,
-    opacity: 0.72,
-    position: "absolute",
-    right: 10,
-    top: 8
-  },
-  resultTrendGridLineMiddle: {
-    top: 22
-  },
-  resultTrendGridLineBottom: {
-    top: 36
-  },
-  resultTrendLineLayer: {
-    bottom: 0,
-    left: 10,
-    position: "absolute",
-    right: 10,
-    top: 0,
-    zIndex: 1
-  },
-  resultTrendSegment: {
-    backgroundColor: "#2563EB",
-    borderRadius: 999,
-    height: 2,
-    opacity: 0.72,
-    position: "absolute",
-    width: "27%"
-  },
-  resultTrendPointColumn: {
-    alignItems: "center",
-    flex: 1,
-    zIndex: 2
-  },
-  resultTrendDot: {
-    backgroundColor: "#93C5FD",
-    borderRadius: 999,
-    height: 6,
-    width: 6
-  },
-  resultTrendDotCurrent: {
-    backgroundColor: "#2563EB",
-    height: 9,
-    width: 9
-  },
-  resultTrendFooter: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between"
-  },
   resultReviewRow: {
     alignItems: "center",
     backgroundColor: "#FFFFFF",
@@ -9212,6 +9096,32 @@ const styles = StyleSheet.create({
     backgroundColor: "#EFF6FF",
     borderColor: "#BFDBFE",
     color: "#1D4ED8"
+  },
+  packCoverageSummary: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    paddingTop: 4
+  },
+  packCoverageChip: {
+    backgroundColor: "#F8FAFC",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 1,
+    minHeight: 34,
+    paddingHorizontal: 8,
+    paddingVertical: 5
+  },
+  packCoverageLabel: {
+    color: "#64748B",
+    fontSize: 9,
+    fontWeight: "800"
+  },
+  packCoverageValue: {
+    color: "#334155",
+    fontSize: 11,
+    fontWeight: "900"
   },
   packActiveMark: {
     alignItems: "center",

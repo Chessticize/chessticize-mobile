@@ -771,18 +771,12 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain("No new review items");
     expect(collectText(findByTestId(renderer, "sprint-result-mistakes"))).toBe("0");
     expect(() => findByTestId(renderer, "sprint-result-rating-snapshot")).toThrow();
-    expect(findByTestId(renderer, "sprint-result-history-trend")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "sprint-result-history-trend"))).toContain("Rating Progress");
-    expect(collectText(findByTestId(renderer, "sprint-result-history-trend"))).toContain("Start 600");
-    expect(collectText(findByTestId(renderer, "sprint-result-trend-current"))).not.toBe("");
-    expect(findByTestId(renderer, "sprint-result-trend-plot")).toBeTruthy();
-    expect(findByTestId(renderer, "sprint-result-trend-point-0")).toBeTruthy();
-    expect(findByTestId(renderer, "sprint-result-trend-point-4")).toBeTruthy();
-    expect(findByTestId(renderer, "sprint-result-trend-segment-0")).toBeTruthy();
-    expect(findByTestId(renderer, "sprint-result-trend-segment-3")).toBeTruthy();
+    expect(() => findByTestId(renderer, "sprint-result-history-trend")).toThrow();
+    expect(() => findByTestId(renderer, "sprint-result-trend-plot")).toThrow();
     expectText(renderer, "Mistakes");
     expectText(renderer, "Done");
     expect(findByTestId(renderer, "sprint-result-history-button")).toBeTruthy();
+    expect(findByTestId(renderer, "sprint-result-history-button").props.accessibilityLabel).toBe("View history trends");
     press(renderer, "sprint-result-history-button");
     expect(findByTestId(renderer, "history-panel")).toBeTruthy();
     expect(findByTestId(renderer, "history-performance-card")).toBeTruthy();
@@ -834,12 +828,14 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-review-status-filters")).toBeTruthy();
     expect(findByTestId(renderer, "history-review-status-queued")).toBeTruthy();
     expect(findByTestId(renderer, "history-review-status-clear")).toBeTruthy();
+    expect(findByTestId(renderer, "history-filter-arrow-duel-only")).toBeTruthy();
     expectText(renderer, "Correct · e6f7");
     expectText(renderer, "Wrong move · g6g5");
 
-    press(renderer, "history-mode-arrow-duel");
+    press(renderer, "history-filter-arrow-duel-only");
     expectText(renderer, "0 results");
     expect(collectText(renderer.root)).not.toContain("Wrong move · g6g5");
+    expect(findByTestId(renderer, "history-filter-arrow-duel-only")).toBeTruthy();
     press(renderer, "history-mode-standard");
     expectText(renderer, "Wrong move · g6g5");
 
@@ -1136,8 +1132,8 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "Due Today");
     expectText(renderer, "All due · Ready now");
     expect(collectText(findByTestId(renderer, "review-due-count"))).toBe("1");
-    expect(() => findByTestId(renderer, "review-overdue-count")).toThrow();
-    expect(() => findByTestId(renderer, "review-total-count")).toThrow();
+    expect(collectText(findByTestId(renderer, "review-overdue-count"))).toBe("1");
+    expect(collectText(findByTestId(renderer, "review-total-count"))).toBe("1");
     expect(collectText(findByTestId(renderer, "review-difficulty-hard"))).toContain("Overdue");
     expectText(renderer, "Oldest due 2026-06-21");
     expectText(renderer, "Start Review");
@@ -1156,6 +1152,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "review-due-items")).toBeTruthy();
     expectText(renderer, "Last wrong 2026-06-20");
     expectText(renderer, "1d interval");
+    expectText(renderer, "Source sprint: Standard · 20s pace");
     expectText(renderer, "Review 1 · Lapses 1");
     const dueItemRows = renderer.root.findAll(
       (node) => typeof node.props.testID === "string" && node.props.testID.startsWith("review-due-item-")
@@ -1759,11 +1756,19 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "packs-active-core"))).toBe("");
     expectText(renderer, "Active");
     expectText(renderer, "Rating 600 - 1600 · Mixed, mate, endgame · Arrow Duel ready");
-    expect(() => findByTestId(renderer, "packs-coverage-core")).toThrow();
+    expect(findByTestId(renderer, "packs-coverage-core")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "packs-coverage-core-puzzles"))).toContain("~1k");
+    expect(collectText(findByTestId(renderer, "packs-coverage-core-rating"))).toContain("600-1600");
+    expect(collectText(findByTestId(renderer, "packs-coverage-core-themes"))).toContain("Mixed");
+    expect(collectText(findByTestId(renderer, "packs-coverage-core-arrow-duel"))).toContain("Ready");
     expect(collectText(findByTestId(renderer, "packs-detail-core"))).toBe("");
     expect(findByTestId(renderer, "packs-installed-tactics")).toBeTruthy();
     expect(findByTestId(renderer, "packs-optional-endgame")).toBeTruthy();
-    expect(() => findByTestId(renderer, "packs-coverage-endgame")).toThrow();
+    expect(findByTestId(renderer, "packs-coverage-endgame")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "packs-coverage-endgame-puzzles"))).toContain("~40k");
+    expect(collectText(findByTestId(renderer, "packs-coverage-endgame-rating"))).toContain("900-2400");
+    expect(collectText(findByTestId(renderer, "packs-coverage-endgame-themes"))).toContain("Endgame");
+    expect(collectText(findByTestId(renderer, "packs-coverage-endgame-arrow-duel"))).toContain("Limited");
     expect(collectText(findByTestId(renderer, "packs-import-endgame"))).toBe("");
     expect(findByTestId(renderer, "packs-import-endgame-glyph")).toBeTruthy();
     expect(findByTestId(renderer, "packs-optional-mate-in-n")).toBeTruthy();
@@ -1843,7 +1848,21 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "packs-processing")).toBeTruthy();
     expect(findByTestId(renderer, "packs-manifest")).toBeTruthy();
     expect(findByTestId(renderer, "packs-build-date")).toBeTruthy();
-    expect(() => findByTestId(renderer, "packs-coverage-card")).toThrow();
+  });
+
+  it("opens advanced rating controls from the current Puzzle ELO row", () => {
+    const renderer = renderScreen();
+
+    press(renderer, "settings-tab");
+    expect(typeof findByTestId(renderer, "settings-standard-elo-row").props.onPress).toBe("function");
+    expect(collectText(findByTestId(renderer, "settings-standard-elo-row"))).toContain("Open rating buckets and manual controls");
+    expect(() => findByTestId(renderer, "settings-advanced-ratings-panel")).toThrow();
+
+    press(renderer, "settings-standard-elo-row");
+
+    expect(findByTestId(renderer, "settings-advanced-ratings-panel")).toBeTruthy();
+    expectText(renderer, "Manual rating controls");
+    expect(collectText(findByTestId(renderer, "settings-advanced-rating-standard-value"))).toBe("ELO 600");
   });
 
   it("keeps the bundled core pack visibly offline-ready after optional packs are removed", () => {
