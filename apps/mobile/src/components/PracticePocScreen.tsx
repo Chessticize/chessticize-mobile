@@ -1427,13 +1427,6 @@ function PracticeHome({
 
   return (
     <View style={styles.practiceHome} testID="practice-home">
-      <View style={styles.sectionHeaderRow} testID="practice-action-header">
-        <View>
-          <Text style={styles.panelTitle}>Practice</Text>
-          <Text style={styles.helperText}>Offline puzzle training</Text>
-        </View>
-      </View>
-
       {resumableSprint ? (
         <ResumeSprintCard
           sprint={resumableSprint}
@@ -1441,9 +1434,8 @@ function PracticeHome({
         />
       ) : null}
 
-      <View style={styles.sectionHeaderRow}>
+      <View style={styles.sectionHeaderRow} testID="practice-action-header">
         <Text style={styles.sectionLabel}>Start a Sprint</Text>
-        <Text style={styles.sectionMeta}>Tap a row to begin</Text>
       </View>
       <View style={styles.modeList}>
         {modes.map((item) => (
@@ -1486,8 +1478,8 @@ function PracticeHome({
         onPress={onOpenReview}
       >
         <View>
-          <Text style={styles.listText}>Review</Text>
-          <Text style={styles.helperText}>{reviewStatusLabel}</Text>
+          <Text style={styles.listText}>{reviewStatusLabel}</Text>
+          <Text style={styles.helperText}>Scheduled mistake reviews</Text>
         </View>
         <View style={styles.reviewStripCounts}>
           <View style={styles.reviewStripMetric} testID="practice-review-due-count">
@@ -1545,13 +1537,14 @@ function PracticeModeCard({
 }): React.JSX.Element {
   const label = modeLabel(item.mode);
   const detail = practiceModeDetailLabel(item);
+  const ratingLabel = `ELO ${item.rating}`;
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
       accessibilityLabel={`${label} mode, ${detail}`}
       testID={`practice-mode-${item.mode.replace("_", "-")}`}
-      style={[styles.practiceModeCard, active ? styles.practiceModeCardActive : null]}
+      style={styles.practiceModeCard}
       onPress={onPress}
     >
       <View style={styles.practiceModeSelectArea}>
@@ -1563,12 +1556,15 @@ function PracticeModeCard({
             <Text style={styles.practiceModeTitle}>{label}</Text>
           </View>
           <Text style={styles.practiceModeDescription}>{PRACTICE_MODE_DESCRIPTIONS[item.mode]}</Text>
-          <Text style={styles.practiceModeRating} testID={`practice-mode-${item.mode.replace("_", "-")}-details`}>
-            {detail}
-          </Text>
+          <View
+            accessibilityLabel={detail}
+            testID={`practice-mode-${item.mode.replace("_", "-")}-details`}
+            style={styles.practiceModeDetailProbe}
+          />
         </View>
       </View>
       <View style={styles.practiceModeMeta}>
+        <Text style={styles.practiceModeRating} testID={`practice-mode-${item.mode.replace("_", "-")}-rating`}>{ratingLabel}</Text>
         <View
           testID={`practice-mode-${item.mode.replace("_", "-")}-start`}
           style={styles.practiceModeChevronButton}
@@ -1722,26 +1718,23 @@ function CustomSprintSetup({
           selected={perPuzzleSeconds}
           onChange={onPerPuzzleChange}
         />
-        <View style={styles.customSummaryCard} testID="custom-summary-card">
-          <CustomSummaryMetric
-            label="Estimated puzzles"
-            value={`~${targetCorrect}`}
-            testID="custom-summary-target"
-            valueTestID="custom-target-count"
-            emphasis
-          />
-          <CustomSummaryMetric
-            label="Rating range"
-            value={ratingRange}
-            testID="custom-summary-rating-range"
-          />
-          <CustomSummaryMetric
-            detail={`${historyRatingKeyLabel(ratingKey)} · separate bucket`}
-            label="Current rating"
-            value={`ELO ${currentRating}`}
-            testID="custom-separate-scoring"
-          />
-        </View>
+        <CustomValueRow
+          label="Estimated puzzles"
+          value={`~${targetCorrect}`}
+          testID="custom-summary-target"
+          valueTestID="custom-target-count"
+        />
+        <CustomValueRow
+          label="Rating range"
+          value={ratingRange}
+          testID="custom-summary-rating-range"
+        />
+        <CustomValueRow
+          detail={`${historyRatingKeyLabel(ratingKey)} · separate bucket`}
+          label="Current rating"
+          value={`ELO ${currentRating}`}
+          testID="custom-separate-scoring"
+        />
         <CustomValueRow
           detail={customMode === "arrow_duel" ? "Two-candidate choice sprint" : "Board-move puzzle sprint"}
           label="ELO type"
@@ -1780,30 +1773,6 @@ function CustomSprintSetup({
           />
         ))}
       </View>
-    </View>
-  );
-}
-
-function CustomSummaryMetric({
-  detail,
-  emphasis = false,
-  label,
-  testID,
-  value,
-  valueTestID
-}: {
-  detail?: string;
-  emphasis?: boolean;
-  label: string;
-  testID: string;
-  value: string;
-  valueTestID?: string;
-}): React.JSX.Element {
-  return (
-    <View style={[styles.customSummaryMetric, emphasis ? styles.customSummaryMetricPrimary : null]} testID={testID}>
-      <Text style={styles.customSummaryLabel}>{label}</Text>
-      <Text testID={valueTestID} style={[styles.customSummaryValue, emphasis ? styles.customSummaryValuePrimary : null]}>{value}</Text>
-      {detail ? <Text style={styles.customSummaryDetail}>{detail}</Text> : null}
     </View>
   );
 }
@@ -2168,22 +2137,34 @@ function SessionStatusBar({
       </View>
 
       <View style={styles.sessionActiveMetricRow} testID="session-status-metrics">
-        <View style={styles.sessionMetricBlock} testID="session-progress-block">
-          <Text style={styles.sessionMetricLabel}>Progress</Text>
+        <View
+          accessibilityLabel={`Progress ${state.correctCount} of ${state.config.targetCorrect}`}
+          style={styles.sessionMetricBlock}
+          testID="session-progress-block"
+        >
           <Text testID="session-progress" style={styles.sessionProgressValue}>
             {state.correctCount} / {state.config.targetCorrect}
           </Text>
         </View>
-        <View style={[styles.sessionMetricBlock, styles.sessionTimerBlock]} testID="session-timer-block">
-          <Text style={styles.sessionMetricLabel}>Timer</Text>
+        <View
+          accessibilityLabel={`Timer ${timerText}`}
+          style={[styles.sessionMetricBlock, styles.sessionTimerBlock]}
+          testID="session-timer-block"
+        >
           <Text testID="session-timer" style={styles.timerText}>{timerText}</Text>
         </View>
-        <View style={styles.sessionMetricBlock} testID="session-rating-block">
-          <Text style={styles.sessionMetricLabel}>ELO</Text>
+        <View
+          accessibilityLabel={`ELO ${currentRating}`}
+          style={styles.sessionMetricBlock}
+          testID="session-rating-block"
+        >
           <Text testID="session-rating" style={styles.sessionRatingValue}>ELO {currentRating}</Text>
         </View>
-        <View style={styles.sessionMetricBlock} testID="session-mistakes-block">
-          <Text style={styles.sessionMetricLabel}>Mistakes</Text>
+        <View
+          accessibilityLabel={`Mistakes ${state.mistakeCount} of ${state.config.maxMistakes}`}
+          style={styles.sessionMetricBlock}
+          testID="session-mistakes-block"
+        >
           <ActiveMistakeIndicator
             count={state.mistakeCount}
             max={state.config.maxMistakes}
@@ -2321,17 +2302,6 @@ function SprintSummary({
         </View>
       </View>
 
-      <View style={styles.resultRatingCard} testID="sprint-result-rating-card">
-        <View>
-          <Text style={styles.resultMetricLabel}>Rating</Text>
-          <Text testID="sprint-result-rating-range" style={styles.resultRatingText}>{state.ratingBefore} → {ratingAfter}</Text>
-        </View>
-        <Text style={[styles.resultRatingDelta, delta >= 0 ? styles.positive : styles.errorText]}>
-          {delta >= 0 ? "+" : ""}
-          {delta}
-        </Text>
-      </View>
-
       <ResultHistoryShortcut
         delta={delta}
         ratingAfter={ratingAfter}
@@ -2346,7 +2316,7 @@ function SprintSummary({
             {delta >= 0 ? "+" : ""}
             {delta}
           </Text>
-          <Text style={styles.resultMetricSubtext}>History keeps the trend</Text>
+          <Text testID="sprint-result-rating-range" style={styles.resultMetricSubtext}>{`${state.ratingBefore} -> ${ratingAfter}`}</Text>
         </View>
         <View style={styles.resultMetric} testID="sprint-result-time">
           <Text style={styles.resultMetricLabel}>Time</Text>
@@ -2496,13 +2466,11 @@ function PracticePrompt({
   const side = sideToMove(currentPuzzle.currentFen) === "b" ? "black" : "white";
   const isArrowDuel = currentPuzzle.kind === "arrow_duel";
   const promptMode = mode === "arrow_duel" ? "arrow_duel" : "standard";
-  const displayedPromptText = promptText === undefined
-    ? (
-      isArrowDuel
-        ? `Choose the better move for ${side} between the two arrows.`
-        : `Find the best move for ${side}.`
-    )
-    : promptText;
+  const defaultPromptTitle = isArrowDuel ? "Choose the better move" : "Find the best move";
+  const defaultPromptContext = isArrowDuel
+    ? `For ${side}, between the two arrows.`
+    : `For ${side}.`;
+  const displayedPromptText = promptText === undefined ? defaultPromptContext : promptText;
   const displayedPromptHint = promptHint === undefined
     ? (isArrowDuel ? "Watch for checks, captures, and attacks!" : null)
     : promptHint;
@@ -2513,7 +2481,7 @@ function PracticePrompt({
         <PracticeModeGlyph mode={promptMode} inverse />
       </View>
       <View style={styles.promptCopy}>
-        <Text style={styles.promptTitle}>{mode === "arrow_duel" ? "Arrow Duel" : modeLabel(mode)}</Text>
+        <Text style={styles.promptTitle}>{promptText === undefined ? defaultPromptTitle : modeLabel(mode)}</Text>
         {displayedPromptText ? <Text style={styles.promptText}>{displayedPromptText}</Text> : null}
         {displayedPromptHint ? (
           <Text style={styles.promptHint}>{displayedPromptHint}</Text>
@@ -3008,11 +2976,8 @@ function HistoryPanel({
   });
   return (
     <View style={styles.historyPanel} testID="history-panel">
-      <View style={styles.reviewQueueHeader} testID="history-action-header">
-        <View>
-          <Text style={styles.panelTitle}>History</Text>
-          <Text style={styles.helperText}>Performance and solved puzzles</Text>
-        </View>
+      <View style={styles.actionOnlyHeader} testID="history-action-header">
+        <Text style={styles.sectionLabel}>Filters</Text>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={filtersExpanded ? "Hide history filters" : "Show history filters"}
@@ -4140,6 +4105,7 @@ function ReviewPanel({
   const difficultySummary = reviewDifficultySummary(dueReviewItems);
   const queueSummary = reviewQueueSummary(reviewQueue, filteredDueReviewItems);
   const activeFilterLabels = reviewActiveFilterLabels(queueFilter, queueSummary);
+  const showActiveFilterStrip = filtersExpanded || queueFilter !== "all";
 
   useEffect(() => {
     setActiveEntries(preferredEntries);
@@ -4165,11 +4131,8 @@ function ReviewPanel({
 
   return (
     <View style={styles.reviewQueuePanel} testID="review-panel">
-      <View style={styles.reviewQueueHeader} testID="review-action-header">
-        <View>
-          <Text style={styles.panelTitle}>Review</Text>
-          <Text style={styles.helperText}>Scheduled mistake reviews</Text>
-        </View>
+      <View style={styles.actionOnlyHeader} testID="review-action-header">
+        <Text style={styles.sectionLabel}>Due reviews</Text>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={filtersExpanded ? "Hide review filters" : "Show review filters"}
@@ -4233,7 +4196,7 @@ function ReviewPanel({
         />
       </View>
 
-      <ReviewActiveFilterStrip labels={activeFilterLabels} />
+      {showActiveFilterStrip ? <ReviewActiveFilterStrip labels={activeFilterLabels} /> : null}
 
       <Pressable
         accessibilityRole="button"
@@ -5531,11 +5494,6 @@ function SettingsPanel({
       ? "Ready"
       : "Needs approval"
     : "Local only";
-  const syncSummaryValue = syncEnabled
-    ? syncUploadAllowed
-      ? "On · Ready"
-      : "On · Needs approval"
-    : "Off · Local only";
   const syncSummaryDetail = syncEnabled
     ? syncUploadAllowed
       ? "Progress can sync through iCloud. Offline practice still works."
@@ -5544,26 +5502,6 @@ function SettingsPanel({
 
   return (
     <View style={styles.settingsPanel} testID="settings-panel">
-      <View style={styles.sectionHeaderRow} testID="settings-action-header">
-        <View>
-          <Text style={styles.panelTitle}>Settings</Text>
-          <Text style={styles.helperText}>Local-first data and sync controls</Text>
-        </View>
-      </View>
-
-      <View style={styles.settingsSyncSummaryCard} testID="settings-sync-summary-card">
-        <View style={styles.settingsRowCopy}>
-          <Text style={styles.sectionLabel}>iCloud Sync</Text>
-          <Text testID="settings-sync-summary-detail" style={styles.helperText}>{syncSummaryDetail}</Text>
-        </View>
-        <Text
-          testID="settings-sync-summary-value"
-          style={[styles.settingsSyncSummaryValue, syncEnabled ? styles.positive : styles.errorText]}
-        >
-          {syncSummaryValue}
-        </Text>
-      </View>
-
       <SettingsSection title="Profile" testID="settings-profile-section">
         <SettingsRow
           label="Puzzle ELO (Standard)"
@@ -5595,9 +5533,7 @@ function SettingsPanel({
           <View style={styles.settingsRowCopy}>
             <Text style={styles.listText}>iCloud Sync</Text>
             <Text testID="settings-sync-status" style={styles.helperText}>
-              {syncEnabled
-                ? "Practice works offline"
-                : "Off · Local-only progress"}
+              {syncSummaryDetail}
             </Text>
           </View>
           <View style={styles.syncRowMeta}>
@@ -6114,28 +6050,23 @@ function PacksPanel(): React.JSX.Element {
 
   return (
     <View style={styles.packsPanel} testID="packs-panel">
-      <View style={styles.sectionHeaderRow} testID="packs-action-header">
-        <View>
-          <Text style={styles.panelTitle}>Puzzle Packs</Text>
-          <Text style={styles.helperText}>Offline-ready puzzle sources</Text>
-        </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Import puzzle pack"
-          testID="packs-import"
-          style={styles.packsIconButton}
-          onPress={() => beginPackImport(PACK_CATALOG.find((pack) => pack.id === "imported") ?? PACK_CATALOG[0])}
-        >
-          <PlusGlyph />
-        </Pressable>
-      </View>
-
       {importProgress ? (
         <PackImportProgressCard progress={importProgress} />
       ) : null}
 
       <View style={styles.packCoverageCard} testID="packs-coverage-summary">
-        <Text style={styles.sectionLabel}>Coverage</Text>
+        <View style={styles.sectionHeaderRow} testID="packs-action-header">
+          <Text style={styles.sectionLabel}>Coverage</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Import puzzle pack"
+            testID="packs-import"
+            style={styles.packsIconButton}
+            onPress={() => beginPackImport(PACK_CATALOG.find((pack) => pack.id === "imported") ?? PACK_CATALOG[0])}
+          >
+            <PlusGlyph />
+          </Pressable>
+        </View>
         <View style={styles.packCoverageGrid}>
           <PackCoverageMetric
             label="Installed"
@@ -7283,34 +7214,31 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between"
   },
+  actionOnlyHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    minHeight: 38
+  },
   sectionLabel: {
     color: "#111827",
     fontSize: 15,
     fontWeight: "800"
   },
-  sectionMeta: {
-    color: "#64748B",
-    fontSize: 12,
-    fontWeight: "700"
-  },
   modeList: {
     gap: 8
   },
   practiceModeCard: {
-    alignItems: "stretch",
+    alignItems: "center",
     backgroundColor: "#FFFFFF",
     borderColor: "#E2E8F0",
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
-    gap: 8,
-    minHeight: 62,
-    paddingHorizontal: 10,
+    gap: 10,
+    minHeight: 56,
+    paddingHorizontal: 12,
     paddingVertical: 8
-  },
-  practiceModeCardActive: {
-    borderColor: "#D7DEE8",
-    backgroundColor: "#FFFFFF"
   },
   practiceModeSelectArea: {
     alignItems: "center",
@@ -7322,10 +7250,10 @@ const styles = StyleSheet.create({
   practiceModeIcon: {
     alignItems: "center",
     backgroundColor: "#EFF6FF",
-    borderRadius: 8,
+    borderRadius: 999,
     height: 32,
     justifyContent: "center",
-    width: 34
+    width: 32
   },
   modeGlyphCanvas: {
     alignItems: "center",
@@ -7420,6 +7348,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600"
   },
+  practiceModeDetailProbe: {
+    height: 0,
+    opacity: 0,
+    overflow: "hidden",
+    width: 0
+  },
   practiceModeDetailChip: {
     backgroundColor: "transparent",
     color: "#475569",
@@ -7430,10 +7364,10 @@ const styles = StyleSheet.create({
     paddingVertical: 1
   },
   practiceModeMeta: {
-    alignItems: "flex-end",
+    alignItems: "center",
+    flexDirection: "row",
     gap: 4,
-    justifyContent: "center",
-    minWidth: 72
+    justifyContent: "flex-end"
   },
   practiceModeRating: {
     color: "#64748B",
@@ -7442,7 +7376,7 @@ const styles = StyleSheet.create({
   },
   practiceModeChevronButton: {
     alignItems: "center",
-    height: 28,
+    height: 44,
     justifyContent: "center",
     width: 28
   },
@@ -7550,12 +7484,6 @@ const styles = StyleSheet.create({
   },
   reviewQueuePanel: {
     gap: 12
-  },
-  reviewQueueHeader: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    minHeight: 44
   },
   reviewFilterButton: {
     alignItems: "center",
@@ -7792,12 +7720,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     minWidth: 0
   },
-  sessionMetricLabel: {
-    color: "#64748B",
-    fontSize: 9,
-    fontWeight: "800",
-    lineHeight: 11
-  },
   activeMistakeIndicator: {
     alignItems: "center",
     gap: 3,
@@ -7964,10 +7886,10 @@ const styles = StyleSheet.create({
     borderColor: "#2563EB",
     borderRadius: 8,
     borderWidth: 1,
-    flex: 1,
     gap: 2,
-    minHeight: 48,
-    justifyContent: "center"
+    height: 44,
+    justifyContent: "center",
+    width: 56
   },
   arrowDuelCandidateLabel: {
     color: "#2563EB",
@@ -8115,44 +8037,6 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 2,
     minWidth: 0
-  },
-  customSummaryCard: {
-    backgroundColor: "#EFF6FF",
-    borderBottomColor: "#E2E8F0",
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10
-  },
-  customSummaryMetric: {
-    flex: 1,
-    gap: 3,
-    minHeight: 54,
-    justifyContent: "center",
-    minWidth: 0
-  },
-  customSummaryMetricPrimary: {
-    flex: 0.9
-  },
-  customSummaryLabel: {
-    color: "#1D4ED8",
-    fontSize: 10,
-    fontWeight: "800"
-  },
-  customSummaryValue: {
-    color: "#1E3A8A",
-    fontSize: 12,
-    fontWeight: "900"
-  },
-  customSummaryValuePrimary: {
-    fontSize: 18,
-    lineHeight: 22
-  },
-  customSummaryDetail: {
-    color: "#2563EB",
-    fontSize: 10,
-    fontWeight: "700"
   },
   customStepperGroup: {
     alignItems: "center",
@@ -8546,28 +8430,6 @@ const styles = StyleSheet.create({
     color: "#64748B",
     fontSize: 11,
     fontWeight: "700"
-  },
-  resultRatingCard: {
-    alignItems: "center",
-    backgroundColor: "#F8FAFC",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    minHeight: 58,
-    paddingHorizontal: 12,
-    paddingVertical: 10
-  },
-  resultRatingText: {
-    color: "#111827",
-    fontFamily: "menlo",
-    fontSize: 17,
-    fontWeight: "900"
-  },
-  resultRatingDelta: {
-    fontSize: 18,
-    fontWeight: "900"
   },
   resultTrendCard: {
     alignItems: "center",
@@ -9169,24 +9031,6 @@ const styles = StyleSheet.create({
   },
   settingsPanel: {
     gap: 12
-  },
-  settingsSyncSummaryCard: {
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 12,
-    justifyContent: "space-between",
-    minHeight: 72,
-    paddingHorizontal: 12,
-    paddingVertical: 10
-  },
-  settingsSyncSummaryValue: {
-    fontSize: 12,
-    fontWeight: "900",
-    textAlign: "right"
   },
   settingsSection: {
     gap: 8
