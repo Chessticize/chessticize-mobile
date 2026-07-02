@@ -1428,6 +1428,13 @@ function PracticeHome({
 
   return (
     <View style={styles.practiceHome} testID="practice-home">
+      <View style={styles.sectionHeaderRow} testID="practice-action-header">
+        <View>
+          <Text style={styles.panelTitle}>Practice</Text>
+          <Text style={styles.helperText}>Offline puzzle training</Text>
+        </View>
+      </View>
+
       {resumableSprint ? (
         <ResumeSprintCard
           sprint={resumableSprint}
@@ -1720,7 +1727,10 @@ function CustomSprintSetup({
         >
           <CloseGlyph />
         </Pressable>
-        <Text style={styles.customScreenTitle}>Custom Sprint</Text>
+        <View style={styles.customHeaderTitleBlock}>
+          <Text style={styles.customScreenTitle}>Custom Sprint</Text>
+          <Text style={styles.helperText}>Time, theme, rating</Text>
+        </View>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Start custom sprint"
@@ -2585,7 +2595,6 @@ function ArrowDuelCandidateChips({
             onPress={() => onChoose(candidate)}
           >
             <Text style={styles.arrowDuelCandidateLabel}>{label}</Text>
-            <Text style={styles.arrowDuelCandidateMeta}>Candidate</Text>
           </Pressable>
         );
       })}
@@ -2988,7 +2997,10 @@ function HistoryPanel({
   return (
     <View style={styles.historyPanel} testID="history-panel">
       <View style={styles.reviewQueueHeader} testID="history-action-header">
-        <View style={styles.panelHeaderSpacer} />
+        <View>
+          <Text style={styles.panelTitle}>History</Text>
+          <Text style={styles.helperText}>Performance and solved puzzles</Text>
+        </View>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={filtersExpanded ? "Hide history filters" : "Show history filters"}
@@ -3509,6 +3521,9 @@ function HistoryAttemptRow({
       : "Review queued"
     : "Correct";
   const resultLabel = isWrong ? "Wrong move" : "Correct";
+  const moveLabel = isWrong
+    ? `Played ${attempt.submittedMove} · Best ${attempt.expectedMove}`
+    : `Move ${attempt.submittedMove}`;
   const sourceLabel = attempt.source === "scheduled_review" ? "Review" : "Sprint";
   const difficulty = historyAttemptDifficulty(attempt, puzzleStats);
   const difficultyStyle = difficulty === "hard"
@@ -3536,7 +3551,7 @@ function HistoryAttemptRow({
           <Text style={styles.historyRowTitle}>{modeLabel(attempt.mode)}</Text>
           <Text testID={`history-attempt-${attempt.id}-result`} style={styles.helperText}>{resultLabel}</Text>
         </View>
-        <Text testID={`history-attempt-${attempt.id}-move`} style={styles.helperText}>{resultLabel} · {attempt.submittedMove}</Text>
+        <Text testID={`history-attempt-${attempt.id}-move`} style={styles.helperText}>{moveLabel}</Text>
         <Text testID={`history-attempt-${attempt.id}-context`} style={styles.helperText}>
           {[primaryTheme, paceLabel].filter(Boolean).join(" · ")}
         </Text>
@@ -4040,7 +4055,10 @@ function ReviewPanel({
   return (
     <View style={styles.reviewQueuePanel} testID="review-panel">
       <View style={styles.reviewQueueHeader} testID="review-action-header">
-        <View style={styles.panelHeaderSpacer} />
+        <View>
+          <Text style={styles.panelTitle}>Review</Text>
+          <Text style={styles.helperText}>Scheduled mistake reviews</Text>
+        </View>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={filtersExpanded ? "Hide review filters" : "Show review filters"}
@@ -5373,6 +5391,13 @@ function SettingsPanel({
 
   return (
     <View style={styles.settingsPanel} testID="settings-panel">
+      <View style={styles.sectionHeaderRow} testID="settings-action-header">
+        <View>
+          <Text style={styles.panelTitle}>Settings</Text>
+          <Text style={styles.helperText}>Local-first data and sync controls</Text>
+        </View>
+      </View>
+
       <SettingsSection title="Profile" testID="settings-profile-section">
         <SettingsRow
           label="Puzzle ELO (Standard)"
@@ -5923,7 +5948,10 @@ function PacksPanel(): React.JSX.Element {
   return (
     <View style={styles.packsPanel} testID="packs-panel">
       <View style={styles.sectionHeaderRow} testID="packs-action-header">
-        <View style={styles.panelHeaderSpacer} />
+        <View>
+          <Text style={styles.panelTitle}>Puzzle Packs</Text>
+          <Text style={styles.helperText}>Offline-ready puzzle sources</Text>
+        </View>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Import puzzle pack"
@@ -7907,9 +7935,13 @@ const styles = StyleSheet.create({
     gap: 10,
     justifyContent: "space-between"
   },
+  customHeaderTitleBlock: {
+    alignItems: "center",
+    flex: 1,
+    gap: 2
+  },
   customScreenTitle: {
     color: "#111827",
-    flex: 1,
     fontSize: 17,
     fontWeight: "800",
     textAlign: "center"
