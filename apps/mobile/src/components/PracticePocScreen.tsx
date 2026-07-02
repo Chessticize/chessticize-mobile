@@ -1595,61 +1595,6 @@ function formatSprintDurationLabel(seconds: number): string {
   return `${seconds}s`;
 }
 
-function ModeRow({
-  mode,
-  onChange,
-  disabled
-}: {
-  mode: SprintMode;
-  onChange: (next: SprintMode) => void;
-  disabled: boolean;
-}): React.JSX.Element {
-  return (
-    <View style={styles.modeRow}>
-      <ModeButton
-        active={mode === "standard"}
-        label="Standard"
-        testID="practice-mode-standard"
-        onPress={() => {
-          if (!disabled) {
-            onChange("standard");
-          }
-        }}
-      />
-      <ModeButton
-        active={mode === "arrow_duel"}
-        label="Arrow Duel"
-        testID="practice-mode-arrow-duel"
-        onPress={() => {
-          if (!disabled) {
-            onChange("arrow_duel");
-          }
-        }}
-      />
-      <ModeButton
-        active={mode === "blitz"}
-        label="Blitz"
-        testID="practice-mode-blitz"
-        onPress={() => {
-          if (!disabled) {
-            onChange("blitz");
-          }
-        }}
-      />
-      <ModeButton
-        active={mode === "custom"}
-        label="Custom"
-        testID="practice-mode-custom"
-        onPress={() => {
-          if (!disabled) {
-            onChange("custom");
-          }
-        }}
-      />
-    </View>
-  );
-}
-
 function CustomSprintSetup({
   availablePuzzleCount,
   customMode,
@@ -1815,7 +1760,9 @@ function CustomSprintSetup({
       <CustomEligibilityNotice
         availablePuzzleCount={availablePuzzleCount}
         hasEnoughLocalPuzzles={hasEnoughLocalPuzzles}
+        onBroadenTheme={theme === "Mixed" ? undefined : () => setTheme("Mixed")}
         requiredPuzzleCount={requiredPuzzleCount}
+        theme={theme}
       />
 
       <View style={styles.previousConfigList} testID="custom-previous-configs">
@@ -1864,11 +1811,15 @@ function CustomSummaryMetric({
 function CustomEligibilityNotice({
   availablePuzzleCount,
   hasEnoughLocalPuzzles,
-  requiredPuzzleCount
+  onBroadenTheme,
+  requiredPuzzleCount,
+  theme
 }: {
   availablePuzzleCount: number;
   hasEnoughLocalPuzzles: boolean;
+  onBroadenTheme?: () => void;
   requiredPuzzleCount: number;
+  theme: string;
 }): React.JSX.Element | null {
   if (hasEnoughLocalPuzzles) {
     return null;
@@ -1880,6 +1831,17 @@ function CustomEligibilityNotice({
       <Text style={styles.helperText}>
         Current offline pack has {availablePuzzleCount} eligible puzzles; this setup may need up to {requiredPuzzleCount}. Broaden theme or rating coverage before a scored release pack.
       </Text>
+      {onBroadenTheme ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Broaden from ${theme} to Mixed theme`}
+          testID="custom-broaden-theme"
+          style={[styles.secondaryButton, styles.customEligibilityAction]}
+          onPress={onBroadenTheme}
+        >
+          <Text style={styles.secondaryButtonText}>Use Mixed</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -1902,26 +1864,24 @@ function CustomModeChoiceRow({
     { value: "arrow_duel", label: "Arrow Duel", detail: "Two candidates", testID: "custom-mode-arrow-duel" }
   ];
   return (
-    <View style={styles.customModeChoiceRow} testID={testID}>
-      <View style={styles.customChoiceHeader}>
+    <View style={styles.customConfigRow} testID={testID}>
+      <View style={styles.customChoiceCopy}>
         <Text style={styles.listText}>Mode</Text>
         <CustomValueWithChevron value={value === "arrow_duel" ? "Arrow Duel" : "Standard"} />
       </View>
-      <View style={styles.customModeChoices}>
+      <View style={styles.customInlineOptions}>
         {options.map((option) => (
           <Pressable
             key={option.value}
             accessibilityRole="button"
             accessibilityState={{ selected: value === option.value }}
+            accessibilityLabel={`${option.label} custom sprint mode, ${option.detail}`}
             testID={option.testID}
-            style={[styles.customModeChoice, value === option.value ? styles.customModeChoiceActive : null]}
+            style={[styles.customMiniChip, value === option.value ? styles.customMiniChipActive : null]}
             onPress={() => onChange(option.value)}
           >
-            <Text style={[styles.customModeChoiceTitle, value === option.value ? styles.customModeChoiceTitleActive : null]}>
+            <Text style={[styles.customMiniChipText, value === option.value ? styles.customMiniChipTextActive : null]}>
               {option.label}
-            </Text>
-            <Text style={[styles.customModeChoiceDetail, value === option.value ? styles.customModeChoiceDetailActive : null]}>
-              {option.detail}
             </Text>
           </Pressable>
         ))}
@@ -3033,6 +2993,19 @@ function HistoryPanel({
   const wrong = visibleAttempts.filter((attempt) => attempt.result === "wrong").length;
   const accuracy = Math.round((correct / Math.max(1, correct + wrong)) * 100);
   const chartSummary = historyChartSummary(chartMetric, visibleAttempts, eloPoints, puzzleStats);
+  const activeFilterLabels = historyActiveFilterLabels({
+    modeFilter,
+    ratingKey: selectedRatingKey,
+    ratingRangeFilter,
+    resultFilter,
+    reviewStatusFilter,
+    sideFilter,
+    sourceFilter,
+    speedFilter,
+    themeFilter,
+    timeRange,
+    wrongLast7Days
+  });
   return (
     <View style={styles.historyPanel} testID="history-panel">
       <View style={styles.reviewQueueHeader} testID="history-action-header">
@@ -3195,6 +3168,8 @@ function HistoryPanel({
         </View>
       ) : null}
 
+      <HistoryActiveFilterStrip labels={activeFilterLabels} />
+
       <View style={styles.historyPageRow}>
         <Text style={styles.helperText}>
           {page.total === 0 ? "0 results" : `${page.offset + 1}-${Math.min(page.offset + attempts.length, page.total)} of ${page.total}`}
@@ -3234,6 +3209,85 @@ function HistoryPanel({
         />
       ))}
     </View>
+  );
+}
+
+type HistoryActiveFilterInput = {
+  modeFilter: "all" | SprintMode;
+  ratingKey: string | null;
+  ratingRangeFilter: HistoryRatingRangeFilter;
+  resultFilter: "all" | "correct" | "wrong";
+  reviewStatusFilter: "all" | "queued" | "clear";
+  sideFilter: "all" | PuzzleSide;
+  sourceFilter: "all" | AttemptSource;
+  speedFilter: "all" | number;
+  themeFilter: string;
+  timeRange: HistoryTimeRange;
+  wrongLast7Days: boolean;
+};
+
+function historyActiveFilterLabels({
+  modeFilter,
+  ratingKey,
+  ratingRangeFilter,
+  resultFilter,
+  reviewStatusFilter,
+  sideFilter,
+  sourceFilter,
+  speedFilter,
+  themeFilter,
+  timeRange,
+  wrongLast7Days
+}: HistoryActiveFilterInput): string[] {
+  const labels = [
+    historyRangeLabel(timeRange),
+    ratingKey ? historyRatingKeyLabel(ratingKey) : "No rating"
+  ];
+  if (wrongLast7Days) {
+    labels.push("Wrong 7d");
+  }
+  if (modeFilter !== "all") {
+    labels.push(modeLabel(modeFilter));
+  }
+  if (sourceFilter !== "all") {
+    labels.push(sourceFilter === "scheduled_review" ? "Review" : "Sprint");
+  }
+  if (resultFilter !== "all") {
+    labels.push(resultFilter === "correct" ? "Correct" : "Wrong");
+  }
+  if (speedFilter !== "all") {
+    labels.push(`${speedFilter}s pace`);
+  }
+  if (ratingRangeFilter !== "all") {
+    labels.push(HISTORY_RATING_RANGE_FILTERS.find((filter) => filter.id === ratingRangeFilter)?.label ?? ratingRangeFilter);
+  }
+  if (reviewStatusFilter !== "all") {
+    labels.push(reviewStatusFilter === "queued" ? "Queued" : "Clear");
+  }
+  if (sideFilter !== "all") {
+    labels.push(sideFilter === "white" ? "White" : "Black");
+  }
+  if (themeFilter !== "all") {
+    labels.push(themeFilter);
+  }
+  return labels;
+}
+
+function HistoryActiveFilterStrip({ labels }: { labels: string[] }): React.JSX.Element {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      testID="history-active-filter-summary"
+    >
+      <View style={styles.historyChipContent}>
+        {labels.map((label, index) => (
+          <View key={`${label}-${index}`} style={styles.historyActiveFilterChip} testID={`history-active-filter-${index}`}>
+            <Text style={styles.historyActiveFilterText}>{label}</Text>
+          </View>
+        ))}
+      </View>
+    </ScrollView>
   );
 }
 
@@ -4085,6 +4139,7 @@ function ReviewPanel({
   const filteredContextGroups = groupReviewEntriesByContext(filteredDueEntries);
   const difficultySummary = reviewDifficultySummary(dueReviewItems);
   const queueSummary = reviewQueueSummary(reviewQueue, filteredDueReviewItems);
+  const activeFilterLabels = reviewActiveFilterLabels(queueFilter, queueSummary);
 
   useEffect(() => {
     setActiveEntries(preferredEntries);
@@ -4178,6 +4233,8 @@ function ReviewPanel({
         />
       </View>
 
+      <ReviewActiveFilterStrip labels={activeFilterLabels} />
+
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Start due review"
@@ -4262,7 +4319,7 @@ function ReviewPanel({
             >
               <View>
                 <Text style={styles.historyRowTitle}>{modeLabel(group.mode)}</Text>
-                <Text style={styles.helperText}>{group.ratingKey}</Text>
+                <Text style={styles.helperText}>{historyRatingKeyLabel(group.ratingKey)}</Text>
               </View>
               <View style={styles.reviewContextMeta}>
                 <Text style={styles.reviewContextCount}>{group.entries.length}</Text>
@@ -4292,6 +4349,36 @@ function ReviewPanel({
       ) : null}
 
     </View>
+  );
+}
+
+function reviewActiveFilterLabels(
+  filter: ReviewQueueFilter,
+  queueSummary: ReturnType<typeof reviewQueueSummary>
+): string[] {
+  const labels = [reviewQueueFilterLabel(filter)];
+  if (queueSummary.overdueCount > 0) {
+    labels.push(`${queueSummary.overdueCount} overdue`);
+  }
+  labels.push(`${queueSummary.totalCount} total`);
+  return labels;
+}
+
+function ReviewActiveFilterStrip({ labels }: { labels: string[] }): React.JSX.Element {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      testID="review-active-filter-summary"
+    >
+      <View style={styles.historyChipContent}>
+        {labels.map((label, index) => (
+          <View key={`${label}-${index}`} style={styles.historyActiveFilterChip} testID={`review-active-filter-${index}`}>
+            <Text style={styles.historyActiveFilterText}>{label}</Text>
+          </View>
+        ))}
+      </View>
+    </ScrollView>
   );
 }
 
@@ -6632,31 +6719,6 @@ function StockfishDiagnosticsPanel({
   );
 }
 
-function ModeButton({
-  active,
-  label,
-  testID,
-  onPress
-}: {
-  active: boolean;
-  label: string;
-  testID: string;
-  onPress: () => void;
-}): React.JSX.Element {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      accessibilityLabel={`${label} mode`}
-      testID={testID}
-      style={[styles.modeButton, active ? styles.modeButtonActive : null]}
-      onPress={onPress}
-    >
-      <Text style={[styles.modeButtonText, active ? styles.modeButtonTextActive : null]}>{label}</Text>
-    </Pressable>
-  );
-}
-
 function OptionButton({
   active,
   label,
@@ -6723,8 +6785,8 @@ function TabGlyph({
   if (tab === "practice") {
     return (
       <View style={styles.tabGlyphCanvas}>
-        <View style={[styles.tabHomeRoof, { borderColor: color }]} />
-        <View style={[styles.tabHomeBase, { borderColor: color }]} />
+        <View testID="practice-tab-target-outer" style={[styles.tabPracticeTargetOuter, { borderColor: color }]} />
+        <View testID="practice-tab-target-inner" style={[styles.tabPracticeTargetInner, { borderColor: color }]} />
       </View>
     );
   }
@@ -7117,22 +7179,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 16
   },
-  tabHomeRoof: {
-    borderLeftWidth: 2,
-    borderTopWidth: 2,
-    height: 10,
-    position: "absolute",
-    top: 2,
-    transform: [{ rotate: "45deg" }],
-    width: 10
-  },
-  tabHomeBase: {
-    borderRadius: 2,
+  tabPracticeTargetOuter: {
+    borderRadius: 999,
     borderWidth: 2,
-    bottom: 1,
-    height: 8,
+    height: 15,
     position: "absolute",
-    width: 9
+    width: 15
+  },
+  tabPracticeTargetInner: {
+    borderRadius: 999,
+    borderWidth: 2,
+    height: 7,
+    position: "absolute",
+    width: 7
   },
   tabDiamondGlyph: {
     borderRadius: 2,
@@ -7803,11 +7862,6 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     textAlign: "center"
   },
-  sessionMetricRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between"
-  },
   timerText: {
     color: "#111827",
     fontFamily: "menlo",
@@ -7921,11 +7975,6 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     lineHeight: 20
   },
-  arrowDuelCandidateMeta: {
-    color: "#64748B",
-    fontSize: 10,
-    fontWeight: "700"
-  },
   sessionScoreStrip: {
     alignItems: "center",
     backgroundColor: "#FFFFFF",
@@ -8016,40 +8065,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700"
   },
-  modeRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8
-  },
-  modeButton: {
-    alignItems: "center",
-    borderColor: "#CBD5E1",
-    borderRadius: 8,
-    borderWidth: 1,
-    flexBasis: "22%",
-    flexGrow: 1,
-    height: 42,
-    justifyContent: "center"
-  },
-  modeButtonActive: {
-    borderColor: "#2563EB"
-  },
-  modeButtonText: {
-    color: "#334155",
-    fontSize: 13,
-    fontWeight: "700"
-  },
-  modeButtonTextActive: {
-    color: "#2563EB"
-  },
-  customPanel: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 10,
-    padding: 12
-  },
   customSetupPanel: {
     gap: 12
   },
@@ -8096,58 +8111,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10
   },
-  customModeChoiceRow: {
-    borderBottomColor: "#E2E8F0",
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10
-  },
-  customChoiceHeader: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between"
-  },
   customChoiceCopy: {
     flex: 1,
     gap: 2,
     minWidth: 0
-  },
-  customModeChoices: {
-    flexDirection: "row",
-    gap: 8
-  },
-  customModeChoice: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#CBD5E1",
-    borderRadius: 8,
-    borderWidth: 1,
-    flex: 1,
-    gap: 2,
-    minHeight: 52,
-    justifyContent: "center",
-    paddingHorizontal: 10,
-    paddingVertical: 8
-  },
-  customModeChoiceActive: {
-    backgroundColor: "#EFF6FF",
-    borderColor: "#2563EB"
-  },
-  customModeChoiceTitle: {
-    color: "#111827",
-    fontSize: 13,
-    fontWeight: "900"
-  },
-  customModeChoiceTitleActive: {
-    color: "#1D4ED8"
-  },
-  customModeChoiceDetail: {
-    color: "#64748B",
-    fontSize: 11,
-    fontWeight: "700"
-  },
-  customModeChoiceDetailActive: {
-    color: "#2563EB"
   },
   customSummaryCard: {
     backgroundColor: "#EFF6FF",
@@ -8259,6 +8226,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFBEB",
     borderColor: "#FBBF24"
   },
+  customEligibilityAction: {
+    alignSelf: "flex-start",
+    flex: 0,
+    height: 34,
+    marginTop: 4
+  },
   previousConfigList: {
     gap: 8
   },
@@ -8314,11 +8287,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between"
   },
-  customTarget: {
-    color: "#111827",
-    fontSize: 14,
-    fontWeight: "800"
-  },
   optionRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -8346,14 +8314,6 @@ const styles = StyleSheet.create({
   },
   optionButtonTextActive: {
     color: "#1D4ED8"
-  },
-  configSummary: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 4,
-    padding: 10
   },
   primaryButton: {
     alignItems: "center",
@@ -8415,29 +8375,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 38
   },
-  iconButtonText: {
-    color: "#334155",
-    fontSize: 18,
-    fontWeight: "800",
-    lineHeight: 22
-  },
   disabledButton: {
     opacity: 0.36
-  },
-  ghostButton: {
-    alignItems: "center",
-    backgroundColor: "#EFF6FF",
-    borderColor: "#93C5FD",
-    borderRadius: 8,
-    borderWidth: 1,
-    height: 32,
-    justifyContent: "center",
-    paddingHorizontal: 12
-  },
-  ghostText: {
-    color: "#1E40AF",
-    fontSize: 12,
-    fontWeight: "700"
   },
   summaryPanel: {
     backgroundColor: "#FFFFFF",
@@ -8733,9 +8672,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "800"
   },
-  panelHeaderSpacer: {
-    flex: 1
-  },
   reviewSessionPanel: {
     gap: 12
   },
@@ -8827,12 +8763,6 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: "center",
     width: 40
-  },
-  analysisIconButtonText: {
-    color: "#0F172A",
-    fontSize: 21,
-    fontWeight: "800",
-    lineHeight: 24
   },
   analysisTitle: {
     color: "#334155",
@@ -8931,22 +8861,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600"
   },
-  filterRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8
-  },
-  filterPill: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    borderWidth: 1,
-    color: "#334155",
-    fontSize: 12,
-    fontWeight: "700",
-    paddingHorizontal: 10,
-    paddingVertical: 6
-  },
   filterButton: {
     alignItems: "center",
     borderColor: "#2563EB",
@@ -8971,14 +8885,6 @@ const styles = StyleSheet.create({
   },
   filterButtonTextActive: {
     color: "#FFFFFF"
-  },
-  performancePanel: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    borderWidth: 1,
-    padding: 10,
-    gap: 4
   },
   historyPanel: {
     gap: 10
@@ -9113,6 +9019,20 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
     paddingRight: 2
+  },
+  historyActiveFilterChip: {
+    backgroundColor: "#F8FAFC",
+    borderColor: "#CBD5E1",
+    borderRadius: 8,
+    borderWidth: 1,
+    minHeight: 30,
+    justifyContent: "center",
+    paddingHorizontal: 10
+  },
+  historyActiveFilterText: {
+    color: "#475569",
+    fontSize: 12,
+    fontWeight: "800"
   },
   historyAttemptCard: {
     alignItems: "center",
@@ -9930,11 +9850,6 @@ const styles = StyleSheet.create({
     top: 12,
     transform: [{ rotate: "45deg" }],
     width: 6
-  },
-  settingRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between"
   },
   switchButton: {
     alignItems: "center",
