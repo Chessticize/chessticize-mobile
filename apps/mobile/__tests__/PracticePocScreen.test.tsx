@@ -1260,6 +1260,8 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "review-active-filter-summary")).toThrow();
     expectText(renderer, "Due Today");
     expect(findByTestId(renderer, "review-due-card").props.accessibilityLabel).toContain("All due · Ready now");
+    expect(collectText(findByTestId(renderer, "review-due-summary"))).toBe("Overdue now");
+    expect(collectText(findByTestId(renderer, "review-next-due"))).toBe("Oldest due 2026-06-21");
     expect(collectText(findByTestId(renderer, "review-due-count"))).toBe("1");
     expect(collectText(findByTestId(renderer, "review-overdue-count"))).toBe("1");
     expect(collectText(findByTestId(renderer, "review-total-count"))).toBe("1");
@@ -1304,14 +1306,16 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "review-active-filter-summary"))).toContain("Arrow Duel only");
     expect(collectText(renderer.root)).not.toContain("Last wrong 2026-06-20");
     press(renderer, "review-filter-speed-20");
-    expect(collectText(findByTestId(renderer, "review-due-summary"))).toBe("Oldest due 2026-06-21");
+    expect(collectText(findByTestId(renderer, "review-due-summary"))).toBe("Overdue now");
+    expect(collectText(findByTestId(renderer, "review-next-due"))).toBe("Oldest due 2026-06-21");
     expect(findByTestId(renderer, "review-due-card").props.accessibilityLabel).toContain("20s pace · Ready now");
     expect(collectText(findByTestId(renderer, "review-due-count"))).toBe("1");
     expect(collectText(findByTestId(renderer, "review-active-filter-summary"))).toContain("20s pace");
     press(renderer, "review-filter-all");
     press(renderer, "review-difficulty-hard");
     expect(findByTestId(renderer, "review-difficulty-hard").props.accessibilityState).toEqual({ selected: true });
-    expect(collectText(findByTestId(renderer, "review-due-summary"))).toBe("Oldest due 2026-06-21");
+    expect(collectText(findByTestId(renderer, "review-due-summary"))).toBe("Overdue now");
+    expect(collectText(findByTestId(renderer, "review-next-due"))).toBe("Oldest due 2026-06-21");
     expect(findByTestId(renderer, "review-due-card").props.accessibilityLabel).toContain("Hard reviews · Ready now");
     expect(collectText(findByTestId(renderer, "review-active-filter-summary"))).toContain("Hard reviews");
     expect(collectText(findByTestId(renderer, "review-due-count"))).toBe("1");
