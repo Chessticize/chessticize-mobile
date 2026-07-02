@@ -1037,7 +1037,6 @@ export function PracticePocScreen({
               <SessionStatusBar
                 mode={mode}
                 state={state}
-                config={selectedConfig}
                 timerText={timerText}
                 currentRating={currentRating}
                 onAbandon={isActive ? abandonSprint : undefined}
@@ -1570,15 +1569,12 @@ function PracticeModeCard({
         </View>
       </View>
       <View style={styles.practiceModeMeta}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Start ${label}`}
+        <View
           testID={`practice-mode-${item.mode.replace("_", "-")}-start`}
           style={styles.practiceModeChevronButton}
-          onPress={onPress}
         >
           <ChevronGlyph direction="right" />
-        </Pressable>
+        </View>
       </View>
     </Pressable>
   );
@@ -1786,6 +1782,8 @@ function CustomSprintSetup({
             label="Estimated puzzles"
             value={`~${targetCorrect}`}
             testID="custom-summary-target"
+            valueTestID="custom-target-count"
+            emphasis
           />
           <CustomSummaryMetric
             label="Rating range"
@@ -1793,37 +1791,17 @@ function CustomSprintSetup({
             testID="custom-summary-rating-range"
           />
           <CustomSummaryMetric
-            label="ELO type"
-            value={customMode === "arrow_duel" ? "Arrow Duel" : "Regular puzzles"}
-            testID="custom-summary-mode"
+            detail={`${historyRatingKeyLabel(ratingKey)} · separate bucket`}
+            label="Current rating"
+            value={`ELO ${currentRating}`}
+            testID="custom-separate-scoring"
           />
         </View>
         <CustomValueRow
-          label="Estimated puzzles"
-          value={`~${targetCorrect}`}
-          testID="custom-target-row"
-          valueTestID="custom-target-count"
-        />
-        <CustomValueRow
-          label="Rating range"
-          value={ratingRange}
-          testID="custom-rating-range"
-        />
-        <CustomValueRow
+          detail={customMode === "arrow_duel" ? "Two-candidate choice sprint" : "Board-move puzzle sprint"}
           label="ELO type"
           value={customMode === "arrow_duel" ? "Arrow Duel" : "Regular puzzles"}
           testID="custom-mode-summary"
-        />
-        <CustomValueRow
-          label="Current rating"
-          value={`ELO ${currentRating}`}
-          testID="custom-current-rating"
-        />
-        <CustomValueRow
-          detail="Separate scoring bucket"
-          label="Scoring history"
-          value={historyRatingKeyLabel(ratingKey)}
-          testID="custom-separate-scoring"
         />
         <CustomToggleRow
           detail="Switches this custom sprint to Arrow Duel scoring."
@@ -1860,18 +1838,25 @@ function CustomSprintSetup({
 }
 
 function CustomSummaryMetric({
+  detail,
+  emphasis = false,
   label,
   testID,
-  value
+  value,
+  valueTestID
 }: {
+  detail?: string;
+  emphasis?: boolean;
   label: string;
   testID: string;
   value: string;
+  valueTestID?: string;
 }): React.JSX.Element {
   return (
-    <View style={styles.customSummaryMetric} testID={testID}>
+    <View style={[styles.customSummaryMetric, emphasis ? styles.customSummaryMetricPrimary : null]} testID={testID}>
       <Text style={styles.customSummaryLabel}>{label}</Text>
-      <Text style={styles.customSummaryValue}>{value}</Text>
+      <Text testID={valueTestID} style={[styles.customSummaryValue, emphasis ? styles.customSummaryValuePrimary : null]}>{value}</Text>
+      {detail ? <Text style={styles.customSummaryDetail}>{detail}</Text> : null}
     </View>
   );
 }
@@ -2188,38 +2173,17 @@ function TestPuzzleSourceControl({
 function SessionStatusBar({
   mode,
   state,
-  config,
   timerText,
   currentRating,
   onAbandon
 }: {
   mode: SprintMode;
-  state: SprintState | null;
-  config: SprintConfig;
+  state: SprintState;
   timerText: string;
   currentRating: number;
   onAbandon?: () => void;
 }): React.JSX.Element {
   const [confirmAbandon, setConfirmAbandon] = useState(false);
-
-  if (!state) {
-    return (
-      <View style={styles.sessionBar} testID="mode-overview">
-        <View style={styles.sessionHeaderRow}>
-          <View>
-            <Text style={styles.sessionTitle}>{modeLabel(mode)}</Text>
-            <Text style={styles.helperText}>{formatDurationLabel(config.durationSeconds)} sprint · {config.perPuzzleSeconds}s target pace</Text>
-          </View>
-          <Text style={styles.ratingPill}>{currentRating}</Text>
-        </View>
-        <View style={styles.sessionMetrics}>
-          <Text style={styles.sessionMetric}>Target {config.targetCorrect}</Text>
-          <Text style={styles.sessionMetric}>Run {config.ratingKey}</Text>
-          <MistakeStrikes count={0} max={config.maxMistakes} />
-        </View>
-      </View>
-    );
-  }
 
   return (
     <View style={styles.activeSessionShell} testID="active-session-shell">
@@ -2332,30 +2296,6 @@ function ActiveMistakeIndicator({
   );
 }
 
-function MistakeStrikes({
-  count,
-  max
-}: {
-  count: number;
-  max: number;
-}): React.JSX.Element {
-  return (
-    <View accessibilityLabel={`Mistakes ${count} of ${max}`} testID="session-strikes" style={styles.strikeRow}>
-      {Array.from({ length: max }, (_, index) => {
-        const used = index < count;
-        return (
-          <View
-            key={index}
-            style={[styles.strikeMark, used ? styles.strikeMarkUsed : null]}
-          />
-        );
-      })}
-      <Text testID="session-mistakes" style={styles.strikeCount}>{count} / {max}</Text>
-      <Text style={styles.strikeLabel}>Mistakes</Text>
-    </View>
-  );
-}
-
 function SprintSummary({
   state,
   elapsedMs,
@@ -2432,10 +2372,11 @@ function SprintSummary({
         </Text>
       </View>
 
-      <ResultRatingProgress
+      <ResultHistoryShortcut
         delta={delta}
         ratingAfter={ratingAfter}
         ratingBefore={state.ratingBefore}
+        onPress={onOpenHistory}
       />
 
       <View style={styles.resultMetricGrid}>
@@ -2496,15 +2437,6 @@ function SprintSummary({
         >
           <Text style={shouldPrioritizeReview ? styles.secondaryButtonText : styles.primaryButtonText}>Play again</Text>
         </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Done"
-          testID="sprint-result-done-button"
-          style={styles.secondaryButton}
-          onPress={onBack}
-        >
-          <Text style={styles.secondaryButtonText}>Done</Text>
-        </Pressable>
       </View>
       {onReview && !shouldPrioritizeReview ? (
         <Pressable
@@ -2521,40 +2453,39 @@ function SprintSummary({
   );
 }
 
-function ResultRatingProgress({
+function ResultHistoryShortcut({
   delta,
+  onPress,
   ratingAfter,
   ratingBefore
 }: {
   delta: number;
+  onPress: () => void;
   ratingAfter: number;
   ratingBefore: number;
 }): React.JSX.Element {
-  const trendLabel = delta === 0
-    ? "No rating movement"
-    : delta > 0
-      ? "Rating improved"
-      : "Rating decreased";
+  const trendLabel = delta === 0 ? "Trend in History" : delta > 0 ? "Improved" : "Dropped";
   return (
-    <View style={styles.resultTrendCard} testID="sprint-result-history-trend">
-      <View style={styles.resultTrendHeader}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Open rating trend in history"
+      style={styles.resultTrendCard}
+      testID="sprint-result-history-trend"
+      onPress={onPress}
+    >
+      <View style={styles.resultTrendCopy}>
         <View>
-          <Text style={styles.resultMetricLabel}>Rating Progress</Text>
-          <Text style={styles.helperText}>{trendLabel}</Text>
+          <Text style={styles.resultMetricLabel}>Rating Trend</Text>
+          <Text style={styles.helperText}>History keeps the full performance chart</Text>
         </View>
-        <Text testID="sprint-result-trend-current" style={styles.resultTrendBadge}>{ratingAfter}</Text>
+        <Text style={[styles.resultTrendBadge, delta < 0 ? styles.resultTrendBadgeDown : null]}>{trendLabel}</Text>
       </View>
-      <View style={styles.resultTrendPlot} testID="sprint-result-trend-plot">
-        <View style={styles.resultTrendTrack} />
-        <View style={styles.resultTrendSegment} />
-        <View style={[styles.resultTrendPoint, styles.resultTrendPointStart]} />
-        <View style={[styles.resultTrendPoint, styles.resultTrendPointEnd, delta < 0 ? styles.resultTrendPointDown : null]} />
+      <View style={styles.resultTrendRange}>
+        <Text testID="sprint-result-trend-start" style={styles.resultTrendRangeText}>{ratingBefore}</Text>
+        <ChevronGlyph direction="right" />
+        <Text testID="sprint-result-trend-current" style={styles.resultTrendRangeText}>{ratingAfter}</Text>
       </View>
-      <View style={styles.resultTrendScale}>
-        <Text testID="sprint-result-trend-start" style={styles.resultTrendScaleText}>{ratingBefore}</Text>
-        <Text style={styles.resultTrendScaleText}>Now</Text>
-      </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -3102,16 +3033,6 @@ function HistoryPanel({
   const wrong = visibleAttempts.filter((attempt) => attempt.result === "wrong").length;
   const accuracy = Math.round((correct / Math.max(1, correct + wrong)) * 100);
   const chartSummary = historyChartSummary(chartMetric, visibleAttempts, eloPoints, puzzleStats);
-  const filterSummary = historyFilterSummary({
-    modeFilter,
-    resultFilter,
-    selectedRatingKey,
-    sourceFilter,
-    speedFilter,
-    timeRange,
-    wrongLast7Days
-  });
-
   return (
     <View style={styles.historyPanel} testID="history-panel">
       <View style={styles.reviewQueueHeader} testID="history-action-header">
@@ -3163,18 +3084,6 @@ function HistoryPanel({
             </View>
           </Pressable>
         </HistoryChipRow>
-      </View>
-
-      <View style={styles.historyFilterSummaryCard} testID="history-filter-summary-card">
-        <Text style={styles.sectionLabel}>Showing</Text>
-        <View style={styles.historyFilterSummaryChips}>
-          {filterSummary.map((item) => (
-            <View key={item.testID} style={styles.historyFilterSummaryChip} testID={item.testID}>
-              <Text style={styles.historyFilterSummaryLabel}>{item.label}</Text>
-              <Text style={styles.historyFilterSummaryValue}>{item.value}</Text>
-            </View>
-          ))}
-        </View>
       </View>
 
       <View style={styles.historyPerformanceCard} testID="history-performance-card">
@@ -3357,57 +3266,6 @@ function historyRatingRangeFilterToQuery(filter: HistoryRatingRangeFilter): { mi
     return { minRating: 1400 };
   }
   return {};
-}
-
-function historyFilterSummary({
-  modeFilter,
-  resultFilter,
-  selectedRatingKey,
-  sourceFilter,
-  speedFilter,
-  timeRange,
-  wrongLast7Days
-}: {
-  modeFilter: "all" | SprintMode;
-  resultFilter: "all" | "correct" | "wrong";
-  selectedRatingKey: string | null;
-  sourceFilter: "all" | AttemptSource;
-  speedFilter: "all" | number;
-  timeRange: HistoryTimeRange;
-  wrongLast7Days: boolean;
-}): Array<{ label: string; value: string; testID: string }> {
-  return [
-    {
-      label: "Range",
-      value: wrongLast7Days ? "Wrong 7d" : historyRangeLabel(timeRange),
-      testID: "history-filter-summary-range"
-    },
-    {
-      label: "ELO",
-      value: selectedRatingKey ? historyRatingKeyLabel(selectedRatingKey) : "No history",
-      testID: "history-filter-summary-elo"
-    },
-    {
-      label: "Type",
-      value: modeFilter === "all" ? "All modes" : modeLabel(modeFilter),
-      testID: "history-filter-summary-mode"
-    },
-    {
-      label: "Result",
-      value: resultFilter === "all" ? "All results" : resultFilter === "wrong" ? "Wrong only" : "Correct only",
-      testID: "history-filter-summary-result"
-    },
-    {
-      label: "Source",
-      value: sourceFilter === "all" ? "Sprint + review" : sourceFilter === "scheduled_review" ? "Review" : "Sprint",
-      testID: "history-filter-summary-source"
-    },
-    {
-      label: "Speed",
-      value: speedFilter === "all" ? "All speeds" : `${speedFilter}s pace`,
-      testID: "history-filter-summary-speed"
-    }
-  ];
 }
 
 function HistoryMiniChart({
@@ -5619,29 +5477,11 @@ function SettingsPanel({
         </Text>
       </View>
 
-      <View style={styles.settingsDataSummaryCard} testID="settings-data-summary-card">
-        <SettingsSummaryMetric
-          label="Ratings"
-          value={`${ratings.length} buckets`}
-          testID="settings-data-summary-ratings"
-        />
-        <SettingsSummaryMetric
-          label="Sync mode"
-          value={syncEnabled ? "iCloud ready" : "Local only"}
-          testID="settings-data-summary-sync"
-        />
-        <SettingsSummaryMetric
-          label="Data"
-          value="Export ready"
-          testID="settings-data-summary-export"
-        />
-      </View>
-
       <SettingsSection title="Profile" testID="settings-profile-section">
         <SettingsRow
           label="Puzzle ELO (Standard)"
           value={`ELO ${standardRating}`}
-          detail="Advanced ratings"
+          detail={`Advanced ratings · ${ratings.length} buckets`}
           testID="settings-standard-elo-row"
           onPress={() => setAdvancedRatingsOpen((current) => !current)}
         />
@@ -5737,7 +5577,7 @@ function SettingsPanel({
         <SettingsRow
           label="Export Data"
           value="JSON"
-          detail="Prepare local progress for backup"
+          detail="Export-ready local progress backup"
           testID="settings-export-data"
           onPress={() => setStatusMessage(exportDataStatusMessage(onExportData()))}
         />
@@ -5814,23 +5654,6 @@ function SettingsPanel({
           <Text style={styles.secondaryButtonText}>Stockfish Diagnostics</Text>
         </Pressable>
       ) : null}
-    </View>
-  );
-}
-
-function SettingsSummaryMetric({
-  label,
-  testID,
-  value
-}: {
-  label: string;
-  testID: string;
-  value: string;
-}): React.JSX.Element {
-  return (
-    <View style={styles.settingsDataSummaryMetric} testID={testID}>
-      <Text style={styles.historyFilterSummaryLabel}>{label}</Text>
-      <Text style={styles.settingsDataSummaryValue}>{value}</Text>
     </View>
   );
 }
@@ -6534,18 +6357,17 @@ function PackRow({
 
 function PackCoverageSummary({ pack }: { pack: PackRowModel }): React.JSX.Element {
   const coverageItems = [
-    { id: "puzzles", label: "Puzzles", value: pack.coverage.puzzles },
-    { id: "rating", label: "Rating", value: pack.coverage.rating },
-    { id: "themes", label: "Themes", value: pack.coverage.themes },
-    { id: "arrow-duel", label: "Arrow Duel", value: pack.coverage.arrowDuel }
+    { id: "puzzles", value: pack.coverage.puzzles },
+    { id: "rating", value: pack.coverage.rating },
+    { id: "themes", value: pack.coverage.themes },
+    { id: "arrow-duel", value: pack.coverage.arrowDuel }
   ];
   return (
     <View style={styles.packCoverageSummary} testID={`packs-coverage-${pack.id}`}>
-      {coverageItems.map((item) => (
-        <View key={item.id} style={styles.packCoverageChip} testID={`packs-coverage-${pack.id}-${item.id}`}>
-          <Text style={styles.packCoverageLabel}>{item.label}</Text>
-          <Text style={styles.packCoverageValue}>{item.value}</Text>
-        </View>
+      {coverageItems.map((item, index) => (
+        <Text key={item.id} style={styles.packCoverageInlineText} testID={`packs-coverage-${pack.id}-${item.id}`}>
+          {index > 0 ? "/ " : ""}{item.value}
+        </Text>
       ))}
     </View>
   );
@@ -7866,14 +7688,6 @@ const styles = StyleSheet.create({
   reviewStartButton: {
     flex: 0
   },
-  sessionBar: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    borderWidth: 1,
-    padding: 12,
-    gap: 10
-  },
   activeSessionShell: {
     gap: 8
   },
@@ -7987,40 +7801,6 @@ const styles = StyleSheet.create({
     color: "#334155",
     fontSize: 12,
     fontWeight: "800",
-    textAlign: "center"
-  },
-  sessionHeaderRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 12,
-    justifyContent: "space-between"
-  },
-  sessionTitle: {
-    color: "#111827",
-    fontSize: 16,
-    fontWeight: "700"
-  },
-  sessionMetrics: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10
-  },
-  sessionMetric: {
-    color: "#334155",
-    fontSize: 12,
-    fontWeight: "700"
-  },
-  ratingPill: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#CBD5E1",
-    borderRadius: 8,
-    borderWidth: 1,
-    color: "#111827",
-    fontSize: 18,
-    fontWeight: "800",
-    minWidth: 64,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
     textAlign: "center"
   },
   sessionMetricRow: {
@@ -8370,7 +8150,7 @@ const styles = StyleSheet.create({
     color: "#2563EB"
   },
   customSummaryCard: {
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#EFF6FF",
     borderBottomColor: "#E2E8F0",
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
@@ -8379,26 +8159,33 @@ const styles = StyleSheet.create({
     paddingVertical: 10
   },
   customSummaryMetric: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    borderWidth: 1,
     flex: 1,
     gap: 3,
-    minHeight: 52,
+    minHeight: 54,
     justifyContent: "center",
-    paddingHorizontal: 8,
-    paddingVertical: 7
+    minWidth: 0
+  },
+  customSummaryMetricPrimary: {
+    flex: 0.9
   },
   customSummaryLabel: {
-    color: "#64748B",
+    color: "#1D4ED8",
     fontSize: 10,
     fontWeight: "800"
   },
   customSummaryValue: {
-    color: "#111827",
+    color: "#1E3A8A",
     fontSize: 12,
     fontWeight: "900"
+  },
+  customSummaryValuePrimary: {
+    fontSize: 18,
+    lineHeight: 22
+  },
+  customSummaryDetail: {
+    color: "#2563EB",
+    fontSize: 10,
+    fontWeight: "700"
   },
   customStepperGroup: {
     alignItems: "center",
@@ -8844,76 +8631,44 @@ const styles = StyleSheet.create({
     fontWeight: "900"
   },
   resultTrendCard: {
+    alignItems: "center",
     backgroundColor: "#FFFFFF",
     borderColor: "#E2E8F0",
     borderRadius: 8,
     borderWidth: 1,
-    gap: 8,
-    padding: 12
-  },
-  resultTrendHeader: {
-    alignItems: "center",
     flexDirection: "row",
+    gap: 12,
     justifyContent: "space-between",
-    gap: 12
+    minHeight: 58,
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  resultTrendCopy: {
+    flex: 1,
+    gap: 2,
+    minWidth: 0
   },
   resultTrendBadge: {
     backgroundColor: "#2563EB",
     borderRadius: 999,
     color: "#FFFFFF",
-    fontFamily: "menlo",
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: "900",
     overflow: "hidden",
     paddingHorizontal: 8,
     paddingVertical: 4
   },
-  resultTrendPlot: {
-    height: 34,
-    justifyContent: "center",
-    position: "relative"
-  },
-  resultTrendTrack: {
-    backgroundColor: "#E2E8F0",
-    borderRadius: 999,
-    height: 3,
-    left: 0,
-    position: "absolute",
-    right: 0
-  },
-  resultTrendSegment: {
-    backgroundColor: "#2563EB",
-    borderRadius: 999,
-    height: 4,
-    left: 16,
-    position: "absolute",
-    right: 16
-  },
-  resultTrendPoint: {
-    backgroundColor: "#93C5FD",
-    borderColor: "#FFFFFF",
-    borderRadius: 999,
-    borderWidth: 2,
-    height: 14,
-    position: "absolute",
-    width: 14
-  },
-  resultTrendPointStart: {
-    left: 8
-  },
-  resultTrendPointEnd: {
-    backgroundColor: "#2563EB",
-    right: 8
-  },
-  resultTrendPointDown: {
+  resultTrendBadgeDown: {
     backgroundColor: "#DC2626"
   },
-  resultTrendScale: {
+  resultTrendRange: {
+    alignItems: "center",
     flexDirection: "row",
-    justifyContent: "space-between"
+    gap: 4
   },
-  resultTrendScaleText: {
+  resultTrendRangeText: {
     color: "#64748B",
+    fontFamily: "menlo",
     fontSize: 10,
     fontWeight: "800"
   },
@@ -8964,34 +8719,6 @@ const styles = StyleSheet.create({
   positive: {
     color: "#15803D",
     fontWeight: "700"
-  },
-  strikeRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 6
-  },
-  strikeMark: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#94A3B8",
-    borderRadius: 3,
-    borderWidth: 1,
-    height: 14,
-    width: 14
-  },
-  strikeMarkUsed: {
-    backgroundColor: "#DC2626",
-    borderColor: "#DC2626"
-  },
-  strikeCount: {
-    color: "#334155",
-    fontSize: 12,
-    fontWeight: "900"
-  },
-  strikeLabel: {
-    color: "#64748B",
-    fontSize: 12,
-    fontWeight: "700",
-    marginLeft: 2
   },
   listPanel: {
     backgroundColor: "#FFFFFF",
@@ -9261,39 +8988,6 @@ const styles = StyleSheet.create({
   },
   historyAdvancedFilters: {
     gap: 8
-  },
-  historyFilterSummaryCard: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 8,
-    padding: 12
-  },
-  historyFilterSummaryChips: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8
-  },
-  historyFilterSummaryChip: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 2,
-    minHeight: 42,
-    paddingHorizontal: 9,
-    paddingVertical: 6
-  },
-  historyFilterSummaryLabel: {
-    color: "#64748B",
-    fontSize: 9,
-    fontWeight: "800"
-  },
-  historyFilterSummaryValue: {
-    color: "#111827",
-    fontSize: 12,
-    fontWeight: "900"
   },
   historyPerformanceCard: {
     backgroundColor: "#FFFFFF",
@@ -9574,32 +9268,6 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     textAlign: "right"
   },
-  settingsDataSummaryCard: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 8,
-    padding: 10
-  },
-  settingsDataSummaryMetric: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    borderWidth: 1,
-    flex: 1,
-    gap: 2,
-    minHeight: 46,
-    justifyContent: "center",
-    paddingHorizontal: 8,
-    paddingVertical: 6
-  },
-  settingsDataSummaryValue: {
-    color: "#111827",
-    fontSize: 11,
-    fontWeight: "900"
-  },
   settingsSection: {
     gap: 8
   },
@@ -9873,28 +9541,19 @@ const styles = StyleSheet.create({
   packCoverageSummary: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 6,
+    gap: 5,
     paddingTop: 4
-  },
-  packCoverageChip: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 1,
-    minHeight: 34,
-    paddingHorizontal: 8,
-    paddingVertical: 5
   },
   packCoverageLabel: {
     color: "#64748B",
     fontSize: 9,
     fontWeight: "800"
   },
-  packCoverageValue: {
-    color: "#334155",
+  packCoverageInlineText: {
+    color: "#64748B",
     fontSize: 11,
-    fontWeight: "900"
+    fontWeight: "800",
+    lineHeight: 15
   },
   packCoverageMetricValue: {
     color: "#111827",
