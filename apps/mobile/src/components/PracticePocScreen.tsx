@@ -2208,7 +2208,7 @@ function SessionStatusBar({
         <View style={styles.sessionHeaderRow}>
           <View>
             <Text style={styles.sessionTitle}>{modeLabel(mode)}</Text>
-        <Text style={styles.helperText}>{formatDurationLabel(config.durationSeconds)} sprint · {config.perPuzzleSeconds}s target pace</Text>
+            <Text style={styles.helperText}>{formatDurationLabel(config.durationSeconds)} sprint · {config.perPuzzleSeconds}s target pace</Text>
           </View>
           <Text style={styles.ratingPill}>{currentRating}</Text>
         </View>
@@ -2244,18 +2244,26 @@ function SessionStatusBar({
       </View>
 
       <View style={styles.sessionActiveMetricRow} testID="session-status-metrics">
-        <Text testID="session-progress" style={styles.sessionProgressValue}>
-          {state.correctCount} / {state.config.targetCorrect}
-        </Text>
-        <View style={styles.sessionTimerBlock}>
+        <View style={styles.sessionMetricBlock} testID="session-progress-block">
+          <Text style={styles.sessionMetricLabel}>Progress</Text>
+          <Text testID="session-progress" style={styles.sessionProgressValue}>
+            {state.correctCount} / {state.config.targetCorrect}
+          </Text>
+        </View>
+        <View style={[styles.sessionMetricBlock, styles.sessionTimerBlock]} testID="session-timer-block">
+          <Text style={styles.sessionMetricLabel}>Timer</Text>
           <Text testID="session-timer" style={styles.timerText}>{timerText}</Text>
         </View>
-        <ActiveMistakeIndicator
-          count={state.mistakeCount}
-          max={state.config.maxMistakes}
-        />
-        <View style={styles.sessionRatingBlock}>
+        <View style={styles.sessionMetricBlock} testID="session-rating-block">
+          <Text style={styles.sessionMetricLabel}>ELO</Text>
           <Text testID="session-rating" style={styles.sessionRatingValue}>ELO {currentRating}</Text>
+        </View>
+        <View style={styles.sessionMetricBlock} testID="session-mistakes-block">
+          <Text style={styles.sessionMetricLabel}>Mistakes</Text>
+          <ActiveMistakeIndicator
+            count={state.mistakeCount}
+            max={state.config.maxMistakes}
+          />
         </View>
       </View>
 
@@ -2424,6 +2432,12 @@ function SprintSummary({
         </Text>
       </View>
 
+      <ResultRatingProgress
+        delta={delta}
+        ratingAfter={ratingAfter}
+        ratingBefore={state.ratingBefore}
+      />
+
       <View style={styles.resultMetricGrid}>
         <View style={styles.resultMetric} testID="sprint-result-rating-change">
           <Text style={styles.resultMetricLabel}>Rating Change</Text>
@@ -2503,6 +2517,43 @@ function SprintSummary({
           <Text style={styles.secondaryButtonText}>Review Mistakes</Text>
         </Pressable>
       ) : null}
+    </View>
+  );
+}
+
+function ResultRatingProgress({
+  delta,
+  ratingAfter,
+  ratingBefore
+}: {
+  delta: number;
+  ratingAfter: number;
+  ratingBefore: number;
+}): React.JSX.Element {
+  const trendLabel = delta === 0
+    ? "No rating movement"
+    : delta > 0
+      ? "Rating improved"
+      : "Rating decreased";
+  return (
+    <View style={styles.resultTrendCard} testID="sprint-result-history-trend">
+      <View style={styles.resultTrendHeader}>
+        <View>
+          <Text style={styles.resultMetricLabel}>Rating Progress</Text>
+          <Text style={styles.helperText}>{trendLabel}</Text>
+        </View>
+        <Text testID="sprint-result-trend-current" style={styles.resultTrendBadge}>{ratingAfter}</Text>
+      </View>
+      <View style={styles.resultTrendPlot} testID="sprint-result-trend-plot">
+        <View style={styles.resultTrendTrack} />
+        <View style={styles.resultTrendSegment} />
+        <View style={[styles.resultTrendPoint, styles.resultTrendPointStart]} />
+        <View style={[styles.resultTrendPoint, styles.resultTrendPointEnd, delta < 0 ? styles.resultTrendPointDown : null]} />
+      </View>
+      <View style={styles.resultTrendScale}>
+        <Text testID="sprint-result-trend-start" style={styles.resultTrendScaleText}>{ratingBefore}</Text>
+        <Text style={styles.resultTrendScaleText}>Now</Text>
+      </View>
     </View>
   );
 }
@@ -3690,15 +3741,17 @@ function HistoryAttemptRow({
         </Text>
       </View>
       <View style={styles.historyAttemptStatus} testID={`history-attempt-${attempt.id}-status`}>
-        <Text
-          testID={`history-attempt-${attempt.id}-difficulty`}
-          style={[styles.historyReviewState, difficultyStyle]}
-        >
-          {difficultyLabel(difficulty)}
-        </Text>
-        <Text testID={`history-attempt-${attempt.id}-delta`} style={[styles.historyRatingDelta, delta < 0 ? styles.errorText : styles.positive]}>
-          {delta >= 0 ? "+" : ""}{delta}
-        </Text>
+        <View style={styles.historyAttemptStatusSummary} testID={`history-attempt-${attempt.id}-status-summary`}>
+          <Text
+            testID={`history-attempt-${attempt.id}-difficulty`}
+            style={[styles.historyReviewState, difficultyStyle]}
+          >
+            {difficultyLabel(difficulty)}
+          </Text>
+          <Text testID={`history-attempt-${attempt.id}-delta`} style={[styles.historyRatingDelta, delta < 0 ? styles.errorText : styles.positive]}>
+            {delta >= 0 ? "+" : ""}{delta}
+          </Text>
+        </View>
         <Text
           testID={`history-attempt-${attempt.id}-review-state`}
           style={[styles.historyReviewStateDetail, isWrong ? styles.reviewDifficultyHard : styles.reviewDifficultyEasy]}
@@ -3950,6 +4003,21 @@ function reviewDifficultySummary(items: ReviewQueueItem[]): { easy: number; medi
     }
     return summary;
   }, { easy: 0, medium: 0, hard: 0 });
+}
+
+function reviewDifficultyDetail(items: ReviewQueueItem[], difficulty: ReviewDifficulty): string {
+  const matchingItems = items.filter((item) => reviewItemDifficulty(item) === difficulty);
+  if (difficulty === "easy") {
+    return matchingItems.length > 0 ? "All good" : "No easy reviews";
+  }
+  if (matchingItems.length === 0) {
+    return difficulty === "hard" ? "Stable" : "No medium reviews";
+  }
+  const hasOverdue = matchingItems.some((item) => new Date(item.review.dueAt).getTime() <= Date.now());
+  if (difficulty === "hard") {
+    return hasOverdue ? "Overdue now" : "Needs attention";
+  }
+  return hasOverdue ? "Ready now" : "Next due later";
 }
 
 function reviewItemDifficulty(item: ReviewQueueItem): "easy" | "medium" | "hard" {
@@ -4229,7 +4297,7 @@ function ReviewPanel({
         <ReviewDifficultyRow
           active={queueFilter === "difficulty:easy"}
           label="Easy"
-          detail="All good"
+          detail={reviewDifficultyDetail(dueReviewItems, "easy")}
           count={difficultySummary.easy}
           tone="easy"
           onPress={() => setQueueFilter("difficulty:easy")}
@@ -4237,7 +4305,7 @@ function ReviewPanel({
         <ReviewDifficultyRow
           active={queueFilter === "difficulty:medium"}
           label="Medium"
-          detail="Needs attention"
+          detail={reviewDifficultyDetail(dueReviewItems, "medium")}
           count={difficultySummary.medium}
           tone="medium"
           onPress={() => setQueueFilter("difficulty:medium")}
@@ -4245,7 +4313,7 @@ function ReviewPanel({
         <ReviewDifficultyRow
           active={queueFilter === "difficulty:hard"}
           label="Hard"
-          detail={difficultySummary.hard > 0 ? "Overdue" : "Stable"}
+          detail={reviewDifficultyDetail(dueReviewItems, "hard")}
           count={difficultySummary.hard}
           tone="hard"
           onPress={() => setQueueFilter("difficulty:hard")}
@@ -5551,6 +5619,24 @@ function SettingsPanel({
         </Text>
       </View>
 
+      <View style={styles.settingsDataSummaryCard} testID="settings-data-summary-card">
+        <SettingsSummaryMetric
+          label="Ratings"
+          value={`${ratings.length} buckets`}
+          testID="settings-data-summary-ratings"
+        />
+        <SettingsSummaryMetric
+          label="Sync mode"
+          value={syncEnabled ? "iCloud ready" : "Local only"}
+          testID="settings-data-summary-sync"
+        />
+        <SettingsSummaryMetric
+          label="Data"
+          value="Export ready"
+          testID="settings-data-summary-export"
+        />
+      </View>
+
       <SettingsSection title="Profile" testID="settings-profile-section">
         <SettingsRow
           label="Puzzle ELO (Standard)"
@@ -5728,6 +5814,23 @@ function SettingsPanel({
           <Text style={styles.secondaryButtonText}>Stockfish Diagnostics</Text>
         </Pressable>
       ) : null}
+    </View>
+  );
+}
+
+function SettingsSummaryMetric({
+  label,
+  testID,
+  value
+}: {
+  label: string;
+  testID: string;
+  value: string;
+}): React.JSX.Element {
+  return (
+    <View style={styles.settingsDataSummaryMetric} testID={testID}>
+      <Text style={styles.historyFilterSummaryLabel}>{label}</Text>
+      <Text style={styles.settingsDataSummaryValue}>{value}</Text>
     </View>
   );
 }
@@ -7798,9 +7901,29 @@ const styles = StyleSheet.create({
   },
   sessionActiveMetricRow: {
     alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
     flexDirection: "row",
+    gap: 6,
     justifyContent: "space-between",
-    minHeight: 32
+    minHeight: 58,
+    paddingHorizontal: 8,
+    paddingVertical: 7
+  },
+  sessionMetricBlock: {
+    alignItems: "center",
+    flex: 1,
+    gap: 3,
+    justifyContent: "center",
+    minWidth: 0
+  },
+  sessionMetricLabel: {
+    color: "#64748B",
+    fontSize: 9,
+    fontWeight: "800",
+    lineHeight: 11
   },
   activeMistakeIndicator: {
     alignItems: "center",
@@ -7852,23 +7975,19 @@ const styles = StyleSheet.create({
   },
   sessionTimerBlock: {
     alignItems: "center",
-    flex: 1
-  },
-  sessionRatingBlock: {
-    alignItems: "flex-end",
-    minWidth: 72
+    flex: 1.25
   },
   sessionProgressValue: {
     color: "#111827",
     fontSize: 13,
     fontWeight: "800",
-    minWidth: 72
+    textAlign: "center"
   },
   sessionRatingValue: {
     color: "#334155",
     fontSize: 12,
     fontWeight: "800",
-    textAlign: "right"
+    textAlign: "center"
   },
   sessionHeaderRow: {
     alignItems: "center",
@@ -8724,6 +8843,80 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "900"
   },
+  resultTrendCard: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 8,
+    padding: 12
+  },
+  resultTrendHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12
+  },
+  resultTrendBadge: {
+    backgroundColor: "#2563EB",
+    borderRadius: 999,
+    color: "#FFFFFF",
+    fontFamily: "menlo",
+    fontSize: 12,
+    fontWeight: "900",
+    overflow: "hidden",
+    paddingHorizontal: 8,
+    paddingVertical: 4
+  },
+  resultTrendPlot: {
+    height: 34,
+    justifyContent: "center",
+    position: "relative"
+  },
+  resultTrendTrack: {
+    backgroundColor: "#E2E8F0",
+    borderRadius: 999,
+    height: 3,
+    left: 0,
+    position: "absolute",
+    right: 0
+  },
+  resultTrendSegment: {
+    backgroundColor: "#2563EB",
+    borderRadius: 999,
+    height: 4,
+    left: 16,
+    position: "absolute",
+    right: 16
+  },
+  resultTrendPoint: {
+    backgroundColor: "#93C5FD",
+    borderColor: "#FFFFFF",
+    borderRadius: 999,
+    borderWidth: 2,
+    height: 14,
+    position: "absolute",
+    width: 14
+  },
+  resultTrendPointStart: {
+    left: 8
+  },
+  resultTrendPointEnd: {
+    backgroundColor: "#2563EB",
+    right: 8
+  },
+  resultTrendPointDown: {
+    backgroundColor: "#DC2626"
+  },
+  resultTrendScale: {
+    flexDirection: "row",
+    justifyContent: "space-between"
+  },
+  resultTrendScaleText: {
+    color: "#64748B",
+    fontSize: 10,
+    fontWeight: "800"
+  },
   resultReviewRow: {
     alignItems: "center",
     backgroundColor: "#FFFFFF",
@@ -9317,6 +9510,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     minWidth: 78
   },
+  historyAttemptStatusSummary: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 5,
+    justifyContent: "flex-end"
+  },
   historyReviewState: {
     fontSize: 12,
     fontWeight: "900",
@@ -9374,6 +9573,32 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "900",
     textAlign: "right"
+  },
+  settingsDataSummaryCard: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 8,
+    padding: 10
+  },
+  settingsDataSummaryMetric: {
+    backgroundColor: "#F8FAFC",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    gap: 2,
+    minHeight: 46,
+    justifyContent: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 6
+  },
+  settingsDataSummaryValue: {
+    color: "#111827",
+    fontSize: 11,
+    fontWeight: "900"
   },
   settingsSection: {
     gap: 8
