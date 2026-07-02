@@ -3,6 +3,7 @@ name: Mobile iOS
 on:
   workflow_dispatch:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - ".github/workflows/mobile-ios.yml"
       - "apps/mobile/**"
@@ -16,9 +17,16 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: mobile-ios-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   detox-ios:
     name: Build and test iOS POC
+    # Draft PRs skip the expensive simulator build; mark the PR ready for
+    # review (or dispatch manually) to run the full Detox suite.
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
     runs-on: macos-latest
     timeout-minutes: 60
     steps:
@@ -90,6 +98,15 @@ jobs:
       - name: Install Ruby dependencies
         working-directory: apps/mobile
         run: bundle _2.4.22_ install
+
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: |
+            apps/mobile/ios/Pods
+            ~/.cocoapods
+          key: pods-${{ runner.os }}-${{ hashFiles('apps/mobile/ios/Podfile.lock') }}
+          restore-keys: pods-${{ runner.os }}-
 
       - name: iOS environment doctor
         run: pnpm mobile:doctor:ios

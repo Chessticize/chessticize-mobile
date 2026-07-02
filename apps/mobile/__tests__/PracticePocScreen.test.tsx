@@ -1867,6 +1867,63 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "review-session")).toThrow();
   });
 
+  it("keeps a wrong due Arrow Duel review on the same puzzle until Continue is pressed", async () => {
+    const service = createMobilePracticeService("familiar15");
+    let sprintState = service.startSprint(
+      {
+        mode: "arrow_duel",
+        durationSeconds: 300,
+        perPuzzleSeconds: 30,
+        targetCorrect: 10,
+        maxMistakes: 3
+      },
+      "2026-06-20T00:00:00.000Z"
+    );
+    const firstPuzzleSolution = [...requireArrowDuelState(sprintState).puzzle.solutionMoves];
+    const wrongMoves: string[] = [];
+    wrongMoves.push(currentArrowWrongMove(sprintState));
+    sprintState = service.submitMove(wrongMoves[0] as string, "2026-06-20T00:00:05.000Z").state;
+    wrongMoves.push(currentArrowWrongMove(sprintState));
+    sprintState = service.submitMove(wrongMoves[1] as string, "2026-06-20T00:00:10.000Z").state;
+    wrongMoves.push(currentArrowWrongMove(sprintState));
+    service.submitMove(wrongMoves[2] as string, "2026-06-20T00:00:15.000Z");
+    const stockfish = createScriptedStockfishTransport(() => {});
+    const renderer = renderScreen({
+      practiceService: service,
+      stockfishTransportFactory: () => stockfish.transport
+    });
+
+    press(renderer, "review-tab");
+    press(renderer, "review-start-due");
+
+    expectText(renderer, "1 / 3 · Arrow Duel");
+    expect(() => findByTestId(renderer, "review-line-continue")).toThrow();
+
+    await boardMove(renderer, wrongMoves[0] as string);
+    await settleFeedbackSnapshot();
+    await settleFeedbackSnapshot();
+    expectText(renderer, "1 / 3 · Arrow Duel");
+
+    for (let cursor = 2; cursor < firstPuzzleSolution.length; cursor += 2) {
+      const guidedMove = firstPuzzleSolution[cursor];
+      if (!guidedMove) {
+        break;
+      }
+      await boardMove(renderer, guidedMove);
+      await settleFeedbackSnapshot();
+    }
+    await settleFeedbackSnapshot();
+
+    expectText(renderer, "1 / 3 · Arrow Duel");
+    expect(findByTestId(renderer, "review-line-continue")).toBeTruthy();
+    expect(findByTestId(renderer, "review-line-continue").props.accessibilityLabel).toBe("Continue to next review");
+
+    press(renderer, "review-line-continue");
+
+    expectText(renderer, "2 / 3 · Arrow Duel");
+    expect(() => findByTestId(renderer, "review-line-continue")).toThrow();
+  });
+
   it("ignores stale board callbacks instead of recording a correct visible move as wrong", async () => {
     const renderer = renderStandardSequenceScreen();
 
@@ -2007,15 +2064,16 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "packs-action-header"))).not.toContain("Coverage");
     expect(collectText(findByTestId(renderer, "packs-action-header"))).not.toContain("Offline-ready puzzle sources");
     press(renderer, "packs-tab");
-    expect(() => findByTestId(renderer, "packs-offline-readiness")).toThrow();
+    expect(() => findByTestId(renderer, "packs-import")).toThrow();
+    expect(() => findByTestId(renderer, "packs-optional-section")).toThrow();
+    expect(() => findByTestId(renderer, "packs-remove")).toThrow();
     expect(findByTestId(renderer, "packs-coverage-summary")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "packs-coverage-header"))).toBe("Coverage");
-    expect(collectText(findByTestId(renderer, "packs-summary-installed"))).toContain("2 packs");
-    expect(collectText(findByTestId(renderer, "packs-summary-puzzles"))).toContain("~51k");
-    expect(collectText(findByTestId(renderer, "packs-summary-rating"))).toContain("600-2200");
+    expect(collectText(findByTestId(renderer, "packs-summary-installed"))).toContain("1 pack");
+    expect(collectText(findByTestId(renderer, "packs-summary-puzzles"))).toContain("~1k");
+    expect(collectText(findByTestId(renderer, "packs-summary-rating"))).toContain("600-1600");
     expect(collectText(findByTestId(renderer, "packs-summary-arrow-duel"))).toContain("Ready");
     expect(findByTestId(renderer, "packs-installed-section")).toBeTruthy();
-    expect(findByTestId(renderer, "packs-optional-section")).toBeTruthy();
     expect(findByTestId(renderer, "packs-installed-core")).toBeTruthy();
     expect(findByTestId(renderer, "packs-installed-core").props.accessibilityLabel).toContain("Core Pack, active puzzle pack");
     expect(findByTestId(renderer, "packs-installed-core").props.accessibilityLabel).toContain("rating 600-1600");
@@ -2023,28 +2081,12 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "packs-active-core"))).toBe("");
     expect(collectText(findByTestId(renderer, "packs-installed-core"))).not.toContain("Active");
     expect(collectText(findByTestId(renderer, "packs-meta-core"))).toBe("600-1600 · Mixed · Arrow Duel Ready");
-    expect(collectText(findByTestId(renderer, "packs-meta-tactics"))).toBe("800-2200 · Tactics · Arrow Duel Partial");
-    expect(collectText(findByTestId(renderer, "packs-installed-core"))).not.toContain("Rating 600 - 1600 · Mixed, mate, endgame · Arrow Duel ready");
-    expect(findByTestId(renderer, "packs-coverage-core")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "packs-subtitle-core"))).toBe("~1k puzzles");
+    expect(findByTestId(renderer, "packs-coverage-core")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "packs-coverage-core"))).toBe("");
     expect(findByTestId(renderer, "packs-coverage-core").props.accessibilityLabel).toBe("Rating 600-1600, themes Mixed, Arrow Duel Ready");
-    expect(collectText(findByTestId(renderer, "packs-detail-core"))).toBe("");
-    expect(findByTestId(renderer, "packs-installed-tactics")).toBeTruthy();
-    expect(findByTestId(renderer, "packs-optional-endgame")).toBeTruthy();
-    expect(findByTestId(renderer, "packs-coverage-endgame")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "packs-subtitle-endgame"))).toBe("~40k puzzles");
-    expect(collectText(findByTestId(renderer, "packs-meta-endgame"))).toBe("900-2400 · Endgame · Arrow Duel Limited");
-    expect(collectText(findByTestId(renderer, "packs-coverage-endgame"))).toBe("");
-    expect(findByTestId(renderer, "packs-coverage-endgame").props.accessibilityLabel).toBe("Rating 900-2400, themes Endgame, Arrow Duel Limited");
-    expect(collectText(findByTestId(renderer, "packs-import-endgame"))).toBe("");
-    expect(findByTestId(renderer, "packs-import-endgame-glyph")).toBeTruthy();
-    expect(findByTestId(renderer, "packs-optional-mate-in-n")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "packs-meta-mate-in-n"))).toBe("700-2300 · Mate · Arrow Duel Ready");
-    expect(findByTestId(renderer, "packs-import")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "packs-import"))).toBe("");
-    expect(styleEntryMatches(findByTestId(renderer, "packs-import").props.style, "borderWidth", 1)).toBe(false);
-    expect(collectText(findByTestId(renderer, "packs-action-header"))).not.toContain("＋");
+    expect(findByTestId(renderer, "packs-offline-readiness")).toBeTruthy();
+    expectText(renderer, "The bundled Core Pack ships with the app and works fully offline. This version does not download additional packs.");
     press(renderer, "packs-detail-core");
     expect(findByTestId(renderer, "pack-detail-panel")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "pack-detail-close"))).toBe("");
@@ -2063,61 +2105,6 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "pack-detail-remove")).toThrow();
     press(renderer, "pack-detail-close");
     expect(() => findByTestId(renderer, "pack-detail-panel")).toThrow();
-    press(renderer, "packs-detail-mate-in-n");
-    expect(findByTestId(renderer, "pack-detail-import")).toBeTruthy();
-    press(renderer, "pack-detail-import");
-    expectText(renderer, "Mate in N Pack validated and activated for offline use");
-    expect(findByTestId(renderer, "packs-installed-mate-in-n")).toBeTruthy();
-    expect(() => findByTestId(renderer, "packs-optional-mate-in-n")).toThrow();
-    expect(findByTestId(renderer, "pack-detail-remove")).toBeTruthy();
-    press(renderer, "pack-detail-close");
-    press(renderer, "packs-import");
-    expect(findByTestId(renderer, "packs-import-progress")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "packs-import-progress-value"))).toBe("100%");
-    expectText(renderer, "Imported Pack");
-    expectText(renderer, "Manifest validated");
-    expect(findByTestId(renderer, "packs-import-step-manifest")).toBeTruthy();
-    expect(findByTestId(renderer, "packs-import-step-license")).toBeTruthy();
-    expect(findByTestId(renderer, "packs-import-step-activate")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "packs-import-step-manifest-mark"))).toBe("");
-    expect(collectText(findByTestId(renderer, "packs-import-step-license-mark"))).toBe("");
-    expect(collectText(findByTestId(renderer, "packs-import-step-activate-mark"))).toBe("");
-    expect(collectText(findByTestId(renderer, "packs-import-progress"))).not.toContain("…");
-    expectText(renderer, "Imported Pack validated and activated for offline use");
-    expect(findByTestId(renderer, "packs-installed-imported")).toBeTruthy();
-    expect(findByTestId(renderer, "packs-installed-imported").props.accessibilityLabel).toContain("Imported Pack, installed puzzle pack");
-    expect(findByTestId(renderer, "packs-installed-imported").props.accessibilityLabel).toContain("rating 900-2100");
-    expect(collectText(findByTestId(renderer, "packs-installed-imported"))).not.toContain("Installed");
-    press(renderer, "packs-import-endgame");
-    expectText(renderer, "Endgame Pack");
-    expectText(renderer, "Endgame Pack validated and activated for offline use");
-    expect(findByTestId(renderer, "packs-installed-endgame")).toBeTruthy();
-    expect(() => findByTestId(renderer, "packs-optional-endgame")).toThrow();
-    press(renderer, "packs-detail-endgame");
-    expect(findByTestId(renderer, "pack-detail-remove")).toBeTruthy();
-    press(renderer, "pack-detail-remove");
-    expect(findByTestId(renderer, "packs-remove-confirmation")).toBeTruthy();
-    expectText(renderer, "Remove Endgame Pack?");
-    press(renderer, "packs-remove-confirmation-cancel");
-    press(renderer, "pack-detail-close");
-    expect(findByTestId(renderer, "packs-remove-tactics")).toBeTruthy();
-    expect(findByTestId(renderer, "packs-remove")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "packs-remove"))).toBe("");
-    expect(findByTestId(renderer, "packs-remove-tactics-glyph")).toBeTruthy();
-    press(renderer, "packs-remove");
-    expect(findByTestId(renderer, "packs-remove-confirmation")).toBeTruthy();
-    expectText(renderer, "Remove Tactics Pack?");
-    expectText(renderer, "Attempt history and review schedules stay intact.");
-    press(renderer, "packs-remove-confirmation-cancel");
-    expect(() => findByTestId(renderer, "packs-remove-confirmation")).toThrow();
-    press(renderer, "packs-remove");
-    press(renderer, "packs-remove-confirmation-confirm");
-    expectText(renderer, "Tactics Pack removed; history retained");
-    expect(collectText(findByTestId(renderer, "packs-summary-installed"))).toContain("4 packs");
-    expect(collectText(findByTestId(renderer, "packs-summary-puzzles"))).toContain("~96k");
-    expect(collectText(findByTestId(renderer, "packs-summary-rating"))).toContain("600-2400");
-    expect(() => findByTestId(renderer, "packs-installed-tactics")).toThrow();
-    expect(findByTestId(renderer, "packs-installed-core")).toBeTruthy();
     expect(findByTestId(renderer, "packs-license-notes")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "packs-license-notes"))).toContain("Lichess-derived");
     expect(collectText(findByTestId(renderer, "packs-info-section"))).not.toContain("Manifest");
@@ -2143,27 +2130,21 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "settings-advanced-rating-standard-value"))).toBe("ELO 600");
   });
 
-  it("keeps the bundled core pack visibly offline-ready after optional packs are removed", () => {
+  it("ships only the bundled core pack with no download or remove affordances", () => {
     const renderer = renderScreen();
 
     press(renderer, "packs-tab");
-    expect(findByTestId(renderer, "packs-installed-core")).toBeTruthy();
-    expect(findByTestId(renderer, "packs-installed-tactics")).toBeTruthy();
-    expect(() => findByTestId(renderer, "packs-offline-readiness")).toThrow();
 
-    press(renderer, "packs-remove");
-    expect(findByTestId(renderer, "packs-remove-confirmation")).toBeTruthy();
-    press(renderer, "packs-remove-confirmation-confirm");
-
-    expect(() => findByTestId(renderer, "packs-installed-tactics")).toThrow();
     expect(findByTestId(renderer, "packs-installed-core")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "packs-summary-installed"))).toContain("1 pack");
-    expect(collectText(findByTestId(renderer, "packs-summary-puzzles"))).toContain("~1k");
-    expect(collectText(findByTestId(renderer, "packs-summary-rating"))).toContain("600-1600");
     expect(findByTestId(renderer, "packs-offline-readiness")).toBeTruthy();
-    expectText(renderer, "Core Pack remains installed and fully available offline.");
-    expectText(renderer, "Removing optional packs does not delete history or review schedules.");
-    expectText(renderer, "Tactics Pack removed; history retained");
+    expect(collectText(findByTestId(renderer, "packs-summary-installed"))).toContain("1 pack");
+    expect(() => findByTestId(renderer, "packs-import")).toThrow();
+    expect(() => findByTestId(renderer, "packs-remove")).toThrow();
+    expect(() => findByTestId(renderer, "packs-optional-section")).toThrow();
+    expect(() => findByTestId(renderer, "packs-import-progress")).toThrow();
+    expect(() => findByTestId(renderer, "packs-remove-confirmation")).toThrow();
+    expect(collectText(findByTestId(renderer, "packs-panel"))).not.toContain("Import");
+    expect(collectText(findByTestId(renderer, "packs-panel"))).not.toContain("Remove");
   });
 
   it("deletes local history and review queue from Settings while preserving rating", () => {
