@@ -1546,6 +1546,7 @@ function PracticeModeCard({
 }): React.JSX.Element {
   const label = modeLabel(item.mode);
   const detail = practiceModeDetailLabel(item);
+  const timingLabel = formatSprintTimingLabel(item.config);
   const ratingLabel = `ELO ${item.rating}`;
   return (
     <Pressable
@@ -1564,7 +1565,13 @@ function PracticeModeCard({
           <View style={styles.practiceModeTitleRow}>
             <Text style={styles.practiceModeTitle}>{label}</Text>
           </View>
-          <Text style={styles.practiceModeDescription}>{PRACTICE_MODE_DESCRIPTIONS[item.mode]}</Text>
+          <Text
+            ellipsizeMode="tail"
+            numberOfLines={1}
+            style={styles.practiceModeDescription}
+          >
+            {PRACTICE_MODE_DESCRIPTIONS[item.mode]} · {timingLabel}
+          </Text>
           <View
             accessibilityLabel={detail}
             testID={`practice-mode-${item.mode.replace("_", "-")}-details`}
