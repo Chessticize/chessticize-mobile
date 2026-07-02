@@ -380,6 +380,11 @@ Custom sprint behavior:
 
 ### Packs
 
+V1 scope note: pack downloading, import, and removal are deferred beyond v1
+(see `V1_IMPLEMENTATION_GUIDE.md`). V1 ships a bundled puzzle pack only; the
+Packs screen shows the bundled pack, its coverage, and license/source
+attribution. The requirements below describe the full post-v1 feature.
+
 - Bundled core pack appears first and must show installed/active state.
 - Optional packs show estimated puzzle count, rating range, theme coverage, and Arrow Duel count.
 - Pack detail shows source attribution, presolve status, manifest hash, build date, and license notes.
@@ -415,8 +420,8 @@ Required labels/test IDs:
 - `settings-icloud-sync-toggle`
 - `settings-reset-elo`
 - `packs-installed-core`
-- `packs-import`
-- `packs-remove`
+- `packs-import` (deferred beyond v1 with pack downloading)
+- `packs-remove` (deferred beyond v1 with pack downloading)
 - `packs-license-notes`
 
 Accessibility rules:

@@ -6,16 +6,16 @@ Audit date: 2026-07-02, against `MOBILE_UI_DESIGN.md` (authoritative spec) and
 
 ## Current Goal
 
-The visual design-board implementation is largely done. The goal is no longer
-"implement the ui-design screens" — all ten design-board screens exist, the
-accessibility/testID contract is complete, the color/typography tokens match, and
-the architecture boundary (UI renders view models, domain packages compute
-outcomes) is respected.
+**The design-board goal is closed as DONE (2026-07-02).** All ten design-board
+screens exist at visual parity, the accessibility/testID contract is complete,
+the color/typography tokens match, and the architecture boundary (UI renders
+view models, domain packages compute outcomes) is respected.
 
-The updated goal is: **close the behavioral gaps between the implemented screens
-and the written spec, replacing mock/placeholder surfaces with real domain-backed
-behavior.** Work through the priorities below top-down. Stop doing standalone
-visual polish PRs; batch any polish into the feature PR that touches that screen.
+This document is the audit record behind that call. The active work plan is
+`V1_IMPLEMENTATION_GUIDE.md`, which supersedes the priorities below where they
+conflict — notably, pack downloading/import/removal is cut from v1, which
+retires items 4 and 5's import aspects. Stop doing standalone visual polish
+PRs; batch any polish into the feature PR that touches that screen.
 
 ## Status Summary
 
@@ -52,11 +52,10 @@ Strongly at parity (audited, no action needed):
    pack warning can misrepresent what will actually be selected. Fix: thread theme
    through the sprint start intent into domain puzzle selection.
 
-4. **Packs tab is entirely mock.** `PACK_CATALOG` (~L6108) is hardcoded; install,
-   remove, and import-validation states are local `useState` with no persistence,
-   so "manifest validated before activation" and "remove keeps attempt history"
-   are only cosmetically satisfied. Fix: a packs domain/storage service behind the
-   existing UI contract. This is the largest remaining feature.
+4. **Packs tab is entirely mock.** *(Superseded 2026-07-02: pack
+   download/import/removal is cut from v1 and the UI for it was removed. The
+   remaining v1 work is bundling a real puzzle set and driving the Packs tab
+   from its real metadata — see `V1_IMPLEMENTATION_GUIDE.md` item 1.)*
 
 5. **Custom sprint "Previous configs" are hardcoded placeholders** (~L1671-1696).
    Fix: persist recently used custom configs and render them as real reusable rows

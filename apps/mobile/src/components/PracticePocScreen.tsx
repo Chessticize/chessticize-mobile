@@ -3898,31 +3898,6 @@ function ChevronGlyph({ direction }: { direction: "left" | "right" }): React.JSX
   );
 }
 
-function CloudDownloadGlyph({ testID = "cloud-download-glyph" }: { testID?: string }): React.JSX.Element {
-  return (
-    <View style={styles.cloudDownloadGlyph} testID={testID}>
-      <View style={styles.cloudDownloadArcLarge} />
-      <View style={styles.cloudDownloadArcSmall} />
-      <View style={styles.cloudDownloadBase} />
-      <View style={styles.cloudDownloadArrowStem} />
-      <View style={styles.cloudDownloadArrowHead} />
-    </View>
-  );
-}
-
-function TrashGlyph({ testID = "trash-glyph" }: { testID?: string }): React.JSX.Element {
-  return (
-    <View style={styles.trashGlyph} testID={testID}>
-      <View style={styles.trashGlyphLid} />
-      <View style={styles.trashGlyphHandle} />
-      <View style={styles.trashGlyphCan}>
-        <View style={styles.trashGlyphLine} />
-        <View style={styles.trashGlyphLine} />
-      </View>
-    </View>
-  );
-}
-
 function ResetGlyph(): React.JSX.Element {
   return (
     <View style={styles.resetGlyph} testID="reset-glyph">
@@ -6127,12 +6102,6 @@ type PackRowModel = {
   testID: string;
 };
 
-type PackImportProgress = {
-  packTitle: string;
-  progress: number;
-  status: "validating" | "ready";
-};
-
 const PACK_CATALOG: PackRowModel[] = [
   {
     id: "core",
@@ -6152,138 +6121,22 @@ const PACK_CATALOG: PackRowModel[] = [
     licenseNote: "Derived from Lichess puzzle data with Chessticize presolve metadata.",
     status: "active",
     testID: "packs-installed-core"
-  },
-  {
-    id: "tactics",
-    title: "Tactics Pack",
-    subtitle: "~50k puzzles · installed",
-    detail: "Rating 800 - 2200 · tactics-heavy coverage",
-    coverage: {
-      puzzles: "~50k",
-      rating: "800-2200",
-      themes: "Tactics",
-      arrowDuel: "Partial"
-    },
-    source: "Lichess puzzle database",
-    presolveStatus: "Presolved locally",
-    manifestHash: "tactics-preview-50k",
-    buildDate: "Preview bundle",
-    licenseNote: "Imported packs keep source attribution and do not modify attempt history.",
-    status: "installed",
-    testID: "packs-installed-tactics"
-  },
-  {
-    id: "endgame",
-    title: "Endgame Pack",
-    subtitle: "~40k puzzles · optional",
-    detail: "Rating 900 - 2400 · rook, pawn, conversion themes",
-    coverage: {
-      puzzles: "~40k",
-      rating: "900-2400",
-      themes: "Endgame",
-      arrowDuel: "Limited"
-    },
-    source: "Lichess puzzle database",
-    presolveStatus: "Manifest pending validation",
-    manifestHash: "endgame-manifest-pending",
-    buildDate: "Remote optional pack",
-    licenseNote: "Activation requires manifest validation before offline use.",
-    status: "optional",
-    testID: "packs-optional-endgame"
-  },
-  {
-    id: "mate-in-n",
-    title: "Mate in N Pack",
-    subtitle: "~30k puzzles · optional",
-    detail: "Rating 700 - 2300 · mate themes · Arrow Duel candidates",
-    coverage: {
-      puzzles: "~30k",
-      rating: "700-2300",
-      themes: "Mate",
-      arrowDuel: "Ready"
-    },
-    source: "Lichess puzzle database",
-    presolveStatus: "Manifest pending validation",
-    manifestHash: "mate-n-manifest-pending",
-    buildDate: "Remote optional pack",
-    licenseNote: "Activation requires manifest validation before offline use.",
-    status: "optional",
-    testID: "packs-optional-mate-in-n"
-  },
-  {
-    id: "imported",
-    title: "Imported Pack",
-    subtitle: "~25k puzzles · imported",
-    detail: "Rating 900 - 2100 · mixed coverage · Arrow Duel partial",
-    coverage: {
-      puzzles: "~25k",
-      rating: "900-2100",
-      themes: "Mixed",
-      arrowDuel: "Partial"
-    },
-    source: "External pack manifest",
-    presolveStatus: "Validated and presolved",
-    manifestHash: "imported-preview-manifest",
-    buildDate: "Local import",
-    licenseNote: "Imported packs must include compatible source attribution before activation.",
-    status: "optional",
-    testID: "packs-optional-imported"
   }
 ];
 
-const INITIAL_INSTALLED_PACK_IDS = ["core", "tactics"];
-
 function PacksPanel(): React.JSX.Element {
-  const [installedPackIds, setInstalledPackIds] = useState(INITIAL_INSTALLED_PACK_IDS);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [importProgress, setImportProgress] = useState<PackImportProgress | null>(null);
-  const [removalPack, setRemovalPack] = useState<PackRowModel | null>(null);
   const [selectedPackId, setSelectedPackId] = useState<string | null>(null);
-  const installedPacks = PACK_CATALOG
-    .filter((pack) => installedPackIds.includes(pack.id))
-    .map((pack) => packWithStatus(pack, pack.id === "core" ? "active" : "installed"));
-  const optionalPacks = PACK_CATALOG
-    .filter((pack) => pack.id !== "imported" && !installedPackIds.includes(pack.id))
-    .map((pack) => packWithStatus(pack, "optional"));
-  const firstRemovablePackId = installedPacks.find((pack) => pack.id !== "core")?.id ?? null;
+  const installedPacks = PACK_CATALOG;
   const selectedPack = selectedPackId === null
     ? null
-    : packWithStatus(
-      PACK_CATALOG.find((pack) => pack.id === selectedPackId) ?? PACK_CATALOG[0],
-      installedPackIds.includes(selectedPackId)
-        ? selectedPackId === "core" ? "active" : "installed"
-        : "optional"
-    );
+    : PACK_CATALOG.find((pack) => pack.id === selectedPackId) ?? null;
   const coverageSummary = summarizeInstalledPackCoverage(installedPacks);
-
-  function beginPackImport(pack: PackRowModel): void {
-    setInstalledPackIds((current) => current.includes(pack.id) ? current : [...current, pack.id]);
-    setImportProgress({
-      packTitle: pack.title,
-      progress: 100,
-      status: "ready"
-    });
-    setStatusMessage(`${pack.title} validated and activated for offline use`);
-  }
 
   return (
     <View style={styles.packsPanel} testID="packs-panel">
       <View style={styles.historyHeaderRow} testID="packs-action-header">
         <Text style={styles.screenTitle}>Puzzle Packs</Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Import puzzle pack"
-          testID="packs-import"
-          style={styles.headerIconButton}
-          onPress={() => beginPackImport(PACK_CATALOG.find((pack) => pack.id === "imported") ?? PACK_CATALOG[0])}
-        >
-          <PlusGlyph />
-        </Pressable>
       </View>
-
-      {importProgress ? (
-        <PackImportProgressCard progress={importProgress} />
-      ) : null}
 
       <View style={styles.packCoverageCard} testID="packs-coverage-summary">
         <View style={styles.sectionHeaderRow} testID="packs-coverage-header">
@@ -6307,42 +6160,21 @@ function PacksPanel(): React.JSX.Element {
             key={pack.id}
             pack={pack}
             onOpenDetail={() => setSelectedPackId(pack.id)}
-            onRemove={pack.id === "core" ? undefined : () => setRemovalPack(pack)}
-            removeTestID={pack.id === firstRemovablePackId ? "packs-remove" : `packs-remove-${pack.id}-button`}
           />
         ))}
       </PackSection>
 
-      <PackSection title="Optional Packs" testID="packs-optional-section">
-        {optionalPacks.length > 0 ? (
-          optionalPacks.map((pack) => (
-            <PackRow
-              key={pack.id}
-              pack={pack}
-              onOpenDetail={() => setSelectedPackId(pack.id)}
-              onImport={() => beginPackImport(pack)}
-            />
-          ))
-        ) : (
-          <Text style={styles.helperText} testID="packs-no-optional-packs">All available packs are installed.</Text>
-        )}
-      </PackSection>
-
-      {installedPacks.length === 1 ? (
-        <View style={styles.packInfoCard} testID="packs-offline-readiness">
-          <Text style={styles.sectionLabel}>Offline Ready</Text>
-          <Text style={styles.helperText}>
-            Core Pack remains installed and fully available offline. Removing optional packs does not delete history or review schedules.
-          </Text>
-        </View>
-      ) : null}
+      <View style={styles.packInfoCard} testID="packs-offline-readiness">
+        <Text style={styles.sectionLabel}>Offline Ready</Text>
+        <Text style={styles.helperText}>
+          The bundled Core Pack ships with the app and works fully offline. This version does not download additional packs.
+        </Text>
+      </View>
 
       {selectedPack ? (
         <PackDetailPanel
           pack={selectedPack}
           onClose={() => setSelectedPackId(null)}
-          onImport={selectedPack.status === "optional" ? () => beginPackImport(selectedPack) : undefined}
-          onRemove={selectedPack.status === "installed" ? () => setRemovalPack(selectedPack) : undefined}
         />
       ) : null}
 
@@ -6357,46 +6189,8 @@ function PacksPanel(): React.JSX.Element {
           testID="packs-license-notes"
         />
       </View>
-
-      {removalPack ? (
-        <DestructiveConfirmationCard
-          confirmLabel="Remove Pack"
-          description={`${removalPack.title} will be disabled from offline selection. Attempt history and review schedules stay intact.`}
-          testID="packs-remove-confirmation"
-          title={`Remove ${removalPack.title}?`}
-          onCancel={() => setRemovalPack(null)}
-          onConfirm={() => {
-            setInstalledPackIds((current) => current.filter((id) => id !== removalPack.id));
-            if (selectedPackId === removalPack.id) {
-              setSelectedPackId(null);
-            }
-            setRemovalPack(null);
-            setStatusMessage(`${removalPack.title} removed; history retained`);
-          }}
-        />
-      ) : null}
-
-      {statusMessage ? (
-        <Text style={styles.settingsStatusText} testID="packs-status-message">{statusMessage}</Text>
-      ) : null}
     </View>
   );
-}
-
-function packWithStatus(pack: PackRowModel, status: PackRowModel["status"]): PackRowModel {
-  const installedLabel = status === "active"
-    ? "offline"
-    : status === "installed"
-      ? "installed"
-      : "optional";
-  return {
-    ...pack,
-    subtitle: pack.subtitle.replace(/(offline|installed|optional|imported)$/, installedLabel),
-    presolveStatus: status === "optional" ? pack.presolveStatus : "Validated and presolved",
-    manifestHash: status === "optional" ? pack.manifestHash : pack.manifestHash.replace("pending", "validated"),
-    status,
-    testID: `packs-${status === "optional" ? "optional" : "installed"}-${pack.id}`
-  };
 }
 
 function summarizeInstalledPackCoverage(packs: PackRowModel[]): { puzzles: string; rating: string; arrowDuel: string } {
@@ -6464,82 +6258,13 @@ function PackSection({
   );
 }
 
-function PackImportProgressCard({
-  progress
-}: {
-  progress: PackImportProgress;
-}): React.JSX.Element {
-  return (
-    <View style={styles.packImportProgressCard} testID="packs-import-progress">
-      <View style={styles.packImportHeader}>
-        <View>
-          <Text style={styles.sectionLabel}>{progress.packTitle}</Text>
-          <Text style={styles.helperText}>
-            {progress.status === "ready" ? "Manifest validated" : "Manifest validation in progress"}
-          </Text>
-        </View>
-        <Text style={styles.packImportPercent} testID="packs-import-progress-value">{progress.progress}%</Text>
-      </View>
-      <View style={styles.packProgressTrack}>
-        <View style={[styles.packProgressFill, { width: `${progress.progress}%` }]} />
-      </View>
-      <View style={styles.packImportStepList}>
-        <PackImportStep done label="Read manifest" testID="packs-import-step-manifest" />
-        <PackImportStep done label="Validate source and license" testID="packs-import-step-license" />
-        <PackImportStep done={progress.status === "ready"} label="Activate after validation" testID="packs-import-step-activate" />
-      </View>
-    </View>
-  );
-}
-
-function PackImportStep({
-  done,
-  label,
-  testID
-}: {
-  done: boolean;
-  label: string;
-  testID: string;
-}): React.JSX.Element {
-  return (
-    <View style={styles.packImportStep} testID={testID}>
-      <PackImportStepMark done={done} testID={`${testID}-mark`} />
-      <Text style={styles.helperText}>{label}</Text>
-    </View>
-  );
-}
-
-function PackImportStepMark({ done, testID }: { done: boolean; testID: string }): React.JSX.Element {
-  if (done) {
-    return (
-      <View style={[styles.packImportStepMark, styles.packImportStepDone]} testID={testID}>
-        <View style={[styles.packImportStepGlyphLine, styles.packImportStepCheckShort]} />
-        <View style={[styles.packImportStepGlyphLine, styles.packImportStepCheckLong]} />
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.packImportStepMark} testID={testID}>
-      <View style={styles.packImportStepPendingDot} />
-    </View>
-  );
-}
-
 function PackRow({
-  onImport,
   onOpenDetail,
-  onRemove,
-  pack,
-  removeTestID
+  pack
 }: {
-  onImport?: () => void;
   onOpenDetail: () => void;
-  onRemove?: () => void;
   pack: PackRowModel;
-  removeTestID?: string;
 }): React.JSX.Element {
-  const isOptional = pack.status === "optional";
   const statusLabel = pack.status === "active" ? "Active" : pack.status === "installed" ? "Installed" : "Optional";
   const coverageLabel = `${pack.coverage.puzzles} puzzles, rating ${pack.coverage.rating}, ${pack.coverage.themes} themes, Arrow Duel ${pack.coverage.arrowDuel}`;
   const optionalCoverageSummary = `${pack.coverage.rating} · ${pack.coverage.themes} · Arrow Duel ${pack.coverage.arrowDuel}`;
@@ -6575,31 +6300,7 @@ function PackRow({
         >
           <ChevronGlyph direction="right" />
         </Pressable>
-      {isOptional ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Import ${pack.title}`}
-          testID={`packs-import-${pack.id}`}
-          style={styles.packActionButton}
-          onPress={onImport}
-        >
-          <CloudDownloadGlyph testID={`packs-import-${pack.id}-glyph`} />
-        </Pressable>
-      ) : onRemove ? (
-        <View testID={`packs-remove-${pack.id}`}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Remove ${pack.title}`}
-            testID={removeTestID}
-            style={styles.packActionButton}
-            onPress={onRemove}
-          >
-            <TrashGlyph testID={`packs-remove-${pack.id}-glyph`} />
-          </Pressable>
-        </View>
-      ) : (
-        <PackActiveMark testID={`packs-active-${pack.id}`} />
-      )}
+      <PackActiveMark testID={`packs-active-${pack.id}`} />
       </View>
     </View>
   );
@@ -6616,13 +6317,9 @@ function PackActiveMark({ testID }: { testID: string }): React.JSX.Element {
 
 function PackDetailPanel({
   onClose,
-  onImport,
-  onRemove,
   pack
 }: {
   onClose: () => void;
-  onImport?: () => void;
-  onRemove?: () => void;
   pack: PackRowModel;
 }): React.JSX.Element {
   return (
@@ -6653,28 +6350,6 @@ function PackDetailPanel({
       <Text testID="pack-detail-license-notes" style={styles.packLicenseText}>
         License notes: {pack.licenseNote}
       </Text>
-      {onImport ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Import ${pack.title}`}
-          testID="pack-detail-import"
-          style={styles.primaryButton}
-          onPress={onImport}
-        >
-          <Text style={styles.primaryButtonText}>Import Pack</Text>
-        </Pressable>
-      ) : null}
-      {onRemove ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Remove ${pack.title}`}
-          testID="pack-detail-remove"
-          style={styles.secondaryButton}
-          onPress={onRemove}
-        >
-          <Text style={styles.secondaryButtonText}>Remove Pack</Text>
-        </Pressable>
-      ) : null}
     </View>
   );
 }
@@ -7472,13 +7147,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     minHeight: 38
-  },
-  headerIconButton: {
-    alignItems: "center",
-    borderRadius: 8,
-    height: 38,
-    justifyContent: "center",
-    width: 38
   },
   screenTitle: {
     color: "#111827",
@@ -9466,83 +9134,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 38
   },
-  packImportProgressCard: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#BFDBFE",
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 10,
-    padding: 12
-  },
-  packImportHeader: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 8,
-    justifyContent: "space-between"
-  },
-  packImportPercent: {
-    color: "#2563EB",
-    fontFamily: "Menlo",
-    fontSize: 18,
-    fontWeight: "900"
-  },
-  packProgressTrack: {
-    backgroundColor: "#E2E8F0",
-    borderRadius: 999,
-    height: 8,
-    overflow: "hidden"
-  },
-  packProgressFill: {
-    backgroundColor: "#2563EB",
-    borderRadius: 999,
-    height: 8
-  },
-  packImportStepList: {
-    gap: 6
-  },
-  packImportStep: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 8
-  },
-  packImportStepMark: {
-    alignItems: "center",
-    borderColor: "#CBD5E1",
-    borderRadius: 999,
-    borderWidth: 1,
-    height: 16,
-    justifyContent: "center",
-    position: "relative",
-    width: 16
-  },
-  packImportStepDone: {
-    backgroundColor: "#DCFCE7",
-    borderColor: "#16A34A"
-  },
-  packImportStepGlyphLine: {
-    backgroundColor: "#16A34A",
-    borderRadius: 999,
-    height: 2,
-    position: "absolute"
-  },
-  packImportStepCheckShort: {
-    left: 4,
-    top: 8,
-    transform: [{ rotate: "45deg" }],
-    width: 4
-  },
-  packImportStepCheckLong: {
-    right: 3,
-    top: 7,
-    transform: [{ rotate: "-48deg" }],
-    width: 8
-  },
-  packImportStepPendingDot: {
-    backgroundColor: "#64748B",
-    borderRadius: 999,
-    height: 4,
-    width: 4
-  },
   packRow: {
     alignItems: "center",
     borderBottomColor: "#E2E8F0",
@@ -9642,16 +9233,6 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     gap: 8,
     justifyContent: "center"
-  },
-  packActionButton: {
-    alignItems: "center",
-    borderColor: "#93C5FD",
-    borderRadius: 8,
-    borderWidth: 1,
-    height: 34,
-    justifyContent: "center",
-    minWidth: 34,
-    paddingHorizontal: 8
   },
   packDetailButton: {
     alignItems: "center",
@@ -9766,107 +9347,6 @@ const styles = StyleSheet.create({
     borderRightWidth: 2.5,
     borderTopWidth: 2.5,
     transform: [{ rotate: "45deg" }]
-  },
-  cloudDownloadGlyph: {
-    height: 20,
-    position: "relative",
-    width: 22
-  },
-  cloudDownloadArcLarge: {
-    borderColor: "#1D4ED8",
-    borderRadius: 999,
-    borderWidth: 2,
-    height: 13,
-    left: 3,
-    position: "absolute",
-    top: 2,
-    width: 15
-  },
-  cloudDownloadArcSmall: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#1D4ED8",
-    borderRadius: 999,
-    borderWidth: 2,
-    height: 10,
-    left: 1,
-    position: "absolute",
-    top: 7,
-    width: 10
-  },
-  cloudDownloadBase: {
-    backgroundColor: "#FFFFFF",
-    borderBottomColor: "#1D4ED8",
-    borderBottomWidth: 2,
-    height: 7,
-    left: 3,
-    position: "absolute",
-    top: 10,
-    width: 17
-  },
-  cloudDownloadArrowStem: {
-    backgroundColor: "#1D4ED8",
-    borderRadius: 999,
-    height: 8,
-    left: 10,
-    position: "absolute",
-    top: 7,
-    width: 2
-  },
-  cloudDownloadArrowHead: {
-    borderBottomColor: "#1D4ED8",
-    borderBottomWidth: 2,
-    borderRightColor: "#1D4ED8",
-    borderRightWidth: 2,
-    height: 6,
-    left: 8,
-    position: "absolute",
-    top: 10,
-    transform: [{ rotate: "45deg" }],
-    width: 6
-  },
-  trashGlyph: {
-    height: 20,
-    position: "relative",
-    width: 18
-  },
-  trashGlyphLid: {
-    backgroundColor: "#DC2626",
-    borderRadius: 999,
-    height: 2,
-    left: 2,
-    position: "absolute",
-    top: 4,
-    width: 14
-  },
-  trashGlyphHandle: {
-    borderColor: "#DC2626",
-    borderRadius: 2,
-    borderTopWidth: 2,
-    height: 4,
-    left: 6,
-    position: "absolute",
-    top: 1,
-    width: 6
-  },
-  trashGlyphCan: {
-    alignItems: "center",
-    borderColor: "#DC2626",
-    borderRadius: 3,
-    borderWidth: 2,
-    flexDirection: "row",
-    gap: 3,
-    height: 13,
-    justifyContent: "center",
-    left: 3,
-    position: "absolute",
-    top: 6,
-    width: 12
-  },
-  trashGlyphLine: {
-    backgroundColor: "#DC2626",
-    borderRadius: 999,
-    height: 7,
-    width: 1.5
   },
   resetGlyph: {
     height: 18,
