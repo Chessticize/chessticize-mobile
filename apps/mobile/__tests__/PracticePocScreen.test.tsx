@@ -36,6 +36,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "packs-tab-icon")).toBeTruthy();
     expect(findByTestId(renderer, "settings-tab-icon")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "practice-tab-icon"))).toBe("");
+    expect(hasStyleEntry(findByTestId(renderer, "practice-tab-icon"), "backgroundColor", "#DBEAFE")).toBe(false);
     expect(findByTestId(renderer, "practice-tab-target-outer")).toBeTruthy();
     expect(findByTestId(renderer, "practice-tab-target-inner")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "settings-tab-icon"))).toBe("");
@@ -145,7 +146,9 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "session-timer-block").props.accessibilityLabel).toContain("Timer");
     expect(findByTestId(renderer, "session-rating-block").props.accessibilityLabel).toBe("ELO 600");
     expect(findByTestId(renderer, "session-mistakes-block").props.accessibilityLabel).toBe("Mistakes 0 of 3");
-    expect(collectText(findByTestId(renderer, "session-score-strip"))).toBe("0030");
+    expect(collectText(findByTestId(renderer, "session-score-strip"))).toContain("0Solved");
+    expect(collectText(findByTestId(renderer, "session-score-strip"))).toContain("0Mistakes");
+    expect(collectText(findByTestId(renderer, "session-score-strip"))).toContain("30Left");
     expect(collectText(findByTestId(renderer, "session-score-strip"))).not.toContain("✓");
     expect(collectText(findByTestId(renderer, "session-score-strip"))).not.toContain("×");
     expect(collectText(findByTestId(renderer, "session-score-strip"))).not.toContain("○");
@@ -265,6 +268,8 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "session-board")).toBeTruthy();
     expect(countPiecesInFen(board.props.fen)).toBeGreaterThan(0);
     expect(board.props.spriteSource).toBeTruthy();
+    expect(board.props.colors.white).toBe("#E6E8EB");
+    expect(board.props.colors.black).toBe("#7B8794");
     expect(board.props.colors.lastMoveHighlight).toBe("rgba(0, 0, 0, 0)");
     expect(board.props.colors.validMoveDot).toBe("rgba(15, 23, 42, 0.36)");
     expect(board.props.colors.validMoveCapture).toBe("rgba(15, 23, 42, 0.56)");
@@ -697,7 +702,11 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "custom-rating-range")).toThrow();
     expect(() => findByTestId(renderer, "custom-current-rating")).toThrow();
     expect(collectText(findByTestId(renderer, "custom-config-list"))).toContain("Current rating");
-    expect(collectText(findByTestId(renderer, "custom-config-list"))).toContain("separate bucket");
+    expect(collectText(findByTestId(renderer, "custom-config-list"))).not.toContain("separate bucket");
+    expect(findByTestId(renderer, "custom-separate-scoring-detail").props.accessibilityLabel).toBe("Custom · 20s pace · separate bucket");
+    expect(findByTestId(renderer, "custom-mode-summary-detail").props.accessibilityLabel).toBe("Board-move puzzle sprint");
+    expect(findByTestId(renderer, "custom-include-arrow-duel-detail").props.accessibilityLabel).toBe("Switches this custom sprint to Arrow Duel scoring.");
+    expect(collectText(findByTestId(renderer, "custom-include-arrow-duel"))).not.toContain("Switches this custom sprint");
     expect(collectText(findByTestId(renderer, "custom-previous-custom-5-20-meta"))).toContain("Mixed");
     expect(collectText(findByTestId(renderer, "custom-previous-custom-5-20-meta"))).toContain("5 min · 20s pace");
     expect(collectText(findByTestId(renderer, "custom-previous-custom-5-20-meta"))).toContain("Last Recently");
@@ -707,13 +716,13 @@ describe("PracticePocScreen", () => {
     press(renderer, "custom-previous-custom-3-30");
     expect(collectText(findByTestId(renderer, "custom-target-count"))).toBe("~6");
     expect(collectText(findByTestId(renderer, "custom-summary-target"))).toBe("Estimated puzzles~6");
-    expect(collectText(findByTestId(renderer, "custom-separate-scoring"))).toContain("Custom · 30s pace");
+    expect(findByTestId(renderer, "custom-separate-scoring-detail").props.accessibilityLabel).toBe("Custom · 30s pace · separate bucket");
     expect(collectText(findByTestId(renderer, "custom-separate-scoring"))).not.toContain("custom 3/30");
     expect(collectText(findByTestId(renderer, "custom-config-list"))).toContain("3m");
     expect(collectText(findByTestId(renderer, "custom-config-list"))).toContain("30 sec");
     press(renderer, "custom-previous-custom-5-20");
     expect(collectText(findByTestId(renderer, "custom-target-count"))).toBe("~15");
-    expect(collectText(findByTestId(renderer, "custom-separate-scoring"))).toContain("Custom · 20s pace");
+    expect(findByTestId(renderer, "custom-separate-scoring-detail").props.accessibilityLabel).toBe("Custom · 20s pace · separate bucket");
     expect(collectText(findByTestId(renderer, "custom-separate-scoring"))).not.toContain("custom 5/20");
     expect(findByTestId(renderer, "custom-include-arrow-duel")).toBeTruthy();
     expect(findByTestId(renderer, "custom-duration-stepper")).toBeTruthy();
@@ -753,7 +762,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "custom-per-puzzle-stepper-increase");
 
     expect(collectText(findByTestId(renderer, "custom-target-count"))).toBe("~6");
-    expect(collectText(findByTestId(renderer, "custom-separate-scoring"))).toContain("Custom · 30s pace");
+    expect(findByTestId(renderer, "custom-separate-scoring-detail").props.accessibilityLabel).toBe("Custom · 30s pace · separate bucket");
     expect(collectText(findByTestId(renderer, "custom-config-list"))).not.toContain("custom 3/30");
     expect(findByTestId(renderer, "start-sprint-button").props.accessibilityState).toEqual({ disabled: false });
 
@@ -799,7 +808,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "custom-mode-regular").props.accessibilityState).toEqual({ selected: false });
     expect(findByTestId(renderer, "custom-mode-arrow-duel").props.accessibilityState).toEqual({ selected: true });
     expect(collectText(findByTestId(renderer, "custom-mode-summary"))).toContain("Arrow Duel");
-    expect(collectText(findByTestId(renderer, "custom-separate-scoring"))).toContain("Arrow Duel · 20s pace");
+    expect(findByTestId(renderer, "custom-separate-scoring-detail").props.accessibilityLabel).toBe("Arrow Duel · 20s pace · separate bucket");
     expect(collectText(findByTestId(renderer, "custom-config-list"))).not.toContain("arrow_duel 5/20");
     expect(findByTestId(renderer, "start-sprint-button").props.accessibilityState).toEqual({ disabled: false });
 
@@ -843,8 +852,11 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "sprint-result-rating-snapshot")).toThrow();
     expect(findByTestId(renderer, "sprint-result-history-trend")).toBeTruthy();
     expect(() => findByTestId(renderer, "sprint-result-trend-plot")).toThrow();
-    expect(collectText(findByTestId(renderer, "sprint-result-history-trend"))).toContain("Rating Trend");
-    expect(collectText(findByTestId(renderer, "sprint-result-history-trend"))).toContain("History keeps the full performance chart");
+    expect(collectText(findByTestId(renderer, "sprint-result-history-trend"))).toContain("History");
+    expect(collectText(findByTestId(renderer, "sprint-result-history-trend"))).toContain("View performance trend");
+    expect(collectText(findByTestId(renderer, "sprint-result-history-trend"))).not.toContain("Rating Trend");
+    expect(collectText(findByTestId(renderer, "sprint-result-history-trend"))).not.toContain("History keeps the full performance chart");
+    expect(findByTestId(renderer, "sprint-result-history-trend").props.accessibilityLabel).toContain("rating 600 to 600");
     expect(collectText(findByTestId(renderer, "sprint-result-trend-start"))).toBe("600");
     expect(collectText(findByTestId(renderer, "sprint-result-trend-current"))).toBe("600");
     expectText(renderer, "Mistakes");
@@ -2001,10 +2013,12 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "packs-installed-tactics")).toThrow();
     expect(findByTestId(renderer, "packs-installed-core")).toBeTruthy();
     expect(findByTestId(renderer, "packs-license-notes")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "packs-license-notes"))).toContain("Lichess-derived");
+    expect(collectText(findByTestId(renderer, "packs-info-section"))).not.toContain("Manifest");
+    expect(collectText(findByTestId(renderer, "packs-info-section"))).not.toContain("Build date");
+    expect(findByTestId(renderer, "packs-license-notes-detail").props.accessibilityLabel).toBe("Puzzle data is derived from the Lichess puzzle database and bundled for offline use with Chessticize presolve metadata.");
     expect(findByTestId(renderer, "packs-source")).toBeTruthy();
     expect(findByTestId(renderer, "packs-processing")).toBeTruthy();
-    expect(findByTestId(renderer, "packs-manifest")).toBeTruthy();
-    expect(findByTestId(renderer, "packs-build-date")).toBeTruthy();
   });
 
   it("opens advanced rating controls from the current Puzzle ELO row", () => {
