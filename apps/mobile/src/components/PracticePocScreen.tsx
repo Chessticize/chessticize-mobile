@@ -998,12 +998,13 @@ export function PracticePocScreen({
   const historyReviewAttempts = fullHistoryReviewView?.attempts ?? displayedAttempts;
   const historyAvailableThemes = historyView?.availableThemes ?? [];
   const historyPage = historyView?.page ?? { limit: HISTORY_PAGE_LIMIT, offset: 0, total: 0, hasMore: false };
-  const appShellVisible = !isActive && !isShowingFeedbackSnapshot;
+  const contentOwnsHeader = tab === "review" || tab === "history" || tab === "packs";
+  const appChromeVisible = !isActive && !isShowingFeedbackSnapshot;
+  const appHeaderVisible = appChromeVisible && !contentOwnsHeader;
   const screenTitle = screenTitleFor(tab);
   const screenSubtitle = tab === "practice"
     ? `Offline-ready · ${seededPuzzleCount(puzzleSource)} puzzles`
     : screenSubtitleFor(tab);
-  const showHeaderRating = tab === "practice" && state === null && mode !== "custom";
   const practiceModeSummaries = (["standard", "arrow_duel", "blitz", "custom"] as const).map((nextMode) => {
     const config = sprintConfigFor(nextMode, customDurationSeconds, customPerPuzzleSeconds);
     return {
@@ -1019,7 +1020,7 @@ export function PracticePocScreen({
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" />
-      {appShellVisible ? (
+      {appHeaderVisible ? (
         <View
           accessibilityLabel={screenSubtitle ? `${screenTitle}, ${screenSubtitle}` : screenTitle}
           style={styles.header}
@@ -1028,15 +1029,12 @@ export function PracticePocScreen({
           <View>
             <Text style={styles.title}>{screenTitle}</Text>
           </View>
-          {showHeaderRating ? (
-            <Text testID="rating-label" style={styles.rating}>{`ELO ${formatRating(state, currentRating)}`}</Text>
-          ) : null}
         </View>
       ) : null}
 
       <ScrollView
         testID="practice-main-scroll"
-        contentContainerStyle={[styles.content, appShellVisible ? styles.contentWithBottomTabs : null]}
+        contentContainerStyle={[styles.content, appChromeVisible ? styles.contentWithBottomTabs : null]}
       >
         {tab === "practice" ? (
           <>
@@ -1333,7 +1331,7 @@ export function PracticePocScreen({
           <StockfishDiagnosticsPanel stockfishTransportFactory={stockfishTransportFactory} />
         ) : null}
       </ScrollView>
-      {appShellVisible ? (
+      {appChromeVisible ? (
         <View style={styles.bottomTabs}>
           {PRIMARY_TABS.map((item) => (
             <TabButton
@@ -2270,7 +2268,6 @@ function ActiveMistakeIndicator({
           />
         ))}
       </View>
-      <Text style={styles.activeMistakeCount}>{count}/{max}</Text>
     </View>
   );
 }
@@ -2316,10 +2313,10 @@ function SprintSummary({
           accessibilityRole="button"
           accessibilityLabel="View history trends"
           testID="sprint-result-history-button"
-          style={styles.resultTopBarButton}
+          style={styles.resultTopBarIconButton}
           onPress={onOpenHistory}
         >
-          <Text style={styles.resultTopBarActionText}>History</Text>
+          <ResultTrendGlyph />
         </Pressable>
       </View>
 
@@ -3022,7 +3019,8 @@ function HistoryPanel({
   });
   return (
     <View style={styles.historyPanel} testID="history-panel">
-      <View style={[styles.actionOnlyHeader, styles.rightAlignedActionHeader]} testID="history-action-header">
+      <View style={styles.historyHeaderRow} testID="history-action-header">
+        <Text style={styles.screenTitle}>History</Text>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={filtersExpanded ? "Hide history filters" : "Show history filters"}
@@ -3834,6 +3832,18 @@ function MoreGlyph(): React.JSX.Element {
   );
 }
 
+function ResultTrendGlyph(): React.JSX.Element {
+  return (
+    <View style={styles.resultTrendGlyph} testID="result-trend-glyph">
+      <View style={[styles.resultTrendGlyphDot, styles.resultTrendGlyphDotStart]} />
+      <View style={[styles.resultTrendGlyphDot, styles.resultTrendGlyphDotMiddle]} />
+      <View style={[styles.resultTrendGlyphDot, styles.resultTrendGlyphDotEnd]} />
+      <View style={[styles.resultTrendGlyphLine, styles.resultTrendGlyphLineFirst]} />
+      <View style={[styles.resultTrendGlyphLine, styles.resultTrendGlyphLineSecond]} />
+    </View>
+  );
+}
+
 function ChevronGlyph({ direction }: { direction: "left" | "right" }): React.JSX.Element {
   return (
     <View style={styles.chevronGlyphCanvas} testID={`chevron-${direction}-glyph`}>
@@ -4195,7 +4205,8 @@ function ReviewPanel({
 
   return (
     <View style={styles.reviewQueuePanel} testID="review-panel">
-      <View style={[styles.actionOnlyHeader, styles.rightAlignedActionHeader]} testID="review-action-header">
+      <View style={styles.historyHeaderRow} testID="review-action-header">
+        <Text style={styles.screenTitle}>Review</Text>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={filtersExpanded ? "Hide review filters" : "Show review filters"}
@@ -6183,22 +6194,26 @@ function PacksPanel(): React.JSX.Element {
 
   return (
     <View style={styles.packsPanel} testID="packs-panel">
+      <View style={styles.historyHeaderRow} testID="packs-action-header">
+        <Text style={styles.screenTitle}>Puzzle Packs</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Import puzzle pack"
+          testID="packs-import"
+          style={styles.headerIconButton}
+          onPress={() => beginPackImport(PACK_CATALOG.find((pack) => pack.id === "imported") ?? PACK_CATALOG[0])}
+        >
+          <PlusGlyph />
+        </Pressable>
+      </View>
+
       {importProgress ? (
         <PackImportProgressCard progress={importProgress} />
       ) : null}
 
       <View style={styles.packCoverageCard} testID="packs-coverage-summary">
-        <View style={styles.sectionHeaderRow} testID="packs-action-header">
+        <View style={styles.sectionHeaderRow} testID="packs-coverage-header">
           <Text style={styles.sectionLabel}>Coverage</Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Import puzzle pack"
-            testID="packs-import"
-            style={styles.packsIconButton}
-            onPress={() => beginPackImport(PACK_CATALOG.find((pack) => pack.id === "imported") ?? PACK_CATALOG[0])}
-          >
-            <PlusGlyph />
-          </Pressable>
         </View>
         <View style={styles.packCoverageGrid}>
           <PackCoverageMetric
@@ -6453,6 +6468,7 @@ function PackRow({
   const isOptional = pack.status === "optional";
   const statusLabel = pack.status === "active" ? "Active" : pack.status === "installed" ? "Installed" : "Optional";
   const coverageLabel = `${pack.coverage.puzzles} puzzles, rating ${pack.coverage.rating}, ${pack.coverage.themes} themes, Arrow Duel ${pack.coverage.arrowDuel}`;
+  const optionalCoverageSummary = `${pack.coverage.rating} · ${pack.coverage.themes} · Arrow Duel ${pack.coverage.arrowDuel}`;
   return (
     <View
       accessibilityLabel={`${pack.title}, ${statusLabel.toLowerCase()} puzzle pack, ${coverageLabel}`}
@@ -6464,6 +6480,11 @@ function PackRow({
           <Text style={styles.historyRowTitle}>{pack.title}</Text>
         </View>
         <Text style={styles.helperText} testID={`packs-subtitle-${pack.id}`}>{pack.coverage.puzzles} puzzles</Text>
+        {isOptional ? (
+          <Text style={styles.packOptionalMetaText} testID={`packs-optional-meta-${pack.id}`}>
+            {optionalCoverageSummary}
+          </Text>
+        ) : null}
         <Text
           accessibilityLabel={`Rating ${pack.coverage.rating}, themes ${pack.coverage.themes}, Arrow Duel ${pack.coverage.arrowDuel}`}
           style={styles.packCoverageHiddenText}
@@ -7187,11 +7208,6 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "700"
   },
-  rating: {
-    color: "#111827",
-    fontSize: 18,
-    fontWeight: "700"
-  },
   bottomTabs: {
     alignItems: "center",
     backgroundColor: "#FFFFFF",
@@ -7340,14 +7356,24 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between"
   },
-  actionOnlyHeader: {
+  historyHeaderRow: {
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
     minHeight: 38
   },
-  rightAlignedActionHeader: {
-    justifyContent: "flex-end"
+  headerIconButton: {
+    alignItems: "center",
+    borderRadius: 8,
+    height: 38,
+    justifyContent: "center",
+    width: 38
+  },
+  screenTitle: {
+    color: "#111827",
+    fontSize: 22,
+    fontWeight: "800",
+    lineHeight: 28
   },
   sectionLabel: {
     color: "#111827",
@@ -7820,9 +7846,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 6,
     justifyContent: "space-between",
-    minHeight: 44,
+    minHeight: 36,
     paddingHorizontal: 8,
-    paddingVertical: 2
+    paddingVertical: 1
   },
   sessionMetricBlock: {
     alignItems: "center",
@@ -7833,8 +7859,8 @@ const styles = StyleSheet.create({
   },
   activeMistakeIndicator: {
     alignItems: "center",
-    gap: 3,
-    minWidth: 48
+    justifyContent: "center",
+    minWidth: 42
   },
   activeMistakeDots: {
     flexDirection: "row",
@@ -7851,13 +7877,6 @@ const styles = StyleSheet.create({
   activeMistakeDotUsed: {
     backgroundColor: "#DC2626",
     borderColor: "#DC2626"
-  },
-  activeMistakeCount: {
-    color: "#64748B",
-    fontFamily: "menlo",
-    fontSize: 10,
-    fontWeight: "800",
-    lineHeight: 12
   },
   sessionAbandonConfirm: {
     alignItems: "center",
@@ -7898,7 +7917,7 @@ const styles = StyleSheet.create({
   timerText: {
     color: "#111827",
     fontFamily: "menlo",
-    fontSize: 22,
+    fontSize: 21,
     fontWeight: "800",
     fontVariant: ["tabular-nums"],
     letterSpacing: 0.2
@@ -8370,22 +8389,21 @@ const styles = StyleSheet.create({
   },
   resultTopBarButton: {
     alignItems: "center",
-    borderColor: "#E2E8F0",
     borderRadius: 8,
-    borderWidth: 1,
     height: 36,
     justifyContent: "center",
-    minWidth: 44,
-    paddingHorizontal: 10
+    width: 40
+  },
+  resultTopBarIconButton: {
+    alignItems: "center",
+    borderRadius: 8,
+    height: 36,
+    justifyContent: "center",
+    width: 40
   },
   resultTopBarTitle: {
     color: "#111827",
     fontSize: 16,
-    fontWeight: "800"
-  },
-  resultTopBarActionText: {
-    color: "#2563EB",
-    fontSize: 12,
     fontWeight: "800"
   },
   resultHero: {
@@ -8552,6 +8570,48 @@ const styles = StyleSheet.create({
     fontFamily: "menlo",
     fontSize: 10,
     fontWeight: "800"
+  },
+  resultTrendGlyph: {
+    height: 20,
+    position: "relative",
+    width: 22
+  },
+  resultTrendGlyphDot: {
+    backgroundColor: "#2563EB",
+    borderRadius: 999,
+    height: 5,
+    position: "absolute",
+    width: 5
+  },
+  resultTrendGlyphDotStart: {
+    bottom: 3,
+    left: 1
+  },
+  resultTrendGlyphDotMiddle: {
+    left: 8,
+    top: 8
+  },
+  resultTrendGlyphDotEnd: {
+    right: 1,
+    top: 2
+  },
+  resultTrendGlyphLine: {
+    backgroundColor: "#2563EB",
+    borderRadius: 999,
+    height: 2,
+    position: "absolute"
+  },
+  resultTrendGlyphLineFirst: {
+    left: 4,
+    top: 12,
+    transform: [{ rotate: "-24deg" }],
+    width: 9
+  },
+  resultTrendGlyphLineSecond: {
+    right: 4,
+    top: 7,
+    transform: [{ rotate: "-31deg" }],
+    width: 10
   },
   resultReviewRow: {
     alignItems: "center",
@@ -9362,6 +9422,12 @@ const styles = StyleSheet.create({
     height: 0,
     opacity: 0,
     width: 0
+  },
+  packOptionalMetaText: {
+    color: "#64748B",
+    fontSize: 11,
+    fontWeight: "800",
+    lineHeight: 15
   },
   packCoverageMetricValue: {
     color: "#111827",
