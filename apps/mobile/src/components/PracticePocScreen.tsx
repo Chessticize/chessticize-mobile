@@ -1358,6 +1358,7 @@ type PracticeModeSummary = {
 type PracticeProgressSummary = {
   correctThisWeek: number;
   accuracyThisWeek: number | null;
+  ratingDeltaThisWeek: number | null;
   wrongThisWeek: number;
   netThisWeek: number;
 };
@@ -1365,6 +1366,8 @@ type PracticeProgressSummary = {
 function buildPracticeProgressSummary(attempts: AttemptEvent[], nowMs: number): PracticeProgressSummary {
   const weekStartMs = nowMs - 7 * 24 * 60 * 60 * 1000;
   let correctThisWeek = 0;
+  let ratingDeltaThisWeek = 0;
+  let ratingChangeCount = 0;
   let wrongThisWeek = 0;
   for (const attempt of attempts) {
     const completedMs = new Date(attempt.completedAt).getTime();
@@ -1376,12 +1379,17 @@ function buildPracticeProgressSummary(attempts: AttemptEvent[], nowMs: number): 
     } else {
       wrongThisWeek += 1;
     }
+    if (attempt.ratingAfter !== undefined) {
+      ratingDeltaThisWeek += attempt.ratingAfter - attempt.ratingBefore;
+      ratingChangeCount += 1;
+    }
   }
   return {
     correctThisWeek,
     accuracyThisWeek: correctThisWeek + wrongThisWeek === 0
       ? null
       : Math.round((correctThisWeek / (correctThisWeek + wrongThisWeek)) * 100),
+    ratingDeltaThisWeek: ratingChangeCount === 0 ? null : ratingDeltaThisWeek,
     wrongThisWeek,
     netThisWeek: correctThisWeek - wrongThisWeek
   };
@@ -1424,6 +1432,14 @@ function PracticeHome({
   const progressContext = progress.accuracyThisWeek === null
     ? "No attempts yet"
     : `${progress.accuracyThisWeek}% accuracy · ${progress.wrongThisWeek} ${progress.wrongThisWeek === 1 ? "mistake" : "mistakes"}`;
+  const ratingDeltaLabel = progress.ratingDeltaThisWeek === null
+    ? "No rating change"
+    : `${progress.ratingDeltaThisWeek >= 0 ? "+" : ""}${progress.ratingDeltaThisWeek} this week`;
+  const ratingDeltaTone = progress.ratingDeltaThisWeek === null
+    ? styles.progressDeltaNeutral
+    : progress.ratingDeltaThisWeek < 0
+      ? styles.progressDeltaNegative
+      : styles.progressDeltaPositive;
   const reviewStatusLabel = overdueReviewCount > 0
     ? "Overdue"
     : dueReviewCount > 0
@@ -1461,13 +1477,14 @@ function PracticeHome({
 
       <Text style={styles.sectionLabel}>Progress</Text>
       <View
-        accessibilityLabel={`Progress summary, ELO ${currentRating}, this week ${progress.correctThisWeek}, ${progressDelta}, ${progressContext}`}
+        accessibilityLabel={`Progress summary, ELO ${currentRating}, rating ${ratingDeltaLabel}, this week ${progress.correctThisWeek}, ${progressDelta}, ${progressContext}`}
         style={styles.practiceProgressCard}
         testID="practice-progress-summary"
       >
         <View style={styles.progressMetric}>
           <Text style={styles.helperText}>ELO ({selected ? modeLabel(selected.mode) : "Standard"})</Text>
           <Text style={styles.progressValue}>{currentRating}</Text>
+          <Text testID="practice-progress-rating-delta" style={[styles.progressDelta, ratingDeltaTone]}>{ratingDeltaLabel}</Text>
         </View>
         <View style={styles.progressDivider} />
         <View style={styles.progressMetric}>
@@ -1754,6 +1771,12 @@ function CustomSprintSetup({
           label="ELO type"
           value={customMode === "arrow_duel" ? "Arrow Duel" : "Regular puzzles"}
           testID="custom-mode-summary"
+        />
+        <CustomValueRow
+          detail="Fixed by sprint scoring rules"
+          label="Mistake limit"
+          value={`${maxMistakes}`}
+          testID="custom-mistake-limit"
         />
         <CustomToggleRow
           detail="Switches this custom sprint to Arrow Duel scoring."
@@ -3071,7 +3094,9 @@ function HistoryPanel({
         <View style={styles.historyPerformanceHeader}>
           <View>
             <Text style={styles.panelTitle}>Performance</Text>
-            <Text style={styles.helperText}>{selectedRatingKey ? historyRatingKeyLabel(selectedRatingKey) : "No rating history"}</Text>
+            <Text testID="history-performance-context" style={styles.helperText}>
+              {selectedRatingKey ? `${historyRatingKeyLabel(selectedRatingKey)} · ${historyRangeLabel(timeRange)}` : "No rating history"}
+            </Text>
           </View>
           <View style={styles.historyMetricSummary}>
             <Text testID="history-chart-value" style={styles.historyAccuracy}>{chartSummary.value}</Text>
@@ -4244,10 +4269,11 @@ function ReviewPanel({
           <Text testID="review-due-count" style={styles.reviewDueBigCount}>{queueSummary.filteredCount}</Text>
           <Text
             testID="review-overdue-count"
-            style={[styles.reviewDueHiddenMetric, queueSummary.overdueCount > 0 ? styles.reviewDifficultyHard : null]}
+            style={[styles.reviewDueOverdueCount, queueSummary.overdueCount > 0 ? styles.reviewDifficultyHard : styles.progressDeltaNeutral]}
           >
             {queueSummary.overdueCount}
           </Text>
+          <Text style={styles.reviewDueOverdueLabel}>Overdue</Text>
           <Text testID="review-total-count" style={styles.reviewDueHiddenMetric}>{queueSummary.totalCount}</Text>
         </View>
       </View>
@@ -5335,10 +5361,10 @@ function ReviewSession({
               </>
             ) : (
               <>
-                <Pressable accessibilityRole="button" accessibilityLabel="Analyze position" testID="review-analysis-button" style={styles.analysisIconButton} onPress={openAnalysis}>
+                <Pressable accessibilityRole="button" accessibilityLabel="Analyze position" testID="review-analysis-button" style={styles.analysisPrimaryButton} onPress={openAnalysis}>
                   <SearchGlyph />
+                  <Text style={styles.analysisPrimaryButtonText}>Analysis</Text>
                 </Pressable>
-                <Text style={styles.analysisTitle}>Analysis</Text>
               </>
             )}
           </View>
@@ -5634,7 +5660,6 @@ function SettingsPanel({
           label="Puzzle ELO (Standard)"
           value={`ELO ${standardRating}`}
           detail={`Advanced ratings · ${ratings.length} buckets`}
-          showDetail={false}
           testID="settings-standard-elo-row"
           onPress={() => setAdvancedRatingsOpen((current) => !current)}
         />
@@ -6480,11 +6505,9 @@ function PackRow({
           <Text style={styles.historyRowTitle}>{pack.title}</Text>
         </View>
         <Text style={styles.helperText} testID={`packs-subtitle-${pack.id}`}>{pack.coverage.puzzles} puzzles</Text>
-        {isOptional ? (
-          <Text style={styles.packOptionalMetaText} testID={`packs-optional-meta-${pack.id}`}>
-            {optionalCoverageSummary}
-          </Text>
-        ) : null}
+        <Text style={styles.packRowMetaText} testID={`packs-meta-${pack.id}`}>
+          {optionalCoverageSummary}
+        </Text>
         <Text
           accessibilityLabel={`Rating ${pack.coverage.rating}, themes ${pack.coverage.themes}, Arrow Duel ${pack.coverage.arrowDuel}`}
           style={styles.packCoverageHiddenText}
@@ -7705,6 +7728,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     minWidth: 52
   },
+  reviewDueOverdueCount: {
+    fontSize: 12,
+    fontWeight: "900",
+    lineHeight: 14
+  },
+  reviewDueOverdueLabel: {
+    color: "#64748B",
+    fontSize: 9,
+    fontWeight: "800",
+    lineHeight: 11
+  },
   reviewDueHiddenMetric: {
     fontSize: 0,
     height: 0,
@@ -8766,7 +8800,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 40
   },
-  analysisTitle: {
+  analysisPrimaryButton: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: "#F8FAFC",
+    borderColor: "#CBD5E1",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 8,
+    minHeight: 40,
+    paddingHorizontal: 12
+  },
+  analysisPrimaryButtonText: {
     color: "#334155",
     fontSize: 13,
     fontWeight: "800"
@@ -9423,7 +9469,7 @@ const styles = StyleSheet.create({
     opacity: 0,
     width: 0
   },
-  packOptionalMetaText: {
+  packRowMetaText: {
     color: "#64748B",
     fontSize: 11,
     fontWeight: "800",
