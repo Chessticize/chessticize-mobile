@@ -1476,6 +1476,7 @@ function PracticeHome({
           <Text style={styles.helperText}>This Week</Text>
           <Text testID="practice-progress-weekly-solved" style={styles.progressValue}>{progress.correctThisWeek}</Text>
           <Text testID="practice-progress-weekly-delta" style={[styles.progressDelta, progressTone]}>{progressDelta}</Text>
+          <Text testID="practice-progress-weekly-context" style={styles.progressContextText}>{progressContext}</Text>
         </View>
       </View>
 
@@ -1570,7 +1571,7 @@ function PracticeModeCard({
             numberOfLines={1}
             style={styles.practiceModeDescription}
           >
-            {PRACTICE_MODE_DESCRIPTIONS[item.mode]} · {timingLabel}
+            {PRACTICE_MODE_DESCRIPTIONS[item.mode]}
           </Text>
           <View
             accessibilityLabel={detail}
@@ -2081,11 +2082,12 @@ function PreviousCustomConfigRow({
   onPress: () => void;
 }): React.JSX.Element {
   const ratingLabel = historyRatingKeyLabel(config.ratingKey);
+  const metaLabel = `${config.theme} · ${config.timing} · Last ${config.lastPlayed}`;
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Use ${ratingLabel} custom sprint`}
+      accessibilityLabel={`Use ${ratingLabel} custom sprint, ${config.mode}, ${metaLabel}, ELO ${config.rating}`}
       style={styles.previousConfigRow}
       testID={`custom-previous-${config.id}`}
       onPress={onPress}
@@ -2093,13 +2095,14 @@ function PreviousCustomConfigRow({
       <View style={styles.previousConfigCopy}>
         <View style={styles.previousConfigHeader}>
           <Text style={styles.historyRowTitle}>{config.mode}</Text>
-          <Text style={styles.previousConfigRatingKey}>{ratingLabel}</Text>
         </View>
-        <View style={styles.previousConfigMetaRow} testID={`custom-previous-${config.id}-meta`}>
-          <Text style={styles.practiceModeDetailChip}>{config.theme}</Text>
-          <Text style={styles.practiceModeDetailChip}>{config.timing}</Text>
-          <Text style={styles.practiceModeDetailChip}>Last {config.lastPlayed}</Text>
-        </View>
+        <Text
+          accessibilityLabel={`${metaLabel} · ${ratingLabel}`}
+          style={styles.helperText}
+          testID={`custom-previous-${config.id}-meta`}
+        >
+          {metaLabel}
+        </Text>
       </View>
       <View style={styles.previousConfigRating}>
         <Text style={styles.helperText}>ELO</Text>
@@ -2326,7 +2329,13 @@ function SprintSummary({
         </View>
         <View style={styles.resultTitleBlock}>
           <Text style={styles.summaryTitle}>{state.status === "won" ? "Sprint complete" : "Sprint failed"}</Text>
-          <Text style={styles.summaryText}>Result: {reason}</Text>
+          <Text
+            accessibilityLabel={`Result: ${reason}`}
+            style={styles.summaryText}
+            testID="sprint-result-reason"
+          >
+            {reason}
+          </Text>
         </View>
         <View style={styles.resultScoreBlock}>
           <Text style={styles.resultSolvedCount} testID="sprint-result-solved">
@@ -2499,7 +2508,7 @@ function PracticePrompt({
   const side = sideToMove(currentPuzzle.currentFen) === "b" ? "black" : "white";
   const isArrowDuel = currentPuzzle.kind === "arrow_duel";
   const promptMode = mode === "arrow_duel" ? "arrow_duel" : "standard";
-  const defaultPromptTitle = isArrowDuel ? "Choose the better move" : "Find the best move";
+  const defaultPromptTitle = isArrowDuel ? "Choose the best move" : "Find the best move";
   const defaultPromptContext = isArrowDuel
     ? `For ${side}, between the two arrows.`
     : `For ${side}.`;
@@ -2611,32 +2620,33 @@ function SessionScoreStrip({ state }: { state: SprintState }): React.JSX.Element
       style={styles.sessionScoreStrip}
       testID="session-score-strip"
     >
-      <SessionScoreMetric label="Solved" tone="positive" value={state.correctCount} />
-      <SessionScoreMetric label="Mistakes" tone="negative" value={state.mistakeCount} />
-      <SessionScoreMetric label="Left" tone="neutral" value={leftCount} />
+      <SessionScoreMetric label="Solved" metricTestID="session-score-solved" tone="positive" value={state.correctCount} />
+      <SessionScoreMetric label="Mistakes" metricTestID="session-score-mistakes" tone="negative" value={state.mistakeCount} />
+      <SessionScoreMetric label="Left" metricTestID="session-score-left" tone="neutral" value={leftCount} />
     </View>
   );
 }
 
 function SessionScoreMetric({
   label,
+  metricTestID,
   tone,
   value
 }: {
   label: string;
+  metricTestID: string;
   tone: "positive" | "negative" | "neutral";
   value: number;
 }): React.JSX.Element {
   return (
     <View
+      accessible
       accessibilityLabel={`${label} ${value}`}
       style={styles.sessionScoreMetric}
+      testID={metricTestID}
     >
       <SessionScoreGlyph tone={tone} />
-      <View style={styles.sessionScoreCopy}>
-        <Text style={styles.sessionScoreValue}>{value}</Text>
-        <Text style={styles.sessionScoreLabel}>{label}</Text>
-      </View>
+      <Text style={styles.sessionScoreValue} testID={`${metricTestID}-value`}>{value}</Text>
     </View>
   );
 }
@@ -3614,21 +3624,31 @@ function HistoryAttemptRow({
       : "Review queued"
     : "Correct";
   const resultLabel = isWrong ? "Wrong move" : "Correct";
-  const moveLabel = isWrong
+  const submittedMoveLabel = isWrong
     ? `Played ${attempt.submittedMove} · Best ${attempt.expectedMove}`
     : `Move ${attempt.submittedMove}`;
   const sourceLabel = attempt.source === "scheduled_review" ? "Review" : "Sprint";
+  const compactContext = [primaryTheme, paceLabel].filter(Boolean).join(" · ");
+  const compactMeta = `${sourceLabel} · Rating ${attempt.puzzleRating} · ${elapsedSeconds}s · ${dateLabel}`;
   const difficulty = historyAttemptDifficulty(attempt, puzzleStats);
   const difficultyStyle = difficulty === "hard"
     ? styles.reviewDifficultyHard
     : difficulty === "medium"
       ? styles.reviewDifficultyMedium
       : styles.reviewDifficultyEasy;
+  const rowAccessibilityLabel = [
+    `Open ${modeLabel(attempt.mode)} ${attempt.result} puzzle review`,
+    resultLabel,
+    submittedMoveLabel,
+    compactContext,
+    compactMeta,
+    reviewLabel
+  ].filter(Boolean).join(", ");
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Open ${modeLabel(attempt.mode)} ${attempt.result} puzzle review`}
+      accessibilityLabel={rowAccessibilityLabel}
       testID={`history-attempt-${attempt.id}`}
       style={styles.historyAttemptCard}
       onPress={onOpen}
@@ -3644,13 +3664,8 @@ function HistoryAttemptRow({
           <Text style={styles.historyRowTitle}>{modeLabel(attempt.mode)}</Text>
           <Text testID={`history-attempt-${attempt.id}-result`} style={styles.helperText}>{resultLabel}</Text>
         </View>
-        <Text testID={`history-attempt-${attempt.id}-move`} style={styles.helperText}>{moveLabel}</Text>
-        <Text testID={`history-attempt-${attempt.id}-context`} style={styles.helperText}>
-          {[primaryTheme, paceLabel].filter(Boolean).join(" · ")}
-        </Text>
-        <Text testID={`history-attempt-${attempt.id}-meta`} style={styles.helperText}>
-          {sourceLabel} · Rating {attempt.puzzleRating} · {elapsedSeconds}s · {dateLabel}
-        </Text>
+        <Text testID={`history-attempt-${attempt.id}-context`} style={styles.helperText}>{compactContext}</Text>
+        <Text testID={`history-attempt-${attempt.id}-meta`} style={styles.helperText}>{compactMeta}</Text>
       </View>
       <View style={styles.historyAttemptStatus} testID={`history-attempt-${attempt.id}-status`}>
         <View style={styles.historyAttemptStatusSummary} testID={`history-attempt-${attempt.id}-status-summary`}>
@@ -4154,6 +4169,7 @@ function ReviewPanel({
   const reviewDueFilterLabel = filteredDueEntries.length > 0
     ? `${reviewQueueFilterLabel(queueFilter)} · Ready now`
     : "No matching scheduled reviews";
+  const reviewDueSubline = reviewDueCardSubline(queueSummary.oldestDueLabel);
 
   useEffect(() => {
     setActiveEntries(preferredEntries);
@@ -4202,7 +4218,13 @@ function ReviewPanel({
           <Text testID="review-due-summary" style={styles.helperText}>
             {reviewDueSummaryLabel}
           </Text>
-          <Text testID="review-next-due" style={styles.reviewDueHiddenMetric}>{queueSummary.oldestDueLabel}</Text>
+          <Text
+            accessibilityLabel={queueSummary.oldestDueLabel}
+            testID="review-next-due"
+            style={styles.helperText}
+          >
+            {reviewDueSubline}
+          </Text>
           <Text testID="review-due-secondary-summary" style={styles.reviewDueHiddenMetric}>
             {queueSummary.overdueCount} overdue · {queueSummary.totalCount} total
           </Text>
@@ -4365,6 +4387,19 @@ function ReviewPanel({
   );
 }
 
+function reviewDueCardSubline(label: string): string {
+  if (label.startsWith("Oldest due ")) {
+    return `Oldest: ${label.slice("Oldest due ".length)}`;
+  }
+  if (label.startsWith("Next review due ")) {
+    return `Next: ${label.slice("Next review due ".length)}`;
+  }
+  if (label.startsWith("Next review appears ")) {
+    return "Next: after the first missed puzzle is due";
+  }
+  return label;
+}
+
 function reviewActiveFilterLabels(
   filter: ReviewQueueFilter,
   queueSummary: ReturnType<typeof reviewQueueSummary>
@@ -4407,12 +4442,23 @@ function ReviewQueueItemCard({
   const lastWrongDate = item.review.lastReviewedAt.slice(0, 10);
   const dueState = new Date(item.review.dueAt).getTime() <= Date.now() ? "Due now" : `Due ${item.review.dueAt.slice(0, 10)}`;
   const source = reviewItemSourceSprintLabel(item);
+  const compactSource = source.replace(/^Source sprint: /, "");
   const rowTestId = `review-due-item-${item.puzzle.id}-${safeTestId(item.review.mode)}`;
+  const accessibilityLabel = [
+    `Start ${modeLabel(item.review.mode)} ${primaryTheme} review`,
+    `${difficultyLabel(difficulty)} difficulty`,
+    `Last wrong ${lastWrongDate}`,
+    dueState,
+    `${formatIntervalHours(item.review.intervalHours)} interval`,
+    source,
+    `Review ${item.review.reviewCount}`,
+    `Lapses ${item.review.lapseCount}`
+  ].join(", ");
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Start ${modeLabel(item.review.mode)} ${primaryTheme} review`}
+      accessibilityLabel={accessibilityLabel}
       testID={rowTestId}
       style={styles.reviewItemCard}
       onPress={onPress}
@@ -4435,9 +4481,10 @@ function ReviewQueueItemCard({
             {difficultyLabel(difficulty)}
           </Text>
         </View>
-        <Text style={styles.helperText}>{primaryTheme} · Last wrong {lastWrongDate}</Text>
-        <Text style={styles.helperText}>{dueState} · {formatIntervalHours(item.review.intervalHours)} interval</Text>
-        <Text style={styles.helperText}>{source} · Review {item.review.reviewCount} · Lapses {item.review.lapseCount}</Text>
+        <Text testID={`${rowTestId}-context`} style={styles.helperText}>{primaryTheme} · Last wrong {lastWrongDate}</Text>
+        <Text testID={`${rowTestId}-meta`} style={styles.helperText}>
+          {dueState} · {formatIntervalHours(item.review.intervalHours)} interval · {compactSource}
+        </Text>
       </View>
       <ChevronGlyph direction="right" />
     </Pressable>
@@ -4459,10 +4506,11 @@ function ReviewDifficultyRow({
   onPress: () => void;
   tone: ReviewDifficulty;
 }): React.JSX.Element {
+  const countLabel = `${count} ${count === 1 ? "review" : "reviews"}`;
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Filter ${label.toLowerCase()} reviews`}
+      accessibilityLabel={`Filter ${label.toLowerCase()} reviews, ${countLabel}, ${detail}`}
       accessibilityState={{ selected: active }}
       style={[styles.reviewDifficultyRow, active ? styles.reviewDifficultyRowActive : null]}
       testID={`review-difficulty-${tone}`}
@@ -4478,7 +4526,7 @@ function ReviewDifficultyRow({
           tone === "easy" ? styles.reviewDifficultyEasy : null,
           tone === "medium" ? styles.reviewDifficultyMedium : null,
           tone === "hard" ? styles.reviewDifficultyHard : null
-        ]}>
+        ]} testID={`review-difficulty-${tone}-count`}>
           {count}
         </Text>
         <ChevronGlyph direction="right" />
@@ -4585,7 +4633,7 @@ function ReviewSession({
   const arrowReviewChoiceLabel = currentEntry.mode === "arrow_duel"
     ? wrongSeen || isArrowDuelFollowUpReview
       ? "You chose: Red (blunder)"
-      : "Green = best move · Red = blunder"
+      : null
     : null;
   const reviewRemainingSeconds =
     currentEntry.source === "due" && (!reviewResultRecorded || reviewTimedOut)
@@ -5115,10 +5163,23 @@ function ReviewSession({
               </Text>
             </View>
           ) : null}
-          {arrowReviewChoiceLabel ? (
-            <View style={styles.reviewArrowLegendPill} testID="review-arrow-choice-marker">
+          {currentEntry.mode === "arrow_duel" ? (
+            <View
+              accessibilityLabel="Green is best move, red is blunder"
+              style={styles.reviewArrowLegendPill}
+              testID="review-arrow-legend"
+            >
               <View style={styles.reviewLegendSwatchGreen} />
               <View style={styles.reviewLegendSwatchRed} />
+              <Text style={styles.reviewContextPillText}>Green = best move · Red = blunder</Text>
+            </View>
+          ) : null}
+          {arrowReviewChoiceLabel ? (
+            <View
+              accessibilityLabel={arrowReviewChoiceLabel}
+              style={styles.reviewContextPill}
+              testID="review-arrow-choice-marker"
+            >
               <Text style={styles.reviewContextPillText}>{arrowReviewChoiceLabel}</Text>
             </View>
           ) : null}
@@ -5562,6 +5623,7 @@ function SettingsPanel({
           label="Puzzle ELO (Standard)"
           value={`ELO ${standardRating}`}
           detail={`Advanced ratings · ${ratings.length} buckets`}
+          showDetail={false}
           testID="settings-standard-elo-row"
           onPress={() => setAdvancedRatingsOpen((current) => !current)}
         />
@@ -5569,6 +5631,7 @@ function SettingsPanel({
           label="Reset ELO"
           detail="Resets the Standard puzzle rating only"
           destructive
+          showDetail={false}
           testID="settings-reset-elo"
           onPress={() => setConfirmation("reset-elo")}
         />
@@ -6389,9 +6452,10 @@ function PackRow({
 }): React.JSX.Element {
   const isOptional = pack.status === "optional";
   const statusLabel = pack.status === "active" ? "Active" : pack.status === "installed" ? "Installed" : "Optional";
+  const coverageLabel = `${pack.coverage.puzzles} puzzles, rating ${pack.coverage.rating}, ${pack.coverage.themes} themes, Arrow Duel ${pack.coverage.arrowDuel}`;
   return (
     <View
-      accessibilityLabel={`${pack.title}, ${statusLabel.toLowerCase()} puzzle pack`}
+      accessibilityLabel={`${pack.title}, ${statusLabel.toLowerCase()} puzzle pack, ${coverageLabel}`}
       style={styles.packRow}
       testID={pack.testID}
     >
@@ -6399,8 +6463,14 @@ function PackRow({
         <View style={styles.packTitleRow}>
           <Text style={styles.historyRowTitle}>{pack.title}</Text>
         </View>
-        <Text style={styles.helperText}>{pack.subtitle}</Text>
-        <PackCoverageSummary pack={pack} />
+        <Text style={styles.helperText} testID={`packs-subtitle-${pack.id}`}>{pack.coverage.puzzles} puzzles</Text>
+        <Text
+          accessibilityLabel={`Rating ${pack.coverage.rating}, themes ${pack.coverage.themes}, Arrow Duel ${pack.coverage.arrowDuel}`}
+          style={styles.packCoverageHiddenText}
+          testID={`packs-coverage-${pack.id}`}
+        >
+          {""}
+        </Text>
       </View>
       <View style={styles.packActionColumn}>
         <Pressable
@@ -6438,24 +6508,6 @@ function PackRow({
         <PackActiveMark testID={`packs-active-${pack.id}`} />
       )}
       </View>
-    </View>
-  );
-}
-
-function PackCoverageSummary({ pack }: { pack: PackRowModel }): React.JSX.Element {
-  const coverageItems = [
-    { id: "puzzles", value: pack.coverage.puzzles },
-    { id: "rating", value: pack.coverage.rating },
-    { id: "themes", value: pack.coverage.themes },
-    { id: "arrow-duel", value: pack.coverage.arrowDuel }
-  ];
-  return (
-    <View style={styles.packCoverageSummary} testID={`packs-coverage-${pack.id}`}>
-      {coverageItems.map((item, index) => (
-        <Text key={item.id} style={styles.packCoverageInlineText} testID={`packs-coverage-${pack.id}-${item.id}`}>
-          {index > 0 ? "/ " : ""}{item.value}
-        </Text>
-      ))}
     </View>
   );
 }
@@ -7431,15 +7483,6 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     width: 0
   },
-  practiceModeDetailChip: {
-    backgroundColor: "transparent",
-    color: "#475569",
-    fontSize: 9,
-    fontWeight: "800",
-    overflow: "hidden",
-    paddingHorizontal: 0,
-    paddingVertical: 1
-  },
   practiceModeMeta: {
     alignItems: "center",
     flexDirection: "row",
@@ -7486,6 +7529,12 @@ const styles = StyleSheet.create({
   progressDelta: {
     fontSize: 12,
     fontWeight: "800"
+  },
+  progressContextText: {
+    color: "#64748B",
+    fontSize: 11,
+    fontWeight: "700",
+    textAlign: "center"
   },
   progressDeltaPositive: {
     color: "#16A34A"
@@ -7972,12 +8021,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flex: 1,
     flexDirection: "row",
-    gap: 7,
+    gap: 8,
     justifyContent: "center"
-  },
-  sessionScoreCopy: {
-    gap: 1,
-    minWidth: 34
   },
   sessionScoreIcon: {
     alignItems: "center",
@@ -8039,12 +8084,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "900",
     lineHeight: 17
-  },
-  sessionScoreLabel: {
-    color: "#64748B",
-    fontSize: 9,
-    fontWeight: "800",
-    lineHeight: 11
   },
   emptyBoard: {
     alignItems: "center",
@@ -8189,7 +8228,7 @@ const styles = StyleSheet.create({
     gap: 8
   },
   previousConfigRow: {
-    alignItems: "flex-start",
+    alignItems: "center",
     backgroundColor: "#FFFFFF",
     borderColor: "#E2E8F0",
     borderRadius: 8,
@@ -8197,30 +8236,19 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
     justifyContent: "space-between",
-    minHeight: 58,
+    minHeight: 54,
     paddingHorizontal: 12,
-    paddingVertical: 10
+    paddingVertical: 9
   },
   previousConfigCopy: {
     flex: 1,
-    gap: 6,
+    gap: 2,
     minWidth: 0
   },
   previousConfigHeader: {
     alignItems: "center",
     flexDirection: "row",
-    flexWrap: "wrap",
     gap: 6
-  },
-  previousConfigRatingKey: {
-    color: "#64748B",
-    fontSize: 11,
-    fontWeight: "800"
-  },
-  previousConfigMetaRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 5
   },
   previousConfigRating: {
     alignItems: "flex-end",
@@ -8234,11 +8262,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 10,
     padding: 12
-  },
-  customHeader: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between"
   },
   optionRow: {
     flexDirection: "row",
@@ -9064,14 +9087,6 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     textAlign: "right"
   },
-  historyRow: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 4,
-    padding: 10
-  },
   historyRowTitle: {
     color: "#1E293B",
     fontSize: 13,
@@ -9337,22 +9352,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8
   },
-  packCoverageSummary: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 5,
-    paddingTop: 4
-  },
   packCoverageLabel: {
     color: "#64748B",
     fontSize: 9,
     fontWeight: "800"
   },
-  packCoverageInlineText: {
-    color: "#64748B",
-    fontSize: 11,
-    fontWeight: "800",
-    lineHeight: 15
+  packCoverageHiddenText: {
+    fontSize: 0,
+    height: 0,
+    opacity: 0,
+    width: 0
   },
   packCoverageMetricValue: {
     color: "#111827",
