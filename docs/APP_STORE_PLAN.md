@@ -107,6 +107,11 @@ Review queue:
    result is recorded but no Continue affordance appears (that exists only on
    the Arrow Duel path). Show the solution or a Continue button after a
    recorded wrong, mirroring the Arrow Duel flow.
+   Status: complete. Standard/Blitz due reviews now enter a post-wrong state
+   after either an incorrect move or timeout: the official wrong result is
+   recorded once, board puzzle gestures are disabled, Analysis remains
+   available, and the same Continue affordance used by Arrow Duel advances to
+   the next due item.
 9. "Start Review" only starts the first context group and silently leaves the
    rest of a mixed queue due. Chain groups in sequence (or make grouped starts
    explicit in the default view).
