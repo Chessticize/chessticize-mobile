@@ -4021,12 +4021,14 @@ function SearchGlyph(): React.JSX.Element {
   );
 }
 
-function groupReviewEntriesByContext(entries: ReviewEntry[]): Array<{
+type ReviewEntryGroup = {
   key: string;
   mode: SprintMode;
   ratingKey: string;
   entries: ReviewEntry[];
-}> {
+};
+
+function groupReviewEntriesByContext(entries: ReviewEntry[]): ReviewEntryGroup[] {
   const groups = new Map<string, { key: string; mode: SprintMode; ratingKey: string; entries: ReviewEntry[] }>();
   for (const entry of entries) {
     const key = `${entry.mode}:${entry.ratingKey}`;
@@ -4272,8 +4274,9 @@ function ReviewPanel({
   const preferredEntries = sessionEntries.length > 0
     ? sessionEntries
     : [];
-  const preferredEntriesKey = preferredEntries.map((entry) => `${entry.source}:${entry.puzzle.id}:${entry.mode}`).join("|");
+  const preferredEntriesKey = preferredEntries.map((entry) => `${entry.source}:${entry.puzzle.id}:${entry.mode}:${entry.ratingKey}`).join("|");
   const [activeEntries, setActiveEntries] = useState<ReviewEntry[]>(preferredEntries);
+  const [queuedReviewGroups, setQueuedReviewGroups] = useState<ReviewEntryGroup[]>([]);
   const [queueFilter, setQueueFilter] = useState<ReviewQueueFilter>("all");
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const themeFilters = collectReviewThemeFilters(dueReviewItems);
@@ -4299,23 +4302,49 @@ function ReviewPanel({
   const reviewDueSubline = reviewDueCardSubline(queueSummary.oldestDueLabel);
 
   useEffect(() => {
+    setQueuedReviewGroups([]);
     setActiveEntries(preferredEntries);
   }, [preferredEntriesKey]);
+
+  function startReviewGroupQueue(groups: ReviewEntryGroup[]): void {
+    const [firstGroup, ...remainingGroups] = groups;
+    if (!firstGroup) {
+      return;
+    }
+    setQueuedReviewGroups(remainingGroups);
+    setActiveEntries(firstGroup.entries);
+  }
+
+  function startSingleReviewGroup(entries: ReviewEntry[]): void {
+    setQueuedReviewGroups([]);
+    setActiveEntries(entries);
+  }
+
+  function finishActiveReview(source: ReviewEntry["source"]): void {
+    if (source === "due") {
+      const [nextGroup, ...remainingGroups] = queuedReviewGroups;
+      if (nextGroup) {
+        setQueuedReviewGroups(remainingGroups);
+        setActiveEntries(nextGroup.entries);
+        return;
+      }
+    }
+    setQueuedReviewGroups([]);
+    setActiveEntries([]);
+    if (source === "session") {
+      onExitSessionReview();
+    }
+  }
 
   if (activeEntries.length > 0) {
     return (
       <ReviewSession
-        key={activeEntries.map((entry) => `${entry.source}:${entry.puzzle.id}:${entry.mode}`).join("|")}
+        key={activeEntries.map((entry) => `${entry.source}:${entry.puzzle.id}:${entry.mode}:${entry.ratingKey}`).join("|")}
         boardSize={boardSize}
         entries={activeEntries}
         service={service}
         onReviewRecorded={onReviewRecorded}
-        onExit={(source) => {
-          setActiveEntries([]);
-          if (source === "session") {
-            onExitSessionReview();
-          }
-        }}
+        onExit={finishActiveReview}
         stockfishTransportFactory={stockfishTransportFactory}
       />
     );
@@ -4407,12 +4436,7 @@ function ReviewPanel({
         disabled={filteredDueEntries.length === 0}
         testID="review-start-due"
         style={[styles.primaryButton, styles.reviewStartButton, filteredDueEntries.length === 0 ? styles.disabledButton : null]}
-        onPress={() => {
-          const firstGroup = filteredContextGroups[0];
-          if (firstGroup) {
-            setActiveEntries(firstGroup.entries);
-          }
-        }}
+        onPress={() => startReviewGroupQueue(filteredContextGroups)}
       >
         <Text style={styles.primaryButtonText}>Start Review</Text>
       </Pressable>
@@ -4460,7 +4484,7 @@ function ReviewPanel({
               key={`${item.review.puzzleId}:${item.review.mode}:${item.review.ratingKey}`}
               item={item}
               nowMs={nowMs}
-              onPress={() => setActiveEntries([{
+              onPress={() => startSingleReviewGroup([{
                 puzzle: item.puzzle,
                 mode: item.review.mode,
                 ratingKey: item.review.ratingKey,
@@ -4481,7 +4505,7 @@ function ReviewPanel({
               accessibilityLabel={`Start ${modeLabel(group.mode)} reviews`}
               testID={`review-context-${safeTestId(group.key)}`}
               style={styles.reviewContextCard}
-              onPress={() => setActiveEntries(group.entries)}
+              onPress={() => startSingleReviewGroup(group.entries)}
             >
               <View>
                 <Text style={styles.historyRowTitle}>{modeLabel(group.mode)}</Text>

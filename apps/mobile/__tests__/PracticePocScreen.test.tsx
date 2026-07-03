@@ -1680,6 +1680,39 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "review-timer"))).toBe("00:20");
   });
 
+  it("chains the default due review start across visible context groups", async () => {
+    const service = createMobilePracticeService("random1000");
+    service.startSprint(
+      { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
+      "2026-06-20T00:00:00.000Z"
+    );
+    service.submitMove("c4b5", "2026-06-20T00:00:05.000Z");
+    service.recordReviewResult(
+      { puzzleId: "000hf", mode: "standard", ratingKey: "standard 5/30" },
+      "wrong",
+      "2026-06-20T00:00:10.000Z"
+    );
+    const renderer = renderScreen({ practiceService: service });
+
+    press(renderer, "review-tab");
+    press(renderer, "review-filter-toggle");
+    expect(findByTestId(renderer, "review-context-standard-standard-5-20")).toBeTruthy();
+    expect(findByTestId(renderer, "review-context-standard-standard-5-30")).toBeTruthy();
+    press(renderer, "review-start-due");
+
+    expect(findByTestId(renderer, "review-session")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "review-timer"))).toBe("00:20");
+
+    await boardMove(renderer, "c4b5");
+    await settleFeedbackSnapshot();
+    press(renderer, "review-line-continue");
+
+    expect(findByTestId(renderer, "review-session")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "review-timer"))).toBe("00:30");
+    expect(collectText(findByTestId(renderer, "review-source-pill"))).toBe("Scheduled review");
+    expect(() => findByTestId(renderer, "review-panel")).toThrow();
+  });
+
   it("records official due review mistakes immediately but keeps analysis reviews unrecorded", async () => {
     const service = createMobilePracticeService("random1000");
     service.startSprint(
