@@ -376,6 +376,7 @@ export function PracticePocScreen({
   }
 
   function refreshState(): void {
+    service.pruneOrphanedReviewQueue();
     setAttempts(service.listHistory() as AttemptEvent[]);
     setReviews(service.getDueReviews(nowIso()));
     setReviewQueue(service.listReviewQueue());

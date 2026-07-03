@@ -619,6 +619,16 @@ export class SyncSQLiteStore implements PracticeStore {
     return this.listAllReviewQueueStates();
   }
 
+  pruneOrphanedReviewQueue(): number {
+    const removed = countRows(this.db, "review_queue", "NOT EXISTS (SELECT 1 FROM puzzles WHERE puzzles.id = review_queue.puzzle_id)");
+    if (removed > 0) {
+      this.db
+        .prepare("DELETE FROM review_queue WHERE NOT EXISTS (SELECT 1 FROM puzzles WHERE puzzles.id = review_queue.puzzle_id)")
+        .run();
+    }
+    return removed;
+  }
+
   getDueReviews(now: string): ReviewQueueState[] {
     const rows = this.db
       .prepare("SELECT * FROM review_queue WHERE due_at <= ? ORDER BY due_at ASC, puzzle_id ASC, mode ASC, rating_key ASC")

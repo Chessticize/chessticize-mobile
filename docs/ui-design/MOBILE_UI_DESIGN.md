@@ -347,6 +347,7 @@ Custom sprint behavior:
 - Empty state should say when the next review is due and offer regular practice.
 - Review cards should show mode, theme, last wrong date, due state, current interval, and source sprint type.
 - The default Review Queue surface shows the due summary plus difficulty group rows for calm density; per-item review cards and grouped starts appear in the expanded filter view.
+- Review queue counts include only locally resolvable puzzles. If a queue row references a puzzle that is no longer available in the active local pack, the backend removes that row before the UI computes due, overdue, and total counts.
 - The user can stop a Scheduled Review session at any time. Completed items are saved; unseen items remain due or overdue.
 - After a Scheduled Review batch, the user may open Analysis Review for missed items. That follow-up inspection does not create history rows and does not update the schedule.
 - Post-sprint Analysis Review is also unrecorded. It is for same-day exploration only; the scheduled memory-curve review still starts from the stored due date, normally the next day after the miss.

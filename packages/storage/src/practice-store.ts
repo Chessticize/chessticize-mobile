@@ -81,6 +81,7 @@ export interface PracticeStore {
   recordReviewResult(context: ReviewContext, result: AttemptResult, now: string): ReviewQueueState;
   getReviewQueueState(context: ReviewContext): ReviewQueueState | undefined;
   listReviewQueue(): ReviewQueueState[];
+  pruneOrphanedReviewQueue(): number;
   getDueReviews(now: string): ReviewQueueState[];
   getDueReviewItems(now: string): ReviewQueueItem[];
   getHistoryView(query: HistoryQuery): HistoryView;

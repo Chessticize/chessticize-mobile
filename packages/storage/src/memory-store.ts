@@ -240,6 +240,17 @@ export class MemoryStore implements PracticeStore {
     return [...this.reviewQueue.values()].sort(compareReviewQueueState);
   }
 
+  pruneOrphanedReviewQueue(): number {
+    let removed = 0;
+    for (const review of this.reviewQueue.values()) {
+      if (!this.puzzles.has(review.puzzleId)) {
+        this.reviewQueue.delete(reviewQueueKey(review));
+        removed += 1;
+      }
+    }
+    return removed;
+  }
+
   getDueReviews(now: string): ReviewQueueState[] {
     return this.listReviewQueue().filter((review) => review.dueAt <= now);
   }
