@@ -145,6 +145,9 @@ Arrow Duel / analysis:
 12. The Analysis panel's candidate list is empty at checkmate; the `1-0`/`0-1`
     terminal line exists but only renders on the guided review path. Inject it
     into the Analysis list too.
+    Status: complete. Terminal positions now produce a domain-level
+    current-position analysis row, so the Analysis panel shows `1-0`/`0-1`
+    checkmate instead of an empty candidate list.
 13. The session loading skeleton toggles on/off synchronously and never paints.
     Either defer heavy start work a frame or drop the dead code.
 

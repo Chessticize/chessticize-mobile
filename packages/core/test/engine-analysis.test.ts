@@ -237,6 +237,43 @@ test("formats a checkmated review position as the game result", () => {
   assert.equal(line.label, "Current position");
 });
 
+test("injects a terminal checkmate row into puzzle analysis lines", () => {
+  const puzzle = arrowDuelMatePuzzle();
+  const finalFen = applyMovesToFen(puzzle.initialFen, puzzle.solutionMoves);
+  const lines = buildPuzzleGuidedAnalysisLines({
+    fen: finalFen,
+    puzzle,
+    currentPuzzle: {
+      kind: "line",
+      puzzle,
+      currentFen: finalFen,
+      playedMoves: puzzle.solutionMoves,
+      cursor: puzzle.solutionMoves.length,
+      autoPlayedMoves: [],
+      solved: true
+    },
+    engineLines: [
+      {
+        move: "e6e7",
+        pv: ["e6e7"],
+        multipv: 1,
+        depth: 12,
+        score: { kind: "cp", sideToMoveCentipawns: 200, whiteCentipawns: 200 }
+      }
+    ],
+    includeUnscoredLegalMoves: false
+  });
+
+  assert.deepEqual(lines, [
+    {
+      move: "",
+      san: "Checkmate",
+      label: "Current position",
+      score: "1-0"
+    }
+  ]);
+});
+
 test("keeps the puzzle move highest only on the puzzle solver side", () => {
   const puzzle = blackToMovePuzzle();
   const initialLines = buildPuzzleGuidedAnalysisLines({

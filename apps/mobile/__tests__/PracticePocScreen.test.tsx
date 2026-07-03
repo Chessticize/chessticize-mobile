@@ -2176,6 +2176,15 @@ describe("PracticePocScreen", () => {
     expect(finalCurrentEval).toContain("Checkmate");
     expect(finalCurrentEval).toContain("Current position");
     expect(() => findByTestId(renderer, "review-guided-eval-line-1")).toThrow();
+    const finalFen = findByTestId(renderer, "mock-chessboard").props.fen;
+    press(renderer, "review-analysis-button");
+    const terminalAnalysisLine = findByTestId(renderer, "review-analysis-line-0");
+    expect(collectText(terminalAnalysisLine)).toMatch(/(?:1-0|0-1).*Checkmate.*Current position/);
+    expect(terminalAnalysisLine.props.disabled).toBe(true);
+    expect(terminalAnalysisLine.props.accessibilityState).toEqual({ disabled: true });
+    expect(() => findByTestId(renderer, "review-analysis-line-1")).toThrow();
+    expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(finalFen);
+    press(renderer, "review-close-analysis");
     await settleFeedbackSnapshot();
     press(renderer, "review-reset-puzzle");
     expectText(renderer, "Choose the best move");
