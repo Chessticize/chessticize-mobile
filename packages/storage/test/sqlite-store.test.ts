@@ -341,6 +341,12 @@ test("PracticeService persists SQLite settings across store reopen", async () =>
             }
           }
         });
+
+        assert.deepEqual(service.saveReviewReminderPreference({ mode: "fixed", fixedLocalTime: "08:15" }), {
+          mode: "fixed",
+          fixedLocalTime: "08:15"
+        });
+        assert.deepEqual(service.getReviewReminderSettings(), { kind: "fixed", hour: 8, minute: 15 });
       } finally {
         store.close();
       }
@@ -359,10 +365,14 @@ test("PracticeService persists SQLite settings across store reopen", async () =>
           notifications: {
             reviewReminder: {
               mode: "fixed",
-              fixedLocalTime: "20:30"
+              fixedLocalTime: "08:15"
             }
           }
         });
+        assert.deepEqual(service.getReviewReminderPreference(), { mode: "fixed", fixedLocalTime: "08:15" });
+        assert.deepEqual(service.getReviewReminderSettings(), { kind: "fixed", hour: 8, minute: 15 });
+        assert.deepEqual(service.saveReviewReminderPreference({ mode: "off" }), { mode: "off" });
+        assert.deepEqual(service.getSettings().notifications.reviewReminder, { mode: "off" });
         assert.deepEqual(service.exportLocalData().settings, service.getSettings());
       } finally {
         store.close();

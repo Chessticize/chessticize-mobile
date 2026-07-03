@@ -280,6 +280,30 @@ test("PracticeService persists settings through the store boundary", () => {
   });
 });
 
+test("PracticeService persists reminder preferences through the MemoryStore boundary", () => {
+  const service = new PracticeService(new MemoryStore());
+
+  assert.deepEqual(service.getReviewReminderPreference(), { mode: "smart" });
+  assert.deepEqual(service.getReviewReminderSettings(), { kind: "smart" });
+
+  const fixed = service.saveReviewReminderPreference({ mode: "fixed", fixedLocalTime: "08:15" });
+  assert.deepEqual(fixed, { mode: "fixed", fixedLocalTime: "08:15" });
+  assert.deepEqual(service.getSettings().notifications.reviewReminder, fixed);
+  assert.deepEqual(service.getReviewReminderSettings(), { kind: "fixed", hour: 8, minute: 15 });
+
+  fixed.fixedLocalTime = "23:59";
+  assert.deepEqual(service.getReviewReminderPreference(), { mode: "fixed", fixedLocalTime: "08:15" });
+
+  assert.deepEqual(service.saveReviewReminderPreference({ mode: "off" }), { mode: "off" });
+  assert.deepEqual(service.getSettings().notifications.reviewReminder, { mode: "off" });
+  assert.deepEqual(service.getReviewReminderSettings(), { kind: "off" });
+
+  assert.throws(
+    () => service.saveReviewReminderPreference({ mode: "fixed", fixedLocalTime: "8:15" }),
+    /HH:mm/
+  );
+});
+
 test("PracticeService selects standard sprint puzzles from the current run ELO window", async () => {
   const store = new MemoryStore();
   store.seedPuzzles(await loadFixturePuzzles());

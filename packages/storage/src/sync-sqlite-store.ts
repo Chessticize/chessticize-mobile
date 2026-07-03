@@ -28,8 +28,10 @@ import type {
 } from "../../core/src/index.ts";
 import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./query-types.ts";
 import type { ClearLocalHistoryResult, ExportedSprintSession, LocalDataExport, PracticeSettings, PracticeStore } from "./practice-store.ts";
-import { clonePracticeSettings, defaultPracticeSettings } from "./practice-settings.ts";
+import { clonePracticeSettings, defaultPracticeSettings, normalizeReviewReminderPreference, reviewReminderPreferenceToSettings } from "./practice-settings.ts";
 import { selectUniquePuzzles } from "./puzzle-selection.ts";
+import type { ReviewReminderPreference } from "./practice-store.ts";
+import type { ReviewReminderSettings } from "../../core/src/index.ts";
 
 interface AttemptHistoryDbRow extends Omit<AttemptHistoryRow, "ratingAfter" | "arrowDuelCandidateOrder"> {
   ratingAfter: number | null;
@@ -396,8 +398,30 @@ export class SyncSQLiteStore implements PracticeStore {
         boolToInt(cloned.sync.iCloudEnabled),
         boolToInt(cloned.sync.uploadAllowed),
         cloned.notifications.reviewReminder.mode,
-        cloned.notifications.reviewReminder.fixedLocalTime ?? null
+        cloned.notifications.reviewReminder.mode === "fixed"
+          ? cloned.notifications.reviewReminder.fixedLocalTime
+          : null
       );
+  }
+
+  getReviewReminderPreference(): ReviewReminderPreference {
+    return this.getSettings().notifications.reviewReminder;
+  }
+
+  saveReviewReminderPreference(preference: ReviewReminderPreference): ReviewReminderPreference {
+    const settings = this.getSettings();
+    this.saveSettings({
+      ...settings,
+      notifications: {
+        ...settings.notifications,
+        reviewReminder: preference
+      }
+    });
+    return this.getReviewReminderPreference();
+  }
+
+  getReviewReminderSettings(): ReviewReminderSettings {
+    return reviewReminderPreferenceToSettings(this.getReviewReminderPreference());
   }
 
   createSprintSession(state: SprintState): void {
@@ -893,10 +917,11 @@ function reviewFromRow(row: ReviewRow): ReviewQueueState {
 }
 
 function settingsFromRow(row: AppSettingsRow): PracticeSettings {
-  const reminder = {
-    mode: row.review_reminder_mode,
-    ...(row.review_reminder_fixed_local_time === null ? {} : { fixedLocalTime: row.review_reminder_fixed_local_time })
-  };
+  const reminder = normalizeReviewReminderPreference(
+    row.review_reminder_mode === "fixed"
+      ? { mode: "fixed", fixedLocalTime: row.review_reminder_fixed_local_time ?? "" }
+      : { mode: row.review_reminder_mode }
+  );
   return {
     sync: {
       iCloudEnabled: intToBool(row.sync_icloud_enabled),

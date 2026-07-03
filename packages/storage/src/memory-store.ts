@@ -27,7 +27,9 @@ import type {
 } from "../../core/src/index.ts";
 import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./query-types.ts";
 import type { ClearLocalHistoryResult, LocalDataExport, PracticeSettings, PracticeStore } from "./practice-store.ts";
-import { clonePracticeSettings, defaultPracticeSettings } from "./practice-settings.ts";
+import { clonePracticeSettings, defaultPracticeSettings, reviewReminderPreferenceToSettings } from "./practice-settings.ts";
+import type { ReviewReminderPreference } from "./practice-store.ts";
+import type { ReviewReminderSettings } from "../../core/src/index.ts";
 import { selectUniquePuzzles } from "./puzzle-selection.ts";
 
 export class MemoryStore implements PracticeStore {
@@ -123,6 +125,25 @@ export class MemoryStore implements PracticeStore {
 
   saveSettings(settings: PracticeSettings): void {
     this.settings = clonePracticeSettings(settings);
+  }
+
+  getReviewReminderPreference(): ReviewReminderPreference {
+    return clonePracticeSettings(this.settings).notifications.reviewReminder;
+  }
+
+  saveReviewReminderPreference(preference: ReviewReminderPreference): ReviewReminderPreference {
+    this.settings = clonePracticeSettings({
+      ...this.settings,
+      notifications: {
+        ...this.settings.notifications,
+        reviewReminder: preference
+      }
+    });
+    return this.getReviewReminderPreference();
+  }
+
+  getReviewReminderSettings(): ReviewReminderSettings {
+    return reviewReminderPreferenceToSettings(this.getReviewReminderPreference());
   }
 
   createSprintSession(state: SprintState): void {

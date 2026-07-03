@@ -184,6 +184,11 @@ Design approved 2026-07-03; the "Review Reminder Notifications" section of
    projection, disabled reminders, zero-due suppression, and validation.
 2. Settings persistence for the reminder preference (smart / fixed time / off)
    — depends on Milestone 1.
+   Status: complete. The storage boundary now exposes a typed persisted review
+   reminder preference API for smart, fixed local time, and off states; the
+   service maps it to the core scheduler settings, validates fixed `HH:mm`
+   local times, clears stale fixed times when switching modes, and MemoryStore
+   plus SQLite tests cover persistence and SQLite reopen behavior.
 3. A `ReminderScheduler` interface with a maintained fake; the real adapter
    wraps `UNUserNotificationCenter` (local notifications only, no push
    entitlement). Re-schedule on queue change and on app background.
