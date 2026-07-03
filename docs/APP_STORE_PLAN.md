@@ -150,6 +150,9 @@ Arrow Duel / analysis:
     checkmate instead of an empty candidate list.
 13. The session loading skeleton toggles on/off synchronously and never paints.
     Either defer heavy start work a frame or drop the dead code.
+    Status: complete. The unreachable loading skeleton state, component, and
+    styles were removed; sprint start/resume stays immediate and covered by the
+    Practice screen component test.
 
 Scheduler polish (low priority):
 

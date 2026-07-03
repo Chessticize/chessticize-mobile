@@ -238,7 +238,6 @@ export function PracticePocScreen({
   const [feedbackPuzzleId, setFeedbackPuzzleId] = useState<string | null>(null);
   const [feedbackSnapshot, setFeedbackSnapshot] = useState<FeedbackBoardSnapshot | null>(null);
   const [boardInputLocked, setBoardInputLocked] = useState(false);
-  const [sessionLoading, setSessionLoading] = useState(false);
   const [chessboardDebugEvents, setChessboardDebugEvents] = useState<string[]>([]);
   const [historyTimeRange, setHistoryTimeRange] = useState<HistoryTimeRange>("7d");
   const [historySourceFilter, setHistorySourceFilter] = useState<"all" | AttemptSource>("all");
@@ -440,7 +439,6 @@ export function PracticePocScreen({
 
   function startSprint(nextMode: SprintMode = mode, useCustomTiming = nextMode === "custom"): void {
     setError(null);
-    setSessionLoading(true);
     try {
       const customThemeValue = useCustomTiming ? themeForCustomSprint(customTheme) : undefined;
       const config = sprintConfigFor(nextMode, customDurationSeconds, customPerPuzzleSeconds, useCustomTiming, customThemeValue);
@@ -465,8 +463,6 @@ export function PracticePocScreen({
       refreshState();
     } catch (caught) {
       setError(errorMessage(caught));
-    } finally {
-      setSessionLoading(false);
     }
   }
 
@@ -830,7 +826,6 @@ export function PracticePocScreen({
 
   function resumeSprint(nextSprint: SprintState): void {
     setError(null);
-    setSessionLoading(true);
     try {
       const resumed = nextSprint.status === "paused" && service.getActiveSprint()?.id === nextSprint.id
         ? service.resumeSprint(nowIso())
@@ -849,8 +844,6 @@ export function PracticePocScreen({
       refreshState();
     } catch (caught) {
       setError(errorMessage(caught));
-    } finally {
-      setSessionLoading(false);
     }
   }
 
@@ -1083,7 +1076,7 @@ export function PracticePocScreen({
   const historyAvailableThemes = historyView?.availableThemes ?? [];
   const historyPage = historyView?.page ?? { limit: HISTORY_PAGE_LIMIT, offset: 0, total: 0, hasMore: false };
   const contentOwnsHeader = tab === "review" || tab === "history" || tab === "packs";
-  const appChromeVisible = !isOpenSession && !sessionLoading && !isShowingFeedbackSnapshot;
+  const appChromeVisible = !isOpenSession && !isShowingFeedbackSnapshot;
   const appHeaderVisible = appChromeVisible && !contentOwnsHeader;
   const screenTitle = screenTitleFor(tab);
   const screenSubtitle = tab === "practice"
@@ -1129,10 +1122,6 @@ export function PracticePocScreen({
       >
         {tab === "practice" ? (
           <>
-            {sessionLoading ? (
-              <SessionLoadingSkeleton boardSize={boardSize} />
-            ) : null}
-
             {isOpenSession ? (
               <SessionStatusBar
                 mode={mode}
@@ -1153,7 +1142,7 @@ export function PracticePocScreen({
               />
             ) : null}
 
-            {!isOpenSession && !sessionLoading && state === null && mode !== "custom" ? (
+            {!isOpenSession && state === null && mode !== "custom" ? (
               <PracticeHome
                 mode={mode}
                 modes={practiceModeSummaries}
@@ -1169,7 +1158,7 @@ export function PracticePocScreen({
               />
             ) : null}
 
-            {!isOpenSession && !sessionLoading && state === null && mode === "custom" ? (
+            {!isOpenSession && state === null && mode === "custom" ? (
               <CustomSprintSetup
                 durationSeconds={customDurationSeconds}
                 perPuzzleSeconds={customPerPuzzleSeconds}
@@ -1681,21 +1670,6 @@ function ResumeSprintCard({
       </View>
       <Text style={styles.resumeSprintAction}>Resume</Text>
     </Pressable>
-  );
-}
-
-function SessionLoadingSkeleton({ boardSize }: { boardSize: number }): React.JSX.Element {
-  return (
-    <View style={styles.sessionLoadingShell} testID="session-loading-skeleton">
-      <View style={styles.sessionLoadingStatusRow}>
-        <View style={styles.skeletonMetric} />
-        <View style={styles.skeletonMetricWide} />
-        <View style={styles.skeletonMetric} />
-      </View>
-      <View style={[styles.boardSurface, styles.sessionLoadingBoard, { width: boardSize, height: boardSize }]}>
-        <Text style={styles.emptyBoardText}>Loading</Text>
-      </View>
-    </View>
   );
 }
 
@@ -7565,32 +7539,6 @@ const styles = StyleSheet.create({
     color: "#2563EB",
     fontSize: 13,
     fontWeight: "900"
-  },
-  sessionLoadingShell: {
-    gap: 14
-  },
-  sessionLoadingStatusRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 8,
-    justifyContent: "space-between"
-  },
-  skeletonMetric: {
-    backgroundColor: "#E2E8F0",
-    borderRadius: 8,
-    height: 42,
-    width: 76
-  },
-  skeletonMetricWide: {
-    backgroundColor: "#E2E8F0",
-    borderRadius: 8,
-    flex: 1,
-    height: 42
-  },
-  sessionLoadingBoard: {
-    alignItems: "center",
-    alignSelf: "center",
-    justifyContent: "center"
   },
   pausedSessionPanel: {
     backgroundColor: "#FFFFFF",
