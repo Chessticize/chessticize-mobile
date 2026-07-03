@@ -19,14 +19,20 @@ if [[ -n "${DETOX_IOS_DEVICE:-}" ]]; then
   destination_args=(-destination "platform=iOS Simulator,name=${DETOX_IOS_DEVICE}")
 fi
 
-xcodebuild \
+xcodebuild_args=(
   -workspace ios/ChessticizeMobile.xcworkspace \
   -scheme ChessticizeMobile \
   -configuration Debug \
   -sdk iphonesimulator \
-  "${destination_args[@]}" \
   -derivedDataPath ios/build \
   ONLY_ACTIVE_ARCH=YES
+)
+
+if [[ ${#destination_args[@]} -gt 0 ]]; then
+  xcodebuild_args+=("${destination_args[@]}")
+fi
+
+xcodebuild "${xcodebuild_args[@]}"
 
 app_bundle="ios/build/Build/Products/Debug-iphonesimulator/ChessticizeMobile.app"
 js_bundle="$app_bundle/main.jsbundle"
