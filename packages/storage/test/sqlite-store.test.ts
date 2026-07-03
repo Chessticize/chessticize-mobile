@@ -378,6 +378,13 @@ test("PracticeService records official SQLite reviews in history without mixing 
       ["correct"]
     );
     assert.deepEqual(
+      service.getHistoryView({ ...all.query, source: "scheduled_review" }).attempts.map((attempt) => ({
+        startedAt: attempt.startedAt,
+        completedAt: attempt.completedAt
+      })),
+      [{ startedAt: "2026-06-21T00:00:00.000Z", completedAt: "2026-06-21T00:00:05.000Z" }]
+    );
+    assert.deepEqual(
       service.getHistoryView({ ...all.query, source: "sprint" }).attempts.map((attempt) => attempt.result),
       ["wrong"]
     );

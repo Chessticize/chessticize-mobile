@@ -1404,6 +1404,14 @@ export function PracticePocScreen({
             sessionMistakeReviewItems={sessionMistakeReviewItems}
             onExitSessionReview={() => setTab("practice")}
             onOpenPractice={() => setTab("practice")}
+            onReviewRecorded={(completedAt) => {
+              const completedAtMs = new Date(completedAt).getTime();
+              if (Number.isFinite(completedAtMs) && completedAtMs > nowMsRef.current) {
+                nowMsRef.current = completedAtMs;
+                setNowMs(completedAtMs);
+              }
+              refreshState();
+            }}
             stockfishTransportFactory={stockfishTransportFactory}
           />
         ) : null}
@@ -4234,6 +4242,7 @@ function ReviewPanel({
   dueReviewItems,
   onExitSessionReview,
   onOpenPractice,
+  onReviewRecorded,
   reviewQueue,
   service,
   sessionMistakeReviewItems,
@@ -4243,6 +4252,7 @@ function ReviewPanel({
   dueReviewItems: ReviewQueueItem[];
   onExitSessionReview: () => void;
   onOpenPractice: () => void;
+  onReviewRecorded: (completedAt: string) => void;
   reviewQueue: ReviewQueueState[];
   service: PracticeService;
   sessionMistakeReviewItems: SessionMistakeReviewItem[];
@@ -4295,6 +4305,7 @@ function ReviewPanel({
         boardSize={boardSize}
         entries={activeEntries}
         service={service}
+        onReviewRecorded={onReviewRecorded}
         onExit={(source) => {
           setActiveEntries([]);
           if (source === "session") {
@@ -4656,6 +4667,7 @@ function ReviewSession({
   initialIndex = 0,
   service,
   onExit,
+  onReviewRecorded,
   stockfishTransportFactory
 }: {
   boardSize: number;
@@ -4663,6 +4675,7 @@ function ReviewSession({
   initialIndex?: number;
   service: PracticeService;
   onExit: (source: ReviewEntry["source"]) => void;
+  onReviewRecorded?: (completedAt: string) => void;
   stockfishTransportFactory: () => UciEngineTransport | null;
 }): React.JSX.Element {
   const boardRef = useRef<ChessboardRef | null>(null);
@@ -4897,14 +4910,17 @@ function ReviewSession({
       return;
     }
     reviewResultRecordedRef.current = true;
+    const completedAt = new Date().toISOString();
     service.recordReviewAttempt({
       puzzleId: currentEntry.puzzle.id,
       mode: currentEntry.mode,
       ratingKey: currentEntry.ratingKey,
       result,
       submittedMove: reviewMove?.submittedMove ?? "__analysis__",
-      expectedMove: reviewMove?.expectedMove ?? expectedReviewMove(currentPuzzle)
-    });
+      expectedMove: reviewMove?.expectedMove ?? expectedReviewMove(currentPuzzle),
+      startedAt: new Date(reviewStartedAtMs).toISOString()
+    }, completedAt);
+    onReviewRecorded?.(completedAt);
     setReviewResultRecorded(true);
   }
 
