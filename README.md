@@ -9,6 +9,7 @@ The repository contains the React Native app shell (`apps/mobile`), a pure TypeS
 - [Mobile UI Design](docs/ui-design/MOBILE_UI_DESIGN.md) — authoritative screen behavior and visual spec
 - [Core Library And CLI](docs/CORE_CLI.md) — backend package layout and CLI harness
 - [App Store Plan](docs/APP_STORE_PLAN.md) — active goal and milestone plan toward the 1.0 submission
+- [Privacy Policy](docs/PRIVACY_POLICY.md) — 1.0 local-only data and tracking disclosure
 - [Agent Instructions](AGENTS.md) — architecture boundary, testing philosophy, and PR workflow
 
 ## Current Implementation

@@ -250,6 +250,15 @@ Design approved 2026-07-03; the "Review Reminder Notifications" section of
    "Data Not Collected" if truly nothing leaves device), a privacy policy URL,
    `PrivacyInfo.xcprivacy` privacy manifest (required-reason APIs from RN and
    SQLite deps), `ITSAppUsesNonExemptEncryption = false` in Info.plist.
+   Status: implementation complete. `docs/APP_PRIVACY_DISCLOSURE.md` records
+   the 1.0 App Store Connect answer as Data Not Collected / no tracking, points
+   the privacy policy URL to the public repository document, and captures the
+   release re-audit gate. `docs/PRIVACY_POLICY.md` is the public policy.
+   `PrivacyInfo.xcprivacy` declares no tracking and no collected data while
+   preserving the required-reason API entries currently needed by React Native
+   and SQLite dependencies. `Info.plist` sets
+   `ITSAppUsesNonExemptEncryption = false` and no longer declares an unused
+   location permission string.
 4. **Release configuration**: dev-only puzzle-source switch verified hidden in
    release (already gated on `__DEV__`), LogBox suppression acceptable, no
    debug menus reachable, Metro not required.
