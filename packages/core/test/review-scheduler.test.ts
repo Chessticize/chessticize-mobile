@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { scheduleMistake, scheduleMistakeForContext, scheduleReview } from "../src/index.ts";
+import { isReviewDue, isReviewOverdue, reviewDueState, scheduleMistake, scheduleMistakeForContext, scheduleReview } from "../src/index.ts";
 
 test("first mistake is scheduled for one day later", () => {
   const scheduled = scheduleMistake("p1", "2026-06-20T00:00:00.000Z");
@@ -52,4 +52,18 @@ test("sprint misses refresh review due dates without counting as failed schedule
   assert.equal(refreshed.lapseCount, 0);
   assert.equal(refreshed.reviewCount, 0);
   assert.equal(refreshed.dueAt, "2026-06-21T12:00:00.000Z");
+});
+
+test("review overdue state starts only after the review is more than 24 hours late", () => {
+  const review = scheduleMistake("p1", "2026-06-20T00:00:00.000Z");
+
+  assert.equal(reviewDueState(review, "2026-06-20T23:59:59.999Z"), "future");
+  assert.equal(isReviewDue(review, "2026-06-20T23:59:59.999Z"), false);
+  assert.equal(isReviewOverdue(review, "2026-06-20T23:59:59.999Z"), false);
+  assert.equal(reviewDueState(review, "2026-06-21T00:00:00.000Z"), "due");
+  assert.equal(isReviewDue(review, "2026-06-21T12:00:00.000Z"), true);
+  assert.equal(isReviewOverdue(review, "2026-06-21T23:59:59.999Z"), false);
+  assert.equal(reviewDueState(review, "2026-06-22T00:00:00.000Z"), "due");
+  assert.equal(reviewDueState(review, "2026-06-22T00:00:00.001Z"), "overdue");
+  assert.equal(isReviewOverdue(review, "2026-06-22T00:00:00.001Z"), true);
 });

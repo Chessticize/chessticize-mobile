@@ -99,6 +99,10 @@ Review queue:
 7. "Overdue" is computed as `dueAt <= now` — identical to "due" — everywhere
    (badge, summary, filter). Define overdue as meaningfully late (e.g. > 24h
    past due) and use it consistently.
+   Status: complete. Review due state is now a core-tested rule: a queue item
+   is due at `dueAt`, but it becomes overdue only when it is more than 24 hours
+   past `dueAt`. The Practice badge, Review summary, Overdue filter,
+   difficulty details, and queue row due labels all use that shared definition.
 8. A Standard/Blitz review timeout or unsolvable position dead-ends: the wrong
    result is recorded but no Continue affordance appears (that exists only on
    the Arrow Duel path). Show the solution or a Continue button after a

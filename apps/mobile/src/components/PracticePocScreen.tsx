@@ -26,6 +26,8 @@ import {
   formatSideToMoveScore,
   historyAttemptReviewKey,
   historyAttemptSpeedSeconds,
+  isReviewOverdue,
+  reviewDueState,
   submitArrowDuelChoice,
   submitLineMove
 } from "../../../../packages/core/src/index.ts";
@@ -1096,7 +1098,7 @@ export function PracticePocScreen({
   });
   const practiceProgress = buildPracticeProgressSummary(attempts, nowMs);
   const dueTodayCount = dueReviewItems.length;
-  const overdueCount = dueReviewItems.filter((item) => new Date(item.review.dueAt).getTime() <= nowMs).length;
+  const overdueCount = dueReviewItems.filter((item) => isReviewOverdue(item.review, nowMs)).length;
   const customThemeValue = themeForCustomSprint(customTheme);
   const customEligiblePuzzleCount = service.countEligibleSprintPuzzles({
     mode: customSprintMode,
@@ -1399,6 +1401,7 @@ export function PracticePocScreen({
           <ReviewPanel
             boardSize={boardSize}
             dueReviewItems={dueReviewItems}
+            nowMs={nowMs}
             reviewQueue={reviewQueue}
             service={service}
             sessionMistakeReviewItems={sessionMistakeReviewItems}
@@ -4053,7 +4056,7 @@ function reviewDifficultySummary(items: ReviewQueueItem[]): { easy: number; medi
   }, { easy: 0, medium: 0, hard: 0 });
 }
 
-function reviewDifficultyDetail(items: ReviewQueueItem[], difficulty: ReviewDifficulty): string {
+function reviewDifficultyDetail(items: ReviewQueueItem[], difficulty: ReviewDifficulty, nowMs: number): string {
   const matchingItems = items.filter((item) => reviewItemDifficulty(item) === difficulty);
   if (difficulty === "easy") {
     return matchingItems.length > 0 ? "All good" : "No easy reviews";
@@ -4061,11 +4064,12 @@ function reviewDifficultyDetail(items: ReviewQueueItem[], difficulty: ReviewDiff
   if (matchingItems.length === 0) {
     return difficulty === "hard" ? "Stable" : "No medium reviews";
   }
-  const hasOverdue = matchingItems.some((item) => new Date(item.review.dueAt).getTime() <= Date.now());
+  const hasOverdue = matchingItems.some((item) => isReviewOverdue(item.review, nowMs));
+  const hasReady = matchingItems.some((item) => reviewDueState(item.review, nowMs) !== "future");
   if (difficulty === "hard") {
     return hasOverdue ? "Overdue now" : "Needs attention";
   }
-  return hasOverdue ? "Ready now" : "Next due later";
+  return hasReady ? "Ready now" : "Next due later";
 }
 
 function reviewItemDifficulty(item: ReviewQueueItem): "easy" | "medium" | "hard" {
@@ -4114,14 +4118,13 @@ function reviewItemSourceSprintLabel(item: ReviewQueueItem): string {
   return `Source sprint: ${modeLabel(item.review.mode)}${speedLabel ? ` · ${speedLabel}` : ""}`;
 }
 
-function filterReviewQueueItems(items: ReviewQueueItem[], filter: ReviewQueueFilter): ReviewQueueItem[] {
-  const now = Date.now();
+function filterReviewQueueItems(items: ReviewQueueItem[], filter: ReviewQueueFilter, nowMs: number): ReviewQueueItem[] {
   return items.filter((item) => {
     if (filter === "all") {
       return true;
     }
     if (filter === "overdue") {
-      return new Date(item.review.dueAt).getTime() <= now;
+      return isReviewOverdue(item.review, nowMs);
     }
     if (filter === "failed") {
       return item.review.lapseCount > 0;
@@ -4173,17 +4176,16 @@ function reviewQueueFilterLabel(filter: ReviewQueueFilter): string {
   return "All due";
 }
 
-function reviewQueueSummary(queue: ReviewQueueState[], filteredItems: ReviewQueueItem[]): {
+function reviewQueueSummary(queue: ReviewQueueState[], filteredItems: ReviewQueueItem[], nowMs: number): {
   dueStatusLabel: string;
   filteredCount: number;
   oldestDueLabel: string;
   overdueCount: number;
   totalCount: number;
 } {
-  const now = Date.now();
   const dueTimes = queue.map((review) => new Date(review.dueAt).getTime()).filter(Number.isFinite);
   const oldestDueTime = dueTimes.length > 0 ? Math.min(...dueTimes) : null;
-  const filteredOverdueCount = filteredItems.filter((item) => new Date(item.review.dueAt).getTime() <= now).length;
+  const filteredOverdueCount = filteredItems.filter((item) => isReviewOverdue(item.review, nowMs)).length;
   return {
     dueStatusLabel: filteredItems.length === 0
       ? "No matching scheduled reviews"
@@ -4193,10 +4195,10 @@ function reviewQueueSummary(queue: ReviewQueueState[], filteredItems: ReviewQueu
     filteredCount: filteredItems.length,
     oldestDueLabel: oldestDueTime === null
       ? "Next review appears after a missed puzzle reaches its due time"
-      : oldestDueTime <= now
+      : oldestDueTime <= nowMs
         ? `Oldest due ${new Date(oldestDueTime).toISOString().slice(0, 10)}`
         : `Next review due ${new Date(oldestDueTime).toISOString().slice(0, 10)}`,
-    overdueCount: queue.filter((review) => new Date(review.dueAt).getTime() <= now).length,
+    overdueCount: queue.filter((review) => isReviewOverdue(review, nowMs)).length,
     totalCount: queue.length
   };
 }
@@ -4240,6 +4242,7 @@ type ReviewPuzzleState =
 function ReviewPanel({
   boardSize,
   dueReviewItems,
+  nowMs,
   onExitSessionReview,
   onOpenPractice,
   onReviewRecorded,
@@ -4250,6 +4253,7 @@ function ReviewPanel({
 }: {
   boardSize: number;
   dueReviewItems: ReviewQueueItem[];
+  nowMs: number;
   onExitSessionReview: () => void;
   onOpenPractice: () => void;
   onReviewRecorded: (completedAt: string) => void;
@@ -4274,7 +4278,7 @@ function ReviewPanel({
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const themeFilters = collectReviewThemeFilters(dueReviewItems);
   const speedFilters = collectReviewSpeedFilters(dueReviewItems);
-  const filteredDueReviewItems = filterReviewQueueItems(dueReviewItems, queueFilter);
+  const filteredDueReviewItems = filterReviewQueueItems(dueReviewItems, queueFilter, nowMs);
   const filteredDueEntries = filteredDueReviewItems.map((item): ReviewEntry => ({
     puzzle: item.puzzle,
     mode: item.review.mode,
@@ -4283,14 +4287,14 @@ function ReviewPanel({
   }));
   const filteredContextGroups = groupReviewEntriesByContext(filteredDueEntries);
   const difficultySummary = reviewDifficultySummary(dueReviewItems);
-  const queueSummary = reviewQueueSummary(reviewQueue, filteredDueReviewItems);
+  const queueSummary = reviewQueueSummary(reviewQueue, filteredDueReviewItems, nowMs);
   const activeFilterLabels = reviewActiveFilterLabels(queueFilter, queueSummary);
   const showActiveFilterStrip = filtersExpanded || queueFilter !== "all";
   const reviewDueSummaryLabel = filteredDueEntries.length > 0
     ? queueSummary.dueStatusLabel
     : "No matching scheduled reviews";
   const reviewDueFilterLabel = filteredDueEntries.length > 0
-    ? `${reviewQueueFilterLabel(queueFilter)} · Ready now`
+    ? `${reviewQueueFilterLabel(queueFilter)} · ${queueSummary.dueStatusLabel}`
     : "No matching scheduled reviews";
   const reviewDueSubline = reviewDueCardSubline(queueSummary.oldestDueLabel);
 
@@ -4371,7 +4375,7 @@ function ReviewPanel({
         <ReviewDifficultyRow
           active={queueFilter === "difficulty:easy"}
           label="Easy"
-          detail={reviewDifficultyDetail(dueReviewItems, "easy")}
+          detail={reviewDifficultyDetail(dueReviewItems, "easy", nowMs)}
           count={difficultySummary.easy}
           tone="easy"
           onPress={() => setQueueFilter("difficulty:easy")}
@@ -4379,7 +4383,7 @@ function ReviewPanel({
         <ReviewDifficultyRow
           active={queueFilter === "difficulty:medium"}
           label="Medium"
-          detail={reviewDifficultyDetail(dueReviewItems, "medium")}
+          detail={reviewDifficultyDetail(dueReviewItems, "medium", nowMs)}
           count={difficultySummary.medium}
           tone="medium"
           onPress={() => setQueueFilter("difficulty:medium")}
@@ -4387,7 +4391,7 @@ function ReviewPanel({
         <ReviewDifficultyRow
           active={queueFilter === "difficulty:hard"}
           label="Hard"
-          detail={reviewDifficultyDetail(dueReviewItems, "hard")}
+          detail={reviewDifficultyDetail(dueReviewItems, "hard", nowMs)}
           count={difficultySummary.hard}
           tone="hard"
           onPress={() => setQueueFilter("difficulty:hard")}
@@ -4455,6 +4459,7 @@ function ReviewPanel({
             <ReviewQueueItemCard
               key={`${item.review.puzzleId}:${item.review.mode}:${item.review.ratingKey}`}
               item={item}
+              nowMs={nowMs}
               onPress={() => setActiveEntries([{
                 puzzle: item.puzzle,
                 mode: item.review.mode,
@@ -4558,15 +4563,22 @@ function ReviewActiveFilterStrip({ labels }: { labels: string[] }): React.JSX.El
 
 function ReviewQueueItemCard({
   item,
+  nowMs,
   onPress
 }: {
   item: ReviewQueueItem;
+  nowMs: number;
   onPress: () => void;
 }): React.JSX.Element {
   const difficulty = reviewItemDifficulty(item);
   const primaryTheme = item.puzzle.themes[0] ?? "mixed";
   const lastWrongDate = item.review.lastReviewedAt.slice(0, 10);
-  const dueState = new Date(item.review.dueAt).getTime() <= Date.now() ? "Due now" : `Due ${item.review.dueAt.slice(0, 10)}`;
+  const dueKind = reviewDueState(item.review, nowMs);
+  const dueState = dueKind === "overdue"
+    ? "Overdue"
+    : dueKind === "due"
+      ? "Due now"
+      : `Due ${item.review.dueAt.slice(0, 10)}`;
   const source = reviewItemSourceSprintLabel(item);
   const compactSource = source.replace(/^Source sprint: /, "");
   const nextReviewNumber = item.review.reviewCount + 1;
