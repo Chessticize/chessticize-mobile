@@ -1,4 +1,4 @@
-import { NativeModules } from "react-native";
+import { NativeEventEmitter, NativeModules } from "react-native";
 import {
   computeNextReminder,
   type AttemptEvent,
@@ -16,8 +16,25 @@ export interface ReviewReminderScheduler {
   replaceNextReminder(decision: ReviewReminderDecision | undefined): Promise<ReviewReminderScheduleResult>;
 }
 
+export type ReviewReminderPermissionStatus = "not_determined" | "authorized" | "denied" | "unavailable";
+export type ReviewReminderNotificationRoute = "review";
+
+export interface ReviewReminderNotificationClient {
+  getAuthorizationStatus(): Promise<ReviewReminderPermissionStatus>;
+  requestAuthorization(): Promise<ReviewReminderPermissionStatus>;
+  openSystemSettings(): Promise<void>;
+  consumeInitialRoute(): Promise<ReviewReminderNotificationRoute | undefined>;
+  addNotificationResponseListener(listener: (route: ReviewReminderNotificationRoute) => void): () => void;
+}
+
 type NativeReviewReminderNotificationsModule = {
+  addListener: (eventName: string) => void;
+  removeListeners: (count: number) => void;
   replaceNextReminder: (reminder: NativeReviewReminderPayload | null) => Promise<ReviewReminderScheduleResult>;
+  getAuthorizationStatus?: () => Promise<string>;
+  requestAuthorization?: () => Promise<string>;
+  openSystemSettings?: () => Promise<void>;
+  consumeInitialRoute?: () => Promise<string | null | undefined>;
 };
 
 interface NativeReviewReminderPayload {
@@ -41,6 +58,63 @@ export class FakeReviewReminderScheduler implements ReviewReminderScheduler {
   }
 }
 
+export class FakeReviewReminderNotificationClient implements ReviewReminderNotificationClient {
+  requestCount = 0;
+  openSettingsCount = 0;
+  private listeners = new Set<(route: ReviewReminderNotificationRoute) => void>();
+  private initialRoute: ReviewReminderNotificationRoute | undefined;
+
+  constructor(
+    private status: ReviewReminderPermissionStatus = "not_determined",
+    private requestedStatus: ReviewReminderPermissionStatus = "authorized"
+  ) {}
+
+  async getAuthorizationStatus(): Promise<ReviewReminderPermissionStatus> {
+    return this.status;
+  }
+
+  async requestAuthorization(): Promise<ReviewReminderPermissionStatus> {
+    this.requestCount += 1;
+    this.status = this.requestedStatus;
+    return this.status;
+  }
+
+  async openSystemSettings(): Promise<void> {
+    this.openSettingsCount += 1;
+  }
+
+  async consumeInitialRoute(): Promise<ReviewReminderNotificationRoute | undefined> {
+    const route = this.initialRoute;
+    this.initialRoute = undefined;
+    return route;
+  }
+
+  addNotificationResponseListener(listener: (route: ReviewReminderNotificationRoute) => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  setAuthorizationStatus(status: ReviewReminderPermissionStatus): void {
+    this.status = status;
+  }
+
+  setRequestedStatus(status: ReviewReminderPermissionStatus): void {
+    this.requestedStatus = status;
+  }
+
+  setInitialRoute(route: ReviewReminderNotificationRoute | undefined): void {
+    this.initialRoute = route;
+  }
+
+  emitRoute(route: ReviewReminderNotificationRoute): void {
+    for (const listener of Array.from(this.listeners)) {
+      listener(route);
+    }
+  }
+}
+
 export function createNativeReviewReminderScheduler(): ReviewReminderScheduler | null {
   const nativeModule = NativeModules?.ReviewReminderNotifications as NativeReviewReminderNotificationsModule | undefined;
   if (!nativeModule || typeof nativeModule.replaceNextReminder !== "function") {
@@ -48,6 +122,39 @@ export function createNativeReviewReminderScheduler(): ReviewReminderScheduler |
   }
   return {
     replaceNextReminder: (decision) => nativeModule.replaceNextReminder(decision ? nativePayload(decision) : null)
+  };
+}
+
+export function createNativeReviewReminderNotificationClient(): ReviewReminderNotificationClient | null {
+  const nativeModule = NativeModules?.ReviewReminderNotifications as NativeReviewReminderNotificationsModule | undefined;
+  if (
+    !nativeModule ||
+    typeof nativeModule.getAuthorizationStatus !== "function" ||
+    typeof nativeModule.requestAuthorization !== "function" ||
+    typeof nativeModule.openSystemSettings !== "function" ||
+    typeof nativeModule.consumeInitialRoute !== "function"
+  ) {
+    return null;
+  }
+  const eventEmitter = new NativeEventEmitter(nativeModule);
+  return {
+    getAuthorizationStatus: async () => normalizePermissionStatus(await nativeModule.getAuthorizationStatus?.()),
+    requestAuthorization: async () => normalizePermissionStatus(await nativeModule.requestAuthorization?.()),
+    openSystemSettings: async () => {
+      await nativeModule.openSystemSettings?.();
+    },
+    consumeInitialRoute: async () => normalizeNotificationRoute(await nativeModule.consumeInitialRoute?.()),
+    addNotificationResponseListener: (listener) => {
+      const subscription = eventEmitter.addListener("ReviewReminderNotificationRoute", (route: unknown) => {
+        const normalized = normalizeNotificationRoute(route);
+        if (normalized) {
+          listener(normalized);
+        }
+      });
+      return () => {
+        subscription.remove();
+      };
+    }
   };
 }
 
@@ -94,4 +201,24 @@ function nativePayload(decision: ReviewReminderDecision): NativeReviewReminderPa
     route: decision.route,
     dueCount: decision.dueCount
   };
+}
+
+function normalizePermissionStatus(status: unknown): ReviewReminderPermissionStatus {
+  switch (status) {
+    case "not_determined":
+    case "notDetermined":
+      return "not_determined";
+    case "authorized":
+    case "provisional":
+    case "ephemeral":
+      return "authorized";
+    case "denied":
+      return "denied";
+    default:
+      return "unavailable";
+  }
+}
+
+function normalizeNotificationRoute(route: unknown): ReviewReminderNotificationRoute | undefined {
+  return route === "review" ? "review" : undefined;
 }

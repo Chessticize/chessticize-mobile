@@ -12,7 +12,7 @@ import {
 import { fixtureNeedsAtLeast, PracticeService } from "../../../packages/storage/src/practice-service";
 import { MemoryStore } from "../../../packages/storage/src/memory-store";
 import { formatLocalCalendarDate, type ArrowDuelState, type AttemptEvent, type Puzzle, type SprintState, type UciEngineTransport } from "../../../packages/core/src/index";
-import { FakeReviewReminderScheduler } from "../src/backend/reviewReminderScheduler";
+import { FakeReviewReminderNotificationClient, FakeReviewReminderScheduler } from "../src/backend/reviewReminderScheduler";
 
 const renderers: TestRenderer.ReactTestRenderer[] = [];
 
@@ -2304,6 +2304,7 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "settings-data-summary-card")).toThrow();
     expect(findByTestId(renderer, "settings-profile-section")).toBeTruthy();
     expect(findByTestId(renderer, "settings-data-section")).toBeTruthy();
+    expect(findByTestId(renderer, "settings-notifications-section")).toBeTruthy();
     expect(findByTestId(renderer, "settings-packs-section")).toBeTruthy();
     expect(findByTestId(renderer, "settings-about-section")).toBeTruthy();
     expect(() => findByTestId(renderer, "settings-sync-section")).toThrow();
@@ -2321,6 +2322,15 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "settings-local-storage")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "settings-local-storage"))).toContain("On device");
     expect(collectText(findByTestId(renderer, "settings-local-storage"))).toContain("Ratings, history, review queue, and custom sprint configs are stored only on this device.");
+    expect(testIdOrder(renderer, "settings-data-section", "settings-notifications-section")).toBeLessThan(0);
+    expect(testIdOrder(renderer, "settings-notifications-section", "settings-profile-section")).toBeLessThan(0);
+    expect(collectText(findByTestId(renderer, "settings-notifications-section"))).toContain("Notifications");
+    expect(findByTestId(renderer, "settings-review-reminders")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "settings-review-reminders"))).toContain("Smart");
+    expect(collectText(findByTestId(renderer, "settings-review-reminders"))).toContain("Notifications unavailable on this device");
+    expect(findByTestId(renderer, "settings-review-reminder-smart")).toBeTruthy();
+    expect(findByTestId(renderer, "settings-review-reminder-fixed-1900")).toBeTruthy();
+    expect(findByTestId(renderer, "settings-review-reminder-off")).toBeTruthy();
     expect(testIdOrder(renderer, "settings-data-section", "settings-profile-section")).toBeLessThan(0);
     expect(findByTestId(renderer, "settings-standard-elo-row")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "settings-standard-elo-row"))).toContain("ELO 600");
@@ -2539,6 +2549,108 @@ describe("PracticePocScreen", () => {
 
     expect(scheduler.calls).toHaveLength(3);
     expect(scheduler.calls[2]).toBeUndefined();
+  });
+
+  it("saves review reminder preferences from Settings and reschedules the local reminder", async () => {
+    jest.setSystemTime(new Date("2026-06-20T12:00:00.000Z"));
+    const scheduler = new FakeReviewReminderScheduler();
+    const notificationClient = new FakeReviewReminderNotificationClient("authorized");
+    const service = createMobilePracticeService("random1000");
+    service.startSprint(
+      { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 15, maxMistakes: 3 },
+      "2026-06-20T00:00:00.000Z"
+    );
+    service.submitMove("c4b5", "2026-06-20T00:00:05.000Z");
+
+    const renderer = renderScreen({
+      practiceService: service,
+      reviewReminderNotificationClient: notificationClient,
+      reviewReminderScheduler: scheduler
+    });
+    await act(async () => {});
+
+    press(renderer, "settings-tab");
+    expect(collectText(findByTestId(renderer, "settings-review-reminders"))).toContain("Smart");
+    expect(collectText(findByTestId(renderer, "settings-review-reminders"))).toContain("Local notifications enabled");
+
+    press(renderer, "settings-review-reminder-fixed-1900");
+    await act(async () => {});
+
+    expect(service.getReviewReminderPreference()).toEqual({ mode: "fixed", fixedLocalTime: "19:00" });
+    expect(collectText(findByTestId(renderer, "settings-review-reminders"))).toContain("19:00");
+    expect(localTime(scheduler.currentReminder?.scheduledAt)).toEqual({ hour: 19, minute: 0 });
+
+    press(renderer, "settings-review-reminder-off");
+    await act(async () => {});
+
+    expect(service.getReviewReminderPreference()).toEqual({ mode: "off" });
+    expect(scheduler.currentReminder).toBeUndefined();
+    expect(collectText(findByTestId(renderer, "settings-review-reminders"))).toContain("Off");
+  });
+
+  it("uses the Settings permission affordances without re-prompting denied users", async () => {
+    const deniedClient = new FakeReviewReminderNotificationClient("denied");
+    const deniedRenderer = renderScreen({ reviewReminderNotificationClient: deniedClient });
+    await act(async () => {});
+
+    press(deniedRenderer, "settings-tab");
+    expect(collectText(findByTestId(deniedRenderer, "settings-review-reminders"))).toContain("Blocked in iOS Settings");
+    expect(() => findByTestId(deniedRenderer, "settings-review-reminder-enable")).toThrow();
+    press(deniedRenderer, "settings-review-reminder-open-settings");
+    await act(async () => {});
+    expect(deniedClient.openSettingsCount).toBe(1);
+    expectText(deniedRenderer, "Opened iOS Settings");
+
+    const undecidedClient = new FakeReviewReminderNotificationClient("not_determined", "authorized");
+    const undecidedRenderer = renderScreen({ reviewReminderNotificationClient: undecidedClient });
+    await act(async () => {});
+
+    press(undecidedRenderer, "settings-tab");
+    expect(findByTestId(undecidedRenderer, "settings-review-reminder-enable")).toBeTruthy();
+    press(undecidedRenderer, "settings-review-reminder-enable");
+    await act(async () => {});
+
+    expect(undecidedClient.requestCount).toBe(1);
+    expectText(undecidedRenderer, "Notifications enabled");
+    expect(() => findByTestId(undecidedRenderer, "settings-review-reminder-enable")).toThrow();
+  });
+
+  it("opens the Review tab from local reminder notification routes", async () => {
+    const notificationClient = new FakeReviewReminderNotificationClient("authorized");
+    const renderer = renderScreen({ reviewReminderNotificationClient: notificationClient });
+    await act(async () => {});
+
+    press(renderer, "settings-tab");
+    expect(findByTestId(renderer, "settings-panel")).toBeTruthy();
+    act(() => {
+      notificationClient.emitRoute("review");
+    });
+
+    expect(findByTestId(renderer, "review-panel")).toBeTruthy();
+  });
+
+  it("asks for review reminder permission after the first completed scheduled review", async () => {
+    const notificationClient = new FakeReviewReminderNotificationClient("not_determined", "authorized");
+    const service = createMobilePracticeService("random1000");
+    service.startSprint(
+      { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
+      "2026-06-20T00:00:00.000Z"
+    );
+    service.submitMove("c4b5", "2026-06-20T00:00:05.000Z");
+    const renderer = renderScreen({ practiceService: service, reviewReminderNotificationClient: notificationClient });
+    await act(async () => {});
+
+    press(renderer, "review-tab");
+    press(renderer, "review-start-due");
+    await boardMove(renderer, "c4b5");
+    await settleFeedbackSnapshot();
+
+    expect(findByTestId(renderer, "review-reminder-permission-prompt")).toBeTruthy();
+    press(renderer, "review-reminder-permission-enable");
+    await act(async () => {});
+
+    expect(notificationClient.requestCount).toBe(1);
+    expect(() => findByTestId(renderer, "review-reminder-permission-prompt")).toThrow();
   });
 });
 
