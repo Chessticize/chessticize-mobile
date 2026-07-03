@@ -56,4 +56,14 @@ Use the simulator only for native behavior or final GUI checks: real gesture ren
 
 ## License
 
-This project is intended to be released under GPL-3.0-or-later because the app embeds Stockfish. Final release packaging must include complete license notices, source availability, and build instructions for all GPL-covered components.
+Chessticize Mobile is distributed under GPL-3.0-or-later because the app embeds
+Stockfish. See [LICENSE](LICENSE) for the complete GPLv3 license text and
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for bundled third-party notices.
+
+## Release Source Rule
+
+Every binary submitted to App Store Connect must be built from a public tagged
+source release in this repository. Do not submit an App Store binary from an
+untagged commit. The release tag must identify the exact source, native code,
+bundled puzzle artifact, Stockfish source, and notices used for that binary.
+See [Release Source Policy](docs/RELEASE_SOURCE_POLICY.md).

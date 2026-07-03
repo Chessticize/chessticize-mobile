@@ -2388,8 +2388,10 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "settings-manage-packs")).toBeTruthy();
     expect(findByTestId(renderer, "settings-app-version")).toBeTruthy();
     expect(findByTestId(renderer, "settings-license")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "settings-license"))).not.toContain("Stockfish integration keeps the app open source");
-    expect(findByTestId(renderer, "settings-license-detail").props.accessibilityLabel).toBe("Stockfish integration keeps the app open source");
+    expect(collectText(findByTestId(renderer, "settings-license"))).toContain("License & Source");
+    expect(collectText(findByTestId(renderer, "settings-license"))).toContain("GPL-3.0-or-later");
+    expect(collectText(findByTestId(renderer, "settings-license"))).toContain("Stockfish 18 embedded");
+    expect(collectText(findByTestId(renderer, "settings-license"))).toContain("github.com/Chessticize/chessticize-mobile");
     expect(collectText(findByTestId(renderer, "settings-data-section"))).not.toContain("›");
     expect(collectText(findByTestId(renderer, "settings-packs-section"))).not.toContain("›");
 

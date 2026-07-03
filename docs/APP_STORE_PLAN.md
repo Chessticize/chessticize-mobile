@@ -231,6 +231,14 @@ Design approved 2026-07-03; the "Review Reminder Notifications" section of
    - Tag a repository release for every binary submitted to App Store Connect
      so published source always matches the shipped build; document this rule
      in the README.
+   Status: implementation complete. `LICENSE` now contains the full GPLv3 text
+   with SPDX GPL-3.0-or-later, `THIRD_PARTY_NOTICES.md` records Stockfish 18,
+   the upstream `sf_18` tag commit, Lichess puzzle data, the chessboard
+   package, and React Native runtime dependency notices, the Settings license
+   row names Stockfish 18 and the public source repository, and the README
+   links the release source policy. Release-time execution still requires
+   refreshing notices against the final lockfile and tagging each App Store
+   binary from its exact release commit.
 2. **App identity**: final display name, bundle identifier, version/build
    scheme, app icon set (all slots), launch screen matching the app background.
 3. **Privacy**: App Privacy questionnaire answers (local-only data collection =
