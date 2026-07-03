@@ -158,6 +158,9 @@ Scheduler polish (low priority):
 
 14. First correct review jumps 1d → 3d because `successStreak` indexes past the
     24h rung; confirm intended or shift the index.
+    Status: complete. Successful scheduled reviews now keep `successStreak` as
+    a 1-based persisted count but use it as a 0-based interval index, so the
+    first correct review schedules 24h and the second schedules 72h.
 15. Next-due dates render as UTC calendar days; use local-time formatting.
 
 ## Milestone 4 — Review reminder notifications

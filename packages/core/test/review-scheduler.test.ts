@@ -13,7 +13,7 @@ test("first mistake is scheduled for one day later", () => {
   assert.equal(scheduled.lapseCount, 0);
 });
 
-test("successful reviews expand intervals and failed reviews contract them", () => {
+test("successful reviews start at one day, expand intervals, and failed reviews contract them", () => {
   const first = scheduleMistake("p1", "2026-06-20T00:00:00.000Z");
   const success = scheduleReview({
     previous: first,
@@ -21,21 +21,33 @@ test("successful reviews expand intervals and failed reviews contract them", () 
     now: "2026-06-21T00:00:00.000Z"
   });
 
-  assert.equal(success.dueAt, "2026-06-24T00:00:00.000Z");
-  assert.equal(success.intervalHours, 72);
+  assert.equal(success.dueAt, "2026-06-22T00:00:00.000Z");
+  assert.equal(success.intervalHours, 24);
   assert.equal(success.reviewCount, 1);
   assert.equal(success.successStreak, 1);
   assert.equal(success.lapseCount, 0);
 
-  const failed = scheduleReview({
+  const secondSuccess = scheduleReview({
     previous: success,
-    result: "wrong",
+    result: "correct",
     now: "2026-06-22T00:00:00.000Z"
   });
 
-  assert.equal(failed.dueAt, "2026-06-22T06:00:00.000Z");
+  assert.equal(secondSuccess.dueAt, "2026-06-25T00:00:00.000Z");
+  assert.equal(secondSuccess.intervalHours, 72);
+  assert.equal(secondSuccess.reviewCount, 2);
+  assert.equal(secondSuccess.successStreak, 2);
+  assert.equal(secondSuccess.lapseCount, 0);
+
+  const failed = scheduleReview({
+    previous: secondSuccess,
+    result: "wrong",
+    now: "2026-06-23T00:00:00.000Z"
+  });
+
+  assert.equal(failed.dueAt, "2026-06-23T06:00:00.000Z");
   assert.equal(failed.intervalHours, 6);
-  assert.equal(failed.reviewCount, 2);
+  assert.equal(failed.reviewCount, 3);
   assert.equal(failed.successStreak, 0);
   assert.equal(failed.lapseCount, 1);
 });
