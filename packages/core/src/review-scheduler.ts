@@ -1,6 +1,9 @@
 import type { ReviewContext, ReviewQueueState, ReviewScheduleInput } from "./types.ts";
 
 const SUCCESS_INTERVALS_HOURS = [24, 72, 168, 336, 720, 1440];
+export const REVIEW_OVERDUE_THRESHOLD_HOURS = 24;
+
+export type ReviewDueState = "future" | "due" | "overdue";
 
 export function scheduleReview(input: ReviewScheduleInput): ReviewQueueState {
   const nowDate = new Date(input.now);
@@ -71,6 +74,26 @@ export function scheduleMistakeForContext(context: ReviewContext, now: string, p
     lastResult: "wrong",
     lastReviewedAt: nowDate.toISOString()
   };
+}
+
+export function reviewDueState(review: Pick<ReviewQueueState, "dueAt">, now: string | number | Date): ReviewDueState {
+  const dueAtMs = new Date(review.dueAt).getTime();
+  const nowMs = now instanceof Date ? now.getTime() : new Date(now).getTime();
+  if (!Number.isFinite(dueAtMs) || !Number.isFinite(nowMs)) {
+    return "future";
+  }
+  if (nowMs - dueAtMs > REVIEW_OVERDUE_THRESHOLD_HOURS * 60 * 60 * 1000) {
+    return "overdue";
+  }
+  return dueAtMs <= nowMs ? "due" : "future";
+}
+
+export function isReviewDue(review: Pick<ReviewQueueState, "dueAt">, now: string | number | Date): boolean {
+  return reviewDueState(review, now) !== "future";
+}
+
+export function isReviewOverdue(review: Pick<ReviewQueueState, "dueAt">, now: string | number | Date): boolean {
+  return reviewDueState(review, now) === "overdue";
 }
 
 function addHours(date: Date, hours: number): Date {

@@ -1441,13 +1441,14 @@ describe("PracticePocScreen", () => {
       "2026-06-20T00:00:00.000Z"
     );
     service.submitMove("c4b5", "2026-06-20T00:00:05.000Z");
+    jest.setSystemTime(new Date("2026-06-21T12:00:00.000Z"));
     const renderer = renderScreen({ practiceService: service });
 
     press(renderer, "review-tab");
 
     expect(findByTestId(renderer, "review-panel")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "review-tab-badge"))).toBe("1");
-    expect(hasStyleEntry(findByTestId(renderer, "review-tab-badge"), "backgroundColor", "#DC2626")).toBe(true);
+    expect(hasStyleEntry(findByTestId(renderer, "review-tab-badge"), "backgroundColor", "#DC2626")).toBe(false);
     expect(() => findByTestId(renderer, "app-shell-header")).toThrow();
     expect(collectText(findByTestId(renderer, "review-action-header"))).not.toContain("Due reviews");
     expect(collectText(findByTestId(renderer, "review-action-header"))).toContain("Review");
@@ -1474,15 +1475,15 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "review-active-filter-summary")).toThrow();
     expectText(renderer, "Due Today");
     expect(findByTestId(renderer, "review-due-card").props.accessibilityLabel).toContain("All due · Ready now");
-    expect(collectText(findByTestId(renderer, "review-due-summary"))).toBe("Overdue now");
+    expect(collectText(findByTestId(renderer, "review-due-summary"))).toBe("Ready now");
     expect(collectText(findByTestId(renderer, "review-next-due"))).toBe("Oldest: 2026-06-21");
     expect(findByTestId(renderer, "review-next-due").props.accessibilityLabel).toBe("Oldest due 2026-06-21");
     expect(collectText(findByTestId(renderer, "review-due-count"))).toBe("1");
-    expect(collectText(findByTestId(renderer, "review-overdue-count"))).toBe("1");
+    expect(collectText(findByTestId(renderer, "review-overdue-count"))).toBe("0");
     expect(hasStyleEntry(findByTestId(renderer, "review-overdue-count"), "fontSize", 0)).toBe(false);
     expect(collectText(findByTestId(renderer, "review-due-card"))).toContain("Overdue");
     expect(collectText(findByTestId(renderer, "review-total-count"))).toBe("1");
-    expect(collectText(findByTestId(renderer, "review-due-secondary-summary"))).toBe("1 overdue · 1 total");
+    expect(collectText(findByTestId(renderer, "review-due-secondary-summary"))).toBe("0 overdue · 1 total");
     expect(collectText(findByTestId(renderer, "review-difficulty-medium"))).toContain("Ready now");
     expectText(renderer, "Oldest: 2026-06-21");
     expectText(renderer, "Start Review");
@@ -1493,7 +1494,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "review-filter-toggle").props.accessibilityState).toEqual({ expanded: true });
     expect(findByTestId(renderer, "review-active-filter-summary")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "review-active-filter-summary"))).toContain("All due");
-    expect(collectText(findByTestId(renderer, "review-active-filter-summary"))).toContain("1 overdue");
+    expect(collectText(findByTestId(renderer, "review-active-filter-summary"))).not.toContain("1 overdue");
     expect(collectText(findByTestId(renderer, "review-active-filter-summary"))).toContain("1 total");
     expect(findByTestId(renderer, "review-queue-filters")).toBeTruthy();
     expect(findByTestId(renderer, "review-filter-all")).toBeTruthy();
@@ -1530,13 +1531,20 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "review-active-filter-summary"))).toContain("Failed again");
     press(renderer, "review-filter-all");
 
+    press(renderer, "review-filter-overdue");
+    expect(findByTestId(renderer, "review-start-due").props.accessibilityState).toEqual({ disabled: true });
+    expect(collectText(findByTestId(renderer, "review-due-summary"))).toBe("No matching scheduled reviews");
+    expect(collectText(findByTestId(renderer, "review-active-filter-summary"))).toContain("Overdue");
+    expect(collectText(findByTestId(renderer, "review-active-filter-summary"))).not.toContain("1 overdue");
+    press(renderer, "review-filter-all");
+
     press(renderer, "review-filter-arrow-duel");
     expect(findByTestId(renderer, "review-start-due").props.accessibilityState).toEqual({ disabled: true });
     expect(collectText(findByTestId(renderer, "review-due-summary"))).toBe("No matching scheduled reviews");
     expect(collectText(findByTestId(renderer, "review-active-filter-summary"))).toContain("Arrow Duel only");
     expect(collectText(renderer.root)).not.toContain("Last wrong 2026-06-20");
     press(renderer, "review-filter-speed-20");
-    expect(collectText(findByTestId(renderer, "review-due-summary"))).toBe("Overdue now");
+    expect(collectText(findByTestId(renderer, "review-due-summary"))).toBe("Ready now");
     expect(collectText(findByTestId(renderer, "review-next-due"))).toBe("Oldest: 2026-06-21");
     expect(findByTestId(renderer, "review-next-due").props.accessibilityLabel).toBe("Oldest due 2026-06-21");
     expect(findByTestId(renderer, "review-due-card").props.accessibilityLabel).toContain("20s pace · Ready now");
@@ -1545,7 +1553,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "review-filter-all");
     press(renderer, "review-difficulty-medium");
     expect(findByTestId(renderer, "review-difficulty-medium").props.accessibilityState).toEqual({ selected: true });
-    expect(collectText(findByTestId(renderer, "review-due-summary"))).toBe("Overdue now");
+    expect(collectText(findByTestId(renderer, "review-due-summary"))).toBe("Ready now");
     expect(collectText(findByTestId(renderer, "review-next-due"))).toBe("Oldest: 2026-06-21");
     expect(findByTestId(renderer, "review-next-due").props.accessibilityLabel).toBe("Oldest due 2026-06-21");
     expect(findByTestId(renderer, "review-due-card").props.accessibilityLabel).toContain("Medium reviews · Ready now");
@@ -1577,6 +1585,31 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "review-next")).toThrow();
     expect(() => findByTestId(renderer, "review-previous")).toThrow();
     expect(() => findByTestId(renderer, "review-start-session-mistakes")).toThrow();
+  });
+
+  it("counts reviews as overdue only after they are more than 24 hours late", () => {
+    const service = createMobilePracticeService("random1000");
+    service.startSprint(
+      { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
+      "2026-06-20T00:00:00.000Z"
+    );
+    service.submitMove("c4b5", "2026-06-20T00:00:05.000Z");
+    jest.setSystemTime(new Date("2026-06-22T00:00:05.001Z"));
+    const renderer = renderScreen({ practiceService: service });
+
+    expect(collectText(findByTestId(renderer, "practice-review-overdue-count"))).toContain("1");
+
+    press(renderer, "review-tab");
+
+    expect(collectText(findByTestId(renderer, "review-due-summary"))).toBe("Overdue now");
+    expect(collectText(findByTestId(renderer, "review-overdue-count"))).toBe("1");
+    expect(collectText(findByTestId(renderer, "review-due-secondary-summary"))).toBe("1 overdue · 1 total");
+    expect(findByTestId(renderer, "review-due-card").props.accessibilityLabel).toContain("All due · Overdue now");
+    press(renderer, "review-filter-toggle");
+    press(renderer, "review-filter-overdue");
+    expect(findByTestId(renderer, "review-start-due").props.accessibilityState).toEqual({ disabled: false });
+    expect(collectText(findByTestId(renderer, "review-active-filter-summary"))).toContain("1 overdue");
+    expect(collectText(findByTestId(renderer, "review-due-items"))).toContain("Overdue");
   });
 
   it("offers regular practice from an empty review queue", () => {
