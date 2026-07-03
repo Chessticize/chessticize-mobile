@@ -292,6 +292,12 @@ Design approved 2026-07-03; the "Review Reminder Notifications" section of
 7. **TestFlight pass**: internal build, manual QA checklist covering the E2E
    flow list below on a physical device, including kill-and-relaunch
    persistence and offline (airplane-mode) practice.
+   Status: repo preparation complete; external execution pending.
+   `docs/TESTFLIGHT_QA.md` now defines the TestFlight setup inputs, preflight
+   gates, physical-device matrix, manual QA checklist, evidence log, and
+   completion rule. The actual pass still requires an App Store Connect upload,
+   an internal TestFlight group, a physical iPhone install through TestFlight,
+   and a filled evidence log before this item can be marked complete.
 
 ## Milestone 6 — Automated coverage of key user flows
 
