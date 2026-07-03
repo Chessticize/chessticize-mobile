@@ -69,6 +69,23 @@ test("MemoryStore records due reviews for wrong Arrow Duel choices", async () =>
   assert.equal(service.getDueReviews("2026-06-20T12:00:00.000Z").length, 0);
 });
 
+test("MemoryStore sprint misses do not count as failed scheduled review lapses", () => {
+  const store = new MemoryStore();
+  const context = { puzzleId: "000hf", mode: "standard" as const, ratingKey: "standard 5/20" };
+
+  const firstMiss = store.scheduleMistakeReview(context, "2026-06-20T00:00:00.000Z");
+  const repeatedMiss = store.scheduleMistakeReview(context, "2026-06-20T12:00:00.000Z");
+  const failedReview = store.recordReviewResult(context, "wrong", "2026-06-21T12:00:00.000Z");
+
+  assert.equal(firstMiss.reviewCount, 0);
+  assert.equal(firstMiss.lapseCount, 0);
+  assert.equal(repeatedMiss.reviewCount, 0);
+  assert.equal(repeatedMiss.lapseCount, 0);
+  assert.equal(repeatedMiss.dueAt, "2026-06-21T12:00:00.000Z");
+  assert.equal(failedReview.reviewCount, 1);
+  assert.equal(failedReview.lapseCount, 1);
+});
+
 test("PracticeService keeps paused sprints open and resumes through the store boundary", async () => {
   const store = new MemoryStore();
   store.seedPuzzles(await loadFixturePuzzles());

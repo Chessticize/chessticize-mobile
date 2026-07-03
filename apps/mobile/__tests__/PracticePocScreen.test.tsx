@@ -1464,13 +1464,13 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "review-difficulty-medium")).toBeTruthy();
     expect(findByTestId(renderer, "review-difficulty-hard")).toBeTruthy();
     expect(findByTestId(renderer, "review-difficulty-easy").props.accessibilityLabel).toBe("Filter easy reviews, 0 reviews, No easy reviews");
-    expect(findByTestId(renderer, "review-difficulty-medium").props.accessibilityLabel).toBe("Filter medium reviews, 0 reviews, No medium reviews");
-    expect(findByTestId(renderer, "review-difficulty-hard").props.accessibilityLabel).toBe("Filter hard reviews, 1 review, Overdue now");
+    expect(findByTestId(renderer, "review-difficulty-medium").props.accessibilityLabel).toBe("Filter medium reviews, 1 review, Ready now");
+    expect(findByTestId(renderer, "review-difficulty-hard").props.accessibilityLabel).toBe("Filter hard reviews, 0 reviews, Stable");
     expect(collectText(findByTestId(renderer, "review-difficulty-easy-count"))).toBe("0");
-    expect(collectText(findByTestId(renderer, "review-difficulty-medium-count"))).toBe("0");
-    expect(collectText(findByTestId(renderer, "review-difficulty-hard-count"))).toBe("1");
+    expect(collectText(findByTestId(renderer, "review-difficulty-medium-count"))).toBe("1");
+    expect(collectText(findByTestId(renderer, "review-difficulty-hard-count"))).toBe("0");
     expect(collectText(findByTestId(renderer, "review-difficulty-list"))).not.toContain("›");
-    expect(collectText(findByTestId(renderer, "review-difficulty-hard"))).toContain("1");
+    expect(collectText(findByTestId(renderer, "review-difficulty-medium"))).toContain("1");
     expect(() => findByTestId(renderer, "review-active-filter-summary")).toThrow();
     expectText(renderer, "Due Today");
     expect(findByTestId(renderer, "review-due-card").props.accessibilityLabel).toContain("All due · Ready now");
@@ -1483,7 +1483,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "review-due-card"))).toContain("Overdue");
     expect(collectText(findByTestId(renderer, "review-total-count"))).toBe("1");
     expect(collectText(findByTestId(renderer, "review-due-secondary-summary"))).toBe("1 overdue · 1 total");
-    expect(collectText(findByTestId(renderer, "review-difficulty-hard"))).toContain("Overdue now");
+    expect(collectText(findByTestId(renderer, "review-difficulty-medium"))).toContain("Ready now");
     expectText(renderer, "Oldest: 2026-06-21");
     expectText(renderer, "Start Review");
     expect(findByTestId(renderer, "review-start-due")).toBeTruthy();
@@ -1519,10 +1519,16 @@ describe("PracticePocScreen", () => {
     expect(dueItemRows.length).toBeGreaterThan(0);
     expect(dueItemRows[0]!.props.accessibilityLabel).toContain("Source sprint: Standard · 20s pace");
     expect(dueItemRows[0]!.props.accessibilityLabel).toContain("Review 1");
-    expect(dueItemRows[0]!.props.accessibilityLabel).toContain("Lapses 1");
+    expect(dueItemRows[0]!.props.accessibilityLabel).toContain("Lapses 0");
     expect(collectText(findByTestId(renderer, `${dueItemRows[0]!.props.testID}-meta`))).toContain("Due now · 1d interval · Standard · 20s pace");
     expect(collectText(findByTestId(renderer, `${dueItemRows[0]!.props.testID}-badge`))).toBe("");
-    expect(findByTestId(renderer, "result-badge-alert-glyph")).toBeTruthy();
+    expect(findByTestId(renderer, "result-badge-correct-glyph")).toBeTruthy();
+
+    press(renderer, "review-filter-failed");
+    expect(findByTestId(renderer, "review-start-due").props.accessibilityState).toEqual({ disabled: true });
+    expect(collectText(findByTestId(renderer, "review-due-summary"))).toBe("No matching scheduled reviews");
+    expect(collectText(findByTestId(renderer, "review-active-filter-summary"))).toContain("Failed again");
+    press(renderer, "review-filter-all");
 
     press(renderer, "review-filter-arrow-duel");
     expect(findByTestId(renderer, "review-start-due").props.accessibilityState).toEqual({ disabled: true });
@@ -1537,20 +1543,20 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "review-due-count"))).toBe("1");
     expect(collectText(findByTestId(renderer, "review-active-filter-summary"))).toContain("20s pace");
     press(renderer, "review-filter-all");
-    press(renderer, "review-difficulty-hard");
-    expect(findByTestId(renderer, "review-difficulty-hard").props.accessibilityState).toEqual({ selected: true });
+    press(renderer, "review-difficulty-medium");
+    expect(findByTestId(renderer, "review-difficulty-medium").props.accessibilityState).toEqual({ selected: true });
     expect(collectText(findByTestId(renderer, "review-due-summary"))).toBe("Overdue now");
     expect(collectText(findByTestId(renderer, "review-next-due"))).toBe("Oldest: 2026-06-21");
     expect(findByTestId(renderer, "review-next-due").props.accessibilityLabel).toBe("Oldest due 2026-06-21");
-    expect(findByTestId(renderer, "review-due-card").props.accessibilityLabel).toContain("Hard reviews · Ready now");
-    expect(collectText(findByTestId(renderer, "review-active-filter-summary"))).toContain("Hard reviews");
+    expect(findByTestId(renderer, "review-due-card").props.accessibilityLabel).toContain("Medium reviews · Ready now");
+    expect(collectText(findByTestId(renderer, "review-active-filter-summary"))).toContain("Medium reviews");
     expect(collectText(findByTestId(renderer, "review-due-count"))).toBe("1");
-    expect(collectText(findByTestId(renderer, "review-difficulty-hard"))).toContain("1");
+    expect(collectText(findByTestId(renderer, "review-difficulty-medium"))).toContain("1");
     press(renderer, "review-difficulty-easy");
     expect(findByTestId(renderer, "review-difficulty-easy").props.accessibilityState).toEqual({ selected: true });
     expect(collectText(findByTestId(renderer, "review-due-summary"))).toBe("No matching scheduled reviews");
     expect(collectText(findByTestId(renderer, "review-due-count"))).toBe("0");
-    expect(collectText(findByTestId(renderer, "review-difficulty-hard"))).toContain("1");
+    expect(collectText(findByTestId(renderer, "review-difficulty-medium"))).toContain("1");
     press(renderer, "review-filter-all");
 
     const filteredDueItemRows = renderer.root.findAll(

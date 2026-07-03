@@ -45,17 +45,32 @@ export function scheduleReview(input: ReviewScheduleInput): ReviewQueueState {
     intervalHours,
     reviewCount: input.previous.reviewCount + 1,
     successStreak,
+    lapseCount: Math.max(0, input.previous.lapseCount - 1),
     lastResult: input.result,
     lastReviewedAt: nowDate.toISOString()
   };
 }
 
 export function scheduleMistake(puzzleId: string, now: string): ReviewQueueState {
-  return scheduleReview({ context: { puzzleId, mode: "standard", ratingKey: "standard 5/20" }, result: "wrong", now });
+  return scheduleMistakeForContext({ puzzleId, mode: "standard", ratingKey: "standard 5/20" }, now);
 }
 
-export function scheduleMistakeForContext(context: ReviewContext, now: string): ReviewQueueState {
-  return scheduleReview({ context, result: "wrong", now });
+export function scheduleMistakeForContext(context: ReviewContext, now: string, previous?: ReviewQueueState): ReviewQueueState {
+  const nowDate = new Date(now);
+  if (Number.isNaN(nowDate.getTime())) {
+    throw new Error("now must be a valid ISO timestamp");
+  }
+  const intervalHours = successIntervalAt(0);
+  return {
+    ...(previous ?? context),
+    dueAt: addHours(nowDate, intervalHours).toISOString(),
+    intervalHours,
+    reviewCount: previous?.reviewCount ?? 0,
+    successStreak: 0,
+    lapseCount: previous?.lapseCount ?? 0,
+    lastResult: "wrong",
+    lastReviewedAt: nowDate.toISOString()
+  };
 }
 
 function addHours(date: Date, hours: number): Date {

@@ -337,6 +337,9 @@ Custom sprint behavior:
 - Standard and Blitz review items use the original puzzle-solving flow and preserve the relevant target pace, such as a 20-second item from a 20-second sprint.
 - Arrow Duel review items use the Arrow Duel choice flow.
 - Correct reviews increase interval; failed reviews reset or shorten interval.
+- The original sprint mistake creates a Scheduled Review queue item but is not itself a review-time lapse. Queue items start with `lapseCount = 0`; failed Scheduled Review attempts increment lapses; successful Scheduled Review attempts reduce lapses toward zero.
+- Difficulty groups use review-time state: Easy means the item has no current lapse and the latest official review result was correct; Medium means the item is due from an original sprint miss with no review-time lapse; Hard means at least one failed Scheduled Review lapse remains.
+- The "Failed again" filter matches review-time lapses only. It must not match every item that originated from a sprint mistake.
 - Empty state should say when the next review is due and offer regular practice.
 - Review cards should show mode, theme, last wrong date, due state, current interval, and source sprint type.
 - The default Review Queue surface shows the due summary plus difficulty group rows for calm density; per-item review cards and grouped starts appear in the expanded filter view.

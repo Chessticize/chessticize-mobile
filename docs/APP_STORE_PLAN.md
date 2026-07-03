@@ -91,6 +91,11 @@ Review queue:
    miss from review-time lapses (e.g. start at 0, increment only on failed
    scheduled reviews, decay on success) so Easy/Medium/Hard and Failed-again
    are meaningful.
+   Status: complete. Sprint mistakes now create or refresh queue rows with
+   `lapseCount = 0` and do not count as review-time lapses. Failed Scheduled
+   Review attempts increment lapses, successful Scheduled Review attempts decay
+   lapses toward zero, first due reviews classify as Medium, and "Failed
+   again" filters only review-time lapses.
 7. "Overdue" is computed as `dueAt <= now` — identical to "due" — everywhere
    (badge, summary, filter). Define overdue as meaningfully late (e.g. > 24h
    past due) and use it consistently.
