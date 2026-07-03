@@ -507,12 +507,12 @@ export class SQLiteStore implements PracticeStore {
       attempts: countRows(this.db, "attempts"),
       reviewEvents: countRows(this.db, "review_events"),
       reviewQueue: countRows(this.db, "review_queue"),
-      sprintSessions: countRows(this.db, "sprint_sessions", "status != 'active'")
+      sprintSessions: countRows(this.db, "sprint_sessions", "status NOT IN ('active', 'paused')")
     };
     this.db.prepare("DELETE FROM attempts").run();
     this.db.prepare("DELETE FROM review_events").run();
     this.db.prepare("DELETE FROM review_queue").run();
-    this.db.prepare("DELETE FROM sprint_sessions WHERE status != 'active'").run();
+    this.db.prepare("DELETE FROM sprint_sessions WHERE status NOT IN ('active', 'paused')").run();
     return result;
   }
 

@@ -77,7 +77,7 @@ export function submitLineMove(state: PuzzleLineState, move: string): {
   };
 }
 
-export function beginArrowDuelPuzzle(puzzle: Puzzle, seed = 0): ArrowDuelState {
+export function beginArrowDuelPuzzle(puzzle: Puzzle, seed: string | number = 0): ArrowDuelState {
   const wrongMove = puzzle.solutionMoves[0];
   const correctMove = puzzle.stockfishBestMove;
   if (!wrongMove) {
@@ -90,7 +90,7 @@ export function beginArrowDuelPuzzle(puzzle: Puzzle, seed = 0): ArrowDuelState {
     throw new Error(`Puzzle ${puzzle.id} is not eligible for Arrow Duel`);
   }
 
-  const candidates = seed % 2 === 0 ? [correctMove, wrongMove] : [wrongMove, correctMove];
+  const candidates = hashSeed(seed) % 2 === 0 ? [correctMove, wrongMove] : [wrongMove, correctMove];
   return {
     kind: "arrow_duel",
     puzzle,
@@ -247,4 +247,16 @@ function isCheckmateFen(fen: string): boolean {
 
 function normalizeMove(move: string): string {
   return move.trim().toLowerCase();
+}
+
+function hashSeed(seed: string | number): number {
+  if (typeof seed === "number") {
+    return Math.abs(Math.trunc(seed));
+  }
+  let hash = 2166136261;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash ^= seed.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
 }

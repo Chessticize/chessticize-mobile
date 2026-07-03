@@ -339,9 +339,9 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "session-rating-block").props.accessibilityLabel).toBe("ELO 600");
     expect(findByTestId(renderer, "session-mistakes-block").props.accessibilityLabel).toBe("Mistakes 0 of 3");
     expect(collectText(findByTestId(renderer, "session-mistakes"))).toBe("");
-    expect(findByTestId(renderer, "session-overflow")).toBeTruthy();
+    expect(findByTestId(renderer, "session-pause")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "session-abandon"))).toBe("");
-    expect(collectText(findByTestId(renderer, "session-overflow"))).toBe("");
+    expect(collectText(findByTestId(renderer, "session-pause"))).toBe("");
     expect(collectText(findByTestId(renderer, "session-shell-nav"))).not.toContain("×");
     expect(collectText(findByTestId(renderer, "session-shell-nav"))).not.toContain("•••");
     expect(findByTestId(renderer, "session-timer")).toBeTruthy();
@@ -392,6 +392,23 @@ describe("PracticePocScreen", () => {
     press(renderer, "history-tab");
     expectHistoryRowAccessibility(renderer, "Move e6f7");
     expect(collectText(renderer.root)).not.toContain("000hf · standard");
+  });
+
+  it("pauses an active sprint with explicit resume controls", () => {
+    const renderer = renderStandardSequenceScreen();
+
+    startStandardSprint(renderer);
+    expect(findByTestId(renderer, "session-board")).toBeTruthy();
+
+    press(renderer, "session-pause");
+    expect(findByTestId(renderer, "paused-session-panel")).toBeTruthy();
+    expectText(renderer, "Sprint paused");
+    expect(() => findByTestId(renderer, "session-board")).toThrow();
+    expect(() => findByTestId(renderer, "sprint-summary-panel")).toThrow();
+
+    press(renderer, "paused-session-resume");
+    expect(findByTestId(renderer, "session-board")).toBeTruthy();
+    expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
   });
 
   it("locks the board during an opponent reply and ignores attempted extra user moves", async () => {
@@ -660,13 +677,14 @@ describe("PracticePocScreen", () => {
   });
 
   it("advances Arrow Duel after a correct candidate chip", async () => {
-    const renderer = renderScreen({ practiceService: createMobilePracticeService("familiar15") });
-    const arrow = firstArrowDuelPuzzleForTest();
+    const service = createMobilePracticeService("familiar15");
+    const renderer = renderScreen({ practiceService: service });
+
+    press(renderer, "practice-mode-arrow-duel");
+    const arrow = requireArrowDuelState(activeSprintForTest(service));
     const correctCandidateId = arrow.candidates[0]?.toLowerCase() === arrow.correctMove.toLowerCase()
       ? "arrow-duel-candidate-a"
       : "arrow-duel-candidate-b";
-
-    press(renderer, "practice-mode-arrow-duel");
     await pressAsync(renderer, correctCandidateId);
 
     expectText(renderer, "1 / 10");

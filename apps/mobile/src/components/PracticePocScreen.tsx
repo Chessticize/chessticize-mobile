@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  AppState,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -215,6 +216,7 @@ export function PracticePocScreen({
   const [feedbackPuzzleId, setFeedbackPuzzleId] = useState<string | null>(null);
   const [feedbackSnapshot, setFeedbackSnapshot] = useState<FeedbackBoardSnapshot | null>(null);
   const [boardInputLocked, setBoardInputLocked] = useState(false);
+  const [sessionLoading, setSessionLoading] = useState(false);
   const [chessboardDebugEvents, setChessboardDebugEvents] = useState<string[]>([]);
   const [historyWrongLast7Days, setHistoryWrongLast7Days] = useState(false);
   const [historyTimeRange, setHistoryTimeRange] = useState<HistoryTimeRange>("7d");
@@ -248,7 +250,9 @@ export function PracticePocScreen({
   }, [stockfishTransportFactory]);
 
   const isActive = state?.status === "active";
-  const isFinished = state !== null && state.status !== "active";
+  const isPaused = state?.status === "paused";
+  const isOpenSession = isActive || isPaused;
+  const isFinished = state !== null && !isOpenSession;
   const isShowingFeedbackSnapshot = feedbackSnapshot !== null;
   const shouldShowSessionBoard = isActive || isShowingFeedbackSnapshot;
   const selectedConfig = useMemo(
@@ -274,6 +278,21 @@ export function PracticePocScreen({
       refreshState();
     }
   }, [tab, service]);
+
+  useEffect(() => {
+    const appState = AppState as typeof AppState | undefined;
+    if (!appState?.addEventListener) {
+      return undefined;
+    }
+    const subscription = appState.addEventListener("change", (nextState) => {
+      if ((nextState === "background" || nextState === "inactive") && stateRef.current?.status === "active") {
+        pauseActiveSprint("app-state");
+      }
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, [service]);
 
   useEffect(() => {
     if (!isActive) {
@@ -337,7 +356,11 @@ export function PracticePocScreen({
     setDueReviewItems(service.getDueReviewItems(nowIso()));
     setCurrentRating(readRating(service, selectedConfig.ratingKey));
     const activeSprint = service.getActiveSprint();
-    setResumableSprint(activeSprint?.status === "active" && stateRef.current?.id !== activeSprint.id ? activeSprint : null);
+    setResumableSprint(
+      activeSprint && (activeSprint.status === "active" || activeSprint.status === "paused") && stateRef.current?.id !== activeSprint.id
+        ? activeSprint
+        : null
+    );
   }
 
   function commitState(nextState: SprintState | null): void {
@@ -390,6 +413,7 @@ export function PracticePocScreen({
 
   function startSprint(nextMode: SprintMode = mode, useCustomTiming = nextMode === "custom"): void {
     setError(null);
+    setSessionLoading(true);
     try {
       const customThemeValue = useCustomTiming ? themeForCustomSprint(customTheme) : undefined;
       const config = sprintConfigFor(nextMode, customDurationSeconds, customPerPuzzleSeconds, useCustomTiming, customThemeValue);
@@ -414,6 +438,8 @@ export function PracticePocScreen({
       refreshState();
     } catch (caught) {
       setError(errorMessage(caught));
+    } finally {
+      setSessionLoading(false);
     }
   }
 
@@ -439,7 +465,7 @@ export function PracticePocScreen({
   }
 
   function abandonSprint(): void {
-    if (!state || state.status !== "active") {
+    if (!state || (state.status !== "active" && state.status !== "paused")) {
       return;
     }
     try {
@@ -455,6 +481,24 @@ export function PracticePocScreen({
       refreshState();
     } catch {
       // no-op; abandon is safe fallback
+    }
+  }
+
+  function pauseActiveSprint(reason: string): void {
+    const activeState = stateRef.current;
+    if (activeState?.status !== "active") {
+      return;
+    }
+    try {
+      const paused = service.pauseSprint(nowIso());
+      commitState(paused);
+      commitBoardInputLocked(true, `pause-${reason}`, paused.currentPuzzle?.puzzle.id ?? null);
+      clearFeedbackSnapshot();
+      setFeedback(null);
+      setFeedbackPuzzleId(null);
+      refreshState();
+    } catch (caught) {
+      setError(errorMessage(caught));
     }
   }
 
@@ -769,17 +813,28 @@ export function PracticePocScreen({
 
   function resumeSprint(nextSprint: SprintState): void {
     setError(null);
-    setMode(nextSprint.config.mode);
-    commitState(nextSprint);
-    setResumableSprint(null);
-    setCurrentRating(nextSprint.ratingBefore);
-    commitBoardFen(nextSprint.currentPuzzle?.currentFen ?? null);
-    setLastBoardMove(null);
-    setFeedback(null);
-    setFeedbackPuzzleId(null);
-    clearFeedbackSnapshot();
-    commitBoardInputLocked(false, "resume", nextSprint.currentPuzzle?.puzzle.id ?? null);
-    setTab("practice");
+    setSessionLoading(true);
+    try {
+      const resumed = nextSprint.status === "paused" && service.getActiveSprint()?.id === nextSprint.id
+        ? service.resumeSprint(nowIso())
+        : nextSprint;
+      setMode(resumed.config.mode);
+      commitState(resumed);
+      setResumableSprint(null);
+      setCurrentRating(resumed.ratingBefore);
+      commitBoardFen(resumed.currentPuzzle?.currentFen ?? null);
+      setLastBoardMove(null);
+      setFeedback(null);
+      setFeedbackPuzzleId(null);
+      clearFeedbackSnapshot();
+      commitBoardInputLocked(false, "resume", resumed.currentPuzzle?.puzzle.id ?? null);
+      setTab("practice");
+      refreshState();
+    } catch (caught) {
+      setError(errorMessage(caught));
+    } finally {
+      setSessionLoading(false);
+    }
   }
 
   function showReviewMistakes(): void {
@@ -1015,7 +1070,7 @@ export function PracticePocScreen({
   const historyAvailableSpeeds = historyView?.availableSpeeds ?? [];
   const historyPage = historyView?.page ?? { limit: HISTORY_PAGE_LIMIT, offset: 0, total: 0, hasMore: false };
   const contentOwnsHeader = tab === "review" || tab === "history" || tab === "packs";
-  const appChromeVisible = !isActive && !isShowingFeedbackSnapshot;
+  const appChromeVisible = !isOpenSession && !sessionLoading && !isShowingFeedbackSnapshot;
   const appHeaderVisible = appChromeVisible && !contentOwnsHeader;
   const screenTitle = screenTitleFor(tab);
   const screenSubtitle = tab === "practice"
@@ -1061,17 +1116,31 @@ export function PracticePocScreen({
       >
         {tab === "practice" ? (
           <>
-            {state?.status === "active" ? (
+            {sessionLoading ? (
+              <SessionLoadingSkeleton boardSize={boardSize} />
+            ) : null}
+
+            {isOpenSession ? (
               <SessionStatusBar
                 mode={mode}
                 state={state}
                 timerText={timerText}
                 currentRating={currentRating}
                 onAbandon={isActive ? abandonSprint : undefined}
+                onPause={isActive ? () => pauseActiveSprint("manual") : undefined}
+                onResume={isPaused && state ? () => resumeSprint(state) : undefined}
               />
             ) : null}
 
-            {!isActive && state === null && mode !== "custom" ? (
+            {isPaused && state ? (
+              <PausedSessionPanel
+                state={state}
+                onAbandon={abandonSprint}
+                onResume={() => resumeSprint(state)}
+              />
+            ) : null}
+
+            {!isOpenSession && !sessionLoading && state === null && mode !== "custom" ? (
               <PracticeHome
                 mode={mode}
                 modes={practiceModeSummaries}
@@ -1087,7 +1156,7 @@ export function PracticePocScreen({
               />
             ) : null}
 
-            {!isActive && state === null && mode === "custom" ? (
+            {!isOpenSession && !sessionLoading && state === null && mode === "custom" ? (
               <CustomSprintSetup
                 durationSeconds={customDurationSeconds}
                 perPuzzleSeconds={customPerPuzzleSeconds}
@@ -1597,6 +1666,67 @@ function ResumeSprintCard({
       </View>
       <Text style={styles.resumeSprintAction}>Resume</Text>
     </Pressable>
+  );
+}
+
+function SessionLoadingSkeleton({ boardSize }: { boardSize: number }): React.JSX.Element {
+  return (
+    <View style={styles.sessionLoadingShell} testID="session-loading-skeleton">
+      <View style={styles.sessionLoadingStatusRow}>
+        <View style={styles.skeletonMetric} />
+        <View style={styles.skeletonMetricWide} />
+        <View style={styles.skeletonMetric} />
+      </View>
+      <View style={[styles.boardSurface, styles.sessionLoadingBoard, { width: boardSize, height: boardSize }]}>
+        <Text style={styles.emptyBoardText}>Loading</Text>
+      </View>
+    </View>
+  );
+}
+
+function PausedSessionPanel({
+  onAbandon,
+  onResume,
+  state
+}: {
+  onAbandon: () => void;
+  onResume: () => void;
+  state: SprintState;
+}): React.JSX.Element {
+  const remaining = Math.max(0, state.config.targetCorrect - state.correctCount);
+  return (
+    <View
+      accessibilityLabel={`Paused ${modeLabel(state.config.mode)} sprint, ${state.correctCount} solved, ${remaining} left`}
+      style={styles.pausedSessionPanel}
+      testID="paused-session-panel"
+    >
+      <View style={styles.pausedSessionCopy}>
+        <Text style={styles.sectionLabel}>Sprint paused</Text>
+        <Text style={styles.helperText}>
+          {modeLabel(state.config.mode)} · {state.correctCount} solved · {remaining} left · {state.mistakeCount} mistakes
+        </Text>
+      </View>
+      <View style={styles.pausedSessionActions}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Abandon paused sprint"
+          testID="paused-session-abandon"
+          style={styles.secondaryButton}
+          onPress={onAbandon}
+        >
+          <Text style={styles.secondaryButtonText}>Abandon</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Resume paused sprint"
+          testID="paused-session-resume"
+          style={styles.primaryButton}
+          onPress={onResume}
+        >
+          <Text style={styles.primaryButtonText}>Resume</Text>
+        </Pressable>
+      </View>
+    </View>
   );
 }
 
@@ -2198,13 +2328,17 @@ function SessionStatusBar({
   state,
   timerText,
   currentRating,
-  onAbandon
+  onAbandon,
+  onPause,
+  onResume
 }: {
   mode: SprintMode;
   state: SprintState;
   timerText: string;
   currentRating: number;
   onAbandon?: () => void;
+  onPause?: () => void;
+  onResume?: () => void;
 }): React.JSX.Element {
   const [confirmAbandon, setConfirmAbandon] = useState(false);
 
@@ -2225,9 +2359,31 @@ function SessionStatusBar({
           <View style={styles.sessionNavButton} />
         )}
         <Text style={styles.sessionNavTitle}>{modeLabel(mode)}</Text>
-        <View style={styles.sessionNavButton} testID="session-overflow">
-          <MoreGlyph />
-        </View>
+        {onPause ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Pause sprint"
+            testID="session-pause"
+            style={styles.sessionNavButton}
+            onPress={onPause}
+          >
+            <PauseGlyph />
+          </Pressable>
+        ) : onResume ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Resume sprint"
+            testID="session-resume"
+            style={styles.sessionNavButton}
+            onPress={onResume}
+          >
+            <PlayGlyph />
+          </Pressable>
+        ) : (
+          <View style={styles.sessionNavButton} testID="session-overflow">
+            <MoreGlyph />
+          </View>
+        )}
       </View>
 
       <View style={styles.sessionActiveMetricRow} testID="session-status-metrics">
@@ -3863,6 +4019,21 @@ function MoreGlyph(): React.JSX.Element {
       <View style={styles.moreGlyphDot} />
       <View style={styles.moreGlyphDot} />
     </View>
+  );
+}
+
+function PauseGlyph(): React.JSX.Element {
+  return (
+    <View style={styles.pauseGlyph} testID="pause-glyph">
+      <View style={styles.pauseGlyphBar} />
+      <View style={styles.pauseGlyphBar} />
+    </View>
+  );
+}
+
+function PlayGlyph(): React.JSX.Element {
+  return (
+    <View style={styles.playGlyph} testID="play-glyph" />
   );
 }
 
@@ -7461,6 +7632,47 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "900"
   },
+  sessionLoadingShell: {
+    gap: 14
+  },
+  sessionLoadingStatusRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "space-between"
+  },
+  skeletonMetric: {
+    backgroundColor: "#E2E8F0",
+    borderRadius: 8,
+    height: 42,
+    width: 76
+  },
+  skeletonMetricWide: {
+    backgroundColor: "#E2E8F0",
+    borderRadius: 8,
+    flex: 1,
+    height: 42
+  },
+  sessionLoadingBoard: {
+    alignItems: "center",
+    alignSelf: "center",
+    justifyContent: "center"
+  },
+  pausedSessionPanel: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#CBD5E1",
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 12,
+    padding: 14
+  },
+  pausedSessionCopy: {
+    gap: 4
+  },
+  pausedSessionActions: {
+    flexDirection: "row",
+    gap: 10
+  },
   reviewStripCounts: {
     alignItems: "flex-end",
     flexDirection: "row",
@@ -9391,6 +9603,27 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     height: 4,
     width: 4
+  },
+  pauseGlyph: {
+    flexDirection: "row",
+    gap: 4
+  },
+  pauseGlyphBar: {
+    backgroundColor: "#111827",
+    borderRadius: 999,
+    height: 16,
+    width: 4
+  },
+  playGlyph: {
+    borderBottomColor: "transparent",
+    borderBottomWidth: 8,
+    borderLeftColor: "#111827",
+    borderLeftWidth: 13,
+    borderTopColor: "transparent",
+    borderTopWidth: 8,
+    height: 0,
+    marginLeft: 3,
+    width: 0
   },
   chevronGlyphCanvas: {
     alignItems: "center",
