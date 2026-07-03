@@ -1,6 +1,7 @@
 import {
   buildHistoryView,
   createDefaultRating,
+  filterHistoryAttemptsForQuery,
   resetRating as resetRatingRecord,
   buildSessionMistakeReview,
   resolveHistoryRange,
@@ -11,6 +12,7 @@ import {
 import type {
   AttemptEvent,
   AttemptResult,
+  CustomSprintConfigRecord,
   HistoryAttemptView,
   HistoryEloPoint,
   HistoryQuery,
@@ -30,6 +32,7 @@ import { selectUniquePuzzles } from "./puzzle-selection.ts";
 export class MemoryStore implements PracticeStore {
   private readonly puzzles = new Map<string, Puzzle>();
   private readonly ratings = new Map<string, RatingRecord>();
+  private readonly customSprintConfigs = new Map<string, CustomSprintConfigRecord>();
   private readonly sessions = new Map<string, SprintState>();
   private readonly attempts: AttemptEvent[] = [];
   private readonly reviewQueue = new Map<string, ReviewQueueState>();
@@ -99,6 +102,16 @@ export class MemoryStore implements PracticeStore {
     const next = resetRatingRecord(this.getRating(key));
     this.saveRating(next);
     return next;
+  }
+
+  saveCustomSprintConfig(config: CustomSprintConfigRecord): void {
+    this.customSprintConfigs.set(config.id, config);
+  }
+
+  listCustomSprintConfigs(): CustomSprintConfigRecord[] {
+    return [...this.customSprintConfigs.values()].sort((left, right) =>
+      right.lastStartedAt.localeCompare(left.lastStartedAt) || left.id.localeCompare(right.id)
+    );
   }
 
   createSprintSession(state: SprintState): void {
@@ -231,21 +244,15 @@ export class MemoryStore implements PracticeStore {
   getHistoryView(query: HistoryQuery): HistoryView {
     const range = resolveHistoryRange(query.now, query.timeRange);
     const allAttempts = this.historyAttemptsForRange(query.ratingKey, range.since, range.until);
-    const attempts = allAttempts
-      .filter((attempt) => !query.result || attempt.result === query.result)
-      .filter((attempt) => !query.source || attempt.source === query.source)
-      .filter((attempt) => !query.mode || attempt.mode === query.mode)
-      .filter((attempt) => !query.side || attempt.side === query.side)
-      .filter((attempt) => query.minRating === undefined || attempt.puzzleRating >= query.minRating)
-      .filter((attempt) => query.maxRating === undefined || attempt.puzzleRating <= query.maxRating)
-      .filter((attempt) => !query.theme || attempt.themes.includes(query.theme));
+    const reviews = [...this.reviewQueue.values()];
+    const attempts = filterHistoryAttemptsForQuery({ attempts: allAttempts, query, reviews });
     return buildHistoryView({
       query,
       ratingKeys: this.listPlayedRatings(),
       attempts,
       elo: this.eloPointsForRange(query.ratingKey, range.since, range.until),
-      reviews: [...this.reviewQueue.values()],
-      availableThemes: [...new Set(allAttempts.flatMap((attempt) => attempt.themes))].sort()
+      reviews,
+      allAttemptsForOptions: allAttempts
     });
   }
 

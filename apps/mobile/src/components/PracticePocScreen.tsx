@@ -23,6 +23,7 @@ import {
   currentExpectedMove,
   defaultSprintConfig,
   formatSideToMoveScore,
+  historyAttemptSpeedSeconds,
   submitArrowDuelChoice,
   submitLineMove
 } from "../../../../packages/core/src/index.ts";
@@ -31,10 +32,12 @@ import type {
   AttemptSource,
   ArrowDuelState,
   CurrentPuzzleState,
+  CustomSprintConfigRecord,
   EngineAnalysisLine,
   HistoryEloPoint,
   HistoryAttemptView,
   HistoryPuzzleStats,
+  HistoryReviewStatus,
   HistoryTimeRange,
   PuzzleSide,
   Puzzle,
@@ -73,6 +76,7 @@ type Tab = "practice" | "review" | "history" | "settings" | "packs" | "analysis"
 type SessionFeedback = PuzzleFeedback | null;
 type AnalysisEngineStatus = "idle" | "thinking" | "stockfish" | "fallback" | "error";
 type HistoryRatingRangeFilter = "all" | "under1000" | "1000-1399" | "1400-plus";
+type CustomThemeFilter = "mixed" | "mate" | "endgame";
 
 export type PracticeDebugTraceEvent = {
   type:
@@ -220,6 +224,8 @@ export function PracticePocScreen({
   const [historySideFilter, setHistorySideFilter] = useState<"all" | PuzzleSide>("all");
   const [historyThemeFilter, setHistoryThemeFilter] = useState<string>("all");
   const [historyRatingRangeFilter, setHistoryRatingRangeFilter] = useState<HistoryRatingRangeFilter>("all");
+  const [historySpeedFilter, setHistorySpeedFilter] = useState<"all" | number>("all");
+  const [historyReviewStatusFilter, setHistoryReviewStatusFilter] = useState<"all" | HistoryReviewStatus>("all");
   const [historyPageOffset, setHistoryPageOffset] = useState(0);
   const [historyRatingKey, setHistoryRatingKey] = useState<string | null>(null);
   const [historyReviewEntries, setHistoryReviewEntries] = useState<ReviewEntry[]>([]);
@@ -227,6 +233,7 @@ export function PracticePocScreen({
   const [customSprintMode, setCustomSprintMode] = useState<"custom" | "arrow_duel">("custom");
   const [customDurationSeconds, setCustomDurationSeconds] = useState(5 * 60);
   const [customPerPuzzleSeconds, setCustomPerPuzzleSeconds] = useState(20);
+  const [customTheme, setCustomTheme] = useState<CustomThemeFilter>("mixed");
   const [, setSettingsRevision] = useState(0);
 
   const boardSize = useMemo(() => {
@@ -245,8 +252,8 @@ export function PracticePocScreen({
   const isShowingFeedbackSnapshot = feedbackSnapshot !== null;
   const shouldShowSessionBoard = isActive || isShowingFeedbackSnapshot;
   const selectedConfig = useMemo(
-    () => sprintConfigFor(mode === "custom" ? customSprintMode : mode, customDurationSeconds, customPerPuzzleSeconds, mode === "custom"),
-    [customDurationSeconds, customPerPuzzleSeconds, customSprintMode, mode]
+    () => sprintConfigFor(mode === "custom" ? customSprintMode : mode, customDurationSeconds, customPerPuzzleSeconds, mode === "custom", themeForCustomSprint(customTheme)),
+    [customDurationSeconds, customPerPuzzleSeconds, customSprintMode, customTheme, mode]
   );
   stateRef.current = state;
   boardFenRef.current = boardFen;
@@ -384,11 +391,13 @@ export function PracticePocScreen({
   function startSprint(nextMode: SprintMode = mode, useCustomTiming = nextMode === "custom"): void {
     setError(null);
     try {
-      const config = sprintConfigFor(nextMode, customDurationSeconds, customPerPuzzleSeconds, useCustomTiming);
+      const customThemeValue = useCustomTiming ? themeForCustomSprint(customTheme) : undefined;
+      const config = sprintConfigFor(nextMode, customDurationSeconds, customPerPuzzleSeconds, useCustomTiming, customThemeValue);
       const started = service.startSprint({
         mode: nextMode,
         durationSeconds: config.durationSeconds,
         perPuzzleSeconds: config.perPuzzleSeconds,
+        ...(customThemeValue ? { theme: customThemeValue, persistCustomConfig: true } : useCustomTiming ? { persistCustomConfig: true } : {}),
         ...(!practiceService && shouldRandomizePuzzleSelection(puzzleSource) ? { puzzleSelectionSeed: `${Date.now()}-${Math.random()}` } : {})
       });
       setMode(nextMode);
@@ -980,6 +989,8 @@ export function PracticePocScreen({
         ...(historyModeFilter === "all" ? {} : { mode: historyModeFilter }),
         ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
         ...(historyThemeFilter === "all" ? {} : { theme: historyThemeFilter }),
+        ...(historySpeedFilter === "all" ? {} : { speedSeconds: historySpeedFilter }),
+        ...(historyReviewStatusFilter === "all" ? {} : { reviewStatus: historyReviewStatusFilter }),
         page: { limit: HISTORY_PAGE_LIMIT, offset: historyPageOffset }
       })
     : null;
@@ -993,12 +1004,15 @@ export function PracticePocScreen({
         ...(historyResultFilter === "all" ? {} : { result: historyResultFilter }),
         ...(historyModeFilter === "all" ? {} : { mode: historyModeFilter }),
         ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
-        ...(historyThemeFilter === "all" ? {} : { theme: historyThemeFilter })
+        ...(historyThemeFilter === "all" ? {} : { theme: historyThemeFilter }),
+        ...(historySpeedFilter === "all" ? {} : { speedSeconds: historySpeedFilter }),
+        ...(historyReviewStatusFilter === "all" ? {} : { reviewStatus: historyReviewStatusFilter })
       })
     : null;
   const displayedAttempts = historyView?.attempts ?? [];
   const historyReviewAttempts = fullHistoryReviewView?.attempts ?? displayedAttempts;
   const historyAvailableThemes = historyView?.availableThemes ?? [];
+  const historyAvailableSpeeds = historyView?.availableSpeeds ?? [];
   const historyPage = historyView?.page ?? { limit: HISTORY_PAGE_LIMIT, offset: 0, total: 0, hasMore: false };
   const contentOwnsHeader = tab === "review" || tab === "history" || tab === "packs";
   const appChromeVisible = !isActive && !isShowingFeedbackSnapshot;
@@ -1018,6 +1032,13 @@ export function PracticePocScreen({
   const practiceProgress = buildPracticeProgressSummary(attempts, nowMs);
   const dueTodayCount = dueReviewItems.length;
   const overdueCount = dueReviewItems.filter((item) => new Date(item.review.dueAt).getTime() <= nowMs).length;
+  const customThemeValue = themeForCustomSprint(customTheme);
+  const customEligiblePuzzleCount = service.countEligibleSprintPuzzles({
+    mode: customSprintMode,
+    durationSeconds: customDurationSeconds,
+    perPuzzleSeconds: customPerPuzzleSeconds,
+    ...(customThemeValue ? { theme: customThemeValue } : {})
+  });
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -1070,9 +1091,10 @@ export function PracticePocScreen({
               <CustomSprintSetup
                 durationSeconds={customDurationSeconds}
                 perPuzzleSeconds={customPerPuzzleSeconds}
+                theme={customTheme}
                 targetCorrect={selectedConfig.targetCorrect}
                 maxMistakes={selectedConfig.maxMistakes}
-                availablePuzzleCount={seededPuzzleCount(puzzleSource)}
+                availablePuzzleCount={customEligiblePuzzleCount}
                 ratingKey={selectedConfig.ratingKey}
                 currentRating={currentRating}
                 onDurationChange={setCustomDurationSeconds}
@@ -1080,6 +1102,8 @@ export function PracticePocScreen({
                 customMode={customSprintMode}
                 onCustomModeChange={setCustomSprintMode}
                 onPerPuzzleChange={setCustomPerPuzzleSeconds}
+                onThemeChange={setCustomTheme}
+                previousConfigs={service.listCustomSprintConfigs()}
                 onStart={() => startSprint(customSprintMode, true)}
               />
             ) : null}
@@ -1244,7 +1268,10 @@ export function PracticePocScreen({
               sideFilter={historySideFilter}
               themeFilter={historyThemeFilter}
               availableThemes={historyAvailableThemes}
+              availableSpeeds={historyAvailableSpeeds}
               page={historyPage}
+              reviewStatusFilter={historyReviewStatusFilter}
+              speedFilter={historySpeedFilter}
               wrongLast7Days={historyWrongLast7Days}
               onRatingKeyChange={(ratingKey) => {
                 setHistoryRatingKey(ratingKey);
@@ -1276,6 +1303,14 @@ export function PracticePocScreen({
               }}
               onThemeFilterChange={(theme) => {
                 setHistoryThemeFilter(theme);
+                setHistoryPageOffset(0);
+              }}
+              onSpeedFilterChange={(speed) => {
+                setHistorySpeedFilter(speed);
+                setHistoryPageOffset(0);
+              }}
+              onReviewStatusFilterChange={(status) => {
+                setHistoryReviewStatusFilter(status);
                 setHistoryPageOffset(0);
               }}
               onPageOffsetChange={setHistoryPageOffset}
@@ -1645,10 +1680,13 @@ function CustomSprintSetup({
   onClose,
   onCustomModeChange,
   perPuzzleSeconds,
+  previousConfigs,
   targetCorrect,
+  theme,
   ratingKey,
   onDurationChange,
   onPerPuzzleChange,
+  onThemeChange,
   onStart
 }: {
   availablePuzzleCount: number;
@@ -1659,43 +1697,22 @@ function CustomSprintSetup({
   onClose: () => void;
   onCustomModeChange: (next: "custom" | "arrow_duel") => void;
   perPuzzleSeconds: number;
+  previousConfigs: CustomSprintConfigRecord[];
   targetCorrect: number;
+  theme: CustomThemeFilter;
   ratingKey: string;
   onDurationChange: (next: number) => void;
   onPerPuzzleChange: (next: number) => void;
+  onThemeChange: (next: CustomThemeFilter) => void;
   onStart: () => void;
 }): React.JSX.Element {
-  const [theme, setTheme] = useState("Mixed");
   const ratingRange = `${Math.max(400, currentRating - 200)} - ${currentRating + 200}`;
   const requiredPuzzleCount = targetCorrect + maxMistakes;
   const hasEnoughLocalPuzzles = availablePuzzleCount >= requiredPuzzleCount;
   const canStartWithLocalPuzzles = availablePuzzleCount > 0;
-  const previousConfigs: PreviousCustomConfig[] = [
-    {
-      id: "custom-5-20",
-      mode: "Regular Puzzles",
-      customMode: "custom",
-      theme: "Mixed",
-      durationSeconds: 5 * 60,
-      perPuzzleSeconds: 20,
-      timing: "5 min · 20s pace",
-      lastPlayed: "Recently",
-      ratingKey: "custom 5/20",
-      rating: currentRating
-    },
-    {
-      id: "custom-3-30",
-      mode: "Regular Puzzles",
-      customMode: "custom",
-      theme: "Mixed",
-      durationSeconds: 3 * 60,
-      perPuzzleSeconds: 30,
-      timing: "3 min · 30s pace",
-      lastPlayed: "Saved setup",
-      ratingKey: "custom 3/30",
-      rating: readCustomPreviewRating("custom 3/30", ratingKey, currentRating)
-    }
-  ];
+  const previousRows = previousConfigs.slice(0, 5).map((config) =>
+    previousCustomConfigRowModel(config, ratingKey, currentRating)
+  );
 
   return (
     <View style={styles.customSetupPanel} testID="custom-sprint-setup">
@@ -1733,10 +1750,10 @@ function CustomSprintSetup({
         />
         <CustomChoiceRow
           label="Theme"
-          value={theme}
+          value={customThemeLabel(theme)}
           options={["Mixed", "Mate", "Endgame"]}
           testID="custom-theme-row"
-          onChange={setTheme}
+          onChange={(label) => onThemeChange(customThemeFromLabel(label))}
         />
         <CustomOptionRow
           label="Duration"
@@ -1803,14 +1820,17 @@ function CustomSprintSetup({
       <CustomEligibilityNotice
         availablePuzzleCount={availablePuzzleCount}
         hasEnoughLocalPuzzles={hasEnoughLocalPuzzles}
-        onBroadenTheme={theme === "Mixed" ? undefined : () => setTheme("Mixed")}
+        onBroadenTheme={theme === "mixed" ? undefined : () => onThemeChange("mixed")}
         requiredPuzzleCount={requiredPuzzleCount}
-        theme={theme}
+        theme={customThemeLabel(theme)}
       />
 
       <View style={styles.previousConfigList} testID="custom-previous-configs">
         <Text style={styles.sectionLabel}>Previous configs</Text>
-        {previousConfigs.map((config) => (
+        {previousRows.length === 0 ? (
+          <Text style={styles.helperText} testID="custom-previous-empty">Start a custom sprint to save this setup.</Text>
+        ) : null}
+        {previousRows.map((config) => (
           <PreviousCustomConfigRow
             key={config.id}
             config={config}
@@ -1818,7 +1838,7 @@ function CustomSprintSetup({
               onCustomModeChange(config.customMode);
               onDurationChange(config.durationSeconds);
               onPerPuzzleChange(config.perPuzzleSeconds);
-              setTheme(config.theme);
+              onThemeChange(config.theme);
             }}
           />
         ))}
@@ -1863,10 +1883,6 @@ function CustomEligibilityNotice({
       ) : null}
     </View>
   );
-}
-
-function readCustomPreviewRating(candidateKey: string, activeKey: string, currentRating: number): number {
-  return candidateKey === activeKey ? currentRating : 600;
 }
 
 function CustomModeChoiceRow({
@@ -2101,7 +2117,8 @@ type PreviousCustomConfig = {
   id: string;
   mode: string;
   perPuzzleSeconds: number;
-  theme: string;
+  theme: CustomThemeFilter;
+  themeLabel: string;
   timing: string;
   lastPlayed: string;
   ratingKey: string;
@@ -2116,7 +2133,7 @@ function PreviousCustomConfigRow({
   onPress: () => void;
 }): React.JSX.Element {
   const ratingLabel = historyRatingKeyLabel(config.ratingKey);
-  const metaLabel = `${config.theme} · ${config.timing} · Last ${config.lastPlayed}`;
+  const metaLabel = `${config.themeLabel} · ${config.timing} · Last ${config.lastPlayed}`;
 
   return (
     <Pressable
@@ -2982,7 +2999,10 @@ function HistoryPanel({
   sideFilter,
   themeFilter,
   availableThemes,
+  availableSpeeds,
   page,
+  reviewStatusFilter,
+  speedFilter,
   wrongLast7Days,
   onRatingKeyChange,
   onTimeRangeChange,
@@ -2992,6 +3012,8 @@ function HistoryPanel({
   onRatingRangeFilterChange,
   onSideFilterChange,
   onThemeFilterChange,
+  onSpeedFilterChange,
+  onReviewStatusFilterChange,
   onPageOffsetChange,
   onOpenAttempt,
   onToggleWrongLast7Days
@@ -3009,7 +3031,10 @@ function HistoryPanel({
   sideFilter: "all" | PuzzleSide;
   themeFilter: string;
   availableThemes: string[];
+  availableSpeeds: number[];
   page: { limit: number; offset: number; total: number; hasMore: boolean };
+  reviewStatusFilter: "all" | HistoryReviewStatus;
+  speedFilter: "all" | number;
   wrongLast7Days: boolean;
   onRatingKeyChange: (ratingKey: string) => void;
   onTimeRangeChange: (range: HistoryTimeRange) => void;
@@ -3019,6 +3044,8 @@ function HistoryPanel({
   onRatingRangeFilterChange: (ratingRange: HistoryRatingRangeFilter) => void;
   onSideFilterChange: (side: "all" | PuzzleSide) => void;
   onThemeFilterChange: (theme: string) => void;
+  onSpeedFilterChange: (speed: "all" | number) => void;
+  onReviewStatusFilterChange: (status: "all" | HistoryReviewStatus) => void;
   onPageOffsetChange: (offset: number) => void;
   onOpenAttempt: (attemptId: string) => void;
   onToggleWrongLast7Days: () => void;
@@ -3026,21 +3053,7 @@ function HistoryPanel({
   const [chartMetric, setChartMetric] = useState<HistoryChartMetric>("rating");
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const puzzleStatsById = new Map(puzzleStats.map((stats) => [stats.puzzleId, stats]));
-  const [speedFilter, setSpeedFilter] = useState<"all" | number>("all");
-  const [reviewStatusFilter, setReviewStatusFilter] = useState<"all" | "queued" | "clear">("all");
-  const speedFilters = collectHistorySpeedFilters(attempts);
-  const visibleAttempts = attempts.filter((attempt) => {
-    if (speedFilter !== "all" && historyAttemptSpeedSeconds(attempt) !== speedFilter) {
-      return false;
-    }
-    if (reviewStatusFilter === "queued") {
-      return historyAttemptHasReviewQueued(attempt, puzzleStatsById);
-    }
-    if (reviewStatusFilter === "clear") {
-      return !historyAttemptHasReviewQueued(attempt, puzzleStatsById);
-    }
-    return true;
-  });
+  const visibleAttempts = attempts;
   const correct = visibleAttempts.filter((attempt) => attempt.result === "correct").length;
   const wrong = visibleAttempts.filter((attempt) => attempt.result === "wrong").length;
   const accuracy = Math.round((correct / Math.max(1, correct + wrong)) * 100);
@@ -3167,16 +3180,16 @@ function HistoryPanel({
             <FilterButton active={resultFilter === "wrong"} label="Wrong" testID="history-result-wrong" onPress={() => onResultFilterChange("wrong")} />
             <FilterButton active={modeFilter === "arrow_duel"} label="Arrow Duel only" testID="history-filter-arrow-duel-only" onPress={() => onModeFilterChange("arrow_duel")} />
           </HistoryChipRow>
-          {speedFilters.length > 0 ? (
+          {availableSpeeds.length > 0 ? (
             <HistoryChipRow testID="history-speed-filters">
-              <FilterButton active={speedFilter === "all"} label="All speeds" testID="history-speed-all" onPress={() => setSpeedFilter("all")} />
-              {speedFilters.map((speed) => (
+              <FilterButton active={speedFilter === "all"} label="All speeds" testID="history-speed-all" onPress={() => onSpeedFilterChange("all")} />
+              {availableSpeeds.map((speed) => (
                 <FilterButton
                   key={speed}
                   active={speedFilter === speed}
                   label={`${speed}s pace`}
                   testID={`history-speed-${speed}`}
-                  onPress={() => setSpeedFilter(speed)}
+                  onPress={() => onSpeedFilterChange(speed)}
                 />
               ))}
             </HistoryChipRow>
@@ -3193,9 +3206,9 @@ function HistoryPanel({
             ))}
           </HistoryChipRow>
           <HistoryChipRow testID="history-review-status-filters">
-            <FilterButton active={reviewStatusFilter === "all"} label="All review states" testID="history-review-status-all" onPress={() => setReviewStatusFilter("all")} />
-            <FilterButton active={reviewStatusFilter === "queued"} label="Queued" testID="history-review-status-queued" onPress={() => setReviewStatusFilter("queued")} />
-            <FilterButton active={reviewStatusFilter === "clear"} label="Clear" testID="history-review-status-clear" onPress={() => setReviewStatusFilter("clear")} />
+            <FilterButton active={reviewStatusFilter === "all"} label="All review states" testID="history-review-status-all" onPress={() => onReviewStatusFilterChange("all")} />
+            <FilterButton active={reviewStatusFilter === "queued"} label="Queued" testID="history-review-status-queued" onPress={() => onReviewStatusFilterChange("queued")} />
+            <FilterButton active={reviewStatusFilter === "clear"} label="Clear" testID="history-review-status-clear" onPress={() => onReviewStatusFilterChange("clear")} />
           </HistoryChipRow>
           <HistoryChipRow testID="history-side-filters">
             <FilterButton active={sideFilter === "all"} label="Both sides" testID="history-side-all" onPress={() => onSideFilterChange("all")} />
@@ -3562,37 +3575,10 @@ function historyChartEmptyLabel(metric: HistoryChartMetric): string {
   return metric;
 }
 
-function collectHistorySpeedFilters(attempts: HistoryAttemptView[]): number[] {
-  const speeds = new Set<number>();
-  for (const attempt of attempts) {
-    const speed = historyAttemptSpeedSeconds(attempt);
-    if (speed !== null) {
-      speeds.add(speed);
-    }
-  }
-  return [...speeds].sort((left, right) => left - right);
-}
-
-function historyAttemptSpeedSeconds(attempt: HistoryAttemptView): number | null {
-  const match = attempt.ratingKey.match(/\/(\d+)\b/);
-  return match ? Number(match[1]) : null;
-}
-
 function historyRatingKeyLabel(ratingKey: string): string {
   const speed = ratingKey.match(/\/(\d+)\b/)?.[1];
   const speedLabel = speed ? ` · ${speed}s pace` : "";
   return `${ratingLabelFromKey(ratingKey)}${speedLabel}`;
-}
-
-function historyAttemptHasReviewQueued(
-  attempt: HistoryAttemptView,
-  puzzleStatsById: Map<string, HistoryPuzzleStats>
-): boolean {
-  if (attempt.result !== "wrong") {
-    return false;
-  }
-  const stats = puzzleStatsById.get(attempt.puzzleId);
-  return stats?.nextReviewAt ? true : true;
 }
 
 function ResultBadgeGlyph({ tone }: { tone: "correct" | "wrong" | "alert" }): React.JSX.Element {
@@ -5956,13 +5942,13 @@ function AdvancedRatingRow({
 }
 
 function ratingLabelFromKey(ratingKey: string): string {
-  if (ratingKey.startsWith("arrow duel") || ratingKey.startsWith("arrow_duel")) {
+  if (/\barrow[_ ]duel\b/.test(ratingKey)) {
     return "Arrow Duel";
   }
-  if (ratingKey.startsWith("blitz")) {
+  if (/\bblitz\b/.test(ratingKey)) {
     return "Blitz";
   }
-  if (ratingKey.startsWith("custom")) {
+  if (/\bcustom\b/.test(ratingKey)) {
     return "Custom";
   }
   return "Standard";
@@ -6776,16 +6762,86 @@ function sprintConfigFor(
   mode: SprintMode,
   customDurationSeconds: number,
   customPerPuzzleSeconds: number,
-  useCustomTiming = mode === "custom"
+  useCustomTiming = mode === "custom",
+  theme?: string
 ): SprintConfig {
   if (!useCustomTiming) {
     return defaultSprintConfig(mode);
   }
-  return buildSprintConfig({
+  const input: {
+    mode: SprintMode;
+    durationSeconds: number;
+    perPuzzleSeconds: number;
+    theme?: string;
+  } = {
     mode,
     durationSeconds: customDurationSeconds,
     perPuzzleSeconds: customPerPuzzleSeconds
-  });
+  };
+  if (theme) {
+    input.theme = theme;
+  }
+  return buildSprintConfig(input);
+}
+
+function themeForCustomSprint(theme: CustomThemeFilter): string | undefined {
+  return theme === "mixed" ? undefined : theme;
+}
+
+function customThemeLabel(theme: CustomThemeFilter): string {
+  if (theme === "mate") {
+    return "Mate";
+  }
+  if (theme === "endgame") {
+    return "Endgame";
+  }
+  return "Mixed";
+}
+
+function customThemeFromLabel(label: string): CustomThemeFilter {
+  if (label === "Mate") {
+    return "mate";
+  }
+  if (label === "Endgame") {
+    return "endgame";
+  }
+  return "mixed";
+}
+
+function previousCustomConfigRowModel(
+  config: CustomSprintConfigRecord,
+  activeRatingKey: string,
+  currentRating: number
+): PreviousCustomConfig {
+  const theme = customThemeFromStoredValue(config.theme);
+  return {
+    id: safeTestId(config.id),
+    mode: config.mode === "arrow_duel" ? "Arrow Duel" : "Regular Puzzles",
+    customMode: config.mode === "arrow_duel" ? "arrow_duel" : "custom",
+    theme,
+    themeLabel: customThemeLabel(theme),
+    durationSeconds: config.durationSeconds,
+    perPuzzleSeconds: config.perPuzzleSeconds,
+    timing: formatSprintTimingLabel(config),
+    lastPlayed: formatConfigLastPlayed(config.lastStartedAt),
+    ratingKey: config.ratingKey,
+    rating: config.ratingKey === activeRatingKey ? currentRating : 600
+  };
+}
+
+function customThemeFromStoredValue(theme: string | undefined): CustomThemeFilter {
+  if (theme === "mate" || theme === "endgame") {
+    return theme;
+  }
+  return "mixed";
+}
+
+function formatConfigLastPlayed(lastStartedAt: string): string {
+  const date = new Date(lastStartedAt);
+  if (Number.isNaN(date.getTime())) {
+    return "Recently";
+  }
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 function readRating(service: PracticeService, ratingKey: string): number {

@@ -40,6 +40,19 @@ export interface SprintConfig {
   theme?: string;
 }
 
+export interface CustomSprintConfigRecord {
+  id: string;
+  mode: SprintMode;
+  ratingKey: string;
+  durationSeconds: number;
+  perPuzzleSeconds: number;
+  targetCorrect: number;
+  maxMistakes: number;
+  theme?: string;
+  lastStartedAt: string;
+  playCount: number;
+}
+
 export interface RatingRecord {
   key: string;
   generation: number;

@@ -1,6 +1,6 @@
 # V1 Implementation Guide
 
-Status date: 2026-07-02. This document is the active work plan. It supersedes the
+Status date: 2026-07-03. This document is the active work plan. It supersedes the
 priorities in `DESIGN_PARITY_BACKLOG.md` where they conflict; the backlog remains
 the detailed audit record. `MOBILE_UI_DESIGN.md` remains authoritative for screen
 behavior specs, subject to the v1 scope cuts below.
@@ -54,6 +54,11 @@ behind the dev-only source switch.
   it is inert local state, so the eligibility summary can lie.
 - Custom sprint "Previous configs" must be real persisted configs, not
   hardcoded placeholder rows.
+
+Implementation note: item 2 is implemented by extending the domain history query
+with speed and review-status filters, making custom sprint theme selection part
+of the service start/count command, and persisting previous custom sprint
+configs through the store interface.
 
 ### 3. Required behavior not yet implemented (backlog P1)
 

@@ -4,6 +4,7 @@ import {
   buildHistoryView,
   buildSessionMistakeReview,
   createDefaultRating,
+  filterHistoryAttemptsForQuery,
   resetRating as resetRatingRecord,
   resolveHistoryRange,
   scheduleMistakeForContext,
@@ -13,6 +14,7 @@ import {
 import type {
   AttemptEvent,
   AttemptResult,
+  CustomSprintConfigRecord,
   HistoryAttemptView,
   HistoryEloPoint,
   HistoryQuery,
@@ -91,6 +93,19 @@ interface ReviewRow {
   lapse_count: number;
   last_result: AttemptResult;
   last_reviewed_at: string;
+}
+
+interface CustomSprintConfigRow {
+  id: string;
+  mode: SprintMode;
+  rating_key: string;
+  duration_seconds: number;
+  per_puzzle_seconds: number;
+  target_correct: number;
+  max_mistakes: number;
+  theme: string | null;
+  last_started_at: string;
+  play_count: number;
 }
 
 interface SprintSessionExportRow {
@@ -279,6 +294,54 @@ export class SQLiteStore implements PracticeStore {
     const next = resetRatingRecord(this.getRating(key));
     this.saveRating(next);
     return next;
+  }
+
+  saveCustomSprintConfig(config: CustomSprintConfigRecord): void {
+    this.db
+      .prepare(
+        `INSERT OR REPLACE INTO custom_sprint_configs (
+          id,
+          mode,
+          rating_key,
+          duration_seconds,
+          per_puzzle_seconds,
+          target_correct,
+          max_mistakes,
+          theme,
+          last_started_at,
+          play_count
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        config.id,
+        config.mode,
+        config.ratingKey,
+        config.durationSeconds,
+        config.perPuzzleSeconds,
+        config.targetCorrect,
+        config.maxMistakes,
+        config.theme ?? null,
+        config.lastStartedAt,
+        config.playCount
+      );
+  }
+
+  listCustomSprintConfigs(): CustomSprintConfigRecord[] {
+    const rows = this.db
+      .prepare("SELECT * FROM custom_sprint_configs ORDER BY last_started_at DESC, id ASC")
+      .all() as CustomSprintConfigRow[];
+    return rows.map((row) => ({
+      id: row.id,
+      mode: row.mode,
+      ratingKey: row.rating_key,
+      durationSeconds: row.duration_seconds,
+      perPuzzleSeconds: row.per_puzzle_seconds,
+      targetCorrect: row.target_correct,
+      maxMistakes: row.max_mistakes,
+      ...(row.theme === null ? {} : { theme: row.theme }),
+      lastStartedAt: row.last_started_at,
+      playCount: row.play_count
+    }));
   }
 
   createSprintSession(state: SprintState): void {
@@ -523,21 +586,15 @@ export class SQLiteStore implements PracticeStore {
   getHistoryView(query: HistoryQuery): HistoryView {
     const range = resolveHistoryRange(query.now, query.timeRange);
     const allAttempts = this.selectHistoryAttempts(query.ratingKey, range.since, range.until);
-    const attempts = allAttempts
-      .filter((attempt) => !query.result || attempt.result === query.result)
-      .filter((attempt) => !query.source || attempt.source === query.source)
-      .filter((attempt) => !query.mode || attempt.mode === query.mode)
-      .filter((attempt) => !query.side || attempt.side === query.side)
-      .filter((attempt) => query.minRating === undefined || attempt.puzzleRating >= query.minRating)
-      .filter((attempt) => query.maxRating === undefined || attempt.puzzleRating <= query.maxRating)
-      .filter((attempt) => !query.theme || attempt.themes.includes(query.theme));
+    const reviews = this.listAllReviewQueueStates();
+    const attempts = filterHistoryAttemptsForQuery({ attempts: allAttempts, query, reviews });
     return buildHistoryView({
       query,
       ratingKeys: this.listPlayedRatings(),
       attempts,
       elo: this.selectHistoryElo(query.ratingKey, range.since, range.until),
-      reviews: this.listAllReviewQueueStates(),
-      availableThemes: [...new Set(allAttempts.flatMap((attempt) => attempt.themes))].sort()
+      reviews,
+      allAttemptsForOptions: allAttempts
     });
   }
 
@@ -849,6 +906,21 @@ CREATE INDEX IF NOT EXISTS attempts_result_idx ON attempts(result);
 CREATE INDEX IF NOT EXISTS attempts_mode_idx ON attempts(mode);
 CREATE INDEX IF NOT EXISTS attempts_session_id_idx ON attempts(session_id);
 CREATE INDEX IF NOT EXISTS sprint_sessions_rating_key_completed_at_idx ON sprint_sessions(rating_key, completed_at);
+
+CREATE TABLE IF NOT EXISTS custom_sprint_configs (
+  id TEXT PRIMARY KEY,
+  mode TEXT NOT NULL,
+  rating_key TEXT NOT NULL,
+  duration_seconds INTEGER NOT NULL,
+  per_puzzle_seconds INTEGER NOT NULL,
+  target_correct INTEGER NOT NULL,
+  max_mistakes INTEGER NOT NULL,
+  theme TEXT,
+  last_started_at TEXT NOT NULL,
+  play_count INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS custom_sprint_configs_last_started_at_idx ON custom_sprint_configs(last_started_at);
 
 CREATE TABLE IF NOT EXISTS review_queue (
   puzzle_id TEXT NOT NULL,

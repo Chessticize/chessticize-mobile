@@ -3,6 +3,7 @@ import type { AttemptEvent, AttemptResult, AttemptSource, Puzzle, RatingRecord, 
 
 export type HistoryTimeRange = "7d" | "30d" | "90d" | "1y" | "max";
 export type PuzzleSide = "white" | "black";
+export type HistoryReviewStatus = "queued" | "clear";
 
 export interface HistoryPageQuery {
   limit: number;
@@ -20,6 +21,8 @@ export interface HistoryQuery {
   side?: PuzzleSide;
   theme?: string;
   mode?: SprintMode;
+  speedSeconds?: number;
+  reviewStatus?: HistoryReviewStatus;
   page?: HistoryPageQuery;
 }
 
@@ -75,6 +78,7 @@ export interface HistoryView {
   page: HistoryPage;
   ratingKeys: RatingRecord[];
   availableThemes: string[];
+  availableSpeeds: number[];
   attempts: HistoryAttemptView[];
   elo: HistoryEloPoint[];
   puzzleStats: HistoryPuzzleStats[];
@@ -104,6 +108,9 @@ export function validateHistoryQuery(query: HistoryQuery): HistoryQuery {
   resolveHistoryRange(query.now, query.timeRange);
   validateOptionalRatingBound("minRating", query.minRating);
   validateOptionalRatingBound("maxRating", query.maxRating);
+  if (query.speedSeconds !== undefined && (!Number.isInteger(query.speedSeconds) || query.speedSeconds <= 0)) {
+    throw new Error("speedSeconds must be a positive integer");
+  }
   if (query.minRating !== undefined && query.maxRating !== undefined && query.minRating > query.maxRating) {
     throw new Error("minRating must be less than or equal to maxRating");
   }
@@ -165,22 +172,81 @@ export function buildHistoryView(input: {
   elo: HistoryEloPoint[];
   reviews: ReviewQueueState[];
   availableThemes?: string[];
+  availableSpeeds?: number[];
+  allAttemptsForOptions?: HistoryAttemptView[];
 }): HistoryView {
   const query = validateHistoryQuery(input.query);
   const range = resolveHistoryRange(query.now, query.timeRange);
   const page = resolveHistoryPage(query.page, input.attempts.length);
   const attempts = applyHistoryPage(input.attempts, page);
-  const availableThemes = input.availableThemes ?? collectThemes(input.attempts);
+  const attemptsForOptions = input.allAttemptsForOptions ?? input.attempts;
+  const availableThemes = input.availableThemes ?? collectThemes(attemptsForOptions);
+  const availableSpeeds = input.availableSpeeds ?? collectHistorySpeeds(attemptsForOptions);
   return {
     query,
     range,
     page,
     ratingKeys: input.ratingKeys,
     availableThemes,
+    availableSpeeds,
     attempts,
     elo: input.elo,
     puzzleStats: buildHistoryPuzzleStats(attempts, input.reviews)
   };
+}
+
+export function filterHistoryAttemptsForQuery(input: {
+  attempts: HistoryAttemptView[];
+  query: Pick<HistoryQuery, "result" | "source" | "mode" | "side" | "minRating" | "maxRating" | "theme" | "speedSeconds" | "reviewStatus">;
+  reviews: ReviewQueueState[];
+}): HistoryAttemptView[] {
+  return input.attempts
+    .filter((attempt) => !input.query.result || attempt.result === input.query.result)
+    .filter((attempt) => !input.query.source || attempt.source === input.query.source)
+    .filter((attempt) => !input.query.mode || attempt.mode === input.query.mode)
+    .filter((attempt) => !input.query.side || attempt.side === input.query.side)
+    .filter((attempt) => input.query.minRating === undefined || attempt.puzzleRating >= input.query.minRating)
+    .filter((attempt) => input.query.maxRating === undefined || attempt.puzzleRating <= input.query.maxRating)
+    .filter((attempt) => !input.query.theme || attempt.themes.includes(input.query.theme))
+    .filter((attempt) => input.query.speedSeconds === undefined || historyAttemptSpeedSeconds(attempt) === input.query.speedSeconds)
+    .filter((attempt) => {
+      if (input.query.reviewStatus === undefined) {
+        return true;
+      }
+      const queued = historyAttemptHasReviewQueued(attempt, input.reviews);
+      return input.query.reviewStatus === "queued" ? queued : !queued;
+    });
+}
+
+export function historyAttemptSpeedSeconds(attempt: Pick<HistoryAttemptView, "ratingKey">): number | null {
+  const match = attempt.ratingKey.match(/\/(\d+)\b/);
+  return match ? Number(match[1]) : null;
+}
+
+export function collectHistorySpeeds(attempts: Array<Pick<HistoryAttemptView, "ratingKey">>): number[] {
+  const speeds = new Set<number>();
+  for (const attempt of attempts) {
+    const speed = historyAttemptSpeedSeconds(attempt);
+    if (speed !== null) {
+      speeds.add(speed);
+    }
+  }
+  return [...speeds].sort((left, right) => left - right);
+}
+
+export function historyAttemptHasReviewQueued(
+  attempt: Pick<HistoryAttemptView, "puzzleId" | "mode" | "ratingKey" | "result">,
+  reviews: ReviewQueueState[]
+): boolean {
+  if (attempt.result !== "wrong") {
+    return false;
+  }
+  return reviews.some((review) =>
+    review.puzzleId === attempt.puzzleId &&
+    review.mode === attempt.mode &&
+    review.ratingKey === attempt.ratingKey &&
+    review.dueAt.length > 0
+  );
 }
 
 export function buildHistoryPuzzleStats(

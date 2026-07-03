@@ -187,6 +187,61 @@ test("PracticeService builds MemoryStore history view for a required time range 
   );
   assert.equal(service.getHistoryView({ ...view.query, side: view.attempts[0]?.side === "white" ? "black" : "white" }).attempts.length, 0);
   assert.equal(service.getDueReviewItems("2026-06-21T00:00:05.000Z")[0]?.puzzle.id, "000hf");
+  assert.deepEqual(
+    service.getHistoryView({ ...view.query, reviewStatus: "queued" }).attempts.map((attempt) => attempt.id),
+    view.attempts.map((attempt) => attempt.id)
+  );
+  assert.deepEqual(service.getHistoryView({ ...view.query, reviewStatus: "clear" }).attempts, []);
+});
+
+test("PracticeService persists MemoryStore custom sprint configs after successful custom starts", async () => {
+  const store = new MemoryStore();
+  store.seedPuzzles(await loadFixturePuzzles());
+  const service = new PracticeService(store);
+
+  service.startSprint(
+    {
+      mode: "custom",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      targetCorrect: 1,
+      maxMistakes: 3,
+      theme: "hangingPiece",
+      persistCustomConfig: true
+    },
+    "2026-06-20T00:00:00.000Z"
+  );
+  service.submitMove("e6e7", "2026-06-20T00:00:05.000Z");
+  service.submitMove("b3c1", "2026-06-20T00:00:10.000Z");
+  service.submitMove("h6c1", "2026-06-20T00:00:15.000Z");
+  service.startSprint(
+    {
+      mode: "custom",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      targetCorrect: 1,
+      maxMistakes: 3,
+      theme: "hangingPiece",
+      persistCustomConfig: true
+    },
+    "2026-06-21T00:00:00.000Z"
+  );
+
+  assert.deepEqual(service.getActiveSprint()?.puzzles.map((puzzle) => puzzle.id), ["00008"]);
+  assert.deepEqual(service.listCustomSprintConfigs(), [
+    {
+      id: "custom-custom-300-20-hangingPiece",
+      mode: "custom",
+      ratingKey: "hangingPiece custom 5/20",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      targetCorrect: 1,
+      maxMistakes: 3,
+      theme: "hangingPiece",
+      lastStartedAt: "2026-06-21T00:00:00.000Z",
+      playCount: 2
+    }
+  ]);
 });
 
 test("PracticeService clears MemoryStore local history without resetting ratings or puzzles", async () => {

@@ -765,26 +765,8 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "custom-mode-summary-detail").props.accessibilityLabel).toBe("Board-move puzzle sprint");
     expect(findByTestId(renderer, "custom-include-arrow-duel-detail").props.accessibilityLabel).toBe("Switches this custom sprint to Arrow Duel scoring.");
     expect(collectText(findByTestId(renderer, "custom-include-arrow-duel"))).not.toContain("Switches this custom sprint");
-    expect(collectText(findByTestId(renderer, "custom-previous-custom-5-20-meta"))).toBe("Mixed · 5 min · 20s pace · Last Recently");
-    expect(findByTestId(renderer, "custom-previous-custom-5-20-meta").props.accessibilityLabel).toBe("Mixed · 5 min · 20s pace · Last Recently · Custom · 20s pace");
-    expect(findByTestId(renderer, "custom-previous-custom-5-20").props.accessibilityLabel).toContain("Use Custom · 20s pace custom sprint");
-    expect(collectText(findByTestId(renderer, "custom-previous-custom-3-30"))).not.toContain("Custom · 30s pace");
-    expect(findByTestId(renderer, "custom-previous-custom-3-30-meta").props.accessibilityLabel).toContain("Custom · 30s pace");
-    expect(collectText(findByTestId(renderer, "custom-previous-custom-3-30"))).toContain("ELO");
-    expect(findByTestId(renderer, "custom-previous-custom-3-30-chevron")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "custom-previous-custom-3-30-chevron"))).toBe("");
-    expect(findByTestId(renderer, "custom-previous-custom-3-30").props.accessibilityRole).toBe("button");
-    press(renderer, "custom-previous-custom-3-30");
-    expect(collectText(findByTestId(renderer, "custom-target-count"))).toBe("~6");
-    expect(collectText(findByTestId(renderer, "custom-summary-target"))).toBe("Estimated puzzles~6");
-    expect(findByTestId(renderer, "custom-separate-scoring-detail").props.accessibilityLabel).toBe("Custom · 30s pace · separate bucket");
-    expect(collectText(findByTestId(renderer, "custom-separate-scoring"))).not.toContain("custom 3/30");
-    expect(collectText(findByTestId(renderer, "custom-config-list"))).toContain("3m");
-    expect(collectText(findByTestId(renderer, "custom-config-list"))).toContain("30 sec");
-    press(renderer, "custom-previous-custom-5-20");
-    expect(collectText(findByTestId(renderer, "custom-target-count"))).toBe("~15");
-    expect(findByTestId(renderer, "custom-separate-scoring-detail").props.accessibilityLabel).toBe("Custom · 20s pace · separate bucket");
-    expect(collectText(findByTestId(renderer, "custom-separate-scoring"))).not.toContain("custom 5/20");
+    expect(findByTestId(renderer, "custom-previous-empty")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "custom-previous-empty"))).toContain("Start a custom sprint");
     expect(findByTestId(renderer, "custom-include-arrow-duel")).toBeTruthy();
     expect(findByTestId(renderer, "custom-duration-stepper")).toBeTruthy();
     expect(findByTestId(renderer, "custom-per-puzzle-stepper")).toBeTruthy();
@@ -832,6 +814,33 @@ describe("PracticePocScreen", () => {
 
     expectText(renderer, "Custom");
     expectText(renderer, "0 / 6");
+  });
+
+  it("shows persisted previous custom sprint configs and can reuse one", () => {
+    const service = createMobilePracticeService("familiar15");
+    service.startSprint(
+      {
+        mode: "custom",
+        durationSeconds: 3 * 60,
+        perPuzzleSeconds: 30,
+        targetCorrect: 6,
+        maxMistakes: 3,
+        theme: "mate",
+        persistCustomConfig: true
+      },
+      "2026-06-20T00:00:00.000Z"
+    );
+    service.abandonSprint("2026-06-20T00:00:05.000Z");
+    const renderer = renderScreen({ practiceService: service });
+
+    press(renderer, "practice-mode-custom");
+
+    expect(collectText(findByTestId(renderer, "custom-previous-custom-custom-180-30-mate-meta"))).toContain("Mate · 3 min · 30s pace · Last");
+    expect(findByTestId(renderer, "custom-previous-custom-custom-180-30-mate").props.accessibilityLabel).toContain("Use Custom · 30s pace custom sprint");
+    press(renderer, "custom-previous-custom-custom-180-30-mate");
+    expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("Mate");
+    expect(collectText(findByTestId(renderer, "custom-target-count"))).toBe("~6");
+    expect(findByTestId(renderer, "custom-separate-scoring-detail").props.accessibilityLabel).toBe("Custom · 30s pace · separate bucket");
   });
 
   it("shows custom sprint local pack readiness when the selected fixture has enough puzzles", () => {

@@ -1,6 +1,7 @@
 import type {
   AttemptEvent,
   AttemptResult,
+  CustomSprintConfigRecord,
   Puzzle,
   RatingRecord,
   ReviewContext,
@@ -51,6 +52,8 @@ export interface PracticeStore {
   listPlayedRatings(): RatingRecord[];
   saveRating(record: RatingRecord): void;
   resetRating(key: string): RatingRecord;
+  saveCustomSprintConfig(config: CustomSprintConfigRecord): void;
+  listCustomSprintConfigs(): CustomSprintConfigRecord[];
   createSprintSession(state: SprintState): void;
   updateSprintSession(state: SprintState): void;
   recordAttempt(attempt: AttemptEvent): void;
