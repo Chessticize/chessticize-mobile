@@ -241,11 +241,9 @@ export function PracticePocScreen({
   const [historyTimeRange, setHistoryTimeRange] = useState<HistoryTimeRange>("7d");
   const [historySourceFilter, setHistorySourceFilter] = useState<"all" | AttemptSource>("all");
   const [historyResultFilter, setHistoryResultFilter] = useState<"all" | "correct" | "wrong">("all");
-  const [historyModeFilter, setHistoryModeFilter] = useState<"all" | SprintMode>("all");
   const [historySideFilter, setHistorySideFilter] = useState<"all" | PuzzleSide>("all");
   const [historyThemeFilter, setHistoryThemeFilter] = useState<string>("all");
   const [historyRatingRangeFilter, setHistoryRatingRangeFilter] = useState<HistoryRatingRangeFilter>("all");
-  const [historySpeedFilter, setHistorySpeedFilter] = useState<"all" | number>("all");
   const [historyReviewStatusFilter, setHistoryReviewStatusFilter] = useState<"all" | HistoryReviewStatus>("all");
   const [historyPageOffset, setHistoryPageOffset] = useState(0);
   const [historyRatingKey, setHistoryRatingKey] = useState<string | null>(null);
@@ -1057,10 +1055,8 @@ export function PracticePocScreen({
         ...historyRatingRangeQuery,
         ...(historySourceFilter === "all" ? {} : { source: historySourceFilter }),
         ...(historyResultFilter === "all" ? {} : { result: historyResultFilter }),
-        ...(historyModeFilter === "all" ? {} : { mode: historyModeFilter }),
         ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
         ...(historyThemeFilter === "all" ? {} : { theme: historyThemeFilter }),
-        ...(historySpeedFilter === "all" ? {} : { speedSeconds: historySpeedFilter }),
         ...(historyReviewStatusFilter === "all" ? {} : { reviewStatus: historyReviewStatusFilter }),
         page: { limit: HISTORY_PAGE_LIMIT, offset: historyPageOffset }
       })
@@ -1073,17 +1069,14 @@ export function PracticePocScreen({
         ...historyRatingRangeQuery,
         ...(historySourceFilter === "all" ? {} : { source: historySourceFilter }),
         ...(historyResultFilter === "all" ? {} : { result: historyResultFilter }),
-        ...(historyModeFilter === "all" ? {} : { mode: historyModeFilter }),
         ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
         ...(historyThemeFilter === "all" ? {} : { theme: historyThemeFilter }),
-        ...(historySpeedFilter === "all" ? {} : { speedSeconds: historySpeedFilter }),
         ...(historyReviewStatusFilter === "all" ? {} : { reviewStatus: historyReviewStatusFilter })
       })
     : null;
   const displayedAttempts = historyView?.attempts ?? [];
   const historyReviewAttempts = fullHistoryReviewView?.attempts ?? displayedAttempts;
   const historyAvailableThemes = historyView?.availableThemes ?? [];
-  const historyAvailableSpeeds = historyView?.availableSpeeds ?? [];
   const historyPage = historyView?.page ?? { limit: HISTORY_PAGE_LIMIT, offset: 0, total: 0, hasMore: false };
   const contentOwnsHeader = tab === "review" || tab === "history" || tab === "packs";
   const appChromeVisible = !isOpenSession && !sessionLoading && !isShowingFeedbackSnapshot;
@@ -1348,15 +1341,12 @@ export function PracticePocScreen({
               timeRange={historyTimeRange}
               sourceFilter={historySourceFilter}
               resultFilter={historyResultFilter}
-              modeFilter={historyModeFilter}
               ratingRangeFilter={historyRatingRangeFilter}
               sideFilter={historySideFilter}
               themeFilter={historyThemeFilter}
               availableThemes={historyAvailableThemes}
-              availableSpeeds={historyAvailableSpeeds}
               page={historyPage}
               reviewStatusFilter={historyReviewStatusFilter}
-              speedFilter={historySpeedFilter}
               wrongLast7Days={historyWrongLast7Days}
               onRatingKeyChange={(ratingKey) => {
                 setHistoryRatingKey(ratingKey);
@@ -1374,10 +1364,6 @@ export function PracticePocScreen({
                 setHistoryResultFilter(result);
                 setHistoryPageOffset(0);
               }}
-              onModeFilterChange={(nextMode) => {
-                setHistoryModeFilter(nextMode);
-                setHistoryPageOffset(0);
-              }}
               onRatingRangeFilterChange={(ratingRange) => {
                 setHistoryRatingRangeFilter(ratingRange);
                 setHistoryPageOffset(0);
@@ -1388,10 +1374,6 @@ export function PracticePocScreen({
               }}
               onThemeFilterChange={(theme) => {
                 setHistoryThemeFilter(theme);
-                setHistoryPageOffset(0);
-              }}
-              onSpeedFilterChange={(speed) => {
-                setHistorySpeedFilter(speed);
                 setHistoryPageOffset(0);
               }}
               onReviewStatusFilterChange={(status) => {
@@ -3166,25 +3148,20 @@ function HistoryPanel({
   timeRange,
   sourceFilter,
   resultFilter,
-  modeFilter,
   ratingRangeFilter,
   sideFilter,
   themeFilter,
   availableThemes,
-  availableSpeeds,
   page,
   reviewStatusFilter,
-  speedFilter,
   wrongLast7Days,
   onRatingKeyChange,
   onTimeRangeChange,
   onSourceFilterChange,
   onResultFilterChange,
-  onModeFilterChange,
   onRatingRangeFilterChange,
   onSideFilterChange,
   onThemeFilterChange,
-  onSpeedFilterChange,
   onReviewStatusFilterChange,
   onPageOffsetChange,
   onOpenAttempt,
@@ -3198,25 +3175,20 @@ function HistoryPanel({
   timeRange: HistoryTimeRange;
   sourceFilter: "all" | AttemptSource;
   resultFilter: "all" | "correct" | "wrong";
-  modeFilter: "all" | SprintMode;
   ratingRangeFilter: HistoryRatingRangeFilter;
   sideFilter: "all" | PuzzleSide;
   themeFilter: string;
   availableThemes: string[];
-  availableSpeeds: number[];
   page: { limit: number; offset: number; total: number; hasMore: boolean };
   reviewStatusFilter: "all" | HistoryReviewStatus;
-  speedFilter: "all" | number;
   wrongLast7Days: boolean;
   onRatingKeyChange: (ratingKey: string) => void;
   onTimeRangeChange: (range: HistoryTimeRange) => void;
   onSourceFilterChange: (source: "all" | AttemptSource) => void;
   onResultFilterChange: (result: "all" | "correct" | "wrong") => void;
-  onModeFilterChange: (mode: "all" | SprintMode) => void;
   onRatingRangeFilterChange: (ratingRange: HistoryRatingRangeFilter) => void;
   onSideFilterChange: (side: "all" | PuzzleSide) => void;
   onThemeFilterChange: (theme: string) => void;
-  onSpeedFilterChange: (speed: "all" | number) => void;
   onReviewStatusFilterChange: (status: "all" | HistoryReviewStatus) => void;
   onPageOffsetChange: (offset: number) => void;
   onOpenAttempt: (attemptId: string) => void;
@@ -3232,14 +3204,12 @@ function HistoryPanel({
   const chartPoints = performance.charts[chartMetric];
   const chartSummary = historyChartSummary(chartMetric, performance, chartPoints);
   const activeFilterLabels = historyActiveFilterLabels({
-    modeFilter,
     ratingKey: selectedRatingKey,
     ratingRangeFilter,
     resultFilter,
     reviewStatusFilter,
     sideFilter,
     sourceFilter,
-    speedFilter,
     themeFilter,
     timeRange,
     wrongLast7Days
@@ -3261,13 +3231,6 @@ function HistoryPanel({
       </View>
 
       <View style={styles.historyTopFilterStack} testID="history-primary-filters">
-        <HistoryChipRow testID="history-mode-filters">
-          <FilterButton active={modeFilter === "all"} label="All" testID="history-mode-all" onPress={() => onModeFilterChange("all")} />
-          <FilterButton active={modeFilter === "standard"} label="Standard" testID="history-mode-standard" onPress={() => onModeFilterChange("standard")} />
-          <FilterButton active={modeFilter === "arrow_duel"} label="Arrow Duel" testID="history-mode-arrow-duel" onPress={() => onModeFilterChange("arrow_duel")} />
-          <FilterButton active={modeFilter === "blitz"} label="Blitz" testID="history-mode-blitz" onPress={() => onModeFilterChange("blitz")} />
-          <FilterButton active={modeFilter === "custom"} label="Custom" testID="history-mode-custom" onPress={() => onModeFilterChange("custom")} />
-        </HistoryChipRow>
         <HistoryChipRow testID="history-range-filters">
           {(["7d", "30d", "90d", "1y", "max"] as const).map((range) => (
             <FilterButton
@@ -3349,22 +3312,7 @@ function HistoryPanel({
             <FilterButton active={resultFilter === "all"} label="All" testID="history-result-all" onPress={() => onResultFilterChange("all")} />
             <FilterButton active={resultFilter === "correct"} label="Correct" testID="history-result-correct" onPress={() => onResultFilterChange("correct")} />
             <FilterButton active={resultFilter === "wrong"} label="Wrong" testID="history-result-wrong" onPress={() => onResultFilterChange("wrong")} />
-            <FilterButton active={modeFilter === "arrow_duel"} label="Arrow Duel only" testID="history-filter-arrow-duel-only" onPress={() => onModeFilterChange("arrow_duel")} />
           </HistoryChipRow>
-          {availableSpeeds.length > 0 ? (
-            <HistoryChipRow testID="history-speed-filters">
-              <FilterButton active={speedFilter === "all"} label="All speeds" testID="history-speed-all" onPress={() => onSpeedFilterChange("all")} />
-              {availableSpeeds.map((speed) => (
-                <FilterButton
-                  key={speed}
-                  active={speedFilter === speed}
-                  label={`${speed}s pace`}
-                  testID={`history-speed-${speed}`}
-                  onPress={() => onSpeedFilterChange(speed)}
-                />
-              ))}
-            </HistoryChipRow>
-          ) : null}
           <HistoryChipRow testID="history-rating-range-filters">
             {HISTORY_RATING_RANGE_FILTERS.map((ratingRange) => (
               <FilterButton
@@ -3448,28 +3396,24 @@ function HistoryPanel({
 }
 
 type HistoryActiveFilterInput = {
-  modeFilter: "all" | SprintMode;
   ratingKey: string | null;
   ratingRangeFilter: HistoryRatingRangeFilter;
   resultFilter: "all" | "correct" | "wrong";
   reviewStatusFilter: "all" | "queued" | "clear";
   sideFilter: "all" | PuzzleSide;
   sourceFilter: "all" | AttemptSource;
-  speedFilter: "all" | number;
   themeFilter: string;
   timeRange: HistoryTimeRange;
   wrongLast7Days: boolean;
 };
 
 function historyActiveFilterLabels({
-  modeFilter,
   ratingKey,
   ratingRangeFilter,
   resultFilter,
   reviewStatusFilter,
   sideFilter,
   sourceFilter,
-  speedFilter,
   themeFilter,
   timeRange,
   wrongLast7Days
@@ -3481,17 +3425,11 @@ function historyActiveFilterLabels({
   if (wrongLast7Days) {
     labels.push("Wrong 7d");
   }
-  if (modeFilter !== "all") {
-    labels.push(modeLabel(modeFilter));
-  }
   if (sourceFilter !== "all") {
     labels.push(sourceFilter === "scheduled_review" ? "Review" : "Sprint");
   }
   if (resultFilter !== "all") {
     labels.push(resultFilter === "correct" ? "Correct" : "Wrong");
-  }
-  if (speedFilter !== "all") {
-    labels.push(`${speedFilter}s pace`);
   }
   if (ratingRangeFilter !== "all") {
     labels.push(HISTORY_RATING_RANGE_FILTERS.find((filter) => filter.id === ratingRangeFilter)?.label ?? ratingRangeFilter);

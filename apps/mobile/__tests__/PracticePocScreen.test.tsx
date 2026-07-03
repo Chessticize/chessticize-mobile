@@ -1041,31 +1041,28 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-filter-wrong-7-days").props.accessibilityState).toEqual({ selected: false });
     expect(() => findByTestId(renderer, "history-filter-wrong-7-days-clear-glyph")).toThrow();
     expect(() => findByTestId(renderer, "history-filter-arrow-duel-only")).toThrow();
+    expect(() => findByTestId(renderer, "history-mode-filters")).toThrow();
+    expect(() => findByTestId(renderer, "history-mode-standard")).toThrow();
     expect(() => findByTestId(renderer, "history-advanced-filters")).toThrow();
     expect(() => findByTestId(renderer, "history-speed-filters")).toThrow();
+    expect(() => findByTestId(renderer, "history-speed-20")).toThrow();
     expect(() => findByTestId(renderer, "history-review-status-filters")).toThrow();
     press(renderer, "history-filter-toggle");
     expect(findByTestId(renderer, "history-filter-toggle").props.accessibilityState).toEqual({ expanded: true });
     expect(findByTestId(renderer, "history-advanced-filters")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "history-rating-filters"))).toContain("Standard · 20s pace");
     expect(collectText(findByTestId(renderer, "history-rating-filters"))).not.toContain("standard 5/20");
-    expect(findByTestId(renderer, "history-speed-filters")).toBeTruthy();
-    expect(findByTestId(renderer, "history-speed-20")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-mode-filters")).toThrow();
+    expect(() => findByTestId(renderer, "history-mode-standard")).toThrow();
+    expect(() => findByTestId(renderer, "history-filter-arrow-duel-only")).toThrow();
+    expect(() => findByTestId(renderer, "history-speed-filters")).toThrow();
+    expect(() => findByTestId(renderer, "history-speed-20")).toThrow();
     expect(findByTestId(renderer, "history-review-status-filters")).toBeTruthy();
     expect(findByTestId(renderer, "history-review-status-queued")).toBeTruthy();
     expect(findByTestId(renderer, "history-review-status-clear")).toBeTruthy();
-    expect(findByTestId(renderer, "history-filter-arrow-duel-only")).toBeTruthy();
     expectHistoryRowAccessibility(renderer, "Move e6f7");
     expectHistoryRowAccessibility(renderer, "Played g6g5 · Best f4g3");
 
-    press(renderer, "history-filter-arrow-duel-only");
-    expectText(renderer, "0 results");
-    expectNoHistoryRowAccessibility(renderer, "Played g6g5 · Best f4g3");
-    expect(findByTestId(renderer, "history-filter-arrow-duel-only")).toBeTruthy();
-    press(renderer, "history-mode-standard");
-    expectHistoryRowAccessibility(renderer, "Played g6g5 · Best f4g3");
-
-    press(renderer, "history-speed-20");
     expectHistoryRowAccessibility(renderer, "Move e6f7");
     expectHistoryRowAccessibility(renderer, "Played g6g5 · Best f4g3");
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("20s pace");
@@ -1112,7 +1109,6 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "history-source-sprint");
     expectHistoryRowAccessibility(renderer, "Played g6g5 · Best f4g3");
-    press(renderer, "history-mode-standard");
     expectHistoryRowAccessibility(renderer, "Played g6g5 · Best f4g3");
 
     const historyAttemptRow = renderer.root.findAll(

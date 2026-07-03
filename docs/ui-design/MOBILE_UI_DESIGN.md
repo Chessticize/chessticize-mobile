@@ -348,7 +348,10 @@ Custom sprint behavior:
 
 - Quick range filters include 7 days, 30 days, 90 days, 1 year, and all time.
 - History data must be pageable, including the all-time range.
-- Quick content filters include "Wrong in the last 7 days", source type, mode, theme, rating range, sprint config, sprint speed, review status, and Arrow Duel only.
+- Quick content filters include "Wrong in the last 7 days", source type, theme, rating range, and review status.
+- The selected ELO bucket is required and supplies the mode, sprint config, and
+  sprint-speed context in 1.0. Do not show separate History mode or speed chips
+  while the view is scoped to a single bucket.
 - Source type distinguishes sprint attempts from official Scheduled Review attempts.
 - History includes correct and wrong sprint attempts.
 - History includes correct and wrong Scheduled Review attempts.
@@ -364,7 +367,8 @@ Custom sprint behavior:
 - Performance headline stats and chart series use the full filtered time range.
   Pagination affects only the visible attempt rows, never the headline metrics
   or chart inputs.
-- Statistics are grouped separately for Standard, Blitz, Arrow Duel, theme sprint, and custom sprint speeds.
+- Statistics are grouped separately by the selected ELO bucket for Standard,
+  Blitz, Arrow Duel, theme sprint, and custom sprint speeds.
 - Mistake statistics are also grouped separately by sprint type, speed, theme, and review state.
 
 ### Sprint Results
