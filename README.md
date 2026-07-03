@@ -10,6 +10,7 @@ The repository contains the React Native app shell (`apps/mobile`), a pure TypeS
 - [Core Library And CLI](docs/CORE_CLI.md) — backend package layout and CLI harness
 - [App Store Plan](docs/APP_STORE_PLAN.md) — active goal and milestone plan toward the 1.0 submission
 - [App Store Assets](docs/STORE_ASSETS.md) — 1.0 App Store metadata and screenshot capture plan
+- [TestFlight QA](docs/TESTFLIGHT_QA.md) — internal TestFlight pass checklist and evidence log
 - [Privacy Policy](docs/PRIVACY_POLICY.md) — 1.0 local-only data and tracking disclosure
 - [iOS Device Targets](docs/DEVICE_TARGETS.md) — 1.0 iPhone-only, portrait-only release target
 - [Agent Instructions](AGENTS.md) — architecture boundary, testing philosophy, and PR workflow
