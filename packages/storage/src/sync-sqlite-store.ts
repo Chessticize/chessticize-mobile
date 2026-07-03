@@ -27,7 +27,8 @@ import type {
   SprintState
 } from "../../core/src/index.ts";
 import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./query-types.ts";
-import type { ClearLocalHistoryResult, ExportedSprintSession, LocalDataExport, PracticeStore } from "./practice-store.ts";
+import type { ClearLocalHistoryResult, ExportedSprintSession, LocalDataExport, PracticeSettings, PracticeStore } from "./practice-store.ts";
+import { clonePracticeSettings, defaultPracticeSettings } from "./practice-settings.ts";
 import { selectUniquePuzzles } from "./puzzle-selection.ts";
 
 interface AttemptHistoryDbRow extends Omit<AttemptHistoryRow, "ratingAfter"> {
@@ -104,6 +105,14 @@ interface CustomSprintConfigRow {
   theme: string | null;
   last_started_at: string;
   play_count: number;
+}
+
+interface AppSettingsRow {
+  id: string;
+  sync_icloud_enabled: number;
+  sync_upload_allowed: number;
+  review_reminder_mode: PracticeSettings["notifications"]["reviewReminder"]["mode"];
+  review_reminder_fixed_local_time: string | null;
 }
 
 interface SprintSessionExportRow {
@@ -358,6 +367,36 @@ export class SyncSQLiteStore implements PracticeStore {
     }));
   }
 
+  getSettings(): PracticeSettings {
+    const row = this.db.prepare("SELECT * FROM app_settings WHERE id = 'default'").get() as AppSettingsRow | undefined;
+    if (!row) {
+      const settings = defaultPracticeSettings();
+      this.saveSettings(settings);
+      return settings;
+    }
+    return settingsFromRow(row);
+  }
+
+  saveSettings(settings: PracticeSettings): void {
+    const cloned = clonePracticeSettings(settings);
+    this.db
+      .prepare(
+        `INSERT OR REPLACE INTO app_settings (
+          id,
+          sync_icloud_enabled,
+          sync_upload_allowed,
+          review_reminder_mode,
+          review_reminder_fixed_local_time
+        ) VALUES ('default', ?, ?, ?, ?)`
+      )
+      .run(
+        boolToInt(cloned.sync.iCloudEnabled),
+        boolToInt(cloned.sync.uploadAllowed),
+        cloned.notifications.reviewReminder.mode,
+        cloned.notifications.reviewReminder.fixedLocalTime ?? null
+      );
+  }
+
   createSprintSession(state: SprintState): void {
     this.db
       .prepare(
@@ -503,6 +542,7 @@ export class SyncSQLiteStore implements PracticeStore {
   exportLocalData(): LocalDataExport {
     return {
       schemaVersion: 1,
+      settings: this.getSettings(),
       ratings: this.listRatings(),
       attempts: this.listAttempts(),
       reviewQueue: this.listAllReviewQueueStates()
@@ -826,6 +866,22 @@ function reviewFromRow(row: ReviewRow): ReviewQueueState {
   };
 }
 
+function settingsFromRow(row: AppSettingsRow): PracticeSettings {
+  const reminder = {
+    mode: row.review_reminder_mode,
+    ...(row.review_reminder_fixed_local_time === null ? {} : { fixedLocalTime: row.review_reminder_fixed_local_time })
+  };
+  return {
+    sync: {
+      iCloudEnabled: intToBool(row.sync_icloud_enabled),
+      uploadAllowed: intToBool(row.sync_upload_allowed)
+    },
+    notifications: {
+      reviewReminder: reminder
+    }
+  };
+}
+
 function attemptEventFromHistoryRow(row: AttemptHistoryRow): AttemptEvent {
   return {
     id: row.id,
@@ -849,8 +905,24 @@ function countRows(db: SyncSqliteDatabase, table: string, where?: string): numbe
   return (db.prepare(sql).get() as { count: number }).count;
 }
 
+function boolToInt(value: boolean): number {
+  return value ? 1 : 0;
+}
+
+function intToBool(value: number): boolean {
+  return value !== 0;
+}
+
 const SCHEMA_SQL = `
 PRAGMA foreign_keys = ON;
+
+CREATE TABLE IF NOT EXISTS app_settings (
+  id TEXT PRIMARY KEY,
+  sync_icloud_enabled INTEGER NOT NULL,
+  sync_upload_allowed INTEGER NOT NULL,
+  review_reminder_mode TEXT NOT NULL,
+  review_reminder_fixed_local_time TEXT
+);
 
 CREATE TABLE IF NOT EXISTS puzzles (
   id TEXT PRIMARY KEY,

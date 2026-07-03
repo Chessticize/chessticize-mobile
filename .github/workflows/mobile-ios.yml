@@ -27,7 +27,11 @@ jobs:
     # Draft PRs skip the expensive simulator build; mark the PR ready for
     # review (or dispatch manually) to run the full Detox suite.
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
-    runs-on: macos-latest
+    # macos-latest started resolving to macOS 26 in July 2026, where the first
+    # Detox launch can remain busy until the smoke test times out. Keep the
+    # release gate on the supported macOS 15 runner until Detox is qualified on
+    # macOS 26.
+    runs-on: macos-15
     timeout-minutes: 60
     steps:
       - name: Checkout

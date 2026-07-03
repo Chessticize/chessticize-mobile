@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { PracticeService, SQLiteStore } from "../src/index.ts";
 import type { Puzzle, ReviewContext } from "../../core/src/index.ts";
 
@@ -224,6 +225,71 @@ test("PracticeService persists SQLite custom sprint configs after successful cus
     ]);
   } finally {
     store.close();
+  }
+});
+
+test("PracticeService persists SQLite settings across store reopen", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "chessticize-mobile-settings-"));
+  const databasePath = join(directory, "settings.sqlite");
+  try {
+    {
+      const store = new SQLiteStore(databasePath);
+      store.migrate();
+      const service = new PracticeService(store);
+      try {
+        assert.deepEqual(service.getSettings(), {
+          sync: {
+            iCloudEnabled: true,
+            uploadAllowed: false
+          },
+          notifications: {
+            reviewReminder: {
+              mode: "smart"
+            }
+          }
+        });
+
+        service.saveSettings({
+          sync: {
+            iCloudEnabled: false,
+            uploadAllowed: true
+          },
+          notifications: {
+            reviewReminder: {
+              mode: "fixed",
+              fixedLocalTime: "20:30"
+            }
+          }
+        });
+      } finally {
+        store.close();
+      }
+    }
+
+    {
+      const store = new SQLiteStore(databasePath);
+      store.migrate();
+      const service = new PracticeService(store);
+      try {
+        assert.deepEqual(service.getSettings(), {
+          sync: {
+            iCloudEnabled: false,
+            uploadAllowed: true
+          },
+          notifications: {
+            reviewReminder: {
+              mode: "fixed",
+              fixedLocalTime: "20:30"
+            }
+          }
+        });
+        assert.deepEqual(service.exportLocalData().settings, service.getSettings());
+      } finally {
+        store.close();
+      }
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
   }
 });
 
