@@ -5560,15 +5560,21 @@ function ReviewSession({
                 <Pressable
                   key={`${line.move}-${index}`}
                   accessibilityRole="button"
-                  accessibilityLabel={`${line.score} ${index + 1}. ${line.san} ${line.label}`}
+                  accessibilityLabel={`${line.score} ${formatAnalysisLineMoveLabel(line, index)} ${line.label}`}
+                  accessibilityState={{ disabled: !line.move }}
+                  disabled={!line.move}
                   style={styles.analysisLineRow}
                   testID={`review-analysis-line-${index}`}
                   onPress={() => {
-                    void playAnalysisCandidateMove(line.move);
+                    if (line.move) {
+                      void playAnalysisCandidateMove(line.move);
+                    }
                   }}
                 >
                   <Text style={styles.analysisEvalText}>{line.score}</Text>
-                  <Text style={styles.analysisMoveText} numberOfLines={1}>{index + 1}. {line.san}</Text>
+                  <Text style={styles.analysisMoveText} numberOfLines={1}>
+                    {formatAnalysisLineMoveLabel(line, index)}
+                  </Text>
                   <Text style={styles.analysisLineLabel} numberOfLines={1}>{line.label}</Text>
                 </Pressable>
               ))}
@@ -5578,6 +5584,10 @@ function ReviewSession({
       </View>
     </View>
   );
+}
+
+function formatAnalysisLineMoveLabel(line: ReviewAnalysisLine, index: number): string {
+  return line.label === "Current position" ? line.san : `${index + 1}. ${line.san}`;
 }
 
 function formatGuidedCurrentEvalLine(

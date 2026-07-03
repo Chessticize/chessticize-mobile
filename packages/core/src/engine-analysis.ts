@@ -210,6 +210,11 @@ export function buildPuzzleGuidedAnalysisLines({
   engineLines?: EngineAnalysisLine[];
   includeUnscoredLegalMoves?: boolean;
 }): ReviewAnalysisLine[] {
+  const terminal = terminalPositionScore(fen);
+  if (terminal) {
+    return [currentPositionLine(terminal.score, terminal.san)];
+  }
+
   const legalMoves = legalUciMoves(fen);
   const legalMoveSet = new Set(legalMoves);
   const guidedMove = puzzleGuidedMoveForFen(puzzle, fen, currentPuzzle);
