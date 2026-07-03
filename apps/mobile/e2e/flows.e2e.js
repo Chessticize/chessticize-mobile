@@ -62,6 +62,8 @@ describe('Key user flows', () => {
     // Mistakes schedule for the next day, so nothing is due yet: the empty
     // state must surface the next due estimate and offer practice instead.
     await openTab('review-tab', 'review-empty-state');
+    await waitFor(element(by.id('review-total-count'))).toHaveText('3').withTimeout(10000);
+    await waitForElementTextContaining('review-next-due', 'Next:', 10000);
     await expect(element(by.id('review-empty-practice'))).toBeVisible();
   });
 
