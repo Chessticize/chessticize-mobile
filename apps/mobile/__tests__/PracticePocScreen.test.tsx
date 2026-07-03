@@ -1672,6 +1672,47 @@ describe("PracticePocScreen", () => {
     expect(service.listHistory({ source: "scheduled_review" }) as unknown[]).toHaveLength(1);
   });
 
+  it("records scheduled review elapsed time from review start to answer", async () => {
+    jest.setSystemTime(new Date("2026-06-21T00:01:00.000Z"));
+    const service = createMobilePracticeService("random1000");
+    service.startSprint(
+      { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
+      "2026-06-20T00:00:00.000Z"
+    );
+    service.submitMove("c4b5", "2026-06-20T00:00:05.000Z");
+    const renderer = renderScreen({ practiceService: service });
+
+    press(renderer, "review-tab");
+    press(renderer, "review-start-due");
+    act(() => {
+      jest.advanceTimersByTime(5_000);
+    });
+    await boardMove(renderer, "c4b5");
+    await flushMicrotasks();
+
+    const officialReviewAttempts = service.listHistory({ source: "scheduled_review" }) as Array<{
+      startedAt: string;
+      completedAt: string;
+    }>;
+    expect(officialReviewAttempts).toHaveLength(1);
+    expect(officialReviewAttempts[0]).toMatchObject({
+      startedAt: "2026-06-21T00:01:00.000Z",
+      completedAt: "2026-06-21T00:01:05.000Z"
+    });
+
+    press(renderer, "review-exit");
+    press(renderer, "history-tab");
+    press(renderer, "history-filter-toggle");
+    press(renderer, "history-source-review");
+
+    await waitForAssertion(() => {
+      expect(historyAttemptRows(renderer).length).toBeGreaterThan(0);
+    });
+    const historyAttemptRow = historyAttemptRows(renderer)[0];
+    expect(collectText(findByTestId(renderer, `${historyAttemptRow!.props.testID}-meta`))).toContain("Review · Rating");
+    expect(collectText(findByTestId(renderer, `${historyAttemptRow!.props.testID}-meta`))).toContain("5s");
+  });
+
   it("times official due reviews using the original sprint pace", () => {
     const service = createMobilePracticeService("random1000");
     service.startSprint(

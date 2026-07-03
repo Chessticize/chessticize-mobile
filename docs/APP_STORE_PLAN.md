@@ -78,6 +78,10 @@ History:
    buckets for the same puzzle.
 5. Review-source rows render 0s elapsed (`startedAt` defaults to
    `completedAt`). Record real elapsed time for scheduled review attempts.
+   Status: complete. Official scheduled-review attempts now pass the measured
+   review start timestamp into the backend, use one completion timestamp for
+   storage and UI refresh, and advance the app-shell clock before rebuilding
+   History so review rows render the real elapsed duration immediately.
 
 Review queue:
 
