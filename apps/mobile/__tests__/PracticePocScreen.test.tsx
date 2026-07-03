@@ -1199,6 +1199,37 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "20 / 22 · Standard");
   });
 
+  it("keeps history performance metrics scoped to the full filtered range while paging rows", () => {
+    const service = createMobilePracticeService("random1000");
+    for (let index = 0; index < 22; index += 1) {
+      service.recordReviewAttempt({
+        puzzleId: "000hf",
+        mode: "standard",
+        ratingKey: "standard 5/20",
+        result: index < 20 ? "correct" : "wrong",
+        submittedMove: `a${(index % 8) + 1}a${((index + 1) % 8) + 1}`,
+        expectedMove: "c4b5",
+        startedAt: new Date(Date.now() - index * 1000 - 100).toISOString()
+      }, new Date(Date.now() - index * 1000).toISOString());
+    }
+    const renderer = renderScreen({ practiceService: service });
+
+    press(renderer, "history-tab");
+    press(renderer, "history-filter-toggle");
+    press(renderer, "history-source-review");
+    expectText(renderer, "1-20 of 22");
+    expectText(renderer, "Accuracy 91% · Correct 20 · Wrong 2");
+
+    press(renderer, "history-page-next");
+    expectText(renderer, "21-22 of 22");
+    expectText(renderer, "Accuracy 91% · Correct 20 · Wrong 2");
+
+    press(renderer, "history-chart-solved");
+    expect(collectText(findByTestId(renderer, "history-chart-value"))).toBe("20");
+    press(renderer, "history-chart-mistake-rate");
+    expect(collectText(findByTestId(renderer, "history-chart-value"))).toBe("9%");
+  });
+
   it("keeps history analysis review on the current puzzle after a retry is solved", async () => {
     const service = createMobilePracticeService("random1000");
     const renderer = renderScreen({ practiceService: service });

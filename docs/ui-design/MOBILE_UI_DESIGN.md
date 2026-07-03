@@ -361,6 +361,9 @@ Custom sprint behavior:
 - Failed attempts should clearly show whether they are already in the review queue.
 - Performance chart belongs in History, not primarily in Sprint Results.
 - Performance chart can switch between rating trend, wins/losses, accuracy, solved count, mistake rate, and review due volume.
+- Performance headline stats and chart series use the full filtered time range.
+  Pagination affects only the visible attempt rows, never the headline metrics
+  or chart inputs.
 - Statistics are grouped separately for Standard, Blitz, Arrow Duel, theme sprint, and custom sprint speeds.
 - Mistake statistics are also grouped separately by sprint type, speed, theme, and review state.
 

@@ -35,8 +35,10 @@ import type {
   CurrentPuzzleState,
   CustomSprintConfigRecord,
   EngineAnalysisLine,
-  HistoryEloPoint,
   HistoryAttemptView,
+  HistoryPerformance,
+  HistoryPerformanceMetric,
+  HistoryPerformancePoint,
   HistoryPuzzleStats,
   HistoryReviewStatus,
   HistoryTimeRange,
@@ -1339,7 +1341,7 @@ export function PracticePocScreen({
           ) : (
             <HistoryPanel
               attempts={displayedAttempts}
-              eloPoints={historyView?.elo ?? []}
+              performance={historyView?.performance ?? emptyHistoryPerformance()}
               ratingKeys={historyRatingKeys}
               puzzleStats={historyView?.puzzleStats ?? []}
               selectedRatingKey={activeHistoryRatingKey}
@@ -3157,7 +3159,7 @@ function ArrowHint({
 
 function HistoryPanel({
   attempts,
-  eloPoints,
+  performance,
   ratingKeys,
   puzzleStats,
   selectedRatingKey,
@@ -3189,7 +3191,7 @@ function HistoryPanel({
   onToggleWrongLast7Days
 }: {
   attempts: HistoryAttemptView[];
-  eloPoints: HistoryEloPoint[];
+  performance: HistoryPerformance;
   ratingKeys: string[];
   puzzleStats: HistoryPuzzleStats[];
   selectedRatingKey: string | null;
@@ -3224,10 +3226,11 @@ function HistoryPanel({
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const puzzleStatsById = new Map(puzzleStats.map((stats) => [stats.puzzleId, stats]));
   const visibleAttempts = attempts;
-  const correct = visibleAttempts.filter((attempt) => attempt.result === "correct").length;
-  const wrong = visibleAttempts.filter((attempt) => attempt.result === "wrong").length;
-  const accuracy = Math.round((correct / Math.max(1, correct + wrong)) * 100);
-  const chartSummary = historyChartSummary(chartMetric, visibleAttempts, eloPoints, puzzleStats);
+  const correct = performance.correctCount;
+  const wrong = performance.wrongCount;
+  const accuracy = performance.accuracyPercent;
+  const chartPoints = performance.charts[chartMetric];
+  const chartSummary = historyChartSummary(chartMetric, performance, chartPoints);
   const activeFilterLabels = historyActiveFilterLabels({
     modeFilter,
     ratingKey: selectedRatingKey,
@@ -3317,10 +3320,8 @@ function HistoryPanel({
           ))}
         </HistoryChipRow>
         <HistoryMiniChart
-          attempts={visibleAttempts}
           metric={chartMetric}
-          points={eloPoints}
-          puzzleStats={puzzleStats}
+          points={chartPoints}
         />
       </View>
 
@@ -3525,7 +3526,7 @@ function HistoryActiveFilterStrip({ labels }: { labels: string[] }): React.JSX.E
   );
 }
 
-type HistoryChartMetric = "rating" | "wins-losses" | "accuracy" | "solved" | "mistake-rate" | "review-due";
+type HistoryChartMetric = HistoryPerformanceMetric;
 
 const HISTORY_CHART_METRICS: ReadonlyArray<{ id: HistoryChartMetric; label: string }> = [
   { id: "rating", label: "Rating" },
@@ -3557,17 +3558,13 @@ function historyRatingRangeFilterToQuery(filter: HistoryRatingRangeFilter): { mi
 }
 
 function HistoryMiniChart({
-  attempts,
   metric,
-  points,
-  puzzleStats
+  points
 }: {
-  attempts: HistoryAttemptView[];
   metric: HistoryChartMetric;
-  points: HistoryEloPoint[];
-  puzzleStats: HistoryPuzzleStats[];
+  points: HistoryPerformancePoint[];
 }): React.JSX.Element {
-  const displayed = buildHistoryChartValues(metric, attempts, points, puzzleStats).slice(-8);
+  const displayed = points.slice(-8);
   if (displayed.length === 0) {
     return (
       <View style={styles.historyChartEmpty} testID="history-performance-chart">
@@ -3659,77 +3656,47 @@ function HistoryRatingLineChart({
   );
 }
 
-function buildHistoryChartValues(
-  metric: HistoryChartMetric,
-  attempts: HistoryAttemptView[],
-  points: HistoryEloPoint[],
-  puzzleStats: HistoryPuzzleStats[]
-): Array<{ key: string; value: number }> {
-  if (metric === "rating") {
-    return points.map((point, index) => ({
-      key: `${point.sessionId}-${point.completedAt}-${index}`,
-      value: point.ratingAfter
-    }));
-  }
-
-  if (metric === "review-due") {
-    return puzzleStats.map((stats, index) => ({
-      key: `${stats.puzzleId}-${index}`,
-      value: (stats.nextReviewAt ? 1 : 0) + Math.max(0, stats.wrongCount - stats.correctCount)
-    }));
-  }
-
-  let correct = 0;
-  let wrong = 0;
-  return [...attempts].reverse().map((attempt, index) => {
-    if (attempt.result === "correct") {
-      correct += 1;
-    } else {
-      wrong += 1;
-    }
-    const total = Math.max(1, correct + wrong);
-    const value = metric === "wins-losses"
-      ? correct - wrong
-      : metric === "accuracy"
-        ? Math.round((correct / total) * 100)
-        : metric === "mistake-rate"
-          ? Math.round((wrong / total) * 100)
-          : correct;
-    return {
-      key: `${attempt.id}-${index}`,
-      value
-    };
-  });
-}
-
 function historyChartSummary(
   metric: HistoryChartMetric,
-  attempts: HistoryAttemptView[],
-  points: HistoryEloPoint[],
-  puzzleStats: HistoryPuzzleStats[]
+  performance: HistoryPerformance,
+  points: HistoryPerformancePoint[]
 ): { label: string; value: string } {
-  const correct = attempts.filter((attempt) => attempt.result === "correct").length;
-  const wrong = attempts.filter((attempt) => attempt.result === "wrong").length;
-  const total = Math.max(1, correct + wrong);
   if (metric === "rating") {
-    const latest = points[points.length - 1]?.ratingAfter;
+    const latest = points[points.length - 1]?.value;
     return { label: "Rating", value: latest ? String(latest) : "—" };
   }
   if (metric === "accuracy") {
-    return { label: "Accuracy", value: `${Math.round((correct / total) * 100)}%` };
+    return { label: "Accuracy", value: `${performance.accuracyPercent}%` };
   }
   if (metric === "wins-losses") {
-    const net = correct - wrong;
+    const net = performance.correctCount - performance.wrongCount;
     return { label: "Wins/Losses", value: `${net >= 0 ? "+" : ""}${net}` };
   }
   if (metric === "solved") {
-    return { label: "Solved", value: String(correct) };
+    return { label: "Solved", value: String(performance.correctCount) };
   }
   if (metric === "mistake-rate") {
-    return { label: "Mistake rate", value: `${Math.round((wrong / total) * 100)}%` };
+    const total = Math.max(1, performance.correctCount + performance.wrongCount);
+    return { label: "Mistake rate", value: `${Math.round((performance.wrongCount / total) * 100)}%` };
   }
-  const dueVolume = puzzleStats.filter((stats) => Boolean(stats.nextReviewAt)).length;
+  const dueVolume = points.filter((point) => point.value > 0).length;
   return { label: "Review due", value: String(dueVolume) };
+}
+
+function emptyHistoryPerformance(): HistoryPerformance {
+  return {
+    correctCount: 0,
+    wrongCount: 0,
+    accuracyPercent: 0,
+    charts: {
+      rating: [],
+      "wins-losses": [],
+      accuracy: [],
+      solved: [],
+      "mistake-rate": [],
+      "review-due": []
+    }
+  };
 }
 
 function historyChartEmptyLabel(metric: HistoryChartMetric): string {
