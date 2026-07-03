@@ -129,12 +129,24 @@ Design approved 2026-07-03; the "Review Reminder Notifications" section of
 
 ## Milestone 5 — App Store submission requirements
 
-1. **Licensing decision (blocker).** The app embeds Stockfish (GPLv3) and the
-   Settings copy already says the app is open source under GPL. GPLv3 and App
-   Store distribution are generally considered incompatible unless the whole
-   app is released as GPL with source published (the Lichess route). Decide and
-   execute: publish the repo (or a source drop) under GPL and keep attribution,
-   or replace the engine. Record the decision in the README and Settings copy.
+1. **Licensing (decided 2026-07-03, execute the checklist).** Owner decision:
+   keep Stockfish embedded and ship the whole app as plain GPL-3.0-or-later
+   with the public repo as the published source (the Lichess route); the
+   residual App Store/GPL tension and the permanently-public source are
+   accepted; no App Store license exception. Execution checklist, which is the
+   LICENSE file's own release gate:
+   - Replace the LICENSE stub with the complete GPLv3 license text
+     (SPDX GPL-3.0-or-later).
+   - Add a THIRD_PARTY_NOTICES file covering Stockfish (GPLv3, Stockfish
+     authors, the exact version/commit built, link to its source), the Lichess
+     puzzle database (CC0), the chessboard library, and React Native
+     dependency notices.
+   - Update the in-app Settings license row to name the shipped Stockfish
+     version, state GPL-3.0-or-later, and link to the public repository as the
+     source offer.
+   - Tag a repository release for every binary submitted to App Store Connect
+     so published source always matches the shipped build; document this rule
+     in the README.
 2. **App identity**: final display name, bundle identifier, version/build
    scheme, app icon set (all slots), launch screen matching the app background.
 3. **Privacy**: App Privacy questionnaire answers (local-only data collection =
