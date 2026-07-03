@@ -108,13 +108,24 @@ Scheduler polish (low priority):
 
 ## Milestone 4 — Review reminder notifications
 
-Implement daily local review reminders per the new
-"Review Reminder Notifications" section of `MOBILE_UI_DESIGN.md`: at most one
-per day, only when items are due, smart default time from usage history
-(fallback 19:00 local), user-configurable fixed time or off, contextual
-permission ask after the first completed review session, domain-computed
-schedule behind a fake-able notification interface. Depends on Milestone 1
-(usage history and preferences must persist).
+Design approved 2026-07-03; the "Review Reminder Notifications" section of
+`MOBILE_UI_DESIGN.md` is the spec. Implementation steps, in order:
+
+1. Domain: a pure `computeNextReminder(queue, usageHistory, settings, now)`
+   function in `packages/core` returning the next reminder (local time, due
+   count, copy) or none — smart default time from the median session-start
+   hour over the trailing 14 days (minimum 5 sessions), fallback 19:00 local;
+   at most one per day; none when zero items will be due. Unit-test the
+   histogram, fallback, and zero-due cases first.
+2. Settings persistence for the reminder preference (smart / fixed time / off)
+   — depends on Milestone 1.
+3. A `ReminderScheduler` interface with a maintained fake; the real adapter
+   wraps `UNUserNotificationCenter` (local notifications only, no push
+   entitlement). Re-schedule on queue change and on app background.
+4. UI: Notifications section in Settings; contextual permission ask after the
+   first completed review session; denied state links to system settings and
+   never re-prompts. Tapping the notification opens the Review tab.
+5. E2E/component coverage via the fake scheduler (flow 9 in Milestone 6).
 
 ## Milestone 5 — App Store submission requirements
 
