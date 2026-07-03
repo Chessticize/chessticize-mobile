@@ -12,6 +12,7 @@ export interface SelectUniquePuzzlesInput {
   minRating?: number;
   maxRating?: number;
   theme?: string;
+  includeIds?: string[];
   excludeIds?: string[];
   randomSeed?: string | number;
 }
@@ -45,6 +46,7 @@ function selectPuzzlesByServerEloFallback(input: SelectUniquePuzzlesInput & { ra
         minRating: strategy.minRating,
         maxRating: strategy.maxRating,
         ...(strategy.themes.length === 0 ? {} : { theme: strategy.themes[0] }),
+        ...(input.includeIds === undefined ? {} : { includeIds: input.includeIds }),
         ...(input.randomSeed === undefined
           ? {}
           : { randomSeed: `${input.randomSeed}:${strategy.minRating}:${strategy.maxRating}:${strategy.themes.join(",")}` })
@@ -67,9 +69,13 @@ function selectMatchingPuzzles(
   excludedIds: Set<string>
 ): Puzzle[] {
   const selected: Puzzle[] = [];
+  const includedIds = input.includeIds === undefined ? undefined : new Set(input.includeIds);
   const candidates = input.randomSeed === undefined ? input.puzzles : seededShuffle(input.puzzles, input.randomSeed);
 
   for (const puzzle of candidates) {
+    if (includedIds !== undefined && !includedIds.has(puzzle.id)) {
+      continue;
+    }
     if (excludedIds.has(puzzle.id) || !isEligiblePuzzle(puzzle, input)) {
       continue;
     }

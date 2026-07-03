@@ -44,6 +44,23 @@ test("SQLite store does not select duplicate puzzle positions for one sprint", a
   }
 });
 
+test("SQLite store can scope future puzzle selection without deleting seeded puzzles", async () => {
+  const store = await seededStore();
+  try {
+    const selected = store.selectPuzzles({
+      mode: "standard",
+      limit: 10,
+      includeIds: ["000hf"],
+      rating: 1500
+    });
+
+    assert.deepEqual(selected.map((puzzle) => puzzle.id), ["000hf"]);
+    assert.equal(store.getPuzzle("00008")?.id, "00008");
+  } finally {
+    store.close();
+  }
+});
+
 test("PracticeService selects SQLite sprint puzzles from the current run ELO window", async () => {
   const store = await seededStore();
   const service = new PracticeService(store);

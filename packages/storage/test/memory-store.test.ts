@@ -130,6 +130,50 @@ test("MemoryStore supports deterministic seeded random puzzle selection", () => 
   assert.notDeepEqual(firstSeed, differentSeed);
 });
 
+test("MemoryStore can scope future puzzle selection without deleting seeded puzzles", async () => {
+  const store = new MemoryStore();
+  const puzzles = await loadFixturePuzzles();
+  store.seedPuzzles(puzzles);
+
+  const selected = store.selectPuzzles({
+    mode: "standard",
+    limit: 10,
+    includeIds: ["000hf"],
+    rating: 1500
+  });
+
+  assert.deepEqual(selected.map((puzzle) => puzzle.id), ["000hf"]);
+  assert.equal(store.getPuzzle("00008")?.id, "00008");
+});
+
+test("PracticeService changes puzzle selection scope without losing local state", async () => {
+  const store = new MemoryStore();
+  const service = new PracticeService(store);
+  const puzzles = await loadFixturePuzzles();
+
+  service.setPuzzleSelectionScope([puzzles.find((puzzle) => puzzle.id === "000hf") as Puzzle]);
+  service.setRating("standard 5/20", 625);
+  service.startSprint(
+    { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 1, maxMistakes: 1, minRating: 1400, maxRating: 1500 },
+    "2026-06-20T00:00:00.000Z"
+  );
+  service.submitMove("c4b5", "2026-06-20T00:00:05.000Z");
+
+  assert.equal(service.listHistory({ result: "wrong" }) instanceof Array, true);
+  assert.equal((service.listHistory({ result: "wrong" }) as unknown[]).length, 1);
+  assert.equal(service.getRating("standard 5/20").rating, 625);
+
+  service.setPuzzleSelectionScope([puzzles.find((puzzle) => puzzle.id === "00008") as Puzzle]);
+  const nextSprint = service.startSprint(
+    { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 1, maxMistakes: 1, minRating: 1700, maxRating: 1800 },
+    "2026-06-20T00:01:00.000Z"
+  );
+
+  assert.equal(nextSprint.currentPuzzle?.puzzle.id, "00008");
+  assert.equal((service.listHistory({ result: "wrong" }) as unknown[]).length, 1);
+  assert.equal(service.getRating("standard 5/20").rating, 625);
+});
+
 test("PracticeService selects standard sprint puzzles from the current run ELO window", async () => {
   const store = new MemoryStore();
   store.seedPuzzles(await loadFixturePuzzles());

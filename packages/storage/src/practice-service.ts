@@ -49,6 +49,7 @@ export interface RecordReviewAttemptCommand extends ReviewContext {
 
 export class PracticeService {
   private activeSprint: SprintState | undefined;
+  private puzzleSelectionScopeIds: string[] | undefined;
   private readonly store: PracticeStore;
 
   constructor(store: PracticeStore) {
@@ -305,6 +306,19 @@ export class PracticeService {
     this.store.seedPuzzles(puzzles);
   }
 
+  setPuzzleSelectionScope(puzzles: Puzzle[] | undefined): void {
+    if (puzzles === undefined) {
+      this.setPuzzleSelectionScopeIds(undefined);
+      return;
+    }
+    this.store.seedPuzzles(puzzles);
+    this.setPuzzleSelectionScopeIds(puzzles.map((puzzle) => puzzle.id));
+  }
+
+  setPuzzleSelectionScopeIds(puzzleIds: string[] | undefined): void {
+    this.puzzleSelectionScopeIds = puzzleIds;
+  }
+
   private sprintConfigForCommand(command: StartSprintCommand): SprintConfig {
     const configInput: {
       mode: SprintMode;
@@ -337,6 +351,7 @@ export class PracticeService {
     minRating?: number;
     maxRating?: number;
     theme?: string;
+    includeIds?: string[];
     randomSeed?: string | number;
   } {
     const puzzleFilter: {
@@ -346,6 +361,7 @@ export class PracticeService {
       minRating?: number;
       maxRating?: number;
       theme?: string;
+      includeIds?: string[];
       randomSeed?: string | number;
     } = {
       mode: config.mode,
@@ -360,6 +376,9 @@ export class PracticeService {
     }
     if (command.theme !== undefined) {
       puzzleFilter.theme = command.theme;
+    }
+    if (this.puzzleSelectionScopeIds !== undefined) {
+      puzzleFilter.includeIds = this.puzzleSelectionScopeIds;
     }
     if (command.puzzleSelectionSeed !== undefined) {
       puzzleFilter.randomSeed = command.puzzleSelectionSeed;

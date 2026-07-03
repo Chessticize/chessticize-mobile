@@ -284,6 +284,24 @@ describe("PracticePocScreen", () => {
     expect(hasStyleEntry(findByTestId(renderer, "test-puzzle-source-familiar15"), "borderColor", "#2563EB")).toBe(true);
   });
 
+  it("keeps the same backend service when switching test puzzle sources", () => {
+    const service = createMobilePracticeService();
+    service.setRating("standard 5/20", 625);
+    const practiceServiceFactory = jest.fn(() => service);
+    const renderer = renderScreen({ practiceServiceFactory });
+
+    expect(practiceServiceFactory).toHaveBeenCalledTimes(1);
+    expect(collectText(findByTestId(renderer, "practice-mode-standard-rating"))).toBe("ELO 625");
+
+    press(renderer, "test-puzzle-source-familiar15");
+    expect(practiceServiceFactory).toHaveBeenCalledTimes(1);
+    expect(collectText(findByTestId(renderer, "practice-mode-standard-rating"))).toBe("ELO 625");
+
+    press(renderer, "test-puzzle-source-random1000");
+    expect(practiceServiceFactory).toHaveBeenCalledTimes(1);
+    expect(collectText(findByTestId(renderer, "practice-mode-standard-rating"))).toBe("ELO 625");
+  });
+
   it("accepts a non-official legal checkmate in the fixed first familiar puzzle", async () => {
     const renderer = renderScreen({ practiceService: createMobilePracticeService("familiar15") });
 
