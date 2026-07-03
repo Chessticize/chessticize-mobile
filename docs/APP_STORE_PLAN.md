@@ -192,6 +192,12 @@ Design approved 2026-07-03; the "Review Reminder Notifications" section of
 3. A `ReminderScheduler` interface with a maintained fake; the real adapter
    wraps `UNUserNotificationCenter` (local notifications only, no push
    entitlement). Re-schedule on queue change and on app background.
+   Status: complete. The mobile backend now exposes a `ReviewReminderScheduler`
+   port with a maintained fake, a native iOS adapter backed by
+   `UNUserNotificationCenter`, and app-shell orchestration that replaces the
+   pending local review reminder when the queue/settings decision changes and
+   when the app backgrounds. Permission prompts remain deferred to the
+   contextual UI step.
 4. UI: Notifications section in Settings; contextual permission ask after the
    first completed review session; denied state links to system settings and
    never re-prompts. Tapping the notification opens the Review tab.

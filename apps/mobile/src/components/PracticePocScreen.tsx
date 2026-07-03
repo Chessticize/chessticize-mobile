@@ -71,6 +71,13 @@ import {
   type MobilePuzzleSource
 } from "../backend/mobilePractice.ts";
 import { createNativeStockfishTransport, prewarmNativeStockfishTransport } from "../backend/nativeStockfishTransport.ts";
+import {
+  computeReviewReminderDecision,
+  createNativeReviewReminderScheduler,
+  reminderScheduleKey,
+  rescheduleReviewReminder,
+  type ReviewReminderScheduler
+} from "../backend/reviewReminderScheduler.ts";
 import { Chess, type PieceSymbol, type Square } from "chess.js";
 
 interface Props {
@@ -79,6 +86,8 @@ interface Props {
   configurePuzzleSource?: (service: PracticeService, source: MobilePuzzleSource) => void;
   debugTrace?: (event: PracticeDebugTraceEvent) => void;
   stockfishTransportFactory?: () => UciEngineTransport | null;
+  reviewReminderScheduler?: ReviewReminderScheduler | null;
+  reviewReminderSchedulerFactory?: () => ReviewReminderScheduler | null;
 }
 
 type Tab = "practice" | "review" | "history" | "settings" | "packs" | "analysis";
@@ -205,16 +214,23 @@ export function PracticePocScreen({
   practiceServiceFactory = createMobilePracticeService,
   configurePuzzleSource = configureMobilePracticePuzzleSource,
   debugTrace,
-  stockfishTransportFactory = createNativeStockfishTransport
+  stockfishTransportFactory = createNativeStockfishTransport,
+  reviewReminderScheduler,
+  reviewReminderSchedulerFactory = createNativeReviewReminderScheduler
 }: Props): React.JSX.Element {
   const [puzzleSource, setPuzzleSource] = useState<MobilePuzzleSource>("bundledCore");
   const service = useMemo(() => practiceService ?? practiceServiceFactory(), [practiceService, practiceServiceFactory]);
+  const scheduler = useMemo(
+    () => reviewReminderScheduler !== undefined ? reviewReminderScheduler : reviewReminderSchedulerFactory(),
+    [reviewReminderScheduler, reviewReminderSchedulerFactory]
+  );
   const boardRef = useRef<ChessboardRef | null>(null);
   const suppressedBoardMovesRef = useRef<string[]>([]);
   const boardSyncInProgressRef = useRef(false);
   const boardInputLockedRef = useRef(false);
   const boardVisualFenRef = useRef<string | null>(null);
   const feedbackSnapshotTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reminderScheduleKeyRef = useRef<string | null>(null);
   const stateRef = useRef<SprintState | null>(null);
   const boardFenRef = useRef<string | null>(null);
   const feedbackSnapshotRef = useRef<FeedbackBoardSnapshot | null>(null);
@@ -314,6 +330,9 @@ export function PracticePocScreen({
       if ((nextState === "background" || nextState === "inactive") && stateRef.current?.status === "active") {
         pauseActiveSprint("app-state");
       }
+      if (nextState === "background" || nextState === "inactive") {
+        refreshReviewReminder("app-background", true);
+      }
     });
     return () => {
       subscription.remove();
@@ -388,6 +407,32 @@ export function PracticePocScreen({
         ? activeSprint
         : null
     );
+    refreshReviewReminder("queue-refresh");
+  }
+
+  function refreshReviewReminder(reason: string, force = false): void {
+    if (!scheduler) {
+      return;
+    }
+    try {
+      const decision = computeReviewReminderDecision(service, nowIso());
+      const nextKey = reminderScheduleKey(decision);
+      if (!force && reminderScheduleKeyRef.current === nextKey) {
+        return;
+      }
+      reminderScheduleKeyRef.current = nextKey;
+      void rescheduleReviewReminder(service, scheduler, nowIso()).catch((caught) => {
+        emitTrace({
+          type: "move-ignored",
+          reason: `review-reminder-${reason}-failed:${errorMessage(caught)}`
+        });
+      });
+    } catch (caught) {
+      emitTrace({
+        type: "move-ignored",
+        reason: `review-reminder-${reason}-failed:${errorMessage(caught)}`
+      });
+    }
   }
 
   function commitState(nextState: SprintState | null): void {
