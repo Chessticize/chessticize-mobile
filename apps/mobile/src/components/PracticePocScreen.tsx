@@ -61,7 +61,7 @@ import type {
   UciEngineTransport
 } from "../../../../packages/core/src/index.ts";
 import type { PracticeService } from "../../../../packages/storage/src/practice-service.ts";
-import type { ClearLocalHistoryResult, LocalDataExport } from "../../../../packages/storage/src/practice-store.ts";
+import type { ClearLocalHistoryResult, LocalDataExport, ReviewReminderPreference } from "../../../../packages/storage/src/practice-store.ts";
 import {
   configureMobilePracticePuzzleSource,
   createMobilePracticeService,
@@ -73,9 +73,12 @@ import {
 import { createNativeStockfishTransport, prewarmNativeStockfishTransport } from "../backend/nativeStockfishTransport.ts";
 import {
   computeReviewReminderDecision,
+  createNativeReviewReminderNotificationClient,
   createNativeReviewReminderScheduler,
   reminderScheduleKey,
   rescheduleReviewReminder,
+  type ReviewReminderNotificationClient,
+  type ReviewReminderPermissionStatus,
   type ReviewReminderScheduler
 } from "../backend/reviewReminderScheduler.ts";
 import { Chess, type PieceSymbol, type Square } from "chess.js";
@@ -88,6 +91,8 @@ interface Props {
   stockfishTransportFactory?: () => UciEngineTransport | null;
   reviewReminderScheduler?: ReviewReminderScheduler | null;
   reviewReminderSchedulerFactory?: () => ReviewReminderScheduler | null;
+  reviewReminderNotificationClient?: ReviewReminderNotificationClient | null;
+  reviewReminderNotificationClientFactory?: () => ReviewReminderNotificationClient | null;
 }
 
 type Tab = "practice" | "review" | "history" | "settings" | "packs" | "analysis";
@@ -216,13 +221,19 @@ export function PracticePocScreen({
   debugTrace,
   stockfishTransportFactory = createNativeStockfishTransport,
   reviewReminderScheduler,
-  reviewReminderSchedulerFactory = createNativeReviewReminderScheduler
+  reviewReminderSchedulerFactory = createNativeReviewReminderScheduler,
+  reviewReminderNotificationClient,
+  reviewReminderNotificationClientFactory = createNativeReviewReminderNotificationClient
 }: Props): React.JSX.Element {
   const [puzzleSource, setPuzzleSource] = useState<MobilePuzzleSource>("bundledCore");
   const service = useMemo(() => practiceService ?? practiceServiceFactory(), [practiceService, practiceServiceFactory]);
   const scheduler = useMemo(
     () => reviewReminderScheduler !== undefined ? reviewReminderScheduler : reviewReminderSchedulerFactory(),
     [reviewReminderScheduler, reviewReminderSchedulerFactory]
+  );
+  const notificationClient = useMemo(
+    () => reviewReminderNotificationClient !== undefined ? reviewReminderNotificationClient : reviewReminderNotificationClientFactory(),
+    [reviewReminderNotificationClient, reviewReminderNotificationClientFactory]
   );
   const boardRef = useRef<ChessboardRef | null>(null);
   const suppressedBoardMovesRef = useRef<string[]>([]);
@@ -231,6 +242,8 @@ export function PracticePocScreen({
   const boardVisualFenRef = useRef<string | null>(null);
   const feedbackSnapshotTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reminderScheduleKeyRef = useRef<string | null>(null);
+  const scheduledReviewAttemptCountRef = useRef(scheduledReviewAttemptCount(service));
+  const reviewReminderPromptDismissedRef = useRef(false);
   const stateRef = useRef<SprintState | null>(null);
   const boardFenRef = useRef<string | null>(null);
   const feedbackSnapshotRef = useRef<FeedbackBoardSnapshot | null>(null);
@@ -271,6 +284,9 @@ export function PracticePocScreen({
   const [customDurationSeconds, setCustomDurationSeconds] = useState(5 * 60);
   const [customPerPuzzleSeconds, setCustomPerPuzzleSeconds] = useState(20);
   const [customTheme, setCustomTheme] = useState<CustomThemeFilter>("mixed");
+  const [reviewReminderPreference, setReviewReminderPreference] = useState<ReviewReminderPreference>(() => service.getReviewReminderPreference());
+  const [notificationPermissionStatus, setNotificationPermissionStatus] = useState<ReviewReminderPermissionStatus>("unavailable");
+  const [reviewReminderPermissionPromptVisible, setReviewReminderPermissionPromptVisible] = useState(false);
   const [, setSettingsRevision] = useState(0);
 
   const boardSize = useMemo(() => {
@@ -314,6 +330,41 @@ export function PracticePocScreen({
   useEffect(() => {
     refreshState();
   }, [service]);
+
+  useEffect(() => {
+    let canceled = false;
+    scheduledReviewAttemptCountRef.current = scheduledReviewAttemptCount(service);
+    setReviewReminderPreference(service.getReviewReminderPreference());
+    if (!notificationClient) {
+      setNotificationPermissionStatus("unavailable");
+      return undefined;
+    }
+
+    void notificationClient.getAuthorizationStatus().then((status) => {
+      if (!canceled) {
+        setNotificationPermissionStatus(status);
+      }
+    }).catch(() => {
+      if (!canceled) {
+        setNotificationPermissionStatus("unavailable");
+      }
+    });
+    void notificationClient.consumeInitialRoute().then((route) => {
+      if (!canceled && route === "review") {
+        setTab("review");
+      }
+    }).catch(() => {});
+    const unsubscribe = notificationClient.addNotificationResponseListener((route) => {
+      if (route === "review") {
+        setTab("review");
+      }
+    });
+
+    return () => {
+      canceled = true;
+      unsubscribe();
+    };
+  }, [notificationClient, service]);
 
   useEffect(() => {
     if (!isActive && !isShowingFeedbackSnapshot) {
@@ -400,6 +451,7 @@ export function PracticePocScreen({
     setReviews(service.getDueReviews(nowIso()));
     setReviewQueue(service.listReviewQueue());
     setDueReviewItems(service.getDueReviewItems(nowIso()));
+    setReviewReminderPreference(service.getReviewReminderPreference());
     setCurrentRating(readRating(service, selectedConfig.ratingKey));
     const activeSprint = service.getActiveSprint();
     setResumableSprint(
@@ -408,6 +460,62 @@ export function PracticePocScreen({
         : null
     );
     refreshReviewReminder("queue-refresh");
+  }
+
+  function saveReviewReminderPreference(preference: ReviewReminderPreference): void {
+    const saved = service.saveReviewReminderPreference(preference);
+    setReviewReminderPreference(saved);
+    setSettingsRevision((current) => current + 1);
+    refreshReviewReminder("settings", true);
+  }
+
+  async function requestReviewReminderPermission(): Promise<ReviewReminderPermissionStatus> {
+    if (!notificationClient) {
+      setNotificationPermissionStatus("unavailable");
+      return "unavailable";
+    }
+    try {
+      const status = await notificationClient.requestAuthorization();
+      setNotificationPermissionStatus(status);
+      setReviewReminderPermissionPromptVisible(false);
+      reviewReminderPromptDismissedRef.current = true;
+      if (status === "authorized") {
+        refreshReviewReminder("permission", true);
+      }
+      return status;
+    } catch {
+      setNotificationPermissionStatus("unavailable");
+      return "unavailable";
+    }
+  }
+
+  async function openReviewReminderSystemSettings(): Promise<void> {
+    if (!notificationClient) {
+      return;
+    }
+    await notificationClient.openSystemSettings();
+    try {
+      setNotificationPermissionStatus(await notificationClient.getAuthorizationStatus());
+    } catch {
+      setNotificationPermissionStatus("unavailable");
+    }
+  }
+
+  function maybeShowReviewReminderPermissionPrompt(): void {
+    if (
+      !notificationClient ||
+      reviewReminderPromptDismissedRef.current ||
+      reviewReminderPreference.mode === "off" ||
+      notificationPermissionStatus !== "not_determined"
+    ) {
+      return;
+    }
+    setReviewReminderPermissionPromptVisible(true);
+  }
+
+  function dismissReviewReminderPermissionPrompt(): void {
+    reviewReminderPromptDismissedRef.current = true;
+    setReviewReminderPermissionPromptVisible(false);
   }
 
   function refreshReviewReminder(reason: string, force = false): void {
@@ -1166,6 +1274,14 @@ export function PracticePocScreen({
         testID="practice-main-scroll"
         contentContainerStyle={[styles.content, appChromeVisible ? styles.contentWithBottomTabs : null]}
       >
+        {reviewReminderPermissionPromptVisible ? (
+          <ReviewReminderPermissionPrompt
+            onDismiss={dismissReviewReminderPermissionPrompt}
+            onEnable={() => {
+              void requestReviewReminderPermission();
+            }}
+          />
+        ) : null}
         {tab === "practice" ? (
           <>
             {isOpenSession ? (
@@ -1450,6 +1566,11 @@ export function PracticePocScreen({
                 nowMsRef.current = completedAtMs;
                 setNowMs(completedAtMs);
               }
+              const nextScheduledReviewAttemptCount = scheduledReviewAttemptCount(service);
+              if (nextScheduledReviewAttemptCount > scheduledReviewAttemptCountRef.current) {
+                maybeShowReviewReminderPermissionPrompt();
+              }
+              scheduledReviewAttemptCountRef.current = nextScheduledReviewAttemptCount;
               refreshState();
             }}
             stockfishTransportFactory={stockfishTransportFactory}
@@ -1480,6 +1601,13 @@ export function PracticePocScreen({
               service.resetRating(defaultSprintConfig("standard").ratingKey);
               setSettingsRevision((current) => current + 1);
             }}
+            notificationPermissionStatus={notificationPermissionStatus}
+            reviewReminderPreference={reviewReminderPreference}
+            onOpenNotificationSettings={() => {
+              void openReviewReminderSystemSettings();
+            }}
+            onRequestReviewReminderPermission={() => requestReviewReminderPermission()}
+            onSaveReviewReminderPreference={saveReviewReminderPreference}
           />
         ) : null}
         {tab === "packs" ? <PacksPanel /> : null}
@@ -5844,19 +5972,29 @@ function SettingsPanel({
   onDeleteLocalHistory,
   onExportData,
   onOpenDiagnostics,
+  onOpenNotificationSettings,
   onOpenPacks,
   onAdjustRating,
+  onRequestReviewReminderPermission,
   onResetRating,
+  onSaveReviewReminderPreference,
+  notificationPermissionStatus,
   ratings,
+  reviewReminderPreference,
   standardRating
 }: {
   onDeleteLocalHistory: () => ClearLocalHistoryResult;
   onExportData: () => LocalDataExport;
   onOpenDiagnostics?: () => void;
+  onOpenNotificationSettings: () => void;
   onOpenPacks: () => void;
   onAdjustRating: (ratingKey: string, nextRating: number) => RatingRecord;
+  onRequestReviewReminderPermission: () => Promise<ReviewReminderPermissionStatus>;
   onResetRating: () => void;
+  onSaveReviewReminderPreference: (preference: ReviewReminderPreference) => void;
+  notificationPermissionStatus: ReviewReminderPermissionStatus;
   ratings: Array<{ label: string; record: RatingRecord }>;
+  reviewReminderPreference: ReviewReminderPreference;
   standardRating: number;
 }): React.JSX.Element {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -5886,6 +6024,58 @@ function SettingsPanel({
           testID="settings-delete-local-history"
           onPress={() => setConfirmation("delete-history")}
         />
+      </SettingsSection>
+
+      <SettingsSection title="Notifications" testID="settings-notifications-section">
+        <SettingsRow
+          label="Review Reminders"
+          value={reviewReminderPreferenceLabel(reviewReminderPreference)}
+          detail={reviewReminderPermissionDetail(notificationPermissionStatus)}
+          testID="settings-review-reminders"
+        />
+        <View style={styles.settingsInlineControls} testID="settings-review-reminder-preferences">
+          <SettingsPreferenceButton
+            active={reviewReminderPreference.mode === "smart"}
+            label="Smart"
+            testID="settings-review-reminder-smart"
+            onPress={() => onSaveReviewReminderPreference({ mode: "smart" })}
+          />
+          <SettingsPreferenceButton
+            active={reviewReminderPreference.mode === "fixed" && reviewReminderPreference.fixedLocalTime === "19:00"}
+            label="19:00"
+            testID="settings-review-reminder-fixed-1900"
+            onPress={() => onSaveReviewReminderPreference({ mode: "fixed", fixedLocalTime: "19:00" })}
+          />
+          <SettingsPreferenceButton
+            active={reviewReminderPreference.mode === "off"}
+            label="Off"
+            testID="settings-review-reminder-off"
+            onPress={() => onSaveReviewReminderPreference({ mode: "off" })}
+          />
+        </View>
+        {notificationPermissionStatus === "not_determined" && reviewReminderPreference.mode !== "off" ? (
+          <SettingsActionRow
+            label="Enable Notifications"
+            detail="Ask iOS permission after your first review session"
+            testID="settings-review-reminder-enable"
+            onPress={() => {
+              void onRequestReviewReminderPermission().then((status) => {
+                setStatusMessage(reviewReminderPermissionStatusMessage(status));
+              });
+            }}
+          />
+        ) : null}
+        {notificationPermissionStatus === "denied" ? (
+          <SettingsActionRow
+            label="Open iOS Settings"
+            detail="Notifications are blocked by iOS and cannot be requested again here"
+            testID="settings-review-reminder-open-settings"
+            onPress={() => {
+              onOpenNotificationSettings();
+              setStatusMessage("Opened iOS Settings");
+            }}
+          />
+        ) : null}
       </SettingsSection>
 
       <SettingsSection title="Profile" testID="settings-profile-section">
@@ -5982,6 +6172,137 @@ function SettingsPanel({
       ) : null}
     </View>
   );
+}
+
+function ReviewReminderPermissionPrompt({
+  onDismiss,
+  onEnable
+}: {
+  onDismiss: () => void;
+  onEnable: () => void;
+}): React.JSX.Element {
+  return (
+    <View style={styles.reviewReminderPrompt} testID="review-reminder-permission-prompt">
+      <View style={styles.reviewReminderPromptCopy}>
+        <Text style={styles.sectionLabel}>Review reminders</Text>
+        <Text style={styles.helperText}>Get a local reminder when missed puzzles are ready again.</Text>
+      </View>
+      <View style={styles.confirmationActionRow}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss review reminder permission prompt"
+          testID="review-reminder-permission-dismiss"
+          style={styles.secondaryButton}
+          onPress={onDismiss}
+        >
+          <Text style={styles.secondaryButtonText}>Not Now</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Enable review reminders"
+          testID="review-reminder-permission-enable"
+          style={styles.primarySmallButton}
+          onPress={onEnable}
+        >
+          <Text style={styles.primarySmallButtonText}>Enable</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+function SettingsPreferenceButton({
+  active,
+  label,
+  onPress,
+  testID
+}: {
+  active: boolean;
+  label: string;
+  onPress: () => void;
+  testID: string;
+}): React.JSX.Element {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      testID={testID}
+      style={[styles.settingsPreferenceButton, active ? styles.settingsPreferenceButtonActive : null]}
+      onPress={onPress}
+    >
+      <Text style={[styles.settingsPreferenceButtonText, active ? styles.settingsPreferenceButtonTextActive : null]}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+function SettingsActionRow({
+  detail,
+  label,
+  onPress,
+  testID
+}: {
+  detail: string;
+  label: string;
+  onPress: () => void;
+  testID: string;
+}): React.JSX.Element {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${label}, ${detail}`}
+      testID={testID}
+      style={styles.settingsActionRow}
+      onPress={onPress}
+    >
+      <View style={styles.settingsRowCopy}>
+        <Text style={styles.listText}>{label}</Text>
+        <Text style={styles.helperText}>{detail}</Text>
+      </View>
+      <ChevronGlyph direction="right" />
+    </Pressable>
+  );
+}
+
+function reviewReminderPreferenceLabel(preference: ReviewReminderPreference): string {
+  if (preference.mode === "fixed") {
+    return preference.fixedLocalTime;
+  }
+  if (preference.mode === "off") {
+    return "Off";
+  }
+  return "Smart";
+}
+
+function reviewReminderPermissionDetail(status: ReviewReminderPermissionStatus): string {
+  switch (status) {
+    case "authorized":
+      return "Local notifications enabled";
+    case "denied":
+      return "Blocked in iOS Settings";
+    case "not_determined":
+      return "Permission not requested";
+    case "unavailable":
+      return "Notifications unavailable on this device";
+  }
+}
+
+function reviewReminderPermissionStatusMessage(status: ReviewReminderPermissionStatus): string {
+  switch (status) {
+    case "authorized":
+      return "Notifications enabled";
+    case "denied":
+      return "Notifications blocked in iOS Settings";
+    case "not_determined":
+      return "Notification permission not requested";
+    case "unavailable":
+      return "Notifications unavailable";
+  }
+}
+
+function scheduledReviewAttemptCount(service: PracticeService): number {
+  return (service.listHistory({ source: "scheduled_review" }) as AttemptEvent[]).length;
 }
 
 function deleteHistoryStatusMessage(result: ClearLocalHistoryResult): string {
@@ -8351,6 +8672,19 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "800"
   },
+  primarySmallButton: {
+    alignItems: "center",
+    backgroundColor: "#2563EB",
+    borderRadius: 8,
+    height: 38,
+    justifyContent: "center",
+    paddingHorizontal: 14
+  },
+  primarySmallButtonText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "800"
+  },
   summaryPrimaryAction: {
     alignSelf: "stretch",
     flex: 0
@@ -9249,8 +9583,67 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "800"
   },
+  settingsInlineControls: {
+    borderBottomColor: "#E2E8F0",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  settingsPreferenceButton: {
+    alignItems: "center",
+    backgroundColor: "#F8FAFC",
+    borderColor: "#CBD5E1",
+    borderRadius: 8,
+    borderWidth: 1,
+    minHeight: 34,
+    justifyContent: "center",
+    paddingHorizontal: 12
+  },
+  settingsPreferenceButtonActive: {
+    backgroundColor: "#EFF6FF",
+    borderColor: "#2563EB"
+  },
+  settingsPreferenceButtonText: {
+    color: "#334155",
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  settingsPreferenceButtonTextActive: {
+    color: "#1D4ED8"
+  },
+  settingsActionRow: {
+    alignItems: "center",
+    borderBottomColor: "#E2E8F0",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "space-between",
+    minHeight: 58,
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
   settingsDestructiveText: {
     color: "#DC2626"
+  },
+  reviewReminderPrompt: {
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderColor: "#BFDBFE",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    justifyContent: "space-between",
+    padding: 12
+  },
+  reviewReminderPromptCopy: {
+    flex: 1,
+    gap: 2,
+    minWidth: 180
   },
   advancedRatingsPanel: {
     backgroundColor: "#F8FAFC",

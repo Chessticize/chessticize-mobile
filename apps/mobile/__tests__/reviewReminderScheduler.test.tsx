@@ -1,6 +1,8 @@
 import { NativeModules } from "react-native";
 import {
+  createNativeReviewReminderNotificationClient,
   createNativeReviewReminderScheduler,
+  FakeReviewReminderNotificationClient,
   FakeReviewReminderScheduler,
   reminderScheduleKey,
   rescheduleReviewReminder
@@ -82,6 +84,61 @@ describe("review reminder scheduler", () => {
       },
       null
     ]);
+  });
+
+  it("wraps native notification permissions and review routing", async () => {
+    const listeners = new Set<(route: string) => void>();
+    const openSystemSettings = jest.fn(async () => {});
+    (NativeModules as Record<string, unknown>).ReviewReminderNotifications = {
+      replaceNextReminder: jest.fn(),
+      getAuthorizationStatus: jest.fn(async () => "not_determined"),
+      requestAuthorization: jest.fn(async () => "authorized"),
+      openSystemSettings,
+      consumeInitialRoute: jest.fn(async () => "review"),
+      __addListener: (_eventName: string, listener: (route: string) => void) => {
+        listeners.add(listener);
+        return {
+          remove: () => listeners.delete(listener)
+        };
+      }
+    };
+
+    const client = createNativeReviewReminderNotificationClient();
+    const routed: string[] = [];
+    const unsubscribe = client?.addNotificationResponseListener((route) => routed.push(route));
+
+    await expect(client?.getAuthorizationStatus()).resolves.toBe("not_determined");
+    await expect(client?.requestAuthorization()).resolves.toBe("authorized");
+    await expect(client?.consumeInitialRoute()).resolves.toBe("review");
+    await expect(client?.openSystemSettings()).resolves.toBeUndefined();
+    for (const listener of Array.from(listeners)) {
+      listener("review");
+      listener("unknown");
+    }
+    unsubscribe?.();
+
+    expect(openSystemSettings).toHaveBeenCalledTimes(1);
+    expect(routed).toEqual(["review"]);
+  });
+
+  it("keeps the notification client fake observable without native modules", async () => {
+    const client = new FakeReviewReminderNotificationClient("denied", "authorized");
+    const routed: string[] = [];
+    const unsubscribe = client.addNotificationResponseListener((route) => routed.push(route));
+
+    await expect(client.getAuthorizationStatus()).resolves.toBe("denied");
+    await expect(client.requestAuthorization()).resolves.toBe("authorized");
+    client.setInitialRoute("review");
+    await expect(client.consumeInitialRoute()).resolves.toBe("review");
+    await expect(client.consumeInitialRoute()).resolves.toBeUndefined();
+    client.emitRoute("review");
+    unsubscribe();
+    client.emitRoute("review");
+    await client.openSystemSettings();
+
+    expect(client.requestCount).toBe(1);
+    expect(client.openSettingsCount).toBe(1);
+    expect(routed).toEqual(["review"]);
   });
 });
 

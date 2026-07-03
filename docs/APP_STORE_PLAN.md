@@ -201,7 +201,15 @@ Design approved 2026-07-03; the "Review Reminder Notifications" section of
 4. UI: Notifications section in Settings; contextual permission ask after the
    first completed review session; denied state links to system settings and
    never re-prompts. Tapping the notification opens the Review tab.
+   Status: complete. Settings now has a Notifications section for smart,
+   fixed-time, and off reminder preferences; the app asks for notification
+   permission only after the first completed scheduled review session, keeps
+   denied users on an iOS Settings link, and routes review reminder taps to the
+   Review tab through a native/fake notification client port.
 5. E2E/component coverage via the fake scheduler (flow 9 in Milestone 6).
+   Status: component coverage added for the Settings controls, permission
+   prompt, denied-state Settings link, scheduler rescheduling, and notification
+   route navigation. Full Detox flow coverage remains part of Milestone 6.
 
 ## Milestone 5 — App Store submission requirements
 
