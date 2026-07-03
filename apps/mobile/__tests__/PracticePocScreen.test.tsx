@@ -1692,10 +1692,14 @@ describe("PracticePocScreen", () => {
     press(renderer, "review-tab");
     press(renderer, "review-start-due");
     await boardMove(renderer, "c4b5");
+    await settleFeedbackSnapshot();
 
     const officialReviewAttempts = service.listHistory({ source: "scheduled_review" }) as Array<{ result: string; submittedMove: string }>;
     expect(officialReviewAttempts).toHaveLength(1);
     expect(officialReviewAttempts[0]).toMatchObject({ result: "wrong", submittedMove: "c4b5" });
+    expect(findByTestId(renderer, "review-line-continue")).toBeTruthy();
+    expect(findByTestId(renderer, "review-line-continue").props.accessibilityLabel).toBe("Continue to next review");
+    expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(false);
 
     press(renderer, "review-exit");
     press(renderer, "history-tab");
@@ -1774,7 +1778,8 @@ describe("PracticePocScreen", () => {
     expect(service.listHistory({ source: "scheduled_review" }) as Array<{ result: string; submittedMove: string }>).toEqual([
       expect.objectContaining({ result: "wrong", submittedMove: "__timeout__" })
     ]);
-    expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
+    expect(findByTestId(renderer, "review-line-continue")).toBeTruthy();
+    expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(false);
   });
 
   it("opens review analysis without mutating the active review line", async () => {

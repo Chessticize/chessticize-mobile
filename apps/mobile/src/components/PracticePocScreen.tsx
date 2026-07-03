@@ -4713,6 +4713,7 @@ function ReviewSession({
   const [reviewNowMs, setReviewNowMs] = useState(() => Date.now());
   const [reviewTimedOut, setReviewTimedOut] = useState(false);
   const [punishmentLineComplete, setPunishmentLineComplete] = useState(false);
+  const [lineReviewNeedsContinue, setLineReviewNeedsContinue] = useState(false);
   const currentEntry = entries[entryIndex];
   const currentPuzzle = currentReviewPuzzleState(reviewState);
   const currentFen = currentPuzzle.currentFen;
@@ -4756,7 +4757,7 @@ function ReviewSession({
       ? currentExpectedMove(reviewState.line)
       : undefined;
   const isArrowDuelFollowUpReview = currentEntry.mode === "arrow_duel" && reviewState.kind === "line";
-  const boardGestureEnabled = !boardLocked;
+  const boardGestureEnabled = !boardLocked && (!lineReviewNeedsContinue || analysisEnabled);
   const boardDraggableColor = boardGestureEnabled ? sideToMove(displayFen) : null;
   const isSessionReview = currentEntry.source === "session";
   const canNavigateReview = (currentEntry.source === "session" || currentEntry.source === "history") && !boardLocked;
@@ -4869,6 +4870,7 @@ function ReviewSession({
       submittedMove: "__timeout__",
       expectedMove: expectedReviewMove(currentPuzzle)
     });
+    setLineReviewNeedsContinue(true);
   }, [currentEntry.source, currentPuzzle, reviewRemainingSeconds, reviewResultRecorded, reviewTimedOut]);
 
   function resetCurrentReview(nextIndex = entryIndex): void {
@@ -4893,6 +4895,7 @@ function ReviewSession({
     setReviewStartedAtMs(now);
     setReviewNowMs(now);
     setReviewTimedOut(false);
+    setLineReviewNeedsContinue(false);
     reviewResultRecordedRef.current = false;
     reviewSuppressedBoardMovesRef.current = [];
   }
@@ -4966,6 +4969,10 @@ function ReviewSession({
       boardRef.current?.resetBoard(currentFen);
       return;
     }
+    if (lineReviewNeedsContinue && !analysisEnabled) {
+      boardRef.current?.resetBoard(currentFen);
+      return;
+    }
     const submittedFen = currentFen;
     const submittedMoveFen = fenAfterMove(submittedFen, move);
     if (!submittedMoveFen) {
@@ -5001,6 +5008,9 @@ function ReviewSession({
         await sleep(FEEDBACK_SNAPSHOT_MS);
         boardRef.current?.resetBoard(submittedFen);
         setFeedback(null);
+        if (currentEntry.source === "due") {
+          setLineReviewNeedsContinue(true);
+        }
         setBoardLocked(false);
         return;
       }
@@ -5428,7 +5438,7 @@ function ReviewSession({
         </View>
 
         <View style={styles.analysisPanel} testID="review-analysis-panel">
-          {punishmentLineComplete && currentEntry.source === "due" && !analysisEnabled ? (
+          {((punishmentLineComplete && currentEntry.source === "due") || lineReviewNeedsContinue) && !analysisEnabled ? (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Continue to next review"
