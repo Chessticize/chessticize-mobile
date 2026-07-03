@@ -160,8 +160,10 @@ describe("PracticePocScreen", () => {
   it("starts a selected sprint directly from the mode row", () => {
     const renderer = renderScreen({ practiceService: createMobilePracticeService("familiar15") });
 
+    expect(() => findByTestId(renderer, "session-loading-skeleton")).toThrow();
     press(renderer, "practice-mode-blitz");
 
+    expect(() => findByTestId(renderer, "session-loading-skeleton")).toThrow();
     expect(findByTestId(renderer, "session-board")).toBeTruthy();
     expect(testIdOrder(renderer, "session-board", "session-score-strip")).toBeLessThan(0);
     expect(testIdOrder(renderer, "session-score-strip", "practice-prompt")).toBeLessThan(0);
