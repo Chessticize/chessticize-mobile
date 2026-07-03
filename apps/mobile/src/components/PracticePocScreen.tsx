@@ -23,6 +23,7 @@ import {
   buildSprintConfig,
   currentExpectedMove,
   defaultSprintConfig,
+  formatLocalCalendarDate,
   formatSideToMoveScore,
   historyAttemptReviewKey,
   historyAttemptSpeedSeconds,
@@ -3716,13 +3717,13 @@ function HistoryAttemptRow({
   const delta = (attempt.ratingAfter ?? attempt.ratingBefore) - attempt.ratingBefore;
   const completedAtMs = new Date(attempt.completedAt).getTime();
   const elapsedSeconds = Math.max(0, Math.round((completedAtMs - new Date(attempt.startedAt).getTime()) / 1000));
-  const dateLabel = `${historyAttemptRecencyLabel(completedAtMs)} · ${attempt.completedAt.slice(0, 10)}`;
+  const dateLabel = `${historyAttemptRecencyLabel(completedAtMs)} · ${formatLocalCalendarDate(attempt.completedAt)}`;
   const primaryTheme = historyAttemptThemeLabel(attempt);
   const pace = historyAttemptSpeedSeconds(attempt);
   const paceLabel = pace === null ? null : `${pace}s pace`;
   const reviewLabel = isWrong
     ? puzzleStats?.nextReviewAt
-      ? `Review ${puzzleStats.nextReviewAt.slice(0, 10)}`
+      ? `Review ${formatLocalCalendarDate(puzzleStats.nextReviewAt)}`
       : "Review queued"
     : "Correct";
   const resultLabel = isWrong ? "Wrong move" : "Correct";
@@ -4183,8 +4184,8 @@ function reviewQueueSummary(queue: ReviewQueueState[], filteredItems: ReviewQueu
     oldestDueLabel: oldestDueTime === null
       ? "Next review appears after a missed puzzle reaches its due time"
       : oldestDueTime <= nowMs
-        ? `Oldest due ${new Date(oldestDueTime).toISOString().slice(0, 10)}`
-        : `Next review due ${new Date(oldestDueTime).toISOString().slice(0, 10)}`,
+        ? `Oldest due ${formatLocalCalendarDate(oldestDueTime)}`
+        : `Next review due ${formatLocalCalendarDate(oldestDueTime)}`,
     overdueCount: queue.filter((review) => isReviewOverdue(review, nowMs)).length,
     totalCount: queue.length
   };
@@ -4581,13 +4582,13 @@ function ReviewQueueItemCard({
 }): React.JSX.Element {
   const difficulty = reviewItemDifficulty(item);
   const primaryTheme = item.puzzle.themes[0] ?? "mixed";
-  const lastWrongDate = item.review.lastReviewedAt.slice(0, 10);
+  const lastWrongDate = formatLocalCalendarDate(item.review.lastReviewedAt);
   const dueKind = reviewDueState(item.review, nowMs);
   const dueState = dueKind === "overdue"
     ? "Overdue"
     : dueKind === "due"
       ? "Due now"
-      : `Due ${item.review.dueAt.slice(0, 10)}`;
+      : `Due ${formatLocalCalendarDate(item.review.dueAt)}`;
   const source = reviewItemSourceSprintLabel(item);
   const compactSource = source.replace(/^Source sprint: /, "");
   const nextReviewNumber = item.review.reviewCount + 1;

@@ -10,7 +10,7 @@ import {
 } from "../src/backend/mobilePractice";
 import { fixtureNeedsAtLeast, PracticeService } from "../../../packages/storage/src/practice-service";
 import { MemoryStore } from "../../../packages/storage/src/memory-store";
-import type { ArrowDuelState, AttemptEvent, Puzzle, SprintState, UciEngineTransport } from "../../../packages/core/src/index";
+import { formatLocalCalendarDate, type ArrowDuelState, type AttemptEvent, type Puzzle, type SprintState, type UciEngineTransport } from "../../../packages/core/src/index";
 
 const renderers: TestRenderer.ReactTestRenderer[] = [];
 
@@ -1144,7 +1144,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-context`))).toMatch(/^[A-Z]/);
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-meta`))).toContain("Sprint · Rating");
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-meta`))).toMatch(
-      /Sprint · Rating \d+ · \d+s · (Today|Yesterday|\d+ days ago|\d+w ago|\d+mo ago|\d+y ago|Scheduled) · \d{4}-\d{2}-\d{2}/
+      /Sprint · Rating \d+ · \d+s · (Today|Yesterday|\d+ days ago|\d+w ago|\d+mo ago|\d+y ago|Scheduled) · [A-Z][a-z]{2} \d{1,2}, \d{4}/
     );
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-status`))).toContain("Review");
     expect(findByTestId(renderer, `history-attempt-${historyAttemptId}-chevron`)).toBeTruthy();
@@ -1270,7 +1270,9 @@ describe("PracticePocScreen", () => {
     press(renderer, "history-tab");
     press(renderer, "history-range-max");
     expect(collectText(findByTestId(renderer, "history-performance-context"))).toBe("Arrow Duel · 30s pace · All Time");
-    expect(collectText(findByTestId(renderer, "history-attempt-arrow-attempt-review-state"))).toBe("Review 2026-06-21");
+    expect(collectText(findByTestId(renderer, "history-attempt-arrow-attempt-review-state"))).toBe(
+      `Review ${formatLocalCalendarDate("2026-06-21T00:01:00.000Z")}`
+    );
     expect(collectText(findByTestId(renderer, "history-attempt-arrow-attempt-difficulty"))).toBe("Hard");
 
     press(renderer, "history-filter-toggle");
@@ -1466,6 +1468,8 @@ describe("PracticePocScreen", () => {
 
   it("shows a review queue before starting due reviews", () => {
     const service = createMobilePracticeService("random1000");
+    const oldestDueDate = formatLocalCalendarDate("2026-06-21T00:00:05.000Z");
+    const lastWrongDate = formatLocalCalendarDate("2026-06-20T00:00:05.000Z");
     service.startSprint(
       { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
       "2026-06-20T00:00:00.000Z"
@@ -1506,8 +1510,8 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "Due Today");
     expect(findByTestId(renderer, "review-due-card").props.accessibilityLabel).toContain("All due · Ready now");
     expect(collectText(findByTestId(renderer, "review-due-summary"))).toBe("Ready now");
-    expect(collectText(findByTestId(renderer, "review-next-due"))).toBe("Oldest: 2026-06-21");
-    expect(findByTestId(renderer, "review-next-due").props.accessibilityLabel).toBe("Oldest due 2026-06-21");
+    expect(collectText(findByTestId(renderer, "review-next-due"))).toBe(`Oldest: ${oldestDueDate}`);
+    expect(findByTestId(renderer, "review-next-due").props.accessibilityLabel).toBe(`Oldest due ${oldestDueDate}`);
     expect(collectText(findByTestId(renderer, "review-due-count"))).toBe("1");
     expect(collectText(findByTestId(renderer, "review-overdue-count"))).toBe("0");
     expect(hasStyleEntry(findByTestId(renderer, "review-overdue-count"), "fontSize", 0)).toBe(false);
@@ -1515,7 +1519,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "review-total-count"))).toBe("1");
     expect(collectText(findByTestId(renderer, "review-due-secondary-summary"))).toBe("0 overdue · 1 total");
     expect(collectText(findByTestId(renderer, "review-difficulty-medium"))).toContain("Ready now");
-    expectText(renderer, "Oldest: 2026-06-21");
+    expectText(renderer, `Oldest: ${oldestDueDate}`);
     expectText(renderer, "Start Review");
     expect(findByTestId(renderer, "review-start-due")).toBeTruthy();
     expect(() => findByTestId(renderer, "review-session")).toThrow();
@@ -1537,7 +1541,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "review-context-list")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "review-context-list"))).toContain("Standard · 20s pace");
     expect(collectText(findByTestId(renderer, "review-context-list"))).not.toContain("standard 5/20");
-    expectText(renderer, "Last wrong 2026-06-20");
+    expectText(renderer, `Last wrong ${lastWrongDate}`);
     expectText(renderer, "1d interval");
     expectText(renderer, "Standard · 20s pace");
     expect(collectText(renderer.root)).not.toContain("Source sprint:");
@@ -1572,11 +1576,11 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "review-start-due").props.accessibilityState).toEqual({ disabled: true });
     expect(collectText(findByTestId(renderer, "review-due-summary"))).toBe("No matching scheduled reviews");
     expect(collectText(findByTestId(renderer, "review-active-filter-summary"))).toContain("Arrow Duel only");
-    expect(collectText(renderer.root)).not.toContain("Last wrong 2026-06-20");
+    expect(collectText(renderer.root)).not.toContain(`Last wrong ${lastWrongDate}`);
     press(renderer, "review-filter-speed-20");
     expect(collectText(findByTestId(renderer, "review-due-summary"))).toBe("Ready now");
-    expect(collectText(findByTestId(renderer, "review-next-due"))).toBe("Oldest: 2026-06-21");
-    expect(findByTestId(renderer, "review-next-due").props.accessibilityLabel).toBe("Oldest due 2026-06-21");
+    expect(collectText(findByTestId(renderer, "review-next-due"))).toBe(`Oldest: ${oldestDueDate}`);
+    expect(findByTestId(renderer, "review-next-due").props.accessibilityLabel).toBe(`Oldest due ${oldestDueDate}`);
     expect(findByTestId(renderer, "review-due-card").props.accessibilityLabel).toContain("20s pace · Ready now");
     expect(collectText(findByTestId(renderer, "review-due-count"))).toBe("1");
     expect(collectText(findByTestId(renderer, "review-active-filter-summary"))).toContain("20s pace");
@@ -1584,8 +1588,8 @@ describe("PracticePocScreen", () => {
     press(renderer, "review-difficulty-medium");
     expect(findByTestId(renderer, "review-difficulty-medium").props.accessibilityState).toEqual({ selected: true });
     expect(collectText(findByTestId(renderer, "review-due-summary"))).toBe("Ready now");
-    expect(collectText(findByTestId(renderer, "review-next-due"))).toBe("Oldest: 2026-06-21");
-    expect(findByTestId(renderer, "review-next-due").props.accessibilityLabel).toBe("Oldest due 2026-06-21");
+    expect(collectText(findByTestId(renderer, "review-next-due"))).toBe(`Oldest: ${oldestDueDate}`);
+    expect(findByTestId(renderer, "review-next-due").props.accessibilityLabel).toBe(`Oldest due ${oldestDueDate}`);
     expect(findByTestId(renderer, "review-due-card").props.accessibilityLabel).toContain("Medium reviews · Ready now");
     expect(collectText(findByTestId(renderer, "review-active-filter-summary"))).toContain("Medium reviews");
     expect(collectText(findByTestId(renderer, "review-due-count"))).toBe("1");
@@ -1673,7 +1677,7 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "review-empty-state")).toBeTruthy();
     expectText(renderer, "No reviews due today");
-    expectText(renderer, "Next review due 2099-01-02");
+    expectText(renderer, `Next review due ${formatLocalCalendarDate("2099-01-02T00:00:05.000Z")}`);
     expect(findByTestId(renderer, "review-start-due").props.accessibilityState).toEqual({ disabled: true });
   });
 

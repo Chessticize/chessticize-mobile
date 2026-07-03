@@ -162,6 +162,9 @@ Scheduler polish (low priority):
     a 1-based persisted count but use it as a 0-based interval index, so the
     first correct review schedules 24h and the second schedules 72h.
 15. Next-due dates render as UTC calendar days; use local-time formatting.
+    Status: complete. Review and history due-date labels now use a shared local
+    calendar formatter instead of slicing UTC ISO strings, with a timezone
+    regression test covering the previous off-by-one-day case.
 
 ## Milestone 4 — Review reminder notifications
 
