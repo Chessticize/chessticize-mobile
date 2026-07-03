@@ -6122,10 +6122,9 @@ function SettingsPanel({
           testID="settings-app-version"
         />
         <SettingsRow
-          label="License"
-          value="GPL"
-          detail="Stockfish integration keeps the app open source"
-          showDetail={false}
+          label="License & Source"
+          value="GPL-3.0-or-later"
+          detail="Stockfish 18 embedded. Public source: github.com/Chessticize/chessticize-mobile"
           testID="settings-license"
         />
       </SettingsSection>
