@@ -360,6 +360,10 @@ Custom sprint behavior:
 - History includes correct and wrong Scheduled Review attempts.
 - History excludes Analysis Review exploration and retry moves.
 - Each row should show result, source type, mode, puzzle rating, elapsed time, date, and review status.
+- Row review status and difficulty must be resolved by the full attempt context
+  (`puzzleId + mode + ratingKey`), not by `puzzleId` alone. The same puzzle can
+  appear in multiple sprint modes or ELO buckets, and a queued review date from
+  one bucket must never appear on another bucket's row.
 - Tapping a row opens Analysis Review with original attempt context.
 - Analysis Review launched from History supports retry, Stockfish analysis, and previous/next navigation through the current filtered History result set.
 - Previous/next navigation from History follows the active filter result order, not just the currently visible page.

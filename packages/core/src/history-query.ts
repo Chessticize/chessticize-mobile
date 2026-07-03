@@ -66,6 +66,8 @@ export interface HistoryEloPoint {
 
 export interface HistoryPuzzleStats {
   puzzleId: string;
+  mode: SprintMode;
+  ratingKey: string;
   correctCount: number;
   wrongCount: number;
   lastWrongAt?: string;
@@ -266,18 +268,25 @@ export function historyAttemptHasReviewQueued(
   );
 }
 
+export function historyAttemptReviewKey(input: Pick<HistoryAttemptView | ReviewQueueState, "puzzleId" | "mode" | "ratingKey">): string {
+  return `${input.puzzleId}\u0000${input.mode}\u0000${input.ratingKey}`;
+}
+
 export function buildHistoryPuzzleStats(
   attempts: HistoryAttemptView[],
   reviews: ReviewQueueState[]
 ): HistoryPuzzleStats[] {
-  const reviewsByPuzzle = new Map(reviews.map((review) => [review.puzzleId, review]));
+  const reviewsByAttemptKey = new Map(reviews.map((review) => [historyAttemptReviewKey(review), review]));
   const stats = new Map<string, HistoryPuzzleStats>();
 
   for (const attempt of attempts) {
+    const statsKey = historyAttemptReviewKey(attempt);
     const current =
-      stats.get(attempt.puzzleId) ??
+      stats.get(statsKey) ??
       {
         puzzleId: attempt.puzzleId,
+        mode: attempt.mode,
+        ratingKey: attempt.ratingKey,
         correctCount: 0,
         wrongCount: 0
       };
@@ -291,14 +300,18 @@ export function buildHistoryPuzzleStats(
       }
     }
 
-    const review = reviewsByPuzzle.get(attempt.puzzleId);
+    const review = reviewsByAttemptKey.get(statsKey);
     if (review) {
       current.nextReviewAt = review.dueAt;
     }
-    stats.set(attempt.puzzleId, current);
+    stats.set(statsKey, current);
   }
 
-  return [...stats.values()].sort((left, right) => left.puzzleId.localeCompare(right.puzzleId));
+  return [...stats.values()].sort((left, right) =>
+    left.puzzleId.localeCompare(right.puzzleId) ||
+    left.mode.localeCompare(right.mode) ||
+    left.ratingKey.localeCompare(right.ratingKey)
+  );
 }
 
 export function buildHistoryPerformance(
@@ -323,7 +336,7 @@ export function buildHistoryPerformance(
       solved: buildAttemptPerformanceChart(attempts, "solved"),
       "mistake-rate": buildAttemptPerformanceChart(attempts, "mistake-rate"),
       "review-due": puzzleStats.map((stats, index) => ({
-        key: `${stats.puzzleId}-${index}`,
+        key: `${historyAttemptReviewKey(stats)}-${index}`,
         value: (stats.nextReviewAt ? 1 : 0) + Math.max(0, stats.wrongCount - stats.correctCount)
       }))
     }

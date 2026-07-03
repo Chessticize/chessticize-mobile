@@ -72,6 +72,10 @@ History:
 4. Row review-queue membership matches by `puzzleId` only while the
    review-status filter matches `puzzleId + mode + ratingKey`; a row can show a
    due date from another mode's queue entry. Unify on the keyed match.
+   Status: complete. History puzzle stats, row lookup, and the review-status
+   filter now all use the same `puzzleId + mode + ratingKey` key, so queue
+   labels and difficulty badges cannot leak across sprint modes or rating
+   buckets for the same puzzle.
 5. Review-source rows render 0s elapsed (`startedAt` defaults to
    `completedAt`). Record real elapsed time for scheduled review attempts.
 

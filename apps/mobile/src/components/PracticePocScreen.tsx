@@ -24,6 +24,7 @@ import {
   currentExpectedMove,
   defaultSprintConfig,
   formatSideToMoveScore,
+  historyAttemptReviewKey,
   historyAttemptSpeedSeconds,
   submitArrowDuelChoice,
   submitLineMove
@@ -3199,7 +3200,7 @@ function HistoryPanel({
 }): React.JSX.Element {
   const [chartMetric, setChartMetric] = useState<HistoryChartMetric>("rating");
   const [filtersExpanded, setFiltersExpanded] = useState(false);
-  const puzzleStatsById = new Map(puzzleStats.map((stats) => [stats.puzzleId, stats]));
+  const puzzleStatsByAttemptKey = new Map(puzzleStats.map((stats) => [historyAttemptReviewKey(stats), stats]));
   const visibleAttempts = attempts;
   const correct = performance.correctCount;
   const wrong = performance.wrongCount;
@@ -3390,7 +3391,7 @@ function HistoryPanel({
         <HistoryAttemptRow
           key={attempt.id}
           attempt={attempt}
-          puzzleStats={puzzleStatsById.get(attempt.puzzleId)}
+          puzzleStats={puzzleStatsByAttemptKey.get(historyAttemptReviewKey(attempt))}
           onOpen={() => onOpenAttempt(attempt.id)}
         />
       ))}

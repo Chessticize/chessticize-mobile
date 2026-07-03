@@ -8,8 +8,9 @@ import {
   seededPuzzleCount,
   seededUniquePositionCount
 } from "../src/backend/mobilePractice";
-import { fixtureNeedsAtLeast } from "../../../packages/storage/src/practice-service";
-import type { ArrowDuelState, SprintState, UciEngineTransport } from "../../../packages/core/src/index";
+import { fixtureNeedsAtLeast, PracticeService } from "../../../packages/storage/src/practice-service";
+import { MemoryStore } from "../../../packages/storage/src/memory-store";
+import type { ArrowDuelState, AttemptEvent, Puzzle, SprintState, UciEngineTransport } from "../../../packages/core/src/index";
 
 const renderers: TestRenderer.ReactTestRenderer[] = [];
 
@@ -1240,6 +1241,43 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "history-chart-value"))).toBe("9%");
   });
 
+  it("keeps history row review status keyed by puzzle, mode, and rating bucket", () => {
+    const store = new MemoryStore();
+    store.seedPuzzles([sharedHistoryPuzzle()]);
+    store.saveRating({ key: "arrow duel 5/30", generation: 0, rating: 600, games: 1 });
+    store.saveRating({ key: "standard 5/20", generation: 0, rating: 600, games: 1 });
+    store.recordAttempt(historyAttempt({
+      id: "arrow-attempt",
+      mode: "arrow_duel",
+      ratingKey: "arrow duel 5/30",
+      completedAt: "2026-06-20T00:01:00.000Z"
+    }));
+    store.recordAttempt(historyAttempt({
+      id: "standard-attempt",
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      completedAt: "2026-06-20T00:00:00.000Z"
+    }));
+    store.scheduleMistakeReview({
+      puzzleId: "shared-history",
+      mode: "arrow_duel",
+      ratingKey: "arrow duel 5/30"
+    }, "2026-06-20T00:01:00.000Z");
+    const renderer = renderScreen({ practiceService: new PracticeService(store) });
+
+    press(renderer, "history-tab");
+    press(renderer, "history-range-max");
+    expect(collectText(findByTestId(renderer, "history-performance-context"))).toBe("Arrow Duel · 30s pace · All Time");
+    expect(collectText(findByTestId(renderer, "history-attempt-arrow-attempt-review-state"))).toBe("Review 2026-06-21");
+    expect(collectText(findByTestId(renderer, "history-attempt-arrow-attempt-difficulty"))).toBe("Hard");
+
+    press(renderer, "history-filter-toggle");
+    press(renderer, "history-rating-standard 5/20");
+    expect(collectText(findByTestId(renderer, "history-performance-context"))).toBe("Standard · 20s pace · All Time");
+    expect(collectText(findByTestId(renderer, "history-attempt-standard-attempt-review-state"))).toBe("Review queued");
+    expect(collectText(findByTestId(renderer, "history-attempt-standard-attempt-difficulty"))).toBe("Medium");
+  });
+
   it("keeps history analysis review on the current puzzle after a retry is solved", async () => {
     const service = createMobilePracticeService("random1000");
     const renderer = renderScreen({ practiceService: service });
@@ -2338,6 +2376,41 @@ function firstArrowDuelPuzzleForTest(): ArrowDuelState {
     maxMistakes: 3
   });
   return requireArrowDuelState(state);
+}
+
+function sharedHistoryPuzzle(): Puzzle {
+  return {
+    id: "shared-history",
+    initialFen: "4k3/8/8/8/8/8/4P3/4K3 w - - 0 1",
+    solutionMoves: ["e2e4"],
+    rating: 900,
+    themes: ["fork"],
+    source: "lichess",
+    stockfishBestMove: "e2e3"
+  };
+}
+
+function historyAttempt(input: {
+  id: string;
+  mode: AttemptEvent["mode"];
+  ratingKey: string;
+  completedAt: string;
+}): AttemptEvent {
+  return {
+    id: input.id,
+    source: "sprint",
+    sessionId: `session-${input.id}`,
+    puzzleId: "shared-history",
+    mode: input.mode,
+    ratingKey: input.ratingKey,
+    result: "wrong",
+    submittedMove: "e2e4",
+    expectedMove: "e2e3",
+    startedAt: "2026-06-20T00:00:00.000Z",
+    completedAt: input.completedAt,
+    ratingBefore: 600,
+    ratingAfter: 580
+  };
 }
 
 function currentArrowWrongMove(state: SprintState): string {

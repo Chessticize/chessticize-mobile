@@ -139,6 +139,8 @@ test("PracticeService builds SQLite history view for a required time range and r
     assert.deepEqual(view.puzzleStats, [
       {
         puzzleId: "000hf",
+        mode: "standard",
+        ratingKey: "standard 5/20",
         correctCount: 0,
         wrongCount: 1,
         lastWrongAt: "2026-06-20T00:00:05.000Z",
