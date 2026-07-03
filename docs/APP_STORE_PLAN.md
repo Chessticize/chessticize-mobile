@@ -281,6 +281,14 @@ Design approved 2026-07-03; the "Review Reminder Notifications" section of
    target metadata and compact/modern portrait layout smoke renders.
 6. **Store assets**: screenshots (6.7" and 6.1" minimum), description,
    keywords, support URL.
+   Status: implementation complete. `docs/STORE_ASSETS.md` now records the
+   1.0 App Store Connect metadata draft, including description, subtitle,
+   promotional text, keywords, support URL, privacy policy URL, category
+   choices, screenshot scenes, capture checklist, and the current Apple
+   screenshot-spec source of truth. The committed validation test enforces the
+   metadata character/byte limits and required public URLs. Release-time
+   execution still requires final sanitized screenshots from a release or
+   production-like build before uploading to App Store Connect.
 7. **TestFlight pass**: internal build, manual QA checklist covering the E2E
    flow list below on a physical device, including kill-and-relaunch
    persistence and offline (airplane-mode) practice.

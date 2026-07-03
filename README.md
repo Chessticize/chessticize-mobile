@@ -9,6 +9,7 @@ The repository contains the React Native app shell (`apps/mobile`), a pure TypeS
 - [Mobile UI Design](docs/ui-design/MOBILE_UI_DESIGN.md) — authoritative screen behavior and visual spec
 - [Core Library And CLI](docs/CORE_CLI.md) — backend package layout and CLI harness
 - [App Store Plan](docs/APP_STORE_PLAN.md) — active goal and milestone plan toward the 1.0 submission
+- [App Store Assets](docs/STORE_ASSETS.md) — 1.0 App Store metadata and screenshot capture plan
 - [Privacy Policy](docs/PRIVACY_POLICY.md) — 1.0 local-only data and tracking disclosure
 - [iOS Device Targets](docs/DEVICE_TARGETS.md) — 1.0 iPhone-only, portrait-only release target
 - [Agent Instructions](AGENTS.md) — architecture boundary, testing philosophy, and PR workflow
@@ -47,6 +48,13 @@ pnpm --filter ChessticizeMobile ios --terminal dumb --no-packager --simulator "i
 ```
 
 Use the simulator only for native behavior or final GUI checks: real gesture rendering, safe areas, Skia/chessboard rendering, animation, native module behavior, iOS build issues, Detox, or critical end-to-end acceptance.
+
+## Support
+
+For app issues, general feedback, or feature requests, use
+https://github.com/Chessticize/chessticize-mobile/issues. If you need to reach
+the project maintainers privately before a dedicated support address is added,
+open a GitHub issue requesting a private contact path.
 
 ## Product Direction
 
