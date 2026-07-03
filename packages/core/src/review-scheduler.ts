@@ -13,7 +13,7 @@ export function scheduleReview(input: ReviewScheduleInput): ReviewQueueState {
 
   if (!input.previous) {
     const context = input.context ?? defaultReviewContext();
-    const intervalHours = input.result === "correct" ? successIntervalAt(1) : successIntervalAt(0);
+    const intervalHours = successIntervalAt(0);
     return {
       ...context,
       dueAt: addHours(nowDate, intervalHours).toISOString(),
@@ -41,7 +41,7 @@ export function scheduleReview(input: ReviewScheduleInput): ReviewQueueState {
   }
 
   const successStreak = input.previous.successStreak + 1;
-  const intervalHours = successIntervalAt(successStreak);
+  const intervalHours = successIntervalAt(successStreak - 1);
   return {
     ...input.previous,
     dueAt: addHours(nowDate, intervalHours).toISOString(),

@@ -91,6 +91,22 @@ test("MemoryStore sprint misses do not count as failed scheduled review lapses",
   assert.equal(failedReview.lapseCount, 1);
 });
 
+test("MemoryStore review result updates start at one day before expanding", () => {
+  const store = new MemoryStore();
+  const context = { puzzleId: "00008", mode: "standard" as const, ratingKey: "standard 5/20" };
+  store.scheduleMistakeReview(context, "2026-06-20T00:00:00.000Z");
+
+  const success = store.recordReviewResult(context, "correct", "2026-06-21T00:00:00.000Z");
+  assert.equal(success.dueAt, "2026-06-22T00:00:00.000Z");
+  assert.equal(success.intervalHours, 24);
+  assert.equal(success.successStreak, 1);
+
+  const secondSuccess = store.recordReviewResult(context, "correct", "2026-06-22T00:00:00.000Z");
+  assert.equal(secondSuccess.dueAt, "2026-06-25T00:00:00.000Z");
+  assert.equal(secondSuccess.intervalHours, 72);
+  assert.equal(secondSuccess.successStreak, 2);
+});
+
 test("PracticeService prunes orphaned MemoryStore review queue rows", async () => {
   const store = new MemoryStore();
   store.seedPuzzles(await loadFixturePuzzles());
@@ -510,7 +526,7 @@ test("PracticeService records official MemoryStore reviews in history without mi
       correctCount: 1,
       wrongCount: 1,
       lastWrongAt: "2026-06-20T00:00:05.000Z",
-      nextReviewAt: "2026-06-24T00:00:05.000Z"
+      nextReviewAt: "2026-06-22T00:00:05.000Z"
     }
   ]);
 

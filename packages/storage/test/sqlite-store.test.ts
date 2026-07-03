@@ -550,11 +550,17 @@ test("SQLite review result updates expand and contract the persisted review sche
     store.scheduleMistakeReview(context, "2026-06-20T00:00:00.000Z");
 
     const success = store.recordReviewResult(context, "correct", "2026-06-21T00:00:00.000Z");
-    assert.equal(success.dueAt, "2026-06-24T00:00:00.000Z");
+    assert.equal(success.dueAt, "2026-06-22T00:00:00.000Z");
+    assert.equal(success.intervalHours, 24);
     assert.equal(success.successStreak, 1);
 
-    const wrong = store.recordReviewResult(context, "wrong", "2026-06-22T00:00:00.000Z");
-    assert.equal(wrong.dueAt, "2026-06-22T06:00:00.000Z");
+    const secondSuccess = store.recordReviewResult(context, "correct", "2026-06-22T00:00:00.000Z");
+    assert.equal(secondSuccess.dueAt, "2026-06-25T00:00:00.000Z");
+    assert.equal(secondSuccess.intervalHours, 72);
+    assert.equal(secondSuccess.successStreak, 2);
+
+    const wrong = store.recordReviewResult(context, "wrong", "2026-06-23T00:00:00.000Z");
+    assert.equal(wrong.dueAt, "2026-06-23T06:00:00.000Z");
     assert.equal(wrong.successStreak, 0);
     assert.equal(wrong.lapseCount, 1);
   } finally {
@@ -650,7 +656,7 @@ test("SQLite review result without an existing queue row is counted once", async
     const correct = store.recordReviewResult(reviewContext("000hf"), "correct", "2026-06-20T00:00:00.000Z");
     assert.equal(correct.reviewCount, 1);
     assert.equal(correct.successStreak, 1);
-    assert.equal(correct.dueAt, "2026-06-23T00:00:00.000Z");
+    assert.equal(correct.dueAt, "2026-06-21T00:00:00.000Z");
   } finally {
     store.close();
   }
