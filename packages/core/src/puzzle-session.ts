@@ -77,7 +77,12 @@ export function submitLineMove(state: PuzzleLineState, move: string): {
   };
 }
 
-export function beginArrowDuelPuzzle(puzzle: Puzzle, seed: string | number = 0): ArrowDuelState {
+export interface BeginArrowDuelPuzzleOptions {
+  seed?: string | number;
+  candidateOrder?: string[];
+}
+
+export function beginArrowDuelPuzzle(puzzle: Puzzle, seedOrOptions: string | number | BeginArrowDuelPuzzleOptions = 0): ArrowDuelState {
   const wrongMove = puzzle.solutionMoves[0];
   const correctMove = puzzle.stockfishBestMove;
   if (!wrongMove) {
@@ -90,7 +95,15 @@ export function beginArrowDuelPuzzle(puzzle: Puzzle, seed: string | number = 0):
     throw new Error(`Puzzle ${puzzle.id} is not eligible for Arrow Duel`);
   }
 
-  const candidates = hashSeed(seed) % 2 === 0 ? [correctMove, wrongMove] : [wrongMove, correctMove];
+  const options = typeof seedOrOptions === "object" ? seedOrOptions : { seed: seedOrOptions };
+  const candidates = options.candidateOrder
+    ? validateArrowDuelCandidateOrder({
+      puzzleId: puzzle.id,
+      candidateOrder: options.candidateOrder,
+      correctMove,
+      wrongMove
+    })
+    : hashSeed(options.seed ?? 0) % 2 === 0 ? [correctMove, wrongMove] : [wrongMove, correctMove];
   return {
     kind: "arrow_duel",
     puzzle,
@@ -100,6 +113,20 @@ export function beginArrowDuelPuzzle(puzzle: Puzzle, seed: string | number = 0):
     wrongMove,
     solved: false
   };
+}
+
+function validateArrowDuelCandidateOrder(input: {
+  puzzleId: string;
+  candidateOrder: string[];
+  correctMove: string;
+  wrongMove: string;
+}): string[] {
+  const normalizedOrder = input.candidateOrder.map(normalizeMove);
+  const expected = new Set([normalizeMove(input.correctMove), normalizeMove(input.wrongMove)]);
+  if (normalizedOrder.length !== 2 || new Set(normalizedOrder).size !== 2 || normalizedOrder.some((move) => !expected.has(move))) {
+    throw new Error(`Stored Arrow Duel candidate order for puzzle ${input.puzzleId} does not match its candidate moves`);
+  }
+  return input.candidateOrder;
 }
 
 export function submitArrowDuelChoice(state: ArrowDuelState, move: string): {

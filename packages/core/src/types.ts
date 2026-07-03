@@ -143,6 +143,7 @@ export interface AttemptEvent {
   completedAt: string;
   ratingBefore: number;
   ratingAfter?: number;
+  arrowDuelCandidateOrder?: string[];
 }
 
 export interface SessionMistakeReviewItem {

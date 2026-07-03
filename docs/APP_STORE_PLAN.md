@@ -133,6 +133,11 @@ Arrow Duel / analysis:
     review reconstruction uses a default seed, so replayed A/B order can differ
     from what the user actually saw. Persist the order (or seed) on the attempt
     and reuse it in review (spec requires stored-with-attempt).
+    Status: complete. Arrow Duel attempts now persist the displayed candidate
+    order in MemoryStore and SQLite, including scheduled-review attempts.
+    History and post-sprint review reconstruction pass that stored order back
+    into the Arrow Duel domain state, with SQLite migration coverage for
+    existing `attempts` tables.
 12. The Analysis panel's candidate list is empty at checkmate; the `1-0`/`0-1`
     terminal line exists but only renders on the guided review path. Inject it
     into the Analysis list too.

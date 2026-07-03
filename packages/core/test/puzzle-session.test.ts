@@ -109,6 +109,21 @@ test("Arrow Duel exposes two candidates and marks review arrows after a wrong ch
   ]);
 });
 
+test("Arrow Duel can replay a persisted candidate order", () => {
+  const state = beginArrowDuelPuzzle(samplePuzzle("00008"), { candidateOrder: ["f2g3", "b2b1"] });
+
+  assert.deepEqual(state.candidates, ["f2g3", "b2b1"]);
+  assert.equal(state.correctMove, "b2b1");
+  assert.equal(state.wrongMove, "f2g3");
+});
+
+test("Arrow Duel rejects a persisted candidate order that does not match the puzzle", () => {
+  assert.throws(
+    () => beginArrowDuelPuzzle(samplePuzzle("00008"), { candidateOrder: ["f2g3", "a1a8"] }),
+    /does not match its candidate moves/
+  );
+});
+
 test("Arrow Duel rejects moves outside the displayed candidates without creating feedback", () => {
   const state = beginArrowDuelPuzzle(samplePuzzle("00008"));
 

@@ -35,4 +35,5 @@ export interface AttemptHistoryRow {
   completedAt: string;
   ratingBefore: number;
   ratingAfter?: number;
+  arrowDuelCandidateOrder?: string[];
 }

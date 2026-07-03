@@ -176,6 +176,27 @@ test("Arrow Duel candidate ordering is stable for one attempt and seeded by the 
   assert.notDeepEqual(first.currentPuzzle?.candidates, second.currentPuzzle?.candidates);
 });
 
+test("Arrow Duel attempts store the displayed candidate order", () => {
+  const state = startSprint({
+    id: "session-b",
+    config: buildSprintConfig({
+      mode: "arrow_duel",
+      durationSeconds: 300,
+      perPuzzleSeconds: 30,
+      targetCorrect: 1,
+      maxMistakes: 3
+    }),
+    puzzles: [samplePuzzle("p1")],
+    ratingBefore: 600,
+    now: NOW
+  });
+
+  assert.equal(state.currentPuzzle?.kind, "arrow_duel");
+  const result = submitSprintMove(state, state.currentPuzzle.candidates[1] as string, "2026-06-20T00:00:01.000Z");
+
+  assert.deepEqual(result.attempt?.arrowDuelCandidateOrder, state.currentPuzzle.candidates);
+});
+
 test("a target-one correct Arrow Duel sprint completes immediately", () => {
   const state = startSprint({
     config: buildSprintConfig({

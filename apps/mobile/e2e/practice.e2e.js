@@ -3,12 +3,12 @@ const zlib = require('zlib');
 const {
   sleep,
   frameFor,
-  playBoardMove,
   startPracticeMode,
   selectTestPuzzleSource,
   waitForVisibleInPracticeScroll,
   waitForElementTextContaining,
-  boardPoint
+  boardPoint,
+  failStandardSprint
 } = require('./helpers');
 
 describe('Practice POC', () => {
@@ -62,17 +62,7 @@ describe('Practice POC', () => {
   });
 
   it('opens last sprint mistake review with navigation and analysis arrows', async () => {
-    await selectTestPuzzleSource('familiar15');
-    await startPracticeMode('standard');
-    await waitForVisibleInPracticeScroll('session-board');
-
-    await playBoardMove('session-board', 'c2b3');
-    await sleep(1100);
-    await playBoardMove('session-board', 'c4b5');
-    await sleep(1100);
-    await playBoardMove('session-board', 'g6g5', true);
-
-    await waitFor(element(by.text('Sprint failed'))).toBeVisible().withTimeout(10000);
+    await failStandardSprint();
     await waitFor(element(by.id('review-mistakes-button'))).toBeVisible().withTimeout(10000);
     await element(by.id('review-mistakes-button')).tap();
 

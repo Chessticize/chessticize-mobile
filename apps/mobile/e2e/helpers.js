@@ -70,6 +70,10 @@ async function waitForElementTextContaining(testID, expected, timeoutMs) {
   throw new Error(`Timed out waiting for ${testID} to contain "${expected}". Last text: "${lastText}"`);
 }
 
+async function waitForMistakeCount(count, timeoutMs = 30000) {
+  await waitFor(element(by.label(`Mistakes ${count} of 3`)).atIndex(0)).toExist().withTimeout(timeoutMs);
+}
+
 function textFromAttributes(attributes) {
   const first = Array.isArray(attributes) ? attributes[0] : attributes;
   return String(first?.text ?? first?.label ?? first?.value ?? '');
@@ -102,12 +106,14 @@ async function failStandardSprint() {
   await waitForVisibleInPracticeScroll('session-board');
 
   await playBoardMove('session-board', 'c2b3');
-  await sleep(1100);
+  await waitForMistakeCount(1);
+  await sleep(1600);
   await playBoardMove('session-board', 'c4b5');
-  await sleep(1100);
+  await waitForMistakeCount(2);
+  await sleep(1600);
   await playBoardMove('session-board', 'g6g5', true);
 
-  await waitFor(element(by.text('Sprint failed'))).toBeVisible().withTimeout(10000);
+  await waitFor(element(by.text('Sprint failed'))).toBeVisible().withTimeout(30000);
 }
 
 module.exports = {

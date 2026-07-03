@@ -256,6 +256,7 @@ Arrow Duel active-session rules:
 
 Arrow Duel review rules:
 
+- Review reconstruction must reuse the candidate order stored on the original attempt. It must not generate a fresh default order for History, post-sprint Analysis Review, or scheduled-review replay.
 - Green always means the best move.
 - Red always means the inferior candidate.
 - User-selected wrong move receives an additional marker that is distinguishable without color alone (currently the "You chose" text pill on the review surface).
