@@ -316,7 +316,8 @@ asserting through public UI and stable testIDs):
 6. Settings: reset ELO with confirmation; delete local history with
    confirmation; status messages. *(added 2026-07-03)*
 7. Relaunch persistence: kill and relaunch, assert rating/history/queue intact.
-   *(blocked on Milestone 1.)*
+   *(added 2026-07-03; strengthened to assert persisted review queue totals
+   after relaunch.)*
 8. Scheduled due review completion (needs a time-travel or fixture seam to make
    items due within a test run — design a public fixture path per AGENTS.md,
    never a test-only backdoor in product code). *(blocked on Milestone 1.)*
