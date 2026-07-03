@@ -56,6 +56,7 @@ describe('Key user flows', () => {
 
   it('schedules failed sprint mistakes into the review queue', async () => {
     await failStandardSprint();
+    await dismissSprintSummary();
 
     await element(by.id('review-tab')).tap();
     await waitFor(element(by.id('review-panel'))).toBeVisible().withTimeout(10000);
@@ -67,21 +68,22 @@ describe('Key user flows', () => {
 
   it('shows failed attempts in history with the wrong-7-days shortcut', async () => {
     await failStandardSprint();
+    await dismissSprintSummary();
 
     await element(by.id('history-tab')).tap();
     await waitFor(element(by.id('history-panel'))).toBeVisible().withTimeout(10000);
     await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
     await expect(element(by.id('history-performance-card'))).toExist();
 
+    await waitForVisibleInPracticeScroll('history-filter-wrong-7-days');
     await element(by.id('history-filter-wrong-7-days')).tap();
     await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
   });
 
   it('configures and starts a custom sprint', async () => {
-    await selectTestPuzzleSource('familiar15');
     await waitForVisibleInPracticeScroll('practice-mode-custom');
     await element(by.id('practice-mode-custom')).tap();
-    await waitFor(element(by.id('custom-sprint-setup'))).toBeVisible().withTimeout(10000);
+    await waitForVisibleInPracticeScroll('custom-sprint-setup');
 
     await waitForElementTextContaining('custom-target-count', '15', 5000);
     await element(by.id('custom-duration-stepper-decrease')).tap();
@@ -100,14 +102,22 @@ describe('Key user flows', () => {
     await element(by.id('settings-tab')).tap();
     await waitForVisibleInPracticeScroll('settings-reset-elo');
     await element(by.id('settings-reset-elo')).tap();
-    await waitFor(element(by.id('settings-reset-elo-confirmation'))).toBeVisible().withTimeout(5000);
+    await waitForVisibleInPracticeScroll('settings-reset-elo-confirmation-confirm');
     await element(by.id('settings-reset-elo-confirmation-confirm')).tap();
-    await waitFor(element(by.id('settings-status-message'))).toBeVisible().withTimeout(5000);
+    await waitForVisibleInPracticeScroll('settings-status-message');
 
+    await element(by.id('practice-main-scroll')).scrollTo('top');
     await waitForVisibleInPracticeScroll('settings-delete-local-history');
     await element(by.id('settings-delete-local-history')).tap();
-    await waitFor(element(by.id('settings-delete-history-confirmation'))).toBeVisible().withTimeout(5000);
+    await waitForVisibleInPracticeScroll('settings-delete-history-confirmation-confirm');
     await element(by.id('settings-delete-history-confirmation-confirm')).tap();
-    await waitFor(element(by.id('settings-status-message'))).toBeVisible().withTimeout(5000);
+    await waitForVisibleInPracticeScroll('settings-status-message');
   });
 });
+
+async function dismissSprintSummary() {
+  // The app chrome (tab bar) is hidden while the sprint summary is open;
+  // leave via Done before navigating tabs.
+  await element(by.id('back-practice-button')).tap();
+  await waitFor(element(by.id('practice-tab'))).toBeVisible().withTimeout(10000);
+}
