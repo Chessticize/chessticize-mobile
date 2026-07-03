@@ -237,7 +237,6 @@ export function PracticePocScreen({
   const [boardInputLocked, setBoardInputLocked] = useState(false);
   const [sessionLoading, setSessionLoading] = useState(false);
   const [chessboardDebugEvents, setChessboardDebugEvents] = useState<string[]>([]);
-  const [historyWrongLast7Days, setHistoryWrongLast7Days] = useState(false);
   const [historyTimeRange, setHistoryTimeRange] = useState<HistoryTimeRange>("7d");
   const [historySourceFilter, setHistorySourceFilter] = useState<"all" | AttemptSource>("all");
   const [historyResultFilter, setHistoryResultFilter] = useState<"all" | "correct" | "wrong">("all");
@@ -1046,6 +1045,7 @@ export function PracticePocScreen({
     [attempts, service]
   );
   const activeHistoryRatingKey = historyRatingKey ?? historyRatingKeys[0] ?? null;
+  const historyWrongLast7Days = historyTimeRange === "7d" && historyResultFilter === "wrong";
   const historyRatingRangeQuery = historyRatingRangeFilterToQuery(historyRatingRangeFilter);
   const historyView = activeHistoryRatingKey
     ? service.getHistoryView({
@@ -1383,10 +1383,13 @@ export function PracticePocScreen({
               onPageOffsetChange={setHistoryPageOffset}
               onOpenAttempt={openHistoryReview}
               onToggleWrongLast7Days={() => {
-                setHistoryWrongLast7Days((current) => !current);
-                setHistoryTimeRange("7d");
                 setHistoryPageOffset(0);
-                setHistoryResultFilter((current) => current === "wrong" ? "all" : "wrong");
+                if (historyWrongLast7Days) {
+                  setHistoryResultFilter("all");
+                } else {
+                  setHistoryTimeRange("7d");
+                  setHistoryResultFilter("wrong");
+                }
               }}
             />
           )

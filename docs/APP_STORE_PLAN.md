@@ -66,6 +66,9 @@ History:
 3. "Wrong in the last 7 days" chip is UI state that desyncs from the actual
    query when range/result change afterward; toggling it off force-resets the
    range. Derive the chip state from the query.
+   Status: complete. The chip is selected only when the active History query is
+   exactly `7d + wrong`; changing the range or result filter updates the chip
+   automatically, and clearing the chip removes only the wrong-result filter.
 4. Row review-queue membership matches by `puzzleId` only while the
    review-status filter matches `puzzleId + mode + ratingKey`; a row can show a
    due date from another mode's queue entry. Unify on the keyed match.

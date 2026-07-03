@@ -349,6 +349,9 @@ Custom sprint behavior:
 - Quick range filters include 7 days, 30 days, 90 days, 1 year, and all time.
 - History data must be pageable, including the all-time range.
 - Quick content filters include "Wrong in the last 7 days", source type, theme, rating range, and review status.
+- "Wrong in the last 7 days" is a query shortcut, not independent UI state. It
+  is selected only when the active query is 7 days plus wrong results; changing
+  either the range or result filter updates it automatically.
 - The selected ELO bucket is required and supplies the mode, sprint config, and
   sprint-speed context in 1.0. Do not show separate History mode or speed chips
   while the view is scoped to a single bucket.
