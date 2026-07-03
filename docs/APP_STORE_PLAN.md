@@ -177,6 +177,11 @@ Design approved 2026-07-03; the "Review Reminder Notifications" section of
    hour over the trailing 14 days (minimum 5 sessions), fallback 19:00 local;
    at most one per day; none when zero items will be due. Unit-test the
    histogram, fallback, and zero-due cases first.
+   Status: complete. `packages/core` now exposes `computeNextReminder` as a
+   pure domain decision with smart, fixed, and off settings; it projects the
+   next local reminder time with a due count and Review-tab copy, and unit
+   tests cover smart history, same-session deduplication, fallback, future due
+   projection, disabled reminders, zero-due suppression, and validation.
 2. Settings persistence for the reminder preference (smart / fixed time / off)
    — depends on Milestone 1.
 3. A `ReminderScheduler` interface with a maintained fake; the real adapter
