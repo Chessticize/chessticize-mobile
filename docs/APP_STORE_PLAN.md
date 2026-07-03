@@ -115,6 +115,10 @@ Review queue:
 9. "Start Review" only starts the first context group and silently leaves the
    rest of a mixed queue due. Chain groups in sequence (or make grouped starts
    explicit in the default view).
+   Status: complete. The default Start Review action now queues every visible
+   due context group and advances into the next group when the current group
+   exits. Expanded per-group and per-item starts remain explicit single-group
+   starts.
 10. Orphaned queue entries (puzzle no longer resolvable) are hidden from the
     due list but linger in `review_queue` and inflate `totalCount`. Clean them
     up.
