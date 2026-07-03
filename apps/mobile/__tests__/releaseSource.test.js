@@ -1,0 +1,27 @@
+const { readFileSync, readdirSync, statSync } = require("node:fs");
+const { join } = require("node:path");
+
+const appRoot = process.cwd();
+
+function readSourceFiles(dir) {
+  return readdirSync(dir).flatMap((entry) => {
+    const fullPath = join(dir, entry);
+    const stat = statSync(fullPath);
+    if (stat.isDirectory()) {
+      return readSourceFiles(fullPath);
+    }
+    return /\.(js|jsx|ts|tsx)$/.test(entry) ? [readFileSync(fullPath, "utf8")] : [];
+  });
+}
+
+describe("release source configuration", () => {
+  it("keeps production-facing source free of Metro and React Native debug menu entry points", () => {
+    const source = [
+      readFileSync(join(appRoot, "App.tsx"), "utf8"),
+      readFileSync(join(appRoot, "index.js"), "utf8"),
+      ...readSourceFiles(join(appRoot, "src"))
+    ].join("\n");
+
+    expect(source).not.toMatch(/\bDevSettings\b|NativeDevSettings|localhost|127\.0\.0\.1|:8081|port 8081/);
+  });
+});
