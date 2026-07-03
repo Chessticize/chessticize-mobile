@@ -59,6 +59,10 @@ History:
    chips silently return empty pages. Either make the history view span rating
    keys with real cross-key filters, or remove the dead chips and present the
    rating-key bucket honestly.
+   Status: complete. The 1.0 History screen keeps one selected rating-key
+   bucket as the required mode/speed context and removes separate History
+   mode/speed chips that could only narrow the selected bucket into empty or
+   redundant states.
 3. "Wrong in the last 7 days" chip is UI state that desyncs from the actual
    query when range/result change afterward; toggling it off force-resets the
    range. Derive the chip state from the query.
