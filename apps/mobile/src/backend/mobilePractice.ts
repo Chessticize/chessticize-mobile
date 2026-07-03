@@ -27,29 +27,39 @@ const FAMILIAR_PUZZLE_IDS = [
   "04Phf"
 ] as const;
 
-const persistentPracticeServices = new Map<MobilePuzzleSource, PracticeService>();
+let persistentPracticeService: PracticeService | undefined;
+const seededPuzzleSources = new WeakMap<PracticeService, Set<MobilePuzzleSource>>();
 
 export function createMobilePracticeService(source: MobilePuzzleSource = DEFAULT_PUZZLE_SOURCE): PracticeService {
   const store = new MemoryStore();
-  store.seedPuzzles(puzzlesForSource(source));
-  return new PracticeService(store);
+  const service = new PracticeService(store);
+  configureMobilePracticePuzzleSource(service, source);
+  return service;
 }
 
-export function createPersistentMobilePracticeService(source: MobilePuzzleSource = DEFAULT_PUZZLE_SOURCE): PracticeService {
-  const existing = persistentPracticeServices.get(source);
-  if (existing) {
-    return existing;
+export function createPersistentMobilePracticeService(): PracticeService {
+  if (persistentPracticeService) {
+    return persistentPracticeService;
   }
 
   const { DeviceSQLiteStore } = require("./deviceSQLiteStore.ts") as typeof import("./deviceSQLiteStore.ts");
-  const store = DeviceSQLiteStore.open(databaseNameForSource(source));
+  const store = DeviceSQLiteStore.open("chessticize-mobile.sqlite");
   store.migrate();
-  if (store.countPuzzles() === 0) {
-    store.seedPuzzles(puzzlesForSource(source));
-  }
   const service = new PracticeService(store);
-  persistentPracticeServices.set(source, service);
+  configureMobilePracticePuzzleSource(service, DEFAULT_PUZZLE_SOURCE);
+  persistentPracticeService = service;
   return service;
+}
+
+export function configureMobilePracticePuzzleSource(service: PracticeService, source: MobilePuzzleSource): void {
+  const puzzles = puzzlesForSource(source);
+  const seededSources = seededPuzzleSources.get(service) ?? new Set<MobilePuzzleSource>();
+  if (!seededSources.has(source)) {
+    service.loadFixturePuzzles(puzzles);
+    seededSources.add(source);
+    seededPuzzleSources.set(service, seededSources);
+  }
+  service.setPuzzleSelectionScopeIds(puzzles.map((puzzle) => puzzle.id));
 }
 
 export function seededPuzzleCount(source: MobilePuzzleSource = DEFAULT_PUZZLE_SOURCE): number {
@@ -76,12 +86,6 @@ function puzzlesForSource(source: MobilePuzzleSource): Puzzle[] {
     return familiarPuzzles();
   }
   return regressionPuzzles;
-}
-
-function databaseNameForSource(source: MobilePuzzleSource): string {
-  return source === DEFAULT_PUZZLE_SOURCE
-    ? "chessticize-mobile.sqlite"
-    : `chessticize-mobile-${source}.sqlite`;
 }
 
 function familiarPuzzles(): Puzzle[] {

@@ -57,6 +57,7 @@ import type {
 import type { PracticeService } from "../../../../packages/storage/src/practice-service.ts";
 import type { ClearLocalHistoryResult, LocalDataExport } from "../../../../packages/storage/src/practice-store.ts";
 import {
+  configureMobilePracticePuzzleSource,
   createMobilePracticeService,
   getBundledCorePackManifest,
   seededPuzzleCount,
@@ -68,7 +69,8 @@ import { Chess, type PieceSymbol, type Square } from "chess.js";
 
 interface Props {
   practiceService?: PracticeService;
-  practiceServiceFactory?: (source: MobilePuzzleSource) => PracticeService;
+  practiceServiceFactory?: () => PracticeService;
+  configurePuzzleSource?: (service: PracticeService, source: MobilePuzzleSource) => void;
   debugTrace?: (event: PracticeDebugTraceEvent) => void;
   stockfishTransportFactory?: () => UciEngineTransport | null;
 }
@@ -195,11 +197,12 @@ const ANALYSIS_DIAGNOSTIC_POSITIONS = [
 export function PracticePocScreen({
   practiceService,
   practiceServiceFactory = createMobilePracticeService,
+  configurePuzzleSource = configureMobilePracticePuzzleSource,
   debugTrace,
   stockfishTransportFactory = createNativeStockfishTransport
 }: Props): React.JSX.Element {
   const [puzzleSource, setPuzzleSource] = useState<MobilePuzzleSource>("bundledCore");
-  const service = useMemo(() => practiceService ?? practiceServiceFactory(puzzleSource), [practiceService, practiceServiceFactory, puzzleSource]);
+  const service = useMemo(() => practiceService ?? practiceServiceFactory(), [practiceService, practiceServiceFactory]);
   const boardRef = useRef<ChessboardRef | null>(null);
   const suppressedBoardMovesRef = useRef<string[]>([]);
   const boardSyncInProgressRef = useRef(false);
@@ -282,6 +285,13 @@ export function PracticePocScreen({
   useEffect(() => {
     setCurrentRating(readRating(service, selectedConfig.ratingKey));
   }, [selectedConfig.ratingKey, service]);
+
+  useEffect(() => {
+    if (!practiceService) {
+      configurePuzzleSource(service, puzzleSource);
+      refreshState();
+    }
+  }, [configurePuzzleSource, practiceService, puzzleSource, service]);
 
   useEffect(() => {
     refreshState();
@@ -461,21 +471,11 @@ export function PracticePocScreen({
     if (isActive || practiceService) {
       return;
     }
+    if (nextSource === puzzleSource) {
+      return;
+    }
     setPuzzleSource(nextSource);
-    commitState(null);
-    setResumableSprint(null);
-    setFeedback(null);
-    setFeedbackPuzzleId(null);
-    clearFeedbackSnapshot();
     setError(null);
-    commitBoardInputLocked(false, "puzzle-source", null);
-    commitBoardFen(null);
-    setLastBoardMove(null);
-    setAttempts([]);
-    setReviews([]);
-    setDueReviewItems([]);
-    setSessionMistakeReviewItems([]);
-    setCurrentRating(600);
   }
 
   function abandonSprint(): void {
