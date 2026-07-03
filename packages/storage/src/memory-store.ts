@@ -26,7 +26,8 @@ import type {
   SprintState
 } from "../../core/src/index.ts";
 import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./query-types.ts";
-import type { ClearLocalHistoryResult, LocalDataExport, PracticeStore } from "./practice-store.ts";
+import type { ClearLocalHistoryResult, LocalDataExport, PracticeSettings, PracticeStore } from "./practice-store.ts";
+import { clonePracticeSettings, defaultPracticeSettings } from "./practice-settings.ts";
 import { selectUniquePuzzles } from "./puzzle-selection.ts";
 
 export class MemoryStore implements PracticeStore {
@@ -36,6 +37,7 @@ export class MemoryStore implements PracticeStore {
   private readonly sessions = new Map<string, SprintState>();
   private readonly attempts: AttemptEvent[] = [];
   private readonly reviewQueue = new Map<string, ReviewQueueState>();
+  private settings = defaultPracticeSettings();
 
   seedPuzzles(puzzles: Puzzle[]): void {
     for (const puzzle of puzzles) {
@@ -115,6 +117,14 @@ export class MemoryStore implements PracticeStore {
     );
   }
 
+  getSettings(): PracticeSettings {
+    return clonePracticeSettings(this.settings);
+  }
+
+  saveSettings(settings: PracticeSettings): void {
+    this.settings = clonePracticeSettings(settings);
+  }
+
   createSprintSession(state: SprintState): void {
     this.sessions.set(state.id, state);
   }
@@ -156,6 +166,7 @@ export class MemoryStore implements PracticeStore {
   exportLocalData(): LocalDataExport {
     return {
       schemaVersion: 1,
+      settings: this.getSettings(),
       ratings: this.listRatings(),
       attempts: this.listAttempts(),
       reviewQueue: [...this.reviewQueue.values()]

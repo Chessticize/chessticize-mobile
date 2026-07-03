@@ -36,10 +36,24 @@ export interface ExportedSprintSession {
 
 export interface LocalDataExport {
   schemaVersion: 1;
+  settings: PracticeSettings;
   ratings: RatingRecord[];
   attempts: AttemptHistoryRow[];
   reviewQueue: ReviewQueueState[];
   sprintSessions: ExportedSprintSession[];
+}
+
+export interface PracticeSettings {
+  sync: {
+    iCloudEnabled: boolean;
+    uploadAllowed: boolean;
+  };
+  notifications: {
+    reviewReminder: {
+      mode: "smart" | "fixed" | "off";
+      fixedLocalTime?: string;
+    };
+  };
 }
 
 export interface PracticeStore {
@@ -54,6 +68,8 @@ export interface PracticeStore {
   resetRating(key: string): RatingRecord;
   saveCustomSprintConfig(config: CustomSprintConfigRecord): void;
   listCustomSprintConfigs(): CustomSprintConfigRecord[];
+  getSettings(): PracticeSettings;
+  saveSettings(settings: PracticeSettings): void;
   createSprintSession(state: SprintState): void;
   updateSprintSession(state: SprintState): void;
   recordAttempt(attempt: AttemptEvent): void;

@@ -55,7 +55,7 @@ import type {
   UciEngineTransport
 } from "../../../../packages/core/src/index.ts";
 import type { PracticeService } from "../../../../packages/storage/src/practice-service.ts";
-import type { ClearLocalHistoryResult, LocalDataExport } from "../../../../packages/storage/src/practice-store.ts";
+import type { ClearLocalHistoryResult, LocalDataExport, PracticeSettings } from "../../../../packages/storage/src/practice-store.ts";
 import {
   configureMobilePracticePuzzleSource,
   createMobilePracticeService,
@@ -1422,6 +1422,7 @@ export function PracticePocScreen({
         {tab === "settings" ? (
           <SettingsPanel
             standardRating={readRating(service, defaultSprintConfig("standard").ratingKey)}
+            settings={service.getSettings()}
             ratings={[
               { label: "Standard", record: service.getRating(defaultSprintConfig("standard").ratingKey) },
               { label: "Arrow Duel", record: service.getRating(defaultSprintConfig("arrow_duel").ratingKey) },
@@ -1434,6 +1435,11 @@ export function PracticePocScreen({
               const result = service.clearLocalHistory();
               refreshState();
               return result;
+            }}
+            onSaveSettings={(settings) => {
+              const next = service.saveSettings(settings);
+              setSettingsRevision((current) => current + 1);
+              return next;
             }}
             onAdjustRating={(ratingKey, nextRating) => {
               const next = service.setRating(ratingKey, nextRating);
@@ -5817,7 +5823,9 @@ function SettingsPanel({
   onOpenPacks,
   onAdjustRating,
   onResetRating,
+  onSaveSettings,
   ratings,
+  settings,
   standardRating
 }: {
   onDeleteLocalHistory: () => ClearLocalHistoryResult;
@@ -5826,14 +5834,16 @@ function SettingsPanel({
   onOpenPacks: () => void;
   onAdjustRating: (ratingKey: string, nextRating: number) => RatingRecord;
   onResetRating: () => void;
+  onSaveSettings: (settings: PracticeSettings) => PracticeSettings;
   ratings: Array<{ label: string; record: RatingRecord }>;
+  settings: PracticeSettings;
   standardRating: number;
 }): React.JSX.Element {
-  const [syncEnabled, setSyncEnabled] = useState(true);
-  const [syncUploadAllowed, setSyncUploadAllowed] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<"reset-elo" | "delete-history" | null>(null);
   const [advancedRatingsOpen, setAdvancedRatingsOpen] = useState(false);
+  const syncEnabled = settings.sync.iCloudEnabled;
+  const syncUploadAllowed = settings.sync.uploadAllowed;
   const syncStatusLabel = syncEnabled
     ? syncUploadAllowed
       ? "Ready"
@@ -5849,6 +5859,10 @@ function SettingsPanel({
       ? "Progress can sync through iCloud. Offline practice still works."
       : "Practice stays local until you approve uploading existing progress."
     : "Progress remains on this device until sync is turned back on.";
+  const saveSettings = (next: PracticeSettings, message: string) => {
+    onSaveSettings(next);
+    setStatusMessage(message);
+  };
 
   return (
     <View style={styles.settingsPanel} testID="settings-panel">
@@ -5878,8 +5892,16 @@ function SettingsPanel({
               testID="settings-icloud-sync-toggle"
               style={[styles.switchButton, syncEnabled ? styles.switchButtonActive : null]}
               onPress={() => {
-                setSyncEnabled((current) => !current);
-                setStatusMessage(syncEnabled ? "iCloud sync off" : "iCloud sync on");
+                saveSettings(
+                  {
+                    ...settings,
+                    sync: {
+                      ...settings.sync,
+                      iCloudEnabled: !syncEnabled
+                    }
+                  },
+                  syncEnabled ? "iCloud sync off" : "iCloud sync on"
+                );
               }}
             >
               <SwitchGlyph enabled={syncEnabled} />
@@ -5911,8 +5933,16 @@ function SettingsPanel({
             testID="settings-sync-allow-upload"
             style={styles.syncApprovalRow}
             onPress={() => {
-              setSyncUploadAllowed(true);
-              setStatusMessage("iCloud upload allowed");
+              saveSettings(
+                {
+                  ...settings,
+                  sync: {
+                    ...settings.sync,
+                    uploadAllowed: true
+                  }
+                },
+                "iCloud upload allowed"
+              );
             }}
           >
             <View style={styles.settingsRowCopy}>

@@ -25,7 +25,7 @@ import type {
   SprintState
 } from "../../core/src/index.ts";
 import type { HistoryFilter } from "./query-types.ts";
-import type { ClearLocalHistoryResult, LocalDataExport, PracticeStore } from "./practice-store.ts";
+import type { ClearLocalHistoryResult, LocalDataExport, PracticeSettings, PracticeStore } from "./practice-store.ts";
 
 export interface StartSprintCommand {
   mode: SprintMode;
@@ -238,6 +238,15 @@ export class PracticeService {
 
   listCustomSprintConfigs() {
     return this.store.listCustomSprintConfigs();
+  }
+
+  getSettings(): PracticeSettings {
+    return this.store.getSettings();
+  }
+
+  saveSettings(settings: PracticeSettings): PracticeSettings {
+    this.store.saveSettings(settings);
+    return this.store.getSettings();
   }
 
   countEligibleSprintPuzzles(command: StartSprintCommand): number {

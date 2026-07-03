@@ -2199,6 +2199,27 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "settings-advanced-rating-standard-value"))).toBe("ELO 600");
   });
 
+  it("persists Settings sync choices through the backend when the panel remounts", () => {
+    const service = createMobilePracticeService();
+    const renderer = renderScreen({ practiceService: service });
+
+    press(renderer, "settings-tab");
+    press(renderer, "settings-sync-allow-upload");
+    press(renderer, "settings-icloud-sync-toggle");
+
+    expect(service.getSettings().sync).toEqual({
+      iCloudEnabled: false,
+      uploadAllowed: true
+    });
+
+    press(renderer, "practice-tab");
+    press(renderer, "settings-tab");
+
+    expect(findByTestId(renderer, "settings-icloud-sync-toggle").props.accessibilityState).toEqual({ checked: false });
+    expect(collectText(findByTestId(renderer, "settings-sync-status"))).toContain("Off · Local only");
+    expect(() => findByTestId(renderer, "settings-sync-allow-upload")).toThrow();
+  });
+
   it("ships only the bundled core pack with no download or remove affordances", () => {
     const renderer = renderScreen();
 

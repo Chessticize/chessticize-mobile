@@ -174,6 +174,53 @@ test("PracticeService changes puzzle selection scope without losing local state"
   assert.equal(service.getRating("standard 5/20").rating, 625);
 });
 
+test("PracticeService persists settings through the store boundary", () => {
+  const store = new MemoryStore();
+  const service = new PracticeService(store);
+
+  const defaults = service.getSettings();
+  assert.deepEqual(defaults, {
+    sync: {
+      iCloudEnabled: true,
+      uploadAllowed: false
+    },
+    notifications: {
+      reviewReminder: {
+        mode: "smart"
+      }
+    }
+  });
+
+  const saved = service.saveSettings({
+    sync: {
+      iCloudEnabled: false,
+      uploadAllowed: true
+    },
+    notifications: {
+      reviewReminder: {
+        mode: "fixed",
+        fixedLocalTime: "20:30"
+      }
+    }
+  });
+
+  saved.sync.iCloudEnabled = true;
+  assert.equal(service.getSettings().sync.iCloudEnabled, false);
+  assert.equal(service.getSettings().sync.uploadAllowed, true);
+  assert.deepEqual(service.exportLocalData().settings, {
+    sync: {
+      iCloudEnabled: false,
+      uploadAllowed: true
+    },
+    notifications: {
+      reviewReminder: {
+        mode: "fixed",
+        fixedLocalTime: "20:30"
+      }
+    }
+  });
+});
+
 test("PracticeService selects standard sprint puzzles from the current run ELO window", async () => {
   const store = new MemoryStore();
   store.seedPuzzles(await loadFixturePuzzles());
