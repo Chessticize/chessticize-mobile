@@ -208,6 +208,10 @@ export class PracticeService {
     return this.store.listReviewQueue();
   }
 
+  pruneOrphanedReviewQueue(): number {
+    return this.store.transaction(() => this.store.pruneOrphanedReviewQueue());
+  }
+
   getDueReviewItems(now = new Date().toISOString()): ReviewQueueItem[] {
     return this.store.getDueReviewItems(now);
   }

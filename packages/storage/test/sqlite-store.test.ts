@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { PracticeService, SQLiteStore } from "../src/index.ts";
 import type { Puzzle, ReviewContext } from "../../core/src/index.ts";
 
@@ -505,6 +506,62 @@ test("SQLite sprint misses do not count as failed scheduled review lapses", asyn
   }
 });
 
+test("PracticeService prunes orphaned SQLite review queue rows", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "chessticize-sqlite-orphan-"));
+  const dbPath = join(dir, "practice.sqlite");
+  try {
+    const setupStore = new SQLiteStore(dbPath);
+    setupStore.migrate();
+    setupStore.seedPuzzles(await loadFixturePuzzles());
+    setupStore.scheduleMistakeReview(reviewContext("000hf"), "2026-06-20T00:00:00.000Z");
+    setupStore.close();
+
+    const legacyDb = new DatabaseSync(dbPath);
+    legacyDb.exec("PRAGMA foreign_keys = OFF");
+    legacyDb
+      .prepare(
+        `INSERT INTO review_queue (
+          puzzle_id,
+          mode,
+          rating_key,
+          due_at,
+          interval_hours,
+          review_count,
+          success_streak,
+          lapse_count,
+          last_result,
+          last_reviewed_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        "missing-puzzle",
+        "standard",
+        "standard 5/20",
+        "2026-06-21T00:00:00.000Z",
+        24,
+        0,
+        0,
+        0,
+        "wrong",
+        "2026-06-20T00:00:00.000Z"
+      );
+    legacyDb.close();
+
+    const store = new SQLiteStore(dbPath);
+    const service = new PracticeService(store);
+    try {
+      assert.equal(service.listReviewQueue().length, 2);
+      assert.equal(service.getDueReviewItems("2026-06-22T00:00:00.000Z").length, 1);
+      assert.equal(service.pruneOrphanedReviewQueue(), 1);
+      assert.deepEqual(service.listReviewQueue().map((review) => review.puzzleId), ["000hf"]);
+      assert.equal(service.pruneOrphanedReviewQueue(), 0);
+    } finally {
+      store.close();
+    }
+  } finally {
+    await rm(dir, { force: true, recursive: true });
+  }
+});
 test("SQLite review result without an existing queue row is counted once", async () => {
   const store = await seededStore();
   try {

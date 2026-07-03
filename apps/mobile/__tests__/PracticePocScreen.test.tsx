@@ -1647,6 +1647,31 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "review-start-due").props.accessibilityState).toEqual({ disabled: true });
   });
 
+  it("prunes orphaned review queue rows before showing Review totals", () => {
+    const service = createMobilePracticeService("random1000");
+    service.recordReviewResult(
+      { puzzleId: "000hf", mode: "standard", ratingKey: "standard 5/20" },
+      "wrong",
+      "2026-06-20T00:00:00.000Z"
+    );
+    service.recordReviewResult(
+      { puzzleId: "missing-puzzle", mode: "standard", ratingKey: "standard 5/20" },
+      "wrong",
+      "2026-06-20T00:00:00.000Z"
+    );
+    expect(service.listReviewQueue()).toHaveLength(2);
+    jest.setSystemTime(new Date("2026-06-22T00:00:00.000Z"));
+
+    const renderer = renderScreen({ practiceService: service });
+    press(renderer, "review-tab");
+
+    expect(service.listReviewQueue()).toHaveLength(1);
+    expect(collectText(findByTestId(renderer, "review-due-count"))).toBe("1");
+    expect(collectText(findByTestId(renderer, "review-total-count"))).toBe("1");
+    expect(findByTestId(renderer, "review-due-card").props.accessibilityLabel).toContain("1 total");
+    expect(collectText(findByTestId(renderer, "review-due-secondary-summary"))).toBe("0 overdue · 1 total");
+  });
+
   it("keeps official due review contexts separate by sprint run", () => {
     const service = createMobilePracticeService("random1000");
     service.startSprint(

@@ -122,6 +122,10 @@ Review queue:
 10. Orphaned queue entries (puzzle no longer resolvable) are hidden from the
     due list but linger in `review_queue` and inflate `totalCount`. Clean them
     up.
+    Status: complete. `PracticeService` now exposes a store-level cleanup for
+    orphaned review queue rows, and the Review tab runs it before computing due
+    items and total queue counts. Memory and SQLite stores share the same
+    behavior, so missing local puzzles are removed rather than hidden-only.
 
 Arrow Duel / analysis:
 

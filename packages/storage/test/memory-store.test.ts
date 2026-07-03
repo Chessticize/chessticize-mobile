@@ -86,6 +86,27 @@ test("MemoryStore sprint misses do not count as failed scheduled review lapses",
   assert.equal(failedReview.lapseCount, 1);
 });
 
+test("PracticeService prunes orphaned MemoryStore review queue rows", async () => {
+  const store = new MemoryStore();
+  store.seedPuzzles(await loadFixturePuzzles());
+  const service = new PracticeService(store);
+
+  store.scheduleMistakeReview(
+    { puzzleId: "000hf", mode: "standard", ratingKey: "standard 5/20" },
+    "2026-06-20T00:00:00.000Z"
+  );
+  store.scheduleMistakeReview(
+    { puzzleId: "missing-puzzle", mode: "standard", ratingKey: "standard 5/20" },
+    "2026-06-20T00:00:00.000Z"
+  );
+
+  assert.equal(service.listReviewQueue().length, 2);
+  assert.equal(service.getDueReviewItems("2026-06-22T00:00:00.000Z").length, 1);
+  assert.equal(service.pruneOrphanedReviewQueue(), 1);
+  assert.deepEqual(service.listReviewQueue().map((review) => review.puzzleId), ["000hf"]);
+  assert.equal(service.pruneOrphanedReviewQueue(), 0);
+});
+
 test("PracticeService keeps paused sprints open and resumes through the store boundary", async () => {
   const store = new MemoryStore();
   store.seedPuzzles(await loadFixturePuzzles());
