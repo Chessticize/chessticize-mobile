@@ -30,14 +30,18 @@ settings state is persisted through the same backend boundary.
 
 ## Milestone 2 — Honest sync story (App Review risk)
 
-There is no sync engine: no CloudKit code, no entitlement, no transport
-interface. Shipping a simulated sync UI is misleading and an App Review
-rejection risk.
+Status: complete for 1.0. The shipped Settings screen now presents an honest
+"Local Data" section: progress is stored on device, export/delete actions remain
+explicit, and there is no fabricated iCloud toggle, upload approval prompt, sync
+status, or last-synced timestamp. Real CloudKit sync remains post-1.0.
 
 1. For 1.0, replace the iCloud sync section with an honest "Local data" section:
    storage is on-device, export/delete remain, no fabricated sync status.
    Remove the fake toggle, disclosure, upload prompt, and timestamp (spec rule
    added 2026-07-03: sync status must reflect real system state).
+   Status: complete. PR #64 replaced the simulated iCloud controls with the
+   local-only Settings surface and added component coverage that rejects the
+   removed fake sync controls.
 2. Real CloudKit sync is post-1.0. When picked up, follow the build order the
    audit produced: sync metadata columns + migration, `SyncTransport` interface
    with a maintained fake, CloudKit adapter + entitlement, domain merge engine,
