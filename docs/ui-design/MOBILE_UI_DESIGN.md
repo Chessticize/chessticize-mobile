@@ -58,7 +58,7 @@ Screen inventory:
 | Arrow Duel Review | Board, green/red arrows, choice marker, playback controls | Play line, step line, finish review | Review Complete, History |
 | History | Performance chart, range/type filters, attempt rows, result/rating/review state | Filter Wrong 7d, inspect sprint type/speed, open attempt | Attempt Detail, Review Item |
 | Custom Sprint Setup | Mode/theme/timing controls, estimate, rating range, start | Start sprint, save template | Active Sprint |
-| Settings | Sync, reset, export, local data, about | Toggle iCloud, reset ELO, export/delete | Confirm Sheet, Sync Disclosure |
+| Settings | Local data, reset, export, about | Export data, delete local history, reset ELO | Confirm Sheet |
 | Puzzle Packs | Installed/optional packs, metadata, source/license notes | Import, enable, remove, inspect license | Pack Detail |
 
 ## Mobile Information Architecture
@@ -69,7 +69,7 @@ Use a five-tab app shell:
 - Review: due mistake reviews and spaced repetition queue.
 - History: attempts, sprint sessions, filters, and "Wrong in the last 7 days".
 - Packs: bundled pack, optional packs, rating/theme coverage, imports, and license/source attribution.
-- Settings: iCloud sync, local data, ELO reset, export/delete data, and advanced rating adjustment.
+- Settings: local data, ELO reset, export/delete data, and advanced rating adjustment.
 
 There should be no mobile Home tab and no Game Review tab in v1.
 
@@ -83,7 +83,6 @@ Navigation rules:
 - The app has two review concepts. Analysis Review is an unscored replay/analyze surface. Scheduled Review is the official spaced repetition flow that records review attempts and updates the queue.
 - Settings is the only place for data-destructive actions such as ELO reset and history delete.
 - Packs owns puzzle pack visibility, imports, removals, coverage, source attribution, and license notes.
-- Any sync error should be recoverable from Settings without blocking offline practice.
 - Any puzzle pack error should be recoverable from Packs without blocking already-installed offline practice.
 
 Primary flows:
@@ -97,12 +96,12 @@ Primary flows:
 | Post-session analysis | Sprint Results or Scheduled Review Complete -> Analysis Review -> Results or Practice | Used to inspect mistakes immediately. It does not write History and does not change the spaced repetition schedule. |
 | History replay | History -> Filtered row -> Analysis Review | History preserves original attempt context. Previous/next navigation stays inside the active History filter. |
 | Puzzle pack management | Packs -> Pack Detail -> Import or Remove -> Packs | Installed packs remain usable offline. |
-| iCloud and local data | Settings -> Sync Disclosure or Confirm Sheet -> Settings | Practice must keep working when sync is off. |
+| Local data | Settings -> Confirm Sheet -> Settings | Progress stays on device; export and delete actions are explicit. |
 
 ## Design Principles
 
 - Board first: during practice and review, the board is the primary surface and must receive the largest stable area.
-- Local-first clarity: the user should always know whether progress is local-only or syncing through iCloud.
+- Local-first clarity: in v1, the user should see that progress is stored on device only. Do not imply cloud sync until a real sync engine ships.
 - Calm density: show enough data for repeated training, but avoid desktop dashboards, marketing hero panels, or decorative statistics.
 - One-handed portrait first: primary controls should sit below or immediately above the board and remain reachable.
 - Business state comes from the local backend/domain core. UI screens render view models and dispatch typed intents.
@@ -373,11 +372,11 @@ Custom sprint behavior:
 
 ### Settings
 
-- iCloud sync toggle appears near the top with clear local-first copy.
+- Local Data appears near the top with clear on-device storage copy.
 - ELO reset is explicit and separate from deleting history.
 - Advanced manual ELO adjustment should be hidden behind an "Advanced ratings" affordance.
-- iCloud sync default state should match the sync plan: default on for fresh iOS installs with disclosure, explicit prompt before uploading existing local-only progress.
-- Sync status must always reflect real system state. Until a real sync engine ships, Settings must present the honest local-only state: no simulated sync toggles, no fabricated "last synced" timestamps.
+- Settings must not include simulated cloud state in v1: no iCloud toggle, no upload approval prompt, and no fabricated "last synced" timestamp.
+- Real CloudKit sync is post-1.0 and must add a real transport, entitlement, merge engine, and truthful UI state before any sync controls are shown.
 
 ### Review Reminder Notifications
 
@@ -457,7 +456,7 @@ Required labels/test IDs:
 - `arrow-duel-candidate-b`
 - `review-start-due`
 - `history-filter-wrong-7-days`
-- `settings-icloud-sync-toggle`
+- `settings-local-storage`
 - `settings-reset-elo`
 - `packs-installed-core`
 - `packs-import` (deferred beyond v1 with pack downloading)
@@ -470,14 +469,14 @@ Accessibility rules:
 - Dynamic timer changes must not spam screen readers.
 - Board coordinates and selected squares need accessible descriptions in review mode.
 - Destructive confirmations must identify what will be reset or deleted.
-- iCloud sync status must be readable as text, not only as an icon.
+- Local-only storage status must be readable as text, not only as an icon.
 
 ## Testing Implications
 
 - Every core screen must expose stable accessibility labels for Detox.
 - Component tests should verify user-visible behavior, not component internals.
 - UI should receive view models from backend/domain packages; React components must not compute sprint outcomes, ELO updates, review scheduling, or Arrow Duel correctness.
-- E2E flows should cover Practice start, Arrow Duel choice, wrong-answer review, custom sprint setup, history filtering, pack management, ELO reset, and iCloud sync toggle.
+- E2E flows should cover Practice start, Arrow Duel choice, wrong-answer review, custom sprint setup, history filtering, pack management, ELO reset, and local data export/delete.
 - Design QA should include iPhone SE-sized viewport, modern iPhone portrait, and at least one landscape/tablet sanity pass.
 - E2E assertions should target stable labels/test IDs from this document.
 
@@ -485,5 +484,4 @@ Accessibility rules:
 
 - Whether Arrow Duel candidate chips should display SAN only, coordinate notation only, or both.
 - Whether manual ELO editing should ship in v1 or only reset/import/export.
-- Whether iCloud sync should show first-run disclosure as a sheet or as a persistent Settings banner for the first session.
 - Whether custom max mistakes is part of v1 custom sprint or should remain fixed by scoring mode.
