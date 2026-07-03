@@ -1,0 +1,74 @@
+const { existsSync, readFileSync } = require("node:fs");
+const { join } = require("node:path");
+
+const appRoot = process.cwd();
+const iosRoot = join(appRoot, "ios", "ChessticizeMobile");
+
+function readText(path) {
+  return readFileSync(path, "utf8");
+}
+
+function expectedPixels(size, scale) {
+  const [pointSize] = size.split("x");
+  const points = Number(pointSize);
+  const multiplier = scale === "3x" ? 3 : scale === "2x" ? 2 : 1;
+  return Math.round(points * multiplier);
+}
+
+describe("iOS App Store identity artifacts", () => {
+  it("uses the public Chessticize app identity instead of the React Native template identity", () => {
+    const infoPlist = readText(join(iosRoot, "Info.plist"));
+    const project = readText(join(appRoot, "ios", "ChessticizeMobile.xcodeproj", "project.pbxproj"));
+
+    expect(infoPlist).toContain("<key>CFBundleDisplayName</key>\n\t<string>Chessticize</string>");
+    expect(infoPlist).toContain("<key>CFBundleShortVersionString</key>\n\t<string>$(MARKETING_VERSION)</string>");
+    expect(infoPlist).toContain("<key>CFBundleVersion</key>\n\t<string>$(CURRENT_PROJECT_VERSION)</string>");
+    expect(project).toContain("PRODUCT_BUNDLE_IDENTIFIER = com.chessticize.mobile;");
+    expect(project).toContain("PRODUCT_NAME = Chessticize;");
+    expect(project).toContain("productName = Chessticize;");
+    expect(project).toContain("MARKETING_VERSION = 1.0;");
+    expect(project).toContain("CURRENT_PROJECT_VERSION = 1;");
+    expect(project).not.toContain("org.reactjs.native.example");
+    expect(project).not.toContain("ChessticizeMobile.app");
+  });
+
+  it("keeps the launch screen aligned with the app background and removes template copy", () => {
+    const launchScreen = readText(join(iosRoot, "LaunchScreen.storyboard"));
+
+    expect(launchScreen).toContain('text="Chessticize"');
+    expect(launchScreen).not.toContain("ChessticizeMobile");
+    expect(launchScreen).not.toContain("Powered by React Native");
+    expect(launchScreen).toContain(
+      'red="0.97254901960784312" green="0.98039215686274506" blue="0.9882352941176471"'
+    );
+  });
+
+  it("has concrete no-alpha PNGs for every AppIcon catalog slot", () => {
+    const iconDir = join(iosRoot, "Images.xcassets", "AppIcon.appiconset");
+    const contents = JSON.parse(readText(join(iconDir, "Contents.json")));
+
+    expect(contents.images.length).toBeGreaterThanOrEqual(18);
+    for (const image of contents.images) {
+      expect(image.filename).toBeTruthy();
+      const iconPath = join(iconDir, image.filename);
+      expect(existsSync(iconPath)).toBe(true);
+      const png = readFileSync(iconPath);
+      expect(png.subarray(0, 8)).toEqual(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+      expect(png.readUInt32BE(16)).toBe(expectedPixels(image.size, image.scale));
+      expect(png.readUInt32BE(20)).toBe(expectedPixels(image.size, image.scale));
+      expect(png[25]).toBe(2);
+    }
+  });
+
+  it("lets the Detox build wrapper follow the Xcode product name", () => {
+    const detoxBuildScript = readText(join(appRoot, "scripts", "ios-build-for-detox.sh"));
+    const detoxConfig = readText(join(appRoot, ".detoxrc.js"));
+
+    expect(detoxBuildScript).toContain("-showBuildSettings");
+    expect(detoxBuildScript).toContain("TARGET_BUILD_DIR");
+    expect(detoxBuildScript).toContain("WRAPPER_NAME");
+    expect(detoxBuildScript).not.toContain("ChessticizeMobile.app");
+    expect(detoxConfig).toContain("Chessticize.app");
+    expect(detoxConfig).not.toContain("ChessticizeMobile.app");
+  });
+});

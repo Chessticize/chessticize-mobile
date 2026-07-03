@@ -32,9 +32,18 @@ if [[ ${#destination_args[@]} -gt 0 ]]; then
   xcodebuild_args+=("${destination_args[@]}")
 fi
 
+build_settings="$(xcodebuild "${xcodebuild_args[@]}" -showBuildSettings)"
+target_build_dir="$(awk -F ' = ' '/ TARGET_BUILD_DIR = / { print $2; exit }' <<<"$build_settings")"
+wrapper_name="$(awk -F ' = ' '/ WRAPPER_NAME = / { print $2; exit }' <<<"$build_settings")"
+
+if [[ -z "$target_build_dir" || -z "$wrapper_name" ]]; then
+  echo "Could not resolve Detox app bundle path from Xcode build settings." >&2
+  exit 69
+fi
+
 xcodebuild "${xcodebuild_args[@]}"
 
-app_bundle="ios/build/Build/Products/Debug-iphonesimulator/ChessticizeMobile.app"
+app_bundle="$target_build_dir/$wrapper_name"
 js_bundle="$app_bundle/main.jsbundle"
 
 if [[ ! -f "$js_bundle" ]]; then

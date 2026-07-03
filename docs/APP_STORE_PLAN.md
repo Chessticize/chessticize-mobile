@@ -241,6 +241,11 @@ Design approved 2026-07-03; the "Review Reminder Notifications" section of
    binary from its exact release commit.
 2. **App identity**: final display name, bundle identifier, version/build
    scheme, app icon set (all slots), launch screen matching the app background.
+   Status: implementation complete. The iOS target now uses the display name
+   `Chessticize`, bundle identifier `com.chessticize.mobile`, marketing
+   version `1.0`, build `1`, a complete iPhone/iPad/marketing AppIcon catalog,
+   and a launch screen using the app background `#F8FAFC` instead of the React
+   Native template copy.
 3. **Privacy**: App Privacy questionnaire answers (local-only data collection =
    "Data Not Collected" if truly nothing leaves device), a privacy policy URL,
    `PrivacyInfo.xcprivacy` privacy manifest (required-reason APIs from RN and
