@@ -1271,6 +1271,7 @@ export function PracticePocScreen({
                       boardSize={boardSize}
                       flipped={boardFlipped}
                       candidates={displayedPuzzle.candidates}
+                      testID="arrow-duel-candidate-overlay"
                     />
                   ) : null}
                 </View>
@@ -3041,11 +3042,13 @@ function MoveFeedbackOverlay({
 function ArrowCandidateOverlay({
   boardSize,
   flipped,
-  candidates
+  candidates,
+  testID
 }: {
   boardSize: number;
   flipped: boolean;
   candidates: string[];
+  testID?: string;
 }): React.JSX.Element {
   const squareSize = boardSize / 8;
   const pieceMoves = candidates.map((candidate) => ({
@@ -3056,7 +3059,14 @@ function ArrowCandidateOverlay({
   }));
 
   return (
-    <View style={[styles.arrowLayer, { width: boardSize, height: boardSize }]} pointerEvents="none">
+    <View
+      accessibilityLabel={`Arrow Duel candidates: ${candidates.join(", ")}`}
+      accessibilityValue={{ text: candidates.join(", ") }}
+      style={[styles.arrowLayer, { width: boardSize, height: boardSize }]}
+      pointerEvents="none"
+      testID={testID}
+    >
+      {testID ? <View testID={`${testID}-order-${candidates.join("-")}`} /> : null}
       {pieceMoves.map((arrow) => {
         const from = arrowFromTo(arrow.move);
         const arrowStyle = ARROW_VISUAL_STYLES.candidate;
@@ -4959,7 +4969,8 @@ function ReviewSession({
       result,
       submittedMove: reviewMove?.submittedMove ?? "__analysis__",
       expectedMove: reviewMove?.expectedMove ?? expectedReviewMove(currentPuzzle),
-      startedAt: new Date(reviewStartedAtMs).toISOString()
+      startedAt: new Date(reviewStartedAtMs).toISOString(),
+      ...(currentPuzzle.kind === "arrow_duel" ? { arrowDuelCandidateOrder: [...currentPuzzle.candidates] } : {})
     }, completedAt);
     onReviewRecorded?.(completedAt);
     setReviewResultRecorded(true);
@@ -5442,7 +5453,12 @@ function ReviewSession({
               />
             ) : null}
             {reviewState.kind === "arrow_duel" && !feedback && !analysisEnabled ? (
-              <ArrowCandidateOverlay boardSize={boardSize} flipped={boardFlipped} candidates={reviewState.duel.candidates} />
+              <ArrowCandidateOverlay
+                boardSize={boardSize}
+                flipped={boardFlipped}
+                candidates={reviewState.duel.candidates}
+                testID="review-arrow-duel-candidate-overlay"
+              />
             ) : null}
             {analysisEnabled ? (
               <AnalysisArrowOverlay
@@ -5665,9 +5681,20 @@ function startReviewPuzzle(entry: ReviewEntry | undefined): ReviewPuzzleState {
     throw new Error("Cannot start an empty review session");
   }
   if (entry.mode === "arrow_duel") {
-    return { kind: "arrow_duel", duel: beginArrowDuelPuzzle(entry.puzzle) };
+    const candidateOrder = reviewEntryArrowDuelCandidateOrder(entry);
+    return {
+      kind: "arrow_duel",
+      duel: beginArrowDuelPuzzle(
+        entry.puzzle,
+        candidateOrder === undefined ? 0 : { candidateOrder }
+      )
+    };
   }
   return { kind: "line", line: beginLinePuzzle(entry.puzzle) };
+}
+
+function reviewEntryArrowDuelCandidateOrder(entry: ReviewEntry): string[] | undefined {
+  return entry.attempt?.arrowDuelCandidateOrder;
 }
 
 function lineStateAfterMoves(puzzle: Puzzle, moves: string[]): PuzzleLineState {

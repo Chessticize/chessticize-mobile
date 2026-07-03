@@ -31,8 +31,9 @@ import type { ClearLocalHistoryResult, ExportedSprintSession, LocalDataExport, P
 import { clonePracticeSettings, defaultPracticeSettings } from "./practice-settings.ts";
 import { selectUniquePuzzles } from "./puzzle-selection.ts";
 
-interface AttemptHistoryDbRow extends Omit<AttemptHistoryRow, "ratingAfter"> {
+interface AttemptHistoryDbRow extends Omit<AttemptHistoryRow, "ratingAfter" | "arrowDuelCandidateOrder"> {
   ratingAfter: number | null;
+  arrowDuelCandidateOrderJson: string | null;
 }
 
 interface HistoryAttemptDbRow extends PuzzleRow {
@@ -47,6 +48,7 @@ interface HistoryAttemptDbRow extends PuzzleRow {
   completed_at: string;
   rating_before: number;
   rating_after: number | null;
+  arrow_duel_candidate_order_json: string | null;
   rating_key: string;
 }
 
@@ -156,6 +158,7 @@ export class SyncSQLiteStore implements PracticeStore {
 
   migrate(): void {
     this.db.exec(SCHEMA_SQL);
+    this.ensureAttemptCandidateOrderColumn();
   }
 
   transaction<T>(work: () => T): T {
@@ -469,8 +472,9 @@ export class SyncSQLiteStore implements PracticeStore {
           started_at,
           completed_at,
           rating_before,
-          rating_after
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          rating_after,
+          arrow_duel_candidate_order_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         attempt.id,
@@ -485,7 +489,8 @@ export class SyncSQLiteStore implements PracticeStore {
         attempt.startedAt,
         attempt.completedAt,
         attempt.ratingBefore,
-        attempt.ratingAfter ?? null
+        attempt.ratingAfter ?? null,
+        attempt.arrowDuelCandidateOrder ? JSON.stringify(attempt.arrowDuelCandidateOrder) : null
       );
   }
 
@@ -505,7 +510,8 @@ export class SyncSQLiteStore implements PracticeStore {
           started_at AS startedAt,
           completed_at AS completedAt,
           rating_before AS ratingBefore,
-          rating_after AS ratingAfter
+          rating_after AS ratingAfter,
+          arrow_duel_candidate_order_json AS arrowDuelCandidateOrderJson
          FROM attempts
          WHERE (? IS NULL OR source = ?)
            AND (? IS NULL OR result = ?)
@@ -531,11 +537,13 @@ export class SyncSQLiteStore implements PracticeStore {
       ) as AttemptHistoryDbRow[];
 
     return rows.map((row) => {
-      if (row.ratingAfter === null) {
-        const { ratingAfter: _ratingAfter, ...withoutRatingAfter } = row;
-        return withoutRatingAfter;
-      }
-      return row;
+      const candidateOrder = optionalStringArrayFromJson(row.arrowDuelCandidateOrderJson);
+      const { ratingAfter, arrowDuelCandidateOrderJson: _arrowDuelCandidateOrderJson, ...attempt } = row;
+      return {
+        ...attempt,
+        ...(ratingAfter === null ? {} : { ratingAfter }),
+        ...(candidateOrder === undefined ? {} : { arrowDuelCandidateOrder: candidateOrder })
+      };
     });
   }
 
@@ -705,6 +713,7 @@ export class SyncSQLiteStore implements PracticeStore {
           a.completed_at,
           a.rating_before,
           a.rating_after,
+          a.arrow_duel_candidate_order_json,
           COALESCE(a.rating_key, s.rating_key) AS rating_key,
           p.*
          FROM attempts a
@@ -719,6 +728,7 @@ export class SyncSQLiteStore implements PracticeStore {
 
     return rows.map((row) => {
       const puzzle = puzzleFromRow(row);
+      const candidateOrder = optionalStringArrayFromJson(row.arrow_duel_candidate_order_json);
       return {
         id: row.attempt_id,
         source: row.attempt_source,
@@ -733,6 +743,7 @@ export class SyncSQLiteStore implements PracticeStore {
         completedAt: row.completed_at,
         ratingBefore: row.rating_before,
         ...(row.rating_after === null ? {} : { ratingAfter: row.rating_after }),
+        ...(candidateOrder === undefined ? {} : { arrowDuelCandidateOrder: candidateOrder }),
         puzzleRating: puzzle.rating,
         side: sideToMoveForHistoryPuzzle({ puzzle, mode: row.mode }),
         themes: puzzle.themes
@@ -836,6 +847,13 @@ export class SyncSQLiteStore implements PracticeStore {
         null
       );
   }
+
+  private ensureAttemptCandidateOrderColumn(): void {
+    const columns = this.db.prepare("PRAGMA table_info(attempts)").all() as Array<{ name: string }>;
+    if (!columns.some((column) => column.name === "arrow_duel_candidate_order_json")) {
+      this.db.exec("ALTER TABLE attempts ADD COLUMN arrow_duel_candidate_order_json TEXT");
+    }
+  }
 }
 
 function puzzleFromRow(row: PuzzleRow): Puzzle {
@@ -904,8 +922,20 @@ function attemptEventFromHistoryRow(row: AttemptHistoryRow): AttemptEvent {
     startedAt: row.startedAt,
     completedAt: row.completedAt,
     ratingBefore: row.ratingBefore,
-    ...(row.ratingAfter === undefined ? {} : { ratingAfter: row.ratingAfter })
+    ...(row.ratingAfter === undefined ? {} : { ratingAfter: row.ratingAfter }),
+    ...(row.arrowDuelCandidateOrder === undefined ? {} : { arrowDuelCandidateOrder: row.arrowDuelCandidateOrder })
   };
+}
+
+function optionalStringArrayFromJson(value: string | null): string[] | undefined {
+  if (value === null) {
+    return undefined;
+  }
+  const parsed = JSON.parse(value) as unknown;
+  if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== "string")) {
+    throw new Error("Stored Arrow Duel candidate order must be a string array");
+  }
+  return parsed;
 }
 
 function countRows(db: SyncSqliteDatabase, table: string, where?: string): number {
@@ -987,6 +1017,7 @@ CREATE TABLE IF NOT EXISTS attempts (
   completed_at TEXT NOT NULL,
   rating_before INTEGER NOT NULL,
   rating_after INTEGER,
+  arrow_duel_candidate_order_json TEXT,
   FOREIGN KEY (session_id) REFERENCES sprint_sessions(id),
   FOREIGN KEY (puzzle_id) REFERENCES puzzles(id)
 );

@@ -45,6 +45,7 @@ export interface RecordReviewAttemptCommand extends ReviewContext {
   submittedMove: string;
   expectedMove: string;
   startedAt?: string;
+  arrowDuelCandidateOrder?: string[];
 }
 
 export class PracticeService {
@@ -301,7 +302,8 @@ export class PracticeService {
       expectedMove: command.expectedMove,
       startedAt: command.startedAt ?? completedAt,
       completedAt,
-      ratingBefore: rating.rating
+      ratingBefore: rating.rating,
+      ...(command.arrowDuelCandidateOrder === undefined ? {} : { arrowDuelCandidateOrder: [...command.arrowDuelCandidateOrder] })
     };
     let review!: ReviewQueueState;
     this.store.transaction(() => {

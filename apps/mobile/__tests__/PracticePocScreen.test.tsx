@@ -1309,6 +1309,34 @@ describe("PracticePocScreen", () => {
     expect(service.listHistory({ source: "scheduled_review" }) as unknown[]).toHaveLength(0);
   });
 
+  it("replays Arrow Duel history review with the candidate order stored on the attempt", () => {
+    const service = createMobilePracticeService("random1000");
+    const completedAt = new Date().toISOString();
+    const startedAt = new Date(Date.now() - 5000).toISOString();
+    service.recordReviewAttempt({
+      puzzleId: "00008",
+      mode: "arrow_duel",
+      ratingKey: "arrow duel 5/30",
+      result: "wrong",
+      submittedMove: "f2g3",
+      expectedMove: "b2b1",
+      startedAt,
+      arrowDuelCandidateOrder: ["f2g3", "b2b1"]
+    }, completedAt);
+    const renderer = renderScreen({ practiceService: service });
+
+    press(renderer, "history-tab");
+    press(renderer, "history-filter-toggle");
+    press(renderer, "history-rating-arrow duel 5/30");
+    const historyAttemptRow = renderer.root.findAll(
+      (node) => typeof node.props.testID === "string" && node.props.testID.startsWith("history-attempt-")
+    )[0];
+    press(renderer, historyAttemptRow.props.testID);
+
+    expectText(renderer, "1 / 1 · Arrow Duel");
+    expect(findByTestId(renderer, "review-arrow-duel-candidate-overlay-order-f2g3-b2b1")).toBeTruthy();
+  });
+
   it("shows a review button after a failed sprint with mistakes", async () => {
     const renderer = renderStandardSequenceScreen();
 

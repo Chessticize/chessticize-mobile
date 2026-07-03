@@ -63,6 +63,83 @@ test("SQLite store can scope future puzzle selection without deleting seeded puz
   }
 });
 
+test("SQLite persists Arrow Duel attempt candidate order across reopen", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "chessticize-arrow-order-"));
+  const dbPath = join(dir, "practice.sqlite");
+  try {
+    const store = new SQLiteStore(dbPath);
+    store.migrate();
+    store.seedPuzzles(await loadFixturePuzzles());
+    const service = new PracticeService(store);
+    const sprint = service.startSprint(
+      {
+        mode: "arrow_duel",
+        durationSeconds: 300,
+        perPuzzleSeconds: 30,
+        targetCorrect: 1,
+        maxMistakes: 3,
+        minRating: 1700,
+        maxRating: 1800
+      },
+      "2026-06-20T00:00:00.000Z"
+    );
+    const currentPuzzle = sprint.currentPuzzle;
+    assert.equal(currentPuzzle?.kind, "arrow_duel");
+    const candidateOrder = currentPuzzle?.kind === "arrow_duel" ? currentPuzzle.candidates : [];
+
+    const result = service.submitMove("f2g3", "2026-06-20T00:00:05.000Z");
+    assert.deepEqual(result.attempt?.arrowDuelCandidateOrder, candidateOrder);
+    store.close();
+
+    const reopened = new SQLiteStore(dbPath);
+    reopened.migrate();
+    try {
+      assert.deepEqual(reopened.listAttempts({ result: "wrong" })[0]?.arrowDuelCandidateOrder, candidateOrder);
+    } finally {
+      reopened.close();
+    }
+  } finally {
+    await rm(dir, { force: true, recursive: true });
+  }
+});
+
+test("SQLite migration adds Arrow Duel candidate order to existing attempts tables", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "chessticize-arrow-order-migration-"));
+  const dbPath = join(dir, "practice.sqlite");
+  try {
+    const legacyDb = new DatabaseSync(dbPath);
+    legacyDb.exec(`
+      CREATE TABLE attempts (
+        id TEXT PRIMARY KEY,
+        source TEXT NOT NULL DEFAULT 'sprint',
+        session_id TEXT NOT NULL,
+        puzzle_id TEXT NOT NULL,
+        mode TEXT NOT NULL,
+        rating_key TEXT,
+        result TEXT NOT NULL,
+        submitted_move TEXT NOT NULL,
+        expected_move TEXT NOT NULL,
+        started_at TEXT NOT NULL,
+        completed_at TEXT NOT NULL,
+        rating_before INTEGER NOT NULL,
+        rating_after INTEGER
+      );
+    `);
+    legacyDb.close();
+
+    const store = new SQLiteStore(dbPath);
+    store.migrate();
+    store.close();
+
+    const migratedDb = new DatabaseSync(dbPath);
+    const columns = migratedDb.prepare("PRAGMA table_info(attempts)").all() as Array<{ name: string }>;
+    migratedDb.close();
+    assert.ok(columns.some((column) => column.name === "arrow_duel_candidate_order_json"));
+  } finally {
+    await rm(dir, { force: true, recursive: true });
+  }
+});
+
 test("PracticeService selects SQLite sprint puzzles from the current run ELO window", async () => {
   const store = await seededStore();
   const service = new PracticeService(store);

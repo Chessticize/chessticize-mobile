@@ -225,7 +225,7 @@ function buildAttemptEvent(state: SprintState, feedback: PuzzleFeedback, now: st
   if (!state.currentPuzzle) {
     throw new Error("Cannot build attempt without current puzzle");
   }
-  return {
+  const attempt: AttemptEvent = {
     id: generateId(),
     source: "sprint",
     sessionId: state.id,
@@ -239,6 +239,10 @@ function buildAttemptEvent(state: SprintState, feedback: PuzzleFeedback, now: st
     completedAt: new Date(now).toISOString(),
     ratingBefore: state.ratingBefore
   };
+  if (state.currentPuzzle.kind === "arrow_duel") {
+    attempt.arrowDuelCandidateOrder = [...state.currentPuzzle.candidates];
+  }
+  return attempt;
 }
 
 function failIfExpired(state: SprintState, now: string): SprintState {

@@ -52,6 +52,7 @@ export interface HistoryAttemptView {
   completedAt: string;
   ratingBefore: number;
   ratingAfter?: number;
+  arrowDuelCandidateOrder?: string[];
   puzzleRating: number;
   side: PuzzleSide;
   themes: string[];

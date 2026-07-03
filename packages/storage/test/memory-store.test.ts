@@ -45,7 +45,7 @@ test("MemoryStore records due reviews for wrong Arrow Duel choices", async () =>
   store.seedPuzzles(await loadFixturePuzzles());
   const service = new PracticeService(store);
 
-  service.startSprint(
+  const sprint = service.startSprint(
     {
       mode: "arrow_duel",
       durationSeconds: 300,
@@ -57,8 +57,13 @@ test("MemoryStore records due reviews for wrong Arrow Duel choices", async () =>
     },
     "2026-06-20T00:00:00.000Z"
   );
-  service.submitMove("f2g3", "2026-06-20T00:00:05.000Z");
+  const currentPuzzle = sprint.currentPuzzle;
+  assert.equal(currentPuzzle?.kind, "arrow_duel");
+  const candidateOrder = currentPuzzle?.kind === "arrow_duel" ? currentPuzzle.candidates : [];
+  const result = service.submitMove("f2g3", "2026-06-20T00:00:05.000Z");
 
+  assert.deepEqual(result.attempt?.arrowDuelCandidateOrder, candidateOrder);
+  assert.deepEqual(store.listAttempts({ result: "wrong" })[0]?.arrowDuelCandidateOrder, candidateOrder);
   const reviews = store.getDueReviews("2026-06-22T00:00:00.000Z");
   assert.equal(reviews.length, 1);
   assert.equal(reviews[0]?.puzzleId, "00008");

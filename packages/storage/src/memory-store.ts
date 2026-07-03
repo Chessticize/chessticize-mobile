@@ -158,7 +158,8 @@ export class MemoryStore implements PracticeStore {
         startedAt: attempt.startedAt,
         completedAt: attempt.completedAt,
         ratingBefore: attempt.ratingBefore,
-        ...(attempt.ratingAfter === undefined ? {} : { ratingAfter: attempt.ratingAfter })
+        ...(attempt.ratingAfter === undefined ? {} : { ratingAfter: attempt.ratingAfter }),
+        ...(attempt.arrowDuelCandidateOrder === undefined ? {} : { arrowDuelCandidateOrder: [...attempt.arrowDuelCandidateOrder] })
       }))
       .sort((left, right) => right.completedAt.localeCompare(left.completedAt) || right.id.localeCompare(left.id));
   }
