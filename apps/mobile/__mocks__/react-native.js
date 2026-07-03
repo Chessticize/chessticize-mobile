@@ -1,4 +1,5 @@
 const React = require('react');
+const appStateListeners = new Set();
 
 function component(name) {
   return function MockComponent(props) {
@@ -8,6 +9,29 @@ function component(name) {
 
 module.exports = {
   NativeModules: {},
+  AppState: {
+    addEventListener(eventName, listener) {
+      if (eventName !== 'change') {
+        return {
+          remove() {}
+        };
+      }
+      appStateListeners.add(listener);
+      return {
+        remove() {
+          appStateListeners.delete(listener);
+        }
+      };
+    },
+    __emit(nextState) {
+      for (const listener of Array.from(appStateListeners)) {
+        listener(nextState);
+      }
+    },
+    __reset() {
+      appStateListeners.clear();
+    }
+  },
   NativeEventEmitter: class NativeEventEmitter {
     constructor(nativeModule) {
       this.nativeModule = nativeModule;

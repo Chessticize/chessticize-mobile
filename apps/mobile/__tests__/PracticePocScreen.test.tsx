@@ -1,5 +1,6 @@
 import React from "react";
 import { Chess } from "chess.js";
+import { AppState } from "react-native";
 import TestRenderer, { act } from "react-test-renderer";
 import { PracticePocScreen, type PracticeDebugTraceEvent } from "../src/components/PracticePocScreen";
 import {
@@ -11,6 +12,7 @@ import {
 import { fixtureNeedsAtLeast, PracticeService } from "../../../packages/storage/src/practice-service";
 import { MemoryStore } from "../../../packages/storage/src/memory-store";
 import { formatLocalCalendarDate, type ArrowDuelState, type AttemptEvent, type Puzzle, type SprintState, type UciEngineTransport } from "../../../packages/core/src/index";
+import { FakeReviewReminderScheduler } from "../src/backend/reviewReminderScheduler";
 
 const renderers: TestRenderer.ReactTestRenderer[] = [];
 
@@ -24,6 +26,7 @@ afterEach(() => {
       renderer.unmount();
     });
   }
+  (AppState as unknown as { __reset?: () => void }).__reset?.();
   jest.useRealTimers();
 });
 
@@ -2499,6 +2502,44 @@ describe("PracticePocScreen", () => {
     press(renderer, "review-tab");
     expectText(renderer, "No reviews due today");
   });
+
+  it("reschedules review reminders when the review queue changes and when the app backgrounds", async () => {
+    jest.setSystemTime(new Date("2026-06-20T12:00:00.000Z"));
+    const scheduler = new FakeReviewReminderScheduler();
+    const service = createMobilePracticeService("random1000");
+    service.saveReviewReminderPreference({ mode: "fixed", fixedLocalTime: "08:15" });
+    service.startSprint(
+      { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 15, maxMistakes: 3 },
+      "2026-06-20T00:00:00.000Z"
+    );
+    service.submitMove("c4b5", "2026-06-20T00:00:05.000Z");
+
+    const renderer = renderScreen({ practiceService: service, reviewReminderScheduler: scheduler });
+    await act(async () => {});
+
+    const queuedReminder = scheduler.calls[0];
+    expect(queuedReminder).toMatchObject({
+      dueCount: 1,
+      body: "1 puzzle is ready for review",
+      route: "review"
+    });
+    expect(localTime(queuedReminder?.scheduledAt)).toEqual({ hour: 8, minute: 15 });
+
+    press(renderer, "settings-tab");
+    press(renderer, "settings-delete-local-history");
+    press(renderer, "settings-delete-history-confirmation-confirm");
+    await act(async () => {});
+
+    expect(scheduler.currentReminder).toBeUndefined();
+
+    act(() => {
+      (AppState as unknown as { __emit: (nextState: string) => void }).__emit("background");
+    });
+    await act(async () => {});
+
+    expect(scheduler.calls).toHaveLength(3);
+    expect(scheduler.calls[2]).toBeUndefined();
+  });
 });
 
 function createScriptedStockfishTransport(
@@ -2651,6 +2692,17 @@ function abandonSprint(renderer: TestRenderer.ReactTestRenderer): void {
 
 function expectSessionMistakes(renderer: TestRenderer.ReactTestRenderer, count: number): void {
   expect(findByTestId(renderer, "session-score-strip").props.accessibilityLabel).toContain(`mistakes ${count}`);
+}
+
+function localTime(iso: string | undefined): { hour: number; minute: number } {
+  if (!iso) {
+    throw new Error("expected scheduled reminder time");
+  }
+  const date = new Date(iso);
+  return {
+    hour: date.getHours(),
+    minute: date.getMinutes()
+  };
 }
 
 async function boardMove(
