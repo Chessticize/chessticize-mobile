@@ -2,18 +2,36 @@ import { createInterface } from "node:readline";
 import { createReadStream } from "node:fs";
 import { opendir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { createHash } from "node:crypto";
+import { Chess } from "chess.js";
 
 const DEFAULT_SOURCE = "../lichess-presolve/presolved-depth16";
-const DEFAULT_OUTPUT = "fixtures/puzzles/presolved-1000.json";
-const DEFAULT_TARGET_COUNT = 1000;
-const MIN_RATING = 1485;
+const DEFAULT_OUTPUT = "fixtures/puzzles/bundled-core-pack.json";
+const DEFAULT_TARGET_COUNT = 3000;
+const DEFAULT_MIN_RATING = 600;
+const DEFAULT_MAX_RATING = 1600;
+const PACK_METADATA = {
+  id: "core",
+  title: "Core Pack",
+  buildDate: "2026-07-02",
+  source: "Lichess puzzle database",
+  sourceLicense: "CC0",
+  presolve: "Chessticize depth-16 Stockfish presolve",
+  licenseNote: "Derived from Lichess puzzle data with Chessticize presolve metadata."
+};
 
 const sourcePath = resolve(process.argv[2] ?? DEFAULT_SOURCE);
 const outputPath = resolve(process.argv[3] ?? DEFAULT_OUTPUT);
 const targetCount = Number.parseInt(process.argv[4] ?? String(DEFAULT_TARGET_COUNT), 10);
+const minRating = Number.parseInt(process.argv[5] ?? String(DEFAULT_MIN_RATING), 10);
+const maxRating = Number.parseInt(process.argv[6] ?? String(DEFAULT_MAX_RATING), 10);
+const manifestPath = resolve(process.argv[7] ?? outputPath.replace(/\.json$/u, ".manifest.json"));
 
 if (!Number.isInteger(targetCount) || targetCount <= 0) {
   throw new Error(`Invalid target count: ${process.argv[4]}`);
+}
+if (!Number.isInteger(minRating) || !Number.isInteger(maxRating) || minRating > maxRating) {
+  throw new Error(`Invalid rating range: ${minRating}-${maxRating}`);
 }
 
 const selected = [];
@@ -25,7 +43,7 @@ for (const filePath of await listCsvFiles(sourcePath)) {
       return false;
     }
 
-    const puzzle = puzzleFromRow(row);
+    const puzzle = puzzleFromRow(row, { minRating, maxRating });
     if (!puzzle) {
       return true;
     }
@@ -48,8 +66,16 @@ if (selected.length < targetCount) {
   throw new Error(`Only found ${selected.length} eligible puzzles in ${sourcePath}`);
 }
 
-await writeFile(outputPath, `${JSON.stringify(selected, null, 2)}\n`);
+const puzzleJson = `${JSON.stringify(selected, null, 2)}\n`;
+const manifest = buildManifest(selected, {
+  ...PACK_METADATA,
+  manifestHash: `sha256:${createHash("sha256").update(puzzleJson).digest("hex")}`
+});
+
+await writeFile(outputPath, puzzleJson);
+await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 console.log(`Wrote ${selected.length} puzzles to ${outputPath}`);
+console.log(`Wrote manifest to ${manifestPath}`);
 
 async function listCsvFiles(path) {
   const entries = [];
@@ -83,12 +109,19 @@ async function readCsvFile(path, onRow) {
   }
 }
 
-function puzzleFromRow(row) {
+function puzzleFromRow(row, ratingRange) {
   const rating = parseNumber(row.Rating);
   const moves = splitWords(row.Moves);
   const stockfishBestMove = row.stockfish_bestmove?.trim();
 
-  if (!row.PuzzleId || !row.FEN || !moves.length || !stockfishBestMove || rating < MIN_RATING) {
+  if (
+    !row.PuzzleId ||
+    !row.FEN ||
+    !moves.length ||
+    !stockfishBestMove ||
+    rating < ratingRange.minRating ||
+    rating > ratingRange.maxRating
+  ) {
     return undefined;
   }
 
@@ -156,4 +189,67 @@ function parseOptionalNumber(value) {
     return undefined;
   }
   return parseNumber(value);
+}
+
+function buildManifest(puzzles, input) {
+  const ratings = puzzles.map((puzzle) => puzzle.rating);
+  return {
+    id: input.id,
+    title: input.title,
+    buildDate: input.buildDate,
+    source: input.source,
+    sourceLicense: input.sourceLicense,
+    presolve: input.presolve,
+    licenseNote: input.licenseNote,
+    manifestHash: input.manifestHash,
+    puzzleCount: puzzles.length,
+    rating: {
+      min: Math.min(...ratings),
+      max: Math.max(...ratings)
+    },
+    themes: [...new Set(puzzles.flatMap((puzzle) => puzzle.themes))].sort(),
+    arrowDuelCount: puzzles.filter(isServerCompatibleArrowDuelPuzzle).length
+  };
+}
+
+function isServerCompatibleArrowDuelPuzzle(puzzle) {
+  const blunderMove = puzzle.solutionMoves[0];
+  const bestMove = puzzle.stockfishBestMove;
+  const bestEval = puzzle.stockfishEval;
+  const evalAfterBlunder = puzzle.stockfishEvalAfterFirstMove;
+  if (!blunderMove || !bestMove || bestEval === undefined || evalAfterBlunder === undefined) {
+    return false;
+  }
+  if (normalizeMove(blunderMove) === normalizeMove(bestMove)) {
+    return false;
+  }
+
+  const legalMoves = legalMovesFromFen(puzzle.initialFen);
+  if (legalMoves.length < 2) {
+    return false;
+  }
+  if (!legalMoves.includes(normalizeMove(blunderMove)) || !legalMoves.includes(normalizeMove(bestMove))) {
+    return false;
+  }
+
+  if (evalAfterBlunder > 0) {
+    return bestEval <= 60 && evalAfterBlunder - bestEval > 200;
+  }
+  if (evalAfterBlunder < 0) {
+    return bestEval >= -60 && bestEval - evalAfterBlunder > 200;
+  }
+  return false;
+}
+
+function legalMovesFromFen(fen) {
+  try {
+    const chess = new Chess(fen);
+    return chess.moves({ verbose: true }).map((move) => normalizeMove(`${move.from}${move.to}${move.promotion ?? ""}`));
+  } catch {
+    return [];
+  }
+}
+
+function normalizeMove(move) {
+  return move.trim().toLowerCase();
 }

@@ -35,6 +35,7 @@ describe('Practice POC', () => {
   });
 
   it('accepts the fixed alternate mate-in-one puzzle', async () => {
+    await selectTestPuzzleSource('familiar15');
     await startPracticeMode('standard');
     await waitForVisibleInPracticeScroll('session-board');
 
@@ -51,6 +52,7 @@ describe('Practice POC', () => {
   });
 
   it('opens last sprint mistake review with navigation and analysis arrows', async () => {
+    await selectTestPuzzleSource('familiar15');
     await startPracticeMode('standard');
     await waitForVisibleInPracticeScroll('session-board');
 
@@ -108,6 +110,12 @@ async function startPracticeMode(mode) {
   const startButtonId = `practice-mode-${mode}-start`;
   await waitForVisibleInPracticeScroll(startButtonId);
   await tapUntilExists(startButtonId, 'session-board', 3);
+}
+
+async function selectTestPuzzleSource(source) {
+  const sourceButtonId = `test-puzzle-source-${source}`;
+  await waitForVisibleInPracticeScroll(sourceButtonId);
+  await element(by.id(sourceButtonId)).tap();
 }
 
 async function waitForVisibleInPracticeScroll(testID) {

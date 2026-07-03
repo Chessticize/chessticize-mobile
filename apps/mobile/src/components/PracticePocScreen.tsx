@@ -54,6 +54,7 @@ import type { PracticeService } from "../../../../packages/storage/src/practice-
 import type { ClearLocalHistoryResult, LocalDataExport } from "../../../../packages/storage/src/practice-store.ts";
 import {
   createMobilePracticeService,
+  getBundledCorePackManifest,
   seededPuzzleCount,
   shouldRandomizePuzzleSelection,
   type MobilePuzzleSource
@@ -133,6 +134,7 @@ const BOARD_COLOR_TOKENS = {
   black: "#7B8794"
 } as const;
 const TEST_PUZZLE_SOURCES: ReadonlyArray<{ source: MobilePuzzleSource; label: string }> = [
+  { source: "bundledCore", label: "Core Pack" },
   { source: "familiar15", label: "Familiar 15" },
   { source: "random1000", label: "Random 1000" }
 ];
@@ -177,7 +179,7 @@ export function PracticePocScreen({
   debugTrace,
   stockfishTransportFactory = createNativeStockfishTransport
 }: Props): React.JSX.Element {
-  const [puzzleSource, setPuzzleSource] = useState<MobilePuzzleSource>("familiar15");
+  const [puzzleSource, setPuzzleSource] = useState<MobilePuzzleSource>("bundledCore");
   const service = useMemo(() => practiceService ?? createMobilePracticeService(puzzleSource), [practiceService, puzzleSource]);
   const boardRef = useRef<ChessboardRef | null>(null);
   const suppressedBoardMovesRef = useRef<string[]>([]);
@@ -387,7 +389,7 @@ export function PracticePocScreen({
         mode: nextMode,
         durationSeconds: config.durationSeconds,
         perPuzzleSeconds: config.perPuzzleSeconds,
-        ...(shouldRandomizePuzzleSelection(puzzleSource) ? { puzzleSelectionSeed: `${Date.now()}-${Math.random()}` } : {})
+        ...(!practiceService && shouldRandomizePuzzleSelection(puzzleSource) ? { puzzleSelectionSeed: `${Date.now()}-${Math.random()}` } : {})
       });
       setMode(nextMode);
       commitState(started);
@@ -6102,27 +6104,34 @@ type PackRowModel = {
   testID: string;
 };
 
-const PACK_CATALOG: PackRowModel[] = [
-  {
-    id: "core",
-    title: "Core Pack",
-    subtitle: "~1,000 puzzles · offline",
-    detail: "Rating 600 - 1600 · Mixed, mate, endgame · Arrow Duel ready",
+const PACK_CATALOG: PackRowModel[] = [packRowFromManifest()];
+
+function packRowFromManifest(): PackRowModel {
+  const manifest = getBundledCorePackManifest();
+  const puzzleCount = formatWholeNumber(manifest.puzzleCount);
+  const arrowDuelCount = formatWholeNumber(manifest.arrowDuelCount);
+  const themeCount = `${formatWholeNumber(manifest.themes.length)} themes`;
+  const ratingRange = `${manifest.rating.min}-${manifest.rating.max}`;
+  return {
+    id: manifest.id,
+    title: manifest.title,
+    subtitle: `${puzzleCount} puzzles · offline`,
+    detail: `Rating ${ratingRange} · ${themeCount} · ${arrowDuelCount} Arrow Duel`,
     coverage: {
-      puzzles: "~1k",
-      rating: "600-1600",
-      themes: "Mixed",
-      arrowDuel: "Ready"
+      puzzles: puzzleCount,
+      rating: ratingRange,
+      themes: themeCount,
+      arrowDuel: arrowDuelCount
     },
-    source: "Lichess puzzle database",
-    presolveStatus: "Chessticize presolved",
-    manifestHash: "core-2026-06-fixture",
-    buildDate: "Bundled fixture",
-    licenseNote: "Derived from Lichess puzzle data with Chessticize presolve metadata.",
+    source: `${manifest.source} (${manifest.sourceLicense})`,
+    presolveStatus: manifest.presolve,
+    manifestHash: manifest.manifestHash,
+    buildDate: manifest.buildDate,
+    licenseNote: manifest.licenseNote,
     status: "active",
     testID: "packs-installed-core"
-  }
-];
+  };
+}
 
 function PacksPanel(): React.JSX.Element {
   const [selectedPackId, setSelectedPackId] = useState<string | null>(null);
@@ -6194,29 +6203,29 @@ function PacksPanel(): React.JSX.Element {
 }
 
 function summarizeInstalledPackCoverage(packs: PackRowModel[]): { puzzles: string; rating: string; arrowDuel: string } {
-  const puzzleTotal = packs.reduce((sum, pack) => sum + parsePuzzleCountK(pack.coverage.puzzles), 0);
+  const puzzleTotal = packs.reduce((sum, pack) => sum + parseWholeNumber(pack.coverage.puzzles), 0);
   const ratingRanges = packs
     .map((pack) => parseRatingRange(pack.coverage.rating))
     .filter((range): range is { min: number; max: number } => range !== null);
   const rating = ratingRanges.length > 0
     ? `${Math.min(...ratingRanges.map((range) => range.min))}-${Math.max(...ratingRanges.map((range) => range.max))}`
     : "n/a";
-  const arrowDuel = packs.some((pack) => pack.coverage.arrowDuel === "Ready")
-    ? "Ready"
-    : packs.some((pack) => pack.coverage.arrowDuel === "Partial")
-      ? "Partial"
-      : "Limited";
+  const arrowDuelTotal = packs.reduce((sum, pack) => sum + parseWholeNumber(pack.coverage.arrowDuel), 0);
 
   return {
-    puzzles: puzzleTotal > 0 ? `~${puzzleTotal}k` : "0",
+    puzzles: formatWholeNumber(puzzleTotal),
     rating,
-    arrowDuel
+    arrowDuel: arrowDuelTotal > 0 ? formatWholeNumber(arrowDuelTotal) : "Limited"
   };
 }
 
-function parsePuzzleCountK(value: string): number {
-  const match = value.match(/~?(\d+)k/i);
-  return match ? Number(match[1]) : 0;
+function formatWholeNumber(value: number): string {
+  return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
+function parseWholeNumber(value: string): number {
+  const match = value.match(/[\d,]+/);
+  return match ? Number(match[0].replaceAll(",", "")) : 0;
 }
 
 function parseRatingRange(value: string): { min: number; max: number } | null {
