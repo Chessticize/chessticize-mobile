@@ -1,5 +1,7 @@
 const React = require('react');
 const appStateListeners = new Set();
+const defaultWindowDimensions = { width: 390, height: 844, scale: 3, fontScale: 3 };
+let windowDimensions = { ...defaultWindowDimensions };
 
 function component(name) {
   return function MockComponent(props) {
@@ -9,6 +11,12 @@ function component(name) {
 
 module.exports = {
   NativeModules: {},
+  __setWindowDimensions(nextDimensions) {
+    windowDimensions = { ...windowDimensions, ...nextDimensions };
+  },
+  __resetWindowDimensions() {
+    windowDimensions = { ...defaultWindowDimensions };
+  },
   LogBox: {
     ignoreAllLogs() {}
   },
@@ -59,7 +67,7 @@ module.exports = {
   Modal: component('Modal'),
   View: component('View'),
   useWindowDimensions() {
-    return { width: 390, height: 844, scale: 3, fontScale: 3 };
+    return windowDimensions;
   },
   StyleSheet: {
     absoluteFillObject: {

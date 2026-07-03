@@ -1,6 +1,7 @@
 import React from "react";
 import { Chess } from "chess.js";
 import { AppState } from "react-native";
+import * as ReactNative from "react-native";
 import TestRenderer, { act } from "react-test-renderer";
 import { PracticePocScreen, type PracticeDebugTraceEvent } from "../src/components/PracticePocScreen";
 import {
@@ -27,6 +28,7 @@ afterEach(() => {
     });
   }
   (AppState as unknown as { __reset?: () => void }).__reset?.();
+  (ReactNative as unknown as { __resetWindowDimensions?: () => void }).__resetWindowDimensions?.();
   jest.useRealTimers();
 });
 
@@ -115,6 +117,29 @@ describe("PracticePocScreen", () => {
     expect(collectText(renderer.root)).not.toContain("Offline-ready · 3000 puzzles");
     expect(findByTestId(renderer, "app-shell-header").props.accessibilityLabel).toContain("Offline-ready · 3000 puzzles");
     expect(collectText(findByTestId(renderer, "practice-action-header"))).toBe("Start a Sprint");
+  });
+
+  it.each([
+    { label: "iPhone SE-sized portrait", width: 320, height: 568, scale: 2 },
+    { label: "modern iPhone portrait", width: 430, height: 932, scale: 3 }
+  ])("renders the core practice surfaces in a %s viewport", ({ width, height, scale }) => {
+    (ReactNative as unknown as {
+      __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
+    }).__setWindowDimensions?.({ width, height, scale, fontScale: scale });
+
+    const renderer = renderScreen({ practiceService: createMobilePracticeService("random1000") });
+
+    expect(findByTestId(renderer, "app-shell-header")).toBeTruthy();
+    expect(findByTestId(renderer, "practice-home")).toBeTruthy();
+    expect(findByTestId(renderer, "practice-tab")).toBeTruthy();
+    expect(findByTestId(renderer, "settings-tab")).toBeTruthy();
+
+    startStandardSprint(renderer);
+
+    expect(findByTestId(renderer, "session-board")).toBeTruthy();
+    expect(findByTestId(renderer, "session-score-strip")).toBeTruthy();
+    expect(findByTestId(renderer, "practice-prompt")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "practice-prompt"))).toContain("Find the best move");
   });
 
   it("summarizes recent local practice progress on the Practice home", () => {
