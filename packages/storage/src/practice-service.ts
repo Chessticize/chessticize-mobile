@@ -25,7 +25,8 @@ import type {
   SprintState
 } from "../../core/src/index.ts";
 import type { HistoryFilter } from "./query-types.ts";
-import type { ClearLocalHistoryResult, LocalDataExport, PracticeSettings, PracticeStore } from "./practice-store.ts";
+import type { ClearLocalHistoryResult, LocalDataExport, PracticeSettings, PracticeStore, ReviewReminderPreference } from "./practice-store.ts";
+import type { ReviewReminderSettings } from "../../core/src/index.ts";
 
 export interface StartSprintCommand {
   mode: SprintMode;
@@ -252,6 +253,18 @@ export class PracticeService {
   saveSettings(settings: PracticeSettings): PracticeSettings {
     this.store.saveSettings(settings);
     return this.store.getSettings();
+  }
+
+  getReviewReminderPreference(): ReviewReminderPreference {
+    return this.store.getReviewReminderPreference();
+  }
+
+  saveReviewReminderPreference(preference: ReviewReminderPreference): ReviewReminderPreference {
+    return this.store.saveReviewReminderPreference(preference);
+  }
+
+  getReviewReminderSettings(): ReviewReminderSettings {
+    return this.store.getReviewReminderSettings();
   }
 
   countEligibleSprintPuzzles(command: StartSprintCommand): number {

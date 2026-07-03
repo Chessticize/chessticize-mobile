@@ -11,7 +11,7 @@ import type {
   SprintMode,
   SprintState
 } from "../../core/src/index.ts";
-import type { HistoryQuery, HistoryView } from "../../core/src/index.ts";
+import type { HistoryQuery, HistoryView, ReviewReminderSettings } from "../../core/src/index.ts";
 import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./query-types.ts";
 
 export interface ClearLocalHistoryResult {
@@ -49,12 +49,14 @@ export interface PracticeSettings {
     uploadAllowed: boolean;
   };
   notifications: {
-    reviewReminder: {
-      mode: "smart" | "fixed" | "off";
-      fixedLocalTime?: string;
-    };
+    reviewReminder: ReviewReminderPreference;
   };
 }
+
+export type ReviewReminderPreference =
+  | { mode: "smart" }
+  | { mode: "fixed"; fixedLocalTime: string }
+  | { mode: "off" };
 
 export interface PracticeStore {
   seedPuzzles(puzzles: Puzzle[]): void;
@@ -70,6 +72,9 @@ export interface PracticeStore {
   listCustomSprintConfigs(): CustomSprintConfigRecord[];
   getSettings(): PracticeSettings;
   saveSettings(settings: PracticeSettings): void;
+  getReviewReminderPreference(): ReviewReminderPreference;
+  saveReviewReminderPreference(preference: ReviewReminderPreference): ReviewReminderPreference;
+  getReviewReminderSettings(): ReviewReminderSettings;
   createSprintSession(state: SprintState): void;
   updateSprintSession(state: SprintState): void;
   recordAttempt(attempt: AttemptEvent): void;
