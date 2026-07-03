@@ -10,7 +10,7 @@ module.exports = {
   apps: {
     'ios.debug': {
       type: 'ios.app',
-      binaryPath: 'ios/build/Build/Products/Debug-iphonesimulator/ChessticizeMobile.app',
+      binaryPath: 'ios/build/Build/Products/Debug-iphonesimulator/Chessticize.app',
       build: 'scripts/ios-build-for-detox.sh',
     },
   },
