@@ -1,4 +1,5 @@
 const {
+  openTab,
   sleep,
   playBoardMove,
   startPracticeMode,
@@ -58,11 +59,9 @@ describe('Key user flows', () => {
     await failStandardSprint();
     await dismissSprintSummary();
 
-    await element(by.id('review-tab')).tap();
-    await waitFor(element(by.id('review-panel'))).toBeVisible().withTimeout(10000);
     // Mistakes schedule for the next day, so nothing is due yet: the empty
     // state must surface the next due estimate and offer practice instead.
-    await waitFor(element(by.id('review-empty-state'))).toBeVisible().withTimeout(10000);
+    await openTab('review-tab', 'review-empty-state');
     await expect(element(by.id('review-empty-practice'))).toBeVisible();
   });
 
@@ -70,12 +69,10 @@ describe('Key user flows', () => {
     await failStandardSprint();
     await dismissSprintSummary();
 
-    await element(by.id('history-tab')).tap();
-    await waitFor(element(by.id('history-panel'))).toBeVisible().withTimeout(10000);
+    await openTab('history-tab', 'history-filter-wrong-7-days');
     await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
     await expect(element(by.id('history-performance-card'))).toExist();
 
-    await waitForVisibleInPracticeScroll('history-filter-wrong-7-days');
     await element(by.id('history-filter-wrong-7-days')).tap();
     await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
   });
@@ -83,7 +80,8 @@ describe('Key user flows', () => {
   it('configures and starts a custom sprint', async () => {
     await waitForVisibleInPracticeScroll('practice-mode-custom');
     await element(by.id('practice-mode-custom')).tap();
-    await waitForVisibleInPracticeScroll('custom-sprint-setup');
+    // The setup panel is taller than the viewport, so wait on a child row.
+    await waitForVisibleInPracticeScroll('custom-target-count');
 
     await waitForElementTextContaining('custom-target-count', '15', 5000);
     await element(by.id('custom-duration-stepper-decrease')).tap();
@@ -99,8 +97,7 @@ describe('Key user flows', () => {
   });
 
   it('resets ELO and deletes local history with explicit confirmation', async () => {
-    await element(by.id('settings-tab')).tap();
-    await waitForVisibleInPracticeScroll('settings-reset-elo');
+    await openTab('settings-tab', 'settings-reset-elo');
     await element(by.id('settings-reset-elo')).tap();
     await waitForVisibleInPracticeScroll('settings-reset-elo-confirmation-confirm');
     await element(by.id('settings-reset-elo-confirmation-confirm')).tap();

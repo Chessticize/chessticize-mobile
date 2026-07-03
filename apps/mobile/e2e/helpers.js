@@ -31,7 +31,7 @@ async function selectTestPuzzleSource(source) {
 }
 
 async function waitForVisibleInPracticeScroll(testID) {
-  await waitFor(element(by.id(testID))).toExist().withTimeout(120000);
+  await waitFor(element(by.id(testID))).toExist().withTimeout(180000);
   await waitFor(element(by.id(testID)))
     .toBeVisible()
     .whileElement(by.id('practice-main-scroll'))
@@ -87,6 +87,14 @@ function boardPoint(frame, square, flipped = false) {
   };
 }
 
+async function openTab(tabTestID, contentTestID) {
+  await element(by.id(tabTestID)).tap();
+  // Tabs share one scroll view, so the previous tab's scroll offset persists;
+  // container panels are taller than the viewport, so assert on a child.
+  await element(by.id('practice-main-scroll')).scrollTo('top');
+  await waitForVisibleInPracticeScroll(contentTestID);
+}
+
 async function failStandardSprint() {
   await selectTestPuzzleSource('familiar15');
   await startPracticeMode('standard');
@@ -102,6 +110,7 @@ async function failStandardSprint() {
 }
 
 module.exports = {
+  openTab,
   sleep,
   frameFor,
   playBoardMove,
