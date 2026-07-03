@@ -9,6 +9,7 @@ import {
 import type {
   AttemptEvent,
   AttemptResult,
+  CustomSprintConfigRecord,
   HistoryQuery,
   HistoryView,
   Puzzle,
@@ -34,6 +35,7 @@ export interface StartSprintCommand {
   minRating?: number;
   maxRating?: number;
   puzzleSelectionSeed?: string | number;
+  persistCustomConfig?: boolean;
 }
 
 export interface RecordReviewAttemptCommand extends ReviewContext {
@@ -55,55 +57,9 @@ export class PracticeService {
     if (this.activeSprint?.status === "active") {
       throw new Error("Cannot start a new sprint while another sprint is active");
     }
-    const configInput: {
-      mode: SprintMode;
-      durationSeconds: number;
-      perPuzzleSeconds: number;
-      targetCorrect?: number;
-      maxMistakes?: number;
-      theme?: string;
-    } = {
-      mode: command.mode,
-      durationSeconds: command.durationSeconds ?? 5 * 60,
-      perPuzzleSeconds: command.perPuzzleSeconds ?? defaultPerPuzzleSeconds(command.mode)
-    };
-    if (command.targetCorrect !== undefined) {
-      configInput.targetCorrect = command.targetCorrect;
-    }
-    if (command.maxMistakes !== undefined) {
-      configInput.maxMistakes = command.maxMistakes;
-    }
-    if (command.theme !== undefined) {
-      configInput.theme = command.theme;
-    }
-    const config = buildSprintConfig(configInput);
+    const config = this.sprintConfigForCommand(command);
     const rating = this.store.getRating(config.ratingKey);
-    const puzzleFilter: {
-      mode: SprintMode;
-      limit: number;
-      rating?: number;
-      minRating?: number;
-      maxRating?: number;
-      theme?: string;
-      randomSeed?: string | number;
-    } = {
-      mode: config.mode,
-      limit: Math.max(config.targetCorrect + config.maxMistakes, config.targetCorrect),
-      rating: rating.rating
-    };
-    if (command.minRating !== undefined) {
-      puzzleFilter.minRating = command.minRating;
-    }
-    if (command.maxRating !== undefined) {
-      puzzleFilter.maxRating = command.maxRating;
-    }
-    if (command.theme !== undefined) {
-      puzzleFilter.theme = command.theme;
-    }
-    if (command.puzzleSelectionSeed !== undefined) {
-      puzzleFilter.randomSeed = command.puzzleSelectionSeed;
-    }
-    const puzzles = this.store.selectPuzzles(puzzleFilter);
+    const puzzles = this.store.selectPuzzles(this.puzzleFilterForCommand(command, config, rating.rating));
     if (puzzles.length === 0) {
       throw new Error("No eligible puzzles are available for this sprint");
     }
@@ -115,7 +71,17 @@ export class PracticeService {
       now
     });
     this.activeSprint = sprint;
-    this.store.createSprintSession(sprint);
+    this.store.transaction(() => {
+      if (command.persistCustomConfig) {
+        const previousConfig = this.store.listCustomSprintConfigs().find((record) => record.id === customSprintConfigId(config));
+        this.store.saveCustomSprintConfig(buildCustomSprintConfigRecord({
+          config,
+          lastStartedAt: now,
+          ...(previousConfig ? { previous: previousConfig } : {})
+        }));
+      }
+      this.store.createSprintSession(sprint);
+    });
     return sprint;
   }
 
@@ -242,6 +208,19 @@ export class PracticeService {
     return this.store.listPlayedRatings();
   }
 
+  listCustomSprintConfigs() {
+    return this.store.listCustomSprintConfigs();
+  }
+
+  countEligibleSprintPuzzles(command: StartSprintCommand): number {
+    const config = this.sprintConfigForCommand(command);
+    const rating = this.store.getRating(config.ratingKey);
+    return this.store.selectPuzzles({
+      ...this.puzzleFilterForCommand(command, config, rating.rating),
+      limit: Number.MAX_SAFE_INTEGER
+    }).length;
+  }
+
   resetRating(ratingKey: string): unknown {
     return this.store.resetRating(ratingKey);
   }
@@ -299,6 +278,68 @@ export class PracticeService {
     this.store.seedPuzzles(puzzles);
   }
 
+  private sprintConfigForCommand(command: StartSprintCommand): SprintConfig {
+    const configInput: {
+      mode: SprintMode;
+      durationSeconds: number;
+      perPuzzleSeconds: number;
+      targetCorrect?: number;
+      maxMistakes?: number;
+      theme?: string;
+    } = {
+      mode: command.mode,
+      durationSeconds: command.durationSeconds ?? 5 * 60,
+      perPuzzleSeconds: command.perPuzzleSeconds ?? defaultPerPuzzleSeconds(command.mode)
+    };
+    if (command.targetCorrect !== undefined) {
+      configInput.targetCorrect = command.targetCorrect;
+    }
+    if (command.maxMistakes !== undefined) {
+      configInput.maxMistakes = command.maxMistakes;
+    }
+    if (command.theme !== undefined) {
+      configInput.theme = command.theme;
+    }
+    return buildSprintConfig(configInput);
+  }
+
+  private puzzleFilterForCommand(command: StartSprintCommand, config: SprintConfig, rating: number): {
+    mode: SprintMode;
+    limit: number;
+    rating?: number;
+    minRating?: number;
+    maxRating?: number;
+    theme?: string;
+    randomSeed?: string | number;
+  } {
+    const puzzleFilter: {
+      mode: SprintMode;
+      limit: number;
+      rating?: number;
+      minRating?: number;
+      maxRating?: number;
+      theme?: string;
+      randomSeed?: string | number;
+    } = {
+      mode: config.mode,
+      limit: Math.max(config.targetCorrect + config.maxMistakes, config.targetCorrect),
+      rating
+    };
+    if (command.minRating !== undefined) {
+      puzzleFilter.minRating = command.minRating;
+    }
+    if (command.maxRating !== undefined) {
+      puzzleFilter.maxRating = command.maxRating;
+    }
+    if (command.theme !== undefined) {
+      puzzleFilter.theme = command.theme;
+    }
+    if (command.puzzleSelectionSeed !== undefined) {
+      puzzleFilter.randomSeed = command.puzzleSelectionSeed;
+    }
+    return puzzleFilter;
+  }
+
   private persistCompletedSprint(state: SprintState): void {
     this.store.updateSprintSession(state);
     if (state.ratingAfter !== undefined) {
@@ -324,6 +365,35 @@ function defaultPerPuzzleSeconds(mode: SprintMode): number {
     return 30;
   }
   return 20;
+}
+
+function buildCustomSprintConfigRecord(input: {
+  config: SprintConfig;
+  lastStartedAt: string;
+  previous?: CustomSprintConfigRecord;
+}): CustomSprintConfigRecord {
+  return {
+    id: customSprintConfigId(input.config),
+    mode: input.config.mode,
+    ratingKey: input.config.ratingKey,
+    durationSeconds: input.config.durationSeconds,
+    perPuzzleSeconds: input.config.perPuzzleSeconds,
+    targetCorrect: input.config.targetCorrect,
+    maxMistakes: input.config.maxMistakes,
+    ...(input.config.theme ? { theme: input.config.theme } : {}),
+    lastStartedAt: input.lastStartedAt,
+    playCount: (input.previous?.playCount ?? 0) + 1
+  };
+}
+
+function customSprintConfigId(config: SprintConfig): string {
+  return [
+    "custom",
+    config.mode,
+    config.durationSeconds,
+    config.perPuzzleSeconds,
+    config.theme ?? "mixed"
+  ].join("-");
 }
 
 export function fixtureNeedsAtLeast(config: SprintConfig): number {

@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
   buildHistoryPuzzleStats,
   buildHistoryView,
+  filterHistoryAttemptsForQuery,
+  historyAttemptHasReviewQueued,
   resolveHistoryRange,
   sideToMoveForHistoryPuzzle,
   validateHistoryQuery
@@ -75,6 +77,62 @@ test("history view validates paging and slices visible attempts", () => {
       }),
     /offset must be a non-negative integer/
   );
+});
+
+test("history view filters speed and review status before paging", () => {
+  const attempts: HistoryAttemptView[] = [
+    attempt({ id: "a1", puzzleId: "p1", result: "wrong", completedAt: "2026-06-20T00:00:00.000Z", ratingKey: "standard 5/20" }),
+    attempt({ id: "a2", puzzleId: "p2", result: "wrong", completedAt: "2026-06-20T00:01:00.000Z", ratingKey: "standard 5/30" }),
+    attempt({ id: "a3", puzzleId: "p3", result: "wrong", completedAt: "2026-06-20T00:02:00.000Z", ratingKey: "standard 5/20" })
+  ];
+  const reviews = [
+    {
+      puzzleId: "p3",
+      mode: "standard" as const,
+      ratingKey: "standard 5/20",
+      dueAt: "2026-06-21T00:00:00.000Z",
+      intervalHours: 24,
+      reviewCount: 1,
+      successStreak: 0,
+      lapseCount: 1,
+      lastResult: "wrong" as const,
+      lastReviewedAt: "2026-06-20T00:02:00.000Z"
+    }
+  ];
+
+  const view = buildHistoryView({
+    query: {
+      now: "2026-06-21T12:00:00.000Z",
+      timeRange: "max",
+      ratingKey: "standard 5/20",
+      speedSeconds: 20,
+      reviewStatus: "queued",
+      page: { limit: 1 }
+    },
+    ratingKeys: [],
+    attempts: filterHistoryAttemptsForQuery({
+      attempts,
+      query: {
+        speedSeconds: 20,
+        reviewStatus: "queued"
+      },
+      reviews
+    }),
+    elo: [],
+    reviews,
+    allAttemptsForOptions: attempts
+  });
+
+  assert.deepEqual(view.attempts.map((attemptView) => attemptView.id), ["a3"]);
+  assert.deepEqual(view.page, {
+    limit: 1,
+    offset: 0,
+    total: 1,
+    hasMore: false
+  });
+  assert.deepEqual(view.availableSpeeds, [20, 30]);
+  assert.equal(historyAttemptHasReviewQueued(attempts[0] as HistoryAttemptView, reviews), false);
+  assert.equal(historyAttemptHasReviewQueued(attempts[2] as HistoryAttemptView, reviews), true);
 });
 
 test("history query validates optional puzzle rating bounds", () => {
@@ -166,6 +224,7 @@ function attempt(input: {
   puzzleId: string;
   result: "correct" | "wrong";
   completedAt: string;
+  ratingKey?: string;
 }): HistoryAttemptView {
   return {
     id: input.id,
@@ -173,7 +232,7 @@ function attempt(input: {
     sessionId: "s1",
     puzzleId: input.puzzleId,
     mode: "standard",
-    ratingKey: "standard 5/20",
+    ratingKey: input.ratingKey ?? "standard 5/20",
     result: input.result,
     submittedMove: "a1a2",
     expectedMove: "a1a3",
