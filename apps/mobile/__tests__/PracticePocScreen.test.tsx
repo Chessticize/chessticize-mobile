@@ -2035,42 +2035,31 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "settings-sync-summary-card")).toThrow();
     expect(() => findByTestId(renderer, "settings-data-summary-card")).toThrow();
     expect(findByTestId(renderer, "settings-profile-section")).toBeTruthy();
-    expect(findByTestId(renderer, "settings-sync-section")).toBeTruthy();
     expect(findByTestId(renderer, "settings-data-section")).toBeTruthy();
     expect(findByTestId(renderer, "settings-packs-section")).toBeTruthy();
     expect(findByTestId(renderer, "settings-about-section")).toBeTruthy();
-    expect(testIdOrder(renderer, "settings-sync-section", "settings-profile-section")).toBeLessThan(0);
+    expect(() => findByTestId(renderer, "settings-sync-section")).toThrow();
+    expect(() => findByTestId(renderer, "settings-sync-disclosure")).toThrow();
+    expect(() => findByTestId(renderer, "settings-sync-status")).toThrow();
+    expect(() => findByTestId(renderer, "settings-sync-last-synced")).toThrow();
+    expect(() => findByTestId(renderer, "settings-icloud-sync-toggle")).toThrow();
+    expect(() => findByTestId(renderer, "settings-sync-allow-upload")).toThrow();
+    expect(collectText(renderer.root)).not.toContain("iCloud");
+    expect(collectText(renderer.root)).not.toContain("Last synced");
+    expect(collectText(renderer.root)).not.toContain("Today, 09:28");
+    expect(collectText(renderer.root)).not.toContain("Pending approval");
+    expect(collectText(renderer.root)).not.toContain("Allow upload");
+    expect(collectText(findByTestId(renderer, "settings-data-section"))).toContain("Local Data");
+    expect(findByTestId(renderer, "settings-local-storage")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "settings-local-storage"))).toContain("On device");
+    expect(collectText(findByTestId(renderer, "settings-local-storage"))).toContain("Ratings, history, review queue, and custom sprint configs are stored only on this device.");
+    expect(testIdOrder(renderer, "settings-data-section", "settings-profile-section")).toBeLessThan(0);
     expect(findByTestId(renderer, "settings-standard-elo-row")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "settings-standard-elo-row"))).toContain("ELO 600");
     expect(collectText(findByTestId(renderer, "settings-standard-elo-row"))).toContain("Advanced ratings · 3 buckets");
     expect(() => findByTestId(renderer, "settings-standard-elo-row-detail")).toThrow();
     expect(collectText(findByTestId(renderer, "settings-reset-elo"))).not.toContain("Standard puzzle rating only");
     expect(findByTestId(renderer, "settings-reset-elo-detail").props.accessibilityLabel).toBe("Resets the Standard puzzle rating only");
-    expect(findByTestId(renderer, "settings-sync-disclosure")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "settings-sync-status"))).toContain("On · Upload approval needed");
-    expect(findByTestId(renderer, "settings-sync-status").props.accessibilityLabel).toBe("Practice stays local until you approve uploading existing progress.");
-    expectText(renderer, "Needs approval");
-    expect(findByTestId(renderer, "settings-sync-last-synced")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "settings-sync-last-synced"))).toContain("Pending approval");
-    expect(collectText(findByTestId(renderer, "settings-sync-last-synced"))).toContain("Approve upload before existing progress leaves this device");
-    expect(findByTestId(renderer, "settings-icloud-sync-toggle")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "settings-icloud-sync-toggle"))).toBe("");
-    expect(findByTestId(renderer, "settings-sync-allow-upload")).toBeTruthy();
-    expectText(renderer, "Required before this device uploads existing local progress.");
-    press(renderer, "settings-sync-allow-upload");
-    expectText(renderer, "iCloud upload allowed");
-    expect(collectText(findByTestId(renderer, "settings-sync-status"))).toContain("On · Local-first");
-    expect(findByTestId(renderer, "settings-sync-status").props.accessibilityLabel).toBe("Progress can sync through iCloud. Offline practice still works.");
-    expectText(renderer, "Ready");
-    expect(collectText(findByTestId(renderer, "settings-sync-last-synced"))).toContain("Today, 09:28");
-    expect(collectText(findByTestId(renderer, "settings-sync-last-synced"))).toContain("This device is ready for iCloud sync");
-    expect(() => findByTestId(renderer, "settings-sync-allow-upload")).toThrow();
-    press(renderer, "settings-icloud-sync-toggle");
-    expect(findByTestId(renderer, "settings-icloud-sync-toggle").props.accessibilityState).toEqual({ checked: false });
-    expect(collectText(findByTestId(renderer, "settings-sync-status"))).toContain("Off · Local only");
-    expect(findByTestId(renderer, "settings-sync-status").props.accessibilityLabel).toBe("Progress remains on this device until sync is turned back on.");
-    expectText(renderer, "Local only");
-    expect(collectText(findByTestId(renderer, "settings-sync-last-synced"))).toContain("Sync is disabled for this device");
     press(renderer, "settings-reset-elo");
     expect(findByTestId(renderer, "settings-reset-elo-confirmation")).toBeTruthy();
     expectText(renderer, "Reset Standard puzzle ELO?");
@@ -2197,27 +2186,6 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "settings-advanced-ratings-panel")).toBeTruthy();
     expectText(renderer, "Manual rating controls");
     expect(collectText(findByTestId(renderer, "settings-advanced-rating-standard-value"))).toBe("ELO 600");
-  });
-
-  it("persists Settings sync choices through the backend when the panel remounts", () => {
-    const service = createMobilePracticeService();
-    const renderer = renderScreen({ practiceService: service });
-
-    press(renderer, "settings-tab");
-    press(renderer, "settings-sync-allow-upload");
-    press(renderer, "settings-icloud-sync-toggle");
-
-    expect(service.getSettings().sync).toEqual({
-      iCloudEnabled: false,
-      uploadAllowed: true
-    });
-
-    press(renderer, "practice-tab");
-    press(renderer, "settings-tab");
-
-    expect(findByTestId(renderer, "settings-icloud-sync-toggle").props.accessibilityState).toEqual({ checked: false });
-    expect(collectText(findByTestId(renderer, "settings-sync-status"))).toContain("Off · Local only");
-    expect(() => findByTestId(renderer, "settings-sync-allow-upload")).toThrow();
   });
 
   it("ships only the bundled core pack with no download or remove affordances", () => {

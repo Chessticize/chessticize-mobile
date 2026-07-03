@@ -12,10 +12,10 @@ numbered item per `AGENTS.md > Branch And PR Workflow`.
 
 ## Milestone 1 — Real local persistence (blocks everything)
 
-The app currently wires `MemoryStore` (`apps/mobile/src/backend/mobilePractice.ts`),
-so all ratings, history, review schedules, and custom configs are lost when the
-app is killed. The existing `SqliteStore` imports `node:sqlite` and cannot run
-on React Native.
+Status: complete. The mobile app now uses a device SQLite adapter behind the
+existing `PracticeStore` interface, persistence survives relaunch in Detox, the
+dev puzzle-source switch scopes selection without replacing the service, and
+settings state is persisted through the same backend boundary.
 
 1. Add a device SQLite adapter (e.g. `op-sqlite` or `expo-sqlite`) implementing
    the existing `PracticeStore` interface, sharing the schema and the shared
@@ -31,9 +31,8 @@ on React Native.
 ## Milestone 2 — Honest sync story (App Review risk)
 
 There is no sync engine: no CloudKit code, no entitlement, no transport
-interface. The Settings sync section is two `useState` booleans and a
-hardcoded "Last synced: Today, 09:28" string. Shipping a simulated sync UI is
-misleading and an App Review rejection risk.
+interface. Shipping a simulated sync UI is misleading and an App Review
+rejection risk.
 
 1. For 1.0, replace the iCloud sync section with an honest "Local data" section:
    storage is on-device, export/delete remain, no fabricated sync status.

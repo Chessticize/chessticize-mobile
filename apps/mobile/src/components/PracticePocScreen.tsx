@@ -55,7 +55,7 @@ import type {
   UciEngineTransport
 } from "../../../../packages/core/src/index.ts";
 import type { PracticeService } from "../../../../packages/storage/src/practice-service.ts";
-import type { ClearLocalHistoryResult, LocalDataExport, PracticeSettings } from "../../../../packages/storage/src/practice-store.ts";
+import type { ClearLocalHistoryResult, LocalDataExport } from "../../../../packages/storage/src/practice-store.ts";
 import {
   configureMobilePracticePuzzleSource,
   createMobilePracticeService,
@@ -1422,7 +1422,6 @@ export function PracticePocScreen({
         {tab === "settings" ? (
           <SettingsPanel
             standardRating={readRating(service, defaultSprintConfig("standard").ratingKey)}
-            settings={service.getSettings()}
             ratings={[
               { label: "Standard", record: service.getRating(defaultSprintConfig("standard").ratingKey) },
               { label: "Arrow Duel", record: service.getRating(defaultSprintConfig("arrow_duel").ratingKey) },
@@ -1435,11 +1434,6 @@ export function PracticePocScreen({
               const result = service.clearLocalHistory();
               refreshState();
               return result;
-            }}
-            onSaveSettings={(settings) => {
-              const next = service.saveSettings(settings);
-              setSettingsRevision((current) => current + 1);
-              return next;
             }}
             onAdjustRating={(ratingKey, nextRating) => {
               const next = service.setRating(ratingKey, nextRating);
@@ -5823,9 +5817,7 @@ function SettingsPanel({
   onOpenPacks,
   onAdjustRating,
   onResetRating,
-  onSaveSettings,
   ratings,
-  settings,
   standardRating
 }: {
   onDeleteLocalHistory: () => ClearLocalHistoryResult;
@@ -5834,124 +5826,36 @@ function SettingsPanel({
   onOpenPacks: () => void;
   onAdjustRating: (ratingKey: string, nextRating: number) => RatingRecord;
   onResetRating: () => void;
-  onSaveSettings: (settings: PracticeSettings) => PracticeSettings;
   ratings: Array<{ label: string; record: RatingRecord }>;
-  settings: PracticeSettings;
   standardRating: number;
 }): React.JSX.Element {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<"reset-elo" | "delete-history" | null>(null);
   const [advancedRatingsOpen, setAdvancedRatingsOpen] = useState(false);
-  const syncEnabled = settings.sync.iCloudEnabled;
-  const syncUploadAllowed = settings.sync.uploadAllowed;
-  const syncStatusLabel = syncEnabled
-    ? syncUploadAllowed
-      ? "Ready"
-      : "Needs approval"
-    : "Local only";
-  const syncVisibleStatus = syncEnabled
-    ? syncUploadAllowed
-      ? "On · Local-first"
-      : "On · Upload approval needed"
-    : "Off · Local only";
-  const syncSummaryDetail = syncEnabled
-    ? syncUploadAllowed
-      ? "Progress can sync through iCloud. Offline practice still works."
-      : "Practice stays local until you approve uploading existing progress."
-    : "Progress remains on this device until sync is turned back on.";
-  const saveSettings = (next: PracticeSettings, message: string) => {
-    onSaveSettings(next);
-    setStatusMessage(message);
-  };
 
   return (
     <View style={styles.settingsPanel} testID="settings-panel">
-      <SettingsSection title="Sync" testID="settings-sync-section">
-        <View style={styles.settingsRow} testID="settings-icloud-sync-row">
-          <View style={styles.settingsRowCopy}>
-            <Text style={styles.listText}>iCloud Sync</Text>
-            <Text
-              accessibilityLabel={syncSummaryDetail}
-              testID="settings-sync-status"
-              style={styles.helperText}
-            >
-              {syncVisibleStatus}
-            </Text>
-          </View>
-          <View style={styles.syncRowMeta}>
-            <Text
-              testID="settings-sync-disclosure"
-              style={[styles.syncStatusText, syncEnabled ? styles.positive : styles.errorText]}
-            >
-              {syncStatusLabel}
-            </Text>
-            <Pressable
-              accessibilityRole="switch"
-              accessibilityLabel="iCloud sync"
-              accessibilityState={{ checked: syncEnabled }}
-              testID="settings-icloud-sync-toggle"
-              style={[styles.switchButton, syncEnabled ? styles.switchButtonActive : null]}
-              onPress={() => {
-                saveSettings(
-                  {
-                    ...settings,
-                    sync: {
-                      ...settings.sync,
-                      iCloudEnabled: !syncEnabled
-                    }
-                  },
-                  syncEnabled ? "iCloud sync off" : "iCloud sync on"
-                );
-              }}
-            >
-              <SwitchGlyph enabled={syncEnabled} />
-            </Pressable>
-          </View>
-        </View>
+      <SettingsSection title="Local Data" testID="settings-data-section">
         <SettingsRow
-          label="Last synced"
-          value={
-            syncEnabled
-              ? syncUploadAllowed
-                ? "Today, 09:28"
-                : "Pending approval"
-              : "Local only"
-          }
-          detail={
-            syncEnabled
-              ? syncUploadAllowed
-                ? "This device is ready for iCloud sync"
-                : "Approve upload before existing progress leaves this device"
-              : "Sync is disabled for this device"
-          }
-          testID="settings-sync-last-synced"
+          label="Storage"
+          value="On device"
+          detail="Ratings, history, review queue, and custom sprint configs are stored only on this device."
+          testID="settings-local-storage"
         />
-        {syncEnabled && !syncUploadAllowed ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Allow iCloud upload"
-            testID="settings-sync-allow-upload"
-            style={styles.syncApprovalRow}
-            onPress={() => {
-              saveSettings(
-                {
-                  ...settings,
-                  sync: {
-                    ...settings.sync,
-                    uploadAllowed: true
-                  }
-                },
-                "iCloud upload allowed"
-              );
-            }}
-          >
-            <View style={styles.settingsRowCopy}>
-              <Text style={styles.listText}>Allow upload</Text>
-              <Text style={styles.helperText}>Required before this device uploads existing local progress.</Text>
-            </View>
-            <ChevronGlyph direction="right" />
-          </Pressable>
-        ) : null}
+        <SettingsRow
+          label="Export Data"
+          value="JSON"
+          detail="Export-ready local progress backup"
+          testID="settings-export-data"
+          onPress={() => setStatusMessage(exportDataStatusMessage(onExportData()))}
+        />
+        <SettingsRow
+          label="Delete Local History"
+          detail="Requires confirmation before anything is removed"
+          destructive
+          testID="settings-delete-local-history"
+          onPress={() => setConfirmation("delete-history")}
+        />
       </SettingsSection>
 
       <SettingsSection title="Profile" testID="settings-profile-section">
@@ -5979,23 +5883,6 @@ function SettingsPanel({
             }}
           />
         ) : null}
-      </SettingsSection>
-
-      <SettingsSection title="Data" testID="settings-data-section">
-        <SettingsRow
-          label="Export Data"
-          value="JSON"
-          detail="Export-ready local progress backup"
-          testID="settings-export-data"
-          onPress={() => setStatusMessage(exportDataStatusMessage(onExportData()))}
-        />
-        <SettingsRow
-          label="Delete Local History"
-          detail="Requires confirmation before anything is removed"
-          destructive
-          testID="settings-delete-local-history"
-          onPress={() => setConfirmation("delete-history")}
-        />
       </SettingsSection>
 
       <SettingsSection title="Packs" testID="settings-packs-section">
@@ -9332,28 +9219,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     overflow: "hidden"
-  },
-  syncRowMeta: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 8,
-    justifyContent: "flex-end"
-  },
-  syncStatusText: {
-    fontSize: 12,
-    fontWeight: "900"
-  },
-  syncApprovalRow: {
-    alignItems: "center",
-    backgroundColor: "#F8FAFC",
-    borderBottomColor: "#E2E8F0",
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    gap: 12,
-    justifyContent: "space-between",
-    minHeight: 52,
-    paddingHorizontal: 12,
-    paddingVertical: 9
   },
   settingsRow: {
     alignItems: "center",
