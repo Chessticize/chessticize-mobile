@@ -27,10 +27,29 @@ const FAMILIAR_PUZZLE_IDS = [
   "04Phf"
 ] as const;
 
+const persistentPracticeServices = new Map<MobilePuzzleSource, PracticeService>();
+
 export function createMobilePracticeService(source: MobilePuzzleSource = DEFAULT_PUZZLE_SOURCE): PracticeService {
   const store = new MemoryStore();
   store.seedPuzzles(puzzlesForSource(source));
   return new PracticeService(store);
+}
+
+export function createPersistentMobilePracticeService(source: MobilePuzzleSource = DEFAULT_PUZZLE_SOURCE): PracticeService {
+  const existing = persistentPracticeServices.get(source);
+  if (existing) {
+    return existing;
+  }
+
+  const { DeviceSQLiteStore } = require("./deviceSQLiteStore.ts") as typeof import("./deviceSQLiteStore.ts");
+  const store = DeviceSQLiteStore.open(databaseNameForSource(source));
+  store.migrate();
+  if (store.countPuzzles() === 0) {
+    store.seedPuzzles(puzzlesForSource(source));
+  }
+  const service = new PracticeService(store);
+  persistentPracticeServices.set(source, service);
+  return service;
 }
 
 export function seededPuzzleCount(source: MobilePuzzleSource = DEFAULT_PUZZLE_SOURCE): number {
@@ -57,6 +76,12 @@ function puzzlesForSource(source: MobilePuzzleSource): Puzzle[] {
     return familiarPuzzles();
   }
   return regressionPuzzles;
+}
+
+function databaseNameForSource(source: MobilePuzzleSource): string {
+  return source === DEFAULT_PUZZLE_SOURCE
+    ? "chessticize-mobile.sqlite"
+    : `chessticize-mobile-${source}.sqlite`;
 }
 
 function familiarPuzzles(): Puzzle[] {

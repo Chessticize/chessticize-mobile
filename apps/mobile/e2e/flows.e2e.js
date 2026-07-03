@@ -101,6 +101,51 @@ describe('Key user flows', () => {
     await waitFor(element(by.text('Sprint failed'))).toBeVisible().withTimeout(10000);
   });
 
+  it('persists rating, history, review queue, and custom configs after relaunch', async () => {
+    await failStandardSprint();
+    await dismissSprintSummary();
+
+    await openTab('practice-tab', 'practice-mode-custom');
+    await element(by.id('practice-mode-custom')).tap();
+    await waitForVisibleInPracticeScroll('custom-target-count');
+    await element(by.id('custom-duration-stepper-decrease')).tap();
+    await waitForElementTextContaining('custom-target-count', '9', 5000);
+    await element(by.id('start-sprint-button')).tap();
+    await waitFor(element(by.id('session-board'))).toExist().withTimeout(15000);
+    await element(by.id('session-abandon')).tap();
+    await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(5000);
+    await element(by.id('session-abandon-confirm')).tap();
+    await waitFor(element(by.text('Sprint failed'))).toBeVisible().withTimeout(10000);
+    await dismissSprintSummary();
+
+    await openTab('settings-tab', 'settings-standard-elo-row');
+    await element(by.id('settings-standard-elo-row')).tap();
+    await waitForVisibleInPracticeScroll('settings-advanced-rating-standard-increase');
+    await element(by.id('settings-advanced-rating-standard-increase')).tap();
+    await waitForElementTextContaining('settings-standard-elo-row', 'ELO 625', 5000);
+
+    await device.terminateApp();
+    await device.launchApp({
+      newInstance: true,
+      delete: false,
+      launchArgs: { detoxEnableSynchronization: '0' }
+    });
+    await selectTestPuzzleSource('familiar15');
+
+    await openTab('history-tab', 'history-action-header');
+    await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
+
+    await openTab('review-tab', 'review-empty-state');
+    await expect(element(by.id('review-empty-practice'))).toBeVisible();
+
+    await openTab('settings-tab', 'settings-standard-elo-row');
+    await waitForElementTextContaining('settings-standard-elo-row', 'ELO 625', 5000);
+
+    await openTab('practice-tab', 'practice-mode-custom');
+    await element(by.id('practice-mode-custom')).tap();
+    await waitFor(element(by.id('custom-previous-configs'))).toExist().withTimeout(10000);
+  });
+
   it('resets ELO and deletes local history with explicit confirmation', async () => {
     await openTab('settings-tab', 'settings-reset-elo');
     await element(by.id('settings-reset-elo')).tap();

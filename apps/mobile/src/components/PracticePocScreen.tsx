@@ -68,6 +68,7 @@ import { Chess, type PieceSymbol, type Square } from "chess.js";
 
 interface Props {
   practiceService?: PracticeService;
+  practiceServiceFactory?: (source: MobilePuzzleSource) => PracticeService;
   debugTrace?: (event: PracticeDebugTraceEvent) => void;
   stockfishTransportFactory?: () => UciEngineTransport | null;
 }
@@ -193,11 +194,12 @@ const ANALYSIS_DIAGNOSTIC_POSITIONS = [
 
 export function PracticePocScreen({
   practiceService,
+  practiceServiceFactory = createMobilePracticeService,
   debugTrace,
   stockfishTransportFactory = createNativeStockfishTransport
 }: Props): React.JSX.Element {
   const [puzzleSource, setPuzzleSource] = useState<MobilePuzzleSource>("bundledCore");
-  const service = useMemo(() => practiceService ?? createMobilePracticeService(puzzleSource), [practiceService, puzzleSource]);
+  const service = useMemo(() => practiceService ?? practiceServiceFactory(puzzleSource), [practiceService, practiceServiceFactory, puzzleSource]);
   const boardRef = useRef<ChessboardRef | null>(null);
   const suppressedBoardMovesRef = useRef<string[]>([]);
   const boardSyncInProgressRef = useRef(false);

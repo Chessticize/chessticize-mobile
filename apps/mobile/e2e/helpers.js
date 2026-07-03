@@ -19,9 +19,9 @@ async function playBoardMove(testID, move, flipped = false) {
 }
 
 async function startPracticeMode(mode) {
-  const startButtonId = `practice-mode-${mode}-start`;
-  await waitForVisibleInPracticeScroll(startButtonId);
-  await tapUntilExists(startButtonId, 'session-board', 3);
+  const modeCardId = `practice-mode-${mode}`;
+  await waitForVisibleInPracticeScroll(modeCardId);
+  await tapUntilExists(modeCardId, 'session-board', 3);
 }
 
 async function selectTestPuzzleSource(source) {
