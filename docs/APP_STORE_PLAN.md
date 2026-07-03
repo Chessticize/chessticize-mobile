@@ -51,6 +51,9 @@ History:
    (`buildHistoryView` builds `puzzleStats` from the paged slice; the chart
    further takes `.slice(-8)`). Compute chart/summary metrics in the domain
    over the full filtered range, not the page.
+   Status: complete. `HistoryView.performance` is computed in the core domain
+   from the full filtered range before paging, while `HistoryView.attempts`
+   remains the paged row slice.
 2. Mode and sprint-speed filters are degenerate: the history view is scoped to
    one `ratingKey`, which already encodes mode and speed, so other mode/speed
    chips silently return empty pages. Either make the history view span rating

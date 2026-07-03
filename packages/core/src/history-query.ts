@@ -72,6 +72,20 @@ export interface HistoryPuzzleStats {
   nextReviewAt?: string;
 }
 
+export type HistoryPerformanceMetric = "rating" | "wins-losses" | "accuracy" | "solved" | "mistake-rate" | "review-due";
+
+export interface HistoryPerformancePoint {
+  key: string;
+  value: number;
+}
+
+export interface HistoryPerformance {
+  correctCount: number;
+  wrongCount: number;
+  accuracyPercent: number;
+  charts: Record<HistoryPerformanceMetric, HistoryPerformancePoint[]>;
+}
+
 export interface HistoryView {
   query: HistoryQuery;
   range: HistoryResolvedRange;
@@ -82,6 +96,7 @@ export interface HistoryView {
   attempts: HistoryAttemptView[];
   elo: HistoryEloPoint[];
   puzzleStats: HistoryPuzzleStats[];
+  performance: HistoryPerformance;
 }
 
 export function resolveHistoryRange(now: string, timeRange: HistoryTimeRange): HistoryResolvedRange {
@@ -182,6 +197,7 @@ export function buildHistoryView(input: {
   const attemptsForOptions = input.allAttemptsForOptions ?? input.attempts;
   const availableThemes = input.availableThemes ?? collectThemes(attemptsForOptions);
   const availableSpeeds = input.availableSpeeds ?? collectHistorySpeeds(attemptsForOptions);
+  const puzzleStats = buildHistoryPuzzleStats(input.attempts, input.reviews);
   return {
     query,
     range,
@@ -191,7 +207,8 @@ export function buildHistoryView(input: {
     availableSpeeds,
     attempts,
     elo: input.elo,
-    puzzleStats: buildHistoryPuzzleStats(attempts, input.reviews)
+    puzzleStats,
+    performance: buildHistoryPerformance(input.attempts, input.elo, puzzleStats)
   };
 }
 
@@ -282,6 +299,62 @@ export function buildHistoryPuzzleStats(
   }
 
   return [...stats.values()].sort((left, right) => left.puzzleId.localeCompare(right.puzzleId));
+}
+
+export function buildHistoryPerformance(
+  attempts: HistoryAttemptView[],
+  elo: HistoryEloPoint[],
+  puzzleStats: HistoryPuzzleStats[]
+): HistoryPerformance {
+  const correctCount = attempts.filter((attempt) => attempt.result === "correct").length;
+  const wrongCount = attempts.filter((attempt) => attempt.result === "wrong").length;
+  const total = Math.max(1, correctCount + wrongCount);
+  return {
+    correctCount,
+    wrongCount,
+    accuracyPercent: Math.round((correctCount / total) * 100),
+    charts: {
+      rating: elo.map((point, index) => ({
+        key: `${point.sessionId}-${point.completedAt}-${index}`,
+        value: point.ratingAfter
+      })),
+      "wins-losses": buildAttemptPerformanceChart(attempts, "wins-losses"),
+      accuracy: buildAttemptPerformanceChart(attempts, "accuracy"),
+      solved: buildAttemptPerformanceChart(attempts, "solved"),
+      "mistake-rate": buildAttemptPerformanceChart(attempts, "mistake-rate"),
+      "review-due": puzzleStats.map((stats, index) => ({
+        key: `${stats.puzzleId}-${index}`,
+        value: (stats.nextReviewAt ? 1 : 0) + Math.max(0, stats.wrongCount - stats.correctCount)
+      }))
+    }
+  };
+}
+
+function buildAttemptPerformanceChart(
+  attempts: HistoryAttemptView[],
+  metric: Exclude<HistoryPerformanceMetric, "rating" | "review-due">
+): HistoryPerformancePoint[] {
+  let correct = 0;
+  let wrong = 0;
+  return [...attempts].reverse().map((attempt, index) => {
+    if (attempt.result === "correct") {
+      correct += 1;
+    } else {
+      wrong += 1;
+    }
+    const total = Math.max(1, correct + wrong);
+    const value = metric === "wins-losses"
+      ? correct - wrong
+      : metric === "accuracy"
+        ? Math.round((correct / total) * 100)
+        : metric === "mistake-rate"
+          ? Math.round((wrong / total) * 100)
+          : correct;
+    return {
+      key: `${attempt.id}-${index}`,
+      value
+    };
+  });
 }
 
 function collectThemes(attempts: HistoryAttemptView[]): string[] {

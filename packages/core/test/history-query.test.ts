@@ -79,6 +79,85 @@ test("history view validates paging and slices visible attempts", () => {
   );
 });
 
+test("history performance and puzzle stats use the full filtered range, not the visible page", () => {
+  const attempts: HistoryAttemptView[] = [
+    attempt({ id: "a3", puzzleId: "p3", result: "correct", completedAt: "2026-06-20T00:02:00.000Z" }),
+    attempt({ id: "a2", puzzleId: "p2", result: "correct", completedAt: "2026-06-20T00:01:00.000Z" }),
+    attempt({ id: "a1", puzzleId: "p1", result: "wrong", completedAt: "2026-06-20T00:00:00.000Z" })
+  ];
+  const view = buildHistoryView({
+    query: {
+      now: "2026-06-21T12:00:00.000Z",
+      timeRange: "max",
+      ratingKey: "standard 5/20",
+      page: { limit: 1, offset: 1 }
+    },
+    ratingKeys: [],
+    attempts,
+    elo: [
+      {
+        sessionId: "s1",
+        completedAt: "2026-06-20T00:03:00.000Z",
+        ratingBefore: 600,
+        ratingAfter: 612
+      }
+    ],
+    reviews: [
+      {
+        puzzleId: "p1",
+        mode: "standard",
+        ratingKey: "standard 5/20",
+        dueAt: "2026-06-21T00:00:00.000Z",
+        intervalHours: 24,
+        reviewCount: 1,
+        successStreak: 0,
+        lapseCount: 1,
+        lastResult: "wrong",
+        lastReviewedAt: "2026-06-20T00:00:00.000Z"
+      }
+    ]
+  });
+
+  assert.deepEqual(view.attempts.map((attemptView) => attemptView.id), ["a2"]);
+  assert.deepEqual(view.performance, {
+    correctCount: 2,
+    wrongCount: 1,
+    accuracyPercent: 67,
+    charts: {
+      rating: [{ key: "s1-2026-06-20T00:03:00.000Z-0", value: 612 }],
+      "wins-losses": [
+        { key: "a1-0", value: -1 },
+        { key: "a2-1", value: 0 },
+        { key: "a3-2", value: 1 }
+      ],
+      accuracy: [
+        { key: "a1-0", value: 0 },
+        { key: "a2-1", value: 50 },
+        { key: "a3-2", value: 67 }
+      ],
+      solved: [
+        { key: "a1-0", value: 0 },
+        { key: "a2-1", value: 1 },
+        { key: "a3-2", value: 2 }
+      ],
+      "mistake-rate": [
+        { key: "a1-0", value: 100 },
+        { key: "a2-1", value: 50 },
+        { key: "a3-2", value: 33 }
+      ],
+      "review-due": [
+        { key: "p1-0", value: 2 },
+        { key: "p2-1", value: 0 },
+        { key: "p3-2", value: 0 }
+      ]
+    }
+  });
+  assert.deepEqual(
+    view.puzzleStats.map((stats) => stats.puzzleId),
+    ["p1", "p2", "p3"]
+  );
+});
+
 test("history view filters speed and review status before paging", () => {
   const attempts: HistoryAttemptView[] = [
     attempt({ id: "a1", puzzleId: "p1", result: "wrong", completedAt: "2026-06-20T00:00:00.000Z", ratingKey: "standard 5/20" }),
