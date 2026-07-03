@@ -478,7 +478,28 @@ test("SQLite review result updates expand and contract the persisted review sche
     const wrong = store.recordReviewResult(context, "wrong", "2026-06-22T00:00:00.000Z");
     assert.equal(wrong.dueAt, "2026-06-22T06:00:00.000Z");
     assert.equal(wrong.successStreak, 0);
-    assert.equal(wrong.lapseCount, 2);
+    assert.equal(wrong.lapseCount, 1);
+  } finally {
+    store.close();
+  }
+});
+
+test("SQLite sprint misses do not count as failed scheduled review lapses", async () => {
+  const store = await seededStore();
+  try {
+    const context = reviewContext("000hf");
+
+    const firstMiss = store.scheduleMistakeReview(context, "2026-06-20T00:00:00.000Z");
+    const repeatedMiss = store.scheduleMistakeReview(context, "2026-06-20T12:00:00.000Z");
+    const failedReview = store.recordReviewResult(context, "wrong", "2026-06-21T12:00:00.000Z");
+
+    assert.equal(firstMiss.reviewCount, 0);
+    assert.equal(firstMiss.lapseCount, 0);
+    assert.equal(repeatedMiss.reviewCount, 0);
+    assert.equal(repeatedMiss.lapseCount, 0);
+    assert.equal(repeatedMiss.dueAt, "2026-06-21T12:00:00.000Z");
+    assert.equal(failedReview.reviewCount, 1);
+    assert.equal(failedReview.lapseCount, 1);
   } finally {
     store.close();
   }

@@ -4069,10 +4069,10 @@ function reviewDifficultyDetail(items: ReviewQueueItem[], difficulty: ReviewDiff
 }
 
 function reviewItemDifficulty(item: ReviewQueueItem): "easy" | "medium" | "hard" {
-  if (item.review.lapseCount > 0 || item.review.lastResult === "wrong") {
+  if (item.review.lapseCount > 0) {
     return "hard";
   }
-  if (item.review.reviewCount > 1) {
+  if (item.review.lastResult === "wrong") {
     return "medium";
   }
   return "easy";
@@ -4124,7 +4124,7 @@ function filterReviewQueueItems(items: ReviewQueueItem[], filter: ReviewQueueFil
       return new Date(item.review.dueAt).getTime() <= now;
     }
     if (filter === "failed") {
-      return item.review.lastResult === "wrong" || item.review.lapseCount > 0;
+      return item.review.lapseCount > 0;
     }
     if (filter === "arrow_duel") {
       return item.review.mode === "arrow_duel";
@@ -4569,6 +4569,7 @@ function ReviewQueueItemCard({
   const dueState = new Date(item.review.dueAt).getTime() <= Date.now() ? "Due now" : `Due ${item.review.dueAt.slice(0, 10)}`;
   const source = reviewItemSourceSprintLabel(item);
   const compactSource = source.replace(/^Source sprint: /, "");
+  const nextReviewNumber = item.review.reviewCount + 1;
   const rowTestId = `review-due-item-${item.puzzle.id}-${safeTestId(item.review.mode)}`;
   const accessibilityLabel = [
     `Start ${modeLabel(item.review.mode)} ${primaryTheme} review`,
@@ -4577,7 +4578,7 @@ function ReviewQueueItemCard({
     dueState,
     `${formatIntervalHours(item.review.intervalHours)} interval`,
     source,
-    `Review ${item.review.reviewCount}`,
+    `Review ${nextReviewNumber}`,
     `Lapses ${item.review.lapseCount}`
   ].join(", ");
 

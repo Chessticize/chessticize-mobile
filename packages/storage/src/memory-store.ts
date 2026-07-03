@@ -220,7 +220,7 @@ export class MemoryStore implements PracticeStore {
 
   scheduleMistakeReview(context: ReviewContext, now: string): ReviewQueueState {
     const previous = this.getReviewQueueState(context);
-    const next = previous ? scheduleReview({ previous, result: "wrong", now }) : scheduleMistakeForContext(context, now);
+    const next = scheduleMistakeForContext(context, now, previous);
     this.reviewQueue.set(reviewQueueKey(context), next);
     return next;
   }
