@@ -146,9 +146,9 @@ test("history performance and puzzle stats use the full filtered range, not the 
         { key: "a3-2", value: 33 }
       ],
       "review-due": [
-        { key: "p1-0", value: 2 },
-        { key: "p2-1", value: 0 },
-        { key: "p3-2", value: 0 }
+        { key: "p1\u0000standard\u0000standard 5/20-0", value: 2 },
+        { key: "p2\u0000standard\u0000standard 5/20-1", value: 0 },
+        { key: "p3\u0000standard\u0000standard 5/20-2", value: 0 }
       ]
     }
   });
@@ -279,6 +279,8 @@ test("history puzzle stats aggregate original sprint attempts and attach next re
     [
       {
         puzzleId: "p1",
+        mode: "standard",
+        ratingKey: "standard 5/20",
         correctCount: 1,
         wrongCount: 1,
         lastWrongAt: "2026-06-20T00:00:00.000Z",
@@ -286,12 +288,69 @@ test("history puzzle stats aggregate original sprint attempts and attach next re
       },
       {
         puzzleId: "p2",
+        mode: "standard",
+        ratingKey: "standard 5/20",
         correctCount: 0,
         wrongCount: 1,
         lastWrongAt: "2026-06-20T00:02:00.000Z"
       }
     ]
   );
+});
+
+test("history puzzle stats attach review queue by puzzle, mode, and rating key", () => {
+  const standardAttempt = attempt({
+    id: "a1",
+    puzzleId: "shared",
+    result: "wrong",
+    completedAt: "2026-06-20T00:00:00.000Z",
+    mode: "standard",
+    ratingKey: "standard 5/20"
+  });
+  const arrowAttempt = attempt({
+    id: "a2",
+    puzzleId: "shared",
+    result: "wrong",
+    completedAt: "2026-06-20T00:01:00.000Z",
+    mode: "arrow_duel",
+    ratingKey: "arrow duel 5/30"
+  });
+  const reviews = [
+    {
+      puzzleId: "shared",
+      mode: "arrow_duel" as const,
+      ratingKey: "arrow duel 5/30",
+      dueAt: "2026-06-22T00:00:00.000Z",
+      intervalHours: 48,
+      reviewCount: 1,
+      successStreak: 0,
+      lapseCount: 1,
+      lastResult: "wrong" as const,
+      lastReviewedAt: "2026-06-20T00:01:00.000Z"
+    }
+  ];
+
+  assert.equal(historyAttemptHasReviewQueued(standardAttempt, reviews), false);
+  assert.equal(historyAttemptHasReviewQueued(arrowAttempt, reviews), true);
+  assert.deepEqual(buildHistoryPuzzleStats([standardAttempt, arrowAttempt], reviews), [
+    {
+      puzzleId: "shared",
+      mode: "arrow_duel",
+      ratingKey: "arrow duel 5/30",
+      correctCount: 0,
+      wrongCount: 1,
+      lastWrongAt: "2026-06-20T00:01:00.000Z",
+      nextReviewAt: "2026-06-22T00:00:00.000Z"
+    },
+    {
+      puzzleId: "shared",
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      correctCount: 0,
+      wrongCount: 1,
+      lastWrongAt: "2026-06-20T00:00:00.000Z"
+    }
+  ]);
 });
 
 test("history side-to-move reflects the user turn shown for standard puzzles", () => {
@@ -303,6 +362,7 @@ function attempt(input: {
   puzzleId: string;
   result: "correct" | "wrong";
   completedAt: string;
+  mode?: HistoryAttemptView["mode"];
   ratingKey?: string;
 }): HistoryAttemptView {
   return {
@@ -310,7 +370,7 @@ function attempt(input: {
     source: "sprint",
     sessionId: "s1",
     puzzleId: input.puzzleId,
-    mode: "standard",
+    mode: input.mode ?? "standard",
     ratingKey: input.ratingKey ?? "standard 5/20",
     result: input.result,
     submittedMove: "a1a2",

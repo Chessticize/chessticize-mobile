@@ -286,6 +286,8 @@ test("PracticeService builds MemoryStore history view for a required time range 
   assert.deepEqual(view.puzzleStats, [
     {
       puzzleId: "000hf",
+      mode: "standard",
+      ratingKey: "standard 5/20",
       correctCount: 0,
       wrongCount: 1,
       lastWrongAt: "2026-06-20T00:00:05.000Z",
@@ -453,6 +455,8 @@ test("PracticeService records official MemoryStore reviews in history without mi
   assert.deepEqual(all.puzzleStats, [
     {
       puzzleId: "000hf",
+      mode: "standard",
+      ratingKey: "standard 5/20",
       correctCount: 1,
       wrongCount: 1,
       lastWrongAt: "2026-06-20T00:00:05.000Z",
