@@ -1,9 +1,10 @@
 # V1 Implementation Guide
 
-Status date: 2026-07-03. This document is the active work plan. It supersedes the
-priorities in `DESIGN_PARITY_BACKLOG.md` where they conflict; the backlog remains
-the detailed audit record. `MOBILE_UI_DESIGN.md` remains authoritative for screen
-behavior specs, subject to the v1 scope cuts below.
+Status date: 2026-07-03. This document is the V1 implementation completion
+record. It supersedes the priorities in `DESIGN_PARITY_BACKLOG.md` where they
+conflict; the backlog remains the detailed audit record. `MOBILE_UI_DESIGN.md`
+remains authoritative for screen behavior specs, subject to the v1 scope cuts
+below.
 
 ## Goal Status
 
@@ -14,8 +15,10 @@ and the accessibility/testID contract match the design, and the architecture
 boundary (UI renders view models; domain packages compute outcomes) is
 respected. See `DESIGN_PARITY_BACKLOG.md` for the audit evidence.
 
-The v1 goal is: **make every visible surface behaviorally real** — no mock data,
-no inert controls, no spec-violating flows — within the v1 scope below.
+The v1 goal — **make every visible surface behaviorally real** within the v1
+scope below — is **DONE**. All numbered work items below have implementation
+notes and validation coverage in code, component tests, core/storage tests, and
+iOS CI.
 
 ## V1 Scope Cuts
 
@@ -31,10 +34,6 @@ no inert controls, no spec-violating flows — within the v1 scope below.
 
 ### 1. Bundle a real puzzle set
 
-The app currently defaults to the `familiar15` fixture (15 puzzles); a
-1,000-puzzle presolved fixture (`fixtures/puzzles/presolved-1000.json`) exists
-behind the dev-only source switch.
-
 - Make the release default a real bundled pack sized for training across the
   600–1600 rating band with theme and Arrow Duel coverage (target: enough that
   a daily user does not see repeats for weeks; expand the presolve pipeline
@@ -45,7 +44,16 @@ behind the dev-only source switch.
   themes, Arrow Duel count, manifest hash, build date) from the real bundled
   pack metadata instead of the hardcoded catalog entry.
 
-### 2. Behavioral gaps that misrepresent state (backlog P0)
+Implementation note: item 1 is implemented by shipping `fixtures/puzzles/bundled-core-pack.json`
+as the release-default offline Core Pack. The pack contains 3,000 unique
+positions in the 600–1600 rating band, includes broad tactical themes and Arrow
+Duel coverage, and is paired with `bundled-core-pack.manifest.json` for count,
+rating range, theme count, Arrow Duel count, manifest hash, build date, source,
+license, and presolve metadata. `familiar15` and `presolved-1000.json` remain
+test-only sources behind the dev puzzle-source switch, while production-like
+services hide that switch.
+
+### 2. Implemented behavioral gaps that misrepresented state (backlog P0)
 
 - History speed and review-status filters must move into the domain query
   (`getHistoryView`) — today they filter only the loaded page client-side, so
@@ -60,7 +68,7 @@ with speed and review-status filters, making custom sprint theme selection part
 of the service start/count command, and persisting previous custom sprint
 configs through the store interface.
 
-### 3. Required behavior not yet implemented (backlog P1)
+### 3. Implemented required behavior (backlog P1)
 
 - Paused/backgrounded session state with explicit UI, driven by domain rules.
 - Randomized, attempt-persisted Arrow Duel candidate ordering (domain change;

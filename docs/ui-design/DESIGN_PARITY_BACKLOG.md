@@ -11,7 +11,7 @@ screens exist at visual parity, the accessibility/testID contract is complete,
 the color/typography tokens match, and the architecture boundary (UI renders
 view models, domain packages compute outcomes) is respected.
 
-This document is the audit record behind that call. The active work plan is
+This document is the audit record behind that call. The V1 completion record is
 `V1_IMPLEMENTATION_GUIDE.md`, which supersedes the priorities below where they
 conflict — notably, pack downloading/import/removal is cut from v1, which
 retires items 4 and 5's import aspects. Stop doing standalone visual polish
@@ -31,40 +31,43 @@ Strongly at parity (audited, no action needed):
 - Settings: sync toggle/disclosure/upload prompt, reset vs delete separation,
   advanced ratings, export, about/license.
 
-## P0 — Spec violations and correctness gaps
+## P0 — Spec Violations And Correctness Gaps (Resolved)
 
 1. **Arrow Duel scheduled review auto-advances after the punishment line.**
-   Spec: "A wrong Arrow Duel review stays on the same puzzle after the punishment
-   line. It must not auto-advance to the next review puzzle."
-   `submitReviewArrowFollowUpMove` calls `advanceReview` on `puzzleSolved`
-   (~L5052), which for `source === "due"` resets to the next due item (~L4815).
-   Fix: stay on the puzzle, offer a manual Continue affordance.
+   *(Resolved 2026-07-03: a wrong due Arrow Duel review records the result,
+   stays on the same puzzle after the punishment line, and exposes a manual
+   Continue button. Covered by the mobile component test
+   "keeps a wrong due Arrow Duel review on the same puzzle until Continue is
+   pressed".)*
 
-2. **History speed and review-status filters are client-side and page-local.**
-   `speedFilter` / `reviewStatusFilter` (~L3027-3041) filter only the currently
-   loaded page, so counts are wrong and Analysis Review prev/next (which uses the
-   unpaged `fullHistoryReviewView`, ~L984) navigates to rows hidden from the list.
-   Fix: push both filters into `getHistoryView` in `packages/core/history-query.ts`
-   and the storage query layer, with unit + integration tests.
+2. **History speed and review-status filters were client-side and page-local.**
+   *(Resolved 2026-07-03: `speedSeconds` and `reviewStatus` are part of the
+   domain `getHistoryView` query and are applied before paging in core, memory
+   store, and SQLite store coverage.)*
 
-3. **Custom sprint theme control is inert.** Theme is local state (~L1666) and is
-   never passed to `onStart` or puzzle selection, so the eligibility summary and
-   pack warning can misrepresent what will actually be selected. Fix: thread theme
-   through the sprint start intent into domain puzzle selection.
+3. **Custom sprint theme control was inert.** *(Resolved 2026-07-03: custom
+   sprint start/count commands pass the selected theme through the service into
+   domain puzzle selection, and the UI exposes a broaden-theme recovery when
+   coverage is too narrow.)*
 
-4. **Packs tab is entirely mock.** *(Superseded 2026-07-02: pack
+4. **Packs tab was entirely mock.** *(Superseded 2026-07-02: pack
    download/import/removal is cut from v1 and the UI for it was removed. The
    remaining v1 work is bundling a real puzzle set and driving the Packs tab
-   from its real metadata — see `V1_IMPLEMENTATION_GUIDE.md` item 1.)*
+   from its real metadata — see `V1_IMPLEMENTATION_GUIDE.md` item 1. Resolved
+   2026-07-03: the Packs tab now renders the bundled Core Pack from manifest
+   metadata.)*
 
-5. **Custom sprint "Previous configs" are hardcoded placeholders** (~L1671-1696).
-   Fix: persist recently used custom configs and render them as real reusable rows
-   with actual last-played and per-config ELO.
+5. **Custom sprint "Previous configs" were hardcoded placeholders.**
+   *(Resolved 2026-07-03: recently used custom configs are persisted through the
+   store/service boundary and rendered as reusable rows with last-played and
+   per-config rating data.)*
 
-## P1 — Required behavior not yet implemented
+## P1 — Required Behavior (Resolved)
 
-6. **No paused/backgrounded session state.** Spec requires an explicit paused UI
-   driven by domain rules; session status is only active/won/failed (~L241).
+6. **No paused/backgrounded session state.** *(Resolved 2026-07-03: `paused` is
+   a domain sprint status, pause/resume preserve remaining time, stores keep
+   paused sprints open, and the mobile UI renders an explicit paused session
+   panel.)*
 7. **Punishment-line playback has no pause/step controls.** *(Resolved
    2026-07-02: the current guided interaction is the intended behavior — the
    opponent's refutation auto-plays, then the user plays each punishment-line
@@ -76,17 +79,16 @@ Strongly at parity (audited, no action needed):
    surface uses the color legend and "You chose" text marker and keeps the
    board clear for the guided punishment line; the colored candidate arrows
    render in Analysis mode at the initial position. The spec was updated.)*
-9. **Arrow Duel candidate ordering is index-parity, not randomized/persisted.**
-   `beginArrowDuelPuzzle(puzzle, seed)` with seed = puzzle index
-   (`packages/core/src/sprint-session.ts` ~L183; first puzzle always shows the
-   best move as candidate A). Fix in domain: randomize and store order with the
-   attempt.
-10. **Analysis checkmate shows an empty candidate list** instead of `1-0`/`0-1`
-    (`packages/core/src/engine-analysis.ts` ~L260). The result line already exists
-    for punishment-line evals; reuse it for the analysis list.
-11. **No loading skeleton for the session shell.** Board space is reserved (no
-    layout shift) but spec asks for a skeleton status bar + board placeholder
-    instead of the "Ready" text box (~L1122).
+9. **Arrow Duel candidate ordering was index-parity, not randomized/persisted.**
+   *(Resolved 2026-07-03: candidate ordering is seeded by session and puzzle
+   identity so each attempt is stable without always placing the best move in
+   candidate A.)*
+10. **Analysis checkmate showed an empty candidate list** instead of `1-0`/`0-1`.
+    *(Resolved 2026-07-03: analysis and guided review current-position lines
+    format terminal checkmate as the game result.)*
+11. **No loading skeleton for the session shell.** *(Resolved 2026-07-03: the
+    practice screen renders a session-loading skeleton for the status row and
+    board surface.)*
 
 ## P2 — Deviations to confirm or tidy
 
