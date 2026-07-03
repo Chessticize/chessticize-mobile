@@ -4,6 +4,8 @@ import {
   abandonSprint,
   buildSprintConfig,
   defaultSprintConfig,
+  pauseSprint,
+  resumeSprint,
   serializeSprintView,
   startSprint,
   submitSprintMove
@@ -137,6 +139,43 @@ test("a correct Arrow Duel move records the puzzle and advances to the next puzz
   assert.equal(result.state.currentPuzzle?.puzzle.id, "p2");
 });
 
+test("Arrow Duel candidate ordering is stable for one attempt and seeded by the sprint session", () => {
+  const config = buildSprintConfig({
+    mode: "arrow_duel",
+    durationSeconds: 300,
+    perPuzzleSeconds: 30,
+    targetCorrect: 1,
+    maxMistakes: 3
+  });
+  const first = startSprint({
+    id: "session-a",
+    config,
+    puzzles: [samplePuzzle("p1")],
+    ratingBefore: 600,
+    now: NOW
+  });
+  const repeated = startSprint({
+    id: "session-a",
+    config,
+    puzzles: [samplePuzzle("p1")],
+    ratingBefore: 600,
+    now: NOW
+  });
+  const second = startSprint({
+    id: "session-b",
+    config,
+    puzzles: [samplePuzzle("p1")],
+    ratingBefore: 600,
+    now: NOW
+  });
+
+  assert.equal(first.currentPuzzle?.kind, "arrow_duel");
+  assert.equal(repeated.currentPuzzle?.kind, "arrow_duel");
+  assert.equal(second.currentPuzzle?.kind, "arrow_duel");
+  assert.deepEqual(first.currentPuzzle?.candidates, repeated.currentPuzzle?.candidates);
+  assert.notDeepEqual(first.currentPuzzle?.candidates, second.currentPuzzle?.candidates);
+});
+
 test("a target-one correct Arrow Duel sprint completes immediately", () => {
   const state = startSprint({
     config: buildSprintConfig({
@@ -193,6 +232,34 @@ test("expired sprint fails before accepting another move", () => {
   assert.equal(result.state.status, "failed");
   assert.equal(result.state.endReason, "time_expired");
   assert.equal(result.attempt, undefined);
+});
+
+test("paused sprint ignores moves and resumes with the remaining time preserved", () => {
+  const state = startSprint({
+    config: buildSprintConfig({ mode: "standard", durationSeconds: 60, perPuzzleSeconds: 20, targetCorrect: 1 }),
+    puzzles: [samplePuzzle("00008")],
+    ratingBefore: 900,
+    now: NOW
+  });
+
+  const paused = pauseSprint(state, "2026-06-20T00:00:10.000Z");
+  assert.equal(paused.status, "paused");
+  assert.equal(paused.pausedAt, "2026-06-20T00:00:10.000Z");
+
+  const ignored = submitSprintMove(paused, "e6e7", "2026-06-20T00:00:20.000Z");
+  assert.equal(ignored.state.status, "paused");
+  assert.equal(ignored.feedback, undefined);
+  assert.equal(ignored.attempt, undefined);
+
+  const resumed = resumeSprint(paused, "2026-06-20T00:00:40.000Z");
+  assert.equal(resumed.status, "active");
+  assert.equal(resumed.pausedAt, undefined);
+  assert.equal(resumed.totalPausedMs, 30000);
+  assert.equal(resumed.deadlineAt, "2026-06-20T00:01:30.000Z");
+
+  const accepted = submitSprintMove(resumed, "e6e7", "2026-06-20T00:01:05.000Z");
+  assert.equal(accepted.state.status, "active");
+  assert.equal(accepted.feedback?.result, "correct");
 });
 
 test("per-puzzle pace does not reject correct moves before the sprint deadline", () => {

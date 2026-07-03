@@ -1,7 +1,9 @@
 import {
   abandonSprint as abandonSprintCore,
   buildSprintConfig,
+  pauseSprint as pauseSprintCore,
   RATING_FLOOR,
+  resumeSprint as resumeSprintCore,
   serializeSprintView,
   startSprint,
   submitSprintMove
@@ -54,7 +56,7 @@ export class PracticeService {
   }
 
   startSprint(command: StartSprintCommand, now = new Date().toISOString()): SprintState {
-    if (this.activeSprint?.status === "active") {
+    if (this.activeSprint && (this.activeSprint.status === "active" || this.activeSprint.status === "paused")) {
       throw new Error("Cannot start a new sprint while another sprint is active");
     }
     const config = this.sprintConfigForCommand(command);
@@ -113,12 +115,12 @@ export class PracticeService {
         }
       }
 
-      if (result.state.status !== "active") {
+      if (!isOpenSprint(result.state)) {
         this.persistCompletedSprint(result.state);
       }
     });
 
-    if (result.state.status === "active") {
+    if (isOpenSprint(result.state)) {
       this.activeSprint = result.state;
     } else {
       this.activeSprint = undefined;
@@ -150,6 +152,31 @@ export class PracticeService {
     });
     this.activeSprint = undefined;
     return completed;
+  }
+
+  pauseSprint(now = new Date().toISOString()): SprintState {
+    if (!this.activeSprint) {
+      throw new Error("No active sprint");
+    }
+    const paused = pauseSprintCore(this.activeSprint, now);
+    if (isOpenSprint(paused)) {
+      this.activeSprint = paused;
+      this.store.updateSprintSession(paused);
+    } else {
+      this.activeSprint = undefined;
+      this.persistCompletedSprint(paused);
+    }
+    return paused;
+  }
+
+  resumeSprint(now = new Date().toISOString()): SprintState {
+    if (!this.activeSprint) {
+      throw new Error("No active sprint");
+    }
+    const resumed = resumeSprintCore(this.activeSprint, now);
+    this.activeSprint = resumed;
+    this.store.updateSprintSession(resumed);
+    return resumed;
   }
 
   getState(): unknown {
@@ -365,6 +392,10 @@ function defaultPerPuzzleSeconds(mode: SprintMode): number {
     return 30;
   }
   return 20;
+}
+
+function isOpenSprint(state: SprintState): boolean {
+  return state.status === "active" || state.status === "paused";
 }
 
 function buildCustomSprintConfigRecord(input: {

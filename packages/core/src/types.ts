@@ -1,6 +1,6 @@
 export type SprintMode = "standard" | "blitz" | "arrow_duel" | "custom";
 
-export type SprintStatus = "active" | "won" | "failed" | "abandoned";
+export type SprintStatus = "active" | "paused" | "won" | "failed" | "abandoned";
 
 export type AttemptResult = "correct" | "wrong";
 
@@ -114,6 +114,8 @@ export interface SprintState {
   deadlineAt: string;
   currentPuzzleStartedAt?: string;
   currentPuzzleDeadlineAt?: string;
+  pausedAt?: string;
+  totalPausedMs?: number;
   completedAt?: string;
   endReason?: SprintEndReason;
   correctCount: number;

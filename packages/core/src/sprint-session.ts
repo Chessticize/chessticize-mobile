@@ -40,7 +40,7 @@ export function startSprint(input: {
   };
   return {
     ...state,
-    currentPuzzle: buildCurrentPuzzle(input.config.mode, input.puzzles[0], 0)
+    currentPuzzle: buildCurrentPuzzle(input.config.mode, input.puzzles[0], candidateSeed(state, 0))
   };
 }
 
@@ -75,6 +75,38 @@ export function submitSprintMove(state: SprintState, move: string, now: string):
   );
 }
 
+export function pauseSprint(state: SprintState, now: string): SprintState {
+  const timedState = failIfExpired(state, now);
+  if (timedState.status !== "active") {
+    return timedState;
+  }
+  return {
+    ...timedState,
+    status: "paused",
+    pausedAt: new Date(now).toISOString()
+  };
+}
+
+export function resumeSprint(state: SprintState, now: string): SprintState {
+  if (state.status !== "paused") {
+    return state;
+  }
+  const pausedAt = state.pausedAt ? new Date(state.pausedAt).getTime() : new Date(now).getTime();
+  const resumedAt = new Date(now).getTime();
+  const pausedMs = Math.max(0, resumedAt - pausedAt);
+  const {
+    pausedAt: _pausedAt,
+    ...withoutPausedAt
+  } = state;
+  return {
+    ...withoutPausedAt,
+    status: "active",
+    deadlineAt: shiftIso(state.deadlineAt, pausedMs),
+    ...(state.currentPuzzleDeadlineAt ? { currentPuzzleDeadlineAt: shiftIso(state.currentPuzzleDeadlineAt, pausedMs) } : {}),
+    totalPausedMs: (state.totalPausedMs ?? 0) + pausedMs
+  };
+}
+
 export function abandonSprint(state: SprintState, now: string): SprintState {
   return completeSprint(state, "failed", "abandoned", now);
 }
@@ -86,6 +118,8 @@ export function serializeSprintView(state: SprintState): unknown {
     status: state.status,
     startedAt: state.startedAt,
     deadlineAt: state.deadlineAt,
+    pausedAt: state.pausedAt,
+    totalPausedMs: state.totalPausedMs ?? 0,
     completedAt: state.completedAt,
     endReason: state.endReason,
     correctCount: state.correctCount,
@@ -180,7 +214,7 @@ function applyPuzzleFeedback(state: SprintState, feedback: PuzzleFeedback, now: 
       ...updated,
       currentPuzzleIndex: nextPuzzleIndex,
       currentPuzzleStartedAt: new Date(now).toISOString(),
-      currentPuzzle: buildCurrentPuzzle(state.config.mode, state.puzzles[nextPuzzleIndex], nextPuzzleIndex)
+      currentPuzzle: buildCurrentPuzzle(state.config.mode, state.puzzles[nextPuzzleIndex], candidateSeed(state, nextPuzzleIndex))
     },
     feedback,
     attempt
@@ -257,7 +291,7 @@ function averagePuzzleRating(puzzles: Puzzle[]): number {
   return Math.round(total / puzzles.length);
 }
 
-function buildCurrentPuzzle(mode: SprintConfig["mode"], puzzle: Puzzle | undefined, seed: number): CurrentPuzzleState {
+function buildCurrentPuzzle(mode: SprintConfig["mode"], puzzle: Puzzle | undefined, seed: string): CurrentPuzzleState {
   if (!puzzle) {
     throw new Error("No puzzle available");
   }
@@ -265,6 +299,15 @@ function buildCurrentPuzzle(mode: SprintConfig["mode"], puzzle: Puzzle | undefin
     return beginArrowDuelPuzzle(puzzle, seed);
   }
   return beginLinePuzzle(puzzle);
+}
+
+function candidateSeed(state: SprintState, puzzleIndex: number): string {
+  const puzzle = state.puzzles[puzzleIndex];
+  return `${state.id}:${puzzle?.id ?? "missing"}:${puzzleIndex}`;
+}
+
+function shiftIso(iso: string, deltaMs: number): string {
+  return new Date(new Date(iso).getTime() + deltaMs).toISOString();
 }
 
 function generateId(): string {

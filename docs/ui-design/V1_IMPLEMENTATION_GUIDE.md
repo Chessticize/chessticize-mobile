@@ -70,6 +70,15 @@ configs through the store interface.
   candidate list.
 - Session loading skeleton (status bar + board placeholder).
 
+Implementation note: item 3 is implemented by adding a domain `paused` sprint
+state with `pauseSprint` / `resumeSprint`, preserving remaining time by shifting
+the deadline on resume, keeping paused sessions open through the service/store
+boundary, and rendering an explicit paused session UI. Arrow Duel candidate
+order is now seeded by the session and puzzle identity so each attempt is stable
+without always putting the best move in candidate A. The analysis current
+position line handles terminal checkmate as `1-0` / `0-1`, and the practice
+screen includes a session-loading skeleton for the status row and board surface.
+
 ### 4. Tidy-ups (backlog P2, fold into whichever PR touches the screen)
 
 See `DESIGN_PARITY_BACKLOG.md` items 12–18. Resolve or explicitly record each

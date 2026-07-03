@@ -186,12 +186,12 @@ export class MemoryStore implements PracticeStore {
       attempts: this.attempts.length,
       reviewEvents: 0,
       reviewQueue: this.reviewQueue.size,
-      sprintSessions: [...this.sessions.values()].filter((session) => session.status !== "active").length
+      sprintSessions: [...this.sessions.values()].filter((session) => !isOpenSprint(session)).length
     };
     this.attempts.splice(0, this.attempts.length);
     this.reviewQueue.clear();
     for (const [id, session] of this.sessions) {
-      if (session.status !== "active") {
+      if (!isOpenSprint(session)) {
         this.sessions.delete(id);
       }
     }
@@ -305,6 +305,10 @@ export class MemoryStore implements PracticeStore {
 
 function reviewQueueKey(context: ReviewContext): string {
   return `${context.puzzleId}\u0000${context.mode}\u0000${context.ratingKey}`;
+}
+
+function isOpenSprint(session: SprintState): boolean {
+  return session.status === "active" || session.status === "paused";
 }
 
 function compareReviewQueueState(left: ReviewQueueState, right: ReviewQueueState): number {

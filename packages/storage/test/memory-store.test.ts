@@ -69,6 +69,32 @@ test("MemoryStore records due reviews for wrong Arrow Duel choices", async () =>
   assert.equal(service.getDueReviews("2026-06-20T12:00:00.000Z").length, 0);
 });
 
+test("PracticeService keeps paused sprints open and resumes through the store boundary", async () => {
+  const store = new MemoryStore();
+  store.seedPuzzles(await loadFixturePuzzles());
+  const service = new PracticeService(store);
+
+  const sprint = service.startSprint(
+    { mode: "standard", durationSeconds: 60, perPuzzleSeconds: 20, targetCorrect: 1, maxMistakes: 3, theme: "hangingPiece" },
+    "2026-06-20T00:00:00.000Z"
+  );
+  const paused = service.pauseSprint("2026-06-20T00:00:10.000Z");
+
+  assert.equal(paused.status, "paused");
+  assert.equal(service.getActiveSprint()?.id, sprint.id);
+  assert.equal(store.clearLocalHistory().sprintSessions, 0);
+  assert.equal(service.getActiveSprint()?.status, "paused");
+
+  const resumed = service.resumeSprint("2026-06-20T00:00:40.000Z");
+  assert.equal(resumed.status, "active");
+  assert.equal(resumed.deadlineAt, "2026-06-20T00:01:30.000Z");
+
+  service.submitMove("e6e7", "2026-06-20T00:00:45.000Z");
+  service.submitMove("b3c1", "2026-06-20T00:00:50.000Z");
+  const solved = service.submitMove("h6c1", "2026-06-20T00:00:55.000Z");
+  assert.equal(solved.state.status, "won");
+});
+
 test("MemoryStore does not select duplicate puzzle positions for one sprint", async () => {
   const store = new MemoryStore();
   const puzzles = await loadFixturePuzzles();
