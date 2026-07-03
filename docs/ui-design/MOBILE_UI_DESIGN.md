@@ -340,6 +340,7 @@ Custom sprint behavior:
 - Correct reviews increase interval; failed reviews reset or shorten interval.
 - Empty state should say when the next review is due and offer regular practice.
 - Review cards should show mode, theme, last wrong date, due state, current interval, and source sprint type.
+- The default Review Queue surface shows the due summary plus difficulty group rows for calm density; per-item review cards and grouped starts appear in the expanded filter view.
 - The user can stop a Scheduled Review session at any time. Completed items are saved; unseen items remain due or overdue.
 - After a Scheduled Review batch, the user may open Analysis Review for missed items. That follow-up inspection does not create history rows and does not update the schedule.
 - Post-sprint Analysis Review is also unrecorded. It is for same-day exploration only; the scheduled memory-curve review still starts from the stored due date, normally the next day after the miss.
@@ -367,7 +368,7 @@ Custom sprint behavior:
 ### Sprint Results
 
 - Results should stay action-oriented and compact.
-- Show win/loss, reason, solved count, mistakes, time, rating before/after, rating delta, review queue impact, Play Again, and Review Mistakes.
+- Show win/loss, reason, solved count, mistakes, time, best streak, rating before/after, rating delta, review queue impact, Play Again, and Review Mistakes.
 - Do not make the rating performance chart the main result view; link to History for deeper trend analysis.
 
 ### Settings
@@ -376,11 +377,51 @@ Custom sprint behavior:
 - ELO reset is explicit and separate from deleting history.
 - Advanced manual ELO adjustment should be hidden behind an "Advanced ratings" affordance.
 - iCloud sync default state should match the sync plan: default on for fresh iOS installs with disclosure, explicit prompt before uploading existing local-only progress.
+- Sync status must always reflect real system state. Until a real sync engine ships, Settings must present the honest local-only state: no simulated sync toggles, no fabricated "last synced" timestamps.
+
+### Review Reminder Notifications
+
+Daily local notifications remind the user when scheduled reviews are due. No
+push infrastructure: everything is computed on device from the local review
+queue.
+
+Scheduling rules:
+
+- At most one reminder per day, and only when at least one review item will be
+  due at the reminder time. Zero due items means no notification.
+- The reminder time defaults to a smart time: the hour the user most often
+  trains, derived from local attempt history (median session start hour over
+  the trailing 14 days, minimum 5 sessions). Until enough history exists, fall
+  back to 19:00 local time.
+- The user can override the smart default with a fixed time, or disable
+  reminders entirely, from a Notifications section in Settings.
+- The notification copy includes the due count, for example "12 puzzles are
+  ready for review". Tapping it opens the Review tab.
+- The next reminder is (re)scheduled whenever the review queue changes and when
+  the app backgrounds, using the projected due count at the reminder time
+  (computable locally from stored `dueAt` timestamps).
+
+Permission flow:
+
+- Do not request notification permission at first launch. Ask contextually:
+  after the first review session completes (value already demonstrated), offer
+  enabling reminders with a one-line explanation, then trigger the iOS
+  permission prompt.
+- If permission is denied, the Settings row shows the disabled state with a
+  link to system settings. Never re-prompt automatically.
+
+Architecture:
+
+- The decision "what reminder should be scheduled next" (time, due-count copy,
+  or none) is computed in the domain core from the review queue, usage
+  history, and notification settings, and is unit-testable in Node.
+- The platform notification API (UNUserNotificationCenter) sits behind an
+  interface with a maintained fake, matching the repo boundary rules.
 
 ### Packs
 
 V1 scope note: pack downloading, import, and removal are deferred beyond v1
-(see `V1_IMPLEMENTATION_GUIDE.md`). V1 ships a bundled puzzle pack only; the
+(see `docs/APP_STORE_PLAN.md`). V1 ships a bundled puzzle pack only; the
 Packs screen shows the bundled pack, its coverage, and license/source
 attribution. The requirements below describe the full post-v1 feature.
 
