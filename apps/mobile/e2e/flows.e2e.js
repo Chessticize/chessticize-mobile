@@ -69,10 +69,15 @@ describe('Key user flows', () => {
     await failStandardSprint();
     await dismissSprintSummary();
 
-    await openTab('history-tab', 'history-filter-wrong-7-days');
+    await openTab('history-tab', 'history-action-header');
     await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
     await expect(element(by.id('history-performance-card'))).toExist();
 
+    // The Wrong 7d chip is the last item in the horizontal range chip strip.
+    await waitFor(element(by.id('history-filter-wrong-7-days')))
+      .toBeVisible()
+      .whileElement(by.id('history-range-filters'))
+      .scroll(120, 'right');
     await element(by.id('history-filter-wrong-7-days')).tap();
     await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
   });

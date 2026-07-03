@@ -88,6 +88,7 @@ function boardPoint(frame, square, flipped = false) {
 }
 
 async function openTab(tabTestID, contentTestID) {
+  await waitFor(element(by.id(tabTestID))).toExist().withTimeout(180000);
   await element(by.id(tabTestID)).tap();
   // Tabs share one scroll view, so the previous tab's scroll offset persists;
   // container panels are taller than the viewport, so assert on a child.
