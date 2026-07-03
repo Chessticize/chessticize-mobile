@@ -84,6 +84,13 @@ screen includes a session-loading skeleton for the status row and board surface.
 See `DESIGN_PARITY_BACKLOG.md` items 12–18. Resolve or explicitly record each
 decision; do not open standalone polish PRs for them.
 
+Implementation note: item 4 resolves the remaining P2 decisions. Review queue
+item cards stay behind expanded filters for density, Arrow Duel-only remains a
+mode-filter shortcut, History uses `ratingKey` as the v1 sprint-config bucket,
+the board-adjacent score strip and Best Streak result metric are kept and
+specified, Sync is moved to the top of Settings, and Custom Sprint exposes Mixed
+plus supported tactical theme strings.
+
 ## Out of Scope for V1
 
 - Pack downloading/import/removal (cut above).

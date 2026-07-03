@@ -764,6 +764,10 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "custom-mode-row"))).not.toContain("Board moves");
     expect(collectText(findByTestId(renderer, "custom-mode-row"))).not.toContain("Two candidates");
     expect(findByTestId(renderer, "custom-theme-row")).toBeTruthy();
+    expect(findByTestId(renderer, "custom-theme-fork")).toBeTruthy();
+    expect(findByTestId(renderer, "custom-theme-hanging-piece")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("Sacrifice");
+    expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("Promotion");
     expect(() => findByTestId(renderer, "custom-summary-card")).toThrow();
     expect(collectText(findByTestId(renderer, "custom-summary-target"))).toBe("Estimated puzzles~15");
     expect(collectText(findByTestId(renderer, "custom-summary-rating-range"))).toBe("Rating range400 - 800");
@@ -2017,6 +2021,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "settings-data-section")).toBeTruthy();
     expect(findByTestId(renderer, "settings-packs-section")).toBeTruthy();
     expect(findByTestId(renderer, "settings-about-section")).toBeTruthy();
+    expect(testIdOrder(renderer, "settings-sync-section", "settings-profile-section")).toBeLessThan(0);
     expect(findByTestId(renderer, "settings-standard-elo-row")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "settings-standard-elo-row"))).toContain("ELO 600");
     expect(collectText(findByTestId(renderer, "settings-standard-elo-row"))).toContain("Advanced ratings · 3 buckets");

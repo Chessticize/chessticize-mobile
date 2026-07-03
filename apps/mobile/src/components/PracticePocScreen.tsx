@@ -77,7 +77,7 @@ type Tab = "practice" | "review" | "history" | "settings" | "packs" | "analysis"
 type SessionFeedback = PuzzleFeedback | null;
 type AnalysisEngineStatus = "idle" | "thinking" | "stockfish" | "fallback" | "error";
 type HistoryRatingRangeFilter = "all" | "under1000" | "1000-1399" | "1400-plus";
-type CustomThemeFilter = "mixed" | "mate" | "endgame";
+type CustomThemeFilter = string;
 
 export type PracticeDebugTraceEvent = {
   type:
@@ -134,6 +134,18 @@ const USER_FEEDBACK_BEFORE_AUTO_MS = 260;
 const ANALYSIS_DEPTH = 20;
 const CUSTOM_DURATION_OPTIONS = [3 * 60, 5 * 60, 10 * 60] as const;
 const CUSTOM_PER_PUZZLE_OPTIONS = [10, 20, 30] as const;
+const CUSTOM_THEME_OPTIONS: ReadonlyArray<CustomThemeFilter> = [
+  "mixed",
+  "mate",
+  "endgame",
+  "fork",
+  "pin",
+  "skewer",
+  "sacrifice",
+  "promotion",
+  "hangingPiece",
+  "advancedPawn"
+];
 const BOARD_COLOR_TOKENS = {
   white: "#E6E8EB",
   black: "#7B8794"
@@ -1881,7 +1893,7 @@ function CustomSprintSetup({
         <CustomChoiceRow
           label="Theme"
           value={customThemeLabel(theme)}
-          options={["Mixed", "Mate", "Endgame"]}
+          options={CUSTOM_THEME_OPTIONS.map(customThemeLabel)}
           testID="custom-theme-row"
           onChange={(label) => onThemeChange(customThemeFromLabel(label))}
         />
@@ -5838,33 +5850,6 @@ function SettingsPanel({
 
   return (
     <View style={styles.settingsPanel} testID="settings-panel">
-      <SettingsSection title="Profile" testID="settings-profile-section">
-        <SettingsRow
-          label="Puzzle ELO (Standard)"
-          value={`ELO ${standardRating}`}
-          detail={`Advanced ratings · ${ratings.length} buckets`}
-          testID="settings-standard-elo-row"
-          onPress={() => setAdvancedRatingsOpen((current) => !current)}
-        />
-        <SettingsRow
-          label="Reset ELO"
-          detail="Resets the Standard puzzle rating only"
-          destructive
-          showDetail={false}
-          testID="settings-reset-elo"
-          onPress={() => setConfirmation("reset-elo")}
-        />
-        {advancedRatingsOpen ? (
-          <AdvancedRatingsPanel
-            ratings={ratings}
-            onAdjust={(ratingKey, nextRating) => {
-              const next = onAdjustRating(ratingKey, nextRating);
-              setStatusMessage(`${ratingLabelFromKey(ratingKey)} rating set to ${next.rating}`);
-            }}
-          />
-        ) : null}
-      </SettingsSection>
-
       <SettingsSection title="Sync" testID="settings-sync-section">
         <View style={styles.settingsRow} testID="settings-icloud-sync-row">
           <View style={styles.settingsRowCopy}>
@@ -5934,6 +5919,33 @@ function SettingsPanel({
             </View>
             <ChevronGlyph direction="right" />
           </Pressable>
+        ) : null}
+      </SettingsSection>
+
+      <SettingsSection title="Profile" testID="settings-profile-section">
+        <SettingsRow
+          label="Puzzle ELO (Standard)"
+          value={`ELO ${standardRating}`}
+          detail={`Advanced ratings · ${ratings.length} buckets`}
+          testID="settings-standard-elo-row"
+          onPress={() => setAdvancedRatingsOpen((current) => !current)}
+        />
+        <SettingsRow
+          label="Reset ELO"
+          detail="Resets the Standard puzzle rating only"
+          destructive
+          showDetail={false}
+          testID="settings-reset-elo"
+          onPress={() => setConfirmation("reset-elo")}
+        />
+        {advancedRatingsOpen ? (
+          <AdvancedRatingsPanel
+            ratings={ratings}
+            onAdjust={(ratingKey, nextRating) => {
+              const next = onAdjustRating(ratingKey, nextRating);
+              setStatusMessage(`${ratingLabelFromKey(ratingKey)} rating set to ${next.rating}`);
+            }}
+          />
         ) : null}
       </SettingsSection>
 
@@ -6960,23 +6972,16 @@ function themeForCustomSprint(theme: CustomThemeFilter): string | undefined {
 }
 
 function customThemeLabel(theme: CustomThemeFilter): string {
-  if (theme === "mate") {
-    return "Mate";
+  if (theme === "mixed") {
+    return "Mixed";
   }
-  if (theme === "endgame") {
-    return "Endgame";
-  }
-  return "Mixed";
+  return theme
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
 function customThemeFromLabel(label: string): CustomThemeFilter {
-  if (label === "Mate") {
-    return "mate";
-  }
-  if (label === "Endgame") {
-    return "endgame";
-  }
-  return "mixed";
+  return CUSTOM_THEME_OPTIONS.find((theme) => customThemeLabel(theme) === label) ?? "mixed";
 }
 
 function previousCustomConfigRowModel(
@@ -7001,7 +7006,7 @@ function previousCustomConfigRowModel(
 }
 
 function customThemeFromStoredValue(theme: string | undefined): CustomThemeFilter {
-  if (theme === "mate" || theme === "endgame") {
+  if (theme && CUSTOM_THEME_OPTIONS.includes(theme)) {
     return theme;
   }
   return "mixed";

@@ -90,18 +90,30 @@ Strongly at parity (audited, no action needed):
 
 ## P2 — Deviations to confirm or tidy
 
-12. Review queue per-item cards render only when the filter panel is expanded
-    (~L4383); the design board shows difficulty rows by default, so current
-    behavior may be fine — decide and record.
+12. Review queue per-item cards render only when the filter panel is expanded.
+    *(Resolved 2026-07-03: keep this behavior for v1. The default Review Queue
+    surface intentionally shows the due summary plus difficulty rows for calm
+    density; expanded filters expose per-item cards and grouped starts.)*
 13. "Arrow Duel only" filters in History/Review are aliases for the mode filter,
-    not independent toggles.
-14. History lacks a dedicated sprint-config filter (ratingKey buckets approximate it).
-15. `SessionScoreStrip` below the board duplicates status-bar progress/mistakes;
-    spec prefers calm density — consider removing one.
-16. "Best Streak" on Sprint Results is not in the spec field list — keep or spec it.
+    not independent toggles. *(Resolved 2026-07-03: keep as a user-facing shortcut
+    alias for `mode = arrow_duel`; it should not create a second independent
+    filter dimension.)*
+14. History lacks a dedicated sprint-config filter. *(Resolved 2026-07-03:
+    `ratingKey` is the sprint-config bucket for v1 because it encodes mode,
+    duration, pace, and theme; separate speed/theme filters refine the bucket.)*
+15. `SessionScoreStrip` below the board duplicates status-bar progress/mistakes.
+    *(Resolved 2026-07-03: keep for v1 because it provides a stable compact
+    board-adjacent score readout while the status bar remains the global session
+    chrome.)*
+16. "Best Streak" on Sprint Results is not in the spec field list. *(Resolved
+    2026-07-03: keep and spec it as a useful sprint-result metric alongside
+    rating change and elapsed time.)*
 17. Settings sync section sits below Profile; spec says "near the top."
+    *(Resolved 2026-07-03: Sync now renders first in Settings.)*
 18. Custom theme list is only Mixed/Mate/Endgame; spec says Mixed plus supported
-    tactical themes from the domain config.
+    tactical themes from the domain config. *(Resolved 2026-07-03: Custom Sprint
+    now exposes Mixed plus the supported theme strings used by domain puzzle
+    selection.)*
 
 ## Process
 
