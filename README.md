@@ -1,15 +1,15 @@
 # Chessticize Mobile
 
-Chessticize Mobile is the planned offline-first, open-source mobile app for Puzzle Sprint and Arrow Duel.
+Chessticize Mobile is an offline-first, open-source iOS training app for Puzzle Sprint and Arrow Duel: timed tactics sprints, per-mode ELO, and spaced-repetition review of mistakes, all computed on device from a bundled puzzle pack.
 
-The current repository includes the offline backend core, CLI test harness, and a React Native mobile practice screen for local Standard Sprint and Arrow Duel iteration.
+The repository contains the React Native app shell (`apps/mobile`), a pure TypeScript domain core (`packages/core`), storage services (`packages/storage`), a stdio CLI harness (`apps/cli`), and bundled puzzle fixtures (`fixtures/puzzles`).
 
 ## Documents
 
-- [Phased Execution Plan](docs/PHASED_EXECUTION_PLAN.md)
-- [Mobile UI Design](docs/ui-design/MOBILE_UI_DESIGN.md)
-- [Core Library And CLI](docs/CORE_CLI.md)
-- [Agent Instructions](AGENTS.md)
+- [Mobile UI Design](docs/ui-design/MOBILE_UI_DESIGN.md) — authoritative screen behavior and visual spec
+- [Core Library And CLI](docs/CORE_CLI.md) — backend package layout and CLI harness
+- [App Store Plan](docs/APP_STORE_PLAN.md) — active goal and milestone plan toward the 1.0 submission
+- [Agent Instructions](AGENTS.md) — architecture boundary, testing philosophy, and PR workflow
 
 ## Current Implementation
 
