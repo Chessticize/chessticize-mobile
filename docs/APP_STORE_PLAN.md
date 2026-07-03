@@ -262,6 +262,14 @@ Design approved 2026-07-03; the "Review Reminder Notifications" section of
 4. **Release configuration**: dev-only puzzle-source switch verified hidden in
    release (already gated on `__DEV__`), LogBox suppression acceptable, no
    debug menus reachable, Metro not required.
+   Status: implementation complete. Release gating now lives in
+   `apps/mobile/src/releaseConfig.ts`, so test-only puzzle source controls,
+   Stockfish diagnostics, and debug tracing are behind explicit development or
+   test-harness flags. `App.tsx` suppresses LogBox only in React Native
+   development builds, not production-like module loads. The release
+   configuration tests verify that the puzzle-source switch is hidden with
+   `__DEV__ = false`, can still be enabled by the Jest harness, and does not
+   require Metro or a debug menu surface in app code.
 5. **Device targets**: decide iPhone-only vs iPad support
    (`TARGETED_DEVICE_FAMILY`), orientation lock (portrait-first per design),
    minimum iOS version; verify layout on iPhone SE-size and current-flagship

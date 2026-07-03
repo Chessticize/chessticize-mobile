@@ -9,6 +9,9 @@ function component(name) {
 
 module.exports = {
   NativeModules: {},
+  LogBox: {
+    ignoreAllLogs() {}
+  },
   AppState: {
     addEventListener(eventName, listener) {
       if (eventName !== 'change') {

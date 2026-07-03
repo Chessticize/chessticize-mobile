@@ -81,6 +81,7 @@ import {
   type ReviewReminderPermissionStatus,
   type ReviewReminderScheduler
 } from "../backend/reviewReminderScheduler.ts";
+import { arePracticeTestControlsEnabled, isPracticeDebugEnabled } from "../releaseConfig.ts";
 import { Chess, type PieceSymbol, type Square } from "chess.js";
 
 interface Props {
@@ -1467,7 +1468,7 @@ export function PracticePocScreen({
               />
             ) : null}
 
-            {!isActive && state === null && isPracticeTestControlsEnabled() && !practiceService ? (
+            {!isActive && state === null && arePracticeTestControlsEnabled() && !practiceService ? (
               <TestPuzzleSourceControl
                 source={puzzleSource}
                 onChange={changePuzzleSource}
@@ -1584,7 +1585,7 @@ export function PracticePocScreen({
               { label: "Arrow Duel", record: service.getRating(defaultSprintConfig("arrow_duel").ratingKey) },
               { label: "Blitz", record: service.getRating(defaultSprintConfig("blitz").ratingKey) }
             ]}
-            onOpenDiagnostics={isPracticeTestControlsEnabled() ? () => setTab("analysis") : undefined}
+            onOpenDiagnostics={arePracticeTestControlsEnabled() ? () => setTab("analysis") : undefined}
             onOpenPacks={() => setTab("packs")}
             onExportData={() => service.exportLocalData()}
             onDeleteLocalHistory={() => {
@@ -1611,7 +1612,7 @@ export function PracticePocScreen({
           />
         ) : null}
         {tab === "packs" ? <PacksPanel /> : null}
-        {tab === "analysis" && isPracticeTestControlsEnabled() ? (
+        {tab === "analysis" && arePracticeTestControlsEnabled() ? (
           <StockfishDiagnosticsPanel stockfishTransportFactory={stockfishTransportFactory} />
         ) : null}
       </ScrollView>
@@ -7403,25 +7404,6 @@ function sideToMove(fen: string): "w" | "b" {
 
 function errorMessage(caught: unknown): string {
   return caught instanceof Error ? caught.message : String(caught);
-}
-
-function isPracticeDebugEnabled(): boolean {
-  const globals = globalThis as unknown as {
-    __CHESSTICIZE_PRACTICE_DEBUG__?: boolean;
-    process?: { env?: { NODE_ENV?: string } };
-  };
-  if (globals.__CHESSTICIZE_PRACTICE_DEBUG__) {
-    return true;
-  }
-  return globals.process?.env?.NODE_ENV === "test" && Boolean(globals.__CHESSTICIZE_PRACTICE_DEBUG__);
-}
-
-function isPracticeTestControlsEnabled(): boolean {
-  const globals = globalThis as unknown as {
-    __DEV__?: boolean;
-    process?: { env?: { NODE_ENV?: string } };
-  };
-  return Boolean(globals.__DEV__ || globals.process?.env?.NODE_ENV === "test");
 }
 
 function sleep(ms: number): Promise<void> {

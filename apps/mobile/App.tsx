@@ -3,8 +3,11 @@ import { LogBox } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { PracticePocScreen } from "./src/components/PracticePocScreen";
 import { createPersistentMobilePracticeService } from "./src/backend/mobilePractice";
+import { shouldSuppressLogBoxWarnings } from "./src/releaseConfig";
 
-LogBox.ignoreAllLogs();
+if (shouldSuppressLogBoxWarnings()) {
+  LogBox.ignoreAllLogs();
+}
 
 function App() {
   return (
