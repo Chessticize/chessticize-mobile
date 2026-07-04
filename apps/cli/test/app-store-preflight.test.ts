@@ -25,6 +25,7 @@ test("App Store preflight CLI reports automatable checks and manual release gate
   assert.ok(checkNames.has("GPL license text is present"));
   assert.ok(checkNames.has("Third-party notices inventory covers direct runtime packages"));
   assert.ok(checkNames.has("iOS release identity is fixed for 1.0"));
+  assert.ok(checkNames.has("Store screenshot capture flow is wired"));
   assert.ok(checkNames.has("TestFlight QA checklist is explicit about real-device execution"));
 
   const manualNames = new Set(payload.manual.map((entry: { name: string }) => entry.name));
