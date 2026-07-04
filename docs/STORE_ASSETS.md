@@ -90,7 +90,7 @@ the simulator size you are validating:
 ```sh
 pnpm mobile:e2e:build:ios
 DETOX_IOS_DEVICE="iPhone 17 Pro Max" pnpm mobile:e2e:store-assets:ios
-DETOX_IOS_DEVICE="iPhone 17" pnpm mobile:e2e:store-assets:ios
+DETOX_IOS_DEVICE="iPhone 17e" pnpm mobile:e2e:store-assets:ios
 ```
 
 The script sets `CHESSTICIZE_CAPTURE_STORE_ASSETS=1` and captures these named
@@ -109,7 +109,10 @@ Raw Detox artifacts are written under `apps/mobile/artifacts/store-assets/`.
 Move private iteration captures into `scratch/store-assets/raw/` if you need to
 keep local evidence. Do not commit Detox artifacts or unsanitized screenshots.
 Before App Store Connect upload, export or crop final images to the exact
-current Apple pixel requirements for the target display groups.
+current Apple pixel requirements for the target display groups. Do not use the
+`iPhone 17` simulator as the compact 6.1" upload source: its raw screenshots are
+`1206 x 2622`, which are useful for layout review but are not one of the
+accepted 6.1" portrait sizes checked by `pnpm app-store:screenshot-audit`.
 
 ## Final Screenshot Audit
 
