@@ -48,6 +48,7 @@ const mobilePackage = readJson("apps/mobile/package.json");
 const readme = readText("README.md");
 const releasePolicy = readText("docs/RELEASE_SOURCE_POLICY.md");
 const storeAssets = readText("docs/STORE_ASSETS.md");
+const storeAssetsE2e = readText("apps/mobile/e2e/store-assets.e2e.js");
 const testFlightQa = readText("docs/TESTFLIGHT_QA.md");
 const privacyDisclosure = readText("docs/APP_PRIVACY_DISCLOSURE.md");
 const privacyPolicy = readText("docs/PRIVACY_POLICY.md");
@@ -145,6 +146,21 @@ check(
     storeAssets.includes("6.9\"") &&
     storeAssets.includes("6.1\""),
   "STORE_ASSETS.md must include the public metadata URLs and required screenshot display groups."
+);
+
+check(
+  "Store screenshot capture flow is wired",
+  rootPackage.scripts?.["mobile:e2e:store-assets:ios"]?.includes("e2e:store-assets:ios") &&
+    mobilePackage.scripts?.["e2e:store-assets:ios"]?.includes("CHESSTICIZE_CAPTURE_STORE_ASSETS=1") &&
+    mobilePackage.scripts?.["e2e:store-assets:ios"]?.includes("e2e/store-assets.e2e.js") &&
+    mobilePackage.scripts?.["e2e:store-assets:ios"]?.includes("artifacts/store-assets") &&
+    storeAssetsE2e.includes("CHESSTICIZE_CAPTURE_STORE_ASSETS") &&
+    storeAssetsE2e.includes("describe.skip") &&
+    storeAssetsE2e.includes("app-store-01-practice-home") &&
+    storeAssetsE2e.includes("app-store-06-history") &&
+    storeAssets.includes("pnpm mobile:e2e:store-assets:ios") &&
+    storeAssets.includes("app-store-05-mistake-review-analysis"),
+  "Store screenshot capture must stay opt-in, documented, and wired to the named Detox capture spec."
 );
 
 check(
