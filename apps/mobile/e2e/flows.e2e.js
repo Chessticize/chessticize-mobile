@@ -103,6 +103,26 @@ describe('Key user flows', () => {
     await waitFor(element(by.id('review-start-due'))).toBeVisible().withTimeout(10000);
   });
 
+  it('schedules review reminders through the native fixture', async () => {
+    const sprintNowMs = Date.now() - (2 * dayMs);
+    await launchAppAt(sprintNowMs, true, { chessticizeTestNotificationStatus: 'authorized' });
+
+    await failStandardSprint();
+    await dismissSprintSummary();
+
+    await openTab('settings-tab', 'settings-review-reminders');
+    await waitForElementTextContaining('settings-review-reminders', 'Local notifications enabled', 10000);
+
+    await waitForVisibleInPracticeScroll('settings-review-reminder-fixed-1900');
+    await element(by.id('settings-review-reminder-fixed-1900')).tap();
+    await waitForElementTextContaining('settings-review-reminder-schedule-status', 'scheduled|', 10000);
+    await waitForElementTextContaining('settings-review-reminder-schedule-status', '|3|3 puzzles are ready for review|review', 10000);
+
+    await waitForVisibleInPracticeScroll('settings-review-reminder-off');
+    await element(by.id('settings-review-reminder-off')).tap();
+    await waitForElementTextContaining('settings-review-reminder-schedule-status', 'none', 10000);
+  });
+
   it('shows failed attempts in history with the wrong-7-days shortcut', async () => {
     await failStandardSprint();
     await dismissSprintSummary();
@@ -207,13 +227,14 @@ async function dismissSprintSummary() {
   await waitFor(element(by.id('practice-tab'))).toBeVisible().withTimeout(10000);
 }
 
-async function launchAppAt(nowMs, deleteData) {
+async function launchAppAt(nowMs, deleteData, extraLaunchArgs = {}) {
   await device.launchApp({
     newInstance: true,
     delete: deleteData,
     launchArgs: {
       detoxEnableSynchronization: '0',
-      chessticizeTestNowMs: String(nowMs)
+      chessticizeTestNowMs: String(nowMs),
+      ...extraLaunchArgs
     }
   });
 }

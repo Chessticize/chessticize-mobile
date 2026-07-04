@@ -76,9 +76,9 @@ import {
   createNativeReviewReminderNotificationClient,
   createNativeReviewReminderScheduler,
   reminderScheduleKey,
-  rescheduleReviewReminder,
   type ReviewReminderNotificationClient,
   type ReviewReminderPermissionStatus,
+  type ReviewReminderScheduleResult,
   type ReviewReminderScheduler
 } from "../backend/reviewReminderScheduler.ts";
 import { arePracticeTestControlsEnabled, isPracticeDebugEnabled } from "../releaseConfig.ts";
@@ -289,6 +289,7 @@ export function PracticePocScreen({
   const [customTheme, setCustomTheme] = useState<CustomThemeFilter>("mixed");
   const [reviewReminderPreference, setReviewReminderPreference] = useState<ReviewReminderPreference>(() => service.getReviewReminderPreference());
   const [notificationPermissionStatus, setNotificationPermissionStatus] = useState<ReviewReminderPermissionStatus>("unavailable");
+  const [reviewReminderScheduleStatus, setReviewReminderScheduleStatus] = useState("unavailable");
   const [reviewReminderPermissionPromptVisible, setReviewReminderPermissionPromptVisible] = useState(false);
   const [, setSettingsRevision] = useState(0);
 
@@ -523,6 +524,7 @@ export function PracticePocScreen({
 
   function refreshReviewReminder(reason: string, force = false): void {
     if (!scheduler) {
+      setReviewReminderScheduleStatus("unavailable");
       return;
     }
     try {
@@ -532,13 +534,18 @@ export function PracticePocScreen({
         return;
       }
       reminderScheduleKeyRef.current = nextKey;
-      void rescheduleReviewReminder(service, scheduler, nowIso()).catch((caught) => {
+      setReviewReminderScheduleStatus("pending");
+      void scheduler.replaceNextReminder(decision).then((result) => {
+        setReviewReminderScheduleStatus(reviewReminderScheduleStatusLabel(decision, result));
+      }).catch((caught) => {
+        setReviewReminderScheduleStatus("error");
         emitTrace({
           type: "move-ignored",
           reason: `review-reminder-${reason}-failed:${errorMessage(caught)}`
         });
       });
     } catch (caught) {
+      setReviewReminderScheduleStatus("error");
       emitTrace({
         type: "move-ignored",
         reason: `review-reminder-${reason}-failed:${errorMessage(caught)}`
@@ -1607,6 +1614,7 @@ export function PracticePocScreen({
               setSettingsRevision((current) => current + 1);
             }}
             notificationPermissionStatus={notificationPermissionStatus}
+            reviewReminderScheduleStatus={reviewReminderScheduleStatus}
             reviewReminderPreference={reviewReminderPreference}
             onOpenNotificationSettings={() => {
               void openReviewReminderSystemSettings();
@@ -5991,6 +5999,16 @@ function normalizeUci(move: string): string {
   return move.trim().toLowerCase();
 }
 
+function reviewReminderScheduleStatusLabel(
+  decision: ReturnType<typeof computeReviewReminderDecision>,
+  result: ReviewReminderScheduleResult
+): string {
+  if (!decision || !result.scheduled) {
+    return "none";
+  }
+  return `scheduled|${result.scheduledAt ?? decision.scheduledAt}|${decision.dueCount}|${decision.body}|${decision.route}`;
+}
+
 function SettingsPanel({
   onDeleteLocalHistory,
   onExportData,
@@ -6003,6 +6021,7 @@ function SettingsPanel({
   onSaveReviewReminderPreference,
   notificationPermissionStatus,
   ratings,
+  reviewReminderScheduleStatus,
   reviewReminderPreference,
   standardRating
 }: {
@@ -6017,6 +6036,7 @@ function SettingsPanel({
   onSaveReviewReminderPreference: (preference: ReviewReminderPreference) => void;
   notificationPermissionStatus: ReviewReminderPermissionStatus;
   ratings: Array<{ label: string; record: RatingRecord }>;
+  reviewReminderScheduleStatus: string;
   reviewReminderPreference: ReviewReminderPreference;
   standardRating: number;
 }): React.JSX.Element {
@@ -6098,6 +6118,11 @@ function SettingsPanel({
               setStatusMessage("Opened iOS Settings");
             }}
           />
+        ) : null}
+        {arePracticeTestControlsEnabled() ? (
+          <Text testID="settings-review-reminder-schedule-status" style={styles.reviewDueHiddenMetric}>
+            {reviewReminderScheduleStatus}
+          </Text>
         ) : null}
       </SettingsSection>
 

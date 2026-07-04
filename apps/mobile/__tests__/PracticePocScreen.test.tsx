@@ -2645,12 +2645,15 @@ describe("PracticePocScreen", () => {
     expect(service.getReviewReminderPreference()).toEqual({ mode: "fixed", fixedLocalTime: "19:00" });
     expect(collectText(findByTestId(renderer, "settings-review-reminders"))).toContain("19:00");
     expect(localTime(scheduler.currentReminder?.scheduledAt)).toEqual({ hour: 19, minute: 0 });
+    expect(collectText(findByTestId(renderer, "settings-review-reminder-schedule-status"))).toContain("scheduled|");
+    expect(collectText(findByTestId(renderer, "settings-review-reminder-schedule-status"))).toContain("|1|1 puzzle is ready for review|review");
 
     press(renderer, "settings-review-reminder-off");
     await act(async () => {});
 
     expect(service.getReviewReminderPreference()).toEqual({ mode: "off" });
     expect(scheduler.currentReminder).toBeUndefined();
+    expect(collectText(findByTestId(renderer, "settings-review-reminder-schedule-status"))).toBe("none");
     expect(collectText(findByTestId(renderer, "settings-review-reminders"))).toContain("Off");
   });
 
