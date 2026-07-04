@@ -10,6 +10,10 @@ function readText(path) {
   return readFileSync(join(repoRoot, path), "utf8");
 }
 
+function readJson(path) {
+  return JSON.parse(readText(path));
+}
+
 function fileExists(path) {
   return existsSync(join(repoRoot, path));
 }
@@ -39,6 +43,8 @@ function manualGate(name, detail) {
 
 const license = readText("LICENSE");
 const notices = readText("THIRD_PARTY_NOTICES.md");
+const rootPackage = readJson("package.json");
+const mobilePackage = readJson("apps/mobile/package.json");
 const readme = readText("README.md");
 const releasePolicy = readText("docs/RELEASE_SOURCE_POLICY.md");
 const storeAssets = readText("docs/STORE_ASSETS.md");
@@ -54,6 +60,11 @@ const marketingVersions = uniqueMatches(pbxproj, /MARKETING_VERSION = ([^;]+);/g
 const buildNumbers = uniqueMatches(pbxproj, /CURRENT_PROJECT_VERSION = ([^;]+);/g);
 const bundleIdentifiers = uniqueMatches(pbxproj, /PRODUCT_BUNDLE_IDENTIFIER = ([^;]+);/g);
 const deviceFamilies = uniqueMatches(pbxproj, /TARGETED_DEVICE_FAMILY = ([^;]+);/g);
+const runtimeDependencies = Array.from(new Set([
+  ...Object.keys(rootPackage.dependencies ?? {}),
+  ...Object.keys(mobilePackage.dependencies ?? {})
+])).sort();
+const missingRuntimeNotices = runtimeDependencies.filter((dependency) => !notices.includes(`| \`${dependency}\` |`));
 
 check(
   "GPL license text is present",
@@ -71,6 +82,12 @@ check(
     notices.includes("react-native-chessboard") &&
     notices.includes("React Native"),
   "THIRD_PARTY_NOTICES.md must cover Stockfish, Lichess puzzle data, chessboard, and React Native notices."
+);
+
+check(
+  "Third-party notices inventory covers direct runtime packages",
+  missingRuntimeNotices.length === 0,
+  `Missing direct runtime dependency notices: ${missingRuntimeNotices.join(", ") || "none"}.`
 );
 
 check(
