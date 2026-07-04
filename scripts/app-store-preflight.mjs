@@ -48,6 +48,7 @@ const rootPackage = readJson("package.json");
 const mobilePackage = readJson("apps/mobile/package.json");
 const readme = readText("README.md");
 const releasePolicy = readText("docs/RELEASE_SOURCE_POLICY.md");
+const appStoreUpload = readText("docs/APP_STORE_UPLOAD.md");
 const storeAssets = readText("docs/STORE_ASSETS.md");
 const storeAssetsE2e = readText("apps/mobile/e2e/store-assets.e2e.js");
 const testFlightQa = readText("docs/TESTFLIGHT_QA.md");
@@ -57,6 +58,7 @@ const appStorePlan = readText("docs/APP_STORE_PLAN.md");
 const pbxproj = readText("apps/mobile/ios/ChessticizeMobile.xcodeproj/project.pbxproj");
 const infoPlist = readText("apps/mobile/ios/ChessticizeMobile/Info.plist");
 const privacyManifest = readText("apps/mobile/ios/ChessticizeMobile/PrivacyInfo.xcprivacy");
+const exportOptions = readText("apps/mobile/ios/ExportOptions.app-store-connect.plist");
 const thirdPartyAudit = spawnSync(
   process.execPath,
   ["scripts/app-store-third-party-audit.mjs", "--json"],
@@ -203,6 +205,23 @@ check(
     testFlightQa.includes("Result | Pending") &&
     testFlightQa.includes("Completion Rule"),
   "TESTFLIGHT_QA.md must keep the real TestFlight pass separate from simulator preflight evidence."
+);
+
+check(
+  "App Store archive and upload path is documented",
+  readme.includes("[App Store Upload](docs/APP_STORE_UPLOAD.md)") &&
+    releasePolicy.includes("docs/APP_STORE_UPLOAD.md") &&
+    testFlightQa.includes("docs/APP_STORE_UPLOAD.md") &&
+    appStoreUpload.includes("xcodebuild") &&
+    appStoreUpload.includes("xcodebuild -exportArchive") &&
+    appStoreUpload.includes("apps/mobile/ios/ExportOptions.app-store-connect.plist") &&
+    appStoreUpload.includes("Do not commit keys") &&
+    exportOptions.includes("<string>app-store-connect</string>") &&
+    exportOptions.includes("<string>upload</string>") &&
+    exportOptions.includes("<key>manageAppVersionAndBuildNumber</key>") &&
+    exportOptions.includes("<false/>") &&
+    !exportOptions.includes("testFlightInternalTestingOnly"),
+  "README, release policy, TestFlight QA, upload runbook, and ExportOptions plist must describe the owner-executed App Store Connect upload path."
 );
 
 check(
