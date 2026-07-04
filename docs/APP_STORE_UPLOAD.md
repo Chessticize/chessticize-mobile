@@ -53,11 +53,15 @@ Then publish a GitHub release for that tag and attach or copy the
 Use one of these signing/authentication paths:
 
 - Xcode account signing: add the Apple Developer account in Xcode Settings and
-  let `xcodebuild -allowProvisioningUpdates` use that account.
+  let `xcodebuild -allowProvisioningUpdates` use that account. The command
+  still needs the Apple Developer Team ID, either selected in the Xcode target's
+  Signing & Capabilities editor or passed as `DEVELOPMENT_TEAM`.
 - App Store Connect API key: set the variables below and pass them to
-  `xcodebuild` during archive/export.
+  `xcodebuild` during archive/export. The API key authenticates App Store
+  Connect access; signing still needs the Developer Team ID.
 
 ```sh
+export APPLE_DEVELOPMENT_TEAM="XXXXXXXXXX"
 export ASC_KEY_PATH="/absolute/path/to/AuthKey_XXXXXXXXXX.p8"
 export ASC_KEY_ID="XXXXXXXXXX"
 export ASC_ISSUER_ID="00000000-0000-0000-0000-000000000000"
@@ -79,6 +83,7 @@ xcodebuild \
   -configuration Release \
   -destination "generic/platform=iOS" \
   -archivePath scratch/app-store/archive/ChessticizeMobile.xcarchive \
+  DEVELOPMENT_TEAM="$APPLE_DEVELOPMENT_TEAM" \
   -allowProvisioningUpdates \
   clean archive
 ```
@@ -101,6 +106,7 @@ xcodebuild \
   -archivePath scratch/app-store/archive/ChessticizeMobile.xcarchive \
   -exportPath scratch/app-store/export \
   -exportOptionsPlist apps/mobile/ios/ExportOptions.app-store-connect.plist \
+  DEVELOPMENT_TEAM="$APPLE_DEVELOPMENT_TEAM" \
   -allowProvisioningUpdates
 ```
 
@@ -118,6 +124,29 @@ The export options intentionally set:
 Do not set `testFlightInternalTestingOnly = true` for this release-candidate
 upload, because the same uploaded build must remain eligible for external
 TestFlight or App Store submission after the internal QA pass.
+
+## Signing Troubleshooting
+
+If archive fails with:
+
+```text
+Signing for "ChessticizeMobile" requires a development team.
+```
+
+then the local Xcode project/account does not have a team selected for this
+archive invocation. Set `APPLE_DEVELOPMENT_TEAM` to the 10-character Apple
+Developer Team ID and rerun the archive command, or open the workspace in Xcode
+and select that team for the `ChessticizeMobile` target.
+
+If Xcode also reports invalid keychain credentials such as:
+
+```text
+Invalid credentials in keychain ... missing Xcode-Username
+```
+
+remove and re-add the Apple Developer account in Xcode Settings before rerunning
+the archive. The repository source, release tag, and unsigned archive can be
+valid while this signing-account gate is still incomplete.
 
 ## After Upload
 
