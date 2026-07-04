@@ -5,6 +5,9 @@ const repoRoot = path.resolve(__dirname, "../../..");
 const storeAssetsDoc = fs.readFileSync(path.join(repoRoot, "docs/STORE_ASSETS.md"), "utf8");
 const appStorePlan = fs.readFileSync(path.join(repoRoot, "docs/APP_STORE_PLAN.md"), "utf8");
 const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
+const rootPackage = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
+const mobilePackage = JSON.parse(fs.readFileSync(path.join(repoRoot, "apps/mobile/package.json"), "utf8"));
+const storeAssetsE2e = fs.readFileSync(path.join(repoRoot, "apps/mobile/e2e/store-assets.e2e.js"), "utf8");
 
 function tableValue(field) {
   const escapedField = field.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -42,6 +45,17 @@ describe("App Store assets document", () => {
     expect(storeAssetsDoc).toContain("Arrow Duel");
     expect(storeAssetsDoc).toContain("Analysis panel");
     expect(storeAssetsDoc).toContain("History");
+  });
+
+  it("documents and gates the opt-in screenshot capture flow", () => {
+    expect(rootPackage.scripts["mobile:e2e:store-assets:ios"]).toContain("e2e:store-assets:ios");
+    expect(mobilePackage.scripts["e2e:store-assets:ios"]).toContain("CHESSTICIZE_CAPTURE_STORE_ASSETS=1");
+    expect(mobilePackage.scripts["e2e:store-assets:ios"]).toContain("e2e/store-assets.e2e.js");
+    expect(mobilePackage.scripts["e2e:store-assets:ios"]).toContain("artifacts/store-assets");
+    expect(storeAssetsE2e).toContain("describe.skip");
+    expect(storeAssetsE2e).toContain("CHESSTICIZE_CAPTURE_STORE_ASSETS");
+    expect(storeAssetsDoc).toContain("pnpm mobile:e2e:store-assets:ios");
+    expect(storeAssetsDoc).toContain("app-store-05-mistake-review-analysis");
   });
 
   it("marks the App Store plan store-assets item implementation complete", () => {

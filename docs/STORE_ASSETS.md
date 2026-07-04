@@ -81,6 +81,36 @@ folder is ignored and may contain private iteration artifacts. Only commit
 final store-ready screenshots if they are intentionally reviewed, sanitized,
 and named by display group.
 
+## Automated Capture
+
+The Detox capture spec is opt-in so normal Mobile iOS CI does not spend time on
+store-asset screenshots. Build the app bundle, then run the capture flow for
+the simulator size you are validating:
+
+```sh
+pnpm mobile:e2e:build:ios
+DETOX_IOS_DEVICE="iPhone 17 Pro Max" pnpm mobile:e2e:store-assets:ios
+DETOX_IOS_DEVICE="iPhone 17" pnpm mobile:e2e:store-assets:ios
+```
+
+The script sets `CHESSTICIZE_CAPTURE_STORE_ASSETS=1` and captures these named
+Detox screenshots:
+
+| Screenshot name | Store scene |
+| --- | --- |
+| `app-store-01-practice-home` | Practice home with local ratings and bundled offline pack context. |
+| `app-store-02-standard-sprint` | Standard Puzzle Sprint board, timer, progress, and mistakes. |
+| `app-store-03-arrow-duel` | Arrow Duel board with both candidate choices available. |
+| `app-store-04-sprint-results` | Post-sprint result with mistake review available. |
+| `app-store-05-mistake-review-analysis` | Mistake review with Stockfish analysis lines. |
+| `app-store-06-history` | History with recorded wrong moves and performance context. |
+
+Raw Detox artifacts are written under `apps/mobile/artifacts/store-assets/`.
+Move private iteration captures into `scratch/store-assets/raw/` if you need to
+keep local evidence. Do not commit Detox artifacts or unsanitized screenshots.
+Before App Store Connect upload, export or crop final images to the exact
+current Apple pixel requirements for the target display groups.
+
 ## Capture Checklist
 
 - Use portrait orientation.
