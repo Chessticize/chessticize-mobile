@@ -11,6 +11,7 @@
     "test:e2e": "node --experimental-strip-types --test apps/cli/test/*.test.ts",
     "app-store:preflight": "node scripts/app-store-preflight.mjs",
     "app-store:third-party-audit": "node scripts/app-store-third-party-audit.mjs",
+    "app-store:screenshot-audit": "node scripts/app-store-screenshot-audit.mjs",
     "app-store:release-manifest": "node scripts/app-store-release-manifest.mjs",
     "generate:offline-puzzles": "node scripts/generate-offline-puzzle-fixture.mjs",
     "typecheck": "tsc --noEmit",

@@ -48,11 +48,11 @@ Chessticize Mobile is free and open source.
 
 The app is iPhone-only for 1.0, so App Store Connect only needs iPhone
 screenshots. The original 1.0 plan called out 6.7" and 6.1" minimum coverage.
-Apple's current screenshot reference now lists 6.9" as the required iPhone
-display group when the app runs on iPhone, with accepted portrait sizes
-including `1290 x 2796`, `1320 x 2868`, `1284 x 2778`, and `1242 x 2688`
-pixels. The current 6.1" group accepts portrait sizes including `1170 x 2532`,
-`1125 x 2436`, and `1080 x 2340` pixels.
+Apple's current screenshot reference, rechecked on 2026-07-04, lists 6.9" as
+the required iPhone display group when the app runs on iPhone, with accepted
+portrait sizes `1260 x 2736`, `1290 x 2796`, and `1320 x 2868` pixels. The
+current 6.1" group accepts portrait sizes
+including `1170 x 2532`, `1125 x 2436`, and `1080 x 2340` pixels.
 
 Release rule:
 
@@ -110,6 +110,40 @@ Move private iteration captures into `scratch/store-assets/raw/` if you need to
 keep local evidence. Do not commit Detox artifacts or unsanitized screenshots.
 Before App Store Connect upload, export or crop final images to the exact
 current Apple pixel requirements for the target display groups.
+
+## Final Screenshot Audit
+
+After final export or cropping, place the upload-ready screenshots under
+`scratch/store-assets/final/` with this structure:
+
+```text
+scratch/store-assets/final/
+  iphone-6.9/
+    app-store-01-practice-home.png
+    app-store-02-standard-sprint.png
+    app-store-03-arrow-duel.png
+    app-store-04-sprint-results.png
+    app-store-05-mistake-review-analysis.png
+    app-store-06-history.png
+  iphone-6.1/
+    app-store-01-practice-home.png
+    app-store-02-standard-sprint.png
+    app-store-03-arrow-duel.png
+    app-store-04-sprint-results.png
+    app-store-05-mistake-review-analysis.png
+    app-store-06-history.png
+```
+
+Then run:
+
+```sh
+pnpm app-store:screenshot-audit
+```
+
+The audit verifies that both required display groups are present, every named
+scene exists exactly once per group, and each image is a `.png`, `.jpg`, or
+`.jpeg` file using one of Apple's accepted portrait sizes for that group. Use
+`-- --root PATH` to audit a different local export directory.
 
 ## Capture Checklist
 

@@ -49,12 +49,17 @@ describe("App Store assets document", () => {
 
   it("documents and gates the opt-in screenshot capture flow", () => {
     expect(rootPackage.scripts["mobile:e2e:store-assets:ios"]).toContain("e2e:store-assets:ios");
+    expect(rootPackage.scripts["app-store:screenshot-audit"]).toBe("node scripts/app-store-screenshot-audit.mjs");
     expect(mobilePackage.scripts["e2e:store-assets:ios"]).toContain("CHESSTICIZE_CAPTURE_STORE_ASSETS=1");
     expect(mobilePackage.scripts["e2e:store-assets:ios"]).toContain("e2e/store-assets.e2e.js");
     expect(mobilePackage.scripts["e2e:store-assets:ios"]).toContain("artifacts/store-assets");
     expect(storeAssetsE2e).toContain("describe.skip");
     expect(storeAssetsE2e).toContain("CHESSTICIZE_CAPTURE_STORE_ASSETS");
     expect(storeAssetsDoc).toContain("pnpm mobile:e2e:store-assets:ios");
+    expect(storeAssetsDoc).toContain("pnpm app-store:screenshot-audit");
+    expect(storeAssetsDoc).toContain("scratch/store-assets/final/");
+    expect(storeAssetsDoc).toContain("iphone-6.9");
+    expect(storeAssetsDoc).toContain("iphone-6.1");
     expect(storeAssetsDoc).toContain("app-store-05-mistake-review-analysis");
   });
 
