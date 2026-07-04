@@ -241,6 +241,10 @@ manualGate(
   "Tag the exact commit used for the App Store Connect binary, for example ios-v1.0.0-build-1, and publish the GitHub release."
 );
 manualGate(
+  "Configure Apple signing team and Xcode account",
+  "Set APPLE_DEVELOPMENT_TEAM to the 10-character Apple Developer Team ID, ensure Xcode has a valid Apple Developer account in Settings, then run the signed archive command in docs/APP_STORE_UPLOAD.md."
+);
+manualGate(
   "Capture final sanitized App Store screenshots",
   "Use a release or production-like build for the 6.9-inch and 6.1-inch screenshot sets in docs/STORE_ASSETS.md, then run pnpm app-store:screenshot-audit before upload."
 );

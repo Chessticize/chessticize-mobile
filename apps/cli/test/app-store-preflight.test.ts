@@ -34,6 +34,14 @@ test("App Store preflight CLI reports automatable checks and manual release gate
   const manualNames = new Set(payload.manual.map((entry: { name: string }) => entry.name));
   assert.ok(manualNames.has("Refresh third-party notices against the final lockfile"));
   assert.ok(manualNames.has("Create the public source release tag"));
+  assert.ok(manualNames.has("Configure Apple signing team and Xcode account"));
   assert.ok(manualNames.has("Capture final sanitized App Store screenshots"));
   assert.ok(manualNames.has("Execute the internal TestFlight physical-device pass"));
+
+  const signingGate = payload.manual.find(
+    (entry: { name: string; detail: string }) => entry.name === "Configure Apple signing team and Xcode account"
+  );
+  assert.ok(signingGate?.detail.includes("APPLE_DEVELOPMENT_TEAM"));
+  assert.ok(signingGate?.detail.includes("10-character Apple Developer Team ID"));
+  assert.ok(signingGate?.detail.includes("Xcode"));
 });
