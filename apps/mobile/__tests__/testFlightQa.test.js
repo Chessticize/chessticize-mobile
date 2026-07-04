@@ -35,6 +35,7 @@ describe("TestFlight QA checklist", () => {
 
   it("requires preflight automation before upload", () => {
     const requiredCommands = [
+      "pnpm app-store:preflight",
       "pnpm test",
       "pnpm typecheck",
       "pnpm mobile:test",

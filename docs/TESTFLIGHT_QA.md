@@ -40,6 +40,7 @@ binary on real hardware.
 
 Run these before uploading the build:
 
+- [ ] `pnpm app-store:preflight`
 - [ ] `pnpm test`
 - [ ] `pnpm typecheck`
 - [ ] `pnpm mobile:test`
