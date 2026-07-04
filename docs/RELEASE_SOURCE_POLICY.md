@@ -28,6 +28,8 @@ https://github.com/Chessticize/chessticize-mobile
 ## Release Checklist
 
 - Run `pnpm app-store:preflight` and resolve any failed automatable checks.
+- Run `pnpm app-store:third-party-audit` from the final lockfile and resolve
+  any stale package, Stockfish, NNUE, or puzzle-data notice.
 - Run `pnpm app-store:release-manifest` from the clean release commit and save
   the JSON output with the GitHub release or the TestFlight QA evidence.
 - `LICENSE` contains GPL-3.0-or-later.
@@ -50,3 +52,15 @@ and bundled NNUE networks.
 The command refuses a dirty working tree by default. The `-- --allow-dirty`
 flag is only for local review and test automation; do not use a dirty manifest
 for App Store Connect, TestFlight, or a public release tag.
+
+## Third-Party Notice Audit
+
+`pnpm app-store:third-party-audit` verifies the runtime package inventory in
+`THIRD_PARTY_NOTICES.md` against `pnpm-lock.yaml`, checks that the active
+`react-native-chessboard` patch is disclosed, and confirms that the Stockfish,
+NNUE, and Lichess puzzle-data notices match the bundled release artifacts.
+
+This audit is required before tagging a submitted App Store binary. It is still
+not a replacement for the release owner reading the notices against the final
+submitted build, because license interpretation and App Store submission remain
+human release decisions.

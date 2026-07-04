@@ -236,9 +236,12 @@ Design approved 2026-07-03; the "Review Reminder Notifications" section of
    the upstream `sf_18` tag commit, Lichess puzzle data, the chessboard
    package, and React Native runtime dependency notices, the Settings license
    row names Stockfish 18 and the public source repository, and the README
-   links the release source policy. Release-time execution still requires
-   refreshing notices against the final lockfile and tagging each App Store
-   binary from its exact release commit.
+   links the release source policy. `pnpm app-store:third-party-audit`
+   machine-checks the notice inventory against the final lockfile, bundled
+   Stockfish/NNUE artifacts, and Lichess puzzle manifest. Release-time
+   execution still requires running that audit from the final submitted
+   lockfile, manually reading the notices for license correctness, and tagging
+   each App Store binary from its exact release commit.
 2. **App identity**: final display name, bundle identifier, version/build
    scheme, app icon set (all slots), launch screen matching the app background.
    Status: implementation complete. The iOS target now uses the display name
