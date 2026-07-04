@@ -1835,6 +1835,45 @@ describe("PracticePocScreen", () => {
     expect(service.listHistory({ source: "scheduled_review" }) as unknown[]).toHaveLength(1);
   });
 
+  it("records official due review success after the scheduled puzzle is solved", async () => {
+    const service = createMobilePracticeService("random1000");
+    service.startSprint(
+      { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
+      "2026-06-20T00:00:00.000Z"
+    );
+    service.submitMove("c4b5", "2026-06-20T00:00:05.000Z");
+    jest.setSystemTime(new Date("2026-06-21T00:01:00.000Z"));
+    const renderer = renderScreen({ practiceService: service });
+
+    press(renderer, "review-tab");
+    press(renderer, "review-start-due");
+    expect(findByTestId(renderer, "review-session")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "review-source-pill"))).toBe("Scheduled review");
+    expect(collectText(findByTestId(renderer, "review-current-expected-move"))).toBe("e2e6");
+
+    await boardMove(renderer, "e2e6");
+    await settleFeedbackSnapshot();
+    expect(service.listHistory({ source: "scheduled_review" }) as unknown[]).toHaveLength(0);
+    expect(collectText(findByTestId(renderer, "review-current-expected-move"))).toBe("e6f7");
+
+    await boardMove(renderer, "e6f7");
+    await settleFeedbackSnapshot();
+
+    expect(() => findByTestId(renderer, "review-session")).toThrow();
+    expect(findByTestId(renderer, "review-panel")).toBeTruthy();
+    const officialReviewAttempts = service.listHistory({ source: "scheduled_review" }) as Array<{
+      expectedMove: string;
+      result: string;
+      submittedMove: string;
+    }>;
+    expect(officialReviewAttempts).toHaveLength(1);
+    expect(officialReviewAttempts[0]).toMatchObject({
+      result: "correct",
+      submittedMove: "e6f7",
+      expectedMove: "e6f7"
+    });
+  });
+
   it("records scheduled review elapsed time from review start to answer", async () => {
     jest.setSystemTime(new Date("2026-06-21T00:01:00.000Z"));
     const service = createMobilePracticeService("random1000");

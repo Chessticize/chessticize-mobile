@@ -11,6 +11,7 @@
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
+		8B2F1D9A2D420E4A00A00001 /* ChessticizeTestLaunchConfig.m in Sources */ = {isa = PBXBuildFile; fileRef = 8B2F1D992D420E4A00A00001 /* ChessticizeTestLaunchConfig.m */; };
 		8F4D4A4B2D1A4BEF8A9C1001 /* ReviewReminderNotifications.m in Sources */ = {isa = PBXBuildFile; fileRef = 8F4D4A4A2D1A4BEF8A9C1001 /* ReviewReminderNotifications.m */; };
 		D3C7E4DB20DDEF6FD16890C3 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
@@ -25,6 +26,7 @@
 		5DCACB8F33CDC322A6C60F78 /* libPods-ChessticizeMobile.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-ChessticizeMobile.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = ChessticizeMobile/AppDelegate.swift; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = ChessticizeMobile/LaunchScreen.storyboard; sourceTree = "<group>"; };
+		8B2F1D992D420E4A00A00001 /* ChessticizeTestLaunchConfig.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = ChessticizeTestLaunchConfig.m; path = ChessticizeMobile/ChessticizeTestLaunchConfig.m; sourceTree = "<group>"; };
 		8F4D4A4A2D1A4BEF8A9C1001 /* ReviewReminderNotifications.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = ReviewReminderNotifications.m; path = ChessticizeMobile/ReviewReminderNotifications.m; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
@@ -46,6 +48,7 @@
 			children = (
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				761780EC2CA45674006654EE /* AppDelegate.swift */,
+				8B2F1D992D420E4A00A00001 /* ChessticizeTestLaunchConfig.m */,
 				8F4D4A4A2D1A4BEF8A9C1001 /* ReviewReminderNotifications.m */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
@@ -250,6 +253,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				761780ED2CA45674006654EE /* AppDelegate.swift in Sources */,
+				8B2F1D9A2D420E4A00A00001 /* ChessticizeTestLaunchConfig.m in Sources */,
 				8F4D4A4B2D1A4BEF8A9C1001 /* ReviewReminderNotifications.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
