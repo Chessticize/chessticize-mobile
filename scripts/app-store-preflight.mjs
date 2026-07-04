@@ -179,6 +179,7 @@ check(
 check(
   "Store screenshot capture flow is wired",
   rootPackage.scripts?.["mobile:e2e:store-assets:ios"]?.includes("e2e:store-assets:ios") &&
+    rootPackage.scripts?.["app-store:screenshot-audit"] === "node scripts/app-store-screenshot-audit.mjs" &&
     mobilePackage.scripts?.["e2e:store-assets:ios"]?.includes("CHESSTICIZE_CAPTURE_STORE_ASSETS=1") &&
     mobilePackage.scripts?.["e2e:store-assets:ios"]?.includes("e2e/store-assets.e2e.js") &&
     mobilePackage.scripts?.["e2e:store-assets:ios"]?.includes("artifacts/store-assets") &&
@@ -186,9 +187,12 @@ check(
     storeAssetsE2e.includes("describe.skip") &&
     storeAssetsE2e.includes("app-store-01-practice-home") &&
     storeAssetsE2e.includes("app-store-06-history") &&
+    storeAssets.includes("pnpm app-store:screenshot-audit") &&
+    storeAssets.includes("iphone-6.9") &&
+    storeAssets.includes("iphone-6.1") &&
     storeAssets.includes("pnpm mobile:e2e:store-assets:ios") &&
     storeAssets.includes("app-store-05-mistake-review-analysis"),
-  "Store screenshot capture must stay opt-in, documented, and wired to the named Detox capture spec."
+  "Store screenshot capture and final artifact audit must stay opt-in, documented, and wired to the named Detox capture spec."
 );
 
 check(
@@ -219,7 +223,7 @@ manualGate(
 );
 manualGate(
   "Capture final sanitized App Store screenshots",
-  "Use a release or production-like build for the 6.9-inch and 6.1-inch screenshot sets in docs/STORE_ASSETS.md."
+  "Use a release or production-like build for the 6.9-inch and 6.1-inch screenshot sets in docs/STORE_ASSETS.md, then run pnpm app-store:screenshot-audit before upload."
 );
 manualGate(
   "Execute the internal TestFlight physical-device pass",

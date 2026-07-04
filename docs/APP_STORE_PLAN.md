@@ -289,9 +289,12 @@ Design approved 2026-07-03; the "Review Reminder Notifications" section of
    promotional text, keywords, support URL, privacy policy URL, category
    choices, screenshot scenes, capture checklist, and the current Apple
    screenshot-spec source of truth. The committed validation test enforces the
-   metadata character/byte limits and required public URLs. Release-time
-   execution still requires final sanitized screenshots from a release or
-   production-like build before uploading to App Store Connect.
+   metadata character/byte limits and required public URLs.
+   `pnpm app-store:screenshot-audit` verifies the final local screenshot export
+   contains the required 6.9-inch and 6.1-inch scene sets at accepted Apple
+   portrait dimensions. Release-time execution still requires final sanitized
+   screenshots from a release or production-like build before uploading to App
+   Store Connect.
 7. **TestFlight pass**: internal build, manual QA checklist covering the E2E
    flow list below on a physical device, including kill-and-relaunch
    persistence and offline (airplane-mode) practice.

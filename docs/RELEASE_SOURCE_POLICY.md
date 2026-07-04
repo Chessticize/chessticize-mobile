@@ -30,6 +30,8 @@ https://github.com/Chessticize/chessticize-mobile
 - Run `pnpm app-store:preflight` and resolve any failed automatable checks.
 - Run `pnpm app-store:third-party-audit` from the final lockfile and resolve
   any stale package, Stockfish, NNUE, or puzzle-data notice.
+- After final screenshot export, run `pnpm app-store:screenshot-audit` and
+  resolve any missing scene or invalid pixel size before uploading screenshots.
 - Run `pnpm app-store:release-manifest` from the clean release commit and save
   the JSON output with the GitHub release or the TestFlight QA evidence.
 - `LICENSE` contains GPL-3.0-or-later.
