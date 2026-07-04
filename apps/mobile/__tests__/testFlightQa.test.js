@@ -74,10 +74,15 @@ describe("TestFlight QA checklist", () => {
     expect(appStoreUploadDoc).toContain("-scheme ChessticizeMobile");
     expect(appStoreUploadDoc).toContain("-configuration Release");
     expect(appStoreUploadDoc).toContain("-destination \"generic/platform=iOS\"");
+    expect(appStoreUploadDoc).toContain("APPLE_DEVELOPMENT_TEAM");
+    expect(appStoreUploadDoc).toContain("DEVELOPMENT_TEAM=\"$APPLE_DEVELOPMENT_TEAM\"");
     expect(appStoreUploadDoc).toContain("-exportArchive");
     expect(appStoreUploadDoc).toContain("apps/mobile/ios/ExportOptions.app-store-connect.plist");
     expect(appStoreUploadDoc).toContain("Internal 1.0 QA");
     expect(appStoreUploadDoc).toContain("Do not commit keys");
+    expect(appStoreUploadDoc).toContain("Signing Troubleshooting");
+    expect(appStoreUploadDoc).toContain("requires a development team");
+    expect(appStoreUploadDoc).toContain("missing Xcode-Username");
   });
 
   it("keeps the App Store Connect export options aligned with the release runbook", () => {
