@@ -84,20 +84,23 @@ Before tagging or uploading a build, run the automatable release preflight:
 
 ```sh
 pnpm app-store:preflight
+pnpm app-store:signing-readiness
 pnpm app-store:third-party-audit
 pnpm app-store:screenshot-audit
 pnpm app-store:release-manifest
 ```
 
 The preflight command reports repository checks that must pass and the manual
-App Store gates that still require owner or device execution. The third-party
-audit checks that `THIRD_PARTY_NOTICES.md` matches the final lockfile, bundled
-Stockfish artifacts, NNUE files, and Lichess puzzle manifest. The screenshot
-audit checks the final local screenshot export after the 6.9-inch and 6.1-inch
-sets have been captured and cropped. The release manifest command emits the
-exact source commit, iOS identity, bundled puzzle pack metadata, Stockfish
-identifiers, and SHA-256 hashes for release-critical files; save that JSON with
-the GitHub release or TestFlight QA evidence.
+App Store gates that still require owner or device execution. The signing
+readiness command checks the local Apple Developer Team ID, Xcode command line
+tools, and available Apple distribution signing identities before archive. The
+third-party audit checks that `THIRD_PARTY_NOTICES.md` matches the final
+lockfile, bundled Stockfish artifacts, NNUE files, and Lichess puzzle manifest.
+The screenshot audit checks the final local screenshot export after the
+6.9-inch and 6.1-inch sets have been captured and cropped. The release manifest
+command emits the exact source commit, iOS identity, bundled puzzle pack
+metadata, Stockfish identifiers, and SHA-256 hashes for release-critical files;
+save that JSON with the GitHub release or TestFlight QA evidence.
 
 The App Store Connect archive/upload path is documented in
 [App Store Upload](docs/APP_STORE_UPLOAD.md). Uploads use

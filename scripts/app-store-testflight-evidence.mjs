@@ -124,6 +124,11 @@ function main() {
       args: ["--json"]
     },
     {
+      name: "signing-readiness",
+      script: "scripts/app-store-signing-readiness.mjs",
+      args: ["--json"]
+    },
+    {
       name: "release-manifest",
       script: "scripts/app-store-release-manifest.mjs",
       args: options.allowDirty ? ["--allow-dirty"] : []
@@ -200,6 +205,7 @@ function main() {
       "- `summary.json` - command summary and remaining manual gates.",
       "- `preflight.json` - App Store preflight result.",
       "- `third-party-audit.json` - release notice audit result.",
+      "- `signing-readiness.json` - local Apple signing team and certificate readiness result.",
       "- `release-manifest.json` - exact source manifest for the candidate build.",
       screenshotAuditIncluded
         ? "- `screenshot-audit.json` - final screenshot export audit result."

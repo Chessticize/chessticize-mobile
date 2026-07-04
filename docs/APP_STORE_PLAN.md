@@ -315,9 +315,12 @@ Design approved 2026-07-03; the "Review Reminder Notifications" section of
    The repo now also exposes `pnpm app-store:preflight`, which machine-checks the
    automatable release artifacts and reports the manual release gates that
    cannot be completed from the repository. `pnpm app-store:testflight-evidence`
-   collects the automatable preflight, notice-audit, release-manifest, and
-   final screenshot-audit outputs under `scratch/testflight-qa/` for the
-   physical-device pass evidence bundle.
+   collects the automatable preflight, notice-audit, local signing-readiness,
+   release-manifest, and final screenshot-audit outputs under
+   `scratch/testflight-qa/` for the physical-device pass evidence bundle.
+   `pnpm app-store:signing-readiness` reports the current upload machine's
+   Apple Developer Team ID, Xcode command line tools, and Apple distribution
+   signing identity readiness before archive/upload.
 
 ## Milestone 6 — Automated coverage of key user flows
 
