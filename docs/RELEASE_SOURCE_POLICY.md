@@ -28,6 +28,8 @@ https://github.com/Chessticize/chessticize-mobile
 ## Release Checklist
 
 - Run `pnpm app-store:preflight` and resolve any failed automatable checks.
+- Run `pnpm app-store:release-manifest` from the clean release commit and save
+  the JSON output with the GitHub release or the TestFlight QA evidence.
 - `LICENSE` contains GPL-3.0-or-later.
 - `THIRD_PARTY_NOTICES.md` is current.
 - `apps/mobile/ios/StockfishEngine/Copying.txt` and
@@ -35,3 +37,16 @@ https://github.com/Chessticize/chessticize-mobile
 - The shipped Stockfish version and bundled NNUE files are listed in
   `THIRD_PARTY_NOTICES.md`.
 - The App Store binary was built from the tagged release commit.
+
+## Release Manifest
+
+`pnpm app-store:release-manifest` emits a JSON source manifest for the exact
+commit being submitted. It records the source commit, suggested release tag,
+iOS bundle identity, package manager, bundled puzzle pack metadata, Stockfish
+version/source identifiers, and SHA-256 hashes for release-critical files such
+as the lockfile, notices, privacy policy, puzzle pack, Stockfish license files,
+and bundled NNUE networks.
+
+The command refuses a dirty working tree by default. The `-- --allow-dirty`
+flag is only for local review and test automation; do not use a dirty manifest
+for App Store Connect, TestFlight, or a public release tag.

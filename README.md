@@ -83,7 +83,11 @@ Before tagging or uploading a build, run the automatable release preflight:
 
 ```sh
 pnpm app-store:preflight
+pnpm app-store:release-manifest
 ```
 
-The command reports repository checks that must pass and the manual App Store
-gates that still require owner or device execution.
+The preflight command reports repository checks that must pass and the manual
+App Store gates that still require owner or device execution. The release
+manifest command emits the exact source commit, iOS identity, bundled puzzle
+pack metadata, Stockfish identifiers, and SHA-256 hashes for release-critical
+files; save that JSON with the GitHub release or TestFlight QA evidence.
