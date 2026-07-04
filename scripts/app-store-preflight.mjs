@@ -101,9 +101,12 @@ check(
 
 check(
   "Release source rule is documented",
-  releasePolicy.includes("Do not submit a binary built from an untagged commit") &&
-    readme.includes("[Release Source Policy](docs/RELEASE_SOURCE_POLICY.md)"),
-  "README and release policy must require a public source tag for every submitted binary."
+  rootPackage.scripts?.["app-store:release-manifest"] === "node scripts/app-store-release-manifest.mjs" &&
+    releasePolicy.includes("Do not submit a binary built from an untagged commit") &&
+    releasePolicy.includes("pnpm app-store:release-manifest") &&
+    readme.includes("[Release Source Policy](docs/RELEASE_SOURCE_POLICY.md)") &&
+    readme.includes("pnpm app-store:release-manifest"),
+  "README and release policy must require a public source tag and release manifest for every submitted binary."
 );
 
 check(
