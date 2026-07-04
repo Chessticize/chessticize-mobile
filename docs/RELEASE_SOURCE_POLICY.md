@@ -28,6 +28,9 @@ https://github.com/Chessticize/chessticize-mobile
 ## Release Checklist
 
 - Run `pnpm app-store:preflight` and resolve any failed automatable checks.
+- Run `pnpm app-store:signing-readiness` on the upload machine and resolve any
+  missing Apple Developer Team ID, Xcode, or Apple distribution identity before
+  archiving.
 - Run `pnpm app-store:third-party-audit` from the final lockfile and resolve
   any stale package, Stockfish, NNUE, or puzzle-data notice.
 - After final screenshot export, run `pnpm app-store:screenshot-audit` and
@@ -36,8 +39,8 @@ https://github.com/Chessticize/chessticize-mobile
   the JSON output with the GitHub release or the TestFlight QA evidence.
 - Run `pnpm app-store:testflight-evidence -- --screenshot-root scratch/store-assets/final`
   from the clean candidate commit to collect the automatable preflight,
-  notice-audit, release-manifest, and screenshot-audit outputs in
-  `scratch/testflight-qa/`.
+  notice-audit, signing-readiness, release-manifest, and screenshot-audit
+  outputs in `scratch/testflight-qa/`.
 - Follow `docs/APP_STORE_UPLOAD.md` to archive and upload with
   `apps/mobile/ios/ExportOptions.app-store-connect.plist`.
 - `LICENSE` contains GPL-3.0-or-later.

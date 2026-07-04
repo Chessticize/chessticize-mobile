@@ -44,13 +44,43 @@ function writeScreenshotSet(root: string) {
   }
 }
 
-function runEvidence(args: string[]) {
+function writeSigningFixture(root: string) {
+  const fixture = join(root, "signing-readiness.json");
+  writeFileSync(
+    fixture,
+    `${JSON.stringify(
+      {
+        teamId: "ABCDE12345",
+        xcodebuild: {
+          status: 0,
+          stdout: "Xcode 16.4\nBuild version 16F6\n",
+          stderr: ""
+        },
+        security: {
+          status: 0,
+          stdout:
+            '  1) ABCDEF123456 "Apple Distribution: Example, Inc. (ABCDE12345)"\n     1 valid identities found\n',
+          stderr: ""
+        }
+      },
+      null,
+      2
+    )}\n`
+  );
+  return fixture;
+}
+
+function runEvidence(args: string[], signingFixture: string) {
   return spawnSync(
     process.execPath,
     ["scripts/app-store-testflight-evidence.mjs", "--json", ...args],
     {
       cwd: resolve("."),
-      encoding: "utf8"
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        CHESSTICIZE_SIGNING_READINESS_FIXTURE: signingFixture
+      }
     }
   );
 }
@@ -61,13 +91,14 @@ test("TestFlight evidence CLI writes validator outputs and a release summary", (
   const screenshots = join(tempDir, "screenshots");
   try {
     writeScreenshotSet(screenshots);
+    const signingFixture = writeSigningFixture(tempDir);
     const result = runEvidence([
       "--allow-dirty",
       "--output",
       output,
       "--screenshot-root",
       screenshots
-    ]);
+    ], signingFixture);
 
     assert.equal(result.status, 0, result.stderr || result.stdout);
     const summary = JSON.parse(result.stdout);
@@ -78,10 +109,10 @@ test("TestFlight evidence CLI writes validator outputs and a release summary", (
     assert.equal(summary.screenshotAuditIncluded, true);
     assert.equal(summary.screenshotRoot, screenshots);
     assert.equal(summary.screenshotRootExists, true);
-    assert.equal(summary.commands.length, 4);
+    assert.equal(summary.commands.length, 5);
     assert.deepEqual(
       summary.commands.map((entry: { name: string }) => entry.name),
-      ["preflight", "third-party-audit", "release-manifest", "screenshot-audit"]
+      ["preflight", "third-party-audit", "signing-readiness", "release-manifest", "screenshot-audit"]
     );
     assert.ok(summary.manualGates.some((gate: string) => gate.includes("physical iPhone")));
 
@@ -90,6 +121,7 @@ test("TestFlight evidence CLI writes validator outputs and a release summary", (
     assert.match(readFileSync(join(output, "README.md"), "utf8"), /automatable release evidence only/);
     assert.equal(JSON.parse(readFileSync(join(output, "preflight.json"), "utf8")).status, "pass");
     assert.equal(JSON.parse(readFileSync(join(output, "third-party-audit.json"), "utf8")).status, "pass");
+    assert.equal(JSON.parse(readFileSync(join(output, "signing-readiness.json"), "utf8")).status, "pass");
     assert.equal(JSON.parse(readFileSync(join(output, "screenshot-audit.json"), "utf8")).status, "pass");
     assert.equal(
       JSON.parse(readFileSync(join(output, "release-manifest.json"), "utf8")).releaseTagSuggestion,
@@ -106,6 +138,7 @@ test("TestFlight evidence CLI fails when an included screenshot audit fails", ()
   const screenshots = join(tempDir, "screenshots");
   try {
     writeScreenshotSet(screenshots);
+    const signingFixture = writeSigningFixture(tempDir);
     writeFileSync(
       join(screenshots, "iphone-6.1", "app-store-02-standard-sprint.png"),
       pngFixture(1000, 1000)
@@ -117,7 +150,7 @@ test("TestFlight evidence CLI fails when an included screenshot audit fails", ()
       output,
       "--screenshot-root",
       screenshots
-    ]);
+    ], signingFixture);
 
     assert.notEqual(result.status, 0);
     const summary = JSON.parse(result.stdout);

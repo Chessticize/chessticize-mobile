@@ -212,6 +212,11 @@ check(
   readme.includes("[App Store Upload](docs/APP_STORE_UPLOAD.md)") &&
     releasePolicy.includes("docs/APP_STORE_UPLOAD.md") &&
     testFlightQa.includes("docs/APP_STORE_UPLOAD.md") &&
+    rootPackage.scripts?.["app-store:signing-readiness"] === "node scripts/app-store-signing-readiness.mjs" &&
+    readme.includes("pnpm app-store:signing-readiness") &&
+    releasePolicy.includes("pnpm app-store:signing-readiness") &&
+    testFlightQa.includes("pnpm app-store:signing-readiness") &&
+    appStoreUpload.includes("pnpm app-store:signing-readiness") &&
     appStoreUpload.includes("xcodebuild") &&
     appStoreUpload.includes("xcodebuild -exportArchive") &&
     appStoreUpload.includes("apps/mobile/ios/ExportOptions.app-store-connect.plist") &&

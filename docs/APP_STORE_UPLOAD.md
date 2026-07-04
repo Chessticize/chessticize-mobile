@@ -23,6 +23,7 @@ Run from a clean `main` checkout at the exact commit that will be uploaded:
 git status --short --branch
 pnpm install --frozen-lockfile
 pnpm app-store:preflight
+pnpm app-store:signing-readiness
 pnpm test
 pnpm typecheck
 pnpm mobile:test
