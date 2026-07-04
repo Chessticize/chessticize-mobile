@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -56,6 +57,20 @@ const appStorePlan = readText("docs/APP_STORE_PLAN.md");
 const pbxproj = readText("apps/mobile/ios/ChessticizeMobile.xcodeproj/project.pbxproj");
 const infoPlist = readText("apps/mobile/ios/ChessticizeMobile/Info.plist");
 const privacyManifest = readText("apps/mobile/ios/ChessticizeMobile/PrivacyInfo.xcprivacy");
+const thirdPartyAudit = spawnSync(
+  process.execPath,
+  ["scripts/app-store-third-party-audit.mjs", "--json"],
+  {
+    cwd: repoRoot,
+    encoding: "utf8"
+  }
+);
+let thirdPartyAuditPayload = null;
+try {
+  thirdPartyAuditPayload = JSON.parse(thirdPartyAudit.stdout || "{}");
+} catch {
+  thirdPartyAuditPayload = null;
+}
 
 const marketingVersions = uniqueMatches(pbxproj, /MARKETING_VERSION = ([^;]+);/g);
 const buildNumbers = uniqueMatches(pbxproj, /CURRENT_PROJECT_VERSION = ([^;]+);/g);
@@ -89,6 +104,16 @@ check(
   "Third-party notices inventory covers direct runtime packages",
   missingRuntimeNotices.length === 0,
   `Missing direct runtime dependency notices: ${missingRuntimeNotices.join(", ") || "none"}.`
+);
+
+check(
+  "Third-party notice audit passes",
+  rootPackage.scripts?.["app-store:third-party-audit"] === "node scripts/app-store-third-party-audit.mjs" &&
+    thirdPartyAudit.status === 0 &&
+    thirdPartyAuditPayload?.status === "pass",
+  thirdPartyAuditPayload
+    ? `Third-party audit status=${thirdPartyAuditPayload.status}; failed=${thirdPartyAuditPayload.summary?.failed ?? "unknown"}.`
+    : `Third-party audit failed before JSON output: ${thirdPartyAudit.stderr || thirdPartyAudit.stdout || "no output"}.`
 );
 
 check(
@@ -186,7 +211,7 @@ check(
 
 manualGate(
   "Refresh third-party notices against the final lockfile",
-  "Before tagging the submitted binary, re-audit THIRD_PARTY_NOTICES.md against the final package lock, Stockfish source, and bundled puzzle artifacts."
+  "Before tagging the submitted binary, run pnpm app-store:third-party-audit and manually recheck THIRD_PARTY_NOTICES.md against the final package lock, Stockfish source, and bundled puzzle artifacts."
 );
 manualGate(
   "Create the public source release tag",
