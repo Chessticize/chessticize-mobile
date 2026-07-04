@@ -34,6 +34,10 @@ https://github.com/Chessticize/chessticize-mobile
   resolve any missing scene or invalid pixel size before uploading screenshots.
 - Run `pnpm app-store:release-manifest` from the clean release commit and save
   the JSON output with the GitHub release or the TestFlight QA evidence.
+- Run `pnpm app-store:testflight-evidence -- --screenshot-root scratch/store-assets/final`
+  from the clean candidate commit to collect the automatable preflight,
+  notice-audit, release-manifest, and screenshot-audit outputs in
+  `scratch/testflight-qa/`.
 - `LICENSE` contains GPL-3.0-or-later.
 - `THIRD_PARTY_NOTICES.md` is current.
 - `apps/mobile/ios/StockfishEngine/Copying.txt` and

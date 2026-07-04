@@ -13,6 +13,7 @@
     "app-store:third-party-audit": "node scripts/app-store-third-party-audit.mjs",
     "app-store:screenshot-audit": "node scripts/app-store-screenshot-audit.mjs",
     "app-store:release-manifest": "node scripts/app-store-release-manifest.mjs",
+    "app-store:testflight-evidence": "node scripts/app-store-testflight-evidence.mjs",
     "generate:offline-puzzles": "node scripts/generate-offline-puzzle-fixture.mjs",
     "typecheck": "tsc --noEmit",
     "mobile:start": "pnpm --filter ChessticizeMobile start",

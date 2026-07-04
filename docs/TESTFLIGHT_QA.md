@@ -53,6 +53,10 @@ Run these before uploading the build:
 - [ ] Confirm the Release Source Rule is satisfied for the uploaded commit.
 - [ ] Confirm the build is not a Metro/debug build and no development puzzle
       source switch is visible.
+- [ ] Generate an automatable evidence bundle:
+      `pnpm app-store:testflight-evidence -- --screenshot-root scratch/store-assets/final`
+      after the final screenshot export is present. Use `-- --allow-dirty`
+      only for local rehearsal, never for submitted-binary evidence.
 
 ## Physical Device Matrix
 
@@ -175,6 +179,28 @@ while private; only commit sanitized screenshots or logs intentionally.
 | Result | Pending |
 | Blocking issues | TBD |
 | Evidence location | `scratch/testflight-qa/` |
+
+## Automatable Evidence Bundle
+
+Run this after final screenshots are exported and before uploading the candidate
+build:
+
+```sh
+pnpm app-store:testflight-evidence -- --screenshot-root scratch/store-assets/final
+```
+
+The command writes a timestamped folder under `scratch/testflight-qa/` with:
+
+- `preflight.json`
+- `third-party-audit.json`
+- `release-manifest.json`
+- `screenshot-audit.json`
+- `summary.json`
+
+The bundle is only local evidence for repository-controlled gates. It does not
+complete the TestFlight pass until the uploaded App Store Connect build is
+distributed, installed from TestFlight on a physical iPhone, and the manual
+checklist plus evidence log above are filled.
 
 ## Completion Rule
 
