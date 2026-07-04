@@ -48,7 +48,8 @@ test("a multi-step solved puzzle can win a target-one sprint and raise ELO", () 
   assert.equal(result.state.correctCount, 1);
   assert.equal(result.state.currentStreak, 1);
   assert.equal(result.state.bestStreak, 1);
-  assert.ok((result.state.ratingAfter ?? 0) > 600);
+  assert.equal(result.state.ratingAfter, 775);
+  assert.ok((result.state.ratingDeviationAfter ?? 0) < 350);
   assert.equal(result.attempt?.result, "correct");
 });
 
@@ -237,7 +238,7 @@ test("exhausting the local puzzle set completes the sprint as a pass", () => {
   assert.equal(result.state.status, "won");
   assert.equal(result.state.endReason, "puzzles_exhausted");
   assert.equal(result.state.correctCount, 1);
-  assert.ok((result.state.ratingAfter ?? 0) > 600);
+  assert.equal(result.state.ratingAfter, 775);
   assert.equal(result.attempt?.result, "correct");
 });
 

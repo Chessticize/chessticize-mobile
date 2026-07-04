@@ -35,8 +35,9 @@ test("MemoryStore supports the practice service contract used by the mobile POC"
 
   assert.equal(result.state.status, "won");
   assert.equal(service.getActiveSprint(), undefined);
-  assert.ok((result.state.ratingAfter ?? 0) > 600);
+  assert.equal(result.state.ratingAfter, 775);
   assert.equal(store.getRating("hangingPiece standard 5/20").games, 1);
+  assert.ok((store.getRating("hangingPiece standard 5/20").ratingDeviation ?? 0) < 350);
   assert.equal(store.listAttempts({ result: "correct" }).length, 1);
 });
 
@@ -220,7 +221,8 @@ test("PracticeService changes puzzle selection scope without losing local state"
 
   assert.equal(service.listHistory({ result: "wrong" }) instanceof Array, true);
   assert.equal((service.listHistory({ result: "wrong" }) as unknown[]).length, 1);
-  assert.equal(service.getRating("standard 5/20").rating, 625);
+  assert.equal(service.getRating("standard 5/20").rating, 600);
+  assert.equal(service.getRating("standard 5/20").games, 1);
 
   service.setPuzzleSelectionScope([puzzles.find((puzzle) => puzzle.id === "00008") as Puzzle]);
   const nextSprint = service.startSprint(
@@ -230,7 +232,7 @@ test("PracticeService changes puzzle selection scope without losing local state"
 
   assert.equal(nextSprint.currentPuzzle?.puzzle.id, "00008");
   assert.equal((service.listHistory({ result: "wrong" }) as unknown[]).length, 1);
-  assert.equal(service.getRating("standard 5/20").rating, 625);
+  assert.equal(service.getRating("standard 5/20").rating, 600);
 });
 
 test("PracticeService persists settings through the store boundary", () => {

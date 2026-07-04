@@ -1,9 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  applySprintRatingChange,
   buildSprintConfig,
+  calculateSprintRatingChange,
   calculateRatingUpdate,
   createDefaultRating,
+  DEFAULT_RATING_DEVIATION,
+  DEFAULT_VOLATILITY,
   ratingKeyForConfig,
   resetRating
 } from "../src/index.ts";
@@ -59,16 +63,61 @@ test("rating helpers create, update, floor, and reset rating generations", () =>
     key: "standard 5/20",
     generation: 0,
     rating: 600,
+    ratingDeviation: DEFAULT_RATING_DEVIATION,
+    volatility: DEFAULT_VOLATILITY,
     games: 0
   });
 
-  assert.ok(calculateRatingUpdate({ currentRating: 600, opponentRating: 1800, score: 1 }) > 600);
-  assert.equal(calculateRatingUpdate({ currentRating: 600, opponentRating: 1800, score: 0 }), 600);
+  assert.equal(calculateRatingUpdate({ currentRating: 600, score: 1 }), 775);
+  assert.equal(calculateRatingUpdate({ currentRating: 600, score: 0 }), 600);
 
   assert.deepEqual(resetRating({ ...rating, rating: 900, games: 10 }), {
     key: "standard 5/20",
     generation: 1,
     rating: 600,
+    ratingDeviation: DEFAULT_RATING_DEVIATION,
+    volatility: DEFAULT_VOLATILITY,
     games: 0
   });
+});
+
+test("sprint rating changes match server-compatible Glicko-2 cold-start behavior", () => {
+  const rating = createDefaultRating("standard 5/20");
+  const change = calculateSprintRatingChange({ rating, won: true });
+
+  assert.equal(change.ratingBefore, 600);
+  assert.equal(change.ratingAfter, 775);
+  assert.equal(change.ratingChange, 175);
+  assert.equal(change.ratingDeviationBefore, DEFAULT_RATING_DEVIATION);
+  assert.ok(Math.abs(change.ratingDeviationAfter - 248.17054151409985) < 0.000001);
+  assert.equal(change.volatilityBefore, DEFAULT_VOLATILITY);
+  assert.equal(change.volatilityAfter, DEFAULT_VOLATILITY);
+
+  assert.deepEqual(applySprintRatingChange(rating, change), {
+    key: "standard 5/20",
+    generation: 0,
+    rating: 775,
+    ratingDeviation: change.ratingDeviationAfter,
+    volatility: DEFAULT_VOLATILITY,
+    games: 1
+  });
+});
+
+test("sprint rating changes preserve floor and decay volatility after provisional games", () => {
+  const loss = calculateSprintRatingChange({ rating: createDefaultRating("standard 5/20"), won: false });
+
+  assert.equal(loss.ratingAfter, 600);
+  assert.equal(loss.ratingChange, 0);
+  assert.ok(loss.ratingDeviationAfter < DEFAULT_RATING_DEVIATION);
+
+  const established = {
+    key: "standard 5/20",
+    generation: 0,
+    rating: 1200,
+    ratingDeviation: 80,
+    volatility: DEFAULT_VOLATILITY,
+    games: 10
+  };
+  const establishedChange = calculateSprintRatingChange({ rating: established, won: true });
+  assert.ok(Math.abs(establishedChange.volatilityAfter - 0.0594) < 0.000001);
 });

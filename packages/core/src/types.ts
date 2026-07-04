@@ -57,6 +57,8 @@ export interface RatingRecord {
   key: string;
   generation: number;
   rating: number;
+  ratingDeviation?: number;
+  volatility?: number;
   games: number;
 }
 
@@ -127,6 +129,11 @@ export interface SprintState {
   currentPuzzle?: CurrentPuzzleState;
   ratingBefore: number;
   ratingAfter?: number;
+  ratingGamesBefore?: number;
+  ratingDeviationBefore?: number;
+  ratingDeviationAfter?: number;
+  volatilityBefore?: number;
+  volatilityAfter?: number;
 }
 
 export interface AttemptEvent {

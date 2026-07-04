@@ -140,6 +140,47 @@ test("SQLite migration adds Arrow Duel candidate order to existing attempts tabl
   }
 });
 
+test("SQLite migration adds server-compatible Glicko fields to existing ratings tables", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "chessticize-rating-migration-"));
+  const dbPath = join(dir, "practice.sqlite");
+  try {
+    const legacyDb = new DatabaseSync(dbPath);
+    legacyDb.exec(`
+      CREATE TABLE ratings (
+        key TEXT NOT NULL,
+        generation INTEGER NOT NULL,
+        rating INTEGER NOT NULL,
+        games INTEGER NOT NULL,
+        PRIMARY KEY (key, generation)
+      );
+      INSERT INTO ratings (key, generation, rating, games)
+      VALUES ('standard 5/20', 0, 900, 4);
+    `);
+    legacyDb.close();
+
+    const store = new SQLiteStore(dbPath);
+    store.migrate();
+    const rating = store.getRating("standard 5/20");
+    store.close();
+
+    const migratedDb = new DatabaseSync(dbPath);
+    const columns = migratedDb.prepare("PRAGMA table_info(ratings)").all() as Array<{ name: string }>;
+    migratedDb.close();
+    assert.ok(columns.some((column) => column.name === "rating_deviation"));
+    assert.ok(columns.some((column) => column.name === "volatility"));
+    assert.deepEqual(rating, {
+      key: "standard 5/20",
+      generation: 0,
+      rating: 900,
+      ratingDeviation: 350,
+      volatility: 0.06,
+      games: 4
+    });
+  } finally {
+    await rm(dir, { force: true, recursive: true });
+  }
+});
+
 test("PracticeService selects SQLite sprint puzzles from the current run ELO window", async () => {
   const store = await seededStore();
   const service = new PracticeService(store);
@@ -770,7 +811,9 @@ test("PracticeService records a completed sprint and persists updated ELO", asyn
     assert.equal(result.state.status, "won");
 
     const rating = store.getRating("hangingPiece standard 5/20");
-    assert.ok(rating.rating > 600);
+    assert.equal(rating.rating, 775);
+    assert.ok((rating.ratingDeviation ?? 0) < 350);
+    assert.equal(rating.volatility, 0.06);
     assert.equal(rating.games, 1);
   } finally {
     store.close();
