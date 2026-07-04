@@ -10,6 +10,7 @@ The repository contains the React Native app shell (`apps/mobile`), a pure TypeS
 - [Core Library And CLI](docs/CORE_CLI.md) — backend package layout and CLI harness
 - [App Store Plan](docs/APP_STORE_PLAN.md) — active goal and milestone plan toward the 1.0 submission
 - [App Store Assets](docs/STORE_ASSETS.md) — 1.0 App Store metadata and screenshot capture plan
+- [App Store Upload](docs/APP_STORE_UPLOAD.md) — owner-executed archive and App Store Connect upload runbook
 - [TestFlight QA](docs/TESTFLIGHT_QA.md) — internal TestFlight pass checklist and evidence log
 - [Privacy Policy](docs/PRIVACY_POLICY.md) — 1.0 local-only data and tracking disclosure
 - [iOS Device Targets](docs/DEVICE_TARGETS.md) — 1.0 iPhone-only, portrait-only release target
@@ -97,3 +98,8 @@ sets have been captured and cropped. The release manifest command emits the
 exact source commit, iOS identity, bundled puzzle pack metadata, Stockfish
 identifiers, and SHA-256 hashes for release-critical files; save that JSON with
 the GitHub release or TestFlight QA evidence.
+
+The App Store Connect archive/upload path is documented in
+[App Store Upload](docs/APP_STORE_UPLOAD.md). Uploads use
+`apps/mobile/ios/ExportOptions.app-store-connect.plist` with
+`method = app-store-connect` and `destination = upload`.

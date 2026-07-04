@@ -38,6 +38,8 @@ https://github.com/Chessticize/chessticize-mobile
   from the clean candidate commit to collect the automatable preflight,
   notice-audit, release-manifest, and screenshot-audit outputs in
   `scratch/testflight-qa/`.
+- Follow `docs/APP_STORE_UPLOAD.md` to archive and upload with
+  `apps/mobile/ios/ExportOptions.app-store-connect.plist`.
 - `LICENSE` contains GPL-3.0-or-later.
 - `THIRD_PARTY_NOTICES.md` is current.
 - `apps/mobile/ios/StockfishEngine/Copying.txt` and

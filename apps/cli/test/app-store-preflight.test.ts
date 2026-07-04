@@ -29,6 +29,7 @@ test("App Store preflight CLI reports automatable checks and manual release gate
   assert.ok(checkNames.has("iOS release identity is fixed for 1.0"));
   assert.ok(checkNames.has("Store screenshot capture flow is wired"));
   assert.ok(checkNames.has("TestFlight QA checklist is explicit about real-device execution"));
+  assert.ok(checkNames.has("App Store archive and upload path is documented"));
 
   const manualNames = new Set(payload.manual.map((entry: { name: string }) => entry.name));
   assert.ok(manualNames.has("Refresh third-party notices against the final lockfile"));

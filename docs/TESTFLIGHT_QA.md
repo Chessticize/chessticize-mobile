@@ -6,6 +6,8 @@ tester group and the physical-device checklist below is executed.
 
 Recheck Apple's live documentation before the pass:
 
+- Upload builds:
+  https://developer.apple.com/help/app-store-connect/manage-builds/upload-builds/
 - TestFlight overview:
   https://developer.apple.com/help/app-store-connect/test-a-beta-version/testflight-overview
 - Add internal testers:
@@ -57,6 +59,8 @@ Run these before uploading the build:
       `pnpm app-store:testflight-evidence -- --screenshot-root scratch/store-assets/final`
       after the final screenshot export is present. Use `-- --allow-dirty`
       only for local rehearsal, never for submitted-binary evidence.
+- [ ] Follow `docs/APP_STORE_UPLOAD.md` to create the Release archive and upload
+      it with `apps/mobile/ios/ExportOptions.app-store-connect.plist`.
 
 ## Physical Device Matrix
 
@@ -201,6 +205,14 @@ The bundle is only local evidence for repository-controlled gates. It does not
 complete the TestFlight pass until the uploaded App Store Connect build is
 distributed, installed from TestFlight on a physical iPhone, and the manual
 checklist plus evidence log above are filled.
+
+## Archive And Upload
+
+Follow `docs/APP_STORE_UPLOAD.md` for the owner-executed archive and upload
+step. The 1.0 upload path uses `xcodebuild archive`, then
+`xcodebuild -exportArchive` with
+`apps/mobile/ios/ExportOptions.app-store-connect.plist`. Do not count this step
+as complete until App Store Connect finishes processing the uploaded build.
 
 ## Completion Rule
 
