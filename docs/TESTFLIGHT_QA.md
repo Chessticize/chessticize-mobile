@@ -170,10 +170,19 @@ failure, retry, or unclear result.
 Fill this table when the pass is executed. Keep evidence links in `scratch/`
 while private; only commit sanitized screenshots or logs intentionally.
 
+Current source release candidate:
+
+- Source commit: `380f73c70a916d6494609fce8f334ef4f4094626`
+- Release tag:
+  [`ios-v1.0.0-build-1`](https://github.com/Chessticize/chessticize-mobile/releases/tag/ios-v1.0.0-build-1)
+- Rule: upload only a binary archived from this exact commit. If any source,
+  dependency, puzzle, native, or notice file changes before upload, regenerate
+  the release manifest and publish a new tag/release for the submitted binary.
+
 | Field | Value |
 | --- | --- |
-| Source commit | TBD |
-| Release tag | TBD |
+| Source commit | `380f73c70a916d6494609fce8f334ef4f4094626` |
+| Release tag | `ios-v1.0.0-build-1` |
 | App Store Connect build | TBD |
 | TestFlight group | TBD |
 | Physical device and iOS version | TBD |
