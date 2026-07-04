@@ -327,8 +327,11 @@ asserting through public UI and stable testIDs):
    covered by a component behavior test through the Review board `onMove`
    contract, which records a correct `scheduled_review` attempt and returns to
    the due queue.)*
-9. Review reminder scheduling (fake notification interface). *(blocked on
-   Milestone 4.)*
+9. Review reminder scheduling (fake notification interface).
+   *(added 2026-07-03; covered through a native notification launch fixture
+   that reports authorized permission, schedules a local review reminder from
+   Settings, asserts the scheduled payload, and clears it when reminders are
+   turned off.)*
 
 ## Out of scope for 1.0
 

@@ -10,6 +10,7 @@ static NSString * const ChessticizeReviewReminderRouteEvent = @"ReviewReminderNo
 @interface ReviewReminderNotifications : RCTEventEmitter <RCTBridgeModule, UNUserNotificationCenterDelegate>
 @property (nonatomic, assign) BOOL hasListeners;
 @property (nonatomic, copy, nullable) NSString *pendingRoute;
+@property (nonatomic, copy, nullable) NSString *testAuthorizationStatus;
 @end
 
 @implementation ReviewReminderNotifications
@@ -21,6 +22,7 @@ RCT_EXPORT_MODULE();
   self = [super init];
   if (self) {
     [UNUserNotificationCenter currentNotificationCenter].delegate = self;
+    self.testAuthorizationStatus = [self processArgumentValueForKey:@"chessticizeTestNotificationStatus"];
   }
   return self;
 }
@@ -45,7 +47,9 @@ RCT_EXPORT_METHOD(replaceNextReminder:(NSDictionary *)reminder
                   rejecter:(RCTPromiseRejectBlock)reject)
 {
   UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
-  [center removePendingNotificationRequestsWithIdentifiers:@[ChessticizeReviewReminderIdentifier]];
+  if (self.testAuthorizationStatus == nil) {
+    [center removePendingNotificationRequestsWithIdentifiers:@[ChessticizeReviewReminderIdentifier]];
+  }
 
   if (reminder == nil || (id)reminder == [NSNull null]) {
     resolve(@{@"scheduled": @NO});
@@ -60,6 +64,11 @@ RCT_EXPORT_METHOD(replaceNextReminder:(NSDictionary *)reminder
   NSDate *scheduledDate = [self dateFromISOString:scheduledAt];
   if (scheduledDate == nil || body == nil || body.length == 0) {
     reject(@"invalid_reminder", @"Reminder payload must include a valid scheduledAt and body.", nil);
+    return;
+  }
+
+  if (self.testAuthorizationStatus != nil) {
+    resolve(@{@"scheduled": @YES, @"scheduledAt": scheduledAt});
     return;
   }
 
@@ -87,6 +96,10 @@ RCT_EXPORT_METHOD(replaceNextReminder:(NSDictionary *)reminder
 RCT_EXPORT_METHOD(getAuthorizationStatus:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 {
+  if (self.testAuthorizationStatus != nil) {
+    resolve(self.testAuthorizationStatus);
+    return;
+  }
   [[UNUserNotificationCenter currentNotificationCenter] getNotificationSettingsWithCompletionHandler:^(UNNotificationSettings *settings) {
     resolve([self stringFromAuthorizationStatus:settings.authorizationStatus]);
   }];
@@ -95,6 +108,10 @@ RCT_EXPORT_METHOD(getAuthorizationStatus:(RCTPromiseResolveBlock)resolve
 RCT_EXPORT_METHOD(requestAuthorization:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 {
+  if (self.testAuthorizationStatus != nil) {
+    resolve(self.testAuthorizationStatus);
+    return;
+  }
   UNAuthorizationOptions options = UNAuthorizationOptionAlert | UNAuthorizationOptionBadge | UNAuthorizationOptionSound;
   [[UNUserNotificationCenter currentNotificationCenter] requestAuthorizationWithOptions:options completionHandler:^(BOOL granted, NSError *error) {
     if (error != nil) {
@@ -182,6 +199,30 @@ didReceiveNotificationResponse:(UNNotificationResponse *)response
 
   formatter.formatOptions = NSISO8601DateFormatWithInternetDateTime;
   return [formatter dateFromString:value];
+}
+
+- (NSString *)processArgumentValueForKey:(NSString *)key
+{
+  NSArray<NSString *> *arguments = NSProcessInfo.processInfo.arguments;
+  NSString *dashKey = [NSString stringWithFormat:@"-%@", key];
+  NSString *dashPrefix = [NSString stringWithFormat:@"%@=", dashKey];
+  NSString *plainPrefix = [NSString stringWithFormat:@"%@=", key];
+  for (NSUInteger index = 0; index < arguments.count; index++) {
+    NSString *argument = arguments[index];
+    if ([argument isEqualToString:dashKey] || [argument isEqualToString:key]) {
+      NSUInteger valueIndex = index + 1;
+      if (valueIndex < arguments.count) {
+        return arguments[valueIndex];
+      }
+    }
+    if ([argument hasPrefix:dashPrefix]) {
+      return [argument substringFromIndex:dashPrefix.length];
+    }
+    if ([argument hasPrefix:plainPrefix]) {
+      return [argument substringFromIndex:plainPrefix.length];
+    }
+  }
+  return nil;
 }
 
 @end
