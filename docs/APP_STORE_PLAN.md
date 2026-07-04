@@ -240,8 +240,12 @@ Design approved 2026-07-03; the "Review Reminder Notifications" section of
    machine-checks the notice inventory against the final lockfile, bundled
    Stockfish/NNUE artifacts, and Lichess puzzle manifest. Release-time
    execution still requires running that audit from the final submitted
-   lockfile, manually reading the notices for license correctness, and tagging
-   each App Store binary from its exact release commit.
+   lockfile and manually reading the notices for license correctness. The
+   current build-1 source release has been published as
+   `ios-v1.0.0-build-1` from commit
+   `380f73c70a916d6494609fce8f334ef4f4094626`; use that tag only for an App
+   Store Connect binary archived from that exact commit, otherwise create a new
+   tag and release for the submitted binary.
 2. **App identity**: final display name, bundle identifier, version/build
    scheme, app icon set (all slots), launch screen matching the app background.
    Status: implementation complete. The iOS target now uses the display name
@@ -304,7 +308,11 @@ Design approved 2026-07-03; the "Review Reminder Notifications" section of
    completion rule. The actual pass still requires an App Store Connect upload,
    an internal TestFlight group, a physical iPhone install through TestFlight,
    and a filled evidence log before this item can be marked complete. The
-   repo now also exposes `pnpm app-store:preflight`, which machine-checks the
+   current source release tag is
+   `ios-v1.0.0-build-1`
+   (`380f73c70a916d6494609fce8f334ef4f4094626`), so the uploaded build must be
+   archived from that exact commit or the source release must be regenerated.
+   The repo now also exposes `pnpm app-store:preflight`, which machine-checks the
    automatable release artifacts and reports the manual release gates that
    cannot be completed from the repository. `pnpm app-store:testflight-evidence`
    collects the automatable preflight, notice-audit, release-manifest, and
