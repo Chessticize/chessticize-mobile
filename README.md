@@ -78,3 +78,12 @@ source release in this repository. Do not submit an App Store binary from an
 untagged commit. The release tag must identify the exact source, native code,
 bundled puzzle artifact, Stockfish source, and notices used for that binary.
 See [Release Source Policy](docs/RELEASE_SOURCE_POLICY.md).
+
+Before tagging or uploading a build, run the automatable release preflight:
+
+```sh
+pnpm app-store:preflight
+```
+
+The command reports repository checks that must pass and the manual App Store
+gates that still require owner or device execution.

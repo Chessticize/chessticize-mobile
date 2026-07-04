@@ -27,6 +27,7 @@ https://github.com/Chessticize/chessticize-mobile
 
 ## Release Checklist
 
+- Run `pnpm app-store:preflight` and resolve any failed automatable checks.
 - `LICENSE` contains GPL-3.0-or-later.
 - `THIRD_PARTY_NOTICES.md` is current.
 - `apps/mobile/ios/StockfishEngine/Copying.txt` and

@@ -9,6 +9,7 @@
     "test:unit": "node --experimental-strip-types --test packages/core/test/*.test.ts",
     "test:integration": "node --experimental-strip-types --test packages/storage/test/*.test.ts",
     "test:e2e": "node --experimental-strip-types --test apps/cli/test/*.test.ts",
+    "app-store:preflight": "node scripts/app-store-preflight.mjs",
     "generate:offline-puzzles": "node scripts/generate-offline-puzzle-fixture.mjs",
     "typecheck": "tsc --noEmit",
     "mobile:start": "pnpm --filter ChessticizeMobile start",

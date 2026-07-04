@@ -297,7 +297,10 @@ Design approved 2026-07-03; the "Review Reminder Notifications" section of
    gates, physical-device matrix, manual QA checklist, evidence log, and
    completion rule. The actual pass still requires an App Store Connect upload,
    an internal TestFlight group, a physical iPhone install through TestFlight,
-   and a filled evidence log before this item can be marked complete.
+   and a filled evidence log before this item can be marked complete. The
+   repo now also exposes `pnpm app-store:preflight`, which machine-checks the
+   automatable release artifacts and reports the manual release gates that
+   cannot be completed from the repository.
 
 ## Milestone 6 — Automated coverage of key user flows
 
