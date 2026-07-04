@@ -89,6 +89,7 @@ interface Props {
   practiceServiceFactory?: () => PracticeService;
   configurePuzzleSource?: (service: PracticeService, source: MobilePuzzleSource) => void;
   debugTrace?: (event: PracticeDebugTraceEvent) => void;
+  currentTimeMs?: () => number;
   stockfishTransportFactory?: () => UciEngineTransport | null;
   reviewReminderScheduler?: ReviewReminderScheduler | null;
   reviewReminderSchedulerFactory?: () => ReviewReminderScheduler | null;
@@ -220,6 +221,7 @@ export function PracticePocScreen({
   practiceServiceFactory = createMobilePracticeService,
   configurePuzzleSource = configureMobilePracticePuzzleSource,
   debugTrace,
+  currentTimeMs = Date.now,
   stockfishTransportFactory = createNativeStockfishTransport,
   reviewReminderScheduler,
   reviewReminderSchedulerFactory = createNativeReviewReminderScheduler,
@@ -248,7 +250,7 @@ export function PracticePocScreen({
   const stateRef = useRef<SprintState | null>(null);
   const boardFenRef = useRef<string | null>(null);
   const feedbackSnapshotRef = useRef<FeedbackBoardSnapshot | null>(null);
-  const nowMsRef = useRef<number>(Date.now());
+  const nowMsRef = useRef<number>(currentTimeMs());
   const { width } = useWindowDimensions();
 
   const [mode, setMode] = useState<SprintMode>("standard");
@@ -261,7 +263,7 @@ export function PracticePocScreen({
   const [dueReviewItems, setDueReviewItems] = useState<ReviewQueueItem[]>([]);
   const [sessionMistakeReviewItems, setSessionMistakeReviewItems] = useState<SessionMistakeReviewItem[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [nowMs, setNowMs] = useState(() => currentTimeMs());
   const [currentRating, setCurrentRating] = useState(600);
   const [resumableSprint, setResumableSprint] = useState<SprintState | null>(null);
   const [boardFen, setBoardFen] = useState<string | null>(null);
@@ -397,13 +399,13 @@ export function PracticePocScreen({
     }
 
     const timer = setInterval(() => {
-      setNowMs(Date.now());
+      setNowMs(currentTimeMs());
     }, 500);
 
     return () => {
       clearInterval(timer);
     };
-  }, [isActive]);
+  }, [currentTimeMs, isActive]);
 
   useEffect(() => {
     if (!state || state.status !== "active") {
@@ -1482,6 +1484,7 @@ export function PracticePocScreen({
             <ReviewSession
               key={`history:${historyReviewEntries.map((entry) => entry.attempt?.id ?? entry.puzzle.id).join("|")}:${historyReviewInitialIndex}`}
               boardSize={boardSize}
+              currentTimeMs={currentTimeMs}
               entries={historyReviewEntries}
               initialIndex={historyReviewInitialIndex}
               service={service}
@@ -1557,6 +1560,7 @@ export function PracticePocScreen({
             dueReviewItems={dueReviewItems}
             nowMs={nowMs}
             reviewQueue={reviewQueue}
+            currentTimeMs={currentTimeMs}
             service={service}
             sessionMistakeReviewItems={sessionMistakeReviewItems}
             onExitSessionReview={() => setTab("practice")}
@@ -4403,6 +4407,7 @@ type ReviewPuzzleState =
 
 function ReviewPanel({
   boardSize,
+  currentTimeMs,
   dueReviewItems,
   nowMs,
   onExitSessionReview,
@@ -4414,6 +4419,7 @@ function ReviewPanel({
   stockfishTransportFactory
 }: {
   boardSize: number;
+  currentTimeMs: () => number;
   dueReviewItems: ReviewQueueItem[];
   nowMs: number;
   onExitSessionReview: () => void;
@@ -4501,6 +4507,7 @@ function ReviewPanel({
       <ReviewSession
         key={activeEntries.map((entry) => `${entry.source}:${entry.puzzle.id}:${entry.mode}:${entry.ratingKey}`).join("|")}
         boardSize={boardSize}
+        currentTimeMs={currentTimeMs}
         entries={activeEntries}
         service={service}
         onReviewRecorded={onReviewRecorded}
@@ -4860,6 +4867,7 @@ function ReviewDifficultyRow({
 
 function ReviewSession({
   boardSize,
+  currentTimeMs,
   entries,
   initialIndex = 0,
   service,
@@ -4868,6 +4876,7 @@ function ReviewSession({
   stockfishTransportFactory
 }: {
   boardSize: number;
+  currentTimeMs: () => number;
   entries: ReviewEntry[];
   initialIndex?: number;
   service: PracticeService;
@@ -4893,8 +4902,8 @@ function ReviewSession({
   const [analysisForwardStack, setAnalysisForwardStack] = useState<string[]>([]);
   const [manualBoardFlip, setManualBoardFlip] = useState(false);
   const [reviewResultRecorded, setReviewResultRecorded] = useState(false);
-  const [reviewStartedAtMs, setReviewStartedAtMs] = useState(() => Date.now());
-  const [reviewNowMs, setReviewNowMs] = useState(() => Date.now());
+  const [reviewStartedAtMs, setReviewStartedAtMs] = useState(() => currentTimeMs());
+  const [reviewNowMs, setReviewNowMs] = useState(() => currentTimeMs());
   const [reviewTimedOut, setReviewTimedOut] = useState(false);
   const [punishmentLineComplete, setPunishmentLineComplete] = useState(false);
   const [lineReviewNeedsContinue, setLineReviewNeedsContinue] = useState(false);
@@ -5037,12 +5046,12 @@ function ReviewSession({
       return;
     }
     const timer = setInterval(() => {
-      setReviewNowMs(Date.now());
+      setReviewNowMs(currentTimeMs());
     }, 500);
     return () => {
       clearInterval(timer);
     };
-  }, [currentEntry.source, entryIndex, reviewResultRecorded]);
+  }, [currentEntry.source, currentTimeMs, entryIndex, reviewResultRecorded]);
 
   useEffect(() => {
     if (currentEntry.source !== "due" || reviewResultRecorded || reviewTimedOut || reviewRemainingSeconds !== 0) {
@@ -5075,7 +5084,7 @@ function ReviewSession({
     setAnalysisForwardStack([]);
     setManualBoardFlip(false);
     setReviewResultRecorded(false);
-    const now = Date.now();
+    const now = currentTimeMs();
     setReviewStartedAtMs(now);
     setReviewNowMs(now);
     setReviewTimedOut(false);
@@ -5110,7 +5119,7 @@ function ReviewSession({
       return;
     }
     reviewResultRecordedRef.current = true;
-    const completedAt = new Date().toISOString();
+    const completedAt = new Date(currentTimeMs()).toISOString();
     service.recordReviewAttempt({
       puzzleId: currentEntry.puzzle.id,
       mode: currentEntry.mode,
@@ -5464,6 +5473,19 @@ function ReviewSession({
             <Text testID="review-progress" style={styles.helperText}>
               {entryIndex + 1} / {entries.length} · {modeLabel(currentEntry.mode)}
             </Text>
+            {arePracticeTestControlsEnabled() ? (
+              <>
+                <Text testID="review-current-puzzle-id" style={styles.reviewDueHiddenMetric}>
+                  {currentEntry.puzzle.id}
+                </Text>
+                <Text testID="review-current-expected-move" style={styles.reviewDueHiddenMetric}>
+                  {expectedReviewMove(currentPuzzle)}
+                </Text>
+                <Text testID="review-board-flipped" style={styles.reviewDueHiddenMetric}>
+                  {boardFlipped ? "flipped" : "normal"}
+                </Text>
+              </>
+            ) : null}
           </View>
           <View style={styles.iconButtonRow} testID="review-header-actions">
           {currentEntry.source === "session" || currentEntry.source === "history" ? (

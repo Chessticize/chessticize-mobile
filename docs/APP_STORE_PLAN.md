@@ -320,7 +320,13 @@ asserting through public UI and stable testIDs):
    after relaunch.)*
 8. Scheduled due review completion (needs a time-travel or fixture seam to make
    items due within a test run — design a public fixture path per AGENTS.md,
-   never a test-only backdoor in product code). *(blocked on Milestone 1.)*
+   never a test-only backdoor in product code).
+   *(added 2026-07-03; covered through a dev/test-harness launch clock that
+   creates future-due review rows through real sprint UI, relaunches after the
+   due interval, and opens the scheduled Review session in Detox. Completion is
+   covered by a component behavior test through the Review board `onMove`
+   contract, which records a correct `scheduled_review` attempt and returns to
+   the due queue.)*
 9. Review reminder scheduling (fake notification interface). *(blocked on
    Milestone 4.)*
 

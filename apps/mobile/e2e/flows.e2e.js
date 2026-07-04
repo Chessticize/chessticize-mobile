@@ -4,12 +4,15 @@ const {
   playBoardMove,
   startPracticeMode,
   selectTestPuzzleSource,
+  textFromAttributes,
   waitForVisibleInPracticeScroll,
   waitForElementTextContaining,
   failStandardSprint
 } = require('./helpers');
 
 describe('Key user flows', () => {
+  const dayMs = 24 * 60 * 60 * 1000;
+
   beforeEach(async () => {
     await device.launchApp({
       newInstance: true,
@@ -65,6 +68,39 @@ describe('Key user flows', () => {
     await waitFor(element(by.id('review-total-count'))).toHaveText('3').withTimeout(10000);
     await waitForElementTextContaining('review-next-due', 'Next:', 10000);
     await expect(element(by.id('review-empty-practice'))).toBeVisible();
+  });
+
+  it('opens a scheduled due review after relaunch', async () => {
+    const sprintNowMs = Date.now() - (2 * dayMs);
+    const reviewNowMs = sprintNowMs + dayMs + 60 * 1000;
+    await launchAppAt(sprintNowMs, true);
+
+    await failStandardSprint();
+    await dismissSprintSummary();
+
+    await device.terminateApp();
+    await launchAppAt(reviewNowMs, false);
+    await selectTestPuzzleSource('familiar15');
+
+    await openTab('review-tab', 'review-start-due');
+    await waitFor(element(by.id('review-due-count'))).toHaveText('3').withTimeout(10000);
+    await waitForElementTextContaining('review-due-summary', 'Ready now', 10000);
+
+    await element(by.id('review-start-due')).tap();
+    await waitFor(element(by.id('review-session'))).toBeVisible().withTimeout(10000);
+    await waitFor(element(by.text('Scheduled review'))).toBeVisible().withTimeout(10000);
+    await waitForElementTextContaining('review-progress', '1 / 3', 10000);
+
+    const expectedMove = await elementText('review-current-expected-move');
+    const boardOrientation = await elementText('review-board-flipped');
+    if (!/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(expectedMove)) {
+      throw new Error(`Expected a UCI review move, got ${expectedMove}`);
+    }
+    if (!['normal', 'flipped'].includes(boardOrientation)) {
+      throw new Error(`Expected review board orientation, got ${boardOrientation}`);
+    }
+    await element(by.id('review-exit')).tap();
+    await waitFor(element(by.id('review-start-due'))).toBeVisible().withTimeout(10000);
   });
 
   it('shows failed attempts in history with the wrong-7-days shortcut', async () => {
@@ -169,4 +205,19 @@ async function dismissSprintSummary() {
   // leave via Done before navigating tabs.
   await element(by.id('back-practice-button')).tap();
   await waitFor(element(by.id('practice-tab'))).toBeVisible().withTimeout(10000);
+}
+
+async function launchAppAt(nowMs, deleteData) {
+  await device.launchApp({
+    newInstance: true,
+    delete: deleteData,
+    launchArgs: {
+      detoxEnableSynchronization: '0',
+      chessticizeTestNowMs: String(nowMs)
+    }
+  });
+}
+
+async function elementText(testID) {
+  return textFromAttributes(await element(by.id(testID)).getAttributes());
 }
