@@ -356,6 +356,17 @@ asserting through public UI and stable testIDs):
    Settings, asserts the scheduled payload, and clears it when reminders are
    turned off.)*
 
+## Milestone 7 — Core Pack expansion to the full offline library
+
+Owner decision 2026-07-04: regenerate the bundled Core Pack per
+`docs/PUZZLE_PACK_SAMPLING.md` — all puzzles Arrow Duel eligible, quality
+filters (Popularity >= 70, NbPlays >= 100, RatingDeviation <= 100), rating
+600–2200, ~1.4M puzzles targeting ≈ 700 MB install (hard cap 800 MB), shipped
+as a prebuilt read-only SQLite asset with stratified bucket/theme/mate-pattern
+quotas and a deterministic seeded draw. That spec is authoritative for filter
+thresholds, quotas, packaging, and acceptance criteria; it also requires
+aligning `SERVER_PUZZLE_MIN_RATING` with the pack floor.
+
 ## Out of scope for 1.0
 
 - Pack downloading/import/removal (Packs tab stays bundled-only).
