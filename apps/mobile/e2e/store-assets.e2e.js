@@ -20,7 +20,9 @@ describeStoreAssets('App Store screenshot capture', () => {
   });
 
   it('captures the practice home scene', async () => {
-    await waitForVisibleInPracticeScroll('practice-home');
+    await waitFor(element(by.id('practice-home'))).toExist().withTimeout(180000);
+    await element(by.id('practice-main-scroll')).scrollTo('top');
+    await waitFor(element(by.id('practice-action-header'))).toBeVisible().withTimeout(10000);
     await device.takeScreenshot('app-store-01-practice-home');
   });
 
