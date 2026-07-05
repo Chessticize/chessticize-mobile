@@ -138,6 +138,17 @@ source presolve library change:
    `.sqlite`). The CI cache invalidates automatically because its key hashes
    the manifest.
 
+How the artifact enters the app binary (automatic — no per-resample steps):
+the iOS project's Copy Bundle Resources and the Android `build.gradle` assets
+both reference the fixed path `fixtures/puzzles/bundled-core-pack.sqlite`, and
+every build path (`ios-build-for-detox.sh`, the CI fetch step, release builds)
+runs `pnpm fetch:core-pack` before compiling, so whatever verified artifact
+sits at that path is copied into the app bundle. Consequently the filename and
+path are load-bearing: a re-sampled pack must keep the name
+`bundled-core-pack.sqlite` (only the release tag and hashes change). Renaming
+it requires touching the Xcode project, the Android build, the fetch script,
+the runtime `openReadOnlyPuzzlePack` calls, and the asset test — don't.
+
 ## Acceptance Criteria
 
 - Every puzzle in the pack passes `isServerCompatibleArrowDuelPuzzle` (verify
