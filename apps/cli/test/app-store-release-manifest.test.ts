@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 type ReleaseManifest = {
@@ -40,11 +40,15 @@ type ReleaseManifest = {
   releaseRules: string[];
 };
 
-test("App Store release manifest reports source identity and hashed release artifacts", () => {
+test("App Store release manifest reports source identity and hashed release artifacts", (t) => {
   const puzzleManifest = JSON.parse(readFileSync(resolve("fixtures/puzzles/bundled-core-pack.manifest.json"), "utf8")) as {
     puzzleCount: number;
     format?: "json" | "sqlite";
   };
+  if (puzzleManifest.format === "sqlite" && !existsSync(resolve("fixtures/puzzles/bundled-core-pack.sqlite"))) {
+    t.skip("core pack artifact not fetched; run pnpm fetch:core-pack before generating a release manifest");
+    return;
+  }
   const result = spawnSync(
     process.execPath,
     ["scripts/app-store-release-manifest.mjs", "--allow-dirty"],

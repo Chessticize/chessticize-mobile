@@ -53,6 +53,15 @@ jobs:
       - name: Install JS dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Cache core puzzle pack
+        uses: actions/cache@v4
+        with:
+          path: fixtures/puzzles/bundled-core-pack.sqlite
+          key: core-pack-${{ hashFiles('fixtures/puzzles/bundled-core-pack.manifest.json') }}
+
+      - name: Fetch core puzzle pack
+        run: pnpm fetch:core-pack
+
       - name: Show Xcode
         run: xcodebuild -version
 

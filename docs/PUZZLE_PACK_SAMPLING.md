@@ -90,7 +90,10 @@ Measured inventory after filters 1–4 (per 200-point band):
 ## Packaging Requirements
 
 1. Ship the pack as a **prebuilt read-only SQLite database asset** generated at
-   build time, with indexes on rating and themes. Do not `require()` a JSON
+   build time, with indexes on rating and themes. The artifact is distributed
+   as a GitHub Release asset and fetched by hash via `pnpm fetch:core-pack`
+   (never committed to git or LFS: a ~500 MB file in LFS would burn the free
+   bandwidth quota on every CI checkout). Do not `require()` a JSON
    pack of this size (hundreds of MB in the JS heap) and do not import rows on
    first launch (minutes of device time for ~1.4M rows).
 2. User data stays in the existing separate writable `DeviceSQLiteStore`

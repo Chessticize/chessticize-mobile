@@ -24,7 +24,8 @@
     "mobile:doctor:ios": "pnpm --filter ChessticizeMobile doctor:ios",
     "mobile:e2e:build:ios": "pnpm --filter ChessticizeMobile e2e:build:ios",
     "mobile:e2e:test:ios": "pnpm --filter ChessticizeMobile e2e:test:ios",
-    "mobile:e2e:store-assets:ios": "pnpm --filter ChessticizeMobile e2e:store-assets:ios"
+    "mobile:e2e:store-assets:ios": "pnpm --filter ChessticizeMobile e2e:store-assets:ios",
+    "fetch:core-pack": "node scripts/fetch-core-pack.mjs"
   },
   "dependencies": {
     "chess.js": "^1.4.0"

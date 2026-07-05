@@ -44,6 +44,10 @@ function artifact(path, role) {
 
 function puzzlePackArtifactPath(manifest) {
   if (manifest.format === "sqlite" || existsSync(join(repoRoot, "fixtures/puzzles/bundled-core-pack.sqlite"))) {
+    if (!existsSync(join(repoRoot, "fixtures/puzzles/bundled-core-pack.sqlite"))) {
+      console.error("Core pack artifact is missing. Run `pnpm fetch:core-pack` before generating a release manifest.");
+      process.exit(1);
+    }
     return "fixtures/puzzles/bundled-core-pack.sqlite";
   }
   return "fixtures/puzzles/bundled-core-pack.json";

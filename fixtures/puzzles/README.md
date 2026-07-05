@@ -34,3 +34,18 @@ the release-default mobile puzzle source.
 `regression-samples.json` names stable puzzle IDs from `presolved-1000.json` for recurring regression coverage, such as promotion lines, multi-move lines, and check positions. Tests should load the real puzzle from `presolved-1000.json` by ID instead of copying full puzzle records into another fixture.
 
 Lichess currently publishes database exports under Creative Commons CC0 on the open database page: https://database.lichess.org/#puzzles. The fixture keeps source IDs and URLs so attribution and provenance remain visible in tests. Chessticize-specific fields such as `stockfishBestMove` and `stockfishEvalAfterFirstMove` come from the local presolve pipeline.
+
+## Core Pack distribution
+
+`bundled-core-pack.sqlite` (~493 MB) is NOT committed to git. It is published
+as a GitHub Release asset (`core-pack-v1`) and fetched on demand:
+
+```sh
+pnpm fetch:core-pack
+```
+
+The fetch verifies size and SHA-256 against `bundled-core-pack.manifest.json`
+(`packFileBytes` / `packFileHash`). CI caches the artifact keyed on the
+manifest; the Detox iOS build fetches it automatically. After regenerating the
+pack, upload the new artifact to a new release tag and update the URL in
+`scripts/fetch-core-pack.mjs`.
