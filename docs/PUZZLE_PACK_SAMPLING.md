@@ -109,6 +109,35 @@ Measured inventory after filters 1–4 (per 200-point band):
    windows can be empty until fallback. The selection floor must align with the
    shipped pack floor.
 
+## Regenerating And Publishing The Pack
+
+Follow this checklist whenever the sampling rules, seed, thresholds, or the
+source presolve library change:
+
+1. Ensure the presolve library is present at
+   `../lichess-presolve/presolved-depth16`.
+2. Run `pnpm generate:offline-puzzles`. This rebuilds
+   `fixtures/puzzles/bundled-core-pack.sqlite` (gitignored) and rewrites
+   `bundled-core-pack.manifest.json` with the new seed, build date, counts,
+   `packFileBytes`, and `packFileHash`.
+3. Verify locally with the artifact present: `pnpm test` runs the real
+   manifest-vs-artifact validation, and building twice from the same seed must
+   produce the identical `packFileHash` (acceptance criteria below).
+4. Publish the artifact to a NEW release tag (never overwrite an old tag, so
+   older commits stay reproducible):
+
+   ```sh
+   gh release create core-pack-v<N> --target main --title "Core Pack v<N> (seed <SEED>)" --notes "<counts, rating range, seed, sha256>"
+   gh release upload core-pack-v<N> fixtures/puzzles/bundled-core-pack.sqlite
+   ```
+
+5. Update `DEFAULT_ARTIFACT_URL` in `scripts/fetch-core-pack.mjs` to the new
+   tag, and run `pnpm fetch:core-pack` once to confirm the published artifact
+   verifies against the new manifest.
+6. Commit the manifest and the fetch-script URL together in one PR (never the
+   `.sqlite`). The CI cache invalidates automatically because its key hashes
+   the manifest.
+
 ## Acceptance Criteria
 
 - Every puzzle in the pack passes `isServerCompatibleArrowDuelPuzzle` (verify
