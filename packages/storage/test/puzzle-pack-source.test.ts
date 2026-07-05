@@ -109,6 +109,33 @@ test("PackBackedPracticeStore honors locally seeded scoped puzzle sources before
   }
 });
 
+test("PackBackedPracticeStore treats seeded includeIds as a local source scope", async () => {
+  const puzzles = await loadFixturePuzzles();
+  const localPuzzle = puzzles[0] as Puzzle;
+  const packPuzzle = { ...(puzzles[1] as Puzzle), id: localPuzzle.id };
+  const packDb = buildPackDatabase([packPuzzle]);
+  const userStore = new SQLiteStore(":memory:");
+  try {
+    userStore.migrate();
+    userStore.seedPuzzles([localPuzzle]);
+    const source = new SQLitePuzzlePackSource(new NodeSqliteDatabase(packDb));
+    const store = new PackBackedPracticeStore(userStore, source);
+
+    assert.deepEqual(
+      store.selectPuzzles({
+        mode: "standard",
+        limit: 1,
+        theme: "mate",
+        includeIds: [localPuzzle.id]
+      }),
+      []
+    );
+  } finally {
+    userStore.close();
+    packDb.close();
+  }
+});
+
 function buildPackDatabase(puzzles: Puzzle[]): DatabaseSync {
   const db = new DatabaseSync(":memory:");
   db.exec(`

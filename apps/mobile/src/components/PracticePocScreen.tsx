@@ -637,6 +637,8 @@ export function PracticePocScreen({
     if (nextSource === puzzleSource) {
       return;
     }
+    configurePuzzleSource(service, nextSource);
+    refreshState();
     setPuzzleSource(nextSource);
     setError(null);
   }

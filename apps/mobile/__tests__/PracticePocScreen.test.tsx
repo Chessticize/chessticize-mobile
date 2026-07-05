@@ -353,6 +353,21 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "practice-mode-standard-rating"))).toBe("ELO 625");
   });
 
+  it("configures the selected test puzzle source before the next render", () => {
+    const service = createMobilePracticeService();
+    const configurePuzzleSource = jest.fn();
+    const renderer = renderScreen({
+      practiceServiceFactory: () => service,
+      configurePuzzleSource
+    });
+    configurePuzzleSource.mockClear();
+
+    act(() => {
+      findByTestId(renderer, "test-puzzle-source-familiar15").props.onPress();
+      expect(configurePuzzleSource).toHaveBeenCalledWith(service, "familiar15");
+    });
+  });
+
   it("accepts a non-official legal checkmate in the fixed first familiar puzzle", async () => {
     const renderer = renderScreen({ practiceService: createMobilePracticeService("familiar15") });
 

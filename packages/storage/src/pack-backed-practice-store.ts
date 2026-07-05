@@ -46,8 +46,9 @@ export class PackBackedPracticeStore implements PracticeStore {
   }
 
   selectPuzzles(filter: PuzzleSelectionFilter): Puzzle[] {
-    const localScopedPuzzles = filter.includeIds === undefined ? [] : this.userStore.selectPuzzles(filter);
-    const puzzles = localScopedPuzzles.length > 0 ? localScopedPuzzles : this.puzzleSource.selectPuzzles(filter);
+    const localScopeIsSeeded = filter.includeIds?.some((id) => this.userStore.getPuzzle(id) !== undefined) ?? false;
+    const localScopedPuzzles = localScopeIsSeeded ? this.userStore.selectPuzzles(filter) : [];
+    const puzzles = localScopeIsSeeded ? localScopedPuzzles : this.puzzleSource.selectPuzzles(filter);
     if (puzzles.length > 0) {
       this.userStore.seedPuzzles(puzzles);
     }
