@@ -367,6 +367,26 @@ quotas and a deterministic seeded draw. That spec is authoritative for filter
 thresholds, quotas, packaging, and acceptance criteria; it also requires
 aligning `SERVER_PUZZLE_MIN_RATING` with the pack floor.
 
+## In-Flight Owner Fine-Tuning (do not modify)
+
+Owner-identified gap and tuning track, recorded 2026-07-04. Both items live on
+branch `codex/server-compatible-ratings` (draft PR #109) and are **pending
+owner acceptance — no agent may modify, rebase, split, or close that branch or
+PR until the owner signs off**:
+
+1. **Server-compatible Glicko sprint ratings.** The owner identified that local
+   sprint rating math must be ported to the server's Glicko implementation so
+   local ratings stay compatible with the server-side rating semantics. The
+   port is committed on the branch ("Port sprint ratings to server Glicko").
+2. **Chessboard gesture patch tuning.** Working-tree changes to
+   `patches/react-native-chessboard@0.2.0.patch`, the gesture patch test, and
+   the practice screen are part of the same owner tuning pass.
+
+After owner acceptance, document the final Glicko rating rules (parameters,
+rating periods, deviation handling, and any migration for existing stored
+ratings) in the domain docs, and remember that changing `patches/` or the
+lockfile requires `pnpm mobile:ios` before any simulator verification.
+
 ## Out of scope for 1.0
 
 - Pack downloading/import/removal (Packs tab stays bundled-only).
