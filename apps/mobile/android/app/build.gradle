@@ -71,6 +71,13 @@ def enableProguardInReleaseBuilds = false
  * this variant is about 6MiB larger per architecture than default.
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
+def puzzlePackSource = file("$rootDir/../../../fixtures/puzzles/bundled-core-pack.sqlite")
+def generatedPuzzlePackAssetsDir = "$buildDir/generated/assets/puzzle-pack"
+
+tasks.register("copyPuzzlePackAsset", Copy) {
+    from puzzlePackSource
+    into "$generatedPuzzlePackAssetsDir/custom"
+}
 
 android {
     ndkVersion rootProject.ext.ndkVersion
@@ -84,6 +91,11 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+    }
+    sourceSets {
+        main {
+            assets.srcDirs += generatedPuzzlePackAssetsDir
+        }
     }
     signingConfigs {
         debug {
@@ -105,6 +117,10 @@ android {
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
     }
+}
+
+tasks.matching { task -> task.name.startsWith("merge") && task.name.endsWith("Assets") }.configureEach {
+    dependsOn("copyPuzzlePackAsset")
 }
 
 dependencies {

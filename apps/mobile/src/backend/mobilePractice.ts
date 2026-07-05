@@ -1,8 +1,9 @@
 import type { Puzzle, PuzzlePackManifest } from "../../../../packages/core/src/index.ts";
 import { MemoryStore } from "../../../../packages/storage/src/memory-store.ts";
+import { PackBackedPracticeStore } from "../../../../packages/storage/src/pack-backed-practice-store.ts";
 import { PracticeService } from "../../../../packages/storage/src/practice-service.ts";
+import type { PuzzleSource } from "../../../../packages/storage/src/puzzle-source.ts";
 
-const bundledCorePuzzles = require("../../../../fixtures/puzzles/bundled-core-pack.json") as Puzzle[];
 const bundledCoreManifest = require("../../../../fixtures/puzzles/bundled-core-pack.manifest.json") as PuzzlePackManifest;
 const regressionPuzzles = require("../../../../fixtures/puzzles/presolved-1000.json") as Puzzle[];
 
@@ -29,6 +30,8 @@ const FAMILIAR_PUZZLE_IDS = [
 
 let persistentPracticeService: PracticeService | undefined;
 const seededPuzzleSources = new WeakMap<PracticeService, Set<MobilePuzzleSource>>();
+const packBackedServices = new WeakSet<PracticeService>();
+let persistentPracticeServicePromise: Promise<PracticeService> | undefined;
 
 export function createMobilePracticeService(source: MobilePuzzleSource = DEFAULT_PUZZLE_SOURCE): PracticeService {
   const store = new MemoryStore();
@@ -37,21 +40,104 @@ export function createMobilePracticeService(source: MobilePuzzleSource = DEFAULT
   return service;
 }
 
-export function createPersistentMobilePracticeService(): PracticeService {
+export async function createPersistentMobilePracticeService(): Promise<PracticeService> {
+  if (persistentPracticeService) {
+    return persistentPracticeService;
+  }
+  const syncService = createPersistentMobilePracticeServiceSync();
+  if (syncService) {
+    return syncService;
+  }
+  if (persistentPracticeServicePromise) {
+    return persistentPracticeServicePromise;
+  }
+
+  persistentPracticeServicePromise = createPersistentMobilePracticeServiceImpl().catch((error) => {
+    persistentPracticeServicePromise = undefined;
+    throw error;
+  });
+  persistentPracticeService = await persistentPracticeServicePromise;
+  return persistentPracticeService;
+}
+
+export function createPersistentMobilePracticeServiceSync(): PracticeService | undefined {
+  if (persistentPracticeService) {
+    return persistentPracticeService;
+  }
+  if (persistentPracticeServicePromise) {
+    return undefined;
+  }
+
+  const { DeviceSQLiteStore } = require("./deviceSQLiteStore.ts") as typeof import("./deviceSQLiteStore.ts");
+  if (!DeviceSQLiteStore.canOpenBundledReadOnlyPuzzlePack()) {
+    return undefined;
+  }
+  const userStore = DeviceSQLiteStore.open("chessticize-mobile.sqlite");
+  userStore.migrate();
+  return createPersistentService(
+    userStore,
+    new LazyPuzzleSource(() => {
+      const source = DeviceSQLiteStore.openBundledReadOnlyPuzzlePack("bundled-core-pack.sqlite");
+      if (!source) {
+        throw new Error("Bundled puzzle pack is unavailable");
+      }
+      return source;
+    })
+  );
+}
+
+async function createPersistentMobilePracticeServiceImpl(): Promise<PracticeService> {
   if (persistentPracticeService) {
     return persistentPracticeService;
   }
 
   const { DeviceSQLiteStore } = require("./deviceSQLiteStore.ts") as typeof import("./deviceSQLiteStore.ts");
-  const store = DeviceSQLiteStore.open("chessticize-mobile.sqlite");
-  store.migrate();
+  const userStore = DeviceSQLiteStore.open("chessticize-mobile.sqlite");
+  userStore.migrate();
+  const packSource = await DeviceSQLiteStore.openReadOnlyPuzzlePack("bundled-core-pack.sqlite");
+  return createPersistentService(userStore, packSource);
+}
+
+function createPersistentService(userStore: InstanceType<typeof import("./deviceSQLiteStore.ts").DeviceSQLiteStore>, packSource: PuzzleSource): PracticeService {
+  const store = new PackBackedPracticeStore(userStore, packSource);
   const service = new PracticeService(store);
+  packBackedServices.add(service);
   configureMobilePracticePuzzleSource(service, DEFAULT_PUZZLE_SOURCE);
   persistentPracticeService = service;
   return service;
 }
 
+class LazyPuzzleSource implements PuzzleSource {
+  private readonly openSource: () => PuzzleSource;
+  private source: PuzzleSource | undefined;
+
+  constructor(openSource: () => PuzzleSource) {
+    this.openSource = openSource;
+  }
+
+  countPuzzles(): number {
+    return this.current.countPuzzles();
+  }
+
+  getPuzzle(id: string): Puzzle | undefined {
+    return this.current.getPuzzle(id);
+  }
+
+  selectPuzzles(filter: Parameters<PuzzleSource["selectPuzzles"]>[0]): Puzzle[] {
+    return this.current.selectPuzzles(filter);
+  }
+
+  private get current(): PuzzleSource {
+    this.source ??= this.openSource();
+    return this.source;
+  }
+}
+
 export function configureMobilePracticePuzzleSource(service: PracticeService, source: MobilePuzzleSource): void {
+  if (source === "bundledCore" && packBackedServices.has(service)) {
+    service.setPuzzleSelectionScopeIds(undefined);
+    return;
+  }
   const puzzles = puzzlesForSource(source);
   const seededSources = seededPuzzleSources.get(service) ?? new Set<MobilePuzzleSource>();
   if (!seededSources.has(source)) {
@@ -63,6 +149,9 @@ export function configureMobilePracticePuzzleSource(service: PracticeService, so
 }
 
 export function seededPuzzleCount(source: MobilePuzzleSource = DEFAULT_PUZZLE_SOURCE): number {
+  if (source === "bundledCore") {
+    return bundledCoreManifest.puzzleCount;
+  }
   return puzzlesForSource(source).length;
 }
 
@@ -80,12 +169,16 @@ export function shouldRandomizePuzzleSelection(source: MobilePuzzleSource): bool
 
 function puzzlesForSource(source: MobilePuzzleSource): Puzzle[] {
   if (source === "bundledCore") {
-    return bundledCorePuzzles;
+    return bundledCoreFixturePuzzles();
   }
   if (source === "familiar15") {
     return familiarPuzzles();
   }
   return regressionPuzzles;
+}
+
+function bundledCoreFixturePuzzles(): Puzzle[] {
+  return require("../../../../fixtures/puzzles/bundled-core-pack.json") as Puzzle[];
 }
 
 function familiarPuzzles(): Puzzle[] {

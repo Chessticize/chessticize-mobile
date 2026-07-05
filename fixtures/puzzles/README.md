@@ -2,18 +2,31 @@
 
 `presolved-sample.json` contains a tiny deterministic fixture set derived from the local Chessticize presolved Lichess puzzle CSV. It is intentionally small and is only meant for unit, integration, and CLI E2E tests.
 
-`bundled-core-pack.json` contains the mobile app's release-default offline Core Pack.
+`bundled-core-pack.sqlite` is the mobile app's release-default offline Core Pack.
 It is generated from the local Chessticize presolved Lichess puzzle CSV with:
 
 ```sh
 pnpm generate:offline-puzzles
 ```
 
-The generator reads `../lichess-presolve/presolved-depth16` by default, keeps source
-puzzle IDs, requires Stockfish presolve fields, filters to the 600-1600 rating
-band, removes duplicate board positions, and writes a deterministic 3,000-puzzle
-JSON pack plus `bundled-core-pack.manifest.json`. It does not synthesize puzzles
-by copying existing records.
+The generator reads `../lichess-presolve/presolved-depth16` by default, keeps
+source puzzle IDs, requires Stockfish presolve fields, applies the quality and
+Arrow Duel eligibility filters in `docs/PUZZLE_PACK_SAMPLING.md`, samples the
+600-2200 rating range with deterministic stratified bucket/theme quotas, removes
+duplicate board positions, and writes a deterministic SQLite pack plus
+`bundled-core-pack.manifest.json`. It does not synthesize puzzles by copying
+existing records.
+
+The release SQLite schema is intentionally runtime-only: `puzzles` keeps the
+source puzzle ID, compact FEN, solution moves, rating, and presolved Stockfish
+fields; `themes` and `puzzle_themes` provide the indexed theme lookup. Fields
+used only during generation, such as game URL, opening tags, rating deviation,
+popularity, and play count, are filtered in the candidate table and omitted from
+the shipped pack.
+
+`bundled-core-pack.json` is retained as a small development/test compatibility
+fixture while the release app reads the SQLite pack through the storage-layer
+puzzle source. Do not import the JSON file in release runtime code.
 
 `presolved-1000.json` is retained as a stable regression/test fixture. It is not
 the release-default mobile puzzle source.

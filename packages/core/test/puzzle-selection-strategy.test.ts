@@ -12,23 +12,23 @@ test("server-compatible puzzle selection keeps themed fallback inside the reques
     { name: "wider", minRating: 1300, maxRating: 1700, themes: ["fork"] },
     { name: "much_wider", minRating: 1100, maxRating: 1900, themes: ["fork"] },
     { name: "very_wide", minRating: 900, maxRating: 2100, themes: ["fork"] },
-    { name: "themed_full_range", minRating: 800, maxRating: 2800, themes: ["fork"] }
+    { name: "themed_full_range", minRating: 600, maxRating: 2200, themes: ["fork"] }
   ]);
 });
 
 test("server-compatible puzzle selection mirrors low-rating floor and unthemed fallback order", () => {
   assert.deepEqual(buildServerEloPuzzleSelectionStrategies({ rating: 600 }).slice(0, 5), [
-    { name: "preferred", minRating: 800, maxRating: 700, themes: [] },
-    { name: "wider", minRating: 800, maxRating: 800, themes: [] },
-    { name: "much_wider", minRating: 800, maxRating: 1000, themes: [] },
-    { name: "very_wide", minRating: 800, maxRating: 1200, themes: [] },
-    { name: "no_themes_preferred", minRating: 800, maxRating: 700, themes: [] }
+    { name: "preferred", minRating: 600, maxRating: 700, themes: [] },
+    { name: "wider", minRating: 600, maxRating: 800, themes: [] },
+    { name: "much_wider", minRating: 600, maxRating: 1000, themes: [] },
+    { name: "very_wide", minRating: 600, maxRating: 1200, themes: [] },
+    { name: "no_themes_preferred", minRating: 600, maxRating: 700, themes: [] }
   ]);
 
   assert.deepEqual(buildServerEloPuzzleSelectionStrategies({ rating: 600 }).at(-1), {
     name: "fallback",
-    minRating: 800,
-    maxRating: 2800,
+    minRating: 600,
+    maxRating: 2200,
     themes: []
   });
 });

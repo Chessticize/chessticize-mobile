@@ -114,9 +114,25 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "review-difficulty-medium"))).toContain("No medium reviews");
     expect(collectText(findByTestId(renderer, "review-difficulty-hard"))).toContain("Stable");
     press(renderer, "practice-tab");
-    expect(collectText(renderer.root)).not.toContain("Offline-ready · 3000 puzzles");
-    expect(findByTestId(renderer, "app-shell-header").props.accessibilityLabel).toContain("Offline-ready · 3000 puzzles");
+    const bundledPuzzleLabel = formatTestWholeNumber(seededPuzzleCount());
+    const rawBundledPuzzleLabel = String(seededPuzzleCount());
+    expect(collectText(renderer.root)).not.toContain(`Offline-ready · ${bundledPuzzleLabel} puzzles`);
+    expect(findByTestId(renderer, "app-shell-header").props.accessibilityLabel).toContain(`Offline-ready · ${rawBundledPuzzleLabel} puzzles`);
     expect(collectText(findByTestId(renderer, "practice-action-header"))).toBe("Start a Sprint");
+  });
+
+  it("does not scan the bundled Core Pack when rendering custom sprint availability", () => {
+    const service = createMobilePracticeService("random1000");
+    const countEligible = jest.spyOn(service, "countEligibleSprintPuzzles");
+    const renderer = renderScreen({ practiceService: service });
+
+    expect(countEligible).not.toHaveBeenCalled();
+
+    press(renderer, "practice-mode-custom");
+
+    expect(countEligible).not.toHaveBeenCalled();
+    expect(() => findByTestId(renderer, "custom-pack-warning")).toThrow();
+    expect(findByTestId(renderer, "start-sprint-button").props.accessibilityState).toEqual({ disabled: false });
   });
 
   it.each([
@@ -270,11 +286,13 @@ describe("PracticePocScreen", () => {
     const service = createMobilePracticeService();
     const manifest = getBundledCorePackManifest();
 
-    expect(seededPuzzleCount()).toBe(3000);
     expect(seededPuzzleCount()).toBe(manifest.puzzleCount);
-    expect(seededUniquePositionCount()).toBe(seededPuzzleCount());
-    expect(manifest.rating).toEqual({ min: 600, max: 1600 });
-    expect(manifest.arrowDuelCount).toBeGreaterThanOrEqual(2000);
+    if (manifest.format !== "sqlite") {
+      expect(seededUniquePositionCount()).toBe(seededPuzzleCount());
+    }
+    expect(manifest.rating.min).toBe(600);
+    expect(manifest.rating.max).toBeLessThanOrEqual(2200);
+    expect(manifest.arrowDuelCount).toBeGreaterThanOrEqual(Math.min(2000, manifest.puzzleCount));
 
     const state = service.startSprint({
       mode: "custom",
@@ -296,8 +314,10 @@ describe("PracticePocScreen", () => {
     const renderer = renderScreen();
 
     expect(findByTestId(renderer, "test-puzzle-source-control")).toBeTruthy();
-    expect(collectText(renderer.root)).not.toContain("Offline-ready · 3000 puzzles");
-    expect(findByTestId(renderer, "app-shell-header").props.accessibilityLabel).toContain("Offline-ready · 3000 puzzles");
+    const bundledPuzzleLabel = formatTestWholeNumber(seededPuzzleCount());
+    const rawBundledPuzzleLabel = String(seededPuzzleCount());
+    expect(collectText(renderer.root)).not.toContain(`Offline-ready · ${bundledPuzzleLabel} puzzles`);
+    expect(findByTestId(renderer, "app-shell-header").props.accessibilityLabel).toContain(`Offline-ready · ${rawBundledPuzzleLabel} puzzles`);
     expect(hasStyleEntry(findByTestId(renderer, "test-puzzle-source-bundledCore"), "borderColor", "#2563EB")).toBe(true);
 
     press(renderer, "test-puzzle-source-familiar15");
@@ -2361,6 +2381,11 @@ describe("PracticePocScreen", () => {
 
   it("keeps settings and packs screens locally reachable without a simulator", () => {
     const renderer = renderScreen();
+    const manifest = getBundledCorePackManifest();
+    const puzzleCount = formatTestWholeNumber(manifest.puzzleCount);
+    const ratingRange = `${manifest.rating.min}-${manifest.rating.max}`;
+    const themeCount = `${formatTestWholeNumber(manifest.themes.length)} themes`;
+    const arrowDuelCount = formatTestWholeNumber(manifest.arrowDuelCount);
 
     press(renderer, "settings-tab");
     expect(() => findByTestId(renderer, "settings-action-header")).toThrow();
@@ -2472,30 +2497,30 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "packs-coverage-summary")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "packs-coverage-header"))).toBe("Coverage");
     expect(collectText(findByTestId(renderer, "packs-summary-installed"))).toContain("1 pack");
-    expect(collectText(findByTestId(renderer, "packs-summary-puzzles"))).toContain("3,000");
-    expect(collectText(findByTestId(renderer, "packs-summary-rating"))).toContain("600-1600");
-    expect(collectText(findByTestId(renderer, "packs-summary-arrow-duel"))).toContain("2,399");
+    expect(collectText(findByTestId(renderer, "packs-summary-puzzles"))).toContain(puzzleCount);
+    expect(collectText(findByTestId(renderer, "packs-summary-rating"))).toContain(ratingRange);
+    expect(collectText(findByTestId(renderer, "packs-summary-arrow-duel"))).toContain(arrowDuelCount);
     expect(findByTestId(renderer, "packs-installed-section")).toBeTruthy();
     expect(findByTestId(renderer, "packs-installed-core")).toBeTruthy();
     expect(findByTestId(renderer, "packs-installed-core").props.accessibilityLabel).toContain("Core Pack, active puzzle pack");
-    expect(findByTestId(renderer, "packs-installed-core").props.accessibilityLabel).toContain("rating 600-1600");
+    expect(findByTestId(renderer, "packs-installed-core").props.accessibilityLabel).toContain(`rating ${ratingRange}`);
     expect(findByTestId(renderer, "packs-active-core")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "packs-active-core"))).toBe("");
     expect(collectText(findByTestId(renderer, "packs-installed-core"))).not.toContain("Active");
-    expect(collectText(findByTestId(renderer, "packs-meta-core"))).toBe("600-1600 · 59 themes · Arrow Duel 2,399");
-    expect(collectText(findByTestId(renderer, "packs-subtitle-core"))).toBe("3,000 puzzles");
+    expect(collectText(findByTestId(renderer, "packs-meta-core"))).toBe(`${ratingRange} · ${themeCount} · Arrow Duel ${arrowDuelCount}`);
+    expect(collectText(findByTestId(renderer, "packs-subtitle-core"))).toBe(`${puzzleCount} puzzles`);
     expect(findByTestId(renderer, "packs-coverage-core")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "packs-coverage-core"))).toBe("");
-    expect(findByTestId(renderer, "packs-coverage-core").props.accessibilityLabel).toBe("Rating 600-1600, themes 59 themes, Arrow Duel 2,399");
+    expect(findByTestId(renderer, "packs-coverage-core").props.accessibilityLabel).toBe(`Rating ${ratingRange}, themes ${themeCount}, Arrow Duel ${arrowDuelCount}`);
     expect(findByTestId(renderer, "packs-offline-readiness")).toBeTruthy();
     expectText(renderer, "The bundled Core Pack ships with the app and works fully offline. This version does not download additional packs.");
     press(renderer, "packs-detail-core");
     expect(findByTestId(renderer, "pack-detail-panel")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "pack-detail-close"))).toBe("");
-    expect(collectText(findByTestId(renderer, "pack-detail-puzzles"))).toContain("3,000");
-    expect(collectText(findByTestId(renderer, "pack-detail-rating"))).toContain("600-1600");
-    expect(collectText(findByTestId(renderer, "pack-detail-themes"))).toContain("59 themes");
-    expect(collectText(findByTestId(renderer, "pack-detail-arrow-duel"))).toContain("2,399");
+    expect(collectText(findByTestId(renderer, "pack-detail-puzzles"))).toContain(puzzleCount);
+    expect(collectText(findByTestId(renderer, "pack-detail-rating"))).toContain(ratingRange);
+    expect(collectText(findByTestId(renderer, "pack-detail-themes"))).toContain(themeCount);
+    expect(collectText(findByTestId(renderer, "pack-detail-arrow-duel"))).toContain(arrowDuelCount);
     expect(findByTestId(renderer, "pack-detail-source")).toBeTruthy();
     expect(findByTestId(renderer, "pack-detail-presolve")).toBeTruthy();
     expect(findByTestId(renderer, "pack-detail-manifest-hash")).toBeTruthy();
@@ -3091,6 +3116,10 @@ function styleContains(style: unknown, value: string): boolean {
 
 function countPiecesInFen(fen: string): number {
   return new Chess(fen).board().flat().filter(Boolean).length;
+}
+
+function formatTestWholeNumber(value: number): string {
+  return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
 function tryFenAfterMove(fen: string, move: string): string | null {

@@ -96,4 +96,5 @@ describe("release configuration integration", () => {
 
     expect(ignoreAllLogsCalls).toBe(1);
   });
+
 });

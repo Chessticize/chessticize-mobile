@@ -1,4 +1,6 @@
 import { open, type DB, type Scalar } from "@op-engineering/op-sqlite";
+import { NativeModules, Platform } from "react-native";
+import { SQLitePuzzlePackSource } from "../../../../packages/storage/src/sqlite-puzzle-pack-source.ts";
 import {
   SyncSQLiteStore,
   type SyncSqliteDatabase,
@@ -18,12 +20,61 @@ export class DeviceSQLiteStore extends SyncSQLiteStore {
     return new DeviceSQLiteStore(open({ name }));
   }
 
+  static async openReadOnlyPuzzlePack(name = "bundled-core-pack.sqlite"): Promise<SQLitePuzzlePackSource> {
+    const bundledPack = DeviceSQLiteStore.openBundledReadOnlyPuzzlePack(name);
+    if (bundledPack) {
+      return bundledPack;
+    }
+
+    const copied = await moveBundledDatabaseAsset({ filename: name, path: "custom" });
+    if (!copied) {
+      throw new Error(`Bundled puzzle pack could not be copied: ${name}`);
+    }
+    return new SQLitePuzzlePackSource(new OPSqliteDatabase(open({ name, readOnly: true } as Parameters<typeof open>[0] & { readOnly: boolean })));
+  }
+
+  static openBundledReadOnlyPuzzlePack(name = "bundled-core-pack.sqlite"): SQLitePuzzlePackSource | undefined {
+    const iosBundleLocation = Platform.OS === "ios" ? bundledJsDirectory() : undefined;
+    if (!iosBundleLocation) {
+      return undefined;
+    }
+    return new SQLitePuzzlePackSource(
+      new OPSqliteDatabase(open({ name, location: iosBundleLocation, readOnly: true } as Parameters<typeof open>[0] & { readOnly: boolean }))
+    );
+  }
+
+  static canOpenBundledReadOnlyPuzzlePack(): boolean {
+    return Platform.OS === "ios" && bundledJsDirectory() !== undefined;
+  }
+
   close(): void {
     this.nativeDb.close();
   }
 }
 
-class OPSqliteDatabase implements SyncSqliteDatabase {
+function bundledJsDirectory(): string | undefined {
+  const sourceCode = NativeModules.SourceCode as { scriptURL?: string } | undefined;
+  const scriptUrl = sourceCode?.scriptURL;
+  if (!scriptUrl?.startsWith("file://")) {
+    return undefined;
+  }
+
+  const scriptPath = decodeURIComponent(scriptUrl.slice("file://".length));
+  const lastSlash = scriptPath.lastIndexOf("/");
+  return lastSlash === -1 ? undefined : scriptPath.slice(0, lastSlash);
+}
+
+function moveBundledDatabaseAsset(args: { filename: string; path: string }): Promise<boolean> {
+  const module = NativeModules.OPSQLite as
+    | { moveAssetsDatabase?: (input: { filename: string; path: string; overwrite?: boolean }) => Promise<boolean> }
+    | undefined;
+  if (!module?.moveAssetsDatabase) {
+    return Promise.reject(new Error("OPSQLite asset copy API is unavailable"));
+  }
+  return module.moveAssetsDatabase(args);
+}
+
+export class OPSqliteDatabase implements SyncSqliteDatabase {
   private readonly db: DB;
 
   constructor(db: DB) {

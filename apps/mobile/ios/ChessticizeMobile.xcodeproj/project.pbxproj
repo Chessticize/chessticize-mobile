@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		0C80B921A6F3F58F76C31292 /* libPods-ChessticizeMobile.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DCACB8F33CDC322A6C60F78 /* libPods-ChessticizeMobile.a */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		58A3D47B2D58A00100A00001 /* bundled-core-pack.sqlite in Resources */ = {isa = PBXBuildFile; fileRef = 58A3D47A2D58A00100A00001 /* bundled-core-pack.sqlite */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
 		8B2F1D9A2D420E4A00A00001 /* ChessticizeTestLaunchConfig.m in Sources */ = {isa = PBXBuildFile; fileRef = 8B2F1D992D420E4A00A00001 /* ChessticizeTestLaunchConfig.m */; };
@@ -23,6 +24,7 @@
 		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = ChessticizeMobile/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		3B4392A12AC88292D35C810B /* Pods-ChessticizeMobile.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-ChessticizeMobile.debug.xcconfig"; path = "Target Support Files/Pods-ChessticizeMobile/Pods-ChessticizeMobile.debug.xcconfig"; sourceTree = "<group>"; };
 		5709B34CF0A7D63546082F79 /* Pods-ChessticizeMobile.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-ChessticizeMobile.release.xcconfig"; path = "Target Support Files/Pods-ChessticizeMobile/Pods-ChessticizeMobile.release.xcconfig"; sourceTree = "<group>"; };
+		58A3D47A2D58A00100A00001 /* bundled-core-pack.sqlite */ = {isa = PBXFileReference; lastKnownFileType = file; name = "bundled-core-pack.sqlite"; path = "../../../fixtures/puzzles/bundled-core-pack.sqlite"; sourceTree = SOURCE_ROOT; };
 		5DCACB8F33CDC322A6C60F78 /* libPods-ChessticizeMobile.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-ChessticizeMobile.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = ChessticizeMobile/AppDelegate.swift; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = ChessticizeMobile/LaunchScreen.storyboard; sourceTree = "<group>"; };
@@ -53,6 +55,7 @@
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
+				58A3D47A2D58A00100A00001 /* bundled-core-pack.sqlite */,
 			);
 			name = ChessticizeMobile;
 			sourceTree = "<group>";
@@ -166,6 +169,7 @@
 			files = (
 				81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
+				58A3D47B2D58A00100A00001 /* bundled-core-pack.sqlite in Resources */,
 				D3C7E4DB20DDEF6FD16890C3 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

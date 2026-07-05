@@ -13,8 +13,8 @@ export interface BuildEloPuzzleSelectionStrategiesInput {
   themes?: string[];
 }
 
-export const SERVER_PUZZLE_MIN_RATING = 800;
-export const SERVER_PUZZLE_MAX_RATING = 2800;
+export const SERVER_PUZZLE_MIN_RATING = 600;
+export const SERVER_PUZZLE_MAX_RATING = 2200;
 
 export function buildServerEloPuzzleSelectionStrategies(
   input: BuildEloPuzzleSelectionStrategiesInput

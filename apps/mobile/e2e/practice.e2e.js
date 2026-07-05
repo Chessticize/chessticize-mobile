@@ -3,6 +3,7 @@ const zlib = require('zlib');
 const {
   sleep,
   frameFor,
+  launchWithDisabledSynchronization,
   startPracticeMode,
   selectTestPuzzleSource,
   waitForVisibleInPracticeScroll,
@@ -17,10 +18,9 @@ describe('Practice POC', () => {
     // React Native, Skia, and native engine startup can keep Detox synchronization
     // busy after the first visible frame, so launch args disable synchronization
     // before Detox waits on app readiness.
-    await device.launchApp({
+    await launchWithDisabledSynchronization({
       newInstance: true,
-      delete: true,
-      launchArgs: { detoxEnableSynchronization: '0' }
+      delete: true
     });
   });
 
