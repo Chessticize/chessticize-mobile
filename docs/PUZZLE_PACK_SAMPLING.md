@@ -90,7 +90,10 @@ Measured inventory after filters 1–4 (per 200-point band):
 ## Packaging Requirements
 
 1. Ship the pack as a **prebuilt read-only SQLite database asset** generated at
-   build time, with indexes on rating and themes. Do not `require()` a JSON
+   build time, with indexes on rating and themes. The artifact is distributed
+   as a GitHub Release asset and fetched by hash via `pnpm fetch:core-pack`
+   (never committed to git or LFS: a ~500 MB file in LFS would burn the free
+   bandwidth quota on every CI checkout). Do not `require()` a JSON
    pack of this size (hundreds of MB in the JS heap) and do not import rows on
    first launch (minutes of device time for ~1.4M rows).
 2. User data stays in the existing separate writable `DeviceSQLiteStore`
@@ -105,6 +108,46 @@ Measured inventory after filters 1–4 (per 200-point band):
    (800) exceeds the pack floor (600), so low-rated users' preferred selection
    windows can be empty until fallback. The selection floor must align with the
    shipped pack floor.
+
+## Regenerating And Publishing The Pack
+
+Follow this checklist whenever the sampling rules, seed, thresholds, or the
+source presolve library change:
+
+1. Ensure the presolve library is present at
+   `../lichess-presolve/presolved-depth16`.
+2. Run `pnpm generate:offline-puzzles`. This rebuilds
+   `fixtures/puzzles/bundled-core-pack.sqlite` (gitignored) and rewrites
+   `bundled-core-pack.manifest.json` with the new seed, build date, counts,
+   `packFileBytes`, and `packFileHash`.
+3. Verify locally with the artifact present: `pnpm test` runs the real
+   manifest-vs-artifact validation, and building twice from the same seed must
+   produce the identical `packFileHash` (acceptance criteria below).
+4. Publish the artifact to a NEW release tag (never overwrite an old tag, so
+   older commits stay reproducible):
+
+   ```sh
+   gh release create core-pack-v<N> --target main --title "Core Pack v<N> (seed <SEED>)" --notes "<counts, rating range, seed, sha256>"
+   gh release upload core-pack-v<N> fixtures/puzzles/bundled-core-pack.sqlite
+   ```
+
+5. Update `DEFAULT_ARTIFACT_URL` in `scripts/fetch-core-pack.mjs` to the new
+   tag, and run `pnpm fetch:core-pack` once to confirm the published artifact
+   verifies against the new manifest.
+6. Commit the manifest and the fetch-script URL together in one PR (never the
+   `.sqlite`). The CI cache invalidates automatically because its key hashes
+   the manifest.
+
+How the artifact enters the app binary (automatic — no per-resample steps):
+the iOS project's Copy Bundle Resources and the Android `build.gradle` assets
+both reference the fixed path `fixtures/puzzles/bundled-core-pack.sqlite`, and
+every build path (`ios-build-for-detox.sh`, the CI fetch step, release builds)
+runs `pnpm fetch:core-pack` before compiling, so whatever verified artifact
+sits at that path is copied into the app bundle. Consequently the filename and
+path are load-bearing: a re-sampled pack must keep the name
+`bundled-core-pack.sqlite` (only the release tag and hashes change). Renaming
+it requires touching the Xcode project, the Android build, the fetch script,
+the runtime `openReadOnlyPuzzlePack` calls, and the asset test — don't.
 
 ## Acceptance Criteria
 

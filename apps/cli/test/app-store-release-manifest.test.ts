@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 type ReleaseManifest = {
@@ -20,7 +21,9 @@ type ReleaseManifest = {
   puzzlePack: {
     id: string;
     puzzleCount: number;
+    format: "json" | "sqlite";
     manifestHash: string;
+    packFileHash: string;
     sourceLicense: string;
   };
   stockfish: {
@@ -37,7 +40,15 @@ type ReleaseManifest = {
   releaseRules: string[];
 };
 
-test("App Store release manifest reports source identity and hashed release artifacts", () => {
+test("App Store release manifest reports source identity and hashed release artifacts", (t) => {
+  const puzzleManifest = JSON.parse(readFileSync(resolve("fixtures/puzzles/bundled-core-pack.manifest.json"), "utf8")) as {
+    puzzleCount: number;
+    format?: "json" | "sqlite";
+  };
+  if (puzzleManifest.format === "sqlite" && !existsSync(resolve("fixtures/puzzles/bundled-core-pack.sqlite"))) {
+    t.skip("core pack artifact not fetched; run pnpm fetch:core-pack before generating a release manifest");
+    return;
+  }
   const result = spawnSync(
     process.execPath,
     ["scripts/app-store-release-manifest.mjs", "--allow-dirty"],
@@ -63,9 +74,11 @@ test("App Store release manifest reports source identity and hashed release arti
     platform: "ios"
   });
   assert.equal(manifest.puzzlePack.id, "core");
-  assert.equal(manifest.puzzlePack.puzzleCount, 3000);
+  assert.equal(manifest.puzzlePack.puzzleCount, puzzleManifest.puzzleCount);
+  assert.equal(manifest.puzzlePack.format, puzzleManifest.format ?? "json");
   assert.equal(manifest.puzzlePack.sourceLicense, "CC0");
   assert.match(manifest.puzzlePack.manifestHash, /^sha256:[0-9a-f]{64}$/u);
+  assert.match(manifest.puzzlePack.packFileHash, /^sha256:[0-9a-f]{64}$/u);
   assert.equal(manifest.stockfish.version, "Stockfish 18");
   assert.equal(manifest.stockfish.upstreamTag, "sf_18");
   assert.equal(manifest.stockfish.upstreamCommit, "cb3d4ee9b47d0c5aae855b12379378ea1439675c");
@@ -76,7 +89,7 @@ test("App Store release manifest reports source identity and hashed release arti
     "apps/mobile/Gemfile.lock",
     "apps/mobile/ios/Podfile.lock",
     "THIRD_PARTY_NOTICES.md",
-    "fixtures/puzzles/bundled-core-pack.json",
+    puzzleManifest.format === "sqlite" ? "fixtures/puzzles/bundled-core-pack.sqlite" : "fixtures/puzzles/bundled-core-pack.json",
     "fixtures/puzzles/bundled-core-pack.manifest.json",
     "apps/mobile/ios/StockfishEngine/Copying.txt",
     "apps/mobile/ios/StockfishEngine/AUTHORS",

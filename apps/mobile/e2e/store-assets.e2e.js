@@ -1,5 +1,6 @@
 const {
   openTab,
+  launchWithDisabledSynchronization,
   sleep,
   startPracticeMode,
   selectTestPuzzleSource,
@@ -12,10 +13,9 @@ const describeStoreAssets = process.env.CHESSTICIZE_CAPTURE_STORE_ASSETS === '1'
 
 describeStoreAssets('App Store screenshot capture', () => {
   beforeEach(async () => {
-    await device.launchApp({
+    await launchWithDisabledSynchronization({
       newInstance: true,
-      delete: true,
-      launchArgs: { detoxEnableSynchronization: '0' }
+      delete: true
     });
   });
 

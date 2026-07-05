@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -42,8 +42,20 @@ function artifact(path, role) {
   };
 }
 
+function puzzlePackArtifactPath(manifest) {
+  if (manifest.format === "sqlite" || existsSync(join(repoRoot, "fixtures/puzzles/bundled-core-pack.sqlite"))) {
+    if (!existsSync(join(repoRoot, "fixtures/puzzles/bundled-core-pack.sqlite"))) {
+      console.error("Core pack artifact is missing. Run `pnpm fetch:core-pack` before generating a release manifest.");
+      process.exit(1);
+    }
+    return "fixtures/puzzles/bundled-core-pack.sqlite";
+  }
+  return "fixtures/puzzles/bundled-core-pack.json";
+}
+
 const rootPackage = readJson("package.json");
 const puzzleManifest = readJson("fixtures/puzzles/bundled-core-pack.manifest.json");
+const puzzlePackPath = puzzlePackArtifactPath(puzzleManifest);
 const pbxproj = readText("apps/mobile/ios/ChessticizeMobile.xcodeproj/project.pbxproj");
 const marketingVersions = uniqueMatches(pbxproj, /MARKETING_VERSION = ([^;]+);/g);
 const buildNumbers = uniqueMatches(pbxproj, /CURRENT_PROJECT_VERSION = ([^;]+);/g);
@@ -95,7 +107,11 @@ const manifest = {
     title: puzzleManifest.title,
     puzzleCount: puzzleManifest.puzzleCount,
     arrowDuelCount: puzzleManifest.arrowDuelCount,
+    format: puzzleManifest.format ?? "json",
+    packFileHash: puzzleManifest.packFileHash ?? puzzleManifest.manifestHash,
+    packFileBytes: puzzleManifest.packFileBytes,
     manifestHash: puzzleManifest.manifestHash,
+    rating: puzzleManifest.rating,
     source: puzzleManifest.source,
     sourceLicense: puzzleManifest.sourceLicense
   },
@@ -121,7 +137,7 @@ const manifest = {
     artifact("THIRD_PARTY_NOTICES.md", "third-party notices"),
     artifact("docs/RELEASE_SOURCE_POLICY.md", "release source policy"),
     artifact("docs/PRIVACY_POLICY.md", "public privacy policy"),
-    artifact("fixtures/puzzles/bundled-core-pack.json", "bundled offline puzzle pack"),
+    artifact(puzzlePackPath, "bundled offline puzzle pack"),
     artifact("fixtures/puzzles/bundled-core-pack.manifest.json", "bundled offline puzzle manifest"),
     artifact("apps/mobile/ios/StockfishEngine/Copying.txt", "bundled Stockfish GPL text"),
     artifact("apps/mobile/ios/StockfishEngine/AUTHORS", "bundled Stockfish authors"),

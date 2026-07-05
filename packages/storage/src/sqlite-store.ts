@@ -16,7 +16,7 @@ export class SQLiteStore extends SyncSQLiteStore {
   }
 }
 
-class NodeSqliteDatabase implements SyncSqliteDatabase {
+export class NodeSqliteDatabase implements SyncSqliteDatabase {
   private readonly db: DatabaseSync;
 
   constructor(db: DatabaseSync) {

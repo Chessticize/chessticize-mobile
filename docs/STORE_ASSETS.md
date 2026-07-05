@@ -64,6 +64,16 @@ Release rule:
 4. Do not upload debug screenshots that expose the development puzzle-source
    switch, Metro overlays, local paths, or user-private data.
 
+## Bundled Puzzle Pack Measurement
+
+The release Core Pack is generated as `fixtures/puzzles/bundled-core-pack.sqlite`
+and copied into the native app bundle as a read-only SQLite database asset. The
+2026-07-04 generated pack contains 1,400,000 Arrow Duel eligible puzzles across
+the 600-2200 rating range. Its measured artifact size is `517,369,856` bytes
+(`493.40 MiB`), below the 800 MB hard cap in
+`docs/PUZZLE_PACK_SAMPLING.md`. The manifest records the exact file hash and
+per-bucket/theme counts.
+
 ## Screenshot Set
 
 Use a release or production-like build, not a Metro debug screenshot. Capture

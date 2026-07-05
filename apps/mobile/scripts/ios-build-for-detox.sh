@@ -6,6 +6,8 @@ cd "$APP_DIR"
 
 scripts/ios-doctor.sh
 
+(cd "$APP_DIR/../.." && node scripts/fetch-core-pack.mjs)
+
 if ! bundle check; then
   bundle install
 fi

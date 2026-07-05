@@ -1,5 +1,6 @@
 const {
   openTab,
+  launchWithDisabledSynchronization,
   sleep,
   playBoardMove,
   startPracticeMode,
@@ -14,10 +15,9 @@ describe('Key user flows', () => {
   const dayMs = 24 * 60 * 60 * 1000;
 
   beforeEach(async () => {
-    await device.launchApp({
+    await launchWithDisabledSynchronization({
       newInstance: true,
-      delete: true,
-      launchArgs: { detoxEnableSynchronization: '0' }
+      delete: true
     });
   });
 
@@ -183,10 +183,9 @@ describe('Key user flows', () => {
     await waitForElementTextContaining('settings-standard-elo-row', 'ELO 625', 5000);
 
     await device.terminateApp();
-    await device.launchApp({
+    await launchWithDisabledSynchronization({
       newInstance: true,
-      delete: false,
-      launchArgs: { detoxEnableSynchronization: '0' }
+      delete: false
     });
     await selectTestPuzzleSource('familiar15');
 
@@ -228,11 +227,10 @@ async function dismissSprintSummary() {
 }
 
 async function launchAppAt(nowMs, deleteData, extraLaunchArgs = {}) {
-  await device.launchApp({
+  await launchWithDisabledSynchronization({
     newInstance: true,
     delete: deleteData,
     launchArgs: {
-      detoxEnableSynchronization: '0',
       chessticizeTestNowMs: String(nowMs),
       ...extraLaunchArgs
     }

@@ -24,6 +24,18 @@ async function startPracticeMode(mode) {
   await tapUntilExists(modeCardId, 'session-board', 3);
 }
 
+async function launchWithDisabledSynchronization(options = {}) {
+  await device.launchApp({
+    ...options,
+    launchArgs: {
+      DTXDisableMainRunLoopSync: 'YES',
+      detoxEnableSynchronization: false,
+      ...(options.launchArgs ?? {})
+    }
+  });
+  await device.disableSynchronization();
+}
+
 async function selectTestPuzzleSource(source) {
   const sourceButtonId = `test-puzzle-source-${source}`;
   await waitForVisibleInPracticeScroll(sourceButtonId);
@@ -118,6 +130,7 @@ async function failStandardSprint() {
 
 module.exports = {
   openTab,
+  launchWithDisabledSynchronization,
   sleep,
   frameFor,
   playBoardMove,

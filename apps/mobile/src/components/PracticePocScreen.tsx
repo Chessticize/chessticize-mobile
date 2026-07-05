@@ -637,6 +637,8 @@ export function PracticePocScreen({
     if (nextSource === puzzleSource) {
       return;
     }
+    configurePuzzleSource(service, nextSource);
+    refreshState();
     setPuzzleSource(nextSource);
     setError(null);
   }
@@ -1258,12 +1260,14 @@ export function PracticePocScreen({
   const dueTodayCount = dueReviewItems.length;
   const overdueCount = dueReviewItems.filter((item) => isReviewOverdue(item.review, nowMs)).length;
   const customThemeValue = themeForCustomSprint(customTheme);
-  const customEligiblePuzzleCount = service.countEligibleSprintPuzzles({
-    mode: customSprintMode,
-    durationSeconds: customDurationSeconds,
-    perPuzzleSeconds: customPerPuzzleSeconds,
-    ...(customThemeValue ? { theme: customThemeValue } : {})
-  });
+  const customEligiblePuzzleCount = puzzleSource === "bundledCore"
+    ? bundledCoreCustomEligiblePuzzleCount(customThemeValue)
+    : service.countEligibleSprintPuzzles({
+        mode: customSprintMode,
+        durationSeconds: customDurationSeconds,
+        perPuzzleSeconds: customPerPuzzleSeconds,
+        ...(customThemeValue ? { theme: customThemeValue } : {})
+      });
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -6617,6 +6621,14 @@ function packRowFromManifest(): PackRowModel {
     status: "active",
     testID: "packs-installed-core"
   };
+}
+
+function bundledCoreCustomEligiblePuzzleCount(theme: string | undefined): number {
+  const manifest = getBundledCorePackManifest();
+  if (!theme) {
+    return manifest.puzzleCount;
+  }
+  return manifest.themeCounts?.[theme] ?? 0;
 }
 
 function PacksPanel(): React.JSX.Element {

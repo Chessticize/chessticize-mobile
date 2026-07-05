@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -85,7 +85,14 @@ function runEvidence(args: string[], signingFixture: string) {
   );
 }
 
-test("TestFlight evidence CLI writes validator outputs and a release summary", () => {
+test("TestFlight evidence CLI writes validator outputs and a release summary", (t) => {
+  const puzzleManifest = JSON.parse(readFileSync(resolve("fixtures/puzzles/bundled-core-pack.manifest.json"), "utf8")) as {
+    format?: "json" | "sqlite";
+  };
+  if (puzzleManifest.format === "sqlite" && !existsSync(resolve("fixtures/puzzles/bundled-core-pack.sqlite"))) {
+    t.skip("core pack artifact not fetched; run pnpm fetch:core-pack before generating TestFlight evidence");
+    return;
+  }
   const tempDir = mkdtempSync(join(tmpdir(), "chessticize-testflight-evidence-"));
   const output = join(tempDir, "evidence");
   const screenshots = join(tempDir, "screenshots");
