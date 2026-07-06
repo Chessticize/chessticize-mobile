@@ -323,7 +323,7 @@ test("abandonSprint and serializeSprintView expose stable frontend-independent s
   const state = startSprint({
     config: buildSprintConfig({ mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 1 }),
     puzzles: [samplePuzzle("00008")],
-    ratingBefore: 750,
+    ratingBefore: 800,
     now: NOW
   });
 
@@ -331,18 +331,63 @@ test("abandonSprint and serializeSprintView expose stable frontend-independent s
     status: string;
     ratingBefore: number;
     bestStreak: number;
+    hasUserSubmittedMove: boolean;
     currentPuzzle: { puzzleId: string; playedMoves: string[] };
   };
   assert.equal(view.status, "active");
-  assert.equal(view.ratingBefore, 750);
+  assert.equal(view.ratingBefore, 800);
   assert.equal(view.bestStreak, 0);
+  assert.equal(view.hasUserSubmittedMove, false);
   assert.equal(view.currentPuzzle.puzzleId, "00008");
   assert.deepEqual(view.currentPuzzle.playedMoves, ["f2g3"]);
 
   const abandoned = abandonSprint(state, "2026-06-20T00:00:05.000Z");
+  assert.equal(abandoned.status, "abandoned");
+  assert.equal(abandoned.endReason, "abandoned");
+  assert.equal(abandoned.ratingAfter, undefined);
+  assert.equal(abandoned.currentPuzzle, undefined);
+});
+
+test("abandonSprint rates a failed run after the first correct move in an unfinished puzzle", () => {
+  const state = startSprint({
+    config: buildSprintConfig({ mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 2 }),
+    puzzles: [samplePuzzle("00008"), samplePuzzle("00009")],
+    ratingBefore: 800,
+    now: NOW
+  });
+
+  const firstMove = submitSprintMove(state, "e6e7", "2026-06-20T00:00:05.000Z");
+  assert.equal(firstMove.feedback?.result, "correct");
+  assert.equal(firstMove.feedback?.puzzleSolved, false);
+  assert.equal(firstMove.attempt, undefined);
+  assert.equal(firstMove.state.correctCount, 0);
+  assert.equal(firstMove.state.hasUserSubmittedMove, true);
+
+  const abandoned = abandonSprint(firstMove.state, "2026-06-20T00:00:06.000Z");
   assert.equal(abandoned.status, "failed");
   assert.equal(abandoned.endReason, "abandoned");
-  assert.equal(abandoned.currentPuzzle, undefined);
+  assert.ok(abandoned.ratingAfter !== undefined);
+  assert.ok(abandoned.ratingAfter < abandoned.ratingBefore);
+});
+
+test("abandonSprint rates a failed run after the first wrong move", () => {
+  const state = startSprint({
+    config: buildSprintConfig({ mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 2 }),
+    puzzles: [samplePuzzle("00008"), samplePuzzle("00009")],
+    ratingBefore: 800,
+    now: NOW
+  });
+
+  const firstMove = submitSprintMove(state, "e6d6", "2026-06-20T00:00:05.000Z");
+  assert.equal(firstMove.feedback?.result, "wrong");
+  assert.equal(firstMove.state.mistakeCount, 1);
+  assert.equal(firstMove.state.hasUserSubmittedMove, true);
+
+  const abandoned = abandonSprint(firstMove.state, "2026-06-20T00:00:06.000Z");
+  assert.equal(abandoned.status, "failed");
+  assert.equal(abandoned.endReason, "abandoned");
+  assert.ok(abandoned.ratingAfter !== undefined);
+  assert.ok(abandoned.ratingAfter < abandoned.ratingBefore);
 });
 
 function samplePuzzle(id: string): Puzzle {

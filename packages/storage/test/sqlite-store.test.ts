@@ -696,6 +696,41 @@ test("PracticeService prunes orphaned SQLite review queue rows", async () => {
     await rm(dir, { force: true, recursive: true });
   }
 });
+
+test("PracticeService can promote the next future SQLite review date to due now", async () => {
+  const store = await seededStore();
+  const service = new PracticeService(store);
+  try {
+    store.scheduleMistakeReview(reviewContext("00008"), "2026-06-20T08:00:00.000Z");
+    store.scheduleMistakeReview(reviewContext("000hf"), "2026-06-20T18:00:00.000Z");
+    store.scheduleMistakeReview(reviewContext("0018S"), "2026-06-21T00:00:00.000Z");
+
+    const result = service.promoteNextFutureReviewsToDue("2026-06-20T20:00:00.000Z");
+
+    assert.deepEqual(result, {
+      promotedCount: 2,
+      promotedDate: "2026-06-21",
+      dueAt: "2026-06-20T20:00:00.000Z"
+    });
+    assert.deepEqual(
+      service.getDueReviews("2026-06-20T20:00:00.000Z").map((review) => review.puzzleId).sort(),
+      ["00008", "000hf"]
+    );
+    assert.equal(store.getReviewQueueState(reviewContext("0018S"))?.dueAt, "2026-06-22T00:00:00.000Z");
+  } finally {
+    store.close();
+  }
+});
+
+test("PracticeService future review promotion is a SQLite no-op without future rows", async () => {
+  const store = await seededStore();
+  const service = new PracticeService(store);
+  try {
+    assert.deepEqual(service.promoteNextFutureReviewsToDue("2026-06-20T20:00:00.000Z"), { promotedCount: 0 });
+  } finally {
+    store.close();
+  }
+});
 test("SQLite review result without an existing queue row is counted once", async () => {
   const store = await seededStore();
   try {

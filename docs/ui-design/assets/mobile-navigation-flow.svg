@@ -82,7 +82,7 @@
   <g transform="translate(638,430)">
     <rect class="node-review" width="214" height="82" rx="10"/>
     <text class="title" x="18" y="30">Arrow Duel Review</text>
-    <text class="body" x="18" y="52">Green best, red blunder</text>
+    <text class="body" x="18" y="52">Guided line + analysis</text>
   </g>
 
   <g transform="translate(928,430)">
@@ -94,7 +94,7 @@
   <g transform="translate(326,604)">
     <rect class="node" width="230" height="104" rx="10"/>
     <text class="title" x="18" y="30">History</text>
-    <text class="body" x="18" y="52">Wrong 7d, mode, theme</text>
+    <text class="body" x="18" y="52">Wrong only, theme</text>
     <text class="body" x="18" y="72">Open attempt review</text>
   </g>
 

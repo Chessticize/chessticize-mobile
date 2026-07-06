@@ -36,6 +36,7 @@ export function startSprint(input: {
     mistakeCount: 0,
     currentStreak: 0,
     bestStreak: 0,
+    hasUserSubmittedMove: false,
     currentPuzzleIndex: 0,
     puzzles: input.puzzles,
     ratingBefore: input.ratingBefore,
@@ -113,7 +114,10 @@ export function resumeSprint(state: SprintState, now: string): SprintState {
 }
 
 export function abandonSprint(state: SprintState, now: string): SprintState {
-  return completeSprint(state, "failed", "abandoned", now);
+  if (!state.hasUserSubmittedMove) {
+    return completeSprint(state, "abandoned", "abandoned", now);
+  }
+  return completeSprintWithRating(state, "failed", "abandoned", now);
 }
 
 export function serializeSprintView(state: SprintState): unknown {
@@ -131,6 +135,7 @@ export function serializeSprintView(state: SprintState): unknown {
     mistakeCount: state.mistakeCount,
     currentStreak: state.currentStreak,
     bestStreak: state.bestStreak,
+    hasUserSubmittedMove: state.hasUserSubmittedMove,
     targetCorrect: state.config.targetCorrect,
     maxMistakes: state.config.maxMistakes,
     ratingKey: state.config.ratingKey,
@@ -171,18 +176,22 @@ function applyPuzzleFeedback(state: SprintState, feedback: PuzzleFeedback, now: 
   if (!state.currentPuzzle) {
     throw new Error("Sprint has no current puzzle");
   }
+  const stateWithSubmittedMove: SprintState = {
+    ...state,
+    hasUserSubmittedMove: true
+  };
 
   if (feedback.result === "correct" && !feedback.puzzleSolved) {
-    return { state, feedback };
+    return { state: stateWithSubmittedMove, feedback };
   }
 
-  const attempt = buildAttemptEvent(state, feedback, now);
+  const attempt = buildAttemptEvent(stateWithSubmittedMove, feedback, now);
   const nextCorrectCount = state.correctCount + (feedback.result === "correct" ? 1 : 0);
   const nextMistakeCount = state.mistakeCount + (feedback.result === "wrong" ? 1 : 0);
   const nextCurrentStreak = feedback.result === "correct" ? state.currentStreak + 1 : 0;
   const nextBestStreak = Math.max(state.bestStreak, nextCurrentStreak);
   const updated: SprintState = {
-    ...state,
+    ...stateWithSubmittedMove,
     correctCount: nextCorrectCount,
     mistakeCount: nextMistakeCount,
     currentStreak: nextCurrentStreak,

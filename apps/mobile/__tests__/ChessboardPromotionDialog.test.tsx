@@ -21,17 +21,28 @@ jest.mock("react-native-reanimated", () => {
   };
 });
 
+jest.mock("@shopify/react-native-skia", () => {
+  const React = require("react");
+
+  return {
+    Atlas: (props: { children?: React.ReactNode }) => React.createElement("Atlas", props, props.children),
+    Canvas: (props: { children?: React.ReactNode }) => React.createElement("Canvas", props, props.children),
+    Skia: {
+      RSXform: (scale: number, skew: number, translateX: number, translateY: number) => ({
+        scale,
+        skew,
+        translateX,
+        translateY
+      })
+    },
+    rect: (x: number, y: number, width: number, height: number) => ({ x, y, width, height })
+  };
+});
+
 jest.mock("react-native-chessboard/src/assets/piece-images", () => ({
-  PIECE_SOURCES: {
-    wq: 1,
-    wr: 1,
-    wb: 1,
-    wn: 1,
-    bq: 1,
-    br: 1,
-    bb: 1,
-    bn: 1
-  }
+  usePieceSpriteSheet: () => ({
+    image: { id: "mock-piece-sprite" }
+  })
 }));
 
 describe("react-native-chessboard promotion dialog patch", () => {
@@ -42,7 +53,7 @@ describe("react-native-chessboard promotion dialog patch", () => {
     act(() => {
       renderer = TestRenderer.create(
         <PromotionDialog
-          color="w"
+          color="b"
           onSelect={onSelect}
           onCancel={jest.fn()}
           config={{
@@ -67,6 +78,14 @@ describe("react-native-chessboard promotion dialog patch", () => {
     expect(renderer.root.findByProps({ testID: "promotion-dialog-container" })).toBeTruthy();
     const pieceButtons = renderer.root.findAll((node) => String(node.type) === "TouchableOpacity");
     expect(pieceButtons).toHaveLength(4);
+    ["q", "r", "b", "n"].forEach((piece) => {
+      const choiceImage = renderer!.root.findByProps({ testID: `promotion-choice-${piece}-image` });
+      expect(choiceImage.props.style).toMatchObject({
+        width: 48,
+        height: 48
+      });
+    });
+    expect(renderer.root.findAll((node) => String(node.type) === "Atlas")).toHaveLength(4);
     expect(pieceButtons[0].props.style).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

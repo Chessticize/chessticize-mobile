@@ -124,6 +124,7 @@ export interface SprintState {
   mistakeCount: number;
   currentStreak: number;
   bestStreak: number;
+  hasUserSubmittedMove: boolean;
   currentPuzzleIndex: number;
   puzzles: Puzzle[];
   currentPuzzle?: CurrentPuzzleState;

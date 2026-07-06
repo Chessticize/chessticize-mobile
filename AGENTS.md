@@ -68,6 +68,7 @@ Before declaring code work complete:
 - After completing any mobile UI, board interaction, navigation, animation, or review-flow change, update the iOS simulator before reporting the work as ready for manual testing.
 - The normal order is focused component tests, mobile typecheck, then simulator refresh.
 - Use `pnpm mobile:ios` to rebuild and relaunch the app when native or bundled code may have changed.
+- Do not run Detox E2E on the simulator used for manual testing. Detox launches the app with `delete: true` and wipes the app sandbox, including local SQLite history, sprint sessions, and review queue data. Use a dedicated simulator such as `iPhone 17-Detox` for local Detox runs.
 - If Metro is not running or the simulator reports that it cannot connect to the development server, start Metro with `pnpm mobile:start` and then rerun the simulator refresh.
 - If simulator refresh is skipped because Xcode, Metro, or the simulator is unavailable, say that explicitly in the final response and include the exact command the next agent or developer should run.
 

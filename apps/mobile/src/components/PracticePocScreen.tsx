@@ -41,8 +41,6 @@ import type {
   EngineAnalysisLine,
   HistoryAttemptView,
   HistoryPerformance,
-  HistoryPerformanceMetric,
-  HistoryPerformancePoint,
   HistoryPuzzleStats,
   HistoryReviewStatus,
   HistoryTimeRange,
@@ -52,6 +50,7 @@ import type {
   PuzzleLineState,
   RatingRecord,
   ReviewAnalysisLine,
+  ReviewReminderDecision,
   ReviewQueueItem,
   ReviewQueueState,
   SessionMistakeReviewItem,
@@ -61,7 +60,7 @@ import type {
   UciEngineTransport
 } from "../../../../packages/core/src/index.ts";
 import type { PracticeService } from "../../../../packages/storage/src/practice-service.ts";
-import type { ClearLocalHistoryResult, LocalDataExport, ReviewReminderPreference } from "../../../../packages/storage/src/practice-store.ts";
+import type { ClearLocalHistoryResult, LocalDataExport, ReviewQueueDuePromotionResult, ReviewReminderPreference } from "../../../../packages/storage/src/practice-store.ts";
 import {
   configureMobilePracticePuzzleSource,
   createMobilePracticeService,
@@ -97,7 +96,7 @@ interface Props {
   reviewReminderNotificationClientFactory?: () => ReviewReminderNotificationClient | null;
 }
 
-type Tab = "practice" | "review" | "history" | "settings" | "packs" | "analysis";
+type Tab = "practice" | "review" | "history" | "settings" | "analysis";
 
 type SessionFeedback = PuzzleFeedback | null;
 type AnalysisEngineStatus = "idle" | "thinking" | "stockfish" | "fallback" | "error";
@@ -177,14 +176,12 @@ const BOARD_COLOR_TOKENS = {
 } as const;
 const TEST_PUZZLE_SOURCES: ReadonlyArray<{ source: MobilePuzzleSource; label: string }> = [
   { source: "bundledCore", label: "Core Pack" },
-  { source: "familiar15", label: "Familiar 15" },
-  { source: "random1000", label: "Random 1000" }
+  { source: "familiar15", label: "Familiar 15" }
 ];
 const PRIMARY_TABS: ReadonlyArray<{ tab: Exclude<Tab, "analysis">; label: string; testID: string }> = [
   { tab: "practice", label: "Practice", testID: "practice-tab" },
   { tab: "review", label: "Review", testID: "review-tab" },
   { tab: "history", label: "History", testID: "history-tab" },
-  { tab: "packs", label: "Packs", testID: "packs-tab" },
   { tab: "settings", label: "Settings", testID: "settings-tab" }
 ];
 const PRACTICE_MODE_DESCRIPTIONS: Record<SprintMode, string> = {
@@ -355,12 +352,12 @@ export function PracticePocScreen({
     });
     void notificationClient.consumeInitialRoute().then((route) => {
       if (!canceled && route === "review") {
-        setTab("review");
+        openReviewQueue();
       }
     }).catch(() => {});
     const unsubscribe = notificationClient.addNotificationResponseListener((route) => {
       if (route === "review") {
-        setTab("review");
+        openReviewQueue();
       }
     });
 
@@ -553,6 +550,41 @@ export function PracticePocScreen({
     }
   }
 
+  function promoteNextFutureReviewsToDue(): ReviewQueueDuePromotionResult {
+    const result = service.promoteNextFutureReviewsToDue(nowIso());
+    refreshState();
+    refreshReviewReminder("dev-promote-next-due", true);
+    return result;
+  }
+
+  async function scheduleDevReviewReminderNotification(): Promise<ReviewReminderScheduleResult> {
+    if (!scheduler) {
+      setReviewReminderScheduleStatus("unavailable");
+      return { scheduled: false };
+    }
+    const dueCount = Math.max(1, service.getDueReviewItems(nowIso()).length);
+    const decision: ReviewReminderDecision = {
+      scheduledAt: new Date(nowMsRef.current + 5000).toISOString(),
+      dueCount,
+      body: `${dueCount} ${dueCount === 1 ? "puzzle is" : "puzzles are"} ready for review`,
+      route: "review"
+    };
+    reminderScheduleKeyRef.current = reminderScheduleKey(decision);
+    setReviewReminderScheduleStatus("pending");
+    try {
+      const result = await scheduler.replaceNextReminder(decision);
+      setReviewReminderScheduleStatus(reviewReminderScheduleStatusLabel(decision, result));
+      return result;
+    } catch (caught) {
+      setReviewReminderScheduleStatus("error");
+      emitTrace({
+        type: "move-ignored",
+        reason: `review-reminder-dev-test-failed:${errorMessage(caught)}`
+      });
+      return { scheduled: false };
+    }
+  }
+
   function commitState(nextState: SprintState | null): void {
     stateRef.current = nextState;
     setState(nextState);
@@ -614,6 +646,7 @@ export function PracticePocScreen({
         ...(!practiceService && shouldRandomizePuzzleSelection(puzzleSource) ? { puzzleSelectionSeed: `${Date.now()}-${Math.random()}` } : {})
       });
       setMode(nextMode);
+      setSessionMistakeReviewItems([]);
       commitState(started);
       setResumableSprint(null);
       setCurrentRating(started.ratingBefore);
@@ -811,78 +844,6 @@ export function PracticePocScreen({
     });
   }
 
-  async function onArrowDuelCandidatePress(move: string, context: BoardMoveContext): Promise<void> {
-    const activeState = stateRef.current;
-    const activeFeedbackSnapshot = feedbackSnapshotRef.current;
-    if (activeState?.status !== "active") {
-      emitTrace({
-        type: "move-ignored",
-        reason: "inactive",
-        move,
-        contextPuzzleId: context.puzzleId
-      });
-      return;
-    }
-    if (activeFeedbackSnapshot || boardSyncInProgressRef.current || boardInputLockedRef.current) {
-      emitTrace({
-        type: "move-ignored",
-        reason: activeFeedbackSnapshot ? "feedback-snapshot" : "board-locked",
-        move,
-        contextPuzzleId: context.puzzleId,
-        puzzleId: activeState.currentPuzzle?.puzzle.id ?? null
-      });
-      return;
-    }
-
-    const submittedPuzzle = activeState.currentPuzzle;
-    const submittedPuzzleId = submittedPuzzle?.puzzle.id ?? null;
-    if (context.puzzleId !== submittedPuzzleId || submittedPuzzle?.kind !== "arrow_duel") {
-      emitTrace({
-        type: "move-ignored",
-        reason: "context-puzzle-mismatch",
-        move,
-        contextPuzzleId: context.puzzleId,
-        puzzleId: submittedPuzzleId
-      });
-      return;
-    }
-    if (!isArrowDuelCandidate(submittedPuzzle.candidates, move)) {
-      emitTrace({
-        type: "move-ignored",
-        reason: "arrow-duel-non-candidate",
-        move,
-        contextPuzzleId: context.puzzleId,
-        puzzleId: submittedPuzzleId,
-        submittedFen: submittedPuzzle.currentFen
-      });
-      return;
-    }
-
-    const submittedFen = submittedPuzzle.currentFen ?? boardFenRef.current ?? null;
-    const submittedMoveFen = submittedFen ? fenAfterMove(submittedFen, move) : null;
-    if (submittedFen && !submittedMoveFen) {
-      emitTrace({
-        type: "move-ignored",
-        reason: "submitted-move-illegal-for-current-fen",
-        move,
-        puzzleId: submittedPuzzleId,
-        submittedFen
-      });
-      return;
-    }
-
-    setLastBoardMove(null);
-    boardVisualFenRef.current = submittedMoveFen ?? submittedFen;
-    commitBoardInputLocked(true, "candidate-chip", submittedPuzzleId);
-    await submitAcceptedMove({
-      move,
-      nextVisualFen: submittedMoveFen,
-      submittedFen,
-      submittedPuzzle,
-      submittedPuzzleId
-    });
-  }
-
   async function submitAcceptedMove({
     move,
     nextVisualFen,
@@ -980,6 +941,7 @@ export function PracticePocScreen({
   function resetToIdle(): void {
     commitState(null);
     setResumableSprint(null);
+    setSessionMistakeReviewItems([]);
     setFeedback(null);
     setFeedbackPuzzleId(null);
     clearFeedbackSnapshot();
@@ -997,6 +959,7 @@ export function PracticePocScreen({
         ? service.resumeSprint(nowIso())
         : nextSprint;
       setMode(resumed.config.mode);
+      setSessionMistakeReviewItems([]);
       commitState(resumed);
       setResumableSprint(null);
       setCurrentRating(resumed.ratingBefore);
@@ -1019,6 +982,16 @@ export function PracticePocScreen({
     resetToIdle();
     setSessionMistakeReviewItems(reviewItems);
     setTab("review");
+  }
+
+  function openReviewQueue(): void {
+    setSessionMistakeReviewItems([]);
+    setTab("review");
+  }
+
+  function exitSessionReview(): void {
+    setSessionMistakeReviewItems([]);
+    setTab("practice");
   }
 
   function openHistoryReview(attemptId: string): void {
@@ -1208,7 +1181,7 @@ export function PracticePocScreen({
     [attempts, service]
   );
   const activeHistoryRatingKey = historyRatingKey ?? historyRatingKeys[0] ?? null;
-  const historyWrongLast7Days = historyTimeRange === "7d" && historyResultFilter === "wrong";
+  const historyWrongOnly = historyResultFilter === "wrong";
   const historyRatingRangeQuery = historyRatingRangeFilterToQuery(historyRatingRangeFilter);
   const historyView = activeHistoryRatingKey
     ? service.getHistoryView({
@@ -1222,6 +1195,18 @@ export function PracticePocScreen({
         ...(historyThemeFilter === "all" ? {} : { theme: historyThemeFilter }),
         ...(historyReviewStatusFilter === "all" ? {} : { reviewStatus: historyReviewStatusFilter }),
         page: { limit: HISTORY_PAGE_LIMIT, offset: historyPageOffset }
+      })
+    : null;
+  const historyPerformanceView = activeHistoryRatingKey
+    ? service.getHistoryView({
+        now: nowIso(),
+        timeRange: historyTimeRange,
+        ratingKey: activeHistoryRatingKey,
+        ...historyRatingRangeQuery,
+        ...(historySourceFilter === "all" ? {} : { source: historySourceFilter }),
+        ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
+        ...(historyThemeFilter === "all" ? {} : { theme: historyThemeFilter }),
+        ...(historyReviewStatusFilter === "all" ? {} : { reviewStatus: historyReviewStatusFilter })
       })
     : null;
   const fullHistoryReviewView = activeHistoryRatingKey
@@ -1241,7 +1226,7 @@ export function PracticePocScreen({
   const historyReviewAttempts = fullHistoryReviewView?.attempts ?? displayedAttempts;
   const historyAvailableThemes = historyView?.availableThemes ?? [];
   const historyPage = historyView?.page ?? { limit: HISTORY_PAGE_LIMIT, offset: 0, total: 0, hasMore: false };
-  const contentOwnsHeader = tab === "review" || tab === "history" || tab === "packs";
+  const contentOwnsHeader = tab === "review" || tab === "history";
   const appChromeVisible = !isOpenSession && !isShowingFeedbackSnapshot;
   const appHeaderVisible = appChromeVisible && !contentOwnsHeader;
   const screenTitle = screenTitleFor(tab);
@@ -1330,7 +1315,7 @@ export function PracticePocScreen({
                 onSelectMode={setMode}
                 onStartMode={(nextMode) => startSprint(nextMode)}
                 onResumeSprint={resumeSprint}
-                onOpenReview={() => setTab("review")}
+                onOpenReview={openReviewQueue}
               />
             ) : null}
 
@@ -1456,18 +1441,6 @@ export function PracticePocScreen({
               <PracticePrompt currentPuzzle={displayedPuzzle} mode={mode} />
             ) : null}
 
-            {displayedPuzzle?.kind === "arrow_duel" && !boardFeedback ? (
-              <ArrowDuelCandidateChips
-                candidates={displayedPuzzle.candidates}
-                disabled={!boardGestureEnabled}
-                onChoose={(move) => {
-                  void onArrowDuelCandidatePress(move, {
-                    puzzleId: displayedPuzzle.puzzle.id
-                  });
-                }}
-              />
-            ) : null}
-
             {error ? <ErrorPanel error={error} /> : null}
 
             {isFinished && !isShowingFeedbackSnapshot ? (
@@ -1505,7 +1478,7 @@ export function PracticePocScreen({
           ) : (
             <HistoryPanel
               attempts={displayedAttempts}
-              performance={historyView?.performance ?? emptyHistoryPerformance()}
+              performance={historyPerformanceView?.performance ?? emptyHistoryPerformance()}
               ratingKeys={historyRatingKeys}
               puzzleStats={historyView?.puzzleStats ?? []}
               selectedRatingKey={activeHistoryRatingKey}
@@ -1518,7 +1491,7 @@ export function PracticePocScreen({
               availableThemes={historyAvailableThemes}
               page={historyPage}
               reviewStatusFilter={historyReviewStatusFilter}
-              wrongLast7Days={historyWrongLast7Days}
+              wrongOnly={historyWrongOnly}
               onRatingKeyChange={(ratingKey) => {
                 setHistoryRatingKey(ratingKey);
                 setHistoryPageOffset(0);
@@ -1553,14 +1526,9 @@ export function PracticePocScreen({
               }}
               onPageOffsetChange={setHistoryPageOffset}
               onOpenAttempt={openHistoryReview}
-              onToggleWrongLast7Days={() => {
+              onToggleWrongOnly={() => {
                 setHistoryPageOffset(0);
-                if (historyWrongLast7Days) {
-                  setHistoryResultFilter("all");
-                } else {
-                  setHistoryTimeRange("7d");
-                  setHistoryResultFilter("wrong");
-                }
+                setHistoryResultFilter(historyWrongOnly ? "all" : "wrong");
               }}
             />
           )
@@ -1574,8 +1542,8 @@ export function PracticePocScreen({
             currentTimeMs={currentTimeMs}
             service={service}
             sessionMistakeReviewItems={sessionMistakeReviewItems}
-            onExitSessionReview={() => setTab("practice")}
-            onOpenPractice={() => setTab("practice")}
+            onExitSessionReview={exitSessionReview}
+            onOpenPractice={exitSessionReview}
             onReviewRecorded={(completedAt) => {
               const completedAtMs = new Date(completedAt).getTime();
               if (Number.isFinite(completedAtMs) && completedAtMs > nowMsRef.current) {
@@ -1589,6 +1557,9 @@ export function PracticePocScreen({
               scheduledReviewAttemptCountRef.current = nextScheduledReviewAttemptCount;
               refreshState();
             }}
+            onPromoteNextFutureReviewsToDue={arePracticeTestControlsEnabled() ? promoteNextFutureReviewsToDue : undefined}
+            onScheduleTestReviewReminder={arePracticeTestControlsEnabled() ? scheduleDevReviewReminderNotification : undefined}
+            reviewReminderScheduleStatus={arePracticeTestControlsEnabled() ? reviewReminderScheduleStatus : undefined}
             stockfishTransportFactory={stockfishTransportFactory}
           />
         ) : null}
@@ -1601,7 +1572,6 @@ export function PracticePocScreen({
               { label: "Blitz", record: service.getRating(defaultSprintConfig("blitz").ratingKey) }
             ]}
             onOpenDiagnostics={arePracticeTestControlsEnabled() ? () => setTab("analysis") : undefined}
-            onOpenPacks={() => setTab("packs")}
             onExportData={() => service.exportLocalData()}
             onDeleteLocalHistory={() => {
               const result = service.clearLocalHistory();
@@ -1627,7 +1597,6 @@ export function PracticePocScreen({
             onSaveReviewReminderPreference={saveReviewReminderPreference}
           />
         ) : null}
-        {tab === "packs" ? <PacksPanel /> : null}
         {tab === "analysis" && arePracticeTestControlsEnabled() ? (
           <StockfishDiagnosticsPanel stockfishTransportFactory={stockfishTransportFactory} />
         ) : null}
@@ -1648,7 +1617,13 @@ export function PracticePocScreen({
               label={item.label}
               tab={item.tab}
               testID={item.testID}
-              onPress={() => setTab(item.tab)}
+              onPress={() => {
+                if (item.tab === "review") {
+                  openReviewQueue();
+                  return;
+                }
+                setTab(item.tab);
+              }}
             />
           ))}
         </View>
@@ -2966,43 +2941,6 @@ function PracticeModeGlyph({
   );
 }
 
-function ArrowDuelCandidateChips({
-  candidates,
-  disabled,
-  onChoose
-}: {
-  candidates: string[];
-  disabled: boolean;
-  onChoose: (move: string) => void;
-}): React.JSX.Element | null {
-  const visibleCandidates = candidates.slice(0, 2);
-  if (visibleCandidates.length < 2) {
-    return null;
-  }
-  return (
-    <View style={styles.arrowDuelCandidateRow} testID="arrow-duel-candidates">
-      {visibleCandidates.map((candidate, index) => {
-        const label = index === 0 ? "A" : "B";
-        const testID = index === 0 ? "arrow-duel-candidate-a" : "arrow-duel-candidate-b";
-        return (
-          <Pressable
-            key={`${label}-${candidate}`}
-            accessibilityRole="button"
-            accessibilityLabel={`Choose Arrow Duel candidate ${label}`}
-            accessibilityState={{ disabled }}
-            disabled={disabled}
-            testID={testID}
-            style={[styles.arrowDuelCandidateChip, disabled ? styles.disabledButton : null]}
-            onPress={() => onChoose(candidate)}
-          >
-            <Text style={styles.arrowDuelCandidateLabel}>{label}</Text>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}
-
 function SessionScoreStrip({ state }: { state: SprintState }): React.JSX.Element {
   const leftCount = Math.max(0, state.config.targetCorrect - state.correctCount);
   return (
@@ -3345,7 +3283,7 @@ function HistoryPanel({
   availableThemes,
   page,
   reviewStatusFilter,
-  wrongLast7Days,
+  wrongOnly,
   onRatingKeyChange,
   onTimeRangeChange,
   onSourceFilterChange,
@@ -3356,7 +3294,7 @@ function HistoryPanel({
   onReviewStatusFilterChange,
   onPageOffsetChange,
   onOpenAttempt,
-  onToggleWrongLast7Days
+  onToggleWrongOnly
 }: {
   attempts: HistoryAttemptView[];
   performance: HistoryPerformance;
@@ -3372,7 +3310,7 @@ function HistoryPanel({
   availableThemes: string[];
   page: { limit: number; offset: number; total: number; hasMore: boolean };
   reviewStatusFilter: "all" | HistoryReviewStatus;
-  wrongLast7Days: boolean;
+  wrongOnly: boolean;
   onRatingKeyChange: (ratingKey: string) => void;
   onTimeRangeChange: (range: HistoryTimeRange) => void;
   onSourceFilterChange: (source: "all" | AttemptSource) => void;
@@ -3383,17 +3321,13 @@ function HistoryPanel({
   onReviewStatusFilterChange: (status: "all" | HistoryReviewStatus) => void;
   onPageOffsetChange: (offset: number) => void;
   onOpenAttempt: (attemptId: string) => void;
-  onToggleWrongLast7Days: () => void;
+  onToggleWrongOnly: () => void;
 }): React.JSX.Element {
-  const [chartMetric, setChartMetric] = useState<HistoryChartMetric>("rating");
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const puzzleStatsByAttemptKey = new Map(puzzleStats.map((stats) => [historyAttemptReviewKey(stats), stats]));
   const visibleAttempts = attempts;
-  const correct = performance.correctCount;
-  const wrong = performance.wrongCount;
-  const accuracy = performance.accuracyPercent;
-  const chartPoints = performance.charts[chartMetric];
-  const chartSummary = historyChartSummary(chartMetric, performance, chartPoints);
+  const ratingPoints = performance.charts.rating;
+  const latestRating = ratingPoints[ratingPoints.length - 1]?.value;
   const activeFilterLabels = historyActiveFilterLabels({
     ratingKey: selectedRatingKey,
     ratingRangeFilter,
@@ -3402,8 +3336,7 @@ function HistoryPanel({
     sideFilter,
     sourceFilter,
     themeFilter,
-    timeRange,
-    wrongLast7Days
+    timeRange
   });
   return (
     <View style={styles.historyPanel} testID="history-panel">
@@ -3434,15 +3367,15 @@ function HistoryPanel({
           ))}
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={wrongLast7Days ? "Clear wrong in the last 7 days filter" : "Wrong in the last 7 days"}
-            accessibilityState={{ selected: wrongLast7Days }}
-            testID="history-filter-wrong-7-days"
-            style={[styles.filterButton, wrongLast7Days ? styles.filterButtonActive : null]}
-            onPress={onToggleWrongLast7Days}
+            accessibilityLabel={wrongOnly ? "Clear wrong puzzles only filter" : "Wrong puzzles only"}
+            accessibilityState={{ selected: wrongOnly }}
+            testID="history-filter-wrong-only"
+            style={[styles.filterButton, wrongOnly ? styles.filterButtonActive : null]}
+            onPress={onToggleWrongOnly}
           >
             <View style={styles.filterButtonContent}>
-              <Text style={[styles.filterButtonText, wrongLast7Days ? styles.filterButtonTextActive : null]}>Wrong 7d</Text>
-              {wrongLast7Days ? <CloseGlyph color="#FFFFFF" testID="history-filter-wrong-7-days-clear-glyph" /> : null}
+              <Text style={[styles.filterButtonText, wrongOnly ? styles.filterButtonTextActive : null]}>Wrong only</Text>
+              {wrongOnly ? <CloseGlyph color="#FFFFFF" testID="history-filter-wrong-only-clear-glyph" /> : null}
             </View>
           </Pressable>
         </HistoryChipRow>
@@ -3451,32 +3384,17 @@ function HistoryPanel({
       <View style={styles.historyPerformanceCard} testID="history-performance-card">
         <View style={styles.historyPerformanceHeader}>
           <View>
-            <Text style={styles.panelTitle}>Performance</Text>
+            <Text style={styles.panelTitle}>Rating Trend</Text>
             <Text testID="history-performance-context" style={styles.helperText}>
               {selectedRatingKey ? `${historyRatingKeyLabel(selectedRatingKey)} · ${historyRangeLabel(timeRange)}` : "No rating history"}
             </Text>
           </View>
           <View style={styles.historyMetricSummary}>
-            <Text testID="history-chart-value" style={styles.historyAccuracy}>{chartSummary.value}</Text>
-            <Text testID="history-chart-label" style={styles.helperText}>{chartSummary.label}</Text>
+            <Text testID="history-chart-value" style={styles.historyAccuracy}>{latestRating ? String(latestRating) : "—"}</Text>
+            <Text testID="history-chart-label" style={styles.helperText}>Rating</Text>
           </View>
         </View>
-        <Text style={styles.listText}>Accuracy {accuracy}% · Correct {correct} · Wrong {wrong}</Text>
-        <HistoryChipRow testID="history-chart-metric-filters">
-          {HISTORY_CHART_METRICS.map((metric) => (
-            <FilterButton
-              key={metric.id}
-              active={chartMetric === metric.id}
-              label={metric.label}
-              testID={`history-chart-${metric.id}`}
-              onPress={() => setChartMetric(metric.id)}
-            />
-          ))}
-        </HistoryChipRow>
-        <HistoryMiniChart
-          metric={chartMetric}
-          points={chartPoints}
-        />
+        <HistoryRatingTrendChart points={ratingPoints} />
       </View>
 
       {filtersExpanded ? (
@@ -3595,7 +3513,6 @@ type HistoryActiveFilterInput = {
   sourceFilter: "all" | AttemptSource;
   themeFilter: string;
   timeRange: HistoryTimeRange;
-  wrongLast7Days: boolean;
 };
 
 function historyActiveFilterLabels({
@@ -3606,21 +3523,17 @@ function historyActiveFilterLabels({
   sideFilter,
   sourceFilter,
   themeFilter,
-  timeRange,
-  wrongLast7Days
+  timeRange
 }: HistoryActiveFilterInput): string[] {
   const labels = [
     historyRangeLabel(timeRange),
     ratingKey ? historyRatingKeyLabel(ratingKey) : "No rating"
   ];
-  if (wrongLast7Days) {
-    labels.push("Wrong 7d");
-  }
   if (sourceFilter !== "all") {
     labels.push(sourceFilter === "scheduled_review" ? "Review" : "Sprint");
   }
   if (resultFilter !== "all") {
-    labels.push(resultFilter === "correct" ? "Correct" : "Wrong");
+    labels.push(resultFilter === "correct" ? "Correct" : "Wrong only");
   }
   if (ratingRangeFilter !== "all") {
     labels.push(HISTORY_RATING_RANGE_FILTERS.find((filter) => filter.id === ratingRangeFilter)?.label ?? ratingRangeFilter);
@@ -3655,17 +3568,6 @@ function HistoryActiveFilterStrip({ labels }: { labels: string[] }): React.JSX.E
   );
 }
 
-type HistoryChartMetric = HistoryPerformanceMetric;
-
-const HISTORY_CHART_METRICS: ReadonlyArray<{ id: HistoryChartMetric; label: string }> = [
-  { id: "rating", label: "Rating" },
-  { id: "wins-losses", label: "W/L" },
-  { id: "accuracy", label: "Accuracy" },
-  { id: "solved", label: "Solved" },
-  { id: "mistake-rate", label: "Mistakes" },
-  { id: "review-due", label: "Reviews" }
-];
-
 const HISTORY_RATING_RANGE_FILTERS: ReadonlyArray<{ id: HistoryRatingRangeFilter; label: string }> = [
   { id: "all", label: "All ratings" },
   { id: "under1000", label: "<1000" },
@@ -3686,41 +3588,20 @@ function historyRatingRangeFilterToQuery(filter: HistoryRatingRangeFilter): { mi
   return {};
 }
 
-function HistoryMiniChart({
-  metric,
+function HistoryRatingTrendChart({
   points
 }: {
-  metric: HistoryChartMetric;
-  points: HistoryPerformancePoint[];
+  points: Array<{ key: string; value: number }>;
 }): React.JSX.Element {
   const displayed = points.slice(-8);
   if (displayed.length === 0) {
     return (
       <View style={styles.historyChartEmpty} testID="history-performance-chart">
-        <Text style={styles.helperText}>No {historyChartEmptyLabel(metric)} data in this range.</Text>
+        <Text style={styles.helperText}>No rating data in this range.</Text>
       </View>
     );
   }
-  if (metric === "rating") {
-    return <HistoryRatingLineChart points={displayed} />;
-  }
-  const values = displayed.map((point) => point.value);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const span = Math.max(1, max - min);
-
-  return (
-    <View style={styles.historyChart} testID="history-performance-chart">
-      {displayed.map((point, index) => {
-        const height = 12 + ((point.value - min) / span) * 46;
-        return (
-          <View key={`${metric}-${point.key}-${index}`} style={styles.historyChartColumn}>
-            <View style={[styles.historyChartBar, { height }]} testID={`history-chart-bar-${index}`} />
-          </View>
-        );
-      })}
-    </View>
-  );
+  return <HistoryRatingLineChart points={displayed} />;
 }
 
 function HistoryRatingLineChart({
@@ -3785,33 +3666,6 @@ function HistoryRatingLineChart({
   );
 }
 
-function historyChartSummary(
-  metric: HistoryChartMetric,
-  performance: HistoryPerformance,
-  points: HistoryPerformancePoint[]
-): { label: string; value: string } {
-  if (metric === "rating") {
-    const latest = points[points.length - 1]?.value;
-    return { label: "Rating", value: latest ? String(latest) : "—" };
-  }
-  if (metric === "accuracy") {
-    return { label: "Accuracy", value: `${performance.accuracyPercent}%` };
-  }
-  if (metric === "wins-losses") {
-    const net = performance.correctCount - performance.wrongCount;
-    return { label: "Wins/Losses", value: `${net >= 0 ? "+" : ""}${net}` };
-  }
-  if (metric === "solved") {
-    return { label: "Solved", value: String(performance.correctCount) };
-  }
-  if (metric === "mistake-rate") {
-    const total = Math.max(1, performance.correctCount + performance.wrongCount);
-    return { label: "Mistake rate", value: `${Math.round((performance.wrongCount / total) * 100)}%` };
-  }
-  const dueVolume = points.filter((point) => point.value > 0).length;
-  return { label: "Review due", value: String(dueVolume) };
-}
-
 function emptyHistoryPerformance(): HistoryPerformance {
   return {
     correctCount: 0,
@@ -3826,19 +3680,6 @@ function emptyHistoryPerformance(): HistoryPerformance {
       "review-due": []
     }
   };
-}
-
-function historyChartEmptyLabel(metric: HistoryChartMetric): string {
-  if (metric === "mistake-rate") {
-    return "mistake rate";
-  }
-  if (metric === "review-due") {
-    return "review due";
-  }
-  if (metric === "wins-losses") {
-    return "wins/losses";
-  }
-  return metric;
 }
 
 function historyRatingKeyLabel(ratingKey: string): string {
@@ -4424,8 +4265,11 @@ function ReviewPanel({
   nowMs,
   onExitSessionReview,
   onOpenPractice,
+  onPromoteNextFutureReviewsToDue,
   onReviewRecorded,
+  onScheduleTestReviewReminder,
   reviewQueue,
+  reviewReminderScheduleStatus,
   service,
   sessionMistakeReviewItems,
   stockfishTransportFactory
@@ -4436,8 +4280,11 @@ function ReviewPanel({
   nowMs: number;
   onExitSessionReview: () => void;
   onOpenPractice: () => void;
+  onPromoteNextFutureReviewsToDue?: () => ReviewQueueDuePromotionResult;
   onReviewRecorded: (completedAt: string) => void;
+  onScheduleTestReviewReminder?: () => Promise<ReviewReminderScheduleResult>;
   reviewQueue: ReviewQueueState[];
+  reviewReminderScheduleStatus?: string;
   service: PracticeService;
   sessionMistakeReviewItems: SessionMistakeReviewItem[];
   stockfishTransportFactory: () => UciEngineTransport | null;
@@ -4457,6 +4304,7 @@ function ReviewPanel({
   const [queuedReviewGroups, setQueuedReviewGroups] = useState<ReviewEntryGroup[]>([]);
   const [queueFilter, setQueueFilter] = useState<ReviewQueueFilter>("all");
   const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [devStatus, setDevStatus] = useState<string | null>(null);
   const themeFilters = collectReviewThemeFilters(dueReviewItems);
   const speedFilters = collectReviewSpeedFilters(dueReviewItems);
   const filteredDueReviewItems = filterReviewQueueItems(dueReviewItems, queueFilter, nowMs);
@@ -4620,6 +4468,44 @@ function ReviewPanel({
         <Text style={styles.primaryButtonText}>Start Review</Text>
       </Pressable>
 
+      {onPromoteNextFutureReviewsToDue || onScheduleTestReviewReminder ? (
+        <View style={styles.reviewDevControls} testID="review-dev-controls">
+          {onPromoteNextFutureReviewsToDue ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Make next future review date due today"
+              testID="review-dev-promote-next-due"
+              style={styles.secondaryButton}
+              onPress={() => {
+                const result = onPromoteNextFutureReviewsToDue();
+                setDevStatus(reviewDuePromotionStatus(result));
+              }}
+            >
+              <Text style={styles.secondaryButtonText}>Make next due today</Text>
+            </Pressable>
+          ) : null}
+          {onScheduleTestReviewReminder ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Schedule a test review notification"
+              testID="review-dev-test-notification"
+              style={styles.secondaryButton}
+              onPress={() => {
+                void onScheduleTestReviewReminder().then((result) => {
+                  setDevStatus(result.scheduled ? `Test notification scheduled ${formatLocalCalendarDate(result.scheduledAt ?? "")}` : "No test notification scheduled");
+                });
+              }}
+            >
+              <Text style={styles.secondaryButtonText}>Test notification</Text>
+            </Pressable>
+          ) : null}
+          {devStatus ? <Text style={styles.helperText} testID="review-dev-status">{devStatus}</Text> : null}
+          {reviewReminderScheduleStatus ? (
+            <Text style={styles.reviewDueHiddenMetric} testID="review-dev-reminder-status">{reviewReminderScheduleStatus}</Text>
+          ) : null}
+        </View>
+      ) : null}
+
       {filtersExpanded ? (
         <ScrollView
           horizontal
@@ -4719,6 +4605,14 @@ function ReviewPanel({
 
     </View>
   );
+}
+
+function reviewDuePromotionStatus(result: ReviewQueueDuePromotionResult): string {
+  if (result.promotedCount === 0) {
+    return "No future reviews to promote";
+  }
+  const puzzleLabel = result.promotedCount === 1 ? "1 puzzle" : `${result.promotedCount} puzzles`;
+  return `${puzzleLabel} from ${result.promotedDate ?? "next due date"} due today`;
 }
 
 function reviewDueCardSubline(label: string): string {
@@ -4978,11 +4872,6 @@ function ReviewSession({
     : currentEntry.source === "history"
       ? "History replay"
       : "Scheduled review";
-  const arrowReviewChoiceLabel = currentEntry.mode === "arrow_duel"
-    ? wrongSeen || isArrowDuelFollowUpReview
-      ? "You chose: Red (blunder)"
-      : null
-    : null;
   const reviewRemainingSeconds =
     currentEntry.source === "due" && (!reviewResultRecorded || reviewTimedOut)
       ? Math.max(0, reviewPerPuzzleSeconds - Math.floor((reviewNowMs - reviewStartedAtMs) / 1000))
@@ -5553,26 +5442,6 @@ function ReviewSession({
               </Text>
             </View>
           ) : null}
-          {currentEntry.mode === "arrow_duel" ? (
-            <View
-              accessibilityLabel="Green is best move, red is blunder"
-              style={styles.reviewArrowLegendPill}
-              testID="review-arrow-legend"
-            >
-              <View style={styles.reviewLegendSwatchGreen} />
-              <View style={styles.reviewLegendSwatchRed} />
-              <Text style={styles.reviewContextPillText}>Green = best move · Red = blunder</Text>
-            </View>
-          ) : null}
-          {arrowReviewChoiceLabel ? (
-            <View
-              accessibilityLabel={arrowReviewChoiceLabel}
-              style={styles.reviewContextPill}
-              testID="review-arrow-choice-marker"
-            >
-              <Text style={styles.reviewContextPillText}>{arrowReviewChoiceLabel}</Text>
-            </View>
-          ) : null}
         </View>
       </View>
 
@@ -6018,7 +5887,6 @@ function SettingsPanel({
   onExportData,
   onOpenDiagnostics,
   onOpenNotificationSettings,
-  onOpenPacks,
   onAdjustRating,
   onRequestReviewReminderPermission,
   onResetRating,
@@ -6033,7 +5901,6 @@ function SettingsPanel({
   onExportData: () => LocalDataExport;
   onOpenDiagnostics?: () => void;
   onOpenNotificationSettings: () => void;
-  onOpenPacks: () => void;
   onAdjustRating: (ratingKey: string, nextRating: number) => RatingRecord;
   onRequestReviewReminderPermission: () => Promise<ReviewReminderPermissionStatus>;
   onResetRating: () => void;
@@ -6047,6 +5914,7 @@ function SettingsPanel({
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<"reset-elo" | "delete-history" | null>(null);
   const [advancedRatingsOpen, setAdvancedRatingsOpen] = useState(false);
+  const bundledCoreManifest = getBundledCorePackManifest();
 
   return (
     <View style={styles.settingsPanel} testID="settings-panel">
@@ -6157,16 +6025,6 @@ function SettingsPanel({
         ) : null}
       </SettingsSection>
 
-      <SettingsSection title="Packs" testID="settings-packs-section">
-        <SettingsRow
-          label="Manage Puzzle Packs"
-          value="Open Packs"
-          detail="Bundled and imported offline puzzle packs"
-          testID="settings-manage-packs"
-          onPress={onOpenPacks}
-        />
-      </SettingsSection>
-
       <SettingsSection title="About" testID="settings-about-section">
         <SettingsRow
           label="App Version"
@@ -6178,6 +6036,12 @@ function SettingsPanel({
           value="GPL-3.0-or-later"
           detail="Stockfish 18 embedded. Public source: github.com/Chessticize/chessticize-mobile"
           testID="settings-license"
+        />
+        <SettingsRow
+          label="Puzzle Data"
+          value={`${bundledCoreManifest.source} · ${bundledCoreManifest.sourceLicense}`}
+          detail={`${bundledCoreManifest.licenseNote} ${bundledCoreManifest.presolve}.`}
+          testID="settings-puzzle-data-license"
         />
       </SettingsSection>
 
@@ -6199,7 +6063,7 @@ function SettingsPanel({
       {confirmation === "delete-history" ? (
         <DestructiveConfirmationCard
           confirmLabel="Delete History"
-          description="This removes local attempts, sprint history, and scheduled review queue data. Ratings and puzzle packs stay intact."
+          description="This removes local attempts, sprint history, and scheduled review queue data. Ratings and bundled puzzle data stay intact."
           testID="settings-delete-history-confirmation"
           title="Delete local history?"
           onCancel={() => setConfirmation(null)}
@@ -7159,14 +7023,6 @@ function TabGlyph({
       </View>
     );
   }
-  if (tab === "packs") {
-    return (
-      <View style={styles.tabGlyphCanvas}>
-        <View style={[styles.tabPackHandle, { borderColor: color }]} />
-        <View style={[styles.tabPackBody, { borderColor: color }]} />
-      </View>
-    );
-  }
   return (
     <View style={styles.tabSliderGlyph}>
       <View style={[styles.tabSliderLine, { backgroundColor: color }]}>
@@ -7256,10 +7112,7 @@ function screenSubtitleFor(tab: Tab): string | null {
     return "Scheduled mistake review";
   }
   if (tab === "history") {
-    return "Performance and solved puzzles";
-  }
-  if (tab === "packs") {
-    return "Offline puzzle sources";
+    return "Rating trend and attempts";
   }
   if (tab === "settings") {
     return "Sync, data, and ratings";
@@ -8190,6 +8043,15 @@ const styles = StyleSheet.create({
   reviewStartButton: {
     flex: 0
   },
+  reviewDevControls: {
+    alignItems: "stretch",
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 8,
+    padding: 10
+  },
   reviewContinueButton: {
     marginBottom: 8
   },
@@ -8378,28 +8240,6 @@ const styles = StyleSheet.create({
     color: "#2563EB",
     fontSize: 12,
     fontWeight: "800"
-  },
-  arrowDuelCandidateRow: {
-    flexDirection: "row",
-    gap: 10,
-    justifyContent: "center"
-  },
-  arrowDuelCandidateChip: {
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#2563EB",
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 2,
-    height: 44,
-    justifyContent: "center",
-    width: 56
-  },
-  arrowDuelCandidateLabel: {
-    color: "#2563EB",
-    fontSize: 16,
-    fontWeight: "900",
-    lineHeight: 20
   },
   sessionScoreStrip: {
     alignItems: "center",
@@ -9116,29 +8956,6 @@ const styles = StyleSheet.create({
     color: "#334155",
     fontSize: 12,
     fontWeight: "800"
-  },
-  reviewArrowLegendPill: {
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 6,
-    minHeight: 30,
-    paddingHorizontal: 10
-  },
-  reviewLegendSwatchGreen: {
-    backgroundColor: "#16A34A",
-    borderRadius: 999,
-    height: 8,
-    width: 8
-  },
-  reviewLegendSwatchRed: {
-    backgroundColor: "#DC2626",
-    borderRadius: 999,
-    height: 8,
-    width: 8
   },
   reviewBoardLayout: {
     gap: 12

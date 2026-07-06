@@ -1,9 +1,25 @@
 diff --git a/lib/commonjs/components/promotion-dialog.js b/lib/commonjs/components/promotion-dialog.js
-index de72beac3b9cda50edb7a8f34b1630cfdd2bd8cf..b13003dd456b05ba619f3da0b5a6646d4650da30 100644
+index de72beac3b9cda50edb7a8f34b1630cfdd2bd8cf..00fc5f4c1093d47f56809fb07fc42d40e448ae7f 100644
 --- a/lib/commonjs/components/promotion-dialog.js
 +++ b/lib/commonjs/components/promotion-dialog.js
-@@ -13,28 +13,36 @@ function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e
+@@ -6,35 +6,52 @@ Object.defineProperty(exports, "__esModule", {
+ exports.PromotionDialog = void 0;
+ var _react = _interopRequireDefault(require("react"));
+ var _reactNative = require("react-native");
++var _reactNativeSkia = require("@shopify/react-native-skia");
+ var _reactNativeReanimated = _interopRequireWildcard(require("react-native-reanimated"));
+ var _pieceImages = require("../assets/piece-images");
+ function _interopRequireWildcard(e, t) { if ("function" == typeof WeakMap) var r = new WeakMap(), n = new WeakMap(); return (_interopRequireWildcard = function (e, t) { if (!t && e && e.__esModule) return e; var o, i, f = { __proto__: null, default: e }; if (null === e || "object" != typeof e && "function" != typeof e) return f; if (o = t ? n : r) { if (o.has(e)) return o.get(e); o.set(e, f); } for (const t in e) "default" !== t && {}.hasOwnProperty.call(e, t) && ((i = (o = Object.defineProperty) && Object.getOwnPropertyDescriptor(e, t)) && (i.get || i.set) ? o(f, t, i) : f[t] = e[t]); return f; })(e, t); }
+ function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
  const PROMOTION_PIECES = ['q', 'r', 'b', 'n'];
++const SPRITE_CELL_SIZE = 128;
++const PROMOTION_ICON_SIZE = 48;
++const SPRITE_FILE_INDEX = {
++  n: 1,
++  b: 2,
++  r: 3,
++  q: 4
++};
  const styles = _reactNative.StyleSheet.create({
    overlay: {
 -    ..._reactNative.StyleSheet.absoluteFillObject,
@@ -48,7 +64,33 @@ index de72beac3b9cda50edb7a8f34b1630cfdd2bd8cf..b13003dd456b05ba619f3da0b5a6646d
      marginHorizontal: 4
    },
    pieceImage: {
-@@ -56,13 +64,17 @@ const PromotionDialog = exports.PromotionDialog = /*#__PURE__*/_react.default.me
+@@ -42,6 +59,25 @@ const styles = _reactNative.StyleSheet.create({
+     height: 48
+   }
+ });
++const PromotionPieceIcon = ({
++  color,
++  piece
++}) => {
++  const {
++    image: spriteImage
++  } = (0, _pieceImages.usePieceSpriteSheet)();
++  const sourceRect = (0, _reactNativeSkia.rect)(SPRITE_FILE_INDEX[piece] * SPRITE_CELL_SIZE, color === 'w' ? 0 : SPRITE_CELL_SIZE, SPRITE_CELL_SIZE, SPRITE_CELL_SIZE);
++  const scale = PROMOTION_ICON_SIZE / SPRITE_CELL_SIZE;
++  const transform = _reactNativeSkia.Skia.RSXform(scale, 0, 0, 0);
++  return /*#__PURE__*/_react.default.createElement(_reactNativeSkia.Canvas, {
++    style: styles.pieceImage,
++    testID: `promotion-choice-${piece}-image`
++  }, spriteImage ? /*#__PURE__*/_react.default.createElement(_reactNativeSkia.Atlas, {
++    image: spriteImage,
++    sprites: [sourceRect],
++    transforms: [transform]
++  }) : null);
++};
+ const PromotionDialog = exports.PromotionDialog = /*#__PURE__*/_react.default.memo(({
+   color,
+   onSelect,
+@@ -56,26 +92,30 @@ const PromotionDialog = exports.PromotionDialog = /*#__PURE__*/_react.default.me
      visible: true,
      animationType: "fade",
      onRequestClose: onCancel
@@ -67,16 +109,27 @@ index de72beac3b9cda50edb7a8f34b1630cfdd2bd8cf..b13003dd456b05ba619f3da0b5a6646d
 +    style: styles.container,
 +    testID: "promotion-dialog-container"
    }, PROMOTION_PIECES.map(piece => {
-     const pieceCode = `${color}${piece}`;
-     const source = _pieceImages.PIECE_SOURCES[pieceCode];
-@@ -71,6 +83,7 @@ const PromotionDialog = exports.PromotionDialog = /*#__PURE__*/_react.default.me
+-    const pieceCode = `${color}${piece}`;
+-    const source = _pieceImages.PIECE_SOURCES[pieceCode];
+     return /*#__PURE__*/_react.default.createElement(_reactNative.TouchableOpacity, {
+       key: piece,
        style: [styles.pieceButton, {
          backgroundColor: colors.promotionPieceButton
        }],
 +      testID: `promotion-choice-${piece}`,
        onPress: () => onSelect(piece),
-       activeOpacity: 0.7
-     }, /*#__PURE__*/_react.default.createElement(_reactNative.Image, {
+-      activeOpacity: 0.7
+-    }, /*#__PURE__*/_react.default.createElement(_reactNative.Image, {
+-      source: source,
+-      style: styles.pieceImage
++      activeOpacity: 0.7,
++      accessibilityLabel: `Promote to ${piece}`
++    }, /*#__PURE__*/_react.default.createElement(PromotionPieceIcon, {
++      color: color,
++      piece: piece
+     }));
+   }))));
+ });
 diff --git a/lib/commonjs/components/skia/gesture-board.js b/lib/commonjs/components/skia/gesture-board.js
 index 7ddc0516545a4e1e16774f520123aaa883c235c0..748653cf34925669683bd41c868e191c7f31cf26 100644
 --- a/lib/commonjs/components/skia/gesture-board.js
@@ -170,7 +223,7 @@ index 99152d0e193c3ff32b49cb57c78a5b09799a8617..24c27cf6c6a713472f3eb0d6e377a38f
  SkiaDots.displayName = 'SkiaDots';
  //# sourceMappingURL=skia-dots.js.map
 diff --git a/lib/commonjs/hooks/use-board-gesture.js b/lib/commonjs/hooks/use-board-gesture.js
-index 26deda8bb43c022624db07d6ea463a1028f082f9..cde89b65790dfb2f5b2f255485f50785b449832c 100644
+index 26deda8bb43c022624db07d6ea463a1028f082f9..529e876aeb91da1ce9324c1c4a45b3746ba3ebb2 100644
 --- a/lib/commonjs/hooks/use-board-gesture.js
 +++ b/lib/commonjs/hooks/use-board-gesture.js
 @@ -19,7 +19,8 @@ const useBoardGesture = ({
@@ -183,7 +236,24 @@ index 26deda8bb43c022624db07d6ea463a1028f082f9..cde89b65790dfb2f5b2f255485f50785
    } = config;
 
    // Track the currently dragged piece
-@@ -57,16 +58,21 @@ const useBoardGesture = ({
+@@ -31,9 +32,13 @@ const useBoardGesture = ({
+   const touchOffsetY = (0, _reactNativeReanimated.useSharedValue)(0);
+
+   // Stable callback for tryMove
+-  const handleTryMove = (0, _react.useCallback)((from, to) => {
+-    moveExecutor.tryMove(from, to);
+-  }, [moveExecutor]);
++  const handleTryMove = (0, _react.useCallback)((from, to, notifyOnInvalid = false) => {
++    void moveExecutor.tryMove(from, to).then(move => {
++      if (!move && notifyOnInvalid) {
++        onIllegalMove === null || onIllegalMove === void 0 || onIllegalMove(from, to);
++      }
++    });
++  }, [moveExecutor, onIllegalMove]);
+
+   // Stable callback for selectPiece
+   const handleSelectPiece = (0, _react.useCallback)(square => {
+@@ -57,16 +62,26 @@ const useBoardGesture = ({
        const square = (0, _useBoardState.positionToSquare)(x, y, pieceSize, flipped);
        const squareState = boardState.squares[square];
        const piece = squareState.piece.get();
@@ -211,10 +281,15 @@ index 26deda8bb43c022624db07d6ea463a1028f082f9..cde89b65790dfb2f5b2f255485f50785
 +      const pieceCenterY = squareState.translateY.get() + pieceSize / 2;
 +      touchOffsetX.set(x - pieceCenterX);
 +      touchOffsetY.set(y - pieceCenterY);
++
++      // Start the valid-target calculation before the drag crosses the
++      // min-distance threshold. Otherwise very fast drags can reach onEnd
++      // before the RN-thread select callback has populated validMoves.
++      (0, _reactNativeWorklets.scheduleOnRN)(handleSelectPiece, square);
      }).onStart(() => {
        'worklet';
 
-@@ -76,16 +82,22 @@ const useBoardGesture = ({
+@@ -76,16 +91,22 @@ const useBoardGesture = ({
        const squareState = boardState.squares[square];
        const piece = squareState.piece.get();
        const turn = boardState.turn.get();
@@ -241,7 +316,7 @@ index 26deda8bb43c022624db07d6ea463a1028f082f9..cde89b65790dfb2f5b2f255485f50785
      }).onUpdate(event => {
        'worklet';
 
-@@ -115,7 +127,8 @@ const useBoardGesture = ({
+@@ -115,7 +136,8 @@ const useBoardGesture = ({
        // Check if this is own piece - only own pieces can make moves
        const piece = squareState.piece.get();
        const turn = boardState.turn.get();
@@ -251,7 +326,25 @@ index 26deda8bb43c022624db07d6ea463a1028f082f9..cde89b65790dfb2f5b2f255485f50785
 
        // If not own piece, just snap back (can't make moves with opponent's pieces)
        if (!isOwnPiece) {
-@@ -187,7 +200,8 @@ const useBoardGesture = ({
+@@ -147,6 +169,17 @@ const useBoardGesture = ({
+         draggedSquare.set(null);
+         return;
+       }
++      if (targetSquare !== square && validMoves.length === 0) {
++        const originalPos = (0, _useBoardState.squareToPosition)(square, pieceSize, flipped);
++        squareState.translateX.set(originalPos.x);
++        squareState.translateY.set(originalPos.y);
++        squareState.zIndex.set(0);
++        boardState.selectedSquare.set(null);
++        boardState.validMoves.set([]);
++        (0, _reactNativeWorklets.scheduleOnRN)(handleTryMove, square, targetSquare, true);
++        draggedSquare.set(null);
++        return;
++      }
+
+       // Invalid move - snap back to original position and clear selection
+       const originalPos = (0, _useBoardState.squareToPosition)(square, pieceSize, flipped);
+@@ -187,7 +220,8 @@ const useBoardGesture = ({
        const selectedSquare = boardState.selectedSquare.get();
        const piece = boardState.squares[square].piece.get();
        const turn = boardState.turn.get();
@@ -261,7 +354,25 @@ index 26deda8bb43c022624db07d6ea463a1028f082f9..cde89b65790dfb2f5b2f255485f50785
 
        // Case 1: No piece selected - try to select own piece
        if (!selectedSquare) {
-@@ -224,7 +238,7 @@ const useBoardGesture = ({
+@@ -217,14 +251,24 @@ const useBoardGesture = ({
+         return;
+       }
+
+-      // Case 5: Invalid target - deselect
++      // Case 5: Valid moves may not have crossed from the RN thread to the
++      // UI worklet yet after a fast source tap. Let the executor make the
++      // final legality decision so tap-tap stays responsive.
++      if (validMoves.length === 0) {
++        boardState.selectedSquare.set(null);
++        boardState.validMoves.set([]);
++        (0, _reactNativeWorklets.scheduleOnRN)(handleTryMove, selectedSquare, square, true);
++        return;
++      }
++
++      // Case 6: Invalid target - deselect
+       boardState.selectedSquare.set(null);
+       boardState.validMoves.set([]);
+     });
 
      // Combine gestures - pan takes precedence
      return _reactNativeGestureHandler.Gesture.Simultaneous(tapGesture, panGesture);
@@ -331,16 +442,26 @@ index cfd52d5394e32d3972be93c85977c62f4ad30885..c053d8f58b807b27594c24a934c8537e
      boardState,
      chess
 diff --git a/lib/module/components/promotion-dialog.js b/lib/module/components/promotion-dialog.js
-index 5bf64b655079b16368383257bc53bc3bce4d8418..ca2a24307fa333129c93deb7f64a0197b31953b2 100644
+index 5bf64b655079b16368383257bc53bc3bce4d8418..d85b789bcb8c53328caa8a0536100f5ac2137636 100644
 --- a/lib/module/components/promotion-dialog.js
 +++ b/lib/module/components/promotion-dialog.js
-@@ -1,32 +1,40 @@
+@@ -1,32 +1,49 @@
  import React from 'react';
 -import { StyleSheet, TouchableOpacity, Image, Modal, Pressable } from 'react-native';
-+import { StyleSheet, TouchableOpacity, Image, Modal, Pressable, View } from 'react-native';
++import { StyleSheet, TouchableOpacity, Modal, Pressable, View } from 'react-native';
++import { Atlas, Canvas, rect, Skia } from '@shopify/react-native-skia';
  import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
- import { PIECE_SOURCES } from '../assets/piece-images';
+-import { PIECE_SOURCES } from '../assets/piece-images';
++import { usePieceSpriteSheet } from '../assets/piece-images';
  const PROMOTION_PIECES = ['q', 'r', 'b', 'n'];
++const SPRITE_CELL_SIZE = 128;
++const PROMOTION_ICON_SIZE = 48;
++const SPRITE_FILE_INDEX = {
++  n: 1,
++  b: 2,
++  r: 3,
++  q: 4
++};
  const styles = StyleSheet.create({
    overlay: {
 -    ...StyleSheet.absoluteFillObject,
@@ -385,7 +506,33 @@ index 5bf64b655079b16368383257bc53bc3bce4d8418..ca2a24307fa333129c93deb7f64a0197
      marginHorizontal: 4
    },
    pieceImage: {
-@@ -48,13 +56,17 @@ export const PromotionDialog = /*#__PURE__*/React.memo(({
+@@ -34,6 +51,25 @@ const styles = StyleSheet.create({
+     height: 48
+   }
+ });
++const PromotionPieceIcon = ({
++  color,
++  piece
++}) => {
++  const {
++    image: spriteImage
++  } = usePieceSpriteSheet();
++  const sourceRect = rect(SPRITE_FILE_INDEX[piece] * SPRITE_CELL_SIZE, color === 'w' ? 0 : SPRITE_CELL_SIZE, SPRITE_CELL_SIZE, SPRITE_CELL_SIZE);
++  const scale = PROMOTION_ICON_SIZE / SPRITE_CELL_SIZE;
++  const transform = Skia.RSXform(scale, 0, 0, 0);
++  return /*#__PURE__*/React.createElement(Canvas, {
++    style: styles.pieceImage,
++    testID: `promotion-choice-${piece}-image`
++  }, spriteImage ? /*#__PURE__*/React.createElement(Atlas, {
++    image: spriteImage,
++    sprites: [sourceRect],
++    transforms: [transform]
++  }) : null);
++};
+ export const PromotionDialog = /*#__PURE__*/React.memo(({
+   color,
+   onSelect,
+@@ -48,26 +84,30 @@ export const PromotionDialog = /*#__PURE__*/React.memo(({
      visible: true,
      animationType: "fade",
      onRequestClose: onCancel
@@ -404,16 +551,27 @@ index 5bf64b655079b16368383257bc53bc3bce4d8418..ca2a24307fa333129c93deb7f64a0197
 +    style: styles.container,
 +    testID: "promotion-dialog-container"
    }, PROMOTION_PIECES.map(piece => {
-     const pieceCode = `${color}${piece}`;
-     const source = PIECE_SOURCES[pieceCode];
-@@ -63,6 +75,7 @@ export const PromotionDialog = /*#__PURE__*/React.memo(({
+-    const pieceCode = `${color}${piece}`;
+-    const source = PIECE_SOURCES[pieceCode];
+     return /*#__PURE__*/React.createElement(TouchableOpacity, {
+       key: piece,
        style: [styles.pieceButton, {
          backgroundColor: colors.promotionPieceButton
        }],
 +      testID: `promotion-choice-${piece}`,
        onPress: () => onSelect(piece),
-       activeOpacity: 0.7
-     }, /*#__PURE__*/React.createElement(Image, {
+-      activeOpacity: 0.7
+-    }, /*#__PURE__*/React.createElement(Image, {
+-      source: source,
+-      style: styles.pieceImage
++      activeOpacity: 0.7,
++      accessibilityLabel: `Promote to ${piece}`
++    }, /*#__PURE__*/React.createElement(PromotionPieceIcon, {
++      color: color,
++      piece: piece
+     }));
+   }))));
+ });
 diff --git a/lib/module/components/skia/gesture-board.js b/lib/module/components/skia/gesture-board.js
 index 79598f3cce08d079d2a004ed0563f1194fd7d31c..e9c4b9b6c3e29dfef7523ed53015031bb7c655f7 100644
 --- a/lib/module/components/skia/gesture-board.js
@@ -507,7 +665,7 @@ index 120f116f938d6bf19ed350321959c9c5a860b48a..5d8e884209b1142d6923281494c502f9
  SkiaDots.displayName = 'SkiaDots';
  //# sourceMappingURL=skia-dots.js.map
 diff --git a/lib/module/hooks/use-board-gesture.js b/lib/module/hooks/use-board-gesture.js
-index 504126e4dc0a469cf5b00913e176e360322a1194..e34c0ae9b6ed8a0e1531d71437297d444c2e5c87 100644
+index 504126e4dc0a469cf5b00913e176e360322a1194..a0d4318682344ed7ac18f53044a14cd685dca8be 100644
 --- a/lib/module/hooks/use-board-gesture.js
 +++ b/lib/module/hooks/use-board-gesture.js
 @@ -13,7 +13,8 @@ export const useBoardGesture = ({
@@ -520,7 +678,24 @@ index 504126e4dc0a469cf5b00913e176e360322a1194..e34c0ae9b6ed8a0e1531d71437297d44
    } = config;
 
    // Track the currently dragged piece
-@@ -51,16 +52,21 @@ export const useBoardGesture = ({
+@@ -25,9 +26,13 @@ export const useBoardGesture = ({
+   const touchOffsetY = useSharedValue(0);
+
+   // Stable callback for tryMove
+-  const handleTryMove = useCallback((from, to) => {
+-    moveExecutor.tryMove(from, to);
+-  }, [moveExecutor]);
++  const handleTryMove = useCallback((from, to, notifyOnInvalid = false) => {
++    void moveExecutor.tryMove(from, to).then(move => {
++      if (!move && notifyOnInvalid) {
++        onIllegalMove === null || onIllegalMove === void 0 || onIllegalMove(from, to);
++      }
++    });
++  }, [moveExecutor, onIllegalMove]);
+
+   // Stable callback for selectPiece
+   const handleSelectPiece = useCallback(square => {
+@@ -51,16 +56,26 @@ export const useBoardGesture = ({
        const square = positionToSquare(x, y, pieceSize, flipped);
        const squareState = boardState.squares[square];
        const piece = squareState.piece.get();
@@ -548,10 +723,15 @@ index 504126e4dc0a469cf5b00913e176e360322a1194..e34c0ae9b6ed8a0e1531d71437297d44
 +      const pieceCenterY = squareState.translateY.get() + pieceSize / 2;
 +      touchOffsetX.set(x - pieceCenterX);
 +      touchOffsetY.set(y - pieceCenterY);
++
++      // Start the valid-target calculation before the drag crosses the
++      // min-distance threshold. Otherwise very fast drags can reach onEnd
++      // before the RN-thread select callback has populated validMoves.
++      scheduleOnRN(handleSelectPiece, square);
      }).onStart(() => {
        'worklet';
 
-@@ -70,16 +76,22 @@ export const useBoardGesture = ({
+@@ -70,16 +85,22 @@ export const useBoardGesture = ({
        const squareState = boardState.squares[square];
        const piece = squareState.piece.get();
        const turn = boardState.turn.get();
@@ -578,7 +758,7 @@ index 504126e4dc0a469cf5b00913e176e360322a1194..e34c0ae9b6ed8a0e1531d71437297d44
      }).onUpdate(event => {
        'worklet';
 
-@@ -109,7 +121,8 @@ export const useBoardGesture = ({
+@@ -109,7 +130,8 @@ export const useBoardGesture = ({
        // Check if this is own piece - only own pieces can make moves
        const piece = squareState.piece.get();
        const turn = boardState.turn.get();
@@ -588,7 +768,25 @@ index 504126e4dc0a469cf5b00913e176e360322a1194..e34c0ae9b6ed8a0e1531d71437297d44
 
        // If not own piece, just snap back (can't make moves with opponent's pieces)
        if (!isOwnPiece) {
-@@ -181,7 +194,8 @@ export const useBoardGesture = ({
+@@ -141,6 +163,17 @@ export const useBoardGesture = ({
+         draggedSquare.set(null);
+         return;
+       }
++      if (targetSquare !== square && validMoves.length === 0) {
++        const originalPos = squareToPosition(square, pieceSize, flipped);
++        squareState.translateX.set(originalPos.x);
++        squareState.translateY.set(originalPos.y);
++        squareState.zIndex.set(0);
++        boardState.selectedSquare.set(null);
++        boardState.validMoves.set([]);
++        scheduleOnRN(handleTryMove, square, targetSquare, true);
++        draggedSquare.set(null);
++        return;
++      }
+
+       // Invalid move - snap back to original position and clear selection
+       const originalPos = squareToPosition(square, pieceSize, flipped);
+@@ -181,7 +214,8 @@ export const useBoardGesture = ({
        const selectedSquare = boardState.selectedSquare.get();
        const piece = boardState.squares[square].piece.get();
        const turn = boardState.turn.get();
@@ -598,7 +796,25 @@ index 504126e4dc0a469cf5b00913e176e360322a1194..e34c0ae9b6ed8a0e1531d71437297d44
 
        // Case 1: No piece selected - try to select own piece
        if (!selectedSquare) {
-@@ -218,7 +232,7 @@ export const useBoardGesture = ({
+@@ -211,14 +245,24 @@ export const useBoardGesture = ({
+         return;
+       }
+
+-      // Case 5: Invalid target - deselect
++      // Case 5: Valid moves may not have crossed from the RN thread to the
++      // UI worklet yet after a fast source tap. Let the executor make the
++      // final legality decision so tap-tap stays responsive.
++      if (validMoves.length === 0) {
++        boardState.selectedSquare.set(null);
++        boardState.validMoves.set([]);
++        scheduleOnRN(handleTryMove, selectedSquare, square, true);
++        return;
++      }
++
++      // Case 6: Invalid target - deselect
+       boardState.selectedSquare.set(null);
+       boardState.validMoves.set([]);
+     });
 
      // Combine gestures - pan takes precedence
      return Gesture.Simultaneous(tapGesture, panGesture);
@@ -708,18 +924,41 @@ index eaac9e98118247d6e6776fe990fa7e10aa5b9227..2f896b9f44846bf23b0cbac42e69da01
      durations: {
          move: number;
 diff --git a/src/components/promotion-dialog.tsx b/src/components/promotion-dialog.tsx
-index a3f67bf02f45b674772813bdf03f4b25c56f070e..3c087c36b3935a3f821fee154613d2a04e1d7e3f 100644
+index a3f67bf02f45b674772813bdf03f4b25c56f070e..5771815c93dae8f4c11b4bef4599c37c41e193e9 100644
 --- a/src/components/promotion-dialog.tsx
 +++ b/src/components/promotion-dialog.tsx
-@@ -5,6 +5,7 @@ import {
-   Image,
+@@ -2,16 +2,27 @@ import React from 'react';
+ import {
+   StyleSheet,
+   TouchableOpacity,
+-  Image,
    Modal,
    Pressable,
 +  View,
  } from 'react-native';
  import type { PieceSymbol } from 'chess.js';
++import { Atlas, Canvas, rect, Skia } from '@shopify/react-native-skia';
  import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-@@ -20,27 +21,45 @@ interface PromotionDialogProps {
+ import type { BoardConfig } from '../state';
+-import { PIECE_SOURCES } from '../assets/piece-images';
++import { usePieceSpriteSheet } from '../assets/piece-images';
+
+-const PROMOTION_PIECES: PieceSymbol[] = ['q', 'r', 'b', 'n'];
++type PromotionPiece = 'q' | 'r' | 'b' | 'n';
++
++const PROMOTION_PIECES: PromotionPiece[] = ['q', 'r', 'b', 'n'];
++const SPRITE_CELL_SIZE = 128;
++const PROMOTION_ICON_SIZE = 48;
++const SPRITE_FILE_INDEX: Record<PromotionPiece, number> = {
++  n: 1,
++  b: 2,
++  r: 3,
++  q: 4,
++};
+
+ interface PromotionDialogProps {
+   color: 'w' | 'b';
+@@ -20,27 +31,45 @@ interface PromotionDialogProps {
    config: BoardConfig;
  }
 
@@ -773,7 +1012,36 @@ index a3f67bf02f45b674772813bdf03f4b25c56f070e..3c087c36b3935a3f821fee154613d2a0
      marginHorizontal: 4,
    },
    pieceImage: {
-@@ -55,11 +74,13 @@ export const PromotionDialog: React.FC<PromotionDialogProps> = React.memo(
+@@ -49,23 +78,44 @@ const styles = StyleSheet.create({
+   },
+ });
+
++const PromotionPieceIcon: React.FC<{
++  color: 'w' | 'b';
++  piece: PromotionPiece;
++}> = ({ color, piece }) => {
++  const { image: spriteImage } = usePieceSpriteSheet();
++  const sourceRect = rect(
++    SPRITE_FILE_INDEX[piece] * SPRITE_CELL_SIZE,
++    color === 'w' ? 0 : SPRITE_CELL_SIZE,
++    SPRITE_CELL_SIZE,
++    SPRITE_CELL_SIZE
++  );
++  const scale = PROMOTION_ICON_SIZE / SPRITE_CELL_SIZE;
++  const transform = Skia.RSXform(scale, 0, 0, 0);
++
++  return (
++    <Canvas style={styles.pieceImage} testID={`promotion-choice-${piece}-image`}>
++      {spriteImage ? (
++        <Atlas image={spriteImage} sprites={[sourceRect]} transforms={[transform]} />
++      ) : null}
++    </Canvas>
++  );
++};
++
+ export const PromotionDialog: React.FC<PromotionDialogProps> = React.memo(
+   ({ color, onSelect, onCancel, config }) => {
+     const { colors } = config;
 
      return (
        <Modal transparent visible animationType="fade" onRequestClose={onCancel}>
@@ -787,8 +1055,14 @@ index a3f67bf02f45b674772813bdf03f4b25c56f070e..3c087c36b3935a3f821fee154613d2a0
 +            testID="promotion-dialog-container"
            >
              {PROMOTION_PIECES.map((piece) => {
-               const pieceCode =
-@@ -73,7 +94,11 @@ export const PromotionDialog: React.FC<PromotionDialogProps> = React.memo(
+-              const pieceCode =
+-                `${color}${piece}` as keyof typeof PIECE_SOURCES;
+-              const source = PIECE_SOURCES[pieceCode];
+-
+               return (
+                 <TouchableOpacity
+                   key={piece}
+@@ -73,15 +123,20 @@ export const PromotionDialog: React.FC<PromotionDialogProps> = React.memo(
                      styles.pieceButton,
                      { backgroundColor: colors.promotionPieceButton },
                    ]}
@@ -799,9 +1073,11 @@ index a3f67bf02f45b674772813bdf03f4b25c56f070e..3c087c36b3935a3f821fee154613d2a0
 +                    onSelect(piece);
 +                  }}
                    activeOpacity={0.7}
++                  accessibilityLabel={`Promote to ${piece}`}
                  >
-                   <Image source={source} style={styles.pieceImage} />
-@@ -81,7 +106,7 @@ export const PromotionDialog: React.FC<PromotionDialogProps> = React.memo(
+-                  <Image source={source} style={styles.pieceImage} />
++                  <PromotionPieceIcon color={color} piece={piece} />
+                 </TouchableOpacity>
                );
              })}
            </Animated.View>
@@ -1054,7 +1330,7 @@ index 5032bfe81a485ff85d710e7d6e4c0a2e8d78347e..041ff73a79b81185b4719c5e53c6e56e
  );
 
 diff --git a/src/hooks/use-board-gesture.ts b/src/hooks/use-board-gesture.ts
-index 92df972f7ec3c671308e8cc0e6cd275469a7144d..b6d2f79887d7ec0209989673fe22ad2cedaf9506 100644
+index 92df972f7ec3c671308e8cc0e6cd275469a7144d..f221ae108ff5de6c665753939bdd52eb024f6285 100644
 --- a/src/hooks/use-board-gesture.ts
 +++ b/src/hooks/use-board-gesture.ts
 @@ -22,7 +22,7 @@ export const useBoardGesture = ({
@@ -1066,7 +1342,25 @@ index 92df972f7ec3c671308e8cc0e6cd275469a7144d..b6d2f79887d7ec0209989673fe22ad2c
 
    // Track the currently dragged piece
    const draggedSquare = useSharedValue<Square | null>(null);
-@@ -67,18 +67,23 @@ export const useBoardGesture = ({
+@@ -34,10 +34,14 @@ export const useBoardGesture = ({
+
+   // Stable callback for tryMove
+   const handleTryMove = useCallback(
+-    (from: Square, to: Square) => {
+-      moveExecutor.tryMove(from, to);
++    (from: Square, to: Square, notifyOnInvalid = false) => {
++      void moveExecutor.tryMove(from, to).then((move) => {
++        if (!move && notifyOnInvalid) {
++          onIllegalMove?.(from, to);
++        }
++      });
+     },
+-    [moveExecutor]
++    [moveExecutor, onIllegalMove]
+   );
+
+   // Stable callback for selectPiece
+@@ -67,18 +71,28 @@ export const useBoardGesture = ({
          const square = positionToSquare(x, y, pieceSize, flipped);
          const squareState = boardState.squares[square];
          const piece = squareState.piece.get();
@@ -1097,10 +1391,15 @@ index 92df972f7ec3c671308e8cc0e6cd275469a7144d..b6d2f79887d7ec0209989673fe22ad2c
 +        const pieceCenterY = squareState.translateY.get() + pieceSize / 2;
 +        touchOffsetX.set(x - pieceCenterX);
 +        touchOffsetY.set(y - pieceCenterY);
++
++        // Start the valid-target calculation before the drag crosses the
++        // min-distance threshold. Otherwise very fast drags can reach onEnd
++        // before the RN-thread select callback has populated validMoves.
++        scheduleOnRN(handleSelectPiece, square);
        })
        .onStart(() => {
          'worklet';
-@@ -89,16 +94,22 @@ export const useBoardGesture = ({
+@@ -89,16 +103,22 @@ export const useBoardGesture = ({
          const squareState = boardState.squares[square];
          const piece = squareState.piece.get();
          const turn = boardState.turn.get();
@@ -1127,7 +1426,7 @@ index 92df972f7ec3c671308e8cc0e6cd275469a7144d..b6d2f79887d7ec0209989673fe22ad2c
        })
        .onUpdate((event) => {
          'worklet';
-@@ -135,7 +146,8 @@ export const useBoardGesture = ({
+@@ -135,7 +155,8 @@ export const useBoardGesture = ({
          // Check if this is own piece - only own pieces can make moves
          const piece = squareState.piece.get();
          const turn = boardState.turn.get();
@@ -1137,7 +1436,26 @@ index 92df972f7ec3c671308e8cc0e6cd275469a7144d..b6d2f79887d7ec0209989673fe22ad2c
 
          // If not own piece, just snap back (can't make moves with opponent's pieces)
          if (!isOwnPiece) {
-@@ -221,7 +233,8 @@ export const useBoardGesture = ({
+@@ -180,6 +201,18 @@ export const useBoardGesture = ({
+           return;
+         }
+
++        if (targetSquare !== square && validMoves.length === 0) {
++          const originalPos = squareToPosition(square, pieceSize, flipped);
++          squareState.translateX.set(originalPos.x);
++          squareState.translateY.set(originalPos.y);
++          squareState.zIndex.set(0);
++          boardState.selectedSquare.set(null);
++          boardState.validMoves.set([]);
++          scheduleOnRN(handleTryMove, square, targetSquare, true);
++          draggedSquare.set(null);
++          return;
++        }
++
+         // Invalid move - snap back to original position and clear selection
+         const originalPos = squareToPosition(square, pieceSize, flipped);
+         squareState.translateX.set(
+@@ -221,7 +254,8 @@ export const useBoardGesture = ({
          const selectedSquare = boardState.selectedSquare.get();
          const piece = boardState.squares[square].piece.get();
          const turn = boardState.turn.get();
@@ -1147,7 +1465,26 @@ index 92df972f7ec3c671308e8cc0e6cd275469a7144d..b6d2f79887d7ec0209989673fe22ad2c
 
          // Case 1: No piece selected - try to select own piece
          if (!selectedSquare) {
-@@ -269,6 +282,7 @@ export const useBoardGesture = ({
+@@ -251,7 +285,17 @@ export const useBoardGesture = ({
+           return;
+         }
+
+-        // Case 5: Invalid target - deselect
++        // Case 5: Valid moves may not have crossed from the RN thread to the
++        // UI worklet yet after a fast source tap. Let the executor make the
++        // final legality decision so tap-tap stays responsive.
++        if (validMoves.length === 0) {
++          boardState.selectedSquare.set(null);
++          boardState.validMoves.set([]);
++          scheduleOnRN(handleTryMove, selectedSquare, square, true);
++          return;
++        }
++
++        // Case 6: Invalid target - deselect
+         boardState.selectedSquare.set(null);
+         boardState.validMoves.set([]);
+       });
+@@ -269,6 +313,7 @@ export const useBoardGesture = ({
      touchOffsetY,
      animations,
      gestureEnabled,
