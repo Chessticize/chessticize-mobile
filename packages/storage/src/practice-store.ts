@@ -58,6 +58,12 @@ export type ReviewReminderPreference =
   | { mode: "fixed"; fixedLocalTime: string }
   | { mode: "off" };
 
+export interface ReviewQueueDuePromotionResult {
+  promotedCount: number;
+  promotedDate?: string;
+  dueAt?: string;
+}
+
 export interface PracticeStore {
   seedPuzzles(puzzles: Puzzle[]): void;
   countPuzzles(): number;
@@ -87,6 +93,7 @@ export interface PracticeStore {
   getReviewQueueState(context: ReviewContext): ReviewQueueState | undefined;
   listReviewQueue(): ReviewQueueState[];
   pruneOrphanedReviewQueue(): number;
+  promoteNextFutureReviewsToDue(now: string): ReviewQueueDuePromotionResult;
   getDueReviews(now: string): ReviewQueueState[];
   getDueReviewItems(now: string): ReviewQueueItem[];
   getHistoryView(query: HistoryQuery): HistoryView;

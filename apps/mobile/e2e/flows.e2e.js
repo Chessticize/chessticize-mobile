@@ -2,7 +2,6 @@ const {
   openTab,
   launchWithDisabledSynchronization,
   sleep,
-  playBoardMove,
   startPracticeMode,
   selectTestPuzzleSource,
   textFromAttributes,
@@ -40,22 +39,14 @@ describe('Key user flows', () => {
     await waitFor(element(by.text('Sprint failed'))).toBeVisible().withTimeout(10000);
   });
 
-  it('submits an Arrow Duel candidate choice from the chips', async () => {
+  it('opens Arrow Duel as a board-move sprint without choice chips', async () => {
     await selectTestPuzzleSource('familiar15');
     await startPracticeMode('arrow-duel');
     await waitForVisibleInPracticeScroll('session-board');
-    await waitFor(element(by.id('arrow-duel-candidate-a'))).toBeVisible().withTimeout(10000);
 
-    await element(by.id('arrow-duel-candidate-a')).tap();
-    await sleep(1500);
-
-    // Candidate order is randomized per session, so chip A may be either the
-    // correct or the wrong move: progress advances or a mistake is recorded.
-    try {
-      await waitFor(element(by.id('session-progress'))).toHaveText('1 / 10').withTimeout(5000);
-    } catch (error) {
-      await waitFor(element(by.label('Mistakes 1 of 3')).atIndex(0)).toExist().withTimeout(5000);
-    }
+    await expect(element(by.id('arrow-duel-candidate-a'))).not.toExist();
+    await expect(element(by.id('arrow-duel-candidate-b'))).not.toExist();
+    await waitFor(element(by.id('session-progress'))).toHaveText('0 / 10').withTimeout(10000);
   });
 
   it('schedules failed sprint mistakes into the review queue', async () => {
@@ -128,15 +119,15 @@ describe('Key user flows', () => {
     await dismissSprintSummary();
 
     await openTab('history-tab', 'history-action-header');
-    await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
-    await expect(element(by.id('history-performance-card'))).toExist();
+    await waitFor(element(by.id('history-performance-card'))).toExist().withTimeout(10000);
+    await waitFor(element(by.id('history-chart-line'))).toExist().withTimeout(10000);
 
-    // The Wrong 7d chip is the last item in the horizontal range chip strip.
-    await waitFor(element(by.id('history-filter-wrong-7-days')))
+    await waitFor(element(by.id('history-filter-wrong-only')))
       .toBeVisible()
       .whileElement(by.id('history-range-filters'))
       .scroll(120, 'right');
-    await element(by.id('history-filter-wrong-7-days')).tap();
+    await element(by.id('history-filter-wrong-only')).tap();
+    await waitFor(element(by.id('history-filter-wrong-only-clear-glyph'))).toExist().withTimeout(10000);
     await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
   });
 
@@ -190,7 +181,8 @@ describe('Key user flows', () => {
     await selectTestPuzzleSource('familiar15');
 
     await openTab('history-tab', 'history-action-header');
-    await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
+    await waitFor(element(by.id('history-performance-card'))).toExist().withTimeout(10000);
+    await waitFor(element(by.id('history-chart-line'))).toExist().withTimeout(10000);
 
     await openTab('review-tab', 'review-empty-state');
     await expect(element(by.id('review-empty-practice'))).toBeVisible();

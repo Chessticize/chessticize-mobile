@@ -19,10 +19,10 @@ apps/cli -> packages/storage -> packages/core
 
 Lichess puzzle rows store the FEN before the opponent move. The first move in `solutionMoves` is applied automatically before a normal puzzle is presented. The second move begins the user's solution. Multi-step puzzles alternate between user moves and automatic opponent replies until the solution line is complete.
 
-The sprint timer has two limits:
+The sprint timer has one scoring deadline plus one pacing target:
 
 - The total sprint duration ends the session when it expires.
-- The per-puzzle timer counts the current puzzle as wrong when it expires. That timeout can advance the sprint or fail it when the mistake limit is reached.
+- `perPuzzleSeconds` is a target pace used to derive the expected puzzle count and rating bucket. It is not a hard per-puzzle deadline in the current sprint rules, so a correct move after that pace marker is still accepted as long as the total sprint has not expired.
 
 Arrow Duel uses the original pre-puzzle FEN. The candidate moves are:
 
@@ -30,6 +30,26 @@ Arrow Duel uses the original pre-puzzle FEN. The candidate moves are:
 - Wrong move: the first move from the Lichess puzzle line.
 
 When the user chooses the wrong Arrow Duel move, the review payload includes both colored arrows plus the stored punishment line prefix.
+
+## Puzzle Selection
+
+Practice starts select puzzles from the active offline source using the user's
+current rating bucket and the same progressive ELO bands as
+`chessticize-server`: preferred +/-100, then +/-200, +/-400, +/-600, then a
+full-range fallback. Theme-filtered starts keep the theme through the full-range
+fallback; mixed starts can fall back without a theme.
+
+The server uses database randomness for each fallback query. Mobile must work
+fully offline, so the backend accepts an optional `puzzleSelectionSeed` and uses
+a deterministic shuffle within each fallback band. The production Core Pack UI
+passes a fresh seed for each new sprint, giving a new random batch while keeping
+the backend reproducible for tests. The Familiar 15 test source intentionally
+does not pass a seed, so it remains a fixed manual-regression sequence.
+
+Pack-backed stores must still implement the full `PracticeStore` user-state
+contract. Puzzle rows can come from a read-only bundled pack, but ratings,
+sprint sessions, attempts, review queues, reminder settings, and dev-only review
+date promotion remain user-store state.
 
 ## Rating Semantics
 
@@ -78,7 +98,7 @@ Example:
 
 Supported commands:
 
-- `startSprint`: starts a sprint with `mode`, optional timing fields, optional target/mistake limits, optional rating/theme bounds, optional theme, and optional deterministic `now`.
+- `startSprint`: starts a sprint with `mode`, optional timing fields, optional target/mistake limits, optional rating/theme bounds, optional theme, optional `puzzleSelectionSeed`, and optional deterministic `now`.
 - `move`: submits a normal puzzle move, with optional deterministic `now`.
 - `chooseArrow`: submits an Arrow Duel candidate, with optional deterministic `now`. It uses the same backend path as `move`; the active puzzle type decides validation.
 - `state`: returns the active sprint view, or `null` when no sprint is active.
@@ -103,6 +123,6 @@ GitHub Actions runs these checks in `.github/workflows/core.yml` on pull request
 
 Coverage focus:
 
-- Core unit tests cover multi-step puzzle progression, Arrow Duel review arrows, candidate rejection, sprint success/failure, ELO floor/update behavior, default sprint rules, total and per-puzzle timeout behavior, and spaced repetition intervals.
+- Core unit tests cover multi-step puzzle progression, Arrow Duel review arrows, candidate rejection, sprint success/failure, ELO floor/update behavior, default sprint rules, total timeout and per-puzzle pace behavior, seeded puzzle selection, and spaced repetition intervals.
 - Storage integration tests use real `node:sqlite` databases for fixture seeding, puzzle selection, attempt history filters, due review queries, rating reset generations, transaction rollback, active sprint protection, and completed sprint persistence.
 - CLI E2E tests spawn the real CLI process, communicate only through stdio, and verify normal multi-step sprint behavior, Arrow Duel wrong-choice review output, history/review source semantics, and invalid command handling.

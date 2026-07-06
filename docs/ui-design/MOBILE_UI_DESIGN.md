@@ -44,7 +44,6 @@ The board covers these major screens:
 - History
 - Custom Sprint Setup
 - Settings
-- Puzzle Packs
 
 Screen inventory:
 
@@ -52,26 +51,24 @@ Screen inventory:
 | --- | --- | --- | --- |
 | Practice Home | Mode list, progress summary, due review strip, bottom tabs | Start Standard, Arrow Duel, Blitz, Custom; resume interrupted session | Active Sprint, Custom Sprint, Review Queue |
 | Regular Sprint Active | Focused session shell, status bar, board, prompt | Make board move, abandon, complete/fail sprint | Sprint Results |
-| Arrow Duel Active | Focused shell, status bar, board, neutral candidate arrows, A/B chips | Choose candidate, abandon, complete/fail sprint | Sprint Results, Arrow Duel Review |
+| Arrow Duel Active | Focused shell, status bar, board, neutral candidate arrows | Choose a candidate on the board, abandon, complete/fail sprint | Sprint Results, Arrow Duel Review |
 | Sprint Results | Win/loss status, solved count, rating change, mistakes, actions | Review mistakes, play again, done | Review Item, Practice Home |
 | Review Queue | Due/overdue summary, difficulty groups, start button | Start due review, filter queue | Review Item |
-| Arrow Duel Review | Board, green/red arrows, choice marker, playback controls | Play line, step line, finish review | Review Complete, History |
-| History | Performance chart, range/type filters, attempt rows, result/rating/review state | Filter Wrong 7d, inspect sprint type/speed, open attempt | Attempt Detail, Review Item |
+| Arrow Duel Review | Board, green/red arrows, guided punishment line | Follow line, reset, analyze, finish review | Review Complete, History |
+| History | Rating trend line chart, range/type filters, attempt rows, result/rating/review state | Filter wrong-only rows, inspect sprint type/speed, open attempt | Attempt Detail, Review Item |
 | Custom Sprint Setup | Mode/theme/timing controls, estimate, rating range, start | Start sprint, save template | Active Sprint |
-| Settings | Local data, reset, export, about | Export data, delete local history, reset ELO | Confirm Sheet |
-| Puzzle Packs | Installed/optional packs, metadata, source/license notes | Import, enable, remove, inspect license | Pack Detail |
+| Settings | Local data, reset, export, notifications, about, puzzle-data source notes | Export data, delete local history, reset ELO, inspect licenses | Confirm Sheet |
 
 ## Mobile Information Architecture
 
-Use a five-tab app shell:
+Use a four-tab app shell:
 
 - Practice: quick start, active session, custom sprint setup, and Arrow Duel entry.
 - Review: due mistake reviews and spaced repetition queue.
-- History: attempts, sprint sessions, filters, and "Wrong in the last 7 days".
-- Packs: bundled pack, optional packs, rating/theme coverage, imports, and license/source attribution.
-- Settings: local data, ELO reset, export/delete data, and advanced rating adjustment.
+- History: attempts, sprint sessions, filters, and the wrong-only shortcut.
+- Settings: local data, ELO reset, export/delete data, notification preferences, advanced rating adjustment, and puzzle data attribution.
 
-There should be no mobile Home tab and no Game Review tab in v1.
+There should be no mobile Home tab, Game Review tab, or Packs tab in v1.
 
 ![Mobile navigation flow](assets/mobile-navigation-flow.svg)
 
@@ -82,8 +79,8 @@ Navigation rules:
 - Review and History both open the same board-based review surface, but with different entry context.
 - The app has two review concepts. Analysis Review is an unscored replay/analyze surface. Scheduled Review is the official spaced repetition flow that records review attempts and updates the queue.
 - Settings is the only place for data-destructive actions such as ELO reset and history delete.
-- Packs owns puzzle pack visibility, imports, removals, coverage, source attribution, and license notes.
-- Any puzzle pack error should be recoverable from Packs without blocking already-installed offline practice.
+- Settings owns puzzle data source attribution and license notes for the bundled offline puzzle data.
+- The app does not expose pack import, removal, or switching controls in v1.
 
 Primary flows:
 
@@ -93,9 +90,8 @@ Primary flows:
 | Arrow Duel practice | Practice Home -> Arrow Duel Active -> Sprint Results -> Arrow Duel Review | Candidate arrows are neutral until selection. Win by solving the target count before time/mistake failure. |
 | Custom sprint | Practice Home -> Custom Sprint Setup -> Regular Sprint Active or Arrow Duel Active -> Sprint Results | The selected mode determines the active session shell. |
 | Due mistake review | Review Queue -> Scheduled Review Item -> Review Complete -> Review Queue | Correct answers increase interval; failures reset or shorten it. Official review attempts are recorded in History. |
-| Post-session analysis | Sprint Results or Scheduled Review Complete -> Analysis Review -> Results or Practice | Used to inspect mistakes immediately. It does not write History and does not change the spaced repetition schedule. |
+| Post-session analysis | Sprint Results or Scheduled Review Complete -> Analysis Review -> Results or Practice | Used to inspect mistakes immediately. It is opened only by the result-screen review action, does not write History, and does not change the spaced repetition schedule. |
 | History replay | History -> Filtered row -> Analysis Review | History preserves original attempt context. Previous/next navigation stays inside the active History filter. |
-| Puzzle pack management | Packs -> Pack Detail -> Import or Remove -> Packs | Installed packs remain usable offline. |
 | Local data | Settings -> Confirm Sheet -> Settings | Progress stays on device; export and delete actions are explicit. |
 
 ## Design Principles
@@ -161,10 +157,10 @@ Core components:
 - `ChessboardSurface`: reused board component plus highlight/arrow overlay adapter.
 - `ModePicker`: compact list or segmented choice for Standard, Arrow Duel, Blitz, Custom.
 - `ReviewQueueHeader`: due count, overdue count, and next review estimate.
-- `HistoryFilterBar`: date/result/mode/theme chips with a persistent "Wrong in the last 7 days" shortcut.
-- `PerformanceChart`: rating, wins/losses, accuracy, mistake rate, and solved count over a selected time range.
+- `HistoryFilterBar`: date/result/mode/theme chips with a persistent wrong-only shortcut.
+- `RatingTrendChart`: rating-only line chart over the selected ELO bucket and time range.
 - `SettingsRow`: label, value, status, and disclosure or switch.
-- `PackCoverageCard`: pack name, installed state, puzzle count, rating range, theme coverage, Arrow Duel count, and attribution status.
+- `PuzzleDataLicenseSection`: bundled source name, puzzle count, source license, Lichess-derived attribution, and Chessticize presolve metadata.
 - `DestructiveActionSheet`: reset/delete confirmation with explicit copy.
 
 ## Core Screen Drafts
@@ -179,7 +175,7 @@ Practice session layout:
 - Board gets most of the screen and remains visually stable.
 - Prompt and action area live below the board.
 - Regular puzzles use board moves as the primary input.
-- Arrow Duel uses board arrows plus two candidate action chips below the board when needed.
+- Arrow Duel uses board arrows as the only candidate input. Do not show separate A/B choice chips below the board.
 - Board coordinates should be visible enough for review/debug discussion without competing with pieces, arrows, or feedback highlights.
 
 Practice session states:
@@ -213,6 +209,7 @@ Sprint scoring rules:
 - A sprint is failed when time expires, the user abandons, or the user reaches 3 mistakes.
 - Winning a sprint increases that sprint ELO type.
 - Failing a sprint lowers that sprint ELO type.
+- Abandoning after the first submitted move, whether that move was correct or wrong, is a failed rated run and lowers that sprint ELO type. Abandoning before any submitted move remains an unrated cancel.
 - Each sprint mode and custom speed has its own ELO/statistics bucket.
 
 Practice controls:
@@ -226,8 +223,10 @@ Practice controls:
 Developer/test-build controls:
 
 - Test builds may expose a puzzle source switch for manual QA.
-- The familiar fixed set is for deterministic regression testing and quick simulator repros.
-- The random larger fixture is for rating-based puzzle selection and pack coverage testing.
+- The Core Pack source should start each sprint with a fresh puzzle-selection seed so manual QA sees a random batch from the offline pack.
+- The familiar fixed set is for deterministic regression testing and quick simulator repros. It intentionally keeps a stable order instead of using the random seed.
+- The familiar fixed set should include stable edge cases such as a promotion puzzle.
+- Do not expose the old Random 1000 source in the manual test-build switch; large regression fixtures may remain internal automated-test inputs only.
 - Special fixtures may be added temporarily for focused bugs, but should not become the default familiar set unless they are stable regression samples.
 - The puzzle source switch must be hidden in release builds.
 
@@ -238,8 +237,7 @@ Developer/test-build controls:
 Arrow Duel Analysis Review behavior:
 
 - The colored candidate arrows render in Analysis mode at the puzzle's initial position: correct Stockfish best move is green, the blunder or inferior candidate is red.
-- The review surface itself communicates the outcome with a color legend and a "You chose" marker in text (readable without color); it does not redraw the candidate arrows, keeping the board clear for the guided punishment line.
-- User's original choice gets an additional marker.
+- The review surface does not show separate color-legend or "You chose" chips. The board arrows and guided punishment-line state carry the context.
 - If the user chose wrong, automatically play the opponent response or punishment line.
 - Prefer stored puzzle solution lines for explanation; fall back to local Stockfish when the stored line is not enough.
 - While the punishment line is being replayed, show the current-position evaluation, not the original candidate evals.
@@ -250,16 +248,15 @@ Arrow Duel Analysis Review behavior:
 Arrow Duel active-session rules:
 
 - Candidate arrows are neutral before selection.
-- Candidate move chips may show SAN, UCI, or both, but the final choice should be locked in the domain spec before implementation.
 - Candidate ordering is randomized by backend/domain logic and stored with the attempt.
-- The board and chips must not reveal which move is best before selection.
+- The board must not reveal which move is best before selection.
 
 Arrow Duel review rules:
 
 - Review reconstruction must reuse the candidate order stored on the original attempt. It must not generate a fresh default order for History, post-sprint Analysis Review, or scheduled-review replay.
 - Green always means the best move.
 - Red always means the inferior candidate.
-- User-selected wrong move receives an additional marker that is distinguishable without color alone (currently the "You chose" text pill on the review surface).
+- The review should avoid redundant legend or choice-marker chips; use board arrows, feedback highlights, and the guided line to explain the state.
 - After a wrong answer, the opponent's refutation reply plays automatically, then the punishment line continues as a guided interaction: the user plays each expected move themselves by following the guide arrow, so no pause/step transport controls are needed. Replay is available by resetting the puzzle. Throughout the line, show the live Stockfish evaluation of the current position. (This guided interaction supersedes the playback transport bar drawn on the design board.)
 - If the stored punishment line requires the user's next move, show that expected move with an arrow, wait for the user to make it, then play the next reply. Continue until the line ends, then stop.
 - Review copy should explain the tactical reason only when the data supports it; otherwise show engine line and evaluation shift.
@@ -352,15 +349,14 @@ Custom sprint behavior:
 - The user can stop a Scheduled Review session at any time. Completed items are saved; unseen items remain due or overdue.
 - After a Scheduled Review batch, the user may open Analysis Review for missed items. That follow-up inspection does not create history rows and does not update the schedule.
 - Post-sprint Analysis Review is also unrecorded. It is for same-day exploration only; the scheduled memory-curve review still starts from the stored due date, normally the next day after the miss.
+- Post-sprint mistake review is a one-shot immediate action from Sprint Results. If the user leaves the result screen, starts another sprint, or exits that immediate review, the Review tab must show only the scheduled review queue and must not auto-start those session mistakes again.
 
 ### History
 
 - Quick range filters include 7 days, 30 days, 90 days, 1 year, and all time.
 - History data must be pageable, including the all-time range.
-- Quick content filters include "Wrong in the last 7 days", source type, theme, rating range, and review status.
-- "Wrong in the last 7 days" is a query shortcut, not independent UI state. It
-  is selected only when the active query is 7 days plus wrong results; changing
-  either the range or result filter updates it automatically.
+- Quick content filters include a front-page "Wrong only" shortcut, source type, theme, rating range, and review status.
+- "Wrong only" is a result filter shortcut that does not change the active time range. It toggles the attempt rows between all results and wrong results.
 - The selected ELO bucket is required and supplies the mode, sprint config, and
   sprint-speed context in 1.0. Do not show separate History mode or speed chips
   while the view is scoped to a single bucket.
@@ -378,11 +374,12 @@ Custom sprint behavior:
 - Previous/next navigation from History follows the active filter result order, not just the currently visible page.
 - History filters should be horizontally scrollable chips on phones.
 - Failed attempts should clearly show whether they are already in the review queue.
-- Performance chart belongs in History, not primarily in Sprint Results.
-- Performance chart can switch between rating trend, wins/losses, accuracy, solved count, mistake rate, and review due volume.
-- Performance headline stats and chart series use the full filtered time range.
-  Pagination affects only the visible attempt rows, never the headline metrics
-  or chart inputs.
+- The rating trend chart belongs in History, not primarily in Sprint Results.
+- History must show only the selected ELO bucket's rating trend as a line chart connecting rating-change points.
+- Do not show alternate History performance chart modes such as wins/losses, accuracy, solved count, mistake rate, or review due volume.
+- The rating trend chart series uses the full filtered time range.
+  Pagination affects only the visible attempt rows, never the chart inputs.
+- The rating trend chart intentionally ignores the correct/wrong result filter. That filter is for narrowing attempt rows, not for redefining the rating series.
 - Statistics are grouped separately by the selected ELO bucket for Standard,
   Blitz, Arrow Duel, theme sprint, and custom sprint speeds.
 - Mistake statistics are also grouped separately by sprint type, speed, theme, and review state.
@@ -439,21 +436,17 @@ Architecture:
   history, and notification settings, and is unit-testable in Node.
 - The platform notification API (UNUserNotificationCenter) sits behind an
   interface with a maintained fake, matching the repo boundary rules.
+- In dev/test builds only, the Review tab may expose controls to promote the next future due review date to today and to schedule a short-delay test notification. These controls must call the same storage and notification scheduler interfaces used by production code and must not appear in release builds.
 
-### Packs
+### Puzzle Data Attribution
 
-V1 scope note: pack downloading, import, and removal are deferred beyond v1
-(see `docs/APP_STORE_PLAN.md`). V1 ships a bundled puzzle pack only; the
-Packs screen shows the bundled pack, its coverage, and license/source
-attribution. The requirements below describe the full post-v1 feature.
+V1 ships bundled offline puzzle data only. Pack downloading, import, removal,
+and switching are out of scope, so there is no Packs tab in the app shell.
+Puzzle data source and license notes live in Settings.
 
-- Bundled core pack appears first and must show installed/active state.
-- Optional packs show estimated puzzle count, rating range, theme coverage, and Arrow Duel count.
-- Pack detail shows source attribution, presolve status, manifest hash, build date, and license notes.
-- Importing a pack uses a visible progress state and validates the manifest before activation.
-- Removing a pack is a destructive action and must not remove user attempt history.
-- If no optional packs are installed, the screen should still make clear that the bundled pack works fully offline.
-- Puzzle pack screen should show bundled pack, imported packs, rating coverage, theme coverage, Arrow Duel count, and license/source attribution.
+- Settings must state that the bundled puzzle data is derived from the Lichess puzzle database and includes Chessticize presolve metadata.
+- Settings must show the source license from the bundled manifest.
+- Deleting local history must not remove bundled puzzle data.
 
 ## Accessibility And Automation Contracts
 
@@ -465,7 +458,6 @@ Required labels/test IDs:
 - `review-tab`
 - `history-tab`
 - `settings-tab`
-- `packs-tab`
 - `practice-mode-standard`
 - `practice-mode-arrow-duel`
 - `practice-mode-blitz`
@@ -475,16 +467,13 @@ Required labels/test IDs:
 - `session-progress`
 - `session-mistakes`
 - `session-abandon`
-- `arrow-duel-candidate-a`
-- `arrow-duel-candidate-b`
 - `review-start-due`
-- `history-filter-wrong-7-days`
+- `review-dev-promote-next-due` (dev/test builds only)
+- `review-dev-test-notification` (dev/test builds only)
+- `history-filter-wrong-only`
 - `settings-local-storage`
 - `settings-reset-elo`
-- `packs-installed-core`
-- `packs-import` (deferred beyond v1 with pack downloading)
-- `packs-remove` (deferred beyond v1 with pack downloading)
-- `packs-license-notes`
+- `settings-puzzle-data-license`
 
 Accessibility rules:
 
@@ -499,12 +488,11 @@ Accessibility rules:
 - Every core screen must expose stable accessibility labels for Detox.
 - Component tests should verify user-visible behavior, not component internals.
 - UI should receive view models from backend/domain packages; React components must not compute sprint outcomes, ELO updates, review scheduling, or Arrow Duel correctness.
-- E2E flows should cover Practice start, Arrow Duel choice, wrong-answer review, custom sprint setup, history filtering, pack management, ELO reset, and local data export/delete.
+- E2E flows should cover Practice start, Arrow Duel choice, wrong-answer review, custom sprint setup, history filtering, Settings license/source attribution, ELO reset, and local data export/delete.
 - Design QA should include iPhone SE-sized viewport, modern iPhone portrait, and at least one landscape/tablet sanity pass.
 - E2E assertions should target stable labels/test IDs from this document.
 
 ## Open Design Questions
 
-- Whether Arrow Duel candidate chips should display SAN only, coordinate notation only, or both.
 - Whether manual ELO editing should ship in v1 or only reset/import/export.
 - Whether custom max mistakes is part of v1 custom sprint or should remain fixed by scoring mode.

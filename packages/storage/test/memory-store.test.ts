@@ -129,6 +129,42 @@ test("PracticeService prunes orphaned MemoryStore review queue rows", async () =
   assert.equal(service.pruneOrphanedReviewQueue(), 0);
 });
 
+test("PracticeService can promote the next future MemoryStore review date to due now", () => {
+  const store = new MemoryStore();
+  const service = new PracticeService(store);
+  store.scheduleMistakeReview(
+    { puzzleId: "next-morning", mode: "standard", ratingKey: "standard 5/20" },
+    "2026-06-20T08:00:00.000Z"
+  );
+  store.scheduleMistakeReview(
+    { puzzleId: "next-evening", mode: "standard", ratingKey: "standard 5/20" },
+    "2026-06-20T18:00:00.000Z"
+  );
+  store.scheduleMistakeReview(
+    { puzzleId: "later", mode: "standard", ratingKey: "standard 5/20" },
+    "2026-06-21T00:00:00.000Z"
+  );
+
+  const result = service.promoteNextFutureReviewsToDue("2026-06-20T20:00:00.000Z");
+
+  assert.deepEqual(result, {
+    promotedCount: 2,
+    promotedDate: "2026-06-21",
+    dueAt: "2026-06-20T20:00:00.000Z"
+  });
+  assert.deepEqual(
+    service.getDueReviews("2026-06-20T20:00:00.000Z").map((review) => review.puzzleId).sort(),
+    ["next-evening", "next-morning"]
+  );
+  assert.equal(store.getReviewQueueState({ puzzleId: "later", mode: "standard", ratingKey: "standard 5/20" })?.dueAt, "2026-06-22T00:00:00.000Z");
+});
+
+test("PracticeService future review promotion is a MemoryStore no-op without future rows", () => {
+  const service = new PracticeService(new MemoryStore());
+
+  assert.deepEqual(service.promoteNextFutureReviewsToDue("2026-06-20T20:00:00.000Z"), { promotedCount: 0 });
+});
+
 test("PracticeService keeps paused sprints open and resumes through the store boundary", async () => {
   const store = new MemoryStore();
   store.seedPuzzles(await loadFixturePuzzles());
@@ -318,6 +354,43 @@ test("PracticeService selects standard sprint puzzles from the current run ELO w
   );
 
   assert.equal(sprint.currentPuzzle?.puzzle.id, "00008");
+});
+
+test("PracticeService records an abandoned run after the first submitted move as a rated failure", async () => {
+  const store = new MemoryStore();
+  store.seedPuzzles(await loadFixturePuzzles());
+  store.saveRating({ key: "standard 5/20", generation: 0, rating: 800, games: 0 });
+  const service = new PracticeService(store);
+
+  const sprint = service.startSprint(
+    {
+      mode: "standard",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      targetCorrect: 2,
+      maxMistakes: 3,
+      minRating: 1400,
+      maxRating: 1900
+    },
+    "2026-06-20T00:00:00.000Z"
+  );
+  assert.equal(sprint.currentPuzzle?.puzzle.id, "000hf");
+  const firstMove = service.submitMove("e2e6", "2026-06-20T00:00:05.000Z");
+  assert.equal((firstMove.feedback as { result?: string } | undefined)?.result, "correct");
+  assert.equal(firstMove.state.status, "active");
+  assert.equal(firstMove.state.correctCount, 0);
+  assert.equal(firstMove.state.hasUserSubmittedMove, true);
+
+  const abandoned = service.abandonSprint("2026-06-20T00:00:10.000Z");
+
+  assert.equal(abandoned.status, "failed");
+  assert.equal(abandoned.endReason, "abandoned");
+  assert.equal(abandoned.correctCount, 0);
+  assert.ok(abandoned.ratingAfter !== undefined);
+  assert.ok(abandoned.ratingAfter < 800);
+  assert.equal(service.getRating("standard 5/20").rating, abandoned.ratingAfter);
+  assert.equal(service.getRating("standard 5/20").games, 1);
+  assert.equal(service.getActiveSprint(), undefined);
 });
 
 test("PracticeService exposes current-session mistake review items from MemoryStore", async () => {

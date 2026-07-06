@@ -24,7 +24,6 @@ const FAMILIAR_PUZZLE_IDS = [
   "04QUG",
   "063T7",
   "00qk4",
-  "02nKr",
   "04Phf"
 ] as const;
 
@@ -183,7 +182,7 @@ function bundledCoreFixturePuzzles(): Puzzle[] {
 
 function familiarPuzzles(): Puzzle[] {
   const byId = new Map(regressionPuzzles.map((puzzle) => [puzzle.id, puzzle]));
-  const classicPuzzles = FAMILIAR_PUZZLE_IDS.slice(0, 14).flatMap((id) => {
+  const classicPuzzles = FAMILIAR_PUZZLE_IDS.flatMap((id) => {
     const puzzle = byId.get(id);
     return puzzle === undefined ? [] : [puzzle];
   });

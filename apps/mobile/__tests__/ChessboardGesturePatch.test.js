@@ -24,6 +24,53 @@ describe("react-native-chessboard gesture patch", () => {
     expect(patch).toContain("if (!piece || piece[0] !== allowedDragColor)");
     expect(patch).toContain("draggedSquare.set(null);");
   });
+
+  it("accepts fast legal drags before validMoves has returned to the UI thread", () => {
+    const packageRoot = dirname(require.resolve("react-native-chessboard/package.json"));
+    const sources = [
+      resolve(packageRoot, "src/hooks/use-board-gesture.ts"),
+      resolve(packageRoot, "lib/module/hooks/use-board-gesture.js"),
+      resolve(packageRoot, "lib/commonjs/hooks/use-board-gesture.js")
+    ];
+
+    for (const sourcePath of sources) {
+      expectGestureSourceHandlesPendingValidMoves(readFileSync(sourcePath, "utf8"), sourcePath);
+    }
+  });
+
+  it("keeps the fast-drag validMoves fallback in the durable package patch", () => {
+    const patch = readFileSync(
+      resolve(__dirname, "../../../patches/react-native-chessboard@0.2.0.patch"),
+      "utf8"
+    );
+
+    expect(patch).toContain("before the drag crosses the");
+    expect(patch).toContain("validMoves.length === 0");
+    expect(patch).toContain("handleTryMove, square, targetSquare, true");
+  });
+
+  it("accepts fast tap-tap moves before validMoves has returned to the UI thread", () => {
+    const packageRoot = dirname(require.resolve("react-native-chessboard/package.json"));
+    const sources = [
+      resolve(packageRoot, "src/hooks/use-board-gesture.ts"),
+      resolve(packageRoot, "lib/module/hooks/use-board-gesture.js"),
+      resolve(packageRoot, "lib/commonjs/hooks/use-board-gesture.js")
+    ];
+
+    for (const sourcePath of sources) {
+      expectGestureSourceHandlesPendingTapTarget(readFileSync(sourcePath, "utf8"), sourcePath);
+    }
+  });
+
+  it("keeps the fast tap-tap validMoves fallback in the durable package patch", () => {
+    const patch = readFileSync(
+      resolve(__dirname, "../../../patches/react-native-chessboard@0.2.0.patch"),
+      "utf8"
+    );
+
+    expect(patch).toContain("tap-tap stays responsive");
+    expect(patch).toContain("handleTryMove, selectedSquare, square, true");
+  });
 });
 
 function expectGestureSourceRejectsOpponentPiecesBeforeRaise(source, sourcePath) {
@@ -69,5 +116,47 @@ function expectGestureSourceRejectsOpponentPiecesBeforeRaise(source, sourcePath)
   const dependencyListIndex = source.lastIndexOf("handleIllegalMove");
   expect(depsIndex).toBeGreaterThan(rejectReturnIndex);
   expect(depsIndex).toBeLessThan(dependencyListIndex);
+  expect(sourcePath).toBeTruthy();
+}
+
+function expectGestureSourceHandlesPendingValidMoves(source, sourcePath) {
+  const beginIndex = source.indexOf(".onBegin");
+  const startIndex = source.indexOf(".onStart", beginIndex);
+  const earlySelectIndex = source.indexOf("handleSelectPiece, square", beginIndex);
+
+  expect(beginIndex).toBeGreaterThanOrEqual(0);
+  expect(startIndex).toBeGreaterThan(beginIndex);
+  expect(earlySelectIndex).toBeGreaterThan(beginIndex);
+  expect(earlySelectIndex).toBeLessThan(startIndex);
+
+  const tryMoveIndex = source.indexOf("notifyOnInvalid");
+  const pendingIndex = source.indexOf("validMoves.length === 0");
+  const pendingTryIndex = source.indexOf("handleTryMove, square, targetSquare, true", pendingIndex);
+
+  expect(tryMoveIndex).toBeGreaterThanOrEqual(0);
+  expect(source).toContain("moveExecutor.tryMove(from, to).then");
+  expect(pendingIndex).toBeGreaterThan(startIndex);
+  expect(pendingTryIndex).toBeGreaterThan(pendingIndex);
+  expect(sourcePath).toBeTruthy();
+}
+
+function expectGestureSourceHandlesPendingTapTarget(source, sourcePath) {
+  const tapIndex = source.indexOf("Add tap gesture");
+  const validMovesIndex = source.indexOf("const validMoves = boardState.validMoves.get();", tapIndex);
+  const validTryIndex = source.indexOf("handleTryMove, selectedSquare, square", validMovesIndex);
+  const switchOwnPieceIndex = source.indexOf("Tapped on another own piece", validTryIndex);
+  const pendingIndex = source.indexOf("validMoves.length === 0", switchOwnPieceIndex);
+  const clearSelectionIndex = source.indexOf("boardState.selectedSquare.set(null);", pendingIndex);
+  const pendingTryIndex = source.indexOf("handleTryMove, selectedSquare, square, true", pendingIndex);
+  const invalidTargetIndex = source.indexOf("Invalid target - deselect", pendingTryIndex);
+
+  expect(tapIndex).toBeGreaterThanOrEqual(0);
+  expect(validMovesIndex).toBeGreaterThan(tapIndex);
+  expect(validTryIndex).toBeGreaterThan(validMovesIndex);
+  expect(switchOwnPieceIndex).toBeGreaterThan(validTryIndex);
+  expect(pendingIndex).toBeGreaterThan(switchOwnPieceIndex);
+  expect(clearSelectionIndex).toBeGreaterThan(pendingIndex);
+  expect(pendingTryIndex).toBeGreaterThan(clearSelectionIndex);
+  expect(invalidTargetIndex).toBeGreaterThan(pendingTryIndex);
   expect(sourcePath).toBeTruthy();
 }

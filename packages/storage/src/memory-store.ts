@@ -27,7 +27,7 @@ import type {
   SprintState
 } from "../../core/src/index.ts";
 import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./query-types.ts";
-import type { ClearLocalHistoryResult, LocalDataExport, PracticeSettings, PracticeStore } from "./practice-store.ts";
+import type { ClearLocalHistoryResult, LocalDataExport, PracticeSettings, PracticeStore, ReviewQueueDuePromotionResult } from "./practice-store.ts";
 import { clonePracticeSettings, defaultPracticeSettings, reviewReminderPreferenceToSettings } from "./practice-settings.ts";
 import type { ReviewReminderPreference } from "./practice-store.ts";
 import type { ReviewReminderSettings } from "../../core/src/index.ts";
@@ -274,6 +274,28 @@ export class MemoryStore implements PracticeStore {
       }
     }
     return removed;
+  }
+
+  promoteNextFutureReviewsToDue(now: string): ReviewQueueDuePromotionResult {
+    const nowIso = new Date(now).toISOString();
+    const [nextFutureReview] = this.listReviewQueue().filter((review) => review.dueAt > nowIso);
+    if (!nextFutureReview) {
+      return { promotedCount: 0 };
+    }
+
+    const promotedDate = nextFutureReview.dueAt.slice(0, 10);
+    let promotedCount = 0;
+    for (const review of this.reviewQueue.values()) {
+      if (review.dueAt > nowIso && review.dueAt.slice(0, 10) === promotedDate) {
+        this.reviewQueue.set(reviewQueueKey(review), { ...review, dueAt: nowIso });
+        promotedCount += 1;
+      }
+    }
+    return {
+      promotedCount,
+      promotedDate,
+      dueAt: nowIso
+    };
   }
 
   getDueReviews(now: string): ReviewQueueState[] {

@@ -37,7 +37,8 @@ describeStoreAssets('App Store screenshot capture', () => {
     await selectTestPuzzleSource('familiar15');
     await startPracticeMode('arrow-duel');
     await waitForVisibleInPracticeScroll('session-board');
-    await waitFor(element(by.id('arrow-duel-candidate-a'))).toBeVisible().withTimeout(10000);
+    await expect(element(by.id('arrow-duel-candidate-a'))).not.toExist();
+    await expect(element(by.id('arrow-duel-candidate-b'))).not.toExist();
     await device.takeScreenshot('app-store-03-arrow-duel');
   });
 
@@ -56,7 +57,8 @@ describeStoreAssets('App Store screenshot capture', () => {
     await element(by.id('review-exit')).tap();
     await waitFor(element(by.id('practice-tab'))).toBeVisible().withTimeout(10000);
     await openTab('history-tab', 'history-action-header');
-    await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
+    await waitFor(element(by.id('history-performance-card'))).toExist().withTimeout(10000);
+    await waitFor(element(by.id('history-chart-line'))).toExist().withTimeout(10000);
     await sleep(500);
     await device.takeScreenshot('app-store-06-history');
   });

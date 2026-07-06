@@ -28,7 +28,14 @@ import type {
   SprintState
 } from "../../core/src/index.ts";
 import type { HistoryFilter } from "./query-types.ts";
-import type { ClearLocalHistoryResult, LocalDataExport, PracticeSettings, PracticeStore, ReviewReminderPreference } from "./practice-store.ts";
+import type {
+  ClearLocalHistoryResult,
+  LocalDataExport,
+  PracticeSettings,
+  PracticeStore,
+  ReviewQueueDuePromotionResult,
+  ReviewReminderPreference
+} from "./practice-store.ts";
 import type { ReviewReminderSettings } from "../../core/src/index.ts";
 
 export interface StartSprintCommand {
@@ -216,6 +223,10 @@ export class PracticeService {
 
   pruneOrphanedReviewQueue(): number {
     return this.store.transaction(() => this.store.pruneOrphanedReviewQueue());
+  }
+
+  promoteNextFutureReviewsToDue(now = new Date().toISOString()): ReviewQueueDuePromotionResult {
+    return this.store.transaction(() => this.store.promoteNextFutureReviewsToDue(now));
   }
 
   getDueReviewItems(now = new Date().toISOString()): ReviewQueueItem[] {

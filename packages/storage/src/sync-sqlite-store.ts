@@ -28,7 +28,14 @@ import type {
   SprintState
 } from "../../core/src/index.ts";
 import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./query-types.ts";
-import type { ClearLocalHistoryResult, ExportedSprintSession, LocalDataExport, PracticeSettings, PracticeStore } from "./practice-store.ts";
+import type {
+  ClearLocalHistoryResult,
+  ExportedSprintSession,
+  LocalDataExport,
+  PracticeSettings,
+  PracticeStore,
+  ReviewQueueDuePromotionResult
+} from "./practice-store.ts";
 import { clonePracticeSettings, defaultPracticeSettings, normalizeReviewReminderPreference, reviewReminderPreferenceToSettings } from "./practice-settings.ts";
 import { selectUniquePuzzles } from "./puzzle-selection.ts";
 import type { ReviewReminderPreference } from "./practice-store.ts";
@@ -656,6 +663,35 @@ export class SyncSQLiteStore implements PracticeStore {
         .run();
     }
     return removed;
+  }
+
+  promoteNextFutureReviewsToDue(now: string): ReviewQueueDuePromotionResult {
+    const nowIso = new Date(now).toISOString();
+    const nextFuture = this.db
+      .prepare("SELECT due_at AS dueAt FROM review_queue WHERE due_at > ? ORDER BY due_at ASC, puzzle_id ASC, mode ASC, rating_key ASC LIMIT 1")
+      .get(nowIso) as { dueAt: string } | undefined;
+    if (!nextFuture) {
+      return { promotedCount: 0 };
+    }
+
+    const promotedDate = nextFuture.dueAt.slice(0, 10);
+    const promotedCount = (
+      this.db
+        .prepare("SELECT COUNT(*) AS count FROM review_queue WHERE due_at > ? AND substr(due_at, 1, 10) = ?")
+        .get(nowIso, promotedDate) as { count: number }
+    ).count;
+
+    if (promotedCount > 0) {
+      this.db
+        .prepare("UPDATE review_queue SET due_at = ? WHERE due_at > ? AND substr(due_at, 1, 10) = ?")
+        .run(nowIso, nowIso, promotedDate);
+    }
+
+    return {
+      promotedCount,
+      promotedDate,
+      dueAt: nowIso
+    };
   }
 
   getDueReviews(now: string): ReviewQueueState[] {

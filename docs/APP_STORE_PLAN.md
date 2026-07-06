@@ -51,13 +51,14 @@ status, or last-synced timestamp. Real CloudKit sync remains post-1.0.
 
 History:
 
-1. Performance chart and headline stats aggregate only the current 20-row page
+1. Rating trend chart inputs aggregate only the current 20-row page
    (`buildHistoryView` builds `puzzleStats` from the paged slice; the chart
-   further takes `.slice(-8)`). Compute chart/summary metrics in the domain
+   further takes `.slice(-8)`). Compute the rating trend series in the domain
    over the full filtered range, not the page.
    Status: complete. `HistoryView.performance` is computed in the core domain
-   from the full filtered range before paging, while `HistoryView.attempts`
-   remains the paged row slice.
+   from the full filtered range before paging. The mobile History screen now
+   renders only the selected rating bucket's rating trend line, while
+   `HistoryView.attempts` remains the paged row slice.
 2. Mode and sprint-speed filters are degenerate: the history view is scoped to
    one `ratingKey`, which already encodes mode and speed, so other mode/speed
    chips silently return empty pages. Either make the history view span rating
@@ -67,12 +68,13 @@ History:
    bucket as the required mode/speed context and removes separate History
    mode/speed chips that could only narrow the selected bucket into empty or
    redundant states.
-3. "Wrong in the last 7 days" chip is UI state that desyncs from the actual
-   query when range/result change afterward; toggling it off force-resets the
-   range. Derive the chip state from the query.
-   Status: complete. The chip is selected only when the active History query is
-   exactly `7d + wrong`; changing the range or result filter updates the chip
-   automatically, and clearing the chip removes only the wrong-result filter.
+3. The History wrong-only shortcut must not force-reset the active time range
+   and must not change the rating trend chart.
+   Status: complete. The front-page shortcut toggles only the wrong-result row
+   filter. History now shows only the selected rating bucket's rating trend
+   line, and that series intentionally ignores the correct/wrong result filter
+   while still respecting time range, rating bucket, source, side, theme,
+   rating range, and review status.
 4. Row review-queue membership matches by `puzzleId` only while the
    review-status filter matches `puzzleId + mode + ratingKey`; a row can show a
    due date from another mode's queue entry. Unify on the keyed match.
@@ -134,7 +136,7 @@ Review queue:
 Arrow Duel / analysis:
 
 11. Candidate order is seeded per live session but not stored with the attempt;
-    review reconstruction uses a default seed, so replayed A/B order can differ
+    review reconstruction uses a default seed, so replayed candidate order can differ
     from what the user actually saw. Persist the order (or seed) on the attempt
     and reuse it in review (spec requires stored-with-attempt).
     Status: complete. Arrow Duel attempts now persist the displayed candidate
@@ -329,10 +331,12 @@ correct move, mistake-review navigation). Target flow list (each a Detox spec
 asserting through public UI and stable testIDs):
 
 1. Standard sprint fail → Sprint Results fields → Play Again. *(added 2026-07-03)*
-2. Arrow Duel choice via candidate chip → score strip updates. *(added 2026-07-03)*
+2. Arrow Duel choice via a board candidate move → score strip updates.
+   Candidate arrows are the input surface; separate A/B chips are intentionally
+   absent. *(added 2026-07-03; updated 2026-07-05)*
 3. Sprint mistakes → Review tab shows scheduled queue state and next-due
    estimate. *(added 2026-07-03)*
-4. History after a sprint: rows render, Wrong-7d filter, open a row into
+4. History after a sprint: rows render, wrong-only filter, open a row into
    Analysis Review, navigate, exit. *(added 2026-07-03)*
 5. Custom sprint: open setup, change timing, live target-count update, start
    session, abandon with confirmation. *(added 2026-07-03)*
@@ -355,6 +359,10 @@ asserting through public UI and stable testIDs):
    that reports authorized permission, schedules a local review reminder from
    Settings, asserts the scheduled payload, and clears it when reminders are
    turned off.)*
+10. Dev/test Review controls for time-shifting the next future due review date
+   and scheduling a short-delay test notification through the same storage and
+   notification interfaces used by production code. *(component covered; dev
+   controls must not ship in release builds.)*
 
 ## Milestone 7 — Core Pack expansion to the full offline library
 
@@ -389,7 +397,8 @@ lockfile requires `pnpm mobile:ios` before any simulator verification.
 
 ## Out of scope for 1.0
 
-- Pack downloading/import/removal (Packs tab stays bundled-only).
+- Pack downloading/import/removal and the Packs tab. Puzzle data attribution
+  lives in Settings for 1.0.
 - Game Review.
 - Android.
 - Chess.com / Lichess account import.

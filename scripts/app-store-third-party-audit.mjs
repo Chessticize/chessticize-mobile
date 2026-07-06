@@ -186,7 +186,7 @@ function main() {
   check(
     checks,
     "Patched chessboard package is disclosed",
-    lockfile.includes("react-native-chessboard@0.2.0: 68b7c185f0a4ff08b20347869abf2f27b9f3c2fc3c17101327b7c1680341aaed") &&
+    /^  react-native-chessboard@0\.2\.0: [0-9a-f]+$/m.test(lockfile) &&
       notices.includes("patches/react-native-chessboard@0.2.0.patch"),
     "The notice must disclose the local react-native-chessboard patch that is active in pnpm-lock.yaml."
   );

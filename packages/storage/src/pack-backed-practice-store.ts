@@ -19,6 +19,7 @@ import type {
   LocalDataExport,
   PracticeSettings,
   PracticeStore,
+  ReviewQueueDuePromotionResult,
   ReviewReminderPreference
 } from "./practice-store.ts";
 import type { ReviewReminderSettings } from "../../core/src/index.ts";
@@ -153,6 +154,10 @@ export class PackBackedPracticeStore implements PracticeStore {
 
   pruneOrphanedReviewQueue(): number {
     return this.userStore.pruneOrphanedReviewQueue();
+  }
+
+  promoteNextFutureReviewsToDue(now: string): ReviewQueueDuePromotionResult {
+    return this.userStore.promoteNextFutureReviewsToDue(now);
   }
 
   getDueReviews(now: string): ReviewQueueState[] {

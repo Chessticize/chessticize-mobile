@@ -19,7 +19,7 @@ Use this skill before changing Chessticize Mobile behavior or declaring work com
    - CLI E2E should start the real CLI and interact through stdin/stdout or public command interfaces, not by calling services directly.
 
 3. **Mobile component behavior**
-   - For normal UI state, labels, tabs, timers, history filters, settings toggles, pack rows, and service wiring, use Jest/component tests.
+   - For normal UI state, labels, tabs, timers, history filters, settings toggles, Settings source/license rows, and service wiring, use Jest/component tests.
    - Prefer `apps/mobile/__tests__/PracticePocScreen.test.tsx` style tests before simulator tests.
    - Mock only external/native rendering boundaries that Jest cannot host, such as the chessboard component. Keep assertions on public UI behavior, testIDs, accessibility labels, and user-visible text.
 
@@ -74,7 +74,7 @@ Component tests should cover:
 - Standard sprint start, board move callback wiring, timer/progress/mistake labels, abandon/reset, and summary behavior.
 - Arrow Duel candidate display, non-candidate wrong moves, feedback colors, and review text.
 - History filters and performance summaries.
-- Settings/Packs reachability and local-only toggles.
+- Settings reachability, puzzle source/license attribution, and local-only toggles.
 
 Do not start the simulator for every UI text/layout/state change. If `react-native-chessboard` is mocked in Jest, remember that Jest proves prop wiring and UI state, not real piece rendering or gestures.
 
@@ -85,10 +85,10 @@ Use this when a change affects native or rendered behavior:
 ```sh
 pnpm mobile:doctor:ios
 pnpm mobile:e2e:build:ios
-DETOX_IOS_DEVICE="iPhone 17" pnpm mobile:e2e:test:ios
+DETOX_IOS_DEVICE="iPhone 17-Detox" pnpm mobile:e2e:test:ios
 ```
 
-Replace `iPhone 17` with an installed simulator from:
+Use a dedicated Detox simulator, not the simulator used for manual testing. Detox specs call `device.launchApp({ delete: true })`, which resets the app sandbox and deletes local SQLite history, sprint sessions, and review queue data. Replace `iPhone 17-Detox` with another dedicated installed simulator from:
 
 ```sh
 xcrun simctl list devices available
