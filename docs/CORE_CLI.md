@@ -31,6 +31,10 @@ Arrow Duel uses the original pre-puzzle FEN. The candidate moves are:
 
 When the user chooses the wrong Arrow Duel move, the review payload includes both colored arrows plus the stored punishment line prefix.
 
+## Rating Semantics
+
+Sprint ratings use the same server-compatible Glicko-2 shape as `chessticize-server`: a new rating bucket starts at 600 with rating deviation 350 and volatility 0.06, and ratings are floored at 600. A completed sprint is one rated game against a system opponent at the user's current rating. Winning the first sprint from a fresh 600 bucket moves the rating to about 775, so cold-start calibration is intentionally much faster than a fixed-K Elo update. Failing at the floor keeps the rating at 600 while still reducing rating deviation.
+
 ## Review And History Semantics
 
 The backend distinguishes two concepts that are both easy to call "review" in casual product discussion:

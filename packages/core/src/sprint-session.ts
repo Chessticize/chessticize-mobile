@@ -3,12 +3,13 @@ import type {
   CurrentPuzzleState,
   Puzzle,
   PuzzleFeedback,
+  RatingRecord,
   SprintCommandResult,
   SprintConfig,
   SprintEndReason,
   SprintState
 } from "./types.ts";
-import { calculateRatingUpdate } from "./ratings.ts";
+import { calculateSprintRatingChange, DEFAULT_RATING_DEVIATION, DEFAULT_VOLATILITY } from "./ratings.ts";
 import { beginArrowDuelPuzzle, beginLinePuzzle, submitArrowDuelChoice, submitLineMove } from "./puzzle-session.ts";
 
 export function startSprint(input: {
@@ -16,6 +17,7 @@ export function startSprint(input: {
   config: SprintConfig;
   puzzles: Puzzle[];
   ratingBefore: number;
+  ratingBeforeRecord?: RatingRecord;
   now: string;
 }): SprintState {
   if (input.puzzles.length === 0) {
@@ -36,7 +38,10 @@ export function startSprint(input: {
     bestStreak: 0,
     currentPuzzleIndex: 0,
     puzzles: input.puzzles,
-    ratingBefore: input.ratingBefore
+    ratingBefore: input.ratingBefore,
+    ratingGamesBefore: input.ratingBeforeRecord?.games ?? 0,
+    ratingDeviationBefore: input.ratingBeforeRecord?.ratingDeviation ?? DEFAULT_RATING_DEVIATION,
+    volatilityBefore: input.ratingBeforeRecord?.volatility ?? DEFAULT_VOLATILITY
   };
   return {
     ...state,
@@ -261,13 +266,21 @@ function completeSprintWithRating(
   reason: SprintEndReason,
   now: string
 ): SprintState {
-  const opponentRating = averagePuzzleRating(state.puzzles.slice(0, Math.max(1, state.currentPuzzleIndex + 1)));
-  const ratingAfter = calculateRatingUpdate({
-    currentRating: state.ratingBefore,
-    opponentRating,
-    score: status === "won" ? 1 : 0
+  const ratingChange = calculateSprintRatingChange({
+    rating: {
+      rating: state.ratingBefore,
+      ratingDeviation: state.ratingDeviationBefore,
+      volatility: state.volatilityBefore,
+      games: state.ratingGamesBefore ?? 0
+    },
+    won: status === "won"
   });
-  return completeSprint({ ...state, ratingAfter }, status, reason, now);
+  return completeSprint({
+    ...state,
+    ratingAfter: ratingChange.ratingAfter,
+    ratingDeviationAfter: ratingChange.ratingDeviationAfter,
+    volatilityAfter: ratingChange.volatilityAfter
+  }, status, reason, now);
 }
 
 function completeSprint(
@@ -288,11 +301,6 @@ function completeSprint(
     endReason: reason,
     completedAt: new Date(now).toISOString()
   };
-}
-
-function averagePuzzleRating(puzzles: Puzzle[]): number {
-  const total = puzzles.reduce((sum, puzzle) => sum + puzzle.rating, 0);
-  return Math.round(total / puzzles.length);
 }
 
 function buildCurrentPuzzle(mode: SprintConfig["mode"], puzzle: Puzzle | undefined, seed: string): CurrentPuzzleState {

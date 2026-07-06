@@ -2,6 +2,7 @@ import {
   buildHistoryView,
   createDefaultRating,
   filterHistoryAttemptsForQuery,
+  normalizeRatingRecord,
   resetRating as resetRatingRecord,
   buildSessionMistakeReview,
   resolveHistoryRange,
@@ -73,7 +74,7 @@ export class MemoryStore implements PracticeStore {
   getRating(key: string): RatingRecord {
     const existing = this.ratings.get(key);
     if (existing) {
-      return existing;
+      return normalizeRatingRecord(existing);
     }
     const created = createDefaultRating(key);
     this.ratings.set(key, created);
@@ -81,7 +82,9 @@ export class MemoryStore implements PracticeStore {
   }
 
   listRatings(): RatingRecord[] {
-    return [...this.ratings.values()].sort((left, right) => left.key.localeCompare(right.key));
+    return [...this.ratings.values()]
+      .map((rating) => normalizeRatingRecord(rating))
+      .sort((left, right) => left.key.localeCompare(right.key));
   }
 
   listPlayedRatings(): RatingRecord[] {
@@ -100,7 +103,7 @@ export class MemoryStore implements PracticeStore {
   }
 
   saveRating(record: RatingRecord): void {
-    this.ratings.set(record.key, record);
+    this.ratings.set(record.key, normalizeRatingRecord(record));
   }
 
   resetRating(key: string): RatingRecord {

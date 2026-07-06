@@ -3,6 +3,7 @@ import {
   buildSessionMistakeReview,
   createDefaultRating,
   filterHistoryAttemptsForQuery,
+  normalizeRatingRecord,
   resetRating as resetRatingRecord,
   resolveHistoryRange,
   scheduleMistakeForContext,
@@ -82,6 +83,8 @@ interface RatingRow {
   key: string;
   generation: number;
   rating: number;
+  rating_deviation: number | null;
+  volatility: number | null;
   games: number;
 }
 
@@ -161,6 +164,7 @@ export class SyncSQLiteStore implements PracticeStore {
   migrate(): void {
     this.db.exec(SCHEMA_SQL);
     this.ensureAttemptCandidateOrderColumn();
+    this.ensureRatingGlickoColumns();
   }
 
   transaction<T>(work: () => T): T {
@@ -253,12 +257,7 @@ export class SyncSQLiteStore implements PracticeStore {
       this.saveRating(created);
       return created;
     }
-    return {
-      key: row.key,
-      generation: row.generation,
-      rating: row.rating,
-      games: row.games
-    };
+    return ratingFromRow(row);
   }
 
   listRatings(): RatingRecord[] {
@@ -274,12 +273,7 @@ export class SyncSQLiteStore implements PracticeStore {
          ORDER BY r.key ASC`
       )
       .all() as RatingRow[];
-    return rows.map((row) => ({
-      key: row.key,
-      generation: row.generation,
-      rating: row.rating,
-      games: row.games
-    }));
+    return rows.map((row) => ratingFromRow(row));
   }
 
   listPlayedRatings(): RatingRecord[] {
@@ -301,21 +295,24 @@ export class SyncSQLiteStore implements PracticeStore {
          ORDER BY r.key ASC`
       )
       .all() as RatingRow[];
-    return rows.map((row) => ({
-      key: row.key,
-      generation: row.generation,
-      rating: row.rating,
-      games: row.games
-    }));
+    return rows.map((row) => ratingFromRow(row));
   }
 
   saveRating(record: RatingRecord): void {
+    const normalized = normalizeRatingRecord(record);
     this.db
       .prepare(
-        `INSERT OR REPLACE INTO ratings (key, generation, rating, games)
-         VALUES (?, ?, ?, ?)`
+        `INSERT OR REPLACE INTO ratings (key, generation, rating, games, rating_deviation, volatility)
+         VALUES (?, ?, ?, ?, ?, ?)`
       )
-      .run(record.key, record.generation, record.rating, record.games);
+      .run(
+        normalized.key,
+        normalized.generation,
+        normalized.rating,
+        normalized.games,
+        normalized.ratingDeviation ?? null,
+        normalized.volatility ?? null
+      );
   }
 
   resetRating(key: string): RatingRecord {
@@ -878,6 +875,16 @@ export class SyncSQLiteStore implements PracticeStore {
       this.db.exec("ALTER TABLE attempts ADD COLUMN arrow_duel_candidate_order_json TEXT");
     }
   }
+
+  private ensureRatingGlickoColumns(): void {
+    const columns = this.db.prepare("PRAGMA table_info(ratings)").all() as Array<{ name: string }>;
+    if (!columns.some((column) => column.name === "rating_deviation")) {
+      this.db.exec("ALTER TABLE ratings ADD COLUMN rating_deviation REAL NOT NULL DEFAULT 350");
+    }
+    if (!columns.some((column) => column.name === "volatility")) {
+      this.db.exec("ALTER TABLE ratings ADD COLUMN volatility REAL NOT NULL DEFAULT 0.06");
+    }
+  }
 }
 
 function puzzleFromRow(row: PuzzleRow): Puzzle {
@@ -899,6 +906,17 @@ function puzzleFromRow(row: PuzzleRow): Puzzle {
       ? {}
       : { stockfishEvalAfterFirstMove: row.stockfish_eval_after_first_move })
   };
+}
+
+function ratingFromRow(row: RatingRow): RatingRecord {
+  return normalizeRatingRecord({
+    key: row.key,
+    generation: row.generation,
+    rating: row.rating,
+    ...(row.rating_deviation === null ? {} : { ratingDeviation: row.rating_deviation }),
+    ...(row.volatility === null ? {} : { volatility: row.volatility }),
+    games: row.games
+  });
 }
 
 function reviewFromRow(row: ReviewRow): ReviewQueueState {
@@ -1008,6 +1026,8 @@ CREATE TABLE IF NOT EXISTS ratings (
   key TEXT NOT NULL,
   generation INTEGER NOT NULL,
   rating INTEGER NOT NULL,
+  rating_deviation REAL NOT NULL DEFAULT 350,
+  volatility REAL NOT NULL DEFAULT 0.06,
   games INTEGER NOT NULL,
   PRIMARY KEY (key, generation)
 );

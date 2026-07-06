@@ -1,6 +1,9 @@
 import {
   abandonSprint as abandonSprintCore,
+  applySprintRatingChange,
   buildSprintConfig,
+  DEFAULT_RATING_DEVIATION,
+  DEFAULT_VOLATILITY,
   pauseSprint as pauseSprintCore,
   RATING_FLOOR,
   resumeSprint as resumeSprintCore,
@@ -73,6 +76,7 @@ export class PracticeService {
       config,
       puzzles,
       ratingBefore: rating.rating,
+      ratingBeforeRecord: rating,
       now
     });
     this.activeSprint = sprint;
@@ -418,11 +422,15 @@ export class PracticeService {
     this.store.updateSprintSession(state);
     if (state.ratingAfter !== undefined) {
       const rating = this.store.getRating(state.config.ratingKey);
-      this.store.saveRating({
-        ...rating,
-        rating: state.ratingAfter,
-        games: rating.games + 1
-      });
+      this.store.saveRating(applySprintRatingChange(rating, {
+        ratingBefore: state.ratingBefore,
+        ratingAfter: state.ratingAfter,
+        ratingChange: state.ratingAfter - state.ratingBefore,
+        ratingDeviationBefore: state.ratingDeviationBefore ?? rating.ratingDeviation ?? DEFAULT_RATING_DEVIATION,
+        ratingDeviationAfter: state.ratingDeviationAfter ?? rating.ratingDeviation ?? DEFAULT_RATING_DEVIATION,
+        volatilityBefore: state.volatilityBefore ?? rating.volatility ?? DEFAULT_VOLATILITY,
+        volatilityAfter: state.volatilityAfter ?? rating.volatility ?? DEFAULT_VOLATILITY
+      }));
     }
   }
 }
