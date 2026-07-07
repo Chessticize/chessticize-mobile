@@ -503,6 +503,27 @@ describe("PracticePocScreen", () => {
     expect(collectText(renderer.root)).not.toContain("000hf · standard");
   });
 
+  it("submits standard puzzle moves with tap selection", async () => {
+    const renderer = renderStandardSequenceScreen();
+
+    startStandardSprint(renderer);
+
+    await boardTap(renderer, "e2");
+    expectSessionMistakes(renderer, 0);
+    expectText(renderer, "0 / 15");
+
+    await boardTap(renderer, "e6");
+    expectSessionMistakes(renderer, 0);
+    expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
+
+    await settleFeedbackSnapshot();
+    await boardTap(renderer, "e6");
+    await boardTap(renderer, "f7");
+
+    expectSessionMistakes(renderer, 0);
+    expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
+  });
+
   it("pauses an active sprint with explicit resume controls", () => {
     const renderer = renderStandardSequenceScreen();
 
@@ -518,6 +539,41 @@ describe("PracticePocScreen", () => {
     press(renderer, "paused-session-resume");
     expect(findByTestId(renderer, "session-board")).toBeTruthy();
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
+  });
+
+  it("preserves the remaining time while a sprint is paused", () => {
+    jest.setSystemTime(new Date("2026-06-20T00:00:00.000Z"));
+    const service = createMobilePracticeService("random1000");
+    const renderer = renderScreen({ practiceService: service });
+
+    startStandardSprint(renderer);
+    act(() => {
+      jest.advanceTimersByTime(10_000);
+    });
+    expect(collectText(findByTestId(renderer, "session-timer"))).toBe("04:50");
+
+    press(renderer, "session-pause");
+    expect(service.getActiveSprint()?.status).toBe("paused");
+    expect(service.getActiveSprint()?.pausedAt).toBe("2026-06-20T00:00:10.000Z");
+    expect(collectText(findByTestId(renderer, "session-timer"))).toBe("04:50");
+
+    act(() => {
+      jest.advanceTimersByTime(300_000);
+    });
+    expect(service.getActiveSprint()?.status).toBe("paused");
+    expect(collectText(findByTestId(renderer, "session-timer"))).toBe("04:50");
+
+    press(renderer, "paused-session-resume");
+    expect(service.getActiveSprint()?.status).toBe("active");
+    expect(service.getActiveSprint()?.totalPausedMs).toBe(300_000);
+    expect(service.getActiveSprint()?.deadlineAt).toBe("2026-06-20T00:10:00.000Z");
+    expect(collectText(findByTestId(renderer, "session-timer"))).toBe("04:50");
+
+    act(() => {
+      jest.advanceTimersByTime(1_000);
+    });
+    expect(collectText(findByTestId(renderer, "session-timer"))).toBe("04:49");
+    expect(service.getActiveSprint()?.status).toBe("active");
   });
 
   it("locks the board during an opponent reply and ignores attempted extra user moves", async () => {
@@ -2951,6 +3007,20 @@ async function boardMove(
   options: { stateFen?: string | null } = {}
 ): Promise<void> {
   await boardMoveOnBoard(findByTestId(renderer, "mock-chessboard"), move, options);
+}
+
+async function boardTap(
+  renderer: TestRenderer.ReactTestRenderer,
+  square: string
+): Promise<void> {
+  const board = findByTestId(renderer, "mock-chessboard");
+  if (board.props.gestureEnabled === false) {
+    throw new Error(`Board gesture is disabled before tapping ${square}`);
+  }
+  await act(async () => {
+    board.props.mockTapSquare(square);
+    await Promise.resolve();
+  });
 }
 
 async function boardMoveOnBoard(

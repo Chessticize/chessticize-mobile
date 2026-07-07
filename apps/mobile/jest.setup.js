@@ -5,6 +5,7 @@ jest.mock('react-native-chessboard', () => {
   return React.forwardRef(function ChessboardMock(props, ref) {
     const chessRef = React.useRef(new Chess(props.fen));
     const latestFenRef = React.useRef(props.fen);
+    const selectedSquareRef = React.useRef(null);
     const [pendingPromotion, setPendingPromotion] = React.useState(null);
     const resetBoardMock = React.useMemo(() => jest.fn((fen) => {
       try {
@@ -12,11 +13,13 @@ jest.mock('react-native-chessboard', () => {
       } catch {
         chessRef.current = new Chess(latestFenRef.current);
       }
+      selectedSquareRef.current = null;
     }), []);
 
     React.useEffect(() => {
       latestFenRef.current = props.fen;
       chessRef.current = new Chess(props.fen);
+      selectedSquareRef.current = null;
       setPendingPromotion(null);
     }, [props.fen]);
 
@@ -46,6 +49,33 @@ jest.mock('react-native-chessboard', () => {
       return move;
     }
 
+    function tapSquare(square) {
+      const piece = chessRef.current.get(square);
+      const allowedColor = props.draggableColor ?? chessRef.current.turn();
+      const isOwnPiece = piece && piece.color === allowedColor;
+      const selectedSquare = selectedSquareRef.current;
+
+      if (!selectedSquare) {
+        if (isOwnPiece) {
+          selectedSquareRef.current = square;
+        }
+        return undefined;
+      }
+
+      if (selectedSquare === square) {
+        selectedSquareRef.current = null;
+        return undefined;
+      }
+
+      if (isOwnPiece) {
+        selectedSquareRef.current = square;
+        return undefined;
+      }
+
+      selectedSquareRef.current = null;
+      return playMove({ from: selectedSquare, to: square });
+    }
+
     React.useImperativeHandle(ref, () => ({
       move: async ({ from, to, promotion }) => {
         return playMove({ from, to, promotion });
@@ -55,7 +85,7 @@ jest.mock('react-native-chessboard', () => {
 
     return React.createElement(
       'Chessboard',
-      { ...props, mockMove: playMove, mockResetBoard: resetBoardMock, testID: 'mock-chessboard' },
+      { ...props, mockMove: playMove, mockTapSquare: tapSquare, mockResetBoard: resetBoardMock, testID: 'mock-chessboard' },
       pendingPromotion
         ? React.createElement(
           'PromotionDialog',

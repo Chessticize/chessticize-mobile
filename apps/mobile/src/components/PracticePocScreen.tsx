@@ -446,6 +446,13 @@ export function PracticePocScreen({
     return new Date(nowMsRef.current).toISOString();
   }
 
+  function captureLiveNowIso(): string {
+    const liveNowMs = currentTimeMs();
+    nowMsRef.current = liveNowMs;
+    setNowMs(liveNowMs);
+    return new Date(liveNowMs).toISOString();
+  }
+
   function refreshState(): void {
     service.pruneOrphanedReviewQueue();
     setAttempts(service.listHistory() as AttemptEvent[]);
@@ -681,7 +688,7 @@ export function PracticePocScreen({
       return;
     }
     try {
-      const nextState = service.abandonSprint(nowIso());
+      const nextState = service.abandonSprint(captureLiveNowIso());
       commitState(nextState);
       setResumableSprint(null);
       setFeedback(null);
@@ -702,7 +709,7 @@ export function PracticePocScreen({
       return;
     }
     try {
-      const paused = service.pauseSprint(nowIso());
+      const paused = service.pauseSprint(captureLiveNowIso());
       commitState(paused);
       commitBoardInputLocked(true, `pause-${reason}`, paused.currentPuzzle?.puzzle.id ?? null);
       clearFeedbackSnapshot();
@@ -956,7 +963,7 @@ export function PracticePocScreen({
     setError(null);
     try {
       const resumed = nextSprint.status === "paused" && service.getActiveSprint()?.id === nextSprint.id
-        ? service.resumeSprint(nowIso())
+        ? service.resumeSprint(captureLiveNowIso())
         : nextSprint;
       setMode(resumed.config.mode);
       setSessionMistakeReviewItems([]);
@@ -1159,7 +1166,10 @@ export function PracticePocScreen({
 
   const currentPuzzle = state?.currentPuzzle;
   const sprintElapsedMs = state ? Math.max(0, nowMs - new Date(state.startedAt).getTime()) : 0;
-  const remainingMs = state ? Math.max(0, new Date(state.deadlineAt).getTime() - nowMs) : 0;
+  const remainingClockMs = state?.status === "paused" && state.pausedAt
+    ? new Date(state.pausedAt).getTime()
+    : nowMs;
+  const remainingMs = state ? Math.max(0, new Date(state.deadlineAt).getTime() - remainingClockMs) : 0;
   const timerText = formatDuration(Math.max(0, Math.floor(remainingMs / 1000)));
   const currentBoardFen = boardFen ?? currentPuzzle?.currentFen ?? null;
   const displayedPuzzle = feedbackSnapshot?.currentPuzzle ?? currentPuzzle;
