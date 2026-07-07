@@ -344,7 +344,7 @@ index 26deda8bb43c022624db07d6ea463a1028f082f9..529e876aeb91da1ce9324c1c4a45b374
 
        // Invalid move - snap back to original position and clear selection
        const originalPos = (0, _useBoardState.squareToPosition)(square, pieceSize, flipped);
-@@ -187,7 +220,8 @@ const useBoardGesture = ({
+@@ -187,11 +220,14 @@ const useBoardGesture = ({
        const selectedSquare = boardState.selectedSquare.get();
        const piece = boardState.squares[square].piece.get();
        const turn = boardState.turn.get();
@@ -354,7 +354,19 @@ index 26deda8bb43c022624db07d6ea463a1028f082f9..529e876aeb91da1ce9324c1c4a45b374
 
        // Case 1: No piece selected - try to select own piece
        if (!selectedSquare) {
-@@ -217,14 +251,24 @@ const useBoardGesture = ({
+         if (isOwnPiece) {
++          boardState.selectedSquare.set(square);
++          boardState.validMoves.set([]);
+           (0, _reactNativeWorklets.scheduleOnRN)(handleSelectPiece, square);
+         }
+         return;
+@@ -213,18 +249,30 @@ const useBoardGesture = ({
+
+       // Case 4: Tapped on another own piece - switch selection
+       if (isOwnPiece) {
++        boardState.selectedSquare.set(square);
++        boardState.validMoves.set([]);
+         (0, _reactNativeWorklets.scheduleOnRN)(handleSelectPiece, square);
          return;
        }
 
@@ -786,7 +798,7 @@ index 504126e4dc0a469cf5b00913e176e360322a1194..a0d4318682344ed7ac18f53044a14cd6
 
        // Invalid move - snap back to original position and clear selection
        const originalPos = squareToPosition(square, pieceSize, flipped);
-@@ -181,7 +214,8 @@ export const useBoardGesture = ({
+@@ -181,11 +214,14 @@ export const useBoardGesture = ({
        const selectedSquare = boardState.selectedSquare.get();
        const piece = boardState.squares[square].piece.get();
        const turn = boardState.turn.get();
@@ -796,7 +808,19 @@ index 504126e4dc0a469cf5b00913e176e360322a1194..a0d4318682344ed7ac18f53044a14cd6
 
        // Case 1: No piece selected - try to select own piece
        if (!selectedSquare) {
-@@ -211,14 +245,24 @@ export const useBoardGesture = ({
+         if (isOwnPiece) {
++          boardState.selectedSquare.set(square);
++          boardState.validMoves.set([]);
+           scheduleOnRN(handleSelectPiece, square);
+         }
+         return;
+@@ -207,18 +243,30 @@ export const useBoardGesture = ({
+
+       // Case 4: Tapped on another own piece - switch selection
+       if (isOwnPiece) {
++        boardState.selectedSquare.set(square);
++        boardState.validMoves.set([]);
+         scheduleOnRN(handleSelectPiece, square);
          return;
        }
 
@@ -1455,7 +1479,7 @@ index 92df972f7ec3c671308e8cc0e6cd275469a7144d..f221ae108ff5de6c665753939bdd52eb
          // Invalid move - snap back to original position and clear selection
          const originalPos = squareToPosition(square, pieceSize, flipped);
          squareState.translateX.set(
-@@ -221,7 +254,8 @@ export const useBoardGesture = ({
+@@ -221,11 +254,14 @@ export const useBoardGesture = ({
          const selectedSquare = boardState.selectedSquare.get();
          const piece = boardState.squares[square].piece.get();
          const turn = boardState.turn.get();
@@ -1465,7 +1489,19 @@ index 92df972f7ec3c671308e8cc0e6cd275469a7144d..f221ae108ff5de6c665753939bdd52eb
 
          // Case 1: No piece selected - try to select own piece
          if (!selectedSquare) {
-@@ -251,7 +285,17 @@ export const useBoardGesture = ({
+           if (isOwnPiece) {
++            boardState.selectedSquare.set(square);
++            boardState.validMoves.set([]);
+             scheduleOnRN(handleSelectPiece, square);
+           }
+           return;
+@@ -247,28 +283,41 @@ export const useBoardGesture = ({
+
+         // Case 4: Tapped on another own piece - switch selection
+         if (isOwnPiece) {
++          boardState.selectedSquare.set(square);
++          boardState.validMoves.set([]);
+           scheduleOnRN(handleSelectPiece, square);
            return;
          }
 
@@ -1484,7 +1520,17 @@ index 92df972f7ec3c671308e8cc0e6cd275469a7144d..f221ae108ff5de6c665753939bdd52eb
          boardState.selectedSquare.set(null);
          boardState.validMoves.set([]);
        });
-@@ -269,6 +313,7 @@ export const useBoardGesture = ({
+
+     // Combine gestures - pan takes precedence
+     return Gesture.Simultaneous(tapGesture, panGesture);
+   }, [
+     boardState,
+     pieceSize,
+     flipped,
+     draggedSquare,
+     dragStartX,
+     dragStartY,
+     touchOffsetX,
      touchOffsetY,
      animations,
      gestureEnabled,
