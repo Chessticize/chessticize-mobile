@@ -8,7 +8,7 @@ The current web app was reviewed in Chrome on `chessticize.com`, focused on Puzz
 
 ### Sanitized Capture Summary
 
-![Current web observed flow](assets/current-web-observed-flow.svg)
+![Current web observed flow](assets/current-web-observed-flow.png)
 
 ### Functional Inventory
 
@@ -30,6 +30,8 @@ The current web app was reviewed in Chrome on `chessticize.com`, focused on Puzz
 ## Complete App Design Board
 
 The design board below is a simulator-captured implementation snapshot from the current iOS app. It is useful for reviewing the actual product shape, but the written specifications in this document are authoritative for exact copy, scoring behavior, chart placement, licensing text, and remaining implementation details. The captured build is a development/test build, so it may show QA-only controls such as the puzzle source switch and review notification test actions that must remain hidden in release builds.
+
+All visual design artifacts in this document use PNG renderings. The full design board is captured from the simulator; the other rendered boards are implementation-target mockups that use the same color, spacing, board, control, and device-frame language.
 
 ![Complete mobile design board](assets/mobile-full-design-board.png)
 
@@ -72,7 +74,7 @@ Use a four-tab app shell:
 
 There should be no mobile Home tab, Game Review tab, or Packs tab in v1.
 
-![Mobile navigation flow](assets/mobile-navigation-flow.svg)
+![Mobile navigation flow](assets/mobile-navigation-flow.png)
 
 Navigation rules:
 
@@ -110,7 +112,7 @@ Primary flows:
 
 The current implementation and App Store target are still portrait-only, but the design target should support compact portrait, compact landscape, and regular-width iPad layouts. Unlocking the orientation mask should happen only after the adaptive shell, component tests, simulator screenshots, and App Store screenshot coverage are in place.
 
-![Adaptive mobile layouts](assets/mobile-adaptive-layouts.svg)
+![Adaptive mobile layouts](assets/mobile-adaptive-layouts.png)
 
 Adaptive classes:
 
@@ -188,7 +190,7 @@ Implementation notes:
 
 The mobile UI should feel like a quiet training tool, not a marketing page.
 
-![Clean mobile palette](assets/mobile-color-palette.svg)
+![Clean mobile palette](assets/mobile-color-palette.png)
 
 Color tokens:
 
@@ -248,7 +250,7 @@ Core components:
 
 ### Practice Session
 
-![Mobile practice wireframe](assets/mobile-practice-wireframe.svg)
+![Mobile practice rendered design](assets/mobile-practice-wireframe.png)
 
 Practice session layout:
 
@@ -313,7 +315,7 @@ Developer/test-build controls:
 
 ### Arrow Duel Review
 
-![Mobile Arrow Duel review wireframe](assets/mobile-arrow-duel-review-wireframe.svg)
+![Mobile Arrow Duel review rendered design](assets/mobile-arrow-duel-review-wireframe.png)
 
 Arrow Duel Analysis Review behavior:
 
@@ -371,7 +373,7 @@ Terminal and guided-line states:
 
 ### Custom Sprint Setup
 
-![Mobile custom sprint setup wireframe](assets/mobile-custom-config-wireframe.svg)
+![Mobile custom sprint setup rendered design](assets/mobile-custom-config-wireframe.png)
 
 Custom sprint layout:
 
