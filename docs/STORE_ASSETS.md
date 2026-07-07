@@ -46,8 +46,10 @@ Chessticize Mobile is free and open source.
 
 ## Screenshot Requirements
 
-The app is iPhone-only for 1.0, so App Store Connect only needs iPhone
-screenshots. The original 1.0 plan called out 6.7" and 6.1" minimum coverage.
+The app targets iPhone and iPad for 1.0. The current automated capture plan
+covers the required iPhone screenshots; iPad App Store screenshots need a
+dedicated capture pass before submission. The original 1.0 plan called out 6.7"
+and 6.1" minimum iPhone coverage.
 Apple's current screenshot reference, rechecked on 2026-07-04, lists 6.9" as
 the required iPhone display group when the app runs on iPhone, with accepted
 portrait sizes `1260 x 2736`, `1290 x 2796`, and `1320 x 2868` pixels. The

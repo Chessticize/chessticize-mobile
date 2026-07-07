@@ -1,5 +1,5 @@
 diff --git a/lib/commonjs/components/promotion-dialog.js b/lib/commonjs/components/promotion-dialog.js
-index de72beac3b9cda50edb7a8f34b1630cfdd2bd8cf..00fc5f4c1093d47f56809fb07fc42d40e448ae7f 100644
+index de72beac3b9cda50edb7a8f34b1630cfdd2bd8cf..0bccb0fcd4305c749f11e01b738087a4e023e7b0 100644
 --- a/lib/commonjs/components/promotion-dialog.js
 +++ b/lib/commonjs/components/promotion-dialog.js
 @@ -6,35 +6,52 @@ Object.defineProperty(exports, "__esModule", {
@@ -145,7 +145,7 @@ index 7ddc0516545a4e1e16774f520123aaa883c235c0..748653cf34925669683bd41c868e191c
  });
  const GestureBoard = exports.GestureBoard = /*#__PURE__*/(0, _react.forwardRef)(({
 diff --git a/lib/commonjs/components/skia/skia-dots.js b/lib/commonjs/components/skia/skia-dots.js
-index 99152d0e193c3ff32b49cb57c78a5b09799a8617..24c27cf6c6a713472f3eb0d6e377a38ffab2f7f2 100644
+index 99152d0e193c3ff32b49cb57c78a5b09799a8617..27bd528cb50e65fefa778afe525945ca29584669 100644
 --- a/lib/commonjs/components/skia/skia-dots.js
 +++ b/lib/commonjs/components/skia/skia-dots.js
 @@ -9,36 +9,58 @@ var _reactNativeSkia = require("@shopify/react-native-skia");
@@ -222,8 +222,9 @@ index 99152d0e193c3ff32b49cb57c78a5b09799a8617..24c27cf6c6a713472f3eb0d6e377a38f
  });
  SkiaDots.displayName = 'SkiaDots';
  //# sourceMappingURL=skia-dots.js.map
+\ No newline at end of file
 diff --git a/lib/commonjs/hooks/use-board-gesture.js b/lib/commonjs/hooks/use-board-gesture.js
-index 26deda8bb43c022624db07d6ea463a1028f082f9..529e876aeb91da1ce9324c1c4a45b3746ba3ebb2 100644
+index 26deda8bb43c022624db07d6ea463a1028f082f9..caa236f487c19d172085e0a32e2ea6882a252c90 100644
 --- a/lib/commonjs/hooks/use-board-gesture.js
 +++ b/lib/commonjs/hooks/use-board-gesture.js
 @@ -19,7 +19,8 @@ const useBoardGesture = ({
@@ -234,11 +235,17 @@ index 26deda8bb43c022624db07d6ea463a1028f082f9..529e876aeb91da1ce9324c1c4a45b374
 +    flipped,
 +    draggableColor
    } = config;
-
+ 
    // Track the currently dragged piece
-@@ -31,9 +32,13 @@ const useBoardGesture = ({
+@@ -29,11 +30,19 @@ const useBoardGesture = ({
+   // Offset between touch point and piece position (to follow finger exactly)
+   const touchOffsetX = (0, _reactNativeReanimated.useSharedValue)(0);
    const touchOffsetY = (0, _reactNativeReanimated.useSharedValue)(0);
-
++  // Square that was already selected when the current touch began. pan.onBegin
++  // pre-selects the touched piece on touch-down, so the tap handler needs this
++  // to tell a "toggle off" tap from the tap that created the selection.
++  const selectedAtTouchStart = (0, _reactNativeReanimated.useSharedValue)(null);
+ 
    // Stable callback for tryMove
 -  const handleTryMove = (0, _react.useCallback)((from, to) => {
 -    moveExecutor.tryMove(from, to);
@@ -250,11 +257,14 @@ index 26deda8bb43c022624db07d6ea463a1028f082f9..529e876aeb91da1ce9324c1c4a45b374
 +      }
 +    });
 +  }, [moveExecutor, onIllegalMove]);
-
+ 
    // Stable callback for selectPiece
    const handleSelectPiece = (0, _react.useCallback)(square => {
-@@ -57,16 +62,26 @@ const useBoardGesture = ({
+@@ -55,17 +64,32 @@ const useBoardGesture = ({
+         y
+       } = event;
        const square = (0, _useBoardState.positionToSquare)(x, y, pieceSize, flipped);
++      selectedAtTouchStart.set(boardState.selectedSquare.get());
        const squareState = boardState.squares[square];
        const piece = squareState.piece.get();
 -      if (piece) {
@@ -271,7 +281,7 @@ index 26deda8bb43c022624db07d6ea463a1028f082f9..529e876aeb91da1ce9324c1c4a45b374
 +      if (!piece || piece[0] !== allowedDragColor) {
 +        draggedSquare.set(null);
 +        return;
-       }
++      }
 +
 +      // Store drag start info (but don't start drag yet)
 +      draggedSquare.set(square);
@@ -285,11 +295,14 @@ index 26deda8bb43c022624db07d6ea463a1028f082f9..529e876aeb91da1ce9324c1c4a45b374
 +      // Start the valid-target calculation before the drag crosses the
 +      // min-distance threshold. Otherwise very fast drags can reach onEnd
 +      // before the RN-thread select callback has populated validMoves.
-+      (0, _reactNativeWorklets.scheduleOnRN)(handleSelectPiece, square);
++      // Skip when the square is already selected: validMoves are populated,
++      // and re-selecting could race a deselect issued by the tap handler.
++      if (boardState.selectedSquare.get() !== square) {
++        (0, _reactNativeWorklets.scheduleOnRN)(handleSelectPiece, square);
+       }
      }).onStart(() => {
        'worklet';
-
-@@ -76,16 +91,22 @@ const useBoardGesture = ({
+@@ -76,16 +100,22 @@ const useBoardGesture = ({
        const squareState = boardState.squares[square];
        const piece = squareState.piece.get();
        const turn = boardState.turn.get();
@@ -302,11 +315,11 @@ index 26deda8bb43c022624db07d6ea463a1028f082f9..529e876aeb91da1ce9324c1c4a45b374
 +        draggedSquare.set(null);
 +        return;
 +      }
-
+ 
        // Raise and scale the piece
        squareState.zIndex.set(100);
        squareState.scale.set((0, _reactNativeReanimated.withSpring)(1.1, animations.scale));
-
+ 
        // Only show valid moves (dots) for own pieces
 -      const isOwnPiece = piece && piece[0] === turn;
 -      if (isOwnPiece) {
@@ -315,18 +328,18 @@ index 26deda8bb43c022624db07d6ea463a1028f082f9..529e876aeb91da1ce9324c1c4a45b374
 +      (0, _reactNativeWorklets.scheduleOnRN)(handleSelectPiece, square);
      }).onUpdate(event => {
        'worklet';
-
-@@ -115,7 +136,8 @@ const useBoardGesture = ({
+ 
+@@ -115,7 +145,8 @@ const useBoardGesture = ({
        // Check if this is own piece - only own pieces can make moves
        const piece = squareState.piece.get();
        const turn = boardState.turn.get();
 -      const isOwnPiece = piece && piece[0] === turn;
 +      const allowedDragColor = draggableColor ?? turn;
 +      const isOwnPiece = piece && piece[0] === allowedDragColor;
-
+ 
        // If not own piece, just snap back (can't make moves with opponent's pieces)
        if (!isOwnPiece) {
-@@ -147,6 +169,17 @@ const useBoardGesture = ({
+@@ -147,6 +178,17 @@ const useBoardGesture = ({
          draggedSquare.set(null);
          return;
        }
@@ -341,23 +354,54 @@ index 26deda8bb43c022624db07d6ea463a1028f082f9..529e876aeb91da1ce9324c1c4a45b374
 +        draggedSquare.set(null);
 +        return;
 +      }
-
+ 
        // Invalid move - snap back to original position and clear selection
        const originalPos = (0, _useBoardState.squareToPosition)(square, pieceSize, flipped);
-@@ -187,7 +220,8 @@ const useBoardGesture = ({
+@@ -187,20 +229,30 @@ const useBoardGesture = ({
        const selectedSquare = boardState.selectedSquare.get();
        const piece = boardState.squares[square].piece.get();
        const turn = boardState.turn.get();
 -      const isOwnPiece = piece && piece[0] === turn;
 +      const allowedDragColor = draggableColor ?? turn;
 +      const isOwnPiece = piece && piece[0] === allowedDragColor;
-
+ 
        // Case 1: No piece selected - try to select own piece
        if (!selectedSquare) {
-@@ -217,14 +251,24 @@ const useBoardGesture = ({
+         if (isOwnPiece) {
++          boardState.selectedSquare.set(square);
++          boardState.validMoves.set([]);
+           (0, _reactNativeWorklets.scheduleOnRN)(handleSelectPiece, square);
+         }
          return;
        }
-
+ 
+-      // Case 2: Tapped on same piece - deselect
++      // Case 2: Tapped on same piece - deselect, but only when the piece
++      // was already selected before this touch began. pan.onBegin selects
++      // the touched piece on touch-down, so without this guard every quick
++      // tap would read its own selection here and immediately toggle it
++      // off (dots flash and vanish; only >maxDuration presses survived
++      // because the failed tap never ran onEnd).
+       if (square === selectedSquare) {
+-        boardState.selectedSquare.set(null);
+-        boardState.validMoves.set([]);
++        if (selectedAtTouchStart.get() === square) {
++          boardState.selectedSquare.set(null);
++          boardState.validMoves.set([]);
++        }
+         return;
+       }
+ 
+@@ -213,18 +265,31 @@ const useBoardGesture = ({
+ 
+       // Case 4: Tapped on another own piece - switch selection
+       if (isOwnPiece) {
++        boardState.selectedSquare.set(square);
++        boardState.validMoves.set([]);
+         (0, _reactNativeWorklets.scheduleOnRN)(handleSelectPiece, square);
+         return;
+       }
+ 
 -      // Case 5: Invalid target - deselect
 +      // Case 5: Valid moves may not have crossed from the RN thread to the
 +      // UI worklet yet after a fast source tap. Let the executor make the
@@ -373,16 +417,19 @@ index 26deda8bb43c022624db07d6ea463a1028f082f9..529e876aeb91da1ce9324c1c4a45b374
        boardState.selectedSquare.set(null);
        boardState.validMoves.set([]);
      });
-
-     // Combine gestures - pan takes precedence
-     return _reactNativeGestureHandler.Gesture.Simultaneous(tapGesture, panGesture);
+ 
+-    // Combine gestures - pan takes precedence
+-    return _reactNativeGestureHandler.Gesture.Simultaneous(tapGesture, panGesture);
 -  }, [boardState, pieceSize, flipped, draggedSquare, dragStartX, dragStartY, touchOffsetX, touchOffsetY, animations, gestureEnabled, handleTryMove, handleSelectPiece, handleIllegalMove]);
-+  }, [boardState, pieceSize, flipped, draggedSquare, dragStartX, dragStartY, touchOffsetX, touchOffsetY, animations, gestureEnabled, draggableColor, handleTryMove, handleSelectPiece, handleIllegalMove]);
++    // Tap should not wait for the pan candidate to settle. A real drag still
++    // wins once it crosses minDistance before the tap can activate on release.
++    return _reactNativeGestureHandler.Gesture.Race(tapGesture, panGesture);
++  }, [boardState, pieceSize, flipped, draggedSquare, dragStartX, dragStartY, touchOffsetX, touchOffsetY, selectedAtTouchStart, animations, gestureEnabled, draggableColor, handleTryMove, handleSelectPiece, handleIllegalMove]);
    return gesture;
  };
  exports.useBoardGesture = useBoardGesture;
 diff --git a/lib/commonjs/index.js b/lib/commonjs/index.js
-index 360d75d327324795ca72a43b37965b1ea2bc19d9..d537244ea686338203b8d82d5bd20f8f2d472ba5 100644
+index 360d75d327324795ca72a43b37965b1ea2bc19d9..2071f0fe1352a0f48d3c72d9a05350274737c1bf 100644
 --- a/lib/commonjs/index.js
 +++ b/lib/commonjs/index.js
 @@ -12,6 +12,7 @@ const Chessboard = exports.Chessboard = /*#__PURE__*/(0, _react.forwardRef)(({
@@ -402,7 +449,7 @@ index 360d75d327324795ca72a43b37965b1ea2bc19d9..d537244ea686338203b8d82d5bd20f8f
      withLetters: withLetters,
      withNumbers: withNumbers,
 diff --git a/lib/commonjs/state/board-state-context.js b/lib/commonjs/state/board-state-context.js
-index cfd52d5394e32d3972be93c85977c62f4ad30885..c053d8f58b807b27594c24a934c8537e58ddf75e 100644
+index cfd52d5394e32d3972be93c85977c62f4ad30885..297972ef10bbda6a19b00c88166ac3a916364387 100644
 --- a/lib/commonjs/state/board-state-context.js
 +++ b/lib/commonjs/state/board-state-context.js
 @@ -19,7 +19,9 @@ const defaultColors = {
@@ -442,7 +489,7 @@ index cfd52d5394e32d3972be93c85977c62f4ad30885..c053d8f58b807b27594c24a934c8537e
      boardState,
      chess
 diff --git a/lib/module/components/promotion-dialog.js b/lib/module/components/promotion-dialog.js
-index 5bf64b655079b16368383257bc53bc3bce4d8418..d85b789bcb8c53328caa8a0536100f5ac2137636 100644
+index 5bf64b655079b16368383257bc53bc3bce4d8418..6313910ecd52f23830722b3bd69ceb29e1991268 100644
 --- a/lib/module/components/promotion-dialog.js
 +++ b/lib/module/components/promotion-dialog.js
 @@ -1,32 +1,49 @@
@@ -587,7 +634,7 @@ index 79598f3cce08d079d2a004ed0563f1194fd7d31c..e9c4b9b6c3e29dfef7523ed53015031b
  });
  export const GestureBoard = /*#__PURE__*/forwardRef(({
 diff --git a/lib/module/components/skia/skia-dots.js b/lib/module/components/skia/skia-dots.js
-index 120f116f938d6bf19ed350321959c9c5a860b48a..5d8e884209b1142d6923281494c502f9a2f102eb 100644
+index 120f116f938d6bf19ed350321959c9c5a860b48a..863f4f5380a90afb2c2f1ed1508efe197b54782b 100644
 --- a/lib/module/components/skia/skia-dots.js
 +++ b/lib/module/components/skia/skia-dots.js
 @@ -2,36 +2,58 @@ import React from 'react';
@@ -664,8 +711,9 @@ index 120f116f938d6bf19ed350321959c9c5a860b48a..5d8e884209b1142d6923281494c502f9
  });
  SkiaDots.displayName = 'SkiaDots';
  //# sourceMappingURL=skia-dots.js.map
+\ No newline at end of file
 diff --git a/lib/module/hooks/use-board-gesture.js b/lib/module/hooks/use-board-gesture.js
-index 504126e4dc0a469cf5b00913e176e360322a1194..a0d4318682344ed7ac18f53044a14cd685dca8be 100644
+index 504126e4dc0a469cf5b00913e176e360322a1194..c035b1a9e5572e1b06b0fcabbf2d1fa1d09af49c 100644
 --- a/lib/module/hooks/use-board-gesture.js
 +++ b/lib/module/hooks/use-board-gesture.js
 @@ -13,7 +13,8 @@ export const useBoardGesture = ({
@@ -676,11 +724,17 @@ index 504126e4dc0a469cf5b00913e176e360322a1194..a0d4318682344ed7ac18f53044a14cd6
 +    flipped,
 +    draggableColor
    } = config;
-
+ 
    // Track the currently dragged piece
-@@ -25,9 +26,13 @@ export const useBoardGesture = ({
+@@ -23,11 +24,19 @@ export const useBoardGesture = ({
+   // Offset between touch point and piece position (to follow finger exactly)
+   const touchOffsetX = useSharedValue(0);
    const touchOffsetY = useSharedValue(0);
-
++  // Square that was already selected when the current touch began. pan.onBegin
++  // pre-selects the touched piece on touch-down, so the tap handler needs this
++  // to tell a "toggle off" tap from the tap that created the selection.
++  const selectedAtTouchStart = useSharedValue(null);
+ 
    // Stable callback for tryMove
 -  const handleTryMove = useCallback((from, to) => {
 -    moveExecutor.tryMove(from, to);
@@ -692,11 +746,14 @@ index 504126e4dc0a469cf5b00913e176e360322a1194..a0d4318682344ed7ac18f53044a14cd6
 +      }
 +    });
 +  }, [moveExecutor, onIllegalMove]);
-
+ 
    // Stable callback for selectPiece
    const handleSelectPiece = useCallback(square => {
-@@ -51,16 +56,26 @@ export const useBoardGesture = ({
+@@ -49,17 +58,32 @@ export const useBoardGesture = ({
+         y
+       } = event;
        const square = positionToSquare(x, y, pieceSize, flipped);
++      selectedAtTouchStart.set(boardState.selectedSquare.get());
        const squareState = boardState.squares[square];
        const piece = squareState.piece.get();
 -      if (piece) {
@@ -713,7 +770,7 @@ index 504126e4dc0a469cf5b00913e176e360322a1194..a0d4318682344ed7ac18f53044a14cd6
 +      if (!piece || piece[0] !== allowedDragColor) {
 +        draggedSquare.set(null);
 +        return;
-       }
++      }
 +
 +      // Store drag start info (but don't start drag yet)
 +      draggedSquare.set(square);
@@ -727,11 +784,14 @@ index 504126e4dc0a469cf5b00913e176e360322a1194..a0d4318682344ed7ac18f53044a14cd6
 +      // Start the valid-target calculation before the drag crosses the
 +      // min-distance threshold. Otherwise very fast drags can reach onEnd
 +      // before the RN-thread select callback has populated validMoves.
-+      scheduleOnRN(handleSelectPiece, square);
++      // Skip when the square is already selected: validMoves are populated,
++      // and re-selecting could race a deselect issued by the tap handler.
++      if (boardState.selectedSquare.get() !== square) {
++        scheduleOnRN(handleSelectPiece, square);
+       }
      }).onStart(() => {
        'worklet';
-
-@@ -70,16 +85,22 @@ export const useBoardGesture = ({
+@@ -70,16 +94,22 @@ export const useBoardGesture = ({
        const squareState = boardState.squares[square];
        const piece = squareState.piece.get();
        const turn = boardState.turn.get();
@@ -744,11 +804,11 @@ index 504126e4dc0a469cf5b00913e176e360322a1194..a0d4318682344ed7ac18f53044a14cd6
 +        draggedSquare.set(null);
 +        return;
 +      }
-
+ 
        // Raise and scale the piece
        squareState.zIndex.set(100);
        squareState.scale.set(withSpring(1.1, animations.scale));
-
+ 
        // Only show valid moves (dots) for own pieces
 -      const isOwnPiece = piece && piece[0] === turn;
 -      if (isOwnPiece) {
@@ -757,18 +817,18 @@ index 504126e4dc0a469cf5b00913e176e360322a1194..a0d4318682344ed7ac18f53044a14cd6
 +      scheduleOnRN(handleSelectPiece, square);
      }).onUpdate(event => {
        'worklet';
-
-@@ -109,7 +130,8 @@ export const useBoardGesture = ({
+ 
+@@ -109,7 +139,8 @@ export const useBoardGesture = ({
        // Check if this is own piece - only own pieces can make moves
        const piece = squareState.piece.get();
        const turn = boardState.turn.get();
 -      const isOwnPiece = piece && piece[0] === turn;
 +      const allowedDragColor = draggableColor ?? turn;
 +      const isOwnPiece = piece && piece[0] === allowedDragColor;
-
+ 
        // If not own piece, just snap back (can't make moves with opponent's pieces)
        if (!isOwnPiece) {
-@@ -141,6 +163,17 @@ export const useBoardGesture = ({
+@@ -141,6 +172,17 @@ export const useBoardGesture = ({
          draggedSquare.set(null);
          return;
        }
@@ -783,23 +843,54 @@ index 504126e4dc0a469cf5b00913e176e360322a1194..a0d4318682344ed7ac18f53044a14cd6
 +        draggedSquare.set(null);
 +        return;
 +      }
-
+ 
        // Invalid move - snap back to original position and clear selection
        const originalPos = squareToPosition(square, pieceSize, flipped);
-@@ -181,7 +214,8 @@ export const useBoardGesture = ({
+@@ -181,20 +223,30 @@ export const useBoardGesture = ({
        const selectedSquare = boardState.selectedSquare.get();
        const piece = boardState.squares[square].piece.get();
        const turn = boardState.turn.get();
 -      const isOwnPiece = piece && piece[0] === turn;
 +      const allowedDragColor = draggableColor ?? turn;
 +      const isOwnPiece = piece && piece[0] === allowedDragColor;
-
+ 
        // Case 1: No piece selected - try to select own piece
        if (!selectedSquare) {
-@@ -211,14 +245,24 @@ export const useBoardGesture = ({
+         if (isOwnPiece) {
++          boardState.selectedSquare.set(square);
++          boardState.validMoves.set([]);
+           scheduleOnRN(handleSelectPiece, square);
+         }
          return;
        }
-
+ 
+-      // Case 2: Tapped on same piece - deselect
++      // Case 2: Tapped on same piece - deselect, but only when the piece
++      // was already selected before this touch began. pan.onBegin selects
++      // the touched piece on touch-down, so without this guard every quick
++      // tap would read its own selection here and immediately toggle it
++      // off (dots flash and vanish; only >maxDuration presses survived
++      // because the failed tap never ran onEnd).
+       if (square === selectedSquare) {
+-        boardState.selectedSquare.set(null);
+-        boardState.validMoves.set([]);
++        if (selectedAtTouchStart.get() === square) {
++          boardState.selectedSquare.set(null);
++          boardState.validMoves.set([]);
++        }
+         return;
+       }
+ 
+@@ -207,18 +259,31 @@ export const useBoardGesture = ({
+ 
+       // Case 4: Tapped on another own piece - switch selection
+       if (isOwnPiece) {
++        boardState.selectedSquare.set(square);
++        boardState.validMoves.set([]);
+         scheduleOnRN(handleSelectPiece, square);
+         return;
+       }
+ 
 -      // Case 5: Invalid target - deselect
 +      // Case 5: Valid moves may not have crossed from the RN thread to the
 +      // UI worklet yet after a fast source tap. Let the executor make the
@@ -815,16 +906,20 @@ index 504126e4dc0a469cf5b00913e176e360322a1194..a0d4318682344ed7ac18f53044a14cd6
        boardState.selectedSquare.set(null);
        boardState.validMoves.set([]);
      });
-
-     // Combine gestures - pan takes precedence
-     return Gesture.Simultaneous(tapGesture, panGesture);
+ 
+-    // Combine gestures - pan takes precedence
+-    return Gesture.Simultaneous(tapGesture, panGesture);
 -  }, [boardState, pieceSize, flipped, draggedSquare, dragStartX, dragStartY, touchOffsetX, touchOffsetY, animations, gestureEnabled, handleTryMove, handleSelectPiece, handleIllegalMove]);
-+  }, [boardState, pieceSize, flipped, draggedSquare, dragStartX, dragStartY, touchOffsetX, touchOffsetY, animations, gestureEnabled, draggableColor, handleTryMove, handleSelectPiece, handleIllegalMove]);
++    // Tap should not wait for the pan candidate to settle. A real drag still
++    // wins once it crosses minDistance before the tap can activate on release.
++    return Gesture.Race(tapGesture, panGesture);
++  }, [boardState, pieceSize, flipped, draggedSquare, dragStartX, dragStartY, touchOffsetX, touchOffsetY, selectedAtTouchStart, animations, gestureEnabled, draggableColor, handleTryMove, handleSelectPiece, handleIllegalMove]);
    return gesture;
  };
  //# sourceMappingURL=use-board-gesture.js.map
+\ No newline at end of file
 diff --git a/lib/module/index.js b/lib/module/index.js
-index 7cee33e75529b83bea5c7216e4b89be54c9fb520..fbb0128b96d0f1e305999253ea9257e9dbd49b3e 100644
+index 7cee33e75529b83bea5c7216e4b89be54c9fb520..589a0ec7e6083552dac8d5defbd2ff7d9940f04f 100644
 --- a/lib/module/index.js
 +++ b/lib/module/index.js
 @@ -5,6 +5,7 @@ const Chessboard = /*#__PURE__*/forwardRef(({
@@ -844,7 +939,7 @@ index 7cee33e75529b83bea5c7216e4b89be54c9fb520..fbb0128b96d0f1e305999253ea9257e9
      withLetters: withLetters,
      withNumbers: withNumbers,
 diff --git a/lib/module/state/board-state-context.js b/lib/module/state/board-state-context.js
-index 9c5fc37c72a09fa6a338aba03bd0433d0c09573e..eeb34994e5b3d24aa21fcc8bd2e55ab4307fbbae 100644
+index 9c5fc37c72a09fa6a338aba03bd0433d0c09573e..9c781af9859d91627effe7113c653689ad84ac7e 100644
 --- a/lib/module/state/board-state-context.js
 +++ b/lib/module/state/board-state-context.js
 @@ -12,7 +12,9 @@ const defaultColors = {
@@ -942,7 +1037,7 @@ index a3f67bf02f45b674772813bdf03f4b25c56f070e..5771815c93dae8f4c11b4bef4599c37c
  import type { BoardConfig } from '../state';
 -import { PIECE_SOURCES } from '../assets/piece-images';
 +import { usePieceSpriteSheet } from '../assets/piece-images';
-
+ 
 -const PROMOTION_PIECES: PieceSymbol[] = ['q', 'r', 'b', 'n'];
 +type PromotionPiece = 'q' | 'r' | 'b' | 'n';
 +
@@ -955,13 +1050,13 @@ index a3f67bf02f45b674772813bdf03f4b25c56f070e..5771815c93dae8f4c11b4bef4599c37c
 +  r: 3,
 +  q: 4,
 +};
-
+ 
  interface PromotionDialogProps {
    color: 'w' | 'b';
 @@ -20,27 +31,45 @@ interface PromotionDialogProps {
    config: BoardConfig;
  }
-
+ 
 +const debugChessboard = (event: string, details: Record<string, unknown>) => {
 +  const globals = globalThis as unknown as {
 +    __CHESSTICIZE_CHESSBOARD_DEBUG__?: boolean;
@@ -1015,7 +1110,7 @@ index a3f67bf02f45b674772813bdf03f4b25c56f070e..5771815c93dae8f4c11b4bef4599c37c
 @@ -49,23 +78,44 @@ const styles = StyleSheet.create({
    },
  });
-
+ 
 +const PromotionPieceIcon: React.FC<{
 +  color: 'w' | 'b';
 +  piece: PromotionPiece;
@@ -1042,7 +1137,7 @@ index a3f67bf02f45b674772813bdf03f4b25c56f070e..5771815c93dae8f4c11b4bef4599c37c
  export const PromotionDialog: React.FC<PromotionDialogProps> = React.memo(
    ({ color, onSelect, onCancel, config }) => {
      const { colors } = config;
-
+ 
      return (
        <Modal transparent visible animationType="fade" onRequestClose={onCancel}>
 -        <Pressable style={styles.overlay} onPress={onCancel}>
@@ -1105,7 +1200,7 @@ index b4a278cc2ada84715a4916324b459952ab33c942..13084b25d8e9f36f52e24bbb4219db91
 +    position: 'relative',
    },
  });
-
+ 
 +const debugChessboard = (event: string, details: Record<string, unknown>) => {
 +  const globals = globalThis as unknown as {
 +    __CHESSTICIZE_CHESSBOARD_DEBUG__?: boolean;
@@ -1122,7 +1217,7 @@ index b4a278cc2ada84715a4916324b459952ab33c942..13084b25d8e9f36f52e24bbb4219db91
 @@ -71,30 +83,46 @@ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
        'checkmate' | 'check' | 'stalemate' | ''
      >('');
-
+ 
 -    // Use ref to store promotion info to avoid re-renders during drag
 -    // Only the boolean state triggers a render when dialog needs to show/hide
 +    // Keep the pending promotion in React state so the dialog render is tied
@@ -1132,7 +1227,7 @@ index b4a278cc2ada84715a4916324b459952ab33c942..13084b25d8e9f36f52e24bbb4219db91
 -    const [showPromotion, setShowPromotion] = useState(false);
 +    const [promotionInfo, setPromotionInfo] = useState<PromotionInfo | null>(null);
 +    const showPromotion = promotionInfo !== null;
-
+ 
      const handlePromotionRequired = useCallback((info: PromotionInfo) => {
        // If a promotion is somehow already pending, abandon it (resolving its
        // move() promise) before replacing it, so the old one never leaks.
@@ -1146,7 +1241,7 @@ index b4a278cc2ada84715a4916324b459952ab33c942..13084b25d8e9f36f52e24bbb4219db91
 +      });
 +      setPromotionInfo(info);
      }, []);
-
+ 
      const handlePromotionSelect = useCallback((piece: PieceSymbol) => {
        const info = promotionInfoRef.current;
 +      debugChessboard('promotionBoard:select', {
@@ -1160,7 +1255,7 @@ index b4a278cc2ada84715a4916324b459952ab33c942..13084b25d8e9f36f52e24bbb4219db91
 +        setPromotionInfo(null);
        }
      }, []);
-
+ 
      const handlePromotionCancel = useCallback(() => {
        const info = promotionInfoRef.current;
 +      debugChessboard('promotionBoard:cancel', {
@@ -1178,7 +1273,7 @@ index b4a278cc2ada84715a4916324b459952ab33c942..13084b25d8e9f36f52e24bbb4219db91
 -      setShowPromotion(false);
 +      setPromotionInfo(null);
      }, [boardState, config]);
-
+ 
 +    useEffect(() => {
 +      debugChessboard('promotionBoard:state', {
 +        showPromotion,
@@ -1193,7 +1288,7 @@ index b4a278cc2ada84715a4916324b459952ab33c942..13084b25d8e9f36f52e24bbb4219db91
      const triggerEffect = useCallback(
        (trigger: EffectTrigger, kingColor: 'w' | 'b') => {
 @@ -244,25 +282,27 @@ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
-
+ 
      return (
        <GestureHandlerRootView style={containerStyle}>
 -        <GestureDetector gesture={gesture}>
@@ -1254,7 +1349,7 @@ index 759d04e3d374ee79388c2acddc541cfceb0ee7db..c46b6e4e785df632ae3361ac337cefab
 +        <SkiaDots config={config} boardState={boardState} />
        </>
      );
-
+ 
 diff --git a/src/components/skia/skia-dots.tsx b/src/components/skia/skia-dots.tsx
 index 5032bfe81a485ff85d710e7d6e4c0a2e8d78347e..041ff73a79b81185b4719c5e53c6e56ea7a31420 100644
 --- a/src/components/skia/skia-dots.tsx
@@ -1262,7 +1357,7 @@ index 5032bfe81a485ff85d710e7d6e4c0a2e8d78347e..041ff73a79b81185b4719c5e53c6e56e
 @@ -9,29 +9,56 @@ interface SkiaDotsProps {
    boardState: BoardState;
  }
-
+ 
 -// All valid-move dots are built by ONE derived path that reads the shared
 -// `validMoves` once (a single subscription) and adds a circle per target —
 -// instead of 64 per-square components each subscribing to `validMoves` and
@@ -1279,7 +1374,7 @@ index 5032bfe81a485ff85d710e7d6e4c0a2e8d78347e..041ff73a79b81185b4719c5e53c6e56e
      const radius = pieceSize * 0.15;
 +    const captureRadius = pieceSize * 0.38;
      const half = pieceSize / 2;
-
+ 
 -    const path = useDerivedValue(() => {
 -      const p = Skia.Path.Make();
 +    const quietPath = useDerivedValue(() => {
@@ -1298,7 +1393,7 @@ index 5032bfe81a485ff85d710e7d6e4c0a2e8d78347e..041ff73a79b81185b4719c5e53c6e56e
 -      return p;
 +      return path;
      });
-
+ 
 -    return <Path path={path} color="rgba(0, 0, 0, 0.3)" opacity={0.5} />;
 +    const capturePath = useDerivedValue(() => {
 +      const path = Skia.Path.Make();
@@ -1328,9 +1423,9 @@ index 5032bfe81a485ff85d710e7d6e4c0a2e8d78347e..041ff73a79b81185b4719c5e53c6e56e
 +    );
    }
  );
-
+ 
 diff --git a/src/hooks/use-board-gesture.ts b/src/hooks/use-board-gesture.ts
-index 92df972f7ec3c671308e8cc0e6cd275469a7144d..f221ae108ff5de6c665753939bdd52eb024f6285 100644
+index 92df972f7ec3c671308e8cc0e6cd275469a7144d..2bd2abb9521060d09e28c1936f5b40064de62b73 100644
 --- a/src/hooks/use-board-gesture.ts
 +++ b/src/hooks/use-board-gesture.ts
 @@ -22,7 +22,7 @@ export const useBoardGesture = ({
@@ -1339,11 +1434,18 @@ index 92df972f7ec3c671308e8cc0e6cd275469a7144d..f221ae108ff5de6c665753939bdd52eb
  }: UseBoardGestureProps) => {
 -  const { pieceSize, animations, flipped } = config;
 +  const { pieceSize, animations, flipped, draggableColor } = config;
-
+ 
    // Track the currently dragged piece
    const draggedSquare = useSharedValue<Square | null>(null);
-@@ -34,10 +34,14 @@ export const useBoardGesture = ({
-
+@@ -31,13 +31,21 @@ export const useBoardGesture = ({
+   // Offset between touch point and piece position (to follow finger exactly)
+   const touchOffsetX = useSharedValue(0);
+   const touchOffsetY = useSharedValue(0);
++  // Square that was already selected when the current touch began. pan.onBegin
++  // pre-selects the touched piece on touch-down, so the tap handler needs this
++  // to tell a "toggle off" tap from the tap that created the selection.
++  const selectedAtTouchStart = useSharedValue<Square | null>(null);
+ 
    // Stable callback for tryMove
    const handleTryMove = useCallback(
 -    (from: Square, to: Square) => {
@@ -1358,35 +1460,37 @@ index 92df972f7ec3c671308e8cc0e6cd275469a7144d..f221ae108ff5de6c665753939bdd52eb
 -    [moveExecutor]
 +    [moveExecutor, onIllegalMove]
    );
-
+ 
    // Stable callback for selectPiece
-@@ -67,18 +71,28 @@ export const useBoardGesture = ({
+@@ -65,19 +73,34 @@ export const useBoardGesture = ({
+         // Just prepare for potential drag - store touch info
+         const { x, y } = event;
          const square = positionToSquare(x, y, pieceSize, flipped);
++        selectedAtTouchStart.set(boardState.selectedSquare.get());
          const squareState = boardState.squares[square];
          const piece = squareState.piece.get();
 +        const turn = boardState.turn.get();
 +        const allowedDragColor = draggableColor ?? turn;
-
++
++        if (!piece || piece[0] !== allowedDragColor) {
++          draggedSquare.set(null);
++          return;
++        }
+ 
 -        if (piece) {
 -          // Store drag start info (but don't start drag yet)
 -          draggedSquare.set(square);
 -          dragStartX.set(squareState.translateX.get());
 -          dragStartY.set(squareState.translateY.get());
--
--          const pieceCenterX = squareState.translateX.get() + pieceSize / 2;
--          const pieceCenterY = squareState.translateY.get() + pieceSize / 2;
--          touchOffsetX.set(x - pieceCenterX);
--          touchOffsetY.set(y - pieceCenterY);
-+        if (!piece || piece[0] !== allowedDragColor) {
-+          draggedSquare.set(null);
-+          return;
-         }
-+
 +        // Store drag start info (but don't start drag yet)
 +        draggedSquare.set(square);
 +        dragStartX.set(squareState.translateX.get());
 +        dragStartY.set(squareState.translateY.get());
-+
+ 
+-          const pieceCenterX = squareState.translateX.get() + pieceSize / 2;
+-          const pieceCenterY = squareState.translateY.get() + pieceSize / 2;
+-          touchOffsetX.set(x - pieceCenterX);
+-          touchOffsetY.set(y - pieceCenterY);
 +        const pieceCenterX = squareState.translateX.get() + pieceSize / 2;
 +        const pieceCenterY = squareState.translateY.get() + pieceSize / 2;
 +        touchOffsetX.set(x - pieceCenterX);
@@ -1395,11 +1499,14 @@ index 92df972f7ec3c671308e8cc0e6cd275469a7144d..f221ae108ff5de6c665753939bdd52eb
 +        // Start the valid-target calculation before the drag crosses the
 +        // min-distance threshold. Otherwise very fast drags can reach onEnd
 +        // before the RN-thread select callback has populated validMoves.
-+        scheduleOnRN(handleSelectPiece, square);
++        // Skip when the square is already selected: validMoves are populated,
++        // and re-selecting could race a deselect issued by the tap handler.
++        if (boardState.selectedSquare.get() !== square) {
++          scheduleOnRN(handleSelectPiece, square);
+         }
        })
        .onStart(() => {
-         'worklet';
-@@ -89,16 +103,22 @@ export const useBoardGesture = ({
+@@ -89,16 +112,22 @@ export const useBoardGesture = ({
          const squareState = boardState.squares[square];
          const piece = squareState.piece.get();
          const turn = boardState.turn.get();
@@ -1412,11 +1519,11 @@ index 92df972f7ec3c671308e8cc0e6cd275469a7144d..f221ae108ff5de6c665753939bdd52eb
 +          draggedSquare.set(null);
 +          return;
 +        }
-
+ 
          // Raise and scale the piece
          squareState.zIndex.set(100);
          squareState.scale.set(withSpring(1.1, animations.scale));
-
+ 
          // Only show valid moves (dots) for own pieces
 -        const isOwnPiece = piece && piece[0] === turn;
 -        if (isOwnPiece) {
@@ -1426,20 +1533,20 @@ index 92df972f7ec3c671308e8cc0e6cd275469a7144d..f221ae108ff5de6c665753939bdd52eb
        })
        .onUpdate((event) => {
          'worklet';
-@@ -135,7 +155,8 @@ export const useBoardGesture = ({
+@@ -135,7 +164,8 @@ export const useBoardGesture = ({
          // Check if this is own piece - only own pieces can make moves
          const piece = squareState.piece.get();
          const turn = boardState.turn.get();
 -        const isOwnPiece = piece && piece[0] === turn;
 +        const allowedDragColor = draggableColor ?? turn;
 +        const isOwnPiece = piece && piece[0] === allowedDragColor;
-
+ 
          // If not own piece, just snap back (can't make moves with opponent's pieces)
          if (!isOwnPiece) {
-@@ -180,6 +201,18 @@ export const useBoardGesture = ({
+@@ -180,6 +210,18 @@ export const useBoardGesture = ({
            return;
          }
-
+ 
 +        if (targetSquare !== square && validMoves.length === 0) {
 +          const originalPos = squareToPosition(square, pieceSize, flipped);
 +          squareState.translateX.set(originalPos.x);
@@ -1455,20 +1562,51 @@ index 92df972f7ec3c671308e8cc0e6cd275469a7144d..f221ae108ff5de6c665753939bdd52eb
          // Invalid move - snap back to original position and clear selection
          const originalPos = squareToPosition(square, pieceSize, flipped);
          squareState.translateX.set(
-@@ -221,7 +254,8 @@ export const useBoardGesture = ({
+@@ -221,20 +263,30 @@ export const useBoardGesture = ({
          const selectedSquare = boardState.selectedSquare.get();
          const piece = boardState.squares[square].piece.get();
          const turn = boardState.turn.get();
 -        const isOwnPiece = piece && piece[0] === turn;
 +        const allowedDragColor = draggableColor ?? turn;
 +        const isOwnPiece = piece && piece[0] === allowedDragColor;
-
+ 
          // Case 1: No piece selected - try to select own piece
          if (!selectedSquare) {
-@@ -251,7 +285,17 @@ export const useBoardGesture = ({
+           if (isOwnPiece) {
++            boardState.selectedSquare.set(square);
++            boardState.validMoves.set([]);
+             scheduleOnRN(handleSelectPiece, square);
+           }
            return;
          }
-
+ 
+-        // Case 2: Tapped on same piece - deselect
++        // Case 2: Tapped on same piece - deselect, but only when the piece
++        // was already selected before this touch began. pan.onBegin selects
++        // the touched piece on touch-down, so without this guard every quick
++        // tap would read its own selection here and immediately toggle it
++        // off (dots flash and vanish; only >maxDuration presses survived
++        // because the failed tap never ran onEnd).
+         if (square === selectedSquare) {
+-          boardState.selectedSquare.set(null);
+-          boardState.validMoves.set([]);
++          if (selectedAtTouchStart.get() === square) {
++            boardState.selectedSquare.set(null);
++            boardState.validMoves.set([]);
++          }
+           return;
+         }
+ 
+@@ -247,17 +299,30 @@ export const useBoardGesture = ({
+ 
+         // Case 4: Tapped on another own piece - switch selection
+         if (isOwnPiece) {
++          boardState.selectedSquare.set(square);
++          boardState.validMoves.set([]);
+           scheduleOnRN(handleSelectPiece, square);
+           return;
+         }
+ 
 -        // Case 5: Invalid target - deselect
 +        // Case 5: Valid moves may not have crossed from the RN thread to the
 +        // UI worklet yet after a fast source tap. Let the executor make the
@@ -1484,8 +1622,20 @@ index 92df972f7ec3c671308e8cc0e6cd275469a7144d..f221ae108ff5de6c665753939bdd52eb
          boardState.selectedSquare.set(null);
          boardState.validMoves.set([]);
        });
-@@ -269,6 +313,7 @@ export const useBoardGesture = ({
+ 
+-    // Combine gestures - pan takes precedence
+-    return Gesture.Simultaneous(tapGesture, panGesture);
++    // Tap should not wait for the pan candidate to settle. A real drag still
++    // wins once it crosses minDistance before the tap can activate on release.
++    return Gesture.Race(tapGesture, panGesture);
+   }, [
+     boardState,
+     pieceSize,
+@@ -267,8 +332,10 @@ export const useBoardGesture = ({
+     dragStartY,
+     touchOffsetX,
      touchOffsetY,
++    selectedAtTouchStart,
      animations,
      gestureEnabled,
 +    draggableColor,
@@ -1539,7 +1689,7 @@ index 2f2990b96a62e49047a101e225317ab1a01b20ae..222650a2f245f85e9f15eab121943056
 +  validMoveDot: 'rgba(0, 0, 0, 0.3)',
 +  validMoveCapture: 'rgba(0, 0, 0, 0.55)',
  };
-
+ 
  const defaultDurations: BoardConfig['durations'] = {
 @@ -57,6 +61,7 @@ export const BoardStateProvider: React.FC<BoardStateProviderProps> = ({
    fen,

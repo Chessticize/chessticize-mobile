@@ -70,7 +70,7 @@ test("App Store release manifest reports source identity and hashed release arti
     bundleIdentifier: "com.chessticize.mobile",
     version: "1.0",
     build: "1",
-    targetedDeviceFamily: "1",
+    targetedDeviceFamily: "1,2",
     platform: "ios"
   });
   assert.equal(manifest.puzzlePack.id, "core");

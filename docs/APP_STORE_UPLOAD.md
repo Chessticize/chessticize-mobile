@@ -157,7 +157,8 @@ valid while this signing-account gate is still incomplete.
    `ITSAppUsesNonExemptEncryption = false`.
 4. Configure the TestFlight test information from `docs/TESTFLIGHT_QA.md`.
 5. Add the build to the `Internal 1.0 QA` internal testing group.
-6. Install the build from the TestFlight app on a physical iPhone.
+6. Install the build from the TestFlight app on a physical iPhone and a
+   representative iPad.
 7. Run the full checklist in `docs/TESTFLIGHT_QA.md`.
 8. Fill the evidence log with the source commit, release tag, build, device,
    tester, result, blocking issues, and evidence folder.

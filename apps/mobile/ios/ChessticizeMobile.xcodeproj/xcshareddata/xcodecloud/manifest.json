@@ -1,0 +1,9 @@
+{
+  "id" : "d9fd4ed8-e84a-427a-9c3b-6cc1ee9a0584",
+  "targets" : [
+    {
+      "id" : "c6c7143a-d5f6-4a91-86c2-682878a973bd",
+      "name" : "ChessticizeMobile"
+    }
+  ]
+}

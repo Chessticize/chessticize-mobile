@@ -223,11 +223,14 @@ describe("PracticePocScreen", () => {
     expect(styleEntryMatches(findByTestId(renderer, "session-status-metrics").props.style, "borderWidth", 1)).toBe(false);
     expect(findByTestId(renderer, "session-progress-block")).toBeTruthy();
     expect(findByTestId(renderer, "session-timer-block")).toBeTruthy();
-    expect(findByTestId(renderer, "session-rating-block")).toBeTruthy();
+    expect(findByTestId(renderer, "session-side-to-move-block")).toBeTruthy();
     expect(findByTestId(renderer, "session-mistakes-block")).toBeTruthy();
     expect(findByTestId(renderer, "session-progress-block").props.accessibilityLabel).toBe("Progress 0 of 30");
     expect(findByTestId(renderer, "session-timer-block").props.accessibilityLabel).toContain("Timer");
-    expect(findByTestId(renderer, "session-rating-block").props.accessibilityLabel).toBe("ELO 600");
+    expect(findByTestId(renderer, "session-side-to-move-block").props.accessibilityLabel).toBe("White to move");
+    expect(findByTestId(renderer, "session-side-to-move").props.accessibilityLabel).toBe("White to move");
+    expect(findByTestId(renderer, "move-side-white-glyph")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "session-side-to-move-label"))).toBe("White");
     expect(findByTestId(renderer, "session-mistakes-block").props.accessibilityLabel).toBe("Mistakes 0 of 3");
     expect(findByTestId(renderer, "session-mistakes").props.accessibilityLabel).toBe("Mistakes 0 of 3");
     expect(collectText(findByTestId(renderer, "session-mistakes"))).toBe("");
@@ -241,6 +244,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "session-status-metrics"))).not.toContain("Progress");
     expect(collectText(findByTestId(renderer, "session-status-metrics"))).not.toContain("Timer");
     expect(collectText(findByTestId(renderer, "session-status-metrics"))).not.toContain("Mistakes");
+    expect(collectText(findByTestId(renderer, "session-status-metrics"))).not.toContain("ELO");
     expect(collectText(findByTestId(renderer, "session-status-metrics"))).not.toContain("0/3");
     expect(collectText(findByTestId(renderer, "session-progress"))).toBe("0 / 30");
     expect(styleEntryMatches(findByTestId(renderer, "practice-prompt").props.style, "borderWidth", 1)).toBe(false);
@@ -441,11 +445,15 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "session-status-metrics")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "session-status-metrics"))).not.toContain("Progress");
     expect(collectText(findByTestId(renderer, "session-status-metrics"))).not.toContain("Timer");
-    expect(collectText(findByTestId(renderer, "session-status-metrics"))).toContain("ELO");
+    expect(collectText(findByTestId(renderer, "session-status-metrics"))).not.toContain("ELO");
+    expect(collectText(findByTestId(renderer, "session-status-metrics"))).toContain("White");
     expect(collectText(findByTestId(renderer, "session-status-metrics"))).not.toContain("Mistakes");
     expect(findByTestId(renderer, "session-progress-block").props.accessibilityLabel).toBe("Progress 0 of 15");
     expect(findByTestId(renderer, "session-timer-block").props.accessibilityLabel).toContain("Timer");
-    expect(findByTestId(renderer, "session-rating-block").props.accessibilityLabel).toBe("ELO 600");
+    expect(findByTestId(renderer, "session-side-to-move-block").props.accessibilityLabel).toBe("White to move");
+    expect(findByTestId(renderer, "session-side-to-move").props.accessibilityLabel).toBe("White to move");
+    expect(findByTestId(renderer, "move-side-white-glyph")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "session-side-to-move-label"))).toBe("White");
     expect(findByTestId(renderer, "session-mistakes-block").props.accessibilityLabel).toBe("Mistakes 0 of 3");
     expect(collectText(findByTestId(renderer, "session-mistakes"))).toBe("");
     expect(findByTestId(renderer, "session-pause")).toBeTruthy();
@@ -455,7 +463,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "session-shell-nav"))).not.toContain("•••");
     expect(findByTestId(renderer, "session-timer")).toBeTruthy();
     expect(findByTestId(renderer, "session-progress")).toBeTruthy();
-    expect(findByTestId(renderer, "session-rating")).toBeTruthy();
+    expect(findByTestId(renderer, "session-side-to-move")).toBeTruthy();
     expect(() => findByTestId(renderer, "session-strikes")).toThrow();
     expect(findByTestId(renderer, "session-mistakes")).toBeTruthy();
     expect(findByTestId(renderer, "session-mistakes").props.accessibilityLabel).toBe("Mistakes 0 of 3");
@@ -1060,6 +1068,63 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "history-chart-bar-0")).toThrow();
   });
 
+  it("renders the rating trend as connected pixel-space segments", async () => {
+    const renderer = renderStandardSequenceScreen();
+
+    // Two settled sprints -> two elo points -> at least one line segment.
+    for (let sprint = 0; sprint < 2; sprint++) {
+      startStandardSprint(renderer);
+      act(() => {
+        jest.advanceTimersByTime(301_000);
+      });
+      press(renderer, "back-practice-button");
+    }
+
+    press(renderer, "history-tab");
+    const plotWidth = 300;
+    act(() => {
+      findByTestId(renderer, "history-chart-line").props.onLayout({
+        nativeEvent: { layout: { width: plotWidth, height: 60, x: 0, y: 0 } }
+      });
+    });
+
+    const dots: Array<{ x: number; y: number }> = [];
+    for (let index = 0; ; index++) {
+      let dot: TestRenderer.ReactTestInstance;
+      try {
+        dot = findByTestId(renderer, `history-chart-line-point-${index}`);
+      } catch {
+        break;
+      }
+      const style = flattenTestStyle(dot.props.style);
+      const left = style.left;
+      const x = typeof left === "string" ? (parseFloat(left) / 100) * plotWidth : Number(left);
+      dots.push({ x, y: Number(style.top) });
+    }
+    expect(dots.length).toBeGreaterThanOrEqual(2);
+
+    // Every segment must connect consecutive data points exactly: length is
+    // the pixel distance, the center sits on the midpoint (RN rotates around
+    // the center), and the angle matches the pixel-space slope. The previous
+    // implementation mixed percent and pixel units, drawing detached
+    // segments at wrong angles.
+    for (let index = 0; index < dots.length - 1; index++) {
+      const segment = findByTestId(renderer, `history-chart-line-segment-${index}`);
+      const style = flattenTestStyle(segment.props.style);
+      const from = dots[index];
+      const to = dots[index + 1];
+      const expectedLength = Math.hypot(to.x - from.x, to.y - from.y);
+      expect(style.width).toBeCloseTo(expectedLength, 5);
+      expect(style.left).toBeCloseTo((from.x + to.x) / 2 - expectedLength / 2, 5);
+      expect(style.top).toBeCloseTo((from.y + to.y) / 2 - 1, 5);
+      const transform = style.transform as Array<{ rotate?: string }> | undefined;
+      const rotate = transform?.find((entry) => entry.rotate)?.rotate ?? "0deg";
+      const expectedAngle = Math.atan2(to.y - from.y, to.x - from.x) * (180 / Math.PI);
+      expect(parseFloat(rotate)).toBeCloseTo(expectedAngle, 5);
+    }
+    expect(() => findByTestId(renderer, `history-chart-line-segment-${dots.length - 1}`)).toThrow();
+  });
+
   it("filters history to wrong attempts from the recent window", async () => {
     const renderer = renderStandardSequenceScreen();
 
@@ -1210,6 +1275,9 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "review-progress").props.children.join("")).toBe("1 / 1 · Standard");
     expect(findByTestId(renderer, "review-context-strip")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "review-source-pill"))).toBe("History replay");
+    expect(findByTestId(renderer, "review-side-to-move").props.accessibilityLabel).toBe("Black to move");
+    expect(findByTestId(renderer, "move-side-black-glyph")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "review-side-to-move-label"))).toBe("Black to move");
     expect(findByTestId(renderer, "review-theme-pill")).toBeTruthy();
     expect(findByTestId(renderer, "review-reset-puzzle")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "review-exit"))).toBe("");
@@ -1969,6 +2037,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "review-start-due");
     expect(findByTestId(renderer, "review-session")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "review-source-pill"))).toBe("Scheduled review");
+    expect(findByTestId(renderer, "review-side-to-move").props.accessibilityLabel).toBe("White to move");
     expect(collectText(findByTestId(renderer, "review-current-expected-move"))).toBe("e2e6");
 
     await boardMove(renderer, "e2e6");
@@ -3115,6 +3184,19 @@ function countStyleEntry(node: TestRenderer.ReactTestInstance, key: string, valu
   return own + node.children
     .filter((child): child is TestRenderer.ReactTestInstance => typeof child !== "string")
     .reduce((sum, child) => sum + countStyleEntry(child, key, value), 0);
+}
+
+function flattenTestStyle(style: unknown): Record<string, unknown> {
+  if (!style) {
+    return {};
+  }
+  if (Array.isArray(style)) {
+    return style.reduce<Record<string, unknown>>(
+      (merged, entry) => Object.assign(merged, flattenTestStyle(entry)),
+      {}
+    );
+  }
+  return typeof style === "object" ? { ...(style as Record<string, unknown>) } : {};
 }
 
 function styleEntryMatches(style: unknown, key: string, value: unknown): boolean {

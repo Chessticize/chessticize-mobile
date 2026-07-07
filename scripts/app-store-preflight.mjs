@@ -23,6 +23,10 @@ function uniqueMatches(source, pattern) {
   return Array.from(new Set(Array.from(source.matchAll(pattern), (match) => match[1].trim())));
 }
 
+function unquoteBuildSetting(value) {
+  return value.replace(/^"|"$/gu, "");
+}
+
 const checks = [];
 const manual = [];
 
@@ -78,6 +82,7 @@ const marketingVersions = uniqueMatches(pbxproj, /MARKETING_VERSION = ([^;]+);/g
 const buildNumbers = uniqueMatches(pbxproj, /CURRENT_PROJECT_VERSION = ([^;]+);/g);
 const bundleIdentifiers = uniqueMatches(pbxproj, /PRODUCT_BUNDLE_IDENTIFIER = ([^;]+);/g);
 const deviceFamilies = uniqueMatches(pbxproj, /TARGETED_DEVICE_FAMILY = ([^;]+);/g);
+const targetedDeviceFamily = deviceFamilies.length === 1 ? unquoteBuildSetting(deviceFamilies[0]) : "";
 const runtimeDependencies = Array.from(new Set([
   ...Object.keys(rootPackage.dependencies ?? {}),
   ...Object.keys(mobilePackage.dependencies ?? {})
@@ -145,7 +150,10 @@ check(
     bundleIdentifiers.length === 1 &&
     bundleIdentifiers[0] === "com.chessticize.mobile" &&
     deviceFamilies.length === 1 &&
-    deviceFamilies[0] === "1",
+    targetedDeviceFamily === "1,2" &&
+    infoPlist.includes("<key>UIRequiresFullScreen</key>") &&
+    infoPlist.includes("<true/>") &&
+    infoPlist.includes("UIInterfaceOrientationPortrait"),
   `Found marketingVersions=${marketingVersions.join(",")}, buildNumbers=${buildNumbers.join(",")}, bundleIdentifiers=${bundleIdentifiers.join(",")}, deviceFamilies=${deviceFamilies.join(",")}.`
 );
 
@@ -251,11 +259,11 @@ manualGate(
 );
 manualGate(
   "Capture final sanitized App Store screenshots",
-  "Use a release or production-like build for the 6.9-inch and 6.1-inch screenshot sets in docs/STORE_ASSETS.md, then run pnpm app-store:screenshot-audit before upload."
+  "Use a release or production-like build for the 6.9-inch, 6.1-inch, and required iPad screenshot sets in docs/STORE_ASSETS.md, then run pnpm app-store:screenshot-audit before upload."
 );
 manualGate(
   "Execute the internal TestFlight physical-device pass",
-  "Upload the build to App Store Connect, distribute it to Internal 1.0 QA, install from TestFlight on a physical iPhone, and fill docs/TESTFLIGHT_QA.md evidence."
+  "Upload the build to App Store Connect, distribute it to Internal 1.0 QA, install from TestFlight on physical iPhone and iPad hardware, and fill docs/TESTFLIGHT_QA.md evidence."
 );
 
 const failed = checks.filter((entry) => entry.status === "fail");
