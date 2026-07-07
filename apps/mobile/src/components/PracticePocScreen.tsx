@@ -132,6 +132,8 @@ type BoardMove = {
   promotion?: string;
 };
 
+type MoveSide = "w" | "b";
+
 type BoardMoveContext = {
   puzzleId: string | null;
 };
@@ -1171,6 +1173,7 @@ export function PracticePocScreen({
   const boardDraggableColor = boardGestureEnabled && currentPuzzle
     ? sideToMove(currentPuzzle.currentFen)
     : null;
+  const displayedSideToMove = displayedBoardFen ? sideToMove(displayedBoardFen) : null;
   const submittedMoveForCurrentPuzzle =
     boardFeedback?.submittedMove && boardFeedback.submittedMove !== "__illegal__"
       ? arrowFromTo(boardFeedback.submittedMove)
@@ -1287,8 +1290,8 @@ export function PracticePocScreen({
               <SessionStatusBar
                 mode={mode}
                 state={state}
+                sideToMove={displayedSideToMove}
                 timerText={timerText}
-                currentRating={currentRating}
                 onAbandon={isActive ? abandonSprint : undefined}
                 onPause={isActive ? () => pauseActiveSprint("manual") : undefined}
                 onResume={isPaused && state ? () => resumeSprint(state) : undefined}
@@ -2481,16 +2484,16 @@ function TestPuzzleSourceControl({
 function SessionStatusBar({
   mode,
   state,
+  sideToMove,
   timerText,
-  currentRating,
   onAbandon,
   onPause,
   onResume
 }: {
   mode: SprintMode;
   state: SprintState;
+  sideToMove: MoveSide | null;
   timerText: string;
-  currentRating: number;
   onAbandon?: () => void;
   onPause?: () => void;
   onResume?: () => void;
@@ -2559,11 +2562,11 @@ function SessionStatusBar({
           <Text testID="session-timer" style={styles.timerText}>{timerText}</Text>
         </View>
         <View
-          accessibilityLabel={`ELO ${currentRating}`}
+          accessibilityLabel={sideToMove ? sideToMoveAccessibilityLabel(sideToMove) : "Side to move unavailable"}
           style={styles.sessionMetricBlock}
-          testID="session-rating-block"
+          testID="session-side-to-move-block"
         >
-          <Text testID="session-rating" style={styles.sessionRatingValue}>ELO {currentRating}</Text>
+          {sideToMove ? <MoveSideBadge badgeTestID="session-side-to-move" compact side={sideToMove} /> : null}
         </View>
         <View
           accessibilityLabel={`Mistakes ${state.mistakeCount} of ${state.config.maxMistakes}`}
@@ -3004,6 +3007,50 @@ function SessionScoreGlyph({ tone }: { tone: "positive" | "negative" | "neutral"
         </>
       ) : null}
       {tone === "neutral" ? <View style={styles.sessionScoreNeutralLine} /> : null}
+    </View>
+  );
+}
+
+function MoveSideBadge({
+  badgeTestID,
+  compact = false,
+  side
+}: {
+  badgeTestID: string;
+  compact?: boolean;
+  side: MoveSide;
+}): React.JSX.Element {
+  const sideLabel = sideToMoveLabel(side);
+  return (
+    <View
+      accessible
+      accessibilityLabel={sideToMoveAccessibilityLabel(side)}
+      style={styles.moveSideBadge}
+      testID={badgeTestID}
+    >
+      <MoveSideGlyph side={side} />
+      <Text style={styles.moveSideBadgeText} testID={`${badgeTestID}-label`}>
+        {compact ? sideLabel : `${sideLabel} to move`}
+      </Text>
+    </View>
+  );
+}
+
+function MoveSideGlyph({ side }: { side: MoveSide }): React.JSX.Element {
+  return (
+    <View
+      style={[
+        styles.moveSideGlyph,
+        side === "w" ? styles.moveSideGlyphWhite : styles.moveSideGlyphBlack
+      ]}
+      testID={`move-side-${side === "w" ? "white" : "black"}-glyph`}
+    >
+      <View
+        style={[
+          styles.moveSideGlyphBase,
+          side === "w" ? styles.moveSideGlyphWhiteBase : styles.moveSideGlyphBlackBase
+        ]}
+      />
     </View>
   );
 }
@@ -3588,12 +3635,43 @@ function historyRatingRangeFilterToQuery(filter: HistoryRatingRangeFilter): { mi
   return {};
 }
 
+// Cap the rendered points so long ranges stay smooth without stacking
+// hundreds of segment Views; downsampling always keeps first and last.
+const HISTORY_LINE_CHART_MAX_POINTS = 64;
+// Individual dots read as noise once the line is dense; past this count only
+// the latest-rating dot is drawn.
+const HISTORY_LINE_CHART_MAX_DOTS = 16;
+// Vertical band used by the plot inside the 60px line layer: value min maps
+// to y=48, value max to y=6 (48 - 42).
+const HISTORY_LINE_CHART_BASE_Y = 48;
+const HISTORY_LINE_CHART_PLOT_HEIGHT = 42;
+
+function downsampleHistoryRatingPoints(
+  points: Array<{ key: string; value: number }>,
+  maxPoints: number
+): Array<{ key: string; value: number }> {
+  if (points.length <= maxPoints) {
+    return points;
+  }
+  const lastIndex = points.length - 1;
+  const sampled: Array<{ key: string; value: number }> = [];
+  let previousIndex = -1;
+  for (let i = 0; i < maxPoints; i++) {
+    const index = Math.round((i * lastIndex) / (maxPoints - 1));
+    if (index !== previousIndex) {
+      sampled.push(points[index]);
+      previousIndex = index;
+    }
+  }
+  return sampled;
+}
+
 function HistoryRatingTrendChart({
   points
 }: {
   points: Array<{ key: string; value: number }>;
 }): React.JSX.Element {
-  const displayed = points.slice(-8);
+  const displayed = downsampleHistoryRatingPoints(points, HISTORY_LINE_CHART_MAX_POINTS);
   if (displayed.length === 0) {
     return (
       <View style={styles.historyChartEmpty} testID="history-performance-chart">
@@ -3609,42 +3687,65 @@ function HistoryRatingLineChart({
 }: {
   points: Array<{ key: string; value: number }>;
 }): React.JSX.Element {
+  // Segment geometry needs the layer's pixel width: percent-based math mixed
+  // px rise with % run, which rendered detached segments at wrong angles.
+  const [plotWidth, setPlotWidth] = useState(0);
   const values = points.map((point) => point.value);
   const min = Math.min(...values);
   const max = Math.max(...values);
   const span = Math.max(1, max - min);
   const step = points.length > 1 ? 100 / (points.length - 1) : 0;
+  const stepPx = points.length > 1 ? plotWidth / (points.length - 1) : 0;
+  const showAllDots = points.length <= HISTORY_LINE_CHART_MAX_DOTS;
+  const pointY = (value: number) =>
+    HISTORY_LINE_CHART_BASE_Y - ((value - min) / span) * HISTORY_LINE_CHART_PLOT_HEIGHT;
 
   return (
     <View style={styles.historyLineChart} testID="history-performance-chart">
       <View style={styles.historyLineGrid} />
       <View style={[styles.historyLineGrid, styles.historyLineGridMiddle]} />
       <View style={[styles.historyLineGrid, styles.historyLineGridBottom]} />
-      <View style={styles.historyLineLayer} testID="history-chart-line">
-        {points.slice(0, -1).map((point, index) => {
-          const next = points[index + 1] ?? point;
-          const y = ((point.value - min) / span) * 42;
-          const nextY = ((next.value - min) / span) * 42;
-          return (
-            <View
-              key={`${point.key}-${next.key}-${index}`}
-              style={[
-                styles.historyLineSegment,
-                {
-                  left: `${index * step}%`,
-                  top: 48 - (y + nextY) / 2,
-                  transform: [{ rotate: `${Math.atan2(y - nextY, Math.max(24, step)) * (180 / Math.PI)}deg` }],
-                  width: `${Math.max(12, step + 4)}%`
-                }
-              ]}
-              testID={`history-chart-line-segment-${index}`}
-            />
-          );
-        })}
+      <View
+        style={styles.historyLineLayer}
+        testID="history-chart-line"
+        onLayout={(event) => setPlotWidth(event.nativeEvent.layout.width)}
+      >
+        {plotWidth > 0
+          ? points.slice(0, -1).map((point, index) => {
+              const next = points[index + 1] ?? point;
+              const x1 = index * stepPx;
+              const x2 = (index + 1) * stepPx;
+              const y1 = pointY(point.value);
+              const y2 = pointY(next.value);
+              const length = Math.hypot(x2 - x1, y2 - y1);
+              const angle = Math.atan2(y2 - y1, x2 - x1) * (180 / Math.PI);
+              // RN rotates around the view's center, so center the segment on
+              // the midpoint of its two data points; endpoints then land on
+              // the dots exactly.
+              return (
+                <View
+                  key={`${point.key}-${next.key}-${index}`}
+                  style={[
+                    styles.historyLineSegment,
+                    {
+                      left: (x1 + x2) / 2 - length / 2,
+                      top: (y1 + y2) / 2 - 1,
+                      transform: [{ rotate: `${angle}deg` }],
+                      width: length
+                    }
+                  ]}
+                  testID={`history-chart-line-segment-${index}`}
+                />
+              );
+            })
+          : null}
       </View>
       <View style={styles.historyLinePointLayer}>
         {points.map((point, index) => {
-          const y = ((point.value - min) / span) * 42;
+          const isLast = index === points.length - 1;
+          if (!showAllDots && !isLast) {
+            return null;
+          }
           return (
             <View
               key={`${point.key}-${index}`}
@@ -3652,12 +3753,12 @@ function HistoryRatingLineChart({
                 styles.historyLinePointColumn,
                 {
                   left: points.length > 1 ? `${index * step}%` : "50%",
-                  top: 48 - y
+                  top: pointY(point.value)
                 }
               ]}
               testID={`history-chart-line-point-${index}`}
             >
-              <View style={[styles.historyLinePoint, index === points.length - 1 ? styles.historyLinePointCurrent : null]} />
+              <View style={[styles.historyLinePoint, isLast ? styles.historyLinePointCurrent : null]} />
             </View>
           );
         })}
@@ -4858,6 +4959,7 @@ function ReviewSession({
   const isArrowDuelFollowUpReview = currentEntry.mode === "arrow_duel" && reviewState.kind === "line";
   const boardGestureEnabled = !boardLocked && (!lineReviewNeedsContinue || analysisEnabled);
   const boardDraggableColor = boardGestureEnabled ? sideToMove(displayFen) : null;
+  const reviewSideToMove = sideToMove(displayFen);
   const isSessionReview = currentEntry.source === "session";
   const canNavigateReview = (currentEntry.source === "session" || currentEntry.source === "history") && !boardLocked;
   const canReviewPrevious = canNavigateReview && entryIndex > 0;
@@ -5432,6 +5534,7 @@ function ReviewSession({
           <View style={styles.reviewContextPill} testID="review-source-pill">
             <Text style={styles.reviewContextPillText}>{reviewSourceLabel}</Text>
           </View>
+          <MoveSideBadge badgeTestID="review-side-to-move" side={reviewSideToMove} />
           <View style={styles.reviewContextPill} testID="review-theme-pill">
             <Text style={styles.reviewContextPillText}>{reviewPrimaryTheme}</Text>
           </View>
@@ -7310,8 +7413,16 @@ function shouldFlipBoard(currentPuzzle: CurrentPuzzleState): boolean {
   return sideToMove(currentPuzzle.currentFen) === "b";
 }
 
-function sideToMove(fen: string): "w" | "b" {
+function sideToMove(fen: string): MoveSide {
   return fen.split(" ")[1] === "b" ? "b" : "w";
+}
+
+function sideToMoveLabel(side: MoveSide): "White" | "Black" {
+  return side === "b" ? "Black" : "White";
+}
+
+function sideToMoveAccessibilityLabel(side: MoveSide): string {
+  return `${sideToMoveLabel(side)} to move`;
 }
 
 function errorMessage(caught: unknown): string {
@@ -8147,11 +8258,57 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     textAlign: "center"
   },
-  sessionRatingValue: {
+  moveSideBadge: {
+    alignItems: "center",
+    alignSelf: "center",
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 5,
+    justifyContent: "center",
+    minHeight: 30,
+    paddingHorizontal: 7
+  },
+  moveSideBadgeText: {
     color: "#334155",
-    fontSize: 12,
-    fontWeight: "800",
+    flexShrink: 1,
+    fontSize: 11,
+    fontWeight: "900",
     textAlign: "center"
+  },
+  moveSideGlyph: {
+    alignItems: "center",
+    borderRadius: 999,
+    borderWidth: 1.5,
+    height: 16,
+    justifyContent: "center",
+    position: "relative",
+    width: 16
+  },
+  moveSideGlyphWhite: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#0F172A"
+  },
+  moveSideGlyphBlack: {
+    backgroundColor: "#0F172A",
+    borderColor: "#0F172A"
+  },
+  moveSideGlyphBase: {
+    borderRadius: 999,
+    bottom: -3,
+    height: 5,
+    position: "absolute",
+    width: 12
+  },
+  moveSideGlyphWhiteBase: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#0F172A",
+    borderWidth: 1.5
+  },
+  moveSideGlyphBlackBase: {
+    backgroundColor: "#0F172A"
   },
   timerText: {
     color: "#111827",
