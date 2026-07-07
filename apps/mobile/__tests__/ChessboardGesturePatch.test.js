@@ -84,6 +84,56 @@ describe("react-native-chessboard gesture patch", () => {
     expect(patch).toContain("handleTryMove, selectedSquare, square, true");
     expect(patch).toContain("boardState.selectedSquare.set(square);");
   });
+
+  it("only toggles selection off when the piece was selected before the touch began", () => {
+    const packageRoot = dirname(require.resolve("react-native-chessboard/package.json"));
+    const sources = [
+      resolve(packageRoot, "src/hooks/use-board-gesture.ts"),
+      resolve(packageRoot, "lib/module/hooks/use-board-gesture.js"),
+      resolve(packageRoot, "lib/commonjs/hooks/use-board-gesture.js")
+    ];
+
+    for (const sourcePath of sources) {
+      expectGestureSourceGuardsSameSquareDeselect(readFileSync(sourcePath, "utf8"), sourcePath);
+    }
+  });
+
+  it("keeps the touch-start deselect guard in the durable package patch", () => {
+    const patch = readFileSync(
+      resolve(__dirname, "../../../patches/react-native-chessboard@0.2.0.patch"),
+      "utf8"
+    );
+
+    expect(patch).toContain("selectedAtTouchStart");
+    expect(patch).toContain("if (selectedAtTouchStart.get() === square)");
+    expect(patch).toContain("selectedAtTouchStart.set(boardState.selectedSquare.get());");
+  });
+
+  it("lets tap selection win without waiting for the pan gesture to settle", () => {
+    const packageRoot = dirname(require.resolve("react-native-chessboard/package.json"));
+    const sources = [
+      resolve(packageRoot, "src/hooks/use-board-gesture.ts"),
+      resolve(packageRoot, "lib/module/hooks/use-board-gesture.js"),
+      resolve(packageRoot, "lib/commonjs/hooks/use-board-gesture.js")
+    ];
+
+    for (const sourcePath of sources) {
+      expectGestureSourceRacesTapBeforePan(readFileSync(sourcePath, "utf8"), sourcePath);
+    }
+  });
+
+  it("keeps tap-first gesture competition in the durable package patch", () => {
+    const patch = readFileSync(
+      resolve(__dirname, "../../../patches/react-native-chessboard@0.2.0.patch"),
+      "utf8"
+    );
+
+    expect(patch).toContain("Tap should not wait for the pan");
+    expect(patch).toContain("Gesture.Race(tapGesture, panGesture)");
+    expect(patch).toContain("_reactNativeGestureHandler.Gesture.Race(tapGesture, panGesture)");
+    expect(patch).not.toContain("+    return Gesture.Simultaneous(tapGesture, panGesture)");
+    expect(patch).not.toContain("+    return _reactNativeGestureHandler.Gesture.Simultaneous(tapGesture, panGesture)");
+  });
 });
 
 function expectGestureSourceRejectsOpponentPiecesBeforeRaise(source, sourcePath) {
@@ -201,5 +251,54 @@ function expectGestureSourceSelectsTappedPiecesImmediately(source, sourcePath) {
   expect(switchSelectIndex).toBeGreaterThan(switchOwnPieceGuardIndex);
   expect(switchClearMovesIndex).toBeGreaterThan(switchSelectIndex);
   expect(switchScheduleIndex).toBeGreaterThan(switchClearMovesIndex);
+  expect(sourcePath).toBeTruthy();
+}
+
+function expectGestureSourceGuardsSameSquareDeselect(source, sourcePath) {
+  // pan.onBegin must snapshot the selection before any early return so the
+  // tap handler can distinguish "toggle off" from "keep the selection this
+  // same touch just created".
+  const beginIndex = source.indexOf(".onBegin");
+  const snapshotIndex = source.indexOf("selectedAtTouchStart.set(boardState.selectedSquare.get());", beginIndex);
+  const beginRejectIndex = source.indexOf("if (!piece || piece[0] !== allowedDragColor)", beginIndex);
+
+  expect(beginIndex).toBeGreaterThanOrEqual(0);
+  expect(snapshotIndex).toBeGreaterThan(beginIndex);
+  expect(snapshotIndex).toBeLessThan(beginRejectIndex);
+
+  // onBegin must not re-select an already-selected square (would race a
+  // deselect issued by the tap handler on the RN thread).
+  const startIndex = source.indexOf(".onStart", beginIndex);
+  const beginSelectGuardIndex = source.indexOf("boardState.selectedSquare.get() !== square", beginIndex);
+  expect(beginSelectGuardIndex).toBeGreaterThan(beginIndex);
+  expect(beginSelectGuardIndex).toBeLessThan(startIndex);
+
+  // Tap Case 2 deselects only when the piece was selected at touch start.
+  const tapIndex = source.indexOf("Add tap gesture");
+  const sameSquareIndex = source.indexOf("if (square === selectedSquare)", tapIndex);
+  const guardIndex = source.indexOf("if (selectedAtTouchStart.get() === square)", sameSquareIndex);
+  const clearIndex = source.indexOf("boardState.selectedSquare.set(null);", guardIndex);
+  const caseThreeIndex = source.indexOf("Tapped on valid move target", sameSquareIndex);
+
+  expect(tapIndex).toBeGreaterThanOrEqual(0);
+  expect(sameSquareIndex).toBeGreaterThan(tapIndex);
+  expect(guardIndex).toBeGreaterThan(sameSquareIndex);
+  expect(guardIndex).toBeLessThan(caseThreeIndex);
+  expect(clearIndex).toBeGreaterThan(guardIndex);
+  expect(clearIndex).toBeLessThan(caseThreeIndex);
+  expect(sourcePath).toBeTruthy();
+}
+
+function expectGestureSourceRacesTapBeforePan(source, sourcePath) {
+  const tapIndex = source.indexOf("const tapGesture");
+  const panIndex = source.indexOf("const panGesture");
+  const raceIndex = source.indexOf("Gesture.Race(tapGesture, panGesture)");
+  const compiledRaceIndex = source.indexOf("_reactNativeGestureHandler.Gesture.Race(tapGesture, panGesture)");
+
+  expect(tapIndex).toBeGreaterThanOrEqual(0);
+  expect(panIndex).toBeGreaterThanOrEqual(0);
+  expect(source).not.toContain("Gesture.Simultaneous(tapGesture, panGesture)");
+  expect(source).not.toContain("_reactNativeGestureHandler.Gesture.Simultaneous(tapGesture, panGesture)");
+  expect(Math.max(raceIndex, compiledRaceIndex)).toBeGreaterThan(Math.max(tapIndex, panIndex));
   expect(sourcePath).toBeTruthy();
 }
