@@ -20,18 +20,19 @@ function targetBuildSettings(project) {
 }
 
 describe("iOS device target configuration", () => {
-  it("ships 1.0 as iPhone-only with the current React Native minimum iOS target", () => {
+  it("ships 1.0 for iPhone and iPad with the current React Native minimum iOS target", () => {
     const project = readText(join(appRoot, "ios", "ChessticizeMobile.xcodeproj", "project.pbxproj"));
     const settings = targetBuildSettings(project);
 
-    expect(settings.match(/TARGETED_DEVICE_FAMILY = 1;/g)).toHaveLength(2);
-    expect(settings).not.toContain('TARGETED_DEVICE_FAMILY = "1,2";');
+    expect(settings.match(/TARGETED_DEVICE_FAMILY = "1,2";/g)).toHaveLength(2);
+    expect(settings).not.toContain("TARGETED_DEVICE_FAMILY = 1;");
     expect(settings.match(/IPHONEOS_DEPLOYMENT_TARGET = 15\.1;/g)).toHaveLength(2);
   });
 
-  it("locks the app to portrait orientation for the iPhone target", () => {
+  it("locks the app to full-screen portrait orientation on iPhone and iPad", () => {
     const infoPlist = readText(join(iosRoot, "Info.plist"));
 
+    expect(infoPlist).toContain("<key>UIRequiresFullScreen</key>\n\t<true/>");
     expect(infoPlist).toContain(
       "<key>UISupportedInterfaceOrientations</key>\n\t<array>\n\t\t<string>UIInterfaceOrientationPortrait</string>\n\t</array>"
     );
@@ -44,9 +45,9 @@ describe("iOS device target configuration", () => {
     const deviceTargets = readText(join(repoRoot, "docs", "DEVICE_TARGETS.md"));
     const readme = readText(join(repoRoot, "README.md"));
 
-    expect(deviceTargets).toContain("Chessticize Mobile 1.0 ships as an iPhone-only app.");
-    expect(deviceTargets).toContain("Device family: iPhone only (`TARGETED_DEVICE_FAMILY = 1`)");
-    expect(deviceTargets).toContain("Orientation: portrait only (`UIInterfaceOrientationPortrait`)");
+    expect(deviceTargets).toContain("Chessticize Mobile 1.0 ships as a full-screen portrait app for iPhone and iPad.");
+    expect(deviceTargets).toContain('Device family: iPhone and iPad (`TARGETED_DEVICE_FAMILY = "1,2"`)');
+    expect(deviceTargets).toContain("Orientation: full-screen portrait only (`UIRequiresFullScreen` and `UIInterfaceOrientationPortrait`)");
     expect(deviceTargets).toContain("Minimum iOS version: 15.1");
     expect(readme).toContain("[iOS Device Targets](docs/DEVICE_TARGETS.md)");
   });

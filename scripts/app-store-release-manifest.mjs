@@ -28,6 +28,10 @@ function uniqueMatches(source, pattern) {
   return Array.from(new Set(Array.from(source.matchAll(pattern), (match) => match[1].trim())));
 }
 
+function unquoteBuildSetting(value) {
+  return value.replace(/^"|"$/gu, "");
+}
+
 function sha256(path) {
   return createHash("sha256").update(readFileSync(join(repoRoot, path))).digest("hex");
 }
@@ -61,6 +65,7 @@ const marketingVersions = uniqueMatches(pbxproj, /MARKETING_VERSION = ([^;]+);/g
 const buildNumbers = uniqueMatches(pbxproj, /CURRENT_PROJECT_VERSION = ([^;]+);/g);
 const bundleIdentifiers = uniqueMatches(pbxproj, /PRODUCT_BUNDLE_IDENTIFIER = ([^;]+);/g);
 const deviceFamilies = uniqueMatches(pbxproj, /TARGETED_DEVICE_FAMILY = ([^;]+);/g);
+const targetedDeviceFamily = deviceFamilies.length === 1 ? unquoteBuildSetting(deviceFamilies[0]) : "";
 const dirtyStatus = git(["status", "--porcelain"]);
 
 if (dirtyStatus && !allowDirty) {
@@ -99,7 +104,7 @@ const manifest = {
     bundleIdentifier: bundleIdentifiers[0],
     version,
     build,
-    targetedDeviceFamily: deviceFamilies[0],
+    targetedDeviceFamily,
     platform: "ios"
   },
   puzzlePack: {

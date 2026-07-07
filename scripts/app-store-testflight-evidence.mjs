@@ -165,7 +165,7 @@ function main() {
   const manualGates = [
     "Upload the build to App Store Connect.",
     "Distribute the uploaded build to the Internal 1.0 QA TestFlight group.",
-    "Install the TestFlight build on a physical iPhone.",
+    "Install the TestFlight build on physical iPhone and iPad hardware.",
     "Run the physical-device checklist in docs/TESTFLIGHT_QA.md.",
     "Fill docs/TESTFLIGHT_QA.md with exact build, device, tester, result, and evidence location."
   ];

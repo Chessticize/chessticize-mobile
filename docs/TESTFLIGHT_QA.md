@@ -21,8 +21,9 @@ Recheck Apple's live documentation before the pass:
    feedback email or support path.
 3. Create or reuse an internal testing group.
 4. Add the build to that internal testing group.
-5. Install the build from the TestFlight app on at least one physical iPhone.
-6. Run the full checklist below on the physical device.
+5. Install the build from the TestFlight app on at least one physical iPhone and
+   one representative iPad.
+6. Run the full checklist below on the physical devices.
 7. Record the result in the evidence log.
 
 Do not count simulator-only testing as the TestFlight pass. Simulator and Detox
@@ -65,11 +66,13 @@ Run these before uploading the build:
 
 ## Physical Device Matrix
 
-Record at least one physical iPhone before marking the pass complete.
+Record at least one physical iPhone and one representative iPad before marking
+the pass complete.
 
 | Device | iOS version | Apple ID role | Network state | Result |
 | --- | --- | --- | --- | --- |
-| TBD | TBD | Internal tester | Online and airplane mode | Pending |
+| TBD iPhone | TBD | Internal tester | Online and airplane mode | Pending |
+| TBD iPad | TBD | Internal tester | Online and airplane mode | Pending |
 
 ## Manual QA Checklist
 
@@ -213,8 +216,8 @@ The command writes a timestamped folder under `scratch/testflight-qa/` with:
 
 The bundle is only local evidence for repository-controlled gates. It does not
 complete the TestFlight pass until the uploaded App Store Connect build is
-distributed, installed from TestFlight on a physical iPhone, and the manual
-checklist plus evidence log above are filled.
+distributed, installed from TestFlight on physical iPhone and iPad hardware, and
+the manual checklist plus evidence log above are filled.
 
 ## Archive And Upload
 

@@ -1,38 +1,38 @@
 # iOS Device Targets
 
-Chessticize Mobile 1.0 ships as an iPhone-only app.
+Chessticize Mobile 1.0 ships as a full-screen portrait app for iPhone and iPad.
 
 ## 1.0 Decision
 
-- Device family: iPhone only (`TARGETED_DEVICE_FAMILY = 1`)
-- Orientation: portrait only (`UIInterfaceOrientationPortrait`)
+- Device family: iPhone and iPad (`TARGETED_DEVICE_FAMILY = "1,2"`)
+- Orientation: full-screen portrait only (`UIRequiresFullScreen` and `UIInterfaceOrientationPortrait`)
 - Minimum iOS version: 15.1
 
 ## Rationale
 
-The 1.0 design is optimized for one-handed portrait use. Practice and review
-flows keep the board as the primary surface, with timer, prompts, candidate
-controls, and review actions arranged for a phone viewport. Shipping as
-iPhone-only keeps the first App Store release aligned with the tested design and
-avoids implying first-class iPad or landscape support before those layouts are
-designed.
+The 1.0 design is optimized for portrait use. Practice and review flows keep the
+board as the primary surface, with timer, prompts, candidate controls, and
+review actions arranged for the tested phone viewport while scaling up to iPad
+in full-screen portrait.
 
-iPad support should be treated as a later product decision. It needs a dedicated
-tablet layout pass, landscape behavior, and App Store screenshot and QA coverage
-before `TARGETED_DEVICE_FAMILY` is expanded again.
+Landscape and multitasking layouts remain out of scope for 1.0. `UIRequiresFullScreen`
+keeps the iPad target on the same portrait surface until a dedicated tablet
+layout pass, landscape behavior, and App Store screenshot and QA coverage are
+added.
 
 ## Verification
 
 Release readiness for this item is covered by:
 
-- `apps/mobile/__tests__/iosDeviceTargets.test.js`, which asserts the iPhone
-  target family, portrait-only Info.plist orientation, iOS 15.1 deployment
-  target, and this documented decision.
+- `apps/mobile/__tests__/iosDeviceTargets.test.js`, which asserts the iPhone and
+  iPad target family, full-screen portrait Info.plist orientation, iOS 15.1
+  deployment target, and this documented decision.
 - `apps/mobile/__tests__/PracticePocScreen.test.tsx`, which renders the main app
   shell under compact iPhone SE-sized and modern iPhone-sized portrait
   viewports.
-- Simulator build checks on the smallest available iPhone simulator and the
-  current flagship simulator before App Store submission.
+- Simulator build checks on the smallest available iPhone simulator, the current
+  flagship simulator, and a representative iPad simulator before App Store
+  submission.
 
 If the local Xcode install does not include an iPhone SE runtime, use the
 smallest available iPhone simulator for native build verification and keep the

@@ -284,10 +284,11 @@ Design approved 2026-07-03; the "Review Reminder Notifications" section of
    minimum iOS version; verify layout on iPhone SE-size and current-flagship
    simulators (design doc QA rule).
    Status: implementation complete. `docs/DEVICE_TARGETS.md` records the 1.0
-   decision to ship iPhone-only, portrait-only, with minimum iOS 15.1. The iOS
-   target now uses `TARGETED_DEVICE_FAMILY = 1`, `Info.plist` only declares
-   `UIInterfaceOrientationPortrait`, and mobile tests cover both the native
-   target metadata and compact/modern portrait layout smoke renders.
+   decision to ship iPhone+iPad full-screen portrait, with minimum iOS 15.1. The
+   iOS target now uses `TARGETED_DEVICE_FAMILY = "1,2"`, `Info.plist` declares
+   `UIRequiresFullScreen` and `UIInterfaceOrientationPortrait`, and mobile tests
+   cover both the native target metadata and compact/modern portrait layout smoke
+   renders.
 6. **Store assets**: screenshots (6.7" and 6.1" minimum), description,
    keywords, support URL.
    Status: implementation complete. `docs/STORE_ASSETS.md` now records the
