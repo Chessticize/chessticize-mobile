@@ -44,7 +44,6 @@ describe("react-native-chessboard gesture patch", () => {
       "utf8"
     );
 
-    expect(patch).toContain("before the drag crosses the");
     expect(patch).toContain("validMoves.length === 0");
     expect(patch).toContain("handleTryMove, square, targetSquare, true");
   });
@@ -62,6 +61,19 @@ describe("react-native-chessboard gesture patch", () => {
     }
   });
 
+  it("selects tapped own pieces on the UI thread before React handles valid moves", () => {
+    const packageRoot = dirname(require.resolve("react-native-chessboard/package.json"));
+    const sources = [
+      resolve(packageRoot, "src/hooks/use-board-gesture.ts"),
+      resolve(packageRoot, "lib/module/hooks/use-board-gesture.js"),
+      resolve(packageRoot, "lib/commonjs/hooks/use-board-gesture.js")
+    ];
+
+    for (const sourcePath of sources) {
+      expectGestureSourceSelectsTappedPiecesImmediately(readFileSync(sourcePath, "utf8"), sourcePath);
+    }
+  });
+
   it("keeps the fast tap-tap validMoves fallback in the durable package patch", () => {
     const patch = readFileSync(
       resolve(__dirname, "../../../patches/react-native-chessboard@0.2.0.patch"),
@@ -70,6 +82,7 @@ describe("react-native-chessboard gesture patch", () => {
 
     expect(patch).toContain("tap-tap stays responsive");
     expect(patch).toContain("handleTryMove, selectedSquare, square, true");
+    expect(patch).toContain("boardState.selectedSquare.set(square);");
   });
 });
 
@@ -158,5 +171,35 @@ function expectGestureSourceHandlesPendingTapTarget(source, sourcePath) {
   expect(clearSelectionIndex).toBeGreaterThan(pendingIndex);
   expect(pendingTryIndex).toBeGreaterThan(clearSelectionIndex);
   expect(invalidTargetIndex).toBeGreaterThan(pendingTryIndex);
+  expect(sourcePath).toBeTruthy();
+}
+
+function expectGestureSourceSelectsTappedPiecesImmediately(source, sourcePath) {
+  const tapIndex = source.indexOf("Add tap gesture");
+
+  const noSelectionIndex = source.indexOf("No piece selected", tapIndex);
+  const firstOwnPieceIndex = source.indexOf("if (isOwnPiece)", noSelectionIndex);
+  const firstSelectIndex = source.indexOf("boardState.selectedSquare.set(square);", firstOwnPieceIndex);
+  const firstClearMovesIndex = source.indexOf("boardState.validMoves.set([]);", firstSelectIndex);
+  const firstScheduleIndex = source.indexOf("handleSelectPiece, square", firstClearMovesIndex);
+
+  expect(tapIndex).toBeGreaterThanOrEqual(0);
+  expect(noSelectionIndex).toBeGreaterThan(tapIndex);
+  expect(firstOwnPieceIndex).toBeGreaterThan(noSelectionIndex);
+  expect(firstSelectIndex).toBeGreaterThan(firstOwnPieceIndex);
+  expect(firstClearMovesIndex).toBeGreaterThan(firstSelectIndex);
+  expect(firstScheduleIndex).toBeGreaterThan(firstClearMovesIndex);
+
+  const switchOwnPieceIndex = source.indexOf("Tapped on another own piece", firstScheduleIndex);
+  const switchOwnPieceGuardIndex = source.indexOf("if (isOwnPiece)", switchOwnPieceIndex);
+  const switchSelectIndex = source.indexOf("boardState.selectedSquare.set(square);", switchOwnPieceGuardIndex);
+  const switchClearMovesIndex = source.indexOf("boardState.validMoves.set([]);", switchSelectIndex);
+  const switchScheduleIndex = source.indexOf("handleSelectPiece, square", switchClearMovesIndex);
+
+  expect(switchOwnPieceIndex).toBeGreaterThan(firstScheduleIndex);
+  expect(switchOwnPieceGuardIndex).toBeGreaterThan(switchOwnPieceIndex);
+  expect(switchSelectIndex).toBeGreaterThan(switchOwnPieceGuardIndex);
+  expect(switchClearMovesIndex).toBeGreaterThan(switchSelectIndex);
+  expect(switchScheduleIndex).toBeGreaterThan(switchClearMovesIndex);
   expect(sourcePath).toBeTruthy();
 }
