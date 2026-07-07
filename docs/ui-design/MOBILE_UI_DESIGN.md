@@ -1,6 +1,6 @@
 # Mobile UI Design
 
-This document captures the current Chessticize web Puzzle Sprint experience and proposes a cleaner mobile-first UI direction for Chessticize Mobile. Game Review is intentionally out of scope for the mobile app.
+This document captures the current Chessticize web Puzzle Sprint experience, the current Chessticize Mobile implementation shape, and the remaining mobile-first UI requirements. Game Review is intentionally out of scope for the mobile app.
 
 ## Current Web Observations
 
@@ -29,35 +29,37 @@ The current web app was reviewed in Chrome on `chessticize.com`, focused on Puzz
 
 ## Complete App Design Board
 
-The design board below is an imagegen-rendered high-fidelity concept for reviewing the overall product shape. It is useful for visual direction, but the written specifications in this document are authoritative for exact copy, scoring behavior, chart placement, licensing text, and implementation details.
+The design board below is a simulator-captured implementation snapshot from the current iOS app. It is useful for reviewing the actual product shape, but the written specifications in this document are authoritative for exact copy, scoring behavior, chart placement, licensing text, and remaining implementation details. The captured build is a development/test build, so it may show QA-only controls such as the puzzle source switch and review notification test actions that must remain hidden in release builds.
 
 ![Complete mobile design board](assets/mobile-full-design-board.png)
 
-The board covers these major screens:
+The board covers these current major screens:
 
 - Practice Home
-- Regular Sprint Active
+- Standard Sprint Active
 - Arrow Duel Active
 - Sprint Results
 - Review Queue
-- Arrow Duel Review
+- Analysis Review
 - History
 - Custom Sprint Setup
 - Settings
+- Puzzle Data / License
 
 Screen inventory:
 
 | Screen | Main layout | Primary actions | Navigates to |
 | --- | --- | --- | --- |
 | Practice Home | Mode list, progress summary, due review strip, bottom tabs | Start Standard, Arrow Duel, Blitz, Custom; resume interrupted session | Active Sprint, Custom Sprint, Review Queue |
-| Regular Sprint Active | Focused session shell, status bar, board, prompt | Make board move, abandon, complete/fail sprint | Sprint Results |
-| Arrow Duel Active | Focused shell, status bar, board, neutral candidate arrows | Choose a candidate on the board, abandon, complete/fail sprint | Sprint Results, Arrow Duel Review |
+| Standard Sprint Active | Focused session shell, status bar, board, prompt | Make board move, abandon, complete/fail sprint | Sprint Results |
+| Arrow Duel Active | Focused shell, status bar, board, neutral candidate arrows | Choose a candidate on the board, abandon, complete/fail sprint | Sprint Results, Analysis Review |
 | Sprint Results | Win/loss status, solved count, rating change, mistakes, actions | Review mistakes, play again, done | Review Item, Practice Home |
 | Review Queue | Due/overdue summary, difficulty groups, start button | Start due review, filter queue | Review Item |
-| Arrow Duel Review | Board, green/red arrows, guided punishment line | Follow line, reset, analyze, finish review | Review Complete, History |
-| History | Rating trend line chart, range/type filters, attempt rows, result/rating/review state | Filter wrong-only rows, inspect sprint type/speed, open attempt | Attempt Detail, Review Item |
+| Analysis Review | Board, compact toolbar, Stockfish status, candidate line rows, guided arrows when applicable | Reset, flip, analyze, navigate, finish review | Review Complete, History |
+| History | Rating trend line chart, range filters, selected ELO bucket, expandable row filters, attempt rows | Filter wrong-only/source rows, inspect attempt context, open attempt | Attempt Detail, Review Item |
 | Custom Sprint Setup | Mode/theme/timing controls, estimate, rating range, start | Start sprint, save template | Active Sprint |
-| Settings | Local data, reset, export, notifications, about, puzzle-data source notes | Export data, delete local history, reset ELO, inspect licenses | Confirm Sheet |
+| Settings | Local data, reset, export, notifications, about, puzzle-data source notes | Export data, delete local history, reset ELO, inspect licenses | Confirm Sheet, Puzzle Data / License |
+| Puzzle Data / License | Bundled source name, puzzle count, source license, Lichess-derived attribution, presolve metadata | Inspect source and license notes | Settings |
 
 ## Mobile Information Architecture
 
@@ -65,7 +67,7 @@ Use a four-tab app shell:
 
 - Practice: quick start, active session, custom sprint setup, and Arrow Duel entry.
 - Review: due mistake reviews and spaced repetition queue.
-- History: attempts, sprint sessions, filters, and the wrong-only shortcut.
+- History: attempts, sprint sessions, range filters, selected ELO bucket, and expandable detailed filters including wrong-only/source filters.
 - Settings: local data, ELO reset, export/delete data, notification preferences, advanced rating adjustment, and puzzle data attribution.
 
 There should be no mobile Home tab, Game Review tab, or Packs tab in v1.
@@ -86,9 +88,9 @@ Primary flows:
 
 | Flow | Steps | Notes |
 | --- | --- | --- |
-| Standard or Blitz practice | Practice Home -> Regular Sprint Active -> Sprint Results -> Practice Home | Board moves submit answers directly. Win by solving the target count before time/mistake failure. |
-| Arrow Duel practice | Practice Home -> Arrow Duel Active -> Sprint Results -> Arrow Duel Review | Candidate arrows are neutral until selection. Win by solving the target count before time/mistake failure. |
-| Custom sprint | Practice Home -> Custom Sprint Setup -> Regular Sprint Active or Arrow Duel Active -> Sprint Results | The selected mode determines the active session shell. |
+| Standard or Blitz practice | Practice Home -> Standard Sprint Active -> Sprint Results -> Practice Home | Board moves submit answers directly. Win by solving the target count before time/mistake failure. |
+| Arrow Duel practice | Practice Home -> Arrow Duel Active -> Sprint Results -> Analysis Review | Candidate arrows are neutral until selection. Win by solving the target count before time/mistake failure. |
+| Custom sprint | Practice Home -> Custom Sprint Setup -> Standard Sprint Active or Arrow Duel Active -> Sprint Results | The selected mode determines the active session shell. |
 | Due mistake review | Review Queue -> Scheduled Review Item -> Review Complete -> Review Queue | Correct answers increase interval; failures reset or shorten it. Official review attempts are recorded in History. |
 | Post-session analysis | Sprint Results or Scheduled Review Complete -> Analysis Review -> Results or Practice | Used to inspect mistakes immediately. It is opened only by the result-screen review action, does not write History, and does not change the spaced repetition schedule. |
 | History replay | History -> Filtered row -> Analysis Review | History preserves original attempt context. Previous/next navigation stays inside the active History filter. |
@@ -157,7 +159,7 @@ Core components:
 - `ChessboardSurface`: reused board component plus highlight/arrow overlay adapter.
 - `ModePicker`: compact list or segmented choice for Standard, Arrow Duel, Blitz, Custom.
 - `ReviewQueueHeader`: due count, overdue count, and next review estimate.
-- `HistoryFilterBar`: date/result/mode/theme chips with a persistent wrong-only shortcut.
+- `HistoryFilterBar`: date-range chips, selected ELO bucket, compact filter toggle, and expandable result/source filters.
 - `RatingTrendChart`: rating-only line chart over the selected ELO bucket and time range.
 - `SettingsRow`: label, value, status, and disclosure or switch.
 - `PuzzleDataLicenseSection`: bundled source name, puzzle count, source license, Lichess-derived attribution, and Chessticize presolve metadata.
@@ -257,7 +259,7 @@ Arrow Duel review rules:
 - Green always means the best move.
 - Red always means the inferior candidate.
 - The review should avoid redundant legend or choice-marker chips; use board arrows, feedback highlights, and the guided line to explain the state.
-- After a wrong answer, the opponent's refutation reply plays automatically, then the punishment line continues as a guided interaction: the user plays each expected move themselves by following the guide arrow, so no pause/step transport controls are needed. Replay is available by resetting the puzzle. Throughout the line, show the live Stockfish evaluation of the current position. (This guided interaction supersedes the playback transport bar drawn on the design board.)
+- After a wrong answer, the opponent's refutation reply plays automatically, then the punishment line continues as a guided interaction: the user plays each expected move themselves by following the guide arrow, so no pause/step transport controls are needed. Replay is available by resetting the puzzle. Throughout the line, show the live Stockfish evaluation of the current position. The current implementation uses the compact review toolbar and guided arrows rather than a playback transport bar.
 - If the stored punishment line requires the user's next move, show that expected move with an arrow, wait for the user to make it, then play the next reply. Continue until the line ends, then stop.
 - Review copy should explain the tactical reason only when the data supports it; otherwise show engine line and evaluation shift.
 - In a Scheduled Review, selecting the wrong Arrow Duel candidate records a failed review attempt and resets or contracts that puzzle's schedule. The user may then enter Analysis Review to inspect the line without creating additional history.
@@ -355,8 +357,8 @@ Custom sprint behavior:
 
 - Quick range filters include 7 days, 30 days, 90 days, 1 year, and all time.
 - History data must be pageable, including the all-time range.
-- Quick content filters include a front-page "Wrong only" shortcut, source type, theme, rating range, and review status.
-- "Wrong only" is a result filter shortcut that does not change the active time range. It toggles the attempt rows between all results and wrong results.
+- Quick content filters include wrong-only and source type. These live behind the compact filter toggle so the default History surface can prioritize range chips, the selected ELO bucket, the rating trend, and attempt rows.
+- "Wrong only" is a result filter shortcut that does not change the active time range. It toggles the attempt rows between all results and wrong results and should appear in the active filter summary when enabled.
 - The selected ELO bucket is required and supplies the mode, sprint config, and
   sprint-speed context in 1.0. Do not show separate History mode or speed chips
   while the view is scoped to a single bucket.
@@ -470,6 +472,7 @@ Required labels/test IDs:
 - `review-start-due`
 - `review-dev-promote-next-due` (dev/test builds only)
 - `review-dev-test-notification` (dev/test builds only)
+- `history-filter-toggle`
 - `history-filter-wrong-only`
 - `settings-local-storage`
 - `settings-reset-elo`
