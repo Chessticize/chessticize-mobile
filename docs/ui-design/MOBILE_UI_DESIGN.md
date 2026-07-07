@@ -1,16 +1,8 @@
 # Mobile UI Design
 
-This document captures the current Chessticize web Puzzle Sprint experience, the current Chessticize Mobile implementation shape, and the remaining mobile-first UI requirements. Game Review is intentionally out of scope for the mobile app.
+This document captures the current Chessticize Mobile implementation shape and the remaining mobile-first UI requirements. Game Review is intentionally out of scope for the mobile app.
 
-## Current Web Observations
-
-The current web app was reviewed in Chrome on `chessticize.com`, focused on Puzzle Sprint flows. Raw screenshots were captured during review, but public repository artifacts use a sanitized schematic so usernames, exact ELO values, personal stats, and dates are not published.
-
-### Sanitized Capture Summary
-
-![Current web observed flow](assets/current-web-observed-flow.png)
-
-### Functional Inventory
+## Initial Web Reference
 
 - Main navigation includes Home, Puzzle Sprint, Game Review, and Settings. Mobile should exclude Game Review from the app scope.
 - Puzzle Sprint dashboard shows daily stats, Standard Sprint, Arrow Duel, Blitz Sprint, recent custom sprint configs, and a Custom Sprint entry.
