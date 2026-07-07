@@ -15,22 +15,33 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
+    configureReactNativeFactory()
+
+    return true
+  }
+
+  func configureReactNativeFactory() {
+    if reactNativeFactory != nil {
+      return
+    }
+
     let delegate = ReactNativeDelegate()
     let factory = RCTReactNativeFactory(delegate: delegate)
     delegate.dependencyProvider = RCTAppDependencyProvider()
 
     reactNativeDelegate = delegate
     reactNativeFactory = factory
+  }
 
-    window = UIWindow(frame: UIScreen.main.bounds)
+  func startReactNative(in window: UIWindow) {
+    configureReactNativeFactory()
 
-    factory.startReactNative(
+    self.window = window
+    reactNativeFactory?.startReactNative(
       withModuleName: "ChessticizeMobile",
       in: window,
-      launchOptions: launchOptions
+      launchOptions: nil
     )
-
-    return true
   }
 }
 
