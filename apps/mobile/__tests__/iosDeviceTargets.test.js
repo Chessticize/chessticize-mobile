@@ -33,7 +33,7 @@ describe("iOS device target configuration", () => {
     const infoPlist = readText(join(iosRoot, "Info.plist"));
 
     expect(infoPlist).toContain(
-      "<key>UISupportedInterfaceOrientations</key>\n\t<array>\n\t\t<string>UIInterfaceOrientationPortrait</string>\n\t\t<string>UIInterfaceOrientationLandscapeLeft</string>\n\t\t<string>UIInterfaceOrientationLandscapeRight</string>\n\t</array>"
+      "<key>UISupportedInterfaceOrientations</key>\n\t<array>\n\t\t<string>UIInterfaceOrientationPortrait</string>\n\t</array>"
     );
     expect(infoPlist).toContain(
       "<key>UISupportedInterfaceOrientations~ipad</key>\n\t<array>\n\t\t<string>UIInterfaceOrientationPortrait</string>\n\t\t<string>UIInterfaceOrientationPortraitUpsideDown</string>\n\t\t<string>UIInterfaceOrientationLandscapeLeft</string>\n\t\t<string>UIInterfaceOrientationLandscapeRight</string>\n\t</array>"
@@ -45,11 +45,11 @@ describe("iOS device target configuration", () => {
     const deviceTargets = readText(join(repoRoot, "docs", "DEVICE_TARGETS.md"));
     const readme = readText(join(repoRoot, "README.md"));
 
-    expect(deviceTargets).toContain("Chessticize Mobile 1.0 ships for iPhone and iPad with adaptive portrait,");
-    expect(deviceTargets).toContain("landscape, and iPad multitasking layouts.");
+    expect(deviceTargets).toContain("Chessticize Mobile 1.0 ships for iPhone portrait and adaptive iPad portrait,");
+    expect(deviceTargets).toContain("landscape, and multitasking layouts.");
     expect(deviceTargets).toContain('Device family: iPhone and iPad (`TARGETED_DEVICE_FAMILY = "1,2"`)');
-    expect(deviceTargets).toContain("Orientation: iPhone portrait plus landscape; iPad portrait, upside-down");
-    expect(deviceTargets).toContain("portrait, and landscape");
+    expect(deviceTargets).toContain("Orientation: iPhone portrait only; iPad portrait, upside-down");
+    expect(deviceTargets).toContain("and\n  landscape");
     expect(deviceTargets).toContain("Minimum iOS version: 15.1");
     expect(readme).toContain("[iOS Device Targets](docs/DEVICE_TARGETS.md)");
   });

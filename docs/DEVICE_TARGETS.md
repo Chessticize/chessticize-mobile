@@ -1,13 +1,13 @@
 # iOS Device Targets
 
-Chessticize Mobile 1.0 ships for iPhone and iPad with adaptive portrait,
-landscape, and iPad multitasking layouts.
+Chessticize Mobile 1.0 ships for iPhone portrait and adaptive iPad portrait,
+landscape, and multitasking layouts.
 
 ## 1.0 Decision
 
 - Device family: iPhone and iPad (`TARGETED_DEVICE_FAMILY = "1,2"`)
-- Orientation: iPhone portrait plus landscape; iPad portrait, upside-down
-  portrait, and landscape
+- Orientation: iPhone portrait only; iPad portrait, upside-down portrait, and
+  landscape
 - Minimum iOS version: 15.1
 
 ## Rationale
@@ -21,17 +21,18 @@ and active-session controls beside the board where space allows.
 
 `UIRequiresFullScreen` is intentionally absent so iPad can use Split View and
 Stage Manager sizes. The app declares an iPhone orientation mask for portrait
-and landscape and an iPad mask for all four interface orientations.
+only and an iPad mask for all four interface orientations.
 
 ## Adaptive Orientation Coverage
 
-The mobile UI design defines the adaptive target for compact iPhone landscape,
-regular-width iPad, and iPad split-view widths. The current implementation covers:
+The mobile UI design defines the adaptive target for compact portrait phones,
+regular-width iPad, iPad landscape, and iPad split-view widths. The current
+implementation covers:
 
 - an adaptive shell derived from measured width, height, and safe-area insets;
 - board sizing based on the available board slot rather than screen width only;
-- compact landscape session layouts with a fixed board lane and scrollable
-  control rail;
+- compact landscape viewport session layouts with a fixed board lane and
+  scrollable control rail;
 - regular-width iPad layouts with side navigation and two-pane or three-pane
   content where useful;
 - component tests for explicit portrait, landscape, iPad, and split-view
@@ -50,7 +51,7 @@ Release readiness for this item is covered by:
   target, and this documented decision.
 - `apps/mobile/__tests__/PracticePocScreen.test.tsx`, which renders the main app
   shell under compact iPhone SE-sized portrait, modern iPhone portrait, compact
-  iPhone landscape, iPad portrait, iPad landscape, and split-width viewports.
+  landscape viewport, iPad portrait, iPad landscape, and split-width viewports.
 - Simulator build checks on the smallest available iPhone simulator, the current
   flagship simulator, and a representative iPad simulator before App Store
   submission.

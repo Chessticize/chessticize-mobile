@@ -124,6 +124,7 @@ type AdaptiveLayout = {
   sideNavigationExpanded: boolean;
   sideNavigationWidth: number;
   usesSideNavigation: boolean;
+  usesSessionRail: boolean;
   usesWideContent: boolean;
 };
 
@@ -272,20 +273,22 @@ function buildAdaptiveLayout({
     MIN_BOARD,
     viewportWidth - (usesSideNavigation ? sideNavigationWidth : 0)
   );
+  const sessionContentWidth = viewportWidth;
   const usesWideContent = isCompactLandscape || contentWidth >= 860;
+  const usesSessionRail = isCompactLandscape || sessionContentWidth >= 860;
   const sessionRailWidth = isRegularWidth
-    ? Math.min(REGULAR_RAIL_MAX, Math.max(REGULAR_RAIL_MIN, Math.floor(contentWidth * 0.3)))
-    : Math.min(COMPACT_LANDSCAPE_RAIL_MAX, Math.max(COMPACT_LANDSCAPE_RAIL_MIN, Math.floor(contentWidth * 0.34)));
+    ? Math.min(REGULAR_RAIL_MAX, Math.max(REGULAR_RAIL_MIN, Math.floor(sessionContentWidth * 0.3)))
+    : Math.min(COMPACT_LANDSCAPE_RAIL_MAX, Math.max(COMPACT_LANDSCAPE_RAIL_MIN, Math.floor(sessionContentWidth * 0.34)));
   const sessionBoardSlotWidth = Math.max(
     MIN_BOARD,
-    contentWidth - UI_PADDING * 2 - sessionRailWidth - 14
+    sessionContentWidth - UI_PADDING * 2 - sessionRailWidth - 14
   );
   const sessionBoardSlotHeight = Math.max(MIN_BOARD, contentHeight - UI_PADDING * 2);
-  const portraitBoardSlotWidth = Math.max(MIN_BOARD, contentWidth - UI_PADDING * 2);
+  const portraitBoardSlotWidth = Math.max(MIN_BOARD, sessionContentWidth - UI_PADDING * 2);
   const boardMax = isRegularWidth
     ? REGULAR_BOARD_MAX
     : isCompactLandscape ? COMPACT_LANDSCAPE_BOARD_MAX : PHONE_PORTRAIT_BOARD_MAX;
-  const boardSlot = usesWideContent
+  const boardSlot = usesSessionRail
     ? Math.min(sessionBoardSlotWidth, sessionBoardSlotHeight)
     : portraitBoardSlotWidth;
   const boardSize = Math.floor(Math.max(MIN_BOARD, Math.min(boardSlot, boardMax)));
@@ -302,6 +305,7 @@ function buildAdaptiveLayout({
     sideNavigationExpanded,
     sideNavigationWidth,
     usesSideNavigation,
+    usesSessionRail,
     usesWideContent
   };
 }
@@ -1329,7 +1333,7 @@ export function PracticePocScreen({
   const appHeaderVisible = appChromeVisible && !contentOwnsHeader;
   const sideNavigationVisible = appChromeVisible && adaptiveLayout.usesSideNavigation;
   const bottomTabsVisible = appChromeVisible && !sideNavigationVisible;
-  const sessionUsesRail = shouldShowSessionBoard && adaptiveLayout.usesWideContent;
+  const sessionUsesRail = shouldShowSessionBoard && adaptiveLayout.usesSessionRail;
   const screenTitle = screenTitleFor(tab);
   const screenSubtitle = tab === "practice"
     ? `Offline-ready · ${seededPuzzleCount(puzzleSource)} puzzles`
@@ -7946,7 +7950,7 @@ const styles = StyleSheet.create({
   },
   contentSessionRail: {
     flexGrow: 1,
-    justifyContent: "center"
+    justifyContent: "flex-start"
   },
   practiceHome: {
     gap: 12
