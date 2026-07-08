@@ -4,8 +4,7 @@ import type { PracticeSettings, ReviewReminderPreference } from "./practice-stor
 export function defaultPracticeSettings(): PracticeSettings {
   return {
     sync: {
-      iCloudEnabled: true,
-      uploadAllowed: false
+      iCloudEnabled: false
     },
     notifications: {
       reviewReminder: {
@@ -18,8 +17,7 @@ export function defaultPracticeSettings(): PracticeSettings {
 export function clonePracticeSettings(settings: PracticeSettings): PracticeSettings {
   return normalizePracticeSettings({
     sync: {
-      iCloudEnabled: settings.sync.iCloudEnabled,
-      uploadAllowed: settings.sync.uploadAllowed
+      iCloudEnabled: settings.sync.iCloudEnabled
     },
     notifications: {
       reviewReminder: settings.notifications.reviewReminder
@@ -30,8 +28,7 @@ export function clonePracticeSettings(settings: PracticeSettings): PracticeSetti
 export function normalizePracticeSettings(settings: PracticeSettings): PracticeSettings {
   return {
     sync: {
-      iCloudEnabled: Boolean(settings.sync.iCloudEnabled),
-      uploadAllowed: Boolean(settings.sync.uploadAllowed)
+      iCloudEnabled: Boolean(settings.sync.iCloudEnabled)
     },
     notifications: {
       reviewReminder: normalizeReviewReminderPreference(settings.notifications.reviewReminder)

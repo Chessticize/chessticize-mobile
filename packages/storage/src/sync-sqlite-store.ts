@@ -31,6 +31,7 @@ import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./
 import type {
   ClearLocalHistoryResult,
   ExportedSprintSession,
+  LocalDataImportResult,
   LocalDataExport,
   PracticeSettings,
   PracticeStore,
@@ -124,7 +125,6 @@ interface CustomSprintConfigRow {
 interface AppSettingsRow {
   id: string;
   sync_icloud_enabled: number;
-  sync_upload_allowed: number;
   review_reminder_mode: PracticeSettings["notifications"]["reviewReminder"]["mode"];
   review_reminder_fixed_local_time: string | null;
 }
@@ -400,7 +400,7 @@ export class SyncSQLiteStore implements PracticeStore {
       )
       .run(
         boolToInt(cloned.sync.iCloudEnabled),
-        boolToInt(cloned.sync.uploadAllowed),
+        0,
         cloned.notifications.reviewReminder.mode,
         cloned.notifications.reviewReminder.mode === "fixed"
           ? cloned.notifications.reviewReminder.fixedLocalTime
@@ -590,6 +590,51 @@ export class SyncSQLiteStore implements PracticeStore {
         ),
       sprintSessions: this.listExportedSprintSessions()
     };
+  }
+
+  importLocalData(data: LocalDataExport): LocalDataImportResult {
+    const result: LocalDataImportResult = {
+      ratings: 0,
+      attempts: 0,
+      reviewQueue: 0,
+      sprintSessions: 0
+    };
+    this.transaction(() => {
+      this.saveSettings({
+        ...this.getSettings(),
+        notifications: clonePracticeSettings(data.settings).notifications
+      });
+      for (const rating of data.ratings) {
+        const previous = this.getRating(rating.key);
+        const next = preferredRating(previous, rating);
+        if (!sameRating(previous, next)) {
+          this.saveRating(next);
+          result.ratings += 1;
+        }
+      }
+      for (const session of data.sprintSessions) {
+        if (this.importSprintSession(session)) {
+          result.sprintSessions += 1;
+        }
+      }
+      for (const attempt of data.attempts) {
+        if (this.importAttempt(attempt)) {
+          result.attempts += 1;
+        }
+      }
+      for (const review of data.reviewQueue) {
+        if (!this.getPuzzle(review.puzzleId)) {
+          continue;
+        }
+        const previous = this.getReviewQueueState(review);
+        const next = preferredReviewQueue(previous, review);
+        if (!sameReviewQueue(previous, next)) {
+          this.saveReviewQueueState(next);
+          result.reviewQueue += 1;
+        }
+      }
+    });
+    return result;
   }
 
   clearLocalHistory(): ClearLocalHistoryResult {
@@ -871,6 +916,95 @@ export class SyncSQLiteStore implements PracticeStore {
     }));
   }
 
+  private importSprintSession(session: ExportedSprintSession): boolean {
+    const existing = this.db.prepare("SELECT id FROM sprint_sessions WHERE id = ?").get(session.id);
+    if (existing) {
+      return false;
+    }
+    const status = session.status === "active" || session.status === "paused" ? "failed" : session.status;
+    const completedAt = session.completedAt ?? session.startedAt;
+    this.db
+      .prepare(
+        `INSERT INTO sprint_sessions (
+          id,
+          mode,
+          rating_key,
+          config_json,
+          started_at,
+          deadline_at,
+          completed_at,
+          status,
+          correct_count,
+          mistake_count,
+          rating_before,
+          rating_after
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        session.id,
+        session.mode,
+        session.ratingKey,
+        JSON.stringify({ source: "icloud_sync", mode: session.mode, ratingKey: session.ratingKey }),
+        session.startedAt,
+        completedAt,
+        completedAt,
+        status,
+        session.correctCount,
+        session.mistakeCount,
+        session.ratingBefore,
+        session.ratingAfter ?? null
+      );
+    return true;
+  }
+
+  private importAttempt(attempt: AttemptEvent): boolean {
+    const existing = this.db.prepare("SELECT id FROM attempts WHERE id = ?").get(attempt.id);
+    if (existing || !this.getPuzzle(attempt.puzzleId)) {
+      return false;
+    }
+    this.ensureSessionForAttempt(attempt);
+    this.recordAttempt(attempt);
+    return true;
+  }
+
+  private ensureSessionForAttempt(attempt: AttemptEvent): void {
+    const existing = this.db.prepare("SELECT id FROM sprint_sessions WHERE id = ?").get(attempt.sessionId);
+    if (existing) {
+      return;
+    }
+    this.db
+      .prepare(
+        `INSERT INTO sprint_sessions (
+          id,
+          mode,
+          rating_key,
+          config_json,
+          started_at,
+          deadline_at,
+          completed_at,
+          status,
+          correct_count,
+          mistake_count,
+          rating_before,
+          rating_after
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        attempt.sessionId,
+        attempt.mode,
+        attempt.ratingKey,
+        JSON.stringify({ source: "icloud_sync", mode: attempt.mode, ratingKey: attempt.ratingKey }),
+        attempt.startedAt,
+        attempt.completedAt,
+        attempt.completedAt,
+        attempt.result === "correct" ? "won" : "failed",
+        attempt.result === "correct" ? 1 : 0,
+        attempt.result === "wrong" ? 1 : 0,
+        attempt.ratingBefore,
+        attempt.ratingAfter ?? null
+      );
+  }
+
   private ensureSyntheticReviewSession(attempt: AttemptEvent): void {
     this.db
       .prepare(
@@ -978,13 +1112,65 @@ function settingsFromRow(row: AppSettingsRow): PracticeSettings {
   );
   return {
     sync: {
-      iCloudEnabled: intToBool(row.sync_icloud_enabled),
-      uploadAllowed: intToBool(row.sync_upload_allowed)
+      iCloudEnabled: intToBool(row.sync_icloud_enabled)
     },
     notifications: {
       reviewReminder: reminder
     }
   };
+}
+
+function preferredRating(local: RatingRecord, incoming: RatingRecord): RatingRecord {
+  const normalizedLocal = normalizeRatingRecord(local);
+  const normalizedIncoming = normalizeRatingRecord(incoming);
+  if (normalizedIncoming.generation !== normalizedLocal.generation) {
+    return normalizedIncoming.generation > normalizedLocal.generation ? normalizedIncoming : normalizedLocal;
+  }
+  if (normalizedIncoming.games !== normalizedLocal.games) {
+    return normalizedIncoming.games > normalizedLocal.games ? normalizedIncoming : normalizedLocal;
+  }
+  return normalizedIncoming;
+}
+
+function sameRating(left: RatingRecord, right: RatingRecord): boolean {
+  return left.key === right.key &&
+    left.generation === right.generation &&
+    left.rating === right.rating &&
+    left.games === right.games &&
+    left.ratingDeviation === right.ratingDeviation &&
+    left.volatility === right.volatility;
+}
+
+function preferredReviewQueue(
+  local: ReviewQueueState | undefined,
+  incoming: ReviewQueueState
+): ReviewQueueState {
+  if (!local) {
+    return incoming;
+  }
+  const reviewComparison = incoming.lastReviewedAt.localeCompare(local.lastReviewedAt);
+  if (reviewComparison !== 0) {
+    return reviewComparison > 0 ? incoming : local;
+  }
+  const dueComparison = incoming.dueAt.localeCompare(local.dueAt);
+  if (dueComparison !== 0) {
+    return dueComparison > 0 ? incoming : local;
+  }
+  return incoming;
+}
+
+function sameReviewQueue(left: ReviewQueueState | undefined, right: ReviewQueueState): boolean {
+  return left !== undefined &&
+    left.puzzleId === right.puzzleId &&
+    left.mode === right.mode &&
+    left.ratingKey === right.ratingKey &&
+    left.dueAt === right.dueAt &&
+    left.intervalHours === right.intervalHours &&
+    left.reviewCount === right.reviewCount &&
+    left.successStreak === right.successStreak &&
+    left.lapseCount === right.lapseCount &&
+    left.lastResult === right.lastResult &&
+    left.lastReviewedAt === right.lastReviewedAt;
 }
 
 function attemptEventFromHistoryRow(row: AttemptHistoryRow): AttemptEvent {

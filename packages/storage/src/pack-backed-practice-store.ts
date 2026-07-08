@@ -16,6 +16,7 @@ import type {
 import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./query-types.ts";
 import type {
   ClearLocalHistoryResult,
+  LocalDataImportResult,
   LocalDataExport,
   PracticeSettings,
   PracticeStore,
@@ -122,6 +123,10 @@ export class PackBackedPracticeStore implements PracticeStore {
 
   exportLocalData(): LocalDataExport {
     return this.userStore.exportLocalData();
+  }
+
+  importLocalData(data: LocalDataExport): LocalDataImportResult {
+    return this.userStore.importLocalData(data);
   }
 
   clearLocalHistory(): ClearLocalHistoryResult {

@@ -15,6 +15,8 @@
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
 		8B2F1D9A2D420E4A00A00001 /* ChessticizeTestLaunchConfig.m in Sources */ = {isa = PBXBuildFile; fileRef = 8B2F1D992D420E4A00A00001 /* ChessticizeTestLaunchConfig.m */; };
 		8F4D4A4B2D1A4BEF8A9C1001 /* ReviewReminderNotifications.m in Sources */ = {isa = PBXBuildFile; fileRef = 8F4D4A4A2D1A4BEF8A9C1001 /* ReviewReminderNotifications.m */; };
+		9D2E4F5A2D2C400100A00001 /* ICloudProgressSync.m in Sources */ = {isa = PBXBuildFile; fileRef = 9D2E4F5C2D2C400100A00001 /* ICloudProgressSync.m */; };
+		9D2E4F5B2D2C400100A00001 /* CloudKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9D2E4F5E2D2C400100A00001 /* CloudKit.framework */; };
 		D3C7E4DB20DDEF6FD16890C3 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 
@@ -32,6 +34,9 @@
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = ChessticizeMobile/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		8B2F1D992D420E4A00A00001 /* ChessticizeTestLaunchConfig.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = ChessticizeTestLaunchConfig.m; path = ChessticizeMobile/ChessticizeTestLaunchConfig.m; sourceTree = "<group>"; };
 		8F4D4A4A2D1A4BEF8A9C1001 /* ReviewReminderNotifications.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = ReviewReminderNotifications.m; path = ChessticizeMobile/ReviewReminderNotifications.m; sourceTree = "<group>"; };
+		9D2E4F5C2D2C400100A00001 /* ICloudProgressSync.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = ICloudProgressSync.m; path = ChessticizeMobile/ICloudProgressSync.m; sourceTree = "<group>"; };
+		9D2E4F5D2D2C400100A00001 /* ChessticizeMobile.entitlements */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.entitlements; name = ChessticizeMobile.entitlements; path = ChessticizeMobile/ChessticizeMobile.entitlements; sourceTree = "<group>"; };
+		9D2E4F5E2D2C400100A00001 /* CloudKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CloudKit.framework; path = System/Library/Frameworks/CloudKit.framework; sourceTree = SDKROOT; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
@@ -40,6 +45,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9D2E4F5B2D2C400100A00001 /* CloudKit.framework in Frameworks */,
 				0C80B921A6F3F58F76C31292 /* libPods-ChessticizeMobile.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -55,6 +61,8 @@
 				761780EE2CA45674006654EE /* SceneDelegate.swift */,
 				8B2F1D992D420E4A00A00001 /* ChessticizeTestLaunchConfig.m */,
 				8F4D4A4A2D1A4BEF8A9C1001 /* ReviewReminderNotifications.m */,
+				9D2E4F5C2D2C400100A00001 /* ICloudProgressSync.m */,
+				9D2E4F5D2D2C400100A00001 /* ChessticizeMobile.entitlements */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
@@ -66,6 +74,7 @@
 		2D16E6871FA4F8E400B85C8A /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				9D2E4F5E2D2C400100A00001 /* CloudKit.framework */,
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
 				5DCACB8F33CDC322A6C60F78 /* libPods-ChessticizeMobile.a */,
 			);
@@ -144,6 +153,11 @@
 				TargetAttributes = {
 					13B07F861A680F5B00A75B9A = {
 						LastSwiftMigration = 1120;
+						SystemCapabilities = {
+							com.apple.iCloud = {
+								enabled = 1;
+							};
+						};
 					};
 				};
 			};
@@ -271,6 +285,7 @@
 				761780EF2CA45674006654EE /* SceneDelegate.swift in Sources */,
 				8B2F1D9A2D420E4A00A00001 /* ChessticizeTestLaunchConfig.m in Sources */,
 				8F4D4A4B2D1A4BEF8A9C1001 /* ReviewReminderNotifications.m in Sources */,
+				9D2E4F5A2D2C400100A00001 /* ICloudProgressSync.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -283,6 +298,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = ChessticizeMobile/ChessticizeMobile.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 2462CRG264;
 				ENABLE_BITCODE = NO;
@@ -317,6 +333,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = ChessticizeMobile/ChessticizeMobile.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 2462CRG264;
 				INFOPLIST_FILE = ChessticizeMobile/Info.plist;

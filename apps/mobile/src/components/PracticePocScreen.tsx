@@ -61,6 +61,8 @@ import type {
 } from "../../../../packages/core/src/index.ts";
 import type { PracticeService } from "../../../../packages/storage/src/practice-service.ts";
 import type { ClearLocalHistoryResult, LocalDataExport, ReviewQueueDuePromotionResult, ReviewReminderPreference } from "../../../../packages/storage/src/practice-store.ts";
+import { syncPracticeProgress } from "../../../../packages/storage/src/progress-sync.ts";
+import type { ProgressSyncResult } from "../../../../packages/storage/src/progress-sync.ts";
 import {
   configureMobilePracticePuzzleSource,
   createMobilePracticeService,
@@ -80,6 +82,11 @@ import {
   type ReviewReminderScheduleResult,
   type ReviewReminderScheduler
 } from "../backend/reviewReminderScheduler.ts";
+import {
+  createNativeICloudProgressSyncClient,
+  type ICloudAccountStatus,
+  type ICloudProgressSyncClient
+} from "../backend/iCloudProgressSync.ts";
 import { arePracticeTestControlsEnabled, isPracticeDebugEnabled } from "../releaseConfig.ts";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Chess, type PieceSymbol, type Square } from "chess.js";
@@ -95,6 +102,8 @@ interface Props {
   reviewReminderSchedulerFactory?: () => ReviewReminderScheduler | null;
   reviewReminderNotificationClient?: ReviewReminderNotificationClient | null;
   reviewReminderNotificationClientFactory?: () => ReviewReminderNotificationClient | null;
+  iCloudProgressSyncClient?: ICloudProgressSyncClient | null;
+  iCloudProgressSyncClientFactory?: () => ICloudProgressSyncClient | null;
 }
 
 type Tab = "practice" | "review" | "history" | "settings" | "analysis";
@@ -325,7 +334,9 @@ export function PracticePocScreen({
   reviewReminderScheduler,
   reviewReminderSchedulerFactory = createNativeReviewReminderScheduler,
   reviewReminderNotificationClient,
-  reviewReminderNotificationClientFactory = createNativeReviewReminderNotificationClient
+  reviewReminderNotificationClientFactory = createNativeReviewReminderNotificationClient,
+  iCloudProgressSyncClient,
+  iCloudProgressSyncClientFactory = createNativeICloudProgressSyncClient
 }: Props): React.JSX.Element {
   const [puzzleSource, setPuzzleSource] = useState<MobilePuzzleSource>("bundledCore");
   const service = useMemo(() => practiceService ?? practiceServiceFactory(), [practiceService, practiceServiceFactory]);
@@ -337,6 +348,10 @@ export function PracticePocScreen({
     () => reviewReminderNotificationClient !== undefined ? reviewReminderNotificationClient : reviewReminderNotificationClientFactory(),
     [reviewReminderNotificationClient, reviewReminderNotificationClientFactory]
   );
+  const iCloudSyncClient = useMemo(
+    () => iCloudProgressSyncClient !== undefined ? iCloudProgressSyncClient : iCloudProgressSyncClientFactory(),
+    [iCloudProgressSyncClient, iCloudProgressSyncClientFactory]
+  );
   const boardRef = useRef<ChessboardRef | null>(null);
   const suppressedBoardMovesRef = useRef<string[]>([]);
   const boardSyncInProgressRef = useRef(false);
@@ -346,6 +361,7 @@ export function PracticePocScreen({
   const reminderScheduleKeyRef = useRef<string | null>(null);
   const scheduledReviewAttemptCountRef = useRef(scheduledReviewAttemptCount(service));
   const reviewReminderPromptDismissedRef = useRef(false);
+  const iCloudSyncInFlightRef = useRef<Promise<string> | null>(null);
   const stateRef = useRef<SprintState | null>(null);
   const boardFenRef = useRef<string | null>(null);
   const feedbackSnapshotRef = useRef<FeedbackBoardSnapshot | null>(null);
@@ -392,6 +408,8 @@ export function PracticePocScreen({
   const [notificationPermissionStatus, setNotificationPermissionStatus] = useState<ReviewReminderPermissionStatus>("unavailable");
   const [reviewReminderScheduleStatus, setReviewReminderScheduleStatus] = useState("unavailable");
   const [reviewReminderPermissionPromptVisible, setReviewReminderPermissionPromptVisible] = useState(false);
+  const [iCloudSyncEnabled, setICloudSyncEnabled] = useState(() => service.getSettings().sync.iCloudEnabled);
+  const [iCloudSyncStatus, setICloudSyncStatus] = useState(() => service.getSettings().sync.iCloudEnabled ? "Ready" : "Off");
   const [, setSettingsRevision] = useState(0);
 
   const adaptiveLayout = useMemo(
@@ -436,6 +454,21 @@ export function PracticePocScreen({
   useEffect(() => {
     refreshState();
   }, [service]);
+
+  useEffect(() => {
+    const enabled = service.getSettings().sync.iCloudEnabled;
+    setICloudSyncEnabled(enabled);
+    if (!enabled) {
+      setICloudSyncStatus("Off");
+      return;
+    }
+    if (!iCloudSyncClient) {
+      setICloudSyncStatus("Unavailable on this build");
+      return;
+    }
+    setICloudSyncStatus("Ready");
+    void runICloudProgressSync("startup");
+  }, [iCloudSyncClient, service]);
 
   useEffect(() => {
     let canceled = false;
@@ -489,12 +522,15 @@ export function PracticePocScreen({
       }
       if (nextState === "background" || nextState === "inactive") {
         refreshReviewReminder("app-background", true);
+        if (service.getSettings().sync.iCloudEnabled) {
+          void runICloudProgressSync("app-background");
+        }
       }
     });
     return () => {
       subscription.remove();
     };
-  }, [service]);
+  }, [iCloudSyncClient, service]);
 
   useEffect(() => {
     if (!isActive) {
@@ -605,6 +641,77 @@ export function PracticePocScreen({
     } catch {
       setNotificationPermissionStatus("unavailable");
     }
+  }
+
+  function saveICloudSyncEnabled(enabled: boolean): void {
+    service.saveSettings({
+      ...service.getSettings(),
+      sync: {
+        iCloudEnabled: enabled
+      }
+    });
+    setICloudSyncEnabled(enabled);
+    setSettingsRevision((current) => current + 1);
+    if (!enabled) {
+      setICloudSyncStatus("Off");
+      return;
+    }
+    setICloudSyncStatus(iCloudSyncClient ? "Ready" : "Unavailable on this build");
+    if (iCloudSyncClient) {
+      void runICloudProgressSync("settings-enabled");
+    }
+  }
+
+  async function runICloudProgressSync(reason: string): Promise<string> {
+    if (!service.getSettings().sync.iCloudEnabled) {
+      setICloudSyncStatus("Off");
+      return "iCloud sync is off";
+    }
+    if (!iCloudSyncClient) {
+      setICloudSyncStatus("Unavailable on this build");
+      return "iCloud sync is unavailable on this build";
+    }
+    if (iCloudSyncInFlightRef.current) {
+      return iCloudSyncInFlightRef.current;
+    }
+
+    const work = (async () => {
+      setICloudSyncStatus("Syncing");
+      try {
+        const accountStatus = await iCloudSyncClient.getAccountStatus();
+        if (accountStatus !== "available") {
+          const message = iCloudAccountStatusMessage(accountStatus);
+          setICloudSyncStatus(message);
+          return message;
+        }
+        const result = await syncPracticeProgress(service, iCloudSyncClient, {
+          deviceId: "ios-mobile",
+          now: nowIso
+        });
+        refreshState();
+        setICloudSyncEnabled(service.getSettings().sync.iCloudEnabled);
+        setSettingsRevision((current) => current + 1);
+        const message = progressSyncStatusMessage(result);
+        setICloudSyncStatus(message);
+        return message;
+      } catch (caught) {
+        const message = "iCloud sync failed";
+        setICloudSyncStatus(message);
+        emitTrace({
+          type: "move-ignored",
+          reason: `icloud-sync-${reason}-failed:${errorMessage(caught)}`
+        });
+        return message;
+      }
+    })();
+
+    iCloudSyncInFlightRef.current = work;
+    void work.finally(() => {
+      if (iCloudSyncInFlightRef.current === work) {
+        iCloudSyncInFlightRef.current = null;
+      }
+    });
+    return work;
   }
 
   function maybeShowReviewReminderPermissionPrompt(): void {
@@ -1755,11 +1862,15 @@ export function PracticePocScreen({
                 notificationPermissionStatus={notificationPermissionStatus}
                 reviewReminderScheduleStatus={reviewReminderScheduleStatus}
                 reviewReminderPreference={reviewReminderPreference}
+                iCloudSyncEnabled={iCloudSyncEnabled}
+                iCloudSyncStatus={iCloudSyncStatus}
                 onOpenNotificationSettings={() => {
                   void openReviewReminderSystemSettings();
                 }}
                 onRequestReviewReminderPermission={() => requestReviewReminderPermission()}
                 onSaveReviewReminderPreference={saveReviewReminderPreference}
+                onSaveICloudSyncEnabled={saveICloudSyncEnabled}
+                onSyncICloudNow={() => runICloudProgressSync("manual")}
               />
             ) : null}
             {tab === "analysis" && arePracticeTestControlsEnabled() ? (
@@ -6212,6 +6323,35 @@ function reviewReminderScheduleStatusLabel(
   return `scheduled|${result.scheduledAt ?? decision.scheduledAt}|${decision.dueCount}|${decision.body}|${decision.route}`;
 }
 
+function progressSyncStatusMessage(result: ProgressSyncResult): string {
+  if (result.status === "disabled") {
+    return "iCloud sync is off";
+  }
+  const importedCount = result.imported.ratings +
+    result.imported.attempts +
+    result.imported.reviewQueue +
+    result.imported.sprintSessions;
+  if (importedCount === 0) {
+    return "Synced";
+  }
+  return `Synced ${importedCount} updates`;
+}
+
+function iCloudAccountStatusMessage(status: ICloudAccountStatus): string {
+  switch (status) {
+    case "available":
+      return "Ready";
+    case "no_account":
+      return "Sign in to iCloud to sync";
+    case "restricted":
+      return "iCloud sync is restricted";
+    case "could_not_determine":
+      return "Cannot determine iCloud status";
+    case "unavailable":
+      return "iCloud sync is unavailable";
+  }
+}
+
 function SettingsPanel({
   adaptiveLayout,
   onDeleteLocalHistory,
@@ -6221,7 +6361,11 @@ function SettingsPanel({
   onAdjustRating,
   onRequestReviewReminderPermission,
   onResetRating,
+  onSaveICloudSyncEnabled,
   onSaveReviewReminderPreference,
+  onSyncICloudNow,
+  iCloudSyncEnabled,
+  iCloudSyncStatus,
   notificationPermissionStatus,
   ratings,
   reviewReminderScheduleStatus,
@@ -6236,7 +6380,11 @@ function SettingsPanel({
   onAdjustRating: (ratingKey: string, nextRating: number) => RatingRecord;
   onRequestReviewReminderPermission: () => Promise<ReviewReminderPermissionStatus>;
   onResetRating: () => void;
+  onSaveICloudSyncEnabled: (enabled: boolean) => void;
   onSaveReviewReminderPreference: (preference: ReviewReminderPreference) => void;
+  onSyncICloudNow: () => Promise<string>;
+  iCloudSyncEnabled: boolean;
+  iCloudSyncStatus: string;
   notificationPermissionStatus: ReviewReminderPermissionStatus;
   ratings: Array<{ label: string; record: RatingRecord }>;
   reviewReminderScheduleStatus: string;
@@ -6254,7 +6402,7 @@ function SettingsPanel({
         <SettingsRow
           label="Storage"
           value="On device"
-          detail="Ratings, history, review queue, and custom sprint configs are stored only on this device."
+          detail="Ratings, history, review queue, and custom sprint configs start on this device."
           testID="settings-local-storage"
         />
         <SettingsRow
@@ -6271,6 +6419,47 @@ function SettingsPanel({
           testID="settings-delete-local-history"
           onPress={() => setConfirmation("delete-history")}
         />
+      </SettingsSection>
+
+      <SettingsSection title="iCloud Sync" testID="settings-sync-section" wide={adaptiveLayout.usesWideContent}>
+        <SettingsRow
+          label="Progress Sync"
+          value={iCloudSyncEnabled ? "On" : "Off"}
+          detail={iCloudSyncStatus}
+          testID="settings-sync-status"
+        />
+        <View style={styles.settingsInlineControls} testID="settings-icloud-sync-controls">
+          <SettingsPreferenceButton
+            active={iCloudSyncEnabled}
+            label="On"
+            testID="settings-icloud-sync-on"
+            onPress={() => {
+              onSaveICloudSyncEnabled(true);
+              setStatusMessage("iCloud sync enabled");
+            }}
+          />
+          <SettingsPreferenceButton
+            active={!iCloudSyncEnabled}
+            label="Off"
+            testID="settings-icloud-sync-off"
+            onPress={() => {
+              onSaveICloudSyncEnabled(false);
+              setStatusMessage("iCloud sync disabled");
+            }}
+          />
+        </View>
+        {iCloudSyncEnabled ? (
+          <SettingsActionRow
+            label="Sync Now"
+            detail="Merge ratings, history, and review queue with your private iCloud."
+            testID="settings-sync-now"
+            onPress={() => {
+              void onSyncICloudNow().then((message) => {
+                setStatusMessage(message);
+              });
+            }}
+          />
+        ) : null}
       </SettingsSection>
 
       <SettingsSection title="Notifications" testID="settings-notifications-section" wide={adaptiveLayout.usesWideContent}>

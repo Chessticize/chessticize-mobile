@@ -88,12 +88,12 @@ Primary flows:
 | Due mistake review | Review Queue -> Scheduled Review Item -> Review Complete -> Review Queue | Correct answers increase interval; failures reset or shorten it. Official review attempts are recorded in History. |
 | Post-session analysis | Sprint Results or Scheduled Review Complete -> Analysis Review -> Results or Practice | Used to inspect mistakes immediately. It is opened only by the result-screen review action, does not write History, and does not change the spaced repetition schedule. |
 | History replay | History -> Filtered row -> Analysis Review | History preserves original attempt context. Previous/next navigation stays inside the active History filter. |
-| Local data | Settings -> Confirm Sheet -> Settings | Progress stays on device; export and delete actions are explicit. |
+| Progress sync | Settings -> iCloud Sync -> Settings | Progress starts on device; optional iCloud Sync merges ratings, history, and review queue across Apple devices. Export and delete actions remain explicit. |
 
 ## Design Principles
 
 - Board first: during practice and review, the board is the primary surface and must receive the largest stable area.
-- Local-first clarity: in v1, the user should see that progress is stored on device only. Do not imply cloud sync until a real sync engine ships.
+- Local-first clarity: in v1, progress starts on device and optional iCloud Sync must present only real transport/account status.
 - Calm density: show enough data for repeated training, but avoid desktop dashboards, marketing hero panels, or decorative statistics.
 - One-handed portrait first: primary controls should sit below or immediately above the board and remain reachable.
 - Adaptive by slot, not by device name: layouts should derive from available width, available height, safe-area insets, and size class rather than from a hard-coded iPhone or iPad model.
@@ -475,11 +475,16 @@ Custom sprint behavior:
 ### Settings
 
 - Local Data appears near the top with clear on-device storage copy.
+- iCloud Sync appears near Local Data. It defaults off, shows the real enabled
+  state and current account/sync status, and exposes a manual Sync Now action
+  only after sync is enabled.
 - On regular-width iPad, Settings should use grouped navigation plus a detail panel; do not make each settings row stretch across the full display.
 - ELO reset is explicit and separate from deleting history.
 - Advanced manual ELO adjustment should be hidden behind an "Advanced ratings" affordance.
-- Settings must not include simulated cloud state in v1: no iCloud toggle, no upload approval prompt, and no fabricated "last synced" timestamp.
-- Real CloudKit sync is post-1.0 and must add a real transport, entitlement, merge engine, and truthful UI state before any sync controls are shown.
+- Settings must not include simulated cloud state in v1: no upload approval
+  prompt and no fabricated "last synced" timestamp. Sync controls must be
+  backed by the CloudKit transport, entitlement, merge engine, and truthful UI
+  state.
 
 ### Review Reminder Notifications
 

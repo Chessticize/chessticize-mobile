@@ -30,6 +30,7 @@ import type {
 import type { HistoryFilter } from "./query-types.ts";
 import type {
   ClearLocalHistoryResult,
+  LocalDataImportResult,
   LocalDataExport,
   PracticeSettings,
   PracticeStore,
@@ -207,6 +208,10 @@ export class PracticeService {
 
   exportLocalData(): LocalDataExport {
     return this.store.exportLocalData();
+  }
+
+  importLocalData(data: LocalDataExport): LocalDataImportResult {
+    return this.store.importLocalData(data);
   }
 
   clearLocalHistory(): ClearLocalHistoryResult {

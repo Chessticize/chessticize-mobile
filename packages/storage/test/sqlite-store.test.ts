@@ -360,8 +360,7 @@ test("PracticeService persists SQLite settings across store reopen", async () =>
       try {
         assert.deepEqual(service.getSettings(), {
           sync: {
-            iCloudEnabled: true,
-            uploadAllowed: false
+            iCloudEnabled: false
           },
           notifications: {
             reviewReminder: {
@@ -372,8 +371,7 @@ test("PracticeService persists SQLite settings across store reopen", async () =>
 
         service.saveSettings({
           sync: {
-            iCloudEnabled: false,
-            uploadAllowed: true
+            iCloudEnabled: true
           },
           notifications: {
             reviewReminder: {
@@ -400,8 +398,7 @@ test("PracticeService persists SQLite settings across store reopen", async () =>
       try {
         assert.deepEqual(service.getSettings(), {
           sync: {
-            iCloudEnabled: false,
-            uploadAllowed: true
+            iCloudEnabled: true
           },
           notifications: {
             reviewReminder: {

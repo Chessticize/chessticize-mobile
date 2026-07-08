@@ -80,6 +80,7 @@ const appStorePlan = readText("docs/APP_STORE_PLAN.md");
 const pbxproj = readText("apps/mobile/ios/ChessticizeMobile.xcodeproj/project.pbxproj");
 const infoPlist = readText("apps/mobile/ios/ChessticizeMobile/Info.plist");
 const privacyManifest = readText("apps/mobile/ios/ChessticizeMobile/PrivacyInfo.xcprivacy");
+const entitlements = readText("apps/mobile/ios/ChessticizeMobile/ChessticizeMobile.entitlements");
 const exportOptions = readText("apps/mobile/ios/ExportOptions.app-store-connect.plist");
 const thirdPartyAudit = spawnSync(
   process.execPath,
@@ -193,19 +194,27 @@ check(
   "Export compliance flag is set",
   infoPlist.includes("<key>ITSAppUsesNonExemptEncryption</key>") &&
     infoPlist.includes("<false/>"),
-  "Info.plist must declare ITSAppUsesNonExemptEncryption=false for the local-only 1.0 app."
+  "Info.plist must declare ITSAppUsesNonExemptEncryption=false for the 1.0 app."
 );
 
 check(
-  "Privacy documents stay aligned with local-only behavior",
+  "Privacy documents stay aligned with no-collection optional iCloud sync behavior",
     privacyDisclosure.includes("Data Not Collected") &&
     privacyDisclosure.includes("Tracking: **No**") &&
     privacyDisclosure.includes("https://github.com/Chessticize/chessticize-mobile/blob/main/docs/PRIVACY_POLICY.md") &&
     privacyPolicy.includes("does not collect data from the app") &&
+    privacyPolicy.includes("private iCloud account") &&
+    privacyPolicy.includes("does not operate a sync server") &&
     privacyPolicy.includes("does not track you") &&
     privacyManifest.includes("<key>NSPrivacyTracking</key>") &&
-    privacyManifest.includes("<false/>"),
-  "Privacy disclosure, public privacy policy, and iOS privacy manifest must describe no collection and no tracking."
+    privacyManifest.includes("<false/>") &&
+    privacyManifest.includes("<key>NSPrivacyCollectedDataTypes</key>") &&
+    privacyManifest.includes("<array/>") &&
+    entitlements.includes("iCloud.com.chessticize.mobile") &&
+    entitlements.includes("<string>CloudKit</string>") &&
+    pbxproj.includes("ICloudProgressSync.m in Sources") &&
+    pbxproj.includes("CloudKit.framework in Frameworks"),
+  "Privacy disclosure, public privacy policy, iOS privacy manifest, and CloudKit entitlement must describe no collection, no tracking, and optional private iCloud sync."
 );
 
 check(

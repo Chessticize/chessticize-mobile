@@ -1,6 +1,7 @@
 export * from "./memory-store.ts";
 export * from "./practice-store.ts";
 export * from "./practice-settings.ts";
+export * from "./progress-sync.ts";
 export * from "./query-types.ts";
 export * from "./puzzle-source.ts";
 export * from "./pack-backed-practice-store.ts";

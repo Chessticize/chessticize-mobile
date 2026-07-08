@@ -28,7 +28,7 @@ describe("iOS App Store privacy artifacts", () => {
     expect(infoPlist).not.toContain("NSLocationWhenInUseUsageDescription");
   });
 
-  it("keeps the privacy manifest aligned with local-only, no-tracking behavior", () => {
+  it("keeps the privacy manifest aligned with no-collection, no-tracking behavior", () => {
     const manifest = readText(join(iosRoot, "PrivacyInfo.xcprivacy"));
     const entries = extractPrivacyManifestEntries(manifest);
 
@@ -53,7 +53,22 @@ describe("iOS App Store privacy artifacts", () => {
     );
     expect(disclosure).toContain("Re-audit these answers before every App Store submission");
     expect(policy).toContain("Chessticize Mobile does not collect data from the app.");
+    expect(policy).toContain("private iCloud account");
+    expect(policy).toContain("Chessticize does not operate a sync server");
     expect(policy).toContain("does not track you across apps or websites");
     expect(readme).toContain("[Privacy Policy](docs/PRIVACY_POLICY.md)");
+  });
+
+  it("enables only the CloudKit iCloud entitlement needed for optional progress sync", () => {
+    const entitlements = readText(join(iosRoot, "ChessticizeMobile.entitlements"));
+    const pbxproj = readText(join(appRoot, "ios", "ChessticizeMobile.xcodeproj", "project.pbxproj"));
+
+    expect(entitlements).toContain("com.apple.developer.icloud-container-identifiers");
+    expect(entitlements).toContain("iCloud.com.chessticize.mobile");
+    expect(entitlements).toContain("com.apple.developer.icloud-services");
+    expect(entitlements).toContain("<string>CloudKit</string>");
+    expect(pbxproj).toContain("CODE_SIGN_ENTITLEMENTS = ChessticizeMobile/ChessticizeMobile.entitlements;");
+    expect(pbxproj).toContain("ICloudProgressSync.m in Sources");
+    expect(pbxproj).toContain("CloudKit.framework in Frameworks");
   });
 });

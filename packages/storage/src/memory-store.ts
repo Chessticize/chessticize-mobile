@@ -27,7 +27,7 @@ import type {
   SprintState
 } from "../../core/src/index.ts";
 import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./query-types.ts";
-import type { ClearLocalHistoryResult, LocalDataExport, PracticeSettings, PracticeStore, ReviewQueueDuePromotionResult } from "./practice-store.ts";
+import type { ClearLocalHistoryResult, LocalDataImportResult, LocalDataExport, PracticeSettings, PracticeStore, ReviewQueueDuePromotionResult } from "./practice-store.ts";
 import { clonePracticeSettings, defaultPracticeSettings, reviewReminderPreferenceToSettings } from "./practice-settings.ts";
 import type { ReviewReminderPreference } from "./practice-store.ts";
 import type { ReviewReminderSettings } from "../../core/src/index.ts";
@@ -218,6 +218,52 @@ export class MemoryStore implements PracticeStore {
     };
   }
 
+  importLocalData(data: LocalDataExport): LocalDataImportResult {
+    const result: LocalDataImportResult = {
+      ratings: 0,
+      attempts: 0,
+      reviewQueue: 0,
+      sprintSessions: 0
+    };
+    this.saveSettings({
+      ...this.getSettings(),
+      notifications: clonePracticeSettings(data.settings).notifications
+    });
+    for (const rating of data.ratings) {
+      const previous = this.getRating(rating.key);
+      const next = preferredRating(previous, rating);
+      if (!sameRating(previous, next)) {
+        this.saveRating(next);
+        result.ratings += 1;
+      }
+    }
+    const existingAttempts = new Set(this.attempts.map((attempt) => attempt.id));
+    for (const attempt of data.attempts) {
+      if (existingAttempts.has(attempt.id) || !this.getPuzzle(attempt.puzzleId)) {
+        continue;
+      }
+      this.attempts.push({
+        ...attempt,
+        ...(attempt.arrowDuelCandidateOrder === undefined ? {} : { arrowDuelCandidateOrder: [...attempt.arrowDuelCandidateOrder] })
+      });
+      existingAttempts.add(attempt.id);
+      result.attempts += 1;
+    }
+    for (const review of data.reviewQueue) {
+      if (!this.getPuzzle(review.puzzleId)) {
+        continue;
+      }
+      const key = reviewQueueKey(review);
+      const previous = this.reviewQueue.get(key);
+      const next = preferredReviewQueue(previous, review);
+      if (!sameReviewQueue(previous, next)) {
+        this.reviewQueue.set(key, next);
+        result.reviewQueue += 1;
+      }
+    }
+    return result;
+  }
+
   clearLocalHistory(): ClearLocalHistoryResult {
     const result: ClearLocalHistoryResult = {
       attempts: this.attempts.length,
@@ -375,6 +421,59 @@ export class MemoryStore implements PracticeStore {
 
 function reviewQueueKey(context: ReviewContext): string {
   return `${context.puzzleId}\u0000${context.mode}\u0000${context.ratingKey}`;
+}
+
+function preferredRating(local: RatingRecord, incoming: RatingRecord): RatingRecord {
+  const normalizedLocal = normalizeRatingRecord(local);
+  const normalizedIncoming = normalizeRatingRecord(incoming);
+  if (normalizedIncoming.generation !== normalizedLocal.generation) {
+    return normalizedIncoming.generation > normalizedLocal.generation ? normalizedIncoming : normalizedLocal;
+  }
+  if (normalizedIncoming.games !== normalizedLocal.games) {
+    return normalizedIncoming.games > normalizedLocal.games ? normalizedIncoming : normalizedLocal;
+  }
+  return normalizedIncoming;
+}
+
+function sameRating(left: RatingRecord, right: RatingRecord): boolean {
+  return left.key === right.key &&
+    left.generation === right.generation &&
+    left.rating === right.rating &&
+    left.games === right.games &&
+    left.ratingDeviation === right.ratingDeviation &&
+    left.volatility === right.volatility;
+}
+
+function preferredReviewQueue(
+  local: ReviewQueueState | undefined,
+  incoming: ReviewQueueState
+): ReviewQueueState {
+  if (!local) {
+    return incoming;
+  }
+  const reviewComparison = incoming.lastReviewedAt.localeCompare(local.lastReviewedAt);
+  if (reviewComparison !== 0) {
+    return reviewComparison > 0 ? incoming : local;
+  }
+  const dueComparison = incoming.dueAt.localeCompare(local.dueAt);
+  if (dueComparison !== 0) {
+    return dueComparison > 0 ? incoming : local;
+  }
+  return incoming;
+}
+
+function sameReviewQueue(left: ReviewQueueState | undefined, right: ReviewQueueState): boolean {
+  return left !== undefined &&
+    left.puzzleId === right.puzzleId &&
+    left.mode === right.mode &&
+    left.ratingKey === right.ratingKey &&
+    left.dueAt === right.dueAt &&
+    left.intervalHours === right.intervalHours &&
+    left.reviewCount === right.reviewCount &&
+    left.successStreak === right.successStreak &&
+    left.lapseCount === right.lapseCount &&
+    left.lastResult === right.lastResult &&
+    left.lastReviewedAt === right.lastReviewedAt;
 }
 
 function isOpenSprint(session: SprintState): boolean {

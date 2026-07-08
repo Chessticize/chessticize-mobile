@@ -14,6 +14,7 @@ import { fixtureNeedsAtLeast, PracticeService } from "../../../packages/storage/
 import { MemoryStore } from "../../../packages/storage/src/memory-store";
 import { formatLocalCalendarDate, type ArrowDuelState, type AttemptEvent, type Puzzle, type SprintState, type UciEngineTransport } from "../../../packages/core/src/index";
 import { FakeReviewReminderNotificationClient, FakeReviewReminderScheduler } from "../src/backend/reviewReminderScheduler";
+import { FakeICloudProgressSyncClient } from "../src/backend/iCloudProgressSync";
 
 const renderers: TestRenderer.ReactTestRenderer[] = [];
 
@@ -2589,13 +2590,12 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "settings-packs-section")).toThrow();
     expect(findByTestId(renderer, "settings-about-section")).toBeTruthy();
     expect(findByTestId(renderer, "settings-puzzle-data-license")).toBeTruthy();
-    expect(() => findByTestId(renderer, "settings-sync-section")).toThrow();
+    expect(findByTestId(renderer, "settings-sync-section")).toBeTruthy();
     expect(() => findByTestId(renderer, "settings-sync-disclosure")).toThrow();
-    expect(() => findByTestId(renderer, "settings-sync-status")).toThrow();
+    expect(findByTestId(renderer, "settings-sync-status")).toBeTruthy();
     expect(() => findByTestId(renderer, "settings-sync-last-synced")).toThrow();
     expect(() => findByTestId(renderer, "settings-icloud-sync-toggle")).toThrow();
     expect(() => findByTestId(renderer, "settings-sync-allow-upload")).toThrow();
-    expect(collectText(renderer.root)).not.toContain("iCloud");
     expect(collectText(renderer.root)).not.toContain("Last synced");
     expect(collectText(renderer.root)).not.toContain("Today, 09:28");
     expect(collectText(renderer.root)).not.toContain("Pending approval");
@@ -2603,8 +2603,14 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "settings-data-section"))).toContain("Local Data");
     expect(findByTestId(renderer, "settings-local-storage")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "settings-local-storage"))).toContain("On device");
-    expect(collectText(findByTestId(renderer, "settings-local-storage"))).toContain("Ratings, history, review queue, and custom sprint configs are stored only on this device.");
-    expect(testIdOrder(renderer, "settings-data-section", "settings-notifications-section")).toBeLessThan(0);
+    expect(collectText(findByTestId(renderer, "settings-local-storage"))).toContain("Ratings, history, review queue, and custom sprint configs start on this device.");
+    expect(collectText(findByTestId(renderer, "settings-sync-section"))).toContain("iCloud Sync");
+    expect(collectText(findByTestId(renderer, "settings-sync-status"))).toContain("Off");
+    expect(findByTestId(renderer, "settings-icloud-sync-on")).toBeTruthy();
+    expect(findByTestId(renderer, "settings-icloud-sync-off")).toBeTruthy();
+    expect(() => findByTestId(renderer, "settings-sync-now")).toThrow();
+    expect(testIdOrder(renderer, "settings-data-section", "settings-sync-section")).toBeLessThan(0);
+    expect(testIdOrder(renderer, "settings-sync-section", "settings-notifications-section")).toBeLessThan(0);
     expect(testIdOrder(renderer, "settings-notifications-section", "settings-profile-section")).toBeLessThan(0);
     expect(collectText(findByTestId(renderer, "settings-notifications-section"))).toContain("Notifications");
     expect(findByTestId(renderer, "settings-review-reminders")).toBeTruthy();
@@ -2682,6 +2688,35 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "settings-puzzle-data-license"))).toContain("Derived from Lichess puzzle data");
     expect(collectText(findByTestId(renderer, "settings-puzzle-data-license"))).toContain("Chessticize presolve metadata");
     expect(collectText(findByTestId(renderer, "settings-data-section"))).not.toContain("›");
+  });
+
+  it("syncs progress through the injected iCloud client from Settings", async () => {
+    const service = createMobilePracticeService("random1000");
+    service.startSprint(
+      { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
+      "2026-06-20T00:00:00.000Z"
+    );
+    service.submitMove("c4b5", "2026-06-20T00:00:05.000Z");
+    const client = new FakeICloudProgressSyncClient();
+    const renderer = renderScreen({
+      practiceService: service,
+      iCloudProgressSyncClient: client
+    });
+
+    press(renderer, "settings-tab");
+    expect(collectText(findByTestId(renderer, "settings-sync-status"))).toContain("Off");
+
+    await pressAsync(renderer, "settings-icloud-sync-on");
+    await flushMicrotasks();
+
+    expect(service.getSettings().sync.iCloudEnabled).toBe(true);
+    expect(client.fetchCount).toBe(1);
+    expect(client.saveCount).toBe(1);
+    expect(findByTestId(renderer, "settings-sync-now")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "settings-sync-status"))).toContain("Synced");
+    expect(client.savedSnapshots[0]?.data.attempts.length).toBe(1);
+    expect(client.savedSnapshots[0]?.data.reviewQueue.length).toBe(1);
+    expect(client.savedSnapshots[0]?.data.ratings.find((rating) => rating.key === "standard 5/20")?.games).toBe(1);
   });
 
   it("opens advanced rating controls from the current Puzzle ELO row", () => {

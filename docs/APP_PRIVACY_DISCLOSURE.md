@@ -2,8 +2,8 @@
 
 This document records the App Store Connect privacy answers for Chessticize
 Mobile 1.0. Re-audit these answers before every App Store submission, especially
-after adding sync, accounts, telemetry, crash reporting, remote packs, or cloud
-analysis.
+after changing sync, accounts, telemetry, crash reporting, remote packs, or
+cloud analysis.
 
 ## App Privacy Questionnaire
 
@@ -19,15 +19,19 @@ Rationale:
 - The app has no accounts, ads, analytics SDK, tracking SDK, or remote telemetry.
 - Puzzle data is bundled with the app.
 - Sprint history, puzzle attempts, ratings, review queue state, settings, and
-  reminder preferences are stored locally on device.
+  reminder preferences are stored locally on device by default.
+- Optional iCloud Sync stores a progress snapshot in the user's private iCloud
+  account through Apple's CloudKit service. Chessticize does not operate a sync
+  server, does not receive this data, and does not use it for tracking or
+  analytics.
 - Stockfish analysis runs on device.
 - Review reminders are local notifications and do not use a push notification
   server.
 - Development builds can connect to local Metro tooling; release builds must not
   depend on Metro or a Chessticize server for practice.
 
-If a future release enables iCloud sync, remote packs, accounts, telemetry, or
-crash reporting, this answer must be updated before submission.
+If a future release adds a Chessticize-operated backend, remote packs, accounts,
+telemetry, or crash reporting, this answer must be updated before submission.
 
 ## iOS Privacy Manifest
 
@@ -63,7 +67,9 @@ Before submission:
 3. Confirm the test-only puzzle source switch is hidden in the release build.
 4. Search the release diff for new SDKs, network clients, telemetry, accounts,
    cloud sync, crash reporting, or permission prompts.
-5. Re-run the privacy regression test:
+5. Confirm optional iCloud Sync still uses only the app's private CloudKit
+   container and does not introduce a Chessticize-operated data collection path.
+6. Re-run the privacy regression test:
 
    ```sh
    pnpm --filter ChessticizeMobile test -- iosPrivacy.test.js

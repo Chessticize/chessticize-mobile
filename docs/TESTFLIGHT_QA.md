@@ -141,8 +141,14 @@ failure, retry, or unclear result.
 ### Settings And Local Data
 
 - [ ] Open Settings.
-- [ ] Confirm Settings describes local-only data and does not present fake
-      iCloud sync state.
+- [ ] Confirm Settings shows Local Data and iCloud Sync sections, with iCloud
+      Sync defaulting off.
+- [ ] Turn iCloud Sync on while signed into iCloud and confirm the status changes
+      to a successful sync state.
+- [ ] On a second Apple device signed into the same iCloud account, turn iCloud
+      Sync on and confirm rating, History, and Review queue import without
+      deleting local-only progress.
+- [ ] Turn iCloud Sync off and confirm practice still works offline.
 - [ ] Change review reminder preference and confirm the UI persists after app
       relaunch.
 - [ ] Use export local data and confirm the share/export flow opens.
@@ -167,7 +173,8 @@ failure, retry, or unclear result.
 - [ ] Start Arrow Duel and confirm candidate arrows still render.
 - [ ] Open a review/history analysis surface and confirm on-device Stockfish
       analysis works without network.
-- [ ] Disable airplane mode and confirm no required sync prompt appears.
+- [ ] Disable airplane mode and confirm optional iCloud Sync remains user
+      controlled.
 
 ## Evidence Log
 
