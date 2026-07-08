@@ -102,7 +102,7 @@ Primary flows:
 
 ## Adaptive Layout And Orientation
 
-The current implementation and App Store target support compact portrait, compact landscape, regular-width iPad layouts, and iPad split-view widths. Release QA still needs simulator screenshots across those classes before App Store submission.
+The current implementation and App Store target support compact portrait, compact landscape, regular-width iPad portrait, regular-width iPad landscape, and iPad split-view widths. Release QA still needs simulator screenshots across those classes before App Store submission.
 
 ![Adaptive mobile layouts](assets/mobile-adaptive-layouts.png)
 
@@ -111,8 +111,9 @@ Adaptive classes:
 | Class | Typical viewport | Navigation | Content rule |
 | --- | --- | --- | --- |
 | Compact portrait | iPhone portrait, narrow split view | Bottom tab bar when app chrome is visible | Existing one-column scroll. Active sessions hide tabs and stack status, board, score, prompt, and results vertically. |
-| Compact landscape | Short-height landscape viewport | Icon rail outside active sessions; no bottom tab bar while playing | Active session uses a board lane plus a right control rail. The control rail owns status, prompt, score, pause/abandon, and overflow scrolling. |
-| Regular width | iPad portrait/landscape, large split view | Persistent side rail with labels when width allows, icon-only rail below that | Use two-pane or three-pane layouts with constrained content width. Board/review surfaces stay centered and support panels sit beside the board. |
+| Compact landscape | iPhone landscape, short-height split view | Icon rail outside active sessions; no bottom tab bar while playing | Active session uses a board lane plus a right control rail. The control rail owns status, prompt, score, pause/abandon, and overflow scrolling. |
+| Regular portrait | iPad portrait, tall large split view | Persistent side rail with labels when width allows, icon-only rail below that | Active practice uses a large board-first vertical flow so the board can grow with the tall screen. Dashboard, history, settings, and review surfaces can still use wider content where useful. |
+| Regular landscape | iPad landscape, wide large split view | Persistent side rail with labels when width allows, icon-only rail below that | Use two-pane or three-pane layouts with constrained content width. Active-session controls sit beside the board where space allows. |
 
 Sizing rules:
 
@@ -120,7 +121,8 @@ Sizing rules:
 - Board size is computed from the board slot, not from screen width. Use `min(slotWidth, slotHeight)` with a stable minimum and maximum per class.
 - Phone portrait board target: fill the content width up to the existing max, while keeping prompt and score visible below the board.
 - Compact landscape board target: maximize board height after subtracting top status chrome, bottom/home-indicator inset, and vertical gaps. Cap the board at the compact class maximum and let only the control rail scroll.
-- iPad board target: cap at a comfortable inspection size rather than filling the whole display. A 560-640 pt board is usually enough; extra space belongs to analysis, queue, history, or settings detail panels.
+- iPad portrait board target: use a large board-first vertical flow capped around 860 pt on full-size iPads, with timer, score, and prompt below the board and still visible without hunting.
+- iPad landscape board target: cap at a comfortable inspection size rather than filling the whole display. A 560-640 pt board is usually enough; extra space belongs to analysis, queue, history, or settings detail panels.
 - Never scale type with viewport width. Keep platform text sizes stable and let columns, gaps, and panel counts change instead.
 
 Navigation rules:
@@ -148,7 +150,8 @@ Practice Home:
 Active Sprint:
 
 - Compact portrait keeps the current vertical stack.
-- Compact landscape uses board lane plus control rail. The board lane contains the board and any board-adjacent status. The control rail contains timer, progress, mistakes, side-to-move, prompt, pause, and abandon confirmation.
+- Compact landscape and iPad landscape use board lane plus control rail. The board lane contains the board and any board-adjacent status. The control rail contains timer, progress, mistakes, side-to-move, prompt, pause, and abandon confirmation.
+- iPad portrait uses the same vertical task order as phone portrait, but with a larger capped board and wider supporting rows.
 - The prompt must not appear below the fold in landscape. If the prompt plus actions overflow, the control rail scrolls independently while the board remains fixed.
 - Arrow Duel candidate arrows stay on the board in every class. Do not move candidate selection into separate landscape buttons.
 
@@ -574,7 +577,7 @@ Accessibility rules:
 - Component tests should verify user-visible behavior, not component internals.
 - UI should receive view models from backend/domain packages; React components must not compute sprint outcomes, ELO updates, review scheduling, or Arrow Duel correctness.
 - E2E flows should cover Practice start, Arrow Duel choice, wrong-answer review, custom sprint setup, history filtering, Settings license/source attribution, ELO reset, and local data export/delete.
-- Design QA should include iPhone SE-sized portrait, modern iPhone portrait, compact landscape viewport, iPad portrait, iPad landscape, and iPad split-view widths.
+- Design QA should include iPhone SE-sized portrait, modern iPhone portrait, compact iPhone landscape, iPad portrait, iPad landscape, and iPad split-view widths.
 - Adaptive component tests should render the app shell with explicit width/height pairs and assert chrome placement, board sizing, rail visibility, and absence of overlapping controls.
 - Simulator screenshot QA should include at least one active sprint, one Arrow Duel state, one Analysis Review state, and one History/Settings regular-width state before App Store submission.
 - E2E assertions should target stable labels/test IDs from this document.

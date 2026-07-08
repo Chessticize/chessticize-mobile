@@ -137,9 +137,9 @@ describe("PracticePocScreen", () => {
   it.each([
     { label: "iPhone SE-sized portrait", width: 320, height: 568, scale: 2, layout: "compactPortrait", boardSize: 288, sideRail: false, sessionRail: false, homeColumns: false },
     { label: "modern iPhone portrait", width: 430, height: 932, scale: 3, layout: "compactPortrait", boardSize: 398, sideRail: false, sessionRail: false, homeColumns: false },
-    { label: "compact landscape viewport", width: 844, height: 390, scale: 3, layout: "compactLandscape", boardSize: 358, sideRail: true, sessionRail: true, homeColumns: true },
-    { label: "iPad A16 portrait", width: 820, height: 1180, scale: 2, layout: "regularPortrait", boardSize: 640, sideRail: true, sessionRail: false, homeColumns: false },
-    { label: "iPad Pro portrait", width: 1032, height: 1376, scale: 2, layout: "regularPortrait", boardSize: 640, sideRail: true, sessionRail: true, homeColumns: true },
+    { label: "compact iPhone landscape", width: 844, height: 390, scale: 3, layout: "compactLandscape", boardSize: 358, sideRail: true, sessionRail: true, homeColumns: true },
+    { label: "iPad A16 portrait", width: 820, height: 1180, scale: 2, layout: "regularPortrait", boardSize: 788, sideRail: true, sessionRail: false, homeColumns: false },
+    { label: "iPad Pro portrait", width: 1032, height: 1376, scale: 2, layout: "regularPortrait", boardSize: 860, sideRail: true, sessionRail: false, homeColumns: true },
     { label: "iPad landscape", width: 1180, height: 820, scale: 2, layout: "regularLandscape", boardSize: 640, sideRail: true, sessionRail: true, homeColumns: true },
     { label: "iPad split-width portrait", width: 694, height: 1024, scale: 2, layout: "compactPortrait", boardSize: 560, sideRail: false, sessionRail: false, homeColumns: false }
   ])("renders the core practice surfaces in a %s viewport", ({ width, height, scale, layout, boardSize, sideRail, sessionRail, homeColumns }) => {

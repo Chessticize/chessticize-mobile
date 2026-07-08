@@ -281,14 +281,14 @@ Design approved 2026-07-03; the "Review Reminder Notifications" section of
    require Metro or a debug menu surface in app code.
 5. **Device targets**: decide iPhone-only vs iPad support
    (`TARGETED_DEVICE_FAMILY`), adaptive orientation masks, minimum iOS version;
-   verify layout on iPhone SE-size, current-flagship portrait, and iPad
-   portrait/landscape simulators (design doc QA rule).
+   verify layout on iPhone SE-size, current-flagship portrait/landscape, and
+   iPad portrait/landscape simulators (design doc QA rule).
    Status: implementation complete. `docs/DEVICE_TARGETS.md` records the 1.0
    decision to ship iPhone+iPad adaptive orientation support, with minimum iOS
    15.1. The iOS target now uses `TARGETED_DEVICE_FAMILY = "1,2"`,
-   `Info.plist` declares iPhone portrait-only and iPad all-orientation masks
-   without `UIRequiresFullScreen`, and mobile tests cover both the native target
-   metadata and compact portrait, compact landscape viewport, iPad, and
+   `Info.plist` declares iPhone portrait/landscape and iPad all-orientation
+   masks without `UIRequiresFullScreen`, and mobile tests cover both the native
+   target metadata and compact portrait, compact landscape phone, iPad, and
    split-width layout smoke renders.
 6. **Store assets**: screenshots (6.7" and 6.1" minimum), description,
    keywords, support URL.

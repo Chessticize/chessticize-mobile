@@ -178,7 +178,9 @@ const REGULAR_RAIL_MIN = 296;
 const REGULAR_RAIL_MAX = 360;
 const COMPACT_LANDSCAPE_BOARD_MAX = 430;
 const PHONE_PORTRAIT_BOARD_MAX = 560;
-const REGULAR_BOARD_MAX = 640;
+const REGULAR_LANDSCAPE_BOARD_MAX = 640;
+const REGULAR_PORTRAIT_BOARD_MAX = 860;
+const REGULAR_PORTRAIT_RESERVED_CONTROLS_HEIGHT = 240;
 const HISTORY_PAGE_LIMIT = 20;
 const NEUTRAL_ARROW = "#2563EB";
 const ARROW_VISUAL_STYLES = {
@@ -275,7 +277,7 @@ function buildAdaptiveLayout({
   );
   const sessionContentWidth = viewportWidth;
   const usesWideContent = isCompactLandscape || contentWidth >= 860;
-  const usesSessionRail = isCompactLandscape || sessionContentWidth >= 860;
+  const usesSessionRail = isCompactLandscape || (isRegularWidth && isLandscape && sessionContentWidth >= 860);
   const sessionRailWidth = isRegularWidth
     ? Math.min(REGULAR_RAIL_MAX, Math.max(REGULAR_RAIL_MIN, Math.floor(sessionContentWidth * 0.3)))
     : Math.min(COMPACT_LANDSCAPE_RAIL_MAX, Math.max(COMPACT_LANDSCAPE_RAIL_MIN, Math.floor(sessionContentWidth * 0.34)));
@@ -285,12 +287,15 @@ function buildAdaptiveLayout({
   );
   const sessionBoardSlotHeight = Math.max(MIN_BOARD, contentHeight - UI_PADDING * 2);
   const portraitBoardSlotWidth = Math.max(MIN_BOARD, sessionContentWidth - UI_PADDING * 2);
+  const portraitBoardSlotHeight = isRegularWidth && !isLandscape
+    ? Math.max(MIN_BOARD, contentHeight - UI_PADDING * 2 - REGULAR_PORTRAIT_RESERVED_CONTROLS_HEIGHT)
+    : portraitBoardSlotWidth;
   const boardMax = isRegularWidth
-    ? REGULAR_BOARD_MAX
+    ? isLandscape ? REGULAR_LANDSCAPE_BOARD_MAX : REGULAR_PORTRAIT_BOARD_MAX
     : isCompactLandscape ? COMPACT_LANDSCAPE_BOARD_MAX : PHONE_PORTRAIT_BOARD_MAX;
   const boardSlot = usesSessionRail
     ? Math.min(sessionBoardSlotWidth, sessionBoardSlotHeight)
-    : portraitBoardSlotWidth;
+    : Math.min(portraitBoardSlotWidth, portraitBoardSlotHeight);
   const boardSize = Math.floor(Math.max(MIN_BOARD, Math.min(boardSlot, boardMax)));
 
   return {
@@ -1360,6 +1365,7 @@ export function PracticePocScreen({
       });
   const sessionStatusNode = isOpenSession ? (
     <SessionStatusBar
+      compactMetrics={sessionUsesRail}
       mode={mode}
       state={state}
       sideToMove={displayedSideToMove}
@@ -2652,6 +2658,7 @@ function TestPuzzleSourceControl({
 }
 
 function SessionStatusBar({
+  compactMetrics = false,
   mode,
   state,
   sideToMove,
@@ -2660,6 +2667,7 @@ function SessionStatusBar({
   onPause,
   onResume
 }: {
+  compactMetrics?: boolean;
   mode: SprintMode;
   state: SprintState;
   sideToMove: MoveSide | null;
@@ -2714,33 +2722,57 @@ function SessionStatusBar({
         )}
       </View>
 
-      <View style={styles.sessionActiveMetricRow} testID="session-status-metrics">
+      <View
+        style={[
+          styles.sessionActiveMetricRow,
+          compactMetrics ? styles.sessionActiveMetricRowCompact : null
+        ]}
+        testID="session-status-metrics"
+      >
         <View
           accessibilityLabel={`Progress ${state.correctCount} of ${state.config.targetCorrect}`}
-          style={styles.sessionMetricBlock}
+          style={[
+            styles.sessionMetricBlock,
+            compactMetrics ? styles.sessionMetricBlockCompact : null,
+            compactMetrics ? styles.sessionProgressBlockCompact : null
+          ]}
           testID="session-progress-block"
         >
-          <Text testID="session-progress" style={styles.sessionProgressValue}>
+          <Text numberOfLines={1} testID="session-progress" style={styles.sessionProgressValue}>
             {state.correctCount} / {state.config.targetCorrect}
           </Text>
         </View>
         <View
           accessibilityLabel={`Timer ${timerText}`}
-          style={[styles.sessionMetricBlock, styles.sessionTimerBlock]}
+          style={[
+            styles.sessionMetricBlock,
+            styles.sessionTimerBlock,
+            compactMetrics ? styles.sessionMetricBlockCompact : null,
+            compactMetrics ? styles.sessionTimerBlockCompact : null
+          ]}
           testID="session-timer-block"
         >
-          <Text testID="session-timer" style={styles.timerText}>{timerText}</Text>
+          <Text numberOfLines={1} testID="session-timer" style={styles.timerText}>{timerText}</Text>
         </View>
         <View
           accessibilityLabel={sideToMove ? sideToMoveAccessibilityLabel(sideToMove) : "Side to move unavailable"}
-          style={styles.sessionMetricBlock}
+          style={[
+            styles.sessionMetricBlock,
+            styles.sessionSideToMoveBlock,
+            compactMetrics ? styles.sessionMetricBlockCompact : null,
+            compactMetrics ? styles.sessionSideToMoveBlockCompact : null
+          ]}
           testID="session-side-to-move-block"
         >
           {sideToMove ? <MoveSideBadge badgeTestID="session-side-to-move" compact side={sideToMove} /> : null}
         </View>
         <View
           accessibilityLabel={`Mistakes ${state.mistakeCount} of ${state.config.maxMistakes}`}
-          style={styles.sessionMetricBlock}
+          style={[
+            styles.sessionMetricBlock,
+            compactMetrics ? styles.sessionMetricBlockCompact : null,
+            compactMetrics ? styles.sessionMistakesBlockCompact : null
+          ]}
           testID="session-mistakes-block"
         >
           <ActiveMistakeIndicator
@@ -3199,7 +3231,7 @@ function MoveSideBadge({
       testID={badgeTestID}
     >
       <MoveSideGlyph side={side} />
-      <Text style={styles.moveSideBadgeText} testID={`${badgeTestID}-label`}>
+      <Text numberOfLines={1} style={styles.moveSideBadgeText} testID={`${badgeTestID}-label`}>
         {compact ? sideLabel : `${sideLabel} to move`}
       </Text>
     </View>
@@ -8538,12 +8570,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 1
   },
+  sessionActiveMetricRowCompact: {
+    flexWrap: "wrap",
+    justifyContent: "center",
+    paddingHorizontal: 0,
+    rowGap: 6
+  },
   sessionMetricBlock: {
     alignItems: "center",
     flex: 1,
     gap: 3,
     justifyContent: "center",
     minWidth: 0
+  },
+  sessionMetricBlockCompact: {
+    flex: 0,
+    flexShrink: 0
   },
   activeMistakeIndicator: {
     alignItems: "center",
@@ -8590,6 +8632,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flex: 1.25
   },
+  sessionProgressBlockCompact: {
+    minWidth: 54
+  },
+  sessionTimerBlockCompact: {
+    minWidth: 78
+  },
+  sessionSideToMoveBlock: {
+    minWidth: 70
+  },
+  sessionSideToMoveBlockCompact: {
+    minWidth: 72
+  },
+  sessionMistakesBlockCompact: {
+    minWidth: 42
+  },
   sessionProgressValue: {
     color: "#111827",
     fontSize: 13,
@@ -8611,7 +8668,7 @@ const styles = StyleSheet.create({
   },
   moveSideBadgeText: {
     color: "#334155",
-    flexShrink: 1,
+    flexShrink: 0,
     fontSize: 11,
     fontWeight: "900",
     textAlign: "center"

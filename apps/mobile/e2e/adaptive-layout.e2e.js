@@ -47,6 +47,8 @@ async function captureHomeAndSprint(orientation) {
   await device.takeScreenshot(`${deviceLabel}-${orientation}-home`);
 
   await selectTestPuzzleSource('familiar15');
+  await element(by.id('practice-main-scroll')).scrollTo('top');
+  await sleep(300);
   await startPracticeMode('standard');
   await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(30000);
   await sleep(1000);

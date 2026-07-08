@@ -1,13 +1,13 @@
 # iOS Device Targets
 
-Chessticize Mobile 1.0 ships for iPhone portrait and adaptive iPad portrait,
-landscape, and multitasking layouts.
+Chessticize Mobile 1.0 ships for adaptive iPhone portrait/landscape
+and adaptive iPad portrait, landscape, and multitasking layouts.
 
 ## 1.0 Decision
 
 - Device family: iPhone and iPad (`TARGETED_DEVICE_FAMILY = "1,2"`)
-- Orientation: iPhone portrait only; iPad portrait, upside-down portrait, and
-  landscape
+- Orientation: iPhone portrait and landscape; iPad portrait, upside-down
+  portrait, and landscape
 - Minimum iOS version: 15.1
 
 ## Rationale
@@ -16,25 +16,28 @@ The 1.0 design keeps the board as the primary surface while adapting the chrome
 and control placement to the measured viewport. Compact portrait keeps the
 bottom-tab, one-column phone flow. Compact landscape uses a fixed board lane and
 scrollable control rail so the board is not pushed below the fold. Regular-width
-iPad layouts use a side navigation rail and wider content surfaces, with review
-and active-session controls beside the board where space allows.
+iPad portrait keeps active practice board-first in a large vertical flow, while
+iPad landscape uses side navigation and wider content surfaces with controls
+beside the board where space allows.
 
 `UIRequiresFullScreen` is intentionally absent so iPad can use Split View and
 Stage Manager sizes. The app declares an iPhone orientation mask for portrait
-only and an iPad mask for all four interface orientations.
+and landscape and an iPad mask for all four interface orientations.
 
 ## Adaptive Orientation Coverage
 
 The mobile UI design defines the adaptive target for compact portrait phones,
-regular-width iPad, iPad landscape, and iPad split-view widths. The current
+compact landscape phones, regular-width iPad portrait, iPad landscape, and iPad
+split-view widths. The current
 implementation covers:
 
 - an adaptive shell derived from measured width, height, and safe-area insets;
 - board sizing based on the available board slot rather than screen width only;
-- compact landscape viewport session layouts with a fixed board lane and
+- compact landscape phone and split-view session layouts with a fixed board lane and
   scrollable control rail;
-- regular-width iPad layouts with side navigation and two-pane or three-pane
-  content where useful;
+- regular-width iPad portrait sessions with a larger vertical board flow;
+- regular-width iPad landscape layouts with side navigation and two-pane or
+  three-pane content where useful;
 - component tests for explicit portrait, landscape, iPad, and split-view
   dimensions.
 
@@ -51,7 +54,7 @@ Release readiness for this item is covered by:
   target, and this documented decision.
 - `apps/mobile/__tests__/PracticePocScreen.test.tsx`, which renders the main app
   shell under compact iPhone SE-sized portrait, modern iPhone portrait, compact
-  landscape viewport, iPad portrait, iPad landscape, and split-width viewports.
+  iPhone landscape, iPad portrait, iPad landscape, and split-width viewports.
 - Simulator build checks on the smallest available iPhone simulator, the current
   flagship simulator, and a representative iPad simulator before App Store
   submission.
