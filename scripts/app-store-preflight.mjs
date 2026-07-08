@@ -27,6 +27,24 @@ function unquoteBuildSetting(value) {
   return value.replace(/^"|"$/gu, "");
 }
 
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+}
+
+function plistStringArrayForKey(plist, key) {
+  const pattern = new RegExp(`<key>${escapeRegExp(key)}</key>\\s*<array>([\\s\\S]*?)</array>`, "u");
+  const match = plist.match(pattern);
+  if (!match) {
+    return [];
+  }
+
+  return Array.from(match[1].matchAll(/<string>([^<]+)<\/string>/gu), (entry) => entry[1]);
+}
+
+function stringArrayEquals(actual, expected) {
+  return actual.length === expected.length && actual.every((value, index) => value === expected[index]);
+}
+
 const checks = [];
 const manual = [];
 
@@ -83,6 +101,20 @@ const buildNumbers = uniqueMatches(pbxproj, /CURRENT_PROJECT_VERSION = ([^;]+);/
 const bundleIdentifiers = uniqueMatches(pbxproj, /PRODUCT_BUNDLE_IDENTIFIER = ([^;]+);/g);
 const deviceFamilies = uniqueMatches(pbxproj, /TARGETED_DEVICE_FAMILY = ([^;]+);/g);
 const targetedDeviceFamily = deviceFamilies.length === 1 ? unquoteBuildSetting(deviceFamilies[0]) : "";
+const iphoneOrientations = plistStringArrayForKey(infoPlist, "UISupportedInterfaceOrientations");
+const ipadOrientations = plistStringArrayForKey(infoPlist, "UISupportedInterfaceOrientations~ipad");
+const expectedIphoneOrientations = [
+  "UIInterfaceOrientationPortrait",
+  "UIInterfaceOrientationLandscapeLeft",
+  "UIInterfaceOrientationLandscapeRight"
+];
+const expectedIpadOrientations = [
+  "UIInterfaceOrientationPortrait",
+  "UIInterfaceOrientationPortraitUpsideDown",
+  "UIInterfaceOrientationLandscapeLeft",
+  "UIInterfaceOrientationLandscapeRight"
+];
+const fullScreenLocked = infoPlist.includes("<key>UIRequiresFullScreen</key>");
 const runtimeDependencies = Array.from(new Set([
   ...Object.keys(rootPackage.dependencies ?? {}),
   ...Object.keys(mobilePackage.dependencies ?? {})
@@ -151,10 +183,10 @@ check(
     bundleIdentifiers[0] === "com.chessticize.mobile" &&
     deviceFamilies.length === 1 &&
     targetedDeviceFamily === "1,2" &&
-    infoPlist.includes("<key>UIRequiresFullScreen</key>") &&
-    infoPlist.includes("<true/>") &&
-    infoPlist.includes("UIInterfaceOrientationPortrait"),
-  `Found marketingVersions=${marketingVersions.join(",")}, buildNumbers=${buildNumbers.join(",")}, bundleIdentifiers=${bundleIdentifiers.join(",")}, deviceFamilies=${deviceFamilies.join(",")}.`
+    !fullScreenLocked &&
+    stringArrayEquals(iphoneOrientations, expectedIphoneOrientations) &&
+    stringArrayEquals(ipadOrientations, expectedIpadOrientations),
+  `Found marketingVersions=${marketingVersions.join(",")}, buildNumbers=${buildNumbers.join(",")}, bundleIdentifiers=${bundleIdentifiers.join(",")}, deviceFamilies=${deviceFamilies.join(",")}, fullScreenLocked=${fullScreenLocked}, iphoneOrientations=${iphoneOrientations.join("|")}, ipadOrientations=${ipadOrientations.join("|")}.`
 );
 
 check(
