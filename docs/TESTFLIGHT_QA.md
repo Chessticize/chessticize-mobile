@@ -83,8 +83,8 @@ failure, retry, or unclear result.
 
 - [ ] Install the build from the TestFlight app.
 - [ ] Launch without a Metro server or local development machine.
-- [ ] Confirm app name, app icon, launch screen, portrait orientation, and safe
-      area behavior.
+- [ ] Confirm app name, app icon, launch screen, portrait and landscape
+      orientation behavior, and safe-area behavior.
 - [ ] Confirm the app opens without a network account or sign-in requirement.
 
 ### Standard Sprint

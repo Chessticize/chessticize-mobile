@@ -102,7 +102,7 @@ Primary flows:
 
 ## Adaptive Layout And Orientation
 
-The current implementation and App Store target are still portrait-only, but the design target should support compact portrait, compact landscape, and regular-width iPad layouts. Unlocking the orientation mask should happen only after the adaptive shell, component tests, simulator screenshots, and App Store screenshot coverage are in place.
+The current implementation and App Store target support compact portrait, compact landscape, regular-width iPad layouts, and iPad split-view widths. Release QA still needs simulator screenshots across those classes before App Store submission.
 
 ![Adaptive mobile layouts](assets/mobile-adaptive-layouts.png)
 
@@ -173,10 +173,10 @@ Settings:
 
 Implementation notes:
 
-- Introduce a small adaptive layout model, for example `compactPortrait`, `compactLandscape`, `regularPortrait`, and `regularLandscape`, derived from measured width, height, and safe-area insets.
-- Replace the current width-only board sizing with a reusable board-slot calculation shared by active sprint and review.
+- Keep the adaptive layout model (`compactPortrait`, `compactLandscape`, `regularPortrait`, and `regularLandscape`) derived from measured width, height, and safe-area insets.
+- Keep board sizing tied to the available board slot rather than screen width alone, shared by active sprint and review.
 - Keep view models and domain behavior unchanged; adaptive layout should only change rendering, navigation placement, and panel composition.
-- Update iOS orientation/device-target configuration only after the adaptive UI is covered by component tests and simulator screenshots.
+- Keep iOS orientation/device-target configuration aligned with component coverage and simulator screenshot QA.
 
 ## Visual Direction
 
@@ -576,12 +576,11 @@ Accessibility rules:
 - E2E flows should cover Practice start, Arrow Duel choice, wrong-answer review, custom sprint setup, history filtering, Settings license/source attribution, ELO reset, and local data export/delete.
 - Design QA should include iPhone SE-sized portrait, modern iPhone portrait, compact iPhone landscape, iPad portrait, iPad landscape, and iPad split-view widths.
 - Adaptive component tests should render the app shell with explicit width/height pairs and assert chrome placement, board sizing, rail visibility, and absence of overlapping controls.
-- Simulator screenshot QA should include at least one active sprint, one Arrow Duel state, one Analysis Review state, and one History/Settings regular-width state before orientation support is enabled.
+- Simulator screenshot QA should include at least one active sprint, one Arrow Duel state, one Analysis Review state, and one History/Settings regular-width state before App Store submission.
 - E2E assertions should target stable labels/test IDs from this document.
 
 ## Open Design Questions
 
 - Whether manual ELO editing should ship in v1 or only reset/import/export.
 - Whether custom max mistakes is part of v1 custom sprint or should remain fixed by scoring mode.
-- Whether orientation support should ship as a post-1.0 feature flag first or replace the portrait-only App Store target immediately.
 - Whether regular-width iPad navigation should always show text labels or collapse to icon-only in smaller split-view widths.
