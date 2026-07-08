@@ -1,16 +1,8 @@
 # Mobile UI Design
 
-This document captures the current Chessticize web Puzzle Sprint experience, the current Chessticize Mobile implementation shape, and the remaining mobile-first UI requirements. Game Review is intentionally out of scope for the mobile app.
+This document captures the current Chessticize Mobile implementation shape and the remaining mobile-first UI requirements. Game Review is intentionally out of scope for the mobile app.
 
-## Current Web Observations
-
-The current web app was reviewed in Chrome on `chessticize.com`, focused on Puzzle Sprint flows. Raw screenshots were captured during review, but public repository artifacts use a sanitized schematic so usernames, exact ELO values, personal stats, and dates are not published.
-
-### Sanitized Capture Summary
-
-![Current web observed flow](assets/current-web-observed-flow.svg)
-
-### Functional Inventory
+## Initial Web Reference
 
 - Main navigation includes Home, Puzzle Sprint, Game Review, and Settings. Mobile should exclude Game Review from the app scope.
 - Puzzle Sprint dashboard shows daily stats, Standard Sprint, Arrow Duel, Blitz Sprint, recent custom sprint configs, and a Custom Sprint entry.
@@ -30,6 +22,8 @@ The current web app was reviewed in Chrome on `chessticize.com`, focused on Puzz
 ## Complete App Design Board
 
 The design board below is a simulator-captured implementation snapshot from the current iOS app. It is useful for reviewing the actual product shape, but the written specifications in this document are authoritative for exact copy, scoring behavior, chart placement, licensing text, and remaining implementation details. The captured build is a development/test build, so it may show QA-only controls such as the puzzle source switch and review notification test actions that must remain hidden in release builds.
+
+All visual design artifacts in this document use PNG renderings. The full design board is captured from the simulator; the other rendered boards are implementation-target mockups that use the same color, spacing, board, control, and device-frame language.
 
 ![Complete mobile design board](assets/mobile-full-design-board.png)
 
@@ -72,7 +66,7 @@ Use a four-tab app shell:
 
 There should be no mobile Home tab, Game Review tab, or Packs tab in v1.
 
-![Mobile navigation flow](assets/mobile-navigation-flow.svg)
+![Mobile navigation flow](assets/mobile-navigation-flow.png)
 
 Navigation rules:
 
@@ -102,14 +96,93 @@ Primary flows:
 - Local-first clarity: in v1, the user should see that progress is stored on device only. Do not imply cloud sync until a real sync engine ships.
 - Calm density: show enough data for repeated training, but avoid desktop dashboards, marketing hero panels, or decorative statistics.
 - One-handed portrait first: primary controls should sit below or immediately above the board and remain reachable.
+- Adaptive by slot, not by device name: layouts should derive from available width, available height, safe-area insets, and size class rather than from a hard-coded iPhone or iPad model.
 - Business state comes from the local backend/domain core. UI screens render view models and dispatch typed intents.
 - No hidden scoring changes: UI controls such as hint, skip, undo, or analysis must not appear in scored sprint mode unless the scoring rules explicitly support them.
+
+## Adaptive Layout And Orientation
+
+The current implementation and App Store target are still portrait-only, but the design target should support compact portrait, compact landscape, and regular-width iPad layouts. Unlocking the orientation mask should happen only after the adaptive shell, component tests, simulator screenshots, and App Store screenshot coverage are in place.
+
+![Adaptive mobile layouts](assets/mobile-adaptive-layouts.png)
+
+Adaptive classes:
+
+| Class | Typical viewport | Navigation | Content rule |
+| --- | --- | --- | --- |
+| Compact portrait | iPhone portrait, narrow split view | Bottom tab bar when app chrome is visible | Existing one-column scroll. Active sessions hide tabs and stack status, board, score, prompt, and results vertically. |
+| Compact landscape | iPhone landscape, short height | Icon rail outside active sessions; no bottom tab bar while playing | Active session uses a board lane plus a right control rail. The control rail owns status, prompt, score, pause/abandon, and overflow scrolling. |
+| Regular width | iPad portrait/landscape, large split view | Persistent side rail with labels when width allows, icon-only rail below that | Use two-pane or three-pane layouts with constrained content width. Board/review surfaces stay centered and support panels sit beside the board. |
+
+Sizing rules:
+
+- Derive layout from `useWindowDimensions()` width and height plus safe-area insets. Width-only board sizing is not enough for landscape because height becomes the limiting axis.
+- Board size is computed from the board slot, not from screen width. Use `min(slotWidth, slotHeight)` with a stable minimum and maximum per class.
+- Phone portrait board target: fill the content width up to the existing max, while keeping prompt and score visible below the board.
+- Phone landscape board target: maximize board height after subtracting top status chrome, bottom/home-indicator inset, and vertical gaps. Cap the board at the phone class maximum and let only the control rail scroll.
+- iPad board target: cap at a comfortable inspection size rather than filling the whole display. A 560-640 pt board is usually enough; extra space belongs to analysis, queue, history, or settings detail panels.
+- Never scale type with viewport width. Keep platform text sizes stable and let columns, gaps, and panel counts change instead.
+
+Navigation rules:
+
+- Bottom tabs are for compact portrait only.
+- Compact landscape uses a narrow vertical rail outside active sessions so navigation does not consume scarce height.
+- Regular width uses a persistent side rail. At wider iPad sizes, show icon plus text labels; at narrower split-view widths, collapse to icon-only.
+- Active practice and review sessions hide global navigation in every class. The exit/close affordance remains in the session header or control rail.
+
+Safe-area rules:
+
+- No board, tab, rail, or primary control may sit under the Dynamic Island, camera cutout, rounded-corner exclusion, or home indicator.
+- In compact landscape, prefer left or right rails that can absorb notch/camera safe area without compressing the board.
+- Keep 44 x 44 pt minimum hit targets after safe-area padding is applied.
+- Panels that overflow in landscape should scroll internally; the board itself must not be pushed off-screen by long prompt, engine, or review text.
+
+### Adaptive Practice And Review
+
+Practice Home:
+
+- Compact portrait keeps the current task-first list.
+- Compact landscape shows a left navigation rail plus a two-column content area: mode shortcuts and progress/review summary. Avoid a wide desktop dashboard.
+- Regular width uses two columns: primary practice modes on the left, progress/review/resume cards on the right. Keep the active "Start" affordance close to the mode row.
+
+Active Sprint:
+
+- Compact portrait keeps the current vertical stack.
+- Compact landscape uses board lane plus control rail. The board lane contains the board and any board-adjacent status. The control rail contains timer, progress, mistakes, side-to-move, prompt, pause, and abandon confirmation.
+- The prompt must not appear below the fold in landscape. If the prompt plus actions overflow, the control rail scrolls independently while the board remains fixed.
+- Arrow Duel candidate arrows stay on the board in every class. Do not move candidate selection into separate landscape buttons.
+
+Analysis Review:
+
+- Compact portrait keeps board above the analysis toolbar and line list.
+- Compact landscape puts the board in the larger lane and the analysis/guided-line panel in the control rail.
+- Regular width uses board plus inspector. The inspector can hold analysis controls, engine status, candidate rows, and the Continue action without covering the board.
+- History-launched review should preserve previous/next navigation in the header or inspector, not in a bottom toolbar.
+
+History:
+
+- Compact portrait keeps range chips, selected ELO bucket, trend, and attempt rows stacked.
+- Compact landscape and regular width can use a split view: filters and chart on one side, attempt list/detail on the other.
+- Regular-width attempt detail may open beside the list rather than replacing the full screen, but Analysis Review still owns the full board surface when launched.
+
+Settings:
+
+- Compact portrait keeps the current stacked settings groups.
+- Compact landscape and iPad regular width can use a master/detail settings layout: groups on the left, selected group detail on the right.
+- Destructive confirmations remain modal or sheet-based and must not become small inline controls in wide layouts.
+
+Implementation notes:
+
+- Introduce a small adaptive layout model, for example `compactPortrait`, `compactLandscape`, `regularPortrait`, and `regularLandscape`, derived from measured width, height, and safe-area insets.
+- Replace the current width-only board sizing with a reusable board-slot calculation shared by active sprint and review.
+- Keep view models and domain behavior unchanged; adaptive layout should only change rendering, navigation placement, and panel composition.
+- Update iOS orientation/device-target configuration only after the adaptive UI is covered by component tests and simulator screenshots.
 
 ## Visual Direction
 
 The mobile UI should feel like a quiet training tool, not a marketing page.
 
-![Clean mobile palette](assets/mobile-color-palette.svg)
+![Clean mobile palette](assets/mobile-color-palette.png)
 
 Color tokens:
 
@@ -169,7 +242,7 @@ Core components:
 
 ### Practice Session
 
-![Mobile practice wireframe](assets/mobile-practice-wireframe.svg)
+![Mobile practice rendered design](assets/mobile-practice-wireframe.png)
 
 Practice session layout:
 
@@ -234,7 +307,7 @@ Developer/test-build controls:
 
 ### Arrow Duel Review
 
-![Mobile Arrow Duel review wireframe](assets/mobile-arrow-duel-review-wireframe.svg)
+![Mobile Arrow Duel review rendered design](assets/mobile-arrow-duel-review-wireframe.png)
 
 Arrow Duel Analysis Review behavior:
 
@@ -292,7 +365,7 @@ Terminal and guided-line states:
 
 ### Custom Sprint Setup
 
-![Mobile custom sprint setup wireframe](assets/mobile-custom-config-wireframe.svg)
+![Mobile custom sprint setup rendered design](assets/mobile-custom-config-wireframe.png)
 
 Custom sprint layout:
 
@@ -325,6 +398,8 @@ Custom sprint behavior:
 - Quick choices: Standard Sprint, Arrow Duel, Blitz, Custom.
 - Current ELO appears near each mode, but detailed rating management stays in Settings.
 - The active session should remain readable at small phone widths.
+- The active session should remain playable in compact landscape without requiring vertical scrolling of the board lane.
+- On iPad, Practice should use available width to expose progress and due-review context beside mode choices, not by enlarging every card.
 - Abandon must be visible but visually secondary.
 - If a session was interrupted, Practice should offer Resume before Start New.
 
@@ -334,6 +409,7 @@ Custom sprint behavior:
 - First screen shows due mistake count and starts the official review flow.
 - Filters include due, overdue, failed again, mode, sprint speed, Arrow Duel only, and theme.
 - Scheduled Review should reuse the same board surface as Practice.
+- Scheduled Review should use the same adaptive board-slot sizing as active sprint, with review controls moving into the side/control rail in landscape and regular-width layouts.
 - Standard and Blitz review items use the original puzzle-solving flow and preserve the relevant target pace, such as a 20-second item from a 20-second sprint.
 - Arrow Duel review items use the Arrow Duel choice flow.
 - Correct reviews increase interval; failed reviews reset or shorten interval.
@@ -375,6 +451,7 @@ Custom sprint behavior:
 - Analysis Review launched from History supports retry, Stockfish analysis, and previous/next navigation through the current filtered History result set.
 - Previous/next navigation from History follows the active filter result order, not just the currently visible page.
 - History filters should be horizontally scrollable chips on phones.
+- On regular-width iPad, History may use a split view for filters/chart/list, but the selected ELO bucket remains required and the trend chart still follows the full filtered time range.
 - Failed attempts should clearly show whether they are already in the review queue.
 - The rating trend chart belongs in History, not primarily in Sprint Results.
 - History must show only the selected ELO bucket's rating trend as a line chart connecting rating-change points.
@@ -395,6 +472,7 @@ Custom sprint behavior:
 ### Settings
 
 - Local Data appears near the top with clear on-device storage copy.
+- On regular-width iPad, Settings should use grouped navigation plus a detail panel; do not make each settings row stretch across the full display.
 - ELO reset is explicit and separate from deleting history.
 - Advanced manual ELO adjustment should be hidden behind an "Advanced ratings" affordance.
 - Settings must not include simulated cloud state in v1: no iCloud toggle, no upload approval prompt, and no fabricated "last synced" timestamp.
@@ -477,6 +555,10 @@ Required labels/test IDs:
 - `settings-local-storage`
 - `settings-reset-elo`
 - `settings-puzzle-data-license`
+- `adaptive-layout-root`
+- `primary-navigation-rail`
+- `session-control-rail`
+- `analysis-side-panel`
 
 Accessibility rules:
 
@@ -492,10 +574,14 @@ Accessibility rules:
 - Component tests should verify user-visible behavior, not component internals.
 - UI should receive view models from backend/domain packages; React components must not compute sprint outcomes, ELO updates, review scheduling, or Arrow Duel correctness.
 - E2E flows should cover Practice start, Arrow Duel choice, wrong-answer review, custom sprint setup, history filtering, Settings license/source attribution, ELO reset, and local data export/delete.
-- Design QA should include iPhone SE-sized viewport, modern iPhone portrait, and at least one landscape/tablet sanity pass.
+- Design QA should include iPhone SE-sized portrait, modern iPhone portrait, compact iPhone landscape, iPad portrait, iPad landscape, and iPad split-view widths.
+- Adaptive component tests should render the app shell with explicit width/height pairs and assert chrome placement, board sizing, rail visibility, and absence of overlapping controls.
+- Simulator screenshot QA should include at least one active sprint, one Arrow Duel state, one Analysis Review state, and one History/Settings regular-width state before orientation support is enabled.
 - E2E assertions should target stable labels/test IDs from this document.
 
 ## Open Design Questions
 
 - Whether manual ELO editing should ship in v1 or only reset/import/export.
 - Whether custom max mistakes is part of v1 custom sprint or should remain fixed by scoring mode.
+- Whether orientation support should ship as a post-1.0 feature flag first or replace the portrait-only App Store target immediately.
+- Whether regular-width iPad navigation should always show text labels or collapse to icon-only in smaller split-view widths.

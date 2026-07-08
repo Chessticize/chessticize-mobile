@@ -20,6 +20,23 @@ keeps the iPad target on the same portrait surface until a dedicated tablet
 layout pass, landscape behavior, and App Store screenshot and QA coverage are
 added.
 
+## Future Adaptive Orientation Target
+
+The mobile UI design now defines a follow-up adaptive target for compact
+iPhone landscape, regular-width iPad, and iPad split-view widths. That target
+does not change the 1.0 release configuration by itself. Before removing the
+portrait-only orientation lock, the app needs:
+
+- an adaptive shell derived from measured width, height, and safe-area insets;
+- board sizing based on the available board slot rather than screen width only;
+- compact landscape session layouts with a fixed board lane and scrollable
+  control rail;
+- regular-width iPad layouts with side navigation and two-pane or three-pane
+  content where useful;
+- component tests for explicit portrait, landscape, and split-view dimensions;
+- simulator screenshot QA for active sprint, Arrow Duel, Analysis Review,
+  History, and Settings in landscape and iPad layouts.
+
 ## Verification
 
 Release readiness for this item is covered by:
