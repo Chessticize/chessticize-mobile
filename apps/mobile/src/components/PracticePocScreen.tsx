@@ -81,6 +81,7 @@ import {
   type ReviewReminderScheduler
 } from "../backend/reviewReminderScheduler.ts";
 import { arePracticeTestControlsEnabled, isPracticeDebugEnabled } from "../releaseConfig.ts";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Chess, type PieceSymbol, type Square } from "chess.js";
 
 interface Props {
@@ -102,6 +103,30 @@ type SessionFeedback = PuzzleFeedback | null;
 type AnalysisEngineStatus = "idle" | "thinking" | "stockfish" | "fallback" | "error";
 type HistoryRatingRangeFilter = "all" | "under1000" | "1000-1399" | "1400-plus";
 type CustomThemeFilter = string;
+type AdaptiveLayoutClass = "compactPortrait" | "compactLandscape" | "regularPortrait" | "regularLandscape";
+
+type SafeAreaInsets = {
+  bottom: number;
+  left: number;
+  right: number;
+  top: number;
+};
+
+type AdaptiveLayout = {
+  boardSize: number;
+  className: AdaptiveLayoutClass;
+  contentHeight: number;
+  contentWidth: number;
+  isCompactLandscape: boolean;
+  isLandscape: boolean;
+  isRegularWidth: boolean;
+  sessionRailWidth: number;
+  sideNavigationExpanded: boolean;
+  sideNavigationWidth: number;
+  usesSideNavigation: boolean;
+  usesSessionRail: boolean;
+  usesWideContent: boolean;
+};
 
 export type PracticeDebugTraceEvent = {
   type:
@@ -147,6 +172,15 @@ type FeedbackBoardSnapshot = {
 
 const UI_PADDING = 16;
 const MIN_BOARD = 280;
+const COMPACT_LANDSCAPE_RAIL_MIN = 220;
+const COMPACT_LANDSCAPE_RAIL_MAX = 300;
+const REGULAR_RAIL_MIN = 296;
+const REGULAR_RAIL_MAX = 360;
+const COMPACT_LANDSCAPE_BOARD_MAX = 430;
+const PHONE_PORTRAIT_BOARD_MAX = 560;
+const REGULAR_LANDSCAPE_BOARD_MAX = 640;
+const REGULAR_PORTRAIT_BOARD_MAX = 860;
+const REGULAR_PORTRAIT_RESERVED_CONTROLS_HEIGHT = 240;
 const HISTORY_PAGE_LIMIT = 20;
 const NEUTRAL_ARROW = "#2563EB";
 const ARROW_VISUAL_STYLES = {
@@ -215,6 +249,72 @@ const ANALYSIS_DIAGNOSTIC_POSITIONS = [
   }
 ] as const;
 
+function buildAdaptiveLayout({
+  height,
+  insets,
+  width
+}: {
+  height: number;
+  insets: SafeAreaInsets;
+  width: number;
+}): AdaptiveLayout {
+  const viewportWidth = Math.max(MIN_BOARD, width - insets.left - insets.right);
+  const contentHeight = Math.max(MIN_BOARD, height - insets.top - insets.bottom);
+  const isLandscape = viewportWidth > contentHeight;
+  const isRegularWidth = viewportWidth >= 768 && contentHeight >= 600;
+  const isCompactLandscape = isLandscape && !isRegularWidth;
+  const className: AdaptiveLayoutClass = isRegularWidth
+    ? isLandscape ? "regularLandscape" : "regularPortrait"
+    : isLandscape ? "compactLandscape" : "compactPortrait";
+  const usesSideNavigation = isCompactLandscape || isRegularWidth;
+  const sideNavigationExpanded = usesSideNavigation && viewportWidth >= 960;
+  const sideNavigationWidth = isRegularWidth
+    ? sideNavigationExpanded ? 136 : 76
+    : 64;
+  const contentWidth = Math.max(
+    MIN_BOARD,
+    viewportWidth - (usesSideNavigation ? sideNavigationWidth : 0)
+  );
+  const sessionContentWidth = viewportWidth;
+  const usesWideContent = isCompactLandscape || contentWidth >= 860;
+  const usesSessionRail = isCompactLandscape || (isRegularWidth && isLandscape && sessionContentWidth >= 860);
+  const sessionRailWidth = isRegularWidth
+    ? Math.min(REGULAR_RAIL_MAX, Math.max(REGULAR_RAIL_MIN, Math.floor(sessionContentWidth * 0.3)))
+    : Math.min(COMPACT_LANDSCAPE_RAIL_MAX, Math.max(COMPACT_LANDSCAPE_RAIL_MIN, Math.floor(sessionContentWidth * 0.34)));
+  const sessionBoardSlotWidth = Math.max(
+    MIN_BOARD,
+    sessionContentWidth - UI_PADDING * 2 - sessionRailWidth - 14
+  );
+  const sessionBoardSlotHeight = Math.max(MIN_BOARD, contentHeight - UI_PADDING * 2);
+  const portraitBoardSlotWidth = Math.max(MIN_BOARD, sessionContentWidth - UI_PADDING * 2);
+  const portraitBoardSlotHeight = isRegularWidth && !isLandscape
+    ? Math.max(MIN_BOARD, contentHeight - UI_PADDING * 2 - REGULAR_PORTRAIT_RESERVED_CONTROLS_HEIGHT)
+    : portraitBoardSlotWidth;
+  const boardMax = isRegularWidth
+    ? isLandscape ? REGULAR_LANDSCAPE_BOARD_MAX : REGULAR_PORTRAIT_BOARD_MAX
+    : isCompactLandscape ? COMPACT_LANDSCAPE_BOARD_MAX : PHONE_PORTRAIT_BOARD_MAX;
+  const boardSlot = usesSessionRail
+    ? Math.min(sessionBoardSlotWidth, sessionBoardSlotHeight)
+    : Math.min(portraitBoardSlotWidth, portraitBoardSlotHeight);
+  const boardSize = Math.floor(Math.max(MIN_BOARD, Math.min(boardSlot, boardMax)));
+
+  return {
+    boardSize,
+    className,
+    contentHeight,
+    contentWidth,
+    isCompactLandscape,
+    isLandscape,
+    isRegularWidth,
+    sessionRailWidth,
+    sideNavigationExpanded,
+    sideNavigationWidth,
+    usesSideNavigation,
+    usesSessionRail,
+    usesWideContent
+  };
+}
+
 export function PracticePocScreen({
   practiceService,
   practiceServiceFactory = createMobilePracticeService,
@@ -250,7 +350,8 @@ export function PracticePocScreen({
   const boardFenRef = useRef<string | null>(null);
   const feedbackSnapshotRef = useRef<FeedbackBoardSnapshot | null>(null);
   const nowMsRef = useRef<number>(currentTimeMs());
-  const { width } = useWindowDimensions();
+  const { height, width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
 
   const [mode, setMode] = useState<SprintMode>("standard");
   const [tab, setTab] = useState<Tab>("practice");
@@ -282,6 +383,7 @@ export function PracticePocScreen({
   const [historyRatingKey, setHistoryRatingKey] = useState<string | null>(null);
   const [historyReviewEntries, setHistoryReviewEntries] = useState<ReviewEntry[]>([]);
   const [historyReviewInitialIndex, setHistoryReviewInitialIndex] = useState(0);
+  const [reviewSessionActive, setReviewSessionActive] = useState(false);
   const [customSprintMode, setCustomSprintMode] = useState<"custom" | "arrow_duel">("custom");
   const [customDurationSeconds, setCustomDurationSeconds] = useState(5 * 60);
   const [customPerPuzzleSeconds, setCustomPerPuzzleSeconds] = useState(20);
@@ -292,10 +394,11 @@ export function PracticePocScreen({
   const [reviewReminderPermissionPromptVisible, setReviewReminderPermissionPromptVisible] = useState(false);
   const [, setSettingsRevision] = useState(0);
 
-  const boardSize = useMemo(() => {
-    const available = Math.max(width - UI_PADDING * 2, MIN_BOARD);
-    return Math.max(MIN_BOARD, Math.min(available, 560));
-  }, [width]);
+  const adaptiveLayout = useMemo(
+    () => buildAdaptiveLayout({ height, insets, width }),
+    [height, insets.bottom, insets.left, insets.right, insets.top, width]
+  );
+  const boardSize = adaptiveLayout.boardSize;
 
   useEffect(() => {
     if (stockfishTransportFactory === createNativeStockfishTransport) {
@@ -1230,8 +1333,12 @@ export function PracticePocScreen({
   const historyAvailableThemes = historyView?.availableThemes ?? [];
   const historyPage = historyView?.page ?? { limit: HISTORY_PAGE_LIMIT, offset: 0, total: 0, hasMore: false };
   const contentOwnsHeader = tab === "review" || tab === "history";
-  const appChromeVisible = !isOpenSession && !isShowingFeedbackSnapshot;
+  const reviewSurfaceOpen = reviewSessionActive || historyReviewEntries.length > 0;
+  const appChromeVisible = !isOpenSession && !isShowingFeedbackSnapshot && !reviewSurfaceOpen;
   const appHeaderVisible = appChromeVisible && !contentOwnsHeader;
+  const sideNavigationVisible = appChromeVisible && adaptiveLayout.usesSideNavigation;
+  const bottomTabsVisible = appChromeVisible && !sideNavigationVisible;
+  const sessionUsesRail = shouldShowSessionBoard && adaptiveLayout.usesSessionRail;
   const screenTitle = screenTitleFor(tab);
   const screenSubtitle = tab === "practice"
     ? `Offline-ready · ${seededPuzzleCount(puzzleSource)} puzzles`
@@ -1256,381 +1363,439 @@ export function PracticePocScreen({
         perPuzzleSeconds: customPerPuzzleSeconds,
         ...(customThemeValue ? { theme: customThemeValue } : {})
       });
+  const sessionStatusNode = isOpenSession ? (
+    <SessionStatusBar
+      compactMetrics={sessionUsesRail}
+      mode={mode}
+      state={state}
+      sideToMove={displayedSideToMove}
+      timerText={timerText}
+      onAbandon={isActive ? abandonSprint : undefined}
+      onPause={isActive ? () => pauseActiveSprint("manual") : undefined}
+      onResume={isPaused && state ? () => resumeSprint(state) : undefined}
+    />
+  ) : null;
+  const pausedSessionNode = isPaused && state ? (
+    <PausedSessionPanel
+      state={state}
+      onAbandon={abandonSprint}
+      onResume={() => resumeSprint(state)}
+    />
+  ) : null;
+  const sessionBoardNode = shouldShowSessionBoard ? (
+    <View style={styles.boardWrapper}>
+      <View testID="session-board" style={[styles.boardSurface, { width: boardSize, height: boardSize }]}>
+        {displayedBoardFen ? (
+          <Chessboard
+            key={`${state?.id ?? "idle"}-${displayedPuzzle?.puzzle.id ?? "none"}-${displayedPuzzle?.kind ?? "line"}`}
+            ref={boardRef}
+            fen={displayedBoardFen}
+            onMove={(result) => {
+              void onBoardMove(result, {
+                puzzleId: displayedPuzzle?.puzzle.id ?? null
+              });
+            }}
+            onIllegalMove={(from, to) => {
+              onIllegalMove(from, to, {
+                puzzleId: displayedPuzzle?.puzzle.id ?? null
+              });
+            }}
+            gestureEnabled={boardGestureEnabled}
+            draggableColor={boardDraggableColor}
+            boardSize={boardSize}
+            flipped={boardFlipped}
+            withLetters={false}
+            withNumbers={false}
+            durations={{ move: 260 }}
+            spriteSource={CHESS_PIECE_SPRITE}
+            colors={{
+              white: BOARD_COLOR_TOKENS.white,
+              black: BOARD_COLOR_TOKENS.black,
+              lastMoveHighlight: "rgba(0, 0, 0, 0)",
+              checkmateHighlight: "rgba(0, 0, 0, 0)",
+              promotionPieceButton: "#F8FAFC",
+              validMoveDot: "rgba(15, 23, 42, 0.36)",
+              validMoveCapture: "rgba(15, 23, 42, 0.56)"
+            }}
+          />
+        ) : (
+          <View style={[styles.emptyBoard, { width: boardSize, height: boardSize }]}>
+            <Text style={styles.emptyBoardText}>Ready</Text>
+          </View>
+        )}
+
+        {displayedBoardFen ? (
+          <BoardCoordinateOverlay
+            boardSize={boardSize}
+            flipped={boardFlipped}
+          />
+        ) : null}
+
+        {!boardGestureEnabled ? (
+          <Pressable
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            onPress={() => undefined}
+            style={styles.boardInputBlocker}
+            testID="board-input-blocker"
+          />
+        ) : null}
+
+        {displayedLastBoardMove ? (
+          <LastMoveOverlay
+            boardSize={boardSize}
+            flipped={boardFlipped}
+            move={displayedLastBoardMove}
+          />
+        ) : null}
+
+        {submittedMoveForCurrentPuzzle ? (
+          <MoveFeedbackOverlay
+            boardSize={boardSize}
+            flipped={boardFlipped}
+            move={submittedMoveForCurrentPuzzle}
+            result={boardFeedback?.result ?? "wrong"}
+          />
+        ) : null}
+
+        {displayedPuzzle?.kind === "arrow_duel" && !boardFeedback ? (
+          <ArrowCandidateOverlay
+            boardSize={boardSize}
+            flipped={boardFlipped}
+            candidates={displayedPuzzle.candidates}
+            testID="arrow-duel-candidate-overlay"
+          />
+        ) : null}
+      </View>
+      {isPracticeDebugEnabled() && chessboardDebugEvents.length > 0 ? (
+        <Text style={styles.debugLog} testID="chessboard-debug-log">
+          {chessboardDebugEvents.join("\n")}
+        </Text>
+      ) : null}
+    </View>
+  ) : null;
+  const sessionScoreNode = state?.status === "active" ? (
+    <SessionScoreStrip state={state} />
+  ) : null;
+  const practicePromptNode = shouldShowSessionBoard ? (
+    <PracticePrompt currentPuzzle={displayedPuzzle} mode={mode} />
+  ) : null;
+  const errorNode = error ? <ErrorPanel error={error} /> : null;
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" />
-      {appHeaderVisible ? (
-        <View
-          accessibilityLabel={screenSubtitle ? `${screenTitle}, ${screenSubtitle}` : screenTitle}
-          style={styles.header}
-          testID="app-shell-header"
-        >
-          <View>
-            <Text style={styles.title}>{screenTitle}</Text>
-          </View>
-        </View>
-      ) : null}
-
-      <ScrollView
-        testID="practice-main-scroll"
-        contentContainerStyle={[styles.content, appChromeVisible ? styles.contentWithBottomTabs : null]}
+      <View
+        accessibilityLabel={`Layout ${adaptiveLayout.className}`}
+        style={styles.appRootShell}
+        testID="adaptive-layout"
       >
-        {reviewReminderPermissionPromptVisible ? (
-          <ReviewReminderPermissionPrompt
-            onDismiss={dismissReviewReminderPermissionPrompt}
-            onEnable={() => {
-              void requestReviewReminderPermission();
+        {sideNavigationVisible ? (
+          <NavigationRail
+            activeTab={tab}
+            dueReviewCount={dueTodayCount}
+            expanded={adaptiveLayout.sideNavigationExpanded}
+            overdueReviewCount={overdueCount}
+            width={adaptiveLayout.sideNavigationWidth}
+            onSelectTab={(nextTab) => {
+              if (nextTab === "review") {
+                openReviewQueue();
+                return;
+              }
+              setTab(nextTab);
             }}
           />
         ) : null}
-        {tab === "practice" ? (
-          <>
-            {isOpenSession ? (
-              <SessionStatusBar
-                mode={mode}
-                state={state}
-                sideToMove={displayedSideToMove}
-                timerText={timerText}
-                onAbandon={isActive ? abandonSprint : undefined}
-                onPause={isActive ? () => pauseActiveSprint("manual") : undefined}
-                onResume={isPaused && state ? () => resumeSprint(state) : undefined}
-              />
-            ) : null}
-
-            {isPaused && state ? (
-              <PausedSessionPanel
-                state={state}
-                onAbandon={abandonSprint}
-                onResume={() => resumeSprint(state)}
-              />
-            ) : null}
-
-            {!isOpenSession && state === null && mode !== "custom" ? (
-              <PracticeHome
-                mode={mode}
-                modes={practiceModeSummaries}
-                currentRating={currentRating}
-                dueReviewCount={dueTodayCount}
-                overdueReviewCount={overdueCount}
-                progress={practiceProgress}
-                resumableSprint={resumableSprint}
-                onSelectMode={setMode}
-                onStartMode={(nextMode) => startSprint(nextMode)}
-                onResumeSprint={resumeSprint}
-                onOpenReview={openReviewQueue}
-              />
-            ) : null}
-
-            {!isOpenSession && state === null && mode === "custom" ? (
-              <CustomSprintSetup
-                durationSeconds={customDurationSeconds}
-                perPuzzleSeconds={customPerPuzzleSeconds}
-                theme={customTheme}
-                targetCorrect={selectedConfig.targetCorrect}
-                maxMistakes={selectedConfig.maxMistakes}
-                availablePuzzleCount={customEligiblePuzzleCount}
-                ratingKey={selectedConfig.ratingKey}
-                currentRating={currentRating}
-                onDurationChange={setCustomDurationSeconds}
-                onClose={() => setMode("standard")}
-                customMode={customSprintMode}
-                onCustomModeChange={setCustomSprintMode}
-                onPerPuzzleChange={setCustomPerPuzzleSeconds}
-                onThemeChange={setCustomTheme}
-                previousConfigs={service.listCustomSprintConfigs()}
-                onStart={() => startSprint(customSprintMode, true)}
-              />
-            ) : null}
-
-            {shouldShowSessionBoard ? (
-              <View style={styles.boardWrapper}>
-                <View testID="session-board" style={[styles.boardSurface, { width: boardSize, height: boardSize }]}>
-                  {displayedBoardFen ? (
-                    <Chessboard
-                      key={`${state?.id ?? "idle"}-${displayedPuzzle?.puzzle.id ?? "none"}-${displayedPuzzle?.kind ?? "line"}`}
-                      ref={boardRef}
-                      fen={displayedBoardFen}
-                      onMove={(result) => {
-                        void onBoardMove(result, {
-                          puzzleId: displayedPuzzle?.puzzle.id ?? null
-                        });
-                      }}
-                      onIllegalMove={(from, to) => {
-                        onIllegalMove(from, to, {
-                          puzzleId: displayedPuzzle?.puzzle.id ?? null
-                        });
-                      }}
-                      gestureEnabled={boardGestureEnabled}
-                      draggableColor={boardDraggableColor}
-                      boardSize={boardSize}
-                      flipped={boardFlipped}
-                      withLetters={false}
-                      withNumbers={false}
-                      durations={{ move: 260 }}
-                      spriteSource={CHESS_PIECE_SPRITE}
-                      colors={{
-                        white: BOARD_COLOR_TOKENS.white,
-                        black: BOARD_COLOR_TOKENS.black,
-                        lastMoveHighlight: "rgba(0, 0, 0, 0)",
-                        checkmateHighlight: "rgba(0, 0, 0, 0)",
-                        promotionPieceButton: "#F8FAFC",
-                        validMoveDot: "rgba(15, 23, 42, 0.36)",
-                        validMoveCapture: "rgba(15, 23, 42, 0.56)"
-                      }}
-                    />
-                  ) : (
-                    <View style={[styles.emptyBoard, { width: boardSize, height: boardSize }]}>
-                      <Text style={styles.emptyBoardText}>Ready</Text>
-                    </View>
-                  )}
-
-                  {displayedBoardFen ? (
-                    <BoardCoordinateOverlay
-                      boardSize={boardSize}
-                      flipped={boardFlipped}
-                    />
-                  ) : null}
-
-                  {!boardGestureEnabled ? (
-                    <Pressable
-                      accessibilityElementsHidden
-                      importantForAccessibility="no-hide-descendants"
-                      onPress={() => undefined}
-                      style={styles.boardInputBlocker}
-                      testID="board-input-blocker"
-                    />
-                  ) : null}
-
-                  {displayedLastBoardMove ? (
-                    <LastMoveOverlay
-                      boardSize={boardSize}
-                      flipped={boardFlipped}
-                      move={displayedLastBoardMove}
-                    />
-                  ) : null}
-
-                  {submittedMoveForCurrentPuzzle ? (
-                    <MoveFeedbackOverlay
-                      boardSize={boardSize}
-                      flipped={boardFlipped}
-                      move={submittedMoveForCurrentPuzzle}
-                      result={boardFeedback?.result ?? "wrong"}
-                    />
-                  ) : null}
-
-                  {displayedPuzzle?.kind === "arrow_duel" && !boardFeedback ? (
-                    <ArrowCandidateOverlay
-                      boardSize={boardSize}
-                      flipped={boardFlipped}
-                      candidates={displayedPuzzle.candidates}
-                      testID="arrow-duel-candidate-overlay"
-                    />
-                  ) : null}
-                </View>
-                {isPracticeDebugEnabled() && chessboardDebugEvents.length > 0 ? (
-                  <Text style={styles.debugLog} testID="chessboard-debug-log">
-                    {chessboardDebugEvents.join("\n")}
-                  </Text>
-                ) : null}
+        <View style={styles.appContentShell}>
+          {appHeaderVisible ? (
+            <View
+              accessibilityLabel={screenSubtitle ? `${screenTitle}, ${screenSubtitle}` : screenTitle}
+              style={styles.header}
+              testID="app-shell-header"
+            >
+              <View>
+                <Text style={styles.title}>{screenTitle}</Text>
               </View>
-            ) : null}
+            </View>
+          ) : null}
 
-            {state?.status === "active" ? (
-              <SessionScoreStrip state={state} />
-            ) : null}
-
-            {shouldShowSessionBoard ? (
-              <PracticePrompt currentPuzzle={displayedPuzzle} mode={mode} />
-            ) : null}
-
-            {error ? <ErrorPanel error={error} /> : null}
-
-            {isFinished && !isShowingFeedbackSnapshot ? (
-              <SprintSummary
-                state={state}
-                elapsedMs={Math.min(sprintElapsedMs, state ? state.config.durationSeconds * 1000 : sprintElapsedMs)}
-                onReplay={() => startSprint(mode)}
-                onBack={resetToIdle}
-                onOpenHistory={() => setTab("history")}
-                onReview={state.mistakeCount > 0 ? showReviewMistakes : undefined}
-              />
-            ) : null}
-
-            {!isActive && state === null && arePracticeTestControlsEnabled() && !practiceService ? (
-              <TestPuzzleSourceControl
-                source={puzzleSource}
-                onChange={changePuzzleSource}
-              />
-            ) : null}
-          </>
-        ) : null}
-
-        {tab === "history" ? (
-          historyReviewEntries.length > 0 ? (
-            <ReviewSession
-              key={`history:${historyReviewEntries.map((entry) => entry.attempt?.id ?? entry.puzzle.id).join("|")}:${historyReviewInitialIndex}`}
-              boardSize={boardSize}
-              currentTimeMs={currentTimeMs}
-              entries={historyReviewEntries}
-              initialIndex={historyReviewInitialIndex}
-              service={service}
-              onExit={() => setHistoryReviewEntries([])}
-              stockfishTransportFactory={stockfishTransportFactory}
-            />
-          ) : (
-            <HistoryPanel
-              attempts={displayedAttempts}
-              performance={historyPerformanceView?.performance ?? emptyHistoryPerformance()}
-              ratingKeys={historyRatingKeys}
-              puzzleStats={historyView?.puzzleStats ?? []}
-              selectedRatingKey={activeHistoryRatingKey}
-              timeRange={historyTimeRange}
-              sourceFilter={historySourceFilter}
-              resultFilter={historyResultFilter}
-              ratingRangeFilter={historyRatingRangeFilter}
-              sideFilter={historySideFilter}
-              themeFilter={historyThemeFilter}
-              availableThemes={historyAvailableThemes}
-              page={historyPage}
-              reviewStatusFilter={historyReviewStatusFilter}
-              wrongOnly={historyWrongOnly}
-              onRatingKeyChange={(ratingKey) => {
-                setHistoryRatingKey(ratingKey);
-                setHistoryPageOffset(0);
-              }}
-              onTimeRangeChange={(range) => {
-                setHistoryTimeRange(range);
-                setHistoryPageOffset(0);
-              }}
-              onSourceFilterChange={(source) => {
-                setHistorySourceFilter(source);
-                setHistoryPageOffset(0);
-              }}
-              onResultFilterChange={(result) => {
-                setHistoryResultFilter(result);
-                setHistoryPageOffset(0);
-              }}
-              onRatingRangeFilterChange={(ratingRange) => {
-                setHistoryRatingRangeFilter(ratingRange);
-                setHistoryPageOffset(0);
-              }}
-              onSideFilterChange={(side) => {
-                setHistorySideFilter(side);
-                setHistoryPageOffset(0);
-              }}
-              onThemeFilterChange={(theme) => {
-                setHistoryThemeFilter(theme);
-                setHistoryPageOffset(0);
-              }}
-              onReviewStatusFilterChange={(status) => {
-                setHistoryReviewStatusFilter(status);
-                setHistoryPageOffset(0);
-              }}
-              onPageOffsetChange={setHistoryPageOffset}
-              onOpenAttempt={openHistoryReview}
-              onToggleWrongOnly={() => {
-                setHistoryPageOffset(0);
-                setHistoryResultFilter(historyWrongOnly ? "all" : "wrong");
-              }}
-            />
-          )
-        ) : null}
-        {tab === "review" ? (
-          <ReviewPanel
-            boardSize={boardSize}
-            dueReviewItems={dueReviewItems}
-            nowMs={nowMs}
-            reviewQueue={reviewQueue}
-            currentTimeMs={currentTimeMs}
-            service={service}
-            sessionMistakeReviewItems={sessionMistakeReviewItems}
-            onExitSessionReview={exitSessionReview}
-            onOpenPractice={exitSessionReview}
-            onReviewRecorded={(completedAt) => {
-              const completedAtMs = new Date(completedAt).getTime();
-              if (Number.isFinite(completedAtMs) && completedAtMs > nowMsRef.current) {
-                nowMsRef.current = completedAtMs;
-                setNowMs(completedAtMs);
-              }
-              const nextScheduledReviewAttemptCount = scheduledReviewAttemptCount(service);
-              if (nextScheduledReviewAttemptCount > scheduledReviewAttemptCountRef.current) {
-                maybeShowReviewReminderPermissionPrompt();
-              }
-              scheduledReviewAttemptCountRef.current = nextScheduledReviewAttemptCount;
-              refreshState();
-            }}
-            onPromoteNextFutureReviewsToDue={arePracticeTestControlsEnabled() ? promoteNextFutureReviewsToDue : undefined}
-            onScheduleTestReviewReminder={arePracticeTestControlsEnabled() ? scheduleDevReviewReminderNotification : undefined}
-            reviewReminderScheduleStatus={arePracticeTestControlsEnabled() ? reviewReminderScheduleStatus : undefined}
-            stockfishTransportFactory={stockfishTransportFactory}
-          />
-        ) : null}
-        {tab === "settings" ? (
-          <SettingsPanel
-            standardRating={readRating(service, defaultSprintConfig("standard").ratingKey)}
-            ratings={[
-              { label: "Standard", record: service.getRating(defaultSprintConfig("standard").ratingKey) },
-              { label: "Arrow Duel", record: service.getRating(defaultSprintConfig("arrow_duel").ratingKey) },
-              { label: "Blitz", record: service.getRating(defaultSprintConfig("blitz").ratingKey) }
+          <ScrollView
+            testID="practice-main-scroll"
+            contentContainerStyle={[
+              styles.content,
+              adaptiveLayout.usesWideContent ? styles.contentWide : null,
+              bottomTabsVisible ? styles.contentWithBottomTabs : null,
+              sessionUsesRail ? styles.contentSessionRail : null
             ]}
-            onOpenDiagnostics={arePracticeTestControlsEnabled() ? () => setTab("analysis") : undefined}
-            onExportData={() => service.exportLocalData()}
-            onDeleteLocalHistory={() => {
-              const result = service.clearLocalHistory();
-              refreshState();
-              return result;
-            }}
-            onAdjustRating={(ratingKey, nextRating) => {
-              const next = service.setRating(ratingKey, nextRating);
-              setSettingsRevision((current) => current + 1);
-              return next;
-            }}
-            onResetRating={() => {
-              service.resetRating(defaultSprintConfig("standard").ratingKey);
-              setSettingsRevision((current) => current + 1);
-            }}
-            notificationPermissionStatus={notificationPermissionStatus}
-            reviewReminderScheduleStatus={reviewReminderScheduleStatus}
-            reviewReminderPreference={reviewReminderPreference}
-            onOpenNotificationSettings={() => {
-              void openReviewReminderSystemSettings();
-            }}
-            onRequestReviewReminderPermission={() => requestReviewReminderPermission()}
-            onSaveReviewReminderPreference={saveReviewReminderPreference}
-          />
-        ) : null}
-        {tab === "analysis" && arePracticeTestControlsEnabled() ? (
-          <StockfishDiagnosticsPanel stockfishTransportFactory={stockfishTransportFactory} />
-        ) : null}
-      </ScrollView>
-      {appChromeVisible ? (
-        <View style={styles.bottomTabs}>
-          {PRIMARY_TABS.map((item) => (
-            <TabButton
-              key={item.tab}
-              active={tab === item.tab}
-              badgeAccessibilityLabel={
-                item.tab === "review" && dueTodayCount > 0
-                  ? `${dueTodayCount} due reviews${overdueCount > 0 ? `, ${overdueCount} overdue` : ""}`
-                  : undefined
-              }
-              badgeCount={item.tab === "review" ? dueTodayCount : 0}
-              badgeTone={item.tab === "review" && overdueCount > 0 ? "danger" : "default"}
-              label={item.label}
-              tab={item.tab}
-              testID={item.testID}
-              onPress={() => {
-                if (item.tab === "review") {
-                  openReviewQueue();
-                  return;
-                }
-                setTab(item.tab);
-              }}
-            />
-          ))}
+          >
+            {reviewReminderPermissionPromptVisible ? (
+              <ReviewReminderPermissionPrompt
+                onDismiss={dismissReviewReminderPermissionPrompt}
+                onEnable={() => {
+                  void requestReviewReminderPermission();
+                }}
+              />
+            ) : null}
+            {tab === "practice" ? (
+              <>
+                {sessionUsesRail ? (
+                  <View style={styles.activeSessionAdaptiveLayout} testID="active-session-adaptive-layout">
+                    <View style={styles.activeSessionBoardLane} testID="active-session-board-lane">
+                      {sessionBoardNode}
+                    </View>
+                    <ScrollView
+                      style={[styles.activeSessionControlRailScroll, { width: adaptiveLayout.sessionRailWidth }]}
+                      contentContainerStyle={styles.activeSessionControlRail}
+                      testID="active-session-control-rail"
+                    >
+                      {sessionStatusNode}
+                      {sessionScoreNode}
+                      {practicePromptNode}
+                      {errorNode}
+                    </ScrollView>
+                  </View>
+                ) : (
+                  <>
+                    {sessionStatusNode}
+                    {pausedSessionNode}
+                    {sessionBoardNode}
+                    {sessionScoreNode}
+                    {practicePromptNode}
+                    {errorNode}
+                  </>
+                )}
+
+                {!isOpenSession && state === null && mode !== "custom" ? (
+                  <PracticeHome
+                    adaptiveLayout={adaptiveLayout}
+                    mode={mode}
+                    modes={practiceModeSummaries}
+                    currentRating={currentRating}
+                    dueReviewCount={dueTodayCount}
+                    overdueReviewCount={overdueCount}
+                    progress={practiceProgress}
+                    resumableSprint={resumableSprint}
+                    onSelectMode={setMode}
+                    onStartMode={(nextMode) => startSprint(nextMode)}
+                    onResumeSprint={resumeSprint}
+                    onOpenReview={openReviewQueue}
+                  />
+                ) : null}
+
+                {!isOpenSession && state === null && mode === "custom" ? (
+                  <CustomSprintSetup
+                    durationSeconds={customDurationSeconds}
+                    perPuzzleSeconds={customPerPuzzleSeconds}
+                    theme={customTheme}
+                    targetCorrect={selectedConfig.targetCorrect}
+                    maxMistakes={selectedConfig.maxMistakes}
+                    availablePuzzleCount={customEligiblePuzzleCount}
+                    ratingKey={selectedConfig.ratingKey}
+                    currentRating={currentRating}
+                    onDurationChange={setCustomDurationSeconds}
+                    onClose={() => setMode("standard")}
+                    customMode={customSprintMode}
+                    onCustomModeChange={setCustomSprintMode}
+                    onPerPuzzleChange={setCustomPerPuzzleSeconds}
+                    onThemeChange={setCustomTheme}
+                    previousConfigs={service.listCustomSprintConfigs()}
+                    onStart={() => startSprint(customSprintMode, true)}
+                  />
+                ) : null}
+
+                {isFinished && !isShowingFeedbackSnapshot ? (
+                  <SprintSummary
+                    state={state}
+                    elapsedMs={Math.min(sprintElapsedMs, state ? state.config.durationSeconds * 1000 : sprintElapsedMs)}
+                    onReplay={() => startSprint(mode)}
+                    onBack={resetToIdle}
+                    onOpenHistory={() => setTab("history")}
+                    onReview={state.mistakeCount > 0 ? showReviewMistakes : undefined}
+                  />
+                ) : null}
+
+                {!isActive && state === null && arePracticeTestControlsEnabled() && !practiceService ? (
+                  <TestPuzzleSourceControl
+                    source={puzzleSource}
+                    onChange={changePuzzleSource}
+                  />
+                ) : null}
+              </>
+            ) : null}
+
+            {tab === "history" ? (
+              historyReviewEntries.length > 0 ? (
+                <ReviewSession
+                  key={`history:${historyReviewEntries.map((entry) => entry.attempt?.id ?? entry.puzzle.id).join("|")}:${historyReviewInitialIndex}`}
+                  adaptiveLayout={adaptiveLayout}
+                  boardSize={boardSize}
+                  currentTimeMs={currentTimeMs}
+                  entries={historyReviewEntries}
+                  initialIndex={historyReviewInitialIndex}
+                  service={service}
+                  onExit={() => setHistoryReviewEntries([])}
+                  stockfishTransportFactory={stockfishTransportFactory}
+                />
+              ) : (
+                <HistoryPanel
+                  adaptiveLayout={adaptiveLayout}
+                  attempts={displayedAttempts}
+                  performance={historyPerformanceView?.performance ?? emptyHistoryPerformance()}
+                  ratingKeys={historyRatingKeys}
+                  puzzleStats={historyView?.puzzleStats ?? []}
+                  selectedRatingKey={activeHistoryRatingKey}
+                  timeRange={historyTimeRange}
+                  sourceFilter={historySourceFilter}
+                  resultFilter={historyResultFilter}
+                  ratingRangeFilter={historyRatingRangeFilter}
+                  sideFilter={historySideFilter}
+                  themeFilter={historyThemeFilter}
+                  availableThemes={historyAvailableThemes}
+                  page={historyPage}
+                  reviewStatusFilter={historyReviewStatusFilter}
+                  wrongOnly={historyWrongOnly}
+                  onRatingKeyChange={(ratingKey) => {
+                    setHistoryRatingKey(ratingKey);
+                    setHistoryPageOffset(0);
+                  }}
+                  onTimeRangeChange={(range) => {
+                    setHistoryTimeRange(range);
+                    setHistoryPageOffset(0);
+                  }}
+                  onSourceFilterChange={(source) => {
+                    setHistorySourceFilter(source);
+                    setHistoryPageOffset(0);
+                  }}
+                  onResultFilterChange={(result) => {
+                    setHistoryResultFilter(result);
+                    setHistoryPageOffset(0);
+                  }}
+                  onRatingRangeFilterChange={(ratingRange) => {
+                    setHistoryRatingRangeFilter(ratingRange);
+                    setHistoryPageOffset(0);
+                  }}
+                  onSideFilterChange={(side) => {
+                    setHistorySideFilter(side);
+                    setHistoryPageOffset(0);
+                  }}
+                  onThemeFilterChange={(theme) => {
+                    setHistoryThemeFilter(theme);
+                    setHistoryPageOffset(0);
+                  }}
+                  onReviewStatusFilterChange={(status) => {
+                    setHistoryReviewStatusFilter(status);
+                    setHistoryPageOffset(0);
+                  }}
+                  onPageOffsetChange={setHistoryPageOffset}
+                  onOpenAttempt={openHistoryReview}
+                  onToggleWrongOnly={() => {
+                    setHistoryPageOffset(0);
+                    setHistoryResultFilter(historyWrongOnly ? "all" : "wrong");
+                  }}
+                />
+              )
+            ) : null}
+            {tab === "review" ? (
+              <ReviewPanel
+                adaptiveLayout={adaptiveLayout}
+                boardSize={boardSize}
+                dueReviewItems={dueReviewItems}
+                nowMs={nowMs}
+                reviewQueue={reviewQueue}
+                currentTimeMs={currentTimeMs}
+                service={service}
+                sessionMistakeReviewItems={sessionMistakeReviewItems}
+                onExitSessionReview={exitSessionReview}
+                onOpenPractice={exitSessionReview}
+                onReviewRecorded={(completedAt) => {
+                  const completedAtMs = new Date(completedAt).getTime();
+                  if (Number.isFinite(completedAtMs) && completedAtMs > nowMsRef.current) {
+                    nowMsRef.current = completedAtMs;
+                    setNowMs(completedAtMs);
+                  }
+                  const nextScheduledReviewAttemptCount = scheduledReviewAttemptCount(service);
+                  if (nextScheduledReviewAttemptCount > scheduledReviewAttemptCountRef.current) {
+                    maybeShowReviewReminderPermissionPrompt();
+                  }
+                  scheduledReviewAttemptCountRef.current = nextScheduledReviewAttemptCount;
+                  refreshState();
+                }}
+                onPromoteNextFutureReviewsToDue={arePracticeTestControlsEnabled() ? promoteNextFutureReviewsToDue : undefined}
+                onScheduleTestReviewReminder={arePracticeTestControlsEnabled() ? scheduleDevReviewReminderNotification : undefined}
+                onSessionActiveChange={setReviewSessionActive}
+                reviewReminderScheduleStatus={arePracticeTestControlsEnabled() ? reviewReminderScheduleStatus : undefined}
+                stockfishTransportFactory={stockfishTransportFactory}
+              />
+            ) : null}
+            {tab === "settings" ? (
+              <SettingsPanel
+                adaptiveLayout={adaptiveLayout}
+                standardRating={readRating(service, defaultSprintConfig("standard").ratingKey)}
+                ratings={[
+                  { label: "Standard", record: service.getRating(defaultSprintConfig("standard").ratingKey) },
+                  { label: "Arrow Duel", record: service.getRating(defaultSprintConfig("arrow_duel").ratingKey) },
+                  { label: "Blitz", record: service.getRating(defaultSprintConfig("blitz").ratingKey) }
+                ]}
+                onOpenDiagnostics={arePracticeTestControlsEnabled() ? () => setTab("analysis") : undefined}
+                onExportData={() => service.exportLocalData()}
+                onDeleteLocalHistory={() => {
+                  const result = service.clearLocalHistory();
+                  refreshState();
+                  return result;
+                }}
+                onAdjustRating={(ratingKey, nextRating) => {
+                  const next = service.setRating(ratingKey, nextRating);
+                  setSettingsRevision((current) => current + 1);
+                  return next;
+                }}
+                onResetRating={() => {
+                  service.resetRating(defaultSprintConfig("standard").ratingKey);
+                  setSettingsRevision((current) => current + 1);
+                }}
+                notificationPermissionStatus={notificationPermissionStatus}
+                reviewReminderScheduleStatus={reviewReminderScheduleStatus}
+                reviewReminderPreference={reviewReminderPreference}
+                onOpenNotificationSettings={() => {
+                  void openReviewReminderSystemSettings();
+                }}
+                onRequestReviewReminderPermission={() => requestReviewReminderPermission()}
+                onSaveReviewReminderPreference={saveReviewReminderPreference}
+              />
+            ) : null}
+            {tab === "analysis" && arePracticeTestControlsEnabled() ? (
+              <StockfishDiagnosticsPanel stockfishTransportFactory={stockfishTransportFactory} />
+            ) : null}
+          </ScrollView>
+          {bottomTabsVisible ? (
+            <View style={styles.bottomTabs}>
+              {PRIMARY_TABS.map((item) => (
+                <TabButton
+                  key={item.tab}
+                  active={tab === item.tab}
+                  badgeAccessibilityLabel={
+                    item.tab === "review" && dueTodayCount > 0
+                      ? `${dueTodayCount} due reviews${overdueCount > 0 ? `, ${overdueCount} overdue` : ""}`
+                      : undefined
+                  }
+                  badgeCount={item.tab === "review" ? dueTodayCount : 0}
+                  badgeTone={item.tab === "review" && overdueCount > 0 ? "danger" : "default"}
+                  label={item.label}
+                  presentation="bottom"
+                  tab={item.tab}
+                  testID={item.testID}
+                  onPress={() => {
+                    if (item.tab === "review") {
+                      openReviewQueue();
+                      return;
+                    }
+                    setTab(item.tab);
+                  }}
+                />
+              ))}
+            </View>
+          ) : null}
         </View>
-      ) : null}
+      </View>
     </SafeAreaView>
   );
 }
@@ -1682,6 +1847,7 @@ function buildPracticeProgressSummary(attempts: AttemptEvent[], nowMs: number): 
 }
 
 function PracticeHome({
+  adaptiveLayout,
   mode,
   modes,
   currentRating,
@@ -1694,6 +1860,7 @@ function PracticeHome({
   onResumeSprint,
   onOpenReview
 }: {
+  adaptiveLayout: AdaptiveLayout;
   mode: SprintMode;
   modes: PracticeModeSummary[];
   currentRating: number;
@@ -1741,73 +1908,82 @@ function PracticeHome({
         />
       ) : null}
 
-      <View style={styles.sectionHeaderRow} testID="practice-action-header">
-        <Text style={styles.sectionLabel}>Start a Sprint</Text>
-      </View>
-      <View style={styles.modeList}>
-        {modes.map((item) => (
-          <PracticeModeCard
-            key={item.mode}
-            active={mode === item.mode}
-            item={item}
-            onPress={() => {
-              if (item.mode === "custom") {
-                onSelectMode(item.mode);
-              } else {
-                onStartMode(item.mode);
-              }
-            }}
-          />
-        ))}
-      </View>
-
-      <Text style={styles.sectionLabel}>Progress</Text>
       <View
-        accessibilityLabel={`Progress summary, ELO ${currentRating}, rating ${ratingDeltaLabel}, this week ${progress.correctThisWeek}, ${progressDelta}, ${progressContext}`}
-        style={styles.practiceProgressCard}
-        testID="practice-progress-summary"
+        style={adaptiveLayout.usesWideContent ? styles.practiceHomeColumns : null}
+        testID="practice-home-layout"
       >
-        <View style={styles.progressMetric}>
-          <Text style={styles.helperText}>ELO ({selected ? modeLabel(selected.mode) : "Standard"})</Text>
-          <Text style={styles.progressValue}>{currentRating}</Text>
-          <Text testID="practice-progress-rating-delta" style={[styles.progressDelta, ratingDeltaTone]}>{ratingDeltaLabel}</Text>
+        <View style={styles.practiceHomePrimaryColumn}>
+          <View style={styles.sectionHeaderRow} testID="practice-action-header">
+            <Text style={styles.sectionLabel}>Start a Sprint</Text>
+          </View>
+          <View style={styles.modeList}>
+            {modes.map((item) => (
+              <PracticeModeCard
+                key={item.mode}
+                active={mode === item.mode}
+                item={item}
+                onPress={() => {
+                  if (item.mode === "custom") {
+                    onSelectMode(item.mode);
+                  } else {
+                    onStartMode(item.mode);
+                  }
+                }}
+              />
+            ))}
+          </View>
         </View>
-        <View style={styles.progressDivider} />
-        <View style={styles.progressMetric}>
-          <Text style={styles.helperText}>This Week</Text>
-          <Text testID="practice-progress-weekly-solved" style={styles.progressValue}>{progress.correctThisWeek}</Text>
-          <Text testID="practice-progress-weekly-delta" style={[styles.progressDelta, progressTone]}>{progressDelta}</Text>
-          <Text testID="practice-progress-weekly-context" style={styles.progressContextText}>{progressContext}</Text>
+
+        <View style={styles.practiceHomeSecondaryColumn}>
+          <Text style={styles.sectionLabel}>Progress</Text>
+          <View
+            accessibilityLabel={`Progress summary, ELO ${currentRating}, rating ${ratingDeltaLabel}, this week ${progress.correctThisWeek}, ${progressDelta}, ${progressContext}`}
+            style={styles.practiceProgressCard}
+            testID="practice-progress-summary"
+          >
+            <View style={styles.progressMetric}>
+              <Text style={styles.helperText}>ELO ({selected ? modeLabel(selected.mode) : "Standard"})</Text>
+              <Text style={styles.progressValue}>{currentRating}</Text>
+              <Text testID="practice-progress-rating-delta" style={[styles.progressDelta, ratingDeltaTone]}>{ratingDeltaLabel}</Text>
+            </View>
+            <View style={styles.progressDivider} />
+            <View style={styles.progressMetric}>
+              <Text style={styles.helperText}>This Week</Text>
+              <Text testID="practice-progress-weekly-solved" style={styles.progressValue}>{progress.correctThisWeek}</Text>
+              <Text testID="practice-progress-weekly-delta" style={[styles.progressDelta, progressTone]}>{progressDelta}</Text>
+              <Text testID="practice-progress-weekly-context" style={styles.progressContextText}>{progressContext}</Text>
+            </View>
+          </View>
+
+          <Text style={styles.sectionLabel}>Review</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Open scheduled mistake reviews, ${dueReviewCount} due today, ${overdueReviewCount} overdue`}
+            testID="practice-review-strip"
+            style={styles.practiceReviewStrip}
+            onPress={onOpenReview}
+          >
+            <View>
+              <Text style={styles.listText}>{reviewStatusLabel}</Text>
+            </View>
+            <View style={styles.reviewStripActionArea}>
+              <View style={styles.reviewStripCounts}>
+                <View style={styles.reviewStripMetric} testID="practice-review-due-count">
+                  <Text style={styles.reviewDueCount}>{dueReviewCount}</Text>
+                  <Text style={styles.reviewStripMetricLabel}>Due today</Text>
+                </View>
+                <View style={styles.reviewStripMetric} testID="practice-review-overdue-count">
+                  <Text style={styles.reviewOverdueCount}>{overdueReviewCount}</Text>
+                  <Text style={styles.reviewStripMetricLabel}>Overdue</Text>
+                </View>
+              </View>
+              <View style={styles.reviewStripChevron} testID="practice-review-strip-chevron">
+                <ChevronGlyph direction="right" />
+              </View>
+            </View>
+          </Pressable>
         </View>
       </View>
-
-      <Text style={styles.sectionLabel}>Review</Text>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Open scheduled mistake reviews, ${dueReviewCount} due today, ${overdueReviewCount} overdue`}
-        testID="practice-review-strip"
-        style={styles.practiceReviewStrip}
-        onPress={onOpenReview}
-      >
-        <View>
-          <Text style={styles.listText}>{reviewStatusLabel}</Text>
-        </View>
-        <View style={styles.reviewStripActionArea}>
-          <View style={styles.reviewStripCounts}>
-            <View style={styles.reviewStripMetric} testID="practice-review-due-count">
-              <Text style={styles.reviewDueCount}>{dueReviewCount}</Text>
-              <Text style={styles.reviewStripMetricLabel}>Due today</Text>
-            </View>
-            <View style={styles.reviewStripMetric} testID="practice-review-overdue-count">
-              <Text style={styles.reviewOverdueCount}>{overdueReviewCount}</Text>
-              <Text style={styles.reviewStripMetricLabel}>Overdue</Text>
-            </View>
-          </View>
-          <View style={styles.reviewStripChevron} testID="practice-review-strip-chevron">
-            <ChevronGlyph direction="right" />
-          </View>
-        </View>
-      </Pressable>
     </View>
   );
 }
@@ -2482,6 +2658,7 @@ function TestPuzzleSourceControl({
 }
 
 function SessionStatusBar({
+  compactMetrics = false,
   mode,
   state,
   sideToMove,
@@ -2490,6 +2667,7 @@ function SessionStatusBar({
   onPause,
   onResume
 }: {
+  compactMetrics?: boolean;
   mode: SprintMode;
   state: SprintState;
   sideToMove: MoveSide | null;
@@ -2544,33 +2722,57 @@ function SessionStatusBar({
         )}
       </View>
 
-      <View style={styles.sessionActiveMetricRow} testID="session-status-metrics">
+      <View
+        style={[
+          styles.sessionActiveMetricRow,
+          compactMetrics ? styles.sessionActiveMetricRowCompact : null
+        ]}
+        testID="session-status-metrics"
+      >
         <View
           accessibilityLabel={`Progress ${state.correctCount} of ${state.config.targetCorrect}`}
-          style={styles.sessionMetricBlock}
+          style={[
+            styles.sessionMetricBlock,
+            compactMetrics ? styles.sessionMetricBlockCompact : null,
+            compactMetrics ? styles.sessionProgressBlockCompact : null
+          ]}
           testID="session-progress-block"
         >
-          <Text testID="session-progress" style={styles.sessionProgressValue}>
+          <Text numberOfLines={1} testID="session-progress" style={styles.sessionProgressValue}>
             {state.correctCount} / {state.config.targetCorrect}
           </Text>
         </View>
         <View
           accessibilityLabel={`Timer ${timerText}`}
-          style={[styles.sessionMetricBlock, styles.sessionTimerBlock]}
+          style={[
+            styles.sessionMetricBlock,
+            styles.sessionTimerBlock,
+            compactMetrics ? styles.sessionMetricBlockCompact : null,
+            compactMetrics ? styles.sessionTimerBlockCompact : null
+          ]}
           testID="session-timer-block"
         >
-          <Text testID="session-timer" style={styles.timerText}>{timerText}</Text>
+          <Text numberOfLines={1} testID="session-timer" style={styles.timerText}>{timerText}</Text>
         </View>
         <View
           accessibilityLabel={sideToMove ? sideToMoveAccessibilityLabel(sideToMove) : "Side to move unavailable"}
-          style={styles.sessionMetricBlock}
+          style={[
+            styles.sessionMetricBlock,
+            styles.sessionSideToMoveBlock,
+            compactMetrics ? styles.sessionMetricBlockCompact : null,
+            compactMetrics ? styles.sessionSideToMoveBlockCompact : null
+          ]}
           testID="session-side-to-move-block"
         >
           {sideToMove ? <MoveSideBadge badgeTestID="session-side-to-move" compact side={sideToMove} /> : null}
         </View>
         <View
           accessibilityLabel={`Mistakes ${state.mistakeCount} of ${state.config.maxMistakes}`}
-          style={styles.sessionMetricBlock}
+          style={[
+            styles.sessionMetricBlock,
+            compactMetrics ? styles.sessionMetricBlockCompact : null,
+            compactMetrics ? styles.sessionMistakesBlockCompact : null
+          ]}
           testID="session-mistakes-block"
         >
           <ActiveMistakeIndicator
@@ -3029,7 +3231,7 @@ function MoveSideBadge({
       testID={badgeTestID}
     >
       <MoveSideGlyph side={side} />
-      <Text style={styles.moveSideBadgeText} testID={`${badgeTestID}-label`}>
+      <Text numberOfLines={1} style={styles.moveSideBadgeText} testID={`${badgeTestID}-label`}>
         {compact ? sideLabel : `${sideLabel} to move`}
       </Text>
     </View>
@@ -3316,6 +3518,7 @@ function ArrowHint({
 }
 
 function HistoryPanel({
+  adaptiveLayout,
   attempts,
   performance,
   ratingKeys,
@@ -3343,6 +3546,7 @@ function HistoryPanel({
   onOpenAttempt,
   onToggleWrongOnly
 }: {
+  adaptiveLayout: AdaptiveLayout;
   attempts: HistoryAttemptView[];
   performance: HistoryPerformance;
   ratingKeys: string[];
@@ -3386,7 +3590,7 @@ function HistoryPanel({
     timeRange
   });
   return (
-    <View style={styles.historyPanel} testID="history-panel">
+    <View style={[styles.historyPanel, adaptiveLayout.usesWideContent ? styles.historyPanelWide : null]} testID="history-panel">
       <View style={styles.historyHeaderRow} testID="history-action-header">
         <Text style={styles.screenTitle}>History</Text>
         <Pressable
@@ -4360,6 +4564,7 @@ type ReviewPuzzleState =
   | { kind: "arrow_duel"; duel: ArrowDuelState };
 
 function ReviewPanel({
+  adaptiveLayout,
   boardSize,
   currentTimeMs,
   dueReviewItems,
@@ -4368,6 +4573,7 @@ function ReviewPanel({
   onOpenPractice,
   onPromoteNextFutureReviewsToDue,
   onReviewRecorded,
+  onSessionActiveChange,
   onScheduleTestReviewReminder,
   reviewQueue,
   reviewReminderScheduleStatus,
@@ -4375,6 +4581,7 @@ function ReviewPanel({
   sessionMistakeReviewItems,
   stockfishTransportFactory
 }: {
+  adaptiveLayout: AdaptiveLayout;
   boardSize: number;
   currentTimeMs: () => number;
   dueReviewItems: ReviewQueueItem[];
@@ -4383,6 +4590,7 @@ function ReviewPanel({
   onOpenPractice: () => void;
   onPromoteNextFutureReviewsToDue?: () => ReviewQueueDuePromotionResult;
   onReviewRecorded: (completedAt: string) => void;
+  onSessionActiveChange?: (active: boolean) => void;
   onScheduleTestReviewReminder?: () => Promise<ReviewReminderScheduleResult>;
   reviewQueue: ReviewQueueState[];
   reviewReminderScheduleStatus?: string;
@@ -4433,6 +4641,16 @@ function ReviewPanel({
     setActiveEntries(preferredEntries);
   }, [preferredEntriesKey]);
 
+  useEffect(() => {
+    onSessionActiveChange?.(activeEntries.length > 0);
+  }, [activeEntries.length, onSessionActiveChange]);
+
+  useEffect(() => {
+    return () => {
+      onSessionActiveChange?.(false);
+    };
+  }, [onSessionActiveChange]);
+
   function startReviewGroupQueue(groups: ReviewEntryGroup[]): void {
     const [firstGroup, ...remainingGroups] = groups;
     if (!firstGroup) {
@@ -4467,6 +4685,7 @@ function ReviewPanel({
     return (
       <ReviewSession
         key={activeEntries.map((entry) => `${entry.source}:${entry.puzzle.id}:${entry.mode}:${entry.ratingKey}`).join("|")}
+        adaptiveLayout={adaptiveLayout}
         boardSize={boardSize}
         currentTimeMs={currentTimeMs}
         entries={activeEntries}
@@ -4873,6 +5092,7 @@ function ReviewDifficultyRow({
 }
 
 function ReviewSession({
+  adaptiveLayout,
   boardSize,
   currentTimeMs,
   entries,
@@ -4882,6 +5102,7 @@ function ReviewSession({
   onReviewRecorded,
   stockfishTransportFactory
 }: {
+  adaptiveLayout: AdaptiveLayout;
   boardSize: number;
   currentTimeMs: () => number;
   entries: ReviewEntry[];
@@ -5459,7 +5680,7 @@ function ReviewSession({
   }
 
   return (
-    <View style={styles.reviewSessionPanel} testID="review-session">
+    <View style={[styles.reviewSessionPanel, adaptiveLayout.usesWideContent ? styles.reviewSessionPanelWide : null]} testID="review-session">
       <View style={styles.reviewHeaderRow}>
         <View style={styles.reviewTopNav}>
           <Pressable
@@ -5548,23 +5769,8 @@ function ReviewSession({
         </View>
       </View>
 
-      <PracticePrompt
-        currentPuzzle={currentPuzzle}
-        mode={currentEntry.mode}
-        promptText={
-          isArrowDuelFollowUpReview
-            ? null
-            : undefined
-        }
-        promptHint={
-          isArrowDuelFollowUpReview
-            ? "Blue arrows show the next move in the punishment line. Follow them to see why the choice is bad."
-            : undefined
-        }
-      />
-
-      <View style={styles.reviewBoardLayout}>
-        <View style={styles.boardWrapper}>
+      <View style={[styles.reviewBoardLayout, adaptiveLayout.usesWideContent ? styles.reviewBoardLayoutWide : null]}>
+        <View style={styles.reviewBoardLane} testID="review-board-lane">
           <View testID="review-board" style={[styles.boardSurface, { width: boardSize, height: boardSize }]}>
             <Chessboard
               key={`${currentEntry.puzzle.id}-${entryIndex}`}
@@ -5633,7 +5839,28 @@ function ReviewSession({
           </View>
         </View>
 
-        <View style={styles.analysisPanel} testID="review-analysis-panel">
+        <View
+          style={[
+            styles.analysisPanel,
+            adaptiveLayout.usesWideContent ? styles.reviewAnalysisPanelWide : null,
+            adaptiveLayout.usesWideContent ? { width: adaptiveLayout.sessionRailWidth } : null
+          ]}
+          testID="review-analysis-panel"
+        >
+          <PracticePrompt
+            currentPuzzle={currentPuzzle}
+            mode={currentEntry.mode}
+            promptText={
+              isArrowDuelFollowUpReview
+                ? null
+                : undefined
+            }
+            promptHint={
+              isArrowDuelFollowUpReview
+                ? "Blue arrows show the next move in the punishment line. Follow them to see why the choice is bad."
+                : undefined
+            }
+          />
           {((punishmentLineComplete && currentEntry.source === "due") || lineReviewNeedsContinue) && !analysisEnabled ? (
             <Pressable
               accessibilityRole="button"
@@ -5986,6 +6213,7 @@ function reviewReminderScheduleStatusLabel(
 }
 
 function SettingsPanel({
+  adaptiveLayout,
   onDeleteLocalHistory,
   onExportData,
   onOpenDiagnostics,
@@ -6000,6 +6228,7 @@ function SettingsPanel({
   reviewReminderPreference,
   standardRating
 }: {
+  adaptiveLayout: AdaptiveLayout;
   onDeleteLocalHistory: () => ClearLocalHistoryResult;
   onExportData: () => LocalDataExport;
   onOpenDiagnostics?: () => void;
@@ -6020,8 +6249,8 @@ function SettingsPanel({
   const bundledCoreManifest = getBundledCorePackManifest();
 
   return (
-    <View style={styles.settingsPanel} testID="settings-panel">
-      <SettingsSection title="Local Data" testID="settings-data-section">
+    <View style={[styles.settingsPanel, adaptiveLayout.usesWideContent ? styles.settingsPanelWide : null]} testID="settings-panel">
+      <SettingsSection title="Local Data" testID="settings-data-section" wide={adaptiveLayout.usesWideContent}>
         <SettingsRow
           label="Storage"
           value="On device"
@@ -6044,7 +6273,7 @@ function SettingsPanel({
         />
       </SettingsSection>
 
-      <SettingsSection title="Notifications" testID="settings-notifications-section">
+      <SettingsSection title="Notifications" testID="settings-notifications-section" wide={adaptiveLayout.usesWideContent}>
         <SettingsRow
           label="Review Reminders"
           value={reviewReminderPreferenceLabel(reviewReminderPreference)}
@@ -6101,7 +6330,7 @@ function SettingsPanel({
         ) : null}
       </SettingsSection>
 
-      <SettingsSection title="Profile" testID="settings-profile-section">
+      <SettingsSection title="Profile" testID="settings-profile-section" wide={adaptiveLayout.usesWideContent}>
         <SettingsRow
           label="Puzzle ELO (Standard)"
           value={`ELO ${standardRating}`}
@@ -6128,7 +6357,7 @@ function SettingsPanel({
         ) : null}
       </SettingsSection>
 
-      <SettingsSection title="About" testID="settings-about-section">
+      <SettingsSection title="About" testID="settings-about-section" wide={adaptiveLayout.usesWideContent}>
         <SettingsRow
           label="App Version"
           value="1.0.0"
@@ -6480,14 +6709,16 @@ function DestructiveConfirmationCard({
 function SettingsSection({
   children,
   testID,
-  title
+  title,
+  wide = false
 }: {
   children: React.ReactNode;
   testID: string;
   title: string;
+  wide?: boolean;
 }): React.JSX.Element {
   return (
-    <View style={styles.settingsSection} testID={testID}>
+    <View style={[styles.settingsSection, wide ? styles.settingsSectionWide : null]} testID={testID}>
       <Text style={styles.sectionLabel}>{title}</Text>
       <View style={styles.settingsSectionCard}>
         {children}
@@ -7051,12 +7282,58 @@ function OptionButton({
   );
 }
 
+function NavigationRail({
+  activeTab,
+  dueReviewCount,
+  expanded,
+  overdueReviewCount,
+  width,
+  onSelectTab
+}: {
+  activeTab: Tab;
+  dueReviewCount: number;
+  expanded: boolean;
+  overdueReviewCount: number;
+  width: number;
+  onSelectTab: (tab: Exclude<Tab, "analysis">) => void;
+}): React.JSX.Element {
+  return (
+    <View
+      accessibilityLabel={expanded ? "Primary navigation rail" : "Compact navigation rail"}
+      style={[styles.navigationRail, { width }]}
+      testID="navigation-rail"
+    >
+      {PRIMARY_TABS.map((item) => (
+        <TabButton
+          key={item.tab}
+          active={activeTab === item.tab}
+          badgeAccessibilityLabel={
+            item.tab === "review" && dueReviewCount > 0
+              ? `${dueReviewCount} due reviews${overdueReviewCount > 0 ? `, ${overdueReviewCount} overdue` : ""}`
+              : undefined
+          }
+          badgeCount={item.tab === "review" ? dueReviewCount : 0}
+          badgeTone={item.tab === "review" && overdueReviewCount > 0 ? "danger" : "default"}
+          expanded={expanded}
+          label={item.label}
+          presentation="rail"
+          tab={item.tab}
+          testID={item.testID}
+          onPress={() => onSelectTab(item.tab)}
+        />
+      ))}
+    </View>
+  );
+}
+
 function TabButton({
   active,
   badgeAccessibilityLabel,
   badgeCount = 0,
   badgeTone = "default",
+  expanded = true,
   label,
+  presentation,
   tab,
   testID,
   onPress
@@ -7065,7 +7342,9 @@ function TabButton({
   badgeAccessibilityLabel?: string;
   badgeCount?: number;
   badgeTone?: "default" | "danger";
+  expanded?: boolean;
   label: string;
+  presentation: "bottom" | "rail";
   tab: Exclude<Tab, "analysis">;
   testID: string;
   onPress: () => void;
@@ -7078,7 +7357,12 @@ function TabButton({
       accessibilityState={{ selected: active }}
       accessibilityLabel={[`${label} tab`, hasBadge ? badgeAccessibilityLabel : null].filter(Boolean).join(", ")}
       testID={testID}
-      style={[styles.tabButton, active ? styles.tabButtonActive : null]}
+      style={[
+        styles.tabButton,
+        presentation === "rail" ? styles.tabButtonRail : null,
+        presentation === "rail" && expanded ? styles.tabButtonRailExpanded : null,
+        active ? styles.tabButtonActive : null
+      ]}
       onPress={onPress}
     >
       <View style={styles.tabIconBadge} testID={`${testID}-icon`}>
@@ -7094,7 +7378,9 @@ function TabButton({
           </Text>
         ) : null}
       </View>
-      <Text style={[styles.tabText, active ? styles.tabTextActive : null]}>{label}</Text>
+      {presentation === "bottom" || expanded ? (
+        <Text style={[styles.tabText, presentation === "rail" ? styles.tabTextRail : null, active ? styles.tabTextActive : null]}>{label}</Text>
+      ) : null}
     </Pressable>
   );
 }
@@ -7475,6 +7761,16 @@ const styles = StyleSheet.create({
     backgroundColor: "#F8FAFC",
     flex: 1
   },
+  appRootShell: {
+    backgroundColor: "#F8FAFC",
+    flex: 1,
+    flexDirection: "row",
+    minWidth: 0
+  },
+  appContentShell: {
+    flex: 1,
+    minWidth: 0
+  },
   header: {
     alignItems: "center",
     flexDirection: "row",
@@ -7499,6 +7795,16 @@ const styles = StyleSheet.create({
     paddingTop: 6,
     paddingBottom: 4
   },
+  navigationRail: {
+    alignItems: "stretch",
+    backgroundColor: "#FFFFFF",
+    borderRightColor: "#E2E8F0",
+    borderRightWidth: StyleSheet.hairlineWidth,
+    gap: 6,
+    justifyContent: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 12
+  },
   tabButton: {
     alignItems: "center",
     flex: 1,
@@ -7506,6 +7812,22 @@ const styles = StyleSheet.create({
     minHeight: 48,
     justifyContent: "center",
     paddingHorizontal: 2
+  },
+  tabButtonRail: {
+    borderRadius: 8,
+    flex: 0,
+    flexDirection: "column",
+    minHeight: 54,
+    paddingHorizontal: 6,
+    paddingVertical: 6
+  },
+  tabButtonRailExpanded: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "flex-start",
+    minHeight: 46,
+    paddingHorizontal: 10
   },
   tabButtonActive: {
     backgroundColor: "transparent"
@@ -7543,6 +7865,10 @@ const styles = StyleSheet.create({
     color: "#64748B",
     fontSize: 10,
     fontWeight: "700"
+  },
+  tabTextRail: {
+    fontSize: 13,
+    fontWeight: "800"
   },
   tabTextActive: {
     color: "#2563EB"
@@ -7646,11 +7972,34 @@ const styles = StyleSheet.create({
     padding: UI_PADDING,
     paddingBottom: 40
   },
+  contentWide: {
+    alignSelf: "center",
+    maxWidth: 1120,
+    width: "100%"
+  },
   contentWithBottomTabs: {
     paddingBottom: 96
   },
+  contentSessionRail: {
+    flexGrow: 1,
+    justifyContent: "flex-start"
+  },
   practiceHome: {
     gap: 12
+  },
+  practiceHomeColumns: {
+    flexDirection: "row",
+    gap: 14
+  },
+  practiceHomePrimaryColumn: {
+    flex: 1.1,
+    gap: 12,
+    minWidth: 0
+  },
+  practiceHomeSecondaryColumn: {
+    flex: 0.9,
+    gap: 12,
+    minWidth: 280
   },
   sectionHeaderRow: {
     alignItems: "center",
@@ -8166,6 +8515,27 @@ const styles = StyleSheet.create({
   reviewContinueButton: {
     marginBottom: 8
   },
+  activeSessionAdaptiveLayout: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 14,
+    justifyContent: "center"
+  },
+  activeSessionBoardLane: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center",
+    minWidth: 0
+  },
+  activeSessionControlRailScroll: {
+    flexGrow: 0,
+    flexShrink: 0,
+    maxHeight: "100%"
+  },
+  activeSessionControlRail: {
+    gap: 10,
+    paddingBottom: 4
+  },
   activeSessionShell: {
     gap: 8
   },
@@ -8200,12 +8570,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 1
   },
+  sessionActiveMetricRowCompact: {
+    flexWrap: "wrap",
+    justifyContent: "center",
+    paddingHorizontal: 0,
+    rowGap: 6
+  },
   sessionMetricBlock: {
     alignItems: "center",
     flex: 1,
     gap: 3,
     justifyContent: "center",
     minWidth: 0
+  },
+  sessionMetricBlockCompact: {
+    flex: 0,
+    flexShrink: 0
   },
   activeMistakeIndicator: {
     alignItems: "center",
@@ -8252,6 +8632,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flex: 1.25
   },
+  sessionProgressBlockCompact: {
+    minWidth: 54
+  },
+  sessionTimerBlockCompact: {
+    minWidth: 78
+  },
+  sessionSideToMoveBlock: {
+    minWidth: 70
+  },
+  sessionSideToMoveBlockCompact: {
+    minWidth: 72
+  },
+  sessionMistakesBlockCompact: {
+    minWidth: 42
+  },
   sessionProgressValue: {
     color: "#111827",
     fontSize: 13,
@@ -8273,7 +8668,7 @@ const styles = StyleSheet.create({
   },
   moveSideBadgeText: {
     color: "#334155",
-    flexShrink: 1,
+    flexShrink: 0,
     fontSize: 11,
     fontWeight: "900",
     textAlign: "center"
@@ -9075,6 +9470,10 @@ const styles = StyleSheet.create({
   reviewSessionPanel: {
     gap: 12
   },
+  reviewSessionPanelWide: {
+    alignSelf: "center",
+    width: "100%"
+  },
   reviewHeaderRow: {
     gap: 8
   },
@@ -9117,6 +9516,17 @@ const styles = StyleSheet.create({
   reviewBoardLayout: {
     gap: 12
   },
+  reviewBoardLayoutWide: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    justifyContent: "center"
+  },
+  reviewBoardLane: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center",
+    minWidth: 0
+  },
   analysisPanel: {
     backgroundColor: "#FFFFFF",
     borderColor: "#E2E8F0",
@@ -9124,6 +9534,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 6,
     padding: 12
+  },
+  reviewAnalysisPanelWide: {
+    flexGrow: 0,
+    flexShrink: 0
   },
   analysisToolbar: {
     alignItems: "center",
@@ -9277,6 +9691,11 @@ const styles = StyleSheet.create({
   },
   historyPanel: {
     gap: 10
+  },
+  historyPanelWide: {
+    alignSelf: "center",
+    maxWidth: 980,
+    width: "100%"
   },
   historyTopFilterStack: {
     gap: 8
@@ -9562,8 +9981,20 @@ const styles = StyleSheet.create({
   settingsPanel: {
     gap: 12
   },
+  settingsPanelWide: {
+    alignSelf: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    maxWidth: 980,
+    width: "100%"
+  },
   settingsSection: {
     gap: 8
+  },
+  settingsSectionWide: {
+    flexBasis: "48%",
+    flexGrow: 1,
+    minWidth: 300
   },
   settingsSectionCard: {
     backgroundColor: "#FFFFFF",

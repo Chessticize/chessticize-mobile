@@ -162,7 +162,9 @@ scene exists exactly once per group, and each image is a `.png`, `.jpg`, or
 
 ## Capture Checklist
 
-- Use portrait orientation.
+- Use portrait orientation for the required App Store scene set audited here.
+- Capture separate landscape/iPad QA evidence for the adaptive orientation pass
+  before release sign-off.
 - Use the clean release palette and current app icon.
 - Keep all screenshots in English.
 - Prefer deterministic fixture data so ratings, history, and review states are

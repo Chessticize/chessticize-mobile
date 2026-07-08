@@ -13,7 +13,7 @@ The repository contains the React Native app shell (`apps/mobile`), a pure TypeS
 - [App Store Upload](docs/APP_STORE_UPLOAD.md) — owner-executed archive and App Store Connect upload runbook
 - [TestFlight QA](docs/TESTFLIGHT_QA.md) — internal TestFlight pass checklist and evidence log
 - [Privacy Policy](docs/PRIVACY_POLICY.md) — 1.0 local-only data and tracking disclosure
-- [iOS Device Targets](docs/DEVICE_TARGETS.md) — 1.0 iPhone+iPad full-screen portrait release target
+- [iOS Device Targets](docs/DEVICE_TARGETS.md) — 1.0 iPhone+iPad adaptive orientation release target
 - [Agent Instructions](AGENTS.md) — architecture boundary, testing philosophy, and PR workflow
 
 ## Current Implementation

@@ -135,26 +135,49 @@ describe("PracticePocScreen", () => {
   });
 
   it.each([
-    { label: "iPhone SE-sized portrait", width: 320, height: 568, scale: 2 },
-    { label: "modern iPhone portrait", width: 430, height: 932, scale: 3 }
-  ])("renders the core practice surfaces in a %s viewport", ({ width, height, scale }) => {
+    { label: "iPhone SE-sized portrait", width: 320, height: 568, scale: 2, layout: "compactPortrait", boardSize: 288, sideRail: false, sessionRail: false, homeColumns: false },
+    { label: "modern iPhone portrait", width: 430, height: 932, scale: 3, layout: "compactPortrait", boardSize: 398, sideRail: false, sessionRail: false, homeColumns: false },
+    { label: "compact iPhone landscape", width: 844, height: 390, scale: 3, layout: "compactLandscape", boardSize: 358, sideRail: true, sessionRail: true, homeColumns: true },
+    { label: "iPad A16 portrait", width: 820, height: 1180, scale: 2, layout: "regularPortrait", boardSize: 788, sideRail: true, sessionRail: false, homeColumns: false },
+    { label: "iPad Pro portrait", width: 1032, height: 1376, scale: 2, layout: "regularPortrait", boardSize: 860, sideRail: true, sessionRail: false, homeColumns: true },
+    { label: "iPad landscape", width: 1180, height: 820, scale: 2, layout: "regularLandscape", boardSize: 640, sideRail: true, sessionRail: true, homeColumns: true },
+    { label: "iPad split-width portrait", width: 694, height: 1024, scale: 2, layout: "compactPortrait", boardSize: 560, sideRail: false, sessionRail: false, homeColumns: false }
+  ])("renders the core practice surfaces in a %s viewport", ({ width, height, scale, layout, boardSize, sideRail, sessionRail, homeColumns }) => {
     (ReactNative as unknown as {
       __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
     }).__setWindowDimensions?.({ width, height, scale, fontScale: scale });
 
     const renderer = renderScreen({ practiceService: createMobilePracticeService("random1000") });
 
+    expect(findByTestId(renderer, "adaptive-layout").props.accessibilityLabel).toBe(`Layout ${layout}`);
     expect(findByTestId(renderer, "app-shell-header")).toBeTruthy();
     expect(findByTestId(renderer, "practice-home")).toBeTruthy();
+    expect(styleEntryMatches(findByTestId(renderer, "practice-home-layout").props.style, "flexDirection", "row")).toBe(homeColumns);
     expect(findByTestId(renderer, "practice-tab")).toBeTruthy();
     expect(findByTestId(renderer, "settings-tab")).toBeTruthy();
+    if (sideRail) {
+      expect(findByTestId(renderer, "navigation-rail")).toBeTruthy();
+    } else {
+      expect(() => findByTestId(renderer, "navigation-rail")).toThrow();
+    }
 
     startStandardSprint(renderer);
 
-    expect(findByTestId(renderer, "session-board")).toBeTruthy();
+    const board = findByTestId(renderer, "session-board");
+    const boardStyle = flattenTestStyle(board.props.style);
+    expect(board).toBeTruthy();
+    expect(boardStyle.width).toBe(boardSize);
+    expect(boardStyle.height).toBe(boardSize);
     expect(findByTestId(renderer, "session-score-strip")).toBeTruthy();
     expect(findByTestId(renderer, "practice-prompt")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "practice-prompt"))).toContain("Find the best move");
+    if (sessionRail) {
+      expect(findByTestId(renderer, "active-session-adaptive-layout")).toBeTruthy();
+      expect(findByTestId(renderer, "active-session-board-lane")).toBeTruthy();
+      expect(findByTestId(renderer, "active-session-control-rail")).toBeTruthy();
+    } else {
+      expect(() => findByTestId(renderer, "active-session-adaptive-layout")).toThrow();
+    }
   });
 
   it("summarizes recent local practice progress on the Practice home", () => {
