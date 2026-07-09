@@ -1,5 +1,5 @@
 const {
-  openTab,
+  openStandardHistoryTrend,
   launchWithDisabledSynchronization,
   sleep,
   startPracticeMode,
@@ -56,9 +56,7 @@ describeStoreAssets('App Store screenshot capture', () => {
 
     await element(by.id('review-exit')).tap();
     await waitFor(element(by.id('practice-tab'))).toBeVisible().withTimeout(10000);
-    await openTab('history-tab', 'history-action-header');
-    await waitFor(element(by.id('history-performance-card'))).toExist().withTimeout(10000);
-    await waitFor(element(by.id('history-chart-line'))).toExist().withTimeout(10000);
+    await openStandardHistoryTrend();
     await sleep(500);
     await device.takeScreenshot('app-store-06-history');
   });

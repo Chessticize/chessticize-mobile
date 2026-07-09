@@ -1,5 +1,6 @@
 const {
   openTab,
+  openStandardHistoryTrend,
   launchWithDisabledSynchronization,
   sleep,
   startPracticeMode,
@@ -118,9 +119,7 @@ describe('Key user flows', () => {
     await failStandardSprint();
     await dismissSprintSummary();
 
-    await openTab('history-tab', 'history-action-header');
-    await waitFor(element(by.id('history-performance-card'))).toExist().withTimeout(10000);
-    await waitFor(element(by.id('history-chart-line'))).toExist().withTimeout(10000);
+    await openStandardHistoryTrend();
 
     await waitFor(element(by.id('history-filter-wrong-only')))
       .toBeVisible()
@@ -180,9 +179,7 @@ describe('Key user flows', () => {
     });
     await selectTestPuzzleSource('familiar15');
 
-    await openTab('history-tab', 'history-action-header');
-    await waitFor(element(by.id('history-performance-card'))).toExist().withTimeout(10000);
-    await waitFor(element(by.id('history-chart-line'))).toExist().withTimeout(10000);
+    await openStandardHistoryTrend();
 
     await openTab('review-tab', 'review-empty-state');
     await expect(element(by.id('review-empty-practice'))).toBeVisible();
