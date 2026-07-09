@@ -20,9 +20,8 @@ async function playBoardMove(testID, move, flipped = false) {
 
 async function startPracticeMode(mode) {
   const modeCardId = `practice-mode-${mode}`;
-  const modeStartId = `${modeCardId}-start`;
   await waitForVisibleInPracticeScroll(modeCardId);
-  await tapUntilExists(modeStartId, 'session-board', 3);
+  await tapModeStartUntilExists(modeCardId, 'session-board', 3);
 }
 
 async function launchWithDisabledSynchronization(options = {}) {
@@ -62,6 +61,29 @@ async function tapUntilExists(tapTestID, expectedTestID, attempts) {
       lastError = error;
       if (attempt + 1 < attempts) {
         await waitForVisibleInPracticeScroll(tapTestID);
+        await sleep(500);
+      }
+    }
+  }
+  throw lastError;
+}
+
+async function tapModeStartUntilExists(modeCardId, expectedTestID, attempts) {
+  let lastError;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const modeCard = element(by.id(modeCardId));
+    const cardFrame = await frameFor(modeCard);
+    await modeCard.tapAtPoint({
+      x: Math.max(cardFrame.width - 26, 1),
+      y: Math.max(cardFrame.height / 2, 1)
+    });
+    try {
+      await waitFor(element(by.id(expectedTestID))).toExist().withTimeout(15000);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt + 1 < attempts) {
+        await waitForVisibleInPracticeScroll(modeCardId);
         await sleep(500);
       }
     }
@@ -139,6 +161,7 @@ module.exports = {
   selectTestPuzzleSource,
   waitForVisibleInPracticeScroll,
   tapUntilExists,
+  tapModeStartUntilExists,
   waitForElementTextContaining,
   textFromAttributes,
   boardPoint,
