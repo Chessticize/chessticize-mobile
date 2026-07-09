@@ -2,7 +2,6 @@ const {
   openTab,
   openStandardHistoryTrend,
   launchWithDisabledSynchronization,
-  sleep,
   startPracticeMode,
   selectTestPuzzleSource,
   waitForVisibleInPracticeScroll,

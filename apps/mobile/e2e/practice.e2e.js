@@ -253,6 +253,8 @@ function unfilterRgbaScanlines(inflated, width, height) {
         ? output[rowOffset - stride + col - bytesPerPixel]
         : 0;
 
+      // PNG scanline reconstruction intentionally clamps the decoded value to one byte.
+      // eslint-disable-next-line no-bitwise
       output[rowOffset + col] = (raw + unfilterByte(filter, left, up, upperLeft)) & 0xff;
     }
 
