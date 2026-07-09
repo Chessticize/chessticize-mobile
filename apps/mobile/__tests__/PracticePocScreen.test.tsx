@@ -2741,11 +2741,6 @@ describe("PracticePocScreen", () => {
 
   it("keeps settings locally reachable without a simulator", () => {
     const renderer = renderScreen();
-    const manifest = getBundledCorePackManifest();
-    const puzzleCount = formatTestWholeNumber(manifest.puzzleCount);
-    const ratingRange = `${manifest.rating.min}-${manifest.rating.max}`;
-    const themeCount = `${formatTestWholeNumber(manifest.themes.length)} themes`;
-    const arrowDuelCount = formatTestWholeNumber(manifest.arrowDuelCount);
 
     press(renderer, "settings-tab");
     expect(() => findByTestId(renderer, "settings-action-header")).toThrow();

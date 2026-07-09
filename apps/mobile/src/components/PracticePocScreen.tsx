@@ -434,7 +434,7 @@ export function PracticePocScreen({
 
   const adaptiveLayout = useMemo(
     () => buildAdaptiveLayout({ height, insets, width }),
-    [height, insets.bottom, insets.left, insets.right, insets.top, width]
+    [height, insets, width]
   );
   const boardSize = adaptiveLayout.boardSize;
 
@@ -471,17 +471,21 @@ export function PracticePocScreen({
     if (selectedConfig.mode === "custom" || selectedConfig.mode === "arrow_duel") {
       setCustomInitialRating(rating.rating);
     }
-  }, [selectedConfig.ratingKey, service]);
+  }, [selectedConfig.mode, selectedConfig.ratingKey, service]);
 
   useEffect(() => {
     if (!practiceService) {
       configurePuzzleSource(service, puzzleSource);
       refreshState();
     }
+    // refreshState reads mutable service state; rerunning for its render-local identity would loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [configurePuzzleSource, practiceService, puzzleSource, service]);
 
   useEffect(() => {
     refreshState();
+    // refreshState reads mutable service state; this effect intentionally tracks service replacement only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [service]);
 
   useEffect(() => {
@@ -497,6 +501,8 @@ export function PracticePocScreen({
     }
     setICloudSyncStatus("Ready");
     void runICloudProgressSync("startup");
+    // Sync is intentionally triggered only when the client or backing service changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [iCloudSyncClient, service]);
 
   useEffect(() => {
@@ -538,6 +544,8 @@ export function PracticePocScreen({
     if (!isActive && !isShowingFeedbackSnapshot) {
       refreshState();
     }
+    // The tab transition is the trigger; status values and refreshState are read at that moment.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, service]);
 
   useEffect(() => {
@@ -559,6 +567,8 @@ export function PracticePocScreen({
     return () => {
       subscription.remove();
     };
+    // The listener is rebound only when its native client or backing service changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [iCloudSyncClient, service]);
 
   useEffect(() => {
@@ -593,6 +603,8 @@ export function PracticePocScreen({
     } catch (caught) {
       setError(errorMessage(caught));
     }
+    // refreshState is deliberately omitted because its identity changes on each render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nowMs, service, state]);
 
   useEffect(() => {
@@ -3612,7 +3624,7 @@ function ArrowHint({
   boardSize,
   squareSize,
   flipped,
-  move,
+  move: _move,
   stroke,
   opacity,
   selected,
@@ -4468,14 +4480,6 @@ function MinusGlyph(): React.JSX.Element {
   );
 }
 
-function SwitchGlyph({ enabled }: { enabled: boolean }): React.JSX.Element {
-  return (
-    <View style={styles.switchGlyph} testID="switch-glyph">
-      <View style={[styles.switchGlyphKnob, enabled ? styles.switchGlyphKnobEnabled : null]} />
-    </View>
-  );
-}
-
 function CloseGlyph({
   color = "#111827",
   testID = "close-glyph"
@@ -4862,6 +4866,8 @@ function ReviewPanel({
   useEffect(() => {
     setQueuedReviewGroups([]);
     setActiveEntries(preferredEntries);
+    // preferredEntriesKey is the stable semantic identity for this derived array.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preferredEntriesKey]);
 
   useEffect(() => {
@@ -5403,7 +5409,6 @@ function ReviewSession({
   const boardGestureEnabled = !boardLocked && (!lineReviewNeedsContinue || analysisEnabled);
   const boardDraggableColor = boardGestureEnabled ? sideToMove(displayFen) : null;
   const reviewSideToMove = sideToMove(displayFen);
-  const isSessionReview = currentEntry.source === "session";
   const canNavigateReview = (currentEntry.source === "session" || currentEntry.source === "history") && !boardLocked;
   const canReviewPrevious = canNavigateReview && entryIndex > 0;
   const canReviewNext = canNavigateReview && entryIndex < entries.length - 1;
@@ -5510,6 +5515,8 @@ function ReviewSession({
       expectedMove: expectedReviewMove(currentPuzzle)
     });
     setLineReviewNeedsContinue(true);
+    // The timer state is the trigger; the render-local recorder must not restart the effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentEntry.source, currentPuzzle, reviewRemainingSeconds, reviewResultRecorded, reviewTimedOut]);
 
   function resetCurrentReview(nextIndex = entryIndex): void {
@@ -7076,6 +7083,8 @@ function bundledCoreCustomEligiblePuzzleCount(theme: string | undefined): number
   return manifest.themeCounts?.[theme] ?? 0;
 }
 
+// This dormant panel is intentionally retained while it is not wired into navigation.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function PacksPanel(): React.JSX.Element {
   const [selectedPackId, setSelectedPackId] = useState<string | null>(null);
   const installedPacks = PACK_CATALOG;
@@ -7696,13 +7705,6 @@ function consumeSuppressedBoardMove(move: string, suppressedMoves: string[]): bo
 function isArrowDuelCandidate(candidates: string[], move: string): boolean {
   const normalizedMove = move.trim().toLowerCase();
   return candidates.some((candidate) => candidate.trim().toLowerCase() === normalizedMove);
-}
-
-function formatRating(state: SprintState | null, currentRating: number): string {
-  if (!state) {
-    return String(currentRating);
-  }
-  return String(state.ratingAfter ?? state.ratingBefore);
 }
 
 function formatDuration(seconds: number): string {
