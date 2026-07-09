@@ -211,19 +211,30 @@ async function launchAppAt(nowMs, deleteData, extraLaunchArgs = {}) {
 }
 
 async function startDueReviewSession() {
-  await element(by.id('review-start-due')).tap();
-  try {
-    await waitFor(element(by.id('review-session'))).toBeVisible().withTimeout(30000);
-    return;
-  } catch {
+  let lastError;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
     try {
+      await waitForVisibleInPracticeScroll('review-start-due');
+      try {
+        await element(by.id('practice-main-scroll')).scroll(160, 'down');
+      } catch {
+        // The button may already be as far from the tab bar as the view allows.
+      }
       await waitFor(element(by.id('review-start-due'))).toBeVisible().withTimeout(5000);
-      await element(by.id('review-start-due')).tap();
-    } catch {
-      // The first tap may already be transitioning; keep waiting for the session.
+      await element(by.id('review-start-due')).tapAtPoint({ x: 140, y: 18 });
+      await waitFor(element(by.id('review-session'))).toBeVisible().withTimeout(20000);
+      return;
+    } catch (error) {
+      lastError = error;
+      try {
+        await waitFor(element(by.id('review-session'))).toBeVisible().withTimeout(3000);
+        return;
+      } catch {
+        await sleep(500);
+      }
     }
-    await waitFor(element(by.id('review-session'))).toBeVisible().withTimeout(60000);
   }
+  throw lastError;
 }
 
 async function elementText(testID) {
