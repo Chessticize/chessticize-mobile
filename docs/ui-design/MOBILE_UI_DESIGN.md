@@ -9,7 +9,7 @@ This document captures the current Chessticize Mobile implementation shape and t
 - Standard Sprint session shows Abandon, success progress, timer, turn prompt, and a large chessboard.
 - Arrow Duel session shows Abandon, success progress, timer, a short instruction card, a chessboard, and two candidate arrows.
 - Custom Sprint setup includes mode, theme, duration, time per puzzle, computed puzzle count, ELO type, and previous custom configs.
-- Settings includes chess platform connections and ELO editing. Mobile v1 should keep ELO reset/rating management but not prioritize chess.com or Lichess account import.
+- Settings includes chess platform connections and ELO editing. Mobile v1 should keep advanced rating management but not prioritize chess.com or Lichess account import.
 
 ### Current UI Issues To Avoid
 
@@ -17,7 +17,7 @@ This document captures the current Chessticize Mobile implementation shape and t
 - The tan/brown board dominates the screen and makes the product feel warmer and heavier than desired.
 - Arrow Duel uses decorative emoji in instructional text; mobile should avoid emoji and rely on concise labels and state colors.
 - The web dashboard mixes summary stats, mode selection, and recent configs in one broad page. Mobile needs a tighter task-first hierarchy.
-- Settings exposes many ELO fields as editable inputs. Mobile should prefer explicit reset/adjust flows and avoid a dense form by default.
+- Settings exposes many ELO fields as editable inputs. Mobile should prefer explicit advanced adjustment flows and avoid a dense form by default.
 
 ## Complete App Design Board
 
@@ -52,7 +52,7 @@ Screen inventory:
 | Analysis Review | Board, compact toolbar, Stockfish status, candidate line rows, guided arrows when applicable | Reset, flip, analyze, navigate, finish review | Review Complete, History |
 | History | Rating trend line chart, range filters, selected ELO bucket, expandable row filters, attempt rows | Filter wrong-only/source rows, inspect attempt context, open attempt | Attempt Detail, Review Item |
 | Custom Sprint Setup | Mode/theme/timing controls, estimate, rating range, start | Start sprint, save template | Active Sprint |
-| Settings | Local data, reset, export, notifications, about, puzzle-data source notes | Export data, delete local history, reset ELO, inspect licenses | Confirm Sheet, Puzzle Data / License |
+| Settings | Local data, export, notifications, about, puzzle-data source notes | Export data, delete local history, inspect licenses | Confirm Sheet, Puzzle Data / License |
 | Puzzle Data / License | Bundled source name, puzzle count, source license, Lichess-derived attribution, presolve metadata | Inspect source and license notes | Settings |
 
 ## Mobile Information Architecture
@@ -62,7 +62,7 @@ Use a four-tab app shell:
 - Practice: quick start, active session, custom sprint setup, and Arrow Duel entry.
 - Review: due mistake reviews and spaced repetition queue.
 - History: attempts, sprint sessions, range filters, selected ELO bucket, and expandable detailed filters including wrong-only/source filters.
-- Settings: local data, ELO reset, export/delete data, notification preferences, advanced rating adjustment, and puzzle data attribution.
+- Settings: local data, export/delete data, notification preferences, advanced rating adjustment, and puzzle data attribution.
 
 There should be no mobile Home tab, Game Review tab, or Packs tab in v1.
 
@@ -74,7 +74,7 @@ Navigation rules:
 - Active practice sessions hide the tab bar and use a focused session shell.
 - Review and History both open the same board-based review surface, but with different entry context.
 - The app has two review concepts. Analysis Review is an unscored replay/analyze surface. Scheduled Review is the official spaced repetition flow that records review attempts and updates the queue.
-- Settings is the only place for data-destructive actions such as ELO reset and history delete.
+- Settings is the only place for data-destructive actions such as history delete.
 - Settings owns puzzle data source attribution and license notes for the bundled offline puzzle data.
 - The app does not expose pack import, removal, or switching controls in v1.
 
@@ -478,7 +478,6 @@ Custom sprint behavior:
   state and current account/sync status, and exposes a manual Sync Now action
   only after sync is enabled.
 - On regular-width iPad, Settings should use grouped navigation plus a detail panel; do not make each settings row stretch across the full display.
-- ELO reset is explicit and separate from deleting history.
 - Advanced manual ELO adjustment should be hidden behind an "Advanced ratings" affordance.
 - Settings must not include simulated cloud state in v1: no upload approval
   prompt and no fabricated "last synced" timestamp. Sync controls must be
@@ -559,7 +558,6 @@ Required labels/test IDs:
 - `history-filter-toggle`
 - `history-filter-wrong-only`
 - `settings-local-storage`
-- `settings-reset-elo`
 - `settings-puzzle-data-license`
 - `adaptive-layout-root`
 - `primary-navigation-rail`
@@ -579,7 +577,7 @@ Accessibility rules:
 - Every core screen must expose stable accessibility labels for Detox.
 - Component tests should verify user-visible behavior, not component internals.
 - UI should receive view models from backend/domain packages; React components must not compute sprint outcomes, ELO updates, review scheduling, or Arrow Duel correctness.
-- E2E flows should cover Practice start, Arrow Duel choice, wrong-answer review, custom sprint setup, history filtering, Settings license/source attribution, ELO reset, and local data export/delete.
+- E2E flows should cover Practice start, Arrow Duel choice, wrong-answer review, custom sprint setup, history filtering, Settings license/source attribution, and local data export/delete.
 - Design QA should include iPhone SE-sized portrait, modern iPhone portrait, compact iPhone landscape, iPad portrait, iPad landscape, and iPad split-view widths.
 - Adaptive component tests should render the app shell with explicit width/height pairs and assert chrome placement, board sizing, rail visibility, and absence of overlapping controls.
 - Simulator screenshot QA should include at least one active sprint, one Arrow Duel state, one Analysis Review state, and one History/Settings regular-width state before App Store submission.
@@ -587,6 +585,6 @@ Accessibility rules:
 
 ## Open Design Questions
 
-- Whether manual ELO editing should ship in v1 or only reset/import/export.
+- Whether advanced manual ELO editing should ship in v1 or stay internal-only.
 - Whether custom max mistakes is part of v1 custom sprint or should remain fixed by scoring mode.
 - Whether regular-width iPad navigation should always show text labels or collapse to icon-only in smaller split-view widths.

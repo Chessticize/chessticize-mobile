@@ -1856,10 +1856,6 @@ export function PracticePocScreen({
                   setSettingsRevision((current) => current + 1);
                   return next;
                 }}
-                onResetRating={() => {
-                  service.resetRating(defaultSprintConfig("standard").ratingKey);
-                  setSettingsRevision((current) => current + 1);
-                }}
                 notificationPermissionStatus={notificationPermissionStatus}
                 reviewReminderScheduleStatus={reviewReminderScheduleStatus}
                 reviewReminderPreference={reviewReminderPreference}
@@ -6368,7 +6364,6 @@ function SettingsPanel({
   onOpenNotificationSettings,
   onAdjustRating,
   onRequestReviewReminderPermission,
-  onResetRating,
   onSaveICloudSyncEnabled,
   onSaveReviewReminderPreference,
   onSyncICloudNow,
@@ -6387,7 +6382,6 @@ function SettingsPanel({
   onOpenNotificationSettings: () => void;
   onAdjustRating: (ratingKey: string, nextRating: number) => RatingRecord;
   onRequestReviewReminderPermission: () => Promise<ReviewReminderPermissionStatus>;
-  onResetRating: () => void;
   onSaveICloudSyncEnabled: (enabled: boolean) => void;
   onSaveReviewReminderPreference: (preference: ReviewReminderPreference) => void;
   onSyncICloudNow: () => Promise<string>;
@@ -6400,7 +6394,7 @@ function SettingsPanel({
   standardRating: number;
 }): React.JSX.Element {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [confirmation, setConfirmation] = useState<"reset-elo" | "delete-history" | null>(null);
+  const [confirmation, setConfirmation] = useState<"delete-history" | null>(null);
   const [advancedRatingsOpen, setAdvancedRatingsOpen] = useState(false);
   const bundledCoreManifest = getBundledCorePackManifest();
 
@@ -6535,28 +6529,6 @@ function SettingsPanel({
           testID="settings-standard-elo-row"
           onPress={() => setAdvancedRatingsOpen((current) => !current)}
         />
-        <SettingsRow
-          label="Reset ELO"
-          detail="Resets the Standard puzzle rating only"
-          destructive
-          showDetail={false}
-          testID="settings-reset-elo"
-          onPress={() => setConfirmation("reset-elo")}
-        />
-        {confirmation === "reset-elo" ? (
-          <DestructiveConfirmationCard
-            confirmLabel="Reset ELO"
-            description="This resets only the Standard puzzle rating bucket. Puzzle history and review schedules stay intact."
-            testID="settings-reset-elo-confirmation"
-            title="Reset Standard puzzle ELO?"
-            onCancel={() => setConfirmation(null)}
-            onConfirm={() => {
-              onResetRating();
-              setConfirmation(null);
-              setStatusMessage("ELO reset");
-            }}
-          />
-        ) : null}
         {advancedRatingsOpen ? (
           <AdvancedRatingsPanel
             ratings={ratings}

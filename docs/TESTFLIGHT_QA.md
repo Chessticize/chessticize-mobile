@@ -152,7 +152,6 @@ failure, retry, or unclear result.
 - [ ] Change review reminder preference and confirm the UI persists after app
       relaunch.
 - [ ] Use export local data and confirm the share/export flow opens.
-- [ ] Reset ELO with confirmation and confirm the displayed rating changes.
 - [ ] Delete local history with confirmation and confirm History/Review update.
 - [ ] Open license/source information and confirm Stockfish 18 and the public
       source repository are shown.

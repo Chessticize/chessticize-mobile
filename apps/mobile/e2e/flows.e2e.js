@@ -195,14 +195,8 @@ describe('Key user flows', () => {
     await waitFor(element(by.id('custom-previous-configs'))).toExist().withTimeout(10000);
   });
 
-  it('resets ELO and deletes local history with explicit confirmation', async () => {
-    await openTab('settings-tab', 'settings-reset-elo');
-    await element(by.id('settings-reset-elo')).tap();
-    await waitForVisibleInPracticeScroll('settings-reset-elo-confirmation-confirm');
-    await element(by.id('settings-reset-elo-confirmation-confirm')).tap();
-    await waitForVisibleInPracticeScroll('settings-status-message');
-
-    await element(by.id('practice-main-scroll')).scrollTo('top');
+  it('deletes local history with explicit confirmation', async () => {
+    await openTab('settings-tab', 'settings-delete-local-history');
     await waitForVisibleInPracticeScroll('settings-delete-local-history');
     await element(by.id('settings-delete-local-history')).tap();
     await waitForVisibleInPracticeScroll('settings-delete-history-confirmation-confirm');
