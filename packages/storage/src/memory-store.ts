@@ -1,6 +1,7 @@
 import {
   buildHistoryView,
   createDefaultRating,
+  defaultSprintConfig,
   filterHistoryAttemptsForQuery,
   normalizeRatingRecord,
   resetRating as resetRatingRecord,
@@ -27,7 +28,7 @@ import type {
   SprintState
 } from "../../core/src/index.ts";
 import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./query-types.ts";
-import type { ClearLocalHistoryResult, LocalDataImportResult, LocalDataExport, PracticeSettings, PracticeStore, ReviewQueueDuePromotionResult } from "./practice-store.ts";
+import type { ClearLocalHistoryResult, ExportedSprintSession, LocalDataImportResult, LocalDataExport, PracticeSettings, PracticeStore, ReviewQueueDuePromotionResult } from "./practice-store.ts";
 import { clonePracticeSettings, defaultPracticeSettings, reviewReminderPreferenceToSettings } from "./practice-settings.ts";
 import type { ReviewReminderPreference } from "./practice-store.ts";
 import type { ReviewReminderSettings } from "../../core/src/index.ts";
@@ -201,21 +202,25 @@ export class MemoryStore implements PracticeStore {
           left.mode.localeCompare(right.mode) ||
           left.ratingKey.localeCompare(right.ratingKey)
         ),
-      sprintSessions: [...this.sessions.values()]
-        .map((session) => ({
-          id: session.id,
-          mode: session.config.mode,
-          ratingKey: session.config.ratingKey,
-          startedAt: session.startedAt,
-          ...(session.completedAt === undefined ? {} : { completedAt: session.completedAt }),
-          status: session.status,
-          correctCount: session.correctCount,
-          mistakeCount: session.mistakeCount,
-          ratingBefore: session.ratingBefore,
-          ...(session.ratingAfter === undefined ? {} : { ratingAfter: session.ratingAfter })
-        }))
-        .sort((left, right) => right.startedAt.localeCompare(left.startedAt) || right.id.localeCompare(left.id))
+      sprintSessions: this.listSprintSessions()
     };
+  }
+
+  listSprintSessions(): ExportedSprintSession[] {
+    return [...this.sessions.values()]
+      .map((session) => ({
+        id: session.id,
+        mode: session.config.mode,
+        ratingKey: session.config.ratingKey,
+        startedAt: session.startedAt,
+        ...(session.completedAt === undefined ? {} : { completedAt: session.completedAt }),
+        status: session.status,
+        correctCount: session.correctCount,
+        mistakeCount: session.mistakeCount,
+        ratingBefore: session.ratingBefore,
+        ...(session.ratingAfter === undefined ? {} : { ratingAfter: session.ratingAfter })
+      }))
+      .sort((left, right) => right.startedAt.localeCompare(left.startedAt) || right.id.localeCompare(left.id));
   }
 
   importLocalData(data: LocalDataExport): LocalDataImportResult {
@@ -236,6 +241,33 @@ export class MemoryStore implements PracticeStore {
         this.saveRating(next);
         result.ratings += 1;
       }
+    }
+    for (const session of data.sprintSessions) {
+      if (this.sessions.has(session.id)) {
+        continue;
+      }
+      const completedAt = session.completedAt ?? session.startedAt;
+      this.sessions.set(session.id, {
+        id: session.id,
+        config: {
+          ...defaultSprintConfig(session.mode),
+          ratingKey: session.ratingKey
+        },
+        status: session.status === "active" || session.status === "paused" ? "failed" : session.status,
+        startedAt: session.startedAt,
+        deadlineAt: completedAt,
+        completedAt,
+        correctCount: session.correctCount,
+        mistakeCount: session.mistakeCount,
+        currentStreak: 0,
+        bestStreak: 0,
+        hasUserSubmittedMove: session.correctCount + session.mistakeCount > 0,
+        currentPuzzleIndex: session.correctCount + session.mistakeCount,
+        puzzles: [],
+        ratingBefore: session.ratingBefore,
+        ...(session.ratingAfter === undefined ? {} : { ratingAfter: session.ratingAfter })
+      });
+      result.sprintSessions += 1;
     }
     const existingAttempts = new Set(this.attempts.map((attempt) => attempt.id));
     for (const attempt of data.attempts) {

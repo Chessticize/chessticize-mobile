@@ -162,7 +162,7 @@ describe("PracticePocScreen", () => {
       startedAt: "2026-07-07T00:00:00.000Z",
       completedAt: "2026-07-07T00:00:05.000Z",
       ratingBefore: 600,
-      ratingAfter: 700
+      ratingAfter: 1_400
     });
     store.recordAttempt({
       id: "arrow-win",
@@ -177,8 +177,22 @@ describe("PracticePocScreen", () => {
       startedAt: "2026-07-07T00:01:00.000Z",
       completedAt: "2026-07-07T00:01:05.000Z",
       ratingBefore: 600,
-      ratingAfter: 900
+      ratingAfter: 1_500
     });
+    store.createSprintSession(completedRatingSprintState({
+      id: "session-standard-win",
+      mode: "standard",
+      completedAt: "2026-07-07T00:00:05.000Z",
+      ratingBefore: 600,
+      ratingAfter: 700
+    }));
+    store.createSprintSession(completedRatingSprintState({
+      id: "session-arrow-win",
+      mode: "arrow_duel",
+      completedAt: "2026-07-07T00:01:05.000Z",
+      ratingBefore: 600,
+      ratingAfter: 900
+    }));
 
     const renderer = renderScreen({
       currentTimeMs: () => Date.parse("2026-07-08T12:00:00.000Z"),
@@ -1053,7 +1067,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "custom-initial-rating-value"))).toBe("ELO 600");
   });
 
-  it("uses editable initial ELO for unplayed custom buckets and locks played buckets", () => {
+  it("keeps played custom ELO editable as a difficulty control", () => {
     const service = createMobilePracticeService("familiar15");
     const renderer = renderScreen({ practiceService: service });
 
@@ -1065,16 +1079,46 @@ describe("PracticePocScreen", () => {
     press(renderer, "start-sprint-button");
     expect(activeSprintForTest(service).ratingBefore).toBe(800);
 
-    const lockedStore = new MemoryStore();
-    lockedStore.seedPuzzles([sharedHistoryPuzzle()]);
-    lockedStore.saveRating({ key: "custom 5/20", generation: 0, rating: 900, games: 1 });
-    const lockedRenderer = renderScreen({ practiceService: new PracticeService(lockedStore) });
+    const playedStore = new MemoryStore();
+    playedStore.seedPuzzles([sharedHistoryPuzzle()]);
+    playedStore.saveRating({
+      key: "custom 5/20",
+      generation: 0,
+      rating: 900,
+      ratingDeviation: 180,
+      volatility: 0.05,
+      games: 1
+    });
+    playedStore.createSprintSession(completedRatingSprintState({
+      id: "played-custom",
+      mode: "custom",
+      completedAt: "2026-07-07T00:00:05.000Z",
+      ratingBefore: 600,
+      ratingAfter: 900
+    }));
+    const playedService = new PracticeService(playedStore);
+    const playedRenderer = renderScreen({ practiceService: playedService });
 
-    press(lockedRenderer, "practice-mode-custom");
-    expect(collectText(findByTestId(lockedRenderer, "custom-initial-rating-value"))).toBe("ELO 900");
-    expect(collectText(findByTestId(lockedRenderer, "custom-initial-rating-locked"))).toBe("Locked after play");
-    expect(findByTestId(lockedRenderer, "custom-initial-rating-stepper-decrease").props.accessibilityState).toEqual({ disabled: true });
-    expect(findByTestId(lockedRenderer, "custom-initial-rating-stepper-increase").props.accessibilityState).toEqual({ disabled: true });
+    press(playedRenderer, "practice-mode-custom");
+    expect(collectText(findByTestId(playedRenderer, "custom-initial-rating-row"))).toContain("Edit ELO");
+    expect(collectText(findByTestId(playedRenderer, "custom-initial-rating-value"))).toBe("ELO 900");
+    expect(findByTestId(playedRenderer, "custom-initial-rating-row").props.accessibilityState).toEqual({ expanded: false });
+    expect(() => findByTestId(playedRenderer, "custom-initial-rating-editor")).toThrow();
+    expect(() => findByTestId(playedRenderer, "custom-initial-rating-stepper-decrease")).toThrow();
+
+    press(playedRenderer, "custom-initial-rating-row");
+    expect(findByTestId(playedRenderer, "custom-initial-rating-row").props.accessibilityState).toEqual({ expanded: true });
+    expect(findByTestId(playedRenderer, "custom-initial-rating-editor")).toBeTruthy();
+    expect(findByTestId(playedRenderer, "custom-initial-rating-stepper-decrease").props.accessibilityState).toEqual({ disabled: false });
+    expect(findByTestId(playedRenderer, "custom-initial-rating-stepper-increase").props.accessibilityState).toEqual({ disabled: false });
+    press(playedRenderer, "custom-initial-rating-stepper-decrease");
+    expect(collectText(findByTestId(playedRenderer, "custom-initial-rating-value"))).toBe("ELO 800");
+    expect(playedService.getRating("custom 5/20")).toMatchObject({
+      rating: 800,
+      games: 0,
+      ratingDeviation: 100,
+      volatility: 0.05
+    });
   });
 
   it("shows custom sprint local pack readiness when the selected fixture has enough puzzles", () => {
@@ -1181,11 +1225,11 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-performance-card")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "history-chart-label"))).toBe("Rating");
     expect(findByTestId(renderer, "history-chart-line")).toBeTruthy();
-    expect(findByTestId(renderer, "history-chart-line-point-0")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-chart-line-point-0")).toThrow();
     expect(() => findByTestId(renderer, "history-chart-bar-0")).toThrow();
   });
 
-  it("renders the rating trend as connected pixel-space segments", async () => {
+  it("renders a dot-free rating curve that can be inspected by dragging", async () => {
     const renderer = renderStandardSequenceScreen();
 
     // Two settled sprints -> two elo points -> at least one line segment.
@@ -1206,41 +1250,23 @@ describe("PracticePocScreen", () => {
       });
     });
 
-    const dots: Array<{ x: number; y: number }> = [];
-    for (let index = 0; ; index++) {
-      let dot: TestRenderer.ReactTestInstance;
-      try {
-        dot = findByTestId(renderer, `history-chart-line-point-${index}`);
-      } catch {
-        break;
-      }
-      const style = flattenTestStyle(dot.props.style);
-      const left = style.left;
-      const x = typeof left === "string" ? (parseFloat(left) / 100) * plotWidth : Number(left);
-      dots.push({ x, y: Number(style.top) });
-    }
-    expect(dots.length).toBeGreaterThanOrEqual(2);
+    expect(() => findByTestId(renderer, "history-chart-line-point-0")).toThrow();
+    const firstSegmentStyle = flattenTestStyle(findByTestId(renderer, "history-chart-line-segment-0").props.style);
+    expect(Number(firstSegmentStyle.width)).toBeGreaterThan(0);
 
-    // Every segment must connect consecutive data points exactly: length is
-    // the pixel distance, the center sits on the midpoint (RN rotates around
-    // the center), and the angle matches the pixel-space slope. The previous
-    // implementation mixed percent and pixel units, drawing detached
-    // segments at wrong angles.
-    for (let index = 0; index < dots.length - 1; index++) {
-      const segment = findByTestId(renderer, `history-chart-line-segment-${index}`);
-      const style = flattenTestStyle(segment.props.style);
-      const from = dots[index];
-      const to = dots[index + 1];
-      const expectedLength = Math.hypot(to.x - from.x, to.y - from.y);
-      expect(style.width).toBeCloseTo(expectedLength, 5);
-      expect(style.left).toBeCloseTo((from.x + to.x) / 2 - expectedLength / 2, 5);
-      expect(style.top).toBeCloseTo((from.y + to.y) / 2 - 1, 5);
-      const transform = style.transform as Array<{ rotate?: string }> | undefined;
-      const rotate = transform?.find((entry) => entry.rotate)?.rotate ?? "0deg";
-      const expectedAngle = Math.atan2(to.y - from.y, to.x - from.x) * (180 / Math.PI);
-      expect(parseFloat(rotate)).toBeCloseTo(expectedAngle, 5);
-    }
-    expect(() => findByTestId(renderer, `history-chart-line-segment-${dots.length - 1}`)).toThrow();
+    act(() => {
+      findByTestId(renderer, "history-chart-line").props.onResponderGrant({ nativeEvent: { locationX: 0 } });
+    });
+    const firstSelectionLabel = findByTestId(renderer, "history-chart-line").props.accessibilityLabel;
+    expect(firstSelectionLabel).toMatch(/Rating \d+ on /);
+    expect(findByTestId(renderer, "history-chart-tooltip")).toBeTruthy();
+
+    act(() => {
+      findByTestId(renderer, "history-chart-line").props.onResponderMove({ nativeEvent: { locationX: plotWidth } });
+    });
+    expect(findByTestId(renderer, "history-chart-line").props.accessibilityLabel).toMatch(/Rating \d+ on /);
+    expect(findByTestId(renderer, "history-chart-selection-guide")).toBeTruthy();
+    expect(findByTestId(renderer, "history-chart-selection-point")).toBeTruthy();
   });
 
   it("filters history to wrong attempts from the recent window", async () => {
@@ -1282,6 +1308,18 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "history-performance-card"))).not.toContain("Accuracy");
     expect(findByTestId(renderer, "history-performance-chart")).toBeTruthy();
     expect(findByTestId(renderer, "history-chart-line")).toBeTruthy();
+    expect(findByTestId(renderer, "history-chart-line").props.accessibilityRole).toBe("adjustable");
+    expect(findByTestId(renderer, "history-chart-line").props.accessibilityLabel).toContain("Drag across the chart");
+    expect(renderer.root.findAll((node) => String(node.props.testID ?? "").startsWith("history-chart-line-point-")).length).toBe(0);
+    act(() => {
+      findByTestId(renderer, "history-chart-line").props.onLayout({ nativeEvent: { layout: { width: 240 } } });
+    });
+    act(() => {
+      findByTestId(renderer, "history-chart-line").props.onResponderGrant({ nativeEvent: { locationX: 120 } });
+    });
+    expect(findByTestId(renderer, "history-chart-tooltip")).toBeTruthy();
+    expect(findByTestId(renderer, "history-chart-selection-point")).toBeTruthy();
+    expect(findByTestId(renderer, "history-chart-line").props.accessibilityLabel).toMatch(/Rating \d+ on /);
     expect(() => findByTestId(renderer, "history-chart-metric-filters")).toThrow();
     expect(() => findByTestId(renderer, "history-chart-rating")).toThrow();
     expect(() => findByTestId(renderer, "history-chart-wins-losses")).toThrow();
@@ -2753,17 +2791,20 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "settings-review-reminder-off")).toBeTruthy();
     expect(findByTestId(renderer, "settings-standard-elo-row")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "settings-standard-elo-row"))).toContain("ELO 600");
-    expect(collectText(findByTestId(renderer, "settings-standard-elo-row"))).toContain("Advanced ratings · 2 buckets");
+    expect(collectText(findByTestId(renderer, "settings-standard-elo-row"))).toContain("Edit ELO");
+    expect(collectText(findByTestId(renderer, "settings-standard-elo-row"))).toContain("Standard and Arrow Duel difficulty");
     expect(() => findByTestId(renderer, "settings-standard-elo-row-detail")).toThrow();
     expect(() => findByTestId(renderer, "settings-reset-elo-confirmation")).toThrow();
     expect(() => findByTestId(renderer, "settings-reset-elo")).toThrow();
     expect(() => findByTestId(renderer, "settings-reset-elo-detail")).toThrow();
     expect(() => findByTestId(renderer, "settings-advanced-ratings")).toThrow();
     expect(() => findByTestId(renderer, "settings-advanced-ratings-panel")).toThrow();
-    expect(collectText(findByTestId(renderer, "settings-standard-elo-row"))).toContain("Advanced ratings · 2 buckets");
+    expect(collectText(findByTestId(renderer, "settings-standard-elo-row"))).toContain("Standard and Arrow Duel difficulty");
     press(renderer, "settings-standard-elo-row");
     expect(findByTestId(renderer, "settings-advanced-ratings-panel")).toBeTruthy();
-    expectText(renderer, "Manual rating controls");
+    expectText(renderer, "Difficulty controls");
+    expectText(renderer, "Set each ELO to curate your preferred puzzle difficulty.");
+    expect(collectText(renderer.root)).not.toContain("Adjust only when");
     expect(findByTestId(renderer, "settings-advanced-rating-standard")).toBeTruthy();
     expect(findByTestId(renderer, "settings-advanced-rating-arrow-duel")).toBeTruthy();
     expect(() => findByTestId(renderer, "settings-advanced-rating-blitz")).toThrow();
@@ -2780,7 +2821,7 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "Standard rating set to 625");
     expect(collectText(findByTestId(renderer, "settings-advanced-rating-standard-value"))).toBe("ELO 625");
     expect(collectText(findByTestId(renderer, "settings-standard-elo-row"))).toContain("ELO 625");
-    expect(collectText(findByTestId(renderer, "settings-standard-elo-row"))).toContain("Advanced ratings · 2 buckets");
+    expect(collectText(findByTestId(renderer, "settings-standard-elo-row"))).toContain("Standard and Arrow Duel difficulty");
     expect(findByTestId(renderer, "settings-advanced-rating-standard-decrease").props.accessibilityState).toEqual({ disabled: false });
     press(renderer, "settings-advanced-rating-standard-decrease");
     expectText(renderer, "Standard rating set to 600");
@@ -2861,19 +2902,21 @@ describe("PracticePocScreen", () => {
     });
   });
 
-  it("opens advanced rating controls from the current Puzzle ELO row", () => {
+  it("opens difficulty controls from the Edit ELO row", () => {
     const renderer = renderScreen();
 
     press(renderer, "settings-tab");
     expect(typeof findByTestId(renderer, "settings-standard-elo-row").props.onPress).toBe("function");
-    expect(collectText(findByTestId(renderer, "settings-standard-elo-row"))).toContain("Advanced ratings · 2 buckets");
+    expect(collectText(findByTestId(renderer, "settings-standard-elo-row"))).toContain("Edit ELO");
+    expect(collectText(findByTestId(renderer, "settings-standard-elo-row"))).toContain("Standard and Arrow Duel difficulty");
     expect(() => findByTestId(renderer, "settings-standard-elo-row-detail")).toThrow();
     expect(() => findByTestId(renderer, "settings-advanced-ratings-panel")).toThrow();
 
     press(renderer, "settings-standard-elo-row");
 
     expect(findByTestId(renderer, "settings-advanced-ratings-panel")).toBeTruthy();
-    expectText(renderer, "Manual rating controls");
+    expectText(renderer, "Difficulty controls");
+    expectText(renderer, "Set each ELO to curate your preferred puzzle difficulty.");
     expect(collectText(findByTestId(renderer, "settings-advanced-rating-standard-value"))).toBe("ELO 600");
   });
 
@@ -3136,6 +3179,39 @@ function historyAttempt(input: {
 
 function currentArrowWrongMove(state: SprintState): string {
   return requireArrowDuelState(state).wrongMove;
+}
+
+function completedRatingSprintState({
+  id,
+  mode,
+  completedAt,
+  ratingBefore,
+  ratingAfter
+}: {
+  id: string;
+  mode: "standard" | "arrow_duel" | "custom";
+  completedAt: string;
+  ratingBefore: number;
+  ratingAfter: number;
+}): SprintState {
+  return {
+    id,
+    config: defaultSprintConfig(mode),
+    status: "won",
+    startedAt: completedAt,
+    deadlineAt: completedAt,
+    completedAt,
+    endReason: "target_reached",
+    correctCount: 1,
+    mistakeCount: 0,
+    currentStreak: 1,
+    bestStreak: 1,
+    hasUserSubmittedMove: true,
+    currentPuzzleIndex: 1,
+    puzzles: [],
+    ratingBefore,
+    ratingAfter
+  };
 }
 
 function activeSprintForTest(service: ReturnType<typeof createMobilePracticeService>): SprintState {

@@ -30,6 +30,7 @@ import type {
 import type { HistoryFilter } from "./query-types.ts";
 import type {
   ClearLocalHistoryResult,
+  ExportedSprintSession,
   LocalDataImportResult,
   LocalDataExport,
   PracticeSettings,
@@ -38,6 +39,9 @@ import type {
   ReviewReminderPreference
 } from "./practice-store.ts";
 import type { ReviewReminderSettings } from "../../core/src/index.ts";
+import { reconcileRatingWithSprintSessions } from "./rating-history.ts";
+
+const MANUAL_RATING_DEVIATION_CAP = 100;
 
 export interface StartSprintCommand {
   mode: SprintMode;
@@ -67,6 +71,7 @@ export class PracticeService {
 
   constructor(store: PracticeStore) {
     this.store = store;
+    this.reconcilePersistedRatings();
   }
 
   startSprint(command: StartSprintCommand, now = new Date().toISOString()): SprintState {
@@ -211,7 +216,11 @@ export class PracticeService {
   }
 
   importLocalData(data: LocalDataExport): LocalDataImportResult {
-    return this.store.importLocalData(data);
+    const result = this.store.importLocalData(data);
+    return {
+      ...result,
+      ratings: result.ratings + this.reconcilePersistedRatings()
+    };
   }
 
   clearLocalHistory(): ClearLocalHistoryResult {
@@ -252,6 +261,10 @@ export class PracticeService {
 
   getRating(ratingKey: string): RatingRecord {
     return this.store.getRating(ratingKey);
+  }
+
+  listSprintSessions(): ExportedSprintSession[] {
+    return this.store.listSprintSessions();
   }
 
   listRatings(): RatingRecord[] {
@@ -311,7 +324,12 @@ export class PracticeService {
     const next: RatingRecord = {
       ...current,
       generation: current.generation + 1,
-      rating
+      games: 0,
+      rating,
+      ratingDeviation: Math.min(
+        current.ratingDeviation ?? DEFAULT_RATING_DEVIATION,
+        MANUAL_RATING_DEVIATION_CAP
+      )
     };
     this.store.saveRating(next);
     return next;
@@ -449,10 +467,34 @@ export class PracticeService {
       }));
     }
   }
+
+  private reconcilePersistedRatings(): number {
+    const sprintSessions = this.store.listSprintSessions();
+    let repaired = 0;
+    this.store.transaction(() => {
+      for (const rating of this.store.listRatings()) {
+        const next = reconcileRatingWithSprintSessions(rating, sprintSessions);
+        if (!sameRatingRecord(rating, next)) {
+          this.store.saveRating(next);
+          repaired += 1;
+        }
+      }
+    });
+    return repaired;
+  }
 }
 
 export function sprintView(state: SprintState): unknown {
   return serializeSprintView(state);
+}
+
+function sameRatingRecord(left: RatingRecord, right: RatingRecord): boolean {
+  return left.key === right.key &&
+    left.generation === right.generation &&
+    left.rating === right.rating &&
+    left.games === right.games &&
+    left.ratingDeviation === right.ratingDeviation &&
+    left.volatility === right.volatility;
 }
 
 function defaultPerPuzzleSeconds(mode: SprintMode): number {

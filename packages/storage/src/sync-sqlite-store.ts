@@ -588,7 +588,7 @@ export class SyncSQLiteStore implements PracticeStore {
           left.mode.localeCompare(right.mode) ||
           left.ratingKey.localeCompare(right.ratingKey)
         ),
-      sprintSessions: this.listExportedSprintSessions()
+      sprintSessions: this.listSprintSessions()
     };
   }
 
@@ -883,7 +883,7 @@ export class SyncSQLiteStore implements PracticeStore {
     return rows.map(reviewFromRow);
   }
 
-  private listExportedSprintSessions(): ExportedSprintSession[] {
+  listSprintSessions(): ExportedSprintSession[] {
     const rows = this.db
       .prepare(
         `SELECT

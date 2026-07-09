@@ -61,9 +61,17 @@ import type {
   UciEngineTransport
 } from "../../../../packages/core/src/index.ts";
 import type { PracticeService } from "../../../../packages/storage/src/practice-service.ts";
-import type { ReviewQueueDuePromotionResult, ReviewReminderPreference } from "../../../../packages/storage/src/practice-store.ts";
+import type {
+  ExportedSprintSession,
+  ReviewQueueDuePromotionResult,
+  ReviewReminderPreference
+} from "../../../../packages/storage/src/practice-store.ts";
 import { syncPracticeProgress } from "../../../../packages/storage/src/progress-sync.ts";
 import type { ProgressSyncResult } from "../../../../packages/storage/src/progress-sync.ts";
+import {
+  buildPracticeProgressSummary,
+  type PracticeProgressSummary
+} from "../../../../packages/storage/src/rating-history.ts";
 import {
   configureMobilePracticePuzzleSource,
   createMobilePracticeService,
@@ -384,6 +392,7 @@ export function PracticePocScreen({
   const [state, setState] = useState<SprintState | null>(null);
   const [feedback, setFeedback] = useState<SessionFeedback>(null);
   const [attempts, setAttempts] = useState<AttemptEvent[]>([]);
+  const [sprintSessions, setSprintSessions] = useState<ExportedSprintSession[]>([]);
   const [, setReviews] = useState<ReviewQueueState[]>([]);
   const [reviewQueue, setReviewQueue] = useState<ReviewQueueState[]>([]);
   const [dueReviewItems, setDueReviewItems] = useState<ReviewQueueItem[]>([]);
@@ -446,8 +455,10 @@ export function PracticePocScreen({
     [customDurationSeconds, customPerPuzzleSeconds, customSprintMode, customTheme, mode]
   );
   const selectedRatingRecord = service.getRating(selectedConfig.ratingKey);
-  const customInitialRatingLocked = selectedRatingRecord.games > 0;
-  const displayedCustomInitialRating = customInitialRatingLocked ? selectedRatingRecord.rating : customInitialRating;
+  const customRatingPlayed = selectedRatingRecord.games > 0 ||
+    sprintSessions.some((session) => session.ratingKey === selectedConfig.ratingKey && session.ratingAfter !== undefined) ||
+    attempts.some((attempt) => attempt.ratingKey === selectedConfig.ratingKey && attempt.source === "sprint");
+  const displayedCustomInitialRating = customRatingPlayed ? selectedRatingRecord.rating : customInitialRating;
   stateRef.current = state;
   boardFenRef.current = boardFen;
   feedbackSnapshotRef.current = feedbackSnapshot;
@@ -458,7 +469,7 @@ export function PracticePocScreen({
     const rating = service.getRating(selectedConfig.ratingKey);
     setCurrentRating(rating.rating);
     if (selectedConfig.mode === "custom" || selectedConfig.mode === "arrow_duel") {
-      setCustomInitialRating(rating.games > 0 ? rating.rating : CUSTOM_INITIAL_RATING_MIN);
+      setCustomInitialRating(rating.rating);
     }
   }, [selectedConfig.ratingKey, service]);
 
@@ -608,6 +619,7 @@ export function PracticePocScreen({
   function refreshState(): void {
     service.pruneOrphanedReviewQueue();
     setAttempts(service.listHistory() as AttemptEvent[]);
+    setSprintSessions(service.listSprintSessions());
     setReviews(service.getDueReviews(nowIso()));
     setReviewQueue(service.listReviewQueue());
     setDueReviewItems(service.getDueReviewItems(nowIso()));
@@ -1478,7 +1490,12 @@ export function PracticePocScreen({
       rating: readRating(service, config.ratingKey)
     };
   });
-  const practiceProgress = buildPracticeProgressSummary(attempts, nowMs, selectedConfig.ratingKey);
+  const practiceProgress = buildPracticeProgressSummary(
+    attempts,
+    sprintSessions,
+    nowMs,
+    selectedConfig.ratingKey
+  );
   const dueTodayCount = dueReviewItems.length;
   const overdueCount = dueReviewItems.filter((item) => isReviewOverdue(item.review, nowMs)).length;
   const customThemeValue = themeForCustomSprint(customTheme);
@@ -1719,8 +1736,17 @@ export function PracticePocScreen({
                     availablePuzzleCount={customEligiblePuzzleCount}
                     ratingKey={selectedConfig.ratingKey}
                     initialRating={displayedCustomInitialRating}
-                    initialRatingLocked={customInitialRatingLocked}
-                    onInitialRatingChange={setCustomInitialRating}
+                    ratingPlayed={customRatingPlayed}
+                    onInitialRatingChange={(nextRating) => {
+                      if (customRatingPlayed) {
+                        const next = service.setRating(selectedConfig.ratingKey, nextRating);
+                        setCustomInitialRating(next.rating);
+                        setCurrentRating(next.rating);
+                        setSettingsRevision((current) => current + 1);
+                        return;
+                      }
+                      setCustomInitialRating(nextRating);
+                    }}
                     onDurationChange={setCustomDurationSeconds}
                     onClose={() => setMode("standard")}
                     customMode={customSprintMode}
@@ -1931,53 +1957,6 @@ type PracticeModeSummary = {
   config: SprintConfig;
   rating: number;
 };
-
-type PracticeProgressSummary = {
-  correctThisWeek: number;
-  accuracyThisWeek: number | null;
-  ratingDeltaThisWeek: number | null;
-  wrongThisWeek: number;
-  netThisWeek: number;
-};
-
-function buildPracticeProgressSummary(
-  attempts: AttemptEvent[],
-  nowMs: number,
-  ratingKey: string
-): PracticeProgressSummary {
-  const weekStartMs = nowMs - 7 * 24 * 60 * 60 * 1000;
-  let correctThisWeek = 0;
-  let ratingDeltaThisWeek = 0;
-  let ratingChangeCount = 0;
-  let wrongThisWeek = 0;
-  for (const attempt of attempts) {
-    if (attempt.ratingKey !== ratingKey) {
-      continue;
-    }
-    const completedMs = new Date(attempt.completedAt).getTime();
-    if (!Number.isFinite(completedMs) || completedMs < weekStartMs || completedMs > nowMs) {
-      continue;
-    }
-    if (attempt.result === "correct") {
-      correctThisWeek += 1;
-    } else {
-      wrongThisWeek += 1;
-    }
-    if (attempt.ratingAfter !== undefined) {
-      ratingDeltaThisWeek += attempt.ratingAfter - attempt.ratingBefore;
-      ratingChangeCount += 1;
-    }
-  }
-  return {
-    correctThisWeek,
-    accuracyThisWeek: correctThisWeek + wrongThisWeek === 0
-      ? null
-      : Math.round((correctThisWeek / (correctThisWeek + wrongThisWeek)) * 100),
-    ratingDeltaThisWeek: ratingChangeCount === 0 ? null : ratingDeltaThisWeek,
-    wrongThisWeek,
-    netThisWeek: correctThisWeek - wrongThisWeek
-  };
-}
 
 function PracticeHome({
   adaptiveLayout,
@@ -2296,7 +2275,7 @@ function CustomSprintSetup({
   customMode,
   durationSeconds,
   initialRating,
-  initialRatingLocked,
+  ratingPlayed,
   maxMistakes,
   onClose,
   onCustomModeChange,
@@ -2315,7 +2294,7 @@ function CustomSprintSetup({
   customMode: "custom" | "arrow_duel";
   durationSeconds: number;
   initialRating: number;
-  initialRatingLocked: boolean;
+  ratingPlayed: boolean;
   maxMistakes: number;
   onClose: () => void;
   onCustomModeChange: (next: "custom" | "arrow_duel") => void;
@@ -2403,7 +2382,8 @@ function CustomSprintSetup({
           onChange={onPerPuzzleChange}
         />
         <CustomInitialRatingRow
-          locked={initialRatingLocked}
+          key={ratingKey}
+          played={ratingPlayed}
           onChange={onInitialRatingChange}
           value={initialRating}
         />
@@ -2523,16 +2503,71 @@ function CustomModeChoiceRow({
 }
 
 function CustomInitialRatingRow({
-  locked,
+  played,
   onChange,
   value
 }: {
-  locked: boolean;
+  played: boolean;
   onChange: (next: number) => void;
   value: number;
 }): React.JSX.Element {
-  const canDecrease = !locked && value > CUSTOM_INITIAL_RATING_MIN;
-  const canIncrease = !locked && value < CUSTOM_INITIAL_RATING_MAX;
+  const [editOpen, setEditOpen] = useState(false);
+  if (!played) {
+    return (
+      <View
+        accessibilityLabel={`Initial ELO, ELO ${value}`}
+        style={styles.customConfigRow}
+        testID="custom-initial-rating-row"
+      >
+        <View style={styles.customChoiceCopy}>
+          <Text style={styles.listText}>Initial ELO</Text>
+        </View>
+        <View style={styles.customStepperGroup}>
+          <Text style={styles.customConfigValue} testID="custom-initial-rating-value">ELO {value}</Text>
+          <CustomRatingStepper onChange={onChange} value={value} />
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <>
+      <Pressable
+        accessible
+        accessibilityRole="button"
+        accessibilityLabel={`Edit ELO, ELO ${value}`}
+        accessibilityState={{ expanded: editOpen }}
+        style={styles.customConfigRow}
+        testID="custom-initial-rating-row"
+        onPress={() => setEditOpen((current) => !current)}
+      >
+        <View style={styles.customChoiceCopy}>
+          <Text style={styles.listText}>Edit ELO</Text>
+        </View>
+        <View style={styles.customStepperGroup}>
+          <Text style={styles.customConfigValue} testID="custom-initial-rating-value">ELO {value}</Text>
+          <ChevronGlyph direction="right" />
+        </View>
+      </Pressable>
+      {editOpen ? (
+        <View style={styles.customConfigRow} testID="custom-initial-rating-editor">
+          <Text style={styles.listText}>Adjustment</Text>
+          <CustomRatingStepper onChange={onChange} value={value} />
+        </View>
+      ) : null}
+    </>
+  );
+}
+
+function CustomRatingStepper({
+  onChange,
+  value
+}: {
+  onChange: (next: number) => void;
+  value: number;
+}): React.JSX.Element {
+  const canDecrease = value > CUSTOM_INITIAL_RATING_MIN;
+  const canIncrease = value < CUSTOM_INITIAL_RATING_MAX;
   const decrease = () => {
     if (canDecrease) {
       onChange(Math.max(CUSTOM_INITIAL_RATING_MIN, value - CUSTOM_INITIAL_RATING_STEP));
@@ -2544,44 +2579,29 @@ function CustomInitialRatingRow({
     }
   };
   return (
-    <View
-      accessibilityLabel={`Initial ELO, ELO ${value}${locked ? ", locked after rated games" : ""}`}
-      style={styles.customConfigRow}
-      testID="custom-initial-rating-row"
-    >
-      <View>
-        <Text style={styles.listText}>Initial ELO</Text>
-        {locked ? (
-          <Text style={styles.helperText} testID="custom-initial-rating-locked">Locked after play</Text>
-        ) : null}
-      </View>
-      <View style={styles.customStepperGroup}>
-        <Text style={styles.customConfigValue} testID="custom-initial-rating-value">ELO {value}</Text>
-        <View style={styles.customStepperCompact} testID="custom-initial-rating-stepper">
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Decrease initial ELO"
-            accessibilityState={{ disabled: !canDecrease }}
-            disabled={!canDecrease}
-            testID="custom-initial-rating-stepper-decrease"
-            style={[styles.customStepperButton, !canDecrease ? styles.disabledButton : null]}
-            onPress={decrease}
-          >
-            <MinusGlyph />
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Increase initial ELO"
-            accessibilityState={{ disabled: !canIncrease }}
-            disabled={!canIncrease}
-            testID="custom-initial-rating-stepper-increase"
-            style={[styles.customStepperButton, !canIncrease ? styles.disabledButton : null]}
-            onPress={increase}
-          >
-            <PlusGlyph />
-          </Pressable>
-        </View>
-      </View>
+    <View style={styles.customStepperCompact} testID="custom-initial-rating-stepper">
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Decrease ELO"
+        accessibilityState={{ disabled: !canDecrease }}
+        disabled={!canDecrease}
+        testID="custom-initial-rating-stepper-decrease"
+        style={[styles.customStepperButton, !canDecrease ? styles.disabledButton : null]}
+        onPress={decrease}
+      >
+        <MinusGlyph />
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Increase ELO"
+        accessibilityState={{ disabled: !canIncrease }}
+        disabled={!canIncrease}
+        testID="custom-initial-rating-stepper-increase"
+        style={[styles.customStepperButton, !canIncrease ? styles.disabledButton : null]}
+        onPress={increase}
+      >
+        <PlusGlyph />
+      </Pressable>
     </View>
   );
 }
@@ -3994,7 +4014,6 @@ function historyRatingRangeFilterToQuery(filter: HistoryRatingRangeFilter): { mi
 const HISTORY_LINE_CHART_MAX_POINTS = 64;
 // Individual dots read as noise once the line is dense; past this count only
 // the latest-rating dot is drawn.
-const HISTORY_LINE_CHART_MAX_DOTS = 16;
 // Vertical band used by the plot inside the 60px line layer: value min maps
 // to y=48, value max to y=6 (48 - 42).
 const HISTORY_LINE_CHART_BASE_Y = 48;
@@ -4044,15 +4063,31 @@ function HistoryRatingLineChart({
   // Segment geometry needs the layer's pixel width: percent-based math mixed
   // px rise with % run, which rendered detached segments at wrong angles.
   const [plotWidth, setPlotWidth] = useState(0);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const values = points.map((point) => point.value);
   const min = Math.min(...values);
   const max = Math.max(...values);
   const span = Math.max(1, max - min);
-  const step = points.length > 1 ? 100 / (points.length - 1) : 0;
   const stepPx = points.length > 1 ? plotWidth / (points.length - 1) : 0;
-  const showAllDots = points.length <= HISTORY_LINE_CHART_MAX_DOTS;
   const pointY = (value: number) =>
     HISTORY_LINE_CHART_BASE_Y - ((value - min) / span) * HISTORY_LINE_CHART_PLOT_HEIGHT;
+  const selectedPoint = selectedIndex === null ? null : points[selectedIndex];
+  const selectedX = selectedIndex === null
+    ? 0
+    : points.length > 1
+      ? selectedIndex * stepPx
+      : plotWidth / 2;
+  const smoothedPoints = plotWidth > 0
+    ? smoothHistoryRatingPoints(points.map((point, index) => ({ x: index * stepPx, y: pointY(point.value) })))
+    : [];
+
+  const selectNearestPoint = (locationX: number): void => {
+    if (plotWidth <= 0) {
+      return;
+    }
+    const ratio = Math.max(0, Math.min(1, locationX / plotWidth));
+    setSelectedIndex(points.length === 1 ? 0 : Math.round(ratio * (points.length - 1)));
+  };
 
   return (
     <View style={styles.historyLineChart} testID="history-performance-chart">
@@ -4063,14 +4098,21 @@ function HistoryRatingLineChart({
         style={styles.historyLineLayer}
         testID="history-chart-line"
         onLayout={(event) => setPlotWidth(event.nativeEvent.layout.width)}
+        accessibilityRole="adjustable"
+        accessibilityLabel={selectedPoint
+          ? `Rating ${selectedPoint.value} on ${formatHistoryRatingDate(selectedPoint.key)}`
+          : "Rating trend. Drag across the chart to inspect dates and ratings."}
+        onStartShouldSetResponder={() => true}
+        onMoveShouldSetResponder={() => true}
+        onResponderGrant={(event) => selectNearestPoint(event.nativeEvent.locationX)}
+        onResponderMove={(event) => selectNearestPoint(event.nativeEvent.locationX)}
       >
-        {plotWidth > 0
-          ? points.slice(0, -1).map((point, index) => {
-              const next = points[index + 1] ?? point;
-              const x1 = index * stepPx;
-              const x2 = (index + 1) * stepPx;
-              const y1 = pointY(point.value);
-              const y2 = pointY(next.value);
+        {smoothedPoints.slice(0, -1).map((point, index) => {
+              const next = smoothedPoints[index + 1] ?? point;
+              const x1 = point.x;
+              const x2 = next.x;
+              const y1 = point.y;
+              const y2 = next.y;
               const length = Math.hypot(x2 - x1, y2 - y1);
               const angle = Math.atan2(y2 - y1, x2 - x1) * (180 / Math.PI);
               // RN rotates around the view's center, so center the segment on
@@ -4078,7 +4120,7 @@ function HistoryRatingLineChart({
               // the dots exactly.
               return (
                 <View
-                  key={`${point.key}-${next.key}-${index}`}
+                  key={`curve-${index}`}
                   style={[
                     styles.historyLineSegment,
                     {
@@ -4091,34 +4133,69 @@ function HistoryRatingLineChart({
                   testID={`history-chart-line-segment-${index}`}
                 />
               );
-            })
-          : null}
-      </View>
-      <View style={styles.historyLinePointLayer}>
-        {points.map((point, index) => {
-          const isLast = index === points.length - 1;
-          if (!showAllDots && !isLast) {
-            return null;
-          }
-          return (
+            })}
+        {selectedPoint ? (
+          <>
+            <View style={[styles.historyLineSelectionGuide, { left: selectedX }]} testID="history-chart-selection-guide" />
             <View
-              key={`${point.key}-${index}`}
+              style={[styles.historyLineSelectionPoint, { left: selectedX, top: pointY(selectedPoint.value) }]}
+              testID="history-chart-selection-point"
+            />
+            <View
               style={[
-                styles.historyLinePointColumn,
-                {
-                  left: points.length > 1 ? `${index * step}%` : "50%",
-                  top: pointY(point.value)
-                }
+                styles.historyLineTooltip,
+                selectedX > plotWidth / 2 ? { right: Math.max(0, plotWidth - selectedX - 8) } : { left: Math.max(0, selectedX + 8) }
               ]}
-              testID={`history-chart-line-point-${index}`}
+              testID="history-chart-tooltip"
             >
-              <View style={[styles.historyLinePoint, isLast ? styles.historyLinePointCurrent : null]} />
+              <Text style={styles.historyLineTooltipRating}>{selectedPoint.value}</Text>
+              <Text style={styles.historyLineTooltipDate}>{formatHistoryRatingDate(selectedPoint.key)}</Text>
             </View>
-          );
-        })}
+          </>
+        ) : null}
       </View>
     </View>
   );
+}
+
+function smoothHistoryRatingPoints(
+  points: Array<{ x: number; y: number }>,
+  samplesPerSegment = 6
+): Array<{ x: number; y: number }> {
+  if (points.length < 3) {
+    return points;
+  }
+  const smoothed: Array<{ x: number; y: number }> = [];
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const p0 = points[Math.max(0, index - 1)];
+    const p1 = points[index];
+    const p2 = points[index + 1];
+    const p3 = points[Math.min(points.length - 1, index + 2)];
+    for (let sample = 0; sample < samplesPerSegment; sample += 1) {
+      const t = sample / samplesPerSegment;
+      const t2 = t * t;
+      const t3 = t2 * t;
+      smoothed.push({
+        x: p1.x + (p2.x - p1.x) * t,
+        y: 0.5 * (
+          2 * p1.y
+          + (-p0.y + p2.y) * t
+          + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2
+          + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3
+        )
+      });
+    }
+  }
+  smoothed.push(points[points.length - 1]);
+  return smoothed;
+}
+
+function formatHistoryRatingDate(key: string): string {
+  const parsed = new Date(key.includes("T") ? key : `${key}T12:00:00`);
+  if (!Number.isFinite(parsed.getTime())) {
+    return key;
+  }
+  return parsed.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 function emptyHistoryPerformance(): HistoryPerformance {
@@ -6525,9 +6602,9 @@ function SettingsPanel({
 
       <SettingsSection title="Profile" testID="settings-profile-section" wide={adaptiveLayout.usesWideContent}>
         <SettingsRow
-          label="Puzzle ELO (Standard)"
+          label="Edit ELO"
           value={`ELO ${standardRating}`}
-          detail={`Advanced ratings · ${ratings.length} buckets`}
+          detail="Standard and Arrow Duel difficulty"
           testID="settings-standard-elo-row"
           onPress={() => setAdvancedRatingsOpen((current) => !current)}
         />
@@ -6756,9 +6833,9 @@ function AdvancedRatingsPanel({
 }): React.JSX.Element {
   return (
     <View style={styles.advancedRatingsPanel} testID="settings-advanced-ratings-panel">
-      <Text style={styles.sectionLabel}>Manual rating controls</Text>
+      <Text style={styles.sectionLabel}>Difficulty controls</Text>
       <Text style={styles.helperText}>
-        Hidden by default. Adjust only when you need to repair a local rating bucket.
+        Set each ELO to curate your preferred puzzle difficulty.
       </Text>
       <View style={styles.advancedRatingRows}>
         {ratings.map(({ label, record }) => (
@@ -10005,31 +10082,41 @@ const styles = StyleSheet.create({
     opacity: 0.82,
     position: "absolute"
   },
-  historyLinePointLayer: {
-    bottom: 8,
-    left: 18,
+  historyLineSelectionGuide: {
+    backgroundColor: "#93C5FD",
+    bottom: 0,
     position: "absolute",
-    right: 18,
-    top: 8
+    top: 0,
+    width: StyleSheet.hairlineWidth
   },
-  historyLinePointColumn: {
-    alignItems: "center",
+  historyLineSelectionPoint: {
+    backgroundColor: "#2563EB",
+    borderColor: "#FFFFFF",
+    borderRadius: 999,
+    borderWidth: 2,
     height: 10,
     marginLeft: -5,
     marginTop: -5,
     position: "absolute",
     width: 10
   },
-  historyLinePoint: {
-    backgroundColor: "#93C5FD",
-    borderRadius: 999,
-    height: 7,
-    width: 7
+  historyLineTooltip: {
+    backgroundColor: "#0F172A",
+    borderRadius: 7,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    position: "absolute",
+    top: 0
   },
-  historyLinePointCurrent: {
-    backgroundColor: "#2563EB",
-    height: 10,
-    width: 10
+  historyLineTooltipRating: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  historyLineTooltipDate: {
+    color: "#CBD5E1",
+    fontSize: 9,
+    fontWeight: "600"
   },
   historyChipContent: {
     flexDirection: "row",

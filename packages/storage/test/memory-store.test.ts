@@ -599,12 +599,24 @@ test("PracticeService clears MemoryStore local history without resetting ratings
 test("PracticeService manually adjusts MemoryStore ratings behind the service boundary", async () => {
   const store = new MemoryStore();
   const service = new PracticeService(store);
+  store.saveRating({
+    key: "standard 5/20",
+    generation: 2,
+    rating: 900,
+    ratingDeviation: 180,
+    volatility: 0.05,
+    games: 4
+  });
 
   const adjusted = service.setRating("standard 5/20", 725);
 
   assert.equal(adjusted.rating, 725);
-  assert.equal(adjusted.generation, 1);
+  assert.equal(adjusted.generation, 3);
+  assert.equal(adjusted.games, 0);
+  assert.equal(adjusted.ratingDeviation, 100);
+  assert.equal(adjusted.volatility, 0.05);
   assert.equal(service.getRating("standard 5/20").rating, 725);
+  assert.equal(new PracticeService(store).getRating("standard 5/20").rating, 725);
   assert.throws(() => service.setRating("standard 5/20", 599), /at least 600/);
   assert.throws(() => service.setRating("standard 5/20", 700.5), /integer/);
 });
