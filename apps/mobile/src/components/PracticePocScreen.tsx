@@ -1465,7 +1465,7 @@ export function PracticePocScreen({
       rating: readRating(service, config.ratingKey)
     };
   });
-  const practiceProgress = buildPracticeProgressSummary(attempts, nowMs);
+  const practiceProgress = buildPracticeProgressSummary(attempts, nowMs, selectedConfig.ratingKey);
   const dueTodayCount = dueReviewItems.length;
   const overdueCount = dueReviewItems.filter((item) => isReviewOverdue(item.review, nowMs)).length;
   const customThemeValue = themeForCustomSprint(customTheme);
@@ -1921,13 +1921,20 @@ type PracticeProgressSummary = {
   netThisWeek: number;
 };
 
-function buildPracticeProgressSummary(attempts: AttemptEvent[], nowMs: number): PracticeProgressSummary {
+function buildPracticeProgressSummary(
+  attempts: AttemptEvent[],
+  nowMs: number,
+  ratingKey: string
+): PracticeProgressSummary {
   const weekStartMs = nowMs - 7 * 24 * 60 * 60 * 1000;
   let correctThisWeek = 0;
   let ratingDeltaThisWeek = 0;
   let ratingChangeCount = 0;
   let wrongThisWeek = 0;
   for (const attempt of attempts) {
+    if (attempt.ratingKey !== ratingKey) {
+      continue;
+    }
     const completedMs = new Date(attempt.completedAt).getTime();
     if (!Number.isFinite(completedMs) || completedMs < weekStartMs || completedMs > nowMs) {
       continue;
@@ -2029,7 +2036,8 @@ function PracticeHome({
                 key={item.mode}
                 active={mode === item.mode}
                 item={item}
-                onPress={() => {
+                onPress={() => onSelectMode(item.mode)}
+                onStart={() => {
                   if (item.mode === "custom") {
                     onSelectMode(item.mode);
                   } else {
@@ -2186,26 +2194,30 @@ function PausedSessionPanel({
 function PracticeModeCard({
   active,
   item,
-  onPress
+  onPress,
+  onStart
 }: {
   active: boolean;
   item: PracticeModeSummary;
   onPress: () => void;
+  onStart: () => void;
 }): React.JSX.Element {
   const label = modeLabel(item.mode);
   const detail = practiceModeDetailLabel(item);
   const ratingLabel = `ELO ${item.rating}`;
+  const modeTestId = item.mode.replace("_", "-");
+  const startLabel = item.mode === "custom" ? "Configure Custom sprint" : `Start ${label} sprint`;
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
-      accessibilityLabel={`${label} mode, ${detail}`}
-      testID={`practice-mode-${item.mode.replace("_", "-")}`}
+      accessibilityLabel={`Select ${label} mode, ${detail}`}
+      testID={`practice-mode-${modeTestId}`}
       style={[styles.practiceModeCard, active ? styles.practiceModeCardActive : null]}
       onPress={onPress}
     >
       <View style={styles.practiceModeSelectArea}>
-        <View style={[styles.practiceModeIcon, active ? styles.practiceModeIconActive : null]} testID={`practice-mode-${item.mode.replace("_", "-")}-icon`}>
+        <View style={[styles.practiceModeIcon, active ? styles.practiceModeIconActive : null]} testID={`practice-mode-${modeTestId}-icon`}>
           <PracticeModeGlyph mode={item.mode} />
         </View>
         <View style={styles.practiceModeCopy}>
@@ -2221,19 +2233,25 @@ function PracticeModeCard({
           </Text>
           <View
             accessibilityLabel={detail}
-            testID={`practice-mode-${item.mode.replace("_", "-")}-details`}
+            testID={`practice-mode-${modeTestId}-details`}
             style={styles.practiceModeDetailProbe}
           />
         </View>
       </View>
       <View style={styles.practiceModeMeta}>
-        <Text style={styles.practiceModeRating} testID={`practice-mode-${item.mode.replace("_", "-")}-rating`}>{ratingLabel}</Text>
-        <View
-          testID={`practice-mode-${item.mode.replace("_", "-")}-start`}
+        <Text style={styles.practiceModeRating} testID={`practice-mode-${modeTestId}-rating`}>{ratingLabel}</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={startLabel}
+          testID={`practice-mode-${modeTestId}-start`}
           style={styles.practiceModeChevronButton}
+          onPress={(event) => {
+            event?.stopPropagation?.();
+            onStart();
+          }}
         >
           <ChevronGlyph direction="right" />
-        </View>
+        </Pressable>
       </View>
     </Pressable>
   );
