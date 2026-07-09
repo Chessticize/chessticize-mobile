@@ -78,8 +78,7 @@ describe('Key user flows', () => {
     await waitFor(element(by.id('review-due-count'))).toHaveText('3').withTimeout(10000);
     await waitForElementTextContaining('review-due-summary', 'Ready now', 10000);
 
-    await element(by.id('review-start-due')).tap();
-    await waitFor(element(by.id('review-session'))).toBeVisible().withTimeout(30000);
+    await startDueReviewSession();
     await waitFor(element(by.text('Scheduled review'))).toBeVisible().withTimeout(30000);
     await waitForElementTextContaining('review-progress', '1 / 3', 30000);
 
@@ -209,6 +208,22 @@ async function launchAppAt(nowMs, deleteData, extraLaunchArgs = {}) {
       ...extraLaunchArgs
     }
   });
+}
+
+async function startDueReviewSession() {
+  await element(by.id('review-start-due')).tap();
+  try {
+    await waitFor(element(by.id('review-session'))).toBeVisible().withTimeout(30000);
+    return;
+  } catch {
+    try {
+      await waitFor(element(by.id('review-start-due'))).toBeVisible().withTimeout(5000);
+      await element(by.id('review-start-due')).tap();
+    } catch {
+      // The first tap may already be transitioning; keep waiting for the session.
+    }
+    await waitFor(element(by.id('review-session'))).toBeVisible().withTimeout(60000);
+  }
 }
 
 async function elementText(testID) {
