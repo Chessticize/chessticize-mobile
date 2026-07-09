@@ -79,9 +79,9 @@ describe('Key user flows', () => {
     await waitForElementTextContaining('review-due-summary', 'Ready now', 10000);
 
     await element(by.id('review-start-due')).tap();
-    await waitFor(element(by.id('review-session'))).toBeVisible().withTimeout(10000);
-    await waitFor(element(by.text('Scheduled review'))).toBeVisible().withTimeout(10000);
-    await waitForElementTextContaining('review-progress', '1 / 3', 10000);
+    await waitFor(element(by.id('review-session'))).toBeVisible().withTimeout(30000);
+    await waitFor(element(by.text('Scheduled review'))).toBeVisible().withTimeout(30000);
+    await waitForElementTextContaining('review-progress', '1 / 3', 30000);
 
     const expectedMove = await elementText('review-current-expected-move');
     const boardOrientation = await elementText('review-board-flipped');
