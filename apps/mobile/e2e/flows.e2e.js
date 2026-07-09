@@ -194,15 +194,6 @@ describe('Key user flows', () => {
     await element(by.id('practice-mode-custom')).tap();
     await waitFor(element(by.id('custom-previous-configs'))).toExist().withTimeout(10000);
   });
-
-  it('deletes local history with explicit confirmation', async () => {
-    await openTab('settings-tab', 'settings-delete-local-history');
-    await waitForVisibleInPracticeScroll('settings-delete-local-history');
-    await element(by.id('settings-delete-local-history')).tap();
-    await waitForVisibleInPracticeScroll('settings-delete-history-confirmation-confirm');
-    await element(by.id('settings-delete-history-confirmation-confirm')).tap();
-    await waitForVisibleInPracticeScroll('settings-status-message');
-  });
 });
 
 async function dismissSprintSummary() {

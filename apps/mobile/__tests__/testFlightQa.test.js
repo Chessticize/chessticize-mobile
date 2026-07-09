@@ -29,7 +29,7 @@ describe("TestFlight QA checklist", () => {
       "Post-Sprint Mistake Review",
       "History",
       "Scheduled Review",
-      "Settings And Local Data",
+      "Settings",
       "Persistence And Relaunch",
       "Offline Practice"
     ];

@@ -52,7 +52,7 @@ Screen inventory:
 | Analysis Review | Board, compact toolbar, Stockfish status, candidate line rows, guided arrows when applicable | Reset, flip, analyze, navigate, finish review | Review Complete, History |
 | History | Rating trend line chart, range filters, selected ELO bucket, expandable row filters, attempt rows | Filter wrong-only/source rows, inspect attempt context, open attempt | Attempt Detail, Review Item |
 | Custom Sprint Setup | Mode/theme/timing controls, estimate, rating range, start | Start sprint, save template | Active Sprint |
-| Settings | Local data, export, notifications, about, puzzle-data source notes | Export data, delete local history, inspect licenses | Confirm Sheet, Puzzle Data / License |
+| Settings | iCloud Sync, notifications, profile, about, puzzle-data source notes | Toggle sync, adjust reminders, inspect licenses | Puzzle Data / License |
 | Puzzle Data / License | Bundled source name, puzzle count, source license, Lichess-derived attribution, presolve metadata | Inspect source and license notes | Settings |
 
 ## Mobile Information Architecture
@@ -473,12 +473,14 @@ Custom sprint behavior:
 
 ### Settings
 
-- Local Data appears near the top with clear on-device storage copy.
-- iCloud Sync appears near Local Data. It defaults off, shows the real enabled
+- iCloud Sync appears near the top. It defaults off, shows the real enabled
   state and current account/sync status, and exposes a manual Sync Now action
   only after sync is enabled.
 - On regular-width iPad, Settings should use grouped navigation plus a detail panel; do not make each settings row stretch across the full display.
 - Advanced manual ELO adjustment should be hidden behind an "Advanced ratings" affordance.
+- Settings must not expose incomplete local data actions. Do not show local
+  storage copy, export, local-history deletion, or rating-reset rows unless a
+  complete user-facing workflow is implemented.
 - Settings must not include simulated cloud state in v1: no upload approval
   prompt and no fabricated "last synced" timestamp. Sync controls must be
   backed by the CloudKit transport, entitlement, merge engine, and truthful UI
@@ -532,7 +534,6 @@ Puzzle data source and license notes live in Settings.
 
 - Settings must state that the bundled puzzle data is derived from the Lichess puzzle database and includes Chessticize presolve metadata.
 - Settings must show the source license from the bundled manifest.
-- Deleting local history must not remove bundled puzzle data.
 
 ## Accessibility And Automation Contracts
 
@@ -557,7 +558,6 @@ Required labels/test IDs:
 - `review-dev-test-notification` (dev/test builds only)
 - `history-filter-toggle`
 - `history-filter-wrong-only`
-- `settings-local-storage`
 - `settings-puzzle-data-license`
 - `adaptive-layout-root`
 - `primary-navigation-rail`

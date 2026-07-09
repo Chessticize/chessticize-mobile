@@ -1,6 +1,6 @@
 # Chessticize Mobile Privacy Policy
 
-Effective date: 2026-07-03
+Effective date: 2026-07-08
 
 Chessticize Mobile is an offline-first chess training app. The 1.0 app does not
 create Chessticize accounts, does not show ads, does not use analytics SDKs, and
@@ -39,11 +39,13 @@ on your device. There is no push notification server.
 
 ## Deleting Local Data
 
-You can reset app progress from the app's settings. You can also remove all
-local app data by deleting Chessticize Mobile from your device.
+You can remove local app data by deleting Chessticize Mobile from your device.
+Deleting the app removes the app's on-device storage, including local training
+history, review queue state, settings, and locally cached progress.
 
 Turning off iCloud Sync stops future sync attempts from the app. Data already
-stored in iCloud is managed by your Apple ID and iCloud settings.
+stored in iCloud is managed by your Apple ID and iCloud settings, and deleting
+the app does not by itself delete existing iCloud records.
 
 ## Contact
 

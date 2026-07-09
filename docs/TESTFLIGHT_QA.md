@@ -138,11 +138,11 @@ failure, retry, or unclear result.
       shown.
 - [ ] Complete the visible due queue without corrupting sprint ratings.
 
-### Settings And Local Data
+### Settings
 
 - [ ] Open Settings.
-- [ ] Confirm Settings shows Local Data and iCloud Sync sections, with iCloud
-      Sync defaulting off.
+- [ ] Confirm Settings shows iCloud Sync, Notifications, Profile, and About
+      sections, with iCloud Sync defaulting off.
 - [ ] Turn iCloud Sync on while signed into iCloud and confirm the status changes
       to a successful sync state.
 - [ ] On a second Apple device signed into the same iCloud account, turn iCloud
@@ -151,8 +151,6 @@ failure, retry, or unclear result.
 - [ ] Turn iCloud Sync off and confirm practice still works offline.
 - [ ] Change review reminder preference and confirm the UI persists after app
       relaunch.
-- [ ] Use export local data and confirm the share/export flow opens.
-- [ ] Delete local history with confirmation and confirm History/Review update.
 - [ ] Open license/source information and confirm Stockfish 18 and the public
       source repository are shown.
 

@@ -2612,7 +2612,11 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "settings-sync-summary-card")).toThrow();
     expect(() => findByTestId(renderer, "settings-data-summary-card")).toThrow();
     expect(findByTestId(renderer, "settings-profile-section")).toBeTruthy();
-    expect(findByTestId(renderer, "settings-data-section")).toBeTruthy();
+    expect(() => findByTestId(renderer, "settings-data-section")).toThrow();
+    expect(() => findByTestId(renderer, "settings-local-storage")).toThrow();
+    expect(() => findByTestId(renderer, "settings-export-data")).toThrow();
+    expect(() => findByTestId(renderer, "settings-delete-local-history")).toThrow();
+    expect(() => findByTestId(renderer, "settings-delete-history-confirmation")).toThrow();
     expect(findByTestId(renderer, "settings-notifications-section")).toBeTruthy();
     expect(() => findByTestId(renderer, "settings-packs-section")).toThrow();
     expect(findByTestId(renderer, "settings-about-section")).toBeTruthy();
@@ -2627,16 +2631,15 @@ describe("PracticePocScreen", () => {
     expect(collectText(renderer.root)).not.toContain("Today, 09:28");
     expect(collectText(renderer.root)).not.toContain("Pending approval");
     expect(collectText(renderer.root)).not.toContain("Allow upload");
-    expect(collectText(findByTestId(renderer, "settings-data-section"))).toContain("Local Data");
-    expect(findByTestId(renderer, "settings-local-storage")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "settings-local-storage"))).toContain("On device");
-    expect(collectText(findByTestId(renderer, "settings-local-storage"))).toContain("Ratings, history, review queue, and custom sprint configs start on this device.");
+    expect(collectText(renderer.root)).not.toContain("Local Data");
+    expect(collectText(renderer.root)).not.toContain("Export Data");
+    expect(collectText(renderer.root)).not.toContain("Delete Local History");
+    expect(collectText(renderer.root)).not.toContain("On device");
     expect(collectText(findByTestId(renderer, "settings-sync-section"))).toContain("iCloud Sync");
     expect(collectText(findByTestId(renderer, "settings-sync-status"))).toContain("Off");
     expect(findByTestId(renderer, "settings-icloud-sync-on")).toBeTruthy();
     expect(findByTestId(renderer, "settings-icloud-sync-off")).toBeTruthy();
     expect(() => findByTestId(renderer, "settings-sync-now")).toThrow();
-    expect(testIdOrder(renderer, "settings-data-section", "settings-sync-section")).toBeLessThan(0);
     expect(testIdOrder(renderer, "settings-sync-section", "settings-notifications-section")).toBeLessThan(0);
     expect(testIdOrder(renderer, "settings-notifications-section", "settings-profile-section")).toBeLessThan(0);
     expect(collectText(findByTestId(renderer, "settings-notifications-section"))).toContain("Notifications");
@@ -2646,7 +2649,6 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "settings-review-reminder-smart")).toBeTruthy();
     expect(findByTestId(renderer, "settings-review-reminder-fixed-1900")).toBeTruthy();
     expect(findByTestId(renderer, "settings-review-reminder-off")).toBeTruthy();
-    expect(testIdOrder(renderer, "settings-data-section", "settings-profile-section")).toBeLessThan(0);
     expect(findByTestId(renderer, "settings-standard-elo-row")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "settings-standard-elo-row"))).toContain("ELO 600");
     expect(collectText(findByTestId(renderer, "settings-standard-elo-row"))).toContain("Advanced ratings · 2 buckets");
@@ -2654,15 +2656,6 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "settings-reset-elo-confirmation")).toThrow();
     expect(() => findByTestId(renderer, "settings-reset-elo")).toThrow();
     expect(() => findByTestId(renderer, "settings-reset-elo-detail")).toThrow();
-    expect(findByTestId(renderer, "settings-export-data")).toBeTruthy();
-    press(renderer, "settings-export-data");
-    expectText(renderer, "Export ready · 0 attempts · 0 reviews · 3 ratings");
-    press(renderer, "settings-delete-local-history");
-    expect(findByTestId(renderer, "settings-delete-history-confirmation")).toBeTruthy();
-    expectText(renderer, "Delete local history?");
-    expectText(renderer, "Ratings and bundled puzzle data stay intact.");
-    press(renderer, "settings-delete-history-confirmation-confirm");
-    expectText(renderer, "No local history to delete");
     expect(() => findByTestId(renderer, "settings-advanced-ratings")).toThrow();
     expect(() => findByTestId(renderer, "settings-advanced-ratings-panel")).toThrow();
     expect(collectText(findByTestId(renderer, "settings-standard-elo-row"))).toContain("Advanced ratings · 2 buckets");
@@ -2711,7 +2704,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "settings-puzzle-data-license"))).toContain(getBundledCorePackManifest().sourceLicense);
     expect(collectText(findByTestId(renderer, "settings-puzzle-data-license"))).toContain("Derived from Lichess puzzle data");
     expect(collectText(findByTestId(renderer, "settings-puzzle-data-license"))).toContain("Chessticize presolve metadata");
-    expect(collectText(findByTestId(renderer, "settings-data-section"))).not.toContain("›");
+    expect(collectText(findByTestId(renderer, "settings-panel"))).not.toContain("›");
   });
 
   it("syncs progress through the injected iCloud client from Settings", async () => {
@@ -2759,38 +2752,8 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "settings-advanced-rating-standard-value"))).toBe("ELO 600");
   });
 
-  it("deletes local history and review queue from Settings while preserving rating", () => {
-    const service = createMobilePracticeService("random1000");
-    service.startSprint(
-      { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
-      new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 - 120_000).toISOString()
-    );
-    service.submitMove("c4b5", new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 - 60_000).toISOString());
-    const ratingBefore = service.getRating("standard 5/20");
-    const renderer = renderScreen({ practiceService: service });
-
-    press(renderer, "history-tab");
-    expectHistoryRowAccessibility(renderer, "Played c4b5 · Best e2e6");
-    press(renderer, "review-tab");
-    expect(findByTestId(renderer, "review-due-card")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "review-due-count"))).toBe("1");
-
-    press(renderer, "settings-tab");
-    press(renderer, "settings-export-data");
-    expectText(renderer, "Export ready · 1 attempt · 1 review · 3 ratings");
-    press(renderer, "settings-delete-local-history");
-    press(renderer, "settings-delete-history-confirmation-confirm");
-
-    expectText(renderer, "Local history deleted · 1 attempt · 1 review");
-    expect(service.getRating("standard 5/20")).toEqual(ratingBefore);
-    press(renderer, "history-tab");
-    expectText(renderer, "No attempts");
-    press(renderer, "review-tab");
-    expectText(renderer, "No reviews due today");
-  });
-
   it("reschedules review reminders when the review queue changes and when the app backgrounds", async () => {
-    jest.setSystemTime(new Date("2026-06-20T12:00:00.000Z"));
+    jest.setSystemTime(new Date("2026-06-21T00:01:00.000Z"));
     const scheduler = new FakeReviewReminderScheduler();
     const service = createMobilePracticeService("random1000");
     service.saveReviewReminderPreference({ mode: "fixed", fixedLocalTime: "08:15" });
@@ -2811,12 +2774,21 @@ describe("PracticePocScreen", () => {
     });
     expect(localTime(queuedReminder?.scheduledAt)).toEqual({ hour: 8, minute: 15 });
 
-    press(renderer, "settings-tab");
-    press(renderer, "settings-delete-local-history");
-    press(renderer, "settings-delete-history-confirmation-confirm");
+    press(renderer, "review-tab");
+    press(renderer, "review-start-due");
+    await boardMove(renderer, "e2e6");
+    await settleFeedbackSnapshot();
+    await boardMove(renderer, "e6f7");
+    await settleFeedbackSnapshot();
     await act(async () => {});
 
-    expect(scheduler.currentReminder).toBeUndefined();
+    expect(scheduler.currentReminder).toMatchObject({
+      dueCount: 1,
+      body: "1 puzzle is ready for review",
+      route: "review"
+    });
+    expect(localTime(scheduler.currentReminder?.scheduledAt)).toEqual({ hour: 8, minute: 15 });
+    const rescheduledAt = scheduler.currentReminder?.scheduledAt;
 
     act(() => {
       (AppState as unknown as { __emit: (nextState: string) => void }).__emit("background");
@@ -2824,7 +2796,12 @@ describe("PracticePocScreen", () => {
     await act(async () => {});
 
     expect(scheduler.calls).toHaveLength(3);
-    expect(scheduler.calls[2]).toBeUndefined();
+    expect(scheduler.calls[2]).toMatchObject({
+      dueCount: 1,
+      body: "1 puzzle is ready for review",
+      route: "review"
+    });
+    expect(scheduler.currentReminder?.scheduledAt).toBe(rescheduledAt);
   });
 
   it("saves review reminder preferences from Settings and reschedules the local reminder", async () => {

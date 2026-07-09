@@ -61,7 +61,7 @@ import type {
   UciEngineTransport
 } from "../../../../packages/core/src/index.ts";
 import type { PracticeService } from "../../../../packages/storage/src/practice-service.ts";
-import type { ClearLocalHistoryResult, LocalDataExport, ReviewQueueDuePromotionResult, ReviewReminderPreference } from "../../../../packages/storage/src/practice-store.ts";
+import type { ReviewQueueDuePromotionResult, ReviewReminderPreference } from "../../../../packages/storage/src/practice-store.ts";
 import { syncPracticeProgress } from "../../../../packages/storage/src/progress-sync.ts";
 import type { ProgressSyncResult } from "../../../../packages/storage/src/progress-sync.ts";
 import {
@@ -1845,12 +1845,6 @@ export function PracticePocScreen({
                   { label: "Arrow Duel", record: service.getRating(defaultSprintConfig("arrow_duel").ratingKey) }
                 ]}
                 onOpenDiagnostics={arePracticeTestControlsEnabled() ? () => setTab("analysis") : undefined}
-                onExportData={() => service.exportLocalData()}
-                onDeleteLocalHistory={() => {
-                  const result = service.clearLocalHistory();
-                  refreshState();
-                  return result;
-                }}
                 onAdjustRating={(ratingKey, nextRating) => {
                   const next = service.setRating(ratingKey, nextRating);
                   setSettingsRevision((current) => current + 1);
@@ -6358,8 +6352,6 @@ function iCloudAccountStatusMessage(status: ICloudAccountStatus): string {
 
 function SettingsPanel({
   adaptiveLayout,
-  onDeleteLocalHistory,
-  onExportData,
   onOpenDiagnostics,
   onOpenNotificationSettings,
   onAdjustRating,
@@ -6376,8 +6368,6 @@ function SettingsPanel({
   standardRating
 }: {
   adaptiveLayout: AdaptiveLayout;
-  onDeleteLocalHistory: () => ClearLocalHistoryResult;
-  onExportData: () => LocalDataExport;
   onOpenDiagnostics?: () => void;
   onOpenNotificationSettings: () => void;
   onAdjustRating: (ratingKey: string, nextRating: number) => RatingRecord;
@@ -6394,35 +6384,11 @@ function SettingsPanel({
   standardRating: number;
 }): React.JSX.Element {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [confirmation, setConfirmation] = useState<"delete-history" | null>(null);
   const [advancedRatingsOpen, setAdvancedRatingsOpen] = useState(false);
   const bundledCoreManifest = getBundledCorePackManifest();
 
   return (
     <View style={[styles.settingsPanel, adaptiveLayout.usesWideContent ? styles.settingsPanelWide : null]} testID="settings-panel">
-      <SettingsSection title="Local Data" testID="settings-data-section" wide={adaptiveLayout.usesWideContent}>
-        <SettingsRow
-          label="Storage"
-          value="On device"
-          detail="Ratings, history, review queue, and custom sprint configs start on this device."
-          testID="settings-local-storage"
-        />
-        <SettingsRow
-          label="Export Data"
-          value="JSON"
-          detail="Export-ready local progress backup"
-          testID="settings-export-data"
-          onPress={() => setStatusMessage(exportDataStatusMessage(onExportData()))}
-        />
-        <SettingsRow
-          label="Delete Local History"
-          detail="Requires confirmation before anything is removed"
-          destructive
-          testID="settings-delete-local-history"
-          onPress={() => setConfirmation("delete-history")}
-        />
-      </SettingsSection>
-
       <SettingsSection title="iCloud Sync" testID="settings-sync-section" wide={adaptiveLayout.usesWideContent}>
         <SettingsRow
           label="Progress Sync"
@@ -6565,20 +6531,6 @@ function SettingsPanel({
       </SettingsSection>
 
       {statusMessage ? <Text style={styles.settingsStatusText} testID="settings-status-message">{statusMessage}</Text> : null}
-      {confirmation === "delete-history" ? (
-        <DestructiveConfirmationCard
-          confirmLabel="Delete History"
-          description="This removes local attempts, sprint history, and scheduled review queue data. Ratings and bundled puzzle data stay intact."
-          testID="settings-delete-history-confirmation"
-          title="Delete local history?"
-          onCancel={() => setConfirmation(null)}
-          onConfirm={() => {
-            const result = onDeleteLocalHistory();
-            setConfirmation(null);
-            setStatusMessage(deleteHistoryStatusMessage(result));
-          }}
-        />
-      ) : null}
       {onOpenDiagnostics ? (
         <Pressable
           accessibilityRole="button"
@@ -6725,22 +6677,6 @@ function scheduledReviewAttemptCount(service: PracticeService): number {
   return (service.listHistory({ source: "scheduled_review" }) as AttemptEvent[]).length;
 }
 
-function deleteHistoryStatusMessage(result: ClearLocalHistoryResult): string {
-  if (result.attempts === 0 && result.reviewQueue === 0 && result.sprintSessions === 0) {
-    return "No local history to delete";
-  }
-  const attemptText = result.attempts === 1 ? "1 attempt" : `${result.attempts} attempts`;
-  const reviewText = result.reviewQueue === 1 ? "1 review" : `${result.reviewQueue} reviews`;
-  return `Local history deleted · ${attemptText} · ${reviewText}`;
-}
-
-function exportDataStatusMessage(data: LocalDataExport): string {
-  const attemptText = data.attempts.length === 1 ? "1 attempt" : `${data.attempts.length} attempts`;
-  const reviewText = data.reviewQueue.length === 1 ? "1 review" : `${data.reviewQueue.length} reviews`;
-  const ratingText = data.ratings.length === 1 ? "1 rating" : `${data.ratings.length} ratings`;
-  return `Export ready · ${attemptText} · ${reviewText} · ${ratingText}`;
-}
-
 function AdvancedRatingsPanel({
   onAdjust,
   ratings
@@ -6830,53 +6766,6 @@ function ratingLabelFromKey(ratingKey: string): string {
 function advancedRatingBucketLabel(label: string, ratingKey: string): string {
   const speed = ratingKey.match(/\/(\d+)\b/)?.[1];
   return speed ? `${label} · ${speed}s pace` : label;
-}
-
-function DestructiveConfirmationCard({
-  confirmLabel,
-  description,
-  onCancel,
-  onConfirm,
-  testID,
-  title
-}: {
-  confirmLabel: string;
-  description: string;
-  onCancel: () => void;
-  onConfirm: () => void;
-  testID: string;
-  title: string;
-}): React.JSX.Element {
-  return (
-    <View
-      accessibilityLabel={title}
-      testID={testID}
-      style={styles.destructiveConfirmationCard}
-    >
-      <Text style={styles.sectionLabel}>{title}</Text>
-      <Text style={styles.helperText}>{description}</Text>
-      <View style={styles.confirmationActionRow}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Cancel destructive action"
-          testID={`${testID}-cancel`}
-          style={styles.secondaryButton}
-          onPress={onCancel}
-        >
-          <Text style={styles.secondaryButtonText}>Cancel</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={confirmLabel}
-          testID={`${testID}-confirm`}
-          style={styles.destructiveButton}
-          onPress={onConfirm}
-        >
-          <Text style={styles.destructiveButtonText}>{confirmLabel}</Text>
-        </Pressable>
-      </View>
-    </View>
-  );
 }
 
 function SettingsSection({
@@ -10350,6 +10239,11 @@ const styles = StyleSheet.create({
     gap: 2,
     minWidth: 180
   },
+  confirmationActionRow: {
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "flex-end"
+  },
   advancedRatingsPanel: {
     backgroundColor: "#F8FAFC",
     borderBottomColor: "#E2E8F0",
@@ -10388,19 +10282,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
     paddingHorizontal: 2
-  },
-  destructiveConfirmationCard: {
-    backgroundColor: "#FEF2F2",
-    borderColor: "#FCA5A5",
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 8,
-    padding: 12
-  },
-  confirmationActionRow: {
-    flexDirection: "row",
-    gap: 8,
-    justifyContent: "flex-end"
   },
   packsPanel: {
     gap: 12

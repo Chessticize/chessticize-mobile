@@ -347,8 +347,9 @@ asserting through public UI and stable testIDs):
    Analysis Review, navigate, exit. *(added 2026-07-03)*
 5. Custom sprint: open setup, change timing, live target-count update, start
    session, abandon with confirmation. *(added 2026-07-03)*
-6. Settings: delete local history with confirmation and status messages.
-   *(added 2026-07-03; updated after removing the rating reset UI.)*
+6. Settings: verify iCloud Sync, notification, profile, and About rows remain
+   reachable without local-data reset/export affordances.
+   *(added 2026-07-03; updated after removing rating reset and local-data UI.)*
 7. Relaunch persistence: kill and relaunch, assert rating/history/queue intact.
    *(added 2026-07-03; strengthened to assert persisted review queue totals
    after relaunch.)*
