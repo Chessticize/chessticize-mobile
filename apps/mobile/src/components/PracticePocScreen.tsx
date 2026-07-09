@@ -287,7 +287,7 @@ function buildAdaptiveLayout({
     viewportWidth - (usesSideNavigation ? sideNavigationWidth : 0)
   );
   const sessionContentWidth = viewportWidth;
-  const usesWideContent = isCompactLandscape || contentWidth >= 860;
+  const usesWideContent = contentWidth >= 860;
   const usesSessionRail = isCompactLandscape || (isRegularWidth && isLandscape && sessionContentWidth >= 860);
   const sessionRailWidth = isRegularWidth
     ? Math.min(REGULAR_RAIL_MAX, Math.max(REGULAR_RAIL_MIN, Math.floor(sessionContentWidth * 0.3)))
@@ -1452,7 +1452,7 @@ export function PracticePocScreen({
   const screenSubtitle = tab === "practice"
     ? `Offline-ready · ${seededPuzzleCount(puzzleSource)} puzzles`
     : screenSubtitleFor(tab);
-  const practiceModeSummaries = (["standard", "arrow_duel", "blitz", "custom"] as const).map((nextMode) => {
+  const practiceModeSummaries = (["standard", "arrow_duel", "custom"] as const).map((nextMode) => {
     const config = sprintConfigFor(nextMode, customDurationSeconds, customPerPuzzleSeconds);
     return {
       mode: nextMode,
@@ -1842,8 +1842,7 @@ export function PracticePocScreen({
                 standardRating={readRating(service, defaultSprintConfig("standard").ratingKey)}
                 ratings={[
                   { label: "Standard", record: service.getRating(defaultSprintConfig("standard").ratingKey) },
-                  { label: "Arrow Duel", record: service.getRating(defaultSprintConfig("arrow_duel").ratingKey) },
-                  { label: "Blitz", record: service.getRating(defaultSprintConfig("blitz").ratingKey) }
+                  { label: "Arrow Duel", record: service.getRating(defaultSprintConfig("arrow_duel").ratingKey) }
                 ]}
                 onOpenDiagnostics={arePracticeTestControlsEnabled() ? () => setTab("analysis") : undefined}
                 onExportData={() => service.exportLocalData()}
@@ -2022,7 +2021,7 @@ function PracticeHome({
       ) : null}
 
       <View
-        style={adaptiveLayout.usesWideContent ? styles.practiceHomeColumns : null}
+        style={adaptiveLayout.usesWideContent ? styles.practiceHomeColumns : styles.practiceHomeStack}
         testID="practice-home-layout"
       >
         <View style={styles.practiceHomePrimaryColumn}>
@@ -2054,14 +2053,14 @@ function PracticeHome({
             style={styles.practiceProgressCard}
             testID="practice-progress-summary"
           >
-            <View style={styles.progressMetric}>
-              <Text style={styles.helperText}>ELO ({selected ? modeLabel(selected.mode) : "Standard"})</Text>
+            <View style={styles.progressMetric} testID="practice-progress-rating-metric">
+              <Text style={styles.progressMetricLabel}>ELO ({selected ? modeLabel(selected.mode) : "Standard"})</Text>
               <Text style={styles.progressValue}>{currentRating}</Text>
               <Text testID="practice-progress-rating-delta" style={[styles.progressDelta, ratingDeltaTone]}>{ratingDeltaLabel}</Text>
             </View>
             <View style={styles.progressDivider} />
-            <View style={styles.progressMetric}>
-              <Text style={styles.helperText}>This Week</Text>
+            <View style={styles.progressMetric} testID="practice-progress-weekly-metric">
+              <Text style={styles.progressMetricLabel}>This Week</Text>
               <Text testID="practice-progress-weekly-solved" style={styles.progressValue}>{progress.correctThisWeek}</Text>
               <Text testID="practice-progress-weekly-delta" style={[styles.progressDelta, progressTone]}>{progressDelta}</Text>
               <Text testID="practice-progress-weekly-context" style={styles.progressContextText}>{progressContext}</Text>
@@ -2076,7 +2075,7 @@ function PracticeHome({
             style={styles.practiceReviewStrip}
             onPress={onOpenReview}
           >
-            <View>
+            <View style={styles.reviewStripStatusCopy}>
               <Text style={styles.listText}>{reviewStatusLabel}</Text>
             </View>
             <View style={styles.reviewStripActionArea}>
@@ -4948,7 +4947,6 @@ function ReviewPanel({
           <FilterButton active={queueFilter === "failed"} label="Failed again" testID="review-filter-failed" onPress={() => setQueueFilter("failed")} />
           <FilterButton active={queueFilter === "mode:standard"} label="Standard" testID="review-filter-mode-standard" onPress={() => setQueueFilter("mode:standard")} />
           <FilterButton active={queueFilter === "arrow_duel"} label="Arrow Duel only" testID="review-filter-arrow-duel" onPress={() => setQueueFilter("arrow_duel")} />
-          <FilterButton active={queueFilter === "mode:blitz"} label="Blitz" testID="review-filter-mode-blitz" onPress={() => setQueueFilter("mode:blitz")} />
           {speedFilters.map((speed) => (
             <FilterButton
               key={speed}
@@ -8217,8 +8215,12 @@ const styles = StyleSheet.create({
     gap: 12
   },
   practiceHomeColumns: {
+    alignItems: "flex-start",
     flexDirection: "row",
     gap: 14
+  },
+  practiceHomeStack: {
+    gap: 18
   },
   practiceHomePrimaryColumn: {
     flex: 1.1,
@@ -8406,22 +8408,33 @@ const styles = StyleSheet.create({
     width: 28
   },
   practiceProgressCard: {
-    alignItems: "center",
+    alignItems: "flex-start",
     backgroundColor: "#FFFFFF",
     borderColor: "#E2E8F0",
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
-    minHeight: 74,
-    padding: 12
+    minHeight: 92,
+    paddingHorizontal: 14,
+    paddingVertical: 14
   },
   progressMetric: {
+    alignItems: "center",
     flex: 1,
-    gap: 2
+    gap: 4,
+    justifyContent: "flex-start",
+    minWidth: 0
+  },
+  progressMetricLabel: {
+    color: "#64748B",
+    fontSize: 12,
+    fontWeight: "800",
+    lineHeight: 15,
+    textAlign: "center"
   },
   progressDivider: {
+    alignSelf: "stretch",
     backgroundColor: "#E2E8F0",
-    height: 44,
     marginHorizontal: 12,
     width: 1
   },
@@ -8429,16 +8442,20 @@ const styles = StyleSheet.create({
     color: "#111827",
     fontSize: 22,
     fontWeight: "800",
-    lineHeight: 26
+    lineHeight: 26,
+    textAlign: "center"
   },
   progressDelta: {
     fontSize: 12,
-    fontWeight: "800"
+    fontWeight: "800",
+    lineHeight: 15,
+    textAlign: "center"
   },
   progressContextText: {
     color: "#64748B",
     fontSize: 11,
     fontWeight: "700",
+    lineHeight: 14,
     textAlign: "center"
   },
   progressDeltaPositive: {
@@ -8465,7 +8482,12 @@ const styles = StyleSheet.create({
   reviewStripActionArea: {
     alignItems: "center",
     flexDirection: "row",
+    flexShrink: 0,
     gap: 8
+  },
+  reviewStripStatusCopy: {
+    flex: 1,
+    minWidth: 0
   },
   resumeSprintCard: {
     alignItems: "center",
@@ -8505,9 +8527,9 @@ const styles = StyleSheet.create({
     gap: 10
   },
   reviewStripCounts: {
-    alignItems: "flex-end",
+    alignItems: "flex-start",
     flexDirection: "row",
-    gap: 12
+    gap: 10
   },
   reviewStripChevron: {
     alignItems: "center",
@@ -8516,23 +8538,32 @@ const styles = StyleSheet.create({
     width: 18
   },
   reviewStripMetric: {
-    alignItems: "flex-end",
-    gap: 2
+    alignItems: "center",
+    gap: 3,
+    minWidth: 58
   },
   reviewDueCount: {
     color: "#111827",
     fontSize: 17,
-    fontWeight: "800"
+    fontWeight: "800",
+    lineHeight: 21,
+    textAlign: "center",
+    width: "100%"
   },
   reviewOverdueCount: {
     color: "#DC2626",
     fontSize: 17,
-    fontWeight: "800"
+    fontWeight: "800",
+    lineHeight: 21,
+    textAlign: "center",
+    width: "100%"
   },
   reviewStripMetricLabel: {
     color: "#64748B",
     fontSize: 11,
-    fontWeight: "800"
+    fontWeight: "800",
+    lineHeight: 14,
+    textAlign: "center"
   },
   reviewQueuePanel: {
     gap: 12
@@ -8602,24 +8633,27 @@ const styles = StyleSheet.create({
     color: "#2563EB",
     fontSize: 24,
     fontWeight: "900",
-    lineHeight: 28
+    lineHeight: 28,
+    textAlign: "center"
   },
   reviewDueCountBlock: {
-    alignItems: "flex-end",
+    alignItems: "center",
     gap: 2,
     justifyContent: "center",
-    minWidth: 52
+    minWidth: 58
   },
   reviewDueOverdueCount: {
     fontSize: 12,
     fontWeight: "900",
-    lineHeight: 14
+    lineHeight: 14,
+    textAlign: "center"
   },
   reviewDueOverdueLabel: {
     color: "#64748B",
     fontSize: 9,
     fontWeight: "800",
-    lineHeight: 11
+    lineHeight: 11,
+    textAlign: "center"
   },
   reviewDueHiddenMetric: {
     fontSize: 0,

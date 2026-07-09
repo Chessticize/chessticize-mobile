@@ -5,7 +5,7 @@ This document captures the current Chessticize Mobile implementation shape and t
 ## Initial Web Reference
 
 - Main navigation includes Home, Puzzle Sprint, Game Review, and Settings. Mobile should exclude Game Review from the app scope.
-- Puzzle Sprint dashboard shows daily stats, Standard Sprint, Arrow Duel, Blitz Sprint, recent custom sprint configs, and a Custom Sprint entry.
+- Puzzle Sprint dashboard shows daily stats, Standard Sprint, Arrow Duel, recent custom sprint configs, and a Custom Sprint entry.
 - Standard Sprint session shows Abandon, success progress, timer, turn prompt, and a large chessboard.
 - Arrow Duel session shows Abandon, success progress, timer, a short instruction card, a chessboard, and two candidate arrows.
 - Custom Sprint setup includes mode, theme, duration, time per puzzle, computed puzzle count, ELO type, and previous custom configs.
@@ -44,7 +44,7 @@ Screen inventory:
 
 | Screen | Main layout | Primary actions | Navigates to |
 | --- | --- | --- | --- |
-| Practice Home | Mode list, progress summary, due review strip, bottom tabs | Start Standard, Arrow Duel, Blitz, Custom; resume interrupted session | Active Sprint, Custom Sprint, Review Queue |
+| Practice Home | Mode list, progress summary, due review strip, bottom tabs | Start Standard, Arrow Duel, Custom; resume interrupted session | Active Sprint, Custom Sprint, Review Queue |
 | Standard Sprint Active | Focused session shell, status bar, board, prompt | Make board move, abandon, complete/fail sprint | Sprint Results |
 | Arrow Duel Active | Focused shell, status bar, board, neutral candidate arrows | Choose a candidate on the board, abandon, complete/fail sprint | Sprint Results, Analysis Review |
 | Sprint Results | Win/loss status, solved count, rating change, mistakes, actions | Review mistakes, play again, done | Review Item, Practice Home |
@@ -82,7 +82,7 @@ Primary flows:
 
 | Flow | Steps | Notes |
 | --- | --- | --- |
-| Standard or Blitz practice | Practice Home -> Standard Sprint Active -> Sprint Results -> Practice Home | Board moves submit answers directly. Win by solving the target count before time/mistake failure. |
+| Standard practice | Practice Home -> Standard Sprint Active -> Sprint Results -> Practice Home | Board moves submit answers directly. Win by solving the target count before time/mistake failure. |
 | Arrow Duel practice | Practice Home -> Arrow Duel Active -> Sprint Results -> Analysis Review | Candidate arrows are neutral until selection. Win by solving the target count before time/mistake failure. |
 | Custom sprint | Practice Home -> Custom Sprint Setup -> Standard Sprint Active or Arrow Duel Active -> Sprint Results | The selected mode determines the active session shell. |
 | Due mistake review | Review Queue -> Scheduled Review Item -> Review Complete -> Review Queue | Correct answers increase interval; failures reset or shorten it. Official review attempts are recorded in History. |
@@ -233,7 +233,7 @@ Core components:
 
 - `SessionStatusBar`: mode, ELO, progress, timer, mistakes, pause/abandon affordance.
 - `ChessboardSurface`: reused board component plus highlight/arrow overlay adapter.
-- `ModePicker`: compact list or segmented choice for Standard, Arrow Duel, Blitz, Custom.
+- `ModePicker`: compact list or segmented choice for Standard, Arrow Duel, Custom.
 - `ReviewQueueHeader`: due count, overdue count, and next review estimate.
 - `HistoryFilterBar`: date-range chips, selected ELO bucket, compact filter toggle, and expandable result/source filters.
 - `RatingTrendChart`: rating-only line chart over the selected ELO bucket and time range.
@@ -280,7 +280,6 @@ Board input rules:
 Sprint scoring rules:
 
 - Standard Sprint default: 5 minutes, 20 seconds per puzzle, target 15 correct puzzles.
-- Blitz Sprint default: 5 minutes, 10 seconds per puzzle, target 30 correct puzzles.
 - Arrow Duel default: 5 minutes, 30 seconds per puzzle, target 10 correct puzzles.
 - Custom Sprint target count is `floor(durationSeconds / perPuzzleSeconds)`.
 - A sprint is won only when the target correct count is reached before time expires and before mistake failure.
@@ -398,7 +397,7 @@ Custom sprint behavior:
 ### Practice
 
 - Default entry opens Practice, not a landing page.
-- Quick choices: Standard Sprint, Arrow Duel, Blitz, Custom.
+- Quick choices: Standard Sprint, Arrow Duel, Custom.
 - Current ELO appears near each mode, but detailed rating management stays in Settings.
 - The active session should remain readable at small phone widths.
 - The active session should remain playable in compact landscape without requiring vertical scrolling of the board lane.
@@ -413,7 +412,7 @@ Custom sprint behavior:
 - Filters include due, overdue, failed again, mode, sprint speed, Arrow Duel only, and theme.
 - Scheduled Review should reuse the same board surface as Practice.
 - Scheduled Review should use the same adaptive board-slot sizing as active sprint, with review controls moving into the side/control rail in landscape and regular-width layouts.
-- Standard and Blitz review items use the original puzzle-solving flow and preserve the relevant target pace, such as a 20-second item from a 20-second sprint.
+- Standard review items use the original puzzle-solving flow and preserve the relevant target pace, such as a 20-second item from a 20-second sprint. Legacy Blitz history may still be displayed for compatibility, but Blitz is no longer a current mobile practice entry.
 - Arrow Duel review items use the Arrow Duel choice flow.
 - Correct reviews increase interval; failed reviews reset or shorten interval.
 - The original sprint mistake creates a Scheduled Review queue item but is not itself a review-time lapse. Queue items start with `lapseCount = 0`; failed Scheduled Review attempts increment lapses; successful Scheduled Review attempts reduce lapses toward zero.
@@ -463,7 +462,7 @@ Custom sprint behavior:
   Pagination affects only the visible attempt rows, never the chart inputs.
 - The rating trend chart intentionally ignores the correct/wrong result filter. That filter is for narrowing attempt rows, not for redefining the rating series.
 - Statistics are grouped separately by the selected ELO bucket for Standard,
-  Blitz, Arrow Duel, theme sprint, and custom sprint speeds.
+  legacy Blitz data, Arrow Duel, theme sprint, and custom sprint speeds.
 - Mistake statistics are also grouped separately by sprint type, speed, theme, and review state.
 
 ### Sprint Results
@@ -548,7 +547,6 @@ Required labels/test IDs:
 - `settings-tab`
 - `practice-mode-standard`
 - `practice-mode-arrow-duel`
-- `practice-mode-blitz`
 - `practice-mode-custom`
 - `session-board`
 - `session-timer`

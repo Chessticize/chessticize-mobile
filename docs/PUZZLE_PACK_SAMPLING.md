@@ -22,7 +22,7 @@ presolve fields are Chessticize-generated.
    every 200-point band in 600–2200 retains 110k–396k eligible puzzles; the
    puzzles removed are dominated by already-lost positions where an A/B duel is
    meaningless, so the filter raises Standard-sprint quality too. Every puzzle
-   becomes usable by Standard, Blitz, and Arrow Duel, and custom-sprint
+   becomes usable by Standard, legacy Blitz data, and Arrow Duel, and custom-sprint
    "Include Arrow Duel" can never hit an inventory shortage.
 2. **Install-size budget: about 700 MB, hard cap 800 MB.** Measured density:
    431 bytes/puzzle as minified JSON; plan for ~500 bytes/row in SQLite with

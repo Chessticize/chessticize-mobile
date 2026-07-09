@@ -112,11 +112,11 @@ Review queue:
    is due at `dueAt`, but it becomes overdue only when it is more than 24 hours
    past `dueAt`. The Practice badge, Review summary, Overdue filter,
    difficulty details, and queue row due labels all use that shared definition.
-8. A Standard/Blitz review timeout or unsolvable position dead-ends: the wrong
+8. A Standard or legacy Blitz review timeout or unsolvable position dead-ends: the wrong
    result is recorded but no Continue affordance appears (that exists only on
    the Arrow Duel path). Show the solution or a Continue button after a
    recorded wrong, mirroring the Arrow Duel flow.
-   Status: complete. Standard/Blitz due reviews now enter a post-wrong state
+   Status: complete. Standard and legacy Blitz due reviews now enter a post-wrong state
    after either an incorrect move or timeout: the official wrong result is
    recorded once, board puzzle gestures are disabled, Analysis remains
    available, and the same Continue affordance used by Arrow Duel advances to

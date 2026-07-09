@@ -69,7 +69,7 @@ Attempt history must preserve source type:
 
 History queries should be able to include both source types, filter by either source type, and include correct as well as wrong attempts. Analysis Review exploration is excluded from History.
 
-Scheduled review items keep puzzle-specific scheduling state. A correct scheduled review advances the interval. A failed scheduled review resets or contracts the interval and keeps the puzzle in the review cycle. Review queues may be partitioned by mode or sprint type so that Standard, Blitz, Arrow Duel, theme sprint, and custom sprint speeds do not get mixed into a single training context.
+Scheduled review items keep puzzle-specific scheduling state. A correct scheduled review advances the interval. A failed scheduled review resets or contracts the interval and keeps the puzzle in the review cycle. Review queues may be partitioned by mode or sprint type so that Standard, legacy Blitz data, Arrow Duel, theme sprint, and custom sprint speeds do not get mixed into a single training context.
 
 Opening a History row should produce an Analysis Review context with the original attempt metadata and a filtered previous/next cursor. It should not create a Scheduled Review attempt unless the user explicitly starts an official due review item.
 
