@@ -4,7 +4,8 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { MemoryStore, PracticeService, mergeLocalDataExports, syncPracticeProgress } from "../src/index.ts";
 import type { ProgressSyncSnapshot, ProgressSyncTransport } from "../src/index.ts";
-import type { Puzzle } from "../../core/src/index.ts";
+import { defaultSprintConfig } from "../../core/src/index.ts";
+import type { Puzzle, SprintState } from "../../core/src/index.ts";
 
 test("syncPracticeProgress does not touch transport while iCloud sync is disabled", async () => {
   const store = await seededMemoryStore();
@@ -81,11 +82,13 @@ test("syncPracticeProgress imports another device snapshot before uploading the 
   assert.equal(result.imported.attempts, 1);
   assert.equal(result.imported.ratings, 1);
   assert.equal(result.imported.reviewQueue, 1);
+  assert.equal(result.imported.sprintSessions, 1);
   assert.equal((localService.listHistory() as unknown[]).length, 1);
   assert.equal(localService.getRating("standard 5/20").games, 1);
   assert.equal(localService.listReviewQueue().length, 1);
   assert.equal(transport.saved.length, 1);
   assert.equal(transport.saved[0]?.data.attempts.length, 1);
+  assert.equal(transport.saved[0]?.data.sprintSessions.length, 1);
   assert.equal(transport.saved[0]?.data.settings.sync.iCloudEnabled, true);
 });
 
@@ -114,8 +117,14 @@ test("mergeLocalDataExports conservatively merges same-generation rating deltas"
     startedAt: "2026-06-20T00:00:00.000Z",
     completedAt: "2026-06-20T00:00:05.000Z",
     ratingBefore: 600,
-    ratingAfter: 700
+    ratingAfter: 1_200
   }];
+  local.sprintSessions = [completedRatingSprint({
+    id: "local-session",
+    completedAt: "2026-06-20T00:00:05.000Z",
+    ratingBefore: 600,
+    ratingAfter: 700
+  })];
 
   const remoteService = new PracticeService(await seededMemoryStore());
   enableSync(remoteService);
@@ -141,8 +150,14 @@ test("mergeLocalDataExports conservatively merges same-generation rating deltas"
     startedAt: "2026-06-21T00:00:00.000Z",
     completedAt: "2026-06-21T00:00:05.000Z",
     ratingBefore: 600,
-    ratingAfter: 550
+    ratingAfter: 100
   }];
+  remote.sprintSessions = [completedRatingSprint({
+    id: "remote-session",
+    completedAt: "2026-06-21T00:00:05.000Z",
+    ratingBefore: 600,
+    ratingAfter: 550
+  })];
 
   const merged = mergeLocalDataExports(local, remote);
   const rating = merged.ratings.find((record) => record.key === "standard 5/20");
@@ -152,6 +167,78 @@ test("mergeLocalDataExports conservatively merges same-generation rating deltas"
   assert.equal(rating?.ratingDeviation, 90);
   assert.equal(rating?.volatility, 0.07);
   assert.deepEqual(merged.attempts.map((attempt) => attempt.id).sort(), ["local-win", "remote-loss"]);
+});
+
+test("mergeLocalDataExports repairs inflated ratings and stays idempotent", async () => {
+  const localService = new PracticeService(await seededMemoryStore());
+  const local = localService.exportLocalData();
+  local.ratings = [{
+    key: "standard 5/20",
+    generation: 0,
+    rating: 1_450,
+    ratingDeviation: 70,
+    volatility: 0.05,
+    games: 2
+  }];
+  local.sprintSessions = [
+    completedRatingSprint({
+      id: "local-win",
+      completedAt: "2026-06-20T00:00:05.000Z",
+      ratingBefore: 600,
+      ratingAfter: 700
+    }),
+    completedRatingSprint({
+      id: "remote-loss",
+      completedAt: "2026-06-21T00:00:05.000Z",
+      ratingBefore: 600,
+      ratingAfter: 550
+    })
+  ];
+
+  const remote = structuredClone(local);
+  remote.ratings[0] = {
+    ...remote.ratings[0]!,
+    rating: 1_300,
+    ratingDeviation: 90,
+    volatility: 0.07
+  };
+
+  const merged = mergeLocalDataExports(local, remote);
+  const mergedAgain = mergeLocalDataExports(merged, merged);
+
+  assert.equal(merged.ratings[0]?.rating, 650);
+  assert.equal(merged.ratings[0]?.games, 2);
+  assert.equal(mergedAgain.ratings[0]?.rating, 650);
+  assert.equal(mergedAgain.ratings[0]?.games, 2);
+});
+
+test("PracticeService repairs a persisted rating from completed sprint sessions", async () => {
+  const store = await seededMemoryStore();
+  store.saveRating({
+    key: "standard 5/20",
+    generation: 0,
+    rating: 1_450,
+    ratingDeviation: 70,
+    volatility: 0.05,
+    games: 2
+  });
+  store.createSprintSession(completedSprintState({
+    id: "local-win",
+    completedAt: "2026-06-20T00:00:05.000Z",
+    ratingBefore: 600,
+    ratingAfter: 700
+  }));
+  store.createSprintSession(completedSprintState({
+    id: "remote-loss",
+    completedAt: "2026-06-21T00:00:05.000Z",
+    ratingBefore: 600,
+    ratingAfter: 550
+  }));
+
+  const service = new PracticeService(store);
+
+  assert.equal(service.getRating("standard 5/20").rating, 650);
+  assert.equal(service.getRating("standard 5/20").games, 2);
 });
 
 test("mergeLocalDataExports does not apply old deltas across rating reset generations", async () => {
@@ -200,6 +287,36 @@ test("mergeLocalDataExports does not apply old deltas across rating reset genera
   assert.equal(rating?.generation, 1);
   assert.equal(rating?.rating, 600);
   assert.equal(rating?.games, 0);
+});
+
+test("mergeLocalDataExports keeps a manual ELO anchor ahead of an older device generation", async () => {
+  const oldDeviceService = new PracticeService(await seededMemoryStore());
+  const oldDevice = oldDeviceService.exportLocalData();
+  oldDevice.ratings = [{
+    key: "standard 5/20",
+    generation: 0,
+    rating: 700,
+    ratingDeviation: 70,
+    volatility: 0.05,
+    games: 1
+  }];
+  oldDevice.sprintSessions = [completedRatingSprint({
+    id: "old-device-win",
+    completedAt: "2026-06-20T00:00:05.000Z",
+    ratingBefore: 600,
+    ratingAfter: 700
+  })];
+
+  const editedDeviceService = new PracticeService(await seededMemoryStore());
+  editedDeviceService.setRating("standard 5/20", 900);
+  const editedDevice = editedDeviceService.exportLocalData();
+  const merged = mergeLocalDataExports(oldDevice, editedDevice);
+  const rating = merged.ratings.find((record) => record.key === "standard 5/20");
+
+  assert.equal(rating?.generation, 1);
+  assert.equal(rating?.rating, 900);
+  assert.equal(rating?.games, 0);
+  assert.equal(rating?.ratingDeviation, 100);
 });
 
 class RecordingTransport implements ProgressSyncTransport {
@@ -257,4 +374,60 @@ function recordWrongStandardAttempt(service: PracticeService): void {
 async function loadFixturePuzzles(): Promise<Puzzle[]> {
   const contents = await readFile(resolve("fixtures/puzzles/presolved-sample.json"), "utf8");
   return JSON.parse(contents) as Puzzle[];
+}
+
+function completedRatingSprint({
+  id,
+  completedAt,
+  ratingBefore,
+  ratingAfter
+}: {
+  id: string;
+  completedAt: string;
+  ratingBefore: number;
+  ratingAfter: number;
+}) {
+  return {
+    id,
+    mode: "standard" as const,
+    ratingKey: "standard 5/20",
+    startedAt: completedAt,
+    completedAt,
+    status: "won" as const,
+    correctCount: 1,
+    mistakeCount: 0,
+    ratingBefore,
+    ratingAfter
+  };
+}
+
+function completedSprintState({
+  id,
+  completedAt,
+  ratingBefore,
+  ratingAfter
+}: {
+  id: string;
+  completedAt: string;
+  ratingBefore: number;
+  ratingAfter: number;
+}): SprintState {
+  return {
+    id,
+    config: defaultSprintConfig("standard"),
+    status: "won",
+    startedAt: completedAt,
+    deadlineAt: completedAt,
+    completedAt,
+    endReason: "target_reached",
+    correctCount: 1,
+    mistakeCount: 0,
+    currentStreak: 1,
+    bestStreak: 1,
+    hasUserSubmittedMove: true,
+    currentPuzzleIndex: 1,
+    puzzles: [],
+    ratingBefore,
+    ratingAfter
+  };
 }

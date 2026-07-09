@@ -91,6 +91,7 @@ export interface PracticeStore {
   updateSprintSession(state: SprintState): void;
   recordAttempt(attempt: AttemptEvent): void;
   listAttempts(filter?: HistoryFilter): AttemptHistoryRow[];
+  listSprintSessions(): ExportedSprintSession[];
   exportLocalData(): LocalDataExport;
   importLocalData(data: LocalDataExport): LocalDataImportResult;
   clearLocalHistory(): ClearLocalHistoryResult;

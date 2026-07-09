@@ -621,9 +621,79 @@ test("PracticeService exposes the current rating for the selected sprint run", a
     const adjusted = service.setRating("standard 5/20", 725);
     assert.equal(adjusted.rating, 725);
     assert.equal(adjusted.generation, 2);
+    assert.equal(adjusted.games, 0);
+    assert.equal(adjusted.ratingDeviation, 100);
     assert.equal(service.getRating("standard 5/20").rating, 725);
     assert.throws(() => service.setRating("standard 5/20", 599), /at least 600/);
     assert.throws(() => service.setRating("standard 5/20", 700.5), /integer/);
+  } finally {
+    store.close();
+  }
+});
+
+test("PracticeService repairs an inflated SQLite rating from completed sprint history", async () => {
+  const store = await seededStore();
+  let service = new PracticeService(store);
+  try {
+    service.startSprint(
+      {
+        mode: "standard",
+        durationSeconds: 300,
+        perPuzzleSeconds: 20,
+        targetCorrect: 1,
+        maxMistakes: 3,
+        theme: "hangingPiece"
+      },
+      "2026-06-20T00:00:00.000Z"
+    );
+    service.submitMove("e6e7", "2026-06-20T00:00:05.000Z");
+    service.submitMove("b3c1", "2026-06-20T00:00:10.000Z");
+    service.submitMove("h6c1", "2026-06-20T00:00:15.000Z");
+    const ratingKey = "hangingPiece standard 5/20";
+    const completedRating = service.getRating(ratingKey);
+    store.saveRating({
+      ...completedRating,
+      rating: completedRating.rating + 600
+    });
+
+    service = new PracticeService(store);
+
+    assert.equal(service.getRating(ratingKey).rating, completedRating.rating);
+    assert.equal(service.getRating(ratingKey).games, completedRating.games);
+  } finally {
+    store.close();
+  }
+});
+
+test("PracticeService preserves a manually anchored SQLite rating across restart", async () => {
+  const store = await seededStore();
+  let service = new PracticeService(store);
+  try {
+    service.startSprint(
+      {
+        mode: "standard",
+        durationSeconds: 300,
+        perPuzzleSeconds: 20,
+        targetCorrect: 1,
+        maxMistakes: 3,
+        theme: "hangingPiece"
+      },
+      "2026-06-20T00:00:00.000Z"
+    );
+    service.submitMove("e6e7", "2026-06-20T00:00:05.000Z");
+    service.submitMove("b3c1", "2026-06-20T00:00:10.000Z");
+    service.submitMove("h6c1", "2026-06-20T00:00:15.000Z");
+    const ratingKey = "hangingPiece standard 5/20";
+    const volatility = service.getRating(ratingKey).volatility;
+
+    const adjusted = service.setRating(ratingKey, 900);
+
+    assert.equal(adjusted.games, 0);
+    assert.equal(adjusted.ratingDeviation, 100);
+    assert.equal(adjusted.volatility, volatility);
+    service = new PracticeService(store);
+    assert.equal(service.getRating(ratingKey).rating, 900);
+    assert.equal(service.getRating(ratingKey).games, 0);
   } finally {
     store.close();
   }

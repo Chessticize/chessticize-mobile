@@ -1,6 +1,6 @@
-import { normalizeRatingRecord } from "../../core/src/index.ts";
 import type { RatingRecord, ReviewQueueState } from "../../core/src/index.ts";
 import { clonePracticeSettings } from "./practice-settings.ts";
+import { mergeRatingWithSprintSessions, reconcileRatingWithSprintSessions } from "./rating-history.ts";
 import type { AttemptHistoryRow } from "./query-types.ts";
 import type {
   ExportedSprintSession,
@@ -87,17 +87,26 @@ export function mergeLocalDataExports(local: LocalDataExport, remote: LocalDataE
     attempts.set(attempt.id, previous ? preferredAttempt(previous, attempt) : cloneAttempt(attempt));
   }
 
+  const sprintSessions = new Map<string, ExportedSprintSession>();
+  for (const session of local.sprintSessions) {
+    sprintSessions.set(session.id, { ...session });
+  }
+  for (const session of remote.sprintSessions) {
+    const previous = sprintSessions.get(session.id);
+    sprintSessions.set(session.id, previous ? preferredSprintSession(previous, session) : { ...session });
+  }
+
   const ratings = new Map<string, RatingRecord>();
   for (const rating of local.ratings) {
-    ratings.set(rating.key, normalizeRatingRecord(rating));
+    ratings.set(rating.key, reconcileRatingWithSprintSessions(rating, local.sprintSessions));
   }
   for (const rating of remote.ratings) {
     const previous = ratings.get(rating.key);
     ratings.set(
       rating.key,
       previous
-        ? mergeRatingWithAttemptDeltas(previous, rating, local.attempts, remote.attempts)
-        : normalizeRatingRecord(rating)
+        ? mergeRatingWithSprintSessions(previous, rating, local.sprintSessions, remote.sprintSessions)
+        : reconcileRatingWithSprintSessions(rating, remote.sprintSessions)
     );
   }
 
@@ -108,15 +117,6 @@ export function mergeLocalDataExports(local: LocalDataExport, remote: LocalDataE
   for (const review of remote.reviewQueue) {
     const key = reviewQueueKey(review);
     reviewQueue.set(key, preferredReviewQueue(reviewQueue.get(key), review));
-  }
-
-  const sprintSessions = new Map<string, ExportedSprintSession>();
-  for (const session of local.sprintSessions) {
-    sprintSessions.set(session.id, { ...session });
-  }
-  for (const session of remote.sprintSessions) {
-    const previous = sprintSessions.get(session.id);
-    sprintSessions.set(session.id, previous ? preferredSprintSession(previous, session) : { ...session });
   }
 
   return {
@@ -136,58 +136,6 @@ function emptyImportResult(): LocalDataImportResult {
     reviewQueue: 0,
     sprintSessions: 0
   };
-}
-
-function mergeRatingWithAttemptDeltas(
-  local: RatingRecord,
-  incoming: RatingRecord,
-  localAttempts: AttemptHistoryRow[],
-  incomingAttempts: AttemptHistoryRow[]
-): RatingRecord {
-  const normalizedLocal = normalizeRatingRecord(local);
-  const normalizedIncoming = normalizeRatingRecord(incoming);
-  if (normalizedIncoming.generation !== normalizedLocal.generation) {
-    return normalizedIncoming.generation > normalizedLocal.generation ? normalizedIncoming : normalizedLocal;
-  }
-
-  const incomingIsBase = normalizedIncoming.games >= normalizedLocal.games;
-  const base = incomingIsBase ? normalizedIncoming : normalizedLocal;
-  const baseAttempts = incomingIsBase ? incomingAttempts : localAttempts;
-  const additionalAttempts = incomingIsBase ? localAttempts : incomingAttempts;
-  const additional = ratingDeltaFromMissingAttempts(base.key, baseAttempts, additionalAttempts);
-  const ratingDeviation = Math.max(
-    normalizedLocal.ratingDeviation ?? 0,
-    normalizedIncoming.ratingDeviation ?? 0
-  );
-
-  return {
-    ...base,
-    rating: base.rating + additional.delta,
-    ratingDeviation,
-    games: base.games + additional.games
-  };
-}
-
-function ratingDeltaFromMissingAttempts(
-  ratingKey: string,
-  baseAttempts: AttemptHistoryRow[],
-  additionalAttempts: AttemptHistoryRow[]
-): { delta: number; games: number } {
-  const baseIds = new Set(
-    baseAttempts
-      .filter((attempt) => attempt.ratingKey === ratingKey && attempt.ratingAfter !== undefined)
-      .map((attempt) => attempt.id)
-  );
-  let delta = 0;
-  let games = 0;
-  for (const attempt of additionalAttempts) {
-    if (attempt.ratingKey !== ratingKey || attempt.ratingAfter === undefined || baseIds.has(attempt.id)) {
-      continue;
-    }
-    delta += attempt.ratingAfter - attempt.ratingBefore;
-    games += 1;
-  }
-  return { delta, games };
 }
 
 function preferredAttempt(local: AttemptHistoryRow, incoming: AttemptHistoryRow): AttemptHistoryRow {

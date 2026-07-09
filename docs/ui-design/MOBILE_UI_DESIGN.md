@@ -9,8 +9,7 @@ This document captures the current Chessticize Mobile implementation shape and t
 - Standard Sprint session shows Abandon, success progress, timer, turn prompt, and a large chessboard.
 - Arrow Duel session shows Abandon, success progress, timer, a short instruction card, a chessboard, and two candidate arrows.
 - Custom Sprint setup includes mode, theme, duration, time per puzzle, editable
-  initial ELO for unplayed buckets, computed puzzle count, and previous custom
-  configs.
+  ELO, computed puzzle count, and previous custom configs.
 - Settings includes chess platform connections and ELO editing. Mobile v1 should keep advanced rating management but not prioritize chess.com or Lichess account import.
 
 ### Current UI Issues To Avoid
@@ -52,7 +51,7 @@ Screen inventory:
 | Review Queue | Due/overdue summary, difficulty groups, start button | Start due review, filter queue | Review Item |
 | Analysis Review | Board, compact toolbar, Stockfish status, candidate line rows, guided arrows when applicable | Reset, flip, analyze, navigate, finish review | Review Complete, History |
 | History | All-puzzle attempt list, top-level rating bucket chips, range filters, conditional rating trend, expandable row filters | Filter wrong-only/source rows, inspect attempt context, open attempt | Attempt Detail, Review Item |
-| Custom Sprint Setup | Mode/theme/timing controls, initial ELO for unplayed buckets, estimate, start | Start sprint, save template | Active Sprint |
+| Custom Sprint Setup | Mode/theme/timing controls, editable ELO, estimate, start | Start sprint, save template | Active Sprint |
 | Settings | iCloud Sync, notifications, profile, about, puzzle-data source notes | Toggle sync, adjust reminders, inspect licenses and support contact | External license/source/data/support links |
 
 ## Mobile Information Architecture
@@ -295,6 +294,10 @@ Sprint scoring rules:
 - Failing a sprint lowers that sprint ELO type.
 - Abandoning after the first submitted move, whether that move was correct or wrong, is a failed rated run and lowers that sprint ELO type. Abandoning before any submitted move remains an unrated cancel.
 - Each sprint mode and custom speed has its own ELO/statistics bucket.
+- A manual ELO edit starts a new rating generation, clears the rated-game count,
+  caps rating deviation at 100 without increasing an already lower value, and
+  preserves volatility. This treats the chosen ELO as a deliberate difficulty
+  anchor while allowing later sprints to recalibrate it.
 
 Practice controls:
 
@@ -380,7 +383,7 @@ Custom sprint layout:
 
 - Use a focused setup screen or bottom sheet rather than a desktop-style page.
 - Keep mode, theme, duration, and per-puzzle time as compact controls.
-- Show computed puzzle count and initial ELO as a live summary.
+- Show computed puzzle count and ELO as a live summary.
 - Show previous configs below the setup area as compact reusable rows.
 
 Custom sprint controls:
@@ -389,8 +392,10 @@ Custom sprint controls:
 - Theme: Mixed plus supported tactical themes.
 - Duration: use allowed sprint durations from the domain config.
 - Per-puzzle time: use allowed per-puzzle times from the domain config.
-- Initial ELO: default to 600 for unplayed custom buckets and allow adjustment
-  before the first rated run in that bucket.
+- ELO: default to 600 for unplayed custom buckets. Show the `Initial ELO`
+  stepper directly before play. After play, replace it with a collapsed
+  `Edit ELO` disclosure row so changing an established rating remains possible
+  but is not presented as a routine action.
 - Max mistakes: default from domain config; do not expose in the current Custom
   Sprint setup.
 - Summary: target puzzle count only; avoid repeating mode, rating range, current
@@ -401,8 +406,8 @@ Custom sprint behavior:
 
 - Changing any control updates the summary immediately.
 - Start button is disabled only when the config is invalid or no eligible puzzles exist locally.
-- Once a custom bucket has rated games, its ELO is locked in setup and cannot be
-  changed from the Custom Sprint screen.
+- Once a custom bucket has rated games, its ELO remains editable from the Custom
+  Sprint screen only after opening the `Edit ELO` disclosure.
 - If the selected puzzle pack lacks enough eligible puzzles, show a local pack
   warning and offer a broader theme.
 
@@ -500,7 +505,8 @@ Custom sprint behavior:
   and current account/sync status, and exposes a manual Sync Now action while
   sync is enabled.
 - On regular-width iPad, Settings should use grouped navigation plus a detail panel; do not make each settings row stretch across the full display.
-- Advanced manual ELO adjustment should be hidden behind an "Advanced ratings" affordance.
+- ELO difficulty controls should be hidden behind an `Edit ELO` row to keep the
+  default Settings surface compact.
 - Settings must not expose incomplete local data actions. Do not show local
   storage copy, export, local-history deletion, or rating-reset rows unless a
   complete user-facing workflow is implemented.
@@ -620,6 +626,5 @@ Accessibility rules:
 
 ## Open Design Questions
 
-- Whether advanced manual ELO editing should ship in v1 or stay internal-only.
 - Whether custom max mistakes is part of v1 custom sprint or should remain fixed by scoring mode.
 - Whether regular-width iPad navigation should always show text labels or collapse to icon-only in smaller split-view widths.

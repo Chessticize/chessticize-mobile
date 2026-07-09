@@ -16,6 +16,7 @@ import type {
 import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./query-types.ts";
 import type {
   ClearLocalHistoryResult,
+  ExportedSprintSession,
   LocalDataImportResult,
   LocalDataExport,
   PracticeSettings,
@@ -119,6 +120,10 @@ export class PackBackedPracticeStore implements PracticeStore {
 
   listAttempts(filter?: HistoryFilter): AttemptHistoryRow[] {
     return this.userStore.listAttempts(filter);
+  }
+
+  listSprintSessions(): ExportedSprintSession[] {
+    return this.userStore.listSprintSessions();
   }
 
   exportLocalData(): LocalDataExport {
