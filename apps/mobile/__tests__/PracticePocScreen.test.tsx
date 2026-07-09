@@ -123,6 +123,54 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "practice-action-header"))).toBe("Start a Sprint");
   });
 
+  it("scopes the home progress summary to the selected rating bucket", () => {
+    const store = new MemoryStore();
+    store.seedPuzzles([sharedHistoryPuzzle()]);
+    store.saveRating({ key: "standard 5/20", generation: 0, rating: 700, games: 1 });
+    store.saveRating({ key: "arrow duel 5/30", generation: 0, rating: 900, games: 1 });
+    store.recordAttempt({
+      id: "standard-win",
+      source: "sprint",
+      sessionId: "session-standard-win",
+      puzzleId: "shared-history",
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      result: "correct",
+      submittedMove: "e2e4",
+      expectedMove: "e2e4",
+      startedAt: "2026-07-07T00:00:00.000Z",
+      completedAt: "2026-07-07T00:00:05.000Z",
+      ratingBefore: 600,
+      ratingAfter: 700
+    });
+    store.recordAttempt({
+      id: "arrow-win",
+      source: "sprint",
+      sessionId: "session-arrow-win",
+      puzzleId: "shared-history",
+      mode: "arrow_duel",
+      ratingKey: "arrow duel 5/30",
+      result: "correct",
+      submittedMove: "e2e4",
+      expectedMove: "e2e4",
+      startedAt: "2026-07-07T00:01:00.000Z",
+      completedAt: "2026-07-07T00:01:05.000Z",
+      ratingBefore: 600,
+      ratingAfter: 900
+    });
+
+    const renderer = renderScreen({
+      currentTimeMs: () => Date.parse("2026-07-08T12:00:00.000Z"),
+      practiceService: new PracticeService(store)
+    });
+
+    expect(collectText(findByTestId(renderer, "practice-progress-rating-metric"))).toContain("700");
+    expect(collectText(findByTestId(renderer, "practice-progress-rating-delta"))).toBe("+100 this week");
+    expect(collectText(findByTestId(renderer, "practice-progress-weekly-solved"))).toBe("1");
+    expect(collectText(findByTestId(renderer, "practice-progress-weekly-delta"))).toBe("+1 net");
+    expect(collectText(findByTestId(renderer, "practice-progress-weekly-context"))).toBe("100% accuracy · 0 mistakes");
+  });
+
   it("does not scan the bundled Core Pack when rendering custom sprint availability", () => {
     const service = createMobilePracticeService("random1000");
     const countEligible = jest.spyOn(service, "countEligibleSprintPuzzles");

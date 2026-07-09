@@ -1465,7 +1465,7 @@ export function PracticePocScreen({
       rating: readRating(service, config.ratingKey)
     };
   });
-  const practiceProgress = buildPracticeProgressSummary(attempts, nowMs);
+  const practiceProgress = buildPracticeProgressSummary(attempts, nowMs, selectedConfig.ratingKey);
   const dueTodayCount = dueReviewItems.length;
   const overdueCount = dueReviewItems.filter((item) => isReviewOverdue(item.review, nowMs)).length;
   const customThemeValue = themeForCustomSprint(customTheme);
@@ -1921,13 +1921,20 @@ type PracticeProgressSummary = {
   netThisWeek: number;
 };
 
-function buildPracticeProgressSummary(attempts: AttemptEvent[], nowMs: number): PracticeProgressSummary {
+function buildPracticeProgressSummary(
+  attempts: AttemptEvent[],
+  nowMs: number,
+  ratingKey: string
+): PracticeProgressSummary {
   const weekStartMs = nowMs - 7 * 24 * 60 * 60 * 1000;
   let correctThisWeek = 0;
   let ratingDeltaThisWeek = 0;
   let ratingChangeCount = 0;
   let wrongThisWeek = 0;
   for (const attempt of attempts) {
+    if (attempt.ratingKey !== ratingKey) {
+      continue;
+    }
     const completedMs = new Date(attempt.completedAt).getTime();
     if (!Number.isFinite(completedMs) || completedMs < weekStartMs || completedMs > nowMs) {
       continue;
