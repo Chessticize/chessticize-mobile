@@ -20,6 +20,11 @@ module.exports = {
   LogBox: {
     ignoreAllLogs() {}
   },
+  Linking: {
+    openURL() {
+      return Promise.resolve();
+    }
+  },
   AppState: {
     addEventListener(eventName, listener) {
       if (eventName !== 'change') {

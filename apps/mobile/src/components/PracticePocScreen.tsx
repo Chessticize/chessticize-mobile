@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   AppState,
+  Linking,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -240,6 +241,7 @@ const BOARD_FILES_FLIPPED = ["h", "g", "f", "e", "d", "c", "b", "a"] as const;
 const BOARD_RANKS = ["8", "7", "6", "5", "4", "3", "2", "1"] as const;
 const BOARD_RANKS_FLIPPED = ["1", "2", "3", "4", "5", "6", "7", "8"] as const;
 const CHESS_PIECE_SPRITE = require("../assets/chess-pieces-sprite.png") as ImageSourcePropType;
+const SOURCE_REPOSITORY_URL = "https://github.com/Chessticize/chessticize-mobile";
 const ANALYSIS_DIAGNOSTIC_POSITIONS = [
   {
     id: "queen-capture",
@@ -278,7 +280,7 @@ function buildAdaptiveLayout({
   const usesSideNavigation = isCompactLandscape || isRegularWidth;
   const sideNavigationExpanded = usesSideNavigation && viewportWidth >= 960;
   const sideNavigationWidth = isRegularWidth
-    ? sideNavigationExpanded ? 136 : 76
+    ? sideNavigationExpanded ? 168 : 76
     : 64;
   const contentWidth = Math.max(
     MIN_BOARD,
@@ -4161,7 +4163,7 @@ function HistoryAttemptRow({
   puzzleStats?: HistoryPuzzleStats;
 }): React.JSX.Element {
   const isWrong = attempt.result === "wrong";
-  const delta = (attempt.ratingAfter ?? attempt.ratingBefore) - attempt.ratingBefore;
+  const delta = attempt.ratingAfter === undefined ? null : attempt.ratingAfter - attempt.ratingBefore;
   const completedAtMs = new Date(attempt.completedAt).getTime();
   const elapsedSeconds = Math.max(0, Math.round((completedAtMs - new Date(attempt.startedAt).getTime()) / 1000));
   const dateLabel = `${historyAttemptRecencyLabel(completedAtMs)} · ${formatLocalCalendarDate(attempt.completedAt)}`;
@@ -4226,9 +4228,11 @@ function HistoryAttemptRow({
             >
               {difficultyLabel(difficulty)}
             </Text>
-            <Text testID={`history-attempt-${attempt.id}-delta`} style={[styles.historyRatingDelta, delta < 0 ? styles.errorText : styles.positive]}>
-              {delta >= 0 ? "+" : ""}{delta}
-            </Text>
+            {delta === null ? null : (
+              <Text testID={`history-attempt-${attempt.id}-delta`} style={[styles.historyRatingDelta, delta < 0 ? styles.errorText : styles.positive]}>
+                {delta >= 0 ? "+" : ""}{delta}
+              </Text>
+            )}
           </View>
           <Text
             testID={`history-attempt-${attempt.id}-review-state`}
@@ -6535,6 +6539,20 @@ function SettingsPanel({
           testID="settings-reset-elo"
           onPress={() => setConfirmation("reset-elo")}
         />
+        {confirmation === "reset-elo" ? (
+          <DestructiveConfirmationCard
+            confirmLabel="Reset ELO"
+            description="This resets only the Standard puzzle rating bucket. Puzzle history and review schedules stay intact."
+            testID="settings-reset-elo-confirmation"
+            title="Reset Standard puzzle ELO?"
+            onCancel={() => setConfirmation(null)}
+            onConfirm={() => {
+              onResetRating();
+              setConfirmation(null);
+              setStatusMessage("ELO reset");
+            }}
+          />
+        ) : null}
         {advancedRatingsOpen ? (
           <AdvancedRatingsPanel
             ratings={ratings}
@@ -6552,11 +6570,15 @@ function SettingsPanel({
           value="1.0.0"
           testID="settings-app-version"
         />
-        <SettingsRow
+        <SettingsExternalLinkRow
           label="License & Source"
           value="GPL-3.0-or-later"
-          detail="Stockfish 18 embedded. Public source: github.com/Chessticize/chessticize-mobile"
+          detail="Stockfish 18 embedded."
+          linkLabel="github.com/Chessticize/chessticize-mobile"
           testID="settings-license"
+          onPress={() => {
+            void Linking.openURL(SOURCE_REPOSITORY_URL);
+          }}
         />
         <SettingsRow
           label="Puzzle Data"
@@ -6567,20 +6589,6 @@ function SettingsPanel({
       </SettingsSection>
 
       {statusMessage ? <Text style={styles.settingsStatusText} testID="settings-status-message">{statusMessage}</Text> : null}
-      {confirmation === "reset-elo" ? (
-        <DestructiveConfirmationCard
-          confirmLabel="Reset ELO"
-          description="This resets only the Standard puzzle rating bucket. Puzzle history and review schedules stay intact."
-          testID="settings-reset-elo-confirmation"
-          title="Reset Standard puzzle ELO?"
-          onCancel={() => setConfirmation(null)}
-          onConfirm={() => {
-            onResetRating();
-            setConfirmation(null);
-            setStatusMessage("ELO reset");
-          }}
-        />
-      ) : null}
       {confirmation === "delete-history" ? (
         <DestructiveConfirmationCard
           confirmLabel="Delete History"
@@ -6956,6 +6964,44 @@ function SettingsRow({
       <View style={styles.settingsRowMeta}>
         {value ? <Text style={styles.settingsRowValue}>{value}</Text> : null}
         {onPress ? <ChevronGlyph direction="right" /> : null}
+      </View>
+    </Pressable>
+  );
+}
+
+function SettingsExternalLinkRow({
+  detail,
+  label,
+  linkLabel,
+  onPress,
+  testID,
+  value
+}: {
+  detail: string;
+  label: string;
+  linkLabel: string;
+  onPress: () => void;
+  testID: string;
+  value: string;
+}): React.JSX.Element {
+  const accessibilityLabel = [label, value, detail, linkLabel].join(", ");
+  return (
+    <Pressable
+      accessible
+      accessibilityRole="link"
+      accessibilityLabel={accessibilityLabel}
+      testID={testID}
+      style={styles.settingsRow}
+      onPress={onPress}
+    >
+      <View style={styles.settingsRowCopy}>
+        <Text style={styles.listText}>{label}</Text>
+        <Text style={styles.helperText}>{detail}</Text>
+        <Text style={styles.settingsLinkText}>{linkLabel}</Text>
+      </View>
+      <View style={styles.settingsRowMeta}>
+        <Text style={styles.settingsRowValue}>{value}</Text>
+        <ChevronGlyph direction="right" />
       </View>
     </Pressable>
   );
@@ -7989,10 +8035,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderRightColor: "#E2E8F0",
     borderRightWidth: StyleSheet.hairlineWidth,
-    gap: 6,
+    gap: 8,
     justifyContent: "center",
-    paddingHorizontal: 8,
-    paddingVertical: 12
+    paddingHorizontal: 12,
+    paddingVertical: 16
   },
   tabButton: {
     alignItems: "center",
@@ -8013,10 +8059,10 @@ const styles = StyleSheet.create({
   tabButtonRailExpanded: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 10,
+    gap: 12,
     justifyContent: "flex-start",
-    minHeight: 46,
-    paddingHorizontal: 10
+    minHeight: 50,
+    paddingHorizontal: 12
   },
   tabButtonActive: {
     backgroundColor: "transparent"
@@ -10216,6 +10262,12 @@ const styles = StyleSheet.create({
     color: "#64748B",
     fontSize: 12,
     fontWeight: "800"
+  },
+  settingsLinkText: {
+    color: "#2563EB",
+    fontSize: 12,
+    fontWeight: "800",
+    lineHeight: 16
   },
   settingsInlineControls: {
     borderBottomColor: "#E2E8F0",

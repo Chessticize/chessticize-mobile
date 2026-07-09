@@ -136,14 +136,14 @@ describe("PracticePocScreen", () => {
   });
 
   it.each([
-    { label: "iPhone SE-sized portrait", width: 320, height: 568, scale: 2, layout: "compactPortrait", boardSize: 288, sideRail: false, sessionRail: false, homeColumns: false },
-    { label: "modern iPhone portrait", width: 430, height: 932, scale: 3, layout: "compactPortrait", boardSize: 398, sideRail: false, sessionRail: false, homeColumns: false },
-    { label: "compact iPhone landscape", width: 844, height: 390, scale: 3, layout: "compactLandscape", boardSize: 358, sideRail: true, sessionRail: true, homeColumns: true },
-    { label: "iPad A16 portrait", width: 820, height: 1180, scale: 2, layout: "regularPortrait", boardSize: 788, sideRail: true, sessionRail: false, homeColumns: false },
-    { label: "iPad Pro portrait", width: 1032, height: 1376, scale: 2, layout: "regularPortrait", boardSize: 860, sideRail: true, sessionRail: false, homeColumns: true },
-    { label: "iPad landscape", width: 1180, height: 820, scale: 2, layout: "regularLandscape", boardSize: 640, sideRail: true, sessionRail: true, homeColumns: true },
-    { label: "iPad split-width portrait", width: 694, height: 1024, scale: 2, layout: "compactPortrait", boardSize: 560, sideRail: false, sessionRail: false, homeColumns: false }
-  ])("renders the core practice surfaces in a %s viewport", ({ width, height, scale, layout, boardSize, sideRail, sessionRail, homeColumns }) => {
+    { label: "iPhone SE-sized portrait", width: 320, height: 568, scale: 2, layout: "compactPortrait", boardSize: 288, sideRail: false, railWidth: null, sessionRail: false, homeColumns: false },
+    { label: "modern iPhone portrait", width: 430, height: 932, scale: 3, layout: "compactPortrait", boardSize: 398, sideRail: false, railWidth: null, sessionRail: false, homeColumns: false },
+    { label: "compact iPhone landscape", width: 844, height: 390, scale: 3, layout: "compactLandscape", boardSize: 358, sideRail: true, railWidth: 64, sessionRail: true, homeColumns: true },
+    { label: "iPad A16 portrait", width: 820, height: 1180, scale: 2, layout: "regularPortrait", boardSize: 788, sideRail: true, railWidth: 76, sessionRail: false, homeColumns: false },
+    { label: "iPad Pro portrait", width: 1032, height: 1376, scale: 2, layout: "regularPortrait", boardSize: 860, sideRail: true, railWidth: 168, sessionRail: false, homeColumns: true },
+    { label: "iPad landscape", width: 1180, height: 820, scale: 2, layout: "regularLandscape", boardSize: 640, sideRail: true, railWidth: 168, sessionRail: true, homeColumns: true },
+    { label: "iPad split-width portrait", width: 694, height: 1024, scale: 2, layout: "compactPortrait", boardSize: 560, sideRail: false, railWidth: null, sessionRail: false, homeColumns: false }
+  ])("renders the core practice surfaces in a %s viewport", ({ width, height, scale, layout, boardSize, sideRail, railWidth, sessionRail, homeColumns }) => {
     (ReactNative as unknown as {
       __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
     }).__setWindowDimensions?.({ width, height, scale, fontScale: scale });
@@ -157,7 +157,9 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "practice-tab")).toBeTruthy();
     expect(findByTestId(renderer, "settings-tab")).toBeTruthy();
     if (sideRail) {
-      expect(findByTestId(renderer, "navigation-rail")).toBeTruthy();
+      const rail = findByTestId(renderer, "navigation-rail");
+      expect(rail).toBeTruthy();
+      expect(flattenTestStyle(rail.props.style).width).toBe(railWidth);
     } else {
       expect(() => findByTestId(renderer, "navigation-rail")).toThrow();
     }
@@ -1293,7 +1295,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-status-summary`))).toContain("Hard");
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-difficulty`))).toBe("Hard");
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-review-state`))).toContain("Review");
-    expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-delta`))).toMatch(/^[+-]\d+$/);
+    expect(() => findByTestId(renderer, `history-attempt-${historyAttemptId}-delta`)).toThrow();
     press(renderer, historyAttemptRow.props.testID);
     expect(findByTestId(renderer, "review-session")).toBeTruthy();
     expect(findByTestId(renderer, "review-progress").props.children.join("")).toBe("1 / 1 · Standard");
@@ -1422,6 +1424,27 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "history-performance-context"))).toBe("Standard · 20s pace · All Time");
     expect(collectText(findByTestId(renderer, "history-attempt-standard-attempt-review-state"))).toBe("Review queued");
     expect(collectText(findByTestId(renderer, "history-attempt-standard-attempt-difficulty"))).toBe("Medium");
+  });
+
+  it("omits rating deltas for history attempts that did not settle a sprint rating", () => {
+    const store = new MemoryStore();
+    store.seedPuzzles([sharedHistoryPuzzle()]);
+    store.saveRating({ key: "standard 5/20", generation: 0, rating: 600, games: 0 });
+    store.recordAttempt(historyAttempt({
+      id: "unscored-attempt",
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      completedAt: "2026-06-20T00:00:00.000Z",
+      ratingAfter: null
+    }));
+    const renderer = renderScreen({ practiceService: new PracticeService(store) });
+
+    press(renderer, "history-tab");
+    press(renderer, "history-range-max");
+
+    expect(findByTestId(renderer, "history-attempt-unscored-attempt")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-unscored-attempt-delta")).toThrow();
+    expect(collectText(findByTestId(renderer, "history-attempt-unscored-attempt-status-summary"))).not.toContain("+0");
   });
 
   it("keeps history analysis review on the current puzzle after a retry is solved", async () => {
@@ -2628,6 +2651,8 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "settings-reset-elo-detail").props.accessibilityLabel).toBe("Resets the Standard puzzle rating only");
     press(renderer, "settings-reset-elo");
     expect(findByTestId(renderer, "settings-reset-elo-confirmation")).toBeTruthy();
+    expect(testIdOrder(renderer, "settings-reset-elo", "settings-reset-elo-confirmation")).toBeLessThan(0);
+    expect(testIdOrder(renderer, "settings-reset-elo-confirmation", "settings-about-section")).toBeLessThan(0);
     expectText(renderer, "Reset Standard puzzle ELO?");
     expectText(renderer, "Puzzle history and review schedules stay intact.");
     press(renderer, "settings-reset-elo-confirmation-cancel");
@@ -2682,6 +2707,11 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "settings-license"))).toContain("GPL-3.0-or-later");
     expect(collectText(findByTestId(renderer, "settings-license"))).toContain("Stockfish 18 embedded");
     expect(collectText(findByTestId(renderer, "settings-license"))).toContain("github.com/Chessticize/chessticize-mobile");
+    expect(typeof findByTestId(renderer, "settings-license").props.onPress).toBe("function");
+    const openURLSpy = jest.spyOn(ReactNative.Linking, "openURL").mockResolvedValue(undefined);
+    press(renderer, "settings-license");
+    expect(openURLSpy).toHaveBeenCalledWith("https://github.com/Chessticize/chessticize-mobile");
+    openURLSpy.mockRestore();
     expect(findByTestId(renderer, "settings-puzzle-data-license")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "settings-puzzle-data-license"))).toContain(getBundledCorePackManifest().source);
     expect(collectText(findByTestId(renderer, "settings-puzzle-data-license"))).toContain(getBundledCorePackManifest().sourceLicense);
@@ -2989,6 +3019,7 @@ function historyAttempt(input: {
   mode: AttemptEvent["mode"];
   ratingKey: string;
   completedAt: string;
+  ratingAfter?: number | null;
 }): AttemptEvent {
   return {
     id: input.id,
@@ -3003,7 +3034,7 @@ function historyAttempt(input: {
     startedAt: "2026-06-20T00:00:00.000Z",
     completedAt: input.completedAt,
     ratingBefore: 600,
-    ratingAfter: 580
+    ...(input.ratingAfter === null ? {} : { ratingAfter: input.ratingAfter ?? 580 })
   };
 }
 

@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { MemoryStore, PracticeService, syncPracticeProgress } from "../src/index.ts";
+import { MemoryStore, PracticeService, mergeLocalDataExports, syncPracticeProgress } from "../src/index.ts";
 import type { ProgressSyncSnapshot, ProgressSyncTransport } from "../src/index.ts";
 import type { Puzzle } from "../../core/src/index.ts";
 
@@ -85,6 +85,119 @@ test("syncPracticeProgress imports another device snapshot before uploading the 
   assert.equal(transport.saved.length, 1);
   assert.equal(transport.saved[0]?.data.attempts.length, 1);
   assert.equal(transport.saved[0]?.data.settings.sync.iCloudEnabled, true);
+});
+
+test("mergeLocalDataExports conservatively merges same-generation rating deltas", async () => {
+  const localService = new PracticeService(await seededMemoryStore());
+  enableSync(localService);
+  const local = localService.exportLocalData();
+  local.ratings = [{
+    key: "standard 5/20",
+    generation: 0,
+    rating: 700,
+    ratingDeviation: 70,
+    volatility: 0.05,
+    games: 1
+  }];
+  local.attempts = [{
+    id: "local-win",
+    source: "sprint",
+    sessionId: "local-session",
+    puzzleId: "local-puzzle",
+    mode: "standard",
+    ratingKey: "standard 5/20",
+    result: "correct",
+    submittedMove: "e2e4",
+    expectedMove: "e2e4",
+    startedAt: "2026-06-20T00:00:00.000Z",
+    completedAt: "2026-06-20T00:00:05.000Z",
+    ratingBefore: 600,
+    ratingAfter: 700
+  }];
+
+  const remoteService = new PracticeService(await seededMemoryStore());
+  enableSync(remoteService);
+  const remote = remoteService.exportLocalData();
+  remote.ratings = [{
+    key: "standard 5/20",
+    generation: 0,
+    rating: 550,
+    ratingDeviation: 90,
+    volatility: 0.07,
+    games: 1
+  }];
+  remote.attempts = [{
+    id: "remote-loss",
+    source: "sprint",
+    sessionId: "remote-session",
+    puzzleId: "remote-puzzle",
+    mode: "standard",
+    ratingKey: "standard 5/20",
+    result: "wrong",
+    submittedMove: "c4b5",
+    expectedMove: "e2e6",
+    startedAt: "2026-06-21T00:00:00.000Z",
+    completedAt: "2026-06-21T00:00:05.000Z",
+    ratingBefore: 600,
+    ratingAfter: 550
+  }];
+
+  const merged = mergeLocalDataExports(local, remote);
+  const rating = merged.ratings.find((record) => record.key === "standard 5/20");
+
+  assert.equal(rating?.rating, 650);
+  assert.equal(rating?.games, 2);
+  assert.equal(rating?.ratingDeviation, 90);
+  assert.equal(rating?.volatility, 0.07);
+  assert.deepEqual(merged.attempts.map((attempt) => attempt.id).sort(), ["local-win", "remote-loss"]);
+});
+
+test("mergeLocalDataExports does not apply old deltas across rating reset generations", async () => {
+  const localService = new PracticeService(await seededMemoryStore());
+  enableSync(localService);
+  const local = localService.exportLocalData();
+  local.ratings = [{
+    key: "standard 5/20",
+    generation: 0,
+    rating: 700,
+    ratingDeviation: 70,
+    volatility: 0.05,
+    games: 1
+  }];
+  local.attempts = [{
+    id: "pre-reset-win",
+    source: "sprint",
+    sessionId: "local-session",
+    puzzleId: "local-puzzle",
+    mode: "standard",
+    ratingKey: "standard 5/20",
+    result: "correct",
+    submittedMove: "e2e4",
+    expectedMove: "e2e4",
+    startedAt: "2026-06-20T00:00:00.000Z",
+    completedAt: "2026-06-20T00:00:05.000Z",
+    ratingBefore: 600,
+    ratingAfter: 700
+  }];
+
+  const remoteService = new PracticeService(await seededMemoryStore());
+  enableSync(remoteService);
+  const remote = remoteService.exportLocalData();
+  remote.ratings = [{
+    key: "standard 5/20",
+    generation: 1,
+    rating: 600,
+    ratingDeviation: 350,
+    volatility: 0.06,
+    games: 0
+  }];
+
+  const merged = mergeLocalDataExports(local, remote);
+  const rating = merged.ratings.find((record) => record.key === "standard 5/20");
+
+  assert.equal(rating?.generation, 1);
+  assert.equal(rating?.rating, 600);
+  assert.equal(rating?.games, 0);
 });
 
 class RecordingTransport implements ProgressSyncTransport {

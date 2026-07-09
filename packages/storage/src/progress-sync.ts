@@ -78,15 +78,6 @@ export async function syncPracticeProgress(
 }
 
 export function mergeLocalDataExports(local: LocalDataExport, remote: LocalDataExport): LocalDataExport {
-  const ratings = new Map<string, RatingRecord>();
-  for (const rating of local.ratings) {
-    ratings.set(rating.key, normalizeRatingRecord(rating));
-  }
-  for (const rating of remote.ratings) {
-    const previous = ratings.get(rating.key);
-    ratings.set(rating.key, previous ? preferredRating(previous, rating) : normalizeRatingRecord(rating));
-  }
-
   const attempts = new Map<string, AttemptHistoryRow>();
   for (const attempt of local.attempts) {
     attempts.set(attempt.id, cloneAttempt(attempt));
@@ -94,6 +85,20 @@ export function mergeLocalDataExports(local: LocalDataExport, remote: LocalDataE
   for (const attempt of remote.attempts) {
     const previous = attempts.get(attempt.id);
     attempts.set(attempt.id, previous ? preferredAttempt(previous, attempt) : cloneAttempt(attempt));
+  }
+
+  const ratings = new Map<string, RatingRecord>();
+  for (const rating of local.ratings) {
+    ratings.set(rating.key, normalizeRatingRecord(rating));
+  }
+  for (const rating of remote.ratings) {
+    const previous = ratings.get(rating.key);
+    ratings.set(
+      rating.key,
+      previous
+        ? mergeRatingWithAttemptDeltas(previous, rating, local.attempts, remote.attempts)
+        : normalizeRatingRecord(rating)
+    );
   }
 
   const reviewQueue = new Map<string, ReviewQueueState>();
@@ -133,16 +138,56 @@ function emptyImportResult(): LocalDataImportResult {
   };
 }
 
-function preferredRating(local: RatingRecord, incoming: RatingRecord): RatingRecord {
+function mergeRatingWithAttemptDeltas(
+  local: RatingRecord,
+  incoming: RatingRecord,
+  localAttempts: AttemptHistoryRow[],
+  incomingAttempts: AttemptHistoryRow[]
+): RatingRecord {
   const normalizedLocal = normalizeRatingRecord(local);
   const normalizedIncoming = normalizeRatingRecord(incoming);
   if (normalizedIncoming.generation !== normalizedLocal.generation) {
     return normalizedIncoming.generation > normalizedLocal.generation ? normalizedIncoming : normalizedLocal;
   }
-  if (normalizedIncoming.games !== normalizedLocal.games) {
-    return normalizedIncoming.games > normalizedLocal.games ? normalizedIncoming : normalizedLocal;
+
+  const incomingIsBase = normalizedIncoming.games >= normalizedLocal.games;
+  const base = incomingIsBase ? normalizedIncoming : normalizedLocal;
+  const baseAttempts = incomingIsBase ? incomingAttempts : localAttempts;
+  const additionalAttempts = incomingIsBase ? localAttempts : incomingAttempts;
+  const additional = ratingDeltaFromMissingAttempts(base.key, baseAttempts, additionalAttempts);
+  const ratingDeviation = Math.max(
+    normalizedLocal.ratingDeviation ?? 0,
+    normalizedIncoming.ratingDeviation ?? 0
+  );
+
+  return {
+    ...base,
+    rating: base.rating + additional.delta,
+    ratingDeviation,
+    games: base.games + additional.games
+  };
+}
+
+function ratingDeltaFromMissingAttempts(
+  ratingKey: string,
+  baseAttempts: AttemptHistoryRow[],
+  additionalAttempts: AttemptHistoryRow[]
+): { delta: number; games: number } {
+  const baseIds = new Set(
+    baseAttempts
+      .filter((attempt) => attempt.ratingKey === ratingKey && attempt.ratingAfter !== undefined)
+      .map((attempt) => attempt.id)
+  );
+  let delta = 0;
+  let games = 0;
+  for (const attempt of additionalAttempts) {
+    if (attempt.ratingKey !== ratingKey || attempt.ratingAfter === undefined || baseIds.has(attempt.id)) {
+      continue;
+    }
+    delta += attempt.ratingAfter - attempt.ratingBefore;
+    games += 1;
   }
-  return normalizedIncoming;
+  return { delta, games };
 }
 
 function preferredAttempt(local: AttemptHistoryRow, incoming: AttemptHistoryRow): AttemptHistoryRow {
