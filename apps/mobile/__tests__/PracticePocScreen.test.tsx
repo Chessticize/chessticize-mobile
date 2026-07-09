@@ -156,6 +156,8 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "app-shell-header")).toBeTruthy();
     expect(findByTestId(renderer, "practice-home")).toBeTruthy();
     expect(styleEntryMatches(findByTestId(renderer, "practice-home-layout").props.style, "flexDirection", "row")).toBe(homeColumns);
+    expect(styleEntryMatches(findByTestId(renderer, "practice-review-strip-action-area").props.style, "width", "50%")).toBe(homeColumns);
+    expect(styleEntryMatches(findByTestId(renderer, "practice-review-strip-counts").props.style, "justifyContent", "center")).toBe(homeColumns);
     expect(findByTestId(renderer, "practice-tab")).toBeTruthy();
     expect(findByTestId(renderer, "settings-tab")).toBeTruthy();
     if (sideRail) {

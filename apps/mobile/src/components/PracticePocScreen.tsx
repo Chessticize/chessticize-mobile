@@ -2078,8 +2078,20 @@ function PracticeHome({
             <View style={styles.reviewStripStatusCopy}>
               <Text style={styles.listText}>{reviewStatusLabel}</Text>
             </View>
-            <View style={styles.reviewStripActionArea}>
-              <View style={styles.reviewStripCounts}>
+            <View
+              style={[
+                styles.reviewStripActionArea,
+                adaptiveLayout.usesWideContent ? styles.reviewStripActionAreaWide : null
+              ]}
+              testID="practice-review-strip-action-area"
+            >
+              <View
+                style={[
+                  styles.reviewStripCounts,
+                  adaptiveLayout.usesWideContent ? styles.reviewStripCountsWide : null
+                ]}
+                testID="practice-review-strip-counts"
+              >
                 <View style={styles.reviewStripMetric} testID="practice-review-due-count">
                   <Text style={styles.reviewDueCount}>{dueReviewCount}</Text>
                   <Text style={styles.reviewStripMetricLabel}>Due today</Text>
@@ -8485,6 +8497,9 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     gap: 8
   },
+  reviewStripActionAreaWide: {
+    width: "50%"
+  },
   reviewStripStatusCopy: {
     flex: 1,
     minWidth: 0
@@ -8530,6 +8545,10 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     flexDirection: "row",
     gap: 10
+  },
+  reviewStripCountsWide: {
+    flex: 1,
+    justifyContent: "center"
   },
   reviewStripChevron: {
     alignItems: "center",
