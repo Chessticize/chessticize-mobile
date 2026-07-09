@@ -12,7 +12,7 @@ import {
 } from "../src/backend/mobilePractice";
 import { fixtureNeedsAtLeast, PracticeService } from "../../../packages/storage/src/practice-service";
 import { MemoryStore } from "../../../packages/storage/src/memory-store";
-import { formatLocalCalendarDate, type ArrowDuelState, type AttemptEvent, type Puzzle, type SprintState, type UciEngineTransport } from "../../../packages/core/src/index";
+import { defaultSprintConfig, formatLocalCalendarDate, type ArrowDuelState, type AttemptEvent, type Puzzle, type SprintState, type UciEngineTransport } from "../../../packages/core/src/index";
 import { FakeReviewReminderNotificationClient, FakeReviewReminderScheduler } from "../src/backend/reviewReminderScheduler";
 import { FakeICloudProgressSyncClient } from "../src/backend/iCloudProgressSync";
 
@@ -126,7 +126,7 @@ describe("PracticePocScreen", () => {
 
   it("selects Arrow Duel on the home screen before starting from its start control", () => {
     const service = createMobilePracticeService("familiar15");
-    service.setRating("arrow duel 5/30", 900);
+    service.setRating(defaultSprintConfig("arrow_duel").ratingKey, 900);
     const renderer = renderScreen({ practiceService: service });
 
     press(renderer, "practice-mode-arrow-duel");
