@@ -1426,25 +1426,25 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "history-attempt-standard-attempt-difficulty"))).toBe("Medium");
   });
 
-  it("omits rating deltas for history attempts that did not settle a sprint rating", () => {
+  it("omits run-level rating deltas from individual history attempts", () => {
     const store = new MemoryStore();
     store.seedPuzzles([sharedHistoryPuzzle()]);
     store.saveRating({ key: "standard 5/20", generation: 0, rating: 600, games: 0 });
     store.recordAttempt(historyAttempt({
-      id: "unscored-attempt",
+      id: "run-scored-attempt",
       mode: "standard",
       ratingKey: "standard 5/20",
       completedAt: "2026-06-20T00:00:00.000Z",
-      ratingAfter: null
+      ratingAfter: 650
     }));
     const renderer = renderScreen({ practiceService: new PracticeService(store) });
 
     press(renderer, "history-tab");
     press(renderer, "history-range-max");
 
-    expect(findByTestId(renderer, "history-attempt-unscored-attempt")).toBeTruthy();
-    expect(() => findByTestId(renderer, "history-attempt-unscored-attempt-delta")).toThrow();
-    expect(collectText(findByTestId(renderer, "history-attempt-unscored-attempt-status-summary"))).not.toContain("+0");
+    expect(findByTestId(renderer, "history-attempt-run-scored-attempt")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-run-scored-attempt-delta")).toThrow();
+    expect(collectText(findByTestId(renderer, "history-attempt-run-scored-attempt-status-summary"))).not.toContain("+50");
   });
 
   it("keeps history analysis review on the current puzzle after a retry is solved", async () => {

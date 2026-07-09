@@ -4163,7 +4163,6 @@ function HistoryAttemptRow({
   puzzleStats?: HistoryPuzzleStats;
 }): React.JSX.Element {
   const isWrong = attempt.result === "wrong";
-  const delta = attempt.ratingAfter === undefined ? null : attempt.ratingAfter - attempt.ratingBefore;
   const completedAtMs = new Date(attempt.completedAt).getTime();
   const elapsedSeconds = Math.max(0, Math.round((completedAtMs - new Date(attempt.startedAt).getTime()) / 1000));
   const dateLabel = `${historyAttemptRecencyLabel(completedAtMs)} · ${formatLocalCalendarDate(attempt.completedAt)}`;
@@ -4228,11 +4227,6 @@ function HistoryAttemptRow({
             >
               {difficultyLabel(difficulty)}
             </Text>
-            {delta === null ? null : (
-              <Text testID={`history-attempt-${attempt.id}-delta`} style={[styles.historyRatingDelta, delta < 0 ? styles.errorText : styles.positive]}>
-                {delta >= 0 ? "+" : ""}{delta}
-              </Text>
-            )}
           </View>
           <Text
             testID={`history-attempt-${attempt.id}-review-state`}
