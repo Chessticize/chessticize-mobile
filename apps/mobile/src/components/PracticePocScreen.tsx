@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   AppState,
+  Linking,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -60,7 +61,9 @@ import type {
   UciEngineTransport
 } from "../../../../packages/core/src/index.ts";
 import type { PracticeService } from "../../../../packages/storage/src/practice-service.ts";
-import type { ClearLocalHistoryResult, LocalDataExport, ReviewQueueDuePromotionResult, ReviewReminderPreference } from "../../../../packages/storage/src/practice-store.ts";
+import type { ReviewQueueDuePromotionResult, ReviewReminderPreference } from "../../../../packages/storage/src/practice-store.ts";
+import { syncPracticeProgress } from "../../../../packages/storage/src/progress-sync.ts";
+import type { ProgressSyncResult } from "../../../../packages/storage/src/progress-sync.ts";
 import {
   configureMobilePracticePuzzleSource,
   createMobilePracticeService,
@@ -80,6 +83,11 @@ import {
   type ReviewReminderScheduleResult,
   type ReviewReminderScheduler
 } from "../backend/reviewReminderScheduler.ts";
+import {
+  createNativeICloudProgressSyncClient,
+  type ICloudAccountStatus,
+  type ICloudProgressSyncClient
+} from "../backend/iCloudProgressSync.ts";
 import { arePracticeTestControlsEnabled, isPracticeDebugEnabled } from "../releaseConfig.ts";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Chess, type PieceSymbol, type Square } from "chess.js";
@@ -95,6 +103,8 @@ interface Props {
   reviewReminderSchedulerFactory?: () => ReviewReminderScheduler | null;
   reviewReminderNotificationClient?: ReviewReminderNotificationClient | null;
   reviewReminderNotificationClientFactory?: () => ReviewReminderNotificationClient | null;
+  iCloudProgressSyncClient?: ICloudProgressSyncClient | null;
+  iCloudProgressSyncClientFactory?: () => ICloudProgressSyncClient | null;
 }
 
 type Tab = "practice" | "review" | "history" | "settings" | "analysis";
@@ -231,6 +241,12 @@ const BOARD_FILES_FLIPPED = ["h", "g", "f", "e", "d", "c", "b", "a"] as const;
 const BOARD_RANKS = ["8", "7", "6", "5", "4", "3", "2", "1"] as const;
 const BOARD_RANKS_FLIPPED = ["1", "2", "3", "4", "5", "6", "7", "8"] as const;
 const CHESS_PIECE_SPRITE = require("../assets/chess-pieces-sprite.png") as ImageSourcePropType;
+const SOURCE_REPOSITORY_URL = "https://github.com/Chessticize/chessticize-mobile";
+const SOURCE_LICENSE_URL = `${SOURCE_REPOSITORY_URL}/blob/main/LICENSE`;
+const STOCKFISH_SOURCE_URL = `${SOURCE_REPOSITORY_URL}/tree/main/apps/mobile/ios/StockfishEngine`;
+const LICHESS_PUZZLE_DATABASE_URL = "https://database.lichess.org/#puzzles";
+const SUPPORT_EMAIL = "support@chessticize.com";
+const SUPPORT_EMAIL_URL = `mailto:${SUPPORT_EMAIL}`;
 const ANALYSIS_DIAGNOSTIC_POSITIONS = [
   {
     id: "queen-capture",
@@ -269,14 +285,14 @@ function buildAdaptiveLayout({
   const usesSideNavigation = isCompactLandscape || isRegularWidth;
   const sideNavigationExpanded = usesSideNavigation && viewportWidth >= 960;
   const sideNavigationWidth = isRegularWidth
-    ? sideNavigationExpanded ? 136 : 76
+    ? sideNavigationExpanded ? 168 : 76
     : 64;
   const contentWidth = Math.max(
     MIN_BOARD,
     viewportWidth - (usesSideNavigation ? sideNavigationWidth : 0)
   );
   const sessionContentWidth = viewportWidth;
-  const usesWideContent = isCompactLandscape || contentWidth >= 860;
+  const usesWideContent = contentWidth >= 860;
   const usesSessionRail = isCompactLandscape || (isRegularWidth && isLandscape && sessionContentWidth >= 860);
   const sessionRailWidth = isRegularWidth
     ? Math.min(REGULAR_RAIL_MAX, Math.max(REGULAR_RAIL_MIN, Math.floor(sessionContentWidth * 0.3)))
@@ -325,7 +341,9 @@ export function PracticePocScreen({
   reviewReminderScheduler,
   reviewReminderSchedulerFactory = createNativeReviewReminderScheduler,
   reviewReminderNotificationClient,
-  reviewReminderNotificationClientFactory = createNativeReviewReminderNotificationClient
+  reviewReminderNotificationClientFactory = createNativeReviewReminderNotificationClient,
+  iCloudProgressSyncClient,
+  iCloudProgressSyncClientFactory = createNativeICloudProgressSyncClient
 }: Props): React.JSX.Element {
   const [puzzleSource, setPuzzleSource] = useState<MobilePuzzleSource>("bundledCore");
   const service = useMemo(() => practiceService ?? practiceServiceFactory(), [practiceService, practiceServiceFactory]);
@@ -337,6 +355,10 @@ export function PracticePocScreen({
     () => reviewReminderNotificationClient !== undefined ? reviewReminderNotificationClient : reviewReminderNotificationClientFactory(),
     [reviewReminderNotificationClient, reviewReminderNotificationClientFactory]
   );
+  const iCloudSyncClient = useMemo(
+    () => iCloudProgressSyncClient !== undefined ? iCloudProgressSyncClient : iCloudProgressSyncClientFactory(),
+    [iCloudProgressSyncClient, iCloudProgressSyncClientFactory]
+  );
   const boardRef = useRef<ChessboardRef | null>(null);
   const suppressedBoardMovesRef = useRef<string[]>([]);
   const boardSyncInProgressRef = useRef(false);
@@ -346,6 +368,7 @@ export function PracticePocScreen({
   const reminderScheduleKeyRef = useRef<string | null>(null);
   const scheduledReviewAttemptCountRef = useRef(scheduledReviewAttemptCount(service));
   const reviewReminderPromptDismissedRef = useRef(false);
+  const iCloudSyncInFlightRef = useRef<Promise<string> | null>(null);
   const stateRef = useRef<SprintState | null>(null);
   const boardFenRef = useRef<string | null>(null);
   const feedbackSnapshotRef = useRef<FeedbackBoardSnapshot | null>(null);
@@ -392,6 +415,8 @@ export function PracticePocScreen({
   const [notificationPermissionStatus, setNotificationPermissionStatus] = useState<ReviewReminderPermissionStatus>("unavailable");
   const [reviewReminderScheduleStatus, setReviewReminderScheduleStatus] = useState("unavailable");
   const [reviewReminderPermissionPromptVisible, setReviewReminderPermissionPromptVisible] = useState(false);
+  const [iCloudSyncEnabled, setICloudSyncEnabled] = useState(() => service.getSettings().sync.iCloudEnabled);
+  const [iCloudSyncStatus, setICloudSyncStatus] = useState(() => service.getSettings().sync.iCloudEnabled ? "Ready" : "Off");
   const [, setSettingsRevision] = useState(0);
 
   const adaptiveLayout = useMemo(
@@ -436,6 +461,21 @@ export function PracticePocScreen({
   useEffect(() => {
     refreshState();
   }, [service]);
+
+  useEffect(() => {
+    const enabled = service.getSettings().sync.iCloudEnabled;
+    setICloudSyncEnabled(enabled);
+    if (!enabled) {
+      setICloudSyncStatus("Off");
+      return;
+    }
+    if (!iCloudSyncClient) {
+      setICloudSyncStatus("Unavailable on this build");
+      return;
+    }
+    setICloudSyncStatus("Ready");
+    void runICloudProgressSync("startup");
+  }, [iCloudSyncClient, service]);
 
   useEffect(() => {
     let canceled = false;
@@ -489,12 +529,15 @@ export function PracticePocScreen({
       }
       if (nextState === "background" || nextState === "inactive") {
         refreshReviewReminder("app-background", true);
+        if (service.getSettings().sync.iCloudEnabled) {
+          void runICloudProgressSync("app-background");
+        }
       }
     });
     return () => {
       subscription.remove();
     };
-  }, [service]);
+  }, [iCloudSyncClient, service]);
 
   useEffect(() => {
     if (!isActive) {
@@ -605,6 +648,77 @@ export function PracticePocScreen({
     } catch {
       setNotificationPermissionStatus("unavailable");
     }
+  }
+
+  function saveICloudSyncEnabled(enabled: boolean): void {
+    service.saveSettings({
+      ...service.getSettings(),
+      sync: {
+        iCloudEnabled: enabled
+      }
+    });
+    setICloudSyncEnabled(enabled);
+    setSettingsRevision((current) => current + 1);
+    if (!enabled) {
+      setICloudSyncStatus("Off");
+      return;
+    }
+    setICloudSyncStatus(iCloudSyncClient ? "Ready" : "Unavailable on this build");
+    if (iCloudSyncClient) {
+      void runICloudProgressSync("settings-enabled");
+    }
+  }
+
+  async function runICloudProgressSync(reason: string): Promise<string> {
+    if (!service.getSettings().sync.iCloudEnabled) {
+      setICloudSyncStatus("Off");
+      return "iCloud sync is off";
+    }
+    if (!iCloudSyncClient) {
+      setICloudSyncStatus("Unavailable on this build");
+      return "iCloud sync is unavailable on this build";
+    }
+    if (iCloudSyncInFlightRef.current) {
+      return iCloudSyncInFlightRef.current;
+    }
+
+    const work = (async () => {
+      setICloudSyncStatus("Syncing");
+      try {
+        const accountStatus = await iCloudSyncClient.getAccountStatus();
+        if (accountStatus !== "available") {
+          const message = iCloudAccountStatusMessage(accountStatus);
+          setICloudSyncStatus(message);
+          return message;
+        }
+        const result = await syncPracticeProgress(service, iCloudSyncClient, {
+          deviceId: "ios-mobile",
+          now: nowIso
+        });
+        refreshState();
+        setICloudSyncEnabled(service.getSettings().sync.iCloudEnabled);
+        setSettingsRevision((current) => current + 1);
+        const message = progressSyncStatusMessage(result);
+        setICloudSyncStatus(message);
+        return message;
+      } catch (caught) {
+        const message = "iCloud sync failed";
+        setICloudSyncStatus(message);
+        emitTrace({
+          type: "move-ignored",
+          reason: `icloud-sync-${reason}-failed:${errorMessage(caught)}`
+        });
+        return message;
+      }
+    })();
+
+    iCloudSyncInFlightRef.current = work;
+    void work.finally(() => {
+      if (iCloudSyncInFlightRef.current === work) {
+        iCloudSyncInFlightRef.current = null;
+      }
+    });
+    return work;
   }
 
   function maybeShowReviewReminderPermissionPrompt(): void {
@@ -1343,7 +1457,7 @@ export function PracticePocScreen({
   const screenSubtitle = tab === "practice"
     ? `Offline-ready · ${seededPuzzleCount(puzzleSource)} puzzles`
     : screenSubtitleFor(tab);
-  const practiceModeSummaries = (["standard", "arrow_duel", "blitz", "custom"] as const).map((nextMode) => {
+  const practiceModeSummaries = (["standard", "arrow_duel", "custom"] as const).map((nextMode) => {
     const config = sprintConfigFor(nextMode, customDurationSeconds, customPerPuzzleSeconds);
     return {
       mode: nextMode,
@@ -1733,33 +1847,26 @@ export function PracticePocScreen({
                 standardRating={readRating(service, defaultSprintConfig("standard").ratingKey)}
                 ratings={[
                   { label: "Standard", record: service.getRating(defaultSprintConfig("standard").ratingKey) },
-                  { label: "Arrow Duel", record: service.getRating(defaultSprintConfig("arrow_duel").ratingKey) },
-                  { label: "Blitz", record: service.getRating(defaultSprintConfig("blitz").ratingKey) }
+                  { label: "Arrow Duel", record: service.getRating(defaultSprintConfig("arrow_duel").ratingKey) }
                 ]}
                 onOpenDiagnostics={arePracticeTestControlsEnabled() ? () => setTab("analysis") : undefined}
-                onExportData={() => service.exportLocalData()}
-                onDeleteLocalHistory={() => {
-                  const result = service.clearLocalHistory();
-                  refreshState();
-                  return result;
-                }}
                 onAdjustRating={(ratingKey, nextRating) => {
                   const next = service.setRating(ratingKey, nextRating);
                   setSettingsRevision((current) => current + 1);
                   return next;
                 }}
-                onResetRating={() => {
-                  service.resetRating(defaultSprintConfig("standard").ratingKey);
-                  setSettingsRevision((current) => current + 1);
-                }}
                 notificationPermissionStatus={notificationPermissionStatus}
                 reviewReminderScheduleStatus={reviewReminderScheduleStatus}
                 reviewReminderPreference={reviewReminderPreference}
+                iCloudSyncEnabled={iCloudSyncEnabled}
+                iCloudSyncStatus={iCloudSyncStatus}
                 onOpenNotificationSettings={() => {
                   void openReviewReminderSystemSettings();
                 }}
                 onRequestReviewReminderPermission={() => requestReviewReminderPermission()}
                 onSaveReviewReminderPreference={saveReviewReminderPreference}
+                onSaveICloudSyncEnabled={saveICloudSyncEnabled}
+                onSyncICloudNow={() => runICloudProgressSync("manual")}
               />
             ) : null}
             {tab === "analysis" && arePracticeTestControlsEnabled() ? (
@@ -1909,7 +2016,7 @@ function PracticeHome({
       ) : null}
 
       <View
-        style={adaptiveLayout.usesWideContent ? styles.practiceHomeColumns : null}
+        style={adaptiveLayout.usesWideContent ? styles.practiceHomeColumns : styles.practiceHomeStack}
         testID="practice-home-layout"
       >
         <View style={styles.practiceHomePrimaryColumn}>
@@ -1941,14 +2048,14 @@ function PracticeHome({
             style={styles.practiceProgressCard}
             testID="practice-progress-summary"
           >
-            <View style={styles.progressMetric}>
-              <Text style={styles.helperText}>ELO ({selected ? modeLabel(selected.mode) : "Standard"})</Text>
+            <View style={styles.progressMetric} testID="practice-progress-rating-metric">
+              <Text style={styles.progressMetricLabel}>ELO ({selected ? modeLabel(selected.mode) : "Standard"})</Text>
               <Text style={styles.progressValue}>{currentRating}</Text>
               <Text testID="practice-progress-rating-delta" style={[styles.progressDelta, ratingDeltaTone]}>{ratingDeltaLabel}</Text>
             </View>
             <View style={styles.progressDivider} />
-            <View style={styles.progressMetric}>
-              <Text style={styles.helperText}>This Week</Text>
+            <View style={styles.progressMetric} testID="practice-progress-weekly-metric">
+              <Text style={styles.progressMetricLabel}>This Week</Text>
               <Text testID="practice-progress-weekly-solved" style={styles.progressValue}>{progress.correctThisWeek}</Text>
               <Text testID="practice-progress-weekly-delta" style={[styles.progressDelta, progressTone]}>{progressDelta}</Text>
               <Text testID="practice-progress-weekly-context" style={styles.progressContextText}>{progressContext}</Text>
@@ -1963,11 +2070,23 @@ function PracticeHome({
             style={styles.practiceReviewStrip}
             onPress={onOpenReview}
           >
-            <View>
+            <View style={styles.reviewStripStatusCopy}>
               <Text style={styles.listText}>{reviewStatusLabel}</Text>
             </View>
-            <View style={styles.reviewStripActionArea}>
-              <View style={styles.reviewStripCounts}>
+            <View
+              style={[
+                styles.reviewStripActionArea,
+                adaptiveLayout.usesWideContent ? styles.reviewStripActionAreaWide : null
+              ]}
+              testID="practice-review-strip-action-area"
+            >
+              <View
+                style={[
+                  styles.reviewStripCounts,
+                  adaptiveLayout.usesWideContent ? styles.reviewStripCountsWide : null
+                ]}
+                testID="practice-review-strip-counts"
+              >
                 <View style={styles.reviewStripMetric} testID="practice-review-due-count">
                   <Text style={styles.reviewDueCount}>{dueReviewCount}</Text>
                   <Text style={styles.reviewStripMetricLabel}>Due today</Text>
@@ -4050,7 +4169,6 @@ function HistoryAttemptRow({
   puzzleStats?: HistoryPuzzleStats;
 }): React.JSX.Element {
   const isWrong = attempt.result === "wrong";
-  const delta = (attempt.ratingAfter ?? attempt.ratingBefore) - attempt.ratingBefore;
   const completedAtMs = new Date(attempt.completedAt).getTime();
   const elapsedSeconds = Math.max(0, Math.round((completedAtMs - new Date(attempt.startedAt).getTime()) / 1000));
   const dateLabel = `${historyAttemptRecencyLabel(completedAtMs)} · ${formatLocalCalendarDate(attempt.completedAt)}`;
@@ -4114,9 +4232,6 @@ function HistoryAttemptRow({
               style={[styles.historyReviewState, difficultyStyle]}
             >
               {difficultyLabel(difficulty)}
-            </Text>
-            <Text testID={`history-attempt-${attempt.id}-delta`} style={[styles.historyRatingDelta, delta < 0 ? styles.errorText : styles.positive]}>
-              {delta >= 0 ? "+" : ""}{delta}
             </Text>
           </View>
           <Text
@@ -4839,7 +4954,6 @@ function ReviewPanel({
           <FilterButton active={queueFilter === "failed"} label="Failed again" testID="review-filter-failed" onPress={() => setQueueFilter("failed")} />
           <FilterButton active={queueFilter === "mode:standard"} label="Standard" testID="review-filter-mode-standard" onPress={() => setQueueFilter("mode:standard")} />
           <FilterButton active={queueFilter === "arrow_duel"} label="Arrow Duel only" testID="review-filter-arrow-duel" onPress={() => setQueueFilter("arrow_duel")} />
-          <FilterButton active={queueFilter === "mode:blitz"} label="Blitz" testID="review-filter-mode-blitz" onPress={() => setQueueFilter("mode:blitz")} />
           {speedFilters.map((speed) => (
             <FilterButton
               key={speed}
@@ -6212,16 +6326,46 @@ function reviewReminderScheduleStatusLabel(
   return `scheduled|${result.scheduledAt ?? decision.scheduledAt}|${decision.dueCount}|${decision.body}|${decision.route}`;
 }
 
+function progressSyncStatusMessage(result: ProgressSyncResult): string {
+  if (result.status === "disabled") {
+    return "iCloud sync is off";
+  }
+  const importedCount = result.imported.ratings +
+    result.imported.attempts +
+    result.imported.reviewQueue +
+    result.imported.sprintSessions;
+  if (importedCount === 0) {
+    return "Synced";
+  }
+  return `Synced ${importedCount} updates`;
+}
+
+function iCloudAccountStatusMessage(status: ICloudAccountStatus): string {
+  switch (status) {
+    case "available":
+      return "Ready";
+    case "no_account":
+      return "Sign in to iCloud to sync";
+    case "restricted":
+      return "iCloud sync is restricted";
+    case "could_not_determine":
+      return "Cannot determine iCloud status";
+    case "unavailable":
+      return "iCloud sync is unavailable";
+  }
+}
+
 function SettingsPanel({
   adaptiveLayout,
-  onDeleteLocalHistory,
-  onExportData,
   onOpenDiagnostics,
   onOpenNotificationSettings,
   onAdjustRating,
   onRequestReviewReminderPermission,
-  onResetRating,
+  onSaveICloudSyncEnabled,
   onSaveReviewReminderPreference,
+  onSyncICloudNow,
+  iCloudSyncEnabled,
+  iCloudSyncStatus,
   notificationPermissionStatus,
   ratings,
   reviewReminderScheduleStatus,
@@ -6229,14 +6373,15 @@ function SettingsPanel({
   standardRating
 }: {
   adaptiveLayout: AdaptiveLayout;
-  onDeleteLocalHistory: () => ClearLocalHistoryResult;
-  onExportData: () => LocalDataExport;
   onOpenDiagnostics?: () => void;
   onOpenNotificationSettings: () => void;
   onAdjustRating: (ratingKey: string, nextRating: number) => RatingRecord;
   onRequestReviewReminderPermission: () => Promise<ReviewReminderPermissionStatus>;
-  onResetRating: () => void;
+  onSaveICloudSyncEnabled: (enabled: boolean) => void;
   onSaveReviewReminderPreference: (preference: ReviewReminderPreference) => void;
+  onSyncICloudNow: () => Promise<string>;
+  iCloudSyncEnabled: boolean;
+  iCloudSyncStatus: string;
   notificationPermissionStatus: ReviewReminderPermissionStatus;
   ratings: Array<{ label: string; record: RatingRecord }>;
   reviewReminderScheduleStatus: string;
@@ -6244,33 +6389,50 @@ function SettingsPanel({
   standardRating: number;
 }): React.JSX.Element {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [confirmation, setConfirmation] = useState<"reset-elo" | "delete-history" | null>(null);
   const [advancedRatingsOpen, setAdvancedRatingsOpen] = useState(false);
   const bundledCoreManifest = getBundledCorePackManifest();
 
   return (
     <View style={[styles.settingsPanel, adaptiveLayout.usesWideContent ? styles.settingsPanelWide : null]} testID="settings-panel">
-      <SettingsSection title="Local Data" testID="settings-data-section" wide={adaptiveLayout.usesWideContent}>
+      <SettingsSection title="iCloud Sync" testID="settings-sync-section" wide={adaptiveLayout.usesWideContent}>
         <SettingsRow
-          label="Storage"
-          value="On device"
-          detail="Ratings, history, review queue, and custom sprint configs are stored only on this device."
-          testID="settings-local-storage"
+          label="Progress Sync"
+          value={iCloudSyncEnabled ? "On" : "Off"}
+          detail={iCloudSyncStatus}
+          testID="settings-sync-status"
         />
-        <SettingsRow
-          label="Export Data"
-          value="JSON"
-          detail="Export-ready local progress backup"
-          testID="settings-export-data"
-          onPress={() => setStatusMessage(exportDataStatusMessage(onExportData()))}
-        />
-        <SettingsRow
-          label="Delete Local History"
-          detail="Requires confirmation before anything is removed"
-          destructive
-          testID="settings-delete-local-history"
-          onPress={() => setConfirmation("delete-history")}
-        />
+        <View style={styles.settingsInlineControls} testID="settings-icloud-sync-controls">
+          <SettingsPreferenceButton
+            active={iCloudSyncEnabled}
+            label="On"
+            testID="settings-icloud-sync-on"
+            onPress={() => {
+              onSaveICloudSyncEnabled(true);
+              setStatusMessage("iCloud sync enabled");
+            }}
+          />
+          <SettingsPreferenceButton
+            active={!iCloudSyncEnabled}
+            label="Off"
+            testID="settings-icloud-sync-off"
+            onPress={() => {
+              onSaveICloudSyncEnabled(false);
+              setStatusMessage("iCloud sync disabled");
+            }}
+          />
+        </View>
+        {iCloudSyncEnabled ? (
+          <SettingsActionRow
+            label="Sync Now"
+            detail="Merge ratings, history, and review queue with your private iCloud."
+            testID="settings-sync-now"
+            onPress={() => {
+              void onSyncICloudNow().then((message) => {
+                setStatusMessage(message);
+              });
+            }}
+          />
+        ) : null}
       </SettingsSection>
 
       <SettingsSection title="Notifications" testID="settings-notifications-section" wide={adaptiveLayout.usesWideContent}>
@@ -6338,14 +6500,6 @@ function SettingsPanel({
           testID="settings-standard-elo-row"
           onPress={() => setAdvancedRatingsOpen((current) => !current)}
         />
-        <SettingsRow
-          label="Reset ELO"
-          detail="Resets the Standard puzzle rating only"
-          destructive
-          showDetail={false}
-          testID="settings-reset-elo"
-          onPress={() => setConfirmation("reset-elo")}
-        />
         {advancedRatingsOpen ? (
           <AdvancedRatingsPanel
             ratings={ratings}
@@ -6363,49 +6517,59 @@ function SettingsPanel({
           value="1.0.0"
           testID="settings-app-version"
         />
-        <SettingsRow
-          label="License & Source"
+        <SettingsExternalLinkRow
+          label="License"
           value="GPL-3.0-or-later"
-          detail="Stockfish 18 embedded. Public source: github.com/Chessticize/chessticize-mobile"
+          detail="App source license"
+          linkLabel="Open license"
           testID="settings-license"
+          onPress={() => {
+            void Linking.openURL(SOURCE_LICENSE_URL);
+          }}
         />
-        <SettingsRow
+        <SettingsExternalLinkRow
+          label="Source"
+          value="GitHub"
+          detail="Public Chessticize mobile repository"
+          linkLabel="github.com/Chessticize/chessticize-mobile"
+          testID="settings-source"
+          onPress={() => {
+            void Linking.openURL(SOURCE_REPOSITORY_URL);
+          }}
+        />
+        <SettingsExternalLinkRow
+          label="Stockfish"
+          value="Embedded"
+          detail="Stockfish 18 engine source used by the app"
+          linkLabel="StockfishEngine in source"
+          testID="settings-stockfish-source"
+          onPress={() => {
+            void Linking.openURL(STOCKFISH_SOURCE_URL);
+          }}
+        />
+        <SettingsExternalLinkRow
           label="Puzzle Data"
-          value={`${bundledCoreManifest.source} · ${bundledCoreManifest.sourceLicense}`}
-          detail={`${bundledCoreManifest.licenseNote} ${bundledCoreManifest.presolve}.`}
+          value={bundledCoreManifest.source}
+          detail={`${bundledCoreManifest.sourceLicense}. ${bundledCoreManifest.licenseNote} ${bundledCoreManifest.presolve}.`}
+          linkLabel="database.lichess.org/#puzzles"
           testID="settings-puzzle-data-license"
+          onPress={() => {
+            void Linking.openURL(LICHESS_PUZZLE_DATABASE_URL);
+          }}
+        />
+        <SettingsExternalLinkRow
+          label="Support"
+          value="Email"
+          detail="Questions, feedback, and support"
+          linkLabel={SUPPORT_EMAIL}
+          testID="settings-support-email"
+          onPress={() => {
+            void Linking.openURL(SUPPORT_EMAIL_URL);
+          }}
         />
       </SettingsSection>
 
       {statusMessage ? <Text style={styles.settingsStatusText} testID="settings-status-message">{statusMessage}</Text> : null}
-      {confirmation === "reset-elo" ? (
-        <DestructiveConfirmationCard
-          confirmLabel="Reset ELO"
-          description="This resets only the Standard puzzle rating bucket. Puzzle history and review schedules stay intact."
-          testID="settings-reset-elo-confirmation"
-          title="Reset Standard puzzle ELO?"
-          onCancel={() => setConfirmation(null)}
-          onConfirm={() => {
-            onResetRating();
-            setConfirmation(null);
-            setStatusMessage("ELO reset");
-          }}
-        />
-      ) : null}
-      {confirmation === "delete-history" ? (
-        <DestructiveConfirmationCard
-          confirmLabel="Delete History"
-          description="This removes local attempts, sprint history, and scheduled review queue data. Ratings and bundled puzzle data stay intact."
-          testID="settings-delete-history-confirmation"
-          title="Delete local history?"
-          onCancel={() => setConfirmation(null)}
-          onConfirm={() => {
-            const result = onDeleteLocalHistory();
-            setConfirmation(null);
-            setStatusMessage(deleteHistoryStatusMessage(result));
-          }}
-        />
-      ) : null}
       {onOpenDiagnostics ? (
         <Pressable
           accessibilityRole="button"
@@ -6552,22 +6716,6 @@ function scheduledReviewAttemptCount(service: PracticeService): number {
   return (service.listHistory({ source: "scheduled_review" }) as AttemptEvent[]).length;
 }
 
-function deleteHistoryStatusMessage(result: ClearLocalHistoryResult): string {
-  if (result.attempts === 0 && result.reviewQueue === 0 && result.sprintSessions === 0) {
-    return "No local history to delete";
-  }
-  const attemptText = result.attempts === 1 ? "1 attempt" : `${result.attempts} attempts`;
-  const reviewText = result.reviewQueue === 1 ? "1 review" : `${result.reviewQueue} reviews`;
-  return `Local history deleted · ${attemptText} · ${reviewText}`;
-}
-
-function exportDataStatusMessage(data: LocalDataExport): string {
-  const attemptText = data.attempts.length === 1 ? "1 attempt" : `${data.attempts.length} attempts`;
-  const reviewText = data.reviewQueue.length === 1 ? "1 review" : `${data.reviewQueue.length} reviews`;
-  const ratingText = data.ratings.length === 1 ? "1 rating" : `${data.ratings.length} ratings`;
-  return `Export ready · ${attemptText} · ${reviewText} · ${ratingText}`;
-}
-
 function AdvancedRatingsPanel({
   onAdjust,
   ratings
@@ -6659,53 +6807,6 @@ function advancedRatingBucketLabel(label: string, ratingKey: string): string {
   return speed ? `${label} · ${speed}s pace` : label;
 }
 
-function DestructiveConfirmationCard({
-  confirmLabel,
-  description,
-  onCancel,
-  onConfirm,
-  testID,
-  title
-}: {
-  confirmLabel: string;
-  description: string;
-  onCancel: () => void;
-  onConfirm: () => void;
-  testID: string;
-  title: string;
-}): React.JSX.Element {
-  return (
-    <View
-      accessibilityLabel={title}
-      testID={testID}
-      style={styles.destructiveConfirmationCard}
-    >
-      <Text style={styles.sectionLabel}>{title}</Text>
-      <Text style={styles.helperText}>{description}</Text>
-      <View style={styles.confirmationActionRow}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Cancel destructive action"
-          testID={`${testID}-cancel`}
-          style={styles.secondaryButton}
-          onPress={onCancel}
-        >
-          <Text style={styles.secondaryButtonText}>Cancel</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={confirmLabel}
-          testID={`${testID}-confirm`}
-          style={styles.destructiveButton}
-          onPress={onConfirm}
-        >
-          <Text style={styles.destructiveButtonText}>{confirmLabel}</Text>
-        </Pressable>
-      </View>
-    </View>
-  );
-}
-
 function SettingsSection({
   children,
   testID,
@@ -6767,6 +6868,44 @@ function SettingsRow({
       <View style={styles.settingsRowMeta}>
         {value ? <Text style={styles.settingsRowValue}>{value}</Text> : null}
         {onPress ? <ChevronGlyph direction="right" /> : null}
+      </View>
+    </Pressable>
+  );
+}
+
+function SettingsExternalLinkRow({
+  detail,
+  label,
+  linkLabel,
+  onPress,
+  testID,
+  value
+}: {
+  detail: string;
+  label: string;
+  linkLabel: string;
+  onPress: () => void;
+  testID: string;
+  value: string;
+}): React.JSX.Element {
+  const accessibilityLabel = [label, value, detail, linkLabel].join(", ");
+  return (
+    <Pressable
+      accessible
+      accessibilityRole="link"
+      accessibilityLabel={accessibilityLabel}
+      testID={testID}
+      style={styles.settingsRow}
+      onPress={onPress}
+    >
+      <View style={styles.settingsRowCopy}>
+        <Text style={styles.listText}>{label}</Text>
+        <Text style={styles.helperText}>{detail}</Text>
+        <Text style={styles.settingsLinkText}>{linkLabel}</Text>
+      </View>
+      <View style={styles.settingsRowMeta}>
+        <Text style={styles.settingsRowValue}>{value}</Text>
+        <ChevronGlyph direction="right" />
       </View>
     </Pressable>
   );
@@ -7800,10 +7939,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderRightColor: "#E2E8F0",
     borderRightWidth: StyleSheet.hairlineWidth,
-    gap: 6,
+    gap: 8,
     justifyContent: "center",
-    paddingHorizontal: 8,
-    paddingVertical: 12
+    paddingHorizontal: 12,
+    paddingVertical: 16
   },
   tabButton: {
     alignItems: "center",
@@ -7824,10 +7963,10 @@ const styles = StyleSheet.create({
   tabButtonRailExpanded: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 10,
+    gap: 12,
     justifyContent: "flex-start",
-    minHeight: 46,
-    paddingHorizontal: 10
+    minHeight: 50,
+    paddingHorizontal: 12
   },
   tabButtonActive: {
     backgroundColor: "transparent"
@@ -7988,8 +8127,12 @@ const styles = StyleSheet.create({
     gap: 12
   },
   practiceHomeColumns: {
+    alignItems: "flex-start",
     flexDirection: "row",
     gap: 14
+  },
+  practiceHomeStack: {
+    gap: 18
   },
   practiceHomePrimaryColumn: {
     flex: 1.1,
@@ -8177,22 +8320,33 @@ const styles = StyleSheet.create({
     width: 28
   },
   practiceProgressCard: {
-    alignItems: "center",
+    alignItems: "flex-start",
     backgroundColor: "#FFFFFF",
     borderColor: "#E2E8F0",
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
-    minHeight: 74,
-    padding: 12
+    minHeight: 92,
+    paddingHorizontal: 14,
+    paddingVertical: 14
   },
   progressMetric: {
+    alignItems: "center",
     flex: 1,
-    gap: 2
+    gap: 4,
+    justifyContent: "flex-start",
+    minWidth: 0
+  },
+  progressMetricLabel: {
+    color: "#64748B",
+    fontSize: 12,
+    fontWeight: "800",
+    lineHeight: 15,
+    textAlign: "center"
   },
   progressDivider: {
+    alignSelf: "stretch",
     backgroundColor: "#E2E8F0",
-    height: 44,
     marginHorizontal: 12,
     width: 1
   },
@@ -8200,16 +8354,20 @@ const styles = StyleSheet.create({
     color: "#111827",
     fontSize: 22,
     fontWeight: "800",
-    lineHeight: 26
+    lineHeight: 26,
+    textAlign: "center"
   },
   progressDelta: {
     fontSize: 12,
-    fontWeight: "800"
+    fontWeight: "800",
+    lineHeight: 15,
+    textAlign: "center"
   },
   progressContextText: {
     color: "#64748B",
     fontSize: 11,
     fontWeight: "700",
+    lineHeight: 14,
     textAlign: "center"
   },
   progressDeltaPositive: {
@@ -8236,7 +8394,15 @@ const styles = StyleSheet.create({
   reviewStripActionArea: {
     alignItems: "center",
     flexDirection: "row",
+    flexShrink: 0,
     gap: 8
+  },
+  reviewStripActionAreaWide: {
+    width: "50%"
+  },
+  reviewStripStatusCopy: {
+    flex: 1,
+    minWidth: 0
   },
   resumeSprintCard: {
     alignItems: "center",
@@ -8276,9 +8442,13 @@ const styles = StyleSheet.create({
     gap: 10
   },
   reviewStripCounts: {
-    alignItems: "flex-end",
+    alignItems: "flex-start",
     flexDirection: "row",
-    gap: 12
+    gap: 10
+  },
+  reviewStripCountsWide: {
+    flex: 1,
+    justifyContent: "center"
   },
   reviewStripChevron: {
     alignItems: "center",
@@ -8287,23 +8457,32 @@ const styles = StyleSheet.create({
     width: 18
   },
   reviewStripMetric: {
-    alignItems: "flex-end",
-    gap: 2
+    alignItems: "center",
+    gap: 3,
+    minWidth: 58
   },
   reviewDueCount: {
     color: "#111827",
     fontSize: 17,
-    fontWeight: "800"
+    fontWeight: "800",
+    lineHeight: 21,
+    textAlign: "center",
+    width: "100%"
   },
   reviewOverdueCount: {
     color: "#DC2626",
     fontSize: 17,
-    fontWeight: "800"
+    fontWeight: "800",
+    lineHeight: 21,
+    textAlign: "center",
+    width: "100%"
   },
   reviewStripMetricLabel: {
     color: "#64748B",
     fontSize: 11,
-    fontWeight: "800"
+    fontWeight: "800",
+    lineHeight: 14,
+    textAlign: "center"
   },
   reviewQueuePanel: {
     gap: 12
@@ -8373,24 +8552,27 @@ const styles = StyleSheet.create({
     color: "#2563EB",
     fontSize: 24,
     fontWeight: "900",
-    lineHeight: 28
+    lineHeight: 28,
+    textAlign: "center"
   },
   reviewDueCountBlock: {
-    alignItems: "flex-end",
+    alignItems: "center",
     gap: 2,
     justifyContent: "center",
-    minWidth: 52
+    minWidth: 58
   },
   reviewDueOverdueCount: {
     fontSize: 12,
     fontWeight: "900",
-    lineHeight: 14
+    lineHeight: 14,
+    textAlign: "center"
   },
   reviewDueOverdueLabel: {
     color: "#64748B",
     fontSize: 9,
     fontWeight: "800",
-    lineHeight: 11
+    lineHeight: 11,
+    textAlign: "center"
   },
   reviewDueHiddenMetric: {
     fontSize: 0,
@@ -10016,17 +10198,30 @@ const styles = StyleSheet.create({
   },
   settingsRowCopy: {
     flex: 1,
-    gap: 2
+    flexShrink: 1,
+    gap: 2,
+    minWidth: 0
   },
   settingsRowMeta: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 4
+    flexShrink: 0,
+    gap: 4,
+    justifyContent: "flex-end",
+    maxWidth: "36%"
   },
   settingsRowValue: {
     color: "#64748B",
     fontSize: 12,
-    fontWeight: "800"
+    fontWeight: "800",
+    flexShrink: 1,
+    textAlign: "right"
+  },
+  settingsLinkText: {
+    color: "#2563EB",
+    fontSize: 12,
+    fontWeight: "800",
+    lineHeight: 16
   },
   settingsInlineControls: {
     borderBottomColor: "#E2E8F0",
@@ -10090,6 +10285,11 @@ const styles = StyleSheet.create({
     gap: 2,
     minWidth: 180
   },
+  confirmationActionRow: {
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "flex-end"
+  },
   advancedRatingsPanel: {
     backgroundColor: "#F8FAFC",
     borderBottomColor: "#E2E8F0",
@@ -10128,19 +10328,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
     paddingHorizontal: 2
-  },
-  destructiveConfirmationCard: {
-    backgroundColor: "#FEF2F2",
-    borderColor: "#FCA5A5",
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 8,
-    padding: 12
-  },
-  confirmationActionRow: {
-    flexDirection: "row",
-    gap: 8,
-    justifyContent: "flex-end"
   },
   packsPanel: {
     gap: 12

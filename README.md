@@ -12,7 +12,7 @@ The repository contains the React Native app shell (`apps/mobile`), a pure TypeS
 - [App Store Assets](docs/STORE_ASSETS.md) — 1.0 App Store metadata and screenshot capture plan
 - [App Store Upload](docs/APP_STORE_UPLOAD.md) — owner-executed archive and App Store Connect upload runbook
 - [TestFlight QA](docs/TESTFLIGHT_QA.md) — internal TestFlight pass checklist and evidence log
-- [Privacy Policy](docs/PRIVACY_POLICY.md) — 1.0 local-only data and tracking disclosure
+- [Privacy Policy](docs/PRIVACY_POLICY.md) — 1.0 data, optional iCloud Sync, and tracking disclosure
 - [iOS Device Targets](docs/DEVICE_TARGETS.md) — 1.0 iPhone+iPad adaptive orientation release target
 - [Agent Instructions](AGENTS.md) — architecture boundary, testing philosophy, and PR workflow
 
@@ -61,7 +61,7 @@ open a GitHub issue requesting a private contact path.
 ## Product Direction
 
 - Offline-first practice app for iOS first, Android later.
-- Puzzle Sprint, Arrow Duel, mistake review, spaced repetition, local ELO, history filters, and optional iCloud sync.
+- Puzzle Sprint, Arrow Duel, mistake review, spaced repetition, local ELO, history filters, and optional iCloud sync for progress across Apple devices.
 - Reuse an existing chessboard component instead of maintaining a custom board widget.
 - Embed Stockfish for offline analysis under GPL-compatible licensing.
 - Keep frontend UI code separate from a solid local backend/domain core so business logic is reusable and heavily automated-testable.

@@ -36,7 +36,7 @@ binary on real hardware.
 | --- | --- |
 | Test group | `Internal 1.0 QA` |
 | Beta app description | `Offline chess tactics trainer for Puzzle Sprint, Arrow Duel, mistake review, local ratings, and on-device Stockfish analysis.` |
-| What to test | `Run a Standard sprint, run Arrow Duel, fail a sprint and review mistakes, verify History filters, complete a scheduled review, verify local data controls, relaunch the app, and test offline practice in airplane mode.` |
+| What to test | `Run a Standard sprint, run Arrow Duel, fail a sprint and review mistakes, verify History filters, complete a scheduled review, verify iCloud Sync and About links, relaunch the app, and test offline practice in airplane mode.` |
 | Feedback path | `https://github.com/Chessticize/chessticize-mobile/issues` |
 
 ## Preflight Gates
@@ -138,18 +138,21 @@ failure, retry, or unclear result.
       shown.
 - [ ] Complete the visible due queue without corrupting sprint ratings.
 
-### Settings And Local Data
+### Settings
 
 - [ ] Open Settings.
-- [ ] Confirm Settings describes local-only data and does not present fake
-      iCloud sync state.
+- [ ] Confirm Settings shows iCloud Sync, Notifications, Profile, and About
+      sections, with iCloud Sync defaulting off.
+- [ ] Turn iCloud Sync on while signed into iCloud and confirm the status changes
+      to a successful sync state.
+- [ ] On a second Apple device signed into the same iCloud account, turn iCloud
+      Sync on and confirm rating, History, and Review queue import without
+      deleting local-only progress.
+- [ ] Turn iCloud Sync off and confirm practice still works offline.
 - [ ] Change review reminder preference and confirm the UI persists after app
       relaunch.
-- [ ] Use export local data and confirm the share/export flow opens.
-- [ ] Reset ELO with confirmation and confirm the displayed rating changes.
-- [ ] Delete local history with confirmation and confirm History/Review update.
-- [ ] Open license/source information and confirm Stockfish 18 and the public
-      source repository are shown.
+- [ ] Open About links and confirm License, Source, Stockfish, Puzzle Data, and
+      Support email targets open the expected destinations.
 
 ### Persistence And Relaunch
 
@@ -167,7 +170,8 @@ failure, retry, or unclear result.
 - [ ] Start Arrow Duel and confirm candidate arrows still render.
 - [ ] Open a review/history analysis surface and confirm on-device Stockfish
       analysis works without network.
-- [ ] Disable airplane mode and confirm no required sync prompt appears.
+- [ ] Disable airplane mode and confirm optional iCloud Sync remains user
+      controlled.
 
 ## Evidence Log
 

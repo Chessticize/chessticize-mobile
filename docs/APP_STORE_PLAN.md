@@ -25,27 +25,30 @@ settings state is persisted through the same backend boundary.
    rating, review queue, and custom configs are intact).
 3. Do not recreate the service when the dev puzzle-source switch changes
    (currently a `useMemo` on `puzzleSource` wipes state even in dev).
-4. Persist settings state (sync opt-ins, notification preferences) rather than
+4. Persist real settings state, such as notification preferences, rather than
    `useState`-only.
 
 ## Milestone 2 — Honest sync story (App Review risk)
 
-Status: complete for 1.0. The shipped Settings screen now presents an honest
-"Local Data" section: progress is stored on device, export/delete actions remain
-explicit, and there is no fabricated iCloud toggle, upload approval prompt, sync
-status, or last-synced timestamp. Real CloudKit sync remains post-1.0.
+Status: implementation complete, device validation required. The shipped
+Settings screen exposes real optional iCloud Sync backed by a CloudKit private
+database snapshot, not a fabricated status surface. The app does not expose
+incomplete local export/delete controls, and the sync setting defaults off.
 
-1. For 1.0, replace the iCloud sync section with an honest "Local data" section:
-   storage is on-device, export/delete remain, no fabricated sync status.
-   Remove the fake toggle, disclosure, upload prompt, and timestamp (spec rule
-   added 2026-07-03: sync status must reflect real system state).
-   Status: complete. PR #64 replaced the simulated iCloud controls with the
-   local-only Settings surface and added component coverage that rejects the
-   removed fake sync controls.
-2. Real CloudKit sync is post-1.0. When picked up, follow the build order the
-   audit produced: sync metadata columns + migration, `SyncTransport` interface
+1. Remove the earlier simulated iCloud state: no upload approval prompt and no
+   fabricated "last synced" timestamp.
+   Status: complete. The Settings UI now shows only the real sync switch,
+   current sync status, and a manual Sync Now action.
+2. Implement real progress sync: storage import/merge, `ProgressSyncTransport`
    with a maintained fake, CloudKit adapter + entitlement, domain merge engine,
-   then real UI state. Track as its own goal.
+   and truthful UI state.
+   Status: complete. Ratings, history, review queue, and sprint session exports
+   merge through the storage boundary before the merged snapshot is written back
+   to private iCloud.
+3. Before App Store submission, validate on at least two Apple devices signed
+   into the same iCloud account. Confirm enabling sync on one device uploads a
+   snapshot and enabling sync on the second device imports the first device's
+   rating/history/review queue without deleting local-only progress.
 
 ## Milestone 3 — Functional fixes from the 2026-07-03 audit
 
@@ -109,11 +112,11 @@ Review queue:
    is due at `dueAt`, but it becomes overdue only when it is more than 24 hours
    past `dueAt`. The Practice badge, Review summary, Overdue filter,
    difficulty details, and queue row due labels all use that shared definition.
-8. A Standard/Blitz review timeout or unsolvable position dead-ends: the wrong
+8. A Standard or legacy Blitz review timeout or unsolvable position dead-ends: the wrong
    result is recorded but no Continue affordance appears (that exists only on
    the Arrow Duel path). Show the solution or a Continue button after a
    recorded wrong, mirroring the Arrow Duel flow.
-   Status: complete. Standard/Blitz due reviews now enter a post-wrong state
+   Status: complete. Standard and legacy Blitz due reviews now enter a post-wrong state
    after either an incorrect move or timeout: the official wrong result is
    recorded once, board puzzle gestures are disabled, Analysis remains
    available, and the same Continue affordance used by Arrow Duel advances to
@@ -255,14 +258,16 @@ Design approved 2026-07-03; the "Review Reminder Notifications" section of
    version `1.0`, build `1`, a complete iPhone/iPad/marketing AppIcon catalog,
    and a launch screen using the app background `#F8FAFC` instead of the React
    Native template copy.
-3. **Privacy**: App Privacy questionnaire answers (local-only data collection =
-   "Data Not Collected" if truly nothing leaves device), a privacy policy URL,
-   `PrivacyInfo.xcprivacy` privacy manifest (required-reason APIs from RN and
-   SQLite deps), `ITSAppUsesNonExemptEncryption = false` in Info.plist.
+3. **Privacy**: App Privacy questionnaire answers (Data Not Collected / no
+   tracking while optional iCloud Sync stores data only in the user's private
+   Apple iCloud account), a privacy policy URL, `PrivacyInfo.xcprivacy` privacy
+   manifest (required-reason APIs from RN and SQLite deps),
+   `ITSAppUsesNonExemptEncryption = false` in Info.plist.
    Status: implementation complete. `docs/APP_PRIVACY_DISCLOSURE.md` records
    the 1.0 App Store Connect answer as Data Not Collected / no tracking, points
-   the privacy policy URL to the public repository document, and captures the
-   release re-audit gate. `docs/PRIVACY_POLICY.md` is the public policy.
+   the privacy policy URL to the public repository document, documents optional
+   private iCloud Sync, and captures the release re-audit gate.
+   `docs/PRIVACY_POLICY.md` is the public policy.
    `PrivacyInfo.xcprivacy` declares no tracking and no collected data while
    preserving the required-reason API entries currently needed by React Native
    and SQLite dependencies. `Info.plist` sets
@@ -342,8 +347,9 @@ asserting through public UI and stable testIDs):
    Analysis Review, navigate, exit. *(added 2026-07-03)*
 5. Custom sprint: open setup, change timing, live target-count update, start
    session, abandon with confirmation. *(added 2026-07-03)*
-6. Settings: reset ELO with confirmation; delete local history with
-   confirmation; status messages. *(added 2026-07-03)*
+6. Settings: verify iCloud Sync, notification, profile, and About rows remain
+   reachable without local-data reset/export affordances.
+   *(added 2026-07-03; updated after removing rating reset and local-data UI.)*
 7. Relaunch persistence: kill and relaunch, assert rating/history/queue intact.
    *(added 2026-07-03; strengthened to assert persisted review queue totals
    after relaunch.)*
@@ -404,5 +410,3 @@ lockfile requires `pnpm mobile:ios` before any simulator verification.
 - Game Review.
 - Android.
 - Chess.com / Lichess account import.
-- Real CloudKit sync (Milestone 2 ships the honest local-only story; sync is
-  the first post-1.0 goal).

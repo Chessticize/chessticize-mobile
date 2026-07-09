@@ -43,10 +43,16 @@ export interface LocalDataExport {
   sprintSessions: ExportedSprintSession[];
 }
 
+export interface LocalDataImportResult {
+  ratings: number;
+  attempts: number;
+  reviewQueue: number;
+  sprintSessions: number;
+}
+
 export interface PracticeSettings {
   sync: {
     iCloudEnabled: boolean;
-    uploadAllowed: boolean;
   };
   notifications: {
     reviewReminder: ReviewReminderPreference;
@@ -86,6 +92,7 @@ export interface PracticeStore {
   recordAttempt(attempt: AttemptEvent): void;
   listAttempts(filter?: HistoryFilter): AttemptHistoryRow[];
   exportLocalData(): LocalDataExport;
+  importLocalData(data: LocalDataExport): LocalDataImportResult;
   clearLocalHistory(): ClearLocalHistoryResult;
   getSessionMistakeReview(sessionId: string): SessionMistakeReviewItem[];
   scheduleMistakeReview(context: ReviewContext, now: string): ReviewQueueState;

@@ -278,8 +278,7 @@ test("PracticeService persists settings through the store boundary", () => {
   const defaults = service.getSettings();
   assert.deepEqual(defaults, {
     sync: {
-      iCloudEnabled: true,
-      uploadAllowed: false
+      iCloudEnabled: false
     },
     notifications: {
       reviewReminder: {
@@ -290,8 +289,7 @@ test("PracticeService persists settings through the store boundary", () => {
 
   const saved = service.saveSettings({
     sync: {
-      iCloudEnabled: false,
-      uploadAllowed: true
+      iCloudEnabled: true
     },
     notifications: {
       reviewReminder: {
@@ -301,13 +299,13 @@ test("PracticeService persists settings through the store boundary", () => {
     }
   });
 
-  saved.sync.iCloudEnabled = true;
-  assert.equal(service.getSettings().sync.iCloudEnabled, false);
-  assert.equal(service.getSettings().sync.uploadAllowed, true);
+  saved.sync.iCloudEnabled = false;
+  saved.notifications.reviewReminder = { mode: "off" };
+  assert.deepEqual(service.getSettings().sync, { iCloudEnabled: true });
+  assert.deepEqual(service.getSettings().notifications.reviewReminder, { mode: "fixed", fixedLocalTime: "20:30" });
   assert.deepEqual(service.exportLocalData().settings, {
     sync: {
-      iCloudEnabled: false,
-      uploadAllowed: true
+      iCloudEnabled: true
     },
     notifications: {
       reviewReminder: {
