@@ -67,7 +67,8 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "practice-mode-custom-icon"))).toBe("");
     expect(findByTestId(renderer, "practice-mode-standard-start")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "practice-mode-standard-start"))).toBe("");
-    expect(findByTestId(renderer, "practice-mode-standard-start").props.accessibilityRole).toBeUndefined();
+    expect(findByTestId(renderer, "practice-mode-standard-start").props.accessibilityRole).toBe("button");
+    expect(findByTestId(renderer, "practice-mode-standard-start").props.accessibilityLabel).toBe("Start Standard sprint");
     expect(findByTestId(renderer, "practice-mode-standard-details").props.accessibilityLabel).toBe("5 min · 20s pace · ELO 600");
     expect(findByTestId(renderer, "practice-mode-arrow-duel-details").props.accessibilityLabel).toBe("5 min · 30s pace · ELO 600");
     expect(collectText(findByTestId(renderer, "practice-mode-standard-rating"))).toBe("ELO 600");
@@ -77,8 +78,8 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "practice-mode-arrow-duel"))).not.toContain("Choose the best move · 5 min");
     expect(collectText(findByTestId(renderer, "practice-mode-custom"))).toContain("Time, theme, rating");
     expect(collectText(findByTestId(renderer, "practice-mode-custom"))).not.toContain("Time, theme, rating · 5 min");
-    expect(findByTestId(renderer, "practice-mode-standard").props.accessibilityLabel).toBe("Standard mode, 5 min · 20s pace · ELO 600");
-    expect(findByTestId(renderer, "practice-mode-arrow-duel").props.accessibilityLabel).toBe("Arrow Duel mode, 5 min · 30s pace · ELO 600");
+    expect(findByTestId(renderer, "practice-mode-standard").props.accessibilityLabel).toBe("Select Standard mode, 5 min · 20s pace · ELO 600");
+    expect(findByTestId(renderer, "practice-mode-arrow-duel").props.accessibilityLabel).toBe("Select Arrow Duel mode, 5 min · 30s pace · ELO 600");
     expect(() => findByTestId(renderer, "rating-label")).toThrow();
     expect(collectText(renderer.root)).not.toContain("Target 15");
     expect(collectText(renderer.root)).not.toContain("standard 5/20");
@@ -121,6 +122,26 @@ describe("PracticePocScreen", () => {
     expect(collectText(renderer.root)).not.toContain(`Offline-ready · ${bundledPuzzleLabel} puzzles`);
     expect(findByTestId(renderer, "app-shell-header").props.accessibilityLabel).toContain(`Offline-ready · ${rawBundledPuzzleLabel} puzzles`);
     expect(collectText(findByTestId(renderer, "practice-action-header"))).toBe("Start a Sprint");
+  });
+
+  it("selects Arrow Duel on the home screen before starting from its start control", () => {
+    const service = createMobilePracticeService("familiar15");
+    service.setRating("arrow duel 5/30", 900);
+    const renderer = renderScreen({ practiceService: service });
+
+    press(renderer, "practice-mode-arrow-duel");
+
+    expect(findByTestId(renderer, "practice-home")).toBeTruthy();
+    expect(findByTestId(renderer, "practice-mode-standard").props.accessibilityState).toEqual({ selected: false });
+    expect(findByTestId(renderer, "practice-mode-arrow-duel").props.accessibilityState).toEqual({ selected: true });
+    expect(hasStyleEntry(findByTestId(renderer, "practice-mode-arrow-duel"), "borderColor", "#93C5FD")).toBe(true);
+    expect(collectText(findByTestId(renderer, "practice-progress-rating-metric"))).toContain("ELO (Arrow Duel)");
+    expect(collectText(findByTestId(renderer, "practice-progress-rating-metric"))).toContain("900");
+    expect(() => findByTestId(renderer, "session-board")).toThrow();
+
+    press(renderer, "practice-mode-arrow-duel-start");
+
+    expect(findByTestId(renderer, "session-board")).toBeTruthy();
   });
 
   it("scopes the home progress summary to the selected rating bucket", () => {
@@ -278,11 +299,11 @@ describe("PracticePocScreen", () => {
     expect(hasStyleEntry(findByTestId(renderer, "practice-progress-weekly-delta"), "color", "#DC2626")).toBe(true);
   });
 
-  it("starts a selected sprint directly from the mode row", () => {
+  it("starts a selected sprint from the mode start control", () => {
     const renderer = renderScreen({ practiceService: createMobilePracticeService("familiar15") });
 
     expect(() => findByTestId(renderer, "session-loading-skeleton")).toThrow();
-    press(renderer, "practice-mode-standard");
+    press(renderer, "practice-mode-standard-start");
 
     expect(() => findByTestId(renderer, "session-loading-skeleton")).toThrow();
     expect(findByTestId(renderer, "session-board")).toBeTruthy();
@@ -458,14 +479,14 @@ describe("PracticePocScreen", () => {
 
     try {
       const coreRenderer = renderScreen({ practiceServiceFactory: () => coreService });
-      press(coreRenderer, "practice-mode-standard");
+      startStandardSprint(coreRenderer);
       expect(coreStartSprintSpy).toHaveBeenLastCalledWith(expect.objectContaining({
         puzzleSelectionSeed: "1789000000-0.314159"
       }));
 
       const familiarRenderer = renderScreen({ practiceServiceFactory: () => familiarService });
       press(familiarRenderer, "test-puzzle-source-familiar15");
-      press(familiarRenderer, "practice-mode-standard");
+      startStandardSprint(familiarRenderer);
       expect(familiarStartSprintSpy).toHaveBeenLastCalledWith(expect.not.objectContaining({
         puzzleSelectionSeed: expect.anything()
       }));
@@ -824,7 +845,7 @@ describe("PracticePocScreen", () => {
     const renderer = renderScreen({ practiceService: createMobilePracticeService("familiar15") });
     const arrow = firstArrowDuelPuzzleForTest();
 
-    press(renderer, "practice-mode-arrow-duel");
+    startArrowDuelSprint(renderer);
 
     expect(findByTestId(renderer, "mock-chessboard").props.flipped).toBe(new Chess(arrow.currentFen).turn() === "b");
     expect(collectText(renderer.root)).not.toContain("Choose one candidate move");
@@ -851,7 +872,7 @@ describe("PracticePocScreen", () => {
     const renderer = renderScreen({ practiceService: createMobilePracticeService("familiar15") });
     const arrow = firstArrowDuelPuzzleForTest();
 
-    press(renderer, "practice-mode-arrow-duel");
+    startArrowDuelSprint(renderer);
 
     await boardMove(renderer, arrow.correctMove);
 
@@ -875,7 +896,7 @@ describe("PracticePocScreen", () => {
     });
     const arrow = firstArrowDuelPuzzleForTest();
 
-    press(renderer, "practice-mode-arrow-duel");
+    startArrowDuelSprint(renderer);
 
     const boardFen = findByTestId(renderer, "mock-chessboard").props.fen;
     const nonCandidate = firstLegalNonCandidate(boardFen, arrow.candidates);
@@ -2446,7 +2467,7 @@ describe("PracticePocScreen", () => {
     });
     const wrongMoves: string[] = [];
 
-    press(renderer, "practice-mode-arrow-duel");
+    startArrowDuelSprint(renderer);
 
     wrongMoves.push(currentArrowWrongMove(activeSprintForTest(service)));
     await boardMove(renderer, wrongMoves[0] as string);
@@ -3117,7 +3138,11 @@ async function pressAsync(renderer: TestRenderer.ReactTestRenderer, testID: stri
 }
 
 function startStandardSprint(renderer: TestRenderer.ReactTestRenderer): void {
-  press(renderer, "practice-mode-standard");
+  press(renderer, "practice-mode-standard-start");
+}
+
+function startArrowDuelSprint(renderer: TestRenderer.ReactTestRenderer): void {
+  press(renderer, "practice-mode-arrow-duel-start");
 }
 
 function abandonSprint(renderer: TestRenderer.ReactTestRenderer): void {

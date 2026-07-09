@@ -20,8 +20,9 @@ async function playBoardMove(testID, move, flipped = false) {
 
 async function startPracticeMode(mode) {
   const modeCardId = `practice-mode-${mode}`;
+  const modeStartId = `${modeCardId}-start`;
   await waitForVisibleInPracticeScroll(modeCardId);
-  await tapUntilExists(modeCardId, 'session-board', 3);
+  await tapUntilExists(modeStartId, 'session-board', 3);
 }
 
 async function launchWithDisabledSynchronization(options = {}) {
