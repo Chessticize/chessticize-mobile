@@ -135,6 +135,14 @@ async function openTab(tabTestID, contentTestID) {
   await waitForVisibleInPracticeScroll(contentTestID);
 }
 
+async function openStandardHistoryTrend() {
+  await openTab('history-tab', 'history-action-header');
+  await waitFor(element(by.id('history-rating-standard 5/20'))).toBeVisible().withTimeout(10000);
+  await element(by.id('history-rating-standard 5/20')).tap();
+  await waitFor(element(by.id('history-performance-card'))).toExist().withTimeout(10000);
+  await waitFor(element(by.id('history-chart-line'))).toExist().withTimeout(10000);
+}
+
 async function failStandardSprint() {
   await selectTestPuzzleSource('familiar15');
   await startPracticeMode('standard');
@@ -153,6 +161,7 @@ async function failStandardSprint() {
 
 module.exports = {
   openTab,
+  openStandardHistoryTrend,
   launchWithDisabledSynchronization,
   sleep,
   frameFor,

@@ -278,7 +278,7 @@ test("PracticeService persists settings through the store boundary", () => {
   const defaults = service.getSettings();
   assert.deepEqual(defaults, {
     sync: {
-      iCloudEnabled: false
+      iCloudEnabled: true
     },
     notifications: {
       reviewReminder: {
@@ -467,6 +467,42 @@ test("PracticeService builds MemoryStore history view for a required time range 
     view.attempts.map((attempt) => attempt.id)
   );
   assert.deepEqual(service.getHistoryView({ ...view.query, reviewStatus: "clear" }).attempts, []);
+});
+
+test("PracticeService builds MemoryStore history view across rating buckets when no rating key is selected", async () => {
+  const store = new MemoryStore();
+  store.seedPuzzles(await loadFixturePuzzles());
+  const service = new PracticeService(store);
+
+  service.recordReviewAttempt({
+    puzzleId: "000hf",
+    mode: "standard",
+    ratingKey: "standard 5/20",
+    result: "wrong",
+    submittedMove: "c4b5",
+    expectedMove: "e2e6",
+    startedAt: "2026-06-20T00:00:00.000Z"
+  }, "2026-06-20T00:00:05.000Z");
+  service.recordReviewAttempt({
+    puzzleId: "00008",
+    mode: "arrow_duel",
+    ratingKey: "arrow duel 5/30",
+    result: "correct",
+    submittedMove: "b2b1",
+    expectedMove: "b2b1",
+    startedAt: "2026-06-20T00:01:00.000Z"
+  }, "2026-06-20T00:01:05.000Z");
+
+  const view = service.getHistoryView({
+    now: "2026-06-21T00:00:00.000Z",
+    timeRange: "max"
+  });
+
+  assert.deepEqual(
+    view.attempts.map((attempt) => attempt.ratingKey).sort(),
+    ["arrow duel 5/30", "standard 5/20"]
+  );
+  assert.deepEqual(view.performance.charts.rating, []);
 });
 
 test("PracticeService persists MemoryStore custom sprint configs after successful custom starts", async () => {

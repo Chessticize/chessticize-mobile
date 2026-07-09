@@ -122,8 +122,10 @@ failure, retry, or unclear result.
 ### History
 
 - [ ] Open History.
-- [ ] Verify required time range and rating-key filters are visible.
+- [ ] Verify History defaults to All Puzzles with top-level rating-key filters
+      visible.
 - [ ] Filter to 7 days, 30 days, 90 days, 1 year, and Max.
+- [ ] Select a specific rating-key bucket and confirm the rating trend appears.
 - [ ] Toggle wrong-only filtering and confirm rows update.
 - [ ] Open a History row into Analysis Review.
 - [ ] Confirm the performance summary reflects the selected time range.
@@ -142,12 +144,12 @@ failure, retry, or unclear result.
 
 - [ ] Open Settings.
 - [ ] Confirm Settings shows iCloud Sync, Notifications, Profile, and About
-      sections, with iCloud Sync defaulting off.
-- [ ] Turn iCloud Sync on while signed into iCloud and confirm the status changes
-      to a successful sync state.
-- [ ] On a second Apple device signed into the same iCloud account, turn iCloud
-      Sync on and confirm rating, History, and Review queue import without
-      deleting local-only progress.
+      sections, with iCloud Sync defaulting on.
+- [ ] While signed into iCloud, confirm the default sync state reaches a
+      successful sync status or exposes the real account error.
+- [ ] On a second Apple device signed into the same iCloud account, confirm the
+      default enabled sync imports rating, History, and Review queue data
+      without deleting local-only progress.
 - [ ] Turn iCloud Sync off and confirm practice still works offline.
 - [ ] Change review reminder preference and confirm the UI persists after app
       relaunch.
@@ -170,8 +172,7 @@ failure, retry, or unclear result.
 - [ ] Start Arrow Duel and confirm candidate arrows still render.
 - [ ] Open a review/history analysis surface and confirm on-device Stockfish
       analysis works without network.
-- [ ] Disable airplane mode and confirm optional iCloud Sync remains user
-      controlled.
+- [ ] Disable airplane mode and confirm iCloud Sync remains user controlled.
 
 ## Evidence Log
 

@@ -4,7 +4,7 @@ import type { PracticeSettings, ReviewReminderPreference } from "./practice-stor
 export function defaultPracticeSettings(): PracticeSettings {
   return {
     sync: {
-      iCloudEnabled: false
+      iCloudEnabled: true
     },
     notifications: {
       reviewReminder: {

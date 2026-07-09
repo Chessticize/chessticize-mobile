@@ -8,6 +8,8 @@ import type { Puzzle } from "../../core/src/index.ts";
 
 test("syncPracticeProgress does not touch transport while iCloud sync is disabled", async () => {
   const store = await seededMemoryStore();
+  const service = new PracticeService(store);
+  disableSync(service);
   const transport = new RecordingTransport();
 
   const result = await syncPracticeProgress(store, transport, {
@@ -231,6 +233,15 @@ function enableSync(service: PracticeService): void {
     ...service.getSettings(),
     sync: {
       iCloudEnabled: true
+    }
+  });
+}
+
+function disableSync(service: PracticeService): void {
+  service.saveSettings({
+    ...service.getSettings(),
+    sync: {
+      iCloudEnabled: false
     }
   });
 }

@@ -964,38 +964,37 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("Promotion");
     expect(() => findByTestId(renderer, "custom-summary-card")).toThrow();
     expect(collectText(findByTestId(renderer, "custom-summary-target"))).toBe("Estimated puzzles~15");
-    expect(collectText(findByTestId(renderer, "custom-summary-rating-range"))).toBe("Rating range400 - 800");
-    expect(collectText(findByTestId(renderer, "custom-mode-summary"))).toContain("Regular puzzles");
-    expect(collectText(findByTestId(renderer, "custom-mistake-limit"))).toBe("Mistake limit3");
-    expect(findByTestId(renderer, "custom-mistake-limit-detail").props.accessibilityLabel).toBe("Fixed by sprint scoring rules");
+    expect(findByTestId(renderer, "custom-initial-rating-row")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "custom-initial-rating-value"))).toBe("ELO 600");
+    expect(findByTestId(renderer, "custom-initial-rating-stepper-decrease").props.accessibilityState).toEqual({ disabled: true });
+    expect(findByTestId(renderer, "custom-initial-rating-stepper-increase").props.accessibilityState).toEqual({ disabled: false });
+    expect(() => findByTestId(renderer, "custom-summary-rating-range")).toThrow();
+    expect(() => findByTestId(renderer, "custom-mode-summary")).toThrow();
+    expect(() => findByTestId(renderer, "custom-mistake-limit")).toThrow();
     expect(findByTestId(renderer, "custom-previous-configs")).toBeTruthy();
-    expect(findByTestId(renderer, "custom-separate-scoring")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "custom-separate-scoring"))).toContain("ELO 600");
     expect(collectText(findByTestId(renderer, "custom-target-count"))).toBe("~15");
     expect(() => findByTestId(renderer, "custom-target-row")).toThrow();
     expect(() => findByTestId(renderer, "custom-rating-range")).toThrow();
     expect(() => findByTestId(renderer, "custom-current-rating")).toThrow();
-    expect(collectText(findByTestId(renderer, "custom-config-list"))).toContain("Current rating");
+    expect(collectText(findByTestId(renderer, "custom-config-list"))).not.toContain("Current rating");
     expect(collectText(findByTestId(renderer, "custom-config-list"))).not.toContain("separate bucket");
-    expect(findByTestId(renderer, "custom-separate-scoring-detail").props.accessibilityLabel).toBe("Custom · 20s pace · separate bucket");
-    expect(findByTestId(renderer, "custom-mode-summary-detail").props.accessibilityLabel).toBe("Board-move puzzle sprint");
-    expect(findByTestId(renderer, "custom-include-arrow-duel-detail").props.accessibilityLabel).toBe("Switches this custom sprint to Arrow Duel scoring.");
-    expect(collectText(findByTestId(renderer, "custom-include-arrow-duel"))).not.toContain("Switches this custom sprint");
     expect(findByTestId(renderer, "custom-previous-empty")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "custom-previous-empty"))).toContain("Start a custom sprint");
-    expect(findByTestId(renderer, "custom-include-arrow-duel")).toBeTruthy();
+    expect(() => findByTestId(renderer, "custom-include-arrow-duel")).toThrow();
     expect(findByTestId(renderer, "custom-duration-stepper")).toBeTruthy();
     expect(findByTestId(renderer, "custom-per-puzzle-stepper")).toBeTruthy();
+    expect(findByTestId(renderer, "custom-initial-rating-stepper")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "custom-duration-stepper-decrease"))).toBe("");
     expect(collectText(findByTestId(renderer, "custom-duration-stepper-increase"))).toBe("");
     expect(collectText(findByTestId(renderer, "custom-per-puzzle-stepper-decrease"))).toBe("");
     expect(collectText(findByTestId(renderer, "custom-per-puzzle-stepper-increase"))).toBe("");
+    expect(collectText(findByTestId(renderer, "custom-initial-rating-stepper-decrease"))).toBe("");
+    expect(collectText(findByTestId(renderer, "custom-initial-rating-stepper-increase"))).toBe("");
     expect(collectText(findByTestId(renderer, "custom-config-list"))).not.toContain("−");
     expect(collectText(findByTestId(renderer, "custom-config-list"))).not.toContain("＋");
     expect(collectText(findByTestId(renderer, "custom-config-list"))).not.toContain("›");
     expect(collectText(findByTestId(renderer, "custom-config-list"))).not.toContain("Allowed values");
     expect(() => findByTestId(renderer, "custom-mistake-limit-stepper")).toThrow();
-    expect(collectText(findByTestId(renderer, "custom-include-arrow-duel-toggle"))).toBe("");
     press(renderer, "custom-theme-mate");
     expectText(renderer, "Mate");
     expect(findByTestId(renderer, "custom-broaden-theme")).toBeTruthy();
@@ -1004,16 +1003,12 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("Mixed");
     expect(() => findByTestId(renderer, "custom-broaden-theme")).toThrow();
     press(renderer, "custom-theme-mate");
-    press(renderer, "custom-include-arrow-duel-toggle");
-    expect(findByTestId(renderer, "custom-include-arrow-duel-toggle").props.accessibilityState).toEqual({ checked: true });
+    press(renderer, "custom-mode-arrow-duel");
     expect(findByTestId(renderer, "custom-mode-regular").props.accessibilityState).toEqual({ selected: false });
     expect(findByTestId(renderer, "custom-mode-arrow-duel").props.accessibilityState).toEqual({ selected: true });
-    expect(collectText(findByTestId(renderer, "custom-mode-summary"))).toContain("Arrow Duel");
-    press(renderer, "custom-include-arrow-duel-toggle");
-    expect(findByTestId(renderer, "custom-include-arrow-duel-toggle").props.accessibilityState).toEqual({ checked: false });
+    press(renderer, "custom-mode-regular");
     expect(findByTestId(renderer, "custom-mode-regular").props.accessibilityState).toEqual({ selected: true });
     expect(findByTestId(renderer, "custom-mode-arrow-duel").props.accessibilityState).toEqual({ selected: false });
-    expect(collectText(findByTestId(renderer, "custom-mode-summary"))).toContain("Regular puzzles");
     expect(collectText(findByTestId(renderer, "custom-target-count"))).toBe("~15");
 
     press(renderer, "custom-duration-stepper-decrease");
@@ -1022,7 +1017,6 @@ describe("PracticePocScreen", () => {
     press(renderer, "custom-per-puzzle-stepper-increase");
 
     expect(collectText(findByTestId(renderer, "custom-target-count"))).toBe("~6");
-    expect(findByTestId(renderer, "custom-separate-scoring-detail").props.accessibilityLabel).toBe("Custom · 30s pace · separate bucket");
     expect(collectText(findByTestId(renderer, "custom-config-list"))).not.toContain("custom 3/30");
     expect(findByTestId(renderer, "start-sprint-button").props.accessibilityState).toEqual({ disabled: false });
 
@@ -1056,7 +1050,31 @@ describe("PracticePocScreen", () => {
     press(renderer, "custom-previous-custom-custom-180-30-mate");
     expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("Mate");
     expect(collectText(findByTestId(renderer, "custom-target-count"))).toBe("~6");
-    expect(findByTestId(renderer, "custom-separate-scoring-detail").props.accessibilityLabel).toBe("Custom · 30s pace · separate bucket");
+    expect(collectText(findByTestId(renderer, "custom-initial-rating-value"))).toBe("ELO 600");
+  });
+
+  it("uses editable initial ELO for unplayed custom buckets and locks played buckets", () => {
+    const service = createMobilePracticeService("familiar15");
+    const renderer = renderScreen({ practiceService: service });
+
+    press(renderer, "practice-mode-custom");
+    press(renderer, "custom-initial-rating-stepper-increase");
+    press(renderer, "custom-initial-rating-stepper-increase");
+    expect(collectText(findByTestId(renderer, "custom-initial-rating-value"))).toBe("ELO 800");
+
+    press(renderer, "start-sprint-button");
+    expect(activeSprintForTest(service).ratingBefore).toBe(800);
+
+    const lockedStore = new MemoryStore();
+    lockedStore.seedPuzzles([sharedHistoryPuzzle()]);
+    lockedStore.saveRating({ key: "custom 5/20", generation: 0, rating: 900, games: 1 });
+    const lockedRenderer = renderScreen({ practiceService: new PracticeService(lockedStore) });
+
+    press(lockedRenderer, "practice-mode-custom");
+    expect(collectText(findByTestId(lockedRenderer, "custom-initial-rating-value"))).toBe("ELO 900");
+    expect(collectText(findByTestId(lockedRenderer, "custom-initial-rating-locked"))).toBe("Locked after play");
+    expect(findByTestId(lockedRenderer, "custom-initial-rating-stepper-decrease").props.accessibilityState).toEqual({ disabled: true });
+    expect(findByTestId(lockedRenderer, "custom-initial-rating-stepper-increase").props.accessibilityState).toEqual({ disabled: true });
   });
 
   it("shows custom sprint local pack readiness when the selected fixture has enough puzzles", () => {
@@ -1093,8 +1111,8 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "custom-mode-regular").props.accessibilityState).toEqual({ selected: false });
     expect(findByTestId(renderer, "custom-mode-arrow-duel").props.accessibilityState).toEqual({ selected: true });
-    expect(collectText(findByTestId(renderer, "custom-mode-summary"))).toContain("Arrow Duel");
-    expect(findByTestId(renderer, "custom-separate-scoring-detail").props.accessibilityLabel).toBe("Arrow Duel · 20s pace · separate bucket");
+    expect(() => findByTestId(renderer, "custom-mode-summary")).toThrow();
+    expect(() => findByTestId(renderer, "custom-separate-scoring")).toThrow();
     expect(collectText(findByTestId(renderer, "custom-config-list"))).not.toContain("arrow_duel 5/20");
     expect(findByTestId(renderer, "start-sprint-button").props.accessibilityState).toEqual({ disabled: false });
 
@@ -1180,6 +1198,7 @@ describe("PracticePocScreen", () => {
     }
 
     press(renderer, "history-tab");
+    press(renderer, "history-rating-standard 5/20");
     const plotWidth = 300;
     act(() => {
       findByTestId(renderer, "history-chart-line").props.onLayout({
@@ -1248,6 +1267,12 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "history-filter-summary-card")).toThrow();
     expect(findByTestId(renderer, "history-active-filter-summary")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("7 days");
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("All puzzles");
+    expect(findByTestId(renderer, "history-rating-filters")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "history-rating-filters"))).toContain("All Puzzles");
+    expect(collectText(findByTestId(renderer, "history-rating-filters"))).toContain("Standard · 20s pace");
+    expect(() => findByTestId(renderer, "history-performance-card")).toThrow();
+    press(renderer, "history-rating-standard 5/20");
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Standard · 20s pace");
     expect(findByTestId(renderer, "history-performance-card")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "history-performance-card"))).toContain("Rating Trend");
@@ -1402,6 +1427,7 @@ describe("PracticePocScreen", () => {
     const renderer = renderScreen({ practiceService: service });
 
     press(renderer, "history-tab");
+    press(renderer, "history-rating-standard 5/20");
     press(renderer, "history-filter-toggle");
     press(renderer, "history-source-review");
     expectText(renderer, "1-20 of 22");
@@ -1446,6 +1472,7 @@ describe("PracticePocScreen", () => {
     const renderer = renderScreen({ practiceService: service });
 
     press(renderer, "history-tab");
+    press(renderer, "history-rating-standard 5/20");
     press(renderer, "history-filter-toggle");
     press(renderer, "history-source-review");
     expectText(renderer, "1-20 of 22");
@@ -1486,13 +1513,18 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "history-tab");
     press(renderer, "history-range-max");
+    expect(() => findByTestId(renderer, "history-performance-card")).toThrow();
+    expect(findByTestId(renderer, "history-attempt-arrow-attempt")).toBeTruthy();
+    expect(findByTestId(renderer, "history-attempt-standard-attempt")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("All puzzles");
+
+    press(renderer, "history-rating-arrow duel 5/30");
     expect(collectText(findByTestId(renderer, "history-performance-context"))).toBe("Arrow Duel · 30s pace · All Time");
     expect(collectText(findByTestId(renderer, "history-attempt-arrow-attempt-review-state"))).toBe(
       `Review ${formatLocalCalendarDate("2026-06-21T00:01:00.000Z")}`
     );
     expect(collectText(findByTestId(renderer, "history-attempt-arrow-attempt-difficulty"))).toBe("Hard");
 
-    press(renderer, "history-filter-toggle");
     press(renderer, "history-rating-standard 5/20");
     expect(collectText(findByTestId(renderer, "history-performance-context"))).toBe("Standard · 20s pace · All Time");
     expect(collectText(findByTestId(renderer, "history-attempt-standard-attempt-review-state"))).toBe("Review queued");
@@ -2663,6 +2695,7 @@ describe("PracticePocScreen", () => {
 
     abandonSprint(renderer);
     press(renderer, "history-tab");
+    press(renderer, "history-rating-standard 5/20");
     expect(collectText(findByTestId(renderer, "history-performance-card"))).toContain("Rating Trend");
     expect(collectText(findByTestId(renderer, "history-performance-card"))).not.toContain("Accuracy");
     expect(collectText(renderer.root)).not.toContain("Standard · wrong · e6f7");
@@ -2705,10 +2738,10 @@ describe("PracticePocScreen", () => {
     expect(collectText(renderer.root)).not.toContain("Delete Local History");
     expect(collectText(renderer.root)).not.toContain("On device");
     expect(collectText(findByTestId(renderer, "settings-sync-section"))).toContain("iCloud Sync");
-    expect(collectText(findByTestId(renderer, "settings-sync-status"))).toContain("Off");
+    expect(collectText(findByTestId(renderer, "settings-sync-status"))).toContain("On");
     expect(findByTestId(renderer, "settings-icloud-sync-on")).toBeTruthy();
     expect(findByTestId(renderer, "settings-icloud-sync-off")).toBeTruthy();
-    expect(() => findByTestId(renderer, "settings-sync-now")).toThrow();
+    expect(findByTestId(renderer, "settings-sync-now")).toBeTruthy();
     expect(testIdOrder(renderer, "settings-sync-section", "settings-notifications-section")).toBeLessThan(0);
     expect(testIdOrder(renderer, "settings-notifications-section", "settings-profile-section")).toBeLessThan(0);
     expect(collectText(findByTestId(renderer, "settings-notifications-section"))).toContain("Notifications");
@@ -2795,7 +2828,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "settings-panel"))).not.toContain("›");
   });
 
-  it("syncs progress through the injected iCloud client from Settings", async () => {
+  it("syncs progress through the injected iCloud client by default and from Settings", async () => {
     const service = createMobilePracticeService("random1000");
     service.startSprint(
       { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
@@ -2808,20 +2841,24 @@ describe("PracticePocScreen", () => {
       iCloudProgressSyncClient: client
     });
 
-    press(renderer, "settings-tab");
-    expect(collectText(findByTestId(renderer, "settings-sync-status"))).toContain("Off");
-
-    await pressAsync(renderer, "settings-icloud-sync-on");
-    await flushMicrotasks();
+    await waitForAssertion(() => {
+      expect(client.fetchCount).toBe(1);
+      expect(client.saveCount).toBe(1);
+    });
 
     expect(service.getSettings().sync.iCloudEnabled).toBe(true);
-    expect(client.fetchCount).toBe(1);
-    expect(client.saveCount).toBe(1);
+    press(renderer, "settings-tab");
     expect(findByTestId(renderer, "settings-sync-now")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "settings-sync-status"))).toContain("Synced");
     expect(client.savedSnapshots[0]?.data.attempts.length).toBe(1);
     expect(client.savedSnapshots[0]?.data.reviewQueue.length).toBe(1);
     expect(client.savedSnapshots[0]?.data.ratings.find((rating) => rating.key === "standard 5/20")?.games).toBe(1);
+
+    await pressAsync(renderer, "settings-sync-now");
+    await waitForAssertion(() => {
+      expect(client.fetchCount).toBe(2);
+      expect(client.saveCount).toBe(2);
+    });
   });
 
   it("opens advanced rating controls from the current Puzzle ELO row", () => {
