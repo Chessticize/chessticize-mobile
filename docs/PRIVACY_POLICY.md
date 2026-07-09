@@ -15,9 +15,11 @@ local data can include puzzle ratings, sprint history, puzzle attempts, review
 queue state, settings, and local notification preferences. This data is not
 transmitted to Chessticize.
 
-If you turn on iCloud Sync, Chessticize Mobile stores a progress snapshot in
-your private iCloud account using Apple's CloudKit service so your Apple devices
-can merge ratings, history, and review queue state. Chessticize does not operate a sync server and does not have a Chessticize account system for this data.
+iCloud Sync defaults on and can be turned off in Settings. When enabled,
+Chessticize Mobile stores a progress snapshot in your private iCloud account
+using Apple's CloudKit service so your Apple devices can merge ratings, history,
+and review queue state. Chessticize does not operate a sync server and does not
+have a Chessticize account system for this data.
 
 ## Tracking
 
@@ -27,8 +29,8 @@ companies.
 ## Network Use
 
 The 1.0 app is designed to practice without a network connection. Puzzle data
-and Stockfish analysis run on device. Optional iCloud Sync uses Apple's iCloud
-and CloudKit network services only when you enable it. Development builds can
+and Stockfish analysis run on device. iCloud Sync uses Apple's iCloud and
+CloudKit network services only while it is enabled. Development builds can
 connect to local developer tooling, but release builds do not require Metro or a
 Chessticize server to practice.
 

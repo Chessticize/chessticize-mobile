@@ -19,11 +19,11 @@ Rationale:
 - The app has no accounts, ads, analytics SDK, tracking SDK, or remote telemetry.
 - Puzzle data is bundled with the app.
 - Sprint history, puzzle attempts, ratings, review queue state, settings, and
-  reminder preferences are stored locally on device by default.
-- Optional iCloud Sync stores a progress snapshot in the user's private iCloud
-  account through Apple's CloudKit service. Chessticize does not operate a sync
-  server, does not receive this data, and does not use it for tracking or
-  analytics.
+  reminder preferences are stored locally on device so offline practice works.
+- iCloud Sync defaults on and can be turned off by the user. When enabled, it
+  stores a progress snapshot in the user's private iCloud account through
+  Apple's CloudKit service. Chessticize does not operate a sync server, does not
+  receive this data, and does not use it for tracking or analytics.
 - Stockfish analysis runs on device.
 - Review reminders are local notifications and do not use a push notification
   server.
@@ -67,8 +67,8 @@ Before submission:
 3. Confirm the test-only puzzle source switch is hidden in the release build.
 4. Search the release diff for new SDKs, network clients, telemetry, accounts,
    cloud sync, crash reporting, or permission prompts.
-5. Confirm optional iCloud Sync still uses only the app's private CloudKit
-   container and does not introduce a Chessticize-operated data collection path.
+5. Confirm iCloud Sync still uses only the app's private CloudKit container and
+   does not introduce a Chessticize-operated data collection path.
 6. Re-run the privacy regression test:
 
    ```sh

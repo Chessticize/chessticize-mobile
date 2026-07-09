@@ -204,6 +204,9 @@ const USER_FEEDBACK_BEFORE_AUTO_MS = 260;
 const ANALYSIS_DEPTH = 20;
 const CUSTOM_DURATION_OPTIONS = [3 * 60, 5 * 60, 10 * 60] as const;
 const CUSTOM_PER_PUZZLE_OPTIONS = [10, 20, 30] as const;
+const CUSTOM_INITIAL_RATING_MIN = 600;
+const CUSTOM_INITIAL_RATING_MAX = 2200;
+const CUSTOM_INITIAL_RATING_STEP = 100;
 const CUSTOM_THEME_OPTIONS: ReadonlyArray<CustomThemeFilter> = [
   "mixed",
   "mate",
@@ -411,6 +414,7 @@ export function PracticePocScreen({
   const [customDurationSeconds, setCustomDurationSeconds] = useState(5 * 60);
   const [customPerPuzzleSeconds, setCustomPerPuzzleSeconds] = useState(20);
   const [customTheme, setCustomTheme] = useState<CustomThemeFilter>("mixed");
+  const [customInitialRating, setCustomInitialRating] = useState(CUSTOM_INITIAL_RATING_MIN);
   const [reviewReminderPreference, setReviewReminderPreference] = useState<ReviewReminderPreference>(() => service.getReviewReminderPreference());
   const [notificationPermissionStatus, setNotificationPermissionStatus] = useState<ReviewReminderPermissionStatus>("unavailable");
   const [reviewReminderScheduleStatus, setReviewReminderScheduleStatus] = useState("unavailable");
@@ -441,6 +445,9 @@ export function PracticePocScreen({
     () => sprintConfigFor(mode === "custom" ? customSprintMode : mode, customDurationSeconds, customPerPuzzleSeconds, mode === "custom", themeForCustomSprint(customTheme)),
     [customDurationSeconds, customPerPuzzleSeconds, customSprintMode, customTheme, mode]
   );
+  const selectedRatingRecord = service.getRating(selectedConfig.ratingKey);
+  const customInitialRatingLocked = selectedRatingRecord.games > 0;
+  const displayedCustomInitialRating = customInitialRatingLocked ? selectedRatingRecord.rating : customInitialRating;
   stateRef.current = state;
   boardFenRef.current = boardFen;
   feedbackSnapshotRef.current = feedbackSnapshot;
@@ -448,7 +455,11 @@ export function PracticePocScreen({
   nowMsRef.current = nowMs;
 
   useEffect(() => {
-    setCurrentRating(readRating(service, selectedConfig.ratingKey));
+    const rating = service.getRating(selectedConfig.ratingKey);
+    setCurrentRating(rating.rating);
+    if (selectedConfig.mode === "custom" || selectedConfig.mode === "arrow_duel") {
+      setCustomInitialRating(rating.games > 0 ? rating.rating : CUSTOM_INITIAL_RATING_MIN);
+    }
   }, [selectedConfig.ratingKey, service]);
 
   useEffect(() => {
@@ -857,6 +868,12 @@ export function PracticePocScreen({
     try {
       const customThemeValue = useCustomTiming ? themeForCustomSprint(customTheme) : undefined;
       const config = sprintConfigFor(nextMode, customDurationSeconds, customPerPuzzleSeconds, useCustomTiming, customThemeValue);
+      if (useCustomTiming) {
+        const rating = service.getRating(config.ratingKey);
+        if (rating.games === 0 && rating.rating !== customInitialRating) {
+          service.setRating(config.ratingKey, customInitialRating);
+        }
+      }
       const started = service.startSprint({
         mode: nextMode,
         durationSeconds: config.durationSeconds,
@@ -1400,23 +1417,21 @@ export function PracticePocScreen({
     () => [...new Set([...service.listPlayedRatings().map((rating) => rating.key), ...attempts.map((attempt) => attempt.ratingKey)])].sort(),
     [attempts, service]
   );
-  const activeHistoryRatingKey = historyRatingKey ?? historyRatingKeys[0] ?? null;
+  const activeHistoryRatingKey = historyRatingKey;
   const historyWrongOnly = historyResultFilter === "wrong";
   const historyRatingRangeQuery = historyRatingRangeFilterToQuery(historyRatingRangeFilter);
-  const historyView = activeHistoryRatingKey
-    ? service.getHistoryView({
-        now: nowIso(),
-        timeRange: historyTimeRange,
-        ratingKey: activeHistoryRatingKey,
-        ...historyRatingRangeQuery,
-        ...(historySourceFilter === "all" ? {} : { source: historySourceFilter }),
-        ...(historyResultFilter === "all" ? {} : { result: historyResultFilter }),
-        ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
-        ...(historyThemeFilter === "all" ? {} : { theme: historyThemeFilter }),
-        ...(historyReviewStatusFilter === "all" ? {} : { reviewStatus: historyReviewStatusFilter }),
-        page: { limit: HISTORY_PAGE_LIMIT, offset: historyPageOffset }
-      })
-    : null;
+  const historyView = service.getHistoryView({
+    now: nowIso(),
+    timeRange: historyTimeRange,
+    ...(activeHistoryRatingKey ? { ratingKey: activeHistoryRatingKey } : {}),
+    ...historyRatingRangeQuery,
+    ...(historySourceFilter === "all" ? {} : { source: historySourceFilter }),
+    ...(historyResultFilter === "all" ? {} : { result: historyResultFilter }),
+    ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
+    ...(historyThemeFilter === "all" ? {} : { theme: historyThemeFilter }),
+    ...(historyReviewStatusFilter === "all" ? {} : { reviewStatus: historyReviewStatusFilter }),
+    page: { limit: HISTORY_PAGE_LIMIT, offset: historyPageOffset }
+  });
   const historyPerformanceView = activeHistoryRatingKey
     ? service.getHistoryView({
         now: nowIso(),
@@ -1429,23 +1444,21 @@ export function PracticePocScreen({
         ...(historyReviewStatusFilter === "all" ? {} : { reviewStatus: historyReviewStatusFilter })
       })
     : null;
-  const fullHistoryReviewView = activeHistoryRatingKey
-    ? service.getHistoryView({
-        now: nowIso(),
-        timeRange: historyTimeRange,
-        ratingKey: activeHistoryRatingKey,
-        ...historyRatingRangeQuery,
-        ...(historySourceFilter === "all" ? {} : { source: historySourceFilter }),
-        ...(historyResultFilter === "all" ? {} : { result: historyResultFilter }),
-        ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
-        ...(historyThemeFilter === "all" ? {} : { theme: historyThemeFilter }),
-        ...(historyReviewStatusFilter === "all" ? {} : { reviewStatus: historyReviewStatusFilter })
-      })
-    : null;
-  const displayedAttempts = historyView?.attempts ?? [];
-  const historyReviewAttempts = fullHistoryReviewView?.attempts ?? displayedAttempts;
-  const historyAvailableThemes = historyView?.availableThemes ?? [];
-  const historyPage = historyView?.page ?? { limit: HISTORY_PAGE_LIMIT, offset: 0, total: 0, hasMore: false };
+  const fullHistoryReviewView = service.getHistoryView({
+    now: nowIso(),
+    timeRange: historyTimeRange,
+    ...(activeHistoryRatingKey ? { ratingKey: activeHistoryRatingKey } : {}),
+    ...historyRatingRangeQuery,
+    ...(historySourceFilter === "all" ? {} : { source: historySourceFilter }),
+    ...(historyResultFilter === "all" ? {} : { result: historyResultFilter }),
+    ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
+    ...(historyThemeFilter === "all" ? {} : { theme: historyThemeFilter }),
+    ...(historyReviewStatusFilter === "all" ? {} : { reviewStatus: historyReviewStatusFilter })
+  });
+  const displayedAttempts = historyView.attempts;
+  const historyReviewAttempts = fullHistoryReviewView.attempts;
+  const historyAvailableThemes = historyView.availableThemes;
+  const historyPage = historyView.page;
   const contentOwnsHeader = tab === "review" || tab === "history";
   const reviewSurfaceOpen = reviewSessionActive || historyReviewEntries.length > 0;
   const appChromeVisible = !isOpenSession && !isShowingFeedbackSnapshot && !reviewSurfaceOpen;
@@ -1705,7 +1718,9 @@ export function PracticePocScreen({
                     maxMistakes={selectedConfig.maxMistakes}
                     availablePuzzleCount={customEligiblePuzzleCount}
                     ratingKey={selectedConfig.ratingKey}
-                    currentRating={currentRating}
+                    initialRating={displayedCustomInitialRating}
+                    initialRatingLocked={customInitialRatingLocked}
+                    onInitialRatingChange={setCustomInitialRating}
                     onDurationChange={setCustomDurationSeconds}
                     onClose={() => setMode("standard")}
                     customMode={customSprintMode}
@@ -1723,7 +1738,11 @@ export function PracticePocScreen({
                     elapsedMs={Math.min(sprintElapsedMs, state ? state.config.durationSeconds * 1000 : sprintElapsedMs)}
                     onReplay={() => startSprint(mode)}
                     onBack={resetToIdle}
-                    onOpenHistory={() => setTab("history")}
+                    onOpenHistory={() => {
+                      setHistoryRatingKey(state.config.ratingKey);
+                      setHistoryPageOffset(0);
+                      setTab("history");
+                    }}
                     onReview={state.mistakeCount > 0 ? showReviewMistakes : undefined}
                   />
                 ) : null}
@@ -2257,11 +2276,13 @@ function formatSprintDurationLabel(seconds: number): string {
 function CustomSprintSetup({
   availablePuzzleCount,
   customMode,
-  currentRating,
   durationSeconds,
+  initialRating,
+  initialRatingLocked,
   maxMistakes,
   onClose,
   onCustomModeChange,
+  onInitialRatingChange,
   perPuzzleSeconds,
   previousConfigs,
   targetCorrect,
@@ -2274,11 +2295,13 @@ function CustomSprintSetup({
 }: {
   availablePuzzleCount: number;
   customMode: "custom" | "arrow_duel";
-  currentRating: number;
   durationSeconds: number;
+  initialRating: number;
+  initialRatingLocked: boolean;
   maxMistakes: number;
   onClose: () => void;
   onCustomModeChange: (next: "custom" | "arrow_duel") => void;
+  onInitialRatingChange: (next: number) => void;
   perPuzzleSeconds: number;
   previousConfigs: CustomSprintConfigRecord[];
   targetCorrect: number;
@@ -2289,12 +2312,11 @@ function CustomSprintSetup({
   onThemeChange: (next: CustomThemeFilter) => void;
   onStart: () => void;
 }): React.JSX.Element {
-  const ratingRange = `${Math.max(400, currentRating - 200)} - ${currentRating + 200}`;
   const requiredPuzzleCount = targetCorrect + maxMistakes;
   const hasEnoughLocalPuzzles = availablePuzzleCount >= requiredPuzzleCount;
   const canStartWithLocalPuzzles = availablePuzzleCount > 0;
   const previousRows = previousConfigs.slice(0, 5).map((config) =>
-    previousCustomConfigRowModel(config, ratingKey, currentRating)
+    previousCustomConfigRowModel(config, ratingKey, initialRating)
   );
 
   return (
@@ -2362,41 +2384,16 @@ function CustomSprintSetup({
           selected={perPuzzleSeconds}
           onChange={onPerPuzzleChange}
         />
+        <CustomInitialRatingRow
+          locked={initialRatingLocked}
+          onChange={onInitialRatingChange}
+          value={initialRating}
+        />
         <CustomValueRow
           label="Estimated puzzles"
           value={`~${targetCorrect}`}
           testID="custom-summary-target"
           valueTestID="custom-target-count"
-        />
-        <CustomValueRow
-          label="Rating range"
-          value={ratingRange}
-          testID="custom-summary-rating-range"
-        />
-        <CustomValueRow
-          detail={`${historyRatingKeyLabel(ratingKey)} · separate bucket`}
-          label="Current rating"
-          value={`ELO ${currentRating}`}
-          testID="custom-separate-scoring"
-        />
-        <CustomValueRow
-          detail={customMode === "arrow_duel" ? "Two-candidate choice sprint" : "Board-move puzzle sprint"}
-          label="ELO type"
-          value={customMode === "arrow_duel" ? "Arrow Duel" : "Regular puzzles"}
-          testID="custom-mode-summary"
-        />
-        <CustomValueRow
-          detail="Fixed by sprint scoring rules"
-          label="Mistake limit"
-          value={`${maxMistakes}`}
-          testID="custom-mistake-limit"
-        />
-        <CustomToggleRow
-          detail="Switches this custom sprint to Arrow Duel scoring."
-          enabled={customMode === "arrow_duel"}
-          label="Include Arrow Duel"
-          testID="custom-include-arrow-duel"
-          onToggle={() => onCustomModeChange(customMode === "arrow_duel" ? "custom" : "arrow_duel")}
         />
       </View>
 
@@ -2485,7 +2482,6 @@ function CustomModeChoiceRow({
     <View style={styles.customConfigRow} testID={testID}>
       <View style={styles.customChoiceCopy}>
         <Text style={styles.listText}>Mode</Text>
-        <CustomValueWithChevron value={value === "arrow_duel" ? "Arrow Duel" : "Standard"} />
       </View>
       <View style={styles.customInlineOptions}>
         {options.map((option) => (
@@ -2503,6 +2499,70 @@ function CustomModeChoiceRow({
             </Text>
           </Pressable>
         ))}
+      </View>
+    </View>
+  );
+}
+
+function CustomInitialRatingRow({
+  locked,
+  onChange,
+  value
+}: {
+  locked: boolean;
+  onChange: (next: number) => void;
+  value: number;
+}): React.JSX.Element {
+  const canDecrease = !locked && value > CUSTOM_INITIAL_RATING_MIN;
+  const canIncrease = !locked && value < CUSTOM_INITIAL_RATING_MAX;
+  const decrease = () => {
+    if (canDecrease) {
+      onChange(Math.max(CUSTOM_INITIAL_RATING_MIN, value - CUSTOM_INITIAL_RATING_STEP));
+    }
+  };
+  const increase = () => {
+    if (canIncrease) {
+      onChange(Math.min(CUSTOM_INITIAL_RATING_MAX, value + CUSTOM_INITIAL_RATING_STEP));
+    }
+  };
+  return (
+    <View
+      accessibilityLabel={`Initial ELO, ELO ${value}${locked ? ", locked after rated games" : ""}`}
+      style={styles.customConfigRow}
+      testID="custom-initial-rating-row"
+    >
+      <View>
+        <Text style={styles.listText}>Initial ELO</Text>
+        {locked ? (
+          <Text style={styles.helperText} testID="custom-initial-rating-locked">Locked after play</Text>
+        ) : null}
+      </View>
+      <View style={styles.customStepperGroup}>
+        <Text style={styles.customConfigValue} testID="custom-initial-rating-value">ELO {value}</Text>
+        <View style={styles.customStepperCompact} testID="custom-initial-rating-stepper">
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Decrease initial ELO"
+            accessibilityState={{ disabled: !canDecrease }}
+            disabled={!canDecrease}
+            testID="custom-initial-rating-stepper-decrease"
+            style={[styles.customStepperButton, !canDecrease ? styles.disabledButton : null]}
+            onPress={decrease}
+          >
+            <MinusGlyph />
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Increase initial ELO"
+            accessibilityState={{ disabled: !canIncrease }}
+            disabled={!canIncrease}
+            testID="custom-initial-rating-stepper-increase"
+            style={[styles.customStepperButton, !canIncrease ? styles.disabledButton : null]}
+            onPress={increase}
+          >
+            <PlusGlyph />
+          </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -2559,7 +2619,6 @@ function CustomChoiceRow({
     <View style={styles.customConfigRow} testID={testID}>
       <View style={styles.customChoiceCopy}>
         <Text style={styles.listText}>{label}</Text>
-        <CustomValueWithChevron value={value} />
       </View>
       <View style={styles.customInlineOptions}>
         {options.map((option) => (
@@ -2575,15 +2634,6 @@ function CustomChoiceRow({
           </Pressable>
         ))}
       </View>
-    </View>
-  );
-}
-
-function CustomValueWithChevron({ value }: { value: string }): React.JSX.Element {
-  return (
-    <View style={styles.customValueWithChevron}>
-      <Text style={styles.customConfigValue}>{value}</Text>
-      <ChevronGlyph direction="right" />
     </View>
   );
 }
@@ -2647,49 +2697,6 @@ function CustomOptionRow<T extends number>({
           </Pressable>
         </View>
       </View>
-    </View>
-  );
-}
-
-function CustomToggleRow({
-  detail,
-  enabled,
-  label,
-  onToggle,
-  testID
-}: {
-  detail?: string;
-  enabled: boolean;
-  label: string;
-  onToggle: () => void;
-  testID: string;
-}): React.JSX.Element {
-  const accessibilityLabel = [label, detail].filter(Boolean).join(", ");
-  return (
-    <View
-      accessibilityLabel={accessibilityLabel}
-      style={styles.customConfigRow}
-      testID={testID}
-    >
-      <View>
-        <Text style={styles.listText}>{label}</Text>
-        {detail ? (
-          <View
-            accessibilityLabel={detail}
-            testID={`${testID}-detail`}
-          />
-        ) : null}
-      </View>
-      <Pressable
-        accessibilityRole="switch"
-        accessibilityLabel={label}
-        accessibilityState={{ checked: enabled }}
-        testID={`${testID}-toggle`}
-        style={[styles.switchButton, enabled ? styles.switchButtonActive : null]}
-        onPress={onToggle}
-      >
-        <SwitchGlyph enabled={enabled} />
-      </Pressable>
     </View>
   );
 }
@@ -3681,7 +3688,7 @@ function HistoryPanel({
   page: { limit: number; offset: number; total: number; hasMore: boolean };
   reviewStatusFilter: "all" | HistoryReviewStatus;
   wrongOnly: boolean;
-  onRatingKeyChange: (ratingKey: string) => void;
+  onRatingKeyChange: (ratingKey: string | null) => void;
   onTimeRangeChange: (range: HistoryTimeRange) => void;
   onSourceFilterChange: (source: "all" | AttemptSource) => void;
   onResultFilterChange: (result: "all" | "correct" | "wrong") => void;
@@ -3725,6 +3732,23 @@ function HistoryPanel({
       </View>
 
       <View style={styles.historyTopFilterStack} testID="history-primary-filters">
+        <HistoryChipRow testID="history-rating-filters">
+          <FilterButton
+            active={selectedRatingKey === null}
+            label="All Puzzles"
+            testID="history-rating-all"
+            onPress={() => onRatingKeyChange(null)}
+          />
+          {ratingKeys.map((ratingKey) => (
+            <FilterButton
+              key={ratingKey}
+              active={selectedRatingKey === ratingKey}
+              label={historyRatingKeyLabel(ratingKey)}
+              testID={`history-rating-${ratingKey}`}
+              onPress={() => onRatingKeyChange(ratingKey)}
+            />
+          ))}
+        </HistoryChipRow>
         <HistoryChipRow testID="history-range-filters">
           {(["7d", "30d", "90d", "1y", "max"] as const).map((range) => (
             <FilterButton
@@ -3751,37 +3775,26 @@ function HistoryPanel({
         </HistoryChipRow>
       </View>
 
-      <View style={styles.historyPerformanceCard} testID="history-performance-card">
-        <View style={styles.historyPerformanceHeader}>
-          <View>
-            <Text style={styles.panelTitle}>Rating Trend</Text>
-            <Text testID="history-performance-context" style={styles.helperText}>
-              {selectedRatingKey ? `${historyRatingKeyLabel(selectedRatingKey)} · ${historyRangeLabel(timeRange)}` : "No rating history"}
-            </Text>
+      {selectedRatingKey ? (
+        <View style={styles.historyPerformanceCard} testID="history-performance-card">
+          <View style={styles.historyPerformanceHeader}>
+            <View>
+              <Text style={styles.panelTitle}>Rating Trend</Text>
+              <Text testID="history-performance-context" style={styles.helperText}>
+                {`${historyRatingKeyLabel(selectedRatingKey)} · ${historyRangeLabel(timeRange)}`}
+              </Text>
+            </View>
+            <View style={styles.historyMetricSummary}>
+              <Text testID="history-chart-value" style={styles.historyAccuracy}>{latestRating ? String(latestRating) : "—"}</Text>
+              <Text testID="history-chart-label" style={styles.helperText}>Rating</Text>
+            </View>
           </View>
-          <View style={styles.historyMetricSummary}>
-            <Text testID="history-chart-value" style={styles.historyAccuracy}>{latestRating ? String(latestRating) : "—"}</Text>
-            <Text testID="history-chart-label" style={styles.helperText}>Rating</Text>
-          </View>
+          <HistoryRatingTrendChart points={ratingPoints} />
         </View>
-        <HistoryRatingTrendChart points={ratingPoints} />
-      </View>
+      ) : null}
 
       {filtersExpanded ? (
         <View style={styles.historyAdvancedFilters} testID="history-advanced-filters">
-          {ratingKeys.length > 0 ? (
-            <HistoryChipRow testID="history-rating-filters">
-              {ratingKeys.map((ratingKey) => (
-                <FilterButton
-                  key={ratingKey}
-                  active={selectedRatingKey === ratingKey}
-                  label={historyRatingKeyLabel(ratingKey)}
-                  testID={`history-rating-${ratingKey}`}
-                  onPress={() => onRatingKeyChange(ratingKey)}
-                />
-              ))}
-            </HistoryChipRow>
-          ) : null}
           <HistoryChipRow testID="history-source-filters">
             <FilterButton active={sourceFilter === "all"} label="All" testID="history-source-all" onPress={() => onSourceFilterChange("all")} />
             <FilterButton active={sourceFilter === "sprint"} label="Sprint" testID="history-source-sprint" onPress={() => onSourceFilterChange("sprint")} />
@@ -3897,7 +3910,7 @@ function historyActiveFilterLabels({
 }: HistoryActiveFilterInput): string[] {
   const labels = [
     historyRangeLabel(timeRange),
-    ratingKey ? historyRatingKeyLabel(ratingKey) : "No rating"
+    ratingKey ? historyRatingKeyLabel(ratingKey) : "All puzzles"
   ];
   if (sourceFilter !== "all") {
     labels.push(sourceFilter === "scheduled_review" ? "Review" : "Sprint");
@@ -9141,11 +9154,6 @@ const styles = StyleSheet.create({
     color: "#475569",
     fontSize: 13,
     fontWeight: "800"
-  },
-  customValueWithChevron: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 4
   },
   customInlineOptions: {
     flexDirection: "row",

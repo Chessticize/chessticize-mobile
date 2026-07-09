@@ -764,7 +764,7 @@ export class SyncSQLiteStore implements PracticeStore {
       query,
       ratingKeys: this.listPlayedRatings(),
       attempts,
-      elo: this.selectHistoryElo(query.ratingKey, range.since, range.until),
+      elo: query.ratingKey ? this.selectHistoryElo(query.ratingKey, range.since, range.until) : [],
       reviews,
       allAttemptsForOptions: allAttempts
     });
@@ -800,7 +800,7 @@ export class SyncSQLiteStore implements PracticeStore {
       );
   }
 
-  private selectHistoryAttempts(ratingKey: string, since: string | undefined, until: string): HistoryAttemptView[] {
+  private selectHistoryAttempts(ratingKey: string | undefined, since: string | undefined, until: string): HistoryAttemptView[] {
     const rows = this.db
       .prepare(
         `SELECT
@@ -821,12 +821,12 @@ export class SyncSQLiteStore implements PracticeStore {
          FROM attempts a
          JOIN sprint_sessions s ON s.id = a.session_id
          JOIN puzzles p ON p.id = a.puzzle_id
-         WHERE COALESCE(a.rating_key, s.rating_key) = ?
+         WHERE (? IS NULL OR COALESCE(a.rating_key, s.rating_key) = ?)
            AND (? IS NULL OR a.completed_at >= ?)
            AND a.completed_at <= ?
          ORDER BY a.completed_at DESC, a.id DESC`
       )
-      .all(ratingKey, since ?? null, since ?? null, until) as HistoryAttemptDbRow[];
+      .all(ratingKey ?? null, ratingKey ?? null, since ?? null, since ?? null, until) as HistoryAttemptDbRow[];
 
     return rows.map((row) => {
       const puzzle = puzzleFromRow(row);

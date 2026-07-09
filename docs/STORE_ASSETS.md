@@ -86,7 +86,7 @@ the same six scenes for both required display groups:
 3. Arrow Duel with both candidate arrows visible.
 4. Post-sprint results with Review highlighted when mistakes exist.
 5. Mistake review with the Analysis panel and Stockfish candidate lines.
-6. History with the required time range and rating-key filters visible.
+6. History with All Puzzles, time range, and rating-key filters visible.
 
 Save local raw captures under `scratch/store-assets/raw/`. The `scratch/`
 folder is ignored and may contain private iteration artifacts. Only commit

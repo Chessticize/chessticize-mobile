@@ -366,7 +366,7 @@ export class MemoryStore implements PracticeStore {
       query,
       ratingKeys: this.listPlayedRatings(),
       attempts,
-      elo: this.eloPointsForRange(query.ratingKey, range.since, range.until),
+      elo: query.ratingKey ? this.eloPointsForRange(query.ratingKey, range.since, range.until) : [],
       reviews,
       allAttemptsForOptions: allAttempts
     });
@@ -376,11 +376,11 @@ export class MemoryStore implements PracticeStore {
     return work();
   }
 
-  private historyAttemptsForRange(ratingKey: string, since: string | undefined, until: string): HistoryAttemptView[] {
+  private historyAttemptsForRange(ratingKey: string | undefined, since: string | undefined, until: string): HistoryAttemptView[] {
     return this.attempts
       .map((attempt) => this.toHistoryAttempt(attempt))
       .filter((attempt): attempt is HistoryAttemptView => Boolean(attempt))
-      .filter((attempt) => attempt.ratingKey === ratingKey)
+      .filter((attempt) => ratingKey === undefined || attempt.ratingKey === ratingKey)
       .filter((attempt) => (since === undefined || attempt.completedAt >= since) && attempt.completedAt <= until)
       .sort((left, right) => right.completedAt.localeCompare(left.completedAt) || right.id.localeCompare(left.id));
   }
