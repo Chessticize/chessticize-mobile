@@ -13,7 +13,7 @@ export interface HistoryPageQuery {
 export interface HistoryQuery {
   now: string;
   timeRange: HistoryTimeRange;
-  ratingKey: string;
+  ratingKey?: string;
   minRating?: number;
   maxRating?: number;
   source?: AttemptSource;
@@ -120,9 +120,6 @@ export function resolveHistoryRange(now: string, timeRange: HistoryTimeRange): H
 }
 
 export function validateHistoryQuery(query: HistoryQuery): HistoryQuery {
-  if (!query.ratingKey.trim()) {
-    throw new Error("ratingKey is required");
-  }
   resolveHistoryRange(query.now, query.timeRange);
   validateOptionalRatingBound("minRating", query.minRating);
   validateOptionalRatingBound("maxRating", query.maxRating);
@@ -133,9 +130,11 @@ export function validateHistoryQuery(query: HistoryQuery): HistoryQuery {
     throw new Error("minRating must be less than or equal to maxRating");
   }
   const page = query.page ? validateHistoryPageQuery(query.page) : undefined;
+  const { ratingKey: rawRatingKey, ...queryWithoutRatingKey } = query;
+  const ratingKey = rawRatingKey?.trim();
   const normalized: HistoryQuery = {
-    ...query,
-    ratingKey: query.ratingKey.trim()
+    ...queryWithoutRatingKey,
+    ...(ratingKey ? { ratingKey } : {})
   };
   if (page) {
     normalized.page = page;

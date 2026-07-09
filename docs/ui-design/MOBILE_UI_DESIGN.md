@@ -8,7 +8,9 @@ This document captures the current Chessticize Mobile implementation shape and t
 - Puzzle Sprint dashboard shows daily stats, Standard Sprint, Arrow Duel, recent custom sprint configs, and a Custom Sprint entry.
 - Standard Sprint session shows Abandon, success progress, timer, turn prompt, and a large chessboard.
 - Arrow Duel session shows Abandon, success progress, timer, a short instruction card, a chessboard, and two candidate arrows.
-- Custom Sprint setup includes mode, theme, duration, time per puzzle, computed puzzle count, ELO type, and previous custom configs.
+- Custom Sprint setup includes mode, theme, duration, time per puzzle, editable
+  initial ELO for unplayed buckets, computed puzzle count, and previous custom
+  configs.
 - Settings includes chess platform connections and ELO editing. Mobile v1 should keep advanced rating management but not prioritize chess.com or Lichess account import.
 
 ### Current UI Issues To Avoid
@@ -49,8 +51,8 @@ Screen inventory:
 | Sprint Results | Win/loss status, solved count, rating change, mistakes, actions | Review mistakes, play again, done | Review Item, Practice Home |
 | Review Queue | Due/overdue summary, difficulty groups, start button | Start due review, filter queue | Review Item |
 | Analysis Review | Board, compact toolbar, Stockfish status, candidate line rows, guided arrows when applicable | Reset, flip, analyze, navigate, finish review | Review Complete, History |
-| History | Rating trend line chart, range filters, selected ELO bucket, expandable row filters, attempt rows | Filter wrong-only/source rows, inspect attempt context, open attempt | Attempt Detail, Review Item |
-| Custom Sprint Setup | Mode/theme/timing controls, estimate, rating range, start | Start sprint, save template | Active Sprint |
+| History | All-puzzle attempt list, top-level rating bucket chips, range filters, conditional rating trend, expandable row filters | Filter wrong-only/source rows, inspect attempt context, open attempt | Attempt Detail, Review Item |
+| Custom Sprint Setup | Mode/theme/timing controls, initial ELO for unplayed buckets, estimate, start | Start sprint, save template | Active Sprint |
 | Settings | iCloud Sync, notifications, profile, about, puzzle-data source notes | Toggle sync, adjust reminders, inspect licenses and support contact | External license/source/data/support links |
 
 ## Mobile Information Architecture
@@ -59,7 +61,8 @@ Use a four-tab app shell:
 
 - Practice: quick start, active session, custom sprint setup, and Arrow Duel entry.
 - Review: due mistake reviews and spaced repetition queue.
-- History: attempts, sprint sessions, range filters, selected ELO bucket, and expandable detailed filters including wrong-only/source filters.
+- History: attempts, sprint sessions, range filters, top-level rating bucket
+  filters, and expandable detailed filters including wrong-only/source filters.
 - Settings: iCloud Sync, notification preferences, advanced rating adjustment,
   About links, support contact, and puzzle data attribution.
 
@@ -86,12 +89,13 @@ Primary flows:
 | Due mistake review | Review Queue -> Scheduled Review Item -> Review Complete -> Review Queue | Correct answers increase interval; failures reset or shorten it. Official review attempts are recorded in History. |
 | Post-session analysis | Sprint Results or Scheduled Review Complete -> Analysis Review -> Results or Practice | Used to inspect mistakes immediately. It is opened only by the result-screen review action, does not write History, and does not change the spaced repetition schedule. |
 | History replay | History -> Filtered row -> Analysis Review | History preserves original attempt context. Previous/next navigation stays inside the active History filter. |
-| Progress sync | Settings -> iCloud Sync -> Settings | Progress starts on device; optional iCloud Sync merges ratings, history, and review queue across Apple devices. |
+| Progress sync | Settings -> iCloud Sync -> Settings | Progress starts on device; default-enabled iCloud Sync merges ratings, history, and review queue across Apple devices and can be turned off. |
 
 ## Design Principles
 
 - Board first: during practice and review, the board is the primary surface and must receive the largest stable area.
-- Local-first clarity: in v1, progress starts on device and optional iCloud Sync must present only real transport/account status.
+- Local-first clarity: in v1, progress starts on device and iCloud Sync must
+  present only real transport/account status while remaining user-controllable.
 - Calm density: show enough data for repeated training, but avoid desktop dashboards, marketing hero panels, or decorative statistics.
 - One-handed portrait first: primary controls should sit below or immediately above the board and remain reachable.
 - Adaptive by slot, not by device name: layouts should derive from available width, available height, safe-area insets, and size class rather than from a hard-coded iPhone or iPad model.
@@ -162,7 +166,8 @@ Analysis Review:
 
 History:
 
-- Compact portrait keeps range chips, selected ELO bucket, trend, and attempt rows stacked.
+- Compact portrait keeps rating bucket chips, range chips, optional trend, and
+  attempt rows stacked.
 - Compact landscape and regular width can use a split view: filters and chart on one side, attempt list/detail on the other.
 - Regular-width attempt detail may open beside the list rather than replacing the full screen, but Analysis Review still owns the full board surface when launched.
 
@@ -233,8 +238,10 @@ Core components:
 - `ChessboardSurface`: reused board component plus highlight/arrow overlay adapter.
 - `ModePicker`: compact list or segmented choice for Standard, Arrow Duel, Custom.
 - `ReviewQueueHeader`: due count, overdue count, and next review estimate.
-- `HistoryFilterBar`: date-range chips, selected ELO bucket, compact filter toggle, and expandable result/source filters.
-- `RatingTrendChart`: rating-only line chart over the selected ELO bucket and time range.
+- `HistoryFilterBar`: All Puzzles and rating bucket chips, date-range chips,
+  compact filter toggle, and expandable result/source filters.
+- `RatingTrendChart`: rating-only line chart over the selected ELO bucket and
+  time range; hidden in the default All Puzzles view.
 - `SettingsRow`: label, value, status, and disclosure or switch.
 - `SettingsExternalLinkRow`: label, short value, readable detail, and a
   tappable link target without compressing the primary copy on phone widths.
@@ -373,7 +380,7 @@ Custom sprint layout:
 
 - Use a focused setup screen or bottom sheet rather than a desktop-style page.
 - Keep mode, theme, duration, and per-puzzle time as compact controls.
-- Show computed puzzle count and ELO type as a live summary.
+- Show computed puzzle count and initial ELO as a live summary.
 - Show previous configs below the setup area as compact reusable rows.
 
 Custom sprint controls:
@@ -382,15 +389,22 @@ Custom sprint controls:
 - Theme: Mixed plus supported tactical themes.
 - Duration: use allowed sprint durations from the domain config.
 - Per-puzzle time: use allowed per-puzzle times from the domain config.
-- Max mistakes: default from domain config; expose only if custom scoring is in v1.
-- Summary: target puzzle count, ELO type, current rating, and whether the config has separate scoring history.
+- Initial ELO: default to 600 for unplayed custom buckets and allow adjustment
+  before the first rated run in that bucket.
+- Max mistakes: default from domain config; do not expose in the current Custom
+  Sprint setup.
+- Summary: target puzzle count only; avoid repeating mode, rating range, current
+  rating, ELO type, or mistake limit as non-editable rows.
 - Previous configs: compact rows with mode, theme, timing, last played, and current ELO.
 
 Custom sprint behavior:
 
 - Changing any control updates the summary immediately.
 - Start button is disabled only when the config is invalid or no eligible puzzles exist locally.
-- If the selected puzzle pack lacks enough eligible puzzles, show a local pack warning and offer a broader theme/rating range.
+- Once a custom bucket has rated games, its ELO is locked in setup and cannot be
+  changed from the Custom Sprint screen.
+- If the selected puzzle pack lacks enough eligible puzzles, show a local pack
+  warning and offer a broader theme.
 
 ## Screen-Level Requirements
 
@@ -435,11 +449,16 @@ Custom sprint behavior:
 
 - Quick range filters include 7 days, 30 days, 90 days, 1 year, and all time.
 - History data must be pageable, including the all-time range.
-- Quick content filters include wrong-only and source type. These live behind the compact filter toggle so the default History surface can prioritize range chips, the selected ELO bucket, the rating trend, and attempt rows.
+- The default History surface shows all puzzle attempts across rating buckets.
+  Top-level chips include All Puzzles plus each played rating bucket so the user
+  can quickly focus a sprint type without opening the filter panel.
+- Quick content filters include wrong-only and source type. Source type and
+  detailed filters live behind the compact filter toggle; wrong-only remains in
+  the top filter stack for fast triage.
 - "Wrong only" is a result filter shortcut that does not change the active time range. It toggles the attempt rows between all results and wrong results and should appear in the active filter summary when enabled.
-- The selected ELO bucket is required and supplies the mode, sprint config, and
-  sprint-speed context in 1.0. Do not show separate History mode or speed chips
-  while the view is scoped to a single bucket.
+- Selecting an ELO bucket supplies the mode, sprint config, and sprint-speed
+  context for rating history. Do not show separate History mode or speed chips
+  while the view can be focused through rating bucket chips.
 - Source type distinguishes sprint attempts from official Scheduled Review attempts.
 - History includes correct and wrong sprint attempts.
 - History includes correct and wrong Scheduled Review attempts.
@@ -453,10 +472,14 @@ Custom sprint behavior:
 - Analysis Review launched from History supports retry, Stockfish analysis, and previous/next navigation through the current filtered History result set.
 - Previous/next navigation from History follows the active filter result order, not just the currently visible page.
 - History filters should be horizontally scrollable chips on phones.
-- On regular-width iPad, History may use a split view for filters/chart/list, but the selected ELO bucket remains required and the trend chart still follows the full filtered time range.
+- On regular-width iPad, History may use a split view for filters/chart/list,
+  but the default list remains All Puzzles and the trend chart appears only
+  after a rating bucket is selected.
 - Failed attempts should clearly show whether they are already in the review queue.
 - The rating trend chart belongs in History, not primarily in Sprint Results.
-- History must show only the selected ELO bucket's rating trend as a line chart connecting rating-change points.
+- History must show only the selected ELO bucket's rating trend as a line chart
+  connecting rating-change points. Do not show a rating trend in the default All
+  Puzzles view.
 - Do not show alternate History performance chart modes such as wins/losses, accuracy, solved count, mistake rate, or review due volume.
 - The rating trend chart series uses the full filtered time range.
   Pagination affects only the visible attempt rows, never the chart inputs.
@@ -473,9 +496,9 @@ Custom sprint behavior:
 
 ### Settings
 
-- iCloud Sync appears near the top. It defaults off, shows the real enabled
-  state and current account/sync status, and exposes a manual Sync Now action
-  only after sync is enabled.
+- iCloud Sync appears near the top. It defaults on, shows the real enabled state
+  and current account/sync status, and exposes a manual Sync Now action while
+  sync is enabled.
 - On regular-width iPad, Settings should use grouped navigation plus a detail panel; do not make each settings row stretch across the full display.
 - Advanced manual ELO adjustment should be hidden behind an "Advanced ratings" affordance.
 - Settings must not expose incomplete local data actions. Do not show local

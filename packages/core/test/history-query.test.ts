@@ -11,7 +11,7 @@ import {
 } from "../src/index.ts";
 import type { HistoryAttemptView, Puzzle } from "../src/index.ts";
 
-test("history query requires ratingKey and resolves supported time ranges", () => {
+test("history query accepts optional ratingKey and resolves supported time ranges", () => {
   assert.deepEqual(resolveHistoryRange("2026-06-21T12:00:00.000Z", "7d"), {
     since: "2026-06-14T12:00:00.000Z",
     until: "2026-06-21T12:00:00.000Z"
@@ -23,9 +23,13 @@ test("history query requires ratingKey and resolves supported time ranges", () =
   assert.deepEqual(resolveHistoryRange("2026-06-21T12:00:00.000Z", "max"), {
     until: "2026-06-21T12:00:00.000Z"
   });
-  assert.throws(
-    () => validateHistoryQuery({ now: "2026-06-21T12:00:00.000Z", timeRange: "30d", ratingKey: " " }),
-    /ratingKey is required/
+  assert.deepEqual(
+    validateHistoryQuery({ now: "2026-06-21T12:00:00.000Z", timeRange: "30d" }),
+    { now: "2026-06-21T12:00:00.000Z", timeRange: "30d" }
+  );
+  assert.deepEqual(
+    validateHistoryQuery({ now: "2026-06-21T12:00:00.000Z", timeRange: "30d", ratingKey: " " }),
+    { now: "2026-06-21T12:00:00.000Z", timeRange: "30d" }
   );
 });
 

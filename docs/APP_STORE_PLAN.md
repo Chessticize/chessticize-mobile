@@ -31,9 +31,10 @@ settings state is persisted through the same backend boundary.
 ## Milestone 2 — Honest sync story (App Review risk)
 
 Status: implementation complete, device validation required. The shipped
-Settings screen exposes real optional iCloud Sync backed by a CloudKit private
-database snapshot, not a fabricated status surface. The app does not expose
-incomplete local export/delete controls, and the sync setting defaults off.
+Settings screen exposes real user-controllable iCloud Sync backed by a CloudKit
+private database snapshot, not a fabricated status surface. The app does not expose
+incomplete local export/delete controls, and the sync setting defaults on while
+remaining user-controllable.
 
 1. Remove the earlier simulated iCloud state: no upload approval prompt and no
    fabricated "last synced" timestamp.
@@ -46,9 +47,9 @@ incomplete local export/delete controls, and the sync setting defaults off.
    merge through the storage boundary before the merged snapshot is written back
    to private iCloud.
 3. Before App Store submission, validate on at least two Apple devices signed
-   into the same iCloud account. Confirm enabling sync on one device uploads a
-   snapshot and enabling sync on the second device imports the first device's
-   rating/history/review queue without deleting local-only progress.
+   into the same iCloud account. Confirm the default enabled sync uploads a
+   snapshot on one device and imports the first device's rating/history/review
+   queue on the second device without deleting local-only progress.
 
 ## Milestone 3 — Functional fixes from the 2026-07-03 audit
 
@@ -60,23 +61,24 @@ History:
    over the full filtered range, not the page.
    Status: complete. `HistoryView.performance` is computed in the core domain
    from the full filtered range before paging. The mobile History screen now
-   renders only the selected rating bucket's rating trend line, while
-   `HistoryView.attempts` remains the paged row slice.
+   defaults to all puzzle attempts and renders a rating trend only after a
+   rating bucket is selected, while `HistoryView.attempts` remains the paged row
+   slice.
 2. Mode and sprint-speed filters are degenerate: the history view is scoped to
    one `ratingKey`, which already encodes mode and speed, so other mode/speed
    chips silently return empty pages. Either make the history view span rating
    keys with real cross-key filters, or remove the dead chips and present the
    rating-key bucket honestly.
-   Status: complete. The 1.0 History screen keeps one selected rating-key
-   bucket as the required mode/speed context and removes separate History
-   mode/speed chips that could only narrow the selected bucket into empty or
-   redundant states.
+   Status: complete. The 1.0 History screen defaults to all rating-key buckets,
+   exposes the bucket selector at the top level for quick sprint-type focus,
+   and removes separate History mode/speed chips that could only narrow a
+   selected bucket into empty or redundant states.
 3. The History wrong-only shortcut must not force-reset the active time range
    and must not change the rating trend chart.
    Status: complete. The front-page shortcut toggles only the wrong-result row
-   filter. History now shows only the selected rating bucket's rating trend
-   line, and that series intentionally ignores the correct/wrong result filter
-   while still respecting time range, rating bucket, source, side, theme,
+   filter. History shows the rating trend only after a rating bucket is
+   selected, and that series intentionally ignores the correct/wrong result
+   filter while still respecting time range, rating bucket, source, side, theme,
    rating range, and review status.
 4. Row review-queue membership matches by `puzzleId` only while the
    review-status filter matches `puzzleId + mode + ratingKey`; a row can show a
@@ -259,7 +261,7 @@ Design approved 2026-07-03; the "Review Reminder Notifications" section of
    and a launch screen using the app background `#F8FAFC` instead of the React
    Native template copy.
 3. **Privacy**: App Privacy questionnaire answers (Data Not Collected / no
-   tracking while optional iCloud Sync stores data only in the user's private
+   tracking while iCloud Sync stores data only in the user's private
    Apple iCloud account), a privacy policy URL, `PrivacyInfo.xcprivacy` privacy
    manifest (required-reason APIs from RN and SQLite deps),
    `ITSAppUsesNonExemptEncryption = false` in Info.plist.
