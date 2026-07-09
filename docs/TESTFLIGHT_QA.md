@@ -36,7 +36,7 @@ binary on real hardware.
 | --- | --- |
 | Test group | `Internal 1.0 QA` |
 | Beta app description | `Offline chess tactics trainer for Puzzle Sprint, Arrow Duel, mistake review, local ratings, and on-device Stockfish analysis.` |
-| What to test | `Run a Standard sprint, run Arrow Duel, fail a sprint and review mistakes, verify History filters, complete a scheduled review, verify local data controls, relaunch the app, and test offline practice in airplane mode.` |
+| What to test | `Run a Standard sprint, run Arrow Duel, fail a sprint and review mistakes, verify History filters, complete a scheduled review, verify iCloud Sync and About links, relaunch the app, and test offline practice in airplane mode.` |
 | Feedback path | `https://github.com/Chessticize/chessticize-mobile/issues` |
 
 ## Preflight Gates
@@ -151,8 +151,8 @@ failure, retry, or unclear result.
 - [ ] Turn iCloud Sync off and confirm practice still works offline.
 - [ ] Change review reminder preference and confirm the UI persists after app
       relaunch.
-- [ ] Open license/source information and confirm Stockfish 18 and the public
-      source repository are shown.
+- [ ] Open About links and confirm License, Source, Stockfish, Puzzle Data, and
+      Support email targets open the expected destinations.
 
 ### Persistence And Relaunch
 

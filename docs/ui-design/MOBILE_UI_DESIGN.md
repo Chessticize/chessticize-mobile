@@ -38,7 +38,6 @@ The board covers these current major screens:
 - History
 - Custom Sprint Setup
 - Settings
-- Puzzle Data / License
 
 Screen inventory:
 
@@ -52,8 +51,7 @@ Screen inventory:
 | Analysis Review | Board, compact toolbar, Stockfish status, candidate line rows, guided arrows when applicable | Reset, flip, analyze, navigate, finish review | Review Complete, History |
 | History | Rating trend line chart, range filters, selected ELO bucket, expandable row filters, attempt rows | Filter wrong-only/source rows, inspect attempt context, open attempt | Attempt Detail, Review Item |
 | Custom Sprint Setup | Mode/theme/timing controls, estimate, rating range, start | Start sprint, save template | Active Sprint |
-| Settings | iCloud Sync, notifications, profile, about, puzzle-data source notes | Toggle sync, adjust reminders, inspect licenses | Puzzle Data / License |
-| Puzzle Data / License | Bundled source name, puzzle count, source license, Lichess-derived attribution, presolve metadata | Inspect source and license notes | Settings |
+| Settings | iCloud Sync, notifications, profile, about, puzzle-data source notes | Toggle sync, adjust reminders, inspect licenses and support contact | External license/source/data/support links |
 
 ## Mobile Information Architecture
 
@@ -62,7 +60,8 @@ Use a four-tab app shell:
 - Practice: quick start, active session, custom sprint setup, and Arrow Duel entry.
 - Review: due mistake reviews and spaced repetition queue.
 - History: attempts, sprint sessions, range filters, selected ELO bucket, and expandable detailed filters including wrong-only/source filters.
-- Settings: local data, export/delete data, notification preferences, advanced rating adjustment, and puzzle data attribution.
+- Settings: iCloud Sync, notification preferences, advanced rating adjustment,
+  About links, support contact, and puzzle data attribution.
 
 There should be no mobile Home tab, Game Review tab, or Packs tab in v1.
 
@@ -74,7 +73,6 @@ Navigation rules:
 - Active practice sessions hide the tab bar and use a focused session shell.
 - Review and History both open the same board-based review surface, but with different entry context.
 - The app has two review concepts. Analysis Review is an unscored replay/analyze surface. Scheduled Review is the official spaced repetition flow that records review attempts and updates the queue.
-- Settings is the only place for data-destructive actions such as history delete.
 - Settings owns puzzle data source attribution and license notes for the bundled offline puzzle data.
 - The app does not expose pack import, removal, or switching controls in v1.
 
@@ -88,7 +86,7 @@ Primary flows:
 | Due mistake review | Review Queue -> Scheduled Review Item -> Review Complete -> Review Queue | Correct answers increase interval; failures reset or shorten it. Official review attempts are recorded in History. |
 | Post-session analysis | Sprint Results or Scheduled Review Complete -> Analysis Review -> Results or Practice | Used to inspect mistakes immediately. It is opened only by the result-screen review action, does not write History, and does not change the spaced repetition schedule. |
 | History replay | History -> Filtered row -> Analysis Review | History preserves original attempt context. Previous/next navigation stays inside the active History filter. |
-| Progress sync | Settings -> iCloud Sync -> Settings | Progress starts on device; optional iCloud Sync merges ratings, history, and review queue across Apple devices. Export and delete actions remain explicit. |
+| Progress sync | Settings -> iCloud Sync -> Settings | Progress starts on device; optional iCloud Sync merges ratings, history, and review queue across Apple devices. |
 
 ## Design Principles
 
@@ -238,8 +236,10 @@ Core components:
 - `HistoryFilterBar`: date-range chips, selected ELO bucket, compact filter toggle, and expandable result/source filters.
 - `RatingTrendChart`: rating-only line chart over the selected ELO bucket and time range.
 - `SettingsRow`: label, value, status, and disclosure or switch.
-- `PuzzleDataLicenseSection`: bundled source name, puzzle count, source license, Lichess-derived attribution, and Chessticize presolve metadata.
-- `DestructiveActionSheet`: reset/delete confirmation with explicit copy.
+- `SettingsExternalLinkRow`: label, short value, readable detail, and a
+  tappable link target without compressing the primary copy on phone widths.
+- `AboutLinkRows`: separate external rows for License, Source, Stockfish,
+  Puzzle Data, and Support.
 
 ## Core Screen Drafts
 
@@ -485,6 +485,14 @@ Custom sprint behavior:
   prompt and no fabricated "last synced" timestamp. Sync controls must be
   backed by the CloudKit transport, entitlement, merge engine, and truthful UI
   state.
+- About must use separate readable link rows for License, Source, Stockfish,
+  Puzzle Data, and Support. License opens the repository license file, Source
+  opens the public repository, Stockfish opens the embedded Stockfish engine
+  source in the repository, Puzzle Data opens the Lichess puzzle database, and
+  Support opens `support@chessticize.com`.
+- On phone widths, About rows must leave enough horizontal room for label,
+  detail, and link text. Keep right-side values short and do not combine
+  multiple unrelated links into one row.
 
 ### Review Reminder Notifications
 
@@ -534,6 +542,7 @@ Puzzle data source and license notes live in Settings.
 
 - Settings must state that the bundled puzzle data is derived from the Lichess puzzle database and includes Chessticize presolve metadata.
 - Settings must show the source license from the bundled manifest.
+- Settings must link to `https://database.lichess.org/#puzzles`.
 
 ## Accessibility And Automation Contracts
 
@@ -558,7 +567,11 @@ Required labels/test IDs:
 - `review-dev-test-notification` (dev/test builds only)
 - `history-filter-toggle`
 - `history-filter-wrong-only`
+- `settings-license`
+- `settings-source`
+- `settings-stockfish-source`
 - `settings-puzzle-data-license`
+- `settings-support-email`
 - `adaptive-layout-root`
 - `primary-navigation-rail`
 - `session-control-rail`
@@ -569,15 +582,14 @@ Accessibility rules:
 - Do not rely on color alone for correct/wrong states.
 - Dynamic timer changes must not spam screen readers.
 - Board coordinates and selected squares need accessible descriptions in review mode.
-- Destructive confirmations must identify what will be reset or deleted.
-- Local-only storage status must be readable as text, not only as an icon.
+- Support contact information must be readable as text, not only as an icon.
 
 ## Testing Implications
 
 - Every core screen must expose stable accessibility labels for Detox.
 - Component tests should verify user-visible behavior, not component internals.
 - UI should receive view models from backend/domain packages; React components must not compute sprint outcomes, ELO updates, review scheduling, or Arrow Duel correctness.
-- E2E flows should cover Practice start, Arrow Duel choice, wrong-answer review, custom sprint setup, history filtering, Settings license/source attribution, and local data export/delete.
+- E2E flows should cover Practice start, Arrow Duel choice, wrong-answer review, custom sprint setup, history filtering, Settings iCloud Sync, and About link attribution.
 - Design QA should include iPhone SE-sized portrait, modern iPhone portrait, compact iPhone landscape, iPad portrait, iPad landscape, and iPad split-view widths.
 - Adaptive component tests should render the app shell with explicit width/height pairs and assert chrome placement, board sizing, rail visibility, and absence of overlapping controls.
 - Simulator screenshot QA should include at least one active sprint, one Arrow Duel state, one Analysis Review state, and one History/Settings regular-width state before App Store submission.

@@ -32,8 +32,8 @@ settings state is persisted through the same backend boundary.
 
 Status: implementation complete, device validation required. The shipped
 Settings screen exposes real optional iCloud Sync backed by a CloudKit private
-database snapshot, not a fabricated status surface. Local export/delete remain
-explicit and the sync setting defaults off.
+database snapshot, not a fabricated status surface. The app does not expose
+incomplete local export/delete controls, and the sync setting defaults off.
 
 1. Remove the earlier simulated iCloud state: no upload approval prompt and no
    fabricated "last synced" timestamp.

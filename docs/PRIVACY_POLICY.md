@@ -49,6 +49,10 @@ the app does not by itself delete existing iCloud records.
 
 ## Contact
 
-For privacy questions, open an issue in the public repository:
+For privacy questions, email:
+
+support@chessticize.com
+
+You can also open an issue in the public repository:
 
 https://github.com/Chessticize/chessticize-mobile

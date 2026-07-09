@@ -242,6 +242,11 @@ const BOARD_RANKS = ["8", "7", "6", "5", "4", "3", "2", "1"] as const;
 const BOARD_RANKS_FLIPPED = ["1", "2", "3", "4", "5", "6", "7", "8"] as const;
 const CHESS_PIECE_SPRITE = require("../assets/chess-pieces-sprite.png") as ImageSourcePropType;
 const SOURCE_REPOSITORY_URL = "https://github.com/Chessticize/chessticize-mobile";
+const SOURCE_LICENSE_URL = `${SOURCE_REPOSITORY_URL}/blob/main/LICENSE`;
+const STOCKFISH_SOURCE_URL = `${SOURCE_REPOSITORY_URL}/tree/main/apps/mobile/ios/StockfishEngine`;
+const LICHESS_PUZZLE_DATABASE_URL = "https://database.lichess.org/#puzzles";
+const SUPPORT_EMAIL = "support@chessticize.com";
+const SUPPORT_EMAIL_URL = `mailto:${SUPPORT_EMAIL}`;
 const ANALYSIS_DIAGNOSTIC_POSITIONS = [
   {
     id: "queen-capture",
@@ -6513,20 +6518,54 @@ function SettingsPanel({
           testID="settings-app-version"
         />
         <SettingsExternalLinkRow
-          label="License & Source"
+          label="License"
           value="GPL-3.0-or-later"
-          detail="Stockfish 18 embedded."
-          linkLabel="github.com/Chessticize/chessticize-mobile"
+          detail="App source license"
+          linkLabel="Open license"
           testID="settings-license"
+          onPress={() => {
+            void Linking.openURL(SOURCE_LICENSE_URL);
+          }}
+        />
+        <SettingsExternalLinkRow
+          label="Source"
+          value="GitHub"
+          detail="Public Chessticize mobile repository"
+          linkLabel="github.com/Chessticize/chessticize-mobile"
+          testID="settings-source"
           onPress={() => {
             void Linking.openURL(SOURCE_REPOSITORY_URL);
           }}
         />
-        <SettingsRow
+        <SettingsExternalLinkRow
+          label="Stockfish"
+          value="Embedded"
+          detail="Stockfish 18 engine source used by the app"
+          linkLabel="StockfishEngine in source"
+          testID="settings-stockfish-source"
+          onPress={() => {
+            void Linking.openURL(STOCKFISH_SOURCE_URL);
+          }}
+        />
+        <SettingsExternalLinkRow
           label="Puzzle Data"
-          value={`${bundledCoreManifest.source} · ${bundledCoreManifest.sourceLicense}`}
-          detail={`${bundledCoreManifest.licenseNote} ${bundledCoreManifest.presolve}.`}
+          value={bundledCoreManifest.source}
+          detail={`${bundledCoreManifest.sourceLicense}. ${bundledCoreManifest.licenseNote} ${bundledCoreManifest.presolve}.`}
+          linkLabel="database.lichess.org/#puzzles"
           testID="settings-puzzle-data-license"
+          onPress={() => {
+            void Linking.openURL(LICHESS_PUZZLE_DATABASE_URL);
+          }}
+        />
+        <SettingsExternalLinkRow
+          label="Support"
+          value="Email"
+          detail="Questions, feedback, and support"
+          linkLabel={SUPPORT_EMAIL}
+          testID="settings-support-email"
+          onPress={() => {
+            void Linking.openURL(SUPPORT_EMAIL_URL);
+          }}
         />
       </SettingsSection>
 
@@ -10159,17 +10198,24 @@ const styles = StyleSheet.create({
   },
   settingsRowCopy: {
     flex: 1,
-    gap: 2
+    flexShrink: 1,
+    gap: 2,
+    minWidth: 0
   },
   settingsRowMeta: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 4
+    flexShrink: 0,
+    gap: 4,
+    justifyContent: "flex-end",
+    maxWidth: "36%"
   },
   settingsRowValue: {
     color: "#64748B",
     fontSize: 12,
-    fontWeight: "800"
+    fontWeight: "800",
+    flexShrink: 1,
+    textAlign: "right"
   },
   settingsLinkText: {
     color: "#2563EB",
