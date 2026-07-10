@@ -12,11 +12,13 @@ import {
   SQLiteStore
 } from "../src/index.ts";
 import { SyncSQLiteStore, type SyncSqliteDatabase } from "../src/sync-sqlite-store.ts";
+import { computeSchemaSnapshot, type SchemaSnapshot } from "./schema-snapshot.ts";
 
 const RELEASED_V0_FIXTURE = resolve(
   "packages/storage/test/fixtures/migrations/schema-v0-ios-1.0.0.sqlite"
 );
 const RELEASED_V0_SHA256 = "f9746607dcd98c642a1b111be348dd7476ee12a239c10346b64abe069e6cad5f";
+const GOLDEN_SCHEMA_SNAPSHOTS_DIR = resolve("packages/storage/test/fixtures/schema-snapshots");
 const SNAPSHOT_TABLES = [
   "app_settings",
   "puzzles",
@@ -355,6 +357,48 @@ test("SQLite migrates a large released-schema history without dropping attempts"
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test("SQLite schema at the current version matches the committed golden snapshot", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "chessticize-schema-snapshot-"));
+  const databasePath = join(directory, "practice.sqlite");
+  try {
+    const store = new SQLiteStore(databasePath);
+    store.migrate();
+    const snapshot = computeSchemaSnapshot(store.db);
+    store.close();
+
+    assert.deepEqual(snapshot, await goldenSchemaSnapshot(CURRENT_SCHEMA_VERSION));
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("SQLite schema after migrating the released iOS 1.0.0 database matches the fresh-install golden snapshot", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "chessticize-schema-snapshot-legacy-"));
+  const databasePath = join(directory, "practice.sqlite");
+  try {
+    await copyFile(RELEASED_V0_FIXTURE, databasePath);
+
+    const store = new SQLiteStore(databasePath);
+    store.migrate();
+    const snapshot = computeSchemaSnapshot(store.db);
+    store.close();
+
+    assert.deepEqual(
+      snapshot,
+      await goldenSchemaSnapshot(CURRENT_SCHEMA_VERSION),
+      "a legacy database migrated to the current version must end up with the exact same table shape as a fresh install; " +
+        "if this fails after an intentional schema change, add a new migration and a new golden snapshot instead of editing this one"
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+async function goldenSchemaSnapshot(version: number): Promise<SchemaSnapshot> {
+  const contents = await readFile(join(GOLDEN_SCHEMA_SNAPSHOTS_DIR, `v${version}.json`), "utf8");
+  return JSON.parse(contents) as SchemaSnapshot;
+}
 
 function sha256(contents: Uint8Array): string {
   return createHash("sha256").update(contents).digest("hex");
