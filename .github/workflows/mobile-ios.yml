@@ -187,4 +187,6 @@ jobs:
         env:
           DETOX_ACTIVE_SUITE: ${{ matrix.suite }}
           DETOX_MAX_WORKERS: "1"
-        run: ./node_modules/.bin/detox test --configuration ios.sim.debug --cleanup
+        run: |
+          export PATH="$PWD/node_modules/.bin:$PATH"
+          ./node_modules/.bin/detox test --configuration ios.sim.debug --cleanup
