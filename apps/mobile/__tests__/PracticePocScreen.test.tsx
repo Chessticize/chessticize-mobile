@@ -65,10 +65,19 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "practice-mode-standard-icon"))).toBe("");
     expect(collectText(findByTestId(renderer, "practice-mode-arrow-duel-icon"))).toBe("");
     expect(collectText(findByTestId(renderer, "practice-mode-custom-icon"))).toBe("");
-    expect(findByTestId(renderer, "practice-mode-standard-start")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "practice-mode-standard-start"))).toBe("");
-    expect(findByTestId(renderer, "practice-mode-standard-start").props.accessibilityRole).toBe("button");
-    expect(findByTestId(renderer, "practice-mode-standard-start").props.accessibilityLabel).toBe("Start Standard sprint");
+    expect(() => findByTestId(renderer, "practice-mode-standard-start")).toThrow();
+    expect(() => findByTestId(renderer, "practice-mode-arrow-duel-start")).toThrow();
+    expect(findByTestId(renderer, "practice-mode-custom-disclosure")).toBeTruthy();
+    expect(() => findByTestId(renderer, "practice-mode-custom-rating")).toThrow();
+    expect(collectText(findByTestId(renderer, "practice-mode-custom"))).not.toContain("ELO");
+    expect(findByTestId(renderer, "practice-mode-custom").props.accessibilityLabel).toBe("Open Custom sprint setup, Configure time, theme, and rating");
+    expect(findByTestId(renderer, "practice-start-button")).toBeTruthy();
+    expect(findByTestId(renderer, "practice-start-button").props.accessibilityRole).toBe("button");
+    expect(findByTestId(renderer, "practice-start-button").props.accessibilityLabel).toBe("Start Standard sprint");
+    expect(collectText(findByTestId(renderer, "practice-start-button"))).toBe("Start");
+    expect(flattenTestStyle(findByTestId(renderer, "practice-action-header").props.style).minHeight).toBe(40);
+    expect(flattenTestStyle(findByTestId(renderer, "practice-header-title").props.style).fontSize).toBe(17);
+    expect(flattenTestStyle(findByTestId(renderer, "practice-start-button").props.style).height).toBe(40);
     expect(findByTestId(renderer, "practice-mode-standard-details").props.accessibilityLabel).toBe("5 min · 20s pace · ELO 600");
     expect(findByTestId(renderer, "practice-mode-arrow-duel-details").props.accessibilityLabel).toBe("5 min · 30s pace · ELO 600");
     expect(collectText(findByTestId(renderer, "practice-mode-standard-rating"))).toBe("ELO 600");
@@ -86,7 +95,7 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "ELO 600");
     expect(findByTestId(renderer, "practice-home")).toBeTruthy();
     expect(() => findByTestId(renderer, "review-tab-badge")).toThrow();
-    expect(collectText(findByTestId(renderer, "practice-action-header"))).toBe("Start a Sprint");
+    expect(collectText(findByTestId(renderer, "practice-header-title"))).toBe("Start a Sprint");
     expect(collectText(findByTestId(renderer, "practice-home"))).not.toContain("Offline puzzle training");
     expect(findByTestId(renderer, "practice-progress-summary")).toBeTruthy();
     expect(flattenTestStyle(findByTestId(renderer, "practice-progress-summary").props.style).alignItems).toBe("flex-start");
@@ -121,10 +130,10 @@ describe("PracticePocScreen", () => {
     const rawBundledPuzzleLabel = String(seededPuzzleCount());
     expect(collectText(renderer.root)).not.toContain(`Offline-ready · ${bundledPuzzleLabel} puzzles`);
     expect(findByTestId(renderer, "app-shell-header").props.accessibilityLabel).toContain(`Offline-ready · ${rawBundledPuzzleLabel} puzzles`);
-    expect(collectText(findByTestId(renderer, "practice-action-header"))).toBe("Start a Sprint");
+    expect(collectText(findByTestId(renderer, "practice-header-title"))).toBe("Start a Sprint");
   });
 
-  it("selects Arrow Duel on the home screen before starting from its start control", () => {
+  it("selects Arrow Duel on the home screen before starting from the header action", () => {
     const service = createMobilePracticeService("familiar15");
     service.setRating(defaultSprintConfig("arrow_duel").ratingKey, 900);
     const renderer = renderScreen({ practiceService: service });
@@ -139,7 +148,8 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "practice-progress-rating-metric"))).toContain("900");
     expect(() => findByTestId(renderer, "session-board")).toThrow();
 
-    press(renderer, "practice-mode-arrow-duel-start");
+    expect(findByTestId(renderer, "practice-start-button").props.accessibilityLabel).toBe("Start Arrow Duel sprint");
+    press(renderer, "practice-start-button");
 
     expect(findByTestId(renderer, "session-board")).toBeTruthy();
   });
@@ -313,11 +323,11 @@ describe("PracticePocScreen", () => {
     expect(hasStyleEntry(findByTestId(renderer, "practice-progress-weekly-delta"), "color", "#DC2626")).toBe(true);
   });
 
-  it("starts a selected sprint from the mode start control", () => {
+  it("starts a selected sprint from the explicit header action", () => {
     const renderer = renderScreen({ practiceService: createMobilePracticeService("familiar15") });
 
     expect(() => findByTestId(renderer, "session-loading-skeleton")).toThrow();
-    press(renderer, "practice-mode-standard-start");
+    press(renderer, "practice-start-button");
 
     expect(() => findByTestId(renderer, "session-loading-skeleton")).toThrow();
     expect(findByTestId(renderer, "session-board")).toBeTruthy();
@@ -395,6 +405,9 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "rating-label")).toThrow();
     expect(collectText(findByTestId(renderer, "custom-close"))).toBe("");
     expectText(renderer, "Custom Sprint");
+    expect(flattenTestStyle(findByTestId(renderer, "custom-action-header").props.style).minHeight).toBe(40);
+    expect(flattenTestStyle(findByTestId(renderer, "custom-header-title").props.style).fontSize).toBe(17);
+    expect(flattenTestStyle(findByTestId(renderer, "start-sprint-button").props.style).height).toBe(40);
     expect(collectText(findByTestId(renderer, "custom-sprint-setup"))).not.toContain("Time, theme, rating");
   });
 
@@ -1321,19 +1334,26 @@ describe("PracticePocScreen", () => {
     expect(Number(firstSegmentStyle.width)).toBeGreaterThan(0);
 
     act(() => {
-      findByTestId(renderer, "history-chart-line").props.onResponderGrant({ nativeEvent: { locationX: 0 } });
+      findByTestId(renderer, "history-chart-line").props.onResponderGrant({ nativeEvent: { locationX: 0, locationY: 0 } });
     });
     const firstSelectionLabel = findByTestId(renderer, "history-chart-line").props.accessibilityLabel;
-    expect(firstSelectionLabel).toMatch(/Rating \d+ on /);
+    const firstSelectionX = flattenTestStyle(findByTestId(renderer, "history-chart-selection-guide").props.style).left;
+    expect(firstSelectionLabel).toMatch(/^[A-Z][a-z]{2} \d{1,2}, \d{4} · Rating \d+$/);
     expect(findByTestId(renderer, "history-chart-tooltip")).toBeTruthy();
 
     act(() => {
-      findByTestId(renderer, "history-chart-line").props.onResponderMove({ nativeEvent: { locationX: plotWidth } });
+      findByTestId(renderer, "history-chart-line").props.onResponderMove({ nativeEvent: { locationX: 0, locationY: 999 } });
     });
-    expect(findByTestId(renderer, "history-chart-line").props.accessibilityLabel).toMatch(/Rating \d+ on /);
+    expect(findByTestId(renderer, "history-chart-line").props.accessibilityLabel).toBe(firstSelectionLabel);
+
+    act(() => {
+      findByTestId(renderer, "history-chart-line").props.onResponderMove({ nativeEvent: { locationX: plotWidth, locationY: 999 } });
+    });
+    expect(findByTestId(renderer, "history-chart-line").props.accessibilityLabel).toMatch(/Rating \d+$/);
     expect(findByTestId(renderer, "history-chart-selection-guide")).toBeTruthy();
+    expect(flattenTestStyle(findByTestId(renderer, "history-chart-selection-guide").props.style).left).not.toBe(firstSelectionX);
     expect(findByTestId(renderer, "history-chart-selection-point")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "history-chart-tooltip"))).toMatch(/^[A-Z][a-z]{2} \d{1,2}, \d{4}$/);
+    expect(collectText(findByTestId(renderer, "history-chart-tooltip"))).toMatch(/^Rating \d+[A-Z][a-z]{2} \d{1,2}, \d{4}$/);
     act(() => {
       findByTestId(renderer, "history-chart-line").props.onResponderRelease();
     });
@@ -1399,7 +1419,7 @@ describe("PracticePocScreen", () => {
     });
     expect(findByTestId(renderer, "history-chart-tooltip")).toBeTruthy();
     expect(findByTestId(renderer, "history-chart-selection-point")).toBeTruthy();
-    expect(findByTestId(renderer, "history-chart-line").props.accessibilityLabel).toMatch(/Rating \d+ on /);
+    expect(findByTestId(renderer, "history-chart-line").props.accessibilityLabel).toMatch(/Rating \d+$/);
     expect(() => findByTestId(renderer, "history-chart-metric-filters")).toThrow();
     expect(() => findByTestId(renderer, "history-chart-rating")).toThrow();
     expect(() => findByTestId(renderer, "history-chart-wins-losses")).toThrow();
@@ -3376,11 +3396,13 @@ async function pressAsync(renderer: TestRenderer.ReactTestRenderer, testID: stri
 }
 
 function startStandardSprint(renderer: TestRenderer.ReactTestRenderer): void {
-  press(renderer, "practice-mode-standard-start");
+  press(renderer, "practice-mode-standard");
+  press(renderer, "practice-start-button");
 }
 
 function startArrowDuelSprint(renderer: TestRenderer.ReactTestRenderer): void {
-  press(renderer, "practice-mode-arrow-duel-start");
+  press(renderer, "practice-mode-arrow-duel");
+  press(renderer, "practice-start-button");
 }
 
 function abandonSprint(renderer: TestRenderer.ReactTestRenderer): void {

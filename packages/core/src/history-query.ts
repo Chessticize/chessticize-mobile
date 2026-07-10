@@ -80,6 +80,7 @@ export type HistoryPerformanceMetric = "rating" | "wins-losses" | "accuracy" | "
 export interface HistoryPerformancePoint {
   key: string;
   value: number;
+  completedAt?: string;
 }
 
 export interface HistoryPerformance {
@@ -329,7 +330,8 @@ export function buildHistoryPerformance(
     charts: {
       rating: elo.map((point, index) => ({
         key: `${point.sessionId}-${point.completedAt}-${index}`,
-        value: point.ratingAfter
+        value: point.ratingAfter,
+        completedAt: point.completedAt
       })),
       "wins-losses": buildAttemptPerformanceChart(attempts, "wins-losses"),
       accuracy: buildAttemptPerformanceChart(attempts, "accuracy"),
