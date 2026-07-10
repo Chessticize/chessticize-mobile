@@ -656,6 +656,47 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
   });
 
+  it("preserves the countdown after resuming from a pause longer than the remaining sprint", () => {
+    let wallClockMs = Date.parse("2026-06-20T00:00:00.000Z");
+    const service = createMobilePracticeService("random1000");
+    service.startSprint(
+      { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 15, maxMistakes: 3 },
+      new Date(wallClockMs).toISOString()
+    );
+    const renderer = renderScreen({
+      currentTimeMs: () => wallClockMs,
+      practiceService: service
+    });
+
+    press(renderer, "practice-resume-card");
+    act(() => {
+      wallClockMs += 10_000;
+      jest.advanceTimersByTime(500);
+    });
+    expect(collectText(findByTestId(renderer, "session-timer"))).toBe("04:50");
+
+    press(renderer, "session-pause");
+    expect(findByTestId(renderer, "paused-session-panel")).toBeTruthy();
+
+    act(() => {
+      wallClockMs += 10 * 60_000;
+      jest.advanceTimersByTime(10 * 60_000);
+    });
+    expect(collectText(findByTestId(renderer, "session-timer"))).toBe("04:50");
+
+    press(renderer, "paused-session-resume");
+    expect(findByTestId(renderer, "session-board")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "session-timer"))).toBe("04:50");
+
+    act(() => {
+      wallClockMs += 1_000;
+      jest.advanceTimersByTime(1_000);
+    });
+    expect(findByTestId(renderer, "session-board")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "session-timer"))).toBe("04:49");
+    expect(() => findByTestId(renderer, "sprint-summary-panel")).toThrow();
+  });
+
   it("locks the board during an opponent reply and ignores attempted extra user moves", async () => {
     const trace: PracticeDebugTraceEvent[] = [];
     const renderer = renderStandardSequenceScreen({ debugTrace: (event) => trace.push(event) });
