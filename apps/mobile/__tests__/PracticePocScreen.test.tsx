@@ -77,6 +77,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "practice-start-button"))).toBe("Start");
     expect(flattenTestStyle(findByTestId(renderer, "practice-action-header").props.style).minHeight).toBe(40);
     expect(flattenTestStyle(findByTestId(renderer, "practice-header-title").props.style).fontSize).toBe(17);
+    expect(flattenTestStyle(findByTestId(renderer, "practice-header-title").props.style).textAlign).toBe("left");
     expect(flattenTestStyle(findByTestId(renderer, "practice-start-button").props.style).height).toBe(40);
     expect(findByTestId(renderer, "practice-mode-standard-details").props.accessibilityLabel).toBe("5 min · 20s pace · ELO 600");
     expect(findByTestId(renderer, "practice-mode-arrow-duel-details").props.accessibilityLabel).toBe("5 min · 30s pace · ELO 600");
@@ -154,6 +155,38 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "session-board")).toBeTruthy();
   });
 
+  it("keeps first-select Arrow Duel progress on its own ELO after startup sync completes", async () => {
+    const service = createMobilePracticeService("familiar15");
+    service.setRating(defaultSprintConfig("standard").ratingKey, 1_106);
+    service.setRating(defaultSprintConfig("arrow_duel").ratingKey, 775);
+    let resolveAccountStatus: (() => void) | undefined;
+    const client = {
+      getAccountStatus: () => new Promise<"available">((resolve) => {
+        resolveAccountStatus = () => resolve("available");
+      }),
+      fetchSnapshot: async () => undefined,
+      saveSnapshot: async () => {}
+    };
+    const renderer = renderScreen({
+      practiceService: service,
+      iCloudProgressSyncClient: client
+    });
+
+    press(renderer, "practice-mode-arrow-duel");
+    expect(collectText(findByTestId(renderer, "practice-mode-arrow-duel-rating"))).toBe("ELO 775");
+    expect(collectText(findByTestId(renderer, "practice-progress-rating-metric"))).toContain("ELO (Arrow Duel)775");
+
+    await act(async () => {
+      resolveAccountStatus?.();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(collectText(findByTestId(renderer, "practice-progress-rating-metric"))).toContain("ELO (Arrow Duel)775");
+    expect(collectText(findByTestId(renderer, "practice-progress-rating-metric"))).not.toContain("1106");
+  });
+
   it("scopes the home progress summary to the selected rating bucket", () => {
     const store = new MemoryStore();
     store.seedPuzzles([sharedHistoryPuzzle()]);
@@ -217,7 +250,7 @@ describe("PracticePocScreen", () => {
   });
 
   it("does not scan the bundled Core Pack when rendering custom sprint availability", () => {
-    const service = createMobilePracticeService("random1000");
+    const service = createMobilePracticeService("familiar15");
     const countEligible = jest.spyOn(service, "countEligibleSprintPuzzles");
     const renderer = renderScreen({ practiceService: service });
 
@@ -1348,6 +1381,36 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "history-chart-bar-0")).toThrow();
   });
 
+  it("keeps the timer and score row mounted while the final board feedback is visible", async () => {
+    const nowMs = Date.parse("2026-06-20T00:00:00.000Z");
+    const service = createMobilePracticeService("random1000");
+    service.startSprint(
+      { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 1, maxMistakes: 3 },
+      new Date(nowMs).toISOString()
+    );
+    const renderer = renderScreen({
+      currentTimeMs: () => nowMs,
+      practiceService: service
+    });
+
+    press(renderer, "practice-resume-card");
+    await boardMove(renderer, "e2e6");
+    await settleFeedbackSnapshot();
+    await boardMove(renderer, "e6f7");
+
+    expect(findByTestId(renderer, "session-board")).toBeTruthy();
+    expect(findByTestId(renderer, "session-status-metrics")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "session-progress"))).toBe("1 / 1");
+    expect(collectText(findByTestId(renderer, "session-timer"))).toBe("05:00");
+    expect(() => findByTestId(renderer, "sprint-summary-panel")).toThrow();
+
+    await settleFeedbackSnapshot();
+
+    expect(() => findByTestId(renderer, "session-board")).toThrow();
+    expect(() => findByTestId(renderer, "session-status-metrics")).toThrow();
+    expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
+  });
+
   it("renders a dot-free rating curve that can be inspected by dragging", async () => {
     const renderer = renderStandardSequenceScreen();
 
@@ -1381,6 +1444,8 @@ describe("PracticePocScreen", () => {
     const firstSelectionX = flattenTestStyle(findByTestId(renderer, "history-chart-selection-guide").props.style).left;
     expect(firstSelectionLabel).toMatch(/^[A-Z][a-z]{2} \d{1,2}, \d{4} · Rating \d+$/);
     expect(findByTestId(renderer, "history-chart-tooltip")).toBeTruthy();
+    expect(flattenTestStyle(findByTestId(renderer, "history-chart-tooltip").props.style).right).toBe(0);
+    expect(findByTestId(renderer, "history-chart-tooltip").props.pointerEvents).toBe("none");
 
     act(() => {
       findByTestId(renderer, "history-chart-line").props.onResponderMove({ nativeEvent: { locationX: 0, locationY: 999 } });
@@ -1394,6 +1459,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-chart-selection-guide")).toBeTruthy();
     expect(flattenTestStyle(findByTestId(renderer, "history-chart-selection-guide").props.style).left).not.toBe(firstSelectionX);
     expect(findByTestId(renderer, "history-chart-selection-point")).toBeTruthy();
+    expect(flattenTestStyle(findByTestId(renderer, "history-chart-tooltip").props.style).left).toBe(0);
     expect(collectText(findByTestId(renderer, "history-chart-tooltip"))).toMatch(/^Rating \d+[A-Z][a-z]{2} \d{1,2}, \d{4}$/);
     act(() => {
       findByTestId(renderer, "history-chart-line").props.onResponderRelease();
