@@ -9,13 +9,24 @@ It is generated from the local Chessticize presolved Lichess puzzle CSV with:
 pnpm generate:offline-puzzles
 ```
 
-The generator reads `../lichess-presolve/presolved-depth16` by default, keeps
+The generator reads the depth-20 `../lichess-presolve/presolved` corpus by default, keeps
 source puzzle IDs, requires Stockfish presolve fields, applies the quality and
 Arrow Duel eligibility filters in `docs/PUZZLE_PACK_SAMPLING.md`, samples the
 600-2200 rating range with deterministic stratified bucket/theme quotas, removes
 duplicate board positions, and writes a deterministic SQLite pack plus
 `bundled-core-pack.manifest.json`. It does not synthesize puzzles by copying
 existing records.
+
+To update the presolve fields of an existing sampled pack without renewing its
+IDs, run:
+
+```sh
+pnpm update:offline-puzzle-presolve
+```
+
+This targeted updater changes only the three Stockfish fields, removes rows
+that no longer satisfy the full Arrow Duel eligibility rule, and performs full
+artifact/manifest validation. It does not replenish removed rows.
 
 The release SQLite schema is intentionally runtime-only: `puzzles` keeps the
 source puzzle ID, compact FEN, solution moves, rating, and presolved Stockfish
@@ -37,8 +48,9 @@ Lichess currently publishes database exports under Creative Commons CC0 on the o
 
 ## Core Pack distribution
 
-`bundled-core-pack.sqlite` (~493 MB) is NOT committed to git. It is published
-as a GitHub Release asset (`core-pack-v1`) and fetched on demand:
+`bundled-core-pack.sqlite` (~490 MiB after the depth-20 migration) is NOT
+committed to git. Pack artifacts are published as immutable GitHub Release
+assets and fetched on demand:
 
 ```sh
 pnpm fetch:core-pack
@@ -46,6 +58,8 @@ pnpm fetch:core-pack
 
 The fetch verifies size and SHA-256 against `bundled-core-pack.manifest.json`
 (`packFileBytes` / `packFileHash`). CI caches the artifact keyed on the
-manifest; the Detox iOS build fetches it automatically. After regenerating the
-pack, upload the new artifact to a new release tag and update the URL in
-`scripts/fetch-core-pack.mjs`.
+manifest; the Detox iOS build fetches it automatically. The immutable
+`core-pack-v1` asset contains the original depth-16 pack. Publish the migrated
+depth-20 artifact to a new release tag; the current manifest and
+`scripts/fetch-core-pack.mjs` reference `core-pack-v2`. Do not overwrite
+`core-pack-v1`.

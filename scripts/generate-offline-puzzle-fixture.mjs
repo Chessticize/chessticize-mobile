@@ -5,12 +5,13 @@ import { mkdir, rm, opendir, stat, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { DatabaseSync } from "node:sqlite";
+import { pathToFileURL } from "node:url";
 import {
   MATE_PATTERN_THEMES,
   isServerCompatibleArrowDuelPuzzle
 } from "../packages/core/src/index.ts";
 
-const DEFAULT_SOURCE = "../lichess-presolve/presolved-depth16";
+const DEFAULT_SOURCE = "../lichess-presolve/presolved";
 const DEFAULT_OUTPUT = "fixtures/puzzles/bundled-core-pack.sqlite";
 const DEFAULT_MANIFEST = "fixtures/puzzles/bundled-core-pack.manifest.json";
 const DEFAULT_TARGET_COUNT = 1_400_000;
@@ -31,63 +32,69 @@ const CUSTOM_SPRINT_THEMES = [
 const PACK_METADATA = {
   id: "core",
   title: "Core Pack",
-  buildDate: "2026-07-04",
+  buildDate: new Date().toISOString().slice(0, 10),
   source: "Lichess puzzle database",
   sourceLicense: "CC0",
-  sourceSnapshotDate: "2026-07-04",
-  presolve: "Chessticize depth-16 Stockfish presolve",
-  presolveDepth: 16,
+  sourceSnapshotDate: "2025-07-24",
+  presolve: "Chessticize depth-20 Stockfish presolve",
+  presolveDepth: 20,
   licenseNote: "Derived from Lichess puzzle data with Chessticize presolve metadata."
 };
 
-const options = parseArgs(process.argv.slice(2));
-const sourcePath = resolve(options.source);
-const outputPath = resolve(options.output);
-const manifestPath = resolve(options.manifest);
+async function main(argv = process.argv.slice(2)) {
+  const options = parseArgs(argv);
+  const sourcePath = resolve(options.source);
+  const outputPath = resolve(options.output);
+  const manifestPath = resolve(options.manifest);
 
-await mkdir(dirname(outputPath), { recursive: true });
-await mkdir(dirname(manifestPath), { recursive: true });
-if (!options.resumeCandidates && !options.manifestOnly) {
-  await rm(outputPath, { force: true });
-}
-const db = new DatabaseSync(outputPath);
-try {
-  if (options.manifestOnly) {
-    console.log(`Rebuilding manifest from existing pack ${outputPath}`);
-  } else if (!options.resumeCandidates) {
-    initializeDatabase(db);
-    await ingestCandidates(db, sourcePath, options);
-  } else {
-    const candidateCount = db.prepare("SELECT COUNT(*) AS count FROM candidates").get().count;
-    console.log(`Resuming from ${candidateCount} existing candidate rows in ${outputPath}`);
+  await mkdir(dirname(outputPath), { recursive: true });
+  await mkdir(dirname(manifestPath), { recursive: true });
+  if (!options.resumeCandidates && !options.manifestOnly) {
+    await rm(outputPath, { force: true });
   }
-  if (!options.manifestOnly) {
-    const quotas = computeBucketQuotas(readBucketInventories(db), options.targetCount);
-    const selected = selectFinalPuzzles(db, quotas, options.seed);
-    writeSelectedPack(db, selected);
-    db.exec("VACUUM");
+  const db = new DatabaseSync(outputPath);
+  try {
+    if (options.manifestOnly) {
+      console.log(`Rebuilding manifest from existing pack ${outputPath}`);
+    } else if (!options.resumeCandidates) {
+      initializeDatabase(db);
+      await ingestCandidates(db, sourcePath, options);
+    } else {
+      const candidateCount = db.prepare("SELECT COUNT(*) AS count FROM candidates").get().count;
+      console.log(`Resuming from ${candidateCount} existing candidate rows in ${outputPath}`);
+    }
+    if (!options.manifestOnly) {
+      const quotas = computeBucketQuotas(readBucketInventories(db), options.targetCount);
+      const selected = selectFinalPuzzles(db, quotas, options.seed);
+      writeSelectedPack(db, selected);
+      db.exec("VACUUM");
+    }
+  } finally {
+    db.close();
   }
-} finally {
-  db.close();
+
+  const packFileBytes = (await stat(outputPath)).size;
+  const packFileHash = `sha256:${await sha256File(outputPath)}`;
+  const manifest = buildSqliteManifest(outputPath, {
+    ...PACK_METADATA,
+    format: "sqlite",
+    seed: options.seed,
+    targetPuzzleCount: options.targetCount,
+    packFileBytes,
+    packFileHash,
+    manifestHash: "pending"
+  }, options);
+  manifest.manifestHash = `sha256:${sha256Text(stableJson({ ...manifest, manifestHash: "" }))}`;
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+
+  console.log(`Wrote ${manifest.puzzleCount} puzzles to ${outputPath}`);
+  console.log(`Wrote manifest to ${manifestPath}`);
+  console.log(`Pack size ${packFileBytes} bytes; ${packFileHash}`);
 }
 
-const packFileBytes = (await stat(outputPath)).size;
-const packFileHash = `sha256:${await sha256File(outputPath)}`;
-const manifest = buildSqliteManifest(outputPath, {
-  ...PACK_METADATA,
-  format: "sqlite",
-  seed: options.seed,
-  targetPuzzleCount: options.targetCount,
-  packFileBytes,
-  packFileHash,
-  manifestHash: "pending"
-}, options);
-manifest.manifestHash = `sha256:${sha256Text(stableJson({ ...manifest, manifestHash: "" }))}`;
-await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-
-console.log(`Wrote ${manifest.puzzleCount} puzzles to ${outputPath}`);
-console.log(`Wrote manifest to ${manifestPath}`);
-console.log(`Pack size ${packFileBytes} bytes; ${packFileHash}`);
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  await main();
+}
 
 function parseArgs(argv) {
   const options = {
@@ -907,3 +914,13 @@ function sortObject(value) {
   }
   return value;
 }
+
+export {
+  buildSqliteManifest,
+  listCsvFiles,
+  main,
+  readCsvFile,
+  sha256File,
+  sha256Text,
+  stableJson
+};

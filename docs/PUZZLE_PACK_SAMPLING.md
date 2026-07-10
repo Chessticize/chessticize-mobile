@@ -1,18 +1,23 @@
 # Bundled Puzzle Pack Sampling Specification
 
-Status date: 2026-07-04. Owner-approved specification for regenerating the
+Status date: 2026-07-10. Owner-approved specification for regenerating the
 release Core Pack. Supersedes the first-3,000-eligible-rows behavior of
-`scripts/generate-offline-puzzle-fixture.mjs`. All statistics below were
-measured on 2026-07-04 against the full local presolve library.
+`scripts/generate-offline-puzzle-fixture.mjs`.
 
 ## Source
 
-The local presolve library at `../lichess-presolve/presolved-depth16` contains
-the complete Lichess puzzle database (4,824,507 rows) presolved with Stockfish
-at depth 16. Columns: `PuzzleId, FEN, Moves, Rating, RatingDeviation,
+The canonical local presolve library at `../lichess-presolve/presolved` contains
+the complete July 24, 2025 Lichess puzzle snapshot (4,824,507 rows) presolved
+with Stockfish at depth 20. Columns: `PuzzleId, FEN, Moves, Rating, RatingDeviation,
 Popularity, NbPlays, Themes, GameUrl, OpeningTags, stockfish_eval,
 stockfish_bestmove, stockfish_eval_after_first_move`. Lichess data is CC0;
 presolve fields are Chessticize-generated.
+
+`core-pack-v1` was mistakenly generated from the historical
+`presolved-depth16` directory. Use the targeted depth-20 update workflow below
+to retain its sampled puzzle IDs while replacing changed presolve fields and
+removing puzzles that no longer pass the full Arrow Duel rule. Do not use the
+depth-16 directory for a new pack.
 
 ## Owner Decisions (2026-07-04)
 
@@ -44,7 +49,8 @@ presolve fields are Chessticize-generated.
 5. Position dedupe on the canonical FEN (first four FEN fields), keeping the
    more popular record.
 
-Measured inventory after filters 1–4 (per 200-point band):
+Historical inventory measured for the original depth-16 sampling run after
+filters 1–4 (per 200-point band):
 
 | Band | Quality | + Arrow Duel |
 | --- | --- | --- |
@@ -109,13 +115,53 @@ Measured inventory after filters 1–4 (per 200-point band):
    windows can be empty until fallback. The selection floor must align with the
    shipped pack floor.
 
+## Updating Presolve Data Without Resampling
+
+Use this workflow when the sampled IDs should remain fixed but their presolve
+fields need to move to a newer corpus:
+
+```sh
+pnpm update:offline-puzzle-presolve
+```
+
+The updater verifies the existing artifact against its manifest, works on a
+temporary copy, and requires every shipped `PuzzleId` to exist in the new
+source with the same FEN, solution moves, and rating. It changes only
+`stockfish_eval`, `stockfish_bestmove`, and
+`stockfish_eval_after_first_move`. Each row is rechecked with
+`isServerCompatibleArrowDuelPuzzle`; rows that fail are removed from both the
+puzzle and theme relations. It then runs `PRAGMA integrity_check`, rebuilds the
+manifest, and performs a full second Arrow Duel validation from the resulting
+SQLite database before atomically replacing the pack and manifest.
+
+This is intentionally not a full renewal: it never adds or resamples puzzle
+IDs and does not backfill rows removed by the depth-20 eligibility check. The
+result may therefore contain fewer puzzles than `targetPuzzleCount`. Publish
+the migrated artifact under a new release tag; never replace the immutable
+`core-pack-v1` asset.
+
+### Depth-20 migration result (2026-07-10)
+
+- Source IDs matched: 1,400,000 / 1,400,000; source identity mismatches: 0.
+- Rows with changed presolve data: 1,371,232. Updated and retained: 1,360,472.
+- Rows removed after the depth-20 eligibility check: 10,760. Replacement rows:
+  0.
+- Changed fields: `stockfish_eval` 1,267,234;
+  `stockfish_bestmove` 236,769;
+  `stockfish_eval_after_first_move` 1,080,953.
+- Final rows: 1,389,240; fully validated Arrow Duel rows: 1,389,240.
+- SQLite integrity: `ok`; artifact size: 513,323,008 bytes; artifact SHA-256:
+  `0256e4386b9d3c17287782beae81f06fd02c1687fa8081825835e418faa9e187`.
+- Published release: `core-pack-v2`; the fetch script references its immutable
+  `bundled-core-pack.sqlite` asset.
+
 ## Regenerating And Publishing The Pack
 
 Follow this checklist whenever the sampling rules, seed, thresholds, or the
 source presolve library change:
 
-1. Ensure the presolve library is present at
-   `../lichess-presolve/presolved-depth16`.
+1. Ensure the depth-20 presolve library is present at
+   `../lichess-presolve/presolved`.
 2. Run `pnpm generate:offline-puzzles`. This rebuilds
    `fixtures/puzzles/bundled-core-pack.sqlite` (gitignored) and rewrites
    `bundled-core-pack.manifest.json` with the new seed, build date, counts,
@@ -154,8 +200,9 @@ the runtime `openReadOnlyPuzzlePack` calls, and the asset test — don't.
 - Every puzzle in the pack passes `isServerCompatibleArrowDuelPuzzle` (verify
   in a build-time validation pass, not by sampling).
 - Manifest counts match the database contents exactly.
-- Per-bucket, per-theme, and mate-pattern minimums are met or equal the full
-  available inventory.
+- For a full regeneration, per-bucket, per-theme, and mate-pattern minimums are
+  met or equal the full available inventory. A targeted presolve update instead
+  preserves the original IDs and does not refill newly ineligible rows.
 - Two consecutive builds from the same source and seed produce identical
   hashes.
 - Install-size measurement of the built asset is ≤ 800 MB, target ≈ 700 MB;
