@@ -1443,15 +1443,12 @@ export function PracticePocScreen({
       move: pending.move,
       puzzleId
     });
+    const replyFen = activeState.currentPuzzle?.currentFen ?? null;
+    const appliedFen = replyFen ? fenAfterMove(replyFen, pending.move) : null;
     if (pending.result) {
-      // The board accepted this move mid-animation, so its internal position
-      // already includes it. The drop can race the reply animation's square
-      // commits, so re-sync the sprites to the post-premove position before
-      // dispatching the stored result through the normal submit path.
-      const replyFen = activeState.currentPuzzle?.currentFen ?? null;
-      const appliedFen = replyFen ? fenAfterMove(replyFen, pending.move) : null;
       if (!appliedFen) {
         resetBoardToFen(replyFen, "premove-not-legal", puzzleId, pending.move);
+        commitBoardFen(replyFen);
         emitTrace({
           type: "move-ignored",
           reason: "premove-not-legal",
@@ -1460,19 +1457,51 @@ export function PracticePocScreen({
         });
         return;
       }
+      // The board accepted this move mid-animation, so its internal position
+      // already includes it. The drop can race the reply animation's square
+      // commits, so re-sync the sprites to the post-premove position, and
+      // align the fen prop with it — the board hard-resets whenever the fen
+      // prop changes, so leaving the reply fen pending would rewind the
+      // premove at the next render.
       resetBoardToFen(appliedFen, "premove-replay", puzzleId, pending.move);
+      commitBoardFen(appliedFen);
       await onBoardMove(pending.result, pending.context);
       return;
     }
-    // The drop happened before the reply reached the board's internal state.
-    // Play it through the board now so legality is decided against the final
-    // position; an illegal premove resolves undefined and is dropped.
+    // The drop happened before the reply reached the board's internal state,
+    // so the board never applied it. Validate against the reply position and
+    // play it through the board now.
+    const boardFenNow = boardRef.current?.getState?.().fen ?? null;
+    const boardInSync = !boardFenNow || !replyFen || canonicalFen(boardFenNow) === canonicalFen(replyFen);
+    // A bare promotion intent (the dialog never completed while locked) has
+    // no legal fen without a piece; probe with a queen and let the board's
+    // promotion dialog collect the real choice during the replay.
+    const isPromotionIntent = !appliedFen && pending.move.length === 4 && replyFen !== null &&
+      fenAfterMove(replyFen, `${pending.move}q`) !== null;
+    if (!boardInSync || (!appliedFen && !isPromotionIntent)) {
+      resetBoardToFen(replyFen, "premove-not-legal", puzzleId, pending.move);
+      emitTrace({
+        type: "move-ignored",
+        reason: "premove-not-legal",
+        move: pending.move,
+        puzzleId
+      });
+      return;
+    }
+    if (appliedFen) {
+      // Align the fen prop with the post-premove position before the board
+      // applies it, so the fen-change hard reset cannot rewind the replayed
+      // move while its animation is still settling.
+      commitBoardFen(appliedFen);
+    }
     const played = await boardRef.current?.move({
       from: pending.move.slice(0, 2) as Square,
       to: pending.move.slice(2, 4) as Square,
       ...(pending.move.length > 4 ? { promotion: pending.move.slice(4, 5) as PieceSymbol } : {})
     });
     if (!played) {
+      resetBoardToFen(replyFen, "premove-not-legal", puzzleId, pending.move);
+      commitBoardFen(replyFen);
       emitTrace({
         type: "move-ignored",
         reason: "premove-not-legal",
