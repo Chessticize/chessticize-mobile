@@ -2,6 +2,12 @@ name: Mobile iOS
 
 on:
   workflow_dispatch:
+    inputs:
+      shard_detox:
+        description: "Run flows and practice on two independent macOS workers"
+        required: false
+        default: false
+        type: boolean
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
@@ -76,7 +82,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        suite: [flows, practice]
+        # Pull requests use one worker because two cold macOS VMs measured
+        # slower overall. Manual dispatch keeps the scope-preserving A/B path.
+        suite: ${{ fromJSON(inputs.shard_detox && '["flows","practice"]' || '["all"]') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4

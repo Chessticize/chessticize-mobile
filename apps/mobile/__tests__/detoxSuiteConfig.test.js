@@ -17,6 +17,8 @@ describe('Detox suite configuration', () => {
   });
 
   it('partitions every active spec exactly once across the two CI suites', () => {
+    expect(resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'all' }))
+      .toEqual(ACTIVE_E2E_TEST_MATCH);
     expect(resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'practice' }))
       .toEqual(ACTIVE_E2E_TEST_MATCH_BY_SUITE.practice);
     expect(resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'flows' }))

@@ -28,6 +28,10 @@ function resolveDetoxTestMatch(environment = process.env) {
     return ADAPTIVE_LAYOUT_TEST_MATCH;
   }
 
+  if (activeSuite === 'all') {
+    return ACTIVE_E2E_TEST_MATCH;
+  }
+
   if (activeSuite) {
     const suiteTestMatch = ACTIVE_E2E_TEST_MATCH_BY_SUITE[activeSuite];
     if (!suiteTestMatch) {
