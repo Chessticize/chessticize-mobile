@@ -774,7 +774,7 @@ describe("PracticePocScreen", () => {
     expect(hasStyleValue(renderer.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
   });
 
-  it("keeps only the latest premove queued during an opponent reply", async () => {
+  it("keeps only the latest playable premove queued during an opponent reply", async () => {
     const trace: PracticeDebugTraceEvent[] = [];
     const renderer = renderStandardSequenceScreen({ debugTrace: (event) => trace.push(event) });
 
@@ -786,13 +786,76 @@ describe("PracticePocScreen", () => {
 
     await settleFeedbackSnapshot();
 
-    expect(trace.filter((event) => event.type === "premove-replay")).toHaveLength(1);
+    expect(trace.some((event) =>
+      event.type === "premove-replay" &&
+      event.move === "e6f7"
+    )).toBe(true);
+    expect(trace.some((event) =>
+      event.type === "premove-replay" &&
+      event.move === "e6e5"
+    )).toBe(false);
+    expectText(renderer, "1 / 15");
+    expectSessionMistakes(renderer, 0);
+  });
+
+  it("does not let a junk drag evict a queued premove", async () => {
+    const trace: PracticeDebugTraceEvent[] = [];
+    const renderer = renderStandardSequenceScreen({ debugTrace: (event) => trace.push(event) });
+
+    startStandardSprint(renderer);
+    await boardMove(renderer, "e2e6");
+
+    // Queue the real premove, then brush a square pair that can never be
+    // legal in the reply position.
+    await boardMove(renderer, "e6f7");
+    act(() => {
+      findByTestId(renderer, "mock-chessboard").props.onIllegalMove("d8", "a8");
+    });
+
+    expect(trace.some((event) =>
+      event.type === "move-ignored" &&
+      event.reason === "premove-illegal-intent" &&
+      event.move === "d8a8"
+    )).toBe(true);
+
+    await settleFeedbackSnapshot();
+
     expect(trace.some((event) =>
       event.type === "premove-replay" &&
       event.move === "e6f7"
     )).toBe(true);
     expectText(renderer, "1 / 15");
     expectSessionMistakes(renderer, 0);
+  });
+
+  it("still discards moves arriving during a hard lock instead of queueing them", async () => {
+    const trace: PracticeDebugTraceEvent[] = [];
+    const renderer = renderStandardSequenceScreen({ debugTrace: (event) => trace.push(event) });
+
+    startStandardSprint(renderer);
+    await boardMove(renderer, "e2e6");
+    await settleFeedbackSnapshot();
+
+    // A wrong move advances to the next puzzle behind a feedback-snapshot
+    // hard lock: gestures are disabled and the input blocker is up.
+    await boardMove(renderer, "e6d7");
+    expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(false);
+    expect(findByTestId(renderer, "board-input-blocker")).toBeTruthy();
+
+    act(() => {
+      findByTestId(renderer, "mock-chessboard").props.onIllegalMove("e6", "f7");
+    });
+
+    expect(trace.some((event) =>
+      event.type === "move-ignored" &&
+      event.reason === "board-locked-illegal-move" &&
+      event.move === "e6f7"
+    )).toBe(true);
+    expect(trace.some((event) => event.type === "premove-queued")).toBe(false);
+
+    await settleFeedbackSnapshot();
+    expect(trace.some((event) => event.type === "premove-replay")).toBe(false);
+    expectSessionMistakes(renderer, 1);
   });
 
   it("discards opponent-piece drags during the opponent reply animation", async () => {
@@ -837,7 +900,7 @@ describe("PracticePocScreen", () => {
     expect(hasStyleValue(renderer.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
   });
 
-  it("drops illegal drags queued during the opponent reply without stalling the board", async () => {
+  it("drops illegal drags during the opponent reply without stalling the board", async () => {
     const trace: PracticeDebugTraceEvent[] = [];
     const renderer = renderStandardSequenceScreen({ debugTrace: (event) => trace.push(event) });
 
@@ -851,21 +914,18 @@ describe("PracticePocScreen", () => {
     });
 
     expectSessionMistakes(renderer, 0);
+    // A drag that can never be legal in the reply position is swallowed at
+    // queue time instead of becoming a queued premove.
     expect(trace.some((event) =>
-      event.type === "premove-queued" &&
-      event.reason === "pending-board" &&
+      event.type === "move-ignored" &&
+      event.reason === "premove-illegal-intent" &&
       event.move === "d8a8"
     )).toBe(true);
+    expect(trace.some((event) => event.type === "premove-queued")).toBe(false);
 
     await settleFeedbackSnapshot();
 
-    // The queued drag is still illegal against the reply position, so the
-    // replay drops it without counting a mistake or stalling the board.
-    expect(trace.some((event) =>
-      event.type === "move-ignored" &&
-      event.reason === "premove-not-legal" &&
-      event.move === "d8a8"
-    )).toBe(true);
+    expect(trace.some((event) => event.type === "premove-replay")).toBe(false);
     expectText(renderer, "0 / 15");
     await boardMove(renderer, "e6f7");
 

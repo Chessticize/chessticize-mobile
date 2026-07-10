@@ -50,7 +50,15 @@ jest.mock('react-native-chessboard', () => {
       move: async ({ from, to, promotion }) => {
         return playMove({ from, to, promotion });
       },
-      resetBoard: resetBoardMock
+      resetBoard: resetBoardMock,
+      getState: () => ({
+        fen: chessRef.current.fen(),
+        isCheck: chessRef.current.isCheck(),
+        isCheckmate: chessRef.current.isCheckmate(),
+        isStalemate: chessRef.current.isStalemate(),
+        isGameOver: chessRef.current.isGameOver(),
+        turn: chessRef.current.turn()
+      })
     }));
 
     return React.createElement(
