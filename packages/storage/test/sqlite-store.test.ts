@@ -181,6 +181,67 @@ test("SQLite migration adds server-compatible Glicko fields to existing ratings 
   }
 });
 
+test("SQLite migration preserves legacy settings while adding the sync upload safety flag", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "chessticize-settings-migration-"));
+  const dbPath = join(dir, "practice.sqlite");
+  try {
+    const legacyDb = new DatabaseSync(dbPath);
+    legacyDb.exec(`
+      CREATE TABLE app_settings (
+        id TEXT PRIMARY KEY,
+        sync_icloud_enabled INTEGER NOT NULL,
+        review_reminder_mode TEXT NOT NULL,
+        review_reminder_fixed_local_time TEXT
+      );
+      INSERT INTO app_settings (
+        id,
+        sync_icloud_enabled,
+        review_reminder_mode,
+        review_reminder_fixed_local_time
+      ) VALUES ('default', 0, 'fixed', '19:00');
+    `);
+    legacyDb.close();
+
+    const store = new SQLiteStore(dbPath);
+    store.migrate();
+    assert.deepEqual(store.getSettings(), {
+      sync: { iCloudEnabled: false },
+      notifications: { reviewReminder: { mode: "fixed", fixedLocalTime: "19:00" } }
+    });
+
+    store.saveSettings({
+      sync: { iCloudEnabled: true },
+      notifications: { reviewReminder: { mode: "off" } }
+    });
+    store.migrate();
+    store.close();
+
+    const migratedDb = new DatabaseSync(dbPath);
+    const columns = migratedDb.prepare("PRAGMA table_info(app_settings)").all() as Array<{ name: string }>;
+    const settings = migratedDb.prepare("SELECT * FROM app_settings WHERE id = 'default'").get() as {
+      id: string;
+      sync_icloud_enabled: number;
+      sync_upload_allowed: number;
+      review_reminder_mode: string;
+      review_reminder_fixed_local_time: string | null;
+    };
+    const integrity = migratedDb.prepare("PRAGMA integrity_check").get() as { integrity_check: string };
+    migratedDb.close();
+
+    assert.ok(columns.some((column) => column.name === "sync_upload_allowed"));
+    assert.deepEqual({ ...settings }, {
+      id: "default",
+      sync_icloud_enabled: 1,
+      sync_upload_allowed: 0,
+      review_reminder_mode: "off",
+      review_reminder_fixed_local_time: null
+    });
+    assert.equal(integrity.integrity_check, "ok");
+  } finally {
+    await rm(dir, { force: true, recursive: true });
+  }
+});
+
 test("PracticeService selects SQLite sprint puzzles from the current run ELO window", async () => {
   const store = await seededStore();
   const service = new PracticeService(store);

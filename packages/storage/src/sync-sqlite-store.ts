@@ -125,6 +125,7 @@ interface CustomSprintConfigRow {
 interface AppSettingsRow {
   id: string;
   sync_icloud_enabled: number;
+  sync_upload_allowed: number;
   review_reminder_mode: PracticeSettings["notifications"]["reviewReminder"]["mode"];
   review_reminder_fixed_local_time: string | null;
 }
@@ -170,6 +171,7 @@ export class SyncSQLiteStore implements PracticeStore {
 
   migrate(): void {
     this.db.exec(SCHEMA_SQL);
+    this.ensureAppSettingsSyncUploadAllowedColumn();
     this.ensureAttemptCandidateOrderColumn();
     this.ensureRatingGlickoColumns();
   }
@@ -1043,6 +1045,13 @@ export class SyncSQLiteStore implements PracticeStore {
     const columns = this.db.prepare("PRAGMA table_info(attempts)").all() as Array<{ name: string }>;
     if (!columns.some((column) => column.name === "arrow_duel_candidate_order_json")) {
       this.db.exec("ALTER TABLE attempts ADD COLUMN arrow_duel_candidate_order_json TEXT");
+    }
+  }
+
+  private ensureAppSettingsSyncUploadAllowedColumn(): void {
+    const columns = this.db.prepare("PRAGMA table_info(app_settings)").all() as Array<{ name: string }>;
+    if (!columns.some((column) => column.name === "sync_upload_allowed")) {
+      this.db.exec("ALTER TABLE app_settings ADD COLUMN sync_upload_allowed INTEGER NOT NULL DEFAULT 0");
     }
   }
 
