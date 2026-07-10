@@ -54,7 +54,7 @@ test("Detox fixture generator emits a small production-compatible SQLite pack", 
       outputPath
     ]);
 
-    const packDb = new DatabaseSync(outputPath, { readOnly: true });
+    const packDb = new DatabaseSync(outputPath);
     try {
       const source = new SQLitePuzzlePackSource(new NodeSqliteDatabase(packDb));
       assert.equal(source.countPuzzles(), 2399);
