@@ -409,7 +409,7 @@ export function PracticePocScreen({
   const [chessboardDebugEvents, setChessboardDebugEvents] = useState<string[]>([]);
   const [historyTimeRange, setHistoryTimeRange] = useState<HistoryTimeRange>("7d");
   const [historySourceFilter, setHistorySourceFilter] = useState<"all" | AttemptSource>("all");
-  const [historyResultFilter, setHistoryResultFilter] = useState<"all" | "correct" | "wrong">("all");
+  const [historyResultFilter, setHistoryResultFilter] = useState<"all" | "correct" | "wrong">("wrong");
   const [historySideFilter, setHistorySideFilter] = useState<"all" | PuzzleSide>("all");
   const [historyThemeFilter, setHistoryThemeFilter] = useState<string>("all");
   const [historyRatingRangeFilter, setHistoryRatingRangeFilter] = useState<HistoryRatingRangeFilter>("all");
@@ -1438,8 +1438,12 @@ export function PracticePocScreen({
       : null;
   const displayedLastBoardMove = feedbackSnapshot || boardFeedback ? null : lastBoardMove;
   const historyRatingKeys = useMemo(
-    () => [...new Set([...service.listPlayedRatings().map((rating) => rating.key), ...attempts.map((attempt) => attempt.ratingKey)])].sort(),
-    [attempts, service]
+    () => sortHistoryRatingKeys(
+      [...new Set([...service.listPlayedRatings().map((rating) => rating.key), ...attempts.map((attempt) => attempt.ratingKey)])],
+      attempts,
+      sprintSessions
+    ),
+    [attempts, service, sprintSessions]
   );
   const activeHistoryRatingKey = historyRatingKey;
   const historyWrongOnly = historyResultFilter === "wrong";
@@ -1766,7 +1770,7 @@ export function PracticePocScreen({
                     onPerPuzzleChange={setCustomPerPuzzleSeconds}
                     onThemeChange={setCustomTheme}
                     previousConfigs={service.listCustomSprintConfigs()}
-                    ratingForKey={(ratingKey) => service.getRating(ratingKey).rating}
+                    ratingForKey={(key) => service.getRating(key).rating}
                     onStart={() => startSprint(customSprintMode, true)}
                   />
                 ) : null}
@@ -3812,20 +3816,20 @@ function HistoryPanel({
               onPress={() => onTimeRangeChange(range)}
             />
           ))}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={wrongOnly ? "Clear wrong puzzles only filter" : "Wrong puzzles only"}
-            accessibilityState={{ selected: wrongOnly }}
-            testID="history-filter-wrong-only"
-            style={[styles.filterButton, wrongOnly ? styles.filterButtonActive : null]}
-            onPress={onToggleWrongOnly}
-          >
-            <View style={styles.filterButtonContent}>
-              <Text style={[styles.filterButtonText, wrongOnly ? styles.filterButtonTextActive : null]}>Wrong only</Text>
-              {wrongOnly ? <CloseGlyph color="#FFFFFF" testID="history-filter-wrong-only-clear-glyph" /> : null}
-            </View>
-          </Pressable>
         </HistoryChipRow>
+        <Pressable
+          accessibilityRole="switch"
+          accessibilityLabel="Wrong puzzles only"
+          accessibilityState={{ checked: wrongOnly }}
+          testID="history-filter-wrong-only"
+          style={styles.historyWrongOnlyToggle}
+          onPress={onToggleWrongOnly}
+        >
+          <Text style={styles.filterButtonText}>Wrong only</Text>
+          <View style={[styles.historyToggleTrack, wrongOnly ? styles.historyToggleTrackActive : null]}>
+            <View style={[styles.historyToggleThumb, wrongOnly ? styles.historyToggleThumbActive : null]} />
+          </View>
+        </Pressable>
       </View>
 
       {selectedRatingKey ? (
@@ -4121,6 +4125,8 @@ function HistoryRatingLineChart({
         onMoveShouldSetResponder={() => true}
         onResponderGrant={(event) => selectNearestPoint(event.nativeEvent.locationX)}
         onResponderMove={(event) => selectNearestPoint(event.nativeEvent.locationX)}
+        onResponderRelease={() => setSelectedIndex(null)}
+        onResponderTerminate={() => setSelectedIndex(null)}
       >
         {smoothedPoints.slice(0, -1).map((point, index) => {
               const next = smoothedPoints[index + 1] ?? point;
@@ -4163,7 +4169,6 @@ function HistoryRatingLineChart({
               ]}
               testID="history-chart-tooltip"
             >
-              <Text style={styles.historyLineTooltipRating}>{selectedPoint.value}</Text>
               <Text style={styles.historyLineTooltipDate}>{formatHistoryRatingDate(selectedPoint.key)}</Text>
             </View>
           </>
@@ -4206,7 +4211,8 @@ function smoothHistoryRatingPoints(
 }
 
 function formatHistoryRatingDate(key: string): string {
-  const parsed = new Date(key.includes("T") ? key : `${key}T12:00:00`);
+  const embeddedIsoDate = key.match(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z/)?.[0];
+  const parsed = new Date(embeddedIsoDate ?? (key.includes("T") ? key : `${key}T12:00:00`));
   if (!Number.isFinite(parsed.getTime())) {
     return key;
   }
@@ -4309,17 +4315,13 @@ function HistoryAttemptRow({
     : `Move ${attempt.submittedMove}`;
   const sourceLabel = attempt.source === "scheduled_review" ? "Review" : "Sprint";
   const compactContext = [primaryTheme, paceLabel].filter(Boolean).join(" · ");
-  const compactMeta = `${sourceLabel} · Rating ${attempt.puzzleRating} · ${elapsedSeconds}s · ${dateLabel}`;
-  const difficulty = historyAttemptDifficulty(attempt, puzzleStats);
-  const difficultyStyle = difficulty === "hard"
-    ? styles.reviewDifficultyHard
-    : difficulty === "medium"
-      ? styles.reviewDifficultyMedium
-      : styles.reviewDifficultyEasy;
+  const puzzleIdentity = `Puzzle ID ${attempt.puzzleId} · Puzzle rating ${attempt.puzzleRating}`;
+  const compactMeta = `${sourceLabel} · ${elapsedSeconds}s · ${dateLabel}`;
   const rowAccessibilityLabel = [
     `Open ${modeLabel(attempt.mode)} ${attempt.result} puzzle review`,
     resultLabel,
     submittedMoveLabel,
+    puzzleIdentity,
     compactContext,
     compactMeta,
     reviewLabel
@@ -4344,22 +4346,15 @@ function HistoryAttemptRow({
           <Text style={styles.historyRowTitle}>{modeLabel(attempt.mode)}</Text>
           <Text testID={`history-attempt-${attempt.id}-result`} style={styles.helperText}>{resultLabel}</Text>
         </View>
+        <Text testID={`history-attempt-${attempt.id}-identity`} style={styles.helperText}>{puzzleIdentity}</Text>
         <Text testID={`history-attempt-${attempt.id}-context`} style={styles.helperText}>{compactContext}</Text>
         <Text testID={`history-attempt-${attempt.id}-meta`} style={styles.helperText}>{compactMeta}</Text>
       </View>
       <View style={styles.historyAttemptTrailing}>
         <View style={styles.historyAttemptStatus} testID={`history-attempt-${attempt.id}-status`}>
-          <View style={styles.historyAttemptStatusSummary} testID={`history-attempt-${attempt.id}-status-summary`}>
-            <Text
-              testID={`history-attempt-${attempt.id}-difficulty`}
-              style={[styles.historyReviewState, difficultyStyle]}
-            >
-              {difficultyLabel(difficulty)}
-            </Text>
-          </View>
           <Text
             testID={`history-attempt-${attempt.id}-review-state`}
-            style={[styles.historyReviewStateDetail, isWrong ? styles.reviewDifficultyHard : styles.reviewDifficultyEasy]}
+            style={[styles.historyReviewState, isWrong ? styles.reviewDifficultyHard : styles.reviewDifficultyEasy]}
           >
             {reviewLabel}
           </Text>
@@ -4410,19 +4405,6 @@ function titleCase(value: string): string {
     .filter(Boolean)
     .map((word) => word[0]?.toUpperCase() + word.slice(1))
     .join(" ");
-}
-
-function historyAttemptDifficulty(
-  attempt: HistoryAttemptView,
-  puzzleStats?: HistoryPuzzleStats
-): ReviewDifficulty {
-  if (attempt.result === "correct") {
-    return "easy";
-  }
-  if (puzzleStats?.nextReviewAt || (puzzleStats?.wrongCount ?? 0) > 1) {
-    return "hard";
-  }
-  return "medium";
 }
 
 function FilterButton({
@@ -7827,6 +7809,33 @@ function previousCustomConfigRowModel(
   };
 }
 
+function sortHistoryRatingKeys(
+  ratingKeys: string[],
+  attempts: AttemptEvent[],
+  sessions: ExportedSprintSession[]
+): string[] {
+  const latestPlayedAt = new Map<string, number>();
+  for (const attempt of attempts) {
+    latestPlayedAt.set(
+      attempt.ratingKey,
+      Math.max(latestPlayedAt.get(attempt.ratingKey) ?? 0, new Date(attempt.completedAt).getTime() || 0)
+    );
+  }
+  for (const session of sessions) {
+    latestPlayedAt.set(
+      session.ratingKey,
+      Math.max(
+        latestPlayedAt.get(session.ratingKey) ?? 0,
+        new Date(session.completedAt ?? session.startedAt).getTime() || 0
+      )
+    );
+  }
+  return [...ratingKeys].sort((left, right) => {
+    return (latestPlayedAt.get(right) ?? 0) - (latestPlayedAt.get(left) ?? 0)
+      || historyRatingKeyLabel(left).localeCompare(historyRatingKeyLabel(right));
+  });
+}
+
 function customThemeFromStoredValue(theme: string | undefined): CustomThemeFilter {
   if (theme && CUSTOM_THEME_OPTIONS.includes(theme)) {
     return theme;
@@ -9989,6 +9998,33 @@ const styles = StyleSheet.create({
   historyTopFilterStack: {
     gap: 8
   },
+  historyWrongOnlyToggle: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    gap: 10,
+    minHeight: 36,
+    paddingHorizontal: 8
+  },
+  historyToggleTrack: {
+    backgroundColor: "#CBD5E1",
+    borderRadius: 12,
+    height: 24,
+    padding: 2,
+    width: 42
+  },
+  historyToggleTrackActive: {
+    backgroundColor: "#2563EB"
+  },
+  historyToggleThumb: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 10,
+    height: 20,
+    width: 20
+  },
+  historyToggleThumbActive: {
+    transform: [{ translateX: 18 }]
+  },
   historyAdvancedFilters: {
     gap: 8
   },
@@ -10232,7 +10268,6 @@ const styles = StyleSheet.create({
   },
   historyAttemptStatus: {
     alignItems: "flex-end",
-    gap: 4,
     justifyContent: "center",
     minWidth: 78
   },
@@ -10242,20 +10277,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 14
   },
-  historyAttemptStatusSummary: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 5,
-    justifyContent: "flex-end"
-  },
   historyReviewState: {
     fontSize: 12,
     fontWeight: "900",
-    textAlign: "right"
-  },
-  historyReviewStateDetail: {
-    fontSize: 10,
-    fontWeight: "800",
     textAlign: "right"
   },
   historyRatingDelta: {

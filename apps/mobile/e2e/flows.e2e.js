@@ -120,7 +120,7 @@ describe('Key user flows', () => {
     await waitForElementTextContaining('settings-review-reminder-schedule-status', 'none', 10000);
   });
 
-  it('shows failed attempts in history with the wrong-7-days shortcut', async () => {
+  it('shows failed attempts in history with the wrong-only toggle', async () => {
     await failStandardSprint();
     await dismissSprintSummary();
 
@@ -130,8 +130,18 @@ describe('Key user flows', () => {
       .toBeVisible()
       .whileElement(by.id('history-range-filters'))
       .scroll(120, 'right');
+    await expect(element(by.id('history-filter-wrong-only'))).toHaveValue('1');
     await element(by.id('history-filter-wrong-only')).tap();
-    await waitFor(element(by.id('history-filter-wrong-only-clear-glyph'))).toExist().withTimeout(10000);
+    await waitFor(element(by.id('history-filter-wrong-only'))).toHaveValue('0').withTimeout(10000);
+    await element(by.id('history-filter-wrong-only')).tap();
+    await waitFor(element(by.id('history-filter-wrong-only'))).toHaveValue('1').withTimeout(10000);
+    await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
+
+    // Replay round trip must preserve the toggle's non-default state: turn the
+    // filter off (default is on), open a wrong attempt's replay, exit, and
+    // require the toggle to still be off rather than reset to its default.
+    await element(by.id('history-filter-wrong-only')).tap();
+    await waitFor(element(by.id('history-filter-wrong-only'))).toHaveValue('0').withTimeout(10000);
     await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
 
     const resultAttributes = await element(by.text('Wrong move')).atIndex(0).getAttributes();
@@ -144,7 +154,7 @@ describe('Key user flows', () => {
     await element(by.id('practice-main-scroll')).scrollTo('top');
     await waitFor(element(by.id('review-exit'))).toBeVisible().withTimeout(10000);
     await element(by.id('review-exit')).tap();
-    await waitFor(element(by.id('history-filter-wrong-only-clear-glyph'))).toExist().withTimeout(10000);
+    await waitFor(element(by.id('history-filter-wrong-only'))).toHaveValue('0').withTimeout(10000);
   });
 
   it('configures and starts a custom sprint', async () => {
