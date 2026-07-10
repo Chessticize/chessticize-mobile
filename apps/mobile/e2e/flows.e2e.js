@@ -2,6 +2,7 @@ const {
   openTab,
   openStandardHistoryTrend,
   launchWithDisabledSynchronization,
+  playBoardMove,
   startPracticeMode,
   selectTestPuzzleSource,
   waitForVisibleInPracticeScroll,
@@ -46,6 +47,13 @@ describe('Key user flows', () => {
     await expect(element(by.id('arrow-duel-candidate-a'))).not.toExist();
     await expect(element(by.id('arrow-duel-candidate-b'))).not.toExist();
     await waitFor(element(by.id('session-progress'))).toHaveText('0 / 10').withTimeout(10000);
+    // 00Kbj is the first Arrow-Duel-eligible familiar15 puzzle. Assert the
+    // fixture contract before playing its Stockfish-best candidate.
+    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'h1h2', 10000);
+    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'h3h4', 10000);
+
+    await playBoardMove('session-board', 'h1h2');
+    await waitFor(element(by.id('session-progress'))).toHaveText('1 / 10').withTimeout(10000);
   });
 
   it('schedules failed sprint mistakes into the review queue', async () => {
@@ -75,6 +83,21 @@ describe('Key user flows', () => {
     await waitFor(element(by.id('review-due-count'))).toHaveText('3').withTimeout(10000);
     await waitFor(element(by.id('review-total-count'))).toHaveText('3').withTimeout(10000);
     await waitForElementTextContaining('review-due-summary', 'Ready now', 10000);
+
+    await element(by.id('review-start-due')).tap();
+    await waitFor(element(by.id('review-session'))).toExist().withTimeout(10000);
+    await element(by.id('practice-main-scroll')).scrollTo('top');
+    await waitForVisibleInPracticeScroll('review-board');
+    await waitFor(element(by.id('review-progress'))).toHaveText('1 / 3 · Standard').withTimeout(10000);
+    await waitForElementTextContaining('review-current-expected-move', 'e2e6', 10000);
+
+    await playBoardMove('review-board', 'e2e6');
+    await waitForElementTextContaining('review-current-expected-move', 'e6f7', 10000);
+    await playBoardMove('review-board', 'e6f7');
+
+    await waitFor(element(by.id('review-progress'))).toHaveText('2 / 3 · Standard').withTimeout(15000);
+    await element(by.id('review-exit')).tap();
+    await waitFor(element(by.id('review-due-count'))).toHaveText('2').withTimeout(10000);
   });
 
   it('schedules review reminders through the native fixture', async () => {
@@ -110,6 +133,18 @@ describe('Key user flows', () => {
     await element(by.id('history-filter-wrong-only')).tap();
     await waitFor(element(by.id('history-filter-wrong-only-clear-glyph'))).toExist().withTimeout(10000);
     await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
+
+    const resultAttributes = await element(by.text('Wrong move')).atIndex(0).getAttributes();
+    const resultIdentifier = (Array.isArray(resultAttributes) ? resultAttributes[0] : resultAttributes).identifier;
+    if (typeof resultIdentifier !== 'string' || !resultIdentifier.endsWith('-result')) {
+      throw new Error(`Could not resolve history attempt row from ${String(resultIdentifier)}`);
+    }
+    await element(by.id(resultIdentifier.replace(/-result$/, ''))).tap();
+    await waitFor(element(by.id('review-session'))).toExist().withTimeout(10000);
+    await element(by.id('practice-main-scroll')).scrollTo('top');
+    await waitFor(element(by.id('review-exit'))).toBeVisible().withTimeout(10000);
+    await element(by.id('review-exit')).tap();
+    await waitFor(element(by.id('history-filter-wrong-only-clear-glyph'))).toExist().withTimeout(10000);
   });
 
   it('configures and starts a custom sprint', async () => {
