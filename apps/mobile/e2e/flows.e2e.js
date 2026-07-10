@@ -107,11 +107,11 @@ describe('Key user flows', () => {
       .toBeVisible()
       .whileElement(by.id('history-range-filters'))
       .scroll(120, 'right');
-    await expect(element(by.id('history-filter-wrong-only'))).toHaveToggleValue(true);
+    await expect(element(by.id('history-filter-wrong-only'))).toHaveValue('1');
     await element(by.id('history-filter-wrong-only')).tap();
-    await expect(element(by.id('history-filter-wrong-only'))).toHaveToggleValue(false);
+    await expect(element(by.id('history-filter-wrong-only'))).toHaveValue('0');
     await element(by.id('history-filter-wrong-only')).tap();
-    await expect(element(by.id('history-filter-wrong-only'))).toHaveToggleValue(true);
+    await expect(element(by.id('history-filter-wrong-only'))).toHaveValue('1');
     await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
   });
 
