@@ -42,6 +42,7 @@ import type {
   EngineAnalysisLine,
   HistoryAttemptView,
   HistoryPerformance,
+  HistoryPerformancePoint,
   HistoryPuzzleStats,
   HistoryReviewStatus,
   HistoryTimeRange,
@@ -1498,12 +1499,12 @@ export function PracticePocScreen({
   const screenSubtitle = tab === "practice"
     ? `Offline-ready · ${seededPuzzleCount(puzzleSource)} puzzles`
     : screenSubtitleFor(tab);
-  const practiceModeSummaries = (["standard", "arrow_duel", "custom"] as const).map((nextMode) => {
+  const practiceModeSummaries: PracticeModeSummary[] = (["standard", "arrow_duel", "custom"] as const).map((nextMode) => {
     const config = sprintConfigFor(nextMode, customDurationSeconds, customPerPuzzleSeconds);
     return {
       mode: nextMode,
       config,
-      rating: readRating(service, config.ratingKey)
+      ...(nextMode === "custom" ? {} : { rating: readRating(service, config.ratingKey) })
     };
   });
   const practiceProgress = buildPracticeProgressSummary(
@@ -1972,8 +1973,64 @@ export function PracticePocScreen({
 type PracticeModeSummary = {
   mode: SprintMode;
   config: SprintConfig;
-  rating: number;
+  rating?: number;
 };
+
+function SprintStartHeader({
+  closeAccessibilityLabel,
+  closeTestID,
+  headerTestID,
+  startAccessibilityLabel,
+  startDisabled = false,
+  startTestID,
+  title,
+  titleTestID,
+  onClose,
+  onStart
+}: {
+  closeAccessibilityLabel?: string;
+  closeTestID?: string;
+  headerTestID: string;
+  startAccessibilityLabel: string;
+  startDisabled?: boolean;
+  startTestID: string;
+  title: string;
+  titleTestID: string;
+  onClose?: () => void;
+  onStart: () => void;
+}): React.JSX.Element {
+  return (
+    <View style={styles.sprintScreenHeader} testID={headerTestID}>
+      <View style={styles.sprintHeaderSideSlot}>
+        {onClose ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={closeAccessibilityLabel}
+            testID={closeTestID}
+            style={styles.analysisIconButton}
+            onPress={onClose}
+          >
+            <CloseGlyph />
+          </Pressable>
+        ) : null}
+      </View>
+      <View style={styles.sprintHeaderTitleBlock}>
+        <Text style={styles.sprintScreenTitle} testID={titleTestID}>{title}</Text>
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={startAccessibilityLabel}
+        accessibilityState={{ disabled: startDisabled }}
+        disabled={startDisabled}
+        testID={startTestID}
+        style={[styles.sprintHeaderStartButton, startDisabled ? styles.disabledButton : null]}
+        onPress={onStart}
+      >
+        <Text style={styles.primaryButtonText}>Start</Text>
+      </Pressable>
+    </View>
+  );
+}
 
 function PracticeHome({
   adaptiveLayout,
@@ -2042,9 +2099,14 @@ function PracticeHome({
         testID="practice-home-layout"
       >
         <View style={styles.practiceHomePrimaryColumn}>
-          <View style={styles.sectionHeaderRow} testID="practice-action-header">
-            <Text style={styles.sectionLabel}>Start a Sprint</Text>
-          </View>
+          <SprintStartHeader
+            headerTestID="practice-action-header"
+            startAccessibilityLabel={`Start ${modeLabel(mode)} sprint`}
+            startTestID="practice-start-button"
+            title="Start a Sprint"
+            titleTestID="practice-header-title"
+            onStart={() => onStartMode(mode)}
+          />
           <View style={styles.modeList}>
             {modes.map((item) => (
               <PracticeModeCard
@@ -2052,13 +2114,6 @@ function PracticeHome({
                 active={mode === item.mode}
                 item={item}
                 onPress={() => onSelectMode(item.mode)}
-                onStart={() => {
-                  if (item.mode === "custom") {
-                    onSelectMode(item.mode);
-                  } else {
-                    onStartMode(item.mode);
-                  }
-                }}
               />
             ))}
           </View>
@@ -2209,24 +2264,23 @@ function PausedSessionPanel({
 function PracticeModeCard({
   active,
   item,
-  onPress,
-  onStart
+  onPress
 }: {
   active: boolean;
   item: PracticeModeSummary;
   onPress: () => void;
-  onStart: () => void;
 }): React.JSX.Element {
   const label = modeLabel(item.mode);
   const detail = practiceModeDetailLabel(item);
-  const ratingLabel = `ELO ${item.rating}`;
+  const ratingLabel = item.rating === undefined ? null : `ELO ${item.rating}`;
   const modeTestId = item.mode.replace("_", "-");
-  const startLabel = item.mode === "custom" ? "Configure Custom sprint" : `Start ${label} sprint`;
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
-      accessibilityLabel={`Select ${label} mode, ${detail}`}
+      accessibilityLabel={item.mode === "custom"
+        ? `Open Custom sprint setup, ${detail}`
+        : `Select ${label} mode, ${detail}`}
       testID={`practice-mode-${modeTestId}`}
       style={[styles.practiceModeCard, active ? styles.practiceModeCardActive : null]}
       onPress={onPress}
@@ -2254,26 +2308,24 @@ function PracticeModeCard({
         </View>
       </View>
       <View style={styles.practiceModeMeta}>
-        <Text style={styles.practiceModeRating} testID={`practice-mode-${modeTestId}-rating`}>{ratingLabel}</Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={startLabel}
-          testID={`practice-mode-${modeTestId}-start`}
-          style={styles.practiceModeChevronButton}
-          onPress={(event) => {
-            event?.stopPropagation?.();
-            onStart();
-          }}
-        >
-          <ChevronGlyph direction="right" />
-        </Pressable>
+        {ratingLabel ? (
+          <Text style={styles.practiceModeRating} testID={`practice-mode-${modeTestId}-rating`}>{ratingLabel}</Text>
+        ) : null}
+        {item.mode === "custom" ? (
+          <View testID="practice-mode-custom-disclosure" style={styles.practiceModeDisclosure}>
+            <ChevronGlyph direction="right" />
+          </View>
+        ) : null}
       </View>
     </Pressable>
   );
 }
 
 function practiceModeDetailLabel(item: PracticeModeSummary): string {
-  return `${formatSprintTimingLabel(item.config)} · ELO ${item.rating}`;
+  if (item.mode === "custom") {
+    return "Configure time, theme, and rating";
+  }
+  return `${formatSprintTimingLabel(item.config)} · ELO ${item.rating ?? 600}`;
 }
 
 function formatSprintTimingLabel(config: SprintConfig): string {
@@ -2337,31 +2389,18 @@ function CustomSprintSetup({
 
   return (
     <View style={styles.customSetupPanel} testID="custom-sprint-setup">
-      <View style={styles.customScreenHeader}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Close custom sprint setup"
-          testID="custom-close"
-          style={styles.analysisIconButton}
-          onPress={onClose}
-        >
-          <CloseGlyph />
-        </Pressable>
-        <View style={styles.customHeaderTitleBlock}>
-          <Text style={styles.customScreenTitle}>Custom Sprint</Text>
-        </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Start custom sprint"
-          accessibilityState={{ disabled: !canStartWithLocalPuzzles }}
-          disabled={!canStartWithLocalPuzzles}
-          testID="start-sprint-button"
-          style={[styles.customHeaderStartButton, !canStartWithLocalPuzzles ? styles.disabledButton : null]}
-          onPress={onStart}
-        >
-          <Text style={styles.primaryButtonText}>Start</Text>
-        </Pressable>
-      </View>
+      <SprintStartHeader
+        closeAccessibilityLabel="Close custom sprint setup"
+        closeTestID="custom-close"
+        headerTestID="custom-action-header"
+        startAccessibilityLabel="Start custom sprint"
+        startDisabled={!canStartWithLocalPuzzles}
+        startTestID="start-sprint-button"
+        title="Custom Sprint"
+        titleTestID="custom-header-title"
+        onClose={onClose}
+        onStart={onStart}
+      />
 
       <View style={styles.customConfigCard} testID="custom-config-list">
         <CustomModeChoiceRow
@@ -4061,7 +4100,7 @@ function downsampleHistoryRatingPoints(
 function HistoryRatingTrendChart({
   points
 }: {
-  points: Array<{ key: string; value: number }>;
+  points: HistoryPerformancePoint[];
 }): React.JSX.Element {
   const displayed = downsampleHistoryRatingPoints(points, HISTORY_LINE_CHART_MAX_POINTS);
   if (displayed.length === 0) {
@@ -4077,7 +4116,7 @@ function HistoryRatingTrendChart({
 function HistoryRatingLineChart({
   points
 }: {
-  points: Array<{ key: string; value: number }>;
+  points: HistoryPerformancePoint[];
 }): React.JSX.Element {
   // Segment geometry needs the layer's pixel width: percent-based math mixed
   // px rise with % run, which rendered detached segments at wrong angles.
@@ -4091,6 +4130,7 @@ function HistoryRatingLineChart({
   const pointY = (value: number) =>
     HISTORY_LINE_CHART_BASE_Y - ((value - min) / span) * HISTORY_LINE_CHART_PLOT_HEIGHT;
   const selectedPoint = selectedIndex === null ? null : points[selectedIndex];
+  const selectedPointLabel = selectedPoint ? historyRatingPointLabel(selectedPoint) : null;
   const selectedX = selectedIndex === null
     ? 0
     : points.length > 1
@@ -4118,9 +4158,7 @@ function HistoryRatingLineChart({
         testID="history-chart-line"
         onLayout={(event) => setPlotWidth(event.nativeEvent.layout.width)}
         accessibilityRole="adjustable"
-        accessibilityLabel={selectedPoint
-          ? `Rating ${selectedPoint.value} on ${formatHistoryRatingDate(selectedPoint.key)}`
-          : "Rating trend. Drag across the chart to inspect dates and ratings."}
+        accessibilityLabel={selectedPointLabel ?? "Rating trend. Drag across the chart to inspect dates and ratings."}
         onStartShouldSetResponder={() => true}
         onMoveShouldSetResponder={() => true}
         onResponderGrant={(event) => selectNearestPoint(event.nativeEvent.locationX)}
@@ -4169,7 +4207,10 @@ function HistoryRatingLineChart({
               ]}
               testID="history-chart-tooltip"
             >
-              <Text style={styles.historyLineTooltipDate}>{formatHistoryRatingDate(selectedPoint.key)}</Text>
+              <Text style={styles.historyLineTooltipRating}>Rating {selectedPoint.value}</Text>
+              <Text style={styles.historyLineTooltipDate}>
+                {selectedPoint.completedAt ? formatLocalCalendarDate(selectedPoint.completedAt) : formatHistoryRatingDate(selectedPoint.key)}
+              </Text>
             </View>
           </>
         ) : null}
@@ -4217,6 +4258,11 @@ function formatHistoryRatingDate(key: string): string {
     return key;
   }
   return parsed.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function historyRatingPointLabel(point: HistoryPerformancePoint): string {
+  const dateLabel = point.completedAt ? formatLocalCalendarDate(point.completedAt) : formatHistoryRatingDate(point.key);
+  return `${dateLabel} · Rating ${point.value}`;
 }
 
 function emptyHistoryPerformance(): HistoryPerformance {
@@ -8434,7 +8480,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "800"
   },
-  practiceModeChevronButton: {
+  practiceModeDisclosure: {
     alignItems: "center",
     height: 44,
     justifyContent: "center",
@@ -9189,29 +9235,35 @@ const styles = StyleSheet.create({
   customSetupPanel: {
     gap: 12
   },
-  customScreenHeader: {
+  sprintScreenHeader: {
     alignItems: "center",
     flexDirection: "row",
     gap: 10,
-    justifyContent: "space-between"
+    justifyContent: "space-between",
+    minHeight: 40
   },
-  customHeaderTitleBlock: {
+  sprintHeaderSideSlot: {
+    alignItems: "flex-start",
+    width: 64
+  },
+  sprintHeaderTitleBlock: {
     alignItems: "center",
     flex: 1,
     justifyContent: "center"
   },
-  customScreenTitle: {
+  sprintScreenTitle: {
     color: "#111827",
     fontSize: 17,
     fontWeight: "800",
     textAlign: "center"
   },
-  customHeaderStartButton: {
+  sprintHeaderStartButton: {
     alignItems: "center",
     backgroundColor: "#2563EB",
     borderRadius: 8,
     height: 40,
     justifyContent: "center",
+    minWidth: 64,
     paddingHorizontal: 14
   },
   customConfigCard: {

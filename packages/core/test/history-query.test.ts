@@ -128,7 +128,11 @@ test("history performance and puzzle stats use the full filtered range, not the 
     wrongCount: 1,
     accuracyPercent: 67,
     charts: {
-      rating: [{ key: "s1-2026-06-20T00:03:00.000Z-0", value: 612 }],
+      rating: [{
+        key: "s1-2026-06-20T00:03:00.000Z-0",
+        value: 612,
+        completedAt: "2026-06-20T00:03:00.000Z"
+      }],
       "wins-losses": [
         { key: "a1-0", value: -1 },
         { key: "a2-1", value: 0 },
