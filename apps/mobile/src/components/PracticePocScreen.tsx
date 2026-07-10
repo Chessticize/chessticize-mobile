@@ -409,7 +409,7 @@ export function PracticePocScreen({
   const [chessboardDebugEvents, setChessboardDebugEvents] = useState<string[]>([]);
   const [historyTimeRange, setHistoryTimeRange] = useState<HistoryTimeRange>("7d");
   const [historySourceFilter, setHistorySourceFilter] = useState<"all" | AttemptSource>("all");
-  const [historyResultFilter, setHistoryResultFilter] = useState<"all" | "correct" | "wrong">("all");
+  const [historyResultFilter, setHistoryResultFilter] = useState<"all" | "correct" | "wrong">("wrong");
   const [historySideFilter, setHistorySideFilter] = useState<"all" | PuzzleSide>("all");
   const [historyThemeFilter, setHistoryThemeFilter] = useState<string>("all");
   const [historyRatingRangeFilter, setHistoryRatingRangeFilter] = useState<HistoryRatingRangeFilter>("all");
@@ -4315,17 +4315,13 @@ function HistoryAttemptRow({
     : `Move ${attempt.submittedMove}`;
   const sourceLabel = attempt.source === "scheduled_review" ? "Review" : "Sprint";
   const compactContext = [primaryTheme, paceLabel].filter(Boolean).join(" · ");
-  const compactMeta = `${sourceLabel} · Rating ${attempt.puzzleRating} · ${elapsedSeconds}s · ${dateLabel}`;
-  const difficulty = historyAttemptDifficulty(attempt, puzzleStats);
-  const difficultyStyle = difficulty === "hard"
-    ? styles.reviewDifficultyHard
-    : difficulty === "medium"
-      ? styles.reviewDifficultyMedium
-      : styles.reviewDifficultyEasy;
+  const puzzleIdentity = `Puzzle ID ${attempt.puzzleId} · Puzzle rating ${attempt.puzzleRating}`;
+  const compactMeta = `${sourceLabel} · ${elapsedSeconds}s · ${dateLabel}`;
   const rowAccessibilityLabel = [
     `Open ${modeLabel(attempt.mode)} ${attempt.result} puzzle review`,
     resultLabel,
     submittedMoveLabel,
+    puzzleIdentity,
     compactContext,
     compactMeta,
     reviewLabel
@@ -4350,22 +4346,15 @@ function HistoryAttemptRow({
           <Text style={styles.historyRowTitle}>{modeLabel(attempt.mode)}</Text>
           <Text testID={`history-attempt-${attempt.id}-result`} style={styles.helperText}>{resultLabel}</Text>
         </View>
+        <Text testID={`history-attempt-${attempt.id}-identity`} style={styles.helperText}>{puzzleIdentity}</Text>
         <Text testID={`history-attempt-${attempt.id}-context`} style={styles.helperText}>{compactContext}</Text>
         <Text testID={`history-attempt-${attempt.id}-meta`} style={styles.helperText}>{compactMeta}</Text>
       </View>
       <View style={styles.historyAttemptTrailing}>
         <View style={styles.historyAttemptStatus} testID={`history-attempt-${attempt.id}-status`}>
-          <View style={styles.historyAttemptStatusSummary} testID={`history-attempt-${attempt.id}-status-summary`}>
-            <Text
-              testID={`history-attempt-${attempt.id}-difficulty`}
-              style={[styles.historyReviewState, difficultyStyle]}
-            >
-              {difficultyLabel(difficulty)}
-            </Text>
-          </View>
           <Text
             testID={`history-attempt-${attempt.id}-review-state`}
-            style={[styles.historyReviewStateDetail, isWrong ? styles.reviewDifficultyHard : styles.reviewDifficultyEasy]}
+            style={[styles.historyReviewState, isWrong ? styles.reviewDifficultyHard : styles.reviewDifficultyEasy]}
           >
             {reviewLabel}
           </Text>
@@ -4416,19 +4405,6 @@ function titleCase(value: string): string {
     .filter(Boolean)
     .map((word) => word[0]?.toUpperCase() + word.slice(1))
     .join(" ");
-}
-
-function historyAttemptDifficulty(
-  attempt: HistoryAttemptView,
-  puzzleStats?: HistoryPuzzleStats
-): ReviewDifficulty {
-  if (attempt.result === "correct") {
-    return "easy";
-  }
-  if (puzzleStats?.nextReviewAt || (puzzleStats?.wrongCount ?? 0) > 1) {
-    return "hard";
-  }
-  return "medium";
 }
 
 function FilterButton({
@@ -10292,7 +10268,6 @@ const styles = StyleSheet.create({
   },
   historyAttemptStatus: {
     alignItems: "flex-end",
-    gap: 4,
     justifyContent: "center",
     minWidth: 78
   },
@@ -10302,20 +10277,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 14
   },
-  historyAttemptStatusSummary: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 5,
-    justifyContent: "flex-end"
-  },
   historyReviewState: {
     fontSize: 12,
     fontWeight: "900",
-    textAlign: "right"
-  },
-  historyReviewStateDetail: {
-    fontSize: 10,
-    fontWeight: "800",
     textAlign: "right"
   },
   historyRatingDelta: {
