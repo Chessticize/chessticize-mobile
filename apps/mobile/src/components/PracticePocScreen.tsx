@@ -1438,8 +1438,12 @@ export function PracticePocScreen({
       : null;
   const displayedLastBoardMove = feedbackSnapshot || boardFeedback ? null : lastBoardMove;
   const historyRatingKeys = useMemo(
-    () => [...new Set([...service.listPlayedRatings().map((rating) => rating.key), ...attempts.map((attempt) => attempt.ratingKey)])].sort(),
-    [attempts, service]
+    () => sortHistoryRatingKeys(
+      [...new Set([...service.listPlayedRatings().map((rating) => rating.key), ...attempts.map((attempt) => attempt.ratingKey)])],
+      attempts,
+      sprintSessions
+    ),
+    [attempts, service, sprintSessions]
   );
   const activeHistoryRatingKey = historyRatingKey;
   const historyWrongOnly = historyResultFilter === "wrong";
@@ -1766,6 +1770,7 @@ export function PracticePocScreen({
                     onPerPuzzleChange={setCustomPerPuzzleSeconds}
                     onThemeChange={setCustomTheme}
                     previousConfigs={service.listCustomSprintConfigs()}
+                    ratingForKey={(key) => service.getRating(key).rating}
                     onStart={() => startSprint(customSprintMode, true)}
                   />
                 ) : null}
@@ -2294,6 +2299,7 @@ function CustomSprintSetup({
   onInitialRatingChange,
   perPuzzleSeconds,
   previousConfigs,
+  ratingForKey,
   targetCorrect,
   theme,
   ratingKey,
@@ -2313,6 +2319,7 @@ function CustomSprintSetup({
   onInitialRatingChange: (next: number) => void;
   perPuzzleSeconds: number;
   previousConfigs: CustomSprintConfigRecord[];
+  ratingForKey: (ratingKey: string) => number;
   targetCorrect: number;
   theme: CustomThemeFilter;
   ratingKey: string;
@@ -2325,7 +2332,7 @@ function CustomSprintSetup({
   const hasEnoughLocalPuzzles = availablePuzzleCount >= requiredPuzzleCount;
   const canStartWithLocalPuzzles = availablePuzzleCount > 0;
   const previousRows = previousConfigs.slice(0, 5).map((config) =>
-    previousCustomConfigRowModel(config, ratingKey, initialRating)
+    previousCustomConfigRowModel(config, ratingForKey(config.ratingKey))
   );
 
   return (
@@ -3809,20 +3816,20 @@ function HistoryPanel({
               onPress={() => onTimeRangeChange(range)}
             />
           ))}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={wrongOnly ? "Clear wrong puzzles only filter" : "Wrong puzzles only"}
-            accessibilityState={{ selected: wrongOnly }}
-            testID="history-filter-wrong-only"
-            style={[styles.filterButton, wrongOnly ? styles.filterButtonActive : null]}
-            onPress={onToggleWrongOnly}
-          >
-            <View style={styles.filterButtonContent}>
-              <Text style={[styles.filterButtonText, wrongOnly ? styles.filterButtonTextActive : null]}>Wrong only</Text>
-              {wrongOnly ? <CloseGlyph color="#FFFFFF" testID="history-filter-wrong-only-clear-glyph" /> : null}
-            </View>
-          </Pressable>
         </HistoryChipRow>
+        <Pressable
+          accessibilityRole="switch"
+          accessibilityLabel="Wrong puzzles only"
+          accessibilityState={{ checked: wrongOnly }}
+          testID="history-filter-wrong-only"
+          style={styles.historyWrongOnlyToggle}
+          onPress={onToggleWrongOnly}
+        >
+          <Text style={styles.filterButtonText}>Wrong only</Text>
+          <View style={[styles.historyToggleTrack, wrongOnly ? styles.historyToggleTrackActive : null]}>
+            <View style={[styles.historyToggleThumb, wrongOnly ? styles.historyToggleThumbActive : null]} />
+          </View>
+        </Pressable>
       </View>
 
       {selectedRatingKey ? (
@@ -4118,6 +4125,8 @@ function HistoryRatingLineChart({
         onMoveShouldSetResponder={() => true}
         onResponderGrant={(event) => selectNearestPoint(event.nativeEvent.locationX)}
         onResponderMove={(event) => selectNearestPoint(event.nativeEvent.locationX)}
+        onResponderRelease={() => setSelectedIndex(null)}
+        onResponderTerminate={() => setSelectedIndex(null)}
       >
         {smoothedPoints.slice(0, -1).map((point, index) => {
               const next = smoothedPoints[index + 1] ?? point;
@@ -4160,7 +4169,6 @@ function HistoryRatingLineChart({
               ]}
               testID="history-chart-tooltip"
             >
-              <Text style={styles.historyLineTooltipRating}>{selectedPoint.value}</Text>
               <Text style={styles.historyLineTooltipDate}>{formatHistoryRatingDate(selectedPoint.key)}</Text>
             </View>
           </>
@@ -4203,7 +4211,8 @@ function smoothHistoryRatingPoints(
 }
 
 function formatHistoryRatingDate(key: string): string {
-  const parsed = new Date(key.includes("T") ? key : `${key}T12:00:00`);
+  const embeddedIsoDate = key.match(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z/)?.[0];
+  const parsed = new Date(embeddedIsoDate ?? (key.includes("T") ? key : `${key}T12:00:00`));
   if (!Number.isFinite(parsed.getTime())) {
     return key;
   }
@@ -7782,8 +7791,7 @@ function customThemeFromLabel(label: string): CustomThemeFilter {
 
 function previousCustomConfigRowModel(
   config: CustomSprintConfigRecord,
-  activeRatingKey: string,
-  currentRating: number
+  rating: number
 ): PreviousCustomConfig {
   const theme = customThemeFromStoredValue(config.theme);
   return {
@@ -7797,8 +7805,35 @@ function previousCustomConfigRowModel(
     timing: formatSprintTimingLabel(config),
     lastPlayed: formatConfigLastPlayed(config.lastStartedAt),
     ratingKey: config.ratingKey,
-    rating: config.ratingKey === activeRatingKey ? currentRating : 600
+    rating
   };
+}
+
+function sortHistoryRatingKeys(
+  ratingKeys: string[],
+  attempts: AttemptEvent[],
+  sessions: ExportedSprintSession[]
+): string[] {
+  const latestPlayedAt = new Map<string, number>();
+  for (const attempt of attempts) {
+    latestPlayedAt.set(
+      attempt.ratingKey,
+      Math.max(latestPlayedAt.get(attempt.ratingKey) ?? 0, new Date(attempt.completedAt).getTime() || 0)
+    );
+  }
+  for (const session of sessions) {
+    latestPlayedAt.set(
+      session.ratingKey,
+      Math.max(
+        latestPlayedAt.get(session.ratingKey) ?? 0,
+        new Date(session.completedAt ?? session.startedAt).getTime() || 0
+      )
+    );
+  }
+  return [...ratingKeys].sort((left, right) => {
+    return (latestPlayedAt.get(right) ?? 0) - (latestPlayedAt.get(left) ?? 0)
+      || historyRatingKeyLabel(left).localeCompare(historyRatingKeyLabel(right));
+  });
 }
 
 function customThemeFromStoredValue(theme: string | undefined): CustomThemeFilter {
@@ -9962,6 +9997,33 @@ const styles = StyleSheet.create({
   },
   historyTopFilterStack: {
     gap: 8
+  },
+  historyWrongOnlyToggle: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    gap: 10,
+    minHeight: 36,
+    paddingHorizontal: 8
+  },
+  historyToggleTrack: {
+    backgroundColor: "#CBD5E1",
+    borderRadius: 12,
+    height: 24,
+    padding: 2,
+    width: 42
+  },
+  historyToggleTrackActive: {
+    backgroundColor: "#2563EB"
+  },
+  historyToggleThumb: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 10,
+    height: 20,
+    width: 20
+  },
+  historyToggleThumbActive: {
+    transform: [{ translateX: 18 }]
   },
   historyAdvancedFilters: {
     gap: 8
