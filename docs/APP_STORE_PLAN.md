@@ -335,9 +335,14 @@ Design approved 2026-07-03; the "Review Reminder Notifications" section of
 
 ## Milestone 6 — Automated coverage of key user flows
 
-Detox E2E currently covers four smoke tests (board renders, arrows render, one
-correct move, mistake-review navigation). Target flow list (each a Detox spec
-asserting through public UI and stable testIDs):
+The authoritative long-term test-layer responsibilities, critical E2E
+regression scope, and SQLite migration compatibility design are documented in
+[`TESTING_ARCHITECTURE.md`](TESTING_ARCHITECTURE.md). The list below records the
+1.0 milestone implementation status and must not be treated as a requirement to
+duplicate every domain branch in Detox.
+
+Detox E2E includes native rendering smoke tests and key user-flow specs. Target
+flow list (each asserting through public UI and stable testIDs):
 
 1. Standard sprint fail → Sprint Results fields → Play Again. *(added 2026-07-03)*
 2. Arrow Duel choice via a board candidate move → score strip updates.

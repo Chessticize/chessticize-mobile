@@ -8,6 +8,7 @@ The repository contains the React Native app shell (`apps/mobile`), a pure TypeS
 
 - [Mobile UI Design](docs/ui-design/MOBILE_UI_DESIGN.md) — authoritative screen behavior and visual spec
 - [Core Library And CLI](docs/CORE_CLI.md) — backend package layout and CLI harness
+- [Testing Architecture](docs/TESTING_ARCHITECTURE.md) — test-layer responsibilities, critical E2E regression scope, and SQLite migration compatibility design
 - [App Store Plan](docs/APP_STORE_PLAN.md) — active goal and milestone plan toward the 1.0 submission
 - [App Store Assets](docs/STORE_ASSETS.md) — 1.0 App Store metadata and screenshot capture plan
 - [App Store Upload](docs/APP_STORE_UPLOAD.md) — owner-executed archive and App Store Connect upload runbook
@@ -15,6 +16,7 @@ The repository contains the React Native app shell (`apps/mobile`), a pure TypeS
 - [Privacy Policy](docs/PRIVACY_POLICY.md) — 1.0 data, user-controllable iCloud Sync, and tracking disclosure
 - [iOS Device Targets](docs/DEVICE_TARGETS.md) — 1.0 iPhone+iPad adaptive orientation release target
 - [Agent Instructions](AGENTS.md) — architecture boundary, testing philosophy, and PR workflow
+- [Claude Instructions](CLAUDE.md) — symlink alias to the shared repository agent instructions
 
 ## Current Implementation
 

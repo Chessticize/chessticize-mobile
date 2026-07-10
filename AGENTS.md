@@ -14,6 +14,11 @@ For development-loop decisions, use the repo-local skill at `.codex/skills/chess
 
 ## Testing Philosophy
 
+The authoritative test-layer responsibilities, E2E regression scope, and
+SQLite migration compatibility requirements are documented in
+`docs/TESTING_ARCHITECTURE.md`. Read it before changing test infrastructure,
+storage, sync, database schemas, or release validation.
+
 - Business logic must be thoroughly tested before code is described as complete.
 - Business logic must live outside React components and React Native screens.
 - Prefer real implementations for internal dependencies whenever practical.
