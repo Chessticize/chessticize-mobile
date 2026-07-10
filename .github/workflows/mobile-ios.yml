@@ -83,6 +83,32 @@ jobs:
         with:
           lfs: true
 
+      - name: Select available iOS simulator
+        run: |
+          set -euo pipefail
+          available="$(xcrun simctl list devices available)"
+          echo "$available"
+
+          for device in "iPhone 17" "iPhone 16 Pro" "iPhone 16" "iPhone 15 Pro" "iPhone 15"; do
+            if grep -q "^[[:space:]]*$device (" <<<"$available"; then
+              echo "DETOX_IOS_DEVICE=$device" >> "$GITHUB_ENV"
+              echo "Selected Detox simulator: $device"
+              exit 0
+            fi
+          done
+
+          fallback="$(awk -F ' \\(' '/^[[:space:]]+iPhone / { gsub(/^[[:space:]]+|[[:space:]]+$/, "", $1); print $1; exit }' <<<"$available")"
+          if [ -z "$fallback" ]; then
+            echo "No available iPhone simulator found" >&2
+            exit 1
+          fi
+
+          echo "DETOX_IOS_DEVICE=$fallback" >> "$GITHUB_ENV"
+          echo "Selected Detox simulator: $fallback"
+
+      - name: Start Detox simulator warmup
+        run: xcrun simctl boot "$DETOX_IOS_DEVICE" || true
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -127,29 +153,6 @@ jobs:
           brew trust --formula wix/brew/applesimutils
           brew install applesimutils
 
-      - name: Select available iOS simulator
-        run: |
-          set -euo pipefail
-          available="$(xcrun simctl list devices available)"
-          echo "$available"
-
-          for device in "iPhone 17" "iPhone 16 Pro" "iPhone 16" "iPhone 15 Pro" "iPhone 15"; do
-            if grep -q "^[[:space:]]*$device (" <<<"$available"; then
-              echo "DETOX_IOS_DEVICE=$device" >> "$GITHUB_ENV"
-              echo "Selected Detox simulator: $device"
-              exit 0
-            fi
-          done
-
-          fallback="$(awk -F ' \\(' '/^[[:space:]]+iPhone / { gsub(/^[[:space:]]+|[[:space:]]+$/, "", $1); print $1; exit }' <<<"$available")"
-          if [ -z "$fallback" ]; then
-            echo "No available iPhone simulator found" >&2
-            exit 1
-          fi
-
-          echo "DETOX_IOS_DEVICE=$fallback" >> "$GITHUB_ENV"
-          echo "Selected Detox simulator: $fallback"
-
       - name: Setup system Ruby Bundler
         run: |
           /usr/bin/ruby --version
@@ -173,6 +176,11 @@ jobs:
 
       - name: iOS environment doctor
         run: pnpm mobile:doctor:ios
+
+      - name: Finish Detox simulator warmup
+        run: |
+          xcrun simctl bootstatus "$DETOX_IOS_DEVICE" -b
+          xcrun simctl shutdown "$DETOX_IOS_DEVICE"
 
       - name: Build iOS simulator app
         run: pnpm mobile:e2e:build:ios
