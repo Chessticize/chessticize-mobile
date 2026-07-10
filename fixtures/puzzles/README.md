@@ -28,6 +28,13 @@ the shipped pack.
 fixture while the release app reads the SQLite pack through the storage-layer
 puzzle source. Do not import the JSON file in release runtime code.
 
+Detox CI converts the production-eligible rows in that stable JSON fixture into
+the production SQLite schema and temporarily packages it as
+`bundled-core-pack.sqlite`. The app therefore exercises the same bundled-file
+and read-only `SQLitePuzzlePackSource` boundary without reinstalling the 493 MB
+release pack for every isolated E2E case. The production pack, active E2E case
+list, and test assertions are unchanged.
+
 `presolved-1000.json` is retained as a stable regression/test fixture. It is not
 the release-default mobile puzzle source.
 

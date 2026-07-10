@@ -1,7 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { execFileSync } from "node:child_process";
+import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { Puzzle } from "../../core/src/index.ts";
 import {
@@ -38,6 +40,35 @@ test("SQLitePuzzlePackSource selects puzzles from a read-only pack schema", asyn
     );
   } finally {
     packDb.close();
+  }
+});
+
+test("Detox fixture generator emits a small production-compatible SQLite pack", async () => {
+  const tempDirectory = await mkdtemp(join(tmpdir(), "chessticize-detox-pack-"));
+  const outputPath = join(tempDirectory, "bundled-core-pack.sqlite");
+  try {
+    execFileSync(process.execPath, [
+      "--experimental-strip-types",
+      resolve("scripts/generate-detox-puzzle-pack.mjs"),
+      "--output",
+      outputPath
+    ]);
+
+    const packDb = new DatabaseSync(outputPath, { readOnly: true });
+    try {
+      const source = new SQLitePuzzlePackSource(new NodeSqliteDatabase(packDb));
+      assert.equal(source.countPuzzles(), 2399);
+      assert.equal(source.getPuzzle("0030b")?.stockfishBestMove, "e2e8");
+      assert.equal(source.getPuzzle("0030b")?.initialFen.split(" ").length, 6);
+      assert.equal(source.selectPuzzles({ mode: "standard", limit: 15 }).length, 15);
+      assert.equal(source.selectPuzzles({ mode: "arrow_duel", limit: 10 }).length, 10);
+    } finally {
+      packDb.close();
+    }
+
+    assert.ok((await stat(outputPath)).size < 10 * 1024 * 1024);
+  } finally {
+    await rm(tempDirectory, { recursive: true, force: true });
   }
 });
 
