@@ -61,7 +61,7 @@ above.
 
 ## Core Pack distribution
 
-`bundled-core-pack.sqlite` (~490 MiB after the depth-20 migration) is NOT
+`bundled-core-pack.sqlite` (~490 MiB after the depth-20 correction) is NOT
 committed to git. Pack artifacts are published as immutable GitHub Release
 assets and fetched on demand:
 
@@ -71,8 +71,9 @@ pnpm fetch:core-pack
 
 The fetch verifies size and SHA-256 against `bundled-core-pack.manifest.json`
 (`packFileBytes` / `packFileHash`). CI caches the artifact keyed on the
-manifest; the Detox iOS build fetches it automatically. The immutable
-`core-pack-v1` asset contains the original depth-16 pack. Publish the migrated
-depth-20 artifact to a new release tag; the current manifest and
-`scripts/fetch-core-pack.mjs` reference `core-pack-v2`. Do not overwrite
-`core-pack-v1`.
+manifest; the Detox iOS build fetches it automatically. The first
+`core-pack-v1` build used the wrong, lower-quality presolve input and is
+superseded by the corrected depth-20 `core-pack-v2` artifact. The current
+manifest and `scripts/fetch-core-pack.mjs` reference `core-pack-v2`. Publish
+future updates under new immutable release tags; never overwrite an existing
+Core Pack release.

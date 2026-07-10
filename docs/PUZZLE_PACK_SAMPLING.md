@@ -43,29 +43,28 @@ published release is the reproducible input for this Core Pack; rebuilding from
 a newer Lichess export creates a different source corpus and requires the full
 pack validation and publishing workflow below.
 
-`core-pack-v1` was mistakenly generated from the historical
-`presolved-depth16` directory. Use the targeted depth-20 update workflow below
-to retain its sampled puzzle IDs while replacing changed presolve fields and
-removing puzzles that no longer pass the full Arrow Duel rule. Do not use the
-depth-16 directory for a new pack.
+`core-pack-v1` was the first Core Pack build and used the wrong, lower-quality
+presolve input. It is superseded by `core-pack-v2`, which retains the sampled
+puzzle IDs, refreshes their presolve fields from the canonical depth-20 release,
+and removes puzzles that no longer pass the full Arrow Duel rule. Treat the
+published depth-20 dataset as the only presolve source for current and future
+Core Packs.
 
 ## Owner Decisions (2026-07-04)
 
 1. **Every shipped puzzle must be Arrow Duel eligible** (the full
    `isServerCompatibleArrowDuelPuzzle` rule, including the legality checks,
-   evaluated at build time). Rationale: 83.7% of quality-filtered puzzles pass;
-   every 200-point band in 600–2200 retains 110k–396k eligible puzzles; the
-   puzzles removed are dominated by already-lost positions where an A/B duel is
-   meaningless, so the filter raises Standard-sprint quality too. Every puzzle
-   becomes usable by Standard, legacy Blitz data, and Arrow Duel, and the Custom
-   Sprint mode selector can never hit an inventory shortage.
+   evaluated at build time). The filter removes positions where an A/B duel is
+   meaningless and raises Standard-sprint quality too. Every puzzle becomes
+   usable by Standard, legacy Blitz data, and Arrow Duel, and the Custom Sprint
+   mode selector can never select an ineligible puzzle.
 2. **Install-size budget: about 700 MB, hard cap 800 MB.** Measured density:
    431 bytes/puzzle as minified JSON; plan for ~500 bytes/row in SQLite with
    indexes. Budget therefore targets ≈ 1.4 million puzzles (cap ≈ 1.6M).
    The pack ships as a build-time-generated read-only SQLite file.
 3. **Rating range 600–2200.** Below 600 and above 2200 remain for post-1.0
-   optional packs. Note: the total eligible pool in 600–2200 is ≈ 2.65M, so
-   even the 800 MB cap cannot hold everything — sampling stays mandatory.
+   optional packs. The corrected Core Pack remains sampled by design to stay
+   within the install-size budget.
 
 ## Hard Filters (applied in order)
 
@@ -79,44 +78,32 @@ depth-16 directory for a new pack.
 5. Position dedupe on the canonical FEN (first four FEN fields), keeping the
    more popular record.
 
-Historical inventory measured for the original depth-16 sampling run after
-filters 1–4 (per 200-point band):
-
-| Band | Quality | + Arrow Duel |
-| --- | --- | --- |
-| 600–800 | 160,769 | 109,793 |
-| 800–1000 | 407,069 | 305,642 |
-| 1000–1200 | 491,419 | 396,034 |
-| 1200–1400 | 435,013 | 369,080 |
-| 1400–1600 | 444,977 | 388,566 |
-| 1600–1800 | 399,624 | 355,576 |
-| 1800–2000 | 334,721 | 301,302 |
-| 2000–2200 | 209,506 | 188,212 |
-| Total | 2,883,098 | 2,414,205 |
+Compute candidate inventory and eligibility counts from the canonical depth-20
+input whenever a full regeneration changes quotas or filters. Do not reuse
+candidate-pool statistics from the first Core Pack build because its presolve
+input was incorrect.
 
 ## Stratified Sampling
 
 1. **Buckets**: sixteen 100-point rating buckets covering 600–2200. Baseline
    quota per bucket = `TOTAL_TARGET / 16` (≈ 87,500 at the 1.4M target).
 2. **Shortfall redistribution**: if a bucket has fewer eligible puzzles than
-   its quota (the 600–800 buckets will), take everything it has and
-   redistribute the remainder across the other buckets proportionally to their
-   remaining inventory.
+   its quota, take everything it has and redistribute the remainder across the
+   other buckets proportionally to their remaining inventory.
 3. **Theme-family cap**: within a bucket, no single theme family may exceed
    30% of the bucket (families: mate patterns, tactical motifs, endgames,
    openings/middlegame, defensive).
 4. **Theme minimums**: every theme supported by custom sprint selection must
    have at least `min(500, available)` puzzles per bucket so themed custom
    sprints never trigger the low-inventory warning in the shipping range.
-5. **Mate-pattern diversity guard**: the Arrow Duel filter removes mate
-   puzzles unevenly (measured pass rates: mateIn1 48.8%, mateIn2 65.2%,
-   mateIn3 73.0%, smotheredMate 35.4%, bodenMate 48.0%, killBoxMate 49.4%,
-   arabianMate 54.6%, backRankMate 65.4%). To preserve pattern variety,
-   each named mate-pattern theme (`backRankMate`, `smotheredMate`,
+5. **Mate-pattern diversity guard**: the Arrow Duel filter can remove mate
+   patterns unevenly. Compute availability from the canonical depth-20 input;
+   to preserve pattern variety, each named mate-pattern theme (`backRankMate`,
+   `smotheredMate`,
    `anastasiaMate`, `arabianMate`, `bodenMate`, `hookMate`, `dovetailMate`,
    `doubleBishopMate`, `killBoxMate`) gets a per-bucket minimum of
-   `min(50, available)`. Sparse coverage of rare patterns above ~1800 is a
-   pre-existing property of the source data and is accepted.
+   `min(50, available)`. If a rare pattern is sparse, limit the minimum to the
+   depth-20 available inventory and record the resulting count in the manifest.
 6. **Deterministic weighted draw**: within a bucket, order candidates by
    `sha256(SEED + PuzzleId)` and draw with Popularity-proportional weighting
    until quotas are satisfied. The seed is a build input recorded in the
@@ -166,11 +153,12 @@ SQLite database before atomically replacing the pack and manifest.
 
 This is intentionally not a full renewal: it never adds or resamples puzzle
 IDs and does not backfill rows removed by the depth-20 eligibility check. The
-result may therefore contain fewer puzzles than `targetPuzzleCount`. Publish
-the migrated artifact under a new release tag; never replace the immutable
-`core-pack-v1` asset.
+result may therefore contain fewer puzzles than `targetPuzzleCount`.
+`core-pack-v2` is the corrected artifact produced by this workflow. Publish
+future updates under new immutable release tags; never overwrite an existing
+Core Pack release.
 
-### Depth-20 migration result (2026-07-10)
+### Depth-20 correction result (2026-07-10)
 
 - Source IDs matched: 1,400,000 / 1,400,000; source identity mismatches: 0.
 - Rows with changed presolve data: 1,371,232. Updated and retained: 1,360,472.
