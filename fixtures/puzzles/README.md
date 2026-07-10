@@ -9,13 +9,21 @@ It is generated from the local Chessticize presolved Lichess puzzle CSV with:
 pnpm generate:offline-puzzles
 ```
 
-The generator reads the depth-20 `../lichess-presolve/presolved` corpus by default, keeps
-source puzzle IDs, requires Stockfish presolve fields, applies the quality and
-Arrow Duel eligibility filters in `docs/PUZZLE_PACK_SAMPLING.md`, samples the
-600-2200 rating range with deterministic stratified bucket/theme quotas, removes
-duplicate board positions, and writes a deterministic SQLite pack plus
+The generator reads the depth-20 `../lichess-presolve/presolved` corpus by
+default, keeps source puzzle IDs, requires Stockfish presolve fields, applies
+the quality and Arrow Duel eligibility filters in
+`docs/PUZZLE_PACK_SAMPLING.md`, samples the 600-2200 rating range with
+deterministic stratified bucket/theme quotas, removes duplicate board
+positions, and writes a deterministic SQLite pack plus
 `bundled-core-pack.manifest.json`. It does not synthesize puzzles by copying
 existing records.
+
+The presolver is public at
+[Chessticize/lichess-presolver](https://github.com/Chessticize/lichess-presolver),
+and the exact eight-part depth-20 source corpus is available from its
+[`dataset-2025-07-depth20` release](https://github.com/Chessticize/lichess-presolver/releases/tag/dataset-2025-07-depth20).
+See `docs/PUZZLE_PACK_SAMPLING.md` for download, checksum, decompression, and
+full-rebuild entry points.
 
 To update the presolve fields of an existing sampled pack without renewing its
 IDs, run:
@@ -44,7 +52,12 @@ the release-default mobile puzzle source.
 
 `regression-samples.json` names stable puzzle IDs from `presolved-1000.json` for recurring regression coverage, such as promotion lines, multi-move lines, and check positions. Tests should load the real puzzle from `presolved-1000.json` by ID instead of copying full puzzle records into another fixture.
 
-Lichess currently publishes database exports under Creative Commons CC0 on the open database page: https://database.lichess.org/#puzzles. The fixture keeps source IDs and URLs so attribution and provenance remain visible in tests. Chessticize-specific fields such as `stockfishBestMove` and `stockfishEvalAfterFirstMove` come from the local presolve pipeline.
+Lichess currently publishes database exports under Creative Commons CC0 on the
+open database page: https://database.lichess.org/#puzzles. The fixture keeps
+source IDs and URLs so attribution and provenance remain visible in tests.
+Chessticize-specific fields such as `stockfishBestMove` and
+`stockfishEvalAfterFirstMove` come from the public presolver pipeline linked
+above.
 
 ## Core Pack distribution
 
