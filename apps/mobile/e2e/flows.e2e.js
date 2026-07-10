@@ -109,9 +109,9 @@ describe('Key user flows', () => {
       .scroll(120, 'right');
     await expect(element(by.id('history-filter-wrong-only'))).toHaveValue('1');
     await element(by.id('history-filter-wrong-only')).tap();
-    await expect(element(by.id('history-filter-wrong-only'))).toHaveValue('0');
+    await waitFor(element(by.id('history-filter-wrong-only'))).toHaveValue('0').withTimeout(10000);
     await element(by.id('history-filter-wrong-only')).tap();
-    await expect(element(by.id('history-filter-wrong-only'))).toHaveValue('1');
+    await waitFor(element(by.id('history-filter-wrong-only'))).toHaveValue('1').withTimeout(10000);
     await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
   });
 
