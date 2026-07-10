@@ -161,9 +161,13 @@ class StockfishRunner {
     NSString* smallPath = [[NSBundle mainBundle] pathForResource:@"nn-37f18f62d772" ofType:@"nnue"];
     if (bigPath != nil) {
       setOption("EvalFile", toStdString(bigPath));
+    } else {
+      emit("info string bundled NNUE network nn-c288c895ea92.nnue not found in app bundle");
     }
     if (smallPath != nil) {
       setOption("EvalFileSmall", toStdString(smallPath));
+    } else {
+      emit("info string bundled NNUE network nn-37f18f62d772.nnue not found in app bundle");
     }
   }
 
