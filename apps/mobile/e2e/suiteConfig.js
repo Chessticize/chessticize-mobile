@@ -1,7 +1,8 @@
-const ACTIVE_E2E_TEST_MATCH = [
-  '<rootDir>/e2e/practice.e2e.js',
-  '<rootDir>/e2e/flows.e2e.js'
-];
+const ACTIVE_E2E_TEST_MATCH_BY_SUITE = {
+  practice: ['<rootDir>/e2e/practice.e2e.js'],
+  flows: ['<rootDir>/e2e/flows.e2e.js']
+};
+const ACTIVE_E2E_TEST_MATCH = Object.values(ACTIVE_E2E_TEST_MATCH_BY_SUITE).flat();
 
 const STORE_ASSETS_TEST_MATCH = ['<rootDir>/e2e/store-assets.e2e.js'];
 const ADAPTIVE_LAYOUT_TEST_MATCH = ['<rootDir>/e2e/adaptive-layout.e2e.js'];
@@ -13,9 +14,10 @@ const DEFAULT_DETOX_MAX_WORKERS = 1;
 function resolveDetoxTestMatch(environment = process.env) {
   const captureStoreAssets = environment.CHESSTICIZE_CAPTURE_STORE_ASSETS === '1';
   const captureAdaptiveLayout = environment.CHESSTICIZE_CAPTURE_ADAPTIVE_LAYOUT === '1';
+  const activeSuite = environment.DETOX_ACTIVE_SUITE;
 
-  if (captureStoreAssets && captureAdaptiveLayout) {
-    throw new Error('Store asset and adaptive layout capture suites must run separately.');
+  if ([captureStoreAssets, captureAdaptiveLayout, Boolean(activeSuite)].filter(Boolean).length > 1) {
+    throw new Error('Active E2E and screenshot capture suites must run separately.');
   }
 
   if (captureStoreAssets) {
@@ -24,6 +26,14 @@ function resolveDetoxTestMatch(environment = process.env) {
 
   if (captureAdaptiveLayout) {
     return ADAPTIVE_LAYOUT_TEST_MATCH;
+  }
+
+  if (activeSuite) {
+    const suiteTestMatch = ACTIVE_E2E_TEST_MATCH_BY_SUITE[activeSuite];
+    if (!suiteTestMatch) {
+      throw new Error(`Unknown DETOX_ACTIVE_SUITE "${activeSuite}".`);
+    }
+    return suiteTestMatch;
   }
 
   return ACTIVE_E2E_TEST_MATCH;
@@ -44,6 +54,7 @@ function resolveDetoxMaxWorkers(environment = process.env) {
 }
 
 module.exports = {
+  ACTIVE_E2E_TEST_MATCH_BY_SUITE,
   ACTIVE_E2E_TEST_MATCH,
   STORE_ASSETS_TEST_MATCH,
   ADAPTIVE_LAYOUT_TEST_MATCH,

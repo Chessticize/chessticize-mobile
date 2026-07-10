@@ -1,4 +1,5 @@
 const {
+  ACTIVE_E2E_TEST_MATCH_BY_SUITE,
   ACTIVE_E2E_TEST_MATCH,
   STORE_ASSETS_TEST_MATCH,
   ADAPTIVE_LAYOUT_TEST_MATCH,
@@ -15,6 +16,26 @@ describe('Detox suite configuration', () => {
     ]);
   });
 
+  it('partitions every active spec exactly once across the two CI suites', () => {
+    expect(resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'practice' }))
+      .toEqual(ACTIVE_E2E_TEST_MATCH_BY_SUITE.practice);
+    expect(resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'flows' }))
+      .toEqual(ACTIVE_E2E_TEST_MATCH_BY_SUITE.flows);
+
+    const partitionedSpecs = Object.values(ACTIVE_E2E_TEST_MATCH_BY_SUITE).flat();
+    expect(partitionedSpecs).toEqual(ACTIVE_E2E_TEST_MATCH);
+    expect(new Set(partitionedSpecs).size).toBe(ACTIVE_E2E_TEST_MATCH.length);
+  });
+
+  it('rejects unknown or mixed active suite selections', () => {
+    expect(() => resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'unknown' }))
+      .toThrow('Unknown DETOX_ACTIVE_SUITE "unknown".');
+    expect(() => resolveDetoxTestMatch({
+      DETOX_ACTIVE_SUITE: 'practice',
+      CHESSTICIZE_CAPTURE_STORE_ASSETS: '1'
+    })).toThrow('Active E2E and screenshot capture suites must run separately.');
+  });
+
   it('keeps the App Store screenshot spec available through its opt-in command', () => {
     expect(resolveDetoxTestMatch({ CHESSTICIZE_CAPTURE_STORE_ASSETS: '1' }))
       .toEqual(STORE_ASSETS_TEST_MATCH);
@@ -29,7 +50,7 @@ describe('Detox suite configuration', () => {
     expect(() => resolveDetoxTestMatch({
       CHESSTICIZE_CAPTURE_STORE_ASSETS: '1',
       CHESSTICIZE_CAPTURE_ADAPTIVE_LAYOUT: '1'
-    })).toThrow('Store asset and adaptive layout capture suites must run separately.');
+    })).toThrow('Active E2E and screenshot capture suites must run separately.');
   });
 
   it('uses one reliable worker by default and accepts an explicit experiment count', () => {

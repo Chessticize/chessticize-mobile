@@ -2,12 +2,6 @@ name: Mobile iOS
 
 on:
   workflow_dispatch:
-    inputs:
-      detox_workers:
-        description: "Detox worker count for scope-preserving timing experiments"
-        required: false
-        default: "1"
-        type: string
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
@@ -28,8 +22,48 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  mobile-checks:
+    name: Mobile JS checks
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.1.2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26.x
+          cache: pnpm
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache core puzzle pack
+        uses: actions/cache@v4
+        with:
+          path: fixtures/puzzles/bundled-core-pack.sqlite
+          key: core-pack-${{ hashFiles('fixtures/puzzles/bundled-core-pack.manifest.json') }}
+
+      - name: Fetch core puzzle pack
+        run: pnpm fetch:core-pack
+
+      - name: Mobile typecheck
+        run: pnpm mobile:typecheck
+
+      - name: Mobile component tests
+        run: pnpm mobile:test
+
   detox-ios:
-    name: Build and test iOS POC
+    name: Detox iOS (${{ matrix.suite }})
     # Draft PRs skip the expensive simulator build; mark the PR ready for
     # review (or dispatch manually) to run the full Detox suite.
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
@@ -38,7 +72,11 @@ jobs:
     # release gate on the supported macOS 15 runner until Detox is qualified on
     # macOS 26.
     runs-on: macos-15
-    timeout-minutes: 60
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [flows, practice]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -82,12 +120,6 @@ jobs:
 
       - name: Fetch core puzzle pack
         run: pnpm fetch:core-pack
-
-      - name: Mobile typecheck
-        run: pnpm mobile:typecheck
-
-      - name: Mobile component tests
-        run: pnpm mobile:test
 
       - name: Install Detox iOS utilities
         run: |
@@ -142,19 +174,16 @@ jobs:
       - name: iOS environment doctor
         run: pnpm mobile:doctor:ios
 
-      - name: Start Detox simulator boot
-        run: |
-          if ! xcrun simctl boot "$DETOX_IOS_DEVICE"; then
-            xcrun simctl bootstatus "$DETOX_IOS_DEVICE" -b
-          fi
-
       - name: Build iOS simulator app
         run: pnpm mobile:e2e:build:ios
 
-      - name: Finish Detox simulator boot
-        run: xcrun simctl bootstatus "$DETOX_IOS_DEVICE" -b
+      - name: Boot Detox simulator
+        run: |
+          xcrun simctl boot "$DETOX_IOS_DEVICE" || true
+          xcrun simctl bootstatus "$DETOX_IOS_DEVICE" -b
 
-      - name: Run Detox iOS E2E
+      - name: Run Detox iOS E2E suite
         env:
-          DETOX_MAX_WORKERS: ${{ inputs.detox_workers || '1' }}
+          DETOX_ACTIVE_SUITE: ${{ matrix.suite }}
+          DETOX_MAX_WORKERS: "1"
         run: pnpm mobile:e2e:test:ios:ci
