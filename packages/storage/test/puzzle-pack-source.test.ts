@@ -41,6 +41,49 @@ test("SQLitePuzzlePackSource selects puzzles from a read-only pack schema", asyn
   }
 });
 
+test("SQLitePuzzlePackSource preserves themed candidate results while using the composite theme index", async () => {
+  const packDb = buildPackDatabase(await loadFixturePuzzles());
+  try {
+    const nodeDb = new NodeSqliteDatabase(packDb);
+    const preparedSql: string[] = [];
+    const source = new SQLitePuzzlePackSource({
+      exec: (sql) => nodeDb.exec(sql),
+      prepare: (sql) => {
+        preparedSql.push(sql);
+        return nodeDb.prepare(sql);
+      }
+    });
+    const themeId = (packDb.prepare("SELECT id FROM themes WHERE name = ?").get("crushing") as { id: number }).id;
+    const legacyIds = (packDb
+      .prepare(
+        `SELECT puzzles.id
+         FROM puzzle_themes
+         JOIN puzzles ON puzzles.id = puzzle_themes.puzzle_id
+         WHERE puzzle_themes.theme_id = ?
+           AND puzzles.rating >= ?
+           AND puzzles.rating <= ?
+         ORDER BY puzzles.rating ASC, puzzles.id ASC
+         LIMIT ?`
+      )
+      .all(themeId, 1700, 1900, 10) as Array<{ id: string }>).map((row) => row.id);
+
+    const selectedIds = source
+      .selectPuzzles({ mode: "standard", limit: 10, theme: "crushing", minRating: 1700, maxRating: 1900 })
+      .map((puzzle) => puzzle.id);
+
+    assert.deepEqual(selectedIds, legacyIds);
+    const candidateSql = preparedSql.find((sql) => sql.includes("FROM puzzle_themes JOIN puzzles"));
+    assert.ok(candidateSql);
+    assert.match(candidateSql, /puzzle_themes\.rating >= \?/);
+    assert.match(candidateSql, /ORDER BY puzzle_themes\.rating ASC, puzzle_themes\.puzzle_id ASC/);
+    const plan = packDb.prepare(`EXPLAIN QUERY PLAN ${candidateSql}`).all(themeId, 1700, 1900, 10) as Array<{ detail: string }>;
+    assert.ok(plan.some((row) => row.detail.includes("puzzle_themes_theme_rating_idx") && row.detail.includes("rating>?")));
+    assert.ok(plan.every((row) => !row.detail.includes("TEMP B-TREE")));
+  } finally {
+    packDb.close();
+  }
+});
+
 test("PackBackedPracticeStore queries pack puzzles without preloading the user database", async () => {
   const packDb = buildPackDatabase(await loadFixturePuzzles());
   const userStore = new SQLiteStore(":memory:");

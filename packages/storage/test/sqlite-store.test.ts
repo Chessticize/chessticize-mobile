@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { PracticeService, SQLiteStore } from "../src/index.ts";
+import type { AttemptHistoryRow, HistoryFilter } from "../src/index.ts";
 import type { Puzzle, ReviewContext } from "../../core/src/index.ts";
 
 test("SQLite store seeds fixture puzzles and filters Arrow Duel eligibility", async () => {
@@ -239,6 +240,193 @@ test("SQLite migration preserves legacy settings while adding the sync upload sa
     assert.equal(integrity.integrity_check, "ok");
   } finally {
     await rm(dir, { force: true, recursive: true });
+  }
+});
+
+test("SQLite migration backfills attempt rating keys and replaces superseded indexes", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "chessticize-index-migration-"));
+  const dbPath = join(dir, "practice.sqlite");
+  try {
+    const setupStore = new SQLiteStore(dbPath);
+    setupStore.migrate();
+    setupStore.seedPuzzles(await loadFixturePuzzles());
+    const service = new PracticeService(setupStore);
+    service.startSprint(
+      { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
+      "2026-06-20T00:00:00.000Z"
+    );
+    service.submitMove("c4b5", "2026-06-20T00:00:05.000Z");
+    setupStore.close();
+
+    const legacyDb = new DatabaseSync(dbPath);
+    legacyDb.exec(`
+      PRAGMA user_version = 1;
+      UPDATE attempts SET rating_key = NULL;
+      DROP INDEX puzzles_rating_id_idx;
+      DROP INDEX attempts_completed_at_id_idx;
+      DROP INDEX attempts_rating_key_completed_at_id_idx;
+      DROP INDEX attempts_session_result_completed_at_id_idx;
+      DROP INDEX attempts_puzzle_id_completed_at_id_idx;
+      DROP INDEX sprint_sessions_rating_key_completed_at_id_idx;
+      DROP INDEX sprint_sessions_started_at_id_idx;
+      DROP INDEX custom_sprint_configs_last_started_at_id_idx;
+      DROP INDEX review_queue_due_at_order_idx;
+      CREATE INDEX attempts_completed_at_idx ON attempts(completed_at);
+      CREATE INDEX attempts_result_idx ON attempts(result);
+      CREATE INDEX attempts_mode_idx ON attempts(mode);
+      CREATE INDEX attempts_session_id_idx ON attempts(session_id);
+      CREATE INDEX sprint_sessions_rating_key_completed_at_idx ON sprint_sessions(rating_key, completed_at);
+      CREATE INDEX custom_sprint_configs_last_started_at_idx ON custom_sprint_configs(last_started_at);
+      CREATE INDEX review_queue_due_at_idx ON review_queue(due_at);
+      CREATE INDEX review_events_reviewed_at_idx ON review_events(reviewed_at);
+    `);
+    legacyDb.close();
+
+    const migrated = new SQLiteStore(dbPath);
+    migrated.migrate();
+    migrated.migrate();
+    try {
+      assert.equal(migrated.listAttempts()[0]?.ratingKey, "standard 5/20");
+      assert.equal(migrated.getHistoryView({
+        now: "2026-06-21T00:00:00.000Z",
+        timeRange: "max",
+        ratingKey: "standard 5/20"
+      }).attempts.length, 1);
+      const indexes = (migrated.db
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name NOT LIKE 'sqlite_autoindex_%' ORDER BY name")
+        .all() as Array<{ name: string }>).map((row) => row.name);
+      assert.ok(indexes.includes("attempts_completed_at_id_idx"));
+      assert.ok(indexes.includes("attempts_rating_key_completed_at_id_idx"));
+      assert.ok(indexes.includes("attempts_session_result_completed_at_id_idx"));
+      assert.ok(indexes.includes("puzzles_rating_id_idx"));
+      assert.ok(indexes.includes("review_queue_due_at_order_idx"));
+      assert.ok(indexes.includes("sprint_sessions_started_at_id_idx"));
+      assert.ok(!indexes.includes("attempts_completed_at_idx"));
+      assert.ok(!indexes.includes("attempts_result_idx"));
+      assert.ok(!indexes.includes("attempts_mode_idx"));
+      assert.ok(!indexes.includes("attempts_session_id_idx"));
+      assert.ok(!indexes.includes("review_events_reviewed_at_idx"));
+    } finally {
+      migrated.close();
+    }
+  } finally {
+    await rm(dir, { force: true, recursive: true });
+  }
+});
+
+test("optimized SQLite attempt filters preserve legacy query results", async () => {
+  const store = await seededStore();
+  const service = new PracticeService(store);
+  try {
+    const sprint = service.startSprint(
+      { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
+      "2026-06-20T00:00:00.000Z"
+    );
+    service.submitMove("c4b5", "2026-06-20T00:00:05.000Z");
+    service.recordReviewAttempt({
+      puzzleId: "000hf",
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      result: "correct",
+      submittedMove: "e2e6",
+      expectedMove: "e2e6",
+      startedAt: "2026-06-21T00:00:00.000Z"
+    }, "2026-06-21T00:00:05.000Z");
+    service.recordReviewAttempt({
+      puzzleId: "00008",
+      mode: "arrow_duel",
+      ratingKey: "arrow duel 5/30",
+      result: "wrong",
+      submittedMove: "a1a2",
+      expectedMove: "b2b1",
+      startedAt: "2026-06-22T00:00:00.000Z",
+      arrowDuelCandidateOrder: ["b2b1", "b2a2", "b2c2"]
+    }, "2026-06-22T00:00:05.000Z");
+
+    const filters: HistoryFilter[] = [
+      {},
+      { source: "scheduled_review" },
+      { result: "wrong" },
+      { mode: "arrow_duel" },
+      { since: "2026-06-21T00:00:05.000Z" },
+      { puzzleId: "000hf" },
+      { sessionId: sprint.id },
+      { sessionId: sprint.id, result: "wrong" },
+      { source: "scheduled_review", result: "wrong", mode: "arrow_duel", puzzleId: "00008" }
+    ];
+
+    for (const filter of filters) {
+      assert.deepEqual(store.listAttempts(filter), legacyListAttempts(store, filter));
+    }
+
+    const historyNow = "2026-06-23T00:00:00.000Z";
+    assert.deepEqual(
+      service.getHistoryView({ now: historyNow, timeRange: "max", ratingKey: "standard 5/20" }).attempts.map((attempt) => attempt.id),
+      legacyHistoryAttemptIds(store, "standard 5/20", undefined, historyNow)
+    );
+    assert.deepEqual(
+      service.getHistoryView({ now: historyNow, timeRange: "max" }).attempts.map((attempt) => attempt.id),
+      legacyHistoryAttemptIds(store, undefined, undefined, historyNow)
+    );
+
+    const sessionPlan = store.db
+      .prepare(
+        `EXPLAIN QUERY PLAN
+         SELECT id FROM attempts
+         WHERE session_id = ? AND result = ?
+         ORDER BY completed_at DESC, id DESC`
+      )
+      .all(sprint.id, "wrong") as Array<{ detail: string }>;
+    assert.ok(sessionPlan.some((row) => row.detail.includes("attempts_session_result_completed_at_id_idx")));
+    assert.ok(sessionPlan.every((row) => !row.detail.includes("SCAN attempts") && !row.detail.includes("TEMP B-TREE")));
+  } finally {
+    store.close();
+  }
+});
+
+test("optimized SQLite indexes cover production range and ordering queries", async () => {
+  const store = await seededStore();
+  try {
+    const plans = [
+      {
+        sql: "SELECT * FROM puzzles WHERE rating >= ? AND rating <= ? ORDER BY rating ASC, id ASC",
+        params: [1200, 1800],
+        index: "puzzles_rating_id_idx"
+      },
+      {
+        sql: "SELECT id, started_at FROM sprint_sessions ORDER BY started_at DESC, id DESC",
+        params: [],
+        index: "sprint_sessions_started_at_id_idx"
+      },
+      {
+        sql: "SELECT * FROM review_queue WHERE due_at <= ? ORDER BY due_at ASC, puzzle_id ASC, mode ASC, rating_key ASC",
+        params: ["2026-06-22T00:00:00.000Z"],
+        index: "review_queue_due_at_order_idx"
+      },
+      {
+        sql: "SELECT id FROM sprint_sessions WHERE rating_key = ? AND completed_at >= ? AND completed_at <= ? ORDER BY completed_at ASC, id ASC",
+        params: ["standard 5/20", "2026-06-01T00:00:00.000Z", "2026-07-01T00:00:00.000Z"],
+        index: "sprint_sessions_rating_key_completed_at_id_idx"
+      },
+      {
+        sql: `SELECT a.id
+              FROM attempts a
+              JOIN sprint_sessions s ON s.id = a.session_id
+              JOIN puzzles p ON p.id = a.puzzle_id
+              WHERE a.rating_key = ? AND a.completed_at >= ? AND a.completed_at <= ?
+              ORDER BY a.completed_at DESC, a.id DESC`,
+        params: ["standard 5/20", "2026-06-01T00:00:00.000Z", "2026-07-01T00:00:00.000Z"],
+        index: "attempts_rating_key_completed_at_id_idx"
+      }
+    ];
+
+    for (const expected of plans) {
+      const plan = store.db.prepare(`EXPLAIN QUERY PLAN ${expected.sql}`).all(...expected.params) as Array<{ detail: string }>;
+      assert.ok(plan.some((row) => row.detail.includes(expected.index)), `${expected.index}: ${JSON.stringify(plan)}`);
+      assert.ok(plan.every((row) => !row.detail.includes("TEMP B-TREE")), JSON.stringify(plan));
+    }
+  } finally {
+    store.close();
   }
 });
 
@@ -1039,4 +1227,83 @@ function reviewContext(puzzleId: string): ReviewContext {
     mode: "standard",
     ratingKey: "standard 5/20"
   };
+}
+
+interface LegacyAttemptRow extends Omit<AttemptHistoryRow, "ratingAfter" | "arrowDuelCandidateOrder"> {
+  ratingAfter: number | null;
+  arrowDuelCandidateOrderJson: string | null;
+}
+
+function legacyListAttempts(store: SQLiteStore, filter: HistoryFilter): AttemptHistoryRow[] {
+  const rows = store.db
+    .prepare(
+      `SELECT
+        id,
+        source,
+        session_id AS sessionId,
+        puzzle_id AS puzzleId,
+        mode,
+        rating_key AS ratingKey,
+        result,
+        submitted_move AS submittedMove,
+        expected_move AS expectedMove,
+        started_at AS startedAt,
+        completed_at AS completedAt,
+        rating_before AS ratingBefore,
+        rating_after AS ratingAfter,
+        arrow_duel_candidate_order_json AS arrowDuelCandidateOrderJson
+       FROM attempts
+       WHERE (? IS NULL OR source = ?)
+         AND (? IS NULL OR result = ?)
+         AND (? IS NULL OR mode = ?)
+         AND (? IS NULL OR completed_at >= ?)
+         AND (? IS NULL OR puzzle_id = ?)
+         AND (? IS NULL OR session_id = ?)
+       ORDER BY completed_at DESC, id DESC`
+    )
+    .all(
+      filter.source ?? null,
+      filter.source ?? null,
+      filter.result ?? null,
+      filter.result ?? null,
+      filter.mode ?? null,
+      filter.mode ?? null,
+      filter.since ?? null,
+      filter.since ?? null,
+      filter.puzzleId ?? null,
+      filter.puzzleId ?? null,
+      filter.sessionId ?? null,
+      filter.sessionId ?? null
+    ) as LegacyAttemptRow[];
+
+  return rows.map((row) => {
+    const { ratingAfter, arrowDuelCandidateOrderJson, ...attempt } = row;
+    return {
+      ...attempt,
+      ...(ratingAfter === null ? {} : { ratingAfter }),
+      ...(arrowDuelCandidateOrderJson === null
+        ? {}
+        : { arrowDuelCandidateOrder: JSON.parse(arrowDuelCandidateOrderJson) as string[] })
+    };
+  });
+}
+
+function legacyHistoryAttemptIds(
+  store: SQLiteStore,
+  ratingKey: string | undefined,
+  since: string | undefined,
+  until: string
+): string[] {
+  return (store.db
+    .prepare(
+      `SELECT a.id
+       FROM attempts a
+       JOIN sprint_sessions s ON s.id = a.session_id
+       JOIN puzzles p ON p.id = a.puzzle_id
+       WHERE (? IS NULL OR COALESCE(a.rating_key, s.rating_key) = ?)
+         AND (? IS NULL OR a.completed_at >= ?)
+         AND a.completed_at <= ?
+       ORDER BY a.completed_at DESC, a.id DESC`
+    )
+    .all(ratingKey ?? null, ratingKey ?? null, since ?? null, since ?? null, until) as Array<{ id: string }>).map((row) => row.id);
 }
