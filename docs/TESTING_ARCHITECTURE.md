@@ -185,6 +185,12 @@ const MIGRATIONS = [
 Released migrations are append-only. Never rewrite or remove a migration that
 may already have run on a user device.
 
+The storage migration chain currently starts at schema version `1`. The
+`ios-v1.0.0-build-1` release used the legacy unversioned schema and is retained
+as the immutable `schema-v0-ios-1.0.0.sqlite` regression fixture. Version `1`
+adds the server-compatible Glicko fields while assigning an explicit storage
+schema version.
+
 The first versioned migration must handle existing unversioned databases. A
 database with `user_version = 0` and known Chessticize tables is a legacy user
 database, not necessarily an empty database. Classify its known columns/tables,
