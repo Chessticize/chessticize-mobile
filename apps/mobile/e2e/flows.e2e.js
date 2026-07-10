@@ -97,7 +97,7 @@ describe('Key user flows', () => {
     await waitForElementTextContaining('settings-review-reminder-schedule-status', 'none', 10000);
   });
 
-  it('shows failed attempts in history with the wrong-7-days shortcut', async () => {
+  it('shows failed attempts in history with the wrong-only toggle', async () => {
     await failStandardSprint();
     await dismissSprintSummary();
 
@@ -107,6 +107,8 @@ describe('Key user flows', () => {
       .toBeVisible()
       .whileElement(by.id('history-range-filters'))
       .scroll(120, 'right');
+    await expect(element(by.id('history-filter-wrong-only'))).toHaveToggleValue(true);
+    await element(by.id('history-filter-wrong-only')).tap();
     await expect(element(by.id('history-filter-wrong-only'))).toHaveToggleValue(false);
     await element(by.id('history-filter-wrong-only')).tap();
     await expect(element(by.id('history-filter-wrong-only'))).toHaveToggleValue(true);

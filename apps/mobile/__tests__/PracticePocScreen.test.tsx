@@ -1305,12 +1305,11 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("7 days");
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("All puzzles");
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Wrong only");
-    expect(findByTestId(renderer, "history-filter-wrong-only").props.accessibilityState).toEqual({ selected: true });
-    expect(findByTestId(renderer, "history-filter-wrong-only-clear-glyph")).toBeTruthy();
+    expect(findByTestId(renderer, "history-filter-wrong-only").props.accessibilityState).toEqual({ checked: true });
     expectHistoryRowAccessibility(renderer, "Played g6g5 · Best f4g3");
     expectNoHistoryRowAccessibility(renderer, "Move e6f7");
     press(renderer, "history-filter-wrong-only");
-    expect(findByTestId(renderer, "history-filter-wrong-only").props.accessibilityState).toEqual({ selected: false });
+    expect(findByTestId(renderer, "history-filter-wrong-only").props.accessibilityState).toEqual({ checked: false });
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain("Wrong only");
     expectHistoryRowAccessibility(renderer, "Played g6g5 · Best f4g3");
     expectHistoryRowAccessibility(renderer, "Move e6f7");
