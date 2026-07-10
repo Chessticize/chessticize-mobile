@@ -2,12 +2,6 @@ name: Mobile iOS
 
 on:
   workflow_dispatch:
-    inputs:
-      shard_detox:
-        description: "Run flows and practice on two independent macOS workers"
-        required: false
-        default: false
-        type: boolean
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
@@ -82,9 +76,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Pull requests use one worker because two cold macOS VMs measured
-        # slower overall. Manual dispatch keeps the scope-preserving A/B path.
-        suite: ${{ fromJSON(inputs.shard_detox && '["flows","practice"]' || '["all"]') }}
+        suite: [flows, practice]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -191,7 +183,8 @@ jobs:
           xcrun simctl bootstatus "$DETOX_IOS_DEVICE" -b
 
       - name: Run Detox iOS E2E suite
+        working-directory: apps/mobile
         env:
           DETOX_ACTIVE_SUITE: ${{ matrix.suite }}
           DETOX_MAX_WORKERS: "1"
-        run: pnpm mobile:e2e:test:ios:ci
+        run: ./node_modules/.bin/detox test --configuration ios.sim.debug --cleanup
