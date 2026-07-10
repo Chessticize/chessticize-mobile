@@ -125,6 +125,7 @@ interface CustomSprintConfigRow {
 interface AppSettingsRow {
   id: string;
   sync_icloud_enabled: number;
+  sync_upload_allowed: number;
   review_reminder_mode: PracticeSettings["notifications"]["reviewReminder"]["mode"];
   review_reminder_fixed_local_time: string | null;
 }
@@ -159,6 +160,18 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
+export const CURRENT_SCHEMA_VERSION = 1;
+
+interface SQLiteMigration {
+  from: number;
+  to: number;
+  apply: (db: SyncSqliteDatabase) => void;
+}
+
+const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
+  { from: 0, to: 1, apply: migrateUnversionedSchemaToV1 }
+];
+
 export class SyncSQLiteStore implements PracticeStore {
   readonly db: SyncSqliteDatabase;
   private readonly options: SyncSQLiteStoreOptions;
@@ -169,9 +182,33 @@ export class SyncSQLiteStore implements PracticeStore {
   }
 
   migrate(): void {
-    this.db.exec(SCHEMA_SQL);
-    this.ensureAttemptCandidateOrderColumn();
-    this.ensureRatingGlickoColumns();
+    this.db.exec("PRAGMA foreign_keys = ON");
+    const startingVersion = readSchemaVersion(this.db);
+    if (startingVersion > CURRENT_SCHEMA_VERSION) {
+      throw new Error(
+        `SQLite schema version ${startingVersion} is newer than supported version ${CURRENT_SCHEMA_VERSION}`
+      );
+    }
+    if (startingVersion === CURRENT_SCHEMA_VERSION) {
+      return;
+    }
+
+    this.transaction(() => {
+      let version = startingVersion;
+      while (version < CURRENT_SCHEMA_VERSION) {
+        const migration = SQLITE_MIGRATIONS.find((candidate) => candidate.from === version);
+        if (!migration || migration.to !== version + 1 || migration.to > CURRENT_SCHEMA_VERSION) {
+          throw new Error(`No SQLite migration is registered from schema version ${version}`);
+        }
+        migration.apply(this.db);
+        assertForeignKeyIntegrity(this.db);
+        setSchemaVersion(this.db, migration.to);
+        version = migration.to;
+      }
+      if (version !== CURRENT_SCHEMA_VERSION) {
+        throw new Error(`SQLite migration stopped at schema version ${version}`);
+      }
+    });
   }
 
   transaction<T>(work: () => T): T {
@@ -1039,21 +1076,60 @@ export class SyncSQLiteStore implements PracticeStore {
       );
   }
 
-  private ensureAttemptCandidateOrderColumn(): void {
-    const columns = this.db.prepare("PRAGMA table_info(attempts)").all() as Array<{ name: string }>;
-    if (!columns.some((column) => column.name === "arrow_duel_candidate_order_json")) {
-      this.db.exec("ALTER TABLE attempts ADD COLUMN arrow_duel_candidate_order_json TEXT");
-    }
-  }
+}
 
-  private ensureRatingGlickoColumns(): void {
-    const columns = this.db.prepare("PRAGMA table_info(ratings)").all() as Array<{ name: string }>;
-    if (!columns.some((column) => column.name === "rating_deviation")) {
-      this.db.exec("ALTER TABLE ratings ADD COLUMN rating_deviation REAL NOT NULL DEFAULT 350");
-    }
-    if (!columns.some((column) => column.name === "volatility")) {
-      this.db.exec("ALTER TABLE ratings ADD COLUMN volatility REAL NOT NULL DEFAULT 0.06");
-    }
+function migrateUnversionedSchemaToV1(db: SyncSqliteDatabase): void {
+  db.exec(SCHEMA_V1_SQL);
+  ensureColumn(
+    db,
+    "app_settings",
+    "sync_upload_allowed",
+    "ALTER TABLE app_settings ADD COLUMN sync_upload_allowed INTEGER NOT NULL DEFAULT 0"
+  );
+  ensureColumn(
+    db,
+    "attempts",
+    "arrow_duel_candidate_order_json",
+    "ALTER TABLE attempts ADD COLUMN arrow_duel_candidate_order_json TEXT"
+  );
+  ensureColumn(
+    db,
+    "ratings",
+    "rating_deviation",
+    "ALTER TABLE ratings ADD COLUMN rating_deviation REAL NOT NULL DEFAULT 350"
+  );
+  ensureColumn(
+    db,
+    "ratings",
+    "volatility",
+    "ALTER TABLE ratings ADD COLUMN volatility REAL NOT NULL DEFAULT 0.06"
+  );
+}
+
+function ensureColumn(db: SyncSqliteDatabase, table: string, column: string, alterSql: string): void {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  if (!columns.some((candidate) => candidate.name === column)) {
+    db.exec(alterSql);
+  }
+}
+
+function readSchemaVersion(db: SyncSqliteDatabase): number {
+  const row = db.prepare("PRAGMA user_version").get() as { user_version?: unknown } | undefined;
+  const version = row?.user_version;
+  if (typeof version !== "number" || !Number.isInteger(version) || version < 0) {
+    throw new Error(`SQLite returned an invalid schema version: ${String(version)}`);
+  }
+  return version;
+}
+
+function setSchemaVersion(db: SyncSqliteDatabase, version: number): void {
+  db.exec(`PRAGMA user_version = ${version}`);
+}
+
+function assertForeignKeyIntegrity(db: SyncSqliteDatabase): void {
+  const violations = db.prepare("PRAGMA foreign_key_check").all();
+  if (violations.length > 0) {
+    throw new Error(`SQLite migration found ${violations.length} foreign key violation(s)`);
   }
 }
 
@@ -1216,9 +1292,9 @@ function intToBool(value: number): boolean {
   return value !== 0;
 }
 
-const SCHEMA_SQL = `
-PRAGMA foreign_keys = ON;
-
+// This is the frozen schema produced by migration 0 -> 1. Add a new migration
+// instead of editing it after schema version 1 has shipped.
+const SCHEMA_V1_SQL = `
 CREATE TABLE IF NOT EXISTS app_settings (
   id TEXT PRIMARY KEY,
   sync_icloud_enabled INTEGER NOT NULL,

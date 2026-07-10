@@ -4,6 +4,7 @@ const {
   sleep,
   frameFor,
   launchWithDisabledSynchronization,
+  playBoardMove,
   startPracticeMode,
   selectTestPuzzleSource,
   waitForVisibleInPracticeScroll,
@@ -42,6 +43,22 @@ describe('Practice POC', () => {
     const screenshotPath = await device.takeScreenshot('arrow-duel-neutral-arrows');
     expectBoardScreenshotContainsNeutralArrows(screenshotPath, boardFrame);
 
+  });
+
+  it('shows Arrow Duel feedback after a wrong candidate move', async () => {
+    await selectTestPuzzleSource('familiar15');
+    await startPracticeMode('arrow-duel');
+    await waitForVisibleInPracticeScroll('session-board');
+    // 00Kbj is the first Arrow-Duel-eligible familiar15 puzzle. Assert the
+    // fixture contract before playing its known wrong candidate.
+    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'h1h2', 10000);
+    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'h3h4', 10000);
+
+    await playBoardMove('session-board', 'h3h4');
+
+    await waitFor(element(by.label('Mistakes 1 of 3')).atIndex(0)).toExist().withTimeout(10000);
+    await waitFor(element(by.id('move-feedback-overlay'))).toExist().withTimeout(10000);
+    await waitFor(element(by.id('session-progress'))).toHaveText('0 / 10').withTimeout(10000);
   });
 
   it('accepts the fixed alternate mate-in-one puzzle', async () => {

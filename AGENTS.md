@@ -7,12 +7,19 @@ For development-loop decisions, use the repo-local skill at `.codex/skills/chess
 ## Branch And PR Workflow
 
 - Prefer one feature-scoped PR per coherent goal (for example, one screen or one flow brought to design parity), not a separate PR per small polish tweak. Batch related polish into the active feature PR.
-- Open the PR as a draft and push to it frequently. Draft pushes run only the fast Core Library checks; the expensive Mobile iOS Detox job is skipped for drafts.
-- Mark the PR ready for review only when the goal for that PR is complete. That triggers the full Mobile iOS simulator suite once, instead of on every push.
-- Merge to main when the feature PR is complete and green, not after every increment. Do not create a new branch for each small follow-up while a feature PR is still open — push to the open PR instead.
+- Open the PR as a draft and push to it frequently. Draft pushes run only the fast Core Library checks; the expensive Mobile iOS Detox job is skipped for drafts. The agent is authorized to `git push` to open PR branches in this repository without asking for per-push confirmation.
+- Mark the PR ready for review (`gh pr ready`) as soon as the agent judges the PR's stated goal complete and its required checks are green — do this proactively, without waiting to be asked. That triggers the full Mobile iOS simulator suite once, instead of on every push.
+- The agent is authorized to merge a ready-for-review PR (`gh pr merge --squash --delete-branch`, matching this repo's existing squash-merge convention) once it is complete and all required checks are green, without asking for per-merge confirmation. Merge to main when the feature PR is complete and green, not after every increment. Do not create a new branch for each small follow-up while a feature PR is still open — push to the open PR instead.
+- `main` has no branch protection, so GitHub will not itself block a merge while a check is still pending or has failed. Before merging, check actual check status (for example `gh pr checks`) and confirm every check has completed with a passing conclusion; do not merge based on an assumption that checks will pass or on a status snapshot taken before marking the PR ready.
+- Do not mark a PR ready or merge it while part of its stated goal is unfinished, a check is red, or the PR description calls out a known unresolved issue (e.g. keeping a PR in draft because of a reproduced E2E disconnect). Surface the blocker instead of forcing readiness.
 - Delete or reuse stale `codex/*` branches after their PR merges.
 
 ## Testing Philosophy
+
+The authoritative test-layer responsibilities, E2E regression scope, and
+SQLite migration compatibility requirements are documented in
+`docs/TESTING_ARCHITECTURE.md`. Read it before changing test infrastructure,
+storage, sync, database schemas, or release validation.
 
 - Business logic must be thoroughly tested before code is described as complete.
 - Business logic must live outside React components and React Native screens.
