@@ -629,6 +629,13 @@ export function PracticePocScreen({
     return new Date(nowMsRef.current).toISOString();
   }
 
+  function captureLiveNowIso(): string {
+    const liveNowMs = currentTimeMs();
+    nowMsRef.current = liveNowMs;
+    setNowMs(liveNowMs);
+    return new Date(liveNowMs).toISOString();
+  }
+
   function refreshState(): void {
     service.pruneOrphanedReviewQueue();
     setAttempts(service.listHistory() as AttemptEvent[]);
@@ -963,7 +970,7 @@ export function PracticePocScreen({
       return;
     }
     try {
-      const paused = service.pauseSprint(nowIso());
+      const paused = service.pauseSprint(captureLiveNowIso());
       commitState(paused);
       commitBoardInputLocked(true, `pause-${reason}`, paused.currentPuzzle?.puzzle.id ?? null);
       clearFeedbackSnapshot();
@@ -1217,7 +1224,7 @@ export function PracticePocScreen({
     setError(null);
     try {
       const resumed = nextSprint.status === "paused" && service.getActiveSprint()?.id === nextSprint.id
-        ? service.resumeSprint(nowIso())
+        ? service.resumeSprint(captureLiveNowIso())
         : nextSprint;
       setMode(resumed.config.mode);
       setSessionMistakeReviewItems([]);
