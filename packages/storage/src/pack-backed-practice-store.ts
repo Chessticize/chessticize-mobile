@@ -131,6 +131,17 @@ export class PackBackedPracticeStore implements PracticeStore {
   }
 
   importLocalData(data: LocalDataExport): LocalDataImportResult {
+    const referencedPuzzleIds = new Set([
+      ...data.attempts.map((attempt) => attempt.puzzleId),
+      ...data.reviewQueue.map((review) => review.puzzleId)
+    ]);
+    const missingReferencedPuzzles = [...referencedPuzzleIds]
+      .filter((puzzleId) => this.userStore.getPuzzle(puzzleId) === undefined)
+      .map((puzzleId) => this.puzzleSource.getPuzzle(puzzleId))
+      .filter((puzzle): puzzle is Puzzle => puzzle !== undefined);
+    if (missingReferencedPuzzles.length > 0) {
+      this.userStore.seedPuzzles(missingReferencedPuzzles);
+    }
     return this.userStore.importLocalData(data);
   }
 

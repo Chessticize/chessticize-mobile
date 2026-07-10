@@ -2,7 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { MemoryStore, PracticeService, mergeLocalDataExports, syncPracticeProgress } from "../src/index.ts";
+import {
+  MemoryStore,
+  PackBackedPracticeStore,
+  PracticeService,
+  SQLiteStore,
+  mergeLocalDataExports,
+  syncPracticeProgress
+} from "../src/index.ts";
 import type { ProgressSyncSnapshot, ProgressSyncTransport } from "../src/index.ts";
 import { defaultSprintConfig } from "../../core/src/index.ts";
 import type { Puzzle, SprintState } from "../../core/src/index.ts";
@@ -90,6 +97,63 @@ test("syncPracticeProgress imports another device snapshot before uploading the 
   assert.equal(transport.saved[0]?.data.attempts.length, 1);
   assert.equal(transport.saved[0]?.data.sprintSessions.length, 1);
   assert.equal(transport.saved[0]?.data.settings.sync.iCloudEnabled, true);
+});
+
+test("pack-backed SQLite sync makes remote progress readable when referenced puzzles only exist in the bundled pack", async () => {
+  const bundledPuzzleStore = await seededMemoryStore();
+  const remoteService = new PracticeService(bundledPuzzleStore);
+  enableSync(remoteService);
+  recordWrongStandardAttempt(remoteService);
+  const remoteSession = remoteService.listSprintSessions()[0];
+  const remoteSnapshot: ProgressSyncSnapshot = {
+    schemaVersion: 1,
+    deviceId: "iphone",
+    updatedAt: "2026-07-06T00:00:00.000Z",
+    data: remoteService.exportLocalData()
+  };
+
+  const localUserStore = new SQLiteStore(":memory:");
+  localUserStore.migrate();
+  const localStore = new PackBackedPracticeStore(localUserStore, bundledPuzzleStore);
+  const localService = new PracticeService(localStore);
+  enableSync(localService);
+  const transport = new RecordingTransport(remoteSnapshot);
+
+  try {
+    assert.equal(localUserStore.countPuzzles(), 0);
+
+    const result = await syncPracticeProgress(localStore, transport, {
+      deviceId: "ipad",
+      now: () => "2026-07-07T00:00:00.000Z"
+    });
+
+    assert.deepEqual(result.imported, {
+      ratings: 1,
+      attempts: 1,
+      reviewQueue: 1,
+      sprintSessions: 1
+    });
+    assert.equal(localUserStore.countPuzzles(), 1);
+    assert.equal(localService.getRating("standard 5/20").games, 1);
+    assert.equal(localService.listSprintSessions().length, 1);
+    assert.equal(localService.listReviewQueue().length, 1);
+    assert.equal(localService.getDueReviewItems("2026-07-07T00:00:00.000Z").length, 1);
+    assert.equal(localService.getSessionMistakeReview(remoteSession?.id ?? "missing").length, 1);
+
+    const history = localService.getHistoryView({
+      now: "2026-07-07T00:00:00.000Z",
+      timeRange: "max"
+    });
+    assert.equal(history.attempts.length, 1);
+    assert.equal(history.attempts[0]?.puzzleId, remoteSnapshot.data.attempts[0]?.puzzleId);
+
+    assert.equal(transport.saved.length, 1);
+    assert.equal(transport.saved[0]?.data.attempts.length, 1);
+    assert.equal(transport.saved[0]?.data.reviewQueue.length, 1);
+    assert.equal(transport.saved[0]?.data.sprintSessions.length, 1);
+  } finally {
+    localUserStore.close();
+  }
 });
 
 test("mergeLocalDataExports conservatively merges same-generation rating deltas", async () => {
