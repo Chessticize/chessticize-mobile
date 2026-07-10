@@ -22,17 +22,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  detox-ios:
-    name: Build and test iOS POC
-    # Draft PRs skip the expensive simulator build; mark the PR ready for
-    # review (or dispatch manually) to run the full Detox suite.
+  mobile-checks:
+    name: Mobile JS checks
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
-    # macos-latest started resolving to macOS 26 in July 2026, where the first
-    # Detox launch can remain busy until the smoke test times out. Keep the
-    # release gate on the supported macOS 15 runner until Detox is qualified on
-    # macOS 26.
-    runs-on: macos-15
-    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -62,14 +56,70 @@ jobs:
       - name: Fetch core puzzle pack
         run: pnpm fetch:core-pack
 
-      - name: Show Xcode
-        run: xcodebuild -version
-
       - name: Mobile typecheck
         run: pnpm mobile:typecheck
 
       - name: Mobile component tests
         run: pnpm mobile:test
+
+  detox-ios:
+    name: Detox iOS (${{ matrix.suite }})
+    # Draft PRs skip the expensive simulator build; mark the PR ready for
+    # review (or dispatch manually) to run the full Detox suite.
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
+    # macos-latest started resolving to macOS 26 in July 2026, where the first
+    # Detox launch can remain busy until the smoke test times out. Keep the
+    # release gate on the supported macOS 15 runner until Detox is qualified on
+    # macOS 26.
+    runs-on: macos-15
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [flows, practice]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.1.2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26.x
+          cache: pnpm
+
+      - name: Show Xcode
+        id: xcode
+        run: |
+          xcodebuild -version
+          xcode_cache_key="$(xcodebuild -version | shasum -a 256 | awk '{ print $1 }')"
+          echo "cache-key=$xcode_cache_key" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Detox iOS framework
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Detox/ios
+          key: detox-ios-${{ runner.os }}-${{ steps.xcode.outputs.cache-key }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            detox-ios-${{ runner.os }}-${{ steps.xcode.outputs.cache-key }}-
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache core puzzle pack
+        uses: actions/cache@v4
+        with:
+          path: fixtures/puzzles/bundled-core-pack.sqlite
+          key: core-pack-${{ hashFiles('fixtures/puzzles/bundled-core-pack.manifest.json') }}
+
+      - name: Fetch core puzzle pack
+        run: pnpm fetch:core-pack
 
       - name: Install Detox iOS utilities
         run: |
@@ -127,5 +177,16 @@ jobs:
       - name: Build iOS simulator app
         run: pnpm mobile:e2e:build:ios
 
-      - name: Run Detox iOS E2E
-        run: pnpm mobile:e2e:test:ios
+      - name: Boot Detox simulator
+        run: |
+          xcrun simctl boot "$DETOX_IOS_DEVICE" || true
+          xcrun simctl bootstatus "$DETOX_IOS_DEVICE" -b
+
+      - name: Run Detox iOS E2E suite
+        working-directory: apps/mobile
+        env:
+          DETOX_ACTIVE_SUITE: ${{ matrix.suite }}
+          DETOX_MAX_WORKERS: "1"
+        run: |
+          export PATH="$PWD/node_modules/.bin:$PATH"
+          ./node_modules/.bin/detox test --configuration ios.sim.debug --cleanup

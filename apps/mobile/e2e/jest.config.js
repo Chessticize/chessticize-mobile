@@ -1,14 +1,18 @@
+const {
+  resolveDetoxMaxWorkers,
+  resolveDetoxTestMatch
+} = require('./suiteConfig');
+
 module.exports = {
   rootDir: '..',
-  testMatch: ['<rootDir>/e2e/**/*.e2e.js'],
+  testMatch: resolveDetoxTestMatch(),
   testPathIgnorePatterns: [],
   testTimeout: 300000,
   forceExit: true,
-  maxWorkers: 1,
+  maxWorkers: resolveDetoxMaxWorkers(),
   globalSetup: 'detox/runners/jest/globalSetup',
   globalTeardown: 'detox/runners/jest/globalTeardown',
   reporters: ['detox/runners/jest/reporter'],
   testEnvironment: 'detox/runners/jest/testEnvironment',
-  setupFilesAfterEnv: ['<rootDir>/e2e/init.js'],
   verbose: true,
 };

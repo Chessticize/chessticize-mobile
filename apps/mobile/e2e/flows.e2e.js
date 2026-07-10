@@ -71,7 +71,9 @@ describe('Key user flows', () => {
   it('shows scheduled due reviews after relaunch', async () => {
     const sprintNowMs = Date.now() - (2 * dayMs);
     const reviewNowMs = sprintNowMs + dayMs + 60 * 1000;
-    await launchAppAt(sprintNowMs, true);
+    // beforeEach already installed a clean app; relaunch with the test clock
+    // without paying for a second uninstall/install cycle.
+    await launchAppAt(sprintNowMs, false);
 
     await failStandardSprint();
     await dismissSprintSummary();
@@ -102,7 +104,8 @@ describe('Key user flows', () => {
 
   it('schedules review reminders through the native fixture', async () => {
     const sprintNowMs = Date.now() - (2 * dayMs);
-    await launchAppAt(sprintNowMs, true, { chessticizeTestNotificationStatus: 'authorized' });
+    // beforeEach already installed a clean app; relaunch only to apply fixtures.
+    await launchAppAt(sprintNowMs, false, { chessticizeTestNotificationStatus: 'authorized' });
 
     await failStandardSprint();
     await dismissSprintSummary();
