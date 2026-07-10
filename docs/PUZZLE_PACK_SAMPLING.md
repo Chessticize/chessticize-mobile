@@ -13,6 +13,36 @@ Popularity, NbPlays, Themes, GameUrl, OpeningTags, stockfish_eval,
 stockfish_bestmove, stockfish_eval_after_first_move`. Lichess data is CC0;
 presolve fields are Chessticize-generated.
 
+The presolver implementation, usage guide, and dataset provenance are public in
+[Chessticize/lichess-presolver](https://github.com/Chessticize/lichess-presolver).
+The exact depth-20 corpus used here is published as the immutable
+[`dataset-2025-07-depth20` release](https://github.com/Chessticize/lichess-presolver/releases/tag/dataset-2025-07-depth20).
+That release contains eight independently decompressible CSV archives and a
+`SHA256SUMS` file.
+
+For a fresh local setup from the published corpus, run these commands from the
+`chessticize-mobile` repository root. The checkout directory intentionally uses
+the existing `lichess-presolve` local name expected by the build scripts:
+
+```sh
+git clone https://github.com/Chessticize/lichess-presolver.git ../lichess-presolve
+mkdir -p ../lichess-presolve/presolved
+cd ../lichess-presolve/presolved
+gh release download dataset-2025-07-depth20 \
+  --repo Chessticize/lichess-presolver
+shasum -a 256 -c SHA256SUMS
+unzstd lichess-puzzles-presolved-depth20-2025-07-split-*.csv.zst
+```
+
+To rebuild the presolved corpus from a Lichess puzzle export instead of using
+the release, start with the public repository's
+[README](https://github.com/Chessticize/lichess-presolver#readme) and
+[usage guide](https://github.com/Chessticize/lichess-presolver/blob/master/docs/USAGE.md).
+They document single-file and parallel full-snapshot depth-20 runs. The
+published release is the reproducible input for this Core Pack; rebuilding from
+a newer Lichess export creates a different source corpus and requires the full
+pack validation and publishing workflow below.
+
 `core-pack-v1` was mistakenly generated from the historical
 `presolved-depth16` directory. Use the targeted depth-20 update workflow below
 to retain its sampled puzzle IDs while replacing changed presolve fields and
@@ -160,8 +190,9 @@ the migrated artifact under a new release tag; never replace the immutable
 Follow this checklist whenever the sampling rules, seed, thresholds, or the
 source presolve library change:
 
-1. Ensure the depth-20 presolve library is present at
-   `../lichess-presolve/presolved`.
+1. Materialize the published depth-20 release at
+   `../lichess-presolve/presolved` using the source setup above, or rebuild it
+   with the public presolver and verify its metadata and hashes.
 2. Run `pnpm generate:offline-puzzles`. This rebuilds
    `fixtures/puzzles/bundled-core-pack.sqlite` (gitignored) and rewrites
    `bundled-core-pack.manifest.json` with the new seed, build date, counts,
