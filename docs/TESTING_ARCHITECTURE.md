@@ -156,6 +156,12 @@ Use `device.launchApp({ delete: true })` for isolated fresh-state journeys. Use
 subject of the test. A dedicated Detox simulator is required because deleting
 the app sandbox removes local SQLite history, sprint sessions, and review data.
 
+Mobile iOS CI may cache Xcode intermediates and dependency build products, but
+must exclude the final app bundle and dSYM. Pull requests restore the latest
+compatible cache seeded by `main`, then still run the normal Xcode build and
+the complete Detox suites. Cache hits are an acceleration mechanism, not a
+substitute for building or running any regression case.
+
 ## SQLite Schema Migration Architecture
 
 User data must survive upgrades from every previously shipped database schema

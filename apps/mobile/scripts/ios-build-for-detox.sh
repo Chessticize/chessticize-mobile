@@ -6,33 +6,7 @@ cd "$APP_DIR"
 
 scripts/ios-doctor.sh
 
-REPO_DIR="$APP_DIR/../.."
-CORE_PACK_PATH="$REPO_DIR/fixtures/puzzles/bundled-core-pack.sqlite"
-core_pack_backup=""
-
-restore_core_pack() {
-  if [[ "${DETOX_USE_FIXTURE_CORE_PACK:-0}" != "1" ]]; then
-    return
-  fi
-  rm -f "$CORE_PACK_PATH"
-  if [[ -n "$core_pack_backup" && -f "$core_pack_backup" ]]; then
-    mv "$core_pack_backup" "$CORE_PACK_PATH"
-  fi
-}
-
-if [[ "${DETOX_USE_FIXTURE_CORE_PACK:-0}" == "1" ]]; then
-  if [[ -f "$CORE_PACK_PATH" ]]; then
-    core_pack_backup="$CORE_PACK_PATH.release-backup.$$"
-    mv "$CORE_PACK_PATH" "$core_pack_backup"
-  fi
-  trap restore_core_pack EXIT
-  (
-    cd "$REPO_DIR"
-    node --experimental-strip-types scripts/generate-detox-puzzle-pack.mjs --output "$CORE_PACK_PATH"
-  )
-else
-  (cd "$REPO_DIR" && node scripts/fetch-core-pack.mjs)
-fi
+(cd "$APP_DIR/../.." && node scripts/fetch-core-pack.mjs)
 
 if ! bundle check; then
   bundle install
