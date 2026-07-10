@@ -1067,6 +1067,67 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "custom-initial-rating-value"))).toBe("ELO 600");
   });
 
+  it("keeps multiple previous custom configs attached to their own ELO buckets", () => {
+    const store = new MemoryStore();
+    store.seedPuzzles([sharedHistoryPuzzle()]);
+    store.saveCustomSprintConfig({
+      id: "custom-custom-180-30-mate",
+      mode: "custom",
+      ratingKey: "mate custom 3/30",
+      durationSeconds: 180,
+      perPuzzleSeconds: 30,
+      targetCorrect: 6,
+      maxMistakes: 3,
+      theme: "mate",
+      lastStartedAt: "2026-07-07T00:00:00.000Z",
+      playCount: 2
+    });
+    store.saveRating({
+      key: "mate custom 3/30",
+      generation: 0,
+      rating: 875,
+      games: 2
+    });
+    store.saveCustomSprintConfig({
+      id: "custom-custom-300-20-fork",
+      mode: "custom",
+      ratingKey: "fork custom 5/20",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      targetCorrect: 15,
+      maxMistakes: 3,
+      theme: "fork",
+      lastStartedAt: "2026-07-06T00:00:00.000Z",
+      playCount: 1
+    });
+    store.saveRating({
+      key: "fork custom 5/20",
+      generation: 0,
+      rating: 1025,
+      games: 1
+    });
+    const renderer = renderScreen({ practiceService: new PracticeService(store) });
+
+    press(renderer, "practice-mode-custom");
+
+    const mateConfig = findByTestId(renderer, "custom-previous-custom-custom-180-30-mate");
+    const forkConfig = findByTestId(renderer, "custom-previous-custom-custom-300-20-fork");
+    expect(collectText(mateConfig)).toContain("875");
+    expect(mateConfig.props.accessibilityLabel).toContain("ELO 875");
+    expect(collectText(forkConfig)).toContain("1025");
+    expect(forkConfig.props.accessibilityLabel).toContain("ELO 1025");
+
+    press(renderer, "custom-previous-custom-custom-180-30-mate");
+    expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("Mate");
+    expect(collectText(findByTestId(renderer, "custom-target-count"))).toBe("~6");
+    expect(collectText(findByTestId(renderer, "custom-initial-rating-value"))).toBe("ELO 875");
+
+    press(renderer, "custom-previous-custom-custom-300-20-fork");
+    expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("Fork");
+    expect(collectText(findByTestId(renderer, "custom-target-count"))).toBe("~15");
+    expect(collectText(findByTestId(renderer, "custom-initial-rating-value"))).toBe("ELO 1025");
+  });
+
   it("keeps played custom ELO editable as a difficulty control", () => {
     const service = createMobilePracticeService("familiar15");
     const renderer = renderScreen({ practiceService: service });
@@ -2895,6 +2956,45 @@ describe("PracticePocScreen", () => {
       expect(client.fetchCount).toBe(2);
       expect(client.saveCount).toBe(2);
     });
+  });
+
+  it("does not sync while iCloud is off and syncs once when it is enabled", async () => {
+    const service = createMobilePracticeService("random1000");
+    service.saveSettings({
+      ...service.getSettings(),
+      sync: {
+        iCloudEnabled: false
+      }
+    });
+    const client = new FakeICloudProgressSyncClient();
+    const renderer = renderScreen({
+      practiceService: service,
+      iCloudProgressSyncClient: client
+    });
+    await act(async () => {});
+
+    expect(client.fetchCount).toBe(0);
+    expect(client.saveCount).toBe(0);
+    press(renderer, "settings-tab");
+    expect(collectText(findByTestId(renderer, "settings-sync-status"))).toContain("Off");
+    expect(() => findByTestId(renderer, "settings-sync-now")).toThrow();
+
+    press(renderer, "settings-icloud-sync-on");
+    await waitForAssertion(() => {
+      expect(client.fetchCount).toBe(1);
+      expect(client.saveCount).toBe(1);
+    });
+    expect(service.getSettings().sync.iCloudEnabled).toBe(true);
+    expect(findByTestId(renderer, "settings-sync-now")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "settings-sync-status"))).toContain("Synced");
+
+    press(renderer, "settings-icloud-sync-off");
+    await flushMicrotasks();
+    expect(service.getSettings().sync.iCloudEnabled).toBe(false);
+    expect(collectText(findByTestId(renderer, "settings-sync-status"))).toContain("Off");
+    expect(() => findByTestId(renderer, "settings-sync-now")).toThrow();
+    expect(client.fetchCount).toBe(1);
+    expect(client.saveCount).toBe(1);
   });
 
   it("opens difficulty controls from the Edit ELO row", () => {

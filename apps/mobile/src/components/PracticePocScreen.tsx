@@ -1766,6 +1766,7 @@ export function PracticePocScreen({
                     onPerPuzzleChange={setCustomPerPuzzleSeconds}
                     onThemeChange={setCustomTheme}
                     previousConfigs={service.listCustomSprintConfigs()}
+                    ratingForKey={(ratingKey) => service.getRating(ratingKey).rating}
                     onStart={() => startSprint(customSprintMode, true)}
                   />
                 ) : null}
@@ -2294,6 +2295,7 @@ function CustomSprintSetup({
   onInitialRatingChange,
   perPuzzleSeconds,
   previousConfigs,
+  ratingForKey,
   targetCorrect,
   theme,
   ratingKey,
@@ -2313,6 +2315,7 @@ function CustomSprintSetup({
   onInitialRatingChange: (next: number) => void;
   perPuzzleSeconds: number;
   previousConfigs: CustomSprintConfigRecord[];
+  ratingForKey: (ratingKey: string) => number;
   targetCorrect: number;
   theme: CustomThemeFilter;
   ratingKey: string;
@@ -2325,7 +2328,7 @@ function CustomSprintSetup({
   const hasEnoughLocalPuzzles = availablePuzzleCount >= requiredPuzzleCount;
   const canStartWithLocalPuzzles = availablePuzzleCount > 0;
   const previousRows = previousConfigs.slice(0, 5).map((config) =>
-    previousCustomConfigRowModel(config, ratingKey, initialRating)
+    previousCustomConfigRowModel(config, ratingForKey(config.ratingKey))
   );
 
   return (
@@ -7806,8 +7809,7 @@ function customThemeFromLabel(label: string): CustomThemeFilter {
 
 function previousCustomConfigRowModel(
   config: CustomSprintConfigRecord,
-  activeRatingKey: string,
-  currentRating: number
+  rating: number
 ): PreviousCustomConfig {
   const theme = customThemeFromStoredValue(config.theme);
   return {
@@ -7821,7 +7823,7 @@ function previousCustomConfigRowModel(
     timing: formatSprintTimingLabel(config),
     lastPlayed: formatConfigLastPlayed(config.lastStartedAt),
     ratingKey: config.ratingKey,
-    rating: config.ratingKey === activeRatingKey ? currentRating : 600
+    rating
   };
 }
 
