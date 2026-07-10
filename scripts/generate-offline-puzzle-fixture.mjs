@@ -68,6 +68,7 @@ async function main(argv = process.argv.slice(2)) {
       const selected = selectFinalPuzzles(db, quotas, options.seed);
       writeSelectedPack(db, selected);
       db.exec("VACUUM");
+      db.exec("ANALYZE");
     }
   } finally {
     db.close();

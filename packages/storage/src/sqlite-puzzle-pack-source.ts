@@ -112,18 +112,24 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
   }
 
   private queryCandidates(filter: PuzzleSelectionFilter): Puzzle[] {
-    const clauses = ["puzzles.rating >= ?", "puzzles.rating <= ?"];
-    const params: Array<string | number> = [filter.minRating ?? 0, filter.maxRating ?? 4000];
+    const clauses: string[] = [];
+    const params: Array<string | number> = [];
     let from = "puzzles";
+    let ratingColumn = "puzzles.rating";
+    let idColumn = "puzzles.id";
     if (filter.theme !== undefined) {
       const themeId = this.themeId(filter.theme);
       if (themeId === undefined) {
         return [];
       }
       from = "puzzle_themes JOIN puzzles ON puzzles.id = puzzle_themes.puzzle_id";
-      clauses.unshift("puzzle_themes.theme_id = ?");
-      params.unshift(themeId);
+      ratingColumn = "puzzle_themes.rating";
+      idColumn = "puzzle_themes.puzzle_id";
+      clauses.push("puzzle_themes.theme_id = ?");
+      params.push(themeId);
     }
+    clauses.push(`${ratingColumn} >= ?`, `${ratingColumn} <= ?`);
+    params.push(filter.minRating ?? 0, filter.maxRating ?? 4000);
     const hasInMemoryIdFilter =
       (filter.includeIds !== undefined && filter.includeIds.length > MAX_SQL_ID_FILTER_VALUES) ||
       (filter.excludeIds !== undefined && filter.excludeIds.length > MAX_SQL_ID_FILTER_VALUES);
@@ -140,7 +146,7 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
       SELECT puzzles.*
       FROM ${from}
       WHERE ${clauses.join(" AND ")}
-      ORDER BY puzzles.rating ASC, puzzles.id ASC
+      ORDER BY ${ratingColumn} ASC, ${idColumn} ASC
       LIMIT ?
     `;
     params.push(this.candidateLimit(filter.limit, filter.randomSeed !== undefined || hasInMemoryIdFilter));

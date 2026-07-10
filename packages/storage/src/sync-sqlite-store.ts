@@ -160,7 +160,7 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 1;
+export const CURRENT_SCHEMA_VERSION = 2;
 
 interface SQLiteMigration {
   from: number;
@@ -169,7 +169,8 @@ interface SQLiteMigration {
 }
 
 const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
-  { from: 0, to: 1, apply: migrateUnversionedSchemaToV1 }
+  { from: 0, to: 1, apply: migrateUnversionedSchemaToV1 },
+  { from: 1, to: 2, apply: migrateV1ToV2 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
@@ -560,6 +561,33 @@ export class SyncSQLiteStore implements PracticeStore {
   }
 
   listAttempts(filter: HistoryFilter = {}): AttemptHistoryRow[] {
+    const clauses: string[] = [];
+    const params: SyncSqliteValue[] = [];
+    if (filter.source !== undefined) {
+      clauses.push("source = ?");
+      params.push(filter.source);
+    }
+    if (filter.result !== undefined) {
+      clauses.push("result = ?");
+      params.push(filter.result);
+    }
+    if (filter.mode !== undefined) {
+      clauses.push("mode = ?");
+      params.push(filter.mode);
+    }
+    if (filter.since !== undefined) {
+      clauses.push("completed_at >= ?");
+      params.push(filter.since);
+    }
+    if (filter.puzzleId !== undefined) {
+      clauses.push("puzzle_id = ?");
+      params.push(filter.puzzleId);
+    }
+    if (filter.sessionId !== undefined) {
+      clauses.push("session_id = ?");
+      params.push(filter.sessionId);
+    }
+    const where = clauses.length === 0 ? "" : `WHERE ${clauses.join(" AND ")}`;
     const rows = this.db
       .prepare(
         `SELECT
@@ -578,28 +606,10 @@ export class SyncSQLiteStore implements PracticeStore {
           rating_after AS ratingAfter,
           arrow_duel_candidate_order_json AS arrowDuelCandidateOrderJson
          FROM attempts
-         WHERE (? IS NULL OR source = ?)
-           AND (? IS NULL OR result = ?)
-           AND (? IS NULL OR mode = ?)
-           AND (? IS NULL OR completed_at >= ?)
-           AND (? IS NULL OR puzzle_id = ?)
-           AND (? IS NULL OR session_id = ?)
+         ${where}
          ORDER BY completed_at DESC, id DESC`
       )
-      .all(
-        filter.source ?? null,
-        filter.source ?? null,
-        filter.result ?? null,
-        filter.result ?? null,
-        filter.mode ?? null,
-        filter.mode ?? null,
-        filter.since ?? null,
-        filter.since ?? null,
-        filter.puzzleId ?? null,
-        filter.puzzleId ?? null,
-        filter.sessionId ?? null,
-        filter.sessionId ?? null
-      ) as AttemptHistoryDbRow[];
+      .all(...params) as AttemptHistoryDbRow[];
 
     return rows.map((row) => {
       const candidateOrder = optionalStringArrayFromJson(row.arrowDuelCandidateOrderJson);
@@ -838,6 +848,18 @@ export class SyncSQLiteStore implements PracticeStore {
   }
 
   private selectHistoryAttempts(ratingKey: string | undefined, since: string | undefined, until: string): HistoryAttemptView[] {
+    const clauses: string[] = [];
+    const params: SyncSqliteValue[] = [];
+    if (ratingKey !== undefined) {
+      clauses.push("a.rating_key = ?");
+      params.push(ratingKey);
+    }
+    if (since !== undefined) {
+      clauses.push("a.completed_at >= ?");
+      params.push(since);
+    }
+    clauses.push("a.completed_at <= ?");
+    params.push(until);
     const rows = this.db
       .prepare(
         `SELECT
@@ -858,12 +880,10 @@ export class SyncSQLiteStore implements PracticeStore {
          FROM attempts a
          JOIN sprint_sessions s ON s.id = a.session_id
          JOIN puzzles p ON p.id = a.puzzle_id
-         WHERE (? IS NULL OR COALESCE(a.rating_key, s.rating_key) = ?)
-           AND (? IS NULL OR a.completed_at >= ?)
-           AND a.completed_at <= ?
+         WHERE ${clauses.join(" AND ")}
          ORDER BY a.completed_at DESC, a.id DESC`
       )
-      .all(ratingKey ?? null, ratingKey ?? null, since ?? null, since ?? null, until) as HistoryAttemptDbRow[];
+      .all(...params) as HistoryAttemptDbRow[];
 
     return rows.map((row) => {
       const puzzle = puzzleFromRow(row);
@@ -891,6 +911,18 @@ export class SyncSQLiteStore implements PracticeStore {
   }
 
   private selectHistoryElo(ratingKey: string, since: string | undefined, until: string): HistoryEloPoint[] {
+    const clauses = [
+      "rating_key = ?",
+      "completed_at IS NOT NULL",
+      "rating_after IS NOT NULL"
+    ];
+    const params: SyncSqliteValue[] = [ratingKey];
+    if (since !== undefined) {
+      clauses.push("completed_at >= ?");
+      params.push(since);
+    }
+    clauses.push("completed_at <= ?");
+    params.push(until);
     const rows = this.db
       .prepare(
         `SELECT
@@ -899,14 +931,10 @@ export class SyncSQLiteStore implements PracticeStore {
           rating_before,
           rating_after
          FROM sprint_sessions
-         WHERE rating_key = ?
-           AND completed_at IS NOT NULL
-           AND rating_after IS NOT NULL
-           AND (? IS NULL OR completed_at >= ?)
-           AND completed_at <= ?
+         WHERE ${clauses.join(" AND ")}
          ORDER BY completed_at ASC, id ASC`
       )
-      .all(ratingKey, since ?? null, since ?? null, until) as HistoryEloDbRow[];
+      .all(...params) as HistoryEloDbRow[];
     return rows.map((row) => ({
       sessionId: row.session_id,
       completedAt: row.completed_at,
@@ -1104,6 +1132,30 @@ function migrateUnversionedSchemaToV1(db: SyncSqliteDatabase): void {
     "volatility",
     "ALTER TABLE ratings ADD COLUMN volatility REAL NOT NULL DEFAULT 0.06"
   );
+}
+
+function migrateV1ToV2(db: SyncSqliteDatabase): void {
+  ensureColumn(
+    db,
+    "attempts",
+    "rating_key",
+    "ALTER TABLE attempts ADD COLUMN rating_key TEXT"
+  );
+  db.prepare(
+    `UPDATE attempts
+     SET rating_key = (
+       SELECT sprint_sessions.rating_key
+       FROM sprint_sessions
+       WHERE sprint_sessions.id = attempts.session_id
+     )
+     WHERE rating_key IS NULL
+       AND EXISTS (
+         SELECT 1
+         FROM sprint_sessions
+         WHERE sprint_sessions.id = attempts.session_id
+       )`
+  ).run();
+  db.exec(INDEX_V2_SQL);
 }
 
 function ensureColumn(db: SyncSqliteDatabase, table: string, column: string, alterSql: string): void {
@@ -1416,4 +1468,26 @@ CREATE TABLE IF NOT EXISTS review_events (
 );
 CREATE INDEX IF NOT EXISTS review_events_puzzle_id_idx ON review_events(puzzle_id);
 CREATE INDEX IF NOT EXISTS review_events_reviewed_at_idx ON review_events(reviewed_at);
+`;
+
+const INDEX_V2_SQL = `
+DROP INDEX IF EXISTS attempts_completed_at_idx;
+DROP INDEX IF EXISTS attempts_result_idx;
+DROP INDEX IF EXISTS attempts_mode_idx;
+DROP INDEX IF EXISTS attempts_session_id_idx;
+DROP INDEX IF EXISTS sprint_sessions_rating_key_completed_at_idx;
+DROP INDEX IF EXISTS custom_sprint_configs_last_started_at_idx;
+DROP INDEX IF EXISTS review_queue_due_at_idx;
+DROP INDEX IF EXISTS review_events_reviewed_at_idx;
+
+CREATE INDEX IF NOT EXISTS puzzles_rating_id_idx ON puzzles(rating, id);
+CREATE INDEX IF NOT EXISTS attempts_completed_at_id_idx ON attempts(completed_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS attempts_rating_key_completed_at_id_idx ON attempts(rating_key, completed_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS attempts_session_result_completed_at_id_idx ON attempts(session_id, result, completed_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS attempts_puzzle_id_completed_at_id_idx ON attempts(puzzle_id, completed_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS sprint_sessions_rating_key_completed_at_id_idx ON sprint_sessions(rating_key, completed_at, id);
+CREATE INDEX IF NOT EXISTS sprint_sessions_started_at_id_idx ON sprint_sessions(started_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS custom_sprint_configs_last_started_at_id_idx ON custom_sprint_configs(last_started_at DESC, id ASC);
+CREATE INDEX IF NOT EXISTS review_queue_due_at_order_idx ON review_queue(due_at, puzzle_id, mode, rating_key);
+CREATE INDEX IF NOT EXISTS review_events_puzzle_id_idx ON review_events(puzzle_id);
 `;
