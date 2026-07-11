@@ -32,15 +32,19 @@ describe("iOS App Store identity artifacts", () => {
     expect(project).not.toContain("ChessticizeMobile.app");
   });
 
-  it("keeps the launch screen aligned with the app background and removes template copy", () => {
+  it("keeps the launch screen aligned with the app background and reuses the main app logo", () => {
     const launchScreen = readText(join(iosRoot, "LaunchScreen.storyboard"));
+    const launchLogo = readFileSync(join(iosRoot, "Images.xcassets", "LaunchLogo.imageset", "LaunchLogo.png"));
+    const appLogo = readFileSync(join(iosRoot, "Images.xcassets", "AppIcon.appiconset", "AppIcon-ios-marketing-1024.png"));
 
     expect(launchScreen).toContain('text="Chessticize"');
+    expect(launchScreen).toContain('image="LaunchLogo"');
     expect(launchScreen).not.toContain("ChessticizeMobile");
     expect(launchScreen).not.toContain("Powered by React Native");
     expect(launchScreen).toContain(
       'red="0.97254901960784312" green="0.98039215686274506" blue="0.9882352941176471"'
     );
+    expect(launchLogo).toEqual(appLogo);
   });
 
   it("has concrete no-alpha PNGs for every AppIcon catalog slot", () => {

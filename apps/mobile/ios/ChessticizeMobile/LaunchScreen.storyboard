@@ -16,36 +16,13 @@
                         <rect key="frame" x="0.0" y="0.0" width="375" height="667"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
-                            <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="mark-bg">
-                                <rect key="frame" x="151.5" y="261.5" width="72" height="72"/>
-                                <subviews>
-                                    <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="mark-dot-top">
-                                        <rect key="frame" x="19" y="19" width="14" height="14"/>
-                                        <color key="backgroundColor" red="0.14509803921568629" green="0.38823529411764707" blue="0.92156862745098034" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
-                                        <constraints>
-                                            <constraint firstAttribute="width" constant="14" id="dot-top-w"/>
-                                            <constraint firstAttribute="height" constant="14" id="dot-top-h"/>
-                                        </constraints>
-                                    </view>
-                                    <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="mark-dot-bottom">
-                                        <rect key="frame" x="39" y="39" width="14" height="14"/>
-                                        <color key="backgroundColor" red="0.086274509803921567" green="0.63921568627450975" blue="0.29019607843137257" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
-                                        <constraints>
-                                            <constraint firstAttribute="width" constant="14" id="dot-bottom-w"/>
-                                            <constraint firstAttribute="height" constant="14" id="dot-bottom-h"/>
-                                        </constraints>
-                                    </view>
-                                </subviews>
-                                <color key="backgroundColor" red="0.058823529411764705" green="0.090196078431372548" blue="0.16470588235294117" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" image="LaunchLogo" translatesAutoresizingMaskIntoConstraints="NO" id="launch-logo">
+                                <rect key="frame" x="139.5" y="249.5" width="96" height="96"/>
                                 <constraints>
-                                    <constraint firstAttribute="width" constant="72" id="mark-bg-w"/>
-                                    <constraint firstAttribute="height" constant="72" id="mark-bg-h"/>
-                                    <constraint firstItem="mark-dot-top" firstAttribute="leading" secondItem="mark-bg" secondAttribute="leading" constant="19" id="dot-top-leading"/>
-                                    <constraint firstItem="mark-dot-top" firstAttribute="top" secondItem="mark-bg" secondAttribute="top" constant="19" id="dot-top-top"/>
-                                    <constraint firstAttribute="trailing" secondItem="mark-dot-bottom" secondAttribute="trailing" constant="19" id="dot-bottom-trailing"/>
-                                    <constraint firstAttribute="bottom" secondItem="mark-dot-bottom" secondAttribute="bottom" constant="19" id="dot-bottom-bottom"/>
+                                    <constraint firstAttribute="width" constant="96" id="launch-logo-w"/>
+                                    <constraint firstAttribute="height" constant="96" id="launch-logo-h"/>
                                 </constraints>
-                            </view>
+                            </imageView>
                             <label opaque="NO" clipsSubviews="YES" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Chessticize" textAlignment="center" lineBreakMode="middleTruncation" baselineAdjustment="alignBaselines" minimumFontSize="18" translatesAutoresizingMaskIntoConstraints="NO" id="GJd-Yh-RWb">
                                 <rect key="frame" x="0.0" y="357.5" width="375" height="29"/>
                                 <fontDescription key="fontDescription" type="boldSystem" pointSize="24"/>
@@ -55,10 +32,10 @@
                         </subviews>
                         <color key="backgroundColor" red="0.97254901960784312" green="0.98039215686274506" blue="0.9882352941176471" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                         <constraints>
-                            <constraint firstItem="mark-bg" firstAttribute="centerX" secondItem="Bcu-3y-fUS" secondAttribute="centerX" id="mark-center-x"/>
-                            <constraint firstItem="mark-bg" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" constant="-36" id="mark-center-y"/>
+                            <constraint firstItem="launch-logo" firstAttribute="centerX" secondItem="Bcu-3y-fUS" secondAttribute="centerX" id="logo-center-x"/>
+                            <constraint firstItem="launch-logo" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" constant="-36" id="logo-center-y"/>
                             <constraint firstItem="Bcu-3y-fUS" firstAttribute="centerX" secondItem="GJd-Yh-RWb" secondAttribute="centerX" id="Q3B-4B-g5h"/>
-                            <constraint firstItem="GJd-Yh-RWb" firstAttribute="top" secondItem="mark-bg" secondAttribute="bottom" constant="24" id="title-top"/>
+                            <constraint firstItem="GJd-Yh-RWb" firstAttribute="top" secondItem="launch-logo" secondAttribute="bottom" constant="20" id="title-top"/>
                             <constraint firstItem="GJd-Yh-RWb" firstAttribute="leading" secondItem="Bcu-3y-fUS" secondAttribute="leading" symbolic="YES" id="x7j-FC-K8j"/>
                         </constraints>
                         <viewLayoutGuide key="safeArea" id="Bcu-3y-fUS"/>
@@ -69,4 +46,7 @@
             <point key="canvasLocation" x="52.173913043478265" y="375"/>
         </scene>
     </scenes>
+    <resources>
+        <image name="LaunchLogo" width="1024" height="1024"/>
+    </resources>
 </document>

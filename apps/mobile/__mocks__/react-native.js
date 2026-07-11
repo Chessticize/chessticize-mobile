@@ -10,6 +10,7 @@ function component(name) {
 }
 
 module.exports = {
+  ActivityIndicator: component('ActivityIndicator'),
   NativeModules: {},
   __setWindowDimensions(nextDimensions) {
     windowDimensions = { ...windowDimensions, ...nextDimensions };
