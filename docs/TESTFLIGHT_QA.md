@@ -181,16 +181,17 @@ while private; only commit sanitized screenshots or logs intentionally.
 
 Current source release candidate:
 
-- Source commit: `380f73c70a916d6494609fce8f334ef4f4094626`
+- Source commit: the commit pointed to by the `ios-v1.0.0-build-1` tag
 - Release tag:
   [`ios-v1.0.0-build-1`](https://github.com/Chessticize/chessticize-mobile/releases/tag/ios-v1.0.0-build-1)
-- Rule: upload only a binary archived from this exact commit. If any source,
-  dependency, puzzle, native, or notice file changes before upload, regenerate
-  the release manifest and publish a new tag/release for the submitted binary.
+- Rule: upload only a binary archived from the exact commit pointed to by this
+  tag. If any source, dependency, puzzle, native, or notice file changes before
+  upload, regenerate the release manifest and publish a new tag/release for the
+  submitted binary.
 
 | Field | Value |
 | --- | --- |
-| Source commit | `380f73c70a916d6494609fce8f334ef4f4094626` |
+| Source commit | Tag target for `ios-v1.0.0-build-1` |
 | Release tag | `ios-v1.0.0-build-1` |
 | App Store Connect build | TBD |
 | TestFlight group | TBD |

@@ -1951,6 +1951,8 @@ export function PracticePocScreen({
           <ScrollView
             testID="practice-main-scroll"
             scrollEnabled={!practiceScrollLocked}
+            showsHorizontalScrollIndicator={false}
+            showsVerticalScrollIndicator={false}
             contentContainerStyle={[
               styles.content,
               adaptiveLayout.usesWideContent ? styles.contentWide : null,
@@ -4128,7 +4130,7 @@ function HistoryPanel({
             />
           ))}
         </HistoryChipRow>
-        <HistoryChipRow testID="history-range-filters">
+        <HistoryChipRow testID="history-range-filters" wrap>
           {(["7d", "30d", "90d", "1y", "max"] as const).map((range) => (
             <FilterButton
               key={range}
@@ -4633,11 +4635,21 @@ function ResultBadgeGlyph({ tone }: { tone: "correct" | "wrong" | "alert" }): Re
 
 function HistoryChipRow({
   children,
-  testID
+  testID,
+  wrap = false
 }: {
   children: React.ReactNode;
   testID: string;
+  wrap?: boolean;
 }): React.JSX.Element {
+  if (wrap) {
+    return (
+      <View style={[styles.historyChipContent, styles.historyChipContentWrap]} testID={testID}>
+        {children}
+      </View>
+    );
+  }
+
   return (
     <ScrollView
       horizontal
@@ -10539,6 +10551,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
     paddingRight: 2
+  },
+  historyChipContentWrap: {
+    flexWrap: "wrap",
+    rowGap: 8
   },
   historyActiveFilterChip: {
     backgroundColor: "#F8FAFC",

@@ -41,26 +41,41 @@ describe("App Store assets document", () => {
     expect(storeAssetsDoc).toContain("6.1\"");
     expect(storeAssetsDoc).toContain("1290 x 2796");
     expect(storeAssetsDoc).toContain("1170 x 2532");
+    expect(storeAssetsDoc).toContain("2064 x 2752");
     expect(storeAssetsDoc).toContain("Standard Puzzle Sprint");
     expect(storeAssetsDoc).toContain("Arrow Duel");
-    expect(storeAssetsDoc).toContain("Analysis panel");
+    expect(storeAssetsDoc).toContain("Practice tab");
+    expect(storeAssetsDoc).toContain("Review tab");
     expect(storeAssetsDoc).toContain("History");
+    expect(storeAssetsDoc).toContain("Settings tab");
   });
 
   it("documents and gates the opt-in screenshot capture flow", () => {
     expect(rootPackage.scripts["mobile:e2e:store-assets:ios"]).toContain("e2e:store-assets:ios");
+    expect(rootPackage.scripts["mobile:e2e:build:ios:release"]).toContain("e2e:build:ios:release");
+    expect(rootPackage.scripts["mobile:e2e:store-assets:ios:release"]).toContain(
+      "e2e:store-assets:ios:release"
+    );
     expect(rootPackage.scripts["app-store:screenshot-audit"]).toBe("node scripts/app-store-screenshot-audit.mjs");
     expect(mobilePackage.scripts["e2e:store-assets:ios"]).toContain("CHESSTICIZE_CAPTURE_STORE_ASSETS=1");
+    expect(mobilePackage.scripts["e2e:build:ios:release"]).toContain("ios.sim.release");
+    expect(mobilePackage.scripts["e2e:store-assets:ios:release"]).toContain("CHESSTICIZE_CAPTURE_STORE_ASSETS=1");
+    expect(mobilePackage.scripts["e2e:store-assets:ios:release"]).toContain("ios.sim.release");
     expect(mobilePackage.scripts["e2e:store-assets:ios"]).toContain("e2e/store-assets.e2e.js");
     expect(mobilePackage.scripts["e2e:store-assets:ios"]).toContain("artifacts/store-assets");
     expect(storeAssetsE2e).toContain("describe.skip");
     expect(storeAssetsE2e).toContain("CHESSTICIZE_CAPTURE_STORE_ASSETS");
-    expect(storeAssetsDoc).toContain("pnpm mobile:e2e:store-assets:ios");
+    expect(storeAssetsE2e).toContain("app-store-01-practice-tab");
+    expect(storeAssetsE2e).toContain("app-store-06-arrow-duel");
+    expect(storeAssetsDoc).toContain("pnpm mobile:e2e:build:ios:release");
+    expect(storeAssetsDoc).toContain("pnpm mobile:e2e:store-assets:ios:release");
     expect(storeAssetsDoc).toContain("pnpm app-store:screenshot-audit");
     expect(storeAssetsDoc).toContain("scratch/store-assets/final/");
     expect(storeAssetsDoc).toContain("iphone-6.9");
     expect(storeAssetsDoc).toContain("iphone-6.1");
-    expect(storeAssetsDoc).toContain("app-store-05-mistake-review-analysis");
+    expect(storeAssetsDoc).toContain("ipad-13");
+    expect(storeAssetsDoc).toContain("app-store-04-settings-tab");
+    expect(storeAssetsDoc).toContain("app-store-05-standard-sprint");
   });
 
   it("marks the App Store plan store-assets item implementation complete", () => {

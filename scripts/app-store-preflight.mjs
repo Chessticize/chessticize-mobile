@@ -230,19 +230,26 @@ check(
 check(
   "Store screenshot capture flow is wired",
   rootPackage.scripts?.["mobile:e2e:store-assets:ios"]?.includes("e2e:store-assets:ios") &&
+    rootPackage.scripts?.["mobile:e2e:build:ios:release"]?.includes("e2e:build:ios:release") &&
+    rootPackage.scripts?.["mobile:e2e:store-assets:ios:release"]?.includes("e2e:store-assets:ios:release") &&
     rootPackage.scripts?.["app-store:screenshot-audit"] === "node scripts/app-store-screenshot-audit.mjs" &&
     mobilePackage.scripts?.["e2e:store-assets:ios"]?.includes("CHESSTICIZE_CAPTURE_STORE_ASSETS=1") &&
+    mobilePackage.scripts?.["e2e:build:ios:release"]?.includes("ios.sim.release") &&
+    mobilePackage.scripts?.["e2e:store-assets:ios:release"]?.includes("CHESSTICIZE_CAPTURE_STORE_ASSETS=1") &&
+    mobilePackage.scripts?.["e2e:store-assets:ios:release"]?.includes("ios.sim.release") &&
     mobilePackage.scripts?.["e2e:store-assets:ios"]?.includes("e2e/store-assets.e2e.js") &&
     mobilePackage.scripts?.["e2e:store-assets:ios"]?.includes("artifacts/store-assets") &&
     storeAssetsE2e.includes("CHESSTICIZE_CAPTURE_STORE_ASSETS") &&
     storeAssetsE2e.includes("describe.skip") &&
-    storeAssetsE2e.includes("app-store-01-practice-home") &&
-    storeAssetsE2e.includes("app-store-06-history") &&
+    storeAssetsE2e.includes("app-store-01-practice-tab") &&
+    storeAssetsE2e.includes("app-store-06-arrow-duel") &&
     storeAssets.includes("pnpm app-store:screenshot-audit") &&
     storeAssets.includes("iphone-6.9") &&
     storeAssets.includes("iphone-6.1") &&
-    storeAssets.includes("pnpm mobile:e2e:store-assets:ios") &&
-    storeAssets.includes("app-store-05-mistake-review-analysis"),
+    storeAssets.includes("ipad-13") &&
+    storeAssets.includes("pnpm mobile:e2e:store-assets:ios:release") &&
+    storeAssets.includes("app-store-04-settings-tab") &&
+    storeAssets.includes("app-store-05-standard-sprint"),
   "Store screenshot capture and final artifact audit must stay opt-in, documented, and wired to the named Detox capture spec."
 );
 

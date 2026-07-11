@@ -47,23 +47,25 @@ Chessticize Mobile is free and open source.
 ## Screenshot Requirements
 
 The app targets iPhone and iPad for 1.0. The current automated capture plan
-covers the required iPhone screenshots; iPad App Store screenshots need a
-dedicated capture pass before submission. The original 1.0 plan called out 6.7"
-and 6.1" minimum iPhone coverage.
-Apple's current screenshot reference, rechecked on 2026-07-04, lists 6.9" as
+covers the required 6.9" iPhone, 6.1" iPhone, and 13" iPad screenshot groups.
+The original 1.0 plan called out 6.7" and 6.1" minimum iPhone coverage.
+Apple's current screenshot reference, rechecked on 2026-07-10, lists 6.9" as
 the required iPhone display group when the app runs on iPhone, with accepted
 portrait sizes `1260 x 2736`, `1290 x 2796`, and `1320 x 2868` pixels. The
-current 6.1" group accepts portrait sizes
-including `1170 x 2532`, `1125 x 2436`, and `1080 x 2340` pixels.
+current 6.1" group accepts portrait sizes including `1170 x 2532`,
+`1125 x 2436`, and `1080 x 2340` pixels. Because the app runs on iPad, also
+capture a 13" iPad set; the accepted portrait sizes include `2064 x 2752` and
+`2048 x 2732` pixels.
 
 Release rule:
 
 1. Capture or export a complete 6.9" iPhone set first.
 2. Capture or export a 6.1" iPhone set as the compact verification set.
-3. If App Store Connect accepts scaled screenshots for intermediate iPhone
+3. Capture or export a 13" iPad set because Chessticize ships as an iPad app.
+4. If App Store Connect accepts scaled screenshots for intermediate iPhone
    groups, rely on Apple's scaling only after confirming the uploaded 6.9" and
    6.1" assets preview correctly.
-4. Do not upload debug screenshots that expose the development puzzle-source
+5. Do not upload debug screenshots that expose the development puzzle-source
    switch, Metro overlays, local paths, or user-private data.
 
 ## Bundled Puzzle Pack Measurement
@@ -82,14 +84,14 @@ per-bucket/theme counts. The artifact is published as the immutable
 ## Screenshot Set
 
 Use a release or production-like build, not a Metro debug screenshot. Capture
-the same six scenes for both required display groups:
+the same six scenes for each required display group:
 
-1. Practice home with local ratings and the bundled offline pack.
-2. Standard Puzzle Sprint with the board, timer, progress, and mistake counter.
-3. Arrow Duel with both candidate arrows visible.
-4. Post-sprint results with Review highlighted when mistakes exist.
-5. Mistake review with the Analysis panel and Stockfish candidate lines.
-6. History with All Puzzles, time range, and rating-key filters visible.
+1. Practice tab with local ratings and the bundled offline pack.
+2. Review tab showing the local review queue state.
+3. History tab showing performance and puzzle history.
+4. Settings tab showing local-only settings, source, and license context.
+5. Standard Puzzle Sprint with the board, timer, progress, and mistake counter.
+6. Arrow Duel with both candidate arrows visible.
 
 Save local raw captures under `scratch/store-assets/raw/`. The `scratch/`
 folder is ignored and may contain private iteration artifacts. Only commit
@@ -99,26 +101,32 @@ and named by display group.
 ## Automated Capture
 
 The Detox capture spec is opt-in so normal Mobile iOS CI does not spend time on
-store-asset screenshots. Build the app bundle, then run the capture flow for
-the simulator size you are validating:
+store-asset screenshots. Release screenshot capture must use the Release
+simulator app so development-only controls stay out of App Store assets. Build
+the Release app bundle, then run the capture flow for the simulator size you
+are validating:
 
 ```sh
-pnpm mobile:e2e:build:ios
-DETOX_IOS_DEVICE="iPhone 17 Pro Max" pnpm mobile:e2e:store-assets:ios
-DETOX_IOS_DEVICE="iPhone 17e" pnpm mobile:e2e:store-assets:ios
+DETOX_IOS_DEVICE="iPhone 17 Pro Max" pnpm mobile:e2e:build:ios:release
+DETOX_IOS_DEVICE="iPhone 17 Pro Max" pnpm mobile:e2e:store-assets:ios:release
+DETOX_IOS_DEVICE="iPhone 17e" pnpm mobile:e2e:store-assets:ios:release
+DETOX_IOS_DEVICE="iPad Pro 13-inch (M5)" pnpm mobile:e2e:store-assets:ios:release
 ```
+
+Set `CHESSTICIZE_IOS_PREPARE=1` when the local CocoaPods workspace or bundled
+gems need to be refreshed before building the Release simulator app.
 
 The script sets `CHESSTICIZE_CAPTURE_STORE_ASSETS=1` and captures these named
 Detox screenshots:
 
 | Screenshot name | Store scene |
 | --- | --- |
-| `app-store-01-practice-home` | Practice home with local ratings and bundled offline pack context. |
-| `app-store-02-standard-sprint` | Standard Puzzle Sprint board, timer, progress, and mistakes. |
-| `app-store-03-arrow-duel` | Arrow Duel board with both candidate choices available. |
-| `app-store-04-sprint-results` | Post-sprint result with mistake review available. |
-| `app-store-05-mistake-review-analysis` | Mistake review with Stockfish analysis lines. |
-| `app-store-06-history` | History with recorded wrong moves and performance context. |
+| `app-store-01-practice-tab` | Practice tab with local ratings and bundled offline pack context. |
+| `app-store-02-review-tab` | Review tab with the local review queue state. |
+| `app-store-03-history-tab` | History tab with performance and puzzle history context. |
+| `app-store-04-settings-tab` | Settings tab with local-only settings, source, and license context. |
+| `app-store-05-standard-sprint` | Standard Puzzle Sprint board, timer, progress, and mistakes. |
+| `app-store-06-arrow-duel` | Arrow Duel board with both candidate choices available. |
 
 Raw Detox artifacts are written under `apps/mobile/artifacts/store-assets/`.
 Move private iteration captures into `scratch/store-assets/raw/` if you need to
@@ -137,19 +145,26 @@ After final export or cropping, place the upload-ready screenshots under
 ```text
 scratch/store-assets/final/
   iphone-6.9/
-    app-store-01-practice-home.png
-    app-store-02-standard-sprint.png
-    app-store-03-arrow-duel.png
-    app-store-04-sprint-results.png
-    app-store-05-mistake-review-analysis.png
-    app-store-06-history.png
+    app-store-01-practice-tab.png
+    app-store-02-review-tab.png
+    app-store-03-history-tab.png
+    app-store-04-settings-tab.png
+    app-store-05-standard-sprint.png
+    app-store-06-arrow-duel.png
   iphone-6.1/
-    app-store-01-practice-home.png
-    app-store-02-standard-sprint.png
-    app-store-03-arrow-duel.png
-    app-store-04-sprint-results.png
-    app-store-05-mistake-review-analysis.png
-    app-store-06-history.png
+    app-store-01-practice-tab.png
+    app-store-02-review-tab.png
+    app-store-03-history-tab.png
+    app-store-04-settings-tab.png
+    app-store-05-standard-sprint.png
+    app-store-06-arrow-duel.png
+  ipad-13/
+    app-store-01-practice-tab.png
+    app-store-02-review-tab.png
+    app-store-03-history-tab.png
+    app-store-04-settings-tab.png
+    app-store-05-standard-sprint.png
+    app-store-06-arrow-duel.png
 ```
 
 Then run:
@@ -158,10 +173,16 @@ Then run:
 pnpm app-store:screenshot-audit
 ```
 
-The audit verifies that both required display groups are present, every named
+The audit verifies that the required iPhone and iPad display groups are present, every named
 scene exists exactly once per group, and each image is a `.png`, `.jpg`, or
 `.jpeg` file using one of Apple's accepted portrait sizes for that group. Use
 `-- --root PATH` to audit a different local export directory.
+
+Before upload, also do a manual visual pass on the 6.1" iPhone set, especially
+the iPhone 17e capture. The automated audit verifies dimensions and file
+coverage, but compact-width issues such as clipped filter chips, partially
+hidden labels, or controls cut off by the visible viewport require visual
+inspection.
 
 ## Capture Checklist
 

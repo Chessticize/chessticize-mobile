@@ -75,10 +75,14 @@ async function waitForElementTextContaining(testID, expected, timeoutMs) {
   const startedAt = Date.now();
   let lastText = '';
   while (Date.now() - startedAt < timeoutMs) {
-    const attributes = await element(by.id(testID)).getAttributes();
-    lastText = textFromAttributes(attributes);
-    if (lastText.includes(expected)) {
-      return;
+    try {
+      const attributes = await element(by.id(testID)).getAttributes();
+      lastText = textFromAttributes(attributes);
+      if (lastText.includes(expected)) {
+        return;
+      }
+    } catch (error) {
+      lastText = error?.message ?? String(error);
     }
     await sleep(500);
   }

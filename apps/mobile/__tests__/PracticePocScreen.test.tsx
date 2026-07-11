@@ -36,8 +36,11 @@ afterEach(() => {
 describe("PracticePocScreen", () => {
   it("exposes the mobile app shell automation contract", () => {
     const renderer = renderScreen();
+    const mainScroll = findByTestId(renderer, "practice-main-scroll");
 
     expect(findByTestId(renderer, "practice-tab")).toBeTruthy();
+    expect(mainScroll.props.showsHorizontalScrollIndicator).toBe(false);
+    expect(mainScroll.props.showsVerticalScrollIndicator).toBe(false);
     expect(findByTestId(renderer, "review-tab")).toBeTruthy();
     expect(findByTestId(renderer, "history-tab")).toBeTruthy();
     expect(findByTestId(renderer, "settings-tab")).toBeTruthy();
@@ -1680,6 +1683,7 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "history-chart-bar-0")).toThrow();
     expect(collectText(findByTestId(renderer, "history-chart-label"))).toBe("Rating");
     expect(findByTestId(renderer, "history-range-filters")).toBeTruthy();
+    expect(findByTestId(renderer, "history-range-filters").props.wrap).toBe(true);
     expect(collectText(findByTestId(renderer, "history-range-max"))).toBe("All Time");
     press(renderer, "history-range-max");
     expect(collectText(findByTestId(renderer, "history-performance-context"))).toBe("Standard · 20s pace · All Time");

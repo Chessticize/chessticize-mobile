@@ -7,12 +7,12 @@ const repoRoot = dirname(fileURLToPath(new URL("../package.json", import.meta.ur
 
 const defaultRoot = "scratch/store-assets/final";
 const expectedScenes = [
-  "app-store-01-practice-home",
-  "app-store-02-standard-sprint",
-  "app-store-03-arrow-duel",
-  "app-store-04-sprint-results",
-  "app-store-05-mistake-review-analysis",
-  "app-store-06-history"
+  "app-store-01-practice-tab",
+  "app-store-02-review-tab",
+  "app-store-03-history-tab",
+  "app-store-04-settings-tab",
+  "app-store-05-standard-sprint",
+  "app-store-06-arrow-duel"
 ];
 const requiredGroups = [
   {
@@ -31,6 +31,14 @@ const requiredGroups = [
       [1170, 2532],
       [1125, 2436],
       [1080, 2340]
+    ]
+  },
+  {
+    id: "ipad-13",
+    label: "13-inch iPad",
+    acceptedPortraitSizes: [
+      [2064, 2752],
+      [2048, 2732]
     ]
   }
 ];
