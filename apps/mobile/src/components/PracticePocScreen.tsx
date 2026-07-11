@@ -427,7 +427,6 @@ export function PracticePocScreen({
   const [sessionMistakeReviewItems, setSessionMistakeReviewItems] = useState<SessionMistakeReviewItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(() => currentTimeMs());
-  const [currentRating, setCurrentRating] = useState(600);
   const [resumableSprint, setResumableSprint] = useState<SprintState | null>(null);
   const [boardFen, setBoardFen] = useState<string | null>(null);
   const [lastBoardMove, setLastBoardMove] = useState<BoardMove | null>(null);
@@ -484,6 +483,7 @@ export function PracticePocScreen({
     [customDurationSeconds, customPerPuzzleSeconds, customSprintMode, customTheme, mode]
   );
   const selectedRatingRecord = service.getRating(selectedConfig.ratingKey);
+  const currentRating = selectedRatingRecord.rating;
   const customRatingPlayed = selectedRatingRecord.games > 0 ||
     sprintSessions.some((session) => session.ratingKey === selectedConfig.ratingKey && session.ratingAfter !== undefined) ||
     attempts.some((attempt) => attempt.ratingKey === selectedConfig.ratingKey && attempt.source === "sprint");
@@ -497,7 +497,6 @@ export function PracticePocScreen({
 
   useEffect(() => {
     const rating = service.getRating(selectedConfig.ratingKey);
-    setCurrentRating(rating.rating);
     if (selectedConfig.mode === "custom" || selectedConfig.mode === "arrow_duel") {
       setCustomInitialRating(rating.rating);
     }
@@ -673,7 +672,6 @@ export function PracticePocScreen({
     setReviewQueue(service.listReviewQueue());
     setDueReviewItems(service.getDueReviewItems(nowIso()));
     setReviewReminderPreference(service.getReviewReminderPreference());
-    setCurrentRating(readRating(service, selectedConfig.ratingKey));
     const activeSprint = service.getActiveSprint();
     setResumableSprint(
       activeSprint && (activeSprint.status === "active" || activeSprint.status === "paused") && stateRef.current?.id !== activeSprint.id
@@ -959,7 +957,6 @@ export function PracticePocScreen({
       setSessionMistakeReviewItems([]);
       commitState(started);
       setResumableSprint(null);
-      setCurrentRating(started.ratingBefore);
       commitBoardFen(started.currentPuzzle?.currentFen ?? null);
       setLastBoardMove(null);
       setFeedback(null);
@@ -1280,7 +1277,6 @@ export function PracticePocScreen({
       setSessionMistakeReviewItems([]);
       commitState(resumed);
       setResumableSprint(null);
-      setCurrentRating(resumed.ratingBefore);
       commitBoardFen(resumed.currentPuzzle?.currentFen ?? null);
       setLastBoardMove(null);
       setFeedback(null);
@@ -1768,7 +1764,7 @@ export function PracticePocScreen({
         perPuzzleSeconds: customPerPuzzleSeconds,
         ...(customThemeValue ? { theme: customThemeValue } : {})
       });
-  const sessionStatusNode = isOpenSession ? (
+  const sessionStatusNode = state && (isOpenSession || isShowingFeedbackSnapshot) ? (
     <SessionStatusBar
       compactMetrics={sessionUsesRail}
       mode={mode}
@@ -2003,7 +1999,6 @@ export function PracticePocScreen({
                       if (customRatingPlayed) {
                         const next = service.setRating(selectedConfig.ratingKey, nextRating);
                         setCustomInitialRating(next.rating);
-                        setCurrentRating(next.rating);
                         setSettingsRevision((current) => current + 1);
                         return;
                       }
@@ -2246,8 +2241,8 @@ function SprintStartHeader({
 }): React.JSX.Element {
   return (
     <View style={styles.sprintScreenHeader} testID={headerTestID}>
-      <View style={styles.sprintHeaderSideSlot}>
-        {onClose ? (
+      {onClose ? (
+        <View style={styles.sprintHeaderSideSlot}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={closeAccessibilityLabel}
@@ -2257,10 +2252,10 @@ function SprintStartHeader({
           >
             <CloseGlyph />
           </Pressable>
-        ) : null}
-      </View>
-      <View style={styles.sprintHeaderTitleBlock}>
-        <Text style={styles.sprintScreenTitle} testID={titleTestID}>{title}</Text>
+        </View>
+      ) : null}
+      <View style={[styles.sprintHeaderTitleBlock, !onClose ? styles.sprintHeaderTitleBlockLeading : null]}>
+        <Text style={[styles.sprintScreenTitle, !onClose ? styles.sprintScreenTitleLeading : null]} testID={titleTestID}>{title}</Text>
       </View>
       <Pressable
         accessibilityRole="button"
@@ -4448,8 +4443,9 @@ function HistoryRatingLineChart({
             <View
               style={[
                 styles.historyLineTooltip,
-                selectedX > plotWidth / 2 ? { right: Math.max(0, plotWidth - selectedX - 8) } : { left: Math.max(0, selectedX + 8) }
+                selectedX > plotWidth / 2 ? styles.historyLineTooltipLeft : styles.historyLineTooltipRight
               ]}
+              pointerEvents="none"
               testID="history-chart-tooltip"
             >
               <Text style={styles.historyLineTooltipRating}>Rating {selectedPoint.value}</Text>
@@ -9462,11 +9458,17 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center"
   },
+  sprintHeaderTitleBlockLeading: {
+    alignItems: "flex-start"
+  },
   sprintScreenTitle: {
     color: "#111827",
     fontSize: 17,
     fontWeight: "800",
     textAlign: "center"
+  },
+  sprintScreenTitleLeading: {
+    textAlign: "left"
   },
   sprintHeaderStartButton: {
     alignItems: "center",
@@ -10410,6 +10412,12 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     position: "absolute",
     top: 0
+  },
+  historyLineTooltipLeft: {
+    left: 0
+  },
+  historyLineTooltipRight: {
+    right: 0
   },
   historyLineTooltipRating: {
     color: "#FFFFFF",
