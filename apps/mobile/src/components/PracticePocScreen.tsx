@@ -98,8 +98,17 @@ import {
   type ICloudProgressSyncClient
 } from "../backend/iCloudProgressSync.ts";
 import { arePracticeTestControlsEnabled, isPracticeDebugEnabled } from "../releaseConfig.ts";
+import {
+  canonicalFen,
+  decidePremoveQueue,
+  fenAfterMove,
+  fenAfterMoves,
+  normalizeUci,
+  planPremoveReplay,
+  type BoardInputLockMode
+} from "../backend/premove.ts";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Chess, type PieceSymbol, type Square } from "chess.js";
+import { Chess, type Move, type PieceSymbol, type Square } from "chess.js";
 
 interface Props {
   practiceService?: PracticeService;
@@ -155,7 +164,9 @@ export type PracticeDebugTraceEvent = {
     | "fen-mismatch"
     | "illegal-move"
     | "move-ignored"
-    | "move-submitted";
+    | "move-submitted"
+    | "premove-queued"
+    | "premove-replay";
   move?: string;
   reason?: string;
   puzzleId?: string | null;
@@ -180,6 +191,16 @@ type MoveSide = "w" | "b";
 
 type BoardMoveContext = {
   puzzleId: string | null;
+};
+
+type PendingPremove = {
+  puzzleId: string;
+  move: string;
+  // Set when the board already validated and applied the move internally (it
+  // arrived through onMove while locked). Replay must re-dispatch this stored
+  // result instead of playing the move on the board a second time.
+  result: MoveResult | null;
+  context: BoardMoveContext;
 };
 
 type FeedbackBoardSnapshot = {
@@ -209,7 +230,11 @@ const ARROW_VISUAL_STYLES = {
   }
 } as const;
 const FEEDBACK_SNAPSHOT_MS = 800;
-const USER_FEEDBACK_BEFORE_AUTO_MS = 260;
+// Brief pause so the correct-move feedback registers before the opponent
+// reply animates. Kept short — the reply window delays the user's next move.
+const USER_FEEDBACK_BEFORE_AUTO_MS = 120;
+// Shared by the practice and review boards so they animate at the same speed.
+const BOARD_MOVE_ANIMATION_MS = 200;
 const ANALYSIS_DEPTH = 20;
 const CUSTOM_DURATION_OPTIONS = [3 * 60, 5 * 60, 10 * 60] as const;
 const CUSTOM_PER_PUZZLE_OPTIONS = [10, 20, 30] as const;
@@ -375,6 +400,8 @@ export function PracticePocScreen({
   const suppressedBoardMovesRef = useRef<string[]>([]);
   const boardSyncInProgressRef = useRef(false);
   const boardInputLockedRef = useRef(false);
+  const boardInputLockModeRef = useRef<BoardInputLockMode>("hard");
+  const pendingPremoveRef = useRef<PendingPremove | null>(null);
   const boardVisualFenRef = useRef<string | null>(null);
   const feedbackSnapshotTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reminderScheduleKeyRef = useRef<string | null>(null);
@@ -407,6 +434,7 @@ export function PracticePocScreen({
   const [feedbackPuzzleId, setFeedbackPuzzleId] = useState<string | null>(null);
   const [feedbackSnapshot, setFeedbackSnapshot] = useState<FeedbackBoardSnapshot | null>(null);
   const [boardInputLocked, setBoardInputLocked] = useState(false);
+  const [boardInputLockMode, setBoardInputLockMode] = useState<BoardInputLockMode>("hard");
   const [chessboardDebugEvents, setChessboardDebugEvents] = useState<string[]>([]);
   const [historyTimeRange, setHistoryTimeRange] = useState<HistoryTimeRange>("7d");
   const [historySourceFilter, setHistorySourceFilter] = useState<"all" | AttemptSource>("all");
@@ -464,6 +492,7 @@ export function PracticePocScreen({
   boardFenRef.current = boardFen;
   feedbackSnapshotRef.current = feedbackSnapshot;
   boardInputLockedRef.current = boardInputLocked;
+  boardInputLockModeRef.current = boardInputLockMode;
   nowMsRef.current = nowMs;
 
   useEffect(() => {
@@ -863,9 +892,22 @@ export function PracticePocScreen({
     setFeedbackSnapshot(nextSnapshot);
   }
 
-  function commitBoardInputLocked(nextLocked: boolean, reason: string, puzzleId?: string | null): void {
+  function commitBoardInputLocked(
+    nextLocked: boolean,
+    reason: string,
+    puzzleId?: string | null,
+    mode: BoardInputLockMode = "hard"
+  ): void {
+    const nextMode = nextLocked ? mode : "hard";
+    if (nextLocked && mode === "hard") {
+      // A hard lock (submit, pause, feedback snapshot) invalidates any premove
+      // captured during a reply animation that never got replayed.
+      pendingPremoveRef.current = null;
+    }
     boardInputLockedRef.current = nextLocked;
+    boardInputLockModeRef.current = nextMode;
     setBoardInputLocked(nextLocked);
+    setBoardInputLockMode(nextMode);
     emitTrace({
       type: "board-lock",
       reason,
@@ -922,6 +964,7 @@ export function PracticePocScreen({
       setLastBoardMove(null);
       setFeedback(null);
       setFeedbackPuzzleId(null);
+      pendingPremoveRef.current = null;
       commitBoardInputLocked(false, "start", started.currentPuzzle?.puzzle.id ?? null);
       clearFeedbackSnapshot();
       setTab("practice");
@@ -1025,6 +1068,9 @@ export function PracticePocScreen({
       return;
     }
     if (boardSyncInProgressRef.current || boardInputLockedRef.current) {
+      if (queuePremoveIfOpen(move, result, context)) {
+        return;
+      }
       resetBoardToFen(
         boardVisualFenRef.current ?? activeState.currentPuzzle?.currentFen,
         "board-locked",
@@ -1161,6 +1207,9 @@ export function PracticePocScreen({
     const activeState = stateRef.current;
     const move = `${from}${to}`;
     if (boardSyncInProgressRef.current || boardInputLockedRef.current) {
+      if (queuePremoveIfOpen(move, null, context)) {
+        return;
+      }
       const activePuzzle = activeState?.status === "active" ? activeState.currentPuzzle : undefined;
       resetBoardToFen(
         boardVisualFenRef.current ?? activePuzzle?.currentFen,
@@ -1214,6 +1263,7 @@ export function PracticePocScreen({
     setFeedbackPuzzleId(null);
     clearFeedbackSnapshot();
     setError(null);
+    pendingPremoveRef.current = null;
     commitBoardInputLocked(false, "reset", null);
     commitBoardFen(null);
     setLastBoardMove(null);
@@ -1326,16 +1376,192 @@ export function PracticePocScreen({
   ): Promise<void> {
     const nextFen = nextState.currentPuzzle?.currentFen ?? null;
     const autoMoves = nextFeedback?.autoPlayedMoves ?? [];
+    const puzzleId = nextState.currentPuzzle?.puzzle.id ?? null;
     boardSyncInProgressRef.current = true;
-    commitBoardInputLocked(true, "opponent-reply", nextState.currentPuzzle?.puzzle.id ?? null);
+    commitBoardInputLocked(true, "opponent-reply", puzzleId, "premove");
     try {
-      await sleep(USER_FEEDBACK_BEFORE_AUTO_MS);
-      setFeedback(null);
-      setFeedbackPuzzleId(null);
-      await animateBoardMoves(autoMoves, nextFen);
+      try {
+        await sleep(USER_FEEDBACK_BEFORE_AUTO_MS);
+        setFeedback(null);
+        setFeedbackPuzzleId(null);
+        await animateBoardMoves(autoMoves, nextFen);
+      } finally {
+        boardSyncInProgressRef.current = false;
+        // A hard lock taken mid-animation (pause, app background) owns the
+        // board now and must survive this window's unlock.
+        if (boardInputLockModeRef.current === "premove") {
+          commitBoardInputLocked(false, "opponent-reply-complete", puzzleId);
+        }
+      }
+      if (!boardInputLockedRef.current) {
+        await replayQueuedPremove(puzzleId);
+      }
     } finally {
-      boardSyncInProgressRef.current = false;
-      commitBoardInputLocked(false, "opponent-reply-complete", nextState.currentPuzzle?.puzzle.id ?? null);
+      // Whatever interrupted the window (animation error, hard lock), no
+      // stale intent may survive to replay against a later position.
+      pendingPremoveRef.current = null;
+    }
+  }
+
+  // During the opponent-reply animation the board stays interactive. A move
+  // the user makes in that window is queued here and replayed as soon as the
+  // reply settles, so fast play never gets swallowed. Only the latest playable
+  // intent is kept, mirroring premove semantics; junk drags are swallowed
+  // without evicting a queued premove.
+  function queuePremoveIfOpen(move: string, result: MoveResult | null, context: BoardMoveContext): boolean {
+    const activeState = stateRef.current;
+    const isActive = activeState?.status === "active";
+    const activePuzzleId = isActive ? activeState.currentPuzzle?.puzzle.id ?? null : null;
+    const decision = decidePremoveQueue({
+      lockMode: boardInputLockModeRef.current,
+      activePuzzleId,
+      contextPuzzleId: context.puzzleId,
+      replyFen: isActive ? activeState.currentPuzzle?.currentFen ?? null : null,
+      move,
+      boardApplied: result !== null
+    });
+    if (decision.action === "not-open") {
+      return false;
+    }
+    if (decision.action === "ignore") {
+      emitTrace({
+        type: "move-ignored",
+        reason: "premove-illegal-intent",
+        move,
+        contextPuzzleId: context.puzzleId,
+        puzzleId: activePuzzleId
+      });
+      return true;
+    }
+    pendingPremoveRef.current = { puzzleId: activePuzzleId as string, move: decision.move, result, context };
+    emitTrace({
+      type: "premove-queued",
+      reason: result ? "board-applied" : "pending-board",
+      move: decision.move,
+      contextPuzzleId: context.puzzleId,
+      puzzleId: activePuzzleId
+    });
+    return true;
+  }
+
+  async function replayQueuedPremove(puzzleId: string | null): Promise<void> {
+    // A premove played through the board fires onMove while this function
+    // re-holds the premove lock; that echo re-queues as a board-applied
+    // intent which the next pass dispatches. The cap guards against a user
+    // replacing the intent on every pass.
+    for (let pass = 0; pass < 4; pass += 1) {
+      const pending = pendingPremoveRef.current;
+      pendingPremoveRef.current = null;
+      const activeState = stateRef.current;
+      const isActive = activeState?.status === "active";
+      const replyFen = isActive ? activeState.currentPuzzle?.currentFen ?? null : null;
+      const plan = planPremoveReplay({
+        pending: pending
+          ? { puzzleId: pending.puzzleId, move: pending.move, boardApplied: pending.result !== null }
+          : null,
+        activePuzzleId: isActive ? activeState.currentPuzzle?.puzzle.id ?? null : null,
+        replyFen,
+        boardFenNow: boardRef.current?.getState?.().fen ?? null
+      });
+      if (plan.action === "none") {
+        return;
+      }
+      if (plan.action === "drop") {
+        if (plan.reason === "not-legal" && plan.resetFen) {
+          resetBoardToFen(plan.resetFen, "premove-not-legal", puzzleId, pending?.move);
+          commitBoardFen(plan.resetFen);
+        }
+        emitTrace({
+          type: "move-ignored",
+          reason: plan.reason === "stale" ? "premove-stale" : "premove-not-legal",
+          move: pending?.move,
+          puzzleId
+        });
+        return;
+      }
+      emitTrace({
+        type: "premove-replay",
+        reason: plan.action === "dispatch-result" ? "board-applied" : "pending-board",
+        move: pending?.move,
+        puzzleId
+      });
+      if (plan.action === "dispatch-result" && pending?.result) {
+        // The board accepted this move mid-animation, so its internal
+        // position already includes it. The drop can race the reply
+        // animation's square commits, so re-sync the sprites to the
+        // post-premove position, and align the fen prop with it — the board
+        // hard-resets whenever the fen prop changes, so leaving the reply
+        // fen pending would rewind the premove at the next render. The
+        // dispatch below re-enters the normal submit path synchronously, so
+        // no gesture can slip in while the board is unlocked.
+        resetBoardToFen(plan.appliedFen, "premove-replay", puzzleId, pending.move);
+        commitBoardFen(plan.appliedFen);
+        await onBoardMove(pending.result, pending.context);
+        return;
+      }
+      if (plan.action !== "play") {
+        return;
+      }
+      // The drop happened before the reply reached the board's internal
+      // state, so the board never applied it. Play it through the board while
+      // re-holding the premove lock — the replay animation must not leave the
+      // board open to unlocked gesture handlers mid-flight.
+      if (plan.resyncFen) {
+        resetBoardToFen(plan.resyncFen, "premove-resync", puzzleId, plan.move);
+      }
+      if (plan.appliedFen) {
+        // Align the fen prop with the post-premove position before the board
+        // applies it, so the fen-change hard reset cannot rewind the replayed
+        // move while its animation is still settling. appliedFen is null for
+        // bare promotion intents, whose dialog collects the piece here.
+        commitBoardFen(plan.appliedFen);
+      }
+      const boardMove = arrowFromTo(plan.move);
+      let played: Move | undefined;
+      boardSyncInProgressRef.current = true;
+      commitBoardInputLocked(true, "premove-replay", puzzleId, "premove");
+      try {
+        played = boardMove
+          ? await boardRef.current?.move({
+            from: boardMove.from as Square,
+            to: boardMove.to as Square,
+            ...(boardMove.promotion ? { promotion: boardMove.promotion as PieceSymbol } : {})
+          })
+          : undefined;
+      } finally {
+        boardSyncInProgressRef.current = false;
+        if (boardInputLockModeRef.current === "premove") {
+          commitBoardInputLocked(false, "premove-replay-complete", puzzleId);
+        }
+      }
+      if (!played) {
+        resetBoardToFen(replyFen, "premove-not-legal", puzzleId, plan.move);
+        commitBoardFen(replyFen);
+        emitTrace({
+          type: "move-ignored",
+          reason: "premove-not-legal",
+          move: plan.move,
+          puzzleId
+        });
+        return;
+      }
+      if (boardInputLockedRef.current) {
+        // A hard lock landed during the replay animation; its owner controls
+        // the board now.
+        return;
+      }
+      // The board applied the replayed move and its onMove echo queued a
+      // board-applied intent (or the user replaced it); dispatch on the next
+      // pass.
+    }
+    if (pendingPremoveRef.current) {
+      emitTrace({
+        type: "move-ignored",
+        reason: "premove-replay-limit",
+        move: pendingPremoveRef.current.move,
+        puzzleId
+      });
+      pendingPremoveRef.current = null;
     }
   }
 
@@ -1435,7 +1661,18 @@ export function PracticePocScreen({
   const boardFlipped = displayedPuzzle ? shouldFlipBoard(displayedPuzzle) : false;
   const feedbackForCurrentPuzzle = feedbackPuzzleId && currentPuzzle?.puzzle.id === feedbackPuzzleId ? feedback : null;
   const boardFeedback = feedbackSnapshot?.feedback ?? feedbackForCurrentPuzzle;
-  const boardGestureEnabled = Boolean(isActive && !isShowingFeedbackSnapshot && !boardInputLocked);
+  const boardPremoveWindow = boardInputLocked && boardInputLockMode === "premove";
+  // While board input is locked, quick drags aimed at the board must not pan
+  // the screen. The board's own pan gesture claims touches while enabled, but
+  // hard-lock windows disable it (and fast drags can start on the padding), so
+  // freeze the surrounding scroll view for the lock's duration.
+  const practiceScrollLocked = shouldShowSessionBoard && (boardInputLocked || isShowingFeedbackSnapshot);
+  const boardGestureEnabled = Boolean(
+    isActive && !isShowingFeedbackSnapshot && (!boardInputLocked || boardPremoveWindow)
+  );
+  // During the premove window currentFen is already the post-reply position,
+  // so this resolves to the user's side and opponent pieces stay undraggable
+  // while the reply animates.
   const boardDraggableColor = boardGestureEnabled && currentPuzzle
     ? sideToMove(currentPuzzle.currentFen)
     : null;
@@ -1574,7 +1811,7 @@ export function PracticePocScreen({
             flipped={boardFlipped}
             withLetters={false}
             withNumbers={false}
-            durations={{ move: 260 }}
+            durations={{ move: BOARD_MOVE_ANIMATION_MS }}
             spriteSource={CHESS_PIECE_SPRITE}
             colors={{
               white: BOARD_COLOR_TOKENS.white,
@@ -1689,6 +1926,7 @@ export function PracticePocScreen({
 
           <ScrollView
             testID="practice-main-scroll"
+            scrollEnabled={!practiceScrollLocked}
             contentContainerStyle={[
               styles.content,
               adaptiveLayout.usesWideContent ? styles.contentWide : null,
@@ -6055,7 +6293,7 @@ function ReviewSession({
               flipped={boardFlipped}
               withLetters={false}
               withNumbers={false}
-              durations={{ move: 260 }}
+              durations={{ move: BOARD_MOVE_ANIMATION_MS }}
               spriteSource={CHESS_PIECE_SPRITE}
               colors={{
                 white: BOARD_COLOR_TOKENS.white,
@@ -6463,10 +6701,6 @@ function perPuzzleSecondsForReviewEntry(entry: ReviewEntry): number {
     return Number(fromRatingKey);
   }
   return defaultSprintConfig(entry.mode).perPuzzleSeconds;
-}
-
-function normalizeUci(move: string): string {
-  return move.trim().toLowerCase();
 }
 
 function reviewReminderScheduleStatusLabel(
@@ -7941,32 +8175,6 @@ function moveResultMatchesExpectedFen(result: MoveResult, expectedFen: string | 
   return canonicalFen(result.state.fen) === canonicalFen(expectedFen);
 }
 
-function fenAfterMove(fen: string, move: string): string | null {
-  try {
-    const chess = new Chess(fen);
-    const normalized = move.trim().toLowerCase();
-    const played = chess.move({
-      from: normalized.slice(0, 2),
-      to: normalized.slice(2, 4),
-      ...(normalized.length > 4 ? { promotion: normalized.slice(4, 5) } : {})
-    });
-    return played ? chess.fen() : null;
-  } catch {
-    return null;
-  }
-}
-
-function fenAfterMoves(fen: string, moves: string[]): string | null {
-  let currentFen: string | null = fen;
-  for (const move of moves) {
-    if (!currentFen) {
-      return null;
-    }
-    currentFen = fenAfterMove(currentFen, move);
-  }
-  return currentFen;
-}
-
 function sanForDiagnosticMove(fen: string, move: string): string {
   try {
     const chess = new Chess(fen);
@@ -8002,10 +8210,6 @@ function diagnosticPvSan(fen: string, pv: string[]): string {
     }
   }
   return sanMoves.join(" ") || pv.join(" ");
-}
-
-function canonicalFen(fen: string): string {
-  return fen.trim().split(/\s+/).join(" ");
 }
 
 function shouldFlipBoard(currentPuzzle: CurrentPuzzleState): boolean {
