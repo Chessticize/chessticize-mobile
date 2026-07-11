@@ -134,7 +134,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "practice-header-title"))).toBe("Start a Sprint");
   });
 
-  it("selects Arrow Duel on the home screen before starting from the header action", () => {
+  it("selects Arrow Duel and shows a loading transition before starting from the header action", () => {
     const service = createMobilePracticeService("familiar15");
     service.setRating(defaultSprintConfig("arrow_duel").ratingKey, 900);
     const renderer = renderScreen({ practiceService: service });
@@ -152,6 +152,15 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "practice-start-button").props.accessibilityLabel).toBe("Start Arrow Duel sprint");
     press(renderer, "practice-start-button");
 
+    expect(findByTestId(renderer, "sprint-loading-overlay").props.accessibilityLabel).toBe("Preparing Arrow Duel sprint");
+    expect(findByTestId(renderer, "sprint-loading-spinner")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "sprint-loading-overlay"))).toContain("Preparing Arrow Duel");
+    expect(() => findByTestId(renderer, "session-board")).toThrow();
+    act(() => {
+      jest.advanceTimersByTime(200);
+    });
+
+    expect(() => findByTestId(renderer, "sprint-loading-overlay")).toThrow();
     expect(findByTestId(renderer, "session-board")).toBeTruthy();
   });
 
@@ -1435,6 +1444,11 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "start-sprint-button").props.accessibilityState).toEqual({ disabled: false });
 
     press(renderer, "start-sprint-button");
+
+    expect(findByTestId(renderer, "sprint-loading-overlay")).toBeTruthy();
+    act(() => {
+      jest.advanceTimersByTime(200);
+    });
 
     expect(findByTestId(renderer, "session-board")).toBeTruthy();
     expectText(renderer, "Arrow Duel");
@@ -3632,6 +3646,9 @@ function startStandardSprint(renderer: TestRenderer.ReactTestRenderer): void {
 function startArrowDuelSprint(renderer: TestRenderer.ReactTestRenderer): void {
   press(renderer, "practice-mode-arrow-duel");
   press(renderer, "practice-start-button");
+  act(() => {
+    jest.advanceTimersByTime(200);
+  });
 }
 
 function abandonSprint(renderer: TestRenderer.ReactTestRenderer): void {

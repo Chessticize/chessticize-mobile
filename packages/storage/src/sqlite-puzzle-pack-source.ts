@@ -23,17 +23,20 @@ const MAX_SQL_ID_FILTER_VALUES = 900;
 export interface SQLitePuzzlePackSourceOptions {
   candidateMultiplier?: number;
   candidateFloor?: number;
+  allPuzzlesArrowDuelEligible?: boolean;
 }
 
 export class SQLitePuzzlePackSource implements PuzzleSource {
   private readonly db: SyncSqliteDatabase;
   private readonly candidateMultiplier: number;
   private readonly candidateFloor: number;
+  private readonly allPuzzlesArrowDuelEligible: boolean;
 
   constructor(db: SyncSqliteDatabase, options: SQLitePuzzlePackSourceOptions = {}) {
     this.db = db;
     this.candidateMultiplier = options.candidateMultiplier ?? 50;
     this.candidateFloor = options.candidateFloor ?? 200;
+    this.allPuzzlesArrowDuelEligible = options.allPuzzlesArrowDuelEligible ?? false;
   }
 
   countPuzzles(): number {
@@ -55,6 +58,7 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
       puzzles: this.queryCandidates(filter),
       mode: filter.mode,
       limit: filter.limit,
+      ...(this.allPuzzlesArrowDuelEligible ? { allPuzzlesArrowDuelEligible: true } : {}),
       ...(filter.rating === undefined ? {} : { rating: filter.rating }),
       ...(filter.minRating === undefined ? {} : { minRating: filter.minRating }),
       ...(filter.maxRating === undefined ? {} : { maxRating: filter.maxRating }),
@@ -94,6 +98,7 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
         puzzles: this.queryCandidates(candidateFilter),
         mode: filter.mode,
         limit: filter.limit - selected.length,
+        ...(this.allPuzzlesArrowDuelEligible ? { allPuzzlesArrowDuelEligible: true } : {}),
         minRating: strategy.minRating,
         maxRating: strategy.maxRating,
         ...(strategy.themes.length === 0 ? {} : { theme: strategy.themes[0] }),
@@ -152,7 +157,7 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
     params.push(this.candidateLimit(filter.limit, filter.randomSeed !== undefined || hasInMemoryIdFilter));
     const rows = this.db.prepare(sql).all(...params) as PuzzlePackRow[];
     const puzzles = rows.map((row) => this.puzzleFromRow(row));
-    if (filter.mode === "arrow_duel") {
+    if (filter.mode === "arrow_duel" && !this.allPuzzlesArrowDuelEligible) {
       return puzzles.filter(isServerCompatibleArrowDuelPuzzle);
     }
     return puzzles;

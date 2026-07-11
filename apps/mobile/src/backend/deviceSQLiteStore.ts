@@ -1,6 +1,9 @@
 import { open, type DB, type Scalar } from "@op-engineering/op-sqlite";
 import { NativeModules, Platform } from "react-native";
-import { SQLitePuzzlePackSource } from "../../../../packages/storage/src/sqlite-puzzle-pack-source.ts";
+import {
+  SQLitePuzzlePackSource,
+  type SQLitePuzzlePackSourceOptions
+} from "../../../../packages/storage/src/sqlite-puzzle-pack-source.ts";
 import {
   SyncSQLiteStore,
   type SyncSqliteDatabase,
@@ -20,8 +23,11 @@ export class DeviceSQLiteStore extends SyncSQLiteStore {
     return new DeviceSQLiteStore(open({ name }));
   }
 
-  static async openReadOnlyPuzzlePack(name = "bundled-core-pack.sqlite"): Promise<SQLitePuzzlePackSource> {
-    const bundledPack = DeviceSQLiteStore.openBundledReadOnlyPuzzlePack(name);
+  static async openReadOnlyPuzzlePack(
+    name = "bundled-core-pack.sqlite",
+    options: SQLitePuzzlePackSourceOptions = {}
+  ): Promise<SQLitePuzzlePackSource> {
+    const bundledPack = DeviceSQLiteStore.openBundledReadOnlyPuzzlePack(name, options);
     if (bundledPack) {
       return bundledPack;
     }
@@ -30,16 +36,23 @@ export class DeviceSQLiteStore extends SyncSQLiteStore {
     if (!copied) {
       throw new Error(`Bundled puzzle pack could not be copied: ${name}`);
     }
-    return new SQLitePuzzlePackSource(new OPSqliteDatabase(open({ name, readOnly: true } as Parameters<typeof open>[0] & { readOnly: boolean })));
+    return new SQLitePuzzlePackSource(
+      new OPSqliteDatabase(open({ name, readOnly: true } as Parameters<typeof open>[0] & { readOnly: boolean })),
+      options
+    );
   }
 
-  static openBundledReadOnlyPuzzlePack(name = "bundled-core-pack.sqlite"): SQLitePuzzlePackSource | undefined {
+  static openBundledReadOnlyPuzzlePack(
+    name = "bundled-core-pack.sqlite",
+    options: SQLitePuzzlePackSourceOptions = {}
+  ): SQLitePuzzlePackSource | undefined {
     const iosBundleLocation = Platform.OS === "ios" ? bundledJsDirectory() : undefined;
     if (!iosBundleLocation) {
       return undefined;
     }
     return new SQLitePuzzlePackSource(
-      new OPSqliteDatabase(open({ name, location: iosBundleLocation, readOnly: true } as Parameters<typeof open>[0] & { readOnly: boolean }))
+      new OPSqliteDatabase(open({ name, location: iosBundleLocation, readOnly: true } as Parameters<typeof open>[0] & { readOnly: boolean })),
+      options
     );
   }
 

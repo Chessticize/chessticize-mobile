@@ -9,6 +9,9 @@ const regressionPuzzles = require("../../../../fixtures/puzzles/presolved-1000.j
 
 export type MobilePuzzleSource = "bundledCore" | "familiar15" | "random1000";
 const DEFAULT_PUZZLE_SOURCE: MobilePuzzleSource = "bundledCore";
+const BUNDLED_CORE_PACK_OPTIONS = {
+  allPuzzlesArrowDuelEligible: bundledCoreManifest.arrowDuelCount === bundledCoreManifest.puzzleCount
+} as const;
 
 const FAMILIAR_PUZZLE_IDS = [
   "000hf",
@@ -76,7 +79,10 @@ export function createPersistentMobilePracticeServiceSync(): PracticeService | u
   return createPersistentService(
     userStore,
     new LazyPuzzleSource(() => {
-      const source = DeviceSQLiteStore.openBundledReadOnlyPuzzlePack("bundled-core-pack.sqlite");
+      const source = DeviceSQLiteStore.openBundledReadOnlyPuzzlePack(
+        "bundled-core-pack.sqlite",
+        BUNDLED_CORE_PACK_OPTIONS
+      );
       if (!source) {
         throw new Error("Bundled puzzle pack is unavailable");
       }
@@ -93,7 +99,10 @@ async function createPersistentMobilePracticeServiceImpl(): Promise<PracticeServ
   const { DeviceSQLiteStore } = require("./deviceSQLiteStore.ts") as typeof import("./deviceSQLiteStore.ts");
   const userStore = DeviceSQLiteStore.open("chessticize-mobile.sqlite");
   userStore.migrate();
-  const packSource = await DeviceSQLiteStore.openReadOnlyPuzzlePack("bundled-core-pack.sqlite");
+  const packSource = await DeviceSQLiteStore.openReadOnlyPuzzlePack(
+    "bundled-core-pack.sqlite",
+    BUNDLED_CORE_PACK_OPTIONS
+  );
   return createPersistentService(userStore, packSource);
 }
 

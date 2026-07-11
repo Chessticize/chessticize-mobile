@@ -8,6 +8,7 @@ export interface SelectUniquePuzzlesInput {
   puzzles: Puzzle[];
   mode: SprintMode;
   limit: number;
+  allPuzzlesArrowDuelEligible?: boolean;
   rating?: number;
   minRating?: number;
   maxRating?: number;
@@ -43,6 +44,9 @@ function selectPuzzlesByServerEloFallback(input: SelectUniquePuzzlesInput & { ra
         puzzles: input.puzzles,
         mode: input.mode,
         limit: input.limit - selected.length,
+        ...(input.allPuzzlesArrowDuelEligible === undefined
+          ? {}
+          : { allPuzzlesArrowDuelEligible: input.allPuzzlesArrowDuelEligible }),
         minRating: strategy.minRating,
         maxRating: strategy.maxRating,
         ...(strategy.themes.length === 0 ? {} : { theme: strategy.themes[0] }),
@@ -104,6 +108,9 @@ function isEligiblePuzzle(
     return false;
   }
   if (filter.mode !== "arrow_duel") {
+    return true;
+  }
+  if (filter.allPuzzlesArrowDuelEligible) {
     return true;
   }
 

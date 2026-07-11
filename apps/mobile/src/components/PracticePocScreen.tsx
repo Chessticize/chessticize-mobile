@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   AppState,
   Linking,
   Pressable,
@@ -241,6 +242,7 @@ const CUSTOM_PER_PUZZLE_OPTIONS = [10, 20, 30] as const;
 const CUSTOM_INITIAL_RATING_MIN = 600;
 const CUSTOM_INITIAL_RATING_MAX = 2200;
 const CUSTOM_INITIAL_RATING_STEP = 100;
+const ARROW_DUEL_LOADING_TRANSITION_MS = 200;
 const CUSTOM_THEME_OPTIONS: ReadonlyArray<CustomThemeFilter> = [
   "mixed",
   "mate",
@@ -404,6 +406,8 @@ export function PracticePocScreen({
   const pendingPremoveRef = useRef<PendingPremove | null>(null);
   const boardVisualFenRef = useRef<string | null>(null);
   const feedbackSnapshotTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sprintStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startingModeRef = useRef<SprintMode | null>(null);
   const reminderScheduleKeyRef = useRef<string | null>(null);
   const scheduledReviewAttemptCountRef = useRef(scheduledReviewAttemptCount(service));
   const reviewReminderPromptDismissedRef = useRef(false);
@@ -416,6 +420,7 @@ export function PracticePocScreen({
   const insets = useSafeAreaInsets();
 
   const [mode, setMode] = useState<SprintMode>("standard");
+  const [startingMode, setStartingMode] = useState<SprintMode | null>(null);
   const [tab, setTab] = useState<Tab>("practice");
   const [state, setState] = useState<SprintState | null>(null);
   const [feedback, setFeedback] = useState<SessionFeedback>(null);
@@ -648,6 +653,10 @@ export function PracticePocScreen({
     };
     return () => {
       clearFeedbackSnapshotTimer();
+      if (sprintStartTimerRef.current) {
+        clearTimeout(sprintStartTimerRef.current);
+        sprintStartTimerRef.current = null;
+      }
       globals.__CHESSTICIZE_CHESSBOARD_DEBUG__ = undefined;
       globals.__CHESSTICIZE_CHESSBOARD_DEBUG_SINK__ = undefined;
     };
@@ -936,6 +945,22 @@ export function PracticePocScreen({
   }
 
   function startSprint(nextMode: SprintMode = mode, useCustomTiming = nextMode === "custom"): void {
+    if (startingModeRef.current !== null) {
+      return;
+    }
+    if (nextMode === "arrow_duel") {
+      startingModeRef.current = nextMode;
+      setStartingMode(nextMode);
+      sprintStartTimerRef.current = setTimeout(() => {
+        sprintStartTimerRef.current = null;
+        performStartSprint(nextMode, useCustomTiming);
+      }, ARROW_DUEL_LOADING_TRANSITION_MS);
+      return;
+    }
+    performStartSprint(nextMode, useCustomTiming);
+  }
+
+  function performStartSprint(nextMode: SprintMode, useCustomTiming: boolean): void {
     setError(null);
     try {
       const customThemeValue = useCustomTiming ? themeForCustomSprint(customTheme) : undefined;
@@ -968,6 +993,9 @@ export function PracticePocScreen({
       refreshState();
     } catch (caught) {
       setError(errorMessage(caught));
+    } finally {
+      startingModeRef.current = null;
+      setStartingMode(null);
     }
   }
 
@@ -2205,6 +2233,21 @@ export function PracticePocScreen({
             </View>
           ) : null}
         </View>
+        {startingMode ? (
+          <View
+            accessibilityLabel={`Preparing ${modeLabel(startingMode)} sprint`}
+            accessibilityRole="progressbar"
+            accessibilityViewIsModal
+            style={styles.sprintLoadingOverlay}
+            testID="sprint-loading-overlay"
+          >
+            <View style={styles.sprintLoadingCard}>
+              <ActivityIndicator color="#2563EB" size="large" testID="sprint-loading-spinner" />
+              <Text style={styles.sprintLoadingTitle}>Preparing {modeLabel(startingMode)}</Text>
+              <Text style={styles.sprintLoadingDetail}>Loading puzzles and setting up the board</Text>
+            </View>
+          </View>
+        ) : null}
       </View>
     </SafeAreaView>
   );
@@ -8283,6 +8326,41 @@ const styles = StyleSheet.create({
   appContentShell: {
     flex: 1,
     minWidth: 0
+  },
+  sprintLoadingOverlay: {
+    alignItems: "center",
+    backgroundColor: "rgba(248, 250, 252, 0.92)",
+    bottom: 0,
+    justifyContent: "center",
+    left: 0,
+    padding: 24,
+    position: "absolute",
+    right: 0,
+    top: 0,
+    zIndex: 100
+  },
+  sprintLoadingCard: {
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderColor: "#DBEAFE",
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 10,
+    maxWidth: 320,
+    paddingHorizontal: 28,
+    paddingVertical: 24,
+    width: "100%"
+  },
+  sprintLoadingTitle: {
+    color: "#111827",
+    fontSize: 18,
+    fontWeight: "800"
+  },
+  sprintLoadingDetail: {
+    color: "#64748B",
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: "center"
   },
   header: {
     alignItems: "center",

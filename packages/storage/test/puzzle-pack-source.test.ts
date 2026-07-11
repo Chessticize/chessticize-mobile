@@ -41,6 +41,23 @@ test("SQLitePuzzlePackSource selects puzzles from a read-only pack schema", asyn
   }
 });
 
+test("SQLitePuzzlePackSource skips repeated Arrow Duel validation for a manifest-validated pack", async () => {
+  const puzzles = await loadFixturePuzzles();
+  const packDb = buildPackDatabase(puzzles);
+  try {
+    const source = new SQLitePuzzlePackSource(new NodeSqliteDatabase(packDb), {
+      allPuzzlesArrowDuelEligible: true
+    });
+
+    assert.deepEqual(
+      source.selectPuzzles({ mode: "arrow_duel", limit: 10 }).map((puzzle) => puzzle.id).sort(),
+      puzzles.map((puzzle) => puzzle.id).sort()
+    );
+  } finally {
+    packDb.close();
+  }
+});
+
 test("SQLitePuzzlePackSource preserves themed candidate results while using the composite theme index", async () => {
   const packDb = buildPackDatabase(await loadFixturePuzzles());
   try {
