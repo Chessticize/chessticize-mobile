@@ -4359,6 +4359,10 @@ const HISTORY_LINE_CHART_MAX_POINTS = 64;
 // to y=48, value max to y=6 (48 - 42).
 const HISTORY_LINE_CHART_BASE_Y = 48;
 const HISTORY_LINE_CHART_PLOT_HEIGHT = 42;
+const HISTORY_LINE_CHART_LAYER_HEIGHT = 60;
+const HISTORY_LINE_TOOLTIP_WIDTH = 104;
+const HISTORY_LINE_TOOLTIP_HEIGHT = 42;
+const HISTORY_LINE_TOOLTIP_GAP = 8;
 
 function downsampleHistoryRatingPoints(
   points: Array<{ key: string; value: number }>,
@@ -4405,6 +4409,7 @@ function HistoryRatingLineChart({
   // px rise with % run, which rendered detached segments at wrong angles.
   const [plotWidth, setPlotWidth] = useState(0);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [scrubberX, setScrubberX] = useState<number | null>(null);
   const values = points.map((point) => point.value);
   const min = Math.min(...values);
   const max = Math.max(...values);
@@ -4419,6 +4424,24 @@ function HistoryRatingLineChart({
     : points.length > 1
       ? selectedIndex * stepPx
       : plotWidth / 2;
+  const activeX = scrubberX ?? selectedX;
+  const tooltipLeft = selectedPoint
+    ? activeX > plotWidth / 2
+      ? Math.max(0, activeX - HISTORY_LINE_TOOLTIP_WIDTH - HISTORY_LINE_TOOLTIP_GAP)
+      : Math.min(
+          Math.max(0, plotWidth - HISTORY_LINE_TOOLTIP_WIDTH),
+          activeX + HISTORY_LINE_TOOLTIP_GAP
+        )
+    : 0;
+  const tooltipTop = selectedPoint
+    ? Math.max(
+        0,
+        Math.min(
+          HISTORY_LINE_CHART_LAYER_HEIGHT - HISTORY_LINE_TOOLTIP_HEIGHT,
+          pointY(selectedPoint.value) - HISTORY_LINE_TOOLTIP_HEIGHT / 2
+        )
+      )
+    : 0;
   const smoothedPoints = plotWidth > 0
     ? smoothHistoryRatingPoints(points.map((point, index) => ({ x: index * stepPx, y: pointY(point.value) })))
     : [];
@@ -4427,8 +4450,15 @@ function HistoryRatingLineChart({
     if (plotWidth <= 0) {
       return;
     }
-    const ratio = Math.max(0, Math.min(1, locationX / plotWidth));
+    const nextScrubberX = Math.max(0, Math.min(plotWidth, locationX));
+    const ratio = nextScrubberX / plotWidth;
+    setScrubberX(nextScrubberX);
     setSelectedIndex(points.length === 1 ? 0 : Math.round(ratio * (points.length - 1)));
+  };
+
+  const clearSelection = (): void => {
+    setSelectedIndex(null);
+    setScrubberX(null);
   };
 
   return (
@@ -4442,12 +4472,15 @@ function HistoryRatingLineChart({
         onLayout={(event) => setPlotWidth(event.nativeEvent.layout.width)}
         accessibilityRole="adjustable"
         accessibilityLabel={selectedPointLabel ?? "Rating trend. Drag across the chart to inspect dates and ratings."}
+        onStartShouldSetResponderCapture={() => true}
+        onMoveShouldSetResponderCapture={() => true}
         onStartShouldSetResponder={() => true}
         onMoveShouldSetResponder={() => true}
         onResponderGrant={(event) => selectNearestPoint(event.nativeEvent.locationX)}
         onResponderMove={(event) => selectNearestPoint(event.nativeEvent.locationX)}
-        onResponderRelease={() => setSelectedIndex(null)}
-        onResponderTerminate={() => setSelectedIndex(null)}
+        onResponderTerminationRequest={() => false}
+        onResponderRelease={clearSelection}
+        onResponderTerminate={clearSelection}
       >
         {smoothedPoints.slice(0, -1).map((point, index) => {
               const next = smoothedPoints[index + 1] ?? point;
@@ -4478,7 +4511,7 @@ function HistoryRatingLineChart({
             })}
         {selectedPoint ? (
           <>
-            <View style={[styles.historyLineSelectionGuide, { left: selectedX }]} testID="history-chart-selection-guide" />
+            <View style={[styles.historyLineSelectionGuide, { left: activeX }]} testID="history-chart-selection-guide" />
             <View
               style={[styles.historyLineSelectionPoint, { left: selectedX, top: pointY(selectedPoint.value) }]}
               testID="history-chart-selection-point"
@@ -4486,7 +4519,7 @@ function HistoryRatingLineChart({
             <View
               style={[
                 styles.historyLineTooltip,
-                selectedX > plotWidth / 2 ? styles.historyLineTooltipLeft : styles.historyLineTooltipRight
+                { left: tooltipLeft, top: tooltipTop }
               ]}
               pointerEvents="none"
               testID="history-chart-tooltip"
@@ -10486,16 +10519,11 @@ const styles = StyleSheet.create({
   historyLineTooltip: {
     backgroundColor: "#0F172A",
     borderRadius: 7,
+    minHeight: HISTORY_LINE_TOOLTIP_HEIGHT,
     paddingHorizontal: 8,
     paddingVertical: 5,
     position: "absolute",
-    top: 0
-  },
-  historyLineTooltipLeft: {
-    left: 0
-  },
-  historyLineTooltipRight: {
-    right: 0
+    width: HISTORY_LINE_TOOLTIP_WIDTH
   },
   historyLineTooltipRating: {
     color: "#FFFFFF",
