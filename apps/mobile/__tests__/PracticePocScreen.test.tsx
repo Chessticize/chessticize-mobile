@@ -1579,14 +1579,19 @@ describe("PracticePocScreen", () => {
     const firstSelectionLabel = findByTestId(renderer, "history-chart-line").props.accessibilityLabel;
     const firstSelectionX = flattenTestStyle(findByTestId(renderer, "history-chart-selection-guide").props.style).left;
     expect(firstSelectionLabel).toMatch(/^[A-Z][a-z]{2} \d{1,2}, \d{4} · Rating \d+$/);
+    expect(findByTestId(renderer, "history-chart-line").props.onStartShouldSetResponderCapture()).toBe(true);
+    expect(findByTestId(renderer, "history-chart-line").props.onMoveShouldSetResponderCapture()).toBe(true);
+    expect(findByTestId(renderer, "history-chart-line").props.onResponderTerminationRequest()).toBe(false);
     expect(findByTestId(renderer, "history-chart-tooltip")).toBeTruthy();
-    expect(flattenTestStyle(findByTestId(renderer, "history-chart-tooltip").props.style).right).toBe(0);
+    expect(flattenTestStyle(findByTestId(renderer, "history-chart-tooltip").props.style).left).toBe(8);
     expect(findByTestId(renderer, "history-chart-tooltip").props.pointerEvents).toBe("none");
 
     act(() => {
-      findByTestId(renderer, "history-chart-line").props.onResponderMove({ nativeEvent: { locationX: 0, locationY: 999 } });
+      findByTestId(renderer, "history-chart-line").props.onResponderMove({ nativeEvent: { locationX: 40, locationY: 999 } });
     });
     expect(findByTestId(renderer, "history-chart-line").props.accessibilityLabel).toBe(firstSelectionLabel);
+    expect(flattenTestStyle(findByTestId(renderer, "history-chart-selection-guide").props.style).left).toBe(40);
+    expect(flattenTestStyle(findByTestId(renderer, "history-chart-selection-point").props.style).left).toBe(firstSelectionX);
 
     act(() => {
       findByTestId(renderer, "history-chart-line").props.onResponderMove({ nativeEvent: { locationX: plotWidth, locationY: 999 } });
@@ -1595,7 +1600,9 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-chart-selection-guide")).toBeTruthy();
     expect(flattenTestStyle(findByTestId(renderer, "history-chart-selection-guide").props.style).left).not.toBe(firstSelectionX);
     expect(findByTestId(renderer, "history-chart-selection-point")).toBeTruthy();
-    expect(flattenTestStyle(findByTestId(renderer, "history-chart-tooltip").props.style).left).toBe(0);
+    const lastTooltipStyle = flattenTestStyle(findByTestId(renderer, "history-chart-tooltip").props.style);
+    expect(Number(lastTooltipStyle.left)).toBeGreaterThan(0);
+    expect(Number(lastTooltipStyle.left) + Number(lastTooltipStyle.width)).toBeLessThan(plotWidth);
     expect(collectText(findByTestId(renderer, "history-chart-tooltip"))).toMatch(/^Rating \d+[A-Z][a-z]{2} \d{1,2}, \d{4}$/);
     act(() => {
       findByTestId(renderer, "history-chart-line").props.onResponderRelease();
