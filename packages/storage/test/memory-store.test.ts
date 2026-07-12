@@ -728,6 +728,40 @@ test("PracticeService pages MemoryStore history over all available sprint attemp
   assert.equal(secondPage.attempts[0]?.completedAt, "2026-05-20T00:00:05.000Z");
 });
 
+test("PracticeService restores completed reviews for the current 4 AM review day", async () => {
+  const store = new MemoryStore();
+  store.seedPuzzles(await loadFixturePuzzles());
+  const service = new PracticeService(store);
+  const beforeRollover = new Date(2026, 5, 21, 3, 59, 0, 0).toISOString();
+  const afterRollover = new Date(2026, 5, 21, 4, 1, 0, 0).toISOString();
+  const currentReviewDay = new Date(2026, 5, 21, 12, 0, 0, 0).toISOString();
+
+  service.recordReviewAttempt({
+    puzzleId: "00008",
+    mode: "standard",
+    ratingKey: "standard 5/20",
+    result: "wrong",
+    submittedMove: "f2g3",
+    expectedMove: "b2b1"
+  }, beforeRollover);
+  service.recordReviewAttempt({
+    puzzleId: "000hf",
+    mode: "standard",
+    ratingKey: "standard 5/20",
+    result: "correct",
+    submittedMove: "e6f7",
+    expectedMove: "e6f7"
+  }, afterRollover);
+
+  assert.deepEqual(
+    service.listCompletedReviewsForDay(currentReviewDay).map((item) => ({
+      puzzleId: item.puzzle.id,
+      result: item.attempt.result
+    })),
+    [{ puzzleId: "000hf", result: "correct" }]
+  );
+});
+
 async function loadFixturePuzzles(): Promise<Puzzle[]> {
   const contents = await readFile(resolve("fixtures/puzzles/presolved-sample.json"), "utf8");
   return JSON.parse(contents) as Puzzle[];

@@ -64,7 +64,7 @@ import type {
   SprintState,
   UciEngineTransport
 } from "../../../../packages/core/src/index.ts";
-import type { PracticeService } from "../../../../packages/storage/src/practice-service.ts";
+import type { CompletedReviewItem, PracticeService } from "../../../../packages/storage/src/practice-service.ts";
 import type {
   ExportedSprintSession,
   ReviewQueueDuePromotionResult,
@@ -5143,10 +5143,21 @@ function ReviewPanel({
     : [];
   const preferredEntriesKey = preferredEntries.map((entry) => `${entry.source}:${entry.puzzle.id}:${entry.mode}:${entry.ratingKey}`).join("|");
   const [activeEntries, setActiveEntries] = useState<ReviewEntry[]>(preferredEntries);
+  const [activeEntryInitialIndex, setActiveEntryInitialIndex] = useState(0);
   const [queuedReviewGroups, setQueuedReviewGroups] = useState<ReviewEntryGroup[]>([]);
   const [queueFilter, setQueueFilter] = useState<ReviewQueueFilter>("all");
   const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [todayHistoryExpanded, setTodayHistoryExpanded] = useState(false);
   const [devStatus, setDevStatus] = useState<string | null>(null);
+  const completedReviews = service.listCompletedReviewsForDay(new Date(nowMs).toISOString());
+  const completedReviewEntries = completedReviews.map((item): ReviewEntry => ({
+    puzzle: item.puzzle,
+    mode: item.attempt.mode,
+    ratingKey: item.attempt.ratingKey,
+    source: "history",
+    attempt: item.attempt
+  }));
+  const dailyReviewTotal = completedReviews.length + dueReviewItems.length;
   const themeFilters = collectReviewThemeFilters(dueReviewItems);
   const speedFilters = collectReviewSpeedFilters(dueReviewItems);
   const filteredDueReviewItems = filterReviewQueueItems(dueReviewItems, queueFilter, nowMs);
@@ -5172,6 +5183,7 @@ function ReviewPanel({
 
   useEffect(() => {
     setQueuedReviewGroups([]);
+    setActiveEntryInitialIndex(0);
     setActiveEntries(preferredEntries);
     // preferredEntriesKey is the stable semantic identity for this derived array.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -5193,12 +5205,24 @@ function ReviewPanel({
       return;
     }
     setQueuedReviewGroups(remainingGroups);
+    setActiveEntryInitialIndex(0);
     setActiveEntries(firstGroup.entries);
   }
 
   function startSingleReviewGroup(entries: ReviewEntry[]): void {
     setQueuedReviewGroups([]);
+    setActiveEntryInitialIndex(0);
     setActiveEntries(entries);
+  }
+
+  function openCompletedReview(attemptId: string): void {
+    const nextIndex = completedReviewEntries.findIndex((entry) => entry.attempt?.id === attemptId);
+    if (nextIndex < 0) {
+      return;
+    }
+    setQueuedReviewGroups([]);
+    setActiveEntryInitialIndex(nextIndex);
+    setActiveEntries(completedReviewEntries);
   }
 
   function finishActiveReview(source: ReviewEntry["source"]): void {
@@ -5206,11 +5230,13 @@ function ReviewPanel({
       const [nextGroup, ...remainingGroups] = queuedReviewGroups;
       if (nextGroup) {
         setQueuedReviewGroups(remainingGroups);
+        setActiveEntryInitialIndex(0);
         setActiveEntries(nextGroup.entries);
         return;
       }
     }
     setQueuedReviewGroups([]);
+    setActiveEntryInitialIndex(0);
     setActiveEntries([]);
     if (source === "session") {
       onExitSessionReview();
@@ -5220,11 +5246,14 @@ function ReviewPanel({
   if (activeEntries.length > 0) {
     return (
       <ReviewSession
-        key={activeEntries.map((entry) => `${entry.source}:${entry.puzzle.id}:${entry.mode}:${entry.ratingKey}`).join("|")}
+        key={`${activeEntryInitialIndex}:${activeEntries.map((entry) => `${entry.source}:${entry.puzzle.id}:${entry.mode}:${entry.ratingKey}`).join("|")}`}
         adaptiveLayout={adaptiveLayout}
         boardSize={boardSize}
         currentTimeMs={currentTimeMs}
         entries={activeEntries}
+        initialIndex={activeEntryInitialIndex}
+        scheduledReviewCompletedCount={completedReviews.length}
+        scheduledReviewTotal={dailyReviewTotal}
         service={service}
         onReviewRecorded={onReviewRecorded}
         onExit={finishActiveReview}
@@ -5249,10 +5278,14 @@ function ReviewPanel({
         </Pressable>
       </View>
 
-      <View
-        accessibilityLabel={`Today, ${queueSummary.filteredCount} reviews due${queueSummary.overdueCount > 0 ? `, ${queueSummary.overdueCount} overdue` : ""}, ${queueSummary.tomorrowCount} tomorrow, ${queueSummary.nextSevenDaysCount} in the next 7 days, ${queueSummary.totalCount} total, ${reviewDueFilterLabel}`}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Today, ${queueSummary.filteredCount} reviews due, ${completedReviews.length} completed${queueSummary.overdueCount > 0 ? `, ${queueSummary.overdueCount} overdue` : ""}, ${queueSummary.tomorrowCount} tomorrow, ${queueSummary.nextSevenDaysCount} in the next 7 days, ${queueSummary.totalCount} total, ${reviewDueFilterLabel}`}
+        accessibilityState={{ expanded: todayHistoryExpanded, disabled: completedReviews.length === 0 }}
+        disabled={completedReviews.length === 0}
         style={styles.reviewDueCard}
         testID="review-due-card"
+        onPress={() => setTodayHistoryExpanded((current) => !current)}
       >
         <View style={styles.reviewDueCopy}>
           <Text style={styles.reviewDueTitle}>Today</Text>
@@ -5266,6 +5299,11 @@ function ReviewPanel({
           >
             {reviewDueSubline}
           </Text>
+          {completedReviews.length > 0 ? (
+            <Text testID="review-today-completed" style={styles.helperText}>
+              {completedReviews.length} completed today · View history
+            </Text>
+          ) : null}
         </View>
         <View style={styles.reviewDueCountBlock}>
           <Text testID="review-due-count" style={styles.reviewDueBigCount}>{queueSummary.filteredCount}</Text>
@@ -5278,7 +5316,20 @@ function ReviewPanel({
             </>
           ) : null}
         </View>
-      </View>
+      </Pressable>
+
+      {todayHistoryExpanded && completedReviews.length > 0 ? (
+        <View style={styles.reviewItemList} testID="review-today-history">
+          <Text style={styles.sectionLabel}>Completed today</Text>
+          {completedReviews.map((item) => (
+            <TodayReviewAttemptRow
+              key={item.attempt.id}
+              item={item}
+              onOpen={() => openCompletedReview(item.attempt.id)}
+            />
+          ))}
+        </View>
+      ) : null}
 
       <View
         accessibilityLabel={`${reviewCountLabel(queueSummary.tomorrowCount)} tomorrow, ${reviewCountLabel(queueSummary.nextSevenDaysCount)} in the next 7 days, ${reviewCountLabel(queueSummary.totalCount)} total`}
@@ -5544,6 +5595,53 @@ function ReviewQueueItemCard({
   );
 }
 
+function TodayReviewAttemptRow({
+  item,
+  onOpen
+}: {
+  item: CompletedReviewItem;
+  onOpen: () => void;
+}): React.JSX.Element {
+  const isWrong = item.attempt.result === "wrong";
+  const resultLabel = isWrong ? "Wrong" : "Correct";
+  const elapsedSeconds = Math.max(
+    0,
+    Math.round((new Date(item.attempt.completedAt).getTime() - new Date(item.attempt.startedAt).getTime()) / 1000)
+  );
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${modeLabel(item.attempt.mode)} ${resultLabel.toLowerCase()} review for analysis or retry`}
+      testID={`review-today-attempt-${item.attempt.id}`}
+      style={styles.historyAttemptCard}
+      onPress={onOpen}
+    >
+      <View
+        style={[styles.historyResultBadge, isWrong ? styles.historyResultWrong : styles.historyResultCorrect]}
+        testID={`review-today-attempt-${item.attempt.id}-badge`}
+      >
+        <ResultBadgeGlyph tone={isWrong ? "wrong" : "correct"} />
+      </View>
+      <View style={styles.historyAttemptCopy}>
+        <View style={styles.historyAttemptHeader}>
+          <Text style={styles.historyRowTitle}>{modeLabel(item.attempt.mode)}</Text>
+          <Text
+            testID={`review-today-attempt-${item.attempt.id}-result`}
+            style={[styles.historyReviewState, isWrong ? styles.errorText : styles.positive]}
+          >
+            {resultLabel}
+          </Text>
+        </View>
+        <Text style={styles.helperText}>Puzzle {item.puzzle.id} · {elapsedSeconds}s</Text>
+        <Text style={styles.helperText}>{formatLocalCalendarDate(item.attempt.completedAt)} · Review or retry</Text>
+      </View>
+      <View style={styles.historyAttemptChevron}>
+        <ChevronGlyph direction="right" />
+      </View>
+    </Pressable>
+  );
+}
+
 function ReviewForecastMetric({
   count,
   label,
@@ -5571,6 +5669,8 @@ function ReviewSession({
   currentTimeMs,
   entries,
   initialIndex = 0,
+  scheduledReviewCompletedCount = 0,
+  scheduledReviewTotal = entries.length,
   service,
   onExit,
   onReviewRecorded,
@@ -5581,6 +5681,8 @@ function ReviewSession({
   currentTimeMs: () => number;
   entries: ReviewEntry[];
   initialIndex?: number;
+  scheduledReviewCompletedCount?: number;
+  scheduledReviewTotal?: number;
   service: PracticeService;
   onExit: (source: ReviewEntry["source"]) => void;
   onReviewRecorded?: (completedAt: string) => void;
@@ -5609,6 +5711,15 @@ function ReviewSession({
   const [reviewTimedOut, setReviewTimedOut] = useState(false);
   const [punishmentLineComplete, setPunishmentLineComplete] = useState(false);
   const [lineReviewNeedsContinue, setLineReviewNeedsContinue] = useState(false);
+  const [scheduledReviewProgress] = useState(() => {
+    const firstEntry = entries[initialIndex] ?? entries[0];
+    return firstEntry?.source === "due"
+      ? {
+          completedBeforeStart: scheduledReviewCompletedCount,
+          total: Math.max(1, scheduledReviewTotal)
+        }
+      : null;
+  });
   const currentEntry = entries[entryIndex];
   const currentPuzzle = currentReviewPuzzleState(reviewState);
   const currentFen = currentPuzzle.currentFen;
@@ -5661,6 +5772,10 @@ function ReviewSession({
   const canAnalysisBack = analysisEnabled && analysisBackStack.length > 0;
   const canAnalysisForward = analysisEnabled && analysisForwardStack.length > 0;
   const analysisDepth = engineAnalysisLines.reduce((maxDepth, line) => Math.max(maxDepth, line.depth), 0);
+  const reviewProgressPosition = scheduledReviewProgress
+    ? Math.min(scheduledReviewProgress.total, scheduledReviewProgress.completedBeforeStart + entryIndex + 1)
+    : entryIndex + 1;
+  const reviewProgressTotal = scheduledReviewProgress?.total ?? entries.length;
   const reviewPerPuzzleSeconds = perPuzzleSecondsForReviewEntry(currentEntry);
   const reviewPrimaryTheme = currentEntry.puzzle.themes[0] ?? "mixed";
   const reviewSourceLabel = currentEntry.source === "session"
@@ -6003,6 +6118,13 @@ function ReviewSession({
       expectedMove: result.feedback.expectedMove
     });
     await sleep(FEEDBACK_SNAPSHOT_MS);
+    if (currentEntry.source === "due") {
+      boardRef.current?.resetBoard(submittedFen);
+      setFeedback(null);
+      setLineReviewNeedsContinue(true);
+      setBoardLocked(false);
+      return;
+    }
     const replyMoves = result.feedback.autoPlayedMoves.slice(1);
     const finalFen = fenAfterMoves(submittedFen, result.feedback.autoPlayedMoves) ?? submittedFen;
     if (replyMoves.length > 0) {
@@ -6175,7 +6297,7 @@ function ReviewSession({
           <View style={styles.reviewTitleBlock}>
             <Text style={styles.panelTitle}>Review</Text>
             <Text testID="review-progress" style={styles.helperText}>
-              {entryIndex + 1} / {entries.length} · {modeLabel(currentEntry.mode)}
+              {reviewProgressPosition} / {reviewProgressTotal} · {modeLabel(currentEntry.mode)}
             </Text>
             {arePracticeTestControlsEnabled() ? (
               <>
@@ -6235,13 +6357,17 @@ function ReviewSession({
           </View>
         </View>
         <View style={styles.reviewContextStrip} testID="review-context-strip">
-          <View style={styles.reviewContextPill} testID="review-source-pill">
-            <Text style={styles.reviewContextPillText}>{reviewSourceLabel}</Text>
-          </View>
+          {currentEntry.source !== "due" ? (
+            <View style={styles.reviewContextPill} testID="review-source-pill">
+              <Text style={styles.reviewContextPillText}>{reviewSourceLabel}</Text>
+            </View>
+          ) : null}
           <MoveSideBadge badgeTestID="review-side-to-move" side={reviewSideToMove} />
-          <View style={styles.reviewContextPill} testID="review-theme-pill">
-            <Text style={styles.reviewContextPillText}>{reviewPrimaryTheme}</Text>
-          </View>
+          {currentEntry.source !== "due" ? (
+            <View style={styles.reviewContextPill} testID="review-theme-pill">
+              <Text style={styles.reviewContextPillText}>{reviewPrimaryTheme}</Text>
+            </View>
+          ) : null}
           {reviewRemainingSeconds !== null ? (
             <View style={[styles.reviewContextPill, reviewRemainingSeconds === 0 ? styles.reviewContextPillDanger : null]}>
               <Text testID="review-timer" style={[styles.reviewContextPillText, reviewRemainingSeconds === 0 ? styles.errorText : null]}>
@@ -6372,6 +6498,7 @@ function ReviewSession({
               ))}
             </View>
           ) : null}
+          {analysisEnabled || currentEntry.source !== "due" ? (
           <View style={styles.analysisToolbar} testID="review-analysis-toolbar">
             {analysisEnabled ? (
               <>
@@ -6419,6 +6546,7 @@ function ReviewSession({
               </>
             )}
           </View>
+          ) : null}
           {analysisEnabled ? (
             <>
               {analysisLines.map((line, index) => (
@@ -6676,9 +6804,9 @@ function expectedReviewMove(state: CurrentPuzzleState): string {
 function perPuzzleSecondsForReviewEntry(entry: ReviewEntry): number {
   const fromRatingKey = entry.ratingKey.match(/\/(\d+)$/)?.[1];
   if (fromRatingKey) {
-    return Number(fromRatingKey);
+    return Number(fromRatingKey) * 2;
   }
-  return defaultSprintConfig(entry.mode).perPuzzleSeconds;
+  return defaultSprintConfig(entry.mode).perPuzzleSeconds * 2;
 }
 
 function reviewReminderScheduleStatusLabel(
