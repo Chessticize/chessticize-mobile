@@ -5147,7 +5147,6 @@ function ReviewPanel({
   const [queuedReviewGroups, setQueuedReviewGroups] = useState<ReviewEntryGroup[]>([]);
   const [queueFilter, setQueueFilter] = useState<ReviewQueueFilter>("all");
   const [filtersExpanded, setFiltersExpanded] = useState(false);
-  const [todayHistoryExpanded, setTodayHistoryExpanded] = useState(false);
   const [devStatus, setDevStatus] = useState<string | null>(null);
   const completedReviews = service.listCompletedReviewsForDay(new Date(nowMs).toISOString());
   const completedReviewEntries = completedReviews.map((item): ReviewEntry => ({
@@ -5158,6 +5157,9 @@ function ReviewPanel({
     attempt: item.attempt
   }));
   const dailyReviewTotal = completedReviews.length + dueReviewItems.length;
+  const dailyReviewProgressLabel = dailyReviewTotal === 0
+    ? "0"
+    : `${completedReviews.length} / ${dailyReviewTotal}`;
   const themeFilters = collectReviewThemeFilters(dueReviewItems);
   const speedFilters = collectReviewSpeedFilters(dueReviewItems);
   const filteredDueReviewItems = filterReviewQueueItems(dueReviewItems, queueFilter, nowMs);
@@ -5278,14 +5280,12 @@ function ReviewPanel({
         </Pressable>
       </View>
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Today, ${queueSummary.filteredCount} reviews due, ${completedReviews.length} completed${queueSummary.overdueCount > 0 ? `, ${queueSummary.overdueCount} overdue` : ""}, ${queueSummary.tomorrowCount} tomorrow, ${queueSummary.nextSevenDaysCount} in the next 7 days, ${queueSummary.totalCount} total, ${reviewDueFilterLabel}`}
-        accessibilityState={{ expanded: todayHistoryExpanded, disabled: completedReviews.length === 0 }}
-        disabled={completedReviews.length === 0}
+      <View
+        accessibilityLabel={dailyReviewTotal === 0
+          ? `Today, no reviews scheduled, ${queueSummary.tomorrowCount} tomorrow, ${queueSummary.nextSevenDaysCount} in the next 7 days, ${queueSummary.totalCount} total, ${reviewDueFilterLabel}`
+          : `Today, ${completedReviews.length} of ${dailyReviewTotal} reviews completed, ${dueReviewItems.length} remaining${queueSummary.overdueCount > 0 ? `, ${queueSummary.overdueCount} overdue` : ""}, ${queueSummary.tomorrowCount} tomorrow, ${queueSummary.nextSevenDaysCount} in the next 7 days, ${queueSummary.totalCount} total, ${reviewDueFilterLabel}`}
         style={styles.reviewDueCard}
         testID="review-due-card"
-        onPress={() => setTodayHistoryExpanded((current) => !current)}
       >
         <View style={styles.reviewDueCopy}>
           <Text style={styles.reviewDueTitle}>Today</Text>
@@ -5299,14 +5299,9 @@ function ReviewPanel({
           >
             {reviewDueSubline}
           </Text>
-          {completedReviews.length > 0 ? (
-            <Text testID="review-today-completed" style={styles.helperText}>
-              {completedReviews.length} completed today · View history
-            </Text>
-          ) : null}
         </View>
         <View style={styles.reviewDueCountBlock}>
-          <Text testID="review-due-count" style={styles.reviewDueBigCount}>{queueSummary.filteredCount}</Text>
+          <Text testID="review-due-count" style={styles.reviewDueBigCount}>{dailyReviewProgressLabel}</Text>
           {queueSummary.overdueCount > 0 ? (
             <>
               <Text testID="review-overdue-count" style={[styles.reviewDueOverdueCount, styles.errorText]}>
@@ -5316,20 +5311,7 @@ function ReviewPanel({
             </>
           ) : null}
         </View>
-      </Pressable>
-
-      {todayHistoryExpanded && completedReviews.length > 0 ? (
-        <View style={styles.reviewItemList} testID="review-today-history">
-          <Text style={styles.sectionLabel}>Completed today</Text>
-          {completedReviews.map((item) => (
-            <TodayReviewAttemptRow
-              key={item.attempt.id}
-              item={item}
-              onOpen={() => openCompletedReview(item.attempt.id)}
-            />
-          ))}
-        </View>
-      ) : null}
+      </View>
 
       <View
         accessibilityLabel={`${reviewCountLabel(queueSummary.tomorrowCount)} tomorrow, ${reviewCountLabel(queueSummary.nextSevenDaysCount)} in the next 7 days, ${reviewCountLabel(queueSummary.totalCount)} total`}
@@ -5486,6 +5468,19 @@ function ReviewPanel({
           >
             <Text style={styles.secondaryButtonText}>Practice now</Text>
           </Pressable>
+        </View>
+      ) : null}
+
+      {completedReviews.length > 0 ? (
+        <View style={styles.reviewItemList} testID="review-today-history">
+          <Text style={styles.sectionLabel}>Completed today</Text>
+          {completedReviews.map((item) => (
+            <TodayReviewAttemptRow
+              key={item.attempt.id}
+              item={item}
+              onOpen={() => openCompletedReview(item.attempt.id)}
+            />
+          ))}
         </View>
       ) : null}
 
