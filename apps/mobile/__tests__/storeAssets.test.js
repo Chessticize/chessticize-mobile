@@ -68,7 +68,7 @@ describe("App Store assets document", () => {
     expect(storeAssetsE2e).toContain("chessticizeStoreAssetCapture");
     expect(storeAssetsE2e).toContain("setStoreAssetRatings({ standard: 800, arrowDuel: 850 })");
     expect(storeAssetsE2e).toContain("toHaveText('1 / 3')");
-    expect(storeAssetsE2e).toContain("by.text('1-4 of 4')");
+    expect(storeAssetsE2e).toContain("by.text('1-3 of 3')");
     expect(storeAssetsE2e).toContain("app-store-01-practice-tab");
     expect(storeAssetsE2e).toContain("app-store-06-arrow-duel");
     expect(storeAssetsDoc).toContain("pnpm mobile:e2e:build:ios:release");

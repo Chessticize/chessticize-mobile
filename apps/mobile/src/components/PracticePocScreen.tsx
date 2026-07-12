@@ -444,7 +444,7 @@ export function PracticePocScreen({
   const [boardInputLockMode, setBoardInputLockMode] = useState<BoardInputLockMode>("hard");
   const [chessboardDebugEvents, setChessboardDebugEvents] = useState<string[]>([]);
   const [historyTimeRange, setHistoryTimeRange] = useState<HistoryTimeRange>("7d");
-  const [historySourceFilter, setHistorySourceFilter] = useState<"all" | AttemptSource>("all");
+  const [historySourceFilter, setHistorySourceFilter] = useState<"all" | AttemptSource>("sprint");
   const [historyResultFilter, setHistoryResultFilter] = useState<"all" | "correct" | "wrong">("wrong");
   const [historySideFilter, setHistorySideFilter] = useState<"all" | PuzzleSide>("all");
   const [historyThemeFilter, setHistoryThemeFilter] = useState<string>("all");
@@ -2111,6 +2111,7 @@ export function PracticePocScreen({
                   availableThemes={historyAvailableThemes}
                   page={historyPage}
                   reviewStatusFilter={historyReviewStatusFilter}
+                  sprintOnly={historySourceFilter === "sprint"}
                   wrongOnly={historyWrongOnly}
                   onRatingKeyChange={(ratingKey) => {
                     setHistoryRatingKey(ratingKey);
@@ -2146,6 +2147,21 @@ export function PracticePocScreen({
                   }}
                   onPageOffsetChange={setHistoryPageOffset}
                   onOpenAttempt={openHistoryReview}
+                  onResetFilters={() => {
+                    setHistoryTimeRange("7d");
+                    setHistorySourceFilter("sprint");
+                    setHistoryResultFilter("wrong");
+                    setHistorySideFilter("all");
+                    setHistoryThemeFilter("all");
+                    setHistoryRatingRangeFilter("all");
+                    setHistoryReviewStatusFilter("all");
+                    setHistoryPageOffset(0);
+                    setHistoryRatingKey(null);
+                  }}
+                  onToggleSprintOnly={() => {
+                    setHistoryPageOffset(0);
+                    setHistorySourceFilter(historySourceFilter === "sprint" ? "all" : "sprint");
+                  }}
                   onToggleWrongOnly={() => {
                     setHistoryPageOffset(0);
                     setHistoryResultFilter(historyWrongOnly ? "all" : "wrong");
@@ -4053,6 +4069,7 @@ function HistoryPanel({
   availableThemes,
   page,
   reviewStatusFilter,
+  sprintOnly,
   wrongOnly,
   onRatingKeyChange,
   onTimeRangeChange,
@@ -4064,6 +4081,8 @@ function HistoryPanel({
   onReviewStatusFilterChange,
   onPageOffsetChange,
   onOpenAttempt,
+  onResetFilters,
+  onToggleSprintOnly,
   onToggleWrongOnly
 }: {
   adaptiveLayout: AdaptiveLayout;
@@ -4081,6 +4100,7 @@ function HistoryPanel({
   availableThemes: string[];
   page: { limit: number; offset: number; total: number; hasMore: boolean };
   reviewStatusFilter: "all" | HistoryReviewStatus;
+  sprintOnly: boolean;
   wrongOnly: boolean;
   onRatingKeyChange: (ratingKey: string | null) => void;
   onTimeRangeChange: (range: HistoryTimeRange) => void;
@@ -4092,6 +4112,8 @@ function HistoryPanel({
   onReviewStatusFilterChange: (status: "all" | HistoryReviewStatus) => void;
   onPageOffsetChange: (offset: number) => void;
   onOpenAttempt: (attemptId: string) => void;
+  onResetFilters: () => void;
+  onToggleSprintOnly: () => void;
   onToggleWrongOnly: () => void;
 }): React.JSX.Element {
   const [filtersExpanded, setFiltersExpanded] = useState(false);
@@ -4113,16 +4135,27 @@ function HistoryPanel({
     <View style={[styles.historyPanel, adaptiveLayout.usesWideContent ? styles.historyPanelWide : null]} testID="history-panel">
       <View style={styles.historyHeaderRow} testID="history-action-header">
         <Text style={styles.screenTitle}>History</Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={filtersExpanded ? "Hide history filters" : "Show history filters"}
-          accessibilityState={{ expanded: filtersExpanded }}
-          testID="history-filter-toggle"
-          style={[styles.reviewFilterButton, filtersExpanded ? styles.reviewFilterButtonActive : null]}
-          onPress={() => setFiltersExpanded((current) => !current)}
-        >
-          <FilterGlyph active={filtersExpanded} />
-        </Pressable>
+        <View style={styles.historyHeaderActions}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Reset history filters"
+            testID="history-filter-reset"
+            style={styles.historyResetButton}
+            onPress={onResetFilters}
+          >
+            <Text style={styles.historyResetButtonText}>Reset</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={filtersExpanded ? "Hide history filters" : "Show history filters"}
+            accessibilityState={{ expanded: filtersExpanded }}
+            testID="history-filter-toggle"
+            style={[styles.reviewFilterButton, filtersExpanded ? styles.reviewFilterButtonActive : null]}
+            onPress={() => setFiltersExpanded((current) => !current)}
+          >
+            <FilterGlyph active={filtersExpanded} />
+          </Pressable>
+        </View>
       </View>
 
       <View style={styles.historyTopFilterStack} testID="history-primary-filters">
@@ -4143,7 +4176,7 @@ function HistoryPanel({
             />
           ))}
         </HistoryChipRow>
-        <HistoryChipRow testID="history-range-filters" wrap>
+        <HistoryChipRow testID="history-range-filters">
           {(["7d", "30d", "90d", "1y", "max"] as const).map((range) => (
             <FilterButton
               key={range}
@@ -4154,19 +4187,22 @@ function HistoryPanel({
             />
           ))}
         </HistoryChipRow>
-        <Pressable
-          accessibilityRole="switch"
-          accessibilityLabel="Wrong puzzles only"
-          accessibilityState={{ checked: wrongOnly }}
-          testID="history-filter-wrong-only"
-          style={styles.historyWrongOnlyToggle}
-          onPress={onToggleWrongOnly}
-        >
-          <Text style={styles.filterButtonText}>Wrong only</Text>
-          <View style={[styles.historyToggleTrack, wrongOnly ? styles.historyToggleTrackActive : null]}>
-            <View style={[styles.historyToggleThumb, wrongOnly ? styles.historyToggleThumbActive : null]} />
-          </View>
-        </Pressable>
+        <View style={styles.historyQuickFilterRow}>
+          <HistoryQuickToggle
+            active={wrongOnly}
+            accessibilityLabel="Wrong puzzles only"
+            controlTestID="history-filter-wrong-only"
+            label="Wrong only"
+            onPress={onToggleWrongOnly}
+          />
+          <HistoryQuickToggle
+            active={sprintOnly}
+            accessibilityLabel="Sprint attempts only"
+            controlTestID="history-filter-sprint-only"
+            label="Sprint only"
+            onPress={onToggleSprintOnly}
+          />
+        </View>
       </View>
 
       {selectedRatingKey ? (
@@ -4648,21 +4684,11 @@ function ResultBadgeGlyph({ tone }: { tone: "correct" | "wrong" | "alert" }): Re
 
 function HistoryChipRow({
   children,
-  testID,
-  wrap = false
+  testID
 }: {
   children: React.ReactNode;
   testID: string;
-  wrap?: boolean;
 }): React.JSX.Element {
-  if (wrap) {
-    return (
-      <View style={[styles.historyChipContent, styles.historyChipContentWrap]} testID={testID}>
-        {children}
-      </View>
-    );
-  }
-
   return (
     <ScrollView
       horizontal
@@ -4673,6 +4699,36 @@ function HistoryChipRow({
         {children}
       </View>
     </ScrollView>
+  );
+}
+
+function HistoryQuickToggle({
+  accessibilityLabel,
+  active,
+  controlTestID,
+  label,
+  onPress
+}: {
+  accessibilityLabel: string;
+  active: boolean;
+  controlTestID: string;
+  label: string;
+  onPress: () => void;
+}): React.JSX.Element {
+  return (
+    <Pressable
+      accessibilityRole="switch"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ checked: active }}
+      testID={controlTestID}
+      style={styles.historyQuickToggle}
+      onPress={onPress}
+    >
+      <Text style={styles.filterButtonText}>{label}</Text>
+      <View style={[styles.historyToggleTrack, active ? styles.historyToggleTrackActive : null]}>
+        <View style={[styles.historyToggleThumb, active ? styles.historyToggleThumbActive : null]} />
+      </View>
+    </Pressable>
   );
 }
 
@@ -5782,11 +5838,6 @@ function ReviewSession({
   const reviewProgressTotal = scheduledReviewProgress?.total ?? entries.length;
   const reviewPerPuzzleSeconds = perPuzzleSecondsForReviewEntry(currentEntry);
   const reviewPrimaryTheme = currentEntry.puzzle.themes[0] ?? "mixed";
-  const reviewSourceLabel = currentEntry.source === "session"
-    ? "Sprint review"
-    : currentEntry.source === "history"
-      ? "History replay"
-      : "Scheduled review";
   const reviewRemainingSeconds =
     currentEntry.source === "due" && (!reviewResultRecorded || reviewTimedOut)
       ? Math.max(0, reviewPerPuzzleSeconds - Math.floor((reviewNowMs - reviewStartedAtMs) / 1000))
@@ -6361,9 +6412,9 @@ function ReviewSession({
           </View>
         </View>
         <View style={styles.reviewContextStrip} testID="review-context-strip">
-          {currentEntry.source !== "due" ? (
+          {currentEntry.source === "session" ? (
             <View style={styles.reviewContextPill} testID="review-source-pill">
-              <Text style={styles.reviewContextPillText}>{reviewSourceLabel}</Text>
+              <Text style={styles.reviewContextPillText}>Sprint review</Text>
             </View>
           ) : null}
           <MoveSideBadge badgeTestID="review-side-to-move" side={reviewSideToMove} />
@@ -8701,6 +8752,25 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     minHeight: 38
   },
+  historyHeaderActions: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8
+  },
+  historyResetButton: {
+    alignItems: "center",
+    borderColor: "#CBD5E1",
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 38,
+    paddingHorizontal: 12
+  },
+  historyResetButtonText: {
+    color: "#475569",
+    fontSize: 12,
+    fontWeight: "800"
+  },
   screenTitle: {
     color: "#111827",
     fontSize: 22,
@@ -10424,9 +10494,14 @@ const styles = StyleSheet.create({
   historyTopFilterStack: {
     gap: 8
   },
-  historyWrongOnlyToggle: {
+  historyQuickFilterRow: {
     alignItems: "center",
-    alignSelf: "flex-start",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10
+  },
+  historyQuickToggle: {
+    alignItems: "center",
     flexDirection: "row",
     gap: 10,
     minHeight: 36,
@@ -10589,10 +10664,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
     paddingRight: 2
-  },
-  historyChipContentWrap: {
-    flexWrap: "wrap",
-    rowGap: 8
   },
   historyActiveFilterChip: {
     backgroundColor: "#F8FAFC",

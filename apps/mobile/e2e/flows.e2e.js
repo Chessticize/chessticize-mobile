@@ -159,6 +159,7 @@ describe('Key user flows', () => {
       .whileElement(by.id('history-range-filters'))
       .scroll(120, 'right');
     await expect(element(by.id('history-filter-wrong-only'))).toHaveValue('1');
+    await expect(element(by.id('history-filter-sprint-only'))).toHaveValue('1');
     await element(by.id('history-filter-wrong-only')).tap();
     await waitFor(element(by.id('history-filter-wrong-only'))).toHaveValue('0').withTimeout(10000);
     await element(by.id('history-filter-wrong-only')).tap();
@@ -170,6 +171,8 @@ describe('Key user flows', () => {
     // require the toggle to still be off rather than reset to its default.
     await element(by.id('history-filter-wrong-only')).tap();
     await waitFor(element(by.id('history-filter-wrong-only'))).toHaveValue('0').withTimeout(10000);
+    await element(by.id('history-filter-sprint-only')).tap();
+    await waitFor(element(by.id('history-filter-sprint-only'))).toHaveValue('0').withTimeout(10000);
     await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
 
     const resultAttributes = await element(by.text('Wrong move')).atIndex(0).getAttributes();
@@ -179,10 +182,15 @@ describe('Key user flows', () => {
     }
     await element(by.id(resultIdentifier.replace(/-result$/, ''))).tap();
     await waitFor(element(by.id('review-session'))).toExist().withTimeout(10000);
+    await expect(element(by.id('review-source-pill'))).not.toExist();
     await element(by.id('practice-main-scroll')).scrollTo('top');
     await waitFor(element(by.id('review-exit'))).toBeVisible().withTimeout(10000);
     await element(by.id('review-exit')).tap();
     await waitFor(element(by.id('history-filter-wrong-only'))).toHaveValue('0').withTimeout(10000);
+    await waitFor(element(by.id('history-filter-sprint-only'))).toHaveValue('0').withTimeout(10000);
+    await element(by.id('history-filter-reset')).tap();
+    await waitFor(element(by.id('history-filter-wrong-only'))).toHaveValue('1').withTimeout(10000);
+    await waitFor(element(by.id('history-filter-sprint-only'))).toHaveValue('1').withTimeout(10000);
   });
 
   it('configures and starts a custom sprint', async () => {

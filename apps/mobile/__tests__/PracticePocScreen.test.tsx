@@ -1633,12 +1633,15 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "history-filter-toggle"))).toBe("");
     expect(collectText(findByTestId(renderer, "history-action-header"))).not.toContain("≡");
     expect(findByTestId(renderer, "history-filter-toggle").props.accessibilityState).toEqual({ expanded: false });
+    expect(findByTestId(renderer, "history-filter-reset").props.accessibilityLabel).toBe("Reset history filters");
     expect(findByTestId(renderer, "history-primary-filters")).toBeTruthy();
     expect(() => findByTestId(renderer, "history-filter-summary-card")).toThrow();
     expect(findByTestId(renderer, "history-active-filter-summary")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("7 days");
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("All puzzles");
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Sprint");
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Wrong only");
+    expect(findByTestId(renderer, "history-filter-sprint-only").props.accessibilityState).toEqual({ checked: true });
     expect(findByTestId(renderer, "history-filter-wrong-only").props.accessibilityState).toEqual({ checked: true });
     expectHistoryRowAccessibility(renderer, "Played g6g5 · Best f4g3");
     expectNoHistoryRowAccessibility(renderer, "Move e6f7");
@@ -1683,7 +1686,7 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "history-chart-bar-0")).toThrow();
     expect(collectText(findByTestId(renderer, "history-chart-label"))).toBe("Rating");
     expect(findByTestId(renderer, "history-range-filters")).toBeTruthy();
-    expect(findByTestId(renderer, "history-range-filters").props.wrap).toBe(true);
+    expect(renderer.root.findAllByProps({ testID: "history-range-filters" }).some((node) => node.props.horizontal === true)).toBe(true);
     expect(collectText(findByTestId(renderer, "history-range-max"))).toBe("All Time");
     press(renderer, "history-range-max");
     expect(collectText(findByTestId(renderer, "history-performance-context"))).toBe("Standard · 20s pace · All Time");
@@ -1787,7 +1790,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "review-session")).toBeTruthy();
     expect(findByTestId(renderer, "review-progress").props.children.join("")).toBe("1 / 1 · Standard");
     expect(findByTestId(renderer, "review-context-strip")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "review-source-pill"))).toBe("History replay");
+    expect(() => findByTestId(renderer, "review-source-pill")).toThrow();
     expect(findByTestId(renderer, "review-side-to-move").props.accessibilityLabel).toBe("Black to move");
     expect(findByTestId(renderer, "move-side-black-glyph")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "review-side-to-move-label"))).toBe("Black to move");
@@ -1798,6 +1801,45 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "review-header-actions"))).not.toContain("↺");
     press(renderer, "review-exit");
     expect(findByTestId(renderer, "history-panel")).toBeTruthy();
+  });
+
+  it("resets history filters to the default sprint-only wrong-attempt view", () => {
+    const renderer = renderStandardSequenceScreen();
+
+    startStandardSprint(renderer);
+    abandonSprint(renderer);
+    press(renderer, "history-tab");
+
+    press(renderer, "history-filter-wrong-only");
+    press(renderer, "history-filter-sprint-only");
+    press(renderer, "history-range-max");
+    press(renderer, "history-filter-toggle");
+    press(renderer, "history-side-black");
+
+    expect(findByTestId(renderer, "history-filter-wrong-only").props.accessibilityState).toEqual({ checked: false });
+    expect(findByTestId(renderer, "history-filter-sprint-only").props.accessibilityState).toEqual({ checked: false });
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("All Time");
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Black");
+
+    press(renderer, "history-filter-reset");
+
+    expect(findByTestId(renderer, "history-filter-wrong-only").props.accessibilityState).toEqual({ checked: true });
+    expect(findByTestId(renderer, "history-filter-sprint-only").props.accessibilityState).toEqual({ checked: true });
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("7 days");
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("All puzzles");
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Sprint");
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Wrong only");
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain("All Time");
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain("Black");
+    expect(renderer.root.findAllByProps({ testID: "history-source-sprint" }).some(
+      (node) => node.props.accessibilityState?.selected === true
+    )).toBe(true);
+    expect(renderer.root.findAllByProps({ testID: "history-result-wrong" }).some(
+      (node) => node.props.accessibilityState?.selected === true
+    )).toBe(true);
+    expect(renderer.root.findAllByProps({ testID: "history-side-all" }).some(
+      (node) => node.props.accessibilityState?.selected === true
+    )).toBe(true);
   });
 
   it("navigates history review across the full filtered result set, not just the visible page", () => {
@@ -2002,6 +2044,7 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "history-tab");
     press(renderer, "history-filter-toggle");
+    press(renderer, "history-source-review");
     press(renderer, "history-rating-arrow duel 5/30");
     const historyAttemptRow = renderer.root.findAll(
       (node) => typeof node.props.testID === "string" && node.props.testID.startsWith("history-attempt-")
@@ -2767,7 +2810,7 @@ describe("PracticePocScreen", () => {
     const queueBeforeReplay = service.listReviewQueue();
 
     press(renderer, wrongRowTestID!);
-    expect(collectText(findByTestId(renderer, "review-source-pill"))).toBe("History replay");
+    expect(() => findByTestId(renderer, "review-source-pill")).toThrow();
     expect(findByTestId(renderer, "review-analysis-button")).toBeTruthy();
     expect(findByTestId(renderer, "review-reset-puzzle")).toBeTruthy();
     press(renderer, "review-analysis-button");

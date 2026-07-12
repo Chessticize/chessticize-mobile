@@ -133,7 +133,7 @@ async function captureMainTabScenes() {
   await device.takeScreenshot('app-store-02-review-tab');
 
   await openTab('history-tab', 'history-action-header');
-  await waitFor(element(by.text('1-4 of 4'))).toExist().withTimeout(10000);
+  await waitFor(element(by.text('1-3 of 3'))).toExist().withTimeout(10000);
   await element(by.id('practice-main-scroll')).scrollTo('top');
   await sleep(1200);
   await device.takeScreenshot('app-store-03-history-tab');
