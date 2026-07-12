@@ -64,6 +64,7 @@ storage, sync, database schemas, or release validation.
 Before declaring code work complete:
 
 - Identify the public behavior, edge cases, and failure cases introduced or changed.
+- When feedback reports a bug or regression, first add a test that reproduces the failure and confirm that it fails before implementing the fix.
 - Add or update unit tests for detailed business logic paths.
 - Add or update component behavior tests when UI behavior changes.
 - Add or update integration tests when SQLite, puzzle packs, sync, engine bridges, or migrations change.
