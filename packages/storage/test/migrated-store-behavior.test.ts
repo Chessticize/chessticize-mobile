@@ -115,7 +115,7 @@ for (const label of STORE_LABELS) {
           maxMistakes: 3,
           theme
         },
-        "2026-06-20T00:00:00.000Z"
+        "2026-06-20T12:00:00.000Z"
       );
       assert.equal(sprint.currentPuzzle?.puzzle.id, puzzle.id);
 
@@ -161,15 +161,15 @@ for (const label of STORE_LABELS) {
           maxMistakes: 1,
           theme
         },
-        "2026-06-20T00:00:00.000Z"
+        "2026-06-20T12:00:00.000Z"
       );
-      const wrongResult = service.submitMove("c4b5", "2026-06-20T00:00:05.000Z");
+      const wrongResult = service.submitMove("c4b5", "2026-06-20T12:00:05.000Z");
       assert.equal(wrongResult.attempt?.result, "wrong");
 
       // getDueReviewItems returns every due item across the whole store (it is not
       // scoped by rating key), so a migrated legacy database can legitimately have
       // its own unrelated due items already in the list alongside this one.
-      const dueBefore = service.getDueReviewItems("2026-06-21T00:00:05.000Z");
+      const dueBefore = service.getDueReviewItems("2026-06-21T12:00:05.000Z");
       assert.ok(dueBefore.some((item) => item.puzzle.id === puzzle.id));
 
       service.recordReviewAttempt(
@@ -180,12 +180,12 @@ for (const label of STORE_LABELS) {
           result: "correct",
           submittedMove: "e2e6",
           expectedMove: "e2e6",
-          startedAt: "2026-06-21T00:00:00.000Z"
+          startedAt: "2026-06-21T12:00:00.000Z"
         },
-        "2026-06-21T00:00:05.000Z"
+        "2026-06-21T12:00:05.000Z"
       );
 
-      const dueAfter = service.getDueReviewItems("2026-06-22T00:00:00.000Z");
+      const dueAfter = service.getDueReviewItems("2026-06-21T12:00:05.000Z");
       assert.ok(!dueAfter.some((item) => item.puzzle.id === puzzle.id));
     } finally {
       await cleanup();

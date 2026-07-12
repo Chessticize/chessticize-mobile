@@ -63,6 +63,8 @@ describe('Key user flows', () => {
     // Mistakes schedule for the next day, so nothing is due yet: the empty
     // state must surface the next due estimate and offer practice instead.
     await openTab('review-tab', 'review-empty-state');
+    await waitFor(element(by.id('review-tomorrow-count'))).toHaveText('3').withTimeout(10000);
+    await waitFor(element(by.id('review-next-seven-days-count'))).toHaveText('3').withTimeout(10000);
     await waitFor(element(by.id('review-total-count'))).toHaveText('3').withTimeout(10000);
     await waitForElementTextContaining('review-next-due', 'Next:', 10000);
     await expect(element(by.id('review-empty-practice'))).toBeVisible();
@@ -121,7 +123,7 @@ describe('Key user flows', () => {
     await waitForVisibleInPracticeScroll('settings-review-reminder-fixed-1900');
     await element(by.id('settings-review-reminder-fixed-1900')).tap();
     await waitForElementTextContaining('settings-review-reminder-schedule-status', 'scheduled|', 10000);
-    await waitForElementTextContaining('settings-review-reminder-schedule-status', '|3|3 puzzles are ready for review|review', 10000);
+    await waitForElementTextContaining('settings-review-reminder-schedule-status', '|3|3 reviews are ready|review', 10000);
 
     await waitForVisibleInPracticeScroll('settings-review-reminder-off');
     await element(by.id('settings-review-reminder-off')).tap();

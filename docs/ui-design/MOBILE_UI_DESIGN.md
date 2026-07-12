@@ -433,17 +433,19 @@ Custom sprint behavior:
 - Scheduled Review should use the same adaptive board-slot sizing as active sprint, with review controls moving into the side/control rail in landscape and regular-width layouts.
 - Standard review items use the original puzzle-solving flow and preserve the relevant target pace, such as a 20-second item from a 20-second sprint. Legacy Blitz history may still be displayed for compatibility, but Blitz is no longer a current mobile practice entry.
 - Arrow Duel review items use the Arrow Duel choice flow.
-- Correct reviews increase interval; failed reviews reset or shorten interval.
+- Correct reviews advance through 1, 3, 7, 14, 30, and 60 calendar-day
+  intervals. Failed scheduled reviews reset to the next review day.
 - The original sprint mistake creates a Scheduled Review queue item but is not itself a review-time lapse. Queue items start with `lapseCount = 0`; failed Scheduled Review attempts increment lapses; successful Scheduled Review attempts reduce lapses toward zero.
-- Difficulty groups use review-time state: Easy means the item has no current lapse and the latest official review result was correct; Medium means the item is due from an original sprint miss with no review-time lapse; Hard means at least one failed Scheduled Review lapse remains.
 - The "Failed again" filter matches review-time lapses only. It must not match every item that originated from a sprint mistake.
-- Due and overdue are different states. A review is due when `dueAt <= now`; it
-  is overdue only when it is more than 24 hours past `dueAt`. Practice badges,
-  Review summaries, filters, difficulty details, and queue rows must all use
-  this shared core definition.
+- Due and overdue are different calendar-day states. A review is due when
+  `dueDay <= today` and overdue when `dueDay < today`. The local review day
+  rolls over at 04:00. Practice badges, Review summaries, filters, and queue
+  rows must all use this shared core definition.
 - Empty state should say when the next review is due and offer regular practice.
 - Review cards should show mode, theme, last wrong date, due state, current interval, and source sprint type.
-- The default Review Queue surface shows the due summary plus difficulty group rows for calm density; per-item review cards and grouped starts appear in the expanded filter view.
+- The default Review Queue surface shows Today, Tomorrow, Next 7 days, and
+  Total workload counts; per-item review cards and grouped starts appear in the
+  expanded filter view. Overdue appears only when the count is nonzero.
 - Review queue counts include only locally resolvable puzzles. If a queue row references a puzzle that is no longer available in the active local pack, the backend removes that row before the UI computes due, overdue, and total counts.
 - The user can stop a Scheduled Review session at any time. Completed items are saved; unseen items remain due or overdue.
 - After a Scheduled Review batch, the user may open Analysis Review for missed items. That follow-up inspection does not create history rows and does not update the schedule.
@@ -539,11 +541,11 @@ Scheduling rules:
   back to 19:00 local time.
 - The user can override the smart default with a fixed time, or disable
   reminders entirely, from a Notifications section in Settings.
-- The notification copy includes the due count, for example "12 puzzles are
-  ready for review". Tapping it opens the Review tab.
+- The notification copy includes the due count, for example "12 reviews are
+  ready". Tapping it opens the Review tab.
 - The next reminder is (re)scheduled whenever the review queue changes and when
   the app backgrounds, using the projected due count at the reminder time
-  (computable locally from stored `dueAt` timestamps).
+  (computable locally from stored `dueDay` values).
 
 Permission flow:
 

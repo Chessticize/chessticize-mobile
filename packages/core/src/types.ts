@@ -170,8 +170,8 @@ export interface ReviewQueueState {
   puzzleId: string;
   mode: SprintMode;
   ratingKey: string;
-  dueAt: string;
-  intervalHours: number;
+  dueDay: string;
+  intervalDays: number;
   reviewCount: number;
   successStreak: number;
   lapseCount: number;
@@ -195,4 +195,5 @@ export interface ReviewScheduleInput {
   previous?: ReviewQueueState;
   result: AttemptResult;
   now: string;
+  timeZone?: string;
 }

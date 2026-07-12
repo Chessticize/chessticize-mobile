@@ -31,6 +31,7 @@ import type { HistoryFilter } from "./query-types.ts";
 import type {
   ClearLocalHistoryResult,
   ExportedSprintSession,
+  LocalDataImport,
   LocalDataImportResult,
   LocalDataExport,
   PracticeSettings,
@@ -215,7 +216,7 @@ export class PracticeService {
     return this.store.exportLocalData();
   }
 
-  importLocalData(data: LocalDataExport): LocalDataImportResult {
+  importLocalData(data: LocalDataImport): LocalDataImportResult {
     const result = this.store.importLocalData(data);
     return {
       ...result,

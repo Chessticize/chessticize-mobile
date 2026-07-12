@@ -1,5 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+
+process.env.TZ = "UTC";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import {
@@ -12,6 +14,7 @@ import {
   syncPracticeProgress
 } from "../src/index.ts";
 import type { ProgressSyncSnapshot, ProgressSyncTransport } from "../src/index.ts";
+import type { LocalDataImport } from "../src/index.ts";
 import { defaultSprintConfig } from "../../core/src/index.ts";
 import type { Puzzle, SprintState } from "../../core/src/index.ts";
 
@@ -118,6 +121,44 @@ test("syncPracticeProgress imports another device snapshot before uploading the 
   assert.equal(transport.saved[0]?.data.attempts.length, 1);
   assert.equal(transport.saved[0]?.data.sprintSessions.length, 1);
   assert.equal(transport.saved[0]?.data.settings.sync.iCloudEnabled, true);
+});
+
+test("mergeLocalDataExports upgrades legacy timestamp-based review queue entries", async () => {
+  const localService = new PracticeService(await seededMemoryStore());
+  const remoteService = new PracticeService(await seededMemoryStore());
+  recordWrongStandardAttempt(remoteService);
+  const remote = remoteService.exportLocalData();
+  const { dueDay: _dueDay, intervalDays: _intervalDays, ...legacyReview } = remote.reviewQueue[0]!;
+  const legacyRemote: LocalDataImport = {
+    ...remote,
+    reviewQueue: [legacyReview]
+  };
+
+  const merged = mergeLocalDataExports(localService.exportLocalData(), legacyRemote);
+
+  assert.equal(merged.reviewQueue[0]?.dueDay, "2026-06-20");
+  assert.equal(merged.reviewQueue[0]?.intervalDays, 1);
+  assert.equal(merged.reviewQueue[0]?.dueAt, "2026-06-20T04:00:00.000Z");
+  assert.equal(merged.reviewQueue[0]?.intervalHours, 24);
+});
+
+test("review sync resolves conflicts by last review time and then due day", async () => {
+  const service = new PracticeService(await seededMemoryStore());
+  recordWrongStandardAttempt(service);
+  const local = service.exportLocalData();
+  const base = local.reviewQueue[0]!;
+  local.reviewQueue = [{ ...base, dueDay: "2026-07-10", lastReviewedAt: "2026-07-01T12:00:00.000Z" }];
+  const newerRemote: LocalDataImport = {
+    ...structuredClone(local),
+    reviewQueue: [{ ...base, dueDay: "2026-07-05", lastReviewedAt: "2026-07-02T12:00:00.000Z" }]
+  };
+  const sameTimeRemote: LocalDataImport = {
+    ...structuredClone(local),
+    reviewQueue: [{ ...base, dueDay: "2026-07-12", lastReviewedAt: "2026-07-01T12:00:00.000Z" }]
+  };
+
+  assert.equal(mergeLocalDataExports(local, newerRemote).reviewQueue[0]?.dueDay, "2026-07-05");
+  assert.equal(mergeLocalDataExports(local, sameTimeRemote).reviewQueue[0]?.dueDay, "2026-07-12");
 });
 
 test("pack-backed SQLite sync makes remote progress readable when referenced puzzles only exist in the bundled pack", async () => {

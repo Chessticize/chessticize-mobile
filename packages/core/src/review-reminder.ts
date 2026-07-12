@@ -1,3 +1,4 @@
+import { isReviewDay, reviewDayFor } from "./review-scheduler.ts";
 import type { ReviewQueueState } from "./types.ts";
 
 export type ReviewReminderSettings =
@@ -23,7 +24,7 @@ const FALLBACK_REMINDER_HOUR = 19;
 const FALLBACK_REMINDER_MINUTE = 0;
 
 export function computeNextReminder(
-  queue: Pick<ReviewQueueState, "dueAt">[],
+  queue: Pick<ReviewQueueState, "dueDay">[],
   usageHistory: ReviewReminderUsageEntry[],
   settings: ReviewReminderSettings,
   now: string | number | Date
@@ -32,35 +33,30 @@ export function computeNextReminder(
   if (settings.kind === "off") {
     return undefined;
   }
-  const dueTimes = queue
-    .map((review) => new Date(review.dueAt).getTime())
-    .filter(Number.isFinite);
-  if (dueTimes.length === 0) {
+  const dueDays = queue.map((review) => review.dueDay).filter(isReviewDay).sort();
+  if (dueDays.length === 0) {
     return undefined;
   }
 
   const reminderTime = reminderLocalTime(settings, usageHistory, nowDate);
-  const latestDueTime = Math.max(...dueTimes);
+  const latestDueDay = dueDays[dueDays.length - 1]!;
   let candidate = nextLocalReminderAt(nowDate, reminderTime);
-  const searchEnd = localReminderAt(new Date(latestDueTime), reminderTime);
-  if (searchEnd.getTime() < latestDueTime) {
-    searchEnd.setDate(searchEnd.getDate() + 1);
-  }
-
-  while (candidate.getTime() <= searchEnd.getTime()) {
-    const dueCount = dueTimes.filter((dueAt) => dueAt <= candidate.getTime()).length;
+  while (true) {
+    const candidateReviewDay = reviewDayFor(candidate);
+    const dueCount = dueDays.filter((dueDay) => dueDay <= candidateReviewDay).length;
     if (dueCount > 0) {
       return {
         scheduledAt: candidate.toISOString(),
         dueCount,
-        body: `${dueCount} ${dueCount === 1 ? "puzzle is" : "puzzles are"} ready for review`,
+        body: `${dueCount} ${dueCount === 1 ? "review is" : "reviews are"} ready`,
         route: "review"
       };
     }
+    if (candidateReviewDay >= latestDueDay) {
+      return undefined;
+    }
     candidate = addLocalDays(candidate, 1);
   }
-
-  return undefined;
 }
 
 function reminderLocalTime(

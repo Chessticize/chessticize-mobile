@@ -17,6 +17,7 @@ import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./
 import type {
   ClearLocalHistoryResult,
   ExportedSprintSession,
+  LocalDataImport,
   LocalDataImportResult,
   LocalDataExport,
   PracticeSettings,
@@ -130,7 +131,7 @@ export class PackBackedPracticeStore implements PracticeStore {
     return this.userStore.exportLocalData();
   }
 
-  importLocalData(data: LocalDataExport): LocalDataImportResult {
+  importLocalData(data: LocalDataImport): LocalDataImportResult {
     const referencedPuzzleIds = new Set([
       ...data.attempts.map((attempt) => attempt.puzzleId),
       ...data.reviewQueue.map((review) => review.puzzleId)
