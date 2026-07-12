@@ -224,7 +224,7 @@ index 99152d0e193c3ff32b49cb57c78a5b09799a8617..27bd528cb50e65fefa778afe525945ca
  //# sourceMappingURL=skia-dots.js.map
 \ No newline at end of file
 diff --git a/lib/commonjs/hooks/use-board-gesture.js b/lib/commonjs/hooks/use-board-gesture.js
-index 26deda8bb43c022624db07d6ea463a1028f082f9..7a259314004153e73e83557d65df571288196c66 100644
+index 26deda8bb43c022624db07d6ea463a1028f082f9..ac8d79cbc8b97162d79bbd06ee463a297f4ce985 100644
 --- a/lib/commonjs/hooks/use-board-gesture.js
 +++ b/lib/commonjs/hooks/use-board-gesture.js
 @@ -19,7 +19,8 @@ const useBoardGesture = ({
@@ -336,7 +336,15 @@ index 26deda8bb43c022624db07d6ea463a1028f082f9..7a259314004153e73e83557d65df5712
      }).onUpdate(event => {
        'worklet';
  
-@@ -104,8 +141,12 @@ const useBoardGesture = ({
+@@ -97,25 +134,45 @@ const useBoardGesture = ({
+       // Subtracting pieceSize/2 converts from center back to top-left (translateX/Y)
+       squareState.translateX.set(event.x - touchOffsetX.get() - pieceSize / 2);
+       squareState.translateY.set(event.y - touchOffsetY.get() - pieceSize / 2);
+-    }).onEnd(() => {
++    }).onEnd((_event, success) => {
+       'worklet';
+ 
+       const square = draggedSquare.get();
        if (!square) return;
        const squareState = boardState.squares[square];
  
@@ -351,7 +359,24 @@ index 26deda8bb43c022624db07d6ea463a1028f082f9..7a259314004153e73e83557d65df5712
        if (!wasDragged) {
          draggedSquare.set(null);
          return;
-@@ -115,7 +156,8 @@ const useBoardGesture = ({
+       }
+       squareState.scale.set((0, _reactNativeReanimated.withSpring)(1, animations.scale));
+ 
++      // The gesture was cancelled mid-drag (success === false: e.g. a board
++      // lock flipped `enabled` while the finger was down). Never derive a
++      // drop from wherever the cancellation caught the piece — snap it home
++      // and clear the selection like a failed drop would.
++      if (!success) {
++        const originalPos = (0, _useBoardState.squareToPosition)(square, pieceSize, flipped);
++        squareState.translateX.set((0, _reactNativeReanimated.withSpring)(originalPos.x, animations.snapBack));
++        squareState.translateY.set((0, _reactNativeReanimated.withSpring)(originalPos.y, animations.snapBack));
++        squareState.zIndex.set(0);
++        boardState.selectedSquare.set(null);
++        boardState.validMoves.set([]);
++        draggedSquare.set(null);
++        return;
++      }
++
        // Check if this is own piece - only own pieces can make moves
        const piece = squareState.piece.get();
        const turn = boardState.turn.get();
@@ -361,7 +386,7 @@ index 26deda8bb43c022624db07d6ea463a1028f082f9..7a259314004153e73e83557d65df5712
  
        // If not own piece, just snap back (can't make moves with opponent's pieces)
        if (!isOwnPiece) {
-@@ -147,6 +189,17 @@ const useBoardGesture = ({
+@@ -147,6 +204,17 @@ const useBoardGesture = ({
          draggedSquare.set(null);
          return;
        }
@@ -379,7 +404,7 @@ index 26deda8bb43c022624db07d6ea463a1028f082f9..7a259314004153e73e83557d65df5712
  
        // Invalid move - snap back to original position and clear selection
        const originalPos = (0, _useBoardState.squareToPosition)(square, pieceSize, flipped);
-@@ -172,6 +225,7 @@ const useBoardGesture = ({
+@@ -172,6 +240,7 @@ const useBoardGesture = ({
            squareState.zIndex.set(0);
          }
        }
@@ -387,7 +412,7 @@ index 26deda8bb43c022624db07d6ea463a1028f082f9..7a259314004153e73e83557d65df5712
        draggedSquare.set(null);
      });
  
-@@ -187,20 +241,30 @@ const useBoardGesture = ({
+@@ -187,20 +256,30 @@ const useBoardGesture = ({
        const selectedSquare = boardState.selectedSquare.get();
        const piece = boardState.squares[square].piece.get();
        const turn = boardState.turn.get();
@@ -422,7 +447,7 @@ index 26deda8bb43c022624db07d6ea463a1028f082f9..7a259314004153e73e83557d65df5712
          return;
        }
  
-@@ -213,18 +277,31 @@ const useBoardGesture = ({
+@@ -213,18 +292,31 @@ const useBoardGesture = ({
  
        // Case 4: Tapped on another own piece - switch selection
        if (isOwnPiece) {
@@ -518,6 +543,132 @@ index cfd52d5394e32d3972be93c85977c62f4ad30885..297972ef10bbda6a19b00c88166ac3a9
    const {
      boardState,
      chess
+diff --git a/lib/commonjs/state/move-executor.js b/lib/commonjs/state/move-executor.js
+index 983112b3bfd62a93c150077851c9cdc0e6fc5c48..f8fa26ab3fac55f953cd29f3e108dcbaa6fda8e2 100644
+--- a/lib/commonjs/state/move-executor.js
++++ b/lib/commonjs/state/move-executor.js
+@@ -61,51 +61,56 @@ const createMoveExecutor = (chess, boardState, config, callbacks) => {
+     if (!move) return null;
+     const fromState = boardState.squares[from];
+     const toState = boardState.squares[to];
+-    const movingPiece = fromState.piece.get();
+-
+-    // Handle capture - clear target square piece
+-    if (move.captured) {
+-      toState.piece.set(null);
+-    }
+ 
+     // Animate the piece
+     const toPos = (0, _useBoardState.squareToPosition)(to, pieceSize, flipped);
+     const fromPos = (0, _useBoardState.squareToPosition)(from, pieceSize, flipped);
+ 
+-    // Raise the moving piece
+-    fromState.zIndex.set(100);
++    // Pre-compute the final piece code to avoid capturing complex objects in
++    // worklet. Derived from the chess move (not the origin sprite slot) so a
++    // sprite-level desync can never plant a null piece on the destination.
++    const finalPieceCode = promotionPiece ? `${move.color}${promotionPiece}` : `${move.color}${move.piece}`;
+ 
+-    // Pre-compute the final piece code to avoid capturing complex objects in worklet
+-    const finalPieceCode = promotionPiece ? `${move.color}${promotionPiece}` : movingPiece;
++    // Migrate the piece to its destination slot immediately, so the sprite
++    // slots always match the chess position (chess.move already ran above).
++    // Parking the piece in the origin slot until the glide settled — the old
++    // flow — made a fast re-grab of a just-moved piece find an empty
++    // destination square, and any interruption of the glide (board reset,
++    // premove replay) left the sprite stranded on the wrong slot. The glide
++    // renders from the destination slot instead, starting wherever the piece
++    // currently is: the origin square for tap moves, or the drop point for
++    // drags. Setting the destination piece also consumes any captured piece.
++    const startX = fromState.translateX.get();
++    const startY = fromState.translateY.get();
++    fromState.piece.set(null);
++    fromState.translateX.set(fromPos.x);
++    fromState.translateY.set(fromPos.y);
++    fromState.zIndex.set(0);
++    toState.piece.set(finalPieceCode);
++    toState.translateX.set(startX);
++    toState.translateY.set(startY);
++    toState.zIndex.set(100);
+     const commitMove = finished => {
+       'worklet';
+ 
+-      // Only commit the sprite writes if the spring actually settled. A
+-      // cancelled spring (resetBoard, or a newer animation on the same
+-      // square) means whoever cancelled it now owns this square's state —
+-      // writing here would smear stale pieces onto the fresh board.
++      // The slots migrated at move time; settling only lowers the piece. A
++      // cancelled glide (resetBoard, a re-grab, or a newer animation on the
++      // same square) means whoever cancelled it owns the square's state now.
+       if (finished) {
+-        // Move complete - update piece positions
+-        toState.piece.set(finalPieceCode);
+-        fromState.piece.set(null);
+-
+-        // Reset position to original square for future use
+-        fromState.translateX.set(fromPos.x);
+-        fromState.translateY.set(fromPos.y);
+-        fromState.zIndex.set(0);
++        toState.zIndex.set(0);
+       }
+       if (onAnimationComplete) {
+         (0, _reactNativeWorklets.scheduleOnRN)(onAnimationComplete);
+       }
+     };
+ 
+-    // Attach the commit to an axis that actually travels. A spring whose
+-    // target equals its current value settles immediately — putting the
+-    // callback there commits the move before any motion happens, so the
+-    // piece teleports (horizontal moves have dy === 0).
+-    const movesVertically = toPos.y !== fromPos.y;
+-    fromState.translateX.set((0, _reactNativeReanimated.withSpring)(toPos.x, animations.move, movesVertically ? undefined : commitMove));
+-    fromState.translateY.set((0, _reactNativeReanimated.withSpring)(toPos.y, animations.move, movesVertically ? commitMove : undefined));
++    // Attach the commit to the axis with the larger travel. A spring whose
++    // target equals its current value settles immediately — riding a
++    // no-travel axis would fire the commit (and resolve tryMove) before any
++    // motion happens.
++    const movesVertically = Math.abs(toPos.y - startY) >= Math.abs(toPos.x - startX);
++    toState.translateX.set((0, _reactNativeReanimated.withSpring)(toPos.x, animations.move, movesVertically ? undefined : commitMove));
++    toState.translateY.set((0, _reactNativeReanimated.withSpring)(toPos.y, animations.move, movesVertically ? commitMove : undefined));
+ 
+     // Handle castling - move the rook
+     if (move.flags.includes('k') || move.flags.includes('q')) {
+@@ -115,22 +120,22 @@ const createMoveExecutor = (chess, boardState, config, callbacks) => {
+       const rookTo = (isKingside ? 'f' : 'd') + rank;
+       const rookFromState = boardState.squares[rookFrom];
+       const rookToState = boardState.squares[rookTo];
+-      const rookPiece = rookFromState.piece.get();
++      const rookPiece = `${move.color}r`;
+       const rookToPos = (0, _useBoardState.squareToPosition)(rookTo, pieceSize, flipped);
+       const rookFromPos = (0, _useBoardState.squareToPosition)(rookFrom, pieceSize, flipped);
+ 
+-      // The rook slides along its rank — horizontal — so the commit must
+-      // ride the X spring (the Y spring settles instantly; see commitMove).
+-      rookFromState.translateX.set((0, _reactNativeReanimated.withSpring)(rookToPos.x, animations.move, finished => {
+-        'worklet';
+-
+-        if (!finished) return;
+-        rookToState.piece.set(rookPiece);
+-        rookFromState.piece.set(null);
+-        rookFromState.translateX.set(rookFromPos.x);
+-        rookFromState.translateY.set(rookFromPos.y);
+-      }));
+-      rookFromState.translateY.set((0, _reactNativeReanimated.withSpring)(rookToPos.y, animations.move));
++      // Same immediate slot migration as the moving piece: the rook lives in
++      // its destination slot from move time and glides in from its origin.
++      const rookStartX = rookFromState.translateX.get();
++      const rookStartY = rookFromState.translateY.get();
++      rookFromState.piece.set(null);
++      rookFromState.translateX.set(rookFromPos.x);
++      rookFromState.translateY.set(rookFromPos.y);
++      rookToState.piece.set(rookPiece);
++      rookToState.translateX.set(rookStartX);
++      rookToState.translateY.set(rookStartY);
++      rookToState.translateX.set((0, _reactNativeReanimated.withSpring)(rookToPos.x, animations.move));
++      rookToState.translateY.set((0, _reactNativeReanimated.withSpring)(rookToPos.y, animations.move));
+     }
+ 
+     // Handle en passant - remove the captured pawn
 diff --git a/lib/commonjs/state/use-board-state.js b/lib/commonjs/state/use-board-state.js
 index 0a6faf6b1ec0b5ac518104d513f3e1a0a9c1a9b6..f0a6b84915dffd222515509afacfd51695484987 100644
 --- a/lib/commonjs/state/use-board-state.js
@@ -762,7 +913,7 @@ index 120f116f938d6bf19ed350321959c9c5a860b48a..863f4f5380a90afb2c2f1ed1508efe19
  //# sourceMappingURL=skia-dots.js.map
 \ No newline at end of file
 diff --git a/lib/module/hooks/use-board-gesture.js b/lib/module/hooks/use-board-gesture.js
-index 504126e4dc0a469cf5b00913e176e360322a1194..cd262b2763ce7b9a096513948d363934a49e80a4 100644
+index 504126e4dc0a469cf5b00913e176e360322a1194..fc26fec8d6204ea4c07e4c6978ccbacccee94e68 100644
 --- a/lib/module/hooks/use-board-gesture.js
 +++ b/lib/module/hooks/use-board-gesture.js
 @@ -13,7 +13,8 @@ export const useBoardGesture = ({
@@ -874,7 +1025,15 @@ index 504126e4dc0a469cf5b00913e176e360322a1194..cd262b2763ce7b9a096513948d363934
      }).onUpdate(event => {
        'worklet';
  
-@@ -98,8 +135,12 @@ export const useBoardGesture = ({
+@@ -91,25 +128,45 @@ export const useBoardGesture = ({
+       // Subtracting pieceSize/2 converts from center back to top-left (translateX/Y)
+       squareState.translateX.set(event.x - touchOffsetX.get() - pieceSize / 2);
+       squareState.translateY.set(event.y - touchOffsetY.get() - pieceSize / 2);
+-    }).onEnd(() => {
++    }).onEnd((_event, success) => {
+       'worklet';
+ 
+       const square = draggedSquare.get();
        if (!square) return;
        const squareState = boardState.squares[square];
  
@@ -889,7 +1048,24 @@ index 504126e4dc0a469cf5b00913e176e360322a1194..cd262b2763ce7b9a096513948d363934
        if (!wasDragged) {
          draggedSquare.set(null);
          return;
-@@ -109,7 +150,8 @@ export const useBoardGesture = ({
+       }
+       squareState.scale.set(withSpring(1, animations.scale));
+ 
++      // The gesture was cancelled mid-drag (success === false: e.g. a board
++      // lock flipped `enabled` while the finger was down). Never derive a
++      // drop from wherever the cancellation caught the piece — snap it home
++      // and clear the selection like a failed drop would.
++      if (!success) {
++        const originalPos = squareToPosition(square, pieceSize, flipped);
++        squareState.translateX.set(withSpring(originalPos.x, animations.snapBack));
++        squareState.translateY.set(withSpring(originalPos.y, animations.snapBack));
++        squareState.zIndex.set(0);
++        boardState.selectedSquare.set(null);
++        boardState.validMoves.set([]);
++        draggedSquare.set(null);
++        return;
++      }
++
        // Check if this is own piece - only own pieces can make moves
        const piece = squareState.piece.get();
        const turn = boardState.turn.get();
@@ -899,7 +1075,7 @@ index 504126e4dc0a469cf5b00913e176e360322a1194..cd262b2763ce7b9a096513948d363934
  
        // If not own piece, just snap back (can't make moves with opponent's pieces)
        if (!isOwnPiece) {
-@@ -141,6 +183,17 @@ export const useBoardGesture = ({
+@@ -141,6 +198,17 @@ export const useBoardGesture = ({
          draggedSquare.set(null);
          return;
        }
@@ -917,7 +1093,7 @@ index 504126e4dc0a469cf5b00913e176e360322a1194..cd262b2763ce7b9a096513948d363934
  
        // Invalid move - snap back to original position and clear selection
        const originalPos = squareToPosition(square, pieceSize, flipped);
-@@ -166,6 +219,7 @@ export const useBoardGesture = ({
+@@ -166,6 +234,7 @@ export const useBoardGesture = ({
            squareState.zIndex.set(0);
          }
        }
@@ -925,7 +1101,7 @@ index 504126e4dc0a469cf5b00913e176e360322a1194..cd262b2763ce7b9a096513948d363934
        draggedSquare.set(null);
      });
  
-@@ -181,20 +235,30 @@ export const useBoardGesture = ({
+@@ -181,20 +250,30 @@ export const useBoardGesture = ({
        const selectedSquare = boardState.selectedSquare.get();
        const piece = boardState.squares[square].piece.get();
        const turn = boardState.turn.get();
@@ -960,7 +1136,7 @@ index 504126e4dc0a469cf5b00913e176e360322a1194..cd262b2763ce7b9a096513948d363934
          return;
        }
  
-@@ -207,18 +271,31 @@ export const useBoardGesture = ({
+@@ -207,18 +286,31 @@ export const useBoardGesture = ({
  
        // Case 4: Tapped on another own piece - switch selection
        if (isOwnPiece) {
@@ -1057,6 +1233,132 @@ index 9c5fc37c72a09fa6a338aba03bd0433d0c09573e..9c781af9859d91627effe7113c653689
    const {
      boardState,
      chess
+diff --git a/lib/module/state/move-executor.js b/lib/module/state/move-executor.js
+index f2f179f71c94846c9cbe456e5889ac1b5c0714d9..480964882e0888e30a23534d29df5b95952a02a8 100644
+--- a/lib/module/state/move-executor.js
++++ b/lib/module/state/move-executor.js
+@@ -55,51 +55,56 @@ export const createMoveExecutor = (chess, boardState, config, callbacks) => {
+     if (!move) return null;
+     const fromState = boardState.squares[from];
+     const toState = boardState.squares[to];
+-    const movingPiece = fromState.piece.get();
+-
+-    // Handle capture - clear target square piece
+-    if (move.captured) {
+-      toState.piece.set(null);
+-    }
+ 
+     // Animate the piece
+     const toPos = squareToPosition(to, pieceSize, flipped);
+     const fromPos = squareToPosition(from, pieceSize, flipped);
+ 
+-    // Raise the moving piece
+-    fromState.zIndex.set(100);
++    // Pre-compute the final piece code to avoid capturing complex objects in
++    // worklet. Derived from the chess move (not the origin sprite slot) so a
++    // sprite-level desync can never plant a null piece on the destination.
++    const finalPieceCode = promotionPiece ? `${move.color}${promotionPiece}` : `${move.color}${move.piece}`;
+ 
+-    // Pre-compute the final piece code to avoid capturing complex objects in worklet
+-    const finalPieceCode = promotionPiece ? `${move.color}${promotionPiece}` : movingPiece;
++    // Migrate the piece to its destination slot immediately, so the sprite
++    // slots always match the chess position (chess.move already ran above).
++    // Parking the piece in the origin slot until the glide settled — the old
++    // flow — made a fast re-grab of a just-moved piece find an empty
++    // destination square, and any interruption of the glide (board reset,
++    // premove replay) left the sprite stranded on the wrong slot. The glide
++    // renders from the destination slot instead, starting wherever the piece
++    // currently is: the origin square for tap moves, or the drop point for
++    // drags. Setting the destination piece also consumes any captured piece.
++    const startX = fromState.translateX.get();
++    const startY = fromState.translateY.get();
++    fromState.piece.set(null);
++    fromState.translateX.set(fromPos.x);
++    fromState.translateY.set(fromPos.y);
++    fromState.zIndex.set(0);
++    toState.piece.set(finalPieceCode);
++    toState.translateX.set(startX);
++    toState.translateY.set(startY);
++    toState.zIndex.set(100);
+     const commitMove = finished => {
+       'worklet';
+ 
+-      // Only commit the sprite writes if the spring actually settled. A
+-      // cancelled spring (resetBoard, or a newer animation on the same
+-      // square) means whoever cancelled it now owns this square's state —
+-      // writing here would smear stale pieces onto the fresh board.
++      // The slots migrated at move time; settling only lowers the piece. A
++      // cancelled glide (resetBoard, a re-grab, or a newer animation on the
++      // same square) means whoever cancelled it owns the square's state now.
+       if (finished) {
+-        // Move complete - update piece positions
+-        toState.piece.set(finalPieceCode);
+-        fromState.piece.set(null);
+-
+-        // Reset position to original square for future use
+-        fromState.translateX.set(fromPos.x);
+-        fromState.translateY.set(fromPos.y);
+-        fromState.zIndex.set(0);
++        toState.zIndex.set(0);
+       }
+       if (onAnimationComplete) {
+         scheduleOnRN(onAnimationComplete);
+       }
+     };
+ 
+-    // Attach the commit to an axis that actually travels. A spring whose
+-    // target equals its current value settles immediately — putting the
+-    // callback there commits the move before any motion happens, so the
+-    // piece teleports (horizontal moves have dy === 0).
+-    const movesVertically = toPos.y !== fromPos.y;
+-    fromState.translateX.set(withSpring(toPos.x, animations.move, movesVertically ? undefined : commitMove));
+-    fromState.translateY.set(withSpring(toPos.y, animations.move, movesVertically ? commitMove : undefined));
++    // Attach the commit to the axis with the larger travel. A spring whose
++    // target equals its current value settles immediately — riding a
++    // no-travel axis would fire the commit (and resolve tryMove) before any
++    // motion happens.
++    const movesVertically = Math.abs(toPos.y - startY) >= Math.abs(toPos.x - startX);
++    toState.translateX.set(withSpring(toPos.x, animations.move, movesVertically ? undefined : commitMove));
++    toState.translateY.set(withSpring(toPos.y, animations.move, movesVertically ? commitMove : undefined));
+ 
+     // Handle castling - move the rook
+     if (move.flags.includes('k') || move.flags.includes('q')) {
+@@ -109,22 +114,22 @@ export const createMoveExecutor = (chess, boardState, config, callbacks) => {
+       const rookTo = (isKingside ? 'f' : 'd') + rank;
+       const rookFromState = boardState.squares[rookFrom];
+       const rookToState = boardState.squares[rookTo];
+-      const rookPiece = rookFromState.piece.get();
++      const rookPiece = `${move.color}r`;
+       const rookToPos = squareToPosition(rookTo, pieceSize, flipped);
+       const rookFromPos = squareToPosition(rookFrom, pieceSize, flipped);
+ 
+-      // The rook slides along its rank — horizontal — so the commit must
+-      // ride the X spring (the Y spring settles instantly; see commitMove).
+-      rookFromState.translateX.set(withSpring(rookToPos.x, animations.move, finished => {
+-        'worklet';
+-
+-        if (!finished) return;
+-        rookToState.piece.set(rookPiece);
+-        rookFromState.piece.set(null);
+-        rookFromState.translateX.set(rookFromPos.x);
+-        rookFromState.translateY.set(rookFromPos.y);
+-      }));
+-      rookFromState.translateY.set(withSpring(rookToPos.y, animations.move));
++      // Same immediate slot migration as the moving piece: the rook lives in
++      // its destination slot from move time and glides in from its origin.
++      const rookStartX = rookFromState.translateX.get();
++      const rookStartY = rookFromState.translateY.get();
++      rookFromState.piece.set(null);
++      rookFromState.translateX.set(rookFromPos.x);
++      rookFromState.translateY.set(rookFromPos.y);
++      rookToState.piece.set(rookPiece);
++      rookToState.translateX.set(rookStartX);
++      rookToState.translateY.set(rookStartY);
++      rookToState.translateX.set(withSpring(rookToPos.x, animations.move));
++      rookToState.translateY.set(withSpring(rookToPos.y, animations.move));
+     }
+ 
+     // Handle en passant - remove the captured pawn
 diff --git a/lib/module/state/use-board-state.js b/lib/module/state/use-board-state.js
 index 70c2cecb9088e81c71bbda522458e5602b3ccfe6..9d563aa5f475e81ed83a3eb55d713e51b0f1e94d 100644
 --- a/lib/module/state/use-board-state.js
@@ -1523,7 +1825,7 @@ index 5032bfe81a485ff85d710e7d6e4c0a2e8d78347e..041ff73a79b81185b4719c5e53c6e56e
  );
  
 diff --git a/src/hooks/use-board-gesture.ts b/src/hooks/use-board-gesture.ts
-index 92df972f7ec3c671308e8cc0e6cd275469a7144d..2e8e0c59318dd785acc4d0254492700ac8d16986 100644
+index 92df972f7ec3c671308e8cc0e6cd275469a7144d..8b7eaf249e2805d8ec5246da8ee697673b44c194 100644
 --- a/src/hooks/use-board-gesture.ts
 +++ b/src/hooks/use-board-gesture.ts
 @@ -22,7 +22,7 @@ export const useBoardGesture = ({
@@ -1575,31 +1877,31 @@ index 92df972f7ec3c671308e8cc0e6cd275469a7144d..2e8e0c59318dd785acc4d0254492700a
          const piece = squareState.piece.get();
 +        const turn = boardState.turn.get();
 +        const allowedDragColor = draggableColor ?? turn;
-+
-+        if (!piece || piece[0] !== allowedDragColor) {
-+          draggedSquare.set(null);
-+          return;
-+        }
  
 -        if (piece) {
 -          // Store drag start info (but don't start drag yet)
 -          draggedSquare.set(square);
 -          dragStartX.set(squareState.translateX.get());
 -          dragStartY.set(squareState.translateY.get());
++        if (!piece || piece[0] !== allowedDragColor) {
++          draggedSquare.set(null);
++          return;
++        }
++
 +        // Store drag start info (but don't start drag yet)
 +        draggedSquare.set(square);
 +        dragStartX.set(squareState.translateX.get());
 +        dragStartY.set(squareState.translateY.get());
++
++        const pieceCenterX = squareState.translateX.get() + pieceSize / 2;
++        const pieceCenterY = squareState.translateY.get() + pieceSize / 2;
++        touchOffsetX.set(x - pieceCenterX);
++        touchOffsetY.set(y - pieceCenterY);
  
 -          const pieceCenterX = squareState.translateX.get() + pieceSize / 2;
 -          const pieceCenterY = squareState.translateY.get() + pieceSize / 2;
 -          touchOffsetX.set(x - pieceCenterX);
 -          touchOffsetY.set(y - pieceCenterY);
-+        const pieceCenterX = squareState.translateX.get() + pieceSize / 2;
-+        const pieceCenterY = squareState.translateY.get() + pieceSize / 2;
-+        touchOffsetX.set(x - pieceCenterX);
-+        touchOffsetY.set(y - pieceCenterY);
-+
 +        // Start the valid-target calculation before the drag crosses the
 +        // min-distance threshold. Otherwise very fast drags can reach onEnd
 +        // before the RN-thread select callback has populated validMoves.
@@ -1638,7 +1940,15 @@ index 92df972f7ec3c671308e8cc0e6cd275469a7144d..2e8e0c59318dd785acc4d0254492700a
        })
        .onUpdate((event) => {
          'worklet';
-@@ -123,8 +159,12 @@ export const useBoardGesture = ({
+@@ -116,15 +152,19 @@ export const useBoardGesture = ({
+           event.y - touchOffsetY.get() - pieceSize / 2
+         );
+       })
+-      .onEnd(() => {
++      .onEnd((_event, success) => {
+         'worklet';
+         const square = draggedSquare.get();
+         if (!square) return;
  
          const squareState = boardState.squares[square];
  
@@ -1653,7 +1963,29 @@ index 92df972f7ec3c671308e8cc0e6cd275469a7144d..2e8e0c59318dd785acc4d0254492700a
          if (!wasDragged) {
            draggedSquare.set(null);
            return;
-@@ -135,7 +175,8 @@ export const useBoardGesture = ({
+@@ -132,10 +172,30 @@ export const useBoardGesture = ({
+ 
+         squareState.scale.set(withSpring(1, animations.scale));
+ 
++        // The gesture was cancelled mid-drag (success === false: e.g. a
++        // board lock flipped `enabled` while the finger was down). Never
++        // derive a drop from wherever the cancellation caught the piece —
++        // snap it home and clear the selection like a failed drop would.
++        if (!success) {
++          const originalPos = squareToPosition(square, pieceSize, flipped);
++          squareState.translateX.set(
++            withSpring(originalPos.x, animations.snapBack)
++          );
++          squareState.translateY.set(
++            withSpring(originalPos.y, animations.snapBack)
++          );
++          squareState.zIndex.set(0);
++          boardState.selectedSquare.set(null);
++          boardState.validMoves.set([]);
++          draggedSquare.set(null);
++          return;
++        }
++
          // Check if this is own piece - only own pieces can make moves
          const piece = squareState.piece.get();
          const turn = boardState.turn.get();
@@ -1663,7 +1995,7 @@ index 92df972f7ec3c671308e8cc0e6cd275469a7144d..2e8e0c59318dd785acc4d0254492700a
  
          // If not own piece, just snap back (can't make moves with opponent's pieces)
          if (!isOwnPiece) {
-@@ -180,6 +221,18 @@ export const useBoardGesture = ({
+@@ -180,6 +240,18 @@ export const useBoardGesture = ({
            return;
          }
  
@@ -1682,7 +2014,7 @@ index 92df972f7ec3c671308e8cc0e6cd275469a7144d..2e8e0c59318dd785acc4d0254492700a
          // Invalid move - snap back to original position and clear selection
          const originalPos = squareToPosition(square, pieceSize, flipped);
          squareState.translateX.set(
-@@ -208,6 +261,7 @@ export const useBoardGesture = ({
+@@ -208,6 +280,7 @@ export const useBoardGesture = ({
              squareState.zIndex.set(0);
            }
          }
@@ -1690,7 +2022,7 @@ index 92df972f7ec3c671308e8cc0e6cd275469a7144d..2e8e0c59318dd785acc4d0254492700a
          draggedSquare.set(null);
        });
  
-@@ -221,20 +275,30 @@ export const useBoardGesture = ({
+@@ -221,20 +294,30 @@ export const useBoardGesture = ({
          const selectedSquare = boardState.selectedSquare.get();
          const piece = boardState.squares[square].piece.get();
          const turn = boardState.turn.get();
@@ -1725,7 +2057,7 @@ index 92df972f7ec3c671308e8cc0e6cd275469a7144d..2e8e0c59318dd785acc4d0254492700a
            return;
          }
  
-@@ -247,17 +311,30 @@ export const useBoardGesture = ({
+@@ -247,17 +330,30 @@ export const useBoardGesture = ({
  
          // Case 4: Tapped on another own piece - switch selection
          if (isOwnPiece) {
@@ -1759,7 +2091,7 @@ index 92df972f7ec3c671308e8cc0e6cd275469a7144d..2e8e0c59318dd785acc4d0254492700a
    }, [
      boardState,
      pieceSize,
-@@ -267,8 +344,11 @@ export const useBoardGesture = ({
+@@ -267,8 +363,11 @@ export const useBoardGesture = ({
      dragStartY,
      touchOffsetX,
      touchOffsetY,
@@ -1844,6 +2176,145 @@ index 2f2990b96a62e49047a101e225317ab1a01b20ae..222650a2f245f85e9f15eab121943056
        flipped,
        withLetters,
        withNumbers,
+diff --git a/src/state/move-executor.ts b/src/state/move-executor.ts
+index 5957db9d36a2d7ab8800c7b171b0c8ef79052d8d..8e510990657826673f48d3f56dfb4aca92256981 100644
+--- a/src/state/move-executor.ts
++++ b/src/state/move-executor.ts
+@@ -104,59 +104,65 @@ export const createMoveExecutor = (
+ 
+     const fromState = boardState.squares[from];
+     const toState = boardState.squares[to];
+-    const movingPiece = fromState.piece.get();
+-
+-    // Handle capture - clear target square piece
+-    if (move.captured) {
+-      toState.piece.set(null);
+-    }
+ 
+     // Animate the piece
+     const toPos = squareToPosition(to, pieceSize, flipped);
+     const fromPos = squareToPosition(from, pieceSize, flipped);
+ 
+-    // Raise the moving piece
+-    fromState.zIndex.set(100);
+-
+-    // Pre-compute the final piece code to avoid capturing complex objects in worklet
++    // Pre-compute the final piece code to avoid capturing complex objects in
++    // worklet. Derived from the chess move (not the origin sprite slot) so a
++    // sprite-level desync can never plant a null piece on the destination.
+     const finalPieceCode: PieceCode = promotionPiece
+       ? (`${move.color}${promotionPiece}` as PieceCode)
+-      : movingPiece;
++      : (`${move.color}${move.piece}` as PieceCode);
++
++    // Migrate the piece to its destination slot immediately, so the sprite
++    // slots always match the chess position (chess.move already ran above).
++    // Parking the piece in the origin slot until the glide settled — the old
++    // flow — made a fast re-grab of a just-moved piece find an empty
++    // destination square, and any interruption of the glide (board reset,
++    // premove replay) left the sprite stranded on the wrong slot. The glide
++    // renders from the destination slot instead, starting wherever the piece
++    // currently is: the origin square for tap moves, or the drop point for
++    // drags. Setting the destination piece also consumes any captured piece.
++    const startX = fromState.translateX.get();
++    const startY = fromState.translateY.get();
++    fromState.piece.set(null);
++    fromState.translateX.set(fromPos.x);
++    fromState.translateY.set(fromPos.y);
++    fromState.zIndex.set(0);
++    toState.piece.set(finalPieceCode);
++    toState.translateX.set(startX);
++    toState.translateY.set(startY);
++    toState.zIndex.set(100);
+ 
+     const commitMove = (finished?: boolean) => {
+       'worklet';
+-      // Only commit the sprite writes if the spring actually settled. A
+-      // cancelled spring (resetBoard, or a newer animation on the same
+-      // square) means whoever cancelled it now owns this square's state —
+-      // writing here would smear stale pieces onto the fresh board.
++      // The slots migrated at move time; settling only lowers the piece. A
++      // cancelled glide (resetBoard, a re-grab, or a newer animation on the
++      // same square) means whoever cancelled it owns the square's state now.
+       if (finished) {
+-        // Move complete - update piece positions
+-        toState.piece.set(finalPieceCode);
+-        fromState.piece.set(null);
+-
+-        // Reset position to original square for future use
+-        fromState.translateX.set(fromPos.x);
+-        fromState.translateY.set(fromPos.y);
+-        fromState.zIndex.set(0);
++        toState.zIndex.set(0);
+       }
+       if (onAnimationComplete) {
+         scheduleOnRN(onAnimationComplete);
+       }
+     };
+ 
+-    // Attach the commit to an axis that actually travels. A spring whose
+-    // target equals its current value settles immediately — putting the
+-    // callback there commits the move before any motion happens, so the
+-    // piece teleports (horizontal moves have dy === 0).
+-    const movesVertically = toPos.y !== fromPos.y;
+-    fromState.translateX.set(
++    // Attach the commit to the axis with the larger travel. A spring whose
++    // target equals its current value settles immediately — riding a
++    // no-travel axis would fire the commit (and resolve tryMove) before any
++    // motion happens.
++    const movesVertically =
++      Math.abs(toPos.y - startY) >= Math.abs(toPos.x - startX);
++    toState.translateX.set(
+       withSpring(
+         toPos.x,
+         animations.move,
+         movesVertically ? undefined : commitMove
+       )
+     );
+-    fromState.translateY.set(
++    toState.translateY.set(
+       withSpring(
+         toPos.y,
+         animations.move,
+@@ -174,25 +180,23 @@ export const createMoveExecutor = (
+ 
+       const rookFromState = boardState.squares[rookFrom];
+       const rookToState = boardState.squares[rookTo];
+-      const rookPiece = rookFromState.piece.get();
++      const rookPiece = `${move.color}r` as PieceCode;
+ 
+       const rookToPos = squareToPosition(rookTo, pieceSize, flipped);
+       const rookFromPos = squareToPosition(rookFrom, pieceSize, flipped);
+ 
+-      // The rook slides along its rank — horizontal — so the commit must
+-      // ride the X spring (the Y spring settles instantly; see commitMove).
+-      rookFromState.translateX.set(
+-        withSpring(rookToPos.x, animations.move, (finished) => {
+-          'worklet';
+-          if (!finished) return;
+-          rookToState.piece.set(rookPiece);
+-          rookFromState.piece.set(null);
+-
+-          rookFromState.translateX.set(rookFromPos.x);
+-          rookFromState.translateY.set(rookFromPos.y);
+-        })
+-      );
+-      rookFromState.translateY.set(withSpring(rookToPos.y, animations.move));
++      // Same immediate slot migration as the moving piece: the rook lives in
++      // its destination slot from move time and glides in from its origin.
++      const rookStartX = rookFromState.translateX.get();
++      const rookStartY = rookFromState.translateY.get();
++      rookFromState.piece.set(null);
++      rookFromState.translateX.set(rookFromPos.x);
++      rookFromState.translateY.set(rookFromPos.y);
++      rookToState.piece.set(rookPiece);
++      rookToState.translateX.set(rookStartX);
++      rookToState.translateY.set(rookStartY);
++      rookToState.translateX.set(withSpring(rookToPos.x, animations.move));
++      rookToState.translateY.set(withSpring(rookToPos.y, animations.move));
+     }
+ 
+     // Handle en passant - remove the captured pawn
 diff --git a/src/state/types.ts b/src/state/types.ts
 index 2b02a76df0c9b736fe0c9f1089787dac919ae336..9b7139a692e2bdd344cc08284d36c4ab072fc6a2 100644
 --- a/src/state/types.ts
