@@ -3013,6 +3013,54 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "review-session")).toThrow();
   });
 
+  it.each([
+    { label: "iPhone bottom tabs", width: 430, height: 932, scale: 3, rail: false, badgeTop: -8 },
+    { label: "iPad expanded rail", width: 1180, height: 820, scale: 2, rail: true, badgeTop: -7 }
+  ])("keeps a two-digit review badge on one line at the icon's upper-right in $label", ({
+    width,
+    height,
+    scale,
+    rail,
+    badgeTop
+  }) => {
+    (ReactNative as unknown as {
+      __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
+    }).__setWindowDimensions?.({ width, height, scale, fontScale: scale });
+    jest.setSystemTime(new Date("2026-06-21T12:00:00.000Z"));
+
+    const renderer = renderScreen({ practiceService: createDueReviewService(16) });
+    const badge = findByTestId(renderer, "review-tab-badge");
+    const badgeStyle = flattenTestStyle(badge.props.style);
+    const iconStyle = flattenTestStyle(findByTestId(renderer, "review-tab-icon").props.style);
+
+    expect(collectText(badge)).toBe("16");
+    expect(badge.props.allowFontScaling).toBe(false);
+    expect(badge.props.numberOfLines).toBe(1);
+    expect(badgeStyle.left).toBe(24);
+    expect(badgeStyle.right).toBeUndefined();
+    expect(badgeStyle.top).toBe(badgeTop);
+    expect(badgeStyle.minHeight).toBe(18);
+    expect(badgeStyle.minWidth).toBe(18);
+    expect(badgeStyle.width).toBe(22);
+    expect(iconStyle.overflow).toBe("visible");
+    expect(iconStyle.width).toBe(32);
+    if (rail) {
+      expect(findByTestId(renderer, "navigation-rail").props.accessibilityLabel).toBe("Primary navigation rail");
+    } else {
+      expect(() => findByTestId(renderer, "navigation-rail")).toThrow();
+    }
+  });
+
+  it("caps a large review badge without wrapping", () => {
+    jest.setSystemTime(new Date("2026-06-21T12:00:00.000Z"));
+    const renderer = renderScreen({ practiceService: createDueReviewService(100) });
+    const badge = findByTestId(renderer, "review-tab-badge");
+
+    expect(collectText(badge)).toBe("99+");
+    expect(badge.props.numberOfLines).toBe(1);
+    expect(flattenTestStyle(badge.props.style).width).toBe(28);
+  });
+
   it("keeps a wrong due Arrow Duel review on the same puzzle until Continue is pressed", async () => {
     const service = createMobilePracticeService("random1000");
     let sprintState = service.startSprint(
@@ -3553,6 +3601,24 @@ function sharedHistoryPuzzle(): Puzzle {
     source: "lichess",
     stockfishBestMove: "e2e3"
   };
+}
+
+function createDueReviewService(count: number): PracticeService {
+  const store = new MemoryStore();
+  const puzzle = sharedHistoryPuzzle();
+  const puzzles = Array.from({ length: count }, (_, index) => ({
+    ...puzzle,
+    id: `review-badge-${index}`
+  }));
+  store.seedPuzzles(puzzles);
+  for (const item of puzzles) {
+    store.scheduleMistakeReview({
+      puzzleId: item.id,
+      mode: "standard",
+      ratingKey: "standard 5/20"
+    }, "2026-06-19T12:00:00.000Z");
+  }
+  return new PracticeService(store);
 }
 
 function historyAttempt(input: {

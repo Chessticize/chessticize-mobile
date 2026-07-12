@@ -7857,6 +7857,7 @@ function TabButton({
 }): React.JSX.Element {
   const hasBadge = badgeCount > 0;
   const badgeText = badgeCount > 99 ? "99+" : `${badgeCount}`;
+  const badgeWidth = badgeText.length === 1 ? 18 : badgeText.length === 2 ? 22 : 28;
   return (
     <Pressable
       accessibilityRole="tab"
@@ -7867,6 +7868,7 @@ function TabButton({
         styles.tabButton,
         presentation === "rail" ? styles.tabButtonRail : null,
         presentation === "rail" && expanded ? styles.tabButtonRailExpanded : null,
+        presentation === "rail" && expanded && hasBadge ? styles.tabButtonRailExpandedWithBadge : null,
         active ? styles.tabButtonActive : null
       ]}
       onPress={onPress}
@@ -7875,9 +7877,16 @@ function TabButton({
         <TabGlyph tab={tab} active={active} />
         {hasBadge ? (
           <Text
+            allowFontScaling={false}
             accessibilityElementsHidden
             importantForAccessibility="no-hide-descendants"
-            style={[styles.tabCountBadge, badgeTone === "danger" ? styles.tabCountBadgeDanger : null]}
+            numberOfLines={1}
+            style={[
+              styles.tabCountBadge,
+              presentation === "rail" ? styles.tabCountBadgeRail : styles.tabCountBadgeBottom,
+              { width: badgeWidth },
+              badgeTone === "danger" ? styles.tabCountBadgeDanger : null
+            ]}
             testID={`${testID}-badge`}
           >
             {badgeText}
@@ -8359,6 +8368,9 @@ const styles = StyleSheet.create({
     minHeight: 50,
     paddingHorizontal: 12
   },
+  tabButtonRailExpandedWithBadge: {
+    gap: 22
+  },
   tabButtonActive: {
     backgroundColor: "transparent"
   },
@@ -8367,9 +8379,9 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     height: 20,
     justifyContent: "center",
-    minWidth: 24,
-    paddingHorizontal: 5,
-    position: "relative"
+    overflow: "visible",
+    position: "relative",
+    width: 32
   },
   tabCountBadge: {
     backgroundColor: "#2563EB",
@@ -8379,14 +8391,25 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 9,
     fontWeight: "900",
-    lineHeight: 12,
-    minWidth: 14,
+    includeFontPadding: false,
+    lineHeight: 14,
+    minHeight: 18,
+    minWidth: 18,
     overflow: "hidden",
-    paddingHorizontal: 3,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
     position: "absolute",
-    right: -4,
     textAlign: "center",
-    top: -5
+    textAlignVertical: "center",
+    zIndex: 1
+  },
+  tabCountBadgeBottom: {
+    left: 24,
+    top: -8
+  },
+  tabCountBadgeRail: {
+    left: 24,
+    top: -7
   },
   tabCountBadgeDanger: {
     backgroundColor: "#DC2626"
