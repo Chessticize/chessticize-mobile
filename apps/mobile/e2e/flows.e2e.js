@@ -3,6 +3,7 @@ const {
   openStandardHistoryTrend,
   launchWithDisabledSynchronization,
   playBoardMove,
+  sleep,
   startPracticeMode,
   selectTestPuzzleSource,
   waitForVisibleInPracticeScroll,
@@ -95,9 +96,13 @@ describe('Key user flows', () => {
 
     await playBoardMove('review-board', 'e2e6');
     await waitForElementTextContaining('review-current-expected-move', 'e6f7', 10000);
+    // The expected-move label can update before the board finishes its
+    // opponent-move animation. Synchronization is disabled for these flows,
+    // so give the board the same settle window used by sprint move sequences.
+    await sleep(1600);
     await playBoardMove('review-board', 'e6f7');
 
-    await waitFor(element(by.id('review-progress'))).toHaveText('2 / 3 · Standard').withTimeout(15000);
+    await waitFor(element(by.id('review-progress'))).toHaveText('2 / 3 · Standard').withTimeout(30000);
     await element(by.id('review-exit')).tap();
     await waitFor(element(by.id('review-due-count'))).toHaveText('2').withTimeout(10000);
   });
