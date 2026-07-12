@@ -15,10 +15,34 @@ RCT_EXPORT_MODULE();
 - (NSDictionary *)constantsToExport
 {
   NSString *testNowMs = [self testNowMsFromProcessArguments];
-  if (testNowMs == nil) {
+  BOOL storeAssetCapture = [self hasProcessArgumentNamed:@"chessticizeStoreAssetCapture"];
+  if (testNowMs == nil && !storeAssetCapture) {
     return @{};
   }
-  return @{@"testNowMs": testNowMs};
+  NSMutableDictionary *constants = [NSMutableDictionary dictionary];
+  if (testNowMs != nil) {
+    constants[@"testNowMs"] = testNowMs;
+  }
+  if (storeAssetCapture) {
+    constants[@"storeAssetCapture"] = @YES;
+  }
+  return constants;
+}
+
+- (BOOL)hasProcessArgumentNamed:(NSString *)name
+{
+  NSString *dashedName = [@"-" stringByAppendingString:name];
+  NSString *plainPrefix = [name stringByAppendingString:@"="];
+  NSString *dashedPrefix = [dashedName stringByAppendingString:@"="];
+  for (NSString *argument in NSProcessInfo.processInfo.arguments) {
+    if ([argument isEqualToString:name] || [argument isEqualToString:dashedName]) {
+      return YES;
+    }
+    if ([argument hasPrefix:plainPrefix] || [argument hasPrefix:dashedPrefix]) {
+      return YES;
+    }
+  }
+  return NO;
 }
 
 - (NSString *)testNowMsFromProcessArguments
