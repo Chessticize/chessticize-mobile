@@ -100,16 +100,10 @@ export function mergeRatingWithSprintSessions(
   return rebuildRatingFromSessions(
     {
       ...base,
-      // A shorter history can still carry the cold-start RD (350). Reusing it
-      // would erase convergence from the device that has played more games.
-      // Equal-length histories may have diverged concurrently, so retain the
-      // more conservative uncertainty in that case.
-      ratingDeviation: normalizedIncoming.games === normalizedLocal.games
-        ? Math.max(
-            normalizedLocal.ratingDeviation ?? 0,
-            normalizedIncoming.ratingDeviation ?? 0
-          )
-        : base.ratingDeviation ?? DEFAULT_RATING_DEVIATION
+      ratingDeviation: Math.min(
+        normalizedLocal.ratingDeviation ?? DEFAULT_RATING_DEVIATION,
+        normalizedIncoming.ratingDeviation ?? DEFAULT_RATING_DEVIATION
+      )
     },
     [...sessions.values()]
   );

@@ -156,7 +156,7 @@ test("pack-backed SQLite sync makes remote progress readable when referenced puz
   }
 });
 
-test("mergeLocalDataExports conservatively merges same-generation rating deltas", async () => {
+test("mergeLocalDataExports merges same-generation rating deltas without increasing converged RD", async () => {
   const localService = new PracticeService(await seededMemoryStore());
   enableSync(localService);
   const local = localService.exportLocalData();
@@ -228,7 +228,7 @@ test("mergeLocalDataExports conservatively merges same-generation rating deltas"
 
   assert.equal(rating?.rating, 650);
   assert.equal(rating?.games, 2);
-  assert.equal(rating?.ratingDeviation, 90);
+  assert.equal(rating?.ratingDeviation, 70);
   assert.equal(rating?.volatility, 0.07);
   assert.deepEqual(merged.attempts.map((attempt) => attempt.id).sort(), ["local-win", "remote-loss"]);
 });
