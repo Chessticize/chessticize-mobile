@@ -1633,7 +1633,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "history-filter-toggle"))).toBe("");
     expect(collectText(findByTestId(renderer, "history-action-header"))).not.toContain("≡");
     expect(findByTestId(renderer, "history-filter-toggle").props.accessibilityState).toEqual({ expanded: false });
-    expect(findByTestId(renderer, "history-filter-reset").props.accessibilityLabel).toBe("Reset history filters");
+    expect(() => findByTestId(renderer, "history-filter-reset")).toThrow();
     expect(findByTestId(renderer, "history-primary-filters")).toBeTruthy();
     expect(() => findByTestId(renderer, "history-filter-summary-card")).toThrow();
     expect(findByTestId(renderer, "history-active-filter-summary")).toBeTruthy();
@@ -1702,6 +1702,8 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "history-review-status-filters")).toThrow();
     press(renderer, "history-filter-toggle");
     expect(findByTestId(renderer, "history-filter-toggle").props.accessibilityState).toEqual({ expanded: true });
+    expect(findByTestId(renderer, "history-filter-reset").props.accessibilityLabel).toBe("Reset history filters");
+    expect(collectText(findByTestId(renderer, "history-filter-reset"))).toBe("Reset filters");
     expect(findByTestId(renderer, "history-advanced-filters")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "history-rating-filters"))).toContain("Standard · 20s pace");
     expect(collectText(findByTestId(renderer, "history-rating-filters"))).not.toContain("standard 5/20");
@@ -1809,12 +1811,15 @@ describe("PracticePocScreen", () => {
     startStandardSprint(renderer);
     abandonSprint(renderer);
     press(renderer, "history-tab");
+    expect(() => findByTestId(renderer, "history-filter-reset")).toThrow();
 
     press(renderer, "history-filter-wrong-only");
     press(renderer, "history-filter-sprint-only");
     press(renderer, "history-range-max");
     press(renderer, "history-filter-toggle");
     press(renderer, "history-side-black");
+
+    expect(collectText(findByTestId(renderer, "history-filter-reset"))).toBe("Reset filters");
 
     expect(findByTestId(renderer, "history-filter-wrong-only").props.accessibilityState).toEqual({ checked: false });
     expect(findByTestId(renderer, "history-filter-sprint-only").props.accessibilityState).toEqual({ checked: false });

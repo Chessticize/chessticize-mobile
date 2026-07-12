@@ -158,6 +158,7 @@ describe('Key user flows', () => {
       .toBeVisible()
       .whileElement(by.id('history-range-filters'))
       .scroll(120, 'right');
+    await expect(element(by.id('history-filter-reset'))).not.toExist();
     await expect(element(by.id('history-filter-wrong-only'))).toHaveValue('1');
     await expect(element(by.id('history-filter-sprint-only'))).toHaveValue('1');
     await element(by.id('history-filter-wrong-only')).tap();
@@ -188,6 +189,10 @@ describe('Key user flows', () => {
     await element(by.id('review-exit')).tap();
     await waitFor(element(by.id('history-filter-wrong-only'))).toHaveValue('0').withTimeout(10000);
     await waitFor(element(by.id('history-filter-sprint-only'))).toHaveValue('0').withTimeout(10000);
+    await expect(element(by.id('history-filter-reset'))).not.toExist();
+    await element(by.id('history-filter-toggle')).tap();
+    await waitFor(element(by.id('history-filter-reset'))).toBeVisible().withTimeout(10000);
+    await expect(element(by.text('Reset filters'))).toExist();
     await element(by.id('history-filter-reset')).tap();
     await waitFor(element(by.id('history-filter-wrong-only'))).toHaveValue('1').withTimeout(10000);
     await waitFor(element(by.id('history-filter-sprint-only'))).toHaveValue('1').withTimeout(10000);
