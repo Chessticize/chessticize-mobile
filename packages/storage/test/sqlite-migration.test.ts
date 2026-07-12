@@ -5,6 +5,8 @@ import { copyFile, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+
+process.env.TZ = "UTC";
 import {
   CURRENT_SCHEMA_VERSION,
   NodeSqliteDatabase,
@@ -13,12 +15,14 @@ import {
 } from "../src/index.ts";
 import { SyncSQLiteStore, type SyncSqliteDatabase } from "../src/sync-sqlite-store.ts";
 import { computeSchemaSnapshot, type SchemaSnapshot } from "./schema-snapshot.ts";
+import type { Puzzle } from "../../core/src/index.ts";
 
 const RELEASED_V0_FIXTURE = resolve(
   "packages/storage/test/fixtures/migrations/schema-v0-ios-1.0.0.sqlite"
 );
 const RELEASED_V0_SHA256 = "f9746607dcd98c642a1b111be348dd7476ee12a239c10346b64abe069e6cad5f";
 const GOLDEN_SCHEMA_SNAPSHOTS_DIR = resolve("packages/storage/test/fixtures/schema-snapshots");
+const PUZZLE_FIXTURE = resolve("fixtures/puzzles/presolved-sample.json");
 const SNAPSHOT_TABLES = [
   "app_settings",
   "puzzles",
@@ -55,6 +59,110 @@ test("SQLite migrates an empty database to the current schema version", async ()
   }
 });
 
+test("SQLite v3 migration tags only safely inferred current-generation sprint sessions", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "chessticize-generation-migration-"));
+  const databasePath = join(directory, "practice.sqlite");
+  try {
+    const setupStore = new SQLiteStore(databasePath);
+    setupStore.migrate();
+    setupStore.seedPuzzles(await loadFixturePuzzles());
+    setupStore.close();
+    const legacy = new DatabaseSync(databasePath);
+    legacy.exec(`
+      INSERT INTO ratings (key, generation, rating, games, rating_deviation, volatility)
+      VALUES
+        ('standard 5/20', 0, 700, 1, 300, 0.06),
+        ('standard 5/20', 1, 650, 1, 250, 0.06),
+        ('arrow duel 5/30', 0, 620, 1, 300, 0.06);
+      INSERT INTO sprint_sessions (
+        id, mode, rating_key, rating_generation, config_json, started_at, deadline_at,
+        completed_at, status, correct_count, mistake_count, rating_before, rating_after
+      ) VALUES
+        ('pre-reset', 'standard', 'standard 5/20', NULL, '{}',
+          '2026-07-01T00:00:00.000Z', '2026-07-01T00:01:00.000Z', '2026-07-01T00:01:00.000Z',
+          'won', 1, 0, 600, 700),
+        ('current-generation', 'standard', 'standard 5/20', NULL, '{}',
+          '2026-07-02T00:00:00.000Z', '2026-07-02T00:01:00.000Z', '2026-07-02T00:01:00.000Z',
+          'won', 1, 0, 600, 650),
+        ('current-active', 'standard', 'standard 5/20', NULL, '{}',
+          '2026-07-03T00:00:00.000Z', '2026-07-03T00:05:00.000Z', NULL,
+          'active', 0, 0, 650, NULL),
+        ('generation-zero', 'arrow_duel', 'arrow duel 5/30', NULL, '{}',
+          '2026-07-01T00:00:00.000Z', '2026-07-01T00:01:00.000Z', '2026-07-01T00:01:00.000Z',
+          'won', 1, 0, 600, 620);
+      DROP INDEX sprint_sessions_rating_generation_completed_at_id_idx;
+      ALTER TABLE sprint_sessions DROP COLUMN rating_generation;
+      DROP TABLE review_events;
+      DROP TABLE review_queue;
+      CREATE TABLE review_queue (
+        puzzle_id TEXT NOT NULL,
+        mode TEXT NOT NULL DEFAULT 'standard',
+        rating_key TEXT NOT NULL DEFAULT 'standard 5/20',
+        due_at TEXT NOT NULL,
+        interval_hours INTEGER NOT NULL,
+        review_count INTEGER NOT NULL,
+        success_streak INTEGER NOT NULL,
+        lapse_count INTEGER NOT NULL,
+        last_result TEXT NOT NULL,
+        last_reviewed_at TEXT NOT NULL,
+        PRIMARY KEY (puzzle_id, mode, rating_key),
+        FOREIGN KEY (puzzle_id) REFERENCES puzzles(id)
+      );
+      CREATE TABLE review_events (
+        id TEXT PRIMARY KEY,
+        puzzle_id TEXT NOT NULL,
+        mode TEXT NOT NULL DEFAULT 'standard',
+        rating_key TEXT NOT NULL DEFAULT 'standard 5/20',
+        result TEXT NOT NULL,
+        reviewed_at TEXT NOT NULL,
+        next_due_at TEXT NOT NULL,
+        interval_hours INTEGER NOT NULL,
+        FOREIGN KEY (puzzle_id) REFERENCES puzzles(id)
+      );
+      INSERT INTO review_queue (
+        puzzle_id, mode, rating_key, due_at, interval_hours, review_count,
+        success_streak, lapse_count, last_result, last_reviewed_at
+      ) VALUES (
+        '00008', 'standard', 'standard 5/20', '2026-06-22T03:00:00.000Z', 30, 2,
+        1, 1, 'correct', '2026-06-20T12:00:00.000Z'
+      );
+      INSERT INTO review_events (
+        id, puzzle_id, mode, rating_key, result, reviewed_at, next_due_at, interval_hours
+      ) VALUES (
+        'legacy-review', '00008', 'standard', 'standard 5/20', 'correct',
+        '2026-06-20T12:00:00.000Z', '2026-06-25T04:00:00.000Z', 72
+      );
+      PRAGMA user_version = 2;
+    `);
+    legacy.close();
+
+    const migrated = new SQLiteStore(databasePath);
+    migrated.migrate();
+    try {
+      const generations = migrated.db
+        .prepare("SELECT id, rating_generation FROM sprint_sessions ORDER BY id")
+        .all()
+        .map(sqliteRow);
+      assert.deepEqual(generations, [
+        { id: "current-active", rating_generation: 1 },
+        { id: "current-generation", rating_generation: 1 },
+        { id: "generation-zero", rating_generation: 0 },
+        { id: "pre-reset", rating_generation: null }
+      ]);
+      assert.deepEqual(sqliteRow(migrated.db.prepare(
+        "SELECT due_day, interval_days FROM review_queue WHERE puzzle_id = '00008'"
+      ).get()), { due_day: "2026-06-21", interval_days: 2 });
+      assert.deepEqual(sqliteRow(migrated.db.prepare(
+        "SELECT next_due_day, interval_days FROM review_events WHERE id = 'legacy-review'"
+      ).get()), { next_due_day: "2026-06-25", interval_days: 3 });
+    } finally {
+      migrated.close();
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("SQLite migrates the released iOS 1.0.0 database without losing user semantics", async () => {
   const directory = await mkdtemp(join(tmpdir(), "chessticize-released-migration-"));
   const databasePath = join(directory, "practice.sqlite");
@@ -83,6 +191,10 @@ test("SQLite migrates the released iOS 1.0.0 database without losing user semant
       const ratingColumns = store.db.prepare("PRAGMA table_info(ratings)").all() as Array<{ name: string }>;
       assert.ok(ratingColumns.some((column) => column.name === "rating_deviation"));
       assert.ok(ratingColumns.some((column) => column.name === "volatility"));
+      const reviewQueueColumns = store.db.prepare("PRAGMA table_info(review_queue)").all() as Array<{ name: string }>;
+      assert.ok(reviewQueueColumns.some((column) => column.name === "due_day"));
+      assert.ok(reviewQueueColumns.some((column) => column.name === "interval_days"));
+      assert.ok(!reviewQueueColumns.some((column) => column.name === "due_at"));
       assert.deepEqual(service.getRating("standard 5/20"), {
         key: "standard 5/20",
         generation: 1,
@@ -144,20 +256,20 @@ test("SQLite migrates the released iOS 1.0.0 database without losing user semant
           puzzleId: review.puzzleId,
           mode: review.mode,
           ratingKey: review.ratingKey,
-          dueAt: review.dueAt
+          dueDay: review.dueDay
         })),
         [
           {
             puzzleId: "legacy-arrow",
             mode: "standard",
             ratingKey: "standard 5/20",
-            dueAt: "2026-06-10T12:00:00.000Z"
+            dueDay: "2026-06-10"
           },
           {
             puzzleId: "legacy-arrow",
             mode: "arrow_duel",
             ratingKey: "arrow duel 5/30",
-            dueAt: "2026-06-11T12:00:00.000Z"
+            dueDay: "2026-06-11"
           }
         ]
       );
@@ -398,6 +510,10 @@ test("SQLite schema after migrating the released iOS 1.0.0 database matches the 
 async function goldenSchemaSnapshot(version: number): Promise<SchemaSnapshot> {
   const contents = await readFile(join(GOLDEN_SCHEMA_SNAPSHOTS_DIR, `v${version}.json`), "utf8");
   return JSON.parse(contents) as SchemaSnapshot;
+}
+
+async function loadFixturePuzzles(): Promise<Puzzle[]> {
+  return JSON.parse(await readFile(PUZZLE_FIXTURE, "utf8")) as Puzzle[];
 }
 
 function sha256(contents: Uint8Array): string {

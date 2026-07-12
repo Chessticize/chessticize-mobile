@@ -28,6 +28,7 @@ export function startSprint(input: {
   const state: SprintState = {
     id: input.id ?? generateId(),
     config: input.config,
+    ratingGeneration: input.ratingBeforeRecord?.generation ?? 0,
     status: "active",
     startedAt: startedAt.toISOString(),
     deadlineAt,

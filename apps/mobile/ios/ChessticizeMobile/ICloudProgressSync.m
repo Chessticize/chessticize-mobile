@@ -51,11 +51,15 @@ RCT_EXPORT_METHOD(fetchSnapshot:(RCTPromiseResolveBlock)resolve
       reject(@"icloud_payload_invalid", payloadError.localizedDescription, payloadError);
       return;
     }
-    resolve(payload);
+    resolve(@{
+      @"payload": payload ?: @"",
+      @"changeTag": record.recordChangeTag ?: [NSNull null]
+    });
   }];
 }
 
 RCT_EXPORT_METHOD(saveSnapshot:(NSString *)payload
+                  expectedChangeTag:(NSString *)expectedChangeTag
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 {
@@ -66,8 +70,17 @@ RCT_EXPORT_METHOD(saveSnapshot:(NSString *)payload
 
   CKRecordID *recordID = [[CKRecordID alloc] initWithRecordName:ChessticizeProgressRecordName];
   [[self privateDatabase] fetchRecordWithID:recordID completionHandler:^(CKRecord *record, NSError *fetchError) {
-    if (fetchError != nil && ![self isUnknownItemError:fetchError]) {
+    BOOL recordDoesNotExist = fetchError != nil && [self isUnknownItemError:fetchError];
+    if (fetchError != nil && !recordDoesNotExist) {
       reject(@"icloud_fetch_failed", fetchError.localizedDescription, fetchError);
+      return;
+    }
+    if (recordDoesNotExist && expectedChangeTag != nil) {
+      reject(@"icloud_save_conflict", @"The iCloud progress snapshot was deleted during sync.", fetchError);
+      return;
+    }
+    if (record != nil && (expectedChangeTag == nil || ![record.recordChangeTag isEqualToString:expectedChangeTag])) {
+      reject(@"icloud_save_conflict", @"The iCloud progress snapshot changed during sync.", nil);
       return;
     }
 
@@ -97,13 +110,20 @@ RCT_EXPORT_METHOD(saveSnapshot:(NSString *)payload
   record[ChessticizeProgressSchemaVersionField] = @1;
   record[ChessticizeProgressUpdatedAtField] = [NSDate date];
 
-  [[self privateDatabase] saveRecord:record completionHandler:^(__unused CKRecord *savedRecord, NSError *saveError) {
+  [[self privateDatabase] saveRecord:record completionHandler:^(CKRecord *savedRecord, NSError *saveError) {
     [[NSFileManager defaultManager] removeItemAtURL:payloadURL error:nil];
     if (saveError != nil) {
+      if ([saveError.domain isEqualToString:CKErrorDomain] && saveError.code == CKErrorServerRecordChanged) {
+        reject(@"icloud_save_conflict", @"The iCloud progress snapshot changed during save.", saveError);
+        return;
+      }
       reject(@"icloud_save_failed", saveError.localizedDescription, saveError);
       return;
     }
-    resolve(@{@"saved": @YES});
+    resolve(@{
+      @"saved": @YES,
+      @"changeTag": savedRecord.recordChangeTag ?: [NSNull null]
+    });
   }];
 }
 

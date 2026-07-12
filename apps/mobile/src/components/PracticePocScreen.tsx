@@ -26,11 +26,13 @@ import {
   currentExpectedMove,
   defaultSprintConfig,
   formatLocalCalendarDate,
+  formatReviewDay,
   formatSideToMoveScore,
   historyAttemptReviewKey,
   historyAttemptSpeedSeconds,
   isReviewOverdue,
   reviewDueState,
+  reviewQueueForecast,
   submitArrowDuelChoice,
   submitLineMove
 } from "../../../../packages/core/src/index.ts";
@@ -62,7 +64,7 @@ import type {
   SprintState,
   UciEngineTransport
 } from "../../../../packages/core/src/index.ts";
-import type { PracticeService } from "../../../../packages/storage/src/practice-service.ts";
+import type { CompletedReviewItem, PracticeService } from "../../../../packages/storage/src/practice-service.ts";
 import type {
   ExportedSprintSession,
   ReviewQueueDuePromotionResult,
@@ -864,7 +866,7 @@ export function PracticePocScreen({
     const decision: ReviewReminderDecision = {
       scheduledAt: new Date(nowMsRef.current + 5000).toISOString(),
       dueCount,
-      body: `${dueCount} ${dueCount === 1 ? "puzzle is" : "puzzles are"} ready for review`,
+      body: `${reviewCountLabel(dueCount)} ${dueCount === 1 ? "is" : "are"} ready`,
       route: "review"
     };
     reminderScheduleKeyRef.current = reminderScheduleKey(decision);
@@ -2428,7 +2430,7 @@ function PracticeHome({
           <Text style={styles.sectionLabel}>Review</Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`Open scheduled mistake reviews, ${dueReviewCount} due today, ${overdueReviewCount} overdue`}
+            accessibilityLabel={`Open scheduled mistake reviews, ${dueReviewCount} due today${overdueReviewCount > 0 ? `, ${overdueReviewCount} overdue` : ""}`}
             testID="practice-review-strip"
             style={styles.practiceReviewStrip}
             onPress={onOpenReview}
@@ -2454,10 +2456,12 @@ function PracticeHome({
                   <Text style={styles.reviewDueCount}>{dueReviewCount}</Text>
                   <Text style={styles.reviewStripMetricLabel}>Due today</Text>
                 </View>
-                <View style={styles.reviewStripMetric} testID="practice-review-overdue-count">
-                  <Text style={styles.reviewOverdueCount}>{overdueReviewCount}</Text>
-                  <Text style={styles.reviewStripMetricLabel}>Overdue</Text>
-                </View>
+                {overdueReviewCount > 0 ? (
+                  <View style={styles.reviewStripMetric} testID="practice-review-overdue-count">
+                    <Text style={styles.reviewOverdueCount}>{overdueReviewCount}</Text>
+                    <Text style={styles.reviewStripMetricLabel}>Overdue</Text>
+                  </View>
+                ) : null}
               </View>
               <View style={styles.reviewStripChevron} testID="practice-review-strip-chevron">
                 <ChevronGlyph direction="right" />
@@ -4680,8 +4684,8 @@ function HistoryAttemptRow({
   const pace = historyAttemptSpeedSeconds(attempt);
   const paceLabel = pace === null ? null : `${pace}s pace`;
   const reviewLabel = isWrong
-    ? puzzleStats?.nextReviewAt
-      ? `Review ${formatLocalCalendarDate(puzzleStats.nextReviewAt)}`
+    ? puzzleStats?.nextReviewDay
+      ? `Review ${formatReviewDay(puzzleStats.nextReviewDay)}`
       : "Review queued"
     : "Correct";
   const resultLabel = isWrong ? "Wrong move" : "Correct";
@@ -4729,7 +4733,7 @@ function HistoryAttemptRow({
         <View style={styles.historyAttemptStatus} testID={`history-attempt-${attempt.id}-status`}>
           <Text
             testID={`history-attempt-${attempt.id}-review-state`}
-            style={[styles.historyReviewState, isWrong ? styles.reviewDifficultyHard : styles.reviewDifficultyEasy]}
+            style={[styles.historyReviewState, isWrong ? styles.errorText : styles.positive]}
           >
             {reviewLabel}
           </Text>
@@ -4953,50 +4957,6 @@ function groupReviewEntriesByContext(entries: ReviewEntry[]): ReviewEntryGroup[]
   return [...groups.values()].sort((left, right) => left.ratingKey.localeCompare(right.ratingKey));
 }
 
-function reviewDifficultySummary(items: ReviewQueueItem[]): { easy: number; medium: number; hard: number } {
-  return items.reduce((summary, item) => {
-    const difficulty = reviewItemDifficulty(item);
-    if (difficulty === "hard") {
-      summary.hard += 1;
-    } else if (difficulty === "medium") {
-      summary.medium += 1;
-    } else {
-      summary.easy += 1;
-    }
-    return summary;
-  }, { easy: 0, medium: 0, hard: 0 });
-}
-
-function reviewDifficultyDetail(items: ReviewQueueItem[], difficulty: ReviewDifficulty, nowMs: number): string {
-  const matchingItems = items.filter((item) => reviewItemDifficulty(item) === difficulty);
-  if (difficulty === "easy") {
-    return matchingItems.length > 0 ? "All good" : "No easy reviews";
-  }
-  if (matchingItems.length === 0) {
-    return difficulty === "hard" ? "Stable" : "No medium reviews";
-  }
-  const hasOverdue = matchingItems.some((item) => isReviewOverdue(item.review, nowMs));
-  const hasReady = matchingItems.some((item) => reviewDueState(item.review, nowMs) !== "future");
-  if (difficulty === "hard") {
-    return hasOverdue ? "Overdue now" : "Needs attention";
-  }
-  return hasReady ? "Ready now" : "Next due later";
-}
-
-function reviewItemDifficulty(item: ReviewQueueItem): "easy" | "medium" | "hard" {
-  if (item.review.lapseCount > 0) {
-    return "hard";
-  }
-  if (item.review.lastResult === "wrong") {
-    return "medium";
-  }
-  return "easy";
-}
-
-function difficultyLabel(difficulty: "easy" | "medium" | "hard"): string {
-  return difficulty[0].toUpperCase() + difficulty.slice(1);
-}
-
 function collectReviewThemeFilters(items: ReviewQueueItem[]): string[] {
   const themes = new Set<string>();
   for (const item of items) {
@@ -5043,9 +5003,6 @@ function filterReviewQueueItems(items: ReviewQueueItem[], filter: ReviewQueueFil
     if (filter === "arrow_duel") {
       return item.review.mode === "arrow_duel";
     }
-    if (filter.startsWith("difficulty:")) {
-      return reviewItemDifficulty(item) === filter.slice("difficulty:".length);
-    }
     if (filter.startsWith("mode:")) {
       return item.review.mode === filter.slice("mode:".length);
     }
@@ -5072,9 +5029,6 @@ function reviewQueueFilterLabel(filter: ReviewQueueFilter): string {
   if (filter === "arrow_duel") {
     return "Arrow Duel only";
   }
-  if (filter.startsWith("difficulty:")) {
-    return `${difficultyLabel(filter.slice("difficulty:".length) as ReviewDifficulty)} reviews`;
-  }
   if (filter.startsWith("mode:")) {
     return modeLabel(filter.slice("mode:".length) as SprintMode);
   }
@@ -5092,10 +5046,11 @@ function reviewQueueSummary(queue: ReviewQueueState[], filteredItems: ReviewQueu
   filteredCount: number;
   oldestDueLabel: string;
   overdueCount: number;
+  tomorrowCount: number;
+  nextSevenDaysCount: number;
   totalCount: number;
 } {
-  const dueTimes = queue.map((review) => new Date(review.dueAt).getTime()).filter(Number.isFinite);
-  const oldestDueTime = dueTimes.length > 0 ? Math.min(...dueTimes) : null;
+  const forecast = reviewQueueForecast(queue, nowMs);
   const filteredOverdueCount = filteredItems.filter((item) => isReviewOverdue(item.review, nowMs)).length;
   return {
     dueStatusLabel: filteredItems.length === 0
@@ -5104,22 +5059,16 @@ function reviewQueueSummary(queue: ReviewQueueState[], filteredItems: ReviewQueu
         ? "Overdue now"
         : "Ready now",
     filteredCount: filteredItems.length,
-    oldestDueLabel: oldestDueTime === null
+    oldestDueLabel: forecast.totalCount === 0
       ? "Next review appears after a missed puzzle reaches its due time"
-      : oldestDueTime <= nowMs
-        ? `Oldest due ${formatLocalCalendarDate(oldestDueTime)}`
-        : `Next review due ${formatLocalCalendarDate(oldestDueTime)}`,
-    overdueCount: queue.filter((review) => isReviewOverdue(review, nowMs)).length,
-    totalCount: queue.length
+      : forecast.todayCount > 0
+        ? `Oldest due ${formatReviewDay(queue.map((review) => review.dueDay).sort()[0]!)}`
+        : `Next review due ${formatReviewDay(forecast.nextDueDay!)}`,
+    overdueCount: forecast.overdueCount,
+    tomorrowCount: forecast.tomorrowCount,
+    nextSevenDaysCount: forecast.nextSevenDaysCount,
+    totalCount: forecast.totalCount
   };
-}
-
-function formatIntervalHours(hours: number): string {
-  if (hours < 24) {
-    return `${hours}h`;
-  }
-  const days = Math.round(hours / 24);
-  return `${days}d`;
 }
 
 function safeTestId(value: string): string {
@@ -5139,12 +5088,9 @@ type ReviewQueueFilter =
   | "overdue"
   | "failed"
   | "arrow_duel"
-  | `difficulty:${ReviewDifficulty}`
   | `mode:${SprintMode}`
   | `speed:${number}`
   | `theme:${string}`;
-
-type ReviewDifficulty = "easy" | "medium" | "hard";
 
 type ReviewPuzzleState =
   | { kind: "line"; line: PuzzleLineState }
@@ -5197,10 +5143,23 @@ function ReviewPanel({
     : [];
   const preferredEntriesKey = preferredEntries.map((entry) => `${entry.source}:${entry.puzzle.id}:${entry.mode}:${entry.ratingKey}`).join("|");
   const [activeEntries, setActiveEntries] = useState<ReviewEntry[]>(preferredEntries);
+  const [activeEntryInitialIndex, setActiveEntryInitialIndex] = useState(0);
   const [queuedReviewGroups, setQueuedReviewGroups] = useState<ReviewEntryGroup[]>([]);
   const [queueFilter, setQueueFilter] = useState<ReviewQueueFilter>("all");
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [devStatus, setDevStatus] = useState<string | null>(null);
+  const completedReviews = service.listCompletedReviewsForDay(new Date(nowMs).toISOString());
+  const completedReviewEntries = completedReviews.map((item): ReviewEntry => ({
+    puzzle: item.puzzle,
+    mode: item.attempt.mode,
+    ratingKey: item.attempt.ratingKey,
+    source: "history",
+    attempt: item.attempt
+  }));
+  const dailyReviewTotal = completedReviews.length + dueReviewItems.length;
+  const dailyReviewProgressLabel = dailyReviewTotal === 0
+    ? "0"
+    : `${completedReviews.length} / ${dailyReviewTotal}`;
   const themeFilters = collectReviewThemeFilters(dueReviewItems);
   const speedFilters = collectReviewSpeedFilters(dueReviewItems);
   const filteredDueReviewItems = filterReviewQueueItems(dueReviewItems, queueFilter, nowMs);
@@ -5211,13 +5170,14 @@ function ReviewPanel({
     source: "due"
   }));
   const filteredContextGroups = groupReviewEntriesByContext(filteredDueEntries);
-  const difficultySummary = reviewDifficultySummary(dueReviewItems);
   const queueSummary = reviewQueueSummary(reviewQueue, filteredDueReviewItems, nowMs);
   const activeFilterLabels = reviewActiveFilterLabels(queueFilter, queueSummary);
   const showActiveFilterStrip = filtersExpanded || queueFilter !== "all";
   const reviewDueSummaryLabel = filteredDueEntries.length > 0
     ? queueSummary.dueStatusLabel
-    : "No matching scheduled reviews";
+    : dueReviewItems.length === 0
+      ? "You're done for today"
+      : "No matching scheduled reviews";
   const reviewDueFilterLabel = filteredDueEntries.length > 0
     ? `${reviewQueueFilterLabel(queueFilter)} · ${queueSummary.dueStatusLabel}`
     : "No matching scheduled reviews";
@@ -5225,6 +5185,7 @@ function ReviewPanel({
 
   useEffect(() => {
     setQueuedReviewGroups([]);
+    setActiveEntryInitialIndex(0);
     setActiveEntries(preferredEntries);
     // preferredEntriesKey is the stable semantic identity for this derived array.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -5246,12 +5207,24 @@ function ReviewPanel({
       return;
     }
     setQueuedReviewGroups(remainingGroups);
+    setActiveEntryInitialIndex(0);
     setActiveEntries(firstGroup.entries);
   }
 
   function startSingleReviewGroup(entries: ReviewEntry[]): void {
     setQueuedReviewGroups([]);
+    setActiveEntryInitialIndex(0);
     setActiveEntries(entries);
+  }
+
+  function openCompletedReview(attemptId: string): void {
+    const nextIndex = completedReviewEntries.findIndex((entry) => entry.attempt?.id === attemptId);
+    if (nextIndex < 0) {
+      return;
+    }
+    setQueuedReviewGroups([]);
+    setActiveEntryInitialIndex(nextIndex);
+    setActiveEntries(completedReviewEntries);
   }
 
   function finishActiveReview(source: ReviewEntry["source"]): void {
@@ -5259,11 +5232,13 @@ function ReviewPanel({
       const [nextGroup, ...remainingGroups] = queuedReviewGroups;
       if (nextGroup) {
         setQueuedReviewGroups(remainingGroups);
+        setActiveEntryInitialIndex(0);
         setActiveEntries(nextGroup.entries);
         return;
       }
     }
     setQueuedReviewGroups([]);
+    setActiveEntryInitialIndex(0);
     setActiveEntries([]);
     if (source === "session") {
       onExitSessionReview();
@@ -5273,11 +5248,14 @@ function ReviewPanel({
   if (activeEntries.length > 0) {
     return (
       <ReviewSession
-        key={activeEntries.map((entry) => `${entry.source}:${entry.puzzle.id}:${entry.mode}:${entry.ratingKey}`).join("|")}
+        key={`${activeEntryInitialIndex}:${activeEntries.map((entry) => `${entry.source}:${entry.puzzle.id}:${entry.mode}:${entry.ratingKey}`).join("|")}`}
         adaptiveLayout={adaptiveLayout}
         boardSize={boardSize}
         currentTimeMs={currentTimeMs}
         entries={activeEntries}
+        initialIndex={activeEntryInitialIndex}
+        scheduledReviewCompletedCount={completedReviews.length}
+        scheduledReviewTotal={dailyReviewTotal}
         service={service}
         onReviewRecorded={onReviewRecorded}
         onExit={finishActiveReview}
@@ -5303,12 +5281,14 @@ function ReviewPanel({
       </View>
 
       <View
-        accessibilityLabel={`Due today, ${queueSummary.filteredCount} due, ${queueSummary.overdueCount} overdue, ${queueSummary.totalCount} total, ${reviewDueFilterLabel}`}
+        accessibilityLabel={dailyReviewTotal === 0
+          ? `Today, no reviews scheduled, ${queueSummary.tomorrowCount} tomorrow, ${queueSummary.nextSevenDaysCount} in the next 7 days, ${queueSummary.totalCount} total, ${reviewDueFilterLabel}`
+          : `Today, ${completedReviews.length} of ${dailyReviewTotal} reviews completed, ${dueReviewItems.length} remaining${queueSummary.overdueCount > 0 ? `, ${queueSummary.overdueCount} overdue` : ""}, ${queueSummary.tomorrowCount} tomorrow, ${queueSummary.nextSevenDaysCount} in the next 7 days, ${queueSummary.totalCount} total, ${reviewDueFilterLabel}`}
         style={styles.reviewDueCard}
         testID="review-due-card"
       >
         <View style={styles.reviewDueCopy}>
-          <Text style={styles.reviewDueTitle}>Due Today</Text>
+          <Text style={styles.reviewDueTitle}>Today</Text>
           <Text testID="review-due-summary" style={styles.helperText}>
             {reviewDueSummaryLabel}
           </Text>
@@ -5319,48 +5299,28 @@ function ReviewPanel({
           >
             {reviewDueSubline}
           </Text>
-          <Text testID="review-due-secondary-summary" style={styles.reviewDueHiddenMetric}>
-            {queueSummary.overdueCount} overdue · {queueSummary.totalCount} total
-          </Text>
         </View>
         <View style={styles.reviewDueCountBlock}>
-          <Text testID="review-due-count" style={styles.reviewDueBigCount}>{queueSummary.filteredCount}</Text>
-          <Text
-            testID="review-overdue-count"
-            style={[styles.reviewDueOverdueCount, queueSummary.overdueCount > 0 ? styles.reviewDifficultyHard : styles.progressDeltaNeutral]}
-          >
-            {queueSummary.overdueCount}
-          </Text>
-          <Text style={styles.reviewDueOverdueLabel}>Overdue</Text>
-          <Text testID="review-total-count" style={styles.reviewDueHiddenMetric}>{queueSummary.totalCount}</Text>
+          <Text testID="review-due-count" style={styles.reviewDueBigCount}>{dailyReviewProgressLabel}</Text>
+          {queueSummary.overdueCount > 0 ? (
+            <>
+              <Text testID="review-overdue-count" style={[styles.reviewDueOverdueCount, styles.errorText]}>
+                {queueSummary.overdueCount}
+              </Text>
+              <Text style={styles.reviewDueOverdueLabel}>Overdue</Text>
+            </>
+          ) : null}
         </View>
       </View>
 
-      <View style={styles.reviewDifficultyList} testID="review-difficulty-list">
-        <ReviewDifficultyRow
-          active={queueFilter === "difficulty:easy"}
-          label="Easy"
-          detail={reviewDifficultyDetail(dueReviewItems, "easy", nowMs)}
-          count={difficultySummary.easy}
-          tone="easy"
-          onPress={() => setQueueFilter("difficulty:easy")}
-        />
-        <ReviewDifficultyRow
-          active={queueFilter === "difficulty:medium"}
-          label="Medium"
-          detail={reviewDifficultyDetail(dueReviewItems, "medium", nowMs)}
-          count={difficultySummary.medium}
-          tone="medium"
-          onPress={() => setQueueFilter("difficulty:medium")}
-        />
-        <ReviewDifficultyRow
-          active={queueFilter === "difficulty:hard"}
-          label="Hard"
-          detail={reviewDifficultyDetail(dueReviewItems, "hard", nowMs)}
-          count={difficultySummary.hard}
-          tone="hard"
-          onPress={() => setQueueFilter("difficulty:hard")}
-        />
+      <View
+        accessibilityLabel={`${reviewCountLabel(queueSummary.tomorrowCount)} tomorrow, ${reviewCountLabel(queueSummary.nextSevenDaysCount)} in the next 7 days, ${reviewCountLabel(queueSummary.totalCount)} total`}
+        style={styles.reviewForecastRow}
+        testID="review-forecast"
+      >
+        <ReviewForecastMetric label="Tomorrow" count={queueSummary.tomorrowCount} countTestID="review-tomorrow-count" />
+        <ReviewForecastMetric label="Next 7 days" count={queueSummary.nextSevenDaysCount} countTestID="review-next-seven-days-count" />
+        <ReviewForecastMetric label="Total" count={queueSummary.totalCount} countTestID="review-total-count" />
       </View>
 
       {showActiveFilterStrip ? <ReviewActiveFilterStrip labels={activeFilterLabels} /> : null}
@@ -5374,7 +5334,7 @@ function ReviewPanel({
         style={[styles.primaryButton, styles.reviewStartButton, filteredDueEntries.length === 0 ? styles.disabledButton : null]}
         onPress={() => startReviewGroupQueue(filteredContextGroups)}
       >
-        <Text style={styles.primaryButtonText}>Start Review</Text>
+        <Text style={styles.primaryButtonText}>Review {queueSummary.filteredCount}</Text>
       </Pressable>
 
       {onPromoteNextFutureReviewsToDue || onScheduleTestReviewReminder ? (
@@ -5493,7 +5453,7 @@ function ReviewPanel({
         </View>
       ) : filteredDueReviewItems.length === 0 ? (
         <View style={styles.emptyReviewPanel} testID="review-empty-state">
-          <Text style={styles.listText}>{dueReviewItems.length === 0 ? "No reviews due today" : "No matching scheduled reviews"}</Text>
+          <Text style={styles.listText}>{dueReviewItems.length === 0 ? "You're done for today" : "No matching scheduled reviews"}</Text>
           <Text style={styles.helperText}>
             {dueReviewItems.length === 0
               ? queueSummary.oldestDueLabel
@@ -5511,6 +5471,19 @@ function ReviewPanel({
         </View>
       ) : null}
 
+      {completedReviews.length > 0 ? (
+        <View style={styles.reviewItemList} testID="review-today-history">
+          <Text style={styles.sectionLabel}>Completed today</Text>
+          {completedReviews.map((item) => (
+            <TodayReviewAttemptRow
+              key={item.attempt.id}
+              item={item}
+              onOpen={() => openCompletedReview(item.attempt.id)}
+            />
+          ))}
+        </View>
+      ) : null}
+
     </View>
   );
 }
@@ -5519,8 +5492,8 @@ function reviewDuePromotionStatus(result: ReviewQueueDuePromotionResult): string
   if (result.promotedCount === 0) {
     return "No future reviews to promote";
   }
-  const puzzleLabel = result.promotedCount === 1 ? "1 puzzle" : `${result.promotedCount} puzzles`;
-  return `${puzzleLabel} from ${result.promotedDate ?? "next due date"} due today`;
+  const reviewLabel = result.promotedCount === 1 ? "1 review" : `${result.promotedCount} reviews`;
+  return `${reviewLabel} from ${result.promotedDate ?? "next due date"} due today`;
 }
 
 function reviewDueCardSubline(label: string): string {
@@ -5575,7 +5548,6 @@ function ReviewQueueItemCard({
   nowMs: number;
   onPress: () => void;
 }): React.JSX.Element {
-  const difficulty = reviewItemDifficulty(item);
   const primaryTheme = item.puzzle.themes[0] ?? "mixed";
   const lastWrongDate = formatLocalCalendarDate(item.review.lastReviewedAt);
   const dueKind = reviewDueState(item.review, nowMs);
@@ -5583,17 +5555,16 @@ function ReviewQueueItemCard({
     ? "Overdue"
     : dueKind === "due"
       ? "Due now"
-      : `Due ${formatLocalCalendarDate(item.review.dueAt)}`;
+      : `Due ${formatReviewDay(item.review.dueDay)}`;
   const source = reviewItemSourceSprintLabel(item);
   const compactSource = source.replace(/^Source sprint: /, "");
   const nextReviewNumber = item.review.reviewCount + 1;
   const rowTestId = `review-due-item-${item.puzzle.id}-${safeTestId(item.review.mode)}`;
   const accessibilityLabel = [
     `Start ${modeLabel(item.review.mode)} ${primaryTheme} review`,
-    `${difficultyLabel(difficulty)} difficulty`,
     `Last wrong ${lastWrongDate}`,
     dueState,
-    `${formatIntervalHours(item.review.intervalHours)} interval`,
+    `${item.review.intervalDays} day interval`,
     source,
     `Review ${nextReviewNumber}`,
     `Lapses ${item.review.lapseCount}`
@@ -5607,27 +5578,11 @@ function ReviewQueueItemCard({
       style={styles.reviewItemCard}
       onPress={onPress}
     >
-      <View
-        style={[styles.historyResultBadge, difficulty === "hard" ? styles.historyResultWrong : styles.historyResultCorrect]}
-        testID={`${rowTestId}-badge`}
-      >
-        <ResultBadgeGlyph tone={difficulty === "hard" ? "alert" : "correct"} />
-      </View>
       <View style={styles.reviewItemCopy}>
-        <View style={styles.historyAttemptHeader}>
-          <Text style={styles.historyRowTitle}>{modeLabel(item.review.mode)}</Text>
-          <Text style={[
-            styles.reviewItemDifficulty,
-            difficulty === "easy" ? styles.reviewDifficultyEasy : null,
-            difficulty === "medium" ? styles.reviewDifficultyMedium : null,
-            difficulty === "hard" ? styles.reviewDifficultyHard : null
-          ]}>
-            {difficultyLabel(difficulty)}
-          </Text>
-        </View>
+        <Text style={styles.historyRowTitle}>{modeLabel(item.review.mode)}</Text>
         <Text testID={`${rowTestId}-context`} style={styles.helperText}>{primaryTheme} · Last wrong {lastWrongDate}</Text>
         <Text testID={`${rowTestId}-meta`} style={styles.helperText}>
-          {dueState} · {formatIntervalHours(item.review.intervalHours)} interval · {compactSource}
+          {dueState} · {item.review.intervalDays}d interval · {compactSource}
         </Text>
       </View>
       <ChevronGlyph direction="right" />
@@ -5635,48 +5590,72 @@ function ReviewQueueItemCard({
   );
 }
 
-function ReviewDifficultyRow({
-  active,
-  count,
-  detail,
-  label,
-  onPress,
-  tone
+function TodayReviewAttemptRow({
+  item,
+  onOpen
 }: {
-  active: boolean;
-  count: number;
-  detail: string;
-  label: string;
-  onPress: () => void;
-  tone: ReviewDifficulty;
+  item: CompletedReviewItem;
+  onOpen: () => void;
 }): React.JSX.Element {
-  const countLabel = `${count} ${count === 1 ? "review" : "reviews"}`;
+  const isWrong = item.attempt.result === "wrong";
+  const resultLabel = isWrong ? "Wrong" : "Correct";
+  const elapsedSeconds = Math.max(
+    0,
+    Math.round((new Date(item.attempt.completedAt).getTime() - new Date(item.attempt.startedAt).getTime()) / 1000)
+  );
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Filter ${label.toLowerCase()} reviews, ${countLabel}, ${detail}`}
-      accessibilityState={{ selected: active }}
-      style={[styles.reviewDifficultyRow, active ? styles.reviewDifficultyRowActive : null]}
-      testID={`review-difficulty-${tone}`}
-      onPress={onPress}
+      accessibilityLabel={`Open ${modeLabel(item.attempt.mode)} ${resultLabel.toLowerCase()} review for analysis or retry`}
+      testID={`review-today-attempt-${item.attempt.id}`}
+      style={styles.historyAttemptCard}
+      onPress={onOpen}
     >
-      <View>
-        <Text style={styles.listText}>{label}</Text>
-        <Text style={styles.helperText}>{detail}</Text>
+      <View
+        style={[styles.historyResultBadge, isWrong ? styles.historyResultWrong : styles.historyResultCorrect]}
+        testID={`review-today-attempt-${item.attempt.id}-badge`}
+      >
+        <ResultBadgeGlyph tone={isWrong ? "wrong" : "correct"} />
       </View>
-      <View style={styles.reviewDifficultyMeta}>
-        <Text style={[
-          styles.reviewDifficultyCount,
-          tone === "easy" ? styles.reviewDifficultyEasy : null,
-          tone === "medium" ? styles.reviewDifficultyMedium : null,
-          tone === "hard" ? styles.reviewDifficultyHard : null
-        ]} testID={`review-difficulty-${tone}-count`}>
-          {count}
-        </Text>
+      <View style={styles.historyAttemptCopy}>
+        <View style={styles.historyAttemptHeader}>
+          <Text style={styles.historyRowTitle}>{modeLabel(item.attempt.mode)}</Text>
+          <Text
+            testID={`review-today-attempt-${item.attempt.id}-result`}
+            style={[styles.historyReviewState, isWrong ? styles.errorText : styles.positive]}
+          >
+            {resultLabel}
+          </Text>
+        </View>
+        <Text style={styles.helperText}>Puzzle {item.puzzle.id} · {elapsedSeconds}s</Text>
+        <Text style={styles.helperText}>{formatLocalCalendarDate(item.attempt.completedAt)} · Review or retry</Text>
+      </View>
+      <View style={styles.historyAttemptChevron}>
         <ChevronGlyph direction="right" />
       </View>
     </Pressable>
   );
+}
+
+function ReviewForecastMetric({
+  count,
+  label,
+  countTestID
+}: {
+  count: number;
+  label: string;
+  countTestID: string;
+}): React.JSX.Element {
+  return (
+    <View style={styles.reviewForecastMetric}>
+      <Text style={styles.reviewForecastCount} testID={countTestID}>{count}</Text>
+      <Text style={styles.reviewForecastLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function reviewCountLabel(count: number): string {
+  return `${count} ${count === 1 ? "review" : "reviews"}`;
 }
 
 function ReviewSession({
@@ -5685,6 +5664,8 @@ function ReviewSession({
   currentTimeMs,
   entries,
   initialIndex = 0,
+  scheduledReviewCompletedCount = 0,
+  scheduledReviewTotal = entries.length,
   service,
   onExit,
   onReviewRecorded,
@@ -5695,6 +5676,8 @@ function ReviewSession({
   currentTimeMs: () => number;
   entries: ReviewEntry[];
   initialIndex?: number;
+  scheduledReviewCompletedCount?: number;
+  scheduledReviewTotal?: number;
   service: PracticeService;
   onExit: (source: ReviewEntry["source"]) => void;
   onReviewRecorded?: (completedAt: string) => void;
@@ -5723,6 +5706,15 @@ function ReviewSession({
   const [reviewTimedOut, setReviewTimedOut] = useState(false);
   const [punishmentLineComplete, setPunishmentLineComplete] = useState(false);
   const [lineReviewNeedsContinue, setLineReviewNeedsContinue] = useState(false);
+  const [scheduledReviewProgress] = useState(() => {
+    const firstEntry = entries[initialIndex] ?? entries[0];
+    return firstEntry?.source === "due"
+      ? {
+          completedBeforeStart: scheduledReviewCompletedCount,
+          total: Math.max(1, scheduledReviewTotal)
+        }
+      : null;
+  });
   const currentEntry = entries[entryIndex];
   const currentPuzzle = currentReviewPuzzleState(reviewState);
   const currentFen = currentPuzzle.currentFen;
@@ -5775,6 +5767,10 @@ function ReviewSession({
   const canAnalysisBack = analysisEnabled && analysisBackStack.length > 0;
   const canAnalysisForward = analysisEnabled && analysisForwardStack.length > 0;
   const analysisDepth = engineAnalysisLines.reduce((maxDepth, line) => Math.max(maxDepth, line.depth), 0);
+  const reviewProgressPosition = scheduledReviewProgress
+    ? Math.min(scheduledReviewProgress.total, scheduledReviewProgress.completedBeforeStart + entryIndex + 1)
+    : entryIndex + 1;
+  const reviewProgressTotal = scheduledReviewProgress?.total ?? entries.length;
   const reviewPerPuzzleSeconds = perPuzzleSecondsForReviewEntry(currentEntry);
   const reviewPrimaryTheme = currentEntry.puzzle.themes[0] ?? "mixed";
   const reviewSourceLabel = currentEntry.source === "session"
@@ -6117,6 +6113,13 @@ function ReviewSession({
       expectedMove: result.feedback.expectedMove
     });
     await sleep(FEEDBACK_SNAPSHOT_MS);
+    if (currentEntry.source === "due") {
+      boardRef.current?.resetBoard(submittedFen);
+      setFeedback(null);
+      setLineReviewNeedsContinue(true);
+      setBoardLocked(false);
+      return;
+    }
     const replyMoves = result.feedback.autoPlayedMoves.slice(1);
     const finalFen = fenAfterMoves(submittedFen, result.feedback.autoPlayedMoves) ?? submittedFen;
     if (replyMoves.length > 0) {
@@ -6206,6 +6209,11 @@ function ReviewSession({
       }
       setLastMove(move);
     }
+    // Imperative reply animations can leave the native board's tap-selection
+    // state attached to the user's previous destination square. Re-sync only
+    // after every reply has settled so the next move starts from a clean input
+    // state without interrupting the animation.
+    boardRef.current.resetBoard(finalFen);
   }
 
   function openAnalysis(): void {
@@ -6284,7 +6292,7 @@ function ReviewSession({
           <View style={styles.reviewTitleBlock}>
             <Text style={styles.panelTitle}>Review</Text>
             <Text testID="review-progress" style={styles.helperText}>
-              {entryIndex + 1} / {entries.length} · {modeLabel(currentEntry.mode)}
+              {reviewProgressPosition} / {reviewProgressTotal} · {modeLabel(currentEntry.mode)}
             </Text>
             {arePracticeTestControlsEnabled() ? (
               <>
@@ -6296,6 +6304,9 @@ function ReviewSession({
                 </Text>
                 <Text testID="review-board-flipped" style={styles.reviewDueHiddenMetric}>
                   {boardFlipped ? "flipped" : "normal"}
+                </Text>
+                <Text testID="review-board-state" style={styles.reviewDueHiddenMetric}>
+                  {boardLocked ? "locked" : "ready"}
                 </Text>
               </>
             ) : null}
@@ -6341,13 +6352,17 @@ function ReviewSession({
           </View>
         </View>
         <View style={styles.reviewContextStrip} testID="review-context-strip">
-          <View style={styles.reviewContextPill} testID="review-source-pill">
-            <Text style={styles.reviewContextPillText}>{reviewSourceLabel}</Text>
-          </View>
+          {currentEntry.source !== "due" ? (
+            <View style={styles.reviewContextPill} testID="review-source-pill">
+              <Text style={styles.reviewContextPillText}>{reviewSourceLabel}</Text>
+            </View>
+          ) : null}
           <MoveSideBadge badgeTestID="review-side-to-move" side={reviewSideToMove} />
-          <View style={styles.reviewContextPill} testID="review-theme-pill">
-            <Text style={styles.reviewContextPillText}>{reviewPrimaryTheme}</Text>
-          </View>
+          {currentEntry.source !== "due" ? (
+            <View style={styles.reviewContextPill} testID="review-theme-pill">
+              <Text style={styles.reviewContextPillText}>{reviewPrimaryTheme}</Text>
+            </View>
+          ) : null}
           {reviewRemainingSeconds !== null ? (
             <View style={[styles.reviewContextPill, reviewRemainingSeconds === 0 ? styles.reviewContextPillDanger : null]}>
               <Text testID="review-timer" style={[styles.reviewContextPillText, reviewRemainingSeconds === 0 ? styles.errorText : null]}>
@@ -6478,6 +6493,7 @@ function ReviewSession({
               ))}
             </View>
           ) : null}
+          {analysisEnabled || currentEntry.source !== "due" ? (
           <View style={styles.analysisToolbar} testID="review-analysis-toolbar">
             {analysisEnabled ? (
               <>
@@ -6525,6 +6541,7 @@ function ReviewSession({
               </>
             )}
           </View>
+          ) : null}
           {analysisEnabled ? (
             <>
               {analysisLines.map((line, index) => (
@@ -6782,9 +6799,9 @@ function expectedReviewMove(state: CurrentPuzzleState): string {
 function perPuzzleSecondsForReviewEntry(entry: ReviewEntry): number {
   const fromRatingKey = entry.ratingKey.match(/\/(\d+)$/)?.[1];
   if (fromRatingKey) {
-    return Number(fromRatingKey);
+    return Number(fromRatingKey) * 2;
   }
-  return defaultSprintConfig(entry.mode).perPuzzleSeconds;
+  return defaultSprintConfig(entry.mode).perPuzzleSeconds * 2;
 }
 
 function reviewReminderScheduleStatusLabel(
@@ -7963,6 +7980,7 @@ function TabButton({
 }): React.JSX.Element {
   const hasBadge = badgeCount > 0;
   const badgeText = badgeCount > 99 ? "99+" : `${badgeCount}`;
+  const badgeWidth = badgeText.length === 1 ? 18 : badgeText.length === 2 ? 22 : 28;
   return (
     <Pressable
       accessibilityRole="tab"
@@ -7973,6 +7991,7 @@ function TabButton({
         styles.tabButton,
         presentation === "rail" ? styles.tabButtonRail : null,
         presentation === "rail" && expanded ? styles.tabButtonRailExpanded : null,
+        presentation === "rail" && expanded && hasBadge ? styles.tabButtonRailExpandedWithBadge : null,
         active ? styles.tabButtonActive : null
       ]}
       onPress={onPress}
@@ -7981,9 +8000,16 @@ function TabButton({
         <TabGlyph tab={tab} active={active} />
         {hasBadge ? (
           <Text
+            allowFontScaling={false}
             accessibilityElementsHidden
             importantForAccessibility="no-hide-descendants"
-            style={[styles.tabCountBadge, badgeTone === "danger" ? styles.tabCountBadgeDanger : null]}
+            numberOfLines={1}
+            style={[
+              styles.tabCountBadge,
+              presentation === "rail" ? styles.tabCountBadgeRail : styles.tabCountBadgeBottom,
+              { width: badgeWidth },
+              badgeTone === "danger" ? styles.tabCountBadgeDanger : null
+            ]}
             testID={`${testID}-badge`}
           >
             {badgeText}
@@ -8465,6 +8491,9 @@ const styles = StyleSheet.create({
     minHeight: 50,
     paddingHorizontal: 12
   },
+  tabButtonRailExpandedWithBadge: {
+    gap: 22
+  },
   tabButtonActive: {
     backgroundColor: "transparent"
   },
@@ -8473,9 +8502,9 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     height: 20,
     justifyContent: "center",
-    minWidth: 24,
-    paddingHorizontal: 5,
-    position: "relative"
+    overflow: "visible",
+    position: "relative",
+    width: 32
   },
   tabCountBadge: {
     backgroundColor: "#2563EB",
@@ -8485,14 +8514,25 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 9,
     fontWeight: "900",
-    lineHeight: 12,
-    minWidth: 14,
+    includeFontPadding: false,
+    lineHeight: 14,
+    minHeight: 18,
+    minWidth: 18,
     overflow: "hidden",
-    paddingHorizontal: 3,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
     position: "absolute",
-    right: -4,
     textAlign: "center",
-    top: -5
+    textAlignVertical: "center",
+    zIndex: 1
+  },
+  tabCountBadgeBottom: {
+    left: 24,
+    top: -8
+  },
+  tabCountBadgeRail: {
+    left: 24,
+    top: -7
   },
   tabCountBadgeDanger: {
     backgroundColor: "#DC2626"
@@ -9084,42 +9124,35 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: UI_PADDING
   },
-  reviewDifficultyList: {
-    gap: 8
-  },
-  reviewDifficultyRow: {
-    alignItems: "center",
+  reviewForecastRow: {
     backgroundColor: "#FFFFFF",
     borderColor: "#E2E8F0",
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
-    justifyContent: "space-between",
-    minHeight: 58,
-    paddingHorizontal: 12,
+    overflow: "hidden"
+  },
+  reviewForecastMetric: {
+    alignItems: "center",
+    borderRightColor: "#E2E8F0",
+    borderRightWidth: 1,
+    flex: 1,
+    gap: 2,
+    justifyContent: "center",
+    minHeight: 62,
+    paddingHorizontal: 6,
     paddingVertical: 10
   },
-  reviewDifficultyRowActive: {
-    backgroundColor: "#EFF6FF",
-    borderColor: "#93C5FD"
-  },
-  reviewDifficultyMeta: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 8
-  },
-  reviewDifficultyCount: {
+  reviewForecastCount: {
+    color: "#111827",
     fontSize: 16,
-    fontWeight: "800"
+    fontWeight: "900"
   },
-  reviewDifficultyEasy: {
-    color: "#16A34A"
-  },
-  reviewDifficultyMedium: {
-    color: "#D97706"
-  },
-  reviewDifficultyHard: {
-    color: "#DC2626"
+  reviewForecastLabel: {
+    color: "#64748B",
+    fontSize: 10,
+    fontWeight: "700",
+    textAlign: "center"
   },
   reviewItemList: {
     gap: 8
@@ -9139,10 +9172,6 @@ const styles = StyleSheet.create({
   reviewItemCopy: {
     flex: 1,
     gap: 2
-  },
-  reviewItemDifficulty: {
-    fontSize: 12,
-    fontWeight: "800"
   },
   reviewContextCard: {
     alignItems: "center",

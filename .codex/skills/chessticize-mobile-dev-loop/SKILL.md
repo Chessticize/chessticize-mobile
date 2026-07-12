@@ -112,6 +112,12 @@ pnpm mobile:e2e:build:ios
 
 Detox uses the built app bundle. It will not automatically pick up Metro-only edits unless the app is rebuilt.
 
+## Local PR Gate And Release CI Gate
+
+Routine PR merges use exact-head local Detox evidence and do not wait for or inspect GitHub Detox. Record the commit SHA, build command, full-suite test command (or separate successful `flows` and `practice` runs), and result in the PR description or a PR comment. Rerun after any code change. All required non-Detox checks must still pass; a focused Detox spec or manual simulator pass is not a substitute for the complete suite.
+
+Before a release, manually dispatch or verify Mobile iOS/Detox for the exact release candidate commit on `main`. Both suites must pass. Treat any failure as a release blocker, fix it, and rerun until green; routine per-PR Detox issue bookkeeping is not required.
+
 ## Screenshot Verification
 
 Take or inspect screenshots when validating:
@@ -140,5 +146,7 @@ Before finalizing:
 - State which test layers were updated and why.
 - Run the focused tests that match the changed layer.
 - Run broader tests when touching shared core, storage, CLI, or native boundaries.
+- For a routine PR merge, record passing exact-head local full-suite Detox evidence in the PR.
+- Before release, require a passing GitHub Detox run for the exact `main` release candidate.
 - Mention any intentionally skipped layer, with the reason.
 - Keep generated artifacts out of git unless they are intentional fixtures.

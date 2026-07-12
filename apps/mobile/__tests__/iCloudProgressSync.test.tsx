@@ -5,6 +5,7 @@ import {
   parseProgressSyncSnapshot
 } from "../src/backend/iCloudProgressSync";
 import type { ProgressSyncSnapshot } from "../../../packages/storage/src/progress-sync";
+import { ProgressSyncConflictError } from "../../../packages/storage/src/progress-sync";
 
 describe("iCloud progress sync bridge", () => {
   afterEach(() => {
@@ -16,14 +17,15 @@ describe("iCloud progress sync bridge", () => {
   });
 
   it("wraps the native CloudKit module with JSON snapshot transport", async () => {
-    const savedPayloads: string[] = [];
     const snapshot = sampleSnapshot();
+    const saveSnapshot = jest.fn(async () => ({ saved: true, changeTag: "revision-2" }));
     (NativeModules as Record<string, unknown>).ICloudProgressSync = {
       getAccountStatus: jest.fn(async () => "available"),
-      fetchSnapshot: jest.fn(async () => JSON.stringify(snapshot)),
-      saveSnapshot: jest.fn(async (payload: string) => {
-        savedPayloads.push(payload);
-      })
+      fetchSnapshot: jest.fn(async () => ({
+        payload: JSON.stringify(snapshot),
+        changeTag: "revision-1"
+      })),
+      saveSnapshot
     };
 
     const client = createNativeICloudProgressSyncClient();
@@ -31,7 +33,27 @@ describe("iCloud progress sync bridge", () => {
     await expect(client?.getAccountStatus()).resolves.toBe("available");
     await expect(client?.fetchSnapshot()).resolves.toEqual(snapshot);
     await expect(client?.saveSnapshot(snapshot)).resolves.toBeUndefined();
-    expect(savedPayloads).toEqual([JSON.stringify(snapshot)]);
+    expect(saveSnapshot).toHaveBeenCalledWith(JSON.stringify(snapshot), "revision-1");
+  });
+
+  it("maps native CloudKit revision conflicts to a retryable sync conflict", async () => {
+    const snapshot = sampleSnapshot();
+    const conflict = Object.assign(new Error("server record changed"), {
+      code: "icloud_save_conflict"
+    });
+    (NativeModules as Record<string, unknown>).ICloudProgressSync = {
+      getAccountStatus: jest.fn(async () => "available"),
+      fetchSnapshot: jest.fn(async () => ({
+        payload: JSON.stringify(snapshot),
+        changeTag: "revision-1"
+      })),
+      saveSnapshot: jest.fn(async () => Promise.reject(conflict))
+    };
+    const client = createNativeICloudProgressSyncClient();
+
+    await client?.fetchSnapshot();
+
+    await expect(client?.saveSnapshot(snapshot)).rejects.toBeInstanceOf(ProgressSyncConflictError);
   });
 
   it("normalizes unavailable status and treats empty native payloads as no snapshot", async () => {

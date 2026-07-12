@@ -1,16 +1,20 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+
+process.env.TZ = "UTC";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import {
   MemoryStore,
   PackBackedPracticeStore,
   PracticeService,
+  ProgressSyncConflictError,
   SQLiteStore,
   mergeLocalDataExports,
   syncPracticeProgress
 } from "../src/index.ts";
 import type { ProgressSyncSnapshot, ProgressSyncTransport } from "../src/index.ts";
+import type { LocalDataImport } from "../src/index.ts";
 import { defaultSprintConfig } from "../../core/src/index.ts";
 import type { Puzzle, SprintState } from "../../core/src/index.ts";
 
@@ -62,6 +66,26 @@ test("syncPracticeProgress uploads the current local progress snapshot when enab
   assert.equal(transport.saved[0]?.data.ratings[0]?.games, 1);
 });
 
+test("new sprint sessions capture the active rating generation for sync", async () => {
+  const store = await seededMemoryStore();
+  store.saveRating({
+    key: "standard 5/20",
+    generation: 2,
+    rating: 700,
+    ratingDeviation: 120,
+    volatility: 0.06,
+    games: 0
+  });
+  const service = new PracticeService(store);
+
+  service.startSprint(
+    { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
+    "2026-07-01T00:00:00.000Z"
+  );
+
+  assert.equal(service.exportLocalData().sprintSessions[0]?.ratingGeneration, 2);
+});
+
 test("syncPracticeProgress imports another device snapshot before uploading the merged snapshot", async () => {
   const remoteStore = await seededMemoryStore();
   const remoteService = new PracticeService(remoteStore);
@@ -97,6 +121,44 @@ test("syncPracticeProgress imports another device snapshot before uploading the 
   assert.equal(transport.saved[0]?.data.attempts.length, 1);
   assert.equal(transport.saved[0]?.data.sprintSessions.length, 1);
   assert.equal(transport.saved[0]?.data.settings.sync.iCloudEnabled, true);
+});
+
+test("mergeLocalDataExports upgrades legacy timestamp-based review queue entries", async () => {
+  const localService = new PracticeService(await seededMemoryStore());
+  const remoteService = new PracticeService(await seededMemoryStore());
+  recordWrongStandardAttempt(remoteService);
+  const remote = remoteService.exportLocalData();
+  const { dueDay: _dueDay, intervalDays: _intervalDays, ...legacyReview } = remote.reviewQueue[0]!;
+  const legacyRemote: LocalDataImport = {
+    ...remote,
+    reviewQueue: [legacyReview]
+  };
+
+  const merged = mergeLocalDataExports(localService.exportLocalData(), legacyRemote);
+
+  assert.equal(merged.reviewQueue[0]?.dueDay, "2026-06-20");
+  assert.equal(merged.reviewQueue[0]?.intervalDays, 1);
+  assert.equal(merged.reviewQueue[0]?.dueAt, "2026-06-20T04:00:00.000Z");
+  assert.equal(merged.reviewQueue[0]?.intervalHours, 24);
+});
+
+test("review sync resolves conflicts by last review time and then due day", async () => {
+  const service = new PracticeService(await seededMemoryStore());
+  recordWrongStandardAttempt(service);
+  const local = service.exportLocalData();
+  const base = local.reviewQueue[0]!;
+  local.reviewQueue = [{ ...base, dueDay: "2026-07-10", lastReviewedAt: "2026-07-01T12:00:00.000Z" }];
+  const newerRemote: LocalDataImport = {
+    ...structuredClone(local),
+    reviewQueue: [{ ...base, dueDay: "2026-07-05", lastReviewedAt: "2026-07-02T12:00:00.000Z" }]
+  };
+  const sameTimeRemote: LocalDataImport = {
+    ...structuredClone(local),
+    reviewQueue: [{ ...base, dueDay: "2026-07-12", lastReviewedAt: "2026-07-01T12:00:00.000Z" }]
+  };
+
+  assert.equal(mergeLocalDataExports(local, newerRemote).reviewQueue[0]?.dueDay, "2026-07-05");
+  assert.equal(mergeLocalDataExports(local, sameTimeRemote).reviewQueue[0]?.dueDay, "2026-07-12");
 });
 
 test("pack-backed SQLite sync makes remote progress readable when referenced puzzles only exist in the bundled pack", async () => {
@@ -419,6 +481,232 @@ test("mergeLocalDataExports keeps a manual ELO anchor ahead of an older device g
   assert.equal(rating?.ratingDeviation, 100);
 });
 
+test("mergeLocalDataExports never reclassifies a stale-device session into a newer rating generation", async () => {
+  const localService = new PracticeService(await seededMemoryStore());
+  const local = localService.exportLocalData();
+  local.ratings = [{
+    key: "standard 5/20",
+    generation: 0,
+    rating: 800,
+    ratingDeviation: 200,
+    volatility: 0.06,
+    games: 2
+  }];
+  local.sprintSessions = [
+    completedRatingSprint({
+      id: "pre-reset",
+      completedAt: "2026-07-01T00:00:00.000Z",
+      ratingBefore: 600,
+      ratingAfter: 700,
+      ratingGeneration: 0
+    }),
+    completedRatingSprint({
+      id: "stale-device-after-reset",
+      completedAt: "2026-07-03T00:00:00.000Z",
+      ratingBefore: 700,
+      ratingAfter: 800,
+      ratingGeneration: 0
+    })
+  ];
+
+  const remoteService = new PracticeService(await seededMemoryStore());
+  const remote = remoteService.exportLocalData();
+  remote.ratings = [{
+    key: "standard 5/20",
+    generation: 1,
+    rating: 650,
+    ratingDeviation: 250,
+    volatility: 0.06,
+    games: 1
+  }];
+  remote.sprintSessions = [completedRatingSprint({
+    id: "new-generation",
+    completedAt: "2026-07-02T00:00:00.000Z",
+    ratingBefore: 600,
+    ratingAfter: 650,
+    ratingGeneration: 1
+  })];
+
+  const merged = mergeLocalDataExports(local, remote);
+  const mergedAgain = mergeLocalDataExports(merged, merged);
+
+  assert.deepEqual(mergedAgain.ratings, merged.ratings);
+  assert.equal(mergedAgain.ratings[0]?.generation, 1);
+  assert.equal(mergedAgain.ratings[0]?.rating, 650);
+  assert.equal(mergedAgain.ratings[0]?.games, 1);
+});
+
+test("mergeLocalDataExports upgrades untagged sessions from a legacy post-reset snapshot", async () => {
+  const localService = new PracticeService(await seededMemoryStore());
+  const local = localService.exportLocalData();
+  local.ratings = [{
+    key: "standard 5/20",
+    generation: 0,
+    rating: 600,
+    ratingDeviation: 350,
+    volatility: 0.06,
+    games: 0
+  }];
+  const legacyRemote = structuredClone(local);
+  legacyRemote.ratings = [{
+    key: "standard 5/20",
+    generation: 1,
+    rating: 650,
+    ratingDeviation: 250,
+    volatility: 0.06,
+    games: 1
+  }];
+  const {
+    ratingGeneration: _legacyRatingGeneration,
+    ...untaggedLegacySession
+  } = completedRatingSprint({
+    id: "legacy-current-generation",
+    completedAt: "2026-07-01T00:00:00.000Z",
+    ratingBefore: 600,
+    ratingAfter: 650
+  });
+  const {
+    ratingGeneration: _staleRatingGeneration,
+    ...untaggedStaleSession
+  } = completedRatingSprint({
+    id: "legacy-stale-generation",
+    completedAt: "2026-07-02T00:00:00.000Z",
+    ratingBefore: 700,
+    ratingAfter: 800
+  });
+  legacyRemote.sprintSessions = [untaggedLegacySession, untaggedStaleSession];
+
+  const restored = mergeLocalDataExports(local, legacyRemote);
+
+  assert.equal(restored.ratings[0]?.rating, 650);
+  assert.equal(restored.ratings[0]?.games, 1);
+  assert.equal(
+    restored.sprintSessions.find((session) => session.id === "legacy-current-generation")?.ratingGeneration,
+    1
+  );
+  assert.equal(
+    restored.sprintSessions.find((session) => session.id === "legacy-stale-generation")?.ratingGeneration,
+    undefined
+  );
+
+  const afterAnotherGame = structuredClone(restored);
+  afterAnotherGame.ratings[0] = {
+    ...afterAnotherGame.ratings[0]!,
+    rating: 700,
+    games: 2
+  };
+  afterAnotherGame.sprintSessions.push(completedRatingSprint({
+    id: "new-current-generation",
+    completedAt: "2026-07-03T00:00:00.000Z",
+    ratingBefore: 650,
+    ratingAfter: 700,
+    ratingGeneration: 1
+  }));
+
+  const reconciled = mergeLocalDataExports(afterAnotherGame, afterAnotherGame);
+
+  assert.equal(reconciled.ratings[0]?.rating, 700);
+  assert.equal(reconciled.ratings[0]?.games, 2);
+});
+
+test("syncPracticeProgress upgrades an existing active session to the remote terminal version", async () => {
+  const sqliteStore = new SQLiteStore(":memory:");
+  sqliteStore.migrate();
+  const stores = [new MemoryStore(), sqliteStore];
+  try {
+    for (const store of stores) {
+      store.createSprintSession(activeSprintState("shared-session"));
+      const remoteData = store.exportLocalData();
+      remoteData.sprintSessions = [completedRatingSprint({
+        id: "shared-session",
+        completedAt: "2026-07-01T00:01:00.000Z",
+        ratingBefore: 600,
+        ratingAfter: 650,
+        ratingGeneration: 0
+      })];
+      const transport = new RecordingTransport({
+        schemaVersion: 1,
+        deviceId: "device-a",
+        updatedAt: "2026-07-01T00:02:00.000Z",
+        data: remoteData
+      });
+
+      await syncPracticeProgress(store, transport, {
+        deviceId: "device-b",
+        now: () => "2026-07-01T00:03:00.000Z"
+      });
+
+      assert.equal(store.listSprintSessions()[0]?.status, "won");
+      assert.equal(store.listSprintSessions()[0]?.ratingAfter, 650);
+      assert.equal(transport.saved[0]?.data.sprintSessions[0]?.status, "won");
+      assert.equal(transport.saved[0]?.data.sprintSessions[0]?.ratingGeneration, 0);
+    }
+  } finally {
+    sqliteStore.close();
+  }
+});
+
+test("mergeLocalDataExports does not let an imported open-session placeholder fail the owning active session", async () => {
+  const service = new PracticeService(await seededMemoryStore());
+  const local = service.exportLocalData();
+  local.sprintSessions = [{
+    id: "shared-session",
+    mode: "standard",
+    ratingKey: "standard 5/20",
+    ratingGeneration: 0,
+    startedAt: "2026-07-01T00:00:00.000Z",
+    status: "active",
+    correctCount: 0,
+    mistakeCount: 0,
+    ratingBefore: 600
+  }];
+  const remote = structuredClone(local);
+  remote.sprintSessions[0] = {
+    ...remote.sprintSessions[0]!,
+    completedAt: "2026-07-01T00:00:00.000Z",
+    status: "failed"
+  };
+
+  assert.equal(mergeLocalDataExports(local, remote).sprintSessions[0]?.status, "active");
+  assert.equal(mergeLocalDataExports(remote, local).sprintSessions[0]?.status, "active");
+});
+
+test("syncPracticeProgress refetches and remerges after a concurrent snapshot conflict", async () => {
+  const firstRemoteService = new PracticeService(await seededMemoryStore());
+  enableSync(firstRemoteService);
+  recordWrongStandardAttempt(firstRemoteService);
+  const concurrentRemoteService = new PracticeService(await seededMemoryStore());
+  enableSync(concurrentRemoteService);
+  recordWrongStandardAttempt(concurrentRemoteService);
+  const firstSnapshot: ProgressSyncSnapshot = {
+    schemaVersion: 1,
+    deviceId: "device-a",
+    updatedAt: "2026-07-01T00:01:00.000Z",
+    data: firstRemoteService.exportLocalData()
+  };
+  const concurrentSnapshot: ProgressSyncSnapshot = {
+    schemaVersion: 1,
+    deviceId: "device-b",
+    updatedAt: "2026-07-01T00:02:00.000Z",
+    data: concurrentRemoteService.exportLocalData()
+  };
+  const localStore = await seededMemoryStore();
+  const localService = new PracticeService(localStore);
+  enableSync(localService);
+  const transport = new ConflictOnceTransport(firstSnapshot, concurrentSnapshot);
+
+  const result = await syncPracticeProgress(localService, transport, {
+    deviceId: "device-c",
+    now: () => "2026-07-01T00:03:00.000Z"
+  });
+
+  assert.equal(transport.fetchCount, 2);
+  assert.equal(transport.saveCount, 2);
+  assert.equal(result.remoteUpdatedAt, concurrentSnapshot.updatedAt);
+  assert.equal(transport.saved?.data.attempts.length, 2);
+  assert.equal(transport.saved?.data.sprintSessions.length, 2);
+});
+
 class RecordingTransport implements ProgressSyncTransport {
   fetchCount = 0;
   readonly saved: ProgressSyncSnapshot[] = [];
@@ -435,6 +723,34 @@ class RecordingTransport implements ProgressSyncTransport {
 
   async saveSnapshot(snapshot: ProgressSyncSnapshot): Promise<void> {
     this.saved.push(snapshot);
+    this.snapshot = snapshot;
+  }
+}
+
+class ConflictOnceTransport implements ProgressSyncTransport {
+  fetchCount = 0;
+  saveCount = 0;
+  saved: ProgressSyncSnapshot | undefined;
+  private snapshot: ProgressSyncSnapshot;
+  private readonly concurrentSnapshot: ProgressSyncSnapshot;
+
+  constructor(snapshot: ProgressSyncSnapshot, concurrentSnapshot: ProgressSyncSnapshot) {
+    this.snapshot = snapshot;
+    this.concurrentSnapshot = concurrentSnapshot;
+  }
+
+  async fetchSnapshot(): Promise<ProgressSyncSnapshot> {
+    this.fetchCount += 1;
+    return this.snapshot;
+  }
+
+  async saveSnapshot(snapshot: ProgressSyncSnapshot): Promise<void> {
+    this.saveCount += 1;
+    if (this.saveCount === 1) {
+      this.snapshot = this.concurrentSnapshot;
+      throw new ProgressSyncConflictError();
+    }
+    this.saved = snapshot;
     this.snapshot = snapshot;
   }
 }
@@ -480,17 +796,20 @@ function completedRatingSprint({
   id,
   completedAt,
   ratingBefore,
-  ratingAfter
+  ratingAfter,
+  ratingGeneration = 0
 }: {
   id: string;
   completedAt: string;
   ratingBefore: number;
   ratingAfter: number;
+  ratingGeneration?: number;
 }) {
   return {
     id,
     mode: "standard" as const,
     ratingKey: "standard 5/20",
+    ratingGeneration,
     startedAt: completedAt,
     completedAt,
     status: "won" as const,
@@ -498,6 +817,25 @@ function completedRatingSprint({
     mistakeCount: 0,
     ratingBefore,
     ratingAfter
+  };
+}
+
+function activeSprintState(id: string): SprintState {
+  return {
+    id,
+    config: defaultSprintConfig("standard"),
+    ratingGeneration: 0,
+    status: "active",
+    startedAt: "2026-07-01T00:00:00.000Z",
+    deadlineAt: "2026-07-01T00:05:00.000Z",
+    correctCount: 0,
+    mistakeCount: 0,
+    currentStreak: 0,
+    bestStreak: 0,
+    hasUserSubmittedMove: false,
+    currentPuzzleIndex: 0,
+    puzzles: [],
+    ratingBefore: 600
   };
 }
 

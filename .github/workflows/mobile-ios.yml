@@ -64,9 +64,9 @@ jobs:
 
   detox-ios:
     name: Detox iOS (${{ matrix.suite }})
-    # Draft PRs skip the expensive simulator build; mark the PR ready for
-    # review (or dispatch manually) to run the full Detox suite.
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
+    # Routine PRs use exact-head local Detox evidence. Run CI Detox manually
+    # against main as the pre-release gate.
+    if: github.event_name == 'workflow_dispatch'
     # macos-latest started resolving to macOS 26 in July 2026, where the first
     # Detox launch can remain busy until the smoke test times out. Keep the
     # release gate on the supported macOS 15 runner until Detox is qualified on

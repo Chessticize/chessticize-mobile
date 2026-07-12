@@ -109,6 +109,24 @@ export function mergeRatingWithSprintSessions(
   );
 }
 
+export function assignLegacyRatingGenerations(
+  ratings: RatingRecord[],
+  sprintSessions: ExportedSprintSession[]
+): ExportedSprintSession[] {
+  const assigned = new Map(sprintSessions.map((session) => [session.id, { ...session }]));
+  for (const rating of ratings) {
+    for (const session of currentGenerationSessions(normalizeRatingRecord(rating), [...assigned.values()])) {
+      if (session.ratingGeneration === undefined) {
+        assigned.set(session.id, {
+          ...session,
+          ratingGeneration: rating.generation
+        });
+      }
+    }
+  }
+  return [...assigned.values()];
+}
+
 function currentGenerationSessions(
   rating: RatingRecord,
   sprintSessions: ExportedSprintSession[]
@@ -116,14 +134,67 @@ function currentGenerationSessions(
   if (rating.games <= 0) {
     return [];
   }
-  return sprintSessions
+  const candidates = sprintSessions
     .filter((session) =>
       session.ratingKey === rating.key &&
       session.completedAt !== undefined &&
       session.ratingAfter !== undefined
     )
+    .sort(compareSessionsNewestFirst);
+  const explicitlyAssigned = candidates.filter((session) => session.ratingGeneration === rating.generation);
+  const legacySlots = Math.max(0, rating.games - explicitlyAssigned.length);
+  const inferredLegacy = inferLegacyGenerationSessions(
+    rating,
+    explicitlyAssigned,
+    candidates.filter((session) => session.ratingGeneration === undefined),
+    legacySlots
+  );
+  return [...explicitlyAssigned, ...inferredLegacy]
     .sort(compareSessionsNewestFirst)
     .slice(0, rating.games);
+}
+
+function inferLegacyGenerationSessions(
+  rating: RatingRecord,
+  explicitlyAssigned: ExportedSprintSession[],
+  legacyCandidates: ExportedSprintSession[],
+  count: number
+): ExportedSprintSession[] {
+  if (count <= 0) {
+    return [];
+  }
+  if (legacyCandidates.length <= count) {
+    return legacyCandidates;
+  }
+  let best = legacyCandidates.slice(0, count);
+  let bestError = ratingReconstructionError(rating, [...explicitlyAssigned, ...best]);
+  for (let start = 1; start + count <= legacyCandidates.length; start += 1) {
+    const candidate = legacyCandidates.slice(start, start + count);
+    const error = ratingReconstructionError(rating, [...explicitlyAssigned, ...candidate]);
+    if (error < bestError) {
+      best = candidate;
+      bestError = error;
+    }
+  }
+  return best;
+}
+
+function ratingReconstructionError(
+  rating: RatingRecord,
+  sessions: ExportedSprintSession[]
+): number {
+  if (sessions.length === 0) {
+    return Math.abs(rating.rating);
+  }
+  const ordered = [...sessions].sort(compareSessionsOldestFirst);
+  const reconstructed = Math.max(
+    RATING_FLOOR,
+    ordered[0]!.ratingBefore + ordered.reduce(
+      (total, session) => total + (session.ratingAfter as number) - session.ratingBefore,
+      0
+    )
+  );
+  return Math.abs(reconstructed - rating.rating);
 }
 
 function rebuildRatingFromSessions(

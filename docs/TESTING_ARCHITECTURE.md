@@ -42,6 +42,31 @@ real boundary is part of the risk.
 suite. The mobile GUI suite is built and run with
 `pnpm mobile:e2e:build:ios` and `pnpm mobile:e2e:test:ios`.
 
+## Local PR Gate And Release CI Gate
+
+Routine PR merges use local Detox as the native GUI gate. GitHub Detox is not a
+per-PR merge gate and its runtime must not keep an otherwise complete PR
+waiting. A PR may merge when all of the following are true:
+
+- Every required non-Detox check has completed successfully.
+- The local iOS Detox app was built from the exact PR head commit.
+- Both the `flows` and `practice` suites passed locally, either through the
+  unfiltered full-suite command or explicit runs of both suites.
+- The PR description or a PR comment records the commit SHA, commands, and
+  result. A later code change invalidates the evidence and requires a rerun.
+
+CI Detox does not run automatically for routine PRs. A failed non-Detox check
+remains a blocker, as does a known product failure. Local Detox evidence must
+be exact-head and full-suite; a focused spec, an older commit, a manual
+simulator pass, or an unrecorded claim does not qualify.
+
+GitHub Detox is the release gate for `main`. Before any release, manually
+dispatch Mobile iOS/Detox for the exact release candidate commit on `main` (or
+verify an existing run for that exact commit) and require both matrix suites to
+pass. If `main` Detox fails, diagnose and fix the failure, then rerun it until
+green before releasing. This release check does not require per-failure issue
+bookkeeping.
+
 ## What Must Be Exhaustive
 
 Pure domain and persistence behavior should cover all meaningful branches,

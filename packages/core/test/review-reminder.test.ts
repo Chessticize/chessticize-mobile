@@ -6,7 +6,7 @@ import { computeNextReminder, type ReviewReminderUsageEntry, type ReviewQueueSta
 test("computeNextReminder uses the median local session-start hour from recent history", () => {
   const now = localIso(2026, 7, 3, 12);
   const decision = computeNextReminder(
-    [reviewDueAt(localIso(2026, 7, 3, 18))],
+    [reviewDueDay("2026-07-03")],
     [
       usage("s1", localIso(2026, 7, 2, 8, 10)),
       usage("s2", localIso(2026, 7, 2, 18, 20)),
@@ -21,13 +21,13 @@ test("computeNextReminder uses the median local session-start hour from recent h
 
   assert.equal(decision?.scheduledAt, localIso(2026, 7, 3, 20));
   assert.equal(decision?.dueCount, 1);
-  assert.equal(decision?.body, "1 puzzle is ready for review");
+  assert.equal(decision?.body, "1 review is ready");
   assert.equal(decision?.route, "review");
 });
 
 test("computeNextReminder deduplicates attempts from the same session before computing smart time", () => {
   const decision = computeNextReminder(
-    [reviewDueAt(localIso(2026, 7, 3, 18))],
+    [reviewDueDay("2026-07-03")],
     [
       usage("s1", localIso(2026, 7, 2, 8, 30)),
       usage("s1", localIso(2026, 7, 2, 23, 30)),
@@ -45,7 +45,7 @@ test("computeNextReminder deduplicates attempts from the same session before com
 
 test("computeNextReminder falls back to 19:00 local time until enough recent sessions exist", () => {
   const decision = computeNextReminder(
-    [reviewDueAt(localIso(2026, 7, 3, 18, 30))],
+    [reviewDueDay("2026-07-03")],
     [
       usage("s1", localIso(2026, 7, 2, 8)),
       usage("s2", localIso(2026, 7, 1, 9)),
@@ -62,9 +62,9 @@ test("computeNextReminder falls back to 19:00 local time until enough recent ses
 test("computeNextReminder respects fixed reminder time and pluralizes due-count copy", () => {
   const decision = computeNextReminder(
     [
-      reviewDueAt(localIso(2026, 7, 3, 6)),
-      reviewDueAt(localIso(2026, 7, 3, 7)),
-      reviewDueAt(localIso(2026, 7, 4, 9))
+      reviewDueDay("2026-07-03"),
+      reviewDueDay("2026-07-03"),
+      reviewDueDay("2026-07-04")
     ],
     [],
     { kind: "fixed", hour: 8, minute: 15 },
@@ -73,24 +73,24 @@ test("computeNextReminder respects fixed reminder time and pluralizes due-count 
 
   assert.equal(decision?.scheduledAt, localIso(2026, 7, 3, 8, 15));
   assert.equal(decision?.dueCount, 2);
-  assert.equal(decision?.body, "2 puzzles are ready for review");
+  assert.equal(decision?.body, "2 reviews are ready");
 });
 
 test("computeNextReminder projects to the next local reminder time that will have due reviews", () => {
   const decision = computeNextReminder(
-    [reviewDueAt(localIso(2026, 7, 5, 20))],
+    [reviewDueDay("2026-07-05")],
     [],
     { kind: "fixed", hour: 19, minute: 0 },
     localIso(2026, 7, 3, 12)
   );
 
-  assert.equal(decision?.scheduledAt, localIso(2026, 7, 6, 19));
+  assert.equal(decision?.scheduledAt, localIso(2026, 7, 5, 19));
   assert.equal(decision?.dueCount, 1);
 });
 
 test("computeNextReminder returns none when reminders are off or no reviews will be due", () => {
   assert.equal(
-    computeNextReminder([reviewDueAt("2026-07-03T18:00:00.000Z")], [], { kind: "off" }, "2026-07-03T12:00:00.000Z"),
+    computeNextReminder([reviewDueDay("2026-07-03")], [], { kind: "off" }, "2026-07-03T12:00:00.000Z"),
     undefined
   );
   assert.equal(
@@ -98,28 +98,28 @@ test("computeNextReminder returns none when reminders are off or no reviews will
     undefined
   );
   assert.equal(
-    computeNextReminder([reviewDueAt("not-a-date")], [], { kind: "smart" }, "2026-07-03T12:00:00.000Z"),
+    computeNextReminder([reviewDueDay("not-a-date")], [], { kind: "smart" }, "2026-07-03T12:00:00.000Z"),
     undefined
   );
 });
 
 test("computeNextReminder validates fixed reminder settings and now", () => {
   assert.throws(
-    () => computeNextReminder([reviewDueAt("2026-07-03T18:00:00.000Z")], [], { kind: "fixed", hour: 24, minute: 0 }, "2026-07-03T12:00:00.000Z"),
+    () => computeNextReminder([reviewDueDay("2026-07-03")], [], { kind: "fixed", hour: 24, minute: 0 }, "2026-07-03T12:00:00.000Z"),
     /hour/
   );
   assert.throws(
-    () => computeNextReminder([reviewDueAt("2026-07-03T18:00:00.000Z")], [], { kind: "fixed", hour: 8, minute: 60 }, "2026-07-03T12:00:00.000Z"),
+    () => computeNextReminder([reviewDueDay("2026-07-03")], [], { kind: "fixed", hour: 8, minute: 60 }, "2026-07-03T12:00:00.000Z"),
     /minute/
   );
   assert.throws(
-    () => computeNextReminder([reviewDueAt("2026-07-03T18:00:00.000Z")], [], { kind: "smart" }, "not-a-date"),
+    () => computeNextReminder([reviewDueDay("2026-07-03")], [], { kind: "smart" }, "not-a-date"),
     /now/
   );
 });
 
-function reviewDueAt(dueAt: string): Pick<ReviewQueueState, "dueAt"> {
-  return { dueAt };
+function reviewDueDay(dueDay: string): Pick<ReviewQueueState, "dueDay"> {
+  return { dueDay };
 }
 
 function usage(sessionId: string, startedAt: string): ReviewReminderUsageEntry {

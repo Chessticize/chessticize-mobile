@@ -28,13 +28,13 @@ describe("review reminder scheduler", () => {
 
     expect(decision).toMatchObject({
       dueCount: 1,
-      body: "1 puzzle is ready for review",
+      body: "1 review is ready",
       route: "review"
     });
     expect(localTime(decision?.scheduledAt)).toEqual({ hour: 8, minute: 15 });
     expect(scheduler.currentReminder).toEqual(decision);
     expect(scheduler.calls).toEqual([decision]);
-    expect(reminderScheduleKey(decision)).toContain("1 puzzle is ready for review");
+    expect(reminderScheduleKey(decision)).toContain("1 review is ready");
   });
 
   it("clears the pending reminder when settings disable reminders", async () => {
@@ -69,7 +69,7 @@ describe("review reminder scheduler", () => {
       scheduler?.replaceNextReminder({
         scheduledAt: "2026-06-21T15:15:00.000Z",
         dueCount: 2,
-        body: "2 puzzles are ready for review",
+        body: "2 reviews are ready",
         route: "review"
       })
     ).resolves.toEqual({ scheduled: true, scheduledAt: "2026-06-21T15:15:00.000Z" });
@@ -79,7 +79,7 @@ describe("review reminder scheduler", () => {
       {
         scheduledAt: "2026-06-21T15:15:00.000Z",
         dueCount: 2,
-        body: "2 puzzles are ready for review",
+        body: "2 reviews are ready",
         route: "review"
       },
       null

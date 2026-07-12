@@ -6,6 +6,7 @@ import {
   normalizeRatingRecord,
   resetRating as resetRatingRecord,
   resolveHistoryRange,
+  reviewDayFor,
   scheduleMistakeForContext,
   scheduleReview,
   sideToMoveForHistoryPuzzle
@@ -31,14 +32,18 @@ import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./
 import type {
   ClearLocalHistoryResult,
   ExportedSprintSession,
+  LocalDataImport,
   LocalDataImportResult,
   LocalDataExport,
   PracticeSettings,
   PracticeStore,
   ReviewQueueDuePromotionResult
 } from "./practice-store.ts";
+import { exportReviewQueueState, normalizeImportedReviewQueueState } from "./practice-store.ts";
 import { clonePracticeSettings, defaultPracticeSettings, normalizeReviewReminderPreference, reviewReminderPreferenceToSettings } from "./practice-settings.ts";
 import { selectUniquePuzzles } from "./puzzle-selection.ts";
+import { preferredSprintSession, sameSprintSession } from "./sprint-session-sync.ts";
+import { assignLegacyRatingGenerations } from "./rating-history.ts";
 import type { ReviewReminderPreference } from "./practice-store.ts";
 import type { ReviewReminderSettings } from "../../core/src/index.ts";
 
@@ -100,8 +105,8 @@ interface ReviewRow {
   puzzle_id: string;
   mode: SprintMode;
   rating_key: string;
-  due_at: string;
-  interval_hours: number;
+  due_day: string;
+  interval_days: number;
   review_count: number;
   success_streak: number;
   lapse_count: number;
@@ -134,6 +139,7 @@ interface SprintSessionExportRow {
   id: string;
   mode: SprintMode;
   ratingKey: string;
+  ratingGeneration: number | null;
   startedAt: string;
   completedAt: string | null;
   status: SprintState["status"];
@@ -160,7 +166,7 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 2;
+export const CURRENT_SCHEMA_VERSION = 4;
 
 interface SQLiteMigration {
   from: number;
@@ -170,7 +176,9 @@ interface SQLiteMigration {
 
 const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
   { from: 0, to: 1, apply: migrateUnversionedSchemaToV1 },
-  { from: 1, to: 2, apply: migrateV1ToV2 }
+  { from: 1, to: 2, apply: migrateV1ToV2 },
+  { from: 2, to: 3, apply: migrateV2ToV3 },
+  { from: 3, to: 4, apply: migrateV3ToV4 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
@@ -473,6 +481,7 @@ export class SyncSQLiteStore implements PracticeStore {
           id,
           mode,
           rating_key,
+          rating_generation,
           config_json,
           started_at,
           deadline_at,
@@ -480,12 +489,13 @@ export class SyncSQLiteStore implements PracticeStore {
           correct_count,
           mistake_count,
           rating_before
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         state.id,
         state.config.mode,
         state.config.ratingKey,
+        state.ratingGeneration ?? this.getRating(state.config.ratingKey).generation,
         JSON.stringify(state.config),
         state.startedAt,
         state.deadlineAt,
@@ -501,6 +511,7 @@ export class SyncSQLiteStore implements PracticeStore {
       .prepare(
         `UPDATE sprint_sessions
          SET status = ?,
+             rating_generation = COALESCE(?, rating_generation),
              completed_at = ?,
              end_reason = ?,
              correct_count = ?,
@@ -510,6 +521,7 @@ export class SyncSQLiteStore implements PracticeStore {
       )
       .run(
         state.status,
+        state.ratingGeneration ?? null,
         state.completedAt ?? null,
         state.endReason ?? null,
         state.correctCount,
@@ -630,16 +642,17 @@ export class SyncSQLiteStore implements PracticeStore {
       attempts: this.listAttempts(),
       reviewQueue: this.listAllReviewQueueStates()
         .sort((left, right) =>
-          left.dueAt.localeCompare(right.dueAt) ||
+          left.dueDay.localeCompare(right.dueDay) ||
           left.puzzleId.localeCompare(right.puzzleId) ||
           left.mode.localeCompare(right.mode) ||
           left.ratingKey.localeCompare(right.ratingKey)
-        ),
+        )
+        .map(exportReviewQueueState),
       sprintSessions: this.listSprintSessions()
     };
   }
 
-  importLocalData(data: LocalDataExport): LocalDataImportResult {
+  importLocalData(data: LocalDataImport): LocalDataImportResult {
     const result: LocalDataImportResult = {
       ratings: 0,
       attempts: 0,
@@ -669,7 +682,8 @@ export class SyncSQLiteStore implements PracticeStore {
           result.attempts += 1;
         }
       }
-      for (const review of data.reviewQueue) {
+      for (const importedReview of data.reviewQueue) {
+        const review = normalizeImportedReviewQueueState(importedReview);
         if (!this.getPuzzle(review.puzzleId)) {
           continue;
         }
@@ -728,11 +742,11 @@ export class SyncSQLiteStore implements PracticeStore {
           rating_key,
           result,
           reviewed_at,
-          next_due_at,
-          interval_hours
+          next_due_day,
+          interval_days
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
       )
-      .run(this.options.randomId(), context.puzzleId, context.mode, context.ratingKey, result, now, next.dueAt, next.intervalHours);
+      .run(this.options.randomId(), context.puzzleId, context.mode, context.ratingKey, result, now, next.dueDay, next.intervalDays);
     return next;
   }
 
@@ -758,38 +772,39 @@ export class SyncSQLiteStore implements PracticeStore {
   }
 
   promoteNextFutureReviewsToDue(now: string): ReviewQueueDuePromotionResult {
-    const nowIso = new Date(now).toISOString();
+    const today = reviewDayFor(now);
     const nextFuture = this.db
-      .prepare("SELECT due_at AS dueAt FROM review_queue WHERE due_at > ? ORDER BY due_at ASC, puzzle_id ASC, mode ASC, rating_key ASC LIMIT 1")
-      .get(nowIso) as { dueAt: string } | undefined;
+      .prepare("SELECT due_day AS dueDay FROM review_queue WHERE due_day > ? ORDER BY due_day ASC, puzzle_id ASC, mode ASC, rating_key ASC LIMIT 1")
+      .get(today) as { dueDay: string } | undefined;
     if (!nextFuture) {
       return { promotedCount: 0 };
     }
 
-    const promotedDate = nextFuture.dueAt.slice(0, 10);
+    const promotedDate = nextFuture.dueDay;
     const promotedCount = (
       this.db
-        .prepare("SELECT COUNT(*) AS count FROM review_queue WHERE due_at > ? AND substr(due_at, 1, 10) = ?")
-        .get(nowIso, promotedDate) as { count: number }
+        .prepare("SELECT COUNT(*) AS count FROM review_queue WHERE due_day = ?")
+        .get(promotedDate) as { count: number }
     ).count;
 
     if (promotedCount > 0) {
       this.db
-        .prepare("UPDATE review_queue SET due_at = ? WHERE due_at > ? AND substr(due_at, 1, 10) = ?")
-        .run(nowIso, nowIso, promotedDate);
+        .prepare("UPDATE review_queue SET due_day = ? WHERE due_day = ?")
+        .run(today, promotedDate);
     }
 
     return {
       promotedCount,
       promotedDate,
-      dueAt: nowIso
+      dueDay: today
     };
   }
 
   getDueReviews(now: string): ReviewQueueState[] {
+    const today = reviewDayFor(now);
     const rows = this.db
-      .prepare("SELECT * FROM review_queue WHERE due_at <= ? ORDER BY due_at ASC, puzzle_id ASC, mode ASC, rating_key ASC")
-      .all(now) as ReviewRow[];
+      .prepare("SELECT * FROM review_queue WHERE due_day <= ? ORDER BY due_day ASC, puzzle_id ASC, mode ASC, rating_key ASC")
+      .all(today) as ReviewRow[];
     return rows.map(reviewFromRow);
   }
 
@@ -824,8 +839,8 @@ export class SyncSQLiteStore implements PracticeStore {
           puzzle_id,
           mode,
           rating_key,
-          due_at,
-          interval_hours,
+          due_day,
+          interval_days,
           review_count,
           success_streak,
           lapse_count,
@@ -837,8 +852,8 @@ export class SyncSQLiteStore implements PracticeStore {
         state.puzzleId,
         state.mode,
         state.ratingKey,
-        state.dueAt,
-        state.intervalHours,
+        state.dueDay,
+        state.intervalDays,
         state.reviewCount,
         state.successStreak,
         state.lapseCount,
@@ -944,7 +959,7 @@ export class SyncSQLiteStore implements PracticeStore {
   }
 
   private listAllReviewQueueStates(): ReviewQueueState[] {
-    const rows = this.db.prepare("SELECT * FROM review_queue ORDER BY due_at ASC, puzzle_id ASC, mode ASC, rating_key ASC").all() as ReviewRow[];
+    const rows = this.db.prepare("SELECT * FROM review_queue ORDER BY due_day ASC, puzzle_id ASC, mode ASC, rating_key ASC").all() as ReviewRow[];
     return rows.map(reviewFromRow);
   }
 
@@ -955,6 +970,7 @@ export class SyncSQLiteStore implements PracticeStore {
           id,
           mode,
           rating_key AS ratingKey,
+          rating_generation AS ratingGeneration,
           started_at AS startedAt,
           completed_at AS completedAt,
           status,
@@ -967,33 +983,78 @@ export class SyncSQLiteStore implements PracticeStore {
       )
       .all() as SprintSessionExportRow[];
 
-    return rows.map((row) => ({
-      id: row.id,
-      mode: row.mode,
-      ratingKey: row.ratingKey,
-      startedAt: row.startedAt,
-      ...(row.completedAt === null ? {} : { completedAt: row.completedAt }),
-      status: row.status,
-      correctCount: row.correctCount,
-      mistakeCount: row.mistakeCount,
-      ratingBefore: row.ratingBefore,
-      ...(row.ratingAfter === null ? {} : { ratingAfter: row.ratingAfter })
-    }));
+    return rows.map(exportedSprintSessionFromRow);
   }
 
   private importSprintSession(session: ExportedSprintSession): boolean {
-    const existing = this.db.prepare("SELECT id FROM sprint_sessions WHERE id = ?").get(session.id);
-    if (existing) {
+    const existingRow = this.db
+      .prepare(
+        `SELECT
+          id,
+          mode,
+          rating_key AS ratingKey,
+          rating_generation AS ratingGeneration,
+          started_at AS startedAt,
+          completed_at AS completedAt,
+          status,
+          correct_count AS correctCount,
+          mistake_count AS mistakeCount,
+          rating_before AS ratingBefore,
+          rating_after AS ratingAfter
+         FROM sprint_sessions
+         WHERE id = ?`
+      )
+      .get(session.id) as SprintSessionExportRow | undefined;
+    if (existingRow && (session.status === "active" || session.status === "paused")) {
       return false;
     }
-    const status = session.status === "active" || session.status === "paused" ? "failed" : session.status;
-    const completedAt = session.completedAt ?? session.startedAt;
+    const previous = existingRow ? exportedSprintSessionFromRow(existingRow) : undefined;
+    const incoming = normalizedImportedSprintSession(session);
+    const next = previous ? preferredSprintSession(previous, incoming) : incoming;
+    if (sameSprintSession(previous, next)) {
+      return false;
+    }
+    const completedAt = next.completedAt ?? next.startedAt;
+    if (existingRow) {
+      this.db
+        .prepare(
+          `UPDATE sprint_sessions
+           SET mode = ?,
+               rating_key = ?,
+               rating_generation = ?,
+               started_at = ?,
+               deadline_at = ?,
+               completed_at = ?,
+               status = ?,
+               correct_count = ?,
+               mistake_count = ?,
+               rating_before = ?,
+               rating_after = ?
+           WHERE id = ?`
+        )
+        .run(
+          next.mode,
+          next.ratingKey,
+          next.ratingGeneration ?? null,
+          next.startedAt,
+          completedAt,
+          completedAt,
+          next.status,
+          next.correctCount,
+          next.mistakeCount,
+          next.ratingBefore,
+          next.ratingAfter ?? null,
+          next.id
+        );
+      return true;
+    }
     this.db
       .prepare(
         `INSERT INTO sprint_sessions (
           id,
           mode,
           rating_key,
+          rating_generation,
           config_json,
           started_at,
           deadline_at,
@@ -1003,21 +1064,22 @@ export class SyncSQLiteStore implements PracticeStore {
           mistake_count,
           rating_before,
           rating_after
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
-        session.id,
-        session.mode,
-        session.ratingKey,
-        JSON.stringify({ source: "icloud_sync", mode: session.mode, ratingKey: session.ratingKey }),
-        session.startedAt,
+        next.id,
+        next.mode,
+        next.ratingKey,
+        next.ratingGeneration ?? null,
+        JSON.stringify({ source: "icloud_sync", mode: next.mode, ratingKey: next.ratingKey }),
+        next.startedAt,
         completedAt,
         completedAt,
-        status,
-        session.correctCount,
-        session.mistakeCount,
-        session.ratingBefore,
-        session.ratingAfter ?? null
+        next.status,
+        next.correctCount,
+        next.mistakeCount,
+        next.ratingBefore,
+        next.ratingAfter ?? null
       );
     return true;
   }
@@ -1158,6 +1220,163 @@ function migrateV1ToV2(db: SyncSqliteDatabase): void {
   db.exec(INDEX_V2_SQL);
 }
 
+function migrateV2ToV3(db: SyncSqliteDatabase): void {
+  ensureColumn(
+    db,
+    "sprint_sessions",
+    "rating_generation",
+    "ALTER TABLE sprint_sessions ADD COLUMN rating_generation INTEGER"
+  );
+  const ratingRows = db
+    .prepare(
+      `SELECT r.*
+       FROM ratings r
+       JOIN (
+         SELECT key, MAX(generation) AS generation
+         FROM ratings
+         GROUP BY key
+       ) latest ON latest.key = r.key AND latest.generation = r.generation`
+    )
+    .all() as RatingRow[];
+  const ratings = ratingRows.map(ratingFromRow);
+  const tagSession = db.prepare(
+    "UPDATE sprint_sessions SET rating_generation = ? WHERE id = ? AND rating_generation IS NULL"
+  );
+  for (const rating of ratings) {
+    if (rating.generation === 0) {
+      db.prepare(
+        "UPDATE sprint_sessions SET rating_generation = 0 WHERE rating_key = ? AND rating_generation IS NULL"
+      ).run(rating.key);
+      continue;
+    }
+    db.prepare(
+      `UPDATE sprint_sessions
+       SET rating_generation = ?
+       WHERE rating_key = ?
+         AND rating_generation IS NULL
+         AND status IN ('active', 'paused')`
+    ).run(rating.generation, rating.key);
+    const sessionRows = db
+      .prepare(
+        `SELECT
+          id,
+          mode,
+          rating_key AS ratingKey,
+          rating_generation AS ratingGeneration,
+          started_at AS startedAt,
+          completed_at AS completedAt,
+          status,
+          correct_count AS correctCount,
+          mistake_count AS mistakeCount,
+          rating_before AS ratingBefore,
+          rating_after AS ratingAfter
+         FROM sprint_sessions
+         WHERE rating_key = ?
+         ORDER BY started_at DESC, id DESC`
+      )
+      .all(rating.key) as SprintSessionExportRow[];
+    const assigned = assignLegacyRatingGenerations(
+      [rating],
+      sessionRows.map(exportedSprintSessionFromRow)
+    );
+    for (const session of assigned) {
+      if (session.ratingGeneration === rating.generation) {
+        tagSession.run(rating.generation, session.id);
+      }
+    }
+  }
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS sprint_sessions_rating_generation_completed_at_id_idx " +
+    "ON sprint_sessions(rating_key, rating_generation, completed_at, id)"
+  );
+}
+
+function migrateV3ToV4(db: SyncSqliteDatabase): void {
+  db.exec(`
+    CREATE TABLE review_queue_v4 (
+      puzzle_id TEXT NOT NULL,
+      mode TEXT NOT NULL DEFAULT 'standard',
+      rating_key TEXT NOT NULL DEFAULT 'standard 5/20',
+      due_day TEXT NOT NULL,
+      interval_days INTEGER NOT NULL,
+      review_count INTEGER NOT NULL,
+      success_streak INTEGER NOT NULL,
+      lapse_count INTEGER NOT NULL,
+      last_result TEXT NOT NULL,
+      last_reviewed_at TEXT NOT NULL,
+      PRIMARY KEY (puzzle_id, mode, rating_key),
+      FOREIGN KEY (puzzle_id) REFERENCES puzzles(id)
+    );
+
+    INSERT INTO review_queue_v4 (
+      puzzle_id,
+      mode,
+      rating_key,
+      due_day,
+      interval_days,
+      review_count,
+      success_streak,
+      lapse_count,
+      last_result,
+      last_reviewed_at
+    )
+    SELECT
+      puzzle_id,
+      mode,
+      rating_key,
+      COALESCE(strftime('%Y-%m-%d', due_at, 'localtime', '-4 hours'), substr(due_at, 1, 10)),
+      MAX(1, CAST((interval_hours + 23) / 24 AS INTEGER)),
+      review_count,
+      success_streak,
+      lapse_count,
+      last_result,
+      last_reviewed_at
+    FROM review_queue;
+
+    CREATE TABLE review_events_v4 (
+      id TEXT PRIMARY KEY,
+      puzzle_id TEXT NOT NULL,
+      mode TEXT NOT NULL DEFAULT 'standard',
+      rating_key TEXT NOT NULL DEFAULT 'standard 5/20',
+      result TEXT NOT NULL,
+      reviewed_at TEXT NOT NULL,
+      next_due_day TEXT NOT NULL,
+      interval_days INTEGER NOT NULL,
+      FOREIGN KEY (puzzle_id) REFERENCES puzzles(id)
+    );
+
+    INSERT INTO review_events_v4 (
+      id,
+      puzzle_id,
+      mode,
+      rating_key,
+      result,
+      reviewed_at,
+      next_due_day,
+      interval_days
+    )
+    SELECT
+      id,
+      puzzle_id,
+      mode,
+      rating_key,
+      result,
+      reviewed_at,
+      COALESCE(strftime('%Y-%m-%d', next_due_at, 'localtime', '-4 hours'), substr(next_due_at, 1, 10)),
+      MAX(1, CAST((interval_hours + 23) / 24 AS INTEGER))
+    FROM review_events;
+
+    DROP TABLE review_events;
+    DROP TABLE review_queue;
+    ALTER TABLE review_queue_v4 RENAME TO review_queue;
+    ALTER TABLE review_events_v4 RENAME TO review_events;
+
+    CREATE INDEX review_queue_due_day_order_idx ON review_queue(due_day, puzzle_id, mode, rating_key);
+    CREATE INDEX review_events_puzzle_id_idx ON review_events(puzzle_id);
+    CREATE INDEX review_events_reviewed_at_idx ON review_events(reviewed_at);
+  `);
+}
+
 function ensureColumn(db: SyncSqliteDatabase, table: string, column: string, alterSql: string): void {
   const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
   if (!columns.some((candidate) => candidate.name === column)) {
@@ -1222,8 +1441,8 @@ function reviewFromRow(row: ReviewRow): ReviewQueueState {
     puzzleId: row.puzzle_id,
     mode: row.mode,
     ratingKey: row.rating_key,
-    dueAt: row.due_at,
-    intervalHours: row.interval_hours,
+    dueDay: row.due_day,
+    intervalDays: row.interval_days,
     reviewCount: row.review_count,
     successStreak: row.success_streak,
     lapseCount: row.lapse_count,
@@ -1280,7 +1499,7 @@ function preferredReviewQueue(
   if (reviewComparison !== 0) {
     return reviewComparison > 0 ? incoming : local;
   }
-  const dueComparison = incoming.dueAt.localeCompare(local.dueAt);
+  const dueComparison = incoming.dueDay.localeCompare(local.dueDay);
   if (dueComparison !== 0) {
     return dueComparison > 0 ? incoming : local;
   }
@@ -1292,8 +1511,8 @@ function sameReviewQueue(left: ReviewQueueState | undefined, right: ReviewQueueS
     left.puzzleId === right.puzzleId &&
     left.mode === right.mode &&
     left.ratingKey === right.ratingKey &&
-    left.dueAt === right.dueAt &&
-    left.intervalHours === right.intervalHours &&
+    left.dueDay === right.dueDay &&
+    left.intervalDays === right.intervalDays &&
     left.reviewCount === right.reviewCount &&
     left.successStreak === right.successStreak &&
     left.lapseCount === right.lapseCount &&
@@ -1334,6 +1553,33 @@ function optionalStringArrayFromJson(value: string | null): string[] | undefined
 function countRows(db: SyncSqliteDatabase, table: string, where?: string): number {
   const sql = `SELECT COUNT(*) AS count FROM ${table}${where ? ` WHERE ${where}` : ""}`;
   return (db.prepare(sql).get() as { count: number }).count;
+}
+
+function exportedSprintSessionFromRow(row: SprintSessionExportRow): ExportedSprintSession {
+  return {
+    id: row.id,
+    mode: row.mode,
+    ratingKey: row.ratingKey,
+    ...(row.ratingGeneration === null ? {} : { ratingGeneration: row.ratingGeneration }),
+    startedAt: row.startedAt,
+    ...(row.completedAt === null ? {} : { completedAt: row.completedAt }),
+    status: row.status,
+    correctCount: row.correctCount,
+    mistakeCount: row.mistakeCount,
+    ratingBefore: row.ratingBefore,
+    ...(row.ratingAfter === null ? {} : { ratingAfter: row.ratingAfter })
+  };
+}
+
+function normalizedImportedSprintSession(session: ExportedSprintSession): ExportedSprintSession {
+  if (session.status !== "active" && session.status !== "paused") {
+    return { ...session };
+  }
+  return {
+    ...session,
+    status: "failed",
+    completedAt: session.completedAt ?? session.startedAt
+  };
 }
 
 function boolToInt(value: boolean): number {

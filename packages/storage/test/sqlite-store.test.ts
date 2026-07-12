@@ -8,6 +8,8 @@ import { PracticeService, SQLiteStore } from "../src/index.ts";
 import type { AttemptHistoryRow, HistoryFilter } from "../src/index.ts";
 import type { Puzzle, ReviewContext } from "../../core/src/index.ts";
 
+process.env.TZ = "UTC";
+
 test("SQLite store seeds fixture puzzles and filters Arrow Duel eligibility", async () => {
   const store = await seededStore();
   try {
@@ -270,7 +272,34 @@ test("SQLite migration backfills attempt rating keys and replaces superseded ind
       DROP INDEX sprint_sessions_rating_key_completed_at_id_idx;
       DROP INDEX sprint_sessions_started_at_id_idx;
       DROP INDEX custom_sprint_configs_last_started_at_id_idx;
-      DROP INDEX review_queue_due_at_order_idx;
+      DROP INDEX review_queue_due_day_order_idx;
+      DROP TABLE review_events;
+      DROP TABLE review_queue;
+      CREATE TABLE review_queue (
+        puzzle_id TEXT NOT NULL,
+        mode TEXT NOT NULL DEFAULT 'standard',
+        rating_key TEXT NOT NULL DEFAULT 'standard 5/20',
+        due_at TEXT NOT NULL,
+        interval_hours INTEGER NOT NULL,
+        review_count INTEGER NOT NULL,
+        success_streak INTEGER NOT NULL,
+        lapse_count INTEGER NOT NULL,
+        last_result TEXT NOT NULL,
+        last_reviewed_at TEXT NOT NULL,
+        PRIMARY KEY (puzzle_id, mode, rating_key),
+        FOREIGN KEY (puzzle_id) REFERENCES puzzles(id)
+      );
+      CREATE TABLE review_events (
+        id TEXT PRIMARY KEY,
+        puzzle_id TEXT NOT NULL,
+        mode TEXT NOT NULL DEFAULT 'standard',
+        rating_key TEXT NOT NULL DEFAULT 'standard 5/20',
+        result TEXT NOT NULL,
+        reviewed_at TEXT NOT NULL,
+        next_due_at TEXT NOT NULL,
+        interval_hours INTEGER NOT NULL,
+        FOREIGN KEY (puzzle_id) REFERENCES puzzles(id)
+      );
       CREATE INDEX attempts_completed_at_idx ON attempts(completed_at);
       CREATE INDEX attempts_result_idx ON attempts(result);
       CREATE INDEX attempts_mode_idx ON attempts(mode);
@@ -299,13 +328,13 @@ test("SQLite migration backfills attempt rating keys and replaces superseded ind
       assert.ok(indexes.includes("attempts_rating_key_completed_at_id_idx"));
       assert.ok(indexes.includes("attempts_session_result_completed_at_id_idx"));
       assert.ok(indexes.includes("puzzles_rating_id_idx"));
-      assert.ok(indexes.includes("review_queue_due_at_order_idx"));
+      assert.ok(indexes.includes("review_queue_due_day_order_idx"));
       assert.ok(indexes.includes("sprint_sessions_started_at_id_idx"));
       assert.ok(!indexes.includes("attempts_completed_at_idx"));
       assert.ok(!indexes.includes("attempts_result_idx"));
       assert.ok(!indexes.includes("attempts_mode_idx"));
       assert.ok(!indexes.includes("attempts_session_id_idx"));
-      assert.ok(!indexes.includes("review_events_reviewed_at_idx"));
+      assert.ok(indexes.includes("review_events_reviewed_at_idx"));
     } finally {
       migrated.close();
     }
@@ -399,9 +428,9 @@ test("optimized SQLite indexes cover production range and ordering queries", asy
         index: "sprint_sessions_started_at_id_idx"
       },
       {
-        sql: "SELECT * FROM review_queue WHERE due_at <= ? ORDER BY due_at ASC, puzzle_id ASC, mode ASC, rating_key ASC",
-        params: ["2026-06-22T00:00:00.000Z"],
-        index: "review_queue_due_at_order_idx"
+        sql: "SELECT * FROM review_queue WHERE due_day <= ? ORDER BY due_day ASC, puzzle_id ASC, mode ASC, rating_key ASC",
+        params: ["2026-06-22"],
+        index: "review_queue_due_day_order_idx"
       },
       {
         sql: "SELECT id FROM sprint_sessions WHERE rating_key = ? AND completed_at >= ? AND completed_at <= ? ORDER BY completed_at ASC, id ASC",
@@ -476,9 +505,9 @@ test("PracticeService builds SQLite history view for a required time range and r
 
     service.startSprint(
       { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
-      "2026-06-20T00:00:00.000Z"
+      "2026-06-20T12:00:00.000Z"
     );
-    service.submitMove("c4b5", "2026-06-20T00:00:05.000Z");
+    service.submitMove("c4b5", "2026-06-20T12:00:05.000Z");
 
     const view = service.getHistoryView({
       now: "2026-06-21T00:00:00.000Z",
@@ -511,14 +540,14 @@ test("PracticeService builds SQLite history view for a required time range and r
         ratingKey: "standard 5/20",
         correctCount: 0,
         wrongCount: 1,
-        lastWrongAt: "2026-06-20T00:00:05.000Z",
-        nextReviewAt: "2026-06-21T00:00:05.000Z"
+        lastWrongAt: "2026-06-20T12:00:05.000Z",
+        nextReviewDay: "2026-06-21"
       }
     ]);
 
     const oppositeSide = view.attempts[0]?.side === "white" ? "black" : "white";
     assert.equal(service.getHistoryView({ ...view.query, side: oppositeSide }).attempts.length, 0);
-    assert.equal(service.getDueReviewItems("2026-06-21T00:00:05.000Z")[0]?.puzzle.id, "000hf");
+    assert.equal(service.getDueReviewItems("2026-06-21T12:00:05.000Z")[0]?.puzzle.id, "000hf");
     assert.deepEqual(
       service.getHistoryView({ ...view.query, reviewStatus: "queued" }).attempts.map((attempt) => attempt.id),
       view.attempts.map((attempt) => attempt.id)
@@ -952,20 +981,20 @@ test("SQLite review result updates expand and contract the persisted review sche
   const store = await seededStore();
   try {
     const context = reviewContext("00008");
-    store.scheduleMistakeReview(context, "2026-06-20T00:00:00.000Z");
+    store.scheduleMistakeReview(context, "2026-06-20T12:00:00.000Z");
 
-    const success = store.recordReviewResult(context, "correct", "2026-06-21T00:00:00.000Z");
-    assert.equal(success.dueAt, "2026-06-22T00:00:00.000Z");
-    assert.equal(success.intervalHours, 24);
+    const success = store.recordReviewResult(context, "correct", "2026-06-21T12:00:00.000Z");
+    assert.equal(success.dueDay, "2026-06-22");
+    assert.equal(success.intervalDays, 1);
     assert.equal(success.successStreak, 1);
 
-    const secondSuccess = store.recordReviewResult(context, "correct", "2026-06-22T00:00:00.000Z");
-    assert.equal(secondSuccess.dueAt, "2026-06-25T00:00:00.000Z");
-    assert.equal(secondSuccess.intervalHours, 72);
+    const secondSuccess = store.recordReviewResult(context, "correct", "2026-06-22T12:00:00.000Z");
+    assert.equal(secondSuccess.dueDay, "2026-06-25");
+    assert.equal(secondSuccess.intervalDays, 3);
     assert.equal(secondSuccess.successStreak, 2);
 
-    const wrong = store.recordReviewResult(context, "wrong", "2026-06-23T00:00:00.000Z");
-    assert.equal(wrong.dueAt, "2026-06-23T06:00:00.000Z");
+    const wrong = store.recordReviewResult(context, "wrong", "2026-06-23T12:00:00.000Z");
+    assert.equal(wrong.dueDay, "2026-06-24");
     assert.equal(wrong.successStreak, 0);
     assert.equal(wrong.lapseCount, 1);
   } finally {
@@ -986,7 +1015,7 @@ test("SQLite sprint misses do not count as failed scheduled review lapses", asyn
     assert.equal(firstMiss.lapseCount, 0);
     assert.equal(repeatedMiss.reviewCount, 0);
     assert.equal(repeatedMiss.lapseCount, 0);
-    assert.equal(repeatedMiss.dueAt, "2026-06-21T12:00:00.000Z");
+    assert.equal(repeatedMiss.dueDay, "2026-06-21");
     assert.equal(failedReview.reviewCount, 1);
     assert.equal(failedReview.lapseCount, 1);
   } finally {
@@ -1012,8 +1041,8 @@ test("PracticeService prunes orphaned SQLite review queue rows", async () => {
           puzzle_id,
           mode,
           rating_key,
-          due_at,
-          interval_hours,
+          due_day,
+          interval_days,
           review_count,
           success_streak,
           lapse_count,
@@ -1025,8 +1054,8 @@ test("PracticeService prunes orphaned SQLite review queue rows", async () => {
         "missing-puzzle",
         "standard",
         "standard 5/20",
-        "2026-06-21T00:00:00.000Z",
-        24,
+        "2026-06-21",
+        1,
         0,
         0,
         0,
@@ -1057,20 +1086,20 @@ test("PracticeService can promote the next future SQLite review date to due now"
   try {
     store.scheduleMistakeReview(reviewContext("00008"), "2026-06-20T08:00:00.000Z");
     store.scheduleMistakeReview(reviewContext("000hf"), "2026-06-20T18:00:00.000Z");
-    store.scheduleMistakeReview(reviewContext("0018S"), "2026-06-21T00:00:00.000Z");
+    store.scheduleMistakeReview(reviewContext("0018S"), "2026-06-21T12:00:00.000Z");
 
     const result = service.promoteNextFutureReviewsToDue("2026-06-20T20:00:00.000Z");
 
     assert.deepEqual(result, {
       promotedCount: 2,
       promotedDate: "2026-06-21",
-      dueAt: "2026-06-20T20:00:00.000Z"
+      dueDay: "2026-06-20"
     });
     assert.deepEqual(
       service.getDueReviews("2026-06-20T20:00:00.000Z").map((review) => review.puzzleId).sort(),
       ["00008", "000hf"]
     );
-    assert.equal(store.getReviewQueueState(reviewContext("0018S"))?.dueAt, "2026-06-22T00:00:00.000Z");
+    assert.equal(store.getReviewQueueState(reviewContext("0018S"))?.dueDay, "2026-06-22");
   } finally {
     store.close();
   }
@@ -1088,15 +1117,15 @@ test("PracticeService future review promotion is a SQLite no-op without future r
 test("SQLite review result without an existing queue row is counted once", async () => {
   const store = await seededStore();
   try {
-    const wrong = store.recordReviewResult(reviewContext("00008"), "wrong", "2026-06-20T00:00:00.000Z");
+    const wrong = store.recordReviewResult(reviewContext("00008"), "wrong", "2026-06-20T12:00:00.000Z");
     assert.equal(wrong.reviewCount, 1);
     assert.equal(wrong.lapseCount, 1);
-    assert.equal(wrong.dueAt, "2026-06-21T00:00:00.000Z");
+    assert.equal(wrong.dueDay, "2026-06-21");
 
-    const correct = store.recordReviewResult(reviewContext("000hf"), "correct", "2026-06-20T00:00:00.000Z");
+    const correct = store.recordReviewResult(reviewContext("000hf"), "correct", "2026-06-20T12:00:00.000Z");
     assert.equal(correct.reviewCount, 1);
     assert.equal(correct.successStreak, 1);
-    assert.equal(correct.dueAt, "2026-06-21T00:00:00.000Z");
+    assert.equal(correct.dueDay, "2026-06-21");
   } finally {
     store.close();
   }
@@ -1124,9 +1153,9 @@ test("PracticeService persists wrong attempts, history filters, review queue, an
   try {
     service.startSprint(
       { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 3 },
-      "2026-06-20T00:00:00.000Z"
+      "2026-06-20T12:00:00.000Z"
     );
-    const result = service.submitMove("c4b5", "2026-06-20T00:00:05.000Z");
+    const result = service.submitMove("c4b5", "2026-06-20T12:00:05.000Z");
     assert.equal(result.attempt?.result, "wrong");
 
     const wrongHistory = store.listAttempts({
@@ -1204,6 +1233,42 @@ test("PracticeService records a completed sprint and persists updated ELO", asyn
     assert.ok((rating.ratingDeviation ?? 0) < 350);
     assert.equal(rating.volatility, 0.06);
     assert.equal(rating.games, 1);
+  } finally {
+    store.close();
+  }
+});
+
+test("PracticeService restores SQLite reviews for the current 4 AM review day", async () => {
+  const store = await seededStore();
+  const service = new PracticeService(store);
+  const beforeRollover = new Date(2026, 5, 21, 3, 59, 0, 0).toISOString();
+  const afterRollover = new Date(2026, 5, 21, 4, 1, 0, 0).toISOString();
+  const currentReviewDay = new Date(2026, 5, 21, 12, 0, 0, 0).toISOString();
+  try {
+    service.recordReviewAttempt({
+      puzzleId: "00008",
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      result: "wrong",
+      submittedMove: "f2g3",
+      expectedMove: "b2b1"
+    }, beforeRollover);
+    service.recordReviewAttempt({
+      puzzleId: "000hf",
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      result: "correct",
+      submittedMove: "e6f7",
+      expectedMove: "e6f7"
+    }, afterRollover);
+
+    assert.deepEqual(
+      service.listCompletedReviewsForDay(currentReviewDay).map((item) => ({
+        puzzleId: item.puzzle.id,
+        result: item.attempt.result
+      })),
+      [{ puzzleId: "000hf", result: "correct" }]
+    );
   } finally {
     store.close();
   }

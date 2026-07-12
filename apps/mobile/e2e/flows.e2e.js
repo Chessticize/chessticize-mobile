@@ -3,7 +3,6 @@ const {
   openStandardHistoryTrend,
   launchWithDisabledSynchronization,
   playBoardMove,
-  sleep,
   startPracticeMode,
   selectTestPuzzleSource,
   waitForVisibleInPracticeScroll,
@@ -64,6 +63,8 @@ describe('Key user flows', () => {
     // Mistakes schedule for the next day, so nothing is due yet: the empty
     // state must surface the next due estimate and offer practice instead.
     await openTab('review-tab', 'review-empty-state');
+    await waitFor(element(by.id('review-tomorrow-count'))).toHaveText('3').withTimeout(10000);
+    await waitFor(element(by.id('review-next-seven-days-count'))).toHaveText('3').withTimeout(10000);
     await waitFor(element(by.id('review-total-count'))).toHaveText('3').withTimeout(10000);
     await waitForElementTextContaining('review-next-due', 'Next:', 10000);
     await expect(element(by.id('review-empty-practice'))).toBeVisible();
@@ -83,7 +84,7 @@ describe('Key user flows', () => {
     await launchAppAt(reviewNowMs, false);
 
     await openTab('review-tab', 'review-start-due');
-    await waitFor(element(by.id('review-due-count'))).toHaveText('3').withTimeout(10000);
+    await waitFor(element(by.id('review-due-count'))).toHaveText('0 / 3').withTimeout(10000);
     await waitFor(element(by.id('review-total-count'))).toHaveText('3').withTimeout(10000);
     await waitForElementTextContaining('review-due-summary', 'Ready now', 10000);
 
@@ -93,18 +94,37 @@ describe('Key user flows', () => {
     await waitForVisibleInPracticeScroll('review-board');
     await waitFor(element(by.id('review-progress'))).toHaveText('1 / 3 · Standard').withTimeout(10000);
     await waitForElementTextContaining('review-current-expected-move', 'e2e6', 10000);
+    await waitFor(element(by.id('review-timer'))).toHaveText('00:40').withTimeout(10000);
+    await expect(element(by.id('review-source-pill'))).not.toExist();
+    await expect(element(by.id('review-theme-pill'))).not.toExist();
+    await expect(element(by.id('review-analysis-button'))).not.toExist();
+
+    // Exiting an unanswered review leaves it due and restores the same fixed
+    // daily position when the user comes back.
+    await element(by.id('review-exit')).tap();
+    await waitFor(element(by.id('review-due-count'))).toHaveText('0 / 3').withTimeout(10000);
+    await element(by.id('review-start-due')).tap();
+    await waitFor(element(by.id('review-progress'))).toHaveText('1 / 3 · Standard').withTimeout(10000);
+    await waitForElementTextContaining('review-current-expected-move', 'e2e6', 10000);
+    await element(by.id('practice-main-scroll')).scrollTo('top');
+    await waitForVisibleInPracticeScroll('review-board');
 
     await playBoardMove('review-board', 'e2e6');
     await waitForElementTextContaining('review-current-expected-move', 'e6f7', 10000);
-    // The expected-move label can update before the board finishes its
-    // opponent-move animation. Synchronization is disabled for these flows,
-    // so give the board the same settle window used by sprint move sequences.
-    await sleep(1600);
+    // The expected-move label can update before the native board has finished
+    // applying the auto reply. Wait for the board lock itself before sending
+    // the next pair of board taps.
+    await waitFor(element(by.id('review-board-state'))).toHaveText('ready').withTimeout(10000);
     await playBoardMove('review-board', 'e6f7');
+    await waitFor(element(by.id('move-feedback-overlay'))).toExist().withTimeout(5000);
 
     await waitFor(element(by.id('review-progress'))).toHaveText('2 / 3 · Standard').withTimeout(30000);
     await element(by.id('review-exit')).tap();
-    await waitFor(element(by.id('review-due-count'))).toHaveText('2').withTimeout(10000);
+    await waitFor(element(by.id('review-due-count'))).toHaveText('1 / 3').withTimeout(10000);
+    await waitFor(element(by.id('review-today-history'))).toExist().withTimeout(10000);
+    await waitForVisibleInPracticeScroll('review-start-due');
+    await element(by.id('review-start-due')).tap();
+    await waitFor(element(by.id('review-progress'))).toHaveText('2 / 3 · Standard').withTimeout(10000);
   });
 
   it('schedules review reminders through the native fixture', async () => {
@@ -121,7 +141,7 @@ describe('Key user flows', () => {
     await waitForVisibleInPracticeScroll('settings-review-reminder-fixed-1900');
     await element(by.id('settings-review-reminder-fixed-1900')).tap();
     await waitForElementTextContaining('settings-review-reminder-schedule-status', 'scheduled|', 10000);
-    await waitForElementTextContaining('settings-review-reminder-schedule-status', '|3|3 puzzles are ready for review|review', 10000);
+    await waitForElementTextContaining('settings-review-reminder-schedule-status', '|3|3 reviews are ready|review', 10000);
 
     await waitForVisibleInPracticeScroll('settings-review-reminder-off');
     await element(by.id('settings-review-reminder-off')).tap();

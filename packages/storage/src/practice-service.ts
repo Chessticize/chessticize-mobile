@@ -6,6 +6,7 @@ import {
   DEFAULT_VOLATILITY,
   pauseSprint as pauseSprintCore,
   RATING_FLOOR,
+  reviewDayFor,
   resumeSprint as resumeSprintCore,
   serializeSprintView,
   startSprint,
@@ -27,10 +28,11 @@ import type {
   SprintMode,
   SprintState
 } from "../../core/src/index.ts";
-import type { HistoryFilter } from "./query-types.ts";
+import type { AttemptHistoryRow, HistoryFilter } from "./query-types.ts";
 import type {
   ClearLocalHistoryResult,
   ExportedSprintSession,
+  LocalDataImport,
   LocalDataImportResult,
   LocalDataExport,
   PracticeSettings,
@@ -62,6 +64,11 @@ export interface RecordReviewAttemptCommand extends ReviewContext {
   expectedMove: string;
   startedAt?: string;
   arrowDuelCandidateOrder?: string[];
+}
+
+export interface CompletedReviewItem {
+  attempt: AttemptHistoryRow;
+  puzzle: Puzzle;
 }
 
 export class PracticeService {
@@ -207,15 +214,28 @@ export class PracticeService {
     return this.activeSprint;
   }
 
-  listHistory(filter: HistoryFilter = {}): unknown {
+  listHistory(filter: HistoryFilter = {}): AttemptHistoryRow[] {
     return this.store.listAttempts(filter);
+  }
+
+  listCompletedReviewsForDay(now = new Date().toISOString()): CompletedReviewItem[] {
+    const reviewDay = reviewDayFor(now);
+    const conservativeSince = new Date(new Date(now).getTime() - 36 * 60 * 60 * 1000).toISOString();
+    return this.store
+      .listAttempts({ source: "scheduled_review", since: conservativeSince })
+      .filter((attempt) => reviewDayFor(attempt.completedAt) === reviewDay)
+      .map((attempt) => {
+        const puzzle = this.store.getPuzzle(attempt.puzzleId);
+        return puzzle ? { attempt, puzzle } : undefined;
+      })
+      .filter((item): item is CompletedReviewItem => Boolean(item));
   }
 
   exportLocalData(): LocalDataExport {
     return this.store.exportLocalData();
   }
 
-  importLocalData(data: LocalDataExport): LocalDataImportResult {
+  importLocalData(data: LocalDataImport): LocalDataImportResult {
     const result = this.store.importLocalData(data);
     return {
       ...result,
