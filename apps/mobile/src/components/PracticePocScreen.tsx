@@ -1689,11 +1689,13 @@ export function PracticePocScreen({
   const feedbackForCurrentPuzzle = feedbackPuzzleId && currentPuzzle?.puzzle.id === feedbackPuzzleId ? feedback : null;
   const boardFeedback = feedbackSnapshot?.feedback ?? feedbackForCurrentPuzzle;
   const boardPremoveWindow = boardInputLocked && boardInputLockMode === "premove";
-  // While board input is locked, quick drags aimed at the board must not pan
-  // the screen. The board's own pan gesture claims touches while enabled, but
-  // hard-lock windows disable it (and fast drags can start on the padding), so
-  // freeze the surrounding scroll view for the lock's duration.
-  const practiceScrollLocked = shouldShowSessionBoard && (boardInputLocked || isShowingFeedbackSnapshot);
+  // While the session board is on screen, drags aimed at the board must pan
+  // pieces, never the page. The board's own pan gesture claims touches while
+  // enabled, but hard-lock windows disable it, fast drags can start on the
+  // padding, and a touch that begins during a lock window can survive into an
+  // unlocked turn and feed the scroll view instead — so freeze the
+  // surrounding scroll for the whole session, not just the lock windows.
+  const practiceScrollLocked = shouldShowSessionBoard;
   const boardGestureEnabled = Boolean(
     isActive && !isShowingFeedbackSnapshot && (!boardInputLocked || boardPremoveWindow)
   );

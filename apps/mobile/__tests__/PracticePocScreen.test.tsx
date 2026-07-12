@@ -671,7 +671,8 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
     expect(findByTestId(renderer, "mock-chessboard").props.draggableColor).toBe("w");
     expect(() => findByTestId(renderer, "board-input-blocker")).toThrow();
-    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
+    // The page never scrolls while the session board is on screen.
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(false);
     expect(hasStyleValue(renderer.root, "rgba(22, 163, 74, 0.34)")).toBe(false);
     expect(countStyleValue(renderer.root, "rgba(37, 99, 235, 0.3)")).toBeGreaterThanOrEqual(2);
 
@@ -686,6 +687,34 @@ describe("PracticePocScreen", () => {
     press(renderer, "history-filter-wrong-only");
     expectHistoryRowAccessibility(renderer, "Move e6f7");
     expect(collectText(renderer.root)).not.toContain("000hf · standard");
+  });
+
+  it("keeps the practice page from scrolling while the session board is on screen", async () => {
+    const renderer = renderStandardSequenceScreen();
+
+    // The idle practice screen scrolls normally.
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
+
+    startStandardSprint(renderer);
+
+    // The user's regular turn: the board is interactive and unlocked. A drag
+    // can begin here — or begin during a lock window and survive into this
+    // state — and must pan pieces, never the page, so the surrounding scroll
+    // stays frozen for the whole session.
+    expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
+    expect(() => findByTestId(renderer, "board-input-blocker")).toThrow();
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(false);
+
+    // The freeze persists through a move, the opponent-reply window, and back
+    // to the next turn.
+    await boardMove(renderer, "e2e6");
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(false);
+    await settleFeedbackSnapshot();
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(false);
+
+    // Leaving the session restores scrolling.
+    abandonSprint(renderer);
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
   });
 
   it("pauses an active sprint with explicit resume controls", () => {
@@ -788,7 +817,8 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
     expect(findByTestId(renderer, "mock-chessboard").props.draggableColor).toBe("b");
-    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
+    // The page never scrolls while the session board is on screen.
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(false);
     expectSessionMistakes(renderer, 0);
   });
 
