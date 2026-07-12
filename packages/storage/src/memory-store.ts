@@ -33,6 +33,7 @@ import { clonePracticeSettings, defaultPracticeSettings, reviewReminderPreferenc
 import type { ReviewReminderPreference } from "./practice-store.ts";
 import type { ReviewReminderSettings } from "../../core/src/index.ts";
 import { selectUniquePuzzles } from "./puzzle-selection.ts";
+import { preferredSprintSession, sameSprintSession } from "./sprint-session-sync.ts";
 
 export class MemoryStore implements PracticeStore {
   private readonly puzzles = new Map<string, Puzzle>();
@@ -208,18 +209,7 @@ export class MemoryStore implements PracticeStore {
 
   listSprintSessions(): ExportedSprintSession[] {
     return [...this.sessions.values()]
-      .map((session) => ({
-        id: session.id,
-        mode: session.config.mode,
-        ratingKey: session.config.ratingKey,
-        startedAt: session.startedAt,
-        ...(session.completedAt === undefined ? {} : { completedAt: session.completedAt }),
-        status: session.status,
-        correctCount: session.correctCount,
-        mistakeCount: session.mistakeCount,
-        ratingBefore: session.ratingBefore,
-        ...(session.ratingAfter === undefined ? {} : { ratingAfter: session.ratingAfter })
-      }))
+      .map(exportedSprintSessionFromState)
       .sort((left, right) => right.startedAt.localeCompare(left.startedAt) || right.id.localeCompare(left.id));
   }
 
@@ -243,29 +233,43 @@ export class MemoryStore implements PracticeStore {
       }
     }
     for (const session of data.sprintSessions) {
-      if (this.sessions.has(session.id)) {
+      const existing = this.sessions.get(session.id);
+      if (existing && (session.status === "active" || session.status === "paused")) {
         continue;
       }
-      const completedAt = session.completedAt ?? session.startedAt;
-      this.sessions.set(session.id, {
-        id: session.id,
+      const incoming = normalizedImportedSprintSession(session);
+      const previous = existing ? exportedSprintSessionFromState(existing) : undefined;
+      const next = previous ? preferredSprintSession(previous, incoming) : incoming;
+      if (sameSprintSession(previous, next)) {
+        continue;
+      }
+      const completedAt = next.completedAt ?? next.startedAt;
+      const {
+        ratingGeneration: _existingRatingGeneration,
+        ratingAfter: _existingRatingAfter,
+        ...existingBase
+      } = existing ?? {};
+      this.sessions.set(next.id, {
+        ...existingBase,
+        id: next.id,
         config: {
-          ...defaultSprintConfig(session.mode),
-          ratingKey: session.ratingKey
+          ...(existing?.config ?? defaultSprintConfig(next.mode)),
+          ratingKey: next.ratingKey
         },
-        status: session.status === "active" || session.status === "paused" ? "failed" : session.status,
-        startedAt: session.startedAt,
+        ...(next.ratingGeneration === undefined ? {} : { ratingGeneration: next.ratingGeneration }),
+        status: next.status,
+        startedAt: next.startedAt,
         deadlineAt: completedAt,
         completedAt,
-        correctCount: session.correctCount,
-        mistakeCount: session.mistakeCount,
-        currentStreak: 0,
-        bestStreak: 0,
-        hasUserSubmittedMove: session.correctCount + session.mistakeCount > 0,
-        currentPuzzleIndex: session.correctCount + session.mistakeCount,
-        puzzles: [],
-        ratingBefore: session.ratingBefore,
-        ...(session.ratingAfter === undefined ? {} : { ratingAfter: session.ratingAfter })
+        correctCount: next.correctCount,
+        mistakeCount: next.mistakeCount,
+        currentStreak: existing?.currentStreak ?? 0,
+        bestStreak: existing?.bestStreak ?? 0,
+        hasUserSubmittedMove: next.correctCount + next.mistakeCount > 0,
+        currentPuzzleIndex: next.correctCount + next.mistakeCount,
+        puzzles: existing?.puzzles ?? [],
+        ratingBefore: next.ratingBefore,
+        ...(next.ratingAfter === undefined ? {} : { ratingAfter: next.ratingAfter })
       });
       result.sprintSessions += 1;
     }
@@ -449,6 +453,33 @@ export class MemoryStore implements PracticeStore {
       }))
       .sort((left, right) => left.completedAt.localeCompare(right.completedAt) || left.sessionId.localeCompare(right.sessionId));
   }
+}
+
+function exportedSprintSessionFromState(session: SprintState): ExportedSprintSession {
+  return {
+    id: session.id,
+    mode: session.config.mode,
+    ratingKey: session.config.ratingKey,
+    ...(session.ratingGeneration === undefined ? {} : { ratingGeneration: session.ratingGeneration }),
+    startedAt: session.startedAt,
+    ...(session.completedAt === undefined ? {} : { completedAt: session.completedAt }),
+    status: session.status,
+    correctCount: session.correctCount,
+    mistakeCount: session.mistakeCount,
+    ratingBefore: session.ratingBefore,
+    ...(session.ratingAfter === undefined ? {} : { ratingAfter: session.ratingAfter })
+  };
+}
+
+function normalizedImportedSprintSession(session: ExportedSprintSession): ExportedSprintSession {
+  if (session.status !== "active" && session.status !== "paused") {
+    return { ...session };
+  }
+  return {
+    ...session,
+    status: "failed",
+    completedAt: session.completedAt ?? session.startedAt
+  };
 }
 
 function reviewQueueKey(context: ReviewContext): string {

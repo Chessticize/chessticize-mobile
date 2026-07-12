@@ -55,6 +55,63 @@ test("SQLite migrates an empty database to the current schema version", async ()
   }
 });
 
+test("SQLite v3 migration tags only safely inferred current-generation sprint sessions", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "chessticize-generation-migration-"));
+  const databasePath = join(directory, "practice.sqlite");
+  try {
+    const setupStore = new SQLiteStore(databasePath);
+    setupStore.migrate();
+    setupStore.close();
+    const legacy = new DatabaseSync(databasePath);
+    legacy.exec(`
+      INSERT INTO ratings (key, generation, rating, games, rating_deviation, volatility)
+      VALUES
+        ('standard 5/20', 0, 700, 1, 300, 0.06),
+        ('standard 5/20', 1, 650, 1, 250, 0.06),
+        ('arrow duel 5/30', 0, 620, 1, 300, 0.06);
+      INSERT INTO sprint_sessions (
+        id, mode, rating_key, rating_generation, config_json, started_at, deadline_at,
+        completed_at, status, correct_count, mistake_count, rating_before, rating_after
+      ) VALUES
+        ('pre-reset', 'standard', 'standard 5/20', NULL, '{}',
+          '2026-07-01T00:00:00.000Z', '2026-07-01T00:01:00.000Z', '2026-07-01T00:01:00.000Z',
+          'won', 1, 0, 600, 700),
+        ('current-generation', 'standard', 'standard 5/20', NULL, '{}',
+          '2026-07-02T00:00:00.000Z', '2026-07-02T00:01:00.000Z', '2026-07-02T00:01:00.000Z',
+          'won', 1, 0, 600, 650),
+        ('current-active', 'standard', 'standard 5/20', NULL, '{}',
+          '2026-07-03T00:00:00.000Z', '2026-07-03T00:05:00.000Z', NULL,
+          'active', 0, 0, 650, NULL),
+        ('generation-zero', 'arrow_duel', 'arrow duel 5/30', NULL, '{}',
+          '2026-07-01T00:00:00.000Z', '2026-07-01T00:01:00.000Z', '2026-07-01T00:01:00.000Z',
+          'won', 1, 0, 600, 620);
+      DROP INDEX sprint_sessions_rating_generation_completed_at_id_idx;
+      ALTER TABLE sprint_sessions DROP COLUMN rating_generation;
+      PRAGMA user_version = 2;
+    `);
+    legacy.close();
+
+    const migrated = new SQLiteStore(databasePath);
+    migrated.migrate();
+    try {
+      const generations = migrated.db
+        .prepare("SELECT id, rating_generation FROM sprint_sessions ORDER BY id")
+        .all()
+        .map(sqliteRow);
+      assert.deepEqual(generations, [
+        { id: "current-active", rating_generation: 1 },
+        { id: "current-generation", rating_generation: 1 },
+        { id: "generation-zero", rating_generation: 0 },
+        { id: "pre-reset", rating_generation: null }
+      ]);
+    } finally {
+      migrated.close();
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("SQLite migrates the released iOS 1.0.0 database without losing user semantics", async () => {
   const directory = await mkdtemp(join(tmpdir(), "chessticize-released-migration-"));
   const databasePath = join(directory, "practice.sqlite");

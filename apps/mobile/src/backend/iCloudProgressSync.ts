@@ -3,6 +3,7 @@ import type {
   ProgressSyncSnapshot,
   ProgressSyncTransport
 } from "../../../../packages/storage/src/progress-sync.ts";
+import { ProgressSyncConflictError } from "../../../../packages/storage/src/progress-sync.ts";
 
 export type ICloudAccountStatus =
   | "available"
@@ -17,8 +18,18 @@ export interface ICloudProgressSyncClient extends ProgressSyncTransport {
 
 type NativeICloudProgressSyncModule = {
   getAccountStatus?: () => Promise<string>;
-  fetchSnapshot?: () => Promise<string | null | undefined>;
-  saveSnapshot?: (payload: string) => Promise<unknown>;
+  fetchSnapshot?: () => Promise<string | NativeSnapshotPayload | null | undefined>;
+  saveSnapshot?: (payload: string, expectedChangeTag: string | null) => Promise<NativeSaveResult | unknown>;
+};
+
+type NativeSnapshotPayload = {
+  payload: string;
+  changeTag?: string | null;
+};
+
+type NativeSaveResult = {
+  saved: boolean;
+  changeTag?: string | null;
 };
 
 export class FakeICloudProgressSyncClient implements ICloudProgressSyncClient {
@@ -71,17 +82,34 @@ export function createNativeICloudProgressSyncClient(): ICloudProgressSyncClient
     return null;
   }
 
+  let lastFetchedChangeTag: string | null = null;
   return {
     getAccountStatus: async () => normalizeICloudAccountStatus(await nativeModule.getAccountStatus?.()),
     fetchSnapshot: async () => {
       const payload = await nativeModule.fetchSnapshot?.();
-      if (typeof payload !== "string" || payload.length === 0) {
+      if (typeof payload === "string") {
+        lastFetchedChangeTag = null;
+        return payload.length === 0 ? undefined : parseProgressSyncSnapshot(payload);
+      }
+      if (!payload || typeof payload.payload !== "string") {
+        lastFetchedChangeTag = null;
         return undefined;
       }
-      return parseProgressSyncSnapshot(payload);
+      lastFetchedChangeTag = typeof payload.changeTag === "string" ? payload.changeTag : null;
+      return payload.payload.length === 0 ? undefined : parseProgressSyncSnapshot(payload.payload);
     },
     saveSnapshot: async (snapshot) => {
-      await nativeModule.saveSnapshot?.(JSON.stringify(snapshot));
+      try {
+        const result = await nativeModule.saveSnapshot?.(JSON.stringify(snapshot), lastFetchedChangeTag);
+        if (isNativeSaveResult(result)) {
+          lastFetchedChangeTag = typeof result.changeTag === "string" ? result.changeTag : null;
+        }
+      } catch (error) {
+        if (isNativeConflictError(error)) {
+          throw new ProgressSyncConflictError();
+        }
+        throw error;
+      }
     }
   };
 }
@@ -117,8 +145,19 @@ function isProgressSyncSnapshot(value: unknown): value is ProgressSyncSnapshot {
     typeof snapshot.updatedAt === "string" &&
     !!snapshot.data &&
     snapshot.data.schemaVersion === 1 &&
+    !!snapshot.data.settings &&
     Array.isArray(snapshot.data.ratings) &&
     Array.isArray(snapshot.data.attempts) &&
     Array.isArray(snapshot.data.reviewQueue) &&
     Array.isArray(snapshot.data.sprintSessions);
+}
+
+function isNativeConflictError(error: unknown): boolean {
+  return !!error && typeof error === "object" &&
+    (error as { code?: unknown }).code === "icloud_save_conflict";
+}
+
+function isNativeSaveResult(value: unknown): value is NativeSaveResult {
+  return !!value && typeof value === "object" &&
+    typeof (value as { saved?: unknown }).saved === "boolean";
 }

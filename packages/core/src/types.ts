@@ -111,6 +111,7 @@ export interface ArrowDuelReviewArrow {
 export interface SprintState {
   id: string;
   config: SprintConfig;
+  ratingGeneration?: number;
   status: SprintStatus;
   startedAt: string;
   deadlineAt: string;

@@ -25,6 +25,7 @@ export interface ExportedSprintSession {
   id: string;
   mode: SprintMode;
   ratingKey: string;
+  ratingGeneration?: number;
   startedAt: string;
   completedAt?: string;
   status: SprintState["status"];
