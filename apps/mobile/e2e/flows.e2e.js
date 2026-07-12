@@ -94,6 +94,20 @@ describe('Key user flows', () => {
     await waitForVisibleInPracticeScroll('review-board');
     await waitFor(element(by.id('review-progress'))).toHaveText('1 / 3 · Standard').withTimeout(10000);
     await waitForElementTextContaining('review-current-expected-move', 'e2e6', 10000);
+    await waitFor(element(by.id('review-timer'))).toHaveText('00:40').withTimeout(10000);
+    await expect(element(by.id('review-source-pill'))).not.toExist();
+    await expect(element(by.id('review-theme-pill'))).not.toExist();
+    await expect(element(by.id('review-analysis-button'))).not.toExist();
+
+    // Exiting an unanswered review leaves it due and restores the same fixed
+    // daily position when the user comes back.
+    await element(by.id('review-exit')).tap();
+    await waitFor(element(by.id('review-due-count'))).toHaveText('3').withTimeout(10000);
+    await element(by.id('review-start-due')).tap();
+    await waitFor(element(by.id('review-progress'))).toHaveText('1 / 3 · Standard').withTimeout(10000);
+    await waitForElementTextContaining('review-current-expected-move', 'e2e6', 10000);
+    await element(by.id('practice-main-scroll')).scrollTo('top');
+    await waitForVisibleInPracticeScroll('review-board');
 
     await playBoardMove('review-board', 'e2e6');
     await waitForElementTextContaining('review-current-expected-move', 'e6f7', 10000);
@@ -107,6 +121,13 @@ describe('Key user flows', () => {
     await waitFor(element(by.id('review-progress'))).toHaveText('2 / 3 · Standard').withTimeout(15000);
     await element(by.id('review-exit')).tap();
     await waitFor(element(by.id('review-due-count'))).toHaveText('2').withTimeout(10000);
+    await waitForElementTextContaining('review-today-completed', '1 completed today', 10000);
+    await element(by.id('review-due-card')).tap();
+    await waitFor(element(by.id('review-today-history'))).toExist().withTimeout(10000);
+    await element(by.id('review-due-card')).tap();
+    await waitForVisibleInPracticeScroll('review-start-due');
+    await element(by.id('review-start-due')).tap();
+    await waitFor(element(by.id('review-progress'))).toHaveText('2 / 3 · Standard').withTimeout(10000);
   });
 
   it('schedules review reminders through the native fixture', async () => {
