@@ -2226,7 +2226,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "review-due-summary"))).toBe("Ready now");
     expect(collectText(findByTestId(renderer, "review-next-due"))).toBe(`Oldest: ${oldestDueDate}`);
     expect(findByTestId(renderer, "review-next-due").props.accessibilityLabel).toBe(`Oldest due ${oldestDueDate}`);
-    expect(collectText(findByTestId(renderer, "review-due-count"))).toBe("1");
+    expect(collectText(findByTestId(renderer, "review-due-count"))).toBe("0 / 1");
     expect(() => findByTestId(renderer, "review-overdue-count")).toThrow();
     expect(collectText(findByTestId(renderer, "review-due-card"))).not.toContain("Overdue");
     expectText(renderer, `Oldest: ${oldestDueDate}`);
@@ -2291,7 +2291,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "review-next-due"))).toBe(`Oldest: ${oldestDueDate}`);
     expect(findByTestId(renderer, "review-next-due").props.accessibilityLabel).toBe(`Oldest due ${oldestDueDate}`);
     expect(findByTestId(renderer, "review-due-card").props.accessibilityLabel).toContain("20s pace · Ready now");
-    expect(collectText(findByTestId(renderer, "review-due-count"))).toBe("1");
+    expect(collectText(findByTestId(renderer, "review-due-count"))).toBe("0 / 1");
     expect(collectText(findByTestId(renderer, "review-active-filter-summary"))).toContain("20s pace");
     press(renderer, "review-filter-all");
 
@@ -2438,7 +2438,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "review-dev-promote-next-due");
 
     expect(collectText(findByTestId(renderer, "review-dev-status"))).toContain("2 reviews from 2026-06-21 due today");
-    expect(collectText(findByTestId(renderer, "review-due-count"))).toBe("2");
+    expect(collectText(findByTestId(renderer, "review-due-count"))).toBe("0 / 2");
     expect(findByTestId(renderer, "review-start-due").props.accessibilityState).toEqual({ disabled: false });
     expect(service.listReviewQueue().find((review) => review.puzzleId === "0018S")?.dueDay).toBe("2026-06-22");
 
@@ -2472,7 +2472,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "review-tab");
 
     expect(service.listReviewQueue()).toHaveLength(1);
-    expect(collectText(findByTestId(renderer, "review-due-count"))).toBe("1");
+    expect(collectText(findByTestId(renderer, "review-due-count"))).toBe("0 / 1");
     expect(collectText(findByTestId(renderer, "review-total-count"))).toBe("1");
     expect(findByTestId(renderer, "review-due-card").props.accessibilityLabel).toContain("1 total");
   });
@@ -2719,6 +2719,8 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "review-exit");
     expect(service.listHistory({ source: "scheduled_review" })).toHaveLength(1);
+    expect(collectText(findByTestId(renderer, "review-due-count"))).toBe("1 / 2");
+    expect(findByTestId(renderer, "review-today-history")).toBeTruthy();
     press(renderer, "review-start-due");
     expect(collectText(findByTestId(renderer, "review-current-puzzle-id"))).toBe(secondPuzzleId);
     expectText(renderer, "2 / 2 · Standard");
@@ -2748,10 +2750,10 @@ describe("PracticePocScreen", () => {
     const renderer = renderScreen({ practiceService: service });
 
     press(renderer, "review-tab");
-    expect(collectText(findByTestId(renderer, "review-today-completed"))).toBe("2 completed today · View history");
-    expect(findByTestId(renderer, "review-due-card").props.accessibilityState).toEqual({ expanded: false, disabled: false });
-    press(renderer, "review-due-card");
-    expect(findByTestId(renderer, "review-due-card").props.accessibilityState).toEqual({ expanded: true, disabled: false });
+    expect(collectText(findByTestId(renderer, "review-due-count"))).toBe("2 / 2");
+    expect(findByTestId(renderer, "review-due-card").props.accessibilityRole).toBeUndefined();
+    expect(findByTestId(renderer, "review-due-card").props.onPress).toBeUndefined();
+    expect(findByTestId(renderer, "review-today-history")).toBeTruthy();
     const todayRowTestIDs = [...new Set(renderer.root.findAll(
       (node) => typeof node.props.testID === "string"
         && node.props.testID.startsWith("review-today-attempt-")

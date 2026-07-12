@@ -84,7 +84,7 @@ describe('Key user flows', () => {
     await launchAppAt(reviewNowMs, false);
 
     await openTab('review-tab', 'review-start-due');
-    await waitFor(element(by.id('review-due-count'))).toHaveText('3').withTimeout(10000);
+    await waitFor(element(by.id('review-due-count'))).toHaveText('0 / 3').withTimeout(10000);
     await waitFor(element(by.id('review-total-count'))).toHaveText('3').withTimeout(10000);
     await waitForElementTextContaining('review-due-summary', 'Ready now', 10000);
 
@@ -102,7 +102,7 @@ describe('Key user flows', () => {
     // Exiting an unanswered review leaves it due and restores the same fixed
     // daily position when the user comes back.
     await element(by.id('review-exit')).tap();
-    await waitFor(element(by.id('review-due-count'))).toHaveText('3').withTimeout(10000);
+    await waitFor(element(by.id('review-due-count'))).toHaveText('0 / 3').withTimeout(10000);
     await element(by.id('review-start-due')).tap();
     await waitFor(element(by.id('review-progress'))).toHaveText('1 / 3 · Standard').withTimeout(10000);
     await waitForElementTextContaining('review-current-expected-move', 'e2e6', 10000);
@@ -120,11 +120,8 @@ describe('Key user flows', () => {
 
     await waitFor(element(by.id('review-progress'))).toHaveText('2 / 3 · Standard').withTimeout(15000);
     await element(by.id('review-exit')).tap();
-    await waitFor(element(by.id('review-due-count'))).toHaveText('2').withTimeout(10000);
-    await waitForElementTextContaining('review-today-completed', '1 completed today', 10000);
-    await element(by.id('review-due-card')).tap();
+    await waitFor(element(by.id('review-due-count'))).toHaveText('1 / 3').withTimeout(10000);
     await waitFor(element(by.id('review-today-history'))).toExist().withTimeout(10000);
-    await element(by.id('review-due-card')).tap();
     await waitForVisibleInPracticeScroll('review-start-due');
     await element(by.id('review-start-due')).tap();
     await waitFor(element(by.id('review-progress'))).toHaveText('2 / 3 · Standard').withTimeout(10000);
