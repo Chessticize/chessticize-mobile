@@ -97,23 +97,21 @@ History:
 Review queue:
 
 6. `lapseCount` never resets, and every queue item is born from a mistake with
-   `lapseCount ≥ 1`, so every item classifies as "Hard" forever and the
-   "Failed again" filter matches everything. Distinguish the original sprint
-   miss from review-time lapses (e.g. start at 0, increment only on failed
-   scheduled reviews, decay on success) so Easy/Medium/Hard and Failed-again
-   are meaningful.
+   `lapseCount ≥ 1`, so the "Failed again" filter matches everything.
+   Distinguish the original sprint miss from review-time lapses (e.g. start at
+   0, increment only on failed scheduled reviews, decay on success) so the
+   Failed-again filter is meaningful.
    Status: complete. Sprint mistakes now create or refresh queue rows with
    `lapseCount = 0` and do not count as review-time lapses. Failed Scheduled
    Review attempts increment lapses, successful Scheduled Review attempts decay
-   lapses toward zero, first due reviews classify as Medium, and "Failed
-   again" filters only review-time lapses.
-7. "Overdue" is computed as `dueAt <= now` — identical to "due" — everywhere
-   (badge, summary, filter). Define overdue as meaningfully late (e.g. > 24h
-   past due) and use it consistently.
-   Status: complete. Review due state is now a core-tested rule: a queue item
-   is due at `dueAt`, but it becomes overdue only when it is more than 24 hours
-   past `dueAt`. The Practice badge, Review summary, Overdue filter,
-   difficulty details, and queue row due labels all use that shared definition.
+   lapses toward zero, and "Failed again" filters only review-time lapses.
+7. "Overdue" must be distinct from "due" everywhere (badge, summary, and
+   filter) and must follow the local review-day boundary.
+   Status: complete. Review due state is now a core-tested calendar-day rule:
+   a queue item is due when `dueDay <= today` and overdue when
+   `dueDay < today`, where the local review day rolls over at 04:00. The
+   Practice badge, Review summary, Overdue filter, and queue row labels use the
+   same definition.
 8. A Standard or legacy Blitz review timeout or unsolvable position dead-ends: the wrong
    result is recorded but no Continue affordance appears (that exists only on
    the Arrow Duel path). Show the solution or a Continue button after a

@@ -8,17 +8,19 @@ import {
 import type { AttemptHistoryRow } from "./query-types.ts";
 import type {
   ExportedSprintSession,
+  LocalDataImport,
   LocalDataExport,
   LocalDataImportResult,
   PracticeSettings
 } from "./practice-store.ts";
+import { exportReviewQueueState, normalizeImportedReviewQueueState } from "./practice-store.ts";
 import { preferredSprintSession } from "./sprint-session-sync.ts";
 
 export interface ProgressSyncSnapshot {
   schemaVersion: 1;
   deviceId: string;
   updatedAt: string;
-  data: LocalDataExport;
+  data: LocalDataImport;
 }
 
 export interface ProgressSyncTransport {
@@ -29,7 +31,7 @@ export interface ProgressSyncTransport {
 export interface ProgressSyncStore {
   getSettings(): PracticeSettings;
   exportLocalData(): LocalDataExport;
-  importLocalData(data: LocalDataExport): LocalDataImportResult;
+  importLocalData(data: LocalDataImport): LocalDataImportResult;
 }
 
 export interface ProgressSyncOptions {
@@ -102,7 +104,7 @@ export async function syncPracticeProgress(
   throw new Error("Progress sync retry loop exited unexpectedly");
 }
 
-export function mergeLocalDataExports(local: LocalDataExport, remote: LocalDataExport): LocalDataExport {
+export function mergeLocalDataExports(local: LocalDataExport, remote: LocalDataImport): LocalDataExport {
   const localSessions = assignLegacyRatingGenerations(local.ratings, local.sprintSessions);
   const remoteSessions = assignLegacyRatingGenerations(remote.ratings, remote.sprintSessions);
   const attempts = new Map<string, AttemptHistoryRow>();
@@ -138,10 +140,12 @@ export function mergeLocalDataExports(local: LocalDataExport, remote: LocalDataE
   }
 
   const reviewQueue = new Map<string, ReviewQueueState>();
-  for (const review of local.reviewQueue) {
+  for (const exportedReview of local.reviewQueue) {
+    const review = normalizeImportedReviewQueueState(exportedReview);
     reviewQueue.set(reviewQueueKey(review), { ...review });
   }
-  for (const review of remote.reviewQueue) {
+  for (const importedReview of remote.reviewQueue) {
+    const review = normalizeImportedReviewQueueState(importedReview);
     const key = reviewQueueKey(review);
     reviewQueue.set(key, preferredReviewQueue(reviewQueue.get(key), review));
   }
@@ -151,7 +155,7 @@ export function mergeLocalDataExports(local: LocalDataExport, remote: LocalDataE
     settings: clonePracticeSettings(local.settings),
     ratings: [...ratings.values()].sort((left, right) => left.key.localeCompare(right.key)),
     attempts: [...attempts.values()].sort(compareAttempts),
-    reviewQueue: [...reviewQueue.values()].sort(compareReviewQueue),
+    reviewQueue: [...reviewQueue.values()].sort(compareReviewQueue).map(exportReviewQueueState),
     sprintSessions: [...sprintSessions.values()].sort(compareSprintSessions)
   };
 }
@@ -191,7 +195,7 @@ function preferredReviewQueue(
   if (reviewComparison !== 0) {
     return reviewComparison > 0 ? { ...incoming } : { ...local };
   }
-  const dueComparison = incoming.dueAt.localeCompare(local.dueAt);
+  const dueComparison = incoming.dueDay.localeCompare(local.dueDay);
   if (dueComparison !== 0) {
     return dueComparison > 0 ? { ...incoming } : { ...local };
   }
@@ -214,7 +218,7 @@ function compareAttempts(left: AttemptHistoryRow, right: AttemptHistoryRow): num
 }
 
 function compareReviewQueue(left: ReviewQueueState, right: ReviewQueueState): number {
-  return left.dueAt.localeCompare(right.dueAt) ||
+  return left.dueDay.localeCompare(right.dueDay) ||
     left.puzzleId.localeCompare(right.puzzleId) ||
     left.mode.localeCompare(right.mode) ||
     left.ratingKey.localeCompare(right.ratingKey);

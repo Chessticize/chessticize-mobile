@@ -6,6 +6,7 @@ import {
   normalizeRatingRecord,
   resetRating as resetRatingRecord,
   resolveHistoryRange,
+  reviewDayFor,
   scheduleMistakeForContext,
   scheduleReview,
   sideToMoveForHistoryPuzzle
@@ -31,12 +32,14 @@ import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./
 import type {
   ClearLocalHistoryResult,
   ExportedSprintSession,
+  LocalDataImport,
   LocalDataImportResult,
   LocalDataExport,
   PracticeSettings,
   PracticeStore,
   ReviewQueueDuePromotionResult
 } from "./practice-store.ts";
+import { exportReviewQueueState, normalizeImportedReviewQueueState } from "./practice-store.ts";
 import { clonePracticeSettings, defaultPracticeSettings, normalizeReviewReminderPreference, reviewReminderPreferenceToSettings } from "./practice-settings.ts";
 import { selectUniquePuzzles } from "./puzzle-selection.ts";
 import { preferredSprintSession, sameSprintSession } from "./sprint-session-sync.ts";
@@ -102,8 +105,8 @@ interface ReviewRow {
   puzzle_id: string;
   mode: SprintMode;
   rating_key: string;
-  due_at: string;
-  interval_hours: number;
+  due_day: string;
+  interval_days: number;
   review_count: number;
   success_streak: number;
   lapse_count: number;
@@ -163,7 +166,7 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 3;
+export const CURRENT_SCHEMA_VERSION = 4;
 
 interface SQLiteMigration {
   from: number;
@@ -174,7 +177,8 @@ interface SQLiteMigration {
 const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
   { from: 0, to: 1, apply: migrateUnversionedSchemaToV1 },
   { from: 1, to: 2, apply: migrateV1ToV2 },
-  { from: 2, to: 3, apply: migrateV2ToV3 }
+  { from: 2, to: 3, apply: migrateV2ToV3 },
+  { from: 3, to: 4, apply: migrateV3ToV4 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
@@ -638,16 +642,17 @@ export class SyncSQLiteStore implements PracticeStore {
       attempts: this.listAttempts(),
       reviewQueue: this.listAllReviewQueueStates()
         .sort((left, right) =>
-          left.dueAt.localeCompare(right.dueAt) ||
+          left.dueDay.localeCompare(right.dueDay) ||
           left.puzzleId.localeCompare(right.puzzleId) ||
           left.mode.localeCompare(right.mode) ||
           left.ratingKey.localeCompare(right.ratingKey)
-        ),
+        )
+        .map(exportReviewQueueState),
       sprintSessions: this.listSprintSessions()
     };
   }
 
-  importLocalData(data: LocalDataExport): LocalDataImportResult {
+  importLocalData(data: LocalDataImport): LocalDataImportResult {
     const result: LocalDataImportResult = {
       ratings: 0,
       attempts: 0,
@@ -677,7 +682,8 @@ export class SyncSQLiteStore implements PracticeStore {
           result.attempts += 1;
         }
       }
-      for (const review of data.reviewQueue) {
+      for (const importedReview of data.reviewQueue) {
+        const review = normalizeImportedReviewQueueState(importedReview);
         if (!this.getPuzzle(review.puzzleId)) {
           continue;
         }
@@ -736,11 +742,11 @@ export class SyncSQLiteStore implements PracticeStore {
           rating_key,
           result,
           reviewed_at,
-          next_due_at,
-          interval_hours
+          next_due_day,
+          interval_days
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
       )
-      .run(this.options.randomId(), context.puzzleId, context.mode, context.ratingKey, result, now, next.dueAt, next.intervalHours);
+      .run(this.options.randomId(), context.puzzleId, context.mode, context.ratingKey, result, now, next.dueDay, next.intervalDays);
     return next;
   }
 
@@ -766,38 +772,39 @@ export class SyncSQLiteStore implements PracticeStore {
   }
 
   promoteNextFutureReviewsToDue(now: string): ReviewQueueDuePromotionResult {
-    const nowIso = new Date(now).toISOString();
+    const today = reviewDayFor(now);
     const nextFuture = this.db
-      .prepare("SELECT due_at AS dueAt FROM review_queue WHERE due_at > ? ORDER BY due_at ASC, puzzle_id ASC, mode ASC, rating_key ASC LIMIT 1")
-      .get(nowIso) as { dueAt: string } | undefined;
+      .prepare("SELECT due_day AS dueDay FROM review_queue WHERE due_day > ? ORDER BY due_day ASC, puzzle_id ASC, mode ASC, rating_key ASC LIMIT 1")
+      .get(today) as { dueDay: string } | undefined;
     if (!nextFuture) {
       return { promotedCount: 0 };
     }
 
-    const promotedDate = nextFuture.dueAt.slice(0, 10);
+    const promotedDate = nextFuture.dueDay;
     const promotedCount = (
       this.db
-        .prepare("SELECT COUNT(*) AS count FROM review_queue WHERE due_at > ? AND substr(due_at, 1, 10) = ?")
-        .get(nowIso, promotedDate) as { count: number }
+        .prepare("SELECT COUNT(*) AS count FROM review_queue WHERE due_day = ?")
+        .get(promotedDate) as { count: number }
     ).count;
 
     if (promotedCount > 0) {
       this.db
-        .prepare("UPDATE review_queue SET due_at = ? WHERE due_at > ? AND substr(due_at, 1, 10) = ?")
-        .run(nowIso, nowIso, promotedDate);
+        .prepare("UPDATE review_queue SET due_day = ? WHERE due_day = ?")
+        .run(today, promotedDate);
     }
 
     return {
       promotedCount,
       promotedDate,
-      dueAt: nowIso
+      dueDay: today
     };
   }
 
   getDueReviews(now: string): ReviewQueueState[] {
+    const today = reviewDayFor(now);
     const rows = this.db
-      .prepare("SELECT * FROM review_queue WHERE due_at <= ? ORDER BY due_at ASC, puzzle_id ASC, mode ASC, rating_key ASC")
-      .all(now) as ReviewRow[];
+      .prepare("SELECT * FROM review_queue WHERE due_day <= ? ORDER BY due_day ASC, puzzle_id ASC, mode ASC, rating_key ASC")
+      .all(today) as ReviewRow[];
     return rows.map(reviewFromRow);
   }
 
@@ -832,8 +839,8 @@ export class SyncSQLiteStore implements PracticeStore {
           puzzle_id,
           mode,
           rating_key,
-          due_at,
-          interval_hours,
+          due_day,
+          interval_days,
           review_count,
           success_streak,
           lapse_count,
@@ -845,8 +852,8 @@ export class SyncSQLiteStore implements PracticeStore {
         state.puzzleId,
         state.mode,
         state.ratingKey,
-        state.dueAt,
-        state.intervalHours,
+        state.dueDay,
+        state.intervalDays,
         state.reviewCount,
         state.successStreak,
         state.lapseCount,
@@ -952,7 +959,7 @@ export class SyncSQLiteStore implements PracticeStore {
   }
 
   private listAllReviewQueueStates(): ReviewQueueState[] {
-    const rows = this.db.prepare("SELECT * FROM review_queue ORDER BY due_at ASC, puzzle_id ASC, mode ASC, rating_key ASC").all() as ReviewRow[];
+    const rows = this.db.prepare("SELECT * FROM review_queue ORDER BY due_day ASC, puzzle_id ASC, mode ASC, rating_key ASC").all() as ReviewRow[];
     return rows.map(reviewFromRow);
   }
 
@@ -1284,6 +1291,92 @@ function migrateV2ToV3(db: SyncSqliteDatabase): void {
   );
 }
 
+function migrateV3ToV4(db: SyncSqliteDatabase): void {
+  db.exec(`
+    CREATE TABLE review_queue_v4 (
+      puzzle_id TEXT NOT NULL,
+      mode TEXT NOT NULL DEFAULT 'standard',
+      rating_key TEXT NOT NULL DEFAULT 'standard 5/20',
+      due_day TEXT NOT NULL,
+      interval_days INTEGER NOT NULL,
+      review_count INTEGER NOT NULL,
+      success_streak INTEGER NOT NULL,
+      lapse_count INTEGER NOT NULL,
+      last_result TEXT NOT NULL,
+      last_reviewed_at TEXT NOT NULL,
+      PRIMARY KEY (puzzle_id, mode, rating_key),
+      FOREIGN KEY (puzzle_id) REFERENCES puzzles(id)
+    );
+
+    INSERT INTO review_queue_v4 (
+      puzzle_id,
+      mode,
+      rating_key,
+      due_day,
+      interval_days,
+      review_count,
+      success_streak,
+      lapse_count,
+      last_result,
+      last_reviewed_at
+    )
+    SELECT
+      puzzle_id,
+      mode,
+      rating_key,
+      COALESCE(strftime('%Y-%m-%d', due_at, 'localtime', '-4 hours'), substr(due_at, 1, 10)),
+      MAX(1, CAST((interval_hours + 23) / 24 AS INTEGER)),
+      review_count,
+      success_streak,
+      lapse_count,
+      last_result,
+      last_reviewed_at
+    FROM review_queue;
+
+    CREATE TABLE review_events_v4 (
+      id TEXT PRIMARY KEY,
+      puzzle_id TEXT NOT NULL,
+      mode TEXT NOT NULL DEFAULT 'standard',
+      rating_key TEXT NOT NULL DEFAULT 'standard 5/20',
+      result TEXT NOT NULL,
+      reviewed_at TEXT NOT NULL,
+      next_due_day TEXT NOT NULL,
+      interval_days INTEGER NOT NULL,
+      FOREIGN KEY (puzzle_id) REFERENCES puzzles(id)
+    );
+
+    INSERT INTO review_events_v4 (
+      id,
+      puzzle_id,
+      mode,
+      rating_key,
+      result,
+      reviewed_at,
+      next_due_day,
+      interval_days
+    )
+    SELECT
+      id,
+      puzzle_id,
+      mode,
+      rating_key,
+      result,
+      reviewed_at,
+      COALESCE(strftime('%Y-%m-%d', next_due_at, 'localtime', '-4 hours'), substr(next_due_at, 1, 10)),
+      MAX(1, CAST((interval_hours + 23) / 24 AS INTEGER))
+    FROM review_events;
+
+    DROP TABLE review_events;
+    DROP TABLE review_queue;
+    ALTER TABLE review_queue_v4 RENAME TO review_queue;
+    ALTER TABLE review_events_v4 RENAME TO review_events;
+
+    CREATE INDEX review_queue_due_day_order_idx ON review_queue(due_day, puzzle_id, mode, rating_key);
+    CREATE INDEX review_events_puzzle_id_idx ON review_events(puzzle_id);
+    CREATE INDEX review_events_reviewed_at_idx ON review_events(reviewed_at);
+  `);
+}
+
 function ensureColumn(db: SyncSqliteDatabase, table: string, column: string, alterSql: string): void {
   const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
   if (!columns.some((candidate) => candidate.name === column)) {
@@ -1348,8 +1441,8 @@ function reviewFromRow(row: ReviewRow): ReviewQueueState {
     puzzleId: row.puzzle_id,
     mode: row.mode,
     ratingKey: row.rating_key,
-    dueAt: row.due_at,
-    intervalHours: row.interval_hours,
+    dueDay: row.due_day,
+    intervalDays: row.interval_days,
     reviewCount: row.review_count,
     successStreak: row.success_streak,
     lapseCount: row.lapse_count,
@@ -1406,7 +1499,7 @@ function preferredReviewQueue(
   if (reviewComparison !== 0) {
     return reviewComparison > 0 ? incoming : local;
   }
-  const dueComparison = incoming.dueAt.localeCompare(local.dueAt);
+  const dueComparison = incoming.dueDay.localeCompare(local.dueDay);
   if (dueComparison !== 0) {
     return dueComparison > 0 ? incoming : local;
   }
@@ -1418,8 +1511,8 @@ function sameReviewQueue(left: ReviewQueueState | undefined, right: ReviewQueueS
     left.puzzleId === right.puzzleId &&
     left.mode === right.mode &&
     left.ratingKey === right.ratingKey &&
-    left.dueAt === right.dueAt &&
-    left.intervalHours === right.intervalHours &&
+    left.dueDay === right.dueDay &&
+    left.intervalDays === right.intervalDays &&
     left.reviewCount === right.reviewCount &&
     left.successStreak === right.successStreak &&
     left.lapseCount === right.lapseCount &&

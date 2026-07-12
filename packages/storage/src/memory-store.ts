@@ -6,6 +6,7 @@ import {
   normalizeRatingRecord,
   resetRating as resetRatingRecord,
   buildSessionMistakeReview,
+  reviewDayFor,
   resolveHistoryRange,
   scheduleMistakeForContext,
   scheduleReview,
@@ -28,7 +29,8 @@ import type {
   SprintState
 } from "../../core/src/index.ts";
 import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./query-types.ts";
-import type { ClearLocalHistoryResult, ExportedSprintSession, LocalDataImportResult, LocalDataExport, PracticeSettings, PracticeStore, ReviewQueueDuePromotionResult } from "./practice-store.ts";
+import type { ClearLocalHistoryResult, ExportedSprintSession, LocalDataImport, LocalDataImportResult, LocalDataExport, PracticeSettings, PracticeStore, ReviewQueueDuePromotionResult } from "./practice-store.ts";
+import { exportReviewQueueState, normalizeImportedReviewQueueState } from "./practice-store.ts";
 import { clonePracticeSettings, defaultPracticeSettings, reviewReminderPreferenceToSettings } from "./practice-settings.ts";
 import type { ReviewReminderPreference } from "./practice-store.ts";
 import type { ReviewReminderSettings } from "../../core/src/index.ts";
@@ -198,11 +200,12 @@ export class MemoryStore implements PracticeStore {
       attempts: this.listAttempts(),
       reviewQueue: [...this.reviewQueue.values()]
         .sort((left, right) =>
-          left.dueAt.localeCompare(right.dueAt) ||
+          left.dueDay.localeCompare(right.dueDay) ||
           left.puzzleId.localeCompare(right.puzzleId) ||
           left.mode.localeCompare(right.mode) ||
           left.ratingKey.localeCompare(right.ratingKey)
-        ),
+        )
+        .map(exportReviewQueueState),
       sprintSessions: this.listSprintSessions()
     };
   }
@@ -213,7 +216,7 @@ export class MemoryStore implements PracticeStore {
       .sort((left, right) => right.startedAt.localeCompare(left.startedAt) || right.id.localeCompare(left.id));
   }
 
-  importLocalData(data: LocalDataExport): LocalDataImportResult {
+  importLocalData(data: LocalDataImport): LocalDataImportResult {
     const result: LocalDataImportResult = {
       ratings: 0,
       attempts: 0,
@@ -285,7 +288,8 @@ export class MemoryStore implements PracticeStore {
       existingAttempts.add(attempt.id);
       result.attempts += 1;
     }
-    for (const review of data.reviewQueue) {
+    for (const importedReview of data.reviewQueue) {
+      const review = normalizeImportedReviewQueueState(importedReview);
       if (!this.getPuzzle(review.puzzleId)) {
         continue;
       }
@@ -359,29 +363,30 @@ export class MemoryStore implements PracticeStore {
   }
 
   promoteNextFutureReviewsToDue(now: string): ReviewQueueDuePromotionResult {
-    const nowIso = new Date(now).toISOString();
-    const [nextFutureReview] = this.listReviewQueue().filter((review) => review.dueAt > nowIso);
+    const today = reviewDayFor(now);
+    const [nextFutureReview] = this.listReviewQueue().filter((review) => review.dueDay > today);
     if (!nextFutureReview) {
       return { promotedCount: 0 };
     }
 
-    const promotedDate = nextFutureReview.dueAt.slice(0, 10);
+    const promotedDate = nextFutureReview.dueDay;
     let promotedCount = 0;
     for (const review of this.reviewQueue.values()) {
-      if (review.dueAt > nowIso && review.dueAt.slice(0, 10) === promotedDate) {
-        this.reviewQueue.set(reviewQueueKey(review), { ...review, dueAt: nowIso });
+      if (review.dueDay === promotedDate) {
+        this.reviewQueue.set(reviewQueueKey(review), { ...review, dueDay: today });
         promotedCount += 1;
       }
     }
     return {
       promotedCount,
       promotedDate,
-      dueAt: nowIso
+      dueDay: today
     };
   }
 
   getDueReviews(now: string): ReviewQueueState[] {
-    return this.listReviewQueue().filter((review) => review.dueAt <= now);
+    const today = reviewDayFor(now);
+    return this.listReviewQueue().filter((review) => review.dueDay <= today);
   }
 
   getDueReviewItems(now: string): ReviewQueueItem[] {
@@ -518,7 +523,7 @@ function preferredReviewQueue(
   if (reviewComparison !== 0) {
     return reviewComparison > 0 ? incoming : local;
   }
-  const dueComparison = incoming.dueAt.localeCompare(local.dueAt);
+  const dueComparison = incoming.dueDay.localeCompare(local.dueDay);
   if (dueComparison !== 0) {
     return dueComparison > 0 ? incoming : local;
   }
@@ -530,8 +535,8 @@ function sameReviewQueue(left: ReviewQueueState | undefined, right: ReviewQueueS
     left.puzzleId === right.puzzleId &&
     left.mode === right.mode &&
     left.ratingKey === right.ratingKey &&
-    left.dueAt === right.dueAt &&
-    left.intervalHours === right.intervalHours &&
+    left.dueDay === right.dueDay &&
+    left.intervalDays === right.intervalDays &&
     left.reviewCount === right.reviewCount &&
     left.successStreak === right.successStreak &&
     left.lapseCount === right.lapseCount &&
@@ -544,7 +549,7 @@ function isOpenSprint(session: SprintState): boolean {
 }
 
 function compareReviewQueueState(left: ReviewQueueState, right: ReviewQueueState): number {
-  return left.dueAt.localeCompare(right.dueAt) ||
+  return left.dueDay.localeCompare(right.dueDay) ||
     left.puzzleId.localeCompare(right.puzzleId) ||
     left.mode.localeCompare(right.mode) ||
     left.ratingKey.localeCompare(right.ratingKey);

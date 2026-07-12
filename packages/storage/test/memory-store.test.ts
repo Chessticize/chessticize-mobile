@@ -5,6 +5,8 @@ import { resolve } from "node:path";
 import { MemoryStore, PracticeService } from "../src/index.ts";
 import type { Puzzle } from "../../core/src/index.ts";
 
+process.env.TZ = "UTC";
+
 test("MemoryStore supports the practice service contract used by the mobile POC", async () => {
   const store = new MemoryStore();
   store.seedPuzzles(await loadFixturePuzzles());
@@ -56,12 +58,12 @@ test("MemoryStore records due reviews for wrong Arrow Duel choices", async () =>
       minRating: 1700,
       maxRating: 1800
     },
-    "2026-06-20T00:00:00.000Z"
+    "2026-06-20T12:00:00.000Z"
   );
   const currentPuzzle = sprint.currentPuzzle;
   assert.equal(currentPuzzle?.kind, "arrow_duel");
   const candidateOrder = currentPuzzle?.kind === "arrow_duel" ? currentPuzzle.candidates : [];
-  const result = service.submitMove("f2g3", "2026-06-20T00:00:05.000Z");
+  const result = service.submitMove("f2g3", "2026-06-20T12:00:05.000Z");
 
   assert.deepEqual(result.attempt?.arrowDuelCandidateOrder, candidateOrder);
   assert.deepEqual(store.listAttempts({ result: "wrong" })[0]?.arrowDuelCandidateOrder, candidateOrder);
@@ -87,7 +89,7 @@ test("MemoryStore sprint misses do not count as failed scheduled review lapses",
   assert.equal(firstMiss.lapseCount, 0);
   assert.equal(repeatedMiss.reviewCount, 0);
   assert.equal(repeatedMiss.lapseCount, 0);
-  assert.equal(repeatedMiss.dueAt, "2026-06-21T12:00:00.000Z");
+  assert.equal(repeatedMiss.dueDay, "2026-06-21");
   assert.equal(failedReview.reviewCount, 1);
   assert.equal(failedReview.lapseCount, 1);
 });
@@ -95,16 +97,16 @@ test("MemoryStore sprint misses do not count as failed scheduled review lapses",
 test("MemoryStore review result updates start at one day before expanding", () => {
   const store = new MemoryStore();
   const context = { puzzleId: "00008", mode: "standard" as const, ratingKey: "standard 5/20" };
-  store.scheduleMistakeReview(context, "2026-06-20T00:00:00.000Z");
+  store.scheduleMistakeReview(context, "2026-06-20T12:00:00.000Z");
 
-  const success = store.recordReviewResult(context, "correct", "2026-06-21T00:00:00.000Z");
-  assert.equal(success.dueAt, "2026-06-22T00:00:00.000Z");
-  assert.equal(success.intervalHours, 24);
+  const success = store.recordReviewResult(context, "correct", "2026-06-21T12:00:00.000Z");
+  assert.equal(success.dueDay, "2026-06-22");
+  assert.equal(success.intervalDays, 1);
   assert.equal(success.successStreak, 1);
 
-  const secondSuccess = store.recordReviewResult(context, "correct", "2026-06-22T00:00:00.000Z");
-  assert.equal(secondSuccess.dueAt, "2026-06-25T00:00:00.000Z");
-  assert.equal(secondSuccess.intervalHours, 72);
+  const secondSuccess = store.recordReviewResult(context, "correct", "2026-06-22T12:00:00.000Z");
+  assert.equal(secondSuccess.dueDay, "2026-06-25");
+  assert.equal(secondSuccess.intervalDays, 3);
   assert.equal(secondSuccess.successStreak, 2);
 });
 
@@ -142,7 +144,7 @@ test("PracticeService can promote the next future MemoryStore review date to due
   );
   store.scheduleMistakeReview(
     { puzzleId: "later", mode: "standard", ratingKey: "standard 5/20" },
-    "2026-06-21T00:00:00.000Z"
+    "2026-06-21T12:00:00.000Z"
   );
 
   const result = service.promoteNextFutureReviewsToDue("2026-06-20T20:00:00.000Z");
@@ -150,13 +152,13 @@ test("PracticeService can promote the next future MemoryStore review date to due
   assert.deepEqual(result, {
     promotedCount: 2,
     promotedDate: "2026-06-21",
-    dueAt: "2026-06-20T20:00:00.000Z"
+    dueDay: "2026-06-20"
   });
   assert.deepEqual(
     service.getDueReviews("2026-06-20T20:00:00.000Z").map((review) => review.puzzleId).sort(),
     ["next-evening", "next-morning"]
   );
-  assert.equal(store.getReviewQueueState({ puzzleId: "later", mode: "standard", ratingKey: "standard 5/20" })?.dueAt, "2026-06-22T00:00:00.000Z");
+  assert.equal(store.getReviewQueueState({ puzzleId: "later", mode: "standard", ratingKey: "standard 5/20" })?.dueDay, "2026-06-22");
 });
 
 test("PracticeService future review promotion is a MemoryStore no-op without future rows", () => {
@@ -419,9 +421,9 @@ test("PracticeService builds MemoryStore history view for a required time range 
 
   service.startSprint(
     { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
-    "2026-06-20T00:00:00.000Z"
+    "2026-06-20T12:00:00.000Z"
   );
-  service.submitMove("c4b5", "2026-06-20T00:00:05.000Z");
+  service.submitMove("c4b5", "2026-06-20T12:00:05.000Z");
 
   const view = service.getHistoryView({
     now: "2026-06-21T00:00:00.000Z",
@@ -446,8 +448,8 @@ test("PracticeService builds MemoryStore history view for a required time range 
       ratingKey: "standard 5/20",
       correctCount: 0,
       wrongCount: 1,
-      lastWrongAt: "2026-06-20T00:00:05.000Z",
-      nextReviewAt: "2026-06-21T00:00:05.000Z"
+      lastWrongAt: "2026-06-20T12:00:05.000Z",
+      nextReviewDay: "2026-06-21"
     }
   ]);
 
@@ -461,7 +463,7 @@ test("PracticeService builds MemoryStore history view for a required time range 
     ["standard 5/20"]
   );
   assert.equal(service.getHistoryView({ ...view.query, side: view.attempts[0]?.side === "white" ? "black" : "white" }).attempts.length, 0);
-  assert.equal(service.getDueReviewItems("2026-06-21T00:00:05.000Z")[0]?.puzzle.id, "000hf");
+  assert.equal(service.getDueReviewItems("2026-06-21T12:00:05.000Z")[0]?.puzzle.id, "000hf");
   assert.deepEqual(
     service.getHistoryView({ ...view.query, reviewStatus: "queued" }).attempts.map((attempt) => attempt.id),
     view.attempts.map((attempt) => attempt.id)
@@ -520,7 +522,7 @@ test("PracticeService persists MemoryStore custom sprint configs after successfu
       theme: "hangingPiece",
       persistCustomConfig: true
     },
-    "2026-06-20T00:00:00.000Z"
+    "2026-06-20T12:00:00.000Z"
   );
   service.submitMove("e6e7", "2026-06-20T00:00:05.000Z");
   service.submitMove("b3c1", "2026-06-20T00:00:10.000Z");
@@ -628,9 +630,9 @@ test("PracticeService records official MemoryStore reviews in history without mi
 
   service.startSprint(
     { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
-    "2026-06-20T00:00:00.000Z"
+    "2026-06-20T12:00:00.000Z"
   );
-  service.submitMove("c4b5", "2026-06-20T00:00:05.000Z");
+  service.submitMove("c4b5", "2026-06-20T12:00:05.000Z");
 
   service.recordReviewAttempt({
     puzzleId: "000hf",
@@ -639,8 +641,8 @@ test("PracticeService records official MemoryStore reviews in history without mi
     result: "correct",
     submittedMove: "c4b5",
     expectedMove: "c4b5",
-    startedAt: "2026-06-21T00:00:00.000Z"
-  }, "2026-06-21T00:00:05.000Z");
+    startedAt: "2026-06-21T12:00:00.000Z"
+  }, "2026-06-21T12:00:05.000Z");
 
   const all = service.getHistoryView({
     now: "2026-06-22T00:00:00.000Z",
@@ -657,7 +659,7 @@ test("PracticeService records official MemoryStore reviews in history without mi
       startedAt: attempt.startedAt,
       completedAt: attempt.completedAt
     })),
-    [{ startedAt: "2026-06-21T00:00:00.000Z", completedAt: "2026-06-21T00:00:05.000Z" }]
+    [{ startedAt: "2026-06-21T12:00:00.000Z", completedAt: "2026-06-21T12:00:05.000Z" }]
   );
   assert.deepEqual(
     service.getHistoryView({ ...all.query, source: "sprint" }).attempts.map((attempt) => attempt.result),
@@ -670,8 +672,8 @@ test("PracticeService records official MemoryStore reviews in history without mi
       ratingKey: "standard 5/20",
       correctCount: 1,
       wrongCount: 1,
-      lastWrongAt: "2026-06-20T00:00:05.000Z",
-      nextReviewAt: "2026-06-22T00:00:05.000Z"
+      lastWrongAt: "2026-06-20T12:00:05.000Z",
+      nextReviewDay: "2026-06-22"
     }
   ]);
 

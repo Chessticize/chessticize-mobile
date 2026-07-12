@@ -72,7 +72,7 @@ export interface HistoryPuzzleStats {
   correctCount: number;
   wrongCount: number;
   lastWrongAt?: string;
-  nextReviewAt?: string;
+  nextReviewDay?: string;
 }
 
 export type HistoryPerformanceMetric = "rating" | "wins-losses" | "accuracy" | "solved" | "mistake-rate" | "review-due";
@@ -265,7 +265,7 @@ export function historyAttemptHasReviewQueued(
     review.puzzleId === attempt.puzzleId &&
     review.mode === attempt.mode &&
     review.ratingKey === attempt.ratingKey &&
-    review.dueAt.length > 0
+    review.dueDay.length > 0
   );
 }
 
@@ -303,7 +303,7 @@ export function buildHistoryPuzzleStats(
 
     const review = reviewsByAttemptKey.get(statsKey);
     if (review) {
-      current.nextReviewAt = review.dueAt;
+      current.nextReviewDay = review.dueDay;
     }
     stats.set(statsKey, current);
   }
@@ -339,7 +339,7 @@ export function buildHistoryPerformance(
       "mistake-rate": buildAttemptPerformanceChart(attempts, "mistake-rate"),
       "review-due": puzzleStats.map((stats, index) => ({
         key: `${historyAttemptReviewKey(stats)}-${index}`,
-        value: (stats.nextReviewAt ? 1 : 0) + Math.max(0, stats.wrongCount - stats.correctCount)
+        value: (stats.nextReviewDay ? 1 : 0) + Math.max(0, stats.wrongCount - stats.correctCount)
       }))
     }
   };

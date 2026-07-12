@@ -19,3 +19,17 @@ export function formatLocalCalendarDate(
     ...(options.timeZone ? { timeZone: options.timeZone } : {})
   }).format(date);
 }
+
+export function formatReviewDay(
+  reviewDay: string,
+  options: Omit<LocalCalendarDateFormatOptions, "timeZone"> = {}
+): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(reviewDay);
+  if (!match) {
+    return reviewDay;
+  }
+  return formatLocalCalendarDate(`${reviewDay}T12:00:00.000Z`, {
+    ...options,
+    timeZone: "UTC"
+  });
+}
