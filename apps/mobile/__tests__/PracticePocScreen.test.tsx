@@ -1912,7 +1912,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "history-rating-arrow duel 5/30");
     expect(collectText(findByTestId(renderer, "history-performance-context"))).toBe("Arrow Duel · 30s pace · All Time");
     expect(collectText(findByTestId(renderer, "history-attempt-arrow-attempt-review-state"))).toBe(
-      `Review ${formatLocalCalendarDate("2026-06-21T00:01:00.000Z")}`
+      `Review ${formatReviewDay("2026-06-20")}`
     );
     expect(collectText(findByTestId(renderer, "history-attempt-arrow-attempt-identity"))).toBe(
       "Puzzle ID shared-history · Puzzle rating 900"
