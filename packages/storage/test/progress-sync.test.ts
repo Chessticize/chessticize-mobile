@@ -233,6 +233,42 @@ test("mergeLocalDataExports conservatively merges same-generation rating deltas"
   assert.deepEqual(merged.attempts.map((attempt) => attempt.id).sort(), ["local-win", "remote-loss"]);
 });
 
+test("mergeLocalDataExports preserves converged RD when the remote snapshot has fewer games", async () => {
+  const localService = new PracticeService(await seededMemoryStore());
+  const local = localService.exportLocalData();
+  local.ratings = [{
+    key: "standard 5/20",
+    generation: 0,
+    rating: 775,
+    ratingDeviation: 248.17054151409985,
+    volatility: 0.06,
+    games: 1
+  }];
+  local.sprintSessions = [completedRatingSprint({
+    id: "local-win",
+    completedAt: "2026-06-20T00:00:05.000Z",
+    ratingBefore: 600,
+    ratingAfter: 775
+  })];
+
+  const staleRemote = structuredClone(local);
+  staleRemote.ratings = [{
+    key: "standard 5/20",
+    generation: 0,
+    rating: 600,
+    ratingDeviation: 350,
+    volatility: 0.06,
+    games: 0
+  }];
+  staleRemote.sprintSessions = [];
+
+  const merged = mergeLocalDataExports(local, staleRemote);
+
+  assert.equal(merged.ratings[0]?.rating, 775);
+  assert.equal(merged.ratings[0]?.games, 1);
+  assert.equal(merged.ratings[0]?.ratingDeviation, 248.17054151409985);
+});
+
 test("mergeLocalDataExports repairs inflated ratings and stays idempotent", async () => {
   const localService = new PracticeService(await seededMemoryStore());
   const local = localService.exportLocalData();

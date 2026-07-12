@@ -1,4 +1,8 @@
-import { normalizeRatingRecord, RATING_FLOOR } from "../../core/src/index.ts";
+import {
+  DEFAULT_RATING_DEVIATION,
+  normalizeRatingRecord,
+  RATING_FLOOR
+} from "../../core/src/index.ts";
 import type { RatingRecord } from "../../core/src/index.ts";
 import type { AttemptHistoryRow } from "./query-types.ts";
 import type { ExportedSprintSession } from "./practice-store.ts";
@@ -96,10 +100,16 @@ export function mergeRatingWithSprintSessions(
   return rebuildRatingFromSessions(
     {
       ...base,
-      ratingDeviation: Math.max(
-        normalizedLocal.ratingDeviation ?? 0,
-        normalizedIncoming.ratingDeviation ?? 0
-      )
+      // A shorter history can still carry the cold-start RD (350). Reusing it
+      // would erase convergence from the device that has played more games.
+      // Equal-length histories may have diverged concurrently, so retain the
+      // more conservative uncertainty in that case.
+      ratingDeviation: normalizedIncoming.games === normalizedLocal.games
+        ? Math.max(
+            normalizedLocal.ratingDeviation ?? 0,
+            normalizedIncoming.ratingDeviation ?? 0
+          )
+        : base.ratingDeviation ?? DEFAULT_RATING_DEVIATION
     },
     [...sessions.values()]
   );
