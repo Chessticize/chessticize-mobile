@@ -248,15 +248,14 @@ Design approved 2026-07-03; the "Review Reminder Notifications" section of
    Stockfish/NNUE artifacts, and Lichess puzzle manifest. Release-time
    execution still requires running that audit from the final submitted
    lockfile and manually reading the notices for license correctness. The
-   current build-1 source release is published as `ios-v1.0.0-build-1`; use
-   that tag only for an App Store Connect binary archived from the exact commit
-   the tag points to, otherwise create a new tag and release for the submitted
-   binary.
+   The rejected build-1 source release remains published as
+   `ios-v1.0.0-build-1`. The current replacement candidate is build 2; publish
+   `ios-v1.0.0-build-2` from the exact commit used to archive that binary.
 2. **App identity**: final display name, bundle identifier, version/build
    scheme, app icon set (all slots), launch screen matching the app background.
    Status: implementation complete. The iOS target now uses the display name
    `Chessticize`, bundle identifier `com.chessticize.mobile`, marketing
-   version `1.0`, build `1`, a complete iPhone/iPad/marketing AppIcon catalog,
+   version `1.0`, build `2`, a complete iPhone/iPad/marketing AppIcon catalog,
    and a launch screen using the app background `#F8FAFC` instead of the React
    Native template copy.
 3. **Privacy**: App Privacy questionnaire answers (Data Not Collected / no
@@ -318,9 +317,9 @@ Design approved 2026-07-03; the "Review Reminder Notifications" section of
    completion rule. The actual pass still requires an App Store Connect upload,
    an internal TestFlight group, a physical iPhone install through TestFlight,
    and a filled evidence log before this item can be marked complete. The
-   current source release tag is `ios-v1.0.0-build-1`, so the uploaded build
-   must be archived from the exact commit that tag points to or the source
-   release must be regenerated.
+   current replacement source release tag is `ios-v1.0.0-build-2`, so the
+   uploaded build must be archived from the exact commit that tag points to or
+   the source release must be regenerated.
    The repo now also exposes `pnpm app-store:preflight`, which machine-checks the
    automatable release artifacts and reports the manual release gates that
    cannot be completed from the repository. `pnpm app-store:testflight-evidence`

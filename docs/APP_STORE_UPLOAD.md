@@ -39,11 +39,11 @@ folder for the physical-device QA record.
 ## Public Source Tag
 
 Create and publish the source tag before or at the same time as the App Store
-Connect upload. The suggested 1.0 build-1 tag is:
+Connect upload. The current 1.0 build-2 tag is:
 
 ```sh
-git tag -a ios-v1.0.0-build-1 -m "iOS 1.0.0 build 1"
-git push origin ios-v1.0.0-build-1
+git tag -a ios-v1.0.0-build-2 -m "iOS 1.0.0 build 2"
+git push origin ios-v1.0.0-build-2
 ```
 
 Then publish a GitHub release for that tag and attach or copy the
@@ -152,7 +152,7 @@ valid while this signing-account gate is still incomplete.
 ## After Upload
 
 1. Wait for App Store Connect processing to complete.
-2. Confirm the uploaded build number is `1` for version `1.0`.
+2. Confirm the uploaded build number is `2` for version `1.0`.
 3. Confirm export compliance is accepted for
    `ITSAppUsesNonExemptEncryption = false`.
 4. Configure the TestFlight test information from `docs/TESTFLIGHT_QA.md`.

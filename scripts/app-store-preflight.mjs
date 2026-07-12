@@ -179,7 +179,7 @@ check(
   marketingVersions.length === 1 &&
     marketingVersions[0] === "1.0" &&
     buildNumbers.length === 1 &&
-    buildNumbers[0] === "1" &&
+    buildNumbers[0] === "2" &&
     bundleIdentifiers.length === 1 &&
     bundleIdentifiers[0] === "com.chessticize.mobile" &&
     deviceFamilies.length === 1 &&
@@ -299,7 +299,7 @@ manualGate(
 );
 manualGate(
   "Create the public source release tag",
-  "Tag the exact commit used for the App Store Connect binary, for example ios-v1.0.0-build-1, and publish the GitHub release."
+  "Tag the exact commit used for the App Store Connect binary as ios-v1.0.0-build-2 and publish the GitHub release."
 );
 manualGate(
   "Configure Apple signing team and Xcode account",
