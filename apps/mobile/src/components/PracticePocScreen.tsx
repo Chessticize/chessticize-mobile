@@ -4752,18 +4752,16 @@ function HistoryAttemptRow({
   const primaryTheme = historyAttemptThemeLabel(attempt);
   const pace = historyAttemptSpeedSeconds(attempt);
   const paceLabel = pace === null ? null : `${pace}s pace`;
-  const reviewLabel = isWrong
-    ? puzzleStats?.nextReviewDay
-      ? `Review ${formatReviewDay(puzzleStats.nextReviewDay)}`
-      : "Review queued"
-    : "Correct";
+  const reviewDueLabel = puzzleStats?.nextReviewDay
+    ? `Review due ${formatReviewDay(puzzleStats.nextReviewDay)}`
+    : null;
   const resultLabel = isWrong ? "Wrong move" : "Correct";
   const submittedMoveLabel = isWrong
     ? `Played ${attempt.submittedMove} · Best ${attempt.expectedMove}`
     : `Move ${attempt.submittedMove}`;
   const sourceLabel = attempt.source === "scheduled_review" ? "Review" : "Sprint";
   const compactContext = [primaryTheme, paceLabel].filter(Boolean).join(" · ");
-  const puzzleIdentity = `Puzzle ID ${attempt.puzzleId} · Puzzle rating ${attempt.puzzleRating}`;
+  const puzzleIdentity = `ID ${attempt.puzzleId} · Rating ${attempt.puzzleRating}`;
   const compactMeta = `${sourceLabel} · ${elapsedSeconds}s · ${dateLabel}`;
   const rowAccessibilityLabel = [
     `Open ${modeLabel(attempt.mode)} ${attempt.result} puzzle review`,
@@ -4772,7 +4770,7 @@ function HistoryAttemptRow({
     puzzleIdentity,
     compactContext,
     compactMeta,
-    reviewLabel
+    reviewDueLabel
   ].filter(Boolean).join(", ");
 
   return (
@@ -4797,19 +4795,14 @@ function HistoryAttemptRow({
         <Text testID={`history-attempt-${attempt.id}-identity`} style={styles.helperText}>{puzzleIdentity}</Text>
         <Text testID={`history-attempt-${attempt.id}-context`} style={styles.helperText}>{compactContext}</Text>
         <Text testID={`history-attempt-${attempt.id}-meta`} style={styles.helperText}>{compactMeta}</Text>
-      </View>
-      <View style={styles.historyAttemptTrailing}>
-        <View style={styles.historyAttemptStatus} testID={`history-attempt-${attempt.id}-status`}>
-          <Text
-            testID={`history-attempt-${attempt.id}-review-state`}
-            style={[styles.historyReviewState, isWrong ? styles.errorText : styles.positive]}
-          >
-            {reviewLabel}
+        {reviewDueLabel ? (
+          <Text testID={`history-attempt-${attempt.id}-review-due`} style={styles.historyReviewDue}>
+            {reviewDueLabel}
           </Text>
-        </View>
-        <View style={styles.historyAttemptChevron} testID={`history-attempt-${attempt.id}-chevron`}>
-          <ChevronGlyph direction="right" />
-        </View>
+        ) : null}
+      </View>
+      <View style={styles.historyAttemptChevron} testID={`history-attempt-${attempt.id}-chevron`}>
+        <ChevronGlyph direction="right" />
       </View>
     </Pressable>
   );
@@ -10767,16 +10760,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8
   },
-  historyAttemptTrailing: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 6
-  },
-  historyAttemptStatus: {
-    alignItems: "flex-end",
-    justifyContent: "center",
-    minWidth: 78
-  },
   historyAttemptChevron: {
     alignItems: "center",
     height: 32,
@@ -10787,6 +10770,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "900",
     textAlign: "right"
+  },
+  historyReviewDue: {
+    color: "#64748B",
+    fontSize: 11,
+    fontWeight: "700"
   },
   historyRatingDelta: {
     fontSize: 12,

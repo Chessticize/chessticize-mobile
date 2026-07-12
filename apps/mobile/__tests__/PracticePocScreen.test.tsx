@@ -1804,19 +1804,19 @@ describe("PracticePocScreen", () => {
     expect(historyAttemptRow.props.accessibilityLabel).toContain("Played g6g5 · Best f4g3");
     expect(collectText(historyAttemptRow)).not.toContain("Played g6g5 · Best f4g3");
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-identity`))).toMatch(
-      /^Puzzle ID .+ · Puzzle rating \d+$/
+      /^ID .+ · Rating \d+$/
     );
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-context`))).toContain("20s pace");
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-context`))).toMatch(/^[A-Z]/);
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-meta`))).toMatch(
       /Sprint · \d+s · (Today|Yesterday|\d+ days ago|\d+w ago|\d+mo ago|\d+y ago|Scheduled) · [A-Z][a-z]{2} \d{1,2}, \d{4}/
     );
-    expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-status`))).toContain("Review");
+    expect(() => findByTestId(renderer, `history-attempt-${historyAttemptId}-status`)).toThrow();
     expect(findByTestId(renderer, `history-attempt-${historyAttemptId}-chevron`)).toBeTruthy();
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-chevron`))).toBe("");
     expect(() => findByTestId(renderer, `history-attempt-${historyAttemptId}-status-summary`)).toThrow();
     expect(() => findByTestId(renderer, `history-attempt-${historyAttemptId}-difficulty`)).toThrow();
-    expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-review-state`))).toContain("Review");
+    expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-review-due`))).toContain("Review due");
     expect(() => findByTestId(renderer, `history-attempt-${historyAttemptId}-delta`)).toThrow();
     press(renderer, historyAttemptRow.props.testID);
     expect(findByTestId(renderer, "review-session")).toBeTruthy();
@@ -1988,19 +1988,21 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "history-rating-arrow duel 5/30");
     expect(collectText(findByTestId(renderer, "history-performance-context"))).toBe("Arrow Duel · 30s pace · All Time");
-    expect(collectText(findByTestId(renderer, "history-attempt-arrow-attempt-review-state"))).toBe(
-      `Review ${formatReviewDay("2026-06-20")}`
+    const reviewDue = findByTestId(renderer, "history-attempt-arrow-attempt-review-due");
+    expect(collectText(reviewDue)).toBe(
+      `Review due ${formatReviewDay("2026-06-20")}`
     );
+    expect(hasStyleEntry(reviewDue, "fontSize", 11)).toBe(true);
     expect(collectText(findByTestId(renderer, "history-attempt-arrow-attempt-identity"))).toBe(
-      "Puzzle ID shared-history · Puzzle rating 900"
+      "ID shared-history · Rating 900"
     );
     expect(() => findByTestId(renderer, "history-attempt-arrow-attempt-difficulty")).toThrow();
 
     press(renderer, "history-rating-standard 5/20");
     expect(collectText(findByTestId(renderer, "history-performance-context"))).toBe("Standard · 20s pace · All Time");
-    expect(collectText(findByTestId(renderer, "history-attempt-standard-attempt-review-state"))).toBe("Review queued");
+    expect(() => findByTestId(renderer, "history-attempt-standard-attempt-review-due")).toThrow();
     expect(collectText(findByTestId(renderer, "history-attempt-standard-attempt-identity"))).toBe(
-      "Puzzle ID shared-history · Puzzle rating 900"
+      "ID shared-history · Rating 900"
     );
     expect(() => findByTestId(renderer, "history-attempt-standard-attempt-difficulty")).toThrow();
   });
@@ -2023,7 +2025,7 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "history-attempt-run-scored-attempt")).toBeTruthy();
     expect(() => findByTestId(renderer, "history-attempt-run-scored-attempt-delta")).toThrow();
-    expect(collectText(findByTestId(renderer, "history-attempt-run-scored-attempt-review-state"))).not.toContain("+50");
+    expect(() => findByTestId(renderer, "history-attempt-run-scored-attempt-review-due")).toThrow();
   });
 
   it("keeps history analysis review on the current puzzle after a retry is solved", async () => {
@@ -2046,7 +2048,7 @@ describe("PracticePocScreen", () => {
     const correctAttemptRow = historyAttemptRows.find((row) => collectText(row).includes("Correct"));
     expect(correctAttemptRow).toBeTruthy();
     const correctAttemptId = correctAttemptRow!.props.testID.replace("history-attempt-", "");
-    expect(collectText(findByTestId(renderer, `history-attempt-${correctAttemptId}-review-state`))).toBe("Correct");
+    expect(() => findByTestId(renderer, `history-attempt-${correctAttemptId}-review-due`)).toThrow();
     expect(() => findByTestId(renderer, `history-attempt-${correctAttemptId}-difficulty`)).toThrow();
     press(renderer, correctAttemptRow!.props.testID);
 
@@ -2739,7 +2741,7 @@ describe("PracticePocScreen", () => {
     });
     const historyAttemptRow = historyAttemptRows(renderer)[0];
     expect(collectText(findByTestId(renderer, `${historyAttemptRow!.props.testID}-identity`))).toMatch(
-      /^Puzzle ID .+ · Puzzle rating \d+$/
+      /^ID .+ · Rating \d+$/
     );
     expect(collectText(findByTestId(renderer, `${historyAttemptRow!.props.testID}-meta`))).toContain("Review · 5s");
   });
