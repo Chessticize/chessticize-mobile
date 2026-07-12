@@ -137,7 +137,7 @@ resulting store story therefore includes:
 
 - a non-default Arrow Duel rating and weekly activity on Practice;
 - two reviews still due plus one completed-today result on Review;
-- four wrong attempts and scheduled-review context on History.
+- three wrong Sprint attempts on History, matching its default Sprint-only filter.
 
 The Release build recognizes the fixed clock only when the native
 `chessticizeStoreAssetCapture` process argument accompanies
