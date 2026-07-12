@@ -5,7 +5,7 @@ settings:
   excludeLinksFromLockfile: false
 
 patchedDependencies:
-  react-native-chessboard@0.2.0: 50ec5328406a7598c72a96cb8cdaf4c6ac963c8c4a592d1dad5a63400c81c8e2
+  react-native-chessboard@0.2.0: c79eaf664a87bd209daa0b07659e7b0f4dcb12a3063be6a99a68658390714bb3
 
 importers:
 
@@ -38,7 +38,7 @@ importers:
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/jest-preset@0.86.0(@babel/core@7.29.7)(react@19.2.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
       react-native-chessboard:
         specifier: 0.2.0
-        version: 0.2.0(patch_hash=50ec5328406a7598c72a96cb8cdaf4c6ac963c8c4a592d1dad5a63400c81c8e2)(2afa43a2fc8a315b0a1fa5592d941e30)
+        version: 0.2.0(patch_hash=c79eaf664a87bd209daa0b07659e7b0f4dcb12a3063be6a99a68658390714bb3)(2afa43a2fc8a315b0a1fa5592d941e30)
       react-native-gesture-handler:
         specifier: ^3.0.2
         version: 3.0.2(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/jest-preset@0.86.0(@babel/core@7.29.7)(react@19.2.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)
@@ -8271,7 +8271,7 @@ snapshots:
 
   react-is@19.2.7: {}
 
-  react-native-chessboard@0.2.0(patch_hash=50ec5328406a7598c72a96cb8cdaf4c6ac963c8c4a592d1dad5a63400c81c8e2)(2afa43a2fc8a315b0a1fa5592d941e30):
+  react-native-chessboard@0.2.0(patch_hash=c79eaf664a87bd209daa0b07659e7b0f4dcb12a3063be6a99a68658390714bb3)(2afa43a2fc8a315b0a1fa5592d941e30):
     dependencies:
       '@shopify/react-native-skia': 2.6.5(react-native-reanimated@4.4.1(react-native-worklets@0.9.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/jest-preset@0.86.0(@babel/core@7.29.7)(react@19.2.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3))(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/jest-preset@0.86.0(@babel/core@7.29.7)(react@19.2.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3))(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/jest-preset@0.86.0(@babel/core@7.29.7)(react@19.2.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)
       chess.js: 1.4.0

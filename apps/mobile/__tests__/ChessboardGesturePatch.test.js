@@ -134,6 +134,53 @@ describe("react-native-chessboard gesture patch", () => {
     expect(patch).not.toContain("+    return Gesture.Simultaneous(tapGesture, panGesture)");
     expect(patch).not.toContain("+    return _reactNativeGestureHandler.Gesture.Simultaneous(tapGesture, panGesture)");
   });
+
+  it("dispatches drops even when a board reset wiped zIndex mid-drag", () => {
+    const packageRoot = dirname(require.resolve("react-native-chessboard/package.json"));
+    const sources = [
+      resolve(packageRoot, "src/hooks/use-board-gesture.ts"),
+      resolve(packageRoot, "lib/module/hooks/use-board-gesture.js"),
+      resolve(packageRoot, "lib/commonjs/hooks/use-board-gesture.js")
+    ];
+
+    for (const sourcePath of sources) {
+      expectGestureSourceTracksDragActivationLocally(readFileSync(sourcePath, "utf8"), sourcePath);
+    }
+  });
+
+  it("keeps the gesture-local drag-activation flag in the durable package patch", () => {
+    const patch = readFileSync(
+      resolve(__dirname, "../../../patches/react-native-chessboard@0.2.0.patch"),
+      "utf8"
+    );
+
+    expect(patch).toContain("const dragActivated = useSharedValue(false);");
+    expect(patch).toContain("const wasDragged = dragActivated.get();");
+    expect(patch).not.toContain("+        const wasDragged = squareState.zIndex.get() > 0;");
+    expect(patch).not.toContain("+      const wasDragged = squareState.zIndex.get() > 0;");
+  });
+
+  it("skips the fen-prop board reset when the board already holds that position", () => {
+    const packageRoot = dirname(require.resolve("react-native-chessboard/package.json"));
+    const sources = [
+      resolve(packageRoot, "src/state/use-board-state.ts"),
+      resolve(packageRoot, "lib/module/state/use-board-state.js"),
+      resolve(packageRoot, "lib/commonjs/state/use-board-state.js")
+    ];
+
+    for (const sourcePath of sources) {
+      expectBoardStateSourceSkipsRedundantFenReset(readFileSync(sourcePath, "utf8"), sourcePath);
+    }
+  });
+
+  it("keeps the redundant fen reset skip in the durable package patch", () => {
+    const patch = readFileSync(
+      resolve(__dirname, "../../../patches/react-native-chessboard@0.2.0.patch"),
+      "utf8"
+    );
+
+    expect(patch).toContain("if (initialFen && chess.fen() === initialFen)");
+  });
 });
 
 function expectGestureSourceRejectsOpponentPiecesBeforeRaise(source, sourcePath) {
@@ -300,5 +347,65 @@ function expectGestureSourceRacesTapBeforePan(source, sourcePath) {
   expect(source).not.toContain("Gesture.Simultaneous(tapGesture, panGesture)");
   expect(source).not.toContain("_reactNativeGestureHandler.Gesture.Simultaneous(tapGesture, panGesture)");
   expect(Math.max(raceIndex, compiledRaceIndex)).toBeGreaterThan(Math.max(tapIndex, panIndex));
+  expect(sourcePath).toBeTruthy();
+}
+
+function expectGestureSourceTracksDragActivationLocally(source, sourcePath) {
+  // The flag must be a gesture-local shared value, declared before the pan
+  // gesture is built.
+  const declarationIndex = source.indexOf("const dragActivated = useSharedValue(false);") >= 0
+    ? source.indexOf("const dragActivated = useSharedValue(false);")
+    : source.indexOf("const dragActivated = (0, _reactNativeReanimated.useSharedValue)(false);");
+  const panIndex = source.indexOf("const panGesture");
+  const beginIndex = source.indexOf(".onBegin", panIndex);
+  expect(declarationIndex).toBeGreaterThanOrEqual(0);
+  expect(panIndex).toBeGreaterThan(declarationIndex);
+  expect(beginIndex).toBeGreaterThan(panIndex);
+
+  // onStart arms the flag when it accepts the drag (alongside the zIndex
+  // raise it used to rely on).
+  const startIndex = source.indexOf(".onStart", beginIndex);
+  const armIndex = source.indexOf("dragActivated.set(true);", startIndex);
+  const raiseIndex = source.indexOf("squareState.zIndex.set(100);", startIndex);
+  const updateIndex = source.indexOf(".onUpdate", startIndex);
+  expect(armIndex).toBeGreaterThan(startIndex);
+  expect(armIndex).toBeLessThan(updateIndex);
+  expect(raiseIndex).toBeGreaterThan(startIndex);
+
+  // onEnd decides "was dragged" from the flag, not from zIndex — a board
+  // reset landing mid-drag zeroes zIndex and used to swallow the drop.
+  const endIndex = source.indexOf(".onEnd", updateIndex);
+  const finalizeIndex = source.indexOf(".onFinalize", endIndex);
+  const wasDraggedIndex = source.indexOf("const wasDragged = dragActivated.get();", endIndex);
+  const disarmIndex = source.indexOf("dragActivated.set(false);", wasDraggedIndex);
+  expect(wasDraggedIndex).toBeGreaterThan(endIndex);
+  expect(wasDraggedIndex).toBeLessThan(finalizeIndex);
+  expect(disarmIndex).toBeGreaterThan(wasDraggedIndex);
+  expect(disarmIndex).toBeLessThan(finalizeIndex);
+  expect(source).not.toContain("const wasDragged = squareState.zIndex.get() > 0;");
+
+  // onFinalize disarms the flag so cancelled gestures cannot leak an armed
+  // state into the next touch.
+  const finalizeDisarmIndex = source.indexOf("dragActivated.set(false);", finalizeIndex);
+  expect(finalizeDisarmIndex).toBeGreaterThan(finalizeIndex);
+  expect(sourcePath).toBeTruthy();
+}
+
+function expectBoardStateSourceSkipsRedundantFenReset(source, sourcePath) {
+  // The fen-prop effect must bail out before touching chess or any square
+  // state when the board already holds the incoming position; the redundant
+  // rewrite wiped live gesture state (selection, valid moves, zIndex)
+  // mid-gesture during the opponent-reply premove window.
+  const firstFenGuardIndex = source.indexOf("if (isFirstFenRef.current)");
+  const skipIndex = source.indexOf("if (initialFen && chess.fen() === initialFen)", firstFenGuardIndex);
+  const skipReturnIndex = source.indexOf("return;", skipIndex);
+  const loadIndex = source.indexOf("chess.load(initialFen);", firstFenGuardIndex);
+  const resetIndex = source.indexOf("chess.reset();", firstFenGuardIndex);
+
+  expect(firstFenGuardIndex).toBeGreaterThanOrEqual(0);
+  expect(skipIndex).toBeGreaterThan(firstFenGuardIndex);
+  expect(skipReturnIndex).toBeGreaterThan(skipIndex);
+  expect(loadIndex).toBeGreaterThan(skipIndex);
+  expect(resetIndex).toBeGreaterThan(skipIndex);
   expect(sourcePath).toBeTruthy();
 }
