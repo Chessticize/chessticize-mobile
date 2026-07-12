@@ -101,6 +101,7 @@ import {
   type ICloudProgressSyncClient
 } from "../backend/iCloudProgressSync.ts";
 import { arePracticeTestControlsEnabled, isPracticeDebugEnabled } from "../releaseConfig.ts";
+import { isStoreAssetCaptureEnabled } from "../backend/testLaunchConfig.ts";
 import {
   canonicalFen,
   decidePremoveQueue,
@@ -1815,7 +1816,15 @@ export function PracticePocScreen({
   ) : null;
   const sessionBoardNode = shouldShowSessionBoard ? (
     <View style={styles.boardWrapper}>
-      <View testID="session-board" style={[styles.boardSurface, { width: boardSize, height: boardSize }]}>
+      {isStoreAssetCaptureEnabled() ? (
+        <Text testID="session-current-puzzle-id" style={styles.reviewDueHiddenMetric}>
+          {displayedPuzzle?.puzzle.id ?? ""}
+        </Text>
+      ) : null}
+      <View
+        testID="session-board"
+        style={[styles.boardSurface, { width: boardSize, height: boardSize }]}
+      >
         {displayedBoardFen ? (
           <Chessboard
             key={`${state?.id ?? "idle"}-${displayedPuzzle?.puzzle.id ?? "none"}-${displayedPuzzle?.kind ?? "line"}`}
@@ -6294,7 +6303,7 @@ function ReviewSession({
             <Text testID="review-progress" style={styles.helperText}>
               {reviewProgressPosition} / {reviewProgressTotal} · {modeLabel(currentEntry.mode)}
             </Text>
-            {arePracticeTestControlsEnabled() ? (
+            {arePracticeTestControlsEnabled() || isStoreAssetCaptureEnabled() ? (
               <>
                 <Text testID="review-current-puzzle-id" style={styles.reviewDueHiddenMetric}>
                   {currentEntry.puzzle.id}

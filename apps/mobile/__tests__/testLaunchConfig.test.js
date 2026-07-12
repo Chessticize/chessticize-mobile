@@ -1,4 +1,7 @@
-const { resolveTestNowMsFromLaunchConfig } = require("../src/backend/testLaunchConfig");
+const {
+  isStoreAssetCaptureEnabled,
+  resolveTestNowMsFromLaunchConfig
+} = require("../src/backend/testLaunchConfig");
 
 describe("test launch configuration", () => {
   it("ignores native test clock values outside development or explicit test harness controls", () => {
@@ -17,6 +20,17 @@ describe("test launch configuration", () => {
         { testNowMs: "1780000000000" }
       )
     ).toBe(1780000000000);
+  });
+
+  it("accepts a fixed clock for release store-asset capture without enabling visible test controls", () => {
+    expect(
+      resolveTestNowMsFromLaunchConfig(
+        { __DEV__: false, __CHESSTICIZE_ENABLE_TEST_CONTROLS__: false },
+        { storeAssetCapture: true, testNowMs: "1780000000000" }
+      )
+    ).toBe(1780000000000);
+    expect(isStoreAssetCaptureEnabled({ storeAssetCapture: true })).toBe(true);
+    expect(isStoreAssetCaptureEnabled({ storeAssetCapture: false })).toBe(false);
   });
 
   it("rejects invalid native test clock values", () => {
