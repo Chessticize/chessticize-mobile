@@ -6,12 +6,12 @@ import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
 const scenes = [
-  "app-store-01-practice-home",
-  "app-store-02-standard-sprint",
-  "app-store-03-arrow-duel",
-  "app-store-04-sprint-results",
-  "app-store-05-mistake-review-analysis",
-  "app-store-06-history"
+  "app-store-01-practice-tab",
+  "app-store-02-review-tab",
+  "app-store-03-history-tab",
+  "app-store-04-settings-tab",
+  "app-store-05-standard-sprint",
+  "app-store-06-arrow-duel"
 ];
 
 function pngFixture(width: number, height: number) {
@@ -32,7 +32,8 @@ function pngFixture(width: number, height: number) {
 function writeScreenshotSet(root: string) {
   const groups = [
     { id: "iphone-6.9", width: 1320, height: 2868 },
-    { id: "iphone-6.1", width: 1170, height: 2532 }
+    { id: "iphone-6.1", width: 1170, height: 2532 },
+    { id: "ipad-13", width: 2064, height: 2752 }
   ];
 
   for (const group of groups) {
@@ -147,7 +148,7 @@ test("TestFlight evidence CLI fails when an included screenshot audit fails", ()
     writeScreenshotSet(screenshots);
     const signingFixture = writeSigningFixture(tempDir);
     writeFileSync(
-      join(screenshots, "iphone-6.1", "app-store-02-standard-sprint.png"),
+      join(screenshots, "iphone-6.1", "app-store-05-standard-sprint.png"),
       pngFixture(1000, 1000)
     );
 

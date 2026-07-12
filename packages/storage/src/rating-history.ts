@@ -1,4 +1,8 @@
-import { normalizeRatingRecord, RATING_FLOOR } from "../../core/src/index.ts";
+import {
+  DEFAULT_RATING_DEVIATION,
+  normalizeRatingRecord,
+  RATING_FLOOR
+} from "../../core/src/index.ts";
 import type { RatingRecord } from "../../core/src/index.ts";
 import type { AttemptHistoryRow } from "./query-types.ts";
 import type { ExportedSprintSession } from "./practice-store.ts";
@@ -96,9 +100,9 @@ export function mergeRatingWithSprintSessions(
   return rebuildRatingFromSessions(
     {
       ...base,
-      ratingDeviation: Math.max(
-        normalizedLocal.ratingDeviation ?? 0,
-        normalizedIncoming.ratingDeviation ?? 0
+      ratingDeviation: Math.min(
+        normalizedLocal.ratingDeviation ?? DEFAULT_RATING_DEVIATION,
+        normalizedIncoming.ratingDeviation ?? DEFAULT_RATING_DEVIATION
       )
     },
     [...sessions.values()]
