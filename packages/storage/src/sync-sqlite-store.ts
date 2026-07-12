@@ -39,6 +39,8 @@ import type {
 } from "./practice-store.ts";
 import { clonePracticeSettings, defaultPracticeSettings, normalizeReviewReminderPreference, reviewReminderPreferenceToSettings } from "./practice-settings.ts";
 import { selectUniquePuzzles } from "./puzzle-selection.ts";
+import { preferredSprintSession, sameSprintSession } from "./sprint-session-sync.ts";
+import { assignLegacyRatingGenerations } from "./rating-history.ts";
 import type { ReviewReminderPreference } from "./practice-store.ts";
 import type { ReviewReminderSettings } from "../../core/src/index.ts";
 
@@ -134,6 +136,7 @@ interface SprintSessionExportRow {
   id: string;
   mode: SprintMode;
   ratingKey: string;
+  ratingGeneration: number | null;
   startedAt: string;
   completedAt: string | null;
   status: SprintState["status"];
@@ -160,7 +163,7 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 2;
+export const CURRENT_SCHEMA_VERSION = 3;
 
 interface SQLiteMigration {
   from: number;
@@ -170,7 +173,8 @@ interface SQLiteMigration {
 
 const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
   { from: 0, to: 1, apply: migrateUnversionedSchemaToV1 },
-  { from: 1, to: 2, apply: migrateV1ToV2 }
+  { from: 1, to: 2, apply: migrateV1ToV2 },
+  { from: 2, to: 3, apply: migrateV2ToV3 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
@@ -473,6 +477,7 @@ export class SyncSQLiteStore implements PracticeStore {
           id,
           mode,
           rating_key,
+          rating_generation,
           config_json,
           started_at,
           deadline_at,
@@ -480,12 +485,13 @@ export class SyncSQLiteStore implements PracticeStore {
           correct_count,
           mistake_count,
           rating_before
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         state.id,
         state.config.mode,
         state.config.ratingKey,
+        state.ratingGeneration ?? this.getRating(state.config.ratingKey).generation,
         JSON.stringify(state.config),
         state.startedAt,
         state.deadlineAt,
@@ -501,6 +507,7 @@ export class SyncSQLiteStore implements PracticeStore {
       .prepare(
         `UPDATE sprint_sessions
          SET status = ?,
+             rating_generation = COALESCE(?, rating_generation),
              completed_at = ?,
              end_reason = ?,
              correct_count = ?,
@@ -510,6 +517,7 @@ export class SyncSQLiteStore implements PracticeStore {
       )
       .run(
         state.status,
+        state.ratingGeneration ?? null,
         state.completedAt ?? null,
         state.endReason ?? null,
         state.correctCount,
@@ -955,6 +963,7 @@ export class SyncSQLiteStore implements PracticeStore {
           id,
           mode,
           rating_key AS ratingKey,
+          rating_generation AS ratingGeneration,
           started_at AS startedAt,
           completed_at AS completedAt,
           status,
@@ -967,33 +976,78 @@ export class SyncSQLiteStore implements PracticeStore {
       )
       .all() as SprintSessionExportRow[];
 
-    return rows.map((row) => ({
-      id: row.id,
-      mode: row.mode,
-      ratingKey: row.ratingKey,
-      startedAt: row.startedAt,
-      ...(row.completedAt === null ? {} : { completedAt: row.completedAt }),
-      status: row.status,
-      correctCount: row.correctCount,
-      mistakeCount: row.mistakeCount,
-      ratingBefore: row.ratingBefore,
-      ...(row.ratingAfter === null ? {} : { ratingAfter: row.ratingAfter })
-    }));
+    return rows.map(exportedSprintSessionFromRow);
   }
 
   private importSprintSession(session: ExportedSprintSession): boolean {
-    const existing = this.db.prepare("SELECT id FROM sprint_sessions WHERE id = ?").get(session.id);
-    if (existing) {
+    const existingRow = this.db
+      .prepare(
+        `SELECT
+          id,
+          mode,
+          rating_key AS ratingKey,
+          rating_generation AS ratingGeneration,
+          started_at AS startedAt,
+          completed_at AS completedAt,
+          status,
+          correct_count AS correctCount,
+          mistake_count AS mistakeCount,
+          rating_before AS ratingBefore,
+          rating_after AS ratingAfter
+         FROM sprint_sessions
+         WHERE id = ?`
+      )
+      .get(session.id) as SprintSessionExportRow | undefined;
+    if (existingRow && (session.status === "active" || session.status === "paused")) {
       return false;
     }
-    const status = session.status === "active" || session.status === "paused" ? "failed" : session.status;
-    const completedAt = session.completedAt ?? session.startedAt;
+    const previous = existingRow ? exportedSprintSessionFromRow(existingRow) : undefined;
+    const incoming = normalizedImportedSprintSession(session);
+    const next = previous ? preferredSprintSession(previous, incoming) : incoming;
+    if (sameSprintSession(previous, next)) {
+      return false;
+    }
+    const completedAt = next.completedAt ?? next.startedAt;
+    if (existingRow) {
+      this.db
+        .prepare(
+          `UPDATE sprint_sessions
+           SET mode = ?,
+               rating_key = ?,
+               rating_generation = ?,
+               started_at = ?,
+               deadline_at = ?,
+               completed_at = ?,
+               status = ?,
+               correct_count = ?,
+               mistake_count = ?,
+               rating_before = ?,
+               rating_after = ?
+           WHERE id = ?`
+        )
+        .run(
+          next.mode,
+          next.ratingKey,
+          next.ratingGeneration ?? null,
+          next.startedAt,
+          completedAt,
+          completedAt,
+          next.status,
+          next.correctCount,
+          next.mistakeCount,
+          next.ratingBefore,
+          next.ratingAfter ?? null,
+          next.id
+        );
+      return true;
+    }
     this.db
       .prepare(
         `INSERT INTO sprint_sessions (
           id,
           mode,
           rating_key,
+          rating_generation,
           config_json,
           started_at,
           deadline_at,
@@ -1003,21 +1057,22 @@ export class SyncSQLiteStore implements PracticeStore {
           mistake_count,
           rating_before,
           rating_after
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
-        session.id,
-        session.mode,
-        session.ratingKey,
-        JSON.stringify({ source: "icloud_sync", mode: session.mode, ratingKey: session.ratingKey }),
-        session.startedAt,
+        next.id,
+        next.mode,
+        next.ratingKey,
+        next.ratingGeneration ?? null,
+        JSON.stringify({ source: "icloud_sync", mode: next.mode, ratingKey: next.ratingKey }),
+        next.startedAt,
         completedAt,
         completedAt,
-        status,
-        session.correctCount,
-        session.mistakeCount,
-        session.ratingBefore,
-        session.ratingAfter ?? null
+        next.status,
+        next.correctCount,
+        next.mistakeCount,
+        next.ratingBefore,
+        next.ratingAfter ?? null
       );
     return true;
   }
@@ -1156,6 +1211,77 @@ function migrateV1ToV2(db: SyncSqliteDatabase): void {
        )`
   ).run();
   db.exec(INDEX_V2_SQL);
+}
+
+function migrateV2ToV3(db: SyncSqliteDatabase): void {
+  ensureColumn(
+    db,
+    "sprint_sessions",
+    "rating_generation",
+    "ALTER TABLE sprint_sessions ADD COLUMN rating_generation INTEGER"
+  );
+  const ratingRows = db
+    .prepare(
+      `SELECT r.*
+       FROM ratings r
+       JOIN (
+         SELECT key, MAX(generation) AS generation
+         FROM ratings
+         GROUP BY key
+       ) latest ON latest.key = r.key AND latest.generation = r.generation`
+    )
+    .all() as RatingRow[];
+  const ratings = ratingRows.map(ratingFromRow);
+  const tagSession = db.prepare(
+    "UPDATE sprint_sessions SET rating_generation = ? WHERE id = ? AND rating_generation IS NULL"
+  );
+  for (const rating of ratings) {
+    if (rating.generation === 0) {
+      db.prepare(
+        "UPDATE sprint_sessions SET rating_generation = 0 WHERE rating_key = ? AND rating_generation IS NULL"
+      ).run(rating.key);
+      continue;
+    }
+    db.prepare(
+      `UPDATE sprint_sessions
+       SET rating_generation = ?
+       WHERE rating_key = ?
+         AND rating_generation IS NULL
+         AND status IN ('active', 'paused')`
+    ).run(rating.generation, rating.key);
+    const sessionRows = db
+      .prepare(
+        `SELECT
+          id,
+          mode,
+          rating_key AS ratingKey,
+          rating_generation AS ratingGeneration,
+          started_at AS startedAt,
+          completed_at AS completedAt,
+          status,
+          correct_count AS correctCount,
+          mistake_count AS mistakeCount,
+          rating_before AS ratingBefore,
+          rating_after AS ratingAfter
+         FROM sprint_sessions
+         WHERE rating_key = ?
+         ORDER BY started_at DESC, id DESC`
+      )
+      .all(rating.key) as SprintSessionExportRow[];
+    const assigned = assignLegacyRatingGenerations(
+      [rating],
+      sessionRows.map(exportedSprintSessionFromRow)
+    );
+    for (const session of assigned) {
+      if (session.ratingGeneration === rating.generation) {
+        tagSession.run(rating.generation, session.id);
+      }
+    }
+  }
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS sprint_sessions_rating_generation_completed_at_id_idx " +
+    "ON sprint_sessions(rating_key, rating_generation, completed_at, id)"
+  );
 }
 
 function ensureColumn(db: SyncSqliteDatabase, table: string, column: string, alterSql: string): void {
@@ -1334,6 +1460,33 @@ function optionalStringArrayFromJson(value: string | null): string[] | undefined
 function countRows(db: SyncSqliteDatabase, table: string, where?: string): number {
   const sql = `SELECT COUNT(*) AS count FROM ${table}${where ? ` WHERE ${where}` : ""}`;
   return (db.prepare(sql).get() as { count: number }).count;
+}
+
+function exportedSprintSessionFromRow(row: SprintSessionExportRow): ExportedSprintSession {
+  return {
+    id: row.id,
+    mode: row.mode,
+    ratingKey: row.ratingKey,
+    ...(row.ratingGeneration === null ? {} : { ratingGeneration: row.ratingGeneration }),
+    startedAt: row.startedAt,
+    ...(row.completedAt === null ? {} : { completedAt: row.completedAt }),
+    status: row.status,
+    correctCount: row.correctCount,
+    mistakeCount: row.mistakeCount,
+    ratingBefore: row.ratingBefore,
+    ...(row.ratingAfter === null ? {} : { ratingAfter: row.ratingAfter })
+  };
+}
+
+function normalizedImportedSprintSession(session: ExportedSprintSession): ExportedSprintSession {
+  if (session.status !== "active" && session.status !== "paused") {
+    return { ...session };
+  }
+  return {
+    ...session,
+    status: "failed",
+    completedAt: session.completedAt ?? session.startedAt
+  };
 }
 
 function boolToInt(value: boolean): number {

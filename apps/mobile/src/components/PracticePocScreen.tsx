@@ -6206,6 +6206,11 @@ function ReviewSession({
       }
       setLastMove(move);
     }
+    // Imperative reply animations can leave the native board's tap-selection
+    // state attached to the user's previous destination square. Re-sync only
+    // after every reply has settled so the next move starts from a clean input
+    // state without interrupting the animation.
+    boardRef.current.resetBoard(finalFen);
   }
 
   function openAnalysis(): void {
@@ -6296,6 +6301,9 @@ function ReviewSession({
                 </Text>
                 <Text testID="review-board-flipped" style={styles.reviewDueHiddenMetric}>
                   {boardFlipped ? "flipped" : "normal"}
+                </Text>
+                <Text testID="review-board-state" style={styles.reviewDueHiddenMetric}>
+                  {boardLocked ? "locked" : "ready"}
                 </Text>
               </>
             ) : null}
