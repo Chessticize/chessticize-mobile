@@ -4136,15 +4136,17 @@ function HistoryPanel({
       <View style={styles.historyHeaderRow} testID="history-action-header">
         <Text style={styles.screenTitle}>History</Text>
         <View style={styles.historyHeaderActions}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Reset history filters"
-            testID="history-filter-reset"
-            style={styles.historyResetButton}
-            onPress={onResetFilters}
-          >
-            <Text style={styles.historyResetButtonText}>Reset</Text>
-          </Pressable>
+          {filtersExpanded ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Reset history filters"
+              testID="history-filter-reset"
+              style={styles.historyResetButton}
+              onPress={onResetFilters}
+            >
+              <Text style={styles.historyResetButtonText}>Reset filters</Text>
+            </Pressable>
+          ) : null}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={filtersExpanded ? "Hide history filters" : "Show history filters"}
