@@ -95,7 +95,12 @@ describe('Key user flows', () => {
 
     await playBoardMove('review-board', 'e2e6');
     await waitForElementTextContaining('review-current-expected-move', 'e6f7', 10000);
+    // The expected-move label can update before the native board has finished
+    // applying the auto reply. Wait for the board lock itself before sending
+    // the next pair of board taps.
+    await waitFor(element(by.id('review-board-state'))).toHaveText('ready').withTimeout(10000);
     await playBoardMove('review-board', 'e6f7');
+    await waitFor(element(by.id('move-feedback-overlay'))).toExist().withTimeout(5000);
 
     await waitFor(element(by.id('review-progress'))).toHaveText('2 / 3 · Standard').withTimeout(15000);
     await element(by.id('review-exit')).tap();

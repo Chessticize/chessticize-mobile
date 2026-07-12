@@ -2157,7 +2157,7 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "No reviews due today");
   });
 
-  it("suppresses review auto-move callbacks so opponent replies animate without board resets", async () => {
+  it("suppresses review auto-move callbacks and re-syncs the board after replies settle", async () => {
     const renderer = renderStandardSequenceScreen();
 
     startStandardSprint(renderer);
@@ -2180,7 +2180,8 @@ describe("PracticePocScreen", () => {
 
     await settleFeedbackSnapshot();
 
-    expect(resetBoard).not.toHaveBeenCalled();
+    expect(resetBoard).toHaveBeenCalledTimes(1);
+    expect(resetBoard).toHaveBeenCalledWith(findByTestId(renderer, "mock-chessboard").props.fen);
     expectText(renderer, "1 / 3 · Standard");
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
     expect(findByTestId(renderer, "mock-chessboard").props.draggableColor).toBe("w");
@@ -2592,11 +2593,14 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "review-source-pill"))).toBe("Scheduled review");
     expect(findByTestId(renderer, "review-side-to-move").props.accessibilityLabel).toBe("White to move");
     expect(collectText(findByTestId(renderer, "review-current-expected-move"))).toBe("e2e6");
+    expect(collectText(findByTestId(renderer, "review-board-state"))).toBe("ready");
 
     await boardMove(renderer, "e2e6");
+    expect(collectText(findByTestId(renderer, "review-board-state"))).toBe("locked");
     await settleFeedbackSnapshot();
     expect(service.listHistory({ source: "scheduled_review" }) as unknown[]).toHaveLength(0);
     expect(collectText(findByTestId(renderer, "review-current-expected-move"))).toBe("e6f7");
+    expect(collectText(findByTestId(renderer, "review-board-state"))).toBe("ready");
 
     await boardMove(renderer, "e6f7");
     await settleFeedbackSnapshot();
