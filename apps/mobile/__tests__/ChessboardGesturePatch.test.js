@@ -181,6 +181,52 @@ describe("react-native-chessboard gesture patch", () => {
 
     expect(patch).toContain("if (initialFen && chess.fen() === initialFen)");
   });
+
+  it("snaps a cancelled drag home instead of deriving a drop from it", () => {
+    const packageRoot = dirname(require.resolve("react-native-chessboard/package.json"));
+    const sources = [
+      resolve(packageRoot, "src/hooks/use-board-gesture.ts"),
+      resolve(packageRoot, "lib/module/hooks/use-board-gesture.js"),
+      resolve(packageRoot, "lib/commonjs/hooks/use-board-gesture.js")
+    ];
+
+    for (const sourcePath of sources) {
+      expectGestureSourceRejectsCancelledDrops(readFileSync(sourcePath, "utf8"), sourcePath);
+    }
+  });
+
+  it("keeps the cancelled-drag snap-back in the durable package patch", () => {
+    const patch = readFileSync(
+      resolve(__dirname, "../../../patches/react-native-chessboard@0.2.0.patch"),
+      "utf8"
+    );
+
+    expect(patch).toContain("onEnd((_event, success) => {");
+    expect(patch).toContain("if (!success) {");
+  });
+
+  it("migrates piece slots to the destination square at move time", () => {
+    const packageRoot = dirname(require.resolve("react-native-chessboard/package.json"));
+    const sources = [
+      resolve(packageRoot, "src/state/move-executor.ts"),
+      resolve(packageRoot, "lib/module/state/move-executor.js"),
+      resolve(packageRoot, "lib/commonjs/state/move-executor.js")
+    ];
+
+    for (const sourcePath of sources) {
+      expectMoveExecutorMigratesSlotsImmediately(readFileSync(sourcePath, "utf8"), sourcePath);
+    }
+  });
+
+  it("keeps the immediate slot migration in the durable package patch", () => {
+    const patch = readFileSync(
+      resolve(__dirname, "../../../patches/react-native-chessboard@0.2.0.patch"),
+      "utf8"
+    );
+
+    expect(patch).toContain("Migrate the piece to its destination slot immediately");
+    expect(patch).toContain("toState.piece.set(finalPieceCode);");
+  });
 });
 
 function expectGestureSourceRejectsOpponentPiecesBeforeRaise(source, sourcePath) {
@@ -388,6 +434,73 @@ function expectGestureSourceTracksDragActivationLocally(source, sourcePath) {
   // state into the next touch.
   const finalizeDisarmIndex = source.indexOf("dragActivated.set(false);", finalizeIndex);
   expect(finalizeDisarmIndex).toBeGreaterThan(finalizeIndex);
+  expect(sourcePath).toBeTruthy();
+}
+
+function expectGestureSourceRejectsCancelledDrops(source, sourcePath) {
+  // pan.onEnd must receive the success flag: RNGH calls onEnd(event, false)
+  // when a gesture is CANCELLED from the active state (e.g. a board lock
+  // flipping `enabled` mid-drag), and a cancellation must never be treated
+  // as a drop at wherever the piece happened to be.
+  const panIndex = source.indexOf("const panGesture");
+  const updateIndex = source.indexOf(".onUpdate", panIndex);
+  const endIndex = source.indexOf(".onEnd((_event, success) => {", updateIndex);
+  const wasDraggedIndex = source.indexOf("const wasDragged = dragActivated.get();", endIndex);
+  const cancelBranchIndex = source.indexOf("if (!success) {", wasDraggedIndex);
+  const cancelSnapIndex = source.indexOf("animations.snapBack", cancelBranchIndex);
+  const cancelClearSelectionIndex = source.indexOf("boardState.selectedSquare.set(null);", cancelBranchIndex);
+  const ownPieceCheckIndex = source.indexOf("only own pieces can make moves", cancelBranchIndex);
+
+  expect(panIndex).toBeGreaterThanOrEqual(0);
+  expect(endIndex).toBeGreaterThan(updateIndex);
+  expect(wasDraggedIndex).toBeGreaterThan(endIndex);
+  // The cancellation branch sits after drag-activation filtering and before
+  // any drop processing (own-piece checks, target resolution, dispatch).
+  expect(cancelBranchIndex).toBeGreaterThan(wasDraggedIndex);
+  expect(cancelSnapIndex).toBeGreaterThan(cancelBranchIndex);
+  expect(cancelSnapIndex).toBeLessThan(ownPieceCheckIndex);
+  expect(cancelClearSelectionIndex).toBeGreaterThan(cancelBranchIndex);
+  expect(cancelClearSelectionIndex).toBeLessThan(ownPieceCheckIndex);
+  expect(sourcePath).toBeTruthy();
+}
+
+function expectMoveExecutorMigratesSlotsImmediately(source, sourcePath) {
+  // The sprite slots must match the chess position from the moment the move
+  // executes: the destination slot takes the piece immediately and glides in
+  // from wherever the piece currently is. Parking the piece in the origin
+  // slot until the animation settled made fast re-grabs of a just-moved
+  // piece find an empty square and left interrupted glides on stale slots.
+  const executeIndex = source.indexOf("const executeMove");
+  const migrationCommentIndex = source.indexOf("Migrate the piece to its destination slot immediately", executeIndex);
+  const clearFromIndex = source.indexOf("fromState.piece.set(null);", migrationCommentIndex);
+  const setToIndex = source.indexOf("toState.piece.set(finalPieceCode);", migrationCommentIndex);
+  const raiseToIndex = source.indexOf("toState.zIndex.set(100);", migrationCommentIndex);
+  const firstSpringIndex = source.indexOf("withSpring", migrationCommentIndex);
+  const commitIndex = source.indexOf("const commitMove", executeIndex);
+
+  expect(executeIndex).toBeGreaterThanOrEqual(0);
+  expect(migrationCommentIndex).toBeGreaterThan(executeIndex);
+  // Slots migrate before any animation starts.
+  expect(clearFromIndex).toBeGreaterThan(migrationCommentIndex);
+  expect(clearFromIndex).toBeLessThan(firstSpringIndex);
+  expect(setToIndex).toBeGreaterThan(migrationCommentIndex);
+  expect(setToIndex).toBeLessThan(firstSpringIndex);
+  expect(raiseToIndex).toBeGreaterThan(setToIndex);
+  expect(raiseToIndex).toBeLessThan(firstSpringIndex);
+
+  // The settle callback only lowers the piece — no piece writes remain in it,
+  // so a cancelled glide can never smear stale slots onto a fresh board.
+  const commitEndIndex = source.indexOf("};", commitIndex);
+  const commitSource = source.slice(commitIndex, commitEndIndex);
+  expect(commitIndex).toBeGreaterThan(setToIndex);
+  expect(commitSource).not.toContain("piece.set");
+  expect(commitSource).toContain("toState.zIndex.set(0);");
+
+  // The castling rook migrates the same way.
+  const rookMigrationIndex = source.indexOf("rookToState.piece.set(rookPiece);", executeIndex);
+  const rookSpringIndex = source.indexOf("withSpring", rookMigrationIndex);
+  expect(rookMigrationIndex).toBeGreaterThan(executeIndex);
+  expect(rookSpringIndex).toBeGreaterThan(rookMigrationIndex);
   expect(sourcePath).toBeTruthy();
 }
 
