@@ -2672,11 +2672,10 @@ describe("PracticePocScreen", () => {
     const officialReviewAttempts = service.listHistory({ source: "scheduled_review" }) as Array<{ result: string; submittedMove: string }>;
     expect(officialReviewAttempts).toHaveLength(1);
     expect(officialReviewAttempts[0]).toMatchObject({ result: "wrong", submittedMove: "c4b5" });
-    expect(findByTestId(renderer, "review-line-continue")).toBeTruthy();
-    expect(findByTestId(renderer, "review-line-continue").props.accessibilityLabel).toBe("Continue to next review");
-    expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(false);
+    expect(() => findByTestId(renderer, "review-session")).toThrow();
+    expect(findByTestId(renderer, "review-panel")).toBeTruthy();
+    expect(() => findByTestId(renderer, "review-line-continue")).toThrow();
 
-    press(renderer, "review-exit");
     press(renderer, "history-tab");
     press(renderer, "history-filter-toggle");
     press(renderer, "history-source-review");
@@ -2706,6 +2705,7 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "review-source-pill")).toThrow();
     expect(() => findByTestId(renderer, "review-theme-pill")).toThrow();
     expect(() => findByTestId(renderer, "review-analysis-button")).toThrow();
+    expect(() => findByTestId(renderer, "review-reset-puzzle")).toThrow();
     expect(findByTestId(renderer, "review-side-to-move").props.accessibilityLabel).toBe("White to move");
     expect(collectText(findByTestId(renderer, "review-current-expected-move"))).toBe("e2e6");
     expect(collectText(findByTestId(renderer, "review-board-state"))).toBe("ready");
@@ -2796,12 +2796,12 @@ describe("PracticePocScreen", () => {
       jest.advanceTimersByTime(40_500);
     });
 
-    expect(collectText(findByTestId(renderer, "review-timer"))).toBe("Time expired");
     expect(service.listHistory({ source: "scheduled_review" }) as Array<{ result: string; submittedMove: string }>).toEqual([
       expect.objectContaining({ result: "wrong", submittedMove: "__timeout__" })
     ]);
-    expect(findByTestId(renderer, "review-line-continue")).toBeTruthy();
-    expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(false);
+    expect(() => findByTestId(renderer, "review-session")).toThrow();
+    expect(findByTestId(renderer, "review-panel")).toBeTruthy();
+    expect(() => findByTestId(renderer, "review-line-continue")).toThrow();
   });
 
   it("keeps the daily review denominator fixed and resumes an unfinished puzzle after exit", () => {
