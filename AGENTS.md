@@ -7,14 +7,24 @@ For development-loop decisions, use the repo-local skill at `.codex/skills/chess
 ## Branch And PR Workflow
 
 - Prefer one feature-scoped PR per coherent goal (for example, one screen or one flow brought to design parity), not a separate PR per small polish tweak. Batch related polish into the active feature PR.
-- Use a draft PR only while its stated goal is still incomplete, and push to it frequently. Draft pushes run only the fast Core Library checks. The agent is authorized to `git push` to open PR branches in this repository without asking for per-push confirmation.
-- If the PR's stated goal is already complete when it is opened or first pushed, open it as ready for review rather than as a draft. If an existing draft becomes complete, mark it ready for review (`gh pr ready`) proactively, without waiting to be asked. Ready PRs run the Mobile JS checks; CI Detox is reserved for the pre-release `main` check.
-- The agent is authorized to merge a ready-for-review PR (`gh pr merge --squash --delete-branch`, matching this repo's existing squash-merge convention) once it is complete, every non-Detox required check is green, and the exact PR head has passing local full-suite Detox evidence. Do not wait for or routinely inspect the PR's GitHub Detox result before merging. Merge to main when the feature PR is complete, not after every increment. Do not create a new branch for each small follow-up while a feature PR is still open — push to the open PR instead.
-- Valid local Detox merge evidence must record the tested commit SHA and successful build plus both the `flows` and `practice` suites (running the unfiltered full suite also qualifies). Any code change after the recorded SHA invalidates that evidence. Put the commands, SHA, and result in the PR description or a PR comment so the decision is auditable.
-- `main` has no branch protection, so GitHub will not itself enforce this policy. Before merging, inspect the actual non-Detox check status (for example `gh pr checks`) and confirm the exact-head local Detox evidence. Do not treat an unverified assumption as local evidence.
-- Do not mark a PR ready or merge it while part of its stated goal is unfinished, a non-Detox required check is red, local full-suite Detox has not passed for the exact PR head, or the PR description calls out a known unresolved product issue.
-- Before a release, manually dispatch or inspect Mobile iOS/Detox for the exact release candidate commit on `main` and require it to pass. A failing `main` Detox run is a release blocker and must be fixed and rerun successfully before release. Routine PR development does not require Detox issue bookkeeping.
+- Use a draft PR only while its stated goal is still incomplete, and push to it frequently. Draft pushes run only path-scoped fast checks. The agent is authorized to `git push` to open PR branches in this repository without asking for per-push confirmation.
+- If the PR's stated goal is already complete when it is opened or first pushed, open it as ready for review rather than as a draft. If an existing draft becomes complete, mark it ready for review (`gh pr ready`) proactively, without waiting to be asked. Ready PRs run the Mobile JS checks; CI Detox is reserved for nightly `main` integration and the pre-release `main` check.
+- The agent is authorized to merge a ready-for-review PR (`gh pr merge --squash --delete-branch`, matching this repo's existing squash-merge convention) once it is complete, every required fast check is green, and the risk-scoped validation described below is recorded. Do not wait for a nightly GitHub Detox run before merging a routine PR. Merge to main when the feature PR is complete, not after every increment. Do not create a new branch for each small follow-up while a feature PR is still open — push to the open PR instead.
+- `main` has no branch protection, so GitHub will not itself enforce this policy. Before merging, inspect the actual required check status (for example `gh pr checks`) and confirm any required exact-head local evidence. Do not treat an unverified assumption as local evidence.
+- Do not mark a PR ready or merge it while part of its stated goal is unfinished, a required check is red, its selected native-validation scope is incomplete, or the PR description calls out a known unresolved product issue.
+- Nightly Mobile iOS/Detox runs the complete `flows` and `practice` suites against the latest `main` as an integration signal. Triage a failure promptly, but do not treat a later nightly failure as retroactively invalidating already merged PR evidence.
+- Before a release, manually dispatch or inspect Mobile iOS/Detox for the exact release candidate commit on `main` and require both suites to pass. A failing `main` Detox run is a release blocker and must be fixed and rerun successfully before release.
 - Delete or reuse stale `codex/*` branches after their PR merges.
+
+### PR Validation Scope
+
+Choose the smallest validation layer that proves the changed boundary. Record the selected scope and rationale in the PR body. File paths can automate which fast CI jobs run, but the PR author must make the native-risk decision because a single React Native file can contain either harmless copy or release-critical native wiring.
+
+- **No mobile Detox**: documentation and tooling; pure core, storage, or CLI behavior covered by their own suites; ordinary React Native copy, state, styling, accessibility, and service wiring covered by component tests and mobile typecheck.
+- **Targeted native validation**: run the affected Detox spec or one affected suite (`flows` or `practice`) when the change crosses navigation, a multi-screen journey, relaunch persistence, real board interaction/rendering, adaptive layout, or a native-module boundary. A focused simulator screenshot may replace Detox for a one-off visual-only acceptance check when no repeatable journey changed.
+- **Full native validation**: build once and run both `flows` and `practice` only when the change has broad native blast radius, such as app startup, shared navigation or storage wiring, global launch fixtures, native build configuration, Detox infrastructure, or a risk that cannot be bounded to one suite.
+- Any required Detox evidence must come from the exact PR head and record the commit SHA, build result, commands, selected scope, results, and clean-worktree confirmation. A later code change invalidates that evidence.
+- SQLite schema changes still require the released-fixture migration matrix in the PR and the native upgrade smoke before release. Real CloudKit, notification delivery, TestFlight upgrade, physical-device, and App Store screenshot checks remain release gates unless the changed boundary specifically requires earlier targeted validation.
 
 ## Testing Philosophy
 
@@ -75,8 +85,9 @@ Before declaring code work complete:
 
 ## Emulator Refresh Expectation
 
-- After completing any mobile UI, board interaction, navigation, animation, or review-flow change, update the iOS simulator before reporting the work as ready for manual testing.
-- The normal order is focused component tests, mobile typecheck, then simulator refresh.
+- Refresh the iOS simulator after changes that affect real rendering, board interaction, navigation geometry, animation, Safe Area/adaptive layout, native modules, or an explicitly requested manual acceptance flow.
+- Ordinary copy, state, styling, accessibility, and service-wiring changes do not require a simulator refresh when component behavior tests prove the public behavior.
+- When a refresh is required, the normal order is focused component tests, mobile typecheck, then simulator refresh.
 - Use `pnpm mobile:ios` to rebuild and relaunch the app when native or bundled code may have changed.
 - Do not run Detox E2E on the simulator used for manual testing. Detox launches the app with `delete: true` and wipes the app sandbox, including local SQLite history, sprint sessions, and review queue data. Use a dedicated simulator such as `iPhone 17-Detox` for local Detox runs.
 - If Metro is not running or the simulator reports that it cannot connect to the development server, start Metro with `pnpm mobile:start` and then rerun the simulator refresh.

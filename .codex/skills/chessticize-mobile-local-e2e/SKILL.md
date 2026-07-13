@@ -1,19 +1,20 @@
 ---
 name: chessticize-mobile-local-e2e
-description: Prepare and validate the Chessticize Mobile macOS/iOS environment and fresh Git worktrees, run the exact-head local Detox PR gate, measure the build, flows, and practice suites, diagnose local Xcode, Ruby, CocoaPods, Git LFS, Simulator, or Detox setup failures, and record auditable PR evidence. Use when a routine PR needs local iOS E2E evidence, when setting up a Mac or worktree for Chessticize Detox, or when the user asks how long the local E2E suite takes.
+description: Prepare and validate the Chessticize Mobile macOS/iOS environment and fresh Git worktrees, run risk-scoped exact-head local Detox evidence for flows, practice, or the full suite, diagnose Xcode, Ruby, CocoaPods, Git LFS, Simulator, or Detox failures, and record auditable results. Use when a PR crosses an iOS native boundary, when nightly or release validation needs the complete suite, when setting up a Mac or worktree for Detox, or when measuring local E2E duration.
 ---
 
 # Chessticize Mobile Local E2E
 
-Run the iOS Detox gate on a dedicated simulator and record evidence for the exact commit tested. Treat environment preparation and the merge gate as separate phases.
+Run the selected iOS Detox scope on a dedicated simulator and record evidence for the exact commit tested. Treat environment preparation, PR risk selection, and release validation as separate phases.
 
 ## Safety Rules
 
 - Run only on macOS with full Xcode and an installed iOS Simulator runtime.
 - Use a dedicated simulator such as `iPhone 17-Detox`. Never use the simulator that holds manual-test data: Detox launches with `delete: true` and wipes the app sandbox.
 - Commit the intended code first and require a clean worktree before producing merge evidence.
-- Rebuild and rerun both suites after any code change. Focused tests are diagnostic only.
-- Do not wait for PR Detox CI. Routine PRs require passing local `flows` and `practice` plus green non-Detox CI.
+- Rebuild and rerun the selected scope after any code change. Evidence from an older commit is invalid.
+- Choose `flows`, `practice`, or `full` from the repository risk matrix. Do not default a routine PR to `full` without a broad native reason.
+- Do not wait for nightly GitHub Detox before merging a routine PR. All relevant fast CI checks must still pass.
 - Do not weaken Ruby, package-manager, signing, or certificate checks to make setup pass.
 
 ## Prepare the Mac
@@ -127,14 +128,26 @@ pnpm --filter ChessticizeMobile exec detox clean-framework-cache
 pnpm --filter ChessticizeMobile exec detox build-framework-cache
 ```
 
-## Run the Exact-Head Gate
+## Choose The Scope
+
+- Use `flows` for affected app-shell, navigation, History, Settings, Analysis, or other flows-suite journeys.
+- Use `practice` for affected Practice, Review, sprint, board, or practice-suite journeys.
+- Use `full` for nightly/release validation and PRs that change app startup, shared navigation/storage wiring, global launch fixtures, native build configuration, Detox infrastructure, or risk that cannot be bounded to one suite.
+- Use a focused simulator screenshot instead of this runner for a visual-only acceptance check when no repeatable journey changed.
+
+Record the choice and rationale in the PR before running native validation.
+
+## Run Exact-Head Evidence
 
 Prefer the bundled runner from the repository root:
 
 ```sh
-DETOX_IOS_DEVICE="iPhone 17-Detox" \
+CHESSTICIZE_E2E_SCOPE=practice \
+  DETOX_IOS_DEVICE="iPhone 17-Detox" \
   .codex/skills/chessticize-mobile-local-e2e/scripts/run-local-e2e.sh
 ```
+
+Replace `practice` with `flows` or `full`. The runner requires an explicit scope so a routine PR cannot accidentally pay for the complete suite.
 
 The runner:
 
@@ -143,11 +156,12 @@ The runner:
 3. Rejects unhydrated Git LFS pointer files for the Stockfish NNUE networks.
 4. Verifies the dedicated simulator and iOS environment.
 5. Builds the app with bundled JavaScript.
-6. Runs `flows` and `practice` separately with one worker.
-7. Verifies the commit and worktree did not change.
-8. Prints per-step timing and a PR evidence summary.
+6. Normalizes only the known worktree-dependent Hermes checksum when that is the build's sole tracked change; any other tracked or untracked build output fails the gate.
+7. Runs the selected suite, or both suites for `full`, with one worker.
+8. Verifies the commit and worktree did not change.
+9. Prints per-step timing and a PR evidence summary.
 
-To run commands manually, use the same order:
+To run commands manually, use the same order and run only the selected scope. This example shows `practice`:
 
 ```sh
 export PATH="$(brew --prefix ruby@3.3)/bin:$PATH"
@@ -158,11 +172,11 @@ pnpm mobile:doctor:ios
 pnpm mobile:e2e:build:ios
 
 cd apps/mobile
-DETOX_ACTIVE_SUITE=flows ./node_modules/.bin/detox test \
-  --configuration ios.sim.debug --cleanup
 DETOX_ACTIVE_SUITE=practice ./node_modules/.bin/detox test \
   --configuration ios.sim.debug --cleanup
 ```
+
+For `full`, run the same command once with `DETOX_ACTIVE_SUITE=flows` and once with `DETOX_ACTIVE_SUITE=practice`; reuse the same build.
 
 The build must create:
 
@@ -181,19 +195,20 @@ Its presence proves the Detox app does not depend on Metro.
 - `jest: command not found` from Detox: ensure `apps/mobile/node_modules/.bin` is in `PATH`, or invoke the repository script, which does this.
 - Analysis-button tests disconnect from Detox without a crash report: check that both `Resources/*.nnue` files exceed 1 MB. If they are 132-134 byte LFS pointers, run the scoped `git lfs pull` command above, rebuild, and rerun the focused test before both complete suites.
 - Missing `main.jsbundle`: rebuild with `pnpm mobile:e2e:build:ios`; do not trust a Metro-only app.
-- A suite fails: inspect the exact failing spec and product state. Rerun the focused spec to diagnose, fix the cause, then rebuild and rerun both complete suites.
-- `pod install` dirties tracked project files: stop. Normalize or intentionally commit the CocoaPods-generated change before producing exact-head evidence; never silently restore unrelated user changes.
+- A suite fails: inspect the exact failing spec and product state. Rerun the focused spec to diagnose, fix the cause, then rebuild and rerun the originally selected scope. Rerun both suites only when `full` was required.
+- `pod install` changes only the Hermes checksum in `Podfile.lock`: the runner verifies that exact diff and normalizes it because React Native embeds the worktree path in the podspec checksum.
+- `pod install` dirties the Xcode project, workspace, another lock entry, or any other tracked file: stop. Fix the environment or intentionally commit the CocoaPods change; the runner must not hide it.
 
 ## Record PR Evidence
 
-Add a PR comment containing:
+When a PR requires native validation, add a PR comment containing:
 
 - Full tested commit SHA.
+- Selected scope and rationale.
 - Xcode version and simulator name.
 - Build command and success.
-- `flows` command, pass count, and duration.
-- `practice` command, pass count, and duration.
+- Each required suite command, pass count, and duration.
 - Total duration.
 - Confirmation that the worktree remained clean and `HEAD` did not change.
 
-Then verify only required non-Detox checks before merging. Any code change after the recorded SHA invalidates the evidence.
+Then verify all relevant fast checks before merging. Any code change after the recorded SHA invalidates the evidence. Nightly and release runs must use `full` and require both suites.

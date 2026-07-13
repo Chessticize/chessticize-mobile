@@ -26,7 +26,7 @@ Use this skill before changing Chessticize Mobile behavior or declaring work com
 4. **Native/simulator validation**
    - Use iOS simulator only when validating real rendering, gestures, Safe Area behavior, native modules, Skia/chessboard rendering, animations, iOS build issues, or final acceptance.
    - Use Detox for repeatable GUI automation and screenshot capture.
-   - Use manual simulator checks only when Detox cannot exercise a required interaction yet; report that gap.
+   - Use a focused simulator screenshot for one-off visual acceptance. Add or run Detox when a journey or native boundary needs repeatable regression coverage.
 
 ## Core And Storage Commands
 
@@ -112,11 +112,25 @@ pnpm mobile:e2e:build:ios
 
 Detox uses the built app bundle. It will not automatically pick up Metro-only edits unless the app is rebuilt.
 
-## Local PR Gate And Release CI Gate
+## PR, Nightly, And Release Gates
 
-Routine PR merges use exact-head local Detox evidence and do not wait for or inspect GitHub Detox. Record the commit SHA, build command, full-suite test command (or separate successful `flows` and `practice` runs), and result in the PR description or a PR comment. Rerun after any code change. All required non-Detox checks must still pass; a focused Detox spec or manual simulator pass is not a substitute for the complete suite.
+Choose the smallest PR scope that proves the changed boundary:
 
-Before a release, manually dispatch or verify Mobile iOS/Detox for the exact release candidate commit on `main`. Both suites must pass. Treat any failure as a release blocker, fix it, and rerun until green; routine per-PR Detox issue bookkeeping is not required.
+- **No mobile Detox** for documentation/tooling, pure core/storage/CLI changes, and ordinary React Native copy, state, styling, accessibility, or service wiring already covered by component tests.
+- **Targeted native validation** for navigation, multi-screen journeys, relaunch persistence, real board behavior/rendering, adaptive layout, or native-module boundaries. Run the affected spec or one affected suite (`flows` or `practice`). A focused simulator screenshot is enough for visual-only acceptance when no repeatable journey changed.
+- **Full native validation** only for broad native risk such as app startup, shared navigation/storage wiring, global launch fixtures, native build configuration, Detox infrastructure, or risk that cannot be bounded to one suite.
+
+Use the risk-scoped runner for suite-level evidence:
+
+```sh
+CHESSTICIZE_E2E_SCOPE=practice \
+  DETOX_IOS_DEVICE="iPhone 17-Detox" \
+  .codex/skills/chessticize-mobile-local-e2e/scripts/run-local-e2e.sh
+```
+
+Replace `practice` with `flows` or `full` as required. Record the scope, exact commit SHA, build result, commands, results, and clean-worktree confirmation in the PR. Any later code change invalidates native evidence. All relevant fast CI checks must still pass.
+
+Nightly GitHub Detox builds once and runs both suites against the latest `main` as an integration signal. Do not wait for it to merge a routine PR. Before a release, manually dispatch or verify Mobile iOS/Detox for the exact release candidate commit on `main`; both suites must pass.
 
 ## Screenshot Verification
 
@@ -130,9 +144,9 @@ Take or inspect screenshots when validating:
 
 Preferred flow:
 
-1. Add or update a Detox spec that reaches the target screen through public UI.
-2. Use `device.takeScreenshot("name")` at the important state.
-3. Run Detox and inspect artifacts under `apps/mobile/artifacts/`.
+1. Reach the target through public UI. Add or update a Detox spec when the regression should be repeatable; otherwise use the manual simulator for one-off acceptance.
+2. Use `device.takeScreenshot("name")` or `xcrun simctl io booted screenshot <path>` at the important state.
+3. Inspect the screenshot or Detox artifacts under `apps/mobile/artifacts/`.
 4. Copy useful local evidence into `scratch/rendering-checks/` if needed. `scratch/` is ignored and suitable for private local evidence.
 5. Do not commit raw screenshots unless a review explicitly asks for published visual artifacts.
 
@@ -146,7 +160,9 @@ Before finalizing:
 - State which test layers were updated and why.
 - Run the focused tests that match the changed layer.
 - Run broader tests when touching shared core, storage, CLI, or native boundaries.
-- For a routine PR merge, record passing exact-head local full-suite Detox evidence in the PR.
+- Record the selected native-validation scope and rationale in the PR.
+- When targeted or full native validation is required, record passing exact-head evidence.
+- Treat nightly `main` Detox as integration feedback, not a routine PR merge gate.
 - Before release, require a passing GitHub Detox run for the exact `main` release candidate.
 - Mention any intentionally skipped layer, with the reason.
 - Keep generated artifacts out of git unless they are intentional fixtures.
