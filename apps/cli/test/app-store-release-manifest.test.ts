@@ -63,13 +63,13 @@ test("App Store release manifest reports source identity and hashed release arti
 
   assert.equal(manifest.schema, "chessticize-mobile.app-store-release-manifest.v1");
   assert.match(manifest.sourceCommit, /^[0-9a-f]{40}$/u);
-  assert.equal(manifest.releaseTagSuggestion, "ios-v1.0.0-build-1");
+  assert.equal(manifest.releaseTagSuggestion, "ios-v1.1.0-build-2");
   assert.equal(manifest.packageManager, "pnpm@11.1.2");
   assert.deepEqual(manifest.app, {
     displayName: "Chessticize",
     bundleIdentifier: "com.chessticize.mobile",
-    version: "1.0",
-    build: "1",
+    version: "1.1",
+    build: "2",
     targetedDeviceFamily: "1,2",
     platform: "ios"
   });

@@ -1,13 +1,13 @@
 # App Store Privacy Disclosure
 
 This document records the App Store Connect privacy answers for Chessticize
-Mobile 1.0. Re-audit these answers before every App Store submission, especially
+Mobile 1.1. Re-audit these answers before every App Store submission, especially
 after changing sync, accounts, telemetry, crash reporting, remote packs, or
 cloud analysis.
 
 ## App Privacy Questionnaire
 
-Recommended App Store Connect answer for 1.0:
+Recommended App Store Connect answer for 1.1:
 
 - Data collection: **Data Not Collected**
 - Tracking: **No**
@@ -54,7 +54,7 @@ additional privacy manifest reasons from pods.
 `apps/mobile/ios/ChessticizeMobile/Info.plist` sets
 `ITSAppUsesNonExemptEncryption` to `false`.
 
-The 1.0 app does not implement custom encryption and does not depend on network
+The 1.1 app does not implement custom encryption and does not depend on network
 encryption for its offline practice, local history, local review queue, or
 on-device Stockfish analysis.
 

@@ -26,7 +26,7 @@ describe("iOS App Store identity artifacts", () => {
     expect(project).toContain("PRODUCT_BUNDLE_IDENTIFIER = com.chessticize.mobile;");
     expect(project).toContain("PRODUCT_NAME = Chessticize;");
     expect(project).toContain("productName = Chessticize;");
-    expect(project).toContain("MARKETING_VERSION = 1.0;");
+    expect(project).toContain("MARKETING_VERSION = 1.1;");
     expect(project).toContain("CURRENT_PROJECT_VERSION = 2;");
     expect(project).not.toContain("org.reactjs.native.example");
     expect(project).not.toContain("ChessticizeMobile.app");

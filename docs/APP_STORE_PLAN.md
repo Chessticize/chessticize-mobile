@@ -3,7 +3,7 @@
 Status date: 2026-07-03. This is the active goal document. The V1 behavioral
 work (2026-07-03) made every visible surface real within the v1 scope; a
 same-day audit of the merged result found the foundation gaps below. The goal:
-**ship Chessticize Mobile 1.0 to the App Store** — a truthful, durable,
+**ship Chessticize Mobile 1.1 to the App Store** — a truthful, durable,
 local-first training app.
 
 `docs/ui-design/MOBILE_UI_DESIGN.md` remains authoritative for screen behavior.
@@ -247,13 +247,14 @@ Design approved 2026-07-03; the "Review Reminder Notifications" section of
    execution still requires running that audit from the final submitted
    lockfile and manually reading the notices for license correctness. The
    The rejected build-1 source release remains published as
-   `ios-v1.0.0-build-1`. The current replacement candidate is build 2; publish
-   `ios-v1.0.0-build-2` from the exact commit used to archive that binary.
+   `ios-v1.0.0-build-1`. The current replacement candidate is version 1.1,
+   build 2; publish `ios-v1.1.0-build-2` from the exact commit used to archive
+   that binary.
 2. **App identity**: final display name, bundle identifier, version/build
    scheme, app icon set (all slots), launch screen matching the app background.
    Status: implementation complete. The iOS target now uses the display name
    `Chessticize`, bundle identifier `com.chessticize.mobile`, marketing
-   version `1.0`, build `2`, a complete iPhone/iPad/marketing AppIcon catalog,
+   version `1.1`, build `2`, a complete iPhone/iPad/marketing AppIcon catalog,
    and a launch screen using the app background `#F8FAFC` instead of the React
    Native template copy.
 3. **Privacy**: App Privacy questionnaire answers (Data Not Collected / no
@@ -262,7 +263,7 @@ Design approved 2026-07-03; the "Review Reminder Notifications" section of
    manifest (required-reason APIs from RN and SQLite deps),
    `ITSAppUsesNonExemptEncryption = false` in Info.plist.
    Status: implementation complete. `docs/APP_PRIVACY_DISCLOSURE.md` records
-   the 1.0 App Store Connect answer as Data Not Collected / no tracking, points
+   the 1.1 App Store Connect answer as Data Not Collected / no tracking, points
    the privacy policy URL to the public repository document, documents optional
    private iCloud Sync, and captures the release re-audit gate.
    `docs/PRIVACY_POLICY.md` is the public policy.
@@ -286,7 +287,7 @@ Design approved 2026-07-03; the "Review Reminder Notifications" section of
    (`TARGETED_DEVICE_FAMILY`), adaptive orientation masks, minimum iOS version;
    verify layout on iPhone SE-size, current-flagship portrait/landscape, and
    iPad portrait/landscape simulators (design doc QA rule).
-   Status: implementation complete. `docs/DEVICE_TARGETS.md` records the 1.0
+   Status: implementation complete. `docs/DEVICE_TARGETS.md` records the 1.1
    decision to ship iPhone+iPad adaptive orientation support, with minimum iOS
    15.1. The iOS target now uses `TARGETED_DEVICE_FAMILY = "1,2"`,
    `Info.plist` declares iPhone portrait/landscape and iPad all-orientation
@@ -296,7 +297,7 @@ Design approved 2026-07-03; the "Review Reminder Notifications" section of
 6. **Store assets**: screenshots (6.7" and 6.1" minimum), description,
    keywords, support URL.
    Status: implementation complete. `docs/STORE_ASSETS.md` now records the
-   1.0 App Store Connect metadata draft, including description, subtitle,
+   1.1 App Store Connect metadata draft, including description, subtitle,
    promotional text, keywords, support URL, privacy policy URL, category
    choices, screenshot scenes, capture checklist, and the current Apple
    screenshot-spec source of truth. The committed validation test enforces the
@@ -315,7 +316,7 @@ Design approved 2026-07-03; the "Review Reminder Notifications" section of
    completion rule. The actual pass still requires an App Store Connect upload,
    an internal TestFlight group, a physical iPhone install through TestFlight,
    and a filled evidence log before this item can be marked complete. The
-   current replacement source release tag is `ios-v1.0.0-build-2`, so the
+   current replacement source release tag is `ios-v1.1.0-build-2`, so the
    uploaded build must be archived from the exact commit that tag points to or
    the source release must be regenerated.
    The repo now also exposes `pnpm app-store:preflight`, which machine-checks the

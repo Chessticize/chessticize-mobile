@@ -1,9 +1,9 @@
 # iOS Device Targets
 
-Chessticize Mobile 1.0 ships for adaptive iPhone portrait/landscape
+Chessticize Mobile 1.1 ships for adaptive iPhone portrait/landscape
 and adaptive iPad portrait, landscape, and multitasking layouts.
 
-## 1.0 Decision
+## 1.1 Decision
 
 - Device family: iPhone and iPad (`TARGETED_DEVICE_FAMILY = "1,2"`)
 - Orientation: iPhone portrait and landscape; iPad portrait, upside-down
@@ -12,7 +12,7 @@ and adaptive iPad portrait, landscape, and multitasking layouts.
 
 ## Rationale
 
-The 1.0 design keeps the board as the primary surface while adapting the chrome
+The 1.1 design keeps the board as the primary surface while adapting the chrome
 and control placement to the measured viewport. Compact portrait keeps the
 bottom-tab, one-column phone flow. Compact landscape uses a fixed board lane and
 scrollable control rail so the board is not pushed below the fold. Regular-width

@@ -1,6 +1,6 @@
 # App Store Assets
 
-This document is the 1.0 source of truth for App Store Connect metadata and
+This document is the 1.1 source of truth for App Store Connect metadata and
 store screenshot capture. Recheck Apple's live documentation before upload:
 
 - Screenshot specifications:
@@ -17,7 +17,7 @@ store screenshot capture. Recheck Apple's live documentation before upload:
 | Promotional text | `Practice chess tactics offline with Puzzle Sprint, Arrow Duel, mistake review, local ratings, and on-device Stockfish analysis.` | Must stay at or below 170 characters. |
 | Keywords | `chess,tactics,puzzles,offline,stockfish,sprint,review,training,elo,analysis` | Must stay at or below 100 bytes, and must not duplicate the app name or use other app/company names. |
 | Support URL | `https://github.com/Chessticize/chessticize-mobile` | Must be public and lead users to support/contact information. |
-| Marketing URL | `https://github.com/Chessticize/chessticize-mobile` | Optional; use the public project page for 1.0. |
+| Marketing URL | `https://github.com/Chessticize/chessticize-mobile` | Optional; use the public project page for 1.1. |
 | Privacy policy URL | `https://github.com/Chessticize/chessticize-mobile/blob/main/docs/PRIVACY_POLICY.md` | Must match `docs/APP_PRIVACY_DISCLOSURE.md`. |
 | Primary category | `Games` | App Store Connect selection. |
 | Secondary category | `Education` | App Store Connect selection. |
@@ -33,7 +33,7 @@ mistakes with spaced repetition, and analyze positions with on-device
 Stockfish. Your puzzle progress, ratings, history, and review queue stay on
 your device, so practice works without an account or network connection.
 
-Included in 1.0:
+Included in 1.1:
 
 - Standard Puzzle Sprint and Arrow Duel
 - Local ratings per sprint type
@@ -46,7 +46,7 @@ Chessticize Mobile is free and open source.
 
 ## Screenshot Requirements
 
-The app targets iPhone and iPad for 1.0. The current automated capture plan
+The app targets iPhone and iPad for 1.1. The current automated capture plan
 covers the required 6.9" iPhone, 6.1" iPhone, and 13" iPad screenshot groups.
 The original 1.0 plan called out 6.7" and 6.1" minimum iPhone coverage.
 Apple's current screenshot reference, rechecked on 2026-07-10, lists 6.9" as

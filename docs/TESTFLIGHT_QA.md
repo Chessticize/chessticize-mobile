@@ -1,6 +1,6 @@
 # TestFlight QA Pass
 
-This document is the 1.0 TestFlight release checklist and evidence log. It is
+This document is the 1.1 TestFlight release checklist and evidence log. It is
 not complete until an App Store Connect build is distributed to an internal
 tester group and the physical-device checklist below is executed.
 
@@ -34,7 +34,7 @@ binary on real hardware.
 
 | Field | Value |
 | --- | --- |
-| Test group | `Internal 1.0 QA` |
+| Test group | `Internal 1.1 QA` |
 | Beta app description | `Offline chess tactics trainer for Puzzle Sprint, Arrow Duel, mistake review, local ratings, and on-device Stockfish analysis.` |
 | What to test | `Run a Standard sprint, run Arrow Duel, fail a sprint and review mistakes, verify History filters, complete a scheduled review, verify iCloud Sync and About links, relaunch the app, and test offline practice in airplane mode.` |
 | Feedback path | `https://github.com/Chessticize/chessticize-mobile/issues` |
@@ -181,9 +181,9 @@ while private; only commit sanitized screenshots or logs intentionally.
 
 Current source release candidate:
 
-- Source commit: the commit pointed to by the `ios-v1.0.0-build-2` tag
+- Source commit: the commit pointed to by the `ios-v1.1.0-build-2` tag
 - Release tag:
-  [`ios-v1.0.0-build-2`](https://github.com/Chessticize/chessticize-mobile/releases/tag/ios-v1.0.0-build-2)
+  [`ios-v1.1.0-build-2`](https://github.com/Chessticize/chessticize-mobile/releases/tag/ios-v1.1.0-build-2)
 - Rule: upload only a binary archived from the exact commit pointed to by this
   tag. If any source, dependency, puzzle, native, or notice file changes before
   upload, regenerate the release manifest and publish a new tag/release for the
@@ -191,8 +191,8 @@ Current source release candidate:
 
 | Field | Value |
 | --- | --- |
-| Source commit | Tag target for `ios-v1.0.0-build-2` |
-| Release tag | `ios-v1.0.0-build-2` |
+| Source commit | Tag target for `ios-v1.1.0-build-2` |
+| Release tag | `ios-v1.1.0-build-2` |
 | App Store Connect build | TBD |
 | TestFlight group | TBD |
 | Physical device and iOS version | TBD |
@@ -228,7 +228,7 @@ the manual checklist plus evidence log above are filled.
 ## Archive And Upload
 
 Follow `docs/APP_STORE_UPLOAD.md` for the owner-executed archive and upload
-step. The 1.0 upload path uses `xcodebuild archive`, then
+step. The 1.1 upload path uses `xcodebuild archive`, then
 `xcodebuild -exportArchive` with
 `apps/mobile/ios/ExportOptions.app-store-connect.plist`. Do not count this step
 as complete until App Store Connect finishes processing the uploaded build.
