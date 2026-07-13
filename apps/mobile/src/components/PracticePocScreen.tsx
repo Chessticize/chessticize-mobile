@@ -2600,7 +2600,7 @@ function PracticeModeCard({
     >
       <View style={styles.practiceModeSelectArea}>
         <View style={[styles.practiceModeIcon, active ? styles.practiceModeIconActive : null]} testID={`practice-mode-${modeTestId}-icon`}>
-          <PracticeModeGlyph mode={item.mode} />
+          <PracticeModeGlyph mode={item.mode} testIDPrefix={`practice-mode-${modeTestId}`} />
         </View>
         <View style={styles.practiceModeCopy}>
           <View style={styles.practiceModeTitleRow}>
@@ -3641,10 +3641,12 @@ function PracticePrompt({
 
 function PracticeModeGlyph({
   inverse = false,
-  mode
+  mode,
+  testIDPrefix
 }: {
   inverse?: boolean;
   mode: SprintMode;
+  testIDPrefix?: string;
 }): React.JSX.Element {
   const color = inverse ? "#FFFFFF" : "#2563EB";
   if (mode === "standard") {
@@ -3658,9 +3660,28 @@ function PracticeModeGlyph({
   if (mode === "arrow_duel") {
     return (
       <View style={styles.modeGlyphCanvas}>
-        <View style={[styles.modeArrowStem, { backgroundColor: color }]} />
-        <View style={[styles.modeArrowHeadTop, { backgroundColor: color }]} />
-        <View style={[styles.modeArrowHeadBottom, { backgroundColor: color }]} />
+        <View
+          style={[styles.modeDuelArrow, styles.modeDuelArrowUpper]}
+          testID={testIDPrefix ? `${testIDPrefix}-arrow-a` : undefined}
+        >
+          <View
+            style={[styles.modeDuelArrowShaft, { backgroundColor: color }]}
+            testID={testIDPrefix ? `${testIDPrefix}-arrow-a-shaft` : undefined}
+          />
+          <View style={[styles.modeDuelArrowHeadTop, { backgroundColor: color }]} />
+          <View style={[styles.modeDuelArrowHeadBottom, { backgroundColor: color }]} />
+        </View>
+        <View
+          style={[styles.modeDuelArrow, styles.modeDuelArrowLower]}
+          testID={testIDPrefix ? `${testIDPrefix}-arrow-b` : undefined}
+        >
+          <View
+            style={[styles.modeDuelArrowShaft, { backgroundColor: color }]}
+            testID={testIDPrefix ? `${testIDPrefix}-arrow-b-shaft` : undefined}
+          />
+          <View style={[styles.modeDuelArrowHeadTop, { backgroundColor: color }]} />
+          <View style={[styles.modeDuelArrowHeadBottom, { backgroundColor: color }]} />
+        </View>
       </View>
     );
   }
@@ -8818,30 +8839,45 @@ const styles = StyleSheet.create({
     position: "absolute",
     width: 10
   },
-  modeArrowStem: {
-    borderRadius: 999,
-    height: 3,
+  modeDuelArrow: {
+    height: 7,
+    left: 1,
     position: "absolute",
-    transform: [{ rotate: "-45deg" }],
-    width: 19
+    width: 15
   },
-  modeArrowHeadTop: {
+  modeDuelArrowUpper: {
+    top: 1,
+    transform: [{ rotate: "-28deg" }]
+  },
+  modeDuelArrowLower: {
+    bottom: 1,
+    transform: [{ rotate: "28deg" }]
+  },
+  modeDuelArrowShaft: {
     borderRadius: 999,
-    height: 3,
+    height: 2,
+    left: 0,
+    position: "absolute",
+    top: 2.5,
+    width: 13
+  },
+  modeDuelArrowHeadTop: {
+    borderRadius: 999,
+    height: 2,
     position: "absolute",
     right: 0,
-    top: 3,
+    top: 1,
     transform: [{ rotate: "45deg" }],
-    width: 9
+    width: 6
   },
-  modeArrowHeadBottom: {
+  modeDuelArrowHeadBottom: {
     borderRadius: 999,
-    bottom: 3,
-    height: 3,
+    bottom: 1,
+    height: 2,
     position: "absolute",
     right: 0,
     transform: [{ rotate: "-45deg" }],
-    width: 9
+    width: 6
   },
   modeBoltTop: {
     borderRadius: 999,

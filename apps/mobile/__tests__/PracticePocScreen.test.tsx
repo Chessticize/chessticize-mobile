@@ -67,6 +67,10 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "practice-mode-custom")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "practice-mode-standard-icon"))).toBe("");
     expect(collectText(findByTestId(renderer, "practice-mode-arrow-duel-icon"))).toBe("");
+    expect(findByTestId(renderer, "practice-mode-arrow-duel-arrow-a")).toBeTruthy();
+    expect(findByTestId(renderer, "practice-mode-arrow-duel-arrow-b")).toBeTruthy();
+    expect(findByTestId(renderer, "practice-mode-arrow-duel-arrow-a-shaft")).toBeTruthy();
+    expect(findByTestId(renderer, "practice-mode-arrow-duel-arrow-b-shaft")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "practice-mode-custom-icon"))).toBe("");
     expect(() => findByTestId(renderer, "practice-mode-standard-start")).toThrow();
     expect(() => findByTestId(renderer, "practice-mode-arrow-duel-start")).toThrow();
