@@ -6423,7 +6423,7 @@ function ReviewSession({
         </View>
       </View>
 
-      <View style={[styles.reviewBoardLayout, adaptiveLayout.usesWideContent ? styles.reviewBoardLayoutWide : null]}>
+      <View style={[styles.reviewBoardLayout, adaptiveLayout.usesSessionRail ? styles.reviewBoardLayoutWide : null]}>
         <View style={styles.reviewBoardLane} testID="review-board-lane">
           <View testID="review-board" style={[styles.boardSurface, { width: boardSize, height: boardSize }]}>
             <Chessboard
@@ -6496,8 +6496,8 @@ function ReviewSession({
         <View
           style={[
             styles.analysisPanel,
-            adaptiveLayout.usesWideContent ? styles.reviewAnalysisPanelWide : null,
-            adaptiveLayout.usesWideContent ? { width: adaptiveLayout.sessionRailWidth } : null
+            adaptiveLayout.usesSessionRail ? styles.reviewAnalysisPanelWide : null,
+            adaptiveLayout.usesSessionRail ? { width: adaptiveLayout.sessionRailWidth } : null
           ]}
           testID="review-analysis-panel"
         >

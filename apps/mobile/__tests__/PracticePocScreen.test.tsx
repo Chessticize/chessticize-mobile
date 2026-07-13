@@ -329,6 +329,23 @@ describe("PracticePocScreen", () => {
     }
   });
 
+  it("stacks the review board and analysis panel on an iPad in portrait", () => {
+    (ReactNative as unknown as {
+      __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
+    }).__setWindowDimensions?.({ width: 1032, height: 1376, scale: 2, fontScale: 2 });
+
+    const renderer = renderScreen({
+      currentTimeMs: () => Date.parse("2026-06-20T12:00:00.000Z"),
+      practiceService: createDueReviewService(1)
+    });
+
+    press(renderer, "review-tab");
+    press(renderer, "review-start-due");
+
+    expect(findByTestId(renderer, "review-session")).toBeTruthy();
+    expect(flattenTestStyle(findByTestId(renderer, "review-analysis-panel").props.style).width).toBeUndefined();
+  });
+
   it("summarizes recent local practice progress on the Practice home", () => {
     const service = createMobilePracticeService("familiar15");
     const startedAt = new Date(Date.now() - 120_000).toISOString();
