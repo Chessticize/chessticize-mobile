@@ -12,6 +12,7 @@ on:
       - "docs/RELEASE_SOURCE_POLICY.md"
       - "docs/TESTFLIGHT_QA.md"
       - "docs/TESTING_ARCHITECTURE.md"
+      - "docs/agents/**"
       - "package.json"
       - "scripts/validate-development-process.mjs"
   push:
@@ -27,6 +28,7 @@ on:
       - "docs/RELEASE_SOURCE_POLICY.md"
       - "docs/TESTFLIGHT_QA.md"
       - "docs/TESTING_ARCHITECTURE.md"
+      - "docs/agents/**"
       - "package.json"
       - "scripts/validate-development-process.mjs"
 
