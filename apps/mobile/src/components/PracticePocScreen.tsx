@@ -4948,16 +4948,6 @@ function ChevronGlyph({ direction }: { direction: "left" | "right" }): React.JSX
   );
 }
 
-function ResetGlyph(): React.JSX.Element {
-  return (
-    <View style={styles.resetGlyph} testID="reset-glyph">
-      <View style={styles.resetArc} />
-      <View style={styles.resetArrowStem} />
-      <View style={styles.resetArrowHead} />
-    </View>
-  );
-}
-
 function FlipGlyph(): React.JSX.Element {
   return (
     <View style={styles.flipGlyph} testID="flip-glyph">
@@ -6386,7 +6376,7 @@ function ReviewSession({
             style={[styles.iconButton, boardLocked ? styles.disabledButton : null]}
             onPress={resetReviewPuzzle}
           >
-            <ResetGlyph />
+            <Text style={styles.iconButtonText}>↺</Text>
           </Pressable>
           </View>
         </View>
@@ -6562,7 +6552,7 @@ function ReviewSession({
                   <ChevronGlyph direction="right" />
                 </Pressable>
                 <Pressable accessibilityRole="button" accessibilityLabel="Reset analysis" testID="review-analysis-reset" style={styles.iconButton} onPress={resetAnalysisPosition}>
-                  <ResetGlyph />
+                  <Text style={styles.iconButtonText}>↺</Text>
                 </Pressable>
                 <Pressable accessibilityRole="button" accessibilityLabel="Flip board" testID="review-analysis-flip" style={styles.iconButton} onPress={() => setManualBoardFlip((current) => !current)}>
                   <FlipGlyph />
@@ -9936,6 +9926,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 38
   },
+  iconButtonText: {
+    color: "#334155",
+    fontSize: 18,
+    fontWeight: "800",
+    lineHeight: 22
+  },
   disabledButton: {
     opacity: 0.36
   },
@@ -11188,46 +11184,6 @@ const styles = StyleSheet.create({
     borderRightWidth: 2.5,
     borderTopWidth: 2.5,
     transform: [{ rotate: "45deg" }]
-  },
-  resetGlyph: {
-    height: 18,
-    position: "relative",
-    width: 18
-  },
-  resetArc: {
-    borderColor: "#334155",
-    borderLeftColor: "transparent",
-    borderRadius: 999,
-    borderWidth: 2,
-    height: 15,
-    left: 1.5,
-    position: "absolute",
-    top: 1.5,
-    transform: [{ rotate: "-35deg" }],
-    width: 15
-  },
-  resetArrowStem: {
-    backgroundColor: "#334155",
-    borderRadius: 999,
-    height: 2,
-    left: 2,
-    position: "absolute",
-    top: 5,
-    transform: [{ rotate: "-22deg" }],
-    width: 7
-  },
-  resetArrowHead: {
-    borderBottomColor: "transparent",
-    borderBottomWidth: 4,
-    borderRightColor: "#334155",
-    borderRightWidth: 6,
-    borderTopColor: "transparent",
-    borderTopWidth: 4,
-    height: 0,
-    left: 1,
-    position: "absolute",
-    top: 1,
-    width: 0
   },
   flipGlyph: {
     height: 18,

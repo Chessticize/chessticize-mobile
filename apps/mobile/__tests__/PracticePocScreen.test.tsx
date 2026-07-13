@@ -1830,8 +1830,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "review-theme-pill")).toBeTruthy();
     expect(findByTestId(renderer, "review-reset-puzzle")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "review-exit"))).toBe("");
-    expect(collectText(findByTestId(renderer, "review-reset-puzzle"))).toBe("");
-    expect(collectText(findByTestId(renderer, "review-header-actions"))).not.toContain("↺");
+    expect(collectText(findByTestId(renderer, "review-reset-puzzle"))).toBe("↺");
     press(renderer, "review-exit");
     expect(findByTestId(renderer, "history-panel")).toBeTruthy();
   });
@@ -2875,12 +2874,12 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "review-close-analysis"))).toBe("");
     expect(collectText(findByTestId(renderer, "review-analysis-back"))).toBe("");
     expect(collectText(findByTestId(renderer, "review-analysis-forward"))).toBe("");
-    expect(collectText(findByTestId(renderer, "review-analysis-reset"))).toBe("");
+    expect(collectText(findByTestId(renderer, "review-analysis-reset"))).toBe("↺");
     expect(collectText(findByTestId(renderer, "review-analysis-flip"))).toBe("");
     expect(collectText(findByTestId(renderer, "review-analysis-toolbar"))).not.toContain("×");
     expect(collectText(findByTestId(renderer, "review-analysis-toolbar"))).not.toContain("‹");
     expect(collectText(findByTestId(renderer, "review-analysis-toolbar"))).not.toContain("›");
-    expect(collectText(findByTestId(renderer, "review-analysis-toolbar"))).not.toContain("↺");
+    expect(collectText(findByTestId(renderer, "review-analysis-toolbar"))).toContain("↺");
     expect(collectText(findByTestId(renderer, "review-analysis-toolbar"))).not.toContain("⇄");
     expect(collectText(findByTestId(renderer, "review-analysis-engine-status"))).toBe("Local hint");
     expect(findByTestId(renderer, "analysis-arrow-overlay")).toBeTruthy();
