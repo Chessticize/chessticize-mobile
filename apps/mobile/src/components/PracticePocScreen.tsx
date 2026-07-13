@@ -972,13 +972,16 @@ export function PracticePocScreen({
           service.setRating(config.ratingKey, customInitialRating);
         }
       }
-      const started = service.startSprint({
-        mode: nextMode,
-        durationSeconds: config.durationSeconds,
-        perPuzzleSeconds: config.perPuzzleSeconds,
-        ...(customThemeValue ? { theme: customThemeValue, persistCustomConfig: true } : useCustomTiming ? { persistCustomConfig: true } : {}),
-        ...(!practiceService && shouldRandomizePuzzleSelection(puzzleSource) ? { puzzleSelectionSeed: `${Date.now()}-${Math.random()}` } : {})
-      });
+      const started = service.startSprint(
+        {
+          mode: nextMode,
+          durationSeconds: config.durationSeconds,
+          perPuzzleSeconds: config.perPuzzleSeconds,
+          ...(customThemeValue ? { theme: customThemeValue, persistCustomConfig: true } : useCustomTiming ? { persistCustomConfig: true } : {}),
+          ...(!practiceService && shouldRandomizePuzzleSelection(puzzleSource) ? { puzzleSelectionSeed: `${Date.now()}-${Math.random()}` } : {})
+        },
+        captureLiveNowIso()
+      );
       setMode(nextMode);
       setSessionMistakeReviewItems([]);
       commitState(started);
@@ -5308,6 +5311,7 @@ function ReviewPanel({
         boardSize={boardSize}
         currentTimeMs={currentTimeMs}
         entries={activeEntries}
+        hasQueuedDueReviews={queuedReviewGroups.length > 0}
         initialIndex={activeEntryInitialIndex}
         scheduledReviewCompletedCount={completedReviews.length}
         scheduledReviewTotal={dailyReviewTotal}
@@ -5718,6 +5722,7 @@ function ReviewSession({
   boardSize,
   currentTimeMs,
   entries,
+  hasQueuedDueReviews = false,
   initialIndex = 0,
   scheduledReviewCompletedCount = 0,
   scheduledReviewTotal = entries.length,
@@ -5730,6 +5735,7 @@ function ReviewSession({
   boardSize: number;
   currentTimeMs: () => number;
   entries: ReviewEntry[];
+  hasQueuedDueReviews?: boolean;
   initialIndex?: number;
   scheduledReviewCompletedCount?: number;
   scheduledReviewTotal?: number;
@@ -5771,6 +5777,7 @@ function ReviewSession({
       : null;
   });
   const currentEntry = entries[entryIndex];
+  const hasNextScheduledReview = entryIndex + 1 < entries.length || hasQueuedDueReviews;
   const currentPuzzle = currentReviewPuzzleState(reviewState);
   const currentFen = currentPuzzle.currentFen;
   const displayFen = analysisEnabled ? (analysisFen ?? currentFen) : currentFen;
@@ -5920,6 +5927,10 @@ function ReviewSession({
       submittedMove: "__timeout__",
       expectedMove: expectedReviewMove(currentPuzzle)
     });
+    if (!hasNextScheduledReview) {
+      onExit(currentEntry.source);
+      return;
+    }
     setLineReviewNeedsContinue(true);
     // The timer state is the trigger; the render-local recorder must not restart the effect.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -6062,7 +6073,8 @@ function ReviewSession({
         boardRef.current?.resetBoard(submittedFen);
         setFeedback(null);
         if (currentEntry.source === "due") {
-          setLineReviewNeedsContinue(true);
+          goToNextDueReview();
+          return;
         }
         setBoardLocked(false);
         return;
@@ -6164,10 +6176,7 @@ function ReviewSession({
     });
     await sleep(FEEDBACK_SNAPSHOT_MS);
     if (currentEntry.source === "due") {
-      boardRef.current?.resetBoard(submittedFen);
-      setFeedback(null);
-      setLineReviewNeedsContinue(true);
-      setBoardLocked(false);
+      goToNextDueReview();
       return;
     }
     const replyMoves = result.feedback.autoPlayedMoves.slice(1);
@@ -6220,6 +6229,10 @@ function ReviewSession({
             submittedMove: result.feedback.submittedMove,
             expectedMove: result.feedback.expectedMove
           });
+          if (!hasNextScheduledReview) {
+            goToNextDueReview();
+            return;
+          }
           setPunishmentLineComplete(true);
           setBoardLocked(false);
           return;
@@ -6388,17 +6401,19 @@ function ReviewSession({
               </Pressable>
             </>
           ) : null}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Reset puzzle"
-            accessibilityState={{ disabled: boardLocked }}
-            disabled={boardLocked}
-            testID="review-reset-puzzle"
-            style={[styles.iconButton, boardLocked ? styles.disabledButton : null]}
-            onPress={resetReviewPuzzle}
-          >
-            <Text style={styles.iconButtonText}>↺</Text>
-          </Pressable>
+          {currentEntry.source !== "due" ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Reset puzzle"
+              accessibilityState={{ disabled: boardLocked }}
+              disabled={boardLocked}
+              testID="review-reset-puzzle"
+              style={[styles.iconButton, boardLocked ? styles.disabledButton : null]}
+              onPress={resetReviewPuzzle}
+            >
+              <Text style={styles.iconButtonText}>↺</Text>
+            </Pressable>
+          ) : null}
           </View>
         </View>
         <View style={styles.reviewContextStrip} testID="review-context-strip">

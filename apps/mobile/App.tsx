@@ -7,7 +7,7 @@ import {
   createPersistentMobilePracticeServiceSync
 } from "./src/backend/mobilePractice";
 import type { PracticeService } from "../../packages/storage/src/practice-service.ts";
-import { resolveTestNowMsFromLaunchConfig } from "./src/backend/testLaunchConfig";
+import { createAdvancingTestClock, resolveTestNowMsFromLaunchConfig } from "./src/backend/testLaunchConfig";
 import { shouldSuppressLogBoxWarnings } from "./src/releaseConfig";
 
 if (shouldSuppressLogBoxWarnings()) {
@@ -18,7 +18,10 @@ function App() {
   const [service, setService] = React.useState<PracticeService | undefined>(() => createPersistentMobilePracticeServiceSync());
   const [loadError, setLoadError] = React.useState<string | undefined>(undefined);
   const testNowMs = resolveTestNowMsFromLaunchConfig();
-  const currentTimeMs = testNowMs === undefined ? undefined : () => testNowMs;
+  const currentTimeMs = React.useMemo(
+    () => testNowMs === undefined ? undefined : createAdvancingTestClock(testNowMs),
+    [testNowMs]
+  );
   const practiceServiceFactory = React.useCallback(() => {
     if (!service) {
       throw new Error("Practice service is not ready");

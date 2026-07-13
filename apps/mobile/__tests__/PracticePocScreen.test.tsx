@@ -441,6 +441,22 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "Find the best move");
   });
 
+  it("starts a sprint on the injected clock used by store screenshots", () => {
+    const nowMs = Date.parse("2026-07-09T18:00:00.000Z");
+    const service = createMobilePracticeService("familiar15");
+    const renderer = renderScreen({
+      currentTimeMs: () => nowMs,
+      practiceService: service
+    });
+
+    startStandardSprint(renderer);
+
+    const activeSprint = activeSprintForTest(service);
+    expect(activeSprint.startedAt).toBe(new Date(nowMs).toISOString());
+    expect(activeSprint.deadlineAt).toBe(new Date(nowMs + 5 * 60 * 1000).toISOString());
+    expect(collectText(findByTestId(renderer, "session-timer"))).toBe("05:00");
+  });
+
   it("offers resume before starting a new sprint when the service has an active session", () => {
     const service = createMobilePracticeService("random1000");
     service.startSprint(
@@ -569,20 +585,21 @@ describe("PracticePocScreen", () => {
     const familiarStartSprintSpy = jest.spyOn(familiarService, "startSprint");
     const dateNowSpy = jest.spyOn(Date, "now").mockReturnValue(1_789_000_000);
     const randomSpy = jest.spyOn(Math, "random").mockReturnValue(0.314159);
+    const startedAt = new Date(1_789_000_000).toISOString();
 
     try {
       const coreRenderer = renderScreen({ practiceServiceFactory: () => coreService });
       startStandardSprint(coreRenderer);
       expect(coreStartSprintSpy).toHaveBeenLastCalledWith(expect.objectContaining({
         puzzleSelectionSeed: "1789000000-0.314159"
-      }));
+      }), startedAt);
 
       const familiarRenderer = renderScreen({ practiceServiceFactory: () => familiarService });
       press(familiarRenderer, "test-puzzle-source-familiar15");
       startStandardSprint(familiarRenderer);
       expect(familiarStartSprintSpy).toHaveBeenLastCalledWith(expect.not.objectContaining({
         puzzleSelectionSeed: expect.anything()
-      }));
+      }), startedAt);
     } finally {
       dateNowSpy.mockRestore();
       randomSpy.mockRestore();
@@ -2630,10 +2647,10 @@ describe("PracticePocScreen", () => {
 
     await boardMove(renderer, "c4b5");
     await settleFeedbackSnapshot();
-    press(renderer, "review-line-continue");
 
     expect(findByTestId(renderer, "review-session")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "review-timer"))).toBe("01:00");
+    expect(() => findByTestId(renderer, "review-line-continue")).toThrow();
     expect(() => findByTestId(renderer, "review-source-pill")).toThrow();
     expect(() => findByTestId(renderer, "review-panel")).toThrow();
   });
@@ -2655,11 +2672,10 @@ describe("PracticePocScreen", () => {
     const officialReviewAttempts = service.listHistory({ source: "scheduled_review" }) as Array<{ result: string; submittedMove: string }>;
     expect(officialReviewAttempts).toHaveLength(1);
     expect(officialReviewAttempts[0]).toMatchObject({ result: "wrong", submittedMove: "c4b5" });
-    expect(findByTestId(renderer, "review-line-continue")).toBeTruthy();
-    expect(findByTestId(renderer, "review-line-continue").props.accessibilityLabel).toBe("Continue to next review");
-    expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(false);
+    expect(() => findByTestId(renderer, "review-session")).toThrow();
+    expect(findByTestId(renderer, "review-panel")).toBeTruthy();
+    expect(() => findByTestId(renderer, "review-line-continue")).toThrow();
 
-    press(renderer, "review-exit");
     press(renderer, "history-tab");
     press(renderer, "history-filter-toggle");
     press(renderer, "history-source-review");
@@ -2689,6 +2705,7 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "review-source-pill")).toThrow();
     expect(() => findByTestId(renderer, "review-theme-pill")).toThrow();
     expect(() => findByTestId(renderer, "review-analysis-button")).toThrow();
+    expect(() => findByTestId(renderer, "review-reset-puzzle")).toThrow();
     expect(findByTestId(renderer, "review-side-to-move").props.accessibilityLabel).toBe("White to move");
     expect(collectText(findByTestId(renderer, "review-current-expected-move"))).toBe("e2e6");
     expect(collectText(findByTestId(renderer, "review-board-state"))).toBe("ready");
@@ -2779,12 +2796,12 @@ describe("PracticePocScreen", () => {
       jest.advanceTimersByTime(40_500);
     });
 
-    expect(collectText(findByTestId(renderer, "review-timer"))).toBe("Time expired");
     expect(service.listHistory({ source: "scheduled_review" }) as Array<{ result: string; submittedMove: string }>).toEqual([
       expect.objectContaining({ result: "wrong", submittedMove: "__timeout__" })
     ]);
-    expect(findByTestId(renderer, "review-line-continue")).toBeTruthy();
-    expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(false);
+    expect(() => findByTestId(renderer, "review-session")).toThrow();
+    expect(findByTestId(renderer, "review-panel")).toBeTruthy();
+    expect(() => findByTestId(renderer, "review-line-continue")).toThrow();
   });
 
   it("keeps the daily review denominator fixed and resumes an unfinished puzzle after exit", () => {
@@ -3244,7 +3261,7 @@ describe("PracticePocScreen", () => {
     expect(flattenTestStyle(badge.props.style).width).toBe(28);
   });
 
-  it("keeps a wrong due Arrow Duel review on the same puzzle until Continue is pressed", async () => {
+  it("auto-advances a wrong due Arrow Duel review and keeps it in today's history", async () => {
     const service = createMobilePracticeService("random1000");
     let sprintState = service.startSprint(
       {
@@ -3277,14 +3294,15 @@ describe("PracticePocScreen", () => {
 
     await boardMove(renderer, wrongMoves[0] as string);
     await settleFeedbackSnapshot();
-    expectText(renderer, "1 / 3 · Arrow Duel");
-    expect(findByTestId(renderer, "review-line-continue")).toBeTruthy();
-    expect(findByTestId(renderer, "review-line-continue").props.accessibilityLabel).toBe("Continue to next review");
-
-    press(renderer, "review-line-continue");
-
     expectText(renderer, "2 / 3 · Arrow Duel");
     expect(() => findByTestId(renderer, "review-line-continue")).toThrow();
+    expect(service.listHistory({ source: "scheduled_review" })).toEqual([
+      expect.objectContaining({ result: "wrong", submittedMove: wrongMoves[0] })
+    ]);
+
+    press(renderer, "review-exit");
+    expect(collectText(findByTestId(renderer, "review-due-count"))).toBe("1 / 3");
+    expect(findByTestId(renderer, "review-today-history")).toBeTruthy();
   });
 
   it("ignores stale board callbacks instead of recording a correct visible move as wrong", async () => {

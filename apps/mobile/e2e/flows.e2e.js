@@ -3,8 +3,10 @@ const {
   openStandardHistoryTrend,
   launchWithDisabledSynchronization,
   playBoardMove,
+  sleep,
   startPracticeMode,
   selectTestPuzzleSource,
+  textFromAttributes,
   waitForVisibleInPracticeScroll,
   waitForElementTextContaining,
   failStandardSprint
@@ -94,7 +96,12 @@ describe('Key user flows', () => {
     await waitForVisibleInPracticeScroll('review-board');
     await waitFor(element(by.id('review-progress'))).toHaveText('1 / 3 · Standard').withTimeout(10000);
     await waitForElementTextContaining('review-current-expected-move', 'e2e6', 10000);
-    await waitFor(element(by.id('review-timer'))).toHaveText('00:40').withTimeout(10000);
+    const timerBefore = durationTextToSeconds(textFromAttributes(await element(by.id('review-timer')).getAttributes()));
+    await sleep(1500);
+    const timerAfter = durationTextToSeconds(textFromAttributes(await element(by.id('review-timer')).getAttributes()));
+    if (timerBefore <= 0 || timerAfter >= timerBefore) {
+      throw new Error(`Expected the review timer to count down, received ${timerBefore} then ${timerAfter}`);
+    }
     await expect(element(by.id('review-source-pill'))).not.toExist();
     await expect(element(by.id('review-theme-pill'))).not.toExist();
     await expect(element(by.id('review-analysis-button'))).not.toExist();
@@ -260,6 +267,14 @@ describe('Key user flows', () => {
     await waitFor(element(by.id('custom-previous-configs'))).toExist().withTimeout(10000);
   });
 });
+
+function durationTextToSeconds(value) {
+  const match = /^(\d+):(\d{2})$/.exec(value);
+  if (!match) {
+    throw new Error(`Expected a countdown duration, received "${value}"`);
+  }
+  return Number(match[1]) * 60 + Number(match[2]);
+}
 
 async function dismissSprintSummary() {
   // The app chrome (tab bar) is hidden while the sprint summary is open;

@@ -33,3 +33,11 @@ export function resolveTestNowMsFromLaunchConfig(
   const parsed = typeof rawValue === "number" ? rawValue : Number(rawValue);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
+
+export function createAdvancingTestClock(
+  testNowMs: number,
+  wallClockMs: () => number = Date.now
+): () => number {
+  const wallClockStartedAtMs = wallClockMs();
+  return () => testNowMs + Math.max(0, wallClockMs() - wallClockStartedAtMs);
+}
