@@ -441,6 +441,22 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "Find the best move");
   });
 
+  it("starts a sprint on the injected clock used by store screenshots", () => {
+    const nowMs = Date.parse("2026-07-09T18:00:00.000Z");
+    const service = createMobilePracticeService("familiar15");
+    const renderer = renderScreen({
+      currentTimeMs: () => nowMs,
+      practiceService: service
+    });
+
+    startStandardSprint(renderer);
+
+    const activeSprint = activeSprintForTest(service);
+    expect(activeSprint.startedAt).toBe(new Date(nowMs).toISOString());
+    expect(activeSprint.deadlineAt).toBe(new Date(nowMs + 5 * 60 * 1000).toISOString());
+    expect(collectText(findByTestId(renderer, "session-timer"))).toBe("05:00");
+  });
+
   it("offers resume before starting a new sprint when the service has an active session", () => {
     const service = createMobilePracticeService("random1000");
     service.startSprint(
@@ -569,20 +585,21 @@ describe("PracticePocScreen", () => {
     const familiarStartSprintSpy = jest.spyOn(familiarService, "startSprint");
     const dateNowSpy = jest.spyOn(Date, "now").mockReturnValue(1_789_000_000);
     const randomSpy = jest.spyOn(Math, "random").mockReturnValue(0.314159);
+    const startedAt = new Date(1_789_000_000).toISOString();
 
     try {
       const coreRenderer = renderScreen({ practiceServiceFactory: () => coreService });
       startStandardSprint(coreRenderer);
       expect(coreStartSprintSpy).toHaveBeenLastCalledWith(expect.objectContaining({
         puzzleSelectionSeed: "1789000000-0.314159"
-      }));
+      }), startedAt);
 
       const familiarRenderer = renderScreen({ practiceServiceFactory: () => familiarService });
       press(familiarRenderer, "test-puzzle-source-familiar15");
       startStandardSprint(familiarRenderer);
       expect(familiarStartSprintSpy).toHaveBeenLastCalledWith(expect.not.objectContaining({
         puzzleSelectionSeed: expect.anything()
-      }));
+      }), startedAt);
     } finally {
       dateNowSpy.mockRestore();
       randomSpy.mockRestore();

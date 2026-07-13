@@ -972,13 +972,16 @@ export function PracticePocScreen({
           service.setRating(config.ratingKey, customInitialRating);
         }
       }
-      const started = service.startSprint({
-        mode: nextMode,
-        durationSeconds: config.durationSeconds,
-        perPuzzleSeconds: config.perPuzzleSeconds,
-        ...(customThemeValue ? { theme: customThemeValue, persistCustomConfig: true } : useCustomTiming ? { persistCustomConfig: true } : {}),
-        ...(!practiceService && shouldRandomizePuzzleSelection(puzzleSource) ? { puzzleSelectionSeed: `${Date.now()}-${Math.random()}` } : {})
-      });
+      const started = service.startSprint(
+        {
+          mode: nextMode,
+          durationSeconds: config.durationSeconds,
+          perPuzzleSeconds: config.perPuzzleSeconds,
+          ...(customThemeValue ? { theme: customThemeValue, persistCustomConfig: true } : useCustomTiming ? { persistCustomConfig: true } : {}),
+          ...(!practiceService && shouldRandomizePuzzleSelection(puzzleSource) ? { puzzleSelectionSeed: `${Date.now()}-${Math.random()}` } : {})
+        },
+        captureLiveNowIso()
+      );
       setMode(nextMode);
       setSessionMistakeReviewItems([]);
       commitState(started);
