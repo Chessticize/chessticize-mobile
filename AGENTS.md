@@ -4,19 +4,24 @@ All repository documentation must be written in English. User-facing GUI copy mu
 
 For development-loop decisions, use the repo-local skill at `.codex/skills/chessticize-mobile-dev-loop/SKILL.md`. It defines the preferred order for core/backend tests, CLI E2E checks, mobile component tests, and iOS simulator/Detox screenshot verification.
 
-## Agent skills
+## Agent wayfinding
 
 ### Issue tracker
 
 Issues and PRDs are tracked in GitHub Issues. See `docs/agents/issue-tracker.md`.
 
-### Triage labels
+### Tracker labels
 
-The default five-role triage vocabulary is used. See `docs/agents/triage-labels.md`.
+The required triage and Wayfinder label vocabulary, plus the live tracker
+preflight, is documented in `docs/agents/triage-labels.md`. Verify the live
+labels before a label-dependent workflow; a missing label is a tracker setup
+blocker, not permission to substitute a different label.
 
 ### Domain docs
 
-This repository uses a multi-context layout with a root `CONTEXT-MAP.md` and context-specific domain docs. See `docs/agents/domain.md`.
+Domain docs are created lazily in a multi-context layout. See
+`docs/agents/domain.md` for discovery and placement rules; an absent glossary or
+ADR is not itself a defect.
 
 ## Branch And PR Workflow
 

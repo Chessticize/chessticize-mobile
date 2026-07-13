@@ -1,15 +1,41 @@
-# Triage Labels
+# Tracker Label Vocabulary
 
-The skills speak in terms of five canonical triage roles. This file maps those roles to the actual label strings used in this repo's issue tracker.
+This file is the authoritative mapping from engineering-skill roles to required
+GitHub label strings. It describes required tracker configuration, not a cached
+snapshot of live labels.
 
-| Label in mattpocock/skills | Label in our tracker | Meaning                                  |
-| -------------------------- | -------------------- | ---------------------------------------- |
-| `needs-triage`             | `needs-triage`       | Maintainer needs to evaluate this issue  |
-| `needs-info`               | `needs-info`         | Waiting on reporter for more information |
-| `ready-for-agent`          | `ready-for-agent`    | Fully specified, ready for an AFK agent  |
-| `ready-for-human`          | `ready-for-human`    | Requires human implementation            |
-| `wontfix`                  | `wontfix`            | Will not be actioned                     |
+## Live tracker preflight
 
-When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the corresponding label string from this table.
+Before a workflow creates or labels an issue, inspect the live label registry:
 
-Edit the right-hand column to match whatever vocabulary you actually use.
+```sh
+gh label list --limit 100 --json name --jq '.[].name'
+```
+
+Every label required by that workflow must appear exactly. If one is missing,
+stop and report the tracker setup blocker. Do not silently substitute a stock
+GitHub label. Provisioning repository labels changes external tracker state and
+must be handled as an explicit repository setup action.
+
+## Triage roles
+
+| Skill role        | Required tracker label | Meaning                                  |
+| ----------------- | ---------------------- | ---------------------------------------- |
+| `needs-triage`    | `needs-triage`         | Maintainer needs to evaluate this issue  |
+| `needs-info`      | `needs-info`           | Waiting on reporter for more information |
+| `ready-for-agent` | `ready-for-agent`      | Fully specified, ready for an AFK agent  |
+| `ready-for-human` | `ready-for-human`      | Requires human implementation            |
+| `wontfix`         | `wontfix`              | Will not be actioned                     |
+
+When a skill mentions a triage role, use the corresponding required tracker
+label from this table.
+
+## Wayfinder roles
+
+| Wayfinder role | Required tracker label |
+| -------------- | ---------------------- |
+| Map            | `wayfinder:map`        |
+| Research       | `wayfinder:research`   |
+| Prototype      | `wayfinder:prototype`  |
+| Grilling       | `wayfinder:grilling`   |
+| Task           | `wayfinder:task`       |

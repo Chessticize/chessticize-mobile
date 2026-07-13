@@ -11,8 +11,17 @@ const count = (text, needle) => text.split(needle).length - 1;
 
 const coreWorkflow = read(".github/workflows/core.yml");
 const mobileWorkflow = read(".github/workflows/mobile-ios.yml");
+const processWorkflow = read(".github/workflows/process.yml");
 const agents = read("AGENTS.md");
 const testingArchitecture = read("docs/TESTING_ARCHITECTURE.md");
+const agentDocPaths = [
+  "docs/agents/domain.md",
+  "docs/agents/issue-tracker.md",
+  "docs/agents/triage-labels.md"
+];
+const domainDocs = read(agentDocPaths[0]);
+const issueTracker = read(agentDocPaths[1]);
+const triageLabels = read(agentDocPaths[2]);
 const devLoopSkill = read(".codex/skills/chessticize-mobile-dev-loop/SKILL.md");
 const localE2eSkill = read(".codex/skills/chessticize-mobile-local-e2e/SKILL.md");
 const localE2eRunner = path.join(
@@ -46,6 +55,32 @@ for (const policy of [agents, testingArchitecture, devLoopSkill]) {
   assert.match(policy, /Full native validation/);
   assert.match(policy, /[Nn]ightly/);
 }
+
+for (const agentDocPath of agentDocPaths) {
+  assert.match(agents, new RegExp(agentDocPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+}
+
+assert.match(domainDocs, /lazy artifacts/);
+assert.match(domainDocs, /CONTEXT-MAP\.md/);
+assert.match(issueTracker, /--json number,title,body,state,labels,comments/);
+assert.match(issueTracker, /docs\/agents\/triage-labels\.md/);
+
+for (const requiredLabel of [
+  "needs-triage",
+  "needs-info",
+  "ready-for-agent",
+  "ready-for-human",
+  "wontfix",
+  "wayfinder:map",
+  "wayfinder:research",
+  "wayfinder:prototype",
+  "wayfinder:grilling",
+  "wayfinder:task"
+]) {
+  assert.match(triageLabels, new RegExp("`" + requiredLabel + "`"));
+}
+
+assert.equal(count(processWorkflow, '- "docs/agents/**"'), 2);
 
 assert.match(localE2eSkill, /CHESSTICIZE_E2E_SCOPE/);
 assert.match(localE2eSkill, /Replace `practice` with `flows` or `full`/);
