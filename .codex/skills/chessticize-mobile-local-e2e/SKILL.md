@@ -156,9 +156,10 @@ The runner:
 3. Rejects unhydrated Git LFS pointer files for the Stockfish NNUE networks.
 4. Verifies the dedicated simulator and iOS environment.
 5. Builds the app with bundled JavaScript.
-6. Runs the selected suite, or both suites for `full`, with one worker.
-7. Verifies the commit and worktree did not change.
-8. Prints per-step timing and a PR evidence summary.
+6. Normalizes only the known worktree-dependent Hermes checksum when that is the build's sole tracked change; any other tracked or untracked build output fails the gate.
+7. Runs the selected suite, or both suites for `full`, with one worker.
+8. Verifies the commit and worktree did not change.
+9. Prints per-step timing and a PR evidence summary.
 
 To run commands manually, use the same order and run only the selected scope. This example shows `practice`:
 
@@ -195,7 +196,8 @@ Its presence proves the Detox app does not depend on Metro.
 - Analysis-button tests disconnect from Detox without a crash report: check that both `Resources/*.nnue` files exceed 1 MB. If they are 132-134 byte LFS pointers, run the scoped `git lfs pull` command above, rebuild, and rerun the focused test before both complete suites.
 - Missing `main.jsbundle`: rebuild with `pnpm mobile:e2e:build:ios`; do not trust a Metro-only app.
 - A suite fails: inspect the exact failing spec and product state. Rerun the focused spec to diagnose, fix the cause, then rebuild and rerun the originally selected scope. Rerun both suites only when `full` was required.
-- `pod install` dirties tracked project files: stop. Normalize or intentionally commit the CocoaPods-generated change before producing exact-head evidence; never silently restore unrelated user changes.
+- `pod install` changes only the Hermes checksum in `Podfile.lock`: the runner verifies that exact diff and normalizes it because React Native embeds the worktree path in the podspec checksum.
+- `pod install` dirties the Xcode project, workspace, another lock entry, or any other tracked file: stop. Fix the environment or intentionally commit the CocoaPods change; the runner must not hide it.
 
 ## Record PR Evidence
 

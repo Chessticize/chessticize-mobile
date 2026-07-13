@@ -57,6 +57,30 @@ run_build() {
   test -f apps/mobile/ios/build/Build/Products/Debug-iphonesimulator/Chessticize.app/main.jsbundle
 }
 
+normalize_worktree_cocoapods_checksum() {
+  local changed_files
+  local lock_diff
+  local unexpected_lines
+
+  changed_files="$(git diff --name-only)"
+  [[ -n "$changed_files" ]] || return 0
+
+  if [[ "$changed_files" != "apps/mobile/ios/Podfile.lock" ]]; then
+    fail "The build changed tracked files other than the known worktree-dependent Hermes checksum: $changed_files"
+  fi
+
+  lock_diff="$(git diff -- apps/mobile/ios/Podfile.lock)"
+  unexpected_lines="$(
+    printf '%s\n' "$lock_diff" |
+      awk '/^[+-]/ && !/^\+\+\+/ && !/^---/ && $0 !~ /^[+-]  hermes-engine: [0-9a-f]{40}$/ { print }'
+  )"
+  [[ -z "$unexpected_lines" ]] || fail "Podfile.lock changed beyond the known worktree-dependent Hermes checksum."
+
+  printf '%s\n' "$lock_diff" | git apply --reverse --whitespace=nowarn
+  git diff --quiet -- apps/mobile/ios/Podfile.lock || fail "Could not normalize the worktree-dependent Hermes checksum."
+  echo "Normalized worktree-dependent Hermes checksum in Podfile.lock."
+}
+
 run_suite() {
   local suite="$1"
   (
@@ -76,6 +100,9 @@ DOCTOR_SECONDS=$((SECONDS - DOCTOR_STARTED))
 BUILD_STARTED=$SECONDS
 run_build
 BUILD_SECONDS=$((SECONDS - BUILD_STARTED))
+normalize_worktree_cocoapods_checksum
+
+[[ -z "$(git status --porcelain --untracked-files=all)" ]] || fail "The build changed tracked or untracked files before the selected suites ran."
 
 FLOWS_SECONDS=""
 PRACTICE_SECONDS=""

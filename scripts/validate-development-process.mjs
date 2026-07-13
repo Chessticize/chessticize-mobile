@@ -51,6 +51,13 @@ assert.match(localE2eSkill, /CHESSTICIZE_E2E_SCOPE/);
 assert.match(localE2eSkill, /Replace `practice` with `flows` or `full`/);
 assert.doesNotMatch(localE2eSkill, /Routine PRs require passing local `flows` and `practice`/);
 
+const localE2eRunnerSource = read(
+  ".codex/skills/chessticize-mobile-local-e2e/scripts/run-local-e2e.sh"
+);
+assert.match(localE2eRunnerSource, /normalize_worktree_cocoapods_checksum/);
+assert.match(localE2eRunnerSource, /hermes-engine: \[0-9a-f\]\{40\}/);
+assert.match(localE2eRunnerSource, /git apply --reverse/);
+
 for (const option of [
   "- [ ] No mobile Detox",
   "- [ ] Targeted `flows` spec or suite",
