@@ -28,7 +28,6 @@ import {
   formatLocalCalendarDate,
   formatReviewDay,
   formatSideToMoveScore,
-  historyAttemptReviewKey,
   historyAttemptSpeedSeconds,
   isReviewOverdue,
   reviewDueState,
@@ -46,7 +45,6 @@ import type {
   HistoryAttemptView,
   HistoryPerformance,
   HistoryPerformancePoint,
-  HistoryPuzzleStats,
   HistoryReviewStatus,
   HistoryTimeRange,
   PuzzleSide,
@@ -445,7 +443,7 @@ export function PracticePocScreen({
   const [chessboardDebugEvents, setChessboardDebugEvents] = useState<string[]>([]);
   const [historyTimeRange, setHistoryTimeRange] = useState<HistoryTimeRange>("7d");
   const [historySourceFilter, setHistorySourceFilter] = useState<"all" | AttemptSource>("sprint");
-  const [historyResultFilter, setHistoryResultFilter] = useState<"all" | "correct" | "wrong">("wrong");
+  const [historyResultFilter, setHistoryResultFilter] = useState<"all" | "correct" | "wrong">("all");
   const [historySideFilter, setHistorySideFilter] = useState<"all" | PuzzleSide>("all");
   const [historyThemeFilter, setHistoryThemeFilter] = useState<string>("all");
   const [historyRatingRangeFilter, setHistoryRatingRangeFilter] = useState<HistoryRatingRangeFilter>("all");
@@ -2102,7 +2100,6 @@ export function PracticePocScreen({
                   attempts={displayedAttempts}
                   performance={historyPerformanceView?.performance ?? emptyHistoryPerformance()}
                   ratingKeys={historyRatingKeys}
-                  puzzleStats={historyView?.puzzleStats ?? []}
                   selectedRatingKey={activeHistoryRatingKey}
                   timeRange={historyTimeRange}
                   sourceFilter={historySourceFilter}
@@ -2152,7 +2149,7 @@ export function PracticePocScreen({
                   onResetFilters={() => {
                     setHistoryTimeRange("7d");
                     setHistorySourceFilter("sprint");
-                    setHistoryResultFilter("wrong");
+                    setHistoryResultFilter("all");
                     setHistorySideFilter("all");
                     setHistoryThemeFilter("all");
                     setHistoryRatingRangeFilter("all");
@@ -4060,7 +4057,6 @@ function HistoryPanel({
   attempts,
   performance,
   ratingKeys,
-  puzzleStats,
   selectedRatingKey,
   timeRange,
   sourceFilter,
@@ -4091,7 +4087,6 @@ function HistoryPanel({
   attempts: HistoryAttemptView[];
   performance: HistoryPerformance;
   ratingKeys: string[];
-  puzzleStats: HistoryPuzzleStats[];
   selectedRatingKey: string | null;
   timeRange: HistoryTimeRange;
   sourceFilter: "all" | AttemptSource;
@@ -4119,7 +4114,6 @@ function HistoryPanel({
   onToggleWrongOnly: () => void;
 }): React.JSX.Element {
   const [filtersExpanded, setFiltersExpanded] = useState(false);
-  const puzzleStatsByAttemptKey = new Map(puzzleStats.map((stats) => [historyAttemptReviewKey(stats), stats]));
   const visibleAttempts = attempts;
   const ratingPoints = performance.charts.rating;
   const latestRating = ratingPoints[ratingPoints.length - 1]?.value;
@@ -4313,7 +4307,6 @@ function HistoryPanel({
         <HistoryAttemptRow
           key={attempt.id}
           attempt={attempt}
-          puzzleStats={puzzleStatsByAttemptKey.get(historyAttemptReviewKey(attempt))}
           onOpen={() => onOpenAttempt(attempt.id)}
         />
       ))}
@@ -4738,12 +4731,10 @@ function HistoryQuickToggle({
 
 function HistoryAttemptRow({
   attempt,
-  onOpen,
-  puzzleStats
+  onOpen
 }: {
   attempt: HistoryAttemptView;
   onOpen: () => void;
-  puzzleStats?: HistoryPuzzleStats;
 }): React.JSX.Element {
   const isWrong = attempt.result === "wrong";
   const completedAtMs = new Date(attempt.completedAt).getTime();
@@ -4752,9 +4743,6 @@ function HistoryAttemptRow({
   const primaryTheme = historyAttemptThemeLabel(attempt);
   const pace = historyAttemptSpeedSeconds(attempt);
   const paceLabel = pace === null ? null : `${pace}s pace`;
-  const reviewDueLabel = puzzleStats?.nextReviewDay
-    ? `Review due ${formatReviewDay(puzzleStats.nextReviewDay)}`
-    : null;
   const resultLabel = isWrong ? "Wrong move" : "Correct";
   const submittedMoveLabel = isWrong
     ? `Played ${attempt.submittedMove} · Best ${attempt.expectedMove}`
@@ -4769,8 +4757,7 @@ function HistoryAttemptRow({
     submittedMoveLabel,
     puzzleIdentity,
     compactContext,
-    compactMeta,
-    reviewDueLabel
+    compactMeta
   ].filter(Boolean).join(", ");
 
   return (
@@ -4795,11 +4782,6 @@ function HistoryAttemptRow({
         <Text testID={`history-attempt-${attempt.id}-identity`} style={styles.helperText}>{puzzleIdentity}</Text>
         <Text testID={`history-attempt-${attempt.id}-context`} style={styles.helperText}>{compactContext}</Text>
         <Text testID={`history-attempt-${attempt.id}-meta`} style={styles.helperText}>{compactMeta}</Text>
-        {reviewDueLabel ? (
-          <Text testID={`history-attempt-${attempt.id}-review-due`} style={styles.historyReviewDue}>
-            {reviewDueLabel}
-          </Text>
-        ) : null}
       </View>
       <View style={styles.historyAttemptChevron} testID={`history-attempt-${attempt.id}-chevron`}>
         <ChevronGlyph direction="right" />
@@ -10770,11 +10752,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "900",
     textAlign: "right"
-  },
-  historyReviewDue: {
-    color: "#64748B",
-    fontSize: 11,
-    fontWeight: "700"
   },
   historyRatingDelta: {
     fontSize: 12,
