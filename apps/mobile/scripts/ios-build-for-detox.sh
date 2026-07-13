@@ -4,6 +4,22 @@ set -euo pipefail
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$APP_DIR"
 
+force_debug_prebuilt_refresh() {
+  local marker
+  for marker in \
+    ios/Pods/React-Core-prebuilt/.last_build_configuration \
+    ios/Pods/ReactNativeDependencies/.last_build_configuration \
+    ios/Pods/.last_build_configuration; do
+    [[ -d "$(dirname "$marker")" ]] || {
+      echo "Expected CocoaPods directory for $marker was not installed." >&2
+      exit 71
+    }
+    if [[ ! -f "$marker" ]]; then
+      printf '%s' Release > "$marker"
+    fi
+  done
+}
+
 scripts/ios-doctor.sh
 
 (cd "$APP_DIR/../.." && node scripts/fetch-core-pack.mjs)
@@ -13,6 +29,7 @@ if ! bundle check; then
 fi
 
 bundle exec pod install --project-directory=ios
+force_debug_prebuilt_refresh
 
 export FORCE_BUNDLING=1
 

@@ -75,4 +75,14 @@ describe("iOS App Store identity artifacts", () => {
     expect(detoxConfig).toContain("Chessticize.app");
     expect(detoxConfig).not.toContain("ChessticizeMobile.app");
   });
+
+  it("refreshes React Native prebuilt dependencies for a Debug Detox build", () => {
+    const detoxBuildScript = readText(join(appRoot, "scripts", "ios-build-for-detox.sh"));
+
+    expect(detoxBuildScript).toContain("force_debug_prebuilt_refresh");
+    expect(detoxBuildScript).toContain("React-Core-prebuilt/.last_build_configuration");
+    expect(detoxBuildScript).toContain("ReactNativeDependencies/.last_build_configuration");
+    expect(detoxBuildScript).toContain("ios/Pods/.last_build_configuration");
+    expect(detoxBuildScript).toContain('[[ ! -f "$marker" ]]');
+  });
 });
