@@ -175,11 +175,11 @@ check(
 );
 
 check(
-  "iOS release identity is fixed for 1.0",
+  "iOS release identity is fixed for 1.1",
   marketingVersions.length === 1 &&
-    marketingVersions[0] === "1.0" &&
+    marketingVersions[0] === "1.1" &&
     buildNumbers.length === 1 &&
-    buildNumbers[0] === "1" &&
+    buildNumbers[0] === "2" &&
     bundleIdentifiers.length === 1 &&
     bundleIdentifiers[0] === "com.chessticize.mobile" &&
     deviceFamilies.length === 1 &&
@@ -194,7 +194,7 @@ check(
   "Export compliance flag is set",
   infoPlist.includes("<key>ITSAppUsesNonExemptEncryption</key>") &&
     infoPlist.includes("<false/>"),
-  "Info.plist must declare ITSAppUsesNonExemptEncryption=false for the 1.0 app."
+  "Info.plist must declare ITSAppUsesNonExemptEncryption=false for the 1.1 app."
 );
 
 check(
@@ -299,7 +299,7 @@ manualGate(
 );
 manualGate(
   "Create the public source release tag",
-  "Tag the exact commit used for the App Store Connect binary, for example ios-v1.0.0-build-1, and publish the GitHub release."
+  "Tag the exact commit used for the App Store Connect binary as ios-v1.1.0-build-2 and publish the GitHub release."
 );
 manualGate(
   "Configure Apple signing team and Xcode account",
@@ -311,7 +311,7 @@ manualGate(
 );
 manualGate(
   "Execute the internal TestFlight physical-device pass",
-  "Upload the build to App Store Connect, distribute it to Internal 1.0 QA, install from TestFlight on physical iPhone and iPad hardware, and fill docs/TESTFLIGHT_QA.md evidence."
+  "Upload the build to App Store Connect, distribute it to Internal 1.1 QA, install from TestFlight on physical iPhone and iPad hardware, and fill docs/TESTFLIGHT_QA.md evidence."
 );
 
 const failed = checks.filter((entry) => entry.status === "fail");

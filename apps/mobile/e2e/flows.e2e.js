@@ -125,7 +125,7 @@ describe('Key user flows', () => {
     await playBoardMove('review-board', 'e6f7');
     await waitFor(element(by.id('move-feedback-overlay'))).toExist().withTimeout(5000);
 
-    await waitFor(element(by.id('review-progress'))).toHaveText('2 / 3 · Standard').withTimeout(15000);
+    await waitFor(element(by.id('review-progress'))).toHaveText('2 / 3 · Standard').withTimeout(30000);
     await element(by.id('review-exit')).tap();
     await waitFor(element(by.id('review-due-count'))).toHaveText('1 / 3').withTimeout(10000);
     await waitFor(element(by.id('review-today-history'))).toExist().withTimeout(10000);

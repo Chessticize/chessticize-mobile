@@ -20,7 +20,7 @@ function targetBuildSettings(project) {
 }
 
 describe("iOS device target configuration", () => {
-  it("ships 1.0 for iPhone and iPad with the current React Native minimum iOS target", () => {
+  it("ships 1.1 for iPhone and iPad with the current React Native minimum iOS target", () => {
     const project = readText(join(appRoot, "ios", "ChessticizeMobile.xcodeproj", "project.pbxproj"));
     const settings = targetBuildSettings(project);
 
@@ -45,7 +45,7 @@ describe("iOS device target configuration", () => {
     const deviceTargets = readText(join(repoRoot, "docs", "DEVICE_TARGETS.md"));
     const readme = readText(join(repoRoot, "README.md"));
 
-    expect(deviceTargets).toContain("Chessticize Mobile 1.0 ships for adaptive iPhone portrait/landscape");
+    expect(deviceTargets).toContain("Chessticize Mobile 1.1 ships for adaptive iPhone portrait/landscape");
     expect(deviceTargets).toContain("and adaptive iPad portrait, landscape, and multitasking layouts.");
     expect(deviceTargets).toContain('Device family: iPhone and iPad (`TARGETED_DEVICE_FAMILY = "1,2"`)');
     expect(deviceTargets).toContain("Orientation: iPhone portrait and landscape; iPad portrait, upside-down");

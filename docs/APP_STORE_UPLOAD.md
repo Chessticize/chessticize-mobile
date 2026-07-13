@@ -1,6 +1,6 @@
 # App Store Upload Runbook
 
-This runbook covers the owner-executed upload step for the 1.0 internal
+This runbook covers the owner-executed upload step for the 1.1 internal
 TestFlight pass. Recheck Apple's live documentation before executing it:
 
 - Upload builds:
@@ -11,7 +11,7 @@ TestFlight pass. Recheck Apple's live documentation before executing it:
   https://developer.apple.com/documentation/xcode/distributing-your-app-for-beta-testing-and-releases
 
 Apple currently supports uploading builds with Xcode, Swift Playground,
-`altool`, or Transporter. This repository standardizes the 1.0 path on
+`altool`, or Transporter. This repository standardizes the 1.1 path on
 `xcodebuild archive` plus `xcodebuild -exportArchive` using the checked-in
 `apps/mobile/ios/ExportOptions.app-store-connect.plist`.
 
@@ -39,11 +39,11 @@ folder for the physical-device QA record.
 ## Public Source Tag
 
 Create and publish the source tag before or at the same time as the App Store
-Connect upload. The suggested 1.0 build-1 tag is:
+Connect upload. The current 1.1 build-2 tag is:
 
 ```sh
-git tag -a ios-v1.0.0-build-1 -m "iOS 1.0.0 build 1"
-git push origin ios-v1.0.0-build-1
+git tag -a ios-v1.1.0-build-2 -m "iOS 1.1.0 build 2"
+git push origin ios-v1.1.0-build-2
 ```
 
 Then publish a GitHub release for that tag and attach or copy the
@@ -152,11 +152,11 @@ valid while this signing-account gate is still incomplete.
 ## After Upload
 
 1. Wait for App Store Connect processing to complete.
-2. Confirm the uploaded build number is `1` for version `1.0`.
+2. Confirm the uploaded build number is `2` for version `1.1`.
 3. Confirm export compliance is accepted for
    `ITSAppUsesNonExemptEncryption = false`.
 4. Configure the TestFlight test information from `docs/TESTFLIGHT_QA.md`.
-5. Add the build to the `Internal 1.0 QA` internal testing group.
+5. Add the build to the `Internal 1.1 QA` internal testing group.
 6. Install the build from the TestFlight app on a physical iPhone and a
    representative iPad.
 7. Run the full checklist in `docs/TESTFLIGHT_QA.md`.

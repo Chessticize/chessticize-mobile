@@ -26,7 +26,7 @@ test("App Store preflight CLI reports automatable checks and manual release gate
   assert.ok(checkNames.has("Third-party notices inventory covers direct runtime packages"));
   assert.ok(checkNames.has("Third-party notice audit passes"));
   assert.ok(checkNames.has("Release source rule is documented"));
-  assert.ok(checkNames.has("iOS release identity is fixed for 1.0"));
+  assert.ok(checkNames.has("iOS release identity is fixed for 1.1"));
   assert.ok(checkNames.has("Store screenshot capture flow is wired"));
   assert.ok(checkNames.has("TestFlight QA checklist is explicit about real-device execution"));
   assert.ok(checkNames.has("App Store archive and upload path is documented"));

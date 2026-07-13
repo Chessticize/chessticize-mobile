@@ -26,8 +26,8 @@ describe("iOS App Store identity artifacts", () => {
     expect(project).toContain("PRODUCT_BUNDLE_IDENTIFIER = com.chessticize.mobile;");
     expect(project).toContain("PRODUCT_NAME = Chessticize;");
     expect(project).toContain("productName = Chessticize;");
-    expect(project).toContain("MARKETING_VERSION = 1.0;");
-    expect(project).toContain("CURRENT_PROJECT_VERSION = 1;");
+    expect(project).toContain("MARKETING_VERSION = 1.1;");
+    expect(project).toContain("CURRENT_PROJECT_VERSION = 2;");
     expect(project).not.toContain("org.reactjs.native.example");
     expect(project).not.toContain("ChessticizeMobile.app");
   });
@@ -74,5 +74,15 @@ describe("iOS App Store identity artifacts", () => {
     expect(detoxBuildScript).not.toContain("ChessticizeMobile.app");
     expect(detoxConfig).toContain("Chessticize.app");
     expect(detoxConfig).not.toContain("ChessticizeMobile.app");
+  });
+
+  it("refreshes React Native prebuilt dependencies for a Debug Detox build", () => {
+    const detoxBuildScript = readText(join(appRoot, "scripts", "ios-build-for-detox.sh"));
+
+    expect(detoxBuildScript).toContain("force_debug_prebuilt_refresh");
+    expect(detoxBuildScript).toContain("React-Core-prebuilt/.last_build_configuration");
+    expect(detoxBuildScript).toContain("ReactNativeDependencies/.last_build_configuration");
+    expect(detoxBuildScript).toContain("ios/Pods/.last_build_configuration");
+    expect(detoxBuildScript).toContain('[[ ! -f "$marker" ]]');
   });
 });
