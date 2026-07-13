@@ -104,9 +104,8 @@ async function completeOneWrongReview() {
   await playBoardMove('review-board', fixture.wrongMove, fixture.flipped);
   await waitFor(element(by.id('review-reminder-permission-prompt'))).toExist().withTimeout(10000);
   await element(by.id('review-reminder-permission-dismiss')).tap();
-  await waitFor(element(by.id('review-line-continue'))).toBeVisible().withTimeout(10000);
-  await element(by.id('review-line-continue')).tap();
   await waitFor(element(by.id('review-progress'))).toHaveText('2 / 3 · Arrow Duel').withTimeout(10000);
+  await expect(element(by.id('review-line-continue'))).not.toExist();
   await element(by.id('review-exit')).tap();
 
   await waitFor(element(by.id('review-due-count'))).toHaveText('1 / 3').withTimeout(10000);
