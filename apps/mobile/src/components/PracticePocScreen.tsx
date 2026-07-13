@@ -6167,10 +6167,7 @@ function ReviewSession({
     });
     await sleep(FEEDBACK_SNAPSHOT_MS);
     if (currentEntry.source === "due") {
-      boardRef.current?.resetBoard(submittedFen);
-      setFeedback(null);
-      setLineReviewNeedsContinue(true);
-      setBoardLocked(false);
+      goToNextDueReview();
       return;
     }
     const replyMoves = result.feedback.autoPlayedMoves.slice(1);

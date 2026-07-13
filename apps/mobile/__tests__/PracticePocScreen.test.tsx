@@ -3261,7 +3261,7 @@ describe("PracticePocScreen", () => {
     expect(flattenTestStyle(badge.props.style).width).toBe(28);
   });
 
-  it("keeps a wrong due Arrow Duel review on the same puzzle until Continue is pressed", async () => {
+  it("auto-advances a wrong due Arrow Duel review and keeps it in today's history", async () => {
     const service = createMobilePracticeService("random1000");
     let sprintState = service.startSprint(
       {
@@ -3294,14 +3294,15 @@ describe("PracticePocScreen", () => {
 
     await boardMove(renderer, wrongMoves[0] as string);
     await settleFeedbackSnapshot();
-    expectText(renderer, "1 / 3 · Arrow Duel");
-    expect(findByTestId(renderer, "review-line-continue")).toBeTruthy();
-    expect(findByTestId(renderer, "review-line-continue").props.accessibilityLabel).toBe("Continue to next review");
-
-    press(renderer, "review-line-continue");
-
     expectText(renderer, "2 / 3 · Arrow Duel");
     expect(() => findByTestId(renderer, "review-line-continue")).toThrow();
+    expect(service.listHistory({ source: "scheduled_review" })).toEqual([
+      expect.objectContaining({ result: "wrong", submittedMove: wrongMoves[0] })
+    ]);
+
+    press(renderer, "review-exit");
+    expect(collectText(findByTestId(renderer, "review-due-count"))).toBe("1 / 3");
+    expect(findByTestId(renderer, "review-today-history")).toBeTruthy();
   });
 
   it("ignores stale board callbacks instead of recording a correct visible move as wrong", async () => {
