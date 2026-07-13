@@ -6073,11 +6073,8 @@ function ReviewSession({
         boardRef.current?.resetBoard(submittedFen);
         setFeedback(null);
         if (currentEntry.source === "due") {
-          if (!hasNextScheduledReview) {
-            goToNextDueReview();
-            return;
-          }
-          setLineReviewNeedsContinue(true);
+          goToNextDueReview();
+          return;
         }
         setBoardLocked(false);
         return;

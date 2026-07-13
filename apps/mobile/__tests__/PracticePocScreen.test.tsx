@@ -2647,10 +2647,10 @@ describe("PracticePocScreen", () => {
 
     await boardMove(renderer, "c4b5");
     await settleFeedbackSnapshot();
-    press(renderer, "review-line-continue");
 
     expect(findByTestId(renderer, "review-session")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "review-timer"))).toBe("01:00");
+    expect(() => findByTestId(renderer, "review-line-continue")).toThrow();
     expect(() => findByTestId(renderer, "review-source-pill")).toThrow();
     expect(() => findByTestId(renderer, "review-panel")).toThrow();
   });
