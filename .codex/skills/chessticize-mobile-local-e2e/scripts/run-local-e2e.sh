@@ -24,6 +24,18 @@ cd "$REPO_ROOT"
 [[ -z "$(git status --porcelain --untracked-files=all)" ]] || fail "Commit or remove all worktree changes before recording exact-head evidence."
 HEAD_BEFORE="$(git rev-parse HEAD)"
 
+verify_nnue_asset() {
+  local asset_path="$1"
+  local asset_size
+
+  [[ -f "$asset_path" ]] || fail "Missing $asset_path. Run git lfs pull for the Stockfish NNUE resources."
+  asset_size="$(wc -c < "$asset_path" | tr -d ' ')"
+  [[ "$asset_size" -gt 1000000 ]] || fail "$asset_path is a Git LFS pointer, not a neural-network binary. Run: git lfs pull --include='apps/mobile/ios/StockfishEngine/Resources/*.nnue'"
+}
+
+verify_nnue_asset "apps/mobile/ios/StockfishEngine/Resources/nn-37f18f62d772.nnue"
+verify_nnue_asset "apps/mobile/ios/StockfishEngine/Resources/nn-c288c895ea92.nnue"
+
 AVAILABLE_DEVICES="$(xcrun simctl list devices available)"
 grep -Fq "$DEVICE_NAME (" <<<"$AVAILABLE_DEVICES" || fail "Dedicated simulator '$DEVICE_NAME' is not available."
 

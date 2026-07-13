@@ -1,6 +1,6 @@
 ---
 name: chessticize-mobile-local-e2e
-description: Prepare and validate the Chessticize Mobile macOS/iOS environment, run the exact-head local Detox PR gate, measure the build, flows, and practice suites, diagnose local Xcode, Ruby, CocoaPods, Simulator, or Detox setup failures, and record auditable PR evidence. Use when a routine PR needs local iOS E2E evidence, when setting up a Mac for Chessticize Detox, or when the user asks how long the local E2E suite takes.
+description: Prepare and validate the Chessticize Mobile macOS/iOS environment and fresh Git worktrees, run the exact-head local Detox PR gate, measure the build, flows, and practice suites, diagnose local Xcode, Ruby, CocoaPods, Git LFS, Simulator, or Detox setup failures, and record auditable PR evidence. Use when a routine PR needs local iOS E2E evidence, when setting up a Mac or worktree for Chessticize Detox, or when the user asks how long the local E2E suite takes.
 ---
 
 # Chessticize Mobile Local E2E
@@ -50,7 +50,18 @@ pnpm install --frozen-lockfile
 
 `package.json` currently pins pnpm 11.1.2. If the pnpm launcher hangs on signature or registry verification, install that pinned version normally; never disable signature verification.
 
-### 3. Use Ruby 3.3 for the locked CocoaPods bundle
+### 3. Hydrate Git LFS resources in every fresh worktree
+
+Git worktrees can contain the 132-byte NNUE pointer files even when another checkout has the real binaries. Hydrate the Stockfish networks before building:
+
+```sh
+git lfs pull --include='apps/mobile/ios/StockfishEngine/Resources/*.nnue'
+wc -c apps/mobile/ios/StockfishEngine/Resources/*.nnue
+```
+
+Expect both files to exceed 1 MB. Pointer files can compile and be copied into the app bundle, but opening Analysis then terminates Stockfish and appears in Detox as `The app has unexpectedly disconnected from Detox server.`
+
+### 4. Use Ruby 3.3 for the locked CocoaPods bundle
 
 The currently verified local combination is Homebrew Ruby 3.3 plus Bundler 2.4.22. Do not use:
 
@@ -72,7 +83,9 @@ cd ../..
 
 Keep gems under `apps/mobile/vendor/bundle` as configured by `.bundle/config`. Do not update `Gemfile.lock` during environment setup.
 
-### 4. Install Detox simulator utilities
+Install the bundle once per fresh worktree; the ignored `vendor/bundle` directory is not shared automatically between worktrees.
+
+### 5. Install Detox simulator utilities
 
 ```sh
 brew tap wix/brew
@@ -82,7 +95,7 @@ applesimutils --version
 
 If Homebrew requires formula trust, use its displayed `brew trust --formula wix/brew/applesimutils` command and retry.
 
-### 5. Create a dedicated simulator
+### 6. Create a dedicated simulator
 
 Inspect installed identifiers:
 
@@ -100,7 +113,7 @@ xcrun simctl create "iPhone 17-Detox" \
   com.apple.CoreSimulator.SimRuntime.iOS-27-0
 ```
 
-### 6. Run the environment doctor
+### 7. Run the environment doctor
 
 ```sh
 export PATH="$(brew --prefix ruby@3.3)/bin:$PATH"
@@ -127,11 +140,12 @@ The runner:
 
 1. Selects Homebrew Ruby 3.3.
 2. Requires a clean git worktree and records `HEAD`.
-3. Verifies the dedicated simulator and iOS environment.
-4. Builds the app with bundled JavaScript.
-5. Runs `flows` and `practice` separately with one worker.
-6. Verifies the commit and worktree did not change.
-7. Prints per-step timing and a PR evidence summary.
+3. Rejects unhydrated Git LFS pointer files for the Stockfish NNUE networks.
+4. Verifies the dedicated simulator and iOS environment.
+5. Builds the app with bundled JavaScript.
+6. Runs `flows` and `practice` separately with one worker.
+7. Verifies the commit and worktree did not change.
+8. Prints per-step timing and a PR evidence summary.
 
 To run commands manually, use the same order:
 
@@ -165,6 +179,7 @@ Its presence proves the Detox app does not depend on Metro.
 - `cannot load such file -- base64`: Ruby 3.4 is active; switch to Ruby 3.3.
 - `minitest ... requires ruby version < 4.0`: Ruby 4 is active; switch to Ruby 3.3.
 - `jest: command not found` from Detox: ensure `apps/mobile/node_modules/.bin` is in `PATH`, or invoke the repository script, which does this.
+- Analysis-button tests disconnect from Detox without a crash report: check that both `Resources/*.nnue` files exceed 1 MB. If they are 132-134 byte LFS pointers, run the scoped `git lfs pull` command above, rebuild, and rerun the focused test before both complete suites.
 - Missing `main.jsbundle`: rebuild with `pnpm mobile:e2e:build:ios`; do not trust a Metro-only app.
 - A suite fails: inspect the exact failing spec and product state. Rerun the focused spec to diagnose, fix the cause, then rebuild and rerun both complete suites.
 - `pod install` dirties tracked project files: stop. Normalize or intentionally commit the CocoaPods-generated change before producing exact-head evidence; never silently restore unrelated user changes.

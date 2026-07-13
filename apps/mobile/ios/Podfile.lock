@@ -2364,7 +2364,7 @@ EXTERNAL SOURCES:
 SPEC CHECKSUMS:
   ChessticizeStockfish: cf3958b77b79128ec9475777398aae8b40cbb917
   FBLazyVector: b3e7ad108f0d882e30445c5527d774e3fd432f3d
-  hermes-engine: 6067667af1456a6dd1901a8749528efe2edb8062
+  hermes-engine: 0e5a95c9eb83f499df38037236adddb94b493540
   op-sqlite: 245e3f31cdb38aab00a8385dbd75b471132e3ac6
   RCTDeprecation: 2a74a2c57675e64419bd89078efde81f7c1de90b
   RCTRequired: 30451112e6fef4e6f31b4e7eee0845156e35e4b0
