@@ -2,9 +2,29 @@ name: Core Library
 
 on:
   pull_request:
+    paths:
+      - ".github/workflows/core.yml"
+      - "apps/cli/**"
+      - "fixtures/**"
+      - "packages/**"
+      - "scripts/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "tsconfig.json"
   push:
     branches:
       - main
+    paths:
+      - ".github/workflows/core.yml"
+      - "apps/cli/**"
+      - "fixtures/**"
+      - "packages/**"
+      - "scripts/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "tsconfig.json"
 
 permissions:
   contents: read
@@ -46,12 +66,3 @@ jobs:
 
       - name: CLI E2E tests
         run: pnpm test:e2e
-
-      - name: Full test suite
-        run: pnpm test
-
-      - name: Mobile typecheck
-        run: pnpm mobile:typecheck
-
-      - name: Mobile component tests
-        run: pnpm mobile:test

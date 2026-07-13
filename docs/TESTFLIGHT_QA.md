@@ -49,9 +49,9 @@ Run these before uploading the build:
 - [ ] `pnpm typecheck`
 - [ ] `pnpm mobile:test`
 - [ ] `pnpm mobile:typecheck`
-- [ ] `pnpm mobile:doctor:ios`
-- [ ] `pnpm mobile:e2e:build:ios`
-- [ ] `DETOX_IOS_DEVICE="iPhone 17" pnpm mobile:e2e:test:ios`
+- [ ] Manually dispatch or verify the GitHub Mobile iOS/Detox workflow for the
+      exact release-candidate commit on `main`; record the run URL and require
+      both `flows` and `practice` to pass.
 - [ ] Confirm `apps/mobile/ios/ChessticizeMobile/Info.plist` still declares
       `ITSAppUsesNonExemptEncryption = false`.
 - [ ] Confirm the Release Source Rule is satisfied for the uploaded commit.

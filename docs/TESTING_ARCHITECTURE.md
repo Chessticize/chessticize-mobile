@@ -42,30 +42,51 @@ real boundary is part of the risk.
 suite. The mobile GUI suite is built and run with
 `pnpm mobile:e2e:build:ios` and `pnpm mobile:e2e:test:ios`.
 
-## Local PR Gate And Release CI Gate
+## PR, Nightly Main, And Release Gates
 
-Routine PR merges use local Detox as the native GUI gate. GitHub Detox is not a
-per-PR merge gate and its runtime must not keep an otherwise complete PR
-waiting. A PR may merge when all of the following are true:
+Use three different gates instead of treating every PR as a release candidate:
 
-- Every required non-Detox check has completed successfully.
-- The local iOS Detox app was built from the exact PR head commit.
-- Both the `flows` and `practice` suites passed locally, either through the
-  unfiltered full-suite command or explicit runs of both suites.
-- The PR description or a PR comment records the commit SHA, commands, and
-  result. A later code change invalidates the evidence and requires a rerun.
+| Gate | Purpose | Required validation |
+| --- | --- | --- |
+| Pull request | Prove the changed behavior at the cheapest reliable layer | Path-scoped fast CI plus the risk-scoped native validation below |
+| Nightly `main` | Detect integration failures across a batch of merged work | One iOS build followed by complete `flows` and `practice` suites |
+| Release candidate | Prove the exact source intended for distribution | Manually dispatched exact-head complete Detox plus applicable release/manual checks |
 
-CI Detox does not run automatically for routine PRs. A failed non-Detox check
-remains a blocker, as does a known product failure. Local Detox evidence must
-be exact-head and full-suite; a focused spec, an older commit, a manual
-simulator pass, or an unrecorded claim does not qualify.
+Every PR must pass its relevant unit, integration, CLI E2E, component, and
+typecheck jobs. GitHub workflow path filters select the applicable fast jobs.
+The PR author selects one native-validation scope based on behavior rather than
+diff size or filename alone:
 
-GitHub Detox is the release gate for `main`. Before any release, manually
-dispatch Mobile iOS/Detox for the exact release candidate commit on `main` (or
-verify an existing run for that exact commit) and require both matrix suites to
-pass. If `main` Detox fails, diagnose and fix the failure, then rerun it until
-green before releasing. This release check does not require per-failure issue
-bookkeeping.
+- **No mobile Detox**: documentation and tooling; pure core, storage, or CLI
+  changes covered by their own suites; ordinary React Native copy, state,
+  styling, accessibility, and service wiring covered by component tests.
+- **Targeted native validation**: the affected Detox spec or one affected suite
+  (`flows` or `practice`) for navigation, multi-screen journeys, relaunch
+  persistence, real board behavior/rendering, adaptive layout, or native-module
+  boundaries. A focused simulator screenshot is sufficient for a visual-only
+  acceptance check when no repeatable journey changed.
+- **Full native validation**: build once and run both suites only for broad
+  native risk such as app startup, shared navigation or storage wiring, global
+  launch fixtures, native build configuration, Detox infrastructure, or risk
+  that cannot be bounded to one suite.
+
+CI Detox does not run automatically for routine PRs. When a PR requires native
+validation, record the selected scope, exact commit SHA, build result, commands,
+results, and clean-worktree confirmation in the PR. A later code change
+invalidates that evidence. A failed required fast check, failed selected native
+scope, or known product failure remains a merge blocker.
+
+The scheduled nightly workflow runs both suites against the latest `main` as a
+non-PR integration signal. Triage failures promptly so they do not accumulate,
+but a later nightly failure does not retroactively invalidate already merged PR
+evidence.
+
+Before any release, manually dispatch Mobile iOS/Detox for the exact release
+candidate commit on `main` (or verify an existing run for that exact commit) and
+require both suites to pass. If `main` Detox fails, diagnose and fix the
+failure, then rerun it until green before releasing. Real CloudKit,
+notification delivery, TestFlight upgrade, physical-device, schema-upgrade,
+and App Store screenshot checks remain conditional release gates.
 
 ## What Must Be Exhaustive
 
@@ -339,17 +360,18 @@ test both compatibility contracts deliberately.
 
 ## Change-To-Test Matrix
 
-| Change | Minimum validation |
-| --- | --- |
-| Pure sprint/ELO/review/history rule | Focused core unit tests, `pnpm test:unit`, typecheck |
-| Repository/store behavior | Real SQLite integration tests, `pnpm test:integration` |
-| SQLite schema or migration | Released-fixture migration matrix, rollback/idempotency checks, native upgrade smoke before release |
-| CLI command or protocol | `pnpm test:e2e` |
-| React Native UI state or wiring | Focused component tests, `pnpm mobile:test`, `pnpm mobile:typecheck` |
-| Navigation or cross-component journey | Component coverage plus a representative Detox update |
-| Real chessboard/native rendering | Detox and screenshot inspection |
-| CloudKit behavior | Fake transport integration plus signed staging/manual validation |
-| Notification scheduling/routing | Fake/native fixture tests plus physical-device release smoke |
+| Change | Minimum PR validation | Later gate |
+| --- | --- | --- |
+| Pure sprint/ELO/review/history rule | Focused core unit tests, `pnpm test:unit`, typecheck; no mobile Detox | Nightly and release full Detox provide integration coverage |
+| Repository/store behavior | Real SQLite integration tests, `pnpm test:integration`; targeted mobile persistence spec only when adapter wiring changed | Nightly and release full Detox |
+| SQLite schema or migration | Released-fixture migration matrix and rollback/idempotency checks | Native upgrade smoke before release |
+| CLI command or protocol | `pnpm test:e2e`; no mobile Detox | None unless a mobile boundary also changed |
+| React Native copy, state, styling, accessibility, or wiring | Focused component tests, `pnpm mobile:test`, `pnpm mobile:typecheck`; no mobile Detox by default | Nightly and release full Detox |
+| Navigation or cross-component journey | Component coverage plus the affected Detox spec or suite on the exact PR head | Nightly and release full Detox |
+| Real chessboard/native rendering or adaptive layout | Targeted Detox or focused simulator screenshot inspection | Nightly and release full Detox |
+| App startup, shared native wiring, launch fixtures, build configuration, or Detox infrastructure | Exact-head full `flows` and `practice` | Nightly and release full Detox |
+| CloudKit behavior | Fake transport integration; targeted native validation only when adapter wiring changed | Signed staging/manual release validation |
+| Notification scheduling/routing | Fake/native fixture tests; targeted native validation only when routing changed | Physical-device release smoke |
 
 ## Completion Checklist
 
@@ -359,6 +381,8 @@ Before describing a change as complete:
 - Put every business-rule branch in core or storage tests.
 - Add component behavior coverage for changed visible states or actions.
 - Add or update a representative E2E journey only when a real boundary changed.
+- Record the selected PR native-validation scope and why broader layers were not
+  required.
 - For schema changes, add the versioned migration and migration regression
   evidence before changing production reads/writes to require the new schema.
 - Run the focused commands for the changed layers.

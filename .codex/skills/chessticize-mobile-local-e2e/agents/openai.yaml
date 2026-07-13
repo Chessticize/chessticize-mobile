@@ -1,4 +1,4 @@
 interface:
-  display_name: "Chessticize Worktree E2E"
-  short_description: "Prepare worktrees and run exact-head iOS Detox"
-  default_prompt: "Use $chessticize-mobile-local-e2e to prepare this fresh worktree and run the exact-head local iOS Detox gate."
+  display_name: "Chessticize Risk-Scoped E2E"
+  short_description: "Run risk-scoped exact-head iOS Detox evidence"
+  default_prompt: "Use $chessticize-mobile-local-e2e to choose and run the smallest exact-head iOS Detox scope that proves this change."

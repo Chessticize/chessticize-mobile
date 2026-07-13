@@ -4,11 +4,20 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 DEVICE_NAME="${DETOX_IOS_DEVICE:-iPhone 17-Detox}"
+E2E_SCOPE="${CHESSTICIZE_E2E_SCOPE:-}"
 
 fail() {
-  echo "Local E2E gate failed: $*" >&2
+  echo "Local E2E evidence failed: $*" >&2
   exit 1
 }
+
+case "$E2E_SCOPE" in
+  flows|practice|full)
+    ;;
+  *)
+    fail "Set CHESSTICIZE_E2E_SCOPE to flows, practice, or full. Choose the smallest scope required by the PR risk matrix."
+    ;;
+esac
 
 command -v brew >/dev/null 2>&1 || fail "Homebrew is required."
 RUBY_PREFIX="${CHESSTICIZE_RUBY_PREFIX:-$(brew --prefix ruby@3.3 2>/dev/null || true)}"
@@ -68,13 +77,20 @@ BUILD_STARTED=$SECONDS
 run_build
 BUILD_SECONDS=$((SECONDS - BUILD_STARTED))
 
-FLOWS_STARTED=$SECONDS
-run_suite flows
-FLOWS_SECONDS=$((SECONDS - FLOWS_STARTED))
+FLOWS_SECONDS=""
+PRACTICE_SECONDS=""
 
-PRACTICE_STARTED=$SECONDS
-run_suite practice
-PRACTICE_SECONDS=$((SECONDS - PRACTICE_STARTED))
+if [[ "$E2E_SCOPE" == "flows" || "$E2E_SCOPE" == "full" ]]; then
+  FLOWS_STARTED=$SECONDS
+  run_suite flows
+  FLOWS_SECONDS=$((SECONDS - FLOWS_STARTED))
+fi
+
+if [[ "$E2E_SCOPE" == "practice" || "$E2E_SCOPE" == "full" ]]; then
+  PRACTICE_STARTED=$SECONDS
+  run_suite practice
+  PRACTICE_SECONDS=$((SECONDS - PRACTICE_STARTED))
+fi
 TOTAL_SECONDS=$((SECONDS - STARTED_AT))
 
 HEAD_AFTER="$(git rev-parse HEAD)"
@@ -82,14 +98,19 @@ HEAD_AFTER="$(git rev-parse HEAD)"
 [[ -z "$(git status --porcelain --untracked-files=all)" ]] || fail "The gate changed tracked or untracked files."
 
 echo
-echo "Local Detox merge evidence"
+echo "Local Detox evidence"
 echo "Exact head: $HEAD_BEFORE"
+echo "Scope: $E2E_SCOPE"
 echo "Device: $DEVICE_NAME"
 echo "Xcode: $(xcodebuild -version | tr '\n' ' ')"
 echo "Ruby: $(ruby --version)"
 echo "Doctor: PASS (${DOCTOR_SECONDS}s)"
 echo "Build: PASS (${BUILD_SECONDS}s)"
-echo "Flows: PASS (${FLOWS_SECONDS}s)"
-echo "Practice: PASS (${PRACTICE_SECONDS}s)"
+if [[ -n "$FLOWS_SECONDS" ]]; then
+  echo "Flows: PASS (${FLOWS_SECONDS}s)"
+fi
+if [[ -n "$PRACTICE_SECONDS" ]]; then
+  echo "Practice: PASS (${PRACTICE_SECONDS}s)"
+fi
 echo "Total: ${TOTAL_SECONDS}s"
 echo "Worktree: clean; HEAD unchanged"

@@ -16,6 +16,7 @@
     "app-store:screenshot-audit": "node scripts/app-store-screenshot-audit.mjs",
     "app-store:release-manifest": "node scripts/app-store-release-manifest.mjs",
     "app-store:testflight-evidence": "node scripts/app-store-testflight-evidence.mjs",
+    "process:validate": "node scripts/validate-development-process.mjs",
     "generate:offline-puzzles": "node --experimental-strip-types scripts/generate-offline-puzzle-fixture.mjs",
     "update:offline-puzzle-presolve": "node --experimental-strip-types scripts/update-offline-puzzle-pack-presolve.mjs",
     "typecheck": "tsc --noEmit",

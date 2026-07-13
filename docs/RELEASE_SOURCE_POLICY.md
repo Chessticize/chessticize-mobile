@@ -31,6 +31,9 @@ https://github.com/Chessticize/chessticize-mobile
 - Run `pnpm app-store:signing-readiness` on the upload machine and resolve any
   missing Apple Developer Team ID, Xcode, or Apple distribution identity before
   archiving.
+- Manually dispatch or verify GitHub Mobile iOS/Detox for the exact candidate
+  commit on `main`, require both `flows` and `practice` to pass, and record the
+  run URL with the release evidence.
 - Run `pnpm app-store:third-party-audit` from the final lockfile and resolve
   any stale package, Stockfish, NNUE, or puzzle-data notice.
 - After final screenshot export, run `pnpm app-store:screenshot-audit` and

@@ -39,21 +39,27 @@ describe("TestFlight QA checklist", () => {
     }
   });
 
-  it("requires preflight automation before upload", () => {
+  it("requires fast preflight checks and exact-candidate GitHub Detox before upload", () => {
     const requiredCommands = [
       "pnpm app-store:preflight",
       "pnpm test",
       "pnpm typecheck",
       "pnpm mobile:test",
-      "pnpm mobile:typecheck",
-      "pnpm mobile:doctor:ios",
-      "pnpm mobile:e2e:build:ios",
-      "pnpm mobile:e2e:test:ios"
+      "pnpm mobile:typecheck"
     ];
 
     for (const command of requiredCommands) {
       expect(testFlightDoc).toContain(command);
     }
+
+    for (const document of [testFlightDoc, appStoreUploadDoc, releasePolicy]) {
+      expect(document).toContain("GitHub Mobile iOS/Detox");
+      expect(document).toContain("exact");
+      expect(document).toContain("`flows`");
+      expect(document).toContain("`practice`");
+    }
+
+    expect(testFlightDoc).toContain("record the run URL");
   });
 
   it("requires evidence before the App Store plan item can be completed", () => {

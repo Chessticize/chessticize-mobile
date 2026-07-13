@@ -32,6 +32,11 @@ pnpm mobile:doctor:ios
 pnpm app-store:testflight-evidence -- --screenshot-root scratch/store-assets/final
 ```
 
+Before archiving, manually dispatch or verify the GitHub Mobile iOS/Detox
+workflow for this exact `main` commit and require both `flows` and `practice` to
+pass. Record the workflow URL with the TestFlight evidence; the nightly run is
+acceptable only when it tested the exact release candidate.
+
 The evidence command must report `dirty: false`, `status: "pass"`, and
 `releaseReady: true`. Keep the generated `scratch/testflight-qa/<timestamp>/`
 folder for the physical-device QA record.
