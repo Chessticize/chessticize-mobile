@@ -28,7 +28,6 @@ import {
   formatLocalCalendarDate,
   formatReviewDay,
   formatSideToMoveScore,
-  historyAttemptReviewKey,
   historyAttemptSpeedSeconds,
   isReviewOverdue,
   reviewDueState,
@@ -46,7 +45,6 @@ import type {
   HistoryAttemptView,
   HistoryPerformance,
   HistoryPerformancePoint,
-  HistoryPuzzleStats,
   HistoryReviewStatus,
   HistoryTimeRange,
   PuzzleSide,
@@ -101,6 +99,7 @@ import {
   type ICloudProgressSyncClient
 } from "../backend/iCloudProgressSync.ts";
 import { arePracticeTestControlsEnabled, isPracticeDebugEnabled } from "../releaseConfig.ts";
+import { isStoreAssetCaptureEnabled } from "../backend/testLaunchConfig.ts";
 import {
   canonicalFen,
   decidePremoveQueue,
@@ -443,8 +442,8 @@ export function PracticePocScreen({
   const [boardInputLockMode, setBoardInputLockMode] = useState<BoardInputLockMode>("hard");
   const [chessboardDebugEvents, setChessboardDebugEvents] = useState<string[]>([]);
   const [historyTimeRange, setHistoryTimeRange] = useState<HistoryTimeRange>("7d");
-  const [historySourceFilter, setHistorySourceFilter] = useState<"all" | AttemptSource>("all");
-  const [historyResultFilter, setHistoryResultFilter] = useState<"all" | "correct" | "wrong">("wrong");
+  const [historySourceFilter, setHistorySourceFilter] = useState<"all" | AttemptSource>("sprint");
+  const [historyResultFilter, setHistoryResultFilter] = useState<"all" | "correct" | "wrong">("all");
   const [historySideFilter, setHistorySideFilter] = useState<"all" | PuzzleSide>("all");
   const [historyThemeFilter, setHistoryThemeFilter] = useState<string>("all");
   const [historyRatingRangeFilter, setHistoryRatingRangeFilter] = useState<HistoryRatingRangeFilter>("all");
@@ -1688,11 +1687,13 @@ export function PracticePocScreen({
   const feedbackForCurrentPuzzle = feedbackPuzzleId && currentPuzzle?.puzzle.id === feedbackPuzzleId ? feedback : null;
   const boardFeedback = feedbackSnapshot?.feedback ?? feedbackForCurrentPuzzle;
   const boardPremoveWindow = boardInputLocked && boardInputLockMode === "premove";
-  // While board input is locked, quick drags aimed at the board must not pan
-  // the screen. The board's own pan gesture claims touches while enabled, but
-  // hard-lock windows disable it (and fast drags can start on the padding), so
-  // freeze the surrounding scroll view for the lock's duration.
-  const practiceScrollLocked = shouldShowSessionBoard && (boardInputLocked || isShowingFeedbackSnapshot);
+  // While the session board is on screen, drags aimed at the board must pan
+  // pieces, never the page. The board's own pan gesture claims touches while
+  // enabled, but hard-lock windows disable it, fast drags can start on the
+  // padding, and a touch that begins during a lock window can survive into an
+  // unlocked turn and feed the scroll view instead — so freeze the
+  // surrounding scroll for the whole session, not just the lock windows.
+  const practiceScrollLocked = shouldShowSessionBoard;
   const boardGestureEnabled = Boolean(
     isActive && !isShowingFeedbackSnapshot && (!boardInputLocked || boardPremoveWindow)
   );
@@ -1815,7 +1816,15 @@ export function PracticePocScreen({
   ) : null;
   const sessionBoardNode = shouldShowSessionBoard ? (
     <View style={styles.boardWrapper}>
-      <View testID="session-board" style={[styles.boardSurface, { width: boardSize, height: boardSize }]}>
+      {isStoreAssetCaptureEnabled() ? (
+        <Text testID="session-current-puzzle-id" style={styles.reviewDueHiddenMetric}>
+          {displayedPuzzle?.puzzle.id ?? ""}
+        </Text>
+      ) : null}
+      <View
+        testID="session-board"
+        style={[styles.boardSurface, { width: boardSize, height: boardSize }]}
+      >
         {displayedBoardFen ? (
           <Chessboard
             key={`${state?.id ?? "idle"}-${displayedPuzzle?.puzzle.id ?? "none"}-${displayedPuzzle?.kind ?? "line"}`}
@@ -2091,7 +2100,6 @@ export function PracticePocScreen({
                   attempts={displayedAttempts}
                   performance={historyPerformanceView?.performance ?? emptyHistoryPerformance()}
                   ratingKeys={historyRatingKeys}
-                  puzzleStats={historyView?.puzzleStats ?? []}
                   selectedRatingKey={activeHistoryRatingKey}
                   timeRange={historyTimeRange}
                   sourceFilter={historySourceFilter}
@@ -2102,6 +2110,7 @@ export function PracticePocScreen({
                   availableThemes={historyAvailableThemes}
                   page={historyPage}
                   reviewStatusFilter={historyReviewStatusFilter}
+                  sprintOnly={historySourceFilter === "sprint"}
                   wrongOnly={historyWrongOnly}
                   onRatingKeyChange={(ratingKey) => {
                     setHistoryRatingKey(ratingKey);
@@ -2137,6 +2146,21 @@ export function PracticePocScreen({
                   }}
                   onPageOffsetChange={setHistoryPageOffset}
                   onOpenAttempt={openHistoryReview}
+                  onResetFilters={() => {
+                    setHistoryTimeRange("7d");
+                    setHistorySourceFilter("sprint");
+                    setHistoryResultFilter("all");
+                    setHistorySideFilter("all");
+                    setHistoryThemeFilter("all");
+                    setHistoryRatingRangeFilter("all");
+                    setHistoryReviewStatusFilter("all");
+                    setHistoryPageOffset(0);
+                    setHistoryRatingKey(null);
+                  }}
+                  onToggleSprintOnly={() => {
+                    setHistoryPageOffset(0);
+                    setHistorySourceFilter(historySourceFilter === "sprint" ? "all" : "sprint");
+                  }}
                   onToggleWrongOnly={() => {
                     setHistoryPageOffset(0);
                     setHistoryResultFilter(historyWrongOnly ? "all" : "wrong");
@@ -2576,7 +2600,7 @@ function PracticeModeCard({
     >
       <View style={styles.practiceModeSelectArea}>
         <View style={[styles.practiceModeIcon, active ? styles.practiceModeIconActive : null]} testID={`practice-mode-${modeTestId}-icon`}>
-          <PracticeModeGlyph mode={item.mode} />
+          <PracticeModeGlyph mode={item.mode} testIDPrefix={`practice-mode-${modeTestId}`} />
         </View>
         <View style={styles.practiceModeCopy}>
           <View style={styles.practiceModeTitleRow}>
@@ -3617,10 +3641,12 @@ function PracticePrompt({
 
 function PracticeModeGlyph({
   inverse = false,
-  mode
+  mode,
+  testIDPrefix
 }: {
   inverse?: boolean;
   mode: SprintMode;
+  testIDPrefix?: string;
 }): React.JSX.Element {
   const color = inverse ? "#FFFFFF" : "#2563EB";
   if (mode === "standard") {
@@ -3634,9 +3660,28 @@ function PracticeModeGlyph({
   if (mode === "arrow_duel") {
     return (
       <View style={styles.modeGlyphCanvas}>
-        <View style={[styles.modeArrowStem, { backgroundColor: color }]} />
-        <View style={[styles.modeArrowHeadTop, { backgroundColor: color }]} />
-        <View style={[styles.modeArrowHeadBottom, { backgroundColor: color }]} />
+        <View
+          style={[styles.modeDuelArrow, styles.modeDuelArrowUpper]}
+          testID={testIDPrefix ? `${testIDPrefix}-arrow-a` : undefined}
+        >
+          <View
+            style={[styles.modeDuelArrowShaft, { backgroundColor: color }]}
+            testID={testIDPrefix ? `${testIDPrefix}-arrow-a-shaft` : undefined}
+          />
+          <View style={[styles.modeDuelArrowHeadTop, { backgroundColor: color }]} />
+          <View style={[styles.modeDuelArrowHeadBottom, { backgroundColor: color }]} />
+        </View>
+        <View
+          style={[styles.modeDuelArrow, styles.modeDuelArrowLower]}
+          testID={testIDPrefix ? `${testIDPrefix}-arrow-b` : undefined}
+        >
+          <View
+            style={[styles.modeDuelArrowShaft, { backgroundColor: color }]}
+            testID={testIDPrefix ? `${testIDPrefix}-arrow-b-shaft` : undefined}
+          />
+          <View style={[styles.modeDuelArrowHeadTop, { backgroundColor: color }]} />
+          <View style={[styles.modeDuelArrowHeadBottom, { backgroundColor: color }]} />
+        </View>
       </View>
     );
   }
@@ -4033,7 +4078,6 @@ function HistoryPanel({
   attempts,
   performance,
   ratingKeys,
-  puzzleStats,
   selectedRatingKey,
   timeRange,
   sourceFilter,
@@ -4044,6 +4088,7 @@ function HistoryPanel({
   availableThemes,
   page,
   reviewStatusFilter,
+  sprintOnly,
   wrongOnly,
   onRatingKeyChange,
   onTimeRangeChange,
@@ -4055,13 +4100,14 @@ function HistoryPanel({
   onReviewStatusFilterChange,
   onPageOffsetChange,
   onOpenAttempt,
+  onResetFilters,
+  onToggleSprintOnly,
   onToggleWrongOnly
 }: {
   adaptiveLayout: AdaptiveLayout;
   attempts: HistoryAttemptView[];
   performance: HistoryPerformance;
   ratingKeys: string[];
-  puzzleStats: HistoryPuzzleStats[];
   selectedRatingKey: string | null;
   timeRange: HistoryTimeRange;
   sourceFilter: "all" | AttemptSource;
@@ -4072,6 +4118,7 @@ function HistoryPanel({
   availableThemes: string[];
   page: { limit: number; offset: number; total: number; hasMore: boolean };
   reviewStatusFilter: "all" | HistoryReviewStatus;
+  sprintOnly: boolean;
   wrongOnly: boolean;
   onRatingKeyChange: (ratingKey: string | null) => void;
   onTimeRangeChange: (range: HistoryTimeRange) => void;
@@ -4083,10 +4130,11 @@ function HistoryPanel({
   onReviewStatusFilterChange: (status: "all" | HistoryReviewStatus) => void;
   onPageOffsetChange: (offset: number) => void;
   onOpenAttempt: (attemptId: string) => void;
+  onResetFilters: () => void;
+  onToggleSprintOnly: () => void;
   onToggleWrongOnly: () => void;
 }): React.JSX.Element {
   const [filtersExpanded, setFiltersExpanded] = useState(false);
-  const puzzleStatsByAttemptKey = new Map(puzzleStats.map((stats) => [historyAttemptReviewKey(stats), stats]));
   const visibleAttempts = attempts;
   const ratingPoints = performance.charts.rating;
   const latestRating = ratingPoints[ratingPoints.length - 1]?.value;
@@ -4104,16 +4152,29 @@ function HistoryPanel({
     <View style={[styles.historyPanel, adaptiveLayout.usesWideContent ? styles.historyPanelWide : null]} testID="history-panel">
       <View style={styles.historyHeaderRow} testID="history-action-header">
         <Text style={styles.screenTitle}>History</Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={filtersExpanded ? "Hide history filters" : "Show history filters"}
-          accessibilityState={{ expanded: filtersExpanded }}
-          testID="history-filter-toggle"
-          style={[styles.reviewFilterButton, filtersExpanded ? styles.reviewFilterButtonActive : null]}
-          onPress={() => setFiltersExpanded((current) => !current)}
-        >
-          <FilterGlyph active={filtersExpanded} />
-        </Pressable>
+        <View style={styles.historyHeaderActions}>
+          {filtersExpanded ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Reset history filters"
+              testID="history-filter-reset"
+              style={styles.historyResetButton}
+              onPress={onResetFilters}
+            >
+              <Text style={styles.historyResetButtonText}>Reset filters</Text>
+            </Pressable>
+          ) : null}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={filtersExpanded ? "Hide history filters" : "Show history filters"}
+            accessibilityState={{ expanded: filtersExpanded }}
+            testID="history-filter-toggle"
+            style={[styles.reviewFilterButton, filtersExpanded ? styles.reviewFilterButtonActive : null]}
+            onPress={() => setFiltersExpanded((current) => !current)}
+          >
+            <FilterGlyph active={filtersExpanded} />
+          </Pressable>
+        </View>
       </View>
 
       <View style={styles.historyTopFilterStack} testID="history-primary-filters">
@@ -4134,7 +4195,7 @@ function HistoryPanel({
             />
           ))}
         </HistoryChipRow>
-        <HistoryChipRow testID="history-range-filters" wrap>
+        <HistoryChipRow testID="history-range-filters">
           {(["7d", "30d", "90d", "1y", "max"] as const).map((range) => (
             <FilterButton
               key={range}
@@ -4145,19 +4206,22 @@ function HistoryPanel({
             />
           ))}
         </HistoryChipRow>
-        <Pressable
-          accessibilityRole="switch"
-          accessibilityLabel="Wrong puzzles only"
-          accessibilityState={{ checked: wrongOnly }}
-          testID="history-filter-wrong-only"
-          style={styles.historyWrongOnlyToggle}
-          onPress={onToggleWrongOnly}
-        >
-          <Text style={styles.filterButtonText}>Wrong only</Text>
-          <View style={[styles.historyToggleTrack, wrongOnly ? styles.historyToggleTrackActive : null]}>
-            <View style={[styles.historyToggleThumb, wrongOnly ? styles.historyToggleThumbActive : null]} />
-          </View>
-        </Pressable>
+        <View style={styles.historyQuickFilterRow}>
+          <HistoryQuickToggle
+            active={wrongOnly}
+            accessibilityLabel="Wrong puzzles only"
+            controlTestID="history-filter-wrong-only"
+            label="Wrong only"
+            onPress={onToggleWrongOnly}
+          />
+          <HistoryQuickToggle
+            active={sprintOnly}
+            accessibilityLabel="Sprint attempts only"
+            controlTestID="history-filter-sprint-only"
+            label="Sprint only"
+            onPress={onToggleSprintOnly}
+          />
+        </View>
       </View>
 
       {selectedRatingKey ? (
@@ -4264,7 +4328,6 @@ function HistoryPanel({
         <HistoryAttemptRow
           key={attempt.id}
           attempt={attempt}
-          puzzleStats={puzzleStatsByAttemptKey.get(historyAttemptReviewKey(attempt))}
           onOpen={() => onOpenAttempt(attempt.id)}
         />
       ))}
@@ -4639,21 +4702,11 @@ function ResultBadgeGlyph({ tone }: { tone: "correct" | "wrong" | "alert" }): Re
 
 function HistoryChipRow({
   children,
-  testID,
-  wrap = false
+  testID
 }: {
   children: React.ReactNode;
   testID: string;
-  wrap?: boolean;
 }): React.JSX.Element {
-  if (wrap) {
-    return (
-      <View style={[styles.historyChipContent, styles.historyChipContentWrap]} testID={testID}>
-        {children}
-      </View>
-    );
-  }
-
   return (
     <ScrollView
       horizontal
@@ -4667,14 +4720,42 @@ function HistoryChipRow({
   );
 }
 
+function HistoryQuickToggle({
+  accessibilityLabel,
+  active,
+  controlTestID,
+  label,
+  onPress
+}: {
+  accessibilityLabel: string;
+  active: boolean;
+  controlTestID: string;
+  label: string;
+  onPress: () => void;
+}): React.JSX.Element {
+  return (
+    <Pressable
+      accessibilityRole="switch"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ checked: active }}
+      testID={controlTestID}
+      style={styles.historyQuickToggle}
+      onPress={onPress}
+    >
+      <Text style={styles.filterButtonText}>{label}</Text>
+      <View style={[styles.historyToggleTrack, active ? styles.historyToggleTrackActive : null]}>
+        <View style={[styles.historyToggleThumb, active ? styles.historyToggleThumbActive : null]} />
+      </View>
+    </Pressable>
+  );
+}
+
 function HistoryAttemptRow({
   attempt,
-  onOpen,
-  puzzleStats
+  onOpen
 }: {
   attempt: HistoryAttemptView;
   onOpen: () => void;
-  puzzleStats?: HistoryPuzzleStats;
 }): React.JSX.Element {
   const isWrong = attempt.result === "wrong";
   const completedAtMs = new Date(attempt.completedAt).getTime();
@@ -4683,18 +4764,13 @@ function HistoryAttemptRow({
   const primaryTheme = historyAttemptThemeLabel(attempt);
   const pace = historyAttemptSpeedSeconds(attempt);
   const paceLabel = pace === null ? null : `${pace}s pace`;
-  const reviewLabel = isWrong
-    ? puzzleStats?.nextReviewDay
-      ? `Review ${formatReviewDay(puzzleStats.nextReviewDay)}`
-      : "Review queued"
-    : "Correct";
   const resultLabel = isWrong ? "Wrong move" : "Correct";
   const submittedMoveLabel = isWrong
     ? `Played ${attempt.submittedMove} · Best ${attempt.expectedMove}`
     : `Move ${attempt.submittedMove}`;
   const sourceLabel = attempt.source === "scheduled_review" ? "Review" : "Sprint";
   const compactContext = [primaryTheme, paceLabel].filter(Boolean).join(" · ");
-  const puzzleIdentity = `Puzzle ID ${attempt.puzzleId} · Puzzle rating ${attempt.puzzleRating}`;
+  const puzzleIdentity = `ID ${attempt.puzzleId} · Rating ${attempt.puzzleRating}`;
   const compactMeta = `${sourceLabel} · ${elapsedSeconds}s · ${dateLabel}`;
   const rowAccessibilityLabel = [
     `Open ${modeLabel(attempt.mode)} ${attempt.result} puzzle review`,
@@ -4702,8 +4778,7 @@ function HistoryAttemptRow({
     submittedMoveLabel,
     puzzleIdentity,
     compactContext,
-    compactMeta,
-    reviewLabel
+    compactMeta
   ].filter(Boolean).join(", ");
 
   return (
@@ -4729,18 +4804,8 @@ function HistoryAttemptRow({
         <Text testID={`history-attempt-${attempt.id}-context`} style={styles.helperText}>{compactContext}</Text>
         <Text testID={`history-attempt-${attempt.id}-meta`} style={styles.helperText}>{compactMeta}</Text>
       </View>
-      <View style={styles.historyAttemptTrailing}>
-        <View style={styles.historyAttemptStatus} testID={`history-attempt-${attempt.id}-status`}>
-          <Text
-            testID={`history-attempt-${attempt.id}-review-state`}
-            style={[styles.historyReviewState, isWrong ? styles.errorText : styles.positive]}
-          >
-            {reviewLabel}
-          </Text>
-        </View>
-        <View style={styles.historyAttemptChevron} testID={`history-attempt-${attempt.id}-chevron`}>
-          <ChevronGlyph direction="right" />
-        </View>
+      <View style={styles.historyAttemptChevron} testID={`history-attempt-${attempt.id}-chevron`}>
+        <ChevronGlyph direction="right" />
       </View>
     </Pressable>
   );
@@ -4900,16 +4965,6 @@ function ChevronGlyph({ direction }: { direction: "left" | "right" }): React.JSX
   return (
     <View style={styles.chevronGlyphCanvas} testID={`chevron-${direction}-glyph`}>
       <View style={[styles.chevronGlyph, direction === "left" ? styles.chevronGlyphLeft : styles.chevronGlyphRight]} />
-    </View>
-  );
-}
-
-function ResetGlyph(): React.JSX.Element {
-  return (
-    <View style={styles.resetGlyph} testID="reset-glyph">
-      <View style={styles.resetArc} />
-      <View style={styles.resetArrowStem} />
-      <View style={styles.resetArrowHead} />
     </View>
   );
 }
@@ -5773,11 +5828,6 @@ function ReviewSession({
   const reviewProgressTotal = scheduledReviewProgress?.total ?? entries.length;
   const reviewPerPuzzleSeconds = perPuzzleSecondsForReviewEntry(currentEntry);
   const reviewPrimaryTheme = currentEntry.puzzle.themes[0] ?? "mixed";
-  const reviewSourceLabel = currentEntry.source === "session"
-    ? "Sprint review"
-    : currentEntry.source === "history"
-      ? "History replay"
-      : "Scheduled review";
   const reviewRemainingSeconds =
     currentEntry.source === "due" && (!reviewResultRecorded || reviewTimedOut)
       ? Math.max(0, reviewPerPuzzleSeconds - Math.floor((reviewNowMs - reviewStartedAtMs) / 1000))
@@ -6294,7 +6344,7 @@ function ReviewSession({
             <Text testID="review-progress" style={styles.helperText}>
               {reviewProgressPosition} / {reviewProgressTotal} · {modeLabel(currentEntry.mode)}
             </Text>
-            {arePracticeTestControlsEnabled() ? (
+            {arePracticeTestControlsEnabled() || isStoreAssetCaptureEnabled() ? (
               <>
                 <Text testID="review-current-puzzle-id" style={styles.reviewDueHiddenMetric}>
                   {currentEntry.puzzle.id}
@@ -6347,14 +6397,14 @@ function ReviewSession({
             style={[styles.iconButton, boardLocked ? styles.disabledButton : null]}
             onPress={resetReviewPuzzle}
           >
-            <ResetGlyph />
+            <Text style={styles.iconButtonText}>↺</Text>
           </Pressable>
           </View>
         </View>
         <View style={styles.reviewContextStrip} testID="review-context-strip">
-          {currentEntry.source !== "due" ? (
+          {currentEntry.source === "session" ? (
             <View style={styles.reviewContextPill} testID="review-source-pill">
-              <Text style={styles.reviewContextPillText}>{reviewSourceLabel}</Text>
+              <Text style={styles.reviewContextPillText}>Sprint review</Text>
             </View>
           ) : null}
           <MoveSideBadge badgeTestID="review-side-to-move" side={reviewSideToMove} />
@@ -6523,7 +6573,7 @@ function ReviewSession({
                   <ChevronGlyph direction="right" />
                 </Pressable>
                 <Pressable accessibilityRole="button" accessibilityLabel="Reset analysis" testID="review-analysis-reset" style={styles.iconButton} onPress={resetAnalysisPosition}>
-                  <ResetGlyph />
+                  <Text style={styles.iconButtonText}>↺</Text>
                 </Pressable>
                 <Pressable accessibilityRole="button" accessibilityLabel="Flip board" testID="review-analysis-flip" style={styles.iconButton} onPress={() => setManualBoardFlip((current) => !current)}>
                   <FlipGlyph />
@@ -8692,6 +8742,25 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     minHeight: 38
   },
+  historyHeaderActions: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8
+  },
+  historyResetButton: {
+    alignItems: "center",
+    borderColor: "#CBD5E1",
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 38,
+    paddingHorizontal: 12
+  },
+  historyResetButtonText: {
+    color: "#475569",
+    fontSize: 12,
+    fontWeight: "800"
+  },
   screenTitle: {
     color: "#111827",
     fontSize: 22,
@@ -8760,30 +8829,45 @@ const styles = StyleSheet.create({
     position: "absolute",
     width: 10
   },
-  modeArrowStem: {
-    borderRadius: 999,
-    height: 3,
+  modeDuelArrow: {
+    height: 7,
+    left: 1,
     position: "absolute",
-    transform: [{ rotate: "-45deg" }],
-    width: 19
+    width: 15
   },
-  modeArrowHeadTop: {
+  modeDuelArrowUpper: {
+    top: 1,
+    transform: [{ rotate: "-28deg" }]
+  },
+  modeDuelArrowLower: {
+    bottom: 1,
+    transform: [{ rotate: "28deg" }]
+  },
+  modeDuelArrowShaft: {
     borderRadius: 999,
-    height: 3,
+    height: 2,
+    left: 0,
+    position: "absolute",
+    top: 2.5,
+    width: 13
+  },
+  modeDuelArrowHeadTop: {
+    borderRadius: 999,
+    height: 2,
     position: "absolute",
     right: 0,
-    top: 3,
+    top: 1,
     transform: [{ rotate: "45deg" }],
-    width: 9
+    width: 6
   },
-  modeArrowHeadBottom: {
+  modeDuelArrowHeadBottom: {
     borderRadius: 999,
-    bottom: 3,
-    height: 3,
+    bottom: 1,
+    height: 2,
     position: "absolute",
     right: 0,
     transform: [{ rotate: "-45deg" }],
-    width: 9
+    width: 6
   },
   modeBoltTop: {
     borderRadius: 999,
@@ -9878,6 +9962,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 38
   },
+  iconButtonText: {
+    color: "#334155",
+    fontSize: 18,
+    fontWeight: "800",
+    lineHeight: 22
+  },
   disabledButton: {
     opacity: 0.36
   },
@@ -10415,9 +10505,14 @@ const styles = StyleSheet.create({
   historyTopFilterStack: {
     gap: 8
   },
-  historyWrongOnlyToggle: {
+  historyQuickFilterRow: {
     alignItems: "center",
-    alignSelf: "flex-start",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10
+  },
+  historyQuickToggle: {
+    alignItems: "center",
     flexDirection: "row",
     gap: 10,
     minHeight: 36,
@@ -10581,10 +10676,6 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingRight: 2
   },
-  historyChipContentWrap: {
-    flexWrap: "wrap",
-    rowGap: 8
-  },
   historyActiveFilterChip: {
     backgroundColor: "#F8FAFC",
     borderColor: "#CBD5E1",
@@ -10682,16 +10773,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     gap: 8
-  },
-  historyAttemptTrailing: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 6
-  },
-  historyAttemptStatus: {
-    alignItems: "flex-end",
-    justifyContent: "center",
-    minWidth: 78
   },
   historyAttemptChevron: {
     alignItems: "center",
@@ -11139,46 +11220,6 @@ const styles = StyleSheet.create({
     borderRightWidth: 2.5,
     borderTopWidth: 2.5,
     transform: [{ rotate: "45deg" }]
-  },
-  resetGlyph: {
-    height: 18,
-    position: "relative",
-    width: 18
-  },
-  resetArc: {
-    borderColor: "#334155",
-    borderLeftColor: "transparent",
-    borderRadius: 999,
-    borderWidth: 2,
-    height: 15,
-    left: 1.5,
-    position: "absolute",
-    top: 1.5,
-    transform: [{ rotate: "-35deg" }],
-    width: 15
-  },
-  resetArrowStem: {
-    backgroundColor: "#334155",
-    borderRadius: 999,
-    height: 2,
-    left: 2,
-    position: "absolute",
-    top: 5,
-    transform: [{ rotate: "-22deg" }],
-    width: 7
-  },
-  resetArrowHead: {
-    borderBottomColor: "transparent",
-    borderBottomWidth: 4,
-    borderRightColor: "#334155",
-    borderRightWidth: 6,
-    borderTopColor: "transparent",
-    borderTopWidth: 4,
-    height: 0,
-    left: 1,
-    position: "absolute",
-    top: 1,
-    width: 0
   },
   flipGlyph: {
     height: 18,

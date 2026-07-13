@@ -7,14 +7,21 @@ type TestLaunchConfigGlobals = typeof globalThis & {
 };
 
 type NativeTestLaunchConfigModule = {
+  storeAssetCapture?: boolean;
   testNowMs?: string | number;
 };
+
+export function isStoreAssetCaptureEnabled(
+  nativeModule: NativeTestLaunchConfigModule | undefined = NativeModules?.ChessticizeTestLaunchConfig as NativeTestLaunchConfigModule | undefined
+): boolean {
+  return nativeModule?.storeAssetCapture === true;
+}
 
 export function resolveTestNowMsFromLaunchConfig(
   globals: TestLaunchConfigGlobals = globalThis,
   nativeModule: NativeTestLaunchConfigModule | undefined = NativeModules?.ChessticizeTestLaunchConfig as NativeTestLaunchConfigModule | undefined
 ): number | undefined {
-  if (!arePracticeTestControlsEnabled(globals)) {
+  if (!arePracticeTestControlsEnabled(globals) && !isStoreAssetCaptureEnabled(nativeModule)) {
     return undefined;
   }
 

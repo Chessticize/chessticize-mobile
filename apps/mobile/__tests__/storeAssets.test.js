@@ -65,11 +65,17 @@ describe("App Store assets document", () => {
     expect(mobilePackage.scripts["e2e:store-assets:ios"]).toContain("artifacts/store-assets");
     expect(storeAssetsE2e).toContain("describe.skip");
     expect(storeAssetsE2e).toContain("CHESSTICIZE_CAPTURE_STORE_ASSETS");
+    expect(storeAssetsE2e).toContain("chessticizeStoreAssetCapture");
+    expect(storeAssetsE2e).toContain("setStoreAssetRatings({ standard: 800, arrowDuel: 850 })");
+    expect(storeAssetsE2e).toContain("toHaveText('1 / 3')");
+    expect(storeAssetsE2e).toContain("by.text('1-3 of 3')");
     expect(storeAssetsE2e).toContain("app-store-01-practice-tab");
     expect(storeAssetsE2e).toContain("app-store-06-arrow-duel");
     expect(storeAssetsDoc).toContain("pnpm mobile:e2e:build:ios:release");
     expect(storeAssetsDoc).toContain("pnpm mobile:e2e:store-assets:ios:release");
     expect(storeAssetsDoc).toContain("pnpm app-store:screenshot-audit");
+    expect(storeAssetsDoc).toContain("deterministic active-player profile");
+    expect(storeAssetsDoc).toContain("two reviews still due plus one completed-today result");
     expect(storeAssetsDoc).toContain("scratch/store-assets/final/");
     expect(storeAssetsDoc).toContain("iphone-6.9");
     expect(storeAssetsDoc).toContain("iphone-6.1");

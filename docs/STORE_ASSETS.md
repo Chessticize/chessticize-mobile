@@ -128,6 +128,25 @@ Detox screenshots:
 | `app-store-05-standard-sprint` | Standard Puzzle Sprint board, timer, progress, and mistakes. |
 | `app-store-06-arrow-duel` | Arrow Duel board with both candidate choices available. |
 
+The capture suite builds one deterministic active-player profile through the
+public app UI before taking any screenshots. It raises Standard difficulty to
+ELO 800 and Arrow Duel difficulty to ELO 850, records a three-mistake Arrow
+Duel sprint, advances the app through the screenshot-only fixed-clock launch
+boundary to the next review day, and completes one scheduled review. The
+resulting store story therefore includes:
+
+- a non-default Arrow Duel rating and weekly activity on Practice;
+- two reviews still due plus one completed-today result on Review;
+- three wrong Sprint attempts on History, matching its default Sprint-only filter.
+
+The Release build recognizes the fixed clock only when the native
+`chessticizeStoreAssetCapture` process argument accompanies
+`chessticizeTestNowMs`. This does not enable the development puzzle-source
+switch, review developer controls, diagnostics, or any visible test UI. Puzzle
+attempts still travel through the real board, app service, and writable SQLite
+store; the local bundled pack database is consulted only by the Detox runner
+to choose a known wrong Arrow Duel candidate deterministically.
+
 Raw Detox artifacts are written under `apps/mobile/artifacts/store-assets/`.
 Move private iteration captures into `scratch/store-assets/raw/` if you need to
 keep local evidence. Do not commit Detox artifacts or unsanitized screenshots.
