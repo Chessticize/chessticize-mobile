@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 const DEFAULT_PROPERTIES_PATH = path.resolve(__dirname, '../android/gradle.properties');
+const DEFAULT_PACKAGE_PATH = path.resolve(__dirname, '../package.json');
 
 function parseGradleProperties(contents) {
   const properties = {};
@@ -37,6 +38,23 @@ function parseIntegerProperty(properties, name) {
   return Number(value);
 }
 
+function loadNodeRequirement(packagePath = DEFAULT_PACKAGE_PATH) {
+  const mobilePackage = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+  const range = mobilePackage.engines?.node;
+  const match = String(range).match(/^>=\s*(\d+)\.(\d+)\.(\d+)$/);
+  if (!match) {
+    throw new Error(`Mobile package Node engine must be a minimum semantic version; received ${range || 'none'}`);
+  }
+  return Object.freeze({
+    range,
+    minimum: Object.freeze({
+      major: Number(match[1]),
+      minor: Number(match[2]),
+      patch: Number(match[3]),
+    }),
+  });
+}
+
 function loadAndroidRequirements(propertiesPath = DEFAULT_PROPERTIES_PATH) {
   const properties = parseGradleProperties(fs.readFileSync(propertiesPath, 'utf8'));
   const abis = requireProperty(properties, 'reactNativeArchitectures')
@@ -50,7 +68,7 @@ function loadAndroidRequirements(propertiesPath = DEFAULT_PROPERTIES_PATH) {
 
   return Object.freeze({
     javaMajor: 17,
-    nodeMajor: 22,
+    node: loadNodeRequirement(),
     minSdk: parseIntegerProperty(properties, 'chessticizeMinSdk'),
     compileSdk: parseIntegerProperty(properties, 'chessticizeCompileSdk'),
     targetSdk: parseIntegerProperty(properties, 'chessticizeTargetSdk'),
@@ -74,8 +92,10 @@ const ANDROID_REQUIREMENTS = loadAndroidRequirements();
 
 module.exports = {
   ANDROID_REQUIREMENTS,
+  DEFAULT_PACKAGE_PATH,
   DEFAULT_PROPERTIES_PATH,
   androidSdkPackages,
   loadAndroidRequirements,
+  loadNodeRequirement,
   parseGradleProperties,
 };
