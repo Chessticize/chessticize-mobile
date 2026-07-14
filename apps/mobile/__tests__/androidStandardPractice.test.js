@@ -92,6 +92,8 @@ describe('Android Standard Practice release slice', () => {
     expect(practiceJourney).toContain("'a3c1'");
     expect(practiceJourney).toContain("'c1d1'");
     expect(practiceJourney).toContain("delete: false");
+    expect(practiceJourney).toContain("const RELAUNCH_TEST_NOW_MS = String(Number(TEST_NOW_MS) + 5 * 60_000)");
+    expect(practiceJourney).toContain("chessticizeTestNowMs: RELAUNCH_TEST_NOW_MS");
     expect(practiceJourney).toContain("history-tab");
     expect(helpers).toContain('androidBoardTapPoint');
     expect(helpers).toContain("'wm', 'density'");

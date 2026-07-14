@@ -10,6 +10,7 @@ const {
 const { setAndroidNetworkEnabled } = require('./androidNetwork');
 
 const TEST_NOW_MS = '1784030400000';
+const RELAUNCH_TEST_NOW_MS = String(Number(TEST_NOW_MS) + 5 * 60_000);
 const TEST_SEED = 'android-standard-practice';
 
 describe('Android Standard Practice offline persistence', () => {
@@ -67,7 +68,7 @@ describe('Android Standard Practice offline persistence', () => {
     await launchWithDisabledSynchronization({
       delete: false,
       newInstance: true,
-      launchArgs: { chessticizeTestNowMs: TEST_NOW_MS },
+      launchArgs: { chessticizeTestNowMs: RELAUNCH_TEST_NOW_MS },
     });
 
     await waitFor(element(by.id('practice-home'))).toExist().withTimeout(180000);
