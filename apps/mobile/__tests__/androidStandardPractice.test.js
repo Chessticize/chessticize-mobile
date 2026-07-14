@@ -105,6 +105,11 @@ describe('Android Standard Practice release slice', () => {
     expect(androidNetwork).not.toContain("'svc'");
     expect(migrationJourney).toContain('schema-v0-ios-1.0.0.sqlite');
     expect(migrationJourney).toContain('run-as');
+    expect(migrationJourney).toContain("'push'");
+    expect(migrationJourney).toContain("'mkdir', '-p', 'databases'");
+    expect(migrationJourney).toContain("'cp', DEVICE_FIXTURE_PATH, PROGRESS_DATABASE_PATH");
+    expect(migrationJourney).not.toContain("'sh',");
+    expect(migrationJourney).not.toContain('cat >');
     expect(migrationJourney).toContain('legacy-attempt-standard-wrong');
     expect(workflow).toContain('DETOX_ACTIVE_SUITE=android-standard-practice');
     expect(workflow).toContain('DETOX_ACTIVE_SUITE=android-migration');
