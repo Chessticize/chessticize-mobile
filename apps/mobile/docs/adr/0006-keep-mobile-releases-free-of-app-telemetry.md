@@ -1,0 +1,3 @@
+# Keep mobile releases free of app telemetry
+
+The Android Local-First Release will preserve the existing mobile privacy commitment by embedding no analytics, crash-reporting, tracking, or remote telemetry SDK and uploading no gameplay, rating, history, or device-identifying data. Android quality investigation will use deterministic local diagnostics and tests plus platform-level Google Play quality signals such as Android Vitals; those platform signals do not create an application telemetry pipeline. Play Data Safety, the privacy policy, and backup disclosure must remain consistent with this Zero App Telemetry property.

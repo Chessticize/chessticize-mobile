@@ -1,0 +1,3 @@
+# Share the product UI across mobile platforms
+
+iOS and Android will share the same React Native screen and product-component tree, with equivalent features, information architecture, chessboard interaction, and state semantics. Platform-specific code is limited to native-service adapters and presentation boundaries such as system bars and insets, Back behavior, permission and settings surfaces, touch feedback, and font metrics. Each platform may maintain its own screenshot baselines, but the Android Local-First Release will not introduce a duplicate Android screen tree, a separate Material redesign, or a pixel-identical parity requirement.
