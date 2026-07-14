@@ -1,3 +1,6 @@
+const fs = require('node:fs');
+const path = require('node:path');
+
 const {
   ACTIVE_E2E_TEST_MATCH_BY_SUITE,
   ACTIVE_E2E_TEST_MATCH,
@@ -11,6 +14,16 @@ const {
 } = require('../e2e/suiteConfig');
 
 describe('Detox suite configuration', () => {
+  it('passes Android synchronization disablement in the numeric form Detox recognizes', () => {
+    const helpers = fs.readFileSync(path.resolve(__dirname, '../e2e/helpers.js'), 'utf8');
+    const launchSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/android-launch.e2e.js'), 'utf8');
+
+    expect(helpers).toContain('detoxEnableSynchronization: 0');
+    expect(launchSpec).toContain('detoxEnableSynchronization: 0');
+    expect(helpers).not.toContain('detoxEnableSynchronization: false');
+    expect(launchSpec).not.toContain('detoxEnableSynchronization: false');
+  });
+
   it('runs every active E2E spec by default without loading opt-in capture specs', () => {
     expect(resolveDetoxTestMatch({})).toEqual(ACTIVE_E2E_TEST_MATCH);
     expect(ACTIVE_E2E_TEST_MATCH).toEqual([

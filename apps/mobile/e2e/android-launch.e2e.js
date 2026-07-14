@@ -4,7 +4,7 @@ describe('Android launch baseline', () => {
       delete: true,
       newInstance: true,
       launchArgs: {
-        detoxEnableSynchronization: false,
+        detoxEnableSynchronization: 0,
       },
     });
     await device.disableSynchronization();

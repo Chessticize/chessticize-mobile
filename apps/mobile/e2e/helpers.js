@@ -50,7 +50,7 @@ async function launchWithDisabledSynchronization(options = {}) {
     ...options,
     launchArgs: {
       DTXDisableMainRunLoopSync: 'YES',
-      detoxEnableSynchronization: false,
+      detoxEnableSynchronization: 0,
       ...(options.launchArgs ?? {})
     }
   });
