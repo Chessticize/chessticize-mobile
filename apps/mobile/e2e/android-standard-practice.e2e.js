@@ -8,12 +8,14 @@ const {
   waitForVisibleInPracticeScroll,
 } = require('./helpers');
 const { setAndroidNetworkEnabled } = require('./androidNetwork');
+const standardFixture = require('../../../fixtures/puzzles/android-standard-practice.fixture.json');
 
 const TEST_NOW_MS = '1784030400000';
 const RELAUNCH_TEST_NOW_MS = String(Number(TEST_NOW_MS) + 5 * 60_000);
-const TEST_SEED = 'android-standard-practice';
+const TEST_SEED = standardFixture.puzzleSelectionSeed;
+const EXPECTED_AUTO_REPLY_MOVE = standardFixture.puzzle.solutionMoves[2];
 
-describe('Android Standard Practice offline persistence', () => {
+describe(`Android Standard Practice offline persistence (${standardFixture.puzzle.id})`, () => {
   beforeAll(async () => {
     await setAndroidNetworkEnabled(false);
     await launchWithDisabledSynchronization({
@@ -21,7 +23,7 @@ describe('Android Standard Practice offline persistence', () => {
       newInstance: true,
       launchArgs: {
         chessticizePuzzleSelectionSeed: TEST_SEED,
-        chessticizeStandardTargetCorrect: '1',
+        chessticizeStandardTargetCorrect: String(standardFixture.targetCorrect),
         chessticizeTestNowMs: TEST_NOW_MS,
       },
     });
@@ -45,10 +47,10 @@ describe('Android Standard Practice offline persistence', () => {
 
     // The real SQLite pack adapter selects the seeded bundled line. The app
     // auto-plays each white move; the user solves the two black moves.
-    await playBoardMove('session-board', 'a3c1', true);
+    await playBoardMove('session-board', standardFixture.userMoves[0], true);
     await waitForElementAccessibilityLabelContaining(
       'session-board',
-      'Last move d2 to d1',
+      `Last move ${EXPECTED_AUTO_REPLY_MOVE.slice(0, 2)} to ${EXPECTED_AUTO_REPLY_MOVE.slice(2, 4)}`,
       10000,
       50
     );
@@ -58,11 +60,19 @@ describe('Android Standard Practice offline persistence', () => {
       10000,
       25
     );
-    await playBoardMove('session-board', 'c1d1', true);
+    await playBoardMove('session-board', standardFixture.userMoves[1], true);
 
     await waitFor(element(by.text('Sprint complete'))).toBeVisible().withTimeout(30000);
-    await waitForElementTextContaining('sprint-result-solved', '1 / 1', 10000);
-    await waitForElementTextContaining('sprint-result-rating-range', '600 -> 775', 10000);
+    await waitForElementTextContaining(
+      'sprint-result-solved',
+      `${standardFixture.targetCorrect} / ${standardFixture.targetCorrect}`,
+      10000
+    );
+    await waitForElementTextContaining(
+      'sprint-result-rating-range',
+      `${standardFixture.puzzle.rating} -> ${standardFixture.expectedRatingAfter}`,
+      10000
+    );
 
     await device.terminateApp();
     await launchWithDisabledSynchronization({
@@ -72,7 +82,11 @@ describe('Android Standard Practice offline persistence', () => {
     });
 
     await waitFor(element(by.id('practice-home'))).toExist().withTimeout(180000);
-    await waitForElementTextContaining('practice-mode-standard-rating', '775', 10000);
+    await waitForElementTextContaining(
+      'practice-mode-standard-rating',
+      String(standardFixture.expectedRatingAfter),
+      10000
+    );
     await waitForElementTextContaining('practice-progress-weekly-solved', '1', 10000);
     await waitForElementTextContaining('practice-progress-rating-delta', '+175 this week', 10000);
 

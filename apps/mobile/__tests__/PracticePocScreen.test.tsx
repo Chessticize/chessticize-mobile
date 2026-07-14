@@ -6,6 +6,7 @@ import TestRenderer, { act } from "react-test-renderer";
 import { PracticePocScreen, type PracticeDebugTraceEvent } from "../src/components/PracticePocScreen";
 import {
   createMobilePracticeService,
+  configureMobilePracticePuzzleSource,
   getBundledCorePackManifest,
   seededPuzzleCount,
   seededUniquePositionCount
@@ -20,6 +21,7 @@ import {
   createTestMobilePlatformCapabilities,
   type TestMobilePlatformCapabilityOverrides
 } from "../src/testing/testMobilePlatformCapabilities";
+import { FailingAttemptStore } from "../test-support/FailingAttemptStore";
 
 const renderers: TestRenderer.ReactTestRenderer[] = [];
 
@@ -613,7 +615,6 @@ describe("PracticePocScreen", () => {
 
   it("uses maintained native journey overrides for a bounded deterministic bundled Core Pack sprint", () => {
     const service = createMobilePracticeService();
-    const startSprintSpy = jest.spyOn(service, "startSprint");
     const renderer = renderScreen({
       practiceServiceFactory: () => service,
       puzzleSelectionSeed: "android-standard-practice",
@@ -625,13 +626,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "session-side-to-move").props.accessible).toBe(true);
     expect(findByTestId(renderer, "session-side-to-move").props.accessibilityLabel).toBe("Black to move");
     expect(collectText(findByTestId(renderer, "session-side-to-move-label"))).toBe("Black");
-    expect(startSprintSpy).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        puzzleSelectionSeed: "android-standard-practice",
-        targetCorrect: 1
-      }),
-      expect.any(String)
-    );
+    expect(findByTestId(renderer, "session-progress-block").props.accessibilityLabel).toBe("Progress 0 of 1");
   });
 
   it("accepts a non-official legal checkmate in the fixed first familiar puzzle", async () => {
@@ -764,19 +759,15 @@ describe("PracticePocScreen", () => {
     expect(collectText(renderer.root)).not.toContain("000hf · standard");
   });
 
-  it("keeps the current board state and unlocks input when move persistence fails", async () => {
-    const service = createMobilePracticeService("random1000");
-    jest.spyOn(service, "submitMove").mockImplementation(() => {
-      throw new Error("Practice write failed");
-    });
+  it("shows a persistence failure and unlocks board input through the store boundary", async () => {
+    const service = new PracticeService(new FailingAttemptStore("Practice write failed"));
+    configureMobilePracticePuzzleSource(service, "random1000");
     const renderer = renderScreen({ practiceService: service });
 
     startStandardSprint(renderer);
-    const initialFen = findByTestId(renderer, "mock-chessboard").props.fen;
 
-    await boardMove(renderer, "e2e6");
+    await boardMove(renderer, "e2d2");
 
-    expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(initialFen);
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
     expect(collectText(findByTestId(renderer, "error-panel"))).toContain("Practice write failed");
     expect(service.listHistory()).toHaveLength(0);

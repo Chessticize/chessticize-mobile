@@ -1,11 +1,16 @@
 const { readFileSync } = require('node:fs');
 const { join } = require('node:path');
+const { spawnSync } = require('node:child_process');
 
 const appRoot = join(__dirname, '..');
 const repoRoot = join(appRoot, '../..');
 
 function read(relativePath) {
   return readFileSync(join(appRoot, relativePath), 'utf8');
+}
+
+function readRepo(relativePath) {
+  return readFileSync(join(repoRoot, relativePath), 'utf8');
 }
 
 describe('Android Standard Practice release slice', () => {
@@ -81,16 +86,39 @@ describe('Android Standard Practice release slice', () => {
     const offlineSetup = read('scripts/prepare-android-offline-e2e.sh');
     const migrationJourney = read('e2e/android-migration.e2e.js');
     const workflow = read('../../.github/workflows/mobile-android.yml');
+    const standardFixture = require('../../../fixtures/puzzles/android-standard-practice.fixture.json');
+    const storageContract = readRepo('packages/storage/test/puzzle-pack-source.test.ts');
+    const componentContract = read('__tests__/PracticePocScreen.test.tsx');
 
     expect(suiteConfig).toContain('android-standard-practice.e2e.js');
     expect(suiteConfig).toContain('android-migration.e2e.js');
-    expect(practiceJourney).toContain('chessticizePuzzleSelectionSeed');
+    expect(standardFixture).toEqual(expect.objectContaining({
+      puzzleSelectionSeed: 'android-standard-practice',
+      puzzle: expect.objectContaining({
+        id: '0CwCS',
+        solutionMoves: ['d7c6', 'a3c1', 'd2d1', 'c1d1'],
+      }),
+      userMoves: ['a3c1', 'c1d1'],
+    }));
+    expect(standardFixture.userMoves).toEqual([
+      standardFixture.puzzle.solutionMoves[1],
+      standardFixture.puzzle.solutionMoves[3],
+    ]);
+    expect(practiceJourney).toContain('android-standard-practice.fixture.json');
+    expect(practiceJourney).toContain('standardFixture.puzzleSelectionSeed');
     expect(practiceJourney).toContain('chessticizeStandardTargetCorrect');
-    expect(practiceJourney).toMatch(/'session-board',\s*'Last move d2 to d1'/);
+    expect(practiceJourney).toContain('standardFixture.puzzle.solutionMoves[2]');
     expect(practiceJourney).toMatch(/'session-side-to-move',\s*'Black to move'/);
     expect(practiceJourney).toContain("by.id('session-side-to-move'))).toBeVisible()");
-    expect(practiceJourney).toContain("'a3c1'");
-    expect(practiceJourney).toContain("'c1d1'");
+    expect(practiceJourney).toContain('standardFixture.userMoves[0]');
+    expect(practiceJourney).toContain('standardFixture.userMoves[1]');
+    expect(practiceJourney).not.toContain("'a3c1'");
+    expect(practiceJourney).not.toContain("'c1d1'");
+    expect(storageContract).toContain('android-standard-practice.fixture.json');
+    expect(storageContract).not.toContain('new DatabaseSync(resolve("fixtures/puzzles/bundled-core-pack.sqlite")');
+    expect(componentContract).toContain('Progress 0 of 1');
+    expect(componentContract).not.toContain('jest.spyOn(service, "submitMove").mockImplementation');
+    expect(componentContract).toContain('FailingAttemptStore');
     expect(practiceJourney).toContain("delete: false");
     expect(practiceJourney).toContain("const RELAUNCH_TEST_NOW_MS = String(Number(TEST_NOW_MS) + 5 * 60_000)");
     expect(practiceJourney).toContain("chessticizeTestNowMs: RELAUNCH_TEST_NOW_MS");
@@ -110,6 +138,8 @@ describe('Android Standard Practice release slice', () => {
     expect(migrationJourney).toContain("'cp', DEVICE_FIXTURE_PATH, PROGRESS_DATABASE_PATH");
     expect(migrationJourney).not.toContain("'sh',");
     expect(migrationJourney).not.toContain('cat >');
+    expect(migrationJourney).toContain("const { androidAdbPath } = require('./androidNetwork');");
+    expect(migrationJourney).not.toContain('function androidAdbPath()');
     expect(migrationJourney).toContain('legacy-attempt-standard-wrong');
     expect(workflow).toContain('DETOX_ACTIVE_SUITE=android-standard-practice');
     expect(workflow).toContain('DETOX_ACTIVE_SUITE=android-migration');
@@ -126,14 +156,19 @@ describe('Android Standard Practice release slice', () => {
     expect(offlineSetup).toContain('[ "$adb_user_id" = "0" ]');
   });
 
-  it('adds no telemetry dependency or Android gameplay upload pipeline', () => {
-    const rootPackage = readFileSync(join(repoRoot, 'package.json'), 'utf8');
-    const mobilePackage = read('package.json');
-    const gradle = read('android/app/build.gradle');
-    const forbidden = /sentry|firebase-analytics|appcenter|bugsnag|datadog|segment|mixpanel/i;
+  it('passes the repository data-egress audit for gameplay, native, and locked runtime surfaces', () => {
+    const rootPackage = JSON.parse(readRepo('package.json'));
+    const audit = spawnSync(
+      process.execPath,
+      [join(repoRoot, 'scripts/mobile-data-egress-audit.mjs'), '--json'],
+      { cwd: repoRoot, encoding: 'utf8' }
+    );
+    const payload = JSON.parse(audit.stdout || '{}');
 
-    expect(rootPackage).not.toMatch(forbidden);
-    expect(mobilePackage).not.toMatch(forbidden);
-    expect(gradle).not.toMatch(forbidden);
+    expect(rootPackage.scripts['mobile:data-egress-audit'])
+      .toBe('node scripts/mobile-data-egress-audit.mjs');
+    expect(audit.status).toBe(0);
+    expect(payload.status).toBe('pass');
+    expect(payload.summary).toEqual(expect.objectContaining({ failed: 0 }));
   });
 });

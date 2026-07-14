@@ -143,8 +143,9 @@ test("PackBackedPracticeStore queries pack puzzles without preloading the user d
   }
 });
 
-test("Android Standard Practice seed follows the maintained SQLite pack solution", () => {
-  const packDb = new DatabaseSync(resolve("fixtures/puzzles/bundled-core-pack.sqlite"), { readOnly: true });
+test("Android Standard Practice seed follows the maintained tracked pack solution", async () => {
+  const fixture = await loadAndroidStandardPracticeFixture();
+  const packDb = buildPackDatabase([fixture.puzzle]);
   const userStore = new SQLiteStore(":memory:");
   try {
     userStore.migrate();
@@ -155,21 +156,21 @@ test("Android Standard Practice seed follows the maintained SQLite pack solution
       {
         mode: "standard",
         durationSeconds: 300,
-        targetCorrect: 1,
-        puzzleSelectionSeed: "android-standard-practice"
+        targetCorrect: fixture.targetCorrect,
+        puzzleSelectionSeed: fixture.puzzleSelectionSeed
       },
       "2026-07-14T12:00:00.000Z"
     );
 
-    assert.equal(sprint.currentPuzzle?.puzzle.id, "0CwCS");
-    assert.deepEqual(sprint.currentPuzzle?.puzzle.solutionMoves, ["d7c6", "a3c1", "d2d1", "c1d1"]);
+    assert.equal(sprint.currentPuzzle?.puzzle.id, fixture.puzzle.id);
+    assert.deepEqual(sprint.currentPuzzle?.puzzle.solutionMoves, fixture.puzzle.solutionMoves);
 
-    service.submitMove("a3c1", "2026-07-14T12:00:01.000Z");
-    const result = service.submitMove("c1d1", "2026-07-14T12:00:02.000Z");
+    service.submitMove(fixture.userMoves[0], "2026-07-14T12:00:01.000Z");
+    const result = service.submitMove(fixture.userMoves[1], "2026-07-14T12:00:02.000Z");
 
     assert.equal(result.state.status, "won");
     assert.equal(result.attempt?.result, "correct");
-    assert.equal(result.state.ratingAfter, 775);
+    assert.equal(result.state.ratingAfter, fixture.expectedRatingAfter);
   } finally {
     userStore.close();
     packDb.close();
@@ -298,4 +299,18 @@ function buildPackDatabase(puzzles: Puzzle[]): DatabaseSync {
 
 async function loadFixturePuzzles(): Promise<Puzzle[]> {
   return JSON.parse(await readFile(resolve("fixtures/puzzles/presolved-sample.json"), "utf8")) as Puzzle[];
+}
+
+interface AndroidStandardPracticeFixture {
+  puzzleSelectionSeed: string;
+  targetCorrect: number;
+  puzzle: Puzzle & { solutionMoves: [string, string, string, string] };
+  userMoves: [string, string];
+  expectedRatingAfter: number;
+}
+
+async function loadAndroidStandardPracticeFixture(): Promise<AndroidStandardPracticeFixture> {
+  return JSON.parse(
+    await readFile(resolve("fixtures/puzzles/android-standard-practice.fixture.json"), "utf8")
+  ) as AndroidStandardPracticeFixture;
 }

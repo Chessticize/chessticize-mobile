@@ -1,11 +1,12 @@
 const { execFileSync } = require('node:child_process');
-const { join, resolve } = require('node:path');
+const { resolve } = require('node:path');
 const {
   launchWithDisabledSynchronization,
   openTab,
   waitForElementTextContaining,
   waitForVisibleInPracticeScroll,
 } = require('./helpers');
+const { androidAdbPath } = require('./androidNetwork');
 
 const APP_ID = 'com.chessticize.mobile';
 const FIXTURE_PATH = resolve(
@@ -52,15 +53,4 @@ function installReleasedProgressFixture() {
 
 function runAs(adb, serial, command) {
   execFileSync(adb, ['-s', serial, 'shell', 'run-as', APP_ID, ...command], { stdio: 'inherit' });
-}
-
-function androidAdbPath() {
-  if (process.env.ADB_PATH) {
-    return process.env.ADB_PATH;
-  }
-  const sdkRoot = process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT;
-  if (!sdkRoot) {
-    throw new Error('ANDROID_HOME or ANDROID_SDK_ROOT is required for Android E2E.');
-  }
-  return join(sdkRoot, 'platform-tools', 'adb');
 }
