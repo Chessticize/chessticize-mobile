@@ -39,11 +39,11 @@ verify_nnue_asset() {
 
   [[ -f "$asset_path" ]] || fail "Missing $asset_path. Run git lfs pull for the Stockfish NNUE resources."
   asset_size="$(wc -c < "$asset_path" | tr -d ' ')"
-  [[ "$asset_size" -gt 1000000 ]] || fail "$asset_path is a Git LFS pointer, not a neural-network binary. Run: git lfs pull --include='apps/mobile/ios/StockfishEngine/Resources/*.nnue'"
+  [[ "$asset_size" -gt 1000000 ]] || fail "$asset_path is a Git LFS pointer, not a neural-network binary. Run: git lfs pull --include='apps/mobile/native/stockfish/Resources/*.nnue'"
 }
 
-verify_nnue_asset "apps/mobile/ios/StockfishEngine/Resources/nn-37f18f62d772.nnue"
-verify_nnue_asset "apps/mobile/ios/StockfishEngine/Resources/nn-c288c895ea92.nnue"
+verify_nnue_asset "apps/mobile/native/stockfish/Resources/nn-37f18f62d772.nnue"
+verify_nnue_asset "apps/mobile/native/stockfish/Resources/nn-c288c895ea92.nnue"
 
 AVAILABLE_DEVICES="$(xcrun simctl list devices available)"
 grep -Fq "$DEVICE_NAME (" <<<"$AVAILABLE_DEVICES" || fail "Dedicated simulator '$DEVICE_NAME' is not available."

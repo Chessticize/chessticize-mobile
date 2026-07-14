@@ -2,6 +2,7 @@ import React from "react";
 import TestRenderer, { act } from "react-test-renderer";
 import { createMobilePracticeService } from "../src/backend/mobilePractice";
 import { PracticePocScreen } from "../src/components/PracticePocScreen";
+import { createTestMobilePlatformCapabilities } from "../src/testing/testMobilePlatformCapabilities";
 
 type TestGlobal = typeof globalThis & {
   __CHESSTICIZE_ENABLE_TEST_CONTROLS__?: boolean;
@@ -14,7 +15,11 @@ function renderScreen(): TestRenderer.ReactTestRenderer {
   let renderer: TestRenderer.ReactTestRenderer | undefined;
   act(() => {
     renderer = TestRenderer.create(
-      <PracticePocScreen practiceServiceFactory={() => createMobilePracticeService("random1000")} />
+      <PracticePocScreen
+        platformCapabilities={createTestMobilePlatformCapabilities({
+          practiceServiceFactory: () => createMobilePracticeService("random1000")
+        })}
+      />
     );
   });
   if (!renderer) {
