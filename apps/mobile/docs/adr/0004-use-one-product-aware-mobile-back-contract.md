@@ -1,0 +1,3 @@
+# Use one product-aware mobile Back contract
+
+The mobile UI will expose one product-aware Back intent instead of letting Android native code reproduce screen-state decisions. Back dismisses transient UI first; active practice and review sessions use the same guarded pause or exit behavior as visible controls; child flows return to their parent; and top-level Review, History, and Settings return to Practice. Only an idle Practice home delegates Back to the operating system for back-to-home behavior. Android will integrate this contract with the supported system Back and Predictive Back APIs without adding a persistent Android-only back control or silently discarding session progress.

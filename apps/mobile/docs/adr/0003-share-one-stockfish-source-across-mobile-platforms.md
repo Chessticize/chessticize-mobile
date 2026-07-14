@@ -1,0 +1,3 @@
+# Share one Stockfish source across mobile platforms
+
+The mobile app will maintain one shared Stockfish C++ source tree outside either platform directory. The iOS Objective-C++ bridge and the Android Kotlin/JNI/CMake bridge will remain thin platform adapters that implement the existing `NativeStockfishEngine` JavaScript contract. Android production and test builds compile the engine for `arm64-v8a` and `x86_64`; the 32-bit `armeabi-v7a` and `x86` ABIs are excluded from the first release. Separate platform source copies or independently versioned prebuilt engine binaries are rejected because they would allow analysis behavior, patches, version reporting, license artifacts, and supported native build surfaces to drift between iOS and Android.
