@@ -124,9 +124,9 @@ const manifest = {
     version: "Stockfish 18",
     upstreamTag: "sf_18",
     upstreamCommit: "cb3d4ee9b47d0c5aae855b12379378ea1439675c",
-    bundledSourcePath: "apps/mobile/ios/StockfishEngine/Stockfish/src",
-    bundledLicensePath: "apps/mobile/ios/StockfishEngine/Copying.txt",
-    bundledAuthorsPath: "apps/mobile/ios/StockfishEngine/AUTHORS"
+    bundledSourcePath: "apps/mobile/native/stockfish/Stockfish/src",
+    bundledLicensePath: "apps/mobile/native/stockfish/Copying.txt",
+    bundledAuthorsPath: "apps/mobile/native/stockfish/AUTHORS"
   },
   artifacts: [
     artifact("package.json", "root package manifest"),
@@ -144,12 +144,12 @@ const manifest = {
     artifact("docs/PRIVACY_POLICY.md", "public privacy policy"),
     artifact(puzzlePackPath, "bundled offline puzzle pack"),
     artifact("fixtures/puzzles/bundled-core-pack.manifest.json", "bundled offline puzzle manifest"),
-    artifact("apps/mobile/ios/StockfishEngine/Copying.txt", "bundled Stockfish GPL text"),
-    artifact("apps/mobile/ios/StockfishEngine/AUTHORS", "bundled Stockfish authors"),
-    artifact("apps/mobile/ios/StockfishEngine/README-STOCKFISH.md", "bundled Stockfish source notes"),
-    artifact("apps/mobile/ios/StockfishEngine/ChessticizeStockfish.podspec", "Stockfish podspec"),
-    artifact("apps/mobile/ios/StockfishEngine/Resources/nn-c288c895ea92.nnue", "Stockfish NNUE network"),
-    artifact("apps/mobile/ios/StockfishEngine/Resources/nn-37f18f62d772.nnue", "Stockfish NNUE network")
+    artifact("apps/mobile/native/stockfish/Copying.txt", "bundled Stockfish GPL text"),
+    artifact("apps/mobile/native/stockfish/AUTHORS", "bundled Stockfish authors"),
+    artifact("apps/mobile/native/stockfish/README-STOCKFISH.md", "bundled Stockfish source notes"),
+    artifact("apps/mobile/ChessticizeStockfish.podspec", "Stockfish podspec"),
+    artifact("apps/mobile/native/stockfish/Resources/nn-c288c895ea92.nnue", "Stockfish NNUE network"),
+    artifact("apps/mobile/native/stockfish/Resources/nn-37f18f62d772.nnue", "Stockfish NNUE network")
   ],
   releaseRules: [
     "Create the public release tag from sourceCommit before or at App Store submission.",

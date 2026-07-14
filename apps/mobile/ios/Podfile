@@ -16,7 +16,7 @@ end
 
 target 'ChessticizeMobile' do
   config = use_native_modules!
-  pod 'ChessticizeStockfish', :path => './StockfishEngine'
+  pod 'ChessticizeStockfish', :path => '..'
 
   use_react_native!(
     :path => config[:reactNativePath],
