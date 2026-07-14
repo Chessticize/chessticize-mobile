@@ -209,6 +209,7 @@ printf 'Xcode 26.5\nBuild version 17F42\n'
           CHESSTICIZE_E2E_SCOPE: "flows",
           CHESSTICIZE_RUBY_PREFIX: rubyPrefix,
           DETOX_IOS_DEVICE: "Test-Detox",
+          PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
           TEST_REPO_ROOT: repoRoot,
           ...extraEnv
         }
