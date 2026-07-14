@@ -18,6 +18,12 @@ module.exports = {
       binaryPath: 'ios/build-release/Build/Products/Release-iphonesimulator/Chessticize.app',
       build: 'bash scripts/ios-build-release-for-detox.sh',
     },
+    'android.debug': {
+      type: 'android.apk',
+      binaryPath: 'android/app/build/outputs/apk/debug/app-debug.apk',
+      testBinaryPath: 'android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk',
+      build: 'cd android && ./gradlew assembleDebug assembleAndroidTest -DtestBuildType=debug',
+    },
   },
   devices: {
     simulator: {
@@ -25,6 +31,12 @@ module.exports = {
       device: process.env.DETOX_IOS_DEVICE
         ? {name: process.env.DETOX_IOS_DEVICE}
         : {type: 'iPhone 16'},
+    },
+    'android.attached': {
+      type: 'android.attached',
+      device: {
+        adbName: process.env.DETOX_ANDROID_DEVICE || 'emulator-5554',
+      },
     },
   },
   configurations: {
@@ -35,6 +47,10 @@ module.exports = {
     'ios.sim.release': {
       device: 'simulator',
       app: 'ios.release',
+    },
+    'android.attached.debug': {
+      device: 'android.attached',
+      app: 'android.debug',
     },
   },
 };

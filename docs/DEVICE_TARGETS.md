@@ -1,4 +1,18 @@
-# iOS Device Targets
+# Mobile Device Targets
+
+## Android Launch Baseline
+
+The permanent Android application ID, namespace, and Kotlin package are
+`com.chessticize.mobile`. The supported platform envelope is minimum API 24
+with compile and target API 36. Universal Android packages contain only
+`arm64-v8a` and `x86_64` native libraries.
+
+CI builds one debug APK, verifies its native ABI contents, and
+launches it through Detox on API 24 and API 36 x86_64 emulators. Production
+release packaging requires explicit release signing material and has no debug
+keystore fallback.
+
+## iOS Device Targets
 
 Chessticize Mobile 1.1 ships for adaptive iPhone portrait/landscape
 and adaptive iPad portrait, landscape, and multitasking layouts.
