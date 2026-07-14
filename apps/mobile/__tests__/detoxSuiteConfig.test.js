@@ -14,6 +14,7 @@ const {
 } = require('../e2e/suiteConfig');
 const {
   bringAndroidAppToForeground,
+  collectAndroidUiDiagnostics,
   launchWithDisabledSynchronization,
 } = require('../e2e/helpers');
 
@@ -87,6 +88,92 @@ describe('Detox suite configuration', () => {
       'chessticizePuzzleSelectionSeed',
       'fixture-seed',
     ], { encoding: 'utf8' });
+  });
+
+  it('captures actionable Android focus, hierarchy, and screenshot diagnostics', () => {
+    const run = jest.fn((_command, args) => {
+      const request = args.join(' ');
+      if (request.includes('dumpsys window windows')) {
+        return [
+          'WINDOW MANAGER WINDOWS',
+          '  mCurrentFocus=Window{123 u0 com.chessticize.mobile/com.chessticize.mobile.MainActivity}',
+          '  mFocusedApp=ActivityRecord{456 com.chessticize.mobile/.MainActivity}',
+        ].join('\n');
+      }
+      if (request.includes('uiautomator dump')) {
+        return 'UI hierchary dumped to: /sdcard/chessticize-window.xml\n';
+      }
+      if (request.includes('cat /sdcard/chessticize-window.xml')) {
+        return '<hierarchy><node text="Practice" /></hierarchy>';
+      }
+      if (request.includes('screencap -p')) {
+        return Buffer.from('png');
+      }
+      throw new Error(`Unexpected ADB request: ${request}`);
+    });
+    const fileSystem = {
+      mkdirSync: jest.fn(),
+      writeFileSync: jest.fn(),
+    };
+    const log = jest.fn();
+
+    collectAndroidUiDiagnostics({
+      ANDROID_HOME: '/sdk',
+      DETOX_ANDROID_DEVICE: 'emulator-5556',
+    }, run, fileSystem, log, '/artifacts/android-ui');
+
+    expect(run).toHaveBeenNthCalledWith(1, '/sdk/platform-tools/adb', [
+      '-s',
+      'emulator-5556',
+      'shell',
+      'dumpsys',
+      'window',
+      'windows',
+    ], { encoding: 'utf8', maxBuffer: 5 * 1024 * 1024, timeout: 30000 });
+    expect(run).toHaveBeenNthCalledWith(2, '/sdk/platform-tools/adb', [
+      '-s',
+      'emulator-5556',
+      'shell',
+      'uiautomator',
+      'dump',
+      '/sdcard/chessticize-window.xml',
+    ], { encoding: 'utf8', maxBuffer: 5 * 1024 * 1024, timeout: 30000 });
+    expect(run).toHaveBeenNthCalledWith(3, '/sdk/platform-tools/adb', [
+      '-s',
+      'emulator-5556',
+      'exec-out',
+      'cat',
+      '/sdcard/chessticize-window.xml',
+    ], { encoding: 'utf8', maxBuffer: 5 * 1024 * 1024, timeout: 30000 });
+    expect(run).toHaveBeenNthCalledWith(4, '/sdk/platform-tools/adb', [
+      '-s',
+      'emulator-5556',
+      'exec-out',
+      'screencap',
+      '-p',
+    ], { maxBuffer: 25 * 1024 * 1024, timeout: 30000 });
+    expect(fileSystem.mkdirSync).toHaveBeenCalledWith('/artifacts/android-ui', { recursive: true });
+    expect(fileSystem.writeFileSync).toHaveBeenCalledWith(
+      '/artifacts/android-ui/current-focus.txt',
+      expect.stringContaining('mCurrentFocus=Window')
+    );
+    expect(fileSystem.writeFileSync).toHaveBeenCalledWith(
+      '/artifacts/android-ui/window.xml',
+      '<hierarchy><node text="Practice" /></hierarchy>'
+    );
+    expect(fileSystem.writeFileSync).toHaveBeenCalledWith(
+      '/artifacts/android-ui/screenshot.png',
+      Buffer.from('png')
+    );
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('[android-ui-diagnostics] current focus'));
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('<node text="Practice" />'));
+  });
+
+  it('collects Android UI diagnostics before launch smoke failures are rethrown', () => {
+    const launchSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/android-launch.e2e.js'), 'utf8');
+
+    expect(launchSpec).toContain('collectAndroidUiDiagnostics');
+    expect(launchSpec).toContain('throw error');
   });
 
   it('runs every active E2E spec by default without loading opt-in capture specs', () => {

@@ -1,5 +1,9 @@
 const { execFileSync } = require('node:child_process');
+const fs = require('node:fs');
+const path = require('node:path');
 const { androidAdbPath } = require('./androidNetwork');
+
+const ANDROID_UI_DIAGNOSTICS_DIR = path.resolve(__dirname, '../artifacts/android-ui');
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -68,6 +72,81 @@ function bringAndroidAppToForeground(
     }
   }
   run(adb, args, { encoding: 'utf8' });
+}
+
+function collectAndroidUiDiagnostics(
+  environment = process.env,
+  run = execFileSync,
+  fileSystem = fs,
+  log = console.log,
+  outputDirectory = ANDROID_UI_DIAGNOSTICS_DIR
+) {
+  const adb = androidAdbPath(environment);
+  const serial = environment.DETOX_ANDROID_DEVICE || 'emulator-5554';
+  const runDiagnostic = (label, args, options) => {
+    try {
+      return run(adb, ['-s', serial, ...args], options);
+    } catch (error) {
+      const detail = error?.stderr ?? error?.stdout ?? error?.message ?? String(error);
+      log(`[android-ui-diagnostics] ${label} failed\n${String(detail)}`);
+      return null;
+    }
+  };
+  const writeDiagnostic = (filename, contents) => {
+    if (contents === null || contents === undefined) {
+      return;
+    }
+    try {
+      fileSystem.writeFileSync(path.join(outputDirectory, filename), contents);
+    } catch (error) {
+      log(`[android-ui-diagnostics] unable to write ${filename}: ${error?.message ?? String(error)}`);
+    }
+  };
+
+  try {
+    fileSystem.mkdirSync(outputDirectory, { recursive: true });
+  } catch (error) {
+    log(`[android-ui-diagnostics] unable to create artifact directory: ${error?.message ?? String(error)}`);
+  }
+
+  const windowDump = runDiagnostic(
+    'dumpsys window',
+    ['shell', 'dumpsys', 'window', 'windows'],
+    { encoding: 'utf8', maxBuffer: 5 * 1024 * 1024, timeout: 30000 }
+  );
+  const focus = windowDump === null
+    ? null
+    : String(windowDump)
+      .split('\n')
+      .filter((line) => /mCurrentFocus|mFocusedApp|topResumedActivity/.test(line))
+      .join('\n') || '[no current focus fields found]';
+  if (focus !== null) {
+    log(`[android-ui-diagnostics] current focus\n${focus}`);
+    writeDiagnostic('current-focus.txt', focus);
+  }
+
+  runDiagnostic(
+    'uiautomator dump',
+    ['shell', 'uiautomator', 'dump', '/sdcard/chessticize-window.xml'],
+    { encoding: 'utf8', maxBuffer: 5 * 1024 * 1024, timeout: 30000 }
+  );
+  const hierarchy = runDiagnostic(
+    'uiautomator hierarchy read',
+    ['exec-out', 'cat', '/sdcard/chessticize-window.xml'],
+    { encoding: 'utf8', maxBuffer: 5 * 1024 * 1024, timeout: 30000 }
+  );
+  if (hierarchy !== null) {
+    log(`[android-ui-diagnostics] hierarchy\n${String(hierarchy)}`);
+    writeDiagnostic('window.xml', hierarchy);
+  }
+
+  const screenshot = runDiagnostic(
+    'screenshot',
+    ['exec-out', 'screencap', '-p'],
+    { maxBuffer: 25 * 1024 * 1024, timeout: 30000 }
+  );
+  writeDiagnostic('screenshot.png', screenshot);
+  log(`[android-ui-diagnostics] artifacts=${outputDirectory}`);
 }
 
 async function launchWithDisabledSynchronization(
@@ -314,6 +393,7 @@ async function failStandardSprint() {
 
 module.exports = {
   bringAndroidAppToForeground,
+  collectAndroidUiDiagnostics,
   openTab,
   openStandardHistoryTrend,
   launchWithDisabledSynchronization,

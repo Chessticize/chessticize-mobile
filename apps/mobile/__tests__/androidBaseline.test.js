@@ -183,6 +183,16 @@ describe('Android launch baseline', () => {
     expect(workflow).not.toMatch(/^\s+pull_request:/m);
   });
 
+  it('gives both Android API emulators fixed realistic memory and preserves failure diagnostics', () => {
+    const workflow = read('../../.github/workflows/mobile-android.yml');
+
+    expect(workflow).toContain('api-level: [24, 36]');
+    expect(workflow).toContain('ram-size: 4096M');
+    expect(workflow.match(/ram-size: 4096M/g)).toHaveLength(1);
+    expect(workflow).toContain('name: Upload Android launch failure diagnostics');
+    expect(workflow).toContain('apps/mobile/artifacts/android-ui/');
+  });
+
   it('uses the doctor-verified SDK with a self-contained offline Android E2E app', () => {
     const androidDetoxScript = read('scripts/android-test-for-detox.sh');
 

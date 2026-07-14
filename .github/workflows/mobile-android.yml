@@ -155,6 +155,7 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_2
+          ram-size: 4096M
           disable-animations: true
           emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           script: |
@@ -167,3 +168,11 @@ jobs:
             fi
         env:
           DETOX_ANDROID_DEVICE: emulator-5554
+
+      - name: Upload Android launch failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-launch-diagnostics-api-${{ matrix.api-level }}
+          if-no-files-found: warn
+          path: apps/mobile/artifacts/android-ui/
