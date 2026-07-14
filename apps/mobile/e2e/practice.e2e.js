@@ -95,8 +95,32 @@ describe('Practice POC', () => {
     await waitFor(element(by.id('review-analysis-forward'))).toBeVisible().withTimeout(5000);
     await waitFor(element(by.id('review-analysis-reset'))).toBeVisible().withTimeout(5000);
     await waitFor(element(by.id('review-analysis-flip'))).toBeVisible().withTimeout(5000);
+
+    // Preserve the active native engine across an ordinary interruption and
+    // confirm that analysis remains usable when the application returns.
+    await device.sendToHome();
+    await sleep(500);
+    await launchWithDisabledSynchronization({
+      newInstance: false,
+      delete: false
+    });
+    await waitFor(element(by.id('review-close-analysis'))).toBeVisible().withTimeout(10000);
     await waitForElementTextContaining('review-analysis-engine-status', 'SF 18 NNUE', 45000);
     await waitForElementTextContaining('review-analysis-line-0', 'Top move', 90000);
+    await waitForElementTextContaining('review-analysis-line-0', 'Qa4#', 90000);
+
+    // Reopen and immediately close a live analysis to exercise stop/cancellation,
+    // then start it again to prove the native start contract is repeatable.
+    await element(by.id('review-close-analysis')).tap();
+    await waitFor(element(by.id('review-analysis-button'))).toBeVisible().withTimeout(10000);
+    await element(by.id('review-analysis-button')).tap();
+    await waitFor(element(by.id('review-close-analysis'))).toBeVisible().withTimeout(10000);
+    await element(by.id('review-close-analysis')).tap();
+    await waitFor(element(by.id('review-analysis-button'))).toBeVisible().withTimeout(10000);
+    await element(by.id('review-analysis-button')).tap();
+    await waitFor(element(by.id('review-close-analysis'))).toBeVisible().withTimeout(10000);
+    await waitForElementTextContaining('review-analysis-engine-status', 'SF 18 NNUE', 45000);
+    await waitForElementTextContaining('review-analysis-line-0', 'Qa4#', 90000);
 
     const screenshotPath = await device.takeScreenshot('review-analysis-arrows');
     expectScreenshotContainsGreenAnalysisArrow(screenshotPath);
