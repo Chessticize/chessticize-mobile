@@ -5,9 +5,9 @@ import {
   createPersistentMobilePracticeService,
   createPersistentMobilePracticeServiceSync,
 } from './mobilePractice.ts';
-import type {
-  MobileApplicationMetadata,
-  MobilePlatformCapabilities,
+import {
+  MOBILE_APPLICATION_METADATA,
+  type MobilePlatformCapabilities,
 } from './mobilePlatformCapabilities.ts';
 import {
   createNativeStockfishTransport,
@@ -17,19 +17,6 @@ import {
   createNativeReviewReminderNotificationClient,
   createNativeReviewReminderScheduler,
 } from './reviewReminderScheduler.ts';
-
-const SOURCE_REPOSITORY_URL =
-  'https://github.com/Chessticize/chessticize-mobile';
-const SUPPORT_EMAIL = 'support@chessticize.com';
-
-export const IOS_APPLICATION_METADATA: MobileApplicationMetadata = {
-  versionName: '1.0.0',
-  sourceLicenseUrl: `${SOURCE_REPOSITORY_URL}/blob/main/LICENSE`,
-  sourceRepositoryUrl: SOURCE_REPOSITORY_URL,
-  stockfishSourceUrl: `${SOURCE_REPOSITORY_URL}/tree/main/apps/mobile/ios/StockfishEngine`,
-  supportEmail: SUPPORT_EMAIL,
-  supportEmailUrl: `mailto:${SUPPORT_EMAIL}`,
-};
 
 export function createIOSMobilePlatformCapabilitiesSync():
   | MobilePlatformCapabilities
@@ -64,6 +51,6 @@ export function composeIOSMobilePlatformCapabilities(
       scheduler: createNativeReviewReminderScheduler(),
       notificationClient: createNativeReviewReminderNotificationClient(),
     },
-    applicationMetadata: IOS_APPLICATION_METADATA,
+    applicationMetadata: MOBILE_APPLICATION_METADATA,
   };
 }

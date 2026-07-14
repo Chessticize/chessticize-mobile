@@ -2992,7 +2992,7 @@ describe("PracticePocScreen", () => {
       }
     });
     const renderer = renderStandardSequenceScreen({
-      stockfishTransportFactory: () => stockfish.transport
+      stockfish: { createTransport: () => stockfish.transport }
     });
 
     startStandardSprint(renderer);
@@ -3043,7 +3043,7 @@ describe("PracticePocScreen", () => {
     });
     const renderer = renderScreen({
       practiceService: createMobilePracticeService("familiar15"),
-      stockfishTransportFactory: () => stockfish.transport
+      stockfish: { createTransport: () => stockfish.transport }
     });
 
     press(renderer, "settings-tab");
@@ -3106,7 +3106,7 @@ describe("PracticePocScreen", () => {
     const service = createMobilePracticeService("familiar15");
     const renderer = renderScreen({
       practiceService: service,
-      stockfishTransportFactory: () => stockfish.transport
+      stockfish: { createTransport: () => stockfish.transport }
     });
     const wrongMoves: string[] = [];
 
@@ -3288,7 +3288,7 @@ describe("PracticePocScreen", () => {
     const stockfish = createScriptedStockfishTransport(() => {});
     const renderer = renderScreen({
       practiceService: service,
-      stockfishTransportFactory: () => stockfish.transport
+      stockfish: { createTransport: () => stockfish.transport }
     });
 
     press(renderer, "review-tab");

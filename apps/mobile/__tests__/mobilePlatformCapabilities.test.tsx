@@ -1,8 +1,6 @@
 import { createMobilePracticeService } from '../src/backend/mobilePractice';
-import {
-  composeIOSMobilePlatformCapabilities,
-  IOS_APPLICATION_METADATA,
-} from '../src/backend/iosMobilePlatformCapabilities';
+import { composeIOSMobilePlatformCapabilities } from '../src/backend/iosMobilePlatformCapabilities';
+import { MOBILE_APPLICATION_METADATA } from '../src/backend/mobilePlatformCapabilities';
 import { createTestMobilePlatformCapabilities } from '../src/testing/testMobilePlatformCapabilities';
 import { FakeICloudProgressSyncClient } from '../src/backend/iCloudProgressSync';
 import {
@@ -22,18 +20,16 @@ describe('mobile platform capabilities', () => {
     await expect(capabilities.stockfish.prewarm()).resolves.toBe(false);
     expect(capabilities.reminders.scheduler).toBeNull();
     expect(capabilities.reminders.notificationClient).toBeNull();
-    expect(capabilities.applicationMetadata).toBe(IOS_APPLICATION_METADATA);
+    expect(capabilities.applicationMetadata).toBe(MOBILE_APPLICATION_METADATA);
   });
 
   it('constructs maintained test bundles from the same lower contracts', () => {
     const service = createMobilePracticeService('random1000');
-    const configurePuzzleSource = jest.fn();
     const progressSyncClient = new FakeICloudProgressSyncClient();
     const scheduler = new FakeReviewReminderScheduler();
     const notificationClient = new FakeReviewReminderNotificationClient();
     const capabilities = createTestMobilePlatformCapabilities({
-      practiceService: service,
-      configurePuzzleSource,
+      practiceServiceFactory: () => service,
       iCloudProgressSyncClient: progressSyncClient,
       reviewReminderScheduler: scheduler,
       reviewReminderNotificationClient: notificationClient,
@@ -44,8 +40,22 @@ describe('mobile platform capabilities', () => {
     });
 
     capabilities.storage.configurePuzzleSource?.('familiar15');
+    const expectedService = createMobilePracticeService('familiar15');
+    const sprintCommand = {
+      mode: 'arrow_duel' as const,
+      durationSeconds: 300,
+      perPuzzleSeconds: 30,
+      targetCorrect: 10,
+      maxMistakes: 3,
+    };
+    const configuredPuzzleIds = capabilities.storage.practiceService
+      .startSprint(sprintCommand)
+      .puzzles.map(puzzle => puzzle.id);
+    const expectedPuzzleIds = expectedService
+      .startSprint(sprintCommand)
+      .puzzles.map(puzzle => puzzle.id);
 
-    expect(configurePuzzleSource).toHaveBeenCalledWith(service, 'familiar15');
+    expect(configuredPuzzleIds).toEqual(expectedPuzzleIds);
     expect(capabilities.storage.practiceService).toBe(service);
     expect(capabilities.progressSync.client).toBe(progressSyncClient);
     expect(capabilities.reminders.scheduler).toBe(scheduler);

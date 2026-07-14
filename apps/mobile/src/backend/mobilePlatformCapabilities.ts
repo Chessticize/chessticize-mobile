@@ -36,6 +36,19 @@ export interface MobileApplicationMetadata {
   supportEmailUrl: string;
 }
 
+const SOURCE_REPOSITORY_URL =
+  'https://github.com/Chessticize/chessticize-mobile';
+const SUPPORT_EMAIL = 'support@chessticize.com';
+
+export const MOBILE_APPLICATION_METADATA: MobileApplicationMetadata = {
+  versionName: '1.0.0',
+  sourceLicenseUrl: `${SOURCE_REPOSITORY_URL}/blob/main/LICENSE`,
+  sourceRepositoryUrl: SOURCE_REPOSITORY_URL,
+  stockfishSourceUrl: `${SOURCE_REPOSITORY_URL}/tree/main/apps/mobile/ios/StockfishEngine`,
+  supportEmail: SUPPORT_EMAIL,
+  supportEmailUrl: `mailto:${SUPPORT_EMAIL}`,
+};
+
 export interface MobilePlatformCapabilities {
   storage: MobileStorageCapabilities;
   progressSync: MobileProgressSyncCapabilities;

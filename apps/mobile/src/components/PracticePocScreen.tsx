@@ -89,7 +89,8 @@ import {
 import type { ICloudAccountStatus } from "../backend/iCloudProgressSync.ts";
 import type {
   MobileApplicationMetadata,
-  MobilePlatformCapabilities
+  MobilePlatformCapabilities,
+  MobileStockfishCapabilities
 } from "../backend/mobilePlatformCapabilities.ts";
 import { arePracticeTestControlsEnabled, isPracticeDebugEnabled } from "../releaseConfig.ts";
 import { isStoreAssetCaptureEnabled } from "../backend/testLaunchConfig.ts";
@@ -358,8 +359,7 @@ export function PracticePocScreen({
   const [puzzleSource, setPuzzleSource] = useState<MobilePuzzleSource>("bundledCore");
   const service = platformCapabilities.storage.practiceService;
   const configurePuzzleSource = platformCapabilities.storage.configurePuzzleSource;
-  const stockfishTransportFactory = platformCapabilities.stockfish.createTransport;
-  const prewarmStockfish = platformCapabilities.stockfish.prewarm;
+  const stockfish = platformCapabilities.stockfish;
   const scheduler = platformCapabilities.reminders.scheduler;
   const notificationClient = platformCapabilities.reminders.notificationClient;
   const iCloudSyncClient = platformCapabilities.progressSync.client;
@@ -437,8 +437,8 @@ export function PracticePocScreen({
   const boardSize = adaptiveLayout.boardSize;
 
   useEffect(() => {
-    void prewarmStockfish();
-  }, [prewarmStockfish]);
+    void stockfish.prewarm();
+  }, [stockfish]);
 
   const isActive = state?.status === "active";
   const isPaused = state?.status === "paused";
@@ -2057,8 +2057,7 @@ export function PracticePocScreen({
                   initialIndex={historyReviewInitialIndex}
                   service={service}
                   onExit={() => setHistoryReviewEntries([])}
-                  prewarmStockfish={prewarmStockfish}
-                  stockfishTransportFactory={stockfishTransportFactory}
+                  stockfish={stockfish}
                 />
               ) : (
                 <HistoryPanel
@@ -2163,8 +2162,7 @@ export function PracticePocScreen({
                 onScheduleTestReviewReminder={arePracticeTestControlsEnabled() ? scheduleDevReviewReminderNotification : undefined}
                 onSessionActiveChange={setReviewSessionActive}
                 reviewReminderScheduleStatus={arePracticeTestControlsEnabled() ? reviewReminderScheduleStatus : undefined}
-                prewarmStockfish={prewarmStockfish}
-                stockfishTransportFactory={stockfishTransportFactory}
+                stockfish={stockfish}
               />
             ) : null}
             {tab === "settings" ? (
@@ -2197,10 +2195,7 @@ export function PracticePocScreen({
               />
             ) : null}
             {tab === "analysis" && arePracticeTestControlsEnabled() ? (
-              <StockfishDiagnosticsPanel
-                prewarmStockfish={prewarmStockfish}
-                stockfishTransportFactory={stockfishTransportFactory}
-              />
+              <StockfishDiagnosticsPanel stockfish={stockfish} />
             ) : null}
           </ScrollView>
           {bottomTabsVisible ? (
@@ -5138,8 +5133,7 @@ function ReviewPanel({
   reviewReminderScheduleStatus,
   service,
   sessionMistakeReviewItems,
-  prewarmStockfish,
-  stockfishTransportFactory
+  stockfish
 }: {
   adaptiveLayout: AdaptiveLayout;
   boardSize: number;
@@ -5156,8 +5150,7 @@ function ReviewPanel({
   reviewReminderScheduleStatus?: string;
   service: PracticeService;
   sessionMistakeReviewItems: SessionMistakeReviewItem[];
-  prewarmStockfish: () => Promise<boolean>;
-  stockfishTransportFactory: () => UciEngineTransport | null;
+  stockfish: MobileStockfishCapabilities;
 }): React.JSX.Element {
   const sessionEntries = sessionMistakeReviewItems.map((item): ReviewEntry => ({
     puzzle: item.puzzle,
@@ -5288,8 +5281,7 @@ function ReviewPanel({
         service={service}
         onReviewRecorded={onReviewRecorded}
         onExit={finishActiveReview}
-        prewarmStockfish={prewarmStockfish}
-        stockfishTransportFactory={stockfishTransportFactory}
+        stockfish={stockfish}
       />
     );
   }
@@ -5700,8 +5692,7 @@ function ReviewSession({
   service,
   onExit,
   onReviewRecorded,
-  prewarmStockfish,
-  stockfishTransportFactory
+  stockfish
 }: {
   adaptiveLayout: AdaptiveLayout;
   boardSize: number;
@@ -5714,8 +5705,7 @@ function ReviewSession({
   service: PracticeService;
   onExit: (source: ReviewEntry["source"]) => void;
   onReviewRecorded?: (completedAt: string) => void;
-  prewarmStockfish: () => Promise<boolean>;
-  stockfishTransportFactory: () => UciEngineTransport | null;
+  stockfish: MobileStockfishCapabilities;
 }): React.JSX.Element {
   const boardRef = useRef<ChessboardRef | null>(null);
   const reviewSuppressedBoardMovesRef = useRef<string[]>([]);
@@ -5829,7 +5819,7 @@ function ReviewSession({
       return;
     }
 
-    const transport = stockfishTransportFactory();
+    const transport = stockfish.createTransport();
     if (!transport) {
       setEngineAnalysisLines([]);
       setAnalysisEngineStatus("fallback");
@@ -5841,7 +5831,7 @@ function ReviewSession({
     setEngineAnalysisLines([]);
     setAnalysisEngineStatus("thinking");
     setAnalysisIsRunning(true);
-    void prewarmStockfish().then((prewarmed) => analyzeFenWithUciEngine(transport, stockfishTargetFen, {
+    void stockfish.prewarm().then((prewarmed) => analyzeFenWithUciEngine(transport, stockfishTargetFen, {
       depth: ANALYSIS_DEPTH,
       multiPv: 3,
       initialize: !prewarmed,
@@ -5874,7 +5864,7 @@ function ReviewSession({
       cancelled = true;
       transport.send("stop");
     };
-  }, [analysisEnabled, prewarmStockfish, stockfishTargetFen, stockfishTransportFactory]);
+  }, [analysisEnabled, stockfish, stockfishTargetFen]);
 
   useEffect(() => {
     if (currentEntry.source !== "due" || reviewResultRecorded) {
@@ -7759,11 +7749,9 @@ function PackInfoRow({
 }
 
 function StockfishDiagnosticsPanel({
-  prewarmStockfish,
-  stockfishTransportFactory
+  stockfish
 }: {
-  prewarmStockfish: () => Promise<boolean>;
-  stockfishTransportFactory: () => UciEngineTransport | null;
+  stockfish: MobileStockfishCapabilities;
 }): React.JSX.Element {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [runId, setRunId] = useState(0);
@@ -7775,7 +7763,7 @@ function StockfishDiagnosticsPanel({
   const selectedPosition = ANALYSIS_DIAGNOSTIC_POSITIONS[selectedIndex] ?? ANALYSIS_DIAGNOSTIC_POSITIONS[0];
 
   useEffect(() => {
-    const transport = stockfishTransportFactory();
+    const transport = stockfish.createTransport();
     let cancelled = false;
     let firstUpdateSeen = false;
     const startedAt = Date.now();
@@ -7808,7 +7796,7 @@ function StockfishDiagnosticsPanel({
       terminate: () => transport.terminate()
     };
 
-    void prewarmStockfish().then((prewarmed) => analyzeFenWithUciEngine(tracedTransport, selectedPosition.fen, {
+    void stockfish.prewarm().then((prewarmed) => analyzeFenWithUciEngine(tracedTransport, selectedPosition.fen, {
       depth: ANALYSIS_DEPTH,
       initialize: !prewarmed,
       multiPv: 4,
@@ -7848,7 +7836,7 @@ function StockfishDiagnosticsPanel({
       cancelled = true;
       transport.send("stop");
     };
-  }, [prewarmStockfish, runId, selectedPosition, stockfishTransportFactory]);
+  }, [runId, selectedPosition, stockfish]);
 
   return (
     <View style={styles.listPanel} testID="stockfish-diagnostics-panel">
