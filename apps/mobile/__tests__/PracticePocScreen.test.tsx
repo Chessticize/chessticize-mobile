@@ -770,7 +770,11 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
     expect(collectText(findByTestId(renderer, "error-panel"))).toContain("Practice write failed");
-    expect(service.listHistory()).toHaveLength(0);
+    abandonSprint(renderer);
+    press(renderer, "history-tab");
+    expect(findByTestId(renderer, "history-empty-state").props.accessibilityLabel).toBe("History has no attempts");
+    expect(collectText(findByTestId(renderer, "history-empty-state"))).toBe("No attempts");
+    expect(historyAttemptRows(renderer)).toHaveLength(0);
   });
 
   it("keeps the practice page from scrolling while the session board is on screen", async () => {

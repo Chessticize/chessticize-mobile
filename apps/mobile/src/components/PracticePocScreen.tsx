@@ -4326,7 +4326,15 @@ function HistoryPanel({
           </Pressable>
         </View>
       </View>
-      {visibleAttempts.length === 0 ? <Text style={styles.listText}>No attempts</Text> : null}
+      {visibleAttempts.length === 0 ? (
+        <Text
+          accessibilityLabel="History has no attempts"
+          style={styles.listText}
+          testID="history-empty-state"
+        >
+          No attempts
+        </Text>
+      ) : null}
       {visibleAttempts.map((attempt) => (
         <HistoryAttemptRow
           key={attempt.id}

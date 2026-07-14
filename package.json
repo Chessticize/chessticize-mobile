@@ -10,6 +10,7 @@
     "test:unit": "node --experimental-strip-types --test packages/core/test/*.test.ts",
     "test:integration": "node --experimental-strip-types --test packages/storage/test/*.test.ts packages/storage/test/*.test.mjs",
     "test:e2e": "node --experimental-strip-types --test apps/cli/test/*.test.ts",
+    "test:tooling": "node --test scripts/*.test.mjs && pnpm mobile:data-egress-audit",
     "app-store:preflight": "node scripts/app-store-preflight.mjs",
     "app-store:signing-readiness": "node scripts/app-store-signing-readiness.mjs",
     "app-store:third-party-audit": "node scripts/app-store-third-party-audit.mjs",

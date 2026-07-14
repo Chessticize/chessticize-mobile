@@ -18,13 +18,40 @@ export const APPROVED_RUNTIME_DEPENDENCIES = Object.freeze({
   ])
 });
 
-const FIRST_PARTY_RUNTIME_ROOTS = Object.freeze([
-  "apps/mobile/App.tsx",
+const FIRST_PARTY_RUNTIME_TREES = Object.freeze([
   "apps/mobile/src",
   "apps/mobile/android/app/src/main",
-  "apps/mobile/ios/ChessticizeMobile",
+  "apps/mobile/ios",
+  "apps/mobile/native",
   "packages/core/src",
   "packages/storage/src"
+]);
+
+const APPLICATION_ENTRYPOINT_DIRECTORY = "apps/mobile";
+
+const EXCLUDED_RUNTIME_DIRECTORY_NAMES = new Set([
+  ".gradle",
+  "__mocks__",
+  "__tests__",
+  "androidtest",
+  "artifacts",
+  "build",
+  "deriveddata",
+  "e2e",
+  "generated",
+  "node_modules",
+  "pods",
+  "scripts",
+  "test",
+  "test-support",
+  "tests",
+  "vendor"
+]);
+
+const EXCLUDED_RUNTIME_TREE_PREFIXES = Object.freeze([
+  // The shared Stockfish tree is vendored upstream engine source. First-party
+  // platform bridges remain covered under android/app/src/main and ios/.
+  "apps/mobile/native/stockfish"
 ]);
 
 const RUNTIME_SOURCE_EXTENSIONS = new Set([
@@ -179,11 +206,28 @@ function unquoteYamlKey(value) {
 }
 
 function runtimeSourceFiles(repoRoot) {
-  return FIRST_PARTY_RUNTIME_ROOTS.flatMap((path) => collectRuntimeSourceFiles(repoRoot, path))
+  return [...new Set([
+    ...collectApplicationEntrypointFiles(repoRoot),
+    ...FIRST_PARTY_RUNTIME_TREES.flatMap((path) => collectRuntimeSourceFiles(repoRoot, path))
+  ])]
     .sort((left, right) => left.localeCompare(right));
 }
 
+function collectApplicationEntrypointFiles(repoRoot) {
+  const absolutePath = join(repoRoot, APPLICATION_ENTRYPOINT_DIRECTORY);
+  if (!existsSync(absolutePath)) {
+    return [];
+  }
+  return readdirSync(absolutePath, { withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .map((entry) => `${APPLICATION_ENTRYPOINT_DIRECTORY}/${entry.name}`)
+    .filter(isRuntimeSource);
+}
+
 function collectRuntimeSourceFiles(repoRoot, relativePath) {
+  if (isExcludedRuntimePath(relativePath)) {
+    return [];
+  }
   const absolutePath = join(repoRoot, relativePath);
   if (!existsSync(absolutePath)) {
     return [];
@@ -202,6 +246,28 @@ function collectRuntimeSourceFiles(repoRoot, relativePath) {
 }
 
 function isRuntimeSource(path) {
+  if (isExcludedRuntimePath(path) || isTestOrToolingSource(path)) {
+    return false;
+  }
   const dot = path.lastIndexOf(".");
   return dot >= 0 && RUNTIME_SOURCE_EXTENSIONS.has(path.slice(dot));
+}
+
+function isExcludedRuntimePath(path) {
+  const normalizedPath = path.split(sep).join("/");
+  if (EXCLUDED_RUNTIME_TREE_PREFIXES.some((prefix) =>
+    normalizedPath === prefix || normalizedPath.startsWith(`${prefix}/`)
+  )) {
+    return true;
+  }
+  return normalizedPath.split("/").some((segment) =>
+    EXCLUDED_RUNTIME_DIRECTORY_NAMES.has(segment.toLowerCase())
+  );
+}
+
+function isTestOrToolingSource(path) {
+  const name = path.split("/").at(-1) ?? "";
+  return name.startsWith(".") ||
+    /\.(?:config|env|setup)\.[^.]+$/u.test(name) ||
+    /\.(?:spec|test)\.[^.]+$/u.test(name);
 }

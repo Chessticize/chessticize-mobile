@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -38,20 +38,39 @@ test("mobile data-egress audit rejects unreviewed runtime transports from packag
   ));
 });
 
-test("mobile data-egress audit rejects native network primitives", () => {
+test("mobile data-egress audit rejects network primitives in application entrypoints and native runtime sources", () => {
   const repoRoot = buildAuditFixture();
+  writeFixtureFile(
+    repoRoot,
+    "apps/mobile/index.js",
+    "export function uploadFromEntrypoint() { return fetch('https://example.invalid'); }\n"
+  );
   writeFixtureFile(
     repoRoot,
     "apps/mobile/android/app/src/main/java/com/chessticize/mobile/GameplayUpload.kt",
     "package com.chessticize.mobile\nimport java.net.HttpURLConnection\n"
   );
+  writeFixtureFile(
+    repoRoot,
+    "apps/mobile/ios/StockfishEngine/Native/NativeStockfishEngine.mm",
+    "void uploadFromEngine() { NSURLSession *session = [NSURLSession sharedSession]; }\n"
+  );
 
   const result = auditMobileDataEgress({ repoRoot });
 
   assert.equal(result.status, "fail");
-  assert.ok(result.findings.some((finding) =>
-    finding.path.endsWith("GameplayUpload.kt") && finding.kind === "network-primitive"
-  ));
+  for (const expectedPath of [
+    "apps/mobile/index.js",
+    "apps/mobile/android/app/src/main/java/com/chessticize/mobile/GameplayUpload.kt",
+    "apps/mobile/ios/StockfishEngine/Native/NativeStockfishEngine.mm"
+  ]) {
+    assert.ok(
+      result.findings.some((finding) =>
+        finding.path === expectedPath && finding.kind === "network-primitive"
+      ),
+      `Expected a network-primitive finding for ${expectedPath}: ${JSON.stringify(result.findings, null, 2)}`
+    );
+  }
 });
 
 test("mobile data-egress audit accepts reviewed dependencies and local-only gameplay code", () => {
@@ -66,6 +85,38 @@ test("mobile data-egress audit accepts reviewed dependencies and local-only game
 
   assert.equal(result.status, "pass", JSON.stringify(result.findings, null, 2));
   assert.deepEqual(result.findings, []);
+});
+
+test("mobile data-egress audit deliberately excludes vendor, build, generated, and test-only sources", () => {
+  const repoRoot = buildAuditFixture();
+  const excludedSources = [
+    "apps/mobile/native/stockfish/Stockfish/src/vendor-transport.cpp",
+    "apps/mobile/ios/build/GeneratedTransport.mm",
+    "apps/mobile/src/generated/transport.ts",
+    "apps/mobile/__tests__/transport.test.ts"
+  ];
+  for (const path of excludedSources) {
+    writeFixtureFile(repoRoot, path, "export function excludedTransport() { return fetch('https://example.invalid'); }\n");
+  }
+
+  const result = auditMobileDataEgress({ repoRoot });
+
+  assert.equal(result.status, "pass", JSON.stringify(result.findings, null, 2));
+  assert.deepEqual(result.findings, []);
+});
+
+test("required Core CI runs the tooling regressions and live data-egress audit", () => {
+  const repoRoot = join(import.meta.dirname, "..");
+  const packageJson = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8"));
+  const workflow = readFileSync(join(repoRoot, ".github/workflows/core.yml"), "utf8");
+
+  assert.equal(
+    packageJson.scripts["test:tooling"],
+    "node --test scripts/*.test.mjs && pnpm mobile:data-egress-audit"
+  );
+  assert.match(workflow, /- name: Tooling and audit regressions\s+run: pnpm test:tooling/u);
+  assert.match(workflow, /- "scripts\/\*\*"/u);
+  assert.match(workflow, /- "apps\/mobile\/\*\*"/u);
 });
 
 function buildAuditFixture({ extraMobileDependency } = {}) {
