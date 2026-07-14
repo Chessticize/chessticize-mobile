@@ -14,9 +14,29 @@ function parseJavaMajor(output) {
   return first === 1 && match[2] ? Number(match[2]) : first;
 }
 
+function parseNodeVersion(version) {
+  const match = String(version).match(/^(?:v)?(\d+)\.(\d+)\.(\d+)$/);
+  if (!match) {
+    return undefined;
+  }
+  return {
+    major: Number(match[1]),
+    minor: Number(match[2]),
+    patch: Number(match[3]),
+  };
+}
+
 function parseNodeMajor(version) {
-  const match = String(version).match(/^(?:v)?(\d+)/);
-  return match ? Number(match[1]) : undefined;
+  return parseNodeVersion(version)?.major;
+}
+
+function isVersionAtLeast(actual, minimum) {
+  for (const part of ['major', 'minor', 'patch']) {
+    if (actual[part] !== minimum[part]) {
+      return actual[part] > minimum[part];
+    }
+  }
+  return true;
 }
 
 function defaultRun(command, args) {
@@ -49,11 +69,11 @@ function inspectAndroidEnvironment(options = {}) {
   const checks = [];
 
   const add = (id, status, detail) => checks.push({ id, status, detail });
-  const nodeMajor = parseNodeMajor(nodeVersion);
+  const parsedNodeVersion = parseNodeVersion(nodeVersion);
   add(
     'node',
-    nodeMajor !== undefined && nodeMajor >= REQUIREMENTS.nodeMajor ? 'pass' : 'fail',
-    `Node ${nodeVersion}; required major ${REQUIREMENTS.nodeMajor}+`,
+    parsedNodeVersion && isVersionAtLeast(parsedNodeVersion, REQUIREMENTS.node.minimum) ? 'pass' : 'fail',
+    `Node ${nodeVersion}; required ${REQUIREMENTS.node.range}`,
   );
 
   const java = run('java', ['-version']);
@@ -164,7 +184,9 @@ if (require.main === module) {
 module.exports = {
   REQUIREMENTS,
   inspectAndroidEnvironment,
+  isVersionAtLeast,
   parseJavaMajor,
   parseNodeMajor,
+  parseNodeVersion,
   runDoctor,
 };

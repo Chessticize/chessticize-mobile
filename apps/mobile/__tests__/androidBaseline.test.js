@@ -212,6 +212,32 @@ describe('Android launch baseline', () => {
   });
 
   it.each([
+    ['22.10.9', 'fail'],
+    ['22.11.0', 'pass'],
+    ['23.0.0', 'pass'],
+  ])('enforces the mobile package Node engine floor for Node %s', (nodeVersion, expectedStatus) => {
+    const sdkRoot = '/sdk';
+    const appDir = '/repo/apps/mobile';
+    const repoRoot = '/repo';
+    const present = completeAndroidFiles(sdkRoot, appDir, repoRoot);
+
+    const report = inspectAndroidEnvironment({
+      environment: { ANDROID_HOME: sdkRoot },
+      exists: (file) => present.has(file),
+      canExecute: (file) => present.has(file),
+      run: successfulAndroidToolRun,
+      nodeVersion,
+      appDir,
+      repoRoot,
+    });
+
+    expect(report.checks.find((check) => check.id === 'node')).toMatchObject({
+      status: expectedStatus,
+      detail: expect.stringContaining(mobilePackage.engines.node),
+    });
+  });
+
+  it.each([
     ['React Native Gradle plugin', '@react-native/gradle-plugin/package.json'],
     ['React Native Codegen', '@react-native/codegen/package.json'],
   ])('rejects an install missing %s', (_label, missingDependency) => {
