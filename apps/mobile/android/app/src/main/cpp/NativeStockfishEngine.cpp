@@ -114,18 +114,13 @@ class JavaLineEmitter {
 
 class StockfishRunner {
  public:
-  StockfishRunner(JNIEnv* environment,
-                  jobject module,
-                  const std::string& bigNetworkPath,
-                  const std::string& smallNetworkPath) :
+  StockfishRunner(JNIEnv* environment, jobject module) :
       engine(std::nullopt),
       emitter(environment, module) {
     Tune::init(engine.get_options());
     configureCallbacks();
     setOption("Threads", "1");
     setOption("Hash", "32");
-    setOption("EvalFile", bigNetworkPath);
-    setOption("EvalFileSmall", smallNetworkPath);
   }
 
   ~StockfishRunner() {
@@ -267,15 +262,9 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
 extern "C" JNIEXPORT jlong JNICALL
 Java_com_chessticize_mobile_NativeStockfishEngineModule_nativeCreate(
     JNIEnv* environment,
-    jobject module,
-    jstring bigNetworkPath,
-    jstring smallNetworkPath) {
+    jobject module) {
   initStockfishStatics();
-  auto runner = std::make_unique<StockfishRunner>(
-      environment,
-      module,
-      toStdString(environment, bigNetworkPath),
-      toStdString(environment, smallNetworkPath));
+  auto runner = std::make_unique<StockfishRunner>(environment, module);
   return reinterpret_cast<jlong>(runner.release());
 }
 

@@ -10,15 +10,10 @@ import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.WritableNativeMap
 import com.facebook.react.modules.core.DeviceEventManagerModule
 import com.facebook.react.uimanager.ViewManager
-import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 private const val STOCKFISH_LINE_EVENT = "StockfishEngineLine"
-private const val BIG_NETWORK = "nn-c288c895ea92.nnue"
-private const val SMALL_NETWORK = "nn-37f18f62d772.nnue"
-private const val BIG_NETWORK_SIZE = 108_919_594L
-private const val SMALL_NETWORK_SIZE = 3_519_630L
 
 class NativeStockfishEngineModule(
   reactContext: ReactApplicationContext,
@@ -41,9 +36,7 @@ class NativeStockfishEngineModule(
       try {
         if (nativeHandle == 0L) {
           ensureNativeLibraryLoaded()
-          val bigNetwork = materializeNetwork(BIG_NETWORK, BIG_NETWORK_SIZE)
-          val smallNetwork = materializeNetwork(SMALL_NETWORK, SMALL_NETWORK_SIZE)
-          nativeHandle = nativeCreate(bigNetwork.absolutePath, smallNetwork.absolutePath)
+          nativeHandle = nativeCreate()
           check(nativeHandle != 0L) { "The on-device engine could not be initialized." }
         }
         promise.resolve(null)
@@ -122,28 +115,7 @@ class NativeStockfishEngineModule(
     }
   }
 
-  private fun materializeNetwork(name: String, expectedSize: Long): File {
-    val directory = File(reactApplicationContext.filesDir, "stockfish").also {
-      check(it.exists() || it.mkdirs()) { "Could not create the Stockfish data directory." }
-    }
-    val destination = File(directory, name)
-    if (destination.isFile && destination.length() == expectedSize) {
-      return destination
-    }
-
-    val temporary = File(directory, "$name.tmp")
-    check(!destination.exists() || destination.delete()) { "Could not replace bundled network $name." }
-    reactApplicationContext.assets.open("stockfish/$name").use { input ->
-      temporary.outputStream().use { output -> input.copyTo(output) }
-    }
-    check(temporary.length() == expectedSize) {
-      "Bundled network $name is incomplete (${temporary.length()} of $expectedSize bytes)."
-    }
-    check(temporary.renameTo(destination)) { "Could not install bundled network $name." }
-    return destination
-  }
-
-  private external fun nativeCreate(bigNetworkPath: String, smallNetworkPath: String): Long
+  private external fun nativeCreate(): Long
   private external fun nativeSend(handle: Long, command: String)
   private external fun nativeDestroy(handle: Long)
 

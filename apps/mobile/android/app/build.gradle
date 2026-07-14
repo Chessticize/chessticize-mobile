@@ -133,18 +133,10 @@ def enableProguardInReleaseBuilds = false
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 def puzzlePackSource = file("$rootDir/../../../fixtures/puzzles/bundled-core-pack.sqlite")
 def generatedPuzzlePackAssetsDir = "$buildDir/generated/assets/puzzle-pack"
-def stockfishResourcesDir = file("$rootDir/../native/stockfish/Resources")
-def generatedStockfishAssetsDir = "$buildDir/generated/assets/stockfish"
 
 tasks.register("copyPuzzlePackAsset", Copy) {
     from puzzlePackSource
     into "$generatedPuzzlePackAssetsDir/puzzle-packs"
-}
-
-tasks.register("copyStockfishAssets", Copy) {
-    from stockfishResourcesDir
-    include "nn-c288c895ea92.nnue", "nn-37f18f62d772.nnue"
-    into "$generatedStockfishAssetsDir/stockfish"
 }
 
 android {
@@ -173,7 +165,6 @@ android {
     sourceSets {
         main {
             assets.srcDirs += generatedPuzzlePackAssetsDir
-            assets.srcDirs += generatedStockfishAssetsDir
         }
     }
     externalNativeBuild {
@@ -181,9 +172,6 @@ android {
             path file("src/main/cpp/CMakeLists.txt")
             version "3.22.1"
         }
-    }
-    androidResources {
-        noCompress += ["nnue"]
     }
     packaging {
         jniLibs {
@@ -228,7 +216,6 @@ android {
 
 tasks.matching { task -> task.name.startsWith("merge") && task.name.endsWith("Assets") }.configureEach {
     dependsOn("copyPuzzlePackAsset")
-    dependsOn("copyStockfishAssets")
 }
 
 dependencies {

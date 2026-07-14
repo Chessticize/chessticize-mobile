@@ -23,16 +23,18 @@ describe('Android Stockfish native contract', () => {
     expect(module).not.toMatch(/Chess|FEN|bestmove|MultiPV/);
   });
 
-  it('builds JNI against the canonical shared source and packages both NNUE networks', () => {
+  it('builds JNI and embedded NNUE data directly from the canonical shared sources', () => {
     const cmake = read('android/app/src/main/cpp/CMakeLists.txt');
     const gradle = read('android/app/build.gradle');
 
     expect(cmake).toContain('../../../../../native/stockfish/Stockfish/src');
+    expect(cmake).toContain('../../../../../native/stockfish/Resources');
     expect(cmake).toContain('NativeStockfishEngine.cpp');
+    expect(cmake).toContain('-Wa,-I,${STOCKFISH_RESOURCES_DIR}');
     expect(cmake).toContain('-Wl,-z,max-page-size=16384');
+    expect(cmake).toContain('nn-c288c895ea92.nnue');
+    expect(cmake).toContain('nn-37f18f62d772.nnue');
     expect(gradle).toContain('externalNativeBuild');
-    expect(gradle).toContain('nn-c288c895ea92.nnue');
-    expect(gradle).toContain('nn-37f18f62d772.nnue');
     expect(gradle).toContain('ANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON');
   });
 
