@@ -440,10 +440,6 @@ export function PracticePocScreen({
   );
   const boardSize = adaptiveLayout.boardSize;
 
-  useEffect(() => {
-    void stockfish.prewarm();
-  }, [stockfish]);
-
   const isActive = state?.status === "active";
   const isPaused = state?.status === "paused";
   const isOpenSession = isActive || isPaused;

@@ -41,6 +41,17 @@ afterEach(() => {
 });
 
 describe("PracticePocScreen", () => {
+  it("does not initialize Stockfish while rendering the Practice home", async () => {
+    const prewarm = jest.fn(async () => true);
+
+    renderScreen({ stockfish: { prewarm } });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(prewarm).not.toHaveBeenCalled();
+  });
+
   it("exposes the mobile app shell automation contract", () => {
     const renderer = renderScreen();
     const mainScroll = findByTestId(renderer, "practice-main-scroll");
