@@ -56,7 +56,6 @@ describe('Android Standard Practice release slice', () => {
   });
 
   it('registers the maintained Android launch-config boundary for deterministic public journeys', () => {
-    const app = read('App.tsx');
     const application = read('android/app/src/main/java/com/chessticize/mobile/MainApplication.kt');
     const testConfigModule = read('android/app/src/main/java/com/chessticize/mobile/ChessticizeTestLaunchConfigModule.kt');
 
@@ -68,9 +67,9 @@ describe('Android Standard Practice release slice', () => {
     expect(testConfigModule).toContain('chessticizePuzzleSelectionSeed');
     expect(testConfigModule).toContain('chessticizeStandardTargetCorrect');
     expect(testConfigModule).toContain('chessticizeTestNowMs');
-    expect(testConfigModule).toContain('chessticizeTestLaunchConfigChanged');
-    expect(testConfigModule).toContain('emitDeviceEvent');
-    expect(app).toContain('subscribeToTestLaunchConfigChanges');
+    expect(testConfigModule).toContain('getBundleExtra("launchArgs")');
+    expect(testConfigModule).toContain('launchArgs?.getString(key)');
+    expect(testConfigModule).toContain('?: intent?.getStringExtra(key)');
     expect(testConfigModule).not.toContain('Log.');
   });
 

@@ -8,8 +8,7 @@ import {
   createAdvancingTestClock,
   resolveTestNowMsFromLaunchConfig,
   resolveTestPuzzleSelectionSeedFromLaunchConfig,
-  resolveTestStandardTargetCorrectFromLaunchConfig,
-  subscribeToTestLaunchConfigChanges
+  resolveTestStandardTargetCorrectFromLaunchConfig
 } from "./src/backend/testLaunchConfig";
 import { shouldSuppressLogBoxWarnings } from "./src/releaseConfig";
 
@@ -18,7 +17,6 @@ if (shouldSuppressLogBoxWarnings()) {
 }
 
 function App() {
-  const [, refreshTestLaunchConfig] = React.useReducer((revision: number) => revision + 1, 0);
   const platformFactory = mobilePlatformCapabilityFactoryFor(Platform.OS as "android" | "ios");
   const [platformCapabilities, setPlatformCapabilities] = React.useState<MobilePlatformCapabilities | undefined>(
     () => platformFactory.createSync()
@@ -30,10 +28,6 @@ function App() {
   const currentTimeMs = React.useMemo(
     () => testNowMs === undefined ? undefined : createAdvancingTestClock(testNowMs),
     [testNowMs]
-  );
-  React.useEffect(
-    () => subscribeToTestLaunchConfigChanges(refreshTestLaunchConfig),
-    []
   );
   React.useEffect(() => {
     if (platformCapabilities) {

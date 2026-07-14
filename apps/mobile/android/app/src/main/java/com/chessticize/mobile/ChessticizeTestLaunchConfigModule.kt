@@ -1,6 +1,7 @@
 package com.chessticize.mobile
 
 import android.content.Intent
+import android.os.Bundle
 import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.NativeModule
@@ -9,28 +10,11 @@ import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.WritableMap
 import com.facebook.react.uimanager.ViewManager
-import java.util.concurrent.CopyOnWriteArraySet
 
 class ChessticizeTestLaunchConfigModule(
   reactContext: ReactApplicationContext,
 ) : ReactContextBaseJavaModule(reactContext) {
   override fun getName(): String = "ChessticizeTestLaunchConfig"
-
-  private val launchConfigChangedListener = {
-    reactApplicationContext.emitDeviceEvent(LAUNCH_CONFIG_CHANGED_EVENT)
-  }
-
-  override fun initialize() {
-    super.initialize()
-    if (BuildConfig.DEBUG) {
-      ChessticizeTestLaunchArguments.addListener(launchConfigChangedListener)
-    }
-  }
-
-  override fun invalidate() {
-    ChessticizeTestLaunchArguments.removeListener(launchConfigChangedListener)
-    super.invalidate()
-  }
 
   @ReactMethod(isBlockingSynchronousMethod = true)
   fun getLaunchConfig(): WritableMap {
@@ -45,48 +29,30 @@ class ChessticizeTestLaunchConfigModule(
     }
     return config
   }
-
-  @ReactMethod
-  fun addListener(eventName: String) = Unit
-
-  @ReactMethod
-  fun removeListeners(count: Int) = Unit
-
-  companion object {
-    const val LAUNCH_CONFIG_CHANGED_EVENT = "chessticizeTestLaunchConfigChanged"
-  }
 }
 
 object ChessticizeTestLaunchArguments {
-  private val listeners = CopyOnWriteArraySet<() -> Unit>()
-
   @Volatile
   var current: Map<String, String> = emptyMap()
     private set
 
   fun capture(intent: Intent?) {
-    val next = buildMap {
-      intent?.getStringExtra("chessticizeTestNowMs")?.let {
+    val launchArgs = intent?.getBundleExtra("launchArgs")
+    current = buildMap {
+      testLaunchArgument(intent, launchArgs, "chessticizeTestNowMs")?.let {
         put("testNowMs", it)
       }
-      intent?.getStringExtra("chessticizePuzzleSelectionSeed")?.let {
+      testLaunchArgument(intent, launchArgs, "chessticizePuzzleSelectionSeed")?.let {
         put("puzzleSelectionSeed", it)
       }
-      intent?.getStringExtra("chessticizeStandardTargetCorrect")?.let {
+      testLaunchArgument(intent, launchArgs, "chessticizeStandardTargetCorrect")?.let {
         put("standardTargetCorrect", it)
       }
     }
-    current = next
-    listeners.forEach { listener -> listener() }
   }
 
-  fun addListener(listener: () -> Unit) {
-    listeners.add(listener)
-  }
-
-  fun removeListener(listener: () -> Unit) {
-    listeners.remove(listener)
-  }
+  private fun testLaunchArgument(intent: Intent?, launchArgs: Bundle?, key: String): String? =
+    launchArgs?.getString(key) ?: intent?.getStringExtra(key)
 }
 
 class ChessticizeTestLaunchConfigPackage : ReactPackage {
