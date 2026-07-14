@@ -158,9 +158,9 @@ check(
 
 check(
   "Bundled Stockfish license artifacts are present",
-  fileExists("apps/mobile/ios/StockfishEngine/Copying.txt") &&
-    fileExists("apps/mobile/ios/StockfishEngine/AUTHORS") &&
-    fileExists("apps/mobile/ios/StockfishEngine/README-STOCKFISH.md"),
+  fileExists("apps/mobile/native/stockfish/Copying.txt") &&
+    fileExists("apps/mobile/native/stockfish/AUTHORS") &&
+    fileExists("apps/mobile/native/stockfish/README-STOCKFISH.md"),
   "The embedded engine must ship its GPL text, authors, and source notes."
 );
 

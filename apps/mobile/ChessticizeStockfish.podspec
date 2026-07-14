@@ -4,20 +4,20 @@ Pod::Spec.new do |s|
   s.summary = "Offline Stockfish engine bridge for Chessticize Mobile."
   s.description = "Builds the official Stockfish engine source into the iOS app and exposes a React Native UCI transport."
   s.homepage = "https://github.com/official-stockfish/Stockfish"
-  s.license = { :type => "GPL-3.0-or-later", :file => "Copying.txt" }
+  s.license = { :type => "GPL-3.0-or-later", :file => "native/stockfish/Copying.txt" }
   s.author = "The Stockfish developers"
   s.platforms = { :ios => "15.1" }
   s.source = { :path => "." }
   s.source_files = [
-    "Native/**/*.{h,mm}",
-    "Stockfish/src/**/*.{h,cpp}"
+    "ios/StockfishEngine/Native/**/*.{h,mm}",
+    "native/stockfish/Stockfish/src/**/*.{h,cpp}"
   ]
   s.exclude_files = [
-    "Stockfish/src/Makefile",
-    "Stockfish/src/main.cpp"
+    "native/stockfish/Stockfish/src/Makefile",
+    "native/stockfish/Stockfish/src/main.cpp"
   ]
-  s.resources = "Resources/*.nnue"
-  s.public_header_files = "Native/**/*.h"
+  s.resources = "native/stockfish/Resources/*.nnue"
+  s.public_header_files = "ios/StockfishEngine/Native/**/*.h"
   s.dependency "React-Core"
   s.pod_target_xcconfig = {
     "CLANG_CXX_LANGUAGE_STANDARD" => "c++17",

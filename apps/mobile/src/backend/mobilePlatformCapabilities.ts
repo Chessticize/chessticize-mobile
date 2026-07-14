@@ -44,7 +44,7 @@ export const MOBILE_APPLICATION_METADATA: MobileApplicationMetadata = {
   versionName: '1.0.0',
   sourceLicenseUrl: `${SOURCE_REPOSITORY_URL}/blob/main/LICENSE`,
   sourceRepositoryUrl: SOURCE_REPOSITORY_URL,
-  stockfishSourceUrl: `${SOURCE_REPOSITORY_URL}/tree/main/apps/mobile/ios/StockfishEngine`,
+  stockfishSourceUrl: `${SOURCE_REPOSITORY_URL}/tree/main/apps/mobile/native/stockfish`,
   supportEmail: SUPPORT_EMAIL,
   supportEmailUrl: `mailto:${SUPPORT_EMAIL}`,
 };

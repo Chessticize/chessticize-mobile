@@ -91,10 +91,10 @@ test("App Store release manifest reports source identity and hashed release arti
     "THIRD_PARTY_NOTICES.md",
     puzzleManifest.format === "sqlite" ? "fixtures/puzzles/bundled-core-pack.sqlite" : "fixtures/puzzles/bundled-core-pack.json",
     "fixtures/puzzles/bundled-core-pack.manifest.json",
-    "apps/mobile/ios/StockfishEngine/Copying.txt",
-    "apps/mobile/ios/StockfishEngine/AUTHORS",
-    "apps/mobile/ios/StockfishEngine/Resources/nn-c288c895ea92.nnue",
-    "apps/mobile/ios/StockfishEngine/Resources/nn-37f18f62d772.nnue"
+    "apps/mobile/native/stockfish/Copying.txt",
+    "apps/mobile/native/stockfish/AUTHORS",
+    "apps/mobile/native/stockfish/Resources/nn-c288c895ea92.nnue",
+    "apps/mobile/native/stockfish/Resources/nn-37f18f62d772.nnue"
   ]) {
     const artifact = artifactsByPath.get(path);
     assert.ok(artifact, `missing artifact ${path}`);

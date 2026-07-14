@@ -6,14 +6,14 @@
 #include <string>
 #include <vector>
 
-#include "../Stockfish/src/bitboard.h"
-#include "../Stockfish/src/engine.h"
-#include "../Stockfish/src/misc.h"
-#include "../Stockfish/src/position.h"
-#include "../Stockfish/src/search.h"
-#include "../Stockfish/src/tune.h"
-#include "../Stockfish/src/uci.h"
-#include "../Stockfish/src/ucioption.h"
+#include "../../../native/stockfish/Stockfish/src/bitboard.h"
+#include "../../../native/stockfish/Stockfish/src/engine.h"
+#include "../../../native/stockfish/Stockfish/src/misc.h"
+#include "../../../native/stockfish/Stockfish/src/position.h"
+#include "../../../native/stockfish/Stockfish/src/search.h"
+#include "../../../native/stockfish/Stockfish/src/tune.h"
+#include "../../../native/stockfish/Stockfish/src/uci.h"
+#include "../../../native/stockfish/Stockfish/src/ucioption.h"
 
 using namespace Stockfish;
 

@@ -141,8 +141,8 @@ function main() {
   const mobilePackage = readJson("apps/mobile/package.json");
   const lockfile = readText("pnpm-lock.yaml");
   const puzzleManifest = readJson("fixtures/puzzles/bundled-core-pack.manifest.json");
-  const stockfishPodspec = readText("apps/mobile/ios/StockfishEngine/ChessticizeStockfish.podspec");
-  const stockfishReadme = readText("apps/mobile/ios/StockfishEngine/README-STOCKFISH.md");
+  const stockfishPodspec = readText("apps/mobile/ChessticizeStockfish.podspec");
+  const stockfishReadme = readText("apps/mobile/native/stockfish/README-STOCKFISH.md");
   const noticeRows = extractNoticeRows(notices);
   const lockDependencies = new Map([
     ...extractImporterDependencies(lockfile, "."),
@@ -192,8 +192,8 @@ function main() {
   );
 
   const nnueFiles = [
-    "apps/mobile/ios/StockfishEngine/Resources/nn-c288c895ea92.nnue",
-    "apps/mobile/ios/StockfishEngine/Resources/nn-37f18f62d772.nnue"
+    "apps/mobile/native/stockfish/Resources/nn-c288c895ea92.nnue",
+    "apps/mobile/native/stockfish/Resources/nn-37f18f62d772.nnue"
   ];
   check(
     checks,
@@ -203,10 +203,10 @@ function main() {
       notices.includes("Upstream tag commit: `cb3d4ee9b47d0c5aae855b12379378ea1439675c`") &&
       notices.includes("Package version: `ChessticizeStockfish` pod `18.0.0`") &&
       stockfishPodspec.includes('s.version = "18.0.0"') &&
-      stockfishPodspec.includes('s.license = { :type => "GPL-3.0-or-later", :file => "Copying.txt" }') &&
-      fileExists("apps/mobile/ios/StockfishEngine/Stockfish/src/position.cpp") &&
-      fileExists("apps/mobile/ios/StockfishEngine/Copying.txt") &&
-      fileExists("apps/mobile/ios/StockfishEngine/AUTHORS"),
+      stockfishPodspec.includes('s.license = { :type => "GPL-3.0-or-later", :file => "native/stockfish/Copying.txt" }') &&
+      fileExists("apps/mobile/native/stockfish/Stockfish/src/position.cpp") &&
+      fileExists("apps/mobile/native/stockfish/Copying.txt") &&
+      fileExists("apps/mobile/native/stockfish/AUTHORS"),
     "The notice must match the bundled Stockfish source, pod version, GPL license, and authors artifacts."
   );
   check(

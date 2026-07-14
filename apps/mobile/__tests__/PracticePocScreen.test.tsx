@@ -3466,7 +3466,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "settings-support-email");
     expect(openURLSpy).toHaveBeenNthCalledWith(1, "https://github.com/Chessticize/chessticize-mobile/blob/main/LICENSE");
     expect(openURLSpy).toHaveBeenNthCalledWith(2, "https://github.com/Chessticize/chessticize-mobile");
-    expect(openURLSpy).toHaveBeenNthCalledWith(3, "https://github.com/Chessticize/chessticize-mobile/tree/main/apps/mobile/ios/StockfishEngine");
+    expect(openURLSpy).toHaveBeenNthCalledWith(3, "https://github.com/Chessticize/chessticize-mobile/tree/main/apps/mobile/native/stockfish");
     expect(openURLSpy).toHaveBeenNthCalledWith(4, "https://database.lichess.org/#puzzles");
     expect(openURLSpy).toHaveBeenNthCalledWith(5, "mailto:support@chessticize.com");
     openURLSpy.mockRestore();

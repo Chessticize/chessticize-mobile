@@ -14,11 +14,11 @@ the complete license texts shipped in this repository.
 - Authors: The Stockfish developers
 - License: GNU General Public License v3.0 or later
 - Source included in this repository:
-  `apps/mobile/ios/StockfishEngine/Stockfish/src`
+  `apps/mobile/native/stockfish/Stockfish/src`
 - License text included in this repository:
-  `apps/mobile/ios/StockfishEngine/Copying.txt`
+  `apps/mobile/native/stockfish/Copying.txt`
 - Authors file included in this repository:
-  `apps/mobile/ios/StockfishEngine/AUTHORS`
+  `apps/mobile/native/stockfish/AUTHORS`
 - Upstream source: https://github.com/official-stockfish/Stockfish
 - Notes: Chessticize Mobile embeds Stockfish for offline analysis. The public
   source for each submitted App Store binary must be available from a matching
@@ -27,8 +27,8 @@ the complete license texts shipped in this repository.
 ## Stockfish NNUE networks
 
 - Files shipped:
-  - `apps/mobile/ios/StockfishEngine/Resources/nn-c288c895ea92.nnue`
-  - `apps/mobile/ios/StockfishEngine/Resources/nn-37f18f62d772.nnue`
+  - `apps/mobile/native/stockfish/Resources/nn-c288c895ea92.nnue`
+  - `apps/mobile/native/stockfish/Resources/nn-37f18f62d772.nnue`
 - Related project: Stockfish NNUE evaluation networks
 - Notes: Stockfish documentation states that Stockfish uses neural networks
   trained on data provided by the Leela Chess Zero project under the Open

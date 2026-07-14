@@ -48,8 +48,8 @@ https://github.com/Chessticize/chessticize-mobile
   `apps/mobile/ios/ExportOptions.app-store-connect.plist`.
 - `LICENSE` contains GPL-3.0-or-later.
 - `THIRD_PARTY_NOTICES.md` is current.
-- `apps/mobile/ios/StockfishEngine/Copying.txt` and
-  `apps/mobile/ios/StockfishEngine/AUTHORS` are present.
+- `apps/mobile/native/stockfish/Copying.txt` and
+  `apps/mobile/native/stockfish/AUTHORS` are present.
 - The shipped Stockfish version and bundled NNUE files are listed in
   `THIRD_PARTY_NOTICES.md`.
 - The App Store binary was built from the tagged release commit.

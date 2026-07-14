@@ -1,1 +1,1 @@
-apps/mobile/ios/StockfishEngine/Resources/*.nnue filter=lfs diff=lfs merge=lfs -text
+apps/mobile/native/stockfish/Resources/*.nnue filter=lfs diff=lfs merge=lfs -text
