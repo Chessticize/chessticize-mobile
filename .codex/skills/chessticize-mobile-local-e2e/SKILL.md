@@ -56,8 +56,8 @@ pnpm install --frozen-lockfile
 Git worktrees can contain the 132-byte NNUE pointer files even when another checkout has the real binaries. Hydrate the Stockfish networks before building:
 
 ```sh
-git lfs pull --include='apps/mobile/ios/StockfishEngine/Resources/*.nnue'
-wc -c apps/mobile/ios/StockfishEngine/Resources/*.nnue
+git lfs pull --include='apps/mobile/native/stockfish/Resources/*.nnue'
+wc -c apps/mobile/native/stockfish/Resources/*.nnue
 ```
 
 Expect both files to exceed 1 MB. Pointer files can compile and be copied into the app bundle, but opening Analysis then terminates Stockfish and appears in Detox as `The app has unexpectedly disconnected from Detox server.`
