@@ -8,6 +8,10 @@ import {
   MOBILE_APPLICATION_METADATA,
   type MobilePlatformCapabilities,
 } from './mobilePlatformCapabilities.ts';
+import {
+  createNativeStockfishTransport,
+  prewarmNativeStockfishTransport,
+} from './nativeStockfishTransport.ts';
 
 export function createAndroidMobilePlatformCapabilitiesSync():
   | MobilePlatformCapabilities
@@ -35,8 +39,8 @@ export function composeAndroidMobilePlatformCapabilities(
       client: null,
     },
     stockfish: {
-      createTransport: () => null,
-      prewarm: async () => false,
+      createTransport: createNativeStockfishTransport,
+      prewarm: prewarmNativeStockfishTransport,
     },
     reminders: {
       scheduler: null,

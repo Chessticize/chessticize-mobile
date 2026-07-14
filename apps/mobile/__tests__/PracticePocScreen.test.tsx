@@ -3118,6 +3118,56 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "review-close-analysis")).toThrow();
   });
 
+  it("offers an actionable retry when native Stockfish startup fails", async () => {
+    const stockfish = createScriptedStockfishTransport((command, emit) => {
+      if (command === "go depth 8") {
+        void Promise.resolve().then(() => {
+          emit("info depth 4 multipv 1 score mate 1 pv e2e6");
+          emit("bestmove e2e6");
+        });
+      }
+    });
+    const start = jest
+      .fn<Promise<void>, []>()
+      .mockRejectedValueOnce(new Error("NNUE assets unavailable"))
+      .mockResolvedValue(undefined);
+    stockfish.transport.start = start;
+    const renderer = renderStandardSequenceScreen({
+      stockfish: {
+        createTransport: () => stockfish.transport,
+        prewarm: async () => false
+      }
+    });
+
+    startStandardSprint(renderer);
+    await boardMove(renderer, "c4b5");
+    await settleFeedbackSnapshot();
+    await boardMove(renderer, "g6g5");
+    await settleFeedbackSnapshot();
+    await boardMove(renderer, "a4b6");
+    await settleFeedbackSnapshot();
+    press(renderer, "review-mistakes-button");
+    press(renderer, "review-analysis-button");
+
+    await waitForAssertion(() => {
+      expect(findByTestId(renderer, "review-analysis-error")).toBeTruthy();
+      expect(collectText(findByTestId(renderer, "review-analysis-error"))).toContain(
+        "Stockfish couldn't start"
+      );
+      expect(findByTestId(renderer, "review-analysis-retry")).toBeTruthy();
+    });
+
+    press(renderer, "review-analysis-retry");
+
+    await waitForAssertion(() => {
+      expect(start).toHaveBeenCalledTimes(2);
+      expect(collectText(findByTestId(renderer, "review-analysis-engine-status"))).toBe(
+        "SF 18 NNUE · Depth 4/20"
+      );
+      expect(() => findByTestId(renderer, "review-analysis-error")).toThrow();
+    });
+  });
+
   it("isolates Stockfish diagnostics with scored live rows whose order can change by depth", async () => {
     const stockfish = createScriptedStockfishTransport((command, emit) => {
       if (command === "go depth 8") {

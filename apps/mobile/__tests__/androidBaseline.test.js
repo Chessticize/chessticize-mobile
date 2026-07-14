@@ -10,6 +10,7 @@ const {
 } = require('../scripts/android-doctor');
 const {
   EXPECTED_ABIS,
+  parseElfLoadAlignments,
   parseNativeAbis,
   verifyApk,
 } = require('../scripts/verify-android-apk-abis');
@@ -292,6 +293,8 @@ describe('Android launch baseline', () => {
       'lib/x86_64/libreactnative.so',
       'lib/arm64-v8a/libreactnative.so',
       'lib/x86_64/libhermes.so',
+      'lib/x86_64/libstockfish.so',
+      'lib/arm64-v8a/libstockfish.so',
     ].join('\n');
 
     expect(parseNativeAbis(entries)).toEqual(EXPECTED_ABIS);
@@ -300,7 +303,23 @@ describe('Android launch baseline', () => {
       'x86',
       'x86_64',
     ]);
-    expect(verifyApk('app.apk', () => ({ status: 0, stdout: entries, stderr: '' })))
+    const run = jest.fn((command, args) => {
+      if (command === 'unzip' && args[0] === '-Z1') {
+        return { status: 0, stdout: entries, stderr: '' };
+      }
+      if (command === 'unzip' && args[0] === '-p') {
+        return { status: 0, stdout: Buffer.from('ELF'), stderr: '' };
+      }
+      if (command.endsWith('llvm-readelf')) {
+        return { status: 0, stdout: '  LOAD 0x0 0x0 0x0 0x1 0x1 R E 0x4000', stderr: '' };
+      }
+      return { status: 0, stdout: '', stderr: '' };
+    });
+    expect(parseElfLoadAlignments('LOAD 0x0 0x0 0x0 0x1 0x1 R E 0x4000'))
+      .toEqual([0x4000]);
+    expect(parseElfLoadAlignments('LOAD 0x0 0x0 0x0 0x1 0x1 R E 2**14'))
+      .toEqual([0x4000]);
+    expect(verifyApk('app.apk', run, { ANDROID_HOME: '/sdk' }))
       .toEqual(EXPECTED_ABIS);
     expect(() => verifyApk(
       'unexpected.apk',
