@@ -45,7 +45,36 @@ async function startPracticeMode(mode) {
   await tapUntilExists('practice-start-button', 'session-board', 3);
 }
 
-async function launchWithDisabledSynchronization(options = {}, targetDevice = device) {
+function bringAndroidAppToForeground(
+  launchArgs = {},
+  environment = process.env,
+  run = execFileSync
+) {
+  const adb = androidAdbPath(environment);
+  const serial = environment.DETOX_ANDROID_DEVICE || 'emulator-5554';
+  const args = [
+    '-s',
+    serial,
+    'shell',
+    'am',
+    'start',
+    '-W',
+    '-n',
+    'com.chessticize.mobile/.MainActivity',
+  ];
+  for (const [key, value] of Object.entries(launchArgs)) {
+    if (value !== undefined && value !== null) {
+      args.push('--es', key, String(value));
+    }
+  }
+  run(adb, args, { encoding: 'utf8' });
+}
+
+async function launchWithDisabledSynchronization(
+  options = {},
+  targetDevice = device,
+  foregroundAndroidApp = bringAndroidAppToForeground
+) {
   const launchOptions = {
     ...options,
     launchArgs: {
@@ -56,11 +85,7 @@ async function launchWithDisabledSynchronization(options = {}, targetDevice = de
   };
   await targetDevice.launchApp(launchOptions);
   if (targetDevice.getPlatform() === 'android') {
-    await targetDevice.launchApp({
-      ...launchOptions,
-      delete: false,
-      newInstance: false,
-    });
+    await foregroundAndroidApp(launchOptions.launchArgs);
   }
   await targetDevice.disableSynchronization();
 }
@@ -288,6 +313,7 @@ async function failStandardSprint() {
 }
 
 module.exports = {
+  bringAndroidAppToForeground,
   openTab,
   openStandardHistoryTrend,
   launchWithDisabledSynchronization,

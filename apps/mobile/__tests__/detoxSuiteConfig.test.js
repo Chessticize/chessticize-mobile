@@ -12,7 +12,10 @@ const {
   resolveDetoxTestMatch,
   resolveDetoxMaxWorkers
 } = require('../e2e/suiteConfig');
-const { launchWithDisabledSynchronization } = require('../e2e/helpers');
+const {
+  bringAndroidAppToForeground,
+  launchWithDisabledSynchronization,
+} = require('../e2e/helpers');
 
 describe('Detox suite configuration', () => {
   it('passes Android synchronization disablement in the numeric form Detox recognizes', () => {
@@ -26,6 +29,7 @@ describe('Detox suite configuration', () => {
   });
 
   it('reacquires Android window focus before public UI assertions', async () => {
+    const foregroundAndroidApp = jest.fn();
     const targetDevice = {
       disableSynchronization: jest.fn().mockResolvedValue(undefined),
       getPlatform: jest.fn(() => 'android'),
@@ -36,10 +40,10 @@ describe('Detox suite configuration', () => {
       delete: true,
       newInstance: true,
       launchArgs: { chessticizeTestNowMs: '1784030400000' },
-    }, targetDevice);
+    }, targetDevice, foregroundAndroidApp);
 
-    expect(targetDevice.launchApp).toHaveBeenCalledTimes(2);
-    expect(targetDevice.launchApp).toHaveBeenNthCalledWith(1, {
+    expect(targetDevice.launchApp).toHaveBeenCalledTimes(1);
+    expect(targetDevice.launchApp).toHaveBeenCalledWith({
       delete: true,
       newInstance: true,
       launchArgs: {
@@ -48,16 +52,41 @@ describe('Detox suite configuration', () => {
         chessticizeTestNowMs: '1784030400000',
       },
     });
-    expect(targetDevice.launchApp).toHaveBeenNthCalledWith(2, {
-      delete: false,
-      newInstance: false,
-      launchArgs: {
-        DTXDisableMainRunLoopSync: 'YES',
-        detoxEnableSynchronization: 0,
-        chessticizeTestNowMs: '1784030400000',
-      },
+    expect(foregroundAndroidApp).toHaveBeenCalledWith({
+      DTXDisableMainRunLoopSync: 'YES',
+      detoxEnableSynchronization: 0,
+      chessticizeTestNowMs: '1784030400000',
     });
     expect(targetDevice.disableSynchronization).toHaveBeenCalledTimes(1);
+  });
+
+  it('foregrounds the attached Android activity with identical launch arguments', () => {
+    const run = jest.fn(() => 'Status: ok\nActivity: com.chessticize.mobile/.MainActivity\n');
+
+    bringAndroidAppToForeground({
+      detoxEnableSynchronization: 0,
+      chessticizePuzzleSelectionSeed: 'fixture-seed',
+    }, {
+      ANDROID_HOME: '/sdk',
+      DETOX_ANDROID_DEVICE: 'emulator-5556',
+    }, run);
+
+    expect(run).toHaveBeenCalledWith('/sdk/platform-tools/adb', [
+      '-s',
+      'emulator-5556',
+      'shell',
+      'am',
+      'start',
+      '-W',
+      '-n',
+      'com.chessticize.mobile/.MainActivity',
+      '--es',
+      'detoxEnableSynchronization',
+      '0',
+      '--es',
+      'chessticizePuzzleSelectionSeed',
+      'fixture-seed',
+    ], { encoding: 'utf8' });
   });
 
   it('runs every active E2E spec by default without loading opt-in capture specs', () => {
