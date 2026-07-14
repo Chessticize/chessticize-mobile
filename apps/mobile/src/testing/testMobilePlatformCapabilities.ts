@@ -46,9 +46,9 @@ export function createTestMobilePlatformCapabilities(
   return {
     storage: {
       practiceService: service,
-      configurePuzzleSource: supportsPuzzleSourceConfiguration
-        ? source => configurePuzzleSource(service, source)
-        : undefined,
+      ...(supportsPuzzleSourceConfiguration
+        ? { configurePuzzleSource: source => configurePuzzleSource(service, source) }
+        : {}),
     },
     progressSync: {
       client: overrides.iCloudProgressSyncClient ?? null,

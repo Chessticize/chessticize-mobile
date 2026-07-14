@@ -26,20 +26,23 @@ describe("release source configuration", () => {
   });
 
   it("keeps Stockfish source, NNUE networks, and license metadata under shared native ownership", () => {
-    const sharedStockfishRoot = join(appRoot, "native", "stockfish");
+    const stockfish = JSON.parse(readFileSync(join(appRoot, "stockfish-artifacts.json"), "utf8"));
+    const sharedStockfishRoot = join(appRoot, stockfish.root);
     const iosStockfishRoot = join(appRoot, "ios", "StockfishEngine");
     const podspec = readFileSync(join(appRoot, "ChessticizeStockfish.podspec"), "utf8");
 
-    expect(existsSync(join(sharedStockfishRoot, "Stockfish", "src", "position.cpp"))).toBe(true);
-    expect(existsSync(join(sharedStockfishRoot, "Resources", "nn-c288c895ea92.nnue"))).toBe(true);
-    expect(existsSync(join(sharedStockfishRoot, "Resources", "nn-37f18f62d772.nnue"))).toBe(true);
-    expect(existsSync(join(sharedStockfishRoot, "Copying.txt"))).toBe(true);
-    expect(existsSync(join(sharedStockfishRoot, "AUTHORS"))).toBe(true);
+    expect(existsSync(join(sharedStockfishRoot, stockfish.sourceSentinel))).toBe(true);
+    for (const nnuePath of stockfish.nnue) {
+      expect(existsSync(join(sharedStockfishRoot, nnuePath))).toBe(true);
+    }
+    expect(existsSync(join(sharedStockfishRoot, stockfish.license))).toBe(true);
+    expect(existsSync(join(sharedStockfishRoot, stockfish.authors))).toBe(true);
     expect(existsSync(join(iosStockfishRoot, "Native", "NativeStockfishEngine.mm"))).toBe(true);
     expect(existsSync(join(iosStockfishRoot, "Stockfish"))).toBe(false);
     expect(existsSync(join(iosStockfishRoot, "Resources"))).toBe(false);
-    expect(podspec).toContain('"native/stockfish/Stockfish/src/**/*.{h,cpp}"');
-    expect(podspec).toContain('"native/stockfish/Resources/*.nnue"');
+    expect(podspec).toContain('stockfish-artifacts.json');
+    expect(podspec).toContain('stockfish.fetch("source")');
+    expect(podspec).toContain('stockfish.fetch("nnue")');
     expect(podspec).toContain('"ios/StockfishEngine/Native/**/*.{h,mm}"');
   });
 });

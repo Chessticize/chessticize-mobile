@@ -1,0 +1,18 @@
+{
+  "schema": "chessticize-mobile.stockfish-artifacts.v1",
+  "podName": "ChessticizeStockfish",
+  "podVersion": "18.0.0",
+  "engineVersion": "Stockfish 18",
+  "upstreamTag": "sf_18",
+  "upstreamCommit": "cb3d4ee9b47d0c5aae855b12379378ea1439675c",
+  "root": "native/stockfish",
+  "source": "Stockfish/src",
+  "sourceSentinel": "Stockfish/src/position.cpp",
+  "license": "Copying.txt",
+  "authors": "AUTHORS",
+  "readme": "README-STOCKFISH.md",
+  "nnue": [
+    "Resources/nn-c288c895ea92.nnue",
+    "Resources/nn-37f18f62d772.nnue"
+  ]
+}

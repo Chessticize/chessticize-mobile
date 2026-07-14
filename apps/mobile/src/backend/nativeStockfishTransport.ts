@@ -53,9 +53,10 @@ export function prewarmNativeStockfishTransport(): Promise<boolean> {
 
   prewarmPromise = new Promise<boolean>((resolve) => {
     let settled = false;
+    let uciAcknowledged = false;
     let cleanup: (() => void) | null = null;
     const timer = setTimeout(() => {
-      finish(true);
+      finish(false);
     }, 1500);
 
     function finish(result: boolean): void {
@@ -65,11 +66,18 @@ export function prewarmNativeStockfishTransport(): Promise<boolean> {
       settled = true;
       clearTimeout(timer);
       cleanup?.();
+      if (!result) {
+        prewarmPromise = null;
+      }
       resolve(result);
     }
 
     cleanup = transport.onLine((line) => {
-      if (line === "readyok") {
+      if (line === "uciok" && !uciAcknowledged) {
+        uciAcknowledged = true;
+        transport.send("setoption name MultiPV value 3");
+        transport.send("isready");
+      } else if (line === "readyok" && uciAcknowledged) {
         finish(true);
       }
     });
@@ -77,11 +85,8 @@ export function prewarmNativeStockfishTransport(): Promise<boolean> {
     transport.start().then(
       () => {
         transport.send("uci");
-        transport.send("setoption name MultiPV value 3");
-        transport.send("isready");
       },
       () => {
-        prewarmPromise = null;
         finish(false);
       }
     );

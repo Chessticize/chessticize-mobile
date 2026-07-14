@@ -2362,7 +2362,7 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 
 SPEC CHECKSUMS:
-  ChessticizeStockfish: 50fceed8284aca8792c45ed0fd29bbe7f4a52752
+  ChessticizeStockfish: b128d98f2e36417421de75d69232a9a146c95fe3
   FBLazyVector: b3e7ad108f0d882e30445c5527d774e3fd432f3d
   hermes-engine: 541e0606177ba82e47735e431e7b8577714cb6a5
   op-sqlite: 245e3f31cdb38aab00a8385dbd75b471132e3ac6

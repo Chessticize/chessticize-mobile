@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { loadStockfishArtifacts } from "./lib/stockfish-artifacts.mjs";
 
 const repoRoot = dirname(fileURLToPath(new URL("../package.json", import.meta.url)));
 const outputJson = process.argv.includes("--json");
@@ -67,6 +68,7 @@ function manualGate(name, detail) {
 const license = readText("LICENSE");
 const notices = readText("THIRD_PARTY_NOTICES.md");
 const rootPackage = readJson("package.json");
+const stockfishArtifacts = loadStockfishArtifacts(repoRoot);
 const mobilePackage = readJson("apps/mobile/package.json");
 const readme = readText("README.md");
 const releasePolicy = readText("docs/RELEASE_SOURCE_POLICY.md");
@@ -158,9 +160,9 @@ check(
 
 check(
   "Bundled Stockfish license artifacts are present",
-  fileExists("apps/mobile/native/stockfish/Copying.txt") &&
-    fileExists("apps/mobile/native/stockfish/AUTHORS") &&
-    fileExists("apps/mobile/native/stockfish/README-STOCKFISH.md"),
+  fileExists(stockfishArtifacts.licensePath) &&
+    fileExists(stockfishArtifacts.authorsPath) &&
+    fileExists(stockfishArtifacts.readmePath),
   "The embedded engine must ship its GPL text, authors, and source notes."
 );
 

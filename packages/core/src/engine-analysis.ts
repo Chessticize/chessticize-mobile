@@ -44,6 +44,7 @@ export interface UciAnalysisOptions {
   multiPv?: number;
   newGame?: boolean;
   onUpdate?: (lines: EngineAnalysisLine[]) => void;
+  signal?: AbortSignal;
   timeoutMs?: number;
 }
 
@@ -66,8 +67,29 @@ export async function analyzeFenWithUciEngine(
 
   return await new Promise((resolve, reject) => {
     let done = false;
+    let searchStarted = false;
     let deepSearchStarted = !useShallowThenFull;
+    let uciAcknowledged = !initialize;
+    let shallowTimer: ReturnType<typeof setTimeout> | null = null;
     const cleanup = transport.onLine((line) => {
+      if (initialize && !searchStarted) {
+        try {
+          if (line === "uciok" && !uciAcknowledged) {
+            uciAcknowledged = true;
+            transport.send(`setoption name MultiPV value ${multiPv}`);
+            transport.send("isready");
+            return;
+          }
+          if (line === "readyok" && uciAcknowledged) {
+            startSearch();
+            return;
+          }
+        } catch (error) {
+          fail(error);
+          return;
+        }
+      }
+
       const parsed = parseStockfishInfoLine(line, fen);
       if (parsed) {
         byMultiPv.set(parsed.multipv, parsed);
@@ -83,10 +105,23 @@ export async function analyzeFenWithUciEngine(
       }
     });
     const timer = setTimeout(() => {
+      stopSearch();
       finish();
     }, timeoutMs);
-    const shallowTimer = useShallowThenFull
-      ? setTimeout(() => {
+
+    function startSearch(): void {
+      if (done || searchStarted) {
+        return;
+      }
+      searchStarted = true;
+      if (newGame) {
+        transport.send("ucinewgame");
+      }
+      transport.send("stop");
+      transport.send(`position fen ${fen}`);
+      transport.send(`go depth ${useShallowThenFull ? shallowDepth : depth}`);
+      if (useShallowThenFull) {
+        shallowTimer = setTimeout(() => {
           if (done) {
             return;
           }
@@ -97,8 +132,20 @@ export async function analyzeFenWithUciEngine(
           } catch (error) {
             fail(error);
           }
-        }, shallowDelayMs)
-      : null;
+        }, shallowDelayMs);
+      }
+    }
+
+    function stopSearch(): void {
+      if (!searchStarted) {
+        return;
+      }
+      try {
+        transport.send("stop");
+      } catch {
+        // Cleanup must still complete if the native engine has already stopped.
+      }
+    }
 
     function currentLines(): EngineAnalysisLine[] {
       return sortEngineLines([...byMultiPv.values()]).slice(0, multiPv);
@@ -118,6 +165,7 @@ export async function analyzeFenWithUciEngine(
         clearTimeout(shallowTimer);
       }
       cleanup();
+      options.signal?.removeEventListener("abort", cancel);
       resolve(currentLines());
     }
 
@@ -131,21 +179,25 @@ export async function analyzeFenWithUciEngine(
         clearTimeout(shallowTimer);
       }
       cleanup();
+      options.signal?.removeEventListener("abort", cancel);
       reject(error);
     }
 
+    function cancel(): void {
+      stopSearch();
+      finish();
+    }
+
+    options.signal?.addEventListener("abort", cancel, { once: true });
+
     try {
-      if (initialize) {
+      if (options.signal?.aborted) {
+        cancel();
+      } else if (initialize) {
         transport.send("uci");
-        transport.send("isready");
-        transport.send(`setoption name MultiPV value ${multiPv}`);
+      } else {
+        startSearch();
       }
-      if (newGame) {
-        transport.send("ucinewgame");
-      }
-      transport.send("stop");
-      transport.send(`position fen ${fen}`);
-      transport.send(`go depth ${useShallowThenFull ? shallowDepth : depth}`);
     } catch (error) {
       fail(error);
     }

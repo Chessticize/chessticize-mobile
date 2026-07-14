@@ -49,8 +49,8 @@ test("analyzes UCI output through a maintained fake transport", async () => {
 
   assert.deepEqual(engine.commands, [
     "uci",
-    "isready",
     "setoption name MultiPV value 2",
+    "isready",
     "ucinewgame",
     "stop",
     `position fen ${fen}`,
@@ -59,6 +59,66 @@ test("analyzes UCI output through a maintained fake transport", async () => {
   assert.equal(lines.length, 2);
   assert.equal(lines[0]?.move, "c2b1");
   assert.equal(lines[0]?.score.kind, "mate");
+});
+
+test("waits for the complete UCI handshake before starting analysis", async () => {
+  const fen = "8/8/8/8/8/8/2Q5/k1K5 w - - 0 1";
+  const engine = new ControlledUciEngine();
+
+  const analysis = analyzeFenWithUciEngine(engine, fen, {
+    depth: 8,
+    multiPv: 2,
+    timeoutMs: 1000
+  });
+  await Promise.resolve();
+
+  assert.deepEqual(engine.commands, ["uci"]);
+  engine.emit("uciok");
+  assert.deepEqual(engine.commands, [
+    "uci",
+    "setoption name MultiPV value 2",
+    "isready"
+  ]);
+  engine.emit("readyok");
+  assert.deepEqual(engine.commands, [
+    "uci",
+    "setoption name MultiPV value 2",
+    "isready",
+    "ucinewgame",
+    "stop",
+    `position fen ${fen}`,
+    "go depth 8"
+  ]);
+
+  engine.emit("info depth 8 multipv 1 score mate 1 pv c2b1");
+  engine.emit("bestmove c2b1");
+  const lines = await analysis;
+
+  assert.equal(lines[0]?.move, "c2b1");
+});
+
+test("stops an active UCI search when analysis is cancelled", async () => {
+  const fen = "8/8/8/8/8/8/2Q5/k1K5 w - - 0 1";
+  const engine = new ControlledUciEngine();
+  const controller = new AbortController();
+
+  const analysis = analyzeFenWithUciEngine(engine, fen, {
+    depth: 20,
+    multiPv: 1,
+    signal: controller.signal,
+    timeoutMs: 1000
+  });
+  await Promise.resolve();
+  engine.emit("uciok");
+  engine.emit("readyok");
+  engine.emit("info depth 12 multipv 1 score cp 120 pv c2a4");
+
+  controller.abort();
+  const lines = await analysis;
+
+  assert.equal(engine.commands.at(-1), "stop");
+  assert.equal(lines[0]?.depth, 12);
+  assert.equal(engine.listenerCount, 0);
 });
 
 test("can analyze against an already warmed UCI engine without repeating initialization", async () => {
@@ -135,8 +195,8 @@ test("starts with shallow analysis and then continues to the requested depth", a
 
   assert.deepEqual(engine.commands, [
     "uci",
-    "isready",
     "setoption name MultiPV value 1",
+    "isready",
     "ucinewgame",
     "stop",
     `position fen ${fen}`,
@@ -386,6 +446,11 @@ class FakeUciEngine implements UciEngineTransport {
 
   send(command: string): void {
     this.commands.push(command);
+    if (command === "uci") {
+      queueMicrotask(() => this.listener?.("uciok"));
+    } else if (command === "isready") {
+      queueMicrotask(() => this.listener?.("readyok"));
+    }
     if (command.startsWith("go ")) {
       queueMicrotask(() => {
         for (const line of this.lines) {
@@ -418,6 +483,11 @@ class StagedFakeUciEngine implements UciEngineTransport {
 
   send(command: string): void {
     this.commands.push(command);
+    if (command === "uci") {
+      queueMicrotask(() => this.listener?.("uciok"));
+    } else if (command === "isready") {
+      queueMicrotask(() => this.listener?.("readyok"));
+    }
     const lines = this.linesByGoCommand[command];
     if (lines) {
       queueMicrotask(() => {
@@ -433,6 +503,36 @@ class StagedFakeUciEngine implements UciEngineTransport {
     return () => {
       this.listener = null;
     };
+  }
+
+  terminate(): void {}
+}
+
+class ControlledUciEngine implements UciEngineTransport {
+  readonly commands: string[] = [];
+  private readonly listeners = new Set<(line: string) => void>();
+
+  get listenerCount(): number {
+    return this.listeners.size;
+  }
+
+  async start(): Promise<void> {}
+
+  send(command: string): void {
+    this.commands.push(command);
+  }
+
+  onLine(listener: (line: string) => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  emit(line: string): void {
+    for (const listener of this.listeners) {
+      listener(line);
+    }
   }
 
   terminate(): void {}

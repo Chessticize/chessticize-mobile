@@ -2,6 +2,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { loadStockfishArtifacts } from "./lib/stockfish-artifacts.mjs";
 
 const repoRoot = dirname(fileURLToPath(new URL("../package.json", import.meta.url)));
 
@@ -141,8 +142,9 @@ function main() {
   const mobilePackage = readJson("apps/mobile/package.json");
   const lockfile = readText("pnpm-lock.yaml");
   const puzzleManifest = readJson("fixtures/puzzles/bundled-core-pack.manifest.json");
-  const stockfishPodspec = readText("apps/mobile/ChessticizeStockfish.podspec");
-  const stockfishReadme = readText("apps/mobile/native/stockfish/README-STOCKFISH.md");
+  const stockfishArtifacts = loadStockfishArtifacts(repoRoot);
+  const stockfishPodspec = readText(stockfishArtifacts.podspecPath);
+  const stockfishReadme = readText(stockfishArtifacts.readmePath);
   const noticeRows = extractNoticeRows(notices);
   const lockDependencies = new Map([
     ...extractImporterDependencies(lockfile, "."),
@@ -191,10 +193,6 @@ function main() {
     "The notice must disclose the local react-native-chessboard patch that is active in pnpm-lock.yaml."
   );
 
-  const nnueFiles = [
-    "apps/mobile/native/stockfish/Resources/nn-c288c895ea92.nnue",
-    "apps/mobile/native/stockfish/Resources/nn-37f18f62d772.nnue"
-  ];
   check(
     checks,
     "Stockfish notice matches bundled source and pod metadata",
@@ -202,17 +200,17 @@ function main() {
       notices.includes("Upstream release tag: `sf_18`") &&
       notices.includes("Upstream tag commit: `cb3d4ee9b47d0c5aae855b12379378ea1439675c`") &&
       notices.includes("Package version: `ChessticizeStockfish` pod `18.0.0`") &&
-      stockfishPodspec.includes('s.version = "18.0.0"') &&
-      stockfishPodspec.includes('s.license = { :type => "GPL-3.0-or-later", :file => "native/stockfish/Copying.txt" }') &&
-      fileExists("apps/mobile/native/stockfish/Stockfish/src/position.cpp") &&
-      fileExists("apps/mobile/native/stockfish/Copying.txt") &&
-      fileExists("apps/mobile/native/stockfish/AUTHORS"),
+      stockfishArtifacts.metadata.podVersion === "18.0.0" &&
+      stockfishPodspec.includes('stockfish-artifacts.json') &&
+      fileExists(stockfishArtifacts.sourceSentinelPath) &&
+      fileExists(stockfishArtifacts.licensePath) &&
+      fileExists(stockfishArtifacts.authorsPath),
     "The notice must match the bundled Stockfish source, pod version, GPL license, and authors artifacts."
   );
   check(
     checks,
     "Stockfish NNUE files are disclosed and present",
-    nnueFiles.every((path) => notices.includes(path) && fileExists(path)) &&
+    stockfishArtifacts.nnuePaths.every((path) => notices.includes(path) && fileExists(path)) &&
       stockfishReadme.includes("Open Database License"),
     "The notice must list each bundled NNUE file and preserve Stockfish's ODbL acknowledgement."
   );
