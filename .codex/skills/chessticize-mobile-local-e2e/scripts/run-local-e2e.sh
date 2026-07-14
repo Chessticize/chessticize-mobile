@@ -42,9 +42,20 @@ verify_nnue_asset() {
   [[ "$asset_size" -gt 1000000 ]] || fail "$asset_path is a Git LFS pointer, not a neural-network binary. Run: git lfs pull --include='$(dirname "$asset_path")/*.nnue'"
 }
 
+if ! STOCKFISH_NNUE_ASSETS="$(node scripts/lib/stockfish-artifacts.mjs --nnue-paths)"; then
+  fail "Could not enumerate Stockfish NNUE assets from artifact metadata."
+fi
+[[ -n "$STOCKFISH_NNUE_ASSETS" ]] || fail "Stockfish artifact metadata listed no NNUE assets."
+
+STOCKFISH_NNUE_ASSET_COUNT=0
 while IFS= read -r stockfish_nnue_asset; do
+  [[ -n "$stockfish_nnue_asset" ]] || fail "Stockfish artifact metadata contains an empty NNUE path."
+  [[ "$stockfish_nnue_asset" == apps/mobile/*.nnue && "$stockfish_nnue_asset" != *"/../"* && "$stockfish_nnue_asset" != *$'\r'* ]] ||
+    fail "Malformed Stockfish NNUE asset path '$stockfish_nnue_asset'; expected a repository-relative apps/mobile/*.nnue path."
   verify_nnue_asset "$stockfish_nnue_asset"
-done < <(node scripts/lib/stockfish-artifacts.mjs --nnue-paths)
+  STOCKFISH_NNUE_ASSET_COUNT=$((STOCKFISH_NNUE_ASSET_COUNT + 1))
+done <<<"$STOCKFISH_NNUE_ASSETS"
+echo "Verified $STOCKFISH_NNUE_ASSET_COUNT Stockfish NNUE assets from artifact metadata."
 
 AVAILABLE_DEVICES="$(xcrun simctl list devices available)"
 grep -Fq "$DEVICE_NAME (" <<<"$AVAILABLE_DEVICES" || fail "Dedicated simulator '$DEVICE_NAME' is not available."
