@@ -1,7 +1,9 @@
 const {
   createAdvancingTestClock,
   isStoreAssetCaptureEnabled,
-  resolveTestNowMsFromLaunchConfig
+  resolveTestNowMsFromLaunchConfig,
+  resolveTestPuzzleSelectionSeedFromLaunchConfig,
+  resolveTestStandardTargetCorrectFromLaunchConfig
 } = require("../src/backend/testLaunchConfig");
 
 describe("test launch configuration", () => {
@@ -21,6 +23,70 @@ describe("test launch configuration", () => {
         { testNowMs: "1780000000000" }
       )
     ).toBe(1780000000000);
+  });
+
+  it("accepts deterministic Android practice launch values only from the native test harness", () => {
+    const productionGlobals = { __DEV__: false, __CHESSTICIZE_ENABLE_TEST_CONTROLS__: false };
+
+    expect(
+      resolveTestNowMsFromLaunchConfig(productionGlobals, {
+        testControlsEnabled: true,
+        testNowMs: "1780000000000"
+      })
+    ).toBe(1780000000000);
+    expect(
+      resolveTestPuzzleSelectionSeedFromLaunchConfig(productionGlobals, {
+        puzzleSelectionSeed: "android-standard-practice",
+        testControlsEnabled: true
+      })
+    ).toBe("android-standard-practice");
+    expect(
+      resolveTestPuzzleSelectionSeedFromLaunchConfig(productionGlobals, {
+        puzzleSelectionSeed: "android-standard-practice",
+        testControlsEnabled: false
+      })
+    ).toBeUndefined();
+    expect(
+      resolveTestPuzzleSelectionSeedFromLaunchConfig(productionGlobals, {
+        puzzleSelectionSeed: "   ",
+        testControlsEnabled: true
+      })
+    ).toBeUndefined();
+    expect(
+      resolveTestStandardTargetCorrectFromLaunchConfig(productionGlobals, {
+        standardTargetCorrect: "1",
+        testControlsEnabled: true
+      })
+    ).toBe(1);
+    expect(
+      resolveTestStandardTargetCorrectFromLaunchConfig(productionGlobals, {
+        standardTargetCorrect: "0",
+        testControlsEnabled: true
+      })
+    ).toBeUndefined();
+    expect(
+      resolveTestStandardTargetCorrectFromLaunchConfig(productionGlobals, {
+        standardTargetCorrect: "1",
+        testControlsEnabled: false
+      })
+    ).toBeUndefined();
+  });
+
+  it("reads Android launch values on demand after the activity captures its intent", () => {
+    const getLaunchConfig = jest.fn(() => ({
+      puzzleSelectionSeed: "android-standard-practice",
+      standardTargetCorrect: "1",
+      testControlsEnabled: true,
+      testNowMs: "1780000000000"
+    }));
+    const nativeModule = { getLaunchConfig };
+    const productionGlobals = { __DEV__: false, __CHESSTICIZE_ENABLE_TEST_CONTROLS__: false };
+
+    expect(resolveTestPuzzleSelectionSeedFromLaunchConfig(productionGlobals, nativeModule))
+      .toBe("android-standard-practice");
+    expect(resolveTestStandardTargetCorrectFromLaunchConfig(productionGlobals, nativeModule)).toBe(1);
+    expect(resolveTestNowMsFromLaunchConfig(productionGlobals, nativeModule)).toBe(1780000000000);
+    expect(getLaunchConfig).toHaveBeenCalledTimes(3);
   });
 
   it("accepts a fixed clock for release store-asset capture without enabling visible test controls", () => {

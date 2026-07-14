@@ -1,3 +1,6 @@
+const { execFileSync } = require('node:child_process');
+const { androidAdbPath } = require('./androidNetwork');
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -13,9 +16,24 @@ async function frameFor(detoxElement) {
 async function playBoardMove(testID, move, flipped = false) {
   const board = element(by.id(testID));
   const boardFrame = await frameFor(board);
-  await board.tapAtPoint(boardPoint(boardFrame, move.slice(0, 2), flipped));
+  const platform = device.getPlatform();
+  const androidMetrics = platform === 'android' ? androidDisplayMetrics() : null;
+  const pointForSquare = (square) => {
+    if (!androidMetrics) {
+      return boardPoint(boardFrame, square, flipped);
+    }
+    return androidBoardTapPoint(boardFrame, square, flipped, androidMetrics).point;
+  };
+  if (androidMetrics) {
+    const { units } = androidBoardTapPoint(boardFrame, move.slice(0, 2), flipped, androidMetrics);
+    console.log(
+      `[android-board-tap] units=${units} frame=${boardFrame.width}x${boardFrame.height} `
+      + `display=${androidMetrics.widthPixels}x${androidMetrics.heightPixels}@${androidMetrics.densityDpi}`
+    );
+  }
+  await board.tapAtPoint(pointForSquare(move.slice(0, 2)));
   await sleep(250);
-  await board.tapAtPoint(boardPoint(boardFrame, move.slice(2, 4), flipped));
+  await board.tapAtPoint(pointForSquare(move.slice(2, 4)));
 }
 
 async function startPracticeMode(mode) {
@@ -71,7 +89,7 @@ async function tapUntilExists(tapTestID, expectedTestID, attempts) {
   throw lastError;
 }
 
-async function waitForElementTextContaining(testID, expected, timeoutMs) {
+async function waitForElementTextContaining(testID, expected, timeoutMs, pollIntervalMs = 500) {
   const startedAt = Date.now();
   let lastText = '';
   while (Date.now() - startedAt < timeoutMs) {
@@ -84,9 +102,35 @@ async function waitForElementTextContaining(testID, expected, timeoutMs) {
     } catch (error) {
       lastText = error?.message ?? String(error);
     }
-    await sleep(500);
+    await sleep(pollIntervalMs);
   }
   throw new Error(`Timed out waiting for ${testID} to contain "${expected}". Last text: "${lastText}"`);
+}
+
+async function waitForElementAccessibilityLabelContaining(
+  testID,
+  expected,
+  timeoutMs,
+  pollIntervalMs = 500
+) {
+  const startedAt = Date.now();
+  let lastLabel = '';
+  while (Date.now() - startedAt < timeoutMs) {
+    try {
+      const attributes = await element(by.id(testID)).getAttributes();
+      lastLabel = accessibilityLabelFromAttributes(attributes);
+      if (lastLabel.includes(expected)) {
+        return;
+      }
+    } catch (error) {
+      lastLabel = error?.message ?? String(error);
+    }
+    await sleep(pollIntervalMs);
+  }
+  throw new Error(
+    `Timed out waiting for ${testID} accessibility label to contain "${expected}". `
+    + `Last label: "${lastLabel}"`
+  );
 }
 
 async function waitForMistakeCount(count, timeoutMs = 30000) {
@@ -98,6 +142,11 @@ function textFromAttributes(attributes) {
   return String(first?.text ?? first?.label ?? first?.value ?? '');
 }
 
+function accessibilityLabelFromAttributes(attributes) {
+  const first = Array.isArray(attributes) ? attributes[0] : attributes;
+  return String(first?.label ?? '');
+}
+
 function boardPoint(frame, square, flipped = false) {
   const file = square.charCodeAt(0) - 'a'.charCodeAt(0);
   const rank = Number(square[1]);
@@ -107,6 +156,93 @@ function boardPoint(frame, square, flipped = false) {
   return {
     x: (col + 0.5) * squareSize,
     y: (row + 0.5) * squareSize
+  };
+}
+
+function androidDisplayMetrics(environment = process.env, run = execFileSync) {
+  const adb = androidAdbPath(environment);
+  const serial = environment.DETOX_ANDROID_DEVICE || 'emulator-5554';
+  const densityOutput = String(
+    run(adb, ['-s', serial, 'shell', 'wm', 'density'], { encoding: 'utf8' }) ?? ''
+  );
+  const sizeOutput = String(
+    run(adb, ['-s', serial, 'shell', 'wm', 'size'], { encoding: 'utf8' }) ?? ''
+  );
+  return {
+    densityDpi: parseAndroidDisplayDensity(densityOutput),
+    ...parseAndroidDisplaySize(sizeOutput),
+  };
+}
+
+function parseAndroidDisplayDensity(output) {
+  const overrideDensity = output.match(/Override density:\s*(\d+)/)?.[1];
+  const physicalDensity = output.match(/Physical density:\s*(\d+)/)?.[1];
+  const densityDpi = Number(overrideDensity ?? physicalDensity);
+  if (!Number.isFinite(densityDpi) || densityDpi <= 0) {
+    throw new Error(`Unable to resolve Android display density from ${JSON.stringify(output.trim())}`);
+  }
+  return densityDpi;
+}
+
+function parseAndroidDisplaySize(output) {
+  const overrideSize = output.match(/Override size:\s*(\d+)x(\d+)/);
+  const physicalSize = output.match(/Physical size:\s*(\d+)x(\d+)/);
+  const match = overrideSize ?? physicalSize;
+  const widthPixels = Number(match?.[1]);
+  const heightPixels = Number(match?.[2]);
+  if (!Number.isFinite(widthPixels) || widthPixels <= 0 || !Number.isFinite(heightPixels) || heightPixels <= 0) {
+    throw new Error(`Unable to resolve Android display size from ${JSON.stringify(output.trim())}`);
+  }
+  return { widthPixels, heightPixels };
+}
+
+function normalizeAndroidTapPoint(point, densityDpi) {
+  if (!Number.isFinite(densityDpi) || densityDpi <= 0) {
+    throw new Error(`Android display density must be positive; received ${densityDpi}`);
+  }
+  const densityScale = densityDpi / 160;
+  return {
+    x: point.x / densityScale,
+    y: point.y / densityScale,
+  };
+}
+
+function classifyAndroidBoardFrameUnits(frame, metrics) {
+  const { densityDpi, heightPixels, widthPixels } = metrics;
+  if (
+    !Number.isFinite(frame?.width) || frame.width <= 0
+    || !Number.isFinite(frame?.height) || frame.height <= 0
+    || !Number.isFinite(widthPixels) || widthPixels <= 0
+    || !Number.isFinite(heightPixels) || heightPixels <= 0
+    || !Number.isFinite(densityDpi) || densityDpi <= 0
+  ) {
+    throw new Error('Unable to classify Android board frame units from invalid frame or display metrics');
+  }
+
+  const displayShortPixels = Math.min(widthPixels, heightPixels);
+  const displayShortDp = displayShortPixels / (densityDpi / 160);
+  const pixelRatio = frame.width / displayShortPixels;
+  const dpRatio = frame.width / displayShortDp;
+  const isBoardSized = (ratio) => ratio >= 0.65 && ratio <= 1.05;
+  const couldBePixels = isBoardSized(pixelRatio);
+  const couldBeDp = isBoardSized(dpRatio);
+
+  if (couldBePixels !== couldBeDp) {
+    return couldBePixels ? 'pixels' : 'dp';
+  }
+  throw new Error(
+    `Unable to classify Android board frame units: frame=${frame.width}x${frame.height}, `
+    + `display=${widthPixels}x${heightPixels}@${densityDpi}, `
+    + `pixelRatio=${pixelRatio.toFixed(3)}, dpRatio=${dpRatio.toFixed(3)}`
+  );
+}
+
+function androidBoardTapPoint(frame, square, flipped, metrics) {
+  const units = classifyAndroidBoardFrameUnits(frame, metrics);
+  const point = boardPoint(frame, square, flipped);
+  return {
+    point: units === 'pixels' ? normalizeAndroidTapPoint(point, metrics.densityDpi) : point,
+    units,
   };
 }
 
@@ -154,8 +290,13 @@ module.exports = {
   selectTestPuzzleSource,
   waitForVisibleInPracticeScroll,
   tapUntilExists,
+  waitForElementAccessibilityLabelContaining,
   waitForElementTextContaining,
+  accessibilityLabelFromAttributes,
   textFromAttributes,
   boardPoint,
+  androidBoardTapPoint,
+  parseAndroidDisplayDensity,
+  parseAndroidDisplaySize,
   failStandardSprint
 };

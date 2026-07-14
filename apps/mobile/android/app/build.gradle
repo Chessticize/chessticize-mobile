@@ -61,6 +61,12 @@ if (!supportedAndroidAbis) {
  * By default you don't need to apply any configuration, just uncomment the lines you need.
  */
 react {
+    // E2E inherits debug signing and native behavior but deliberately bundles
+    // JavaScript so the installed APK can run with Metro and networking off.
+    debuggableVariants = ["debug"]
+    // pnpm keeps React Native's compiler dependency in its virtual store. A
+    // direct mobile dependency gives Gradle one stable cross-platform path.
+    hermesCommand = "$rootDir/../node_modules/hermes-compiler/hermesc/%OS-BIN%/hermesc"
     /* Folders */
     //   The root of your project, i.e. where "package.json" lives. Default is '../..'
     // root = file("../../")
@@ -130,7 +136,7 @@ def generatedPuzzlePackAssetsDir = "$buildDir/generated/assets/puzzle-pack"
 
 tasks.register("copyPuzzlePackAsset", Copy) {
     from puzzlePackSource
-    into "$generatedPuzzlePackAssetsDir/custom"
+    into "$generatedPuzzlePackAssetsDir/puzzle-packs"
 }
 
 android {
@@ -175,6 +181,11 @@ android {
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
+        }
+        e2e {
+            initWith debug
+            matchingFallbacks = ["debug"]
+            manifestPlaceholders = [usesCleartextTraffic: false]
         }
         release {
             if (releaseSigningConfigured) {

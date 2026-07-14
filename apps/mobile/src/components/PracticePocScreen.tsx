@@ -110,6 +110,8 @@ interface Props {
   platformCapabilities: MobilePlatformCapabilities;
   debugTrace?: (event: PracticeDebugTraceEvent) => void;
   currentTimeMs?: () => number;
+  puzzleSelectionSeed?: string;
+  standardTargetCorrect?: number;
 }
 
 type Tab = "practice" | "review" | "history" | "settings" | "analysis";
@@ -354,7 +356,9 @@ function buildAdaptiveLayout({
 export function PracticePocScreen({
   platformCapabilities,
   debugTrace,
-  currentTimeMs = Date.now
+  currentTimeMs = Date.now,
+  puzzleSelectionSeed,
+  standardTargetCorrect
 }: Props): React.JSX.Element {
   const [puzzleSource, setPuzzleSource] = useState<MobilePuzzleSource>("bundledCore");
   const service = platformCapabilities.storage.practiceService;
@@ -940,7 +944,12 @@ export function PracticePocScreen({
           durationSeconds: config.durationSeconds,
           perPuzzleSeconds: config.perPuzzleSeconds,
           ...(customThemeValue ? { theme: customThemeValue, persistCustomConfig: true } : useCustomTiming ? { persistCustomConfig: true } : {}),
-          ...(configurePuzzleSource && shouldRandomizePuzzleSelection(puzzleSource) ? { puzzleSelectionSeed: `${Date.now()}-${Math.random()}` } : {})
+          ...(nextMode === "standard" && standardTargetCorrect !== undefined
+            ? { targetCorrect: standardTargetCorrect }
+            : {}),
+          ...(configurePuzzleSource && shouldRandomizePuzzleSelection(puzzleSource)
+            ? { puzzleSelectionSeed: puzzleSelectionSeed ?? `${Date.now()}-${Math.random()}` }
+            : {})
         },
         captureLiveNowIso()
       );
@@ -1179,6 +1188,7 @@ export function PracticePocScreen({
         submittedFen
       });
       if (shouldAnimateSamePuzzleReply(next.state, nextFeedback, submittedPuzzleId)) {
+        commitBoardFen(nextVisualFen);
         await animateSamePuzzleReply(next.state, nextFeedback);
         refreshState();
         return;
@@ -1787,6 +1797,9 @@ export function PracticePocScreen({
         </Text>
       ) : null}
       <View
+        accessible
+        accessibilityLabel={sessionBoardAccessibilityLabel(displayedSideToMove, displayedLastBoardMove)}
+        accessibilityRole="image"
         testID="session-board"
         style={[styles.boardSurface, { width: boardSize, height: boardSize }]}
       >
@@ -1851,6 +1864,7 @@ export function PracticePocScreen({
             boardSize={boardSize}
             flipped={boardFlipped}
             move={displayedLastBoardMove}
+            overlayTestID="session-last-move-overlay"
           />
         ) : null}
 
@@ -3845,15 +3859,24 @@ function coordinateTextStyle(row: number, col: number): object {
 function LastMoveOverlay({
   boardSize,
   flipped,
-  move
+  move,
+  overlayTestID
 }: {
   boardSize: number;
   flipped: boolean;
   move: BoardMove;
+  overlayTestID: string;
 }): React.JSX.Element {
   const squareSize = boardSize / 8;
   return (
-    <View style={[styles.arrowLayer, { width: boardSize, height: boardSize }]} pointerEvents="none">
+    <View
+      accessible
+      accessibilityLabel={`Last move ${move.from} to ${move.to}`}
+      accessibilityRole="image"
+      pointerEvents="none"
+      style={[styles.arrowLayer, { width: boardSize, height: boardSize }]}
+      testID={overlayTestID}
+    >
       {[move.from, move.to].map((square) => {
         const pos = squareToTopLeft(square, squareSize, flipped);
         return (
@@ -3873,6 +3896,20 @@ function LastMoveOverlay({
       })}
     </View>
   );
+}
+
+function sessionBoardAccessibilityLabel(
+  side: MoveSide | null,
+  lastMove: BoardMove | null
+): string {
+  const parts = ["Chess board"];
+  if (side) {
+    parts.push(sideToMoveAccessibilityLabel(side));
+  }
+  if (lastMove) {
+    parts.push(`Last move ${lastMove.from} to ${lastMove.to}`);
+  }
+  return parts.join(". ");
 }
 
 function MoveFeedbackOverlay({
@@ -4289,7 +4326,15 @@ function HistoryPanel({
           </Pressable>
         </View>
       </View>
-      {visibleAttempts.length === 0 ? <Text style={styles.listText}>No attempts</Text> : null}
+      {visibleAttempts.length === 0 ? (
+        <Text
+          accessibilityLabel="History has no attempts"
+          style={styles.listText}
+          testID="history-empty-state"
+        >
+          No attempts
+        </Text>
+      ) : null}
       {visibleAttempts.map((attempt) => (
         <HistoryAttemptRow
           key={attempt.id}
@@ -6436,7 +6481,14 @@ function ReviewSession({
               boardSize={boardSize}
               flipped={boardFlipped}
             />
-            {lastMove && !feedback ? <LastMoveOverlay boardSize={boardSize} flipped={boardFlipped} move={lastMove} /> : null}
+            {lastMove && !feedback ? (
+              <LastMoveOverlay
+                boardSize={boardSize}
+                flipped={boardFlipped}
+                move={lastMove}
+                overlayTestID="review-last-move-overlay"
+              />
+            ) : null}
             {feedbackMove ? (
               <MoveFeedbackOverlay
                 boardSize={boardSize}

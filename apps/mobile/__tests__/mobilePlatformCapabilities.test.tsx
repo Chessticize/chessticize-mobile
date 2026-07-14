@@ -1,5 +1,7 @@
 import { createMobilePracticeService } from '../src/backend/mobilePractice';
 import { composeIOSMobilePlatformCapabilities } from '../src/backend/iosMobilePlatformCapabilities';
+import { composeAndroidMobilePlatformCapabilities } from '../src/backend/androidMobilePlatformCapabilities';
+import { mobilePlatformCapabilityFactoryFor } from '../src/backend/nativeMobilePlatformCapabilities';
 import { MOBILE_APPLICATION_METADATA } from '../src/backend/mobilePlatformCapabilities';
 import { createTestMobilePlatformCapabilities } from '../src/testing/testMobilePlatformCapabilities';
 import { FakeICloudProgressSyncClient } from '../src/backend/iCloudProgressSync';
@@ -21,6 +23,32 @@ describe('mobile platform capabilities', () => {
     expect(capabilities.reminders.scheduler).toBeNull();
     expect(capabilities.reminders.notificationClient).toBeNull();
     expect(capabilities.applicationMetadata).toBe(MOBILE_APPLICATION_METADATA);
+  });
+
+  it('composes Android with the shared storage contracts and no iCloud transport', async () => {
+    const service = createMobilePracticeService('random1000');
+    const capabilities = composeAndroidMobilePlatformCapabilities(service);
+
+    expect(capabilities.storage.practiceService).toBe(service);
+    expect(capabilities.storage.configurePuzzleSource).toBeDefined();
+    expect(capabilities.progressSync.client).toBeNull();
+    expect(capabilities.stockfish.createTransport()).toBeNull();
+    await expect(capabilities.stockfish.prewarm()).resolves.toBe(false);
+    expect(capabilities.reminders.scheduler).toBeNull();
+    expect(capabilities.reminders.notificationClient).toBeNull();
+    expect(capabilities.applicationMetadata).toBe(MOBILE_APPLICATION_METADATA);
+  });
+
+  it('selects one platform capability factory at the application composition root', () => {
+    const iosFactory = mobilePlatformCapabilityFactoryFor('ios');
+    const androidFactory = mobilePlatformCapabilityFactoryFor('android');
+
+    expect(iosFactory.platform).toBe('ios');
+    expect(androidFactory.platform).toBe('android');
+    expect(iosFactory.create).not.toBe(androidFactory.create);
+    expect(() => mobilePlatformCapabilityFactoryFor('web' as never)).toThrow(
+      'Unsupported mobile platform: web',
+    );
   });
 
   it('constructs maintained test bundles from the same lower contracts', () => {

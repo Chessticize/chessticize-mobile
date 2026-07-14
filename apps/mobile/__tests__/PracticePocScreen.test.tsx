@@ -6,6 +6,7 @@ import TestRenderer, { act } from "react-test-renderer";
 import { PracticePocScreen, type PracticeDebugTraceEvent } from "../src/components/PracticePocScreen";
 import {
   createMobilePracticeService,
+  configureMobilePracticePuzzleSource,
   getBundledCorePackManifest,
   seededPuzzleCount,
   seededUniquePositionCount
@@ -20,6 +21,7 @@ import {
   createTestMobilePlatformCapabilities,
   type TestMobilePlatformCapabilityOverrides
 } from "../src/testing/testMobilePlatformCapabilities";
+import { FailingAttemptStore } from "../test-support/FailingAttemptStore";
 
 const renderers: TestRenderer.ReactTestRenderer[] = [];
 
@@ -611,6 +613,22 @@ describe("PracticePocScreen", () => {
     }
   });
 
+  it("uses maintained native journey overrides for a bounded deterministic bundled Core Pack sprint", () => {
+    const service = createMobilePracticeService();
+    const renderer = renderScreen({
+      practiceServiceFactory: () => service,
+      puzzleSelectionSeed: "android-standard-practice",
+      standardTargetCorrect: 1
+    });
+
+    startStandardSprint(renderer);
+
+    expect(findByTestId(renderer, "session-side-to-move").props.accessible).toBe(true);
+    expect(findByTestId(renderer, "session-side-to-move").props.accessibilityLabel).toBe("Black to move");
+    expect(collectText(findByTestId(renderer, "session-side-to-move-label"))).toBe("Black");
+    expect(findByTestId(renderer, "session-progress-block").props.accessibilityLabel).toBe("Progress 0 of 1");
+  });
+
   it("accepts a non-official legal checkmate in the fixed first familiar puzzle", async () => {
     const renderer = renderScreen({ practiceService: createMobilePracticeService("familiar15") });
 
@@ -698,7 +716,10 @@ describe("PracticePocScreen", () => {
     expect(collectText(renderer.root)).not.toContain("Correct");
     expect(collectText(renderer.root)).not.toContain("Incorrect");
     expectSessionMistakes(renderer, 0);
-    expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(fenBeforeAutoReply);
+    expect(findByTestId(renderer, "mock-chessboard").props.fen)
+      .toBe(mustFenAfterMove(fenBeforeAutoReply, "e2e6"));
+    expect(findByTestId(renderer, "session-side-to-move").props.accessibilityLabel).toBe("Black to move");
+    expect(collectText(findByTestId(renderer, "session-side-to-move-label"))).toBe("Black");
     // The opponent-reply window keeps the board interactive for premoves; only
     // the surrounding scroll view is frozen so fast drags cannot pan the screen.
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
@@ -710,6 +731,14 @@ describe("PracticePocScreen", () => {
 
     await settleFeedbackSnapshot();
     expect(findByTestId(renderer, "mock-chessboard").props.fen).not.toBe(fenBeforeAutoReply);
+    expect(findByTestId(renderer, "session-side-to-move").props.accessibilityLabel).toBe("White to move");
+    expect(collectText(findByTestId(renderer, "session-side-to-move-label"))).toBe("White");
+    expect(findByTestId(renderer, "session-last-move-overlay").props.accessibilityRole).toBe("image");
+    expect(findByTestId(renderer, "session-last-move-overlay").props.accessibilityLabel).toBe("Last move f7 to f8");
+    expect(findByTestId(renderer, "session-board").props.accessible).toBe(true);
+    expect(findByTestId(renderer, "session-board").props.accessibilityRole).toBe("image");
+    expect(findByTestId(renderer, "session-board").props.accessibilityLabel)
+      .toBe("Chess board. White to move. Last move f7 to f8");
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
     expect(findByTestId(renderer, "mock-chessboard").props.draggableColor).toBe("w");
     expect(() => findByTestId(renderer, "board-input-blocker")).toThrow();
@@ -728,6 +757,24 @@ describe("PracticePocScreen", () => {
     press(renderer, "history-tab");
     expectHistoryRowAccessibility(renderer, "Move e6f7");
     expect(collectText(renderer.root)).not.toContain("000hf · standard");
+  });
+
+  it("shows a persistence failure and unlocks board input through the store boundary", async () => {
+    const service = new PracticeService(new FailingAttemptStore("Practice write failed"));
+    configureMobilePracticePuzzleSource(service, "random1000");
+    const renderer = renderScreen({ practiceService: service });
+
+    startStandardSprint(renderer);
+
+    await boardMove(renderer, "e2d2");
+
+    expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
+    expect(collectText(findByTestId(renderer, "error-panel"))).toContain("Practice write failed");
+    abandonSprint(renderer);
+    press(renderer, "history-tab");
+    expect(findByTestId(renderer, "history-empty-state").props.accessibilityLabel).toBe("History has no attempts");
+    expect(collectText(findByTestId(renderer, "history-empty-state"))).toBe("No attempts");
+    expect(historyAttemptRows(renderer)).toHaveLength(0);
   });
 
   it("keeps the practice page from scrolling while the session board is on screen", async () => {
@@ -3816,7 +3863,7 @@ function createScriptedStockfishTransport(
 }
 
 type RenderScreenOptions = TestMobilePlatformCapabilityOverrides &
-  Pick<React.ComponentProps<typeof PracticePocScreen>, "currentTimeMs" | "debugTrace"> & {
+  Pick<React.ComponentProps<typeof PracticePocScreen>, "currentTimeMs" | "debugTrace" | "puzzleSelectionSeed" | "standardTargetCorrect"> & {
     platformCapabilities?: MobilePlatformCapabilities;
   };
 
@@ -3824,6 +3871,8 @@ function renderScreen({
   platformCapabilities,
   currentTimeMs,
   debugTrace,
+  puzzleSelectionSeed,
+  standardTargetCorrect,
   ...capabilityOverrides
 }: RenderScreenOptions = {}): TestRenderer.ReactTestRenderer {
   let renderer: TestRenderer.ReactTestRenderer | undefined;
@@ -3833,6 +3882,8 @@ function renderScreen({
         platformCapabilities={platformCapabilities ?? createTestMobilePlatformCapabilities(capabilityOverrides)}
         currentTimeMs={currentTimeMs}
         debugTrace={debugTrace}
+        puzzleSelectionSeed={puzzleSelectionSeed}
+        standardTargetCorrect={standardTargetCorrect}
       />
     );
   });

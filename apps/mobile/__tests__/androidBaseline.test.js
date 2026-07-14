@@ -182,11 +182,14 @@ describe('Android launch baseline', () => {
     expect(workflow).not.toMatch(/^\s+pull_request:/m);
   });
 
-  it('uses the doctor-verified SDK adb path for the Android smoke', () => {
+  it('uses the doctor-verified SDK with a self-contained offline Android E2E app', () => {
     const androidDetoxScript = read('scripts/android-test-for-detox.sh');
 
     expect(androidDetoxScript).toContain('ANDROID_HOME');
-    expect(androidDetoxScript).toContain('"$ADB_PATH" reverse');
+    expect(androidDetoxScript).toContain('export ADB_PATH=');
+    expect(androidDetoxScript).toContain('--configuration android.attached.e2e');
+    expect(androidDetoxScript).not.toContain('react-native start');
+    expect(androidDetoxScript).not.toContain('"$ADB_PATH" reverse');
     expect(androidDetoxScript).not.toMatch(/^adb reverse/m);
   });
 

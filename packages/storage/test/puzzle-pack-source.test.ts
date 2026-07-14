@@ -143,6 +143,40 @@ test("PackBackedPracticeStore queries pack puzzles without preloading the user d
   }
 });
 
+test("Android Standard Practice seed follows the maintained tracked pack solution", async () => {
+  const fixture = await loadAndroidStandardPracticeFixture();
+  const packDb = buildPackDatabase([fixture.puzzle]);
+  const userStore = new SQLiteStore(":memory:");
+  try {
+    userStore.migrate();
+    const source = new SQLitePuzzlePackSource(new NodeSqliteDatabase(packDb));
+    const service = new PracticeService(new PackBackedPracticeStore(userStore, source));
+
+    const sprint = service.startSprint(
+      {
+        mode: "standard",
+        durationSeconds: 300,
+        targetCorrect: fixture.targetCorrect,
+        puzzleSelectionSeed: fixture.puzzleSelectionSeed
+      },
+      "2026-07-14T12:00:00.000Z"
+    );
+
+    assert.equal(sprint.currentPuzzle?.puzzle.id, fixture.puzzle.id);
+    assert.deepEqual(sprint.currentPuzzle?.puzzle.solutionMoves, fixture.puzzle.solutionMoves);
+
+    service.submitMove(fixture.userMoves[0], "2026-07-14T12:00:01.000Z");
+    const result = service.submitMove(fixture.userMoves[1], "2026-07-14T12:00:02.000Z");
+
+    assert.equal(result.state.status, "won");
+    assert.equal(result.attempt?.result, "correct");
+    assert.equal(result.state.ratingAfter, fixture.expectedRatingAfter);
+  } finally {
+    userStore.close();
+    packDb.close();
+  }
+});
+
 test("PackBackedPracticeStore honors locally seeded scoped puzzle sources before the pack", async () => {
   const puzzles = await loadFixturePuzzles();
   const localPuzzle = puzzles[0] as Puzzle;
@@ -265,4 +299,18 @@ function buildPackDatabase(puzzles: Puzzle[]): DatabaseSync {
 
 async function loadFixturePuzzles(): Promise<Puzzle[]> {
   return JSON.parse(await readFile(resolve("fixtures/puzzles/presolved-sample.json"), "utf8")) as Puzzle[];
+}
+
+interface AndroidStandardPracticeFixture {
+  puzzleSelectionSeed: string;
+  targetCorrect: number;
+  puzzle: Puzzle & { solutionMoves: [string, string, string, string] };
+  userMoves: [string, string];
+  expectedRatingAfter: number;
+}
+
+async function loadAndroidStandardPracticeFixture(): Promise<AndroidStandardPracticeFixture> {
+  return JSON.parse(
+    await readFile(resolve("fixtures/puzzles/android-standard-practice.fixture.json"), "utf8")
+  ) as AndroidStandardPracticeFixture;
 }

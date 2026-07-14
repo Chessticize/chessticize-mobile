@@ -51,6 +51,11 @@ test("a multi-step solved puzzle can win a target-one sprint and raise ELO", () 
   assert.equal(result.state.ratingAfter, 775);
   assert.ok((result.state.ratingDeviationAfter ?? 0) < 350);
   assert.equal(result.attempt?.result, "correct");
+  assert.equal(result.attempt?.mode, "standard");
+  assert.equal(result.attempt?.ratingKey, "standard 5/20");
+  assert.equal(result.attempt?.ratingBefore, 600);
+  assert.equal(result.attempt?.submittedMove, "h6c1");
+  assert.equal(result.attempt?.expectedMove, "h6c1");
 });
 
 test("sprint streak tracks consecutive solved puzzles and resets on mistakes", () => {
