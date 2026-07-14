@@ -15,6 +15,11 @@ import { MemoryStore } from "../../../packages/storage/src/memory-store";
 import { defaultSprintConfig, formatLocalCalendarDate, formatReviewDay, type ArrowDuelState, type AttemptEvent, type Puzzle, type SprintState, type UciEngineTransport } from "../../../packages/core/src/index";
 import { FakeReviewReminderNotificationClient, FakeReviewReminderScheduler } from "../src/backend/reviewReminderScheduler";
 import { FakeICloudProgressSyncClient } from "../src/backend/iCloudProgressSync";
+import type { MobilePlatformCapabilities } from "../src/backend/mobilePlatformCapabilities";
+import {
+  createTestMobilePlatformCapabilities,
+  type TestMobilePlatformCapabilityOverrides
+} from "../src/testing/testMobilePlatformCapabilities";
 
 const renderers: TestRenderer.ReactTestRenderer[] = [];
 
@@ -3430,6 +3435,7 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "settings-packs-section")).toThrow();
     expect(() => findByTestId(renderer, "packs-tab")).toThrow();
     expect(findByTestId(renderer, "settings-app-version")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "settings-app-version"))).toContain("1.0.0");
     expect(findByTestId(renderer, "settings-license")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "settings-license"))).toContain("License");
     expect(collectText(findByTestId(renderer, "settings-license"))).toContain("GPL-3.0-or-later");
@@ -3465,6 +3471,19 @@ describe("PracticePocScreen", () => {
     expect(openURLSpy).toHaveBeenNthCalledWith(5, "mailto:support@chessticize.com");
     openURLSpy.mockRestore();
     expect(collectText(findByTestId(renderer, "settings-panel"))).not.toContain("›");
+  });
+
+  it("renders installed application metadata from the platform capability bundle", () => {
+    const renderer = renderScreen({
+      applicationMetadata: {
+        versionName: "9.8.7",
+        buildNumber: "42"
+      }
+    });
+
+    press(renderer, "settings-tab");
+
+    expect(collectText(findByTestId(renderer, "settings-app-version"))).toContain("9.8.7 (42)");
   });
 
   it("syncs progress through the injected iCloud client by default and from Settings", async () => {
@@ -3745,10 +3764,26 @@ function createScriptedStockfishTransport(
   };
 }
 
-function renderScreen(props: React.ComponentProps<typeof PracticePocScreen> = {}): TestRenderer.ReactTestRenderer {
+type RenderScreenOptions = TestMobilePlatformCapabilityOverrides &
+  Pick<React.ComponentProps<typeof PracticePocScreen>, "currentTimeMs" | "debugTrace"> & {
+    platformCapabilities?: MobilePlatformCapabilities;
+  };
+
+function renderScreen({
+  platformCapabilities,
+  currentTimeMs,
+  debugTrace,
+  ...capabilityOverrides
+}: RenderScreenOptions = {}): TestRenderer.ReactTestRenderer {
   let renderer: TestRenderer.ReactTestRenderer | undefined;
   act(() => {
-    renderer = TestRenderer.create(<PracticePocScreen {...props} />);
+    renderer = TestRenderer.create(
+      <PracticePocScreen
+        platformCapabilities={platformCapabilities ?? createTestMobilePlatformCapabilities(capabilityOverrides)}
+        currentTimeMs={currentTimeMs}
+        debugTrace={debugTrace}
+      />
+    );
   });
   if (!renderer) {
     throw new Error("PracticePocScreen did not render");
@@ -3758,7 +3793,7 @@ function renderScreen(props: React.ComponentProps<typeof PracticePocScreen> = {}
 }
 
 function renderStandardSequenceScreen(
-  props: Omit<React.ComponentProps<typeof PracticePocScreen>, "practiceService"> = {}
+  props: Omit<RenderScreenOptions, "practiceService"> = {}
 ): TestRenderer.ReactTestRenderer {
   return renderScreen({
     ...props,

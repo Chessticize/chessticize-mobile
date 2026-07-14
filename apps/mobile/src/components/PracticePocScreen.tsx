@@ -75,29 +75,22 @@ import {
   type PracticeProgressSummary
 } from "../../../../packages/storage/src/rating-history.ts";
 import {
-  configureMobilePracticePuzzleSource,
-  createMobilePracticeService,
   getBundledCorePackManifest,
   seededPuzzleCount,
   shouldRandomizePuzzleSelection,
   type MobilePuzzleSource
 } from "../backend/mobilePractice.ts";
-import { createNativeStockfishTransport, prewarmNativeStockfishTransport } from "../backend/nativeStockfishTransport.ts";
 import {
   computeReviewReminderDecision,
-  createNativeReviewReminderNotificationClient,
-  createNativeReviewReminderScheduler,
   reminderScheduleKey,
-  type ReviewReminderNotificationClient,
   type ReviewReminderPermissionStatus,
-  type ReviewReminderScheduleResult,
-  type ReviewReminderScheduler
+  type ReviewReminderScheduleResult
 } from "../backend/reviewReminderScheduler.ts";
-import {
-  createNativeICloudProgressSyncClient,
-  type ICloudAccountStatus,
-  type ICloudProgressSyncClient
-} from "../backend/iCloudProgressSync.ts";
+import type { ICloudAccountStatus } from "../backend/iCloudProgressSync.ts";
+import type {
+  MobileApplicationMetadata,
+  MobilePlatformCapabilities
+} from "../backend/mobilePlatformCapabilities.ts";
 import { arePracticeTestControlsEnabled, isPracticeDebugEnabled } from "../releaseConfig.ts";
 import { isStoreAssetCaptureEnabled } from "../backend/testLaunchConfig.ts";
 import {
@@ -113,18 +106,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Chess, type Move, type PieceSymbol, type Square } from "chess.js";
 
 interface Props {
-  practiceService?: PracticeService;
-  practiceServiceFactory?: () => PracticeService;
-  configurePuzzleSource?: (service: PracticeService, source: MobilePuzzleSource) => void;
+  platformCapabilities: MobilePlatformCapabilities;
   debugTrace?: (event: PracticeDebugTraceEvent) => void;
   currentTimeMs?: () => number;
-  stockfishTransportFactory?: () => UciEngineTransport | null;
-  reviewReminderScheduler?: ReviewReminderScheduler | null;
-  reviewReminderSchedulerFactory?: () => ReviewReminderScheduler | null;
-  reviewReminderNotificationClient?: ReviewReminderNotificationClient | null;
-  reviewReminderNotificationClientFactory?: () => ReviewReminderNotificationClient | null;
-  iCloudProgressSyncClient?: ICloudProgressSyncClient | null;
-  iCloudProgressSyncClientFactory?: () => ICloudProgressSyncClient | null;
 }
 
 type Tab = "practice" | "review" | "history" | "settings" | "analysis";
@@ -281,12 +265,7 @@ const BOARD_FILES_FLIPPED = ["h", "g", "f", "e", "d", "c", "b", "a"] as const;
 const BOARD_RANKS = ["8", "7", "6", "5", "4", "3", "2", "1"] as const;
 const BOARD_RANKS_FLIPPED = ["1", "2", "3", "4", "5", "6", "7", "8"] as const;
 const CHESS_PIECE_SPRITE = require("../assets/chess-pieces-sprite.png") as ImageSourcePropType;
-const SOURCE_REPOSITORY_URL = "https://github.com/Chessticize/chessticize-mobile";
-const SOURCE_LICENSE_URL = `${SOURCE_REPOSITORY_URL}/blob/main/LICENSE`;
-const STOCKFISH_SOURCE_URL = `${SOURCE_REPOSITORY_URL}/tree/main/apps/mobile/ios/StockfishEngine`;
 const LICHESS_PUZZLE_DATABASE_URL = "https://database.lichess.org/#puzzles";
-const SUPPORT_EMAIL = "support@chessticize.com";
-const SUPPORT_EMAIL_URL = `mailto:${SUPPORT_EMAIL}`;
 const ANALYSIS_DIAGNOSTIC_POSITIONS = [
   {
     id: "queen-capture",
@@ -372,33 +351,18 @@ function buildAdaptiveLayout({
 }
 
 export function PracticePocScreen({
-  practiceService,
-  practiceServiceFactory = createMobilePracticeService,
-  configurePuzzleSource = configureMobilePracticePuzzleSource,
+  platformCapabilities,
   debugTrace,
-  currentTimeMs = Date.now,
-  stockfishTransportFactory = createNativeStockfishTransport,
-  reviewReminderScheduler,
-  reviewReminderSchedulerFactory = createNativeReviewReminderScheduler,
-  reviewReminderNotificationClient,
-  reviewReminderNotificationClientFactory = createNativeReviewReminderNotificationClient,
-  iCloudProgressSyncClient,
-  iCloudProgressSyncClientFactory = createNativeICloudProgressSyncClient
+  currentTimeMs = Date.now
 }: Props): React.JSX.Element {
   const [puzzleSource, setPuzzleSource] = useState<MobilePuzzleSource>("bundledCore");
-  const service = useMemo(() => practiceService ?? practiceServiceFactory(), [practiceService, practiceServiceFactory]);
-  const scheduler = useMemo(
-    () => reviewReminderScheduler !== undefined ? reviewReminderScheduler : reviewReminderSchedulerFactory(),
-    [reviewReminderScheduler, reviewReminderSchedulerFactory]
-  );
-  const notificationClient = useMemo(
-    () => reviewReminderNotificationClient !== undefined ? reviewReminderNotificationClient : reviewReminderNotificationClientFactory(),
-    [reviewReminderNotificationClient, reviewReminderNotificationClientFactory]
-  );
-  const iCloudSyncClient = useMemo(
-    () => iCloudProgressSyncClient !== undefined ? iCloudProgressSyncClient : iCloudProgressSyncClientFactory(),
-    [iCloudProgressSyncClient, iCloudProgressSyncClientFactory]
-  );
+  const service = platformCapabilities.storage.practiceService;
+  const configurePuzzleSource = platformCapabilities.storage.configurePuzzleSource;
+  const stockfishTransportFactory = platformCapabilities.stockfish.createTransport;
+  const prewarmStockfish = platformCapabilities.stockfish.prewarm;
+  const scheduler = platformCapabilities.reminders.scheduler;
+  const notificationClient = platformCapabilities.reminders.notificationClient;
+  const iCloudSyncClient = platformCapabilities.progressSync.client;
   const boardRef = useRef<ChessboardRef | null>(null);
   const suppressedBoardMovesRef = useRef<string[]>([]);
   const boardSyncInProgressRef = useRef(false);
@@ -473,10 +437,8 @@ export function PracticePocScreen({
   const boardSize = adaptiveLayout.boardSize;
 
   useEffect(() => {
-    if (stockfishTransportFactory === createNativeStockfishTransport) {
-      void prewarmNativeStockfishTransport();
-    }
-  }, [stockfishTransportFactory]);
+    void prewarmStockfish();
+  }, [prewarmStockfish]);
 
   const isActive = state?.status === "active";
   const isPaused = state?.status === "paused";
@@ -509,13 +471,13 @@ export function PracticePocScreen({
   }, [selectedConfig.mode, selectedConfig.ratingKey, service]);
 
   useEffect(() => {
-    if (!practiceService) {
-      configurePuzzleSource(service, puzzleSource);
+    if (configurePuzzleSource) {
+      configurePuzzleSource(puzzleSource);
       refreshState();
     }
     // refreshState reads mutable service state; rerunning for its render-local identity would loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [configurePuzzleSource, practiceService, puzzleSource, service]);
+  }, [configurePuzzleSource, puzzleSource, service]);
 
   useEffect(() => {
     refreshState();
@@ -978,7 +940,7 @@ export function PracticePocScreen({
           durationSeconds: config.durationSeconds,
           perPuzzleSeconds: config.perPuzzleSeconds,
           ...(customThemeValue ? { theme: customThemeValue, persistCustomConfig: true } : useCustomTiming ? { persistCustomConfig: true } : {}),
-          ...(!practiceService && shouldRandomizePuzzleSelection(puzzleSource) ? { puzzleSelectionSeed: `${Date.now()}-${Math.random()}` } : {})
+          ...(configurePuzzleSource && shouldRandomizePuzzleSelection(puzzleSource) ? { puzzleSelectionSeed: `${Date.now()}-${Math.random()}` } : {})
         },
         captureLiveNowIso()
       );
@@ -1004,13 +966,13 @@ export function PracticePocScreen({
   }
 
   function changePuzzleSource(nextSource: MobilePuzzleSource): void {
-    if (isActive || practiceService) {
+    if (isActive || !configurePuzzleSource) {
       return;
     }
     if (nextSource === puzzleSource) {
       return;
     }
-    configurePuzzleSource(service, nextSource);
+    configurePuzzleSource(nextSource);
     refreshState();
     setPuzzleSource(nextSource);
     setError(null);
@@ -2075,7 +2037,7 @@ export function PracticePocScreen({
                   />
                 ) : null}
 
-                {!isActive && state === null && arePracticeTestControlsEnabled() && !practiceService ? (
+                {!isActive && state === null && arePracticeTestControlsEnabled() && configurePuzzleSource ? (
                   <TestPuzzleSourceControl
                     source={puzzleSource}
                     onChange={changePuzzleSource}
@@ -2095,6 +2057,7 @@ export function PracticePocScreen({
                   initialIndex={historyReviewInitialIndex}
                   service={service}
                   onExit={() => setHistoryReviewEntries([])}
+                  prewarmStockfish={prewarmStockfish}
                   stockfishTransportFactory={stockfishTransportFactory}
                 />
               ) : (
@@ -2200,12 +2163,14 @@ export function PracticePocScreen({
                 onScheduleTestReviewReminder={arePracticeTestControlsEnabled() ? scheduleDevReviewReminderNotification : undefined}
                 onSessionActiveChange={setReviewSessionActive}
                 reviewReminderScheduleStatus={arePracticeTestControlsEnabled() ? reviewReminderScheduleStatus : undefined}
+                prewarmStockfish={prewarmStockfish}
                 stockfishTransportFactory={stockfishTransportFactory}
               />
             ) : null}
             {tab === "settings" ? (
               <SettingsPanel
                 adaptiveLayout={adaptiveLayout}
+                applicationMetadata={platformCapabilities.applicationMetadata}
                 standardRating={readRating(service, defaultSprintConfig("standard").ratingKey)}
                 ratings={[
                   { label: "Standard", record: service.getRating(defaultSprintConfig("standard").ratingKey) },
@@ -2232,7 +2197,10 @@ export function PracticePocScreen({
               />
             ) : null}
             {tab === "analysis" && arePracticeTestControlsEnabled() ? (
-              <StockfishDiagnosticsPanel stockfishTransportFactory={stockfishTransportFactory} />
+              <StockfishDiagnosticsPanel
+                prewarmStockfish={prewarmStockfish}
+                stockfishTransportFactory={stockfishTransportFactory}
+              />
             ) : null}
           </ScrollView>
           {bottomTabsVisible ? (
@@ -5170,6 +5138,7 @@ function ReviewPanel({
   reviewReminderScheduleStatus,
   service,
   sessionMistakeReviewItems,
+  prewarmStockfish,
   stockfishTransportFactory
 }: {
   adaptiveLayout: AdaptiveLayout;
@@ -5187,6 +5156,7 @@ function ReviewPanel({
   reviewReminderScheduleStatus?: string;
   service: PracticeService;
   sessionMistakeReviewItems: SessionMistakeReviewItem[];
+  prewarmStockfish: () => Promise<boolean>;
   stockfishTransportFactory: () => UciEngineTransport | null;
 }): React.JSX.Element {
   const sessionEntries = sessionMistakeReviewItems.map((item): ReviewEntry => ({
@@ -5318,6 +5288,7 @@ function ReviewPanel({
         service={service}
         onReviewRecorded={onReviewRecorded}
         onExit={finishActiveReview}
+        prewarmStockfish={prewarmStockfish}
         stockfishTransportFactory={stockfishTransportFactory}
       />
     );
@@ -5729,6 +5700,7 @@ function ReviewSession({
   service,
   onExit,
   onReviewRecorded,
+  prewarmStockfish,
   stockfishTransportFactory
 }: {
   adaptiveLayout: AdaptiveLayout;
@@ -5742,6 +5714,7 @@ function ReviewSession({
   service: PracticeService;
   onExit: (source: ReviewEntry["source"]) => void;
   onReviewRecorded?: (completedAt: string) => void;
+  prewarmStockfish: () => Promise<boolean>;
   stockfishTransportFactory: () => UciEngineTransport | null;
 }): React.JSX.Element {
   const boardRef = useRef<ChessboardRef | null>(null);
@@ -5868,9 +5841,7 @@ function ReviewSession({
     setEngineAnalysisLines([]);
     setAnalysisEngineStatus("thinking");
     setAnalysisIsRunning(true);
-    const usePrewarmedNativeEngine = stockfishTransportFactory === createNativeStockfishTransport;
-    const prewarm = usePrewarmedNativeEngine ? prewarmNativeStockfishTransport() : Promise.resolve(false);
-    void prewarm.then((prewarmed) => analyzeFenWithUciEngine(transport, stockfishTargetFen, {
+    void prewarmStockfish().then((prewarmed) => analyzeFenWithUciEngine(transport, stockfishTargetFen, {
       depth: ANALYSIS_DEPTH,
       multiPv: 3,
       initialize: !prewarmed,
@@ -5903,7 +5874,7 @@ function ReviewSession({
       cancelled = true;
       transport.send("stop");
     };
-  }, [analysisEnabled, stockfishTargetFen, stockfishTransportFactory]);
+  }, [analysisEnabled, prewarmStockfish, stockfishTargetFen, stockfishTransportFactory]);
 
   useEffect(() => {
     if (currentEntry.source !== "due" || reviewResultRecorded) {
@@ -6910,6 +6881,7 @@ function iCloudAccountStatusMessage(status: ICloudAccountStatus): string {
 
 function SettingsPanel({
   adaptiveLayout,
+  applicationMetadata,
   onOpenDiagnostics,
   onOpenNotificationSettings,
   onAdjustRating,
@@ -6926,6 +6898,7 @@ function SettingsPanel({
   standardRating
 }: {
   adaptiveLayout: AdaptiveLayout;
+  applicationMetadata: MobileApplicationMetadata;
   onOpenDiagnostics?: () => void;
   onOpenNotificationSettings: () => void;
   onAdjustRating: (ratingKey: string, nextRating: number) => RatingRecord;
@@ -7067,7 +7040,9 @@ function SettingsPanel({
       <SettingsSection title="About" testID="settings-about-section" wide={adaptiveLayout.usesWideContent}>
         <SettingsRow
           label="App Version"
-          value="1.0.0"
+          value={applicationMetadata.buildNumber
+            ? `${applicationMetadata.versionName} (${applicationMetadata.buildNumber})`
+            : applicationMetadata.versionName}
           testID="settings-app-version"
         />
         <SettingsExternalLinkRow
@@ -7077,7 +7052,7 @@ function SettingsPanel({
           linkLabel="Open license"
           testID="settings-license"
           onPress={() => {
-            void Linking.openURL(SOURCE_LICENSE_URL);
+            void Linking.openURL(applicationMetadata.sourceLicenseUrl);
           }}
         />
         <SettingsExternalLinkRow
@@ -7087,7 +7062,7 @@ function SettingsPanel({
           linkLabel="github.com/Chessticize/chessticize-mobile"
           testID="settings-source"
           onPress={() => {
-            void Linking.openURL(SOURCE_REPOSITORY_URL);
+            void Linking.openURL(applicationMetadata.sourceRepositoryUrl);
           }}
         />
         <SettingsExternalLinkRow
@@ -7097,7 +7072,7 @@ function SettingsPanel({
           linkLabel="StockfishEngine in source"
           testID="settings-stockfish-source"
           onPress={() => {
-            void Linking.openURL(STOCKFISH_SOURCE_URL);
+            void Linking.openURL(applicationMetadata.stockfishSourceUrl);
           }}
         />
         <SettingsExternalLinkRow
@@ -7114,10 +7089,10 @@ function SettingsPanel({
           label="Support"
           value="Email"
           detail="Questions, feedback, and support"
-          linkLabel={SUPPORT_EMAIL}
+          linkLabel={applicationMetadata.supportEmail}
           testID="settings-support-email"
           onPress={() => {
-            void Linking.openURL(SUPPORT_EMAIL_URL);
+            void Linking.openURL(applicationMetadata.supportEmailUrl);
           }}
         />
       </SettingsSection>
@@ -7784,8 +7759,10 @@ function PackInfoRow({
 }
 
 function StockfishDiagnosticsPanel({
+  prewarmStockfish,
   stockfishTransportFactory
 }: {
+  prewarmStockfish: () => Promise<boolean>;
   stockfishTransportFactory: () => UciEngineTransport | null;
 }): React.JSX.Element {
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -7831,9 +7808,7 @@ function StockfishDiagnosticsPanel({
       terminate: () => transport.terminate()
     };
 
-    const usePrewarmedNativeEngine = stockfishTransportFactory === createNativeStockfishTransport;
-    const prewarm = usePrewarmedNativeEngine ? prewarmNativeStockfishTransport() : Promise.resolve(false);
-    void prewarm.then((prewarmed) => analyzeFenWithUciEngine(tracedTransport, selectedPosition.fen, {
+    void prewarmStockfish().then((prewarmed) => analyzeFenWithUciEngine(tracedTransport, selectedPosition.fen, {
       depth: ANALYSIS_DEPTH,
       initialize: !prewarmed,
       multiPv: 4,
@@ -7873,7 +7848,7 @@ function StockfishDiagnosticsPanel({
       cancelled = true;
       transport.send("stop");
     };
-  }, [runId, selectedPosition, stockfishTransportFactory]);
+  }, [prewarmStockfish, runId, selectedPosition, stockfishTransportFactory]);
 
   return (
     <View style={styles.listPanel} testID="stockfish-diagnostics-panel">

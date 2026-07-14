@@ -3,10 +3,10 @@ import { LogBox, StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { PracticePocScreen } from "./src/components/PracticePocScreen";
 import {
-  createPersistentMobilePracticeService,
-  createPersistentMobilePracticeServiceSync
-} from "./src/backend/mobilePractice";
-import type { PracticeService } from "../../packages/storage/src/practice-service.ts";
+  createIOSMobilePlatformCapabilities,
+  createIOSMobilePlatformCapabilitiesSync
+} from "./src/backend/iosMobilePlatformCapabilities";
+import type { MobilePlatformCapabilities } from "./src/backend/mobilePlatformCapabilities";
 import { createAdvancingTestClock, resolveTestNowMsFromLaunchConfig } from "./src/backend/testLaunchConfig";
 import { shouldSuppressLogBoxWarnings } from "./src/releaseConfig";
 
@@ -15,29 +15,24 @@ if (shouldSuppressLogBoxWarnings()) {
 }
 
 function App() {
-  const [service, setService] = React.useState<PracticeService | undefined>(() => createPersistentMobilePracticeServiceSync());
+  const [platformCapabilities, setPlatformCapabilities] = React.useState<MobilePlatformCapabilities | undefined>(
+    () => createIOSMobilePlatformCapabilitiesSync()
+  );
   const [loadError, setLoadError] = React.useState<string | undefined>(undefined);
   const testNowMs = resolveTestNowMsFromLaunchConfig();
   const currentTimeMs = React.useMemo(
     () => testNowMs === undefined ? undefined : createAdvancingTestClock(testNowMs),
     [testNowMs]
   );
-  const practiceServiceFactory = React.useCallback(() => {
-    if (!service) {
-      throw new Error("Practice service is not ready");
-    }
-    return service;
-  }, [service]);
-
   React.useEffect(() => {
-    if (service) {
+    if (platformCapabilities) {
       return;
     }
     let cancelled = false;
-    createPersistentMobilePracticeService()
-      .then((nextService) => {
+    createIOSMobilePlatformCapabilities()
+      .then((nextCapabilities) => {
         if (!cancelled) {
-          setService(nextService);
+          setPlatformCapabilities(nextCapabilities);
         }
       })
       .catch((error: unknown) => {
@@ -48,12 +43,12 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [service]);
+  }, [platformCapabilities]);
 
   return (
     <SafeAreaProvider>
-      {service ? (
-        <PracticePocScreen practiceServiceFactory={practiceServiceFactory} currentTimeMs={currentTimeMs} />
+      {platformCapabilities ? (
+        <PracticePocScreen platformCapabilities={platformCapabilities} currentTimeMs={currentTimeMs} />
       ) : (
         <View style={styles.loadingRoot}>
           <Text style={styles.loadingTitle} testID={loadError ? "puzzle-pack-load-error" : "puzzle-pack-loading"}>
