@@ -72,6 +72,23 @@ describe("test launch configuration", () => {
     ).toBeUndefined();
   });
 
+  it("reads Android launch values on demand after the activity captures its intent", () => {
+    const getLaunchConfig = jest.fn(() => ({
+      puzzleSelectionSeed: "android-standard-practice",
+      standardTargetCorrect: "1",
+      testControlsEnabled: true,
+      testNowMs: "1780000000000"
+    }));
+    const nativeModule = { getLaunchConfig };
+    const productionGlobals = { __DEV__: false, __CHESSTICIZE_ENABLE_TEST_CONTROLS__: false };
+
+    expect(resolveTestPuzzleSelectionSeedFromLaunchConfig(productionGlobals, nativeModule))
+      .toBe("android-standard-practice");
+    expect(resolveTestStandardTargetCorrectFromLaunchConfig(productionGlobals, nativeModule)).toBe(1);
+    expect(resolveTestNowMsFromLaunchConfig(productionGlobals, nativeModule)).toBe(1780000000000);
+    expect(getLaunchConfig).toHaveBeenCalledTimes(3);
+  });
+
   it("accepts a fixed clock for release store-asset capture without enabling visible test controls", () => {
     expect(
       resolveTestNowMsFromLaunchConfig(

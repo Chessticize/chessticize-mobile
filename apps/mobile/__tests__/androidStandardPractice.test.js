@@ -61,6 +61,9 @@ describe('Android Standard Practice release slice', () => {
 
     expect(application).toContain('ChessticizeTestLaunchConfigPackage()');
     expect(testConfigModule).toContain('BuildConfig.DEBUG');
+    expect(testConfigModule).toContain('@ReactMethod(isBlockingSynchronousMethod = true)');
+    expect(testConfigModule).toContain('fun getLaunchConfig()');
+    expect(testConfigModule).not.toContain('override fun getConstants()');
     expect(testConfigModule).toContain('chessticizePuzzleSelectionSeed');
     expect(testConfigModule).toContain('chessticizeStandardTargetCorrect');
     expect(testConfigModule).toContain('chessticizeTestNowMs');
