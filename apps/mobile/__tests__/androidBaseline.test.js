@@ -11,7 +11,14 @@ const {
 const {
   EXPECTED_ABIS,
   parseNativeAbis,
+  verifyApk,
 } = require('../scripts/verify-android-apk-abis');
+const {
+  ANDROID_REQUIREMENTS,
+  androidSdkPackages,
+  parseGradleProperties,
+} = require('../scripts/android-requirements');
+const { installAndroidSdk } = require('../scripts/install-android-sdk');
 
 const mobileRoot = path.resolve(__dirname, '..');
 
@@ -19,20 +26,55 @@ function read(relativePath) {
   return fs.readFileSync(path.join(mobileRoot, relativePath), 'utf8');
 }
 
+function completeAndroidFiles(sdkRoot, appDir, repoRoot) {
+  return new Set([
+    sdkRoot,
+    `${sdkRoot}/platforms/android-36/android.jar`,
+    `${sdkRoot}/build-tools/36.0.0`,
+    `${sdkRoot}/ndk/27.1.12297006/source.properties`,
+    `${sdkRoot}/platform-tools/adb`,
+    `${sdkRoot}/emulator/emulator`,
+    `${sdkRoot}/cmdline-tools/latest/bin/sdkmanager`,
+    `${appDir}/android/gradlew`,
+    `${appDir}/node_modules/react-native/package.json`,
+    `${appDir}/node_modules/@react-native/codegen/package.json`,
+    `${appDir}/node_modules/@react-native/gradle-plugin/package.json`,
+    `${appDir}/node_modules/detox/package.json`,
+    `${repoRoot}/fixtures/puzzles/bundled-core-pack.sqlite`,
+  ]);
+}
+
+function successfulAndroidToolRun(command, args) {
+  if (command === 'java') {
+    return { status: 0, stdout: '', stderr: 'openjdk version "17.0.14"' };
+  }
+  if (command.endsWith('/adb')) {
+    return { status: 0, stdout: 'Android Debug Bridge version 1.0.41', stderr: '' };
+  }
+  if (args[0] === '-list-avds') {
+    return { status: 0, stdout: 'Pixel_API_24\nPixel_API_36\n', stderr: '' };
+  }
+  return { status: 0, stdout: 'Android emulator version 36.1.0', stderr: '' };
+}
+
 describe('Android launch baseline', () => {
   it('uses the permanent identity and supported API/ABI envelope', () => {
-    const rootGradle = read('android/build.gradle');
     const appGradle = read('android/app/build.gradle');
     const gradleProperties = read('android/gradle.properties');
     const activity = read('android/app/src/main/java/com/chessticize/mobile/MainActivity.kt');
     const application = read('android/app/src/main/java/com/chessticize/mobile/MainApplication.kt');
 
-    expect(rootGradle).toContain('minSdkVersion = 24');
-    expect(rootGradle).toContain('compileSdkVersion = 36');
-    expect(rootGradle).toContain('targetSdkVersion = 36');
+    expect(REQUIREMENTS).toMatchObject({
+      minSdk: 24,
+      compileSdk: 36,
+      targetSdk: 36,
+      buildTools: '36.0.0',
+      ndk: '27.1.12297006',
+      abis: ['arm64-v8a', 'x86_64'],
+    });
     expect(appGradle).toContain('namespace "com.chessticize.mobile"');
     expect(appGradle).toContain('applicationId "com.chessticize.mobile"');
-    expect(appGradle).toContain('abiFilters "arm64-v8a", "x86_64"');
+    expect(appGradle).toContain('abiFilters(*supportedAndroidAbis)');
     expect(gradleProperties).toContain('reactNativeArchitectures=arm64-v8a,x86_64');
     expect(activity).toContain('package com.chessticize.mobile');
     expect(application).toContain('package com.chessticize.mobile');
@@ -43,14 +85,70 @@ describe('Android launch baseline', () => {
     });
   });
 
+  it('loads the Android platform envelope from one canonical configuration', () => {
+    const rootGradle = read('android/build.gradle');
+    const appGradle = read('android/app/build.gradle');
+    const gradleProperties = read('android/gradle.properties');
+    const doctor = read('scripts/android-doctor.js');
+    const verifier = read('scripts/verify-android-apk-abis.js');
+    const workflow = read('../../.github/workflows/mobile-android.yml');
+
+    expect(gradleProperties).toContain('chessticizeMinSdk=24');
+    expect(gradleProperties).toContain('chessticizeCompileSdk=36');
+    expect(gradleProperties).toContain('chessticizeTargetSdk=36');
+    expect(gradleProperties).toContain('chessticizeBuildTools=36.0.0');
+    expect(gradleProperties).toContain('chessticizeNdk=27.1.12297006');
+    expect(rootGradle).toContain('property("chessticizeMinSdk")');
+    expect(appGradle).toContain('findProperty("reactNativeArchitectures")');
+    expect(doctor).toContain("require('./android-requirements')");
+    expect(verifier).toContain("require('./android-requirements')");
+    expect(workflow).toContain('pnpm mobile:install:android-sdk');
+    expect(ANDROID_REQUIREMENTS).toBe(REQUIREMENTS);
+    expect(androidSdkPackages(ANDROID_REQUIREMENTS)).toEqual([
+      'platform-tools',
+      'emulator',
+      'platforms;android-36',
+      'build-tools;36.0.0',
+      'ndk;27.1.12297006',
+    ]);
+    expect(parseGradleProperties('answer=42\n# ignored\nabis=x86_64,arm64-v8a\n')).toEqual({
+      answer: '42',
+      abis: 'x86_64,arm64-v8a',
+    });
+
+    const run = jest.fn(() => ({ status: 0 }));
+    expect(installAndroidSdk(run)).toEqual(androidSdkPackages(ANDROID_REQUIREMENTS));
+    expect(run).toHaveBeenCalledWith(
+      'sdkmanager',
+      androidSdkPackages(ANDROID_REQUIREMENTS),
+      { stdio: 'inherit' },
+    );
+  });
+
   it('keeps debug signing isolated and fails release packaging closed', () => {
     const appGradle = read('android/app/build.gradle');
+    const workflow = read('../../.github/workflows/mobile-android.yml');
     const debugSigningReferences = appGradle.match(/signingConfig signingConfigs\.debug/g) || [];
 
     expect(debugSigningReferences).toHaveLength(1);
     expect(appGradle).toContain('Production Android signing material is required for release packaging.');
     expect(appGradle).toContain('CHESSTICIZE_ANDROID_RELEASE_STORE_FILE');
     expect(appGradle).toContain('signingConfig signingConfigs.release');
+    expect(appGradle).toContain('gradle.taskGraph.whenReady');
+    expect(appGradle).toContain('taskGraph.allTasks');
+    expect(appGradle).not.toContain('gradle.startParameter.taskNames');
+    expect(workflow).toContain('verify_release_task_fails_closed :app:bundleRelease');
+    expect(workflow).toContain('verify_release_task_fails_closed :app:assemble');
+  });
+
+  it('keeps Metro cleartext access out of release manifests', () => {
+    const mainManifest = read('android/app/src/main/AndroidManifest.xml');
+    const debugManifest = read('android/app/src/debug/AndroidManifest.xml');
+    const debugNetworkConfig = read('android/app/src/debug/res/xml/network_security_config.xml');
+
+    expect(mainManifest).not.toContain('android:networkSecurityConfig');
+    expect(debugManifest).toContain('android:networkSecurityConfig="@xml/network_security_config"');
+    expect(debugNetworkConfig).toContain('<domain includeSubdomains="true">localhost</domain>');
   });
 
   it('preserves iOS Detox while exposing the Android debug app and attached device', () => {
@@ -77,43 +175,32 @@ describe('Android launch baseline', () => {
     expect(workflow).toContain('sudo chmod 0666 /dev/kvm');
   });
 
+  it('keeps Android emulator Detox out of routine pull-request CI', () => {
+    const workflow = read('../../.github/workflows/mobile-android.yml');
+
+    expect(workflow).toContain('schedule:');
+    expect(workflow).not.toMatch(/^\s+pull_request:/m);
+  });
+
+  it('uses the doctor-verified SDK adb path for the Android smoke', () => {
+    const androidDetoxScript = read('scripts/android-test-for-detox.sh');
+
+    expect(androidDetoxScript).toContain('ANDROID_HOME');
+    expect(androidDetoxScript).toContain('"$ADB_PATH" reverse');
+    expect(androidDetoxScript).not.toMatch(/^adb reverse/m);
+  });
+
   it('reports a ready environment when every pinned prerequisite is present', () => {
     const sdkRoot = '/sdk';
     const appDir = '/repo/apps/mobile';
     const repoRoot = '/repo';
-    const present = new Set([
-      sdkRoot,
-      `${sdkRoot}/platforms/android-36/android.jar`,
-      `${sdkRoot}/build-tools/36.0.0`,
-      `${sdkRoot}/ndk/27.1.12297006/source.properties`,
-      `${sdkRoot}/platform-tools/adb`,
-      `${sdkRoot}/emulator/emulator`,
-      `${sdkRoot}/cmdline-tools/latest/bin/sdkmanager`,
-      `${appDir}/android/gradlew`,
-      `${appDir}/node_modules/react-native/package.json`,
-      `${appDir}/node_modules/@react-native/codegen/package.json`,
-      `${appDir}/node_modules/@react-native/gradle-plugin/package.json`,
-      `${appDir}/node_modules/detox/package.json`,
-      `${repoRoot}/fixtures/puzzles/bundled-core-pack.sqlite`,
-    ]);
-    const run = (command, args) => {
-      if (command === 'java') {
-        return { status: 0, stdout: '', stderr: 'openjdk version "17.0.14"' };
-      }
-      if (command.endsWith('/adb')) {
-        return { status: 0, stdout: 'Android Debug Bridge version 1.0.41', stderr: '' };
-      }
-      if (args[0] === '-list-avds') {
-        return { status: 0, stdout: 'Pixel_API_24\nPixel_API_36\n', stderr: '' };
-      }
-      return { status: 0, stdout: 'Android emulator version 36.1.0', stderr: '' };
-    };
+    const present = completeAndroidFiles(sdkRoot, appDir, repoRoot);
 
     const report = inspectAndroidEnvironment({
       environment: { ANDROID_HOME: sdkRoot },
       exists: (file) => present.has(file),
       canExecute: (file) => present.has(file),
-      run,
+      run: successfulAndroidToolRun,
       nodeVersion: '22.14.0',
       appDir,
       repoRoot,
@@ -124,29 +211,21 @@ describe('Android launch baseline', () => {
     expect(report.checks.filter((check) => check.status === 'fail')).toEqual([]);
   });
 
-  it('rejects an install that cannot resolve the React Native Gradle plugin', () => {
+  it.each([
+    ['React Native Gradle plugin', '@react-native/gradle-plugin/package.json'],
+    ['React Native Codegen', '@react-native/codegen/package.json'],
+  ])('rejects an install missing %s', (_label, missingDependency) => {
     const sdkRoot = '/sdk';
     const appDir = '/repo/apps/mobile';
     const repoRoot = '/repo';
-    const present = new Set([
-      sdkRoot,
-      `${sdkRoot}/platforms/android-36/android.jar`,
-      `${sdkRoot}/build-tools/36.0.0`,
-      `${sdkRoot}/ndk/27.1.12297006/source.properties`,
-      `${sdkRoot}/platform-tools/adb`,
-      `${sdkRoot}/emulator/emulator`,
-      `${sdkRoot}/cmdline-tools/latest/bin/sdkmanager`,
-      `${appDir}/android/gradlew`,
-      `${appDir}/node_modules/react-native/package.json`,
-      `${appDir}/node_modules/detox/package.json`,
-      `${repoRoot}/fixtures/puzzles/bundled-core-pack.sqlite`,
-    ]);
+    const present = completeAndroidFiles(sdkRoot, appDir, repoRoot);
+    present.delete(`${appDir}/node_modules/${missingDependency}`);
 
     const report = inspectAndroidEnvironment({
       environment: { ANDROID_HOME: sdkRoot },
       exists: (file) => present.has(file),
       canExecute: (file) => present.has(file),
-      run: () => ({ status: 0, stdout: 'Pixel_API_36', stderr: 'openjdk version "17.0.14"' }),
+      run: successfulAndroidToolRun,
       nodeVersion: '22.14.0',
       appDir,
       repoRoot,
@@ -192,5 +271,15 @@ describe('Android launch baseline', () => {
       'x86',
       'x86_64',
     ]);
+    expect(verifyApk('app.apk', () => ({ status: 0, stdout: entries, stderr: '' })))
+      .toEqual(EXPECTED_ABIS);
+    expect(() => verifyApk(
+      'unexpected.apk',
+      () => ({ status: 0, stdout: `${entries}\nlib/x86/libreactnative.so`, stderr: '' }),
+    )).toThrow('Unexpected Android ABIs');
+    expect(() => verifyApk(
+      'empty.apk',
+      () => ({ status: 0, stdout: 'AndroidManifest.xml', stderr: '' }),
+    )).toThrow('does not contain native libraries');
   });
 });

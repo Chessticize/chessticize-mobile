@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 
 const { spawnSync } = require('child_process');
+const { ANDROID_REQUIREMENTS } = require('./android-requirements');
 
-const EXPECTED_ABIS = Object.freeze(['arm64-v8a', 'x86_64']);
+const EXPECTED_ABIS = ANDROID_REQUIREMENTS.abis;
 
 function parseNativeAbis(entries) {
   return [...new Set(
