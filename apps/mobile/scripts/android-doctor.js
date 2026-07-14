@@ -3,17 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
-
-const REQUIREMENTS = Object.freeze({
-  javaMajor: 17,
-  nodeMajor: 22,
-  compileSdk: 36,
-  targetSdk: 36,
-  minSdk: 24,
-  buildTools: '36.0.0',
-  ndk: '27.1.12297006',
-  abis: ['arm64-v8a', 'x86_64'],
-});
+const { ANDROID_REQUIREMENTS: REQUIREMENTS } = require('./android-requirements');
 
 function parseJavaMajor(output) {
   const match = String(output).match(/version\s+"(\d+)(?:\.(\d+))?/i);

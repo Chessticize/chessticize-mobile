@@ -2,29 +2,19 @@ name: Mobile Android
 
 on:
   workflow_dispatch:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - ".github/workflows/mobile-android.yml"
-      - "apps/mobile/**"
-      - "fixtures/**"
-      - "package.json"
-      - "packages/**"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
-      - "tsconfig.json"
+  schedule:
+    - cron: "17 10 * * *"
 
 permissions:
   contents: read
 
 concurrency:
-  group: mobile-android-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: mobile-android-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   android-build:
     name: Android build baseline
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
@@ -59,13 +49,7 @@ jobs:
           sudo apt-get install --yes libpulse0
 
       - name: Install pinned Android build tools
-        run: >-
-          sdkmanager
-          "platform-tools"
-          "emulator"
-          "platforms;android-36"
-          "build-tools;36.0.0"
-          "ndk;27.1.12297006"
+        run: pnpm mobile:install:android-sdk
 
       - name: Install JS dependencies
         run: pnpm install --frozen-lockfile
@@ -85,19 +69,25 @@ jobs:
       - name: Mobile typecheck
         run: pnpm mobile:typecheck
 
-      - name: Verify release signing fails closed
+      - name: Verify explicit and aggregate release tasks fail closed
         working-directory: apps/mobile/android
         run: |
-          set +e
-          release_output="$(./gradlew :app:bundleRelease --no-daemon 2>&1)"
-          release_status=$?
-          set -e
-          echo "$release_output"
-          if [ "$release_status" -eq 0 ]; then
-            echo "Release packaging unexpectedly succeeded without production signing material." >&2
-            exit 1
-          fi
-          grep -F "Production Android signing material is required for release packaging." <<<"$release_output"
+          verify_release_task_fails_closed() {
+            local release_task="$1"
+            set +e
+            release_output="$(./gradlew "$release_task" --no-daemon 2>&1)"
+            release_status=$?
+            set -e
+            echo "$release_output"
+            if [ "$release_status" -eq 0 ]; then
+              echo "$release_task unexpectedly succeeded without production signing material." >&2
+              exit 1
+            fi
+            grep -F "Production Android signing material is required for release packaging." <<<"$release_output"
+          }
+
+          verify_release_task_fails_closed :app:bundleRelease
+          verify_release_task_fails_closed :app:assemble
 
       - name: Build debug app and Detox test APK
         run: pnpm mobile:e2e:build:android
@@ -116,7 +106,6 @@ jobs:
 
   android-launch:
     name: Android launch API ${{ matrix.api-level }}
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
     needs: android-build
     runs-on: ubuntu-latest
     timeout-minutes: 30

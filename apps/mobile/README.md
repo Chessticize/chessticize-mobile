@@ -53,11 +53,13 @@ The Detox build command runs `scripts/ios-build-for-detox.sh`. It checks Xcode s
 ## Android Launch Baseline
 
 Android builds support API 24 and newer, compile and target API 36, and package
-only `arm64-v8a` and `x86_64` native libraries. Install the pinned SDK platform,
-Build Tools 36.0.0, and NDK 27.1.12297006, then run:
+only `arm64-v8a` and `x86_64` native libraries. The canonical platform values
+live in `android/gradle.properties`; Gradle, diagnostics, SDK installation, and
+ABI verification consume them. Install the pinned SDK tools, then run:
 
 ```sh
 pnpm install --frozen-lockfile
+pnpm mobile:install:android-sdk
 pnpm fetch:core-pack
 pnpm mobile:doctor:android
 pnpm mobile:e2e:build:android
@@ -66,9 +68,10 @@ pnpm mobile:verify:android:abis
 ```
 
 The Android test command starts and health-checks Metro, maps its port into the
-emulator with `adb reverse`, and shuts Metro down after Detox completes. CI
-installs the debug APK on representative API 24 and API 36 x86_64 emulators and
-verifies the real public Practice UI.
+emulator with `adb reverse`, and shuts Metro down after Detox completes. The
+scheduled/manual Android CI workflow installs the debug APK on representative
+API 24 and API 36 x86_64 emulators and verifies the real public Practice UI;
+routine pull requests continue to use path-scoped fast checks.
 
 Release packaging never uses `android/app/debug.keystore`. A release task fails
 before packaging unless all four production values are provided:
