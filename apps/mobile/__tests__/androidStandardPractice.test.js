@@ -56,6 +56,7 @@ describe('Android Standard Practice release slice', () => {
   });
 
   it('registers the maintained Android launch-config boundary for deterministic public journeys', () => {
+    const app = read('App.tsx');
     const application = read('android/app/src/main/java/com/chessticize/mobile/MainApplication.kt');
     const testConfigModule = read('android/app/src/main/java/com/chessticize/mobile/ChessticizeTestLaunchConfigModule.kt');
 
@@ -67,6 +68,9 @@ describe('Android Standard Practice release slice', () => {
     expect(testConfigModule).toContain('chessticizePuzzleSelectionSeed');
     expect(testConfigModule).toContain('chessticizeStandardTargetCorrect');
     expect(testConfigModule).toContain('chessticizeTestNowMs');
+    expect(testConfigModule).toContain('chessticizeTestLaunchConfigChanged');
+    expect(testConfigModule).toContain('emitDeviceEvent');
+    expect(app).toContain('subscribeToTestLaunchConfigChanges');
     expect(testConfigModule).not.toContain('Log.');
   });
 
@@ -83,8 +87,7 @@ describe('Android Standard Practice release slice', () => {
     expect(suiteConfig).toContain('android-migration.e2e.js');
     expect(practiceJourney).toContain('chessticizePuzzleSelectionSeed');
     expect(practiceJourney).toContain('chessticizeStandardTargetCorrect');
-    expect(practiceJourney).toContain("by.id('session-last-move-overlay'))).toExist()");
-    expect(practiceJourney).toMatch(/'session-last-move-overlay',\s*'Last move d2 to d1'/);
+    expect(practiceJourney).toMatch(/'session-board',\s*'Last move d2 to d1'/);
     expect(practiceJourney).toMatch(/'session-side-to-move',\s*'Black to move'/);
     expect(practiceJourney).toContain("by.id('session-side-to-move'))).toBeVisible()");
     expect(practiceJourney).toContain("'a3c1'");

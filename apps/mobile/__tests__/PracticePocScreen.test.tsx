@@ -740,6 +740,10 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "session-side-to-move-label"))).toBe("White");
     expect(findByTestId(renderer, "session-last-move-overlay").props.accessibilityRole).toBe("image");
     expect(findByTestId(renderer, "session-last-move-overlay").props.accessibilityLabel).toBe("Last move f7 to f8");
+    expect(findByTestId(renderer, "session-board").props.accessible).toBe(true);
+    expect(findByTestId(renderer, "session-board").props.accessibilityRole).toBe("image");
+    expect(findByTestId(renderer, "session-board").props.accessibilityLabel)
+      .toBe("Chess board. White to move. Last move f7 to f8");
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
     expect(findByTestId(renderer, "mock-chessboard").props.draggableColor).toBe("w");
     expect(() => findByTestId(renderer, "board-input-blocker")).toThrow();

@@ -1797,6 +1797,9 @@ export function PracticePocScreen({
         </Text>
       ) : null}
       <View
+        accessible
+        accessibilityLabel={sessionBoardAccessibilityLabel(displayedSideToMove, displayedLastBoardMove)}
+        accessibilityRole="image"
         testID="session-board"
         style={[styles.boardSurface, { width: boardSize, height: boardSize }]}
       >
@@ -3893,6 +3896,20 @@ function LastMoveOverlay({
       })}
     </View>
   );
+}
+
+function sessionBoardAccessibilityLabel(
+  side: MoveSide | null,
+  lastMove: BoardMove | null
+): string {
+  const parts = ["Chess board"];
+  if (side) {
+    parts.push(sideToMoveAccessibilityLabel(side));
+  }
+  if (lastMove) {
+    parts.push(`Last move ${lastMove.from} to ${lastMove.to}`);
+  }
+  return parts.join(". ");
 }
 
 function MoveFeedbackOverlay({

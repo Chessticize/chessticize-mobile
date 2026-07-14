@@ -1,4 +1,4 @@
-import { NativeModules } from "react-native";
+import { NativeEventEmitter, NativeModules } from "react-native";
 import { arePracticeTestControlsEnabled } from "../releaseConfig.ts";
 
 type TestLaunchConfigGlobals = typeof globalThis & {
@@ -15,8 +15,12 @@ type NativeTestLaunchConfigValues = {
 };
 
 type NativeTestLaunchConfigModule = NativeTestLaunchConfigValues & {
+  addListener?: (eventName: string) => void;
   getLaunchConfig?: () => NativeTestLaunchConfigValues;
+  removeListeners?: (count: number) => void;
 };
+
+const TEST_LAUNCH_CONFIG_CHANGED_EVENT = "chessticizeTestLaunchConfigChanged";
 
 function readNativeTestLaunchConfig(
   nativeModule: NativeTestLaunchConfigModule | undefined
@@ -29,6 +33,21 @@ function areNativeTestControlsEnabled(
   nativeModule: NativeTestLaunchConfigModule | undefined
 ): boolean {
   return arePracticeTestControlsEnabled(globals) || nativeModule?.testControlsEnabled === true;
+}
+
+export function subscribeToTestLaunchConfigChanges(
+  listener: () => void,
+  nativeModule: NativeTestLaunchConfigModule | undefined = NativeModules?.ChessticizeTestLaunchConfig as NativeTestLaunchConfigModule | undefined
+): () => void {
+  if (!nativeModule?.getLaunchConfig) {
+    return () => undefined;
+  }
+  const subscription = new NativeEventEmitter(nativeModule as never)
+    .addListener(TEST_LAUNCH_CONFIG_CHANGED_EVENT, listener);
+  // Close the gap between the first render and listener registration: an
+  // Activity intent captured in that window is already available synchronously.
+  listener();
+  return () => subscription.remove();
 }
 
 export function isStoreAssetCaptureEnabled(

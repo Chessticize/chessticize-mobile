@@ -45,9 +45,8 @@ describe('Android Standard Practice offline persistence', () => {
     // The real SQLite pack adapter selects the seeded bundled line. The app
     // auto-plays each white move; the user solves the two black moves.
     await playBoardMove('session-board', 'a3c1', true);
-    await waitFor(element(by.id('session-last-move-overlay'))).toExist().withTimeout(10000);
     await waitForElementAccessibilityLabelContaining(
-      'session-last-move-overlay',
+      'session-board',
       'Last move d2 to d1',
       10000,
       50

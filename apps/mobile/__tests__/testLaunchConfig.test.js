@@ -3,7 +3,8 @@ const {
   isStoreAssetCaptureEnabled,
   resolveTestNowMsFromLaunchConfig,
   resolveTestPuzzleSelectionSeedFromLaunchConfig,
-  resolveTestStandardTargetCorrectFromLaunchConfig
+  resolveTestStandardTargetCorrectFromLaunchConfig,
+  subscribeToTestLaunchConfigChanges
 } = require("../src/backend/testLaunchConfig");
 
 describe("test launch configuration", () => {
@@ -87,6 +88,31 @@ describe("test launch configuration", () => {
     expect(resolveTestStandardTargetCorrectFromLaunchConfig(productionGlobals, nativeModule)).toBe(1);
     expect(resolveTestNowMsFromLaunchConfig(productionGlobals, nativeModule)).toBe(1780000000000);
     expect(getLaunchConfig).toHaveBeenCalledTimes(3);
+  });
+
+  it("refreshes Android launch values when a reused activity receives a new intent", () => {
+    let nativeListener;
+    const remove = jest.fn();
+    const listener = jest.fn();
+    const nativeModule = {
+      getLaunchConfig: jest.fn(() => ({})),
+      __addListener: jest.fn((_eventName, nextListener) => {
+        nativeListener = nextListener;
+        return { remove };
+      })
+    };
+
+    const unsubscribe = subscribeToTestLaunchConfigChanges(listener, nativeModule);
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(nativeModule.__addListener).toHaveBeenCalledWith(
+      "chessticizeTestLaunchConfigChanged",
+      expect.any(Function)
+    );
+    nativeListener();
+    expect(listener).toHaveBeenCalledTimes(2);
+    unsubscribe();
+    expect(remove).toHaveBeenCalledTimes(1);
   });
 
   it("accepts a fixed clock for release store-asset capture without enabling visible test controls", () => {
