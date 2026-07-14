@@ -110,6 +110,8 @@ interface Props {
   platformCapabilities: MobilePlatformCapabilities;
   debugTrace?: (event: PracticeDebugTraceEvent) => void;
   currentTimeMs?: () => number;
+  puzzleSelectionSeed?: string;
+  standardTargetCorrect?: number;
 }
 
 type Tab = "practice" | "review" | "history" | "settings" | "analysis";
@@ -354,7 +356,9 @@ function buildAdaptiveLayout({
 export function PracticePocScreen({
   platformCapabilities,
   debugTrace,
-  currentTimeMs = Date.now
+  currentTimeMs = Date.now,
+  puzzleSelectionSeed,
+  standardTargetCorrect
 }: Props): React.JSX.Element {
   const [puzzleSource, setPuzzleSource] = useState<MobilePuzzleSource>("bundledCore");
   const service = platformCapabilities.storage.practiceService;
@@ -940,7 +944,12 @@ export function PracticePocScreen({
           durationSeconds: config.durationSeconds,
           perPuzzleSeconds: config.perPuzzleSeconds,
           ...(customThemeValue ? { theme: customThemeValue, persistCustomConfig: true } : useCustomTiming ? { persistCustomConfig: true } : {}),
-          ...(configurePuzzleSource && shouldRandomizePuzzleSelection(puzzleSource) ? { puzzleSelectionSeed: `${Date.now()}-${Math.random()}` } : {})
+          ...(nextMode === "standard" && standardTargetCorrect !== undefined
+            ? { targetCorrect: standardTargetCorrect }
+            : {}),
+          ...(configurePuzzleSource && shouldRandomizePuzzleSelection(puzzleSource)
+            ? { puzzleSelectionSeed: puzzleSelectionSeed ?? `${Date.now()}-${Math.random()}` }
+            : {})
         },
         captureLiveNowIso()
       );
@@ -1179,6 +1188,7 @@ export function PracticePocScreen({
         submittedFen
       });
       if (shouldAnimateSamePuzzleReply(next.state, nextFeedback, submittedPuzzleId)) {
+        commitBoardFen(nextVisualFen);
         await animateSamePuzzleReply(next.state, nextFeedback);
         refreshState();
         return;
@@ -1851,6 +1861,7 @@ export function PracticePocScreen({
             boardSize={boardSize}
             flipped={boardFlipped}
             move={displayedLastBoardMove}
+            overlayTestID="session-last-move-overlay"
           />
         ) : null}
 
@@ -3845,15 +3856,24 @@ function coordinateTextStyle(row: number, col: number): object {
 function LastMoveOverlay({
   boardSize,
   flipped,
-  move
+  move,
+  overlayTestID
 }: {
   boardSize: number;
   flipped: boolean;
   move: BoardMove;
+  overlayTestID: string;
 }): React.JSX.Element {
   const squareSize = boardSize / 8;
   return (
-    <View style={[styles.arrowLayer, { width: boardSize, height: boardSize }]} pointerEvents="none">
+    <View
+      accessible
+      accessibilityLabel={`Last move ${move.from} to ${move.to}`}
+      accessibilityRole="image"
+      pointerEvents="none"
+      style={[styles.arrowLayer, { width: boardSize, height: boardSize }]}
+      testID={overlayTestID}
+    >
       {[move.from, move.to].map((square) => {
         const pos = squareToTopLeft(square, squareSize, flipped);
         return (
@@ -6436,7 +6456,14 @@ function ReviewSession({
               boardSize={boardSize}
               flipped={boardFlipped}
             />
-            {lastMove && !feedback ? <LastMoveOverlay boardSize={boardSize} flipped={boardFlipped} move={lastMove} /> : null}
+            {lastMove && !feedback ? (
+              <LastMoveOverlay
+                boardSize={boardSize}
+                flipped={boardFlipped}
+                move={lastMove}
+                overlayTestID="review-last-move-overlay"
+              />
+            ) : null}
             {feedbackMove ? (
               <MoveFeedbackOverlay
                 boardSize={boardSize}

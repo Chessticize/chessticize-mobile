@@ -10,6 +10,7 @@ import {
   type SyncSqliteStatement,
   type SyncSqliteValue
 } from "../../../../packages/storage/src/sync-sqlite-store.ts";
+import { MOBILE_DATABASE_LAYOUT } from "./mobileDatabaseLayout.ts";
 
 export class DeviceSQLiteStore extends SyncSQLiteStore {
   private readonly nativeDb: DB;
@@ -19,12 +20,12 @@ export class DeviceSQLiteStore extends SyncSQLiteStore {
     this.nativeDb = nativeDb;
   }
 
-  static open(name = "chessticize-mobile.sqlite"): DeviceSQLiteStore {
+  static open(name = MOBILE_DATABASE_LAYOUT.progressDatabaseName): DeviceSQLiteStore {
     return new DeviceSQLiteStore(open({ name }));
   }
 
   static async openReadOnlyPuzzlePack(
-    name = "bundled-core-pack.sqlite",
+    name = MOBILE_DATABASE_LAYOUT.bundledPuzzlePackDatabaseName,
     options: SQLitePuzzlePackSourceOptions = {}
   ): Promise<SQLitePuzzlePackSource> {
     const bundledPack = DeviceSQLiteStore.openBundledReadOnlyPuzzlePack(name, options);
@@ -32,7 +33,10 @@ export class DeviceSQLiteStore extends SyncSQLiteStore {
       return bundledPack;
     }
 
-    const copied = await moveBundledDatabaseAsset({ filename: name, path: "custom" });
+    const copied = await moveBundledDatabaseAsset({
+      filename: name,
+      path: MOBILE_DATABASE_LAYOUT.androidPuzzlePackAssetDirectory
+    });
     if (!copied) {
       throw new Error(`Bundled puzzle pack could not be copied: ${name}`);
     }
@@ -43,7 +47,7 @@ export class DeviceSQLiteStore extends SyncSQLiteStore {
   }
 
   static openBundledReadOnlyPuzzlePack(
-    name = "bundled-core-pack.sqlite",
+    name = MOBILE_DATABASE_LAYOUT.bundledPuzzlePackDatabaseName,
     options: SQLitePuzzlePackSourceOptions = {}
   ): SQLitePuzzlePackSource | undefined {
     const iosBundleLocation = Platform.OS === "ios" ? bundledJsDirectory() : undefined;

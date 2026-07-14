@@ -4,7 +4,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { PracticeService, SQLiteStore } from "../src/index.ts";
+import { buildPracticeProgressSummary, PracticeService, SQLiteStore } from "../src/index.ts";
 import type { AttemptHistoryRow, HistoryFilter } from "../src/index.ts";
 import type { Puzzle, ReviewContext } from "../../core/src/index.ts";
 
@@ -1235,6 +1235,91 @@ test("PracticeService records a completed sprint and persists updated ELO", asyn
     assert.equal(rating.games, 1);
   } finally {
     store.close();
+  }
+});
+
+test("PracticeService restores a completed Standard attempt, rating, progress, and history after SQLite reopen", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "chessticize-standard-relaunch-"));
+  const databasePath = join(directory, "chessticize-mobile.sqlite");
+  const completedAt = "2026-07-14T12:00:15.000Z";
+  try {
+    const firstStore = new SQLiteStore(databasePath);
+    firstStore.migrate();
+    firstStore.seedPuzzles(await loadFixturePuzzles());
+    const firstService = new PracticeService(firstStore);
+    try {
+      firstService.startSprint(
+        {
+          mode: "standard",
+          durationSeconds: 300,
+          perPuzzleSeconds: 20,
+          targetCorrect: 1,
+          maxMistakes: 3,
+          theme: "hangingPiece"
+        },
+        "2026-07-14T12:00:00.000Z"
+      );
+      firstService.submitMove("e6e7", "2026-07-14T12:00:05.000Z");
+      firstService.submitMove("b3c1", "2026-07-14T12:00:10.000Z");
+      const completion = firstService.submitMove("h6c1", completedAt);
+      assert.equal(completion.state.status, "won");
+    } finally {
+      firstStore.close();
+    }
+
+    const reopenedStore = new SQLiteStore(databasePath);
+    reopenedStore.migrate();
+    const reopenedService = new PracticeService(reopenedStore);
+    try {
+      assert.deepEqual(reopenedService.getRating("hangingPiece standard 5/20"), {
+        key: "hangingPiece standard 5/20",
+        generation: 0,
+        rating: 775,
+        ratingDeviation: 248.17054151409985,
+        volatility: 0.06,
+        games: 1
+      });
+      assert.equal(reopenedService.listHistory().length, 1);
+      assert.deepEqual(
+        reopenedService.getHistoryView({
+          now: "2026-07-14T13:00:00.000Z",
+          timeRange: "max",
+          ratingKey: "hangingPiece standard 5/20"
+        }).attempts.map((attempt) => ({
+          completedAt: attempt.completedAt,
+          ratingAfter: attempt.ratingAfter,
+          result: attempt.result,
+          submittedMove: attempt.submittedMove
+        })),
+        [{ completedAt, ratingAfter: 775, result: "correct", submittedMove: "h6c1" }]
+      );
+      assert.deepEqual(
+        reopenedService.listSprintSessions().map((session) => ({
+          ratingAfter: session.ratingAfter,
+          status: session.status
+        })),
+        [{ ratingAfter: 775, status: "won" }]
+      );
+      assert.deepEqual(
+        buildPracticeProgressSummary(
+          reopenedService.listHistory(),
+          reopenedService.listSprintSessions(),
+          new Date("2026-07-14T13:00:00.000Z").getTime(),
+          "hangingPiece standard 5/20"
+        ),
+        {
+          correctThisWeek: 1,
+          accuracyThisWeek: 100,
+          ratingDeltaThisWeek: 175,
+          wrongThisWeek: 0,
+          netThisWeek: 1
+        }
+      );
+    } finally {
+      reopenedStore.close();
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
   }
 });
 

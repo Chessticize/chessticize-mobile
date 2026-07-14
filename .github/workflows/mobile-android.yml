@@ -89,7 +89,7 @@ jobs:
           verify_release_task_fails_closed :app:bundleRelease
           verify_release_task_fails_closed :app:assemble
 
-      - name: Build debug app and Detox test APK
+      - name: Build self-contained E2E app and Detox test APK
         run: pnpm mobile:e2e:build:android
 
       - name: Verify packaged native ABIs
@@ -98,17 +98,17 @@ jobs:
       - name: Upload Android APKs
         uses: actions/upload-artifact@v4
         with:
-          name: android-launch-apks
+          name: android-practice-apks
           if-no-files-found: error
           path: |
-            apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
-            apps/mobile/android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            apps/mobile/android/app/build/outputs/apk/e2e/app-e2e.apk
+            apps/mobile/android/app/build/outputs/apk/androidTest/e2e/app-e2e-androidTest.apk
 
   android-launch:
-    name: Android launch API ${{ matrix.api-level }}
+    name: Android offline practice API ${{ matrix.api-level }}
     needs: android-build
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -140,7 +140,7 @@ jobs:
       - name: Download Android APKs
         uses: actions/download-artifact@v4
         with:
-          name: android-launch-apks
+          name: android-practice-apks
           path: apps/mobile/android/app/build/outputs/apk
 
       - name: Enable KVM acceleration
@@ -157,6 +157,10 @@ jobs:
           profile: pixel_2
           disable-animations: true
           emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
-          script: pnpm mobile:e2e:test:android:ci
+          script: |
+            apps/mobile/scripts/prepare-android-offline-e2e.sh
+            DETOX_ACTIVE_SUITE=android-launch pnpm mobile:e2e:test:android:ci
+            DETOX_ACTIVE_SUITE=android-standard-practice pnpm mobile:e2e:test:android:ci
+            DETOX_ACTIVE_SUITE=android-migration pnpm mobile:e2e:test:android:ci
         env:
           DETOX_ANDROID_DEVICE: emulator-5554

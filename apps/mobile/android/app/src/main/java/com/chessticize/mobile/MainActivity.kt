@@ -1,11 +1,24 @@
 package com.chessticize.mobile
 
+import android.content.Intent
+import android.os.Bundle
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
 import com.facebook.react.defaults.DefaultReactActivityDelegate
 
 class MainActivity : ReactActivity() {
+
+  override fun onCreate(savedInstanceState: Bundle?) {
+    ChessticizeTestLaunchArguments.capture(intent)
+    super.onCreate(savedInstanceState)
+  }
+
+  override fun onNewIntent(intent: Intent) {
+    super.onNewIntent(intent)
+    setIntent(intent)
+    ChessticizeTestLaunchArguments.capture(intent)
+  }
 
   /**
    * Returns the name of the main component registered from JavaScript. This is used to schedule

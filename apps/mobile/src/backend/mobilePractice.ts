@@ -3,6 +3,7 @@ import { MemoryStore } from "../../../../packages/storage/src/memory-store.ts";
 import { PackBackedPracticeStore } from "../../../../packages/storage/src/pack-backed-practice-store.ts";
 import { PracticeService } from "../../../../packages/storage/src/practice-service.ts";
 import type { PuzzleSource } from "../../../../packages/storage/src/puzzle-source.ts";
+import { MOBILE_DATABASE_LAYOUT } from "./mobileDatabaseLayout.ts";
 
 const bundledCoreManifest = require("../../../../fixtures/puzzles/bundled-core-pack.manifest.json") as PuzzlePackManifest;
 const regressionPuzzles = require("../../../../fixtures/puzzles/presolved-1000.json") as Puzzle[];
@@ -74,13 +75,13 @@ export function createPersistentMobilePracticeServiceSync(): PracticeService | u
   if (!DeviceSQLiteStore.canOpenBundledReadOnlyPuzzlePack()) {
     return undefined;
   }
-  const userStore = DeviceSQLiteStore.open("chessticize-mobile.sqlite");
+  const userStore = DeviceSQLiteStore.open(MOBILE_DATABASE_LAYOUT.progressDatabaseName);
   userStore.migrate();
   return createPersistentService(
     userStore,
     new LazyPuzzleSource(() => {
       const source = DeviceSQLiteStore.openBundledReadOnlyPuzzlePack(
-        "bundled-core-pack.sqlite",
+        MOBILE_DATABASE_LAYOUT.bundledPuzzlePackDatabaseName,
         BUNDLED_CORE_PACK_OPTIONS
       );
       if (!source) {
@@ -97,10 +98,10 @@ async function createPersistentMobilePracticeServiceImpl(): Promise<PracticeServ
   }
 
   const { DeviceSQLiteStore } = require("./deviceSQLiteStore.ts") as typeof import("./deviceSQLiteStore.ts");
-  const userStore = DeviceSQLiteStore.open("chessticize-mobile.sqlite");
+  const userStore = DeviceSQLiteStore.open(MOBILE_DATABASE_LAYOUT.progressDatabaseName);
   userStore.migrate();
   const packSource = await DeviceSQLiteStore.openReadOnlyPuzzlePack(
-    "bundled-core-pack.sqlite",
+    MOBILE_DATABASE_LAYOUT.bundledPuzzlePackDatabaseName,
     BUNDLED_CORE_PACK_OPTIONS
   );
   return createPersistentService(userStore, packSource);

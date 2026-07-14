@@ -1,13 +1,15 @@
 import React from "react";
-import { LogBox, StyleSheet, Text, View } from "react-native";
+import { LogBox, Platform, StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { PracticePocScreen } from "./src/components/PracticePocScreen";
-import {
-  createIOSMobilePlatformCapabilities,
-  createIOSMobilePlatformCapabilitiesSync
-} from "./src/backend/iosMobilePlatformCapabilities";
+import { mobilePlatformCapabilityFactoryFor } from "./src/backend/nativeMobilePlatformCapabilities";
 import type { MobilePlatformCapabilities } from "./src/backend/mobilePlatformCapabilities";
-import { createAdvancingTestClock, resolveTestNowMsFromLaunchConfig } from "./src/backend/testLaunchConfig";
+import {
+  createAdvancingTestClock,
+  resolveTestNowMsFromLaunchConfig,
+  resolveTestPuzzleSelectionSeedFromLaunchConfig,
+  resolveTestStandardTargetCorrectFromLaunchConfig
+} from "./src/backend/testLaunchConfig";
 import { shouldSuppressLogBoxWarnings } from "./src/releaseConfig";
 
 if (shouldSuppressLogBoxWarnings()) {
@@ -15,11 +17,14 @@ if (shouldSuppressLogBoxWarnings()) {
 }
 
 function App() {
+  const platformFactory = mobilePlatformCapabilityFactoryFor(Platform.OS as "android" | "ios");
   const [platformCapabilities, setPlatformCapabilities] = React.useState<MobilePlatformCapabilities | undefined>(
-    () => createIOSMobilePlatformCapabilitiesSync()
+    () => platformFactory.createSync()
   );
   const [loadError, setLoadError] = React.useState<string | undefined>(undefined);
   const testNowMs = resolveTestNowMsFromLaunchConfig();
+  const puzzleSelectionSeed = resolveTestPuzzleSelectionSeedFromLaunchConfig();
+  const standardTargetCorrect = resolveTestStandardTargetCorrectFromLaunchConfig();
   const currentTimeMs = React.useMemo(
     () => testNowMs === undefined ? undefined : createAdvancingTestClock(testNowMs),
     [testNowMs]
@@ -29,7 +34,7 @@ function App() {
       return;
     }
     let cancelled = false;
-    createIOSMobilePlatformCapabilities()
+    platformFactory.create()
       .then((nextCapabilities) => {
         if (!cancelled) {
           setPlatformCapabilities(nextCapabilities);
@@ -43,12 +48,17 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [platformCapabilities]);
+  }, [platformCapabilities, platformFactory]);
 
   return (
     <SafeAreaProvider>
       {platformCapabilities ? (
-        <PracticePocScreen platformCapabilities={platformCapabilities} currentTimeMs={currentTimeMs} />
+        <PracticePocScreen
+          platformCapabilities={platformCapabilities}
+          currentTimeMs={currentTimeMs}
+          puzzleSelectionSeed={puzzleSelectionSeed}
+          standardTargetCorrect={standardTargetCorrect}
+        />
       ) : (
         <View style={styles.loadingRoot}>
           <Text style={styles.loadingTitle} testID={loadError ? "puzzle-pack-load-error" : "puzzle-pack-loading"}>
