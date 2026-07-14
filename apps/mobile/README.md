@@ -1,6 +1,8 @@
 # Chessticize Mobile
 
-This is the Bare React Native iOS-first app for Chessticize Mobile.
+This is the Bare React Native app for Chessticize Mobile. iOS remains the
+release-leading platform, and Android has a repeatable install-and-launch
+baseline under the permanent `com.chessticize.mobile` identity.
 
 The current app includes:
 
@@ -47,6 +49,39 @@ pnpm mobile:e2e:test:ios
 ```
 
 The Detox build command runs `scripts/ios-build-for-detox.sh`. It checks Xcode simulator access, installs Ruby dependencies through Bundler when needed, runs CocoaPods, and then builds the iOS simulator app. Detox and simulator runs are final acceptance tools, not the default loop for ordinary UI state changes.
+
+## Android Launch Baseline
+
+Android builds support API 24 and newer, compile and target API 36, and package
+only `arm64-v8a` and `x86_64` native libraries. Install the pinned SDK platform,
+Build Tools 36.0.0, and NDK 27.1.12297006, then run:
+
+```sh
+pnpm install --frozen-lockfile
+pnpm fetch:core-pack
+pnpm mobile:doctor:android
+pnpm mobile:e2e:build:android
+DETOX_ANDROID_DEVICE=emulator-5554 pnpm mobile:e2e:test:android
+pnpm mobile:verify:android:abis
+```
+
+The Android test command starts and health-checks Metro, maps its port into the
+emulator with `adb reverse`, and shuts Metro down after Detox completes. CI
+installs the debug APK on representative API 24 and API 36 x86_64 emulators and
+verifies the real public Practice UI.
+
+Release packaging never uses `android/app/debug.keystore`. A release task fails
+before packaging unless all four production values are provided:
+
+- `CHESSTICIZE_ANDROID_RELEASE_STORE_FILE`
+- `CHESSTICIZE_ANDROID_RELEASE_STORE_PASSWORD`
+- `CHESSTICIZE_ANDROID_RELEASE_KEY_ALIAS`
+- `CHESSTICIZE_ANDROID_RELEASE_KEY_PASSWORD`
+
+The matching local Gradle properties are `chessticizeReleaseStoreFile`,
+`chessticizeReleaseStorePassword`, `chessticizeReleaseKeyAlias`, and
+`chessticizeReleaseKeyPassword`. Keep those values in a user-level Gradle file
+or an untracked local file; never commit signing material.
 
 ## GUI Automation
 

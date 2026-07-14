@@ -1,0 +1,173 @@
+name: Mobile Android
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/mobile-android.yml"
+      - "apps/mobile/**"
+      - "fixtures/**"
+      - "package.json"
+      - "packages/**"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "tsconfig.json"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-android-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android-build:
+    name: Android build baseline
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.1.2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26.x
+          cache: pnpm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android emulator runtime libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libpulse0
+
+      - name: Install pinned Android build tools
+        run: >-
+          sdkmanager
+          "platform-tools"
+          "emulator"
+          "platforms;android-36"
+          "build-tools;36.0.0"
+          "ndk;27.1.12297006"
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache core puzzle pack
+        uses: actions/cache@v4
+        with:
+          path: fixtures/puzzles/bundled-core-pack.sqlite
+          key: core-pack-${{ hashFiles('fixtures/puzzles/bundled-core-pack.manifest.json') }}
+
+      - name: Fetch core puzzle pack
+        run: pnpm fetch:core-pack
+
+      - name: Android environment doctor
+        run: pnpm mobile:doctor:android
+
+      - name: Mobile typecheck
+        run: pnpm mobile:typecheck
+
+      - name: Verify release signing fails closed
+        working-directory: apps/mobile/android
+        run: |
+          set +e
+          release_output="$(./gradlew :app:bundleRelease --no-daemon 2>&1)"
+          release_status=$?
+          set -e
+          echo "$release_output"
+          if [ "$release_status" -eq 0 ]; then
+            echo "Release packaging unexpectedly succeeded without production signing material." >&2
+            exit 1
+          fi
+          grep -F "Production Android signing material is required for release packaging." <<<"$release_output"
+
+      - name: Build debug app and Detox test APK
+        run: pnpm mobile:e2e:build:android
+
+      - name: Verify packaged native ABIs
+        run: pnpm mobile:verify:android:abis
+
+      - name: Upload Android APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-launch-apks
+          if-no-files-found: error
+          path: |
+            apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+            apps/mobile/android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+
+  android-launch:
+    name: Android launch API ${{ matrix.api-level }}
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
+    needs: android-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [24, 36]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.1.2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26.x
+          cache: pnpm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download Android APKs
+        uses: actions/download-artifact@v4
+        with:
+          name: android-launch-apks
+          path: apps/mobile/android/app/build/outputs/apk
+
+      - name: Enable KVM acceleration
+        run: |
+          test -c /dev/kvm
+          sudo chmod 0666 /dev/kvm
+
+      - name: Launch through the public UI
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          script: pnpm mobile:e2e:test:android:ci
+        env:
+          DETOX_ANDROID_DEVICE: emulator-5554

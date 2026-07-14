@@ -25,6 +25,7 @@
     "mobile:test": "pnpm --filter ChessticizeMobile test",
     "mobile:typecheck": "pnpm --filter ChessticizeMobile typecheck",
     "mobile:doctor:ios": "pnpm --filter ChessticizeMobile doctor:ios",
+    "mobile:doctor:android": "pnpm --filter ChessticizeMobile doctor:android",
     "mobile:e2e:build:ios": "pnpm --filter ChessticizeMobile e2e:build:ios",
     "mobile:e2e:build:ios:release": "pnpm --filter ChessticizeMobile e2e:build:ios:release",
     "mobile:e2e:test:ios": "pnpm --filter ChessticizeMobile e2e:test:ios",
@@ -32,6 +33,10 @@
     "mobile:e2e:store-assets:ios": "pnpm --filter ChessticizeMobile e2e:store-assets:ios",
     "mobile:e2e:store-assets:ios:release": "pnpm --filter ChessticizeMobile e2e:store-assets:ios:release",
     "mobile:e2e:adaptive-layout:ios": "pnpm --filter ChessticizeMobile e2e:adaptive-layout:ios",
+    "mobile:e2e:build:android": "pnpm --filter ChessticizeMobile e2e:build:android",
+    "mobile:e2e:test:android": "pnpm --filter ChessticizeMobile e2e:test:android",
+    "mobile:e2e:test:android:ci": "pnpm --filter ChessticizeMobile e2e:test:android:ci",
+    "mobile:verify:android:abis": "pnpm --filter ChessticizeMobile verify:android:abis",
     "fetch:core-pack": "node scripts/fetch-core-pack.mjs"
   },
   "dependencies": {

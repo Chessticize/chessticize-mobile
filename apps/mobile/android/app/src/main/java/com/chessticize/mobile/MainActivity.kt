@@ -1,4 +1,4 @@
-package com.chessticizemobile
+package com.chessticize.mobile
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate

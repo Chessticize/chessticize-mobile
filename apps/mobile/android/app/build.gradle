@@ -2,6 +2,37 @@ apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
+def releaseSigningValue = { String environmentName, String propertyName ->
+    def value = System.getenv(environmentName) ?: findProperty(propertyName)
+    value == null ? null : value.toString()
+}
+def releaseSigning = [
+    storeFile: releaseSigningValue("CHESSTICIZE_ANDROID_RELEASE_STORE_FILE", "chessticizeReleaseStoreFile"),
+    storePassword: releaseSigningValue("CHESSTICIZE_ANDROID_RELEASE_STORE_PASSWORD", "chessticizeReleaseStorePassword"),
+    keyAlias: releaseSigningValue("CHESSTICIZE_ANDROID_RELEASE_KEY_ALIAS", "chessticizeReleaseKeyAlias"),
+    keyPassword: releaseSigningValue("CHESSTICIZE_ANDROID_RELEASE_KEY_PASSWORD", "chessticizeReleaseKeyPassword")
+]
+def missingReleaseSigningValues = releaseSigning.findAll { _, value -> value == null || value.trim().isEmpty() }.keySet()
+def releaseTaskRequested = gradle.startParameter.taskNames.any { taskName ->
+    taskName.toLowerCase().contains("release")
+}
+
+if (releaseTaskRequested && !missingReleaseSigningValues.isEmpty()) {
+    throw new GradleException(
+        "Production Android signing material is required for release packaging. " +
+        "Missing: ${missingReleaseSigningValues.sort().join(', ')}. " +
+        "Set the CHESSTICIZE_ANDROID_RELEASE_* environment variables or matching Gradle properties."
+    )
+}
+
+if (releaseTaskRequested && !file(releaseSigning.storeFile).isFile()) {
+    throw new GradleException(
+        "Production Android signing keystore does not exist: ${releaseSigning.storeFile}"
+    )
+}
+
+def releaseSigningConfigured = missingReleaseSigningValues.isEmpty() && file(releaseSigning.storeFile).isFile()
+
 /**
  * This is the configuration block to customize your React Native Android app.
  * By default you don't need to apply any configuration, just uncomment the lines you need.
@@ -84,13 +115,18 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.chessticizemobile"
+    namespace "com.chessticize.mobile"
     defaultConfig {
-        applicationId "com.chessticizemobile"
+        applicationId "com.chessticize.mobile"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+        testBuildType System.getProperty("testBuildType", "debug")
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        ndk {
+            abiFilters "arm64-v8a", "x86_64"
+        }
     }
     sourceSets {
         main {
@@ -104,17 +140,26 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        if (releaseSigningConfigured) {
+            release {
+                storeFile file(releaseSigning.storeFile)
+                storePassword releaseSigning.storePassword
+                keyAlias releaseSigning.keyAlias
+                keyPassword releaseSigning.keyPassword
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            if (releaseSigningConfigured) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+            proguardFile "${rootProject.projectDir}/../node_modules/detox/android/detox/proguard-rules-app.pro"
         }
     }
 }
@@ -126,6 +171,8 @@ tasks.matching { task -> task.name.startsWith("merge") && task.name.endsWith("As
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
+    implementation("androidx.appcompat:appcompat:1.7.1")
+    androidTestImplementation("com.wix:detox:+")
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")

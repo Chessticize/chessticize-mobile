@@ -3,6 +3,7 @@ const {
   ACTIVE_E2E_TEST_MATCH,
   STORE_ASSETS_TEST_MATCH,
   ADAPTIVE_LAYOUT_TEST_MATCH,
+  ANDROID_LAUNCH_TEST_MATCH,
   resolveDetoxTestMatch,
   resolveDetoxMaxWorkers
 } = require('../e2e/suiteConfig');
@@ -46,6 +47,12 @@ describe('Detox suite configuration', () => {
   it('keeps the adaptive layout screenshot spec available through its opt-in command', () => {
     expect(resolveDetoxTestMatch({ CHESSTICIZE_CAPTURE_ADAPTIVE_LAYOUT: '1' }))
       .toEqual(ADAPTIVE_LAYOUT_TEST_MATCH);
+  });
+
+  it('keeps the Android launch smoke isolated from the iOS regression suites', () => {
+    expect(resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'android-launch' }))
+      .toEqual(ANDROID_LAUNCH_TEST_MATCH);
+    expect(ACTIVE_E2E_TEST_MATCH).not.toContain(ANDROID_LAUNCH_TEST_MATCH[0]);
   });
 
   it('rejects mixing the two screenshot capture suites in one invocation', () => {
