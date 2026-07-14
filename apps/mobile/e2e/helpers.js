@@ -45,16 +45,24 @@ async function startPracticeMode(mode) {
   await tapUntilExists('practice-start-button', 'session-board', 3);
 }
 
-async function launchWithDisabledSynchronization(options = {}) {
-  await device.launchApp({
+async function launchWithDisabledSynchronization(options = {}, targetDevice = device) {
+  const launchOptions = {
     ...options,
     launchArgs: {
       DTXDisableMainRunLoopSync: 'YES',
       detoxEnableSynchronization: 0,
       ...(options.launchArgs ?? {})
     }
-  });
-  await device.disableSynchronization();
+  };
+  await targetDevice.launchApp(launchOptions);
+  if (targetDevice.getPlatform() === 'android') {
+    await targetDevice.launchApp({
+      ...launchOptions,
+      delete: false,
+      newInstance: false,
+    });
+  }
+  await targetDevice.disableSynchronization();
 }
 
 async function selectTestPuzzleSource(source) {

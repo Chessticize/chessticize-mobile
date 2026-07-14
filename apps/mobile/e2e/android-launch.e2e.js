@@ -1,13 +1,11 @@
+const { launchWithDisabledSynchronization } = require('./helpers');
+
 describe('Android launch baseline', () => {
   beforeAll(async () => {
-    await device.launchApp({
+    await launchWithDisabledSynchronization({
       delete: true,
       newInstance: true,
-      launchArgs: {
-        detoxEnableSynchronization: 0,
-      },
     });
-    await device.disableSynchronization();
   });
 
   it('launches the real app and renders its public Practice UI', async () => {

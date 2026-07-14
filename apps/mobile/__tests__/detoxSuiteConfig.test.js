@@ -12,6 +12,7 @@ const {
   resolveDetoxTestMatch,
   resolveDetoxMaxWorkers
 } = require('../e2e/suiteConfig');
+const { launchWithDisabledSynchronization } = require('../e2e/helpers');
 
 describe('Detox suite configuration', () => {
   it('passes Android synchronization disablement in the numeric form Detox recognizes', () => {
@@ -19,9 +20,44 @@ describe('Detox suite configuration', () => {
     const launchSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/android-launch.e2e.js'), 'utf8');
 
     expect(helpers).toContain('detoxEnableSynchronization: 0');
-    expect(launchSpec).toContain('detoxEnableSynchronization: 0');
+    expect(launchSpec).toContain('launchWithDisabledSynchronization');
     expect(helpers).not.toContain('detoxEnableSynchronization: false');
     expect(launchSpec).not.toContain('detoxEnableSynchronization: false');
+  });
+
+  it('reacquires Android window focus before public UI assertions', async () => {
+    const targetDevice = {
+      disableSynchronization: jest.fn().mockResolvedValue(undefined),
+      getPlatform: jest.fn(() => 'android'),
+      launchApp: jest.fn().mockResolvedValue(undefined),
+    };
+
+    await launchWithDisabledSynchronization({
+      delete: true,
+      newInstance: true,
+      launchArgs: { chessticizeTestNowMs: '1784030400000' },
+    }, targetDevice);
+
+    expect(targetDevice.launchApp).toHaveBeenCalledTimes(2);
+    expect(targetDevice.launchApp).toHaveBeenNthCalledWith(1, {
+      delete: true,
+      newInstance: true,
+      launchArgs: {
+        DTXDisableMainRunLoopSync: 'YES',
+        detoxEnableSynchronization: 0,
+        chessticizeTestNowMs: '1784030400000',
+      },
+    });
+    expect(targetDevice.launchApp).toHaveBeenNthCalledWith(2, {
+      delete: false,
+      newInstance: false,
+      launchArgs: {
+        DTXDisableMainRunLoopSync: 'YES',
+        detoxEnableSynchronization: 0,
+        chessticizeTestNowMs: '1784030400000',
+      },
+    });
+    expect(targetDevice.disableSynchronization).toHaveBeenCalledTimes(1);
   });
 
   it('runs every active E2E spec by default without loading opt-in capture specs', () => {
