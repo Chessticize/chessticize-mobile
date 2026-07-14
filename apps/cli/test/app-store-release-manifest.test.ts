@@ -45,6 +45,13 @@ test("App Store release manifest reports source identity and hashed release arti
     puzzleCount: number;
     format?: "json" | "sqlite";
   };
+  const stockfishArtifacts = JSON.parse(readFileSync(resolve("apps/mobile/stockfish-artifacts.json"), "utf8")) as {
+    root: string;
+    license: string;
+    authors: string;
+    nnue: string[];
+  };
+  const stockfishPath = (path: string) => `apps/mobile/${stockfishArtifacts.root}/${path}`;
   if (puzzleManifest.format === "sqlite" && !existsSync(resolve("fixtures/puzzles/bundled-core-pack.sqlite"))) {
     t.skip("core pack artifact not fetched; run pnpm fetch:core-pack before generating a release manifest");
     return;
@@ -89,12 +96,12 @@ test("App Store release manifest reports source identity and hashed release arti
     "apps/mobile/Gemfile.lock",
     "apps/mobile/ios/Podfile.lock",
     "THIRD_PARTY_NOTICES.md",
+    "apps/mobile/stockfish-artifacts.json",
     puzzleManifest.format === "sqlite" ? "fixtures/puzzles/bundled-core-pack.sqlite" : "fixtures/puzzles/bundled-core-pack.json",
     "fixtures/puzzles/bundled-core-pack.manifest.json",
-    "apps/mobile/native/stockfish/Copying.txt",
-    "apps/mobile/native/stockfish/AUTHORS",
-    "apps/mobile/native/stockfish/Resources/nn-c288c895ea92.nnue",
-    "apps/mobile/native/stockfish/Resources/nn-37f18f62d772.nnue"
+    stockfishPath(stockfishArtifacts.license),
+    stockfishPath(stockfishArtifacts.authors),
+    ...stockfishArtifacts.nnue.map(stockfishPath)
   ]) {
     const artifact = artifactsByPath.get(path);
     assert.ok(artifact, `missing artifact ${path}`);

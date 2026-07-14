@@ -4,6 +4,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { loadStockfishArtifacts } from "./lib/stockfish-artifacts.mjs";
 
 const repoRoot = dirname(fileURLToPath(new URL("../package.json", import.meta.url)));
 const allowDirty = process.argv.includes("--allow-dirty");
@@ -58,6 +59,7 @@ function puzzlePackArtifactPath(manifest) {
 }
 
 const rootPackage = readJson("package.json");
+const stockfishArtifacts = loadStockfishArtifacts(repoRoot);
 const puzzleManifest = readJson("fixtures/puzzles/bundled-core-pack.manifest.json");
 const puzzlePackPath = puzzlePackArtifactPath(puzzleManifest);
 const pbxproj = readText("apps/mobile/ios/ChessticizeMobile.xcodeproj/project.pbxproj");
@@ -121,12 +123,12 @@ const manifest = {
     sourceLicense: puzzleManifest.sourceLicense
   },
   stockfish: {
-    version: "Stockfish 18",
-    upstreamTag: "sf_18",
-    upstreamCommit: "cb3d4ee9b47d0c5aae855b12379378ea1439675c",
-    bundledSourcePath: "apps/mobile/native/stockfish/Stockfish/src",
-    bundledLicensePath: "apps/mobile/native/stockfish/Copying.txt",
-    bundledAuthorsPath: "apps/mobile/native/stockfish/AUTHORS"
+    version: stockfishArtifacts.metadata.engineVersion,
+    upstreamTag: stockfishArtifacts.metadata.upstreamTag,
+    upstreamCommit: stockfishArtifacts.metadata.upstreamCommit,
+    bundledSourcePath: stockfishArtifacts.sourcePath,
+    bundledLicensePath: stockfishArtifacts.licensePath,
+    bundledAuthorsPath: stockfishArtifacts.authorsPath
   },
   artifacts: [
     artifact("package.json", "root package manifest"),
@@ -144,12 +146,12 @@ const manifest = {
     artifact("docs/PRIVACY_POLICY.md", "public privacy policy"),
     artifact(puzzlePackPath, "bundled offline puzzle pack"),
     artifact("fixtures/puzzles/bundled-core-pack.manifest.json", "bundled offline puzzle manifest"),
-    artifact("apps/mobile/native/stockfish/Copying.txt", "bundled Stockfish GPL text"),
-    artifact("apps/mobile/native/stockfish/AUTHORS", "bundled Stockfish authors"),
-    artifact("apps/mobile/native/stockfish/README-STOCKFISH.md", "bundled Stockfish source notes"),
-    artifact("apps/mobile/ChessticizeStockfish.podspec", "Stockfish podspec"),
-    artifact("apps/mobile/native/stockfish/Resources/nn-c288c895ea92.nnue", "Stockfish NNUE network"),
-    artifact("apps/mobile/native/stockfish/Resources/nn-37f18f62d772.nnue", "Stockfish NNUE network")
+    artifact(stockfishArtifacts.configPath, "Stockfish artifact metadata"),
+    artifact(stockfishArtifacts.licensePath, "bundled Stockfish GPL text"),
+    artifact(stockfishArtifacts.authorsPath, "bundled Stockfish authors"),
+    artifact(stockfishArtifacts.readmePath, "bundled Stockfish source notes"),
+    artifact(stockfishArtifacts.podspecPath, "Stockfish podspec"),
+    ...stockfishArtifacts.nnuePaths.map((path) => artifact(path, "Stockfish NNUE network"))
   ],
   releaseRules: [
     "Create the public release tag from sourceCommit before or at App Store submission.",

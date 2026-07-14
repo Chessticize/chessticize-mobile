@@ -5828,6 +5828,7 @@ function ReviewSession({
     }
 
     let cancelled = false;
+    const analysisController = new AbortController();
     setEngineAnalysisLines([]);
     setAnalysisEngineStatus("thinking");
     setAnalysisIsRunning(true);
@@ -5836,6 +5837,7 @@ function ReviewSession({
       multiPv: 3,
       initialize: !prewarmed,
       newGame: !prewarmed,
+      signal: analysisController.signal,
       onUpdate: (lines) => {
         if (!cancelled) {
           setEngineAnalysisLines(lines);
@@ -5862,7 +5864,7 @@ function ReviewSession({
 
     return () => {
       cancelled = true;
-      transport.send("stop");
+      analysisController.abort();
     };
   }, [analysisEnabled, stockfish, stockfishTargetFen]);
 

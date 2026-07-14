@@ -91,6 +91,10 @@ describe("native Stockfish transport", () => {
 
     const prewarm = prewarmNativeStockfishTransport();
     await Promise.resolve();
+    expect(commands).toEqual(["uci"]);
+    for (const listener of listeners) {
+      listener({ line: "uciok" });
+    }
     expect(commands).toEqual(["uci", "setoption name MultiPV value 3", "isready"]);
     for (const listener of listeners) {
       listener({ line: "readyok" });
@@ -99,5 +103,37 @@ describe("native Stockfish transport", () => {
     await expect(prewarmNativeStockfishTransport()).resolves.toBe(true);
 
     expect(start).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails prewarming when the engine never completes the UCI handshake", async () => {
+    jest.useFakeTimers();
+    const listeners = new Set<StockfishLineListener>();
+
+    (NativeModules as Record<string, unknown>).NativeStockfishEngine = {
+      start: jest.fn(async () => {}),
+      send: jest.fn(),
+      terminate: jest.fn(),
+      __addListener: (_eventName: string, listener: StockfishLineListener) => {
+        listeners.add(listener);
+        return {
+          remove: () => {
+            listeners.delete(listener);
+          }
+        };
+      }
+    };
+
+    try {
+      const prewarm = prewarmNativeStockfishTransport();
+      await Promise.resolve();
+      for (const listener of listeners) {
+        listener({ line: "readyok" });
+      }
+      jest.advanceTimersByTime(1500);
+
+      await expect(prewarm).resolves.toBe(false);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

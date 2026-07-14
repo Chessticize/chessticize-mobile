@@ -109,23 +109,60 @@ describe('Practice POC', () => {
     await waitForElementTextContaining('review-analysis-line-0', 'Top move', 90000);
     await waitForElementTextContaining('review-analysis-line-0', 'Qa4#', 90000);
 
-    // Reopen and immediately close a live analysis to exercise stop/cancellation,
-    // then start it again to prove the native start contract is repeatable.
+    // Observe a full-depth search in progress on a different review position,
+    // then close it so cancellation is sent while the native engine is active.
     await element(by.id('review-close-analysis')).tap();
     await waitFor(element(by.id('review-analysis-button'))).toBeVisible().withTimeout(10000);
+    await element(by.id('review-next')).tap();
+    await waitFor(element(by.text('2 / 3 · Standard'))).toBeVisible().withTimeout(30000);
     await element(by.id('review-analysis-button')).tap();
     await waitFor(element(by.id('review-close-analysis'))).toBeVisible().withTimeout(10000);
+    await waitForRunningStockfishDepth('review-analysis-engine-status', 8, 90000);
     await element(by.id('review-close-analysis')).tap();
     await waitFor(element(by.id('review-analysis-button'))).toBeVisible().withTimeout(10000);
+
+    // Start a third, position-specific analysis. Seeing its own best move proves
+    // that output from the cancelled search did not leak into the replacement.
+    await element(by.id('review-next')).tap();
+    await waitFor(element(by.text('3 / 3 · Standard'))).toBeVisible().withTimeout(30000);
     await element(by.id('review-analysis-button')).tap();
     await waitFor(element(by.id('review-close-analysis'))).toBeVisible().withTimeout(10000);
     await waitForElementTextContaining('review-analysis-engine-status', 'SF 18 NNUE', 45000);
-    await waitForElementTextContaining('review-analysis-line-0', 'Qa4#', 90000);
+    await waitForElementTextContaining('review-analysis-line-0', 'Kg3', 90000);
+    const replacementLine = await elementText('review-analysis-line-0');
+    if (replacementLine.includes('Qxe6')) {
+      throw new Error(`Cancelled analysis leaked into the replacement position: ${replacementLine}`);
+    }
 
     const screenshotPath = await device.takeScreenshot('review-analysis-arrows');
     expectScreenshotContainsGreenAnalysisArrow(screenshotPath);
   });
 });
+
+async function waitForRunningStockfishDepth(testID, minimumDepth, timeoutMs) {
+  const startedAt = Date.now();
+  let lastText = '';
+  while (Date.now() - startedAt < timeoutMs) {
+    try {
+      lastText = await elementText(testID);
+      const match = lastText.match(/Depth (\d+)\/20/);
+      const depth = Number(match?.[1] ?? 0);
+      if (depth > minimumDepth) {
+        return depth;
+      }
+    } catch (error) {
+      lastText = error?.message ?? String(error);
+    }
+    await sleep(25);
+  }
+  throw new Error(`Timed out waiting for an active Stockfish search above depth ${minimumDepth}. Last text: "${lastText}"`);
+}
+
+async function elementText(testID) {
+  const attributes = await element(by.id(testID)).getAttributes();
+  const first = Array.isArray(attributes) ? attributes[0] : attributes;
+  return String(first?.text ?? first?.label ?? first?.value ?? '');
+}
 
 function expectBoardScreenshotContainsPieces(screenshotPath, boardFrame) {
   const png = readRgbaPng(screenshotPath);
