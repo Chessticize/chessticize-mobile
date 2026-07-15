@@ -889,6 +889,23 @@ describe('Android Progress Backup', () => {
     );
   });
 
+  it('keeps the API 36 mask-zero producer and API 30 consumer handoff exact', () => {
+    const policyEvidenceScript = read('scripts/android-progress-backup-policy-evidence.sh');
+    const restoreEvidenceScript = read(
+      'scripts/android-progress-backup-api30-restore-evidence.sh',
+    );
+    const expectedRecord =
+      'case=neither delivered-mask=0 selected=false emitted=0 agent-invocations=1 payload=no-archive framework-result=fail-closed-transport-rejection result=pass';
+
+    expect(policyEvidenceScript).toMatch(
+      /run_case neither 'is_encrypted=false,is_device_transfer=false,log_agent_results=true' \\\s+0 false 0 no-archive \\\s+fail-closed-transport-rejection/,
+    );
+    expect(restoreEvidenceScript).toContain(`grep -Fx '${expectedRecord}'`);
+    expect(restoreEvidenceScript).not.toMatch(
+      /case=neither[^\n]*agent-invocations=\[/,
+    );
+  });
+
   it('selects and inspects the in-framework API 24 LocalTransport', () => {
     const policyEvidenceScript = read('scripts/android-progress-backup-policy-evidence.sh');
 

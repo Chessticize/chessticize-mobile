@@ -332,7 +332,7 @@ grep -Fx 'retained-install-source=/data/local/tmp/chessticize-exact-head.apk' \
 grep -Fx '/data/local/tmp/chessticize-exact-head.apk' \
   "$API36_SOURCE_DIR/retained-install-source-apk-path.txt"
 grep -Fx 'Success' "$API36_SOURCE_DIR/retained-apk-install.txt"
-grep -E '^case=neither delivered-mask=0 selected=false emitted=0 agent-invocations=[1-9][0-9]* payload=none framework-result=success result=pass$' \
+grep -Fx 'case=neither delivered-mask=0 selected=false emitted=0 agent-invocations=1 payload=no-archive framework-result=fail-closed-transport-rejection result=pass' \
   "$API36_SOURCE_DIR/context.txt"
 grep -E '^case=encryption-only delivered-mask=1 selected=true emitted=3 agent-invocations=[1-9][0-9]* payload=exact-progress-files framework-result=success result=pass$' \
   "$API36_SOURCE_DIR/context.txt"
