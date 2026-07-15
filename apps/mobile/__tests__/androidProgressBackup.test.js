@@ -1,4 +1,4 @@
-const { readFileSync, statSync } = require('node:fs');
+const { accessSync, constants, readFileSync, statSync } = require('node:fs');
 const { join } = require('node:path');
 const {
   ANDROID_AUTO_BACKUP_QUOTA_BYTES,
@@ -101,12 +101,12 @@ describe('Android Progress Backup', () => {
   });
 
   it('normalizes one leading separator from the nested root pnpm invocation', () => {
-    const workflow = readRepo('.github/workflows/mobile-android.yml');
+    const restoreEvidenceScript = read('scripts/android-progress-backup-restore-evidence.sh');
     const rootPackage = JSON.parse(readRepo('package.json'));
     const mobilePackage = JSON.parse(read('package.json'));
 
-    expect(workflow).toContain(
-      'pnpm mobile:verify:android:backup -- --adb-device emulator-5554 --json',
+    expect(restoreEvidenceScript).toContain(
+      'pnpm mobile:verify:android:backup -- --adb-device "$DEVICE" --json',
     );
     expect(rootPackage.scripts['mobile:verify:android:backup']).toBe(
       'pnpm --filter ChessticizeMobile verify:android:backup',
@@ -171,6 +171,7 @@ describe('Android Progress Backup', () => {
     const workflow = readRepo('.github/workflows/mobile-android.yml');
     const suiteConfig = read('e2e/suiteConfig.js');
     const evidenceScript = read('scripts/android-progress-backup-evidence.sh');
+    const restoreEvidenceScript = read('scripts/android-progress-backup-restore-evidence.sh');
     const androidDetoxScript = read('scripts/android-test-for-detox.sh');
     const restoreJourney = read('e2e/android-progress-backup-restore.e2e.js');
     const privacy = readRepo('docs/ANDROID_PRIVACY_DISCLOSURE.md');
@@ -218,20 +219,41 @@ describe('Android Progress Backup', () => {
     expect(androidDetoxScript).toContain('CHESSTICIZE_DETOX_REUSE_INSTALLED_APP');
     expect(androidDetoxScript).toContain('detox_args+=(--reuse)');
     expect(workflow).toContain('name: Android Progress Backup restore evidence');
-    expect(workflow).toContain('cloud-encrypted');
-    expect(workflow).toContain('device-transfer');
-    expect(workflow).toContain('pnpm mobile:verify:android:backup');
+    expect(restoreEvidenceScript).toContain('cloud-encrypted');
+    expect(restoreEvidenceScript).toContain('device-transfer');
+    expect(restoreEvidenceScript).toContain('pnpm mobile:verify:android:backup');
     expect(workflow).toContain('commit-sha=$GITHUB_SHA');
-    expect(workflow).toContain('tracked-worktree-after.txt');
-    expect(workflow).toContain('result=pass');
-    expect(workflow.match(/CHESSTICIZE_DETOX_REUSE_INSTALLED_APP=1/g)).toHaveLength(1);
-    expect(workflow).toContain('record_restored_install "$evidence_prefix-before-detox"');
-    expect(workflow).toContain('record_restored_install "$evidence_prefix-after-detox"');
-    expect(workflow).toContain('$evidence_prefix-payload.json');
-    expect(workflow).toContain('$evidence_prefix-package.txt');
-    expect(workflow).toContain('shell pm path com.chessticize.mobile.test');
-    expect(workflow).toContain('assert_restored_progress current-progress cloud-restored');
-    expect(workflow).toContain('assert_restored_progress released-fixture device-transfer-restored');
+    expect(restoreEvidenceScript).toContain('tracked-worktree-after.txt');
+    expect(restoreEvidenceScript).toContain('result=pass');
+    expect(workflow).toContain(
+      'apps/mobile/scripts/android-progress-backup-restore-evidence.sh',
+    );
+    expect(workflow).toMatch(
+      /script: \|\n {12}apps\/mobile\/scripts\/android-progress-backup-restore-evidence\.sh\n {8}env:/,
+    );
+    expect(workflow).not.toContain('record_restored_install() {');
+    expect(workflow).not.toContain('assert_restored_progress() {');
+    expect(() => accessSync(
+      join(appRoot, 'scripts/android-progress-backup-restore-evidence.sh'),
+      constants.X_OK,
+    )).not.toThrow();
+    expect(restoreEvidenceScript.match(/CHESSTICIZE_DETOX_REUSE_INSTALLED_APP=1/g))
+      .toHaveLength(1);
+    expect(restoreEvidenceScript).toContain(
+      'record_restored_install "$evidence_prefix-before-detox"',
+    );
+    expect(restoreEvidenceScript).toContain(
+      'record_restored_install "$evidence_prefix-after-detox"',
+    );
+    expect(restoreEvidenceScript).toContain('$evidence_prefix-payload.json');
+    expect(restoreEvidenceScript).toContain('$evidence_prefix-package.txt');
+    expect(restoreEvidenceScript).toContain('shell pm path com.chessticize.mobile.test');
+    expect(restoreEvidenceScript).toContain(
+      'assert_restored_progress current-progress cloud-restored',
+    );
+    expect(restoreEvidenceScript).toContain(
+      'assert_restored_progress released-fixture device-transfer-restored',
+    );
 
     expect(privacy).toContain('Android-managed backup');
     expect(privacy).toContain('Zero App Telemetry');

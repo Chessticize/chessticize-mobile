@@ -240,47 +240,7 @@ jobs:
           disable-animations: true
           emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           script: |
-            record_restored_install() {
-              local evidence_prefix="$1"
-              local app_paths
-              local test_paths
-              pnpm mobile:verify:android:backup -- --adb-device emulator-5554 --json > "apps/mobile/artifacts/android-progress-backup/$evidence_prefix-payload.json"
-              app_paths="$("$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell pm path com.chessticize.mobile)"
-              test_paths="$("$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell pm path com.chessticize.mobile.test)"
-              test "${app_paths#package:}" != "$app_paths"
-              test "${test_paths#package:}" != "$test_paths"
-              {
-                echo "app:"
-                echo "$app_paths"
-                echo "test:"
-                echo "$test_paths"
-              } > "apps/mobile/artifacts/android-progress-backup/$evidence_prefix-package.txt"
-            }
-            assert_restored_progress() {
-              local expectation="$1"
-              local evidence_prefix="$2"
-              local restore_status=0
-              record_restored_install "$evidence_prefix-before-detox"
-              CHESSTICIZE_DETOX_REUSE_INSTALLED_APP=1 \
-                CHESSTICIZE_BACKUP_EXPECTATION="$expectation" \
-                DETOX_ACTIVE_SUITE=android-progress-backup-restore \
-                pnpm mobile:e2e:test:android:ci || restore_status=$?
-              record_restored_install "$evidence_prefix-after-detox"
-              return "$restore_status"
-            }
-            apps/mobile/scripts/prepare-android-offline-e2e.sh
-            DETOX_ACTIVE_SUITE=android-standard-practice pnpm mobile:e2e:test:android:ci
-            mkdir -p apps/mobile/artifacts/android-progress-backup
-            pnpm mobile:verify:android:backup -- --adb-device emulator-5554 --json > apps/mobile/artifacts/android-progress-backup/cloud-payload.json
-            apps/mobile/scripts/android-progress-backup-evidence.sh cloud-encrypted
-            assert_restored_progress current-progress cloud-restored
-            apps/mobile/scripts/android-progress-backup-evidence.sh seed-released-fixture
-            pnpm mobile:verify:android:backup -- --adb-device emulator-5554 --json > apps/mobile/artifacts/android-progress-backup/device-transfer-payload.json
-            apps/mobile/scripts/android-progress-backup-evidence.sh device-transfer
-            assert_restored_progress released-fixture device-transfer-restored
-            git status --porcelain --untracked-files=no > apps/mobile/artifacts/android-progress-backup/tracked-worktree-after.txt
-            test ! -s apps/mobile/artifacts/android-progress-backup/tracked-worktree-after.txt
-            echo "result=pass" >> apps/mobile/artifacts/android-progress-backup/context.txt
+            apps/mobile/scripts/android-progress-backup-restore-evidence.sh
         env:
           DETOX_ANDROID_DEVICE: emulator-5554
 

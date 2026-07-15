@@ -144,6 +144,11 @@ describe('Android Standard Practice release slice', () => {
     expect(workflow).toContain('DETOX_ACTIVE_SUITE=android-standard-practice');
     expect(workflow).toContain('DETOX_ACTIVE_SUITE=android-migration');
     expect(workflow).toContain('apps/mobile/scripts/prepare-android-offline-e2e.sh');
+    const launchJob = workflow.slice(
+      workflow.indexOf('  android-launch:'),
+      workflow.indexOf('  android-progress-backup:'),
+    );
+    expect(launchJob).toContain('ram-size: 4096M');
     expect(workflow.indexOf('apps/mobile/scripts/prepare-android-offline-e2e.sh'))
       .toBeLessThan(workflow.indexOf('DETOX_ACTIVE_SUITE=android-launch'));
     expect(workflow).not.toContain('if (( android_sdk_level');
