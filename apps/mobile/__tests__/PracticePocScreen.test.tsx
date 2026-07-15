@@ -160,6 +160,53 @@ describe("PracticePocScreen", () => {
     expect(service.getActiveSprint()).toBeUndefined();
   });
 
+  it("keeps the active-sprint exit destination valid when the deadline expires during Predictive Back", () => {
+    const systemBack = createTestSystemBackSource("android");
+    const service = createMobilePracticeService("random1000");
+    const renderer = renderScreen({ practiceService: service, systemBack });
+
+    startStandardSprint(renderer);
+    act(() => {
+      jest.advanceTimersByTime(299_750);
+    });
+    systemBack.startPredictive("left");
+    systemBack.progressPredictive(0.6, "left");
+
+    act(() => {
+      jest.advanceTimersByTime(1_000);
+    });
+
+    expect(collectText(findByTestId(renderer, "mobile-back-destination-preview-label")))
+      .toBe("Leave sprint confirmation");
+    expect(service.getActiveSprint()?.status).toBe("active");
+
+    expect(systemBack.commitPredictive()).toBe(true);
+    expect(findByTestId(renderer, "session-abandon-confirmation")).toBeTruthy();
+    expect(service.getActiveSprint()?.status).toBe("active");
+  });
+
+  it("settles an expired active sprint after its predictive gesture is cancelled", () => {
+    const systemBack = createTestSystemBackSource("android");
+    const service = createMobilePracticeService("random1000");
+    const renderer = renderScreen({ practiceService: service, systemBack });
+
+    startStandardSprint(renderer);
+    act(() => {
+      jest.advanceTimersByTime(299_750);
+    });
+    systemBack.startPredictive("right");
+
+    act(() => {
+      jest.advanceTimersByTime(1_000);
+    });
+    expect(service.getActiveSprint()?.status).toBe("active");
+
+    systemBack.cancelPredictive();
+
+    expect(service.getActiveSprint()).toBeUndefined();
+    expect(collectText(findByTestId(renderer, "sprint-result-reason"))).toBe("Time expired");
+  });
+
   it("cancels a pending Arrow Duel start before its delayed callback can enter practice", () => {
     const systemBack = createTestSystemBackSource("android");
     const service = createMobilePracticeService("familiar15");
@@ -3275,6 +3322,38 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "review-session")).toThrow();
     expect(findByTestId(renderer, "review-panel")).toBeTruthy();
     expect(() => findByTestId(renderer, "review-line-continue")).toThrow();
+  });
+
+  it("keeps a timed-out review session mounted until Predictive Back settles", () => {
+    const systemBack = createTestSystemBackSource("android");
+    const service = createMobilePracticeService("random1000");
+    service.startSprint(
+      { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
+      "2026-06-20T00:00:00.000Z"
+    );
+    service.submitMove("c4b5", "2026-06-20T00:00:05.000Z");
+    const renderer = renderScreen({ practiceService: service, systemBack });
+
+    press(renderer, "review-tab");
+    press(renderer, "review-start-due");
+    act(() => {
+      jest.advanceTimersByTime(39_750);
+    });
+    systemBack.startPredictive("left");
+
+    act(() => {
+      jest.advanceTimersByTime(1_000);
+    });
+
+    expect(collectText(findByTestId(renderer, "mobile-back-destination-preview-label"))).toBe("Review");
+    expect(findByTestId(renderer, "review-session")).toBeTruthy();
+    expect(service.listHistory({ source: "scheduled_review" }) as Array<{ submittedMove: string }>).toEqual([
+      expect.objectContaining({ submittedMove: "__timeout__" })
+    ]);
+
+    expect(systemBack.commitPredictive()).toBe(true);
+    expect(() => findByTestId(renderer, "review-session")).toThrow();
+    expect(findByTestId(renderer, "review-panel")).toBeTruthy();
   });
 
   it("keeps the daily review denominator fixed and resumes an unfinished puzzle after exit", () => {

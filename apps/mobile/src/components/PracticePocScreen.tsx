@@ -224,6 +224,8 @@ type ReviewBackCommand = {
   kind: "close-analysis" | "return-to-owner";
 };
 
+type DeferBackRelevantTransition = (key: string, resumeAfterCancel: () => void) => boolean;
+
 const UI_PADDING = 16;
 const MIN_BOARD = 280;
 const COMPACT_LANDSCAPE_RAIL_MIN = 220;
@@ -404,11 +406,8 @@ export function PracticePocScreen({
   const feedbackSnapshotTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sprintStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startingModeRef = useRef<SprintMode | null>(null);
-  const deferredSprintStartRef = useRef<{
-    nextMode: SprintMode;
-    useCustomTiming: boolean;
-  } | null>(null);
-  const resumeDeferredSprintStartRef = useRef<(() => void) | null>(null);
+  const deferredBackTransitionsRef = useRef(new Map<string, () => void>());
+  const resumeDeferredBackTransitionsRef = useRef<(() => void) | null>(null);
   const predictiveBackIntentRef = useRef<MobileBackIntent | null>(null);
   const predictiveBackStateRef = useRef<MobileBackState | null>(null);
   const mobileBackStateRef = useRef<MobileBackState | null>(null);
@@ -647,23 +646,33 @@ export function PracticePocScreen({
       return;
     }
 
-    try {
-      const expired = service.submitMove("__expired__", new Date(nowMs).toISOString());
-      commitState(expired.state);
-      setFeedback((expired.feedback as SessionFeedback) ?? null);
-      refreshState();
-    } catch (caught) {
-      setError(errorMessage(caught));
+    const settleExpiredSprint = () => {
+      try {
+        const expired = service.submitMove("__expired__", new Date(nowMs).toISOString());
+        commitState(expired.state);
+        setFeedback((expired.feedback as SessionFeedback) ?? null);
+        refreshState();
+      } catch (caught) {
+        setError(errorMessage(caught));
+      }
+    };
+    if (practiceExitConfirmationVisible) {
+      return;
     }
+    if (deferBackRelevantTransition("active-sprint-expiry", settleExpiredSprint)) {
+      return;
+    }
+    settleExpiredSprint();
     // refreshState is deliberately omitted because its identity changes on each render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nowMs, service, state]);
+  }, [nowMs, practiceExitConfirmationVisible, service, state]);
 
   useEffect(() => {
     const globals = globalThis as unknown as {
       __CHESSTICIZE_CHESSBOARD_DEBUG__?: boolean;
       __CHESSTICIZE_CHESSBOARD_DEBUG_SINK__?: (event: string, details: Record<string, unknown>) => void;
     };
+    const deferredBackTransitions = deferredBackTransitionsRef.current;
     globals.__CHESSTICIZE_CHESSBOARD_DEBUG__ = isPracticeDebugEnabled();
     globals.__CHESSTICIZE_CHESSBOARD_DEBUG_SINK__ = (event, details) => {
       const message = `${event} ${JSON.stringify(details)}`;
@@ -676,7 +685,7 @@ export function PracticePocScreen({
         sprintStartTimerRef.current = null;
       }
       startingModeRef.current = null;
-      deferredSprintStartRef.current = null;
+      deferredBackTransitions.clear();
       globals.__CHESSTICIZE_CHESSBOARD_DEBUG__ = undefined;
       globals.__CHESSTICIZE_CHESSBOARD_DEBUG_SINK__ = undefined;
     };
@@ -741,8 +750,13 @@ export function PracticePocScreen({
     try {
       const status = await notificationClient.requestAuthorization();
       setNotificationPermissionStatus(status);
-      setReviewReminderPermissionPromptVisible(false);
-      reviewReminderPromptDismissedRef.current = true;
+      const finishPermissionPrompt = () => {
+        setReviewReminderPermissionPromptVisible(false);
+        reviewReminderPromptDismissedRef.current = true;
+      };
+      if (!deferBackRelevantTransition("review-reminder-permission", finishPermissionPrompt)) {
+        finishPermissionPrompt();
+      }
       if (status === "authorized") {
         refreshReviewReminder("permission", true);
       }
@@ -845,7 +859,10 @@ export function PracticePocScreen({
     ) {
       return;
     }
-    setReviewReminderPermissionPromptVisible(true);
+    const showPermissionPrompt = () => setReviewReminderPermissionPromptVisible(true);
+    if (!deferBackRelevantTransition("review-reminder-permission", showPermissionPrompt)) {
+      showPermissionPrompt();
+    }
   }
 
   function dismissReviewReminderPermissionPrompt(): void {
@@ -1000,30 +1017,43 @@ export function PracticePocScreen({
     if (startingModeRef.current !== nextMode) {
       return;
     }
-    if (predictiveBackIntentRef.current) {
-      deferredSprintStartRef.current = { nextMode, useCustomTiming };
+    if (deferBackRelevantTransition("delayed-sprint-start", () => {
+      if (startingModeRef.current === nextMode) {
+        performStartSprint(nextMode, useCustomTiming);
+      }
+    })) {
       return;
     }
     performStartSprint(nextMode, useCustomTiming);
   }
 
-  function resumeDeferredSprintStart(): void {
-    const deferredStart = deferredSprintStartRef.current;
-    deferredSprintStartRef.current = null;
-    if (!deferredStart || startingModeRef.current !== deferredStart.nextMode) {
-      return;
+  function deferBackRelevantTransition(key: string, resumeAfterCancel: () => void): boolean {
+    if (!predictiveBackIntentRef.current) {
+      return false;
     }
-    performStartSprint(deferredStart.nextMode, deferredStart.useCustomTiming);
+    // Autonomous work may finish while Android is revealing a destination.
+    // Keep that destination mounted until the gesture settles: cancel resumes
+    // the work, while commit lets the frozen Back intent supersede it.
+    deferredBackTransitionsRef.current.set(key, resumeAfterCancel);
+    return true;
   }
 
-  resumeDeferredSprintStartRef.current = resumeDeferredSprintStart;
+  function resumeDeferredBackTransitions(): void {
+    const transitions = [...deferredBackTransitionsRef.current.values()];
+    deferredBackTransitionsRef.current.clear();
+    for (const resume of transitions) {
+      resume();
+    }
+  }
+
+  resumeDeferredBackTransitionsRef.current = resumeDeferredBackTransitions;
 
   function cancelStartingSprint(): void {
     if (sprintStartTimerRef.current) {
       clearTimeout(sprintStartTimerRef.current);
       sprintStartTimerRef.current = null;
     }
-    deferredSprintStartRef.current = null;
+    deferredBackTransitionsRef.current.delete("delayed-sprint-start");
     startingModeRef.current = null;
     setStartingMode(null);
   }
@@ -1947,6 +1977,7 @@ export function PracticePocScreen({
       return undefined;
     }
 
+    const deferredBackTransitions = deferredBackTransitionsRef.current;
     const unsubscribe = systemBack.subscribe({
       onStart(edge) {
         const currentState = mobileBackStateRef.current;
@@ -1971,7 +2002,7 @@ export function PracticePocScreen({
         predictiveBackIntentRef.current = null;
         predictiveBackStateRef.current = null;
         setMobileBackPreview(null);
-        resumeDeferredSprintStartRef.current?.();
+        resumeDeferredBackTransitionsRef.current?.();
         const currentState = mobileBackStateRef.current;
         if (currentState) {
           const currentIntent = resolveMobileBackIntent(currentState, "button");
@@ -1988,6 +2019,7 @@ export function PracticePocScreen({
         const currentState = mobileBackStateRef.current;
         predictiveBackIntentRef.current = null;
         predictiveBackStateRef.current = null;
+        deferredBackTransitionsRef.current.clear();
         setMobileBackPreview(null);
         if (!currentState) {
           return false;
@@ -2001,6 +2033,7 @@ export function PracticePocScreen({
     return () => {
       predictiveBackIntentRef.current = null;
       predictiveBackStateRef.current = null;
+      deferredBackTransitions.clear();
       systemBack.setPredictiveBackEnabled(false);
       unsubscribe();
     };
@@ -2374,6 +2407,7 @@ export function PracticePocScreen({
                   adaptiveLayout={adaptiveLayout}
                   boardSize={boardSize}
                   currentTimeMs={currentTimeMs}
+                  deferBackRelevantTransition={deferBackRelevantTransition}
                   entries={historyReviewEntries}
                   initialIndex={historyReviewInitialIndex}
                   service={service}
@@ -2466,6 +2500,7 @@ export function PracticePocScreen({
                 nowMs={nowMs}
                 reviewQueue={reviewQueue}
                 currentTimeMs={currentTimeMs}
+                deferBackRelevantTransition={deferBackRelevantTransition}
                 service={service}
                 sessionMistakeReviewItems={sessionMistakeReviewItems}
                 onExitSessionReview={exitSessionReview}
@@ -5500,6 +5535,7 @@ function ReviewPanel({
   adaptiveLayout,
   boardSize,
   currentTimeMs,
+  deferBackRelevantTransition,
   dueReviewItems,
   filtersExpanded,
   nowMs,
@@ -5521,6 +5557,7 @@ function ReviewPanel({
   adaptiveLayout: AdaptiveLayout;
   boardSize: number;
   currentTimeMs: () => number;
+  deferBackRelevantTransition: DeferBackRelevantTransition;
   dueReviewItems: ReviewQueueItem[];
   filtersExpanded: boolean;
   nowMs: number;
@@ -5659,6 +5696,7 @@ function ReviewPanel({
         adaptiveLayout={adaptiveLayout}
         boardSize={boardSize}
         currentTimeMs={currentTimeMs}
+        deferBackRelevantTransition={deferBackRelevantTransition}
         entries={activeEntries}
         hasQueuedDueReviews={queuedReviewGroups.length > 0}
         initialIndex={activeEntryInitialIndex}
@@ -6072,6 +6110,7 @@ function ReviewSession({
   adaptiveLayout,
   boardSize,
   currentTimeMs,
+  deferBackRelevantTransition,
   entries,
   hasQueuedDueReviews = false,
   initialIndex = 0,
@@ -6087,6 +6126,7 @@ function ReviewSession({
   adaptiveLayout: AdaptiveLayout;
   boardSize: number;
   currentTimeMs: () => number;
+  deferBackRelevantTransition: DeferBackRelevantTransition;
   entries: ReviewEntry[];
   hasQueuedDueReviews?: boolean;
   initialIndex?: number;
@@ -6308,7 +6348,7 @@ function ReviewSession({
       expectedMove: expectedReviewMove(currentPuzzle)
     });
     if (!hasNextScheduledReview) {
-      onExit(currentEntry.source);
+      finishReviewSession();
       return;
     }
     setLineReviewNeedsContinue(true);
@@ -6355,10 +6395,17 @@ function ReviewSession({
   function goToNextDueReview(): void {
     const nextIndex = entryIndex + 1;
     if (nextIndex >= entries.length) {
-      onExit(currentEntry.source);
+      finishReviewSession();
       return;
     }
     resetCurrentReview(nextIndex);
+  }
+
+  function finishReviewSession(): void {
+    const exit = () => onExit(currentEntry.source);
+    if (!deferBackRelevantTransition("review-session-exit", exit)) {
+      exit();
+    }
   }
 
   function recordCurrentReviewResult(result: "correct" | "wrong", reviewMove?: { submittedMove: string; expectedMove: string }): void {
