@@ -17,5 +17,12 @@ fi
 
 cd "$APP_DIR"
 
+detox_args=("$@")
+if [[ "${CHESSTICIZE_DETOX_REUSE_INSTALLED_APP:-0}" == "1" ]]; then
+  # Restore evidence must exercise the package Android just restored. Detox's
+  # default initialization uninstalls and reinstalls the app, erasing that data.
+  detox_args+=(--reuse)
+fi
+
 DETOX_ACTIVE_SUITE="${DETOX_ACTIVE_SUITE:-android-launch}" \
-  pnpm exec detox test --configuration android.attached.e2e "$@"
+  pnpm exec detox test --configuration android.attached.e2e "${detox_args[@]}"

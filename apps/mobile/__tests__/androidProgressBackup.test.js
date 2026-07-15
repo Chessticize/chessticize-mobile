@@ -171,6 +171,7 @@ describe('Android Progress Backup', () => {
     const workflow = readRepo('.github/workflows/mobile-android.yml');
     const suiteConfig = read('e2e/suiteConfig.js');
     const evidenceScript = read('scripts/android-progress-backup-evidence.sh');
+    const androidDetoxScript = read('scripts/android-test-for-detox.sh');
     const restoreJourney = read('e2e/android-progress-backup-restore.e2e.js');
     const privacy = readRepo('docs/ANDROID_PRIVACY_DISCLOSURE.md');
     const policy = readRepo('docs/PRIVACY_POLICY.md');
@@ -214,6 +215,8 @@ describe('Android Progress Backup', () => {
     expect(evidenceScript).toContain('install-multiple -t --user 0');
     expect(restoreJourney).toContain("delete: false");
     expect(restoreJourney).toContain("history-attempt-legacy-attempt-standard-wrong");
+    expect(androidDetoxScript).toContain('CHESSTICIZE_DETOX_REUSE_INSTALLED_APP');
+    expect(androidDetoxScript).toContain('detox_args+=(--reuse)');
     expect(workflow).toContain('name: Android Progress Backup restore evidence');
     expect(workflow).toContain('cloud-encrypted');
     expect(workflow).toContain('device-transfer');
@@ -221,6 +224,14 @@ describe('Android Progress Backup', () => {
     expect(workflow).toContain('commit-sha=$GITHUB_SHA');
     expect(workflow).toContain('tracked-worktree-after.txt');
     expect(workflow).toContain('result=pass');
+    expect(workflow.match(/CHESSTICIZE_DETOX_REUSE_INSTALLED_APP=1/g)).toHaveLength(1);
+    expect(workflow).toContain('record_restored_install "$evidence_prefix-before-detox"');
+    expect(workflow).toContain('record_restored_install "$evidence_prefix-after-detox"');
+    expect(workflow).toContain('$evidence_prefix-payload.json');
+    expect(workflow).toContain('$evidence_prefix-package.txt');
+    expect(workflow).toContain('shell pm path com.chessticize.mobile.test');
+    expect(workflow).toContain('assert_restored_progress current-progress cloud-restored');
+    expect(workflow).toContain('assert_restored_progress released-fixture device-transfer-restored');
 
     expect(privacy).toContain('Android-managed backup');
     expect(privacy).toContain('Zero App Telemetry');
