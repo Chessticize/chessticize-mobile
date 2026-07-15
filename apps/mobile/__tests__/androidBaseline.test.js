@@ -338,6 +338,7 @@ describe('Android launch baseline', () => {
       'x86',
       'x86_64',
     ]);
+    const inspectedElfPaths = [];
     const run = jest.fn((command, args) => {
       if (command === 'unzip' && args[0] === '-Z1') {
         return { status: 0, stdout: entries, stderr: '' };
@@ -346,6 +347,7 @@ describe('Android launch baseline', () => {
         return { status: 0, stdout: Buffer.from('ELF'), stderr: '' };
       }
       if (command.endsWith('llvm-readelf')) {
+        inspectedElfPaths.push(args[1]);
         return { status: 0, stdout: '  LOAD 0x0 0x0 0x0 0x1 0x1 R E 0x4000', stderr: '' };
       }
       return { status: 0, stdout: '', stderr: '' };
@@ -356,6 +358,15 @@ describe('Android launch baseline', () => {
       .toEqual([0x4000]);
     expect(verifyApk('app.apk', run, { ANDROID_HOME: '/sdk' }))
       .toEqual(EXPECTED_ABIS);
+    expect(inspectedElfPaths.map((entry) => path.basename(entry)).sort()).toEqual([
+      'arm64-v8a-libappmodules.so',
+      'arm64-v8a-libreactnative.so',
+      'arm64-v8a-libstockfish.so',
+      'x86_64-libappmodules.so',
+      'x86_64-libhermes.so',
+      'x86_64-libreactnative.so',
+      'x86_64-libstockfish.so',
+    ]);
     expect(() => verifyApk(
       'duplicate-nnue.apk',
       (command, args) => {
@@ -376,6 +387,16 @@ describe('Android launch baseline', () => {
       },
       { ANDROID_HOME: '/sdk' },
     )).toThrow('still appears to embed ABI-duplicated NNUE data');
+    expect(() => verifyApk(
+      'unaligned-appmodules.apk',
+      (command, args) => {
+        if (command.endsWith('llvm-readelf') && args[1].endsWith('libappmodules.so')) {
+          return { status: 0, stdout: '  LOAD 0x0 0x0 0x0 0x1 0x1 R E 0x1000', stderr: '' };
+        }
+        return run(command, args);
+      },
+      { ANDROID_HOME: '/sdk' },
+    )).toThrow('libappmodules.so has incompatible ELF LOAD alignment');
     expect(() => verifyApk(
       'unexpected.apk',
       () => ({ status: 0, stdout: `${entries}\nlib/x86/libreactnative.so`, stderr: '' }),

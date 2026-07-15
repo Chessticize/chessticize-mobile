@@ -134,7 +134,7 @@ describe('Key user flows', () => {
     await waitFor(element(by.id('review-progress'))).toHaveText('2 / 3 · Standard').withTimeout(10000);
   });
 
-  it('schedules review reminders through the native fixture', async () => {
+  it('handles review reminders through the platform capability', async () => {
     const sprintNowMs = Date.now() - (2 * dayMs);
     // beforeEach already installed a clean app; relaunch only to apply fixtures.
     await launchAppAt(sprintNowMs, false, { chessticizeTestNotificationStatus: 'authorized' });
@@ -143,6 +143,20 @@ describe('Key user flows', () => {
     await dismissSprintSummary();
 
     await openTab('settings-tab', 'settings-review-reminders');
+    if (device.getPlatform() === 'android') {
+      await waitForElementTextContaining(
+        'settings-review-reminders',
+        'Notifications unavailable on this device',
+        10000
+      );
+      await waitForElementTextContaining(
+        'settings-review-reminder-schedule-status',
+        'unavailable',
+        10000
+      );
+      return;
+    }
+
     await waitForElementTextContaining('settings-review-reminders', 'Local notifications enabled', 10000);
 
     await waitForVisibleInPracticeScroll('settings-review-reminder-fixed-1900');
@@ -166,21 +180,31 @@ describe('Key user flows', () => {
       .whileElement(by.id('history-range-filters'))
       .scroll(120, 'right');
     await expect(element(by.id('history-filter-reset'))).not.toExist();
-    await expect(element(by.id('history-filter-wrong-only'))).toHaveValue('0');
-    await expect(element(by.id('history-filter-sprint-only'))).toHaveValue('1');
+    await expect(element(by.id('history-filter-wrong-only')))
+      .toHaveValue(historyToggleValue('Wrong puzzles only', false));
+    await expect(element(by.id('history-filter-sprint-only')))
+      .toHaveValue(historyToggleValue('Sprint attempts only', true));
     await element(by.id('history-filter-wrong-only')).tap();
-    await waitFor(element(by.id('history-filter-wrong-only'))).toHaveValue('1').withTimeout(10000);
+    await waitFor(element(by.id('history-filter-wrong-only')))
+      .toHaveValue(historyToggleValue('Wrong puzzles only', true))
+      .withTimeout(10000);
     await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
     await element(by.id('history-filter-wrong-only')).tap();
-    await waitFor(element(by.id('history-filter-wrong-only'))).toHaveValue('0').withTimeout(10000);
+    await waitFor(element(by.id('history-filter-wrong-only')))
+      .toHaveValue(historyToggleValue('Wrong puzzles only', false))
+      .withTimeout(10000);
 
     // Replay round trip must preserve the toggles' non-default state: turn the
     // wrong-only filter on and sprint-only filter off, open a wrong attempt's
     // replay, exit, and require both choices to remain unchanged.
     await element(by.id('history-filter-wrong-only')).tap();
-    await waitFor(element(by.id('history-filter-wrong-only'))).toHaveValue('1').withTimeout(10000);
+    await waitFor(element(by.id('history-filter-wrong-only')))
+      .toHaveValue(historyToggleValue('Wrong puzzles only', true))
+      .withTimeout(10000);
     await element(by.id('history-filter-sprint-only')).tap();
-    await waitFor(element(by.id('history-filter-sprint-only'))).toHaveValue('0').withTimeout(10000);
+    await waitFor(element(by.id('history-filter-sprint-only')))
+      .toHaveValue(historyToggleValue('Sprint attempts only', false))
+      .withTimeout(10000);
     await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
 
     const resultAttributes = await element(by.text('Wrong move')).atIndex(0).getAttributes();
@@ -194,15 +218,23 @@ describe('Key user flows', () => {
     await element(by.id('practice-main-scroll')).scrollTo('top');
     await waitFor(element(by.id('review-exit'))).toBeVisible().withTimeout(10000);
     await element(by.id('review-exit')).tap();
-    await waitFor(element(by.id('history-filter-wrong-only'))).toHaveValue('1').withTimeout(10000);
-    await waitFor(element(by.id('history-filter-sprint-only'))).toHaveValue('0').withTimeout(10000);
+    await waitFor(element(by.id('history-filter-wrong-only')))
+      .toHaveValue(historyToggleValue('Wrong puzzles only', true))
+      .withTimeout(10000);
+    await waitFor(element(by.id('history-filter-sprint-only')))
+      .toHaveValue(historyToggleValue('Sprint attempts only', false))
+      .withTimeout(10000);
     await expect(element(by.id('history-filter-reset'))).not.toExist();
     await element(by.id('history-filter-toggle')).tap();
     await waitFor(element(by.id('history-filter-reset'))).toBeVisible().withTimeout(10000);
     await expect(element(by.text('Reset filters'))).toExist();
     await element(by.id('history-filter-reset')).tap();
-    await waitFor(element(by.id('history-filter-wrong-only'))).toHaveValue('0').withTimeout(10000);
-    await waitFor(element(by.id('history-filter-sprint-only'))).toHaveValue('1').withTimeout(10000);
+    await waitFor(element(by.id('history-filter-wrong-only')))
+      .toHaveValue(historyToggleValue('Wrong puzzles only', false))
+      .withTimeout(10000);
+    await waitFor(element(by.id('history-filter-sprint-only')))
+      .toHaveValue(historyToggleValue('Sprint attempts only', true))
+      .withTimeout(10000);
   });
 
   it('configures and starts a custom sprint', async () => {
@@ -274,6 +306,11 @@ function durationTextToSeconds(value) {
     throw new Error(`Expected a countdown duration, received "${value}"`);
   }
   return Number(match[1]) * 60 + Number(match[2]);
+}
+
+function historyToggleValue(label, active) {
+  const state = active ? 'On' : 'Off';
+  return device.getPlatform() === 'android' ? `${label}, ${state}` : state;
 }
 
 async function dismissSprintSummary() {

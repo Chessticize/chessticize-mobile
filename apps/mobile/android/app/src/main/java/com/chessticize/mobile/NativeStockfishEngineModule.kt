@@ -50,13 +50,16 @@ class NativeStockfishEngineModule(
   fun start(promise: Promise) {
     engineExecutor.execute {
       try {
-        if (nativeHandle == 0L) {
+        // A retained JS runtime uses this signal to repeat the UCI handshake
+        // after Activity destruction has torn down the native runner.
+        val created = nativeHandle == 0L
+        if (created) {
           ensureNativeLibraryLoaded()
           val (bigNetwork, smallNetwork) = materializeBundledNetworks(reactApplicationContext)
           nativeHandle = nativeCreate(bigNetwork.absolutePath, smallNetwork.absolutePath)
           check(nativeHandle != 0L) { "The on-device engine could not be initialized." }
         }
-        promise.resolve(null)
+        promise.resolve(created)
       } catch (error: Throwable) {
         if (nativeHandle != 0L) {
           nativeDestroy(nativeHandle)

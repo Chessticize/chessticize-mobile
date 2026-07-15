@@ -1867,6 +1867,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-filter-wrong-only").props.accessibilityLabel).toBe("Wrong puzzles only");
     expect(findByTestId(renderer, "history-filter-wrong-only").props.accessibilityRole).toBe("switch");
     expect(findByTestId(renderer, "history-filter-wrong-only").props.accessibilityState).toEqual({ checked: true });
+    expect(findByTestId(renderer, "history-filter-wrong-only").props.accessibilityValue).toEqual({ text: "On" });
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Wrong only");
     expect(collectText(findByTestId(renderer, "history-performance-card"))).not.toContain("Wrong");
     expectHistoryRowAccessibility(renderer, "Played g6g5 · Best f4g3");

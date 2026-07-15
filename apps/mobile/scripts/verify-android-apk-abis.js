@@ -112,12 +112,15 @@ function verifyApk(apkPath, run = spawnSync, environment = process.env) {
 
   const extractionDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'chessticize-stockfish-'));
   try {
-    for (const abi of EXPECTED_ABIS) {
-      const entry = `lib/${abi}/${STOCKFISH_LIBRARY}`;
-      const extracted = path.join(extractionDirectory, `${abi}-${STOCKFISH_LIBRARY}`);
+    const nativeLibraryEntries = listedEntries.filter(
+      (entry) => /^lib\/[^/]+\/[^/]+\.so$/.test(entry),
+    );
+    for (const entry of nativeLibraryEntries) {
+      const [, abi, libraryName] = entry.split('/');
+      const extracted = path.join(extractionDirectory, `${abi}-${libraryName}`);
       const library = run('unzip', ['-p', apkPath, entry], { encoding: null, maxBuffer: 128 * 1024 * 1024 });
       requireSuccessful(library, `Could not extract ${entry}`);
-      if (library.stdout.length > MAXIMUM_STOCKFISH_LIBRARY_BYTES) {
+      if (libraryName === STOCKFISH_LIBRARY && library.stdout.length > MAXIMUM_STOCKFISH_LIBRARY_BYTES) {
         throw new Error(
           `${entry} is ${library.stdout.length} bytes and still appears to embed ABI-duplicated NNUE data; `
           + `expected at most ${MAXIMUM_STOCKFISH_LIBRARY_BYTES}`,
@@ -144,7 +147,7 @@ if (require.main === module) {
   try {
     const actual = verifyApk(process.argv[2]);
     process.stdout.write(
-      `Android APK ABIs, single-copy NNUE assets, and 16 KB Stockfish packaging verified: ${actual.join(', ')}\n`,
+      `Android APK ABIs, single-copy NNUE assets, and 16 KB native packaging verified: ${actual.join(', ')}\n`,
     );
   } catch (error) {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);

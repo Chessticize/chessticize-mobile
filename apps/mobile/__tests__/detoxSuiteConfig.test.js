@@ -253,6 +253,17 @@ describe('Detox suite configuration', () => {
     ]);
   });
 
+  it('keeps the shared flows suite portable across iOS and Android', () => {
+    const flowsSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/flows.e2e.js'), 'utf8');
+
+    expect(flowsSpec).toContain("device.getPlatform() === 'android'");
+    expect(flowsSpec).toContain('Notifications unavailable on this device');
+    expect(flowsSpec).toContain("historyToggleValue('Wrong puzzles only', false)");
+    expect(flowsSpec).toContain("historyToggleValue('Sprint attempts only', true)");
+    expect(flowsSpec).toContain("return device.getPlatform() === 'android' ? `${label}, ${state}` : state");
+    expect(flowsSpec).not.toContain('toHaveToggleValue');
+  });
+
   it('partitions every active spec exactly once across the two CI suites', () => {
     expect(resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'all' }))
       .toEqual(ACTIVE_E2E_TEST_MATCH);

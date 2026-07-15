@@ -4745,6 +4745,7 @@ function HistoryQuickToggle({
       accessibilityRole="switch"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ checked: active }}
+      accessibilityValue={{ text: active ? "On" : "Off" }}
       testID={controlTestID}
       style={styles.historyQuickToggle}
       onPress={onPress}

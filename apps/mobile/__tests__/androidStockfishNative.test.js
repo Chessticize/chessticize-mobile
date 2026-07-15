@@ -17,6 +17,8 @@ describe('Android Stockfish native contract', () => {
     expect(module).toContain('class NativeStockfishEngineModule');
     expect(module).toContain('LifecycleEventListener');
     expect(module).toContain('fun start(promise: Promise)');
+    expect(module).toContain('val created = nativeHandle == 0L');
+    expect(module).toContain('promise.resolve(created)');
     expect(module).toContain('fun send(command: String)');
     expect(module).toContain('fun terminate()');
     expect(module).toContain('override fun onHostPause()');
