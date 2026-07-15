@@ -290,29 +290,65 @@ find_transport_archive() {
 
 capture_installed_apk() {
   local installed_path
-  local installed_apk="$ARTIFACT_DIR/installed-base.apk"
-  adb_cmd shell pm path "$APP_ID" | tr -d '\r' | tee "$ARTIFACT_DIR/installed-apk-paths.txt"
-  installed_path="$(sed -n 's/^package://p' "$ARTIFACT_DIR/installed-apk-paths.txt" | head -n 1)"
-  if [[ -z "$installed_path" ]]; then
-    echo "No installed APK path was reported for $APP_ID." >&2
+  local installed_path_count
+  local installed_size
+  local installed_hash
+  local workflow_size
+  local workflow_hash
+
+  if ! read_installed_package_apk_paths "$APP_ID" \
+      > "$ARTIFACT_DIR/installed-apk-paths.txt"; then
+    echo "Unable to inspect installed APK paths for exact-head provenance." >&2
     exit 1
   fi
+  installed_path="$(sed -n 's/^package:\(.*\/base\.apk\)$/\1/p' \
+    "$ARTIFACT_DIR/installed-apk-paths.txt")"
+  installed_path_count="$(awk '/^package:.*\/base\.apk$/ { count += 1 } END { print count + 0 }' \
+    "$ARTIFACT_DIR/installed-apk-paths.txt")"
+  if [[ "$installed_path_count" != "1" || -z "$installed_path" \
+      || "$installed_path" == *$'\n'* ]]; then
+    echo "Expected exactly one installed base.apk path for $APP_ID." >&2
+    exit 1
+  fi
+
+  workflow_size="$(stat -c %s "$APK")"
+  if [[ ! "$workflow_size" =~ ^[1-9][0-9]*$ ]]; then
+    echo "Exact-head workflow APK has an invalid size: ${workflow_size:-<empty>}" >&2
+    exit 1
+  fi
+  printf '%s\n' "$workflow_size" > "$ARTIFACT_DIR/workflow-artifact-apk-size.txt"
   sha256sum "$APK" > "$ARTIFACT_DIR/workflow-artifact-apk-sha256.txt"
-  if ! adb_cmd exec-out cat "$installed_path" > "$installed_apk"; then
-    echo "Unable to stream the installed APK for exact-head provenance." >&2
+  workflow_hash="$(cut -d ' ' -f 1 "$ARTIFACT_DIR/workflow-artifact-apk-sha256.txt")"
+  if [[ ! "$workflow_hash" =~ ^[0-9a-f]{64}$ ]]; then
+    echo "Exact-head workflow APK has an invalid SHA-256: ${workflow_hash:-<empty>}" >&2
     exit 1
   fi
-  if [[ ! -s "$installed_apk" ]]; then
-    echo "Installed APK stream was empty; exact-head provenance cannot be proven." >&2
+
+  if ! installed_size="$(read_device_file_size "$installed_path")"; then
+    echo "Unable to measure the installed APK for exact-head provenance." >&2
     exit 1
   fi
-  sha256sum "$installed_apk" > "$ARTIFACT_DIR/installed-apk-sha256.txt"
-  if [[ "$(cut -d ' ' -f 1 "$ARTIFACT_DIR/workflow-artifact-apk-sha256.txt")" \
-      != "$(cut -d ' ' -f 1 "$ARTIFACT_DIR/installed-apk-sha256.txt")" ]]; then
+  if [[ ! "$installed_size" =~ ^[1-9][0-9]*$ ]]; then
+    echo "Installed APK has an invalid device-local size: ${installed_size:-<empty>}" >&2
+    exit 1
+  fi
+  printf '%s\n' "$installed_size" > "$ARTIFACT_DIR/installed-apk-size.txt"
+  if ! installed_hash="$(read_device_file_sha256 "$installed_path")"; then
+    echo "Unable to hash the installed APK for exact-head provenance." >&2
+    exit 1
+  fi
+  if [[ ! "$installed_hash" =~ ^[0-9a-f]{64}$ ]]; then
+    echo "Installed APK has an invalid device-local SHA-256: ${installed_hash:-<empty>}" >&2
+    exit 1
+  fi
+  printf '%s  %s\n' "$installed_hash" "$installed_path" \
+    > "$ARTIFACT_DIR/installed-apk-sha256.txt"
+
+  if [[ "$installed_size" != "$workflow_size" \
+      || "$installed_hash" != "$workflow_hash" ]]; then
     echo "Installed APK does not match the downloaded exact-head APK." >&2
     exit 1
   fi
-  rm -f "$installed_apk"
   adb_cmd shell dumpsys package "$APP_ID" > "$ARTIFACT_DIR/installed-package.txt"
 }
 
@@ -566,7 +602,9 @@ cleanup() {
 }
 trap cleanup EXIT
 
-adb_cmd install -r -t "$APK"
+# Force a complete push before Package Manager installs the APK. ADB's --wait
+# applies to incremental installs, which are deliberately disabled here.
+adb_cmd install --no-incremental --no-streaming -r -t "$APK"
 adb_cmd shell am start -W -n "$APP_ID/.MainActivity" \
   | tee "$ARTIFACT_DIR/launch.txt" | grep -F 'Status: ok'
 capture_installed_apk

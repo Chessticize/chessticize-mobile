@@ -67,10 +67,81 @@ read_app_process_ids() {
 validate_device_path() {
   local path="$1"
 
-  if [[ -z "$path" || ! "$path" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+  if [[ -z "$path" || ! "$path" =~ ^[A-Za-z0-9._/~=-]+$ ]]; then
     echo "Refusing to inspect an empty or unsafe Android device path: ${path:-<empty>}" >&2
     return 1
   fi
+}
+
+read_installed_package_apk_paths() {
+  local package_name="$1"
+  local line
+  local path
+
+  if [[ ! "$package_name" =~ ^[A-Za-z0-9._]+$ ]]; then
+    echo "Cannot inspect an invalid Android package name: $package_name" >&2
+    return 1
+  fi
+  if ! inspect_device_command "pm path \"$package_name\""; then
+    return 1
+  fi
+  if [[ "$ANDROID_DEVICE_COMMAND_STATUS" != "0" \
+      || -z "$ANDROID_DEVICE_COMMAND_OUTPUT" ]]; then
+    echo "Unable to read installed APK paths for $package_name (status $ANDROID_DEVICE_COMMAND_STATUS): ${ANDROID_DEVICE_COMMAND_OUTPUT:-<empty>}" >&2
+    return 1
+  fi
+
+  while IFS= read -r line; do
+    if [[ "$line" != package:* ]]; then
+      echo "Installed APK path output was malformed for $package_name: $line" >&2
+      return 1
+    fi
+    path="${line#package:}"
+    if ! validate_device_path "$path" || [[ "$path" != /*.apk ]]; then
+      echo "Installed APK path output was unsafe or not an APK for $package_name: $line" >&2
+      return 1
+    fi
+    printf 'package:%s\n' "$path"
+  done <<< "$ANDROID_DEVICE_COMMAND_OUTPUT"
+}
+
+read_device_file_size() {
+  local path="$1"
+
+  validate_device_path "$path" || return 1
+  if ! inspect_device_command "stat -c %s \"$path\""; then
+    return 1
+  fi
+  if [[ "$ANDROID_DEVICE_COMMAND_STATUS" != "0" \
+      || ! "$ANDROID_DEVICE_COMMAND_OUTPUT" =~ ^(0|[1-9][0-9]*)$ ]]; then
+    echo "Unable to read a strict device-local size for $path (status $ANDROID_DEVICE_COMMAND_STATUS): ${ANDROID_DEVICE_COMMAND_OUTPUT:-<empty>}" >&2
+    return 1
+  fi
+  printf '%s' "$ANDROID_DEVICE_COMMAND_OUTPUT"
+}
+
+read_device_file_sha256() {
+  local path="$1"
+  local digest
+  local reported_path
+
+  validate_device_path "$path" || return 1
+  if ! inspect_device_command "sha256sum \"$path\""; then
+    return 1
+  fi
+  if [[ "$ANDROID_DEVICE_COMMAND_STATUS" != "0" \
+      || "$ANDROID_DEVICE_COMMAND_OUTPUT" == *$'\n'* \
+      || ! "$ANDROID_DEVICE_COMMAND_OUTPUT" =~ ^([0-9A-Fa-f]{64})[[:space:]]+([A-Za-z0-9._/~=-]+)$ ]]; then
+    echo "Unable to read a strict device-local SHA-256 for $path (status $ANDROID_DEVICE_COMMAND_STATUS): ${ANDROID_DEVICE_COMMAND_OUTPUT:-<empty>}" >&2
+    return 1
+  fi
+  digest="${BASH_REMATCH[1]}"
+  reported_path="${BASH_REMATCH[2]}"
+  if [[ "$reported_path" != "$path" ]]; then
+    echo "Device-local SHA-256 reported an unexpected path for $path: $reported_path" >&2
+    return 1
+  fi
+  printf '%s' "$digest" | tr '[:upper:]' '[:lower:]'
 }
 
 probe_device_path() {
@@ -143,7 +214,7 @@ read_canonical_device_path() {
     return 1
   fi
   if [[ "$ANDROID_DEVICE_COMMAND_STATUS" != "0" \
-      || ! "$ANDROID_DEVICE_COMMAND_OUTPUT" =~ ^/[A-Za-z0-9._/-]+$ ]]; then
+      || ! "$ANDROID_DEVICE_COMMAND_OUTPUT" =~ ^/[A-Za-z0-9._/~=-]+$ ]]; then
     echo "Unable to canonicalize present Android device path $path (status $ANDROID_DEVICE_COMMAND_STATUS): ${ANDROID_DEVICE_COMMAND_OUTPUT:-<empty>}" >&2
     return 1
   fi

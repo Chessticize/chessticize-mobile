@@ -483,29 +483,130 @@ describe('Android Progress Backup', () => {
     );
   });
 
-  it('hashes a nonempty streamed installed APK on the host for API 24 provenance', () => {
+  it('proves installed APK identity without streaming the APK through ADB', () => {
     const policyEvidenceScript = read('scripts/android-progress-backup-policy-evidence.sh');
+    const api30RestoreScript = read(
+      'scripts/android-progress-backup-api30-restore-evidence.sh',
+    );
 
-    expect(policyEvidenceScript).toContain(
-      'adb_cmd exec-out cat "$installed_path" > "$installed_apk"',
+    expect(policyEvidenceScript).not.toContain('installed-base.apk');
+    expect(policyEvidenceScript).not.toContain(
+      'adb_cmd exec-out cat "$installed_path"',
     );
-    expect(policyEvidenceScript).toContain('if [[ ! -s "$installed_apk" ]]');
-    expect(policyEvidenceScript).toContain('Installed APK stream was empty');
     expect(policyEvidenceScript).toContain(
-      'sha256sum "$installed_apk" > "$ARTIFACT_DIR/installed-apk-sha256.txt"',
+      'read_device_file_size "$installed_path"',
     );
+    expect(policyEvidenceScript).toContain(
+      'read_device_file_sha256 "$installed_path"',
+    );
+    expect(policyEvidenceScript).toContain('workflow-artifact-apk-size.txt');
+    expect(policyEvidenceScript).toContain('installed-apk-size.txt');
+    expect(policyEvidenceScript).toContain('workflow-artifact-apk-sha256.txt');
+    expect(policyEvidenceScript).toContain('installed-apk-sha256.txt');
     expect(policyEvidenceScript).toContain(
       'Installed APK does not match the downloaded exact-head APK',
     );
-    expect(policyEvidenceScript).not.toContain(
-      'adb_cmd shell sha256sum "$installed_path"',
-    );
-    expect(policyEvidenceScript).not.toContain(
-      'adb_cmd shell run-as "$APP_ID" sha256sum',
+    expect(policyEvidenceScript).toContain(
+      'adb_cmd install --no-incremental --no-streaming -r -t "$APK"',
     );
     expect(policyEvidenceScript).toContain(
       'adb_cmd exec-out run-as "$APP_ID" cat "$relative_path"',
     );
+
+    for (const artifact of [
+      'workflow-artifact-apk-size.txt',
+      'installed-apk-size.txt',
+      'workflow-artifact-apk-sha256.txt',
+      'installed-apk-sha256.txt',
+    ]) {
+      expect(api30RestoreScript).toContain(artifact);
+    }
+    expect(api30RestoreScript).toContain('source_workflow_apk_size');
+    expect(api30RestoreScript).toContain('source_installed_apk_size');
+    expect(api30RestoreScript).toContain('current_workflow_apk_size');
+    expect(api30RestoreScript).toContain('current_installed_apk_size');
+    expect(api30RestoreScript).toContain('read_strict_size_artifact');
+    expect(api30RestoreScript).toContain('read_strict_sha256_artifact');
+    expect(api30RestoreScript).not.toContain("tr -d '\\r\\n'");
+  });
+
+  it('strictly parses bounded device-local APK size and SHA-256 evidence', () => {
+    const deviceInspection = 'scripts/android-device-inspection.sh';
+    const deviceInspectionPath = join(appRoot, deviceInspection);
+    const helper = read(deviceInspection);
+    const installedPath = '/data/app/~~token==/com.chessticize.mobile-token==/base.apk';
+    const digest = '01cc4cb43b5300f1671ecda1ed618b6c452a59be3ca6f4a5c513e88cdaaa3856';
+
+    expect(helper).toContain('read_device_file_size');
+    expect(helper).toContain('read_device_file_sha256');
+    expect(helper).toContain('inspect_device_command "stat -c %s');
+    expect(helper).toContain('inspect_device_command "sha256sum');
+
+    const inspect = (kind, mode) => {
+      const command = `
+        set -u
+        PROVENANCE_KIND=${kind}
+        PROVENANCE_MODE=${mode}
+        adb_cmd() {
+          case "$PROVENANCE_MODE" in
+            outer-failure) return 42 ;;
+            missing-sentinel) printf 'missing\\n' ;;
+            device-error) printf '__CHESSTICIZE_DEVICE_STATUS__=2\\npermission denied\\n' ;;
+            malformed-size) printf '__CHESSTICIZE_DEVICE_STATUS__=0\\n384MB\\n' ;;
+            multiline-size) printf '__CHESSTICIZE_DEVICE_STATUS__=0\\n384484899\\n0\\n' ;;
+            malformed-hash) printf '__CHESSTICIZE_DEVICE_STATUS__=0\\nabc  ${installedPath}\\n' ;;
+            split-hash-line) printf '__CHESSTICIZE_DEVICE_STATUS__=0\\n${digest}\\n${installedPath}\\n' ;;
+            wrong-hash-path) printf '__CHESSTICIZE_DEVICE_STATUS__=0\\n${digest}  /data/app/wrong/base.apk\\n' ;;
+            extra-hash-line) printf '__CHESSTICIZE_DEVICE_STATUS__=0\\n${digest}  ${installedPath}\\nextra\\n' ;;
+            success)
+              if [[ "$PROVENANCE_KIND" == size ]]; then
+                printf '__CHESSTICIZE_DEVICE_STATUS__=0\\n384484899\\n'
+              else
+                printf '__CHESSTICIZE_DEVICE_STATUS__=0\\n${digest.toUpperCase()}  ${installedPath}\\n'
+              fi
+              ;;
+          esac
+        }
+        source ${JSON.stringify(deviceInspectionPath)}
+        set +e
+        if [[ "$PROVENANCE_KIND" == size ]]; then
+          evidence_output="$(read_device_file_size ${installedPath} 2>/dev/null)"
+        else
+          evidence_output="$(read_device_file_sha256 ${installedPath} 2>/dev/null)"
+        fi
+        evidence_status=$?
+        set -e
+        printf 'status=%s\\noutput=<%s>\\n' "$evidence_status" "$evidence_output"
+      `;
+      const result = spawnSync('/bin/bash', ['-c', command], {
+        encoding: 'utf8',
+      });
+      expect(result.status).toBe(0);
+      return result.stdout;
+    };
+
+    expect(inspect('size', 'success')).toBe('status=0\noutput=<384484899>\n');
+    expect(inspect('hash', 'success')).toBe(`status=0\noutput=<${digest}>\n`);
+    for (const mode of [
+      'outer-failure',
+      'missing-sentinel',
+      'device-error',
+      'malformed-size',
+      'multiline-size',
+    ]) {
+      expect(inspect('size', mode)).toMatch(/^status=[1-9][0-9]*\noutput=<>\n$/);
+    }
+    for (const mode of [
+      'outer-failure',
+      'missing-sentinel',
+      'device-error',
+      'malformed-hash',
+      'split-hash-line',
+      'wrong-hash-path',
+      'extra-hash-line',
+    ]) {
+      expect(inspect('hash', mode)).toMatch(/^status=[1-9][0-9]*\noutput=<>\n$/);
+    }
   });
 
   it('keeps synthetic SQLite sidecars stable by proving the app process is quiescent', () => {
