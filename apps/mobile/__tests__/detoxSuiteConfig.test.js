@@ -587,6 +587,8 @@ describe('Detox suite configuration', () => {
     expect(spec).toContain('cancel: true');
     expect(spec).toContain('await cancelledPredictiveBack.started');
     expect(spec).toContain('await cancelledPredictiveBack.completion()');
+    expect(spec).toContain('Pending Arrow Duel timer cancellation is covered deterministically');
+    expect(spec).not.toContain("by.id('sprint-loading-overlay')");
     expect(spec).toContain('androidAppIsResumed');
     expect(spec).toContain('const rootPredictiveBack = beginAndroidPredictiveBackGesture()');
     expect(spec).toContain('Idle Practice root trapped Predictive Back');

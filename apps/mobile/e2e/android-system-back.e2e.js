@@ -53,15 +53,10 @@ describe('Android product-aware system Back', () => {
       await waitFor(element(by.id('practice-home'))).toExist().withTimeout(10000);
 
       await selectTestPuzzleSource('familiar15');
-      await waitForVisibleInPracticeScroll('practice-mode-arrow-duel');
-      await element(by.id('practice-mode-arrow-duel')).tap();
-      await element(by.id('practice-main-scroll')).scrollTo('top');
-      await element(by.id('practice-start-button')).tap();
-      await waitFor(element(by.id('sprint-loading-overlay'))).toExist().withTimeout(10000);
-      await device.pressBack();
-      await waitFor(element(by.id('sprint-loading-overlay'))).not.toExist().withTimeout(10000);
-      await sleep(500);
-      await expect(element(by.id('practice-home'))).toExist();
+      // Pending Arrow Duel timer cancellation is covered deterministically by
+      // PracticePocScreen.test.tsx: "cancels a pending Arrow Duel start before its
+      // delayed callback can enter practice". This native journey owns Android
+      // system input, active-session confirmation, Predictive Back, and root delegation.
 
       await startPracticeMode('standard');
       await waitForVisibleInPracticeScroll('session-board');
