@@ -788,7 +788,7 @@ describe('Android Progress Backup', () => {
     expect(helper).toContain('read_device_file_identity');
     expect(helper).toContain('stat -c %d:%i');
     expect(policyEvidenceScript).toContain(
-      'find_existing_device_paths file "${candidates[@]}"',
+      'probe_device_path file "$candidate"',
     );
     expect(api30RestoreScript).toContain(
       'find_existing_device_paths directory "${candidates[@]}"',
@@ -868,8 +868,9 @@ describe('Android Progress Backup', () => {
     }
   });
 
-  it('collapses API 36 LocalTransport aliases only after proving one device and inode', () => {
+  it('retains raw API 36 aliases before proving one canonical device and inode target', () => {
     const policyEvidenceScript = read('scripts/android-progress-backup-policy-evidence.sh');
+    const deviceInspectionPath = join(appRoot, 'scripts/android-device-inspection.sh');
     const findTransportArchive = policyEvidenceScript.slice(
       policyEvidenceScript.indexOf('find_transport_archive()'),
       policyEvidenceScript.indexOf("WORKFLOW_APK_SIZE=''"),
@@ -885,9 +886,13 @@ describe('Android Progress Backup', () => {
     expect(policyEvidenceScript).toContain(
       '"/data/user/0/com.android.localtransport/files/1/_full/$APP_ID"',
     );
-    expect(policyEvidenceScript).toContain('read_device_file_identity "$archive_alias"');
-    expect(policyEvidenceScript).toContain('$case_name-transport-archive-aliases.txt');
+    expect(policyEvidenceScript).toContain('read_device_file_identity "$candidate"');
+    expect(policyEvidenceScript).toContain('$case_name-transport-archive-raw-aliases.txt');
+    expect(policyEvidenceScript).toContain('$case_name-transport-archive-canonical-aliases.txt');
     expect(policyEvidenceScript).toContain('$case_name-transport-archive-identities.txt');
+    expect(policyEvidenceScript).not.toContain(
+      'find_existing_device_paths file "${candidates[@]}" > "$aliases_file"',
+    );
 
     const discover = (mode) => {
       const command = `
@@ -896,22 +901,50 @@ describe('Android Progress Backup', () => {
         ALIAS_MODE=${mode}
         ARTIFACT_DIR="$(mktemp -d)"
         trap 'rm -rf "$ARTIFACT_DIR"' EXIT
-        find_existing_device_paths() {
-          printf '%s\\n' ${JSON.stringify(dataAlias)} ${JSON.stringify(userAlias)}
-        }
-        read_device_file_identity() {
-          case "$ALIAS_MODE:$1" in
-            same:*) printf '253:4242' ;;
-            distinct:${dataAlias}) printf '253:4242' ;;
-            distinct:${userAlias}) printf '253:4343' ;;
+        adb_cmd() {
+          local remote_command="\${*: -1}"
+          local alias_name
+          case "$remote_command" in
+            *${JSON.stringify(dataAlias)}*) alias_name=data ;;
+            *${JSON.stringify(userAlias)}*) alias_name=user ;;
+            *) alias_name=other ;;
+          esac
+          case "$remote_command" in
+            *'test -f'*)
+              if [[ "$alias_name" == data || "$alias_name" == user ]]; then
+                printf '__CHESSTICIZE_DEVICE_STATUS__=0\\n'
+              else
+                printf '__CHESSTICIZE_DEVICE_STATUS__=1\\n'
+              fi
+              ;;
+            *'readlink -f'*)
+              printf '__CHESSTICIZE_DEVICE_STATUS__=0\\n/canonical/archive\\n'
+              ;;
+            *'stat -c %d:%i'*)
+              if [[ "$ALIAS_MODE" == unreadable && "$alias_name" == user ]]; then
+                printf '__CHESSTICIZE_DEVICE_STATUS__=0\\nnot-an-identity\\n'
+              elif [[ "$ALIAS_MODE" == distinct && "$alias_name" == user ]]; then
+                printf '__CHESSTICIZE_DEVICE_STATUS__=0\\n253:4343\\n'
+              else
+                printf '__CHESSTICIZE_DEVICE_STATUS__=0\\n253:4242\\n'
+              fi
+              ;;
+            *)
+              printf '__CHESSTICIZE_DEVICE_STATUS__=2\\nunsupported\\n'
+              ;;
           esac
         }
+        source ${JSON.stringify(deviceInspectionPath)}
         ${findTransportArchive}
         set +e
         output="$(find_transport_archive encryption-only 2>"$ARTIFACT_DIR/error.txt")"
         status=$?
         set -e
         printf 'status=%s\\noutput=<%s>\\n' "$status" "$output"
+        printf 'raw-aliases=\\n'
+        cat "$ARTIFACT_DIR/encryption-only-transport-archive-raw-aliases.txt"
+        printf 'canonical-aliases=\\n'
+        cat "$ARTIFACT_DIR/encryption-only-transport-archive-canonical-aliases.txt"
         if [[ -f "$ARTIFACT_DIR/encryption-only-transport-archive-identities.txt" ]]; then
           printf 'identities=\\n'
           cat "$ARTIFACT_DIR/encryption-only-transport-archive-identities.txt"
@@ -926,12 +959,20 @@ describe('Android Progress Backup', () => {
     };
 
     expect(discover('same')).toBe(
-      `status=0\noutput=<${dataAlias}>\nidentities=\n253:4242 ${dataAlias}\n253:4242 ${userAlias}\nerror=<>\n`,
+      `status=0\noutput=</canonical/archive>\nraw-aliases=\n${dataAlias}\n${userAlias}\ncanonical-aliases=\n${dataAlias} /canonical/archive\n${userAlias} /canonical/archive\nidentities=\n253:4242 ${dataAlias} /canonical/archive\n253:4242 ${userAlias} /canonical/archive\nerror=<>\n`,
     );
-    expect(discover('distinct')).toContain(
+    const distinct = discover('distinct');
+    expect(distinct).toContain(`${dataAlias}\n${userAlias}\ncanonical-aliases=`);
+    expect(distinct).toContain(`253:4242 ${dataAlias} /canonical/archive`);
+    expect(distinct).toContain(`253:4343 ${userAlias} /canonical/archive`);
+    expect(distinct).toContain(
       'Expected at most one canonical LocalTransport archive target.',
     );
-    expect(discover('distinct')).toMatch(/^status=[1-9][0-9]*\noutput=<>\n/);
+    expect(distinct).toMatch(/^status=[1-9][0-9]*\noutput=<>\n/);
+    const unreadable = discover('unreadable');
+    expect(unreadable).toContain(`${dataAlias}\n${userAlias}\ncanonical-aliases=`);
+    expect(unreadable).toContain('Unable to read a strict device/inode identity');
+    expect(unreadable).toMatch(/^status=[1-9][0-9]*\noutput=<>\n/);
   });
 
   it('treats API 30 mask zero as an expected fail-closed transport rejection', () => {
@@ -952,9 +993,17 @@ describe('Android Progress Backup', () => {
   it('requires the exact API 24 legacy rejection with one fail-closed decision and no archive', () => {
     const policyEvidenceScript = read('scripts/android-progress-backup-policy-evidence.sh');
     const backupContract = read('docs/ANDROID_PROGRESS_BACKUP.md');
+    const assertionStart = policyEvidenceScript.indexOf(
+      'assert_exclusive_framework_result() {',
+    );
 
     expect(policyEvidenceScript).toMatch(
       /run_case pre-flags-api 'non_incremental_only=false' unavailable false 0 no-archive \\\s+fail-closed-legacy-transport-rejection/,
+    );
+    expect(assertionStart).toBeGreaterThan(-1);
+    const exclusiveFrameworkResult = policyEvidenceScript.slice(
+      assertionStart,
+      policyEvidenceScript.indexOf('run_case() {'),
     );
     const legacyRejectionCase = policyEvidenceScript.slice(
       policyEvidenceScript.indexOf('fail-closed-legacy-transport-rejection)'),
@@ -962,18 +1011,76 @@ describe('Android Progress Backup', () => {
     );
     expect(legacyRejectionCase).toContain('invocation_policy=exactly-one');
     expect(legacyRejectionCase).toContain(
-      'grep -Fx "Package $APP_ID with result: Transport rejected package"',
-    );
-    expect(legacyRejectionCase).toContain(
-      'grep -Fx "Backup finished with result: Success"',
+      'assert_exclusive_framework_result "$case_name"',
     );
     expect(legacyRejectionCase).not.toContain("wasn't able to process it");
     expect(backupContract).toContain(
       'API 24 requires the exact legacy package rejection with one fail-closed agent decision',
     );
     expect(policyEvidenceScript).toContain(
-      'API24 requires one pre-transport-flags fail-closed decision, the exact legacy package rejection, no payload log, and no archive',
+      'API24 requires one pre-transport-flags fail-closed decision, exactly one legacy package rejection and successful overall result, no payload log, and no archive',
     );
+
+    const verify = (mode) => {
+      const command = `
+        set -u
+        APP_ID=com.chessticize.mobile
+        ARTIFACT_DIR="$(mktemp -d)"
+        trap 'rm -rf "$ARTIFACT_DIR"' EXIT
+        case ${mode} in
+          exact)
+            printf '%s\\n' \\
+              'Package @pm@ with result: Success' \\
+              'Package com.chessticize.mobile with result: Transport rejected package' \\
+              'Backup finished with result: Success' \\
+              > "$ARTIFACT_DIR/pre-flags-api-backupnow.txt"
+            ;;
+          duplicate-package)
+            printf '%s\\n' \\
+              'Package com.chessticize.mobile with result: Transport rejected package' \\
+              'Package com.chessticize.mobile with result: Transport rejected package' \\
+              'Backup finished with result: Success' \\
+              > "$ARTIFACT_DIR/pre-flags-api-backupnow.txt"
+            ;;
+          conflicting-package)
+            printf '%s\\n' \\
+              'Package com.chessticize.mobile with result: Transport rejected package' \\
+              'Package com.chessticize.mobile with result: Success' \\
+              'Backup finished with result: Success' \\
+              > "$ARTIFACT_DIR/pre-flags-api-backupnow.txt"
+            ;;
+          duplicate-overall)
+            printf '%s\\n' \\
+              'Package com.chessticize.mobile with result: Transport rejected package' \\
+              'Backup finished with result: Success' \\
+              'Backup finished with result: Success' \\
+              > "$ARTIFACT_DIR/pre-flags-api-backupnow.txt"
+            ;;
+        esac
+        ${exclusiveFrameworkResult}
+        set +e
+        assert_exclusive_framework_result pre-flags-api \\
+          'Package com.chessticize.mobile with result: Transport rejected package' \\
+          2>"$ARTIFACT_DIR/error.txt"
+        status=$?
+        set -e
+        printf 'status=%s\\nerror=<%s>\\n' "$status" "$(cat "$ARTIFACT_DIR/error.txt")"
+      `;
+      const result = spawnSync('/bin/bash', ['-c', command], {
+        encoding: 'utf8',
+      });
+      expect(result.status).toBe(0);
+      return result.stdout;
+    };
+
+    expect(verify('exact')).toBe('status=0\nerror=<>\n');
+    for (const mode of [
+      'duplicate-package',
+      'conflicting-package',
+      'duplicate-overall',
+    ]) {
+      expect(verify(mode)).toMatch(/^status=[1-9][0-9]*\nerror=</);
+    }
   });
 
   it('treats API 36 mask zero as an expected fail-closed transport rejection with no archive', () => {
@@ -1222,7 +1329,7 @@ describe('Android Progress Backup', () => {
       'repeated identical policy/result/payload groups',
     );
     expect(policyEvidenceScript).toContain(
-      'API36 mask 0 requires exactly one fail-closed policy/result invocation, selected masks 1,2,3 tolerate only repeated-identical preflight groups, and device/inode identity collapses path aliases only when one canonical archive target proves exact-once payload',
+      'API36 mask 0 requires exactly one fail-closed policy/result invocation, selected masks 1,2,3 tolerate only repeated-identical preflight groups, and device/inode identity collapses raw path aliases only after recording every alias and proving one canonical archive target',
     );
     expect(policyEvidenceScript).not.toContain('once-only agent output');
   });

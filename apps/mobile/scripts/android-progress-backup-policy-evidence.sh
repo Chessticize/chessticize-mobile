@@ -288,27 +288,45 @@ find_transport_archive() {
     "/data/user_de/0/com.android.localtransport/files/1/_full/$APP_ID"
     "/cache/backup/1/_full/$APP_ID"
   )
-  local aliases_file="$ARTIFACT_DIR/$case_name-transport-archive-aliases.txt"
+  local raw_aliases_file="$ARTIFACT_DIR/$case_name-transport-archive-raw-aliases.txt"
+  local canonical_aliases_file="$ARTIFACT_DIR/$case_name-transport-archive-canonical-aliases.txt"
   local identities_file="$ARTIFACT_DIR/$case_name-transport-archive-identities.txt"
-  local archive_alias
+  local candidate
+  local path_state
+  local canonical_path
   local archive_identity
   local identity_count
+  local -a canonical_paths=()
 
-  if ! find_existing_device_paths file "${candidates[@]}" > "$aliases_file"; then
-    return 1
-  fi
+  : > "$raw_aliases_file"
+  : > "$canonical_aliases_file"
   : > "$identities_file"
-  while IFS= read -r archive_alias; do
-    if [[ -z "$archive_alias" ]]; then
-      continue
-    fi
-    if ! archive_identity="$(read_device_file_identity "$archive_alias")"; then
+
+  for candidate in "${candidates[@]}"; do
+    if ! path_state="$(probe_device_path file "$candidate")"; then
       return 1
     fi
-    printf '%s %s\n' "$archive_identity" "$archive_alias" >> "$identities_file"
-  done < "$aliases_file"
+    if [[ "$path_state" == "absent" ]]; then
+      continue
+    fi
+    if [[ "$path_state" != "present" ]]; then
+      echo "Android device path probe returned an unsupported state for $candidate: $path_state" >&2
+      return 1
+    fi
+    printf '%s\n' "$candidate" >> "$raw_aliases_file"
+    if ! canonical_path="$(read_canonical_device_path "$candidate")"; then
+      return 1
+    fi
+    printf '%s %s\n' "$candidate" "$canonical_path" >> "$canonical_aliases_file"
+    if ! archive_identity="$(read_device_file_identity "$candidate")"; then
+      return 1
+    fi
+    printf '%s %s %s\n' "$archive_identity" "$candidate" "$canonical_path" \
+      >> "$identities_file"
+    canonical_paths+=("$canonical_path")
+  done
 
-  if [[ ! -s "$aliases_file" ]]; then
+  if [[ ! -s "$raw_aliases_file" ]]; then
     return
   fi
   identity_count="$(cut -d ' ' -f 1 "$identities_file" | sort -u | wc -l | tr -d ' ')"
@@ -317,7 +335,7 @@ find_transport_archive() {
     cat "$identities_file" >&2
     return 1
   fi
-  sed -n '1p' "$aliases_file"
+  printf '%s\n' "${canonical_paths[0]}"
 }
 
 WORKFLOW_APK_SIZE=''
@@ -619,6 +637,29 @@ assert_app_data_archive_paths() {
     | cmp - <(printf '%s' 'write-ahead-log-fixture')
 }
 
+assert_exclusive_framework_result() {
+  local case_name="$1"
+  local expected_package_result="$2"
+  local backup_output="$ARTIFACT_DIR/$case_name-backupnow.txt"
+  local package_results="$ARTIFACT_DIR/$case_name-framework-package-results.txt"
+  local overall_results="$ARTIFACT_DIR/$case_name-framework-overall-results.txt"
+
+  grep -F "Package $APP_ID with result:" "$backup_output" > "$package_results" || true
+  grep -F "Backup finished with result:" "$backup_output" > "$overall_results" || true
+  if [[ "$(wc -l < "$package_results" | tr -d ' ')" != "1" \
+      || "$(cat "$package_results")" != "$expected_package_result" ]]; then
+    echo "Expected exactly one framework package result for $case_name: $expected_package_result" >&2
+    cat "$package_results" >&2
+    return 1
+  fi
+  if [[ "$(wc -l < "$overall_results" | tr -d ' ')" != "1" \
+      || "$(cat "$overall_results")" != "Backup finished with result: Success" ]]; then
+    echo "Expected exactly one successful overall framework result for $case_name." >&2
+    cat "$overall_results" >&2
+    return 1
+  fi
+}
+
 run_case() {
   local case_name="$1"
   local transport_parameters="$2"
@@ -648,9 +689,10 @@ run_case() {
       ;;
     fail-closed-legacy-transport-rejection)
       invocation_policy=exactly-one
-      grep -Fx "Package $APP_ID with result: Transport rejected package" \
-        "$ARTIFACT_DIR/$case_name-backupnow.txt"
-      grep -Fx "Backup finished with result: Success" "$ARTIFACT_DIR/$case_name-backupnow.txt"
+      if ! assert_exclusive_framework_result "$case_name" \
+          "Package $APP_ID with result: Transport rejected package"; then
+        exit 1
+      fi
       ;;
     fail-closed-transport-rejection)
       invocation_policy=exactly-one
@@ -754,7 +796,7 @@ adb_cmd shell bmgr enable true
   echo "transport=$LOCAL_TRANSPORT"
   echo "exact-commands=./gradlew :app:testDebugUnitTest --tests com.chessticize.mobile.backup.ProgressBackupPolicyTest --no-daemon; apps/mobile/scripts/android-progress-backup-policy-evidence.sh"
   echo "validation-scope=targeted native Android full-backup capability and allowlist policy"
-  echo "scope-rationale=API24 requires one pre-transport-flags fail-closed decision, the exact legacy package rejection, no payload log, and no archive; API30 proves shared agent mask 0 fails closed with no payload and a real inherited restore admits only the v28 path-only allowlist; API36 mask 0 requires exactly one fail-closed policy/result invocation, selected masks 1,2,3 tolerate only repeated-identical preflight groups, and device/inode identity collapses path aliases only when one canonical archive target proves exact-once payload"
+  echo "scope-rationale=API24 requires one pre-transport-flags fail-closed decision, exactly one legacy package rejection and successful overall result, no payload log, and no archive; API30 proves shared agent mask 0 fails closed with no payload and a real inherited restore admits only the v28 path-only allowlist; API36 mask 0 requires exactly one fail-closed policy/result invocation, selected masks 1,2,3 tolerate only repeated-identical preflight groups, and device/inode identity collapses raw path aliases only after recording every alias and proving one canonical archive target"
   echo "artifact-name=android-progress-backup-policy-api-$SDK_LEVEL"
   echo "artifact-identifier=run-${GITHUB_RUN_ID:-local}/android-progress-backup-policy-api-$SDK_LEVEL"
   echo "artifact-url=${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY:-local/repository}/actions/runs/${GITHUB_RUN_ID:-local}#artifacts"
