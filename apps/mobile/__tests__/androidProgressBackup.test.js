@@ -1328,7 +1328,19 @@ describe('Android Progress Backup', () => {
     expect(restoreParserScript).toContain('final_metadata_entries');
     expect(restoreParserScript).toContain('ls -Zd "$archive_path"');
     expect(restoreParserScript).toContain('chcon "$archive_context" "$archive_path"');
-    expect(restoreParserScript).toContain('adb_cmd shell pm clear "$APP_ID"');
+    const restoreClearIndex = restoreParserScript.indexOf(
+      'adb_cmd shell pm clear "$APP_ID"',
+    );
+    const restoreForceStopIndex = restoreParserScript.indexOf(
+      'adb_cmd shell am force-stop --user 0 "$APP_ID"',
+    );
+    const stoppedAssertionIndex = restoreParserScript.indexOf(
+      'assert_package_stopped_without_process',
+      restoreForceStopIndex,
+    );
+    expect(restoreClearIndex).toBeGreaterThan(-1);
+    expect(restoreForceStopIndex).toBeGreaterThan(restoreClearIndex);
+    expect(stoppedAssertionIndex).toBeGreaterThan(restoreForceStopIndex);
     expect(restoreParserScript).toContain('stopped=true');
     expect(restoreParserScript).not.toContain('pm unstop');
     expect(restoreParserScript).not.toContain('MainActivity');

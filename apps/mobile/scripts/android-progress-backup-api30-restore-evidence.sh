@@ -694,6 +694,7 @@ printf '%s %s %s %s\n' "$archive_uid" "$archive_gid" "$archive_mode" "$archive_c
   > "$ARTIFACT_DIR/api30-restore-base-archive-security.txt"
 
 adb_cmd shell pm clear "$APP_ID"
+adb_cmd shell am force-stop --user 0 "$APP_ID"
 assert_package_stopped_without_process
 for path in "${POSITIVE_DEVICE_PATHS[@]}" "${NEGATIVE_DEVICE_PATHS[@]}"; do
   require_device_path_state any "$path" absent "$APP_ID" \
