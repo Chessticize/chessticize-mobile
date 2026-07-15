@@ -785,6 +785,8 @@ describe('Android Progress Backup', () => {
     expect(helper).toContain('require_device_path_state');
     expect(helper).toContain('find_existing_device_paths');
     expect(helper).toContain('read_canonical_device_path');
+    expect(helper).toContain('read_device_file_identity');
+    expect(helper).toContain('stat -c %d:%i');
     expect(policyEvidenceScript).toContain(
       'find_existing_device_paths file "${candidates[@]}"',
     );
@@ -794,7 +796,7 @@ describe('Android Progress Backup', () => {
     expect(policyEvidenceScript).not.toContain('adb_cmd shell test -f "$candidate"');
     expect(api30RestoreScript).not.toContain('adb_cmd shell test -d "$candidate"');
     expect(policyEvidenceScript).toContain(
-      'if ! find_transport_archive > "$archive_paths_file"; then',
+      'if ! find_transport_archive "$case_name" > "$archive_paths_file"; then',
     );
     expect(api30RestoreScript).toContain(
       'if ! find_transport_archive_parent > "$archive_parent_paths"; then',
@@ -866,6 +868,72 @@ describe('Android Progress Backup', () => {
     }
   });
 
+  it('collapses API 36 LocalTransport aliases only after proving one device and inode', () => {
+    const policyEvidenceScript = read('scripts/android-progress-backup-policy-evidence.sh');
+    const findTransportArchive = policyEvidenceScript.slice(
+      policyEvidenceScript.indexOf('find_transport_archive()'),
+      policyEvidenceScript.indexOf("WORKFLOW_APK_SIZE=''"),
+    );
+    const dataAlias =
+      '/data/data/com.android.localtransport/files/1/_full/com.chessticize.mobile';
+    const userAlias =
+      '/data/user/0/com.android.localtransport/files/1/_full/com.chessticize.mobile';
+
+    expect(policyEvidenceScript).toContain(
+      '"/data/data/com.android.localtransport/files/1/_full/$APP_ID"',
+    );
+    expect(policyEvidenceScript).toContain(
+      '"/data/user/0/com.android.localtransport/files/1/_full/$APP_ID"',
+    );
+    expect(policyEvidenceScript).toContain('read_device_file_identity "$archive_alias"');
+    expect(policyEvidenceScript).toContain('$case_name-transport-archive-aliases.txt');
+    expect(policyEvidenceScript).toContain('$case_name-transport-archive-identities.txt');
+
+    const discover = (mode) => {
+      const command = `
+        set -u
+        APP_ID=com.chessticize.mobile
+        ALIAS_MODE=${mode}
+        ARTIFACT_DIR="$(mktemp -d)"
+        trap 'rm -rf "$ARTIFACT_DIR"' EXIT
+        find_existing_device_paths() {
+          printf '%s\\n' ${JSON.stringify(dataAlias)} ${JSON.stringify(userAlias)}
+        }
+        read_device_file_identity() {
+          case "$ALIAS_MODE:$1" in
+            same:*) printf '253:4242' ;;
+            distinct:${dataAlias}) printf '253:4242' ;;
+            distinct:${userAlias}) printf '253:4343' ;;
+          esac
+        }
+        ${findTransportArchive}
+        set +e
+        output="$(find_transport_archive encryption-only 2>"$ARTIFACT_DIR/error.txt")"
+        status=$?
+        set -e
+        printf 'status=%s\\noutput=<%s>\\n' "$status" "$output"
+        if [[ -f "$ARTIFACT_DIR/encryption-only-transport-archive-identities.txt" ]]; then
+          printf 'identities=\\n'
+          cat "$ARTIFACT_DIR/encryption-only-transport-archive-identities.txt"
+        fi
+        printf 'error=<%s>\\n' "$(cat "$ARTIFACT_DIR/error.txt")"
+      `;
+      const result = spawnSync('/bin/bash', ['-c', command], {
+        encoding: 'utf8',
+      });
+      expect(result.status).toBe(0);
+      return result.stdout;
+    };
+
+    expect(discover('same')).toBe(
+      `status=0\noutput=<${dataAlias}>\nidentities=\n253:4242 ${dataAlias}\n253:4242 ${userAlias}\nerror=<>\n`,
+    );
+    expect(discover('distinct')).toContain(
+      'Expected at most one canonical LocalTransport archive target.',
+    );
+    expect(discover('distinct')).toMatch(/^status=[1-9][0-9]*\noutput=<>\n/);
+  });
+
   it('treats API 30 mask zero as an expected fail-closed transport rejection', () => {
     const policyEvidenceScript = read('scripts/android-progress-backup-policy-evidence.sh');
 
@@ -878,6 +946,33 @@ describe('Android Progress Backup', () => {
     expect(policyEvidenceScript).toContain('unexpectedly emitted app-data payload');
     expect(policyEvidenceScript).toMatch(
       /run_case no-capability 'non_incremental_only=false' 0 false 0 no-archive \\\s+fail-closed-transport-rejection/,
+    );
+  });
+
+  it('requires the exact API 24 legacy rejection with one fail-closed decision and no archive', () => {
+    const policyEvidenceScript = read('scripts/android-progress-backup-policy-evidence.sh');
+    const backupContract = read('docs/ANDROID_PROGRESS_BACKUP.md');
+
+    expect(policyEvidenceScript).toMatch(
+      /run_case pre-flags-api 'non_incremental_only=false' unavailable false 0 no-archive \\\s+fail-closed-legacy-transport-rejection/,
+    );
+    const legacyRejectionCase = policyEvidenceScript.slice(
+      policyEvidenceScript.indexOf('fail-closed-legacy-transport-rejection)'),
+      policyEvidenceScript.indexOf('fail-closed-transport-rejection)'),
+    );
+    expect(legacyRejectionCase).toContain('invocation_policy=exactly-one');
+    expect(legacyRejectionCase).toContain(
+      'grep -Fx "Package $APP_ID with result: Transport rejected package"',
+    );
+    expect(legacyRejectionCase).toContain(
+      'grep -Fx "Backup finished with result: Success"',
+    );
+    expect(legacyRejectionCase).not.toContain("wasn't able to process it");
+    expect(backupContract).toContain(
+      'API 24 requires the exact legacy package rejection with one fail-closed agent decision',
+    );
+    expect(policyEvidenceScript).toContain(
+      'API24 requires one pre-transport-flags fail-closed decision, the exact legacy package rejection, no payload log, and no archive',
     );
   });
 
@@ -1127,7 +1222,7 @@ describe('Android Progress Backup', () => {
       'repeated identical policy/result/payload groups',
     );
     expect(policyEvidenceScript).toContain(
-      'API36 mask 0 requires exactly one fail-closed policy/result invocation, selected masks 1,2,3 tolerate only repeated-identical preflight groups, and the canonical archive proves exact-once payload',
+      'API36 mask 0 requires exactly one fail-closed policy/result invocation, selected masks 1,2,3 tolerate only repeated-identical preflight groups, and device/inode identity collapses path aliases only when one canonical archive target proves exact-once payload',
     );
     expect(policyEvidenceScript).not.toContain('once-only agent output');
   });

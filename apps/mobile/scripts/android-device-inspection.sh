@@ -267,6 +267,21 @@ read_canonical_device_path() {
   printf '%s' "$ANDROID_DEVICE_COMMAND_OUTPUT"
 }
 
+read_device_file_identity() {
+  local path="$1"
+
+  validate_device_path "$path" || return 1
+  if ! inspect_device_command "stat -c %d:%i \"$path\""; then
+    return 1
+  fi
+  if [[ "$ANDROID_DEVICE_COMMAND_STATUS" != "0" \
+      || ! "$ANDROID_DEVICE_COMMAND_OUTPUT" =~ ^[0-9]+:[0-9]+$ ]]; then
+    echo "Unable to read a strict device/inode identity for $path (status $ANDROID_DEVICE_COMMAND_STATUS): ${ANDROID_DEVICE_COMMAND_OUTPUT:-<empty>}" >&2
+    return 1
+  fi
+  printf '%s' "$ANDROID_DEVICE_COMMAND_OUTPUT"
+}
+
 find_existing_device_paths() {
   local kind="$1"
   shift

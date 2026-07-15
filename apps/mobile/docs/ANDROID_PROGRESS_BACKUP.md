@@ -63,8 +63,10 @@ the allowlist.
 
 - API 24-27 fails closed in `ProgressBackupAgent` before it touches
   `getTransportFlags()`, because those versions cannot advertise the
-  client-side encryption and D2D transport flags added in API 28. The base XML
-  restore rules also contain no include.
+  client-side encryption and D2D transport flags added in API 28.
+  API 24 requires the exact legacy package rejection with one fail-closed agent decision,
+  `selected=false`, `emitted=0`, no payload log, and no transport archive. The
+  base XML restore rules also contain no include.
 - API 28-30 XML contains one path-only main-database include for inherited file
   restore. Its former duplicated `requireFlags` backup conditions were
   redundant because the custom agent never invokes default XML backup
@@ -144,7 +146,10 @@ archive. For successful selected masks `1`, `2`, and `3`, Android can invoke
 agent logs may contain repeated identical policy/result/payload groups. The
 harness rejects conflicting decisions or file sets, while the canonical
 transport archive proves the main database, journal, and WAL were emitted
-exactly once. Every payload
+exactly once. If LocalTransport exposes the same archive through both
+`/data/data` and `/data/user/0`, the harness records both aliases and collapses
+them only after their device and inode identities match; distinct identities
+fail closed. Every payload
 case rejects unique nonzero traps across credential- and device-protected root,
 files, shared-preference, and database domains, plus recursive sidecar and
 `-shm` traps. See the authoritative

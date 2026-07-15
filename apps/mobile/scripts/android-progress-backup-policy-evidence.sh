@@ -281,13 +281,43 @@ seed_app_data_fixture() {
 }
 
 find_transport_archive() {
+  local case_name="$1"
   local candidates=(
     "/data/data/com.android.localtransport/files/1/_full/$APP_ID"
     "/data/user/0/com.android.localtransport/files/1/_full/$APP_ID"
     "/data/user_de/0/com.android.localtransport/files/1/_full/$APP_ID"
     "/cache/backup/1/_full/$APP_ID"
   )
-  find_existing_device_paths file "${candidates[@]}"
+  local aliases_file="$ARTIFACT_DIR/$case_name-transport-archive-aliases.txt"
+  local identities_file="$ARTIFACT_DIR/$case_name-transport-archive-identities.txt"
+  local archive_alias
+  local archive_identity
+  local identity_count
+
+  if ! find_existing_device_paths file "${candidates[@]}" > "$aliases_file"; then
+    return 1
+  fi
+  : > "$identities_file"
+  while IFS= read -r archive_alias; do
+    if [[ -z "$archive_alias" ]]; then
+      continue
+    fi
+    if ! archive_identity="$(read_device_file_identity "$archive_alias")"; then
+      return 1
+    fi
+    printf '%s %s\n' "$archive_identity" "$archive_alias" >> "$identities_file"
+  done < "$aliases_file"
+
+  if [[ ! -s "$aliases_file" ]]; then
+    return
+  fi
+  identity_count="$(cut -d ' ' -f 1 "$identities_file" | sort -u | wc -l | tr -d ' ')"
+  if [[ "$identity_count" != "1" ]]; then
+    echo "Expected at most one canonical LocalTransport archive target." >&2
+    cat "$identities_file" >&2
+    return 1
+  fi
+  sed -n '1p' "$aliases_file"
 }
 
 WORKFLOW_APK_SIZE=''
@@ -530,7 +560,7 @@ assert_app_data_archive_paths() {
   local expected_entries="$ARTIFACT_DIR/$case_name-expected-app-data-entries.txt"
   local archive_size
 
-  if ! find_transport_archive > "$archive_paths_file"; then
+  if ! find_transport_archive "$case_name" > "$archive_paths_file"; then
     echo "Unable to inspect canonical LocalTransport archive paths." >&2
     exit 1
   fi
@@ -615,6 +645,12 @@ run_case() {
   case "$expected_framework_result" in
     success)
       grep -F "Package $APP_ID with result: Success" "$ARTIFACT_DIR/$case_name-backupnow.txt"
+      ;;
+    fail-closed-legacy-transport-rejection)
+      invocation_policy=exactly-one
+      grep -Fx "Package $APP_ID with result: Transport rejected package" \
+        "$ARTIFACT_DIR/$case_name-backupnow.txt"
+      grep -Fx "Backup finished with result: Success" "$ARTIFACT_DIR/$case_name-backupnow.txt"
       ;;
     fail-closed-transport-rejection)
       invocation_policy=exactly-one
@@ -718,7 +754,7 @@ adb_cmd shell bmgr enable true
   echo "transport=$LOCAL_TRANSPORT"
   echo "exact-commands=./gradlew :app:testDebugUnitTest --tests com.chessticize.mobile.backup.ProgressBackupPolicyTest --no-daemon; apps/mobile/scripts/android-progress-backup-policy-evidence.sh"
   echo "validation-scope=targeted native Android full-backup capability and allowlist policy"
-  echo "scope-rationale=API24 proves pre-transport-flags fail-closed behavior; API30 proves shared agent mask 0 fails closed with no payload and a real inherited restore admits only the v28 path-only allowlist; API36 mask 0 requires exactly one fail-closed policy/result invocation, selected masks 1,2,3 tolerate only repeated-identical preflight groups, and the canonical archive proves exact-once payload"
+  echo "scope-rationale=API24 requires one pre-transport-flags fail-closed decision, the exact legacy package rejection, no payload log, and no archive; API30 proves shared agent mask 0 fails closed with no payload and a real inherited restore admits only the v28 path-only allowlist; API36 mask 0 requires exactly one fail-closed policy/result invocation, selected masks 1,2,3 tolerate only repeated-identical preflight groups, and device/inode identity collapses path aliases only when one canonical archive target proves exact-once payload"
   echo "artifact-name=android-progress-backup-policy-api-$SDK_LEVEL"
   echo "artifact-identifier=run-${GITHUB_RUN_ID:-local}/android-progress-backup-policy-api-$SDK_LEVEL"
   echo "artifact-url=${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY:-local/repository}/actions/runs/${GITHUB_RUN_ID:-local}#artifacts"
@@ -728,7 +764,8 @@ adb_cmd shell bmgr enable true
 } > "$ARTIFACT_DIR/context.txt"
 
 if (( SDK_LEVEL == 24 )); then
-  run_case pre-flags-api 'non_incremental_only=false' unavailable false 0 none
+  run_case pre-flags-api 'non_incremental_only=false' unavailable false 0 no-archive \
+    fail-closed-legacy-transport-rejection
 elif (( SDK_LEVEL == 30 )); then
   run_case no-capability 'non_incremental_only=false' 0 false 0 no-archive \
     fail-closed-transport-rejection
