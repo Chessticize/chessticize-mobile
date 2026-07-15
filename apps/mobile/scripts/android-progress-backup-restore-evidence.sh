@@ -58,7 +58,7 @@ assert_restored_progress current-progress cloud-restored
 apps/mobile/scripts/android-progress-backup-evidence.sh seed-released-fixture
 pnpm mobile:verify:android:backup -- --adb-device "$DEVICE" --json \
   > "$ARTIFACT_DIR/device-transfer-payload.json"
-apps/mobile/scripts/android-progress-backup-evidence.sh device-transfer
+apps/mobile/scripts/android-progress-backup-evidence.sh device-transfer-released-fixture
 assert_restored_progress released-fixture device-transfer-restored
 git status --porcelain --untracked-files=no > "$ARTIFACT_DIR/tracked-worktree-after.txt"
 [[ ! -s "$ARTIFACT_DIR/tracked-worktree-after.txt" ]]

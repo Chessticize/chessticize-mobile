@@ -1,8 +1,11 @@
 package com.chessticize.mobile.backup;
 
 import android.app.backup.BackupAgent;
+import android.app.backup.BackupDataInput;
+import android.app.backup.BackupDataOutput;
 import android.app.backup.FullBackupDataOutput;
 import android.os.Build;
+import android.os.ParcelFileDescriptor;
 import android.util.Log;
 
 import java.io.File;
@@ -11,6 +14,22 @@ import java.util.List;
 
 public final class ProgressBackupAgent extends BackupAgent {
     private static final String TAG = "ChessticizeBackup";
+
+    @Override
+    public void onBackup(
+            ParcelFileDescriptor oldState,
+            BackupDataOutput data,
+            ParcelFileDescriptor newState) {
+        // Key-value backup is intentionally disabled by android:fullBackupOnly.
+    }
+
+    @Override
+    public void onRestore(
+            BackupDataInput data,
+            int appVersionCode,
+            ParcelFileDescriptor newState) {
+        // Key-value restore is intentionally disabled by android:fullBackupOnly.
+    }
 
     @Override
     public void onFullBackup(FullBackupDataOutput data) throws IOException {

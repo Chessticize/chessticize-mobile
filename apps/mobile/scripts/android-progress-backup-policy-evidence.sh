@@ -223,6 +223,16 @@ assert_agent_decision() {
   local encryption=false
   local d2d=false
   local log="$ARTIFACT_DIR/$case_name-agent-log.txt"
+  local policy_events="$ARTIFACT_DIR/$case_name-policy-events.txt"
+  local unique_policy_events="$ARTIFACT_DIR/$case_name-unique-policy-events.txt"
+  local result_events="$ARTIFACT_DIR/$case_name-result-events.txt"
+  local unique_result_events="$ARTIFACT_DIR/$case_name-unique-result-events.txt"
+  local payload_events="$ARTIFACT_DIR/$case_name-payload-events.txt"
+  local expected_policy
+  local expected_result
+  local policy_invocations
+  local expected_payload_events
+  local name
 
   case "$expected_flags" in
     unavailable) ;;
@@ -233,31 +243,52 @@ assert_agent_decision() {
     *) echo "Unsupported expected transport flag mask: $expected_flags" >&2; exit 64 ;;
   esac
 
-  grep -Fx \
-    "event=policy sdk=$SDK_LEVEL transportFlags=$expected_flags encryption=$encryption d2d=$d2d selected=$expected_selected" \
-    "$log"
-  grep -Fx "event=result selected=$expected_selected emitted=$expected_emitted" "$log"
-  if [[ "$(grep -c '^event=policy ' "$log")" != "1" \
-      || "$(grep -c '^event=result ' "$log")" != "1" ]]; then
-    echo "Expected exactly one policy and result event for $case_name." >&2
+  expected_policy="event=policy sdk=$SDK_LEVEL transportFlags=$expected_flags encryption=$encryption d2d=$d2d selected=$expected_selected"
+  expected_result="event=result selected=$expected_selected emitted=$expected_emitted"
+  grep '^event=policy ' "$log" > "$policy_events" || true
+  grep '^event=result ' "$log" > "$result_events" || true
+  grep '^event=payload ' "$log" > "$payload_events" || true
+  if [[ ! -s "$policy_events" || ! -s "$result_events" ]]; then
+    echo "Expected at least one BackupAgent policy and result invocation for $case_name." >&2
     exit 1
   fi
+  sort -u "$policy_events" > "$unique_policy_events"
+  sort -u "$result_events" > "$unique_result_events"
+  if [[ "$(wc -l < "$unique_policy_events" | tr -d ' ')" != "1" \
+      || "$(cat "$unique_policy_events")" != "$expected_policy" ]]; then
+    echo "Inconsistent BackupAgent policy selections for $case_name." >&2
+    cat "$unique_policy_events" >&2
+    exit 1
+  fi
+  if [[ "$(wc -l < "$unique_result_events" | tr -d ' ')" != "1" \
+      || "$(cat "$unique_result_events")" != "$expected_result" ]]; then
+    echo "Inconsistent BackupAgent results for $case_name." >&2
+    cat "$unique_result_events" >&2
+    exit 1
+  fi
+  policy_invocations="$(wc -l < "$policy_events" | tr -d ' ')"
+  if [[ "$(wc -l < "$result_events" | tr -d ' ')" != "$policy_invocations" ]]; then
+    echo "BackupAgent policy/result invocation counts differ for $case_name." >&2
+    exit 1
+  fi
+  AGENT_INVOCATIONS="$policy_invocations"
 
   if (( expected_emitted == 0 )); then
-    if grep -q '^event=payload ' "$log"; then
+    if [[ -s "$payload_events" ]]; then
       echo "$case_name logged payload despite a fail-closed policy decision." >&2
       exit 1
     fi
     return
   fi
 
-  if [[ "$(grep -c '^event=payload ' "$log")" != "$expected_emitted" ]]; then
-    echo "$case_name did not emit exactly $expected_emitted payload events." >&2
+  expected_payload_events=$((expected_emitted * policy_invocations))
+  if [[ "$(wc -l < "$payload_events" | tr -d ' ')" != "$expected_payload_events" ]]; then
+    echo "$case_name payload log count is inconsistent with its BackupAgent invocations." >&2
     exit 1
   fi
   for name in chessticize-mobile.sqlite chessticize-mobile.sqlite-journal chessticize-mobile.sqlite-wal; do
-    if [[ "$(grep -Fxc "event=payload name=$name" "$log")" != "1" ]]; then
-      echo "$case_name did not emit $name exactly once." >&2
+    if [[ "$(grep -Fxc "event=payload name=$name" "$payload_events")" != "$policy_invocations" ]]; then
+      echo "$case_name did not emit $name once per consistent BackupAgent invocation." >&2
       exit 1
     fi
   done
@@ -326,6 +357,7 @@ run_case() {
   local expected_emitted="$5"
   local expected_payload="$6"
   local backup_status=0
+  AGENT_INVOCATIONS=0
 
   adb_cmd shell settings put secure backup_local_transport_parameters "$transport_parameters"
   adb_cmd shell bmgr transport "$LOCAL_TRANSPORT" | grep -F 'Selected transport'
@@ -343,7 +375,7 @@ run_case() {
   grep -F "* $LOCAL_TRANSPORT" "$ARTIFACT_DIR/$case_name-transports.txt"
   assert_agent_decision "$case_name" "$expected_flags" "$expected_selected" "$expected_emitted"
   assert_app_data_archive_paths "$case_name" "$expected_payload"
-  echo "case=$case_name delivered-mask=$expected_flags selected=$expected_selected emitted=$expected_emitted payload=$expected_payload result=pass" \
+  echo "case=$case_name delivered-mask=$expected_flags selected=$expected_selected emitted=$expected_emitted agent-invocations=$AGENT_INVOCATIONS payload=$expected_payload result=pass" \
     >> "$ARTIFACT_DIR/context.txt"
 }
 

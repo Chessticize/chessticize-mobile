@@ -85,6 +85,26 @@ describe('Android Progress Backup', () => {
     ]);
   });
 
+  it('keeps mandatory key-value BackupAgent callbacks inert in full-backup-only mode', () => {
+    const manifest = read('android/app/src/main/AndroidManifest.xml');
+    const backupAgent = read(
+      'android/app/src/main/java/com/chessticize/mobile/backup/ProgressBackupAgent.java',
+    );
+
+    expect(manifest).toContain('android:fullBackupOnly="true"');
+    expect(backupAgent).toMatch(
+      /public void onBackup\(\s*ParcelFileDescriptor oldState,\s*BackupDataOutput data,\s*ParcelFileDescriptor newState\) \{\s*\/\/ Key-value backup is intentionally disabled by android:fullBackupOnly\.\s*\}/,
+    );
+    expect(backupAgent).toMatch(
+      /public void onRestore\(\s*BackupDataInput data,\s*int appVersionCode,\s*ParcelFileDescriptor newState\) \{\s*\/\/ Key-value restore is intentionally disabled by android:fullBackupOnly\.\s*\}/,
+    );
+    expect(backupAgent).not.toContain('data.writeEntity');
+    expect(backupAgent).not.toContain('data.readNextHeader');
+    expect(backupAgent).not.toContain('super.onBackup');
+    expect(backupAgent).not.toContain('super.onRestore');
+    expect(backupAgent).not.toContain('onRestoreFile');
+  });
+
   it('keeps a 5 MiB guard band below Android Auto Backup quota and fails closed', () => {
     expect(ANDROID_AUTO_BACKUP_QUOTA_BYTES).toBe(25 * 1024 * 1024);
     expect(ANDROID_PROGRESS_BACKUP_MAX_BYTES).toBe(20 * 1024 * 1024);
@@ -354,6 +374,74 @@ describe('Android Progress Backup', () => {
     expect(policy.replace(/\s+/g, ' ')).toContain('does not enable transfer between Android and iOS');
   });
 
+  it('backs up the untouched released schema before first launch and migrates only after restore', () => {
+    const evidenceScript = read('scripts/android-progress-backup-evidence.sh');
+    const restoreEvidenceScript = read('scripts/android-progress-backup-restore-evidence.sh');
+    const seedCommand =
+      'apps/mobile/scripts/android-progress-backup-evidence.sh seed-released-fixture';
+    const backupCommand =
+      'apps/mobile/scripts/android-progress-backup-evidence.sh device-transfer-released-fixture';
+    const restoredAssertion =
+      'assert_restored_progress released-fixture device-transfer-restored';
+
+    expect(evidenceScript).toContain('device-transfer-released-fixture');
+    for (const artifact of [
+      'released-fixture-pre-backup-stat.txt',
+      'released-fixture-pre-backup-sha256.txt',
+      'released-fixture-pre-backup-user-version.txt',
+      'released-fixture-pre-backup-schema.sql',
+      'released-fixture-pre-backup-package-state.txt',
+      'released-fixture-pre-backup-process.txt',
+    ]) {
+      expect(evidenceScript).toContain(artifact);
+    }
+    const seedBranch = evidenceScript.slice(
+      evidenceScript.indexOf('if [[ "$MODE" == "seed-released-fixture" ]]'),
+      evidenceScript.indexOf('original_transport='),
+    );
+    expect(seedBranch).toContain('adb_cmd shell pm clear "$APP_ID"');
+    expect(seedBranch).not.toContain('am force-stop');
+    expect(seedBranch).not.toContain('MainActivity');
+    expect(evidenceScript).toMatch(
+      /if \[\[ "\$MODE" == "cloud-encrypted" \]\]; then[\s\S]*?am start -W -n "\$APP_ID\/\.MainActivity"[\s\S]*?else\s+assert_released_fixture_unlaunched\s+fi\s+adb_cmd logcat -c/,
+    );
+
+    const seedIndex = restoreEvidenceScript.indexOf(seedCommand);
+    const backupIndex = restoreEvidenceScript.indexOf(backupCommand);
+    const restoredAssertionIndex = restoreEvidenceScript.indexOf(restoredAssertion);
+    expect(seedIndex).toBeGreaterThan(-1);
+    expect(seedIndex).toBeLessThan(backupIndex);
+    expect(backupIndex).toBeLessThan(restoredAssertionIndex);
+    expect(restoreEvidenceScript.slice(seedIndex, backupIndex)).not.toContain('MainActivity');
+    expect(restoreEvidenceScript.slice(seedIndex, backupIndex)).not.toContain(
+      'mobile:e2e:test:android',
+    );
+  });
+
+  it('accepts repeated identical agent preflight logs while archives prove once-only payload', () => {
+    const policyEvidenceScript = read('scripts/android-progress-backup-policy-evidence.sh');
+
+    expect(policyEvidenceScript).toContain(
+      'policy_events="$ARTIFACT_DIR/$case_name-policy-events.txt"',
+    );
+    expect(policyEvidenceScript).toContain(
+      'sort -u "$policy_events" > "$unique_policy_events"',
+    );
+    expect(policyEvidenceScript).toContain(
+      'policy_invocations="$(wc -l < "$policy_events" | tr -d \' \')"',
+    );
+    expect(policyEvidenceScript).toContain('Inconsistent BackupAgent policy selections');
+    expect(policyEvidenceScript).toContain(
+      'expected_payload_events=$((expected_emitted * policy_invocations))',
+    );
+    expect(policyEvidenceScript).toContain(
+      'assert_app_data_archive_paths "$case_name" "$expected_payload"',
+    );
+    expect(policyEvidenceScript).not.toContain(
+      'Expected exactly one policy and result event for $case_name.',
+    );
+  });
+
   it('runs the real APK through API 24, API 30, and API 36 backup policy selection', () => {
     const workflow = readRepo('.github/workflows/mobile-android.yml');
     const policyEvidenceScript = read('scripts/android-progress-backup-policy-evidence.sh');
@@ -417,6 +505,9 @@ describe('Android Progress Backup', () => {
     );
     expect(backupPolicy).toContain('!candidate.isFile()');
     expect(backupPolicyTest).toContain('apiBeforeTransportFlagsFailsClosedForEveryMask');
+    expect(backupPolicyTest).toContain(
+      'concreteAgentDeclaresInertKeyValueCallbacksAndFullBackupEntryPoint',
+    );
     expect(backupPolicyTest).toContain('apiWithTransportFlagsUsesOnceOnlyOrSemantics');
     expect(backupPolicyTest).toContain(
       'selectsOnlyCanonicalExistingRegularDatabaseFilesOnce',
@@ -466,7 +557,9 @@ describe('Android Progress Backup', () => {
     expect(backupContract).toContain('`android:fullBackupOnly="true"`');
     expect(backupContract).toContain('API 30 records the installed production');
     expect(backupContract).toContain('API 36 uses the authoritative Android 16 LocalTransport');
-    expect(backupContract).toContain('default restore path continues to enforce the XML allowlist');
+    expect(backupContract).toContain(
+      'default file restore path continues to enforce the XML',
+    );
     expect(backupContract).not.toContain('encrypted API 30 emits');
     for (const trap of [
       'chessticize-mobile.sqlite-journal-journal',

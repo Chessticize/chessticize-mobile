@@ -21,13 +21,17 @@ path is expanded again, which would admit recursive suffixes such as
 Backup emission is owned by the manifest-bound `ProgressBackupAgent`, not by
 default XML traversal. The application sets `android:fullBackupOnly="true"` so
 Android invokes file-based full backup instead of falling back to key-value
-backup. The agent never calls `super.onFullBackup(...)`. On API 28 and later it
+backup. Android still requires a custom agent to implement the abstract
+key-value callbacks, so `onBackup(...)` and `onRestore(...)` are deliberately
+inert and never read or write key-value entities. The agent never calls
+`super.onFullBackup(...)`. On API 28 and later it
 reads `FullBackupDataOutput.getTransportFlags()` and emits only the canonical,
 existing regular files for the main database and its exact `-journal` and
 `-wal` sidecars. Each file is considered once, and the payload is selected once
-when client-side encryption **or** device-to-device transfer is active, including
-when both flags are active. The agent does not override restore methods, so
-Android's default restore path continues to enforce the XML allowlist. See
+when client-side encryption **or** device-to-device transfer is active,
+including when both flags are active. The agent does not override file-restore
+methods, so Android's default file restore path continues to enforce the XML
+allowlist. See
 Android's guidance for [implementing a custom backup agent](https://developer.android.com/identity/data/autobackup#ImplementBackupAgent)
 and the [`fullBackupOnly` manifest attribute](https://developer.android.com/reference/android/R.attr#fullBackupOnly).
 
@@ -110,15 +114,24 @@ the authoritative
 API 36 uses the authoritative Android 16 LocalTransport `is_encrypted` and
 `is_device_transfer` parameters and asserts the agent receives masks `0`, `1`,
 `2`, and `3`. It proves neither emits no app data and encryption-only, D2D-only,
-and both emit exactly the main database, journal, and WAL once. Every payload
+and both produce an archive containing exactly the main database, journal, and
+WAL once. Android can invoke `onFullBackup(...)` repeatedly for quota
+measurement and actual emission, so agent logs may contain repeated identical
+policy/result/payload groups. The harness requires every group to agree on the
+mask, decision, and file set; the canonical transport archive is the
+authoritative exact-once payload proof. Every payload
 case rejects unique nonzero traps across credential- and device-protected root,
 files, shared-preference, and database domains, plus recursive sidecar and
 `-shm` traps. See the authoritative
 [Android 16 LocalTransport parameters](https://android.googlesource.com/platform/frameworks/base/+/android-16.0.0_r1/packages/LocalTransport/src/com/android/localtransport/LocalTransportParameters.java).
 
-The workflow also creates progress through public UI, measures the real database payload,
-exercises an encrypted local cloud transport restore,
-then backs up and restores the immutable released SQLite fixture through the
-Android D2D transport. Both clean-install restores launch the real app and
-assert preserved progress through public UI; the released fixture follows the
-normal startup migration path.
+The workflow also creates progress through public UI, measures the real
+database payload, and exercises an encrypted local cloud transport restore.
+For the released migration case, it clears the app data, seeds the immutable
+schema-v0 SQLite fixture, and records its exact byte size, SHA-256, user version,
+schema, package state, and absent process before backup. No activity or Detox
+journey launches between seeding and the D2D BackupManager invocation, and a
+second hash check proves the fixture is still unchanged. Only after clean
+uninstall, reinstall, and system restore does Detox launch the public UI; that
+launch exercises the normal startup migration and asserts the preserved legacy
+rating and history row with the fixture-aligned clock.

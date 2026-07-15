@@ -2,9 +2,16 @@ package com.chessticize.mobile.backup;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import android.app.backup.BackupDataInput;
+import android.app.backup.BackupDataOutput;
+import android.app.backup.FullBackupDataOutput;
+import android.os.ParcelFileDescriptor;
+
 import java.io.File;
+import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.List;
@@ -24,6 +31,29 @@ public final class ProgressBackupPolicyTest {
     public void apiBeforeTransportFlagsFailsClosedForEveryMask() {
         for (int flags : new int[] {0, ENCRYPTION, DEVICE_TRANSFER, ENCRYPTION | DEVICE_TRANSFER}) {
             assertFalse(ProgressBackupPolicy.shouldBackUp(24, flags, ENCRYPTION, DEVICE_TRANSFER));
+        }
+    }
+
+    @Test
+    public void concreteAgentDeclaresInertKeyValueCallbacksAndFullBackupEntryPoint()
+            throws Exception {
+        assertNotNull(ProgressBackupAgent.class.getDeclaredMethod(
+                "onBackup",
+                ParcelFileDescriptor.class,
+                BackupDataOutput.class,
+                ParcelFileDescriptor.class));
+        assertNotNull(ProgressBackupAgent.class.getDeclaredMethod(
+                "onRestore",
+                BackupDataInput.class,
+                int.class,
+                ParcelFileDescriptor.class));
+        assertNotNull(ProgressBackupAgent.class.getDeclaredMethod(
+                "onFullBackup",
+                FullBackupDataOutput.class));
+        for (Method method : ProgressBackupAgent.class.getDeclaredMethods()) {
+            assertFalse(
+                    "File restore must remain inherited",
+                    method.getName().equals("onRestoreFile"));
         }
     }
 
