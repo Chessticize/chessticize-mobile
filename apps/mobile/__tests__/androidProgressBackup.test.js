@@ -6,6 +6,7 @@ const {
   PROGRESS_DATABASE_FILES,
   assessBackupPayload,
   assertBackupPayloadWithinContract,
+  parseArguments,
 } = require('../scripts/verify-android-progress-backup');
 
 const appRoot = join(__dirname, '..');
@@ -97,6 +98,20 @@ describe('Android Progress Backup', () => {
     expect(() => assertBackupPayloadWithinContract([
       { name: PROGRESS_DATABASE_FILES[0], bytes: ANDROID_PROGRESS_BACKUP_MAX_BYTES + 1 },
     ])).toThrow('exceeds the 20 MiB release contract');
+  });
+
+  it('forwards device quota arguments through the root pnpm script without a literal separator', () => {
+    const workflow = readRepo('.github/workflows/mobile-android.yml');
+
+    expect(workflow).toContain(
+      'pnpm mobile:verify:android:backup --adb-device emulator-5554 --json',
+    );
+    expect(workflow).not.toContain('mobile:verify:android:backup -- --adb-device');
+    expect(parseArguments(['--adb-device', 'emulator-5554', '--json'])).toEqual({
+      json: true,
+      paths: [],
+      serial: 'emulator-5554',
+    });
   });
 
   it('measures the released progress fixture as real SQLite payload', () => {
