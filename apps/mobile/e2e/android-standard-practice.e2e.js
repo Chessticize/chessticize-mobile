@@ -19,7 +19,7 @@ describe(`Android Standard Practice offline persistence (${standardFixture.puzzl
   beforeAll(async () => {
     await setAndroidNetworkEnabled(false);
     await launchWithDisabledSynchronization({
-      delete: true,
+      resetAppState: true,
       newInstance: true,
       launchArgs: {
         chessticizePuzzleSelectionSeed: TEST_SEED,

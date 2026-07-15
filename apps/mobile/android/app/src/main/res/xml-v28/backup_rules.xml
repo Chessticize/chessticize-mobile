@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 9-11 use this path-only allowlist for inherited file restore.
+  ProgressBackupAgent owns backup emission and transport-capability checks.
+  Android expands the database include to its real -journal and -wal sidecars.
+  Keeping only the main database here prevents recursive suffix expansion; all
+  other app data is excluded by the presence of the explicit include.
+-->
+<full-backup-content>
+    <include domain="database" path="chessticize-mobile.sqlite" />
+</full-backup-content>

@@ -35,6 +35,9 @@ export function composeAndroidMobilePlatformCapabilities(
       configurePuzzleSource: source =>
         configureMobilePracticePuzzleSource(service, source),
     },
+    progressProtection: {
+      kind: 'android_managed_backup',
+    },
     progressSync: {
       client: null,
     },

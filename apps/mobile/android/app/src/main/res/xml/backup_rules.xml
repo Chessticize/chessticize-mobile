@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  API 24-27 cannot advertise client-side encryption or D2D transport flags.
+  ProgressBackupAgent fails closed on those releases, and this resource has no
+  restore include. API 28-30 selects the path-only restore allowlist in
+  res/xml-v28 while the agent owns all backup capability decisions.
+-->
+<full-backup-content>
+    <exclude domain="root" path="." />
+    <exclude domain="file" path="." />
+    <exclude domain="database" path="." />
+    <exclude domain="sharedpref" path="." />
+    <exclude domain="external" path="." />
+    <exclude domain="device_root" path="." />
+    <exclude domain="device_file" path="." />
+    <exclude domain="device_database" path="." />
+    <exclude domain="device_sharedpref" path="." />
+</full-backup-content>

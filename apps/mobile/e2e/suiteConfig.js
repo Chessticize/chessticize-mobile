@@ -9,7 +9,15 @@ const ADAPTIVE_LAYOUT_TEST_MATCH = ['<rootDir>/e2e/adaptive-layout.e2e.js'];
 const ANDROID_LAUNCH_TEST_MATCH = ['<rootDir>/e2e/android-launch.e2e.js'];
 const ANDROID_STANDARD_PRACTICE_TEST_MATCH = ['<rootDir>/e2e/android-standard-practice.e2e.js'];
 const ANDROID_MIGRATION_TEST_MATCH = ['<rootDir>/e2e/android-migration.e2e.js'];
+const ANDROID_OFFLINE_PRACTICE_TEST_MATCH = [
+  ...ANDROID_LAUNCH_TEST_MATCH,
+  ...ANDROID_STANDARD_PRACTICE_TEST_MATCH,
+  ...ANDROID_MIGRATION_TEST_MATCH,
+];
 const ANDROID_STOCKFISH_TEST_MATCH = ['<rootDir>/e2e/android-stockfish.e2e.js'];
+const ANDROID_PROGRESS_BACKUP_RESTORE_TEST_MATCH = [
+  '<rootDir>/e2e/android-progress-backup-restore.e2e.js'
+];
 // The practice suite waits on the real Stockfish bridge. Two concurrent iOS
 // simulators can make that analysis exceed the E2E timeout, so parallelism is
 // an explicit DETOX_MAX_WORKERS experiment rather than the default.
@@ -48,8 +56,16 @@ function resolveDetoxTestMatch(environment = process.env) {
     return ANDROID_MIGRATION_TEST_MATCH;
   }
 
+  if (activeSuite === 'android-offline-practice') {
+    return ANDROID_OFFLINE_PRACTICE_TEST_MATCH;
+  }
+
   if (activeSuite === 'android-stockfish') {
     return ANDROID_STOCKFISH_TEST_MATCH;
+  }
+
+  if (activeSuite === 'android-progress-backup-restore') {
+    return ANDROID_PROGRESS_BACKUP_RESTORE_TEST_MATCH;
   }
 
   if (activeSuite) {
@@ -85,7 +101,9 @@ module.exports = {
   ANDROID_LAUNCH_TEST_MATCH,
   ANDROID_STANDARD_PRACTICE_TEST_MATCH,
   ANDROID_MIGRATION_TEST_MATCH,
+  ANDROID_OFFLINE_PRACTICE_TEST_MATCH,
   ANDROID_STOCKFISH_TEST_MATCH,
+  ANDROID_PROGRESS_BACKUP_RESTORE_TEST_MATCH,
   DEFAULT_DETOX_MAX_WORKERS,
   resolveDetoxTestMatch,
   resolveDetoxMaxWorkers

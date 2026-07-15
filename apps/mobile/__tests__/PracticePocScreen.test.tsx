@@ -3637,6 +3637,28 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "settings-panel"))).not.toContain("›");
   });
 
+  it("shows Android-managed restore protection without exposing iCloud controls", () => {
+    const renderer = renderScreen({
+      progressProtection: { kind: "android_managed_backup" }
+    });
+
+    press(renderer, "settings-tab");
+
+    expect(findByTestId(renderer, "settings-android-backup-section")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "settings-android-backup-section")))
+      .toContain("Android Progress Backup");
+    expect(collectText(findByTestId(renderer, "settings-android-backup-status")))
+      .toContain("Managed by Android");
+    expect(collectText(findByTestId(renderer, "settings-android-backup-status")))
+      .toContain("restore local progress after reinstall or device transfer");
+    expect(collectText(findByTestId(renderer, "settings-android-backup-status")))
+      .toContain("not continuous sync");
+    expect(() => findByTestId(renderer, "settings-sync-section")).toThrow();
+    expect(() => findByTestId(renderer, "settings-icloud-sync-controls")).toThrow();
+    expect(() => findByTestId(renderer, "settings-sync-now")).toThrow();
+    expect(collectText(renderer.root)).not.toContain("iCloud");
+  });
+
   it("renders installed application metadata from the platform capability bundle", () => {
     const renderer = renderScreen({
       applicationMetadata: {

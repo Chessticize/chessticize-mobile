@@ -9,6 +9,8 @@ const {
   ANDROID_LAUNCH_TEST_MATCH,
   ANDROID_STANDARD_PRACTICE_TEST_MATCH,
   ANDROID_MIGRATION_TEST_MATCH,
+  ANDROID_OFFLINE_PRACTICE_TEST_MATCH,
+  ANDROID_PROGRESS_BACKUP_RESTORE_TEST_MATCH,
   resolveDetoxTestMatch,
   resolveDetoxMaxWorkers
 } = require('../e2e/suiteConfig');
@@ -381,6 +383,16 @@ describe('Detox suite configuration', () => {
       .toEqual(ANDROID_STANDARD_PRACTICE_TEST_MATCH);
     expect(resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'android-migration' }))
       .toEqual(ANDROID_MIGRATION_TEST_MATCH);
+    expect(resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'android-offline-practice' }))
+      .toEqual(ANDROID_OFFLINE_PRACTICE_TEST_MATCH);
+    expect(ANDROID_OFFLINE_PRACTICE_TEST_MATCH).toEqual([
+      ANDROID_LAUNCH_TEST_MATCH[0],
+      ANDROID_STANDARD_PRACTICE_TEST_MATCH[0],
+      ANDROID_MIGRATION_TEST_MATCH[0],
+    ]);
+    expect(resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'android-progress-backup-restore' }))
+      .toEqual(ANDROID_PROGRESS_BACKUP_RESTORE_TEST_MATCH);
+    expect(ACTIVE_E2E_TEST_MATCH).not.toContain(ANDROID_PROGRESS_BACKUP_RESTORE_TEST_MATCH[0]);
   });
 
   it('rejects mixing the two screenshot capture suites in one invocation', () => {

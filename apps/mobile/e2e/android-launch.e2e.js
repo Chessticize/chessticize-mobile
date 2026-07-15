@@ -7,7 +7,7 @@ describe('Android launch baseline', () => {
   beforeAll(async () => {
     await withAndroidUiDiagnostics(async () => {
       await launchWithDisabledSynchronization({
-        delete: true,
+        resetAppState: true,
         newInstance: true,
       });
     });

@@ -16,6 +16,10 @@ export interface MobileProgressSyncCapabilities {
   client: ICloudProgressSyncClient | null;
 }
 
+export type MobileProgressProtectionCapabilities =
+  | { kind: 'icloud_sync' }
+  | { kind: 'android_managed_backup' };
+
 export interface MobileStockfishCapabilities {
   createTransport: () => UciEngineTransport | null;
   prewarm: () => Promise<boolean>;
@@ -51,6 +55,7 @@ export const MOBILE_APPLICATION_METADATA: MobileApplicationMetadata = {
 
 export interface MobilePlatformCapabilities {
   storage: MobileStorageCapabilities;
+  progressProtection: MobileProgressProtectionCapabilities;
   progressSync: MobileProgressSyncCapabilities;
   stockfish: MobileStockfishCapabilities;
   reminders: MobileReminderCapabilities;
