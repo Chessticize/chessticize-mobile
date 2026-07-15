@@ -179,6 +179,61 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "practice-home")).toBeTruthy();
   });
 
+  it("keeps the starting-practice destination frozen when its timer becomes due during Predictive Back", () => {
+    const systemBack = createTestSystemBackSource("android");
+    const service = createMobilePracticeService("familiar15");
+    const renderer = renderScreen({ practiceService: service, systemBack });
+
+    press(renderer, "practice-mode-arrow-duel");
+    press(renderer, "practice-start-button");
+    expect(findByTestId(renderer, "sprint-loading-overlay")).toBeTruthy();
+
+    const subscriptionsBeforeGesture = systemBack.subscribe.mock.calls.length;
+    const unsubscriptionsBeforeGesture = systemBack.unsubscribe.mock.calls.length;
+    systemBack.startPredictive("left");
+    systemBack.progressPredictive(0.6, "left");
+
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+
+    expect(service.getActiveSprint()).toBeUndefined();
+    expect(findByTestId(renderer, "sprint-loading-overlay")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "mobile-back-destination-preview-label")))
+      .toBe("Practice setup");
+    expect(collectText(findByTestId(renderer, "mobile-back-destination-preview-id")))
+      .toBe("practice-setup");
+    expect(systemBack.subscribe).toHaveBeenCalledTimes(subscriptionsBeforeGesture);
+    expect(systemBack.unsubscribe).toHaveBeenCalledTimes(unsubscriptionsBeforeGesture);
+
+    expect(systemBack.commitPredictive()).toBe(true);
+    expect(service.getActiveSprint()).toBeUndefined();
+    expect(() => findByTestId(renderer, "sprint-loading-overlay")).toThrow();
+    expect(findByTestId(renderer, "practice-home")).toBeTruthy();
+  });
+
+  it("resumes a due Arrow Duel start only after a predictive gesture is cancelled", () => {
+    const systemBack = createTestSystemBackSource("android");
+    const service = createMobilePracticeService("familiar15");
+    const renderer = renderScreen({ practiceService: service, systemBack });
+
+    press(renderer, "practice-mode-arrow-duel");
+    press(renderer, "practice-start-button");
+    systemBack.startPredictive("left");
+
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+    expect(service.getActiveSprint()).toBeUndefined();
+    expect(findByTestId(renderer, "sprint-loading-overlay")).toBeTruthy();
+
+    systemBack.cancelPredictive();
+
+    expect(() => findByTestId(renderer, "mobile-back-destination-preview")).toThrow();
+    expect(service.getActiveSprint()?.status).toBe("active");
+    expect(findByTestId(renderer, "active-session-shell")).toBeTruthy();
+  });
+
   it("returns a completed sprint result to idle Practice", () => {
     const systemBack = createTestSystemBackSource("android");
     const renderer = renderStandardSequenceScreen({ systemBack });
@@ -254,6 +309,31 @@ describe("PracticePocScreen", () => {
     press(renderer, "practice-tab");
     expect(findByTestId(renderer, "custom-sprint-setup")).toBeTruthy();
     expect(() => findByTestId(renderer, "custom-initial-rating-editor")).toThrow();
+  });
+
+  it("previews and commits the Custom setup destination from the rating editor", () => {
+    const systemBack = createTestSystemBackSource("android");
+    const renderer = renderScreen({ practiceService: createPlayedCustomService(), systemBack });
+
+    press(renderer, "practice-mode-custom");
+    press(renderer, "custom-initial-rating-row");
+    expect(findByTestId(renderer, "custom-initial-rating-editor")).toBeTruthy();
+
+    systemBack.startPredictive("left");
+    systemBack.progressPredictive(0.6, "left");
+    expect(collectText(findByTestId(renderer, "mobile-back-destination-preview-label")))
+      .toBe("Custom setup");
+    expect(collectText(findByTestId(renderer, "mobile-back-destination-preview-id")))
+      .toBe("custom-sprint-setup");
+
+    systemBack.cancelPredictive();
+    expect(findByTestId(renderer, "custom-initial-rating-editor")).toBeTruthy();
+
+    systemBack.startPredictive("right");
+    systemBack.progressPredictive(0.8, "right");
+    expect(systemBack.commitPredictive()).toBe(true);
+    expect(() => findByTestId(renderer, "custom-initial-rating-editor")).toThrow();
+    expect(findByTestId(renderer, "custom-sprint-setup")).toBeTruthy();
   });
 
   it("closes review analysis before returning the review to its owner", () => {

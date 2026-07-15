@@ -86,6 +86,9 @@ export function mobileBackDestination(
       if (intent.transient === "starting-practice") {
         return { label: "Practice setup", testID: "practice-setup" };
       }
+      if (intent.transient === "custom-rating-editor") {
+        return { label: "Custom setup", testID: "custom-sprint-setup" };
+      }
       return {
         label: destinationLabelForTab(state.tab),
         testID: `tab-${state.tab}`

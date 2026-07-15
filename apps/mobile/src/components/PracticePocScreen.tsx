@@ -404,7 +404,17 @@ export function PracticePocScreen({
   const feedbackSnapshotTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sprintStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startingModeRef = useRef<SprintMode | null>(null);
+  const deferredSprintStartRef = useRef<{
+    nextMode: SprintMode;
+    useCustomTiming: boolean;
+  } | null>(null);
+  const resumeDeferredSprintStartRef = useRef<(() => void) | null>(null);
   const predictiveBackIntentRef = useRef<MobileBackIntent | null>(null);
+  const predictiveBackStateRef = useRef<MobileBackState | null>(null);
+  const mobileBackStateRef = useRef<MobileBackState | null>(null);
+  const executeMobileBackIntentRef = useRef<(
+    (intent: MobileBackIntent, resolvedState: MobileBackState) => boolean
+  ) | null>(null);
   const reminderScheduleKeyRef = useRef<string | null>(null);
   const scheduledReviewAttemptCountRef = useRef(scheduledReviewAttemptCount(service));
   const reviewReminderPromptDismissedRef = useRef(false);
@@ -666,6 +676,7 @@ export function PracticePocScreen({
         sprintStartTimerRef.current = null;
       }
       startingModeRef.current = null;
+      deferredSprintStartRef.current = null;
       globals.__CHESSTICIZE_CHESSBOARD_DEBUG__ = undefined;
       globals.__CHESSTICIZE_CHESSBOARD_DEBUG_SINK__ = undefined;
     };
@@ -977,22 +988,42 @@ export function PracticePocScreen({
       startingModeRef.current = nextMode;
       setStartingMode(nextMode);
       sprintStartTimerRef.current = setTimeout(() => {
-        sprintStartTimerRef.current = null;
-        if (startingModeRef.current !== nextMode) {
-          return;
-        }
-        performStartSprint(nextMode, useCustomTiming);
+        finishDelayedSprintStart(nextMode, useCustomTiming);
       }, ARROW_DUEL_LOADING_TRANSITION_MS);
       return;
     }
     performStartSprint(nextMode, useCustomTiming);
   }
 
+  function finishDelayedSprintStart(nextMode: SprintMode, useCustomTiming: boolean): void {
+    sprintStartTimerRef.current = null;
+    if (startingModeRef.current !== nextMode) {
+      return;
+    }
+    if (predictiveBackIntentRef.current) {
+      deferredSprintStartRef.current = { nextMode, useCustomTiming };
+      return;
+    }
+    performStartSprint(nextMode, useCustomTiming);
+  }
+
+  function resumeDeferredSprintStart(): void {
+    const deferredStart = deferredSprintStartRef.current;
+    deferredSprintStartRef.current = null;
+    if (!deferredStart || startingModeRef.current !== deferredStart.nextMode) {
+      return;
+    }
+    performStartSprint(deferredStart.nextMode, deferredStart.useCustomTiming);
+  }
+
+  resumeDeferredSprintStartRef.current = resumeDeferredSprintStart;
+
   function cancelStartingSprint(): void {
     if (sprintStartTimerRef.current) {
       clearTimeout(sprintStartTimerRef.current);
       sprintStartTimerRef.current = null;
     }
+    deferredSprintStartRef.current = null;
     startingModeRef.current = null;
     setStartingMode(null);
   }
@@ -1841,8 +1872,12 @@ export function PracticePocScreen({
     tab,
     topTransient: topBackTransient
   };
+  const predictiveBackEnabled = resolveMobileBackIntent(mobileBackState, "button").kind !== "delegate-platform";
 
-  function executeMobileBackIntent(intent: MobileBackIntent): boolean {
+  function executeMobileBackIntent(
+    intent: MobileBackIntent,
+    resolvedState: MobileBackState = mobileBackState
+  ): boolean {
     switch (intent.kind) {
       case "dismiss-transient":
         if (intent.transient === "practice-exit-confirmation") {
@@ -1866,15 +1901,15 @@ export function PracticePocScreen({
         setReviewBackCommand({ id: reviewBackCommandIdRef.current, kind: intent.kind });
         return true;
       case "return-to-owner":
-        if (backDetail?.kind === "review-session") {
+        if (resolvedState.detail?.kind === "review-session") {
           reviewBackCommandIdRef.current += 1;
           setReviewBackCommand({ id: reviewBackCommandIdRef.current, kind: intent.kind });
-        } else if (backDetail?.kind === "stockfish-diagnostics") {
+        } else if (resolvedState.detail?.kind === "stockfish-diagnostics") {
           navigateToTab("settings");
-        } else if (backDetail?.kind === "custom-practice") {
+        } else if (resolvedState.detail?.kind === "custom-practice") {
           setCustomRatingEditorOpen(false);
           setMode("standard");
-        } else if (backDetail?.kind === "sprint-result") {
+        } else if (resolvedState.detail?.kind === "sprint-result") {
           resetToIdle();
         }
         return true;
@@ -1891,21 +1926,40 @@ export function PracticePocScreen({
     }
   }
 
+  mobileBackStateRef.current = mobileBackState;
+  executeMobileBackIntentRef.current = executeMobileBackIntent;
+
   useEffect(() => {
     if (systemBack?.platform !== "android") {
       return undefined;
     }
 
-    const currentIntent = resolveMobileBackIntent(mobileBackState, "button");
-    systemBack.setPredictiveBackEnabled(currentIntent.kind !== "delegate-platform");
+    if (!predictiveBackIntentRef.current) {
+      systemBack.setPredictiveBackEnabled(predictiveBackEnabled);
+    }
+    // Product state may change during a live gesture. Availability is held
+    // until cancel/commit so the native callback and frozen snapshot survive.
+    return undefined;
+  }, [predictiveBackEnabled, systemBack]);
+
+  useEffect(() => {
+    if (systemBack?.platform !== "android") {
+      return undefined;
+    }
+
     const unsubscribe = systemBack.subscribe({
       onStart(edge) {
-        const intent = resolveMobileBackIntent(mobileBackState, "predictive");
-        const destination = mobileBackDestination(intent, mobileBackState);
+        const currentState = mobileBackStateRef.current;
+        if (!currentState) {
+          return;
+        }
+        const intent = resolveMobileBackIntent(currentState, "predictive");
+        const destination = mobileBackDestination(intent, currentState);
         if (!destination) {
           return;
         }
         predictiveBackIntentRef.current = intent;
+        predictiveBackStateRef.current = currentState;
         setMobileBackPreview({ ...destination, edge, progress: 0 });
       },
       onProgress(progress, edge) {
@@ -1915,28 +1969,42 @@ export function PracticePocScreen({
       },
       onCancel() {
         predictiveBackIntentRef.current = null;
+        predictiveBackStateRef.current = null;
         setMobileBackPreview(null);
+        resumeDeferredSprintStartRef.current?.();
+        const currentState = mobileBackStateRef.current;
+        if (currentState) {
+          const currentIntent = resolveMobileBackIntent(currentState, "button");
+          systemBack.setPredictiveBackEnabled(currentIntent.kind !== "delegate-platform");
+        }
       },
       onCommit(activation) {
         const frozenIntent = activation === "predictive"
           ? predictiveBackIntentRef.current
           : null;
+        const frozenState = activation === "predictive"
+          ? predictiveBackStateRef.current
+          : null;
+        const currentState = mobileBackStateRef.current;
         predictiveBackIntentRef.current = null;
+        predictiveBackStateRef.current = null;
         setMobileBackPreview(null);
-        return executeMobileBackIntent(
-          frozenIntent ?? resolveMobileBackIntent(mobileBackState, activation)
-        );
+        if (!currentState) {
+          return false;
+        }
+        const currentIntent = resolveMobileBackIntent(currentState, "button");
+        systemBack.setPredictiveBackEnabled(currentIntent.kind !== "delegate-platform");
+        const intent = frozenIntent ?? resolveMobileBackIntent(currentState, activation);
+        return executeMobileBackIntentRef.current?.(intent, frozenState ?? currentState) ?? false;
       }
     });
     return () => {
       predictiveBackIntentRef.current = null;
+      predictiveBackStateRef.current = null;
       systemBack.setPredictiveBackEnabled(false);
       unsubscribe();
     };
-    // The listener intentionally captures the exact render-local navigation
-    // snapshot; resetToIdle is a function declaration over the same render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [backDetail, isOpenSession, systemBack, tab, topBackTransient]);
+  }, [systemBack]);
 
   const appChromeVisible = !isOpenSession && !isShowingFeedbackSnapshot && !reviewSurfaceOpen;
   const appHeaderVisible = appChromeVisible && !contentOwnsHeader;
