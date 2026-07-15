@@ -1,4 +1,5 @@
 const { accessSync, constants, readFileSync, statSync } = require('node:fs');
+const { spawnSync } = require('node:child_process');
 const { join } = require('node:path');
 const {
   ANDROID_AUTO_BACKUP_QUOTA_BYTES,
@@ -522,6 +523,72 @@ describe('Android Progress Backup', () => {
     expect(seedFixture).toContain('assert_app_process_absent "fixture-seed-$index"');
     expect(seedFixture).toContain('assert_app_process_absent fixture-seed-after');
     expect(policyEvidenceScript).toContain('$label-process.txt');
+  });
+
+  it('fails closed on process-inspection errors and accepts only pidof status one with no PIDs', () => {
+    const processInspection = 'scripts/android-process-inspection.sh';
+    const processInspectionPath = join(appRoot, processInspection);
+    const callers = [
+      'scripts/android-progress-backup-api30-restore-evidence.sh',
+      'scripts/android-progress-backup-evidence.sh',
+      'scripts/android-progress-backup-policy-evidence.sh',
+    ].map(read);
+
+    expect(() => accessSync(processInspectionPath, constants.R_OK)).not.toThrow();
+    const helper = read(processInspection);
+    for (const caller of callers) {
+      expect(caller).toContain('source "$APP_DIR/scripts/android-process-inspection.sh"');
+      expect(caller).toContain('read_app_process_ids');
+      expect(caller).not.toMatch(/adb_cmd shell pidof/);
+    }
+    expect(helper).toContain('__CHESSTICIZE_PIDOF_STATUS__=');
+    expect(helper).toContain('pidof "$1"');
+    expect(helper).toContain('[[ "$process_status" == "1" ]]');
+    expect(helper).toContain('[[ "$process_status" == "0" ]]');
+
+    const inspect = (mode) => {
+      const command = `
+        set -u
+        APP_ID=com.chessticize.mobile
+        INSPECTION_MODE=${mode}
+        adb_cmd() {
+          case "$INSPECTION_MODE" in
+            outer-failure) return 42 ;;
+            no-pid) printf '__CHESSTICIZE_PIDOF_STATUS__=1\\n' ;;
+            pid) printf '__CHESSTICIZE_PIDOF_STATUS__=0\\n123 456\\n' ;;
+            success-empty) printf '__CHESSTICIZE_PIDOF_STATUS__=0\\n' ;;
+            absent-with-output) printf '__CHESSTICIZE_PIDOF_STATUS__=1\\nunexpected\\n' ;;
+            device-error) printf '__CHESSTICIZE_PIDOF_STATUS__=2\\n' ;;
+            missing-sentinel) printf '1\\n' ;;
+            malformed-sentinel) printf '__CHESSTICIZE_PIDOF_STATUS__=x\\n' ;;
+          esac
+        }
+        source ${JSON.stringify(processInspectionPath)}
+        set +e
+        process_output="$(read_app_process_ids 2>/dev/null)"
+        process_status=$?
+        set -e
+        printf 'status=%s\\noutput=<%s>\\n' "$process_status" "$process_output"
+      `;
+      const result = spawnSync('/bin/bash', ['-c', command], {
+        encoding: 'utf8',
+      });
+      expect(result.status).toBe(0);
+      return result.stdout;
+    };
+
+    expect(inspect('no-pid')).toBe('status=0\noutput=<>\n');
+    expect(inspect('pid')).toBe('status=0\noutput=<123 456>\n');
+    for (const mode of [
+      'outer-failure',
+      'success-empty',
+      'absent-with-output',
+      'device-error',
+      'missing-sentinel',
+      'malformed-sentinel',
+    ]) {
+      expect(inspect(mode)).toMatch(/^status=[1-9][0-9]*\noutput=<>\n$/);
+    }
   });
 
   it('treats API 30 mask zero as an expected fail-closed transport rejection', () => {

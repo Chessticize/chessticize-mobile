@@ -53,6 +53,8 @@ adb_cmd() {
   return "$status"
 }
 
+source "$APP_DIR/scripts/android-process-inspection.sh"
+
 fail() {
   echo "$1" >&2
   exit 1
@@ -85,6 +87,7 @@ stream_device_sha256() {
 assert_package_stopped_without_process() {
   local package_state="$ARTIFACT_DIR/api30-restore-package-state-after-clear.txt"
   local process_state="$ARTIFACT_DIR/api30-restore-process-after-clear.txt"
+  local process_output
   local user_state
 
   adb_cmd shell dumpsys package "$APP_ID" > "$package_state"
@@ -92,9 +95,11 @@ assert_package_stopped_without_process() {
   if [[ -z "$user_state" || ! "$user_state" =~ (^|[[:space:]])stopped=true([[:space:]]|$) ]]; then
     fail "API 30 restore fixture package is not stopped after pm clear."
   fi
-  : > "$process_state"
-  if adb_cmd shell pidof "$APP_ID" \
-      | tr -d '\r' | tee "$process_state" | grep -q .; then
+  if ! process_output="$(read_app_process_ids)"; then
+    fail "API 30 restore fixture process absence could not be inspected."
+  fi
+  printf '%s\n' "${process_output:-absent}" > "$process_state"
+  if [[ -n "$process_output" ]]; then
     fail "API 30 restore fixture process started before bmgr restore."
   fi
 }

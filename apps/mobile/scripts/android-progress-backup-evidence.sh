@@ -29,6 +29,8 @@ adb_cmd() {
   "$ADB" -s "$DEVICE" "$@"
 }
 
+source "$APP_DIR/scripts/android-process-inspection.sh"
+
 remote_file_size() {
   local relative_path="$1"
   local measured_size
@@ -93,6 +95,7 @@ assert_released_fixture_ready_for_backup() {
   local pulled_database="$ARTIFACT_DIR/released-fixture-$evidence_prefix.sqlite"
   local package_state="$ARTIFACT_DIR/released-fixture-$evidence_prefix-package-state.txt"
   local process_state="$ARTIFACT_DIR/released-fixture-$evidence_prefix-process.txt"
+  local process_output
   local stat_artifact="$ARTIFACT_DIR/released-fixture-$evidence_prefix-stat.txt"
   local hash_artifact="$ARTIFACT_DIR/released-fixture-$evidence_prefix-sha256.txt"
   local user_version_artifact="$ARTIFACT_DIR/released-fixture-$evidence_prefix-user-version.txt"
@@ -103,10 +106,12 @@ assert_released_fixture_ready_for_backup() {
 
   command -v sqlite3 >/dev/null
   sha256sum "$source_fixture" > "$ARTIFACT_DIR/released-fixture-source-sha256.txt"
-  : > "$process_state"
-  if adb_cmd shell pidof "$APP_ID" \
-      | tr -d '\r' | tee "$process_state" \
-      | grep -q .; then
+  if ! process_output="$(read_app_process_ids)"; then
+    echo "Released fixture app process absence could not be inspected." >&2
+    exit 1
+  fi
+  printf '%s\n' "${process_output:-absent}" > "$process_state"
+  if [[ -n "$process_output" ]]; then
     echo "Released fixture app process started before BackupManager invocation." >&2
     exit 1
   fi

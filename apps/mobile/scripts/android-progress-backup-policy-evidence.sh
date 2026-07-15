@@ -59,21 +59,7 @@ adb_cmd() {
   return "$status"
 }
 
-read_app_process_ids() {
-  local process_output
-  local status=0
-
-  if process_output="$(adb_cmd shell pidof "$APP_ID" 2>&1 | tr -d '\r')"; then
-    status=0
-  else
-    status=$?
-  fi
-  if (( status != 0 )) && [[ -n "$process_output" ]]; then
-    echo "Unable to inspect $APP_ID process state: $process_output" >&2
-    return "$status"
-  fi
-  printf '%s' "$process_output"
-}
+source "$APP_DIR/scripts/android-process-inspection.sh"
 
 assert_app_process_absent() {
   local label="$1"
