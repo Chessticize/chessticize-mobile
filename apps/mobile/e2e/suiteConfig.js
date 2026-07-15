@@ -9,6 +9,11 @@ const ADAPTIVE_LAYOUT_TEST_MATCH = ['<rootDir>/e2e/adaptive-layout.e2e.js'];
 const ANDROID_LAUNCH_TEST_MATCH = ['<rootDir>/e2e/android-launch.e2e.js'];
 const ANDROID_STANDARD_PRACTICE_TEST_MATCH = ['<rootDir>/e2e/android-standard-practice.e2e.js'];
 const ANDROID_MIGRATION_TEST_MATCH = ['<rootDir>/e2e/android-migration.e2e.js'];
+const ANDROID_OFFLINE_PRACTICE_TEST_MATCH = [
+  ...ANDROID_LAUNCH_TEST_MATCH,
+  ...ANDROID_STANDARD_PRACTICE_TEST_MATCH,
+  ...ANDROID_MIGRATION_TEST_MATCH,
+];
 const ANDROID_STOCKFISH_TEST_MATCH = ['<rootDir>/e2e/android-stockfish.e2e.js'];
 const ANDROID_PROGRESS_BACKUP_RESTORE_TEST_MATCH = [
   '<rootDir>/e2e/android-progress-backup-restore.e2e.js'
@@ -49,6 +54,10 @@ function resolveDetoxTestMatch(environment = process.env) {
 
   if (activeSuite === 'android-migration') {
     return ANDROID_MIGRATION_TEST_MATCH;
+  }
+
+  if (activeSuite === 'android-offline-practice') {
+    return ANDROID_OFFLINE_PRACTICE_TEST_MATCH;
   }
 
   if (activeSuite === 'android-stockfish') {
@@ -92,6 +101,7 @@ module.exports = {
   ANDROID_LAUNCH_TEST_MATCH,
   ANDROID_STANDARD_PRACTICE_TEST_MATCH,
   ANDROID_MIGRATION_TEST_MATCH,
+  ANDROID_OFFLINE_PRACTICE_TEST_MATCH,
   ANDROID_STOCKFISH_TEST_MATCH,
   ANDROID_PROGRESS_BACKUP_RESTORE_TEST_MATCH,
   DEFAULT_DETOX_MAX_WORKERS,

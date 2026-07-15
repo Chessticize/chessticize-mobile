@@ -121,7 +121,54 @@ find_transport_archive_parent() {
     "/data/user_de/0/com.android.localtransport/files/1/_full"
     "/cache/backup/1/_full"
   )
-  find_existing_device_paths directory "${candidates[@]}"
+  local raw_aliases_file="$ARTIFACT_DIR/api30-restore-base-archive-parent-raw-aliases.txt"
+  local canonical_aliases_file="$ARTIFACT_DIR/api30-restore-base-archive-parent-canonical-aliases.txt"
+  local identities_file="$ARTIFACT_DIR/api30-restore-base-archive-parent-identities.txt"
+  local candidate
+  local path_state
+  local canonical_path
+  local archive_identity
+  local identity_count
+  local -a canonical_paths=()
+
+  : > "$raw_aliases_file"
+  : > "$canonical_aliases_file"
+  : > "$identities_file"
+
+  for candidate in "${candidates[@]}"; do
+    if ! path_state="$(probe_device_path directory "$candidate")"; then
+      return 1
+    fi
+    if [[ "$path_state" == "absent" ]]; then
+      continue
+    fi
+    if [[ "$path_state" != "present" ]]; then
+      echo "Android device path probe returned an unsupported state for $candidate: $path_state" >&2
+      return 1
+    fi
+    printf '%s\n' "$candidate" >> "$raw_aliases_file"
+    if ! canonical_path="$(read_canonical_device_path "$candidate")"; then
+      return 1
+    fi
+    printf '%s %s\n' "$candidate" "$canonical_path" >> "$canonical_aliases_file"
+    if ! archive_identity="$(read_device_file_identity "$candidate")"; then
+      return 1
+    fi
+    printf '%s %s %s\n' "$archive_identity" "$candidate" "$canonical_path" \
+      >> "$identities_file"
+    canonical_paths+=("$canonical_path")
+  done
+
+  if [[ ! -s "$raw_aliases_file" ]]; then
+    return
+  fi
+  identity_count="$(cut -d ' ' -f 1 "$identities_file" | sort -u | wc -l | tr -d ' ')"
+  if [[ "$identity_count" != "1" ]]; then
+    echo "Expected at most one canonical LocalTransport archive parent target." >&2
+    cat "$identities_file" >&2
+    return 1
+  fi
+  printf '%s\n' "${canonical_paths[0]}"
 }
 
 stream_device_sha256() {

@@ -791,6 +791,13 @@ describe('Android Progress Backup', () => {
       'probe_device_path file "$candidate"',
     );
     expect(api30RestoreScript).toContain(
+      'probe_device_path directory "$candidate"',
+    );
+    expect(api30RestoreScript).toContain('read_device_file_identity "$candidate"');
+    expect(api30RestoreScript).toContain('api30-restore-base-archive-parent-raw-aliases.txt');
+    expect(api30RestoreScript).toContain('api30-restore-base-archive-parent-canonical-aliases.txt');
+    expect(api30RestoreScript).toContain('api30-restore-base-archive-parent-identities.txt');
+    expect(api30RestoreScript).not.toContain(
       'find_existing_device_paths directory "${candidates[@]}"',
     );
     expect(policyEvidenceScript).not.toContain('adb_cmd shell test -f "$candidate"');
@@ -967,6 +974,97 @@ describe('Android Progress Backup', () => {
     expect(distinct).toContain(`253:4343 ${userAlias} /canonical/archive`);
     expect(distinct).toContain(
       'Expected at most one canonical LocalTransport archive target.',
+    );
+    expect(distinct).toMatch(/^status=[1-9][0-9]*\noutput=<>\n/);
+    const unreadable = discover('unreadable');
+    expect(unreadable).toContain(`${dataAlias}\n${userAlias}\ncanonical-aliases=`);
+    expect(unreadable).toContain('Unable to read a strict device/inode identity');
+    expect(unreadable).toMatch(/^status=[1-9][0-9]*\noutput=<>\n/);
+  });
+
+  it('retains API 30 archive-parent aliases and collapses only one proven directory identity', () => {
+    const restoreScript = read('scripts/android-progress-backup-api30-restore-evidence.sh');
+    const deviceInspectionPath = join(appRoot, 'scripts/android-device-inspection.sh');
+    const findTransportArchiveParent = restoreScript.slice(
+      restoreScript.indexOf('find_transport_archive_parent()'),
+      restoreScript.indexOf('stream_device_sha256()'),
+    );
+    const dataAlias = '/data/data/com.android.localtransport/files/1/_full';
+    const userAlias = '/data/user/0/com.android.localtransport/files/1/_full';
+
+    const discover = (mode) => {
+      const command = `
+        set -u
+        ALIAS_MODE=${mode}
+        ARTIFACT_DIR="$(mktemp -d)"
+        trap 'rm -rf "$ARTIFACT_DIR"' EXIT
+        adb_cmd() {
+          local remote_command="\${*: -1}"
+          local alias_name
+          case "$remote_command" in
+            *${JSON.stringify(dataAlias)}*) alias_name=data ;;
+            *${JSON.stringify(userAlias)}*) alias_name=user ;;
+            *) alias_name=other ;;
+          esac
+          case "$remote_command" in
+            *'test -d'*)
+              if [[ "$alias_name" == data || "$alias_name" == user ]]; then
+                printf '__CHESSTICIZE_DEVICE_STATUS__=0\\n'
+              else
+                printf '__CHESSTICIZE_DEVICE_STATUS__=1\\n'
+              fi
+              ;;
+            *'readlink -f'*)
+              if [[ "$alias_name" == data ]]; then
+                printf '__CHESSTICIZE_DEVICE_STATUS__=0\\n%s\\n' ${JSON.stringify(dataAlias)}
+              else
+                printf '__CHESSTICIZE_DEVICE_STATUS__=0\\n%s\\n' ${JSON.stringify(userAlias)}
+              fi
+              ;;
+            *'stat -c %d:%i'*)
+              if [[ "$ALIAS_MODE" == unreadable && "$alias_name" == user ]]; then
+                printf '__CHESSTICIZE_DEVICE_STATUS__=0\\nnot-an-identity\\n'
+              elif [[ "$ALIAS_MODE" == distinct && "$alias_name" == user ]]; then
+                printf '__CHESSTICIZE_DEVICE_STATUS__=0\\n253:4343\\n'
+              else
+                printf '__CHESSTICIZE_DEVICE_STATUS__=0\\n253:4242\\n'
+              fi
+              ;;
+            *)
+              printf '__CHESSTICIZE_DEVICE_STATUS__=2\\nunsupported\\n'
+              ;;
+          esac
+        }
+        source ${JSON.stringify(deviceInspectionPath)}
+        ${findTransportArchiveParent}
+        set +e
+        output="$(find_transport_archive_parent 2>"$ARTIFACT_DIR/error.txt")"
+        status=$?
+        set -e
+        printf 'status=%s\\noutput=<%s>\\n' "$status" "$output"
+        printf 'raw-aliases=\\n'
+        cat "$ARTIFACT_DIR/api30-restore-base-archive-parent-raw-aliases.txt" 2>/dev/null || true
+        printf 'canonical-aliases=\\n'
+        cat "$ARTIFACT_DIR/api30-restore-base-archive-parent-canonical-aliases.txt" 2>/dev/null || true
+        printf 'identities=\\n'
+        cat "$ARTIFACT_DIR/api30-restore-base-archive-parent-identities.txt" 2>/dev/null || true
+        printf 'error=<%s>\\n' "$(cat "$ARTIFACT_DIR/error.txt")"
+      `;
+      const result = spawnSync('/bin/bash', ['-c', command], {
+        encoding: 'utf8',
+      });
+      expect(result.status).toBe(0);
+      return result.stdout;
+    };
+
+    expect(discover('same')).toBe(
+      `status=0\noutput=<${dataAlias}>\nraw-aliases=\n${dataAlias}\n${userAlias}\ncanonical-aliases=\n${dataAlias} ${dataAlias}\n${userAlias} ${userAlias}\nidentities=\n253:4242 ${dataAlias} ${dataAlias}\n253:4242 ${userAlias} ${userAlias}\nerror=<>\n`,
+    );
+    const distinct = discover('distinct');
+    expect(distinct).toContain(`253:4242 ${dataAlias} ${dataAlias}`);
+    expect(distinct).toContain(`253:4343 ${userAlias} ${userAlias}`);
+    expect(distinct).toContain(
+      'Expected at most one canonical LocalTransport archive parent target.',
     );
     expect(distinct).toMatch(/^status=[1-9][0-9]*\noutput=<>\n/);
     const unreadable = discover('unreadable');

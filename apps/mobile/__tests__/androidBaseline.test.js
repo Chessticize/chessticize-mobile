@@ -189,12 +189,16 @@ describe('Android launch baseline', () => {
 
   it('gives both Android API emulators fixed realistic memory and preserves failure diagnostics', () => {
     const workflow = read('../../.github/workflows/mobile-android.yml');
+    const launchJob = workflow.slice(
+      workflow.indexOf('  android-launch:'),
+      workflow.indexOf('  android-progress-backup:'),
+    );
 
-    expect(workflow).toContain('api-level: [24, 36]');
-    expect(workflow).toContain('ram-size: 4096M');
-    expect(workflow.match(/ram-size: 4096M/g)).toHaveLength(1);
-    expect(workflow).toContain('name: Upload Android launch failure diagnostics');
-    expect(workflow).toContain('apps/mobile/artifacts/android-ui/');
+    expect(launchJob).toContain('api-level: [24, 36]');
+    expect(launchJob).toContain('ram-size: 4096M');
+    expect(launchJob.match(/ram-size: 4096M/g)).toHaveLength(1);
+    expect(launchJob).toContain('name: Upload Android launch failure diagnostics');
+    expect(launchJob).toContain('apps/mobile/artifacts/android-ui/');
   });
 
   it('keeps the API 36 Stockfish condition in one emulator-runner script line', () => {

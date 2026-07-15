@@ -167,9 +167,7 @@ jobs:
           emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           script: |
             apps/mobile/scripts/prepare-android-offline-e2e.sh
-            DETOX_ACTIVE_SUITE=android-launch pnpm mobile:e2e:test:android:ci
-            DETOX_ACTIVE_SUITE=android-standard-practice pnpm mobile:e2e:test:android:ci
-            DETOX_ACTIVE_SUITE=android-migration pnpm mobile:e2e:test:android:ci
+            DETOX_ACTIVE_SUITE=android-offline-practice pnpm mobile:e2e:test:android:ci
             if [ "${{ matrix.api-level }}" = "36" ]; then DETOX_ACTIVE_SUITE=android-stockfish pnpm mobile:e2e:test:android:ci; fi
             if [ "${{ matrix.api-level }}" = "36" ]; then DETOX_ACTIVE_SUITE=flows pnpm mobile:e2e:test:android:ci; fi
             if [ "${{ matrix.api-level }}" = "36" ]; then DETOX_ACTIVE_SUITE=practice pnpm mobile:e2e:test:android:ci; fi

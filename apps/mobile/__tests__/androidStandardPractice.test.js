@@ -80,6 +80,7 @@ describe('Android Standard Practice release slice', () => {
 
   it('covers fresh offline completion, relaunch persistence, and released-fixture migration through public UI', () => {
     const suiteConfig = read('e2e/suiteConfig.js');
+    const launchJourney = read('e2e/android-launch.e2e.js');
     const practiceJourney = read('e2e/android-standard-practice.e2e.js');
     const helpers = read('e2e/helpers.js');
     const androidNetwork = read('e2e/androidNetwork.js');
@@ -92,6 +93,11 @@ describe('Android Standard Practice release slice', () => {
 
     expect(suiteConfig).toContain('android-standard-practice.e2e.js');
     expect(suiteConfig).toContain('android-migration.e2e.js');
+    expect(suiteConfig).toContain('ANDROID_OFFLINE_PRACTICE_TEST_MATCH');
+    expect(launchJourney).toContain('resetAppState: true');
+    expect(launchJourney).not.toContain('delete: true');
+    expect(practiceJourney).toContain('resetAppState: true');
+    expect(practiceJourney).not.toContain('delete: true');
     expect(standardFixture).toEqual(expect.objectContaining({
       puzzleSelectionSeed: 'android-standard-practice',
       puzzle: expect.objectContaining({
@@ -141,16 +147,18 @@ describe('Android Standard Practice release slice', () => {
     expect(migrationJourney).toContain("const { androidAdbPath } = require('./androidNetwork');");
     expect(migrationJourney).not.toContain('function androidAdbPath()');
     expect(migrationJourney).toContain('legacy-attempt-standard-wrong');
-    expect(workflow).toContain('DETOX_ACTIVE_SUITE=android-standard-practice');
-    expect(workflow).toContain('DETOX_ACTIVE_SUITE=android-migration');
     expect(workflow).toContain('apps/mobile/scripts/prepare-android-offline-e2e.sh');
     const launchJob = workflow.slice(
       workflow.indexOf('  android-launch:'),
       workflow.indexOf('  android-progress-backup:'),
     );
     expect(launchJob).toContain('ram-size: 4096M');
+    expect(launchJob.match(/DETOX_ACTIVE_SUITE=android-offline-practice/g)).toHaveLength(1);
+    expect(launchJob).not.toContain('DETOX_ACTIVE_SUITE=android-launch');
+    expect(launchJob).not.toContain('DETOX_ACTIVE_SUITE=android-standard-practice');
+    expect(launchJob).not.toContain('DETOX_ACTIVE_SUITE=android-migration');
     expect(workflow.indexOf('apps/mobile/scripts/prepare-android-offline-e2e.sh'))
-      .toBeLessThan(workflow.indexOf('DETOX_ACTIVE_SUITE=android-launch'));
+      .toBeLessThan(workflow.indexOf('DETOX_ACTIVE_SUITE=android-offline-practice'));
     expect(workflow).not.toContain('if (( android_sdk_level');
     expect(offlineSetup).toContain('set -eu');
     expect(offlineSetup).toContain('shell getprop ro.build.version.sdk');
