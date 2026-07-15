@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const mobileRoot = path.resolve(__dirname, '..');
+const stockfishArtifacts = require('../stockfish-artifacts.json');
 
 function read(relativePath) {
   return fs.readFileSync(path.join(mobileRoot, relativePath), 'utf8');
@@ -23,17 +24,36 @@ describe('Android Stockfish native contract', () => {
     expect(module).not.toMatch(/Chess|FEN|bestmove|MultiPV/);
   });
 
-  it('builds JNI and embedded NNUE data directly from the canonical shared sources', () => {
+  it('builds JNI from shared sources and packages canonical NNUE assets once outside ABI libraries', () => {
     const cmake = read('android/app/src/main/cpp/CMakeLists.txt');
     const gradle = read('android/app/build.gradle');
+    const module = read('android/app/src/main/java/com/chessticize/mobile/NativeStockfishEngineModule.kt');
+    const nativeAdapter = read('android/app/src/main/cpp/stockfish/NativeStockfishEngine.cpp');
 
     expect(cmake).toContain('../../../../../native/stockfish/Stockfish/src');
-    expect(cmake).toContain('../../../../../native/stockfish/Resources');
     expect(cmake).toContain('NativeStockfishEngine.cpp');
-    expect(cmake).toContain('-Wa,-I,${STOCKFISH_RESOURCES_DIR}');
+    expect(cmake).toContain('NNUE_EMBEDDING_OFF');
+    expect(cmake).not.toContain('-Wa,-I');
+    expect(cmake).not.toContain('OBJECT_DEPENDS');
+    expect(cmake).not.toMatch(/nn-[a-f0-9]+\.nnue/);
     expect(cmake).toContain('-Wl,-z,max-page-size=16384');
-    expect(cmake).toContain('nn-c288c895ea92.nnue');
-    expect(cmake).toContain('nn-37f18f62d772.nnue');
+    expect(gradle).toContain('stockfish-artifacts.json');
+    expect(gradle).toContain('copyStockfishNnueAssets');
+    expect(gradle).toContain('stockfishArtifacts.nnue');
+    expect(gradle).toContain('generatedStockfishAssetsDir');
+    expect(module).toContain('noBackupFilesDir');
+    expect(module).toContain('@Synchronized');
+    expect(module).toContain('MessageDigest.getInstance("SHA-256")');
+    expect(module).toContain('isCanonicalNetworkFile(target, asset.digestPrefix)');
+    expect(module).toContain('File.createTempFile');
+    expect(module).toContain('output.fd.sync()');
+    expect(module).toContain('Os.rename(temp.absolutePath, target.absolutePath)');
+    expect(module).toContain('nativeCreate(bigNetwork.absolutePath, smallNetwork.absolutePath)');
+    for (const relativePath of stockfishArtifacts.nnue) {
+      expect(module).toContain(path.basename(relativePath));
+    }
+    expect(nativeAdapter).toContain('setOption("EvalFile", bigNetworkPath)');
+    expect(nativeAdapter).toContain('setOption("EvalFileSmall", smallNetworkPath)');
     expect(gradle).toContain('externalNativeBuild');
     expect(gradle).toContain('ANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON');
   });
@@ -55,6 +75,8 @@ describe('Android Stockfish native contract', () => {
     const verifier = read('scripts/verify-android-apk-abis.js');
 
     expect(verifier).toContain('libstockfish.so');
+    expect(verifier).toContain('stockfish-artifacts.json');
+    expect(verifier).toContain('NNUE_ASSET_ENTRIES');
     expect(verifier).toContain('zipalign');
     expect(verifier).toContain('llvm-readelf');
     expect(verifier).toContain('0x4000');

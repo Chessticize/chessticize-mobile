@@ -10,6 +10,8 @@ const {
 } = require('../scripts/android-doctor');
 const {
   EXPECTED_ABIS,
+  MAXIMUM_STOCKFISH_LIBRARY_BYTES,
+  NNUE_ASSET_ENTRIES,
   REQUIRED_NATIVE_LIBRARIES,
   parseElfLoadAlignments,
   parseNativeAbis,
@@ -197,12 +199,15 @@ describe('Android launch baseline', () => {
   it('keeps the API 36 Stockfish condition in one emulator-runner script line', () => {
     const workflow = read('../../.github/workflows/mobile-android.yml');
 
-    expect(workflow).toContain(
-      'if [ "${{ matrix.api-level }}" = "36" ]; then DETOX_ACTIVE_SUITE=android-stockfish pnpm mobile:e2e:test:android:ci; fi'
-    );
-    expect(workflow).not.toMatch(
-      /if \[ "\$\{\{ matrix\.api-level \}\}" = "36" \]; then\s*\n\s*DETOX_ACTIVE_SUITE=android-stockfish/
-    );
+    for (const suite of ['android-stockfish', 'flows', 'practice']) {
+      const command = `if [ "\${{ matrix.api-level }}" = "36" ]; then DETOX_ACTIVE_SUITE=${suite} pnpm mobile:e2e:test:android:ci; fi`;
+      expect(workflow).toContain(command);
+      expect(workflow.match(new RegExp(`DETOX_ACTIVE_SUITE=${suite}`, 'g'))).toHaveLength(1);
+      expect(workflow).not.toMatch(
+        new RegExp(`if \\[ "\\$\\{\\{ matrix\\.api-level \\}\\}" = "36" \\]; then\\s*\\n\\s*DETOX_ACTIVE_SUITE=${suite}`)
+      );
+    }
+    expect(workflow).toContain('timeout-minutes: 75');
   });
 
   it('uses the doctor-verified SDK with a self-contained offline Android E2E app', () => {
@@ -312,6 +317,7 @@ describe('Android launch baseline', () => {
   it('verifies packaged native libraries by ABI', () => {
     const entries = [
       'AndroidManifest.xml',
+      ...NNUE_ASSET_ENTRIES,
       'lib/x86_64/libreactnative.so',
       'lib/arm64-v8a/libreactnative.so',
       'lib/x86_64/libhermes.so',
@@ -323,6 +329,10 @@ describe('Android launch baseline', () => {
 
     expect(parseNativeAbis(entries)).toEqual(EXPECTED_ABIS);
     expect(REQUIRED_NATIVE_LIBRARIES).toEqual(['libappmodules.so', 'libstockfish.so']);
+    expect(NNUE_ASSET_ENTRIES).toEqual([
+      'assets/stockfish/nn-c288c895ea92.nnue',
+      'assets/stockfish/nn-37f18f62d772.nnue',
+    ]);
     expect(parseNativeAbis(`${entries}\nlib/x86/libreactnative.so`)).toEqual([
       'arm64-v8a',
       'x86',
@@ -346,6 +356,26 @@ describe('Android launch baseline', () => {
       .toEqual([0x4000]);
     expect(verifyApk('app.apk', run, { ANDROID_HOME: '/sdk' }))
       .toEqual(EXPECTED_ABIS);
+    expect(() => verifyApk(
+      'duplicate-nnue.apk',
+      (command, args) => {
+        if (command === 'unzip' && args[0] === '-Z1') {
+          return { status: 0, stdout: `${entries}\n${NNUE_ASSET_ENTRIES[0]}`, stderr: '' };
+        }
+        return run(command, args);
+      },
+      { ANDROID_HOME: '/sdk' },
+    )).toThrow('must contain exactly one');
+    expect(() => verifyApk(
+      'embedded-nnue.apk',
+      (command, args) => {
+        if (command === 'unzip' && args[0] === '-p' && args[2].endsWith('/libstockfish.so')) {
+          return { status: 0, stdout: { length: MAXIMUM_STOCKFISH_LIBRARY_BYTES + 1 }, stderr: '' };
+        }
+        return run(command, args);
+      },
+      { ANDROID_HOME: '/sdk' },
+    )).toThrow('still appears to embed ABI-duplicated NNUE data');
     expect(() => verifyApk(
       'unexpected.apk',
       () => ({ status: 0, stdout: `${entries}\nlib/x86/libreactnative.so`, stderr: '' }),

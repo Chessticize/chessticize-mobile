@@ -114,11 +114,16 @@ class JavaLineEmitter {
 
 class StockfishRunner {
  public:
-  StockfishRunner(JNIEnv* environment, jobject module) :
+  StockfishRunner(
+      JNIEnv* environment,
+      jobject module,
+      const std::string& bigNetworkPath,
+      const std::string& smallNetworkPath) :
       engine(std::nullopt),
       emitter(environment, module) {
     Tune::init(engine.get_options());
     configureCallbacks();
+    configureBundledNetworks(bigNetworkPath, smallNetworkPath);
     setOption("Threads", "1");
     setOption("Hash", "32");
   }
@@ -219,6 +224,13 @@ class StockfishRunner {
     engine.get_options().setoption(option);
   }
 
+  void configureBundledNetworks(
+      const std::string& bigNetworkPath,
+      const std::string& smallNetworkPath) {
+    setOption("EvalFile", bigNetworkPath);
+    setOption("EvalFileSmall", smallNetworkPath);
+  }
+
   void applyPosition(const std::string& command) {
     engine.wait_for_search_finished();
     const std::string fenPrefix = "position fen ";
@@ -262,9 +274,15 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
 extern "C" JNIEXPORT jlong JNICALL
 Java_com_chessticize_mobile_NativeStockfishEngineModule_nativeCreate(
     JNIEnv* environment,
-    jobject module) {
+    jobject module,
+    jstring bigNetworkPath,
+    jstring smallNetworkPath) {
   initStockfishStatics();
-  auto runner = std::make_unique<StockfishRunner>(environment, module);
+  auto runner = std::make_unique<StockfishRunner>(
+      environment,
+      module,
+      toStdString(environment, bigNetworkPath),
+      toStdString(environment, smallNetworkPath));
   return reinterpret_cast<jlong>(runner.release());
 }
 
