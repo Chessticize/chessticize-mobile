@@ -30,6 +30,62 @@ import {
 
 const renderers: TestRenderer.ReactTestRenderer[] = [];
 
+type RenderedBackExecutorCase = {
+  afterTestID: string;
+  arrange: (renderer: TestRenderer.ReactTestRenderer) => void;
+  beforeTestID: string;
+  createOptions?: () => RenderScreenOptions;
+  name: string;
+};
+
+const renderedBackExecutorCases: RenderedBackExecutorCase[] = [
+  {
+    name: "Review-filter dismissal",
+    arrange: (renderer) => {
+      press(renderer, "review-tab");
+      press(renderer, "review-filter-toggle");
+    },
+    beforeTestID: "review-queue-filters",
+    afterTestID: "review-panel"
+  },
+  {
+    name: "Settings advanced-rating dismissal",
+    arrange: (renderer) => {
+      press(renderer, "settings-tab");
+      press(renderer, "settings-standard-elo-row");
+    },
+    beforeTestID: "settings-advanced-ratings-panel",
+    afterTestID: "settings-panel"
+  },
+  {
+    name: "Custom rating-editor dismissal",
+    createOptions: () => ({ practiceService: createPlayedCustomService() }),
+    arrange: (renderer) => {
+      press(renderer, "practice-mode-custom");
+      press(renderer, "custom-initial-rating-row");
+    },
+    beforeTestID: "custom-initial-rating-editor",
+    afterTestID: "custom-sprint-setup"
+  },
+  {
+    name: "Custom setup return",
+    arrange: (renderer) => {
+      press(renderer, "practice-mode-custom");
+    },
+    beforeTestID: "custom-sprint-setup",
+    afterTestID: "practice-home"
+  },
+  {
+    name: "Stockfish diagnostics return",
+    arrange: (renderer) => {
+      press(renderer, "settings-tab");
+      press(renderer, "settings-stockfish-diagnostics");
+    },
+    beforeTestID: "stockfish-diagnostics-panel",
+    afterTestID: "settings-panel"
+  }
+];
+
 beforeEach(() => {
   jest.useFakeTimers();
 });
@@ -64,6 +120,25 @@ describe("PracticePocScreen", () => {
     expect(systemBack.invoke()).toBe(false);
   });
 
+  it.each(renderedBackExecutorCases)("executes $name through rendered public behavior", ({
+    afterTestID,
+    arrange,
+    beforeTestID,
+    createOptions
+  }) => {
+    const systemBack = createTestSystemBackSource("android");
+    const renderer = renderScreen({ ...(createOptions?.() ?? {}), systemBack });
+
+    arrange(renderer);
+    expect(findByTestId(renderer, beforeTestID)).toBeTruthy();
+
+    expect(systemBack.invoke()).toBe(true);
+    expect(findByTestId(renderer, afterTestID)).toBeTruthy();
+    if (beforeTestID !== afterTestID) {
+      expect(() => findByTestId(renderer, beforeTestID)).toThrow();
+    }
+  });
+
   it("guards an active sprint and lets Back cancel the exit without losing progress", () => {
     const systemBack = createTestSystemBackSource("android");
     const service = createMobilePracticeService("familiar15");
@@ -83,6 +158,90 @@ describe("PracticePocScreen", () => {
     expect(systemBack.invoke()).toBe(true);
     press(renderer, "session-abandon-confirm");
     expect(service.getActiveSprint()).toBeUndefined();
+  });
+
+  it("cancels a pending Arrow Duel start before its delayed callback can enter practice", () => {
+    const systemBack = createTestSystemBackSource("android");
+    const service = createMobilePracticeService("familiar15");
+    const renderer = renderScreen({ practiceService: service, systemBack });
+
+    press(renderer, "practice-mode-arrow-duel");
+    press(renderer, "practice-start-button");
+    expect(findByTestId(renderer, "sprint-loading-overlay")).toBeTruthy();
+
+    expect(systemBack.invoke()).toBe(true);
+    expect(() => findByTestId(renderer, "sprint-loading-overlay")).toThrow();
+
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+    expect(service.getActiveSprint()).toBeUndefined();
+    expect(findByTestId(renderer, "practice-home")).toBeTruthy();
+  });
+
+  it("returns a completed sprint result to idle Practice", () => {
+    const systemBack = createTestSystemBackSource("android");
+    const renderer = renderStandardSequenceScreen({ systemBack });
+
+    startStandardSprint(renderer);
+    act(() => {
+      jest.advanceTimersByTime(301_000);
+    });
+    expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
+
+    expect(systemBack.invoke()).toBe(true);
+    expect(() => findByTestId(renderer, "sprint-summary-panel")).toThrow();
+    expect(findByTestId(renderer, "practice-home")).toBeTruthy();
+  });
+
+  it.each([
+    {
+      name: "History filters",
+      ownerTab: "history-tab",
+      openControl: "history-filter-toggle",
+      expandedSurface: "history-advanced-filters"
+    },
+    {
+      name: "Review filters",
+      ownerTab: "review-tab",
+      openControl: "review-filter-toggle",
+      expandedSurface: "review-queue-filters"
+    },
+    {
+      name: "Settings advanced ratings",
+      ownerTab: "settings-tab",
+      openControl: "settings-standard-elo-row",
+      expandedSurface: "settings-advanced-ratings-panel"
+    }
+  ])("restores iOS child-local lifetime for $name after tab-away/tab-back", ({
+    expandedSurface,
+    openControl,
+    ownerTab
+  }) => {
+    const systemBack = createTestSystemBackSource("ios");
+    const renderer = renderScreen({ systemBack });
+
+    press(renderer, ownerTab);
+    press(renderer, openControl);
+    expect(findByTestId(renderer, expandedSurface)).toBeTruthy();
+
+    press(renderer, "practice-tab");
+    press(renderer, ownerTab);
+    expect(() => findByTestId(renderer, expandedSurface)).toThrow();
+  });
+
+  it("restores iOS custom rating-editor lifetime after tab-away/tab-back", () => {
+    const systemBack = createTestSystemBackSource("ios");
+    const renderer = renderScreen({ practiceService: createPlayedCustomService(), systemBack });
+
+    press(renderer, "practice-mode-custom");
+    press(renderer, "custom-initial-rating-row");
+    expect(findByTestId(renderer, "custom-initial-rating-editor")).toBeTruthy();
+
+    press(renderer, "settings-tab");
+    press(renderer, "practice-tab");
+    expect(findByTestId(renderer, "custom-sprint-setup")).toBeTruthy();
+    expect(() => findByTestId(renderer, "custom-initial-rating-editor")).toThrow();
   });
 
   it("closes review analysis before returning the review to its owner", () => {
@@ -125,6 +284,59 @@ describe("PracticePocScreen", () => {
     renderScreen({ systemBack });
 
     expect(systemBack.subscribe).not.toHaveBeenCalled();
+    expect(systemBack.setPredictiveBackEnabled).not.toHaveBeenCalled();
+  });
+
+  it("previews the typed destination during Predictive Back, cancels cleanly, and commits parity", () => {
+    const systemBack = createTestSystemBackSource("android");
+    const renderer = renderScreen({ systemBack });
+
+    press(renderer, "settings-tab");
+    expect(systemBack.setPredictiveBackEnabled).toHaveBeenLastCalledWith(true);
+    systemBack.startPredictive("left");
+    systemBack.progressPredictive(0.6, "left");
+    expect(collectText(findByTestId(renderer, "mobile-back-destination-preview-label"))).toBe("Practice");
+    expect(collectText(findByTestId(renderer, "mobile-back-destination-preview-id"))).toBe("tab-practice");
+    expect(findByTestId(renderer, "settings-panel")).toBeTruthy();
+
+    systemBack.cancelPredictive();
+    expect(() => findByTestId(renderer, "mobile-back-destination-preview")).toThrow();
+    expect(findByTestId(renderer, "settings-panel")).toBeTruthy();
+
+    systemBack.startPredictive("right");
+    systemBack.progressPredictive(0.8, "right");
+    expect(systemBack.commitPredictive()).toBe(true);
+    expect(() => findByTestId(renderer, "mobile-back-destination-preview")).toThrow();
+    expect(findByTestId(renderer, "practice-home")).toBeTruthy();
+    expect(systemBack.setPredictiveBackEnabled).toHaveBeenLastCalledWith(false);
+  });
+
+  it("replaces the Android Back listener and removes it on unmount", () => {
+    const sourceA = createTestSystemBackSource("android");
+    const sourceB = createTestSystemBackSource("android");
+    const platformCapabilities = createTestMobilePlatformCapabilities();
+    let renderer: TestRenderer.ReactTestRenderer | undefined;
+
+    act(() => {
+      renderer = TestRenderer.create(
+        <PracticePocScreen platformCapabilities={platformCapabilities} systemBack={sourceA} />
+      );
+    });
+    expect(sourceA.subscribe).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      renderer?.update(
+        <PracticePocScreen platformCapabilities={platformCapabilities} systemBack={sourceB} />
+      );
+    });
+    expect(sourceA.unsubscribe).toHaveBeenCalledTimes(1);
+    expect(sourceB.subscribe).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      renderer?.unmount();
+    });
+    expect(sourceB.unsubscribe).toHaveBeenCalledTimes(1);
+    expect(sourceB.setPredictiveBackEnabled).toHaveBeenLastCalledWith(false);
   });
 
   it("does not initialize Stockfish while rendering the Practice home", async () => {
@@ -4000,6 +4212,34 @@ describe("PracticePocScreen", () => {
     expect(notificationClient.requestCount).toBe(1);
     expect(() => findByTestId(renderer, "review-reminder-permission-prompt")).toThrow();
   });
+
+  it("dismisses the review reminder prompt before its underlying Review session", async () => {
+    const systemBack = createTestSystemBackSource("android");
+    const notificationClient = new FakeReviewReminderNotificationClient("not_determined", "authorized");
+    const service = createMobilePracticeService("random1000");
+    service.startSprint(
+      { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
+      "2026-06-20T00:00:00.000Z"
+    );
+    service.submitMove("c4b5", "2026-06-20T00:00:05.000Z");
+    const renderer = renderScreen({
+      practiceService: service,
+      reviewReminderNotificationClient: notificationClient,
+      systemBack
+    });
+    await act(async () => {});
+
+    press(renderer, "review-tab");
+    press(renderer, "review-start-due");
+    await boardMove(renderer, "c4b5");
+    await settleFeedbackSnapshot();
+    expect(findByTestId(renderer, "review-reminder-permission-prompt")).toBeTruthy();
+
+    expect(systemBack.invoke()).toBe(true);
+    expect(() => findByTestId(renderer, "review-reminder-permission-prompt")).toThrow();
+    expect(findByTestId(renderer, "review-panel")).toBeTruthy();
+    expect(notificationClient.requestCount).toBe(0);
+  });
 });
 
 function createScriptedStockfishTransport(
@@ -4042,6 +4282,27 @@ type RenderScreenOptions = TestMobilePlatformCapabilityOverrides &
     platformCapabilities?: MobilePlatformCapabilities;
   };
 
+function createPlayedCustomService(): PracticeService {
+  const store = new MemoryStore();
+  store.seedPuzzles([sharedHistoryPuzzle()]);
+  store.saveRating({
+    key: "custom 5/20",
+    generation: 0,
+    rating: 900,
+    ratingDeviation: 180,
+    volatility: 0.05,
+    games: 1
+  });
+  store.createSprintSession(completedRatingSprintState({
+    id: "back-played-custom",
+    mode: "custom",
+    completedAt: "2026-07-07T00:00:05.000Z",
+    ratingBefore: 600,
+    ratingAfter: 900
+  }));
+  return new PracticeService(store);
+}
+
 function renderScreen({
   platformCapabilities,
   currentTimeMs,
@@ -4072,28 +4333,57 @@ function renderScreen({
 }
 
 function createTestSystemBackSource(platform: "android" | "ios"): MobileSystemBackSource & {
+  cancelPredictive: () => void;
+  commitPredictive: () => boolean;
   invoke: () => boolean;
+  progressPredictive: (progress: number, edge?: "left" | "right") => void;
+  setPredictiveBackEnabled: jest.Mock;
+  startPredictive: (edge?: "left" | "right") => void;
   subscribe: jest.Mock;
+  unsubscribe: jest.Mock;
 } {
-  let handler: (() => boolean) | null = null;
-  const subscribe = jest.fn((nextHandler: () => boolean) => {
-    handler = nextHandler;
+  let listener: Parameters<MobileSystemBackSource["subscribe"]>[0] | null = null;
+  const unsubscribe = jest.fn();
+  const subscribe = jest.fn((nextListener: Parameters<MobileSystemBackSource["subscribe"]>[0]) => {
+    listener = nextListener;
     return () => {
-      if (handler === nextHandler) {
-        handler = null;
+      unsubscribe();
+      if (listener === nextListener) {
+        listener = null;
       }
     };
   });
   return {
     platform,
+    setPredictiveBackEnabled: jest.fn(),
     subscribe,
+    unsubscribe,
     invoke: () => {
-      if (!handler) {
+      if (!listener) {
         return false;
       }
       let handled = false;
       act(() => {
-        handled = handler?.() ?? false;
+        handled = listener?.onCommit("button") ?? false;
+      });
+      return handled;
+    },
+    startPredictive: (edge = "left") => {
+      act(() => listener?.onStart(edge));
+    },
+    progressPredictive: (progress, edge = "left") => {
+      act(() => listener?.onProgress(progress, edge));
+    },
+    cancelPredictive: () => {
+      act(() => listener?.onCancel());
+    },
+    commitPredictive: () => {
+      if (!listener) {
+        return false;
+      }
+      let handled = false;
+      act(() => {
+        handled = listener?.onCommit("predictive") ?? false;
       });
       return handled;
     }

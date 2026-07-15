@@ -1,4 +1,5 @@
 import {
+  mobileBackDestination,
   resolveMobileBackIntent,
   type MobileBackState
 } from "../src/navigation/mobileBackContract";
@@ -20,6 +21,14 @@ describe("mobile Back contract", () => {
     }, "button")).toEqual({
       kind: "dismiss-transient",
       transient: "practice-exit-confirmation"
+    });
+
+    expect(resolveMobileBackIntent({
+      ...rootState,
+      topTransient: "starting-practice"
+    }, "button")).toEqual({
+      kind: "dismiss-transient",
+      transient: "starting-practice"
     });
   });
 
@@ -71,5 +80,16 @@ describe("mobile Back contract", () => {
         resolveMobileBackIntent(state, "button")
       );
     }
+  });
+
+  it("describes the same typed destination that the frozen predictive intent commits", () => {
+    const state: MobileBackState = { ...rootState, tab: "settings" };
+    const intent = resolveMobileBackIntent(state, "predictive");
+
+    expect(mobileBackDestination(intent, state)).toEqual({
+      label: "Practice",
+      testID: "tab-practice"
+    });
+    expect(mobileBackDestination(resolveMobileBackIntent(rootState, "predictive"), rootState)).toBeNull();
   });
 });

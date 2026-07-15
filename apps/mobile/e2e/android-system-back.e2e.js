@@ -1,8 +1,8 @@
 const {
   androidAppIsResumed,
+  beginAndroidPredictiveBackGesture,
   launchWithDisabledSynchronization,
   openTab,
-  performAndroidPredictiveBackGesture,
   selectTestPuzzleSource,
   sleep,
   startPracticeMode,
@@ -37,10 +37,30 @@ describe('Android product-aware system Back', () => {
       await waitFor(element(by.id('practice-home'))).toExist().withTimeout(10000);
 
       await openTab('settings-tab', 'settings-panel');
-      performAndroidPredictiveBackGesture();
+      const cancelledPredictiveBack = beginAndroidPredictiveBackGesture({ cancel: true });
+      await waitFor(element(by.id('mobile-back-destination-preview'))).toExist().withTimeout(10000);
+      await expect(element(by.id('mobile-back-destination-preview-label'))).toHaveText('Practice');
+      await cancelledPredictiveBack.completion;
+      await waitFor(element(by.id('mobile-back-destination-preview'))).not.toExist().withTimeout(10000);
+      await expect(element(by.id('settings-panel'))).toExist();
+
+      const committedPredictiveBack = beginAndroidPredictiveBackGesture();
+      await waitFor(element(by.id('mobile-back-destination-preview'))).toExist().withTimeout(10000);
+      await expect(element(by.id('mobile-back-destination-preview-label'))).toHaveText('Practice');
+      await committedPredictiveBack.completion;
       await waitFor(element(by.id('practice-home'))).toExist().withTimeout(10000);
 
       await selectTestPuzzleSource('familiar15');
+      await waitForVisibleInPracticeScroll('practice-mode-arrow-duel');
+      await element(by.id('practice-mode-arrow-duel')).tap();
+      await element(by.id('practice-main-scroll')).scrollTo('top');
+      await element(by.id('practice-start-button')).tap();
+      await waitFor(element(by.id('sprint-loading-overlay'))).toExist().withTimeout(10000);
+      await device.pressBack();
+      await waitFor(element(by.id('sprint-loading-overlay'))).not.toExist().withTimeout(10000);
+      await sleep(500);
+      await expect(element(by.id('practice-home'))).toExist();
+
       await startPracticeMode('standard');
       await waitForVisibleInPracticeScroll('session-board');
 

@@ -104,12 +104,19 @@ import {
   type BoardInputLockMode
 } from "../backend/premove.ts";
 import {
+  mobileBackDestination,
   resolveMobileBackIntent,
+  type MobileBackDestination,
   type MobileBackDetail,
+  type MobileBackIntent,
+  type MobileBackState,
   type MobileBackTab,
   type MobileBackTransient
 } from "../navigation/mobileBackContract.ts";
-import type { MobileSystemBackSource } from "../navigation/mobileSystemBack.ts";
+import type {
+  MobileSystemBackEdge,
+  MobileSystemBackSource
+} from "../navigation/mobileSystemBack.ts";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Chess, type Move, type PieceSymbol, type Square } from "chess.js";
 
@@ -123,6 +130,11 @@ interface Props {
 }
 
 type Tab = MobileBackTab;
+
+type MobileBackPreview = MobileBackDestination & {
+  edge: MobileSystemBackEdge;
+  progress: number;
+};
 
 type SessionFeedback = PuzzleFeedback | null;
 type AnalysisEngineStatus = "idle" | "thinking" | "stockfish" | "fallback" | "error";
@@ -392,6 +404,7 @@ export function PracticePocScreen({
   const feedbackSnapshotTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sprintStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startingModeRef = useRef<SprintMode | null>(null);
+  const predictiveBackIntentRef = useRef<MobileBackIntent | null>(null);
   const reminderScheduleKeyRef = useRef<string | null>(null);
   const scheduledReviewAttemptCountRef = useRef(scheduledReviewAttemptCount(service));
   const reviewReminderPromptDismissedRef = useRef(false);
@@ -453,6 +466,7 @@ export function PracticePocScreen({
   const [customRatingEditorOpen, setCustomRatingEditorOpen] = useState(false);
   const [reviewAnalysisOpen, setReviewAnalysisOpen] = useState(false);
   const [reviewBackCommand, setReviewBackCommand] = useState<ReviewBackCommand | null>(null);
+  const [mobileBackPreview, setMobileBackPreview] = useState<MobileBackPreview | null>(null);
   const [iCloudSyncEnabled, setICloudSyncEnabled] = useState(() => service.getSettings().sync.iCloudEnabled);
   const [iCloudSyncStatus, setICloudSyncStatus] = useState(() => service.getSettings().sync.iCloudEnabled ? "Ready" : "Off");
   const [, setSettingsRevision] = useState(0);
@@ -564,6 +578,8 @@ export function PracticePocScreen({
       canceled = true;
       unsubscribe();
     };
+    // Notification callbacks intentionally use the current render-local queue opener.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notificationClient, service]);
 
   useEffect(() => {
@@ -649,6 +665,7 @@ export function PracticePocScreen({
         clearTimeout(sprintStartTimerRef.current);
         sprintStartTimerRef.current = null;
       }
+      startingModeRef.current = null;
       globals.__CHESSTICIZE_CHESSBOARD_DEBUG__ = undefined;
       globals.__CHESSTICIZE_CHESSBOARD_DEBUG_SINK__ = undefined;
     };
@@ -656,6 +673,22 @@ export function PracticePocScreen({
 
   function nowIso(): string {
     return new Date(nowMsRef.current).toISOString();
+  }
+
+  function navigateToTab(nextTab: Tab): void {
+    if (nextTab !== "history") {
+      setHistoryFiltersExpanded(false);
+    }
+    if (nextTab !== "review") {
+      setReviewFiltersExpanded(false);
+    }
+    if (nextTab !== "settings") {
+      setSettingsAdvancedRatingsOpen(false);
+    }
+    if (nextTab !== "practice") {
+      setCustomRatingEditorOpen(false);
+    }
+    setTab(nextTab);
   }
 
   function captureLiveNowIso(): string {
@@ -945,11 +978,23 @@ export function PracticePocScreen({
       setStartingMode(nextMode);
       sprintStartTimerRef.current = setTimeout(() => {
         sprintStartTimerRef.current = null;
+        if (startingModeRef.current !== nextMode) {
+          return;
+        }
         performStartSprint(nextMode, useCustomTiming);
       }, ARROW_DUEL_LOADING_TRANSITION_MS);
       return;
     }
     performStartSprint(nextMode, useCustomTiming);
+  }
+
+  function cancelStartingSprint(): void {
+    if (sprintStartTimerRef.current) {
+      clearTimeout(sprintStartTimerRef.current);
+      sprintStartTimerRef.current = null;
+    }
+    startingModeRef.current = null;
+    setStartingMode(null);
   }
 
   function performStartSprint(nextMode: SprintMode, useCustomTiming: boolean): void {
@@ -989,7 +1034,7 @@ export function PracticePocScreen({
       pendingPremoveRef.current = null;
       commitBoardInputLocked(false, "start", started.currentPuzzle?.puzzle.id ?? null);
       clearFeedbackSnapshot();
-      setTab("practice");
+      navigateToTab("practice");
       refreshState();
     } catch (caught) {
       setError(errorMessage(caught));
@@ -1312,7 +1357,7 @@ export function PracticePocScreen({
       setFeedbackPuzzleId(null);
       clearFeedbackSnapshot();
       commitBoardInputLocked(false, "resume", resumed.currentPuzzle?.puzzle.id ?? null);
-      setTab("practice");
+      navigateToTab("practice");
       refreshState();
     } catch (caught) {
       setError(errorMessage(caught));
@@ -1324,17 +1369,17 @@ export function PracticePocScreen({
     const reviewItems = sessionId ? service.getSessionMistakeReview(sessionId) : [];
     resetToIdle();
     setSessionMistakeReviewItems(reviewItems);
-    setTab("review");
+    navigateToTab("review");
   }
 
   function openReviewQueue(): void {
     setSessionMistakeReviewItems([]);
-    setTab("review");
+    navigateToTab("review");
   }
 
   function exitSessionReview(): void {
     setSessionMistakeReviewItems([]);
-    setTab("practice");
+    navigateToTab("practice");
   }
 
   function openHistoryReview(attemptId: string): void {
@@ -1787,66 +1832,104 @@ export function PracticePocScreen({
           : tab === "practice" && state === null && mode === "custom"
             ? { kind: "custom-practice", owner: "practice" }
             : null;
+  const mobileBackState: MobileBackState = {
+    activePractice: isOpenSession,
+    detail: backDetail,
+    tab,
+    topTransient: topBackTransient
+  };
+
+  function executeMobileBackIntent(intent: MobileBackIntent): boolean {
+    switch (intent.kind) {
+      case "dismiss-transient":
+        if (intent.transient === "practice-exit-confirmation") {
+          setPracticeExitConfirmationVisible(false);
+        } else if (intent.transient === "review-reminder-prompt") {
+          dismissReviewReminderPermissionPrompt();
+        } else if (intent.transient === "history-filters") {
+          setHistoryFiltersExpanded(false);
+        } else if (intent.transient === "review-filters") {
+          setReviewFiltersExpanded(false);
+        } else if (intent.transient === "settings-advanced-ratings") {
+          setSettingsAdvancedRatingsOpen(false);
+        } else if (intent.transient === "custom-rating-editor") {
+          setCustomRatingEditorOpen(false);
+        } else if (intent.transient === "starting-practice") {
+          cancelStartingSprint();
+        }
+        return true;
+      case "close-analysis":
+        reviewBackCommandIdRef.current += 1;
+        setReviewBackCommand({ id: reviewBackCommandIdRef.current, kind: intent.kind });
+        return true;
+      case "return-to-owner":
+        if (backDetail?.kind === "review-session") {
+          reviewBackCommandIdRef.current += 1;
+          setReviewBackCommand({ id: reviewBackCommandIdRef.current, kind: intent.kind });
+        } else if (backDetail?.kind === "stockfish-diagnostics") {
+          navigateToTab("settings");
+        } else if (backDetail?.kind === "custom-practice") {
+          setCustomRatingEditorOpen(false);
+          setMode("standard");
+        } else if (backDetail?.kind === "sprint-result") {
+          resetToIdle();
+        }
+        return true;
+      case "request-practice-exit":
+        setPracticeExitConfirmationVisible(true);
+        return true;
+      case "return-to-practice":
+        setSessionMistakeReviewItems([]);
+        setHistoryReviewEntries([]);
+        navigateToTab("practice");
+        return true;
+      case "delegate-platform":
+        return false;
+    }
+  }
 
   useEffect(() => {
     if (systemBack?.platform !== "android") {
       return undefined;
     }
 
-    return systemBack.subscribe(() => {
-      const intent = resolveMobileBackIntent({
-        activePractice: isOpenSession,
-        detail: backDetail,
-        tab,
-        topTransient: topBackTransient
-      }, "predictive");
-
-      switch (intent.kind) {
-        case "dismiss-transient":
-          if (intent.transient === "practice-exit-confirmation") {
-            setPracticeExitConfirmationVisible(false);
-          } else if (intent.transient === "review-reminder-prompt") {
-            dismissReviewReminderPermissionPrompt();
-          } else if (intent.transient === "history-filters") {
-            setHistoryFiltersExpanded(false);
-          } else if (intent.transient === "review-filters") {
-            setReviewFiltersExpanded(false);
-          } else if (intent.transient === "settings-advanced-ratings") {
-            setSettingsAdvancedRatingsOpen(false);
-          } else if (intent.transient === "custom-rating-editor") {
-            setCustomRatingEditorOpen(false);
-          }
-          return true;
-        case "close-analysis":
-        case "return-to-owner":
-          if (backDetail?.kind === "review-analysis" || backDetail?.kind === "review-session") {
-            reviewBackCommandIdRef.current += 1;
-            setReviewBackCommand({ id: reviewBackCommandIdRef.current, kind: intent.kind });
-          } else if (backDetail?.kind === "stockfish-diagnostics") {
-            setTab("settings");
-          } else if (backDetail?.kind === "custom-practice") {
-            setCustomRatingEditorOpen(false);
-            setMode("standard");
-          } else if (backDetail?.kind === "sprint-result") {
-            resetToIdle();
-          }
-          return true;
-        case "request-practice-exit":
-          setPracticeExitConfirmationVisible(true);
-          return true;
-        case "return-to-practice":
-          setSessionMistakeReviewItems([]);
-          setHistoryReviewEntries([]);
-          setReviewFiltersExpanded(false);
-          setHistoryFiltersExpanded(false);
-          setTab("practice");
-          return true;
-        case "consume":
-          return true;
-        case "delegate-platform":
-          return false;
+    const currentIntent = resolveMobileBackIntent(mobileBackState, "button");
+    systemBack.setPredictiveBackEnabled(currentIntent.kind !== "delegate-platform");
+    const unsubscribe = systemBack.subscribe({
+      onStart(edge) {
+        const intent = resolveMobileBackIntent(mobileBackState, "predictive");
+        const destination = mobileBackDestination(intent, mobileBackState);
+        if (!destination) {
+          return;
+        }
+        predictiveBackIntentRef.current = intent;
+        setMobileBackPreview({ ...destination, edge, progress: 0 });
+      },
+      onProgress(progress, edge) {
+        setMobileBackPreview((current) => current
+          ? { ...current, edge, progress }
+          : current);
+      },
+      onCancel() {
+        predictiveBackIntentRef.current = null;
+        setMobileBackPreview(null);
+      },
+      onCommit(activation) {
+        const frozenIntent = activation === "predictive"
+          ? predictiveBackIntentRef.current
+          : null;
+        predictiveBackIntentRef.current = null;
+        setMobileBackPreview(null);
+        return executeMobileBackIntent(
+          frozenIntent ?? resolveMobileBackIntent(mobileBackState, activation)
+        );
       }
     });
+    return () => {
+      predictiveBackIntentRef.current = null;
+      systemBack.setPredictiveBackEnabled(false);
+      unsubscribe();
+    };
     // The listener intentionally captures the exact render-local navigation
     // snapshot; resetToIdle is a function declaration over the same render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2020,7 +2103,37 @@ export function PracticePocScreen({
   const errorNode = error ? <ErrorPanel error={error} /> : null;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.predictiveBackStage}>
+      {mobileBackPreview ? (
+        <View
+          accessible={false}
+          style={styles.predictiveBackDestination}
+          testID="mobile-back-destination-preview"
+        >
+          <Text style={styles.predictiveBackEyebrow}>Back to</Text>
+          <Text style={styles.predictiveBackDestinationLabel} testID="mobile-back-destination-preview-label">
+            {mobileBackPreview.label}
+          </Text>
+          <Text style={FABRIC_SAFE_HIDDEN_TEXT_STYLE} testID="mobile-back-destination-preview-id">
+            {mobileBackPreview.testID}
+          </Text>
+        </View>
+      ) : null}
+      <SafeAreaView
+        style={[
+          styles.safeArea,
+          mobileBackPreview
+            ? {
+              borderRadius: mobileBackPreview.progress * 20,
+              overflow: "hidden",
+              transform: [
+                { translateX: (mobileBackPreview.edge === "left" ? 1 : -1) * mobileBackPreview.progress * 36 },
+                { scale: 1 - mobileBackPreview.progress * 0.04 }
+              ]
+            }
+            : null
+        ]}
+      >
       <StatusBar barStyle="dark-content" />
       <View
         accessibilityLabel={`Layout ${adaptiveLayout.className}`}
@@ -2039,7 +2152,7 @@ export function PracticePocScreen({
                 openReviewQueue();
                 return;
               }
-              setTab(nextTab);
+              navigateToTab(nextTab);
             }}
           />
         ) : null}
@@ -2168,7 +2281,7 @@ export function PracticePocScreen({
                     onOpenHistory={() => {
                       setHistoryRatingKey(state.config.ratingKey);
                       setHistoryPageOffset(0);
-                      setTab("history");
+                      navigateToTab("history");
                     }}
                     onReview={state.mistakeCount > 0 ? showReviewMistakes : undefined}
                   />
@@ -2320,7 +2433,7 @@ export function PracticePocScreen({
                   { label: "Standard", record: service.getRating(defaultSprintConfig("standard").ratingKey) },
                   { label: "Arrow Duel", record: service.getRating(defaultSprintConfig("arrow_duel").ratingKey) }
                 ]}
-                onOpenDiagnostics={arePracticeTestControlsEnabled() ? () => setTab("analysis") : undefined}
+                onOpenDiagnostics={arePracticeTestControlsEnabled() ? () => navigateToTab("analysis") : undefined}
                 onAdjustRating={(ratingKey, nextRating) => {
                   const next = service.setRating(ratingKey, nextRating);
                   setSettingsRevision((current) => current + 1);
@@ -2368,7 +2481,7 @@ export function PracticePocScreen({
                       openReviewQueue();
                       return;
                     }
-                    setTab(item.tab);
+                    navigateToTab(item.tab);
                   }}
                 />
               ))}
@@ -2391,7 +2504,8 @@ export function PracticePocScreen({
           </View>
         ) : null}
       </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
@@ -8698,6 +8812,35 @@ const FABRIC_SAFE_HIDDEN_TEXT_STYLE = {
 } as const;
 
 const styles = StyleSheet.create({
+  predictiveBackStage: {
+    backgroundColor: "#DCE7F5",
+    flex: 1
+  },
+  predictiveBackDestination: {
+    alignItems: "center",
+    backgroundColor: "#DCE7F5",
+    bottom: 0,
+    justifyContent: "center",
+    left: 0,
+    padding: 32,
+    position: "absolute",
+    right: 0,
+    top: 0
+  },
+  predictiveBackEyebrow: {
+    color: "#516078",
+    fontSize: 13,
+    fontWeight: "600",
+    letterSpacing: 0.5,
+    textTransform: "uppercase"
+  },
+  predictiveBackDestinationLabel: {
+    color: "#172033",
+    fontSize: 24,
+    fontWeight: "700",
+    marginTop: 8,
+    textAlign: "center"
+  },
   safeArea: {
     backgroundColor: "#F8FAFC",
     flex: 1

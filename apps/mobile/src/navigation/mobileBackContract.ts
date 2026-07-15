@@ -34,8 +34,12 @@ export type MobileBackIntent =
   | { kind: "return-to-owner"; owner: MobileBackOwner }
   | { kind: "request-practice-exit" }
   | { kind: "return-to-practice" }
-  | { kind: "delegate-platform" }
-  | { kind: "consume" };
+  | { kind: "delegate-platform" };
+
+export type MobileBackDestination = {
+  label: string;
+  testID: string;
+};
 
 /**
  * The complete product navigation decision for Android Back. The activation
@@ -47,9 +51,7 @@ export function resolveMobileBackIntent(
   _activation: MobileBackActivation
 ): MobileBackIntent {
   if (state.topTransient) {
-    return state.topTransient === "starting-practice"
-      ? { kind: "consume" }
-      : { kind: "dismiss-transient", transient: state.topTransient };
+    return { kind: "dismiss-transient", transient: state.topTransient };
   }
 
   if (state.detail?.kind === "review-analysis") {
@@ -69,4 +71,54 @@ export function resolveMobileBackIntent(
   }
 
   return { kind: "delegate-platform" };
+}
+
+/** A frontend-owned description of the destination revealed by a Back gesture. */
+export function mobileBackDestination(
+  intent: MobileBackIntent,
+  state: MobileBackState
+): MobileBackDestination | null {
+  switch (intent.kind) {
+    case "dismiss-transient":
+      if (intent.transient === "practice-exit-confirmation") {
+        return { label: "Active sprint", testID: "active-practice" };
+      }
+      if (intent.transient === "starting-practice") {
+        return { label: "Practice setup", testID: "practice-setup" };
+      }
+      return {
+        label: destinationLabelForTab(state.tab),
+        testID: `tab-${state.tab}`
+      };
+    case "close-analysis":
+      return {
+        label: intent.owner === "history" ? "History review" : "Review session",
+        testID: `${intent.owner}-review`
+      };
+    case "return-to-owner":
+      return {
+        label: destinationLabelForTab(intent.owner),
+        testID: `tab-${intent.owner}`
+      };
+    case "request-practice-exit":
+      return { label: "Leave sprint confirmation", testID: "practice-exit-confirmation" };
+    case "return-to-practice":
+      return { label: "Practice", testID: "tab-practice" };
+    case "delegate-platform":
+      return null;
+  }
+}
+
+function destinationLabelForTab(tab: MobileBackTab): string {
+  switch (tab) {
+    case "practice":
+      return "Practice";
+    case "review":
+      return "Review";
+    case "history":
+      return "History";
+    case "settings":
+    case "analysis":
+      return "Settings";
+  }
 }

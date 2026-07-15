@@ -1,5 +1,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
+const { EventEmitter } = require('node:events');
 
 const {
   ACTIVE_E2E_TEST_MATCH_BY_SUITE,
@@ -18,6 +19,7 @@ const {
 const {
   bringAndroidAppToForeground,
   androidAppIsResumed,
+  beginAndroidPredictiveBackGesture,
   collectAndroidUiDiagnostics,
   launchWithDisabledSynchronization,
   performAndroidPredictiveBackGesture,
@@ -429,12 +431,34 @@ describe('Detox suite configuration', () => {
     }, run)).toBe(false);
   });
 
+  it('keeps a predictive edge swipe alive for mid-gesture preview and cancellation evidence', async () => {
+    const run = jest.fn((_, args) => args.includes('size') ? 'Physical size: 1080x1920\n' : '');
+    const child = new EventEmitter();
+    child.stderr = new EventEmitter();
+    const spawnProcess = jest.fn(() => child);
+
+    const gesture = beginAndroidPredictiveBackGesture(
+      { cancel: true, durationMs: 1200 },
+      { ADB_PATH: '/sdk/adb', DETOX_ANDROID_DEVICE: 'emulator-6000' },
+      run,
+      spawnProcess
+    );
+
+    expect(spawnProcess).toHaveBeenCalledWith('/sdk/adb', [
+      '-s', 'emulator-6000', 'shell', 'input', 'swipe', '1', '960', '65', '960', '1200'
+    ], { stdio: ['ignore', 'pipe', 'pipe'] });
+    child.emit('close', 0);
+    await expect(gesture.completion).resolves.toBeUndefined();
+  });
+
   it('keeps a dedicated public-UI Android Back journey for ordering and cancellation', () => {
     const spec = fs.readFileSync(path.resolve(__dirname, '../e2e/android-system-back.e2e.js'), 'utf8');
 
     expect(spec).toContain("device.pressBack()");
     expect(spec).toContain('session-abandon-confirmation');
-    expect(spec).toContain('performAndroidPredictiveBackGesture');
+    expect(spec).toContain('beginAndroidPredictiveBackGesture');
+    expect(spec).toContain('mobile-back-destination-preview');
+    expect(spec).toContain('cancel: true');
     expect(spec).toContain('androidAppIsResumed');
   });
 

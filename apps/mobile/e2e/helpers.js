@@ -1,4 +1,4 @@
-const { execFileSync } = require('node:child_process');
+const { execFileSync, spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const { androidAdbPath } = require('./androidNetwork');
@@ -93,6 +93,44 @@ function performAndroidPredictiveBackGesture(
   run(adb, [
     '-s', serial, 'shell', 'input', 'swipe', '1', String(centerY), String(endX), String(centerY), '500'
   ], { encoding: 'utf8' });
+}
+
+function beginAndroidPredictiveBackGesture(
+  { cancel = false, durationMs = 1800 } = {},
+  environment = process.env,
+  run = execFileSync,
+  spawnProcess = spawn
+) {
+  const adb = androidAdbPath(environment);
+  const serial = environment.DETOX_ANDROID_DEVICE || 'emulator-5554';
+  run(adb, [
+    '-s', serial, 'shell', 'cmd', 'overlay', 'enable-exclusive', '--category',
+    'com.android.internal.systemui.navbar.gestural'
+  ], { encoding: 'utf8' });
+  const sizeOutput = String(
+    run(adb, ['-s', serial, 'shell', 'wm', 'size'], { encoding: 'utf8' }) ?? ''
+  );
+  const { widthPixels, heightPixels } = parseAndroidDisplaySize(sizeOutput);
+  const centerY = Math.round(heightPixels / 2);
+  const endX = Math.round(widthPixels * (cancel ? 0.06 : 0.7));
+  const child = spawnProcess(adb, [
+    '-s', serial, 'shell', 'input', 'swipe', '1', String(centerY), String(endX), String(centerY), String(durationMs)
+  ], { stdio: ['ignore', 'pipe', 'pipe'] });
+  const completion = new Promise((resolve, reject) => {
+    let stderr = '';
+    child.stderr?.on('data', (chunk) => {
+      stderr += String(chunk);
+    });
+    child.once('error', reject);
+    child.once('close', (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`Predictive Back gesture exited ${code}: ${stderr.trim()}`));
+      }
+    });
+  });
+  return { completion };
 }
 
 function androidAppIsResumed(
@@ -532,6 +570,7 @@ async function failStandardSprint() {
 
 module.exports = {
   androidAppIsResumed,
+  beginAndroidPredictiveBackGesture,
   bringAndroidAppToForeground,
   collectAndroidUiDiagnostics,
   elementText,
