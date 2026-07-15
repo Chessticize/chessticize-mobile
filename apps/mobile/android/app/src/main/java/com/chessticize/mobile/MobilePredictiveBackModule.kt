@@ -2,7 +2,6 @@ package com.chessticize.mobile
 
 import android.app.Activity
 import android.os.Build
-import android.util.Log
 import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.LifecycleEventListener
@@ -39,7 +38,6 @@ class MobilePredictiveBackModule(
   }
 
   init {
-    Log.i(STARTUP_TAG, "$STARTUP_PREFIX predictive-module-init")
     reactContext.addLifecycleEventListener(this)
   }
 
@@ -116,9 +114,7 @@ class MobilePredictiveBackModule(
   }
 
   private fun emitToJavaScript(phase: String, progress: Double?, edge: String?) {
-    val active = reactApplicationContext.hasActiveReactInstance()
-    Log.i(TAG, "$DEBUG_PREFIX emit-gate phase=$phase active=$active")
-    if (!active) {
+    if (!reactApplicationContext.hasActiveReactInstance()) {
       return
     }
     val event = Arguments.createMap().apply {
@@ -130,42 +126,23 @@ class MobilePredictiveBackModule(
         putString("edge", edge)
       }
     }
-    Log.i(TAG, "$DEBUG_PREFIX emitter-call phase=$phase")
     reactApplicationContext
       .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
       .emit("mobilePredictiveBack", event)
   }
 
   private companion object {
-    const val TAG = "ChessticizeMobileBack"
-    const val DEBUG_PREFIX = "[DEBUG-pr201-back-native]"
-    const val STARTUP_TAG = "ChessticizeStartup"
-    const val STARTUP_PREFIX = "[DEBUG-pr201-api24-startup]"
     const val API34_DELEGATE_CLASS =
       "com.chessticize.mobile.MobilePredictiveBackApi34Delegate"
   }
 }
 
 class MobilePredictiveBackPackage : ReactPackage {
-  init {
-    Log.i(STARTUP_TAG, "$STARTUP_PREFIX predictive-package-init")
-  }
-
   override fun createNativeModules(
     reactContext: ReactApplicationContext,
-  ): List<NativeModule> {
-    Log.i(STARTUP_TAG, "$STARTUP_PREFIX predictive-package-before-module")
-    val module = MobilePredictiveBackModule(reactContext)
-    Log.i(STARTUP_TAG, "$STARTUP_PREFIX predictive-package-after-module")
-    return listOf(module)
-  }
+  ): List<NativeModule> = listOf(MobilePredictiveBackModule(reactContext))
 
   override fun createViewManagers(
     reactContext: ReactApplicationContext,
   ): List<ViewManager<*, *>> = emptyList()
-
-  private companion object {
-    const val STARTUP_TAG = "ChessticizeStartup"
-    const val STARTUP_PREFIX = "[DEBUG-pr201-api24-startup]"
-  }
 }

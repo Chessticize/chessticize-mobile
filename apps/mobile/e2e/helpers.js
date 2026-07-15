@@ -4,7 +4,6 @@ const path = require('node:path');
 const { androidAdbPath } = require('./androidNetwork');
 
 const ANDROID_UI_DIAGNOSTICS_DIR = path.resolve(__dirname, '../artifacts/android-ui');
-const ANDROID_STARTUP_DIAGNOSTICS = 'CHESSTICIZE_ANDROID_STARTUP_DIAGNOSTICS';
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -200,18 +199,6 @@ function androidAppIsResumed(
       && line.includes('com.chessticize.mobile'));
 }
 
-function clearAndroidStartupDiagnosticsLogcat(
-  environment = process.env,
-  run = execFileSync
-) {
-  if (environment[ANDROID_STARTUP_DIAGNOSTICS] !== '1') {
-    return;
-  }
-  const adb = androidAdbPath(environment);
-  const serial = environment.DETOX_ANDROID_DEVICE || 'emulator-5554';
-  run(adb, ['-s', serial, 'logcat', '-c'], { encoding: 'utf8' });
-}
-
 function collectAndroidUiDiagnostics(
   environment = process.env,
   run = execFileSync,
@@ -288,21 +275,11 @@ function collectAndroidUiDiagnostics(
   log(`[android-ui-diagnostics] process state\n${processState}`);
   writeDiagnostic('process-state.txt', processState);
 
-  const captureStartupLogcat = environment[ANDROID_STARTUP_DIAGNOSTICS] === '1';
   const rawLogcat = runDiagnostic(
     'logcat',
-    captureStartupLogcat
-      ? ['logcat', '-d', '-v', 'threadtime']
-      : ['logcat', '-d', '-v', 'threadtime', '-t', '2000'],
-    {
-      encoding: 'utf8',
-      maxBuffer: (captureStartupLogcat ? 25 : 10) * 1024 * 1024,
-      timeout: 30000,
-    }
+    ['logcat', '-d', '-v', 'threadtime', '-t', '2000'],
+    { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024, timeout: 30000 }
   );
-  if (captureStartupLogcat && rawLogcat !== null) {
-    writeDiagnostic('logcat-raw.txt', rawLogcat);
-  }
   const logcat = rawLogcat === null
     ? null
     : String(rawLogcat)
@@ -646,7 +623,6 @@ module.exports = {
   androidAppIsResumed,
   beginAndroidPredictiveBackGesture,
   bringAndroidAppToForeground,
-  clearAndroidStartupDiagnosticsLogcat,
   collectAndroidUiDiagnostics,
   elementText,
   openTab,

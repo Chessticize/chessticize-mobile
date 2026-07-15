@@ -56,7 +56,6 @@ export function createMobileSystemBackSource(
         ? new NativeEventEmitter(nativeModule as never).addListener(
           PREDICTIVE_BACK_EVENT,
           (event: NativePredictiveBackEvent) => {
-            console.info("[DEBUG-pr201-back-js] listener-receipt", event.phase ?? "missing-phase");
             const edge = event.edge === "right" ? "right" : "left";
             if (event.phase === "started") {
               predictiveGestureStarted = true;

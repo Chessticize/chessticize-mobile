@@ -167,15 +167,13 @@ jobs:
           emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           script: |
             apps/mobile/scripts/prepare-android-offline-e2e.sh
-            if [ "${{ matrix.api-level }}" = "24" ]; then sh apps/mobile/scripts/run-android-api24-launch-diagnostic.sh; fi
-            if [ "${{ matrix.api-level }}" = "36" ]; then DETOX_ACTIVE_SUITE=android-offline-practice pnpm mobile:e2e:test:android:ci; fi
+            DETOX_ACTIVE_SUITE=android-offline-practice pnpm mobile:e2e:test:android:ci
             if [ "${{ matrix.api-level }}" = "36" ]; then DETOX_ACTIVE_SUITE=android-stockfish pnpm mobile:e2e:test:android:ci; fi
             if [ "${{ matrix.api-level }}" = "36" ]; then DETOX_ACTIVE_SUITE=android-system-back pnpm mobile:e2e:test:android:ci; fi
             if [ "${{ matrix.api-level }}" = "36" ]; then DETOX_ACTIVE_SUITE=flows pnpm mobile:e2e:test:android:ci; fi
             if [ "${{ matrix.api-level }}" = "36" ]; then DETOX_ACTIVE_SUITE=practice pnpm mobile:e2e:test:android:ci; fi
         env:
           DETOX_ANDROID_DEVICE: emulator-5554
-          CHESSTICIZE_ANDROID_STARTUP_DIAGNOSTICS: ${{ matrix.api-level == 24 && '1' || '0' }}
 
       - name: Upload Android launch failure diagnostics
         if: failure()

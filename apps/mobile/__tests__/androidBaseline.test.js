@@ -295,27 +295,13 @@ describe('Android launch baseline', () => {
     }
   });
 
-  it('captures API 24 startup evidence outside the Jest timeout boundary', () => {
+  it('runs the full offline-practice suite on both Android API levels', () => {
     const workflow = read('../../.github/workflows/mobile-android.yml');
-    const diagnosticScript = read('scripts/run-android-api24-launch-diagnostic.sh');
 
     expect(workflow).toContain(
-      'if [ "${{ matrix.api-level }}" = "24" ]; then sh apps/mobile/scripts/run-android-api24-launch-diagnostic.sh; fi'
+      'DETOX_ACTIVE_SUITE=android-offline-practice pnpm mobile:e2e:test:android:ci'
     );
-    expect(diagnosticScript).toContain('DETOX_ACTIVE_SUITE=android-launch pnpm mobile:e2e:test:android:ci');
-    expect(diagnosticScript).toContain('trap capture_api24_startup 0');
-    expect(diagnosticScript).toContain('status=$?');
-    expect(diagnosticScript).toContain('trap - 0');
-    expect(diagnosticScript).toContain('exit "$status"');
-    expect(diagnosticScript).toContain(
-      'logcat -d -v threadtime > apps/mobile/artifacts/android-ui/logcat-raw.txt'
-    );
-    expect(diagnosticScript).toContain(
-      'dumpsys activity activities > apps/mobile/artifacts/android-ui/activity.txt'
-    );
-    expect(diagnosticScript).toContain(
-      'dumpsys window windows > apps/mobile/artifacts/android-ui/window.txt'
-    );
+    expect(workflow.match(/DETOX_ACTIVE_SUITE=android-offline-practice/g)).toHaveLength(1);
   });
 
   it('uses the doctor-verified SDK with a self-contained offline Android E2E app', () => {

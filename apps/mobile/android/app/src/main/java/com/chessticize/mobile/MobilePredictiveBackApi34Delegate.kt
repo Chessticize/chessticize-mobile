@@ -2,7 +2,6 @@ package com.chessticize.mobile
 
 import android.app.Activity
 import android.os.Build
-import android.util.Log
 import android.window.BackEvent
 import android.window.OnBackAnimationCallback
 import android.window.OnBackInvokedCallback
@@ -17,7 +16,6 @@ internal class MobilePredictiveBackApi34Delegate(
 ) : MobilePredictiveBackPlatformDelegate {
   private var registeredActivity: Activity? = null
   private var registeredCallback: OnBackInvokedCallback? = null
-  private var registrationGeneration = 0
 
   override fun register(activity: Activity?) {
     if (activity == null) {
@@ -27,30 +25,20 @@ internal class MobilePredictiveBackApi34Delegate(
       return
     }
     unregister()
-    registrationGeneration += 1
-    val registrationId = registrationGeneration
-    var loggedProgress = false
     val callback = object : OnBackAnimationCallback {
       override fun onBackStarted(backEvent: BackEvent) {
-        Log.i(TAG, "$DEBUG_PREFIX callback-entry phase=started registration=$registrationId")
         eventSink.emit("started", backEvent.progress.toDouble(), edgeFor(backEvent))
       }
 
       override fun onBackProgressed(backEvent: BackEvent) {
-        if (!loggedProgress) {
-          loggedProgress = true
-          Log.i(TAG, "$DEBUG_PREFIX callback-entry phase=progressed registration=$registrationId")
-        }
         eventSink.emit("progressed", backEvent.progress.toDouble(), edgeFor(backEvent))
       }
 
       override fun onBackCancelled() {
-        Log.i(TAG, "$DEBUG_PREFIX callback-entry phase=cancelled registration=$registrationId")
         eventSink.emit("cancelled")
       }
 
       override fun onBackInvoked() {
-        Log.i(TAG, "$DEBUG_PREFIX callback-entry phase=invoked registration=$registrationId")
         eventSink.emit("invoked")
       }
     }
@@ -60,7 +48,6 @@ internal class MobilePredictiveBackApi34Delegate(
     )
     registeredActivity = activity
     registeredCallback = callback
-    Log.i(TAG, "$DEBUG_PREFIX registered registration=$registrationId")
   }
 
   override fun unregister() {
@@ -75,9 +62,4 @@ internal class MobilePredictiveBackApi34Delegate(
 
   private fun edgeFor(backEvent: BackEvent): String =
     if (backEvent.swipeEdge == BackEvent.EDGE_RIGHT) "right" else "left"
-
-  private companion object {
-    const val TAG = "ChessticizeMobileBack"
-    const val DEBUG_PREFIX = "[DEBUG-pr201-back-native]"
-  }
 }

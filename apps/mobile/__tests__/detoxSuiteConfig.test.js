@@ -20,7 +20,6 @@ const {
   bringAndroidAppToForeground,
   androidAppIsResumed,
   beginAndroidPredictiveBackGesture,
-  clearAndroidStartupDiagnosticsLogcat,
   collectAndroidUiDiagnostics,
   launchWithDisabledSynchronization,
   performAndroidPredictiveBackGesture,
@@ -37,6 +36,30 @@ describe('Detox suite configuration', () => {
     expect(launchSpec).toContain('launchWithDisabledSynchronization');
     expect(helpers).not.toContain('detoxEnableSynchronization: false');
     expect(launchSpec).not.toContain('detoxEnableSynchronization: false');
+  });
+
+  it('pins the Arrow Duel screenshot to a long-arrow fixture and waits for its overlay', () => {
+    const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
+    const renderCaseStart = practiceSpec.indexOf("it('renders Arrow Duel candidate arrows on the board'");
+    const renderCaseEnd = practiceSpec.indexOf("it('shows Arrow Duel feedback after a wrong candidate move'");
+    const renderCase = practiceSpec.slice(renderCaseStart, renderCaseEnd);
+
+    expect(practiceSpec).toContain(
+      "const PRACTICE_RENDER_PUZZLE_SELECTION_SEED = 'practice-arrow-render-v1:4';"
+    );
+    expect(practiceSpec).toContain(
+      'chessticizePuzzleSelectionSeed: PRACTICE_RENDER_PUZZLE_SELECTION_SEED'
+    );
+    expect(renderCase).toContain(
+      "waitForElementTextContaining('arrow-duel-candidate-overlay', 'd7d1', 10000)"
+    );
+    expect(renderCase).toContain(
+      "waitForElementTextContaining('arrow-duel-candidate-overlay', 'd7f7', 10000)"
+    );
+    expect(renderCase.indexOf("'d7d1'")).toBeLessThan(
+      renderCase.indexOf("takeScreenshot('arrow-duel-neutral-arrows')")
+    );
+    expect(practiceSpec).toContain('if (arrowLikePixels <= 5000)');
   });
 
   it('reacquires Android window focus before public UI assertions', async () => {
@@ -239,37 +262,6 @@ describe('Detox suite configuration', () => {
     );
     expect(log).toHaveBeenCalledWith(expect.stringContaining('[android-ui-diagnostics] current focus'));
     expect(log).toHaveBeenCalledWith(expect.stringContaining('<node text="Practice" />'));
-  });
-
-  it('preserves the full API 24 startup log after clearing the pre-launch buffer', () => {
-    const startupLog = [
-      '07-15 19:13:40.000 4242 4242 I ChessticizeStartup: before-package',
-      '07-15 19:13:40.001 4242 4242 E AndroidRuntime: verifier failure',
-    ].join('\n');
-    const run = jest.fn((_command, args) => args.includes('logcat') ? startupLog : '');
-    const fileSystem = {
-      mkdirSync: jest.fn(),
-      writeFileSync: jest.fn(),
-    };
-    const environment = {
-      ANDROID_HOME: '/sdk',
-      DETOX_ANDROID_DEVICE: 'emulator-5556',
-      CHESSTICIZE_ANDROID_STARTUP_DIAGNOSTICS: '1',
-    };
-
-    clearAndroidStartupDiagnosticsLogcat(environment, run);
-    collectAndroidUiDiagnostics(environment, run, fileSystem, jest.fn(), '/artifacts/android-ui');
-
-    expect(run).toHaveBeenCalledWith('/sdk/platform-tools/adb', [
-      '-s', 'emulator-5556', 'logcat', '-c'
-    ], { encoding: 'utf8' });
-    expect(run).toHaveBeenCalledWith('/sdk/platform-tools/adb', [
-      '-s', 'emulator-5556', 'logcat', '-d', '-v', 'threadtime'
-    ], { encoding: 'utf8', maxBuffer: 25 * 1024 * 1024, timeout: 30000 });
-    expect(fileSystem.writeFileSync).toHaveBeenCalledWith(
-      '/artifacts/android-ui/logcat-raw.txt',
-      startupLog
-    );
   });
 
   it('shares Android UI diagnostics around launch and Stockfish failures', async () => {
