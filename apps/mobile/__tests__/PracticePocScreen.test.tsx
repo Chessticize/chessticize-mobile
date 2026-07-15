@@ -436,6 +436,56 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "review-panel")).toBeTruthy();
   });
 
+  it("returns a multi-context due review to its Review owner without advancing the queued group", () => {
+    const systemBack = createTestSystemBackSource("android");
+    const service = createMultiContextDueReviewService();
+    const renderer = renderScreen({ practiceService: service, systemBack });
+
+    press(renderer, "review-tab");
+    press(renderer, "review-start-due");
+    const firstPuzzleId = collectText(findByTestId(renderer, "review-current-puzzle-id"));
+
+    systemBack.startPredictive("left");
+    systemBack.progressPredictive(0.6, "left");
+    expect(collectText(findByTestId(renderer, "mobile-back-destination-preview-label"))).toBe("Review");
+    systemBack.cancelPredictive();
+    expect(collectText(findByTestId(renderer, "review-current-puzzle-id"))).toBe(firstPuzzleId);
+
+    systemBack.startPredictive("right");
+    expect(systemBack.commitPredictive()).toBe(true);
+
+    expect(() => findByTestId(renderer, "review-session")).toThrow();
+    expect(findByTestId(renderer, "review-panel")).toBeTruthy();
+    expect(service.listHistory({ source: "scheduled_review" })).toHaveLength(0);
+  });
+
+  it("commits the Review owner when a multi-context due review times out during Predictive Back", () => {
+    const systemBack = createTestSystemBackSource("android");
+    const service = createMultiContextDueReviewService();
+    const renderer = renderScreen({ practiceService: service, systemBack });
+
+    press(renderer, "review-tab");
+    press(renderer, "review-start-due");
+    act(() => {
+      jest.advanceTimersByTime(39_750);
+    });
+    systemBack.startPredictive("left");
+
+    act(() => {
+      jest.advanceTimersByTime(1_000);
+    });
+
+    expect(collectText(findByTestId(renderer, "mobile-back-destination-preview-label"))).toBe("Review");
+    expect(findByTestId(renderer, "review-session")).toBeTruthy();
+    expect(service.listHistory({ source: "scheduled_review" }) as Array<{ submittedMove: string }>).toEqual([
+      expect.objectContaining({ submittedMove: "__timeout__" })
+    ]);
+
+    expect(systemBack.commitPredictive()).toBe(true);
+    expect(() => findByTestId(renderer, "review-session")).toThrow();
+    expect(findByTestId(renderer, "review-panel")).toBeTruthy();
+  });
+
   it("does not subscribe the iOS shell to Android system Back", () => {
     const systemBack = createTestSystemBackSource("ios");
 
@@ -4491,6 +4541,21 @@ function createPlayedCustomService(): PracticeService {
     ratingAfter: 900
   }));
   return new PracticeService(store);
+}
+
+function createMultiContextDueReviewService(): PracticeService {
+  const service = createMobilePracticeService("random1000");
+  service.startSprint(
+    { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
+    "2026-06-20T00:00:00.000Z"
+  );
+  service.submitMove("c4b5", "2026-06-20T00:00:05.000Z");
+  service.recordReviewResult(
+    { puzzleId: "000hf", mode: "standard", ratingKey: "standard 5/30" },
+    "wrong",
+    "2026-06-20T00:00:10.000Z"
+  );
+  return service;
 }
 
 function renderScreen({

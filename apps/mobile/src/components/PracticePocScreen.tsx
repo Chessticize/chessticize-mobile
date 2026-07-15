@@ -2413,7 +2413,8 @@ export function PracticePocScreen({
                   service={service}
                   systemBackCommand={reviewBackCommand}
                   onAnalysisActiveChange={setReviewAnalysisOpen}
-                  onExit={() => setHistoryReviewEntries([])}
+                  onComplete={() => setHistoryReviewEntries([])}
+                  onReturnToOwner={() => setHistoryReviewEntries([])}
                   stockfish={stockfish}
                 />
               ) : (
@@ -5689,6 +5690,15 @@ function ReviewPanel({
     }
   }
 
+  function returnActiveReviewToOwner(source: ReviewEntry["source"]): void {
+    setQueuedReviewGroups([]);
+    setActiveEntryInitialIndex(0);
+    setActiveEntries([]);
+    if (source === "session") {
+      onExitSessionReview();
+    }
+  }
+
   if (activeEntries.length > 0) {
     return (
       <ReviewSession
@@ -5705,7 +5715,8 @@ function ReviewPanel({
         service={service}
         onReviewRecorded={onReviewRecorded}
         onAnalysisActiveChange={onAnalysisActiveChange}
-        onExit={finishActiveReview}
+        onComplete={finishActiveReview}
+        onReturnToOwner={returnActiveReviewToOwner}
         stockfish={stockfish}
         systemBackCommand={systemBackCommand}
       />
@@ -6115,10 +6126,11 @@ function ReviewSession({
   hasQueuedDueReviews = false,
   initialIndex = 0,
   onAnalysisActiveChange,
+  onComplete,
+  onReturnToOwner,
   scheduledReviewCompletedCount = 0,
   scheduledReviewTotal = entries.length,
   service,
-  onExit,
   onReviewRecorded,
   stockfish,
   systemBackCommand
@@ -6131,10 +6143,11 @@ function ReviewSession({
   hasQueuedDueReviews?: boolean;
   initialIndex?: number;
   onAnalysisActiveChange?: (active: boolean) => void;
+  onComplete: (source: ReviewEntry["source"]) => void;
+  onReturnToOwner: (source: ReviewEntry["source"]) => void;
   scheduledReviewCompletedCount?: number;
   scheduledReviewTotal?: number;
   service: PracticeService;
-  onExit: (source: ReviewEntry["source"]) => void;
   onReviewRecorded?: (completedAt: string) => void;
   stockfish: MobileStockfishCapabilities;
   systemBackCommand: ReviewBackCommand | null;
@@ -6191,8 +6204,8 @@ function ReviewSession({
       closeAnalysis();
       return;
     }
-    onExit(currentEntry.source);
-    // closeAnalysis and onExit are render-local commands intentionally selected
+    onReturnToOwner(currentEntry.source);
+    // closeAnalysis and onReturnToOwner are render-local commands intentionally selected
     // by the shell's typed Back resolver for this exact command id.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [systemBackCommand?.id]);
@@ -6402,9 +6415,9 @@ function ReviewSession({
   }
 
   function finishReviewSession(): void {
-    const exit = () => onExit(currentEntry.source);
-    if (!deferBackRelevantTransition("review-session-exit", exit)) {
-      exit();
+    const complete = () => onComplete(currentEntry.source);
+    if (!deferBackRelevantTransition("review-session-exit", complete)) {
+      complete();
     }
   }
 
@@ -6775,7 +6788,7 @@ function ReviewSession({
             accessibilityLabel="Exit review"
             testID="review-exit"
             style={styles.iconButton}
-            onPress={() => onExit(currentEntry.source)}
+            onPress={() => onReturnToOwner(currentEntry.source)}
           >
             <CloseGlyph />
           </Pressable>
