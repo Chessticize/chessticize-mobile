@@ -494,15 +494,42 @@ describe('Detox suite configuration', () => {
 
     expect(targetDevice.getUiDevice).toHaveBeenCalledTimes(1);
     expect(spawnProcess).not.toHaveBeenCalled();
-    expect(invocationManager).toHaveBeenCalledWith({
+    await expect(gesture.started).resolves.toBeUndefined();
+    expect(invocationManager).toHaveBeenCalledTimes(1);
+    expect(invocationManager).toHaveBeenNthCalledWith(1, {
       target: {
         type: 'Class',
         value: 'com.chessticize.mobile.PredictiveBackGestureDriver',
       },
-      method: 'cancelPredictiveBack',
+      method: 'startCancelledPredictiveBack',
       args: [1080, 1920, 1200].map((value) => ({ type: 'Integer', value })),
     });
-    await expect(gesture.completion).resolves.toBeUndefined();
+    await expect(gesture.completion()).resolves.toBeUndefined();
+    expect(invocationManager).toHaveBeenCalledTimes(2);
+    expect(invocationManager).toHaveBeenNthCalledWith(2, {
+      target: {
+        type: 'Class',
+        value: 'com.chessticize.mobile.PredictiveBackGestureDriver',
+      },
+      method: 'awaitCancelledPredictiveBack',
+      args: [],
+    });
+
+    const reusedGesture = beginAndroidPredictiveBackGesture(
+      { cancel: true, durationMs: 800 },
+      { ADB_PATH: '/sdk/adb', DETOX_ANDROID_DEVICE: 'emulator-6000' },
+      run,
+      spawnProcess,
+      targetDevice
+    );
+    await expect(reusedGesture.started).resolves.toBeUndefined();
+    await expect(reusedGesture.completion()).resolves.toBeUndefined();
+    expect(invocationManager).toHaveBeenNthCalledWith(3, expect.objectContaining({
+      method: 'startCancelledPredictiveBack',
+    }));
+    expect(invocationManager).toHaveBeenNthCalledWith(4, expect.objectContaining({
+      method: 'awaitCancelledPredictiveBack',
+    }));
   });
 
   it('keeps the cancelled gesture public-UI-only and preserves committed edge geometry', async () => {
@@ -517,6 +544,16 @@ describe('Detox suite configuration', () => {
     expect(driver).toContain('widthPixels * 0.03f');
     expect(driver).toContain('durationMs / segmentCount / UI_AUTOMATOR_STEP_DURATION_MS');
     expect(driver).toContain('.swipe(path, segmentSteps)');
+    expect(driver).toContain('startCancelledPredictiveBack');
+    expect(driver).toContain('awaitCancelledPredictiveBack');
+    expect(driver).toContain('new Thread');
+    expect(driver).toContain('if (activeGesture != null)');
+    expect(driver).toMatch(/activeGesture = state;\s+}\s+try \{\s+worker\.start\(\)/);
+    expect(driver).toContain('durationMs + COMPLETION_MARGIN_MS');
+    expect(driver).toMatch(
+      /terminal = true;\s+rethrowGestureFailure\(state\.failure\);[\s\S]*finally \{\s+if \(terminal && activeGesture == state\) \{\s+activeGesture = null;/
+    );
+    expect(driver).toContain('rethrowGestureFailure(state.failure)');
     expect(driver).not.toMatch(/React|Repository|NativeModule/);
 
     const run = jest.fn((_, args) => args.includes('size') ? 'Physical size: 1080x1920\n' : '');
@@ -534,7 +571,8 @@ describe('Detox suite configuration', () => {
       '-s', 'emulator-6000', 'shell', 'input', 'swipe', '1', '960', '756', '960', '1800'
     ], { stdio: ['ignore', 'pipe', 'pipe'] });
     child.emit('close', 0);
-    await expect(gesture.completion).resolves.toBeUndefined();
+    await expect(gesture.started).resolves.toBeUndefined();
+    await expect(gesture.completion()).resolves.toBeUndefined();
   });
 
   it('keeps a dedicated public-UI Android Back journey for ordering and cancellation', () => {
@@ -545,6 +583,8 @@ describe('Detox suite configuration', () => {
     expect(spec).toContain('beginAndroidPredictiveBackGesture');
     expect(spec).toContain('mobile-back-destination-preview');
     expect(spec).toContain('cancel: true');
+    expect(spec).toContain('await cancelledPredictiveBack.started');
+    expect(spec).toContain('await cancelledPredictiveBack.completion()');
     expect(spec).toContain('androidAppIsResumed');
     expect(spec).toContain('const rootPredictiveBack = beginAndroidPredictiveBackGesture()');
     expect(spec).toContain('Idle Practice root trapped Predictive Back');

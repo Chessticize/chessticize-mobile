@@ -119,10 +119,14 @@ function beginAndroidPredictiveBackGesture(
       throw new Error('Detox UiDevice is unavailable for a cancelled Predictive Back gesture.');
     }
     installCancelledPredictiveBackDriver(uiDevice);
+    const started = Promise.resolve(
+      uiDevice.startCancelledPredictiveBack(widthPixels, heightPixels, durationMs)
+    ).then(() => undefined);
     return {
-      completion: Promise.resolve(
-        uiDevice.cancelPredictiveBack(widthPixels, heightPixels, durationMs)
-      ).then(() => undefined),
+      started,
+      completion: () => started
+        .then(() => uiDevice.awaitCancelledPredictiveBack())
+        .then(() => undefined),
     };
   }
   const centerY = Math.round(heightPixels / 2);
@@ -144,26 +148,40 @@ function beginAndroidPredictiveBackGesture(
       }
     });
   });
-  return { completion };
+  return {
+    started: Promise.resolve(),
+    completion: () => completion,
+  };
 }
 
 function installCancelledPredictiveBackDriver(uiDevice) {
   // Detox's UiDevice proxy exposes only methods on this generated adapter. Add
   // one static test invocation through the runtime proxy itself, so the exact
   // adapter instance owned by Detox receives it.
-  if (uiDevice.cancelPredictiveBack) {
+  if (uiDevice.startCancelledPredictiveBack && uiDevice.awaitCancelledPredictiveBack) {
     return;
   }
-  uiDevice.cancelPredictiveBack = (_uiDevice, widthPixels, heightPixels, durationMs) => ({
+  if (uiDevice.startCancelledPredictiveBack || uiDevice.awaitCancelledPredictiveBack) {
+    throw new Error('Detox UiDevice has an incomplete cancelled Predictive Back adapter.');
+  }
+  uiDevice.startCancelledPredictiveBack = (_uiDevice, widthPixels, heightPixels, durationMs) => ({
     target: {
       type: 'Class',
       value: 'com.chessticize.mobile.PredictiveBackGestureDriver',
     },
-    method: 'cancelPredictiveBack',
+    method: 'startCancelledPredictiveBack',
     args: [widthPixels, heightPixels, durationMs].map((value) => ({
       type: 'Integer',
       value,
     })),
+  });
+  uiDevice.awaitCancelledPredictiveBack = () => ({
+    target: {
+      type: 'Class',
+      value: 'com.chessticize.mobile.PredictiveBackGestureDriver',
+    },
+    method: 'awaitCancelledPredictiveBack',
+    args: [],
   });
 }
 

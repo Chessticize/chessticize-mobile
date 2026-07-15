@@ -38,16 +38,18 @@ describe('Android product-aware system Back', () => {
 
       await openTab('settings-tab', 'settings-panel');
       const cancelledPredictiveBack = beginAndroidPredictiveBackGesture({ cancel: true });
+      await cancelledPredictiveBack.started;
       await waitFor(element(by.id('mobile-back-destination-preview'))).toExist().withTimeout(10000);
       await expect(element(by.id('mobile-back-destination-preview-label'))).toHaveText('Practice');
-      await cancelledPredictiveBack.completion;
+      await cancelledPredictiveBack.completion();
       await waitFor(element(by.id('mobile-back-destination-preview'))).not.toExist().withTimeout(10000);
       await expect(element(by.id('settings-panel'))).toExist();
 
       const committedPredictiveBack = beginAndroidPredictiveBackGesture();
+      await committedPredictiveBack.started;
       await waitFor(element(by.id('mobile-back-destination-preview'))).toExist().withTimeout(10000);
       await expect(element(by.id('mobile-back-destination-preview-label'))).toHaveText('Practice');
-      await committedPredictiveBack.completion;
+      await committedPredictiveBack.completion();
       await waitFor(element(by.id('practice-home'))).toExist().withTimeout(10000);
 
       await selectTestPuzzleSource('familiar15');
@@ -80,9 +82,10 @@ describe('Android product-aware system Back', () => {
       await waitFor(element(by.id('practice-home'))).toExist().withTimeout(10000);
 
       const rootPredictiveBack = beginAndroidPredictiveBackGesture();
+      await rootPredictiveBack.started;
       await sleep(500);
       await expect(element(by.id('mobile-back-destination-preview'))).not.toExist();
-      await rootPredictiveBack.completion;
+      await rootPredictiveBack.completion();
       await sleep(750);
       if (androidAppIsResumed()) {
         throw new Error('Idle Practice root trapped Predictive Back instead of delegating to Android.');
