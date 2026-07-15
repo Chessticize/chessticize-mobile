@@ -167,11 +167,27 @@ jobs:
           emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           script: |
             apps/mobile/scripts/prepare-android-offline-e2e.sh
-            DETOX_ACTIVE_SUITE=android-offline-practice pnpm mobile:e2e:test:android:ci
-            if [ "${{ matrix.api-level }}" = "36" ]; then DETOX_ACTIVE_SUITE=android-stockfish pnpm mobile:e2e:test:android:ci; fi
-            if [ "${{ matrix.api-level }}" = "36" ]; then DETOX_ACTIVE_SUITE=android-system-back pnpm mobile:e2e:test:android:ci; fi
-            if [ "${{ matrix.api-level }}" = "36" ]; then DETOX_ACTIVE_SUITE=flows pnpm mobile:e2e:test:android:ci; fi
-            if [ "${{ matrix.api-level }}" = "36" ]; then DETOX_ACTIVE_SUITE=practice pnpm mobile:e2e:test:android:ci; fi
+            if [ "${{ matrix.api-level }}" = "24" ]; then
+              mkdir -p apps/mobile/artifacts/android-ui
+              adb -s "$DETOX_ANDROID_DEVICE" logcat -c
+              capture_api24_startup() {
+                status=$?
+                set +e
+                adb -s "$DETOX_ANDROID_DEVICE" logcat -d -v threadtime > apps/mobile/artifacts/android-ui/logcat-raw.txt
+                adb -s "$DETOX_ANDROID_DEVICE" shell dumpsys activity activities > apps/mobile/artifacts/android-ui/activity.txt
+                adb -s "$DETOX_ANDROID_DEVICE" shell dumpsys window windows > apps/mobile/artifacts/android-ui/window.txt
+                exit "$status"
+              }
+              trap capture_api24_startup EXIT
+              DETOX_ACTIVE_SUITE=android-launch pnpm mobile:e2e:test:android:ci
+              trap - EXIT
+            else
+              DETOX_ACTIVE_SUITE=android-offline-practice pnpm mobile:e2e:test:android:ci
+              if [ "${{ matrix.api-level }}" = "36" ]; then DETOX_ACTIVE_SUITE=android-stockfish pnpm mobile:e2e:test:android:ci; fi
+              if [ "${{ matrix.api-level }}" = "36" ]; then DETOX_ACTIVE_SUITE=android-system-back pnpm mobile:e2e:test:android:ci; fi
+              if [ "${{ matrix.api-level }}" = "36" ]; then DETOX_ACTIVE_SUITE=flows pnpm mobile:e2e:test:android:ci; fi
+              if [ "${{ matrix.api-level }}" = "36" ]; then DETOX_ACTIVE_SUITE=practice pnpm mobile:e2e:test:android:ci; fi
+            fi
         env:
           DETOX_ANDROID_DEVICE: emulator-5554
           CHESSTICIZE_ANDROID_STARTUP_DIAGNOSTICS: ${{ matrix.api-level == 24 && '1' || '0' }}

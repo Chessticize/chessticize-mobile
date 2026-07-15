@@ -180,12 +180,34 @@ describe('Android launch baseline', () => {
     const predictiveBackModule = read(
       'android/app/src/main/java/com/chessticize/mobile/MobilePredictiveBackModule.kt'
     );
+    const api34Delegate = read(
+      'android/app/src/main/java/com/chessticize/mobile/MobilePredictiveBackApi34Delegate.kt'
+    );
 
     expect(predictiveBackModule).toMatch(
       /if \(enabledRequested\) \{\s+\(activity as\? ReactNativeBackCallbackController\)\s+\?\.setReactNativeBackHandlingEnabled\(false\)/
     );
-    expect(predictiveBackModule).toContain('OnBackInvokedDispatcher.PRIORITY_DEFAULT');
-    expect(predictiveBackModule).not.toContain('OnBackInvokedDispatcher.PRIORITY_OVERLAY');
+    expect(api34Delegate).toContain('OnBackInvokedDispatcher.PRIORITY_DEFAULT');
+    expect(api34Delegate).not.toContain('OnBackInvokedDispatcher.PRIORITY_OVERLAY');
+  });
+
+  it('keeps the eagerly loaded API 24 module free of android.window types', () => {
+    const predictiveBackModule = read(
+      'android/app/src/main/java/com/chessticize/mobile/MobilePredictiveBackModule.kt'
+    );
+    const api34Delegate = read(
+      'android/app/src/main/java/com/chessticize/mobile/MobilePredictiveBackApi34Delegate.kt'
+    );
+
+    expect(predictiveBackModule).not.toContain('android.window');
+    expect(predictiveBackModule).not.toMatch(
+      /\bBackEvent\b|\bOnBackAnimationCallback\b|\bOnBackInvokedCallback\b|\bOnBackInvokedDispatcher\b/
+    );
+    expect(predictiveBackModule).toContain('Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE');
+    expect(predictiveBackModule).toContain('Class.forName(API34_DELEGATE_CLASS)');
+    expect(api34Delegate).toContain('android.window.BackEvent');
+    expect(api34Delegate).toContain('OnBackAnimationCallback');
+    expect(api34Delegate).toMatch(/@Keep\s+@RequiresApi/);
   });
 
   it('preserves iOS Detox while exposing the Android debug app and attached device', () => {
@@ -245,6 +267,16 @@ describe('Android launch baseline', () => {
       );
     }
     expect(workflow).toContain('timeout-minutes: 75');
+  });
+
+  it('captures API 24 startup evidence outside the Jest timeout boundary', () => {
+    const workflow = read('../../.github/workflows/mobile-android.yml');
+
+    expect(workflow).toContain('DETOX_ACTIVE_SUITE=android-launch pnpm mobile:e2e:test:android:ci');
+    expect(workflow).toContain('trap capture_api24_startup EXIT');
+    expect(workflow).toContain('logcat -d -v threadtime > apps/mobile/artifacts/android-ui/logcat-raw.txt');
+    expect(workflow).toContain('dumpsys activity activities > apps/mobile/artifacts/android-ui/activity.txt');
+    expect(workflow).toContain('dumpsys window windows > apps/mobile/artifacts/android-ui/window.txt');
   });
 
   it('uses the doctor-verified SDK with a self-contained offline Android E2E app', () => {

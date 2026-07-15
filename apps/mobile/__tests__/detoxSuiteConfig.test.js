@@ -468,9 +468,20 @@ describe('Detox suite configuration', () => {
     const child = new EventEmitter();
     child.stderr = new EventEmitter();
     const spawnProcess = jest.fn(() => child);
-    const cancelPredictiveBack = jest.fn().mockResolvedValue(true);
+    const invocationManager = jest.fn().mockResolvedValue(undefined);
+    const uiDeviceAdapter = {};
+    const uiDevice = new Proxy(uiDeviceAdapter, {
+      get(target, property) {
+        if (target[property] === undefined) {
+          return undefined;
+        }
+        return async (...params) => invocationManager(
+          target[property]({ type: 'Invocation' }, ...params)
+        );
+      },
+    });
     const targetDevice = {
-      getUiDevice: jest.fn(() => ({ cancelPredictiveBack })),
+      getUiDevice: jest.fn(() => uiDevice),
     };
 
     const gesture = beginAndroidPredictiveBackGesture(
@@ -482,10 +493,8 @@ describe('Detox suite configuration', () => {
     );
 
     expect(targetDevice.getUiDevice).toHaveBeenCalledTimes(1);
-    expect(cancelPredictiveBack).toHaveBeenCalledWith(1080, 1920, 1200);
     expect(spawnProcess).not.toHaveBeenCalled();
-    const UiDevice = require('detox/src/android/espressoapi/UIDevice');
-    expect(UiDevice.cancelPredictiveBack({ type: 'Invocation' }, 1080, 1920, 1200)).toEqual({
+    expect(invocationManager).toHaveBeenCalledWith({
       target: {
         type: 'Class',
         value: 'com.chessticize.mobile.PredictiveBackGestureDriver',

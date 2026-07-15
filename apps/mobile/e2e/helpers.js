@@ -114,11 +114,11 @@ function beginAndroidPredictiveBackGesture(
   );
   const { widthPixels, heightPixels } = parseAndroidDisplaySize(sizeOutput);
   if (cancel) {
-    installCancelledPredictiveBackDriver();
     const uiDevice = (targetDevice ?? device)?.getUiDevice?.();
-    if (!uiDevice?.cancelPredictiveBack) {
+    if (!uiDevice) {
       throw new Error('Detox UiDevice is unavailable for a cancelled Predictive Back gesture.');
     }
+    installCancelledPredictiveBackDriver(uiDevice);
     return {
       completion: Promise.resolve(
         uiDevice.cancelPredictiveBack(widthPixels, heightPixels, durationMs)
@@ -147,14 +147,14 @@ function beginAndroidPredictiveBackGesture(
   return { completion };
 }
 
-function installCancelledPredictiveBackDriver() {
+function installCancelledPredictiveBackDriver(uiDevice) {
   // Detox's UiDevice proxy exposes only methods on this generated adapter. Add
-  // one static test invocation while leaving the rest of Detox untouched.
-  const UiDevice = require('detox/src/android/espressoapi/UIDevice');
-  if (UiDevice.cancelPredictiveBack) {
+  // one static test invocation through the runtime proxy itself, so the exact
+  // adapter instance owned by Detox receives it.
+  if (uiDevice.cancelPredictiveBack) {
     return;
   }
-  UiDevice.cancelPredictiveBack = (_uiDevice, widthPixels, heightPixels, durationMs) => ({
+  uiDevice.cancelPredictiveBack = (_uiDevice, widthPixels, heightPixels, durationMs) => ({
     target: {
       type: 'Class',
       value: 'com.chessticize.mobile.PredictiveBackGestureDriver',

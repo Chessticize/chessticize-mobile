@@ -3,11 +3,6 @@ package com.chessticize.mobile
 import android.app.Activity
 import android.os.Build
 import android.util.Log
-import android.window.BackEvent
-import android.window.OnBackAnimationCallback
-import android.window.OnBackInvokedCallback
-import android.window.OnBackInvokedDispatcher
-import androidx.annotation.RequiresApi
 import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.LifecycleEventListener
@@ -18,6 +13,15 @@ import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.modules.core.DeviceEventManagerModule
 import com.facebook.react.uimanager.ViewManager
 
+internal interface MobilePredictiveBackEventSink {
+  fun emit(phase: String, progress: Double? = null, edge: String? = null)
+}
+
+internal interface MobilePredictiveBackPlatformDelegate {
+  fun register(activity: Activity?)
+  fun unregister()
+}
+
 /**
  * API-34 gesture telemetry plus a boolean platform-ownership switch. Product
  * destinations, previews, cancellation, and commits remain in the typed
@@ -27,9 +31,12 @@ class MobilePredictiveBackModule(
   reactContext: ReactApplicationContext,
 ) : ReactContextBaseJavaModule(reactContext), LifecycleEventListener {
   private var enabledRequested = false
-  private var registeredActivity: Activity? = null
-  private var registeredCallback: OnBackInvokedCallback? = null
-  private var registrationGeneration = 0
+  private var api34Delegate: MobilePredictiveBackPlatformDelegate? = null
+  private val eventSink = object : MobilePredictiveBackEventSink {
+    override fun emit(phase: String, progress: Double?, edge: String?) {
+      emitToJavaScript(phase, progress, edge)
+    }
+  }
 
   init {
     Log.i(STARTUP_TAG, "$STARTUP_PREFIX predictive-module-init")
@@ -60,7 +67,7 @@ class MobilePredictiveBackModule(
 
   override fun onHostDestroy() {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-      reactApplicationContext.runOnUiQueueThread { unregister() }
+      reactApplicationContext.runOnUiQueueThread { api34Delegate?.unregister() }
     }
   }
 
@@ -69,7 +76,7 @@ class MobilePredictiveBackModule(
     reactApplicationContext.removeLifecycleEventListener(this)
     reactApplicationContext.runOnUiQueueThread {
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-        unregister()
+        api34Delegate?.unregister()
       }
       (reactApplicationContext.currentActivity as? ReactNativeBackCallbackController)
         ?.setReactNativeBackHandlingEnabled(true)
@@ -83,75 +90,32 @@ class MobilePredictiveBackModule(
       (activity as? ReactNativeBackCallbackController)
         ?.setReactNativeBackHandlingEnabled(false)
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-        register(activity)
+        getOrCreateApi34Delegate().register(activity)
       }
       return
     }
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-      unregister()
+      api34Delegate?.unregister()
     }
     (activity as? ReactNativeBackCallbackController)
       ?.setReactNativeBackHandlingEnabled(false)
   }
 
-  @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
-  private fun register(activity: Activity?) {
-    if (activity == null) {
-      return
+  private fun getOrCreateApi34Delegate(): MobilePredictiveBackPlatformDelegate {
+    val existingDelegate = api34Delegate
+    if (existingDelegate != null) {
+      return existingDelegate
     }
-    if (registeredActivity === activity && registeredCallback != null) {
-      return
-    }
-    unregister()
-    registrationGeneration += 1
-    val registrationId = registrationGeneration
-    var loggedProgress = false
-    val callback = object : OnBackAnimationCallback {
-      override fun onBackStarted(backEvent: BackEvent) {
-        Log.i(TAG, "$DEBUG_PREFIX callback-entry phase=started registration=$registrationId")
-        emit("started", backEvent)
-      }
-
-      override fun onBackProgressed(backEvent: BackEvent) {
-        if (!loggedProgress) {
-          loggedProgress = true
-          Log.i(TAG, "$DEBUG_PREFIX callback-entry phase=progressed registration=$registrationId")
-        }
-        emit("progressed", backEvent)
-      }
-
-      override fun onBackCancelled() {
-        Log.i(TAG, "$DEBUG_PREFIX callback-entry phase=cancelled registration=$registrationId")
-        emit("cancelled")
-      }
-
-      override fun onBackInvoked() {
-        Log.i(TAG, "$DEBUG_PREFIX callback-entry phase=invoked registration=$registrationId")
-        emit("invoked")
-      }
-    }
-    activity.onBackInvokedDispatcher.registerOnBackInvokedCallback(
-      OnBackInvokedDispatcher.PRIORITY_DEFAULT,
-      callback,
-    )
-    registeredActivity = activity
-    registeredCallback = callback
-    Log.i(TAG, "$DEBUG_PREFIX registered registration=$registrationId")
+    check(Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+    val delegate = Class.forName(API34_DELEGATE_CLASS)
+      .getDeclaredConstructor(MobilePredictiveBackEventSink::class.java)
+      .newInstance(eventSink) as MobilePredictiveBackPlatformDelegate
+    api34Delegate = delegate
+    return delegate
   }
 
-  @RequiresApi(Build.VERSION_CODES.TIRAMISU)
-  private fun unregister() {
-    val activity = registeredActivity
-    val callback = registeredCallback
-    if (activity != null && callback != null) {
-      activity.onBackInvokedDispatcher.unregisterOnBackInvokedCallback(callback)
-    }
-    registeredActivity = null
-    registeredCallback = null
-  }
-
-  private fun emit(phase: String, backEvent: BackEvent? = null) {
+  private fun emitToJavaScript(phase: String, progress: Double?, edge: String?) {
     val active = reactApplicationContext.hasActiveReactInstance()
     Log.i(TAG, "$DEBUG_PREFIX emit-gate phase=$phase active=$active")
     if (!active) {
@@ -159,9 +123,11 @@ class MobilePredictiveBackModule(
     }
     val event = Arguments.createMap().apply {
       putString("phase", phase)
-      if (backEvent != null) {
-        putDouble("progress", backEvent.progress.toDouble())
-        putString("edge", if (backEvent.swipeEdge == BackEvent.EDGE_RIGHT) "right" else "left")
+      if (progress != null) {
+        putDouble("progress", progress)
+      }
+      if (edge != null) {
+        putString("edge", edge)
       }
     }
     Log.i(TAG, "$DEBUG_PREFIX emitter-call phase=$phase")
@@ -175,6 +141,8 @@ class MobilePredictiveBackModule(
     const val DEBUG_PREFIX = "[DEBUG-pr201-back-native]"
     const val STARTUP_TAG = "ChessticizeStartup"
     const val STARTUP_PREFIX = "[DEBUG-pr201-api24-startup]"
+    const val API34_DELEGATE_CLASS =
+      "com.chessticize.mobile.MobilePredictiveBackApi34Delegate"
   }
 }
 
