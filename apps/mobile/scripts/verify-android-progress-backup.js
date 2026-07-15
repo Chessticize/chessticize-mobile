@@ -75,21 +75,22 @@ function formatMiB(bytes) {
 }
 
 function parseArguments(argv) {
+  const normalizedArgv = argv[0] === '--' ? argv.slice(1) : argv;
   const args = { json: false, paths: [] };
   const namedFileFlags = new Map([
     ['--database', PROGRESS_DATABASE_FILES[0]],
     ['--journal', PROGRESS_DATABASE_FILES[1]],
     ['--wal', PROGRESS_DATABASE_FILES[2]],
   ]);
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
+  for (let index = 0; index < normalizedArgv.length; index += 1) {
+    const arg = normalizedArgv[index];
     if (arg === '--json') {
       args.json = true;
     } else if (arg === '--adb-device') {
-      args.serial = argv[index + 1];
+      args.serial = normalizedArgv[index + 1];
       index += 1;
     } else if (namedFileFlags.has(arg)) {
-      args.paths.push({ name: namedFileFlags.get(arg), path: argv[index + 1] });
+      args.paths.push({ name: namedFileFlags.get(arg), path: normalizedArgv[index + 1] });
       index += 1;
     } else {
       args.paths.push(arg);

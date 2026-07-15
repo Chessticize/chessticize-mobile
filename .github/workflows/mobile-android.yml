@@ -243,11 +243,11 @@ jobs:
             apps/mobile/scripts/prepare-android-offline-e2e.sh
             DETOX_ACTIVE_SUITE=android-standard-practice pnpm mobile:e2e:test:android:ci
             mkdir -p apps/mobile/artifacts/android-progress-backup
-            pnpm mobile:verify:android:backup --adb-device emulator-5554 --json > apps/mobile/artifacts/android-progress-backup/cloud-payload.json
+            pnpm mobile:verify:android:backup -- --adb-device emulator-5554 --json > apps/mobile/artifacts/android-progress-backup/cloud-payload.json
             apps/mobile/scripts/android-progress-backup-evidence.sh cloud-encrypted
             CHESSTICIZE_BACKUP_EXPECTATION=current-progress DETOX_ACTIVE_SUITE=android-progress-backup-restore pnpm mobile:e2e:test:android:ci
             apps/mobile/scripts/android-progress-backup-evidence.sh seed-released-fixture
-            pnpm mobile:verify:android:backup --adb-device emulator-5554 --json > apps/mobile/artifacts/android-progress-backup/device-transfer-payload.json
+            pnpm mobile:verify:android:backup -- --adb-device emulator-5554 --json > apps/mobile/artifacts/android-progress-backup/device-transfer-payload.json
             apps/mobile/scripts/android-progress-backup-evidence.sh device-transfer
             CHESSTICIZE_BACKUP_EXPECTATION=released-fixture DETOX_ACTIVE_SUITE=android-progress-backup-restore pnpm mobile:e2e:test:android:ci
             git status --porcelain --untracked-files=no > apps/mobile/artifacts/android-progress-backup/tracked-worktree-after.txt

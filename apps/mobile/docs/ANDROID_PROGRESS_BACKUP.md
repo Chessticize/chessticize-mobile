@@ -59,13 +59,13 @@ snapshot, and catches payload growth before Android's hard quota interrupts
 cloud backup. The guard fails closed above 20 MiB:
 
 ```sh
-pnpm mobile:verify:android:backup --database /path/to/progress.sqlite
+pnpm mobile:verify:android:backup -- --database /path/to/progress.sqlite
 ```
 
 For an installed debuggable evidence build:
 
 ```sh
-pnpm mobile:verify:android:backup --adb-device emulator-5554 --json
+pnpm mobile:verify:android:backup -- --adb-device emulator-5554 --json
 ```
 
 The exact-head Android workflow creates progress through public UI, measures the

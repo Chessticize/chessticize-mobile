@@ -100,18 +100,48 @@ describe('Android Progress Backup', () => {
     ])).toThrow('exceeds the 20 MiB release contract');
   });
 
-  it('forwards device quota arguments through the root pnpm script without a literal separator', () => {
+  it('normalizes one leading separator from the nested root pnpm invocation', () => {
     const workflow = readRepo('.github/workflows/mobile-android.yml');
 
     expect(workflow).toContain(
-      'pnpm mobile:verify:android:backup --adb-device emulator-5554 --json',
+      'pnpm mobile:verify:android:backup -- --adb-device emulator-5554 --json',
     );
-    expect(workflow).not.toContain('mobile:verify:android:backup -- --adb-device');
+    expect(parseArguments(['--', '--adb-device', 'emulator-5554', '--json'])).toEqual({
+      json: true,
+      paths: [],
+      serial: 'emulator-5554',
+    });
+  });
+
+  it('keeps device-only and local-path-only quota modes distinct', () => {
     expect(parseArguments(['--adb-device', 'emulator-5554', '--json'])).toEqual({
       json: true,
       paths: [],
       serial: 'emulator-5554',
     });
+    expect(parseArguments([
+      '--',
+      '--database', '/tmp/chessticize-mobile.sqlite',
+      '--wal', '/tmp/chessticize-mobile.sqlite-wal',
+    ])).toEqual({
+      json: false,
+      paths: [
+        { name: 'chessticize-mobile.sqlite', path: '/tmp/chessticize-mobile.sqlite' },
+        { name: 'chessticize-mobile.sqlite-wal', path: '/tmp/chessticize-mobile.sqlite-wal' },
+      ],
+    });
+  });
+
+  it('rejects mixed modes after normalization without swallowing interior separators', () => {
+    expect(() => parseArguments([
+      '--', '--adb-device', 'emulator-5554', '/tmp/chessticize-mobile.sqlite',
+    ])).toThrow('Use either --adb-device or local database paths, not both.');
+    expect(() => parseArguments([
+      '--adb-device', 'emulator-5554', '--', '/tmp/chessticize-mobile.sqlite',
+    ])).toThrow('Use either --adb-device or local database paths, not both.');
+    expect(() => parseArguments([
+      '--', '--', '--adb-device', 'emulator-5554',
+    ])).toThrow('Use either --adb-device or local database paths, not both.');
   });
 
   it('measures the released progress fixture as real SQLite payload', () => {
