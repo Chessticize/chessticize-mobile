@@ -176,3 +176,90 @@ jobs:
           name: android-launch-diagnostics-api-${{ matrix.api-level }}
           if-no-files-found: warn
           path: apps/mobile/artifacts/android-ui/
+
+  android-progress-backup:
+    name: Android Progress Backup restore evidence
+    needs: android-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.1.2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26.x
+          cache: pnpm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download Android APKs
+        uses: actions/download-artifact@v4
+        with:
+          name: android-practice-apks
+          path: apps/mobile/android/app/build/outputs/apk
+
+      - name: Enable KVM acceleration
+        run: |
+          test -c /dev/kvm
+          sudo chmod 0666 /dev/kvm
+
+      - name: Record exact-head validation context
+        run: |
+          mkdir -p apps/mobile/artifacts/android-progress-backup
+          git status --porcelain --untracked-files=no > apps/mobile/artifacts/android-progress-backup/tracked-worktree-before.txt
+          test ! -s apps/mobile/artifacts/android-progress-backup/tracked-worktree-before.txt
+          {
+            echo "commit-sha=$GITHUB_SHA"
+            echo "build-result=success (android-build dependency)"
+            echo "validation-scope=targeted Android encrypted-cloud and D2D clean-install restore"
+            echo "commands=android-standard-practice; quota guard; cloud-encrypted restore; current-progress restore assertion; released-fixture seed; quota guard; device-transfer restore; released-fixture migration assertion"
+          } > apps/mobile/artifacts/android-progress-backup/context.txt
+
+      - name: Exercise encrypted cloud and D2D restore through public UI
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          ram-size: 4096M
+          disable-animations: true
+          emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          script: |
+            apps/mobile/scripts/prepare-android-offline-e2e.sh
+            DETOX_ACTIVE_SUITE=android-standard-practice pnpm mobile:e2e:test:android:ci
+            mkdir -p apps/mobile/artifacts/android-progress-backup
+            pnpm mobile:verify:android:backup -- --adb-device emulator-5554 --json > apps/mobile/artifacts/android-progress-backup/cloud-payload.json
+            apps/mobile/scripts/android-progress-backup-evidence.sh cloud-encrypted
+            CHESSTICIZE_BACKUP_EXPECTATION=current-progress DETOX_ACTIVE_SUITE=android-progress-backup-restore pnpm mobile:e2e:test:android:ci
+            apps/mobile/scripts/android-progress-backup-evidence.sh seed-released-fixture
+            pnpm mobile:verify:android:backup -- --adb-device emulator-5554 --json > apps/mobile/artifacts/android-progress-backup/device-transfer-payload.json
+            apps/mobile/scripts/android-progress-backup-evidence.sh device-transfer
+            CHESSTICIZE_BACKUP_EXPECTATION=released-fixture DETOX_ACTIVE_SUITE=android-progress-backup-restore pnpm mobile:e2e:test:android:ci
+            git status --porcelain --untracked-files=no > apps/mobile/artifacts/android-progress-backup/tracked-worktree-after.txt
+            test ! -s apps/mobile/artifacts/android-progress-backup/tracked-worktree-after.txt
+            echo "result=pass" >> apps/mobile/artifacts/android-progress-backup/context.txt
+        env:
+          DETOX_ANDROID_DEVICE: emulator-5554
+
+      - name: Upload Android Progress Backup evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-progress-backup-evidence
+          if-no-files-found: error
+          path: apps/mobile/artifacts/android-progress-backup

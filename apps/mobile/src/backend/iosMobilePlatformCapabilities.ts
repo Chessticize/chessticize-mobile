@@ -40,6 +40,9 @@ export function composeIOSMobilePlatformCapabilities(
       configurePuzzleSource: source =>
         configureMobilePracticePuzzleSource(service, source),
     },
+    progressProtection: {
+      kind: 'icloud_sync',
+    },
     progressSync: {
       client: createNativeICloudProgressSyncClient(),
     },

@@ -366,6 +366,7 @@ export function PracticePocScreen({
   const stockfish = platformCapabilities.stockfish;
   const scheduler = platformCapabilities.reminders.scheduler;
   const notificationClient = platformCapabilities.reminders.notificationClient;
+  const progressProtection = platformCapabilities.progressProtection;
   const iCloudSyncClient = platformCapabilities.progressSync.client;
   const boardRef = useRef<ChessboardRef | null>(null);
   const suppressedBoardMovesRef = useRef<string[]>([]);
@@ -2179,6 +2180,7 @@ export function PracticePocScreen({
               <SettingsPanel
                 adaptiveLayout={adaptiveLayout}
                 applicationMetadata={platformCapabilities.applicationMetadata}
+                progressProtection={progressProtection}
                 standardRating={readRating(service, defaultSprintConfig("standard").ratingKey)}
                 ratings={[
                   { label: "Standard", record: service.getRating(defaultSprintConfig("standard").ratingKey) },
@@ -6941,6 +6943,7 @@ function iCloudAccountStatusMessage(status: ICloudAccountStatus): string {
 function SettingsPanel({
   adaptiveLayout,
   applicationMetadata,
+  progressProtection,
   onOpenDiagnostics,
   onOpenNotificationSettings,
   onAdjustRating,
@@ -6958,6 +6961,7 @@ function SettingsPanel({
 }: {
   adaptiveLayout: AdaptiveLayout;
   applicationMetadata: MobileApplicationMetadata;
+  progressProtection: MobilePlatformCapabilities["progressProtection"];
   onOpenDiagnostics?: () => void;
   onOpenNotificationSettings: () => void;
   onAdjustRating: (ratingKey: string, nextRating: number) => RatingRecord;
@@ -6979,46 +6983,61 @@ function SettingsPanel({
 
   return (
     <View style={[styles.settingsPanel, adaptiveLayout.usesWideContent ? styles.settingsPanelWide : null]} testID="settings-panel">
-      <SettingsSection title="iCloud Sync" testID="settings-sync-section" wide={adaptiveLayout.usesWideContent}>
-        <SettingsRow
-          label="Progress Sync"
-          value={iCloudSyncEnabled ? "On" : "Off"}
-          detail={iCloudSyncStatus}
-          testID="settings-sync-status"
-        />
-        <View style={styles.settingsInlineControls} testID="settings-icloud-sync-controls">
-          <SettingsPreferenceButton
-            active={iCloudSyncEnabled}
-            label="On"
-            testID="settings-icloud-sync-on"
-            onPress={() => {
-              onSaveICloudSyncEnabled(true);
-              setStatusMessage("iCloud sync enabled");
-            }}
+      {progressProtection.kind === "icloud_sync" ? (
+        <SettingsSection title="iCloud Sync" testID="settings-sync-section" wide={adaptiveLayout.usesWideContent}>
+          <SettingsRow
+            label="Progress Sync"
+            value={iCloudSyncEnabled ? "On" : "Off"}
+            detail={iCloudSyncStatus}
+            testID="settings-sync-status"
           />
-          <SettingsPreferenceButton
-            active={!iCloudSyncEnabled}
-            label="Off"
-            testID="settings-icloud-sync-off"
-            onPress={() => {
-              onSaveICloudSyncEnabled(false);
-              setStatusMessage("iCloud sync disabled");
-            }}
+          <View style={styles.settingsInlineControls} testID="settings-icloud-sync-controls">
+            <SettingsPreferenceButton
+              active={iCloudSyncEnabled}
+              label="On"
+              testID="settings-icloud-sync-on"
+              onPress={() => {
+                onSaveICloudSyncEnabled(true);
+                setStatusMessage("iCloud sync enabled");
+              }}
+            />
+            <SettingsPreferenceButton
+              active={!iCloudSyncEnabled}
+              label="Off"
+              testID="settings-icloud-sync-off"
+              onPress={() => {
+                onSaveICloudSyncEnabled(false);
+                setStatusMessage("iCloud sync disabled");
+              }}
+            />
+          </View>
+          {iCloudSyncEnabled ? (
+            <SettingsActionRow
+              label="Sync Now"
+              detail="Merge ratings, history, and review queue with your private iCloud."
+              testID="settings-sync-now"
+              onPress={() => {
+                void onSyncICloudNow().then((message) => {
+                  setStatusMessage(message);
+                });
+              }}
+            />
+          ) : null}
+        </SettingsSection>
+      ) : (
+        <SettingsSection
+          title="Android Progress Backup"
+          testID="settings-android-backup-section"
+          wide={adaptiveLayout.usesWideContent}
+        >
+          <SettingsRow
+            label="Backup & device transfer"
+            value="Managed by Android"
+            detail="Android can restore local progress after reinstall or device transfer when available. This is restore protection, not continuous sync."
+            testID="settings-android-backup-status"
           />
-        </View>
-        {iCloudSyncEnabled ? (
-          <SettingsActionRow
-            label="Sync Now"
-            detail="Merge ratings, history, and review queue with your private iCloud."
-            testID="settings-sync-now"
-            onPress={() => {
-              void onSyncICloudNow().then((message) => {
-                setStatusMessage(message);
-              });
-            }}
-          />
-        ) : null}
-      </SettingsSection>
+        </SettingsSection>
+      )}
 
       <SettingsSection title="Notifications" testID="settings-notifications-section" wide={adaptiveLayout.usesWideContent}>
         <SettingsRow

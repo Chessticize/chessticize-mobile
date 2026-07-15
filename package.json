@@ -40,6 +40,7 @@
     "mobile:e2e:test:android": "pnpm --filter ChessticizeMobile e2e:test:android",
     "mobile:e2e:test:android:ci": "pnpm --filter ChessticizeMobile e2e:test:android:ci",
     "mobile:verify:android:abis": "pnpm --filter ChessticizeMobile verify:android:abis",
+    "mobile:verify:android:backup": "pnpm --filter ChessticizeMobile verify:android:backup",
     "fetch:core-pack": "node scripts/fetch-core-pack.mjs"
   },
   "dependencies": {

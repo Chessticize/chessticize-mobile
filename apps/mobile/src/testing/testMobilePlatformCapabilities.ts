@@ -9,6 +9,7 @@ import {
   MOBILE_APPLICATION_METADATA,
   type MobileApplicationMetadata,
   type MobilePlatformCapabilities,
+  type MobileProgressProtectionCapabilities,
   type MobileStockfishCapabilities,
 } from '../backend/mobilePlatformCapabilities.ts';
 import type {
@@ -27,6 +28,7 @@ export interface TestMobilePlatformCapabilityOverrides {
   reviewReminderScheduler?: ReviewReminderScheduler | null;
   reviewReminderNotificationClient?: ReviewReminderNotificationClient | null;
   iCloudProgressSyncClient?: ICloudProgressSyncClient | null;
+  progressProtection?: MobileProgressProtectionCapabilities;
   applicationMetadata?: Partial<MobileApplicationMetadata>;
 }
 
@@ -50,6 +52,7 @@ export function createTestMobilePlatformCapabilities(
         ? { configurePuzzleSource: source => configurePuzzleSource(service, source) }
         : {}),
     },
+    progressProtection: overrides.progressProtection ?? { kind: 'icloud_sync' },
     progressSync: {
       client: overrides.iCloudProgressSyncClient ?? null,
     },
