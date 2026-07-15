@@ -29,7 +29,7 @@ adb_cmd() {
   "$ADB" -s "$DEVICE" "$@"
 }
 
-source "$APP_DIR/scripts/android-process-inspection.sh"
+source "$APP_DIR/scripts/android-device-inspection.sh"
 
 remote_file_size() {
   local relative_path="$1"

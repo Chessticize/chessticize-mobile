@@ -59,7 +59,7 @@ adb_cmd() {
   return "$status"
 }
 
-source "$APP_DIR/scripts/android-process-inspection.sh"
+source "$APP_DIR/scripts/android-device-inspection.sh"
 
 assert_app_process_absent() {
   local label="$1"
@@ -279,18 +279,13 @@ seed_app_data_fixture() {
 }
 
 find_transport_archive() {
-  local candidate
   local candidates=(
     "/data/data/com.android.localtransport/files/1/_full/$APP_ID"
     "/data/user/0/com.android.localtransport/files/1/_full/$APP_ID"
     "/data/user_de/0/com.android.localtransport/files/1/_full/$APP_ID"
     "/cache/backup/1/_full/$APP_ID"
   )
-  for candidate in "${candidates[@]}"; do
-    if adb_cmd shell test -f "$candidate"; then
-      adb_cmd shell readlink -f "$candidate" | tr -d '\r'
-    fi
-  done | sort -u
+  find_existing_device_paths file "${candidates[@]}"
 }
 
 capture_installed_apk() {
@@ -429,7 +424,10 @@ assert_app_data_archive_paths() {
   local expected_entries="$ARTIFACT_DIR/$case_name-expected-app-data-entries.txt"
   local archive_size
 
-  find_transport_archive > "$archive_paths_file"
+  if ! find_transport_archive > "$archive_paths_file"; then
+    echo "Unable to inspect canonical LocalTransport archive paths." >&2
+    exit 1
+  fi
   : > "$archive_entries"
   : > "$app_data_entries"
   if [[ -s "$archive_paths_file" ]]; then

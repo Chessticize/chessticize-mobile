@@ -53,7 +53,7 @@ adb_cmd() {
   return "$status"
 }
 
-source "$APP_DIR/scripts/android-process-inspection.sh"
+source "$APP_DIR/scripts/android-device-inspection.sh"
 
 fail() {
   echo "$1" >&2
@@ -61,18 +61,13 @@ fail() {
 }
 
 find_transport_archive_parent() {
-  local candidate
   local candidates=(
     "/data/data/com.android.localtransport/files/1/_full"
     "/data/user/0/com.android.localtransport/files/1/_full"
     "/data/user_de/0/com.android.localtransport/files/1/_full"
     "/cache/backup/1/_full"
   )
-  for candidate in "${candidates[@]}"; do
-    if adb_cmd shell test -d "$candidate"; then
-      adb_cmd shell readlink -f "$candidate" | tr -d '\r'
-    fi
-  done | sort -u
+  find_existing_device_paths directory "${candidates[@]}"
 }
 
 stream_device_sha256() {
@@ -514,7 +509,9 @@ done
 sha256sum "$constructed_archive" > "$ARTIFACT_DIR/api30-restore-archive-sha256.txt"
 
 archive_parent_paths="$ARTIFACT_DIR/api30-restore-base-archive-parent-paths.txt"
-find_transport_archive_parent > "$archive_parent_paths"
+if ! find_transport_archive_parent > "$archive_parent_paths"; then
+  fail "Unable to inspect API 30 LocalTransport full-backup archive parents."
+fi
 if [[ "$(wc -l < "$archive_parent_paths" | tr -d ' ')" != "1" ]]; then
   fail "Expected one initialized API 30 LocalTransport full-backup archive parent."
 fi
@@ -536,7 +533,7 @@ printf '%s %s %s %s\n' "$archive_uid" "$archive_gid" "$archive_mode" "$archive_c
 adb_cmd shell pm clear "$APP_ID"
 assert_package_stopped_without_process
 for path in "${POSITIVE_DEVICE_PATHS[@]}" "${NEGATIVE_DEVICE_PATHS[@]}"; do
-  adb_cmd shell run-as "$APP_ID" test ! -e "$path" \
+  require_device_path_state any "$path" absent "$APP_ID" \
     || fail "API 30 restore target existed after pm clear: $path"
 done
 
@@ -616,7 +613,7 @@ for index in "${!POSITIVE_DEVICE_PATHS[@]}"; do
   expected_entry="${POSITIVE_ARCHIVE_ENTRIES[$index]}"
   expected_hash="$(sha256sum "$staging_root/$expected_entry" | cut -d ' ' -f 1)"
   actual_hash_artifact="$temp_root/restored-positive-$index.sha256"
-  adb_cmd shell run-as "$APP_ID" test -f "$path" \
+  require_device_path_state file "$path" present "$APP_ID" \
     || fail "Expected API 30 restore positive is absent: $path"
   stream_device_sha256 "$path" "$actual_hash_artifact"
   actual_hash="$(cut -d ' ' -f 1 "$actual_hash_artifact")"
@@ -629,7 +626,7 @@ done
 
 : > "$ARTIFACT_DIR/api30-restore-rejected-negative-paths.txt"
 for path in "${NEGATIVE_DEVICE_PATHS[@]}"; do
-  adb_cmd shell run-as "$APP_ID" test ! -e "$path" \
+  require_device_path_state any "$path" absent "$APP_ID" \
     || fail "API 30 inherited restore admitted excluded path: $path"
   printf '%s\n' "$path" >> "$ARTIFACT_DIR/api30-restore-rejected-negative-paths.txt"
   negative_name="$(basename "$path")"

@@ -526,7 +526,7 @@ describe('Android Progress Backup', () => {
   });
 
   it('fails closed on process-inspection errors and accepts only pidof status one with no PIDs', () => {
-    const processInspection = 'scripts/android-process-inspection.sh';
+    const processInspection = 'scripts/android-device-inspection.sh';
     const processInspectionPath = join(appRoot, processInspection);
     const callers = [
       'scripts/android-progress-backup-api30-restore-evidence.sh',
@@ -537,14 +537,15 @@ describe('Android Progress Backup', () => {
     expect(() => accessSync(processInspectionPath, constants.R_OK)).not.toThrow();
     const helper = read(processInspection);
     for (const caller of callers) {
-      expect(caller).toContain('source "$APP_DIR/scripts/android-process-inspection.sh"');
+      expect(caller).toContain('source "$APP_DIR/scripts/android-device-inspection.sh"');
       expect(caller).toContain('read_app_process_ids');
       expect(caller).not.toMatch(/adb_cmd shell pidof/);
     }
-    expect(helper).toContain('__CHESSTICIZE_PIDOF_STATUS__=');
-    expect(helper).toContain('pidof "$1"');
-    expect(helper).toContain('[[ "$process_status" == "1" ]]');
-    expect(helper).toContain('[[ "$process_status" == "0" ]]');
+    expect(helper).toContain('__CHESSTICIZE_DEVICE_STATUS__=');
+    expect(helper).toContain('inspect_device_command');
+    expect(helper).toContain('inspect_device_command "pidof \\"$APP_ID\\""');
+    expect(helper).toContain('[[ "$ANDROID_DEVICE_COMMAND_STATUS" == "1" ]]');
+    expect(helper).toContain('[[ "$ANDROID_DEVICE_COMMAND_STATUS" == "0" ]]');
 
     const inspect = (mode) => {
       const command = `
@@ -554,13 +555,13 @@ describe('Android Progress Backup', () => {
         adb_cmd() {
           case "$INSPECTION_MODE" in
             outer-failure) return 42 ;;
-            no-pid) printf '__CHESSTICIZE_PIDOF_STATUS__=1\\n' ;;
-            pid) printf '__CHESSTICIZE_PIDOF_STATUS__=0\\n123 456\\n' ;;
-            success-empty) printf '__CHESSTICIZE_PIDOF_STATUS__=0\\n' ;;
-            absent-with-output) printf '__CHESSTICIZE_PIDOF_STATUS__=1\\nunexpected\\n' ;;
-            device-error) printf '__CHESSTICIZE_PIDOF_STATUS__=2\\n' ;;
+            no-pid) printf '__CHESSTICIZE_DEVICE_STATUS__=1\\n' ;;
+            pid) printf '__CHESSTICIZE_DEVICE_STATUS__=0\\n123 456\\n' ;;
+            success-empty) printf '__CHESSTICIZE_DEVICE_STATUS__=0\\n' ;;
+            absent-with-output) printf '__CHESSTICIZE_DEVICE_STATUS__=1\\nunexpected\\n' ;;
+            device-error) printf '__CHESSTICIZE_DEVICE_STATUS__=2\\n' ;;
             missing-sentinel) printf '1\\n' ;;
-            malformed-sentinel) printf '__CHESSTICIZE_PIDOF_STATUS__=x\\n' ;;
+            malformed-sentinel) printf '__CHESSTICIZE_DEVICE_STATUS__=x\\n' ;;
           esac
         }
         source ${JSON.stringify(processInspectionPath)}
@@ -588,6 +589,100 @@ describe('Android Progress Backup', () => {
       'malformed-sentinel',
     ]) {
       expect(inspect(mode)).toMatch(/^status=[1-9][0-9]*\noutput=<>\n$/);
+    }
+  });
+
+  it('fails closed while discovering remote archive files and directories', () => {
+    const deviceInspection = 'scripts/android-device-inspection.sh';
+    const deviceInspectionPath = join(appRoot, deviceInspection);
+    const helper = read(deviceInspection);
+    const policyEvidenceScript = read('scripts/android-progress-backup-policy-evidence.sh');
+    const api30RestoreScript = read(
+      'scripts/android-progress-backup-api30-restore-evidence.sh',
+    );
+
+    expect(helper).toContain('probe_device_path');
+    expect(helper).toContain('require_device_path_state');
+    expect(helper).toContain('find_existing_device_paths');
+    expect(helper).toContain('read_canonical_device_path');
+    expect(policyEvidenceScript).toContain(
+      'find_existing_device_paths file "${candidates[@]}"',
+    );
+    expect(api30RestoreScript).toContain(
+      'find_existing_device_paths directory "${candidates[@]}"',
+    );
+    expect(policyEvidenceScript).not.toContain('adb_cmd shell test -f "$candidate"');
+    expect(api30RestoreScript).not.toContain('adb_cmd shell test -d "$candidate"');
+    expect(policyEvidenceScript).toContain(
+      'if ! find_transport_archive > "$archive_paths_file"; then',
+    );
+    expect(api30RestoreScript).toContain(
+      'if ! find_transport_archive_parent > "$archive_parent_paths"; then',
+    );
+
+    expect(api30RestoreScript.match(
+      /require_device_path_state any "\$path" absent "\$APP_ID"/g,
+    )).toHaveLength(2);
+    expect(api30RestoreScript).toMatch(
+      /require_device_path_state file "\$path" present "\$APP_ID" \\\s+\|\| fail "Expected API 30 restore positive is absent: \$path"/,
+    );
+    expect(api30RestoreScript).not.toMatch(/adb_cmd shell run-as .*\btest\b/);
+
+    const discover = (kind, mode) => {
+      const command = `
+        set -u
+        APP_ID=com.chessticize.mobile
+        DISCOVERY_MODE=${mode}
+        adb_cmd() {
+          local remote_command="\${*: -1}"
+          local candidate
+          case "$remote_command" in
+            *'/candidate-a'*) candidate=a ;;
+            *'/candidate-b'*) candidate=b ;;
+            *) candidate=unknown ;;
+          esac
+          case "$DISCOVERY_MODE:$candidate:$remote_command" in
+            outer-failure:b:*) return 42 ;;
+            missing-sentinel:b:*) printf 'missing\\n'; return 0 ;;
+            malformed-status:b:*) printf '__CHESSTICIZE_DEVICE_STATUS__=x\\n'; return 0 ;;
+            device-error:b:*) printf '__CHESSTICIZE_DEVICE_STATUS__=2\\n'; return 0 ;;
+            present-with-output:b:*) printf '__CHESSTICIZE_DEVICE_STATUS__=0\\nunexpected\\n'; return 0 ;;
+            absent-with-output:b:*) printf '__CHESSTICIZE_DEVICE_STATUS__=1\\nunexpected\\n'; return 0 ;;
+            canonical-failure:a:*readlink*) return 42 ;;
+            mixed:a:*test*) printf '__CHESSTICIZE_DEVICE_STATUS__=0\\n'; return 0 ;;
+            mixed:a:*readlink*) printf '__CHESSTICIZE_DEVICE_STATUS__=0\\n/canonical-a\\n'; return 0 ;;
+            canonical-failure:a:*test*) printf '__CHESSTICIZE_DEVICE_STATUS__=0\\n'; return 0 ;;
+            *) printf '__CHESSTICIZE_DEVICE_STATUS__=1\\n'; return 0 ;;
+          esac
+        }
+        source ${JSON.stringify(deviceInspectionPath)}
+        set +e
+        discovery_output="$(find_existing_device_paths ${kind} /candidate-a /candidate-b 2>/dev/null)"
+        discovery_status=$?
+        set -e
+        printf 'status=%s\\noutput=<%s>\\n' "$discovery_status" "$discovery_output"
+      `;
+      const result = spawnSync('/bin/bash', ['-c', command], {
+        encoding: 'utf8',
+      });
+      expect(result.status).toBe(0);
+      return result.stdout;
+    };
+
+    for (const kind of ['file', 'directory']) {
+      expect(discover(kind, 'all-absent')).toBe('status=0\noutput=<>\n');
+      expect(discover(kind, 'mixed')).toBe('status=0\noutput=</canonical-a>\n');
+      for (const mode of [
+        'outer-failure',
+        'missing-sentinel',
+        'malformed-status',
+        'device-error',
+        'present-with-output',
+        'absent-with-output',
+        'canonical-failure',
+      ]) {
+        expect(discover(kind, mode)).toMatch(/^status=[1-9][0-9]*\noutput=<>\n$/);
+      }
     }
   });
 
