@@ -14,13 +14,18 @@ const ANDROID_AUTO_BACKUP_QUOTA_BYTES = 25 * 1024 * 1024;
 const ANDROID_PROGRESS_BACKUP_MAX_BYTES = 20 * 1024 * 1024;
 
 function assessBackupPayload(files) {
+  const seenNames = new Set();
   const normalized = files.map(({ name, bytes }) => {
     if (!PROGRESS_DATABASE_FILES.includes(name)) {
       throw new Error(`Unexpected Android Progress Backup file: ${name}`);
     }
+    if (seenNames.has(name)) {
+      throw new Error(`Duplicate Android Progress Backup file: ${name}`);
+    }
     if (!Number.isSafeInteger(bytes) || bytes < 0) {
       throw new Error(`Invalid byte count for ${name}: ${bytes}`);
     }
+    seenNames.add(name);
     return { name, bytes };
   });
   const totalBytes = normalized.reduce((sum, file) => sum + file.bytes, 0);
@@ -52,6 +57,23 @@ function measureLocalFiles(paths) {
   }));
 }
 
+function isExplicitMissingDeviceFile(error, name) {
+  if (error?.status !== 1) {
+    return false;
+  }
+  const escapedPath = join('databases', name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const stderr = String(error.stderr || '');
+  return new RegExp(
+    `^stat: (?:cannot stat )?['"]?${escapedPath}['"]?: No such file or directory\\r?$`,
+    'm',
+  ).test(stderr);
+}
+
+function describeCommandFailure(error) {
+  const stderr = String(error?.stderr || '').trim();
+  return stderr || error?.message || String(error);
+}
+
 function measureDeviceFiles({ adbPath, serial, run = execFileSync }) {
   return PROGRESS_DATABASE_FILES.flatMap(name => {
     try {
@@ -62,10 +84,14 @@ function measureDeviceFiles({ adbPath, serial, run = execFileSync }) {
       );
       return [{ name, bytes: Number(String(output).trim()) }];
     } catch (error) {
-      if (name === PROGRESS_DATABASE_FILES[0]) {
-        throw new Error(`Unable to measure required progress database on ${serial}: ${error.message}`);
+      const isRequired = name === PROGRESS_DATABASE_FILES[0];
+      if (!isRequired && isExplicitMissingDeviceFile(error, name)) {
+        return [];
       }
-      return [];
+      const fileKind = isRequired ? 'required progress database' : 'optional progress database sidecar';
+      throw new Error(
+        `Unable to measure ${fileKind} ${name} on ${serial}: ${describeCommandFailure(error)}`,
+      );
     }
   });
 }

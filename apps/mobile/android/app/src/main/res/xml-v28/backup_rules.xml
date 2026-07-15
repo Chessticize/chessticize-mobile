@@ -2,13 +2,11 @@
 <!--
   Android 9-11 use per-file transport requirements. Repeating the exact
   progress allowlist keeps encrypted cloud backup and D2D transfer independent;
-  all other app data is excluded by the presence of explicit includes.
+  Android expands each database include to its real -journal and -wal sidecars.
+  Keeping only the main database here prevents recursive suffix expansion; all
+  other app data is excluded by the presence of explicit includes.
 -->
 <full-backup-content>
     <include domain="database" path="chessticize-mobile.sqlite" requireFlags="clientSideEncryption" />
-    <include domain="database" path="chessticize-mobile.sqlite-journal" requireFlags="clientSideEncryption" />
-    <include domain="database" path="chessticize-mobile.sqlite-wal" requireFlags="clientSideEncryption" />
     <include domain="database" path="chessticize-mobile.sqlite" requireFlags="deviceToDeviceTransfer" />
-    <include domain="database" path="chessticize-mobile.sqlite-journal" requireFlags="deviceToDeviceTransfer" />
-    <include domain="database" path="chessticize-mobile.sqlite-wal" requireFlags="deviceToDeviceTransfer" />
 </full-backup-content>

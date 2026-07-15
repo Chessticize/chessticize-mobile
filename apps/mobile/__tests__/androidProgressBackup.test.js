@@ -6,6 +6,7 @@ const {
   PROGRESS_DATABASE_FILES,
   assessBackupPayload,
   assertBackupPayloadWithinContract,
+  measureDeviceFiles,
   parseArguments,
 } = require('../scripts/verify-android-progress-backup');
 
@@ -42,8 +43,8 @@ describe('Android Progress Backup', () => {
     }
 
     expect(includePaths(legacyEncryptedAndD2d)).toEqual([
-      ...PROGRESS_DATABASE_FILES.map(path => ({ path, flags: 'clientSideEncryption' })),
-      ...PROGRESS_DATABASE_FILES.map(path => ({ path, flags: 'deviceToDeviceTransfer' })),
+      { path: PROGRESS_DATABASE_FILES[0], flags: 'clientSideEncryption' },
+      { path: PROGRESS_DATABASE_FILES[0], flags: 'deviceToDeviceTransfer' },
     ]);
 
     expect(modern).toContain('<cloud-backup disableIfNoEncryptionCapabilities="true">');
@@ -51,8 +52,8 @@ describe('Android Progress Backup', () => {
     expect(modern).not.toContain('<cross-platform-transfer');
     const modernIncludes = includePaths(modern);
     expect(modernIncludes).toEqual([
-      ...PROGRESS_DATABASE_FILES.map(path => ({ path, flags: undefined })),
-      ...PROGRESS_DATABASE_FILES.map(path => ({ path, flags: undefined })),
+      { path: PROGRESS_DATABASE_FILES[0], flags: undefined },
+      { path: PROGRESS_DATABASE_FILES[0], flags: undefined },
     ]);
     expect(modern).not.toContain('path="."');
     expect(`${legacyEncryptedAndD2d}\n${modern}`).not.toContain('bundled-core-pack.sqlite');
@@ -98,6 +99,74 @@ describe('Android Progress Backup', () => {
     expect(() => assertBackupPayloadWithinContract([
       { name: PROGRESS_DATABASE_FILES[0], bytes: ANDROID_PROGRESS_BACKUP_MAX_BYTES + 1 },
     ])).toThrow('exceeds the 20 MiB release contract');
+  });
+
+  it('counts each eligible physical file once and fails closed on sidecar stat errors', () => {
+    expect(() => assessBackupPayload([
+      { name: PROGRESS_DATABASE_FILES[0], bytes: 100 },
+      { name: PROGRESS_DATABASE_FILES[0], bytes: 100 },
+    ])).toThrow('Duplicate Android Progress Backup file');
+
+    const missingSidecar = Object.assign(new Error('stat failed'), {
+      status: 1,
+      stderr: Buffer.from(
+        `stat: databases/${PROGRESS_DATABASE_FILES[1]}: No such file or directory\n`,
+      ),
+    });
+    const missingRun = jest.fn((command, args) => {
+      const path = args.at(-1);
+      if (path.endsWith(PROGRESS_DATABASE_FILES[1])) {
+        throw missingSidecar;
+      }
+      return path.endsWith(PROGRESS_DATABASE_FILES[0]) ? '100\n' : '20\n';
+    });
+    expect(measureDeviceFiles({
+      adbPath: '/sdk/adb',
+      serial: 'emulator-5554',
+      run: missingRun,
+    })).toEqual([
+      { name: PROGRESS_DATABASE_FILES[0], bytes: 100 },
+      { name: PROGRESS_DATABASE_FILES[2], bytes: 20 },
+    ]);
+    expect(missingRun).toHaveBeenCalledTimes(PROGRESS_DATABASE_FILES.length);
+
+    for (const failure of [
+      Object.assign(new Error('stat failed'), { status: 1, stderr: 'adb: device offline\n' }),
+      Object.assign(new Error('stat failed'), {
+        status: 1,
+        stderr: 'run-as: package not debuggable: com.chessticize.mobile\n',
+      }),
+      Object.assign(new Error('stat failed'), {
+        status: 1,
+        stderr: `stat: databases/${PROGRESS_DATABASE_FILES[2]}: Permission denied\n`,
+      }),
+      Object.assign(new Error('stat failed'), {
+        status: 2,
+        stderr: `stat: databases/${PROGRESS_DATABASE_FILES[1]}: No such file or directory\n`,
+      }),
+      Object.assign(new Error('spawn adb EPIPE'), { code: 'EPIPE' }),
+    ]) {
+      expect(() => measureDeviceFiles({
+        adbPath: '/sdk/adb',
+        serial: 'emulator-5554',
+        run: (command, args) => {
+          if (args.at(-1).endsWith(PROGRESS_DATABASE_FILES[1])) {
+            throw failure;
+          }
+          return '100\n';
+        },
+      })).toThrow('Unable to measure optional progress database sidecar');
+    }
+
+    const missingRequired = Object.assign(new Error('stat failed'), {
+      status: 1,
+      stderr: `stat: databases/${PROGRESS_DATABASE_FILES[0]}: No such file or directory\n`,
+    });
+    expect(() => measureDeviceFiles({
+      adbPath: '/sdk/adb',
+      serial: 'emulator-5554',
+      run: () => { throw missingRequired; },
+    })).toThrow('Unable to measure required progress database');
   });
 
   it('normalizes one leading separator from the nested root pnpm invocation', () => {
@@ -266,5 +335,58 @@ describe('Android Progress Backup', () => {
     expect(policy).toContain('does not receive this backup data');
     expect(privacy).toContain('does not enable transfer between Android and iOS');
     expect(policy.replace(/\s+/g, ' ')).toContain('does not enable transfer between Android and iOS');
+  });
+
+  it('runs the real APK through API 24 and API 30 framework policy selection', () => {
+    const workflow = readRepo('.github/workflows/mobile-android.yml');
+    const policyEvidenceScript = read('scripts/android-progress-backup-policy-evidence.sh');
+
+    expect(workflow).toContain('android-progress-backup-policy:');
+    expect(workflow).toContain('api-level: [24, 30]');
+    expect(workflow).toContain(
+      'script: apps/mobile/scripts/android-progress-backup-policy-evidence.sh',
+    );
+    expect(workflow).toContain(
+      'name: android-progress-backup-policy-api-${{ matrix.api-level }}',
+    );
+    expect(policyEvidenceScript).toContain('set -euo pipefail');
+    expect(policyEvidenceScript).toContain('case "$SDK_LEVEL"');
+    expect(policyEvidenceScript).toContain("run_case encrypted-advertised 'is_encrypted=true");
+    expect(policyEvidenceScript).toContain("run_case no-capability 'is_encrypted=false");
+    expect(policyEvidenceScript).toContain("run_case encrypted 'is_encrypted=true");
+    expect(policyEvidenceScript).toContain('adb_cmd shell bmgr init "$LOCAL_TRANSPORT"');
+    expect(policyEvidenceScript).toContain(
+      'adb_cmd shell bmgr wipe "$LOCAL_TRANSPORT" "$APP_ID"',
+    );
+    expect(policyEvidenceScript).toContain('BackupXmlParserLogging');
+    expect(policyEvidenceScript).toContain('$case_name-parser-log.txt');
+    expect(policyEvidenceScript).toContain('$case_name-transport-archive-paths.txt');
+    expect(policyEvidenceScript).toContain('$case_name-database-archive-entries.txt');
+    expect(policyEvidenceScript).toContain('seeded-database-sha256.txt');
+    expect(policyEvidenceScript).toContain('Android backup policy fixture markers must be unique');
+    expect(policyEvidenceScript).toContain('diff -u "$expected_entries" "$database_entries"');
+    expect(policyEvidenceScript).toContain('workflow-artifact-apk-sha256.txt');
+    expect(policyEvidenceScript).toContain('installed-apk-sha256.txt');
+    for (const trap of [
+      'chessticize-mobile.sqlite-journal-journal',
+      'chessticize-mobile.sqlite-journal-wal',
+      'chessticize-mobile.sqlite-wal-journal',
+      'chessticize-mobile.sqlite-wal-wal',
+    ]) {
+      expect(policyEvidenceScript).toContain(trap);
+    }
+    expect(policyEvidenceScript).toContain(
+      "grep -F \"Package $APP_ID with result: Success\"",
+    );
+    const runCase = policyEvidenceScript.slice(
+      policyEvidenceScript.indexOf('run_case()'),
+      policyEvidenceScript.indexOf('mkdir -p "$ARTIFACT_ROOT"'),
+    );
+    expect(runCase.indexOf('reset_local_transport'))
+      .toBeLessThan(runCase.indexOf('adb_cmd shell bmgr backupnow "$APP_ID"'));
+    expect(policyEvidenceScript.indexOf('assert_parser_selected_expected_resource "$case_name"'))
+      .toBeLessThan(policyEvidenceScript.indexOf(
+        'assert_database_archive_paths "$case_name" "$expected_payload"',
+      ));
   });
 });

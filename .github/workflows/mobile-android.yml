@@ -251,3 +251,49 @@ jobs:
           name: android-progress-backup-evidence
           if-no-files-found: error
           path: apps/mobile/artifacts/android-progress-backup
+
+  android-progress-backup-policy:
+    name: Android Progress Backup policy API ${{ matrix.api-level }}
+    needs: android-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [24, 30]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Android APKs
+        uses: actions/download-artifact@v4
+        with:
+          name: android-practice-apks
+          path: apps/mobile/android/app/build/outputs/apk
+
+      - name: Enable KVM acceleration
+        run: |
+          test -c /dev/kvm
+          sudo chmod 0666 /dev/kvm
+
+      - name: Exercise framework backup policy and archive selection
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          ram-size: 4096M
+          disable-animations: true
+          emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          script: apps/mobile/scripts/android-progress-backup-policy-evidence.sh
+        env:
+          DETOX_ANDROID_DEVICE: emulator-5554
+
+      - name: Upload Android Progress Backup policy evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-progress-backup-policy-api-${{ matrix.api-level }}
+          if-no-files-found: error
+          path: apps/mobile/artifacts/android-progress-backup-policy/api-${{ matrix.api-level }}
