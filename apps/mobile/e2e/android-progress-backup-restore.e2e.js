@@ -7,6 +7,10 @@ const {
 } = require('./helpers');
 
 const EXPECTATION = process.env.CHESSTICIZE_BACKUP_EXPECTATION;
+const EXPECTATION_NOW_MS = Object.freeze({
+  'current-progress': '1784030700000',
+  'released-fixture': '1780920000000',
+});
 
 describe(`Android Progress Backup restore (${EXPECTATION || 'missing expectation'})`, () => {
   beforeAll(async () => {
@@ -18,7 +22,7 @@ describe(`Android Progress Backup restore (${EXPECTATION || 'missing expectation
     await launchWithDisabledSynchronization({
       delete: false,
       newInstance: true,
-      launchArgs: { chessticizeTestNowMs: '1784030700000' },
+      launchArgs: { chessticizeTestNowMs: EXPECTATION_NOW_MS[EXPECTATION] },
     });
   });
 

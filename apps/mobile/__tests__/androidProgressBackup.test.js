@@ -215,6 +215,9 @@ describe('Android Progress Backup', () => {
     expect(evidenceScript).toContain('pm uninstall --user 0');
     expect(evidenceScript).toContain('install-multiple -t --user 0');
     expect(restoreJourney).toContain("delete: false");
+    expect(restoreJourney).toMatch(
+      /['"]released-fixture['"]:\s*['"]1780920000000['"]/,
+    );
     expect(restoreJourney).toContain("history-attempt-legacy-attempt-standard-wrong");
     expect(androidDetoxScript).toContain('CHESSTICIZE_DETOX_REUSE_INSTALLED_APP');
     expect(androidDetoxScript).toContain('detox_args+=(--reuse)');
