@@ -33,9 +33,10 @@ class MainActivity : ReactActivity(), ReactNativeBackCallbackController {
   }
 
   /**
-   * React Native 0.86 keeps its target-36 callback private. The frontend tells
-   * this activity only whether app-level Back is currently available; disabling
-   * the pinned callback at root lets Android own its predictive home animation.
+   * React Native 0.86 keeps its target-36 callback private. The typed native
+   * bridge owns app-level Back with one animation callback, so its registration
+   * disables this competing default-priority callback. At the idle root both
+   * callbacks are disabled and Android owns the predictive home animation.
    */
   override fun setReactNativeBackHandlingEnabled(enabled: Boolean) {
     if (Build.VERSION.SDK_INT < 36 || applicationInfo.targetSdkVersion < 36) {

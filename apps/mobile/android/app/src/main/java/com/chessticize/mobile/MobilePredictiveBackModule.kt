@@ -78,7 +78,7 @@ class MobilePredictiveBackModule(
     val activity = reactApplicationContext.currentActivity
     if (enabledRequested) {
       (activity as? ReactNativeBackCallbackController)
-        ?.setReactNativeBackHandlingEnabled(true)
+        ?.setReactNativeBackHandlingEnabled(false)
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
         register(activity)
       }

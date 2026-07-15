@@ -176,6 +176,18 @@ describe('Android launch baseline', () => {
     expect(pinnedReactActivity).toContain('private final OnBackPressedCallback mBackPressedCallback');
   });
 
+  it('keeps one API 36 callback owner while app predictive Back is enabled', () => {
+    const predictiveBackModule = read(
+      'android/app/src/main/java/com/chessticize/mobile/MobilePredictiveBackModule.kt'
+    );
+
+    expect(predictiveBackModule).toMatch(
+      /if \(enabledRequested\) \{\s+\(activity as\? ReactNativeBackCallbackController\)\s+\?\.setReactNativeBackHandlingEnabled\(false\)/
+    );
+    expect(predictiveBackModule).toContain('OnBackInvokedDispatcher.PRIORITY_DEFAULT');
+    expect(predictiveBackModule).not.toContain('OnBackInvokedDispatcher.PRIORITY_OVERLAY');
+  });
+
   it('preserves iOS Detox while exposing the Android debug app and attached device', () => {
     expect(detoxConfig.configurations['ios.sim.debug']).toEqual({
       device: 'simulator',
