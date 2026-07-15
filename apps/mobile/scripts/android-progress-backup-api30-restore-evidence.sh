@@ -12,9 +12,11 @@ DEVICE="${DETOX_ANDROID_DEVICE:-emulator-5554}"
 APK="${CHESSTICIZE_ANDROID_E2E_APK:-$APP_DIR/android/app/build/outputs/apk/e2e/app-e2e.apk}"
 ARTIFACT_ROOT="${ANDROID_BACKUP_POLICY_ARTIFACT_DIR:-$APP_DIR/artifacts/android-progress-backup-policy}"
 ARTIFACT_DIR="$ARTIFACT_ROOT/api-30"
+API36_SOURCE_DIR="${ANDROID_BACKUP_API36_SOURCE_DIR:-$ARTIFACT_ROOT/api-36-source}"
 DEVICE_ROOT="/data/user_de/0/$APP_ID"
 ADB_OPERATION_TIMEOUT_SECONDS="${ANDROID_BACKUP_POLICY_ADB_TIMEOUT_SECONDS:-120}"
 ADB_CLEANUP_TIMEOUT_SECONDS="${ANDROID_BACKUP_POLICY_CLEANUP_ADB_TIMEOUT_SECONDS:-10}"
+AOSP_ANDROID11_TAR_BACKUP_READER_URL="https://android.googlesource.com/platform/frameworks/base/+/android11-release/services/backup/java/com/android/server/backup/utils/TarBackupReader.java"
 
 if [[ -z "$ADB" || ! -x "$ADB" ]]; then
   echo "Set ADB_PATH, ANDROID_HOME, or ANDROID_SDK_ROOT to an executable adb." >&2
@@ -56,16 +58,16 @@ fail() {
   exit 1
 }
 
-find_transport_archive() {
+find_transport_archive_parent() {
   local candidate
   local candidates=(
-    "/data/data/com.android.localtransport/files/1/_full/$APP_ID"
-    "/data/user/0/com.android.localtransport/files/1/_full/$APP_ID"
-    "/data/user_de/0/com.android.localtransport/files/1/_full/$APP_ID"
-    "/cache/backup/1/_full/$APP_ID"
+    "/data/data/com.android.localtransport/files/1/_full"
+    "/data/user/0/com.android.localtransport/files/1/_full"
+    "/data/user_de/0/com.android.localtransport/files/1/_full"
+    "/cache/backup/1/_full"
   )
   for candidate in "${candidates[@]}"; do
-    if adb_cmd shell test -f "$candidate"; then
+    if adb_cmd shell test -d "$candidate"; then
       adb_cmd shell readlink -f "$candidate" | tr -d '\r'
     fi
   done | sort -u
@@ -208,68 +210,119 @@ cleanup() {
 }
 trap cleanup EXIT
 
-skeleton_parameters='fake_encryption_flag=true,non_incremental_only=false'
-adb_cmd shell settings put secure backup_local_transport_parameters "$skeleton_parameters"
-adb_cmd shell settings get secure backup_local_transport_parameters \
-  | tr -d '\r' | tee "$ARTIFACT_DIR/api30-restore-skeleton-transport-parameters.txt" \
-  | grep -Fx "$skeleton_parameters"
-adb_cmd shell bmgr transport "$LOCAL_TRANSPORT" \
-  | tee "$ARTIFACT_DIR/api30-restore-skeleton-selected-transport.txt" \
-  | grep -F 'Selected transport'
-adb_cmd shell bmgr init "$LOCAL_TRANSPORT"
-adb_cmd logcat -c
-skeleton_backup_status=0
-adb_cmd shell bmgr backupnow "$APP_ID" \
-  | tee "$ARTIFACT_DIR/api30-restore-skeleton-backupnow.txt" || skeleton_backup_status=$?
-adb_cmd logcat -d -v raw -s ChessticizeBackup:I \
-  > "$ARTIFACT_DIR/api30-restore-skeleton-agent-log.txt" || true
-adb_cmd shell dumpsys backup > "$ARTIFACT_DIR/api30-restore-skeleton-dumpsys-backup.txt"
-if (( skeleton_backup_status != 0 )); then
-  fail "API 30 skeleton-generation-only backup command failed with status $skeleton_backup_status."
-fi
-grep -F "Package $APP_ID with result: Success" \
-  "$ARTIFACT_DIR/api30-restore-skeleton-backupnow.txt"
-grep -Fx 'event=policy sdk=30 transportFlags=1 encryption=true d2d=false selected=true' \
-  "$ARTIFACT_DIR/api30-restore-skeleton-agent-log.txt"
-grep -Fx 'event=result selected=true emitted=3' \
-  "$ARTIFACT_DIR/api30-restore-skeleton-agent-log.txt"
-for skeleton_name in \
-    chessticize-mobile.sqlite \
-    chessticize-mobile.sqlite-journal \
-    chessticize-mobile.sqlite-wal; do
-  grep -Fx "event=payload name=$skeleton_name" \
-    "$ARTIFACT_DIR/api30-restore-skeleton-agent-log.txt"
+required_source_files=(
+  context.txt
+  tracked-worktree-before.txt
+  tracked-worktree-after.txt
+  workflow-artifact-apk-sha256.txt
+  installed-apk-sha256.txt
+  installed-package.txt
+  neither-unique-policy-events.txt
+  neither-unique-result-events.txt
+  encryption-only-unique-policy-events.txt
+  encryption-only-unique-result-events.txt
+  d2d-only-unique-policy-events.txt
+  d2d-only-unique-result-events.txt
+  both-unique-policy-events.txt
+  both-unique-result-events.txt
+  both-transport-archive.tar
+  both-transport-archive-sha256.txt
+  both-transport-archive-entries.txt
+  both-app-data-archive-entries.txt
+)
+for source_name in "${required_source_files[@]}"; do
+  if [[ ! -f "$API36_SOURCE_DIR/$source_name" ]]; then
+    fail "API 36 source evidence is missing: $API36_SOURCE_DIR/$source_name"
+  fi
 done
-printf '%s\n' \
-  'purpose=skeleton-generation-only; fake encryption is not capability evidence' \
-  "parameters=$skeleton_parameters" \
-  > "$ARTIFACT_DIR/api30-restore-skeleton-purpose.txt"
-
-archive_paths="$ARTIFACT_DIR/api30-restore-base-archive-paths.txt"
-find_transport_archive > "$archive_paths"
-if [[ "$(wc -l < "$archive_paths" | tr -d ' ')" != "1" ]]; then
-  fail "Expected one API 30 LocalTransport archive from skeleton generation."
+if [[ -s "$API36_SOURCE_DIR/tracked-worktree-before.txt" \
+    || -s "$API36_SOURCE_DIR/tracked-worktree-after.txt" ]]; then
+  fail "API 36 archive evidence did not come from a clean tracked worktree."
 fi
-archive_path="$(cat "$archive_paths")"
-source_archive="$ARTIFACT_DIR/api30-restore-os-source-archive.tar"
+grep -Fx 'api-level=36' "$API36_SOURCE_DIR/context.txt"
+grep -Fx "commit-sha=$GITHUB_SHA" "$API36_SOURCE_DIR/context.txt"
+grep -Fx 'result=pass' "$API36_SOURCE_DIR/context.txt"
+grep -Fx \
+  "artifact-identifier=run-${GITHUB_RUN_ID:-local}/android-progress-backup-policy-api-36" \
+  "$API36_SOURCE_DIR/context.txt"
+grep -E '^case=neither delivered-mask=0 selected=false emitted=0 agent-invocations=[1-9][0-9]* payload=none framework-result=success result=pass$' \
+  "$API36_SOURCE_DIR/context.txt"
+grep -E '^case=encryption-only delivered-mask=1 selected=true emitted=3 agent-invocations=[1-9][0-9]* payload=exact-progress-files framework-result=success result=pass$' \
+  "$API36_SOURCE_DIR/context.txt"
+grep -E '^case=d2d-only delivered-mask=2 selected=true emitted=3 agent-invocations=[1-9][0-9]* payload=exact-progress-files framework-result=success result=pass$' \
+  "$API36_SOURCE_DIR/context.txt"
+grep -E '^case=both delivered-mask=3 selected=true emitted=3 agent-invocations=[1-9][0-9]* payload=exact-progress-files framework-result=success result=pass$' \
+  "$API36_SOURCE_DIR/context.txt"
+grep -Fx 'event=policy sdk=36 transportFlags=0 encryption=false d2d=false selected=false' \
+  "$API36_SOURCE_DIR/neither-unique-policy-events.txt"
+grep -Fx 'event=result selected=false emitted=0' \
+  "$API36_SOURCE_DIR/neither-unique-result-events.txt"
+grep -Fx 'event=policy sdk=36 transportFlags=1 encryption=true d2d=false selected=true' \
+  "$API36_SOURCE_DIR/encryption-only-unique-policy-events.txt"
+grep -Fx 'event=result selected=true emitted=3' \
+  "$API36_SOURCE_DIR/encryption-only-unique-result-events.txt"
+grep -Fx 'event=policy sdk=36 transportFlags=2 encryption=false d2d=true selected=true' \
+  "$API36_SOURCE_DIR/d2d-only-unique-policy-events.txt"
+grep -Fx 'event=result selected=true emitted=3' \
+  "$API36_SOURCE_DIR/d2d-only-unique-result-events.txt"
+grep -Fx 'event=policy sdk=36 transportFlags=3 encryption=true d2d=true selected=true' \
+  "$API36_SOURCE_DIR/both-unique-policy-events.txt"
+grep -Fx 'event=result selected=true emitted=3' \
+  "$API36_SOURCE_DIR/both-unique-result-events.txt"
+for unique_source_file in \
+    neither-unique-policy-events.txt \
+    neither-unique-result-events.txt \
+    encryption-only-unique-policy-events.txt \
+    encryption-only-unique-result-events.txt \
+    d2d-only-unique-policy-events.txt \
+    d2d-only-unique-result-events.txt \
+    both-unique-policy-events.txt \
+    both-unique-result-events.txt; do
+  if [[ "$(wc -l < "$API36_SOURCE_DIR/$unique_source_file" | tr -d ' ')" != "1" ]]; then
+    fail "API 36 source mask evidence is not unique: $unique_source_file"
+  fi
+done
+
+current_workflow_apk_hash="$(cut -d ' ' -f 1 "$ARTIFACT_DIR/api30-restore-workflow-apk-sha256.txt")"
+current_installed_apk_hash="$(cut -d ' ' -f 1 "$ARTIFACT_DIR/installed-apk-sha256.txt")"
+source_workflow_apk_hash="$(cut -d ' ' -f 1 "$API36_SOURCE_DIR/workflow-artifact-apk-sha256.txt")"
+source_installed_apk_hash="$(cut -d ' ' -f 1 "$API36_SOURCE_DIR/installed-apk-sha256.txt")"
+if [[ ! "$current_workflow_apk_hash" =~ ^[0-9a-f]{64}$ \
+    || "$current_installed_apk_hash" != "$current_workflow_apk_hash" \
+    || "$source_workflow_apk_hash" != "$current_workflow_apk_hash" \
+    || "$source_installed_apk_hash" != "$current_workflow_apk_hash" ]]; then
+  fail "API 36 archive producer and API 30 restore consumer did not use the same exact-head APK."
+fi
+
+source_archive="$API36_SOURCE_DIR/both-transport-archive.tar"
+source_archive_copy="$ARTIFACT_DIR/api30-restore-os-source-archive.tar"
 base_archive="$ARTIFACT_DIR/api30-restore-base-archive.tar"
 constructed_archive="$ARTIFACT_DIR/api30-restore-archive.tar"
-adb_cmd pull "$archive_path" "$source_archive" >/dev/null
 if [[ ! -s "$source_archive" ]]; then
-  fail "API 30 OS-produced source archive is empty."
+  fail "API 36 OS-produced source archive is empty."
 fi
-sha256sum "$source_archive" > "$ARTIFACT_DIR/api30-restore-os-source-archive-sha256.txt"
+cp "$source_archive" "$source_archive_copy"
+source_archive_hash="$(sha256sum "$source_archive" | cut -d ' ' -f 1)"
+recorded_source_archive_hash="$(cut -d ' ' -f 1 "$API36_SOURCE_DIR/both-transport-archive-sha256.txt")"
+if [[ "$source_archive_hash" != "$recorded_source_archive_hash" ]]; then
+  fail "API 36 source archive SHA-256 does not match its producer evidence."
+fi
+sha256sum "$source_archive_copy" > "$ARTIFACT_DIR/api30-restore-os-source-archive-sha256.txt"
 
 source_entries="$ARTIFACT_DIR/api30-restore-os-source-archive-entries.txt"
 source_app_entries="$ARTIFACT_DIR/api30-restore-os-source-app-entries.txt"
 source_data_entries="$ARTIFACT_DIR/api30-restore-os-source-data-entries.txt"
 source_metadata_entries="$ARTIFACT_DIR/api30-restore-os-source-metadata-entries.txt"
 tar -tf "$source_archive" > "$source_entries"
+sort "$source_entries" > "$ARTIFACT_DIR/api30-restore-os-source-sorted-archive-entries.txt"
+diff -u "$API36_SOURCE_DIR/both-transport-archive-entries.txt" \
+  "$ARTIFACT_DIR/api30-restore-os-source-sorted-archive-entries.txt"
 grep -E "^apps/$APP_ID/" "$source_entries" > "$source_app_entries" || true
-grep -E "^apps/$APP_ID/($APP_DATA_DOMAINS)/" "$source_entries" \
-  > "$source_data_entries" || true
 grep -E "^apps/$APP_ID/_(manifest|meta)$" "$source_entries" \
   > "$source_metadata_entries" || true
+grep -E "^apps/$APP_ID/" "$source_entries" \
+  | grep -Ev "^apps/$APP_ID/_(manifest|meta)$" \
+  > "$source_data_entries" || true
 first_app_entry="$(sed -n '1p' "$source_app_entries")"
 manifest_entry="apps/$APP_ID/_manifest"
 if [[ "$first_app_entry" != "$manifest_entry" \
@@ -284,6 +337,8 @@ printf '%s\n' \
 sort "$source_data_entries" > "$ARTIFACT_DIR/api30-restore-os-source-sorted-data-entries.txt"
 diff -u "$ARTIFACT_DIR/api30-restore-os-source-expected-data-entries.txt" \
   "$ARTIFACT_DIR/api30-restore-os-source-sorted-data-entries.txt"
+diff -u "$API36_SOURCE_DIR/both-app-data-archive-entries.txt" \
+  "$ARTIFACT_DIR/api30-restore-os-source-sorted-data-entries.txt"
 
 source_manifest="$ARTIFACT_DIR/api30-restore-os-source-manifest.bin"
 base_manifest="$ARTIFACT_DIR/api30-restore-base-manifest.bin"
@@ -293,11 +348,38 @@ if [[ ! -s "$source_manifest" ]]; then
   fail "The OS-produced exact-head Android restore manifest is empty."
 fi
 sha256sum "$source_manifest" > "$ARTIFACT_DIR/api30-restore-os-source-manifest-sha256.txt"
+mapfile -t manifest_lines < "$source_manifest"
+manifest_version="${manifest_lines[0]:-}"
+manifest_package="${manifest_lines[1]:-}"
+manifest_app_version="${manifest_lines[2]:-}"
+manifest_platform_version="${manifest_lines[3]:-}"
+manifest_has_apk="${manifest_lines[5]:-}"
+manifest_signature_count="${manifest_lines[6]:-}"
+if [[ "$manifest_version" != "1" || "$manifest_package" != "$APP_ID" \
+    || ! "$manifest_app_version" =~ ^[1-9][0-9]*$ \
+    || "$manifest_platform_version" != "36" \
+    || "$manifest_has_apk" != "0" \
+    || ! "$manifest_signature_count" =~ ^[1-9][0-9]*$ ]]; then
+  fail "API 36 OS manifest header does not match the exact package and expected full-backup format."
+fi
+if (( ${#manifest_lines[@]} != 7 + manifest_signature_count )); then
+  fail "API 36 OS manifest signature count does not match its signature entries."
+fi
+for (( signature_index = 0; signature_index < manifest_signature_count; signature_index++ )); do
+  manifest_signature="${manifest_lines[$((7 + signature_index))]}"
+  if [[ ! "$manifest_signature" =~ ^[0-9A-Fa-f]+$ ]]; then
+    fail "API 36 OS manifest contains an invalid signing-certificate digest."
+  fi
+done
+grep -E "versionCode=$manifest_app_version([[:space:]]|$)" \
+  "$API36_SOURCE_DIR/installed-package.txt"
+grep -E "versionCode=$manifest_app_version([[:space:]]|$)" \
+  "$ARTIFACT_DIR/installed-package.txt"
 
 meta_entry="apps/$APP_ID/_meta"
 meta_count="$(grep -Fxc "$meta_entry" "$source_entries" || true)"
 if (( meta_count > 1 )); then
-  fail "The API 30 OS-produced archive contains duplicate _meta entries."
+  fail "The API 36 OS-produced archive contains duplicate _meta entries."
 fi
 source_meta="$ARTIFACT_DIR/api30-restore-os-source-meta.bin"
 base_meta="$ARTIFACT_DIR/api30-restore-base-meta.bin"
@@ -310,13 +392,30 @@ if (( meta_count == 1 )); then
   sha256sum "$source_meta" > "$ARTIFACT_DIR/api30-restore-os-source-meta-sha256.txt"
 fi
 
+{
+  echo "source-api-level=36"
+  echo "source-run-id=${GITHUB_RUN_ID:-local}"
+  echo "source-commit-sha=$GITHUB_SHA"
+  echo "source-workflow-apk-sha256=$source_workflow_apk_hash"
+  echo "source-installed-apk-sha256=$source_installed_apk_hash"
+  echo "source-archive-sha256=$source_archive_hash"
+  echo "source-manifest-version=$manifest_version"
+  echo "source-manifest-package=$manifest_package"
+  echo "source-manifest-app-version=$manifest_app_version"
+  echo "source-platform-version=36"
+  echo "source-manifest-signature-count=$manifest_signature_count"
+  echo "source-case=both-capabilities-real-mask-3"
+  echo "source-artifact=android-progress-backup-policy-api-36"
+  echo "android11-tar-backup-reader=$AOSP_ANDROID11_TAR_BACKUP_READER_URL"
+} > "$ARTIFACT_DIR/api30-restore-source-provenance.txt"
+
 cp "$source_archive" "$base_archive"
 mapfile -t source_data_entry_array < "$source_data_entries"
 if (( ${#source_data_entry_array[@]} == 0 )); then
-  fail "The skeleton-generation-only archive supplied no data entries to strip."
+  fail "The API 36 OS archive supplied no app-data entries to strip."
 fi
 tar --delete --file "$base_archive" "${source_data_entry_array[@]}"
-base_entries="$ARTIFACT_DIR/api30-restore-skeleton-archive-entries.txt"
+base_entries="$ARTIFACT_DIR/api30-restore-stripped-archive-entries.txt"
 base_app_entries="$ARTIFACT_DIR/api30-restore-base-app-entries.txt"
 base_metadata_entries="$ARTIFACT_DIR/api30-restore-base-metadata-entries.txt"
 tar -tf "$base_archive" > "$base_entries"
@@ -326,6 +425,8 @@ grep -E "^apps/$APP_ID/_(manifest|meta)$" "$base_entries" \
 if grep -E "^apps/$APP_ID/($APP_DATA_DOMAINS)/" "$base_entries" >/dev/null; then
   fail "Stripped API 30 archive still contains app-data entries."
 fi
+cmp -s "$base_app_entries" "$base_metadata_entries" \
+  || fail "Stripped archive retained app entries beyond the OS manifest and metadata."
 cmp -s "$source_metadata_entries" "$base_metadata_entries" \
   || fail "Manifest/metadata order changed while stripping OS-produced data."
 tar -xOf "$base_archive" "$manifest_entry" > "$base_manifest"
@@ -407,10 +508,17 @@ for entry in "${ALL_ARCHIVE_ENTRIES[@]}"; do
 done
 sha256sum "$constructed_archive" > "$ARTIFACT_DIR/api30-restore-archive-sha256.txt"
 
-archive_uid="$(adb_cmd shell stat -c %u "$archive_path" | tr -d '\r')"
-archive_gid="$(adb_cmd shell stat -c %g "$archive_path" | tr -d '\r')"
-archive_mode="$(adb_cmd shell stat -c %a "$archive_path" | tr -d '\r')"
-adb_cmd shell ls -Zd "$archive_path" \
+archive_parent_paths="$ARTIFACT_DIR/api30-restore-base-archive-parent-paths.txt"
+find_transport_archive_parent > "$archive_parent_paths"
+if [[ "$(wc -l < "$archive_parent_paths" | tr -d ' ')" != "1" ]]; then
+  fail "Expected one initialized API 30 LocalTransport full-backup archive parent."
+fi
+archive_parent="$(cat "$archive_parent_paths")"
+archive_path="$archive_parent/$APP_ID"
+archive_uid="$(adb_cmd shell stat -c %u "$archive_parent" | tr -d '\r')"
+archive_gid="$(adb_cmd shell stat -c %g "$archive_parent" | tr -d '\r')"
+archive_mode="600"
+adb_cmd shell ls -Zd "$archive_parent" \
   | tr -d '\r' > "$ARTIFACT_DIR/api30-restore-base-archive-selinux.txt"
 archive_context="$(awk 'NR == 1 { print $1 }' "$ARTIFACT_DIR/api30-restore-base-archive-selinux.txt")"
 if [[ ! "$archive_uid" =~ ^[0-9]+$ || ! "$archive_gid" =~ ^[0-9]+$ \
@@ -536,9 +644,10 @@ done
   echo "archive-sha256=$(cut -d ' ' -f 1 "$ARTIFACT_DIR/api30-restore-archive-sha256.txt")"
   echo "transport=$LOCAL_TRANSPORT"
   echo "restore-token=$restore_token"
-  echo "exact-commands=API30 fake-encryption skeleton-generation-only backup; tar --delete OS data; tar --append deterministic domain fixtures; reset normal LocalTransport parameters; bmgr restore $restore_token $APP_ID"
+  echo "source-platform-version=36"
+  echo "exact-commands=validate same-run exact-head API36 mask-3 OS archive; tar --delete all OS app data; tar --append deterministic domain fixtures; reset normal API30 LocalTransport parameters; bmgr restore $restore_token $APP_ID"
   echo "validation-scope=targeted native API 30 inherited fullBackupContent restore parser"
-  echo "scope-rationale=real BackupManager restore proves the v28 path-only main-database include admits only main and exact SQLite recovery sidecars across credential/device domains"
+  echo "scope-rationale=Android 11 TarBackupReader parses but does not use the manifest platform-version field for restore policy; exact APK, package, version, signature-manifest, and archive provenance plus real BackupManager restore prove the v28 path-only allowlist admits only main and exact SQLite recovery sidecars across credential/device domains"
   echo "artifact-name=android-progress-backup-policy-api-30"
   echo "artifact-identifier=run-${GITHUB_RUN_ID:-local}/android-progress-backup-policy-api-30"
   echo "artifact-url=${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY:-local/repository}/actions/runs/${GITHUB_RUN_ID:-local}#artifacts"

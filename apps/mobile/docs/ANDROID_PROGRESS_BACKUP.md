@@ -110,17 +110,29 @@ The exact-head Android workflow gates the pure Java policy and canonical-file
 selector before building the APK, then runs that APK against the Android backup
 framework and LocalTransport on API 24, API 30, and API 36. API 24 proves the
 pre-flags agent path fails closed. API 30 proves a delivered mask of `0` emits
-no app-data payload through the same agent policy used on newer releases and
-that LocalTransport reports the package as rejected while the overall backup
-operation completes. It then performs a real inherited `bmgr restore` with an
-OS-generated exact-APK manifest and deterministic positive and negative domain
-entries. Exact hashes prove the main database, journal, and WAL restore, while
-filesystem absence proves recursive and cross-sidecars, `-shm`, another
-database, and credential- and device-protected domain traps remain excluded.
-The temporary `fake_encryption_flag` used to obtain the OS-generated manifest
-is skeleton generation only, not capability evidence; Android 11's
-LocalTransport does not expose real encryption or D2D capability parameters.
-See the authoritative
+no app-data payload or archive through the same agent policy used on newer
+releases and that LocalTransport reports the package as rejected while the
+overall backup operation completes. It then downloads the same-run, exact-head
+API 36 OS-generated archive from the real both-capabilities case. The consumer
+validates the run, commit, API level, real mask-3 policy/result, exact APK
+hashes, archive hash and entries, and OS manifest package, app version, platform
+version, and signing-certificate entries. It strips every app-data payload
+while preserving the OS manifest and optional metadata bytes and order, appends
+deterministic positive and negative domain entries, resets normal API 30
+LocalTransport parameters, and performs a real inherited `bmgr restore`. Exact
+hashes prove the main database, journal, and WAL restore, while filesystem
+absence proves recursive and cross-sidecars, `-shm`, another database, and
+credential- and device-protected domain traps remain excluded.
+
+The API 36 manifest's platform-version value is not treated as API 30
+capability evidence. Android 11's
+[`TarBackupReader`](https://android.googlesource.com/platform/frameworks/base/+/android11-release/services/backup/java/com/android/server/backup/utils/TarBackupReader.java)
+parses the platform-version field as a manifest-corruption safety check but
+does not use that value when choosing restore policy; package identity, app
+version, signatures, and installed-app state drive the policy. Android 11's
+LocalTransport does not expose real encryption or D2D capability parameters,
+so the API 30 lane makes no fake-encryption capability claim. See the
+authoritative
 [Android 11 LocalTransport parameters](https://android.googlesource.com/platform/frameworks/base/+/android11-release/packages/LocalTransport/src/com/android/localtransport/LocalTransportParameters.java).
 
 API 36 uses the authoritative Android 16 LocalTransport `is_encrypted` and

@@ -463,6 +463,15 @@ assert_app_data_archive_paths() {
       > "$app_data_entries" || true
   fi
 
+  if [[ "$expected_payload" == "no-archive" ]]; then
+    if [[ -s "$archive_paths_file" ]]; then
+      echo "API $SDK_LEVEL $case_name unexpectedly created a transport archive." >&2
+      cat "$archive_paths_file" >&2
+      exit 1
+    fi
+    return
+  fi
+
   if [[ "$expected_payload" == "none" ]]; then
     if [[ -s "$app_data_entries" ]]; then
       echo "API $SDK_LEVEL $case_name unexpectedly emitted app-data payload." >&2
@@ -604,7 +613,7 @@ adb_cmd shell bmgr enable true
 if (( SDK_LEVEL == 24 )); then
   run_case pre-flags-api 'non_incremental_only=false' unavailable false 0 none
 elif (( SDK_LEVEL == 30 )); then
-  run_case no-capability 'non_incremental_only=false' 0 false 0 none \
+  run_case no-capability 'non_incremental_only=false' 0 false 0 no-archive \
     fail-closed-transport-rejection
   apps/mobile/scripts/android-progress-backup-api30-restore-evidence.sh
 else

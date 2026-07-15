@@ -259,15 +259,11 @@ jobs:
           if-no-files-found: error
           path: apps/mobile/artifacts/android-progress-backup
 
-  android-progress-backup-policy:
-    name: Android Progress Backup policy API ${{ matrix.api-level }}
+  android-progress-backup-policy-api24:
+    name: Android Progress Backup policy API 24
     needs: android-build
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    strategy:
-      fail-fast: false
-      matrix:
-        api-level: [24, 30, 36]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -286,7 +282,7 @@ jobs:
       - name: Exercise framework backup policy and archive selection
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: ${{ matrix.api-level }}
+          api-level: 24
           target: google_apis
           arch: x86_64
           profile: pixel_2
@@ -301,6 +297,99 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: android-progress-backup-policy-api-${{ matrix.api-level }}
+          name: android-progress-backup-policy-api-24
           if-no-files-found: error
-          path: apps/mobile/artifacts/android-progress-backup-policy/api-${{ matrix.api-level }}
+          path: apps/mobile/artifacts/android-progress-backup-policy/api-24
+
+  android-progress-backup-policy-api36:
+    name: Android Progress Backup policy API 36
+    needs: android-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Android APKs
+        uses: actions/download-artifact@v4
+        with:
+          name: android-practice-apks
+          path: apps/mobile/android/app/build/outputs/apk
+
+      - name: Enable KVM acceleration
+        run: |
+          test -c /dev/kvm
+          sudo chmod 0666 /dev/kvm
+
+      - name: Exercise framework backup policy and archive selection
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          ram-size: 4096M
+          disable-animations: true
+          emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          script: apps/mobile/scripts/android-progress-backup-policy-evidence.sh
+        env:
+          DETOX_ANDROID_DEVICE: emulator-5554
+
+      - name: Upload Android Progress Backup policy evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-progress-backup-policy-api-36
+          if-no-files-found: error
+          path: apps/mobile/artifacts/android-progress-backup-policy/api-36
+
+  android-progress-backup-policy-api30:
+    name: Android Progress Backup policy API 30
+    needs:
+      - android-build
+      - android-progress-backup-policy-api36
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Android APKs
+        uses: actions/download-artifact@v4
+        with:
+          name: android-practice-apks
+          path: apps/mobile/android/app/build/outputs/apk
+
+      - name: Download API 36 OS archive evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: android-progress-backup-policy-api-36
+          path: apps/mobile/artifacts/android-progress-backup-policy-source/api-36
+
+      - name: Enable KVM acceleration
+        run: |
+          test -c /dev/kvm
+          sudo chmod 0666 /dev/kvm
+
+      - name: Exercise framework backup policy and inherited restore
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          ram-size: 4096M
+          disable-animations: true
+          emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          script: apps/mobile/scripts/android-progress-backup-policy-evidence.sh
+        env:
+          DETOX_ANDROID_DEVICE: emulator-5554
+          ANDROID_BACKUP_API36_SOURCE_DIR: apps/mobile/artifacts/android-progress-backup-policy-source/api-36
+
+      - name: Upload Android Progress Backup policy evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-progress-backup-policy-api-30
+          if-no-files-found: error
+          path: apps/mobile/artifacts/android-progress-backup-policy/api-30

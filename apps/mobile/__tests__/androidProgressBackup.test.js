@@ -532,10 +532,10 @@ describe('Android Progress Backup', () => {
       'Transport rejected package because it wasn\'t able to process it at the time',
     );
     expect(policyEvidenceScript).toContain('Backup finished with result: Success');
-    expect(policyEvidenceScript).toContain('expected_payload" == "none"');
+    expect(policyEvidenceScript).toContain('expected_payload" == "no-archive"');
     expect(policyEvidenceScript).toContain('unexpectedly emitted app-data payload');
     expect(policyEvidenceScript).toMatch(
-      /run_case no-capability 'non_incremental_only=false' 0 false 0 none \\\s+fail-closed-transport-rejection/,
+      /run_case no-capability 'non_incremental_only=false' 0 false 0 no-archive \\\s+fail-closed-transport-rejection/,
     );
   });
 
@@ -572,12 +572,41 @@ describe('Android Progress Backup', () => {
   });
 
   it('proves the API 30 v28 allowlist through a real inherited framework restore', () => {
+    const workflow = readRepo('.github/workflows/mobile-android.yml');
     const policyEvidenceScript = read('scripts/android-progress-backup-policy-evidence.sh');
     const restoreParserScript = read(
       'scripts/android-progress-backup-api30-restore-evidence.sh',
     );
     const backupContract = read('docs/ANDROID_PROGRESS_BACKUP.md');
 
+    const api24Job = workflow.slice(
+      workflow.indexOf('  android-progress-backup-policy-api24:'),
+      workflow.indexOf('  android-progress-backup-policy-api36:'),
+    );
+    const api36Job = workflow.slice(
+      workflow.indexOf('  android-progress-backup-policy-api36:'),
+      workflow.indexOf('  android-progress-backup-policy-api30:'),
+    );
+    const api30Job = workflow.slice(
+      workflow.indexOf('  android-progress-backup-policy-api30:'),
+    );
+    expect(api24Job).toContain('api-level: 24');
+    expect(api36Job).toContain('api-level: 36');
+    expect(api36Job).toContain('name: android-progress-backup-policy-api-36');
+    expect(api36Job).toContain(
+      'path: apps/mobile/artifacts/android-progress-backup-policy/api-36',
+    );
+    expect(api30Job).toMatch(
+      /needs:\s+- android-build\s+- android-progress-backup-policy-api36/,
+    );
+    expect(api30Job).toContain('name: android-progress-backup-policy-api-36');
+    expect(api30Job).toContain(
+      'path: apps/mobile/artifacts/android-progress-backup-policy-source/api-36',
+    );
+    expect(api30Job).toContain('api-level: 30');
+    expect(api30Job).toContain(
+      'ANDROID_BACKUP_API36_SOURCE_DIR: apps/mobile/artifacts/android-progress-backup-policy-source/api-36',
+    );
     expect(policyEvidenceScript).toMatch(
       /elif \(\( SDK_LEVEL == 30 \)\); then\s+run_case no-capability[\s\S]*?android-progress-backup-api30-restore-evidence\.sh/,
     );
@@ -585,16 +614,33 @@ describe('Android Progress Backup', () => {
     expect(restoreParserScript).toContain('API 30');
     expect(restoreParserScript).toContain('apps/$APP_ID/_manifest');
     expect(restoreParserScript).toContain('first_app_entry');
-    expect(restoreParserScript).toContain('fake_encryption_flag=true');
-    expect(restoreParserScript).toContain('skeleton-generation-only');
+    expect(restoreParserScript).not.toContain('fake_encryption_flag=true');
+    expect(restoreParserScript).not.toContain('FLAG_FAKE_CLIENT_SIDE_ENCRYPTION_ENABLED');
+    expect(restoreParserScript).toContain('ANDROID_BACKUP_API36_SOURCE_DIR');
+    expect(restoreParserScript).toContain('both-transport-archive.tar');
+    expect(restoreParserScript).toContain('both-transport-archive-sha256.txt');
+    expect(restoreParserScript).toContain('both-transport-archive-entries.txt');
+    expect(restoreParserScript).toContain('both-unique-policy-events.txt');
+    expect(restoreParserScript).toContain('both-unique-result-events.txt');
+    expect(restoreParserScript).toContain('case=both delivered-mask=3 selected=true');
+    expect(restoreParserScript).toContain('api-level=36');
+    expect(restoreParserScript).toContain('commit-sha=$GITHUB_SHA');
+    expect(restoreParserScript).toContain('GITHUB_RUN_ID');
+    expect(restoreParserScript).toContain('source_workflow_apk_hash');
+    expect(restoreParserScript).toContain('source_installed_apk_hash');
+    expect(restoreParserScript).toContain('manifest_version');
+    expect(restoreParserScript).toContain('manifest_package');
+    expect(restoreParserScript).toContain('manifest_app_version');
+    expect(restoreParserScript).toContain('manifest_platform_version');
+    expect(restoreParserScript).toContain('manifest_signature_count');
+    expect(restoreParserScript).toContain('source-platform-version=36');
+    expect(restoreParserScript).toContain('find_transport_archive_parent');
     expect(restoreParserScript).toContain(
-      'api30-restore-skeleton-transport-parameters.txt',
+      'api30-restore-source-provenance.txt',
     );
     expect(restoreParserScript).toContain('api30-restore-transport-parameters.txt');
-    expect(restoreParserScript.indexOf('skeleton_parameters='))
-      .toBeLessThan(restoreParserScript.indexOf('restore_parameters='));
     expect(restoreParserScript).toContain('tar --delete');
-    expect(restoreParserScript).toContain('api30-restore-skeleton-archive-entries.txt');
+    expect(restoreParserScript).toContain('api30-restore-stripped-archive-entries.txt');
     expect(restoreParserScript).toContain('tar --append');
     expect(restoreParserScript).toContain('cmp -s "$base_manifest" "$final_manifest"');
     expect(restoreParserScript).toContain('base_metadata_entries');
@@ -664,7 +710,9 @@ describe('Android Progress Backup', () => {
       constants.X_OK,
     )).not.toThrow();
     expect(backupContract).toContain('real inherited `bmgr restore`');
-    expect(backupContract).toContain('skeleton generation only');
+    expect(backupContract).toContain('API 36 OS-generated archive');
+    expect(backupContract).toContain('TarBackupReader');
+    expect(backupContract).toContain('parses the platform-version field');
   });
 
   it('accepts repeated identical agent preflight logs while archives prove once-only payload', () => {
@@ -706,8 +754,9 @@ describe('Android Progress Backup', () => {
     );
     const backupContract = read('docs/ANDROID_PROGRESS_BACKUP.md');
 
-    expect(workflow).toContain('android-progress-backup-policy:');
-    expect(workflow).toContain('api-level: [24, 30, 36]');
+    expect(workflow).toContain('android-progress-backup-policy-api24:');
+    expect(workflow).toContain('android-progress-backup-policy-api36:');
+    expect(workflow).toContain('android-progress-backup-policy-api30:');
     expect(workflow).toContain('./gradlew :app:testDebugUnitTest');
     expect(workflow).toContain(
       '--tests com.chessticize.mobile.backup.ProgressBackupPolicyTest',
@@ -715,13 +764,13 @@ describe('Android Progress Backup', () => {
     expect(workflow).toContain(
       'script: apps/mobile/scripts/android-progress-backup-policy-evidence.sh',
     );
-    expect(workflow).toContain(
-      'name: android-progress-backup-policy-api-${{ matrix.api-level }}',
-    );
+    expect(workflow).toContain('name: android-progress-backup-policy-api-24');
+    expect(workflow).toContain('name: android-progress-backup-policy-api-36');
+    expect(workflow).toContain('name: android-progress-backup-policy-api-30');
     expect(policyEvidenceScript).toContain('set -euo pipefail');
     expect(policyEvidenceScript).toContain('case "$SDK_LEVEL"');
     expect(policyEvidenceScript).toMatch(
-      /run_case no-capability 'non_incremental_only=false' 0 false 0 none \\\s+fail-closed-transport-rejection/,
+      /run_case no-capability 'non_incremental_only=false' 0 false 0 no-archive \\\s+fail-closed-transport-rejection/,
     );
     expect(policyEvidenceScript).toContain(
       "run_case encryption-only 'is_encrypted=true,is_device_transfer=false",
@@ -746,6 +795,7 @@ describe('Android Progress Backup', () => {
     expect(manifest).toContain('android:backupAgent=".backup.ProgressBackupAgent"');
     expect(backupAgent).not.toContain('super.onFullBackup');
     expect(backupAgent).not.toContain('onRestoreFile');
+    expect(backupAgent).not.toContain('FLAG_FAKE_CLIENT_SIDE_ENCRYPTION_ENABLED');
     expect(backupAgent.indexOf('Build.VERSION.SDK_INT < Build.VERSION_CODES.P'))
       .toBeLessThan(backupAgent.indexOf('data.getTransportFlags()'));
     expect(backupAgent.match(/fullBackupFile\(/g)).toHaveLength(1);
