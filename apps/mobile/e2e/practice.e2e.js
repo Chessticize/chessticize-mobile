@@ -9,7 +9,6 @@ const {
   selectTestPuzzleSource,
   waitForVisibleInPracticeScroll,
   waitForElementTextContaining,
-  boardPoint,
   failStandardSprint
 } = require('./helpers');
 
@@ -66,13 +65,7 @@ describe('Practice POC', () => {
     await startPracticeMode('standard');
     await waitForVisibleInPracticeScroll('session-board');
 
-    const boardFrame = await frameFor(element(by.id('session-board')));
-    const c2 = boardPoint(boardFrame, 'c2');
-    const b1 = boardPoint(boardFrame, 'b1');
-
-    await element(by.id('session-board')).tapAtPoint(c2);
-    await sleep(300);
-    await element(by.id('session-board')).tapAtPoint(b1);
+    await playBoardMove('session-board', 'c2b1');
 
     await waitFor(element(by.id('session-progress'))).toHaveText('1 / 15').withTimeout(10000);
 
