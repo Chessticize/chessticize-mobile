@@ -2,6 +2,7 @@ package com.chessticize.mobile
 
 import android.app.Activity
 import android.os.Build
+import android.util.Log
 import android.window.BackEvent
 import android.window.OnBackAnimationCallback
 import android.window.OnBackInvokedCallback
@@ -28,6 +29,7 @@ class MobilePredictiveBackModule(
   private var enabledRequested = false
   private var registeredActivity: Activity? = null
   private var registeredCallback: OnBackInvokedCallback? = null
+  private var registrationGeneration = 0
 
   init {
     reactContext.addLifecycleEventListener(this)
@@ -101,20 +103,30 @@ class MobilePredictiveBackModule(
       return
     }
     unregister()
+    registrationGeneration += 1
+    val registrationId = registrationGeneration
+    var loggedProgress = false
     val callback = object : OnBackAnimationCallback {
       override fun onBackStarted(backEvent: BackEvent) {
+        Log.i(TAG, "$DEBUG_PREFIX callback-entry phase=started registration=$registrationId")
         emit("started", backEvent)
       }
 
       override fun onBackProgressed(backEvent: BackEvent) {
+        if (!loggedProgress) {
+          loggedProgress = true
+          Log.i(TAG, "$DEBUG_PREFIX callback-entry phase=progressed registration=$registrationId")
+        }
         emit("progressed", backEvent)
       }
 
       override fun onBackCancelled() {
+        Log.i(TAG, "$DEBUG_PREFIX callback-entry phase=cancelled registration=$registrationId")
         emit("cancelled")
       }
 
       override fun onBackInvoked() {
+        Log.i(TAG, "$DEBUG_PREFIX callback-entry phase=invoked registration=$registrationId")
         emit("invoked")
       }
     }
@@ -124,6 +136,7 @@ class MobilePredictiveBackModule(
     )
     registeredActivity = activity
     registeredCallback = callback
+    Log.i(TAG, "$DEBUG_PREFIX registered registration=$registrationId")
   }
 
   @RequiresApi(Build.VERSION_CODES.TIRAMISU)
@@ -138,7 +151,9 @@ class MobilePredictiveBackModule(
   }
 
   private fun emit(phase: String, backEvent: BackEvent? = null) {
-    if (!reactApplicationContext.hasActiveReactInstance()) {
+    val active = reactApplicationContext.hasActiveReactInstance()
+    Log.i(TAG, "$DEBUG_PREFIX emit-gate phase=$phase active=$active")
+    if (!active) {
       return
     }
     val event = Arguments.createMap().apply {
@@ -148,9 +163,15 @@ class MobilePredictiveBackModule(
         putString("edge", if (backEvent.swipeEdge == BackEvent.EDGE_RIGHT) "right" else "left")
       }
     }
+    Log.i(TAG, "$DEBUG_PREFIX emitter-call phase=$phase")
     reactApplicationContext
       .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
       .emit("mobilePredictiveBack", event)
+  }
+
+  private companion object {
+    const val TAG = "MobilePredictiveBack"
+    const val DEBUG_PREFIX = "[DEBUG-pr201-back-native]"
   }
 }
 
