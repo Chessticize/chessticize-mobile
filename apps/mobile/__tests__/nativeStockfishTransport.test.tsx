@@ -65,10 +65,10 @@ describe("native Stockfish transport", () => {
     expect(terminate).toHaveBeenCalledTimes(1);
   });
 
-  it("prewarms the singleton native Stockfish transport once", async () => {
+  it("reuses the completed handshake while the singleton native runner stays alive", async () => {
     const commands: string[] = [];
     const listeners = new Set<StockfishLineListener>();
-    const start = jest.fn(async () => {});
+    const start = jest.fn(async () => false);
     const send = jest.fn((command: string) => {
       commands.push(command);
     });
@@ -102,7 +102,62 @@ describe("native Stockfish transport", () => {
     await expect(prewarm).resolves.toBe(true);
     await expect(prewarmNativeStockfishTransport()).resolves.toBe(true);
 
-    expect(start).toHaveBeenCalledTimes(1);
+    expect(start).toHaveBeenCalledTimes(2);
+
+    start.mockRejectedValueOnce(new Error("runner recreation failed"));
+    await expect(prewarmNativeStockfishTransport()).resolves.toBe(false);
+    expect(start).toHaveBeenCalledTimes(3);
+  });
+
+  it("repeats the UCI handshake when Activity recreation destroyed the native runner", async () => {
+    const commands: string[] = [];
+    const listeners = new Set<StockfishLineListener>();
+    let runnerAlive = false;
+    const start = jest.fn(async () => {
+      const created = !runnerAlive;
+      runnerAlive = true;
+      return created;
+    });
+
+    (NativeModules as Record<string, unknown>).NativeStockfishEngine = {
+      start,
+      send: (command: string) => {
+        commands.push(command);
+      },
+      terminate: jest.fn(() => {
+        runnerAlive = false;
+      }),
+      __addListener: (_eventName: string, listener: StockfishLineListener) => {
+        listeners.add(listener);
+        return {
+          remove: () => {
+            listeners.delete(listener);
+          }
+        };
+      }
+    };
+
+    const firstPrewarm = prewarmNativeStockfishTransport();
+    await Promise.resolve();
+    for (const listener of listeners) {
+      listener({ line: "uciok" });
+      listener({ line: "readyok" });
+    }
+    await expect(firstPrewarm).resolves.toBe(true);
+
+    runnerAlive = false;
+    const recreatedPrewarm = prewarmNativeStockfishTransport();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(commands.filter((command) => command === "uci")).toHaveLength(2);
+    for (const listener of listeners) {
+      listener({ line: "uciok" });
+      listener({ line: "readyok" });
+    }
+
+    await expect(recreatedPrewarm).resolves.toBe(true);
+    expect(start).toHaveBeenCalledTimes(3);
   });
 
   it("fails prewarming when the engine never completes the UCI handshake", async () => {

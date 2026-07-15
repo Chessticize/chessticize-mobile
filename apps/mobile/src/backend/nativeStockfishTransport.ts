@@ -4,13 +4,15 @@ import type { UciEngineTransport } from "../../../../packages/core/src/index.ts"
 const STOCKFISH_LINE_EVENT = "StockfishEngineLine";
 
 type NativeStockfishEngineModule = {
-  start: () => Promise<void>;
+  start: () => Promise<boolean | void>;
   send: (command: string) => void;
   terminate: () => void;
 };
 
 let singletonTransport: UciEngineTransport | null = null;
 let prewarmPromise: Promise<boolean> | null = null;
+let prewarmReady = false;
+let singletonNativeStart: (() => Promise<boolean | void>) | null = null;
 
 export function createNativeStockfishTransport(): UciEngineTransport | null {
   const nativeModule = NativeModules?.NativeStockfishEngine as NativeStockfishEngineModule | undefined;
@@ -22,8 +24,9 @@ export function createNativeStockfishTransport(): UciEngineTransport | null {
   }
 
   const emitter = new NativeEventEmitter(nativeModule as never);
+  singletonNativeStart = () => nativeModule.start();
   singletonTransport = {
-    start: () => nativeModule.start(),
+    start: () => nativeModule.start() as Promise<void>,
     send: (command: string) => nativeModule.send(command),
     onLine: (listener: (line: string) => void) => {
       const subscription = emitter.addListener(STOCKFISH_LINE_EVENT, (event: { line?: string }) => {
@@ -35,7 +38,9 @@ export function createNativeStockfishTransport(): UciEngineTransport | null {
     },
     terminate: () => {
       prewarmPromise = null;
+      prewarmReady = false;
       singletonTransport = null;
+      singletonNativeStart = null;
       nativeModule.terminate();
     }
   };
@@ -51,7 +56,25 @@ export function prewarmNativeStockfishTransport(): Promise<boolean> {
     return prewarmPromise;
   }
 
-  prewarmPromise = new Promise<boolean>((resolve) => {
+  if (prewarmReady) {
+    return cachePrewarmAttempt((async () => {
+      try {
+        const created = await singletonNativeStart?.();
+        if (created !== true) {
+          return true;
+        }
+        return runPrewarmHandshake(transport);
+      } catch {
+        return false;
+      }
+    })());
+  }
+
+  return cachePrewarmAttempt(runPrewarmHandshake(transport));
+}
+
+function runPrewarmHandshake(transport: UciEngineTransport): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
     let settled = false;
     let uciAcknowledged = false;
     let cleanup: (() => void) | null = null;
@@ -66,9 +89,6 @@ export function prewarmNativeStockfishTransport(): Promise<boolean> {
       settled = true;
       clearTimeout(timer);
       cleanup?.();
-      if (!result) {
-        prewarmPromise = null;
-      }
       resolve(result);
     }
 
@@ -91,6 +111,19 @@ export function prewarmNativeStockfishTransport(): Promise<boolean> {
       }
     );
   });
+}
 
-  return prewarmPromise;
+function cachePrewarmAttempt(attempt: Promise<boolean>): Promise<boolean> {
+  const cached = attempt.then((result) => {
+    if (prewarmPromise === cached) {
+      prewarmReady = result;
+    }
+    return result;
+  }).finally(() => {
+    if (prewarmPromise === cached) {
+      prewarmPromise = null;
+    }
+  });
+  prewarmPromise = cached;
+  return cached;
 }

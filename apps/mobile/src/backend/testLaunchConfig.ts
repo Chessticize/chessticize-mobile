@@ -31,6 +31,17 @@ function areNativeTestControlsEnabled(
   return arePracticeTestControlsEnabled(globals) || nativeModule?.testControlsEnabled === true;
 }
 
+export function enableTestControlsFromLaunchConfig(
+  globals: TestLaunchConfigGlobals = globalThis,
+  nativeModule: NativeTestLaunchConfigModule | undefined = NativeModules?.ChessticizeTestLaunchConfig as NativeTestLaunchConfigModule | undefined
+): boolean {
+  const launchConfig = readNativeTestLaunchConfig(nativeModule);
+  if (launchConfig?.testControlsEnabled === true) {
+    globals.__CHESSTICIZE_ENABLE_TEST_CONTROLS__ = true;
+  }
+  return arePracticeTestControlsEnabled(globals);
+}
+
 export function isStoreAssetCaptureEnabled(
   nativeModule: NativeTestLaunchConfigModule | undefined = NativeModules?.ChessticizeTestLaunchConfig as NativeTestLaunchConfigModule | undefined
 ): boolean {

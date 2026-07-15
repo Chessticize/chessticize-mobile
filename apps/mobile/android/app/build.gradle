@@ -1,3 +1,5 @@
+import groovy.json.JsonSlurper
+
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
@@ -133,10 +135,31 @@ def enableProguardInReleaseBuilds = false
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 def puzzlePackSource = file("$rootDir/../../../fixtures/puzzles/bundled-core-pack.sqlite")
 def generatedPuzzlePackAssetsDir = "$buildDir/generated/assets/puzzle-pack"
+def stockfishArtifactsFile = file("$rootDir/../stockfish-artifacts.json")
+def stockfishArtifacts = new JsonSlurper().parse(stockfishArtifactsFile)
+def stockfishRoot = file("$rootDir/../${stockfishArtifacts.root}")
+def stockfishNnueFiles = stockfishArtifacts.nnue.collect { relativePath ->
+    file("$stockfishRoot/$relativePath")
+}
+def generatedStockfishAssetsDir = "$buildDir/generated/assets/stockfish-nnue"
 
 tasks.register("copyPuzzlePackAsset", Copy) {
     from puzzlePackSource
     into "$generatedPuzzlePackAssetsDir/puzzle-packs"
+}
+
+tasks.register("copyStockfishNnueAssets", Sync) {
+    from stockfishNnueFiles
+    from(stockfishArtifactsFile)
+    into "$generatedStockfishAssetsDir/stockfish"
+    doFirst {
+        def missingFiles = stockfishNnueFiles.findAll { source -> !source.isFile() }
+        if (!missingFiles.isEmpty()) {
+            throw new GradleException(
+                "Canonical Stockfish NNUE assets are missing: ${missingFiles.join(', ')}"
+            )
+        }
+    }
 }
 
 android {
@@ -156,10 +179,27 @@ android {
         ndk {
             abiFilters(*supportedAndroidAbis)
         }
+        externalNativeBuild {
+            cmake {
+                arguments "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+            }
+        }
     }
     sourceSets {
         main {
             assets.srcDirs += generatedPuzzlePackAssetsDir
+            assets.srcDirs += generatedStockfishAssetsDir
+        }
+    }
+    externalNativeBuild {
+        cmake {
+            path file("src/main/cpp/CMakeLists.txt")
+            version "3.22.1"
+        }
+    }
+    packaging {
+        jniLibs {
+            useLegacyPackaging = false
         }
     }
     signingConfigs {
@@ -200,6 +240,7 @@ android {
 
 tasks.matching { task -> task.name.startsWith("merge") && task.name.endsWith("Assets") }.configureEach {
     dependsOn("copyPuzzlePackAsset")
+    dependsOn("copyStockfishNnueAssets")
 }
 
 dependencies {

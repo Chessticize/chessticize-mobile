@@ -22,6 +22,10 @@ import {
   type TestMobilePlatformCapabilityOverrides
 } from "../src/testing/testMobilePlatformCapabilities";
 import { FailingAttemptStore } from "../test-support/FailingAttemptStore";
+import {
+  expectNoRenderedTextHasNonPositiveFontSize,
+  flattenTestStyle
+} from "../test-support/testRendererSupport";
 
 const renderers: TestRenderer.ReactTestRenderer[] = [];
 
@@ -41,6 +45,17 @@ afterEach(() => {
 });
 
 describe("PracticePocScreen", () => {
+  it("does not initialize Stockfish while rendering the Practice home", async () => {
+    const prewarm = jest.fn(async () => true);
+
+    renderScreen({ stockfish: { prewarm } });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(prewarm).not.toHaveBeenCalled();
+  });
+
   it("exposes the mobile app shell automation contract", () => {
     const renderer = renderScreen();
     const mainScroll = findByTestId(renderer, "practice-main-scroll");
@@ -1856,6 +1871,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-filter-wrong-only").props.accessibilityLabel).toBe("Wrong puzzles only");
     expect(findByTestId(renderer, "history-filter-wrong-only").props.accessibilityRole).toBe("switch");
     expect(findByTestId(renderer, "history-filter-wrong-only").props.accessibilityState).toEqual({ checked: true });
+    expect(findByTestId(renderer, "history-filter-wrong-only").props.accessibilityValue).toEqual({ text: "On" });
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Wrong only");
     expect(collectText(findByTestId(renderer, "history-performance-card"))).not.toContain("Wrong");
     expectHistoryRowAccessibility(renderer, "Played g6g5 · Best f4g3");
@@ -2863,7 +2879,12 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "review-tab");
     press(renderer, "review-start-due");
-    const firstPuzzleId = collectText(findByTestId(renderer, "review-current-puzzle-id"));
+    const currentPuzzleIdMetric = findByTestId(renderer, "review-current-puzzle-id");
+    expectNoRenderedTextHasNonPositiveFontSize(renderer);
+    expect(hasStyleEntry(currentPuzzleIdMetric, "height", 0)).toBe(true);
+    expect(hasStyleEntry(currentPuzzleIdMetric, "opacity", 0)).toBe(true);
+    expect(hasStyleEntry(currentPuzzleIdMetric, "width", 0)).toBe(true);
+    const firstPuzzleId = collectText(currentPuzzleIdMetric);
     expectText(renderer, "1 / 2 · Standard");
 
     press(renderer, "review-exit");
@@ -3116,6 +3137,56 @@ describe("PracticePocScreen", () => {
 
     expect(stockfish.commands.at(-1)).toBe("stop");
     expect(() => findByTestId(renderer, "review-close-analysis")).toThrow();
+  });
+
+  it("offers an actionable retry when native Stockfish startup fails", async () => {
+    const stockfish = createScriptedStockfishTransport((command, emit) => {
+      if (command === "go depth 8") {
+        void Promise.resolve().then(() => {
+          emit("info depth 4 multipv 1 score mate 1 pv e2e6");
+          emit("bestmove e2e6");
+        });
+      }
+    });
+    const start = jest
+      .fn<Promise<void>, []>()
+      .mockRejectedValueOnce(new Error("NNUE assets unavailable"))
+      .mockResolvedValue(undefined);
+    stockfish.transport.start = start;
+    const renderer = renderStandardSequenceScreen({
+      stockfish: {
+        createTransport: () => stockfish.transport,
+        prewarm: async () => false
+      }
+    });
+
+    startStandardSprint(renderer);
+    await boardMove(renderer, "c4b5");
+    await settleFeedbackSnapshot();
+    await boardMove(renderer, "g6g5");
+    await settleFeedbackSnapshot();
+    await boardMove(renderer, "a4b6");
+    await settleFeedbackSnapshot();
+    press(renderer, "review-mistakes-button");
+    press(renderer, "review-analysis-button");
+
+    await waitForAssertion(() => {
+      expect(findByTestId(renderer, "review-analysis-error")).toBeTruthy();
+      expect(collectText(findByTestId(renderer, "review-analysis-error"))).toContain(
+        "Stockfish couldn't start"
+      );
+      expect(findByTestId(renderer, "review-analysis-retry")).toBeTruthy();
+    });
+
+    press(renderer, "review-analysis-retry");
+
+    await waitForAssertion(() => {
+      expect(start).toHaveBeenCalledTimes(2);
+      expect(collectText(findByTestId(renderer, "review-analysis-engine-status"))).toBe(
+        "SF 18 NNUE · Depth 4/20"
+      );
+      expect(() => findByTestId(renderer, "review-analysis-error")).toThrow();
+    });
   });
 
   it("isolates Stockfish diagnostics with scored live rows whose order can change by depth", async () => {
@@ -4246,19 +4317,6 @@ function countStyleEntry(node: TestRenderer.ReactTestInstance, key: string, valu
   return own + node.children
     .filter((child): child is TestRenderer.ReactTestInstance => typeof child !== "string")
     .reduce((sum, child) => sum + countStyleEntry(child, key, value), 0);
-}
-
-function flattenTestStyle(style: unknown): Record<string, unknown> {
-  if (!style) {
-    return {};
-  }
-  if (Array.isArray(style)) {
-    return style.reduce<Record<string, unknown>>(
-      (merged, entry) => Object.assign(merged, flattenTestStyle(entry)),
-      {}
-    );
-  }
-  return typeof style === "object" ? { ...(style as Record<string, unknown>) } : {};
 }
 
 function styleEntryMatches(style: unknown, key: string, value: unknown): boolean {

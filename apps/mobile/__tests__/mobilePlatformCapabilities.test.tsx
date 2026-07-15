@@ -9,6 +9,10 @@ import {
   FakeReviewReminderNotificationClient,
   FakeReviewReminderScheduler,
 } from '../src/backend/reviewReminderScheduler';
+import {
+  createNativeStockfishTransport,
+  prewarmNativeStockfishTransport,
+} from '../src/backend/nativeStockfishTransport';
 
 describe('mobile platform capabilities', () => {
   it('composes the existing iOS contracts behind one typed mobile seam', async () => {
@@ -25,15 +29,15 @@ describe('mobile platform capabilities', () => {
     expect(capabilities.applicationMetadata).toBe(MOBILE_APPLICATION_METADATA);
   });
 
-  it('composes Android with the shared storage contracts and no iCloud transport', async () => {
+  it('composes Android with shared storage and the native Stockfish transport', () => {
     const service = createMobilePracticeService('random1000');
     const capabilities = composeAndroidMobilePlatformCapabilities(service);
 
     expect(capabilities.storage.practiceService).toBe(service);
     expect(capabilities.storage.configurePuzzleSource).toBeDefined();
     expect(capabilities.progressSync.client).toBeNull();
-    expect(capabilities.stockfish.createTransport()).toBeNull();
-    await expect(capabilities.stockfish.prewarm()).resolves.toBe(false);
+    expect(capabilities.stockfish.createTransport).toBe(createNativeStockfishTransport);
+    expect(capabilities.stockfish.prewarm).toBe(prewarmNativeStockfishTransport);
     expect(capabilities.reminders.scheduler).toBeNull();
     expect(capabilities.reminders.notificationClient).toBeNull();
     expect(capabilities.applicationMetadata).toBe(MOBILE_APPLICATION_METADATA);

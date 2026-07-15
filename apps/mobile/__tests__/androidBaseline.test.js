@@ -10,6 +10,11 @@ const {
 } = require('../scripts/android-doctor');
 const {
   EXPECTED_ABIS,
+  MAXIMUM_STOCKFISH_LIBRARY_BYTES,
+  NNUE_ASSET_ENTRIES,
+  REQUIRED_NATIVE_LIBRARIES,
+  STOCKFISH_MANIFEST_ENTRY,
+  parseElfLoadAlignments,
   parseNativeAbis,
   verifyApk,
 } = require('../scripts/verify-android-apk-abis');
@@ -182,6 +187,30 @@ describe('Android launch baseline', () => {
     expect(workflow).not.toMatch(/^\s+pull_request:/m);
   });
 
+  it('gives both Android API emulators fixed realistic memory and preserves failure diagnostics', () => {
+    const workflow = read('../../.github/workflows/mobile-android.yml');
+
+    expect(workflow).toContain('api-level: [24, 36]');
+    expect(workflow).toContain('ram-size: 4096M');
+    expect(workflow.match(/ram-size: 4096M/g)).toHaveLength(1);
+    expect(workflow).toContain('name: Upload Android launch failure diagnostics');
+    expect(workflow).toContain('apps/mobile/artifacts/android-ui/');
+  });
+
+  it('keeps the API 36 Stockfish condition in one emulator-runner script line', () => {
+    const workflow = read('../../.github/workflows/mobile-android.yml');
+
+    for (const suite of ['android-stockfish', 'flows', 'practice']) {
+      const command = `if [ "\${{ matrix.api-level }}" = "36" ]; then DETOX_ACTIVE_SUITE=${suite} pnpm mobile:e2e:test:android:ci; fi`;
+      expect(workflow).toContain(command);
+      expect(workflow.match(new RegExp(`DETOX_ACTIVE_SUITE=${suite}`, 'g'))).toHaveLength(1);
+      expect(workflow).not.toMatch(
+        new RegExp(`if \\[ "\\$\\{\\{ matrix\\.api-level \\}\\}" = "36" \\]; then\\s*\\n\\s*DETOX_ACTIVE_SUITE=${suite}`)
+      );
+    }
+    expect(workflow).toContain('timeout-minutes: 75');
+  });
+
   it('uses the doctor-verified SDK with a self-contained offline Android E2E app', () => {
     const androidDetoxScript = read('scripts/android-test-for-detox.sh');
 
@@ -289,19 +318,105 @@ describe('Android launch baseline', () => {
   it('verifies packaged native libraries by ABI', () => {
     const entries = [
       'AndroidManifest.xml',
+      STOCKFISH_MANIFEST_ENTRY,
+      ...NNUE_ASSET_ENTRIES,
       'lib/x86_64/libreactnative.so',
       'lib/arm64-v8a/libreactnative.so',
       'lib/x86_64/libhermes.so',
+      'lib/x86_64/libappmodules.so',
+      'lib/arm64-v8a/libappmodules.so',
+      'lib/x86_64/libstockfish.so',
+      'lib/arm64-v8a/libstockfish.so',
     ].join('\n');
 
     expect(parseNativeAbis(entries)).toEqual(EXPECTED_ABIS);
+    expect(REQUIRED_NATIVE_LIBRARIES).toEqual(['libappmodules.so', 'libstockfish.so']);
+    expect(NNUE_ASSET_ENTRIES).toEqual([
+      'assets/stockfish/nn-c288c895ea92.nnue',
+      'assets/stockfish/nn-37f18f62d772.nnue',
+    ]);
+    expect(STOCKFISH_MANIFEST_ENTRY).toBe('assets/stockfish/stockfish-artifacts.json');
     expect(parseNativeAbis(`${entries}\nlib/x86/libreactnative.so`)).toEqual([
       'arm64-v8a',
       'x86',
       'x86_64',
     ]);
-    expect(verifyApk('app.apk', () => ({ status: 0, stdout: entries, stderr: '' })))
+    const inspectedElfPaths = [];
+    const run = jest.fn((command, args) => {
+      if (command === 'unzip' && args[0] === '-Z1') {
+        return { status: 0, stdout: entries, stderr: '' };
+      }
+      if (command === 'unzip' && args[0] === '-p') {
+        return { status: 0, stdout: Buffer.from('ELF'), stderr: '' };
+      }
+      if (command.endsWith('llvm-readelf')) {
+        inspectedElfPaths.push(args[1]);
+        return { status: 0, stdout: '  LOAD 0x0 0x0 0x0 0x1 0x1 R E 0x4000', stderr: '' };
+      }
+      return { status: 0, stdout: '', stderr: '' };
+    });
+    expect(parseElfLoadAlignments('LOAD 0x0 0x0 0x0 0x1 0x1 R E 0x4000'))
+      .toEqual([0x4000]);
+    expect(parseElfLoadAlignments('LOAD 0x0 0x0 0x0 0x1 0x1 R E 2**14'))
+      .toEqual([0x4000]);
+    expect(verifyApk('app.apk', run, { ANDROID_HOME: '/sdk' }))
       .toEqual(EXPECTED_ABIS);
+    expect(inspectedElfPaths.map((entry) => path.basename(entry)).sort()).toEqual([
+      'arm64-v8a-libappmodules.so',
+      'arm64-v8a-libreactnative.so',
+      'arm64-v8a-libstockfish.so',
+      'x86_64-libappmodules.so',
+      'x86_64-libhermes.so',
+      'x86_64-libreactnative.so',
+      'x86_64-libstockfish.so',
+    ]);
+    expect(() => verifyApk(
+      'duplicate-nnue.apk',
+      (command, args) => {
+        if (command === 'unzip' && args[0] === '-Z1') {
+          return { status: 0, stdout: `${entries}\n${NNUE_ASSET_ENTRIES[0]}`, stderr: '' };
+        }
+        return run(command, args);
+      },
+      { ANDROID_HOME: '/sdk' },
+    )).toThrow('must contain exactly one');
+    expect(() => verifyApk(
+      'missing-stockfish-manifest.apk',
+      (command, args) => {
+        if (command === 'unzip' && args[0] === '-Z1') {
+          return {
+            status: 0,
+            stdout: entries
+              .split('\n')
+              .filter((entry) => entry !== STOCKFISH_MANIFEST_ENTRY)
+              .join('\n'),
+            stderr: '',
+          };
+        }
+        return run(command, args);
+      },
+      { ANDROID_HOME: '/sdk' },
+    )).toThrow('must contain exactly one assets/stockfish/stockfish-artifacts.json');
+    expect(() => verifyApk(
+      'embedded-nnue.apk',
+      (command, args) => {
+        if (command === 'unzip' && args[0] === '-p' && args[2].endsWith('/libstockfish.so')) {
+          return { status: 0, stdout: { length: MAXIMUM_STOCKFISH_LIBRARY_BYTES + 1 }, stderr: '' };
+        }
+        return run(command, args);
+      },
+      { ANDROID_HOME: '/sdk' },
+    )).toThrow('still appears to embed ABI-duplicated NNUE data');
+    expect(() => verifyApk(
+      'unaligned-appmodules.apk',
+      (command, args) => {
+        if (command.endsWith('llvm-readelf') && args[1].endsWith('libappmodules.so')) {
+          return { status: 0, stdout: '  LOAD 0x0 0x0 0x0 0x1 0x1 R E 0x1000', stderr: '' };
+        }
+        return run(command, args);
+      },
+      { ANDROID_HOME: '/sdk' },
+    )).toThrow('libappmodules.so has incompatible ELF LOAD alignment');
     expect(() => verifyApk(
       'unexpected.apk',
       () => ({ status: 0, stdout: `${entries}\nlib/x86/libreactnative.so`, stderr: '' }),
@@ -310,5 +425,16 @@ describe('Android launch baseline', () => {
       'empty.apk',
       () => ({ status: 0, stdout: 'AndroidManifest.xml', stderr: '' }),
     )).toThrow('does not contain native libraries');
+    expect(() => verifyApk(
+      'missing-appmodules.apk',
+      () => ({
+        status: 0,
+        stdout: entries
+          .split('\n')
+          .filter((entry) => !entry.endsWith('/libappmodules.so'))
+          .join('\n'),
+        stderr: '',
+      }),
+    )).toThrow('libappmodules.so');
   });
 });

@@ -1,15 +1,17 @@
 const fs = require('fs');
 const zlib = require('zlib');
 const {
+  elementText,
   sleep,
   frameFor,
   launchWithDisabledSynchronization,
+  openStandardHistoryTrend,
   playBoardMove,
   startPracticeMode,
   selectTestPuzzleSource,
   waitForVisibleInPracticeScroll,
   waitForElementTextContaining,
-  boardPoint,
+  waitForRunningStockfishDepth,
   failStandardSprint
 } = require('./helpers');
 
@@ -66,13 +68,7 @@ describe('Practice POC', () => {
     await startPracticeMode('standard');
     await waitForVisibleInPracticeScroll('session-board');
 
-    const boardFrame = await frameFor(element(by.id('session-board')));
-    const c2 = boardPoint(boardFrame, 'c2');
-    const b1 = boardPoint(boardFrame, 'b1');
-
-    await element(by.id('session-board')).tapAtPoint(c2);
-    await sleep(300);
-    await element(by.id('session-board')).tapAtPoint(b1);
+    await playBoardMove('session-board', 'c2b1');
 
     await waitFor(element(by.id('session-progress'))).toHaveText('1 / 15').withTimeout(10000);
 
@@ -117,7 +113,12 @@ describe('Practice POC', () => {
     await waitFor(element(by.text('2 / 3 · Standard'))).toBeVisible().withTimeout(30000);
     await element(by.id('review-analysis-button')).tap();
     await waitFor(element(by.id('review-close-analysis'))).toBeVisible().withTimeout(10000);
-    await waitForRunningStockfishDepth('review-analysis-engine-status', 8, 90000);
+    await waitForRunningStockfishDepth(
+      'review-analysis-engine-status',
+      8,
+      90000,
+      { comparison: 'above' }
+    );
     await element(by.id('review-close-analysis')).tap();
     await waitFor(element(by.id('review-analysis-button'))).toBeVisible().withTimeout(10000);
 
@@ -136,33 +137,31 @@ describe('Practice POC', () => {
 
     const screenshotPath = await device.takeScreenshot('review-analysis-arrows');
     expectScreenshotContainsGreenAnalysisArrow(screenshotPath);
+
+    // Kill the process with a real native runner active, relaunch against the
+    // persisted attempt, and start analysis again through public History UI.
+    // This proves a fresh native runner can prewarm after process recreation.
+    await device.terminateApp();
+    await launchWithDisabledSynchronization({
+      newInstance: true,
+      delete: false
+    });
+    await openStandardHistoryTrend();
+    await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
+    const resultAttributes = await element(by.text('Wrong move')).atIndex(0).getAttributes();
+    const resultIdentifier = (Array.isArray(resultAttributes) ? resultAttributes[0] : resultAttributes).identifier;
+    if (typeof resultIdentifier !== 'string' || !resultIdentifier.endsWith('-result')) {
+      throw new Error(`Could not resolve persisted history attempt row from ${String(resultIdentifier)}`);
+    }
+    await element(by.id(resultIdentifier.replace(/-result$/, ''))).tap();
+    await waitFor(element(by.id('review-session'))).toExist().withTimeout(10000);
+    await waitForVisibleInPracticeScroll('review-analysis-button');
+    await element(by.id('review-analysis-button')).tap();
+    await waitFor(element(by.id('review-close-analysis'))).toBeVisible().withTimeout(10000);
+    await waitForElementTextContaining('review-analysis-engine-status', 'SF 18 NNUE', 45000);
+    await waitForElementTextContaining('review-analysis-line-0', 'Top move', 90000);
   });
 });
-
-async function waitForRunningStockfishDepth(testID, minimumDepth, timeoutMs) {
-  const startedAt = Date.now();
-  let lastText = '';
-  while (Date.now() - startedAt < timeoutMs) {
-    try {
-      lastText = await elementText(testID);
-      const match = lastText.match(/Depth (\d+)\/20/);
-      const depth = Number(match?.[1] ?? 0);
-      if (depth > minimumDepth) {
-        return depth;
-      }
-    } catch (error) {
-      lastText = error?.message ?? String(error);
-    }
-    await sleep(25);
-  }
-  throw new Error(`Timed out waiting for an active Stockfish search above depth ${minimumDepth}. Last text: "${lastText}"`);
-}
-
-async function elementText(testID) {
-  const attributes = await element(by.id(testID)).getAttributes();
-  const first = Array.isArray(attributes) ? attributes[0] : attributes;
-  return String(first?.text ?? first?.label ?? first?.value ?? '');
-}
 
 function expectBoardScreenshotContainsPieces(screenshotPath, boardFrame) {
   const png = readRgbaPng(screenshotPath);

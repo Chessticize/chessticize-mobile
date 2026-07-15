@@ -1,5 +1,9 @@
 const { execFileSync } = require('node:child_process');
+const fs = require('node:fs');
+const path = require('node:path');
 const { androidAdbPath } = require('./androidNetwork');
+
+const ANDROID_UI_DIAGNOSTICS_DIR = path.resolve(__dirname, '../artifacts/android-ui');
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -45,16 +49,187 @@ async function startPracticeMode(mode) {
   await tapUntilExists('practice-start-button', 'session-board', 3);
 }
 
-async function launchWithDisabledSynchronization(options = {}) {
-  await device.launchApp({
+function bringAndroidAppToForeground(
+  launchArgs = {},
+  environment = process.env,
+  run = execFileSync
+) {
+  const adb = androidAdbPath(environment);
+  const serial = environment.DETOX_ANDROID_DEVICE || 'emulator-5554';
+  const args = [
+    '-s',
+    serial,
+    'shell',
+    'am',
+    'start',
+    '-W',
+    '-n',
+    'com.chessticize.mobile/.MainActivity',
+  ];
+  for (const [key, value] of Object.entries(launchArgs)) {
+    if (value !== undefined && value !== null) {
+      args.push('--es', key, String(value));
+    }
+  }
+  run(adb, args, { encoding: 'utf8' });
+}
+
+function collectAndroidUiDiagnostics(
+  environment = process.env,
+  run = execFileSync,
+  fileSystem = fs,
+  log = console.log,
+  outputDirectory = ANDROID_UI_DIAGNOSTICS_DIR
+) {
+  const adb = androidAdbPath(environment);
+  const serial = environment.DETOX_ANDROID_DEVICE || 'emulator-5554';
+  const runDiagnostic = (label, args, options) => {
+    try {
+      return run(adb, ['-s', serial, ...args], options);
+    } catch (error) {
+      const detail = error?.stderr ?? error?.stdout ?? error?.message ?? String(error);
+      log(`[android-ui-diagnostics] ${label} failed\n${String(detail)}`);
+      return null;
+    }
+  };
+  const writeDiagnostic = (filename, contents) => {
+    if (contents === null || contents === undefined) {
+      return;
+    }
+    try {
+      fileSystem.writeFileSync(path.join(outputDirectory, filename), contents);
+    } catch (error) {
+      log(`[android-ui-diagnostics] unable to write ${filename}: ${error?.message ?? String(error)}`);
+    }
+  };
+
+  try {
+    fileSystem.mkdirSync(outputDirectory, { recursive: true });
+  } catch (error) {
+    log(`[android-ui-diagnostics] unable to create artifact directory: ${error?.message ?? String(error)}`);
+  }
+
+  const windowDump = runDiagnostic(
+    'dumpsys window',
+    ['shell', 'dumpsys', 'window', 'windows'],
+    { encoding: 'utf8', maxBuffer: 5 * 1024 * 1024, timeout: 30000 }
+  );
+  const activityDump = runDiagnostic(
+    'dumpsys activity activities',
+    ['shell', 'dumpsys', 'activity', 'activities'],
+    { encoding: 'utf8', maxBuffer: 5 * 1024 * 1024, timeout: 30000 }
+  );
+  const focusSources = [windowDump, activityDump].filter((source) => source !== null);
+  const focus = focusSources.length === 0
+    ? null
+    : focusSources
+      .map(String)
+      .join('\n')
+      .split('\n')
+      .filter((line) => /mCurrentFocus|mFocusedApp|mResumedActivity|topResumedActivity/.test(line))
+      .join('\n') || '[no current focus fields found]';
+  if (focus !== null) {
+    log(`[android-ui-diagnostics] current focus\n${focus}`);
+    writeDiagnostic('current-focus.txt', focus);
+  }
+
+  const pid = runDiagnostic(
+    'pidof app',
+    ['shell', 'pidof', 'com.chessticize.mobile'],
+    { encoding: 'utf8', maxBuffer: 5 * 1024 * 1024, timeout: 30000 }
+  );
+  const processDump = runDiagnostic(
+    'dumpsys activity processes',
+    ['shell', 'dumpsys', 'activity', 'processes', 'com.chessticize.mobile'],
+    { encoding: 'utf8', maxBuffer: 5 * 1024 * 1024, timeout: 30000 }
+  );
+  const processState = [
+    `pid=${pid === null ? '<unavailable>' : String(pid).trim() || '<not running>'}`,
+    processDump === null ? '[process dump unavailable]' : String(processDump).trim(),
+  ].join('\n');
+  log(`[android-ui-diagnostics] process state\n${processState}`);
+  writeDiagnostic('process-state.txt', processState);
+
+  const rawLogcat = runDiagnostic(
+    'logcat',
+    ['logcat', '-d', '-v', 'threadtime', '-t', '2000'],
+    { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024, timeout: 30000 }
+  );
+  const logcat = rawLogcat === null
+    ? null
+    : String(rawLogcat)
+      .split('\n')
+      .filter((line) => (
+        /chessticize|ReactNative|AndroidRuntime|FATAL EXCEPTION|SoLoader|TurboModule|Hermes|ReactHost|ReactInstance|com\.facebook\.react/i
+          .test(line)
+      ))
+      .join('\n') || '[no React Native or app logcat lines found]';
+  if (logcat !== null) {
+    log(`[android-ui-diagnostics] filtered logcat\n${logcat}`);
+    writeDiagnostic('logcat.txt', logcat);
+  }
+
+  runDiagnostic(
+    'uiautomator dump',
+    ['shell', 'uiautomator', 'dump', '/sdcard/chessticize-window.xml'],
+    { encoding: 'utf8', maxBuffer: 5 * 1024 * 1024, timeout: 30000 }
+  );
+  const hierarchy = runDiagnostic(
+    'uiautomator hierarchy read',
+    ['exec-out', 'cat', '/sdcard/chessticize-window.xml'],
+    { encoding: 'utf8', maxBuffer: 5 * 1024 * 1024, timeout: 30000 }
+  );
+  if (hierarchy !== null) {
+    log(`[android-ui-diagnostics] hierarchy\n${String(hierarchy)}`);
+    writeDiagnostic('window.xml', hierarchy);
+  }
+
+  const screenshot = runDiagnostic(
+    'screenshot',
+    ['exec-out', 'screencap', '-p'],
+    { maxBuffer: 25 * 1024 * 1024, timeout: 30000 }
+  );
+  writeDiagnostic('screenshot.png', screenshot);
+  log(`[android-ui-diagnostics] artifacts=${outputDirectory}`);
+}
+
+async function withAndroidUiDiagnostics(
+  action,
+  collectDiagnostics = collectAndroidUiDiagnostics,
+  log = console.log
+) {
+  try {
+    await action();
+  } catch (error) {
+    try {
+      collectDiagnostics();
+    } catch (diagnosticsError) {
+      log(
+        `[android-ui-diagnostics] collection failed: ${diagnosticsError?.message ?? String(diagnosticsError)}`
+      );
+    }
+    throw error;
+  }
+}
+
+async function launchWithDisabledSynchronization(
+  options = {},
+  targetDevice = device,
+  foregroundAndroidApp = bringAndroidAppToForeground
+) {
+  const launchOptions = {
     ...options,
     launchArgs: {
       DTXDisableMainRunLoopSync: 'YES',
-      detoxEnableSynchronization: false,
+      detoxEnableSynchronization: 0,
       ...(options.launchArgs ?? {})
     }
-  });
-  await device.disableSynchronization();
+  };
+  await targetDevice.launchApp(launchOptions);
+  if (targetDevice.getPlatform() === 'android') {
+    await foregroundAndroidApp(launchOptions.launchArgs);
+  }
+  await targetDevice.disableSynchronization();
 }
 
 async function selectTestPuzzleSource(source) {
@@ -107,6 +282,41 @@ async function waitForElementTextContaining(testID, expected, timeoutMs, pollInt
   throw new Error(`Timed out waiting for ${testID} to contain "${expected}". Last text: "${lastText}"`);
 }
 
+async function waitForRunningStockfishDepth(
+  testID,
+  minimumDepth,
+  timeoutMs,
+  {
+    comparison = 'at-least',
+    now = Date.now,
+    pollIntervalMs = 25,
+    readText = elementText,
+    wait = sleep,
+  } = {}
+) {
+  const startedAt = now();
+  let lastText = '';
+  while (now() - startedAt < timeoutMs) {
+    try {
+      lastText = await readText(testID);
+      const depth = Number(lastText.match(/Depth (\d+)\/20/)?.[1] ?? 0);
+      const reachedMinimum = comparison === 'above'
+        ? depth > minimumDepth
+        : depth >= minimumDepth;
+      if (reachedMinimum) {
+        return depth;
+      }
+    } catch (error) {
+      lastText = error?.message ?? String(error);
+    }
+    await wait(pollIntervalMs);
+  }
+  const comparisonDescription = comparison === 'above' ? ` above depth ${minimumDepth}` : '';
+  throw new Error(
+    `Timed out waiting for an active Stockfish search${comparisonDescription}. Last text: "${lastText}"`
+  );
+}
+
 async function waitForElementAccessibilityLabelContaining(
   testID,
   expected,
@@ -140,6 +350,11 @@ async function waitForMistakeCount(count, timeoutMs = 30000) {
 function textFromAttributes(attributes) {
   const first = Array.isArray(attributes) ? attributes[0] : attributes;
   return String(first?.text ?? first?.label ?? first?.value ?? '');
+}
+
+async function elementText(testID) {
+  const attributes = await element(by.id(testID)).getAttributes();
+  return textFromAttributes(attributes);
 }
 
 function accessibilityLabelFromAttributes(attributes) {
@@ -280,6 +495,9 @@ async function failStandardSprint() {
 }
 
 module.exports = {
+  bringAndroidAppToForeground,
+  collectAndroidUiDiagnostics,
+  elementText,
   openTab,
   openStandardHistoryTrend,
   launchWithDisabledSynchronization,
@@ -292,6 +510,8 @@ module.exports = {
   tapUntilExists,
   waitForElementAccessibilityLabelContaining,
   waitForElementTextContaining,
+  waitForRunningStockfishDepth,
+  withAndroidUiDiagnostics,
   accessibilityLabelFromAttributes,
   textFromAttributes,
   boardPoint,

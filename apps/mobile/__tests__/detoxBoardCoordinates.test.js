@@ -1,3 +1,5 @@
+const fs = require('node:fs');
+const path = require('node:path');
 const {
   accessibilityLabelFromAttributes,
   androidBoardTapPoint,
@@ -7,6 +9,14 @@ const {
 } = require('../e2e/helpers');
 
 describe('Detox Android board coordinates', () => {
+  it('routes practice-spec board moves through the platform-aware helper', () => {
+    const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
+
+    expect(practiceSpec).toContain("playBoardMove('session-board', 'c2b1')");
+    expect(practiceSpec).not.toContain("boardPoint(boardFrame, 'c2')");
+    expect(practiceSpec).not.toContain("tapAtPoint(c2)");
+  });
+
   it('reads the public accessibility label instead of merged child text', () => {
     expect(accessibilityLabelFromAttributes({
       label: 'Black to move',

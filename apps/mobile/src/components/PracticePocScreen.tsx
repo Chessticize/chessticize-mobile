@@ -440,10 +440,6 @@ export function PracticePocScreen({
   );
   const boardSize = adaptiveLayout.boardSize;
 
-  useEffect(() => {
-    void stockfish.prewarm();
-  }, [stockfish]);
-
   const isActive = state?.status === "active";
   const isPaused = state?.status === "paused";
   const isOpenSession = isActive || isPaused;
@@ -4749,6 +4745,7 @@ function HistoryQuickToggle({
       accessibilityRole="switch"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ checked: active }}
+      accessibilityValue={{ text: active ? "On" : "Off" }}
       testID={controlTestID}
       style={styles.historyQuickToggle}
       onPress={onPress}
@@ -5766,6 +5763,7 @@ function ReviewSession({
   const [engineAnalysisLines, setEngineAnalysisLines] = useState<EngineAnalysisLine[]>([]);
   const [analysisEngineStatus, setAnalysisEngineStatus] = useState<AnalysisEngineStatus>("idle");
   const [analysisIsRunning, setAnalysisIsRunning] = useState(false);
+  const [analysisRetryCount, setAnalysisRetryCount] = useState(0);
   const [analysisBackStack, setAnalysisBackStack] = useState<string[]>([]);
   const [analysisForwardStack, setAnalysisForwardStack] = useState<string[]>([]);
   const [manualBoardFlip, setManualBoardFlip] = useState(false);
@@ -5911,7 +5909,7 @@ function ReviewSession({
       cancelled = true;
       analysisController.abort();
     };
-  }, [analysisEnabled, stockfish, stockfishTargetFen]);
+  }, [analysisEnabled, analysisRetryCount, stockfish, stockfishTargetFen]);
 
   useEffect(() => {
     if (currentEntry.source !== "due" || reviewResultRecorded) {
@@ -6624,6 +6622,23 @@ function ReviewSession({
           ) : null}
           {analysisEnabled ? (
             <>
+              {analysisEngineStatus === "error" ? (
+                <View style={styles.analysisError} testID="review-analysis-error">
+                  <Text style={styles.errorText}>Stockfish couldn't start. Check the bundled engine and try again.</Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Retry Stockfish analysis"
+                    testID="review-analysis-retry"
+                    style={styles.secondaryButton}
+                    onPress={() => {
+                      setAnalysisEngineStatus("thinking");
+                      setAnalysisRetryCount((count) => count + 1);
+                    }}
+                  >
+                    <Text style={styles.secondaryButtonText}>Retry analysis</Text>
+                  </Pressable>
+                </View>
+              ) : null}
               {analysisLines.map((line, index) => (
                 <Pressable
                   key={`${line.move}-${index}`}
@@ -8465,6 +8480,14 @@ function arrowFromTo(move: string): BoardMove | null {
   };
 }
 
+const FABRIC_SAFE_HIDDEN_TEXT_STYLE = {
+  // Android Fabric rejects zero-sized fonts even when the Text is fully hidden.
+  fontSize: 1,
+  height: 0,
+  opacity: 0,
+  width: 0
+} as const;
+
 const styles = StyleSheet.create({
   safeArea: {
     backgroundColor: "#F8FAFC",
@@ -9227,12 +9250,7 @@ const styles = StyleSheet.create({
     lineHeight: 11,
     textAlign: "center"
   },
-  reviewDueHiddenMetric: {
-    fontSize: 0,
-    height: 0,
-    opacity: 0,
-    width: 0
-  },
+  reviewDueHiddenMetric: FABRIC_SAFE_HIDDEN_TEXT_STYLE,
   reviewFilterScroller: {
     marginHorizontal: -UI_PADDING
   },
@@ -10372,6 +10390,14 @@ const styles = StyleSheet.create({
     gap: 6,
     padding: 12
   },
+  analysisError: {
+    backgroundColor: "#FEF2F2",
+    borderColor: "#FECACA",
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 8,
+    padding: 10
+  },
   reviewAnalysisPanelWide: {
     flexGrow: 0,
     flexShrink: 0
@@ -11069,12 +11095,7 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: "800"
   },
-  packCoverageHiddenText: {
-    fontSize: 0,
-    height: 0,
-    opacity: 0,
-    width: 0
-  },
+  packCoverageHiddenText: FABRIC_SAFE_HIDDEN_TEXT_STYLE,
   packRowMetaText: {
     color: "#64748B",
     fontSize: 11,
