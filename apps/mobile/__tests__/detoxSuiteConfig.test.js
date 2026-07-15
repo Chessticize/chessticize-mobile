@@ -245,6 +245,16 @@ describe('Detox suite configuration', () => {
     expect(stockfishSpec).toContain('throw error');
   });
 
+  it('restarts the native Stockfish analysis journey through persisted public UI', () => {
+    const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
+
+    expect(practiceSpec).toContain('await device.terminateApp()');
+    expect(practiceSpec).toContain('await openStandardHistoryTrend()');
+    expect(practiceSpec).toContain("newInstance: true");
+    expect(practiceSpec).toContain("delete: false");
+    expect(practiceSpec).toContain("waitForElementTextContaining('review-analysis-engine-status', 'SF 18 NNUE'");
+  });
+
   it('runs every active E2E spec by default without loading opt-in capture specs', () => {
     expect(resolveDetoxTestMatch({})).toEqual(ACTIVE_E2E_TEST_MATCH);
     expect(ACTIVE_E2E_TEST_MATCH).toEqual([

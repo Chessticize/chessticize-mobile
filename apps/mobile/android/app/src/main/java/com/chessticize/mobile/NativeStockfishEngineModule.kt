@@ -16,6 +16,7 @@ import java.io.FileOutputStream
 import java.security.MessageDigest
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import org.json.JSONObject
 
 private const val STOCKFISH_LINE_EVENT = "StockfishEngineLine"
 private const val STOCKFISH_NNUE_ASSET_DIRECTORY = "stockfish"
@@ -140,19 +141,34 @@ class NativeStockfishEngineModule(
   private external fun nativeDestroy(handle: Long)
 
   private companion object {
-    private val bigNetworkAsset = StockfishNnueAsset("nn-c288c895ea92.nnue")
-    private val smallNetworkAsset = StockfishNnueAsset("nn-37f18f62d772.nnue")
-
     @Volatile
     private var nativeLibraryLoaded = false
 
     @Synchronized
     fun materializeBundledNetworks(
       reactContext: ReactApplicationContext,
-    ): Pair<File, File> = Pair(
-      materializeBundledNetwork(reactContext, bigNetworkAsset),
-      materializeBundledNetwork(reactContext, smallNetworkAsset),
-    )
+    ): Pair<File, File> {
+      val networks = readCanonicalNnueAssets(reactContext)
+      return Pair(
+        materializeBundledNetwork(reactContext, networks[0]),
+        materializeBundledNetwork(reactContext, networks[1]),
+      )
+    }
+
+    private fun readCanonicalNnueAssets(
+      reactContext: ReactApplicationContext,
+    ): List<StockfishNnueAsset> {
+      val manifest = reactContext.assets.open("stockfish/stockfish-artifacts.json")
+        .bufferedReader()
+        .use { reader -> JSONObject(reader.readText()) }
+      val paths = manifest.getJSONArray("nnue")
+      check(paths.length() == 2) {
+        "The Stockfish artifact manifest must declare the big and small NNUE networks."
+      }
+      return List(paths.length()) { index ->
+        StockfishNnueAsset(File(paths.getString(index)).name)
+      }
+    }
 
     private fun materializeBundledNetwork(
       reactContext: ReactApplicationContext,

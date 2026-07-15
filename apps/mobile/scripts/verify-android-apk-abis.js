@@ -13,6 +13,7 @@ const REQUIRED_NATIVE_LIBRARIES = ['libappmodules.so', STOCKFISH_LIBRARY];
 const NNUE_ASSET_ENTRIES = stockfishArtifacts.nnue.map(
   (relativePath) => `assets/stockfish/${path.basename(relativePath)}`,
 );
+const STOCKFISH_MANIFEST_ENTRY = 'assets/stockfish/stockfish-artifacts.json';
 const MINIMUM_LOAD_ALIGNMENT = 0x4000;
 // The canonical big network alone is ~104 MiB. Keep enough headroom for an
 // unstripped debug ELF while failing any library that still embeds that blob.
@@ -87,7 +88,7 @@ function verifyApk(apkPath, run = spawnSync, environment = process.env) {
   }
 
   const entries = new Set(listedEntries);
-  for (const expectedAsset of NNUE_ASSET_ENTRIES) {
+  for (const expectedAsset of [STOCKFISH_MANIFEST_ENTRY, ...NNUE_ASSET_ENTRIES]) {
     const count = listedEntries.filter((entry) => entry === expectedAsset).length;
     if (count !== 1) {
       throw new Error(
@@ -161,6 +162,7 @@ module.exports = {
   MINIMUM_LOAD_ALIGNMENT,
   NNUE_ASSET_ENTRIES,
   REQUIRED_NATIVE_LIBRARIES,
+  STOCKFISH_MANIFEST_ENTRY,
   STOCKFISH_LIBRARY,
   androidToolPaths,
   parseElfLoadAlignments,

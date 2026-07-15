@@ -4,6 +4,7 @@ const {
   sleep,
   frameFor,
   launchWithDisabledSynchronization,
+  openStandardHistoryTrend,
   playBoardMove,
   startPracticeMode,
   selectTestPuzzleSource,
@@ -129,6 +130,29 @@ describe('Practice POC', () => {
 
     const screenshotPath = await device.takeScreenshot('review-analysis-arrows');
     expectScreenshotContainsGreenAnalysisArrow(screenshotPath);
+
+    // Kill the process with a real native runner active, relaunch against the
+    // persisted attempt, and start analysis again through public History UI.
+    // This proves a fresh native runner can prewarm after process recreation.
+    await device.terminateApp();
+    await launchWithDisabledSynchronization({
+      newInstance: true,
+      delete: false
+    });
+    await openStandardHistoryTrend();
+    await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
+    const resultAttributes = await element(by.text('Wrong move')).atIndex(0).getAttributes();
+    const resultIdentifier = (Array.isArray(resultAttributes) ? resultAttributes[0] : resultAttributes).identifier;
+    if (typeof resultIdentifier !== 'string' || !resultIdentifier.endsWith('-result')) {
+      throw new Error(`Could not resolve persisted history attempt row from ${String(resultIdentifier)}`);
+    }
+    await element(by.id(resultIdentifier.replace(/-result$/, ''))).tap();
+    await waitFor(element(by.id('review-session'))).toExist().withTimeout(10000);
+    await waitForVisibleInPracticeScroll('review-analysis-button');
+    await element(by.id('review-analysis-button')).tap();
+    await waitFor(element(by.id('review-close-analysis'))).toBeVisible().withTimeout(10000);
+    await waitForElementTextContaining('review-analysis-engine-status', 'SF 18 NNUE', 45000);
+    await waitForElementTextContaining('review-analysis-line-0', 'Top move', 90000);
   });
 });
 

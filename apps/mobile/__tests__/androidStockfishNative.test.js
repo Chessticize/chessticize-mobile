@@ -31,6 +31,7 @@ describe('Android Stockfish native contract', () => {
     const gradle = read('android/app/build.gradle');
     const module = read('android/app/src/main/java/com/chessticize/mobile/NativeStockfishEngineModule.kt');
     const nativeAdapter = read('android/app/src/main/cpp/stockfish/NativeStockfishEngine.cpp');
+    const sharedRunner = read('native/stockfish/Bridge/StockfishRunner.cpp');
 
     expect(cmake).toContain('../../../../../native/stockfish/Stockfish/src');
     expect(cmake).toContain('NativeStockfishEngine.cpp');
@@ -42,6 +43,7 @@ describe('Android Stockfish native contract', () => {
     expect(gradle).toContain('stockfish-artifacts.json');
     expect(gradle).toContain('copyStockfishNnueAssets');
     expect(gradle).toContain('stockfishArtifacts.nnue');
+    expect(gradle).toContain('from(stockfishArtifactsFile)');
     expect(gradle).toContain('generatedStockfishAssetsDir');
     expect(module).toContain('noBackupFilesDir');
     expect(module).toContain('@Synchronized');
@@ -51,11 +53,14 @@ describe('Android Stockfish native contract', () => {
     expect(module).toContain('output.fd.sync()');
     expect(module).toContain('Os.rename(temp.absolutePath, target.absolutePath)');
     expect(module).toContain('nativeCreate(bigNetwork.absolutePath, smallNetwork.absolutePath)');
+    expect(module).toContain('getJSONArray("nnue")');
     for (const relativePath of stockfishArtifacts.nnue) {
-      expect(module).toContain(path.basename(relativePath));
+      expect(module).not.toContain(path.basename(relativePath));
     }
-    expect(nativeAdapter).toContain('setOption("EvalFile", bigNetworkPath)');
-    expect(nativeAdapter).toContain('setOption("EvalFileSmall", smallNetworkPath)');
+    expect(nativeAdapter).toContain('toStdString(environment, bigNetworkPath)');
+    expect(nativeAdapter).toContain('toStdString(environment, smallNetworkPath)');
+    expect(sharedRunner).toContain('setOption("EvalFile", bigNetworkPath)');
+    expect(sharedRunner).toContain('setOption("EvalFileSmall", smallNetworkPath)');
     expect(gradle).toContain('externalNativeBuild');
     expect(gradle).toContain('ANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON');
   });

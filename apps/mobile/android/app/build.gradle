@@ -150,6 +150,7 @@ tasks.register("copyPuzzlePackAsset", Copy) {
 
 tasks.register("copyStockfishNnueAssets", Sync) {
     from stockfishNnueFiles
+    from(stockfishArtifactsFile)
     into "$generatedStockfishAssetsDir/stockfish"
     doFirst {
         def missingFiles = stockfishNnueFiles.findAll { source -> !source.isFile() }

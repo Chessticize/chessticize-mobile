@@ -1,35 +1,17 @@
 #import "NativeStockfishEngine.h"
 
 #include <memory>
-#include <mutex>
-#include <sstream>
 #include <string>
+#include <string_view>
 #include <vector>
 
-#include "../../../native/stockfish/Stockfish/src/bitboard.h"
-#include "../../../native/stockfish/Stockfish/src/engine.h"
-#include "../../../native/stockfish/Stockfish/src/misc.h"
-#include "../../../native/stockfish/Stockfish/src/position.h"
-#include "../../../native/stockfish/Stockfish/src/search.h"
-#include "../../../native/stockfish/Stockfish/src/tune.h"
-#include "../../../native/stockfish/Stockfish/src/uci.h"
-#include "../../../native/stockfish/Stockfish/src/ucioption.h"
+#include "../../../native/stockfish/Bridge/StockfishRunner.h"
 
-using namespace Stockfish;
+using Chessticize::StockfishBridge::StockfishRunner;
 
 namespace {
 
 constexpr NSString* StockfishLineEvent = @"StockfishEngineLine";
-constexpr auto StartFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-
-std::once_flag stockfishInitFlag;
-
-void initStockfishStatics() {
-  std::call_once(stockfishInitFlag, [] {
-    Bitboards::init();
-    Position::init();
-  });
-}
 
 std::string toStdString(NSString* value) {
   return value == nil ? std::string() : std::string([value UTF8String]);
@@ -41,172 +23,73 @@ NSString* toNSString(std::string_view value) {
                                 encoding:NSUTF8StringEncoding];
 }
 
-std::vector<std::string> splitMoves(const std::string& movesText) {
-  std::vector<std::string> moves;
-  std::istringstream input(movesText);
-  std::string move;
-  while (input >> move) {
-    moves.push_back(move);
+void setFailureReason(NSString** failureReason, NSString* reason) {
+  if (failureReason != nullptr) {
+    *failureReason = reason;
   }
-  return moves;
 }
 
-class StockfishRunner {
- public:
-  explicit StockfishRunner(std::function<void(std::string)> emitLine) :
-      engine(std::nullopt),
-      emit(std::move(emitLine)) {
-    Tune::init(engine.get_options());
-    configureCallbacks();
-    configureBundledNetworks();
-    setOption("Threads", "1");
-    setOption("Hash", "32");
+bool loadBundledNetworkPaths(
+    std::vector<std::string>* networkPaths,
+    NSString** failureReason) {
+  NSString* manifestPath = [[NSBundle mainBundle] pathForResource:@"stockfish-artifacts" ofType:@"json"];
+  if (manifestPath == nil) {
+    setFailureReason(failureReason, @"The Stockfish artifact manifest is missing from the app bundle.");
+    return false;
   }
 
-  ~StockfishRunner() {
-    engine.stop();
-    engine.wait_for_search_finished();
+  NSError* readError = nil;
+  NSData* manifestData = [NSData dataWithContentsOfFile:manifestPath
+                                                options:0
+                                                  error:&readError];
+  if (manifestData == nil) {
+    setFailureReason(failureReason, readError.localizedDescription);
+    return false;
   }
 
-  void handle(const std::string& command) {
-    std::istringstream input(command);
-    std::string token;
-    input >> token;
-
-    if (token == "uci") {
-      emit("id name Chessticize Stockfish 18");
-      emit("uciok");
-      return;
-    }
-    if (token == "isready") {
-      emit("readyok");
-      return;
-    }
-    if (token == "setoption") {
-      engine.wait_for_search_finished();
-      engine.get_options().setoption(input);
-      return;
-    }
-    if (token == "ucinewgame") {
-      engine.search_clear();
-      return;
-    }
-    if (token == "position") {
-      applyPosition(command);
-      return;
-    }
-    if (token == "go") {
-      Search::LimitsType limits = UCIEngine::parse_limits(input);
-      engine.go(limits);
-      return;
-    }
-    if (token == "stop" || token == "quit") {
-      engine.stop();
-      return;
-    }
+  NSError* parseError = nil;
+  id root = [NSJSONSerialization JSONObjectWithData:manifestData options:0 error:&parseError];
+  if (![root isKindOfClass:[NSDictionary class]]) {
+    setFailureReason(
+        failureReason,
+        parseError.localizedDescription ?: @"The Stockfish artifact manifest is invalid.");
+    return false;
   }
 
- private:
-  Engine engine;
-  std::function<void(std::string)> emit;
-  std::string currentFen = StartFEN;
-
-  void configureCallbacks() {
-    engine.set_on_update_no_moves([this](const Engine::InfoShort& info) {
-      std::stringstream output;
-      output << "info depth " << info.depth << " score " << UCIEngine::format_score(info.score);
-      emit(output.str());
-    });
-
-    engine.set_on_update_full([this](const Engine::InfoFull& info) {
-      std::stringstream output;
-      output << "info"
-             << " depth " << info.depth
-             << " seldepth " << info.selDepth
-             << " multipv " << info.multiPV
-             << " score " << UCIEngine::format_score(info.score);
-      if (!info.bound.empty()) {
-        output << " " << info.bound;
-      }
-      output << " nodes " << info.nodes
-             << " nps " << info.nps
-             << " hashfull " << info.hashfull
-             << " tbhits " << info.tbHits
-             << " time " << info.timeMs
-             << " pv " << info.pv;
-      emit(output.str());
-    });
-
-    engine.set_on_bestmove([this](std::string_view bestmove, std::string_view ponder) {
-      std::string line = "bestmove " + std::string(bestmove);
-      if (!ponder.empty()) {
-        line += " ponder " + std::string(ponder);
-      }
-      emit(line);
-    });
-
-    engine.set_on_verify_networks([this](std::string_view message) {
-      std::istringstream lines{std::string(message)};
-      std::string line;
-      while (std::getline(lines, line)) {
-        if (!line.empty()) {
-          emit("info string " + line);
-        }
-      }
-    });
+  id declaredNetworks = [(NSDictionary*)root objectForKey:@"nnue"];
+  if (![declaredNetworks isKindOfClass:[NSArray class]] || [(NSArray*)declaredNetworks count] != 2) {
+    setFailureReason(
+        failureReason,
+        @"The Stockfish artifact manifest must declare the big and small NNUE networks.");
+    return false;
   }
 
-  void configureBundledNetworks() {
-    NSString* bigPath = [[NSBundle mainBundle] pathForResource:@"nn-c288c895ea92" ofType:@"nnue"];
-    NSString* smallPath = [[NSBundle mainBundle] pathForResource:@"nn-37f18f62d772" ofType:@"nnue"];
-    if (bigPath != nil) {
-      setOption("EvalFile", toStdString(bigPath));
-    } else {
-      emit("info string bundled NNUE network nn-c288c895ea92.nnue not found in app bundle");
+  NSRegularExpression* canonicalName = [NSRegularExpression
+      regularExpressionWithPattern:@"^nn-[a-f0-9]{12}\\.nnue$"
+                           options:0
+                             error:nil];
+  for (id relativePath in (NSArray*)declaredNetworks) {
+    if (![relativePath isKindOfClass:[NSString class]]) {
+      setFailureReason(failureReason, @"The Stockfish artifact manifest contains an invalid NNUE path.");
+      return false;
     }
-    if (smallPath != nil) {
-      setOption("EvalFileSmall", toStdString(smallPath));
-    } else {
-      emit("info string bundled NNUE network nn-37f18f62d772.nnue not found in app bundle");
+    NSString* fileName = [(NSString*)relativePath lastPathComponent];
+    NSRange fullRange = NSMakeRange(0, fileName.length);
+    if ([canonicalName numberOfMatchesInString:fileName options:0 range:fullRange] != 1) {
+      setFailureReason(failureReason, @"The Stockfish artifact manifest contains an invalid NNUE filename.");
+      return false;
     }
+    NSString* bundledPath = [[NSBundle mainBundle] pathForResource:fileName ofType:nil];
+    if (bundledPath == nil) {
+      setFailureReason(
+          failureReason,
+          [NSString stringWithFormat:@"The bundled Stockfish NNUE network %@ is missing.", fileName]);
+      return false;
+    }
+    networkPaths->push_back(toStdString(bundledPath));
   }
-
-  void setOption(const std::string& name, const std::string& value) {
-    std::istringstream option("name " + name + " value " + value);
-    engine.get_options().setoption(option);
-  }
-
-  void applyPosition(const std::string& command) {
-    engine.wait_for_search_finished();
-
-    const std::string fenPrefix = "position fen ";
-    const std::string startposPrefix = "position startpos";
-    if (command.rfind(fenPrefix, 0) == 0) {
-      std::string fenAndMoves = command.substr(fenPrefix.size());
-      std::vector<std::string> moves;
-      const std::string movesMarker = " moves ";
-      size_t movesIndex = fenAndMoves.find(movesMarker);
-      if (movesIndex != std::string::npos) {
-        moves = splitMoves(fenAndMoves.substr(movesIndex + movesMarker.size()));
-        fenAndMoves = fenAndMoves.substr(0, movesIndex);
-      }
-      currentFen = fenAndMoves;
-      engine.set_position(fenAndMoves, moves);
-      return;
-    }
-
-    if (command.rfind(startposPrefix, 0) == 0) {
-      std::vector<std::string> moves;
-      const std::string movesMarker = " moves ";
-      size_t movesIndex = command.find(movesMarker);
-      if (movesIndex != std::string::npos) {
-        moves = splitMoves(command.substr(movesIndex + movesMarker.size()));
-      }
-      currentFen = StartFEN;
-      engine.set_position(StartFEN, moves);
-    }
-  }
-};
+  return true;
+}
 
 }  // namespace
 
@@ -237,21 +120,31 @@ RCT_REMAP_METHOD(start,
                  rejecter:(RCTPromiseRejectBlock)reject) {
   dispatch_async(_engineQueue, ^{
     @try {
-      initStockfishStatics();
-      if (self->_runner == nullptr) {
+      BOOL created = self->_runner == nullptr;
+      if (created) {
+        std::vector<std::string> networkPaths;
+        NSString* failureReason = nil;
+        if (!loadBundledNetworkPaths(&networkPaths, &failureReason)) {
+          reject(@"stockfish_start_failed", failureReason, nil);
+          return;
+        }
+
         __weak NativeStockfishEngine* weakSelf = self;
-        self->_runner = std::make_unique<StockfishRunner>([weakSelf](std::string line) {
-          NativeStockfishEngine* strongSelf = weakSelf;
-          if (strongSelf == nil) {
-            return;
-          }
-          NSString* nativeLine = toNSString(line);
-          dispatch_async(dispatch_get_main_queue(), ^{
-            [strongSelf sendEventWithName:StockfishLineEvent body:@{ @"line": nativeLine }];
-          });
-        });
+        self->_runner = std::make_unique<StockfishRunner>(
+            [weakSelf](std::string line) {
+              NativeStockfishEngine* strongSelf = weakSelf;
+              if (strongSelf == nil) {
+                return;
+              }
+              NSString* nativeLine = toNSString(line);
+              dispatch_async(dispatch_get_main_queue(), ^{
+                [strongSelf sendEventWithName:StockfishLineEvent body:@{ @"line": nativeLine }];
+              });
+            },
+            networkPaths[0],
+            networkPaths[1]);
       }
-      resolve(nil);
+      resolve(@(created));
     } @catch (NSException* exception) {
       reject(@"stockfish_start_failed", exception.reason, nil);
     }

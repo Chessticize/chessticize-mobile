@@ -6,6 +6,7 @@ project(appmodules LANGUAGES CXX)
 include(${REACT_ANDROID_DIR}/cmake-utils/ReactNative-application.cmake)
 
 set(STOCKFISH_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../native/stockfish/Stockfish/src")
+set(STOCKFISH_BRIDGE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../native/stockfish/Bridge")
 
 file(GLOB STOCKFISH_SOURCES CONFIGURE_DEPENDS
   "${STOCKFISH_SOURCE_DIR}/*.cpp"
@@ -16,11 +17,15 @@ file(GLOB STOCKFISH_SOURCES CONFIGURE_DEPENDS
 
 add_library(stockfish SHARED
   stockfish/NativeStockfishEngine.cpp
+  "${STOCKFISH_BRIDGE_DIR}/StockfishRunner.cpp"
   ${STOCKFISH_SOURCES}
 )
 set_property(TARGET stockfish PROPERTY INTERPROCEDURAL_OPTIMIZATION FALSE)
 
-target_include_directories(stockfish PRIVATE "${STOCKFISH_SOURCE_DIR}")
+target_include_directories(stockfish PRIVATE
+  "${STOCKFISH_BRIDGE_DIR}"
+  "${STOCKFISH_SOURCE_DIR}"
+)
 target_compile_features(stockfish PRIVATE cxx_std_20)
 target_compile_definitions(stockfish PRIVATE IS_64BIT USE_PTHREADS NDEBUG NNUE_EMBEDDING_OFF)
 target_compile_options(stockfish PRIVATE

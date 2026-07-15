@@ -2,6 +2,7 @@ require "json"
 
 stockfish = JSON.parse(File.read(File.join(__dir__, "stockfish-artifacts.json")))
 stockfish_root = stockfish.fetch("root")
+stockfish_bridge = File.join(stockfish_root, stockfish.fetch("bridge"))
 stockfish_source = File.join(stockfish_root, stockfish.fetch("source"))
 
 Pod::Spec.new do |s|
@@ -16,13 +17,14 @@ Pod::Spec.new do |s|
   s.source = { :path => "." }
   s.source_files = [
     "ios/StockfishEngine/Native/**/*.{h,mm}",
+    File.join(stockfish_bridge, "**/*.{h,cpp}"),
     File.join(stockfish_source, "**/*.{h,cpp}")
   ]
   s.exclude_files = [
     File.join(stockfish_source, "Makefile"),
     File.join(stockfish_source, "main.cpp")
   ]
-  s.resources = stockfish.fetch("nnue").map { |path| File.join(stockfish_root, path) }
+  s.resources = stockfish.fetch("nnue").map { |path| File.join(stockfish_root, path) } + ["stockfish-artifacts.json"]
   s.public_header_files = "ios/StockfishEngine/Native/**/*.h"
   s.dependency "React-Core"
   s.pod_target_xcconfig = {

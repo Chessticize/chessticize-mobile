@@ -13,6 +13,7 @@ const {
   MAXIMUM_STOCKFISH_LIBRARY_BYTES,
   NNUE_ASSET_ENTRIES,
   REQUIRED_NATIVE_LIBRARIES,
+  STOCKFISH_MANIFEST_ENTRY,
   parseElfLoadAlignments,
   parseNativeAbis,
   verifyApk,
@@ -317,6 +318,7 @@ describe('Android launch baseline', () => {
   it('verifies packaged native libraries by ABI', () => {
     const entries = [
       'AndroidManifest.xml',
+      STOCKFISH_MANIFEST_ENTRY,
       ...NNUE_ASSET_ENTRIES,
       'lib/x86_64/libreactnative.so',
       'lib/arm64-v8a/libreactnative.so',
@@ -333,6 +335,7 @@ describe('Android launch baseline', () => {
       'assets/stockfish/nn-c288c895ea92.nnue',
       'assets/stockfish/nn-37f18f62d772.nnue',
     ]);
+    expect(STOCKFISH_MANIFEST_ENTRY).toBe('assets/stockfish/stockfish-artifacts.json');
     expect(parseNativeAbis(`${entries}\nlib/x86/libreactnative.so`)).toEqual([
       'arm64-v8a',
       'x86',
@@ -377,6 +380,23 @@ describe('Android launch baseline', () => {
       },
       { ANDROID_HOME: '/sdk' },
     )).toThrow('must contain exactly one');
+    expect(() => verifyApk(
+      'missing-stockfish-manifest.apk',
+      (command, args) => {
+        if (command === 'unzip' && args[0] === '-Z1') {
+          return {
+            status: 0,
+            stdout: entries
+              .split('\n')
+              .filter((entry) => entry !== STOCKFISH_MANIFEST_ENTRY)
+              .join('\n'),
+            stderr: '',
+          };
+        }
+        return run(command, args);
+      },
+      { ANDROID_HOME: '/sdk' },
+    )).toThrow('must contain exactly one assets/stockfish/stockfish-artifacts.json');
     expect(() => verifyApk(
       'embedded-nnue.apk',
       (command, args) => {

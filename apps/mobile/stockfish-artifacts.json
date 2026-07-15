@@ -6,6 +6,7 @@
   "upstreamTag": "sf_18",
   "upstreamCommit": "cb3d4ee9b47d0c5aae855b12379378ea1439675c",
   "root": "native/stockfish",
+  "bridge": "Bridge",
   "source": "Stockfish/src",
   "sourceSentinel": "Stockfish/src/position.cpp",
   "license": "Copying.txt",
