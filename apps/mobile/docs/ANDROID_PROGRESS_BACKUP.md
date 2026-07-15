@@ -137,13 +137,14 @@ authoritative
 
 API 36 uses the authoritative Android 16 LocalTransport `is_encrypted` and
 `is_device_transfer` parameters and asserts the agent receives masks `0`, `1`,
-`2`, and `3`. It proves neither emits no app data and encryption-only, D2D-only,
-and both produce an archive containing exactly the main database, journal, and
-WAL once. Android can invoke `onFullBackup(...)` repeatedly for quota
-measurement and actual emission, so agent logs may contain repeated identical
-policy/result/payload groups. The harness requires every group to agree on the
-mask, decision, and file set; the canonical transport archive is the
-authoritative exact-once payload proof. Every payload
+`2`, and `3`. Mask `0` is the fail-closed transport-rejection exception: it
+requires exactly one policy/result invocation with no payload log or transport
+archive. For successful selected masks `1`, `2`, and `3`, Android can invoke
+`onFullBackup(...)` repeatedly for quota measurement and actual emission, so
+agent logs may contain repeated identical policy/result/payload groups. The
+harness rejects conflicting decisions or file sets, while the canonical
+transport archive proves the main database, journal, and WAL were emitted
+exactly once. Every payload
 case rejects unique nonzero traps across credential- and device-protected root,
 files, shared-preference, and database domains, plus recursive sidecar and
 `-shm` traps. See the authoritative

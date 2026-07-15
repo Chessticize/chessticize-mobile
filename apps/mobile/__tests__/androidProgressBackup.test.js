@@ -1096,8 +1096,9 @@ describe('Android Progress Backup', () => {
     expect(backupContract).toContain('parses the platform-version field');
   });
 
-  it('accepts repeated identical agent preflight logs while archives prove once-only payload', () => {
+  it('documents the mask-zero exception and selected preflight tolerance precisely', () => {
     const policyEvidenceScript = read('scripts/android-progress-backup-policy-evidence.sh');
+    const backupContract = read('docs/ANDROID_PROGRESS_BACKUP.md');
 
     expect(policyEvidenceScript).toContain(
       'policy_events="$ARTIFACT_DIR/$case_name-policy-events.txt"',
@@ -1118,6 +1119,17 @@ describe('Android Progress Backup', () => {
     expect(policyEvidenceScript).not.toContain(
       'Expected exactly one policy and result event for $case_name.',
     );
+    expect(backupContract).toContain(
+      'Mask `0` is the fail-closed transport-rejection exception',
+    );
+    expect(backupContract).toContain('selected masks `1`, `2`, and `3`');
+    expect(backupContract).toContain(
+      'repeated identical policy/result/payload groups',
+    );
+    expect(policyEvidenceScript).toContain(
+      'API36 mask 0 requires exactly one fail-closed policy/result invocation, selected masks 1,2,3 tolerate only repeated-identical preflight groups, and the canonical archive proves exact-once payload',
+    );
+    expect(policyEvidenceScript).not.toContain('once-only agent output');
   });
 
   it('rejects repeated fail-closed decisions while retaining selected preflight tolerance', () => {

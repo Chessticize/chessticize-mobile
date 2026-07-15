@@ -718,7 +718,7 @@ adb_cmd shell bmgr enable true
   echo "transport=$LOCAL_TRANSPORT"
   echo "exact-commands=./gradlew :app:testDebugUnitTest --tests com.chessticize.mobile.backup.ProgressBackupPolicyTest --no-daemon; apps/mobile/scripts/android-progress-backup-policy-evidence.sh"
   echo "validation-scope=targeted native Android full-backup capability and allowlist policy"
-  echo "scope-rationale=API24 proves pre-transport-flags fail-closed behavior; API30 proves shared agent mask 0 fails closed with no payload and a real inherited restore admits only the v28 path-only allowlist; API36 proves authoritative LocalTransport masks 0,1,2,3 and once-only agent output"
+  echo "scope-rationale=API24 proves pre-transport-flags fail-closed behavior; API30 proves shared agent mask 0 fails closed with no payload and a real inherited restore admits only the v28 path-only allowlist; API36 mask 0 requires exactly one fail-closed policy/result invocation, selected masks 1,2,3 tolerate only repeated-identical preflight groups, and the canonical archive proves exact-once payload"
   echo "artifact-name=android-progress-backup-policy-api-$SDK_LEVEL"
   echo "artifact-identifier=run-${GITHUB_RUN_ID:-local}/android-progress-backup-policy-api-$SDK_LEVEL"
   echo "artifact-url=${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY:-local/repository}/actions/runs/${GITHUB_RUN_ID:-local}#artifacts"
