@@ -507,6 +507,166 @@ describe('Android Progress Backup', () => {
     );
   });
 
+  it('keeps synthetic SQLite sidecars stable by proving the app process is quiescent', () => {
+    const policyEvidenceScript = read('scripts/android-progress-backup-policy-evidence.sh');
+    const seedFixture = policyEvidenceScript.slice(
+      policyEvidenceScript.indexOf('seed_app_data_fixture()'),
+      policyEvidenceScript.indexOf('find_transport_archive()'),
+    );
+
+    expect(policyEvidenceScript).toContain('quiesce_app_process_for_fixture()');
+    expect(policyEvidenceScript).toContain('adb_cmd shell kill -9 "${process_ids[@]}"');
+    expect(policyEvidenceScript).toContain('assert_app_process_absent()');
+    expect(seedFixture).toContain('quiesce_app_process_for_fixture');
+    expect(seedFixture).toContain('assert_app_process_absent fixture-seed-before');
+    expect(seedFixture).toContain('assert_app_process_absent "fixture-seed-$index"');
+    expect(seedFixture).toContain('assert_app_process_absent fixture-seed-after');
+    expect(policyEvidenceScript).toContain('$label-process.txt');
+  });
+
+  it('treats API 30 mask zero as an expected fail-closed transport rejection', () => {
+    const policyEvidenceScript = read('scripts/android-progress-backup-policy-evidence.sh');
+
+    expect(policyEvidenceScript).toContain('fail-closed-transport-rejection');
+    expect(policyEvidenceScript).toContain(
+      'Transport rejected package because it wasn\'t able to process it at the time',
+    );
+    expect(policyEvidenceScript).toContain('Backup finished with result: Success');
+    expect(policyEvidenceScript).toContain('expected_payload" == "none"');
+    expect(policyEvidenceScript).toContain('unexpectedly emitted app-data payload');
+    expect(policyEvidenceScript).toMatch(
+      /run_case no-capability 'non_incremental_only=false' 0 false 0 none \\\s+fail-closed-transport-rejection/,
+    );
+  });
+
+  it('bounds policy ADB operations and records timeout diagnostics', () => {
+    const policyEvidenceScript = read('scripts/android-progress-backup-policy-evidence.sh');
+
+    expect(policyEvidenceScript).toContain('ADB_OPERATION_TIMEOUT_SECONDS');
+    expect(policyEvidenceScript).toContain(
+      'timeout --foreground "${ADB_OPERATION_TIMEOUT_SECONDS}s"',
+    );
+    expect(policyEvidenceScript).toContain('adb-timeout-diagnostic-');
+    expect(policyEvidenceScript).toContain('timed-out-command=');
+    expect(policyEvidenceScript).toContain(
+      'if (( status == 124 || status == 137 )); then',
+    );
+    expect(policyEvidenceScript).toContain('Android policy ADB operation timed out');
+    expect(policyEvidenceScript).toContain('ADB_CLEANUP_TIMEOUT_SECONDS');
+  });
+
+  it('retries API 24 BackupManager readiness without probing cleanup transport first', () => {
+    const policyEvidenceScript = read('scripts/android-progress-backup-policy-evidence.sh');
+
+    expect(policyEvidenceScript).toContain('wait_for_api24_backup_manager_ready()');
+    expect(policyEvidenceScript).toContain('BACKUP_MANAGER_READINESS_TIMEOUT_SECONDS');
+    expect(policyEvidenceScript).toContain('BACKUP_MANAGER_READINESS_ATTEMPTS');
+    expect(policyEvidenceScript).toContain('api24-backup-manager-readiness-attempt-');
+    expect(policyEvidenceScript).toContain('api24-backup-manager-readiness.txt');
+    expect(policyEvidenceScript).toMatch(
+      /if \(\( SDK_LEVEL != 24 \)\); then\s+original_transport=.*?bmgr list transports/s,
+    );
+    expect(policyEvidenceScript).toMatch(
+      /if \(\( SDK_LEVEL == 24 \)\); then\s+wait_for_api24_backup_manager_ready\s+fi\s+adb_cmd shell bmgr enable true/,
+    );
+  });
+
+  it('proves the API 30 v28 allowlist through a real inherited framework restore', () => {
+    const policyEvidenceScript = read('scripts/android-progress-backup-policy-evidence.sh');
+    const restoreParserScript = read(
+      'scripts/android-progress-backup-api30-restore-evidence.sh',
+    );
+    const backupContract = read('docs/ANDROID_PROGRESS_BACKUP.md');
+
+    expect(policyEvidenceScript).toMatch(
+      /elif \(\( SDK_LEVEL == 30 \)\); then\s+run_case no-capability[\s\S]*?android-progress-backup-api30-restore-evidence\.sh/,
+    );
+    expect(restoreParserScript).toContain('set -euo pipefail');
+    expect(restoreParserScript).toContain('API 30');
+    expect(restoreParserScript).toContain('apps/$APP_ID/_manifest');
+    expect(restoreParserScript).toContain('first_app_entry');
+    expect(restoreParserScript).toContain('fake_encryption_flag=true');
+    expect(restoreParserScript).toContain('skeleton-generation-only');
+    expect(restoreParserScript).toContain(
+      'api30-restore-skeleton-transport-parameters.txt',
+    );
+    expect(restoreParserScript).toContain('api30-restore-transport-parameters.txt');
+    expect(restoreParserScript.indexOf('skeleton_parameters='))
+      .toBeLessThan(restoreParserScript.indexOf('restore_parameters='));
+    expect(restoreParserScript).toContain('tar --delete');
+    expect(restoreParserScript).toContain('api30-restore-skeleton-archive-entries.txt');
+    expect(restoreParserScript).toContain('tar --append');
+    expect(restoreParserScript).toContain('cmp -s "$base_manifest" "$final_manifest"');
+    expect(restoreParserScript).toContain('base_metadata_entries');
+    expect(restoreParserScript).toContain('final_metadata_entries');
+    expect(restoreParserScript).toContain('ls -Zd "$archive_path"');
+    expect(restoreParserScript).toContain('chcon "$archive_context" "$archive_path"');
+    expect(restoreParserScript).toContain('adb_cmd shell pm clear "$APP_ID"');
+    expect(restoreParserScript).toContain('stopped=true');
+    expect(restoreParserScript).not.toContain('pm unstop');
+    expect(restoreParserScript).not.toContain('MainActivity');
+    expect(restoreParserScript).not.toContain('mobile:e2e');
+    expect(restoreParserScript).toContain('adb_cmd shell bmgr list sets');
+    expect(restoreParserScript).toContain(
+      'adb_cmd shell bmgr restore "$restore_token" "$APP_ID"',
+    );
+    expect(restoreParserScript).toContain('restoreFinished: 0');
+    expect(restoreParserScript).toContain('BackupXmlParserLogging');
+    expect(restoreParserScript).toContain('api30-restore-parser-observations.txt');
+    for (const positive of [
+      'chessticize-mobile.sqlite',
+      'chessticize-mobile.sqlite-journal',
+      'chessticize-mobile.sqlite-wal',
+    ]) {
+      expect(restoreParserScript).toContain(positive);
+    }
+    for (const negative of [
+      'chessticize-mobile.sqlite-journal-journal',
+      'chessticize-mobile.sqlite-journal-wal',
+      'chessticize-mobile.sqlite-wal-journal',
+      'chessticize-mobile.sqlite-wal-wal',
+      'chessticize-mobile.sqlite-shm',
+      'other-progress.sqlite',
+      'credential-root-trap.bin',
+      'credential-file-trap.bin',
+      'credential-sharedpref-trap.xml',
+      'credential-database-trap.bin',
+      'device-root-trap.bin',
+      'device-file-trap.bin',
+      'device-sharedpref-trap.xml',
+      'device-database-trap.bin',
+    ]) {
+      expect(restoreParserScript).toContain(negative);
+    }
+    for (const artifact of [
+      'api30-restore-sdk.txt',
+      'api30-restore-archive-sha256.txt',
+      'api30-restore-archive-entries.txt',
+      'api30-restore-selected-transport.txt',
+      'api30-restore-sets.txt',
+      'api30-restore-token.txt',
+      'api30-restore-bmgr.txt',
+      'api30-restore-logcat.txt',
+      'api30-restore-parser-log.txt',
+      'api30-restore-dumpsys-backup.txt',
+      'api30-restore-context.txt',
+      'api30-restore-tracked-worktree-before.txt',
+      'api30-restore-tracked-worktree-after.txt',
+    ]) {
+      expect(restoreParserScript).toContain(artifact);
+    }
+    expect(restoreParserScript).toContain('exact-commands=');
+    expect(restoreParserScript).toContain('validation-scope=');
+    expect(restoreParserScript).toContain('artifact-identifier=');
+    expect(restoreParserScript).toContain('result=pass');
+    expect(() => accessSync(
+      join(appRoot, 'scripts/android-progress-backup-api30-restore-evidence.sh'),
+      constants.X_OK,
+    )).not.toThrow();
+    expect(backupContract).toContain('real inherited `bmgr restore`');
+    expect(backupContract).toContain('skeleton generation only');
+  });
+
   it('accepts repeated identical agent preflight logs while archives prove once-only payload', () => {
     const policyEvidenceScript = read('scripts/android-progress-backup-policy-evidence.sh');
 
@@ -560,8 +720,8 @@ describe('Android Progress Backup', () => {
     );
     expect(policyEvidenceScript).toContain('set -euo pipefail');
     expect(policyEvidenceScript).toContain('case "$SDK_LEVEL"');
-    expect(policyEvidenceScript).toContain(
-      "run_case no-capability 'non_incremental_only=false' 0 false 0 none",
+    expect(policyEvidenceScript).toMatch(
+      /run_case no-capability 'non_incremental_only=false' 0 false 0 none \\\s+fail-closed-transport-rejection/,
     );
     expect(policyEvidenceScript).toContain(
       "run_case encryption-only 'is_encrypted=true,is_device_transfer=false",

@@ -110,11 +110,17 @@ The exact-head Android workflow gates the pure Java policy and canonical-file
 selector before building the APK, then runs that APK against the Android backup
 framework and LocalTransport on API 24, API 30, and API 36. API 24 proves the
 pre-flags agent path fails closed. API 30 proves a delivered mask of `0` emits
-no app-data payload through the same agent policy used on newer releases; it is
-intentionally no-capability evidence because Android 11's LocalTransport
-supports only `fake_encryption_flag` and
-`non_incremental_only`, not real encryption or D2D capability parameters. See
-the authoritative
+no app-data payload through the same agent policy used on newer releases and
+that LocalTransport reports the package as rejected while the overall backup
+operation completes. It then performs a real inherited `bmgr restore` with an
+OS-generated exact-APK manifest and deterministic positive and negative domain
+entries. Exact hashes prove the main database, journal, and WAL restore, while
+filesystem absence proves recursive and cross-sidecars, `-shm`, another
+database, and credential- and device-protected domain traps remain excluded.
+The temporary `fake_encryption_flag` used to obtain the OS-generated manifest
+is skeleton generation only, not capability evidence; Android 11's
+LocalTransport does not expose real encryption or D2D capability parameters.
+See the authoritative
 [Android 11 LocalTransport parameters](https://android.googlesource.com/platform/frameworks/base/+/android11-release/packages/LocalTransport/src/com/android/localtransport/LocalTransportParameters.java).
 
 API 36 uses the authoritative Android 16 LocalTransport `is_encrypted` and

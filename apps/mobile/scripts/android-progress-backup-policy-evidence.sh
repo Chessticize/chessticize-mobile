@@ -11,6 +11,10 @@ ADB="${ADB_PATH:-${SDK_ROOT:+$SDK_ROOT/platform-tools/adb}}"
 DEVICE="${DETOX_ANDROID_DEVICE:-emulator-5554}"
 APK="${CHESSTICIZE_ANDROID_E2E_APK:-$APP_DIR/android/app/build/outputs/apk/e2e/app-e2e.apk}"
 ARTIFACT_ROOT="${ANDROID_BACKUP_POLICY_ARTIFACT_DIR:-$APP_DIR/artifacts/android-progress-backup-policy}"
+ADB_OPERATION_TIMEOUT_SECONDS="${ANDROID_BACKUP_POLICY_ADB_TIMEOUT_SECONDS:-120}"
+ADB_CLEANUP_TIMEOUT_SECONDS="${ANDROID_BACKUP_POLICY_CLEANUP_ADB_TIMEOUT_SECONDS:-10}"
+BACKUP_MANAGER_READINESS_TIMEOUT_SECONDS="${ANDROID_BACKUP_POLICY_READINESS_TIMEOUT_SECONDS:-15}"
+BACKUP_MANAGER_READINESS_ATTEMPTS="${ANDROID_BACKUP_POLICY_READINESS_ATTEMPTS:-6}"
 
 # API 30's Android 11 LocalTransport recognizes only fake_encryption_flag and
 # non_incremental_only. It cannot be used as evidence for a real encryption or D2D capability:
@@ -30,7 +34,80 @@ if [[ ! -f "$APK" ]]; then
 fi
 
 adb_cmd() {
-  "$ADB" -s "$DEVICE" "$@"
+  local diagnostic_dir="${ARTIFACT_DIR:-$ARTIFACT_ROOT}"
+  local diagnostic_file
+  local status=0
+
+  if timeout --foreground "${ADB_OPERATION_TIMEOUT_SECONDS}s" \
+      "$ADB" -s "$DEVICE" "$@"; then
+    return 0
+  else
+    status=$?
+  fi
+  if (( status == 124 || status == 137 )); then
+    mkdir -p "$diagnostic_dir"
+    diagnostic_file="$diagnostic_dir/adb-timeout-diagnostic-$(date -u +%Y%m%dT%H%M%S%N)-$$.txt"
+    {
+      printf 'timeout-seconds=%s\n' "$ADB_OPERATION_TIMEOUT_SECONDS"
+      printf 'device=%s\n' "$DEVICE"
+      printf 'timed-out-command='
+      printf '%q ' "$ADB" -s "$DEVICE" "$@"
+      printf '\n'
+    } > "$diagnostic_file"
+    echo "Android policy ADB operation timed out after ${ADB_OPERATION_TIMEOUT_SECONDS}s; diagnostic: $diagnostic_file" >&2
+  fi
+  return "$status"
+}
+
+read_app_process_ids() {
+  local process_output
+  local status=0
+
+  if process_output="$(adb_cmd shell pidof "$APP_ID" 2>&1 | tr -d '\r')"; then
+    status=0
+  else
+    status=$?
+  fi
+  if (( status != 0 )) && [[ -n "$process_output" ]]; then
+    echo "Unable to inspect $APP_ID process state: $process_output" >&2
+    return "$status"
+  fi
+  printf '%s' "$process_output"
+}
+
+assert_app_process_absent() {
+  local label="$1"
+  local process_output
+
+  process_output="$(read_app_process_ids)"
+  printf '%s\n' "${process_output:-absent}" > "$ARTIFACT_DIR/$label-process.txt"
+  if [[ -n "$process_output" ]]; then
+    echo "$APP_ID process interfered with the synthetic backup fixture at $label: $process_output" >&2
+    exit 1
+  fi
+}
+
+quiesce_app_process_for_fixture() {
+  local attempts=0
+  local process_output
+  local -a process_ids=()
+
+  adb_cmd shell input keyevent KEYCODE_HOME
+  process_output="$(read_app_process_ids)"
+  if [[ -n "$process_output" ]]; then
+    read -r -a process_ids <<< "$process_output"
+    adb_cmd shell kill -9 "${process_ids[@]}"
+  fi
+  while (( attempts < 40 )); do
+    process_output="$(read_app_process_ids)"
+    if [[ -z "$process_output" ]]; then
+      return
+    fi
+    attempts=$((attempts + 1))
+    sleep 0.25
+  done
+  echo "$APP_ID did not reach a quiescent process state before fixture seeding." >&2
+  exit 1
 }
 
 remote_file_size() {
@@ -92,6 +169,33 @@ ensure_root_adbd() {
   fi
 }
 
+wait_for_api24_backup_manager_ready() {
+  local attempt=1
+  local attempt_artifact
+  local status=0
+
+  while (( attempt <= BACKUP_MANAGER_READINESS_ATTEMPTS )); do
+    attempt_artifact="$ARTIFACT_DIR/api24-backup-manager-readiness-attempt-$attempt.txt"
+    if ADB_OPERATION_TIMEOUT_SECONDS="$BACKUP_MANAGER_READINESS_TIMEOUT_SECONDS" \
+        adb_cmd shell bmgr list transports > "$attempt_artifact" 2>&1; then
+      if grep -F "$LOCAL_TRANSPORT" "$attempt_artifact" >/dev/null; then
+        cp "$attempt_artifact" "$ARTIFACT_DIR/api24-backup-manager-readiness.txt"
+        printf 'attempt=%s status=ready\n' "$attempt" \
+          >> "$ARTIFACT_DIR/api24-backup-manager-readiness.txt"
+        return
+      fi
+      status=1
+    else
+      status=$?
+    fi
+    printf 'attempt=%s status=%s\n' "$attempt" "$status" >> "$attempt_artifact"
+    attempt=$((attempt + 1))
+    sleep 2
+  done
+  echo "API 24 BackupManager did not become ready after $BACKUP_MANAGER_READINESS_ATTEMPTS bounded attempts." >&2
+  exit 1
+}
+
 write_fixture_file() {
   local relative_path="$1"
   local marker="$2"
@@ -149,8 +253,8 @@ seed_app_data_fixture() {
     device-database-domain-trap
   )
 
-  adb_cmd shell input keyevent KEYCODE_HOME
-  adb_cmd shell am kill "$APP_ID" || true
+  quiesce_app_process_for_fixture
+  assert_app_process_absent fixture-seed-before
   credential_root="$(adb_cmd shell run-as "$APP_ID" pwd | tr -d '\r')"
   if [[ -z "$credential_root" ]]; then
     echo "run-as returned an empty credential-protected data root." >&2
@@ -163,7 +267,9 @@ seed_app_data_fixture() {
   for index in "${!paths[@]}"; do
     adb_cmd shell run-as "$APP_ID" rm -rf "${paths[$index]}"
     write_fixture_file "${paths[$index]}" "${markers[$index]}"
+    assert_app_process_absent "fixture-seed-$index"
   done
+  assert_app_process_absent fixture-seed-after
 
   : > "$ARTIFACT_DIR/seeded-app-data-files.txt"
   : > "$ARTIFACT_DIR/seeded-app-data-sha256.txt"
@@ -391,6 +497,7 @@ run_case() {
   local expected_selected="$4"
   local expected_emitted="$5"
   local expected_payload="$6"
+  local expected_framework_result="${7:-success}"
   local backup_status=0
   AGENT_INVOCATIONS=0
 
@@ -405,12 +512,25 @@ run_case() {
     echo "bmgr backupnow command failed for $case_name with status $backup_status." >&2
     exit "$backup_status"
   fi
-  grep -F "Package $APP_ID with result: Success" "$ARTIFACT_DIR/$case_name-backupnow.txt"
+  case "$expected_framework_result" in
+    success)
+      grep -F "Package $APP_ID with result: Success" "$ARTIFACT_DIR/$case_name-backupnow.txt"
+      ;;
+    fail-closed-transport-rejection)
+      grep -F "Package $APP_ID with result: Transport rejected package because it wasn't able to process it at the time" \
+        "$ARTIFACT_DIR/$case_name-backupnow.txt"
+      grep -F "Backup finished with result: Success" "$ARTIFACT_DIR/$case_name-backupnow.txt"
+      ;;
+    *)
+      echo "Unsupported expected framework result: $expected_framework_result" >&2
+      exit 64
+      ;;
+  esac
   grep -Fx "$transport_parameters" "$ARTIFACT_DIR/$case_name-transport-parameters.txt"
   grep -F "* $LOCAL_TRANSPORT" "$ARTIFACT_DIR/$case_name-transports.txt"
   assert_agent_decision "$case_name" "$expected_flags" "$expected_selected" "$expected_emitted"
   assert_app_data_archive_paths "$case_name" "$expected_payload"
-  echo "case=$case_name delivered-mask=$expected_flags selected=$expected_selected emitted=$expected_emitted agent-invocations=$AGENT_INVOCATIONS payload=$expected_payload result=pass" \
+  echo "case=$case_name delivered-mask=$expected_flags selected=$expected_selected emitted=$expected_emitted agent-invocations=$AGENT_INVOCATIONS payload=$expected_payload framework-result=$expected_framework_result result=pass" \
     >> "$ARTIFACT_DIR/context.txt"
 }
 
@@ -439,9 +559,13 @@ if [[ "$(git -C "$REPO_ROOT" rev-parse HEAD)" != "$GITHUB_SHA" ]]; then
   exit 1
 fi
 
-original_transport="$(adb_cmd shell bmgr list transports \
-  | sed -n 's/^  \* //p' | tr -d '\r' | head -n 1)"
+original_transport=""
+if (( SDK_LEVEL != 24 )); then
+  original_transport="$(adb_cmd shell bmgr list transports \
+    | sed -n 's/^  \* //p' | tr -d '\r' | head -n 1)"
+fi
 cleanup() {
+  ADB_OPERATION_TIMEOUT_SECONDS="$ADB_CLEANUP_TIMEOUT_SECONDS"
   adb_cmd shell settings delete secure backup_local_transport_parameters >/dev/null 2>&1 || true
   if [[ -n "$original_transport" ]]; then
     adb_cmd shell bmgr transport "$original_transport" >/dev/null 2>&1 || true
@@ -454,6 +578,9 @@ adb_cmd shell am start -W -n "$APP_ID/.MainActivity" \
   | tee "$ARTIFACT_DIR/launch.txt" | grep -F 'Status: ok'
 capture_installed_apk
 seed_app_data_fixture
+if (( SDK_LEVEL == 24 )); then
+  wait_for_api24_backup_manager_ready
+fi
 adb_cmd shell bmgr enable true
 
 {
@@ -465,7 +592,7 @@ adb_cmd shell bmgr enable true
   echo "transport=$LOCAL_TRANSPORT"
   echo "exact-commands=./gradlew :app:testDebugUnitTest --tests com.chessticize.mobile.backup.ProgressBackupPolicyTest --no-daemon; apps/mobile/scripts/android-progress-backup-policy-evidence.sh"
   echo "validation-scope=targeted native Android full-backup capability and allowlist policy"
-  echo "scope-rationale=API24 proves pre-transport-flags fail-closed behavior; API30 proves shared agent mask 0 while the path-only v28 restore allowlist is source-verified; API36 proves authoritative LocalTransport masks 0,1,2,3 and once-only agent output"
+  echo "scope-rationale=API24 proves pre-transport-flags fail-closed behavior; API30 proves shared agent mask 0 fails closed with no payload and a real inherited restore admits only the v28 path-only allowlist; API36 proves authoritative LocalTransport masks 0,1,2,3 and once-only agent output"
   echo "artifact-name=android-progress-backup-policy-api-$SDK_LEVEL"
   echo "artifact-identifier=run-${GITHUB_RUN_ID:-local}/android-progress-backup-policy-api-$SDK_LEVEL"
   echo "artifact-url=${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY:-local/repository}/actions/runs/${GITHUB_RUN_ID:-local}#artifacts"
@@ -477,7 +604,9 @@ adb_cmd shell bmgr enable true
 if (( SDK_LEVEL == 24 )); then
   run_case pre-flags-api 'non_incremental_only=false' unavailable false 0 none
 elif (( SDK_LEVEL == 30 )); then
-  run_case no-capability 'non_incremental_only=false' 0 false 0 none
+  run_case no-capability 'non_incremental_only=false' 0 false 0 none \
+    fail-closed-transport-rejection
+  apps/mobile/scripts/android-progress-backup-api30-restore-evidence.sh
 else
   run_case neither 'is_encrypted=false,is_device_transfer=false,log_agent_results=true' \
     0 false 0 none
