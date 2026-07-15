@@ -458,101 +458,59 @@ describe('Detox suite configuration', () => {
     }, run)).toBe(false);
   });
 
-  it('keeps a predictive edge swipe alive for mid-gesture preview and cancellation evidence', async () => {
+  it('streams cancelled Predictive Back through black-box Android system input', async () => {
     const run = jest.fn((_, args) => args.includes('size') ? 'Physical size: 1080x1920\n' : '');
     const child = new EventEmitter();
+    child.stdout = new EventEmitter();
     child.stderr = new EventEmitter();
     const spawnProcess = jest.fn(() => child);
-    const invocationManager = jest.fn().mockResolvedValue(undefined);
-    const uiDeviceAdapter = {};
-    const uiDevice = new Proxy(uiDeviceAdapter, {
-      get(target, property) {
-        if (target[property] === undefined) {
-          return undefined;
-        }
-        return async (...params) => invocationManager(
-          target[property]({ type: 'Invocation' }, ...params)
-        );
-      },
-    });
-    const targetDevice = {
-      getUiDevice: jest.fn(() => uiDevice),
-    };
 
     const gesture = beginAndroidPredictiveBackGesture(
       { cancel: true, durationMs: 1200 },
       { ADB_PATH: '/sdk/adb', DETOX_ANDROID_DEVICE: 'emulator-6000' },
       run,
-      spawnProcess,
-      targetDevice
+      spawnProcess
     );
 
-    expect(targetDevice.getUiDevice).toHaveBeenCalledTimes(1);
-    expect(spawnProcess).not.toHaveBeenCalled();
+    expect(spawnProcess).toHaveBeenCalledTimes(1);
+    const [command, args, options] = spawnProcess.mock.calls[0];
+    expect(command).toBe('/sdk/adb');
+    expect(args.slice(0, 5)).toEqual([
+      '-s', 'emulator-6000', 'shell', 'sh', '-c'
+    ]);
+    expect(options).toEqual({ stdio: ['ignore', 'pipe', 'pipe'] });
+    const gestureScript = args[5];
+    expect(gestureScript).toContain('input touchscreen motionevent DOWN 1 960');
+    expect(gestureScript).toContain('input touchscreen motionevent MOVE 486 960');
+    expect(gestureScript).toContain("printf '%s\\n' CHESSTICIZE_PREDICTIVE_BACK_STARTED");
+    expect(gestureScript).toContain('input touchscreen motionevent MOVE 32 960');
+    expect(gestureScript).toContain('input touchscreen motionevent UP 32 960');
+    expect(gestureScript.indexOf('motionevent DOWN')).toBeLessThan(
+      gestureScript.indexOf('motionevent MOVE 486')
+    );
+    expect(gestureScript.indexOf('motionevent MOVE 486')).toBeLessThan(
+      gestureScript.indexOf('motionevent MOVE 32')
+    );
+    expect(gestureScript.indexOf('motionevent MOVE 32')).toBeLessThan(
+      gestureScript.indexOf('motionevent UP 32')
+    );
+    expect(gestureScript).not.toMatch(/PredictiveBackGestureDriver|com\.chessticize\.mobile/);
+
+    child.stdout.emit('data', 'CHESSTICIZE_PREDICTIVE_BACK_STARTED\n');
     await expect(gesture.started).resolves.toBeUndefined();
-    expect(invocationManager).toHaveBeenCalledTimes(1);
-    expect(invocationManager).toHaveBeenNthCalledWith(1, {
-      target: {
-        type: 'Class',
-        value: 'com.chessticize.mobile.PredictiveBackGestureDriver',
-      },
-      method: 'startCancelledPredictiveBack',
-      args: [1080, 1920, 1200].map((value) => ({ type: 'Integer', value })),
-    });
+    child.emit('close', 0);
     await expect(gesture.completion()).resolves.toBeUndefined();
-    expect(invocationManager).toHaveBeenCalledTimes(2);
-    expect(invocationManager).toHaveBeenNthCalledWith(2, {
-      target: {
-        type: 'Class',
-        value: 'com.chessticize.mobile.PredictiveBackGestureDriver',
-      },
-      method: 'awaitCancelledPredictiveBack',
-      args: [],
-    });
 
-    const reusedGesture = beginAndroidPredictiveBackGesture(
-      { cancel: true, durationMs: 800 },
-      { ADB_PATH: '/sdk/adb', DETOX_ANDROID_DEVICE: 'emulator-6000' },
-      run,
-      spawnProcess,
-      targetDevice
-    );
-    await expect(reusedGesture.started).resolves.toBeUndefined();
-    await expect(reusedGesture.completion()).resolves.toBeUndefined();
-    expect(invocationManager).toHaveBeenNthCalledWith(3, expect.objectContaining({
-      method: 'startCancelledPredictiveBack',
-    }));
-    expect(invocationManager).toHaveBeenNthCalledWith(4, expect.objectContaining({
-      method: 'awaitCancelledPredictiveBack',
-    }));
-  });
-
-  it('keeps the cancelled gesture public-UI-only and preserves committed edge geometry', async () => {
-    const driver = fs.readFileSync(path.resolve(
+    const helpers = fs.readFileSync(path.resolve(__dirname, '../e2e/helpers.js'), 'utf8');
+    expect(helpers).not.toContain('PredictiveBackGestureDriver');
+    expect(helpers).not.toContain('getUiDevice');
+    expect(fs.existsSync(path.resolve(
       __dirname,
       '../android/app/src/androidTest/java/com/chessticize/mobile/PredictiveBackGestureDriver.java'
-    ), 'utf8');
-    expect(driver).toContain('only injects touchscreen input through UiAutomator');
-    expect(driver).toContain('new Point(1, centerY)');
-    expect(driver).toContain('widthPixels * 0.45f');
-    expect(driver.match(/activated,/g)).toHaveLength(2);
-    expect(driver).toContain('widthPixels * 0.03f');
-    expect(driver).toContain('UI_AUTOMATOR_FRAME_DURATION_MS = 16');
-    expect(driver).toContain('durationMs / segmentCount / UI_AUTOMATOR_FRAME_DURATION_MS');
-    expect(driver).not.toContain('UI_AUTOMATOR_STEP_DURATION_MS = 5');
-    expect(driver).toContain('.swipe(path, segmentSteps)');
-    expect(driver).toContain('startCancelledPredictiveBack');
-    expect(driver).toContain('awaitCancelledPredictiveBack');
-    expect(driver).toContain('new Thread');
-    expect(driver).toContain('if (activeGesture != null)');
-    expect(driver).toMatch(/activeGesture = state;\s+}\s+try \{\s+worker\.start\(\)/);
-    expect(driver).toContain('durationMs + COMPLETION_MARGIN_MS');
-    expect(driver).toMatch(
-      /terminal = true;\s+rethrowGestureFailure\(state\.failure\);[\s\S]*finally \{\s+if \(terminal && activeGesture == state\) \{\s+activeGesture = null;/
-    );
-    expect(driver).toContain('rethrowGestureFailure(state.failure)');
-    expect(driver).not.toMatch(/React|Repository|NativeModule/);
+    ))).toBe(false);
+  });
 
+  it('preserves committed Predictive Back edge geometry through Android system input', async () => {
     const run = jest.fn((_, args) => args.includes('size') ? 'Physical size: 1080x1920\n' : '');
     const child = new EventEmitter();
     child.stderr = new EventEmitter();

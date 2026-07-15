@@ -4,6 +4,7 @@ const path = require('node:path');
 const { androidAdbPath } = require('./androidNetwork');
 
 const ANDROID_UI_DIAGNOSTICS_DIR = path.resolve(__dirname, '../artifacts/android-ui');
+const PREDICTIVE_BACK_STARTED_MARKER = 'CHESSTICIZE_PREDICTIVE_BACK_STARTED';
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -99,8 +100,7 @@ function beginAndroidPredictiveBackGesture(
   { cancel = false, durationMs = 1800 } = {},
   environment = process.env,
   run = execFileSync,
-  spawnProcess = spawn,
-  targetDevice
+  spawnProcess = spawn
 ) {
   const adb = androidAdbPath(environment);
   const serial = environment.DETOX_ANDROID_DEVICE || 'emulator-5554';
@@ -113,19 +113,88 @@ function beginAndroidPredictiveBackGesture(
   );
   const { widthPixels, heightPixels } = parseAndroidDisplaySize(sizeOutput);
   if (cancel) {
-    const uiDevice = (targetDevice ?? device)?.getUiDevice?.();
-    if (!uiDevice) {
-      throw new Error('Detox UiDevice is unavailable for a cancelled Predictive Back gesture.');
-    }
-    installCancelledPredictiveBackDriver(uiDevice);
-    const started = Promise.resolve(
-      uiDevice.startCancelledPredictiveBack(widthPixels, heightPixels, durationMs)
-    ).then(() => undefined);
+    const centerY = Math.round(heightPixels / 2);
+    const earlyX = Math.round(widthPixels * 0.1);
+    const activatedX = Math.round(widthPixels * 0.45);
+    const returningX = Math.round(widthPixels * 0.24);
+    const retreatX = Math.max(2, Math.round(widthPixels * 0.03));
+    const boundedDurationMs = Math.max(200, durationMs);
+    const stepDelaySeconds = (boundedDurationMs / 6 / 1000).toFixed(3);
+    const holdDelaySeconds = (boundedDurationMs / 2 / 1000).toFixed(3);
+    const gestureScript = [
+      'set -e',
+      `input touchscreen motionevent DOWN 1 ${centerY}`,
+      `sleep ${stepDelaySeconds}`,
+      `input touchscreen motionevent MOVE ${earlyX} ${centerY}`,
+      `sleep ${stepDelaySeconds}`,
+      `input touchscreen motionevent MOVE ${activatedX} ${centerY}`,
+      String.raw`printf '%s\n' ${PREDICTIVE_BACK_STARTED_MARKER}`,
+      `sleep ${holdDelaySeconds}`,
+      `input touchscreen motionevent MOVE ${returningX} ${centerY}`,
+      `sleep ${stepDelaySeconds}`,
+      `input touchscreen motionevent MOVE ${retreatX} ${centerY}`,
+      `sleep ${stepDelaySeconds}`,
+      `input touchscreen motionevent UP ${retreatX} ${centerY}`,
+    ].join(' && ');
+    const child = spawnProcess(
+      adb,
+      ['-s', serial, 'shell', 'sh', '-c', gestureScript],
+      { stdio: ['ignore', 'pipe', 'pipe'] }
+    );
+    let stderr = '';
+    let stdout = '';
+    let startedSettled = false;
+    let resolveStarted;
+    let rejectStarted;
+    const started = new Promise((resolve, reject) => {
+      resolveStarted = resolve;
+      rejectStarted = reject;
+    });
+    const completion = new Promise((resolve, reject) => {
+      child.stdout?.on('data', (chunk) => {
+        stdout += String(chunk);
+        if (!startedSettled && stdout.includes(PREDICTIVE_BACK_STARTED_MARKER)) {
+          startedSettled = true;
+          resolveStarted();
+        }
+      });
+      child.stderr?.on('data', (chunk) => {
+        stderr += String(chunk);
+      });
+      child.once('error', (error) => {
+        if (!startedSettled) {
+          startedSettled = true;
+          rejectStarted(error);
+        }
+        reject(error);
+      });
+      child.once('close', (code) => {
+        if (code !== 0) {
+          const error = new Error(
+            `Cancelled Predictive Back gesture exited ${code}: ${stderr.trim()}`
+          );
+          if (!startedSettled) {
+            startedSettled = true;
+            rejectStarted(error);
+          }
+          reject(error);
+          return;
+        }
+        if (!startedSettled) {
+          const error = new Error(
+            `Cancelled Predictive Back gesture never emitted ${PREDICTIVE_BACK_STARTED_MARKER}.`
+          );
+          startedSettled = true;
+          rejectStarted(error);
+          reject(error);
+          return;
+        }
+        resolve();
+      });
+    });
     return {
       started,
-      completion: () => started
-        .then(() => uiDevice.awaitCancelledPredictiveBack())
-        .then(() => undefined),
+      completion: () => completion,
     };
   }
   const centerY = Math.round(heightPixels / 2);
@@ -151,37 +220,6 @@ function beginAndroidPredictiveBackGesture(
     started: Promise.resolve(),
     completion: () => completion,
   };
-}
-
-function installCancelledPredictiveBackDriver(uiDevice) {
-  // Detox's UiDevice proxy exposes only methods on this generated adapter. Add
-  // one static test invocation through the runtime proxy itself, so the exact
-  // adapter instance owned by Detox receives it.
-  if (uiDevice.startCancelledPredictiveBack && uiDevice.awaitCancelledPredictiveBack) {
-    return;
-  }
-  if (uiDevice.startCancelledPredictiveBack || uiDevice.awaitCancelledPredictiveBack) {
-    throw new Error('Detox UiDevice has an incomplete cancelled Predictive Back adapter.');
-  }
-  uiDevice.startCancelledPredictiveBack = (_uiDevice, widthPixels, heightPixels, durationMs) => ({
-    target: {
-      type: 'Class',
-      value: 'com.chessticize.mobile.PredictiveBackGestureDriver',
-    },
-    method: 'startCancelledPredictiveBack',
-    args: [widthPixels, heightPixels, durationMs].map((value) => ({
-      type: 'Integer',
-      value,
-    })),
-  });
-  uiDevice.awaitCancelledPredictiveBack = () => ({
-    target: {
-      type: 'Class',
-      value: 'com.chessticize.mobile.PredictiveBackGestureDriver',
-    },
-    method: 'awaitCancelledPredictiveBack',
-    args: [],
-  });
 }
 
 function androidAppIsResumed(
