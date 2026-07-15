@@ -191,6 +191,15 @@ describe('Android Progress Backup', () => {
     expect(evidenceScript).not.toContain(
       'grep -F "Backup finished with result: Success"',
     );
+    const launcherCommand =
+      'adb_cmd shell am start -W -n "$APP_ID/.MainActivity" | grep -F "Status: ok"';
+    const launcherIndex = evidenceScript.indexOf(launcherCommand);
+    const backupNowIndex = evidenceScript.indexOf('adb_cmd shell bmgr backupnow');
+    expect(launcherIndex).toBeGreaterThan(-1);
+    expect(launcherIndex).toBeLessThan(backupNowIndex);
+    expect(evidenceScript.slice(launcherIndex, backupNowIndex)).not.toContain(
+      'am force-stop',
+    );
     expect(evidenceScript).toContain('bmgr init "$D2D_TRANSPORT"');
     expect(evidenceScript).toContain('pm uninstall --user 0');
     expect(evidenceScript).toContain('install-multiple -t --user 0');

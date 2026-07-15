@@ -75,7 +75,9 @@ else
   adb_cmd shell bmgr list transports | grep -q -F "  * $D2D_TRANSPORT"
 fi
 
-adb_cmd shell am force-stop "$APP_ID"
+# Detox cleanup can leave the package force-stopped and therefore ineligible.
+# A public launch clears that state; Android Backup quiesces the app itself.
+adb_cmd shell am start -W -n "$APP_ID/.MainActivity" | grep -F "Status: ok"
 adb_cmd shell bmgr backupnow "$APP_ID" | tee "$ARTIFACT_DIR/$MODE-backupnow.txt" | grep -F "Package $APP_ID with result: Success"
 
 apk_index=0
