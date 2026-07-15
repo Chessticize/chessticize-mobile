@@ -458,7 +458,7 @@ export function PracticePocScreen({
   const [historyRatingKey, setHistoryRatingKey] = useState<string | null>(null);
   const [historyReviewEntries, setHistoryReviewEntries] = useState<ReviewEntry[]>([]);
   const [historyReviewInitialIndex, setHistoryReviewInitialIndex] = useState(0);
-  const [reviewSessionActive, setReviewSessionActive] = useState(false);
+  const [reviewSessionSource, setReviewSessionSource] = useState<ReviewEntry["source"] | null>(null);
   const [customSprintMode, setCustomSprintMode] = useState<"custom" | "arrow_duel">("custom");
   const [customDurationSeconds, setCustomDurationSeconds] = useState(5 * 60);
   const [customPerPuzzleSeconds, setCustomPerPuzzleSeconds] = useState(20);
@@ -1866,7 +1866,7 @@ export function PracticePocScreen({
   const historyAvailableThemes = historyView.availableThemes;
   const historyPage = historyView.page;
   const contentOwnsHeader = tab === "review" || tab === "history";
-  const reviewSurfaceOpen = reviewSessionActive || historyReviewEntries.length > 0;
+  const reviewSurfaceOpen = reviewSessionSource !== null || historyReviewEntries.length > 0;
   const topBackTransient: MobileBackTransient | null = startingMode
     ? "starting-practice"
     : practiceExitConfirmationVisible
@@ -1886,7 +1886,10 @@ export function PracticePocScreen({
     () => reviewAnalysisOpen && (tab === "history" || tab === "review")
       ? { kind: "review-analysis", owner: tab }
       : reviewSurfaceOpen && (tab === "history" || tab === "review")
-        ? { kind: "review-session", owner: tab }
+        ? {
+            kind: "review-session",
+            owner: tab === "review" && reviewSessionSource === "session" ? "practice" : tab
+          }
         : tab === "analysis"
           ? { kind: "stockfish-diagnostics", owner: "settings" }
           : isFinished
@@ -1894,7 +1897,7 @@ export function PracticePocScreen({
             : tab === "practice" && state === null && mode === "custom"
               ? { kind: "custom-practice", owner: "practice" }
               : null,
-    [isFinished, mode, reviewAnalysisOpen, reviewSurfaceOpen, state, tab]
+    [isFinished, mode, reviewAnalysisOpen, reviewSessionSource, reviewSurfaceOpen, state, tab]
   );
   const mobileBackState: MobileBackState = {
     activePractice: isOpenSession,
@@ -2521,7 +2524,7 @@ export function PracticePocScreen({
                 }}
                 onPromoteNextFutureReviewsToDue={arePracticeTestControlsEnabled() ? promoteNextFutureReviewsToDue : undefined}
                 onScheduleTestReviewReminder={arePracticeTestControlsEnabled() ? scheduleDevReviewReminderNotification : undefined}
-                onSessionActiveChange={setReviewSessionActive}
+                onSessionSourceChange={setReviewSessionSource}
                 onAnalysisActiveChange={setReviewAnalysisOpen}
                 filtersExpanded={reviewFiltersExpanded}
                 onFiltersExpandedChange={setReviewFiltersExpanded}
@@ -5546,7 +5549,7 @@ function ReviewPanel({
   onOpenPractice,
   onPromoteNextFutureReviewsToDue,
   onReviewRecorded,
-  onSessionActiveChange,
+  onSessionSourceChange,
   onScheduleTestReviewReminder,
   reviewQueue,
   reviewReminderScheduleStatus,
@@ -5568,7 +5571,7 @@ function ReviewPanel({
   onOpenPractice: () => void;
   onPromoteNextFutureReviewsToDue?: () => ReviewQueueDuePromotionResult;
   onReviewRecorded: (completedAt: string) => void;
-  onSessionActiveChange?: (active: boolean) => void;
+  onSessionSourceChange?: (source: ReviewEntry["source"] | null) => void;
   onScheduleTestReviewReminder?: () => Promise<ReviewReminderScheduleResult>;
   reviewQueue: ReviewQueueState[];
   reviewReminderScheduleStatus?: string;
@@ -5591,6 +5594,8 @@ function ReviewPanel({
   const [activeEntries, setActiveEntries] = useState<ReviewEntry[]>(preferredEntries);
   const [activeEntryInitialIndex, setActiveEntryInitialIndex] = useState(0);
   const [queuedReviewGroups, setQueuedReviewGroups] = useState<ReviewEntryGroup[]>([]);
+  const activeReviewGenerationRef = useRef(0);
+  const appliedPreferredEntriesKeyRef = useRef(preferredEntriesKey);
   const [queueFilter, setQueueFilter] = useState<ReviewQueueFilter>("all");
   const [devStatus, setDevStatus] = useState<string | null>(null);
   const completedReviews = service.listCompletedReviewsForDay(new Date(nowMs).toISOString());
@@ -5629,6 +5634,11 @@ function ReviewPanel({
   const reviewDueSubline = reviewDueCardSubline(queueSummary.oldestDueLabel);
 
   useEffect(() => {
+    if (appliedPreferredEntriesKeyRef.current === preferredEntriesKey) {
+      return;
+    }
+    appliedPreferredEntriesKeyRef.current = preferredEntriesKey;
+    activeReviewGenerationRef.current += 1;
     setQueuedReviewGroups([]);
     setActiveEntryInitialIndex(0);
     setActiveEntries(preferredEntries);
@@ -5637,26 +5647,28 @@ function ReviewPanel({
   }, [preferredEntriesKey]);
 
   useEffect(() => {
-    onSessionActiveChange?.(activeEntries.length > 0);
-  }, [activeEntries.length, onSessionActiveChange]);
+    onSessionSourceChange?.(activeEntries[0]?.source ?? null);
+  }, [activeEntries, onSessionSourceChange]);
 
   useEffect(() => {
     return () => {
-      onSessionActiveChange?.(false);
+      onSessionSourceChange?.(null);
     };
-  }, [onSessionActiveChange]);
+  }, [onSessionSourceChange]);
 
   function startReviewGroupQueue(groups: ReviewEntryGroup[]): void {
     const [firstGroup, ...remainingGroups] = groups;
     if (!firstGroup) {
       return;
     }
+    activeReviewGenerationRef.current += 1;
     setQueuedReviewGroups(remainingGroups);
     setActiveEntryInitialIndex(0);
     setActiveEntries(firstGroup.entries);
   }
 
   function startSingleReviewGroup(entries: ReviewEntry[]): void {
+    activeReviewGenerationRef.current += 1;
     setQueuedReviewGroups([]);
     setActiveEntryInitialIndex(0);
     setActiveEntries(entries);
@@ -5667,21 +5679,27 @@ function ReviewPanel({
     if (nextIndex < 0) {
       return;
     }
+    activeReviewGenerationRef.current += 1;
     setQueuedReviewGroups([]);
     setActiveEntryInitialIndex(nextIndex);
     setActiveEntries(completedReviewEntries);
   }
 
-  function finishActiveReview(source: ReviewEntry["source"]): void {
+  function finishActiveReview(source: ReviewEntry["source"], generation: number): void {
+    if (generation !== activeReviewGenerationRef.current) {
+      return;
+    }
     if (source === "due") {
       const [nextGroup, ...remainingGroups] = queuedReviewGroups;
       if (nextGroup) {
+        activeReviewGenerationRef.current += 1;
         setQueuedReviewGroups(remainingGroups);
         setActiveEntryInitialIndex(0);
         setActiveEntries(nextGroup.entries);
         return;
       }
     }
+    activeReviewGenerationRef.current += 1;
     setQueuedReviewGroups([]);
     setActiveEntryInitialIndex(0);
     setActiveEntries([]);
@@ -5691,6 +5709,7 @@ function ReviewPanel({
   }
 
   function returnActiveReviewToOwner(source: ReviewEntry["source"]): void {
+    activeReviewGenerationRef.current += 1;
     setQueuedReviewGroups([]);
     setActiveEntryInitialIndex(0);
     setActiveEntries([]);
@@ -5700,9 +5719,10 @@ function ReviewPanel({
   }
 
   if (activeEntries.length > 0) {
+    const activeReviewGeneration = activeReviewGenerationRef.current;
     return (
       <ReviewSession
-        key={`${activeEntryInitialIndex}:${activeEntries.map((entry) => `${entry.source}:${entry.puzzle.id}:${entry.mode}:${entry.ratingKey}`).join("|")}`}
+        key={`${activeReviewGeneration}:${activeEntryInitialIndex}:${activeEntries.map((entry) => `${entry.source}:${entry.puzzle.id}:${entry.mode}:${entry.ratingKey}`).join("|")}`}
         adaptiveLayout={adaptiveLayout}
         boardSize={boardSize}
         currentTimeMs={currentTimeMs}
@@ -5715,7 +5735,7 @@ function ReviewPanel({
         service={service}
         onReviewRecorded={onReviewRecorded}
         onAnalysisActiveChange={onAnalysisActiveChange}
-        onComplete={finishActiveReview}
+        onComplete={(source) => finishActiveReview(source, activeReviewGeneration)}
         onReturnToOwner={returnActiveReviewToOwner}
         stockfish={stockfish}
         systemBackCommand={systemBackCommand}

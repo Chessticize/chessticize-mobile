@@ -14,7 +14,7 @@ export type MobileBackOwner = MobileBackPrimaryTab;
 
 export type MobileBackDetail =
   | { kind: "review-analysis"; owner: "history" | "review" }
-  | { kind: "review-session"; owner: "history" | "review" }
+  | { kind: "review-session"; owner: MobileBackOwner }
   | { kind: "custom-practice"; owner: "practice" }
   | { kind: "sprint-result"; owner: "practice" }
   | { kind: "stockfish-diagnostics"; owner: "settings" };

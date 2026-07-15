@@ -45,6 +45,18 @@ describe("mobile Back contract", () => {
       tab: "review"
     }, "button")).toEqual({ kind: "return-to-owner", owner: "review" });
 
+    const sessionMistakeState: MobileBackState = {
+      ...rootState,
+      detail: { kind: "review-session", owner: "practice" },
+      tab: "review"
+    };
+    const sessionMistakeIntent = resolveMobileBackIntent(sessionMistakeState, "button");
+    expect(sessionMistakeIntent).toEqual({ kind: "return-to-owner", owner: "practice" });
+    expect(mobileBackDestination(sessionMistakeIntent, sessionMistakeState)).toEqual({
+      label: "Practice",
+      testID: "tab-practice"
+    });
+
     expect(resolveMobileBackIntent({
       ...rootState,
       detail: { kind: "stockfish-diagnostics", owner: "settings" },

@@ -486,6 +486,67 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "review-panel")).toBeTruthy();
   });
 
+  it("ignores a stale multi-context completion after Predictive Back commits the Review owner", async () => {
+    const systemBack = createTestSystemBackSource("android");
+    const service = createMultiContextDueReviewService();
+    const renderer = renderScreen({ practiceService: service, systemBack });
+
+    press(renderer, "review-tab");
+    press(renderer, "review-start-due");
+    await boardMove(renderer, "c4b5");
+    systemBack.startPredictive("left");
+    expect(systemBack.commitPredictive()).toBe(true);
+    expect(findByTestId(renderer, "review-panel")).toBeTruthy();
+
+    await settleFeedbackSnapshot();
+
+    expect(() => findByTestId(renderer, "review-session")).toThrow();
+    expect(findByTestId(renderer, "review-panel")).toBeTruthy();
+  });
+
+  it("lets a pending multi-context completion advance after Predictive Back is cancelled", async () => {
+    const systemBack = createTestSystemBackSource("android");
+    const service = createMultiContextDueReviewService();
+    const renderer = renderScreen({ practiceService: service, systemBack });
+
+    press(renderer, "review-tab");
+    press(renderer, "review-start-due");
+    const firstTimer = collectText(findByTestId(renderer, "review-timer"));
+    await boardMove(renderer, "c4b5");
+    systemBack.startPredictive("right");
+    systemBack.cancelPredictive();
+
+    await settleFeedbackSnapshot();
+
+    expect(findByTestId(renderer, "review-session")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "review-timer"))).not.toBe(firstTimer);
+  });
+
+  it("previews Practice for session-mistake review while analysis returns to the review first", async () => {
+    const systemBack = createTestSystemBackSource("android");
+    const renderer = renderStandardSequenceScreen({ systemBack });
+
+    await openSessionMistakeReview(renderer);
+    press(renderer, "review-analysis-button");
+    systemBack.startPredictive("left");
+    systemBack.progressPredictive(0.5, "left");
+    expect(collectText(findByTestId(renderer, "mobile-back-destination-preview-label"))).toBe("Review session");
+    expect(systemBack.commitPredictive()).toBe(true);
+    expect(findByTestId(renderer, "review-session")).toBeTruthy();
+    expect(() => findByTestId(renderer, "review-close-analysis")).toThrow();
+
+    systemBack.startPredictive("right");
+    systemBack.progressPredictive(0.7, "right");
+    expect(collectText(findByTestId(renderer, "mobile-back-destination-preview-label"))).toBe("Practice");
+    systemBack.cancelPredictive();
+    expect(findByTestId(renderer, "review-session")).toBeTruthy();
+
+    systemBack.startPredictive("right");
+    expect(systemBack.commitPredictive()).toBe(true);
+    expect(findByTestId(renderer, "practice-home")).toBeTruthy();
+    expect(() => findByTestId(renderer, "review-session")).toThrow();
+  });
+
   it("does not subscribe the iOS shell to Android system Back", () => {
     const systemBack = createTestSystemBackSource("ios");
 
@@ -4825,6 +4886,17 @@ function localTime(iso: string | undefined): { hour: number; minute: number } {
     hour: date.getHours(),
     minute: date.getMinutes()
   };
+}
+
+async function openSessionMistakeReview(renderer: TestRenderer.ReactTestRenderer): Promise<void> {
+  startStandardSprint(renderer);
+  await boardMove(renderer, "c4b5");
+  await settleFeedbackSnapshot();
+  await boardMove(renderer, "g6g5");
+  await settleFeedbackSnapshot();
+  await boardMove(renderer, "a4b6");
+  await settleFeedbackSnapshot();
+  press(renderer, "review-mistakes-button");
 }
 
 async function boardMove(
