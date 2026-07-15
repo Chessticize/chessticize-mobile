@@ -1120,6 +1120,71 @@ describe('Android Progress Backup', () => {
     );
   });
 
+  it('rejects repeated fail-closed decisions while retaining selected preflight tolerance', () => {
+    const policyEvidenceScript = read('scripts/android-progress-backup-policy-evidence.sh');
+    const start = policyEvidenceScript.indexOf('assert_agent_decision() {');
+    const end = policyEvidenceScript.indexOf(
+      '\n}\n\nassert_app_data_archive_paths()',
+      start,
+    ) + 2;
+    const assertAgentDecision = policyEvidenceScript.slice(start, end);
+    const runAssertion = ({ emitted, invocationPolicy, lines, selected }) => {
+      const quotedLines = lines.map((line) => `'${line}'`).join(' ');
+      const command = `
+        set -euo pipefail
+        ${assertAgentDecision}
+        ARTIFACT_DIR="$(mktemp -d)"
+        trap 'rm -rf "$ARTIFACT_DIR"' EXIT
+        SDK_LEVEL=36
+        AGENT_INVOCATIONS=0
+        printf '%s\\n' ${quotedLines} > "$ARTIFACT_DIR/test-agent-log.txt"
+        assert_agent_decision test 0 ${selected} ${emitted} ${invocationPolicy}
+      `;
+      return spawnSync('/bin/bash', ['-c', command], { encoding: 'utf8' });
+    };
+    const failClosedPolicy =
+      'event=policy sdk=36 transportFlags=0 encryption=false d2d=false selected=false';
+    const failClosedResult = 'event=result selected=false emitted=0';
+    const selectedPolicy =
+      'event=policy sdk=36 transportFlags=0 encryption=false d2d=false selected=true';
+    const selectedResult = 'event=result selected=true emitted=3';
+    const selectedPayloads = [
+      'event=payload name=chessticize-mobile.sqlite',
+      'event=payload name=chessticize-mobile.sqlite-journal',
+      'event=payload name=chessticize-mobile.sqlite-wal',
+    ];
+
+    expect(runAssertion({
+      emitted: 0,
+      invocationPolicy: 'exactly-one',
+      lines: [failClosedPolicy, failClosedResult],
+      selected: false,
+    }).status).toBe(0);
+    const duplicateFailClosed = runAssertion({
+      emitted: 0,
+      invocationPolicy: 'exactly-one',
+      lines: [failClosedPolicy, failClosedResult, failClosedPolicy, failClosedResult],
+      selected: false,
+    });
+    expect(duplicateFailClosed.status).not.toBe(0);
+    expect(duplicateFailClosed.stderr).toContain(
+      'Expected exactly one BackupAgent invocation for test.',
+    );
+    expect(runAssertion({
+      emitted: 3,
+      invocationPolicy: 'repeated-identical',
+      lines: [
+        selectedPolicy,
+        selectedResult,
+        ...selectedPayloads,
+        selectedPolicy,
+        selectedResult,
+        ...selectedPayloads,
+      ],
+      selected: true,
+    }).status).toBe(0);
+  });
+
   it('runs the real APK through API 24, API 30, and API 36 backup policy selection', () => {
     const workflow = readRepo('.github/workflows/mobile-android.yml');
     const policyEvidenceScript = read('scripts/android-progress-backup-policy-evidence.sh');

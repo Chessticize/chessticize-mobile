@@ -434,6 +434,7 @@ assert_agent_decision() {
   local expected_flags="$2"
   local expected_selected="$3"
   local expected_emitted="$4"
+  local invocation_policy="$5"
   local encryption=false
   local d2d=false
   local log="$ARTIFACT_DIR/$case_name-agent-log.txt"
@@ -485,6 +486,16 @@ assert_agent_decision() {
     echo "BackupAgent policy/result invocation counts differ for $case_name." >&2
     exit 1
   fi
+  case "$invocation_policy" in
+    exactly-one)
+      if [[ "$policy_invocations" != "1" ]]; then
+        echo "Expected exactly one BackupAgent invocation for $case_name." >&2
+        exit 1
+      fi
+      ;;
+    repeated-identical) ;;
+    *) echo "Unsupported BackupAgent invocation policy: $invocation_policy" >&2; exit 64 ;;
+  esac
   AGENT_INVOCATIONS="$policy_invocations"
 
   if (( expected_emitted == 0 )); then
@@ -587,6 +598,7 @@ run_case() {
   local expected_payload="$6"
   local expected_framework_result="${7:-success}"
   local backup_status=0
+  local invocation_policy=repeated-identical
   AGENT_INVOCATIONS=0
 
   adb_cmd shell settings put secure backup_local_transport_parameters "$transport_parameters"
@@ -605,6 +617,7 @@ run_case() {
       grep -F "Package $APP_ID with result: Success" "$ARTIFACT_DIR/$case_name-backupnow.txt"
       ;;
     fail-closed-transport-rejection)
+      invocation_policy=exactly-one
       grep -F "Package $APP_ID with result: Transport rejected package because it wasn't able to process it at the time" \
         "$ARTIFACT_DIR/$case_name-backupnow.txt"
       grep -F "Backup finished with result: Success" "$ARTIFACT_DIR/$case_name-backupnow.txt"
@@ -616,7 +629,8 @@ run_case() {
   esac
   grep -Fx "$transport_parameters" "$ARTIFACT_DIR/$case_name-transport-parameters.txt"
   grep -F "* $LOCAL_TRANSPORT" "$ARTIFACT_DIR/$case_name-transports.txt"
-  assert_agent_decision "$case_name" "$expected_flags" "$expected_selected" "$expected_emitted"
+  assert_agent_decision \
+    "$case_name" "$expected_flags" "$expected_selected" "$expected_emitted" "$invocation_policy"
   assert_app_data_archive_paths "$case_name" "$expected_payload"
   echo "case=$case_name delivered-mask=$expected_flags selected=$expected_selected emitted=$expected_emitted agent-invocations=$AGENT_INVOCATIONS payload=$expected_payload framework-result=$expected_framework_result result=pass" \
     >> "$ARTIFACT_DIR/context.txt"
