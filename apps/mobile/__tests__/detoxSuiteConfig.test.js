@@ -38,7 +38,7 @@ describe('Detox suite configuration', () => {
     expect(launchSpec).not.toContain('detoxEnableSynchronization: false');
   });
 
-  it('pins the Arrow Duel screenshot to a long-arrow fixture and waits for its overlay', () => {
+  it('pins the Arrow Duel screenshot to the exact runtime-selected long-arrow fixture', () => {
     const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
     const renderCaseStart = practiceSpec.indexOf("it('renders Arrow Duel candidate arrows on the board'");
     const renderCaseEnd = practiceSpec.indexOf("it('shows Arrow Duel feedback after a wrong candidate move'");
@@ -51,14 +51,17 @@ describe('Detox suite configuration', () => {
       'chessticizePuzzleSelectionSeed: PRACTICE_RENDER_PUZZLE_SELECTION_SEED'
     );
     expect(renderCase).toContain(
-      "waitForElementTextContaining('arrow-duel-candidate-overlay', 'd7d1', 10000)"
+      "waitForElementTextContaining('arrow-duel-candidate-overlay', 'c3e4', 10000)"
     );
     expect(renderCase).toContain(
-      "waitForElementTextContaining('arrow-duel-candidate-overlay', 'd7f7', 10000)"
+      "waitForElementTextContaining('arrow-duel-candidate-overlay', 'h4f6', 10000)"
     );
-    expect(renderCase.indexOf("'d7d1'")).toBeLessThan(
+    expect(renderCase.indexOf("'c3e4'")).toBeLessThan(
       renderCase.indexOf("takeScreenshot('arrow-duel-neutral-arrows')")
     );
+    expect(renderCase).not.toContain('eQNYb');
+    expect(renderCase).not.toContain("'d7d1'");
+    expect(renderCase).not.toContain("'d7f7'");
     expect(practiceSpec).toContain('if (arrowLikePixels <= 5000)');
   });
 

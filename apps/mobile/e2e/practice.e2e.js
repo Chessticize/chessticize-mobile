@@ -15,9 +15,9 @@ const {
   failStandardSprint
 } = require('./helpers');
 
-// The visual assertion measures absolute painted arrow area. Pin a packaged
-// core-pack puzzle with two long candidate vectors so random move geometry
-// cannot turn that rendering check into a pixel-count lottery.
+// The visual assertion measures absolute painted arrow area. Pin the public
+// service's packaged-core selection to two long candidate vectors so random
+// move geometry cannot turn that rendering check into a pixel-count lottery.
 const PRACTICE_RENDER_PUZZLE_SELECTION_SEED = 'practice-arrow-render-v1:4';
 
 describe('Practice POC', () => {
@@ -48,11 +48,11 @@ describe('Practice POC', () => {
   it('renders Arrow Duel candidate arrows on the board', async () => {
     await startPracticeMode('arrow-duel');
     await waitForVisibleInPracticeScroll('session-board');
-    // eQNYb is the exact packaged-core selection for the pinned seed. Waiting
-    // for both candidates proves the intended long-arrow fixture is laid out
-    // before the native screenshot samples its pixels.
-    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'd7d1', 10000);
-    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'd7f7', 10000);
+    // The default 5/30 Arrow Duel config and pinned seed select packaged puzzle
+    // 03wH4 through PracticeService's rating fallback. Candidate order is
+    // session-seeded, so wait for both long vectors without assuming order.
+    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'c3e4', 10000);
+    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'h4f6', 10000);
 
     const boardFrame = await frameFor(element(by.id('session-board')));
     const screenshotPath = await device.takeScreenshot('arrow-duel-neutral-arrows');
