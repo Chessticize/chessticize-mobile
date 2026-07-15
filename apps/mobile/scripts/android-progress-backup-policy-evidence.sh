@@ -11,6 +11,7 @@ ADB="${ADB_PATH:-${SDK_ROOT:+$SDK_ROOT/platform-tools/adb}}"
 DEVICE="${DETOX_ANDROID_DEVICE:-emulator-5554}"
 APK="${CHESSTICIZE_ANDROID_E2E_APK:-$APP_DIR/android/app/build/outputs/apk/e2e/app-e2e.apk}"
 ARTIFACT_ROOT="${ANDROID_BACKUP_POLICY_ARTIFACT_DIR:-$APP_DIR/artifacts/android-progress-backup-policy}"
+RETAINED_APK_PATH="/data/local/tmp/chessticize-exact-head.apk"
 ADB_OPERATION_TIMEOUT_SECONDS="${ANDROID_BACKUP_POLICY_ADB_TIMEOUT_SECONDS:-120}"
 ADB_CLEANUP_TIMEOUT_SECONDS="${ANDROID_BACKUP_POLICY_CLEANUP_ADB_TIMEOUT_SECONDS:-10}"
 BACKUP_MANAGER_READINESS_TIMEOUT_SECONDS="${ANDROID_BACKUP_POLICY_READINESS_TIMEOUT_SECONDS:-15}"
@@ -288,13 +289,73 @@ find_transport_archive() {
   find_existing_device_paths file "${candidates[@]}"
 }
 
+WORKFLOW_APK_SIZE=''
+WORKFLOW_APK_HASH=''
+RETAINED_APK_SIZE=''
+
+prepare_retained_apk_install_source() {
+  WORKFLOW_APK_SIZE="$(stat -c %s "$APK")"
+  if [[ ! "$WORKFLOW_APK_SIZE" =~ ^[1-9][0-9]*$ ]]; then
+    echo "Exact-head workflow APK has an invalid size: ${WORKFLOW_APK_SIZE:-<empty>}" >&2
+    exit 1
+  fi
+  printf '%s\n' "$WORKFLOW_APK_SIZE" \
+    > "$ARTIFACT_DIR/workflow-artifact-apk-size.txt"
+  sha256sum "$APK" > "$ARTIFACT_DIR/workflow-artifact-apk-sha256.txt"
+  WORKFLOW_APK_HASH="$(cut -d ' ' -f 1 \
+    "$ARTIFACT_DIR/workflow-artifact-apk-sha256.txt")"
+  if [[ ! "$WORKFLOW_APK_HASH" =~ ^[0-9a-f]{64}$ ]]; then
+    echo "Exact-head workflow APK has an invalid SHA-256: ${WORKFLOW_APK_HASH:-<empty>}" >&2
+    exit 1
+  fi
+
+  if ! remove_device_file "$RETAINED_APK_PATH"; then
+    echo "Unable to clear the retained APK path before exact-head installation." >&2
+    exit 1
+  fi
+  if ! require_device_path_state any "$RETAINED_APK_PATH" absent; then
+    echo "Retained APK path was not absent before the exact-head push." >&2
+    exit 1
+  fi
+  printf '%s\n' "$RETAINED_APK_PATH" \
+    > "$ARTIFACT_DIR/retained-install-source-apk-path.txt"
+  if ! push_host_file_to_device "$APK" "$RETAINED_APK_PATH" \
+      > "$ARTIFACT_DIR/retained-apk-push.txt" 2>&1; then
+    cat "$ARTIFACT_DIR/retained-apk-push.txt" >&2
+    echo "Unable to push the exact-head APK to its retained install path." >&2
+    exit 1
+  fi
+  if ! require_device_path_state file "$RETAINED_APK_PATH" present; then
+    echo "Retained APK was not present after the exact-head push." >&2
+    exit 1
+  fi
+  if ! RETAINED_APK_SIZE="$(read_device_file_size "$RETAINED_APK_PATH")"; then
+    echo "Unable to measure the retained exact-head APK." >&2
+    exit 1
+  fi
+  if [[ ! "$RETAINED_APK_SIZE" =~ ^[1-9][0-9]*$ \
+      || "$RETAINED_APK_SIZE" != "$WORKFLOW_APK_SIZE" ]]; then
+    echo "Retained APK size does not match the exact-head workflow APK." >&2
+    exit 1
+  fi
+  printf '%s\n' "$RETAINED_APK_SIZE" \
+    > "$ARTIFACT_DIR/retained-install-source-apk-size.txt"
+}
+
+install_retained_apk() {
+  local install_output
+
+  if ! install_output="$(install_device_apk "$RETAINED_APK_PATH")"; then
+    echo "Unable to install the retained exact-head APK through Package Manager." >&2
+    exit 1
+  fi
+  printf '%s\n' "$install_output" > "$ARTIFACT_DIR/retained-apk-install.txt"
+}
+
 capture_installed_apk() {
   local installed_path
   local installed_path_count
   local installed_size
-  local installed_hash
-  local workflow_size
-  local workflow_hash
 
   if ! read_installed_package_apk_paths "$APP_ID" \
       > "$ARTIFACT_DIR/installed-apk-paths.txt"; then
@@ -311,16 +372,10 @@ capture_installed_apk() {
     exit 1
   fi
 
-  workflow_size="$(stat -c %s "$APK")"
-  if [[ ! "$workflow_size" =~ ^[1-9][0-9]*$ ]]; then
-    echo "Exact-head workflow APK has an invalid size: ${workflow_size:-<empty>}" >&2
-    exit 1
-  fi
-  printf '%s\n' "$workflow_size" > "$ARTIFACT_DIR/workflow-artifact-apk-size.txt"
-  sha256sum "$APK" > "$ARTIFACT_DIR/workflow-artifact-apk-sha256.txt"
-  workflow_hash="$(cut -d ' ' -f 1 "$ARTIFACT_DIR/workflow-artifact-apk-sha256.txt")"
-  if [[ ! "$workflow_hash" =~ ^[0-9a-f]{64}$ ]]; then
-    echo "Exact-head workflow APK has an invalid SHA-256: ${workflow_hash:-<empty>}" >&2
+  if [[ ! "$WORKFLOW_APK_SIZE" =~ ^[1-9][0-9]*$ \
+      || ! "$RETAINED_APK_SIZE" =~ ^[1-9][0-9]*$ \
+      || ! "$WORKFLOW_APK_HASH" =~ ^[0-9a-f]{64}$ ]]; then
+    echo "Retained APK provenance was not initialized before installed-APK capture." >&2
     exit 1
   fi
 
@@ -333,22 +388,25 @@ capture_installed_apk() {
     exit 1
   fi
   printf '%s\n' "$installed_size" > "$ARTIFACT_DIR/installed-apk-size.txt"
-  if ! installed_hash="$(read_device_file_sha256 "$installed_path")"; then
-    echo "Unable to hash the installed APK for exact-head provenance." >&2
-    exit 1
-  fi
-  if [[ ! "$installed_hash" =~ ^[0-9a-f]{64}$ ]]; then
-    echo "Installed APK has an invalid device-local SHA-256: ${installed_hash:-<empty>}" >&2
-    exit 1
-  fi
-  printf '%s  %s\n' "$installed_hash" "$installed_path" \
-    > "$ARTIFACT_DIR/installed-apk-sha256.txt"
-
-  if [[ "$installed_size" != "$workflow_size" \
-      || "$installed_hash" != "$workflow_hash" ]]; then
+  if [[ "$installed_size" != "$WORKFLOW_APK_SIZE" \
+      || "$installed_size" != "$RETAINED_APK_SIZE" ]]; then
     echo "Installed APK does not match the downloaded exact-head APK." >&2
     exit 1
   fi
+  if ! require_device_files_identical "$RETAINED_APK_PATH" "$installed_path"; then
+    echo "Installed APK does not match the downloaded exact-head APK." >&2
+    exit 1
+  fi
+  {
+    echo "source-path=$RETAINED_APK_PATH"
+    echo "installed-path=$installed_path"
+    echo "source-size=$RETAINED_APK_SIZE"
+    echo "installed-size=$installed_size"
+    echo "device-status=0"
+    echo "result=identical"
+  } > "$ARTIFACT_DIR/installed-apk-cmp.txt"
+  printf '%s  %s\n' "$WORKFLOW_APK_HASH" "$installed_path" \
+    > "$ARTIFACT_DIR/installed-apk-sha256.txt"
   adb_cmd shell dumpsys package "$APP_ID" > "$ARTIFACT_DIR/installed-package.txt"
 }
 
@@ -594,17 +652,34 @@ if (( SDK_LEVEL != 24 )); then
     | sed -n 's/^  \* //p' | tr -d '\r' | head -n 1)"
 fi
 cleanup() {
+  local exit_status=$?
+  local retained_cleanup_status=0
+  trap - EXIT
+  set +e
   ADB_OPERATION_TIMEOUT_SECONDS="$ADB_CLEANUP_TIMEOUT_SECONDS"
+  if {
+    remove_device_file "$RETAINED_APK_PATH" \
+      && require_device_path_state any "$RETAINED_APK_PATH" absent
+  } > "$ARTIFACT_DIR/retained-apk-cleanup.txt" 2>&1; then
+    printf 'result=removed\n' > "$ARTIFACT_DIR/retained-apk-cleanup.txt"
+  else
+    retained_cleanup_status=$?
+  fi
   adb_cmd shell settings delete secure backup_local_transport_parameters >/dev/null 2>&1 || true
   if [[ -n "$original_transport" ]]; then
     adb_cmd shell bmgr transport "$original_transport" >/dev/null 2>&1 || true
   fi
+  if (( exit_status == 0 && retained_cleanup_status != 0 )); then
+    cat "$ARTIFACT_DIR/retained-apk-cleanup.txt" >&2
+    echo "Unable to remove the retained exact-head APK during cleanup." >&2
+    exit_status=1
+  fi
+  exit "$exit_status"
 }
 trap cleanup EXIT
 
-# Force a complete push before Package Manager installs the APK. ADB's --wait
-# applies to incremental installs, which are deliberately disabled here.
-adb_cmd install --no-incremental --no-streaming -r -t "$APK"
+prepare_retained_apk_install_source
+install_retained_apk
 adb_cmd shell am start -W -n "$APP_ID/.MainActivity" \
   | tee "$ARTIFACT_DIR/launch.txt" | grep -F 'Status: ok'
 capture_installed_apk
@@ -620,6 +695,8 @@ adb_cmd shell bmgr enable true
   echo "build-result=success (android-build dependency)"
   echo "device=$DEVICE"
   echo "workflow-artifact-apk=$APK"
+  echo "apk-provenance=host-sha256+retained-device-size+installed-device-size+device-cmp"
+  echo "retained-install-source=$RETAINED_APK_PATH"
   echo "transport=$LOCAL_TRANSPORT"
   echo "exact-commands=./gradlew :app:testDebugUnitTest --tests com.chessticize.mobile.backup.ProgressBackupPolicyTest --no-daemon; apps/mobile/scripts/android-progress-backup-policy-evidence.sh"
   echo "validation-scope=targeted native Android full-backup capability and allowlist policy"

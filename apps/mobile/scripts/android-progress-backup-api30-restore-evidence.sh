@@ -90,6 +90,30 @@ read_strict_sha256_artifact() {
   printf '%s' "${BASH_REMATCH[1]}"
 }
 
+validate_apk_cmp_artifact() {
+  local artifact="$1"
+  local expected_size="$2"
+  local label="$3"
+
+  if [[ ! "$expected_size" =~ ^[1-9][0-9]*$ \
+      || ! -s "$artifact" \
+      || "$(awk 'END { print NR + 0 }' "$artifact")" != "6" ]]; then
+    fail "$label does not contain a strict six-line APK comparison record: $artifact"
+  fi
+  grep -Fx 'source-path=/data/local/tmp/chessticize-exact-head.apk' "$artifact" >/dev/null \
+    || fail "$label retained APK comparison source path is invalid."
+  grep -E '^installed-path=/[A-Za-z0-9._/~=-]+/base\.apk$' "$artifact" >/dev/null \
+    || fail "$label installed APK comparison path is invalid."
+  grep -Fx "source-size=$expected_size" "$artifact" >/dev/null \
+    || fail "$label retained APK comparison size is invalid."
+  grep -Fx "installed-size=$expected_size" "$artifact" >/dev/null \
+    || fail "$label installed APK comparison size is invalid."
+  grep -Fx 'device-status=0' "$artifact" >/dev/null \
+    || fail "$label APK comparison status is invalid."
+  grep -Fx 'result=identical' "$artifact" >/dev/null \
+    || fail "$label APK comparison result is invalid."
+}
+
 find_transport_archive_parent() {
   local candidates=(
     "/data/data/com.android.localtransport/files/1/_full"
@@ -219,12 +243,16 @@ fi
 
 stat -c %s "$APK" > "$ARTIFACT_DIR/api30-restore-workflow-apk-size.txt"
 sha256sum "$APK" > "$ARTIFACT_DIR/api30-restore-workflow-apk-sha256.txt"
-if [[ ! -s "$ARTIFACT_DIR/installed-apk-size.txt" \
-    || ! -s "$ARTIFACT_DIR/installed-apk-sha256.txt" ]]; then
+if [[ ! -s "$ARTIFACT_DIR/retained-install-source-apk-size.txt" \
+    || ! -s "$ARTIFACT_DIR/installed-apk-size.txt" \
+    || ! -s "$ARTIFACT_DIR/installed-apk-sha256.txt" \
+    || ! -s "$ARTIFACT_DIR/installed-apk-cmp.txt" ]]; then
   fail "Installed APK provenance is missing before API 30 inherited restore evidence."
 fi
 current_workflow_apk_size="$(read_strict_size_artifact \
   "$ARTIFACT_DIR/api30-restore-workflow-apk-size.txt" "API 30 workflow APK")"
+current_retained_apk_size="$(read_strict_size_artifact \
+  "$ARTIFACT_DIR/retained-install-source-apk-size.txt" "API 30 retained APK")"
 current_installed_apk_size="$(read_strict_size_artifact \
   "$ARTIFACT_DIR/installed-apk-size.txt" "API 30 installed APK")"
 current_workflow_apk_hash="$(read_strict_sha256_artifact \
@@ -232,11 +260,14 @@ current_workflow_apk_hash="$(read_strict_sha256_artifact \
 current_installed_apk_hash="$(read_strict_sha256_artifact \
   "$ARTIFACT_DIR/installed-apk-sha256.txt" "API 30 installed APK")"
 if [[ ! "$current_workflow_apk_size" =~ ^[1-9][0-9]*$ \
+    || "$current_retained_apk_size" != "$current_workflow_apk_size" \
     || "$current_installed_apk_size" != "$current_workflow_apk_size" \
     || ! "$current_workflow_apk_hash" =~ ^[0-9a-f]{64}$ \
     || "$current_installed_apk_hash" != "$current_workflow_apk_hash" ]]; then
   fail "Installed API 30 APK does not match the exact-head workflow artifact."
 fi
+validate_apk_cmp_artifact "$ARTIFACT_DIR/installed-apk-cmp.txt" \
+  "$current_workflow_apk_size" "API 30"
 
 temp_root="$(mktemp -d "${TMPDIR:-/tmp}/chessticize-api30-restore.XXXXXX")"
 staging_root="$temp_root/staging"
@@ -256,10 +287,15 @@ required_source_files=(
   context.txt
   tracked-worktree-before.txt
   tracked-worktree-after.txt
+  retained-install-source-apk-path.txt
+  retained-install-source-apk-size.txt
+  retained-apk-push.txt
+  retained-apk-install.txt
   workflow-artifact-apk-size.txt
   installed-apk-size.txt
   workflow-artifact-apk-sha256.txt
   installed-apk-sha256.txt
+  installed-apk-cmp.txt
   installed-package.txt
   neither-unique-policy-events.txt
   neither-unique-result-events.txt
@@ -289,6 +325,13 @@ grep -Fx 'result=pass' "$API36_SOURCE_DIR/context.txt"
 grep -Fx \
   "artifact-identifier=run-${GITHUB_RUN_ID:-local}/android-progress-backup-policy-api-36" \
   "$API36_SOURCE_DIR/context.txt"
+grep -Fx 'apk-provenance=host-sha256+retained-device-size+installed-device-size+device-cmp' \
+  "$API36_SOURCE_DIR/context.txt"
+grep -Fx 'retained-install-source=/data/local/tmp/chessticize-exact-head.apk' \
+  "$API36_SOURCE_DIR/context.txt"
+grep -Fx '/data/local/tmp/chessticize-exact-head.apk' \
+  "$API36_SOURCE_DIR/retained-install-source-apk-path.txt"
+grep -Fx 'Success' "$API36_SOURCE_DIR/retained-apk-install.txt"
 grep -E '^case=neither delivered-mask=0 selected=false emitted=0 agent-invocations=[1-9][0-9]* payload=none framework-result=success result=pass$' \
   "$API36_SOURCE_DIR/context.txt"
 grep -E '^case=encryption-only delivered-mask=1 selected=true emitted=3 agent-invocations=[1-9][0-9]* payload=exact-progress-files framework-result=success result=pass$' \
@@ -329,10 +372,14 @@ done
 
 current_workflow_apk_size="$(read_strict_size_artifact \
   "$ARTIFACT_DIR/api30-restore-workflow-apk-size.txt" "API 30 workflow APK")"
+current_retained_apk_size="$(read_strict_size_artifact \
+  "$ARTIFACT_DIR/retained-install-source-apk-size.txt" "API 30 retained APK")"
 current_installed_apk_size="$(read_strict_size_artifact \
   "$ARTIFACT_DIR/installed-apk-size.txt" "API 30 installed APK")"
 source_workflow_apk_size="$(read_strict_size_artifact \
   "$API36_SOURCE_DIR/workflow-artifact-apk-size.txt" "API 36 workflow APK")"
+source_retained_apk_size="$(read_strict_size_artifact \
+  "$API36_SOURCE_DIR/retained-install-source-apk-size.txt" "API 36 retained APK")"
 source_installed_apk_size="$(read_strict_size_artifact \
   "$API36_SOURCE_DIR/installed-apk-size.txt" "API 36 installed APK")"
 current_workflow_apk_hash="$(read_strict_sha256_artifact \
@@ -344,8 +391,10 @@ source_workflow_apk_hash="$(read_strict_sha256_artifact \
 source_installed_apk_hash="$(read_strict_sha256_artifact \
   "$API36_SOURCE_DIR/installed-apk-sha256.txt" "API 36 installed APK")"
 if [[ ! "$current_workflow_apk_size" =~ ^[1-9][0-9]*$ \
+    || "$current_retained_apk_size" != "$current_workflow_apk_size" \
     || "$current_installed_apk_size" != "$current_workflow_apk_size" \
     || "$source_workflow_apk_size" != "$current_workflow_apk_size" \
+    || "$source_retained_apk_size" != "$current_workflow_apk_size" \
     || "$source_installed_apk_size" != "$current_workflow_apk_size" \
     || ! "$current_workflow_apk_hash" =~ ^[0-9a-f]{64}$ \
     || "$current_installed_apk_hash" != "$current_workflow_apk_hash" \
@@ -353,6 +402,10 @@ if [[ ! "$current_workflow_apk_size" =~ ^[1-9][0-9]*$ \
     || "$source_installed_apk_hash" != "$current_workflow_apk_hash" ]]; then
   fail "API 36 archive producer and API 30 restore consumer did not use the same exact-head APK."
 fi
+validate_apk_cmp_artifact "$ARTIFACT_DIR/installed-apk-cmp.txt" \
+  "$current_workflow_apk_size" "API 30"
+validate_apk_cmp_artifact "$API36_SOURCE_DIR/installed-apk-cmp.txt" \
+  "$source_workflow_apk_size" "API 36"
 
 source_archive="$API36_SOURCE_DIR/both-transport-archive.tar"
 source_archive_copy="$ARTIFACT_DIR/api30-restore-os-source-archive.tar"
@@ -457,6 +510,7 @@ fi
   echo "source-run-id=${GITHUB_RUN_ID:-local}"
   echo "source-commit-sha=$GITHUB_SHA"
   echo "source-workflow-apk-size=$source_workflow_apk_size"
+  echo "source-retained-apk-size=$source_retained_apk_size"
   echo "source-installed-apk-size=$source_installed_apk_size"
   echo "source-workflow-apk-sha256=$source_workflow_apk_hash"
   echo "source-installed-apk-sha256=$source_installed_apk_hash"

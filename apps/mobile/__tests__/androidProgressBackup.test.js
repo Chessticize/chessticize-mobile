@@ -483,8 +483,9 @@ describe('Android Progress Backup', () => {
     );
   });
 
-  it('proves installed APK identity without streaming the APK through ADB', () => {
+  it('proves installed APK identity from a retained exact source without reverse streaming', () => {
     const policyEvidenceScript = read('scripts/android-progress-backup-policy-evidence.sh');
+    const deviceInspection = read('scripts/android-device-inspection.sh');
     const api30RestoreScript = read(
       'scripts/android-progress-backup-api30-restore-evidence.sh',
     );
@@ -497,7 +498,16 @@ describe('Android Progress Backup', () => {
       'read_device_file_size "$installed_path"',
     );
     expect(policyEvidenceScript).toContain(
-      'read_device_file_sha256 "$installed_path"',
+      'read_device_file_size "$RETAINED_APK_PATH"',
+    );
+    expect(policyEvidenceScript).toContain(
+      'require_device_files_identical "$RETAINED_APK_PATH" "$installed_path"',
+    );
+    expect(policyEvidenceScript).toContain(
+      'push_host_file_to_device "$APK" "$RETAINED_APK_PATH"',
+    );
+    expect(policyEvidenceScript).toContain(
+      'install_device_apk "$RETAINED_APK_PATH"',
     );
     expect(policyEvidenceScript).toContain('workflow-artifact-apk-size.txt');
     expect(policyEvidenceScript).toContain('installed-apk-size.txt');
@@ -506,9 +516,20 @@ describe('Android Progress Backup', () => {
     expect(policyEvidenceScript).toContain(
       'Installed APK does not match the downloaded exact-head APK',
     );
+    expect(policyEvidenceScript).toContain('installed-apk-cmp.txt');
+    expect(policyEvidenceScript).toContain('retained-apk-push.txt');
+    expect(policyEvidenceScript).toContain('retained-apk-install.txt');
+    expect(policyEvidenceScript).toContain('retained-apk-cleanup.txt');
     expect(policyEvidenceScript).toContain(
-      'adb_cmd install --no-incremental --no-streaming -r -t "$APK"',
+      'apk-provenance=host-sha256+retained-device-size+installed-device-size+device-cmp',
     );
+    expect(policyEvidenceScript).toContain('remove_device_file "$RETAINED_APK_PATH"');
+    expect(policyEvidenceScript).toContain(
+      '"$RETAINED_APK_SIZE" != "$WORKFLOW_APK_SIZE"',
+    );
+    expect(policyEvidenceScript).not.toMatch(/adb_cmd install .*"\$APK"/);
+    expect(policyEvidenceScript).not.toContain('read_device_file_sha256');
+    expect(deviceInspection).not.toContain('sha256sum');
     expect(policyEvidenceScript).toContain(
       'adb_cmd exec-out run-as "$APP_ID" cat "$relative_path"',
     );
@@ -518,6 +539,7 @@ describe('Android Progress Backup', () => {
       'installed-apk-size.txt',
       'workflow-artifact-apk-sha256.txt',
       'installed-apk-sha256.txt',
+      'installed-apk-cmp.txt',
     ]) {
       expect(api30RestoreScript).toContain(artifact);
     }
@@ -527,20 +549,24 @@ describe('Android Progress Backup', () => {
     expect(api30RestoreScript).toContain('current_installed_apk_size');
     expect(api30RestoreScript).toContain('read_strict_size_artifact');
     expect(api30RestoreScript).toContain('read_strict_sha256_artifact');
+    expect(api30RestoreScript).toContain('validate_apk_cmp_artifact');
     expect(api30RestoreScript).not.toContain("tr -d '\\r\\n'");
   });
 
-  it('strictly parses bounded device-local APK size and SHA-256 evidence', () => {
+  it('fails closed across retained APK push, install, size, and byte comparison', () => {
     const deviceInspection = 'scripts/android-device-inspection.sh';
     const deviceInspectionPath = join(appRoot, deviceInspection);
     const helper = read(deviceInspection);
+    const retainedPath = '/data/local/tmp/chessticize-exact-head.apk';
     const installedPath = '/data/app/~~token==/com.chessticize.mobile-token==/base.apk';
-    const digest = '01cc4cb43b5300f1671ecda1ed618b6c452a59be3ca6f4a5c513e88cdaaa3856';
 
     expect(helper).toContain('read_device_file_size');
-    expect(helper).toContain('read_device_file_sha256');
+    expect(helper).toContain('push_host_file_to_device');
+    expect(helper).toContain('install_device_apk');
+    expect(helper).toContain('require_device_files_identical');
     expect(helper).toContain('inspect_device_command "stat -c %s');
-    expect(helper).toContain('inspect_device_command "sha256sum');
+    expect(helper).toContain('inspect_device_command "cmp');
+    expect(helper).not.toContain('sha256sum');
 
     const inspect = (kind, mode) => {
       const command = `
@@ -548,21 +574,31 @@ describe('Android Progress Backup', () => {
         PROVENANCE_KIND=${kind}
         PROVENANCE_MODE=${mode}
         adb_cmd() {
+          if [[ "$1" == push ]]; then
+            if [[ "$PROVENANCE_MODE" == push-failure ]]; then
+              return 42
+            fi
+            printf '384484899 bytes pushed\\n'
+            return 0
+          fi
           case "$PROVENANCE_MODE" in
             outer-failure) return 42 ;;
             missing-sentinel) printf 'missing\\n' ;;
             device-error) printf '__CHESSTICIZE_DEVICE_STATUS__=2\\npermission denied\\n' ;;
             malformed-size) printf '__CHESSTICIZE_DEVICE_STATUS__=0\\n384MB\\n' ;;
             multiline-size) printf '__CHESSTICIZE_DEVICE_STATUS__=0\\n384484899\\n0\\n' ;;
-            malformed-hash) printf '__CHESSTICIZE_DEVICE_STATUS__=0\\nabc  ${installedPath}\\n' ;;
-            split-hash-line) printf '__CHESSTICIZE_DEVICE_STATUS__=0\\n${digest}\\n${installedPath}\\n' ;;
-            wrong-hash-path) printf '__CHESSTICIZE_DEVICE_STATUS__=0\\n${digest}  /data/app/wrong/base.apk\\n' ;;
-            extra-hash-line) printf '__CHESSTICIZE_DEVICE_STATUS__=0\\n${digest}  ${installedPath}\\nextra\\n' ;;
+            install-failure) printf '__CHESSTICIZE_DEVICE_STATUS__=1\\nFailure [INSTALL_FAILED_INVALID_APK]\\n' ;;
+            install-unexpected) printf '__CHESSTICIZE_DEVICE_STATUS__=0\\nSuccess\\nextra\\n' ;;
+            cmp-different) printf '__CHESSTICIZE_DEVICE_STATUS__=1\\n${retainedPath} ${installedPath} differ: byte 4\\n' ;;
+            cmp-error) printf '__CHESSTICIZE_DEVICE_STATUS__=2\\ncmp: permission denied\\n' ;;
+            cmp-success-output) printf '__CHESSTICIZE_DEVICE_STATUS__=0\\nunexpected\\n' ;;
             success)
               if [[ "$PROVENANCE_KIND" == size ]]; then
                 printf '__CHESSTICIZE_DEVICE_STATUS__=0\\n384484899\\n'
+              elif [[ "$PROVENANCE_KIND" == install ]]; then
+                printf '__CHESSTICIZE_DEVICE_STATUS__=0\\nSuccess\\n'
               else
-                printf '__CHESSTICIZE_DEVICE_STATUS__=0\\n${digest.toUpperCase()}  ${installedPath}\\n'
+                printf '__CHESSTICIZE_DEVICE_STATUS__=0\\n'
               fi
               ;;
           esac
@@ -571,8 +607,20 @@ describe('Android Progress Backup', () => {
         set +e
         if [[ "$PROVENANCE_KIND" == size ]]; then
           evidence_output="$(read_device_file_size ${installedPath} 2>/dev/null)"
+        elif [[ "$PROVENANCE_KIND" == push ]]; then
+          evidence_output="$(push_host_file_to_device ${JSON.stringify(deviceInspectionPath)} ${retainedPath} 2>/dev/null)"
+        elif [[ "$PROVENANCE_KIND" == push-invalid-path ]]; then
+          evidence_output="$(push_host_file_to_device ${JSON.stringify(deviceInspectionPath)} '/data/local/tmp/bad path.apk' 2>/dev/null)"
+        elif [[ "$PROVENANCE_KIND" == install ]]; then
+          evidence_output="$(install_device_apk ${retainedPath} 2>/dev/null)"
+        elif [[ "$PROVENANCE_KIND" == install-invalid-path ]]; then
+          evidence_output="$(install_device_apk '/data/local/tmp/not-an-apk' 2>/dev/null)"
+        elif [[ "$PROVENANCE_KIND" == cleanup ]]; then
+          evidence_output="$(remove_device_file ${retainedPath} 2>/dev/null)"
+        elif [[ "$PROVENANCE_KIND" == cmp-same-path ]]; then
+          evidence_output="$(require_device_files_identical ${retainedPath} ${retainedPath} 2>/dev/null)"
         else
-          evidence_output="$(read_device_file_sha256 ${installedPath} 2>/dev/null)"
+          evidence_output="$(require_device_files_identical ${retainedPath} ${installedPath} 2>/dev/null)"
         fi
         evidence_status=$?
         set -e
@@ -586,7 +634,22 @@ describe('Android Progress Backup', () => {
     };
 
     expect(inspect('size', 'success')).toBe('status=0\noutput=<384484899>\n');
-    expect(inspect('hash', 'success')).toBe(`status=0\noutput=<${digest}>\n`);
+    expect(inspect('push', 'success')).toBe('status=0\noutput=<384484899 bytes pushed>\n');
+    expect(inspect('install', 'success')).toBe('status=0\noutput=<Success>\n');
+    expect(inspect('cleanup', 'success')).toBe('status=0\noutput=<>\n');
+    expect(inspect('cmp', 'success')).toBe('status=0\noutput=<>\n');
+    expect(inspect('push', 'push-failure')).toMatch(
+      /^status=[1-9][0-9]*\noutput=<>\n$/,
+    );
+    expect(inspect('push-invalid-path', 'success')).toMatch(
+      /^status=[1-9][0-9]*\noutput=<>\n$/,
+    );
+    expect(inspect('install-invalid-path', 'success')).toMatch(
+      /^status=[1-9][0-9]*\noutput=<>\n$/,
+    );
+    expect(inspect('cmp-same-path', 'success')).toMatch(
+      /^status=[1-9][0-9]*\noutput=<>\n$/,
+    );
     for (const mode of [
       'outer-failure',
       'missing-sentinel',
@@ -600,12 +663,28 @@ describe('Android Progress Backup', () => {
       'outer-failure',
       'missing-sentinel',
       'device-error',
-      'malformed-hash',
-      'split-hash-line',
-      'wrong-hash-path',
-      'extra-hash-line',
+      'install-failure',
+      'install-unexpected',
     ]) {
-      expect(inspect('hash', mode)).toMatch(/^status=[1-9][0-9]*\noutput=<>\n$/);
+      expect(inspect('install', mode)).toMatch(/^status=[1-9][0-9]*\noutput=<>\n$/);
+    }
+    for (const mode of [
+      'outer-failure',
+      'missing-sentinel',
+      'device-error',
+      'cmp-different',
+      'cmp-error',
+      'cmp-success-output',
+    ]) {
+      expect(inspect('cmp', mode)).toMatch(/^status=[1-9][0-9]*\noutput=<>\n$/);
+    }
+    for (const mode of [
+      'outer-failure',
+      'missing-sentinel',
+      'device-error',
+      'cmp-success-output',
+    ]) {
+      expect(inspect('cleanup', mode)).toMatch(/^status=[1-9][0-9]*\noutput=<>\n$/);
     }
   });
 

@@ -73,6 +73,56 @@ validate_device_path() {
   fi
 }
 
+push_host_file_to_device() {
+  local host_path="$1"
+  local device_path="$2"
+
+  if [[ -z "$host_path" || "$host_path" == *$'\n'* || "$host_path" == *$'\r'* \
+      || ! -f "$host_path" || ! -s "$host_path" ]]; then
+    echo "Refusing to push an invalid or empty host file: ${host_path:-<empty>}" >&2
+    return 1
+  fi
+  validate_device_path "$device_path" || return 1
+  if [[ "$device_path" != /*.apk ]]; then
+    echo "Refusing to push an APK to a non-APK device path: $device_path" >&2
+    return 1
+  fi
+  adb_cmd push "$host_path" "$device_path"
+}
+
+remove_device_file() {
+  local path="$1"
+
+  validate_device_path "$path" || return 1
+  if ! inspect_device_command "rm -f \"$path\""; then
+    return 1
+  fi
+  if [[ "$ANDROID_DEVICE_COMMAND_STATUS" != "0" \
+      || -n "$ANDROID_DEVICE_COMMAND_OUTPUT" ]]; then
+    echo "Unable to remove Android device file $path (status $ANDROID_DEVICE_COMMAND_STATUS): ${ANDROID_DEVICE_COMMAND_OUTPUT:-<empty>}" >&2
+    return 1
+  fi
+}
+
+install_device_apk() {
+  local path="$1"
+
+  validate_device_path "$path" || return 1
+  if [[ "$path" != /*.apk ]]; then
+    echo "Refusing to install a non-APK device path: $path" >&2
+    return 1
+  fi
+  if ! inspect_device_command "pm install -r -t \"$path\""; then
+    return 1
+  fi
+  if [[ "$ANDROID_DEVICE_COMMAND_STATUS" != "0" \
+      || "$ANDROID_DEVICE_COMMAND_OUTPUT" != "Success" ]]; then
+    echo "Package Manager did not strictly accept retained APK $path (status $ANDROID_DEVICE_COMMAND_STATUS): ${ANDROID_DEVICE_COMMAND_OUTPUT:-<empty>}" >&2
+    return 1
+  fi
+  printf '%s' "$ANDROID_DEVICE_COMMAND_OUTPUT"
+}
+
 read_installed_package_apk_paths() {
   local package_name="$1"
   local line
@@ -120,28 +170,24 @@ read_device_file_size() {
   printf '%s' "$ANDROID_DEVICE_COMMAND_OUTPUT"
 }
 
-read_device_file_sha256() {
-  local path="$1"
-  local digest
-  local reported_path
+require_device_files_identical() {
+  local expected_path="$1"
+  local actual_path="$2"
 
-  validate_device_path "$path" || return 1
-  if ! inspect_device_command "sha256sum \"$path\""; then
+  validate_device_path "$expected_path" || return 1
+  validate_device_path "$actual_path" || return 1
+  if [[ "$expected_path" == "$actual_path" ]]; then
+    echo "Refusing to compare one Android device path to itself: $expected_path" >&2
+    return 1
+  fi
+  if ! inspect_device_command "cmp \"$expected_path\" \"$actual_path\""; then
     return 1
   fi
   if [[ "$ANDROID_DEVICE_COMMAND_STATUS" != "0" \
-      || "$ANDROID_DEVICE_COMMAND_OUTPUT" == *$'\n'* \
-      || ! "$ANDROID_DEVICE_COMMAND_OUTPUT" =~ ^([0-9A-Fa-f]{64})[[:space:]]+([A-Za-z0-9._/~=-]+)$ ]]; then
-    echo "Unable to read a strict device-local SHA-256 for $path (status $ANDROID_DEVICE_COMMAND_STATUS): ${ANDROID_DEVICE_COMMAND_OUTPUT:-<empty>}" >&2
+      || -n "$ANDROID_DEVICE_COMMAND_OUTPUT" ]]; then
+    echo "Android device files are not proven byte-identical (status $ANDROID_DEVICE_COMMAND_STATUS): ${ANDROID_DEVICE_COMMAND_OUTPUT:-<empty>}" >&2
     return 1
   fi
-  digest="${BASH_REMATCH[1]}"
-  reported_path="${BASH_REMATCH[2]}"
-  if [[ "$reported_path" != "$path" ]]; then
-    echo "Device-local SHA-256 reported an unexpected path for $path: $reported_path" >&2
-    return 1
-  fi
-  printf '%s' "$digest" | tr '[:upper:]' '[:lower:]'
 }
 
 probe_device_path() {
