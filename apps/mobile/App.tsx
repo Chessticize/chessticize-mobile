@@ -6,11 +6,14 @@ import { mobilePlatformCapabilityFactoryFor } from "./src/backend/nativeMobilePl
 import type { MobilePlatformCapabilities } from "./src/backend/mobilePlatformCapabilities";
 import {
   createAdvancingTestClock,
+  enableTestControlsFromLaunchConfig,
   resolveTestNowMsFromLaunchConfig,
   resolveTestPuzzleSelectionSeedFromLaunchConfig,
   resolveTestStandardTargetCorrectFromLaunchConfig
 } from "./src/backend/testLaunchConfig";
 import { shouldSuppressLogBoxWarnings } from "./src/releaseConfig";
+
+enableTestControlsFromLaunchConfig();
 
 if (shouldSuppressLogBoxWarnings()) {
   LogBox.ignoreAllLogs();

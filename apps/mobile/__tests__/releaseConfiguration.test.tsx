@@ -1,6 +1,7 @@
 import React from "react";
 import TestRenderer, { act } from "react-test-renderer";
 import { createMobilePracticeService } from "../src/backend/mobilePractice";
+import { enableTestControlsFromLaunchConfig } from "../src/backend/testLaunchConfig";
 import { PracticePocScreen } from "../src/components/PracticePocScreen";
 import { createTestMobilePlatformCapabilities } from "../src/testing/testMobilePlatformCapabilities";
 
@@ -55,6 +56,7 @@ describe("release configuration integration", () => {
   it("hides the puzzle source switch in a production-like render", () => {
     testGlobal.__DEV__ = false;
     testGlobal.__CHESSTICIZE_ENABLE_TEST_CONTROLS__ = false;
+    enableTestControlsFromLaunchConfig(testGlobal, { testControlsEnabled: false });
 
     const renderer = renderScreen();
 
@@ -72,6 +74,18 @@ describe("release configuration integration", () => {
     const renderer = renderScreen();
 
     expect(findAllByTestId(renderer, "test-puzzle-source-control").length).toBeGreaterThan(0);
+  });
+
+  it("exposes test controls for the native debug harness in a production-mode bundle", () => {
+    testGlobal.__DEV__ = false;
+    testGlobal.__CHESSTICIZE_ENABLE_TEST_CONTROLS__ = false;
+    enableTestControlsFromLaunchConfig(testGlobal, { testControlsEnabled: true });
+
+    const renderer = renderScreen();
+
+    expect(findAllByTestId(renderer, "test-puzzle-source-control").length).toBeGreaterThan(0);
+    press(renderer, "settings-tab");
+    expect(findAllByTestId(renderer, "settings-stockfish-diagnostics").length).toBeGreaterThan(0);
   });
 
   it("does not suppress LogBox warnings when App loads under a release-like global", () => {

@@ -238,6 +238,13 @@ describe('Detox suite configuration', () => {
     expect(launchSpec).toContain('throw error');
   });
 
+  it('collects Android UI diagnostics before Stockfish journey failures are rethrown', () => {
+    const stockfishSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/android-stockfish.e2e.js'), 'utf8');
+
+    expect(stockfishSpec).toContain('collectAndroidUiDiagnostics');
+    expect(stockfishSpec).toContain('throw error');
+  });
+
   it('runs every active E2E spec by default without loading opt-in capture specs', () => {
     expect(resolveDetoxTestMatch({})).toEqual(ACTIVE_E2E_TEST_MATCH);
     expect(ACTIVE_E2E_TEST_MATCH).toEqual([
