@@ -16,6 +16,8 @@ const {
   bringAndroidAppToForeground,
   collectAndroidUiDiagnostics,
   launchWithDisabledSynchronization,
+  waitForRunningStockfishDepth,
+  withAndroidUiDiagnostics,
 } = require('../e2e/helpers');
 
 describe('Detox suite configuration', () => {
@@ -231,18 +233,83 @@ describe('Detox suite configuration', () => {
     expect(log).toHaveBeenCalledWith(expect.stringContaining('<node text="Practice" />'));
   });
 
-  it('collects Android UI diagnostics before launch smoke failures are rethrown', () => {
+  it('shares Android UI diagnostics around launch and Stockfish failures', async () => {
     const launchSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/android-launch.e2e.js'), 'utf8');
+    const stockfishSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/android-stockfish.e2e.js'), 'utf8');
+    const actionError = new Error('journey failed');
+    const action = jest.fn().mockRejectedValue(actionError);
+    const collectDiagnostics = jest.fn(() => {
+      throw new Error('diagnostics failed');
+    });
+    const log = jest.fn();
 
-    expect(launchSpec).toContain('collectAndroidUiDiagnostics');
-    expect(launchSpec).toContain('throw error');
+    await expect(withAndroidUiDiagnostics(action, collectDiagnostics, log)).rejects.toBe(actionError);
+
+    expect(collectDiagnostics).toHaveBeenCalledTimes(1);
+    expect(log).toHaveBeenCalledWith(
+      '[android-ui-diagnostics] collection failed: diagnostics failed'
+    );
+    expect(launchSpec).toContain('withAndroidUiDiagnostics');
+    expect(stockfishSpec).toContain('withAndroidUiDiagnostics');
+    expect(launchSpec).not.toContain('async function withAndroidUiDiagnostics');
+    expect(stockfishSpec).not.toContain('async function withAndroidUiDiagnostics');
   });
 
-  it('collects Android UI diagnostics before Stockfish journey failures are rethrown', () => {
+  it('shares inclusive and exclusive running-Stockfish depth polling', async () => {
     const stockfishSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/android-stockfish.e2e.js'), 'utf8');
+    const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
+    const wait = jest.fn().mockResolvedValue(undefined);
+    const readInclusiveText = jest.fn().mockResolvedValue('SF 18 NNUE · Depth 4/20');
+    const readExclusiveText = jest.fn()
+      .mockResolvedValueOnce('SF 18 NNUE · Depth 8/20')
+      .mockResolvedValueOnce('SF 18 NNUE · Depth 9/20');
 
-    expect(stockfishSpec).toContain('collectAndroidUiDiagnostics');
-    expect(stockfishSpec).toContain('throw error');
+    await expect(waitForRunningStockfishDepth(
+      'review-analysis-engine-status',
+      4,
+      90000,
+      { readText: readInclusiveText, wait }
+    )).resolves.toBe(4);
+    await expect(waitForRunningStockfishDepth(
+      'review-analysis-engine-status',
+      8,
+      90000,
+      { comparison: 'above', readText: readExclusiveText, wait }
+    )).resolves.toBe(9);
+
+    expect(readInclusiveText).toHaveBeenCalledWith('review-analysis-engine-status');
+    expect(readExclusiveText).toHaveBeenCalledTimes(2);
+    expect(wait).toHaveBeenCalledWith(25);
+    expect(stockfishSpec).toContain(
+      "waitForRunningStockfishDepth('review-analysis-engine-status', 4, 90000)"
+    );
+    expect(practiceSpec).toContain("{ comparison: 'above' }");
+    expect(stockfishSpec).not.toContain('async function waitForRunningStockfishDepth');
+    expect(practiceSpec).not.toContain('async function waitForRunningStockfishDepth');
+  });
+
+  it.each([
+    ['at-least', '', 'Timed out waiting for an active Stockfish search. Last text: "engine unavailable"'],
+    ['above', ' above depth 8', 'Timed out waiting for an active Stockfish search above depth 8. Last text: "engine unavailable"'],
+  ])('preserves the %s Stockfish depth timeout diagnostic', async (comparison, _description, message) => {
+    let nowMs = 0;
+    const wait = jest.fn(async (pollIntervalMs) => {
+      nowMs += pollIntervalMs;
+    });
+
+    await expect(waitForRunningStockfishDepth(
+      'review-analysis-engine-status',
+      8,
+      25,
+      {
+        comparison,
+        now: () => nowMs,
+        readText: jest.fn().mockRejectedValue(new Error('engine unavailable')),
+        wait,
+      }
+    )).rejects.toThrow(message);
+
+    expect(wait).toHaveBeenCalledWith(25);
   });
 
   it('restarts the native Stockfish analysis journey through persisted public UI', () => {

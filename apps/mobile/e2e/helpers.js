@@ -193,6 +193,25 @@ function collectAndroidUiDiagnostics(
   log(`[android-ui-diagnostics] artifacts=${outputDirectory}`);
 }
 
+async function withAndroidUiDiagnostics(
+  action,
+  collectDiagnostics = collectAndroidUiDiagnostics,
+  log = console.log
+) {
+  try {
+    await action();
+  } catch (error) {
+    try {
+      collectDiagnostics();
+    } catch (diagnosticsError) {
+      log(
+        `[android-ui-diagnostics] collection failed: ${diagnosticsError?.message ?? String(diagnosticsError)}`
+      );
+    }
+    throw error;
+  }
+}
+
 async function launchWithDisabledSynchronization(
   options = {},
   targetDevice = device,
@@ -263,6 +282,41 @@ async function waitForElementTextContaining(testID, expected, timeoutMs, pollInt
   throw new Error(`Timed out waiting for ${testID} to contain "${expected}". Last text: "${lastText}"`);
 }
 
+async function waitForRunningStockfishDepth(
+  testID,
+  minimumDepth,
+  timeoutMs,
+  {
+    comparison = 'at-least',
+    now = Date.now,
+    pollIntervalMs = 25,
+    readText = elementText,
+    wait = sleep,
+  } = {}
+) {
+  const startedAt = now();
+  let lastText = '';
+  while (now() - startedAt < timeoutMs) {
+    try {
+      lastText = await readText(testID);
+      const depth = Number(lastText.match(/Depth (\d+)\/20/)?.[1] ?? 0);
+      const reachedMinimum = comparison === 'above'
+        ? depth > minimumDepth
+        : depth >= minimumDepth;
+      if (reachedMinimum) {
+        return depth;
+      }
+    } catch (error) {
+      lastText = error?.message ?? String(error);
+    }
+    await wait(pollIntervalMs);
+  }
+  const comparisonDescription = comparison === 'above' ? ` above depth ${minimumDepth}` : '';
+  throw new Error(
+    `Timed out waiting for an active Stockfish search${comparisonDescription}. Last text: "${lastText}"`
+  );
+}
+
 async function waitForElementAccessibilityLabelContaining(
   testID,
   expected,
@@ -296,6 +350,11 @@ async function waitForMistakeCount(count, timeoutMs = 30000) {
 function textFromAttributes(attributes) {
   const first = Array.isArray(attributes) ? attributes[0] : attributes;
   return String(first?.text ?? first?.label ?? first?.value ?? '');
+}
+
+async function elementText(testID) {
+  const attributes = await element(by.id(testID)).getAttributes();
+  return textFromAttributes(attributes);
 }
 
 function accessibilityLabelFromAttributes(attributes) {
@@ -438,6 +497,7 @@ async function failStandardSprint() {
 module.exports = {
   bringAndroidAppToForeground,
   collectAndroidUiDiagnostics,
+  elementText,
   openTab,
   openStandardHistoryTrend,
   launchWithDisabledSynchronization,
@@ -450,6 +510,8 @@ module.exports = {
   tapUntilExists,
   waitForElementAccessibilityLabelContaining,
   waitForElementTextContaining,
+  waitForRunningStockfishDepth,
+  withAndroidUiDiagnostics,
   accessibilityLabelFromAttributes,
   textFromAttributes,
   boardPoint,

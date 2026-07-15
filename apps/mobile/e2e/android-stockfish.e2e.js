@@ -1,10 +1,11 @@
 const {
-  collectAndroidUiDiagnostics,
   failStandardSprint,
   launchWithDisabledSynchronization,
   openTab,
   sleep,
   waitForElementTextContaining,
+  waitForRunningStockfishDepth,
+  withAndroidUiDiagnostics,
 } = require('./helpers');
 
 describe('Android on-device Stockfish analysis', () => {
@@ -31,7 +32,7 @@ describe('Android on-device Stockfish analysis', () => {
       await element(by.id('review-close-analysis')).tap();
       await element(by.id('review-next')).tap();
       await element(by.id('review-analysis-button')).tap();
-      await waitForRunningStockfishDepth(4, 90000);
+      await waitForRunningStockfishDepth('review-analysis-engine-status', 4, 90000);
       await element(by.id('review-close-analysis')).tap();
       await element(by.id('review-next')).tap();
       await element(by.id('review-analysis-button')).tap();
@@ -59,38 +60,3 @@ describe('Android on-device Stockfish analysis', () => {
     });
   });
 });
-
-async function withAndroidUiDiagnostics(action) {
-  try {
-    await action();
-  } catch (error) {
-    try {
-      collectAndroidUiDiagnostics();
-    } catch (diagnosticsError) {
-      console.log(
-        `[android-ui-diagnostics] collection failed: ${diagnosticsError?.message ?? String(diagnosticsError)}`
-      );
-    }
-    throw error;
-  }
-}
-
-async function waitForRunningStockfishDepth(minimumDepth, timeoutMs) {
-  const startedAt = Date.now();
-  let lastText = '';
-  while (Date.now() - startedAt < timeoutMs) {
-    try {
-      const attributes = await element(by.id('review-analysis-engine-status')).getAttributes();
-      const first = Array.isArray(attributes) ? attributes[0] : attributes;
-      lastText = String(first?.text ?? first?.label ?? first?.value ?? '');
-      const depth = Number(lastText.match(/Depth (\d+)\/20/)?.[1] ?? 0);
-      if (depth >= minimumDepth) {
-        return;
-      }
-    } catch (error) {
-      lastText = error?.message ?? String(error);
-    }
-    await sleep(25);
-  }
-  throw new Error(`Timed out waiting for an active Stockfish search. Last text: "${lastText}"`);
-}

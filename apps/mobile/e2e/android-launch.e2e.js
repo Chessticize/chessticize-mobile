@@ -1,22 +1,7 @@
 const {
-  collectAndroidUiDiagnostics,
   launchWithDisabledSynchronization,
+  withAndroidUiDiagnostics,
 } = require('./helpers');
-
-async function withAndroidUiDiagnostics(action) {
-  try {
-    await action();
-  } catch (error) {
-    try {
-      collectAndroidUiDiagnostics();
-    } catch (diagnosticsError) {
-      console.log(
-        `[android-ui-diagnostics] collection failed: ${diagnosticsError?.message ?? String(diagnosticsError)}`
-      );
-    }
-    throw error;
-  }
-}
 
 describe('Android launch baseline', () => {
   beforeAll(async () => {

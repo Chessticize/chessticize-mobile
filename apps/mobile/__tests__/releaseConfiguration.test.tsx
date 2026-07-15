@@ -4,6 +4,10 @@ import { createMobilePracticeService } from "../src/backend/mobilePractice";
 import { enableTestControlsFromLaunchConfig } from "../src/backend/testLaunchConfig";
 import { PracticePocScreen } from "../src/components/PracticePocScreen";
 import { createTestMobilePlatformCapabilities } from "../src/testing/testMobilePlatformCapabilities";
+import {
+  expectNoRenderedTextHasNonPositiveFontSize,
+  flattenTestStyle
+} from "../test-support/testRendererSupport";
 
 type TestGlobal = typeof globalThis & {
   __CHESSTICIZE_ENABLE_TEST_CONTROLS__?: boolean;
@@ -41,28 +45,6 @@ function press(renderer: TestRenderer.ReactTestRenderer, testID: string): void {
   act(() => {
     node.props.onPress();
   });
-}
-
-function expectNoRenderedTextHasNonPositiveFontSize(renderer: TestRenderer.ReactTestRenderer): void {
-  for (const node of renderer.root.findAll((candidate) => String(candidate.type) === "Text")) {
-    const style = flattenTestStyle(node.props.style);
-    if (typeof style.fontSize === "number") {
-      expect(style.fontSize).toBeGreaterThan(0);
-    }
-  }
-}
-
-function flattenTestStyle(style: unknown): Record<string, unknown> {
-  if (!style) {
-    return {};
-  }
-  if (Array.isArray(style)) {
-    return style.reduce<Record<string, unknown>>(
-      (merged, entry) => Object.assign(merged, flattenTestStyle(entry)),
-      {}
-    );
-  }
-  return typeof style === "object" ? { ...(style as Record<string, unknown>) } : {};
 }
 
 describe("release configuration integration", () => {
