@@ -194,6 +194,17 @@ describe('Android launch baseline', () => {
     expect(workflow).toContain('apps/mobile/artifacts/android-ui/');
   });
 
+  it('keeps the API 36 Stockfish condition in one emulator-runner script line', () => {
+    const workflow = read('../../.github/workflows/mobile-android.yml');
+
+    expect(workflow).toContain(
+      'if [ "${{ matrix.api-level }}" = "36" ]; then DETOX_ACTIVE_SUITE=android-stockfish pnpm mobile:e2e:test:android:ci; fi'
+    );
+    expect(workflow).not.toMatch(
+      /if \[ "\$\{\{ matrix\.api-level \}\}" = "36" \]; then\s*\n\s*DETOX_ACTIVE_SUITE=android-stockfish/
+    );
+  });
+
   it('uses the doctor-verified SDK with a self-contained offline Android E2E app', () => {
     const androidDetoxScript = read('scripts/android-test-for-detox.sh');
 
