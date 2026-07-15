@@ -269,14 +269,53 @@ describe('Android launch baseline', () => {
     expect(workflow).toContain('timeout-minutes: 75');
   });
 
+  it('keeps emulator-runner launch control flow on complete shell command lines', () => {
+    const workflow = read('../../.github/workflows/mobile-android.yml');
+    const launchJob = workflow.slice(
+      workflow.indexOf('  android-launch:'),
+      workflow.indexOf('  android-progress-backup:'),
+    );
+    const script = launchJob.slice(
+      launchJob.indexOf('          script: |'),
+      launchJob.indexOf('        env:'),
+    );
+
+    for (const line of script.split('\n').map((entry) => entry.trim()).filter(Boolean)) {
+      if (/^(?:if|elif)\b/.test(line)) {
+        expect(line).toMatch(/\bfi$/);
+      }
+      if (/^(?:for|while|until)\b/.test(line)) {
+        expect(line).toMatch(/\bdone$/);
+      }
+      if (/^case\b/.test(line)) {
+        expect(line).toMatch(/\besac$/);
+      }
+      expect(line).not.toMatch(/^(?:else|fi|do|done|esac)\b/);
+      expect(line).not.toMatch(/^[A-Za-z_][A-Za-z0-9_]*\(\)\s*\{$/);
+    }
+  });
+
   it('captures API 24 startup evidence outside the Jest timeout boundary', () => {
     const workflow = read('../../.github/workflows/mobile-android.yml');
+    const diagnosticScript = read('scripts/run-android-api24-launch-diagnostic.sh');
 
-    expect(workflow).toContain('DETOX_ACTIVE_SUITE=android-launch pnpm mobile:e2e:test:android:ci');
-    expect(workflow).toContain('trap capture_api24_startup EXIT');
-    expect(workflow).toContain('logcat -d -v threadtime > apps/mobile/artifacts/android-ui/logcat-raw.txt');
-    expect(workflow).toContain('dumpsys activity activities > apps/mobile/artifacts/android-ui/activity.txt');
-    expect(workflow).toContain('dumpsys window windows > apps/mobile/artifacts/android-ui/window.txt');
+    expect(workflow).toContain(
+      'if [ "${{ matrix.api-level }}" = "24" ]; then sh apps/mobile/scripts/run-android-api24-launch-diagnostic.sh; fi'
+    );
+    expect(diagnosticScript).toContain('DETOX_ACTIVE_SUITE=android-launch pnpm mobile:e2e:test:android:ci');
+    expect(diagnosticScript).toContain('trap capture_api24_startup 0');
+    expect(diagnosticScript).toContain('status=$?');
+    expect(diagnosticScript).toContain('trap - 0');
+    expect(diagnosticScript).toContain('exit "$status"');
+    expect(diagnosticScript).toContain(
+      'logcat -d -v threadtime > apps/mobile/artifacts/android-ui/logcat-raw.txt'
+    );
+    expect(diagnosticScript).toContain(
+      'dumpsys activity activities > apps/mobile/artifacts/android-ui/activity.txt'
+    );
+    expect(diagnosticScript).toContain(
+      'dumpsys window windows > apps/mobile/artifacts/android-ui/window.txt'
+    );
   });
 
   it('uses the doctor-verified SDK with a self-contained offline Android E2E app', () => {
