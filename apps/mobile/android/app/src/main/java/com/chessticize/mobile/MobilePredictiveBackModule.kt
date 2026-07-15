@@ -170,7 +170,7 @@ class MobilePredictiveBackModule(
   }
 
   private companion object {
-    const val TAG = "MobilePredictiveBack"
+    const val TAG = "ChessticizeMobileBack"
     const val DEBUG_PREFIX = "[DEBUG-pr201-back-native]"
   }
 }
