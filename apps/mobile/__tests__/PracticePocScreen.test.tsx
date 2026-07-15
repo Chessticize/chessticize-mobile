@@ -189,7 +189,19 @@ describe("PracticePocScreen", () => {
     });
     expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
 
-    expect(systemBack.invoke()).toBe(true);
+    const subscriptionsBeforeGesture = systemBack.subscribe.mock.calls.length;
+    const unsubscriptionsBeforeGesture = systemBack.unsubscribe.mock.calls.length;
+    systemBack.startPredictive("left");
+    systemBack.progressPredictive(0.5, "left");
+    expect(collectText(findByTestId(renderer, "mobile-back-destination-preview-label"))).toBe("Practice");
+    expect(systemBack.subscribe).toHaveBeenCalledTimes(subscriptionsBeforeGesture);
+    expect(systemBack.unsubscribe).toHaveBeenCalledTimes(unsubscriptionsBeforeGesture);
+
+    systemBack.cancelPredictive();
+    expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
+    systemBack.startPredictive("right");
+    systemBack.progressPredictive(0.8, "right");
+    expect(systemBack.commitPredictive()).toBe(true);
     expect(() => findByTestId(renderer, "sprint-summary-panel")).toThrow();
     expect(findByTestId(renderer, "practice-home")).toBeTruthy();
   });
@@ -269,11 +281,30 @@ describe("PracticePocScreen", () => {
     press(renderer, "review-analysis-button");
     expect(findByTestId(renderer, "review-close-analysis")).toBeTruthy();
 
-    expect(systemBack.invoke()).toBe(true);
+    let subscriptionsBeforeGesture = systemBack.subscribe.mock.calls.length;
+    let unsubscriptionsBeforeGesture = systemBack.unsubscribe.mock.calls.length;
+    systemBack.startPredictive("left");
+    systemBack.progressPredictive(0.55, "left");
+    expect(collectText(findByTestId(renderer, "mobile-back-destination-preview-label"))).toBe("Review session");
+    expect(systemBack.subscribe).toHaveBeenCalledTimes(subscriptionsBeforeGesture);
+    expect(systemBack.unsubscribe).toHaveBeenCalledTimes(unsubscriptionsBeforeGesture);
+
+    systemBack.cancelPredictive();
+    expect(findByTestId(renderer, "review-close-analysis")).toBeTruthy();
+    systemBack.startPredictive("right");
+    systemBack.progressPredictive(0.75, "right");
+    expect(systemBack.commitPredictive()).toBe(true);
     expect(() => findByTestId(renderer, "review-close-analysis")).toThrow();
     expect(findByTestId(renderer, "review-session")).toBeTruthy();
 
-    expect(systemBack.invoke()).toBe(true);
+    subscriptionsBeforeGesture = systemBack.subscribe.mock.calls.length;
+    unsubscriptionsBeforeGesture = systemBack.unsubscribe.mock.calls.length;
+    systemBack.startPredictive("left");
+    systemBack.progressPredictive(0.6, "left");
+    expect(collectText(findByTestId(renderer, "mobile-back-destination-preview-label"))).toBe("Review");
+    expect(systemBack.subscribe).toHaveBeenCalledTimes(subscriptionsBeforeGesture);
+    expect(systemBack.unsubscribe).toHaveBeenCalledTimes(unsubscriptionsBeforeGesture);
+    expect(systemBack.commitPredictive()).toBe(true);
     expect(() => findByTestId(renderer, "review-session")).toThrow();
     expect(findByTestId(renderer, "review-panel")).toBeTruthy();
   });

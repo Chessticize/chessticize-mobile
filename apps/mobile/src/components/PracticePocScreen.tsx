@@ -1821,17 +1821,20 @@ export function PracticePocScreen({
               : tab === "practice" && mode === "custom" && customRatingEditorOpen
                 ? "custom-rating-editor"
                 : null;
-  const backDetail: MobileBackDetail | null = reviewAnalysisOpen && (tab === "history" || tab === "review")
-    ? { kind: "review-analysis", owner: tab }
-    : reviewSurfaceOpen && (tab === "history" || tab === "review")
-      ? { kind: "review-session", owner: tab }
-      : tab === "analysis"
-        ? { kind: "stockfish-diagnostics", owner: "settings" }
-        : isFinished
-          ? { kind: "sprint-result", owner: "practice" }
-          : tab === "practice" && state === null && mode === "custom"
-            ? { kind: "custom-practice", owner: "practice" }
-            : null;
+  const backDetail = useMemo<MobileBackDetail | null>(
+    () => reviewAnalysisOpen && (tab === "history" || tab === "review")
+      ? { kind: "review-analysis", owner: tab }
+      : reviewSurfaceOpen && (tab === "history" || tab === "review")
+        ? { kind: "review-session", owner: tab }
+        : tab === "analysis"
+          ? { kind: "stockfish-diagnostics", owner: "settings" }
+          : isFinished
+            ? { kind: "sprint-result", owner: "practice" }
+            : tab === "practice" && state === null && mode === "custom"
+              ? { kind: "custom-practice", owner: "practice" }
+              : null,
+    [isFinished, mode, reviewAnalysisOpen, reviewSurfaceOpen, state, tab]
+  );
   const mobileBackState: MobileBackState = {
     activePractice: isOpenSession,
     detail: backDetail,

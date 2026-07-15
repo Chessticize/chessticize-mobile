@@ -79,10 +79,13 @@ describe('Android product-aware system Back', () => {
       await element(by.id('back-practice-button')).tap();
       await waitFor(element(by.id('practice-home'))).toExist().withTimeout(10000);
 
-      await device.pressBack();
+      const rootPredictiveBack = beginAndroidPredictiveBackGesture();
+      await sleep(500);
+      await expect(element(by.id('mobile-back-destination-preview'))).not.toExist();
+      await rootPredictiveBack.completion;
       await sleep(750);
       if (androidAppIsResumed()) {
-        throw new Error('Idle Practice root trapped system Back instead of delegating to Android.');
+        throw new Error('Idle Practice root trapped Predictive Back instead of delegating to Android.');
       }
     });
   });

@@ -460,6 +460,8 @@ describe('Detox suite configuration', () => {
     expect(spec).toContain('mobile-back-destination-preview');
     expect(spec).toContain('cancel: true');
     expect(spec).toContain('androidAppIsResumed');
+    expect(spec).toContain('const rootPredictiveBack = beginAndroidPredictiveBackGesture()');
+    expect(spec).toContain('Idle Practice root trapped Predictive Back');
   });
 
   it('rejects mixing the two screenshot capture suites in one invocation', () => {

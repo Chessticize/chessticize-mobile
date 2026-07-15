@@ -2,12 +2,24 @@ package com.chessticize.mobile
 
 import android.content.Intent
 import android.os.Bundle
+import android.os.Build
+import androidx.activity.OnBackPressedCallback
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
 import com.facebook.react.defaults.DefaultReactActivityDelegate
 
-class MainActivity : ReactActivity() {
+interface ReactNativeBackCallbackController {
+  fun setReactNativeBackHandlingEnabled(enabled: Boolean)
+}
+
+class MainActivity : ReactActivity(), ReactNativeBackCallbackController {
+  private val reactNativeBackPressedCallback: OnBackPressedCallback by lazy(LazyThreadSafetyMode.NONE) {
+    val callbackField = ReactActivity::class.java.getDeclaredField("mBackPressedCallback")
+    @Suppress("DEPRECATION")
+    callbackField.isAccessible = true
+    callbackField.get(this) as OnBackPressedCallback
+  }
 
   override fun onCreate(savedInstanceState: Bundle?) {
     ChessticizeTestLaunchArguments.capture(intent)
@@ -18,6 +30,18 @@ class MainActivity : ReactActivity() {
     super.onNewIntent(intent)
     setIntent(intent)
     ChessticizeTestLaunchArguments.capture(intent)
+  }
+
+  /**
+   * React Native 0.86 keeps its target-36 callback private. The frontend tells
+   * this activity only whether app-level Back is currently available; disabling
+   * the pinned callback at root lets Android own its predictive home animation.
+   */
+  override fun setReactNativeBackHandlingEnabled(enabled: Boolean) {
+    if (Build.VERSION.SDK_INT < 36 || applicationInfo.targetSdkVersion < 36) {
+      return
+    }
+    reactNativeBackPressedCallback.isEnabled = enabled
   }
 
   /**

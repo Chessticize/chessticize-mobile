@@ -18,8 +18,9 @@ import com.facebook.react.modules.core.DeviceEventManagerModule
 import com.facebook.react.uimanager.ViewManager
 
 /**
- * API-34 gesture telemetry only. Product destinations, interception policy,
- * previews, cancellation, and commits remain in the typed TypeScript shell.
+ * API-34 gesture telemetry plus a boolean platform-ownership switch. Product
+ * destinations, previews, cancellation, and commits remain in the typed
+ * TypeScript shell.
  */
 class MobilePredictiveBackModule(
   reactContext: ReactApplicationContext,
@@ -38,14 +39,7 @@ class MobilePredictiveBackModule(
   fun setEnabled(enabled: Boolean) {
     enabledRequested = enabled
     reactApplicationContext.runOnUiQueueThread {
-      if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-        return@runOnUiQueueThread
-      }
-      if (enabledRequested) {
-        register(currentActivity)
-      } else {
-        unregister()
-      }
+      updatePlatformBackRegistration()
     }
   }
 
@@ -56,9 +50,7 @@ class MobilePredictiveBackModule(
   fun removeListeners(count: Int) = Unit
 
   override fun onHostResume() {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE && enabledRequested) {
-      reactApplicationContext.runOnUiQueueThread { register(currentActivity) }
-    }
+    reactApplicationContext.runOnUiQueueThread { updatePlatformBackRegistration() }
   }
 
   override fun onHostPause() = Unit
@@ -72,10 +64,32 @@ class MobilePredictiveBackModule(
   override fun invalidate() {
     enabledRequested = false
     reactApplicationContext.removeLifecycleEventListener(this)
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-      reactApplicationContext.runOnUiQueueThread { unregister() }
+    reactApplicationContext.runOnUiQueueThread {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        unregister()
+      }
+      (reactApplicationContext.currentActivity as? ReactNativeBackCallbackController)
+        ?.setReactNativeBackHandlingEnabled(true)
     }
     super.invalidate()
+  }
+
+  private fun updatePlatformBackRegistration() {
+    val activity = reactApplicationContext.currentActivity
+    if (enabledRequested) {
+      (activity as? ReactNativeBackCallbackController)
+        ?.setReactNativeBackHandlingEnabled(true)
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        register(activity)
+      }
+      return
+    }
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+      unregister()
+    }
+    (activity as? ReactNativeBackCallbackController)
+      ?.setReactNativeBackHandlingEnabled(false)
   }
 
   @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)

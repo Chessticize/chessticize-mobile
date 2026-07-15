@@ -157,6 +157,25 @@ describe('Android launch baseline', () => {
     expect(debugNetworkConfig).toContain('<domain includeSubdomains="true">localhost</domain>');
   });
 
+  it('keeps predictive Back activity access compilable and delegates idle root to Android', () => {
+    const activity = read('android/app/src/main/java/com/chessticize/mobile/MainActivity.kt');
+    const predictiveBackModule = read(
+      'android/app/src/main/java/com/chessticize/mobile/MobilePredictiveBackModule.kt'
+    );
+    const pinnedReactActivity = read(
+      'node_modules/react-native/ReactAndroid/src/main/java/com/facebook/react/ReactActivity.java'
+    );
+
+    expect(predictiveBackModule).toContain('reactApplicationContext.currentActivity');
+    expect(predictiveBackModule).not.toMatch(/register\(currentActivity\)/);
+    expect(activity).toContain('ReactNativeBackCallbackController');
+    expect(activity).toContain('mBackPressedCallback');
+    expect(activity).toContain('reactNativeBackPressedCallback.isEnabled = enabled');
+    expect(predictiveBackModule).toContain('setReactNativeBackHandlingEnabled(false)');
+    expect(predictiveBackModule).toContain('setReactNativeBackHandlingEnabled(true)');
+    expect(pinnedReactActivity).toContain('private final OnBackPressedCallback mBackPressedCallback');
+  });
+
   it('preserves iOS Detox while exposing the Android debug app and attached device', () => {
     expect(detoxConfig.configurations['ios.sim.debug']).toEqual({
       device: 'simulator',
