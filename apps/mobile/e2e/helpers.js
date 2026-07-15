@@ -4,6 +4,7 @@ const path = require('node:path');
 const { androidAdbPath } = require('./androidNetwork');
 
 const ANDROID_UI_DIAGNOSTICS_DIR = path.resolve(__dirname, '../artifacts/android-ui');
+const ANDROID_STARTUP_DIAGNOSTICS = 'CHESSTICIZE_ANDROID_STARTUP_DIAGNOSTICS';
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -99,7 +100,8 @@ function beginAndroidPredictiveBackGesture(
   { cancel = false, durationMs = 1800 } = {},
   environment = process.env,
   run = execFileSync,
-  spawnProcess = spawn
+  spawnProcess = spawn,
+  targetDevice
 ) {
   const adb = androidAdbPath(environment);
   const serial = environment.DETOX_ANDROID_DEVICE || 'emulator-5554';
@@ -111,8 +113,20 @@ function beginAndroidPredictiveBackGesture(
     run(adb, ['-s', serial, 'shell', 'wm', 'size'], { encoding: 'utf8' }) ?? ''
   );
   const { widthPixels, heightPixels } = parseAndroidDisplaySize(sizeOutput);
+  if (cancel) {
+    installCancelledPredictiveBackDriver();
+    const uiDevice = (targetDevice ?? device)?.getUiDevice?.();
+    if (!uiDevice?.cancelPredictiveBack) {
+      throw new Error('Detox UiDevice is unavailable for a cancelled Predictive Back gesture.');
+    }
+    return {
+      completion: Promise.resolve(
+        uiDevice.cancelPredictiveBack(widthPixels, heightPixels, durationMs)
+      ).then(() => undefined),
+    };
+  }
   const centerY = Math.round(heightPixels / 2);
-  const endX = Math.round(widthPixels * (cancel ? 0.06 : 0.7));
+  const endX = Math.round(widthPixels * 0.7);
   const child = spawnProcess(adb, [
     '-s', serial, 'shell', 'input', 'swipe', '1', String(centerY), String(endX), String(centerY), String(durationMs)
   ], { stdio: ['ignore', 'pipe', 'pipe'] });
@@ -133,6 +147,26 @@ function beginAndroidPredictiveBackGesture(
   return { completion };
 }
 
+function installCancelledPredictiveBackDriver() {
+  // Detox's UiDevice proxy exposes only methods on this generated adapter. Add
+  // one static test invocation while leaving the rest of Detox untouched.
+  const UiDevice = require('detox/src/android/espressoapi/UIDevice');
+  if (UiDevice.cancelPredictiveBack) {
+    return;
+  }
+  UiDevice.cancelPredictiveBack = (_uiDevice, widthPixels, heightPixels, durationMs) => ({
+    target: {
+      type: 'Class',
+      value: 'com.chessticize.mobile.PredictiveBackGestureDriver',
+    },
+    method: 'cancelPredictiveBack',
+    args: [widthPixels, heightPixels, durationMs].map((value) => ({
+      type: 'Integer',
+      value,
+    })),
+  });
+}
+
 function androidAppIsResumed(
   environment = process.env,
   run = execFileSync
@@ -146,6 +180,18 @@ function androidAppIsResumed(
     .split('\n')
     .some((line) => /(?:mResumedActivity|topResumedActivity)/.test(line)
       && line.includes('com.chessticize.mobile'));
+}
+
+function clearAndroidStartupDiagnosticsLogcat(
+  environment = process.env,
+  run = execFileSync
+) {
+  if (environment[ANDROID_STARTUP_DIAGNOSTICS] !== '1') {
+    return;
+  }
+  const adb = androidAdbPath(environment);
+  const serial = environment.DETOX_ANDROID_DEVICE || 'emulator-5554';
+  run(adb, ['-s', serial, 'logcat', '-c'], { encoding: 'utf8' });
 }
 
 function collectAndroidUiDiagnostics(
@@ -224,11 +270,21 @@ function collectAndroidUiDiagnostics(
   log(`[android-ui-diagnostics] process state\n${processState}`);
   writeDiagnostic('process-state.txt', processState);
 
+  const captureStartupLogcat = environment[ANDROID_STARTUP_DIAGNOSTICS] === '1';
   const rawLogcat = runDiagnostic(
     'logcat',
-    ['logcat', '-d', '-v', 'threadtime', '-t', '2000'],
-    { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024, timeout: 30000 }
+    captureStartupLogcat
+      ? ['logcat', '-d', '-v', 'threadtime']
+      : ['logcat', '-d', '-v', 'threadtime', '-t', '2000'],
+    {
+      encoding: 'utf8',
+      maxBuffer: (captureStartupLogcat ? 25 : 10) * 1024 * 1024,
+      timeout: 30000,
+    }
   );
+  if (captureStartupLogcat && rawLogcat !== null) {
+    writeDiagnostic('logcat-raw.txt', rawLogcat);
+  }
   const logcat = rawLogcat === null
     ? null
     : String(rawLogcat)
@@ -572,6 +628,7 @@ module.exports = {
   androidAppIsResumed,
   beginAndroidPredictiveBackGesture,
   bringAndroidAppToForeground,
+  clearAndroidStartupDiagnosticsLogcat,
   collectAndroidUiDiagnostics,
   elementText,
   openTab,

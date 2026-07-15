@@ -20,6 +20,7 @@ const {
   bringAndroidAppToForeground,
   androidAppIsResumed,
   beginAndroidPredictiveBackGesture,
+  clearAndroidStartupDiagnosticsLogcat,
   collectAndroidUiDiagnostics,
   launchWithDisabledSynchronization,
   performAndroidPredictiveBackGesture,
@@ -240,6 +241,37 @@ describe('Detox suite configuration', () => {
     expect(log).toHaveBeenCalledWith(expect.stringContaining('<node text="Practice" />'));
   });
 
+  it('preserves the full API 24 startup log after clearing the pre-launch buffer', () => {
+    const startupLog = [
+      '07-15 19:13:40.000 4242 4242 I ChessticizeStartup: before-package',
+      '07-15 19:13:40.001 4242 4242 E AndroidRuntime: verifier failure',
+    ].join('\n');
+    const run = jest.fn((_command, args) => args.includes('logcat') ? startupLog : '');
+    const fileSystem = {
+      mkdirSync: jest.fn(),
+      writeFileSync: jest.fn(),
+    };
+    const environment = {
+      ANDROID_HOME: '/sdk',
+      DETOX_ANDROID_DEVICE: 'emulator-5556',
+      CHESSTICIZE_ANDROID_STARTUP_DIAGNOSTICS: '1',
+    };
+
+    clearAndroidStartupDiagnosticsLogcat(environment, run);
+    collectAndroidUiDiagnostics(environment, run, fileSystem, jest.fn(), '/artifacts/android-ui');
+
+    expect(run).toHaveBeenCalledWith('/sdk/platform-tools/adb', [
+      '-s', 'emulator-5556', 'logcat', '-c'
+    ], { encoding: 'utf8' });
+    expect(run).toHaveBeenCalledWith('/sdk/platform-tools/adb', [
+      '-s', 'emulator-5556', 'logcat', '-d', '-v', 'threadtime'
+    ], { encoding: 'utf8', maxBuffer: 25 * 1024 * 1024, timeout: 30000 });
+    expect(fileSystem.writeFileSync).toHaveBeenCalledWith(
+      '/artifacts/android-ui/logcat-raw.txt',
+      startupLog
+    );
+  });
+
   it('shares Android UI diagnostics around launch and Stockfish failures', async () => {
     const launchSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/android-launch.e2e.js'), 'utf8');
     const stockfishSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/android-stockfish.e2e.js'), 'utf8');
@@ -436,16 +468,61 @@ describe('Detox suite configuration', () => {
     const child = new EventEmitter();
     child.stderr = new EventEmitter();
     const spawnProcess = jest.fn(() => child);
+    const cancelPredictiveBack = jest.fn().mockResolvedValue(true);
+    const targetDevice = {
+      getUiDevice: jest.fn(() => ({ cancelPredictiveBack })),
+    };
 
     const gesture = beginAndroidPredictiveBackGesture(
       { cancel: true, durationMs: 1200 },
+      { ADB_PATH: '/sdk/adb', DETOX_ANDROID_DEVICE: 'emulator-6000' },
+      run,
+      spawnProcess,
+      targetDevice
+    );
+
+    expect(targetDevice.getUiDevice).toHaveBeenCalledTimes(1);
+    expect(cancelPredictiveBack).toHaveBeenCalledWith(1080, 1920, 1200);
+    expect(spawnProcess).not.toHaveBeenCalled();
+    const UiDevice = require('detox/src/android/espressoapi/UIDevice');
+    expect(UiDevice.cancelPredictiveBack({ type: 'Invocation' }, 1080, 1920, 1200)).toEqual({
+      target: {
+        type: 'Class',
+        value: 'com.chessticize.mobile.PredictiveBackGestureDriver',
+      },
+      method: 'cancelPredictiveBack',
+      args: [1080, 1920, 1200].map((value) => ({ type: 'Integer', value })),
+    });
+    await expect(gesture.completion).resolves.toBeUndefined();
+  });
+
+  it('keeps the cancelled gesture public-UI-only and preserves committed edge geometry', async () => {
+    const driver = fs.readFileSync(path.resolve(
+      __dirname,
+      '../android/app/src/androidTest/java/com/chessticize/mobile/PredictiveBackGestureDriver.java'
+    ), 'utf8');
+    expect(driver).toContain('only injects touchscreen input through UiAutomator');
+    expect(driver).toContain('new Point(1, centerY)');
+    expect(driver).toContain('widthPixels * 0.45f');
+    expect(driver.match(/activated,/g)).toHaveLength(2);
+    expect(driver).toContain('widthPixels * 0.03f');
+    expect(driver).toContain('durationMs / segmentCount / UI_AUTOMATOR_STEP_DURATION_MS');
+    expect(driver).toContain('.swipe(path, segmentSteps)');
+    expect(driver).not.toMatch(/React|Repository|NativeModule/);
+
+    const run = jest.fn((_, args) => args.includes('size') ? 'Physical size: 1080x1920\n' : '');
+    const child = new EventEmitter();
+    child.stderr = new EventEmitter();
+    const spawnProcess = jest.fn(() => child);
+    const gesture = beginAndroidPredictiveBackGesture(
+      {},
       { ADB_PATH: '/sdk/adb', DETOX_ANDROID_DEVICE: 'emulator-6000' },
       run,
       spawnProcess
     );
 
     expect(spawnProcess).toHaveBeenCalledWith('/sdk/adb', [
-      '-s', 'emulator-6000', 'shell', 'input', 'swipe', '1', '960', '65', '960', '1200'
+      '-s', 'emulator-6000', 'shell', 'input', 'swipe', '1', '960', '756', '960', '1800'
     ], { stdio: ['ignore', 'pipe', 'pipe'] });
     child.emit('close', 0);
     await expect(gesture.completion).resolves.toBeUndefined();

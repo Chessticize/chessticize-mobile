@@ -1,10 +1,12 @@
 const {
+  clearAndroidStartupDiagnosticsLogcat,
   launchWithDisabledSynchronization,
   withAndroidUiDiagnostics,
 } = require('./helpers');
 
 describe('Android launch baseline', () => {
   beforeAll(async () => {
+    clearAndroidStartupDiagnosticsLogcat();
     await withAndroidUiDiagnostics(async () => {
       await launchWithDisabledSynchronization({
         resetAppState: true,

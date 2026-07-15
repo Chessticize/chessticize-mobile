@@ -32,6 +32,7 @@ class MobilePredictiveBackModule(
   private var registrationGeneration = 0
 
   init {
+    Log.i(STARTUP_TAG, "$STARTUP_PREFIX predictive-module-init")
     reactContext.addLifecycleEventListener(this)
   }
 
@@ -172,15 +173,31 @@ class MobilePredictiveBackModule(
   private companion object {
     const val TAG = "ChessticizeMobileBack"
     const val DEBUG_PREFIX = "[DEBUG-pr201-back-native]"
+    const val STARTUP_TAG = "ChessticizeStartup"
+    const val STARTUP_PREFIX = "[DEBUG-pr201-api24-startup]"
   }
 }
 
 class MobilePredictiveBackPackage : ReactPackage {
+  init {
+    Log.i(STARTUP_TAG, "$STARTUP_PREFIX predictive-package-init")
+  }
+
   override fun createNativeModules(
     reactContext: ReactApplicationContext,
-  ): List<NativeModule> = listOf(MobilePredictiveBackModule(reactContext))
+  ): List<NativeModule> {
+    Log.i(STARTUP_TAG, "$STARTUP_PREFIX predictive-package-before-module")
+    val module = MobilePredictiveBackModule(reactContext)
+    Log.i(STARTUP_TAG, "$STARTUP_PREFIX predictive-package-after-module")
+    return listOf(module)
+  }
 
   override fun createViewManagers(
     reactContext: ReactApplicationContext,
   ): List<ViewManager<*, *>> = emptyList()
+
+  private companion object {
+    const val STARTUP_TAG = "ChessticizeStartup"
+    const val STARTUP_PREFIX = "[DEBUG-pr201-api24-startup]"
+  }
 }
