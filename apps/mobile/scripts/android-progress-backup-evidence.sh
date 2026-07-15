@@ -59,8 +59,10 @@ trap cleanup EXIT
 
 adb_cmd shell bmgr enable true
 if [[ "$MODE" == "cloud-encrypted" ]]; then
+  # Set AOSP LocalTransport's test-only encryption capability before selecting
+  # the transport so its service observes the capability during activation.
+  adb_cmd shell settings put secure backup_local_transport_parameters 'fake_encryption_flag=true'
   adb_cmd shell bmgr transport "$LOCAL_TRANSPORT" | grep -F "Selected transport"
-  adb_cmd shell settings put secure backup_local_transport_parameters 'is_encrypted=true'
 else
   sdk_level="$(adb_cmd shell getprop ro.build.version.sdk | tr -d '\r')"
   if (( sdk_level < 31 )); then

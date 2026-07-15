@@ -102,9 +102,17 @@ describe('Android Progress Backup', () => {
 
   it('normalizes one leading separator from the nested root pnpm invocation', () => {
     const workflow = readRepo('.github/workflows/mobile-android.yml');
+    const rootPackage = JSON.parse(readRepo('package.json'));
+    const mobilePackage = JSON.parse(read('package.json'));
 
     expect(workflow).toContain(
       'pnpm mobile:verify:android:backup -- --adb-device emulator-5554 --json',
+    );
+    expect(rootPackage.scripts['mobile:verify:android:backup']).toBe(
+      'pnpm --filter ChessticizeMobile verify:android:backup',
+    );
+    expect(mobilePackage.scripts['verify:android:backup']).toBe(
+      'node scripts/verify-android-progress-backup.js',
     );
     expect(parseArguments(['--', '--adb-device', 'emulator-5554', '--json'])).toEqual({
       json: true,
@@ -169,10 +177,20 @@ describe('Android Progress Backup', () => {
 
     expect(suiteConfig).toContain('android-progress-backup-restore.e2e.js');
     expect(evidenceScript).toContain('com.android.localtransport/.LocalTransport');
-    expect(evidenceScript).toContain("backup_local_transport_parameters 'is_encrypted=true'");
+    expect(evidenceScript).toContain(
+      "backup_local_transport_parameters 'fake_encryption_flag=true'",
+    );
+    expect(evidenceScript.indexOf('fake_encryption_flag=true')).toBeLessThan(
+      evidenceScript.indexOf('bmgr transport "$LOCAL_TRANSPORT"'),
+    );
     expect(evidenceScript).toContain('com.google.android.gms/.backup.migrate.service.D2dTransport');
     expect(evidenceScript).toContain('backup_enable_d2d_test_mode 1');
-    expect(evidenceScript).toContain('bmgr backupnow');
+    expect(evidenceScript).toContain(
+      'grep -F "Package $APP_ID with result: Success"',
+    );
+    expect(evidenceScript).not.toContain(
+      'grep -F "Backup finished with result: Success"',
+    );
     expect(evidenceScript).toContain('bmgr init "$D2D_TRANSPORT"');
     expect(evidenceScript).toContain('pm uninstall --user 0');
     expect(evidenceScript).toContain('install-multiple -t --user 0');
