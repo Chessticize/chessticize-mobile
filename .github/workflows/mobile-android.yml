@@ -69,6 +69,13 @@ jobs:
       - name: Mobile typecheck
         run: pnpm mobile:typecheck
 
+      - name: Android backup policy unit tests
+        working-directory: apps/mobile/android
+        run: >-
+          ./gradlew :app:testDebugUnitTest
+          --tests com.chessticize.mobile.backup.ProgressBackupPolicyTest
+          --no-daemon
+
       - name: Verify explicit and aggregate release tasks fail closed
         working-directory: apps/mobile/android
         run: |
@@ -260,7 +267,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        api-level: [24, 30]
+        api-level: [24, 30, 36]
     steps:
       - name: Checkout
         uses: actions/checkout@v4

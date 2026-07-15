@@ -76,13 +76,13 @@ function describeCommandFailure(error) {
 
 function measureDeviceFiles({ adbPath, serial, run = execFileSync }) {
   return PROGRESS_DATABASE_FILES.flatMap(name => {
+    let output;
     try {
-      const output = run(
+      output = run(
         adbPath,
         ['-s', serial, 'shell', 'run-as', APP_ID, 'stat', '-c', '%s', join('databases', name)],
         { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
       );
-      return [{ name, bytes: Number(String(output).trim()) }];
     } catch (error) {
       const isRequired = name === PROGRESS_DATABASE_FILES[0];
       if (!isRequired && isExplicitMissingDeviceFile(error, name)) {
@@ -93,6 +93,19 @@ function measureDeviceFiles({ adbPath, serial, run = execFileSync }) {
         `Unable to measure ${fileKind} ${name} on ${serial}: ${describeCommandFailure(error)}`,
       );
     }
+    const normalizedOutput = String(output).trim();
+    if (!/^\d+$/.test(normalizedOutput)) {
+      throw new Error(
+        `Invalid stat byte count for ${name} on ${serial}: ${JSON.stringify(normalizedOutput)}`,
+      );
+    }
+    const bytes = Number(normalizedOutput);
+    if (!Number.isSafeInteger(bytes)) {
+      throw new Error(
+        `Invalid stat byte count for ${name} on ${serial}: ${JSON.stringify(normalizedOutput)}`,
+      );
+    }
+    return [{ name, bytes }];
   });
 }
 

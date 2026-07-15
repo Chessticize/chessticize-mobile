@@ -34,6 +34,7 @@ describe('Android Progress Backup', () => {
     const modern = read('android/app/src/main/res/xml/data_extraction_rules.xml');
 
     expect(manifest).toContain('android:allowBackup="true"');
+    expect(manifest).toContain('android:fullBackupOnly="true"');
     expect(manifest).toContain('android:fullBackupContent="@xml/backup_rules"');
     expect(manifest).toContain('android:dataExtractionRules="@xml/data_extraction_rules"');
 
@@ -167,6 +168,22 @@ describe('Android Progress Backup', () => {
       serial: 'emulator-5554',
       run: () => { throw missingRequired; },
     })).toThrow('Unable to measure required progress database');
+  });
+
+  it.each([
+    ['', 'empty'],
+    [' \n', 'whitespace-only'],
+    ['12.5\n', 'decimal'],
+    ['1e3\n', 'exponent'],
+    ['-1\n', 'negative'],
+    ['9007199254740992\n', 'out-of-range'],
+    ['123 bytes\n', 'mixed text'],
+  ])('rejects %s successful stat output before quota assessment (%s)', (output) => {
+    expect(() => measureDeviceFiles({
+      adbPath: '/sdk/adb',
+      serial: 'emulator-5554',
+      run: () => output,
+    })).toThrow('Invalid stat byte count');
   });
 
   it('normalizes one leading separator from the nested root pnpm invocation', () => {
@@ -337,12 +354,27 @@ describe('Android Progress Backup', () => {
     expect(policy.replace(/\s+/g, ' ')).toContain('does not enable transfer between Android and iOS');
   });
 
-  it('runs the real APK through API 24 and API 30 framework policy selection', () => {
+  it('runs the real APK through API 24, API 30, and API 36 backup policy selection', () => {
     const workflow = readRepo('.github/workflows/mobile-android.yml');
     const policyEvidenceScript = read('scripts/android-progress-backup-policy-evidence.sh');
+    const manifest = read('android/app/src/main/AndroidManifest.xml');
+    const backupAgent = read(
+      'android/app/src/main/java/com/chessticize/mobile/backup/ProgressBackupAgent.java',
+    );
+    const backupPolicy = read(
+      'android/app/src/main/java/com/chessticize/mobile/backup/ProgressBackupPolicy.java',
+    );
+    const backupPolicyTest = read(
+      'android/app/src/test/java/com/chessticize/mobile/backup/ProgressBackupPolicyTest.java',
+    );
+    const backupContract = read('docs/ANDROID_PROGRESS_BACKUP.md');
 
     expect(workflow).toContain('android-progress-backup-policy:');
-    expect(workflow).toContain('api-level: [24, 30]');
+    expect(workflow).toContain('api-level: [24, 30, 36]');
+    expect(workflow).toContain('./gradlew :app:testDebugUnitTest');
+    expect(workflow).toContain(
+      '--tests com.chessticize.mobile.backup.ProgressBackupPolicyTest',
+    );
     expect(workflow).toContain(
       'script: apps/mobile/scripts/android-progress-backup-policy-evidence.sh',
     );
@@ -351,22 +383,91 @@ describe('Android Progress Backup', () => {
     );
     expect(policyEvidenceScript).toContain('set -euo pipefail');
     expect(policyEvidenceScript).toContain('case "$SDK_LEVEL"');
-    expect(policyEvidenceScript).toContain("run_case encrypted-advertised 'is_encrypted=true");
-    expect(policyEvidenceScript).toContain("run_case no-capability 'is_encrypted=false");
-    expect(policyEvidenceScript).toContain("run_case encrypted 'is_encrypted=true");
+    expect(policyEvidenceScript).toContain(
+      "run_case no-capability 'non_incremental_only=false' 0 false 0 none",
+    );
+    expect(policyEvidenceScript).toContain(
+      "run_case encryption-only 'is_encrypted=true,is_device_transfer=false",
+    );
+    expect(policyEvidenceScript).toContain(
+      "run_case d2d-only 'is_encrypted=false,is_device_transfer=true",
+    );
+    expect(policyEvidenceScript).toContain(
+      "run_case both 'is_encrypted=true,is_device_transfer=true",
+    );
     expect(policyEvidenceScript).toContain('adb_cmd shell bmgr init "$LOCAL_TRANSPORT"');
     expect(policyEvidenceScript).toContain(
       'adb_cmd shell bmgr wipe "$LOCAL_TRANSPORT" "$APP_ID"',
     );
-    expect(policyEvidenceScript).toContain('BackupXmlParserLogging');
-    expect(policyEvidenceScript).toContain('$case_name-parser-log.txt');
     expect(policyEvidenceScript).toContain('$case_name-transport-archive-paths.txt');
-    expect(policyEvidenceScript).toContain('$case_name-database-archive-entries.txt');
-    expect(policyEvidenceScript).toContain('seeded-database-sha256.txt');
+    expect(policyEvidenceScript).toContain('$case_name-app-data-archive-entries.txt');
+    expect(policyEvidenceScript).toContain('seeded-app-data-sha256.txt');
     expect(policyEvidenceScript).toContain('Android backup policy fixture markers must be unique');
-    expect(policyEvidenceScript).toContain('diff -u "$expected_entries" "$database_entries"');
+    expect(policyEvidenceScript).toContain('diff -u "$expected_entries" "$app_data_entries"');
     expect(policyEvidenceScript).toContain('workflow-artifact-apk-sha256.txt');
     expect(policyEvidenceScript).toContain('installed-apk-sha256.txt');
+    expect(manifest).toContain('android:backupAgent=".backup.ProgressBackupAgent"');
+    expect(backupAgent).not.toContain('super.onFullBackup');
+    expect(backupAgent).not.toContain('onRestoreFile');
+    expect(backupAgent.indexOf('Build.VERSION.SDK_INT < Build.VERSION_CODES.P'))
+      .toBeLessThan(backupAgent.indexOf('data.getTransportFlags()'));
+    expect(backupAgent.match(/fullBackupFile\(/g)).toHaveLength(1);
+    expect(backupPolicy).toContain(
+      'private static final String[] DATABASE_SUFFIXES = {"", "-journal", "-wal"};',
+    );
+    expect(backupPolicy).toContain('!candidate.isFile()');
+    expect(backupPolicyTest).toContain('apiBeforeTransportFlagsFailsClosedForEveryMask');
+    expect(backupPolicyTest).toContain('apiWithTransportFlagsUsesOnceOnlyOrSemantics');
+    expect(backupPolicyTest).toContain(
+      'selectsOnlyCanonicalExistingRegularDatabaseFilesOnce',
+    );
+    expect(backupPolicyTest).toContain('returnsNoPayloadWhenMainAndSidecarsAreMissing');
+    expect(policyEvidenceScript).toContain('dd "of=$relative_path"');
+    expect(policyEvidenceScript).not.toContain('sh -c "cat > databases/$name"');
+    for (const capabilityCase of [
+      'neither',
+      'encryption-only',
+      'd2d-only',
+      'both',
+    ]) {
+      expect(policyEvidenceScript).toContain(capabilityCase);
+    }
+    for (const trap of [
+      'credential-root-trap.bin',
+      'credential-file-trap.bin',
+      'credential-sharedpref-trap.xml',
+      'credential-database-trap.bin',
+      'device-root-trap.bin',
+      'device-file-trap.bin',
+      'device-sharedpref-trap.xml',
+      'device-database-trap.bin',
+    ]) {
+      expect(policyEvidenceScript).toContain(trap);
+    }
+    expect(policyEvidenceScript).toContain("APP_DATA_DOMAINS='r|f|db|sp|d_r|d_f|d_db|d_sp|ef'");
+    expect(policyEvidenceScript).toContain('commit-sha=$GITHUB_SHA');
+    expect(policyEvidenceScript).toContain('build-result=success');
+    expect(policyEvidenceScript).toContain('exact-commands=');
+    expect(policyEvidenceScript).toContain('validation-scope=');
+    expect(policyEvidenceScript).toContain('scope-rationale=');
+    expect(policyEvidenceScript).toContain('artifact-name=');
+    expect(policyEvidenceScript).toContain('artifact-identifier=');
+    expect(policyEvidenceScript).toContain('artifact-url=');
+    expect(policyEvidenceScript).toContain('tracked-worktree-before.txt');
+    expect(policyEvidenceScript).toContain('tracked-worktree-after.txt');
+    expect(policyEvidenceScript).toContain('result=pass');
+    expect(policyEvidenceScript).toContain(
+      'android11-release/packages/LocalTransport/src/com/android/localtransport/LocalTransportParameters.java',
+    );
+    expect(policyEvidenceScript).toContain(
+      'android-16.0.0_r1/packages/LocalTransport/src/com/android/localtransport/LocalTransportParameters.java',
+    );
+    expect(backupContract).toContain('`ProgressBackupAgent`');
+    expect(backupContract).toContain('`android:fullBackupOnly="true"`');
+    expect(backupContract).toContain('API 30 records the installed production');
+    expect(backupContract).toContain('API 36 uses the authoritative Android 16 LocalTransport');
+    expect(backupContract).toContain('default restore path continues to enforce the XML allowlist');
+    expect(backupContract).not.toContain('encrypted API 30 emits');
     for (const trap of [
       'chessticize-mobile.sqlite-journal-journal',
       'chessticize-mobile.sqlite-journal-wal',
@@ -384,9 +485,11 @@ describe('Android Progress Backup', () => {
     );
     expect(runCase.indexOf('reset_local_transport'))
       .toBeLessThan(runCase.indexOf('adb_cmd shell bmgr backupnow "$APP_ID"'));
-    expect(policyEvidenceScript.indexOf('assert_parser_selected_expected_resource "$case_name"'))
+    expect(policyEvidenceScript.indexOf(
+      'assert_agent_decision "$case_name" "$expected_flags"',
+    ))
       .toBeLessThan(policyEvidenceScript.indexOf(
-        'assert_database_archive_paths "$case_name" "$expected_payload"',
+        'assert_app_data_archive_paths "$case_name" "$expected_payload"',
       ));
   });
 });

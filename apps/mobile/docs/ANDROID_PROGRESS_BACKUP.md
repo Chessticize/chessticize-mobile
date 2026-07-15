@@ -6,16 +6,30 @@ does not add a Chessticize account or a cross-platform transfer path.
 
 ## Included data
 
-The Android backup rules explicitly allowlist only the main database:
+The Android backup rules explicitly allowlist only the main database for the
+inherited restore path:
 
 - `chessticize-mobile.sqlite`
 
-Android's backup parser automatically expands that database rule to the real
+Android's XML parser automatically expands that database rule to the real
 `chessticize-mobile.sqlite-journal` and `chessticize-mobile.sqlite-wal`
-sidecars. The XML must not list those sidecars itself: every explicit database
+sidecars. The restore XML must not list those sidecars itself: every explicit database
 path is expanded again, which would admit recursive suffixes such as
 `chessticize-mobile.sqlite-wal-wal`. This is the behavior implemented by
 [Android's `FullBackup` parser](https://android.googlesource.com/platform/frameworks/base/+/HEAD/core/java/android/app/backup/FullBackup.java#667).
+
+Backup emission is owned by the manifest-bound `ProgressBackupAgent`, not by
+default XML traversal. The application sets `android:fullBackupOnly="true"` so
+Android invokes file-based full backup instead of falling back to key-value
+backup. The agent never calls `super.onFullBackup(...)`. On API 28 and later it
+reads `FullBackupDataOutput.getTransportFlags()` and emits only the canonical,
+existing regular files for the main database and its exact `-journal` and
+`-wal` sidecars. Each file is considered once, and the payload is selected once
+when client-side encryption **or** device-to-device transfer is active, including
+when both flags are active. The agent does not override restore methods, so
+Android's default restore path continues to enforce the XML allowlist. See
+Android's guidance for [implementing a custom backup agent](https://developer.android.com/identity/data/autobackup#ImplementBackupAgent)
+and the [`fullBackupOnly` manifest attribute](https://developer.android.com/reference/android/R.attr#fullBackupOnly).
 
 The production path is deliberate: `MOBILE_DATABASE_LAYOUT` names
 `chessticize-mobile.sqlite`, `DeviceSQLiteStore.open(...)` passes that name to
@@ -34,20 +48,27 @@ restore. See SQLite's documentation on
 
 Settings, ratings, attempts, sessions, and the review queue already live in the
 progress database, so no shared preferences or extra metadata files are needed.
-The presence of explicit includes excludes every other eligible app file.
+The agent's explicit file selection excludes every other eligible app file
+during backup, and the XML includes enforce the same boundary during default
+restore.
 Bundled puzzle data and Stockfish networks remain installed application assets;
 caches, logs, temporary files, generated output, and test fixtures are outside
 the allowlist.
 
 ## Platform rules
 
-- API 24-27 fails closed because those versions cannot advertise the
-  client-side encryption and D2D transport flags added in API 28.
-- API 28-30 allows each progress database file only when the transport reports
-  either client-side encryption or device-to-device transfer.
+- API 24-27 fails closed in `ProgressBackupAgent` before it touches
+  `getTransportFlags()`, because those versions cannot advertise the
+  client-side encryption and D2D transport flags added in API 28. The base XML
+  restore rules also contain no include.
+- API 28+ emits the exact progress payload once only when the framework delivers
+  the client-side encryption flag, the D2D flag, or both. Neither flag emits no
+  app-data payload.
 - API 31+ uses separate `cloud-backup` and `device-transfer` sections. Cloud
   backup sets `disableIfNoEncryptionCapabilities="true"`; D2D remains available
-  under Android's supported device-transfer behavior.
+  under Android's supported device-transfer behavior. These sections remain the
+  inherited default restore allowlist; the agent enforces the same capability
+  boundary for backup.
 - No `cross-platform-transfer` section is declared.
 
 These choices follow the current Android guidance for
@@ -75,12 +96,27 @@ For an installed debuggable evidence build:
 pnpm mobile:verify:android:backup -- --adb-device emulator-5554 --json
 ```
 
-The exact-head Android workflow first runs the real APK against Android's backup
-parser and LocalTransport on API 24 and API 30. It proves that API 24 emits no
-database payload even when encryption is advertised, API 30 emits no database
-payload without a qualifying capability, and encrypted API 30 emits exactly the
-main database, journal, and WAL once while rejecting recursive suffix traps. It
-also creates progress through public UI, measures the real database payload,
+The exact-head Android workflow gates the pure Java policy and canonical-file
+selector before building the APK, then runs that APK against the Android backup
+framework and LocalTransport on API 24, API 30, and API 36. API 24 proves the
+pre-flags agent path fails closed. API 30 records the installed production
+resource configuration and proves a delivered mask of `0` emits no app-data
+payload; it is intentionally parser/no-capability evidence because Android 11's
+LocalTransport supports only `fake_encryption_flag` and
+`non_incremental_only`, not real encryption or D2D capability parameters. See
+the authoritative
+[Android 11 LocalTransport parameters](https://android.googlesource.com/platform/frameworks/base/+/android11-release/packages/LocalTransport/src/com/android/localtransport/LocalTransportParameters.java).
+
+API 36 uses the authoritative Android 16 LocalTransport `is_encrypted` and
+`is_device_transfer` parameters and asserts the agent receives masks `0`, `1`,
+`2`, and `3`. It proves neither emits no app data and encryption-only, D2D-only,
+and both emit exactly the main database, journal, and WAL once. Every payload
+case rejects unique nonzero traps across credential- and device-protected root,
+files, shared-preference, and database domains, plus recursive sidecar and
+`-shm` traps. See the authoritative
+[Android 16 LocalTransport parameters](https://android.googlesource.com/platform/frameworks/base/+/android-16.0.0_r1/packages/LocalTransport/src/com/android/localtransport/LocalTransportParameters.java).
+
+The workflow also creates progress through public UI, measures the real database payload,
 exercises an encrypted local cloud transport restore,
 then backs up and restores the immutable released SQLite fixture through the
 Android D2D transport. Both clean-install restores launch the real app and
