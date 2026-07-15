@@ -542,7 +542,9 @@ describe('Detox suite configuration', () => {
     expect(driver).toContain('widthPixels * 0.45f');
     expect(driver.match(/activated,/g)).toHaveLength(2);
     expect(driver).toContain('widthPixels * 0.03f');
-    expect(driver).toContain('durationMs / segmentCount / UI_AUTOMATOR_STEP_DURATION_MS');
+    expect(driver).toContain('UI_AUTOMATOR_FRAME_DURATION_MS = 16');
+    expect(driver).toContain('durationMs / segmentCount / UI_AUTOMATOR_FRAME_DURATION_MS');
+    expect(driver).not.toContain('UI_AUTOMATOR_STEP_DURATION_MS = 5');
     expect(driver).toContain('.swipe(path, segmentSteps)');
     expect(driver).toContain('startCancelledPredictiveBack');
     expect(driver).toContain('awaitCancelledPredictiveBack');

@@ -12,7 +12,10 @@ import androidx.test.uiautomator.UiDevice;
  * handlers, native product modules, or test-only product state.
  */
 public final class PredictiveBackGestureDriver {
-  private static final int UI_AUTOMATOR_STEP_DURATION_MS = 5;
+  // UiDevice guarantees only a 5 ms minimum delay per swipe step, while exact API 36 CI
+  // delivered these steps at roughly display-frame cadence (16-20 ms). Use a nominal
+  // 60 Hz frame interval so the requested gesture duration remains bounded in CI.
+  private static final int UI_AUTOMATOR_FRAME_DURATION_MS = 16;
   private static final long COMPLETION_MARGIN_MS = 5_000L;
   private static final Object GESTURE_LOCK = new Object();
 
@@ -103,7 +106,7 @@ public final class PredictiveBackGestureDriver {
       int segmentCount = path.length - 1;
       int segmentSteps = Math.max(
           1,
-          durationMs / segmentCount / UI_AUTOMATOR_STEP_DURATION_MS
+          durationMs / segmentCount / UI_AUTOMATOR_FRAME_DURATION_MS
       );
       boolean injected = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
           .swipe(path, segmentSteps);
