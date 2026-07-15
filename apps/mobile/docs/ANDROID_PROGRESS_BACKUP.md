@@ -7,7 +7,7 @@ does not add a Chessticize account or a cross-platform transfer path.
 ## Included data
 
 The Android backup rules explicitly allowlist only the main database for the
-inherited restore path:
+inherited restore path on API 28 and later:
 
 - `chessticize-mobile.sqlite`
 
@@ -65,9 +65,15 @@ the allowlist.
   `getTransportFlags()`, because those versions cannot advertise the
   client-side encryption and D2D transport flags added in API 28. The base XML
   restore rules also contain no include.
-- API 28+ emits the exact progress payload once only when the framework delivers
-  the client-side encryption flag, the D2D flag, or both. Neither flag emits no
-  app-data payload.
+- API 28-30 XML contains one path-only main-database include for inherited file
+  restore. Its former duplicated `requireFlags` backup conditions were
+  redundant because the custom agent never invokes default XML backup
+  traversal. During inherited restore, Android uses parsed includes for path
+  membership and does not consult their backup transport requirements.
+- API 28+ backup capability policy therefore lives only in
+  `ProgressBackupAgent`: it emits the exact progress payload when the framework
+  delivers the client-side encryption flag, the D2D flag, or both. Neither
+  flag emits no app-data payload.
 - API 31+ uses separate `cloud-backup` and `device-transfer` sections. Cloud
   backup sets `disableIfNoEncryptionCapabilities="true"`; D2D remains available
   under Android's supported device-transfer behavior. These sections remain the
@@ -103,10 +109,10 @@ pnpm mobile:verify:android:backup -- --adb-device emulator-5554 --json
 The exact-head Android workflow gates the pure Java policy and canonical-file
 selector before building the APK, then runs that APK against the Android backup
 framework and LocalTransport on API 24, API 30, and API 36. API 24 proves the
-pre-flags agent path fails closed. API 30 records the installed production
-resource configuration and proves a delivered mask of `0` emits no app-data
-payload; it is intentionally parser/no-capability evidence because Android 11's
-LocalTransport supports only `fake_encryption_flag` and
+pre-flags agent path fails closed. API 30 proves a delivered mask of `0` emits
+no app-data payload through the same agent policy used on newer releases; it is
+intentionally no-capability evidence because Android 11's LocalTransport
+supports only `fake_encryption_flag` and
 `non_incremental_only`, not real encryption or D2D capability parameters. See
 the authoritative
 [Android 11 LocalTransport parameters](https://android.googlesource.com/platform/frameworks/base/+/android11-release/packages/LocalTransport/src/com/android/localtransport/LocalTransportParameters.java).
@@ -129,9 +135,12 @@ The workflow also creates progress through public UI, measures the real
 database payload, and exercises an encrypted local cloud transport restore.
 For the released migration case, it clears the app data, seeds the immutable
 schema-v0 SQLite fixture, and records its exact byte size, SHA-256, user version,
-schema, package state, and absent process before backup. No activity or Detox
-journey launches between seeding and the D2D BackupManager invocation, and a
-second hash check proves the fixture is still unchanged. Only after clean
+schema, package state, and absent process before backup. Because `pm clear`
+marks the package stopped, the lane first proves Android 16 exposes `pm unstop`,
+uses it to clear `FLAG_STOPPED` without launching an activity, and records
+`stopped=false`. No activity or Detox journey launches between seeding and the
+D2D BackupManager invocation; repeated stat, hash, schema, and user-version
+checks prove the fixture is still unchanged. Only after clean
 uninstall, reinstall, and system restore does Detox launch the public UI; that
 launch exercises the normal startup migration and asserts the preserved legacy
 rating and history row with the fixture-aligned clock.

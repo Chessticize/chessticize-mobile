@@ -27,7 +27,7 @@ function includePaths(xml) {
 }
 
 describe('Android Progress Backup', () => {
-  it('uses API-appropriate encrypted-cloud and device-transfer allowlists', () => {
+  it('uses API-appropriate restore allowlists with agent-owned backup policy', () => {
     const manifest = read('android/app/src/main/AndroidManifest.xml');
     const legacyBase = read('android/app/src/main/res/xml/backup_rules.xml');
     const legacyEncryptedAndD2d = read('android/app/src/main/res/xml-v28/backup_rules.xml');
@@ -44,9 +44,9 @@ describe('Android Progress Backup', () => {
     }
 
     expect(includePaths(legacyEncryptedAndD2d)).toEqual([
-      { path: PROGRESS_DATABASE_FILES[0], flags: 'clientSideEncryption' },
-      { path: PROGRESS_DATABASE_FILES[0], flags: 'deviceToDeviceTransfer' },
+      { path: PROGRESS_DATABASE_FILES[0], flags: undefined },
     ]);
+    expect(legacyEncryptedAndD2d).not.toContain('requireFlags');
 
     expect(modern).toContain('<cloud-backup disableIfNoEncryptionCapabilities="true">');
     expect(modern).toContain('<device-transfer>');
@@ -386,12 +386,12 @@ describe('Android Progress Backup', () => {
 
     expect(evidenceScript).toContain('device-transfer-released-fixture');
     for (const artifact of [
-      'released-fixture-pre-backup-stat.txt',
-      'released-fixture-pre-backup-sha256.txt',
-      'released-fixture-pre-backup-user-version.txt',
-      'released-fixture-pre-backup-schema.sql',
-      'released-fixture-pre-backup-package-state.txt',
-      'released-fixture-pre-backup-process.txt',
+      'released-fixture-$evidence_prefix-stat.txt',
+      'released-fixture-$evidence_prefix-sha256.txt',
+      'released-fixture-$evidence_prefix-user-version.txt',
+      'released-fixture-$evidence_prefix-schema.sql',
+      'released-fixture-$evidence_prefix-package-state.txt',
+      'released-fixture-$evidence_prefix-process.txt',
     ]) {
       expect(evidenceScript).toContain(artifact);
     }
@@ -403,7 +403,7 @@ describe('Android Progress Backup', () => {
     expect(seedBranch).not.toContain('am force-stop');
     expect(seedBranch).not.toContain('MainActivity');
     expect(evidenceScript).toMatch(
-      /if \[\[ "\$MODE" == "cloud-encrypted" \]\]; then[\s\S]*?am start -W -n "\$APP_ID\/\.MainActivity"[\s\S]*?else\s+assert_released_fixture_unlaunched\s+fi\s+adb_cmd logcat -c/,
+      /if \[\[ "\$MODE" == "cloud-encrypted" \]\]; then[\s\S]*?am start -W -n "\$APP_ID\/\.MainActivity"[\s\S]*?else\s+assert_released_fixture_ready_for_backup at-backup\s+fi\s+adb_cmd logcat -c/,
     );
 
     const seedIndex = restoreEvidenceScript.indexOf(seedCommand);
@@ -415,6 +415,95 @@ describe('Android Progress Backup', () => {
     expect(restoreEvidenceScript.slice(seedIndex, backupIndex)).not.toContain('MainActivity');
     expect(restoreEvidenceScript.slice(seedIndex, backupIndex)).not.toContain(
       'mobile:e2e:test:android',
+    );
+  });
+
+  it('clears FLAG_STOPPED without launching or changing the released fixture', () => {
+    const evidenceScript = read('scripts/android-progress-backup-evidence.sh');
+    const seedBranch = evidenceScript.slice(
+      evidenceScript.indexOf('if [[ "$MODE" == "seed-released-fixture" ]]'),
+      evidenceScript.indexOf('original_transport='),
+    );
+    const clearIndex = seedBranch.indexOf('adb_cmd shell pm clear "$APP_ID"');
+    const seedIndex = seedBranch.indexOf(
+      'adb_cmd shell run-as "$APP_ID" cp "$device_fixture" databases/chessticize-mobile.sqlite',
+    );
+    const preflightIndex = seedBranch.indexOf('preflight_pm_unstop');
+    const unstopIndex = seedBranch.indexOf('adb_cmd shell pm unstop --user 0 "$APP_ID"');
+    const readyIndex = seedBranch.indexOf(
+      'assert_released_fixture_ready_for_backup pre-backup',
+    );
+
+    expect(evidenceScript).toContain("grep -F 'unstop [--user USER_ID] PACKAGE'");
+    expect(evidenceScript).toContain('Package manager does not support pm unstop');
+    expect(clearIndex).toBeGreaterThan(-1);
+    expect(clearIndex).toBeLessThan(seedIndex);
+    expect(seedIndex).toBeLessThan(preflightIndex);
+    expect(preflightIndex).toBeLessThan(unstopIndex);
+    expect(unstopIndex).toBeLessThan(readyIndex);
+    expect(seedBranch).not.toContain('MainActivity');
+    expect(seedBranch).not.toContain('am start');
+    expect(evidenceScript).toContain('stopped=false');
+    expect(evidenceScript).toContain(
+      'released-fixture-$evidence_prefix-package-state.txt',
+    );
+    expect(evidenceScript).toContain(
+      'assert_released_fixture_ready_for_backup at-backup',
+    );
+    expect(evidenceScript.indexOf('assert_released_fixture_ready_for_backup at-backup'))
+      .toBeLessThan(evidenceScript.indexOf('adb_cmd shell bmgr backupnow --monitor-verbose'));
+  });
+
+  it('uses single-token remote stat formats and composes path-size evidence on the host', () => {
+    const scriptPaths = [
+      'scripts/android-progress-backup-policy-evidence.sh',
+      'scripts/android-progress-backup-evidence.sh',
+      'scripts/android-progress-backup-restore-evidence.sh',
+    ];
+
+    for (const scriptPath of scriptPaths) {
+      const script = read(scriptPath);
+      expect(script).not.toContain('%n %s');
+    }
+
+    const policyEvidenceScript = read(scriptPaths[0]);
+    const restoreEvidenceScript = read(scriptPaths[1]);
+    expect(policyEvidenceScript).toContain(
+      'adb_cmd shell run-as "$APP_ID" stat -c %s "$relative_path"',
+    );
+    expect(restoreEvidenceScript).toContain(
+      'adb_cmd shell run-as "$APP_ID" stat -c %s "$relative_path"',
+    );
+    expect(policyEvidenceScript).toContain(
+      'printf \'%s %s\\n\' "$relative_path" "$measured_size"',
+    );
+    expect(restoreEvidenceScript).toContain(
+      'printf \'%s %s\\n\' "$relative_path" "$measured_size"',
+    );
+  });
+
+  it('hashes a nonempty streamed installed APK on the host for API 24 provenance', () => {
+    const policyEvidenceScript = read('scripts/android-progress-backup-policy-evidence.sh');
+
+    expect(policyEvidenceScript).toContain(
+      'adb_cmd exec-out cat "$installed_path" > "$installed_apk"',
+    );
+    expect(policyEvidenceScript).toContain('if [[ ! -s "$installed_apk" ]]');
+    expect(policyEvidenceScript).toContain('Installed APK stream was empty');
+    expect(policyEvidenceScript).toContain(
+      'sha256sum "$installed_apk" > "$ARTIFACT_DIR/installed-apk-sha256.txt"',
+    );
+    expect(policyEvidenceScript).toContain(
+      'Installed APK does not match the downloaded exact-head APK',
+    );
+    expect(policyEvidenceScript).not.toContain(
+      'adb_cmd shell sha256sum "$installed_path"',
+    );
+    expect(policyEvidenceScript).not.toContain(
+      'adb_cmd shell run-as "$APP_ID" sha256sum',
+    );
+    expect(policyEvidenceScript).toContain(
+      'adb_cmd exec-out run-as "$APP_ID" cat "$relative_path"',
     );
   });
 
@@ -555,7 +644,7 @@ describe('Android Progress Backup', () => {
     );
     expect(backupContract).toContain('`ProgressBackupAgent`');
     expect(backupContract).toContain('`android:fullBackupOnly="true"`');
-    expect(backupContract).toContain('API 30 records the installed production');
+    expect(backupContract).toContain('API 30 proves a delivered mask of `0`');
     expect(backupContract).toContain('API 36 uses the authoritative Android 16 LocalTransport');
     expect(backupContract).toContain(
       'default file restore path continues to enforce the XML',

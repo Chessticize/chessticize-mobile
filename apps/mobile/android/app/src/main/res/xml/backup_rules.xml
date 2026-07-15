@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   API 24-27 cannot advertise client-side encryption or D2D transport flags.
-  Fail closed on those releases so progress is never sent to unencrypted cloud
-  backup. API 28+ selects the qualified allowlist in res/xml-v28.
+  ProgressBackupAgent fails closed on those releases, and this resource has no
+  restore include. API 28-30 selects the path-only restore allowlist in
+  res/xml-v28 while the agent owns all backup capability decisions.
 -->
 <full-backup-content>
     <exclude domain="root" path="." />

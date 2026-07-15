@@ -29,6 +29,31 @@ adb_cmd() {
   "$ADB" -s "$DEVICE" "$@"
 }
 
+remote_file_size() {
+  local relative_path="$1"
+  local measured_size
+
+  if ! measured_size="$(adb_cmd shell run-as "$APP_ID" stat -c %s "$relative_path" 2>&1 \
+      | tr -d '\r')"; then
+    echo "Remote stat command failed for $relative_path: $measured_size" >&2
+    exit 1
+  fi
+  if [[ ! "$measured_size" =~ ^[0-9]+$ ]] || (( measured_size <= 0 )); then
+    echo "Remote stat returned an invalid size for $relative_path: ${measured_size:-<empty>}" >&2
+    exit 1
+  fi
+  printf '%s' "$measured_size"
+}
+
+record_remote_file_stat() {
+  local relative_path="$1"
+  local artifact="$2"
+  local measured_size
+
+  measured_size="$(remote_file_size "$relative_path")"
+  printf '%s %s\n' "$relative_path" "$measured_size" > "$artifact"
+}
+
 capture_transport_state() {
   adb_cmd shell bmgr list transports \
     | tee "$ARTIFACT_DIR/$MODE-selected-transport.txt"
@@ -48,66 +73,84 @@ capture_backup_diagnostics() {
     | tee "$ARTIFACT_DIR/$MODE-dumpsys-backup.txt" || true
 }
 
-record_released_fixture_state() {
-  local fixture="$1"
-  local database_path="databases/chessticize-mobile.sqlite"
-  local pulled_database="$ARTIFACT_DIR/released-fixture-pre-backup.sqlite"
-  local source_hash
-  local device_hash
-  local pulled_hash
+preflight_pm_unstop() {
+  local help_artifact="$ARTIFACT_DIR/released-fixture-pm-help.txt"
 
-  command -v sqlite3 >/dev/null
-  adb_cmd shell run-as "$APP_ID" stat -c '%n %s' "$database_path" \
-    | tr -d '\r' > "$ARTIFACT_DIR/released-fixture-pre-backup-stat.txt"
-  adb_cmd shell run-as "$APP_ID" sha256sum "$database_path" \
-    | tr -d '\r' > "$ARTIFACT_DIR/released-fixture-pre-backup-sha256.txt"
-  adb_cmd exec-out run-as "$APP_ID" cat "$database_path" > "$pulled_database"
-  sha256sum "$fixture" > "$ARTIFACT_DIR/released-fixture-source-sha256.txt"
-  sha256sum "$pulled_database" > "$ARTIFACT_DIR/released-fixture-pulled-sha256.txt"
-  source_hash="$(cut -d ' ' -f 1 "$ARTIFACT_DIR/released-fixture-source-sha256.txt")"
-  device_hash="$(cut -d ' ' -f 1 "$ARTIFACT_DIR/released-fixture-pre-backup-sha256.txt")"
-  pulled_hash="$(cut -d ' ' -f 1 "$ARTIFACT_DIR/released-fixture-pulled-sha256.txt")"
-  if [[ "$source_hash" != "$device_hash" || "$source_hash" != "$pulled_hash" ]]; then
-    echo "Seeded released fixture does not match the immutable source fixture." >&2
+  if ! adb_cmd shell pm help 2>&1 | tr -d '\r' | tee "$help_artifact"; then
+    echo "Unable to inspect package-manager commands before released-fixture backup." >&2
     exit 1
   fi
-  sqlite3 "$pulled_database" 'PRAGMA user_version;' \
-    > "$ARTIFACT_DIR/released-fixture-pre-backup-user-version.txt"
-  sqlite3 "$pulled_database" '.schema' \
-    > "$ARTIFACT_DIR/released-fixture-pre-backup-schema.sql"
-  grep -Fx '0' "$ARTIFACT_DIR/released-fixture-pre-backup-user-version.txt"
-  grep -F 'CREATE TABLE attempts' "$ARTIFACT_DIR/released-fixture-pre-backup-schema.sql"
-  adb_cmd shell dumpsys package "$APP_ID" \
-    > "$ARTIFACT_DIR/released-fixture-pre-backup-package-state.txt"
-  : > "$ARTIFACT_DIR/released-fixture-pre-backup-process.txt"
-  if adb_cmd shell pidof "$APP_ID" \
-      | tr -d '\r' | tee "$ARTIFACT_DIR/released-fixture-pre-backup-process.txt" \
-      | grep -q .; then
-    echo "Released fixture app process started before backup." >&2
+  if ! grep -F 'unstop [--user USER_ID] PACKAGE' "$help_artifact"; then
+    echo "Package manager does not support pm unstop; cannot prove released-fixture backup eligibility without launching the app." >&2
     exit 1
   fi
 }
 
-assert_released_fixture_unlaunched() {
-  local before_hash
-  local at_backup_hash
+assert_released_fixture_ready_for_backup() {
+  local evidence_prefix="$1"
+  local database_path="databases/chessticize-mobile.sqlite"
+  local source_fixture="$REPO_ROOT/packages/storage/test/fixtures/migrations/schema-v0-ios-1.0.0.sqlite"
+  local pulled_database="$ARTIFACT_DIR/released-fixture-$evidence_prefix.sqlite"
+  local package_state="$ARTIFACT_DIR/released-fixture-$evidence_prefix-package-state.txt"
+  local process_state="$ARTIFACT_DIR/released-fixture-$evidence_prefix-process.txt"
+  local stat_artifact="$ARTIFACT_DIR/released-fixture-$evidence_prefix-stat.txt"
+  local hash_artifact="$ARTIFACT_DIR/released-fixture-$evidence_prefix-sha256.txt"
+  local user_version_artifact="$ARTIFACT_DIR/released-fixture-$evidence_prefix-user-version.txt"
+  local schema_artifact="$ARTIFACT_DIR/released-fixture-$evidence_prefix-schema.sql"
+  local user_state
+  local source_hash
+  local pulled_hash
 
-  : > "$ARTIFACT_DIR/released-fixture-at-backup-process.txt"
+  command -v sqlite3 >/dev/null
+  sha256sum "$source_fixture" > "$ARTIFACT_DIR/released-fixture-source-sha256.txt"
+  : > "$process_state"
   if adb_cmd shell pidof "$APP_ID" \
-      | tr -d '\r' | tee "$ARTIFACT_DIR/released-fixture-at-backup-process.txt" \
+      | tr -d '\r' | tee "$process_state" \
       | grep -q .; then
     echo "Released fixture app process started before BackupManager invocation." >&2
     exit 1
   fi
-  adb_cmd shell run-as "$APP_ID" stat -c '%n %s' databases/chessticize-mobile.sqlite \
-    | tr -d '\r' > "$ARTIFACT_DIR/released-fixture-at-backup-stat.txt"
-  adb_cmd shell run-as "$APP_ID" sha256sum databases/chessticize-mobile.sqlite \
-    | tr -d '\r' > "$ARTIFACT_DIR/released-fixture-at-backup-sha256.txt"
-  before_hash="$(cut -d ' ' -f 1 "$ARTIFACT_DIR/released-fixture-pre-backup-sha256.txt")"
-  at_backup_hash="$(cut -d ' ' -f 1 "$ARTIFACT_DIR/released-fixture-at-backup-sha256.txt")"
-  if [[ "$before_hash" != "$at_backup_hash" ]]; then
-    echo "Released fixture changed before BackupManager invocation." >&2
+  adb_cmd shell dumpsys package "$APP_ID" > "$package_state"
+  user_state="$(grep -E 'User 0:.*stopped=' "$package_state" | head -n 1 || true)"
+  if [[ -z "$user_state" || ! "$user_state" =~ (^|[[:space:]])stopped=false([[:space:]]|$) ]]; then
+    echo "Released fixture package is stopped or its stopped=false state cannot be proven." >&2
     exit 1
+  fi
+
+  record_remote_file_stat "$database_path" "$stat_artifact"
+  if ! adb_cmd exec-out run-as "$APP_ID" cat "$database_path" > "$pulled_database"; then
+    echo "Unable to stream the released fixture for $evidence_prefix evidence." >&2
+    exit 1
+  fi
+  if [[ ! -s "$pulled_database" ]]; then
+    echo "Released fixture stream was empty for $evidence_prefix evidence." >&2
+    exit 1
+  fi
+  sha256sum "$pulled_database" > "$hash_artifact"
+  sqlite3 "$pulled_database" 'PRAGMA user_version;' > "$user_version_artifact"
+  sqlite3 "$pulled_database" '.schema' > "$schema_artifact"
+  grep -Fx '0' "$user_version_artifact"
+  grep -F 'CREATE TABLE attempts' "$schema_artifact"
+
+  source_hash="$(cut -d ' ' -f 1 "$ARTIFACT_DIR/released-fixture-source-sha256.txt")"
+  pulled_hash="$(cut -d ' ' -f 1 "$hash_artifact")"
+  if [[ "$source_hash" != "$pulled_hash" ]]; then
+    echo "Released fixture no longer matches the immutable schema-v0 source." >&2
+    exit 1
+  fi
+  if [[ "$evidence_prefix" == "at-backup" ]]; then
+    cmp -s "$ARTIFACT_DIR/released-fixture-pre-backup-stat.txt" "$stat_artifact" || {
+      echo "Released fixture stat changed before BackupManager invocation." >&2
+      exit 1
+    }
+    cmp -s "$ARTIFACT_DIR/released-fixture-pre-backup-user-version.txt" "$user_version_artifact" || {
+      echo "Released fixture user_version changed before BackupManager invocation." >&2
+      exit 1
+    }
+    cmp -s "$ARTIFACT_DIR/released-fixture-pre-backup-schema.sql" "$schema_artifact" || {
+      echo "Released fixture schema changed before BackupManager invocation." >&2
+      exit 1
+    }
   fi
 }
 
@@ -121,7 +164,12 @@ if [[ "$MODE" == "seed-released-fixture" ]]; then
   adb_cmd shell run-as "$APP_ID" cp "$device_fixture" databases/chessticize-mobile.sqlite
   adb_cmd shell rm -f "$device_fixture"
   trap - EXIT
-  record_released_fixture_state "$fixture"
+  preflight_pm_unstop
+  if ! adb_cmd shell pm unstop --user 0 "$APP_ID"; then
+    echo "Unable to clear FLAG_STOPPED without launching the released fixture." >&2
+    exit 1
+  fi
+  assert_released_fixture_ready_for_backup pre-backup
   echo "Installed released progress fixture through the app database directory."
   exit 0
 fi
@@ -163,7 +211,7 @@ if [[ "$MODE" == "cloud-encrypted" ]]; then
   # A public launch clears that state; Android Backup quiesces the app itself.
   adb_cmd shell am start -W -n "$APP_ID/.MainActivity" | grep -F "Status: ok"
 else
-  assert_released_fixture_unlaunched
+  assert_released_fixture_ready_for_backup at-backup
 fi
 adb_cmd logcat -c
 backup_status=0

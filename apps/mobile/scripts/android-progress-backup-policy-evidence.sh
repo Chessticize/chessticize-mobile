@@ -33,6 +33,33 @@ adb_cmd() {
   "$ADB" -s "$DEVICE" "$@"
 }
 
+remote_file_size() {
+  local relative_path="$1"
+  local measured_size
+
+  if ! measured_size="$(adb_cmd shell run-as "$APP_ID" stat -c %s "$relative_path" 2>&1 \
+      | tr -d '\r')"; then
+    echo "Remote stat command failed for $relative_path: $measured_size" >&2
+    exit 1
+  fi
+  if [[ ! "$measured_size" =~ ^[0-9]+$ ]] || (( measured_size <= 0 )); then
+    echo "Remote stat returned an invalid size for $relative_path: ${measured_size:-<empty>}" >&2
+    exit 1
+  fi
+  printf '%s' "$measured_size"
+}
+
+record_remote_file_sha256() {
+  local relative_path="$1"
+  local artifact="$2"
+
+  if ! adb_cmd exec-out run-as "$APP_ID" cat "$relative_path" \
+      | sha256sum >> "$artifact"; then
+    echo "Unable to stream $relative_path for host-side SHA-256 evidence." >&2
+    exit 1
+  fi
+}
+
 wait_for_boot_completed() {
   local attempts=0
   local boot_completed=""
@@ -76,21 +103,15 @@ write_fixture_file() {
     echo "Fixture write command failed for $relative_path: $dd_output" >&2
     exit 1
   fi
-  if ! measured_size="$(adb_cmd shell run-as "$APP_ID" stat -c '%s' "$relative_path" 2>&1 \
-      | tr -d '\r')"; then
-    echo "Fixture stat command failed for $relative_path: $measured_size" >&2
-    exit 1
-  fi
-  if [[ ! "$measured_size" =~ ^[0-9]+$ ]] || (( measured_size <= 0 )); then
-    echo "Fixture write succeeded without a nonempty file for $relative_path: ${measured_size:-<empty>}" >&2
-    exit 1
-  fi
+  measured_size="$(remote_file_size "$relative_path")"
 }
 
 seed_app_data_fixture() {
   local credential_root
   local device_root="/data/user_de/0/$APP_ID"
   local index
+  local measured_size
+  local relative_path
   local paths=(
     databases/chessticize-mobile.sqlite
     databases/chessticize-mobile.sqlite-journal
@@ -147,10 +168,11 @@ seed_app_data_fixture() {
   : > "$ARTIFACT_DIR/seeded-app-data-files.txt"
   : > "$ARTIFACT_DIR/seeded-app-data-sha256.txt"
   for index in "${!paths[@]}"; do
-    adb_cmd shell run-as "$APP_ID" stat -c '%n %s' "${paths[$index]}" \
-      | tr -d '\r' >> "$ARTIFACT_DIR/seeded-app-data-files.txt"
-    adb_cmd shell run-as "$APP_ID" sha256sum "${paths[$index]}" \
-      | tr -d '\r' >> "$ARTIFACT_DIR/seeded-app-data-sha256.txt"
+    measured_size="$(remote_file_size "${paths[$index]}")"
+    relative_path="${paths[$index]}"
+    printf '%s %s\n' "$relative_path" "$measured_size" \
+      >> "$ARTIFACT_DIR/seeded-app-data-files.txt"
+    record_remote_file_sha256 "$relative_path" "$ARTIFACT_DIR/seeded-app-data-sha256.txt"
   done
   sort -o "$ARTIFACT_DIR/seeded-app-data-files.txt" "$ARTIFACT_DIR/seeded-app-data-files.txt"
   sort -o "$ARTIFACT_DIR/seeded-app-data-sha256.txt" "$ARTIFACT_DIR/seeded-app-data-sha256.txt"
@@ -181,6 +203,7 @@ find_transport_archive() {
 
 capture_installed_apk() {
   local installed_path
+  local installed_apk="$ARTIFACT_DIR/installed-base.apk"
   adb_cmd shell pm path "$APP_ID" | tr -d '\r' | tee "$ARTIFACT_DIR/installed-apk-paths.txt"
   installed_path="$(sed -n 's/^package://p' "$ARTIFACT_DIR/installed-apk-paths.txt" | head -n 1)"
   if [[ -z "$installed_path" ]]; then
@@ -188,12 +211,21 @@ capture_installed_apk() {
     exit 1
   fi
   sha256sum "$APK" > "$ARTIFACT_DIR/workflow-artifact-apk-sha256.txt"
-  adb_cmd shell sha256sum "$installed_path" | tr -d '\r' > "$ARTIFACT_DIR/installed-apk-sha256.txt"
+  if ! adb_cmd exec-out cat "$installed_path" > "$installed_apk"; then
+    echo "Unable to stream the installed APK for exact-head provenance." >&2
+    exit 1
+  fi
+  if [[ ! -s "$installed_apk" ]]; then
+    echo "Installed APK stream was empty; exact-head provenance cannot be proven." >&2
+    exit 1
+  fi
+  sha256sum "$installed_apk" > "$ARTIFACT_DIR/installed-apk-sha256.txt"
   if [[ "$(cut -d ' ' -f 1 "$ARTIFACT_DIR/workflow-artifact-apk-sha256.txt")" \
       != "$(cut -d ' ' -f 1 "$ARTIFACT_DIR/installed-apk-sha256.txt")" ]]; then
     echo "Installed APK does not match the downloaded exact-head APK." >&2
     exit 1
   fi
+  rm -f "$installed_apk"
   adb_cmd shell dumpsys package "$APP_ID" > "$ARTIFACT_DIR/installed-package.txt"
 }
 
@@ -303,6 +335,7 @@ assert_app_data_archive_paths() {
   local archive_entries="$ARTIFACT_DIR/$case_name-transport-archive-entries.txt"
   local app_data_entries="$ARTIFACT_DIR/$case_name-app-data-archive-entries.txt"
   local expected_entries="$ARTIFACT_DIR/$case_name-expected-app-data-entries.txt"
+  local archive_size
 
   find_transport_archive > "$archive_paths_file"
   : > "$archive_entries"
@@ -316,7 +349,9 @@ assert_app_data_archive_paths() {
     archive_path="$(cat "$archive_paths_file")"
     adb_cmd pull "$archive_path" "$archive" >/dev/null
     sha256sum "$archive" > "$ARTIFACT_DIR/$case_name-transport-archive-sha256.txt"
-    stat -c '%n %s' "$archive" > "$ARTIFACT_DIR/$case_name-transport-archive-stat.txt"
+    archive_size="$(stat -c %s "$archive")"
+    printf '%s %s\n' "$archive" "$archive_size" \
+      > "$ARTIFACT_DIR/$case_name-transport-archive-stat.txt"
     tar -tf "$archive" | sort > "$archive_entries"
     grep -E "^apps/$APP_ID/($APP_DATA_DOMAINS)/" "$archive_entries" \
       > "$app_data_entries" || true
@@ -430,7 +465,7 @@ adb_cmd shell bmgr enable true
   echo "transport=$LOCAL_TRANSPORT"
   echo "exact-commands=./gradlew :app:testDebugUnitTest --tests com.chessticize.mobile.backup.ProgressBackupPolicyTest --no-daemon; apps/mobile/scripts/android-progress-backup-policy-evidence.sh"
   echo "validation-scope=targeted native Android full-backup capability and allowlist policy"
-  echo "scope-rationale=API24 proves pre-transport-flags fail-closed behavior; API30 proves the production v28 resource is packaged while unsupported LocalTransport keys are not treated as capabilities; API36 proves authoritative LocalTransport masks 0,1,2,3 and once-only agent output"
+  echo "scope-rationale=API24 proves pre-transport-flags fail-closed behavior; API30 proves shared agent mask 0 while the path-only v28 restore allowlist is source-verified; API36 proves authoritative LocalTransport masks 0,1,2,3 and once-only agent output"
   echo "artifact-name=android-progress-backup-policy-api-$SDK_LEVEL"
   echo "artifact-identifier=run-${GITHUB_RUN_ID:-local}/android-progress-backup-policy-api-$SDK_LEVEL"
   echo "artifact-url=${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY:-local/repository}/actions/runs/${GITHUB_RUN_ID:-local}#artifacts"
