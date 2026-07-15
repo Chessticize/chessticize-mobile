@@ -2874,7 +2874,12 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "review-tab");
     press(renderer, "review-start-due");
-    const firstPuzzleId = collectText(findByTestId(renderer, "review-current-puzzle-id"));
+    const currentPuzzleIdMetric = findByTestId(renderer, "review-current-puzzle-id");
+    expectNoRenderedTextHasNonPositiveFontSize(renderer);
+    expect(hasStyleEntry(currentPuzzleIdMetric, "height", 0)).toBe(true);
+    expect(hasStyleEntry(currentPuzzleIdMetric, "opacity", 0)).toBe(true);
+    expect(hasStyleEntry(currentPuzzleIdMetric, "width", 0)).toBe(true);
+    const firstPuzzleId = collectText(currentPuzzleIdMetric);
     expectText(renderer, "1 / 2 · Standard");
 
     press(renderer, "review-exit");
@@ -4299,6 +4304,15 @@ function countStyleValue(node: TestRenderer.ReactTestInstance, value: string): n
 
 function hasStyleEntry(node: TestRenderer.ReactTestInstance, key: string, value: unknown): boolean {
   return countStyleEntry(node, key, value) > 0;
+}
+
+function expectNoRenderedTextHasNonPositiveFontSize(renderer: TestRenderer.ReactTestRenderer): void {
+  for (const node of renderer.root.findAll((candidate) => String(candidate.type) === "Text")) {
+    const fontSize = flattenTestStyle(node.props.style).fontSize;
+    if (typeof fontSize === "number") {
+      expect(fontSize).toBeGreaterThan(0);
+    }
+  }
 }
 
 function countStyleEntry(node: TestRenderer.ReactTestInstance, key: string, value: unknown): number {

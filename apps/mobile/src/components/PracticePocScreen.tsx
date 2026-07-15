@@ -8479,6 +8479,14 @@ function arrowFromTo(move: string): BoardMove | null {
   };
 }
 
+const FABRIC_SAFE_HIDDEN_TEXT_STYLE = {
+  // Android Fabric rejects zero-sized fonts even when the Text is fully hidden.
+  fontSize: 1,
+  height: 0,
+  opacity: 0,
+  width: 0
+} as const;
+
 const styles = StyleSheet.create({
   safeArea: {
     backgroundColor: "#F8FAFC",
@@ -9241,12 +9249,7 @@ const styles = StyleSheet.create({
     lineHeight: 11,
     textAlign: "center"
   },
-  reviewDueHiddenMetric: {
-    fontSize: 0,
-    height: 0,
-    opacity: 0,
-    width: 0
-  },
+  reviewDueHiddenMetric: FABRIC_SAFE_HIDDEN_TEXT_STYLE,
   reviewFilterScroller: {
     marginHorizontal: -UI_PADDING
   },
@@ -11091,12 +11094,7 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: "800"
   },
-  packCoverageHiddenText: {
-    fontSize: 0,
-    height: 0,
-    opacity: 0,
-    width: 0
-  },
+  packCoverageHiddenText: FABRIC_SAFE_HIDDEN_TEXT_STYLE,
   packRowMetaText: {
     color: "#64748B",
     fontSize: 11,

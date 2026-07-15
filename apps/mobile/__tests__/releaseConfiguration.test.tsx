@@ -43,6 +43,28 @@ function press(renderer: TestRenderer.ReactTestRenderer, testID: string): void {
   });
 }
 
+function expectNoRenderedTextHasNonPositiveFontSize(renderer: TestRenderer.ReactTestRenderer): void {
+  for (const node of renderer.root.findAll((candidate) => String(candidate.type) === "Text")) {
+    const style = flattenTestStyle(node.props.style);
+    if (typeof style.fontSize === "number") {
+      expect(style.fontSize).toBeGreaterThan(0);
+    }
+  }
+}
+
+function flattenTestStyle(style: unknown): Record<string, unknown> {
+  if (!style) {
+    return {};
+  }
+  if (Array.isArray(style)) {
+    return style.reduce<Record<string, unknown>>(
+      (merged, entry) => Object.assign(merged, flattenTestStyle(entry)),
+      {}
+    );
+  }
+  return typeof style === "object" ? { ...(style as Record<string, unknown>) } : {};
+}
+
 describe("release configuration integration", () => {
   const originalDev = testGlobal.__DEV__;
   const originalTestControls = testGlobal.__CHESSTICIZE_ENABLE_TEST_CONTROLS__;
@@ -86,6 +108,14 @@ describe("release configuration integration", () => {
     expect(findAllByTestId(renderer, "test-puzzle-source-control").length).toBeGreaterThan(0);
     press(renderer, "settings-tab");
     expect(findAllByTestId(renderer, "settings-stockfish-diagnostics").length).toBeGreaterThan(0);
+    const hiddenScheduleStatus = findAllByTestId(renderer, "settings-review-reminder-schedule-status")[0];
+    expect(hiddenScheduleStatus).toBeDefined();
+    expect(flattenTestStyle(hiddenScheduleStatus?.props.style)).toMatchObject({
+      height: 0,
+      opacity: 0,
+      width: 0
+    });
+    expectNoRenderedTextHasNonPositiveFontSize(renderer);
   });
 
   it("does not suppress LogBox warnings when App loads under a release-like global", () => {
