@@ -881,6 +881,28 @@ describe('Android Progress Backup', () => {
     );
   });
 
+  it('treats API 36 mask zero as an expected fail-closed transport rejection with no archive', () => {
+    const policyEvidenceScript = read('scripts/android-progress-backup-policy-evidence.sh');
+
+    expect(policyEvidenceScript).toMatch(
+      /run_case neither 'is_encrypted=false,is_device_transfer=false,log_agent_results=true' \\\s+0 false 0 no-archive \\\s+fail-closed-transport-rejection/,
+    );
+  });
+
+  it('selects and inspects the in-framework API 24 LocalTransport', () => {
+    const policyEvidenceScript = read('scripts/android-progress-backup-policy-evidence.sh');
+
+    expect(policyEvidenceScript).toContain(
+      'API24_LOCAL_TRANSPORT="android/com.android.internal.backup.LocalTransport"',
+    );
+    expect(policyEvidenceScript).toMatch(
+      /if \(\( SDK_LEVEL == 24 \)\); then\s+LOCAL_TRANSPORT="\$API24_LOCAL_TRANSPORT"\s+fi/,
+    );
+    expect(policyEvidenceScript).toContain(
+      '"/cache/backup/1/_full/$APP_ID"',
+    );
+  });
+
   it('bounds policy ADB operations and records timeout diagnostics', () => {
     const policyEvidenceScript = read('scripts/android-progress-backup-policy-evidence.sh');
 

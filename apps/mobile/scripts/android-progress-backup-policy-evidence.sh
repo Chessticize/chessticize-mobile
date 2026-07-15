@@ -4,6 +4,7 @@ set -euo pipefail
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO_ROOT="$(cd "$APP_DIR/../.." && pwd)"
 APP_ID="com.chessticize.mobile"
+API24_LOCAL_TRANSPORT="android/com.android.internal.backup.LocalTransport"
 LOCAL_TRANSPORT="com.android.localtransport/.LocalTransport"
 APP_DATA_DOMAINS='r|f|db|sp|d_r|d_f|d_db|d_sp|ef'
 SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
@@ -631,6 +632,9 @@ case "$SDK_LEVEL" in
     exit 64
     ;;
 esac
+if (( SDK_LEVEL == 24 )); then
+  LOCAL_TRANSPORT="$API24_LOCAL_TRANSPORT"
+fi
 ARTIFACT_DIR="$ARTIFACT_ROOT/api-$SDK_LEVEL"
 mkdir -p "$ARTIFACT_DIR"
 
@@ -717,7 +721,8 @@ elif (( SDK_LEVEL == 30 )); then
   apps/mobile/scripts/android-progress-backup-api30-restore-evidence.sh
 else
   run_case neither 'is_encrypted=false,is_device_transfer=false,log_agent_results=true' \
-    0 false 0 none
+    0 false 0 no-archive \
+    fail-closed-transport-rejection
   run_case encryption-only 'is_encrypted=true,is_device_transfer=false,log_agent_results=true' \
     1 true 3 exact-progress-files
   run_case d2d-only 'is_encrypted=false,is_device_transfer=true,log_agent_results=true' \
