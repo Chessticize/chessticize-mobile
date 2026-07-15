@@ -178,11 +178,14 @@ describe('Android Progress Backup', () => {
     expect(suiteConfig).toContain('android-progress-backup-restore.e2e.js');
     expect(evidenceScript).toContain('com.android.localtransport/.LocalTransport');
     expect(evidenceScript).toContain(
-      "backup_local_transport_parameters 'fake_encryption_flag=true'",
+      "backup_local_transport_parameters 'is_encrypted=true,log_agent_results=true'",
     );
-    expect(evidenceScript.indexOf('fake_encryption_flag=true')).toBeLessThan(
+    expect(evidenceScript.indexOf('is_encrypted=true')).toBeLessThan(
       evidenceScript.indexOf('bmgr transport "$LOCAL_TRANSPORT"'),
     );
+    expect(evidenceScript).toContain('$MODE-selected-transport.txt');
+    expect(evidenceScript).toContain('$MODE-transport-parameters.txt');
+    expect(evidenceScript).toContain('backup_enable_d2d_test_mode:');
     expect(evidenceScript).toContain('com.google.android.gms/.backup.migrate.service.D2dTransport');
     expect(evidenceScript).toContain('backup_enable_d2d_test_mode 1');
     expect(evidenceScript).toContain(
@@ -194,12 +197,18 @@ describe('Android Progress Backup', () => {
     const launcherCommand =
       'adb_cmd shell am start -W -n "$APP_ID/.MainActivity" | grep -F "Status: ok"';
     const launcherIndex = evidenceScript.indexOf(launcherCommand);
-    const backupNowIndex = evidenceScript.indexOf('adb_cmd shell bmgr backupnow');
+    const backupNowIndex = evidenceScript.indexOf(
+      'adb_cmd shell bmgr backupnow --monitor-verbose',
+    );
     expect(launcherIndex).toBeGreaterThan(-1);
     expect(launcherIndex).toBeLessThan(backupNowIndex);
     expect(evidenceScript.slice(launcherIndex, backupNowIndex)).not.toContain(
       'am force-stop',
     );
+    expect(evidenceScript).toContain('adb_cmd logcat -c');
+    expect(evidenceScript).toContain('$MODE-backup-logcat.txt');
+    expect(evidenceScript).toContain('adb_cmd shell dumpsys backup');
+    expect(evidenceScript).toContain('$MODE-dumpsys-backup.txt');
     expect(evidenceScript).toContain('bmgr init "$D2D_TRANSPORT"');
     expect(evidenceScript).toContain('pm uninstall --user 0');
     expect(evidenceScript).toContain('install-multiple -t --user 0');

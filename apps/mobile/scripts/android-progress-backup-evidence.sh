@@ -29,6 +29,25 @@ adb_cmd() {
   "$ADB" -s "$DEVICE" "$@"
 }
 
+capture_transport_state() {
+  adb_cmd shell bmgr list transports \
+    | tee "$ARTIFACT_DIR/$MODE-selected-transport.txt"
+  {
+    echo "backup_local_transport_parameters:"
+    adb_cmd shell settings get secure backup_local_transport_parameters
+    echo "backup_enable_d2d_test_mode:"
+    adb_cmd shell settings get secure backup_enable_d2d_test_mode
+  } | tee "$ARTIFACT_DIR/$MODE-transport-parameters.txt"
+}
+
+capture_backup_diagnostics() {
+  adb_cmd logcat -d -v threadtime \
+    BackupManagerService:V LocalTransport:V PFTBT:V FullBackupEngine:V KeyValueBackupTask:V '*:S' \
+    | tee "$ARTIFACT_DIR/$MODE-backup-logcat.txt" || true
+  adb_cmd shell dumpsys backup \
+    | tee "$ARTIFACT_DIR/$MODE-dumpsys-backup.txt" || true
+}
+
 if [[ "$MODE" == "seed-released-fixture" ]]; then
   fixture="$REPO_ROOT/packages/storage/test/fixtures/migrations/schema-v0-ios-1.0.0.sqlite"
   device_fixture="/data/local/tmp/chessticize-mobile-released.sqlite"
@@ -59,9 +78,9 @@ trap cleanup EXIT
 
 adb_cmd shell bmgr enable true
 if [[ "$MODE" == "cloud-encrypted" ]]; then
-  # Set AOSP LocalTransport's test-only encryption capability before selecting
-  # the transport so its service observes the capability during activation.
-  adb_cmd shell settings put secure backup_local_transport_parameters 'fake_encryption_flag=true'
+  # API 31+ cloud rules require the real client-side-encryption capability bit.
+  # LocalTransport's is_encrypted parameter advertises that bit for this test transport.
+  adb_cmd shell settings put secure backup_local_transport_parameters 'is_encrypted=true,log_agent_results=true'
   adb_cmd shell bmgr transport "$LOCAL_TRANSPORT" | grep -F "Selected transport"
 else
   sdk_level="$(adb_cmd shell getprop ro.build.version.sdk | tr -d '\r')"
@@ -74,11 +93,20 @@ else
   adb_cmd shell bmgr init "$D2D_TRANSPORT"
   adb_cmd shell bmgr list transports | grep -q -F "  * $D2D_TRANSPORT"
 fi
+capture_transport_state
 
 # Detox cleanup can leave the package force-stopped and therefore ineligible.
 # A public launch clears that state; Android Backup quiesces the app itself.
 adb_cmd shell am start -W -n "$APP_ID/.MainActivity" | grep -F "Status: ok"
-adb_cmd shell bmgr backupnow "$APP_ID" | tee "$ARTIFACT_DIR/$MODE-backupnow.txt" | grep -F "Package $APP_ID with result: Success"
+adb_cmd logcat -c
+backup_status=0
+adb_cmd shell bmgr backupnow --monitor-verbose "$APP_ID" \
+  | tee "$ARTIFACT_DIR/$MODE-backupnow.txt" || backup_status=$?
+capture_backup_diagnostics
+if (( backup_status != 0 )); then
+  exit "$backup_status"
+fi
+grep -F "Package $APP_ID with result: Success" "$ARTIFACT_DIR/$MODE-backupnow.txt"
 
 apk_index=0
 while IFS= read -r apk_line; do
