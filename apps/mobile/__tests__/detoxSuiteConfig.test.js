@@ -11,13 +11,16 @@ const {
   ANDROID_MIGRATION_TEST_MATCH,
   ANDROID_OFFLINE_PRACTICE_TEST_MATCH,
   ANDROID_PROGRESS_BACKUP_RESTORE_TEST_MATCH,
+  ANDROID_SYSTEM_BACK_TEST_MATCH,
   resolveDetoxTestMatch,
   resolveDetoxMaxWorkers
 } = require('../e2e/suiteConfig');
 const {
   bringAndroidAppToForeground,
+  androidAppIsResumed,
   collectAndroidUiDiagnostics,
   launchWithDisabledSynchronization,
+  performAndroidPredictiveBackGesture,
   waitForRunningStockfishDepth,
   withAndroidUiDiagnostics,
 } = require('../e2e/helpers');
@@ -393,6 +396,46 @@ describe('Detox suite configuration', () => {
     expect(resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'android-progress-backup-restore' }))
       .toEqual(ANDROID_PROGRESS_BACKUP_RESTORE_TEST_MATCH);
     expect(ACTIVE_E2E_TEST_MATCH).not.toContain(ANDROID_PROGRESS_BACKUP_RESTORE_TEST_MATCH[0]);
+    expect(resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'android-system-back' }))
+      .toEqual(ANDROID_SYSTEM_BACK_TEST_MATCH);
+  });
+
+  it('drives Predictive Back through the Android edge gesture and can verify root delegation', () => {
+    const run = jest.fn((_, args) => {
+      if (args.includes('size')) {
+        return 'Physical size: 1080x1920\n';
+      }
+      if (args.includes('activities')) {
+        return 'mResumedActivity: ActivityRecord{1 u0 com.android.launcher/.Launcher t1}';
+      }
+      return '';
+    });
+
+    performAndroidPredictiveBackGesture({
+      ADB_PATH: '/sdk/adb',
+      DETOX_ANDROID_DEVICE: 'emulator-6000'
+    }, run);
+
+    expect(run).toHaveBeenCalledWith('/sdk/adb', [
+      '-s', 'emulator-6000', 'shell', 'cmd', 'overlay', 'enable-exclusive', '--category',
+      'com.android.internal.systemui.navbar.gestural'
+    ], { encoding: 'utf8' });
+    expect(run).toHaveBeenCalledWith('/sdk/adb', [
+      '-s', 'emulator-6000', 'shell', 'input', 'swipe', '1', '960', '432', '960', '500'
+    ], { encoding: 'utf8' });
+    expect(androidAppIsResumed({
+      ADB_PATH: '/sdk/adb',
+      DETOX_ANDROID_DEVICE: 'emulator-6000'
+    }, run)).toBe(false);
+  });
+
+  it('keeps a dedicated public-UI Android Back journey for ordering and cancellation', () => {
+    const spec = fs.readFileSync(path.resolve(__dirname, '../e2e/android-system-back.e2e.js'), 'utf8');
+
+    expect(spec).toContain("device.pressBack()");
+    expect(spec).toContain('session-abandon-confirmation');
+    expect(spec).toContain('performAndroidPredictiveBackGesture');
+    expect(spec).toContain('androidAppIsResumed');
   });
 
   it('rejects mixing the two screenshot capture suites in one invocation', () => {

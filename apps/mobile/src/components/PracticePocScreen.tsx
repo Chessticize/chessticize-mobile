@@ -103,6 +103,13 @@ import {
   planPremoveReplay,
   type BoardInputLockMode
 } from "../backend/premove.ts";
+import {
+  resolveMobileBackIntent,
+  type MobileBackDetail,
+  type MobileBackTab,
+  type MobileBackTransient
+} from "../navigation/mobileBackContract.ts";
+import type { MobileSystemBackSource } from "../navigation/mobileSystemBack.ts";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Chess, type Move, type PieceSymbol, type Square } from "chess.js";
 
@@ -112,9 +119,10 @@ interface Props {
   currentTimeMs?: () => number;
   puzzleSelectionSeed?: string;
   standardTargetCorrect?: number;
+  systemBack?: MobileSystemBackSource;
 }
 
-type Tab = "practice" | "review" | "history" | "settings" | "analysis";
+type Tab = MobileBackTab;
 
 type SessionFeedback = PuzzleFeedback | null;
 type AnalysisEngineStatus = "idle" | "thinking" | "stockfish" | "fallback" | "error";
@@ -197,6 +205,11 @@ type FeedbackBoardSnapshot = {
   currentPuzzle: CurrentPuzzleState;
   feedback: PuzzleFeedback;
   puzzleId: string;
+};
+
+type ReviewBackCommand = {
+  id: number;
+  kind: "close-analysis" | "return-to-owner";
 };
 
 const UI_PADDING = 16;
@@ -358,7 +371,8 @@ export function PracticePocScreen({
   debugTrace,
   currentTimeMs = Date.now,
   puzzleSelectionSeed,
-  standardTargetCorrect
+  standardTargetCorrect,
+  systemBack
 }: Props): React.JSX.Element {
   const [puzzleSource, setPuzzleSource] = useState<MobilePuzzleSource>("bundledCore");
   const service = platformCapabilities.storage.practiceService;
@@ -386,6 +400,7 @@ export function PracticePocScreen({
   const boardFenRef = useRef<string | null>(null);
   const feedbackSnapshotRef = useRef<FeedbackBoardSnapshot | null>(null);
   const nowMsRef = useRef<number>(currentTimeMs());
+  const reviewBackCommandIdRef = useRef(0);
   const { height, width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
@@ -431,6 +446,13 @@ export function PracticePocScreen({
   const [notificationPermissionStatus, setNotificationPermissionStatus] = useState<ReviewReminderPermissionStatus>("unavailable");
   const [reviewReminderScheduleStatus, setReviewReminderScheduleStatus] = useState("unavailable");
   const [reviewReminderPermissionPromptVisible, setReviewReminderPermissionPromptVisible] = useState(false);
+  const [practiceExitConfirmationVisible, setPracticeExitConfirmationVisible] = useState(false);
+  const [historyFiltersExpanded, setHistoryFiltersExpanded] = useState(false);
+  const [reviewFiltersExpanded, setReviewFiltersExpanded] = useState(false);
+  const [settingsAdvancedRatingsOpen, setSettingsAdvancedRatingsOpen] = useState(false);
+  const [customRatingEditorOpen, setCustomRatingEditorOpen] = useState(false);
+  const [reviewAnalysisOpen, setReviewAnalysisOpen] = useState(false);
+  const [reviewBackCommand, setReviewBackCommand] = useState<ReviewBackCommand | null>(null);
   const [iCloudSyncEnabled, setICloudSyncEnabled] = useState(() => service.getSettings().sync.iCloudEnabled);
   const [iCloudSyncStatus, setICloudSyncStatus] = useState(() => service.getSettings().sync.iCloudEnabled ? "Ready" : "Off");
   const [, setSettingsRevision] = useState(0);
@@ -447,6 +469,12 @@ export function PracticePocScreen({
   const isFinished = state !== null && !isOpenSession;
   const isShowingFeedbackSnapshot = feedbackSnapshot !== null;
   const shouldShowSessionBoard = isActive || isShowingFeedbackSnapshot;
+
+  useEffect(() => {
+    if (!isOpenSession && practiceExitConfirmationVisible) {
+      setPracticeExitConfirmationVisible(false);
+    }
+  }, [isOpenSession, practiceExitConfirmationVisible]);
   const selectedConfig = useMemo(
     () => sprintConfigFor(mode === "custom" ? customSprintMode : mode, customDurationSeconds, customPerPuzzleSeconds, mode === "custom", themeForCustomSprint(customTheme)),
     [customDurationSeconds, customPerPuzzleSeconds, customSprintMode, customTheme, mode]
@@ -1733,6 +1761,97 @@ export function PracticePocScreen({
   const historyPage = historyView.page;
   const contentOwnsHeader = tab === "review" || tab === "history";
   const reviewSurfaceOpen = reviewSessionActive || historyReviewEntries.length > 0;
+  const topBackTransient: MobileBackTransient | null = startingMode
+    ? "starting-practice"
+    : practiceExitConfirmationVisible
+      ? "practice-exit-confirmation"
+      : reviewReminderPermissionPromptVisible
+        ? "review-reminder-prompt"
+        : tab === "history" && historyFiltersExpanded
+          ? "history-filters"
+          : tab === "review" && reviewFiltersExpanded
+            ? "review-filters"
+            : tab === "settings" && settingsAdvancedRatingsOpen
+              ? "settings-advanced-ratings"
+              : tab === "practice" && mode === "custom" && customRatingEditorOpen
+                ? "custom-rating-editor"
+                : null;
+  const backDetail: MobileBackDetail | null = reviewAnalysisOpen && (tab === "history" || tab === "review")
+    ? { kind: "review-analysis", owner: tab }
+    : reviewSurfaceOpen && (tab === "history" || tab === "review")
+      ? { kind: "review-session", owner: tab }
+      : tab === "analysis"
+        ? { kind: "stockfish-diagnostics", owner: "settings" }
+        : isFinished
+          ? { kind: "sprint-result", owner: "practice" }
+          : tab === "practice" && state === null && mode === "custom"
+            ? { kind: "custom-practice", owner: "practice" }
+            : null;
+
+  useEffect(() => {
+    if (systemBack?.platform !== "android") {
+      return undefined;
+    }
+
+    return systemBack.subscribe(() => {
+      const intent = resolveMobileBackIntent({
+        activePractice: isOpenSession,
+        detail: backDetail,
+        tab,
+        topTransient: topBackTransient
+      }, "predictive");
+
+      switch (intent.kind) {
+        case "dismiss-transient":
+          if (intent.transient === "practice-exit-confirmation") {
+            setPracticeExitConfirmationVisible(false);
+          } else if (intent.transient === "review-reminder-prompt") {
+            dismissReviewReminderPermissionPrompt();
+          } else if (intent.transient === "history-filters") {
+            setHistoryFiltersExpanded(false);
+          } else if (intent.transient === "review-filters") {
+            setReviewFiltersExpanded(false);
+          } else if (intent.transient === "settings-advanced-ratings") {
+            setSettingsAdvancedRatingsOpen(false);
+          } else if (intent.transient === "custom-rating-editor") {
+            setCustomRatingEditorOpen(false);
+          }
+          return true;
+        case "close-analysis":
+        case "return-to-owner":
+          if (backDetail?.kind === "review-analysis" || backDetail?.kind === "review-session") {
+            reviewBackCommandIdRef.current += 1;
+            setReviewBackCommand({ id: reviewBackCommandIdRef.current, kind: intent.kind });
+          } else if (backDetail?.kind === "stockfish-diagnostics") {
+            setTab("settings");
+          } else if (backDetail?.kind === "custom-practice") {
+            setCustomRatingEditorOpen(false);
+            setMode("standard");
+          } else if (backDetail?.kind === "sprint-result") {
+            resetToIdle();
+          }
+          return true;
+        case "request-practice-exit":
+          setPracticeExitConfirmationVisible(true);
+          return true;
+        case "return-to-practice":
+          setSessionMistakeReviewItems([]);
+          setHistoryReviewEntries([]);
+          setReviewFiltersExpanded(false);
+          setHistoryFiltersExpanded(false);
+          setTab("practice");
+          return true;
+        case "consume":
+          return true;
+        case "delegate-platform":
+          return false;
+      }
+    });
+    // The listener intentionally captures the exact render-local navigation
+    // snapshot; resetToIdle is a function declaration over the same render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [backDetail, isOpenSession, systemBack, tab, topBackTransient]);
+
   const appChromeVisible = !isOpenSession && !isShowingFeedbackSnapshot && !reviewSurfaceOpen;
   const appHeaderVisible = appChromeVisible && !contentOwnsHeader;
   const sideNavigationVisible = appChromeVisible && adaptiveLayout.usesSideNavigation;
@@ -1774,7 +1893,9 @@ export function PracticePocScreen({
       state={state}
       sideToMove={displayedSideToMove}
       timerText={timerText}
-      onAbandon={isActive ? abandonSprint : undefined}
+      confirmAbandon={practiceExitConfirmationVisible}
+      onAbandon={isOpenSession ? abandonSprint : undefined}
+      onConfirmAbandonChange={setPracticeExitConfirmationVisible}
       onPause={isActive ? () => pauseActiveSprint("manual") : undefined}
       onResume={isPaused && state ? () => resumeSprint(state) : undefined}
     />
@@ -1782,7 +1903,7 @@ export function PracticePocScreen({
   const pausedSessionNode = isPaused && state ? (
     <PausedSessionPanel
       state={state}
-      onAbandon={abandonSprint}
+      onAbandon={() => setPracticeExitConfirmationVisible(true)}
       onResume={() => resumeSprint(state)}
     />
   ) : null;
@@ -2011,6 +2132,7 @@ export function PracticePocScreen({
                     availablePuzzleCount={customEligiblePuzzleCount}
                     ratingKey={selectedConfig.ratingKey}
                     initialRating={displayedCustomInitialRating}
+                    initialRatingEditorOpen={customRatingEditorOpen}
                     ratingPlayed={customRatingPlayed}
                     onInitialRatingChange={(nextRating) => {
                       if (customRatingPlayed) {
@@ -2021,8 +2143,12 @@ export function PracticePocScreen({
                       }
                       setCustomInitialRating(nextRating);
                     }}
+                    onInitialRatingEditorOpenChange={setCustomRatingEditorOpen}
                     onDurationChange={setCustomDurationSeconds}
-                    onClose={() => setMode("standard")}
+                    onClose={() => {
+                      setCustomRatingEditorOpen(false);
+                      setMode("standard");
+                    }}
                     customMode={customSprintMode}
                     onCustomModeChange={setCustomSprintMode}
                     onPerPuzzleChange={setCustomPerPuzzleSeconds}
@@ -2067,6 +2193,8 @@ export function PracticePocScreen({
                   entries={historyReviewEntries}
                   initialIndex={historyReviewInitialIndex}
                   service={service}
+                  systemBackCommand={reviewBackCommand}
+                  onAnalysisActiveChange={setReviewAnalysisOpen}
                   onExit={() => setHistoryReviewEntries([])}
                   stockfish={stockfish}
                 />
@@ -2088,6 +2216,8 @@ export function PracticePocScreen({
                   reviewStatusFilter={historyReviewStatusFilter}
                   sprintOnly={historySourceFilter === "sprint"}
                   wrongOnly={historyWrongOnly}
+                  filtersExpanded={historyFiltersExpanded}
+                  onFiltersExpandedChange={setHistoryFiltersExpanded}
                   onRatingKeyChange={(ratingKey) => {
                     setHistoryRatingKey(ratingKey);
                     setHistoryPageOffset(0);
@@ -2172,8 +2302,12 @@ export function PracticePocScreen({
                 onPromoteNextFutureReviewsToDue={arePracticeTestControlsEnabled() ? promoteNextFutureReviewsToDue : undefined}
                 onScheduleTestReviewReminder={arePracticeTestControlsEnabled() ? scheduleDevReviewReminderNotification : undefined}
                 onSessionActiveChange={setReviewSessionActive}
+                onAnalysisActiveChange={setReviewAnalysisOpen}
+                filtersExpanded={reviewFiltersExpanded}
+                onFiltersExpandedChange={setReviewFiltersExpanded}
                 reviewReminderScheduleStatus={arePracticeTestControlsEnabled() ? reviewReminderScheduleStatus : undefined}
                 stockfish={stockfish}
+                systemBackCommand={reviewBackCommand}
               />
             ) : null}
             {tab === "settings" ? (
@@ -2197,6 +2331,8 @@ export function PracticePocScreen({
                 reviewReminderPreference={reviewReminderPreference}
                 iCloudSyncEnabled={iCloudSyncEnabled}
                 iCloudSyncStatus={iCloudSyncStatus}
+                advancedRatingsOpen={settingsAdvancedRatingsOpen}
+                onAdvancedRatingsOpenChange={setSettingsAdvancedRatingsOpen}
                 onOpenNotificationSettings={() => {
                   void openReviewReminderSystemSettings();
                 }}
@@ -2635,11 +2771,13 @@ function CustomSprintSetup({
   customMode,
   durationSeconds,
   initialRating,
+  initialRatingEditorOpen,
   ratingPlayed,
   maxMistakes,
   onClose,
   onCustomModeChange,
   onInitialRatingChange,
+  onInitialRatingEditorOpenChange,
   perPuzzleSeconds,
   previousConfigs,
   ratingForKey,
@@ -2655,11 +2793,13 @@ function CustomSprintSetup({
   customMode: "custom" | "arrow_duel";
   durationSeconds: number;
   initialRating: number;
+  initialRatingEditorOpen: boolean;
   ratingPlayed: boolean;
   maxMistakes: number;
   onClose: () => void;
   onCustomModeChange: (next: "custom" | "arrow_duel") => void;
   onInitialRatingChange: (next: number) => void;
+  onInitialRatingEditorOpenChange: (open: boolean) => void;
   perPuzzleSeconds: number;
   previousConfigs: CustomSprintConfigRecord[];
   ratingForKey: (ratingKey: string) => number;
@@ -2731,9 +2871,11 @@ function CustomSprintSetup({
           onChange={onPerPuzzleChange}
         />
         <CustomInitialRatingRow
+          editOpen={initialRatingEditorOpen}
           key={ratingKey}
           played={ratingPlayed}
           onChange={onInitialRatingChange}
+          onEditOpenChange={onInitialRatingEditorOpenChange}
           value={initialRating}
         />
         <CustomValueRow
@@ -2852,15 +2994,18 @@ function CustomModeChoiceRow({
 }
 
 function CustomInitialRatingRow({
+  editOpen,
   played,
   onChange,
+  onEditOpenChange,
   value
 }: {
+  editOpen: boolean;
   played: boolean;
   onChange: (next: number) => void;
+  onEditOpenChange: (open: boolean) => void;
   value: number;
 }): React.JSX.Element {
-  const [editOpen, setEditOpen] = useState(false);
   if (!played) {
     return (
       <View
@@ -2888,7 +3033,7 @@ function CustomInitialRatingRow({
         accessibilityState={{ expanded: editOpen }}
         style={styles.customConfigRow}
         testID="custom-initial-rating-row"
-        onPress={() => setEditOpen((current) => !current)}
+        onPress={() => onEditOpenChange(!editOpen)}
       >
         <View style={styles.customChoiceCopy}>
           <Text style={styles.listText}>Edit ELO</Text>
@@ -3172,25 +3317,27 @@ function TestPuzzleSourceControl({
 
 function SessionStatusBar({
   compactMetrics = false,
+  confirmAbandon,
   mode,
   state,
   sideToMove,
   timerText,
   onAbandon,
+  onConfirmAbandonChange,
   onPause,
   onResume
 }: {
   compactMetrics?: boolean;
+  confirmAbandon: boolean;
   mode: SprintMode;
   state: SprintState;
   sideToMove: MoveSide | null;
   timerText: string;
   onAbandon?: () => void;
+  onConfirmAbandonChange: (visible: boolean) => void;
   onPause?: () => void;
   onResume?: () => void;
 }): React.JSX.Element {
-  const [confirmAbandon, setConfirmAbandon] = useState(false);
-
   return (
     <View style={styles.activeSessionShell} testID="active-session-shell">
       <View style={styles.sessionNavRow} testID="session-shell-nav">
@@ -3200,7 +3347,7 @@ function SessionStatusBar({
             accessibilityLabel="Abandon sprint"
             testID="session-abandon"
             style={styles.sessionNavButton}
-            onPress={() => setConfirmAbandon(true)}
+            onPress={() => onConfirmAbandonChange(true)}
           >
             <CloseGlyph />
           </Pressable>
@@ -3307,7 +3454,7 @@ function SessionStatusBar({
               accessibilityLabel="Cancel abandon sprint"
               testID="session-abandon-cancel"
               style={styles.secondaryButton}
-              onPress={() => setConfirmAbandon(false)}
+              onPress={() => onConfirmAbandonChange(false)}
             >
               <Text style={styles.secondaryButtonText}>Cancel</Text>
             </Pressable>
@@ -3317,7 +3464,7 @@ function SessionStatusBar({
               testID="session-abandon-confirm"
               style={styles.destructiveButton}
               onPress={() => {
-                setConfirmAbandon(false);
+                onConfirmAbandonChange(false);
                 onAbandon?.();
               }}
             >
@@ -4077,6 +4224,7 @@ function ArrowHint({
 function HistoryPanel({
   adaptiveLayout,
   attempts,
+  filtersExpanded,
   performance,
   ratingKeys,
   selectedRatingKey,
@@ -4101,12 +4249,14 @@ function HistoryPanel({
   onReviewStatusFilterChange,
   onPageOffsetChange,
   onOpenAttempt,
+  onFiltersExpandedChange,
   onResetFilters,
   onToggleSprintOnly,
   onToggleWrongOnly
 }: {
   adaptiveLayout: AdaptiveLayout;
   attempts: HistoryAttemptView[];
+  filtersExpanded: boolean;
   performance: HistoryPerformance;
   ratingKeys: string[];
   selectedRatingKey: string | null;
@@ -4131,11 +4281,11 @@ function HistoryPanel({
   onReviewStatusFilterChange: (status: "all" | HistoryReviewStatus) => void;
   onPageOffsetChange: (offset: number) => void;
   onOpenAttempt: (attemptId: string) => void;
+  onFiltersExpandedChange: (expanded: boolean) => void;
   onResetFilters: () => void;
   onToggleSprintOnly: () => void;
   onToggleWrongOnly: () => void;
 }): React.JSX.Element {
-  const [filtersExpanded, setFiltersExpanded] = useState(false);
   const visibleAttempts = attempts;
   const ratingPoints = performance.charts.rating;
   const latestRating = ratingPoints[ratingPoints.length - 1]?.value;
@@ -4171,7 +4321,7 @@ function HistoryPanel({
             accessibilityState={{ expanded: filtersExpanded }}
             testID="history-filter-toggle"
             style={[styles.reviewFilterButton, filtersExpanded ? styles.reviewFilterButtonActive : null]}
-            onPress={() => setFiltersExpanded((current) => !current)}
+            onPress={() => onFiltersExpandedChange(!filtersExpanded)}
           >
             <FilterGlyph active={filtersExpanded} />
           </Pressable>
@@ -5166,8 +5316,11 @@ function ReviewPanel({
   boardSize,
   currentTimeMs,
   dueReviewItems,
+  filtersExpanded,
   nowMs,
+  onAnalysisActiveChange,
   onExitSessionReview,
+  onFiltersExpandedChange,
   onOpenPractice,
   onPromoteNextFutureReviewsToDue,
   onReviewRecorded,
@@ -5177,14 +5330,18 @@ function ReviewPanel({
   reviewReminderScheduleStatus,
   service,
   sessionMistakeReviewItems,
-  stockfish
+  stockfish,
+  systemBackCommand
 }: {
   adaptiveLayout: AdaptiveLayout;
   boardSize: number;
   currentTimeMs: () => number;
   dueReviewItems: ReviewQueueItem[];
+  filtersExpanded: boolean;
   nowMs: number;
+  onAnalysisActiveChange?: (active: boolean) => void;
   onExitSessionReview: () => void;
+  onFiltersExpandedChange: (expanded: boolean) => void;
   onOpenPractice: () => void;
   onPromoteNextFutureReviewsToDue?: () => ReviewQueueDuePromotionResult;
   onReviewRecorded: (completedAt: string) => void;
@@ -5195,6 +5352,7 @@ function ReviewPanel({
   service: PracticeService;
   sessionMistakeReviewItems: SessionMistakeReviewItem[];
   stockfish: MobileStockfishCapabilities;
+  systemBackCommand: ReviewBackCommand | null;
 }): React.JSX.Element {
   const sessionEntries = sessionMistakeReviewItems.map((item): ReviewEntry => ({
     puzzle: item.puzzle,
@@ -5211,7 +5369,6 @@ function ReviewPanel({
   const [activeEntryInitialIndex, setActiveEntryInitialIndex] = useState(0);
   const [queuedReviewGroups, setQueuedReviewGroups] = useState<ReviewEntryGroup[]>([]);
   const [queueFilter, setQueueFilter] = useState<ReviewQueueFilter>("all");
-  const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [devStatus, setDevStatus] = useState<string | null>(null);
   const completedReviews = service.listCompletedReviewsForDay(new Date(nowMs).toISOString());
   const completedReviewEntries = completedReviews.map((item): ReviewEntry => ({
@@ -5324,8 +5481,10 @@ function ReviewPanel({
         scheduledReviewTotal={dailyReviewTotal}
         service={service}
         onReviewRecorded={onReviewRecorded}
+        onAnalysisActiveChange={onAnalysisActiveChange}
         onExit={finishActiveReview}
         stockfish={stockfish}
+        systemBackCommand={systemBackCommand}
       />
     );
   }
@@ -5340,7 +5499,7 @@ function ReviewPanel({
           accessibilityState={{ expanded: filtersExpanded }}
           testID="review-filter-toggle"
           style={[styles.reviewFilterButton, filtersExpanded ? styles.reviewFilterButtonActive : null]}
-          onPress={() => setFiltersExpanded((current) => !current)}
+          onPress={() => onFiltersExpandedChange(!filtersExpanded)}
         >
           <FilterGlyph active={filtersExpanded} />
         </Pressable>
@@ -5731,12 +5890,14 @@ function ReviewSession({
   entries,
   hasQueuedDueReviews = false,
   initialIndex = 0,
+  onAnalysisActiveChange,
   scheduledReviewCompletedCount = 0,
   scheduledReviewTotal = entries.length,
   service,
   onExit,
   onReviewRecorded,
-  stockfish
+  stockfish,
+  systemBackCommand
 }: {
   adaptiveLayout: AdaptiveLayout;
   boardSize: number;
@@ -5744,16 +5905,19 @@ function ReviewSession({
   entries: ReviewEntry[];
   hasQueuedDueReviews?: boolean;
   initialIndex?: number;
+  onAnalysisActiveChange?: (active: boolean) => void;
   scheduledReviewCompletedCount?: number;
   scheduledReviewTotal?: number;
   service: PracticeService;
   onExit: (source: ReviewEntry["source"]) => void;
   onReviewRecorded?: (completedAt: string) => void;
   stockfish: MobileStockfishCapabilities;
+  systemBackCommand: ReviewBackCommand | null;
 }): React.JSX.Element {
   const boardRef = useRef<ChessboardRef | null>(null);
   const reviewSuppressedBoardMovesRef = useRef<string[]>([]);
   const reviewResultRecordedRef = useRef(false);
+  const handledBackCommandIdRef = useRef(systemBackCommand?.id ?? 0);
   const [entryIndex, setEntryIndex] = useState(initialIndex);
   const [reviewState, setReviewState] = useState<ReviewPuzzleState>(() => startReviewPuzzle(entries[initialIndex] ?? entries[0]));
   const [feedback, setFeedback] = useState<SessionFeedback>(null);
@@ -5784,6 +5948,29 @@ function ReviewSession({
         }
       : null;
   });
+
+  useEffect(() => {
+    onAnalysisActiveChange?.(analysisEnabled);
+  }, [analysisEnabled, onAnalysisActiveChange]);
+
+  useEffect(() => {
+    return () => onAnalysisActiveChange?.(false);
+  }, [onAnalysisActiveChange]);
+
+  useEffect(() => {
+    if (!systemBackCommand || handledBackCommandIdRef.current === systemBackCommand.id) {
+      return;
+    }
+    handledBackCommandIdRef.current = systemBackCommand.id;
+    if (systemBackCommand.kind === "close-analysis") {
+      closeAnalysis();
+      return;
+    }
+    onExit(currentEntry.source);
+    // closeAnalysis and onExit are render-local commands intentionally selected
+    // by the shell's typed Back resolver for this exact command id.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [systemBackCommand?.id]);
   const currentEntry = entries[entryIndex];
   const hasNextScheduledReview = entryIndex + 1 < entries.length || hasQueuedDueReviews;
   const currentPuzzle = currentReviewPuzzleState(reviewState);
@@ -6941,12 +7128,14 @@ function iCloudAccountStatusMessage(status: ICloudAccountStatus): string {
 }
 
 function SettingsPanel({
+  advancedRatingsOpen,
   adaptiveLayout,
   applicationMetadata,
   progressProtection,
   onOpenDiagnostics,
   onOpenNotificationSettings,
   onAdjustRating,
+  onAdvancedRatingsOpenChange,
   onRequestReviewReminderPermission,
   onSaveICloudSyncEnabled,
   onSaveReviewReminderPreference,
@@ -6959,12 +7148,14 @@ function SettingsPanel({
   reviewReminderPreference,
   standardRating
 }: {
+  advancedRatingsOpen: boolean;
   adaptiveLayout: AdaptiveLayout;
   applicationMetadata: MobileApplicationMetadata;
   progressProtection: MobilePlatformCapabilities["progressProtection"];
   onOpenDiagnostics?: () => void;
   onOpenNotificationSettings: () => void;
   onAdjustRating: (ratingKey: string, nextRating: number) => RatingRecord;
+  onAdvancedRatingsOpenChange: (open: boolean) => void;
   onRequestReviewReminderPermission: () => Promise<ReviewReminderPermissionStatus>;
   onSaveICloudSyncEnabled: (enabled: boolean) => void;
   onSaveReviewReminderPreference: (preference: ReviewReminderPreference) => void;
@@ -6978,7 +7169,6 @@ function SettingsPanel({
   standardRating: number;
 }): React.JSX.Element {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [advancedRatingsOpen, setAdvancedRatingsOpen] = useState(false);
   const bundledCoreManifest = getBundledCorePackManifest();
 
   return (
@@ -7102,7 +7292,7 @@ function SettingsPanel({
           value={`ELO ${standardRating}`}
           detail="Standard and Arrow Duel difficulty"
           testID="settings-standard-elo-row"
-          onPress={() => setAdvancedRatingsOpen((current) => !current)}
+          onPress={() => onAdvancedRatingsOpenChange(!advancedRatingsOpen)}
         />
         {advancedRatingsOpen ? (
           <AdvancedRatingsPanel

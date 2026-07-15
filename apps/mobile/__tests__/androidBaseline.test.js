@@ -152,6 +152,7 @@ describe('Android launch baseline', () => {
     const debugNetworkConfig = read('android/app/src/debug/res/xml/network_security_config.xml');
 
     expect(mainManifest).not.toContain('android:networkSecurityConfig');
+    expect(mainManifest).toContain('android:enableOnBackInvokedCallback="true"');
     expect(debugManifest).toContain('android:networkSecurityConfig="@xml/network_security_config"');
     expect(debugNetworkConfig).toContain('<domain includeSubdomains="true">localhost</domain>');
   });
@@ -204,7 +205,7 @@ describe('Android launch baseline', () => {
   it('keeps the API 36 Stockfish condition in one emulator-runner script line', () => {
     const workflow = read('../../.github/workflows/mobile-android.yml');
 
-    for (const suite of ['android-stockfish', 'flows', 'practice']) {
+    for (const suite of ['android-stockfish', 'android-system-back', 'flows', 'practice']) {
       const command = `if [ "\${{ matrix.api-level }}" = "36" ]; then DETOX_ACTIVE_SUITE=${suite} pnpm mobile:e2e:test:android:ci; fi`;
       expect(workflow).toContain(command);
       expect(workflow.match(new RegExp(`DETOX_ACTIVE_SUITE=${suite}`, 'g'))).toHaveLength(1);

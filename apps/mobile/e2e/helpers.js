@@ -74,6 +74,42 @@ function bringAndroidAppToForeground(
   run(adb, args, { encoding: 'utf8' });
 }
 
+function performAndroidPredictiveBackGesture(
+  environment = process.env,
+  run = execFileSync
+) {
+  const adb = androidAdbPath(environment);
+  const serial = environment.DETOX_ANDROID_DEVICE || 'emulator-5554';
+  run(adb, [
+    '-s', serial, 'shell', 'cmd', 'overlay', 'enable-exclusive', '--category',
+    'com.android.internal.systemui.navbar.gestural'
+  ], { encoding: 'utf8' });
+  const sizeOutput = String(
+    run(adb, ['-s', serial, 'shell', 'wm', 'size'], { encoding: 'utf8' }) ?? ''
+  );
+  const { widthPixels, heightPixels } = parseAndroidDisplaySize(sizeOutput);
+  const centerY = Math.round(heightPixels / 2);
+  const endX = Math.round(widthPixels * 0.4);
+  run(adb, [
+    '-s', serial, 'shell', 'input', 'swipe', '1', String(centerY), String(endX), String(centerY), '500'
+  ], { encoding: 'utf8' });
+}
+
+function androidAppIsResumed(
+  environment = process.env,
+  run = execFileSync
+) {
+  const adb = androidAdbPath(environment);
+  const serial = environment.DETOX_ANDROID_DEVICE || 'emulator-5554';
+  const activityState = String(run(adb, [
+    '-s', serial, 'shell', 'dumpsys', 'activity', 'activities'
+  ], { encoding: 'utf8' }) ?? '');
+  return activityState
+    .split('\n')
+    .some((line) => /(?:mResumedActivity|topResumedActivity)/.test(line)
+      && line.includes('com.chessticize.mobile'));
+}
+
 function collectAndroidUiDiagnostics(
   environment = process.env,
   run = execFileSync,
@@ -495,6 +531,7 @@ async function failStandardSprint() {
 }
 
 module.exports = {
+  androidAppIsResumed,
   bringAndroidAppToForeground,
   collectAndroidUiDiagnostics,
   elementText,
@@ -504,6 +541,7 @@ module.exports = {
   sleep,
   frameFor,
   playBoardMove,
+  performAndroidPredictiveBackGesture,
   startPracticeMode,
   selectTestPuzzleSource,
   waitForVisibleInPracticeScroll,

@@ -17,6 +17,7 @@ import { defaultSprintConfig, formatLocalCalendarDate, formatReviewDay, type Arr
 import { FakeReviewReminderNotificationClient, FakeReviewReminderScheduler } from "../src/backend/reviewReminderScheduler";
 import { FakeICloudProgressSyncClient } from "../src/backend/iCloudProgressSync";
 import type { MobilePlatformCapabilities } from "../src/backend/mobilePlatformCapabilities";
+import type { MobileSystemBackSource } from "../src/navigation/mobileSystemBack";
 import {
   createTestMobilePlatformCapabilities,
   type TestMobilePlatformCapabilityOverrides
@@ -45,6 +46,87 @@ afterEach(() => {
 });
 
 describe("PracticePocScreen", () => {
+  it("unwinds Android system Back through the visible product state without trapping the root", () => {
+    const systemBack = createTestSystemBackSource("android");
+    const renderer = renderScreen({ systemBack });
+
+    press(renderer, "history-tab");
+    press(renderer, "history-filter-toggle");
+    expect(findByTestId(renderer, "history-advanced-filters")).toBeTruthy();
+
+    expect(systemBack.invoke()).toBe(true);
+    expect(() => findByTestId(renderer, "history-advanced-filters")).toThrow();
+    expect(findByTestId(renderer, "history-panel")).toBeTruthy();
+
+    expect(systemBack.invoke()).toBe(true);
+    expect(findByTestId(renderer, "practice-home")).toBeTruthy();
+
+    expect(systemBack.invoke()).toBe(false);
+  });
+
+  it("guards an active sprint and lets Back cancel the exit without losing progress", () => {
+    const systemBack = createTestSystemBackSource("android");
+    const service = createMobilePracticeService("familiar15");
+    const renderer = renderScreen({ practiceService: service, systemBack });
+
+    startStandardSprint(renderer);
+    const activeSprintId = activeSprintForTest(service).id;
+
+    expect(systemBack.invoke()).toBe(true);
+    expect(findByTestId(renderer, "session-abandon-confirmation")).toBeTruthy();
+    expect(service.getActiveSprint()?.id).toBe(activeSprintId);
+
+    expect(systemBack.invoke()).toBe(true);
+    expect(() => findByTestId(renderer, "session-abandon-confirmation")).toThrow();
+    expect(service.getActiveSprint()?.id).toBe(activeSprintId);
+
+    expect(systemBack.invoke()).toBe(true);
+    press(renderer, "session-abandon-confirm");
+    expect(service.getActiveSprint()).toBeUndefined();
+  });
+
+  it("closes review analysis before returning the review to its owner", () => {
+    jest.setSystemTime(new Date("2026-06-21T12:00:00.000Z"));
+    const systemBack = createTestSystemBackSource("android");
+    const service = createDueReviewService(1);
+    service.recordReviewAttempt({
+      puzzleId: "review-badge-0",
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      result: "wrong",
+      submittedMove: "e2e3",
+      expectedMove: "e2e4",
+      startedAt: "2026-06-21T11:01:00.000Z"
+    }, "2026-06-21T11:01:08.000Z");
+    const renderer = renderScreen({ practiceService: service, systemBack });
+
+    press(renderer, "review-tab");
+    const completedAttempt = renderer.root.find(
+      (node) => typeof node.props.testID === "string"
+        && node.props.testID.startsWith("review-today-attempt-")
+        && node.props.accessibilityRole === "button"
+    );
+    act(() => completedAttempt.props.onPress());
+    press(renderer, "review-analysis-button");
+    expect(findByTestId(renderer, "review-close-analysis")).toBeTruthy();
+
+    expect(systemBack.invoke()).toBe(true);
+    expect(() => findByTestId(renderer, "review-close-analysis")).toThrow();
+    expect(findByTestId(renderer, "review-session")).toBeTruthy();
+
+    expect(systemBack.invoke()).toBe(true);
+    expect(() => findByTestId(renderer, "review-session")).toThrow();
+    expect(findByTestId(renderer, "review-panel")).toBeTruthy();
+  });
+
+  it("does not subscribe the iOS shell to Android system Back", () => {
+    const systemBack = createTestSystemBackSource("ios");
+
+    renderScreen({ systemBack });
+
+    expect(systemBack.subscribe).not.toHaveBeenCalled();
+  });
+
   it("does not initialize Stockfish while rendering the Practice home", async () => {
     const prewarm = jest.fn(async () => true);
 
@@ -3956,7 +4038,7 @@ function createScriptedStockfishTransport(
 }
 
 type RenderScreenOptions = TestMobilePlatformCapabilityOverrides &
-  Pick<React.ComponentProps<typeof PracticePocScreen>, "currentTimeMs" | "debugTrace" | "puzzleSelectionSeed" | "standardTargetCorrect"> & {
+  Pick<React.ComponentProps<typeof PracticePocScreen>, "currentTimeMs" | "debugTrace" | "puzzleSelectionSeed" | "standardTargetCorrect" | "systemBack"> & {
     platformCapabilities?: MobilePlatformCapabilities;
   };
 
@@ -3966,6 +4048,7 @@ function renderScreen({
   debugTrace,
   puzzleSelectionSeed,
   standardTargetCorrect,
+  systemBack,
   ...capabilityOverrides
 }: RenderScreenOptions = {}): TestRenderer.ReactTestRenderer {
   let renderer: TestRenderer.ReactTestRenderer | undefined;
@@ -3977,6 +4060,7 @@ function renderScreen({
         debugTrace={debugTrace}
         puzzleSelectionSeed={puzzleSelectionSeed}
         standardTargetCorrect={standardTargetCorrect}
+        systemBack={systemBack}
       />
     );
   });
@@ -3985,6 +4069,35 @@ function renderScreen({
   }
   renderers.push(renderer);
   return renderer;
+}
+
+function createTestSystemBackSource(platform: "android" | "ios"): MobileSystemBackSource & {
+  invoke: () => boolean;
+  subscribe: jest.Mock;
+} {
+  let handler: (() => boolean) | null = null;
+  const subscribe = jest.fn((nextHandler: () => boolean) => {
+    handler = nextHandler;
+    return () => {
+      if (handler === nextHandler) {
+        handler = null;
+      }
+    };
+  });
+  return {
+    platform,
+    subscribe,
+    invoke: () => {
+      if (!handler) {
+        return false;
+      }
+      let handled = false;
+      act(() => {
+        handled = handler?.() ?? false;
+      });
+      return handled;
+    }
+  };
 }
 
 function renderStandardSequenceScreen(
