@@ -10,6 +10,7 @@ const {
 } = require('../scripts/android-doctor');
 const {
   EXPECTED_ABIS,
+  REQUIRED_NATIVE_LIBRARIES,
   parseElfLoadAlignments,
   parseNativeAbis,
   verifyApk,
@@ -303,11 +304,14 @@ describe('Android launch baseline', () => {
       'lib/x86_64/libreactnative.so',
       'lib/arm64-v8a/libreactnative.so',
       'lib/x86_64/libhermes.so',
+      'lib/x86_64/libappmodules.so',
+      'lib/arm64-v8a/libappmodules.so',
       'lib/x86_64/libstockfish.so',
       'lib/arm64-v8a/libstockfish.so',
     ].join('\n');
 
     expect(parseNativeAbis(entries)).toEqual(EXPECTED_ABIS);
+    expect(REQUIRED_NATIVE_LIBRARIES).toEqual(['libappmodules.so', 'libstockfish.so']);
     expect(parseNativeAbis(`${entries}\nlib/x86/libreactnative.so`)).toEqual([
       'arm64-v8a',
       'x86',
@@ -339,5 +343,16 @@ describe('Android launch baseline', () => {
       'empty.apk',
       () => ({ status: 0, stdout: 'AndroidManifest.xml', stderr: '' }),
     )).toThrow('does not contain native libraries');
+    expect(() => verifyApk(
+      'missing-appmodules.apk',
+      () => ({
+        status: 0,
+        stdout: entries
+          .split('\n')
+          .filter((entry) => !entry.endsWith('/libappmodules.so'))
+          .join('\n'),
+        stderr: '',
+      }),
+    )).toThrow('libappmodules.so');
   });
 });

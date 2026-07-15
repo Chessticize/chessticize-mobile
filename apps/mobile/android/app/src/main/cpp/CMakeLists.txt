@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.22.1)
-project(chessticize_stockfish LANGUAGES CXX)
+project(appmodules LANGUAGES CXX)
+
+# Retain React Native's New Architecture application target and module
+# registration before composing the independent Stockfish JNI library.
+include(${REACT_ANDROID_DIR}/cmake-utils/ReactNative-application.cmake)
 
 set(STOCKFISH_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../native/stockfish/Stockfish/src")
 set(STOCKFISH_RESOURCES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../native/stockfish/Resources")
@@ -12,9 +16,10 @@ file(GLOB STOCKFISH_SOURCES CONFIGURE_DEPENDS
 )
 
 add_library(stockfish SHARED
-  NativeStockfishEngine.cpp
+  stockfish/NativeStockfishEngine.cpp
   ${STOCKFISH_SOURCES}
 )
+set_property(TARGET stockfish PROPERTY INTERPROCEDURAL_OPTIMIZATION FALSE)
 
 target_include_directories(stockfish PRIVATE "${STOCKFISH_SOURCE_DIR}")
 target_compile_features(stockfish PRIVATE cxx_std_20)

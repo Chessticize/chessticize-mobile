@@ -114,15 +114,59 @@ function collectAndroidUiDiagnostics(
     ['shell', 'dumpsys', 'window', 'windows'],
     { encoding: 'utf8', maxBuffer: 5 * 1024 * 1024, timeout: 30000 }
   );
-  const focus = windowDump === null
+  const activityDump = runDiagnostic(
+    'dumpsys activity activities',
+    ['shell', 'dumpsys', 'activity', 'activities'],
+    { encoding: 'utf8', maxBuffer: 5 * 1024 * 1024, timeout: 30000 }
+  );
+  const focusSources = [windowDump, activityDump].filter((source) => source !== null);
+  const focus = focusSources.length === 0
     ? null
-    : String(windowDump)
+    : focusSources
+      .map(String)
+      .join('\n')
       .split('\n')
-      .filter((line) => /mCurrentFocus|mFocusedApp|topResumedActivity/.test(line))
+      .filter((line) => /mCurrentFocus|mFocusedApp|mResumedActivity|topResumedActivity/.test(line))
       .join('\n') || '[no current focus fields found]';
   if (focus !== null) {
     log(`[android-ui-diagnostics] current focus\n${focus}`);
     writeDiagnostic('current-focus.txt', focus);
+  }
+
+  const pid = runDiagnostic(
+    'pidof app',
+    ['shell', 'pidof', 'com.chessticize.mobile'],
+    { encoding: 'utf8', maxBuffer: 5 * 1024 * 1024, timeout: 30000 }
+  );
+  const processDump = runDiagnostic(
+    'dumpsys activity processes',
+    ['shell', 'dumpsys', 'activity', 'processes', 'com.chessticize.mobile'],
+    { encoding: 'utf8', maxBuffer: 5 * 1024 * 1024, timeout: 30000 }
+  );
+  const processState = [
+    `pid=${pid === null ? '<unavailable>' : String(pid).trim() || '<not running>'}`,
+    processDump === null ? '[process dump unavailable]' : String(processDump).trim(),
+  ].join('\n');
+  log(`[android-ui-diagnostics] process state\n${processState}`);
+  writeDiagnostic('process-state.txt', processState);
+
+  const rawLogcat = runDiagnostic(
+    'logcat',
+    ['logcat', '-d', '-v', 'threadtime', '-t', '2000'],
+    { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024, timeout: 30000 }
+  );
+  const logcat = rawLogcat === null
+    ? null
+    : String(rawLogcat)
+      .split('\n')
+      .filter((line) => (
+        /chessticize|ReactNative|AndroidRuntime|FATAL EXCEPTION|SoLoader|TurboModule|Hermes|ReactHost|ReactInstance|com\.facebook\.react/i
+          .test(line)
+      ))
+      .join('\n') || '[no React Native or app logcat lines found]';
+  if (logcat !== null) {
+    log(`[android-ui-diagnostics] filtered logcat\n${logcat}`);
+    writeDiagnostic('logcat.txt', logcat);
   }
 
   runDiagnostic(

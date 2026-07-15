@@ -100,6 +100,22 @@ describe('Detox suite configuration', () => {
           '  mFocusedApp=ActivityRecord{456 com.chessticize.mobile/.MainActivity}',
         ].join('\n');
       }
+      if (request.includes('dumpsys activity activities')) {
+        return '  topResumedActivity=ActivityRecord{456 com.chessticize.mobile/.MainActivity}\n';
+      }
+      if (request.includes('pidof com.chessticize.mobile')) {
+        return '4242\n';
+      }
+      if (request.includes('dumpsys activity processes com.chessticize.mobile')) {
+        return '*APP* UID 10123 ProcessRecord{789 4242:com.chessticize.mobile/u0a123}\n';
+      }
+      if (request.includes('logcat -d -v threadtime -t 2000')) {
+        return [
+          '07-14 23:54:00.000 4242 4242 E ReactNative: Exception in native call',
+          "07-14 23:54:00.001 4242 4242 E ReactNativeJS: PlatformConstants could not be found",
+          '07-14 23:54:00.002 1000 1000 I unrelated: ignored',
+        ].join('\n');
+      }
       if (request.includes('uiautomator dump')) {
         return 'UI hierchary dumped to: /sdcard/chessticize-window.xml\n';
       }
@@ -134,18 +150,52 @@ describe('Detox suite configuration', () => {
       '-s',
       'emulator-5556',
       'shell',
+      'dumpsys',
+      'activity',
+      'activities',
+    ], { encoding: 'utf8', maxBuffer: 5 * 1024 * 1024, timeout: 30000 });
+    expect(run).toHaveBeenNthCalledWith(3, '/sdk/platform-tools/adb', [
+      '-s',
+      'emulator-5556',
+      'shell',
+      'pidof',
+      'com.chessticize.mobile',
+    ], { encoding: 'utf8', maxBuffer: 5 * 1024 * 1024, timeout: 30000 });
+    expect(run).toHaveBeenNthCalledWith(4, '/sdk/platform-tools/adb', [
+      '-s',
+      'emulator-5556',
+      'shell',
+      'dumpsys',
+      'activity',
+      'processes',
+      'com.chessticize.mobile',
+    ], { encoding: 'utf8', maxBuffer: 5 * 1024 * 1024, timeout: 30000 });
+    expect(run).toHaveBeenNthCalledWith(5, '/sdk/platform-tools/adb', [
+      '-s',
+      'emulator-5556',
+      'logcat',
+      '-d',
+      '-v',
+      'threadtime',
+      '-t',
+      '2000',
+    ], { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024, timeout: 30000 });
+    expect(run).toHaveBeenNthCalledWith(6, '/sdk/platform-tools/adb', [
+      '-s',
+      'emulator-5556',
+      'shell',
       'uiautomator',
       'dump',
       '/sdcard/chessticize-window.xml',
     ], { encoding: 'utf8', maxBuffer: 5 * 1024 * 1024, timeout: 30000 });
-    expect(run).toHaveBeenNthCalledWith(3, '/sdk/platform-tools/adb', [
+    expect(run).toHaveBeenNthCalledWith(7, '/sdk/platform-tools/adb', [
       '-s',
       'emulator-5556',
       'exec-out',
       'cat',
       '/sdcard/chessticize-window.xml',
     ], { encoding: 'utf8', maxBuffer: 5 * 1024 * 1024, timeout: 30000 });
-    expect(run).toHaveBeenNthCalledWith(4, '/sdk/platform-tools/adb', [
+    expect(run).toHaveBeenNthCalledWith(8, '/sdk/platform-tools/adb', [
       '-s',
       'emulator-5556',
       'exec-out',
@@ -164,6 +214,18 @@ describe('Detox suite configuration', () => {
     expect(fileSystem.writeFileSync).toHaveBeenCalledWith(
       '/artifacts/android-ui/screenshot.png',
       Buffer.from('png')
+    );
+    expect(fileSystem.writeFileSync).toHaveBeenCalledWith(
+      '/artifacts/android-ui/process-state.txt',
+      expect.stringContaining('pid=4242')
+    );
+    expect(fileSystem.writeFileSync).toHaveBeenCalledWith(
+      '/artifacts/android-ui/logcat.txt',
+      expect.stringContaining('PlatformConstants could not be found')
+    );
+    expect(fileSystem.writeFileSync).not.toHaveBeenCalledWith(
+      '/artifacts/android-ui/logcat.txt',
+      expect.stringContaining('unrelated: ignored')
     );
     expect(log).toHaveBeenCalledWith(expect.stringContaining('[android-ui-diagnostics] current focus'));
     expect(log).toHaveBeenCalledWith(expect.stringContaining('<node text="Practice" />'));

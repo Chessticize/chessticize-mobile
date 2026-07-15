@@ -38,6 +38,19 @@ describe('Android Stockfish native contract', () => {
     expect(gradle).toContain('ANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON');
   });
 
+  it('composes Stockfish without replacing the React Native application CMake bootstrap', () => {
+    const cmake = read('android/app/src/main/cpp/CMakeLists.txt');
+    const cppRoot = path.join(mobileRoot, 'android/app/src/main/cpp');
+
+    expect(cmake).toContain('project(appmodules');
+    expect(cmake).toContain(
+      'include(${REACT_ANDROID_DIR}/cmake-utils/ReactNative-application.cmake)'
+    );
+    expect(cmake).toContain('stockfish/NativeStockfishEngine.cpp');
+    expect(fs.existsSync(path.join(cppRoot, 'NativeStockfishEngine.cpp'))).toBe(false);
+    expect(fs.existsSync(path.join(cppRoot, 'stockfish/NativeStockfishEngine.cpp'))).toBe(true);
+  });
+
   it('keeps the packaged ABI and 16 KB ELF checks in the required verifier', () => {
     const verifier = read('scripts/verify-android-apk-abis.js');
 

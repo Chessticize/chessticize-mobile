@@ -8,6 +8,7 @@ const { ANDROID_REQUIREMENTS } = require('./android-requirements');
 
 const EXPECTED_ABIS = ANDROID_REQUIREMENTS.abis;
 const STOCKFISH_LIBRARY = 'libstockfish.so';
+const REQUIRED_NATIVE_LIBRARIES = ['libappmodules.so', STOCKFISH_LIBRARY];
 const MINIMUM_LOAD_ALIGNMENT = 0x4000;
 
 function parseNativeAbis(entries) {
@@ -79,9 +80,11 @@ function verifyApk(apkPath, run = spawnSync, environment = process.env) {
 
   const entries = new Set(String(result.stdout).split(/\r?\n/));
   for (const abi of EXPECTED_ABIS) {
-    const expectedLibrary = `lib/${abi}/${STOCKFISH_LIBRARY}`;
-    if (!entries.has(expectedLibrary)) {
-      throw new Error(`${apkPath} is missing ${expectedLibrary}`);
+    for (const library of REQUIRED_NATIVE_LIBRARIES) {
+      const expectedLibrary = `lib/${abi}/${library}`;
+      if (!entries.has(expectedLibrary)) {
+        throw new Error(`${apkPath} is missing ${expectedLibrary}`);
+      }
     }
   }
 
@@ -128,6 +131,7 @@ if (require.main === module) {
 module.exports = {
   EXPECTED_ABIS,
   MINIMUM_LOAD_ALIGNMENT,
+  REQUIRED_NATIVE_LIBRARIES,
   STOCKFISH_LIBRARY,
   androidToolPaths,
   parseElfLoadAlignments,
