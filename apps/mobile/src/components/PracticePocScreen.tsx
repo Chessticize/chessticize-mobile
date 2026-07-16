@@ -238,7 +238,6 @@ type ReviewBackCommand = {
 type DeferBackRelevantTransition = (key: string, resumeAfterCancel: () => void) => boolean;
 
 const UI_PADDING = 16;
-const MIN_BOARD = 280;
 const COMPACT_LANDSCAPE_RAIL_MIN = 220;
 const COMPACT_LANDSCAPE_RAIL_MAX = 300;
 const REGULAR_RAIL_MIN = 296;
@@ -2239,7 +2238,7 @@ export function PracticePocScreen({
   ) : null;
   const sessionBoardNode = shouldShowSessionBoard ? (
     <View style={styles.boardWrapper}>
-      {isStoreAssetCaptureEnabled() ? (
+      {arePracticeTestControlsEnabled() || isStoreAssetCaptureEnabled() ? (
         <Text testID="session-current-puzzle-id" style={styles.reviewDueHiddenMetric}>
           {displayedPuzzle?.puzzle.id ?? ""}
         </Text>

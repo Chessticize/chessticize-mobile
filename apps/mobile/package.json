@@ -19,6 +19,7 @@
     "e2e:store-assets:ios": "CHESSTICIZE_CAPTURE_STORE_ASSETS=1 detox test --configuration ios.sim.debug --artifacts-location artifacts/store-assets e2e/store-assets.e2e.js",
     "e2e:store-assets:ios:release": "CHESSTICIZE_CAPTURE_STORE_ASSETS=1 detox test --configuration ios.sim.release --artifacts-location artifacts/store-assets e2e/store-assets.e2e.js",
     "e2e:adaptive-layout:ios": "CHESSTICIZE_CAPTURE_ADAPTIVE_LAYOUT=1 detox test --configuration ios.sim.debug --artifacts-location artifacts/adaptive-layout e2e/adaptive-layout.e2e.js",
+    "e2e:adaptive-layout:android": "scripts/android-adaptive-layout-evidence.sh",
     "e2e:build:android": "detox build --configuration android.attached.e2e",
     "e2e:test:android": "scripts/android-test-for-detox.sh",
     "e2e:test:android:ci": "scripts/android-test-for-detox.sh --cleanup",

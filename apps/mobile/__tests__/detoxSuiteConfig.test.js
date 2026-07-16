@@ -7,6 +7,7 @@ const {
   ACTIVE_E2E_TEST_MATCH,
   STORE_ASSETS_TEST_MATCH,
   ADAPTIVE_LAYOUT_TEST_MATCH,
+  ANDROID_ADAPTIVE_LAYOUT_TEST_MATCH,
   ANDROID_LAUNCH_TEST_MATCH,
   ANDROID_CUSTOM_PRACTICE_TEST_MATCH,
   ANDROID_HISTORY_TEST_MATCH,
@@ -575,6 +576,41 @@ describe('Detox suite configuration', () => {
       .toEqual(ADAPTIVE_LAYOUT_TEST_MATCH);
   });
 
+  it('keeps Android adaptive evidence isolated as a targeted public-UI suite', () => {
+    expect(resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'android-adaptive-layout' }))
+      .toEqual(ANDROID_ADAPTIVE_LAYOUT_TEST_MATCH);
+    expect(ANDROID_ADAPTIVE_LAYOUT_TEST_MATCH).toEqual(ADAPTIVE_LAYOUT_TEST_MATCH);
+    expect(ACTIVE_E2E_TEST_MATCH).not.toContain(ANDROID_ADAPTIVE_LAYOUT_TEST_MATCH[0]);
+
+    const spec = fs.readFileSync(path.resolve(__dirname, '../e2e/adaptive-layout.e2e.js'), 'utf8');
+    const evidence = fs.readFileSync(
+      path.resolve(__dirname, '../scripts/android-adaptive-layout-evidence.sh'),
+      'utf8'
+    );
+    const workflow = fs.readFileSync(
+      path.resolve(__dirname, '../../../.github/workflows/mobile-android.yml'),
+      'utf8'
+    );
+
+    expect(spec).toContain("device.setOrientation('landscape')");
+    expect(spec).toContain("elementText('session-current-puzzle-id')");
+    expect(spec).toContain("session-accessible-moves-open");
+    expect(spec).toContain("playBoardMove('session-board', 'e2e6')");
+    expect(evidence).toContain('phone:1080x2400:420:both:1');
+    expect(evidence).toContain('tablet:1600x2560:320:both:1');
+    expect(evidence).toContain('foldable:1768x2208:420:landscape:1');
+    expect(evidence).toContain('chromeos:1200x1920:240:landscape:1');
+    expect(evidence).toContain('large-text-phone:1080x2400:420:portrait:1.5');
+    expect(evidence).toContain('wm size reset');
+    expect(evidence).toContain('wm density reset');
+    expect(evidence).toContain('settings put system font_scale');
+    expect(evidence).toContain('git diff --quiet');
+    expect(workflow).toContain('Android adaptive public UI');
+    expect(workflow).toContain("if: github.event_name == 'workflow_dispatch'");
+    expect(workflow).toContain('apps/mobile/scripts/android-adaptive-layout-evidence.sh');
+    expect(workflow).toContain('android-adaptive-layout-evidence');
+  });
+
   it('keeps the Android launch smoke isolated from the iOS regression suites', () => {
     expect(resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'android-launch' }))
       .toEqual(ANDROID_LAUNCH_TEST_MATCH);
@@ -604,6 +640,8 @@ describe('Detox suite configuration', () => {
       .toEqual(ANDROID_SYSTEM_BACK_TEST_MATCH);
     expect(resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'android-review-reminders' }))
       .toEqual(ANDROID_REVIEW_REMINDERS_TEST_MATCH);
+    expect(resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'android-adaptive-layout' }))
+      .toEqual(ANDROID_ADAPTIVE_LAYOUT_TEST_MATCH);
   });
 
   it('drives Predictive Back through the Android edge gesture and can verify root delegation', () => {
