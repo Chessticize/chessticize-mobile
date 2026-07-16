@@ -143,9 +143,22 @@ wait_for_boot_completed() {
 
 is_transient_adb_root_restart_failure() {
   local output="$1"
-  [[ "$output" == *"adb: unable to connect for root: closed"* ||
-    "$output" == *"error: closed"* ||
-    "$output" == *"error: device offline"* ]]
+  local line
+  local matched=0
+
+  while IFS= read -r line; do
+    line="${line//$'\r'/}"
+    [[ -z "$line" ]] && continue
+    case "$line" in
+      "adb: unable to connect for root: closed"|"error: closed"|"error: device offline")
+        matched=1
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+  done <<< "$output"
+  (( matched == 1 ))
 }
 
 read_adbd_uid() {
@@ -181,8 +194,8 @@ ensure_root_adbd() {
   local root_output=""
   local root_status=0
 
-  if [[ ! "$ADB_ROOT_RECOVERY_ATTEMPTS" =~ ^[1-9][0-9]*$ ]]; then
-    echo "ANDROID_BACKUP_POLICY_ADB_ROOT_RECOVERY_ATTEMPTS must be a positive integer." >&2
+  if [[ ! "$ADB_ROOT_RECOVERY_ATTEMPTS" =~ ^[1-3]$ ]]; then
+    echo "ANDROID_BACKUP_POLICY_ADB_ROOT_RECOVERY_ATTEMPTS must be an integer from 1 through 3." >&2
     return 64
   fi
   wait_for_adbd_recovery
@@ -208,8 +221,14 @@ ensure_root_adbd() {
       return 1
     fi
 
-    wait_for_adbd_recovery || return 1
-    adb_uid="$(read_adbd_uid)" || return 1
+    if ! wait_for_adbd_recovery; then
+      echo "adb root recovery diagnostic: $root_diagnostic" >&2
+      return 1
+    fi
+    if ! adb_uid="$(read_adbd_uid)"; then
+      echo "adb root recovery diagnostic: $root_diagnostic" >&2
+      return 1
+    fi
     if [[ "$adb_uid" == "0" ]]; then
       return
     fi

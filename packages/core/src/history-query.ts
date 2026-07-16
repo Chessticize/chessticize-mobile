@@ -148,7 +148,7 @@ export function resolveHistoryRange(now: string, timeRange: HistoryTimeRange): H
 export function normalizeHistoryAttemptDetail(attempt: AttemptEvent | HistoryAttemptView): HistoryAttemptDetail {
   const source = normalizeHistorySource(attempt.source);
   const mode = normalizeHistoryMode(attempt.mode);
-  const ratingKey = normalizeHistoryText(attempt.ratingKey);
+  const ratingKey = normalizeHistoryRatingKey(attempt.ratingKey);
   const result = normalizeHistoryResult(attempt.result);
   const startedAt = normalizeHistoryTimestamp(attempt.startedAt);
   const completedAt = normalizeHistoryTimestamp(attempt.completedAt);
@@ -239,6 +239,27 @@ function normalizeHistoryText(value: unknown): string | null {
   return normalized.length > 0 ? normalized : null;
 }
 
+export function normalizeHistoryRatingKey(value: unknown): string | null {
+  const normalized = normalizeHistoryText(value);
+  if (normalized === null || normalized !== value) {
+    return null;
+  }
+  return /^(?:\S+ )?(?:standard|blitz|custom|arrow(?:_| )duel) (?:[1-9]\d*|[1-9]\d*s)\/[1-9]\d*$/.test(normalized)
+    ? normalized
+    : null;
+}
+
+export function collectHistoryRatingKeys(values: Iterable<unknown>): string[] {
+  const ratingKeys = new Set<string>();
+  for (const value of values) {
+    const ratingKey = normalizeHistoryRatingKey(value);
+    if (ratingKey !== null) {
+      ratingKeys.add(ratingKey);
+    }
+  }
+  return [...ratingKeys];
+}
+
 function normalizeHistoryTimestamp(value: unknown): string | null {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) {
     return null;
@@ -273,7 +294,7 @@ export function validateHistoryQuery(query: HistoryQuery): HistoryQuery {
   }
   const page = query.page ? validateHistoryPageQuery(query.page) : undefined;
   const { ratingKey: rawRatingKey, ...queryWithoutRatingKey } = query;
-  const ratingKey = rawRatingKey?.trim();
+  const ratingKey = normalizeHistoryRatingKey(rawRatingKey?.trim());
   const normalized: HistoryQuery = {
     ...queryWithoutRatingKey,
     ...(ratingKey ? { ratingKey } : {})
@@ -380,7 +401,7 @@ export function filterHistoryAttemptsForQuery(input: {
 }
 
 export function historyAttemptSpeedSeconds(attempt: Pick<HistoryAttemptView, "ratingKey">): number | null {
-  const match = normalizeHistoryText(attempt.ratingKey)?.match(/\/(\d+)\b/);
+  const match = normalizeHistoryRatingKey(attempt.ratingKey)?.match(/\/(\d+)\b/);
   return match ? Number(match[1]) : null;
 }
 
@@ -401,7 +422,7 @@ export function historyAttemptHasReviewQueued(
 ): boolean {
   const result = normalizeHistoryResult(attempt.result);
   const mode = normalizeHistoryMode(attempt.mode);
-  const ratingKey = normalizeHistoryText(attempt.ratingKey);
+  const ratingKey = normalizeHistoryRatingKey(attempt.ratingKey);
   if (result !== "wrong" || mode === null || ratingKey === null) {
     return false;
   }

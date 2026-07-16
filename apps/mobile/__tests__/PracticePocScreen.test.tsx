@@ -3005,6 +3005,43 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-panel")).toBeTruthy();
   });
 
+  it("keeps malformed persisted rating keys out of History buckets while preserving readable detail", () => {
+    const store = new MemoryStore();
+    store.seedPuzzles([sharedHistoryPuzzle()]);
+    store.recordAttempt({
+      id: "malformed-rating-key-attempt",
+      source: "sprint",
+      sessionId: "malformed-rating-key-session",
+      puzzleId: "shared-history",
+      mode: "standard",
+      ratingKey: "   ",
+      result: "wrong",
+      submittedMove: "e2e4",
+      expectedMove: "e2e3",
+      startedAt: "2026-06-20T12:00:00.000Z",
+      completedAt: "2026-06-20T12:00:05.000Z",
+      ratingBefore: 600
+    });
+    const renderer = renderScreen({ practiceService: new PracticeService(store) });
+
+    press(renderer, "history-tab");
+    press(renderer, "history-range-max");
+
+    expect(collectText(findByTestId(renderer, "history-rating-filters"))).toBe("All Puzzles");
+    expect(() => findByTestId(renderer, "history-rating-   ")).toThrow();
+    expect(() => findByTestId(renderer, "history-performance-card")).toThrow();
+    expect(findByTestId(renderer, "history-attempt-malformed-rating-key-attempt")).toBeTruthy();
+
+    press(renderer, "history-attempt-malformed-rating-key-attempt");
+    expect(collectText(findByTestId(renderer, "history-attempt-detail-rating-key"))).toBe(
+      "Rating bucket unavailable"
+    );
+    expect(collectText(findByTestId(renderer, "history-attempt-detail-moves"))).toBe("Played e2e4 · Best e2e3");
+    expect(collectText(findByTestId(renderer, "history-attempt-detail-partial"))).toBe(
+      "Some persisted attempt details are unavailable."
+    );
+  });
+
   it("keeps History filters while returning from a record but resets them on a new process lifetime", () => {
     const store = new MemoryStore();
     store.seedPuzzles([sharedHistoryPuzzle()]);

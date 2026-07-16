@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   buildHistoryPuzzleStats,
   buildHistoryView,
+  collectHistoryRatingKeys,
   filterHistoryAttemptsForQuery,
   historyAttemptHasReviewQueued,
   historyAttemptReplayAvailability,
@@ -33,6 +34,26 @@ test("history query accepts optional ratingKey and resolves supported time range
     validateHistoryQuery({ now: "2026-06-21T12:00:00.000Z", timeRange: "30d", ratingKey: " " }),
     { now: "2026-06-21T12:00:00.000Z", timeRange: "30d" }
   );
+});
+
+test("history rating filters collect only runtime-valid persisted rating keys", () => {
+  assert.deepEqual(collectHistoryRatingKeys([
+    " standard 5/20 ",
+    "standard 5/20",
+    " ",
+    "unknown",
+    "arrow duel 5/30",
+    "arrow_duel 5/30",
+    "hangingPiece custom 5/20",
+    "standard 0/20",
+    "standard 5/0",
+    null
+  ]), [
+    "standard 5/20",
+    "arrow duel 5/30",
+    "arrow_duel 5/30",
+    "hangingPiece custom 5/20"
+  ]);
 });
 
 test("history view validates paging and slices visible attempts", () => {

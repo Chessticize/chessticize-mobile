@@ -23,6 +23,7 @@ import {
   buildCurrentPositionEvaluationLine,
   buildPuzzleGuidedAnalysisLines,
   buildSprintConfig,
+  collectHistoryRatingKeys,
   currentExpectedMove,
   defaultSprintConfig,
   formatLocalCalendarDate,
@@ -1873,7 +1874,10 @@ export function PracticePocScreen({
   const displayedLastBoardMove = feedbackSnapshot || boardFeedback ? null : lastBoardMove;
   const historyRatingKeys = useMemo(
     () => sortHistoryRatingKeys(
-      [...new Set([...service.listPlayedRatings().map((rating) => rating.key), ...attempts.map((attempt) => attempt.ratingKey)])],
+      collectHistoryRatingKeys([
+        ...service.listPlayedRatings().map((rating) => rating.key),
+        ...attempts.map((attempt) => attempt.ratingKey)
+      ]),
       attempts,
       sprintSessions
     ),
