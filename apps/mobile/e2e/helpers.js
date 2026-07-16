@@ -75,6 +75,19 @@ function bringAndroidAppToForeground(
   run(adb, args, { encoding: 'utf8' });
 }
 
+function findAndroidSystemNode(hierarchy, candidates) {
+  const nodes = hierarchy.match(/<node\b[^>]*\/>/g) ?? [];
+  const normalizedCandidates = candidates.map((candidate) => String(candidate).toLowerCase());
+  return nodes.find((node) => {
+    const attributes = ['resource-id', 'text', 'content-desc'].map((attribute) =>
+      node.match(new RegExp(`${attribute}="([^"]*)"`))?.[1]?.toLowerCase() ?? ''
+    );
+    return normalizedCandidates.some((candidate) => attributes.some((value) =>
+      value === candidate || value.endsWith(`/id/${candidate}`)
+    ));
+  }) ?? null;
+}
+
 function performAndroidPredictiveBackGesture(
   environment = process.env,
   run = execFileSync
@@ -684,6 +697,7 @@ module.exports = {
   launchWithFreshAndroidRuntimePermission,
   sleep,
   frameFor,
+  findAndroidSystemNode,
   playBoardMove,
   performAndroidPredictiveBackGesture,
   startPracticeMode,

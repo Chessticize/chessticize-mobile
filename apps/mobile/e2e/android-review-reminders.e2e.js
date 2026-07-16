@@ -4,6 +4,7 @@ const path = require('node:path');
 const { androidAdbPath } = require('./androidNetwork');
 const {
   failStandardSprint,
+  findAndroidSystemNode,
   launchWithDisabledSynchronization,
   launchWithFreshAndroidRuntimePermission,
   openTab,
@@ -203,10 +204,7 @@ async function waitForSystemNode(candidates, timeoutMs = 15_000) {
   while (Date.now() < deadline) {
     adbShell(['uiautomator', 'dump', '/sdcard/chessticize-reminder-window.xml']);
     latest = adbShell(['cat', '/sdcard/chessticize-reminder-window.xml']);
-    const nodes = latest.match(/<node\b[^>]*\/>/g) ?? [];
-    const found = nodes.find((node) => candidates.some((candidate) =>
-      node.toLowerCase().includes(String(candidate).toLowerCase())
-    ));
+    const found = findAndroidSystemNode(latest, candidates);
     if (found) {
       return found;
     }

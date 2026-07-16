@@ -22,6 +22,7 @@ const {
   androidAppIsResumed,
   beginAndroidPredictiveBackGesture,
   collectAndroidUiDiagnostics,
+  findAndroidSystemNode,
   launchWithDisabledSynchronization,
   launchWithFreshAndroidRuntimePermission,
   performAndroidPredictiveBackGesture,
@@ -30,6 +31,16 @@ const {
 } = require('../e2e/helpers');
 
 describe('Detox suite configuration', () => {
+  it('selects the Android permission action instead of the question containing Allow', () => {
+    const hierarchy = [
+      '<node text="Allow ChessticizeMobile to send you notifications?" resource-id="com.android.permissioncontroller:id/permission_message" bounds="[133,765][947,898]" />',
+      '<node text="Allow" resource-id="com.android.permissioncontroller:id/permission_allow_button" bounds="[133,966][947,1113]" />',
+    ].join('');
+
+    expect(findAndroidSystemNode(hierarchy, ['permission_allow_button', 'Allow']))
+      .toContain('resource-id="com.android.permissioncontroller:id/permission_allow_button"');
+  });
+
   it('resets Android runtime permission after Detox recreates and grants the app', async () => {
     let permissionGranted = true;
     const resetPermission = jest.fn(() => {
