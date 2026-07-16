@@ -911,7 +911,8 @@ export class SyncSQLiteStore implements PracticeStore {
         completedAt: row.completed_at,
         ratingBefore: row.rating_before,
         ...(row.rating_after === null ? {} : { ratingAfter: row.rating_after }),
-        ...(candidateOrder === undefined ? {} : { arrowDuelCandidateOrder: candidateOrder }),
+        ...(candidateOrder.status === "valid" ? { arrowDuelCandidateOrder: candidateOrder.value } : {}),
+        ...(candidateOrder.status === "corrupt" ? { arrowDuelCandidateOrderStatus: "corrupt" as const } : {}),
         puzzleRating: puzzle.rating,
         side: sideToMoveForHistoryPuzzle({ puzzle, mode: row.mode }),
         themes: puzzle.themes
@@ -1544,13 +1545,17 @@ function optionalStringArrayFromJson(value: string | null): string[] | undefined
   return parsed;
 }
 
-function optionalHistoryStringArrayFromJson(value: string | null): string[] | undefined {
+function optionalHistoryStringArrayFromJson(value: string | null):
+  | { status: "absent" }
+  | { status: "valid"; value: string[] }
+  | { status: "corrupt" } {
   try {
-    return optionalStringArrayFromJson(value);
+    const parsed = optionalStringArrayFromJson(value);
+    return parsed === undefined ? { status: "absent" } : { status: "valid", value: parsed };
   } catch {
-    // Candidate order is optional reconstruction metadata. A damaged legacy
-    // value must not make otherwise readable History unavailable.
-    return undefined;
+    // Keep the row readable, but preserve the corruption so consumers cannot
+    // silently fabricate a different Arrow Duel candidate set for replay.
+    return { status: "corrupt" };
   }
 }
 

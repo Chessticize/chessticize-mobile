@@ -29,6 +29,14 @@ describe('Android Practice History release slice', () => {
     expect(spec).toContain('device.pressBack()');
     expect(spec).toContain('device.terminateApp()');
     expect(spec).toContain('delete: false');
+    expect(spec).toContain("by.id('review-start-due')");
+    expect(spec).toContain("playBoardMove('review-board', 'e2e6')");
+    expect(spec).toContain("playBoardMove('review-board', 'e6f7')");
+    expect(spec).toContain("by.id('history-source-review')");
+    expect(spec).toContain("'history-attempt-detail-context', 'Standard · Review'");
+    expect(spec).toContain("'history-attempt-detail-moves', 'Played e6f7 · Best e6f7'");
+    expect(spec).toContain("'history-attempt-detail-timing', 'Jul 15, 2026'");
+    expect(spec).toContain("by.id('review-close-analysis')");
     expect(spec).not.toContain('PracticeService');
     expect(spec).not.toContain('run-as');
   });

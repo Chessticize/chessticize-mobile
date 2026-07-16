@@ -396,7 +396,9 @@ test("history attempt detail preserves persisted context and normalizes malforme
       expectedMove: "e2e3",
       ratingBefore: 600,
       ratingAfter: 584,
+      ratingAfterStatus: "valid",
       ratingDelta: -16,
+      arrowDuelCandidateOrderStatus: "absent",
       dataStatus: "complete"
     }
   );
@@ -429,10 +431,46 @@ test("history attempt detail preserves persisted context and normalizes malforme
       expectedMove: null,
       ratingBefore: null,
       ratingAfter: null,
+      ratingAfterStatus: "invalid",
       ratingDelta: null,
+      arrowDuelCandidateOrderStatus: "absent",
       dataStatus: "partial"
     }
   );
+
+  const malformedPersistedAttempt = {
+    ...attempt({
+      id: "malformed-persisted-attempt",
+      puzzleId: "malformed-puzzle",
+      result: "correct",
+      completedAt: "01/02/03"
+    }),
+    source: "mystery-source",
+    mode: "mystery-mode",
+    ratingKey: "   ",
+    result: "mystery-result",
+    startedAt: "0"
+  } as unknown as HistoryAttemptView;
+
+  assert.deepEqual(normalizeHistoryAttemptDetail(malformedPersistedAttempt), {
+    id: "malformed-persisted-attempt",
+    puzzleId: "malformed-puzzle",
+    source: null,
+    mode: null,
+    ratingKey: null,
+    result: null,
+    startedAt: null,
+    completedAt: null,
+    elapsedSeconds: null,
+    submittedMove: "a1a2",
+    expectedMove: "a1a3",
+    ratingBefore: 600,
+    ratingAfter: null,
+    ratingAfterStatus: "absent",
+    ratingDelta: null,
+    arrowDuelCandidateOrderStatus: "absent",
+    dataStatus: "partial"
+  });
 });
 
 function attempt(input: {

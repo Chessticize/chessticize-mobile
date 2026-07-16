@@ -53,6 +53,7 @@ export interface HistoryAttemptView {
   ratingBefore: number;
   ratingAfter?: number;
   arrowDuelCandidateOrder?: string[];
+  arrowDuelCandidateOrderStatus?: "corrupt";
   puzzleRating: number;
   side: PuzzleSide;
   themes: string[];
@@ -106,10 +107,10 @@ export interface HistoryView {
 export interface HistoryAttemptDetail {
   id: string;
   puzzleId: string;
-  source: AttemptSource;
-  mode: SprintMode;
-  ratingKey: string;
-  result: AttemptResult;
+  source: AttemptSource | null;
+  mode: SprintMode | null;
+  ratingKey: string | null;
+  result: AttemptResult | null;
   startedAt: string | null;
   completedAt: string | null;
   elapsedSeconds: number | null;
@@ -117,7 +118,9 @@ export interface HistoryAttemptDetail {
   expectedMove: string | null;
   ratingBefore: number | null;
   ratingAfter: number | null;
+  ratingAfterStatus: "absent" | "valid" | "invalid";
   ratingDelta: number | null;
+  arrowDuelCandidateOrderStatus: "absent" | "valid" | "corrupt";
   dataStatus: "complete" | "partial";
 }
 
@@ -139,33 +142,50 @@ export function resolveHistoryRange(now: string, timeRange: HistoryTimeRange): H
 }
 
 export function normalizeHistoryAttemptDetail(attempt: AttemptEvent | HistoryAttemptView): HistoryAttemptDetail {
-  const startedAtMs = new Date(attempt.startedAt).getTime();
-  const completedAtMs = new Date(attempt.completedAt).getTime();
-  const startedAt = Number.isFinite(startedAtMs) ? attempt.startedAt : null;
-  const completedAt = Number.isFinite(completedAtMs) ? attempt.completedAt : null;
+  const source = normalizeHistorySource(attempt.source);
+  const mode = normalizeHistoryMode(attempt.mode);
+  const ratingKey = normalizeHistoryText(attempt.ratingKey);
+  const result = normalizeHistoryResult(attempt.result);
+  const startedAt = normalizeHistoryTimestamp(attempt.startedAt);
+  const completedAt = normalizeHistoryTimestamp(attempt.completedAt);
+  const startedAtMs = startedAt === null ? Number.NaN : new Date(startedAt).getTime();
+  const completedAtMs = completedAt === null ? Number.NaN : new Date(completedAt).getTime();
   const elapsedSeconds = startedAt !== null && completedAt !== null && completedAtMs >= startedAtMs
     ? Math.round((completedAtMs - startedAtMs) / 1000)
     : null;
   const submittedMove = normalizeHistoryText(attempt.submittedMove);
   const expectedMove = normalizeHistoryText(attempt.expectedMove);
   const ratingBefore = Number.isFinite(attempt.ratingBefore) ? attempt.ratingBefore : null;
-  const ratingAfter = attempt.ratingAfter !== undefined && Number.isFinite(attempt.ratingAfter)
-    ? attempt.ratingAfter
+  const rawRatingAfter = attempt.ratingAfter;
+  const ratingAfter = typeof rawRatingAfter === "number" && Number.isFinite(rawRatingAfter)
+    ? rawRatingAfter
     : null;
+  const ratingAfterStatus = rawRatingAfter === undefined
+    ? "absent"
+    : ratingAfter !== null
+      ? "valid"
+      : "invalid";
   const ratingDelta = ratingBefore !== null && ratingAfter !== null ? ratingAfter - ratingBefore : null;
-  const dataStatus = startedAt === null || completedAt === null || elapsedSeconds === null ||
+  const arrowDuelCandidateOrderStatus = "arrowDuelCandidateOrderStatus" in attempt &&
+      attempt.arrowDuelCandidateOrderStatus === "corrupt"
+    ? "corrupt"
+    : attempt.arrowDuelCandidateOrder === undefined
+      ? "absent"
+      : "valid";
+  const dataStatus = source === null || mode === null || ratingKey === null || result === null ||
+      startedAt === null || completedAt === null || elapsedSeconds === null ||
       submittedMove === null || expectedMove === null || ratingBefore === null ||
-      (attempt.ratingAfter !== undefined && ratingAfter === null)
+      ratingAfterStatus === "invalid" || arrowDuelCandidateOrderStatus === "corrupt"
     ? "partial"
     : "complete";
 
   return {
     id: attempt.id,
     puzzleId: attempt.puzzleId,
-    source: attempt.source,
-    mode: attempt.mode,
-    ratingKey: attempt.ratingKey,
-    result: attempt.result,
+    source,
+    mode,
+    ratingKey,
+    result,
     startedAt,
     completedAt,
     elapsedSeconds,
@@ -173,14 +193,41 @@ export function normalizeHistoryAttemptDetail(attempt: AttemptEvent | HistoryAtt
     expectedMove,
     ratingBefore,
     ratingAfter,
+    ratingAfterStatus,
     ratingDelta,
+    arrowDuelCandidateOrderStatus,
     dataStatus
   };
 }
 
-function normalizeHistoryText(value: string): string | null {
+function normalizeHistoryText(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
   const normalized = value.trim();
   return normalized.length > 0 ? normalized : null;
+}
+
+function normalizeHistoryTimestamp(value: unknown): string | null {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) {
+    return null;
+  }
+  const parsed = new Date(value);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString() === value ? value : null;
+}
+
+function normalizeHistorySource(value: unknown): AttemptSource | null {
+  return value === "sprint" || value === "scheduled_review" ? value : null;
+}
+
+function normalizeHistoryMode(value: unknown): SprintMode | null {
+  return value === "standard" || value === "blitz" || value === "arrow_duel" || value === "custom"
+    ? value
+    : null;
+}
+
+function normalizeHistoryResult(value: unknown): AttemptResult | null {
+  return value === "correct" || value === "wrong" ? value : null;
 }
 
 export function validateHistoryQuery(query: HistoryQuery): HistoryQuery {

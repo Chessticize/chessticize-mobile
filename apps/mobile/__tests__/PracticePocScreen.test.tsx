@@ -2877,15 +2877,47 @@ describe("PracticePocScreen", () => {
       result: "correct",
       submittedMove: " ",
       expectedMove: "",
-      startedAt: "not-a-date",
+      startedAt: "0",
       completedAt: "2026-06-20T12:00:10.000Z",
-      ratingBefore: Number.NaN,
+      ratingBefore: 600,
       ratingAfter: Number.POSITIVE_INFINITY
     });
-    const renderer = renderScreen({ practiceService: new PracticeService(store) });
+    store.recordAttempt({
+      id: "malformed-context-attempt",
+      source: "mystery-source",
+      sessionId: "malformed-context-session",
+      puzzleId: "shared-history",
+      mode: "mystery-mode",
+      ratingKey: "   ",
+      result: "mystery-result",
+      submittedMove: "e2e4",
+      expectedMove: "e2e3",
+      startedAt: "2026-06-20T12:00:00.000Z",
+      completedAt: "2026-06-20T12:00:20.000Z",
+      ratingBefore: 600
+    } as unknown as AttemptEvent);
+    store.recordAttempt({
+      id: "corrupt-arrow-attempt",
+      source: "sprint",
+      sessionId: "corrupt-arrow-session",
+      puzzleId: "shared-history",
+      mode: "arrow_duel",
+      ratingKey: "arrow duel 5/30",
+      result: "wrong",
+      submittedMove: "e2e4",
+      expectedMove: "e2e3",
+      startedAt: "2026-06-20T12:00:00.000Z",
+      completedAt: "2026-06-20T12:00:30.000Z",
+      ratingBefore: 600,
+      arrowDuelCandidateOrderStatus: "corrupt"
+    } as unknown as AttemptEvent);
+    const systemBack = createTestSystemBackSource("android");
+    const renderer = renderScreen({ practiceService: new PracticeService(store), systemBack });
 
     press(renderer, "history-tab");
     press(renderer, "history-range-max");
+    press(renderer, "history-filter-toggle");
+    press(renderer, "history-source-all");
     press(renderer, "history-attempt-custom-detail-attempt");
 
     expect(collectText(findByTestId(renderer, "history-attempt-detail-title"))).toBe("Persisted attempt");
@@ -2913,10 +2945,41 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "history-attempt-detail-context"))).toBe("Standard · Sprint");
     expect(collectText(findByTestId(renderer, "history-attempt-detail-timing"))).toBe("Jun 20, 2026 · Duration unavailable");
     expect(collectText(findByTestId(renderer, "history-attempt-detail-moves"))).toBe("Moves unavailable");
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-rating"))).toBe("Rating unavailable");
+    expect(collectText(findByTestId(renderer, "history-attempt-detail-rating"))).toBe(
+      "Rating 600 · Rating change unavailable"
+    );
     expect(collectText(findByTestId(renderer, "history-attempt-detail-partial"))).toBe(
       "Some persisted attempt details are unavailable."
     );
+
+    press(renderer, "review-exit");
+    expect(collectText(findByTestId(renderer, "history-attempt-malformed-context-attempt-result"))).toBe(
+      "Result unavailable"
+    );
+    expect(collectText(findByTestId(renderer, "history-attempt-malformed-context-attempt-meta"))).toContain(
+      "Unknown source"
+    );
+    press(renderer, "history-attempt-malformed-context-attempt");
+    expect(collectText(findByTestId(renderer, "history-attempt-detail-context"))).toBe(
+      "Unknown mode · Unknown source"
+    );
+    expect(collectText(findByTestId(renderer, "history-attempt-detail-rating-key"))).toBe(
+      "Rating bucket unavailable"
+    );
+    expect(collectText(findByTestId(renderer, "history-attempt-detail-result"))).toBe("Result unavailable");
+    expect(() => findByTestId(renderer, "review-board")).toThrow();
+    expect(() => findByTestId(renderer, "review-analysis-button")).toThrow();
+
+    expect(systemBack.invoke()).toBe(true);
+    expect(findByTestId(renderer, "history-panel")).toBeTruthy();
+    press(renderer, "history-attempt-corrupt-arrow-attempt");
+    expect(collectText(findByTestId(renderer, "history-attempt-detail-replay-unavailable"))).toBe(
+      "Original Arrow Duel candidates are unavailable, so this attempt cannot be replayed safely."
+    );
+    expect(() => findByTestId(renderer, "review-board")).toThrow();
+    expect(() => findByTestId(renderer, "review-analysis-button")).toThrow();
+    expect(systemBack.invoke()).toBe(true);
+    expect(findByTestId(renderer, "history-panel")).toBeTruthy();
   });
 
   it("keeps History filters while returning from a record but resets them on a new process lifetime", () => {

@@ -6,6 +6,7 @@ import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { buildPracticeProgressSummary, PracticeService, SQLiteStore } from "../src/index.ts";
 import type { AttemptHistoryRow, HistoryFilter } from "../src/index.ts";
+import { normalizeHistoryAttemptDetail } from "../../core/src/index.ts";
 import type { Puzzle, ReviewContext } from "../../core/src/index.ts";
 
 process.env.TZ = "UTC";
@@ -613,7 +614,7 @@ test("PracticeService builds SQLite history view across rating buckets when no r
   }
 });
 
-test("PracticeService reads partially migrated history rows without crashing on malformed optional metadata", async () => {
+test("PracticeService marks corrupt persisted history fields partial without fabricating replay metadata", async () => {
   const store = await seededStore();
   const service = new PracticeService(store);
   try {
@@ -628,26 +629,48 @@ test("PracticeService reads partially migrated history rows without crashing on 
       arrowDuelCandidateOrder: ["b2b1", "h6g7"]
     }, "2026-06-20T00:00:05.000Z");
     store.db
-      .prepare("UPDATE attempts SET rating_key = NULL, arrow_duel_candidate_order_json = ? WHERE id = ?")
-      .run("{malformed-json", recorded.attempt.id);
+      .prepare(`UPDATE attempts
+        SET source = ?, mode = ?, rating_key = ?, result = ?, started_at = ?, completed_at = ?,
+            rating_after = ?, arrow_duel_candidate_order_json = ?
+        WHERE id = ?`)
+      .run(
+        "mystery-source",
+        "mystery-mode",
+        " ",
+        "mystery-result",
+        "0",
+        "01/02/03",
+        "not-a-rating",
+        "{malformed-json",
+        recorded.attempt.id
+      );
 
     const view = service.getHistoryView({
       now: "2026-06-21T00:00:00.000Z",
       timeRange: "max",
-      ratingKey: "arrow duel 5/30"
     });
 
-    assert.deepEqual(view.attempts.map((attempt) => ({
-      id: attempt.id,
-      mode: attempt.mode,
-      ratingKey: attempt.ratingKey,
-      arrowDuelCandidateOrder: attempt.arrowDuelCandidateOrder
-    })), [{
+    assert.equal(view.attempts.length, 1);
+    assert.deepEqual(view.attempts[0]?.arrowDuelCandidateOrderStatus, "corrupt");
+    assert.deepEqual(normalizeHistoryAttemptDetail(view.attempts[0]!), {
       id: recorded.attempt.id,
-      mode: "arrow_duel",
-      ratingKey: "arrow duel 5/30",
-      arrowDuelCandidateOrder: undefined
-    }]);
+      puzzleId: "00008",
+      source: null,
+      mode: null,
+      ratingKey: null,
+      result: null,
+      startedAt: null,
+      completedAt: null,
+      elapsedSeconds: null,
+      submittedMove: "h6g7",
+      expectedMove: "b2b1",
+      ratingBefore: 600,
+      ratingAfter: null,
+      ratingAfterStatus: "invalid",
+      ratingDelta: null,
+      arrowDuelCandidateOrderStatus: "corrupt",
+      dataStatus: "partial"
+    });
   } finally {
     store.close();
   }

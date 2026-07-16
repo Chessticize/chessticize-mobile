@@ -3,6 +3,7 @@ const {
   failStandardSprint,
   launchWithDisabledSynchronization,
   openTab,
+  playBoardMove,
   waitForElementTextContaining,
   waitForVisibleInPracticeScroll,
   withAndroidUiDiagnostics,
@@ -10,6 +11,7 @@ const {
 
 const TEST_NOW_MS = '1784030400000';
 const RELAUNCH_TEST_NOW_MS = String(Number(TEST_NOW_MS) + 5 * 60_000);
+const REVIEW_TEST_NOW_MS = String(Number(TEST_NOW_MS) + 24 * 60 * 60_000 + 60_000);
 
 describe('Android Practice History', () => {
   beforeAll(async () => {
@@ -74,6 +76,53 @@ describe('Android Practice History', () => {
       if (relaunchedSummary.includes('Wrong only') || relaunchedSummary.includes('All Time')) {
         throw new Error(`History filters leaked across process relaunch: ${relaunchedSummary}`);
       }
+
+      await device.terminateApp();
+      await launchWithDisabledSynchronization({
+        delete: false,
+        newInstance: true,
+        launchArgs: { chessticizeTestNowMs: REVIEW_TEST_NOW_MS },
+      });
+      await waitFor(element(by.id('practice-home'))).toExist().withTimeout(180000);
+      await openTab('review-tab', 'review-start-due');
+      await element(by.id('review-start-due')).tap();
+      await waitFor(element(by.id('review-progress'))).toHaveText('1 / 3 · Standard').withTimeout(10000);
+      await waitForElementTextContaining('review-current-expected-move', 'e2e6', 10000);
+      await waitForVisibleInPracticeScroll('review-board');
+
+      await playBoardMove('review-board', 'e2e6');
+      await waitForElementTextContaining('review-current-expected-move', 'e6f7', 10000);
+      await waitFor(element(by.id('review-board-state'))).toHaveText('ready').withTimeout(10000);
+      await playBoardMove('review-board', 'e6f7');
+      await waitFor(element(by.id('move-feedback-overlay'))).toExist().withTimeout(5000);
+      await waitFor(element(by.id('review-progress'))).toHaveText('2 / 3 · Standard').withTimeout(30000);
+      await element(by.id('review-exit')).tap();
+
+      await openTab('history-tab', 'history-action-header');
+      await element(by.id('history-filter-toggle')).tap();
+      await element(by.id('history-source-review')).tap();
+      await waitFor(element(by.text('Correct')).atIndex(0)).toExist().withTimeout(10000);
+      const reviewResultAttributes = await element(by.text('Correct')).atIndex(0).getAttributes();
+      const reviewResultIdentifier = (Array.isArray(reviewResultAttributes)
+        ? reviewResultAttributes[0]
+        : reviewResultAttributes).identifier;
+      if (typeof reviewResultIdentifier !== 'string' || !reviewResultIdentifier.endsWith('-result')) {
+        throw new Error(`Could not resolve persisted Review History row from ${String(reviewResultIdentifier)}`);
+      }
+      await element(by.id(reviewResultIdentifier.replace(/-result$/, ''))).tap();
+
+      await waitForElementTextContaining('history-attempt-detail-context', 'Standard · Review', 10000);
+      await waitForElementTextContaining('history-attempt-detail-moves', 'Played e6f7 · Best e6f7', 10000);
+      await waitForElementTextContaining('history-attempt-detail-timing', 'Jul 15, 2026', 10000);
+      await waitForVisibleInPracticeScroll('review-analysis-button');
+      await element(by.id('review-analysis-button')).tap();
+      await waitFor(element(by.id('review-close-analysis'))).toExist().withTimeout(10000);
+
+      await device.pressBack();
+      await waitFor(element(by.id('review-analysis-button'))).toExist().withTimeout(10000);
+      await device.pressBack();
+      await waitFor(element(by.id('history-panel'))).toExist().withTimeout(10000);
+      await waitForElementTextContaining('history-active-filter-summary', 'Review', 10000);
     });
   });
 });
