@@ -594,14 +594,18 @@ describe('Detox suite configuration', () => {
 
     expect(spec).toContain("device.setOrientation('landscape')");
     expect(spec).toContain("elementText('session-current-puzzle-id')");
+    expect(spec).toContain("elementText('session-current-expected-move')");
     expect(spec).toContain("session-accessible-moves-open");
-    expect(spec).toContain("playBoardMove('session-board', 'e2e6')");
+    expect(spec).not.toContain("playBoardMove('session-board', 'e2e6')");
     const closeMoveDialog = spec.indexOf("element(by.id('session-accessible-moves-close')).tap()");
     const waitForMoveDialogClose = spec.indexOf("element(by.id('session-accessible-moves-dialog'))).not.toExist()");
-    const playBoardMove = spec.indexOf("playBoardMove('session-board', 'e2e6')");
+    const readExpectedMove = spec.indexOf("elementText('session-current-expected-move')");
+    const playBoardMove = spec.indexOf("playBoardMove('session-board', expectedMove)");
     expect(closeMoveDialog).toBeGreaterThan(0);
     expect(waitForMoveDialogClose).toBeGreaterThan(closeMoveDialog);
+    expect(readExpectedMove).toBeGreaterThan(waitForMoveDialogClose);
     expect(playBoardMove).toBeGreaterThan(waitForMoveDialogClose);
+    expect(playBoardMove).toBeGreaterThan(readExpectedMove);
     expect(evidence).toContain('phone:1080x2400:420:both:1');
     expect(evidence).toContain('tablet:1600x2560:320:both:1');
     expect(evidence).toContain('foldable:1768x2208:420:landscape:1');

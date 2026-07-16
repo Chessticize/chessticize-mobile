@@ -1001,6 +1001,20 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "active-session-control-rail")).toBeTruthy();
   });
 
+  it("exposes the active line puzzle move only through enabled native test controls", () => {
+    const service = createMobilePracticeService("familiar15");
+    const renderer = renderScreen({ practiceService: service });
+
+    startStandardSprint(renderer);
+
+    const currentPuzzle = activeSprintForTest(service).currentPuzzle;
+    if (!currentPuzzle || currentPuzzle.kind !== "line") {
+      throw new Error("Expected an active line puzzle");
+    }
+    expect(collectText(findByTestId(renderer, "session-current-expected-move")))
+      .toBe(currentPuzzle.puzzle.solutionMoves[currentPuzzle.cursor]);
+  });
+
   it("keeps board geometry inside narrow resizable windows and reserves room for large text", () => {
     (ReactNative as unknown as {
       __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
