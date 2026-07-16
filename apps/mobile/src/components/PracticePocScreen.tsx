@@ -246,6 +246,7 @@ const COMPACT_LANDSCAPE_BOARD_MAX = 430;
 const PHONE_PORTRAIT_BOARD_MAX = 560;
 const REGULAR_LANDSCAPE_BOARD_MAX = 640;
 const REGULAR_PORTRAIT_BOARD_MAX = 860;
+const REGULAR_LANDSCAPE_RESERVED_SESSION_CHROME_HEIGHT = 120;
 const REGULAR_PORTRAIT_RESERVED_CONTROLS_HEIGHT = 240;
 const HISTORY_PAGE_LIMIT = 20;
 const NEUTRAL_ARROW = "#2563EB";
@@ -365,7 +366,7 @@ function buildAdaptiveLayout({
   );
   const sessionContentWidth = viewportWidth;
   const usesWideContent = contentWidth >= 860 && !isLargeText;
-  const usesSessionRail = isCompactLandscape || (isRegularWidth && isLandscape && sessionContentWidth >= 860);
+  const usesSessionRail = isCompactLandscape || (isRegularWidth && isLandscape);
   const sessionRailWidth = isRegularWidth
     ? Math.min(REGULAR_RAIL_MAX, Math.max(REGULAR_RAIL_MIN, Math.floor(sessionContentWidth * 0.3)))
     : Math.min(COMPACT_LANDSCAPE_RAIL_MAX, Math.max(COMPACT_LANDSCAPE_RAIL_MIN, Math.floor(sessionContentWidth * 0.34)));
@@ -373,7 +374,12 @@ function buildAdaptiveLayout({
     0,
     sessionContentWidth - UI_PADDING * 2 - sessionRailWidth - 14
   );
-  const sessionBoardSlotHeight = Math.max(0, contentHeight - UI_PADDING * 2);
+  const sessionBoardSlotHeight = Math.max(
+    0,
+    contentHeight - (isRegularWidth && isLandscape
+      ? REGULAR_LANDSCAPE_RESERVED_SESSION_CHROME_HEIGHT
+      : UI_PADDING * 2)
+  );
   const portraitBoardSlotWidth = Math.max(0, sessionContentWidth - UI_PADDING * 2);
   const regularPortraitReservedControlsHeight = REGULAR_PORTRAIT_RESERVED_CONTROLS_HEIGHT +
     (isLargeText ? Math.min(180, Math.round((fontScale - 1) * 120)) : 0);

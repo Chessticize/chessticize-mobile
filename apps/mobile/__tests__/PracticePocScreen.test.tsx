@@ -958,6 +958,29 @@ describe("PracticePocScreen", () => {
     }
   });
 
+  it("reserves vertical session chrome inside a foldable landscape viewport", () => {
+    const densityScale = 420 / 160;
+    const viewportHeight = 1768 / densityScale;
+    const reservedSessionChrome = 120;
+    (ReactNative as unknown as {
+      __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
+    }).__setWindowDimensions?.({
+      width: 2208 / densityScale,
+      height: viewportHeight,
+      scale: densityScale,
+      fontScale: 1
+    });
+
+    const renderer = renderScreen({ practiceService: createMobilePracticeService("familiar15") });
+    startStandardSprint(renderer);
+
+    expect(findByTestId(renderer, "adaptive-layout").props.accessibilityLabel)
+      .toBe("Layout regularLandscape");
+    expect(findByTestId(renderer, "active-session-control-rail")).toBeTruthy();
+    const boardSize = Number(flattenTestStyle(findByTestId(renderer, "session-board").props.style).height);
+    expect(boardSize + reservedSessionChrome).toBeLessThanOrEqual(viewportHeight);
+  });
+
   it("stacks the review board and analysis panel on an iPad in portrait", () => {
     (ReactNative as unknown as {
       __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
