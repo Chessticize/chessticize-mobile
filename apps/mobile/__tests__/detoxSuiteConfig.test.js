@@ -637,7 +637,22 @@ describe('Detox suite configuration', () => {
     const playBoardMove = spec.indexOf("playBoardMove('session-board', 'c2b3')");
     const nextFixtureOption = spec.lastIndexOf("waitForAccessibleMove('c4b5')");
     const selectAccessibleMove = spec.lastIndexOf("element(by.id('session-accessible-move-c4b5')).tap()");
-    const restorePortrait = spec.lastIndexOf("setAdaptiveOrientation('portrait')");
+    const firstAccessibleInput = spec.indexOf(
+      "waitFor(element(by.id('session-accessible-moves-open'))).toBeVisible()"
+    );
+    const restorePortrait = spec.indexOf(
+      "await setAdaptiveOrientation('portrait')",
+      captureLandscape
+    );
+    const settleRestoredPortrait = spec.indexOf(
+      "await waitForSettledSprintLayout('portrait')",
+      restorePortrait
+    );
+    const settlePublicRootFocus = spec.indexOf(
+      "waitFor(element(by.id('adaptive-layout'))).toBeVisible().withTimeout(10000)",
+      settleRestoredPortrait
+    );
+    const verifyRestoredPuzzle = spec.indexOf('restoredPuzzleID', settlePublicRootFocus);
     expect(closeMoveDialog).toBeGreaterThan(0);
     expect(fixtureOption).toBeGreaterThan(0);
     expect(closeMoveDialog).toBeGreaterThan(fixtureOption);
@@ -646,7 +661,11 @@ describe('Detox suite configuration', () => {
     expect(nextFixtureOption).toBeGreaterThan(playBoardMove);
     expect(selectAccessibleMove).toBeGreaterThan(playBoardMove);
     expect(selectAccessibleMove).toBeGreaterThan(nextFixtureOption);
-    expect(restorePortrait).toBeGreaterThan(selectAccessibleMove);
+    expect(restorePortrait).toBeGreaterThan(captureLandscape);
+    expect(settleRestoredPortrait).toBeGreaterThan(restorePortrait);
+    expect(settlePublicRootFocus).toBeGreaterThan(settleRestoredPortrait);
+    expect(verifyRestoredPuzzle).toBeGreaterThan(settlePublicRootFocus);
+    expect(firstAccessibleInput).toBeGreaterThan(verifyRestoredPuzzle);
     expect(spec).toContain('setAndroidDisplayOrientation(orientation)');
     expect(spec).toContain('actual-root-bounds=${frame.width}x${frame.height}');
     expect(adaptiveOrientationHelper.indexOf('setAndroidDisplayOrientation(orientation)')).toBeGreaterThan(0);

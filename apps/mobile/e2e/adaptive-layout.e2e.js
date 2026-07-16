@@ -55,6 +55,23 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
       await captureSprint('landscape');
     }
 
+    const needsPortraitRestore = includeLandscape || initialOrientation === 'landscape';
+    if (device.getPlatform() === 'android' && needsPortraitRestore) {
+      // API 36 large-screen activities ignore requested-orientation hints, so
+      // the evidence harness rotates the physical display. Return to the
+      // natural orientation and reacquire the public app root before opening
+      // a native Modal; otherwise the rotated base window can remain the
+      // unfocused Espresso root while the dialog is being attached.
+      await setAdaptiveOrientation('portrait');
+      await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
+      await waitForSettledSprintLayout('portrait');
+      await waitFor(element(by.id('adaptive-layout'))).toBeVisible().withTimeout(10000);
+      const restoredPuzzleID = await elementText('session-current-puzzle-id');
+      if (restoredPuzzleID !== puzzleID) {
+        throw new Error(`Portrait restoration replaced the active puzzle: ${puzzleID} -> ${restoredPuzzleID}`);
+      }
+    }
+
     if (device.getPlatform() === 'android') {
       await waitFor(element(by.id('session-accessible-moves-open'))).toBeVisible().withTimeout(10000);
       await element(by.id('session-accessible-moves-open')).tap();
@@ -86,7 +103,7 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
       await waitFor(element(by.id('session-progress'))).toHaveText('0 / 15').withTimeout(10000);
     }
 
-    if (includeLandscape || initialOrientation === 'landscape') {
+    if (needsPortraitRestore && device.getPlatform() !== 'android') {
       // Leave the emulator in its natural orientation before the shell applies
       // the next profile's portrait-shaped size override.
       await setAdaptiveOrientation('portrait');
