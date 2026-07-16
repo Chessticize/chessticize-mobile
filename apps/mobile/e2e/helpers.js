@@ -669,6 +669,41 @@ function androidDisplayMetrics(environment = process.env, run = execFileSync) {
   };
 }
 
+function setAndroidDisplayOrientation(
+  orientation,
+  environment = process.env,
+  run = execFileSync
+) {
+  const requestedRotation = orientation === 'landscape'
+    ? 1
+    : orientation === 'portrait'
+      ? 0
+      : null;
+  if (requestedRotation === null) {
+    throw new Error(`Unsupported Android display orientation ${JSON.stringify(orientation)}`);
+  }
+
+  const adb = androidAdbPath(environment);
+  const serial = environment.DETOX_ANDROID_DEVICE || 'emulator-5554';
+  const shell = (...args) => String(
+    run(adb, ['-s', serial, 'shell', ...args], { encoding: 'utf8' }) ?? ''
+  );
+  const windowManagerHelp = shell('wm', 'help');
+  if (!windowManagerHelp.includes('user-rotation')) {
+    throw new Error('Android device does not support wm user-rotation display control');
+  }
+
+  shell('wm', 'user-rotation', 'lock', String(requestedRotation));
+  const rotationState = shell('wm', 'user-rotation').trim();
+  const actualRotation = Number(/^lock\s+([0-3])$/.exec(rotationState)?.[1]);
+  if (actualRotation !== requestedRotation) {
+    throw new Error(
+      `Android display rotation did not apply: requested=${requestedRotation}, state=${JSON.stringify(rotationState)}`
+    );
+  }
+  return { actualRotation, requestedRotation };
+}
+
 function parseAndroidDisplayDensity(output) {
   const overrideDensity = output.match(/Override density:\s*(\d+)/)?.[1];
   const physicalDensity = output.match(/Physical density:\s*(\d+)/)?.[1];
@@ -791,6 +826,7 @@ module.exports = {
   grantAndroidRuntimePermission,
   playBoardMove,
   performAndroidPredictiveBackGesture,
+  setAndroidDisplayOrientation,
   startPracticeMode,
   selectTestPuzzleSource,
   waitForVisibleInPracticeScroll,

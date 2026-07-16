@@ -25,12 +25,20 @@ restore_system_setting() {
   fi
 }
 
+restore_display_rotation() {
+  local state="$1"
+  if [[ "$state" == "free" ]]; then
+    "$ADB" -s "$DEVICE" shell wm user-rotation free >/dev/null 2>&1 || true
+  elif [[ "$state" =~ ^lock\ ([0-3])$ ]]; then
+    "$ADB" -s "$DEVICE" shell wm user-rotation lock "${BASH_REMATCH[1]}" >/dev/null 2>&1 || true
+  fi
+}
+
 cleanup() {
   "$ADB" -s "$DEVICE" shell wm size reset >/dev/null 2>&1 || true
   "$ADB" -s "$DEVICE" shell wm density reset >/dev/null 2>&1 || true
   restore_system_setting font_scale "${original_font_scale:-}"
-  restore_system_setting user_rotation "${original_user_rotation:-}"
-  restore_system_setting accelerometer_rotation "${original_accelerometer_rotation:-}"
+  restore_display_rotation "${original_user_rotation_state:-}"
 }
 trap cleanup EXIT
 
@@ -45,8 +53,16 @@ fi
 commit_sha="${GITHUB_SHA:-$(git rev-parse HEAD)}"
 api_level="$($ADB -s "$DEVICE" shell getprop ro.build.version.sdk | tr -d '\r')"
 original_font_scale="$($ADB -s "$DEVICE" shell settings get system font_scale | tr -d '\r')"
-original_accelerometer_rotation="$($ADB -s "$DEVICE" shell settings get system accelerometer_rotation | tr -d '\r')"
-original_user_rotation="$($ADB -s "$DEVICE" shell settings get system user_rotation | tr -d '\r')"
+wm_help="$($ADB -s "$DEVICE" shell wm help | tr -d '\r')"
+if [[ "$wm_help" != *"user-rotation"* ]]; then
+  echo "Android adaptive evidence requires wm user-rotation display control." >&2
+  exit 1
+fi
+original_user_rotation_state="$($ADB -s "$DEVICE" shell wm user-rotation | tr -d '\r')"
+if [[ "$original_user_rotation_state" != "free" && ! "$original_user_rotation_state" =~ ^lock\ [0-3]$ ]]; then
+  echo "Android adaptive evidence could not read the original display rotation: $original_user_rotation_state" >&2
+  exit 1
+fi
 if [[ "$api_level" != "36" ]]; then
   echo "Android adaptive evidence requires API 36, found API $api_level." >&2
   exit 1
@@ -67,6 +83,7 @@ profiles=(
   printf 'build=apps/mobile/android/app/build/outputs/apk/e2e/app-e2e.apk\n'
   printf 'scope=targeted-android-adaptive-layout\n'
   printf 'profiles=%s\n' "${profiles[*]}"
+  printf 'original-user-rotation=%s\n' "$original_user_rotation_state"
   printf 'worktree-clean=true\n'
 } > "$EVIDENCE_ROOT/context.txt"
 
@@ -77,11 +94,15 @@ for profile_spec in "${profiles[@]}"; do
 
   # A completed landscape capture leaves Android's display rotation at 90
   # degrees. Normalize the real display before applying the next profile's
-  # portrait dimensions so Espresso's later landscape request is not treated
-  # as already satisfied against a portrait-shaped override.
+  # portrait dimensions so the next physical display rotation starts from
+  # known natural bounds.
   "$ADB" -s "$DEVICE" shell am force-stop com.chessticize.mobile >/dev/null 2>&1 || true
-  "$ADB" -s "$DEVICE" shell settings put system accelerometer_rotation 0
-  "$ADB" -s "$DEVICE" shell settings put system user_rotation 0
+  "$ADB" -s "$DEVICE" shell wm user-rotation lock 0
+  profile_rotation_state="$($ADB -s "$DEVICE" shell wm user-rotation | tr -d '\r')"
+  if [[ "$profile_rotation_state" != "lock 0" ]]; then
+    echo "Android adaptive evidence could not reset display rotation: $profile_rotation_state" >&2
+    exit 1
+  fi
   "$ADB" -s "$DEVICE" shell wm size "$size"
   "$ADB" -s "$DEVICE" shell wm density "$density"
   "$ADB" -s "$DEVICE" shell settings put system font_scale "$font_scale"
@@ -94,8 +115,7 @@ for profile_spec in "${profiles[@]}"; do
     printf 'requested-density=%s\n' "$density"
     printf 'orientation-scope=%s\n' "$orientation_scope"
     printf 'font-scale=%s\n' "$font_scale"
-    printf 'accelerometer-rotation=%s\n' "$($ADB -s "$DEVICE" shell settings get system accelerometer_rotation | tr -d '\r')"
-    printf 'user-rotation=%s\n' "$($ADB -s "$DEVICE" shell settings get system user_rotation | tr -d '\r')"
+    printf 'profile-start-user-rotation=%s\n' "$profile_rotation_state"
     "$ADB" -s "$DEVICE" shell wm size
     "$ADB" -s "$DEVICE" shell wm density
   } > "$profile_root/display.txt"
@@ -114,6 +134,7 @@ for profile_spec in "${profiles[@]}"; do
       CHESSTICIZE_ADAPTIVE_DEVICE_LABEL="android-$profile" \
       CHESSTICIZE_ADAPTIVE_INCLUDE_LANDSCAPE="$include_landscape" \
       CHESSTICIZE_ADAPTIVE_ONLY_ORIENTATION="$only_orientation" \
+      CHESSTICIZE_ADAPTIVE_ORIENTATION_EVIDENCE="$profile_root/display.txt" \
       "$APP_DIR/scripts/android-test-for-detox.sh" \
         --cleanup \
         --artifacts-location "$profile_root/detox"

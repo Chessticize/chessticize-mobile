@@ -1,11 +1,13 @@
 /* global by, describe, device, element, it, waitFor */
 
+const fs = require('node:fs');
 const {
   elementText,
   frameFor,
   launchWithDisabledSynchronization,
   playBoardMove,
   selectTestPuzzleSource,
+  setAndroidDisplayOrientation,
   sleep,
   startPracticeMode
 } = require('./helpers');
@@ -43,8 +45,7 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
     await captureSprint(initialOrientation);
 
     if (includeLandscape && initialOrientation === 'portrait') {
-      await device.setOrientation('landscape');
-      await waitForOrientation('landscape');
+      await setAdaptiveOrientation('landscape');
       await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
       await waitForSettledSprintLayout('landscape');
       const rotatedPuzzleID = await elementText('session-current-puzzle-id');
@@ -88,8 +89,7 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
     if (includeLandscape || initialOrientation === 'landscape') {
       // Leave the emulator in its natural orientation before the shell applies
       // the next profile's portrait-shaped size override.
-      await device.setOrientation('portrait');
-      await waitForOrientation('portrait');
+      await setAdaptiveOrientation('portrait');
     }
   });
 });
@@ -126,9 +126,31 @@ async function launchForOrientation(orientation) {
     delete: true
   });
   await waitFor(element(by.id('practice-home'))).toExist().withTimeout(180000);
-  await device.setOrientation(orientation);
-  await waitForOrientation(orientation);
+  await setAdaptiveOrientation(orientation);
   await element(by.id('practice-main-scroll')).scrollTo('top');
+}
+
+async function setAdaptiveOrientation(orientation) {
+  let rotationControl = 'detox-activity';
+  let requestedRotation = orientation === 'landscape' ? 1 : 0;
+  let actualRotation = requestedRotation;
+  if (device.getPlatform() === 'android') {
+    rotationControl = 'wm-user-rotation';
+    ({ actualRotation, requestedRotation } = setAndroidDisplayOrientation(orientation));
+  } else {
+    await device.setOrientation(orientation);
+  }
+
+  const frame = await waitForOrientation(orientation);
+  const record = `orientation-request=${orientation} rotation-control=${rotationControl} `
+    + `requested-rotation=${requestedRotation} actual-rotation=${actualRotation} `
+    + `actual-root-bounds=${frame.width}x${frame.height}`;
+  console.log(`[adaptive-orientation] ${record}`);
+  const evidencePath = process.env.CHESSTICIZE_ADAPTIVE_ORIENTATION_EVIDENCE;
+  if (evidencePath) {
+    fs.appendFileSync(evidencePath, `${record}\n`, 'utf8');
+  }
+  return frame;
 }
 
 async function waitForOrientation(orientation) {
@@ -137,7 +159,7 @@ async function waitForOrientation(orientation) {
     try {
       lastFrame = await frameFor(element(by.id('adaptive-layout')));
       if (frameHasOrientation(lastFrame, orientation)) {
-        return;
+        return lastFrame;
       }
     } catch {
       lastFrame = null;
