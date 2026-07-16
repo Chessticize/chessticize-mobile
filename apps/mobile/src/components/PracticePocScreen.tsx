@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   AppState,
   Linking,
+  Modal,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -20,6 +21,7 @@ import {
   applyMovesToFen,
   beginArrowDuelPuzzle,
   beginLinePuzzle,
+  buildAccessibleMoveOptions,
   buildCurrentPositionEvaluationLine,
   buildPuzzleGuidedAnalysisLines,
   buildSprintConfig,
@@ -40,6 +42,7 @@ import {
 } from "../../../../packages/core/src/index.ts";
 import type {
   AttemptEvent,
+  AccessibleMoveOption,
   AttemptSource,
   ArrowDuelState,
   CurrentPuzzleState,
@@ -163,6 +166,7 @@ type AdaptiveLayout = {
   contentWidth: number;
   isCompactLandscape: boolean;
   isLandscape: boolean;
+  isLargeText: boolean;
   isRegularWidth: boolean;
   sessionRailWidth: number;
   sideNavigationExpanded: boolean;
@@ -332,45 +336,50 @@ const ANALYSIS_DIAGNOSTIC_POSITIONS = [
 ] as const;
 
 function buildAdaptiveLayout({
+  fontScale,
   height,
   insets,
   width
 }: {
+  fontScale: number;
   height: number;
   insets: SafeAreaInsets;
   width: number;
 }): AdaptiveLayout {
-  const viewportWidth = Math.max(MIN_BOARD, width - insets.left - insets.right);
-  const contentHeight = Math.max(MIN_BOARD, height - insets.top - insets.bottom);
+  const viewportWidth = Math.max(0, width - insets.left - insets.right);
+  const contentHeight = Math.max(0, height - insets.top - insets.bottom);
   const isLandscape = viewportWidth > contentHeight;
+  const isLargeText = fontScale >= 1.5;
   const isRegularWidth = viewportWidth >= 768 && contentHeight >= 600;
   const isCompactLandscape = isLandscape && !isRegularWidth;
   const className: AdaptiveLayoutClass = isRegularWidth
     ? isLandscape ? "regularLandscape" : "regularPortrait"
     : isLandscape ? "compactLandscape" : "compactPortrait";
   const usesSideNavigation = isCompactLandscape || isRegularWidth;
-  const sideNavigationExpanded = usesSideNavigation && viewportWidth >= 960;
+  const sideNavigationExpanded = usesSideNavigation && viewportWidth >= 960 && !isLargeText;
   const sideNavigationWidth = isRegularWidth
     ? sideNavigationExpanded ? 168 : 76
     : 64;
   const contentWidth = Math.max(
-    MIN_BOARD,
+    0,
     viewportWidth - (usesSideNavigation ? sideNavigationWidth : 0)
   );
   const sessionContentWidth = viewportWidth;
-  const usesWideContent = contentWidth >= 860;
+  const usesWideContent = contentWidth >= 860 && !isLargeText;
   const usesSessionRail = isCompactLandscape || (isRegularWidth && isLandscape && sessionContentWidth >= 860);
   const sessionRailWidth = isRegularWidth
     ? Math.min(REGULAR_RAIL_MAX, Math.max(REGULAR_RAIL_MIN, Math.floor(sessionContentWidth * 0.3)))
     : Math.min(COMPACT_LANDSCAPE_RAIL_MAX, Math.max(COMPACT_LANDSCAPE_RAIL_MIN, Math.floor(sessionContentWidth * 0.34)));
   const sessionBoardSlotWidth = Math.max(
-    MIN_BOARD,
+    0,
     sessionContentWidth - UI_PADDING * 2 - sessionRailWidth - 14
   );
-  const sessionBoardSlotHeight = Math.max(MIN_BOARD, contentHeight - UI_PADDING * 2);
-  const portraitBoardSlotWidth = Math.max(MIN_BOARD, sessionContentWidth - UI_PADDING * 2);
+  const sessionBoardSlotHeight = Math.max(0, contentHeight - UI_PADDING * 2);
+  const portraitBoardSlotWidth = Math.max(0, sessionContentWidth - UI_PADDING * 2);
+  const regularPortraitReservedControlsHeight = REGULAR_PORTRAIT_RESERVED_CONTROLS_HEIGHT +
+    (isLargeText ? Math.min(180, Math.round((fontScale - 1) * 120)) : 0);
   const portraitBoardSlotHeight = isRegularWidth && !isLandscape
-    ? Math.max(MIN_BOARD, contentHeight - UI_PADDING * 2 - REGULAR_PORTRAIT_RESERVED_CONTROLS_HEIGHT)
+    ? Math.max(0, contentHeight - UI_PADDING * 2 - regularPortraitReservedControlsHeight)
     : portraitBoardSlotWidth;
   const boardMax = isRegularWidth
     ? isLandscape ? REGULAR_LANDSCAPE_BOARD_MAX : REGULAR_PORTRAIT_BOARD_MAX
@@ -378,7 +387,7 @@ function buildAdaptiveLayout({
   const boardSlot = usesSessionRail
     ? Math.min(sessionBoardSlotWidth, sessionBoardSlotHeight)
     : Math.min(portraitBoardSlotWidth, portraitBoardSlotHeight);
-  const boardSize = Math.floor(Math.max(MIN_BOARD, Math.min(boardSlot, boardMax)));
+  const boardSize = Math.floor(Math.max(0, Math.min(boardSlot, boardMax)));
 
   return {
     boardSize,
@@ -387,6 +396,7 @@ function buildAdaptiveLayout({
     contentWidth,
     isCompactLandscape,
     isLandscape,
+    isLargeText,
     isRegularWidth,
     sessionRailWidth,
     sideNavigationExpanded,
@@ -456,7 +466,7 @@ export function PracticePocScreen({
   const feedbackSnapshotRef = useRef<FeedbackBoardSnapshot | null>(null);
   const nowMsRef = useRef<number>(currentTimeMs());
   const reviewBackCommandIdRef = useRef(0);
-  const { height, width } = useWindowDimensions();
+  const { fontScale, height, width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
   const [mode, setMode] = useState<SprintMode>("standard");
@@ -515,8 +525,8 @@ export function PracticePocScreen({
   const [, setSettingsRevision] = useState(0);
 
   const adaptiveLayout = useMemo(
-    () => buildAdaptiveLayout({ height, insets, width }),
-    [height, insets, width]
+    () => buildAdaptiveLayout({ fontScale, height, insets, width }),
+    [fontScale, height, insets, width]
   );
   const boardSize = adaptiveLayout.boardSize;
 
@@ -1342,6 +1352,20 @@ export function PracticePocScreen({
       submittedPuzzle,
       submittedPuzzleId
     });
+  }
+
+  async function playAccessibleSessionMove(option: AccessibleMoveOption): Promise<void> {
+    if (!boardRef.current || boardInputLockedRef.current || stateRef.current?.status !== "active") {
+      return;
+    }
+    const played = await boardRef.current.move({
+      from: option.from,
+      to: option.to,
+      ...(option.promotion ? { promotion: option.promotion } : {})
+    });
+    if (!played) {
+      setError(`Move ${option.label} is no longer available. Choose another move.`);
+    }
   }
 
   async function submitAcceptedMove({
@@ -2182,8 +2206,18 @@ export function PracticePocScreen({
         perPuzzleSeconds: customPerPuzzleSeconds,
         ...(customThemeValue ? { theme: customThemeValue } : {})
       });
+  const sessionAccessibleMoves = displayedBoardFen ? (
+    <AccessibleMoveControls
+      allowedMoves={displayedPuzzle?.kind === "arrow_duel" ? displayedPuzzle.candidates : undefined}
+      disabled={!isActive || boardInputLocked}
+      fen={displayedBoardFen}
+      testIDPrefix="session"
+      onSelect={playAccessibleSessionMove}
+    />
+  ) : null;
   const sessionStatusNode = state && (isOpenSession || isShowingFeedbackSnapshot) ? (
     <SessionStatusBar
+      accessibleMoves={sessionAccessibleMoves}
       compactMetrics={sessionUsesRail}
       mode={mode}
       state={state}
@@ -2303,6 +2337,13 @@ export function PracticePocScreen({
     <PracticePrompt currentPuzzle={displayedPuzzle} mode={mode} />
   ) : null;
   const errorNode = error ? <ErrorPanel error={error} /> : null;
+  const practiceAnnouncement = error
+    ? `Error. ${error}`
+    : boardFeedback
+      ? `${boardFeedback.result === "correct" ? "Correct move" : "Wrong move"}. ${boardFeedback.puzzleSolved ? "Puzzle complete." : "Continue the puzzle."}`
+      : isActive && displayedSideToMove
+        ? `${modeLabel(mode)} sprint. ${sideToMoveAccessibilityLabel(displayedSideToMove)}. ${state?.correctCount ?? 0} solved, ${state?.mistakeCount ?? 0} mistakes.`
+        : `${screenTitle} screen`;
 
   return (
     <View style={styles.predictiveBackStage}>
@@ -2342,6 +2383,13 @@ export function PracticePocScreen({
         style={styles.appRootShell}
         testID="adaptive-layout"
       >
+        <View
+          accessible
+          accessibilityLabel={practiceAnnouncement}
+          accessibilityLiveRegion="polite"
+          style={styles.accessibilityAnnouncement}
+          testID="practice-announcement"
+        />
         {sideNavigationVisible ? (
           <NavigationRail
             activeTab={tab}
@@ -3661,7 +3709,104 @@ function TestPuzzleSourceControl({
   );
 }
 
+function AccessibleMoveControls({
+  allowedMoves,
+  disabled,
+  fen,
+  testIDPrefix,
+  onSelect
+}: {
+  allowedMoves?: string[];
+  disabled: boolean;
+  fen: string;
+  testIDPrefix: string;
+  onSelect: (option: AccessibleMoveOption) => void | Promise<void>;
+}): React.JSX.Element {
+  const [open, setOpen] = useState(false);
+  const options = useMemo(() => {
+    const allOptions = buildAccessibleMoveOptions(fen);
+    if (!allowedMoves) {
+      return allOptions;
+    }
+    const allowed = new Set(allowedMoves.map(normalizeUci));
+    return allOptions.filter((option) => allowed.has(option.uci));
+  }, [allowedMoves, fen]);
+  const unavailable = disabled || options.length === 0;
+
+  return (
+    <>
+      <Pressable
+        accessibilityHint="Opens a list of legal moves so the board can be used without dragging pieces"
+        accessibilityLabel="Choose move without gestures"
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open, ...(unavailable ? { disabled: true } : {}) }}
+        disabled={unavailable}
+        onPress={() => setOpen(true)}
+        style={[styles.accessibleMoveOpenButton, unavailable ? styles.disabledButton : null]}
+        testID={`${testIDPrefix}-accessible-moves-open`}
+      >
+        <Text style={styles.accessibleMoveOpenButtonText}>Moves</Text>
+      </Pressable>
+      <Modal
+        animationType="fade"
+        onRequestClose={() => setOpen(false)}
+        transparent
+        visible={open}
+      >
+        <View style={styles.accessibleMoveModalBackdrop}>
+          <View
+            accessible={false}
+            accessibilityViewIsModal
+            style={styles.accessibleMoveDialog}
+            testID={`${testIDPrefix}-accessible-moves-dialog`}
+          >
+            <View style={styles.accessibleMoveDialogHeader}>
+              <View style={styles.accessibleMoveDialogTitleBlock}>
+                <Text accessibilityRole="header" style={styles.panelTitle}>Choose a legal move</Text>
+                <Text style={styles.helperText}>Select the same move you would play on the board.</Text>
+              </View>
+              <Pressable
+                accessibilityLabel="Close move chooser"
+                accessibilityRole="button"
+                onPress={() => setOpen(false)}
+                style={styles.iconButton}
+                testID={`${testIDPrefix}-accessible-moves-close`}
+              >
+                <CloseGlyph />
+              </Pressable>
+            </View>
+            <ScrollView
+              contentContainerStyle={styles.accessibleMoveList}
+              testID={`${testIDPrefix}-accessible-moves-list`}
+            >
+              {options.map((option) => (
+                <Pressable
+                  key={option.uci}
+                  accessibilityLabel={option.label}
+                  accessibilityRole="button"
+                  onPress={() => {
+                    setOpen(false);
+                    void onSelect(option);
+                  }}
+                  style={styles.accessibleMoveOption}
+                  testID={`${testIDPrefix}-accessible-move-${option.uci}`}
+                >
+                  <Text style={styles.accessibleMoveSan}>{option.san}</Text>
+                  <Text style={styles.accessibleMoveCoordinates}>
+                    {option.from} → {option.to}{option.promotion ? ` = ${option.promotion.toUpperCase()}` : ""}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    </>
+  );
+}
+
 function SessionStatusBar({
+  accessibleMoves,
   compactMetrics = false,
   confirmAbandon,
   mode,
@@ -3673,6 +3818,7 @@ function SessionStatusBar({
   onPause,
   onResume
 }: {
+  accessibleMoves?: React.JSX.Element | null;
   compactMetrics?: boolean;
   confirmAbandon: boolean;
   mode: SprintMode;
@@ -3701,31 +3847,34 @@ function SessionStatusBar({
           <View style={styles.sessionNavButton} />
         )}
         <Text style={styles.sessionNavTitle}>{modeLabel(mode)}</Text>
-        {onPause ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Pause sprint"
-            testID="session-pause"
-            style={styles.sessionNavButton}
-            onPress={onPause}
-          >
-            <PauseGlyph />
-          </Pressable>
-        ) : onResume ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Resume sprint"
-            testID="session-resume"
-            style={styles.sessionNavButton}
-            onPress={onResume}
-          >
-            <PlayGlyph />
-          </Pressable>
-        ) : (
-          <View style={styles.sessionNavButton} testID="session-overflow">
-            <MoreGlyph />
-          </View>
-        )}
+        <View style={styles.sessionNavActions}>
+          {accessibleMoves}
+          {onPause ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Pause sprint"
+              testID="session-pause"
+              style={styles.sessionNavButton}
+              onPress={onPause}
+            >
+              <PauseGlyph />
+            </Pressable>
+          ) : onResume ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Resume sprint"
+              testID="session-resume"
+              style={styles.sessionNavButton}
+              onPress={onResume}
+            >
+              <PlayGlyph />
+            </Pressable>
+          ) : (
+            <View style={styles.sessionNavButton} testID="session-overflow">
+              <MoreGlyph />
+            </View>
+          )}
+        </View>
       </View>
 
       <View
@@ -4062,7 +4211,14 @@ function SprintResultStatusGlyph({ status }: { status: "won" | "failed" }): Reac
 
 function ErrorPanel({ error }: { error: string }): React.JSX.Element {
   return (
-    <View style={styles.errorPanel} testID="error-panel">
+    <View
+      accessible
+      accessibilityLabel={`Error. ${error}`}
+      accessibilityLiveRegion="assertive"
+      accessibilityRole="alert"
+      style={styles.errorPanel}
+      testID="error-panel"
+    >
       <Text style={styles.errorText}>{error}</Text>
     </View>
   );
@@ -6637,6 +6793,17 @@ function ReviewSession({
     await submitReviewLineMove(move, submittedFen);
   }
 
+  async function playAccessibleReviewMove(option: AccessibleMoveOption): Promise<void> {
+    if (!boardRef.current || !boardGestureEnabled) {
+      return;
+    }
+    await boardRef.current.move({
+      from: option.from,
+      to: option.to,
+      ...(option.promotion ? { promotion: option.promotion } : {})
+    });
+  }
+
   async function submitReviewLineMove(move: string, submittedFen: string): Promise<void> {
     setBoardLocked(true);
     try {
@@ -6920,6 +7087,17 @@ function ReviewSession({
 
   return (
     <View style={[styles.reviewSessionPanel, adaptiveLayout.usesWideContent ? styles.reviewSessionPanelWide : null]} testID="review-session">
+      <View
+        accessible
+        accessibilityLabel={feedback
+          ? `${feedback.result === "correct" ? "Correct move" : "Wrong move"}. ${feedback.puzzleSolved ? "Puzzle complete." : "Continue the review."}`
+          : analysisEnabled
+            ? `Analysis ${analysisEngineLabel || "ready"}`
+            : `Review puzzle ${reviewProgressPosition} of ${reviewProgressTotal}. ${sideToMoveAccessibilityLabel(reviewSideToMove)}.`}
+        accessibilityLiveRegion="polite"
+        style={styles.accessibilityAnnouncement}
+        testID="review-announcement"
+      />
       <View style={styles.reviewHeaderRow}>
         <View style={styles.reviewTopNav}>
           <Pressable
@@ -6954,6 +7132,15 @@ function ReviewSession({
             ) : null}
           </View>
           <View style={styles.iconButtonRow} testID="review-header-actions">
+          <AccessibleMoveControls
+            allowedMoves={reviewState.kind === "arrow_duel" && !analysisEnabled
+              ? reviewState.duel.candidates
+              : undefined}
+            disabled={!boardGestureEnabled}
+            fen={displayFen}
+            testIDPrefix="review"
+            onSelect={playAccessibleReviewMove}
+          />
           {currentEntry.source === "session" || currentEntry.source === "history" ? (
             <>
               <Pressable
@@ -7023,7 +7210,13 @@ function ReviewSession({
 
       <View style={[styles.reviewBoardLayout, adaptiveLayout.usesSessionRail ? styles.reviewBoardLayoutWide : null]}>
         <View style={styles.reviewBoardLane} testID="review-board-lane">
-          <View testID="review-board" style={[styles.boardSurface, { width: boardSize, height: boardSize }]}>
+          <View
+            accessible
+            accessibilityLabel={sessionBoardAccessibilityLabel(reviewSideToMove, lastMove)}
+            accessibilityRole="image"
+            testID="review-board"
+            style={[styles.boardSurface, { width: boardSize, height: boardSize }]}
+          >
             <Chessboard
               key={`${currentEntry.puzzle.id}-${entryIndex}`}
               ref={boardRef}
@@ -9281,6 +9474,84 @@ const FABRIC_SAFE_HIDDEN_TEXT_STYLE = {
 } as const;
 
 const styles = StyleSheet.create({
+  accessibilityAnnouncement: {
+    height: 1,
+    left: -10000,
+    opacity: 0.01,
+    position: "absolute",
+    top: 0,
+    width: 1
+  },
+  accessibleMoveOpenButton: {
+    alignItems: "center",
+    borderColor: "#CBD5E1",
+    borderRadius: 8,
+    borderWidth: 1,
+    height: 40,
+    justifyContent: "center",
+    minWidth: 54,
+    paddingHorizontal: 7
+  },
+  accessibleMoveOpenButtonText: {
+    color: "#334155",
+    fontSize: 11,
+    fontWeight: "800"
+  },
+  accessibleMoveModalBackdrop: {
+    alignItems: "center",
+    backgroundColor: "rgba(15, 23, 42, 0.48)",
+    flex: 1,
+    justifyContent: "center",
+    padding: 20
+  },
+  accessibleMoveDialog: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    maxHeight: "86%",
+    maxWidth: 620,
+    padding: 16,
+    width: "100%"
+  },
+  accessibleMoveDialogHeader: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: 12,
+    justifyContent: "space-between",
+    marginBottom: 12
+  },
+  accessibleMoveDialogTitleBlock: {
+    flex: 1,
+    gap: 4,
+    minWidth: 0
+  },
+  accessibleMoveList: {
+    gap: 8,
+    paddingBottom: 8
+  },
+  accessibleMoveOption: {
+    alignItems: "center",
+    backgroundColor: "#F8FAFC",
+    borderColor: "#CBD5E1",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 12,
+    justifyContent: "space-between",
+    minHeight: 48,
+    paddingHorizontal: 14,
+    paddingVertical: 10
+  },
+  accessibleMoveSan: {
+    color: "#111827",
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "800"
+  },
+  accessibleMoveCoordinates: {
+    color: "#475569",
+    fontSize: 13,
+    fontWeight: "700"
+  },
   predictiveBackStage: {
     backgroundColor: "#DCE7F5",
     flex: 1
@@ -10216,6 +10487,11 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: "center",
     width: 40
+  },
+  sessionNavActions: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 4
   },
   sessionNavTitle: {
     color: "#111827",

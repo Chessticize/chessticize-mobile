@@ -919,7 +919,7 @@ describe("PracticePocScreen", () => {
   ])("renders the core practice surfaces in a %s viewport", ({ width, height, scale, layout, boardSize, sideRail, railWidth, sessionRail, homeColumns }) => {
     (ReactNative as unknown as {
       __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
-    }).__setWindowDimensions?.({ width, height, scale, fontScale: scale });
+    }).__setWindowDimensions?.({ width, height, scale, fontScale: 1 });
 
     const renderer = renderScreen({ practiceService: createMobilePracticeService("random1000") });
 
@@ -961,7 +961,7 @@ describe("PracticePocScreen", () => {
   it("stacks the review board and analysis panel on an iPad in portrait", () => {
     (ReactNative as unknown as {
       __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
-    }).__setWindowDimensions?.({ width: 1032, height: 1376, scale: 2, fontScale: 2 });
+    }).__setWindowDimensions?.({ width: 1032, height: 1376, scale: 2, fontScale: 1 });
 
     const renderer = renderScreen({
       currentTimeMs: () => Date.parse("2026-06-20T12:00:00.000Z"),
@@ -973,6 +973,137 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "review-session")).toBeTruthy();
     expect(flattenTestStyle(findByTestId(renderer, "review-analysis-panel").props.style).width).toBeUndefined();
+  });
+
+  it("preserves the active sprint and its accessible move dialog across a live resize", () => {
+    const service = createMobilePracticeService("familiar15");
+    (ReactNative as unknown as {
+      __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
+    }).__setWindowDimensions?.({ width: 430, height: 932, scale: 3, fontScale: 1 });
+    const renderer = renderScreen({ practiceService: service });
+
+    startStandardSprint(renderer);
+    const sprintId = activeSprintForTest(service).id;
+    const puzzleId = activeSprintForTest(service).currentPuzzle?.puzzle.id;
+    press(renderer, "session-accessible-moves-open");
+    expect(findByTestId(renderer, "session-accessible-moves-dialog")).toBeTruthy();
+
+    act(() => {
+      (ReactNative as unknown as {
+        __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
+      }).__setWindowDimensions?.({ width: 844, height: 390, scale: 3, fontScale: 1 });
+    });
+
+    expect(findByTestId(renderer, "adaptive-layout").props.accessibilityLabel).toBe("Layout compactLandscape");
+    expect(activeSprintForTest(service).id).toBe(sprintId);
+    expect(activeSprintForTest(service).currentPuzzle?.puzzle.id).toBe(puzzleId);
+    expect(findByTestId(renderer, "session-accessible-moves-dialog")).toBeTruthy();
+    expect(findByTestId(renderer, "active-session-control-rail")).toBeTruthy();
+  });
+
+  it("keeps board geometry inside narrow resizable windows and reserves room for large text", () => {
+    (ReactNative as unknown as {
+      __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
+    }).__setWindowDimensions?.({ width: 280, height: 700, scale: 2, fontScale: 1 });
+    const narrowRenderer = renderScreen({ practiceService: createMobilePracticeService("familiar15") });
+    startStandardSprint(narrowRenderer);
+    expect(flattenTestStyle(findByTestId(narrowRenderer, "session-board").props.style).width).toBeLessThanOrEqual(248);
+
+    act(() => {
+      (ReactNative as unknown as {
+        __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
+      }).__setWindowDimensions?.({ width: 1032, height: 1376, scale: 2, fontScale: 2 });
+    });
+    const largeTextRenderer = renderScreen({ practiceService: createMobilePracticeService("familiar15") });
+    expect(flattenTestStyle(findByTestId(largeTextRenderer, "navigation-rail").props.style).width).toBe(76);
+    expect(styleEntryMatches(findByTestId(largeTextRenderer, "practice-home-layout").props.style, "flexDirection", "row")).toBe(false);
+    startStandardSprint(largeTextRenderer);
+    expect(flattenTestStyle(findByTestId(largeTextRenderer, "session-board").props.style).width).toBeLessThanOrEqual(860);
+  });
+
+  it("offers public non-gesture move actions and announces changing session state", async () => {
+    const service = createMobilePracticeService("familiar15");
+    const renderer = renderScreen({ practiceService: service });
+    startStandardSprint(renderer);
+
+    const open = findByTestId(renderer, "session-accessible-moves-open");
+    expect(open.props.accessibilityRole).toBe("button");
+    expect(open.props.accessibilityState).toEqual({ expanded: false });
+    expect(findByTestId(renderer, "practice-announcement").props.accessibilityLiveRegion).toBe("polite");
+
+    press(renderer, "session-accessible-moves-open");
+    const dialog = findByTestId(renderer, "session-accessible-moves-dialog");
+    expect(dialog.props.accessibilityViewIsModal).toBe(true);
+    const moveButtons = renderer.root.findAll((node) =>
+      typeof node.props.testID === "string" && node.props.testID.startsWith("session-accessible-move-")
+    );
+    expect(moveButtons.length).toBeGreaterThan(0);
+    expect(moveButtons.every((node) => node.props.accessibilityRole === "button")).toBe(true);
+    expect(moveButtons.every((node) => Number(flattenTestStyle(node.props.style).minHeight) >= 48)).toBe(true);
+
+    await act(async () => {
+      moveButtons[0]?.props.onPress();
+      await Promise.resolve();
+    });
+    expect(findByTestId(renderer, "practice-announcement").props.accessibilityLiveRegion).toBe("polite");
+  });
+
+  it("limits non-gesture Arrow Duel actions to the visible candidate contract", () => {
+    const service = createMobilePracticeService("random1000");
+    const renderer = renderScreen({ practiceService: service });
+    startArrowDuelSprint(renderer);
+    const candidates = requireArrowDuelState(activeSprintForTest(service)).candidates;
+
+    press(renderer, "session-accessible-moves-open");
+    const moveIDs = Array.from(new Set(renderer.root.findAll((node) =>
+      typeof node.props.testID === "string" && node.props.testID.startsWith("session-accessible-move-")
+    ).map((node) => String(node.props.testID))));
+
+    expect(moveIDs).toEqual(candidates.map((move) => `session-accessible-move-${move}`).sort());
+  });
+
+  it("keeps the non-gesture move contract available in Review and Analysis", () => {
+    const renderer = renderScreen({
+      currentTimeMs: () => Date.parse("2026-06-20T12:00:00.000Z"),
+      practiceService: createDueReviewService(1)
+    });
+    press(renderer, "review-tab");
+    press(renderer, "review-start-due");
+
+    expect(findByTestId(renderer, "review-board").props.accessibilityRole).toBe("image");
+    expect(findByTestId(renderer, "review-announcement").props.accessibilityLiveRegion).toBe("polite");
+    press(renderer, "review-accessible-moves-open");
+    expect(findByTestId(renderer, "review-accessible-moves-dialog").props.accessibilityViewIsModal).toBe(true);
+    expect(renderer.root.findAll((node) =>
+      typeof node.props.testID === "string" && node.props.testID.startsWith("review-accessible-move-")
+    ).length).toBeGreaterThan(0);
+  });
+
+  it.each([
+    { label: "phone portrait", width: 430, height: 932 },
+    { label: "phone landscape", width: 844, height: 390 },
+    { label: "tablet portrait", width: 820, height: 1180 },
+    { label: "tablet landscape", width: 1180, height: 820 }
+  ])("keeps Custom, History, Review, reminders, backup, and Settings reachable on $label", ({ width, height }) => {
+    (ReactNative as unknown as {
+      __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
+    }).__setWindowDimensions?.({ width, height, scale: 2, fontScale: 1 });
+    const renderer = renderScreen({
+      practiceService: createDueReviewService(1),
+      progressProtection: { kind: "android_managed_backup" }
+    });
+
+    press(renderer, "practice-mode-custom");
+    expect(findByTestId(renderer, "custom-sprint-setup")).toBeTruthy();
+    press(renderer, "custom-close");
+    press(renderer, "history-tab");
+    expect(findByTestId(renderer, "history-panel")).toBeTruthy();
+    press(renderer, "review-tab");
+    expect(findByTestId(renderer, "review-panel")).toBeTruthy();
+    press(renderer, "settings-tab");
+    expect(findByTestId(renderer, "settings-panel")).toBeTruthy();
+    expect(findByTestId(renderer, "settings-review-reminders")).toBeTruthy();
+    expect(findByTestId(renderer, "settings-android-backup-section")).toBeTruthy();
   });
 
   it("summarizes recent local practice progress on the Practice home", () => {
@@ -4454,7 +4585,7 @@ describe("PracticePocScreen", () => {
   }) => {
     (ReactNative as unknown as {
       __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
-    }).__setWindowDimensions?.({ width, height, scale, fontScale: scale });
+    }).__setWindowDimensions?.({ width, height, scale, fontScale: 1 });
     jest.setSystemTime(new Date("2026-06-21T12:00:00.000Z"));
 
     const renderer = renderScreen({ practiceService: createDueReviewService(16) });

@@ -11,3 +11,4 @@ export * from "./engine-analysis.ts";
 export * from "./puzzle-pack.ts";
 export * from "./local-date.ts";
 export * from "./review-reminder.ts";
+export * from "./accessible-chess-moves.ts";

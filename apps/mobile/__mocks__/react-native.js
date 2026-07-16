@@ -1,7 +1,8 @@
 const React = require('react');
 const appStateListeners = new Set();
 const backHandlerListeners = new Set();
-const defaultWindowDimensions = { width: 390, height: 844, scale: 3, fontScale: 3 };
+const windowDimensionListeners = new Set();
+const defaultWindowDimensions = { width: 390, height: 844, scale: 3, fontScale: 1 };
 let windowDimensions = { ...defaultWindowDimensions };
 
 function component(name) {
@@ -15,9 +16,15 @@ module.exports = {
   NativeModules: {},
   __setWindowDimensions(nextDimensions) {
     windowDimensions = { ...windowDimensions, ...nextDimensions };
+    for (const listener of Array.from(windowDimensionListeners)) {
+      listener();
+    }
   },
   __resetWindowDimensions() {
     windowDimensions = { ...defaultWindowDimensions };
+    for (const listener of Array.from(windowDimensionListeners)) {
+      listener();
+    }
   },
   LogBox: {
     ignoreAllLogs() {}
@@ -93,7 +100,14 @@ module.exports = {
   Modal: component('Modal'),
   View: component('View'),
   useWindowDimensions() {
-    return windowDimensions;
+    return React.useSyncExternalStore(
+      (listener) => {
+        windowDimensionListeners.add(listener);
+        return () => windowDimensionListeners.delete(listener);
+      },
+      () => windowDimensions,
+      () => windowDimensions
+    );
   },
   StyleSheet: {
     absoluteFillObject: {
