@@ -1,0 +1,27 @@
+{
+  "puzzleSelectionSeed": "android-arrow-duel:2",
+  "targetCorrect": 1,
+  "puzzle": {
+    "id": "03wH4",
+    "initialFen": "2r2b2/p5qk/1p1pR1pp/3Q4/2P4B/1PN5/P4PPP/6K1 w - -",
+    "solutionMoves": [
+      "c3e4",
+      "g7a1",
+      "d5d1",
+      "a1d1"
+    ],
+    "rating": 600,
+    "themes": [],
+    "source": "lichess",
+    "stockfishEval": 790,
+    "stockfishBestMove": "h4f6",
+    "stockfishEvalAfterFirstMove": -10000
+  },
+  "candidates": [
+    "c3e4",
+    "h4f6"
+  ],
+  "wrongMove": "c3e4",
+  "correctMove": "h4f6",
+  "expectedRatingAfter": 775
+}

@@ -1207,6 +1207,23 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "session-progress-block").props.accessibilityLabel).toBe("Progress 0 of 1");
   });
 
+  it("uses the maintained native Arrow Duel target for a bounded completion journey", async () => {
+    const service = createMobilePracticeService("familiar15");
+    const renderer = renderScreen({
+      practiceService: service,
+      arrowDuelTargetCorrect: 1
+    });
+    const arrow = firstArrowDuelPuzzleForTest();
+
+    startArrowDuelSprint(renderer);
+
+    expect(findByTestId(renderer, "session-progress-block").props.accessibilityLabel).toBe("Progress 0 of 1");
+    await boardMove(renderer, arrow.correctMove);
+    await settleFeedbackSnapshot();
+    expectText(renderer, "Sprint complete");
+    expect(collectText(findByTestId(renderer, "sprint-result-solved"))).toContain("1 / 1");
+  });
+
   it("accepts a non-official legal checkmate in the fixed first familiar puzzle", async () => {
     const renderer = renderScreen({ practiceService: createMobilePracticeService("familiar15") });
 
@@ -1775,16 +1792,22 @@ describe("PracticePocScreen", () => {
   });
 
   it("uses neutral Arrow Duel board markers without separate A/B choice chips", () => {
-    const renderer = renderScreen({ practiceService: createMobilePracticeService("familiar15") });
-    const arrow = firstArrowDuelPuzzleForTest();
+    const service = createMobilePracticeService("familiar15");
+    const renderer = renderScreen({ practiceService: service });
 
     startArrowDuelSprint(renderer);
+    const arrow = requireArrowDuelState(activeSprintForTest(service));
 
     expect(findByTestId(renderer, "mock-chessboard").props.flipped).toBe(new Chess(arrow.currentFen).turn() === "b");
     expect(collectText(renderer.root)).not.toContain("Choose one candidate move");
     expect(() => findByTestId(renderer, "arrow-duel-candidates")).toThrow();
     expect(() => findByTestId(renderer, "arrow-duel-candidate-a")).toThrow();
     expect(() => findByTestId(renderer, "arrow-duel-candidate-b")).toThrow();
+    const accessibleCandidateOverlay = renderer.root
+      .findAllByProps({ testID: "arrow-duel-candidate-overlay" })
+      .find((node) => node.props.accessible === true);
+    expect(accessibleCandidateOverlay?.props.accessibilityLabel)
+      .toBe(`Arrow Duel candidates: ${arrow.candidates.join(", ")}`);
     expect(collectText(findByTestId(renderer, "practice-prompt-icon"))).toBe("");
     expect(testIdOrder(renderer, "session-board", "session-score-strip")).toBeLessThan(0);
     expect(testIdOrder(renderer, "session-score-strip", "practice-prompt")).toBeLessThan(0);
@@ -4724,7 +4747,7 @@ function createScriptedStockfishTransport(
 }
 
 type RenderScreenOptions = TestMobilePlatformCapabilityOverrides &
-  Pick<React.ComponentProps<typeof PracticePocScreen>, "currentTimeMs" | "debugTrace" | "puzzleSelectionSeed" | "standardTargetCorrect" | "systemBack"> & {
+  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "debugTrace" | "puzzleSelectionSeed" | "standardTargetCorrect" | "systemBack"> & {
     platformCapabilities?: MobilePlatformCapabilities;
   };
 
@@ -4765,6 +4788,7 @@ function createMultiContextDueReviewService(): PracticeService {
 }
 
 function renderScreen({
+  arrowDuelTargetCorrect,
   platformCapabilities,
   currentTimeMs,
   debugTrace,
@@ -4778,6 +4802,7 @@ function renderScreen({
     renderer = TestRenderer.create(
       <PracticePocScreen
         platformCapabilities={platformCapabilities ?? createTestMobilePlatformCapabilities(capabilityOverrides)}
+        arrowDuelTargetCorrect={arrowDuelTargetCorrect}
         currentTimeMs={currentTimeMs}
         debugTrace={debugTrace}
         puzzleSelectionSeed={puzzleSelectionSeed}

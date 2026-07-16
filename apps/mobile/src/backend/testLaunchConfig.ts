@@ -7,6 +7,7 @@ type TestLaunchConfigGlobals = typeof globalThis & {
 };
 
 type NativeTestLaunchConfigValues = {
+  arrowDuelTargetCorrect?: string | number;
   puzzleSelectionSeed?: string;
   standardTargetCorrect?: string | number;
   storeAssetCapture?: boolean;
@@ -87,6 +88,19 @@ export function resolveTestStandardTargetCorrectFromLaunchConfig(
     return undefined;
   }
   const rawValue = launchConfig?.standardTargetCorrect;
+  const parsed = typeof rawValue === "number" ? rawValue : Number(rawValue);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+export function resolveTestArrowDuelTargetCorrectFromLaunchConfig(
+  globals: TestLaunchConfigGlobals = globalThis,
+  nativeModule: NativeTestLaunchConfigModule | undefined = NativeModules?.ChessticizeTestLaunchConfig as NativeTestLaunchConfigModule | undefined
+): number | undefined {
+  const launchConfig = readNativeTestLaunchConfig(nativeModule);
+  if (!areNativeTestControlsEnabled(globals, launchConfig)) {
+    return undefined;
+  }
+  const rawValue = launchConfig?.arrowDuelTargetCorrect;
   const parsed = typeof rawValue === "number" ? rawValue : Number(rawValue);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
 }

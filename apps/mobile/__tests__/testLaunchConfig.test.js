@@ -1,6 +1,7 @@
 const {
   createAdvancingTestClock,
   isStoreAssetCaptureEnabled,
+  resolveTestArrowDuelTargetCorrectFromLaunchConfig,
   resolveTestNowMsFromLaunchConfig,
   resolveTestPuzzleSelectionSeedFromLaunchConfig,
   resolveTestStandardTargetCorrectFromLaunchConfig
@@ -53,6 +54,24 @@ describe("test launch configuration", () => {
       })
     ).toBeUndefined();
     expect(
+      resolveTestArrowDuelTargetCorrectFromLaunchConfig(productionGlobals, {
+        arrowDuelTargetCorrect: "1",
+        testControlsEnabled: true
+      })
+    ).toBe(1);
+    expect(
+      resolveTestArrowDuelTargetCorrectFromLaunchConfig(productionGlobals, {
+        arrowDuelTargetCorrect: "0",
+        testControlsEnabled: true
+      })
+    ).toBeUndefined();
+    expect(
+      resolveTestArrowDuelTargetCorrectFromLaunchConfig(productionGlobals, {
+        arrowDuelTargetCorrect: "1",
+        testControlsEnabled: false
+      })
+    ).toBeUndefined();
+    expect(
       resolveTestStandardTargetCorrectFromLaunchConfig(productionGlobals, {
         standardTargetCorrect: "1",
         testControlsEnabled: true
@@ -75,6 +94,7 @@ describe("test launch configuration", () => {
   it("reads Android launch values on demand after the activity captures its intent", () => {
     const getLaunchConfig = jest.fn(() => ({
       puzzleSelectionSeed: "android-standard-practice",
+      arrowDuelTargetCorrect: "1",
       standardTargetCorrect: "1",
       testControlsEnabled: true,
       testNowMs: "1780000000000"
@@ -84,9 +104,10 @@ describe("test launch configuration", () => {
 
     expect(resolveTestPuzzleSelectionSeedFromLaunchConfig(productionGlobals, nativeModule))
       .toBe("android-standard-practice");
+    expect(resolveTestArrowDuelTargetCorrectFromLaunchConfig(productionGlobals, nativeModule)).toBe(1);
     expect(resolveTestStandardTargetCorrectFromLaunchConfig(productionGlobals, nativeModule)).toBe(1);
     expect(resolveTestNowMsFromLaunchConfig(productionGlobals, nativeModule)).toBe(1780000000000);
-    expect(getLaunchConfig).toHaveBeenCalledTimes(3);
+    expect(getLaunchConfig).toHaveBeenCalledTimes(4);
   });
 
   it("accepts a fixed clock for release store-asset capture without enabling visible test controls", () => {

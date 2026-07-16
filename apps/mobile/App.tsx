@@ -7,6 +7,7 @@ import type { MobilePlatformCapabilities } from "./src/backend/mobilePlatformCap
 import {
   createAdvancingTestClock,
   enableTestControlsFromLaunchConfig,
+  resolveTestArrowDuelTargetCorrectFromLaunchConfig,
   resolveTestNowMsFromLaunchConfig,
   resolveTestPuzzleSelectionSeedFromLaunchConfig,
   resolveTestStandardTargetCorrectFromLaunchConfig
@@ -31,6 +32,7 @@ function App() {
   );
   const [loadError, setLoadError] = React.useState<string | undefined>(undefined);
   const testNowMs = resolveTestNowMsFromLaunchConfig();
+  const arrowDuelTargetCorrect = resolveTestArrowDuelTargetCorrectFromLaunchConfig();
   const puzzleSelectionSeed = resolveTestPuzzleSelectionSeedFromLaunchConfig();
   const standardTargetCorrect = resolveTestStandardTargetCorrectFromLaunchConfig();
   const currentTimeMs = React.useMemo(
@@ -63,6 +65,7 @@ function App() {
       {platformCapabilities ? (
         <PracticePocScreen
           platformCapabilities={platformCapabilities}
+          arrowDuelTargetCorrect={arrowDuelTargetCorrect}
           currentTimeMs={currentTimeMs}
           puzzleSelectionSeed={puzzleSelectionSeed}
           standardTargetCorrect={standardTargetCorrect}
