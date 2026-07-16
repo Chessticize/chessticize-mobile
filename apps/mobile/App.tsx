@@ -8,6 +8,7 @@ import {
   createAdvancingTestClock,
   enableTestControlsFromLaunchConfig,
   resolveTestArrowDuelTargetCorrectFromLaunchConfig,
+  resolveTestCustomTargetCorrectFromLaunchConfig,
   resolveTestNowMsFromLaunchConfig,
   resolveTestPuzzleSelectionSeedFromLaunchConfig,
   resolveTestStandardTargetCorrectFromLaunchConfig
@@ -33,6 +34,7 @@ function App() {
   const [loadError, setLoadError] = React.useState<string | undefined>(undefined);
   const testNowMs = resolveTestNowMsFromLaunchConfig();
   const arrowDuelTargetCorrect = resolveTestArrowDuelTargetCorrectFromLaunchConfig();
+  const customTargetCorrect = resolveTestCustomTargetCorrectFromLaunchConfig();
   const puzzleSelectionSeed = resolveTestPuzzleSelectionSeedFromLaunchConfig();
   const standardTargetCorrect = resolveTestStandardTargetCorrectFromLaunchConfig();
   const currentTimeMs = React.useMemo(
@@ -67,6 +69,7 @@ function App() {
           platformCapabilities={platformCapabilities}
           arrowDuelTargetCorrect={arrowDuelTargetCorrect}
           currentTimeMs={currentTimeMs}
+          customTargetCorrect={customTargetCorrect}
           puzzleSelectionSeed={puzzleSelectionSeed}
           standardTargetCorrect={standardTargetCorrect}
           systemBack={systemBack}

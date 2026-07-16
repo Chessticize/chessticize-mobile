@@ -123,6 +123,7 @@ import { Chess, type Move, type PieceSymbol, type Square } from "chess.js";
 interface Props {
   platformCapabilities: MobilePlatformCapabilities;
   arrowDuelTargetCorrect?: number;
+  customTargetCorrect?: number;
   debugTrace?: (event: PracticeDebugTraceEvent) => void;
   currentTimeMs?: () => number;
   puzzleSelectionSeed?: string;
@@ -384,6 +385,7 @@ function buildAdaptiveLayout({
 export function PracticePocScreen({
   platformCapabilities,
   arrowDuelTargetCorrect,
+  customTargetCorrect,
   debugTrace,
   currentTimeMs = Date.now,
   puzzleSelectionSeed,
@@ -1095,6 +1097,9 @@ export function PracticePocScreen({
             : {}),
           ...(nextMode === "arrow_duel" && arrowDuelTargetCorrect !== undefined
             ? { targetCorrect: arrowDuelTargetCorrect }
+            : {}),
+          ...(useCustomTiming && customTargetCorrect !== undefined
+            ? { targetCorrect: customTargetCorrect }
             : {}),
           ...(configurePuzzleSource && shouldRandomizePuzzleSelection(puzzleSource)
             ? { puzzleSelectionSeed: puzzleSelectionSeed ?? `${Date.now()}-${Math.random()}` }

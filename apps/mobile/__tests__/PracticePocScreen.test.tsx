@@ -1,5 +1,6 @@
 import React from "react";
 import { Chess } from "chess.js";
+import androidPracticeFixture from "../../../fixtures/puzzles/android-standard-practice.fixture.json";
 import { AppState } from "react-native";
 import * as ReactNative from "react-native";
 import TestRenderer, { act } from "react-test-renderer";
@@ -305,6 +306,38 @@ describe("PracticePocScreen", () => {
     systemBack.progressPredictive(0.8, "right");
     expect(systemBack.commitPredictive()).toBe(true);
     expect(() => findByTestId(renderer, "sprint-summary-panel")).toThrow();
+    expect(findByTestId(renderer, "practice-home")).toBeTruthy();
+  });
+
+  it("returns a completed Custom result through setup to idle Practice", async () => {
+    const systemBack = createTestSystemBackSource("android");
+    const service = createMobilePracticeService();
+    const renderer = renderScreen({
+      customTargetCorrect: 1,
+      practiceService: service,
+      puzzleSelectionSeed: androidPracticeFixture.puzzleSelectionSeed,
+      systemBack
+    });
+
+    press(renderer, "practice-mode-custom");
+    press(renderer, "custom-duration-stepper-decrease");
+    press(renderer, "custom-per-puzzle-stepper-increase");
+    press(renderer, "custom-theme-fork");
+    press(renderer, "start-sprint-button");
+    await boardMove(renderer, androidPracticeFixture.userMoves[0]);
+    await settleFeedbackSnapshot();
+    expect(service.getState()).toMatchObject({
+      status: "active",
+      currentPuzzle: { puzzleId: androidPracticeFixture.puzzle.id, userMoveNumber: 2 }
+    });
+    await boardMove(renderer, androidPracticeFixture.userMoves[1]);
+    expect(service.listSprintSessions().at(-1)?.status).toBe("won");
+    await settleFeedbackSnapshot();
+    expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
+
+    expect(systemBack.invoke()).toBe(true);
+    expect(findByTestId(renderer, "custom-sprint-setup")).toBeTruthy();
+    expect(systemBack.invoke()).toBe(true);
     expect(findByTestId(renderer, "practice-home")).toBeTruthy();
   });
 
@@ -1224,6 +1257,36 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "sprint-result-solved"))).toContain("1 / 1");
   });
 
+  it("keeps a deterministic Custom target inside the selected shared configuration", () => {
+    const service = createMobilePracticeService();
+    const renderer = renderScreen({
+      customTargetCorrect: 1,
+      practiceService: service,
+      puzzleSelectionSeed: androidPracticeFixture.puzzleSelectionSeed
+    });
+
+    press(renderer, "practice-mode-custom");
+    press(renderer, "custom-duration-stepper-decrease");
+    press(renderer, "custom-per-puzzle-stepper-increase");
+    press(renderer, "custom-theme-fork");
+    press(renderer, "start-sprint-button");
+
+    expect(service.getActiveSprint()?.config).toMatchObject({
+      durationSeconds: 180,
+      maxMistakes: 3,
+      mode: "custom",
+      perPuzzleSeconds: 30,
+      ratingKey: "fork custom 3/30",
+      targetCorrect: 1,
+      theme: "fork"
+    });
+    expect(service.getActiveSprint()?.currentPuzzle?.puzzle).toMatchObject({
+      id: androidPracticeFixture.puzzle.id,
+      solutionMoves: androidPracticeFixture.puzzle.solutionMoves
+    });
+    expect(findByTestId(renderer, "session-progress-block").props.accessibilityLabel).toBe("Progress 0 of 1");
+  });
+
   it("accepts a non-official legal checkmate in the fixed first familiar puzzle", async () => {
     const renderer = renderScreen({ practiceService: createMobilePracticeService("familiar15") });
 
@@ -2134,6 +2197,20 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "custom-eligibility-ready")).toThrow();
     expect(() => findByTestId(renderer, "custom-pack-warning")).toThrow();
     expect(findByTestId(renderer, "start-sprint-button").props.accessibilityState).toEqual({ disabled: false });
+  });
+
+  it("prevents an impossible Custom start and explains the empty local selection", () => {
+    const renderer = renderScreen({
+      configurePuzzleSource: () => undefined,
+      practiceService: new PracticeService(new MemoryStore())
+    });
+
+    press(renderer, "test-puzzle-source-familiar15");
+    press(renderer, "practice-mode-custom");
+
+    expect(collectText(findByTestId(renderer, "custom-pack-warning"))).toContain("0 eligible puzzles");
+    expect(findByTestId(renderer, "start-sprint-button").props.accessibilityState).toEqual({ disabled: true });
+    expect(findByTestId(renderer, "start-sprint-button").props.disabled).toBe(true);
   });
 
   it("allows custom sprint start with a local pack warning when eligible puzzles exist", () => {
@@ -4747,7 +4824,7 @@ function createScriptedStockfishTransport(
 }
 
 type RenderScreenOptions = TestMobilePlatformCapabilityOverrides &
-  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "debugTrace" | "puzzleSelectionSeed" | "standardTargetCorrect" | "systemBack"> & {
+  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "puzzleSelectionSeed" | "standardTargetCorrect" | "systemBack"> & {
     platformCapabilities?: MobilePlatformCapabilities;
   };
 
@@ -4791,6 +4868,7 @@ function renderScreen({
   arrowDuelTargetCorrect,
   platformCapabilities,
   currentTimeMs,
+  customTargetCorrect,
   debugTrace,
   puzzleSelectionSeed,
   standardTargetCorrect,
@@ -4804,6 +4882,7 @@ function renderScreen({
         platformCapabilities={platformCapabilities ?? createTestMobilePlatformCapabilities(capabilityOverrides)}
         arrowDuelTargetCorrect={arrowDuelTargetCorrect}
         currentTimeMs={currentTimeMs}
+        customTargetCorrect={customTargetCorrect}
         debugTrace={debugTrace}
         puzzleSelectionSeed={puzzleSelectionSeed}
         standardTargetCorrect={standardTargetCorrect}
