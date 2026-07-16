@@ -107,6 +107,17 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
       await element(by.id('sprint-result-history-button')).tap();
       await waitFor(element(by.id('history-performance-card'))).toExist().withTimeout(10000);
       await openFirstCorrectHistoryAttempt();
+      await waitForElementTextContaining('history-attempt-detail-context', 'Custom · Sprint', 10000);
+      await waitForElementTextContaining('history-attempt-detail-result', 'Correct', 10000);
+      await waitForElementTextContaining('history-attempt-detail-moves', practiceFixture.userMoves[1], 10000);
+      await expect(element(by.id('history-attempt-detail-rating-key'))).toHaveLabel(
+        `Rating bucket ${CUSTOM_RATING_KEY}`
+      );
+      await waitForElementTextContaining(
+        'history-attempt-detail-rating',
+        String(practiceFixture.expectedRatingAfter),
+        10000
+      );
       await waitForVisibleInPracticeScroll('review-analysis-button');
       await element(by.id('review-analysis-button')).tap();
       await waitForElementTextContaining('review-analysis-engine-status', 'SF 18 NNUE', 60000);

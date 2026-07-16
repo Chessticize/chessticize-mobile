@@ -281,7 +281,7 @@ describe('Android launch baseline', () => {
   it('keeps the API 36 Stockfish condition in one emulator-runner script line', () => {
     const workflow = read('../../.github/workflows/mobile-android.yml');
 
-    for (const suite of ['android-stockfish', 'android-system-back', 'android-review-reminders', 'flows', 'practice']) {
+    for (const suite of ['android-history', 'android-stockfish', 'android-system-back', 'android-review-reminders', 'flows', 'practice']) {
       const command = `if [ "\${{ matrix.api-level }}" = "36" ]; then DETOX_ACTIVE_SUITE=${suite} pnpm mobile:e2e:test:android:ci; fi`;
       expect(workflow).toContain(command);
       expect(workflow.match(new RegExp(`DETOX_ACTIVE_SUITE=${suite}`, 'g'))).toHaveLength(1);

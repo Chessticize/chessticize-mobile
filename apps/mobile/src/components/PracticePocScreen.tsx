@@ -23,13 +23,16 @@ import {
   buildCurrentPositionEvaluationLine,
   buildPuzzleGuidedAnalysisLines,
   buildSprintConfig,
+  collectHistoryRatingKeys,
   currentExpectedMove,
   defaultSprintConfig,
   formatLocalCalendarDate,
   formatReviewDay,
   formatSideToMoveScore,
+  historyAttemptReplayAvailability,
   historyAttemptSpeedSeconds,
   isReviewOverdue,
+  normalizeHistoryAttemptDetail,
   reviewDueState,
   reviewQueueForecast,
   submitArrowDuelChoice,
@@ -43,6 +46,7 @@ import type {
   CustomSprintConfigRecord,
   EngineAnalysisLine,
   HistoryAttemptView,
+  HistoryAttemptReplayAvailability,
   HistoryPerformance,
   HistoryPerformancePoint,
   HistoryReviewStatus,
@@ -464,6 +468,7 @@ export function PracticePocScreen({
   const [historyPageOffset, setHistoryPageOffset] = useState(0);
   const [historyRatingKey, setHistoryRatingKey] = useState<string | null>(null);
   const [historyReviewEntries, setHistoryReviewEntries] = useState<ReviewEntry[]>([]);
+  const [historyUnavailableAttempt, setHistoryUnavailableAttempt] = useState<HistoryUnavailableAttempt | null>(null);
   const [historyReviewInitialIndex, setHistoryReviewInitialIndex] = useState(0);
   const [reviewSessionSource, setReviewSessionSource] = useState<ReviewEntry["source"] | null>(null);
   const [customSprintMode, setCustomSprintMode] = useState<"custom" | "arrow_duel">("custom");
@@ -1472,14 +1477,37 @@ export function PracticePocScreen({
   }
 
   function openHistoryReview(attemptId: string): void {
+    const selectedAttempt = historyReviewAttempts.find((attempt) => attempt.id === attemptId);
+    if (!selectedAttempt) {
+      return;
+    }
+    const selectedPuzzle = service.getPuzzle(selectedAttempt.puzzleId);
+    if (!selectedPuzzle) {
+      return;
+    }
+    const selectedReplayAvailability = historyAttemptReplayAvailability({
+      attempt: selectedAttempt,
+      puzzle: selectedPuzzle
+    });
+    if (selectedReplayAvailability.status === "unavailable") {
+      setHistoryReviewEntries([]);
+      setHistoryUnavailableAttempt({
+        attempt: selectedAttempt,
+        replayAvailability: selectedReplayAvailability
+      });
+      return;
+    }
     const entries = historyReviewAttempts
       .map((attempt): ReviewEntry | null => {
         const puzzle = service.getPuzzle(attempt.puzzleId);
-        return puzzle
+        const replayAvailability = puzzle
+          ? historyAttemptReplayAvailability({ attempt, puzzle })
+          : { status: "unavailable" as const, reason: "invalid-context" as const };
+        return puzzle && replayAvailability.status === "available"
           ? {
               puzzle,
-              mode: attempt.mode,
-              ratingKey: attempt.ratingKey,
+              mode: replayAvailability.mode,
+              ratingKey: replayAvailability.ratingKey,
               source: "history",
               attempt
             }
@@ -1490,6 +1518,7 @@ export function PracticePocScreen({
     if (entries.length === 0) {
       return;
     }
+    setHistoryUnavailableAttempt(null);
     setHistoryReviewEntries(entries);
     setHistoryReviewInitialIndex(nextIndex);
   }
@@ -1845,7 +1874,10 @@ export function PracticePocScreen({
   const displayedLastBoardMove = feedbackSnapshot || boardFeedback ? null : lastBoardMove;
   const historyRatingKeys = useMemo(
     () => sortHistoryRatingKeys(
-      [...new Set([...service.listPlayedRatings().map((rating) => rating.key), ...attempts.map((attempt) => attempt.ratingKey)])],
+      collectHistoryRatingKeys([
+        ...service.listPlayedRatings().map((rating) => rating.key),
+        ...attempts.map((attempt) => attempt.ratingKey)
+      ]),
       attempts,
       sprintSessions
     ),
@@ -1894,16 +1926,16 @@ export function PracticePocScreen({
   const historyAvailableThemes = historyView.availableThemes;
   const historyPage = historyView.page;
   const contentOwnsHeader = tab === "review" || tab === "history";
-  const reviewSurfaceOpen = reviewSessionSource !== null || historyReviewEntries.length > 0;
+  const reviewSurfaceOpen = reviewSessionSource !== null || historyReviewEntries.length > 0 || historyUnavailableAttempt !== null;
   const topBackTransient: MobileBackTransient | null = startingMode
     ? "starting-practice"
     : practiceExitConfirmationVisible
       ? "practice-exit-confirmation"
       : reviewReminderPermissionPromptVisible
         ? "review-reminder-prompt"
-        : tab === "history" && historyFiltersExpanded
+        : tab === "history" && !reviewSurfaceOpen && historyFiltersExpanded
           ? "history-filters"
-          : tab === "review" && reviewFiltersExpanded
+          : tab === "review" && !reviewSurfaceOpen && reviewFiltersExpanded
             ? "review-filters"
             : tab === "settings" && settingsAdvancedRatingsOpen
               ? "settings-advanced-ratings"
@@ -1963,8 +1995,12 @@ export function PracticePocScreen({
         return true;
       case "return-to-owner":
         if (resolvedState.detail?.kind === "review-session") {
-          reviewBackCommandIdRef.current += 1;
-          setReviewBackCommand({ id: reviewBackCommandIdRef.current, kind: intent.kind });
+          if (historyUnavailableAttempt) {
+            setHistoryUnavailableAttempt(null);
+          } else {
+            reviewBackCommandIdRef.current += 1;
+            setReviewBackCommand({ id: reviewBackCommandIdRef.current, kind: intent.kind });
+          }
         } else if (resolvedState.detail?.kind === "stockfish-diagnostics") {
           navigateToTab("settings");
         } else if (resolvedState.detail?.kind === "custom-practice") {
@@ -1980,6 +2016,7 @@ export function PracticePocScreen({
       case "return-to-practice":
         setSessionMistakeReviewItems([]);
         setHistoryReviewEntries([]);
+        setHistoryUnavailableAttempt(null);
         navigateToTab("practice");
         return true;
       case "delegate-platform":
@@ -2433,7 +2470,14 @@ export function PracticePocScreen({
             ) : null}
 
             {tab === "history" ? (
-              historyReviewEntries.length > 0 ? (
+              historyUnavailableAttempt ? (
+                <HistoryAttemptReplayUnavailable
+                  adaptiveLayout={adaptiveLayout}
+                  attempt={historyUnavailableAttempt.attempt}
+                  replayAvailability={historyUnavailableAttempt.replayAvailability}
+                  onReturn={() => setHistoryUnavailableAttempt(null)}
+                />
+              ) : historyReviewEntries.length > 0 ? (
                 <ReviewSession
                   key={`history:${historyReviewEntries.map((entry) => entry.attempt?.id ?? entry.puzzle.id).join("|")}:${historyReviewInitialIndex}`}
                   adaptiveLayout={adaptiveLayout}
@@ -5190,23 +5234,29 @@ function HistoryAttemptRow({
   attempt: HistoryAttemptView;
   onOpen: () => void;
 }): React.JSX.Element {
-  const isWrong = attempt.result === "wrong";
-  const completedAtMs = new Date(attempt.completedAt).getTime();
-  const elapsedSeconds = Math.max(0, Math.round((completedAtMs - new Date(attempt.startedAt).getTime()) / 1000));
-  const dateLabel = `${historyAttemptRecencyLabel(completedAtMs)} · ${formatLocalCalendarDate(attempt.completedAt)}`;
+  const detail = normalizeHistoryAttemptDetail(attempt);
+  const isWrong = detail.result === "wrong";
+  const isCorrect = detail.result === "correct";
+  const completedAtMs = detail.completedAt === null ? null : new Date(detail.completedAt).getTime();
+  const dateLabel = completedAtMs === null || detail.completedAt === null
+    ? "Date unavailable"
+    : `${historyAttemptRecencyLabel(completedAtMs)} · ${formatLocalCalendarDate(detail.completedAt)}`;
   const primaryTheme = historyAttemptThemeLabel(attempt);
   const pace = historyAttemptSpeedSeconds(attempt);
   const paceLabel = pace === null ? null : `${pace}s pace`;
-  const resultLabel = isWrong ? "Wrong move" : "Correct";
-  const submittedMoveLabel = isWrong
-    ? `Played ${attempt.submittedMove} · Best ${attempt.expectedMove}`
-    : `Move ${attempt.submittedMove}`;
-  const sourceLabel = attempt.source === "scheduled_review" ? "Review" : "Sprint";
+  const resultLabel = isWrong ? "Wrong move" : isCorrect ? "Correct" : "Result unavailable";
+  const submittedMoveLabel = detail.submittedMove === null || detail.expectedMove === null
+    ? "Moves unavailable"
+    : isWrong
+      ? `Played ${detail.submittedMove} · Best ${detail.expectedMove}`
+      : `Move ${detail.submittedMove}`;
+  const sourceLabel = historyAttemptSourceLabel(detail.source);
   const compactContext = [primaryTheme, paceLabel].filter(Boolean).join(" · ");
   const puzzleIdentity = `ID ${attempt.puzzleId} · Rating ${attempt.puzzleRating}`;
-  const compactMeta = `${sourceLabel} · ${elapsedSeconds}s · ${dateLabel}`;
+  const durationLabel = detail.elapsedSeconds === null ? "Duration unavailable" : `${detail.elapsedSeconds}s`;
+  const compactMeta = `${sourceLabel} · ${durationLabel} · ${dateLabel}`;
   const rowAccessibilityLabel = [
-    `Open ${modeLabel(attempt.mode)} ${attempt.result} puzzle review`,
+    `Open ${historyAttemptModeLabel(detail.mode)} puzzle history`,
     resultLabel,
     submittedMoveLabel,
     puzzleIdentity,
@@ -5223,14 +5273,21 @@ function HistoryAttemptRow({
       onPress={onOpen}
     >
       <View
-        style={[styles.historyResultBadge, isWrong ? styles.historyResultWrong : styles.historyResultCorrect]}
+        style={[
+          styles.historyResultBadge,
+          isWrong ? styles.historyResultWrong : isCorrect ? styles.historyResultCorrect : styles.historyResultUnknown
+        ]}
         testID={`history-attempt-${attempt.id}-badge`}
       >
-        <ResultBadgeGlyph tone={isWrong ? "wrong" : "correct"} />
+        {isWrong || isCorrect ? (
+          <ResultBadgeGlyph tone={isWrong ? "wrong" : "correct"} />
+        ) : (
+          <Text style={styles.historyResultUnknownText}>?</Text>
+        )}
       </View>
       <View style={styles.historyAttemptCopy}>
         <View style={styles.historyAttemptHeader}>
-          <Text style={styles.historyRowTitle}>{modeLabel(attempt.mode)}</Text>
+          <Text style={styles.historyRowTitle}>{historyAttemptModeLabel(detail.mode)}</Text>
           <Text testID={`history-attempt-${attempt.id}-result`} style={styles.helperText}>{resultLabel}</Text>
         </View>
         <Text testID={`history-attempt-${attempt.id}-identity`} style={styles.helperText}>{puzzleIdentity}</Text>
@@ -5242,6 +5299,14 @@ function HistoryAttemptRow({
       </View>
     </Pressable>
   );
+}
+
+function historyAttemptModeLabel(mode: SprintMode | null): string {
+  return mode === null ? "Unknown mode" : modeLabel(mode);
+}
+
+function historyAttemptSourceLabel(source: AttemptSource | null): string {
+  return source === "scheduled_review" ? "Review" : source === "sprint" ? "Sprint" : "Unknown source";
 }
 
 function historyAttemptRecencyLabel(completedAtMs: number): string {
@@ -5569,6 +5634,11 @@ type ReviewEntry = {
   ratingKey: string;
   source: "session" | "due" | "history";
   attempt?: AttemptEvent | HistoryAttemptView;
+};
+
+type HistoryUnavailableAttempt = {
+  attempt: HistoryAttemptView;
+  replayAvailability: Extract<HistoryAttemptReplayAvailability, { status: "unavailable" }>;
 };
 
 type ReviewQueueFilter =
@@ -6917,6 +6987,10 @@ function ReviewSession({
         </View>
       </View>
 
+      {currentEntry.source === "history" && currentEntry.attempt ? (
+        <HistoryAttemptDetailCard attempt={currentEntry.attempt} />
+      ) : null}
+
       <View style={[styles.reviewBoardLayout, adaptiveLayout.usesSessionRail ? styles.reviewBoardLayoutWide : null]}>
         <View style={styles.reviewBoardLane} testID="review-board-lane">
           <View testID="review-board" style={[styles.boardSurface, { width: boardSize, height: boardSize }]}>
@@ -7138,6 +7212,121 @@ function ReviewSession({
           ) : null}
         </View>
       </View>
+    </View>
+  );
+}
+
+function HistoryAttemptReplayUnavailable({
+  adaptiveLayout,
+  attempt,
+  onReturn,
+  replayAvailability
+}: {
+  adaptiveLayout: AdaptiveLayout;
+  attempt: HistoryAttemptView;
+  onReturn: () => void;
+  replayAvailability: Extract<HistoryAttemptReplayAvailability, { status: "unavailable" }>;
+}): React.JSX.Element {
+  return (
+    <View
+      style={[styles.reviewSessionPanel, adaptiveLayout.usesWideContent ? styles.reviewSessionPanelWide : null]}
+      testID="review-session"
+    >
+      <View style={styles.reviewHeaderRow}>
+        <View style={styles.reviewTopNav}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Exit review"
+            testID="review-exit"
+            style={styles.iconButton}
+            onPress={onReturn}
+          >
+            <CloseGlyph />
+          </Pressable>
+          <View style={styles.reviewTitleBlock}>
+            <Text style={styles.panelTitle}>History</Text>
+            <Text style={styles.helperText}>Persisted details only</Text>
+          </View>
+        </View>
+      </View>
+      <HistoryAttemptDetailCard attempt={attempt} replayAvailability={replayAvailability} />
+    </View>
+  );
+}
+
+function HistoryAttemptDetailCard({
+  attempt,
+  replayAvailability
+}: {
+  attempt: AttemptEvent | HistoryAttemptView;
+  replayAvailability?: HistoryAttemptReplayAvailability;
+}): React.JSX.Element {
+  const detail = normalizeHistoryAttemptDetail(attempt);
+  const arrowCandidatesUnavailable = detail.arrowDuelCandidateOrderStatus === "corrupt" ||
+    (replayAvailability?.status === "unavailable" && replayAvailability.reason === "arrow-candidates-unavailable");
+  const sourceLabel = historyAttemptSourceLabel(detail.source);
+  const resultLabel = detail.result === "wrong"
+    ? "Wrong move"
+    : detail.result === "correct"
+      ? "Correct"
+      : "Result unavailable";
+  const timingLabel = detail.completedAt
+    ? `${formatLocalCalendarDate(detail.completedAt)} · ${detail.elapsedSeconds === null ? "Duration unavailable" : `${detail.elapsedSeconds}s`}`
+    : "Date and duration unavailable";
+  const movesLabel = detail.submittedMove && detail.expectedMove
+    ? `Played ${detail.submittedMove} · Best ${detail.expectedMove}`
+    : "Moves unavailable";
+  const ratingLabel = detail.ratingBefore === null
+    ? "Rating unavailable"
+    : detail.ratingAfterStatus === "invalid"
+      ? `Rating ${detail.ratingBefore} · Rating change unavailable`
+      : detail.ratingAfterStatus === "absent" || detail.ratingDelta === null
+      ? `Rating ${detail.ratingBefore} · No run change`
+      : `Rating ${detail.ratingBefore} → ${detail.ratingAfter} · ${detail.ratingDelta > 0 ? "+" : ""}${detail.ratingDelta}`;
+  const ratingKeyLabel = detail.ratingKey === null
+    ? "Rating bucket unavailable"
+    : historyRatingKeyLabel(detail.ratingKey);
+
+  return (
+    <View style={styles.historyPerformanceCard} testID="history-attempt-detail">
+      <View style={styles.historyPerformanceHeader}>
+        <View style={styles.historyAttemptCopy}>
+          <Text style={styles.panelTitle} testID="history-attempt-detail-title">Persisted attempt</Text>
+          <Text style={styles.helperText} testID="history-attempt-detail-context">
+            {historyAttemptModeLabel(detail.mode)} · {sourceLabel}
+          </Text>
+        </View>
+        <Text
+          accessibilityLabel={`Persisted result ${resultLabel}`}
+          style={[
+            styles.historyReviewState,
+            detail.result === "wrong" ? styles.errorText : detail.result === "correct" ? styles.positive : styles.helperText
+          ]}
+          testID="history-attempt-detail-result"
+        >
+          {resultLabel}
+        </Text>
+      </View>
+      <Text
+        accessibilityLabel={detail.ratingKey === null ? "Rating bucket unavailable" : `Rating bucket ${detail.ratingKey}`}
+        style={styles.helperText}
+        testID="history-attempt-detail-rating-key"
+      >
+        {ratingKeyLabel}
+      </Text>
+      <Text style={styles.listText} testID="history-attempt-detail-moves">{movesLabel}</Text>
+      <Text style={styles.helperText} testID="history-attempt-detail-timing">{timingLabel}</Text>
+      <Text style={styles.helperText} testID="history-attempt-detail-rating">{ratingLabel}</Text>
+      {detail.dataStatus === "partial" || arrowCandidatesUnavailable ? (
+        <Text style={styles.errorText} testID="history-attempt-detail-partial">
+          Some persisted attempt details are unavailable.
+        </Text>
+      ) : null}
+      {arrowCandidatesUnavailable ? (
+        <Text style={styles.errorText} testID="history-attempt-detail-replay-unavailable">
+          Original Arrow Duel candidates are unavailable, so this attempt cannot be replayed safely.
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -11374,6 +11563,14 @@ const styles = StyleSheet.create({
   },
   historyResultCorrect: {
     backgroundColor: "#16A34A"
+  },
+  historyResultUnknown: {
+    backgroundColor: "#64748B"
+  },
+  historyResultUnknownText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "800"
   },
   resultBadgeGlyphCanvas: {
     alignItems: "center",

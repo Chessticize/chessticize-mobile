@@ -36,6 +36,9 @@ describe('Android Custom Practice release slice', () => {
     expect(spec).toContain('chessticizePuzzleSelectionId: practiceFixture.puzzle.id');
     expect(spec).toContain("by.id('session-board')");
     expect(spec).toContain("by.id('sprint-result-history-button')");
+    expect(spec).toContain("'history-attempt-detail-context', 'Custom · Sprint'");
+    expect(spec).toContain("by.id('history-attempt-detail-rating-key')");
+    expect(spec).toContain("'history-attempt-detail-moves', practiceFixture.userMoves[1]");
     expect(spec).toContain("by.id('review-analysis-button')");
     expect(spec).toContain("waitForElementTextContaining('review-analysis-engine-status'");
     expect(spec).toContain("waitForVisibleInPracticeScroll('practice-progress-summary')");

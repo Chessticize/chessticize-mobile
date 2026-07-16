@@ -860,7 +860,7 @@ export class SyncSQLiteStore implements PracticeStore {
     const clauses: string[] = [];
     const params: SyncSqliteValue[] = [];
     if (ratingKey !== undefined) {
-      clauses.push("a.rating_key = ?");
+      clauses.push("COALESCE(a.rating_key, s.rating_key) = ?");
       params.push(ratingKey);
     }
     if (since !== undefined) {
@@ -896,7 +896,7 @@ export class SyncSQLiteStore implements PracticeStore {
 
     return rows.map((row) => {
       const puzzle = puzzleFromRow(row);
-      const candidateOrder = optionalStringArrayFromJson(row.arrow_duel_candidate_order_json);
+      const candidateOrder = optionalHistoryStringArrayFromJson(row.arrow_duel_candidate_order_json);
       return {
         id: row.attempt_id,
         source: row.attempt_source,
@@ -911,7 +911,8 @@ export class SyncSQLiteStore implements PracticeStore {
         completedAt: row.completed_at,
         ratingBefore: row.rating_before,
         ...(row.rating_after === null ? {} : { ratingAfter: row.rating_after }),
-        ...(candidateOrder === undefined ? {} : { arrowDuelCandidateOrder: candidateOrder }),
+        ...(candidateOrder.status === "valid" ? { arrowDuelCandidateOrder: candidateOrder.value } : {}),
+        ...(candidateOrder.status === "corrupt" ? { arrowDuelCandidateOrderStatus: "corrupt" as const } : {}),
         puzzleRating: puzzle.rating,
         side: sideToMoveForHistoryPuzzle({ puzzle, mode: row.mode }),
         themes: puzzle.themes
@@ -1542,6 +1543,20 @@ function optionalStringArrayFromJson(value: string | null): string[] | undefined
     throw new Error("Stored Arrow Duel candidate order must be a string array");
   }
   return parsed;
+}
+
+function optionalHistoryStringArrayFromJson(value: string | null):
+  | { status: "absent" }
+  | { status: "valid"; value: string[] }
+  | { status: "corrupt" } {
+  try {
+    const parsed = optionalStringArrayFromJson(value);
+    return parsed === undefined ? { status: "absent" } : { status: "valid", value: parsed };
+  } catch {
+    // Keep the row readable, but preserve the corruption so consumers cannot
+    // silently fabricate a different Arrow Duel candidate set for replay.
+    return { status: "corrupt" };
+  }
 }
 
 function countRows(db: SyncSqliteDatabase, table: string, where?: string): number {
