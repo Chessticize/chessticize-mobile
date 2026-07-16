@@ -583,6 +583,10 @@ describe('Detox suite configuration', () => {
     expect(ACTIVE_E2E_TEST_MATCH).not.toContain(ANDROID_ADAPTIVE_LAYOUT_TEST_MATCH[0]);
 
     const spec = fs.readFileSync(path.resolve(__dirname, '../e2e/adaptive-layout.e2e.js'), 'utf8');
+    const screen = fs.readFileSync(
+      path.resolve(__dirname, '../src/components/PracticePocScreen.tsx'),
+      'utf8'
+    );
     const evidence = fs.readFileSync(
       path.resolve(__dirname, '../scripts/android-adaptive-layout-evidence.sh'),
       'utf8'
@@ -594,18 +598,21 @@ describe('Detox suite configuration', () => {
 
     expect(spec).toContain("device.setOrientation('landscape')");
     expect(spec).toContain("elementText('session-current-puzzle-id')");
-    expect(spec).toContain("elementText('session-current-expected-move')");
+    expect(spec).not.toContain('session-current-expected-move');
+    expect(screen).not.toContain('session-current-expected-move');
     expect(spec).toContain("session-accessible-moves-open");
     expect(spec).not.toContain("playBoardMove('session-board', 'e2e6')");
     const closeMoveDialog = spec.indexOf("element(by.id('session-accessible-moves-close')).tap()");
     const waitForMoveDialogClose = spec.indexOf("element(by.id('session-accessible-moves-dialog'))).not.toExist()");
-    const readExpectedMove = spec.indexOf("elementText('session-current-expected-move')");
-    const playBoardMove = spec.indexOf("playBoardMove('session-board', expectedMove)");
+    const fixtureOption = spec.indexOf("waitForAccessibleMove('c2b1')");
+    const playBoardMove = spec.indexOf("playBoardMove('session-board', 'c2b3')");
+    const selectAccessibleMove = spec.lastIndexOf("element(by.id('session-accessible-move-c2b1')).tap()");
     expect(closeMoveDialog).toBeGreaterThan(0);
+    expect(fixtureOption).toBeGreaterThan(0);
+    expect(closeMoveDialog).toBeGreaterThan(fixtureOption);
     expect(waitForMoveDialogClose).toBeGreaterThan(closeMoveDialog);
-    expect(readExpectedMove).toBeGreaterThan(waitForMoveDialogClose);
     expect(playBoardMove).toBeGreaterThan(waitForMoveDialogClose);
-    expect(playBoardMove).toBeGreaterThan(readExpectedMove);
+    expect(selectAccessibleMove).toBeGreaterThan(playBoardMove);
     expect(evidence).toContain('phone:1080x2400:420:both:1');
     expect(evidence).toContain('tablet:1600x2560:320:both:1');
     expect(evidence).toContain('foldable:1768x2208:420:landscape:1');

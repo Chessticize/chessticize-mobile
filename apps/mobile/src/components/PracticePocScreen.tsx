@@ -2239,14 +2239,9 @@ export function PracticePocScreen({
   const sessionBoardNode = shouldShowSessionBoard ? (
     <View style={styles.boardWrapper}>
       {arePracticeTestControlsEnabled() || isStoreAssetCaptureEnabled() ? (
-        <>
-          <Text testID="session-current-puzzle-id" style={styles.reviewDueHiddenMetric}>
-            {displayedPuzzle?.puzzle.id ?? ""}
-          </Text>
-          <Text testID="session-current-expected-move" style={styles.reviewDueHiddenMetric}>
-            {displayedPuzzle?.kind === "line" ? currentExpectedMove(displayedPuzzle) ?? "" : ""}
-          </Text>
-        </>
+        <Text testID="session-current-puzzle-id" style={styles.reviewDueHiddenMetric}>
+          {displayedPuzzle?.puzzle.id ?? ""}
+        </Text>
       ) : null}
       <View
         accessible

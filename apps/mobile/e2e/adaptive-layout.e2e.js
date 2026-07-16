@@ -57,18 +57,39 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
       await waitFor(element(by.id('session-accessible-moves-open'))).toBeVisible().withTimeout(10000);
       await element(by.id('session-accessible-moves-open')).tap();
       await waitFor(element(by.id('session-accessible-moves-dialog'))).toExist().withTimeout(10000);
+      // Familiar 15's first Standard puzzle is a versioned product fixture:
+      // c2b3 is legal but wrong, while alternate mate c2b1 is accepted. Confirm
+      // the public accessibility surface exposes that fixture before touching
+      // the physical board, rather than reading a hidden domain answer.
+      await waitForAccessibleMove('c2b1');
       await element(by.id('session-accessible-moves-close')).tap();
       await waitFor(element(by.id('session-accessible-moves-dialog'))).not.toExist().withTimeout(10000);
       await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
-      const expectedMove = await elementText('session-current-expected-move');
-      if (!/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(expectedMove)) {
-        throw new Error(`Active puzzle did not expose a valid expected move: ${expectedMove}`);
-      }
-      await playBoardMove('session-board', expectedMove);
+      await playBoardMove('session-board', 'c2b3');
       await waitFor(element(by.id('move-feedback-overlay'))).toExist().withTimeout(10000);
+      await waitFor(element(by.label('Mistakes 1 of 3')).atIndex(0)).toExist().withTimeout(10000);
+      await waitFor(element(by.id('move-feedback-overlay'))).not.toExist().withTimeout(10000);
+
+      await waitFor(element(by.id('session-accessible-moves-open'))).toBeVisible().withTimeout(10000);
+      await element(by.id('session-accessible-moves-open')).tap();
+      await waitFor(element(by.id('session-accessible-moves-dialog'))).toExist().withTimeout(10000);
+      await waitForAccessibleMove('c2b1');
+      await element(by.id('session-accessible-move-c2b1')).tap();
+      await waitFor(element(by.id('session-accessible-moves-dialog'))).not.toExist().withTimeout(10000);
+      await waitFor(element(by.id('move-feedback-overlay'))).toExist().withTimeout(10000);
+      await waitFor(element(by.id('session-progress'))).toHaveText('1 / 15').withTimeout(10000);
     }
   });
 });
+
+async function waitForAccessibleMove(move) {
+  const moveAction = element(by.id(`session-accessible-move-${move}`));
+  await waitFor(moveAction).toExist().withTimeout(10000);
+  await waitFor(moveAction)
+    .toBeVisible()
+    .whileElement(by.id('session-accessible-moves-list'))
+    .scroll(100, 'down');
+}
 
 async function captureHome(orientation) {
   const homeFrame = await frameFor(element(by.id('adaptive-layout')));
