@@ -58,6 +58,8 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
       await element(by.id('session-accessible-moves-open')).tap();
       await waitFor(element(by.id('session-accessible-moves-dialog'))).toExist().withTimeout(10000);
       await element(by.id('session-accessible-moves-close')).tap();
+      await waitFor(element(by.id('session-accessible-moves-dialog'))).not.toExist().withTimeout(10000);
+      await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
       await playBoardMove('session-board', 'e2e6');
       await waitFor(element(by.id('move-feedback-overlay'))).toExist().withTimeout(10000);
     }
