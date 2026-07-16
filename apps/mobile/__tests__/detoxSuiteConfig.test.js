@@ -80,6 +80,20 @@ describe('Detox suite configuration', () => {
     expect(target).toContain('bounds="[42,568][1038,786]"');
   });
 
+  it('refuses to tap matching system text without a clickable target', () => {
+    const hierarchy = [
+      '<node resource-id="com.android.systemui:id/container" clickable="false">',
+      '<node text="3 reviews are ready" resource-id="android:id/text" clickable="false" bounds="[179,676][891,729]" />',
+      '</node>',
+    ].join('');
+
+    expect(findAndroidSystemNode(
+      hierarchy,
+      ['3 reviews are ready'],
+      { clickableAncestor: true }
+    )).toBeNull();
+  });
+
   it('counts only current pending alarms and excludes canceled alarm history', () => {
     const action = 'com.chessticize.mobile.action.DELIVER_REVIEW_REMINDER';
     const state = [
