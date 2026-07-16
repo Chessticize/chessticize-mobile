@@ -669,10 +669,15 @@ function androidDisplayMetrics(environment = process.env, run = execFileSync) {
   };
 }
 
-function setAndroidDisplayOrientation(
+async function setAndroidDisplayOrientation(
   orientation,
   environment = process.env,
-  run = execFileSync
+  run = execFileSync,
+  {
+    maxAttempts = 20,
+    pollIntervalMs = 100,
+    wait = sleep,
+  } = {}
 ) {
   const requestedRotation = orientation === 'landscape'
     ? 1
@@ -694,14 +699,21 @@ function setAndroidDisplayOrientation(
   }
 
   shell('wm', 'user-rotation', 'lock', String(requestedRotation));
-  const rotationState = shell('wm', 'user-rotation').trim();
-  const actualRotation = Number(/^lock\s+([0-3])$/.exec(rotationState)?.[1]);
-  if (actualRotation !== requestedRotation) {
-    throw new Error(
-      `Android display rotation did not apply: requested=${requestedRotation}, state=${JSON.stringify(rotationState)}`
-    );
+  let rotationState = '';
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    rotationState = shell('wm', 'user-rotation').trim();
+    const actualRotation = Number(/^lock\s+([0-3])$/.exec(rotationState)?.[1]);
+    if (actualRotation === requestedRotation) {
+      return { actualRotation, requestedRotation };
+    }
+    if (attempt < maxAttempts) {
+      await wait(pollIntervalMs);
+    }
   }
-  return { actualRotation, requestedRotation };
+  throw new Error(
+    `Android display rotation did not apply after ${maxAttempts} attempts: `
+    + `requested=${requestedRotation}, last state=${JSON.stringify(rotationState)}`
+  );
 }
 
 function parseAndroidDisplayDensity(output) {

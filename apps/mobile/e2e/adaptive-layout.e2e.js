@@ -153,7 +153,7 @@ async function setAdaptiveOrientation(orientation) {
   let actualRotation = requestedRotation;
   if (device.getPlatform() === 'android') {
     rotationControl = 'wm-user-rotation';
-    ({ actualRotation, requestedRotation } = setAndroidDisplayOrientation(orientation));
+    ({ actualRotation, requestedRotation } = await setAndroidDisplayOrientation(orientation));
   } else {
     await device.setOrientation(orientation);
   }

@@ -704,21 +704,29 @@ describe('Detox suite configuration', () => {
     expect(workflow).toContain('android-adaptive-layout-evidence');
   });
 
-  it('rotates the physical Android display and fails closed on unsupported or unapplied rotation', () => {
+  it('polls physical Android rotation to convergence and fails closed with bounded diagnostics', async () => {
     const environment = {
       ADB_PATH: '/sdk/platform-tools/adb',
       DETOX_ANDROID_DEVICE: 'emulator-6000',
     };
     const calls = [];
+    let rotationReads = 0;
     const run = (command, args) => {
       calls.push([command, args]);
       if (args.join(' ') === '-s emulator-6000 shell wm user-rotation') {
-        return 'lock 1\n';
+        rotationReads += 1;
+        return rotationReads < 3 ? 'lock 0\n' : 'lock 1\n';
       }
       return '';
     };
+    const wait = jest.fn().mockResolvedValue(undefined);
 
-    expect(setAndroidDisplayOrientation('landscape', environment, run)).toEqual({
+    await expect(Promise.resolve().then(() => setAndroidDisplayOrientation(
+      'landscape',
+      environment,
+      run,
+      { maxAttempts: 3, pollIntervalMs: 25, wait }
+    ))).resolves.toEqual({
       actualRotation: 1,
       requestedRotation: 1,
     });
@@ -726,17 +734,29 @@ describe('Detox suite configuration', () => {
       ['/sdk/platform-tools/adb', ['-s', 'emulator-6000', 'shell', 'wm', 'user-rotation']],
       ['/sdk/platform-tools/adb', ['-s', 'emulator-6000', 'shell', 'wm', 'user-rotation', 'lock', '1']],
       ['/sdk/platform-tools/adb', ['-s', 'emulator-6000', 'shell', 'wm', 'user-rotation']],
+      ['/sdk/platform-tools/adb', ['-s', 'emulator-6000', 'shell', 'wm', 'user-rotation']],
     ]);
+    expect(wait).toHaveBeenCalledTimes(1);
+    expect(wait).toHaveBeenCalledWith(25);
 
-    expect(() => setAndroidDisplayOrientation('landscape', environment, () => (
-      'unknown command: user-rotation'
-    ))).toThrow('does not support wm user-rotation');
-    expect(() => setAndroidDisplayOrientation('portrait', environment, (_command, args) => {
-      if (args.join(' ') === '-s emulator-6000 shell wm user-rotation') {
-        return 'lock 1\n';
-      }
-      return '';
-    })).toThrow('Android display rotation did not apply');
+    await expect(Promise.resolve().then(() => setAndroidDisplayOrientation(
+      'landscape',
+      environment,
+      () => 'unknown command: user-rotation'
+    ))).rejects.toThrow('does not support wm user-rotation');
+
+    const permanentlyStaleWait = jest.fn().mockResolvedValue(undefined);
+    await expect(Promise.resolve().then(() => setAndroidDisplayOrientation(
+      'portrait',
+      environment,
+      (_command, args) => (
+        args.join(' ') === '-s emulator-6000 shell wm user-rotation' ? 'lock 1\n' : ''
+      ),
+      { maxAttempts: 3, pollIntervalMs: 25, wait: permanentlyStaleWait }
+    ))).rejects.toThrow(
+      'Android display rotation did not apply after 3 attempts: requested=0, last state="lock 1"'
+    );
+    expect(permanentlyStaleWait).toHaveBeenCalledTimes(2);
   });
 
   it('keeps the Android launch smoke isolated from the iOS regression suites', () => {
