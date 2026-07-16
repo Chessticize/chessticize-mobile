@@ -28,6 +28,7 @@ import {
   formatLocalCalendarDate,
   formatReviewDay,
   formatSideToMoveScore,
+  historyAttemptReplayAvailability,
   historyAttemptSpeedSeconds,
   isReviewOverdue,
   normalizeHistoryAttemptDetail,
@@ -44,6 +45,7 @@ import type {
   CustomSprintConfigRecord,
   EngineAnalysisLine,
   HistoryAttemptView,
+  HistoryAttemptReplayAvailability,
   HistoryPerformance,
   HistoryPerformancePoint,
   HistoryReviewStatus,
@@ -465,7 +467,7 @@ export function PracticePocScreen({
   const [historyPageOffset, setHistoryPageOffset] = useState(0);
   const [historyRatingKey, setHistoryRatingKey] = useState<string | null>(null);
   const [historyReviewEntries, setHistoryReviewEntries] = useState<ReviewEntry[]>([]);
-  const [historyUnavailableAttempt, setHistoryUnavailableAttempt] = useState<HistoryAttemptView | null>(null);
+  const [historyUnavailableAttempt, setHistoryUnavailableAttempt] = useState<HistoryUnavailableAttempt | null>(null);
   const [historyReviewInitialIndex, setHistoryReviewInitialIndex] = useState(0);
   const [reviewSessionSource, setReviewSessionSource] = useState<ReviewEntry["source"] | null>(null);
   const [customSprintMode, setCustomSprintMode] = useState<"custom" | "arrow_duel">("custom");
@@ -1478,20 +1480,33 @@ export function PracticePocScreen({
     if (!selectedAttempt) {
       return;
     }
-    if (!historyAttemptCanReplay(selectedAttempt)) {
+    const selectedPuzzle = service.getPuzzle(selectedAttempt.puzzleId);
+    if (!selectedPuzzle) {
+      return;
+    }
+    const selectedReplayAvailability = historyAttemptReplayAvailability({
+      attempt: selectedAttempt,
+      puzzle: selectedPuzzle
+    });
+    if (selectedReplayAvailability.status === "unavailable") {
       setHistoryReviewEntries([]);
-      setHistoryUnavailableAttempt(selectedAttempt);
+      setHistoryUnavailableAttempt({
+        attempt: selectedAttempt,
+        replayAvailability: selectedReplayAvailability
+      });
       return;
     }
     const entries = historyReviewAttempts
       .map((attempt): ReviewEntry | null => {
-        const detail = normalizeHistoryAttemptDetail(attempt);
         const puzzle = service.getPuzzle(attempt.puzzleId);
-        return puzzle && historyAttemptCanReplay(attempt) && detail.mode !== null && detail.ratingKey !== null
+        const replayAvailability = puzzle
+          ? historyAttemptReplayAvailability({ attempt, puzzle })
+          : { status: "unavailable" as const, reason: "invalid-context" as const };
+        return puzzle && replayAvailability.status === "available"
           ? {
               puzzle,
-              mode: detail.mode,
-              ratingKey: detail.ratingKey,
+              mode: replayAvailability.mode,
+              ratingKey: replayAvailability.ratingKey,
               source: "history",
               attempt
             }
@@ -2454,7 +2469,8 @@ export function PracticePocScreen({
               historyUnavailableAttempt ? (
                 <HistoryAttemptReplayUnavailable
                   adaptiveLayout={adaptiveLayout}
-                  attempt={historyUnavailableAttempt}
+                  attempt={historyUnavailableAttempt.attempt}
+                  replayAvailability={historyUnavailableAttempt.replayAvailability}
                   onReturn={() => setHistoryUnavailableAttempt(null)}
                 />
               ) : historyReviewEntries.length > 0 ? (
@@ -5281,12 +5297,6 @@ function HistoryAttemptRow({
   );
 }
 
-function historyAttemptCanReplay(attempt: HistoryAttemptView): boolean {
-  const detail = normalizeHistoryAttemptDetail(attempt);
-  return detail.source !== null && detail.mode !== null && detail.ratingKey !== null && detail.result !== null &&
-    detail.arrowDuelCandidateOrderStatus !== "corrupt";
-}
-
 function historyAttemptModeLabel(mode: SprintMode | null): string {
   return mode === null ? "Unknown mode" : modeLabel(mode);
 }
@@ -5620,6 +5630,11 @@ type ReviewEntry = {
   ratingKey: string;
   source: "session" | "due" | "history";
   attempt?: AttemptEvent | HistoryAttemptView;
+};
+
+type HistoryUnavailableAttempt = {
+  attempt: HistoryAttemptView;
+  replayAvailability: Extract<HistoryAttemptReplayAvailability, { status: "unavailable" }>;
 };
 
 type ReviewQueueFilter =
@@ -7200,11 +7215,13 @@ function ReviewSession({
 function HistoryAttemptReplayUnavailable({
   adaptiveLayout,
   attempt,
-  onReturn
+  onReturn,
+  replayAvailability
 }: {
   adaptiveLayout: AdaptiveLayout;
   attempt: HistoryAttemptView;
   onReturn: () => void;
+  replayAvailability: Extract<HistoryAttemptReplayAvailability, { status: "unavailable" }>;
 }): React.JSX.Element {
   return (
     <View
@@ -7228,13 +7245,21 @@ function HistoryAttemptReplayUnavailable({
           </View>
         </View>
       </View>
-      <HistoryAttemptDetailCard attempt={attempt} />
+      <HistoryAttemptDetailCard attempt={attempt} replayAvailability={replayAvailability} />
     </View>
   );
 }
 
-function HistoryAttemptDetailCard({ attempt }: { attempt: AttemptEvent | HistoryAttemptView }): React.JSX.Element {
+function HistoryAttemptDetailCard({
+  attempt,
+  replayAvailability
+}: {
+  attempt: AttemptEvent | HistoryAttemptView;
+  replayAvailability?: HistoryAttemptReplayAvailability;
+}): React.JSX.Element {
   const detail = normalizeHistoryAttemptDetail(attempt);
+  const arrowCandidatesUnavailable = detail.arrowDuelCandidateOrderStatus === "corrupt" ||
+    (replayAvailability?.status === "unavailable" && replayAvailability.reason === "arrow-candidates-unavailable");
   const sourceLabel = historyAttemptSourceLabel(detail.source);
   const resultLabel = detail.result === "wrong"
     ? "Wrong move"
@@ -7288,12 +7313,12 @@ function HistoryAttemptDetailCard({ attempt }: { attempt: AttemptEvent | History
       <Text style={styles.listText} testID="history-attempt-detail-moves">{movesLabel}</Text>
       <Text style={styles.helperText} testID="history-attempt-detail-timing">{timingLabel}</Text>
       <Text style={styles.helperText} testID="history-attempt-detail-rating">{ratingLabel}</Text>
-      {detail.dataStatus === "partial" ? (
+      {detail.dataStatus === "partial" || arrowCandidatesUnavailable ? (
         <Text style={styles.errorText} testID="history-attempt-detail-partial">
           Some persisted attempt details are unavailable.
         </Text>
       ) : null}
-      {detail.arrowDuelCandidateOrderStatus === "corrupt" ? (
+      {arrowCandidatesUnavailable ? (
         <Text style={styles.errorText} testID="history-attempt-detail-replay-unavailable">
           Original Arrow Duel candidates are unavailable, so this attempt cannot be replayed safely.
         </Text>

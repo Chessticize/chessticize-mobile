@@ -5,6 +5,7 @@ import {
   buildHistoryView,
   filterHistoryAttemptsForQuery,
   historyAttemptHasReviewQueued,
+  historyAttemptReplayAvailability,
   normalizeHistoryAttemptDetail,
   resolveHistoryRange,
   sideToMoveForHistoryPuzzle,
@@ -164,6 +165,37 @@ test("history performance and puzzle stats use the full filtered range, not the 
   assert.deepEqual(
     view.puzzleStats.map((stats) => stats.puzzleId),
     ["p1", "p2", "p3"]
+  );
+});
+
+test("unknown persisted results remain readable but stay out of filters, stats, and performance charts", () => {
+  const wrong = attempt({ id: "wrong", puzzleId: "wrong-puzzle", result: "wrong", completedAt: "2026-06-20T00:00:00.000Z" });
+  const correct = attempt({ id: "correct", puzzleId: "correct-puzzle", result: "correct", completedAt: "2026-06-20T00:01:00.000Z" });
+  const unknown = {
+    ...attempt({ id: "unknown", puzzleId: "unknown-puzzle", result: "wrong", completedAt: "2026-06-20T00:02:00.000Z" }),
+    result: "mystery-result"
+  } as unknown as HistoryAttemptView;
+  const attempts = [unknown, correct, wrong];
+
+  const view = buildHistoryView({
+    query: { now: "2026-06-21T12:00:00.000Z", timeRange: "max" },
+    ratingKeys: [],
+    attempts,
+    elo: [],
+    reviews: []
+  });
+
+  assert.deepEqual(view.attempts.map((attemptView) => attemptView.id), ["unknown", "correct", "wrong"]);
+  assert.deepEqual(view.performance.correctCount, 1);
+  assert.deepEqual(view.performance.wrongCount, 1);
+  assert.deepEqual(view.performance.accuracyPercent, 50);
+  assert.deepEqual(view.puzzleStats.map((stats) => stats.puzzleId), ["correct-puzzle", "wrong-puzzle"]);
+  for (const metric of ["wins-losses", "accuracy", "solved", "mistake-rate"] as const) {
+    assert.deepEqual(view.performance.charts[metric].map((point) => point.key), ["wrong-0", "correct-1"]);
+  }
+  assert.deepEqual(
+    filterHistoryAttemptsForQuery({ attempts, query: { result: "wrong" }, reviews: [] }).map((attemptView) => attemptView.id),
+    ["wrong"]
   );
 });
 
@@ -470,6 +502,35 @@ test("history attempt detail preserves persisted context and normalizes malforme
     ratingDelta: null,
     arrowDuelCandidateOrderStatus: "absent",
     dataStatus: "partial"
+  });
+});
+
+test("history replay availability validates persisted Arrow candidates against the actual puzzle", () => {
+  const validAttempt = {
+    ...attempt({
+      id: "valid-arrow",
+      puzzleId: "00008",
+      result: "wrong",
+      completedAt: "2026-06-20T00:00:05.000Z",
+      mode: "arrow_duel",
+      ratingKey: "arrow duel 5/30"
+    }),
+    arrowDuelCandidateOrder: ["b2b1", "f2g3"]
+  };
+  const invalidAttempt = {
+    ...validAttempt,
+    id: "invalid-arrow",
+    arrowDuelCandidateOrder: ["a1a2", "a2a3"]
+  };
+
+  assert.deepEqual(historyAttemptReplayAvailability({ attempt: validAttempt, puzzle: standardPuzzle() }), {
+    status: "available",
+    mode: "arrow_duel",
+    ratingKey: "arrow duel 5/30"
+  });
+  assert.deepEqual(historyAttemptReplayAvailability({ attempt: invalidAttempt, puzzle: standardPuzzle() }), {
+    status: "unavailable",
+    reason: "arrow-candidates-unavailable"
   });
 });
 

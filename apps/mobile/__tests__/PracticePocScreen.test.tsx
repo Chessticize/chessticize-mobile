@@ -2911,6 +2911,21 @@ describe("PracticePocScreen", () => {
       ratingBefore: 600,
       arrowDuelCandidateOrderStatus: "corrupt"
     } as unknown as AttemptEvent);
+    store.recordAttempt({
+      id: "semantic-corrupt-arrow-attempt",
+      source: "sprint",
+      sessionId: "semantic-corrupt-arrow-session",
+      puzzleId: "shared-history",
+      mode: "arrow_duel",
+      ratingKey: "arrow duel 5/30",
+      result: "wrong",
+      submittedMove: "e2e4",
+      expectedMove: "e2e3",
+      startedAt: "2026-06-20T12:00:00.000Z",
+      completedAt: "2026-06-20T12:00:40.000Z",
+      ratingBefore: 600,
+      arrowDuelCandidateOrder: ["a1a2", "a2a3"]
+    });
     const systemBack = createTestSystemBackSource("android");
     const renderer = renderScreen({ practiceService: new PracticeService(store), systemBack });
 
@@ -2973,6 +2988,14 @@ describe("PracticePocScreen", () => {
     expect(systemBack.invoke()).toBe(true);
     expect(findByTestId(renderer, "history-panel")).toBeTruthy();
     press(renderer, "history-attempt-corrupt-arrow-attempt");
+    expect(collectText(findByTestId(renderer, "history-attempt-detail-replay-unavailable"))).toBe(
+      "Original Arrow Duel candidates are unavailable, so this attempt cannot be replayed safely."
+    );
+    expect(() => findByTestId(renderer, "review-board")).toThrow();
+    expect(() => findByTestId(renderer, "review-analysis-button")).toThrow();
+    expect(systemBack.invoke()).toBe(true);
+    expect(findByTestId(renderer, "history-panel")).toBeTruthy();
+    press(renderer, "history-attempt-semantic-corrupt-arrow-attempt");
     expect(collectText(findByTestId(renderer, "history-attempt-detail-replay-unavailable"))).toBe(
       "Original Arrow Duel candidates are unavailable, so this attempt cannot be replayed safely."
     );

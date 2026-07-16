@@ -6,7 +6,7 @@ import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { buildPracticeProgressSummary, PracticeService, SQLiteStore } from "../src/index.ts";
 import type { AttemptHistoryRow, HistoryFilter } from "../src/index.ts";
-import { normalizeHistoryAttemptDetail } from "../../core/src/index.ts";
+import { historyAttemptReplayAvailability, normalizeHistoryAttemptDetail } from "../../core/src/index.ts";
 import type { Puzzle, ReviewContext } from "../../core/src/index.ts";
 
 process.env.TZ = "UTC";
@@ -670,6 +670,42 @@ test("PracticeService marks corrupt persisted history fields partial without fab
       ratingDelta: null,
       arrowDuelCandidateOrderStatus: "corrupt",
       dataStatus: "partial"
+    });
+  } finally {
+    store.close();
+  }
+});
+
+test("PracticeService keeps semantically invalid persisted Arrow candidates readable but unavailable for replay", async () => {
+  const store = await seededStore();
+  const service = new PracticeService(store);
+  try {
+    const recorded = service.recordReviewAttempt({
+      puzzleId: "00008",
+      mode: "arrow_duel",
+      ratingKey: "arrow duel 5/30",
+      result: "wrong",
+      submittedMove: "h6g7",
+      expectedMove: "b2b1",
+      startedAt: "2026-06-20T00:00:00.000Z",
+      arrowDuelCandidateOrder: ["b2b1", "h6g7"]
+    }, "2026-06-20T00:00:05.000Z");
+    store.db
+      .prepare("UPDATE attempts SET arrow_duel_candidate_order_json = ? WHERE id = ?")
+      .run(JSON.stringify(["b2b1", "a1a2"]), recorded.attempt.id);
+
+    const view = service.getHistoryView({
+      now: "2026-06-21T00:00:00.000Z",
+      timeRange: "max"
+    });
+    const persistedAttempt = view.attempts[0]!;
+    const puzzle = service.getPuzzle(persistedAttempt.puzzleId)!;
+
+    assert.deepEqual(persistedAttempt.arrowDuelCandidateOrder, ["b2b1", "a1a2"]);
+    assert.deepEqual(normalizeHistoryAttemptDetail(persistedAttempt).submittedMove, "h6g7");
+    assert.deepEqual(historyAttemptReplayAvailability({ attempt: persistedAttempt, puzzle }), {
+      status: "unavailable",
+      reason: "arrow-candidates-unavailable"
     });
   } finally {
     store.close();
