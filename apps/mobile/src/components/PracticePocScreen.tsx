@@ -122,6 +122,7 @@ import { Chess, type Move, type PieceSymbol, type Square } from "chess.js";
 
 interface Props {
   platformCapabilities: MobilePlatformCapabilities;
+  arrowDuelTargetCorrect?: number;
   debugTrace?: (event: PracticeDebugTraceEvent) => void;
   currentTimeMs?: () => number;
   puzzleSelectionSeed?: string;
@@ -382,6 +383,7 @@ function buildAdaptiveLayout({
 
 export function PracticePocScreen({
   platformCapabilities,
+  arrowDuelTargetCorrect,
   debugTrace,
   currentTimeMs = Date.now,
   puzzleSelectionSeed,
@@ -1090,6 +1092,9 @@ export function PracticePocScreen({
           ...(customThemeValue ? { theme: customThemeValue, persistCustomConfig: true } : useCustomTiming ? { persistCustomConfig: true } : {}),
           ...(nextMode === "standard" && standardTargetCorrect !== undefined
             ? { targetCorrect: standardTargetCorrect }
+            : {}),
+          ...(nextMode === "arrow_duel" && arrowDuelTargetCorrect !== undefined
+            ? { targetCorrect: arrowDuelTargetCorrect }
             : {}),
           ...(configurePuzzleSource && shouldRandomizePuzzleSelection(puzzleSource)
             ? { puzzleSelectionSeed: puzzleSelectionSeed ?? `${Date.now()}-${Math.random()}` }
@@ -4352,6 +4357,7 @@ function ArrowCandidateOverlay({
 
   return (
     <View
+      accessible
       accessibilityLabel={`Arrow Duel candidates: ${candidates.join(", ")}`}
       accessibilityValue={{ text: candidates.join(", ") }}
       style={[styles.arrowLayer, { width: boardSize, height: boardSize }]}

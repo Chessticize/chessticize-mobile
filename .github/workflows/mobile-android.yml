@@ -169,6 +169,7 @@ jobs:
             apps/mobile/scripts/prepare-android-offline-e2e.sh
             if [ "${{ matrix.api-level }}" = "36" ]; then apps/mobile/scripts/android-review-reminder-native-evidence.sh; fi
             DETOX_ACTIVE_SUITE=android-offline-practice pnpm mobile:e2e:test:android:ci
+            if [ "${{ matrix.api-level }}" = "36" ]; then DETOX_ACTIVE_SUITE=android-arrow-duel pnpm mobile:e2e:test:android:ci; fi
             if [ "${{ matrix.api-level }}" = "36" ]; then DETOX_ACTIVE_SUITE=android-stockfish pnpm mobile:e2e:test:android:ci; fi
             if [ "${{ matrix.api-level }}" = "36" ]; then DETOX_ACTIVE_SUITE=android-system-back pnpm mobile:e2e:test:android:ci; fi
             if [ "${{ matrix.api-level }}" = "36" ]; then DETOX_ACTIVE_SUITE=android-review-reminders pnpm mobile:e2e:test:android:ci; fi

@@ -177,6 +177,48 @@ test("Android Standard Practice seed follows the maintained tracked pack solutio
   }
 });
 
+test("Android Arrow Duel seed completes through the shared pack-backed service", async () => {
+  const fixture = await loadAndroidArrowDuelFixture();
+  const packDb = buildPackDatabase([fixture.puzzle]);
+  const userStore = new SQLiteStore(":memory:");
+  try {
+    userStore.migrate();
+    const source = new SQLitePuzzlePackSource(new NodeSqliteDatabase(packDb));
+    const service = new PracticeService(new PackBackedPracticeStore(userStore, source));
+
+    const sprint = service.startSprint(
+      {
+        mode: "arrow_duel",
+        durationSeconds: 300,
+        perPuzzleSeconds: 30,
+        targetCorrect: fixture.targetCorrect,
+        puzzleSelectionSeed: fixture.puzzleSelectionSeed
+      },
+      "2026-07-16T12:00:00.000Z"
+    );
+
+    assert.equal(sprint.currentPuzzle?.kind, "arrow_duel");
+    assert.equal(sprint.currentPuzzle?.puzzle.id, fixture.puzzle.id);
+    assert.deepEqual(
+      [...(sprint.currentPuzzle?.kind === "arrow_duel" ? sprint.currentPuzzle.candidates : [])].sort(),
+      [...fixture.candidates].sort()
+    );
+
+    const result = service.submitMove(fixture.correctMove, "2026-07-16T12:00:01.000Z");
+
+    assert.equal(result.state.status, "won");
+    assert.equal(result.attempt?.result, "correct");
+    assert.equal(result.state.ratingAfter, fixture.expectedRatingAfter);
+    assert.deepEqual(
+      [...(result.attempt?.arrowDuelCandidateOrder ?? [])].sort(),
+      [...fixture.candidates].sort()
+    );
+  } finally {
+    userStore.close();
+    packDb.close();
+  }
+});
+
 test("PackBackedPracticeStore honors locally seeded scoped puzzle sources before the pack", async () => {
   const puzzles = await loadFixturePuzzles();
   const localPuzzle = puzzles[0] as Puzzle;
@@ -313,4 +355,20 @@ async function loadAndroidStandardPracticeFixture(): Promise<AndroidStandardPrac
   return JSON.parse(
     await readFile(resolve("fixtures/puzzles/android-standard-practice.fixture.json"), "utf8")
   ) as AndroidStandardPracticeFixture;
+}
+
+interface AndroidArrowDuelFixture {
+  puzzleSelectionSeed: string;
+  targetCorrect: number;
+  puzzle: Puzzle;
+  candidates: [string, string];
+  wrongMove: string;
+  correctMove: string;
+  expectedRatingAfter: number;
+}
+
+async function loadAndroidArrowDuelFixture(): Promise<AndroidArrowDuelFixture> {
+  return JSON.parse(
+    await readFile(resolve("fixtures/puzzles/android-arrow-duel.fixture.json"), "utf8")
+  ) as AndroidArrowDuelFixture;
 }

@@ -45,6 +45,9 @@ object ChessticizeTestLaunchArguments {
       testLaunchArgument(intent, launchArgs, "chessticizePuzzleSelectionSeed")?.let {
         put("puzzleSelectionSeed", it)
       }
+      testLaunchArgument(intent, launchArgs, "chessticizeArrowDuelTargetCorrect")?.let {
+        put("arrowDuelTargetCorrect", it)
+      }
       testLaunchArgument(intent, launchArgs, "chessticizeStandardTargetCorrect")?.let {
         put("standardTargetCorrect", it)
       }
