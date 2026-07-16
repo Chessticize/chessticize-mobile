@@ -1323,6 +1323,81 @@ test("PracticeService restores a completed Standard attempt, rating, progress, a
   }
 });
 
+test("PracticeService restores completed scheduled Review history and its future queue after SQLite reopen", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "chessticize-review-relaunch-"));
+  const databasePath = join(directory, "chessticize-mobile.sqlite");
+  const reviewCompletedAt = "2026-06-21T12:00:05.000Z";
+  try {
+    const firstStore = new SQLiteStore(databasePath);
+    firstStore.migrate();
+    firstStore.seedPuzzles(await loadFixturePuzzles());
+    const firstService = new PracticeService(firstStore);
+    try {
+      firstStore.scheduleMistakeReview(reviewContext("000hf"), "2026-06-20T12:00:00.000Z");
+      firstService.recordReviewAttempt({
+        puzzleId: "000hf",
+        mode: "standard",
+        ratingKey: "standard 5/20",
+        result: "correct",
+        submittedMove: "e6f7",
+        expectedMove: "e6f7",
+        startedAt: "2026-06-21T12:00:00.000Z"
+      }, reviewCompletedAt);
+    } finally {
+      firstStore.close();
+    }
+
+    const reopenedStore = new SQLiteStore(databasePath);
+    reopenedStore.migrate();
+    const reopenedService = new PracticeService(reopenedStore);
+    try {
+      assert.deepEqual(
+        reopenedService.listHistory({ source: "scheduled_review" }).map((attempt) => ({
+          completedAt: attempt.completedAt,
+          puzzleId: attempt.puzzleId,
+          result: attempt.result,
+          source: attempt.source
+        })),
+        [{
+          completedAt: reviewCompletedAt,
+          puzzleId: "000hf",
+          result: "correct",
+          source: "scheduled_review"
+        }]
+      );
+      assert.deepEqual(
+        reopenedService.listCompletedReviewsForDay(reviewCompletedAt).map((item) => ({
+          puzzleId: item.puzzle.id,
+          result: item.attempt.result
+        })),
+        [{ puzzleId: "000hf", result: "correct" }]
+      );
+      assert.deepEqual(reopenedService.getDueReviewItems(reviewCompletedAt), []);
+      assert.equal(reopenedService.getDueReviewItems("2026-06-22T12:00:00.000Z")[0]?.puzzle.id, "000hf");
+      assert.deepEqual(
+        reopenedService.listReviewQueue().map((review) => ({
+          dueDay: review.dueDay,
+          intervalDays: review.intervalDays,
+          lastResult: review.lastResult,
+          puzzleId: review.puzzleId,
+          reviewCount: review.reviewCount
+        })),
+        [{
+          dueDay: "2026-06-22",
+          intervalDays: 1,
+          lastResult: "correct",
+          puzzleId: "000hf",
+          reviewCount: 1
+        }]
+      );
+    } finally {
+      reopenedStore.close();
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("PracticeService restores SQLite reviews for the current 4 AM review day", async () => {
   const store = await seededStore();
   const service = new PracticeService(store);

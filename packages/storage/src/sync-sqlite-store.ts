@@ -4,6 +4,7 @@ import {
   createDefaultRating,
   filterHistoryAttemptsForQuery,
   normalizeRatingRecord,
+  orderReviewQueue,
   resetRating as resetRatingRecord,
   resolveHistoryRange,
   reviewDayFor,
@@ -805,7 +806,7 @@ export class SyncSQLiteStore implements PracticeStore {
     const rows = this.db
       .prepare("SELECT * FROM review_queue WHERE due_day <= ? ORDER BY due_day ASC, puzzle_id ASC, mode ASC, rating_key ASC")
       .all(today) as ReviewRow[];
-    return rows.map(reviewFromRow);
+    return orderReviewQueue(rows.map(reviewFromRow));
   }
 
   getDueReviewItems(now: string): ReviewQueueItem[] {
@@ -960,7 +961,7 @@ export class SyncSQLiteStore implements PracticeStore {
 
   private listAllReviewQueueStates(): ReviewQueueState[] {
     const rows = this.db.prepare("SELECT * FROM review_queue ORDER BY due_day ASC, puzzle_id ASC, mode ASC, rating_key ASC").all() as ReviewRow[];
-    return rows.map(reviewFromRow);
+    return orderReviewQueue(rows.map(reviewFromRow));
   }
 
   listSprintSessions(): ExportedSprintSession[] {

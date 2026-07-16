@@ -129,6 +129,17 @@ describe('Key user flows', () => {
     await element(by.id('review-exit')).tap();
     await waitFor(element(by.id('review-due-count'))).toHaveText('1 / 3').withTimeout(10000);
     await waitFor(element(by.id('review-today-history'))).toExist().withTimeout(10000);
+
+    // The completion transaction must survive a real process boundary too:
+    // history, the completed-today numerator, and the future queue all come
+    // back through the same on-device SQLite adapter after relaunch.
+    await device.terminateApp();
+    await launchAppAt(reviewNowMs, false);
+    await openTab('review-tab', 'review-start-due');
+    await waitFor(element(by.id('review-due-count'))).toHaveText('1 / 3').withTimeout(10000);
+    await waitFor(element(by.id('review-total-count'))).toHaveText('3').withTimeout(10000);
+    await waitFor(element(by.id('review-today-history'))).toExist().withTimeout(10000);
+
     await waitForVisibleInPracticeScroll('review-start-due');
     await element(by.id('review-start-due')).tap();
     await waitFor(element(by.id('review-progress'))).toHaveText('2 / 3 · Standard').withTimeout(10000);

@@ -4,6 +4,7 @@ import {
   defaultSprintConfig,
   filterHistoryAttemptsForQuery,
   normalizeRatingRecord,
+  orderReviewQueue,
   resetRating as resetRatingRecord,
   buildSessionMistakeReview,
   reviewDayFor,
@@ -348,7 +349,7 @@ export class MemoryStore implements PracticeStore {
   }
 
   listReviewQueue(): ReviewQueueState[] {
-    return [...this.reviewQueue.values()].sort(compareReviewQueueState);
+    return orderReviewQueue([...this.reviewQueue.values()]);
   }
 
   pruneOrphanedReviewQueue(): number {
@@ -546,11 +547,4 @@ function sameReviewQueue(left: ReviewQueueState | undefined, right: ReviewQueueS
 
 function isOpenSprint(session: SprintState): boolean {
   return session.status === "active" || session.status === "paused";
-}
-
-function compareReviewQueueState(left: ReviewQueueState, right: ReviewQueueState): number {
-  return left.dueDay.localeCompare(right.dueDay) ||
-    left.puzzleId.localeCompare(right.puzzleId) ||
-    left.mode.localeCompare(right.mode) ||
-    left.ratingKey.localeCompare(right.ratingKey);
 }

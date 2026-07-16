@@ -173,6 +173,20 @@ export function isReviewDay(value: string): boolean {
   }
 }
 
+/**
+ * Returns the canonical actionable Review order without mutating the caller's
+ * queue. Storage adapters may optimize their reads, but product ordering stays
+ * shared so in-memory, SQLite, sync, and mobile surfaces cannot drift.
+ */
+export function orderReviewQueue(queue: readonly ReviewQueueState[]): ReviewQueueState[] {
+  return [...queue].sort((left, right) =>
+    left.dueDay.localeCompare(right.dueDay) ||
+    left.puzzleId.localeCompare(right.puzzleId) ||
+    left.mode.localeCompare(right.mode) ||
+    left.ratingKey.localeCompare(right.ratingKey)
+  );
+}
+
 export function reviewQueueForecast(
   queue: Array<Pick<ReviewQueueState, "dueDay">>,
   now: string | number | Date,
