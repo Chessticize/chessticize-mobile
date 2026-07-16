@@ -693,9 +693,6 @@ describe('Detox suite configuration', () => {
     const calls = [];
     const run = (command, args) => {
       calls.push([command, args]);
-      if (args.join(' ').endsWith('shell wm help')) {
-        return 'user-rotation [free|lock] [rotation]';
-      }
       if (args.join(' ') === '-s emulator-6000 shell wm user-rotation') {
         return 'lock 1\n';
       }
@@ -707,18 +704,15 @@ describe('Detox suite configuration', () => {
       requestedRotation: 1,
     });
     expect(calls).toEqual([
-      ['/sdk/platform-tools/adb', ['-s', 'emulator-6000', 'shell', 'wm', 'help']],
+      ['/sdk/platform-tools/adb', ['-s', 'emulator-6000', 'shell', 'wm', 'user-rotation']],
       ['/sdk/platform-tools/adb', ['-s', 'emulator-6000', 'shell', 'wm', 'user-rotation', 'lock', '1']],
       ['/sdk/platform-tools/adb', ['-s', 'emulator-6000', 'shell', 'wm', 'user-rotation']],
     ]);
 
-    expect(() => setAndroidDisplayOrientation('landscape', environment, (_command, args) => (
-      args.join(' ').endsWith('shell wm help') ? 'density [reset|DENSITY]' : ''
+    expect(() => setAndroidDisplayOrientation('landscape', environment, () => (
+      'unknown command: user-rotation'
     ))).toThrow('does not support wm user-rotation');
     expect(() => setAndroidDisplayOrientation('portrait', environment, (_command, args) => {
-      if (args.join(' ').endsWith('shell wm help')) {
-        return 'user-rotation [free|lock] [rotation]';
-      }
       if (args.join(' ') === '-s emulator-6000 shell wm user-rotation') {
         return 'lock 1\n';
       }

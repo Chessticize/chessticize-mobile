@@ -53,12 +53,11 @@ fi
 commit_sha="${GITHUB_SHA:-$(git rev-parse HEAD)}"
 api_level="$($ADB -s "$DEVICE" shell getprop ro.build.version.sdk | tr -d '\r')"
 original_font_scale="$($ADB -s "$DEVICE" shell settings get system font_scale | tr -d '\r')"
-wm_help="$($ADB -s "$DEVICE" shell wm help | tr -d '\r')"
-if [[ "$wm_help" != *"user-rotation"* ]]; then
+if ! original_user_rotation_state="$($ADB -s "$DEVICE" shell wm user-rotation 2>&1)"; then
   echo "Android adaptive evidence requires wm user-rotation display control." >&2
   exit 1
 fi
-original_user_rotation_state="$($ADB -s "$DEVICE" shell wm user-rotation | tr -d '\r')"
+original_user_rotation_state="${original_user_rotation_state//$'\r'/}"
 if [[ "$original_user_rotation_state" != "free" && ! "$original_user_rotation_state" =~ ^lock\ [0-3]$ ]]; then
   echo "Android adaptive evidence could not read the original display rotation: $original_user_rotation_state" >&2
   exit 1

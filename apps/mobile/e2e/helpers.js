@@ -688,8 +688,8 @@ function setAndroidDisplayOrientation(
   const shell = (...args) => String(
     run(adb, ['-s', serial, 'shell', ...args], { encoding: 'utf8' }) ?? ''
   );
-  const windowManagerHelp = shell('wm', 'help');
-  if (!windowManagerHelp.includes('user-rotation')) {
+  const initialRotationState = shell('wm', 'user-rotation').trim();
+  if (!/^(?:free|lock\s+[0-3])$/.test(initialRotationState)) {
     throw new Error('Android device does not support wm user-rotation display control');
   }
 
