@@ -606,13 +606,16 @@ describe('Detox suite configuration', () => {
     const waitForMoveDialogClose = spec.indexOf("element(by.id('session-accessible-moves-dialog'))).not.toExist()");
     const fixtureOption = spec.indexOf("waitForAccessibleMove('c2b1')");
     const playBoardMove = spec.indexOf("playBoardMove('session-board', 'c2b3')");
-    const selectAccessibleMove = spec.lastIndexOf("element(by.id('session-accessible-move-c2b1')).tap()");
+    const nextFixtureOption = spec.lastIndexOf("waitForAccessibleMove('c4b5')");
+    const selectAccessibleMove = spec.lastIndexOf("element(by.id('session-accessible-move-c4b5')).tap()");
     expect(closeMoveDialog).toBeGreaterThan(0);
     expect(fixtureOption).toBeGreaterThan(0);
     expect(closeMoveDialog).toBeGreaterThan(fixtureOption);
     expect(waitForMoveDialogClose).toBeGreaterThan(closeMoveDialog);
     expect(playBoardMove).toBeGreaterThan(waitForMoveDialogClose);
+    expect(nextFixtureOption).toBeGreaterThan(playBoardMove);
     expect(selectAccessibleMove).toBeGreaterThan(playBoardMove);
+    expect(selectAccessibleMove).toBeGreaterThan(nextFixtureOption);
     expect(evidence).toContain('phone:1080x2400:420:both:1');
     expect(evidence).toContain('tablet:1600x2560:320:both:1');
     expect(evidence).toContain('foldable:1768x2208:420:landscape:1');

@@ -73,11 +73,15 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
       await waitFor(element(by.id('session-accessible-moves-open'))).toBeVisible().withTimeout(10000);
       await element(by.id('session-accessible-moves-open')).tap();
       await waitFor(element(by.id('session-accessible-moves-dialog'))).toExist().withTimeout(10000);
-      await waitForAccessibleMove('c2b1');
-      await element(by.id('session-accessible-move-c2b1')).tap();
+      // A terminal wrong result advances the sprint to Familiar 15 puzzle two;
+      // c4b5 is its maintained legal-wrong fixture move (also used by the full
+      // public-UI sprint failure journey).
+      await waitForAccessibleMove('c4b5');
+      await element(by.id('session-accessible-move-c4b5')).tap();
       await waitFor(element(by.id('session-accessible-moves-dialog'))).not.toExist().withTimeout(10000);
       await waitFor(element(by.id('move-feedback-overlay'))).toExist().withTimeout(10000);
-      await waitFor(element(by.id('session-progress'))).toHaveText('1 / 15').withTimeout(10000);
+      await waitFor(element(by.label('Mistakes 2 of 3')).atIndex(0)).toExist().withTimeout(10000);
+      await waitFor(element(by.id('session-progress'))).toHaveText('0 / 15').withTimeout(10000);
     }
   });
 });
