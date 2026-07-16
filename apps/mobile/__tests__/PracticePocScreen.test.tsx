@@ -3286,6 +3286,43 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "review-panel")).toThrow();
   });
 
+  it("starts the canonical oldest due item before a lexically earlier newer context", () => {
+    const service = createMobilePracticeService("random1000");
+    service.recordReviewResult(
+      { puzzleId: "000hf", mode: "standard", ratingKey: "z-oldest standard 5/20" },
+      "wrong",
+      "2026-06-18T12:00:00.000Z"
+    );
+    service.recordReviewResult(
+      { puzzleId: "00008", mode: "standard", ratingKey: "a-newer standard 5/30" },
+      "wrong",
+      "2026-06-20T12:00:00.000Z"
+    );
+    const canonicalDueItems = service.getDueReviewItems("2026-06-22T12:00:00.000Z");
+    expect(canonicalDueItems.map((item) => item.puzzle.id)).toEqual(["000hf", "00008"]);
+    const renderer = renderScreen({
+      currentTimeMs: () => new Date("2026-06-22T12:00:00.000Z").getTime(),
+      practiceService: service
+    });
+
+    press(renderer, "review-tab");
+    press(renderer, "review-filter-toggle");
+    const contextButtonTestIDs = [...new Set(renderer.root.findAll(
+      (node) => typeof node.props.testID === "string"
+        && node.props.testID.startsWith("review-context-")
+        && node.props.accessibilityRole === "button"
+    ).map((button) => button.props.testID as string))];
+    expect(contextButtonTestIDs).toEqual([
+      "review-context-standard-z-oldest-standard-5-20",
+      "review-context-standard-a-newer-standard-5-30"
+    ]);
+
+    press(renderer, "review-start-due");
+
+    expect(collectText(findByTestId(renderer, "review-current-puzzle-id"))).toBe("000hf");
+    expect(collectText(findByTestId(renderer, "review-timer"))).toBe("00:40");
+  });
+
   it("records official due review mistakes immediately but keeps analysis reviews unrecorded", async () => {
     const service = createMobilePracticeService("random1000");
     service.startSprint(

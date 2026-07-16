@@ -5393,7 +5393,7 @@ function groupReviewEntriesByContext(entries: ReviewEntry[]): ReviewEntryGroup[]
     group.entries.push(entry);
     groups.set(key, group);
   }
-  return [...groups.values()].sort((left, right) => left.ratingKey.localeCompare(right.ratingKey));
+  return [...groups.values()];
 }
 
 function collectReviewThemeFilters(items: ReviewQueueItem[]): string[] {
@@ -5593,7 +5593,6 @@ function ReviewPanel({
   const preferredEntriesKey = preferredEntries.map((entry) => `${entry.source}:${entry.puzzle.id}:${entry.mode}:${entry.ratingKey}`).join("|");
   const [activeEntries, setActiveEntries] = useState<ReviewEntry[]>(preferredEntries);
   const [activeEntryInitialIndex, setActiveEntryInitialIndex] = useState(0);
-  const [queuedReviewGroups, setQueuedReviewGroups] = useState<ReviewEntryGroup[]>([]);
   const activeReviewGenerationRef = useRef(0);
   const appliedPreferredEntriesKeyRef = useRef(preferredEntriesKey);
   const [queueFilter, setQueueFilter] = useState<ReviewQueueFilter>("all");
@@ -5639,7 +5638,6 @@ function ReviewPanel({
     }
     appliedPreferredEntriesKeyRef.current = preferredEntriesKey;
     activeReviewGenerationRef.current += 1;
-    setQueuedReviewGroups([]);
     setActiveEntryInitialIndex(0);
     setActiveEntries(preferredEntries);
     // preferredEntriesKey is the stable semantic identity for this derived array.
@@ -5656,20 +5654,8 @@ function ReviewPanel({
     };
   }, [onSessionSourceChange]);
 
-  function startReviewGroupQueue(groups: ReviewEntryGroup[]): void {
-    const [firstGroup, ...remainingGroups] = groups;
-    if (!firstGroup) {
-      return;
-    }
+  function startReviewEntries(entries: ReviewEntry[]): void {
     activeReviewGenerationRef.current += 1;
-    setQueuedReviewGroups(remainingGroups);
-    setActiveEntryInitialIndex(0);
-    setActiveEntries(firstGroup.entries);
-  }
-
-  function startSingleReviewGroup(entries: ReviewEntry[]): void {
-    activeReviewGenerationRef.current += 1;
-    setQueuedReviewGroups([]);
     setActiveEntryInitialIndex(0);
     setActiveEntries(entries);
   }
@@ -5680,7 +5666,6 @@ function ReviewPanel({
       return;
     }
     activeReviewGenerationRef.current += 1;
-    setQueuedReviewGroups([]);
     setActiveEntryInitialIndex(nextIndex);
     setActiveEntries(completedReviewEntries);
   }
@@ -5689,18 +5674,7 @@ function ReviewPanel({
     if (generation !== activeReviewGenerationRef.current) {
       return;
     }
-    if (source === "due") {
-      const [nextGroup, ...remainingGroups] = queuedReviewGroups;
-      if (nextGroup) {
-        activeReviewGenerationRef.current += 1;
-        setQueuedReviewGroups(remainingGroups);
-        setActiveEntryInitialIndex(0);
-        setActiveEntries(nextGroup.entries);
-        return;
-      }
-    }
     activeReviewGenerationRef.current += 1;
-    setQueuedReviewGroups([]);
     setActiveEntryInitialIndex(0);
     setActiveEntries([]);
     if (source === "session") {
@@ -5710,7 +5684,6 @@ function ReviewPanel({
 
   function returnActiveReviewToOwner(source: ReviewEntry["source"]): void {
     activeReviewGenerationRef.current += 1;
-    setQueuedReviewGroups([]);
     setActiveEntryInitialIndex(0);
     setActiveEntries([]);
     if (source === "session") {
@@ -5728,7 +5701,6 @@ function ReviewPanel({
         currentTimeMs={currentTimeMs}
         deferBackRelevantTransition={deferBackRelevantTransition}
         entries={activeEntries}
-        hasQueuedDueReviews={queuedReviewGroups.length > 0}
         initialIndex={activeEntryInitialIndex}
         scheduledReviewCompletedCount={completedReviews.length}
         scheduledReviewTotal={dailyReviewTotal}
@@ -5811,7 +5783,7 @@ function ReviewPanel({
         disabled={filteredDueEntries.length === 0}
         testID="review-start-due"
         style={[styles.primaryButton, styles.reviewStartButton, filteredDueEntries.length === 0 ? styles.disabledButton : null]}
-        onPress={() => startReviewGroupQueue(filteredContextGroups)}
+        onPress={() => startReviewEntries(filteredDueEntries)}
       >
         <Text style={styles.primaryButtonText}>Review {queueSummary.filteredCount}</Text>
       </Pressable>
@@ -5896,7 +5868,7 @@ function ReviewPanel({
               key={`${item.review.puzzleId}:${item.review.mode}:${item.review.ratingKey}`}
               item={item}
               nowMs={nowMs}
-              onPress={() => startSingleReviewGroup([{
+              onPress={() => startReviewEntries([{
                 puzzle: item.puzzle,
                 mode: item.review.mode,
                 ratingKey: item.review.ratingKey,
@@ -5917,7 +5889,7 @@ function ReviewPanel({
               accessibilityLabel={`Start ${modeLabel(group.mode)} reviews`}
               testID={`review-context-${safeTestId(group.key)}`}
               style={styles.reviewContextCard}
-              onPress={() => startSingleReviewGroup(group.entries)}
+              onPress={() => startReviewEntries(group.entries)}
             >
               <View>
                 <Text style={styles.historyRowTitle}>{modeLabel(group.mode)}</Text>
@@ -6143,7 +6115,6 @@ function ReviewSession({
   currentTimeMs,
   deferBackRelevantTransition,
   entries,
-  hasQueuedDueReviews = false,
   initialIndex = 0,
   onAnalysisActiveChange,
   onComplete,
@@ -6160,7 +6131,6 @@ function ReviewSession({
   currentTimeMs: () => number;
   deferBackRelevantTransition: DeferBackRelevantTransition;
   entries: ReviewEntry[];
-  hasQueuedDueReviews?: boolean;
   initialIndex?: number;
   onAnalysisActiveChange?: (active: boolean) => void;
   onComplete: (source: ReviewEntry["source"]) => void;
@@ -6230,7 +6200,7 @@ function ReviewSession({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [systemBackCommand?.id]);
   const currentEntry = entries[entryIndex];
-  const hasNextScheduledReview = entryIndex + 1 < entries.length || hasQueuedDueReviews;
+  const hasNextScheduledReview = entryIndex + 1 < entries.length;
   const currentPuzzle = currentReviewPuzzleState(reviewState);
   const currentFen = currentPuzzle.currentFen;
   const displayFen = analysisEnabled ? (analysisFen ?? currentFen) : currentFen;

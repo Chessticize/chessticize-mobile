@@ -641,14 +641,7 @@ export class SyncSQLiteStore implements PracticeStore {
       settings: this.getSettings(),
       ratings: this.listRatings(),
       attempts: this.listAttempts(),
-      reviewQueue: this.listAllReviewQueueStates()
-        .sort((left, right) =>
-          left.dueDay.localeCompare(right.dueDay) ||
-          left.puzzleId.localeCompare(right.puzzleId) ||
-          left.mode.localeCompare(right.mode) ||
-          left.ratingKey.localeCompare(right.ratingKey)
-        )
-        .map(exportReviewQueueState),
+      reviewQueue: this.listReviewQueue().map(exportReviewQueueState),
       sprintSessions: this.listSprintSessions()
     };
   }
