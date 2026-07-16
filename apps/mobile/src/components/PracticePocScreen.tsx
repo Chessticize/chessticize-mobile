@@ -1363,6 +1363,19 @@ export function PracticePocScreen({
   }
 
   function openHistoryReview(attemptId: string): void {
+    // Computed on demand: the unpaged review view scans the full attempt history,
+    // which is too expensive to rebuild on every render.
+    const historyReviewAttempts = service.getHistoryView({
+      now: nowIso(),
+      timeRange: historyTimeRange,
+      ...(activeHistoryRatingKey ? { ratingKey: activeHistoryRatingKey } : {}),
+      ...historyRatingRangeQuery,
+      ...(historySourceFilter === "all" ? {} : { source: historySourceFilter }),
+      ...(historyResultFilter === "all" ? {} : { result: historyResultFilter }),
+      ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
+      ...(historyThemeFilter === "all" ? {} : { theme: historyThemeFilter }),
+      ...(historyReviewStatusFilter === "all" ? {} : { reviewStatus: historyReviewStatusFilter })
+    }).attempts;
     const entries = historyReviewAttempts
       .map((attempt): ReviewEntry | null => {
         const puzzle = service.getPuzzle(attempt.puzzleId);
@@ -1750,19 +1763,26 @@ export function PracticePocScreen({
   const activeHistoryRatingKey = historyRatingKey;
   const historyWrongOnly = historyResultFilter === "wrong";
   const historyRatingRangeQuery = historyRatingRangeFilterToQuery(historyRatingRangeFilter);
-  const historyView = service.getHistoryView({
-    now: nowIso(),
-    timeRange: historyTimeRange,
-    ...(activeHistoryRatingKey ? { ratingKey: activeHistoryRatingKey } : {}),
-    ...historyRatingRangeQuery,
-    ...(historySourceFilter === "all" ? {} : { source: historySourceFilter }),
-    ...(historyResultFilter === "all" ? {} : { result: historyResultFilter }),
-    ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
-    ...(historyThemeFilter === "all" ? {} : { theme: historyThemeFilter }),
-    ...(historyReviewStatusFilter === "all" ? {} : { reviewStatus: historyReviewStatusFilter }),
-    page: { limit: HISTORY_PAGE_LIMIT, offset: historyPageOffset }
-  });
-  const historyPerformanceView = activeHistoryRatingKey
+  // History views scan the full attempt history, so they are computed only while
+  // the history panel is on screen. Recomputing them on every render made active
+  // sprints progressively laggy: the 500ms countdown tick re-rendered this screen
+  // and re-scanned a history that grows with every solved puzzle.
+  const historyPanelVisible = tab === "history" && historyReviewEntries.length === 0;
+  const historyView = historyPanelVisible
+    ? service.getHistoryView({
+        now: nowIso(),
+        timeRange: historyTimeRange,
+        ...(activeHistoryRatingKey ? { ratingKey: activeHistoryRatingKey } : {}),
+        ...historyRatingRangeQuery,
+        ...(historySourceFilter === "all" ? {} : { source: historySourceFilter }),
+        ...(historyResultFilter === "all" ? {} : { result: historyResultFilter }),
+        ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
+        ...(historyThemeFilter === "all" ? {} : { theme: historyThemeFilter }),
+        ...(historyReviewStatusFilter === "all" ? {} : { reviewStatus: historyReviewStatusFilter }),
+        page: { limit: HISTORY_PAGE_LIMIT, offset: historyPageOffset }
+      })
+    : null;
+  const historyPerformanceView = historyPanelVisible && activeHistoryRatingKey
     ? service.getHistoryView({
         now: nowIso(),
         timeRange: historyTimeRange,
@@ -1774,21 +1794,6 @@ export function PracticePocScreen({
         ...(historyReviewStatusFilter === "all" ? {} : { reviewStatus: historyReviewStatusFilter })
       })
     : null;
-  const fullHistoryReviewView = service.getHistoryView({
-    now: nowIso(),
-    timeRange: historyTimeRange,
-    ...(activeHistoryRatingKey ? { ratingKey: activeHistoryRatingKey } : {}),
-    ...historyRatingRangeQuery,
-    ...(historySourceFilter === "all" ? {} : { source: historySourceFilter }),
-    ...(historyResultFilter === "all" ? {} : { result: historyResultFilter }),
-    ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
-    ...(historyThemeFilter === "all" ? {} : { theme: historyThemeFilter }),
-    ...(historyReviewStatusFilter === "all" ? {} : { reviewStatus: historyReviewStatusFilter })
-  });
-  const displayedAttempts = historyView.attempts;
-  const historyReviewAttempts = fullHistoryReviewView.attempts;
-  const historyAvailableThemes = historyView.availableThemes;
-  const historyPage = historyView.page;
   const contentOwnsHeader = tab === "review" || tab === "history";
   const reviewSurfaceOpen = reviewSessionActive || historyReviewEntries.length > 0;
   const appChromeVisible = !isOpenSession && !isShowingFeedbackSnapshot && !reviewSurfaceOpen;
@@ -1808,11 +1813,17 @@ export function PracticePocScreen({
       ...(nextMode === "custom" ? {} : { rating: readRating(service, config.ratingKey) })
     };
   });
-  const practiceProgress = buildPracticeProgressSummary(
-    attempts,
-    sprintSessions,
-    nowMs,
-    selectedConfig.ratingKey
+  // Quantized to the minute so the 500ms countdown tick does not rescan the
+  // full attempt history on every render during an active sprint.
+  const practiceProgressNowMs = Math.floor(nowMs / 60000) * 60000;
+  const practiceProgress = useMemo(
+    () => buildPracticeProgressSummary(
+      attempts,
+      sprintSessions,
+      practiceProgressNowMs,
+      selectedConfig.ratingKey
+    ),
+    [attempts, sprintSessions, practiceProgressNowMs, selectedConfig.ratingKey]
   );
   const dueTodayCount = dueReviewItems.length;
   const overdueCount = dueReviewItems.filter((item) => isReviewOverdue(item.review, nowMs)).length;
@@ -2113,10 +2124,10 @@ export function PracticePocScreen({
                   onExit={() => setHistoryReviewEntries([])}
                   stockfishTransportFactory={stockfishTransportFactory}
                 />
-              ) : (
+              ) : historyView ? (
                 <HistoryPanel
                   adaptiveLayout={adaptiveLayout}
-                  attempts={displayedAttempts}
+                  attempts={historyView.attempts}
                   performance={historyPerformanceView?.performance ?? emptyHistoryPerformance()}
                   ratingKeys={historyRatingKeys}
                   selectedRatingKey={activeHistoryRatingKey}
@@ -2126,8 +2137,8 @@ export function PracticePocScreen({
                   ratingRangeFilter={historyRatingRangeFilter}
                   sideFilter={historySideFilter}
                   themeFilter={historyThemeFilter}
-                  availableThemes={historyAvailableThemes}
-                  page={historyPage}
+                  availableThemes={historyView.availableThemes}
+                  page={historyView.page}
                   reviewStatusFilter={historyReviewStatusFilter}
                   sprintOnly={historySourceFilter === "sprint"}
                   wrongOnly={historyWrongOnly}
@@ -2185,7 +2196,7 @@ export function PracticePocScreen({
                     setHistoryResultFilter(historyWrongOnly ? "all" : "wrong");
                   }}
                 />
-              )
+              ) : null
             ) : null}
             {tab === "review" ? (
               <ReviewPanel
