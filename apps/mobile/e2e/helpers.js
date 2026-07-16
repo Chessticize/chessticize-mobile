@@ -395,6 +395,21 @@ async function launchWithDisabledSynchronization(
   await targetDevice.disableSynchronization();
 }
 
+async function launchWithFreshAndroidRuntimePermission(
+  resetPermission,
+  launch = launchWithDisabledSynchronization
+) {
+  await launch({
+    newInstance: true,
+    delete: true,
+  });
+  resetPermission();
+  await launch({
+    newInstance: true,
+    delete: false,
+  });
+}
+
 async function selectTestPuzzleSource(source) {
   const sourceButtonId = `test-puzzle-source-${source}`;
   await waitForVisibleInPracticeScroll(sourceButtonId);
@@ -666,6 +681,7 @@ module.exports = {
   openTab,
   openStandardHistoryTrend,
   launchWithDisabledSynchronization,
+  launchWithFreshAndroidRuntimePermission,
   sleep,
   frameFor,
   playBoardMove,

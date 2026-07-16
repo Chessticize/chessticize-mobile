@@ -23,12 +23,29 @@ const {
   beginAndroidPredictiveBackGesture,
   collectAndroidUiDiagnostics,
   launchWithDisabledSynchronization,
+  launchWithFreshAndroidRuntimePermission,
   performAndroidPredictiveBackGesture,
   waitForRunningStockfishDepth,
   withAndroidUiDiagnostics,
 } = require('../e2e/helpers');
 
 describe('Detox suite configuration', () => {
+  it('resets Android runtime permission after Detox recreates and grants the app', async () => {
+    let permissionGranted = true;
+    const resetPermission = jest.fn(() => {
+      permissionGranted = false;
+    });
+    const launch = jest.fn(async ({ delete: deleteApp }) => {
+      if (deleteApp) {
+        permissionGranted = true;
+      }
+    });
+
+    await launchWithFreshAndroidRuntimePermission(resetPermission, launch);
+
+    expect(permissionGranted).toBe(false);
+  });
+
   it('passes Android synchronization disablement in the numeric form Detox recognizes', () => {
     const helpers = fs.readFileSync(path.resolve(__dirname, '../e2e/helpers.js'), 'utf8');
     const launchSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/android-launch.e2e.js'), 'utf8');
@@ -552,6 +569,7 @@ describe('Detox suite configuration', () => {
 
   it('keeps Android reminder evidence on public product and system surfaces', () => {
     const spec = fs.readFileSync(path.resolve(__dirname, '../e2e/android-review-reminders.e2e.js'), 'utf8');
+    const helpers = fs.readFileSync(path.resolve(__dirname, '../e2e/helpers.js'), 'utf8');
     const nativeEvidence = fs.readFileSync(
       path.resolve(__dirname, '../scripts/android-review-reminder-native-evidence.sh'),
       'utf8'
@@ -576,11 +594,18 @@ describe('Detox suite configuration', () => {
     expect(spec).not.toContain("PracticeService");
     expect(spec).not.toContain("run-as");
 
-    const beforeEachIndex = spec.indexOf('beforeEach(async () => {');
-    const resetIndex = spec.indexOf('resetNotificationPermission();', beforeEachIndex);
-    const launchIndex = spec.indexOf('launchWithDisabledSynchronization({', beforeEachIndex);
-    expect(resetIndex).toBeGreaterThan(beforeEachIndex);
-    expect(launchIndex).toBeGreaterThan(resetIndex);
+    expect(spec).toContain(
+      'launchWithFreshAndroidRuntimePermission(resetNotificationPermission)'
+    );
+    const permissionLaunchIndex = helpers.indexOf(
+      'async function launchWithFreshAndroidRuntimePermission('
+    );
+    const deleteLaunchIndex = helpers.indexOf('delete: true', permissionLaunchIndex);
+    const resetIndex = helpers.indexOf('resetPermission();', permissionLaunchIndex);
+    const noDeleteLaunchIndex = helpers.indexOf('delete: false', resetIndex);
+    expect(deleteLaunchIndex).toBeGreaterThan(permissionLaunchIndex);
+    expect(resetIndex).toBeGreaterThan(deleteLaunchIndex);
+    expect(noDeleteLaunchIndex).toBeGreaterThan(resetIndex);
     expect(spec).toContain("['pm', 'revoke', APP_ID, PERMISSION]");
     expect(spec).toContain("'clear-permission-flags', APP_ID, PERMISSION, 'user-set'");
     expect(spec).toContain("'clear-permission-flags', APP_ID, PERMISSION, 'user-fixed'");

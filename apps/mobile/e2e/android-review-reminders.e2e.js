@@ -5,6 +5,7 @@ const { androidAdbPath } = require('./androidNetwork');
 const {
   failStandardSprint,
   launchWithDisabledSynchronization,
+  launchWithFreshAndroidRuntimePermission,
   openTab,
   sleep,
   waitForElementTextContaining,
@@ -25,11 +26,7 @@ describe('Android Review reminders through public and system surfaces', () => {
   });
 
   beforeEach(async () => {
-    resetNotificationPermission();
-    await launchWithDisabledSynchronization({
-      newInstance: true,
-      delete: true,
-    });
+    await launchWithFreshAndroidRuntimePermission(resetNotificationPermission);
     await waitFor(element(by.id('practice-home'))).toExist().withTimeout(180000);
   });
 
