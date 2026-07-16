@@ -22,6 +22,7 @@ const {
   androidAppIsResumed,
   beginAndroidPredictiveBackGesture,
   collectAndroidUiDiagnostics,
+  findPendingAndroidAlarms,
   findAndroidSystemNode,
   launchWithDisabledSynchronization,
   launchWithFreshAndroidRuntimePermission,
@@ -31,14 +32,68 @@ const {
 } = require('../e2e/helpers');
 
 describe('Detox suite configuration', () => {
+  it('discovers Android notification settings through partial system labels', () => {
+    const hierarchy = [
+      '<node content-desc="ChessticizeMobile" text="" />',
+      '<node content-desc="" text="All ChessticizeMobile notifications" />',
+      '<node content-desc="" text="You haven\'t allowed notifications from this app" />',
+    ].join('');
+
+    expect(findAndroidSystemNode(hierarchy, ['Chessticize', 'Notifications']))
+      .toContain('content-desc="ChessticizeMobile"');
+  });
+
   it('selects the Android permission action instead of the question containing Allow', () => {
     const hierarchy = [
       '<node text="Allow ChessticizeMobile to send you notifications?" resource-id="com.android.permissioncontroller:id/permission_message" bounds="[133,765][947,898]" />',
       '<node text="Allow" resource-id="com.android.permissioncontroller:id/permission_allow_button" bounds="[133,966][947,1113]" />',
     ].join('');
 
-    expect(findAndroidSystemNode(hierarchy, ['permission_allow_button', 'Allow']))
+    expect(findAndroidSystemNode(
+      hierarchy,
+      ['permission_allow_button', 'Allow'],
+      { exact: true }
+    ))
       .toContain('resource-id="com.android.permissioncontroller:id/permission_allow_button"');
+  });
+
+  it('counts only current pending alarms and excludes canceled alarm history', () => {
+    const action = 'com.chessticize.mobile.action.DELIVER_REVIEW_REMINDER';
+    const state = [
+      '2 pending alarms:',
+      '  RTC_WAKEUP #1: Alarm{current type 0 origWhen 1784180920629 com.chessticize.mobile}',
+      `    tag=*walarm*:${action}`,
+      '  RTC #45: Alarm{other type 1 origWhen 9223372036854775807 com.google.android.googlequicksearchbox}',
+      '    tag=*alarm*:unrelated',
+      'LazyAlarmStore stats:',
+      '  GET_NEXT_DELIVERY_TIME: count=772',
+      'Recent alarm history:',
+      '  #1: Reason=alarm_cancelled',
+      '    Snapshot:',
+      `      type=RTC_WAKEUP tag=*walarm*:${action}`,
+      '  #2: Reason=alarm_cancelled',
+      '    Snapshot:',
+      `      type=RTC_WAKEUP tag=*walarm*:${action}`,
+    ].join('\n');
+
+    expect(findPendingAndroidAlarms(state, action)).toEqual([expect.objectContaining({
+      identity: `tag=*walarm*:${action}`,
+      triggerMs: 1784180920629,
+    })]);
+  });
+
+  it('retains genuinely duplicated current alarms for the one-alarm assertion to reject', () => {
+    const action = 'com.chessticize.mobile.action.DELIVER_REVIEW_REMINDER';
+    const state = [
+      '2 pending alarms:',
+      '  RTC_WAKEUP #1: Alarm{first type 0 origWhen 1784180920629 com.chessticize.mobile}',
+      `    tag=*walarm*:${action}`,
+      '  RTC_WAKEUP #2: Alarm{second type 0 origWhen 1784180921629 com.chessticize.mobile}',
+      `    tag=*walarm*:${action}`,
+      'LazyAlarmStore stats:',
+    ].join('\n');
+
+    expect(findPendingAndroidAlarms(state, action)).toHaveLength(2);
   });
 
   it('resets Android runtime permission after Detox recreates and grants the app', async () => {

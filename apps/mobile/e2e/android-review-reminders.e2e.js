@@ -5,6 +5,7 @@ const { androidAdbPath } = require('./androidNetwork');
 const {
   failStandardSprint,
   findAndroidSystemNode,
+  findPendingAndroidAlarms,
   launchWithDisabledSynchronization,
   launchWithFreshAndroidRuntimePermission,
   openTab,
@@ -38,7 +39,7 @@ describe('Android Review reminders through public and system surfaces', () => {
 
       await waitForVisibleInPracticeScroll('settings-review-reminder-enable');
       await element(by.id('settings-review-reminder-enable')).tap();
-      await tapSystemNode(['permission_deny_button', "Don’t allow", "Don't allow"]);
+      await tapPermissionSystemNode(['permission_deny_button', "Don’t allow", "Don't allow"]);
 
       await waitForElementTextContaining(
         'settings-review-reminders',
@@ -74,7 +75,7 @@ describe('Android Review reminders through public and system surfaces', () => {
       await openTab('settings-tab', 'settings-review-reminders');
       await waitForVisibleInPracticeScroll('settings-review-reminder-enable');
       await element(by.id('settings-review-reminder-enable')).tap();
-      await tapSystemNode(['permission_allow_button', 'Allow']);
+      await tapPermissionSystemNode(['permission_allow_button', 'Allow']);
       await waitForElementTextContaining('settings-review-reminders', 'No review work is scheduled', 10000);
 
       // Keep the policy disabled while public practice creates due work. This
@@ -187,8 +188,8 @@ async function setDeviceTimezone(timezone) {
   await waitForShellText(['getprop', 'persist.sys.timezone'], timezone, true, 5000);
 }
 
-async function tapSystemNode(candidates, timeoutMs = 15_000) {
-  const node = await waitForSystemNode(candidates, timeoutMs);
+async function tapSystemNode(candidates, timeoutMs = 15_000, options = {}) {
+  const node = await waitForSystemNode(candidates, timeoutMs, options);
   const bounds = node.match(/bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/);
   if (!bounds) {
     throw new Error(`System node has no tappable bounds: ${node}`);
@@ -198,13 +199,17 @@ async function tapSystemNode(candidates, timeoutMs = 15_000) {
   adbShell(['input', 'tap', String(centerX), String(centerY)]);
 }
 
-async function waitForSystemNode(candidates, timeoutMs = 15_000) {
+async function tapPermissionSystemNode(candidates, timeoutMs = 15_000) {
+  await tapSystemNode(candidates, timeoutMs, { exact: true });
+}
+
+async function waitForSystemNode(candidates, timeoutMs = 15_000, options = {}) {
   const deadline = Date.now() + timeoutMs;
   let latest = '';
   while (Date.now() < deadline) {
     adbShell(['uiautomator', 'dump', '/sdcard/chessticize-reminder-window.xml']);
     latest = adbShell(['cat', '/sdcard/chessticize-reminder-window.xml']);
-    const found = findAndroidSystemNode(latest, candidates);
+    const found = findAndroidSystemNode(latest, candidates, options);
     if (found) {
       return found;
     }
@@ -239,29 +244,7 @@ function assertNotificationAbsent(text) {
 
 function pendingReviewAlarmSnapshot() {
   const state = adbShell(['dumpsys', 'alarm']);
-  const lines = state.split('\n');
-  const alarmHeader = /^\s*(?:RTC_WAKEUP|RTC|ELAPSED_WAKEUP|ELAPSED) #\d+:/;
-  const headers = lines
-    .map((line, index) => alarmHeader.test(line) ? index : -1)
-    .filter((index) => index >= 0);
-  const matches = headers.flatMap((start, headerIndex) => {
-    const end = headers[headerIndex + 1] ?? lines.length;
-    const block = lines.slice(start, end).join('\n');
-    if (!block.includes(REMINDER_ACTION)) {
-      return [];
-    }
-    const trigger = block.match(/\borigWhen[= ]+(\d+)/)
-      ?? block.match(/\bwhenElapsed[= ]+(\d+)/)
-      ?? block.match(/\bwhen[= ]+(\d+)/);
-    const identity = lines
-      .slice(start, end)
-      .find((line) => line.includes(REMINDER_ACTION))
-      ?.trim();
-    if (!trigger || !identity) {
-      throw new Error(`Review reminder alarm omitted trigger or identity:\n${block}`);
-    }
-    return [{ identity, triggerMs: Number(trigger[1]), raw: block }];
-  });
+  const matches = findPendingAndroidAlarms(state, REMINDER_ACTION);
 
   if (matches.length !== 1) {
     throw new Error(`Expected exactly one pending review alarm, found ${matches.length}. State:\n${state}`);
