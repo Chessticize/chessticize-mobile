@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { androidAdbPath } = require('./androidNetwork');
 const {
+  androidAppIsResumed,
   failStandardSprint,
   findAndroidSystemNode,
   findPendingAndroidAlarms,
@@ -103,7 +104,7 @@ describe('Android Review reminders through public and system surfaces', () => {
       adbShell(['am', 'kill', APP_ID]);
       await waitForNotification('3 reviews are ready', 20000);
       adbShell(['cmd', 'statusbar', 'expand-notifications']);
-      await tapSystemNode(['3 reviews are ready', 'Chessticize']);
+      await tapNotificationSystemNode(['3 reviews are ready', 'Chessticize']);
       await waitFor(element(by.id('review-panel'))).toExist().withTimeout(180000);
       recordSystemEvidence('cold-tap-route');
 
@@ -127,7 +128,7 @@ describe('Android Review reminders through public and system surfaces', () => {
       await waitForNotification('3 reviews are ready', 20000);
       assertActiveReviewNotificationCount(1);
       adbShell(['cmd', 'statusbar', 'expand-notifications']);
-      await tapSystemNode(['3 reviews are ready', 'Chessticize']);
+      await tapNotificationSystemNode(['3 reviews are ready', 'Chessticize']);
       await waitFor(element(by.id('review-panel'))).toExist().withTimeout(30000);
       recordSystemEvidence('foreground-tap-route');
 
@@ -201,6 +202,18 @@ async function tapSystemNode(candidates, timeoutMs = 15_000, options = {}) {
 
 async function tapPermissionSystemNode(candidates, timeoutMs = 15_000) {
   await tapSystemNode(candidates, timeoutMs, { exact: true });
+}
+
+async function tapNotificationSystemNode(candidates, timeoutMs = 15_000) {
+  await tapSystemNode(candidates, timeoutMs, { clickableAncestor: true });
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (androidAppIsResumed()) {
+      return;
+    }
+    await sleep(200);
+  }
+  throw new Error('Notification tap did not resume the Chessticize app');
 }
 
 async function waitForSystemNode(candidates, timeoutMs = 15_000, options = {}) {

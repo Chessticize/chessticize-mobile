@@ -75,20 +75,43 @@ function bringAndroidAppToForeground(
   run(adb, args, { encoding: 'utf8' });
 }
 
-function findAndroidSystemNode(hierarchy, candidates, { exact = false } = {}) {
-  const nodes = hierarchy.match(/<node\b[^>]*\/>/g) ?? [];
+function findAndroidSystemNode(
+  hierarchy,
+  candidates,
+  { clickableAncestor = false, exact = false } = {}
+) {
   const normalizedCandidates = candidates.map((candidate) => String(candidate).toLowerCase());
-  return nodes.find((node) => {
+  const ancestorStack = [];
+  const nodeTokens = hierarchy.match(/<\/?node\b[^>]*\/?\s*>/g) ?? [];
+  for (const node of nodeTokens) {
+    if (node.startsWith('</')) {
+      ancestorStack.pop();
+      continue;
+    }
     const attributes = ['resource-id', 'text', 'content-desc'].map((attribute) =>
       node.match(new RegExp(`${attribute}="([^"]*)"`))?.[1]?.toLowerCase() ?? ''
     );
-    return normalizedCandidates.some((candidate) => attributes.some((value) => {
+    const matches = normalizedCandidates.some((candidate) => attributes.some((value) => {
       if (exact) {
         return value === candidate || value.endsWith(`/id/${candidate}`);
       }
       return value.includes(candidate);
     }));
-  }) ?? null;
+    if (matches) {
+      if (!clickableAncestor) {
+        return node;
+      }
+      const clickableNode = [node, ...ancestorStack.slice().reverse()]
+        .find((candidateNode) => /\bclickable="true"/.test(candidateNode));
+      if (clickableNode) {
+        return clickableNode;
+      }
+    }
+    if (!node.endsWith('/>')) {
+      ancestorStack.push(node);
+    }
+  }
+  return null;
 }
 
 function findPendingAndroidAlarms(state, action) {

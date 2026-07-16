@@ -57,6 +57,29 @@ describe('Detox suite configuration', () => {
       .toContain('resource-id="com.android.permissioncontroller:id/permission_allow_button"');
   });
 
+  it('targets the enclosing clickable notification row from nested notification text', () => {
+    const hierarchy = [
+      '<node resource-id="com.android.systemui:id/notification_stack_scroller" clickable="false" bounds="[0,0][1080,1836]">',
+      '<node resource-id="com.android.systemui:id/expandableNotificationRow" clickable="true" bounds="[42,568][1038,786]">',
+      '<node resource-id="android:id/notification_headerless_view_column" clickable="false" bounds="[179,620][891,734]">',
+      '<node text="ChessticizeMobile" resource-id="android:id/title" clickable="false" bounds="[179,620][480,671]" />',
+      '<node text="3 reviews are ready" resource-id="android:id/text" clickable="false" bounds="[179,676][891,729]" />',
+      '</node>',
+      '</node>',
+      '</node>',
+    ].join('');
+
+    const target = findAndroidSystemNode(
+      hierarchy,
+      ['3 reviews are ready', 'Chessticize'],
+      { clickableAncestor: true }
+    );
+
+    expect(target).toContain('resource-id="com.android.systemui:id/expandableNotificationRow"');
+    expect(target).toContain('clickable="true"');
+    expect(target).toContain('bounds="[42,568][1038,786]"');
+  });
+
   it('counts only current pending alarms and excludes canceled alarm history', () => {
     const action = 'com.chessticize.mobile.action.DELIVER_REVIEW_REMINDER';
     const state = [
@@ -646,6 +669,8 @@ describe('Detox suite configuration', () => {
     expect(spec).toContain("permission_allow_button");
     expect(spec).toContain("permission_deny_button");
     expect(spec).toContain("statusbar', 'expand-notifications");
+    expect(spec).toContain('tapNotificationSystemNode');
+    expect(spec).toContain('androidAppIsResumed()');
     expect(spec).toContain("3 reviews are ready");
     expect(spec).toContain("review-panel");
     expect(spec).toContain("settings-review-reminder-off");
