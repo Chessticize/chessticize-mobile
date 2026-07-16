@@ -123,8 +123,10 @@ import { Chess, type Move, type PieceSymbol, type Square } from "chess.js";
 interface Props {
   platformCapabilities: MobilePlatformCapabilities;
   arrowDuelTargetCorrect?: number;
+  customTargetCorrect?: number;
   debugTrace?: (event: PracticeDebugTraceEvent) => void;
   currentTimeMs?: () => number;
+  puzzleSelectionId?: string;
   puzzleSelectionSeed?: string;
   standardTargetCorrect?: number;
   systemBack?: MobileSystemBackSource;
@@ -384,8 +386,10 @@ function buildAdaptiveLayout({
 export function PracticePocScreen({
   platformCapabilities,
   arrowDuelTargetCorrect,
+  customTargetCorrect,
   debugTrace,
   currentTimeMs = Date.now,
+  puzzleSelectionId,
   puzzleSelectionSeed,
   standardTargetCorrect,
   systemBack
@@ -1084,6 +1088,9 @@ export function PracticePocScreen({
           service.setRating(config.ratingKey, customInitialRating);
         }
       }
+      if (puzzleSelectionId) {
+        service.setPuzzleSelectionScopeIds([puzzleSelectionId]);
+      }
       const started = service.startSprint(
         {
           mode: nextMode,
@@ -1095,6 +1102,9 @@ export function PracticePocScreen({
             : {}),
           ...(nextMode === "arrow_duel" && arrowDuelTargetCorrect !== undefined
             ? { targetCorrect: arrowDuelTargetCorrect }
+            : {}),
+          ...(useCustomTiming && customTargetCorrect !== undefined
+            ? { targetCorrect: customTargetCorrect }
             : {}),
           ...(configurePuzzleSource && shouldRandomizePuzzleSelection(puzzleSource)
             ? { puzzleSelectionSeed: puzzleSelectionSeed ?? `${Date.now()}-${Math.random()}` }
@@ -2372,6 +2382,7 @@ export function PracticePocScreen({
                     initialRating={displayedCustomInitialRating}
                     initialRatingEditorOpen={customRatingEditorOpen}
                     ratingPlayed={customRatingPlayed}
+                    progress={practiceProgress}
                     onInitialRatingChange={(nextRating) => {
                       if (customRatingPlayed) {
                         const next = service.setRating(selectedConfig.ratingKey, nextRating);
@@ -2725,26 +2736,6 @@ function PracticeHome({
   onResumeSprint: (sprint: SprintState) => void;
   onOpenReview: () => void;
 }): React.JSX.Element {
-  const selected = modes.find((item) => item.mode === mode) ?? modes[0];
-  const progressDelta = progress.correctThisWeek + progress.wrongThisWeek === 0
-    ? "Start training"
-    : `${progress.netThisWeek >= 0 ? "+" : ""}${progress.netThisWeek} net`;
-  const progressTone = progress.netThisWeek < 0
-    ? styles.progressDeltaNegative
-    : progress.correctThisWeek + progress.wrongThisWeek > 0
-      ? styles.progressDeltaPositive
-      : styles.progressDeltaNeutral;
-  const progressContext = progress.accuracyThisWeek === null
-    ? "No attempts yet"
-    : `${progress.accuracyThisWeek}% accuracy · ${progress.wrongThisWeek} ${progress.wrongThisWeek === 1 ? "mistake" : "mistakes"}`;
-  const ratingDeltaLabel = progress.ratingDeltaThisWeek === null
-    ? "No rating change"
-    : `${progress.ratingDeltaThisWeek >= 0 ? "+" : ""}${progress.ratingDeltaThisWeek} this week`;
-  const ratingDeltaTone = progress.ratingDeltaThisWeek === null
-    ? styles.progressDeltaNeutral
-    : progress.ratingDeltaThisWeek < 0
-      ? styles.progressDeltaNegative
-      : styles.progressDeltaPositive;
   const reviewStatusLabel = overdueReviewCount > 0
     ? "Overdue"
     : dueReviewCount > 0
@@ -2786,25 +2777,7 @@ function PracticeHome({
         </View>
 
         <View style={styles.practiceHomeSecondaryColumn}>
-          <Text style={styles.sectionLabel}>Progress</Text>
-          <View
-            accessibilityLabel={`Progress summary, ELO ${currentRating}, rating ${ratingDeltaLabel}, this week ${progress.correctThisWeek}, ${progressDelta}, ${progressContext}`}
-            style={styles.practiceProgressCard}
-            testID="practice-progress-summary"
-          >
-            <View style={styles.progressMetric} testID="practice-progress-rating-metric">
-              <Text style={styles.progressMetricLabel}>ELO ({selected ? modeLabel(selected.mode) : "Standard"})</Text>
-              <Text style={styles.progressValue}>{currentRating}</Text>
-              <Text testID="practice-progress-rating-delta" style={[styles.progressDelta, ratingDeltaTone]}>{ratingDeltaLabel}</Text>
-            </View>
-            <View style={styles.progressDivider} />
-            <View style={styles.progressMetric} testID="practice-progress-weekly-metric">
-              <Text style={styles.progressMetricLabel}>This Week</Text>
-              <Text testID="practice-progress-weekly-solved" style={styles.progressValue}>{progress.correctThisWeek}</Text>
-              <Text testID="practice-progress-weekly-delta" style={[styles.progressDelta, progressTone]}>{progressDelta}</Text>
-              <Text testID="practice-progress-weekly-context" style={styles.progressContextText}>{progressContext}</Text>
-            </View>
-          </View>
+          <PracticeProgressCard currentRating={currentRating} mode={mode} progress={progress} />
 
           <Text style={styles.sectionLabel}>Review</Text>
           <Pressable
@@ -2850,6 +2823,60 @@ function PracticeHome({
         </View>
       </View>
     </View>
+  );
+}
+
+function PracticeProgressCard({
+  currentRating,
+  mode,
+  progress
+}: {
+  currentRating: number;
+  mode: SprintMode;
+  progress: PracticeProgressSummary;
+}): React.JSX.Element {
+  const progressDelta = progress.correctThisWeek + progress.wrongThisWeek === 0
+    ? "Start training"
+    : `${progress.netThisWeek >= 0 ? "+" : ""}${progress.netThisWeek} net`;
+  const progressTone = progress.netThisWeek < 0
+    ? styles.progressDeltaNegative
+    : progress.correctThisWeek + progress.wrongThisWeek > 0
+      ? styles.progressDeltaPositive
+      : styles.progressDeltaNeutral;
+  const progressContext = progress.accuracyThisWeek === null
+    ? "No attempts yet"
+    : `${progress.accuracyThisWeek}% accuracy · ${progress.wrongThisWeek} ${progress.wrongThisWeek === 1 ? "mistake" : "mistakes"}`;
+  const ratingDeltaLabel = progress.ratingDeltaThisWeek === null
+    ? "No rating change"
+    : `${progress.ratingDeltaThisWeek >= 0 ? "+" : ""}${progress.ratingDeltaThisWeek} this week`;
+  const ratingDeltaTone = progress.ratingDeltaThisWeek === null
+    ? styles.progressDeltaNeutral
+    : progress.ratingDeltaThisWeek < 0
+      ? styles.progressDeltaNegative
+      : styles.progressDeltaPositive;
+
+  return (
+    <>
+      <Text style={styles.sectionLabel}>Progress</Text>
+      <View
+        accessibilityLabel={`Progress summary, ELO ${currentRating}, rating ${ratingDeltaLabel}, this week ${progress.correctThisWeek}, ${progressDelta}, ${progressContext}`}
+        style={styles.practiceProgressCard}
+        testID="practice-progress-summary"
+      >
+        <View style={styles.progressMetric} testID="practice-progress-rating-metric">
+          <Text style={styles.progressMetricLabel}>ELO ({modeLabel(mode)})</Text>
+          <Text style={styles.progressValue}>{currentRating}</Text>
+          <Text testID="practice-progress-rating-delta" style={[styles.progressDelta, ratingDeltaTone]}>{ratingDeltaLabel}</Text>
+        </View>
+        <View style={styles.progressDivider} />
+        <View style={styles.progressMetric} testID="practice-progress-weekly-metric">
+          <Text style={styles.progressMetricLabel}>This Week</Text>
+          <Text testID="practice-progress-weekly-solved" style={styles.progressValue}>{progress.correctThisWeek}</Text>
+          <Text testID="practice-progress-weekly-delta" style={[styles.progressDelta, progressTone]}>{progressDelta}</Text>
+          <Text testID="practice-progress-weekly-context" style={styles.progressContextText}>{progressContext}</Text>
+        </View>
+      </View>
+    </>
   );
 }
 
@@ -3020,6 +3047,7 @@ function CustomSprintSetup({
   onInitialRatingChange,
   onInitialRatingEditorOpenChange,
   perPuzzleSeconds,
+  progress,
   previousConfigs,
   ratingForKey,
   targetCorrect,
@@ -3042,6 +3070,7 @@ function CustomSprintSetup({
   onInitialRatingChange: (next: number) => void;
   onInitialRatingEditorOpenChange: (open: boolean) => void;
   perPuzzleSeconds: number;
+  progress: PracticeProgressSummary;
   previousConfigs: CustomSprintConfigRecord[];
   ratingForKey: (ratingKey: string) => number;
   targetCorrect: number;
@@ -3134,6 +3163,8 @@ function CustomSprintSetup({
         requiredPuzzleCount={requiredPuzzleCount}
         theme={customThemeLabel(theme)}
       />
+
+      <PracticeProgressCard currentRating={initialRating} mode={customMode} progress={progress} />
 
       <View style={styles.previousConfigList} testID="custom-previous-configs">
         <Text style={styles.sectionLabel}>Previous configs</Text>

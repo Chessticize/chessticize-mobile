@@ -8,6 +8,8 @@ type TestLaunchConfigGlobals = typeof globalThis & {
 
 type NativeTestLaunchConfigValues = {
   arrowDuelTargetCorrect?: string | number;
+  customTargetCorrect?: string | number;
+  puzzleSelectionId?: string;
   puzzleSelectionSeed?: string;
   standardTargetCorrect?: string | number;
   storeAssetCapture?: boolean;
@@ -79,6 +81,18 @@ export function resolveTestPuzzleSelectionSeedFromLaunchConfig(
   return seed ? seed : undefined;
 }
 
+export function resolveTestPuzzleSelectionIdFromLaunchConfig(
+  globals: TestLaunchConfigGlobals = globalThis,
+  nativeModule: NativeTestLaunchConfigModule | undefined = NativeModules?.ChessticizeTestLaunchConfig as NativeTestLaunchConfigModule | undefined
+): string | undefined {
+  const launchConfig = readNativeTestLaunchConfig(nativeModule);
+  if (!areNativeTestControlsEnabled(globals, launchConfig)) {
+    return undefined;
+  }
+  const puzzleId = launchConfig?.puzzleSelectionId?.trim();
+  return puzzleId ? puzzleId : undefined;
+}
+
 export function resolveTestStandardTargetCorrectFromLaunchConfig(
   globals: TestLaunchConfigGlobals = globalThis,
   nativeModule: NativeTestLaunchConfigModule | undefined = NativeModules?.ChessticizeTestLaunchConfig as NativeTestLaunchConfigModule | undefined
@@ -101,6 +115,19 @@ export function resolveTestArrowDuelTargetCorrectFromLaunchConfig(
     return undefined;
   }
   const rawValue = launchConfig?.arrowDuelTargetCorrect;
+  const parsed = typeof rawValue === "number" ? rawValue : Number(rawValue);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+export function resolveTestCustomTargetCorrectFromLaunchConfig(
+  globals: TestLaunchConfigGlobals = globalThis,
+  nativeModule: NativeTestLaunchConfigModule | undefined = NativeModules?.ChessticizeTestLaunchConfig as NativeTestLaunchConfigModule | undefined
+): number | undefined {
+  const launchConfig = readNativeTestLaunchConfig(nativeModule);
+  if (!areNativeTestControlsEnabled(globals, launchConfig)) {
+    return undefined;
+  }
+  const rawValue = launchConfig?.customTargetCorrect;
   const parsed = typeof rawValue === "number" ? rawValue : Number(rawValue);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
 }

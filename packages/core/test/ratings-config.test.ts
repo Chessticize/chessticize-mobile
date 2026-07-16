@@ -55,6 +55,26 @@ test("buildSprintConfig rejects invalid timing and target inputs", () => {
     () => buildSprintConfig({ mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 0 }),
     /targetCorrect/
   );
+  assert.throws(
+    () => buildSprintConfig({ mode: "custom", durationSeconds: 180.5, perPuzzleSeconds: 20 }),
+    /durationSeconds/
+  );
+  assert.throws(
+    () => buildSprintConfig({ mode: "custom", durationSeconds: 180, perPuzzleSeconds: 10.5 }),
+    /perPuzzleSeconds/
+  );
+  assert.throws(
+    () => buildSprintConfig({ mode: "custom", durationSeconds: 180, perPuzzleSeconds: 30, targetCorrect: 1.5 }),
+    /targetCorrect/
+  );
+  assert.throws(
+    () => buildSprintConfig({ mode: "custom", durationSeconds: 180, perPuzzleSeconds: 30, maxMistakes: 0 }),
+    /maxMistakes/
+  );
+  assert.throws(
+    () => buildSprintConfig({ mode: "custom", durationSeconds: 180, perPuzzleSeconds: 30, maxMistakes: 1.5 }),
+    /maxMistakes/
+  );
 });
 
 test("rating helpers create, update, floor, and reset rating generations", () => {

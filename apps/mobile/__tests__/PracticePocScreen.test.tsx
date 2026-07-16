@@ -1,5 +1,6 @@
 import React from "react";
 import { Chess } from "chess.js";
+import androidPracticeFixture from "../../../fixtures/puzzles/android-standard-practice.fixture.json";
 import { AppState } from "react-native";
 import * as ReactNative from "react-native";
 import TestRenderer, { act } from "react-test-renderer";
@@ -305,6 +306,49 @@ describe("PracticePocScreen", () => {
     systemBack.progressPredictive(0.8, "right");
     expect(systemBack.commitPredictive()).toBe(true);
     expect(() => findByTestId(renderer, "sprint-summary-panel")).toThrow();
+    expect(findByTestId(renderer, "practice-home")).toBeTruthy();
+  });
+
+  it("returns a completed Custom result through setup to idle Practice", async () => {
+    const systemBack = createTestSystemBackSource("android");
+    const service = createMobilePracticeService();
+    const renderer = renderScreen({
+      customTargetCorrect: 1,
+      practiceServiceFactory: () => service,
+      puzzleSelectionId: androidPracticeFixture.puzzle.id,
+      puzzleSelectionSeed: androidPracticeFixture.puzzleSelectionSeed,
+      systemBack
+    });
+
+    press(renderer, "practice-mode-custom");
+    press(renderer, "custom-duration-stepper-decrease");
+    press(renderer, "custom-per-puzzle-stepper-increase");
+    press(renderer, "custom-theme-fork");
+    press(renderer, "start-sprint-button");
+    expect(service.getActiveSprint()?.currentPuzzle).toMatchObject({
+      puzzle: {
+        id: androidPracticeFixture.puzzle.id,
+        initialFen: androidPracticeFixture.puzzle.initialFen,
+        solutionMoves: androidPracticeFixture.puzzle.solutionMoves
+      },
+      playedMoves: [androidPracticeFixture.puzzle.solutionMoves[0]],
+      cursor: 1
+    });
+    expect(findByTestId(renderer, "session-side-to-move").props.accessibilityLabel).toBe("Black to move");
+    await boardMove(renderer, androidPracticeFixture.userMoves[0]);
+    await settleFeedbackSnapshot();
+    expect(service.getState()).toMatchObject({
+      status: "active",
+      currentPuzzle: { puzzleId: androidPracticeFixture.puzzle.id, userMoveNumber: 2 }
+    });
+    await boardMove(renderer, androidPracticeFixture.userMoves[1]);
+    expect(service.listSprintSessions().at(-1)?.status).toBe("won");
+    await settleFeedbackSnapshot();
+    expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
+
+    expect(systemBack.invoke()).toBe(true);
+    expect(findByTestId(renderer, "custom-sprint-setup")).toBeTruthy();
+    expect(systemBack.invoke()).toBe(true);
     expect(findByTestId(renderer, "practice-home")).toBeTruthy();
   });
 
@@ -954,6 +998,52 @@ describe("PracticePocScreen", () => {
     expect(hasStyleEntry(findByTestId(renderer, "practice-progress-weekly-delta"), "color", "#16A34A")).toBe(true);
   });
 
+  it("shows a persisted Custom config's weekly progress after relaunch", async () => {
+    const nowMs = Date.parse("2026-07-14T12:00:00.000Z");
+    const store = new MemoryStore();
+    store.seedPuzzles([androidPracticeFixture.puzzle as Puzzle]);
+    const service = new PracticeService(store);
+    const firstRenderer = renderScreen({
+      currentTimeMs: () => nowMs,
+      customTargetCorrect: 1,
+      practiceService: service
+    });
+
+    press(firstRenderer, "practice-mode-custom");
+    press(firstRenderer, "custom-theme-fork");
+    press(firstRenderer, "custom-duration-stepper-decrease");
+    press(firstRenderer, "custom-per-puzzle-stepper-increase");
+    press(firstRenderer, "start-sprint-button");
+    await boardMove(firstRenderer, androidPracticeFixture.userMoves[0]);
+    await settleFeedbackSnapshot();
+    await boardMove(firstRenderer, androidPracticeFixture.userMoves[1]);
+    await settleFeedbackSnapshot();
+    expect(findByTestId(firstRenderer, "sprint-summary-panel")).toBeTruthy();
+
+    act(() => {
+      firstRenderer.unmount();
+    });
+    const firstRendererIndex = renderers.indexOf(firstRenderer);
+    if (firstRendererIndex >= 0) {
+      renderers.splice(firstRendererIndex, 1);
+    }
+
+    const renderer = renderScreen({
+      currentTimeMs: () => nowMs + 5 * 60_000,
+      practiceService: new PracticeService(store)
+    });
+    expect(collectText(findByTestId(renderer, "practice-progress-weekly-solved"))).toBe("0");
+
+    press(renderer, "practice-mode-custom");
+    press(renderer, "custom-previous-custom-custom-180-30-fork");
+
+    expect(findByTestId(renderer, "custom-sprint-setup")).toBeTruthy();
+    expect(findByTestId(renderer, "practice-progress-summary").props.accessibilityLabel).toContain("ELO 775");
+    expect(collectText(findByTestId(renderer, "practice-progress-weekly-solved"))).toBe("1");
+    expect(collectText(findByTestId(renderer, "practice-progress-weekly-delta"))).toBe("+1 net");
+    expect(collectText(findByTestId(renderer, "practice-progress-rating-delta"))).toBe("+175 this week");
+  });
+
   it("surfaces negative weekly practice progress without hiding mistakes", () => {
     const service = createMobilePracticeService("random1000");
     service.startSprint(
@@ -1222,6 +1312,36 @@ describe("PracticePocScreen", () => {
     await settleFeedbackSnapshot();
     expectText(renderer, "Sprint complete");
     expect(collectText(findByTestId(renderer, "sprint-result-solved"))).toContain("1 / 1");
+  });
+
+  it("keeps a deterministic Custom target inside the selected shared configuration", () => {
+    const service = createMobilePracticeService();
+    const renderer = renderScreen({
+      customTargetCorrect: 1,
+      practiceService: service,
+      puzzleSelectionSeed: androidPracticeFixture.puzzleSelectionSeed
+    });
+
+    press(renderer, "practice-mode-custom");
+    press(renderer, "custom-duration-stepper-decrease");
+    press(renderer, "custom-per-puzzle-stepper-increase");
+    press(renderer, "custom-theme-fork");
+    press(renderer, "start-sprint-button");
+
+    expect(service.getActiveSprint()?.config).toMatchObject({
+      durationSeconds: 180,
+      maxMistakes: 3,
+      mode: "custom",
+      perPuzzleSeconds: 30,
+      ratingKey: "fork custom 3/30",
+      targetCorrect: 1,
+      theme: "fork"
+    });
+    expect(service.getActiveSprint()?.currentPuzzle?.puzzle).toMatchObject({
+      id: androidPracticeFixture.puzzle.id,
+      solutionMoves: androidPracticeFixture.puzzle.solutionMoves
+    });
+    expect(findByTestId(renderer, "session-progress-block").props.accessibilityLabel).toBe("Progress 0 of 1");
   });
 
   it("accepts a non-official legal checkmate in the fixed first familiar puzzle", async () => {
@@ -2134,6 +2254,20 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "custom-eligibility-ready")).toThrow();
     expect(() => findByTestId(renderer, "custom-pack-warning")).toThrow();
     expect(findByTestId(renderer, "start-sprint-button").props.accessibilityState).toEqual({ disabled: false });
+  });
+
+  it("prevents an impossible Custom start and explains the empty local selection", () => {
+    const renderer = renderScreen({
+      configurePuzzleSource: () => undefined,
+      practiceService: new PracticeService(new MemoryStore())
+    });
+
+    press(renderer, "test-puzzle-source-familiar15");
+    press(renderer, "practice-mode-custom");
+
+    expect(collectText(findByTestId(renderer, "custom-pack-warning"))).toContain("0 eligible puzzles");
+    expect(findByTestId(renderer, "start-sprint-button").props.accessibilityState).toEqual({ disabled: true });
+    expect(findByTestId(renderer, "start-sprint-button").props.disabled).toBe(true);
   });
 
   it("allows custom sprint start with a local pack warning when eligible puzzles exist", () => {
@@ -4747,7 +4881,7 @@ function createScriptedStockfishTransport(
 }
 
 type RenderScreenOptions = TestMobilePlatformCapabilityOverrides &
-  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "debugTrace" | "puzzleSelectionSeed" | "standardTargetCorrect" | "systemBack"> & {
+  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "puzzleSelectionId" | "puzzleSelectionSeed" | "standardTargetCorrect" | "systemBack"> & {
     platformCapabilities?: MobilePlatformCapabilities;
   };
 
@@ -4791,7 +4925,9 @@ function renderScreen({
   arrowDuelTargetCorrect,
   platformCapabilities,
   currentTimeMs,
+  customTargetCorrect,
   debugTrace,
+  puzzleSelectionId,
   puzzleSelectionSeed,
   standardTargetCorrect,
   systemBack,
@@ -4804,7 +4940,9 @@ function renderScreen({
         platformCapabilities={platformCapabilities ?? createTestMobilePlatformCapabilities(capabilityOverrides)}
         arrowDuelTargetCorrect={arrowDuelTargetCorrect}
         currentTimeMs={currentTimeMs}
+        customTargetCorrect={customTargetCorrect}
         debugTrace={debugTrace}
+        puzzleSelectionId={puzzleSelectionId}
         puzzleSelectionSeed={puzzleSelectionSeed}
         standardTargetCorrect={standardTargetCorrect}
         systemBack={systemBack}
