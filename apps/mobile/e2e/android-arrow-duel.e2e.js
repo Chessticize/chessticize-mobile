@@ -147,6 +147,6 @@ async function startArrowDuel() {
 
 async function openArrowDuelHistory() {
   await openTab('history-tab', 'history-action-header');
-  await waitForVisibleInPracticeScroll('history-rating-arrow duel 5/30');
-  await element(by.id('history-rating-arrow duel 5/30')).tap();
+  await waitForVisibleInPracticeScroll('history-rating-arrow_duel 5/30');
+  await element(by.id('history-rating-arrow_duel 5/30')).tap();
 }

@@ -59,7 +59,8 @@ describe('Android Arrow Duel release slice', () => {
     expect(journey).toContain('device.pressBack()');
     expect(journey).toContain('device.terminateApp()');
     expect(journey).toContain('deleteData: false');
-    expect(journey).toContain("by.id('history-rating-arrow duel 5/30')");
+    expect(journey).toContain("by.id('history-rating-arrow_duel 5/30')");
+    expect(journey).not.toContain("by.id('history-rating-arrow duel 5/30')");
     expect(journey).toContain("by.id('review-analysis-button')");
     expect(journey).toContain('review-analysis-engine-status');
     expect(journey).not.toContain('PracticeService');

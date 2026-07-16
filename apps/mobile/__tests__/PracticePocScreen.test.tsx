@@ -1792,10 +1792,11 @@ describe("PracticePocScreen", () => {
   });
 
   it("uses neutral Arrow Duel board markers without separate A/B choice chips", () => {
-    const renderer = renderScreen({ practiceService: createMobilePracticeService("familiar15") });
-    const arrow = firstArrowDuelPuzzleForTest();
+    const service = createMobilePracticeService("familiar15");
+    const renderer = renderScreen({ practiceService: service });
 
     startArrowDuelSprint(renderer);
+    const arrow = requireArrowDuelState(activeSprintForTest(service));
 
     expect(findByTestId(renderer, "mock-chessboard").props.flipped).toBe(new Chess(arrow.currentFen).turn() === "b");
     expect(collectText(renderer.root)).not.toContain("Choose one candidate move");
