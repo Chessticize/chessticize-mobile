@@ -552,6 +552,10 @@ describe('Detox suite configuration', () => {
 
   it('keeps Android reminder evidence on public product and system surfaces', () => {
     const spec = fs.readFileSync(path.resolve(__dirname, '../e2e/android-review-reminders.e2e.js'), 'utf8');
+    const nativeEvidence = fs.readFileSync(
+      path.resolve(__dirname, '../scripts/android-review-reminder-native-evidence.sh'),
+      'utf8'
+    );
 
     expect(spec).toContain("failStandardSprint");
     expect(spec).toContain("settings-review-reminder-enable");
@@ -562,11 +566,31 @@ describe('Detox suite configuration', () => {
     expect(spec).toContain("review-panel");
     expect(spec).toContain("settings-review-reminder-off");
     expect(spec).toContain("cmd', 'alarm', 'set-timezone");
+    expect(spec).toContain('const alarmBeforeTimezone = pendingReviewAlarmSnapshot();');
+    expect(spec).toContain('waitForReviewAlarmRebased(alarmBeforeTimezone');
+    expect(spec).toContain('assertActiveReviewNotificationCount(1)');
+    expect(spec).toContain('assertActiveReviewNotificationCount(0)');
     expect(spec).not.toContain("ReviewReminderLifecycleReceiver");
     expect(spec).not.toContain("'-n'");
     expect(spec).not.toContain("NativeModules");
     expect(spec).not.toContain("PracticeService");
     expect(spec).not.toContain("run-as");
+
+    const beforeEachIndex = spec.indexOf('beforeEach(async () => {');
+    const resetIndex = spec.indexOf('resetNotificationPermission();', beforeEachIndex);
+    const launchIndex = spec.indexOf('launchWithDisabledSynchronization({', beforeEachIndex);
+    expect(resetIndex).toBeGreaterThan(beforeEachIndex);
+    expect(launchIndex).toBeGreaterThan(resetIndex);
+    expect(spec).toContain("['pm', 'revoke', APP_ID, PERMISSION]");
+    expect(spec).toContain("'clear-permission-flags', APP_ID, PERMISSION, 'user-set'");
+    expect(spec).toContain("'clear-permission-flags', APP_ID, PERMISSION, 'user-fixed'");
+
+    const instrumentationIndex = nativeEvidence.indexOf('shell am instrument -w');
+    const finalResetIndex = nativeEvidence.lastIndexOf('reset_notification_permission');
+    expect(nativeEvidence).toContain('reset_notification_permission()');
+    expect(finalResetIndex).toBeGreaterThan(instrumentationIndex);
+    expect(nativeEvidence).toContain('clear-permission-flags "$APP_ID" "$PERMISSION" user-set');
+    expect(nativeEvidence).toContain('clear-permission-flags "$APP_ID" "$PERMISSION" user-fixed');
   });
 
   it('rejects mixing the two screenshot capture suites in one invocation', () => {

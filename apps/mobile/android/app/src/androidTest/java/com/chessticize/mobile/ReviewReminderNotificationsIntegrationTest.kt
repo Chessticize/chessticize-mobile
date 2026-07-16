@@ -15,6 +15,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -34,8 +37,9 @@ class ReviewReminderNotificationsIntegrationTest {
     context = InstrumentationRegistry.getInstrumentation().targetContext
     ReviewReminderAlarmScheduler.replace(context, null)
     ReviewReminderStore.clearPermissionDecision(context)
-    context.getSystemService(NotificationManager::class.java)
-      .cancel(ReviewReminderAlarmContract.NOTIFICATION_ID)
+    val manager = context.getSystemService(NotificationManager::class.java)
+    manager.cancel(ReviewReminderAlarmContract.NOTIFICATION_ID)
+    waitForActiveNotificationCount(manager, 0)
     while (ReviewReminderRouteBus.consume() != null) {
       // Clear any cold route buffered by an earlier test.
     }
@@ -106,8 +110,13 @@ class ReviewReminderNotificationsIntegrationTest {
       ComponentName(context, ReviewReminderLifecycleReceiver::class.java),
       0,
     )
+    val tapInfo = packageManager.getActivityInfo(
+      ComponentName(context, ReviewReminderTapActivity::class.java),
+      0,
+    )
     assertFalse(alarmInfo.exported)
-    assertTrue(lifecycleInfo.exported)
+    assertFalse(lifecycleInfo.exported)
+    assertFalse(tapInfo.exported)
   }
 
   @Test
@@ -178,30 +187,64 @@ class ReviewReminderNotificationsIntegrationTest {
       context,
       Intent(context, ReviewReminderAlarmReceiver::class.java).apply {
         action = ReviewReminderAlarmContract.ACTION_DELIVER
+        putExtra(ReviewReminderAlarmContract.EXTRA_DELIVERY_TOKEN, stored.deliveryToken)
       },
     )
 
     assertNull(ReviewReminderStore.load(context))
-    assertEquals(
-      1,
-      manager.activeNotifications.count { it.id == ReviewReminderAlarmContract.NOTIFICATION_ID },
-    )
+    waitForActiveNotificationCount(manager, 1)
     ReviewReminderAlarmReceiver().onReceive(
       context,
       Intent(context, ReviewReminderAlarmReceiver::class.java).apply {
         action = ReviewReminderAlarmContract.ACTION_DELIVER
+        putExtra(ReviewReminderAlarmContract.EXTRA_DELIVERY_TOKEN, stored.deliveryToken)
       },
     )
-    assertEquals(
-      1,
-      manager.activeNotifications.count { it.id == ReviewReminderAlarmContract.NOTIFICATION_ID },
-    )
+    waitForActiveNotificationCount(manager, 1)
+  }
+
+  @Test
+  fun staleConcurrentDeliveryCannotConsumeOrPostTheReplacement() {
+    grantNotificationPermission()
+    val manager = context.getSystemService(NotificationManager::class.java)
+    val first = reminder("first")
+    val replacement = reminder("replacement")
+    ReviewReminderAlarmScheduler.replace(context, first)
+
+    val deliveryReady = CountDownLatch(1)
+    val releaseDelivery = CountDownLatch(1)
+    val deliveryFailure = AtomicReference<Throwable?>(null)
+    val staleDelivery = Thread {
+      try {
+        deliveryReady.countDown()
+        check(releaseDelivery.await(5, TimeUnit.SECONDS))
+        ReviewReminderAlarmReceiver().onReceive(
+          context,
+          Intent(context, ReviewReminderAlarmReceiver::class.java).apply {
+            action = ReviewReminderAlarmContract.ACTION_DELIVER
+            putExtra(ReviewReminderAlarmContract.EXTRA_DELIVERY_TOKEN, first.deliveryToken)
+          },
+        )
+      } catch (error: Throwable) {
+        deliveryFailure.set(error)
+      }
+    }
+    staleDelivery.start()
+    assertTrue(deliveryReady.await(5, TimeUnit.SECONDS))
+
+    ReviewReminderAlarmScheduler.replace(context, replacement)
+    releaseDelivery.countDown()
+    staleDelivery.join(5_000)
+
+    assertFalse(staleDelivery.isAlive)
+    assertNull(deliveryFailure.get())
+    assertEquals(replacement, ReviewReminderStore.load(context))
+    waitForActiveNotificationCount(manager, 0)
   }
 
   @Test
   fun routeBusBuffersColdTapsAndPublishesForegroundTapsOnce() {
-    val coldIntent = reviewRouteIntent()
-    ReviewReminderRouteBus.capture(coldIntent)
+    ReviewReminderRouteBus.captureTrustedReviewRoute()
     assertEquals("review", ReviewReminderRouteBus.consume())
     assertNull(ReviewReminderRouteBus.consume())
 
@@ -209,7 +252,7 @@ class ReviewReminderNotificationsIntegrationTest {
     val sink: (String) -> Unit = { route -> routes += route }
     ReviewReminderRouteBus.subscribe(sink)
     try {
-      ReviewReminderRouteBus.capture(reviewRouteIntent())
+      ReviewReminderRouteBus.captureTrustedReviewRoute()
       assertEquals(listOf("review"), routes)
       assertNull(ReviewReminderRouteBus.consume())
     } finally {
@@ -225,11 +268,22 @@ class ReviewReminderNotificationsIntegrationTest {
       .format(Date(System.currentTimeMillis() + 86_400_000L)),
     body = body,
     dueCount = 1,
+    deliveryToken = "token-$body",
   )
 
-  private fun reviewRouteIntent(): Intent = Intent(context, MainActivity::class.java).apply {
-    action = ReviewReminderAlarmContract.ACTION_OPEN_REVIEW
-    putExtra("route", "review")
+  private fun waitForActiveNotificationCount(manager: NotificationManager, expected: Int) {
+    val deadline = System.currentTimeMillis() + 5_000L
+    var actual = -1
+    while (System.currentTimeMillis() < deadline) {
+      actual = manager.activeNotifications.count {
+        it.id == ReviewReminderAlarmContract.NOTIFICATION_ID
+      }
+      if (actual == expected) {
+        return
+      }
+      Thread.sleep(50)
+    }
+    assertEquals(expected, actual)
   }
 
   private fun grantNotificationPermission() {

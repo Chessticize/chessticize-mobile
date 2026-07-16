@@ -17,6 +17,7 @@ const PERMISSION = 'android.permission.POST_NOTIFICATIONS';
 const REMINDER_ACTION = 'com.chessticize.mobile.action.DELIVER_REVIEW_REMINDER';
 const ARTIFACT_DIR = path.resolve(__dirname, '../artifacts/android-review-reminders');
 const REMINDER_DELAY_MS = 10_000;
+const REVIEW_NOTIFICATION_ID = '182';
 
 describe('Android Review reminders through public and system surfaces', () => {
   beforeAll(() => {
@@ -24,6 +25,7 @@ describe('Android Review reminders through public and system surfaces', () => {
   });
 
   beforeEach(async () => {
+    resetNotificationPermission();
     await launchWithDisabledSynchronization({
       newInstance: true,
       delete: true,
@@ -118,8 +120,13 @@ describe('Android Review reminders through public and system surfaces', () => {
       await waitForVisibleInPracticeScroll('settings-review-reminder-smart');
       await element(by.id('settings-review-reminder-smart')).tap();
       await waitForShellText(['dumpsys', 'alarm'], REMINDER_ACTION, true, 5000);
+      const alarmBeforeTimezone = pendingReviewAlarmSnapshot();
+      await sleep(1_000);
       await setDeviceTimezone(changedTimezone);
+      const alarmAfterTimezone = await waitForReviewAlarmRebased(alarmBeforeTimezone, 5000);
+      recordAlarmReconstructionEvidence(alarmBeforeTimezone, alarmAfterTimezone);
       await waitForNotification('3 reviews are ready', 20000);
+      assertActiveReviewNotificationCount(1);
       adbShell(['cmd', 'statusbar', 'expand-notifications']);
       await tapSystemNode(['3 reviews are ready', 'Chessticize']);
       await waitFor(element(by.id('review-panel'))).toExist().withTimeout(30000);
@@ -132,6 +139,7 @@ describe('Android Review reminders through public and system surfaces', () => {
       await setDeviceTimezone(originalTimezone);
       await sleep(REMINDER_DELAY_MS + 2_000);
       assertNotificationAbsent('3 reviews are ready');
+      assertActiveReviewNotificationCount(0);
 
       await launchWithDisabledSynchronization({
         newInstance: true,
@@ -164,6 +172,12 @@ function adbPath() {
 
 function serial() {
   return process.env.DETOX_ANDROID_DEVICE || 'emulator-5554';
+}
+
+function resetNotificationPermission() {
+  adbShell(['pm', 'revoke', APP_ID, PERMISSION]);
+  adbShell(['pm', 'clear-permission-flags', APP_ID, PERMISSION, 'user-set']);
+  adbShell(['pm', 'clear-permission-flags', APP_ID, PERMISSION, 'user-fixed']);
 }
 
 function deviceTimezone() {
@@ -226,6 +240,84 @@ function assertNotificationAbsent(text) {
   if (state.includes(`android.title=String (${text})`) || state.includes(`android.text=String (${text})`)) {
     throw new Error(`Unexpected active review reminder after disabling: ${text}`);
   }
+}
+
+function pendingReviewAlarmSnapshot() {
+  const state = adbShell(['dumpsys', 'alarm']);
+  const lines = state.split('\n');
+  const alarmHeader = /^\s*(?:RTC_WAKEUP|RTC|ELAPSED_WAKEUP|ELAPSED) #\d+:/;
+  const headers = lines
+    .map((line, index) => alarmHeader.test(line) ? index : -1)
+    .filter((index) => index >= 0);
+  const matches = headers.flatMap((start, headerIndex) => {
+    const end = headers[headerIndex + 1] ?? lines.length;
+    const block = lines.slice(start, end).join('\n');
+    if (!block.includes(REMINDER_ACTION)) {
+      return [];
+    }
+    const trigger = block.match(/\borigWhen[= ]+(\d+)/)
+      ?? block.match(/\bwhenElapsed[= ]+(\d+)/)
+      ?? block.match(/\bwhen[= ]+(\d+)/);
+    const identity = lines
+      .slice(start, end)
+      .find((line) => line.includes(REMINDER_ACTION))
+      ?.trim();
+    if (!trigger || !identity) {
+      throw new Error(`Review reminder alarm omitted trigger or identity:\n${block}`);
+    }
+    return [{ identity, triggerMs: Number(trigger[1]), raw: block }];
+  });
+
+  if (matches.length !== 1) {
+    throw new Error(`Expected exactly one pending review alarm, found ${matches.length}. State:\n${state}`);
+  }
+  return matches[0];
+}
+
+async function waitForReviewAlarmRebased(before, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  let latestError;
+  while (Date.now() < deadline) {
+    try {
+      const after = pendingReviewAlarmSnapshot();
+      if (after.identity === before.identity && after.triggerMs > before.triggerMs + 500) {
+        return after;
+      }
+      latestError = new Error(
+        `Alarm was not rebased: before=${before.triggerMs}/${before.identity}; `
+        + `after=${after.triggerMs}/${after.identity}`
+      );
+    } catch (error) {
+      latestError = error;
+    }
+    await sleep(200);
+  }
+  throw latestError ?? new Error('Timed out waiting for the review alarm to be rebased');
+}
+
+function assertActiveReviewNotificationCount(expected) {
+  const state = adbShell(['cmd', 'notification', 'list']);
+  const count = state
+    .split('\n')
+    .filter((line) => line.includes(`|${APP_ID}|${REVIEW_NOTIFICATION_ID}|`))
+    .length;
+  if (count !== expected) {
+    throw new Error(`Expected ${expected} active review notifications, found ${count}. State:\n${state}`);
+  }
+}
+
+function recordAlarmReconstructionEvidence(before, after) {
+  const evidence = [
+    `recorded-at=${new Date().toISOString()}`,
+    `before-trigger-ms=${before.triggerMs}`,
+    `after-trigger-ms=${after.triggerMs}`,
+    `identity=${before.identity}`,
+    'before:',
+    before.raw,
+    'after:',
+    after.raw,
+  ].join('\n');
+  fs.writeFileSync(path.join(ARTIFACT_DIR, 'timezone-alarm-reconstruction.txt'), evidence);
 }
 
 function recordSystemEvidence(name) {

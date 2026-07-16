@@ -6,9 +6,20 @@ REPO_ROOT="$(cd "$APP_DIR/../.." && pwd)"
 SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
 ADB="${ADB_PATH:-${SDK_ROOT:+$SDK_ROOT/platform-tools/adb}}"
 DEVICE="${DETOX_ANDROID_DEVICE:-emulator-5554}"
+APP_ID="com.chessticize.mobile"
+PERMISSION="android.permission.POST_NOTIFICATIONS"
 APP_APK="${CHESSTICIZE_ANDROID_E2E_APK:-$APP_DIR/android/app/build/outputs/apk/e2e/app-e2e.apk}"
 TEST_APK="${CHESSTICIZE_ANDROID_E2E_TEST_APK:-$APP_DIR/android/app/build/outputs/apk/androidTest/e2e/app-e2e-androidTest.apk}"
 ARTIFACT_DIR="$APP_DIR/artifacts/android-review-reminders"
+
+reset_notification_permission() {
+  "$ADB" -s "$DEVICE" shell pm revoke "$APP_ID" "$PERMISSION"
+  "$ADB" -s "$DEVICE" shell pm clear-permission-flags "$APP_ID" "$PERMISSION" user-set
+  "$ADB" -s "$DEVICE" shell pm clear-permission-flags "$APP_ID" "$PERMISSION" user-fixed
+  "$ADB" -s "$DEVICE" shell dumpsys package "$APP_ID" \
+    > "$ARTIFACT_DIR/notification-permission-after-native.txt"
+  grep -F "$PERMISSION: granted=false" "$ARTIFACT_DIR/notification-permission-after-native.txt"
+}
 
 if [[ -z "$ADB" || ! -x "$ADB" ]]; then
   echo "Set ADB_PATH, ANDROID_HOME, or ANDROID_SDK_ROOT to an executable adb." >&2
@@ -31,6 +42,7 @@ test ! -s "$ARTIFACT_DIR/tracked-worktree-before.txt"
 
 "$ADB" -s "$DEVICE" install -r -t "$APP_APK" > "$ARTIFACT_DIR/native-app-install.txt"
 "$ADB" -s "$DEVICE" install -r -t "$TEST_APK" > "$ARTIFACT_DIR/native-test-install.txt"
+trap reset_notification_permission EXIT
 set +e
 "$ADB" -s "$DEVICE" shell am instrument -w \
   -e class com.chessticize.mobile.ReviewReminderNotificationsIntegrationTest \
@@ -40,8 +52,10 @@ status=$?
 set -e
 cat "$ARTIFACT_DIR/native-instrumentation.txt"
 test "$status" -eq 0
-grep -F "OK (7 tests)" "$ARTIFACT_DIR/native-instrumentation.txt"
-"$ADB" -s "$DEVICE" shell dumpsys package com.chessticize.mobile \
+grep -F "OK (8 tests)" "$ARTIFACT_DIR/native-instrumentation.txt"
+reset_notification_permission
+trap - EXIT
+"$ADB" -s "$DEVICE" shell dumpsys package "$APP_ID" \
   > "$ARTIFACT_DIR/native-installed-package.txt"
 "$ADB" -s "$DEVICE" shell dumpsys notification --noredact \
   > "$ARTIFACT_DIR/native-notification-state.txt"

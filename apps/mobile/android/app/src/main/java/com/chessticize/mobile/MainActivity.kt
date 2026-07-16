@@ -37,7 +37,6 @@ class MainActivity : ReactActivity(), ReactNativeBackCallbackController, ReviewR
 
   override fun onCreate(savedInstanceState: Bundle?) {
     ChessticizeTestLaunchArguments.capture(intent)
-    ReviewReminderRouteBus.capture(intent)
     super.onCreate(savedInstanceState)
   }
 
@@ -45,7 +44,6 @@ class MainActivity : ReactActivity(), ReactNativeBackCallbackController, ReviewR
     super.onNewIntent(intent)
     setIntent(intent)
     ChessticizeTestLaunchArguments.capture(intent)
-    ReviewReminderRouteBus.capture(intent)
   }
 
   override fun requestReviewReminderPermission(callback: (ReviewReminderPermissionResult) -> Unit): Boolean {

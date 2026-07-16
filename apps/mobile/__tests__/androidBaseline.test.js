@@ -157,6 +157,29 @@ describe('Android launch baseline', () => {
     expect(debugNetworkConfig).toContain('<domain includeSubdomains="true">localhost</domain>');
   });
 
+  it('keeps review notification taps behind an unexported authenticity boundary', () => {
+    const mainManifest = read('android/app/src/main/AndroidManifest.xml');
+    const mainActivity = read('android/app/src/main/java/com/chessticize/mobile/MainActivity.kt');
+    const notifications = read(
+      'android/app/src/main/java/com/chessticize/mobile/ReviewReminderNotificationsModule.kt'
+    );
+    const tapActivity = read(
+      'android/app/src/main/java/com/chessticize/mobile/ReviewReminderTapActivity.kt'
+    );
+
+    expect(mainManifest).toMatch(
+      /android:name="\.ReviewReminderTapActivity"[\s\S]*?android:exported="false"/
+    );
+    expect(mainManifest).toMatch(
+      /android:name="\.ReviewReminderLifecycleReceiver"[\s\S]*?android:exported="false"/
+    );
+    expect(notifications).toContain('ReviewReminderTapActivity::class.java');
+    expect(notifications).not.toContain('ACTION_OPEN_REVIEW');
+    expect(notifications).not.toContain('putExtra("route"');
+    expect(mainActivity).not.toContain('ReviewReminderRouteBus.capture');
+    expect(tapActivity).toContain('ReviewReminderRouteBus.captureTrustedReviewRoute()');
+  });
+
   it('keeps predictive Back activity access compilable and delegates idle root to Android', () => {
     const activity = read('android/app/src/main/java/com/chessticize/mobile/MainActivity.kt');
     const predictiveBackModule = read(

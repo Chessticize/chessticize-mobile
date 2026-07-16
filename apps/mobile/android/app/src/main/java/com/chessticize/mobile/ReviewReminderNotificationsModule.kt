@@ -27,6 +27,7 @@ import com.facebook.react.uimanager.ViewManager
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.UUID
 import kotlin.math.max
 
 private const val REVIEW_REMINDER_EVENT = "ReviewReminderNotificationRoute"
@@ -37,12 +38,13 @@ internal data class StoredReviewReminder(
   val targetLocalDateTime: String,
   val body: String,
   val dueCount: Int,
+  val deliveryToken: String,
 )
 
 /** One stable PendingIntent identity owns replacement, cancellation, and delivery. */
 internal object ReviewReminderAlarmContract {
   const val ACTION_DELIVER = "com.chessticize.mobile.action.DELIVER_REVIEW_REMINDER"
-  const val ACTION_OPEN_REVIEW = "com.chessticize.mobile.action.OPEN_REVIEW"
+  const val EXTRA_DELIVERY_TOKEN = "com.chessticize.mobile.extra.REVIEW_REMINDER_DELIVERY_TOKEN"
   const val ALARM_REQUEST_CODE = 182
   const val CONTENT_REQUEST_CODE = 1182
   const val NOTIFICATION_ID = 182
@@ -57,6 +59,7 @@ internal object ReviewReminderStore {
   private const val KEY_TARGET_LOCAL_DATE_TIME = "target-local-date-time"
   private const val KEY_BODY = "body"
   private const val KEY_DUE_COUNT = "due-count"
+  private const val KEY_DELIVERY_TOKEN = "delivery-token"
   private const val KEY_PERMISSION_RESULT = "permission-result"
 
   fun save(context: Context, reminder: StoredReviewReminder) {
@@ -65,6 +68,7 @@ internal object ReviewReminderStore {
       .putString(KEY_TARGET_LOCAL_DATE_TIME, reminder.targetLocalDateTime)
       .putString(KEY_BODY, reminder.body)
       .putInt(KEY_DUE_COUNT, reminder.dueCount)
+      .putString(KEY_DELIVERY_TOKEN, reminder.deliveryToken)
       .apply()
   }
 
@@ -74,11 +78,13 @@ internal object ReviewReminderStore {
     val targetLocalDateTime = preferences.getString(KEY_TARGET_LOCAL_DATE_TIME, null) ?: return null
     val body = preferences.getString(KEY_BODY, null) ?: return null
     val dueCount = preferences.getInt(KEY_DUE_COUNT, 0)
-    return if (body.isBlank() || dueCount <= 0) null else StoredReviewReminder(
+    val deliveryToken = preferences.getString(KEY_DELIVERY_TOKEN, null) ?: return null
+    return if (body.isBlank() || dueCount <= 0 || deliveryToken.isBlank()) null else StoredReviewReminder(
       scheduledAt = scheduledAt,
       targetLocalDateTime = targetLocalDateTime,
       body = body,
       dueCount = dueCount,
+      deliveryToken = deliveryToken,
     )
   }
 
@@ -88,6 +94,7 @@ internal object ReviewReminderStore {
       .remove(KEY_TARGET_LOCAL_DATE_TIME)
       .remove(KEY_BODY)
       .remove(KEY_DUE_COUNT)
+      .remove(KEY_DELIVERY_TOKEN)
       .apply()
   }
 
@@ -116,6 +123,7 @@ internal object ReviewReminderStore {
 internal object ReviewReminderAlarmScheduler {
   private const val MINIMUM_FUTURE_DELAY_MS = 1_000L
 
+  @Synchronized
   fun replace(context: Context, reminder: StoredReviewReminder?): Boolean {
     val applicationContext = context.applicationContext
     cancelAlarm(applicationContext)
@@ -132,6 +140,7 @@ internal object ReviewReminderAlarmScheduler {
     return true
   }
 
+  @Synchronized
   fun rebuild(context: Context): Boolean {
     val reminder = ReviewReminderStore.load(context) ?: run {
       cancelAlarm(context)
@@ -146,6 +155,18 @@ internal object ReviewReminderAlarmScheduler {
     return true
   }
 
+  @Synchronized
+  fun consumeDelivery(context: Context, deliveryToken: String): StoredReviewReminder? {
+    val applicationContext = context.applicationContext
+    val stored = ReviewReminderStore.load(applicationContext) ?: return null
+    if (stored.deliveryToken != deliveryToken) {
+      return null
+    }
+    ReviewReminderStore.clearSchedule(applicationContext)
+    return stored
+  }
+
+  @Synchronized
   fun cancelAlarm(context: Context) {
     val pendingIntent = existingAlarmPendingIntent(context) ?: return
     alarmManager(context).cancel(pendingIntent)
@@ -161,11 +182,12 @@ internal object ReviewReminderAlarmScheduler {
     PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
   )
 
-  fun alarmPendingIntent(context: Context): PendingIntent = PendingIntent.getBroadcast(
+  fun alarmPendingIntent(context: Context, deliveryToken: String): PendingIntent = PendingIntent.getBroadcast(
     context,
     ReviewReminderAlarmContract.ALARM_REQUEST_CODE,
     Intent(context, ReviewReminderAlarmReceiver::class.java).apply {
       action = ReviewReminderAlarmContract.ACTION_DELIVER
+      putExtra(ReviewReminderAlarmContract.EXTRA_DELIVERY_TOKEN, deliveryToken)
     },
     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
   )
@@ -184,7 +206,7 @@ internal object ReviewReminderAlarmScheduler {
     alarmManager(context).setAndAllowWhileIdle(
       AlarmManager.RTC_WAKEUP,
       triggerAt,
-      alarmPendingIntent(context),
+      alarmPendingIntent(context, reminder.deliveryToken),
     )
   }
 
@@ -236,11 +258,7 @@ internal object ReviewReminderNotifications {
     val contentIntent = PendingIntent.getActivity(
       context,
       ReviewReminderAlarmContract.CONTENT_REQUEST_CODE,
-      Intent(context, MainActivity::class.java).apply {
-        action = ReviewReminderAlarmContract.ACTION_OPEN_REVIEW
-        putExtra("route", REVIEW_ROUTE)
-        flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-      },
+      Intent(context, ReviewReminderTapActivity::class.java),
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
     val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -332,8 +350,10 @@ class ReviewReminderAlarmReceiver : BroadcastReceiver() {
     if (intent?.action != ReviewReminderAlarmContract.ACTION_DELIVER) {
       return
     }
-    val reminder = ReviewReminderStore.load(context) ?: return
-    ReviewReminderStore.clearSchedule(context)
+    val deliveryToken = intent.getStringExtra(ReviewReminderAlarmContract.EXTRA_DELIVERY_TOKEN)
+      ?.takeIf { it.isNotBlank() }
+      ?: return
+    val reminder = ReviewReminderAlarmScheduler.consumeDelivery(context, deliveryToken) ?: return
     ReviewReminderNotifications.post(context, reminder)
   }
 }
@@ -362,18 +382,13 @@ internal object ReviewReminderRouteBus {
   private var sink: ((String) -> Unit)? = null
 
   @Synchronized
-  fun capture(intent: Intent?) {
-    if (intent?.action != ReviewReminderAlarmContract.ACTION_OPEN_REVIEW || intent.getStringExtra("route") != REVIEW_ROUTE) {
-      return
-    }
+  fun captureTrustedReviewRoute() {
     val currentSink = sink
     if (currentSink == null) {
       pendingRoute = REVIEW_ROUTE
     } else {
       currentSink(REVIEW_ROUTE)
     }
-    intent.action = null
-    intent.removeExtra("route")
   }
 
   @Synchronized
@@ -523,7 +538,13 @@ class ReviewReminderNotificationsModule(
     val dueCount = reminder.getInt("dueCount")
     require(route == REVIEW_ROUTE) { "route must be review" }
     require(dueCount > 0) { "dueCount must be positive" }
-    return StoredReviewReminder(scheduledAt, targetLocalDateTime, body, dueCount)
+    return StoredReviewReminder(
+      scheduledAt,
+      targetLocalDateTime,
+      body,
+      dueCount,
+      UUID.randomUUID().toString(),
+    )
   }
 }
 

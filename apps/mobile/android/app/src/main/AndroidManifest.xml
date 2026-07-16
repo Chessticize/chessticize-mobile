@@ -30,6 +30,12 @@
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
       </activity>
+      <activity
+        android:name=".ReviewReminderTapActivity"
+        android:excludeFromRecents="true"
+        android:exported="false"
+        android:noHistory="true"
+        android:theme="@android:style/Theme.Translucent.NoTitleBar" />
       <receiver
         android:name=".ReviewReminderAlarmReceiver"
         android:enabled="true"
@@ -37,7 +43,7 @@
       <receiver
         android:name=".ReviewReminderLifecycleReceiver"
         android:enabled="true"
-        android:exported="true">
+        android:exported="false">
         <intent-filter>
           <action android:name="android.intent.action.BOOT_COMPLETED" />
           <action android:name="android.intent.action.TIME_SET" />

@@ -17,7 +17,8 @@ public final class ReviewReminderSourceContractTest {
         assertFalse(manifest.contains("android.permission.SCHEDULE_EXACT_ALARM"));
         assertFalse(manifest.contains("android.permission.USE_EXACT_ALARM"));
         assertTrue(manifest.matches("(?s).*ReviewReminderAlarmReceiver.*?android:exported=\"false\".*"));
-        assertTrue(manifest.matches("(?s).*ReviewReminderLifecycleReceiver.*?android:exported=\"true\".*"));
+        assertTrue(manifest.matches("(?s).*ReviewReminderLifecycleReceiver.*?android:exported=\"false\".*"));
+        assertTrue(manifest.matches("(?s).*ReviewReminderTapActivity.*?android:exported=\"false\".*"));
         for (String action : new String[] {
                 "BOOT_COMPLETED",
                 "TIME_SET",
@@ -61,6 +62,27 @@ public final class ReviewReminderSourceContractTest {
         assertTrue(source.contains("ReviewReminderPermissionResult.DISMISSED"));
         assertFalse(source.contains("markPermissionRequested"));
         assertTrue(activity.contains("grantResults.isEmpty()"));
+    }
+
+    @Test
+    public void deliveryIsVersionedAndNotificationRoutesAreTrustedInternally() throws Exception {
+        String source = readProjectFile(
+                "src/main/java/com/chessticize/mobile/ReviewReminderNotificationsModule.kt");
+        String activity = readProjectFile("src/main/java/com/chessticize/mobile/MainActivity.kt");
+        String tapActivity = readProjectFile(
+                "src/main/java/com/chessticize/mobile/ReviewReminderTapActivity.kt");
+
+        assertTrue(source.contains("val deliveryToken: String"));
+        assertTrue(source.contains("@Synchronized\n  fun replace"));
+        assertTrue(source.contains("@Synchronized\n  fun rebuild"));
+        assertTrue(source.contains("stored.deliveryToken != deliveryToken"));
+        assertTrue(source.contains("@Synchronized\n  fun consumeDelivery"));
+        assertTrue(source.contains("EXTRA_DELIVERY_TOKEN, deliveryToken"));
+        assertTrue(source.contains("ReviewReminderTapActivity::class.java"));
+        assertFalse(source.contains("ACTION_OPEN_REVIEW"));
+        assertFalse(source.contains("putExtra(\"route\""));
+        assertFalse(activity.contains("ReviewReminderRouteBus.capture"));
+        assertTrue(tapActivity.contains("ReviewReminderRouteBus.captureTrustedReviewRoute()"));
     }
 
     private static String readProjectFile(String appRelativePath) throws Exception {
