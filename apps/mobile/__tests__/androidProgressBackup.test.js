@@ -1236,6 +1236,118 @@ describe('Android Progress Backup', () => {
     expect(policyEvidenceScript).toContain('ADB_CLEANUP_TIMEOUT_SECONDS');
   });
 
+  it('recovers only transient adb root restarts and proves root before policy mutation', () => {
+    const policyEvidenceScript = read('scripts/android-progress-backup-policy-evidence.sh');
+    const recoveryStart = policyEvidenceScript.indexOf(
+      'is_transient_adb_root_restart_failure() {',
+    );
+    const recoveryEnd = policyEvidenceScript.indexOf(
+      '\n}\n\nwait_for_api24_backup_manager_ready() {',
+      recoveryStart,
+    ) + 2;
+
+    expect(recoveryStart).toBeGreaterThan(-1);
+    expect(recoveryEnd).toBeGreaterThan(recoveryStart);
+    expect(policyEvidenceScript).toContain('ADB_ROOT_RECOVERY_ATTEMPTS');
+    const recoveryHelpers = policyEvidenceScript.slice(recoveryStart, recoveryEnd);
+    expect(recoveryHelpers).toContain('adb: unable to connect for root: closed');
+    expect(recoveryHelpers).toContain('adb_cmd wait-for-device');
+    expect(recoveryHelpers).toContain('adb_cmd shell id -u');
+    expect(recoveryHelpers).toContain('root_diagnostic="$ARTIFACT_DIR/adb-root-recovery.txt"');
+    expect(recoveryHelpers).not.toContain('sleep ');
+    expect(policyEvidenceScript.lastIndexOf('ARTIFACT_DIR="$ARTIFACT_ROOT/api-$SDK_LEVEL"'))
+      .toBeLessThan(policyEvidenceScript.lastIndexOf('\nensure_root_adbd\n'));
+
+    const runRecovery = (mode) => {
+      const command = `
+        set -u
+        MODE=${mode}
+        STATE_DIR="$(mktemp -d)"
+        ARTIFACT_ROOT="$STATE_DIR/artifacts"
+        ARTIFACT_DIR="$ARTIFACT_ROOT/api-36"
+        mkdir -p "$ARTIFACT_DIR"
+        trap 'rm -rf "$STATE_DIR"' EXIT
+        ADB_ROOT_RECOVERY_ATTEMPTS=3
+        printf '0\n' > "$STATE_DIR/root-count"
+        printf '0\n' > "$STATE_DIR/uid-count"
+        printf '0\n' > "$STATE_DIR/wait-count"
+        bump() {
+          local file="$1"
+          local count
+          count="$(cat "$file")"
+          count=$((count + 1))
+          printf '%s\n' "$count" > "$file"
+          printf '%s' "$count"
+        }
+        adb_cmd() {
+          if [[ "$1" == "wait-for-device" ]]; then
+            bump "$STATE_DIR/wait-count" >/dev/null
+            return 0
+          fi
+          if [[ "$1" == "shell" && "$2" == "id" && "$3" == "-u" ]]; then
+            uid_call="$(bump "$STATE_DIR/uid-count")"
+            if [[ "$MODE" == "transient-success" && "$uid_call" -ge 2 ]]; then
+              printf '0\n'
+            else
+              printf '2000\n'
+            fi
+            return 0
+          fi
+          if [[ "$1" == "root" ]]; then
+            bump "$STATE_DIR/root-count" >/dev/null
+            case "$MODE" in
+              transient-success|transient-persistent)
+                printf 'adb: unable to connect for root: closed\n' >&2
+                return 1
+                ;;
+              non-transient)
+                printf 'adbd cannot run as root in production builds\n' >&2
+                return 42
+                ;;
+              success-nonroot)
+                printf 'restarting adbd as root\n'
+                return 0
+                ;;
+            esac
+          fi
+          return 64
+        }
+        wait_for_boot_completed() { return 0; }
+        ${recoveryHelpers}
+        set +e
+        ensure_root_adbd 2>"$STATE_DIR/error.txt"
+        status=$?
+        set -e
+        printf 'status=%s root=%s uid=%s wait=%s error=<%s>\n' \
+          "$status" \
+          "$(cat "$STATE_DIR/root-count")" \
+          "$(cat "$STATE_DIR/uid-count")" \
+          "$(cat "$STATE_DIR/wait-count")" \
+          "$(cat "$STATE_DIR/error.txt")"
+      `;
+      return spawnSync('/bin/bash', ['-c', command], { encoding: 'utf8' });
+    };
+
+    const transientSuccess = runRecovery('transient-success');
+    expect(transientSuccess.status).toBe(0);
+    expect(transientSuccess.stdout).toMatch(/^status=0 root=1 uid=2 wait=2 error=<>/);
+
+    const persistent = runRecovery('transient-persistent');
+    expect(persistent.status).toBe(0);
+    expect(persistent.stdout).toMatch(/^status=[1-9][0-9]* root=3 uid=4 wait=4 error=</);
+    expect(persistent.stdout).toContain('did not yield root adbd after 3 bounded attempts');
+
+    const unrelated = runRecovery('non-transient');
+    expect(unrelated.status).toBe(0);
+    expect(unrelated.stdout).toMatch(/^status=[1-9][0-9]* root=1 uid=1 wait=1 error=</);
+    expect(unrelated.stdout).toContain('non-transient error');
+
+    const nonRoot = runRecovery('success-nonroot');
+    expect(nonRoot.status).toBe(0);
+    expect(nonRoot.stdout).toMatch(/^status=[1-9][0-9]* root=1 uid=2 wait=2 error=</);
+    expect(nonRoot.stdout).toContain('reported success but adbd remained uid 2000');
+  });
+
   it('retries API 24 BackupManager readiness without probing cleanup transport first', () => {
     const policyEvidenceScript = read('scripts/android-progress-backup-policy-evidence.sh');
 

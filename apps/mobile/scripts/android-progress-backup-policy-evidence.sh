@@ -17,6 +17,7 @@ ADB_OPERATION_TIMEOUT_SECONDS="${ANDROID_BACKUP_POLICY_ADB_TIMEOUT_SECONDS:-120}
 ADB_CLEANUP_TIMEOUT_SECONDS="${ANDROID_BACKUP_POLICY_CLEANUP_ADB_TIMEOUT_SECONDS:-10}"
 BACKUP_MANAGER_READINESS_TIMEOUT_SECONDS="${ANDROID_BACKUP_POLICY_READINESS_TIMEOUT_SECONDS:-15}"
 BACKUP_MANAGER_READINESS_ATTEMPTS="${ANDROID_BACKUP_POLICY_READINESS_ATTEMPTS:-6}"
+ADB_ROOT_RECOVERY_ATTEMPTS="${ANDROID_BACKUP_POLICY_ADB_ROOT_RECOVERY_ATTEMPTS:-3}"
 
 # API 30's Android 11 LocalTransport recognizes only fake_encryption_flag and
 # non_incremental_only. It cannot be used as evidence for a real encryption or D2D capability:
@@ -140,21 +141,87 @@ wait_for_boot_completed() {
   exit 1
 }
 
+is_transient_adb_root_restart_failure() {
+  local output="$1"
+  [[ "$output" == *"adb: unable to connect for root: closed"* ||
+    "$output" == *"error: closed"* ||
+    "$output" == *"error: device offline"* ]]
+}
+
+read_adbd_uid() {
+  local uid_output
+
+  if ! uid_output="$(adb_cmd shell id -u 2>&1)"; then
+    echo "Unable to verify adbd uid after device recovery: ${uid_output:-<empty>}." >&2
+    return 1
+  fi
+  uid_output="${uid_output//$'\r'/}"
+  if [[ ! "$uid_output" =~ ^[0-9]+$ ]]; then
+    echo "adbd returned a malformed uid after device recovery: ${uid_output:-<empty>}." >&2
+    return 1
+  fi
+  printf '%s' "$uid_output"
+}
+
+wait_for_adbd_recovery() {
+  if ! adb_cmd wait-for-device; then
+    echo "Android device $DEVICE did not reconnect after the adbd root restart." >&2
+    return 1
+  fi
+  if ! wait_for_boot_completed; then
+    echo "Android device $DEVICE did not recover to boot-complete after the adbd root restart." >&2
+    return 1
+  fi
+}
+
 ensure_root_adbd() {
   local adb_uid
-  adb_cmd wait-for-device
-  wait_for_boot_completed
-  adb_uid="$(adb_cmd shell id -u | tr -d '\r')"
-  if [[ "$adb_uid" != "0" ]]; then
-    adb_cmd root
-    adb_cmd wait-for-device
-    wait_for_boot_completed
-    adb_uid="$(adb_cmd shell id -u | tr -d '\r')"
+  local attempt=1
+  local root_diagnostic="$ARTIFACT_DIR/adb-root-recovery.txt"
+  local root_output=""
+  local root_status=0
+
+  if [[ ! "$ADB_ROOT_RECOVERY_ATTEMPTS" =~ ^[1-9][0-9]*$ ]]; then
+    echo "ANDROID_BACKUP_POLICY_ADB_ROOT_RECOVERY_ATTEMPTS must be a positive integer." >&2
+    return 64
   fi
-  if [[ "$adb_uid" != "0" ]]; then
-    echo "Android backup policy evidence requires root adbd; received uid ${adb_uid:-<empty>}." >&2
-    exit 1
+  wait_for_adbd_recovery
+  adb_uid="$(read_adbd_uid)" || return 1
+  if [[ "$adb_uid" == "0" ]]; then
+    return
   fi
+
+  while (( attempt <= ADB_ROOT_RECOVERY_ATTEMPTS )); do
+    root_status=0
+    if root_output="$(adb_cmd root 2>&1)"; then
+      root_status=0
+    else
+      root_status=$?
+    fi
+    {
+      printf 'attempt=%s status=%s\n' "$attempt" "$root_status"
+      printf 'output=%s\n' "${root_output:-<empty>}"
+    } >> "$root_diagnostic"
+
+    if (( root_status != 0 )) && ! is_transient_adb_root_restart_failure "$root_output"; then
+      echo "adb root failed with a non-transient error (status $root_status): ${root_output:-<empty>}. Diagnostic: $root_diagnostic" >&2
+      return 1
+    fi
+
+    wait_for_adbd_recovery || return 1
+    adb_uid="$(read_adbd_uid)" || return 1
+    if [[ "$adb_uid" == "0" ]]; then
+      return
+    fi
+    if (( root_status == 0 )); then
+      echo "adb root reported success but adbd remained uid $adb_uid. Diagnostic: $root_diagnostic" >&2
+      return 1
+    fi
+    attempt=$((attempt + 1))
+  done
+
+  echo "Transient adb root restart failures did not yield root adbd after $ADB_ROOT_RECOVERY_ATTEMPTS bounded attempts; final uid $adb_uid. Diagnostic: $root_diagnostic" >&2
+  return 1
 }
 
 wait_for_api24_backup_manager_ready() {
@@ -715,7 +782,8 @@ run_case() {
 }
 
 mkdir -p "$ARTIFACT_ROOT"
-ensure_root_adbd
+adb_cmd wait-for-device
+wait_for_boot_completed
 SDK_LEVEL="$(adb_cmd shell getprop ro.build.version.sdk | tr -d '\r')"
 case "$SDK_LEVEL" in
   24|30|36) ;;
@@ -729,6 +797,7 @@ if (( SDK_LEVEL == 24 )); then
 fi
 ARTIFACT_DIR="$ARTIFACT_ROOT/api-$SDK_LEVEL"
 mkdir -p "$ARTIFACT_DIR"
+ensure_root_adbd
 
 GITHUB_SHA="${GITHUB_SHA:-$(git -C "$REPO_ROOT" rev-parse HEAD)}"
 git -C "$REPO_ROOT" status --porcelain --untracked-files=no \
