@@ -15,14 +15,22 @@ fi
 ADB="$SDK_ROOT/platform-tools/adb"
 mkdir -p "$EVIDENCE_ROOT"
 
+restore_system_setting() {
+  local key="$1"
+  local value="$2"
+  if [[ -n "$value" && "$value" != "null" ]]; then
+    "$ADB" -s "$DEVICE" shell settings put system "$key" "$value" >/dev/null 2>&1 || true
+  else
+    "$ADB" -s "$DEVICE" shell settings delete system "$key" >/dev/null 2>&1 || true
+  fi
+}
+
 cleanup() {
   "$ADB" -s "$DEVICE" shell wm size reset >/dev/null 2>&1 || true
   "$ADB" -s "$DEVICE" shell wm density reset >/dev/null 2>&1 || true
-  if [[ -n "${original_font_scale:-}" && "$original_font_scale" != "null" ]]; then
-    "$ADB" -s "$DEVICE" shell settings put system font_scale "$original_font_scale" >/dev/null 2>&1 || true
-  else
-    "$ADB" -s "$DEVICE" shell settings delete system font_scale >/dev/null 2>&1 || true
-  fi
+  restore_system_setting font_scale "${original_font_scale:-}"
+  restore_system_setting user_rotation "${original_user_rotation:-}"
+  restore_system_setting accelerometer_rotation "${original_accelerometer_rotation:-}"
 }
 trap cleanup EXIT
 
@@ -37,6 +45,8 @@ fi
 commit_sha="${GITHUB_SHA:-$(git rev-parse HEAD)}"
 api_level="$($ADB -s "$DEVICE" shell getprop ro.build.version.sdk | tr -d '\r')"
 original_font_scale="$($ADB -s "$DEVICE" shell settings get system font_scale | tr -d '\r')"
+original_accelerometer_rotation="$($ADB -s "$DEVICE" shell settings get system accelerometer_rotation | tr -d '\r')"
+original_user_rotation="$($ADB -s "$DEVICE" shell settings get system user_rotation | tr -d '\r')"
 if [[ "$api_level" != "36" ]]; then
   echo "Android adaptive evidence requires API 36, found API $api_level." >&2
   exit 1
@@ -65,6 +75,13 @@ for profile_spec in "${profiles[@]}"; do
   profile_root="$EVIDENCE_ROOT/$profile"
   mkdir -p "$profile_root"
 
+  # A completed landscape capture leaves Android's display rotation at 90
+  # degrees. Normalize the real display before applying the next profile's
+  # portrait dimensions so Espresso's later landscape request is not treated
+  # as already satisfied against a portrait-shaped override.
+  "$ADB" -s "$DEVICE" shell am force-stop com.chessticize.mobile >/dev/null 2>&1 || true
+  "$ADB" -s "$DEVICE" shell settings put system accelerometer_rotation 0
+  "$ADB" -s "$DEVICE" shell settings put system user_rotation 0
   "$ADB" -s "$DEVICE" shell wm size "$size"
   "$ADB" -s "$DEVICE" shell wm density "$density"
   "$ADB" -s "$DEVICE" shell settings put system font_scale "$font_scale"
@@ -77,6 +94,8 @@ for profile_spec in "${profiles[@]}"; do
     printf 'requested-density=%s\n' "$density"
     printf 'orientation-scope=%s\n' "$orientation_scope"
     printf 'font-scale=%s\n' "$font_scale"
+    printf 'accelerometer-rotation=%s\n' "$($ADB -s "$DEVICE" shell settings get system accelerometer_rotation | tr -d '\r')"
+    printf 'user-rotation=%s\n' "$($ADB -s "$DEVICE" shell settings get system user_rotation | tr -d '\r')"
     "$ADB" -s "$DEVICE" shell wm size
     "$ADB" -s "$DEVICE" shell wm density
   } > "$profile_root/display.txt"

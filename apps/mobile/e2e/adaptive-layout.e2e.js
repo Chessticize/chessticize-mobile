@@ -84,6 +84,13 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
       await waitFor(element(by.label('Mistakes 2 of 3')).atIndex(0)).toExist().withTimeout(10000);
       await waitFor(element(by.id('session-progress'))).toHaveText('0 / 15').withTimeout(10000);
     }
+
+    if (includeLandscape || initialOrientation === 'landscape') {
+      // Leave the emulator in its natural orientation before the shell applies
+      // the next profile's portrait-shaped size override.
+      await device.setOrientation('portrait');
+      await waitForOrientation('portrait');
+    }
   });
 });
 

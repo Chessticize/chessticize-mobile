@@ -628,6 +628,8 @@ describe('Detox suite configuration', () => {
     const playBoardMove = spec.indexOf("playBoardMove('session-board', 'c2b3')");
     const nextFixtureOption = spec.lastIndexOf("waitForAccessibleMove('c4b5')");
     const selectAccessibleMove = spec.lastIndexOf("element(by.id('session-accessible-move-c4b5')).tap()");
+    const restorePortrait = spec.lastIndexOf("device.setOrientation('portrait')");
+    const waitForRestoredPortrait = spec.indexOf("waitForOrientation('portrait')", restorePortrait);
     expect(closeMoveDialog).toBeGreaterThan(0);
     expect(fixtureOption).toBeGreaterThan(0);
     expect(closeMoveDialog).toBeGreaterThan(fixtureOption);
@@ -636,6 +638,8 @@ describe('Detox suite configuration', () => {
     expect(nextFixtureOption).toBeGreaterThan(playBoardMove);
     expect(selectAccessibleMove).toBeGreaterThan(playBoardMove);
     expect(selectAccessibleMove).toBeGreaterThan(nextFixtureOption);
+    expect(restorePortrait).toBeGreaterThan(selectAccessibleMove);
+    expect(waitForRestoredPortrait).toBeGreaterThan(restorePortrait);
     expect(evidence).toContain('phone:1080x2400:420:both:1');
     expect(evidence).toContain('tablet:1600x2560:320:both:1');
     expect(evidence).toContain('foldable:1768x2208:420:landscape:1');
@@ -644,6 +648,26 @@ describe('Detox suite configuration', () => {
     expect(evidence).toContain('wm size reset');
     expect(evidence).toContain('wm density reset');
     expect(evidence).toContain('settings put system font_scale');
+    const profileLoop = evidence.indexOf('for profile_spec in "${profiles[@]}"');
+    const stopPreviousProfile = evidence.indexOf(
+      'shell am force-stop com.chessticize.mobile',
+      profileLoop
+    );
+    const resetAutoRotation = evidence.indexOf(
+      'shell settings put system accelerometer_rotation 0',
+      profileLoop
+    );
+    const resetUserRotation = evidence.indexOf(
+      'shell settings put system user_rotation 0',
+      profileLoop
+    );
+    const applyProfileSize = evidence.indexOf('shell wm size "$size"', profileLoop);
+    expect(stopPreviousProfile).toBeGreaterThan(profileLoop);
+    expect(resetAutoRotation).toBeGreaterThan(stopPreviousProfile);
+    expect(resetUserRotation).toBeGreaterThan(resetAutoRotation);
+    expect(applyProfileSize).toBeGreaterThan(resetUserRotation);
+    expect(evidence).toContain('original_accelerometer_rotation');
+    expect(evidence).toContain('original_user_rotation');
     expect(evidence).toContain('git diff --quiet');
     expect(workflow).toContain('Android adaptive public UI');
     expect(workflow).toContain("if: github.event_name == 'workflow_dispatch'");
