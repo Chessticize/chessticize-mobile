@@ -3,6 +3,7 @@ const {
   ACTIVE_E2E_TEST_MATCH,
   STORE_ASSETS_TEST_MATCH,
   ADAPTIVE_LAYOUT_TEST_MATCH,
+  SPRINT_PERFORMANCE_TEST_MATCH,
   resolveDetoxTestMatch,
   resolveDetoxMaxWorkers
 } = require('../e2e/suiteConfig');
@@ -48,10 +49,22 @@ describe('Detox suite configuration', () => {
       .toEqual(ADAPTIVE_LAYOUT_TEST_MATCH);
   });
 
+  it('keeps the Sprint performance regression available through its opt-in command', () => {
+    expect(resolveDetoxTestMatch({ CHESSTICIZE_CAPTURE_SPRINT_PERFORMANCE: '1' }))
+      .toEqual(SPRINT_PERFORMANCE_TEST_MATCH);
+  });
+
   it('rejects mixing the two screenshot capture suites in one invocation', () => {
     expect(() => resolveDetoxTestMatch({
       CHESSTICIZE_CAPTURE_STORE_ASSETS: '1',
       CHESSTICIZE_CAPTURE_ADAPTIVE_LAYOUT: '1'
+    })).toThrow('Active E2E and screenshot capture suites must run separately.');
+  });
+
+  it('rejects mixing the Sprint performance run with another opt-in suite', () => {
+    expect(() => resolveDetoxTestMatch({
+      CHESSTICIZE_CAPTURE_ADAPTIVE_LAYOUT: '1',
+      CHESSTICIZE_CAPTURE_SPRINT_PERFORMANCE: '1'
     })).toThrow('Active E2E and screenshot capture suites must run separately.');
   });
 

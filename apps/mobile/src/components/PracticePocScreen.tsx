@@ -260,6 +260,16 @@ const BOARD_COLOR_TOKENS = {
   white: "#E6E8EB",
   black: "#7B8794"
 } as const;
+const CHESSBOARD_COLORS = {
+  white: BOARD_COLOR_TOKENS.white,
+  black: BOARD_COLOR_TOKENS.black,
+  lastMoveHighlight: "rgba(0, 0, 0, 0)",
+  checkmateHighlight: "rgba(0, 0, 0, 0)",
+  promotionPieceButton: "#F8FAFC",
+  validMoveDot: "rgba(15, 23, 42, 0.36)",
+  validMoveCapture: "rgba(15, 23, 42, 0.56)"
+} as const;
+const CHESSBOARD_DURATIONS = { move: BOARD_MOVE_ANIMATION_MS } as const;
 const TEST_PUZZLE_SOURCES: ReadonlyArray<{ source: MobilePuzzleSource; label: string }> = [
   { source: "bundledCore", label: "Core Pack" },
   { source: "familiar15", label: "Familiar 15" }
@@ -400,6 +410,18 @@ export function PracticePocScreen({
     [iCloudProgressSyncClient, iCloudProgressSyncClientFactory]
   );
   const boardRef = useRef<ChessboardRef | null>(null);
+  const sessionBoardHandlersRef = useRef<{
+    onIllegalMove: (from: Square, to: Square) => void;
+    onMove: (result: MoveResult) => void;
+  } | null>(null);
+  const sessionBoardCallbacks = useMemo(() => ({
+    onIllegalMove(from: Square, to: Square): void {
+      sessionBoardHandlersRef.current?.onIllegalMove(from, to);
+    },
+    onMove(result: MoveResult): void {
+      sessionBoardHandlersRef.current?.onMove(result);
+    }
+  }), []);
   const suppressedBoardMovesRef = useRef<string[]>([]);
   const boardSyncInProgressRef = useRef(false);
   const boardInputLockedRef = useRef(false);
@@ -1686,26 +1708,31 @@ export function PracticePocScreen({
   const currentBoardFen = boardFen ?? currentPuzzle?.currentFen ?? null;
   const displayedPuzzle = feedbackSnapshot?.currentPuzzle ?? currentPuzzle;
   const displayedBoardFen = feedbackSnapshot?.boardFen ?? currentBoardFen;
+  sessionBoardHandlersRef.current = {
+    onIllegalMove(from, to) {
+      onIllegalMove(from, to, {
+        puzzleId: displayedPuzzle?.puzzle.id ?? null
+      });
+    },
+    onMove(result) {
+      void onBoardMove(result, {
+        puzzleId: displayedPuzzle?.puzzle.id ?? null
+      });
+    }
+  };
   const boardFlipped = displayedPuzzle ? shouldFlipBoard(displayedPuzzle) : false;
   const feedbackForCurrentPuzzle = feedbackPuzzleId && currentPuzzle?.puzzle.id === feedbackPuzzleId ? feedback : null;
   const boardFeedback = feedbackSnapshot?.feedback ?? feedbackForCurrentPuzzle;
   const boardPremoveWindow = boardInputLocked && boardInputLockMode === "premove";
   // While the session board is on screen, drags aimed at the board must pan
-  // pieces, never the page. The board's own pan gesture claims touches while
-  // enabled, but hard-lock windows disable it, fast drags can start on the
-  // padding, and a touch that begins during a lock window can survive into an
-  // unlocked turn and feed the scroll view instead — so freeze the
-  // surrounding scroll for the whole session, not just the lock windows.
+  // pieces, never the page. Fast drags can start on the padding, and a touch
+  // that begins during a lock window can survive into an unlocked turn and
+  // feed the scroll view, so freeze the surrounding scroll for the whole
+  // session, not just the lock windows.
   const practiceScrollLocked = shouldShowSessionBoard;
   const boardGestureEnabled = Boolean(
     isActive && !isShowingFeedbackSnapshot && (!boardInputLocked || boardPremoveWindow)
   );
-  // During the premove window currentFen is already the post-reply position,
-  // so this resolves to the user's side and opponent pieces stay undraggable
-  // while the reply animates.
-  const boardDraggableColor = boardGestureEnabled && currentPuzzle
-    ? sideToMove(currentPuzzle.currentFen)
-    : null;
   const displayedSideToMove = displayedBoardFen ? sideToMove(displayedBoardFen) : null;
   const submittedMoveForCurrentPuzzle =
     boardFeedback?.submittedMove && boardFeedback.submittedMove !== "__illegal__"
@@ -1830,36 +1857,25 @@ export function PracticePocScreen({
       >
         {displayedBoardFen ? (
           <Chessboard
-            key={`${state?.id ?? "idle"}-${displayedPuzzle?.puzzle.id ?? "none"}-${displayedPuzzle?.kind ?? "line"}`}
+            key={state?.id ?? "idle"}
             ref={boardRef}
             fen={displayedBoardFen}
-            onMove={(result) => {
-              void onBoardMove(result, {
-                puzzleId: displayedPuzzle?.puzzle.id ?? null
-              });
-            }}
-            onIllegalMove={(from, to) => {
-              onIllegalMove(from, to, {
-                puzzleId: displayedPuzzle?.puzzle.id ?? null
-              });
-            }}
-            gestureEnabled={boardGestureEnabled}
-            draggableColor={boardDraggableColor}
+            onMove={sessionBoardCallbacks.onMove}
+            onIllegalMove={sessionBoardCallbacks.onIllegalMove}
+            // Keep the native gesture/worklet graph mounted for the whole
+            // session. Reconfiguring it on every feedback lock retained large
+            // native graphs until a late GC and made long sprints laggy. The
+            // blocker below claims locked touches, onBoardMove rechecks the JS
+            // lock for races, and null keeps the board's own turn restriction.
+            gestureEnabled
+            draggableColor={null}
             boardSize={boardSize}
             flipped={boardFlipped}
             withLetters={false}
             withNumbers={false}
-            durations={{ move: BOARD_MOVE_ANIMATION_MS }}
+            durations={CHESSBOARD_DURATIONS}
             spriteSource={CHESS_PIECE_SPRITE}
-            colors={{
-              white: BOARD_COLOR_TOKENS.white,
-              black: BOARD_COLOR_TOKENS.black,
-              lastMoveHighlight: "rgba(0, 0, 0, 0)",
-              checkmateHighlight: "rgba(0, 0, 0, 0)",
-              promotionPieceButton: "#F8FAFC",
-              validMoveDot: "rgba(15, 23, 42, 0.36)",
-              validMoveCapture: "rgba(15, 23, 42, 0.56)"
-            }}
+            colors={CHESSBOARD_COLORS}
           />
         ) : (
           <View style={[styles.emptyBoard, { width: boardSize, height: boardSize }]}>
