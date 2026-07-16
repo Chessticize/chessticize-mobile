@@ -37,7 +37,7 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
     await startPracticeMode('standard');
     await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(30000);
     await waitFor(element(by.id('session-current-puzzle-id'))).toExist().withTimeout(10000);
-    await sleep(1000);
+    await waitForSettledSprintLayout(initialOrientation);
 
     const puzzleID = await elementText('session-current-puzzle-id');
     await captureSprint(initialOrientation);
@@ -46,6 +46,7 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
       await device.setOrientation('landscape');
       await waitForOrientation('landscape');
       await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
+      await waitForSettledSprintLayout('landscape');
       const rotatedPuzzleID = await elementText('session-current-puzzle-id');
       if (rotatedPuzzleID !== puzzleID) {
         throw new Error(`Rotation replaced the active puzzle: ${puzzleID} -> ${rotatedPuzzleID}`);
@@ -137,6 +138,39 @@ async function waitForOrientation(orientation) {
     await sleep(250);
   }
   throw new Error(`Timed out waiting for ${orientation} layout; last observed frame=${JSON.stringify(lastFrame)}`);
+}
+
+async function waitForSettledSprintLayout(orientation) {
+  let lastFrames = null;
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    try {
+      const screenFrame = await frameFor(element(by.id('adaptive-layout')));
+      const layoutFrame = await frameForIfPresent('active-session-adaptive-layout') ?? screenFrame;
+      const boardFrame = await frameFor(element(by.id('session-board')));
+      lastFrames = { screenFrame, layoutFrame, boardFrame };
+
+      if (frameHasOrientation(screenFrame, orientation)) {
+        try {
+          expectFrameContained(
+            boardFrame,
+            layoutFrame,
+            `${deviceLabel} ${orientation} settling session board`
+          );
+          return;
+        } catch {
+          // React Native can publish the new root orientation before the
+          // session board and its rail have completed their layout pass.
+        }
+      }
+    } catch {
+      // Keep the last complete frame set for a useful timeout diagnostic.
+    }
+    await sleep(250);
+  }
+  throw new Error(
+    `Timed out waiting for ${orientation} session layout geometry; `
+    + `last observed frames=${JSON.stringify(lastFrames)}`
+  );
 }
 
 async function waitForHomeTopFrame() {

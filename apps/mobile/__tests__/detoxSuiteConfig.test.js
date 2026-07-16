@@ -598,10 +598,25 @@ describe('Detox suite configuration', () => {
 
     const requestLandscape = spec.indexOf("device.setOrientation('landscape')");
     const waitForLandscape = spec.indexOf("waitForOrientation('landscape')", requestLandscape);
+    const waitForSettledLandscape = spec.indexOf(
+      "waitForSettledSprintLayout('landscape')",
+      waitForLandscape
+    );
+    const captureLandscape = spec.indexOf("captureSprint('landscape')", waitForLandscape);
+    const settledLayoutHelperStart = spec.indexOf('async function waitForSettledSprintLayout');
+    const settledLayoutHelperEnd = spec.indexOf('async function waitForHomeTopFrame', settledLayoutHelperStart);
+    const settledLayoutHelper = spec.slice(settledLayoutHelperStart, settledLayoutHelperEnd);
     expect(requestLandscape).toBeGreaterThan(0);
     expect(waitForLandscape).toBeGreaterThan(requestLandscape);
+    expect(waitForSettledLandscape).toBeGreaterThan(waitForLandscape);
+    expect(captureLandscape).toBeGreaterThan(waitForSettledLandscape);
     expect(spec).not.toContain('sleep(1200)');
     expect(spec).toContain('Timed out waiting for ${orientation} layout');
+    expect(spec).toContain('Timed out waiting for ${orientation} session layout geometry');
+    expect(spec).toContain('last observed frames=${JSON.stringify(lastFrames)}');
+    expect(settledLayoutHelper).toContain("frameForIfPresent('active-session-adaptive-layout')");
+    expect(settledLayoutHelper).toContain("frameFor(element(by.id('session-board')))");
+    expect(settledLayoutHelper).toContain('expectFrameContained(');
     expect(spec).toContain("elementText('session-current-puzzle-id')");
     expect(spec).not.toContain('session-current-expected-move');
     expect(screen).not.toContain('session-current-expected-move');
