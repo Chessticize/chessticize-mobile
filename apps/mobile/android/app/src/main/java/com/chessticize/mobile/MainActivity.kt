@@ -1,6 +1,7 @@
 package com.chessticize.mobile
 
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.OnBackPressedCallback
@@ -13,7 +14,8 @@ interface ReactNativeBackCallbackController {
   fun setReactNativeBackHandlingEnabled(enabled: Boolean)
 }
 
-class MainActivity : ReactActivity(), ReactNativeBackCallbackController {
+class MainActivity : ReactActivity(), ReactNativeBackCallbackController, ReviewReminderPermissionHost {
+  private var reviewReminderPermissionCallback: ((Boolean) -> Unit)? = null
   private val reactNativeBackPressedCallback: OnBackPressedCallback by lazy(LazyThreadSafetyMode.NONE) {
     val callbackField = ReactActivity::class.java.getDeclaredField("mBackPressedCallback")
     @Suppress("DEPRECATION")
@@ -23,6 +25,7 @@ class MainActivity : ReactActivity(), ReactNativeBackCallbackController {
 
   override fun onCreate(savedInstanceState: Bundle?) {
     ChessticizeTestLaunchArguments.capture(intent)
+    ReviewReminderRouteBus.capture(intent)
     super.onCreate(savedInstanceState)
   }
 
@@ -30,6 +33,34 @@ class MainActivity : ReactActivity(), ReactNativeBackCallbackController {
     super.onNewIntent(intent)
     setIntent(intent)
     ChessticizeTestLaunchArguments.capture(intent)
+    ReviewReminderRouteBus.capture(intent)
+  }
+
+  override fun requestReviewReminderPermission(callback: (Boolean) -> Unit): Boolean {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+      callback(true)
+      return true
+    }
+    if (reviewReminderPermissionCallback != null) {
+      return false
+    }
+    reviewReminderPermissionCallback = callback
+    requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), REVIEW_REMINDER_PERMISSION_REQUEST_CODE)
+    return true
+  }
+
+  override fun onRequestPermissionsResult(
+    requestCode: Int,
+    permissions: Array<out String>,
+    grantResults: IntArray,
+  ) {
+    super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+    if (requestCode != REVIEW_REMINDER_PERMISSION_REQUEST_CODE) {
+      return
+    }
+    val callback = reviewReminderPermissionCallback
+    reviewReminderPermissionCallback = null
+    callback?.invoke(grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED)
   }
 
   /**
@@ -57,4 +88,8 @@ class MainActivity : ReactActivity(), ReactNativeBackCallbackController {
    */
   override fun createReactActivityDelegate(): ReactActivityDelegate =
     DefaultReactActivityDelegate(this, mainComponentName, fabricEnabled)
+
+  private companion object {
+    const val REVIEW_REMINDER_PERMISSION_REQUEST_CODE = 182
+  }
 }

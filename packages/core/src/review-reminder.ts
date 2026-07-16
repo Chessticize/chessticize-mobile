@@ -13,9 +13,12 @@ export interface ReviewReminderUsageEntry {
 
 export interface ReviewReminderDecision {
   scheduledAt: string;
+  /** Local wall-clock target retained so platform adapters can rebuild after timezone changes. */
+  targetLocalDateTime: string;
   dueCount: number;
   body: string;
   route: "review";
+  workloadState: "due_today" | "future" | "overdue";
 }
 
 const SMART_HISTORY_DAYS = 14;
@@ -39,6 +42,12 @@ export function computeNextReminder(
   }
 
   const reminderTime = reminderLocalTime(settings, usageHistory, nowDate);
+  const today = reviewDayFor(nowDate);
+  const workloadState = dueDays.some((dueDay) => dueDay < today)
+    ? "overdue"
+    : dueDays.some((dueDay) => dueDay === today)
+      ? "due_today"
+      : "future";
   const latestDueDay = dueDays[dueDays.length - 1]!;
   let candidate = nextLocalReminderAt(nowDate, reminderTime);
   while (true) {
@@ -47,9 +56,11 @@ export function computeNextReminder(
     if (dueCount > 0) {
       return {
         scheduledAt: candidate.toISOString(),
+        targetLocalDateTime: localDateTime(candidate),
         dueCount,
         body: `${dueCount} ${dueCount === 1 ? "review is" : "reviews are"} ready`,
-        route: "review"
+        route: "review",
+        workloadState
       };
     }
     if (candidateReviewDay >= latestDueDay) {
@@ -57,6 +68,14 @@ export function computeNextReminder(
     }
     candidate = addLocalDays(candidate, 1);
   }
+}
+
+function localDateTime(date: Date): string {
+  return [
+    String(date.getFullYear()).padStart(4, "0"),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0")
+  ].join("-") + `T${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
 function reminderLocalTime(

@@ -26,6 +26,7 @@ export interface MobileStockfishCapabilities {
 }
 
 export interface MobileReminderCapabilities {
+  platform: 'android' | 'ios';
   scheduler: ReviewReminderScheduler | null;
   notificationClient: ReviewReminderNotificationClient | null;
 }

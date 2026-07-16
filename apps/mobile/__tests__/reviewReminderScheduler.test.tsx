@@ -68,9 +68,11 @@ describe("review reminder scheduler", () => {
     await expect(
       scheduler?.replaceNextReminder({
         scheduledAt: "2026-06-21T15:15:00.000Z",
+        targetLocalDateTime: "2026-06-21T08:15",
         dueCount: 2,
         body: "2 reviews are ready",
-        route: "review"
+        route: "review",
+        workloadState: "due_today"
       })
     ).resolves.toEqual({ scheduled: true, scheduledAt: "2026-06-21T15:15:00.000Z" });
     await scheduler?.replaceNextReminder(undefined);
@@ -78,9 +80,11 @@ describe("review reminder scheduler", () => {
     expect(nativeCalls).toEqual([
       {
         scheduledAt: "2026-06-21T15:15:00.000Z",
+        targetLocalDateTime: "2026-06-21T08:15",
         dueCount: 2,
         body: "2 reviews are ready",
-        route: "review"
+        route: "review",
+        workloadState: "due_today"
       },
       null
     ]);

@@ -394,6 +394,7 @@ export function PracticePocScreen({
   const stockfish = platformCapabilities.stockfish;
   const scheduler = platformCapabilities.reminders.scheduler;
   const notificationClient = platformCapabilities.reminders.notificationClient;
+  const reminderPlatform = platformCapabilities.reminders.platform;
   const progressProtection = platformCapabilities.progressProtection;
   const iCloudSyncClient = platformCapabilities.progressSync.client;
   const boardRef = useRef<ChessboardRef | null>(null);
@@ -614,13 +615,23 @@ export function PracticePocScreen({
           void runICloudProgressSync("app-background");
         }
       }
+      if (nextState === "active" && notificationClient) {
+        void notificationClient.getAuthorizationStatus().then((status) => {
+          setNotificationPermissionStatus(status);
+          if (status === "authorized") {
+            refreshReviewReminder("app-active", true);
+          }
+        }).catch(() => {
+          setNotificationPermissionStatus("unavailable");
+        });
+      }
     });
     return () => {
       subscription.remove();
     };
     // The listener is rebound only when its native client or backing service changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [iCloudSyncClient, service]);
+  }, [iCloudSyncClient, notificationClient, service]);
 
   useEffect(() => {
     if (!isActive) {
@@ -916,9 +927,11 @@ export function PracticePocScreen({
     const dueCount = Math.max(1, service.getDueReviewItems(nowIso()).length);
     const decision: ReviewReminderDecision = {
       scheduledAt: new Date(nowMsRef.current + 5000).toISOString(),
+      targetLocalDateTime: localReminderTarget(new Date(nowMsRef.current + 5000)),
       dueCount,
       body: `${reviewCountLabel(dueCount)} ${dueCount === 1 ? "is" : "are"} ready`,
-      route: "review"
+      route: "review",
+      workloadState: "due_today"
     };
     reminderScheduleKeyRef.current = reminderScheduleKey(decision);
     setReviewReminderScheduleStatus("pending");
@@ -2550,6 +2563,7 @@ export function PracticePocScreen({
                   return next;
                 }}
                 notificationPermissionStatus={notificationPermissionStatus}
+                reminderPlatform={reminderPlatform}
                 reviewReminderScheduleStatus={reviewReminderScheduleStatus}
                 reviewReminderPreference={reviewReminderPreference}
                 iCloudSyncEnabled={iCloudSyncEnabled}
@@ -7330,7 +7344,11 @@ function reviewReminderScheduleStatusLabel(
   if (!decision || !result.scheduled) {
     return "none";
   }
-  return `scheduled|${result.scheduledAt ?? decision.scheduledAt}|${decision.dueCount}|${decision.body}|${decision.route}`;
+  return `scheduled|${result.scheduledAt ?? decision.scheduledAt}|${decision.dueCount}|${decision.body}|${decision.route}|${decision.workloadState}|${decision.targetLocalDateTime}`;
+}
+
+function localReminderTarget(date: Date): string {
+  return `${String(date.getFullYear()).padStart(4, "0")}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}T${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
 function progressSyncStatusMessage(result: ProgressSyncResult): string {
@@ -7378,6 +7396,7 @@ function SettingsPanel({
   iCloudSyncEnabled,
   iCloudSyncStatus,
   notificationPermissionStatus,
+  reminderPlatform,
   ratings,
   reviewReminderScheduleStatus,
   reviewReminderPreference,
@@ -7398,6 +7417,7 @@ function SettingsPanel({
   iCloudSyncEnabled: boolean;
   iCloudSyncStatus: string;
   notificationPermissionStatus: ReviewReminderPermissionStatus;
+  reminderPlatform: MobilePlatformCapabilities["reminders"]["platform"];
   ratings: Array<{ label: string; record: RatingRecord }>;
   reviewReminderScheduleStatus: string;
   reviewReminderPreference: ReviewReminderPreference;
@@ -7468,7 +7488,12 @@ function SettingsPanel({
         <SettingsRow
           label="Review Reminders"
           value={reviewReminderPreferenceLabel(reviewReminderPreference)}
-          detail={reviewReminderPermissionDetail(notificationPermissionStatus)}
+          detail={reviewReminderSettingsDetail({
+            notificationPermissionStatus,
+            preference: reviewReminderPreference,
+            reminderPlatform,
+            scheduleStatus: reviewReminderScheduleStatus
+          })}
           testID="settings-review-reminders"
         />
         <View style={styles.settingsInlineControls} testID="settings-review-reminder-preferences">
@@ -7494,7 +7519,9 @@ function SettingsPanel({
         {notificationPermissionStatus === "not_determined" && reviewReminderPreference.mode !== "off" ? (
           <SettingsActionRow
             label="Enable Notifications"
-            detail="Ask iOS permission after your first review session"
+            detail={reminderPlatform === "android"
+              ? "Android shows its notification permission after this action"
+              : "Ask iOS permission after your first review session"}
             testID="settings-review-reminder-enable"
             onPress={() => {
               void onRequestReviewReminderPermission().then((status) => {
@@ -7503,14 +7530,16 @@ function SettingsPanel({
             }}
           />
         ) : null}
-        {notificationPermissionStatus === "denied" ? (
+        {notificationPermissionStatus === "denied" || notificationPermissionStatus === "channel_disabled" ? (
           <SettingsActionRow
-            label="Open iOS Settings"
-            detail="Notifications are blocked by iOS and cannot be requested again here"
+            label={reminderPlatform === "android" ? "Open Android Notification Settings" : "Open iOS Settings"}
+            detail={reminderPlatform === "android"
+              ? "Restore app permission or the Review reminders channel in Android"
+              : "Notifications are blocked by iOS and cannot be requested again here"}
             testID="settings-review-reminder-open-settings"
             onPress={() => {
               onOpenNotificationSettings();
-              setStatusMessage("Opened iOS Settings");
+              setStatusMessage(reminderPlatform === "android" ? "Opened Android notification settings" : "Opened iOS Settings");
             }}
           />
         ) : null}
@@ -7717,12 +7746,65 @@ function reviewReminderPreferenceLabel(preference: ReviewReminderPreference): st
   return "Smart";
 }
 
+function reviewReminderSettingsDetail({
+  notificationPermissionStatus,
+  preference,
+  reminderPlatform,
+  scheduleStatus
+}: {
+  notificationPermissionStatus: ReviewReminderPermissionStatus;
+  preference: ReviewReminderPreference;
+  reminderPlatform: MobilePlatformCapabilities["reminders"]["platform"];
+  scheduleStatus: string;
+}): string {
+  if (reminderPlatform === "ios") {
+    return reviewReminderPermissionDetail(notificationPermissionStatus);
+  }
+  if (preference.mode === "off") {
+    return "Reminders are off. No notification is scheduled.";
+  }
+  switch (notificationPermissionStatus) {
+    case "denied":
+      return "Blocked in Android notification settings. You can restore access.";
+    case "channel_disabled":
+      return "The Review reminders channel is off in Android settings.";
+    case "not_determined":
+      return "Permission not requested. Enable from this screen when you are ready.";
+    case "unavailable":
+      return "Notifications unavailable on this device";
+    case "authorized":
+      break;
+  }
+  if (scheduleStatus === "error") {
+    return "Android could not schedule the next reminder. Try changing the reminder setting.";
+  }
+  if (scheduleStatus === "pending") {
+    return "Updating the next Android reminder.";
+  }
+  if (scheduleStatus === "none") {
+    return "No review work is scheduled.";
+  }
+  const [, , , , , workloadState, targetLocalDateTime] = scheduleStatus.split("|");
+  if (scheduleStatus.startsWith("scheduled|") && targetLocalDateTime) {
+    const target = targetLocalDateTime.replace("T", " ");
+    const workload = workloadState === "overdue"
+      ? " Overdue review work is included."
+      : workloadState === "due_today"
+        ? " Today's review work is included."
+        : " Future review work is included.";
+    return `Target ${target} local; Android may deliver later.${workload}`;
+  }
+  return "Local notifications enabled";
+}
+
 function reviewReminderPermissionDetail(status: ReviewReminderPermissionStatus): string {
   switch (status) {
     case "authorized":
       return "Local notifications enabled";
     case "denied":
       return "Blocked in iOS Settings";
+    case "channel_disabled":
+      return "Notifications disabled in Settings";
     case "not_determined":
       return "Permission not requested";
     case "unavailable":
@@ -7736,6 +7818,8 @@ function reviewReminderPermissionStatusMessage(status: ReviewReminderPermissionS
       return "Notifications enabled";
     case "denied":
       return "Notifications blocked in iOS Settings";
+    case "channel_disabled":
+      return "Review reminder notifications disabled in Settings";
     case "not_determined":
       return "Notification permission not requested";
     case "unavailable":

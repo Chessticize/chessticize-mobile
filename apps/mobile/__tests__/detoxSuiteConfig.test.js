@@ -13,6 +13,7 @@ const {
   ANDROID_OFFLINE_PRACTICE_TEST_MATCH,
   ANDROID_PROGRESS_BACKUP_RESTORE_TEST_MATCH,
   ANDROID_SYSTEM_BACK_TEST_MATCH,
+  ANDROID_REVIEW_REMINDERS_TEST_MATCH,
   resolveDetoxTestMatch,
   resolveDetoxMaxWorkers
 } = require('../e2e/suiteConfig');
@@ -427,6 +428,8 @@ describe('Detox suite configuration', () => {
     expect(ACTIVE_E2E_TEST_MATCH).not.toContain(ANDROID_PROGRESS_BACKUP_RESTORE_TEST_MATCH[0]);
     expect(resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'android-system-back' }))
       .toEqual(ANDROID_SYSTEM_BACK_TEST_MATCH);
+    expect(resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'android-review-reminders' }))
+      .toEqual(ANDROID_REVIEW_REMINDERS_TEST_MATCH);
   });
 
   it('drives Predictive Back through the Android edge gesture and can verify root delegation', () => {
@@ -545,6 +548,23 @@ describe('Detox suite configuration', () => {
     expect(spec).toContain('androidAppIsResumed');
     expect(spec).toContain('const rootPredictiveBack = beginAndroidPredictiveBackGesture()');
     expect(spec).toContain('Idle Practice root trapped Predictive Back');
+  });
+
+  it('keeps Android reminder evidence on public product and system surfaces', () => {
+    const spec = fs.readFileSync(path.resolve(__dirname, '../e2e/android-review-reminders.e2e.js'), 'utf8');
+
+    expect(spec).toContain("failStandardSprint");
+    expect(spec).toContain("settings-review-reminder-enable");
+    expect(spec).toContain("permission_allow_button");
+    expect(spec).toContain("permission_deny_button");
+    expect(spec).toContain("statusbar', 'expand-notifications");
+    expect(spec).toContain("3 reviews are ready");
+    expect(spec).toContain("review-panel");
+    expect(spec).toContain("settings-review-reminder-off");
+    expect(spec).toContain("android.intent.action.TIMEZONE_CHANGED");
+    expect(spec).not.toContain("NativeModules");
+    expect(spec).not.toContain("PracticeService");
+    expect(spec).not.toContain("run-as");
   });
 
   it('rejects mixing the two screenshot capture suites in one invocation', () => {

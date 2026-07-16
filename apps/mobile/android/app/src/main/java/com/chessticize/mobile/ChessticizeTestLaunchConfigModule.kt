@@ -48,6 +48,9 @@ object ChessticizeTestLaunchArguments {
       testLaunchArgument(intent, launchArgs, "chessticizeStandardTargetCorrect")?.let {
         put("standardTargetCorrect", it)
       }
+      testLaunchArgument(intent, launchArgs, "chessticizeTestReminderDelayMs")?.let {
+        put("reviewReminderDelayMs", it)
+      }
     }
   }
 

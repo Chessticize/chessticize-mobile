@@ -20,7 +20,9 @@ test("computeNextReminder uses the median local session-start hour from recent h
   );
 
   assert.equal(decision?.scheduledAt, localIso(2026, 7, 3, 20));
+  assert.equal(decision?.targetLocalDateTime, "2026-07-03T20:00");
   assert.equal(decision?.dueCount, 1);
+  assert.equal(decision?.workloadState, "due_today");
   assert.equal(decision?.body, "1 review is ready");
   assert.equal(decision?.route, "review");
 });
@@ -85,7 +87,23 @@ test("computeNextReminder projects to the next local reminder time that will hav
   );
 
   assert.equal(decision?.scheduledAt, localIso(2026, 7, 5, 19));
+  assert.equal(decision?.targetLocalDateTime, "2026-07-05T19:00");
   assert.equal(decision?.dueCount, 1);
+  assert.equal(decision?.workloadState, "future");
+});
+
+test("computeNextReminder identifies overdue work without changing the one-shot target policy", () => {
+  const decision = computeNextReminder(
+    [reviewDueDay("2026-07-01"), reviewDueDay("2026-07-03")],
+    [],
+    { kind: "fixed", hour: 19, minute: 0 },
+    localIso(2026, 7, 3, 12)
+  );
+
+  assert.equal(decision?.scheduledAt, localIso(2026, 7, 3, 19));
+  assert.equal(decision?.targetLocalDateTime, "2026-07-03T19:00");
+  assert.equal(decision?.dueCount, 2);
+  assert.equal(decision?.workloadState, "overdue");
 });
 
 test("computeNextReminder returns none when reminders are off or no reviews will be due", () => {
