@@ -16,7 +16,12 @@ export interface ReviewReminderScheduler {
   replaceNextReminder(decision: ReviewReminderDecision | undefined): Promise<ReviewReminderScheduleResult>;
 }
 
-export type ReviewReminderPermissionStatus = "not_determined" | "authorized" | "denied" | "unavailable";
+export type ReviewReminderPermissionStatus =
+  | "not_determined"
+  | "authorized"
+  | "denied"
+  | "channel_disabled"
+  | "unavailable";
 export type ReviewReminderNotificationRoute = "review";
 
 export interface ReviewReminderNotificationClient {
@@ -39,22 +44,32 @@ type NativeReviewReminderNotificationsModule = {
 
 interface NativeReviewReminderPayload {
   scheduledAt: string;
+  targetLocalDateTime: string;
   body: string;
   route: ReviewReminderDecision["route"];
   dueCount: number;
+  workloadState: ReviewReminderDecision["workloadState"];
 }
 
 export class FakeReviewReminderScheduler implements ReviewReminderScheduler {
   readonly calls: Array<ReviewReminderDecision | undefined> = [];
   currentReminder: ReviewReminderDecision | undefined;
+  private failure: Error | undefined;
 
   async replaceNextReminder(decision: ReviewReminderDecision | undefined): Promise<ReviewReminderScheduleResult> {
     this.calls.push(decision ? { ...decision } : undefined);
     this.currentReminder = decision ? { ...decision } : undefined;
+    if (this.failure) {
+      throw this.failure;
+    }
     if (!decision) {
       return { scheduled: false };
     }
     return { scheduled: true, scheduledAt: decision.scheduledAt };
+  }
+
+  setFailure(failure: Error | undefined): void {
+    this.failure = failure;
   }
 }
 
@@ -63,6 +78,7 @@ export class FakeReviewReminderNotificationClient implements ReviewReminderNotif
   openSettingsCount = 0;
   private listeners = new Set<(route: ReviewReminderNotificationRoute) => void>();
   private initialRoute: ReviewReminderNotificationRoute | undefined;
+  private openSettingsFailure: Error | undefined;
 
   constructor(
     private status: ReviewReminderPermissionStatus = "not_determined",
@@ -81,6 +97,9 @@ export class FakeReviewReminderNotificationClient implements ReviewReminderNotif
 
   async openSystemSettings(): Promise<void> {
     this.openSettingsCount += 1;
+    if (this.openSettingsFailure) {
+      throw this.openSettingsFailure;
+    }
   }
 
   async consumeInitialRoute(): Promise<ReviewReminderNotificationRoute | undefined> {
@@ -102,6 +121,10 @@ export class FakeReviewReminderNotificationClient implements ReviewReminderNotif
 
   setRequestedStatus(status: ReviewReminderPermissionStatus): void {
     this.requestedStatus = status;
+  }
+
+  setOpenSettingsFailure(failure: Error | undefined): void {
+    this.openSettingsFailure = failure;
   }
 
   setInitialRoute(route: ReviewReminderNotificationRoute | undefined): void {
@@ -197,9 +220,11 @@ function reminderUsageFromHistory(history: AttemptEvent[]): ReviewReminderUsageE
 function nativePayload(decision: ReviewReminderDecision): NativeReviewReminderPayload {
   return {
     scheduledAt: decision.scheduledAt,
+    targetLocalDateTime: decision.targetLocalDateTime,
     body: decision.body,
     route: decision.route,
-    dueCount: decision.dueCount
+    dueCount: decision.dueCount,
+    workloadState: decision.workloadState
   };
 }
 
@@ -214,6 +239,8 @@ function normalizePermissionStatus(status: unknown): ReviewReminderPermissionSta
       return "authorized";
     case "denied":
       return "denied";
+    case "channel_disabled":
+      return "channel_disabled";
     default:
       return "unavailable";
   }

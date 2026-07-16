@@ -75,6 +75,108 @@ function bringAndroidAppToForeground(
   run(adb, args, { encoding: 'utf8' });
 }
 
+function grantAndroidRuntimePermission(
+  appId,
+  permission,
+  environment = process.env,
+  run = execFileSync
+) {
+  const adb = androidAdbPath(environment);
+  const serial = environment.DETOX_ANDROID_DEVICE || 'emulator-5554';
+  const shell = (...args) => run(adb, ['-s', serial, 'shell', ...args], { encoding: 'utf8' });
+  shell('pm', 'clear-permission-flags', appId, permission, 'user-set');
+  shell('pm', 'clear-permission-flags', appId, permission, 'user-fixed');
+  shell('pm', 'grant', appId, permission);
+}
+
+function findAndroidSystemNode(
+  hierarchy,
+  candidates,
+  { clickableAncestor = false, exact = false } = {}
+) {
+  const normalizedCandidates = candidates.map((candidate) => String(candidate).toLowerCase());
+  const ancestorStack = [];
+  const nodeTokens = hierarchy.match(/<\/?node\b[^>]*\/?\s*>/g) ?? [];
+  for (const node of nodeTokens) {
+    if (node.startsWith('</')) {
+      ancestorStack.pop();
+      continue;
+    }
+    const attributes = ['resource-id', 'text', 'content-desc'].map((attribute) =>
+      node.match(new RegExp(`${attribute}="([^"]*)"`))?.[1]?.toLowerCase() ?? ''
+    );
+    const matches = normalizedCandidates.some((candidate) => attributes.some((value) => {
+      if (exact) {
+        return value === candidate || value.endsWith(`/id/${candidate}`);
+      }
+      return value.includes(candidate);
+    }));
+    if (matches) {
+      if (!clickableAncestor) {
+        return node;
+      }
+      const clickableNode = [node, ...ancestorStack.slice().reverse()]
+        .find((candidateNode) => /\bclickable="true"/.test(candidateNode));
+      if (clickableNode) {
+        return clickableNode;
+      }
+    }
+    if (!node.endsWith('/>')) {
+      ancestorStack.push(node);
+    }
+  }
+  return null;
+}
+
+function findPendingAndroidAlarms(state, action) {
+  const lines = state.split('\n');
+  const pendingHeader = /^(\s*)(\d+) pending alarms:\s*$/;
+  const pendingHeaderIndex = lines.findIndex((line) => pendingHeader.test(line));
+  if (pendingHeaderIndex < 0) {
+    throw new Error('Android alarm state omitted the pending alarms section');
+  }
+  const headerMatch = lines[pendingHeaderIndex].match(pendingHeader);
+  const pendingIndent = headerMatch[1].length;
+  const declaredPendingCount = Number(headerMatch[2]);
+  const nextSectionOffset = lines.slice(pendingHeaderIndex + 1).findIndex((line) => {
+    if (!line.trim()) {
+      return false;
+    }
+    return (line.match(/^\s*/)?.[0].length ?? 0) <= pendingIndent;
+  });
+  const pendingSectionEnd = nextSectionOffset < 0
+    ? lines.length
+    : pendingHeaderIndex + 1 + nextSectionOffset;
+  const pendingLines = lines.slice(pendingHeaderIndex + 1, pendingSectionEnd);
+  const alarmHeader = /^\s*(?:RTC_WAKEUP|RTC|ELAPSED_WAKEUP|ELAPSED) #\d+:/;
+  const headers = pendingLines
+    .map((line, index) => alarmHeader.test(line) ? index : -1)
+    .filter((index) => index >= 0);
+  if (headers.length !== declaredPendingCount) {
+    throw new Error(
+      `Android alarm state declared ${declaredPendingCount} pending alarms but exposed ${headers.length}`
+    );
+  }
+  return headers.flatMap((start, headerIndex) => {
+    const end = headers[headerIndex + 1] ?? pendingLines.length;
+    const block = pendingLines.slice(start, end).join('\n');
+    if (!block.includes(action)) {
+      return [];
+    }
+    const trigger = block.match(/\borigWhen[= ]+(\d+)/)
+      ?? block.match(/\bwhenElapsed[= ]+(\d+)/)
+      ?? block.match(/\bwhen[= ]+(\d+)/);
+    const identity = pendingLines
+      .slice(start, end)
+      .find((line) => line.includes(action))
+      ?.trim();
+    if (!trigger || !identity) {
+      throw new Error(`Android alarm omitted trigger or identity:\n${block}`);
+    }
+    return [{ identity, triggerMs: Number(trigger[1]), raw: block }];
+  });
+}
+
 function performAndroidPredictiveBackGesture(
   environment = process.env,
   run = execFileSync
@@ -395,6 +497,21 @@ async function launchWithDisabledSynchronization(
   await targetDevice.disableSynchronization();
 }
 
+async function launchWithFreshAndroidRuntimePermission(
+  resetPermission,
+  launch = launchWithDisabledSynchronization
+) {
+  await launch({
+    newInstance: true,
+    delete: true,
+  });
+  resetPermission();
+  await launch({
+    newInstance: true,
+    delete: false,
+  });
+}
+
 async function selectTestPuzzleSource(source) {
   const sourceButtonId = `test-puzzle-source-${source}`;
   await waitForVisibleInPracticeScroll(sourceButtonId);
@@ -666,8 +783,12 @@ module.exports = {
   openTab,
   openStandardHistoryTrend,
   launchWithDisabledSynchronization,
+  launchWithFreshAndroidRuntimePermission,
   sleep,
   frameFor,
+  findAndroidSystemNode,
+  findPendingAndroidAlarms,
+  grantAndroidRuntimePermission,
   playBoardMove,
   performAndroidPredictiveBackGesture,
   startPracticeMode,

@@ -15,6 +15,7 @@ class MainApplication : Application(), ReactApplication {
         add(ChessticizeTestLaunchConfigPackage())
         add(MobilePredictiveBackPackage())
         add(NativeStockfishEnginePackage())
+        add(ReviewReminderNotificationsPackage())
       }
     getDefaultReactHost(
       context = applicationContext,

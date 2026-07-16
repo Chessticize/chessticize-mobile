@@ -9,8 +9,12 @@ const {
   textFromAttributes,
   waitForVisibleInPracticeScroll,
   waitForElementTextContaining,
-  failStandardSprint
+  failStandardSprint,
+  grantAndroidRuntimePermission
 } = require('./helpers');
+
+const APP_ID = 'com.chessticize.mobile';
+const NOTIFICATION_PERMISSION = 'android.permission.POST_NOTIFICATIONS';
 
 describe('Key user flows', () => {
   const dayMs = 24 * 60 * 60 * 1000;
@@ -147,6 +151,11 @@ describe('Key user flows', () => {
 
   it('handles review reminders through the platform capability', async () => {
     const sprintNowMs = Date.now() - (2 * dayMs);
+    if (device.getPlatform() === 'android') {
+      // This suite can follow native permission journeys on the same emulator.
+      // Establish its authorized OS fixture explicitly before the app relaunch.
+      grantAndroidNotificationPermission();
+    }
     // beforeEach already installed a clean app; relaunch only to apply fixtures.
     await launchAppAt(sprintNowMs, false, { chessticizeTestNotificationStatus: 'authorized' });
 
@@ -157,18 +166,12 @@ describe('Key user flows', () => {
     if (device.getPlatform() === 'android') {
       await waitForElementTextContaining(
         'settings-review-reminders',
-        'Notifications unavailable on this device',
+        'Android may deliver later',
         10000
       );
-      await waitForElementTextContaining(
-        'settings-review-reminder-schedule-status',
-        'unavailable',
-        10000
-      );
-      return;
+    } else {
+      await waitForElementTextContaining('settings-review-reminders', 'Local notifications enabled', 10000);
     }
-
-    await waitForElementTextContaining('settings-review-reminders', 'Local notifications enabled', 10000);
 
     await waitForVisibleInPracticeScroll('settings-review-reminder-fixed-1900');
     await element(by.id('settings-review-reminder-fixed-1900')).tap();
@@ -340,4 +343,8 @@ async function launchAppAt(nowMs, deleteData, extraLaunchArgs = {}) {
       ...extraLaunchArgs
     }
   });
+}
+
+function grantAndroidNotificationPermission() {
+  grantAndroidRuntimePermission(APP_ID, NOTIFICATION_PERMISSION);
 }

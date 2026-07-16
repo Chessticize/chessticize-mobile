@@ -157,6 +157,29 @@ describe('Android launch baseline', () => {
     expect(debugNetworkConfig).toContain('<domain includeSubdomains="true">localhost</domain>');
   });
 
+  it('keeps review notification taps behind an unexported authenticity boundary', () => {
+    const mainManifest = read('android/app/src/main/AndroidManifest.xml');
+    const mainActivity = read('android/app/src/main/java/com/chessticize/mobile/MainActivity.kt');
+    const notifications = read(
+      'android/app/src/main/java/com/chessticize/mobile/ReviewReminderNotificationsModule.kt'
+    );
+    const tapActivity = read(
+      'android/app/src/main/java/com/chessticize/mobile/ReviewReminderTapActivity.kt'
+    );
+
+    expect(mainManifest).toMatch(
+      /android:name="\.ReviewReminderTapActivity"[\s\S]*?android:exported="false"/
+    );
+    expect(mainManifest).toMatch(
+      /android:name="\.ReviewReminderLifecycleReceiver"[\s\S]*?android:exported="false"/
+    );
+    expect(notifications).toContain('ReviewReminderTapActivity::class.java');
+    expect(notifications).not.toContain('ACTION_OPEN_REVIEW');
+    expect(notifications).not.toContain('putExtra("route"');
+    expect(mainActivity).not.toContain('ReviewReminderRouteBus.capture');
+    expect(tapActivity).toContain('ReviewReminderRouteBus.captureTrustedReviewRoute()');
+  });
+
   it('keeps predictive Back activity access compilable and delegates idle root to Android', () => {
     const activity = read('android/app/src/main/java/com/chessticize/mobile/MainActivity.kt');
     const predictiveBackModule = read(
@@ -258,7 +281,7 @@ describe('Android launch baseline', () => {
   it('keeps the API 36 Stockfish condition in one emulator-runner script line', () => {
     const workflow = read('../../.github/workflows/mobile-android.yml');
 
-    for (const suite of ['android-stockfish', 'android-system-back', 'flows', 'practice']) {
+    for (const suite of ['android-stockfish', 'android-system-back', 'android-review-reminders', 'flows', 'practice']) {
       const command = `if [ "\${{ matrix.api-level }}" = "36" ]; then DETOX_ACTIVE_SUITE=${suite} pnpm mobile:e2e:test:android:ci; fi`;
       expect(workflow).toContain(command);
       expect(workflow.match(new RegExp(`DETOX_ACTIVE_SUITE=${suite}`, 'g'))).toHaveLength(1);

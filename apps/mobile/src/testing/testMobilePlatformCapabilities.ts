@@ -27,6 +27,7 @@ export interface TestMobilePlatformCapabilityOverrides {
   stockfish?: Partial<MobileStockfishCapabilities>;
   reviewReminderScheduler?: ReviewReminderScheduler | null;
   reviewReminderNotificationClient?: ReviewReminderNotificationClient | null;
+  reminderPlatform?: MobilePlatformCapabilities['reminders']['platform'];
   iCloudProgressSyncClient?: ICloudProgressSyncClient | null;
   progressProtection?: MobileProgressProtectionCapabilities;
   applicationMetadata?: Partial<MobileApplicationMetadata>;
@@ -61,6 +62,7 @@ export function createTestMobilePlatformCapabilities(
       prewarm: overrides.stockfish?.prewarm ?? (() => Promise.resolve(false)),
     },
     reminders: {
+      platform: overrides.reminderPlatform ?? 'ios',
       scheduler: overrides.reviewReminderScheduler ?? null,
       notificationClient: overrides.reviewReminderNotificationClient ?? null,
     },

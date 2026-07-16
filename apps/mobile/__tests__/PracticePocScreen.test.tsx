@@ -4513,6 +4513,114 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(undecidedRenderer, "settings-review-reminder-enable")).toThrow();
   });
 
+  it("renders recoverable Android permission and disabled-channel states without iOS copy", async () => {
+    const deniedClient = new FakeReviewReminderNotificationClient("denied");
+    const deniedRenderer = renderScreen({
+      progressProtection: { kind: "android_managed_backup" },
+      reminderPlatform: "android",
+      reviewReminderNotificationClient: deniedClient,
+      reviewReminderScheduler: new FakeReviewReminderScheduler()
+    });
+    await act(async () => {});
+
+    press(deniedRenderer, "settings-tab");
+    expect(collectText(findByTestId(deniedRenderer, "settings-review-reminders")))
+      .toContain("Blocked in Android notification settings");
+    expect(collectText(findByTestId(deniedRenderer, "settings-notifications-section"))).not.toContain("iOS");
+    press(deniedRenderer, "settings-review-reminder-open-settings");
+    await act(async () => {});
+    expect(deniedClient.openSettingsCount).toBe(1);
+    expectText(deniedRenderer, "Opened Android notification settings");
+    deniedClient.setOpenSettingsFailure(new Error("missing settings activity"));
+    press(deniedRenderer, "settings-review-reminder-open-settings");
+    await act(async () => {});
+    expectText(deniedRenderer, "Android notification settings are unavailable on this device");
+
+    const channelClient = new FakeReviewReminderNotificationClient("channel_disabled");
+    const channelRenderer = renderScreen({
+      progressProtection: { kind: "android_managed_backup" },
+      reminderPlatform: "android",
+      reviewReminderNotificationClient: channelClient,
+      reviewReminderScheduler: new FakeReviewReminderScheduler()
+    });
+    await act(async () => {});
+    press(channelRenderer, "settings-tab");
+    expect(collectText(findByTestId(channelRenderer, "settings-review-reminders")))
+      .toContain("Review reminders channel is off in Android settings");
+    expect(findByTestId(channelRenderer, "settings-review-reminder-open-settings")).toBeTruthy();
+
+    const requestDeniedClient = new FakeReviewReminderNotificationClient("not_determined", "denied");
+    const requestDeniedRenderer = renderScreen({
+      progressProtection: { kind: "android_managed_backup" },
+      reminderPlatform: "android",
+      reviewReminderNotificationClient: requestDeniedClient,
+      reviewReminderScheduler: new FakeReviewReminderScheduler()
+    });
+    await act(async () => {});
+    press(requestDeniedRenderer, "settings-tab");
+    press(requestDeniedRenderer, "settings-review-reminder-enable");
+    await act(async () => {});
+    const denialStatus = collectText(findByTestId(requestDeniedRenderer, "settings-status-message"));
+    expect(denialStatus).toContain("Notifications blocked in Android notification settings");
+    expect(denialStatus).not.toContain("iOS");
+    expect(collectText(findByTestId(requestDeniedRenderer, "settings-review-reminders")))
+      .toContain("Blocked in Android notification settings");
+  });
+
+  it("shows truthful Android no-due, overdue-target, disabled, and scheduling-failure states", async () => {
+    jest.setSystemTime(new Date("2026-06-21T12:00:00.000Z"));
+    const authorizedClient = new FakeReviewReminderNotificationClient("authorized");
+    const noDueRenderer = renderScreen({
+      progressProtection: { kind: "android_managed_backup" },
+      reminderPlatform: "android",
+      reviewReminderNotificationClient: authorizedClient,
+      reviewReminderScheduler: new FakeReviewReminderScheduler()
+    });
+    await act(async () => {});
+    press(noDueRenderer, "settings-tab");
+    expect(collectText(findByTestId(noDueRenderer, "settings-review-reminders"))).toContain("No review work is scheduled");
+
+    const overdueService = createMobilePracticeService("random1000");
+    overdueService.saveReviewReminderPreference({ mode: "fixed", fixedLocalTime: "19:00" });
+    overdueService.startSprint(
+      { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 15, maxMistakes: 3 },
+      "2026-06-18T00:00:00.000Z"
+    );
+    overdueService.submitMove("c4b5", "2026-06-18T00:00:05.000Z");
+    const overdueRenderer = renderScreen({
+      practiceService: overdueService,
+      progressProtection: { kind: "android_managed_backup" },
+      reminderPlatform: "android",
+      reviewReminderNotificationClient: authorizedClient,
+      reviewReminderScheduler: new FakeReviewReminderScheduler()
+    });
+    await act(async () => {});
+    press(overdueRenderer, "settings-tab");
+    const overdueDetail = collectText(findByTestId(overdueRenderer, "settings-review-reminders"));
+    expect(overdueDetail).toContain("Target ");
+    expect(overdueDetail).toContain("local; Android may deliver later");
+    expect(overdueDetail).toContain("Overdue review work is included");
+    press(overdueRenderer, "settings-review-reminder-off");
+    await act(async () => {});
+    expect(collectText(findByTestId(overdueRenderer, "settings-review-reminders")))
+      .toContain("Reminders are off. No notification is scheduled");
+
+    const failingScheduler = new FakeReviewReminderScheduler();
+    failingScheduler.setFailure(new Error("alarm unavailable"));
+    overdueService.saveReviewReminderPreference({ mode: "fixed", fixedLocalTime: "19:00" });
+    const failingRenderer = renderScreen({
+      practiceService: overdueService,
+      progressProtection: { kind: "android_managed_backup" },
+      reminderPlatform: "android",
+      reviewReminderNotificationClient: authorizedClient,
+      reviewReminderScheduler: failingScheduler
+    });
+    await act(async () => {});
+    press(failingRenderer, "settings-tab");
+    expect(collectText(findByTestId(failingRenderer, "settings-review-reminders")))
+      .toContain("could not schedule the next reminder");
+  });
+
   it("opens the Review tab from local reminder notification routes", async () => {
     const notificationClient = new FakeReviewReminderNotificationClient("authorized");
     const renderer = renderScreen({ reviewReminderNotificationClient: notificationClient });

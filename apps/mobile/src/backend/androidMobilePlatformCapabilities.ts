@@ -12,6 +12,10 @@ import {
   createNativeStockfishTransport,
   prewarmNativeStockfishTransport,
 } from './nativeStockfishTransport.ts';
+import {
+  createNativeReviewReminderNotificationClient,
+  createNativeReviewReminderScheduler,
+} from './reviewReminderScheduler.ts';
 
 export function createAndroidMobilePlatformCapabilitiesSync():
   | MobilePlatformCapabilities
@@ -46,8 +50,9 @@ export function composeAndroidMobilePlatformCapabilities(
       prewarm: prewarmNativeStockfishTransport,
     },
     reminders: {
-      scheduler: null,
-      notificationClient: null,
+      platform: 'android',
+      scheduler: createNativeReviewReminderScheduler(),
+      notificationClient: createNativeReviewReminderNotificationClient(),
     },
     applicationMetadata: MOBILE_APPLICATION_METADATA,
   };

@@ -1,4 +1,5 @@
 import { createMobilePracticeService } from '../src/backend/mobilePractice';
+import { NativeModules } from 'react-native';
 import { composeIOSMobilePlatformCapabilities } from '../src/backend/iosMobilePlatformCapabilities';
 import { composeAndroidMobilePlatformCapabilities } from '../src/backend/androidMobilePlatformCapabilities';
 import { mobilePlatformCapabilityFactoryFor } from '../src/backend/nativeMobilePlatformCapabilities';
@@ -31,6 +32,15 @@ describe('mobile platform capabilities', () => {
   });
 
   it('composes Android with shared storage and the native Stockfish transport', () => {
+    (NativeModules as Record<string, unknown>).ReviewReminderNotifications = {
+      addListener: jest.fn(),
+      removeListeners: jest.fn(),
+      replaceNextReminder: jest.fn(),
+      getAuthorizationStatus: jest.fn(),
+      requestAuthorization: jest.fn(),
+      openSystemSettings: jest.fn(),
+      consumeInitialRoute: jest.fn(),
+    };
     const service = createMobilePracticeService('random1000');
     const capabilities = composeAndroidMobilePlatformCapabilities(service);
 
@@ -40,9 +50,11 @@ describe('mobile platform capabilities', () => {
     expect(capabilities.progressSync.client).toBeNull();
     expect(capabilities.stockfish.createTransport).toBe(createNativeStockfishTransport);
     expect(capabilities.stockfish.prewarm).toBe(prewarmNativeStockfishTransport);
-    expect(capabilities.reminders.scheduler).toBeNull();
-    expect(capabilities.reminders.notificationClient).toBeNull();
+    expect(capabilities.reminders.platform).toBe('android');
+    expect(capabilities.reminders.scheduler).not.toBeNull();
+    expect(capabilities.reminders.notificationClient).not.toBeNull();
     expect(capabilities.applicationMetadata).toBe(MOBILE_APPLICATION_METADATA);
+    delete (NativeModules as Record<string, unknown>).ReviewReminderNotifications;
   });
 
   it('selects one platform capability factory at the application composition root', () => {

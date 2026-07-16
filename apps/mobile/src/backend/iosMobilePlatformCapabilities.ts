@@ -51,6 +51,7 @@ export function composeIOSMobilePlatformCapabilities(
       prewarm: prewarmNativeStockfishTransport,
     },
     reminders: {
+      platform: 'ios',
       scheduler: createNativeReviewReminderScheduler(),
       notificationClient: createNativeReviewReminderNotificationClient(),
     },

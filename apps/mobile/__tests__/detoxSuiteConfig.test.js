@@ -13,6 +13,7 @@ const {
   ANDROID_OFFLINE_PRACTICE_TEST_MATCH,
   ANDROID_PROGRESS_BACKUP_RESTORE_TEST_MATCH,
   ANDROID_SYSTEM_BACK_TEST_MATCH,
+  ANDROID_REVIEW_REMINDERS_TEST_MATCH,
   resolveDetoxTestMatch,
   resolveDetoxMaxWorkers
 } = require('../e2e/suiteConfig');
@@ -21,13 +22,160 @@ const {
   androidAppIsResumed,
   beginAndroidPredictiveBackGesture,
   collectAndroidUiDiagnostics,
+  findPendingAndroidAlarms,
+  findAndroidSystemNode,
+  grantAndroidRuntimePermission,
   launchWithDisabledSynchronization,
+  launchWithFreshAndroidRuntimePermission,
   performAndroidPredictiveBackGesture,
   waitForRunningStockfishDepth,
   withAndroidUiDiagnostics,
 } = require('../e2e/helpers');
 
 describe('Detox suite configuration', () => {
+  it('discovers Android notification settings through partial system labels', () => {
+    const hierarchy = [
+      '<node content-desc="ChessticizeMobile" text="" />',
+      '<node content-desc="" text="All ChessticizeMobile notifications" />',
+      '<node content-desc="" text="You haven\'t allowed notifications from this app" />',
+    ].join('');
+
+    expect(findAndroidSystemNode(hierarchy, ['Chessticize', 'Notifications']))
+      .toContain('content-desc="ChessticizeMobile"');
+  });
+
+  it('selects the Android permission action instead of the question containing Allow', () => {
+    const hierarchy = [
+      '<node text="Allow ChessticizeMobile to send you notifications?" resource-id="com.android.permissioncontroller:id/permission_message" bounds="[133,765][947,898]" />',
+      '<node text="Allow" resource-id="com.android.permissioncontroller:id/permission_allow_button" bounds="[133,966][947,1113]" />',
+    ].join('');
+
+    expect(findAndroidSystemNode(
+      hierarchy,
+      ['permission_allow_button', 'Allow'],
+      { exact: true }
+    ))
+      .toContain('resource-id="com.android.permissioncontroller:id/permission_allow_button"');
+  });
+
+  it('targets the enclosing clickable notification row from nested notification text', () => {
+    const hierarchy = [
+      '<node resource-id="com.android.systemui:id/notification_stack_scroller" clickable="false" bounds="[0,0][1080,1836]">',
+      '<node resource-id="com.android.systemui:id/expandableNotificationRow" clickable="true" bounds="[42,568][1038,786]">',
+      '<node resource-id="android:id/notification_headerless_view_column" clickable="false" bounds="[179,620][891,734]">',
+      '<node text="ChessticizeMobile" resource-id="android:id/title" clickable="false" bounds="[179,620][480,671]" />',
+      '<node text="3 reviews are ready" resource-id="android:id/text" clickable="false" bounds="[179,676][891,729]" />',
+      '</node>',
+      '</node>',
+      '</node>',
+    ].join('');
+
+    const target = findAndroidSystemNode(
+      hierarchy,
+      ['3 reviews are ready', 'Chessticize'],
+      { clickableAncestor: true }
+    );
+
+    expect(target).toContain('resource-id="com.android.systemui:id/expandableNotificationRow"');
+    expect(target).toContain('clickable="true"');
+    expect(target).toContain('bounds="[42,568][1038,786]"');
+  });
+
+  it('refuses to tap matching system text without a clickable target', () => {
+    const hierarchy = [
+      '<node resource-id="com.android.systemui:id/container" clickable="false">',
+      '<node text="3 reviews are ready" resource-id="android:id/text" clickable="false" bounds="[179,676][891,729]" />',
+      '</node>',
+    ].join('');
+
+    expect(findAndroidSystemNode(
+      hierarchy,
+      ['3 reviews are ready'],
+      { clickableAncestor: true }
+    )).toBeNull();
+  });
+
+  it('counts only current pending alarms and excludes canceled alarm history', () => {
+    const action = 'com.chessticize.mobile.action.DELIVER_REVIEW_REMINDER';
+    const state = [
+      '2 pending alarms:',
+      '  RTC_WAKEUP #1: Alarm{current type 0 origWhen 1784180920629 com.chessticize.mobile}',
+      `    tag=*walarm*:${action}`,
+      '  RTC #45: Alarm{other type 1 origWhen 9223372036854775807 com.google.android.googlequicksearchbox}',
+      '    tag=*alarm*:unrelated',
+      'LazyAlarmStore stats:',
+      '  GET_NEXT_DELIVERY_TIME: count=772',
+      'Recent alarm history:',
+      '  #1: Reason=alarm_cancelled',
+      '    Snapshot:',
+      `      type=RTC_WAKEUP tag=*walarm*:${action}`,
+      '  #2: Reason=alarm_cancelled',
+      '    Snapshot:',
+      `      type=RTC_WAKEUP tag=*walarm*:${action}`,
+    ].join('\n');
+
+    expect(findPendingAndroidAlarms(state, action)).toEqual([expect.objectContaining({
+      identity: `tag=*walarm*:${action}`,
+      triggerMs: 1784180920629,
+    })]);
+  });
+
+  it('retains genuinely duplicated current alarms for the one-alarm assertion to reject', () => {
+    const action = 'com.chessticize.mobile.action.DELIVER_REVIEW_REMINDER';
+    const state = [
+      '2 pending alarms:',
+      '  RTC_WAKEUP #1: Alarm{first type 0 origWhen 1784180920629 com.chessticize.mobile}',
+      `    tag=*walarm*:${action}`,
+      '  RTC_WAKEUP #2: Alarm{second type 0 origWhen 1784180921629 com.chessticize.mobile}',
+      `    tag=*walarm*:${action}`,
+      'LazyAlarmStore stats:',
+    ].join('\n');
+
+    expect(findPendingAndroidAlarms(state, action)).toHaveLength(2);
+  });
+
+  it('resets Android runtime permission after Detox recreates and grants the app', async () => {
+    let permissionGranted = true;
+    const resetPermission = jest.fn(() => {
+      permissionGranted = false;
+    });
+    const launch = jest.fn(async ({ delete: deleteApp }) => {
+      if (deleteApp) {
+        permissionGranted = true;
+      }
+    });
+
+    await launchWithFreshAndroidRuntimePermission(resetPermission, launch);
+
+    expect(permissionGranted).toBe(false);
+  });
+
+  it('grants Android runtime permission from an explicit clean OS fixture', () => {
+    const run = jest.fn();
+
+    grantAndroidRuntimePermission(
+      'com.chessticize.mobile',
+      'android.permission.POST_NOTIFICATIONS',
+      { ADB_PATH: '/sdk/adb', DETOX_ANDROID_DEVICE: 'emulator-6000' },
+      run
+    );
+
+    expect(run.mock.calls).toEqual([
+      ['/sdk/adb', [
+        '-s', 'emulator-6000', 'shell', 'pm', 'clear-permission-flags',
+        'com.chessticize.mobile', 'android.permission.POST_NOTIFICATIONS', 'user-set'
+      ], { encoding: 'utf8' }],
+      ['/sdk/adb', [
+        '-s', 'emulator-6000', 'shell', 'pm', 'clear-permission-flags',
+        'com.chessticize.mobile', 'android.permission.POST_NOTIFICATIONS', 'user-fixed'
+      ], { encoding: 'utf8' }],
+      ['/sdk/adb', [
+        '-s', 'emulator-6000', 'shell', 'pm', 'grant',
+        'com.chessticize.mobile', 'android.permission.POST_NOTIFICATIONS'
+      ], { encoding: 'utf8' }],
+    ]);
+  });
+
   it('passes Android synchronization disablement in the numeric form Detox recognizes', () => {
     const helpers = fs.readFileSync(path.resolve(__dirname, '../e2e/helpers.js'), 'utf8');
     const launchSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/android-launch.e2e.js'), 'utf8');
@@ -366,9 +514,25 @@ describe('Detox suite configuration', () => {
 
   it('keeps the shared flows suite portable across iOS and Android', () => {
     const flowsSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/flows.e2e.js'), 'utf8');
+    const reminderCaseStart = flowsSpec.indexOf(
+      "it('handles review reminders through the platform capability'"
+    );
+    const reminderCaseEnd = flowsSpec.indexOf(
+      "it('shows failed attempts in history with the wrong-only toggle'"
+    );
+    const reminderCase = flowsSpec.slice(reminderCaseStart, reminderCaseEnd);
 
     expect(flowsSpec).toContain("device.getPlatform() === 'android'");
-    expect(flowsSpec).toContain('Notifications unavailable on this device');
+    expect(reminderCase).toContain('grantAndroidNotificationPermission();');
+    expect(reminderCase.indexOf('grantAndroidNotificationPermission();')).toBeLessThan(
+      reminderCase.indexOf('launchAppAt(sprintNowMs')
+    );
+    expect(reminderCase).toContain('Android may deliver later');
+    expect(reminderCase).not.toContain('Notifications unavailable on this device');
+    expect(reminderCase).not.toContain('return;');
+    expect(reminderCase).toContain("settings-review-reminder-fixed-1900");
+    expect(reminderCase).toContain("'|3|3 reviews are ready|review'");
+    expect(reminderCase).toContain("settings-review-reminder-off");
     expect(flowsSpec).toContain("historyToggleValue('Wrong puzzles only', false)");
     expect(flowsSpec).toContain("historyToggleValue('Sprint attempts only', true)");
     expect(flowsSpec).toContain("return device.getPlatform() === 'android' ? `${label}, ${state}` : state");
@@ -427,6 +591,8 @@ describe('Detox suite configuration', () => {
     expect(ACTIVE_E2E_TEST_MATCH).not.toContain(ANDROID_PROGRESS_BACKUP_RESTORE_TEST_MATCH[0]);
     expect(resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'android-system-back' }))
       .toEqual(ANDROID_SYSTEM_BACK_TEST_MATCH);
+    expect(resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'android-review-reminders' }))
+      .toEqual(ANDROID_REVIEW_REMINDERS_TEST_MATCH);
   });
 
   it('drives Predictive Back through the Android edge gesture and can verify root delegation', () => {
@@ -545,6 +711,59 @@ describe('Detox suite configuration', () => {
     expect(spec).toContain('androidAppIsResumed');
     expect(spec).toContain('const rootPredictiveBack = beginAndroidPredictiveBackGesture()');
     expect(spec).toContain('Idle Practice root trapped Predictive Back');
+  });
+
+  it('keeps Android reminder evidence on public product and system surfaces', () => {
+    const spec = fs.readFileSync(path.resolve(__dirname, '../e2e/android-review-reminders.e2e.js'), 'utf8');
+    const helpers = fs.readFileSync(path.resolve(__dirname, '../e2e/helpers.js'), 'utf8');
+    const nativeEvidence = fs.readFileSync(
+      path.resolve(__dirname, '../scripts/android-review-reminder-native-evidence.sh'),
+      'utf8'
+    );
+
+    expect(spec).toContain("failStandardSprint");
+    expect(spec).toContain("settings-review-reminder-enable");
+    expect(spec).toContain("permission_allow_button");
+    expect(spec).toContain("permission_deny_button");
+    expect(spec).toContain("statusbar', 'expand-notifications");
+    expect(spec).toContain('tapNotificationSystemNode');
+    expect(spec).toContain('androidAppIsResumed()');
+    expect(spec).toContain("3 reviews are ready");
+    expect(spec).toContain("review-panel");
+    expect(spec).toContain("settings-review-reminder-off");
+    expect(spec).toContain("cmd', 'alarm', 'set-timezone");
+    expect(spec).toContain('const alarmBeforeTimezone = pendingReviewAlarmSnapshot();');
+    expect(spec).toContain('waitForReviewAlarmRebased(alarmBeforeTimezone');
+    expect(spec).toContain('assertActiveReviewNotificationCount(1)');
+    expect(spec).toContain('assertActiveReviewNotificationCount(0)');
+    expect(spec).not.toContain("ReviewReminderLifecycleReceiver");
+    expect(spec).not.toContain("'-n'");
+    expect(spec).not.toContain("NativeModules");
+    expect(spec).not.toContain("PracticeService");
+    expect(spec).not.toContain("run-as");
+
+    expect(spec).toContain(
+      'launchWithFreshAndroidRuntimePermission(resetNotificationPermission)'
+    );
+    const permissionLaunchIndex = helpers.indexOf(
+      'async function launchWithFreshAndroidRuntimePermission('
+    );
+    const deleteLaunchIndex = helpers.indexOf('delete: true', permissionLaunchIndex);
+    const resetIndex = helpers.indexOf('resetPermission();', permissionLaunchIndex);
+    const noDeleteLaunchIndex = helpers.indexOf('delete: false', resetIndex);
+    expect(deleteLaunchIndex).toBeGreaterThan(permissionLaunchIndex);
+    expect(resetIndex).toBeGreaterThan(deleteLaunchIndex);
+    expect(noDeleteLaunchIndex).toBeGreaterThan(resetIndex);
+    expect(spec).toContain("['pm', 'revoke', APP_ID, PERMISSION]");
+    expect(spec).toContain("'clear-permission-flags', APP_ID, PERMISSION, 'user-set'");
+    expect(spec).toContain("'clear-permission-flags', APP_ID, PERMISSION, 'user-fixed'");
+
+    const instrumentationIndex = nativeEvidence.indexOf('shell am instrument -w');
+    const finalResetIndex = nativeEvidence.lastIndexOf('reset_notification_permission');
+    expect(nativeEvidence).toContain('reset_notification_permission()');
+    expect(finalResetIndex).toBeGreaterThan(instrumentationIndex);
+    expect(nativeEvidence).toContain('clear-permission-flags "$APP_ID" "$PERMISSION" user-set');
+    expect(nativeEvidence).toContain('clear-permission-flags "$APP_ID" "$PERMISSION" user-fixed');
   });
 
   it('rejects mixing the two screenshot capture suites in one invocation', () => {
