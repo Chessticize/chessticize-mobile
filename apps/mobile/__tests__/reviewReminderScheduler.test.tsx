@@ -93,10 +93,14 @@ describe("review reminder scheduler", () => {
   it("wraps native notification permissions and review routing", async () => {
     const listeners = new Set<(route: string) => void>();
     const openSystemSettings = jest.fn(async () => {});
+    const requestAuthorization = jest.fn()
+      .mockResolvedValueOnce("not_determined")
+      .mockResolvedValueOnce("denied")
+      .mockResolvedValueOnce("authorized");
     (NativeModules as Record<string, unknown>).ReviewReminderNotifications = {
       replaceNextReminder: jest.fn(),
       getAuthorizationStatus: jest.fn(async () => "not_determined"),
-      requestAuthorization: jest.fn(async () => "authorized"),
+      requestAuthorization,
       openSystemSettings,
       consumeInitialRoute: jest.fn(async () => "review"),
       __addListener: (_eventName: string, listener: (route: string) => void) => {
@@ -112,6 +116,8 @@ describe("review reminder scheduler", () => {
     const unsubscribe = client?.addNotificationResponseListener((route) => routed.push(route));
 
     await expect(client?.getAuthorizationStatus()).resolves.toBe("not_determined");
+    await expect(client?.requestAuthorization()).resolves.toBe("not_determined");
+    await expect(client?.requestAuthorization()).resolves.toBe("denied");
     await expect(client?.requestAuthorization()).resolves.toBe("authorized");
     await expect(client?.consumeInitialRoute()).resolves.toBe("review");
     await expect(client?.openSystemSettings()).resolves.toBeUndefined();
@@ -122,6 +128,7 @@ describe("review reminder scheduler", () => {
     unsubscribe?.();
 
     expect(openSystemSettings).toHaveBeenCalledTimes(1);
+    expect(requestAuthorization).toHaveBeenCalledTimes(3);
     expect(routed).toEqual(["review"]);
   });
 

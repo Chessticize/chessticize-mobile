@@ -2570,9 +2570,7 @@ export function PracticePocScreen({
                 iCloudSyncStatus={iCloudSyncStatus}
                 advancedRatingsOpen={settingsAdvancedRatingsOpen}
                 onAdvancedRatingsOpenChange={setSettingsAdvancedRatingsOpen}
-                onOpenNotificationSettings={() => {
-                  void openReviewReminderSystemSettings();
-                }}
+                onOpenNotificationSettings={openReviewReminderSystemSettings}
                 onRequestReviewReminderPermission={() => requestReviewReminderPermission()}
                 onSaveReviewReminderPreference={saveReviewReminderPreference}
                 onSaveICloudSyncEnabled={saveICloudSyncEnabled}
@@ -7407,7 +7405,7 @@ function SettingsPanel({
   applicationMetadata: MobileApplicationMetadata;
   progressProtection: MobilePlatformCapabilities["progressProtection"];
   onOpenDiagnostics?: () => void;
-  onOpenNotificationSettings: () => void;
+  onOpenNotificationSettings: () => Promise<void>;
   onAdjustRating: (ratingKey: string, nextRating: number) => RatingRecord;
   onAdvancedRatingsOpenChange: (open: boolean) => void;
   onRequestReviewReminderPermission: () => Promise<ReviewReminderPermissionStatus>;
@@ -7525,7 +7523,7 @@ function SettingsPanel({
             testID="settings-review-reminder-enable"
             onPress={() => {
               void onRequestReviewReminderPermission().then((status) => {
-                setStatusMessage(reviewReminderPermissionStatusMessage(status));
+                setStatusMessage(reviewReminderPermissionStatusMessage(status, reminderPlatform));
               });
             }}
           />
@@ -7538,8 +7536,13 @@ function SettingsPanel({
               : "Notifications are blocked by iOS and cannot be requested again here"}
             testID="settings-review-reminder-open-settings"
             onPress={() => {
-              onOpenNotificationSettings();
-              setStatusMessage(reminderPlatform === "android" ? "Opened Android notification settings" : "Opened iOS Settings");
+              void onOpenNotificationSettings().then(() => {
+                setStatusMessage(reminderPlatform === "android" ? "Opened Android notification settings" : "Opened iOS Settings");
+              }).catch(() => {
+                setStatusMessage(reminderPlatform === "android"
+                  ? "Android notification settings are unavailable on this device"
+                  : "iOS Settings are unavailable on this device");
+              });
             }}
           />
         ) : null}
@@ -7812,12 +7815,17 @@ function reviewReminderPermissionDetail(status: ReviewReminderPermissionStatus):
   }
 }
 
-function reviewReminderPermissionStatusMessage(status: ReviewReminderPermissionStatus): string {
+function reviewReminderPermissionStatusMessage(
+  status: ReviewReminderPermissionStatus,
+  reminderPlatform: MobilePlatformCapabilities["reminders"]["platform"]
+): string {
   switch (status) {
     case "authorized":
       return "Notifications enabled";
     case "denied":
-      return "Notifications blocked in iOS Settings";
+      return reminderPlatform === "android"
+        ? "Notifications blocked in Android notification settings"
+        : "Notifications blocked in iOS Settings";
     case "channel_disabled":
       return "Review reminder notifications disabled in Settings";
     case "not_determined":

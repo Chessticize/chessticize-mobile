@@ -561,7 +561,9 @@ describe('Detox suite configuration', () => {
     expect(spec).toContain("3 reviews are ready");
     expect(spec).toContain("review-panel");
     expect(spec).toContain("settings-review-reminder-off");
-    expect(spec).toContain("android.intent.action.TIMEZONE_CHANGED");
+    expect(spec).toContain("cmd', 'alarm', 'set-timezone");
+    expect(spec).not.toContain("ReviewReminderLifecycleReceiver");
+    expect(spec).not.toContain("'-n'");
     expect(spec).not.toContain("NativeModules");
     expect(spec).not.toContain("PracticeService");
     expect(spec).not.toContain("run-as");

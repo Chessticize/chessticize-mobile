@@ -1,6 +1,7 @@
 package com.chessticize.mobile
 
 import android.Manifest
+import android.content.ActivityNotFoundException
 import android.app.AlarmManager
 import android.app.Notification
 import android.app.NotificationChannel
@@ -10,6 +11,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import com.facebook.react.ReactPackage
@@ -55,7 +57,7 @@ internal object ReviewReminderStore {
   private const val KEY_TARGET_LOCAL_DATE_TIME = "target-local-date-time"
   private const val KEY_BODY = "body"
   private const val KEY_DUE_COUNT = "due-count"
-  private const val KEY_PERMISSION_REQUESTED = "permission-requested"
+  private const val KEY_PERMISSION_RESULT = "permission-result"
 
   fun save(context: Context, reminder: StoredReviewReminder) {
     preferences(context).edit()
@@ -89,12 +91,23 @@ internal object ReviewReminderStore {
       .apply()
   }
 
-  fun markPermissionRequested(context: Context) {
-    preferences(context).edit().putBoolean(KEY_PERMISSION_REQUESTED, true).apply()
+  fun recordPermissionResult(context: Context, result: ReviewReminderPermissionResult) {
+    when (result) {
+      ReviewReminderPermissionResult.DENIED,
+      ReviewReminderPermissionResult.GRANTED ->
+        preferences(context).edit().putString(KEY_PERMISSION_RESULT, result.name).apply()
+      ReviewReminderPermissionResult.DISMISSED -> Unit
+    }
   }
 
-  fun wasPermissionRequested(context: Context): Boolean =
-    preferences(context).getBoolean(KEY_PERMISSION_REQUESTED, false)
+  fun permissionResult(context: Context): ReviewReminderPermissionResult? =
+    preferences(context).getString(KEY_PERMISSION_RESULT, null)?.let { stored ->
+      ReviewReminderPermissionResult.entries.firstOrNull { it.name == stored }
+    }
+
+  fun clearPermissionDecision(context: Context) {
+    preferences(context).edit().remove(KEY_PERMISSION_RESULT).apply()
+  }
 
   private fun preferences(context: Context) =
     context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
@@ -203,23 +216,16 @@ internal object ReviewReminderNotifications {
 
   fun authorizationStatus(context: Context): String {
     ensureChannel(context)
-    if (
-      Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-      context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-    ) {
-      return if (ReviewReminderStore.wasPermissionRequested(context)) "denied" else "not_determined"
-    }
     val manager = notificationManager(context)
-    if (!manager.areNotificationsEnabled()) {
-      return "denied"
-    }
-    if (
-      Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
-      manager.getNotificationChannel(ReviewReminderAlarmContract.CHANNEL_ID)?.importance == NotificationManager.IMPORTANCE_NONE
-    ) {
-      return "channel_disabled"
-    }
-    return "authorized"
+    return ReviewReminderPermissionState.resolve(
+      runtimePermissionRequired = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU,
+      permissionGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+        context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED,
+      permissionDecisionRecorded = ReviewReminderStore.permissionResult(context) != null,
+      notificationsEnabled = manager.areNotificationsEnabled(),
+      channelEnabled = Build.VERSION.SDK_INT < Build.VERSION_CODES.O ||
+        manager.getNotificationChannel(ReviewReminderAlarmContract.CHANNEL_ID)?.importance != NotificationManager.IMPORTANCE_NONE,
+    )
   }
 
   fun post(context: Context, reminder: StoredReviewReminder) {
@@ -255,6 +261,69 @@ internal object ReviewReminderNotifications {
       .setContentIntent(contentIntent)
       .build()
     notificationManager(context).notify(ReviewReminderAlarmContract.NOTIFICATION_ID, notification)
+  }
+}
+
+internal object ReviewReminderPermissionState {
+  fun resolve(
+    runtimePermissionRequired: Boolean,
+    permissionGranted: Boolean,
+    permissionDecisionRecorded: Boolean,
+    notificationsEnabled: Boolean,
+    channelEnabled: Boolean,
+  ): String {
+    if (runtimePermissionRequired && !permissionGranted) {
+      return if (permissionDecisionRecorded) "denied" else "not_determined"
+    }
+    if (!notificationsEnabled) {
+      return "denied"
+    }
+    if (!channelEnabled) {
+      return "channel_disabled"
+    }
+    return "authorized"
+  }
+}
+
+internal object ReviewReminderSettingsIntentFactory {
+  fun create(
+    context: Context,
+    status: String,
+    apiLevel: Int = Build.VERSION.SDK_INT,
+  ): Intent {
+    val intent = when {
+      apiLevel < Build.VERSION_CODES.O -> Intent(
+        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+        Uri.parse("package:${context.packageName}"),
+      )
+      status == "channel_disabled" -> Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
+        putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+        putExtra(Settings.EXTRA_CHANNEL_ID, ReviewReminderAlarmContract.CHANNEL_ID)
+      }
+      else -> Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+        putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+      }
+    }
+    return intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+  }
+}
+
+internal object ReviewReminderSettingsLauncher {
+  fun open(context: Context, status: String): Boolean =
+    open(context, ReviewReminderSettingsIntentFactory.create(context, status))
+
+  fun open(context: Context, intent: Intent): Boolean {
+    if (intent.resolveActivity(context.packageManager) == null) {
+      return false
+    }
+    return try {
+      context.startActivity(intent)
+      true
+    } catch (_: ActivityNotFoundException) {
+      false
+    } catch (_: SecurityException) {
+      false
+    }
   }
 }
 
@@ -331,7 +400,7 @@ internal object ReviewReminderRouteBus {
 }
 
 interface ReviewReminderPermissionHost {
-  fun requestReviewReminderPermission(callback: (Boolean) -> Unit): Boolean
+  fun requestReviewReminderPermission(callback: (ReviewReminderPermissionResult) -> Unit): Boolean
 }
 
 class ReviewReminderNotificationsModule(
@@ -385,9 +454,15 @@ class ReviewReminderNotificationsModule(
       promise.resolve("unavailable")
       return
     }
-    ReviewReminderStore.markPermissionRequested(reactApplicationContext)
-    val started = host.requestReviewReminderPermission {
-      promise.resolve(ReviewReminderNotifications.authorizationStatus(reactApplicationContext))
+    val started = host.requestReviewReminderPermission { result ->
+      ReviewReminderStore.recordPermissionResult(reactApplicationContext, result)
+      promise.resolve(
+        if (result == ReviewReminderPermissionResult.DISMISSED) {
+          "not_determined"
+        } else {
+          ReviewReminderNotifications.authorizationStatus(reactApplicationContext)
+        },
+      )
     }
     if (!started) {
       promise.reject("permission_in_progress", "A notification permission request is already active.")
@@ -397,17 +472,10 @@ class ReviewReminderNotificationsModule(
   @ReactMethod
   fun openSystemSettings(promise: Promise) {
     val status = ReviewReminderNotifications.authorizationStatus(reactApplicationContext)
-    val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && status == "channel_disabled") {
-      Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
-        putExtra(Settings.EXTRA_APP_PACKAGE, reactApplicationContext.packageName)
-        putExtra(Settings.EXTRA_CHANNEL_ID, ReviewReminderAlarmContract.CHANNEL_ID)
-      }
-    } else {
-      Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
-        putExtra(Settings.EXTRA_APP_PACKAGE, reactApplicationContext.packageName)
-      }
-    }.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    reactApplicationContext.startActivity(intent)
+    if (!ReviewReminderSettingsLauncher.open(reactApplicationContext, status)) {
+      promise.reject("settings_unavailable", "Android notification settings are unavailable on this device.")
+      return
+    }
     promise.resolve(null)
   }
 

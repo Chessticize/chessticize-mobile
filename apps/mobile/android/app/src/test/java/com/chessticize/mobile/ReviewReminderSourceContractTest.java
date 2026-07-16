@@ -46,6 +46,23 @@ public final class ReviewReminderSourceContractTest {
         assertTrue(source.contains("it in 1_000L..60_000L"));
     }
 
+    @Test
+    public void permissionAndSettingsRecoveryFailClosedAcrossSupportedApis() throws Exception {
+        String source = readProjectFile(
+                "src/main/java/com/chessticize/mobile/ReviewReminderNotificationsModule.kt");
+        String activity = readProjectFile("src/main/java/com/chessticize/mobile/MainActivity.kt");
+
+        assertTrue(source.contains("ACTION_APPLICATION_DETAILS_SETTINGS"));
+        assertTrue(source.contains("Uri.parse(\"package:"));
+        assertTrue(source.contains("ACTION_APP_NOTIFICATION_SETTINGS"));
+        assertTrue(source.contains("ACTION_CHANNEL_NOTIFICATION_SETTINGS"));
+        assertTrue(source.contains("resolveActivity"));
+        assertTrue(source.contains("settings_unavailable"));
+        assertTrue(source.contains("ReviewReminderPermissionResult.DISMISSED"));
+        assertFalse(source.contains("markPermissionRequested"));
+        assertTrue(activity.contains("grantResults.isEmpty()"));
+    }
+
     private static String readProjectFile(String appRelativePath) throws Exception {
         java.nio.file.Path direct = Paths.get(appRelativePath);
         java.nio.file.Path fromAndroid = Paths.get("app").resolve(appRelativePath);

@@ -78,6 +78,7 @@ export class FakeReviewReminderNotificationClient implements ReviewReminderNotif
   openSettingsCount = 0;
   private listeners = new Set<(route: ReviewReminderNotificationRoute) => void>();
   private initialRoute: ReviewReminderNotificationRoute | undefined;
+  private openSettingsFailure: Error | undefined;
 
   constructor(
     private status: ReviewReminderPermissionStatus = "not_determined",
@@ -96,6 +97,9 @@ export class FakeReviewReminderNotificationClient implements ReviewReminderNotif
 
   async openSystemSettings(): Promise<void> {
     this.openSettingsCount += 1;
+    if (this.openSettingsFailure) {
+      throw this.openSettingsFailure;
+    }
   }
 
   async consumeInitialRoute(): Promise<ReviewReminderNotificationRoute | undefined> {
@@ -117,6 +121,10 @@ export class FakeReviewReminderNotificationClient implements ReviewReminderNotif
 
   setRequestedStatus(status: ReviewReminderPermissionStatus): void {
     this.requestedStatus = status;
+  }
+
+  setOpenSettingsFailure(failure: Error | undefined): void {
+    this.openSettingsFailure = failure;
   }
 
   setInitialRoute(route: ReviewReminderNotificationRoute | undefined): void {

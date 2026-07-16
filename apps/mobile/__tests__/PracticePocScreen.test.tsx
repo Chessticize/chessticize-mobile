@@ -4531,6 +4531,10 @@ describe("PracticePocScreen", () => {
     await act(async () => {});
     expect(deniedClient.openSettingsCount).toBe(1);
     expectText(deniedRenderer, "Opened Android notification settings");
+    deniedClient.setOpenSettingsFailure(new Error("missing settings activity"));
+    press(deniedRenderer, "settings-review-reminder-open-settings");
+    await act(async () => {});
+    expectText(deniedRenderer, "Android notification settings are unavailable on this device");
 
     const channelClient = new FakeReviewReminderNotificationClient("channel_disabled");
     const channelRenderer = renderScreen({
@@ -4544,6 +4548,23 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(channelRenderer, "settings-review-reminders")))
       .toContain("Review reminders channel is off in Android settings");
     expect(findByTestId(channelRenderer, "settings-review-reminder-open-settings")).toBeTruthy();
+
+    const requestDeniedClient = new FakeReviewReminderNotificationClient("not_determined", "denied");
+    const requestDeniedRenderer = renderScreen({
+      progressProtection: { kind: "android_managed_backup" },
+      reminderPlatform: "android",
+      reviewReminderNotificationClient: requestDeniedClient,
+      reviewReminderScheduler: new FakeReviewReminderScheduler()
+    });
+    await act(async () => {});
+    press(requestDeniedRenderer, "settings-tab");
+    press(requestDeniedRenderer, "settings-review-reminder-enable");
+    await act(async () => {});
+    const denialStatus = collectText(findByTestId(requestDeniedRenderer, "settings-status-message"));
+    expect(denialStatus).toContain("Notifications blocked in Android notification settings");
+    expect(denialStatus).not.toContain("iOS");
+    expect(collectText(findByTestId(requestDeniedRenderer, "settings-review-reminders")))
+      .toContain("Blocked in Android notification settings");
   });
 
   it("shows truthful Android no-due, overdue-target, disabled, and scheduling-failure states", async () => {

@@ -14,8 +14,20 @@ interface ReactNativeBackCallbackController {
   fun setReactNativeBackHandlingEnabled(enabled: Boolean)
 }
 
+enum class ReviewReminderPermissionResult {
+  GRANTED,
+  DENIED,
+  DISMISSED,
+}
+
+internal fun reviewReminderPermissionResult(grantResults: IntArray): ReviewReminderPermissionResult = when {
+  grantResults.isEmpty() -> ReviewReminderPermissionResult.DISMISSED
+  grantResults.first() == PackageManager.PERMISSION_GRANTED -> ReviewReminderPermissionResult.GRANTED
+  else -> ReviewReminderPermissionResult.DENIED
+}
+
 class MainActivity : ReactActivity(), ReactNativeBackCallbackController, ReviewReminderPermissionHost {
-  private var reviewReminderPermissionCallback: ((Boolean) -> Unit)? = null
+  private var reviewReminderPermissionCallback: ((ReviewReminderPermissionResult) -> Unit)? = null
   private val reactNativeBackPressedCallback: OnBackPressedCallback by lazy(LazyThreadSafetyMode.NONE) {
     val callbackField = ReactActivity::class.java.getDeclaredField("mBackPressedCallback")
     @Suppress("DEPRECATION")
@@ -36,9 +48,9 @@ class MainActivity : ReactActivity(), ReactNativeBackCallbackController, ReviewR
     ReviewReminderRouteBus.capture(intent)
   }
 
-  override fun requestReviewReminderPermission(callback: (Boolean) -> Unit): Boolean {
+  override fun requestReviewReminderPermission(callback: (ReviewReminderPermissionResult) -> Unit): Boolean {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-      callback(true)
+      callback(ReviewReminderPermissionResult.GRANTED)
       return true
     }
     if (reviewReminderPermissionCallback != null) {
@@ -60,7 +72,7 @@ class MainActivity : ReactActivity(), ReactNativeBackCallbackController, ReviewR
     }
     val callback = reviewReminderPermissionCallback
     reviewReminderPermissionCallback = null
-    callback?.invoke(grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED)
+    callback?.invoke(reviewReminderPermissionResult(grantResults))
   }
 
   /**

@@ -40,7 +40,7 @@ status=$?
 set -e
 cat "$ARTIFACT_DIR/native-instrumentation.txt"
 test "$status" -eq 0
-grep -F "OK (3 tests)" "$ARTIFACT_DIR/native-instrumentation.txt"
+grep -F "OK (7 tests)" "$ARTIFACT_DIR/native-instrumentation.txt"
 "$ADB" -s "$DEVICE" shell dumpsys package com.chessticize.mobile \
   > "$ARTIFACT_DIR/native-installed-package.txt"
 "$ADB" -s "$DEVICE" shell dumpsys notification --noredact \

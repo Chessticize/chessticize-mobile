@@ -15,7 +15,6 @@ const {
 const APP_ID = 'com.chessticize.mobile';
 const PERMISSION = 'android.permission.POST_NOTIFICATIONS';
 const REMINDER_ACTION = 'com.chessticize.mobile.action.DELIVER_REVIEW_REMINDER';
-const LIFECYCLE_RECEIVER = `${APP_ID}/.ReviewReminderLifecycleReceiver`;
 const ARTIFACT_DIR = path.resolve(__dirname, '../artifacts/android-review-reminders');
 const REMINDER_DELAY_MS = 10_000;
 
@@ -108,11 +107,18 @@ describe('Android Review reminders through public and system surfaces', () => {
       recordSystemEvidence('cold-tap-route');
 
       // Rescheduling through the product UI while the process is foregrounded
-      // exercises the same one-shot alarm and event-listener route.
+      // exercises the same one-shot alarm and event-listener route. Changing
+      // the host timezone makes Android emit its real TIMEZONE_CHANGED system
+      // broadcast so reconstruction is covered without targeting app code.
+      const originalTimezone = deviceTimezone();
+      const changedTimezone = originalTimezone === 'America/New_York'
+        ? 'America/Los_Angeles'
+        : 'America/New_York';
       await openTab('settings-tab', 'settings-review-reminders');
       await waitForVisibleInPracticeScroll('settings-review-reminder-smart');
       await element(by.id('settings-review-reminder-smart')).tap();
       await waitForShellText(['dumpsys', 'alarm'], REMINDER_ACTION, true, 5000);
+      await setDeviceTimezone(changedTimezone);
       await waitForNotification('3 reviews are ready', 20000);
       adbShell(['cmd', 'statusbar', 'expand-notifications']);
       await tapSystemNode(['3 reviews are ready', 'Chessticize']);
@@ -123,11 +129,7 @@ describe('Android Review reminders through public and system surfaces', () => {
       await waitForVisibleInPracticeScroll('settings-review-reminder-off');
       await element(by.id('settings-review-reminder-off')).tap();
       await waitForElementTextContaining('settings-review-reminders', 'Reminders are off', 10000);
-      adbShell([
-        'am', 'broadcast',
-        '-a', 'android.intent.action.TIMEZONE_CHANGED',
-        '-n', LIFECYCLE_RECEIVER,
-      ]);
+      await setDeviceTimezone(originalTimezone);
       await sleep(REMINDER_DELAY_MS + 2_000);
       assertNotificationAbsent('3 reviews are ready');
 
@@ -162,6 +164,15 @@ function adbPath() {
 
 function serial() {
   return process.env.DETOX_ANDROID_DEVICE || 'emulator-5554';
+}
+
+function deviceTimezone() {
+  return adbShell(['getprop', 'persist.sys.timezone']).trim() || 'UTC';
+}
+
+async function setDeviceTimezone(timezone) {
+  adbShell(['cmd', 'alarm', 'set-timezone', timezone]);
+  await waitForShellText(['getprop', 'persist.sys.timezone'], timezone, true, 5000);
 }
 
 async function tapSystemNode(candidates, timeoutMs = 15_000) {
