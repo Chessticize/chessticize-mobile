@@ -75,6 +75,20 @@ function bringAndroidAppToForeground(
   run(adb, args, { encoding: 'utf8' });
 }
 
+function grantAndroidRuntimePermission(
+  appId,
+  permission,
+  environment = process.env,
+  run = execFileSync
+) {
+  const adb = androidAdbPath(environment);
+  const serial = environment.DETOX_ANDROID_DEVICE || 'emulator-5554';
+  const shell = (...args) => run(adb, ['-s', serial, 'shell', ...args], { encoding: 'utf8' });
+  shell('pm', 'clear-permission-flags', appId, permission, 'user-set');
+  shell('pm', 'clear-permission-flags', appId, permission, 'user-fixed');
+  shell('pm', 'grant', appId, permission);
+}
+
 function findAndroidSystemNode(
   hierarchy,
   candidates,
@@ -774,6 +788,7 @@ module.exports = {
   frameFor,
   findAndroidSystemNode,
   findPendingAndroidAlarms,
+  grantAndroidRuntimePermission,
   playBoardMove,
   performAndroidPredictiveBackGesture,
   startPracticeMode,

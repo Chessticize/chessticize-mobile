@@ -24,6 +24,7 @@ const {
   collectAndroidUiDiagnostics,
   findPendingAndroidAlarms,
   findAndroidSystemNode,
+  grantAndroidRuntimePermission,
   launchWithDisabledSynchronization,
   launchWithFreshAndroidRuntimePermission,
   performAndroidPredictiveBackGesture,
@@ -147,6 +148,32 @@ describe('Detox suite configuration', () => {
     await launchWithFreshAndroidRuntimePermission(resetPermission, launch);
 
     expect(permissionGranted).toBe(false);
+  });
+
+  it('grants Android runtime permission from an explicit clean OS fixture', () => {
+    const run = jest.fn();
+
+    grantAndroidRuntimePermission(
+      'com.chessticize.mobile',
+      'android.permission.POST_NOTIFICATIONS',
+      { ADB_PATH: '/sdk/adb', DETOX_ANDROID_DEVICE: 'emulator-6000' },
+      run
+    );
+
+    expect(run.mock.calls).toEqual([
+      ['/sdk/adb', [
+        '-s', 'emulator-6000', 'shell', 'pm', 'clear-permission-flags',
+        'com.chessticize.mobile', 'android.permission.POST_NOTIFICATIONS', 'user-set'
+      ], { encoding: 'utf8' }],
+      ['/sdk/adb', [
+        '-s', 'emulator-6000', 'shell', 'pm', 'clear-permission-flags',
+        'com.chessticize.mobile', 'android.permission.POST_NOTIFICATIONS', 'user-fixed'
+      ], { encoding: 'utf8' }],
+      ['/sdk/adb', [
+        '-s', 'emulator-6000', 'shell', 'pm', 'grant',
+        'com.chessticize.mobile', 'android.permission.POST_NOTIFICATIONS'
+      ], { encoding: 'utf8' }],
+    ]);
   });
 
   it('passes Android synchronization disablement in the numeric form Detox recognizes', () => {
@@ -487,9 +514,25 @@ describe('Detox suite configuration', () => {
 
   it('keeps the shared flows suite portable across iOS and Android', () => {
     const flowsSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/flows.e2e.js'), 'utf8');
+    const reminderCaseStart = flowsSpec.indexOf(
+      "it('handles review reminders through the platform capability'"
+    );
+    const reminderCaseEnd = flowsSpec.indexOf(
+      "it('shows failed attempts in history with the wrong-only toggle'"
+    );
+    const reminderCase = flowsSpec.slice(reminderCaseStart, reminderCaseEnd);
 
     expect(flowsSpec).toContain("device.getPlatform() === 'android'");
-    expect(flowsSpec).toContain('Notifications unavailable on this device');
+    expect(reminderCase).toContain('grantAndroidNotificationPermission();');
+    expect(reminderCase.indexOf('grantAndroidNotificationPermission();')).toBeLessThan(
+      reminderCase.indexOf('launchAppAt(sprintNowMs')
+    );
+    expect(reminderCase).toContain('Android may deliver later');
+    expect(reminderCase).not.toContain('Notifications unavailable on this device');
+    expect(reminderCase).not.toContain('return;');
+    expect(reminderCase).toContain("settings-review-reminder-fixed-1900");
+    expect(reminderCase).toContain("'|3|3 reviews are ready|review'");
+    expect(reminderCase).toContain("settings-review-reminder-off");
     expect(flowsSpec).toContain("historyToggleValue('Wrong puzzles only', false)");
     expect(flowsSpec).toContain("historyToggleValue('Sprint attempts only', true)");
     expect(flowsSpec).toContain("return device.getPlatform() === 'android' ? `${label}, ${state}` : state");
