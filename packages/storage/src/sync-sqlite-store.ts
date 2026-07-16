@@ -4,6 +4,7 @@ import {
   createDefaultRating,
   filterHistoryAttemptsForQuery,
   normalizeRatingRecord,
+  orderReviewQueue,
   resetRating as resetRatingRecord,
   resolveHistoryRange,
   reviewDayFor,
@@ -640,14 +641,7 @@ export class SyncSQLiteStore implements PracticeStore {
       settings: this.getSettings(),
       ratings: this.listRatings(),
       attempts: this.listAttempts(),
-      reviewQueue: this.listAllReviewQueueStates()
-        .sort((left, right) =>
-          left.dueDay.localeCompare(right.dueDay) ||
-          left.puzzleId.localeCompare(right.puzzleId) ||
-          left.mode.localeCompare(right.mode) ||
-          left.ratingKey.localeCompare(right.ratingKey)
-        )
-        .map(exportReviewQueueState),
+      reviewQueue: this.listReviewQueue().map(exportReviewQueueState),
       sprintSessions: this.listSprintSessions()
     };
   }
@@ -805,7 +799,7 @@ export class SyncSQLiteStore implements PracticeStore {
     const rows = this.db
       .prepare("SELECT * FROM review_queue WHERE due_day <= ? ORDER BY due_day ASC, puzzle_id ASC, mode ASC, rating_key ASC")
       .all(today) as ReviewRow[];
-    return rows.map(reviewFromRow);
+    return orderReviewQueue(rows.map(reviewFromRow));
   }
 
   getDueReviewItems(now: string): ReviewQueueItem[] {
@@ -960,7 +954,7 @@ export class SyncSQLiteStore implements PracticeStore {
 
   private listAllReviewQueueStates(): ReviewQueueState[] {
     const rows = this.db.prepare("SELECT * FROM review_queue ORDER BY due_day ASC, puzzle_id ASC, mode ASC, rating_key ASC").all() as ReviewRow[];
-    return rows.map(reviewFromRow);
+    return orderReviewQueue(rows.map(reviewFromRow));
   }
 
   listSprintSessions(): ExportedSprintSession[] {

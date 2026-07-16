@@ -1,6 +1,7 @@
 const {
   androidAppIsResumed,
   beginAndroidPredictiveBackGesture,
+  failStandardSprint,
   launchWithDisabledSynchronization,
   openTab,
   selectTestPuzzleSource,
@@ -18,6 +19,44 @@ describe('Android product-aware system Back', () => {
     await launchWithDisabledSynchronization({
       delete: true,
       newInstance: true
+    });
+  });
+
+  it('returns an interrupted due Review to its queue without recording a result', async () => {
+    await withAndroidUiDiagnostics(async () => {
+      const dayMs = 24 * 60 * 60 * 1000;
+      const sprintNowMs = Date.now() - (2 * dayMs);
+      const reviewNowMs = sprintNowMs + dayMs + 60 * 1000;
+      await launchWithDisabledSynchronization({
+        delete: false,
+        newInstance: true,
+        launchArgs: { chessticizeTestNowMs: String(sprintNowMs) }
+      });
+
+      await failStandardSprint();
+      await element(by.id('back-practice-button')).tap();
+      await waitFor(element(by.id('practice-home'))).toExist().withTimeout(10000);
+
+      await device.terminateApp();
+      await launchWithDisabledSynchronization({
+        delete: false,
+        newInstance: true,
+        launchArgs: { chessticizeTestNowMs: String(reviewNowMs) }
+      });
+      await openTab('review-tab', 'review-start-due');
+      await waitFor(element(by.id('review-due-count'))).toHaveText('0 / 3').withTimeout(10000);
+      await element(by.id('review-start-due')).tap();
+      await waitFor(element(by.id('review-progress'))).toHaveText('1 / 3 · Standard').withTimeout(10000);
+
+      await device.pressBack();
+
+      await waitFor(element(by.id('review-panel'))).toExist().withTimeout(10000);
+      await expect(element(by.id('review-session'))).not.toExist();
+      await waitFor(element(by.id('review-due-count'))).toHaveText('0 / 3').withTimeout(10000);
+      await expect(element(by.id('review-today-history'))).not.toExist();
+
+      await device.pressBack();
+      await waitFor(element(by.id('practice-home'))).toExist().withTimeout(10000);
     });
   });
 

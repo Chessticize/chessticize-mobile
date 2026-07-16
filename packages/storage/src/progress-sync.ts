@@ -1,4 +1,4 @@
-import type { RatingRecord, ReviewQueueState } from "../../core/src/index.ts";
+import { orderReviewQueue, type RatingRecord, type ReviewQueueState } from "../../core/src/index.ts";
 import { clonePracticeSettings } from "./practice-settings.ts";
 import {
   assignLegacyRatingGenerations,
@@ -155,7 +155,7 @@ export function mergeLocalDataExports(local: LocalDataExport, remote: LocalDataI
     settings: clonePracticeSettings(local.settings),
     ratings: [...ratings.values()].sort((left, right) => left.key.localeCompare(right.key)),
     attempts: [...attempts.values()].sort(compareAttempts),
-    reviewQueue: [...reviewQueue.values()].sort(compareReviewQueue).map(exportReviewQueueState),
+    reviewQueue: orderReviewQueue([...reviewQueue.values()]).map(exportReviewQueueState),
     sprintSessions: [...sprintSessions.values()].sort(compareSprintSessions)
   };
 }
@@ -215,13 +215,6 @@ function reviewQueueKey(context: ReviewQueueState): string {
 
 function compareAttempts(left: AttemptHistoryRow, right: AttemptHistoryRow): number {
   return right.completedAt.localeCompare(left.completedAt) || right.id.localeCompare(left.id);
-}
-
-function compareReviewQueue(left: ReviewQueueState, right: ReviewQueueState): number {
-  return left.dueDay.localeCompare(right.dueDay) ||
-    left.puzzleId.localeCompare(right.puzzleId) ||
-    left.mode.localeCompare(right.mode) ||
-    left.ratingKey.localeCompare(right.ratingKey);
 }
 
 function compareSprintSessions(left: ExportedSprintSession, right: ExportedSprintSession): number {

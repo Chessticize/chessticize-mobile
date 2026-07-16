@@ -646,6 +646,41 @@ test("syncPracticeProgress upgrades an existing active session to the remote ter
   }
 });
 
+test("Memory and SQLite exports preserve the canonical Review order through sync serialization", async () => {
+  const sqliteStore = new SQLiteStore(":memory:");
+  sqliteStore.migrate();
+  sqliteStore.seedPuzzles(await loadFixturePuzzles());
+  const stores = [new MemoryStore(), sqliteStore];
+  try {
+    for (const store of stores) {
+      store.recordReviewResult(
+        { puzzleId: "00008", mode: "standard", ratingKey: "a-newer standard 5/30" },
+        "wrong",
+        "2026-06-21T12:00:00.000Z"
+      );
+      store.recordReviewResult(
+        { puzzleId: "000hf", mode: "standard", ratingKey: "z-oldest standard 5/20" },
+        "wrong",
+        "2026-06-20T12:00:00.000Z"
+      );
+      const canonicalKeys = store.listReviewQueue().map(reviewQueueIdentity);
+      const exported = store.exportLocalData();
+
+      assert.deepEqual(canonicalKeys, [
+        "2026-06-21:000hf:standard:z-oldest standard 5/20",
+        "2026-06-22:00008:standard:a-newer standard 5/30"
+      ]);
+      assert.deepEqual(exported.reviewQueue.map(reviewQueueIdentity), canonicalKeys);
+      assert.deepEqual(
+        mergeLocalDataExports(exported, exported).reviewQueue.map(reviewQueueIdentity),
+        canonicalKeys
+      );
+    }
+  } finally {
+    sqliteStore.close();
+  }
+});
+
 test("mergeLocalDataExports does not let an imported open-session placeholder fail the owning active session", async () => {
   const service = new PracticeService(await seededMemoryStore());
   const local = service.exportLocalData();
@@ -777,6 +812,15 @@ function disableSync(service: PracticeService): void {
       iCloudEnabled: false
     }
   });
+}
+
+function reviewQueueIdentity(review: {
+  dueDay: string;
+  mode: string;
+  puzzleId: string;
+  ratingKey: string;
+}): string {
+  return `${review.dueDay}:${review.puzzleId}:${review.mode}:${review.ratingKey}`;
 }
 
 function recordWrongStandardAttempt(service: PracticeService): void {

@@ -4,6 +4,7 @@ import {
   addReviewDays,
   isReviewDue,
   isReviewOverdue,
+  orderReviewQueue,
   reviewDayFor,
   reviewDueState,
   reviewQueueForecast,
@@ -140,4 +141,44 @@ test("review queue forecasts separate today, tomorrow, the next seven days, and 
     totalCount: 6,
     nextDueDay: "2026-06-21"
   });
+});
+
+test("review queue ordering is a stable shared-domain contract", () => {
+  const queue = [
+    scheduleMistakeForContext(
+      { puzzleId: "p2", mode: "standard", ratingKey: "standard 5/30" },
+      "2026-06-21T12:00:00.000Z",
+      undefined,
+      UTC
+    ),
+    scheduleMistakeForContext(
+      { puzzleId: "p1", mode: "standard", ratingKey: "standard 5/30" },
+      "2026-06-20T12:00:00.000Z",
+      undefined,
+      UTC
+    ),
+    scheduleMistakeForContext(
+      { puzzleId: "p1", mode: "arrow_duel", ratingKey: "arrow duel 5/30" },
+      "2026-06-20T12:00:00.000Z",
+      undefined,
+      UTC
+    ),
+    scheduleMistakeForContext(
+      { puzzleId: "p1", mode: "arrow_duel", ratingKey: "arrow duel 5/20" },
+      "2026-06-20T12:00:00.000Z",
+      undefined,
+      UTC
+    )
+  ];
+
+  assert.deepEqual(
+    orderReviewQueue(queue).map((review) => [review.dueDay, review.puzzleId, review.mode, review.ratingKey]),
+    [
+      ["2026-06-21", "p1", "arrow_duel", "arrow duel 5/20"],
+      ["2026-06-21", "p1", "arrow_duel", "arrow duel 5/30"],
+      ["2026-06-21", "p1", "standard", "standard 5/30"],
+      ["2026-06-22", "p2", "standard", "standard 5/30"]
+    ]
+  );
+  assert.equal(queue[0]?.puzzleId, "p2");
 });
