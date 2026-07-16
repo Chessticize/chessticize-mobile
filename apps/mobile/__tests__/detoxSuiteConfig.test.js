@@ -1,5 +1,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
+const { EventEmitter } = require('node:events');
 
 const {
   ACTIVE_E2E_TEST_MATCH_BY_SUITE,
@@ -11,13 +12,17 @@ const {
   ANDROID_MIGRATION_TEST_MATCH,
   ANDROID_OFFLINE_PRACTICE_TEST_MATCH,
   ANDROID_PROGRESS_BACKUP_RESTORE_TEST_MATCH,
+  ANDROID_SYSTEM_BACK_TEST_MATCH,
   resolveDetoxTestMatch,
   resolveDetoxMaxWorkers
 } = require('../e2e/suiteConfig');
 const {
   bringAndroidAppToForeground,
+  androidAppIsResumed,
+  beginAndroidPredictiveBackGesture,
   collectAndroidUiDiagnostics,
   launchWithDisabledSynchronization,
+  performAndroidPredictiveBackGesture,
   waitForRunningStockfishDepth,
   withAndroidUiDiagnostics,
 } = require('../e2e/helpers');
@@ -31,6 +36,33 @@ describe('Detox suite configuration', () => {
     expect(launchSpec).toContain('launchWithDisabledSynchronization');
     expect(helpers).not.toContain('detoxEnableSynchronization: false');
     expect(launchSpec).not.toContain('detoxEnableSynchronization: false');
+  });
+
+  it('pins the Arrow Duel screenshot to the exact runtime-selected long-arrow fixture', () => {
+    const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
+    const renderCaseStart = practiceSpec.indexOf("it('renders Arrow Duel candidate arrows on the board'");
+    const renderCaseEnd = practiceSpec.indexOf("it('shows Arrow Duel feedback after a wrong candidate move'");
+    const renderCase = practiceSpec.slice(renderCaseStart, renderCaseEnd);
+
+    expect(practiceSpec).toContain(
+      "const PRACTICE_RENDER_PUZZLE_SELECTION_SEED = 'practice-arrow-render-v1:4';"
+    );
+    expect(practiceSpec).toContain(
+      'chessticizePuzzleSelectionSeed: PRACTICE_RENDER_PUZZLE_SELECTION_SEED'
+    );
+    expect(renderCase).toContain(
+      "waitForElementTextContaining('arrow-duel-candidate-overlay', 'c3e4', 10000)"
+    );
+    expect(renderCase).toContain(
+      "waitForElementTextContaining('arrow-duel-candidate-overlay', 'h4f6', 10000)"
+    );
+    expect(renderCase.indexOf("'c3e4'")).toBeLessThan(
+      renderCase.indexOf("takeScreenshot('arrow-duel-neutral-arrows')")
+    );
+    expect(renderCase).not.toContain('eQNYb');
+    expect(renderCase).not.toContain("'d7d1'");
+    expect(renderCase).not.toContain("'d7f7'");
+    expect(practiceSpec).toContain('if (arrowLikePixels <= 5000)');
   });
 
   it('reacquires Android window focus before public UI assertions', async () => {
@@ -393,6 +425,126 @@ describe('Detox suite configuration', () => {
     expect(resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'android-progress-backup-restore' }))
       .toEqual(ANDROID_PROGRESS_BACKUP_RESTORE_TEST_MATCH);
     expect(ACTIVE_E2E_TEST_MATCH).not.toContain(ANDROID_PROGRESS_BACKUP_RESTORE_TEST_MATCH[0]);
+    expect(resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'android-system-back' }))
+      .toEqual(ANDROID_SYSTEM_BACK_TEST_MATCH);
+  });
+
+  it('drives Predictive Back through the Android edge gesture and can verify root delegation', () => {
+    const run = jest.fn((_, args) => {
+      if (args.includes('size')) {
+        return 'Physical size: 1080x1920\n';
+      }
+      if (args.includes('activities')) {
+        return 'mResumedActivity: ActivityRecord{1 u0 com.android.launcher/.Launcher t1}';
+      }
+      return '';
+    });
+
+    performAndroidPredictiveBackGesture({
+      ADB_PATH: '/sdk/adb',
+      DETOX_ANDROID_DEVICE: 'emulator-6000'
+    }, run);
+
+    expect(run).toHaveBeenCalledWith('/sdk/adb', [
+      '-s', 'emulator-6000', 'shell', 'cmd', 'overlay', 'enable-exclusive', '--category',
+      'com.android.internal.systemui.navbar.gestural'
+    ], { encoding: 'utf8' });
+    expect(run).toHaveBeenCalledWith('/sdk/adb', [
+      '-s', 'emulator-6000', 'shell', 'input', 'swipe', '1', '960', '432', '960', '500'
+    ], { encoding: 'utf8' });
+    expect(androidAppIsResumed({
+      ADB_PATH: '/sdk/adb',
+      DETOX_ANDROID_DEVICE: 'emulator-6000'
+    }, run)).toBe(false);
+  });
+
+  it('streams cancelled Predictive Back through black-box Android system input', async () => {
+    const run = jest.fn((_, args) => args.includes('size') ? 'Physical size: 1080x1920\n' : '');
+    const child = new EventEmitter();
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
+    const spawnProcess = jest.fn(() => child);
+
+    const gesture = beginAndroidPredictiveBackGesture(
+      { cancel: true, durationMs: 1200 },
+      { ADB_PATH: '/sdk/adb', DETOX_ANDROID_DEVICE: 'emulator-6000' },
+      run,
+      spawnProcess
+    );
+
+    expect(spawnProcess).toHaveBeenCalledTimes(1);
+    const [command, args, options] = spawnProcess.mock.calls[0];
+    expect(command).toBe('/sdk/adb');
+    expect(args.slice(0, 5)).toEqual([
+      '-s', 'emulator-6000', 'shell', 'sh', '-c'
+    ]);
+    expect(options).toEqual({ stdio: ['ignore', 'pipe', 'pipe'] });
+    const gestureScript = args[5];
+    expect(gestureScript).toContain('input touchscreen motionevent DOWN 1 960');
+    expect(gestureScript).toContain('input touchscreen motionevent MOVE 486 960');
+    expect(gestureScript).toContain("printf '%s\\n' CHESSTICIZE_PREDICTIVE_BACK_STARTED");
+    expect(gestureScript).toContain('input touchscreen motionevent MOVE 32 960');
+    expect(gestureScript).toContain('input touchscreen motionevent UP 32 960');
+    expect(gestureScript.indexOf('motionevent DOWN')).toBeLessThan(
+      gestureScript.indexOf('motionevent MOVE 486')
+    );
+    expect(gestureScript.indexOf('motionevent MOVE 486')).toBeLessThan(
+      gestureScript.indexOf('motionevent MOVE 32')
+    );
+    expect(gestureScript.indexOf('motionevent MOVE 32')).toBeLessThan(
+      gestureScript.indexOf('motionevent UP 32')
+    );
+    expect(gestureScript).not.toMatch(/PredictiveBackGestureDriver|com\.chessticize\.mobile/);
+
+    child.stdout.emit('data', 'CHESSTICIZE_PREDICTIVE_BACK_STARTED\n');
+    await expect(gesture.started).resolves.toBeUndefined();
+    child.emit('close', 0);
+    await expect(gesture.completion()).resolves.toBeUndefined();
+
+    const helpers = fs.readFileSync(path.resolve(__dirname, '../e2e/helpers.js'), 'utf8');
+    expect(helpers).not.toContain('PredictiveBackGestureDriver');
+    expect(helpers).not.toContain('getUiDevice');
+    expect(fs.existsSync(path.resolve(
+      __dirname,
+      '../android/app/src/androidTest/java/com/chessticize/mobile/PredictiveBackGestureDriver.java'
+    ))).toBe(false);
+  });
+
+  it('preserves committed Predictive Back edge geometry through Android system input', async () => {
+    const run = jest.fn((_, args) => args.includes('size') ? 'Physical size: 1080x1920\n' : '');
+    const child = new EventEmitter();
+    child.stderr = new EventEmitter();
+    const spawnProcess = jest.fn(() => child);
+    const gesture = beginAndroidPredictiveBackGesture(
+      {},
+      { ADB_PATH: '/sdk/adb', DETOX_ANDROID_DEVICE: 'emulator-6000' },
+      run,
+      spawnProcess
+    );
+
+    expect(spawnProcess).toHaveBeenCalledWith('/sdk/adb', [
+      '-s', 'emulator-6000', 'shell', 'input', 'swipe', '1', '960', '756', '960', '1800'
+    ], { stdio: ['ignore', 'pipe', 'pipe'] });
+    child.emit('close', 0);
+    await expect(gesture.started).resolves.toBeUndefined();
+    await expect(gesture.completion()).resolves.toBeUndefined();
+  });
+
+  it('keeps a dedicated public-UI Android Back journey for ordering and cancellation', () => {
+    const spec = fs.readFileSync(path.resolve(__dirname, '../e2e/android-system-back.e2e.js'), 'utf8');
+
+    expect(spec).toContain("device.pressBack()");
+    expect(spec).toContain('session-abandon-confirmation');
+    expect(spec).toContain('beginAndroidPredictiveBackGesture');
+    expect(spec).toContain('mobile-back-destination-preview');
+    expect(spec).toContain('cancel: true');
+    expect(spec).toContain('await cancelledPredictiveBack.started');
+    expect(spec).toContain('await cancelledPredictiveBack.completion()');
+    expect(spec).toContain('Pending Arrow Duel timer cancellation is covered deterministically');
+    expect(spec).not.toContain("by.id('sprint-loading-overlay')");
+    expect(spec).toContain('androidAppIsResumed');
+    expect(spec).toContain('const rootPredictiveBack = beginAndroidPredictiveBackGesture()');
+    expect(spec).toContain('Idle Practice root trapped Predictive Back');
   });
 
   it('rejects mixing the two screenshot capture suites in one invocation', () => {

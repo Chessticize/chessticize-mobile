@@ -1,9 +1,10 @@
-const { execFileSync } = require('node:child_process');
+const { execFileSync, spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const { androidAdbPath } = require('./androidNetwork');
 
 const ANDROID_UI_DIAGNOSTICS_DIR = path.resolve(__dirname, '../artifacts/android-ui');
+const PREDICTIVE_BACK_STARTED_MARKER = 'CHESSTICIZE_PREDICTIVE_BACK_STARTED';
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -72,6 +73,168 @@ function bringAndroidAppToForeground(
     }
   }
   run(adb, args, { encoding: 'utf8' });
+}
+
+function performAndroidPredictiveBackGesture(
+  environment = process.env,
+  run = execFileSync
+) {
+  const adb = androidAdbPath(environment);
+  const serial = environment.DETOX_ANDROID_DEVICE || 'emulator-5554';
+  run(adb, [
+    '-s', serial, 'shell', 'cmd', 'overlay', 'enable-exclusive', '--category',
+    'com.android.internal.systemui.navbar.gestural'
+  ], { encoding: 'utf8' });
+  const sizeOutput = String(
+    run(adb, ['-s', serial, 'shell', 'wm', 'size'], { encoding: 'utf8' }) ?? ''
+  );
+  const { widthPixels, heightPixels } = parseAndroidDisplaySize(sizeOutput);
+  const centerY = Math.round(heightPixels / 2);
+  const endX = Math.round(widthPixels * 0.4);
+  run(adb, [
+    '-s', serial, 'shell', 'input', 'swipe', '1', String(centerY), String(endX), String(centerY), '500'
+  ], { encoding: 'utf8' });
+}
+
+function beginAndroidPredictiveBackGesture(
+  { cancel = false, durationMs = 1800 } = {},
+  environment = process.env,
+  run = execFileSync,
+  spawnProcess = spawn
+) {
+  const adb = androidAdbPath(environment);
+  const serial = environment.DETOX_ANDROID_DEVICE || 'emulator-5554';
+  run(adb, [
+    '-s', serial, 'shell', 'cmd', 'overlay', 'enable-exclusive', '--category',
+    'com.android.internal.systemui.navbar.gestural'
+  ], { encoding: 'utf8' });
+  const sizeOutput = String(
+    run(adb, ['-s', serial, 'shell', 'wm', 'size'], { encoding: 'utf8' }) ?? ''
+  );
+  const { widthPixels, heightPixels } = parseAndroidDisplaySize(sizeOutput);
+  if (cancel) {
+    const centerY = Math.round(heightPixels / 2);
+    const earlyX = Math.round(widthPixels * 0.1);
+    const activatedX = Math.round(widthPixels * 0.45);
+    const returningX = Math.round(widthPixels * 0.24);
+    const retreatX = Math.max(2, Math.round(widthPixels * 0.03));
+    const boundedDurationMs = Math.max(200, durationMs);
+    const stepDelaySeconds = (boundedDurationMs / 6 / 1000).toFixed(3);
+    const holdDelaySeconds = (boundedDurationMs / 2 / 1000).toFixed(3);
+    const gestureScript = [
+      'set -e',
+      `input touchscreen motionevent DOWN 1 ${centerY}`,
+      `sleep ${stepDelaySeconds}`,
+      `input touchscreen motionevent MOVE ${earlyX} ${centerY}`,
+      `sleep ${stepDelaySeconds}`,
+      `input touchscreen motionevent MOVE ${activatedX} ${centerY}`,
+      String.raw`printf '%s\n' ${PREDICTIVE_BACK_STARTED_MARKER}`,
+      `sleep ${holdDelaySeconds}`,
+      `input touchscreen motionevent MOVE ${returningX} ${centerY}`,
+      `sleep ${stepDelaySeconds}`,
+      `input touchscreen motionevent MOVE ${retreatX} ${centerY}`,
+      `sleep ${stepDelaySeconds}`,
+      `input touchscreen motionevent UP ${retreatX} ${centerY}`,
+    ].join(' && ');
+    const child = spawnProcess(
+      adb,
+      ['-s', serial, 'shell', 'sh', '-c', gestureScript],
+      { stdio: ['ignore', 'pipe', 'pipe'] }
+    );
+    let stderr = '';
+    let stdout = '';
+    let startedSettled = false;
+    let resolveStarted;
+    let rejectStarted;
+    const started = new Promise((resolve, reject) => {
+      resolveStarted = resolve;
+      rejectStarted = reject;
+    });
+    const completion = new Promise((resolve, reject) => {
+      child.stdout?.on('data', (chunk) => {
+        stdout += String(chunk);
+        if (!startedSettled && stdout.includes(PREDICTIVE_BACK_STARTED_MARKER)) {
+          startedSettled = true;
+          resolveStarted();
+        }
+      });
+      child.stderr?.on('data', (chunk) => {
+        stderr += String(chunk);
+      });
+      child.once('error', (error) => {
+        if (!startedSettled) {
+          startedSettled = true;
+          rejectStarted(error);
+        }
+        reject(error);
+      });
+      child.once('close', (code) => {
+        if (code !== 0) {
+          const error = new Error(
+            `Cancelled Predictive Back gesture exited ${code}: ${stderr.trim()}`
+          );
+          if (!startedSettled) {
+            startedSettled = true;
+            rejectStarted(error);
+          }
+          reject(error);
+          return;
+        }
+        if (!startedSettled) {
+          const error = new Error(
+            `Cancelled Predictive Back gesture never emitted ${PREDICTIVE_BACK_STARTED_MARKER}.`
+          );
+          startedSettled = true;
+          rejectStarted(error);
+          reject(error);
+          return;
+        }
+        resolve();
+      });
+    });
+    return {
+      started,
+      completion: () => completion,
+    };
+  }
+  const centerY = Math.round(heightPixels / 2);
+  const endX = Math.round(widthPixels * 0.7);
+  const child = spawnProcess(adb, [
+    '-s', serial, 'shell', 'input', 'swipe', '1', String(centerY), String(endX), String(centerY), String(durationMs)
+  ], { stdio: ['ignore', 'pipe', 'pipe'] });
+  const completion = new Promise((resolve, reject) => {
+    let stderr = '';
+    child.stderr?.on('data', (chunk) => {
+      stderr += String(chunk);
+    });
+    child.once('error', reject);
+    child.once('close', (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`Predictive Back gesture exited ${code}: ${stderr.trim()}`));
+      }
+    });
+  });
+  return {
+    started: Promise.resolve(),
+    completion: () => completion,
+  };
+}
+
+function androidAppIsResumed(
+  environment = process.env,
+  run = execFileSync
+) {
+  const adb = androidAdbPath(environment);
+  const serial = environment.DETOX_ANDROID_DEVICE || 'emulator-5554';
+  const activityState = String(run(adb, [
+    '-s', serial, 'shell', 'dumpsys', 'activity', 'activities'
+  ], { encoding: 'utf8' }) ?? '');
+  return activityState
+    .split('\n')
+    .some((line) => /(?:mResumedActivity|topResumedActivity)/.test(line)
+      && line.includes('com.chessticize.mobile'));
 }
 
 function collectAndroidUiDiagnostics(
@@ -495,6 +658,8 @@ async function failStandardSprint() {
 }
 
 module.exports = {
+  androidAppIsResumed,
+  beginAndroidPredictiveBackGesture,
   bringAndroidAppToForeground,
   collectAndroidUiDiagnostics,
   elementText,
@@ -504,6 +669,7 @@ module.exports = {
   sleep,
   frameFor,
   playBoardMove,
+  performAndroidPredictiveBackGesture,
   startPracticeMode,
   selectTestPuzzleSource,
   waitForVisibleInPracticeScroll,

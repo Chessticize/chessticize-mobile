@@ -10,13 +10,15 @@ import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
 class MainApplication : Application(), ReactApplication {
 
   override val reactHost: ReactHost by lazy {
+    val packages =
+      PackageList(this).packages.apply {
+        add(ChessticizeTestLaunchConfigPackage())
+        add(MobilePredictiveBackPackage())
+        add(NativeStockfishEnginePackage())
+      }
     getDefaultReactHost(
       context = applicationContext,
-      packageList =
-        PackageList(this).packages.apply {
-          add(ChessticizeTestLaunchConfigPackage())
-          add(NativeStockfishEnginePackage())
-        },
+      packageList = packages,
     )
   }
 

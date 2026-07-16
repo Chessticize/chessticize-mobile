@@ -152,8 +152,62 @@ describe('Android launch baseline', () => {
     const debugNetworkConfig = read('android/app/src/debug/res/xml/network_security_config.xml');
 
     expect(mainManifest).not.toContain('android:networkSecurityConfig');
+    expect(mainManifest).toContain('android:enableOnBackInvokedCallback="true"');
     expect(debugManifest).toContain('android:networkSecurityConfig="@xml/network_security_config"');
     expect(debugNetworkConfig).toContain('<domain includeSubdomains="true">localhost</domain>');
+  });
+
+  it('keeps predictive Back activity access compilable and delegates idle root to Android', () => {
+    const activity = read('android/app/src/main/java/com/chessticize/mobile/MainActivity.kt');
+    const predictiveBackModule = read(
+      'android/app/src/main/java/com/chessticize/mobile/MobilePredictiveBackModule.kt'
+    );
+    const pinnedReactActivity = read(
+      'node_modules/react-native/ReactAndroid/src/main/java/com/facebook/react/ReactActivity.java'
+    );
+
+    expect(predictiveBackModule).toContain('reactApplicationContext.currentActivity');
+    expect(predictiveBackModule).not.toMatch(/register\(currentActivity\)/);
+    expect(activity).toContain('ReactNativeBackCallbackController');
+    expect(activity).toContain('mBackPressedCallback');
+    expect(activity).toContain('reactNativeBackPressedCallback.isEnabled = enabled');
+    expect(predictiveBackModule).toContain('setReactNativeBackHandlingEnabled(false)');
+    expect(predictiveBackModule).toContain('setReactNativeBackHandlingEnabled(true)');
+    expect(pinnedReactActivity).toContain('private final OnBackPressedCallback mBackPressedCallback');
+  });
+
+  it('keeps one API 36 callback owner while app predictive Back is enabled', () => {
+    const predictiveBackModule = read(
+      'android/app/src/main/java/com/chessticize/mobile/MobilePredictiveBackModule.kt'
+    );
+    const api34Delegate = read(
+      'android/app/src/main/java/com/chessticize/mobile/MobilePredictiveBackApi34Delegate.kt'
+    );
+
+    expect(predictiveBackModule).toMatch(
+      /if \(enabledRequested\) \{\s+\(activity as\? ReactNativeBackCallbackController\)\s+\?\.setReactNativeBackHandlingEnabled\(false\)/
+    );
+    expect(api34Delegate).toContain('OnBackInvokedDispatcher.PRIORITY_DEFAULT');
+    expect(api34Delegate).not.toContain('OnBackInvokedDispatcher.PRIORITY_OVERLAY');
+  });
+
+  it('keeps the eagerly loaded API 24 module free of android.window types', () => {
+    const predictiveBackModule = read(
+      'android/app/src/main/java/com/chessticize/mobile/MobilePredictiveBackModule.kt'
+    );
+    const api34Delegate = read(
+      'android/app/src/main/java/com/chessticize/mobile/MobilePredictiveBackApi34Delegate.kt'
+    );
+
+    expect(predictiveBackModule).not.toContain('android.window');
+    expect(predictiveBackModule).not.toMatch(
+      /\bBackEvent\b|\bOnBackAnimationCallback\b|\bOnBackInvokedCallback\b|\bOnBackInvokedDispatcher\b/
+    );
+    expect(predictiveBackModule).toContain('Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE');
+    expect(predictiveBackModule).toContain('Class.forName(API34_DELEGATE_CLASS)');
+    expect(api34Delegate).toContain('android.window.BackEvent');
+    expect(api34Delegate).toContain('OnBackAnimationCallback');
+    expect(api34Delegate).toMatch(/@Keep\s+@RequiresApi/);
   });
 
   it('preserves iOS Detox while exposing the Android debug app and attached device', () => {
@@ -204,7 +258,7 @@ describe('Android launch baseline', () => {
   it('keeps the API 36 Stockfish condition in one emulator-runner script line', () => {
     const workflow = read('../../.github/workflows/mobile-android.yml');
 
-    for (const suite of ['android-stockfish', 'flows', 'practice']) {
+    for (const suite of ['android-stockfish', 'android-system-back', 'flows', 'practice']) {
       const command = `if [ "\${{ matrix.api-level }}" = "36" ]; then DETOX_ACTIVE_SUITE=${suite} pnpm mobile:e2e:test:android:ci; fi`;
       expect(workflow).toContain(command);
       expect(workflow.match(new RegExp(`DETOX_ACTIVE_SUITE=${suite}`, 'g'))).toHaveLength(1);
@@ -213,6 +267,41 @@ describe('Android launch baseline', () => {
       );
     }
     expect(workflow).toContain('timeout-minutes: 75');
+  });
+
+  it('keeps emulator-runner launch control flow on complete shell command lines', () => {
+    const workflow = read('../../.github/workflows/mobile-android.yml');
+    const launchJob = workflow.slice(
+      workflow.indexOf('  android-launch:'),
+      workflow.indexOf('  android-progress-backup:'),
+    );
+    const script = launchJob.slice(
+      launchJob.indexOf('          script: |'),
+      launchJob.indexOf('        env:'),
+    );
+
+    for (const line of script.split('\n').map((entry) => entry.trim()).filter(Boolean)) {
+      if (/^(?:if|elif)\b/.test(line)) {
+        expect(line).toMatch(/\bfi$/);
+      }
+      if (/^(?:for|while|until)\b/.test(line)) {
+        expect(line).toMatch(/\bdone$/);
+      }
+      if (/^case\b/.test(line)) {
+        expect(line).toMatch(/\besac$/);
+      }
+      expect(line).not.toMatch(/^(?:else|fi|do|done|esac)\b/);
+      expect(line).not.toMatch(/^[A-Za-z_][A-Za-z0-9_]*\(\)\s*\{$/);
+    }
+  });
+
+  it('runs the full offline-practice suite on both Android API levels', () => {
+    const workflow = read('../../.github/workflows/mobile-android.yml');
+
+    expect(workflow).toContain(
+      'DETOX_ACTIVE_SUITE=android-offline-practice pnpm mobile:e2e:test:android:ci'
+    );
+    expect(workflow.match(/DETOX_ACTIVE_SUITE=android-offline-practice/g)).toHaveLength(1);
   });
 
   it('uses the doctor-verified SDK with a self-contained offline Android E2E app', () => {

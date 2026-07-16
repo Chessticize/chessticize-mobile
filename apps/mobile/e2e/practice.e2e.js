@@ -15,6 +15,11 @@ const {
   failStandardSprint
 } = require('./helpers');
 
+// The visual assertion measures absolute painted arrow area. Pin the public
+// service's packaged-core selection to two long candidate vectors so random
+// move geometry cannot turn that rendering check into a pixel-count lottery.
+const PRACTICE_RENDER_PUZZLE_SELECTION_SEED = 'practice-arrow-render-v1:4';
+
 describe('Practice POC', () => {
   beforeEach(async () => {
     // These smoke tests use explicit waitFor checks and screenshot assertions.
@@ -23,7 +28,10 @@ describe('Practice POC', () => {
     // before Detox waits on app readiness.
     await launchWithDisabledSynchronization({
       newInstance: true,
-      delete: true
+      delete: true,
+      launchArgs: {
+        chessticizePuzzleSelectionSeed: PRACTICE_RENDER_PUZZLE_SELECTION_SEED
+      }
     });
   });
 
@@ -40,6 +48,11 @@ describe('Practice POC', () => {
   it('renders Arrow Duel candidate arrows on the board', async () => {
     await startPracticeMode('arrow-duel');
     await waitForVisibleInPracticeScroll('session-board');
+    // The default 5/30 Arrow Duel config and pinned seed select packaged puzzle
+    // 03wH4 through PracticeService's rating fallback. Candidate order is
+    // session-seeded, so wait for both long vectors without assuming order.
+    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'c3e4', 10000);
+    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'h4f6', 10000);
 
     const boardFrame = await frameFor(element(by.id('session-board')));
     const screenshotPath = await device.takeScreenshot('arrow-duel-neutral-arrows');

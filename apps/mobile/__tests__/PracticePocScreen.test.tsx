@@ -17,6 +17,7 @@ import { defaultSprintConfig, formatLocalCalendarDate, formatReviewDay, type Arr
 import { FakeReviewReminderNotificationClient, FakeReviewReminderScheduler } from "../src/backend/reviewReminderScheduler";
 import { FakeICloudProgressSyncClient } from "../src/backend/iCloudProgressSync";
 import type { MobilePlatformCapabilities } from "../src/backend/mobilePlatformCapabilities";
+import type { MobileSystemBackSource } from "../src/navigation/mobileSystemBack";
 import {
   createTestMobilePlatformCapabilities,
   type TestMobilePlatformCapabilityOverrides
@@ -28,6 +29,62 @@ import {
 } from "../test-support/testRendererSupport";
 
 const renderers: TestRenderer.ReactTestRenderer[] = [];
+
+type RenderedBackExecutorCase = {
+  afterTestID: string;
+  arrange: (renderer: TestRenderer.ReactTestRenderer) => void;
+  beforeTestID: string;
+  createOptions?: () => RenderScreenOptions;
+  name: string;
+};
+
+const renderedBackExecutorCases: RenderedBackExecutorCase[] = [
+  {
+    name: "Review-filter dismissal",
+    arrange: (renderer) => {
+      press(renderer, "review-tab");
+      press(renderer, "review-filter-toggle");
+    },
+    beforeTestID: "review-queue-filters",
+    afterTestID: "review-panel"
+  },
+  {
+    name: "Settings advanced-rating dismissal",
+    arrange: (renderer) => {
+      press(renderer, "settings-tab");
+      press(renderer, "settings-standard-elo-row");
+    },
+    beforeTestID: "settings-advanced-ratings-panel",
+    afterTestID: "settings-panel"
+  },
+  {
+    name: "Custom rating-editor dismissal",
+    createOptions: () => ({ practiceService: createPlayedCustomService() }),
+    arrange: (renderer) => {
+      press(renderer, "practice-mode-custom");
+      press(renderer, "custom-initial-rating-row");
+    },
+    beforeTestID: "custom-initial-rating-editor",
+    afterTestID: "custom-sprint-setup"
+  },
+  {
+    name: "Custom setup return",
+    arrange: (renderer) => {
+      press(renderer, "practice-mode-custom");
+    },
+    beforeTestID: "custom-sprint-setup",
+    afterTestID: "practice-home"
+  },
+  {
+    name: "Stockfish diagnostics return",
+    arrange: (renderer) => {
+      press(renderer, "settings-tab");
+      press(renderer, "settings-stockfish-diagnostics");
+    },
+    beforeTestID: "stockfish-diagnostics-panel",
+    afterTestID: "settings-panel"
+  }
+];
 
 beforeEach(() => {
   jest.useFakeTimers();
@@ -45,6 +102,512 @@ afterEach(() => {
 });
 
 describe("PracticePocScreen", () => {
+  it("unwinds Android system Back through the visible product state without trapping the root", () => {
+    const systemBack = createTestSystemBackSource("android");
+    const renderer = renderScreen({ systemBack });
+
+    press(renderer, "history-tab");
+    press(renderer, "history-filter-toggle");
+    expect(findByTestId(renderer, "history-advanced-filters")).toBeTruthy();
+
+    expect(systemBack.invoke()).toBe(true);
+    expect(() => findByTestId(renderer, "history-advanced-filters")).toThrow();
+    expect(findByTestId(renderer, "history-panel")).toBeTruthy();
+
+    expect(systemBack.invoke()).toBe(true);
+    expect(findByTestId(renderer, "practice-home")).toBeTruthy();
+
+    expect(systemBack.invoke()).toBe(false);
+  });
+
+  it.each(renderedBackExecutorCases)("executes $name through rendered public behavior", ({
+    afterTestID,
+    arrange,
+    beforeTestID,
+    createOptions
+  }) => {
+    const systemBack = createTestSystemBackSource("android");
+    const renderer = renderScreen({ ...(createOptions?.() ?? {}), systemBack });
+
+    arrange(renderer);
+    expect(findByTestId(renderer, beforeTestID)).toBeTruthy();
+
+    expect(systemBack.invoke()).toBe(true);
+    expect(findByTestId(renderer, afterTestID)).toBeTruthy();
+    if (beforeTestID !== afterTestID) {
+      expect(() => findByTestId(renderer, beforeTestID)).toThrow();
+    }
+  });
+
+  it("guards an active sprint and lets Back cancel the exit without losing progress", () => {
+    const systemBack = createTestSystemBackSource("android");
+    const service = createMobilePracticeService("familiar15");
+    const renderer = renderScreen({ practiceService: service, systemBack });
+
+    startStandardSprint(renderer);
+    const activeSprintId = activeSprintForTest(service).id;
+
+    expect(systemBack.invoke()).toBe(true);
+    expect(findByTestId(renderer, "session-abandon-confirmation")).toBeTruthy();
+    expect(service.getActiveSprint()?.id).toBe(activeSprintId);
+
+    expect(systemBack.invoke()).toBe(true);
+    expect(() => findByTestId(renderer, "session-abandon-confirmation")).toThrow();
+    expect(service.getActiveSprint()?.id).toBe(activeSprintId);
+
+    expect(systemBack.invoke()).toBe(true);
+    press(renderer, "session-abandon-confirm");
+    expect(service.getActiveSprint()).toBeUndefined();
+  });
+
+  it("keeps the active-sprint exit destination valid when the deadline expires during Predictive Back", () => {
+    const systemBack = createTestSystemBackSource("android");
+    const service = createMobilePracticeService("random1000");
+    const renderer = renderScreen({ practiceService: service, systemBack });
+
+    startStandardSprint(renderer);
+    act(() => {
+      jest.advanceTimersByTime(299_750);
+    });
+    systemBack.startPredictive("left");
+    systemBack.progressPredictive(0.6, "left");
+
+    act(() => {
+      jest.advanceTimersByTime(1_000);
+    });
+
+    expect(collectText(findByTestId(renderer, "mobile-back-destination-preview-label")))
+      .toBe("Leave sprint confirmation");
+    expect(service.getActiveSprint()?.status).toBe("active");
+
+    expect(systemBack.commitPredictive()).toBe(true);
+    expect(findByTestId(renderer, "session-abandon-confirmation")).toBeTruthy();
+    expect(service.getActiveSprint()?.status).toBe("active");
+  });
+
+  it("settles an expired active sprint after its predictive gesture is cancelled", () => {
+    const systemBack = createTestSystemBackSource("android");
+    const service = createMobilePracticeService("random1000");
+    const renderer = renderScreen({ practiceService: service, systemBack });
+
+    startStandardSprint(renderer);
+    act(() => {
+      jest.advanceTimersByTime(299_750);
+    });
+    systemBack.startPredictive("right");
+
+    act(() => {
+      jest.advanceTimersByTime(1_000);
+    });
+    expect(service.getActiveSprint()?.status).toBe("active");
+
+    systemBack.cancelPredictive();
+
+    expect(service.getActiveSprint()).toBeUndefined();
+    expect(collectText(findByTestId(renderer, "sprint-result-reason"))).toBe("Time expired");
+  });
+
+  it("cancels a pending Arrow Duel start before its delayed callback can enter practice", () => {
+    const systemBack = createTestSystemBackSource("android");
+    const service = createMobilePracticeService("familiar15");
+    const renderer = renderScreen({ practiceService: service, systemBack });
+
+    press(renderer, "practice-mode-arrow-duel");
+    press(renderer, "practice-start-button");
+    expect(findByTestId(renderer, "sprint-loading-overlay")).toBeTruthy();
+
+    expect(systemBack.invoke()).toBe(true);
+    expect(() => findByTestId(renderer, "sprint-loading-overlay")).toThrow();
+
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+    expect(service.getActiveSprint()).toBeUndefined();
+    expect(findByTestId(renderer, "practice-home")).toBeTruthy();
+  });
+
+  it("keeps the starting-practice destination frozen when its timer becomes due during Predictive Back", () => {
+    const systemBack = createTestSystemBackSource("android");
+    const service = createMobilePracticeService("familiar15");
+    const renderer = renderScreen({ practiceService: service, systemBack });
+
+    press(renderer, "practice-mode-arrow-duel");
+    press(renderer, "practice-start-button");
+    expect(findByTestId(renderer, "sprint-loading-overlay")).toBeTruthy();
+
+    const subscriptionsBeforeGesture = systemBack.subscribe.mock.calls.length;
+    const unsubscriptionsBeforeGesture = systemBack.unsubscribe.mock.calls.length;
+    systemBack.startPredictive("left");
+    systemBack.progressPredictive(0.6, "left");
+
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+
+    expect(service.getActiveSprint()).toBeUndefined();
+    expect(findByTestId(renderer, "sprint-loading-overlay")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "mobile-back-destination-preview-label")))
+      .toBe("Practice setup");
+    expect(collectText(findByTestId(renderer, "mobile-back-destination-preview-id")))
+      .toBe("practice-setup");
+    expect(systemBack.subscribe).toHaveBeenCalledTimes(subscriptionsBeforeGesture);
+    expect(systemBack.unsubscribe).toHaveBeenCalledTimes(unsubscriptionsBeforeGesture);
+
+    expect(systemBack.commitPredictive()).toBe(true);
+    expect(service.getActiveSprint()).toBeUndefined();
+    expect(() => findByTestId(renderer, "sprint-loading-overlay")).toThrow();
+    expect(findByTestId(renderer, "practice-home")).toBeTruthy();
+  });
+
+  it("resumes a due Arrow Duel start only after a predictive gesture is cancelled", () => {
+    const systemBack = createTestSystemBackSource("android");
+    const service = createMobilePracticeService("familiar15");
+    const renderer = renderScreen({ practiceService: service, systemBack });
+
+    press(renderer, "practice-mode-arrow-duel");
+    press(renderer, "practice-start-button");
+    systemBack.startPredictive("left");
+
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+    expect(service.getActiveSprint()).toBeUndefined();
+    expect(findByTestId(renderer, "sprint-loading-overlay")).toBeTruthy();
+
+    systemBack.cancelPredictive();
+
+    expect(() => findByTestId(renderer, "mobile-back-destination-preview")).toThrow();
+    expect(service.getActiveSprint()?.status).toBe("active");
+    expect(findByTestId(renderer, "active-session-shell")).toBeTruthy();
+  });
+
+  it("returns a completed sprint result to idle Practice", () => {
+    const systemBack = createTestSystemBackSource("android");
+    const renderer = renderStandardSequenceScreen({ systemBack });
+
+    startStandardSprint(renderer);
+    act(() => {
+      jest.advanceTimersByTime(301_000);
+    });
+    expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
+
+    const subscriptionsBeforeGesture = systemBack.subscribe.mock.calls.length;
+    const unsubscriptionsBeforeGesture = systemBack.unsubscribe.mock.calls.length;
+    systemBack.startPredictive("left");
+    systemBack.progressPredictive(0.5, "left");
+    expect(collectText(findByTestId(renderer, "mobile-back-destination-preview-label"))).toBe("Practice");
+    expect(systemBack.subscribe).toHaveBeenCalledTimes(subscriptionsBeforeGesture);
+    expect(systemBack.unsubscribe).toHaveBeenCalledTimes(unsubscriptionsBeforeGesture);
+
+    systemBack.cancelPredictive();
+    expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
+    systemBack.startPredictive("right");
+    systemBack.progressPredictive(0.8, "right");
+    expect(systemBack.commitPredictive()).toBe(true);
+    expect(() => findByTestId(renderer, "sprint-summary-panel")).toThrow();
+    expect(findByTestId(renderer, "practice-home")).toBeTruthy();
+  });
+
+  it.each([
+    {
+      name: "History filters",
+      ownerTab: "history-tab",
+      openControl: "history-filter-toggle",
+      expandedSurface: "history-advanced-filters"
+    },
+    {
+      name: "Review filters",
+      ownerTab: "review-tab",
+      openControl: "review-filter-toggle",
+      expandedSurface: "review-queue-filters"
+    },
+    {
+      name: "Settings advanced ratings",
+      ownerTab: "settings-tab",
+      openControl: "settings-standard-elo-row",
+      expandedSurface: "settings-advanced-ratings-panel"
+    }
+  ])("restores iOS child-local lifetime for $name after tab-away/tab-back", ({
+    expandedSurface,
+    openControl,
+    ownerTab
+  }) => {
+    const systemBack = createTestSystemBackSource("ios");
+    const renderer = renderScreen({ systemBack });
+
+    press(renderer, ownerTab);
+    press(renderer, openControl);
+    expect(findByTestId(renderer, expandedSurface)).toBeTruthy();
+
+    press(renderer, "practice-tab");
+    press(renderer, ownerTab);
+    expect(() => findByTestId(renderer, expandedSurface)).toThrow();
+  });
+
+  it("restores iOS custom rating-editor lifetime after tab-away/tab-back", () => {
+    const systemBack = createTestSystemBackSource("ios");
+    const renderer = renderScreen({ practiceService: createPlayedCustomService(), systemBack });
+
+    press(renderer, "practice-mode-custom");
+    press(renderer, "custom-initial-rating-row");
+    expect(findByTestId(renderer, "custom-initial-rating-editor")).toBeTruthy();
+
+    press(renderer, "settings-tab");
+    press(renderer, "practice-tab");
+    expect(findByTestId(renderer, "custom-sprint-setup")).toBeTruthy();
+    expect(() => findByTestId(renderer, "custom-initial-rating-editor")).toThrow();
+  });
+
+  it("previews and commits the Custom setup destination from the rating editor", () => {
+    const systemBack = createTestSystemBackSource("android");
+    const renderer = renderScreen({ practiceService: createPlayedCustomService(), systemBack });
+
+    press(renderer, "practice-mode-custom");
+    press(renderer, "custom-initial-rating-row");
+    expect(findByTestId(renderer, "custom-initial-rating-editor")).toBeTruthy();
+
+    systemBack.startPredictive("left");
+    systemBack.progressPredictive(0.6, "left");
+    expect(collectText(findByTestId(renderer, "mobile-back-destination-preview-label")))
+      .toBe("Custom setup");
+    expect(collectText(findByTestId(renderer, "mobile-back-destination-preview-id")))
+      .toBe("custom-sprint-setup");
+
+    systemBack.cancelPredictive();
+    expect(findByTestId(renderer, "custom-initial-rating-editor")).toBeTruthy();
+
+    systemBack.startPredictive("right");
+    systemBack.progressPredictive(0.8, "right");
+    expect(systemBack.commitPredictive()).toBe(true);
+    expect(() => findByTestId(renderer, "custom-initial-rating-editor")).toThrow();
+    expect(findByTestId(renderer, "custom-sprint-setup")).toBeTruthy();
+  });
+
+  it("closes review analysis before returning the review to its owner", () => {
+    jest.setSystemTime(new Date("2026-06-21T12:00:00.000Z"));
+    const systemBack = createTestSystemBackSource("android");
+    const service = createDueReviewService(1);
+    service.recordReviewAttempt({
+      puzzleId: "review-badge-0",
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      result: "wrong",
+      submittedMove: "e2e3",
+      expectedMove: "e2e4",
+      startedAt: "2026-06-21T11:01:00.000Z"
+    }, "2026-06-21T11:01:08.000Z");
+    const renderer = renderScreen({ practiceService: service, systemBack });
+
+    press(renderer, "review-tab");
+    const completedAttempt = renderer.root.find(
+      (node) => typeof node.props.testID === "string"
+        && node.props.testID.startsWith("review-today-attempt-")
+        && node.props.accessibilityRole === "button"
+    );
+    act(() => completedAttempt.props.onPress());
+    press(renderer, "review-analysis-button");
+    expect(findByTestId(renderer, "review-close-analysis")).toBeTruthy();
+
+    let subscriptionsBeforeGesture = systemBack.subscribe.mock.calls.length;
+    let unsubscriptionsBeforeGesture = systemBack.unsubscribe.mock.calls.length;
+    systemBack.startPredictive("left");
+    systemBack.progressPredictive(0.55, "left");
+    expect(collectText(findByTestId(renderer, "mobile-back-destination-preview-label"))).toBe("Review session");
+    expect(systemBack.subscribe).toHaveBeenCalledTimes(subscriptionsBeforeGesture);
+    expect(systemBack.unsubscribe).toHaveBeenCalledTimes(unsubscriptionsBeforeGesture);
+
+    systemBack.cancelPredictive();
+    expect(findByTestId(renderer, "review-close-analysis")).toBeTruthy();
+    systemBack.startPredictive("right");
+    systemBack.progressPredictive(0.75, "right");
+    expect(systemBack.commitPredictive()).toBe(true);
+    expect(() => findByTestId(renderer, "review-close-analysis")).toThrow();
+    expect(findByTestId(renderer, "review-session")).toBeTruthy();
+
+    subscriptionsBeforeGesture = systemBack.subscribe.mock.calls.length;
+    unsubscriptionsBeforeGesture = systemBack.unsubscribe.mock.calls.length;
+    systemBack.startPredictive("left");
+    systemBack.progressPredictive(0.6, "left");
+    expect(collectText(findByTestId(renderer, "mobile-back-destination-preview-label"))).toBe("Review");
+    expect(systemBack.subscribe).toHaveBeenCalledTimes(subscriptionsBeforeGesture);
+    expect(systemBack.unsubscribe).toHaveBeenCalledTimes(unsubscriptionsBeforeGesture);
+    expect(systemBack.commitPredictive()).toBe(true);
+    expect(() => findByTestId(renderer, "review-session")).toThrow();
+    expect(findByTestId(renderer, "review-panel")).toBeTruthy();
+  });
+
+  it("returns a multi-context due review to its Review owner without advancing the queued group", () => {
+    const systemBack = createTestSystemBackSource("android");
+    const service = createMultiContextDueReviewService();
+    const renderer = renderScreen({ practiceService: service, systemBack });
+
+    press(renderer, "review-tab");
+    press(renderer, "review-start-due");
+    const firstPuzzleId = collectText(findByTestId(renderer, "review-current-puzzle-id"));
+
+    systemBack.startPredictive("left");
+    systemBack.progressPredictive(0.6, "left");
+    expect(collectText(findByTestId(renderer, "mobile-back-destination-preview-label"))).toBe("Review");
+    systemBack.cancelPredictive();
+    expect(collectText(findByTestId(renderer, "review-current-puzzle-id"))).toBe(firstPuzzleId);
+
+    systemBack.startPredictive("right");
+    expect(systemBack.commitPredictive()).toBe(true);
+
+    expect(() => findByTestId(renderer, "review-session")).toThrow();
+    expect(findByTestId(renderer, "review-panel")).toBeTruthy();
+    expect(service.listHistory({ source: "scheduled_review" })).toHaveLength(0);
+  });
+
+  it("commits the Review owner when a multi-context due review times out during Predictive Back", () => {
+    const systemBack = createTestSystemBackSource("android");
+    const service = createMultiContextDueReviewService();
+    const renderer = renderScreen({ practiceService: service, systemBack });
+
+    press(renderer, "review-tab");
+    press(renderer, "review-start-due");
+    act(() => {
+      jest.advanceTimersByTime(39_750);
+    });
+    systemBack.startPredictive("left");
+
+    act(() => {
+      jest.advanceTimersByTime(1_000);
+    });
+
+    expect(collectText(findByTestId(renderer, "mobile-back-destination-preview-label"))).toBe("Review");
+    expect(findByTestId(renderer, "review-session")).toBeTruthy();
+    expect(service.listHistory({ source: "scheduled_review" }) as Array<{ submittedMove: string }>).toEqual([
+      expect.objectContaining({ submittedMove: "__timeout__" })
+    ]);
+
+    expect(systemBack.commitPredictive()).toBe(true);
+    expect(() => findByTestId(renderer, "review-session")).toThrow();
+    expect(findByTestId(renderer, "review-panel")).toBeTruthy();
+  });
+
+  it("ignores a stale multi-context completion after Predictive Back commits the Review owner", async () => {
+    const systemBack = createTestSystemBackSource("android");
+    const service = createMultiContextDueReviewService();
+    const renderer = renderScreen({ practiceService: service, systemBack });
+
+    press(renderer, "review-tab");
+    press(renderer, "review-start-due");
+    await boardMove(renderer, "c4b5");
+    systemBack.startPredictive("left");
+    expect(systemBack.commitPredictive()).toBe(true);
+    expect(findByTestId(renderer, "review-panel")).toBeTruthy();
+
+    await settleFeedbackSnapshot();
+
+    expect(() => findByTestId(renderer, "review-session")).toThrow();
+    expect(findByTestId(renderer, "review-panel")).toBeTruthy();
+  });
+
+  it("lets a pending multi-context completion advance after Predictive Back is cancelled", async () => {
+    const systemBack = createTestSystemBackSource("android");
+    const service = createMultiContextDueReviewService();
+    const renderer = renderScreen({ practiceService: service, systemBack });
+
+    press(renderer, "review-tab");
+    press(renderer, "review-start-due");
+    const firstTimer = collectText(findByTestId(renderer, "review-timer"));
+    await boardMove(renderer, "c4b5");
+    systemBack.startPredictive("right");
+    systemBack.cancelPredictive();
+
+    await settleFeedbackSnapshot();
+
+    expect(findByTestId(renderer, "review-session")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "review-timer"))).not.toBe(firstTimer);
+  });
+
+  it("previews Practice for session-mistake review while analysis returns to the review first", async () => {
+    const systemBack = createTestSystemBackSource("android");
+    const renderer = renderStandardSequenceScreen({ systemBack });
+
+    await openSessionMistakeReview(renderer);
+    press(renderer, "review-analysis-button");
+    systemBack.startPredictive("left");
+    systemBack.progressPredictive(0.5, "left");
+    expect(collectText(findByTestId(renderer, "mobile-back-destination-preview-label"))).toBe("Review session");
+    expect(systemBack.commitPredictive()).toBe(true);
+    expect(findByTestId(renderer, "review-session")).toBeTruthy();
+    expect(() => findByTestId(renderer, "review-close-analysis")).toThrow();
+
+    systemBack.startPredictive("right");
+    systemBack.progressPredictive(0.7, "right");
+    expect(collectText(findByTestId(renderer, "mobile-back-destination-preview-label"))).toBe("Practice");
+    systemBack.cancelPredictive();
+    expect(findByTestId(renderer, "review-session")).toBeTruthy();
+
+    systemBack.startPredictive("right");
+    expect(systemBack.commitPredictive()).toBe(true);
+    expect(findByTestId(renderer, "practice-home")).toBeTruthy();
+    expect(() => findByTestId(renderer, "review-session")).toThrow();
+  });
+
+  it("does not subscribe the iOS shell to Android system Back", () => {
+    const systemBack = createTestSystemBackSource("ios");
+
+    renderScreen({ systemBack });
+
+    expect(systemBack.subscribe).not.toHaveBeenCalled();
+    expect(systemBack.setPredictiveBackEnabled).not.toHaveBeenCalled();
+  });
+
+  it("previews the typed destination during Predictive Back, cancels cleanly, and commits parity", () => {
+    const systemBack = createTestSystemBackSource("android");
+    const renderer = renderScreen({ systemBack });
+
+    press(renderer, "settings-tab");
+    expect(systemBack.setPredictiveBackEnabled).toHaveBeenLastCalledWith(true);
+    systemBack.startPredictive("left");
+    systemBack.progressPredictive(0.6, "left");
+    expect(collectText(findByTestId(renderer, "mobile-back-destination-preview-label"))).toBe("Practice");
+    expect(collectText(findByTestId(renderer, "mobile-back-destination-preview-id"))).toBe("tab-practice");
+    expect(findByTestId(renderer, "settings-panel")).toBeTruthy();
+
+    systemBack.cancelPredictive();
+    expect(() => findByTestId(renderer, "mobile-back-destination-preview")).toThrow();
+    expect(findByTestId(renderer, "settings-panel")).toBeTruthy();
+
+    systemBack.startPredictive("right");
+    systemBack.progressPredictive(0.8, "right");
+    expect(systemBack.commitPredictive()).toBe(true);
+    expect(() => findByTestId(renderer, "mobile-back-destination-preview")).toThrow();
+    expect(findByTestId(renderer, "practice-home")).toBeTruthy();
+    expect(systemBack.setPredictiveBackEnabled).toHaveBeenLastCalledWith(false);
+  });
+
+  it("replaces the Android Back listener and removes it on unmount", () => {
+    const sourceA = createTestSystemBackSource("android");
+    const sourceB = createTestSystemBackSource("android");
+    const platformCapabilities = createTestMobilePlatformCapabilities();
+    let renderer: TestRenderer.ReactTestRenderer | undefined;
+
+    act(() => {
+      renderer = TestRenderer.create(
+        <PracticePocScreen platformCapabilities={platformCapabilities} systemBack={sourceA} />
+      );
+    });
+    expect(sourceA.subscribe).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      renderer?.update(
+        <PracticePocScreen platformCapabilities={platformCapabilities} systemBack={sourceB} />
+      );
+    });
+    expect(sourceA.unsubscribe).toHaveBeenCalledTimes(1);
+    expect(sourceB.subscribe).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      renderer?.unmount();
+    });
+    expect(sourceB.unsubscribe).toHaveBeenCalledTimes(1);
+    expect(sourceB.setPredictiveBackEnabled).toHaveBeenLastCalledWith(false);
+  });
+
   it("does not initialize Stockfish while rendering the Practice home", async () => {
     const prewarm = jest.fn(async () => true);
 
@@ -2872,6 +3435,38 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "review-line-continue")).toThrow();
   });
 
+  it("keeps a timed-out review session mounted until Predictive Back settles", () => {
+    const systemBack = createTestSystemBackSource("android");
+    const service = createMobilePracticeService("random1000");
+    service.startSprint(
+      { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
+      "2026-06-20T00:00:00.000Z"
+    );
+    service.submitMove("c4b5", "2026-06-20T00:00:05.000Z");
+    const renderer = renderScreen({ practiceService: service, systemBack });
+
+    press(renderer, "review-tab");
+    press(renderer, "review-start-due");
+    act(() => {
+      jest.advanceTimersByTime(39_750);
+    });
+    systemBack.startPredictive("left");
+
+    act(() => {
+      jest.advanceTimersByTime(1_000);
+    });
+
+    expect(collectText(findByTestId(renderer, "mobile-back-destination-preview-label"))).toBe("Review");
+    expect(findByTestId(renderer, "review-session")).toBeTruthy();
+    expect(service.listHistory({ source: "scheduled_review" }) as Array<{ submittedMove: string }>).toEqual([
+      expect.objectContaining({ submittedMove: "__timeout__" })
+    ]);
+
+    expect(systemBack.commitPredictive()).toBe(true);
+    expect(() => findByTestId(renderer, "review-session")).toThrow();
+    expect(findByTestId(renderer, "review-panel")).toBeTruthy();
+  });
+
   it("keeps the daily review denominator fixed and resumes an unfinished puzzle after exit", () => {
     jest.setSystemTime(new Date("2026-06-21T12:00:00.000Z"));
     const service = createDueReviewService(2);
@@ -3918,6 +4513,34 @@ describe("PracticePocScreen", () => {
     expect(notificationClient.requestCount).toBe(1);
     expect(() => findByTestId(renderer, "review-reminder-permission-prompt")).toThrow();
   });
+
+  it("dismisses the review reminder prompt before its underlying Review session", async () => {
+    const systemBack = createTestSystemBackSource("android");
+    const notificationClient = new FakeReviewReminderNotificationClient("not_determined", "authorized");
+    const service = createMobilePracticeService("random1000");
+    service.startSprint(
+      { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
+      "2026-06-20T00:00:00.000Z"
+    );
+    service.submitMove("c4b5", "2026-06-20T00:00:05.000Z");
+    const renderer = renderScreen({
+      practiceService: service,
+      reviewReminderNotificationClient: notificationClient,
+      systemBack
+    });
+    await act(async () => {});
+
+    press(renderer, "review-tab");
+    press(renderer, "review-start-due");
+    await boardMove(renderer, "c4b5");
+    await settleFeedbackSnapshot();
+    expect(findByTestId(renderer, "review-reminder-permission-prompt")).toBeTruthy();
+
+    expect(systemBack.invoke()).toBe(true);
+    expect(() => findByTestId(renderer, "review-reminder-permission-prompt")).toThrow();
+    expect(findByTestId(renderer, "review-panel")).toBeTruthy();
+    expect(notificationClient.requestCount).toBe(0);
+  });
 });
 
 function createScriptedStockfishTransport(
@@ -3956,9 +4579,45 @@ function createScriptedStockfishTransport(
 }
 
 type RenderScreenOptions = TestMobilePlatformCapabilityOverrides &
-  Pick<React.ComponentProps<typeof PracticePocScreen>, "currentTimeMs" | "debugTrace" | "puzzleSelectionSeed" | "standardTargetCorrect"> & {
+  Pick<React.ComponentProps<typeof PracticePocScreen>, "currentTimeMs" | "debugTrace" | "puzzleSelectionSeed" | "standardTargetCorrect" | "systemBack"> & {
     platformCapabilities?: MobilePlatformCapabilities;
   };
+
+function createPlayedCustomService(): PracticeService {
+  const store = new MemoryStore();
+  store.seedPuzzles([sharedHistoryPuzzle()]);
+  store.saveRating({
+    key: "custom 5/20",
+    generation: 0,
+    rating: 900,
+    ratingDeviation: 180,
+    volatility: 0.05,
+    games: 1
+  });
+  store.createSprintSession(completedRatingSprintState({
+    id: "back-played-custom",
+    mode: "custom",
+    completedAt: "2026-07-07T00:00:05.000Z",
+    ratingBefore: 600,
+    ratingAfter: 900
+  }));
+  return new PracticeService(store);
+}
+
+function createMultiContextDueReviewService(): PracticeService {
+  const service = createMobilePracticeService("random1000");
+  service.startSprint(
+    { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
+    "2026-06-20T00:00:00.000Z"
+  );
+  service.submitMove("c4b5", "2026-06-20T00:00:05.000Z");
+  service.recordReviewResult(
+    { puzzleId: "000hf", mode: "standard", ratingKey: "standard 5/30" },
+    "wrong",
+    "2026-06-20T00:00:10.000Z"
+  );
+  return service;
+}
 
 function renderScreen({
   platformCapabilities,
@@ -3966,6 +4625,7 @@ function renderScreen({
   debugTrace,
   puzzleSelectionSeed,
   standardTargetCorrect,
+  systemBack,
   ...capabilityOverrides
 }: RenderScreenOptions = {}): TestRenderer.ReactTestRenderer {
   let renderer: TestRenderer.ReactTestRenderer | undefined;
@@ -3977,6 +4637,7 @@ function renderScreen({
         debugTrace={debugTrace}
         puzzleSelectionSeed={puzzleSelectionSeed}
         standardTargetCorrect={standardTargetCorrect}
+        systemBack={systemBack}
       />
     );
   });
@@ -3985,6 +4646,64 @@ function renderScreen({
   }
   renderers.push(renderer);
   return renderer;
+}
+
+function createTestSystemBackSource(platform: "android" | "ios"): MobileSystemBackSource & {
+  cancelPredictive: () => void;
+  commitPredictive: () => boolean;
+  invoke: () => boolean;
+  progressPredictive: (progress: number, edge?: "left" | "right") => void;
+  setPredictiveBackEnabled: jest.Mock;
+  startPredictive: (edge?: "left" | "right") => void;
+  subscribe: jest.Mock;
+  unsubscribe: jest.Mock;
+} {
+  let listener: Parameters<MobileSystemBackSource["subscribe"]>[0] | null = null;
+  const unsubscribe = jest.fn();
+  const subscribe = jest.fn((nextListener: Parameters<MobileSystemBackSource["subscribe"]>[0]) => {
+    listener = nextListener;
+    return () => {
+      unsubscribe();
+      if (listener === nextListener) {
+        listener = null;
+      }
+    };
+  });
+  return {
+    platform,
+    setPredictiveBackEnabled: jest.fn(),
+    subscribe,
+    unsubscribe,
+    invoke: () => {
+      if (!listener) {
+        return false;
+      }
+      let handled = false;
+      act(() => {
+        handled = listener?.onCommit("button") ?? false;
+      });
+      return handled;
+    },
+    startPredictive: (edge = "left") => {
+      act(() => listener?.onStart(edge));
+    },
+    progressPredictive: (progress, edge = "left") => {
+      act(() => listener?.onProgress(progress, edge));
+    },
+    cancelPredictive: () => {
+      act(() => listener?.onCancel());
+    },
+    commitPredictive: () => {
+      if (!listener) {
+        return false;
+      }
+      let handled = false;
+      act(() => {
+        handled = listener?.onCommit("predictive") ?? false;
+      });
+      return handled;
+    }
+  };
 }
 
 function renderStandardSequenceScreen(
@@ -4167,6 +4886,17 @@ function localTime(iso: string | undefined): { hour: number; minute: number } {
     hour: date.getHours(),
     minute: date.getMinutes()
   };
+}
+
+async function openSessionMistakeReview(renderer: TestRenderer.ReactTestRenderer): Promise<void> {
+  startStandardSprint(renderer);
+  await boardMove(renderer, "c4b5");
+  await settleFeedbackSnapshot();
+  await boardMove(renderer, "g6g5");
+  await settleFeedbackSnapshot();
+  await boardMove(renderer, "a4b6");
+  await settleFeedbackSnapshot();
+  press(renderer, "review-mistakes-button");
 }
 
 async function boardMove(

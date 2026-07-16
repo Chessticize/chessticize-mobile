@@ -1,13 +1,25 @@
 package com.chessticize.mobile
 
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
+import androidx.activity.OnBackPressedCallback
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
 import com.facebook.react.defaults.DefaultReactActivityDelegate
 
-class MainActivity : ReactActivity() {
+interface ReactNativeBackCallbackController {
+  fun setReactNativeBackHandlingEnabled(enabled: Boolean)
+}
+
+class MainActivity : ReactActivity(), ReactNativeBackCallbackController {
+  private val reactNativeBackPressedCallback: OnBackPressedCallback by lazy(LazyThreadSafetyMode.NONE) {
+    val callbackField = ReactActivity::class.java.getDeclaredField("mBackPressedCallback")
+    @Suppress("DEPRECATION")
+    callbackField.isAccessible = true
+    callbackField.get(this) as OnBackPressedCallback
+  }
 
   override fun onCreate(savedInstanceState: Bundle?) {
     ChessticizeTestLaunchArguments.capture(intent)
@@ -21,6 +33,19 @@ class MainActivity : ReactActivity() {
   }
 
   /**
+   * React Native 0.86 keeps its target-36 callback private. The typed native
+   * bridge owns app-level Back with one animation callback, so its registration
+   * disables this competing default-priority callback. At the idle root both
+   * callbacks are disabled and Android owns the predictive home animation.
+   */
+  override fun setReactNativeBackHandlingEnabled(enabled: Boolean) {
+    if (Build.VERSION.SDK_INT < 36 || applicationInfo.targetSdkVersion < 36) {
+      return
+    }
+    reactNativeBackPressedCallback.isEnabled = enabled
+  }
+
+  /**
    * Returns the name of the main component registered from JavaScript. This is used to schedule
    * rendering of the component.
    */
@@ -31,5 +56,5 @@ class MainActivity : ReactActivity() {
    * which allows you to enable New Architecture with a single boolean flags [fabricEnabled]
    */
   override fun createReactActivityDelegate(): ReactActivityDelegate =
-      DefaultReactActivityDelegate(this, mainComponentName, fabricEnabled)
+    DefaultReactActivityDelegate(this, mainComponentName, fabricEnabled)
 }

@@ -103,6 +103,20 @@ import {
   planPremoveReplay,
   type BoardInputLockMode
 } from "../backend/premove.ts";
+import {
+  mobileBackDestination,
+  resolveMobileBackIntent,
+  type MobileBackDestination,
+  type MobileBackDetail,
+  type MobileBackIntent,
+  type MobileBackState,
+  type MobileBackTab,
+  type MobileBackTransient
+} from "../navigation/mobileBackContract.ts";
+import type {
+  MobileSystemBackEdge,
+  MobileSystemBackSource
+} from "../navigation/mobileSystemBack.ts";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Chess, type Move, type PieceSymbol, type Square } from "chess.js";
 
@@ -112,9 +126,15 @@ interface Props {
   currentTimeMs?: () => number;
   puzzleSelectionSeed?: string;
   standardTargetCorrect?: number;
+  systemBack?: MobileSystemBackSource;
 }
 
-type Tab = "practice" | "review" | "history" | "settings" | "analysis";
+type Tab = MobileBackTab;
+
+type MobileBackPreview = MobileBackDestination & {
+  edge: MobileSystemBackEdge;
+  progress: number;
+};
 
 type SessionFeedback = PuzzleFeedback | null;
 type AnalysisEngineStatus = "idle" | "thinking" | "stockfish" | "fallback" | "error";
@@ -198,6 +218,13 @@ type FeedbackBoardSnapshot = {
   feedback: PuzzleFeedback;
   puzzleId: string;
 };
+
+type ReviewBackCommand = {
+  id: number;
+  kind: "close-analysis" | "return-to-owner";
+};
+
+type DeferBackRelevantTransition = (key: string, resumeAfterCancel: () => void) => boolean;
 
 const UI_PADDING = 16;
 const MIN_BOARD = 280;
@@ -358,7 +385,8 @@ export function PracticePocScreen({
   debugTrace,
   currentTimeMs = Date.now,
   puzzleSelectionSeed,
-  standardTargetCorrect
+  standardTargetCorrect,
+  systemBack
 }: Props): React.JSX.Element {
   const [puzzleSource, setPuzzleSource] = useState<MobilePuzzleSource>("bundledCore");
   const service = platformCapabilities.storage.practiceService;
@@ -378,6 +406,14 @@ export function PracticePocScreen({
   const feedbackSnapshotTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sprintStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startingModeRef = useRef<SprintMode | null>(null);
+  const deferredBackTransitionsRef = useRef(new Map<string, () => void>());
+  const resumeDeferredBackTransitionsRef = useRef<(() => void) | null>(null);
+  const predictiveBackIntentRef = useRef<MobileBackIntent | null>(null);
+  const predictiveBackStateRef = useRef<MobileBackState | null>(null);
+  const mobileBackStateRef = useRef<MobileBackState | null>(null);
+  const executeMobileBackIntentRef = useRef<(
+    (intent: MobileBackIntent, resolvedState: MobileBackState) => boolean
+  ) | null>(null);
   const reminderScheduleKeyRef = useRef<string | null>(null);
   const scheduledReviewAttemptCountRef = useRef(scheduledReviewAttemptCount(service));
   const reviewReminderPromptDismissedRef = useRef(false);
@@ -386,6 +422,7 @@ export function PracticePocScreen({
   const boardFenRef = useRef<string | null>(null);
   const feedbackSnapshotRef = useRef<FeedbackBoardSnapshot | null>(null);
   const nowMsRef = useRef<number>(currentTimeMs());
+  const reviewBackCommandIdRef = useRef(0);
   const { height, width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
@@ -421,7 +458,7 @@ export function PracticePocScreen({
   const [historyRatingKey, setHistoryRatingKey] = useState<string | null>(null);
   const [historyReviewEntries, setHistoryReviewEntries] = useState<ReviewEntry[]>([]);
   const [historyReviewInitialIndex, setHistoryReviewInitialIndex] = useState(0);
-  const [reviewSessionActive, setReviewSessionActive] = useState(false);
+  const [reviewSessionSource, setReviewSessionSource] = useState<ReviewEntry["source"] | null>(null);
   const [customSprintMode, setCustomSprintMode] = useState<"custom" | "arrow_duel">("custom");
   const [customDurationSeconds, setCustomDurationSeconds] = useState(5 * 60);
   const [customPerPuzzleSeconds, setCustomPerPuzzleSeconds] = useState(20);
@@ -431,6 +468,14 @@ export function PracticePocScreen({
   const [notificationPermissionStatus, setNotificationPermissionStatus] = useState<ReviewReminderPermissionStatus>("unavailable");
   const [reviewReminderScheduleStatus, setReviewReminderScheduleStatus] = useState("unavailable");
   const [reviewReminderPermissionPromptVisible, setReviewReminderPermissionPromptVisible] = useState(false);
+  const [practiceExitConfirmationVisible, setPracticeExitConfirmationVisible] = useState(false);
+  const [historyFiltersExpanded, setHistoryFiltersExpanded] = useState(false);
+  const [reviewFiltersExpanded, setReviewFiltersExpanded] = useState(false);
+  const [settingsAdvancedRatingsOpen, setSettingsAdvancedRatingsOpen] = useState(false);
+  const [customRatingEditorOpen, setCustomRatingEditorOpen] = useState(false);
+  const [reviewAnalysisOpen, setReviewAnalysisOpen] = useState(false);
+  const [reviewBackCommand, setReviewBackCommand] = useState<ReviewBackCommand | null>(null);
+  const [mobileBackPreview, setMobileBackPreview] = useState<MobileBackPreview | null>(null);
   const [iCloudSyncEnabled, setICloudSyncEnabled] = useState(() => service.getSettings().sync.iCloudEnabled);
   const [iCloudSyncStatus, setICloudSyncStatus] = useState(() => service.getSettings().sync.iCloudEnabled ? "Ready" : "Off");
   const [, setSettingsRevision] = useState(0);
@@ -447,6 +492,12 @@ export function PracticePocScreen({
   const isFinished = state !== null && !isOpenSession;
   const isShowingFeedbackSnapshot = feedbackSnapshot !== null;
   const shouldShowSessionBoard = isActive || isShowingFeedbackSnapshot;
+
+  useEffect(() => {
+    if (!isOpenSession && practiceExitConfirmationVisible) {
+      setPracticeExitConfirmationVisible(false);
+    }
+  }, [isOpenSession, practiceExitConfirmationVisible]);
   const selectedConfig = useMemo(
     () => sprintConfigFor(mode === "custom" ? customSprintMode : mode, customDurationSeconds, customPerPuzzleSeconds, mode === "custom", themeForCustomSprint(customTheme)),
     [customDurationSeconds, customPerPuzzleSeconds, customSprintMode, customTheme, mode]
@@ -536,6 +587,8 @@ export function PracticePocScreen({
       canceled = true;
       unsubscribe();
     };
+    // Notification callbacks intentionally use the current render-local queue opener.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notificationClient, service]);
 
   useEffect(() => {
@@ -593,23 +646,33 @@ export function PracticePocScreen({
       return;
     }
 
-    try {
-      const expired = service.submitMove("__expired__", new Date(nowMs).toISOString());
-      commitState(expired.state);
-      setFeedback((expired.feedback as SessionFeedback) ?? null);
-      refreshState();
-    } catch (caught) {
-      setError(errorMessage(caught));
+    const settleExpiredSprint = () => {
+      try {
+        const expired = service.submitMove("__expired__", new Date(nowMs).toISOString());
+        commitState(expired.state);
+        setFeedback((expired.feedback as SessionFeedback) ?? null);
+        refreshState();
+      } catch (caught) {
+        setError(errorMessage(caught));
+      }
+    };
+    if (practiceExitConfirmationVisible) {
+      return;
     }
+    if (deferBackRelevantTransition("active-sprint-expiry", settleExpiredSprint)) {
+      return;
+    }
+    settleExpiredSprint();
     // refreshState is deliberately omitted because its identity changes on each render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nowMs, service, state]);
+  }, [nowMs, practiceExitConfirmationVisible, service, state]);
 
   useEffect(() => {
     const globals = globalThis as unknown as {
       __CHESSTICIZE_CHESSBOARD_DEBUG__?: boolean;
       __CHESSTICIZE_CHESSBOARD_DEBUG_SINK__?: (event: string, details: Record<string, unknown>) => void;
     };
+    const deferredBackTransitions = deferredBackTransitionsRef.current;
     globals.__CHESSTICIZE_CHESSBOARD_DEBUG__ = isPracticeDebugEnabled();
     globals.__CHESSTICIZE_CHESSBOARD_DEBUG_SINK__ = (event, details) => {
       const message = `${event} ${JSON.stringify(details)}`;
@@ -621,6 +684,8 @@ export function PracticePocScreen({
         clearTimeout(sprintStartTimerRef.current);
         sprintStartTimerRef.current = null;
       }
+      startingModeRef.current = null;
+      deferredBackTransitions.clear();
       globals.__CHESSTICIZE_CHESSBOARD_DEBUG__ = undefined;
       globals.__CHESSTICIZE_CHESSBOARD_DEBUG_SINK__ = undefined;
     };
@@ -628,6 +693,22 @@ export function PracticePocScreen({
 
   function nowIso(): string {
     return new Date(nowMsRef.current).toISOString();
+  }
+
+  function navigateToTab(nextTab: Tab): void {
+    if (nextTab !== "history") {
+      setHistoryFiltersExpanded(false);
+    }
+    if (nextTab !== "review") {
+      setReviewFiltersExpanded(false);
+    }
+    if (nextTab !== "settings") {
+      setSettingsAdvancedRatingsOpen(false);
+    }
+    if (nextTab !== "practice") {
+      setCustomRatingEditorOpen(false);
+    }
+    setTab(nextTab);
   }
 
   function captureLiveNowIso(): string {
@@ -669,8 +750,13 @@ export function PracticePocScreen({
     try {
       const status = await notificationClient.requestAuthorization();
       setNotificationPermissionStatus(status);
-      setReviewReminderPermissionPromptVisible(false);
-      reviewReminderPromptDismissedRef.current = true;
+      const finishPermissionPrompt = () => {
+        setReviewReminderPermissionPromptVisible(false);
+        reviewReminderPromptDismissedRef.current = true;
+      };
+      if (!deferBackRelevantTransition("review-reminder-permission", finishPermissionPrompt)) {
+        finishPermissionPrompt();
+      }
       if (status === "authorized") {
         refreshReviewReminder("permission", true);
       }
@@ -773,7 +859,10 @@ export function PracticePocScreen({
     ) {
       return;
     }
-    setReviewReminderPermissionPromptVisible(true);
+    const showPermissionPrompt = () => setReviewReminderPermissionPromptVisible(true);
+    if (!deferBackRelevantTransition("review-reminder-permission", showPermissionPrompt)) {
+      showPermissionPrompt();
+    }
   }
 
   function dismissReviewReminderPermissionPrompt(): void {
@@ -916,12 +1005,57 @@ export function PracticePocScreen({
       startingModeRef.current = nextMode;
       setStartingMode(nextMode);
       sprintStartTimerRef.current = setTimeout(() => {
-        sprintStartTimerRef.current = null;
-        performStartSprint(nextMode, useCustomTiming);
+        finishDelayedSprintStart(nextMode, useCustomTiming);
       }, ARROW_DUEL_LOADING_TRANSITION_MS);
       return;
     }
     performStartSprint(nextMode, useCustomTiming);
+  }
+
+  function finishDelayedSprintStart(nextMode: SprintMode, useCustomTiming: boolean): void {
+    sprintStartTimerRef.current = null;
+    if (startingModeRef.current !== nextMode) {
+      return;
+    }
+    if (deferBackRelevantTransition("delayed-sprint-start", () => {
+      if (startingModeRef.current === nextMode) {
+        performStartSprint(nextMode, useCustomTiming);
+      }
+    })) {
+      return;
+    }
+    performStartSprint(nextMode, useCustomTiming);
+  }
+
+  function deferBackRelevantTransition(key: string, resumeAfterCancel: () => void): boolean {
+    if (!predictiveBackIntentRef.current) {
+      return false;
+    }
+    // Autonomous work may finish while Android is revealing a destination.
+    // Keep that destination mounted until the gesture settles: cancel resumes
+    // the work, while commit lets the frozen Back intent supersede it.
+    deferredBackTransitionsRef.current.set(key, resumeAfterCancel);
+    return true;
+  }
+
+  function resumeDeferredBackTransitions(): void {
+    const transitions = [...deferredBackTransitionsRef.current.values()];
+    deferredBackTransitionsRef.current.clear();
+    for (const resume of transitions) {
+      resume();
+    }
+  }
+
+  resumeDeferredBackTransitionsRef.current = resumeDeferredBackTransitions;
+
+  function cancelStartingSprint(): void {
+    if (sprintStartTimerRef.current) {
+      clearTimeout(sprintStartTimerRef.current);
+      sprintStartTimerRef.current = null;
+    }
+    deferredBackTransitionsRef.current.delete("delayed-sprint-start");
+    startingModeRef.current = null;
+    setStartingMode(null);
   }
 
   function performStartSprint(nextMode: SprintMode, useCustomTiming: boolean): void {
@@ -961,7 +1095,7 @@ export function PracticePocScreen({
       pendingPremoveRef.current = null;
       commitBoardInputLocked(false, "start", started.currentPuzzle?.puzzle.id ?? null);
       clearFeedbackSnapshot();
-      setTab("practice");
+      navigateToTab("practice");
       refreshState();
     } catch (caught) {
       setError(errorMessage(caught));
@@ -1284,7 +1418,7 @@ export function PracticePocScreen({
       setFeedbackPuzzleId(null);
       clearFeedbackSnapshot();
       commitBoardInputLocked(false, "resume", resumed.currentPuzzle?.puzzle.id ?? null);
-      setTab("practice");
+      navigateToTab("practice");
       refreshState();
     } catch (caught) {
       setError(errorMessage(caught));
@@ -1296,17 +1430,17 @@ export function PracticePocScreen({
     const reviewItems = sessionId ? service.getSessionMistakeReview(sessionId) : [];
     resetToIdle();
     setSessionMistakeReviewItems(reviewItems);
-    setTab("review");
+    navigateToTab("review");
   }
 
   function openReviewQueue(): void {
     setSessionMistakeReviewItems([]);
-    setTab("review");
+    navigateToTab("review");
   }
 
   function exitSessionReview(): void {
     setSessionMistakeReviewItems([]);
-    setTab("practice");
+    navigateToTab("practice");
   }
 
   function openHistoryReview(attemptId: string): void {
@@ -1732,7 +1866,182 @@ export function PracticePocScreen({
   const historyAvailableThemes = historyView.availableThemes;
   const historyPage = historyView.page;
   const contentOwnsHeader = tab === "review" || tab === "history";
-  const reviewSurfaceOpen = reviewSessionActive || historyReviewEntries.length > 0;
+  const reviewSurfaceOpen = reviewSessionSource !== null || historyReviewEntries.length > 0;
+  const topBackTransient: MobileBackTransient | null = startingMode
+    ? "starting-practice"
+    : practiceExitConfirmationVisible
+      ? "practice-exit-confirmation"
+      : reviewReminderPermissionPromptVisible
+        ? "review-reminder-prompt"
+        : tab === "history" && historyFiltersExpanded
+          ? "history-filters"
+          : tab === "review" && reviewFiltersExpanded
+            ? "review-filters"
+            : tab === "settings" && settingsAdvancedRatingsOpen
+              ? "settings-advanced-ratings"
+              : tab === "practice" && mode === "custom" && customRatingEditorOpen
+                ? "custom-rating-editor"
+                : null;
+  const backDetail = useMemo<MobileBackDetail | null>(
+    () => reviewAnalysisOpen && (tab === "history" || tab === "review")
+      ? { kind: "review-analysis", owner: tab }
+      : reviewSurfaceOpen && (tab === "history" || tab === "review")
+        ? {
+            kind: "review-session",
+            owner: tab === "review" && reviewSessionSource === "session" ? "practice" : tab
+          }
+        : tab === "analysis"
+          ? { kind: "stockfish-diagnostics", owner: "settings" }
+          : isFinished
+            ? { kind: "sprint-result", owner: "practice" }
+            : tab === "practice" && state === null && mode === "custom"
+              ? { kind: "custom-practice", owner: "practice" }
+              : null,
+    [isFinished, mode, reviewAnalysisOpen, reviewSessionSource, reviewSurfaceOpen, state, tab]
+  );
+  const mobileBackState: MobileBackState = {
+    activePractice: isOpenSession,
+    detail: backDetail,
+    tab,
+    topTransient: topBackTransient
+  };
+  const predictiveBackEnabled = resolveMobileBackIntent(mobileBackState, "button").kind !== "delegate-platform";
+
+  function executeMobileBackIntent(
+    intent: MobileBackIntent,
+    resolvedState: MobileBackState = mobileBackState
+  ): boolean {
+    switch (intent.kind) {
+      case "dismiss-transient":
+        if (intent.transient === "practice-exit-confirmation") {
+          setPracticeExitConfirmationVisible(false);
+        } else if (intent.transient === "review-reminder-prompt") {
+          dismissReviewReminderPermissionPrompt();
+        } else if (intent.transient === "history-filters") {
+          setHistoryFiltersExpanded(false);
+        } else if (intent.transient === "review-filters") {
+          setReviewFiltersExpanded(false);
+        } else if (intent.transient === "settings-advanced-ratings") {
+          setSettingsAdvancedRatingsOpen(false);
+        } else if (intent.transient === "custom-rating-editor") {
+          setCustomRatingEditorOpen(false);
+        } else if (intent.transient === "starting-practice") {
+          cancelStartingSprint();
+        }
+        return true;
+      case "close-analysis":
+        reviewBackCommandIdRef.current += 1;
+        setReviewBackCommand({ id: reviewBackCommandIdRef.current, kind: intent.kind });
+        return true;
+      case "return-to-owner":
+        if (resolvedState.detail?.kind === "review-session") {
+          reviewBackCommandIdRef.current += 1;
+          setReviewBackCommand({ id: reviewBackCommandIdRef.current, kind: intent.kind });
+        } else if (resolvedState.detail?.kind === "stockfish-diagnostics") {
+          navigateToTab("settings");
+        } else if (resolvedState.detail?.kind === "custom-practice") {
+          setCustomRatingEditorOpen(false);
+          setMode("standard");
+        } else if (resolvedState.detail?.kind === "sprint-result") {
+          resetToIdle();
+        }
+        return true;
+      case "request-practice-exit":
+        setPracticeExitConfirmationVisible(true);
+        return true;
+      case "return-to-practice":
+        setSessionMistakeReviewItems([]);
+        setHistoryReviewEntries([]);
+        navigateToTab("practice");
+        return true;
+      case "delegate-platform":
+        return false;
+    }
+  }
+
+  mobileBackStateRef.current = mobileBackState;
+  executeMobileBackIntentRef.current = executeMobileBackIntent;
+
+  useEffect(() => {
+    if (systemBack?.platform !== "android") {
+      return undefined;
+    }
+
+    if (!predictiveBackIntentRef.current) {
+      systemBack.setPredictiveBackEnabled(predictiveBackEnabled);
+    }
+    // Product state may change during a live gesture. Availability is held
+    // until cancel/commit so the native callback and frozen snapshot survive.
+    return undefined;
+  }, [predictiveBackEnabled, systemBack]);
+
+  useEffect(() => {
+    if (systemBack?.platform !== "android") {
+      return undefined;
+    }
+
+    const deferredBackTransitions = deferredBackTransitionsRef.current;
+    const unsubscribe = systemBack.subscribe({
+      onStart(edge) {
+        const currentState = mobileBackStateRef.current;
+        if (!currentState) {
+          return;
+        }
+        const intent = resolveMobileBackIntent(currentState, "predictive");
+        const destination = mobileBackDestination(intent, currentState);
+        if (!destination) {
+          return;
+        }
+        predictiveBackIntentRef.current = intent;
+        predictiveBackStateRef.current = currentState;
+        setMobileBackPreview({ ...destination, edge, progress: 0 });
+      },
+      onProgress(progress, edge) {
+        setMobileBackPreview((current) => current
+          ? { ...current, edge, progress }
+          : current);
+      },
+      onCancel() {
+        predictiveBackIntentRef.current = null;
+        predictiveBackStateRef.current = null;
+        setMobileBackPreview(null);
+        resumeDeferredBackTransitionsRef.current?.();
+        const currentState = mobileBackStateRef.current;
+        if (currentState) {
+          const currentIntent = resolveMobileBackIntent(currentState, "button");
+          systemBack.setPredictiveBackEnabled(currentIntent.kind !== "delegate-platform");
+        }
+      },
+      onCommit(activation) {
+        const frozenIntent = activation === "predictive"
+          ? predictiveBackIntentRef.current
+          : null;
+        const frozenState = activation === "predictive"
+          ? predictiveBackStateRef.current
+          : null;
+        const currentState = mobileBackStateRef.current;
+        predictiveBackIntentRef.current = null;
+        predictiveBackStateRef.current = null;
+        deferredBackTransitionsRef.current.clear();
+        setMobileBackPreview(null);
+        if (!currentState) {
+          return false;
+        }
+        const currentIntent = resolveMobileBackIntent(currentState, "button");
+        systemBack.setPredictiveBackEnabled(currentIntent.kind !== "delegate-platform");
+        const intent = frozenIntent ?? resolveMobileBackIntent(currentState, activation);
+        return executeMobileBackIntentRef.current?.(intent, frozenState ?? currentState) ?? false;
+      }
+    });
+    return () => {
+      predictiveBackIntentRef.current = null;
+      predictiveBackStateRef.current = null;
+      deferredBackTransitions.clear();
+      systemBack.setPredictiveBackEnabled(false);
+      unsubscribe();
+    };
+  }, [systemBack]);
+
   const appChromeVisible = !isOpenSession && !isShowingFeedbackSnapshot && !reviewSurfaceOpen;
   const appHeaderVisible = appChromeVisible && !contentOwnsHeader;
   const sideNavigationVisible = appChromeVisible && adaptiveLayout.usesSideNavigation;
@@ -1774,7 +2083,9 @@ export function PracticePocScreen({
       state={state}
       sideToMove={displayedSideToMove}
       timerText={timerText}
-      onAbandon={isActive ? abandonSprint : undefined}
+      confirmAbandon={practiceExitConfirmationVisible}
+      onAbandon={isOpenSession ? abandonSprint : undefined}
+      onConfirmAbandonChange={setPracticeExitConfirmationVisible}
       onPause={isActive ? () => pauseActiveSprint("manual") : undefined}
       onResume={isPaused && state ? () => resumeSprint(state) : undefined}
     />
@@ -1782,7 +2093,7 @@ export function PracticePocScreen({
   const pausedSessionNode = isPaused && state ? (
     <PausedSessionPanel
       state={state}
-      onAbandon={abandonSprint}
+      onAbandon={() => setPracticeExitConfirmationVisible(true)}
       onResume={() => resumeSprint(state)}
     />
   ) : null;
@@ -1899,7 +2210,37 @@ export function PracticePocScreen({
   const errorNode = error ? <ErrorPanel error={error} /> : null;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.predictiveBackStage}>
+      {mobileBackPreview ? (
+        <View
+          accessible={false}
+          style={styles.predictiveBackDestination}
+          testID="mobile-back-destination-preview"
+        >
+          <Text style={styles.predictiveBackEyebrow}>Back to</Text>
+          <Text style={styles.predictiveBackDestinationLabel} testID="mobile-back-destination-preview-label">
+            {mobileBackPreview.label}
+          </Text>
+          <Text style={FABRIC_SAFE_HIDDEN_TEXT_STYLE} testID="mobile-back-destination-preview-id">
+            {mobileBackPreview.testID}
+          </Text>
+        </View>
+      ) : null}
+      <SafeAreaView
+        style={[
+          styles.safeArea,
+          mobileBackPreview
+            ? {
+              borderRadius: mobileBackPreview.progress * 20,
+              overflow: "hidden",
+              transform: [
+                { translateX: (mobileBackPreview.edge === "left" ? 1 : -1) * mobileBackPreview.progress * 36 },
+                { scale: 1 - mobileBackPreview.progress * 0.04 }
+              ]
+            }
+            : null
+        ]}
+      >
       <StatusBar barStyle="dark-content" />
       <View
         accessibilityLabel={`Layout ${adaptiveLayout.className}`}
@@ -1918,7 +2259,7 @@ export function PracticePocScreen({
                 openReviewQueue();
                 return;
               }
-              setTab(nextTab);
+              navigateToTab(nextTab);
             }}
           />
         ) : null}
@@ -2011,6 +2352,7 @@ export function PracticePocScreen({
                     availablePuzzleCount={customEligiblePuzzleCount}
                     ratingKey={selectedConfig.ratingKey}
                     initialRating={displayedCustomInitialRating}
+                    initialRatingEditorOpen={customRatingEditorOpen}
                     ratingPlayed={customRatingPlayed}
                     onInitialRatingChange={(nextRating) => {
                       if (customRatingPlayed) {
@@ -2021,8 +2363,12 @@ export function PracticePocScreen({
                       }
                       setCustomInitialRating(nextRating);
                     }}
+                    onInitialRatingEditorOpenChange={setCustomRatingEditorOpen}
                     onDurationChange={setCustomDurationSeconds}
-                    onClose={() => setMode("standard")}
+                    onClose={() => {
+                      setCustomRatingEditorOpen(false);
+                      setMode("standard");
+                    }}
                     customMode={customSprintMode}
                     onCustomModeChange={setCustomSprintMode}
                     onPerPuzzleChange={setCustomPerPuzzleSeconds}
@@ -2042,7 +2388,7 @@ export function PracticePocScreen({
                     onOpenHistory={() => {
                       setHistoryRatingKey(state.config.ratingKey);
                       setHistoryPageOffset(0);
-                      setTab("history");
+                      navigateToTab("history");
                     }}
                     onReview={state.mistakeCount > 0 ? showReviewMistakes : undefined}
                   />
@@ -2064,10 +2410,14 @@ export function PracticePocScreen({
                   adaptiveLayout={adaptiveLayout}
                   boardSize={boardSize}
                   currentTimeMs={currentTimeMs}
+                  deferBackRelevantTransition={deferBackRelevantTransition}
                   entries={historyReviewEntries}
                   initialIndex={historyReviewInitialIndex}
                   service={service}
-                  onExit={() => setHistoryReviewEntries([])}
+                  systemBackCommand={reviewBackCommand}
+                  onAnalysisActiveChange={setReviewAnalysisOpen}
+                  onComplete={() => setHistoryReviewEntries([])}
+                  onReturnToOwner={() => setHistoryReviewEntries([])}
                   stockfish={stockfish}
                 />
               ) : (
@@ -2088,6 +2438,8 @@ export function PracticePocScreen({
                   reviewStatusFilter={historyReviewStatusFilter}
                   sprintOnly={historySourceFilter === "sprint"}
                   wrongOnly={historyWrongOnly}
+                  filtersExpanded={historyFiltersExpanded}
+                  onFiltersExpandedChange={setHistoryFiltersExpanded}
                   onRatingKeyChange={(ratingKey) => {
                     setHistoryRatingKey(ratingKey);
                     setHistoryPageOffset(0);
@@ -2152,6 +2504,7 @@ export function PracticePocScreen({
                 nowMs={nowMs}
                 reviewQueue={reviewQueue}
                 currentTimeMs={currentTimeMs}
+                deferBackRelevantTransition={deferBackRelevantTransition}
                 service={service}
                 sessionMistakeReviewItems={sessionMistakeReviewItems}
                 onExitSessionReview={exitSessionReview}
@@ -2171,9 +2524,13 @@ export function PracticePocScreen({
                 }}
                 onPromoteNextFutureReviewsToDue={arePracticeTestControlsEnabled() ? promoteNextFutureReviewsToDue : undefined}
                 onScheduleTestReviewReminder={arePracticeTestControlsEnabled() ? scheduleDevReviewReminderNotification : undefined}
-                onSessionActiveChange={setReviewSessionActive}
+                onSessionSourceChange={setReviewSessionSource}
+                onAnalysisActiveChange={setReviewAnalysisOpen}
+                filtersExpanded={reviewFiltersExpanded}
+                onFiltersExpandedChange={setReviewFiltersExpanded}
                 reviewReminderScheduleStatus={arePracticeTestControlsEnabled() ? reviewReminderScheduleStatus : undefined}
                 stockfish={stockfish}
+                systemBackCommand={reviewBackCommand}
               />
             ) : null}
             {tab === "settings" ? (
@@ -2186,7 +2543,7 @@ export function PracticePocScreen({
                   { label: "Standard", record: service.getRating(defaultSprintConfig("standard").ratingKey) },
                   { label: "Arrow Duel", record: service.getRating(defaultSprintConfig("arrow_duel").ratingKey) }
                 ]}
-                onOpenDiagnostics={arePracticeTestControlsEnabled() ? () => setTab("analysis") : undefined}
+                onOpenDiagnostics={arePracticeTestControlsEnabled() ? () => navigateToTab("analysis") : undefined}
                 onAdjustRating={(ratingKey, nextRating) => {
                   const next = service.setRating(ratingKey, nextRating);
                   setSettingsRevision((current) => current + 1);
@@ -2197,6 +2554,8 @@ export function PracticePocScreen({
                 reviewReminderPreference={reviewReminderPreference}
                 iCloudSyncEnabled={iCloudSyncEnabled}
                 iCloudSyncStatus={iCloudSyncStatus}
+                advancedRatingsOpen={settingsAdvancedRatingsOpen}
+                onAdvancedRatingsOpenChange={setSettingsAdvancedRatingsOpen}
                 onOpenNotificationSettings={() => {
                   void openReviewReminderSystemSettings();
                 }}
@@ -2232,7 +2591,7 @@ export function PracticePocScreen({
                       openReviewQueue();
                       return;
                     }
-                    setTab(item.tab);
+                    navigateToTab(item.tab);
                   }}
                 />
               ))}
@@ -2255,7 +2614,8 @@ export function PracticePocScreen({
           </View>
         ) : null}
       </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
@@ -2635,11 +2995,13 @@ function CustomSprintSetup({
   customMode,
   durationSeconds,
   initialRating,
+  initialRatingEditorOpen,
   ratingPlayed,
   maxMistakes,
   onClose,
   onCustomModeChange,
   onInitialRatingChange,
+  onInitialRatingEditorOpenChange,
   perPuzzleSeconds,
   previousConfigs,
   ratingForKey,
@@ -2655,11 +3017,13 @@ function CustomSprintSetup({
   customMode: "custom" | "arrow_duel";
   durationSeconds: number;
   initialRating: number;
+  initialRatingEditorOpen: boolean;
   ratingPlayed: boolean;
   maxMistakes: number;
   onClose: () => void;
   onCustomModeChange: (next: "custom" | "arrow_duel") => void;
   onInitialRatingChange: (next: number) => void;
+  onInitialRatingEditorOpenChange: (open: boolean) => void;
   perPuzzleSeconds: number;
   previousConfigs: CustomSprintConfigRecord[];
   ratingForKey: (ratingKey: string) => number;
@@ -2731,9 +3095,11 @@ function CustomSprintSetup({
           onChange={onPerPuzzleChange}
         />
         <CustomInitialRatingRow
+          editOpen={initialRatingEditorOpen}
           key={ratingKey}
           played={ratingPlayed}
           onChange={onInitialRatingChange}
+          onEditOpenChange={onInitialRatingEditorOpenChange}
           value={initialRating}
         />
         <CustomValueRow
@@ -2852,15 +3218,18 @@ function CustomModeChoiceRow({
 }
 
 function CustomInitialRatingRow({
+  editOpen,
   played,
   onChange,
+  onEditOpenChange,
   value
 }: {
+  editOpen: boolean;
   played: boolean;
   onChange: (next: number) => void;
+  onEditOpenChange: (open: boolean) => void;
   value: number;
 }): React.JSX.Element {
-  const [editOpen, setEditOpen] = useState(false);
   if (!played) {
     return (
       <View
@@ -2888,7 +3257,7 @@ function CustomInitialRatingRow({
         accessibilityState={{ expanded: editOpen }}
         style={styles.customConfigRow}
         testID="custom-initial-rating-row"
-        onPress={() => setEditOpen((current) => !current)}
+        onPress={() => onEditOpenChange(!editOpen)}
       >
         <View style={styles.customChoiceCopy}>
           <Text style={styles.listText}>Edit ELO</Text>
@@ -3172,25 +3541,27 @@ function TestPuzzleSourceControl({
 
 function SessionStatusBar({
   compactMetrics = false,
+  confirmAbandon,
   mode,
   state,
   sideToMove,
   timerText,
   onAbandon,
+  onConfirmAbandonChange,
   onPause,
   onResume
 }: {
   compactMetrics?: boolean;
+  confirmAbandon: boolean;
   mode: SprintMode;
   state: SprintState;
   sideToMove: MoveSide | null;
   timerText: string;
   onAbandon?: () => void;
+  onConfirmAbandonChange: (visible: boolean) => void;
   onPause?: () => void;
   onResume?: () => void;
 }): React.JSX.Element {
-  const [confirmAbandon, setConfirmAbandon] = useState(false);
-
   return (
     <View style={styles.activeSessionShell} testID="active-session-shell">
       <View style={styles.sessionNavRow} testID="session-shell-nav">
@@ -3200,7 +3571,7 @@ function SessionStatusBar({
             accessibilityLabel="Abandon sprint"
             testID="session-abandon"
             style={styles.sessionNavButton}
-            onPress={() => setConfirmAbandon(true)}
+            onPress={() => onConfirmAbandonChange(true)}
           >
             <CloseGlyph />
           </Pressable>
@@ -3307,7 +3678,7 @@ function SessionStatusBar({
               accessibilityLabel="Cancel abandon sprint"
               testID="session-abandon-cancel"
               style={styles.secondaryButton}
-              onPress={() => setConfirmAbandon(false)}
+              onPress={() => onConfirmAbandonChange(false)}
             >
               <Text style={styles.secondaryButtonText}>Cancel</Text>
             </Pressable>
@@ -3317,7 +3688,7 @@ function SessionStatusBar({
               testID="session-abandon-confirm"
               style={styles.destructiveButton}
               onPress={() => {
-                setConfirmAbandon(false);
+                onConfirmAbandonChange(false);
                 onAbandon?.();
               }}
             >
@@ -4077,6 +4448,7 @@ function ArrowHint({
 function HistoryPanel({
   adaptiveLayout,
   attempts,
+  filtersExpanded,
   performance,
   ratingKeys,
   selectedRatingKey,
@@ -4101,12 +4473,14 @@ function HistoryPanel({
   onReviewStatusFilterChange,
   onPageOffsetChange,
   onOpenAttempt,
+  onFiltersExpandedChange,
   onResetFilters,
   onToggleSprintOnly,
   onToggleWrongOnly
 }: {
   adaptiveLayout: AdaptiveLayout;
   attempts: HistoryAttemptView[];
+  filtersExpanded: boolean;
   performance: HistoryPerformance;
   ratingKeys: string[];
   selectedRatingKey: string | null;
@@ -4131,11 +4505,11 @@ function HistoryPanel({
   onReviewStatusFilterChange: (status: "all" | HistoryReviewStatus) => void;
   onPageOffsetChange: (offset: number) => void;
   onOpenAttempt: (attemptId: string) => void;
+  onFiltersExpandedChange: (expanded: boolean) => void;
   onResetFilters: () => void;
   onToggleSprintOnly: () => void;
   onToggleWrongOnly: () => void;
 }): React.JSX.Element {
-  const [filtersExpanded, setFiltersExpanded] = useState(false);
   const visibleAttempts = attempts;
   const ratingPoints = performance.charts.rating;
   const latestRating = ratingPoints[ratingPoints.length - 1]?.value;
@@ -4171,7 +4545,7 @@ function HistoryPanel({
             accessibilityState={{ expanded: filtersExpanded }}
             testID="history-filter-toggle"
             style={[styles.reviewFilterButton, filtersExpanded ? styles.reviewFilterButtonActive : null]}
-            onPress={() => setFiltersExpanded((current) => !current)}
+            onPress={() => onFiltersExpandedChange(!filtersExpanded)}
           >
             <FilterGlyph active={filtersExpanded} />
           </Pressable>
@@ -5165,36 +5539,46 @@ function ReviewPanel({
   adaptiveLayout,
   boardSize,
   currentTimeMs,
+  deferBackRelevantTransition,
   dueReviewItems,
+  filtersExpanded,
   nowMs,
+  onAnalysisActiveChange,
   onExitSessionReview,
+  onFiltersExpandedChange,
   onOpenPractice,
   onPromoteNextFutureReviewsToDue,
   onReviewRecorded,
-  onSessionActiveChange,
+  onSessionSourceChange,
   onScheduleTestReviewReminder,
   reviewQueue,
   reviewReminderScheduleStatus,
   service,
   sessionMistakeReviewItems,
-  stockfish
+  stockfish,
+  systemBackCommand
 }: {
   adaptiveLayout: AdaptiveLayout;
   boardSize: number;
   currentTimeMs: () => number;
+  deferBackRelevantTransition: DeferBackRelevantTransition;
   dueReviewItems: ReviewQueueItem[];
+  filtersExpanded: boolean;
   nowMs: number;
+  onAnalysisActiveChange?: (active: boolean) => void;
   onExitSessionReview: () => void;
+  onFiltersExpandedChange: (expanded: boolean) => void;
   onOpenPractice: () => void;
   onPromoteNextFutureReviewsToDue?: () => ReviewQueueDuePromotionResult;
   onReviewRecorded: (completedAt: string) => void;
-  onSessionActiveChange?: (active: boolean) => void;
+  onSessionSourceChange?: (source: ReviewEntry["source"] | null) => void;
   onScheduleTestReviewReminder?: () => Promise<ReviewReminderScheduleResult>;
   reviewQueue: ReviewQueueState[];
   reviewReminderScheduleStatus?: string;
   service: PracticeService;
   sessionMistakeReviewItems: SessionMistakeReviewItem[];
   stockfish: MobileStockfishCapabilities;
+  systemBackCommand: ReviewBackCommand | null;
 }): React.JSX.Element {
   const sessionEntries = sessionMistakeReviewItems.map((item): ReviewEntry => ({
     puzzle: item.puzzle,
@@ -5210,8 +5594,9 @@ function ReviewPanel({
   const [activeEntries, setActiveEntries] = useState<ReviewEntry[]>(preferredEntries);
   const [activeEntryInitialIndex, setActiveEntryInitialIndex] = useState(0);
   const [queuedReviewGroups, setQueuedReviewGroups] = useState<ReviewEntryGroup[]>([]);
+  const activeReviewGenerationRef = useRef(0);
+  const appliedPreferredEntriesKeyRef = useRef(preferredEntriesKey);
   const [queueFilter, setQueueFilter] = useState<ReviewQueueFilter>("all");
-  const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [devStatus, setDevStatus] = useState<string | null>(null);
   const completedReviews = service.listCompletedReviewsForDay(new Date(nowMs).toISOString());
   const completedReviewEntries = completedReviews.map((item): ReviewEntry => ({
@@ -5249,6 +5634,11 @@ function ReviewPanel({
   const reviewDueSubline = reviewDueCardSubline(queueSummary.oldestDueLabel);
 
   useEffect(() => {
+    if (appliedPreferredEntriesKeyRef.current === preferredEntriesKey) {
+      return;
+    }
+    appliedPreferredEntriesKeyRef.current = preferredEntriesKey;
+    activeReviewGenerationRef.current += 1;
     setQueuedReviewGroups([]);
     setActiveEntryInitialIndex(0);
     setActiveEntries(preferredEntries);
@@ -5257,26 +5647,28 @@ function ReviewPanel({
   }, [preferredEntriesKey]);
 
   useEffect(() => {
-    onSessionActiveChange?.(activeEntries.length > 0);
-  }, [activeEntries.length, onSessionActiveChange]);
+    onSessionSourceChange?.(activeEntries[0]?.source ?? null);
+  }, [activeEntries, onSessionSourceChange]);
 
   useEffect(() => {
     return () => {
-      onSessionActiveChange?.(false);
+      onSessionSourceChange?.(null);
     };
-  }, [onSessionActiveChange]);
+  }, [onSessionSourceChange]);
 
   function startReviewGroupQueue(groups: ReviewEntryGroup[]): void {
     const [firstGroup, ...remainingGroups] = groups;
     if (!firstGroup) {
       return;
     }
+    activeReviewGenerationRef.current += 1;
     setQueuedReviewGroups(remainingGroups);
     setActiveEntryInitialIndex(0);
     setActiveEntries(firstGroup.entries);
   }
 
   function startSingleReviewGroup(entries: ReviewEntry[]): void {
+    activeReviewGenerationRef.current += 1;
     setQueuedReviewGroups([]);
     setActiveEntryInitialIndex(0);
     setActiveEntries(entries);
@@ -5287,21 +5679,37 @@ function ReviewPanel({
     if (nextIndex < 0) {
       return;
     }
+    activeReviewGenerationRef.current += 1;
     setQueuedReviewGroups([]);
     setActiveEntryInitialIndex(nextIndex);
     setActiveEntries(completedReviewEntries);
   }
 
-  function finishActiveReview(source: ReviewEntry["source"]): void {
+  function finishActiveReview(source: ReviewEntry["source"], generation: number): void {
+    if (generation !== activeReviewGenerationRef.current) {
+      return;
+    }
     if (source === "due") {
       const [nextGroup, ...remainingGroups] = queuedReviewGroups;
       if (nextGroup) {
+        activeReviewGenerationRef.current += 1;
         setQueuedReviewGroups(remainingGroups);
         setActiveEntryInitialIndex(0);
         setActiveEntries(nextGroup.entries);
         return;
       }
     }
+    activeReviewGenerationRef.current += 1;
+    setQueuedReviewGroups([]);
+    setActiveEntryInitialIndex(0);
+    setActiveEntries([]);
+    if (source === "session") {
+      onExitSessionReview();
+    }
+  }
+
+  function returnActiveReviewToOwner(source: ReviewEntry["source"]): void {
+    activeReviewGenerationRef.current += 1;
     setQueuedReviewGroups([]);
     setActiveEntryInitialIndex(0);
     setActiveEntries([]);
@@ -5311,12 +5719,14 @@ function ReviewPanel({
   }
 
   if (activeEntries.length > 0) {
+    const activeReviewGeneration = activeReviewGenerationRef.current;
     return (
       <ReviewSession
-        key={`${activeEntryInitialIndex}:${activeEntries.map((entry) => `${entry.source}:${entry.puzzle.id}:${entry.mode}:${entry.ratingKey}`).join("|")}`}
+        key={`${activeReviewGeneration}:${activeEntryInitialIndex}:${activeEntries.map((entry) => `${entry.source}:${entry.puzzle.id}:${entry.mode}:${entry.ratingKey}`).join("|")}`}
         adaptiveLayout={adaptiveLayout}
         boardSize={boardSize}
         currentTimeMs={currentTimeMs}
+        deferBackRelevantTransition={deferBackRelevantTransition}
         entries={activeEntries}
         hasQueuedDueReviews={queuedReviewGroups.length > 0}
         initialIndex={activeEntryInitialIndex}
@@ -5324,8 +5734,11 @@ function ReviewPanel({
         scheduledReviewTotal={dailyReviewTotal}
         service={service}
         onReviewRecorded={onReviewRecorded}
-        onExit={finishActiveReview}
+        onAnalysisActiveChange={onAnalysisActiveChange}
+        onComplete={(source) => finishActiveReview(source, activeReviewGeneration)}
+        onReturnToOwner={returnActiveReviewToOwner}
         stockfish={stockfish}
+        systemBackCommand={systemBackCommand}
       />
     );
   }
@@ -5340,7 +5753,7 @@ function ReviewPanel({
           accessibilityState={{ expanded: filtersExpanded }}
           testID="review-filter-toggle"
           style={[styles.reviewFilterButton, filtersExpanded ? styles.reviewFilterButtonActive : null]}
-          onPress={() => setFiltersExpanded((current) => !current)}
+          onPress={() => onFiltersExpandedChange(!filtersExpanded)}
         >
           <FilterGlyph active={filtersExpanded} />
         </Pressable>
@@ -5728,32 +6141,41 @@ function ReviewSession({
   adaptiveLayout,
   boardSize,
   currentTimeMs,
+  deferBackRelevantTransition,
   entries,
   hasQueuedDueReviews = false,
   initialIndex = 0,
+  onAnalysisActiveChange,
+  onComplete,
+  onReturnToOwner,
   scheduledReviewCompletedCount = 0,
   scheduledReviewTotal = entries.length,
   service,
-  onExit,
   onReviewRecorded,
-  stockfish
+  stockfish,
+  systemBackCommand
 }: {
   adaptiveLayout: AdaptiveLayout;
   boardSize: number;
   currentTimeMs: () => number;
+  deferBackRelevantTransition: DeferBackRelevantTransition;
   entries: ReviewEntry[];
   hasQueuedDueReviews?: boolean;
   initialIndex?: number;
+  onAnalysisActiveChange?: (active: boolean) => void;
+  onComplete: (source: ReviewEntry["source"]) => void;
+  onReturnToOwner: (source: ReviewEntry["source"]) => void;
   scheduledReviewCompletedCount?: number;
   scheduledReviewTotal?: number;
   service: PracticeService;
-  onExit: (source: ReviewEntry["source"]) => void;
   onReviewRecorded?: (completedAt: string) => void;
   stockfish: MobileStockfishCapabilities;
+  systemBackCommand: ReviewBackCommand | null;
 }): React.JSX.Element {
   const boardRef = useRef<ChessboardRef | null>(null);
   const reviewSuppressedBoardMovesRef = useRef<string[]>([]);
   const reviewResultRecordedRef = useRef(false);
+  const handledBackCommandIdRef = useRef(systemBackCommand?.id ?? 0);
   const [entryIndex, setEntryIndex] = useState(initialIndex);
   const [reviewState, setReviewState] = useState<ReviewPuzzleState>(() => startReviewPuzzle(entries[initialIndex] ?? entries[0]));
   const [feedback, setFeedback] = useState<SessionFeedback>(null);
@@ -5784,6 +6206,29 @@ function ReviewSession({
         }
       : null;
   });
+
+  useEffect(() => {
+    onAnalysisActiveChange?.(analysisEnabled);
+  }, [analysisEnabled, onAnalysisActiveChange]);
+
+  useEffect(() => {
+    return () => onAnalysisActiveChange?.(false);
+  }, [onAnalysisActiveChange]);
+
+  useEffect(() => {
+    if (!systemBackCommand || handledBackCommandIdRef.current === systemBackCommand.id) {
+      return;
+    }
+    handledBackCommandIdRef.current = systemBackCommand.id;
+    if (systemBackCommand.kind === "close-analysis") {
+      closeAnalysis();
+      return;
+    }
+    onReturnToOwner(currentEntry.source);
+    // closeAnalysis and onReturnToOwner are render-local commands intentionally selected
+    // by the shell's typed Back resolver for this exact command id.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [systemBackCommand?.id]);
   const currentEntry = entries[entryIndex];
   const hasNextScheduledReview = entryIndex + 1 < entries.length || hasQueuedDueReviews;
   const currentPuzzle = currentReviewPuzzleState(reviewState);
@@ -5936,7 +6381,7 @@ function ReviewSession({
       expectedMove: expectedReviewMove(currentPuzzle)
     });
     if (!hasNextScheduledReview) {
-      onExit(currentEntry.source);
+      finishReviewSession();
       return;
     }
     setLineReviewNeedsContinue(true);
@@ -5983,10 +6428,17 @@ function ReviewSession({
   function goToNextDueReview(): void {
     const nextIndex = entryIndex + 1;
     if (nextIndex >= entries.length) {
-      onExit(currentEntry.source);
+      finishReviewSession();
       return;
     }
     resetCurrentReview(nextIndex);
+  }
+
+  function finishReviewSession(): void {
+    const complete = () => onComplete(currentEntry.source);
+    if (!deferBackRelevantTransition("review-session-exit", complete)) {
+      complete();
+    }
   }
 
   function recordCurrentReviewResult(result: "correct" | "wrong", reviewMove?: { submittedMove: string; expectedMove: string }): void {
@@ -6356,7 +6808,7 @@ function ReviewSession({
             accessibilityLabel="Exit review"
             testID="review-exit"
             style={styles.iconButton}
-            onPress={() => onExit(currentEntry.source)}
+            onPress={() => onReturnToOwner(currentEntry.source)}
           >
             <CloseGlyph />
           </Pressable>
@@ -6941,12 +7393,14 @@ function iCloudAccountStatusMessage(status: ICloudAccountStatus): string {
 }
 
 function SettingsPanel({
+  advancedRatingsOpen,
   adaptiveLayout,
   applicationMetadata,
   progressProtection,
   onOpenDiagnostics,
   onOpenNotificationSettings,
   onAdjustRating,
+  onAdvancedRatingsOpenChange,
   onRequestReviewReminderPermission,
   onSaveICloudSyncEnabled,
   onSaveReviewReminderPreference,
@@ -6959,12 +7413,14 @@ function SettingsPanel({
   reviewReminderPreference,
   standardRating
 }: {
+  advancedRatingsOpen: boolean;
   adaptiveLayout: AdaptiveLayout;
   applicationMetadata: MobileApplicationMetadata;
   progressProtection: MobilePlatformCapabilities["progressProtection"];
   onOpenDiagnostics?: () => void;
   onOpenNotificationSettings: () => void;
   onAdjustRating: (ratingKey: string, nextRating: number) => RatingRecord;
+  onAdvancedRatingsOpenChange: (open: boolean) => void;
   onRequestReviewReminderPermission: () => Promise<ReviewReminderPermissionStatus>;
   onSaveICloudSyncEnabled: (enabled: boolean) => void;
   onSaveReviewReminderPreference: (preference: ReviewReminderPreference) => void;
@@ -6978,7 +7434,6 @@ function SettingsPanel({
   standardRating: number;
 }): React.JSX.Element {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [advancedRatingsOpen, setAdvancedRatingsOpen] = useState(false);
   const bundledCoreManifest = getBundledCorePackManifest();
 
   return (
@@ -7102,7 +7557,7 @@ function SettingsPanel({
           value={`ELO ${standardRating}`}
           detail="Standard and Arrow Duel difficulty"
           testID="settings-standard-elo-row"
-          onPress={() => setAdvancedRatingsOpen((current) => !current)}
+          onPress={() => onAdvancedRatingsOpenChange(!advancedRatingsOpen)}
         />
         {advancedRatingsOpen ? (
           <AdvancedRatingsPanel
@@ -8508,6 +8963,35 @@ const FABRIC_SAFE_HIDDEN_TEXT_STYLE = {
 } as const;
 
 const styles = StyleSheet.create({
+  predictiveBackStage: {
+    backgroundColor: "#DCE7F5",
+    flex: 1
+  },
+  predictiveBackDestination: {
+    alignItems: "center",
+    backgroundColor: "#DCE7F5",
+    bottom: 0,
+    justifyContent: "center",
+    left: 0,
+    padding: 32,
+    position: "absolute",
+    right: 0,
+    top: 0
+  },
+  predictiveBackEyebrow: {
+    color: "#516078",
+    fontSize: 13,
+    fontWeight: "600",
+    letterSpacing: 0.5,
+    textTransform: "uppercase"
+  },
+  predictiveBackDestinationLabel: {
+    color: "#172033",
+    fontSize: 24,
+    fontWeight: "700",
+    marginTop: 8,
+    textAlign: "center"
+  },
   safeArea: {
     backgroundColor: "#F8FAFC",
     flex: 1

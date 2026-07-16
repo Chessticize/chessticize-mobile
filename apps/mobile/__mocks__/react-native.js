@@ -1,5 +1,6 @@
 const React = require('react');
 const appStateListeners = new Set();
+const backHandlerListeners = new Set();
 const defaultWindowDimensions = { width: 390, height: 844, scale: 3, fontScale: 3 };
 let windowDimensions = { ...defaultWindowDimensions };
 
@@ -47,6 +48,25 @@ module.exports = {
     },
     __reset() {
       appStateListeners.clear();
+    }
+  },
+  BackHandler: {
+    addEventListener(eventName, listener) {
+      if (eventName !== 'hardwareBackPress') {
+        return { remove() {} };
+      }
+      backHandlerListeners.add(listener);
+      return {
+        remove() {
+          backHandlerListeners.delete(listener);
+        }
+      };
+    },
+    __emit() {
+      return Array.from(backHandlerListeners).reverse().some((listener) => listener());
+    },
+    __reset() {
+      backHandlerListeners.clear();
     }
   },
   NativeEventEmitter: class NativeEventEmitter {

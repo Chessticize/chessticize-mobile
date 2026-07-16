@@ -12,6 +12,7 @@ import {
   resolveTestStandardTargetCorrectFromLaunchConfig
 } from "./src/backend/testLaunchConfig";
 import { shouldSuppressLogBoxWarnings } from "./src/releaseConfig";
+import { createMobileSystemBackSource } from "./src/navigation/mobileSystemBack";
 
 enableTestControlsFromLaunchConfig();
 
@@ -21,6 +22,10 @@ if (shouldSuppressLogBoxWarnings()) {
 
 function App() {
   const platformFactory = mobilePlatformCapabilityFactoryFor(Platform.OS as "android" | "ios");
+  const systemBack = React.useMemo(
+    () => createMobileSystemBackSource(Platform.OS as "android" | "ios"),
+    []
+  );
   const [platformCapabilities, setPlatformCapabilities] = React.useState<MobilePlatformCapabilities | undefined>(
     () => platformFactory.createSync()
   );
@@ -61,6 +66,7 @@ function App() {
           currentTimeMs={currentTimeMs}
           puzzleSelectionSeed={puzzleSelectionSeed}
           standardTargetCorrect={standardTargetCorrect}
+          systemBack={systemBack}
         />
       ) : (
         <View style={styles.loadingRoot}>
