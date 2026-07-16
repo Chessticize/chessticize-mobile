@@ -998,6 +998,52 @@ describe("PracticePocScreen", () => {
     expect(hasStyleEntry(findByTestId(renderer, "practice-progress-weekly-delta"), "color", "#16A34A")).toBe(true);
   });
 
+  it("shows a persisted Custom config's weekly progress after relaunch", async () => {
+    const nowMs = Date.parse("2026-07-14T12:00:00.000Z");
+    const store = new MemoryStore();
+    store.seedPuzzles([androidPracticeFixture.puzzle as Puzzle]);
+    const service = new PracticeService(store);
+    const firstRenderer = renderScreen({
+      currentTimeMs: () => nowMs,
+      customTargetCorrect: 1,
+      practiceService: service
+    });
+
+    press(firstRenderer, "practice-mode-custom");
+    press(firstRenderer, "custom-theme-fork");
+    press(firstRenderer, "custom-duration-stepper-decrease");
+    press(firstRenderer, "custom-per-puzzle-stepper-increase");
+    press(firstRenderer, "start-sprint-button");
+    await boardMove(firstRenderer, androidPracticeFixture.userMoves[0]);
+    await settleFeedbackSnapshot();
+    await boardMove(firstRenderer, androidPracticeFixture.userMoves[1]);
+    await settleFeedbackSnapshot();
+    expect(findByTestId(firstRenderer, "sprint-summary-panel")).toBeTruthy();
+
+    act(() => {
+      firstRenderer.unmount();
+    });
+    const firstRendererIndex = renderers.indexOf(firstRenderer);
+    if (firstRendererIndex >= 0) {
+      renderers.splice(firstRendererIndex, 1);
+    }
+
+    const renderer = renderScreen({
+      currentTimeMs: () => nowMs + 5 * 60_000,
+      practiceService: new PracticeService(store)
+    });
+    expect(collectText(findByTestId(renderer, "practice-progress-weekly-solved"))).toBe("0");
+
+    press(renderer, "practice-mode-custom");
+    press(renderer, "custom-previous-custom-custom-180-30-fork");
+
+    expect(findByTestId(renderer, "custom-sprint-setup")).toBeTruthy();
+    expect(findByTestId(renderer, "practice-progress-summary").props.accessibilityLabel).toContain("ELO 775");
+    expect(collectText(findByTestId(renderer, "practice-progress-weekly-solved"))).toBe("1");
+    expect(collectText(findByTestId(renderer, "practice-progress-weekly-delta"))).toBe("+1 net");
+    expect(collectText(findByTestId(renderer, "practice-progress-rating-delta"))).toBe("+175 this week");
+  });
+
   it("surfaces negative weekly practice progress without hiding mistakes", () => {
     const service = createMobilePracticeService("random1000");
     service.startSprint(

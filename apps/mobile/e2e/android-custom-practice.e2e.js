@@ -14,6 +14,7 @@ const RELAUNCH_TEST_NOW_MS = String(Number(TEST_NOW_MS) + 5 * 60_000);
 const CUSTOM_RATING_KEY = 'fork custom 3/30';
 const CUSTOM_CONFIG_ROW_ID = 'custom-previous-custom-custom-180-30-fork';
 const EXPECTED_AUTO_REPLY_MOVE = practiceFixture.puzzle.solutionMoves[2];
+const EXPECTED_RATING_DELTA = practiceFixture.expectedRatingAfter - practiceFixture.puzzle.rating;
 
 describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, () => {
   beforeAll(async () => {
@@ -150,6 +151,21 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
       await waitForElementTextContaining(`${CUSTOM_CONFIG_ROW_ID}-meta`, '30s pace', 10000);
       await element(by.id(CUSTOM_CONFIG_ROW_ID)).tap();
       await waitForElementTextContaining('custom-initial-rating-value', `ELO ${practiceFixture.expectedRatingAfter}`, 10000);
+      await element(by.id('practice-main-scroll')).scrollTo('top');
+      await waitForVisibleInPracticeScroll('practice-progress-summary');
+      await waitForElementAccessibilityLabelContaining(
+        'practice-progress-summary',
+        `ELO ${practiceFixture.expectedRatingAfter}`,
+        10000,
+        50
+      );
+      await waitForElementTextContaining('practice-progress-weekly-solved', '1', 10000);
+      await waitForElementTextContaining('practice-progress-weekly-delta', '+1 net', 10000);
+      await waitForElementTextContaining(
+        'practice-progress-rating-delta',
+        `+${EXPECTED_RATING_DELTA} this week`,
+        10000
+      );
     });
   });
 });

@@ -38,6 +38,9 @@ describe('Android Custom Practice release slice', () => {
     expect(spec).toContain("by.id('sprint-result-history-button')");
     expect(spec).toContain("by.id('review-analysis-button')");
     expect(spec).toContain("waitForElementTextContaining('review-analysis-engine-status'");
+    expect(spec).toContain("waitForVisibleInPracticeScroll('practice-progress-summary')");
+    expect(spec).toContain("waitForElementTextContaining('practice-progress-weekly-solved', '1'");
+    expect(spec).toContain("'practice-progress-rating-delta'");
     expect(spec).toContain('device.pressBack()');
     expect(spec).toContain('device.terminateApp()');
     expect(spec).toContain('delete: false');
