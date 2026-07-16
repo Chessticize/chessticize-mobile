@@ -25,6 +25,7 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
       newInstance: true,
       launchArgs: {
         chessticizeCustomTargetCorrect: '1',
+        chessticizePuzzleSelectionId: practiceFixture.puzzle.id,
         chessticizePuzzleSelectionSeed: practiceFixture.puzzleSelectionSeed,
         chessticizeTestNowMs: TEST_NOW_MS,
       },

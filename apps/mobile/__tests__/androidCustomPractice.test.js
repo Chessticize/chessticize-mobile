@@ -15,8 +15,12 @@ describe('Android Custom Practice release slice', () => {
 
     expect(app).toContain('resolveTestCustomTargetCorrectFromLaunchConfig');
     expect(app).toContain('customTargetCorrect={customTargetCorrect}');
+    expect(app).toContain('resolveTestPuzzleSelectionIdFromLaunchConfig');
+    expect(app).toContain('puzzleSelectionId={puzzleSelectionId}');
     expect(launchConfig).toContain('customTargetCorrect?: string | number');
+    expect(launchConfig).toContain('puzzleSelectionId?: string');
     expect(androidModule).toContain('chessticizeCustomTargetCorrect');
+    expect(androidModule).toContain('chessticizePuzzleSelectionId');
     expect(androidModule).not.toContain('Log.');
   });
 
@@ -29,6 +33,7 @@ describe('Android Custom Practice release slice', () => {
     expect(workflow).toContain('DETOX_ACTIVE_SUITE=android-custom-practice');
     expect(spec).toContain("by.id('practice-mode-custom')");
     expect(spec).toContain('android-standard-practice.fixture.json');
+    expect(spec).toContain('chessticizePuzzleSelectionId: practiceFixture.puzzle.id');
     expect(spec).toContain("by.id('session-board')");
     expect(spec).toContain("by.id('sprint-result-history-button')");
     expect(spec).toContain("by.id('review-analysis-button')");

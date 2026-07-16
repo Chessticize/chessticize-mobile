@@ -126,6 +126,7 @@ interface Props {
   customTargetCorrect?: number;
   debugTrace?: (event: PracticeDebugTraceEvent) => void;
   currentTimeMs?: () => number;
+  puzzleSelectionId?: string;
   puzzleSelectionSeed?: string;
   standardTargetCorrect?: number;
   systemBack?: MobileSystemBackSource;
@@ -388,6 +389,7 @@ export function PracticePocScreen({
   customTargetCorrect,
   debugTrace,
   currentTimeMs = Date.now,
+  puzzleSelectionId,
   puzzleSelectionSeed,
   standardTargetCorrect,
   systemBack
@@ -1085,6 +1087,9 @@ export function PracticePocScreen({
         if (rating.games === 0 && rating.rating !== customInitialRating) {
           service.setRating(config.ratingKey, customInitialRating);
         }
+      }
+      if (puzzleSelectionId) {
+        service.setPuzzleSelectionScopeIds([puzzleSelectionId]);
       }
       const started = service.startSprint(
         {

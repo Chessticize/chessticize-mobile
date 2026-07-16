@@ -314,7 +314,8 @@ describe("PracticePocScreen", () => {
     const service = createMobilePracticeService();
     const renderer = renderScreen({
       customTargetCorrect: 1,
-      practiceService: service,
+      practiceServiceFactory: () => service,
+      puzzleSelectionId: androidPracticeFixture.puzzle.id,
       puzzleSelectionSeed: androidPracticeFixture.puzzleSelectionSeed,
       systemBack
     });
@@ -324,6 +325,16 @@ describe("PracticePocScreen", () => {
     press(renderer, "custom-per-puzzle-stepper-increase");
     press(renderer, "custom-theme-fork");
     press(renderer, "start-sprint-button");
+    expect(service.getActiveSprint()?.currentPuzzle).toMatchObject({
+      puzzle: {
+        id: androidPracticeFixture.puzzle.id,
+        initialFen: androidPracticeFixture.puzzle.initialFen,
+        solutionMoves: androidPracticeFixture.puzzle.solutionMoves
+      },
+      playedMoves: [androidPracticeFixture.puzzle.solutionMoves[0]],
+      cursor: 1
+    });
+    expect(findByTestId(renderer, "session-side-to-move").props.accessibilityLabel).toBe("Black to move");
     await boardMove(renderer, androidPracticeFixture.userMoves[0]);
     await settleFeedbackSnapshot();
     expect(service.getState()).toMatchObject({
@@ -4824,7 +4835,7 @@ function createScriptedStockfishTransport(
 }
 
 type RenderScreenOptions = TestMobilePlatformCapabilityOverrides &
-  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "puzzleSelectionSeed" | "standardTargetCorrect" | "systemBack"> & {
+  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "puzzleSelectionId" | "puzzleSelectionSeed" | "standardTargetCorrect" | "systemBack"> & {
     platformCapabilities?: MobilePlatformCapabilities;
   };
 
@@ -4870,6 +4881,7 @@ function renderScreen({
   currentTimeMs,
   customTargetCorrect,
   debugTrace,
+  puzzleSelectionId,
   puzzleSelectionSeed,
   standardTargetCorrect,
   systemBack,
@@ -4884,6 +4896,7 @@ function renderScreen({
         currentTimeMs={currentTimeMs}
         customTargetCorrect={customTargetCorrect}
         debugTrace={debugTrace}
+        puzzleSelectionId={puzzleSelectionId}
         puzzleSelectionSeed={puzzleSelectionSeed}
         standardTargetCorrect={standardTargetCorrect}
         systemBack={systemBack}

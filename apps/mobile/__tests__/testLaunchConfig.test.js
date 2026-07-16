@@ -4,6 +4,7 @@ const {
   resolveTestArrowDuelTargetCorrectFromLaunchConfig,
   resolveTestCustomTargetCorrectFromLaunchConfig,
   resolveTestNowMsFromLaunchConfig,
+  resolveTestPuzzleSelectionIdFromLaunchConfig,
   resolveTestPuzzleSelectionSeedFromLaunchConfig,
   resolveTestStandardTargetCorrectFromLaunchConfig
 } = require("../src/backend/testLaunchConfig");
@@ -36,6 +37,18 @@ describe("test launch configuration", () => {
         testNowMs: "1780000000000"
       })
     ).toBe(1780000000000);
+    expect(
+      resolveTestPuzzleSelectionIdFromLaunchConfig(productionGlobals, {
+        puzzleSelectionId: "  0CwCS  ",
+        testControlsEnabled: true
+      })
+    ).toBe("0CwCS");
+    expect(
+      resolveTestPuzzleSelectionIdFromLaunchConfig(productionGlobals, {
+        puzzleSelectionId: "0CwCS",
+        testControlsEnabled: false
+      })
+    ).toBeUndefined();
     expect(
       resolveTestPuzzleSelectionSeedFromLaunchConfig(productionGlobals, {
         puzzleSelectionSeed: "android-standard-practice",
@@ -112,6 +125,7 @@ describe("test launch configuration", () => {
 
   it("reads Android launch values on demand after the activity captures its intent", () => {
     const getLaunchConfig = jest.fn(() => ({
+      puzzleSelectionId: "0CwCS",
       puzzleSelectionSeed: "android-standard-practice",
       arrowDuelTargetCorrect: "1",
       customTargetCorrect: "1",
@@ -122,13 +136,14 @@ describe("test launch configuration", () => {
     const nativeModule = { getLaunchConfig };
     const productionGlobals = { __DEV__: false, __CHESSTICIZE_ENABLE_TEST_CONTROLS__: false };
 
+    expect(resolveTestPuzzleSelectionIdFromLaunchConfig(productionGlobals, nativeModule)).toBe("0CwCS");
     expect(resolveTestPuzzleSelectionSeedFromLaunchConfig(productionGlobals, nativeModule))
       .toBe("android-standard-practice");
     expect(resolveTestArrowDuelTargetCorrectFromLaunchConfig(productionGlobals, nativeModule)).toBe(1);
     expect(resolveTestCustomTargetCorrectFromLaunchConfig(productionGlobals, nativeModule)).toBe(1);
     expect(resolveTestStandardTargetCorrectFromLaunchConfig(productionGlobals, nativeModule)).toBe(1);
     expect(resolveTestNowMsFromLaunchConfig(productionGlobals, nativeModule)).toBe(1780000000000);
-    expect(getLaunchConfig).toHaveBeenCalledTimes(5);
+    expect(getLaunchConfig).toHaveBeenCalledTimes(6);
   });
 
   it("accepts a fixed clock for release store-asset capture without enabling visible test controls", () => {

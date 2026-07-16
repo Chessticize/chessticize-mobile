@@ -10,6 +10,7 @@ import {
   resolveTestArrowDuelTargetCorrectFromLaunchConfig,
   resolveTestCustomTargetCorrectFromLaunchConfig,
   resolveTestNowMsFromLaunchConfig,
+  resolveTestPuzzleSelectionIdFromLaunchConfig,
   resolveTestPuzzleSelectionSeedFromLaunchConfig,
   resolveTestStandardTargetCorrectFromLaunchConfig
 } from "./src/backend/testLaunchConfig";
@@ -35,6 +36,7 @@ function App() {
   const testNowMs = resolveTestNowMsFromLaunchConfig();
   const arrowDuelTargetCorrect = resolveTestArrowDuelTargetCorrectFromLaunchConfig();
   const customTargetCorrect = resolveTestCustomTargetCorrectFromLaunchConfig();
+  const puzzleSelectionId = resolveTestPuzzleSelectionIdFromLaunchConfig();
   const puzzleSelectionSeed = resolveTestPuzzleSelectionSeedFromLaunchConfig();
   const standardTargetCorrect = resolveTestStandardTargetCorrectFromLaunchConfig();
   const currentTimeMs = React.useMemo(
@@ -70,6 +72,7 @@ function App() {
           arrowDuelTargetCorrect={arrowDuelTargetCorrect}
           currentTimeMs={currentTimeMs}
           customTargetCorrect={customTargetCorrect}
+          puzzleSelectionId={puzzleSelectionId}
           puzzleSelectionSeed={puzzleSelectionSeed}
           standardTargetCorrect={standardTargetCorrect}
           systemBack={systemBack}
