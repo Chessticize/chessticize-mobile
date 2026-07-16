@@ -30,6 +30,7 @@ import {
   formatSideToMoveScore,
   historyAttemptSpeedSeconds,
   isReviewOverdue,
+  normalizeHistoryAttemptDetail,
   reviewDueState,
   reviewQueueForecast,
   submitArrowDuelChoice,
@@ -5190,21 +5191,26 @@ function HistoryAttemptRow({
   attempt: HistoryAttemptView;
   onOpen: () => void;
 }): React.JSX.Element {
+  const detail = normalizeHistoryAttemptDetail(attempt);
   const isWrong = attempt.result === "wrong";
-  const completedAtMs = new Date(attempt.completedAt).getTime();
-  const elapsedSeconds = Math.max(0, Math.round((completedAtMs - new Date(attempt.startedAt).getTime()) / 1000));
-  const dateLabel = `${historyAttemptRecencyLabel(completedAtMs)} · ${formatLocalCalendarDate(attempt.completedAt)}`;
+  const completedAtMs = detail.completedAt === null ? null : new Date(detail.completedAt).getTime();
+  const dateLabel = completedAtMs === null || detail.completedAt === null
+    ? "Date unavailable"
+    : `${historyAttemptRecencyLabel(completedAtMs)} · ${formatLocalCalendarDate(detail.completedAt)}`;
   const primaryTheme = historyAttemptThemeLabel(attempt);
   const pace = historyAttemptSpeedSeconds(attempt);
   const paceLabel = pace === null ? null : `${pace}s pace`;
   const resultLabel = isWrong ? "Wrong move" : "Correct";
-  const submittedMoveLabel = isWrong
-    ? `Played ${attempt.submittedMove} · Best ${attempt.expectedMove}`
-    : `Move ${attempt.submittedMove}`;
+  const submittedMoveLabel = detail.submittedMove === null || detail.expectedMove === null
+    ? "Moves unavailable"
+    : isWrong
+      ? `Played ${detail.submittedMove} · Best ${detail.expectedMove}`
+      : `Move ${detail.submittedMove}`;
   const sourceLabel = attempt.source === "scheduled_review" ? "Review" : "Sprint";
   const compactContext = [primaryTheme, paceLabel].filter(Boolean).join(" · ");
   const puzzleIdentity = `ID ${attempt.puzzleId} · Rating ${attempt.puzzleRating}`;
-  const compactMeta = `${sourceLabel} · ${elapsedSeconds}s · ${dateLabel}`;
+  const durationLabel = detail.elapsedSeconds === null ? "Duration unavailable" : `${detail.elapsedSeconds}s`;
+  const compactMeta = `${sourceLabel} · ${durationLabel} · ${dateLabel}`;
   const rowAccessibilityLabel = [
     `Open ${modeLabel(attempt.mode)} ${attempt.result} puzzle review`,
     resultLabel,
@@ -6917,6 +6923,10 @@ function ReviewSession({
         </View>
       </View>
 
+      {currentEntry.source === "history" && currentEntry.attempt ? (
+        <HistoryAttemptDetailCard attempt={currentEntry.attempt} />
+      ) : null}
+
       <View style={[styles.reviewBoardLayout, adaptiveLayout.usesSessionRail ? styles.reviewBoardLayoutWide : null]}>
         <View style={styles.reviewBoardLane} testID="review-board-lane">
           <View testID="review-board" style={[styles.boardSurface, { width: boardSize, height: boardSize }]}>
@@ -7138,6 +7148,58 @@ function ReviewSession({
           ) : null}
         </View>
       </View>
+    </View>
+  );
+}
+
+function HistoryAttemptDetailCard({ attempt }: { attempt: AttemptEvent | HistoryAttemptView }): React.JSX.Element {
+  const detail = normalizeHistoryAttemptDetail(attempt);
+  const sourceLabel = detail.source === "scheduled_review" ? "Review" : "Sprint";
+  const resultLabel = detail.result === "wrong" ? "Wrong move" : "Correct";
+  const timingLabel = detail.completedAt
+    ? `${formatLocalCalendarDate(detail.completedAt)} · ${detail.elapsedSeconds === null ? "Duration unavailable" : `${detail.elapsedSeconds}s`}`
+    : "Date and duration unavailable";
+  const movesLabel = detail.submittedMove && detail.expectedMove
+    ? `Played ${detail.submittedMove} · Best ${detail.expectedMove}`
+    : "Moves unavailable";
+  const ratingLabel = detail.ratingBefore === null
+    ? "Rating unavailable"
+    : detail.ratingAfter === null || detail.ratingDelta === null
+      ? `Rating ${detail.ratingBefore} · No run change`
+      : `Rating ${detail.ratingBefore} → ${detail.ratingAfter} · ${detail.ratingDelta > 0 ? "+" : ""}${detail.ratingDelta}`;
+
+  return (
+    <View style={styles.historyPerformanceCard} testID="history-attempt-detail">
+      <View style={styles.historyPerformanceHeader}>
+        <View style={styles.historyAttemptCopy}>
+          <Text style={styles.panelTitle} testID="history-attempt-detail-title">Persisted attempt</Text>
+          <Text style={styles.helperText} testID="history-attempt-detail-context">
+            {modeLabel(detail.mode)} · {sourceLabel}
+          </Text>
+        </View>
+        <Text
+          accessibilityLabel={`Persisted result ${resultLabel}`}
+          style={[styles.historyReviewState, detail.result === "wrong" ? styles.errorText : styles.positive]}
+          testID="history-attempt-detail-result"
+        >
+          {resultLabel}
+        </Text>
+      </View>
+      <Text
+        accessibilityLabel={`Rating bucket ${detail.ratingKey}`}
+        style={styles.helperText}
+        testID="history-attempt-detail-rating-key"
+      >
+        {historyRatingKeyLabel(detail.ratingKey)}
+      </Text>
+      <Text style={styles.listText} testID="history-attempt-detail-moves">{movesLabel}</Text>
+      <Text style={styles.helperText} testID="history-attempt-detail-timing">{timingLabel}</Text>
+      <Text style={styles.helperText} testID="history-attempt-detail-rating">{ratingLabel}</Text>
+      {detail.dataStatus === "partial" ? (
+        <Text style={styles.errorText} testID="history-attempt-detail-partial">
+          Some persisted attempt details are unavailable.
+        </Text>
+      ) : null}
     </View>
   );
 }

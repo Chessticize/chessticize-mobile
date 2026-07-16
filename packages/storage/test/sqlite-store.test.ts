@@ -613,6 +613,46 @@ test("PracticeService builds SQLite history view across rating buckets when no r
   }
 });
 
+test("PracticeService reads partially migrated history rows without crashing on malformed optional metadata", async () => {
+  const store = await seededStore();
+  const service = new PracticeService(store);
+  try {
+    const recorded = service.recordReviewAttempt({
+      puzzleId: "00008",
+      mode: "arrow_duel",
+      ratingKey: "arrow duel 5/30",
+      result: "wrong",
+      submittedMove: "h6g7",
+      expectedMove: "b2b1",
+      startedAt: "2026-06-20T00:00:00.000Z",
+      arrowDuelCandidateOrder: ["b2b1", "h6g7"]
+    }, "2026-06-20T00:00:05.000Z");
+    store.db
+      .prepare("UPDATE attempts SET rating_key = NULL, arrow_duel_candidate_order_json = ? WHERE id = ?")
+      .run("{malformed-json", recorded.attempt.id);
+
+    const view = service.getHistoryView({
+      now: "2026-06-21T00:00:00.000Z",
+      timeRange: "max",
+      ratingKey: "arrow duel 5/30"
+    });
+
+    assert.deepEqual(view.attempts.map((attempt) => ({
+      id: attempt.id,
+      mode: attempt.mode,
+      ratingKey: attempt.ratingKey,
+      arrowDuelCandidateOrder: attempt.arrowDuelCandidateOrder
+    })), [{
+      id: recorded.attempt.id,
+      mode: "arrow_duel",
+      ratingKey: "arrow duel 5/30",
+      arrowDuelCandidateOrder: undefined
+    }]);
+  } finally {
+    store.close();
+  }
+});
+
 test("PracticeService persists SQLite custom sprint configs after successful custom starts", async () => {
   const store = await seededStore();
   const service = new PracticeService(store);

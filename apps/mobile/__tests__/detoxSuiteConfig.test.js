@@ -9,6 +9,7 @@ const {
   ADAPTIVE_LAYOUT_TEST_MATCH,
   ANDROID_LAUNCH_TEST_MATCH,
   ANDROID_CUSTOM_PRACTICE_TEST_MATCH,
+  ANDROID_HISTORY_TEST_MATCH,
   ANDROID_STANDARD_PRACTICE_TEST_MATCH,
   ANDROID_ARROW_DUEL_TEST_MATCH,
   ANDROID_MIGRATION_TEST_MATCH,
@@ -583,6 +584,8 @@ describe('Detox suite configuration', () => {
       .toEqual(ANDROID_ARROW_DUEL_TEST_MATCH);
     expect(resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'android-custom-practice' }))
       .toEqual(ANDROID_CUSTOM_PRACTICE_TEST_MATCH);
+    expect(resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'android-history' }))
+      .toEqual(ANDROID_HISTORY_TEST_MATCH);
     expect(ACTIVE_E2E_TEST_MATCH).not.toContain(ANDROID_CUSTOM_PRACTICE_TEST_MATCH[0]);
     expect(resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'android-migration' }))
       .toEqual(ANDROID_MIGRATION_TEST_MATCH);

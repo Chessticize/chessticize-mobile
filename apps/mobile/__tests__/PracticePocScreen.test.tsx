@@ -2849,6 +2849,115 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "history-attempt-run-scored-attempt-review-due")).toThrow();
   });
 
+  it("inspects the exact persisted attempt before starting analysis and normalizes partial fields", () => {
+    const store = new MemoryStore();
+    store.seedPuzzles([sharedHistoryPuzzle()]);
+    store.recordAttempt({
+      id: "custom-detail-attempt",
+      source: "sprint",
+      sessionId: "custom-detail-session",
+      puzzleId: "shared-history",
+      mode: "custom",
+      ratingKey: "hangingPiece custom 5/20",
+      result: "wrong",
+      submittedMove: "e2e4",
+      expectedMove: "e2e3",
+      startedAt: "2026-06-20T12:00:00.000Z",
+      completedAt: "2026-06-20T12:00:15.000Z",
+      ratingBefore: 600,
+      ratingAfter: 584
+    });
+    store.recordAttempt({
+      id: "partial-detail-attempt",
+      source: "sprint",
+      sessionId: "partial-detail-session",
+      puzzleId: "shared-history",
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      result: "correct",
+      submittedMove: " ",
+      expectedMove: "",
+      startedAt: "not-a-date",
+      completedAt: "2026-06-20T12:00:10.000Z",
+      ratingBefore: Number.NaN,
+      ratingAfter: Number.POSITIVE_INFINITY
+    });
+    const renderer = renderScreen({ practiceService: new PracticeService(store) });
+
+    press(renderer, "history-tab");
+    press(renderer, "history-range-max");
+    press(renderer, "history-attempt-custom-detail-attempt");
+
+    expect(collectText(findByTestId(renderer, "history-attempt-detail-title"))).toBe("Persisted attempt");
+    expect(collectText(findByTestId(renderer, "history-attempt-detail-context"))).toBe("Custom · Sprint");
+    expect(findByTestId(renderer, "history-attempt-detail-rating-key").props.accessibilityLabel).toBe(
+      "Rating bucket hangingPiece custom 5/20"
+    );
+    expect(collectText(findByTestId(renderer, "history-attempt-detail-result"))).toBe("Wrong move");
+    expect(collectText(findByTestId(renderer, "history-attempt-detail-timing"))).toBe("Jun 20, 2026 · 15s");
+    expect(collectText(findByTestId(renderer, "history-attempt-detail-moves"))).toBe("Played e2e4 · Best e2e3");
+    expect(collectText(findByTestId(renderer, "history-attempt-detail-rating"))).toBe("Rating 600 → 584 · -16");
+    expect(() => findByTestId(renderer, "history-attempt-detail-partial")).toThrow();
+    expect(findByTestId(renderer, "review-analysis-button")).toBeTruthy();
+    expect(() => findByTestId(renderer, "review-close-analysis")).toThrow();
+
+    press(renderer, "review-exit");
+    expect(collectText(findByTestId(renderer, "history-attempt-partial-detail-attempt-meta"))).toContain(
+      "Duration unavailable"
+    );
+    expect(findByTestId(renderer, "history-attempt-partial-detail-attempt").props.accessibilityLabel).toContain(
+      "Moves unavailable"
+    );
+    press(renderer, "history-attempt-partial-detail-attempt");
+
+    expect(collectText(findByTestId(renderer, "history-attempt-detail-context"))).toBe("Standard · Sprint");
+    expect(collectText(findByTestId(renderer, "history-attempt-detail-timing"))).toBe("Jun 20, 2026 · Duration unavailable");
+    expect(collectText(findByTestId(renderer, "history-attempt-detail-moves"))).toBe("Moves unavailable");
+    expect(collectText(findByTestId(renderer, "history-attempt-detail-rating"))).toBe("Rating unavailable");
+    expect(collectText(findByTestId(renderer, "history-attempt-detail-partial"))).toBe(
+      "Some persisted attempt details are unavailable."
+    );
+  });
+
+  it("keeps History filters while returning from a record but resets them on a new process lifetime", () => {
+    const store = new MemoryStore();
+    store.seedPuzzles([sharedHistoryPuzzle()]);
+    store.recordAttempt(historyAttempt({
+      id: "process-local-filter-attempt",
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      completedAt: "2026-06-20T12:00:15.000Z"
+    }));
+    const service = new PracticeService(store);
+    const firstSystemBack = createTestSystemBackSource("android");
+    const firstRenderer = renderScreen({ practiceService: service, systemBack: firstSystemBack });
+
+    press(firstRenderer, "history-tab");
+    press(firstRenderer, "history-range-max");
+    press(firstRenderer, "history-rating-standard 5/20");
+    press(firstRenderer, "history-filter-wrong-only");
+    press(firstRenderer, "history-attempt-process-local-filter-attempt");
+    expect(findByTestId(firstRenderer, "history-attempt-detail")).toBeTruthy();
+
+    expect(firstSystemBack.invoke()).toBe(true);
+    expect(findByTestId(firstRenderer, "history-panel")).toBeTruthy();
+    expect(findByTestId(firstRenderer, "history-filter-wrong-only").props.accessibilityState).toEqual({ checked: true });
+    expect(collectText(findByTestId(firstRenderer, "history-active-filter-summary"))).toContain("All Time");
+    expect(collectText(findByTestId(firstRenderer, "history-active-filter-summary"))).toContain("Standard · 20s pace");
+
+    act(() => {
+      firstRenderer.unmount();
+    });
+    const secondRenderer = renderScreen({ practiceService: service, systemBack: createTestSystemBackSource("android") });
+    press(secondRenderer, "history-tab");
+
+    expect(findByTestId(secondRenderer, "history-panel")).toBeTruthy();
+    expect(findByTestId(secondRenderer, "history-filter-wrong-only").props.accessibilityState).toEqual({ checked: false });
+    expect(collectText(findByTestId(secondRenderer, "history-active-filter-summary"))).toContain("7 days");
+    expect(collectText(findByTestId(secondRenderer, "history-active-filter-summary"))).toContain("All puzzles");
+    expect(collectText(findByTestId(secondRenderer, "history-active-filter-summary"))).toContain("Sprint");
+  });
+
   it("keeps history analysis review on the current puzzle after a retry is solved", async () => {
     const service = createMobilePracticeService("random1000");
     const renderer = renderScreen({ practiceService: service });
@@ -3509,6 +3618,10 @@ describe("PracticePocScreen", () => {
       (node) => typeof node.props.testID === "string" && node.props.testID.startsWith("history-attempt-")
     )[0];
     press(renderer, historyAttemptRow.props.testID);
+    expect(collectText(findByTestId(renderer, "history-attempt-detail-context"))).toBe("Standard · Review");
+    expect(collectText(findByTestId(renderer, "history-attempt-detail-result"))).toBe("Wrong move");
+    expect(collectText(findByTestId(renderer, "history-attempt-detail-moves"))).toBe("Played c4b5 · Best e2e6");
+    expect(collectText(findByTestId(renderer, "history-attempt-detail-rating"))).toBe("Rating 600 · No run change");
     press(renderer, "review-analysis-button");
 
     expect(service.listHistory({ source: "scheduled_review" }) as unknown[]).toHaveLength(1);

@@ -860,7 +860,7 @@ export class SyncSQLiteStore implements PracticeStore {
     const clauses: string[] = [];
     const params: SyncSqliteValue[] = [];
     if (ratingKey !== undefined) {
-      clauses.push("a.rating_key = ?");
+      clauses.push("COALESCE(a.rating_key, s.rating_key) = ?");
       params.push(ratingKey);
     }
     if (since !== undefined) {
@@ -896,7 +896,7 @@ export class SyncSQLiteStore implements PracticeStore {
 
     return rows.map((row) => {
       const puzzle = puzzleFromRow(row);
-      const candidateOrder = optionalStringArrayFromJson(row.arrow_duel_candidate_order_json);
+      const candidateOrder = optionalHistoryStringArrayFromJson(row.arrow_duel_candidate_order_json);
       return {
         id: row.attempt_id,
         source: row.attempt_source,
@@ -1542,6 +1542,16 @@ function optionalStringArrayFromJson(value: string | null): string[] | undefined
     throw new Error("Stored Arrow Duel candidate order must be a string array");
   }
   return parsed;
+}
+
+function optionalHistoryStringArrayFromJson(value: string | null): string[] | undefined {
+  try {
+    return optionalStringArrayFromJson(value);
+  } catch {
+    // Candidate order is optional reconstruction metadata. A damaged legacy
+    // value must not make otherwise readable History unavailable.
+    return undefined;
+  }
 }
 
 function countRows(db: SyncSqliteDatabase, table: string, where?: string): number {

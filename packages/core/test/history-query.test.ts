@@ -5,6 +5,7 @@ import {
   buildHistoryView,
   filterHistoryAttemptsForQuery,
   historyAttemptHasReviewQueued,
+  normalizeHistoryAttemptDetail,
   resolveHistoryRange,
   sideToMoveForHistoryPuzzle,
   validateHistoryQuery
@@ -363,6 +364,75 @@ test("history puzzle stats attach review queue by puzzle, mode, and rating key",
 
 test("history side-to-move reflects the user turn shown for standard puzzles", () => {
   assert.equal(sideToMoveForHistoryPuzzle({ puzzle: standardPuzzle(), mode: "standard" }), "white");
+});
+
+test("history attempt detail preserves persisted context and normalizes malformed fields", () => {
+  assert.deepEqual(
+    normalizeHistoryAttemptDetail({
+      ...attempt({
+        id: "custom-attempt",
+        puzzleId: "custom-puzzle",
+        result: "wrong",
+        completedAt: "2026-06-20T00:00:15.000Z",
+        mode: "custom",
+        ratingKey: "hangingPiece custom 5/20"
+      }),
+      source: "scheduled_review",
+      submittedMove: "e2e4",
+      expectedMove: "e2e3",
+      ratingAfter: 584
+    }),
+    {
+      id: "custom-attempt",
+      puzzleId: "custom-puzzle",
+      source: "scheduled_review",
+      mode: "custom",
+      ratingKey: "hangingPiece custom 5/20",
+      result: "wrong",
+      startedAt: "2026-06-20T00:00:00.000Z",
+      completedAt: "2026-06-20T00:00:15.000Z",
+      elapsedSeconds: 15,
+      submittedMove: "e2e4",
+      expectedMove: "e2e3",
+      ratingBefore: 600,
+      ratingAfter: 584,
+      ratingDelta: -16,
+      dataStatus: "complete"
+    }
+  );
+
+  assert.deepEqual(
+    normalizeHistoryAttemptDetail({
+      ...attempt({
+        id: "partial-attempt",
+        puzzleId: "partial-puzzle",
+        result: "correct",
+        completedAt: "not-a-date"
+      }),
+      startedAt: "also-not-a-date",
+      submittedMove: " ",
+      expectedMove: "",
+      ratingBefore: Number.NaN,
+      ratingAfter: Number.POSITIVE_INFINITY
+    }),
+    {
+      id: "partial-attempt",
+      puzzleId: "partial-puzzle",
+      source: "sprint",
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      result: "correct",
+      startedAt: null,
+      completedAt: null,
+      elapsedSeconds: null,
+      submittedMove: null,
+      expectedMove: null,
+      ratingBefore: null,
+      ratingAfter: null,
+      ratingDelta: null,
+      dataStatus: "partial"
+    }
+  );
 });
 
 function attempt(input: {

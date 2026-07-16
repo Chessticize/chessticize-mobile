@@ -103,6 +103,24 @@ export interface HistoryView {
   performance: HistoryPerformance;
 }
 
+export interface HistoryAttemptDetail {
+  id: string;
+  puzzleId: string;
+  source: AttemptSource;
+  mode: SprintMode;
+  ratingKey: string;
+  result: AttemptResult;
+  startedAt: string | null;
+  completedAt: string | null;
+  elapsedSeconds: number | null;
+  submittedMove: string | null;
+  expectedMove: string | null;
+  ratingBefore: number | null;
+  ratingAfter: number | null;
+  ratingDelta: number | null;
+  dataStatus: "complete" | "partial";
+}
+
 export function resolveHistoryRange(now: string, timeRange: HistoryTimeRange): HistoryResolvedRange {
   const end = new Date(now);
   if (Number.isNaN(end.getTime())) {
@@ -118,6 +136,51 @@ export function resolveHistoryRange(now: string, timeRange: HistoryTimeRange): H
     since: new Date(end.getTime() - days * 24 * 60 * 60 * 1000).toISOString(),
     until: end.toISOString()
   };
+}
+
+export function normalizeHistoryAttemptDetail(attempt: AttemptEvent | HistoryAttemptView): HistoryAttemptDetail {
+  const startedAtMs = new Date(attempt.startedAt).getTime();
+  const completedAtMs = new Date(attempt.completedAt).getTime();
+  const startedAt = Number.isFinite(startedAtMs) ? attempt.startedAt : null;
+  const completedAt = Number.isFinite(completedAtMs) ? attempt.completedAt : null;
+  const elapsedSeconds = startedAt !== null && completedAt !== null && completedAtMs >= startedAtMs
+    ? Math.round((completedAtMs - startedAtMs) / 1000)
+    : null;
+  const submittedMove = normalizeHistoryText(attempt.submittedMove);
+  const expectedMove = normalizeHistoryText(attempt.expectedMove);
+  const ratingBefore = Number.isFinite(attempt.ratingBefore) ? attempt.ratingBefore : null;
+  const ratingAfter = attempt.ratingAfter !== undefined && Number.isFinite(attempt.ratingAfter)
+    ? attempt.ratingAfter
+    : null;
+  const ratingDelta = ratingBefore !== null && ratingAfter !== null ? ratingAfter - ratingBefore : null;
+  const dataStatus = startedAt === null || completedAt === null || elapsedSeconds === null ||
+      submittedMove === null || expectedMove === null || ratingBefore === null ||
+      (attempt.ratingAfter !== undefined && ratingAfter === null)
+    ? "partial"
+    : "complete";
+
+  return {
+    id: attempt.id,
+    puzzleId: attempt.puzzleId,
+    source: attempt.source,
+    mode: attempt.mode,
+    ratingKey: attempt.ratingKey,
+    result: attempt.result,
+    startedAt,
+    completedAt,
+    elapsedSeconds,
+    submittedMove,
+    expectedMove,
+    ratingBefore,
+    ratingAfter,
+    ratingDelta,
+    dataStatus
+  };
+}
+
+function normalizeHistoryText(value: string): string | null {
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : null;
 }
 
 export function validateHistoryQuery(query: HistoryQuery): HistoryQuery {

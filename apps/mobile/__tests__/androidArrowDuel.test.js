@@ -62,6 +62,9 @@ describe('Android Arrow Duel release slice', () => {
     expect(journey).toContain("by.id('history-rating-arrow_duel 5/30')");
     expect(journey).not.toContain("by.id('history-rating-arrow duel 5/30')");
     expect(journey).toContain("by.id('review-analysis-button')");
+    expect(journey).toContain("'history-attempt-detail-context', 'Arrow Duel · Sprint'");
+    expect(journey).toContain("by.id('history-attempt-detail-rating-key')");
+    expect(journey).toContain("'history-attempt-detail-moves', fixture.correctMove");
     expect(journey).toContain('review-analysis-engine-status');
     expect(journey).not.toContain('PracticeService');
     expect(journey).not.toContain('run-as');
