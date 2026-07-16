@@ -1239,7 +1239,7 @@ describe('Android Progress Backup', () => {
   it('recovers only transient adb root restarts and proves root before policy mutation', () => {
     const policyEvidenceScript = read('scripts/android-progress-backup-policy-evidence.sh');
     const recoveryStart = policyEvidenceScript.indexOf(
-      'is_transient_adb_root_restart_failure() {',
+      'wait_for_boot_completed() {',
     );
     const recoveryEnd = policyEvidenceScript.indexOf(
       '\n}\n\nwait_for_api24_backup_manager_ready() {',
@@ -1252,9 +1252,10 @@ describe('Android Progress Backup', () => {
     const recoveryHelpers = policyEvidenceScript.slice(recoveryStart, recoveryEnd);
     expect(recoveryHelpers).toContain('adb: unable to connect for root: closed');
     expect(recoveryHelpers).toContain('adb_cmd wait-for-device');
+    expect(recoveryHelpers).toContain('adb_cmd shell getprop sys.boot_completed');
     expect(recoveryHelpers).toContain('adb_cmd shell id -u');
     expect(recoveryHelpers).toContain('root_diagnostic="$ARTIFACT_DIR/adb-root-recovery.txt"');
-    expect(recoveryHelpers).not.toContain('sleep ');
+    expect(recoveryHelpers).toContain('sleep 1');
     expect(policyEvidenceScript.lastIndexOf('ARTIFACT_DIR="$ARTIFACT_ROOT/api-$SDK_LEVEL"'))
       .toBeLessThan(policyEvidenceScript.lastIndexOf('\nensure_root_adbd\n'));
 
@@ -1273,6 +1274,7 @@ describe('Android Progress Backup', () => {
         printf '0\n' > "$STATE_DIR/uid-count"
         printf '0\n' > "$STATE_DIR/wait-count"
         printf '0\n' > "$STATE_DIR/boot-count"
+        printf '0\n' > "$STATE_DIR/sleep-count"
         printf '0\n' > "$STATE_DIR/policy-count"
         bump() {
           local file="$1"
@@ -1302,6 +1304,15 @@ describe('Android Progress Backup', () => {
             fi
             return 0
           fi
+          if [[ "$1" == "shell" && "$2" == "getprop" && "$3" == "sys.boot_completed" ]]; then
+            boot_call="$(bump "$STATE_DIR/boot-count")"
+            if [[ "$MODE" == "boot-failure" && "$boot_call" -ge 2 ]]; then
+              printf '0\n'
+            else
+              printf '1\n'
+            fi
+            return 0
+          fi
           if [[ "$1" == "root" ]]; then
             bump "$STATE_DIR/root-count" >/dev/null
             case "$MODE" in
@@ -1326,11 +1337,11 @@ describe('Android Progress Backup', () => {
           bump "$STATE_DIR/policy-count" >/dev/null
           return 64
         }
-        wait_for_boot_completed() {
-          boot_call="$(bump "$STATE_DIR/boot-count")"
-          if [[ "$MODE" == "boot-failure" && "$boot_call" -ge 2 ]]; then
-            return 1
+        sleep() {
+          if [[ "$1" != "1" ]]; then
+            return 65
           fi
+          bump "$STATE_DIR/sleep-count" >/dev/null
           return 0
         }
         ${recoveryHelpers}
@@ -1338,12 +1349,13 @@ describe('Android Progress Backup', () => {
         ensure_root_adbd 2>"$STATE_DIR/error.txt"
         status=$?
         set -e
-        printf 'status=%s root=%s uid=%s wait=%s boot=%s policy=%s error=<%s> diagnostic=<%s>\n' \
+        printf 'status=%s root=%s uid=%s wait=%s boot=%s sleep=%s policy=%s error=<%s> diagnostic=<%s>\n' \
           "$status" \
           "$(cat "$STATE_DIR/root-count")" \
           "$(cat "$STATE_DIR/uid-count")" \
           "$(cat "$STATE_DIR/wait-count")" \
           "$(cat "$STATE_DIR/boot-count")" \
+          "$(cat "$STATE_DIR/sleep-count")" \
           "$(cat "$STATE_DIR/policy-count")" \
           "$(cat "$STATE_DIR/error.txt")" \
           "$(cat "$ARTIFACT_DIR/adb-root-recovery.txt" 2>/dev/null || printf absent)"
@@ -1353,55 +1365,56 @@ describe('Android Progress Backup', () => {
 
     const transientSuccess = runRecovery('transient-success');
     expect(transientSuccess.status).toBe(0);
-    expect(transientSuccess.stdout).toMatch(/^status=0 root=1 uid=2 wait=2 boot=2 policy=0 error=<>/);
+    expect(transientSuccess.stdout).toMatch(/^status=0 root=1 uid=2 wait=2 boot=2 sleep=0 policy=0 error=<>/);
 
     const persistent = runRecovery('transient-persistent');
     expect(persistent.status).toBe(0);
-    expect(persistent.stdout).toMatch(/^status=[1-9][0-9]* root=3 uid=4 wait=4 boot=4 policy=0 error=</);
+    expect(persistent.stdout).toMatch(/^status=[1-9][0-9]* root=3 uid=4 wait=4 boot=4 sleep=0 policy=0 error=</);
     expect(persistent.stdout).toContain('did not yield root adbd after 3 bounded attempts');
     expect(persistent.stdout).toContain('diagnostic=<attempt=1 status=1');
 
     const unrelated = runRecovery('non-transient');
     expect(unrelated.status).toBe(0);
-    expect(unrelated.stdout).toMatch(/^status=[1-9][0-9]* root=1 uid=1 wait=1 boot=1 policy=0 error=</);
+    expect(unrelated.stdout).toMatch(/^status=[1-9][0-9]* root=1 uid=1 wait=1 boot=1 sleep=0 policy=0 error=</);
     expect(unrelated.stdout).toContain('non-transient error');
     expect(unrelated.stdout).toContain('diagnostic=<attempt=1 status=42');
 
     const nonRoot = runRecovery('success-nonroot');
     expect(nonRoot.status).toBe(0);
-    expect(nonRoot.stdout).toMatch(/^status=[1-9][0-9]* root=1 uid=2 wait=2 boot=2 policy=0 error=</);
+    expect(nonRoot.stdout).toMatch(/^status=[1-9][0-9]* root=1 uid=2 wait=2 boot=2 sleep=0 policy=0 error=</);
     expect(nonRoot.stdout).toContain('reported success but adbd remained uid 2000');
     expect(nonRoot.stdout).toContain('diagnostic=<attempt=1 status=0');
 
     const malformedUid = runRecovery('malformed-uid');
     expect(malformedUid.status).toBe(0);
-    expect(malformedUid.stdout).toMatch(/^status=[1-9][0-9]* root=1 uid=2 wait=2 boot=2 policy=0 error=</);
+    expect(malformedUid.stdout).toMatch(/^status=[1-9][0-9]* root=1 uid=2 wait=2 boot=2 sleep=0 policy=0 error=</);
     expect(malformedUid.stdout).toContain('malformed uid');
     expect(malformedUid.stdout).toContain('adb root recovery diagnostic:');
     expect(malformedUid.stdout).toContain('diagnostic=<attempt=1 status=1');
 
     const waitFailure = runRecovery('wait-failure');
     expect(waitFailure.status).toBe(0);
-    expect(waitFailure.stdout).toMatch(/^status=[1-9][0-9]* root=1 uid=1 wait=2 boot=1 policy=0 error=</);
+    expect(waitFailure.stdout).toMatch(/^status=[1-9][0-9]* root=1 uid=1 wait=2 boot=1 sleep=0 policy=0 error=</);
     expect(waitFailure.stdout).toContain('did not reconnect');
     expect(waitFailure.stdout).toContain('adb root recovery diagnostic:');
     expect(waitFailure.stdout).toContain('diagnostic=<attempt=1 status=1');
 
     const bootFailure = runRecovery('boot-failure');
     expect(bootFailure.status).toBe(0);
-    expect(bootFailure.stdout).toMatch(/^status=[1-9][0-9]* root=1 uid=1 wait=2 boot=2 policy=0 error=</);
+    expect(bootFailure.stdout).toMatch(/^status=[1-9][0-9]* root=1 uid=1 wait=2 boot=61 sleep=60 policy=0 error=</);
+    expect(bootFailure.stdout).toContain('did not return to a boot-complete state');
     expect(bootFailure.stdout).toContain('did not recover to boot-complete');
     expect(bootFailure.stdout).toContain('adb root recovery diagnostic:');
     expect(bootFailure.stdout).toContain('diagnostic=<attempt=1 status=1');
 
     const overLimit = runRecovery('transient-persistent', 4);
     expect(overLimit.status).toBe(0);
-    expect(overLimit.stdout).toMatch(/^status=[1-9][0-9]* root=0 uid=0 wait=0 boot=0 policy=0 error=</);
+    expect(overLimit.stdout).toMatch(/^status=[1-9][0-9]* root=0 uid=0 wait=0 boot=0 sleep=0 policy=0 error=</);
     expect(overLimit.stdout).toContain('must be an integer from 1 through 3');
 
     const mixedOutput = runRecovery('mixed-output');
     expect(mixedOutput.status).toBe(0);
-    expect(mixedOutput.stdout).toMatch(/^status=[1-9][0-9]* root=1 uid=1 wait=1 boot=1 policy=0 error=</);
+    expect(mixedOutput.stdout).toMatch(/^status=[1-9][0-9]* root=1 uid=1 wait=1 boot=1 sleep=0 policy=0 error=</);
     expect(mixedOutput.stdout).toContain('non-transient error');
     expect(mixedOutput.stdout).toContain('fatal: transport authentication rejected');
     expect(mixedOutput.stdout).toContain('diagnostic=<attempt=1 status=1');

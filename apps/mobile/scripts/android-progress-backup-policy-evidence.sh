@@ -138,7 +138,7 @@ wait_for_boot_completed() {
     sleep 1
   done
   echo "Android device $DEVICE did not return to a boot-complete state." >&2
-  exit 1
+  return 1
 }
 
 is_transient_adb_root_restart_failure() {
@@ -198,7 +198,9 @@ ensure_root_adbd() {
     echo "ANDROID_BACKUP_POLICY_ADB_ROOT_RECOVERY_ATTEMPTS must be an integer from 1 through 3." >&2
     return 64
   fi
-  wait_for_adbd_recovery
+  if ! wait_for_adbd_recovery; then
+    return 1
+  fi
   adb_uid="$(read_adbd_uid)" || return 1
   if [[ "$adb_uid" == "0" ]]; then
     return
