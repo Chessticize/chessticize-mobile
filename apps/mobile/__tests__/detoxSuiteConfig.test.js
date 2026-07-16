@@ -596,7 +596,12 @@ describe('Detox suite configuration', () => {
       'utf8'
     );
 
-    expect(spec).toContain("device.setOrientation('landscape')");
+    const requestLandscape = spec.indexOf("device.setOrientation('landscape')");
+    const waitForLandscape = spec.indexOf("waitForOrientation('landscape')", requestLandscape);
+    expect(requestLandscape).toBeGreaterThan(0);
+    expect(waitForLandscape).toBeGreaterThan(requestLandscape);
+    expect(spec).not.toContain('sleep(1200)');
+    expect(spec).toContain('Timed out waiting for ${orientation} layout');
     expect(spec).toContain("elementText('session-current-puzzle-id')");
     expect(spec).not.toContain('session-current-expected-move');
     expect(screen).not.toContain('session-current-expected-move');

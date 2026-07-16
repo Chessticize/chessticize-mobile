@@ -44,7 +44,7 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
 
     if (includeLandscape && initialOrientation === 'portrait') {
       await device.setOrientation('landscape');
-      await sleep(1200);
+      await waitForOrientation('landscape');
       await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
       const rotatedPuzzleID = await elementText('session-current-puzzle-id');
       if (rotatedPuzzleID !== puzzleID) {
@@ -119,8 +119,24 @@ async function launchForOrientation(orientation) {
   });
   await waitFor(element(by.id('practice-home'))).toExist().withTimeout(180000);
   await device.setOrientation(orientation);
-  await sleep(1200);
+  await waitForOrientation(orientation);
   await element(by.id('practice-main-scroll')).scrollTo('top');
+}
+
+async function waitForOrientation(orientation) {
+  let lastFrame = null;
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    try {
+      lastFrame = await frameFor(element(by.id('adaptive-layout')));
+      if (frameHasOrientation(lastFrame, orientation)) {
+        return;
+      }
+    } catch {
+      lastFrame = null;
+    }
+    await sleep(250);
+  }
+  throw new Error(`Timed out waiting for ${orientation} layout; last observed frame=${JSON.stringify(lastFrame)}`);
 }
 
 async function waitForHomeTopFrame() {
@@ -146,10 +162,13 @@ function sanitizeScreenshotLabel(label) {
 }
 
 function expectOrientationFrame(frame, orientation) {
-  if (orientation === 'landscape' && frame.width <= frame.height) {
-    throw new Error(`Expected landscape frame, got ${JSON.stringify(frame)}`);
+  if (!frameHasOrientation(frame, orientation)) {
+    throw new Error(`Expected ${orientation} frame, got ${JSON.stringify(frame)}`);
   }
-  if (orientation === 'portrait' && frame.height <= frame.width) {
-    throw new Error(`Expected portrait frame, got ${JSON.stringify(frame)}`);
-  }
+}
+
+function frameHasOrientation(frame, orientation) {
+  return orientation === 'landscape'
+    ? frame.width > frame.height
+    : frame.height > frame.width;
 }
