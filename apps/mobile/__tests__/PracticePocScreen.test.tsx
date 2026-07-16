@@ -1132,6 +1132,40 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "session-timer"))).toBe("05:00");
   });
 
+  it("keeps the native session board and its handlers stable across timer ticks and puzzle advances", async () => {
+    const renderer = renderStandardSequenceScreen();
+
+    startStandardSprint(renderer);
+    const initialBoard = findByTestId(renderer, "mock-chessboard");
+    expect(initialBoard.props.gestureEnabled).toBe(true);
+    expect(initialBoard.props.draggableColor).toBeNull();
+    const initialProps = {
+      colors: initialBoard.props.colors,
+      durations: initialBoard.props.durations,
+      mockResetBoard: initialBoard.props.mockResetBoard,
+      onIllegalMove: initialBoard.props.onIllegalMove,
+      onMove: initialBoard.props.onMove
+    };
+
+    act(() => {
+      jest.advanceTimersByTime(1_500);
+    });
+
+    const boardAfterTimerTicks = findByTestId(renderer, "mock-chessboard");
+    expect(boardAfterTimerTicks.props).toEqual(expect.objectContaining(initialProps));
+
+    await boardMove(renderer, "e2e6");
+    await settleFeedbackSnapshot();
+    await boardMove(renderer, "e6f7");
+    await settleFeedbackSnapshot();
+
+    const boardAfterPuzzleAdvance = findByTestId(renderer, "mock-chessboard");
+    expect(boardAfterPuzzleAdvance.props.mockResetBoard).toBe(initialProps.mockResetBoard);
+    expect(boardAfterPuzzleAdvance.props.onIllegalMove).toBe(initialProps.onIllegalMove);
+    expect(boardAfterPuzzleAdvance.props.onMove).toBe(initialProps.onMove);
+    expectText(renderer, "1 / 15");
+  });
+
   it("offers resume before starting a new sprint when the service has an active session", () => {
     const service = createMobilePracticeService("random1000");
     service.startSprint(
@@ -1382,7 +1416,7 @@ describe("PracticePocScreen", () => {
     expect(board.props.colors.lastMoveHighlight).toBe("rgba(0, 0, 0, 0)");
     expect(board.props.colors.validMoveDot).toBe("rgba(15, 23, 42, 0.36)");
     expect(board.props.colors.validMoveCapture).toBe("rgba(15, 23, 42, 0.56)");
-    expect(board.props.draggableColor).toBe("w");
+    expect(board.props.draggableColor).toBeNull();
     expect(board.props.withLetters).toBe(false);
     expect(board.props.withNumbers).toBe(false);
     expect(collectText(findByTestId(renderer, "board-coordinate-overlay"))).toContain("abcdefgh");
@@ -1438,7 +1472,7 @@ describe("PracticePocScreen", () => {
     // The opponent-reply window keeps the board interactive for premoves; only
     // the surrounding scroll view is frozen so fast drags cannot pan the screen.
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
-    expect(findByTestId(renderer, "mock-chessboard").props.draggableColor).toBe("w");
+    expect(findByTestId(renderer, "mock-chessboard").props.draggableColor).toBeNull();
     expect(() => findByTestId(renderer, "board-input-blocker")).toThrow();
     expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(false);
     expect(hasStyleValue(renderer.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
@@ -1455,7 +1489,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "session-board").props.accessibilityLabel)
       .toBe("Chess board. White to move. Last move f7 to f8");
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
-    expect(findByTestId(renderer, "mock-chessboard").props.draggableColor).toBe("w");
+    expect(findByTestId(renderer, "mock-chessboard").props.draggableColor).toBeNull();
     expect(() => findByTestId(renderer, "board-input-blocker")).toThrow();
     // The page never scrolls while the session board is on screen.
     expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(false);
@@ -1586,7 +1620,7 @@ describe("PracticePocScreen", () => {
 
     await boardMove(renderer, "e2e6");
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
-    expect(findByTestId(renderer, "mock-chessboard").props.draggableColor).toBe("w");
+    expect(findByTestId(renderer, "mock-chessboard").props.draggableColor).toBeNull();
     expect(() => findByTestId(renderer, "board-input-blocker")).toThrow();
     expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(false);
     expectText(renderer, "0 / 15");
@@ -1619,7 +1653,7 @@ describe("PracticePocScreen", () => {
     await settleFeedbackSnapshot();
 
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
-    expect(findByTestId(renderer, "mock-chessboard").props.draggableColor).toBe("b");
+    expect(findByTestId(renderer, "mock-chessboard").props.draggableColor).toBeNull();
     // The page never scrolls while the session board is on screen.
     expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(false);
     expectSessionMistakes(renderer, 0);
@@ -1715,9 +1749,10 @@ describe("PracticePocScreen", () => {
     await settleFeedbackSnapshot();
 
     // A wrong move advances to the next puzzle behind a feedback-snapshot
-    // hard lock: gestures are disabled and the input blocker is up.
+    // hard lock. The native handler stays mounted, while the input blocker
+    // and the JS lock guard reject touches and callback races.
     await boardMove(renderer, "e6d7");
-    expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(false);
+    expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
     expect(findByTestId(renderer, "board-input-blocker")).toBeTruthy();
 
     act(() => {
@@ -1746,7 +1781,7 @@ describe("PracticePocScreen", () => {
     await boardMove(renderer, "e2e6");
 
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
-    expect(findByTestId(renderer, "mock-chessboard").props.draggableColor).toBe("w");
+    expect(findByTestId(renderer, "mock-chessboard").props.draggableColor).toBeNull();
     await boardMoveWithCallback(
       findByTestId(renderer, "mock-chessboard").props.onMove,
       "f7e8",
@@ -1786,7 +1821,7 @@ describe("PracticePocScreen", () => {
     await boardMove(renderer, "e2e6");
 
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
-    expect(findByTestId(renderer, "mock-chessboard").props.draggableColor).toBe("w");
+    expect(findByTestId(renderer, "mock-chessboard").props.draggableColor).toBeNull();
     act(() => {
       findByTestId(renderer, "mock-chessboard").props.onIllegalMove("d8", "a8");
     });
