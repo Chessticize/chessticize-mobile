@@ -7,10 +7,13 @@ The permanent Android application ID, namespace, and Kotlin package are
 with compile and target API 36. Universal Android packages contain only
 `arm64-v8a` and `x86_64` native libraries.
 
-The scheduled/manual Android CI workflow builds one debug APK, verifies its
-native ABI contents, and launches it through Detox on API 24 and API 36 x86_64
-emulators. Production release packaging requires explicit release signing
-material and has no debug keystore fallback.
+The scheduled Android CI workflow builds one self-contained E2E APK, verifies
+its native ABI contents, and runs the complete shared `flows` and `practice`
+suites on an API 36 x86_64 phone emulator. Manual exact-head dispatch reuses
+that build for the bounded API 24 launch/storage/practice/native-engine smoke
+and representative API 36 tablet and foldable/resizable evidence. See
+`docs/ANDROID_VALIDATION.md`. Production release packaging requires explicit
+release signing material and has no debug keystore fallback.
 
 ## iOS Device Targets
 

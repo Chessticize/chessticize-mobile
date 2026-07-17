@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const { ANDROID_REQUIREMENTS: REQUIREMENTS } = require('./android-requirements');
+const stockfishArtifacts = require('../stockfish-artifacts.json');
 
 function parseJavaMajor(output) {
   const match = String(output).match(/version\s+"(\d+)(?:\.(\d+))?/i);
@@ -138,14 +139,75 @@ function inspectAndroidEnvironment(options = {}) {
   const detoxPackage = path.join(appDir, 'node_modules', 'detox', 'package.json');
   const installedJsBuildDependencies = exists(reactNativePackage)
     && exists(reactNativeCodegen)
-    && exists(reactNativeGradlePlugin)
-    && exists(detoxPackage);
+    && exists(reactNativeGradlePlugin);
   add(
     'js-dependencies',
     installedJsBuildDependencies ? 'pass' : 'fail',
     installedJsBuildDependencies
-      ? 'React Native, Codegen, the Gradle plugin, and Detox are installed'
+      ? 'React Native, Codegen, and the Gradle plugin are installed'
       : 'Run pnpm install --frozen-lockfile before Android builds',
+  );
+  add(
+    'detox',
+    exists(detoxPackage) ? 'pass' : 'fail',
+    exists(detoxPackage)
+      ? `Detox package: ${detoxPackage}`
+      : 'Detox is missing; run pnpm install --frozen-lockfile',
+  );
+
+  const releaseSigningNames = [
+    'CHESSTICIZE_ANDROID_RELEASE_STORE_FILE',
+    'CHESSTICIZE_ANDROID_RELEASE_STORE_PASSWORD',
+    'CHESSTICIZE_ANDROID_RELEASE_KEY_ALIAS',
+    'CHESSTICIZE_ANDROID_RELEASE_KEY_PASSWORD',
+  ];
+  const configuredSigningNames = releaseSigningNames.filter((name) => environment[name]);
+  if (configuredSigningNames.length === 0) {
+    add(
+      'signing',
+      'warn',
+      'Production signing is not configured; development validation remains available and release packaging fails closed',
+    );
+  } else if (configuredSigningNames.length !== releaseSigningNames.length) {
+    add(
+      'signing',
+      'fail',
+      'Production signing is partially configured; provide all CHESSTICIZE_ANDROID_RELEASE_* values',
+    );
+  } else if (!exists(environment.CHESSTICIZE_ANDROID_RELEASE_STORE_FILE)) {
+    add(
+      'signing',
+      'fail',
+      'Production signing keystore does not exist at the configured path',
+    );
+  } else {
+    add('signing', 'pass', 'Production signing variables and keystore path are configured');
+  }
+
+  const nativeLibraryFiles = [
+    path.join(appDir, 'stockfish-artifacts.json'),
+    path.join(appDir, 'native', 'stockfish', 'Bridge', 'StockfishRunner.cpp'),
+    path.join(
+      appDir,
+      'android',
+      'app',
+      'src',
+      'main',
+      'cpp',
+      'stockfish',
+      'NativeStockfishEngine.cpp'
+    ),
+    ...stockfishArtifacts.nnue.map((relativePath) => (
+      path.join(appDir, 'native', 'stockfish', relativePath)
+    )),
+  ];
+  const missingNativeLibraryFiles = nativeLibraryFiles.filter((file) => !exists(file));
+  add(
+    'native-library',
+    missingNativeLibraryFiles.length === 0 ? 'pass' : 'fail',
+    missingNativeLibraryFiles.length === 0
+      ? 'Shared Stockfish sources, bridge, manifest, and NNUE assets are present'
+      : `Stockfish native-library inputs are missing: ${missingNativeLibraryFiles.join(', ')}`,
   );
 
   const puzzlePack = path.join(repoRoot, 'fixtures', 'puzzles', 'bundled-core-pack.sqlite');

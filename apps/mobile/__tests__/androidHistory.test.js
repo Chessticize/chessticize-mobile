@@ -1,5 +1,6 @@
 const { readFileSync } = require('node:fs');
 const { join } = require('node:path');
+const { validationStepsForApiLevel } = require('../scripts/android-validation-matrix');
 
 const appRoot = join(__dirname, '..');
 const repoRoot = join(appRoot, '../..');
@@ -20,7 +21,9 @@ describe('Android Practice History release slice', () => {
 
     expect(suiteConfig).toContain('android-history.e2e.js');
     expect(suiteConfig).toContain("activeSuite === 'android-history'");
-    expect(workflow).toContain('DETOX_ACTIVE_SUITE=android-history pnpm mobile:e2e:test:android:ci');
+    expect(validationStepsForApiLevel(36))
+      .toContainEqual({ kind: 'detox', suite: 'android-history' });
+    expect(workflow).toContain('pnpm mobile:validate:android:matrix');
     expect(spec).toContain('failStandardSprint()');
     expect(spec).toContain("by.id('history-filter-wrong-only')");
     expect(spec).toContain("by.id('history-attempt-detail')");

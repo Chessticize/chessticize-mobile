@@ -3,6 +3,7 @@ const path = require('path');
 
 const detoxConfig = require('../.detoxrc');
 const mobilePackage = require('../package.json');
+const stockfishArtifacts = require('../stockfish-artifacts.json');
 const {
   REQUIREMENTS,
   inspectAndroidEnvironment,
@@ -24,6 +25,7 @@ const {
   parseGradleProperties,
 } = require('../scripts/android-requirements');
 const { installAndroidSdk } = require('../scripts/install-android-sdk');
+const { validationStepsForApiLevel } = require('../scripts/android-validation-matrix');
 
 const mobileRoot = path.resolve(__dirname, '..');
 
@@ -45,6 +47,12 @@ function completeAndroidFiles(sdkRoot, appDir, repoRoot) {
     `${appDir}/node_modules/@react-native/codegen/package.json`,
     `${appDir}/node_modules/@react-native/gradle-plugin/package.json`,
     `${appDir}/node_modules/detox/package.json`,
+    `${appDir}/stockfish-artifacts.json`,
+    `${appDir}/native/stockfish/Bridge/StockfishRunner.cpp`,
+    `${appDir}/android/app/src/main/cpp/stockfish/NativeStockfishEngine.cpp`,
+    ...stockfishArtifacts.nnue.map(
+      (relativePath) => `${appDir}/native/stockfish/${relativePath}`
+    ),
     `${repoRoot}/fixtures/puzzles/bundled-core-pack.sqlite`,
   ]);
 }
@@ -280,60 +288,61 @@ describe('Android launch baseline', () => {
       workflow.indexOf('  android-adaptive-layout:'),
     );
 
-    expect(launchJob).toContain('api-level: [24, 36]');
+    expect(launchJob).toContain(
+      "api-level: ${{ fromJSON(github.event_name == 'schedule' && '[36]' || '[24,36]') }}"
+    );
     expect(launchJob).toContain('ram-size: 4096M');
     expect(launchJob.match(/ram-size: 4096M/g)).toHaveLength(1);
     expect(launchJob).toContain('name: Upload Android launch failure diagnostics');
     expect(launchJob).toContain('apps/mobile/artifacts/android-ui/');
   });
 
-  it('keeps the API 36 Stockfish condition in one emulator-runner script line', () => {
+  it('keeps the complete API 36 suites in the tested matrix runner', () => {
     const workflow = read('../../.github/workflows/mobile-android.yml');
+    const suites = validationStepsForApiLevel(36)
+      .filter((step) => step.kind === 'detox')
+      .map((step) => step.suite);
 
-    for (const suite of ['android-history', 'android-stockfish', 'android-system-back', 'android-review-reminders', 'flows', 'practice']) {
-      const command = `if [ "\${{ matrix.api-level }}" = "36" ]; then DETOX_ACTIVE_SUITE=${suite} pnpm mobile:e2e:test:android:ci; fi`;
-      expect(workflow).toContain(command);
-      expect(workflow.match(new RegExp(`DETOX_ACTIVE_SUITE=${suite}`, 'g'))).toHaveLength(1);
-      expect(workflow).not.toMatch(
-        new RegExp(`if \\[ "\\$\\{\\{ matrix\\.api-level \\}\\}" = "36" \\]; then\\s*\\n\\s*DETOX_ACTIVE_SUITE=${suite}`)
-      );
-    }
+    expect(suites).toEqual(expect.arrayContaining([
+      'android-history',
+      'android-stockfish',
+      'android-system-back',
+      'android-review-reminders',
+      'flows',
+      'practice',
+    ]));
+    expect(workflow).toContain('pnpm mobile:validate:android:matrix');
+    expect(workflow).not.toContain('DETOX_ACTIVE_SUITE=');
     expect(workflow).toContain('timeout-minutes: 75');
   });
 
-  it('keeps emulator-runner launch control flow on complete shell command lines', () => {
+  it('keeps emulator-runner control flow in the tested Node runner', () => {
     const workflow = read('../../.github/workflows/mobile-android.yml');
     const launchJob = workflow.slice(
       workflow.indexOf('  android-launch:'),
-      workflow.indexOf('  android-progress-backup:'),
+      workflow.indexOf('  android-adaptive-layout:'),
     );
     const script = launchJob.slice(
-      launchJob.indexOf('          script: |'),
+      launchJob.indexOf('          script: >-'),
       launchJob.indexOf('        env:'),
     );
-
-    for (const line of script.split('\n').map((entry) => entry.trim()).filter(Boolean)) {
-      if (/^(?:if|elif)\b/.test(line)) {
-        expect(line).toMatch(/\bfi$/);
-      }
-      if (/^(?:for|while|until)\b/.test(line)) {
-        expect(line).toMatch(/\bdone$/);
-      }
-      if (/^case\b/.test(line)) {
-        expect(line).toMatch(/\besac$/);
-      }
-      expect(line).not.toMatch(/^(?:else|fi|do|done|esac)\b/);
-      expect(line).not.toMatch(/^[A-Za-z_][A-Za-z0-9_]*\(\)\s*\{$/);
-    }
+    expect(launchJob).toContain('script: >-');
+    expect(launchJob).toContain('pnpm mobile:validate:android:matrix');
+    expect(script).not.toMatch(/\b(?:if|for|while|until|case)\b/);
   });
 
-  it('runs the full offline-practice suite on both Android API levels', () => {
+  it('keeps API 24 bounded while API 36 retains complete shared suites', () => {
     const workflow = read('../../.github/workflows/mobile-android.yml');
+    const api24Suites = validationStepsForApiLevel(24)
+      .filter((step) => step.kind === 'detox')
+      .map((step) => step.suite);
+    const api36Suites = validationStepsForApiLevel(36)
+      .filter((step) => step.kind === 'detox')
+      .map((step) => step.suite);
 
-    expect(workflow).toContain(
-      'DETOX_ACTIVE_SUITE=android-offline-practice pnpm mobile:e2e:test:android:ci'
-    );
-    expect(workflow.match(/DETOX_ACTIVE_SUITE=android-offline-practice/g)).toHaveLength(1);
+    expect(api24Suites).toEqual(['android-api24-smoke']);
+    expect(api36Suites).toEqual(expect.arrayContaining(['flows', 'practice']));
+    expect(workflow.match(/pnpm mobile:validate:android:matrix/g)).toHaveLength(1);
   });
 
   it('uses the doctor-verified SDK with a self-contained offline Android E2E app', () => {
@@ -366,6 +375,66 @@ describe('Android launch baseline', () => {
     expect(report.ready).toBe(true);
     expect(report.requirements).toEqual(REQUIREMENTS);
     expect(report.checks.filter((check) => check.status === 'fail')).toEqual([]);
+    expect(report.checks).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'java', status: 'pass' }),
+      expect.objectContaining({ id: 'android-sdk', status: 'pass' }),
+      expect.objectContaining({ id: 'ndk', status: 'pass' }),
+      expect.objectContaining({ id: 'emulator', status: 'pass' }),
+      expect.objectContaining({ id: 'signing', status: 'warn' }),
+      expect.objectContaining({ id: 'native-library', status: 'pass' }),
+      expect.objectContaining({ id: 'detox', status: 'pass' }),
+    ]));
+  });
+
+  it('distinguishes partial release signing from simulator-ready development setup', () => {
+    const sdkRoot = '/sdk';
+    const appDir = '/repo/apps/mobile';
+    const repoRoot = '/repo';
+    const present = completeAndroidFiles(sdkRoot, appDir, repoRoot);
+
+    const report = inspectAndroidEnvironment({
+      environment: {
+        ANDROID_HOME: sdkRoot,
+        CHESSTICIZE_ANDROID_RELEASE_STORE_FILE: '/keys/upload.jks',
+      },
+      exists: (file) => present.has(file),
+      canExecute: (file) => present.has(file),
+      run: successfulAndroidToolRun,
+      nodeVersion: '22.14.0',
+      appDir,
+      repoRoot,
+    });
+
+    expect(report.ready).toBe(false);
+    expect(report.checks.find((check) => check.id === 'signing')).toMatchObject({
+      status: 'fail',
+      detail: expect.stringContaining('partially configured'),
+    });
+  });
+
+  it('reports missing native-library sources independently from Detox setup', () => {
+    const sdkRoot = '/sdk';
+    const appDir = '/repo/apps/mobile';
+    const repoRoot = '/repo';
+    const present = completeAndroidFiles(sdkRoot, appDir, repoRoot);
+    present.delete(`${appDir}/native/stockfish/Bridge/StockfishRunner.cpp`);
+
+    const report = inspectAndroidEnvironment({
+      environment: { ANDROID_HOME: sdkRoot },
+      exists: (file) => present.has(file),
+      canExecute: (file) => present.has(file),
+      run: successfulAndroidToolRun,
+      nodeVersion: '22.14.0',
+      appDir,
+      repoRoot,
+    });
+
+    expect(report.ready).toBe(false);
+    expect(report.checks.find((check) => check.id === 'native-library')).toMatchObject({
+      status: 'fail',
+      detail: expect.stringContaining('Stockfish'),
+    });
+    expect(report.checks.find((check) => check.id === 'detox').status).toBe('pass');
   });
 
   it.each([
