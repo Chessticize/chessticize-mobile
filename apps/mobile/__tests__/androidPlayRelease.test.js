@@ -8,6 +8,7 @@ const {
   normalizeFingerprint,
   parseArguments,
   parseZipListing,
+  resolveRepoPath,
 } = require('../scripts/android-play-release');
 
 const mobileRoot = path.resolve(__dirname, '..');
@@ -290,6 +291,19 @@ describe('Android Play release contract', () => {
       bundle: 'candidate.aab',
       bundletool: 'bundletool.jar',
     });
+  });
+
+  it('resolves release paths from the repository root after pnpm changes cwd', () => {
+    expect(resolveRepoPath(
+      'apps/mobile/android/app/build/outputs/bundle/release/app-release.aab',
+      repoRoot,
+    )).toBe(path.join(
+      repoRoot,
+      'apps/mobile/android/app/build/outputs/bundle/release/app-release.aab',
+    ));
+    expect(resolveRepoPath('/tmp/bundletool.jar', repoRoot)).toBe(
+      '/tmp/bundletool.jar',
+    );
   });
 
   it('keeps release construction manual, protected, exact-artifact, and fail closed', () => {

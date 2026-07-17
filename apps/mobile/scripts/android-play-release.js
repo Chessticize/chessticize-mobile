@@ -219,6 +219,10 @@ function parseSignerFingerprint(output) {
   return normalizeFingerprint(value);
 }
 
+function resolveRepoPath(value, repoRoot) {
+  return path.resolve(repoRoot, value);
+}
+
 function inspectReleaseManifest(manifest) {
   const value = String(manifest);
   const errors = [];
@@ -286,10 +290,12 @@ function inspectAndroidPlayRelease(options, dependencies = {}) {
   const releaseVersion = JSON.parse(
     fs.readFileSync(path.join(repoRoot, 'apps/mobile/release-version.json'), 'utf8'),
   );
-  if (!options.bundle || !fs.statSync(options.bundle).isFile()) {
+  const bundlePath = options.bundle && resolveRepoPath(options.bundle, repoRoot);
+  const bundletoolPath = options.bundletool && resolveRepoPath(options.bundletool, repoRoot);
+  if (!bundlePath || !fs.existsSync(bundlePath) || !fs.statSync(bundlePath).isFile()) {
     throw new Error('--bundle must point to the signed production AAB.');
   }
-  if (!options.bundletool || !fs.statSync(options.bundletool).isFile()) {
+  if (!bundletoolPath || !fs.existsSync(bundletoolPath) || !fs.statSync(bundletoolPath).isFile()) {
     throw new Error('--bundletool must point to the pinned bundletool JAR.');
   }
   const approvedUploadFingerprint = normalizeFingerprint(
@@ -306,18 +312,18 @@ function inspectAndroidPlayRelease(options, dependencies = {}) {
   }
 
   const entries = requireSuccessful(
-    run('unzip', ['-Z1', options.bundle], { encoding: 'utf8' }),
+    run('unzip', ['-Z1', bundlePath], { encoding: 'utf8' }),
     'Could not list the AAB',
   ).split(/\r?\n/).filter(Boolean);
   const largestContributors = parseZipListing(requireSuccessful(
-    run('unzip', ['-l', options.bundle], { encoding: 'utf8' }),
+    run('unzip', ['-l', bundlePath], { encoding: 'utf8' }),
     'Could not measure AAB entries',
   ));
   if (largestContributors.length === 0) {
     throw new Error('Could not measure the largest packaged contributors.');
   }
   const bundleConfig = requireSuccessful(
-    run('java', ['-jar', options.bundletool, 'dump', 'config', `--bundle=${options.bundle}`], {
+    run('java', ['-jar', bundletoolPath, 'dump', 'config', `--bundle=${bundlePath}`], {
       encoding: 'utf8',
     }),
     'Could not read the AAB bundle configuration',
@@ -326,14 +332,14 @@ function inspectAndroidPlayRelease(options, dependencies = {}) {
   if (bundleEntryResult.errors.length > 0) {
     throw new Error(bundleEntryResult.errors.join('\n'));
   }
-  verifyNativeElfAlignment(options.bundle, entries, run, environment);
+  verifyNativeElfAlignment(bundlePath, entries, run, environment);
 
   requireSuccessful(
-    run('jarsigner', ['-verify', '-strict', options.bundle], { encoding: 'utf8' }),
+    run('jarsigner', ['-verify', '-strict', bundlePath], { encoding: 'utf8' }),
     'AAB JAR signature verification failed',
   );
   const signerOutput = requireSuccessful(
-    run('keytool', ['-printcert', '-jarfile', options.bundle], {
+    run('keytool', ['-printcert', '-jarfile', bundlePath], {
       encoding: 'utf8',
       env: { ...environment, LANG: 'C' },
     }),
@@ -344,7 +350,7 @@ function inspectAndroidPlayRelease(options, dependencies = {}) {
     throw new Error('AAB signer does not match CHESSTICIZE_ANDROID_UPLOAD_CERT_SHA256.');
   }
   const manifest = requireSuccessful(
-    run('java', ['-jar', options.bundletool, 'dump', 'manifest', `--bundle=${options.bundle}`, '--module=base'], {
+    run('java', ['-jar', bundletoolPath, 'dump', 'manifest', `--bundle=${bundlePath}`, '--module=base'], {
       encoding: 'utf8',
     }),
     'Could not inspect the AAB manifest',
@@ -369,9 +375,9 @@ function inspectAndroidPlayRelease(options, dependencies = {}) {
     commitSha,
     worktreeClean: true,
     bundle: {
-      path: path.relative(repoRoot, options.bundle),
-      bytes: fs.statSync(options.bundle).size,
-      sha256: sha256(options.bundle),
+      path: path.relative(repoRoot, bundlePath),
+      bytes: fs.statSync(bundlePath).size,
+      sha256: sha256(bundlePath),
       ...identity,
       abis: bundleEntryResult.abis,
       pageAlignment: 'PAGE_ALIGNMENT_16K',
@@ -382,10 +388,14 @@ function inspectAndroidPlayRelease(options, dependencies = {}) {
     },
   };
   if (!options.artifactOnly) {
-    if (!options.ownerEvidence || !fs.statSync(options.ownerEvidence).isFile()) {
+    const ownerEvidencePath = options.ownerEvidence &&
+      resolveRepoPath(options.ownerEvidence, repoRoot);
+    if (!ownerEvidencePath ||
+        !fs.existsSync(ownerEvidencePath) ||
+        !fs.statSync(ownerEvidencePath).isFile()) {
       throw new Error('--owner-evidence is required for a play-ready verdict.');
     }
-    const evidence = JSON.parse(fs.readFileSync(options.ownerEvidence, 'utf8'));
+    const evidence = JSON.parse(fs.readFileSync(ownerEvidencePath, 'utf8'));
     const errors = inspectOwnerEvidence(evidence, {
       commitSha,
       aabSha256: result.bundle.sha256,
@@ -395,7 +405,7 @@ function inspectAndroidPlayRelease(options, dependencies = {}) {
     if (errors.length > 0) {
       throw new Error(`Owner evidence is incomplete:\n${errors.join('\n')}`);
     }
-    result.ownerEvidence = { status: 'pass', path: path.relative(repoRoot, options.ownerEvidence) };
+    result.ownerEvidence = { status: 'pass', path: path.relative(repoRoot, ownerEvidencePath) };
   }
   return result;
 }
@@ -406,8 +416,10 @@ function main() {
     const result = inspectAndroidPlayRelease(options);
     const output = `${JSON.stringify(result, null, 2)}\n`;
     if (options.output) {
-      fs.mkdirSync(path.dirname(options.output), { recursive: true });
-      fs.writeFileSync(options.output, output);
+      const repoRoot = path.resolve(__dirname, '../../..');
+      const outputPath = resolveRepoPath(options.output, repoRoot);
+      fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+      fs.writeFileSync(outputPath, output);
     }
     process.stdout.write(output);
   } catch (error) {
@@ -432,5 +444,6 @@ module.exports = {
   parseManifest,
   parseSignerFingerprint,
   parseZipListing,
+  resolveRepoPath,
   verifyNativeElfAlignment,
 };
