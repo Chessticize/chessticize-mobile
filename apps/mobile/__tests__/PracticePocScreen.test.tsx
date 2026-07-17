@@ -1350,6 +1350,24 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "1 / 15");
   });
 
+  it("keeps the stable native board synchronized across the Familiar 15 failure sequence", async () => {
+    const renderer = renderScreen({ practiceService: createMobilePracticeService("familiar15") });
+
+    startStandardSprint(renderer);
+    await boardMove(renderer, "c2b3");
+    await settleFeedbackSnapshot();
+    await boardMove(renderer, "c4b5");
+    await settleFeedbackSnapshot();
+
+    expect(findByTestId(renderer, "session-board")).toBeTruthy();
+    expect(() => findByTestId(renderer, "error-panel")).toThrow();
+    await boardMove(renderer, "g6g5");
+    await settleFeedbackSnapshot();
+
+    expectText(renderer, "Sprint failed");
+    expect(collectText(findByTestId(renderer, "sprint-result-reason"))).toBe("Three mistakes");
+  });
+
   it("offers resume before starting a new sprint when the service has an active session", () => {
     const service = createMobilePracticeService("random1000");
     service.startSprint(

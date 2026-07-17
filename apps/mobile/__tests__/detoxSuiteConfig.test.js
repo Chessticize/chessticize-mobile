@@ -437,9 +437,10 @@ describe('Detox suite configuration', () => {
     expect(log).toHaveBeenCalledWith(expect.stringContaining('<node text="Practice" />'));
   });
 
-  it('shares Android UI diagnostics around launch and Stockfish failures', async () => {
+  it('shares Android UI diagnostics around launch, Stockfish, and key-flow failures', async () => {
     const launchSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/android-launch.e2e.js'), 'utf8');
     const stockfishSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/android-stockfish.e2e.js'), 'utf8');
+    const flowsSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/flows.e2e.js'), 'utf8');
     const actionError = new Error('journey failed');
     const action = jest.fn().mockRejectedValue(actionError);
     const collectDiagnostics = jest.fn(() => {
@@ -455,8 +456,10 @@ describe('Detox suite configuration', () => {
     );
     expect(launchSpec).toContain('withAndroidUiDiagnostics');
     expect(stockfishSpec).toContain('withAndroidUiDiagnostics');
+    expect(flowsSpec).toContain('withAndroidUiDiagnostics');
     expect(launchSpec).not.toContain('async function withAndroidUiDiagnostics');
     expect(stockfishSpec).not.toContain('async function withAndroidUiDiagnostics');
+    expect(flowsSpec).not.toContain('async function withAndroidUiDiagnostics');
   });
 
   it('shares inclusive and exclusive running-Stockfish depth polling', async () => {
