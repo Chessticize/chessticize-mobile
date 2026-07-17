@@ -192,6 +192,22 @@ describe('Detox suite configuration', () => {
     expect(launchSpec).not.toContain('detoxEnableSynchronization: false');
   });
 
+  it('normalizes the practice scroll before a directional public-visibility search', () => {
+    const helpers = fs.readFileSync(path.resolve(__dirname, '../e2e/helpers.js'), 'utf8');
+    const helperStart = helpers.indexOf('async function waitForVisibleInPracticeScroll');
+    const helperEnd = helpers.indexOf('async function tapUntilExists', helperStart);
+    const helper = helpers.slice(helperStart, helperEnd);
+    const waitForExist = helper.indexOf('.toExist().withTimeout(180000)');
+    const restoreTop = helper.indexOf("element(by.id('practice-main-scroll')).scrollTo('top')");
+    const requireVisible = helper.indexOf('.toBeVisible()');
+    const scrollDown = helper.indexOf(".scroll(100, 'down')");
+
+    expect(waitForExist).toBeGreaterThan(0);
+    expect(restoreTop).toBeGreaterThan(waitForExist);
+    expect(requireVisible).toBeGreaterThan(restoreTop);
+    expect(scrollDown).toBeGreaterThan(requireVisible);
+  });
+
   it('pins the Arrow Duel screenshot to the exact runtime-selected long-arrow fixture', () => {
     const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
     const renderCaseStart = practiceSpec.indexOf("it('renders Arrow Duel candidate arrows on the board'");

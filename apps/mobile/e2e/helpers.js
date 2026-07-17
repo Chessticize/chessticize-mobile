@@ -520,6 +520,7 @@ async function selectTestPuzzleSource(source) {
 
 async function waitForVisibleInPracticeScroll(testID) {
   await waitFor(element(by.id(testID))).toExist().withTimeout(180000);
+  await element(by.id('practice-main-scroll')).scrollTo('top');
   await waitFor(element(by.id(testID)))
     .toBeVisible()
     .whileElement(by.id('practice-main-scroll'))
