@@ -31,4 +31,6 @@ Before release, verify the exact artifact's backup rules, measure the real
 progress payload against the 20 MiB release contract and 25 MiB Android quota,
 rerun encrypted-cloud and D2D restore evidence, audit runtime dependencies for
 data egress, and confirm Play Data Safety text remains consistent with this
-document and [the privacy policy](PRIVACY_POLICY.md).
+document, [the Play listing contract](ANDROID_PLAY_LISTING.md), and
+[the privacy policy](PRIVACY_POLICY.md). The production Android manifest has no
+`INTERNET` permission; debug adds it only for local Metro tooling.

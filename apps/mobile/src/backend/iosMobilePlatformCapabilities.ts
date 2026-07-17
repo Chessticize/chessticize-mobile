@@ -6,9 +6,10 @@ import {
   createPersistentMobilePracticeServiceSync,
 } from './mobilePractice.ts';
 import {
-  MOBILE_APPLICATION_METADATA,
+  type MobileApplicationMetadata,
   type MobilePlatformCapabilities,
 } from './mobilePlatformCapabilities.ts';
+import { readNativeApplicationMetadata } from './nativeApplicationMetadata.ts';
 import {
   createNativeStockfishTransport,
   prewarmNativeStockfishTransport,
@@ -33,6 +34,7 @@ export async function createIOSMobilePlatformCapabilities(): Promise<MobilePlatf
 
 export function composeIOSMobilePlatformCapabilities(
   service: PracticeService,
+  applicationMetadata: MobileApplicationMetadata = readNativeApplicationMetadata(),
 ): MobilePlatformCapabilities {
   return {
     storage: {
@@ -55,6 +57,6 @@ export function composeIOSMobilePlatformCapabilities(
       scheduler: createNativeReviewReminderScheduler(),
       notificationClient: createNativeReviewReminderNotificationClient(),
     },
-    applicationMetadata: MOBILE_APPLICATION_METADATA,
+    applicationMetadata,
   };
 }

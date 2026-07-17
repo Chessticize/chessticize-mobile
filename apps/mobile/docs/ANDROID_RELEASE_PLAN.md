@@ -456,6 +456,13 @@ process contract.
 
 ### ANDROID-11 — Complete Google Play release readiness
 
+**Status:** Repository-owned versioning, installed-artifact metadata, signed-AAB
+verification, symbols/notices, listing declarations, and fail-closed owner
+evidence are implemented by #186. Production upload signing, Play App Signing,
+developer verification, Internal/Closed installation, pre-launch review, and
+Production-draft evidence remain owner-executed and cannot be inferred from the
+repository.
+
 **Depends on:** ANDROID-01, ANDROID-03, ANDROID-06, ANDROID-07, ANDROID-08, and
 ANDROID-09
 

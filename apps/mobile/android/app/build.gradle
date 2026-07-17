@@ -17,6 +17,18 @@ def releaseSigning = [
 def missingReleaseSigningValues = releaseSigning.findAll { _, value -> value == null || value.trim().isEmpty() }.keySet()
 def releaseSigningConfigured = missingReleaseSigningValues.isEmpty() && file(releaseSigning.storeFile).isFile()
 def appProjectPath = project.path
+def releaseVersionFile = file("$rootDir/../release-version.json")
+if (!releaseVersionFile.isFile()) {
+    throw new GradleException("Canonical mobile release version is missing: ${releaseVersionFile}")
+}
+def releaseVersion = new JsonSlurper().parse(releaseVersionFile)
+if (releaseVersion.schemaVersion != 1 ||
+    !(releaseVersion.publicVersion instanceof String) ||
+    !(releaseVersion.publicVersion ==~ /[0-9]+\.[0-9]+(\.[0-9]+)?/) ||
+    !(releaseVersion.androidVersionCode instanceof Number) ||
+    releaseVersion.androidVersionCode.intValue() < 1) {
+    throw new GradleException("apps/mobile/release-version.json is invalid")
+}
 
 def validateReleaseSigning = {
     if (!missingReleaseSigningValues.isEmpty()) {
@@ -142,13 +154,14 @@ def stockfishNnueFiles = stockfishArtifacts.nnue.collect { relativePath ->
     file("$stockfishRoot/$relativePath")
 }
 def generatedStockfishAssetsDir = "$buildDir/generated/assets/stockfish-nnue"
+def generatedReleaseNoticeAssetsDir = "$buildDir/generated/assets/release-notices"
 
-tasks.register("copyPuzzlePackAsset", Copy) {
+def copyPuzzlePackAsset = tasks.register("copyPuzzlePackAsset", Copy) {
     from puzzlePackSource
     into "$generatedPuzzlePackAssetsDir/puzzle-packs"
 }
 
-tasks.register("copyStockfishNnueAssets", Sync) {
+def copyStockfishNnueAssets = tasks.register("copyStockfishNnueAssets", Sync) {
     from stockfishNnueFiles
     from(stockfishArtifactsFile)
     into "$generatedStockfishAssetsDir/stockfish"
@@ -162,6 +175,23 @@ tasks.register("copyStockfishNnueAssets", Sync) {
     }
 }
 
+def copyReleaseNoticeAssets = tasks.register("copyReleaseNoticeAssets", Sync) {
+    from(file("$rootDir/../../../LICENSE")) {
+        into "licenses"
+    }
+    from(file("$rootDir/../../../THIRD_PARTY_NOTICES.md")) {
+        into "licenses"
+    }
+    from(file("$stockfishRoot/Copying.txt")) {
+        into "licenses/stockfish"
+        rename { "COPYING.txt" }
+    }
+    from(file("$stockfishRoot/AUTHORS")) {
+        into "licenses/stockfish"
+    }
+    into generatedReleaseNoticeAssetsDir
+}
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -172,8 +202,8 @@ android {
         applicationId "com.chessticize.mobile"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode releaseVersion.androidVersionCode
+        versionName releaseVersion.publicVersion
         testBuildType System.getProperty("testBuildType", "debug")
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         ndk {
@@ -187,8 +217,11 @@ android {
     }
     sourceSets {
         main {
-            assets.srcDirs += generatedPuzzlePackAssetsDir
-            assets.srcDirs += generatedStockfishAssetsDir
+            // Passing the task providers preserves the producer relationship for
+            // every consumer, including Gradle 9 release-lint model generation.
+            assets.srcDir(copyPuzzlePackAsset)
+            assets.srcDir(copyStockfishNnueAssets)
+            assets.srcDir(copyReleaseNoticeAssets)
         }
     }
     externalNativeBuild {
@@ -231,16 +264,14 @@ android {
             if (releaseSigningConfigured) {
                 signingConfig signingConfigs.release
             }
+            ndk {
+                debugSymbolLevel 'FULL'
+            }
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
             proguardFile "${rootProject.projectDir}/../node_modules/detox/android/detox/proguard-rules-app.pro"
         }
     }
-}
-
-tasks.matching { task -> task.name.startsWith("merge") && task.name.endsWith("Assets") }.configureEach {
-    dependsOn("copyPuzzlePackAsset")
-    dependsOn("copyStockfishNnueAssets")
 }
 
 dependencies {

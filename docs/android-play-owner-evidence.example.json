@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "candidate": {
+    "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
+    "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
+    "applicationId": "com.chessticize.mobile",
+    "versionName": "1.1",
+    "versionCode": 1
+  },
+  "signing": {
+    "playAppSigningEnrolled": false,
+    "uploadCertificateSha256": "REPLACE_WITH_64_HEX_CHARACTERS",
+    "appSigningCertificateSha256": "REPLACE_WITH_64_HEX_CHARACTERS"
+  },
+  "console": {
+    "developerVerification": "pending",
+    "storeListing": "pending",
+    "privacyPolicy": "pending",
+    "dataSafety": "pending",
+    "supportedDevices": "pending"
+  },
+  "testing": {
+    "internalInstall": "pending",
+    "closedInstall": "pending",
+    "preLaunch": "pending",
+    "androidMatrix": "pending",
+    "matrixCommitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA"
+  },
+  "production": {
+    "status": "not-prepared",
+    "rolloutPercentage": 0,
+    "launched": false
+  },
+  "artifacts": {
+    "nativeDebugSymbolsRetained": false,
+    "licenseNoticesRetained": false,
+    "universalApkBytes": 0,
+    "arm64ApkBytes": 0,
+    "largestContributors": [
+      {
+        "path": "REPLACE_WITH_LARGEST_PACKAGED_ENTRY_PATH",
+        "bytes": 0
+      }
+    ],
+    "universalApkExpectation": {
+      "minimumBytes": 0,
+      "maximumBytes": 0,
+      "approvalReference": "REPLACE_WITH_HTTPS_APPROVAL_REFERENCE"
+    }
+  }
+}

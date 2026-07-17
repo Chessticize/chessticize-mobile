@@ -25,7 +25,8 @@
     "e2e:test:android:ci": "scripts/android-test-for-detox.sh --cleanup",
     "validate:android:matrix": "node scripts/android-validation-matrix.js",
     "verify:android:abis": "node scripts/verify-android-apk-abis.js android/app/build/outputs/apk/e2e/app-e2e.apk",
-    "verify:android:backup": "node scripts/verify-android-progress-backup.js"
+    "verify:android:backup": "node scripts/verify-android-progress-backup.js",
+    "verify:android:release": "node scripts/android-play-release.js"
   },
   "dependencies": {
     "@op-engineering/op-sqlite": "17.1.1",
