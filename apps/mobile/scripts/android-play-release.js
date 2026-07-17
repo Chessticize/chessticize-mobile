@@ -244,7 +244,7 @@ function inspectReleaseManifest(manifest) {
 function parseZipListing(output, limit = 10) {
   return String(output)
     .split(/\r?\n/)
-    .map(line => line.match(/^\s*(\d+)\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+(.+)$/))
+    .map(line => line.match(/^\s*(\d+)\s+\S+\s+\d{2}:\d{2}\s+(.+)$/))
     .filter(Boolean)
     .map(match => ({ path: match[2], bytes: Number(match[1]) }))
     .filter(entry => entry.bytes > 0 && !entry.path.endsWith('/'))

@@ -267,9 +267,9 @@ describe('Android Play release contract', () => {
     expect(parseZipListing(`Archive: candidate.aab
   Length      Date    Time    Name
 ---------  ---------- -----   ----
-      100  2026-07-17 12:00   base/small.bin
-      900  2026-07-17 12:00   base/large.bin
-      300  2026-07-17 12:00   base/medium.bin
+      100  01-01-1981 01:01   base/small.bin
+      900  01-01-1981 01:01   base/large.bin
+      300  01-01-1981 01:01   base/medium.bin
 ---------                     -------
      1300                     3 files
 `, 2)).toEqual([
