@@ -5,7 +5,6 @@ import {
   Linking,
   Modal,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -2367,9 +2366,16 @@ export function PracticePocScreen({
           </Text>
         </View>
       ) : null}
-      <SafeAreaView
+      <View
+        testID="safe-area-shell"
         style={[
           styles.safeArea,
+          {
+            paddingBottom: insets.bottom,
+            paddingLeft: insets.left,
+            paddingRight: insets.right,
+            paddingTop: insets.top
+          },
           mobileBackPreview
             ? {
               borderRadius: mobileBackPreview.progress * 20,
@@ -2769,7 +2775,7 @@ export function PracticePocScreen({
           </View>
         ) : null}
       </View>
-      </SafeAreaView>
+      </View>
     </View>
   );
 }
@@ -9492,9 +9498,9 @@ const styles = StyleSheet.create({
     borderColor: "#CBD5E1",
     borderRadius: 8,
     borderWidth: 1,
-    height: 40,
+    height: 48,
     justifyContent: "center",
-    minWidth: 54,
+    minWidth: 56,
     paddingHorizontal: 7
   },
   accessibleMoveOpenButtonText: {
@@ -10484,14 +10490,14 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     flexDirection: "row",
     justifyContent: "space-between",
-    minHeight: 42,
+    minHeight: 50,
     paddingBottom: 4
   },
   sessionNavButton: {
     alignItems: "center",
-    height: 40,
+    height: 48,
     justifyContent: "center",
-    width: 40
+    width: 48
   },
   sessionNavActions: {
     alignItems: "center",

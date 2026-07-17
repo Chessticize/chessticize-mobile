@@ -3,6 +3,7 @@ import { Chess } from "chess.js";
 import androidPracticeFixture from "../../../fixtures/puzzles/android-standard-practice.fixture.json";
 import { AppState } from "react-native";
 import * as ReactNative from "react-native";
+import * as SafeAreaContext from "react-native-safe-area-context";
 import TestRenderer, { act } from "react-test-renderer";
 import { PracticePocScreen, type PracticeDebugTraceEvent } from "../src/components/PracticePocScreen";
 import {
@@ -99,6 +100,7 @@ afterEach(() => {
   }
   (AppState as unknown as { __reset?: () => void }).__reset?.();
   (ReactNative as unknown as { __resetWindowDimensions?: () => void }).__resetWindowDimensions?.();
+  (SafeAreaContext as unknown as { __resetSafeAreaInsets?: () => void }).__resetSafeAreaInsets?.();
   jest.useRealTimers();
 });
 
@@ -979,6 +981,30 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "active-session-control-rail")).toBeTruthy();
     const boardSize = Number(flattenTestStyle(findByTestId(renderer, "session-board").props.style).height);
     expect(boardSize + reservedSessionChrome).toBeLessThanOrEqual(viewportHeight);
+  });
+
+  it.each([
+    { fontScale: 1, label: "phone portrait", topInset: 24 },
+    { fontScale: 1.5, label: "large-text phone portrait", topInset: 32 }
+  ])("keeps session actions below the Android status bar on $label", ({ fontScale, topInset }) => {
+    (ReactNative as unknown as {
+      __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
+    }).__setWindowDimensions?.({ width: 412, height: 914, scale: 2.625, fontScale });
+    (SafeAreaContext as unknown as {
+      __setSafeAreaInsets?: (insets: { bottom: number; left: number; right: number; top: number }) => void;
+    }).__setSafeAreaInsets?.({ top: topInset, right: 0, bottom: 24, left: 0 });
+
+    const renderer = renderScreen({ practiceService: createMobilePracticeService("familiar15") });
+    startStandardSprint(renderer);
+
+    const safeAreaShell = renderer.root.find((node) => (
+      node.props.testID === "safe-area-shell" || String(node.type) === "SafeAreaView"
+    ));
+    expect(flattenTestStyle(safeAreaShell.props.style).paddingTop).toBe(topInset);
+    const moves = findByTestId(renderer, "session-accessible-moves-open");
+    expect(moves.props.accessibilityRole).toBe("button");
+    expect(moves.props.accessibilityState).toEqual({ expanded: false });
+    expect(Number(flattenTestStyle(moves.props.style).height)).toBeGreaterThanOrEqual(48);
   });
 
   it("stacks the review board and analysis panel on an iPad in portrait", () => {
