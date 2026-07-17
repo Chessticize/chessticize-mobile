@@ -31,20 +31,44 @@ const {
   collectAndroidUiDiagnostics,
   findPendingAndroidAlarms,
   findAndroidSystemNode,
-  findUniqueAndroidUiNode,
   grantAndroidRuntimePermission,
   launchWithDisabledSynchronization,
   launchWithFreshAndroidRuntimePermission,
   performAndroidPredictiveBackGesture,
-  readAndroidUiHierarchy,
   setAndroidDisplayOrientation,
-  tapAndroidUiNode,
-  waitForAndroidUiState,
   waitForRunningStockfishDepth,
   withAndroidUiDiagnostics,
 } = require('../e2e/helpers');
+const {
+  findUniqueAndroidUiNode,
+  readAndroidUiHierarchy,
+  tapAndroidUiNode,
+  waitForAndroidUiState,
+} = require('../e2e/androidPublicUiEvidence');
 
 describe('Detox suite configuration', () => {
+  it('owns Android public hierarchy evidence behind one focused interface', () => {
+    const androidPublicUiEvidence = require('../e2e/androidPublicUiEvidence');
+    const helpersSource = fs.readFileSync(
+      path.resolve(__dirname, '../e2e/helpers.js'),
+      'utf8'
+    );
+    const adaptiveSource = fs.readFileSync(
+      path.resolve(__dirname, '../e2e/adaptive-layout.e2e.js'),
+      'utf8'
+    );
+
+    expect(Object.keys(androidPublicUiEvidence).sort()).toEqual([
+      'findUniqueAndroidUiNode',
+      'readAndroidUiHierarchy',
+      'tapAndroidUiNode',
+      'waitForAndroidUiState',
+    ]);
+    expect(helpersSource).not.toContain('function readAndroidUiHierarchy');
+    expect(helpersSource).not.toContain('function waitForAndroidUiState');
+    expect(adaptiveSource).toContain("require('./androidPublicUiEvidence')");
+  });
+
   it('discovers Android notification settings through partial system labels', () => {
     const hierarchy = [
       '<node content-desc="ChessticizeMobile" text="" />',

@@ -10,10 +10,12 @@ const {
   setAndroidDisplayOrientation,
   sleep,
   startPracticeMode,
-  tapAndroidUiNode,
-  waitForAndroidUiState,
   withAndroidUiDiagnostics
 } = require('./helpers');
+const {
+  tapAndroidUiNode,
+  waitForAndroidUiState,
+} = require('./androidPublicUiEvidence');
 const {
   expectBoardScreenshotContainsPieces,
   expectFrameContained

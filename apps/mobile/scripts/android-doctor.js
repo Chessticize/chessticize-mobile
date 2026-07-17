@@ -4,7 +4,6 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const { ANDROID_REQUIREMENTS: REQUIREMENTS } = require('./android-requirements');
-const stockfishArtifacts = require('../stockfish-artifacts.json');
 
 function parseJavaMajor(output) {
   const match = String(output).match(/version\s+"(\d+)(?:\.(\d+))?/i);
@@ -63,6 +62,7 @@ function inspectAndroidEnvironment(options = {}) {
     }
   });
   const run = options.run || defaultRun;
+  const readFile = options.readFile || ((file) => fs.readFileSync(file, 'utf8'));
   const appDir = options.appDir || path.resolve(__dirname, '..');
   const repoRoot = options.repoRoot || path.resolve(appDir, '../..');
   const nodeVersion = options.nodeVersion || process.versions.node;
@@ -184,31 +184,71 @@ function inspectAndroidEnvironment(options = {}) {
     add('signing', 'pass', 'Production signing variables and keystore path are configured');
   }
 
-  const nativeLibraryFiles = [
-    path.join(appDir, 'stockfish-artifacts.json'),
-    path.join(appDir, 'native', 'stockfish', 'Bridge', 'StockfishRunner.cpp'),
-    path.join(
-      appDir,
-      'android',
-      'app',
-      'src',
-      'main',
-      'cpp',
-      'stockfish',
-      'NativeStockfishEngine.cpp'
-    ),
-    ...stockfishArtifacts.nnue.map((relativePath) => (
-      path.join(appDir, 'native', 'stockfish', relativePath)
-    )),
-  ];
-  const missingNativeLibraryFiles = nativeLibraryFiles.filter((file) => !exists(file));
-  add(
-    'native-library',
-    missingNativeLibraryFiles.length === 0 ? 'pass' : 'fail',
-    missingNativeLibraryFiles.length === 0
-      ? 'Shared Stockfish sources, bridge, manifest, and NNUE assets are present'
-      : `Stockfish native-library inputs are missing: ${missingNativeLibraryFiles.join(', ')}`,
-  );
+  const stockfishManifestPath = path.join(appDir, 'stockfish-artifacts.json');
+  if (!exists(stockfishManifestPath)) {
+    add(
+      'native-library',
+      'fail',
+      `Stockfish artifact manifest is missing: ${stockfishManifestPath}`,
+    );
+  } else {
+    let stockfishArtifacts;
+    let manifestFailure;
+    try {
+      stockfishArtifacts = JSON.parse(readFile(stockfishManifestPath));
+      const requiredStringFields = ['root', 'bridge', 'sourceSentinel'];
+      const missingFields = requiredStringFields.filter(
+        (field) => typeof stockfishArtifacts[field] !== 'string' || !stockfishArtifacts[field]
+      );
+      const validNnue = Array.isArray(stockfishArtifacts.nnue)
+        && stockfishArtifacts.nnue.length > 0
+        && stockfishArtifacts.nnue.every(
+          (relativePath) => typeof relativePath === 'string' && relativePath.length > 0
+        );
+      if (missingFields.length > 0 || !validNnue) {
+        const invalidFields = [...missingFields, ...(!validNnue ? ['nnue'] : [])];
+        throw new Error(`invalid fields: ${invalidFields.join(', ')}`);
+      }
+    } catch (error) {
+      manifestFailure = error?.message || String(error);
+    }
+
+    if (manifestFailure) {
+      add(
+        'native-library',
+        'fail',
+        `Stockfish artifact manifest is malformed: ${manifestFailure}`,
+      );
+    } else {
+      const stockfishRoot = path.join(appDir, stockfishArtifacts.root);
+      const nativeLibraryFiles = [
+        stockfishManifestPath,
+        path.join(stockfishRoot, stockfishArtifacts.bridge, 'StockfishRunner.cpp'),
+        path.join(stockfishRoot, stockfishArtifacts.sourceSentinel),
+        path.join(
+          appDir,
+          'android',
+          'app',
+          'src',
+          'main',
+          'cpp',
+          'stockfish',
+          'NativeStockfishEngine.cpp'
+        ),
+        ...stockfishArtifacts.nnue.map((relativePath) => (
+          path.join(stockfishRoot, relativePath)
+        )),
+      ];
+      const missingNativeLibraryFiles = nativeLibraryFiles.filter((file) => !exists(file));
+      add(
+        'native-library',
+        missingNativeLibraryFiles.length === 0 ? 'pass' : 'fail',
+        missingNativeLibraryFiles.length === 0
+          ? 'Shared Stockfish sources, bridge, manifest, and NNUE assets are present'
+          : `Stockfish native-library inputs are missing: ${missingNativeLibraryFiles.join(', ')}`,
+      );
+    }
+  }
 
   const puzzlePack = path.join(repoRoot, 'fixtures', 'puzzles', 'bundled-core-pack.sqlite');
   add(

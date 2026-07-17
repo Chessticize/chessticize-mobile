@@ -1,4 +1,5 @@
 const fs = require('fs');
+const os = require('node:os');
 const path = require('path');
 
 const detoxConfig = require('../.detoxrc');
@@ -49,12 +50,63 @@ function completeAndroidFiles(sdkRoot, appDir, repoRoot) {
     `${appDir}/node_modules/detox/package.json`,
     `${appDir}/stockfish-artifacts.json`,
     `${appDir}/native/stockfish/Bridge/StockfishRunner.cpp`,
+    `${appDir}/native/stockfish/${stockfishArtifacts.sourceSentinel}`,
     `${appDir}/android/app/src/main/cpp/stockfish/NativeStockfishEngine.cpp`,
     ...stockfishArtifacts.nnue.map(
       (relativePath) => `${appDir}/native/stockfish/${relativePath}`
     ),
     `${repoRoot}/fixtures/puzzles/bundled-core-pack.sqlite`,
   ]);
+}
+
+function inspectIsolatedAndroidDoctor({ manifestContents, missingAppFiles = [] }) {
+  const appDir = fs.mkdtempSync(path.join(os.tmpdir(), 'chessticize-android-doctor-'));
+  const scriptsDir = path.join(appDir, 'scripts');
+  const androidDir = path.join(appDir, 'android');
+  const repoRoot = '/repo';
+  try {
+    fs.mkdirSync(scriptsDir, { recursive: true });
+    fs.mkdirSync(androidDir, { recursive: true });
+    fs.copyFileSync(
+      path.join(mobileRoot, 'scripts/android-doctor.js'),
+      path.join(scriptsDir, 'android-doctor.js')
+    );
+    fs.copyFileSync(
+      path.join(mobileRoot, 'scripts/android-requirements.js'),
+      path.join(scriptsDir, 'android-requirements.js')
+    );
+    fs.copyFileSync(
+      path.join(mobileRoot, 'android/gradle.properties'),
+      path.join(androidDir, 'gradle.properties')
+    );
+    fs.copyFileSync(
+      path.join(mobileRoot, 'package.json'),
+      path.join(appDir, 'package.json')
+    );
+    if (manifestContents !== undefined) {
+      fs.writeFileSync(path.join(appDir, 'stockfish-artifacts.json'), manifestContents);
+    }
+
+    const isolatedDoctor = require(path.join(scriptsDir, 'android-doctor.js'));
+    const present = completeAndroidFiles('/sdk', appDir, repoRoot);
+    if (manifestContents === undefined) {
+      present.delete(path.join(appDir, 'stockfish-artifacts.json'));
+    }
+    for (const relativePath of missingAppFiles) {
+      present.delete(path.join(appDir, relativePath));
+    }
+    return isolatedDoctor.inspectAndroidEnvironment({
+      environment: { ANDROID_HOME: '/sdk' },
+      exists: (file) => present.has(file),
+      canExecute: (file) => present.has(file),
+      run: successfulAndroidToolRun,
+      nodeVersion: '22.14.0',
+      appDir,
+      repoRoot,
+    });
+  } finally {
+    fs.rmSync(appDir, { recursive: true, force: true });
+  }
 }
 
 function successfulAndroidToolRun(command, args) {
@@ -367,6 +419,7 @@ describe('Android launch baseline', () => {
       exists: (file) => present.has(file),
       canExecute: (file) => present.has(file),
       run: successfulAndroidToolRun,
+      readFile: () => JSON.stringify(stockfishArtifacts),
       nodeVersion: '22.14.0',
       appDir,
       repoRoot,
@@ -400,6 +453,7 @@ describe('Android launch baseline', () => {
       exists: (file) => present.has(file),
       canExecute: (file) => present.has(file),
       run: successfulAndroidToolRun,
+      readFile: () => JSON.stringify(stockfishArtifacts),
       nodeVersion: '22.14.0',
       appDir,
       repoRoot,
@@ -424,6 +478,7 @@ describe('Android launch baseline', () => {
       exists: (file) => present.has(file),
       canExecute: (file) => present.has(file),
       run: successfulAndroidToolRun,
+      readFile: () => JSON.stringify(stockfishArtifacts),
       nodeVersion: '22.14.0',
       appDir,
       repoRoot,
@@ -435,6 +490,47 @@ describe('Android launch baseline', () => {
       detail: expect.stringContaining('Stockfish'),
     });
     expect(report.checks.find((check) => check.id === 'detox').status).toBe('pass');
+  });
+
+  it.each([
+    {
+      label: 'missing artifact manifest',
+      manifestContents: undefined,
+      missingAppFiles: [],
+      expectedDetail: 'Stockfish artifact manifest is missing',
+    },
+    {
+      label: 'malformed artifact manifest',
+      manifestContents: '{not-json',
+      missingAppFiles: [],
+      expectedDetail: 'Stockfish artifact manifest is malformed',
+    },
+    {
+      label: 'missing canonical source sentinel',
+      manifestContents: JSON.stringify(stockfishArtifacts),
+      missingAppFiles: [path.join(stockfishArtifacts.root, stockfishArtifacts.sourceSentinel)],
+      expectedDetail: stockfishArtifacts.sourceSentinel,
+    },
+  ])('fails native-library structurally for $label and still completes diagnostics', ({
+    manifestContents,
+    missingAppFiles,
+    expectedDetail,
+  }) => {
+    const report = inspectIsolatedAndroidDoctor({ manifestContents, missingAppFiles });
+
+    expect(report.ready).toBe(false);
+    expect(report.checks.find((check) => check.id === 'native-library')).toMatchObject({
+      id: 'native-library',
+      status: 'fail',
+      detail: expect.stringContaining(expectedDetail),
+    });
+    expect(report.checks.find((check) => check.id === 'detox')).toMatchObject({
+      status: 'pass',
+    });
+    expect(report.checks.find((check) => check.id === 'puzzle-pack')).toMatchObject({
+      status: 'pass',
+    });
+    expect(report.checks.at(-1).id).toBe('puzzle-pack');
   });
 
   it.each([
@@ -452,6 +548,7 @@ describe('Android launch baseline', () => {
       exists: (file) => present.has(file),
       canExecute: (file) => present.has(file),
       run: successfulAndroidToolRun,
+      readFile: () => JSON.stringify(stockfishArtifacts),
       nodeVersion,
       appDir,
       repoRoot,
@@ -478,6 +575,7 @@ describe('Android launch baseline', () => {
       exists: (file) => present.has(file),
       canExecute: (file) => present.has(file),
       run: successfulAndroidToolRun,
+      readFile: () => JSON.stringify(stockfishArtifacts),
       nodeVersion: '22.14.0',
       appDir,
       repoRoot,
@@ -500,6 +598,7 @@ describe('Android launch baseline', () => {
       exists: () => false,
       canExecute: () => false,
       run: () => ({ status: 1, stdout: '', stderr: '' }),
+      readFile: () => JSON.stringify(stockfishArtifacts),
       nodeVersion: '22.14.0',
       appDir: '/repo/apps/mobile',
       repoRoot: '/repo',
