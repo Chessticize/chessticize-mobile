@@ -6,6 +6,7 @@ const {
   inspectOwnerEvidence,
   inspectReleaseManifest,
   normalizeFingerprint,
+  parseArguments,
   parseZipListing,
 } = require('../scripts/android-play-release');
 
@@ -274,6 +275,21 @@ describe('Android Play release contract', () => {
       { path: 'base/large.bin', bytes: 900 },
       { path: 'base/medium.bin', bytes: 300 },
     ]);
+  });
+
+  it('accepts the pnpm argument separator used by the root release command', () => {
+    expect(parseArguments([
+      '--',
+      '--artifact-only',
+      '--bundle',
+      'candidate.aab',
+      '--bundletool',
+      'bundletool.jar',
+    ])).toEqual({
+      artifactOnly: true,
+      bundle: 'candidate.aab',
+      bundletool: 'bundletool.jar',
+    });
   });
 
   it('keeps release construction manual, protected, exact-artifact, and fail closed', () => {

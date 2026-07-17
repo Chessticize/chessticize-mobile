@@ -187,6 +187,9 @@ function parseArguments(argv) {
   const result = { artifactOnly: false };
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
+    if (argument === '--') {
+      continue;
+    }
     if (argument === '--artifact-only') {
       result.artifactOnly = true;
       continue;
