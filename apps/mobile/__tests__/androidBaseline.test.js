@@ -35,7 +35,10 @@ function read(relativePath) {
   return fs.readFileSync(path.join(mobileRoot, relativePath), 'utf8');
 }
 
-function runIsolatedOfflinePreparation(availableDataKib, { trimDenied = false } = {}) {
+function runIsolatedOfflinePreparation(
+  availableDataKib,
+  { rootMode = 'already-root', trimDenied = false } = {},
+) {
   const isolatedRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'chessticize-android-capacity-'));
   const scriptsDir = path.join(isolatedRoot, 'scripts');
   const appApk = path.join(isolatedRoot, 'android/app/build/outputs/apk/e2e/app-e2e.apk');
@@ -45,6 +48,8 @@ function runIsolatedOfflinePreparation(availableDataKib, { trimDenied = false } 
   );
   const fakeAdb = path.join(isolatedRoot, 'fake-adb');
   const callsPath = path.join(isolatedRoot, 'adb-calls.txt');
+  const rootCountPath = path.join(isolatedRoot, 'root-count.txt');
+  const waitCountPath = path.join(isolatedRoot, 'wait-count.txt');
   fs.mkdirSync(scriptsDir, { recursive: true });
   fs.mkdirSync(path.dirname(appApk), { recursive: true });
   fs.mkdirSync(path.dirname(testApk), { recursive: true });
@@ -54,6 +59,8 @@ function runIsolatedOfflinePreparation(availableDataKib, { trimDenied = false } 
   );
   fs.writeFileSync(appApk, 'app');
   fs.writeFileSync(testApk, 'test');
+  fs.writeFileSync(rootCountPath, '0\n');
+  fs.writeFileSync(waitCountPath, '0\n');
   fs.writeFileSync(fakeAdb, `#!/bin/sh
 printf '%s\\n' "$*" >> "$FAKE_ADB_CALLS"
 case "$*" in
@@ -67,8 +74,45 @@ case "$*" in
     ;;
   *"shell pm trim-caches"*) printf 'Invalid API 24 trim-caches size: %s\\n' "$*" >&2; exit 8 ;;
   *"shell df -k /data"*) printf 'Filesystem 1K-blocks Used Available Use%% Mounted on\\n/data 8000000 1 ${availableDataKib} 1%% /data\\n' ;;
-  *"shell id -u"*) printf '0\\n' ;;
-  *"wait-for-device"*) ;;
+  *"shell id -u"*)
+    root_count="$(cat "$FAKE_ROOT_COUNT")"
+    case "$FAKE_ROOT_MODE:$root_count" in
+      already-root:*|root-success:1|transient-closed:2|transient-offline:2) printf '0\\n' ;;
+      *) printf '2000\\n' ;;
+    esac
+    ;;
+  *" root")
+    root_count="$(cat "$FAKE_ROOT_COUNT")"
+    root_count=$((root_count + 1))
+    printf '%s\\n' "$root_count" > "$FAKE_ROOT_COUNT"
+    case "$FAKE_ROOT_MODE:$root_count" in
+      transient-closed:1|persistent-closed:*|recovery-wait-timeout:1)
+        printf 'adb: unable to connect for root: closed\\n' >&2
+        exit 1
+        ;;
+      transient-offline:1)
+        printf 'error: device offline\\n' >&2
+        exit 1
+        ;;
+      permission:*)
+        printf 'adbd cannot run as root in production builds\\n' >&2
+        exit 42
+        ;;
+      mixed-output:*)
+        printf 'adb: unable to connect for root: closed\\nfatal: transport authentication rejected\\n' >&2
+        exit 1
+        ;;
+      *) printf 'restarting adbd as root\\n' ;;
+    esac
+    ;;
+  *"wait-for-device"*)
+    wait_count="$(cat "$FAKE_WAIT_COUNT")"
+    wait_count=$((wait_count + 1))
+    printf '%s\\n' "$wait_count" > "$FAKE_WAIT_COUNT"
+    if [ "$FAKE_ROOT_MODE" = "recovery-wait-timeout" ] && [ "$wait_count" -ge 2 ]; then
+      while :; do :; done
+    fi
+    ;;
   *) printf 'Unexpected fake adb call: %s\\n' "$*" >&2; exit 9 ;;
 esac
 `);
@@ -80,9 +124,14 @@ esac
       env: {
         ...process.env,
         ADB_PATH: fakeAdb,
+        ANDROID_OFFLINE_ADB_RECOVERY_WAIT_ATTEMPTS: '2',
+        ANDROID_OFFLINE_ADB_RECOVERY_WAIT_INTERVAL_SECONDS: '0.01',
         DETOX_ANDROID_DEVICE: 'emulator-5554',
         FAKE_ADB_CALLS: callsPath,
+        FAKE_ROOT_COUNT: rootCountPath,
+        FAKE_ROOT_MODE: rootMode,
         FAKE_TRIM_DENIED: trimDenied ? '1' : '0',
+        FAKE_WAIT_COUNT: waitCountPath,
       },
     });
     return {
@@ -519,6 +568,63 @@ describe('Android launch baseline', () => {
     expect(insufficient.status).toBe(1);
     expect(insufficient.stderr).toContain('WARN: Android cache trim was unavailable');
     expect(insufficient.stderr).toContain('Android /data capacity is insufficient');
+  });
+
+  it.each([
+    ['closed transport', 'transient-closed', 'adb: unable to connect for root: closed'],
+    ['offline transport', 'transient-offline', 'error: device offline'],
+  ])('recovers one transient adb root %s failure with one retry', (_label, rootMode, diagnostic) => {
+    const result = runIsolatedOfflinePreparation(700000, { rootMode });
+    const rootCalls = result.calls.filter((call) => call.endsWith(' root'));
+    const rootIndexes = result.calls
+      .map((call, index) => call.endsWith(' root') ? index : -1)
+      .filter((index) => index >= 0);
+
+    expect(result.status).toBe(0);
+    expect(rootCalls).toHaveLength(2);
+    expect(result.calls.filter((call) => call.endsWith(' wait-for-device'))).toHaveLength(3);
+    expect(result.calls.slice(rootIndexes[0] + 1, rootIndexes[1])).toContain(
+      '-s emulator-5554 wait-for-device',
+    );
+    expect(result.stderr).toContain(diagnostic);
+  });
+
+  it('waits for adbd and proves root after an ordinary successful root restart', () => {
+    const result = runIsolatedOfflinePreparation(700000, { rootMode: 'root-success' });
+
+    expect(result.status).toBe(0);
+    expect(result.calls.filter((call) => call.endsWith(' root'))).toHaveLength(1);
+    expect(result.calls.filter((call) => call.endsWith(' wait-for-device'))).toHaveLength(2);
+    expect(result.calls.filter((call) => call.endsWith(' shell id -u'))).toHaveLength(2);
+  });
+
+  it('fails after one retry when the adb root transport failure persists', () => {
+    const result = runIsolatedOfflinePreparation(700000, { rootMode: 'persistent-closed' });
+
+    expect(result.status).toBe(1);
+    expect(result.calls.filter((call) => call.endsWith(' root'))).toHaveLength(2);
+    expect(result.calls.filter((call) => call.endsWith(' wait-for-device'))).toHaveLength(2);
+    expect(result.stderr).toContain('persisted after one retry');
+  });
+
+  it('bounds the wait when adbd does not reconnect after a transient root failure', () => {
+    const result = runIsolatedOfflinePreparation(700000, { rootMode: 'recovery-wait-timeout' });
+
+    expect(result.status).toBe(1);
+    expect(result.calls.filter((call) => call.endsWith(' root'))).toHaveLength(1);
+    expect(result.stderr).toContain('did not reconnect within the bounded adbd recovery wait');
+  });
+
+  it.each([
+    ['permission failure', 'permission', 'adbd cannot run as root in production builds'],
+    ['mixed transport and product output', 'mixed-output', 'fatal: transport authentication rejected'],
+  ])('does not retry a non-transient adb root %s', (_label, rootMode, diagnostic) => {
+    const result = runIsolatedOfflinePreparation(700000, { rootMode });
+
+    expect(result.status).not.toBe(0);
+    expect(result.calls.filter((call) => call.endsWith(' root'))).toHaveLength(1);
+    expect(result.calls.filter((call) => call.endsWith(' wait-for-device'))).toHaveLength(1);
+    expect(result.stderr).toContain(diagnostic);
   });
 
   it('preinstalls both exact API 24 APKs once and fails closed on package verification', () => {

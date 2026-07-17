@@ -7,6 +7,8 @@ device="${DETOX_ANDROID_DEVICE:-emulator-5554}"
 app_apk="$app_dir/android/app/build/outputs/apk/e2e/app-e2e.apk"
 test_apk="$app_dir/android/app/build/outputs/apk/androidTest/e2e/app-e2e-androidTest.apk"
 sdk_level="$("$adb_path" -s "$device" shell getprop ro.build.version.sdk | tr -d '\r')"
+adb_recovery_wait_attempts="${ANDROID_OFFLINE_ADB_RECOVERY_WAIT_ATTEMPTS:-60}"
+adb_recovery_wait_interval="${ANDROID_OFFLINE_ADB_RECOVERY_WAIT_INTERVAL_SECONDS:-1}"
 
 case "$sdk_level" in
   ''|*[!0-9]*)
@@ -29,6 +31,63 @@ wait_for_boot_completed() {
   echo "Android device $device did not return to a boot-complete state after adbd preparation." >&2
   exit 1
 }
+
+wait_for_device_bounded() {
+  wait_attempt=0
+  "$adb_path" -s "$device" wait-for-device &
+  wait_pid=$!
+  while kill -0 "$wait_pid" 2>/dev/null; do
+    if [ "$wait_attempt" -ge "$adb_recovery_wait_attempts" ]; then
+      kill "$wait_pid" 2>/dev/null || true
+      wait "$wait_pid" 2>/dev/null || true
+      echo "Android device $device did not reconnect within the bounded adbd recovery wait." >&2
+      return 1
+    fi
+    sleep "$adb_recovery_wait_interval"
+    wait_attempt=$((wait_attempt + 1))
+  done
+  if ! wait "$wait_pid"; then
+    echo "Android device $device failed while waiting for adbd recovery." >&2
+    return 1
+  fi
+}
+
+is_transient_adb_root_restart_failure() {
+  transient_output="$1"
+  transient_matched=0
+  while IFS= read -r transient_line; do
+    transient_line="$(printf '%s' "$transient_line" | tr -d '\r')"
+    [ -z "$transient_line" ] && continue
+    case "$transient_line" in
+      "adb: unable to connect for root: closed"|"error: closed"|"error: device offline")
+        transient_matched=1
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+  done <<EOF
+$transient_output
+EOF
+  [ "$transient_matched" -eq 1 ]
+}
+
+run_adb_root() {
+  adb_root_status=0
+  adb_root_output="$("$adb_path" -s "$device" root 2>&1)" || adb_root_status=$?
+}
+
+recover_after_adb_root() {
+  wait_for_device_bounded || return 1
+  wait_for_boot_completed
+}
+
+case "$adb_recovery_wait_attempts" in
+  ''|*[!0-9]*|0)
+    echo "ANDROID_OFFLINE_ADB_RECOVERY_WAIT_ATTEMPTS must be a positive integer." >&2
+    exit 64
+    ;;
+esac
 
 "$adb_path" -s "$device" wait-for-device
 wait_for_boot_completed
@@ -84,9 +143,27 @@ echo "Android /data capacity ready: available=$available_data_bytes required=$re
 if [ "$sdk_level" -lt 30 ]; then
   adb_user_id="$("$adb_path" -s "$device" shell id -u | tr -d '\r')"
   if ! [ "$adb_user_id" = "0" ]; then
-    "$adb_path" -s "$device" root
-    "$adb_path" -s "$device" wait-for-device
-    wait_for_boot_completed
+    run_adb_root
+    if [ "$adb_root_status" -ne 0 ]; then
+      if ! is_transient_adb_root_restart_failure "$adb_root_output"; then
+        printf '%s\n' "${adb_root_output:-adb root failed without output}" >&2
+        exit 1
+      fi
+      echo "WARN: transient adb root transport failure; waiting for adbd and retrying once." >&2
+      printf '%s\n' "$adb_root_output" >&2
+      recover_after_adb_root || exit 1
+      run_adb_root
+      if [ "$adb_root_status" -ne 0 ]; then
+        printf '%s\n' "${adb_root_output:-adb root retry failed without output}" >&2
+        if is_transient_adb_root_restart_failure "$adb_root_output"; then
+          echo "Transient adb root transport failure persisted after one retry." >&2
+        else
+          echo "adb root retry failed with a non-transient error." >&2
+        fi
+        exit 1
+      fi
+    fi
+    recover_after_adb_root || exit 1
     adb_user_id="$("$adb_path" -s "$device" shell id -u | tr -d '\r')"
   fi
   if ! [ "$adb_user_id" = "0" ]; then
