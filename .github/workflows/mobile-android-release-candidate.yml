@@ -105,7 +105,7 @@ jobs:
           pnpm mobile:verify:android:release -- --artifact-only
           --bundle "$BUNDLE_PATH"
           --bundletool "$BUNDLETOOL_PATH"
-          --output apps/mobile/artifacts/android-release/candidate.json
+          --output apps/mobile/artifacts/android-release/android-source-manifest.json
 
       - name: Retain signed candidate and audit evidence
         uses: actions/upload-artifact@v4
@@ -115,7 +115,7 @@ jobs:
           retention-days: 30
           path: |
             apps/mobile/android/app/build/outputs/bundle/release/app-release.aab
-            apps/mobile/artifacts/android-release/candidate.json
+            apps/mobile/artifacts/android-release/android-source-manifest.json
 
       - name: Destroy upload keystore
         if: always()

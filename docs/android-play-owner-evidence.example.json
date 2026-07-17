@@ -1,11 +1,46 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "candidate": {
     "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
     "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
     "applicationId": "com.chessticize.mobile",
     "versionName": "1.1",
     "versionCode": 1
+  },
+  "sourceRelease": {
+    "status": "pending",
+    "evidenceId": "REPLACE_WITH_GITHUB_RELEASE_EVIDENCE_ID",
+    "reference": "https://github.com/Chessticize/chessticize-mobile/releases/tag/android-v1.1.0-build-1",
+    "candidate": {
+      "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
+      "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
+      "applicationId": "com.chessticize.mobile",
+      "versionName": "1.1",
+      "versionCode": 1
+    },
+    "repositoryUrl": "https://github.com/Chessticize/chessticize-mobile",
+    "tagName": "android-v1.1.0-build-1",
+    "tagCommitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
+    "tagType": "pending",
+    "releaseId": 0,
+    "published": false,
+    "sourceManifest": {
+      "status": "pending",
+      "artifactId": 0,
+      "assetName": "android-source-manifest.json",
+      "sha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
+      "reference": "https://github.com/Chessticize/chessticize-mobile/releases/download/android-v1.1.0-build-1/android-source-manifest.json",
+      "releaseId": 0,
+      "tagName": "android-v1.1.0-build-1",
+      "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
+      "candidate": {
+        "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
+        "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
+        "applicationId": "com.chessticize.mobile",
+        "versionName": "1.1",
+        "versionCode": 1
+      }
+    }
   },
   "signing": {
     "uploadCertificateSha256": "REPLACE_WITH_64_HEX_CHARACTERS",

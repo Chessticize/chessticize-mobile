@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+const { Buffer } = require('node:buffer');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -28,6 +29,21 @@ const REQUIRED_RUNTIME_ASSETS = [
     relativePath => `base/assets/stockfish/${path.basename(relativePath)}`,
   ),
 ];
+const ANDROID_SOURCE_REPOSITORY_URL =
+  'https://github.com/Chessticize/chessticize-mobile';
+const ANDROID_SOURCE_MANIFEST_NAME = 'android-source-manifest.json';
+
+function canonicalAndroidSourceTag(versionName, versionCode) {
+  const match = String(versionName).match(/^(\d+)\.(\d+)(?:\.(\d+))?$/);
+  if (!match || !Number.isSafeInteger(versionCode) || versionCode < 1) {
+    throw new Error('Cannot derive the canonical Android source tag.');
+  }
+  const components = [match[1], match[2], match[3] ?? '0'];
+  if (components.some(component => String(Number(component)) !== component)) {
+    throw new Error('Cannot derive a source tag from an ambiguous Android version.');
+  }
+  return `android-v${components.join('.')}-build-${versionCode}`;
+}
 
 function normalizeFingerprint(value) {
   const normalized = String(value ?? '').replace(/:/g, '').trim().toUpperCase();
@@ -97,6 +113,14 @@ function inspectOwnerEvidence(evidence, expected) {
     ['versionName', 'version name'],
     ['versionCode', 'version code'],
   ];
+  const requireCandidateBinding = (candidate, label) => {
+    if (!candidate || typeof candidate !== 'object') {
+      errors.push(`${label} must include an exact candidate binding.`);
+    }
+    for (const [field, fieldLabel] of candidateFields) {
+      requireEqual(candidate?.[field], expected[field], `${label} candidate ${fieldLabel}`);
+    }
+  };
   const requireEvidenceRecord = (record, status, label) => {
     requireEqual(record?.status, status, `${label} status`);
     if (typeof record?.evidenceId !== 'string' || record.evidenceId.trim().length === 0) {
@@ -111,21 +135,87 @@ function inspectOwnerEvidence(evidence, expected) {
     if (reference?.protocol !== 'https:' || !reference.hostname) {
       errors.push(`${label} must include an auditable HTTPS reference.`);
     }
-    if (!record?.candidate || typeof record.candidate !== 'object') {
-      errors.push(`${label} must include an exact candidate binding.`);
-    }
-    for (const [field, fieldLabel] of candidateFields) {
-      requireEqual(record?.candidate?.[field], expected[field], `${label} candidate ${fieldLabel}`);
-    }
+    requireCandidateBinding(record?.candidate, label);
     return record;
   };
 
-  requireEqual(evidence?.schemaVersion, 2, 'Owner evidence schemaVersion');
+  requireEqual(evidence?.schemaVersion, 3, 'Owner evidence schemaVersion');
   requireEqual(evidence?.candidate?.commitSha, expected.commitSha, 'Candidate commit SHA');
   requireEqual(evidence?.candidate?.aabSha256, expected.aabSha256, 'Candidate AAB SHA-256');
   requireEqual(evidence?.candidate?.applicationId, expected.applicationId, 'Candidate application ID');
   requireEqual(evidence?.candidate?.versionName, expected.versionName, 'Candidate version name');
   requireEqual(evidence?.candidate?.versionCode, expected.versionCode, 'Candidate version code');
+
+  const expectedSourceTag = canonicalAndroidSourceTag(
+    expected.versionName,
+    expected.versionCode,
+  );
+  const expectedSourceReleaseUrl =
+    `${ANDROID_SOURCE_REPOSITORY_URL}/releases/tag/${expectedSourceTag}`;
+  const sourceRelease = requireEvidenceRecord(
+    evidence?.sourceRelease,
+    'published',
+    'Public Android source release',
+  );
+  requireEqual(
+    sourceRelease?.repositoryUrl,
+    ANDROID_SOURCE_REPOSITORY_URL,
+    'Public Android source repository URL',
+  );
+  requireEqual(
+    sourceRelease?.reference,
+    expectedSourceReleaseUrl,
+    'Public Android source release URL',
+  );
+  requireEqual(sourceRelease?.tagName, expectedSourceTag, 'Public Android source tag');
+  requireEqual(
+    sourceRelease?.tagCommitSha,
+    expected.commitSha,
+    'Public Android source tag commit SHA',
+  );
+  if (!['annotated', 'signed'].includes(sourceRelease?.tagType)) {
+    errors.push('Public Android source tag must be annotated or signed.');
+  }
+  if (sourceRelease?.published !== true) {
+    errors.push('Public Android source release must be published.');
+  }
+  if (!Number.isSafeInteger(sourceRelease?.releaseId) || sourceRelease.releaseId <= 0) {
+    errors.push('Public Android source release must record its GitHub release ID.');
+  }
+  const sourceManifest = sourceRelease?.sourceManifest;
+  requireEqual(sourceManifest?.status, 'retained', 'Source manifest status');
+  if (!Number.isSafeInteger(sourceManifest?.artifactId) || sourceManifest.artifactId <= 0) {
+    errors.push('Source manifest must record its retained GitHub release artifact ID.');
+  }
+  requireEqual(
+    sourceManifest?.assetName,
+    ANDROID_SOURCE_MANIFEST_NAME,
+    'Source manifest asset name',
+  );
+  if (typeof sourceManifest?.sha256 !== 'string' ||
+      !/^[0-9a-f]{64}$/i.test(sourceManifest.sha256)) {
+    errors.push('Source manifest must record its SHA-256 digest.');
+  }
+  const expectedSourceManifestUrl =
+    `${ANDROID_SOURCE_REPOSITORY_URL}/releases/download/` +
+    `${expectedSourceTag}/${ANDROID_SOURCE_MANIFEST_NAME}`;
+  requireEqual(
+    sourceManifest?.reference,
+    expectedSourceManifestUrl,
+    'Retained source manifest URL',
+  );
+  requireEqual(
+    sourceManifest?.releaseId,
+    sourceRelease?.releaseId,
+    'Source manifest GitHub release ID',
+  );
+  requireEqual(sourceManifest?.tagName, expectedSourceTag, 'Source manifest tag');
+  requireEqual(
+    sourceManifest?.commitSha,
+    expected.commitSha,
+    'Source manifest commit SHA',
+  );
+  requireCandidateBinding(sourceManifest?.candidate, 'Source manifest');
 
   try {
     requireEqual(
@@ -253,6 +343,175 @@ function inspectOwnerEvidence(evidence, expected) {
       (generatedApkSizes.universalApkBytes < expectation.minimumBytes ||
        generatedApkSizes.universalApkBytes > expectation.maximumBytes)) {
     errors.push('Measured universal APK is outside the approved size expectation.');
+  }
+
+  return errors;
+}
+
+function inspectPublishedSourceRelease(sourceRelease, expected, dependencies = {}) {
+  const run = dependencies.run ?? spawnSync;
+  const repoRoot = dependencies.repoRoot ?? path.resolve(__dirname, '../../..');
+  const errors = [];
+  const expectedTag = canonicalAndroidSourceTag(expected.versionName, expected.versionCode);
+  const requireEqual = (actual, expectedValue, label) => {
+    if (actual !== expectedValue) {
+      errors.push(`${label} is ${JSON.stringify(actual)}; expected ${JSON.stringify(expectedValue)}.`);
+    }
+  };
+  const runGit = args => run('git', args, { cwd: repoRoot, encoding: 'utf8' });
+
+  const tagObjectType = runGit(['cat-file', '-t', expectedTag]);
+  if (tagObjectType.status !== 0) {
+    errors.push(`Public Android source tag ${expectedTag} could not be inspected locally.`);
+  } else {
+    requireEqual(
+      String(tagObjectType.stdout).trim(),
+      'tag',
+      'Public Android source Git object type',
+    );
+  }
+
+  const tagCommit = runGit(['rev-list', '-n', '1', expectedTag]);
+  if (tagCommit.status !== 0) {
+    errors.push(`Public Android source tag ${expectedTag} commit could not be resolved locally.`);
+  } else {
+    requireEqual(
+      String(tagCommit.stdout).trim(),
+      expected.commitSha,
+      'Public Android source tag resolved commit SHA',
+    );
+  }
+
+  if (sourceRelease?.tagType === 'signed') {
+    const tagObject = runGit(['cat-file', 'tag', expectedTag]);
+    const signature = /-----BEGIN (?:PGP|SSH) SIGNATURE-----/.test(
+      String(tagObject.stdout ?? ''),
+    );
+    if (tagObject.status !== 0 || !signature) {
+      errors.push('Public Android source tag is recorded as signed but has no tag signature.');
+    }
+  }
+
+  const releaseApiUrl =
+    `https://api.github.com/repos/Chessticize/chessticize-mobile/releases/` +
+    `${sourceRelease?.releaseId}`;
+  const releaseResult = run('curl', [
+    '--fail',
+    '--location',
+    '--silent',
+    '--show-error',
+    '--header',
+    'Accept: application/vnd.github+json',
+    '--header',
+    'X-GitHub-Api-Version: 2022-11-28',
+    releaseApiUrl,
+  ], { encoding: 'utf8' });
+  if (releaseResult.status !== 0) {
+    errors.push('Public Android source release could not be verified through the GitHub API.');
+    return errors;
+  }
+
+  let release;
+  try {
+    release = JSON.parse(String(releaseResult.stdout));
+  } catch {
+    errors.push('Public Android source release GitHub API response is malformed.');
+    return errors;
+  }
+
+  requireEqual(release?.id, sourceRelease?.releaseId, 'Published GitHub release ID');
+  requireEqual(release?.html_url, sourceRelease?.reference, 'Published GitHub release URL');
+  requireEqual(release?.tag_name, expectedTag, 'Published GitHub release tag');
+  if (release?.draft !== false ||
+      typeof release?.published_at !== 'string' ||
+      !Number.isFinite(Date.parse(release.published_at))) {
+    errors.push('Public Android source release is not a published non-draft GitHub release.');
+  }
+
+  const sourceManifest = sourceRelease?.sourceManifest;
+  const releaseAsset = Array.isArray(release?.assets)
+    ? release.assets.find(asset => asset?.id === sourceManifest?.artifactId)
+    : undefined;
+  if (!releaseAsset) {
+    errors.push('Retained source manifest is not present in the published GitHub release.');
+    return errors;
+  }
+  requireEqual(
+    releaseAsset.name,
+    sourceManifest.assetName,
+    'Published source manifest asset name',
+  );
+  requireEqual(
+    releaseAsset.browser_download_url,
+    sourceManifest.reference,
+    'Published source manifest asset URL',
+  );
+  requireEqual(releaseAsset.state, 'uploaded', 'Published source manifest asset state');
+  requireEqual(
+    String(releaseAsset.digest ?? '').toLowerCase(),
+    `sha256:${sourceManifest.sha256.toLowerCase()}`,
+    'Published source manifest asset digest',
+  );
+
+  const sourceManifestResult = run('curl', [
+    '--fail',
+    '--location',
+    '--silent',
+    '--show-error',
+    sourceManifest.reference,
+  ], { encoding: null, maxBuffer: 16 * 1024 * 1024 });
+  if (sourceManifestResult.status !== 0) {
+    errors.push('Retained source manifest could not be downloaded from the GitHub release.');
+    return errors;
+  }
+  const sourceManifestBytes = Buffer.isBuffer(sourceManifestResult.stdout)
+    ? sourceManifestResult.stdout
+    : Buffer.from(String(sourceManifestResult.stdout ?? ''));
+  requireEqual(
+    crypto.createHash('sha256').update(sourceManifestBytes).digest('hex'),
+    sourceManifest.sha256.toLowerCase(),
+    'Downloaded source manifest SHA-256',
+  );
+
+  let downloadedSourceManifest;
+  try {
+    downloadedSourceManifest = JSON.parse(sourceManifestBytes.toString('utf8'));
+  } catch {
+    errors.push('Downloaded source manifest is malformed JSON.');
+    return errors;
+  }
+  requireEqual(
+    downloadedSourceManifest?.schemaVersion,
+    1,
+    'Downloaded source manifest schemaVersion',
+  );
+  requireEqual(
+    downloadedSourceManifest?.status,
+    'artifact-only',
+    'Downloaded source manifest verifier status',
+  );
+  requireEqual(
+    downloadedSourceManifest?.commitSha,
+    expected.commitSha,
+    'Downloaded source manifest commit SHA',
+  );
+  requireEqual(
+    downloadedSourceManifest?.worktreeClean,
+    true,
+    'Downloaded source manifest clean-worktree result',
+  );
+  for (const [field, label] of [
+    ['sha256', 'AAB SHA-256'],
+    ['applicationId', 'application ID'],
+    ['versionName', 'version name'],
+    ['versionCode', 'version code'],
+  ]) {
+    const expectedField = field === 'sha256' ? expected.aabSha256 : expected[field];
+    requireEqual(
+      downloadedSourceManifest?.bundle?.[field],
+      expectedField,
+      `Downloaded source manifest ${label}`,
+    );
   }
 
   return errors;
@@ -532,14 +791,25 @@ function inspectAndroidPlayRelease(options, dependencies = {}) {
       throw new Error('--owner-evidence is required for a play-ready verdict.');
     }
     const evidence = JSON.parse(fs.readFileSync(ownerEvidencePath, 'utf8'));
-    const errors = inspectOwnerEvidence(evidence, {
+    const expectedOwnerEvidence = {
       commitSha,
       aabSha256: result.bundle.sha256,
       ...expectedIdentity,
       uploadCertificateSha256,
-    });
+    };
+    const errors = inspectOwnerEvidence(evidence, expectedOwnerEvidence);
     if (errors.length > 0) {
       throw new Error(`Owner evidence is incomplete:\n${errors.join('\n')}`);
+    }
+    const sourceReleaseErrors = inspectPublishedSourceRelease(
+      evidence.sourceRelease,
+      expectedOwnerEvidence,
+      { repoRoot, run },
+    );
+    if (sourceReleaseErrors.length > 0) {
+      throw new Error(
+        `Public source release verification failed:\n${sourceReleaseErrors.join('\n')}`,
+      );
     }
     result.ownerEvidence = { status: 'pass', path: path.relative(repoRoot, ownerEvidencePath) };
   }
@@ -569,12 +839,15 @@ if (require.main === module) {
 }
 
 module.exports = {
+  ANDROID_SOURCE_REPOSITORY_URL,
   EXPECTED_ABIS,
   REQUIRED_NOTICES,
   REQUIRED_RUNTIME_ASSETS,
+  canonicalAndroidSourceTag,
   inspectAndroidPlayRelease,
   inspectBundleEntries,
   inspectOwnerEvidence,
+  inspectPublishedSourceRelease,
   inspectReleaseManifest,
   normalizeFingerprint,
   parseArguments,

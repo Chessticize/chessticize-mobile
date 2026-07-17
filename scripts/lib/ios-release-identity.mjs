@@ -1,20 +1,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import iosReleaseVersionRenderer from "./ios-release-version.cjs";
 
-export function renderCanonicalIOSReleaseConfig(releaseVersion) {
-  if (
-    releaseVersion?.schemaVersion !== 1 ||
-    typeof releaseVersion?.publicVersion !== "string" ||
-    !/^\d+\.\d+(?:\.\d+)?$/u.test(releaseVersion.publicVersion) ||
-    !Number.isSafeInteger(releaseVersion?.iosBuildNumber) ||
-    releaseVersion.iosBuildNumber < 1
-  ) {
-    throw new Error("apps/mobile/release-version.json has invalid iOS version fields.");
-  }
-  return "// Generated from apps/mobile/release-version.json. Do not edit.\n" +
-    `MARKETING_VERSION = ${releaseVersion.publicVersion}\n` +
-    `CURRENT_PROJECT_VERSION = ${releaseVersion.iosBuildNumber}\n`;
-}
+export const renderCanonicalIOSReleaseConfig =
+  iosReleaseVersionRenderer.renderIOSReleaseVersion;
 
 export function loadIOSReleaseIdentity(repoRoot) {
   const readText = (path) => readFileSync(join(repoRoot, path), "utf8");

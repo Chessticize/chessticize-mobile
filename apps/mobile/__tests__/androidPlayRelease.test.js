@@ -1,11 +1,14 @@
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const {
+  canonicalAndroidSourceTag,
   inspectBundleEntries,
   inspectOwnerEvidence,
+  inspectPublishedSourceRelease,
   inspectReleaseManifest,
   normalizeFingerprint,
   parseArguments,
@@ -18,6 +21,9 @@ const {
 const mobileRoot = path.resolve(__dirname, '..');
 const repoRoot = path.resolve(mobileRoot, '../..');
 const releaseVersion = JSON.parse(read('apps/mobile/release-version.json'));
+const ownerEvidenceExample = JSON.parse(
+  read('docs/android-play-owner-evidence.example.json'),
+);
 
 const expectedCandidate = {
   commitSha: 'a'.repeat(40),
@@ -32,11 +38,16 @@ function read(relativePath) {
   return fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
 }
 
-function pngDimensions(relativePath) {
+function pngMetadata(relativePath) {
   const png = fs.readFileSync(path.join(repoRoot, relativePath));
+  expect(png.subarray(0, 8)).toEqual(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  expect(png.readUInt32BE(8)).toBe(13);
+  expect(png.subarray(12, 16).toString('ascii')).toBe('IHDR');
   return {
     width: png.readUInt32BE(16),
     height: png.readUInt32BE(20),
+    bitDepth: png[24],
+    colorType: png[25],
   };
 }
 
@@ -61,10 +72,61 @@ function evidenceRecord(status, evidenceId, overrides = {}) {
   };
 }
 
-function validOwnerEvidence(overrides = {}) {
+function retainedSourceManifest(overrides = {}) {
   return {
-    schemaVersion: 2,
+    schemaVersion: 1,
+    status: 'artifact-only',
+    commitSha: expectedCandidate.commitSha,
+    worktreeClean: true,
+    bundle: {
+      sha256: expectedCandidate.aabSha256,
+      applicationId: expectedCandidate.applicationId,
+      versionName: expectedCandidate.versionName,
+      versionCode: expectedCandidate.versionCode,
+    },
+    ...overrides,
+  };
+}
+
+function retainedSourceManifestBytes(overrides = {}) {
+  return Buffer.from(`${JSON.stringify(retainedSourceManifest(overrides), null, 2)}\n`);
+}
+
+function retainedSourceManifestSha256(overrides = {}) {
+  return crypto.createHash('sha256')
+    .update(retainedSourceManifestBytes(overrides))
+    .digest('hex');
+}
+
+function validOwnerEvidence(overrides = {}) {
+  const sourceTag = 'android-v1.1.0-build-1';
+  const sourceReleaseUrl =
+    `https://github.com/Chessticize/chessticize-mobile/releases/tag/${sourceTag}`;
+  return {
+    schemaVersion: 3,
     candidate: candidateBinding(),
+    sourceRelease: evidenceRecord('published', 'source-release-123', {
+      reference: sourceReleaseUrl,
+      repositoryUrl: 'https://github.com/Chessticize/chessticize-mobile',
+      tagName: sourceTag,
+      tagCommitSha: expectedCandidate.commitSha,
+      tagType: 'annotated',
+      releaseId: 123,
+      published: true,
+      sourceManifest: {
+        status: 'retained',
+        artifactId: 456,
+        assetName: 'android-source-manifest.json',
+        sha256: retainedSourceManifestSha256(),
+        reference:
+          `https://github.com/Chessticize/chessticize-mobile/releases/download/` +
+          `${sourceTag}/android-source-manifest.json`,
+        releaseId: 123,
+        tagName: sourceTag,
+        commitSha: expectedCandidate.commitSha,
+        candidate: candidateBinding(),
+      },
+    }),
     signing: {
       uploadCertificateSha256: expectedCandidate.uploadCertificateSha256,
       appSigningCertificateSha256: '33'.repeat(32),
@@ -123,6 +185,65 @@ function validOwnerEvidence(overrides = {}) {
       }),
     },
     ...overrides,
+  };
+}
+
+function publishedSourceRelease(overrides = {}) {
+  const sourceRelease = validOwnerEvidence().sourceRelease;
+  return {
+    id: sourceRelease.releaseId,
+    html_url: sourceRelease.reference,
+    tag_name: sourceRelease.tagName,
+    draft: false,
+    published_at: '2026-07-17T00:00:00Z',
+    assets: [{
+      id: sourceRelease.sourceManifest.artifactId,
+      name: sourceRelease.sourceManifest.assetName,
+      state: 'uploaded',
+      browser_download_url: sourceRelease.sourceManifest.reference,
+      digest: `sha256:${sourceRelease.sourceManifest.sha256}`,
+    }],
+    ...overrides,
+  };
+}
+
+function sourceReleaseRun(overrides = {}) {
+  const responses = {
+    'git cat-file -t android-v1.1.0-build-1': {
+      status: 0,
+      stdout: 'tag\n',
+      stderr: '',
+    },
+    'git rev-list -n 1 android-v1.1.0-build-1': {
+      status: 0,
+      stdout: `${expectedCandidate.commitSha}\n`,
+      stderr: '',
+    },
+    'git cat-file tag android-v1.1.0-build-1': {
+      status: 0,
+      stdout: 'object candidate\ntype commit\ntag android-v1.1.0-build-1\n',
+      stderr: '',
+    },
+    'curl release': {
+      status: 0,
+      stdout: JSON.stringify(publishedSourceRelease()),
+      stderr: '',
+    },
+    'curl manifest': {
+      status: 0,
+      stdout: retainedSourceManifestBytes(),
+      stderr: '',
+    },
+    ...overrides,
+  };
+  return (command, args) => responses[command === 'curl'
+    ? (args.at(-1).startsWith('https://api.github.com/')
+      ? 'curl release'
+      : 'curl manifest')
+    : `${command} ${args.join(' ')}`] ?? {
+    status: 1,
+    stdout: '',
+    stderr: `Unexpected command: ${command} ${args.join(' ')}`,
   };
 }
 
@@ -257,15 +378,19 @@ describe('Android Play release contract', () => {
       mobileRoot,
       'store-assets/android/feature-graphic-1024x500.png',
     ))).toBe(true);
-    expect(pngDimensions('apps/mobile/store-assets/android/play-icon-512.png')).toEqual({
+    expect(pngMetadata('apps/mobile/store-assets/android/play-icon-512.png')).toEqual({
       width: 512,
       height: 512,
+      bitDepth: 8,
+      colorType: 6,
     });
-    expect(pngDimensions(
+    expect(pngMetadata(
       'apps/mobile/store-assets/android/feature-graphic-1024x500.png',
     )).toEqual({
       width: 1024,
       height: 500,
+      bitDepth: 8,
+      colorType: 2,
     });
   });
 
@@ -364,6 +489,314 @@ describe('Android Play release contract', () => {
         expect.stringContaining('must not be launched'),
       ]),
     );
+  });
+
+  it('requires a retained public source release before play-ready', () => {
+    const evidence = validOwnerEvidence();
+    delete evidence.sourceRelease;
+
+    expect(inspectOwnerEvidence(evidence, expectedCandidate)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('Public Android source release'),
+      ]),
+    );
+  });
+
+  it('keeps the blank owner contract on schema v3 with fail-closed source placeholders', () => {
+    expect(ownerEvidenceExample.schemaVersion).toBe(3);
+    expect(ownerEvidenceExample.sourceRelease).toEqual(expect.objectContaining({
+      status: 'pending',
+      repositoryUrl: 'https://github.com/Chessticize/chessticize-mobile',
+      tagName: 'android-v1.1.0-build-1',
+      tagType: 'pending',
+      releaseId: 0,
+      published: false,
+      sourceManifest: expect.objectContaining({
+        status: 'pending',
+        artifactId: 0,
+        assetName: 'android-source-manifest.json',
+      }),
+    }));
+  });
+
+  it('binds the retained source manifest provenance to the exact candidate', () => {
+    const evidence = validOwnerEvidence();
+    evidence.sourceRelease.sourceManifest.candidate.applicationId = 'com.example.other';
+
+    expect(inspectOwnerEvidence(evidence, expectedCandidate)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('Source manifest candidate application ID'),
+      ]),
+    );
+  });
+
+  it('verifies the source tag and retained manifest against the public GitHub release', () => {
+    const sourceRelease = validOwnerEvidence().sourceRelease;
+
+    expect(inspectPublishedSourceRelease(sourceRelease, expectedCandidate, {
+      repoRoot,
+      run: sourceReleaseRun(),
+    })).toEqual([]);
+  });
+
+  it('rejects a retained source manifest whose downloaded audit names another commit', () => {
+    const sourceRelease = validOwnerEvidence().sourceRelease;
+
+    expect(inspectPublishedSourceRelease(sourceRelease, expectedCandidate, {
+      repoRoot,
+      run: sourceReleaseRun({
+        'curl manifest': {
+          status: 0,
+          stdout: retainedSourceManifestBytes({ commitSha: 'c'.repeat(40) }),
+          stderr: '',
+        },
+      }),
+    })).toEqual(expect.arrayContaining([
+      expect.stringContaining('Downloaded source manifest commit SHA'),
+    ]));
+  });
+
+  it('requires the retained source manifest to use its canonical release asset name', () => {
+    const evidence = validOwnerEvidence();
+    evidence.sourceRelease.sourceManifest.assetName = 'other-source.json';
+    evidence.sourceRelease.sourceManifest.reference =
+      'https://github.com/Chessticize/chessticize-mobile/releases/download/' +
+      'android-v1.1.0-build-1/other-source.json';
+
+    expect(inspectOwnerEvidence(evidence, expectedCandidate)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('Source manifest asset name'),
+      ]),
+    );
+  });
+
+  it('derives one canonical Android source tag from normalized semantic versions', () => {
+    expect(canonicalAndroidSourceTag('1.1', 1)).toBe('android-v1.1.0-build-1');
+    expect(canonicalAndroidSourceTag('1.1.0', 1)).toBe('android-v1.1.0-build-1');
+    expect(canonicalAndroidSourceTag('12.34.56', 789)).toBe(
+      'android-v12.34.56-build-789',
+    );
+    for (const [versionName, versionCode] of [
+      ['1', 1],
+      ['01.1', 1],
+      ['1.01', 1],
+      ['1.1.00', 1],
+      ['1.1.0-alpha', 1],
+      ['1.1.0.0', 1],
+      ['1.1', 0],
+      ['1.1', 1.5],
+    ]) {
+      expect(() => canonicalAndroidSourceTag(versionName, versionCode)).toThrow();
+    }
+  });
+
+  it.each([
+    ['schema v2', evidence => { evidence.schemaVersion = 2; }, 'schemaVersion'],
+    ['missing release', evidence => { delete evidence.sourceRelease; },
+      'Public Android source release status'],
+    ['pending release', evidence => { evidence.sourceRelease.status = 'pending'; },
+      'Public Android source release status'],
+    ['missing evidence ID', evidence => { evidence.sourceRelease.evidenceId = ''; },
+      'Public Android source release must include an evidence ID'],
+    ['malformed evidence URL', evidence => { evidence.sourceRelease.reference = 'not-https'; },
+      'Public Android source release must include an auditable HTTPS reference'],
+    ['commit binding', evidence => {
+      evidence.sourceRelease.candidate.commitSha = 'c'.repeat(40);
+    }, 'Public Android source release candidate commit SHA'],
+    ['AAB binding', evidence => {
+      evidence.sourceRelease.candidate.aabSha256 = 'c'.repeat(64);
+    }, 'Public Android source release candidate AAB SHA-256'],
+    ['package binding', evidence => {
+      evidence.sourceRelease.candidate.applicationId = 'com.example.other';
+    }, 'Public Android source release candidate application ID'],
+    ['version binding', evidence => {
+      evidence.sourceRelease.candidate.versionName = '1.2';
+    }, 'Public Android source release candidate version name'],
+    ['version-code binding', evidence => {
+      evidence.sourceRelease.candidate.versionCode = 2;
+    }, 'Public Android source release candidate version code'],
+    ['repository', evidence => {
+      evidence.sourceRelease.repositoryUrl = 'https://github.com/example/other';
+    }, 'Public Android source repository URL'],
+    ['canonical release URL', evidence => {
+      evidence.sourceRelease.reference += '?unpublished=1';
+    }, 'Public Android source release URL'],
+    ['normalized tag', evidence => {
+      evidence.sourceRelease.tagName = 'android-v1.1-build-1';
+    }, 'Public Android source tag'],
+    ['tag commit', evidence => {
+      evidence.sourceRelease.tagCommitSha = 'c'.repeat(40);
+    }, 'Public Android source tag commit SHA'],
+    ['lightweight tag', evidence => { evidence.sourceRelease.tagType = 'lightweight'; },
+      'must be annotated or signed'],
+    ['unpublished release', evidence => { evidence.sourceRelease.published = false; },
+      'must be published'],
+    ['missing release ID', evidence => { evidence.sourceRelease.releaseId = 0; },
+      'must record its GitHub release ID'],
+  ])('rejects source-release evidence with %s', (_label, mutate, expectedMessage) => {
+    const evidence = validOwnerEvidence();
+    mutate(evidence);
+
+    expect(inspectOwnerEvidence(evidence, expectedCandidate)).toEqual(
+      expect.arrayContaining([expect.stringContaining(expectedMessage)]),
+    );
+  });
+
+  it.each([
+    ['missing manifest', evidence => { delete evidence.sourceRelease.sourceManifest; },
+      'Source manifest status'],
+    ['pending status', evidence => {
+      evidence.sourceRelease.sourceManifest.status = 'pending';
+    }, 'Source manifest status'],
+    ['missing artifact ID', evidence => {
+      evidence.sourceRelease.sourceManifest.artifactId = 0;
+    }, 'retained GitHub release artifact ID'],
+    ['unsafe name', evidence => {
+      evidence.sourceRelease.sourceManifest.assetName = '../manifest.json';
+    }, 'Source manifest asset name'],
+    ['malformed digest', evidence => {
+      evidence.sourceRelease.sourceManifest.sha256 = 'not-a-digest';
+    }, 'SHA-256 digest'],
+    ['noncanonical URL', evidence => {
+      evidence.sourceRelease.sourceManifest.reference += '?download=1';
+    }, 'Retained source manifest URL'],
+    ['release provenance', evidence => {
+      evidence.sourceRelease.sourceManifest.releaseId = 999;
+    }, 'Source manifest GitHub release ID'],
+    ['tag provenance', evidence => {
+      evidence.sourceRelease.sourceManifest.tagName = 'android-v1.1.0-build-2';
+    }, 'Source manifest tag'],
+    ['commit provenance', evidence => {
+      evidence.sourceRelease.sourceManifest.commitSha = 'c'.repeat(40);
+    }, 'Source manifest commit SHA'],
+    ['missing candidate provenance', evidence => {
+      delete evidence.sourceRelease.sourceManifest.candidate;
+    }, 'must include an exact candidate binding'],
+    ['candidate commit provenance', evidence => {
+      evidence.sourceRelease.sourceManifest.candidate.commitSha = 'c'.repeat(40);
+    }, 'Source manifest candidate commit SHA'],
+    ['candidate AAB provenance', evidence => {
+      evidence.sourceRelease.sourceManifest.candidate.aabSha256 = 'c'.repeat(64);
+    }, 'Source manifest candidate AAB SHA-256'],
+    ['candidate package provenance', evidence => {
+      evidence.sourceRelease.sourceManifest.candidate.applicationId = 'com.example.other';
+    }, 'Source manifest candidate application ID'],
+    ['candidate version provenance', evidence => {
+      evidence.sourceRelease.sourceManifest.candidate.versionName = '1.2';
+    }, 'Source manifest candidate version name'],
+    ['candidate version-code provenance', evidence => {
+      evidence.sourceRelease.sourceManifest.candidate.versionCode = 2;
+    }, 'Source manifest candidate version code'],
+  ])('rejects retained source-manifest evidence with %s',
+    (_label, mutate, expectedMessage) => {
+      const evidence = validOwnerEvidence();
+      mutate(evidence);
+
+      expect(inspectOwnerEvidence(evidence, expectedCandidate)).toEqual(
+        expect.arrayContaining([expect.stringContaining(expectedMessage)]),
+      );
+    });
+
+  it.each([
+    ['release ID', release => { release.id = 999; }, 'Published GitHub release ID'],
+    ['release URL', release => {
+      release.html_url = 'https://github.com/Chessticize/chessticize-mobile/releases/tag/other';
+    }, 'Published GitHub release URL'],
+    ['release tag', release => { release.tag_name = 'android-v1.1.0-build-2'; },
+      'Published GitHub release tag'],
+    ['draft state', release => { release.draft = true; },
+      'not a published non-draft GitHub release'],
+    ['published timestamp', release => { release.published_at = null; },
+      'not a published non-draft GitHub release'],
+    ['missing retained asset', release => { release.assets = []; },
+      'not present in the published GitHub release'],
+    ['asset name', release => { release.assets[0].name = 'other.json'; },
+      'Published source manifest asset name'],
+    ['asset URL', release => {
+      release.assets[0].browser_download_url += '?other=1';
+    }, 'Published source manifest asset URL'],
+    ['asset upload state', release => { release.assets[0].state = 'new'; },
+      'Published source manifest asset state'],
+    ['asset digest', release => { release.assets[0].digest = `sha256:${'55'.repeat(32)}`; },
+      'Published source manifest asset digest'],
+  ])('rejects GitHub source-release API evidence with mismatched %s',
+    (_label, mutate, expectedMessage) => {
+      const release = publishedSourceRelease();
+      mutate(release);
+      const sourceRelease = validOwnerEvidence().sourceRelease;
+
+      expect(inspectPublishedSourceRelease(sourceRelease, expectedCandidate, {
+        repoRoot,
+        run: sourceReleaseRun({
+          'curl release': { status: 0, stdout: JSON.stringify(release), stderr: '' },
+        }),
+      })).toEqual(expect.arrayContaining([expect.stringContaining(expectedMessage)]));
+    });
+
+  it.each([
+    ['missing local tag', {
+      'git cat-file -t android-v1.1.0-build-1': { status: 1, stdout: '', stderr: 'missing' },
+    }, 'could not be inspected locally'],
+    ['lightweight local tag', {
+      'git cat-file -t android-v1.1.0-build-1': { status: 0, stdout: 'commit\n', stderr: '' },
+    }, 'Git object type'],
+    ['wrong local tag commit', {
+      'git rev-list -n 1 android-v1.1.0-build-1': {
+        status: 0,
+        stdout: `${'c'.repeat(40)}\n`,
+        stderr: '',
+      },
+    }, 'resolved commit SHA'],
+  ])('rejects %s during independent source-tag verification',
+    (_label, overrides, expectedMessage) => {
+      const sourceRelease = validOwnerEvidence().sourceRelease;
+
+      expect(inspectPublishedSourceRelease(sourceRelease, expectedCandidate, {
+        repoRoot,
+        run: sourceReleaseRun(overrides),
+      })).toEqual(expect.arrayContaining([expect.stringContaining(expectedMessage)]));
+    });
+
+  it('accepts a signed tag only when the local annotated tag carries a signature', () => {
+    const sourceRelease = validOwnerEvidence().sourceRelease;
+    sourceRelease.tagType = 'signed';
+    expect(inspectPublishedSourceRelease(sourceRelease, expectedCandidate, {
+      repoRoot,
+      run: sourceReleaseRun({
+        'git cat-file tag android-v1.1.0-build-1': {
+          status: 0,
+          stdout: 'tag android-v1.1.0-build-1\n-----BEGIN PGP SIGNATURE-----\nsig\n',
+          stderr: '',
+        },
+      }),
+    })).toEqual([]);
+
+    expect(inspectPublishedSourceRelease(sourceRelease, expectedCandidate, {
+      repoRoot,
+      run: sourceReleaseRun(),
+    })).toEqual(expect.arrayContaining([
+      expect.stringContaining('recorded as signed but has no tag signature'),
+    ]));
+  });
+
+  it('fails closed when GitHub source-release verification is unavailable or malformed', () => {
+    const sourceRelease = validOwnerEvidence().sourceRelease;
+    expect(inspectPublishedSourceRelease(sourceRelease, expectedCandidate, {
+      repoRoot,
+      run: sourceReleaseRun({
+        'curl release': { status: 22, stdout: '', stderr: 'not found' },
+      }),
+    })).toEqual(expect.arrayContaining([
+      expect.stringContaining('could not be verified through the GitHub API'),
+    ]));
+    expect(inspectPublishedSourceRelease(sourceRelease, expectedCandidate, {
+      repoRoot,
+      run: sourceReleaseRun({
+        'curl release': { status: 0, stdout: '{not-json', stderr: '' },
+      }),
+    })).toEqual(expect.arrayContaining([
+      expect.stringContaining('GitHub API response is malformed'),
+    ]));
   });
 
   it.each([
@@ -527,8 +960,17 @@ describe('Android Play release contract', () => {
     expect(workflow).toContain('ANDROID_RELEASE_KEYSTORE_BASE64');
     expect(workflow).toContain('ANDROID_UPLOAD_CERT_SHA256');
     expect(workflow).toContain('--artifact-only');
+    expect(workflow).toContain(
+      '--output apps/mobile/artifacts/android-release/android-source-manifest.json',
+    );
+    expect(workflow).toContain(
+      'apps/mobile/artifacts/android-release/android-source-manifest.json',
+    );
     expect(workflow).toContain('retention-days: 30');
     expect(runbook).toContain('cannot produce a `play-ready` verdict');
+    expect(runbook).toContain('owner evidence schema v3');
+    expect(runbook).toContain('live GitHub release API');
+    expect(runbook).toContain('android-source-manifest.json');
     expect(runbook).toContain('do not start the rollout in #186');
     expect(listing).toContain('Data collected: No');
     expect(listing).toContain('production manifest intentionally has no `INTERNET` permission');

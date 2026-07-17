@@ -48,8 +48,8 @@ local signing configuration makes Gradle `bundleRelease` fail closed.
 2. Dispatch `Mobile Android release candidate` on that exact ref. The workflow
    materializes the upload keystore only in runner temp, builds one signed AAB,
    verifies every non-signature AAB entry is covered by exactly one approved
-   JAR signer, and retains
-   the AAB plus `candidate.json` for 30 days.
+   JAR signer, and retains the AAB plus `android-source-manifest.json` for 30
+   days.
 3. The verifier requires `com.chessticize.mobile`, the canonical version name
    and version code, only the two approved ABIs, `PAGE_ALIGNMENT_16K`, at least
    16 KB ELF LOAD alignment for every packaged `.so`, native debug symbols,
@@ -66,7 +66,7 @@ CHESSTICIZE_ANDROID_UPLOAD_CERT_SHA256=<approved-upload-certificate> \
 pnpm mobile:verify:android:release -- --artifact-only \
   --bundle apps/mobile/android/app/build/outputs/bundle/release/app-release.aab \
   --bundletool <verified-bundletool-1.18.3.jar> \
-  --output apps/mobile/artifacts/android-release/candidate.json
+  --output apps/mobile/artifacts/android-release/android-source-manifest.json
 ```
 
 `--artifact-only` means only the repository and signed-AAB boundary passed. It
@@ -79,6 +79,18 @@ completed external gate must carry an evidence ID, an auditable HTTPS reference,
 and the exact commit/AAB/application/version binding. Record links or IDs in the
 protected release record; do not commit credentials, tester identities, private
 console screenshots, or signing material.
+
+The owner evidence schema v3 adds the mandatory `sourceRelease` record. After
+the protected candidate workflow passes, attach its unchanged
+`android-source-manifest.json` to the canonical public GitHub release and record
+the release and asset IDs plus the manifest SHA-256. The final verifier checks
+the local tag object and resolved commit, queries the live GitHub release API,
+matches the published release and retained asset, downloads the asset, verifies
+its digest, and binds the protected artifact-only audit inside it to the exact
+commit, AAB, package, version, and code. Plausible hand-authored URLs or IDs do
+not satisfy this check. A missing tag, unpublished or draft release, unavailable
+API, missing asset digest, or mismatched manifest fails closed. This repository
+does not currently claim that the owner-only tag or release exists.
 
 1. Complete Play developer account identity verification and register
    `com.chessticize.mobile` under Android developer verification.
