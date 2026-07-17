@@ -196,12 +196,16 @@ describe('Android Play release contract', () => {
     ]));
   });
 
-  it('requires both approved ABIs, 16 KB metadata, symbols, and notices in the AAB', () => {
-    const result = inspectBundleEntries([
+  it('requires runtime assets, both approved ABIs, 16 KB metadata, symbols, and notices in the AAB', () => {
+    const entries = [
       'base/lib/arm64-v8a/libappmodules.so',
       'base/lib/arm64-v8a/libstockfish.so',
       'base/lib/x86_64/libappmodules.so',
       'base/lib/x86_64/libstockfish.so',
+      'base/assets/puzzle-packs/bundled-core-pack.sqlite',
+      'base/assets/stockfish/stockfish-artifacts.json',
+      'base/assets/stockfish/nn-c288c895ea92.nnue',
+      'base/assets/stockfish/nn-37f18f62d772.nnue',
       'base/assets/licenses/LICENSE',
       'base/assets/licenses/THIRD_PARTY_NOTICES.md',
       'base/assets/licenses/stockfish/COPYING.txt',
@@ -210,12 +214,26 @@ describe('Android Play release contract', () => {
       'BUNDLE-METADATA/com.android.tools.build.debugsymbols/arm64-v8a/libstockfish.so.dbg',
       'BUNDLE-METADATA/com.android.tools.build.debugsymbols/x86_64/libappmodules.so.dbg',
       'BUNDLE-METADATA/com.android.tools.build.debugsymbols/x86_64/libstockfish.so.dbg',
-    ], {
+    ];
+    const result = inspectBundleEntries(entries, {
       pageAlignment: 'PAGE_ALIGNMENT_16K',
     });
 
     expect(result.errors).toEqual([]);
     expect(result.abis).toEqual(['arm64-v8a', 'x86_64']);
+
+    const missingRuntimeAssets = inspectBundleEntries(entries.filter(
+      entry => !entry.includes('/assets/stockfish/') &&
+        entry !== 'base/assets/puzzle-packs/bundled-core-pack.sqlite',
+    ), {
+      pageAlignment: 'PAGE_ALIGNMENT_16K',
+    });
+    expect(missingRuntimeAssets.errors).toEqual(expect.arrayContaining([
+      expect.stringContaining('base/assets/puzzle-packs/bundled-core-pack.sqlite'),
+      expect.stringContaining('base/assets/stockfish/stockfish-artifacts.json'),
+      expect.stringContaining('base/assets/stockfish/nn-c288c895ea92.nnue'),
+      expect.stringContaining('base/assets/stockfish/nn-37f18f62d772.nnue'),
+    ]));
   });
 
   it('rejects owner evidence unless every console and exact-artifact gate is complete', () => {

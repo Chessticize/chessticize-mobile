@@ -6,6 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { ANDROID_REQUIREMENTS } = require('./android-requirements');
+const stockfishArtifacts = require('../stockfish-artifacts.json');
 const {
   MINIMUM_LOAD_ALIGNMENT,
   REQUIRED_NATIVE_LIBRARIES,
@@ -19,6 +20,13 @@ const REQUIRED_NOTICES = [
   'base/assets/licenses/THIRD_PARTY_NOTICES.md',
   'base/assets/licenses/stockfish/COPYING.txt',
   'base/assets/licenses/stockfish/AUTHORS',
+];
+const REQUIRED_RUNTIME_ASSETS = [
+  'base/assets/puzzle-packs/bundled-core-pack.sqlite',
+  'base/assets/stockfish/stockfish-artifacts.json',
+  ...stockfishArtifacts.nnue.map(
+    relativePath => `base/assets/stockfish/${path.basename(relativePath)}`,
+  ),
 ];
 
 function normalizeFingerprint(value) {
@@ -60,6 +68,12 @@ function inspectBundleEntries(entries, { pageAlignment } = {}) {
   for (const notice of REQUIRED_NOTICES) {
     if (!entrySet.has(notice)) {
       errors.push(`AAB is missing required notice ${notice}.`);
+    }
+  }
+  for (const asset of REQUIRED_RUNTIME_ASSETS) {
+    const count = listedEntries.filter(entry => entry === asset).length;
+    if (count !== 1) {
+      errors.push(`AAB must contain exactly one required runtime asset ${asset}; found ${count}.`);
     }
   }
   if (!String(pageAlignment).includes('PAGE_ALIGNMENT_16K')) {
@@ -394,6 +408,7 @@ function inspectAndroidPlayRelease(options, dependencies = {}) {
       uploadCertificateSha256,
       nativeDebugSymbols: 'retained-in-aab',
       licenseNotices: REQUIRED_NOTICES,
+      runtimeAssets: REQUIRED_RUNTIME_ASSETS,
       largestContributors,
     },
   };
@@ -445,6 +460,7 @@ if (require.main === module) {
 module.exports = {
   EXPECTED_ABIS,
   REQUIRED_NOTICES,
+  REQUIRED_RUNTIME_ASSETS,
   inspectAndroidPlayRelease,
   inspectBundleEntries,
   inspectOwnerEvidence,
