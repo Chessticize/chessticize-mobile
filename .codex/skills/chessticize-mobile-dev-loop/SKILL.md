@@ -112,6 +112,45 @@ pnpm mobile:e2e:build:ios
 
 Detox uses the built app bundle. It will not automatically pick up Metro-only edits unless the app is rebuilt.
 
+## Android Validation
+
+Use `docs/ANDROID_VALIDATION.md` for the reproducible commands, evidence schema,
+and physical ARM64 release checklist. Start with:
+
+```sh
+pnpm mobile:doctor:android
+adb devices -l
+emulator -list-avds
+```
+
+Choose the smallest proving Android layer:
+
+- **No Android Detox** for documentation/tooling, pure core/storage/CLI changes,
+  and ordinary shared UI behavior already proven below native.
+- **Targeted Android validation** for one bounded Android system surface,
+  persistence journey, real board/native module, or adaptive profile.
+- **Full Android validation** for startup, shared navigation/storage wiring,
+  launch fixtures, native build configuration, Detox infrastructure, or broad
+  native risk. Build once, then run complete shared `flows` and `practice`.
+
+For an already built app on an attached emulator, the CI-equivalent runner is:
+
+```sh
+ANDROID_VALIDATION_COMMIT_SHA=<exact-40-character-sha> \
+ANDROID_VALIDATION_BUILD_RESULT=success \
+ANDROID_VALIDATION_DEVICE_ABI=x86_64 \
+ANDROID_VALIDATION_DEVICE_PROFILE=pixel_2 \
+DETOX_ANDROID_DEVICE=emulator-5554 \
+pnpm mobile:validate:android:matrix -- --api-level 36 \
+  --output apps/mobile/artifacts/android-validation/api-36.json
+```
+
+API 24 is a bounded launch/storage/practice/native-engine smoke. API 36 owns the
+complete shared suites. Required evidence must come from the exact PR head and
+record build result, commands, device matrix, suite results, and clean tracked
+worktree confirmation. A later source change invalidates it. Physical ARM64
+evidence is owner-recorded at #200/#188 and is not a routine feature-PR blocker.
+
 ## PR, Nightly, And Release Gates
 
 Choose the smallest PR scope that proves the changed boundary:

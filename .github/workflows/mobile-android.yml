@@ -31,7 +31,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 26.x
+          node-version: 22.x
           cache: pnpm
 
       - name: Setup Java
@@ -119,7 +119,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        api-level: [24, 36]
+        api-level: ${{ fromJSON(github.event_name == 'schedule' && '[36]' || '[24,36]') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -132,7 +132,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 26.x
+          node-version: 22.x
           cache: pnpm
 
       - name: Setup Java
@@ -165,20 +165,23 @@ jobs:
           ram-size: 4096M
           disable-animations: true
           emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
-          script: |
-            apps/mobile/scripts/prepare-android-offline-e2e.sh
-            if [ "${{ matrix.api-level }}" = "36" ]; then apps/mobile/scripts/android-review-reminder-native-evidence.sh; fi
-            DETOX_ACTIVE_SUITE=android-offline-practice pnpm mobile:e2e:test:android:ci
-            if [ "${{ matrix.api-level }}" = "36" ]; then DETOX_ACTIVE_SUITE=android-arrow-duel pnpm mobile:e2e:test:android:ci; fi
-            if [ "${{ matrix.api-level }}" = "36" ]; then DETOX_ACTIVE_SUITE=android-custom-practice pnpm mobile:e2e:test:android:ci; fi
-            if [ "${{ matrix.api-level }}" = "36" ]; then DETOX_ACTIVE_SUITE=android-history pnpm mobile:e2e:test:android:ci; fi
-            if [ "${{ matrix.api-level }}" = "36" ]; then DETOX_ACTIVE_SUITE=android-stockfish pnpm mobile:e2e:test:android:ci; fi
-            if [ "${{ matrix.api-level }}" = "36" ]; then DETOX_ACTIVE_SUITE=android-system-back pnpm mobile:e2e:test:android:ci; fi
-            if [ "${{ matrix.api-level }}" = "36" ]; then DETOX_ACTIVE_SUITE=android-review-reminders pnpm mobile:e2e:test:android:ci; fi
-            if [ "${{ matrix.api-level }}" = "36" ]; then DETOX_ACTIVE_SUITE=flows pnpm mobile:e2e:test:android:ci; fi
-            if [ "${{ matrix.api-level }}" = "36" ]; then DETOX_ACTIVE_SUITE=practice pnpm mobile:e2e:test:android:ci; fi
+          script: >-
+            pnpm mobile:validate:android:matrix -- --api-level "${{ matrix.api-level }}"
+            --output "apps/mobile/artifacts/android-validation/api-${{ matrix.api-level }}.json"
         env:
           DETOX_ANDROID_DEVICE: emulator-5554
+          ANDROID_VALIDATION_COMMIT_SHA: ${{ github.sha }}
+          ANDROID_VALIDATION_BUILD_RESULT: success
+          ANDROID_VALIDATION_DEVICE_ABI: x86_64
+          ANDROID_VALIDATION_DEVICE_PROFILE: pixel_2
+
+      - name: Upload exact-head Android matrix evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-validation-api-${{ matrix.api-level }}
+          if-no-files-found: error
+          path: apps/mobile/artifacts/android-validation/
 
       - name: Upload Android launch failure diagnostics
         if: failure()
@@ -269,6 +272,7 @@ jobs:
 
   android-progress-backup:
     name: Android Progress Backup restore evidence
+    if: github.event_name == 'workflow_dispatch'
     needs: android-build
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -284,7 +288,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 26.x
+          node-version: 22.x
           cache: pnpm
 
       - name: Setup Java
@@ -344,6 +348,7 @@ jobs:
 
   android-progress-backup-policy-api24:
     name: Android Progress Backup policy API 24
+    if: github.event_name == 'workflow_dispatch'
     needs: android-build
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -386,6 +391,7 @@ jobs:
 
   android-progress-backup-policy-api36:
     name: Android Progress Backup policy API 36
+    if: github.event_name == 'workflow_dispatch'
     needs: android-build
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -428,6 +434,7 @@ jobs:
 
   android-progress-backup-policy-api30:
     name: Android Progress Backup policy API 30
+    if: github.event_name == 'workflow_dispatch'
     needs:
       - android-build
       - android-progress-backup-policy-api36

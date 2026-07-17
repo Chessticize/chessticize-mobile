@@ -1,5 +1,6 @@
 const { readFileSync } = require('node:fs');
 const { join } = require('node:path');
+const { validationStepsForApiLevel } = require('../scripts/android-validation-matrix');
 
 const appRoot = join(__dirname, '..');
 const repoRoot = join(appRoot, '../..');
@@ -68,6 +69,8 @@ describe('Android Arrow Duel release slice', () => {
     expect(journey).toContain('review-analysis-engine-status');
     expect(journey).not.toContain('PracticeService');
     expect(journey).not.toContain('run-as');
-    expect(workflow).toContain('DETOX_ACTIVE_SUITE=android-arrow-duel pnpm mobile:e2e:test:android:ci');
+    expect(validationStepsForApiLevel(36))
+      .toContainEqual({ kind: 'detox', suite: 'android-arrow-duel' });
+    expect(workflow).toContain('pnpm mobile:validate:android:matrix');
   });
 });

@@ -15,6 +15,8 @@ const {
   ANDROID_ARROW_DUEL_TEST_MATCH,
   ANDROID_MIGRATION_TEST_MATCH,
   ANDROID_OFFLINE_PRACTICE_TEST_MATCH,
+  ANDROID_API24_SMOKE_TEST_MATCH,
+  ANDROID_STOCKFISH_SMOKE_TEST_MATCH,
   ANDROID_PROGRESS_BACKUP_RESTORE_TEST_MATCH,
   ANDROID_SYSTEM_BACK_TEST_MATCH,
   ANDROID_REVIEW_REMINDERS_TEST_MATCH,
@@ -37,8 +39,36 @@ const {
   waitForRunningStockfishDepth,
   withAndroidUiDiagnostics,
 } = require('../e2e/helpers');
+const {
+  findUniqueAndroidUiNode,
+  readAndroidUiHierarchy,
+  tapAndroidUiNode,
+  waitForAndroidUiState,
+} = require('../e2e/androidPublicUiEvidence');
 
 describe('Detox suite configuration', () => {
+  it('owns Android public hierarchy evidence behind one focused interface', () => {
+    const androidPublicUiEvidence = require('../e2e/androidPublicUiEvidence');
+    const helpersSource = fs.readFileSync(
+      path.resolve(__dirname, '../e2e/helpers.js'),
+      'utf8'
+    );
+    const adaptiveSource = fs.readFileSync(
+      path.resolve(__dirname, '../e2e/adaptive-layout.e2e.js'),
+      'utf8'
+    );
+
+    expect(Object.keys(androidPublicUiEvidence).sort()).toEqual([
+      'findUniqueAndroidUiNode',
+      'readAndroidUiHierarchy',
+      'tapAndroidUiNode',
+      'waitForAndroidUiState',
+    ]);
+    expect(helpersSource).not.toContain('function readAndroidUiHierarchy');
+    expect(helpersSource).not.toContain('function waitForAndroidUiState');
+    expect(adaptiveSource).toContain("require('./androidPublicUiEvidence')");
+  });
+
   it('discovers Android notification settings through partial system labels', () => {
     const hierarchy = [
       '<node content-desc="ChessticizeMobile" text="" />',
@@ -99,6 +129,198 @@ describe('Detox suite configuration', () => {
       ['3 reviews are ready'],
       { clickableAncestor: true }
     )).toBeNull();
+  });
+
+  it('reads and taps public Android UI nodes through their exposed hierarchy bounds', () => {
+    const hierarchy = '<hierarchy><node resource-id="com.chessticize.mobile:id/session-accessible-move-c2b3" clickable="true" bounds="[100,200][400,600]" /></hierarchy>';
+    const run = jest.fn((_command, args) => (
+      args.includes('exec-out') ? hierarchy : 'UI hierarchy dumped'
+    ));
+    const environment = {
+      ADB_PATH: '/sdk/adb',
+      DETOX_ANDROID_DEVICE: 'emulator-6000',
+    };
+
+    const visibleHierarchy = readAndroidUiHierarchy(environment, run);
+    expect(visibleHierarchy).toBe(hierarchy);
+    const moveNode = findUniqueAndroidUiNode(
+      visibleHierarchy,
+      'session-accessible-move-c2b3'
+    );
+    tapAndroidUiNode(moveNode, environment, run);
+
+    expect(run.mock.calls).toEqual([
+      ['/sdk/adb', [
+        '-s', 'emulator-6000', 'shell', 'rm', '-f',
+        '/sdcard/chessticize-public-window.xml'
+      ], expect.objectContaining({ encoding: 'utf8' })],
+      ['/sdk/adb', [
+        '-s', 'emulator-6000', 'shell', 'uiautomator', 'dump',
+        '/sdcard/chessticize-public-window.xml'
+      ], expect.objectContaining({ encoding: 'utf8' })],
+      ['/sdk/adb', [
+        '-s', 'emulator-6000', 'exec-out', 'cat',
+        '/sdcard/chessticize-public-window.xml'
+      ], expect.objectContaining({ encoding: 'utf8' })],
+      ['/sdk/adb', [
+        '-s', 'emulator-6000', 'shell', 'input', 'tap', '250', '400'
+      ], expect.objectContaining({ encoding: 'utf8' })],
+    ]);
+  });
+
+  it('rejects a stale hierarchy when a fresh Android UI dump fails', () => {
+    const staleHierarchy = '<hierarchy><node resource-id="session-accessible-move-c2b3" /></hierarchy>';
+    let remoteHierarchy = staleHierarchy;
+    const run = jest.fn((_command, args) => {
+      if (args.includes('rm')) {
+        remoteHierarchy = '';
+        return '';
+      }
+      if (args.includes('uiautomator')) {
+        return 'ERROR: could not get idle state.';
+      }
+      return remoteHierarchy;
+    });
+
+    expect(() => readAndroidUiHierarchy({ ADB_PATH: '/sdk/adb' }, run))
+      .toThrow('Android UI hierarchy dump failed: ERROR: could not get idle state.');
+    expect(run.mock.calls.some(([, args]) => args.includes('exec-out'))).toBe(false);
+  });
+
+  it('fails closed for missing, ambiguous, or invalid public Android UI bounds', () => {
+    const validNode = '<node resource-id="com.chessticize.mobile:id/session-accessible-move-c2b3" clickable="true" bounds="[100,200][400,600]" />';
+
+    expect(() => findUniqueAndroidUiNode('<hierarchy />', 'session-accessible-move-c2b3'))
+      .toThrow('Missing visible Android UI node session-accessible-move-c2b3');
+    expect(() => findUniqueAndroidUiNode(
+      `<hierarchy>${validNode}${validNode}</hierarchy>`,
+      'session-accessible-move-c2b3'
+    )).toThrow('Ambiguous visible Android UI node session-accessible-move-c2b3: 2 matches');
+    expect(() => findUniqueAndroidUiNode(
+      '<node resource-id="com.chessticize.mobile:id/session-accessible-move-c2b3" clickable="true" bounds="[100,200][100,600]" />',
+      'session-accessible-move-c2b3'
+    )).toThrow('Invalid visible bounds for Android UI node session-accessible-move-c2b3');
+  });
+
+  it('polls for native Modal closure and the next public Android UI state', async () => {
+    const hierarchies = [
+      [
+        '<node resource-id="com.chessticize.mobile:id/session-accessible-move-c2b1" clickable="true" bounds="[100,200][400,600]" />',
+        '<node resource-id="com.chessticize.mobile:id/session-accessible-move-c2b3" clickable="true" bounds="[100,600][400,1000]" />',
+      ].join(''),
+      '<node resource-id="com.chessticize.mobile:id/session-mistakes" content-desc="Mistakes 1 of 3" bounds="[0,1600][1080,2200]" />',
+    ];
+    let clock = 0;
+    const delay = jest.fn(async (milliseconds) => {
+      clock += milliseconds;
+    });
+    const readHierarchy = jest.fn(() => hierarchies.shift() ?? '<hierarchy />');
+
+    const state = await waitForAndroidUiState({
+      presentResourceIds: ['session-mistakes'],
+      absentResourceIds: [
+        'session-accessible-move-c2b1',
+        'session-accessible-move-c2b3',
+      ],
+      expectedAttributesByResourceId: {
+        'session-mistakes': { 'content-desc': 'Mistakes 1 of 3' },
+      },
+    }, {
+      delay,
+      now: () => clock,
+      pollIntervalMs: 5,
+      readHierarchy,
+      timeoutMs: 20,
+    });
+
+    expect(state.nodes['session-mistakes'].bounds).toEqual({
+      bottom: 2200,
+      left: 0,
+      right: 1080,
+      top: 1600,
+    });
+    expect(readHierarchy).toHaveBeenCalledTimes(2);
+    expect(delay).toHaveBeenCalledWith(5);
+  });
+
+  it('retries fresh Android UI dump and read failures before accepting public state', async () => {
+    const hierarchy = '<node resource-id="com.chessticize.mobile:id/session-mistakes" content-desc="Mistakes 1 of 3" bounds="[0,1600][1080,2200]" />';
+    const attempts = [
+      new Error('Android UI hierarchy dump failed: ERROR: could not get idle state.'),
+      new Error('Android UI hierarchy read returned empty XML'),
+      hierarchy,
+    ];
+    let clock = 0;
+    const delay = jest.fn(async (milliseconds) => {
+      clock += milliseconds;
+    });
+    const readHierarchy = jest.fn(() => {
+      const attempt = attempts.shift();
+      if (attempt instanceof Error) {
+        throw attempt;
+      }
+      return attempt;
+    });
+
+    await expect(waitForAndroidUiState({
+      presentResourceIds: ['session-mistakes'],
+      expectedAttributesByResourceId: {
+        'session-mistakes': { 'content-desc': 'Mistakes 1 of 3' },
+      },
+    }, {
+      delay,
+      now: () => clock,
+      pollIntervalMs: 5,
+      readHierarchy,
+      timeoutMs: 20,
+    })).resolves.toMatchObject({ hierarchy });
+
+    expect(readHierarchy).toHaveBeenCalledTimes(3);
+    expect(delay).toHaveBeenCalledTimes(2);
+  });
+
+  it('reports the latest fresh hierarchy read failure when polling times out', async () => {
+    let clock = 0;
+    const delay = async (milliseconds) => {
+      clock += milliseconds;
+    };
+
+    await expect(waitForAndroidUiState({
+      presentResourceIds: ['session-mistakes'],
+    }, {
+      delay,
+      now: () => clock,
+      pollIntervalMs: 5,
+      readHierarchy: () => {
+        throw new Error('Android UI hierarchy read returned empty XML');
+      },
+      timeoutMs: 10,
+    })).rejects.toThrow(
+      'latest=Android UI hierarchy read returned empty XML; hierarchy=<unavailable>'
+    );
+  });
+
+  it('times out with the missing public Android UI state in its diagnostic', async () => {
+    let clock = 0;
+    const delay = async (milliseconds) => {
+      clock += milliseconds;
+    };
+
+    await expect(waitForAndroidUiState({
+      presentResourceIds: ['session-mistakes'],
+      absentResourceIds: ['session-accessible-move-c2b3'],
+      expectedAttributesByResourceId: {
+        'session-mistakes': { 'content-desc': 'Mistakes 1 of 3' },
+      },
+    }, {
+      delay,
+      now: () => clock,
+      pollIntervalMs: 5,
+      readHierarchy: () => '<hierarchy />',
+      timeoutMs: 10,
+    })).rejects.toThrow(
+      'Timed out waiting for Android UI state: present=session-mistakes; absent=session-accessible-move-c2b3'
+    );
   });
 
   it('counts only current pending alarms and excludes canceled alarm history', () => {
@@ -650,15 +872,26 @@ describe('Detox suite configuration', () => {
     expect(screen).not.toContain('session-current-expected-move');
     expect(spec).toContain("session-accessible-moves-open");
     expect(spec).not.toContain("playBoardMove('session-board', 'e2e6')");
-    const closeMoveDialog = spec.indexOf("element(by.id('session-accessible-moves-close')).tap()");
-    const waitForMoveDialogClose = spec.indexOf("element(by.id('session-accessible-moves-dialog'))).not.toExist()");
-    const fixtureOption = spec.indexOf("waitForAccessibleMove('c2b1')");
-    const playBoardMove = spec.indexOf("playBoardMove('session-board', 'c2b3')");
-    const nextFixtureOption = spec.lastIndexOf("waitForAccessibleMove('c4b5')");
-    const selectAccessibleMove = spec.lastIndexOf("element(by.id('session-accessible-move-c4b5')).tap()");
+    const publicAccessibleMoves = spec.indexOf("waitForAndroidPublicMoves(['c2b1', 'c2b3'])");
+    const selectAccessibleMove = spec.indexOf('tapAndroidUiNode(accessibleMoves.c2b3)');
+    const accessibleChooserGone = spec.indexOf(
+      "waitFor(element(by.id('session-accessible-move-c2b3'))).not.toExist()",
+      selectAccessibleMove
+    );
+    const verifyAccessibleMoveResult = spec.indexOf(
+      "waitFor(element(by.label('Mistakes 1 of 3')).atIndex(0)).toExist()",
+      selectAccessibleMove
+    );
+    const waitForFeedbackToSettle = spec.indexOf(
+      "waitFor(element(by.id('move-feedback-overlay'))).not.toExist()",
+      verifyAccessibleMoveResult
+    );
+    const playBoardMove = spec.indexOf("playBoardMove('session-board', 'c4b5')");
+    const postAccessibleTap = spec.slice(selectAccessibleMove, playBoardMove);
     const firstAccessibleInput = spec.indexOf(
       "waitFor(element(by.id('session-accessible-moves-open'))).toBeVisible()"
     );
+    const accessibleInputCount = spec.match(/element\(by\.id\('session-accessible-moves-open'\)\)\.tap\(\)/g)?.length ?? 0;
     const restorePortrait = spec.indexOf(
       "await setAdaptiveOrientation('portrait')",
       captureLandscape
@@ -672,14 +905,17 @@ describe('Detox suite configuration', () => {
       settleRestoredPortrait
     );
     const verifyRestoredPuzzle = spec.indexOf('restoredPuzzleID', settlePublicRootFocus);
-    expect(closeMoveDialog).toBeGreaterThan(0);
-    expect(fixtureOption).toBeGreaterThan(0);
-    expect(closeMoveDialog).toBeGreaterThan(fixtureOption);
-    expect(waitForMoveDialogClose).toBeGreaterThan(closeMoveDialog);
-    expect(playBoardMove).toBeGreaterThan(waitForMoveDialogClose);
-    expect(nextFixtureOption).toBeGreaterThan(playBoardMove);
-    expect(selectAccessibleMove).toBeGreaterThan(playBoardMove);
-    expect(selectAccessibleMove).toBeGreaterThan(nextFixtureOption);
+    expect(publicAccessibleMoves).toBeGreaterThan(firstAccessibleInput);
+    expect(selectAccessibleMove).toBeGreaterThan(publicAccessibleMoves);
+    expect(accessibleChooserGone).toBeGreaterThan(selectAccessibleMove);
+    expect(verifyAccessibleMoveResult).toBeGreaterThan(accessibleChooserGone);
+    expect(waitForFeedbackToSettle).toBeGreaterThan(verifyAccessibleMoveResult);
+    expect(playBoardMove).toBeGreaterThan(selectAccessibleMove);
+    expect(postAccessibleTap).not.toContain('waitForAndroidUiState');
+    expect(postAccessibleTap).not.toContain('readAndroidUiHierarchy');
+    expect(accessibleInputCount).toBe(1);
+    expect(spec).not.toContain("waitFor(element(by.id('session-accessible-moves-dialog')))");
+    expect(spec).toContain('withAndroidUiDiagnostics(async () =>');
     expect(restorePortrait).toBeGreaterThan(captureLandscape);
     expect(settleRestoredPortrait).toBeGreaterThan(restorePortrait);
     expect(settlePublicRootFocus).toBeGreaterThan(settleRestoredPortrait);
@@ -799,6 +1035,17 @@ describe('Detox suite configuration', () => {
       ANDROID_LAUNCH_TEST_MATCH[0],
       ANDROID_STANDARD_PRACTICE_TEST_MATCH[0],
       ANDROID_MIGRATION_TEST_MATCH[0],
+    ]);
+    expect(resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'android-api24-smoke' }))
+      .toEqual(ANDROID_API24_SMOKE_TEST_MATCH);
+    expect(ANDROID_API24_SMOKE_TEST_MATCH).toEqual([
+      ANDROID_LAUNCH_TEST_MATCH[0],
+      ANDROID_STANDARD_PRACTICE_TEST_MATCH[0],
+      ANDROID_MIGRATION_TEST_MATCH[0],
+      ANDROID_STOCKFISH_SMOKE_TEST_MATCH[0],
+    ]);
+    expect(ANDROID_STOCKFISH_SMOKE_TEST_MATCH).toEqual([
+      '<rootDir>/e2e/android-stockfish-smoke.e2e.js',
     ]);
     expect(resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'android-progress-backup-restore' }))
       .toEqual(ANDROID_PROGRESS_BACKUP_RESTORE_TEST_MATCH);

@@ -18,6 +18,13 @@ const ANDROID_OFFLINE_PRACTICE_TEST_MATCH = [
   ...ANDROID_STANDARD_PRACTICE_TEST_MATCH,
   ...ANDROID_MIGRATION_TEST_MATCH,
 ];
+const ANDROID_STOCKFISH_SMOKE_TEST_MATCH = [
+  '<rootDir>/e2e/android-stockfish-smoke.e2e.js'
+];
+const ANDROID_API24_SMOKE_TEST_MATCH = [
+  ...ANDROID_OFFLINE_PRACTICE_TEST_MATCH,
+  ...ANDROID_STOCKFISH_SMOKE_TEST_MATCH,
+];
 const ANDROID_STOCKFISH_TEST_MATCH = ['<rootDir>/e2e/android-stockfish.e2e.js'];
 const ANDROID_PROGRESS_BACKUP_RESTORE_TEST_MATCH = [
   '<rootDir>/e2e/android-progress-backup-restore.e2e.js'
@@ -84,6 +91,10 @@ function resolveDetoxTestMatch(environment = process.env) {
     return ANDROID_OFFLINE_PRACTICE_TEST_MATCH;
   }
 
+  if (activeSuite === 'android-api24-smoke') {
+    return ANDROID_API24_SMOKE_TEST_MATCH;
+  }
+
   if (activeSuite === 'android-stockfish') {
     return ANDROID_STOCKFISH_TEST_MATCH;
   }
@@ -142,6 +153,8 @@ module.exports = {
   ANDROID_ARROW_DUEL_TEST_MATCH,
   ANDROID_MIGRATION_TEST_MATCH,
   ANDROID_OFFLINE_PRACTICE_TEST_MATCH,
+  ANDROID_API24_SMOKE_TEST_MATCH,
+  ANDROID_STOCKFISH_SMOKE_TEST_MATCH,
   ANDROID_STOCKFISH_TEST_MATCH,
   ANDROID_PROGRESS_BACKUP_RESTORE_TEST_MATCH,
   ANDROID_SYSTEM_BACK_TEST_MATCH,

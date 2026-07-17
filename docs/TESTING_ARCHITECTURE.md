@@ -76,10 +76,19 @@ results, and clean-worktree confirmation in the PR. A later code change
 invalidates that evidence. A failed required fast check, failed selected native
 scope, or known product failure remains a merge blocker.
 
-The scheduled nightly workflow runs both suites against the latest `main` as a
-non-PR integration signal. Triage failures promptly so they do not accumulate,
-but a later nightly failure does not retroactively invalidate already merged PR
-evidence.
+The scheduled iOS nightly workflow runs both suites against the latest `main`
+as a non-PR integration signal. Triage failures promptly so they do not
+accumulate, but a later nightly failure does not retroactively invalidate
+already merged PR evidence.
+
+Nightly Android `main` builds the self-contained app and Detox APK once, then
+runs complete shared `flows` and `practice` on an API 36 x86_64 phone. Manual
+exact-head dispatch additionally runs the API 24 bounded smoke for launch,
+production SQLite persistence/migration, Standard practice, and packaged
+Stockfish; it also captures the representative tablet and foldable/resizable
+adaptive contract. The fail-closed runner is
+`pnpm mobile:validate:android:matrix`, and `docs/ANDROID_VALIDATION.md` defines
+its evidence schema and commands.
 
 Before any release, manually dispatch Mobile iOS/Detox for the exact release
 candidate commit on `main` (or verify an existing run for that exact commit) and
@@ -87,6 +96,11 @@ require both suites to pass. If `main` Detox fails, diagnose and fix the
 failure, then rerun it until green before releasing. Real CloudKit,
 notification delivery, TestFlight upgrade, physical-device, schema-upgrade,
 and App Store screenshot checks remain conditional release gates.
+
+Android physical ARM64 checks are owner-recorded release evidence, not a
+routine feature-PR gate. They cover install, real board input, Stockfish
+lifecycle, background/resume, reminders, backup-sensitive storage, and upgrade
+behavior for the exact release candidate.
 
 ## What Must Be Exhaustive
 

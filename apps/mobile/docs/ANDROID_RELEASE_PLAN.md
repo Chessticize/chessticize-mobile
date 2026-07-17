@@ -417,6 +417,10 @@ screenshot inspection.
 
 ### ANDROID-10 — Complete the Android E2E and release-validation matrix
 
+**Status:** Automated in `Mobile Android` and documented in
+`docs/ANDROID_VALIDATION.md`. Physical ARM64 execution remains owner-recorded
+release evidence at #200 and #188.
+
 **Depends on:** ANDROID-04, ANDROID-06, ANDROID-07, ANDROID-08, and ANDROID-09
 
 **Outcome:** Android has auditable native evidence at PR, nightly, and release
@@ -430,7 +434,8 @@ gates without duplicating product-journey intent.
   validation, and full native validation.
 - Add API 36 `x86_64` phone nightly execution of complete `flows` and `practice`
   suites after one build.
-- Add an API 24 phone smoke for launch, practice, persistence, and migration.
+- Add an API 24 phone smoke for launch, practice, persistence, migration, and a
+  bounded packaged native-engine check.
 - Add API 36 tablet and foldable adaptive-layout smoke and screenshots.
 - Require a physical ARM64 phone smoke for Stockfish, notifications, backup,
   and upgrade installation before release.

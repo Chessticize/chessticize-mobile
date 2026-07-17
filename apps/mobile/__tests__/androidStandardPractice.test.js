@@ -1,6 +1,7 @@
 const { readFileSync } = require('node:fs');
 const { join } = require('node:path');
 const { spawnSync } = require('node:child_process');
+const { validationStepsForApiLevel } = require('../scripts/android-validation-matrix');
 
 const appRoot = join(__dirname, '..');
 const repoRoot = join(appRoot, '../..');
@@ -147,18 +148,27 @@ describe('Android Standard Practice release slice', () => {
     expect(migrationJourney).toContain("const { androidAdbPath } = require('./androidNetwork');");
     expect(migrationJourney).not.toContain('function androidAdbPath()');
     expect(migrationJourney).toContain('legacy-attempt-standard-wrong');
-    expect(workflow).toContain('apps/mobile/scripts/prepare-android-offline-e2e.sh');
+    const api24Steps = validationStepsForApiLevel(24);
+    const api36Steps = validationStepsForApiLevel(36);
+    expect(api24Steps[0]).toEqual({
+      kind: 'prepare',
+      command: 'apps/mobile/scripts/prepare-android-offline-e2e.sh',
+    });
+    expect(api24Steps).toContainEqual({ kind: 'detox', suite: 'android-api24-smoke' });
+    expect(api36Steps[0]).toEqual({
+      kind: 'prepare',
+      command: 'apps/mobile/scripts/prepare-android-offline-e2e.sh',
+    });
+    expect(api36Steps).toContainEqual({ kind: 'detox', suite: 'android-offline-practice' });
+    expect(api36Steps.filter((step) => step.suite === 'android-offline-practice')).toHaveLength(1);
+    expect(api36Steps.indexOf(api36Steps[0]))
+      .toBeLessThan(api36Steps.findIndex((step) => step.suite === 'android-offline-practice'));
     const launchJob = workflow.slice(
       workflow.indexOf('  android-launch:'),
       workflow.indexOf('  android-progress-backup:'),
     );
     expect(launchJob).toContain('ram-size: 4096M');
-    expect(launchJob.match(/DETOX_ACTIVE_SUITE=android-offline-practice/g)).toHaveLength(1);
-    expect(launchJob).not.toContain('DETOX_ACTIVE_SUITE=android-launch');
-    expect(launchJob).not.toContain('DETOX_ACTIVE_SUITE=android-standard-practice');
-    expect(launchJob).not.toContain('DETOX_ACTIVE_SUITE=android-migration');
-    expect(workflow.indexOf('apps/mobile/scripts/prepare-android-offline-e2e.sh'))
-      .toBeLessThan(workflow.indexOf('DETOX_ACTIVE_SUITE=android-offline-practice'));
+    expect(launchJob).toContain('pnpm mobile:validate:android:matrix');
     expect(workflow).not.toContain('if (( android_sdk_level');
     expect(offlineSetup).toContain('set -eu');
     expect(offlineSetup).toContain('shell getprop ro.build.version.sdk');

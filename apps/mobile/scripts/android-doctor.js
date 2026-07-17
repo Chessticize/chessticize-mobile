@@ -62,6 +62,7 @@ function inspectAndroidEnvironment(options = {}) {
     }
   });
   const run = options.run || defaultRun;
+  const readFile = options.readFile || ((file) => fs.readFileSync(file, 'utf8'));
   const appDir = options.appDir || path.resolve(__dirname, '..');
   const repoRoot = options.repoRoot || path.resolve(appDir, '../..');
   const nodeVersion = options.nodeVersion || process.versions.node;
@@ -138,15 +139,116 @@ function inspectAndroidEnvironment(options = {}) {
   const detoxPackage = path.join(appDir, 'node_modules', 'detox', 'package.json');
   const installedJsBuildDependencies = exists(reactNativePackage)
     && exists(reactNativeCodegen)
-    && exists(reactNativeGradlePlugin)
-    && exists(detoxPackage);
+    && exists(reactNativeGradlePlugin);
   add(
     'js-dependencies',
     installedJsBuildDependencies ? 'pass' : 'fail',
     installedJsBuildDependencies
-      ? 'React Native, Codegen, the Gradle plugin, and Detox are installed'
+      ? 'React Native, Codegen, and the Gradle plugin are installed'
       : 'Run pnpm install --frozen-lockfile before Android builds',
   );
+  add(
+    'detox',
+    exists(detoxPackage) ? 'pass' : 'fail',
+    exists(detoxPackage)
+      ? `Detox package: ${detoxPackage}`
+      : 'Detox is missing; run pnpm install --frozen-lockfile',
+  );
+
+  const releaseSigningNames = [
+    'CHESSTICIZE_ANDROID_RELEASE_STORE_FILE',
+    'CHESSTICIZE_ANDROID_RELEASE_STORE_PASSWORD',
+    'CHESSTICIZE_ANDROID_RELEASE_KEY_ALIAS',
+    'CHESSTICIZE_ANDROID_RELEASE_KEY_PASSWORD',
+  ];
+  const configuredSigningNames = releaseSigningNames.filter((name) => environment[name]);
+  if (configuredSigningNames.length === 0) {
+    add(
+      'signing',
+      'warn',
+      'Production signing is not configured; development validation remains available and release packaging fails closed',
+    );
+  } else if (configuredSigningNames.length !== releaseSigningNames.length) {
+    add(
+      'signing',
+      'fail',
+      'Production signing is partially configured; provide all CHESSTICIZE_ANDROID_RELEASE_* values',
+    );
+  } else if (!exists(environment.CHESSTICIZE_ANDROID_RELEASE_STORE_FILE)) {
+    add(
+      'signing',
+      'fail',
+      'Production signing keystore does not exist at the configured path',
+    );
+  } else {
+    add('signing', 'pass', 'Production signing variables and keystore path are configured');
+  }
+
+  const stockfishManifestPath = path.join(appDir, 'stockfish-artifacts.json');
+  if (!exists(stockfishManifestPath)) {
+    add(
+      'native-library',
+      'fail',
+      `Stockfish artifact manifest is missing: ${stockfishManifestPath}`,
+    );
+  } else {
+    let stockfishArtifacts;
+    let manifestFailure;
+    try {
+      stockfishArtifacts = JSON.parse(readFile(stockfishManifestPath));
+      const requiredStringFields = ['root', 'bridge', 'sourceSentinel'];
+      const missingFields = requiredStringFields.filter(
+        (field) => typeof stockfishArtifacts[field] !== 'string' || !stockfishArtifacts[field]
+      );
+      const validNnue = Array.isArray(stockfishArtifacts.nnue)
+        && stockfishArtifacts.nnue.length > 0
+        && stockfishArtifacts.nnue.every(
+          (relativePath) => typeof relativePath === 'string' && relativePath.length > 0
+        );
+      if (missingFields.length > 0 || !validNnue) {
+        const invalidFields = [...missingFields, ...(!validNnue ? ['nnue'] : [])];
+        throw new Error(`invalid fields: ${invalidFields.join(', ')}`);
+      }
+    } catch (error) {
+      manifestFailure = error?.message || String(error);
+    }
+
+    if (manifestFailure) {
+      add(
+        'native-library',
+        'fail',
+        `Stockfish artifact manifest is malformed: ${manifestFailure}`,
+      );
+    } else {
+      const stockfishRoot = path.join(appDir, stockfishArtifacts.root);
+      const nativeLibraryFiles = [
+        stockfishManifestPath,
+        path.join(stockfishRoot, stockfishArtifacts.bridge, 'StockfishRunner.cpp'),
+        path.join(stockfishRoot, stockfishArtifacts.sourceSentinel),
+        path.join(
+          appDir,
+          'android',
+          'app',
+          'src',
+          'main',
+          'cpp',
+          'stockfish',
+          'NativeStockfishEngine.cpp'
+        ),
+        ...stockfishArtifacts.nnue.map((relativePath) => (
+          path.join(stockfishRoot, relativePath)
+        )),
+      ];
+      const missingNativeLibraryFiles = nativeLibraryFiles.filter((file) => !exists(file));
+      add(
+        'native-library',
+        missingNativeLibraryFiles.length === 0 ? 'pass' : 'fail',
+        missingNativeLibraryFiles.length === 0
+          ? 'Shared Stockfish sources, bridge, manifest, and NNUE assets are present'
+          : `Stockfish native-library inputs are missing: ${missingNativeLibraryFiles.join(', ')}`,
+      );
+    }
+  }
 
   const puzzlePack = path.join(repoRoot, 'fixtures', 'puzzles', 'bundled-core-pack.sqlite');
   add(

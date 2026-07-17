@@ -1,5 +1,6 @@
 const { readFileSync } = require('node:fs');
 const { join } = require('node:path');
+const { validationStepsForApiLevel } = require('../scripts/android-validation-matrix');
 
 const appRoot = join(__dirname, '..');
 
@@ -30,7 +31,9 @@ describe('Android Custom Practice release slice', () => {
     const workflow = read('../../.github/workflows/mobile-android.yml');
 
     expect(suiteConfig).toContain('android-custom-practice.e2e.js');
-    expect(workflow).toContain('DETOX_ACTIVE_SUITE=android-custom-practice');
+    expect(validationStepsForApiLevel(36))
+      .toContainEqual({ kind: 'detox', suite: 'android-custom-practice' });
+    expect(workflow).toContain('pnpm mobile:validate:android:matrix');
     expect(spec).toContain("by.id('practice-mode-custom')");
     expect(spec).toContain('android-standard-practice.fixture.json');
     expect(spec).toContain('chessticizePuzzleSelectionId: practiceFixture.puzzle.id');
