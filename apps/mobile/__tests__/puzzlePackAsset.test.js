@@ -13,9 +13,9 @@ describe("bundled puzzle pack native asset", () => {
 
     expect(iosProject).toContain("bundled-core-pack.sqlite in Resources");
     expect(iosProject).toContain("../../../fixtures/puzzles/bundled-core-pack.sqlite");
-    expect(androidBuild).toContain("copyPuzzlePackAsset");
+    expect(androidBuild).toContain("GenerateChessticizeAssets");
     expect(androidBuild).toContain("fixtures/puzzles/bundled-core-pack.sqlite");
-    expect(androidBuild).toContain("generated/assets/puzzle-pack");
-    expect(androidBuild).toContain("custom");
+    expect(androidBuild).toContain("variant.sources.assets.addGeneratedSourceDirectory");
+    expect(androidBuild).toContain("puzzlePack.set(puzzlePackSource)");
   });
 });

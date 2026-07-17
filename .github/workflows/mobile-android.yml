@@ -43,6 +43,21 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Reclaim hosted runner disk for Android native build
+        run: |
+          set -euo pipefail
+          df -h /
+          sudo rm -rf \
+            /opt/ghc \
+            /opt/hostedtoolcache/CodeQL \
+            /usr/local/.ghcup \
+            /usr/local/share/boost \
+            /usr/share/dotnet
+          if ! docker system prune --all --force; then
+            echo "::warning::Docker cache cleanup was unavailable; the free-space check remains authoritative."
+          fi
+          df -h /
+
       - name: Install Android emulator runtime libraries
         run: |
           sudo apt-get update
@@ -95,6 +110,17 @@ jobs:
 
           verify_release_task_fails_closed :app:bundleRelease
           verify_release_task_fails_closed :app:assemble
+
+      - name: Require Android native build disk headroom
+        run: |
+          set -euo pipefail
+          df -h /
+          available_kib="$(df -Pk / | awk 'NR == 2 { print $4 }')"
+          minimum_kib=$((20 * 1024 * 1024))
+          if ! [[ "$available_kib" =~ ^[0-9]+$ ]] || (( available_kib < minimum_kib )); then
+            echo "Insufficient hosted-runner disk for the Android native build: ${available_kib:-unknown} KiB available; ${minimum_kib} KiB required." >&2
+            exit 1
+          fi
 
       - name: Build self-contained E2E app and Detox test APK
         run: pnpm mobile:e2e:build:android
@@ -163,6 +189,7 @@ jobs:
           arch: x86_64
           profile: pixel_2
           ram-size: 4096M
+          disk-size: 8192M
           disable-animations: true
           emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           script: >-

@@ -43,6 +43,7 @@
     "mobile:validate:android:matrix": "pnpm --filter ChessticizeMobile validate:android:matrix",
     "mobile:verify:android:abis": "pnpm --filter ChessticizeMobile verify:android:abis",
     "mobile:verify:android:backup": "pnpm --filter ChessticizeMobile verify:android:backup",
+    "mobile:verify:android:release": "pnpm --filter ChessticizeMobile verify:android:release",
     "fetch:core-pack": "node scripts/fetch-core-pack.mjs"
   },
   "dependencies": {

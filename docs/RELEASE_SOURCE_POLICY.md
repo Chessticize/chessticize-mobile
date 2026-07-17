@@ -1,8 +1,8 @@
 # Release Source Policy
 
 Chessticize Mobile embeds Stockfish and is distributed as GPL-3.0-or-later.
-Every binary submitted to App Store Connect must have a matching public source
-release.
+Every binary submitted to App Store Connect or Google Play must have a matching
+public source release.
 
 ## Required Rule
 
@@ -11,13 +11,15 @@ For each submitted binary:
 1. Ensure the working tree is clean and the release commit contains the exact
    source, native code, bundled puzzle artifact, Stockfish source, and notices
    used for the binary.
-2. Create a signed or annotated repository tag for the submitted version and
-   build, for example `ios-v1.0.0-build-1`.
+2. Create a signed or annotated platform repository tag for the submitted
+   version and build, for example `ios-v1.0.0-build-1` or
+   `android-v1.1.0-build-1`.
 3. Publish a GitHub release for that tag before or at the same time as App
    Store submission.
 4. Mention the tag and public repository URL in release notes and support
    documentation so recipients can obtain the corresponding source.
-5. Do not submit a binary built from an untagged commit.
+5. Do not submit a binary built from an untagged commit. A Play Internal or
+   Closed candidate is still a distributed binary and follows this rule.
 
 ## Current Public Source Location
 
@@ -53,6 +55,13 @@ https://github.com/Chessticize/chessticize-mobile
 - The shipped Stockfish version and bundled NNUE files are listed in
   `THIRD_PARTY_NOTICES.md`.
 - The App Store binary was built from the tagged release commit.
+- For Android, follow `docs/ANDROID_PLAY_RELEASE.md`, retain the exact signed
+  AAB and artifact-only verifier output, and require the final `play-ready`
+  evidence verdict before Production launch.
+- The Android AAB contains `LICENSE`, `THIRD_PARTY_NOTICES.md`, Stockfish
+  `COPYING.txt`, and Stockfish `AUTHORS`, plus native debug symbols.
+- The Play candidate was built from the exact `android-v<version>-build-<code>`
+  tagged commit and every Play track references the same AAB/version code.
 
 ## Release Manifest
 

@@ -4,6 +4,8 @@ set -euo pipefail
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$APP_DIR"
 
+node scripts/ios-release-version.js
+
 force_debug_prebuilt_refresh() {
   local marker
   for marker in \

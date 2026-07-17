@@ -12,6 +12,7 @@ class MainApplication : Application(), ReactApplication {
   override val reactHost: ReactHost by lazy {
     val packages =
       PackageList(this).packages.apply {
+        add(ApplicationMetadataPackage())
         add(ChessticizeTestLaunchConfigPackage())
         add(MobilePredictiveBackPackage())
         add(NativeStockfishEnginePackage())

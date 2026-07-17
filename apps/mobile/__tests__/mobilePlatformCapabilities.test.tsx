@@ -3,7 +3,8 @@ import { NativeModules } from 'react-native';
 import { composeIOSMobilePlatformCapabilities } from '../src/backend/iosMobilePlatformCapabilities';
 import { composeAndroidMobilePlatformCapabilities } from '../src/backend/androidMobilePlatformCapabilities';
 import { mobilePlatformCapabilityFactoryFor } from '../src/backend/nativeMobilePlatformCapabilities';
-import { MOBILE_APPLICATION_METADATA } from '../src/backend/mobilePlatformCapabilities';
+import { MOBILE_APPLICATION_METADATA_LINKS } from '../src/backend/mobilePlatformCapabilities';
+import { readNativeApplicationMetadata } from '../src/backend/nativeApplicationMetadata';
 import { createTestMobilePlatformCapabilities } from '../src/testing/testMobilePlatformCapabilities';
 import { FakeICloudProgressSyncClient } from '../src/backend/iCloudProgressSync';
 import {
@@ -16,9 +17,18 @@ import {
 } from '../src/backend/nativeStockfishTransport';
 
 describe('mobile platform capabilities', () => {
+  const installedApplicationMetadata = {
+    ...MOBILE_APPLICATION_METADATA_LINKS,
+    versionName: '1.1',
+    buildNumber: 'test-build',
+  };
+
   it('composes the existing iOS contracts behind one typed mobile seam', async () => {
     const service = createMobilePracticeService('random1000');
-    const capabilities = composeIOSMobilePlatformCapabilities(service);
+    const capabilities = composeIOSMobilePlatformCapabilities(
+      service,
+      installedApplicationMetadata,
+    );
 
     expect(capabilities.storage.practiceService).toBe(service);
     expect(capabilities.storage.configurePuzzleSource).toBeDefined();
@@ -28,7 +38,7 @@ describe('mobile platform capabilities', () => {
     await expect(capabilities.stockfish.prewarm()).resolves.toBe(false);
     expect(capabilities.reminders.scheduler).toBeNull();
     expect(capabilities.reminders.notificationClient).toBeNull();
-    expect(capabilities.applicationMetadata).toBe(MOBILE_APPLICATION_METADATA);
+    expect(capabilities.applicationMetadata).toBe(installedApplicationMetadata);
   });
 
   it('composes Android with shared storage and the native Stockfish transport', () => {
@@ -42,7 +52,10 @@ describe('mobile platform capabilities', () => {
       consumeInitialRoute: jest.fn(),
     };
     const service = createMobilePracticeService('random1000');
-    const capabilities = composeAndroidMobilePlatformCapabilities(service);
+    const capabilities = composeAndroidMobilePlatformCapabilities(
+      service,
+      installedApplicationMetadata,
+    );
 
     expect(capabilities.storage.practiceService).toBe(service);
     expect(capabilities.storage.configurePuzzleSource).toBeDefined();
@@ -53,8 +66,25 @@ describe('mobile platform capabilities', () => {
     expect(capabilities.reminders.platform).toBe('android');
     expect(capabilities.reminders.scheduler).not.toBeNull();
     expect(capabilities.reminders.notificationClient).not.toBeNull();
-    expect(capabilities.applicationMetadata).toBe(MOBILE_APPLICATION_METADATA);
+    expect(capabilities.applicationMetadata).toBe(installedApplicationMetadata);
     delete (NativeModules as Record<string, unknown>).ReviewReminderNotifications;
+  });
+
+  it('fails closed when installed artifact metadata is unavailable or incomplete', () => {
+    expect(() => readNativeApplicationMetadata(undefined)).toThrow(
+      'Native ApplicationMetadata module is unavailable.',
+    );
+    expect(() => readNativeApplicationMetadata({ versionName: '1.1' })).toThrow(
+      'Installed application metadata is missing buildNumber.',
+    );
+    expect(readNativeApplicationMetadata({
+      versionName: '1.1',
+      buildNumber: '17',
+    })).toEqual({
+      ...MOBILE_APPLICATION_METADATA_LINKS,
+      versionName: '1.1',
+      buildNumber: '17',
+    });
   });
 
   it('selects one platform capability factory at the application composition root', () => {

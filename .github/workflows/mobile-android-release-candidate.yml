@@ -1,0 +1,122 @@
+name: Mobile Android release candidate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-android-release-candidate
+  cancel-in-progress: false
+
+jobs:
+  signed-release-candidate:
+    name: Build signed Android release candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: android-production
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.1.2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: pnpm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Require protected release inputs
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+          UPLOAD_CERT_SHA256: ${{ secrets.ANDROID_UPLOAD_CERT_SHA256 }}
+        run: |
+          test -n "$KEYSTORE_BASE64"
+          test -n "$STORE_PASSWORD"
+          test -n "$KEY_ALIAS"
+          test -n "$KEY_PASSWORD"
+          test -n "$UPLOAD_CERT_SHA256"
+
+      - name: Install pinned Android packages
+        run: pnpm mobile:install:android-sdk
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Fetch canonical core pack
+        run: pnpm fetch:core-pack
+
+      - name: Materialize upload keystore in runner temp
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/chessticize-upload.jks"
+          chmod 0600 "$RUNNER_TEMP/chessticize-upload.jks"
+
+      - name: Android release environment doctor
+        env:
+          CHESSTICIZE_ANDROID_RELEASE_STORE_FILE: ${{ runner.temp }}/chessticize-upload.jks
+          CHESSTICIZE_ANDROID_RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_STORE_PASSWORD }}
+          CHESSTICIZE_ANDROID_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          CHESSTICIZE_ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+        run: pnpm mobile:doctor:android
+
+      - name: Build production-signed App Bundle
+        working-directory: apps/mobile/android
+        env:
+          CHESSTICIZE_ANDROID_RELEASE_STORE_FILE: ${{ runner.temp }}/chessticize-upload.jks
+          CHESSTICIZE_ANDROID_RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_STORE_PASSWORD }}
+          CHESSTICIZE_ANDROID_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          CHESSTICIZE_ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+        run: ./gradlew :app:bundleRelease --no-daemon
+
+      - name: Download pinned bundletool
+        run: |
+          curl --fail --location --silent --show-error \
+            --output "$RUNNER_TEMP/bundletool.jar" \
+            https://github.com/google/bundletool/releases/download/1.18.3/bundletool-all-1.18.3.jar
+          echo "a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29  $RUNNER_TEMP/bundletool.jar" | sha256sum --check
+
+      - name: Verify exact signed artifact
+        env:
+          BUNDLE_PATH: apps/mobile/android/app/build/outputs/bundle/release/app-release.aab
+          BUNDLETOOL_PATH: ${{ runner.temp }}/bundletool.jar
+          CHESSTICIZE_ANDROID_UPLOAD_CERT_SHA256: ${{ secrets.ANDROID_UPLOAD_CERT_SHA256 }}
+        run: >-
+          pnpm mobile:verify:android:release -- --artifact-only
+          --bundle "$BUNDLE_PATH"
+          --bundletool "$BUNDLETOOL_PATH"
+          --output apps/mobile/artifacts/android-release/android-source-manifest.json
+
+      - name: Retain signed candidate and audit evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-signed-release-candidate-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            apps/mobile/android/app/build/outputs/bundle/release/app-release.aab
+            apps/mobile/artifacts/android-release/android-source-manifest.json
+
+      - name: Destroy upload keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/chessticize-upload.jks"

@@ -102,7 +102,8 @@ describe('Android validation matrix', () => {
   it('keeps API 24 bounded to launch, production storage, practice, and native-engine smoke', () => {
     expect(validationStepsForApiLevel(24)).toEqual([
       { kind: 'prepare', command: 'apps/mobile/scripts/prepare-android-offline-e2e.sh' },
-      { kind: 'detox', suite: 'android-api24-smoke' },
+      { kind: 'install', command: 'apps/mobile/scripts/install-android-detox-apks.sh' },
+      { kind: 'detox', suite: 'android-api24-smoke', reuseInstalledApp: true },
     ]);
   });
 
@@ -160,7 +161,8 @@ describe('Android validation matrix', () => {
       buildResult: 'success',
       commands: [
         'apps/mobile/scripts/prepare-android-offline-e2e.sh',
-        'DETOX_ACTIVE_SUITE=android-api24-smoke pnpm mobile:e2e:test:android:ci',
+        'apps/mobile/scripts/install-android-detox-apks.sh',
+        'CHESSTICIZE_DETOX_REUSE_INSTALLED_APP=1 DETOX_ACTIVE_SUITE=android-api24-smoke pnpm mobile:e2e:test:android:ci',
       ],
       deviceMatrix: [{
         abi: 'x86_64',
@@ -237,7 +239,7 @@ describe('Android validation matrix', () => {
       },
     })).toThrow('Android validation step android-api24-smoke failed with exit code 9.');
 
-    expect(calls).toBe(2);
+    expect(calls).toBe(3);
     expect(fs.existsSync(outputPath)).toBe(false);
   });
 

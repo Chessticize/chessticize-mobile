@@ -8,7 +8,7 @@ const {
 describe('Android API 24 native-engine smoke', () => {
   beforeAll(async () => {
     await withAndroidUiDiagnostics(async () => {
-      await launchWithDisabledSynchronization({ delete: true, newInstance: true });
+      await launchWithDisabledSynchronization({ resetAppState: true, newInstance: true });
     });
   });
 

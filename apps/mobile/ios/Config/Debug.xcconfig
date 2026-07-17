@@ -1,0 +1,2 @@
+#include? "../Pods/Target Support Files/Pods-ChessticizeMobile/Pods-ChessticizeMobile.debug.xcconfig"
+#include "ReleaseVersion.xcconfig"

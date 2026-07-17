@@ -20,7 +20,8 @@ function validationStepsForApiLevel(apiLevel) {
   if (apiLevel === 24) {
     return [
       { kind: 'prepare', command: 'apps/mobile/scripts/prepare-android-offline-e2e.sh' },
-      { kind: 'detox', suite: 'android-api24-smoke' },
+      { kind: 'install', command: 'apps/mobile/scripts/install-android-detox-apks.sh' },
+      { kind: 'detox', suite: 'android-api24-smoke', reuseInstalledApp: true },
     ];
   }
 
@@ -43,7 +44,10 @@ function stepId(step) {
 
 function renderValidationCommand(step) {
   if (step.kind === 'detox') {
-    return `DETOX_ACTIVE_SUITE=${step.suite} pnpm mobile:e2e:test:android:ci`;
+    const reusePrefix = step.reuseInstalledApp
+      ? 'CHESSTICIZE_DETOX_REUSE_INSTALLED_APP=1 '
+      : '';
+    return `${reusePrefix}DETOX_ACTIVE_SUITE=${step.suite} pnpm mobile:e2e:test:android:ci`;
   }
   return step.command;
 }
@@ -223,7 +227,13 @@ function runCli(args = process.argv.slice(2), environment = process.env) {
           ['mobile:e2e:test:android:ci'],
           {
             cwd: repoRoot,
-            env: { ...environment, DETOX_ACTIVE_SUITE: step.suite },
+            env: {
+              ...environment,
+              DETOX_ACTIVE_SUITE: step.suite,
+              ...(step.reuseInstalledApp
+                ? { CHESSTICIZE_DETOX_REUSE_INSTALLED_APP: '1' }
+                : {}),
+            },
             stdio: 'inherit',
           }
         )

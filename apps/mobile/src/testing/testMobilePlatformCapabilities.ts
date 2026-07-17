@@ -6,7 +6,7 @@ import {
   type MobilePuzzleSource,
 } from '../backend/mobilePractice.ts';
 import {
-  MOBILE_APPLICATION_METADATA,
+  MOBILE_APPLICATION_METADATA_LINKS,
   type MobileApplicationMetadata,
   type MobilePlatformCapabilities,
   type MobileProgressProtectionCapabilities,
@@ -67,7 +67,9 @@ export function createTestMobilePlatformCapabilities(
       notificationClient: overrides.reviewReminderNotificationClient ?? null,
     },
     applicationMetadata: {
-      ...MOBILE_APPLICATION_METADATA,
+      ...MOBILE_APPLICATION_METADATA_LINKS,
+      versionName: 'test-version',
+      buildNumber: 'test-build',
       ...overrides.applicationMetadata,
     },
   };

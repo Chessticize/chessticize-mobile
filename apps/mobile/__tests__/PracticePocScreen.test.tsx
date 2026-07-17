@@ -4940,7 +4940,9 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "settings-packs-section")).toThrow();
     expect(() => findByTestId(renderer, "packs-tab")).toThrow();
     expect(findByTestId(renderer, "settings-app-version")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "settings-app-version"))).toContain("1.0.0");
+    expect(collectText(findByTestId(renderer, "settings-app-version"))).toContain(
+      "test-version (test-build)",
+    );
     expect(findByTestId(renderer, "settings-license")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "settings-license"))).toContain("License");
     expect(collectText(findByTestId(renderer, "settings-license"))).toContain("GPL-3.0-or-later");

@@ -1,6 +1,7 @@
 const fs = require('fs');
 const os = require('node:os');
 const path = require('path');
+const { spawnSync } = require('node:child_process');
 
 const detoxConfig = require('../.detoxrc');
 const mobilePackage = require('../package.json');
@@ -32,6 +33,170 @@ const mobileRoot = path.resolve(__dirname, '..');
 
 function read(relativePath) {
   return fs.readFileSync(path.join(mobileRoot, relativePath), 'utf8');
+}
+
+function runIsolatedOfflinePreparation(
+  availableDataKib,
+  { rootMode = 'already-root', trimDenied = false } = {},
+) {
+  const isolatedRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'chessticize-android-capacity-'));
+  const scriptsDir = path.join(isolatedRoot, 'scripts');
+  const appApk = path.join(isolatedRoot, 'android/app/build/outputs/apk/e2e/app-e2e.apk');
+  const testApk = path.join(
+    isolatedRoot,
+    'android/app/build/outputs/apk/androidTest/e2e/app-e2e-androidTest.apk'
+  );
+  const fakeAdb = path.join(isolatedRoot, 'fake-adb');
+  const callsPath = path.join(isolatedRoot, 'adb-calls.txt');
+  const rootCountPath = path.join(isolatedRoot, 'root-count.txt');
+  const waitCountPath = path.join(isolatedRoot, 'wait-count.txt');
+  fs.mkdirSync(scriptsDir, { recursive: true });
+  fs.mkdirSync(path.dirname(appApk), { recursive: true });
+  fs.mkdirSync(path.dirname(testApk), { recursive: true });
+  fs.copyFileSync(
+    path.join(mobileRoot, 'scripts/prepare-android-offline-e2e.sh'),
+    path.join(scriptsDir, 'prepare-android-offline-e2e.sh')
+  );
+  fs.writeFileSync(appApk, 'app');
+  fs.writeFileSync(testApk, 'test');
+  fs.writeFileSync(rootCountPath, '0\n');
+  fs.writeFileSync(waitCountPath, '0\n');
+  fs.writeFileSync(fakeAdb, `#!/bin/sh
+printf '%s\\n' "$*" >> "$FAKE_ADB_CALLS"
+case "$*" in
+  *"shell getprop ro.build.version.sdk"*) printf '24\\n' ;;
+  *"shell getprop sys.boot_completed"*) printf '1\\n' ;;
+  *"shell pm trim-caches "*[Kk])
+    if [ "$FAKE_TRIM_DENIED" = "1" ]; then
+      printf 'SecurityException: requires android.permission.CLEAR_APP_CACHE\\n' >&2
+      exit 8
+    fi
+    ;;
+  *"shell pm trim-caches"*) printf 'Invalid API 24 trim-caches size: %s\\n' "$*" >&2; exit 8 ;;
+  *"shell df -k /data"*) printf 'Filesystem 1K-blocks Used Available Use%% Mounted on\\n/data 8000000 1 ${availableDataKib} 1%% /data\\n' ;;
+  *"shell id -u"*)
+    root_count="$(cat "$FAKE_ROOT_COUNT")"
+    case "$FAKE_ROOT_MODE:$root_count" in
+      already-root:*|root-success:1|transient-closed:2|transient-offline:2) printf '0\\n' ;;
+      *) printf '2000\\n' ;;
+    esac
+    ;;
+  *" root")
+    root_count="$(cat "$FAKE_ROOT_COUNT")"
+    root_count=$((root_count + 1))
+    printf '%s\\n' "$root_count" > "$FAKE_ROOT_COUNT"
+    case "$FAKE_ROOT_MODE:$root_count" in
+      transient-closed:1|persistent-closed:*|recovery-wait-timeout:1)
+        printf 'adb: unable to connect for root: closed\\n' >&2
+        exit 1
+        ;;
+      transient-offline:1)
+        printf 'error: device offline\\n' >&2
+        exit 1
+        ;;
+      permission:*)
+        printf 'adbd cannot run as root in production builds\\n' >&2
+        exit 42
+        ;;
+      mixed-output:*)
+        printf 'adb: unable to connect for root: closed\\nfatal: transport authentication rejected\\n' >&2
+        exit 1
+        ;;
+      *) printf 'restarting adbd as root\\n' ;;
+    esac
+    ;;
+  *"wait-for-device"*)
+    wait_count="$(cat "$FAKE_WAIT_COUNT")"
+    wait_count=$((wait_count + 1))
+    printf '%s\\n' "$wait_count" > "$FAKE_WAIT_COUNT"
+    if [ "$FAKE_ROOT_MODE" = "recovery-wait-timeout" ] && [ "$wait_count" -ge 2 ]; then
+      while :; do :; done
+    fi
+    ;;
+  *) printf 'Unexpected fake adb call: %s\\n' "$*" >&2; exit 9 ;;
+esac
+`);
+  fs.chmodSync(fakeAdb, 0o755);
+
+  try {
+    const result = spawnSync('sh', [path.join(scriptsDir, 'prepare-android-offline-e2e.sh')], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        ADB_PATH: fakeAdb,
+        ANDROID_OFFLINE_ADB_RECOVERY_WAIT_ATTEMPTS: '2',
+        ANDROID_OFFLINE_ADB_RECOVERY_WAIT_INTERVAL_SECONDS: '0.01',
+        DETOX_ANDROID_DEVICE: 'emulator-5554',
+        FAKE_ADB_CALLS: callsPath,
+        FAKE_ROOT_COUNT: rootCountPath,
+        FAKE_ROOT_MODE: rootMode,
+        FAKE_TRIM_DENIED: trimDenied ? '1' : '0',
+        FAKE_WAIT_COUNT: waitCountPath,
+      },
+    });
+    return {
+      ...result,
+      calls: fs.existsSync(callsPath)
+        ? fs.readFileSync(callsPath, 'utf8').trim().split('\n')
+        : [],
+    };
+  } finally {
+    fs.rmSync(isolatedRoot, { recursive: true, force: true });
+  }
+}
+
+function runIsolatedApi24Preinstall({ testPackagePath = 'package:/data/app/test/base.apk' } = {}) {
+  const isolatedRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'chessticize-android-preinstall-'));
+  const scriptsDir = path.join(isolatedRoot, 'scripts');
+  const appApk = path.join(isolatedRoot, 'android/app/build/outputs/apk/e2e/app-e2e.apk');
+  const testApk = path.join(
+    isolatedRoot,
+    'android/app/build/outputs/apk/androidTest/e2e/app-e2e-androidTest.apk'
+  );
+  const fakeAdb = path.join(isolatedRoot, 'fake-adb');
+  const callsPath = path.join(isolatedRoot, 'adb-calls.txt');
+  fs.mkdirSync(scriptsDir, { recursive: true });
+  fs.mkdirSync(path.dirname(appApk), { recursive: true });
+  fs.mkdirSync(path.dirname(testApk), { recursive: true });
+  fs.copyFileSync(
+    path.join(mobileRoot, 'scripts/install-android-detox-apks.sh'),
+    path.join(scriptsDir, 'install-android-detox-apks.sh')
+  );
+  fs.writeFileSync(appApk, 'app');
+  fs.writeFileSync(testApk, 'test');
+  fs.writeFileSync(fakeAdb, `#!/bin/sh
+printf '%s\\n' "$*" >> "$FAKE_ADB_CALLS"
+case "$*" in
+  *"shell getprop ro.build.version.sdk"*) printf '24\\n' ;;
+  *" install -r -g -t "*) printf 'Performing Streamed Install\\nSuccess\\n' ;;
+  *"shell pm path com.chessticize.mobile.test"*) printf '%s\\n' "$FAKE_TEST_PACKAGE_PATH" ;;
+  *"shell pm path com.chessticize.mobile"*) printf 'package:/data/app/main/base.apk\\n' ;;
+  *"wait-for-device"*) ;;
+  *) printf 'Unexpected fake adb call: %s\\n' "$*" >&2; exit 9 ;;
+esac
+`);
+  fs.chmodSync(fakeAdb, 0o755);
+
+  try {
+    const result = spawnSync('sh', [path.join(scriptsDir, 'install-android-detox-apks.sh')], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        ADB_PATH: fakeAdb,
+        DETOX_ANDROID_DEVICE: 'emulator-5554',
+        FAKE_ADB_CALLS: callsPath,
+        FAKE_TEST_PACKAGE_PATH: testPackagePath,
+      },
+    });
+    return {
+      ...result,
+      calls: fs.existsSync(callsPath)
+        ? fs.readFileSync(callsPath, 'utf8').trim().split('\n')
+        : [],
+    };
+  } finally {
+    fs.rmSync(isolatedRoot, { recursive: true, force: true });
+  }
 }
 
 function completeAndroidFiles(sdkRoot, appDir, repoRoot) {
@@ -333,8 +498,26 @@ describe('Android launch baseline', () => {
     expect(workflow).not.toMatch(/^\s+pull_request:/m);
   });
 
-  it('gives both Android API emulators fixed realistic memory and preserves failure diagnostics', () => {
+  it('reclaims unrelated hosted-runner toolchains and fails early without Android build headroom', () => {
     const workflow = read('../../.github/workflows/mobile-android.yml');
+    const cleanup = workflow.indexOf('name: Reclaim hosted runner disk for Android native build');
+    const headroom = workflow.indexOf('name: Require Android native build disk headroom');
+    const nativeBuild = workflow.indexOf('name: Build self-contained E2E app and Detox test APK');
+
+    expect(cleanup).toBeGreaterThan(0);
+    expect(headroom).toBeGreaterThan(cleanup);
+    expect(headroom).toBeLessThan(nativeBuild);
+    expect(workflow).toContain('/opt/hostedtoolcache/CodeQL');
+    expect(workflow).toContain('/usr/local/.ghcup');
+    expect(workflow).toContain('/usr/share/dotnet');
+    expect(workflow).toContain('docker system prune --all --force');
+    expect(workflow).toContain('minimum_kib=$((20 * 1024 * 1024))');
+    expect(workflow).toContain('Insufficient hosted-runner disk for the Android native build');
+  });
+
+  it('gives both Android API emulators enough memory and data capacity for the packaged app', () => {
+    const workflow = read('../../.github/workflows/mobile-android.yml');
+    const prepareScript = read('scripts/prepare-android-offline-e2e.sh');
     const launchJob = workflow.slice(
       workflow.indexOf('  android-launch:'),
       workflow.indexOf('  android-adaptive-layout:'),
@@ -345,8 +528,121 @@ describe('Android launch baseline', () => {
     );
     expect(launchJob).toContain('ram-size: 4096M');
     expect(launchJob.match(/ram-size: 4096M/g)).toHaveLength(1);
+    expect(launchJob).toContain('disk-size: 8192M');
+    expect(launchJob.match(/disk-size: 8192M/g)).toHaveLength(1);
+    expect(prepareScript).toContain('pm trim-caches');
+    expect(prepareScript).toContain('shell df -k /data');
+    expect(prepareScript).toContain('required_data_bytes');
+    expect(prepareScript).toContain('Android /data capacity is insufficient');
     expect(launchJob).toContain('name: Upload Android launch failure diagnostics');
     expect(launchJob).toContain('apps/mobile/artifacts/android-ui/');
+  });
+
+  it('fails before Detox when Android cannot stage the packaged APKs safely', () => {
+    const ready = runIsolatedOfflinePreparation(700000);
+    const insufficient = runIsolatedOfflinePreparation(100);
+
+    expect(ready.status).toBe(0);
+    expect(ready.stdout).toContain('Android /data capacity ready');
+    expect(ready.calls).toContain(
+      '-s emulator-5554 shell pm trim-caches 524289K'
+    );
+    expect(ready.calls.some((call) => /trim-caches [0-9]+$/.test(call))).toBe(false);
+    expect(insufficient.status).toBe(1);
+    expect(insufficient.stderr).toContain('Android /data capacity is insufficient');
+  });
+
+  it('treats cache-trim permission denial as a warning but keeps capacity fail-closed', () => {
+    const ready = runIsolatedOfflinePreparation(700000, { trimDenied: true });
+    const insufficient = runIsolatedOfflinePreparation(100, { trimDenied: true });
+    const preinstall = ready.status === 0
+      ? runIsolatedApi24Preinstall()
+      : { status: 99, calls: [] };
+
+    expect(ready.status).toBe(0);
+    expect(ready.stderr).toContain('WARN: Android cache trim was unavailable');
+    expect(ready.stderr).toContain('android.permission.CLEAR_APP_CACHE');
+    expect(ready.stdout).toContain('Android /data capacity ready');
+    expect(preinstall.status).toBe(0);
+    expect(preinstall.calls.filter((call) => call.includes(' install -r -g -t '))).toHaveLength(2);
+    expect(insufficient.status).toBe(1);
+    expect(insufficient.stderr).toContain('WARN: Android cache trim was unavailable');
+    expect(insufficient.stderr).toContain('Android /data capacity is insufficient');
+  });
+
+  it.each([
+    ['closed transport', 'transient-closed', 'adb: unable to connect for root: closed'],
+    ['offline transport', 'transient-offline', 'error: device offline'],
+  ])('recovers one transient adb root %s failure with one retry', (_label, rootMode, diagnostic) => {
+    const result = runIsolatedOfflinePreparation(700000, { rootMode });
+    const rootCalls = result.calls.filter((call) => call.endsWith(' root'));
+    const rootIndexes = result.calls
+      .map((call, index) => call.endsWith(' root') ? index : -1)
+      .filter((index) => index >= 0);
+
+    expect(result.status).toBe(0);
+    expect(rootCalls).toHaveLength(2);
+    expect(result.calls.filter((call) => call.endsWith(' wait-for-device'))).toHaveLength(3);
+    expect(result.calls.slice(rootIndexes[0] + 1, rootIndexes[1])).toContain(
+      '-s emulator-5554 wait-for-device',
+    );
+    expect(result.stderr).toContain(diagnostic);
+  });
+
+  it('waits for adbd and proves root after an ordinary successful root restart', () => {
+    const result = runIsolatedOfflinePreparation(700000, { rootMode: 'root-success' });
+
+    expect(result.status).toBe(0);
+    expect(result.calls.filter((call) => call.endsWith(' root'))).toHaveLength(1);
+    expect(result.calls.filter((call) => call.endsWith(' wait-for-device'))).toHaveLength(2);
+    expect(result.calls.filter((call) => call.endsWith(' shell id -u'))).toHaveLength(2);
+  });
+
+  it('fails after one retry when the adb root transport failure persists', () => {
+    const result = runIsolatedOfflinePreparation(700000, { rootMode: 'persistent-closed' });
+
+    expect(result.status).toBe(1);
+    expect(result.calls.filter((call) => call.endsWith(' root'))).toHaveLength(2);
+    expect(result.calls.filter((call) => call.endsWith(' wait-for-device'))).toHaveLength(2);
+    expect(result.stderr).toContain('persisted after one retry');
+  });
+
+  it('bounds the wait when adbd does not reconnect after a transient root failure', () => {
+    const result = runIsolatedOfflinePreparation(700000, { rootMode: 'recovery-wait-timeout' });
+
+    expect(result.status).toBe(1);
+    expect(result.calls.filter((call) => call.endsWith(' root'))).toHaveLength(1);
+    expect(result.stderr).toContain('did not reconnect within the bounded adbd recovery wait');
+  });
+
+  it.each([
+    ['permission failure', 'permission', 'adbd cannot run as root in production builds'],
+    ['mixed transport and product output', 'mixed-output', 'fatal: transport authentication rejected'],
+  ])('does not retry a non-transient adb root %s', (_label, rootMode, diagnostic) => {
+    const result = runIsolatedOfflinePreparation(700000, { rootMode });
+
+    expect(result.status).not.toBe(0);
+    expect(result.calls.filter((call) => call.endsWith(' root'))).toHaveLength(1);
+    expect(result.calls.filter((call) => call.endsWith(' wait-for-device'))).toHaveLength(1);
+    expect(result.stderr).toContain(diagnostic);
+  });
+
+  it('preinstalls both exact API 24 APKs once and fails closed on package verification', () => {
+    const ready = runIsolatedApi24Preinstall();
+    const missingTestPackage = runIsolatedApi24Preinstall({ testPackagePath: '' });
+
+    expect(ready.status).toBe(0);
+    expect(ready.calls.filter((call) => call.includes(' install -r -g -t '))).toHaveLength(2);
+    expect(ready.calls).toEqual(expect.arrayContaining([
+      expect.stringContaining('shell pm path com.chessticize.mobile'),
+      expect.stringContaining('shell pm path com.chessticize.mobile.test'),
+    ]));
+    expect(ready.stdout).toContain('Verified preinstalled package com.chessticize.mobile');
+    expect(ready.stdout).toContain('Verified preinstalled package com.chessticize.mobile.test');
+    expect(missingTestPackage.status).toBe(1);
+    expect(missingTestPackage.stderr).toContain(
+      'Expected exactly one installed APK for com.chessticize.mobile.test'
+    );
   });
 
   it('keeps the complete API 36 suites in the tested matrix runner', () => {

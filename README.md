@@ -1,6 +1,6 @@
 # Chessticize Mobile
 
-Chessticize Mobile is an offline-first, open-source iOS training app for Puzzle Sprint and Arrow Duel: timed tactics sprints, per-mode ELO, and spaced-repetition review of mistakes, all computed on device from a bundled puzzle pack.
+Chessticize Mobile is an offline-first, open-source iOS and Android training app for Puzzle Sprint and Arrow Duel: timed tactics sprints, per-mode ELO, and spaced-repetition review of mistakes, all computed on device from a bundled puzzle pack.
 
 The repository contains the React Native app shell (`apps/mobile`), a pure TypeScript domain core (`packages/core`), storage services (`packages/storage`), a stdio CLI harness (`apps/cli`), and bundled puzzle fixtures (`fixtures/puzzles`).
 
@@ -15,6 +15,9 @@ The repository contains the React Native app shell (`apps/mobile`), a pure TypeS
 - [TestFlight QA](docs/TESTFLIGHT_QA.md) — internal TestFlight pass checklist and evidence log
 - [Privacy Policy](docs/PRIVACY_POLICY.md) — 1.1 data, user-controllable iCloud Sync, and tracking disclosure
 - [iOS Device Targets](docs/DEVICE_TARGETS.md) — 1.1 iPhone+iPad adaptive orientation release target
+- [Android Validation](docs/ANDROID_VALIDATION.md) — exact-head API, adaptive, backup, and physical-device evidence contract
+- [Android Play Release](docs/ANDROID_PLAY_RELEASE.md) — signed AAB and owner-only Play readiness runbook
+- [Android Play Listing](docs/ANDROID_PLAY_LISTING.md) — truthful English listing, device, permission, privacy, and Data safety contract
 - [Agent Instructions](AGENTS.md) — architecture boundary, testing philosophy, and PR workflow
 - [Claude Instructions](CLAUDE.md) — symlink alias to the shared repository agent instructions
 
@@ -62,7 +65,7 @@ open a GitHub issue requesting a private contact path.
 
 ## Product Direction
 
-- Offline-first practice app for iOS first, Android later.
+- Offline-first practice app with one shared product UI on iOS and Android.
 - Puzzle Sprint, Arrow Duel, mistake review, spaced repetition, local ELO, history filters, and default-enabled user-controllable iCloud sync for progress across Apple devices.
 - Reuse an existing chessboard component instead of maintaining a custom board widget.
 - Embed Stockfish for offline analysis under GPL-compatible licensing.
@@ -76,11 +79,13 @@ Stockfish. See [LICENSE](LICENSE) for the complete GPLv3 license text and
 
 ## Release Source Rule
 
-Every binary submitted to App Store Connect must be built from a public tagged
+Every binary submitted to App Store Connect or Google Play must be built from a public tagged
 source release in this repository. Do not submit an App Store binary from an
 untagged commit. The release tag must identify the exact source, native code,
 bundled puzzle artifact, Stockfish source, and notices used for that binary.
-See [Release Source Policy](docs/RELEASE_SOURCE_POLICY.md).
+See [Release Source Policy](docs/RELEASE_SOURCE_POLICY.md). Android candidate
+construction and Play readiness are documented in
+[Android Play Release](docs/ANDROID_PLAY_RELEASE.md).
 
 Before tagging or uploading a build, run the automatable release preflight:
 

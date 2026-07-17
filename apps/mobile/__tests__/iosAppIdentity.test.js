@@ -1,8 +1,10 @@
 const { existsSync, readFileSync } = require("node:fs");
 const { join } = require("node:path");
+const { renderIOSReleaseVersion } = require("../scripts/ios-release-version");
 
 const appRoot = process.cwd();
 const iosRoot = join(appRoot, "ios", "ChessticizeMobile");
+const releaseVersion = JSON.parse(readText(join(appRoot, "release-version.json")));
 
 function readText(path) {
   return readFileSync(path, "utf8");
@@ -26,10 +28,23 @@ describe("iOS App Store identity artifacts", () => {
     expect(project).toContain("PRODUCT_BUNDLE_IDENTIFIER = com.chessticize.mobile;");
     expect(project).toContain("PRODUCT_NAME = Chessticize;");
     expect(project).toContain("productName = Chessticize;");
-    expect(project).toContain("MARKETING_VERSION = 1.1;");
-    expect(project).toContain("CURRENT_PROJECT_VERSION = 2;");
+    expect(project).toContain("Config/Debug.xcconfig");
+    expect(project).toContain("Config/Release.xcconfig");
+    expect(project).not.toMatch(/MARKETING_VERSION = \d/);
+    expect(project).not.toMatch(/CURRENT_PROJECT_VERSION = \d/);
     expect(project).not.toContain("org.reactjs.native.example");
     expect(project).not.toContain("ChessticizeMobile.app");
+  });
+
+  it("derives installed iOS version and build settings from the canonical release version", () => {
+    const generatedConfig = readText(join(appRoot, "ios", "Config", "ReleaseVersion.xcconfig"));
+
+    expect(generatedConfig).toBe(renderIOSReleaseVersion(releaseVersion));
+    expect(renderIOSReleaseVersion({
+      ...releaseVersion,
+      publicVersion: "9.8.7",
+      iosBuildNumber: 42,
+    })).toContain("MARKETING_VERSION = 9.8.7\nCURRENT_PROJECT_VERSION = 42\n");
   });
 
   it("keeps the launch screen aligned with the app background and reuses the main app logo", () => {

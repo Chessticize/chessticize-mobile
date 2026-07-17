@@ -13,6 +13,7 @@ const {
   grantAndroidRuntimePermission,
   withAndroidUiDiagnostics
 } = require('./helpers');
+const releaseVersion = require('../release-version.json');
 
 const APP_ID = 'com.chessticize.mobile';
 const NOTIFICATION_PERMISSION = 'android.permission.POST_NOTIFICATIONS';
@@ -25,6 +26,15 @@ describe('Key user flows', () => {
       newInstance: true,
       delete: true
     });
+  });
+
+  it('shows the installed native version and build in Settings', async () => {
+    await openTab('settings-tab', 'settings-app-version');
+    await waitForElementTextContaining(
+      'settings-app-version',
+      `${releaseVersion.publicVersion} (${expectedInstalledBuildNumber()})`,
+      10000
+    );
   });
 
   it('fails a standard sprint and shows actionable results', async () => {
@@ -328,9 +338,17 @@ function durationTextToSeconds(value) {
   return Number(match[1]) * 60 + Number(match[2]);
 }
 
+function expectedInstalledBuildNumber() {
+  return device.getPlatform() === 'android'
+    ? releaseVersion.androidVersionCode
+    : releaseVersion.iosBuildNumber;
+}
+
 function historyToggleValue(label, active) {
-  const state = active ? 'On' : 'Off';
-  return device.getPlatform() === 'android' ? `${label}, ${state}` : state;
+  if (device.getPlatform() === 'android') {
+    return `${label}, ${active ? 'On' : 'Off'}`;
+  }
+  return active ? '1' : '0';
 }
 
 async function dismissSprintSummary() {

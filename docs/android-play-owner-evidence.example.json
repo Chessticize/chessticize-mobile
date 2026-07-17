@@ -1,0 +1,258 @@
+{
+  "schemaVersion": 3,
+  "candidate": {
+    "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
+    "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
+    "applicationId": "com.chessticize.mobile",
+    "versionName": "1.1",
+    "versionCode": 1
+  },
+  "sourceRelease": {
+    "status": "pending",
+    "evidenceId": "REPLACE_WITH_GITHUB_RELEASE_EVIDENCE_ID",
+    "reference": "https://github.com/Chessticize/chessticize-mobile/releases/tag/android-v1.1.0-build-1",
+    "candidate": {
+      "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
+      "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
+      "applicationId": "com.chessticize.mobile",
+      "versionName": "1.1",
+      "versionCode": 1
+    },
+    "repositoryUrl": "https://github.com/Chessticize/chessticize-mobile",
+    "tagName": "android-v1.1.0-build-1",
+    "tagCommitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
+    "tagType": "pending",
+    "releaseId": 0,
+    "published": false,
+    "sourceManifest": {
+      "status": "pending",
+      "releaseAssetId": 0,
+      "assetName": "android-source-manifest.json",
+      "sha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
+      "reference": "https://github.com/Chessticize/chessticize-mobile/releases/download/android-v1.1.0-build-1/android-source-manifest.json",
+      "releaseId": 0,
+      "tagName": "android-v1.1.0-build-1",
+      "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
+      "workflowRunId": 0,
+      "workflowRunReference": "REPLACE_WITH_HTTPS_WORKFLOW_REFERENCE",
+      "workflowArtifactId": 0,
+      "workflowArtifactName": "REPLACE_WITH_EXACT_PROTECTED_WORKFLOW_ARTIFACT_NAME",
+      "workflowArtifactEntry": "artifacts/android-release/android-source-manifest.json",
+      "workflowArtifactSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
+      "candidate": {
+        "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
+        "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
+        "applicationId": "com.chessticize.mobile",
+        "versionName": "1.1",
+        "versionCode": 1
+      }
+    },
+    "sourceDisclosure": {
+      "releaseNotesReference": "https://github.com/Chessticize/chessticize-mobile/releases/tag/android-v1.1.0-build-1",
+      "supportDocumentation": {
+        "status": "pending",
+        "evidenceId": "REPLACE_WITH_SOURCE_SUPPORT_EVIDENCE_ID",
+        "reference": "https://raw.githubusercontent.com/Chessticize/chessticize-mobile/REPLACE_WITH_EXACT_40_CHARACTER_SHA/docs/ANDROID_PLAY_RELEASE.md",
+        "sha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
+        "candidate": {
+          "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
+          "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
+          "applicationId": "com.chessticize.mobile",
+          "versionName": "1.1",
+          "versionCode": 1
+        }
+      }
+    }
+  },
+  "signing": {
+    "uploadCertificateSha256": "REPLACE_WITH_64_HEX_CHARACTERS",
+    "appSigningCertificateSha256": "REPLACE_WITH_64_HEX_CHARACTERS",
+    "protectedUploadSigning": {
+      "status": "pending",
+      "evidenceId": "REPLACE_WITH_WORKFLOW_EVIDENCE_ID",
+      "reference": "REPLACE_WITH_HTTPS_WORKFLOW_REFERENCE",
+      "candidate": {
+        "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
+        "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
+        "applicationId": "com.chessticize.mobile",
+        "versionName": "1.1",
+        "versionCode": 1
+      },
+      "workflowRunId": 0,
+      "artifactId": 0
+    },
+    "playAppSigning": {
+      "status": "pending",
+      "evidenceId": "REPLACE_WITH_PLAY_APP_SIGNING_EVIDENCE_ID",
+      "reference": "REPLACE_WITH_HTTPS_PLAY_APP_SIGNING_REFERENCE",
+      "candidate": {
+        "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
+        "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
+        "applicationId": "com.chessticize.mobile",
+        "versionName": "1.1",
+        "versionCode": 1
+      }
+    }
+  },
+  "console": {
+    "developerVerification": {
+      "status": "pending",
+      "evidenceId": "REPLACE_WITH_DEVELOPER_VERIFICATION_EVIDENCE_ID",
+      "reference": "REPLACE_WITH_HTTPS_DEVELOPER_VERIFICATION_REFERENCE",
+      "candidate": {
+        "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
+        "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
+        "applicationId": "com.chessticize.mobile",
+        "versionName": "1.1",
+        "versionCode": 1
+      }
+    },
+    "storeListing": {
+      "status": "pending",
+      "evidenceId": "REPLACE_WITH_STORE_LISTING_EVIDENCE_ID",
+      "reference": "REPLACE_WITH_HTTPS_STORE_LISTING_REFERENCE",
+      "candidate": {
+        "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
+        "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
+        "applicationId": "com.chessticize.mobile",
+        "versionName": "1.1",
+        "versionCode": 1
+      }
+    },
+    "privacyPolicy": {
+      "status": "pending",
+      "evidenceId": "REPLACE_WITH_PRIVACY_POLICY_EVIDENCE_ID",
+      "reference": "REPLACE_WITH_HTTPS_PRIVACY_POLICY_REFERENCE",
+      "candidate": {
+        "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
+        "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
+        "applicationId": "com.chessticize.mobile",
+        "versionName": "1.1",
+        "versionCode": 1
+      }
+    },
+    "dataSafety": {
+      "status": "pending",
+      "evidenceId": "REPLACE_WITH_DATA_SAFETY_EVIDENCE_ID",
+      "reference": "REPLACE_WITH_HTTPS_DATA_SAFETY_REFERENCE",
+      "candidate": {
+        "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
+        "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
+        "applicationId": "com.chessticize.mobile",
+        "versionName": "1.1",
+        "versionCode": 1
+      }
+    },
+    "supportedDevices": {
+      "status": "pending",
+      "evidenceId": "REPLACE_WITH_DEVICE_CATALOG_EVIDENCE_ID",
+      "reference": "REPLACE_WITH_HTTPS_DEVICE_CATALOG_REFERENCE",
+      "candidate": {
+        "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
+        "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
+        "applicationId": "com.chessticize.mobile",
+        "versionName": "1.1",
+        "versionCode": 1
+      }
+    }
+  },
+  "testing": {
+    "internalInstall": {
+      "status": "not-run",
+      "evidenceId": "REPLACE_IF_RUN",
+      "reference": "REPLACE_IF_RUN",
+      "candidate": {
+        "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
+        "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
+        "applicationId": "com.chessticize.mobile",
+        "versionName": "1.1",
+        "versionCode": 1
+      },
+      "track": "internal",
+      "releaseId": "REPLACE_IF_RUN"
+    },
+    "closedInstall": {
+      "status": "not-run",
+      "evidenceId": "REPLACE_IF_RUN",
+      "reference": "REPLACE_IF_RUN",
+      "candidate": {
+        "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
+        "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
+        "applicationId": "com.chessticize.mobile",
+        "versionName": "1.1",
+        "versionCode": 1
+      },
+      "track": "closed",
+      "releaseId": "REPLACE_IF_RUN"
+    },
+    "preLaunch": {
+      "status": "pending",
+      "evidenceId": "REPLACE_WITH_PRE_LAUNCH_EVIDENCE_ID",
+      "reference": "REPLACE_WITH_HTTPS_PRE_LAUNCH_REFERENCE",
+      "candidate": {
+        "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
+        "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
+        "applicationId": "com.chessticize.mobile",
+        "versionName": "1.1",
+        "versionCode": 1
+      },
+      "reportId": "REPLACE_WITH_REPORT_ID"
+    },
+    "androidMatrix": {
+      "status": "pending",
+      "evidenceId": "REPLACE_WITH_ANDROID_MATRIX_EVIDENCE_ID",
+      "reference": "REPLACE_WITH_HTTPS_ANDROID_MATRIX_REFERENCE",
+      "candidate": {
+        "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
+        "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
+        "applicationId": "com.chessticize.mobile",
+        "versionName": "1.1",
+        "versionCode": 1
+      },
+      "runId": 0,
+      "artifactIds": []
+    }
+  },
+  "production": {
+    "status": "not-prepared",
+    "evidenceId": "REPLACE_WITH_PRODUCTION_DRAFT_EVIDENCE_ID",
+    "reference": "REPLACE_WITH_HTTPS_PRODUCTION_DRAFT_REFERENCE",
+    "candidate": {
+      "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
+      "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
+      "applicationId": "com.chessticize.mobile",
+      "versionName": "1.1",
+      "versionCode": 1
+    },
+    "rolloutPercentage": 0,
+    "launched": false,
+    "releaseId": "REPLACE_WITH_PRODUCTION_RELEASE_ID"
+  },
+  "artifacts": {
+    "generatedApkSizes": {
+      "status": "pending",
+      "evidenceId": "REPLACE_WITH_GENERATED_APK_EVIDENCE_ID",
+      "reference": "REPLACE_WITH_HTTPS_GENERATED_APK_REFERENCE",
+      "candidate": {
+        "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
+        "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
+        "applicationId": "com.chessticize.mobile",
+        "versionName": "1.1",
+        "versionCode": 1
+      },
+      "universalApkBytes": 0,
+      "arm64ApkBytes": 0,
+      "largestContributors": [
+        {
+          "path": "REPLACE_WITH_LARGEST_PACKAGED_ENTRY_PATH",
+          "bytes": 0
+        }
+      ],
+      "universalApkExpectation": {
+        "minimumBytes": 0,
+        "maximumBytes": 0,
+        "approvalReference": "REPLACE_WITH_HTTPS_APPROVAL_REFERENCE"
+      }
+    }
+  }
+}

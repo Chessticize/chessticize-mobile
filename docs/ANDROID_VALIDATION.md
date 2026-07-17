@@ -158,3 +158,13 @@ item.
 Any physical failure blocks release approval. Fix it, rerun the complete
 affected scope on the exact replacement candidate, and retain both the failed
 and passing evidence.
+
+## Play-signed release boundary
+
+The automated API/adaptive/backup matrix proves the exact source commit and
+native behavior; it does not prove upload signing, Play App Signing, store
+declarations, or Play-delivered installation. For an Android release candidate,
+also follow `docs/ANDROID_PLAY_RELEASE.md`. The final Play gate binds the matrix
+commit to one retained AAB SHA-256 and rejects missing Internal-or-Closed
+installation, pre-launch, developer-verification, Data safety, symbol, notice,
+or size evidence. Never describe matrix-only evidence as a Play-ready artifact.

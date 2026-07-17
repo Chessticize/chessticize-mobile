@@ -29,3 +29,13 @@ allprojects {
         }
     }
 }
+
+// Some native React Native libraries rely on the Android Gradle Plugin's NDK
+// default instead of the root React Native convention. Keep every compiled
+// library on the repository's canonical, installed NDK so release builds do
+// not silently select an unpinned side-by-side version.
+subprojects { subproject ->
+    subproject.pluginManager.withPlugin("com.android.library") {
+        subproject.android.ndkVersion = rootProject.ext.ndkVersion
+    }
+}

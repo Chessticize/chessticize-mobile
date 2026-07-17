@@ -25,7 +25,8 @@ describe('Android Standard Practice release slice', () => {
     expect(databaseLayout).toContain('puzzle-packs');
     expect(deviceStore).toContain('MOBILE_DATABASE_LAYOUT.progressDatabaseName');
     expect(deviceStore).toContain('MOBILE_DATABASE_LAYOUT.bundledPuzzlePackDatabaseName');
-    expect(appGradle).toContain('generated/assets/puzzle-pack');
+    expect(appGradle).toContain('puzzlePack.set(puzzlePackSource)');
+    expect(appGradle).toContain('variant.sources.assets.addGeneratedSourceDirectory');
     expect(appGradle).toContain('puzzle-packs');
     expect(appGradle).not.toContain('fixtures/migrations');
   });
@@ -50,6 +51,7 @@ describe('Android Standard Practice release slice', () => {
     expect(appGradle).toContain('matchingFallbacks = ["debug"]');
     expect(appGradle).toContain('manifestPlaceholders = [usesCleartextTraffic: false]');
     expect(appGradle).toContain('hermesCommand = "$rootDir/../node_modules/hermes-compiler/hermesc/%OS-BIN%/hermesc"');
+    expect(e2eManifest).toContain('android.permission.INTERNET');
     expect(e2eManifest).toContain('android:networkSecurityConfig="@xml/network_security_config"');
     expect(e2eNetworkSecurityConfig).toContain('<base-config cleartextTrafficPermitted="false"');
     expect(e2eNetworkSecurityConfig).toContain('<domain-config cleartextTrafficPermitted="true"');
@@ -154,7 +156,15 @@ describe('Android Standard Practice release slice', () => {
       kind: 'prepare',
       command: 'apps/mobile/scripts/prepare-android-offline-e2e.sh',
     });
-    expect(api24Steps).toContainEqual({ kind: 'detox', suite: 'android-api24-smoke' });
+    expect(api24Steps[1]).toEqual({
+      kind: 'install',
+      command: 'apps/mobile/scripts/install-android-detox-apks.sh',
+    });
+    expect(api24Steps).toContainEqual({
+      kind: 'detox',
+      suite: 'android-api24-smoke',
+      reuseInstalledApp: true,
+    });
     expect(api36Steps[0]).toEqual({
       kind: 'prepare',
       command: 'apps/mobile/scripts/prepare-android-offline-e2e.sh',
