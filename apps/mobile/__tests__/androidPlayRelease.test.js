@@ -9,6 +9,7 @@ const {
   parseArguments,
   parseZipListing,
   resolveRepoPath,
+  requireVerifiedJar,
 } = require('../scripts/android-play-release');
 
 const mobileRoot = path.resolve(__dirname, '..');
@@ -261,6 +262,19 @@ describe('Android Play release contract', () => {
     expect(() => normalizeFingerprint('not-a-fingerprint')).toThrow(
       'Invalid SHA-256 certificate fingerprint',
     );
+  });
+
+  it('accepts verified Android self-signed certificates but rejects unsigned jars', () => {
+    expect(requireVerifiedJar({
+      status: 0,
+      stdout: 'jar verified.\n',
+      stderr: 'Warning: certificate is self-signed.\n',
+    })).toBe('jar verified.\n');
+    expect(() => requireVerifiedJar({
+      status: 0,
+      stdout: 'jar is unsigned.\n',
+      stderr: '',
+    })).toThrow('did not confirm a signed JAR');
   });
 
   it('records the largest packaged contributors deterministically', () => {

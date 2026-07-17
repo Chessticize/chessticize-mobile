@@ -179,6 +179,14 @@ function requireSuccessful(result, description) {
   return String(result.stdout ?? '');
 }
 
+function requireVerifiedJar(result) {
+  const output = requireSuccessful(result, 'AAB JAR signature verification failed');
+  if (!/^jar verified\.\s*$/im.test(output)) {
+    throw new Error('AAB JAR signature verification did not confirm a signed JAR.');
+  }
+  return output;
+}
+
 function sha256(filePath) {
   return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
 }
@@ -334,9 +342,11 @@ function inspectAndroidPlayRelease(options, dependencies = {}) {
   }
   verifyNativeElfAlignment(bundlePath, entries, run, environment);
 
-  requireSuccessful(
-    run('jarsigner', ['-verify', '-strict', bundlePath], { encoding: 'utf8' }),
-    'AAB JAR signature verification failed',
+  requireVerifiedJar(
+    run('jarsigner', ['-verify', bundlePath], {
+      encoding: 'utf8',
+      maxBuffer: 64 * 1024 * 1024,
+    }),
   );
   const signerOutput = requireSuccessful(
     run('keytool', ['-printcert', '-jarfile', bundlePath], {
@@ -445,5 +455,6 @@ module.exports = {
   parseSignerFingerprint,
   parseZipListing,
   resolveRepoPath,
+  requireVerifiedJar,
   verifyNativeElfAlignment,
 };
