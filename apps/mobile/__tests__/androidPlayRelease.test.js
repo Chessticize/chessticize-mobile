@@ -458,6 +458,18 @@ describe('Android Play release contract', () => {
     }
   });
 
+  it('accepts exactly one approved signer from real keytool output', () => {
+    const fixture = signedAabFixture();
+    try {
+      expect(requireApprovedSingleSigner(
+        fixture.signerOutput,
+        fixture.approvedFingerprint,
+      )).toBe(fixture.approvedFingerprint);
+    } finally {
+      fixture.cleanup();
+    }
+  });
+
   it('records the largest packaged contributors deterministically', () => {
     expect(parseZipListing(`Archive: candidate.aab
   Length      Date    Time    Name

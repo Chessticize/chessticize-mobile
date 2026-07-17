@@ -338,8 +338,8 @@ function parseSignerFingerprint(output) {
 }
 
 function requireApprovedSingleSigner(output, approvedFingerprint) {
-  const signerBlocks = String(output).split(/(?=^Signer #\d+\s*$)/m)
-    .filter(block => /^Signer #\d+\s*$/m.test(block));
+  const signerBlocks = String(output).split(/(?=^Signer #\d+:?\s*$)/m)
+    .filter(block => /^Signer #\d+:?\s*$/m.test(block));
   if (signerBlocks.length !== 1) {
     throw new Error(`AAB must have exactly one signer; found ${signerBlocks.length}.`);
   }
