@@ -13,6 +13,7 @@ const {
   grantAndroidRuntimePermission,
   withAndroidUiDiagnostics
 } = require('./helpers');
+const releaseVersion = require('../release-version.json');
 
 const APP_ID = 'com.chessticize.mobile';
 const NOTIFICATION_PERMISSION = 'android.permission.POST_NOTIFICATIONS';
@@ -25,6 +26,15 @@ describe('Key user flows', () => {
       newInstance: true,
       delete: true
     });
+  });
+
+  it('shows the installed native version and build in Settings', async () => {
+    await openTab('settings-tab', 'settings-app-version');
+    await waitForElementTextContaining(
+      'settings-app-version',
+      `${releaseVersion.publicVersion} (${releaseVersion.iosBuildNumber})`,
+      10000
+    );
   });
 
   it('fails a standard sprint and shows actionable results', async () => {

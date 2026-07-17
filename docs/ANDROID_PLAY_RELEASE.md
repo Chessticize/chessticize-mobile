@@ -11,7 +11,7 @@ an emulator claim, or a hand-edited passing JSON file.
 - Application ID: `com.chessticize.mobile`
 - Public version: `apps/mobile/release-version.json` (`1.1`)
 - Android version code: `apps/mobile/release-version.json` (`1`)
-- iOS build number: independent (`CURRENT_PROJECT_VERSION = 2`)
+- iOS build number: `apps/mobile/release-version.json` (`2`, independent from Android)
 - Supported ABIs: `arm64-v8a`, `x86_64`
 - Target SDK: API 36
 - Required source tag before any Play track upload: `android-v1.1.0-build-1`
@@ -47,7 +47,8 @@ local signing configuration makes Gradle `bundleRelease` fail closed.
    distributing the candidate through any Play testing track.
 2. Dispatch `Mobile Android release candidate` on that exact ref. The workflow
    materializes the upload keystore only in runner temp, builds one signed AAB,
-   verifies its JAR signer against the approved upload certificate, and retains
+   verifies every non-signature AAB entry is covered by exactly one approved
+   JAR signer, and retains
    the AAB plus `candidate.json` for 30 days.
 3. The verifier requires `com.chessticize.mobile`, the canonical version name
    and version code, only the two approved ABIs, `PAGE_ALIGNMENT_16K`, at least
@@ -73,9 +74,11 @@ cannot produce a `play-ready` verdict and is not enough to close #186.
 
 ## Owner-only Play sequence
 
-Use `docs/android-play-owner-evidence.example.json` as a blank contract. Record
-links or IDs in the protected release record; do not commit credentials,
-tester identities, private console screenshots, or signing material.
+Use `docs/android-play-owner-evidence.example.json` as a blank contract. Every
+completed external gate must carry an evidence ID, an auditable HTTPS reference,
+and the exact commit/AAB/application/version binding. Record links or IDs in the
+protected release record; do not commit credentials, tester identities, private
+console screenshots, or signing material.
 
 1. Complete Play developer account identity verification and register
    `com.chessticize.mobile` under Android developer verification.
@@ -85,11 +88,11 @@ tester identities, private console screenshots, or signing material.
 3. Enter and review the listing, supported-device declaration, content rating,
    privacy-policy URL, and Data safety answers from
    `docs/ANDROID_PLAY_LISTING.md`.
-4. Upload the retained AAB to Internal testing. Install it through Play on an
-   eligible device, confirm the installed version/build in Settings, and retain
-   the track/release/install evidence.
-5. Promote the same version code to Closed testing. Install or upgrade through
-   Play and retain evidence. If the developer account is subject to a minimum
+4. Upload the retained AAB to Internal or Closed testing. Install it through
+   Play on an eligible device, confirm the installed version/build in Settings,
+   and retain the track/release/install evidence. Either track satisfies #186;
+   record both when both were run.
+5. If the developer account is subject to a minimum Closed-testing
    tester/duration requirement, satisfy the live Play Console requirement; do
    not guess it from account age.
 6. Wait for the exact artifact's pre-launch report. Review Stability,

@@ -1,5 +1,7 @@
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
+const { spawnSync } = require('node:child_process');
 
 const {
   inspectBundleEntries,
@@ -8,12 +10,23 @@ const {
   normalizeFingerprint,
   parseArguments,
   parseZipListing,
+  requireApprovedSingleSigner,
   resolveRepoPath,
   requireVerifiedJar,
 } = require('../scripts/android-play-release');
 
 const mobileRoot = path.resolve(__dirname, '..');
 const repoRoot = path.resolve(mobileRoot, '../..');
+const releaseVersion = JSON.parse(read('apps/mobile/release-version.json'));
+
+const expectedCandidate = {
+  commitSha: 'a'.repeat(40),
+  aabSha256: 'b'.repeat(64),
+  applicationId: 'com.chessticize.mobile',
+  versionName: releaseVersion.publicVersion,
+  versionCode: releaseVersion.androidVersionCode,
+  uploadCertificateSha256: '11'.repeat(32),
+};
 
 function read(relativePath) {
   return fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
@@ -27,78 +40,167 @@ function pngDimensions(relativePath) {
   };
 }
 
+function candidateBinding(overrides = {}) {
+  return {
+    commitSha: expectedCandidate.commitSha,
+    aabSha256: expectedCandidate.aabSha256,
+    applicationId: expectedCandidate.applicationId,
+    versionName: expectedCandidate.versionName,
+    versionCode: expectedCandidate.versionCode,
+    ...overrides,
+  };
+}
+
+function evidenceRecord(status, evidenceId, overrides = {}) {
+  return {
+    status,
+    evidenceId,
+    reference: `https://play.google.com/console/evidence/${evidenceId}`,
+    candidate: candidateBinding(),
+    ...overrides,
+  };
+}
+
 function validOwnerEvidence(overrides = {}) {
   return {
-    schemaVersion: 1,
-    candidate: {
-      commitSha: 'a'.repeat(40),
-      aabSha256: 'b'.repeat(64),
-      applicationId: 'com.chessticize.mobile',
-      versionName: '1.1',
-      versionCode: 1,
-    },
+    schemaVersion: 2,
+    candidate: candidateBinding(),
     signing: {
-      playAppSigningEnrolled: true,
-      uploadCertificateSha256: '11'.repeat(32),
+      uploadCertificateSha256: expectedCandidate.uploadCertificateSha256,
       appSigningCertificateSha256: '33'.repeat(32),
+      protectedUploadSigning: evidenceRecord('pass', 'upload-workflow-123', {
+        reference: 'https://github.com/Chessticize/chessticize-mobile/actions/runs/123',
+        workflowRunId: 123,
+        artifactId: 456,
+      }),
+      playAppSigning: evidenceRecord('enrolled', 'play-app-signing-789'),
     },
     console: {
-      developerVerification: 'verified',
-      storeListing: 'reviewed',
-      privacyPolicy: 'reviewed',
-      dataSafety: 'reviewed',
-      supportedDevices: 'reviewed',
+      developerVerification: evidenceRecord('verified', 'developer-verification-1'),
+      storeListing: evidenceRecord('reviewed', 'store-listing-2'),
+      privacyPolicy: evidenceRecord('reviewed', 'privacy-policy-3'),
+      dataSafety: evidenceRecord('reviewed', 'data-safety-4'),
+      supportedDevices: evidenceRecord('reviewed', 'device-catalog-5'),
     },
     testing: {
-      internalInstall: 'pass',
-      closedInstall: 'pass',
-      preLaunch: 'pass',
-      androidMatrix: 'pass',
-      matrixCommitSha: 'a'.repeat(40),
+      internalInstall: evidenceRecord('pass', 'internal-install-6', {
+        track: 'internal',
+        releaseId: 'internal-release-6',
+      }),
+      closedInstall: evidenceRecord('pass', 'closed-install-7', {
+        track: 'closed',
+        releaseId: 'closed-release-7',
+      }),
+      preLaunch: evidenceRecord('pass', 'pre-launch-report-8', {
+        reportId: 'pre-launch-report-8',
+      }),
+      androidMatrix: evidenceRecord('pass', 'android-matrix-9', {
+        reference: 'https://github.com/Chessticize/chessticize-mobile/actions/runs/901',
+        runId: 901,
+        artifactIds: [902, 903],
+      }),
     },
-    production: {
+    production: evidenceRecord('prepared', 'production-draft-10', {
       status: 'prepared',
       rolloutPercentage: 100,
       launched: false,
-    },
+      releaseId: 'production-release-10',
+    }),
     artifacts: {
-      nativeDebugSymbolsRetained: true,
-      licenseNoticesRetained: true,
-      universalApkBytes: 340_000_000,
-      arm64ApkBytes: 310_000_000,
-      largestContributors: [
-        { path: 'base/assets/stockfish/nn-1c0000000000.nnue', bytes: 110_000_000 },
-        { path: 'base/lib/arm64-v8a/libstockfish.so', bytes: 65_000_000 },
-        { path: 'base/assets/puzzle-packs/bundled-core-pack.sqlite', bytes: 8_000_000 },
-      ],
-      universalApkExpectation: {
-        minimumBytes: 300_000_000,
-        maximumBytes: 380_000_000,
-        approvalReference: 'https://github.com/Chessticize/chessticize-mobile/issues/186',
-      },
+      generatedApkSizes: evidenceRecord('pass', 'generated-apk-sizes-11', {
+        universalApkBytes: 340_000_000,
+        arm64ApkBytes: 310_000_000,
+        largestContributors: [
+          { path: 'base/assets/stockfish/nn-1c0000000000.nnue', bytes: 110_000_000 },
+          { path: 'base/lib/arm64-v8a/libstockfish.so', bytes: 65_000_000 },
+          { path: 'base/assets/puzzle-packs/bundled-core-pack.sqlite', bytes: 8_000_000 },
+        ],
+        universalApkExpectation: {
+          minimumBytes: 300_000_000,
+          maximumBytes: 380_000_000,
+          approvalReference: 'https://github.com/Chessticize/chessticize-mobile/issues/186',
+        },
+      }),
     },
     ...overrides,
   };
 }
 
+function runJdkTool(command, args, options = {}) {
+  const result = spawnSync(command, args, { encoding: 'utf8', ...options });
+  if (result.status !== 0) {
+    throw new Error(`${command} ${args.join(' ')} failed: ${result.stderr || result.stdout}`);
+  }
+  return result;
+}
+
+function signedAabFixture({ appendUnsigned = false, addUnexpectedSigner = false } = {}) {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'chessticize-signed-aab-'));
+  const bundlePath = path.join(directory, 'candidate.aab');
+  const keystorePath = path.join(directory, 'signers.p12');
+  const password = 'fixture-password';
+  fs.writeFileSync(path.join(directory, 'approved-entry.txt'), 'approved payload\n');
+  fs.writeFileSync(path.join(directory, 'appended-entry.txt'), 'appended payload\n');
+  runJdkTool('jar', [
+    '--create', '--file', bundlePath, '-C', directory, 'approved-entry.txt',
+  ]);
+  for (const alias of addUnexpectedSigner ? ['approved', 'unexpected'] : ['approved']) {
+    runJdkTool('keytool', [
+      '-genkeypair', '-keystore', keystorePath, '-storetype', 'PKCS12',
+      '-storepass', password, '-keypass', password, '-alias', alias,
+      '-keyalg', 'RSA', '-keysize', '2048', '-validity', '2',
+      '-dname', `CN=${alias}`,
+    ]);
+  }
+  runJdkTool('jarsigner', [
+    '-keystore', keystorePath, '-storepass', password, '-keypass', password,
+    bundlePath, 'approved',
+  ]);
+  if (appendUnsigned) {
+    runJdkTool('jar', [
+      '--update', '--file', bundlePath, '-C', directory, 'appended-entry.txt',
+    ]);
+  }
+  if (addUnexpectedSigner) {
+    runJdkTool('jarsigner', [
+      '-keystore', keystorePath, '-storepass', password, '-keypass', password,
+      bundlePath, 'unexpected',
+    ]);
+  }
+  const approvedCertificate = runJdkTool('keytool', [
+    '-list', '-v', '-keystore', keystorePath, '-storepass', password,
+    '-alias', 'approved',
+  ]).stdout;
+  const approvedFingerprint = normalizeFingerprint(
+    approvedCertificate.match(/SHA256:\s*([0-9A-F:]+)/i)?.[1],
+  );
+  return {
+    approvedFingerprint,
+    bundlePath,
+    cleanup: () => fs.rmSync(directory, { recursive: true, force: true }),
+    entries: runJdkTool('unzip', ['-Z1', bundlePath]).stdout.trim().split(/\r?\n/),
+    signerOutput: runJdkTool('keytool', ['-printcert', '-jarfile', bundlePath]).stdout,
+    verification: spawnSync('jarsigner', ['-verify', '-verbose', bundlePath], {
+      encoding: 'utf8',
+      env: { ...process.env, LANG: 'C' },
+    }),
+  };
+}
+
 describe('Android Play release contract', () => {
   it('uses one public semantic version while Android keeps an independent version code', () => {
-    const releaseVersion = JSON.parse(read('apps/mobile/release-version.json'));
     const appGradle = read('apps/mobile/android/app/build.gradle');
     const iosProject = read(
       'apps/mobile/ios/ChessticizeMobile.xcodeproj/project.pbxproj',
     );
 
-    expect(releaseVersion).toEqual({
-      schemaVersion: 1,
-      publicVersion: '1.1',
-      androidVersionCode: 1,
-    });
+    expect(releaseVersion.schemaVersion).toBe(1);
+    expect(releaseVersion.publicVersion).toMatch(/^\d+\.\d+(?:\.\d+)?$/);
+    expect(releaseVersion.androidVersionCode).toBeGreaterThan(0);
     expect(appGradle).toContain('release-version.json');
     expect(appGradle).toContain('versionCode releaseVersion.androidVersionCode');
     expect(appGradle).toContain('versionName releaseVersion.publicVersion');
-    expect(iosProject).toMatch(/MARKETING_VERSION = 1\.1;/g);
-    expect(iosProject).toMatch(/CURRENT_PROJECT_VERSION = 2;/g);
+    expect(iosProject).not.toMatch(/MARKETING_VERSION = \d/);
   });
 
   it('reads displayed version and build values from each installed artifact', () => {
@@ -237,38 +339,68 @@ describe('Android Play release contract', () => {
   });
 
   it('rejects owner evidence unless every console and exact-artifact gate is complete', () => {
-    const expected = {
-      commitSha: 'a'.repeat(40),
-      aabSha256: 'b'.repeat(64),
-      applicationId: 'com.chessticize.mobile',
-      versionName: '1.1',
-      versionCode: 1,
-      uploadCertificateSha256: '11'.repeat(32),
-    };
-
-    expect(inspectOwnerEvidence(validOwnerEvidence(), expected)).toEqual([]);
+    expect(inspectOwnerEvidence(validOwnerEvidence(), expectedCandidate)).toEqual([]);
 
     const closedTrackOnly = validOwnerEvidence();
-    closedTrackOnly.testing.internalInstall = 'not-run';
-    expect(inspectOwnerEvidence(closedTrackOnly, expected)).toEqual([]);
+    closedTrackOnly.testing.internalInstall = { status: 'not-run' };
+    expect(inspectOwnerEvidence(closedTrackOnly, expectedCandidate)).toEqual([]);
 
     const incomplete = validOwnerEvidence({
       signing: {
-        playAppSigningEnrolled: false,
         uploadCertificateSha256: '00'.repeat(32),
         appSigningCertificateSha256: '',
+        protectedUploadSigning: { status: 'pass' },
+        playAppSigning: { status: 'enrolled' },
       },
-      production: {
-        status: 'prepared',
+      production: evidenceRecord('prepared', 'production-draft-10', {
         rolloutPercentage: 100,
         launched: true,
-      },
+      }),
     });
-    expect(inspectOwnerEvidence(incomplete, expected)).toEqual(
+    expect(inspectOwnerEvidence(incomplete, expectedCandidate)).toEqual(
       expect.arrayContaining([
         expect.stringContaining('Play App Signing'),
         expect.stringContaining('upload certificate'),
         expect.stringContaining('must not be launched'),
+      ]),
+    );
+  });
+
+  it.each([
+    ['aabSha256', 'c'.repeat(64), 'AAB SHA-256'],
+    ['versionName', '99.0', 'version name'],
+    ['versionCode', 999, 'version code'],
+  ])('rejects owner evidence whose per-gate %s binding does not match the exact AAB',
+    (field, value, expectedMessage) => {
+      const evidence = validOwnerEvidence();
+      evidence.console.storeListing.candidate[field] = value;
+      expect(inspectOwnerEvidence(evidence, expectedCandidate)).toEqual(
+        expect.arrayContaining([expect.stringContaining(expectedMessage)]),
+      );
+    });
+
+  it('rejects hand-authored passing flags without auditable references and IDs', () => {
+    const evidence = validOwnerEvidence({
+      signing: {
+        uploadCertificateSha256: expectedCandidate.uploadCertificateSha256,
+        appSigningCertificateSha256: '33'.repeat(32),
+        protectedUploadSigning: { status: 'pass' },
+        playAppSigning: { status: 'enrolled' },
+      },
+      console: {
+        developerVerification: { status: 'verified' },
+        storeListing: { status: 'reviewed' },
+        privacyPolicy: { status: 'reviewed' },
+        dataSafety: { status: 'reviewed' },
+        supportedDevices: { status: 'reviewed' },
+      },
+    });
+    expect(inspectOwnerEvidence(evidence, expectedCandidate)).not.toEqual([]);
+    expect(inspectOwnerEvidence(evidence, expectedCandidate)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('auditable HTTPS reference'),
+        expect.stringContaining('evidence ID'),
+        expect.stringContaining('candidate binding'),
       ]),
     );
   });
@@ -287,17 +419,43 @@ describe('Android Play release contract', () => {
     );
   });
 
-  it('accepts verified Android self-signed certificates but rejects unsigned jars', () => {
+  it('accepts verified Android certificates but rejects unsigned jars', () => {
     expect(requireVerifiedJar({
       status: 0,
-      stdout: 'jar verified.\n',
+      stdout: 'sm 10 Fri Jul 17 00:00:00 UTC 2026 base/payload.bin\njar verified.\n',
       stderr: 'Warning: certificate is self-signed.\n',
-    })).toBe('jar verified.\n');
+    }, ['base/payload.bin'])).toContain('jar verified.');
     expect(() => requireVerifiedJar({
       status: 0,
       stdout: 'jar is unsigned.\n',
       stderr: '',
-    })).toThrow('did not confirm a signed JAR');
+    }, ['base/payload.bin'])).toThrow('did not confirm a signed JAR');
+  });
+
+  it('rejects a signed AAB after an unsigned entry is appended', () => {
+    const fixture = signedAabFixture({ appendUnsigned: true });
+    try {
+      expect(fixture.verification.status).toBe(0);
+      expect(fixture.verification.stdout).toContain('jar verified.');
+      expect(() => requireVerifiedJar(
+        fixture.verification,
+        fixture.entries,
+      )).toThrow(/unsigned.*appended-entry\.txt/i);
+    } finally {
+      fixture.cleanup();
+    }
+  });
+
+  it('rejects AABs with unexpected or multiple signers', () => {
+    const fixture = signedAabFixture({ addUnexpectedSigner: true });
+    try {
+      expect(() => requireApprovedSingleSigner(
+        fixture.signerOutput,
+        fixture.approvedFingerprint,
+      )).toThrow(/exactly one signer/i);
+    } finally {
+      fixture.cleanup();
+    }
   });
 
   it('records the largest packaged contributors deterministically', () => {

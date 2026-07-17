@@ -90,18 +90,43 @@ function inspectOwnerEvidence(evidence, expected) {
       errors.push(`${label} is ${JSON.stringify(actual)}; expected ${JSON.stringify(expectedValue)}.`);
     }
   };
-  const requirePass = (actual, label) => requireEqual(actual, 'pass', label);
+  const candidateFields = [
+    ['commitSha', 'commit SHA'],
+    ['aabSha256', 'AAB SHA-256'],
+    ['applicationId', 'application ID'],
+    ['versionName', 'version name'],
+    ['versionCode', 'version code'],
+  ];
+  const requireEvidenceRecord = (record, status, label) => {
+    requireEqual(record?.status, status, `${label} status`);
+    if (typeof record?.evidenceId !== 'string' || record.evidenceId.trim().length === 0) {
+      errors.push(`${label} must include an evidence ID.`);
+    }
+    let reference;
+    try {
+      reference = new URL(record?.reference);
+    } catch {
+      reference = undefined;
+    }
+    if (reference?.protocol !== 'https:' || !reference.hostname) {
+      errors.push(`${label} must include an auditable HTTPS reference.`);
+    }
+    if (!record?.candidate || typeof record.candidate !== 'object') {
+      errors.push(`${label} must include an exact candidate binding.`);
+    }
+    for (const [field, fieldLabel] of candidateFields) {
+      requireEqual(record?.candidate?.[field], expected[field], `${label} candidate ${fieldLabel}`);
+    }
+    return record;
+  };
 
-  requireEqual(evidence?.schemaVersion, 1, 'Owner evidence schemaVersion');
+  requireEqual(evidence?.schemaVersion, 2, 'Owner evidence schemaVersion');
   requireEqual(evidence?.candidate?.commitSha, expected.commitSha, 'Candidate commit SHA');
   requireEqual(evidence?.candidate?.aabSha256, expected.aabSha256, 'Candidate AAB SHA-256');
   requireEqual(evidence?.candidate?.applicationId, expected.applicationId, 'Candidate application ID');
   requireEqual(evidence?.candidate?.versionName, expected.versionName, 'Candidate version name');
   requireEqual(evidence?.candidate?.versionCode, expected.versionCode, 'Candidate version code');
 
-  if (evidence?.signing?.playAppSigningEnrolled !== true) {
-    errors.push('Play App Signing enrollment is not proven.');
-  }
   try {
     requireEqual(
       normalizeFingerprint(evidence?.signing?.uploadCertificateSha256),
@@ -116,6 +141,22 @@ function inspectOwnerEvidence(evidence, expected) {
   } catch {
     errors.push('Play app-signing certificate SHA-256 is missing or malformed.');
   }
+  const protectedUploadSigning = requireEvidenceRecord(
+    evidence?.signing?.protectedUploadSigning,
+    'pass',
+    'Protected upload-signing workflow',
+  );
+  if (!Number.isSafeInteger(protectedUploadSigning?.workflowRunId) ||
+      protectedUploadSigning.workflowRunId <= 0 ||
+      !Number.isSafeInteger(protectedUploadSigning?.artifactId) ||
+      protectedUploadSigning.artifactId <= 0) {
+    errors.push('Protected upload-signing workflow must record workflow and artifact IDs.');
+  }
+  requireEvidenceRecord(
+    evidence?.signing?.playAppSigning,
+    'enrolled',
+    'Play App Signing enrollment',
+  );
 
   for (const [field, label] of [
     ['developerVerification', 'Android developer verification'],
@@ -124,32 +165,65 @@ function inspectOwnerEvidence(evidence, expected) {
     ['dataSafety', 'Play Data safety'],
     ['supportedDevices', 'Play supported-device review'],
   ]) {
-    requireEqual(evidence?.console?.[field], field === 'developerVerification' ? 'verified' : 'reviewed', label);
+    requireEvidenceRecord(
+      evidence?.console?.[field],
+      field === 'developerVerification' ? 'verified' : 'reviewed',
+      label,
+    );
   }
-  if (![evidence?.testing?.internalInstall, evidence?.testing?.closedInstall].includes('pass')) {
+  const passingInstallRecords = [
+    ['internalInstall', 'internal', 'Internal testing installation'],
+    ['closedInstall', 'closed', 'Closed testing installation'],
+  ].filter(([field]) => evidence?.testing?.[field]?.status === 'pass');
+  if (passingInstallRecords.length === 0) {
     errors.push('An Internal or Closed testing installation must pass.');
+  } else {
+    for (const [field, track, label] of passingInstallRecords) {
+      const record = requireEvidenceRecord(evidence.testing[field], 'pass', label);
+      requireEqual(record?.track, track, `${label} track`);
+      if (typeof record?.releaseId !== 'string' || record.releaseId.length === 0) {
+        errors.push(`${label} must record the Play release ID.`);
+      }
+    }
   }
-  requirePass(evidence?.testing?.preLaunch, 'Play pre-launch report');
-  requirePass(evidence?.testing?.androidMatrix, 'Automated Android validation matrix');
-  requireEqual(
-    evidence?.testing?.matrixCommitSha,
-    expected.commitSha,
-    'Android matrix commit SHA',
+  const preLaunch = requireEvidenceRecord(
+    evidence?.testing?.preLaunch,
+    'pass',
+    'Play pre-launch report',
   );
+  if (typeof preLaunch?.reportId !== 'string' || preLaunch.reportId.length === 0) {
+    errors.push('Play pre-launch report must record the report ID.');
+  }
+  const androidMatrix = requireEvidenceRecord(
+    evidence?.testing?.androidMatrix,
+    'pass',
+    'Automated Android validation matrix',
+  );
+  if (!Number.isSafeInteger(androidMatrix?.runId) || androidMatrix.runId <= 0 ||
+      !Array.isArray(androidMatrix?.artifactIds) || androidMatrix.artifactIds.length === 0 ||
+      androidMatrix.artifactIds.some(id => !Number.isSafeInteger(id) || id <= 0)) {
+    errors.push('Automated Android validation matrix must record its run and artifact IDs.');
+  }
 
-  requireEqual(evidence?.production?.status, 'prepared', 'Production release status');
-  requireEqual(evidence?.production?.rolloutPercentage, 100, 'Production rollout percentage');
-  if (evidence?.production?.launched !== false) {
+  const production = requireEvidenceRecord(
+    evidence?.production,
+    'prepared',
+    'Production release draft',
+  );
+  requireEqual(production?.rolloutPercentage, 100, 'Production rollout percentage');
+  if (production?.launched !== false) {
     errors.push('Production must not be launched by issue #186.');
   }
+  if (typeof production?.releaseId !== 'string' || production.releaseId.length === 0) {
+    errors.push('Production release draft must record the Play release ID.');
+  }
 
-  if (evidence?.artifacts?.nativeDebugSymbolsRetained !== true) {
-    errors.push('Native debug-symbol retention is not proven.');
-  }
-  if (evidence?.artifacts?.licenseNoticesRetained !== true) {
-    errors.push('License-notice retention is not proven.');
-  }
-  const largestContributors = evidence?.artifacts?.largestContributors;
+  const generatedApkSizes = requireEvidenceRecord(
+    evidence?.artifacts?.generatedApkSizes,
+    'pass',
+    'Generated APK size evidence',
+  );
+  const largestContributors = generatedApkSizes?.largestContributors;
   if (!Array.isArray(largestContributors) ||
       largestContributors.length === 0 ||
       largestContributors.some(entry =>
@@ -163,11 +237,11 @@ function inspectOwnerEvidence(evidence, expected) {
     ['universalApkBytes', 'Universal APK size'],
     ['arm64ApkBytes', 'ARM64 APK size'],
   ]) {
-    if (!Number.isSafeInteger(evidence?.artifacts?.[field]) || evidence.artifacts[field] <= 0) {
+    if (!Number.isSafeInteger(generatedApkSizes?.[field]) || generatedApkSizes[field] <= 0) {
       errors.push(`${label} is missing or invalid.`);
     }
   }
-  const expectation = evidence?.artifacts?.universalApkExpectation;
+  const expectation = generatedApkSizes?.universalApkExpectation;
   if (!Number.isSafeInteger(expectation?.minimumBytes) ||
       !Number.isSafeInteger(expectation?.maximumBytes) ||
       expectation.minimumBytes <= 0 ||
@@ -175,9 +249,9 @@ function inspectOwnerEvidence(evidence, expected) {
       typeof expectation?.approvalReference !== 'string' ||
       !/^https:\/\//.test(expectation.approvalReference)) {
     errors.push('Approved universal-APK size expectation is missing or invalid.');
-  } else if (Number.isSafeInteger(evidence?.artifacts?.universalApkBytes) &&
-      (evidence.artifacts.universalApkBytes < expectation.minimumBytes ||
-       evidence.artifacts.universalApkBytes > expectation.maximumBytes)) {
+  } else if (Number.isSafeInteger(generatedApkSizes?.universalApkBytes) &&
+      (generatedApkSizes.universalApkBytes < expectation.minimumBytes ||
+       generatedApkSizes.universalApkBytes > expectation.maximumBytes)) {
     errors.push('Measured universal APK is outside the approved size expectation.');
   }
 
@@ -193,10 +267,32 @@ function requireSuccessful(result, description) {
   return String(result.stdout ?? '');
 }
 
-function requireVerifiedJar(result) {
+function isJarSignatureMetadata(entry) {
+  return /^META-INF\/(?:MANIFEST\.MF|[^/]+\.(?:SF|RSA|DSA|EC)|SIG-[^/]*)$/i.test(entry);
+}
+
+function requireVerifiedJar(result, entries = []) {
   const output = requireSuccessful(result, 'AAB JAR signature verification failed');
   if (!/^jar verified\.\s*$/im.test(output)) {
     throw new Error('AAB JAR signature verification did not confirm a signed JAR.');
+  }
+  const coverageLines = output.split(/\r?\n/).map(line => line.trimEnd());
+  const payloadEntries = entries.filter(entry =>
+    entry && !entry.endsWith('/') && !isJarSignatureMetadata(entry));
+  const duplicateEntries = payloadEntries.filter((entry, index) =>
+    payloadEntries.indexOf(entry) !== index);
+  if (duplicateEntries.length > 0) {
+    throw new Error(`AAB contains duplicate payload entries: ${[...new Set(duplicateEntries)].join(', ')}.`);
+  }
+  for (const entry of payloadEntries) {
+    const matchingLines = coverageLines.filter(line => line.endsWith(` ${entry}`));
+    if (matchingLines.length !== 1) {
+      throw new Error(`AAB signature coverage is missing or ambiguous for ${entry}.`);
+    }
+    const flags = matchingLines[0].match(/^\s*([smk?]+)\s+\d+\s/i)?.[1] ?? '';
+    if (!flags.includes('s') || !flags.includes('m') || flags.includes('?')) {
+      throw new Error(`AAB contains unsigned payload entry ${entry}.`);
+    }
   }
   return output;
 }
@@ -239,6 +335,19 @@ function parseManifest(manifest) {
 function parseSignerFingerprint(output) {
   const value = output.match(/SHA256:\s*([0-9A-F:]{64,})/i)?.[1];
   return normalizeFingerprint(value);
+}
+
+function requireApprovedSingleSigner(output, approvedFingerprint) {
+  const signerBlocks = String(output).split(/(?=^Signer #\d+\s*$)/m)
+    .filter(block => /^Signer #\d+\s*$/m.test(block));
+  if (signerBlocks.length !== 1) {
+    throw new Error(`AAB must have exactly one signer; found ${signerBlocks.length}.`);
+  }
+  const fingerprint = parseSignerFingerprint(signerBlocks[0]);
+  if (fingerprint !== normalizeFingerprint(approvedFingerprint)) {
+    throw new Error('AAB has an unexpected signer certificate.');
+  }
+  return fingerprint;
 }
 
 function resolveRepoPath(value, repoRoot) {
@@ -357,10 +466,12 @@ function inspectAndroidPlayRelease(options, dependencies = {}) {
   verifyNativeElfAlignment(bundlePath, entries, run, environment);
 
   requireVerifiedJar(
-    run('jarsigner', ['-verify', bundlePath], {
+    run('jarsigner', ['-verify', '-verbose', bundlePath], {
       encoding: 'utf8',
       maxBuffer: 64 * 1024 * 1024,
+      env: { ...environment, LANG: 'C' },
     }),
+    entries,
   );
   const signerOutput = requireSuccessful(
     run('keytool', ['-printcert', '-jarfile', bundlePath], {
@@ -369,10 +480,10 @@ function inspectAndroidPlayRelease(options, dependencies = {}) {
     }),
     'Could not inspect the AAB upload certificate',
   );
-  const uploadCertificateSha256 = parseSignerFingerprint(signerOutput);
-  if (uploadCertificateSha256 !== approvedUploadFingerprint) {
-    throw new Error('AAB signer does not match CHESSTICIZE_ANDROID_UPLOAD_CERT_SHA256.');
-  }
+  const uploadCertificateSha256 = requireApprovedSingleSigner(
+    signerOutput,
+    approvedUploadFingerprint,
+  );
   const manifest = requireSuccessful(
     run('java', ['-jar', bundletoolPath, 'dump', 'manifest', `--bundle=${bundlePath}`, '--module=base'], {
       encoding: 'utf8',
@@ -470,6 +581,7 @@ module.exports = {
   parseManifest,
   parseSignerFingerprint,
   parseZipListing,
+  requireApprovedSingleSigner,
   resolveRepoPath,
   requireVerifiedJar,
   verifyNativeElfAlignment,
