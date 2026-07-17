@@ -10,7 +10,8 @@ const {
   waitForVisibleInPracticeScroll,
   waitForElementTextContaining,
   failStandardSprint,
-  grantAndroidRuntimePermission
+  grantAndroidRuntimePermission,
+  withAndroidUiDiagnostics
 } = require('./helpers');
 
 const APP_ID = 'com.chessticize.mobile';
@@ -27,22 +28,27 @@ describe('Key user flows', () => {
   });
 
   it('fails a standard sprint and shows actionable results', async () => {
-    await failStandardSprint();
+    const runWithDiagnostics = device.getPlatform() === 'android'
+      ? withAndroidUiDiagnostics
+      : async (action) => action();
+    await runWithDiagnostics(async () => {
+      await failStandardSprint();
 
-    await waitFor(element(by.id('sprint-result-solved'))).toBeVisible().withTimeout(10000);
-    await expect(element(by.id('sprint-result-reason'))).toBeVisible();
-    await expect(element(by.id('sprint-result-mistakes'))).toBeVisible();
-    await expect(element(by.id('sprint-result-rating-change'))).toBeVisible();
-    await expect(element(by.id('sprint-result-review-impact'))).toBeVisible();
-    await expect(element(by.id('review-mistakes-button'))).toBeVisible();
+      await waitFor(element(by.id('sprint-result-solved'))).toBeVisible().withTimeout(10000);
+      await expect(element(by.id('sprint-result-reason'))).toBeVisible();
+      await expect(element(by.id('sprint-result-mistakes'))).toBeVisible();
+      await expect(element(by.id('sprint-result-rating-change'))).toBeVisible();
+      await expect(element(by.id('sprint-result-review-impact'))).toBeVisible();
+      await expect(element(by.id('review-mistakes-button'))).toBeVisible();
 
-    await element(by.id('play-again-button')).tap();
-    await waitFor(element(by.id('session-board'))).toExist().withTimeout(15000);
+      await element(by.id('play-again-button')).tap();
+      await waitFor(element(by.id('session-board'))).toExist().withTimeout(15000);
 
-    await element(by.id('session-abandon')).tap();
-    await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(5000);
-    await element(by.id('session-abandon-confirm')).tap();
-    await waitFor(element(by.text('Sprint failed'))).toBeVisible().withTimeout(10000);
+      await element(by.id('session-abandon')).tap();
+      await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(5000);
+      await element(by.id('session-abandon-confirm')).tap();
+      await waitFor(element(by.text('Sprint failed'))).toBeVisible().withTimeout(10000);
+    });
   });
 
   it('opens Arrow Duel as a board-move sprint without choice chips', async () => {

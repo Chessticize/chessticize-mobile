@@ -196,6 +196,77 @@ jobs:
           if-no-files-found: error
           path: apps/mobile/artifacts/android-review-reminders/
 
+  android-adaptive-layout:
+    name: Android adaptive public UI
+    if: github.event_name == 'workflow_dispatch'
+    needs: android-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.1.2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: pnpm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download Android APKs
+        uses: actions/download-artifact@v4
+        with:
+          name: android-practice-apks
+          path: apps/mobile/android/app/build/outputs/apk
+
+      - name: Enable KVM acceleration
+        run: |
+          test -c /dev/kvm
+          sudo chmod 0666 /dev/kvm
+
+      - name: Capture phone, tablet, foldable, and ChromeOS evidence
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          ram-size: 4096M
+          disable-animations: true
+          emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          script: apps/mobile/scripts/android-adaptive-layout-evidence.sh
+        env:
+          DETOX_ANDROID_DEVICE: emulator-5554
+
+      - name: Upload Android adaptive evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-adaptive-layout-evidence
+          if-no-files-found: error
+          path: apps/mobile/artifacts/android-adaptive-layout/
+
+      - name: Upload Android adaptive failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-adaptive-layout-diagnostics
+          if-no-files-found: warn
+          path: apps/mobile/artifacts/android-ui/
+
   android-progress-backup:
     name: Android Progress Backup restore evidence
     needs: android-build

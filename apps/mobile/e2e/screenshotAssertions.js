@@ -7,26 +7,98 @@ const zlib = require('zlib');
 function expectBoardScreenshotContainsPieces(screenshotPath, boardFrame, screenFrame) {
   const png = readRgbaPng(screenshotPath);
   const boardPixels = pixelFrameForElement(png, boardFrame, screenFrame);
-  let pieceLikePixels = 0;
+  const occupiedSquares = countOccupiedBoardSquares(png, boardPixels);
 
-  for (let y = boardPixels.y; y < boardPixels.y + boardPixels.height; y += 2) {
-    for (let x = boardPixels.x; x < boardPixels.x + boardPixels.width; x += 2) {
-      const offset = (y * png.width + x) * 4;
-      const r = png.data[offset];
-      const g = png.data[offset + 1];
-      const b = png.data[offset + 2];
-      const a = png.data[offset + 3];
-      const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  // Every valid chess position contains both kings. Detect occupied squares
+  // relative to the two board colors so low-material puzzles remain valid at
+  // any screenshot scale while an empty checkerboard still fails closed.
+  if (occupiedSquares < 2) {
+    throw new Error(`Expected rendered chess pieces, found only ${occupiedSquares} occupied board squares`);
+  }
+}
 
-      if (a > 128 && (luma < 80 || luma > 245)) {
-        pieceLikePixels += 1;
+function countOccupiedBoardSquares(png, boardPixels) {
+  const squareWidth = boardPixels.width / 8;
+  const squareHeight = boardPixels.height / 8;
+  const backgroundSamples = [[], []];
+  const cornerOffsets = [0.12, 0.88];
+
+  for (let row = 0; row < 8; row += 1) {
+    for (let column = 0; column < 8; column += 1) {
+      const parity = (row + column) % 2;
+      for (const yOffset of cornerOffsets) {
+        for (const xOffset of cornerOffsets) {
+          backgroundSamples[parity].push(pixelAt(
+            png,
+            boardPixels.x + ((column + xOffset) * squareWidth),
+            boardPixels.y + ((row + yOffset) * squareHeight)
+          ));
+        }
       }
     }
   }
 
-  if (pieceLikePixels <= 1000) {
-    throw new Error(`Expected rendered chess pieces, found only ${pieceLikePixels} piece-like pixels`);
+  const backgrounds = backgroundSamples.map(medianColor);
+  const sampleStep = Math.max(1, Math.floor(Math.min(squareWidth, squareHeight) / 32));
+  let occupiedSquares = 0;
+
+  for (let row = 0; row < 8; row += 1) {
+    for (let column = 0; column < 8; column += 1) {
+      const background = backgrounds[(row + column) % 2];
+      const left = Math.floor(boardPixels.x + ((column + 0.16) * squareWidth));
+      const right = Math.ceil(boardPixels.x + ((column + 0.84) * squareWidth));
+      const top = Math.floor(boardPixels.y + ((row + 0.16) * squareHeight));
+      const bottom = Math.ceil(boardPixels.y + ((row + 0.84) * squareHeight));
+      let contrastingPixels = 0;
+      let sampledPixels = 0;
+
+      for (let y = top; y < bottom; y += sampleStep) {
+        for (let x = left; x < right; x += sampleStep) {
+          const pixel = pixelAt(png, x, y);
+          if (pixel[3] <= 128) {
+            continue;
+          }
+          sampledPixels += 1;
+          if (maximumChannelDistance(pixel, background) >= 32) {
+            contrastingPixels += 1;
+          }
+        }
+      }
+
+      if (sampledPixels > 0 && contrastingPixels / sampledPixels >= 0.03) {
+        occupiedSquares += 1;
+      }
+    }
   }
+
+  return occupiedSquares;
+}
+
+function pixelAt(png, x, y) {
+  const clampedX = clamp(Math.floor(x), 0, png.width - 1);
+  const clampedY = clamp(Math.floor(y), 0, png.height - 1);
+  const offset = (clampedY * png.width + clampedX) * 4;
+  return [
+    png.data[offset],
+    png.data[offset + 1],
+    png.data[offset + 2],
+    png.data[offset + 3]
+  ];
+}
+
+function medianColor(samples) {
+  return [0, 1, 2, 3].map((channel) => {
+    const values = samples.map((sample) => sample[channel]).sort((left, right) => left - right);
+    return values[Math.floor(values.length / 2)];
+  });
+}
+
+function maximumChannelDistance(left, right) {
+  return Math.max(
+    Math.abs(left[0] - right[0]),
+    Math.abs(left[1] - right[1]),
+    Math.abs(left[2] - right[2])
+  );
 }
 
 function expectFrameContained(childFrame, parentFrame, label) {
@@ -185,6 +257,7 @@ function clamp(value, min, max) {
 }
 
 module.exports = {
+  countOccupiedBoardSquares,
   expectBoardScreenshotContainsPieces,
   expectFrameContained
 };

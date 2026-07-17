@@ -36,6 +36,7 @@
     "mobile:e2e:store-assets:ios": "pnpm --filter ChessticizeMobile e2e:store-assets:ios",
     "mobile:e2e:store-assets:ios:release": "pnpm --filter ChessticizeMobile e2e:store-assets:ios:release",
     "mobile:e2e:adaptive-layout:ios": "pnpm --filter ChessticizeMobile e2e:adaptive-layout:ios",
+    "mobile:e2e:adaptive-layout:android": "pnpm --filter ChessticizeMobile e2e:adaptive-layout:android",
     "mobile:e2e:build:android": "pnpm --filter ChessticizeMobile e2e:build:android",
     "mobile:e2e:test:android": "pnpm --filter ChessticizeMobile e2e:test:android",
     "mobile:e2e:test:android:ci": "pnpm --filter ChessticizeMobile e2e:test:android:ci",

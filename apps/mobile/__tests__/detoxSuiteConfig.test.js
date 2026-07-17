@@ -7,6 +7,7 @@ const {
   ACTIVE_E2E_TEST_MATCH,
   STORE_ASSETS_TEST_MATCH,
   ADAPTIVE_LAYOUT_TEST_MATCH,
+  ANDROID_ADAPTIVE_LAYOUT_TEST_MATCH,
   ANDROID_LAUNCH_TEST_MATCH,
   ANDROID_CUSTOM_PRACTICE_TEST_MATCH,
   ANDROID_HISTORY_TEST_MATCH,
@@ -32,6 +33,7 @@ const {
   launchWithDisabledSynchronization,
   launchWithFreshAndroidRuntimePermission,
   performAndroidPredictiveBackGesture,
+  setAndroidDisplayOrientation,
   waitForRunningStockfishDepth,
   withAndroidUiDiagnostics,
 } = require('../e2e/helpers');
@@ -188,6 +190,22 @@ describe('Detox suite configuration', () => {
     expect(launchSpec).toContain('launchWithDisabledSynchronization');
     expect(helpers).not.toContain('detoxEnableSynchronization: false');
     expect(launchSpec).not.toContain('detoxEnableSynchronization: false');
+  });
+
+  it('normalizes the practice scroll before a directional public-visibility search', () => {
+    const helpers = fs.readFileSync(path.resolve(__dirname, '../e2e/helpers.js'), 'utf8');
+    const helperStart = helpers.indexOf('async function waitForVisibleInPracticeScroll');
+    const helperEnd = helpers.indexOf('async function tapUntilExists', helperStart);
+    const helper = helpers.slice(helperStart, helperEnd);
+    const waitForExist = helper.indexOf('.toExist().withTimeout(180000)');
+    const restoreTop = helper.indexOf("element(by.id('practice-main-scroll')).scrollTo('top')");
+    const requireVisible = helper.indexOf('.toBeVisible()');
+    const scrollDown = helper.indexOf(".scroll(100, 'down')");
+
+    expect(waitForExist).toBeGreaterThan(0);
+    expect(restoreTop).toBeGreaterThan(waitForExist);
+    expect(requireVisible).toBeGreaterThan(restoreTop);
+    expect(scrollDown).toBeGreaterThan(requireVisible);
   });
 
   it('pins the Arrow Duel screenshot to the exact runtime-selected long-arrow fixture', () => {
@@ -419,9 +437,10 @@ describe('Detox suite configuration', () => {
     expect(log).toHaveBeenCalledWith(expect.stringContaining('<node text="Practice" />'));
   });
 
-  it('shares Android UI diagnostics around launch and Stockfish failures', async () => {
+  it('shares Android UI diagnostics around launch, Stockfish, and key-flow failures', async () => {
     const launchSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/android-launch.e2e.js'), 'utf8');
     const stockfishSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/android-stockfish.e2e.js'), 'utf8');
+    const flowsSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/flows.e2e.js'), 'utf8');
     const actionError = new Error('journey failed');
     const action = jest.fn().mockRejectedValue(actionError);
     const collectDiagnostics = jest.fn(() => {
@@ -437,8 +456,10 @@ describe('Detox suite configuration', () => {
     );
     expect(launchSpec).toContain('withAndroidUiDiagnostics');
     expect(stockfishSpec).toContain('withAndroidUiDiagnostics');
+    expect(flowsSpec).toContain('withAndroidUiDiagnostics');
     expect(launchSpec).not.toContain('async function withAndroidUiDiagnostics');
     expect(stockfishSpec).not.toContain('async function withAndroidUiDiagnostics');
+    expect(flowsSpec).not.toContain('async function withAndroidUiDiagnostics');
   });
 
   it('shares inclusive and exclusive running-Stockfish depth polling', async () => {
@@ -575,6 +596,188 @@ describe('Detox suite configuration', () => {
       .toEqual(ADAPTIVE_LAYOUT_TEST_MATCH);
   });
 
+  it('keeps Android adaptive evidence isolated as a targeted public-UI suite', () => {
+    expect(resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'android-adaptive-layout' }))
+      .toEqual(ANDROID_ADAPTIVE_LAYOUT_TEST_MATCH);
+    expect(ANDROID_ADAPTIVE_LAYOUT_TEST_MATCH).toEqual(ADAPTIVE_LAYOUT_TEST_MATCH);
+    expect(ACTIVE_E2E_TEST_MATCH).not.toContain(ANDROID_ADAPTIVE_LAYOUT_TEST_MATCH[0]);
+
+    const spec = fs.readFileSync(path.resolve(__dirname, '../e2e/adaptive-layout.e2e.js'), 'utf8');
+    const screen = fs.readFileSync(
+      path.resolve(__dirname, '../src/components/PracticePocScreen.tsx'),
+      'utf8'
+    );
+    const evidence = fs.readFileSync(
+      path.resolve(__dirname, '../scripts/android-adaptive-layout-evidence.sh'),
+      'utf8'
+    );
+    const workflow = fs.readFileSync(
+      path.resolve(__dirname, '../../../.github/workflows/mobile-android.yml'),
+      'utf8'
+    );
+
+    const requestLandscape = spec.indexOf("setAdaptiveOrientation('landscape')");
+    const waitForSettledLandscape = spec.indexOf(
+      "waitForSettledSprintLayout('landscape')",
+      requestLandscape
+    );
+    const captureLandscape = spec.indexOf("captureSprint('landscape')", requestLandscape);
+    const settledLayoutHelperStart = spec.indexOf('async function waitForSettledSprintLayout');
+    const settledLayoutHelperEnd = spec.indexOf('async function waitForHomeTopFrame', settledLayoutHelperStart);
+    const settledLayoutHelper = spec.slice(settledLayoutHelperStart, settledLayoutHelperEnd);
+    const adaptiveOrientationHelperStart = spec.indexOf('async function setAdaptiveOrientation');
+    const adaptiveOrientationHelperEnd = spec.indexOf(
+      'async function waitForOrientation',
+      adaptiveOrientationHelperStart
+    );
+    const adaptiveOrientationHelper = spec.slice(
+      adaptiveOrientationHelperStart,
+      adaptiveOrientationHelperEnd
+    );
+    expect(requestLandscape).toBeGreaterThan(0);
+    expect(waitForSettledLandscape).toBeGreaterThan(requestLandscape);
+    expect(captureLandscape).toBeGreaterThan(waitForSettledLandscape);
+    expect(spec).not.toContain('sleep(1200)');
+    expect(spec).not.toContain("device.setOrientation('landscape')");
+    expect(spec).toContain('Timed out waiting for ${orientation} layout');
+    expect(spec).toContain('Timed out waiting for ${orientation} session layout geometry');
+    expect(spec).toContain('last observed frames=${JSON.stringify(lastFrames)}');
+    expect(settledLayoutHelper).toContain("frameForIfPresent('active-session-adaptive-layout')");
+    expect(settledLayoutHelper).toContain("frameFor(element(by.id('session-board')))");
+    expect(settledLayoutHelper).toContain('expectFrameContained(');
+    expect(spec).toContain("elementText('session-current-puzzle-id')");
+    expect(spec).not.toContain('session-current-expected-move');
+    expect(screen).not.toContain('session-current-expected-move');
+    expect(spec).toContain("session-accessible-moves-open");
+    expect(spec).not.toContain("playBoardMove('session-board', 'e2e6')");
+    const closeMoveDialog = spec.indexOf("element(by.id('session-accessible-moves-close')).tap()");
+    const waitForMoveDialogClose = spec.indexOf("element(by.id('session-accessible-moves-dialog'))).not.toExist()");
+    const fixtureOption = spec.indexOf("waitForAccessibleMove('c2b1')");
+    const playBoardMove = spec.indexOf("playBoardMove('session-board', 'c2b3')");
+    const nextFixtureOption = spec.lastIndexOf("waitForAccessibleMove('c4b5')");
+    const selectAccessibleMove = spec.lastIndexOf("element(by.id('session-accessible-move-c4b5')).tap()");
+    const firstAccessibleInput = spec.indexOf(
+      "waitFor(element(by.id('session-accessible-moves-open'))).toBeVisible()"
+    );
+    const restorePortrait = spec.indexOf(
+      "await setAdaptiveOrientation('portrait')",
+      captureLandscape
+    );
+    const settleRestoredPortrait = spec.indexOf(
+      "await waitForSettledSprintLayout('portrait')",
+      restorePortrait
+    );
+    const settlePublicRootFocus = spec.indexOf(
+      "waitFor(element(by.id('adaptive-layout'))).toBeVisible().withTimeout(10000)",
+      settleRestoredPortrait
+    );
+    const verifyRestoredPuzzle = spec.indexOf('restoredPuzzleID', settlePublicRootFocus);
+    expect(closeMoveDialog).toBeGreaterThan(0);
+    expect(fixtureOption).toBeGreaterThan(0);
+    expect(closeMoveDialog).toBeGreaterThan(fixtureOption);
+    expect(waitForMoveDialogClose).toBeGreaterThan(closeMoveDialog);
+    expect(playBoardMove).toBeGreaterThan(waitForMoveDialogClose);
+    expect(nextFixtureOption).toBeGreaterThan(playBoardMove);
+    expect(selectAccessibleMove).toBeGreaterThan(playBoardMove);
+    expect(selectAccessibleMove).toBeGreaterThan(nextFixtureOption);
+    expect(restorePortrait).toBeGreaterThan(captureLandscape);
+    expect(settleRestoredPortrait).toBeGreaterThan(restorePortrait);
+    expect(settlePublicRootFocus).toBeGreaterThan(settleRestoredPortrait);
+    expect(verifyRestoredPuzzle).toBeGreaterThan(settlePublicRootFocus);
+    expect(firstAccessibleInput).toBeGreaterThan(verifyRestoredPuzzle);
+    expect(spec).toContain('setAndroidDisplayOrientation(orientation)');
+    expect(spec).toContain('actual-root-bounds=${frame.width}x${frame.height}');
+    expect(adaptiveOrientationHelper.indexOf('setAndroidDisplayOrientation(orientation)')).toBeGreaterThan(0);
+    expect(adaptiveOrientationHelper.indexOf('await waitForOrientation(orientation)'))
+      .toBeGreaterThan(adaptiveOrientationHelper.indexOf('setAndroidDisplayOrientation(orientation)'));
+    expect(adaptiveOrientationHelper.indexOf('fs.appendFileSync'))
+      .toBeGreaterThan(adaptiveOrientationHelper.indexOf('await waitForOrientation(orientation)'));
+    expect(evidence).toContain('phone:1080x2400:420:both:1');
+    expect(evidence).toContain('tablet:1600x2560:320:both:1');
+    expect(evidence).toContain('foldable:1768x2208:420:landscape:1');
+    expect(evidence).toContain('chromeos:1200x1920:240:landscape:1');
+    expect(evidence).toContain('large-text-phone:1080x2400:420:portrait:1.5');
+    expect(evidence).toContain('wm size reset');
+    expect(evidence).toContain('wm density reset');
+    expect(evidence).toContain('settings put system font_scale');
+    expect(evidence).toContain('CHESSTICIZE_ADAPTIVE_ORIENTATION_EVIDENCE="$profile_root/display.txt"');
+    const profileLoop = evidence.indexOf('for profile_spec in "${profiles[@]}"');
+    const stopPreviousProfile = evidence.indexOf(
+      'shell am force-stop com.chessticize.mobile',
+      profileLoop
+    );
+    const resetUserRotation = evidence.indexOf(
+      'shell wm user-rotation lock 0',
+      profileLoop
+    );
+    const applyProfileSize = evidence.indexOf('shell wm size "$size"', profileLoop);
+    expect(stopPreviousProfile).toBeGreaterThan(profileLoop);
+    expect(resetUserRotation).toBeGreaterThan(stopPreviousProfile);
+    expect(applyProfileSize).toBeGreaterThan(resetUserRotation);
+    expect(evidence).toContain('original_user_rotation_state');
+    expect(evidence).toContain('restore_display_rotation');
+    expect(evidence).toContain('git diff --quiet');
+    expect(workflow).toContain('Android adaptive public UI');
+    expect(workflow).toContain("if: github.event_name == 'workflow_dispatch'");
+    expect(workflow).toContain('apps/mobile/scripts/android-adaptive-layout-evidence.sh');
+    expect(workflow).toContain('android-adaptive-layout-evidence');
+  });
+
+  it('polls physical Android rotation to convergence and fails closed with bounded diagnostics', async () => {
+    const environment = {
+      ADB_PATH: '/sdk/platform-tools/adb',
+      DETOX_ANDROID_DEVICE: 'emulator-6000',
+    };
+    const calls = [];
+    let rotationReads = 0;
+    const run = (command, args) => {
+      calls.push([command, args]);
+      if (args.join(' ') === '-s emulator-6000 shell wm user-rotation') {
+        rotationReads += 1;
+        return rotationReads < 3 ? 'lock 0\n' : 'lock 1\n';
+      }
+      return '';
+    };
+    const wait = jest.fn().mockResolvedValue(undefined);
+
+    await expect(Promise.resolve().then(() => setAndroidDisplayOrientation(
+      'landscape',
+      environment,
+      run,
+      { maxAttempts: 3, pollIntervalMs: 25, wait }
+    ))).resolves.toEqual({
+      actualRotation: 1,
+      requestedRotation: 1,
+    });
+    expect(calls).toEqual([
+      ['/sdk/platform-tools/adb', ['-s', 'emulator-6000', 'shell', 'wm', 'user-rotation']],
+      ['/sdk/platform-tools/adb', ['-s', 'emulator-6000', 'shell', 'wm', 'user-rotation', 'lock', '1']],
+      ['/sdk/platform-tools/adb', ['-s', 'emulator-6000', 'shell', 'wm', 'user-rotation']],
+      ['/sdk/platform-tools/adb', ['-s', 'emulator-6000', 'shell', 'wm', 'user-rotation']],
+    ]);
+    expect(wait).toHaveBeenCalledTimes(1);
+    expect(wait).toHaveBeenCalledWith(25);
+
+    await expect(Promise.resolve().then(() => setAndroidDisplayOrientation(
+      'landscape',
+      environment,
+      () => 'unknown command: user-rotation'
+    ))).rejects.toThrow('does not support wm user-rotation');
+
+    const permanentlyStaleWait = jest.fn().mockResolvedValue(undefined);
+    await expect(Promise.resolve().then(() => setAndroidDisplayOrientation(
+      'portrait',
+      environment,
+      (_command, args) => (
+        args.join(' ') === '-s emulator-6000 shell wm user-rotation' ? 'lock 1\n' : ''
+      ),
+      { maxAttempts: 3, pollIntervalMs: 25, wait: permanentlyStaleWait }
+    ))).rejects.toThrow(
+      'Android display rotation did not apply after 3 attempts: requested=0, last state="lock 1"'
+    );
+    expect(permanentlyStaleWait).toHaveBeenCalledTimes(2);
+  });
+
   it('keeps the Android launch smoke isolated from the iOS regression suites', () => {
     expect(resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'android-launch' }))
       .toEqual(ANDROID_LAUNCH_TEST_MATCH);
@@ -604,6 +807,8 @@ describe('Detox suite configuration', () => {
       .toEqual(ANDROID_SYSTEM_BACK_TEST_MATCH);
     expect(resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'android-review-reminders' }))
       .toEqual(ANDROID_REVIEW_REMINDERS_TEST_MATCH);
+    expect(resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'android-adaptive-layout' }))
+      .toEqual(ANDROID_ADAPTIVE_LAYOUT_TEST_MATCH);
   });
 
   it('drives Predictive Back through the Android edge gesture and can verify root delegation', () => {

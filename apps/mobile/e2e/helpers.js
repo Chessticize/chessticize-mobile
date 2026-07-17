@@ -520,6 +520,7 @@ async function selectTestPuzzleSource(source) {
 
 async function waitForVisibleInPracticeScroll(testID) {
   await waitFor(element(by.id(testID))).toExist().withTimeout(180000);
+  await element(by.id('practice-main-scroll')).scrollTo('top');
   await waitFor(element(by.id(testID)))
     .toBeVisible()
     .whileElement(by.id('practice-main-scroll'))
@@ -669,6 +670,53 @@ function androidDisplayMetrics(environment = process.env, run = execFileSync) {
   };
 }
 
+async function setAndroidDisplayOrientation(
+  orientation,
+  environment = process.env,
+  run = execFileSync,
+  {
+    maxAttempts = 20,
+    pollIntervalMs = 100,
+    wait = sleep,
+  } = {}
+) {
+  const requestedRotation = orientation === 'landscape'
+    ? 1
+    : orientation === 'portrait'
+      ? 0
+      : null;
+  if (requestedRotation === null) {
+    throw new Error(`Unsupported Android display orientation ${JSON.stringify(orientation)}`);
+  }
+
+  const adb = androidAdbPath(environment);
+  const serial = environment.DETOX_ANDROID_DEVICE || 'emulator-5554';
+  const shell = (...args) => String(
+    run(adb, ['-s', serial, 'shell', ...args], { encoding: 'utf8' }) ?? ''
+  );
+  const initialRotationState = shell('wm', 'user-rotation').trim();
+  if (!/^(?:free|lock\s+[0-3])$/.test(initialRotationState)) {
+    throw new Error('Android device does not support wm user-rotation display control');
+  }
+
+  shell('wm', 'user-rotation', 'lock', String(requestedRotation));
+  let rotationState = '';
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    rotationState = shell('wm', 'user-rotation').trim();
+    const actualRotation = Number(/^lock\s+([0-3])$/.exec(rotationState)?.[1]);
+    if (actualRotation === requestedRotation) {
+      return { actualRotation, requestedRotation };
+    }
+    if (attempt < maxAttempts) {
+      await wait(pollIntervalMs);
+    }
+  }
+  throw new Error(
+    `Android display rotation did not apply after ${maxAttempts} attempts: `
+    + `requested=${requestedRotation}, last state=${JSON.stringify(rotationState)}`
+  );
+}
+
 function parseAndroidDisplayDensity(output) {
   const overrideDensity = output.match(/Override density:\s*(\d+)/)?.[1];
   const physicalDensity = output.match(/Physical density:\s*(\d+)/)?.[1];
@@ -791,6 +839,7 @@ module.exports = {
   grantAndroidRuntimePermission,
   playBoardMove,
   performAndroidPredictiveBackGesture,
+  setAndroidDisplayOrientation,
   startPracticeMode,
   selectTestPuzzleSource,
   waitForVisibleInPracticeScroll,

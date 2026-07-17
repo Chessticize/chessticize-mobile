@@ -6,6 +6,7 @@ const ACTIVE_E2E_TEST_MATCH = Object.values(ACTIVE_E2E_TEST_MATCH_BY_SUITE).flat
 
 const STORE_ASSETS_TEST_MATCH = ['<rootDir>/e2e/store-assets.e2e.js'];
 const ADAPTIVE_LAYOUT_TEST_MATCH = ['<rootDir>/e2e/adaptive-layout.e2e.js'];
+const ANDROID_ADAPTIVE_LAYOUT_TEST_MATCH = ADAPTIVE_LAYOUT_TEST_MATCH;
 const ANDROID_LAUNCH_TEST_MATCH = ['<rootDir>/e2e/android-launch.e2e.js'];
 const ANDROID_CUSTOM_PRACTICE_TEST_MATCH = ['<rootDir>/e2e/android-custom-practice.e2e.js'];
 const ANDROID_HISTORY_TEST_MATCH = ['<rootDir>/e2e/android-history.e2e.js'];
@@ -99,6 +100,10 @@ function resolveDetoxTestMatch(environment = process.env) {
     return ANDROID_REVIEW_REMINDERS_TEST_MATCH;
   }
 
+  if (activeSuite === 'android-adaptive-layout') {
+    return ANDROID_ADAPTIVE_LAYOUT_TEST_MATCH;
+  }
+
   if (activeSuite) {
     const suiteTestMatch = ACTIVE_E2E_TEST_MATCH_BY_SUITE[activeSuite];
     if (!suiteTestMatch) {
@@ -129,6 +134,7 @@ module.exports = {
   ACTIVE_E2E_TEST_MATCH,
   STORE_ASSETS_TEST_MATCH,
   ADAPTIVE_LAYOUT_TEST_MATCH,
+  ANDROID_ADAPTIVE_LAYOUT_TEST_MATCH,
   ANDROID_LAUNCH_TEST_MATCH,
   ANDROID_CUSTOM_PRACTICE_TEST_MATCH,
   ANDROID_HISTORY_TEST_MATCH,

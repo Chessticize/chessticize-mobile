@@ -63,6 +63,15 @@ function successfulAndroidToolRun(command, args) {
 }
 
 describe('Android launch baseline', () => {
+  it('keeps the shared activity resizable with keyboard and configuration changes handled in place', () => {
+    const manifest = read('android/app/src/main/AndroidManifest.xml');
+
+    expect(manifest).toContain('android:resizeableActivity="true"');
+    expect(manifest).toContain('android:windowSoftInputMode="adjustResize"');
+    expect(manifest).toContain('android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"');
+    expect(manifest).not.toContain('android:screenOrientation');
+  });
+
   it('uses the permanent identity and supported API/ABI envelope', () => {
     const appGradle = read('android/app/build.gradle');
     const gradleProperties = read('android/gradle.properties');
@@ -268,7 +277,7 @@ describe('Android launch baseline', () => {
     const workflow = read('../../.github/workflows/mobile-android.yml');
     const launchJob = workflow.slice(
       workflow.indexOf('  android-launch:'),
-      workflow.indexOf('  android-progress-backup:'),
+      workflow.indexOf('  android-adaptive-layout:'),
     );
 
     expect(launchJob).toContain('api-level: [24, 36]');
