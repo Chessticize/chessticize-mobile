@@ -32,7 +32,7 @@ describe('Key user flows', () => {
     await openTab('settings-tab', 'settings-app-version');
     await waitForElementTextContaining(
       'settings-app-version',
-      `${releaseVersion.publicVersion} (${releaseVersion.iosBuildNumber})`,
+      `${releaseVersion.publicVersion} (${expectedInstalledBuildNumber()})`,
       10000
     );
   });
@@ -338,9 +338,17 @@ function durationTextToSeconds(value) {
   return Number(match[1]) * 60 + Number(match[2]);
 }
 
+function expectedInstalledBuildNumber() {
+  return device.getPlatform() === 'android'
+    ? releaseVersion.androidVersionCode
+    : releaseVersion.iosBuildNumber;
+}
+
 function historyToggleValue(label, active) {
-  const state = active ? 'On' : 'Off';
-  return device.getPlatform() === 'android' ? `${label}, ${state}` : state;
+  if (device.getPlatform() === 'android') {
+    return `${label}, ${active ? 'On' : 'Off'}`;
+  }
+  return active ? '1' : '0';
 }
 
 async function dismissSprintSummary() {

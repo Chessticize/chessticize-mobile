@@ -14,14 +14,18 @@ RCT_EXPORT_MODULE();
 
 - (NSDictionary *)constantsToExport
 {
-  NSString *testNowMs = [self testNowMsFromProcessArguments];
+  NSString *testNowMs = [self processArgumentValueForName:@"chessticizeTestNowMs"];
+  NSString *puzzleSelectionSeed = [self processArgumentValueForName:@"chessticizePuzzleSelectionSeed"];
   BOOL storeAssetCapture = [self hasProcessArgumentNamed:@"chessticizeStoreAssetCapture"];
-  if (testNowMs == nil && !storeAssetCapture) {
+  if (testNowMs == nil && puzzleSelectionSeed == nil && !storeAssetCapture) {
     return @{};
   }
   NSMutableDictionary *constants = [NSMutableDictionary dictionary];
   if (testNowMs != nil) {
     constants[@"testNowMs"] = testNowMs;
+  }
+  if (puzzleSelectionSeed != nil) {
+    constants[@"puzzleSelectionSeed"] = puzzleSelectionSeed;
   }
   if (storeAssetCapture) {
     constants[@"storeAssetCapture"] = @YES;
@@ -45,24 +49,25 @@ RCT_EXPORT_MODULE();
   return NO;
 }
 
-- (NSString *)testNowMsFromProcessArguments
+- (NSString *)processArgumentValueForName:(NSString *)name
 {
   NSArray<NSString *> *arguments = NSProcessInfo.processInfo.arguments;
+  NSString *dashedName = [@"-" stringByAppendingString:name];
+  NSString *plainPrefix = [name stringByAppendingString:@"="];
+  NSString *dashedPrefix = [dashedName stringByAppendingString:@"="];
   for (NSUInteger index = 0; index < arguments.count; index++) {
     NSString *argument = arguments[index];
-    if ([argument isEqualToString:@"-chessticizeTestNowMs"] || [argument isEqualToString:@"chessticizeTestNowMs"]) {
+    if ([argument isEqualToString:name] || [argument isEqualToString:dashedName]) {
       NSUInteger valueIndex = index + 1;
       if (valueIndex < arguments.count) {
         return arguments[valueIndex];
       }
     }
-    NSString *prefixedKey = @"-chessticizeTestNowMs=";
-    if ([argument hasPrefix:prefixedKey]) {
-      return [argument substringFromIndex:prefixedKey.length];
+    if ([argument hasPrefix:dashedPrefix]) {
+      return [argument substringFromIndex:dashedPrefix.length];
     }
-    NSString *plainKey = @"chessticizeTestNowMs=";
-    if ([argument hasPrefix:plainKey]) {
-      return [argument substringFromIndex:plainKey.length];
+    if ([argument hasPrefix:plainPrefix]) {
+      return [argument substringFromIndex:plainPrefix.length];
     }
   }
   return nil;

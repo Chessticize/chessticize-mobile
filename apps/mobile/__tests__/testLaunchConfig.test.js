@@ -1,3 +1,6 @@
+const fs = require("node:fs");
+const path = require("node:path");
+
 const {
   createAdvancingTestClock,
   isStoreAssetCaptureEnabled,
@@ -10,6 +13,20 @@ const {
 } = require("../src/backend/testLaunchConfig");
 
 describe("test launch configuration", () => {
+  it("bridges the deterministic puzzle-selection seed from iOS launch arguments", () => {
+    const iosModule = fs.readFileSync(
+      path.resolve(__dirname, "../ios/ChessticizeMobile/ChessticizeTestLaunchConfig.m"),
+      "utf8"
+    );
+
+    expect(iosModule).toContain(
+      'processArgumentValueForName:@"chessticizePuzzleSelectionSeed"'
+    );
+    expect(iosModule).toContain(
+      'constants[@"puzzleSelectionSeed"] = puzzleSelectionSeed;'
+    );
+  });
+
   it("ignores native test clock values outside development or explicit test harness controls", () => {
     expect(
       resolveTestNowMsFromLaunchConfig(

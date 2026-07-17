@@ -1,6 +1,7 @@
 const fs = require('fs');
 const os = require('node:os');
 const path = require('path');
+const { spawnSync } = require('node:child_process');
 
 const detoxConfig = require('../.detoxrc');
 const mobilePackage = require('../package.json');
@@ -32,6 +33,51 @@ const mobileRoot = path.resolve(__dirname, '..');
 
 function read(relativePath) {
   return fs.readFileSync(path.join(mobileRoot, relativePath), 'utf8');
+}
+
+function runIsolatedOfflinePreparation(availableDataKib) {
+  const isolatedRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'chessticize-android-capacity-'));
+  const scriptsDir = path.join(isolatedRoot, 'scripts');
+  const appApk = path.join(isolatedRoot, 'android/app/build/outputs/apk/e2e/app-e2e.apk');
+  const testApk = path.join(
+    isolatedRoot,
+    'android/app/build/outputs/apk/androidTest/e2e/app-e2e-androidTest.apk'
+  );
+  const fakeAdb = path.join(isolatedRoot, 'fake-adb');
+  fs.mkdirSync(scriptsDir, { recursive: true });
+  fs.mkdirSync(path.dirname(appApk), { recursive: true });
+  fs.mkdirSync(path.dirname(testApk), { recursive: true });
+  fs.copyFileSync(
+    path.join(mobileRoot, 'scripts/prepare-android-offline-e2e.sh'),
+    path.join(scriptsDir, 'prepare-android-offline-e2e.sh')
+  );
+  fs.writeFileSync(appApk, 'app');
+  fs.writeFileSync(testApk, 'test');
+  fs.writeFileSync(fakeAdb, `#!/bin/sh
+case "$*" in
+  *"shell getprop ro.build.version.sdk"*) printf '24\\n' ;;
+  *"shell getprop sys.boot_completed"*) printf '1\\n' ;;
+  *"shell pm trim-caches"*) ;;
+  *"shell df -k /data"*) printf 'Filesystem 1K-blocks Used Available Use%% Mounted on\\n/data 8000000 1 ${availableDataKib} 1%% /data\\n' ;;
+  *"shell id -u"*) printf '0\\n' ;;
+  *"wait-for-device"*) ;;
+  *) printf 'Unexpected fake adb call: %s\\n' "$*" >&2; exit 9 ;;
+esac
+`);
+  fs.chmodSync(fakeAdb, 0o755);
+
+  try {
+    return spawnSync('sh', [path.join(scriptsDir, 'prepare-android-offline-e2e.sh')], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        ADB_PATH: fakeAdb,
+        DETOX_ANDROID_DEVICE: 'emulator-5554',
+      },
+    });
+  } finally {
+    fs.rmSync(isolatedRoot, { recursive: true, force: true });
+  }
 }
 
 function completeAndroidFiles(sdkRoot, appDir, repoRoot) {
@@ -333,8 +379,9 @@ describe('Android launch baseline', () => {
     expect(workflow).not.toMatch(/^\s+pull_request:/m);
   });
 
-  it('gives both Android API emulators fixed realistic memory and preserves failure diagnostics', () => {
+  it('gives both Android API emulators enough memory and data capacity for the packaged app', () => {
     const workflow = read('../../.github/workflows/mobile-android.yml');
+    const prepareScript = read('scripts/prepare-android-offline-e2e.sh');
     const launchJob = workflow.slice(
       workflow.indexOf('  android-launch:'),
       workflow.indexOf('  android-adaptive-layout:'),
@@ -345,8 +392,24 @@ describe('Android launch baseline', () => {
     );
     expect(launchJob).toContain('ram-size: 4096M');
     expect(launchJob.match(/ram-size: 4096M/g)).toHaveLength(1);
+    expect(launchJob).toContain('disk-size: 8192M');
+    expect(launchJob.match(/disk-size: 8192M/g)).toHaveLength(1);
+    expect(prepareScript).toContain('pm trim-caches');
+    expect(prepareScript).toContain('shell df -k /data');
+    expect(prepareScript).toContain('required_data_bytes');
+    expect(prepareScript).toContain('Android /data capacity is insufficient');
     expect(launchJob).toContain('name: Upload Android launch failure diagnostics');
     expect(launchJob).toContain('apps/mobile/artifacts/android-ui/');
+  });
+
+  it('fails before Detox when Android cannot stage the packaged APKs safely', () => {
+    const ready = runIsolatedOfflinePreparation(700000);
+    const insufficient = runIsolatedOfflinePreparation(100);
+
+    expect(ready.status).toBe(0);
+    expect(ready.stdout).toContain('Android /data capacity ready');
+    expect(insufficient.status).toBe(1);
+    expect(insufficient.stderr).toContain('Android /data capacity is insufficient');
   });
 
   it('keeps the complete API 36 suites in the tested matrix runner', () => {

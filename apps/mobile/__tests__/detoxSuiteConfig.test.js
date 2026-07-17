@@ -780,9 +780,13 @@ describe('Detox suite configuration', () => {
     expect(reminderCase).toContain("settings-review-reminder-fixed-1900");
     expect(reminderCase).toContain("'|3|3 reviews are ready|review'");
     expect(reminderCase).toContain("settings-review-reminder-off");
+    expect(flowsSpec).toContain('expectedInstalledBuildNumber()');
+    expect(flowsSpec).toContain('releaseVersion.androidVersionCode');
+    expect(flowsSpec).toContain('releaseVersion.iosBuildNumber');
     expect(flowsSpec).toContain("historyToggleValue('Wrong puzzles only', false)");
     expect(flowsSpec).toContain("historyToggleValue('Sprint attempts only', true)");
-    expect(flowsSpec).toContain("return device.getPlatform() === 'android' ? `${label}, ${state}` : state");
+    expect(flowsSpec).toContain("return `${label}, ${active ? 'On' : 'Off'}`");
+    expect(flowsSpec).toContain("return active ? '1' : '0'");
     expect(flowsSpec).not.toContain('toHaveToggleValue');
   });
 
