@@ -57,7 +57,12 @@ required_data_bytes=$((4 * (app_apk_bytes + test_apk_bytes) + 512 * 1024 * 1024)
 # current Android also accepts the same syntax. Round up to KiB so cache
 # trimming never requests less headroom than the subsequent byte-level check.
 required_data_kib=$(((required_data_bytes + 1023) / 1024))
-"$adb_path" -s "$device" shell pm trim-caches "${required_data_kib}K" >/dev/null
+if ! cache_trim_output="$(
+  "$adb_path" -s "$device" shell pm trim-caches "${required_data_kib}K" 2>&1
+)"; then
+  echo "WARN: Android cache trim was unavailable; continuing to the hard /data capacity check." >&2
+  printf '%s\n' "${cache_trim_output:-<empty>}" >&2
+fi
 available_data_kib="$(
   "$adb_path" -s "$device" shell df -k /data \
     | tr -d '\r' \

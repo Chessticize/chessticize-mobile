@@ -35,7 +35,7 @@ function read(relativePath) {
   return fs.readFileSync(path.join(mobileRoot, relativePath), 'utf8');
 }
 
-function runIsolatedOfflinePreparation(availableDataKib) {
+function runIsolatedOfflinePreparation(availableDataKib, { trimDenied = false } = {}) {
   const isolatedRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'chessticize-android-capacity-'));
   const scriptsDir = path.join(isolatedRoot, 'scripts');
   const appApk = path.join(isolatedRoot, 'android/app/build/outputs/apk/e2e/app-e2e.apk');
@@ -59,7 +59,12 @@ printf '%s\\n' "$*" >> "$FAKE_ADB_CALLS"
 case "$*" in
   *"shell getprop ro.build.version.sdk"*) printf '24\\n' ;;
   *"shell getprop sys.boot_completed"*) printf '1\\n' ;;
-  *"shell pm trim-caches "*[Kk]) ;;
+  *"shell pm trim-caches "*[Kk])
+    if [ "$FAKE_TRIM_DENIED" = "1" ]; then
+      printf 'SecurityException: requires android.permission.CLEAR_APP_CACHE\\n' >&2
+      exit 8
+    fi
+    ;;
   *"shell pm trim-caches"*) printf 'Invalid API 24 trim-caches size: %s\\n' "$*" >&2; exit 8 ;;
   *"shell df -k /data"*) printf 'Filesystem 1K-blocks Used Available Use%% Mounted on\\n/data 8000000 1 ${availableDataKib} 1%% /data\\n' ;;
   *"shell id -u"*) printf '0\\n' ;;
@@ -77,6 +82,7 @@ esac
         ADB_PATH: fakeAdb,
         DETOX_ANDROID_DEVICE: 'emulator-5554',
         FAKE_ADB_CALLS: callsPath,
+        FAKE_TRIM_DENIED: trimDenied ? '1' : '0',
       },
     });
     return {
@@ -477,6 +483,24 @@ describe('Android launch baseline', () => {
     );
     expect(ready.calls.some((call) => /trim-caches [0-9]+$/.test(call))).toBe(false);
     expect(insufficient.status).toBe(1);
+    expect(insufficient.stderr).toContain('Android /data capacity is insufficient');
+  });
+
+  it('treats cache-trim permission denial as a warning but keeps capacity fail-closed', () => {
+    const ready = runIsolatedOfflinePreparation(700000, { trimDenied: true });
+    const insufficient = runIsolatedOfflinePreparation(100, { trimDenied: true });
+    const preinstall = ready.status === 0
+      ? runIsolatedApi24Preinstall()
+      : { status: 99, calls: [] };
+
+    expect(ready.status).toBe(0);
+    expect(ready.stderr).toContain('WARN: Android cache trim was unavailable');
+    expect(ready.stderr).toContain('android.permission.CLEAR_APP_CACHE');
+    expect(ready.stdout).toContain('Android /data capacity ready');
+    expect(preinstall.status).toBe(0);
+    expect(preinstall.calls.filter((call) => call.includes(' install -r -g -t '))).toHaveLength(2);
+    expect(insufficient.status).toBe(1);
+    expect(insufficient.stderr).toContain('WARN: Android cache trim was unavailable');
     expect(insufficient.stderr).toContain('Android /data capacity is insufficient');
   });
 
