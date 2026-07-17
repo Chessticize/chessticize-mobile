@@ -86,20 +86,10 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
         // unfocused application root while the Modal window owns focus.
         const accessibleMoves = await waitForAndroidPublicMoves(['c2b1', 'c2b3']);
         tapAndroidUiNode(accessibleMoves.c2b3);
-        // Give the native window transition one bounded startup interval before
-        // requesting a fresh hierarchy. The hierarchy predicate below, not
-        // this delay, remains the success condition.
-        await sleep(2000);
-        await waitForAndroidUiState({
-          presentResourceIds: ['session-mistakes'],
-          absentResourceIds: [
-            'session-accessible-move-c2b1',
-            'session-accessible-move-c2b3',
-          ],
-          expectedAttributesByResourceId: {
-            'session-mistakes': { 'content-desc': 'Mistakes 1 of 3' },
-          },
-        });
+        // Once the Modal dismisses, return to the focused application window.
+        // The active Sprint clock intentionally keeps that window non-idle for
+        // shell UIAutomator, so prove the post-state through Detox's public UI.
+        await waitFor(element(by.id('session-accessible-move-c2b3'))).not.toExist().withTimeout(10000);
         await waitFor(element(by.label('Mistakes 1 of 3')).atIndex(0)).toExist().withTimeout(10000);
         await waitFor(element(by.id('move-feedback-overlay'))).not.toExist().withTimeout(10000);
 

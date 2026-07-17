@@ -850,12 +850,20 @@ describe('Detox suite configuration', () => {
     expect(spec).not.toContain("playBoardMove('session-board', 'e2e6')");
     const publicAccessibleMoves = spec.indexOf("waitForAndroidPublicMoves(['c2b1', 'c2b3'])");
     const selectAccessibleMove = spec.indexOf('tapAndroidUiNode(accessibleMoves.c2b3)');
-    const settleAfterAccessibleMove = spec.indexOf('await sleep(2000)', selectAccessibleMove);
-    const verifyFreshAccessibleMoveState = spec.indexOf(
-      'await waitForAndroidUiState({',
-      settleAfterAccessibleMove
+    const accessibleChooserGone = spec.indexOf(
+      "waitFor(element(by.id('session-accessible-move-c2b3'))).not.toExist()",
+      selectAccessibleMove
+    );
+    const verifyAccessibleMoveResult = spec.indexOf(
+      "waitFor(element(by.label('Mistakes 1 of 3')).atIndex(0)).toExist()",
+      selectAccessibleMove
+    );
+    const waitForFeedbackToSettle = spec.indexOf(
+      "waitFor(element(by.id('move-feedback-overlay'))).not.toExist()",
+      verifyAccessibleMoveResult
     );
     const playBoardMove = spec.indexOf("playBoardMove('session-board', 'c4b5')");
+    const postAccessibleTap = spec.slice(selectAccessibleMove, playBoardMove);
     const firstAccessibleInput = spec.indexOf(
       "waitFor(element(by.id('session-accessible-moves-open'))).toBeVisible()"
     );
@@ -875,9 +883,12 @@ describe('Detox suite configuration', () => {
     const verifyRestoredPuzzle = spec.indexOf('restoredPuzzleID', settlePublicRootFocus);
     expect(publicAccessibleMoves).toBeGreaterThan(firstAccessibleInput);
     expect(selectAccessibleMove).toBeGreaterThan(publicAccessibleMoves);
-    expect(settleAfterAccessibleMove).toBeGreaterThan(selectAccessibleMove);
-    expect(verifyFreshAccessibleMoveState).toBeGreaterThan(settleAfterAccessibleMove);
+    expect(accessibleChooserGone).toBeGreaterThan(selectAccessibleMove);
+    expect(verifyAccessibleMoveResult).toBeGreaterThan(accessibleChooserGone);
+    expect(waitForFeedbackToSettle).toBeGreaterThan(verifyAccessibleMoveResult);
     expect(playBoardMove).toBeGreaterThan(selectAccessibleMove);
+    expect(postAccessibleTap).not.toContain('waitForAndroidUiState');
+    expect(postAccessibleTap).not.toContain('readAndroidUiHierarchy');
     expect(accessibleInputCount).toBe(1);
     expect(spec).not.toContain("waitFor(element(by.id('session-accessible-moves-dialog')))");
     expect(spec).toContain('withAndroidUiDiagnostics(async () =>');
