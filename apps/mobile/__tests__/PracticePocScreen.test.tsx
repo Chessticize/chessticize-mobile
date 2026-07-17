@@ -1115,21 +1115,87 @@ describe("PracticePocScreen", () => {
     expect(moveIDs).toEqual(candidates.map((move) => `session-accessible-move-${move}`).sort());
   });
 
-  it("keeps the non-gesture move contract available in Review and Analysis", () => {
+  it("advances Analysis through non-gesture Review controls without mutating review records", async () => {
+    const now = "2026-06-20T12:00:00.000Z";
+    const service = createDueReviewService(1);
+    service.recordReviewAttempt({
+      puzzleId: "review-badge-0",
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      result: "wrong",
+      submittedMove: "e2e3",
+      expectedMove: "e2e4",
+      startedAt: "2026-06-20T11:00:00.000Z"
+    }, "2026-06-20T11:00:05.000Z");
     const renderer = renderScreen({
-      currentTimeMs: () => Date.parse("2026-06-20T12:00:00.000Z"),
-      practiceService: createDueReviewService(1)
+      currentTimeMs: () => Date.parse(now),
+      practiceService: service
     });
     press(renderer, "review-tab");
-    press(renderer, "review-start-due");
+    const completedReview = renderer.root.find((node) =>
+      typeof node.props.testID === "string"
+        && node.props.testID.startsWith("review-today-attempt-")
+        && node.props.accessibilityRole === "button"
+    );
+    act(() => completedReview.props.onPress());
 
     expect(findByTestId(renderer, "review-board").props.accessibilityRole).toBe("image");
     expect(findByTestId(renderer, "review-announcement").props.accessibilityLiveRegion).toBe("polite");
+    expect(collectText(findByTestId(renderer, "history-attempt-detail-result"))).toBe("Wrong move");
+    const reviewRecordsBeforeAnalysis = {
+      dueItems: service.getDueReviewItems(now),
+      history: service.listHistory(),
+      queue: service.listReviewQueue(),
+      ratings: service.listRatings()
+    };
+    press(renderer, "review-analysis-button");
+    const analysisStartFen = findByTestId(renderer, "mock-chessboard").props.fen;
+    const announcementBeforeMove = findByTestId(renderer, "review-announcement").props.accessibilityLabel;
+
     press(renderer, "review-accessible-moves-open");
     expect(findByTestId(renderer, "review-accessible-moves-dialog").props.accessibilityViewIsModal).toBe(true);
-    expect(renderer.root.findAll((node) =>
-      typeof node.props.testID === "string" && node.props.testID.startsWith("review-accessible-move-")
-    ).length).toBeGreaterThan(0);
+    const legalAnalysisMove = renderer.root.findAll((node) =>
+      typeof node.props.testID === "string"
+        && node.props.testID.startsWith("review-accessible-move-")
+        && node.props.accessibilityRole === "button"
+    )[0];
+    if (!legalAnalysisMove) {
+      throw new Error("Expected at least one public legal Analysis move");
+    }
+    const legalAnalysisMoveTestID = legalAnalysisMove.props.testID as string;
+    const legalAnalysisMoveUci = legalAnalysisMoveTestID.replace("review-accessible-move-", "");
+    const legalAnalysisMoveFrom = legalAnalysisMoveUci.slice(0, 2);
+    const legalAnalysisMoveTo = legalAnalysisMoveUci.slice(2, 4);
+    const expectedAnalysisPosition = new Chess(analysisStartFen);
+    expect(expectedAnalysisPosition.move({
+      from: legalAnalysisMoveFrom,
+      to: legalAnalysisMoveTo,
+      ...(legalAnalysisMoveUci.length > 4 ? { promotion: legalAnalysisMoveUci.slice(4, 5) } : {})
+    })).toBeTruthy();
+    const expectedAnalysisSide = expectedAnalysisPosition.turn() === "w" ? "White" : "Black";
+    expect(legalAnalysisMove.props.accessibilityRole).toBe("button");
+    expect(legalAnalysisMove.props.accessibilityLabel).toContain(
+      `${legalAnalysisMoveFrom} to ${legalAnalysisMoveTo}`
+    );
+
+    await pressAsync(renderer, legalAnalysisMoveTestID);
+
+    expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(expectedAnalysisPosition.fen());
+    expect(findByTestId(renderer, "mock-chessboard").props.fen).not.toBe(analysisStartFen);
+    expect(findByTestId(renderer, "review-board").props.accessibilityLabel).toBe(
+      `Chess board. ${expectedAnalysisSide} to move. Last move ${legalAnalysisMoveFrom} to ${legalAnalysisMoveTo}`
+    );
+    expect(findByTestId(renderer, "review-announcement").props.accessibilityLabel).toBe(
+      `Analysis Local hint. ${expectedAnalysisSide} to move. Last move ${legalAnalysisMoveFrom} to ${legalAnalysisMoveTo}.`
+    );
+    expect(findByTestId(renderer, "review-announcement").props.accessibilityLabel).not.toBe(announcementBeforeMove);
+    expect(collectText(findByTestId(renderer, "history-attempt-detail-result"))).toBe("Wrong move");
+    expect({
+      dueItems: service.getDueReviewItems(now),
+      history: service.listHistory(),
+      queue: service.listReviewQueue(),
+      ratings: service.listRatings()
+    }).toEqual(reviewRecordsBeforeAnalysis);
   });
 
   it.each([

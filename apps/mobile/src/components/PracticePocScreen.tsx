@@ -7113,7 +7113,7 @@ function ReviewSession({
         accessibilityLabel={feedback
           ? `${feedback.result === "correct" ? "Correct move" : "Wrong move"}. ${feedback.puzzleSolved ? "Puzzle complete." : "Continue the review."}`
           : analysisEnabled
-            ? `Analysis ${analysisEngineLabel || "ready"}`
+            ? `Analysis ${analysisEngineLabel || "ready"}. ${sideToMoveAccessibilityLabel(reviewSideToMove)}.${lastMove ? ` Last move ${lastMove.from} to ${lastMove.to}.` : ""}`
             : `Review puzzle ${reviewProgressPosition} of ${reviewProgressTotal}. ${sideToMoveAccessibilityLabel(reviewSideToMove)}.`}
         accessibilityLiveRegion="polite"
         style={styles.accessibilityAnnouncement}
