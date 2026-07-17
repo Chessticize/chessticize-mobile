@@ -137,6 +137,13 @@ describe('Android Play release contract', () => {
     expect(appGradle).toContain('assets.srcDir(copyPuzzlePackAsset)');
     expect(appGradle).toContain('assets.srcDir(copyStockfishNnueAssets)');
     expect(appGradle).toContain('assets.srcDir(copyReleaseNoticeAssets)');
+    expect(appGradle).toContain('from(puzzlePackSource) {');
+    expect(appGradle).toContain('into "puzzle-packs"');
+    expect(appGradle).toContain('into generatedPuzzlePackAssetsDir');
+    expect(appGradle).toContain('from(stockfishNnueFiles) {');
+    expect(appGradle).toContain('from(stockfishArtifactsFile) {');
+    expect(appGradle).toContain('into "stockfish"');
+    expect(appGradle).toContain('into generatedStockfishAssetsDir');
     expect(strings).toContain('<string name="app_name">Chessticize</string>');
     expect(fs.existsSync(path.join(
       mobileRoot,

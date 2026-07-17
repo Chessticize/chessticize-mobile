@@ -157,14 +157,20 @@ def generatedStockfishAssetsDir = "$buildDir/generated/assets/stockfish-nnue"
 def generatedReleaseNoticeAssetsDir = "$buildDir/generated/assets/release-notices"
 
 def copyPuzzlePackAsset = tasks.register("copyPuzzlePackAsset", Copy) {
-    from puzzlePackSource
-    into "$generatedPuzzlePackAssetsDir/puzzle-packs"
+    from(puzzlePackSource) {
+        into "puzzle-packs"
+    }
+    into generatedPuzzlePackAssetsDir
 }
 
 def copyStockfishNnueAssets = tasks.register("copyStockfishNnueAssets", Sync) {
-    from stockfishNnueFiles
-    from(stockfishArtifactsFile)
-    into "$generatedStockfishAssetsDir/stockfish"
+    from(stockfishNnueFiles) {
+        into "stockfish"
+    }
+    from(stockfishArtifactsFile) {
+        into "stockfish"
+    }
+    into generatedStockfishAssetsDir
     doFirst {
         def missingFiles = stockfishNnueFiles.findAll { source -> !source.isFile() }
         if (!missingFiles.isEmpty()) {
