@@ -53,7 +53,11 @@ esac
 # Keep additional bounded headroom because Detox initializes each API 24 smoke
 # spec independently; a timed-out install must not consume the rest of /data.
 required_data_bytes=$((4 * (app_apk_bytes + test_apk_bytes) + 512 * 1024 * 1024))
-"$adb_path" -s "$device" shell pm trim-caches "$required_data_bytes" >/dev/null
+# Android 7's legacy `pm` parser requires an explicit K/M/G suffix, while
+# current Android also accepts the same syntax. Round up to KiB so cache
+# trimming never requests less headroom than the subsequent byte-level check.
+required_data_kib=$(((required_data_bytes + 1023) / 1024))
+"$adb_path" -s "$device" shell pm trim-caches "${required_data_kib}K" >/dev/null
 available_data_kib="$(
   "$adb_path" -s "$device" shell df -k /data \
     | tr -d '\r' \
