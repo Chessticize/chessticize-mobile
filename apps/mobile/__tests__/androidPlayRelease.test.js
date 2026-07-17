@@ -51,8 +51,8 @@ function read(relativePath) {
   return fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
 }
 
-function pngMetadata(relativePath) {
-  const png = fs.readFileSync(path.join(repoRoot, relativePath));
+function pngMetadataAt(filePath) {
+  const png = fs.readFileSync(filePath);
   expect(png.subarray(0, 8)).toEqual(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
   expect(png.readUInt32BE(8)).toBe(13);
   expect(png.subarray(12, 16).toString('ascii')).toBe('IHDR');
@@ -62,6 +62,22 @@ function pngMetadata(relativePath) {
     bitDepth: png[24],
     colorType: png[25],
   };
+}
+
+function pngMetadata(relativePath) {
+  return pngMetadataAt(path.join(repoRoot, relativePath));
+}
+
+function repeatedByteDigest(byte, size) {
+  const hash = crypto.createHash('sha256');
+  const chunk = Buffer.alloc(1024 * 1024, byte);
+  let remaining = size;
+  while (remaining > 0) {
+    const count = Math.min(remaining, chunk.length);
+    hash.update(count === chunk.length ? chunk : chunk.subarray(0, count));
+    remaining -= count;
+  }
+  return hash.digest('hex');
 }
 
 function candidateBinding(overrides = {}) {
@@ -391,9 +407,10 @@ function sourceReleaseRun(overrides = {}) {
     },
     ...overrides,
   };
-  return (command, args) => responses[command === 'unzip'
-    ? 'unzip manifest'
-    : command === 'curl'
+  return (command, args, options) => {
+    const key = command === 'unzip'
+      ? 'unzip manifest'
+      : command === 'curl'
     ? (args.at(-1).includes('/git/ref/tags/')
       ? 'curl tag ref'
       : args.at(-1).includes('/git/tags/')
@@ -411,10 +428,33 @@ function sourceReleaseRun(overrides = {}) {
         : args.at(-1).startsWith('https://api.github.com/')
           ? 'curl release'
           : 'curl manifest')
-    : `${command} ${args.join(' ')}`] ?? {
-    status: 1,
-    stdout: '',
-    stderr: `Unexpected command: ${command} ${args.join(' ')}`,
+      : `${command} ${args.join(' ')}`;
+    const response = responses[key] ?? {
+      status: 1,
+      stdout: '',
+      stderr: `Unexpected command: ${command} ${args.join(' ')}`,
+    };
+    if (key === 'curl workflow archive' && response.status === 0) {
+      const outputIndex = args.indexOf('--output');
+      if (outputIndex < 0 || options?.maxBuffer !== undefined) {
+        return {
+          status: 70,
+          stdout: '',
+          stderr: 'Refusing a buffered protected workflow archive download.',
+        };
+      }
+      const outputPath = args[outputIndex + 1];
+      if (typeof response.writeOutput === 'function') {
+        response.writeOutput(outputPath);
+      } else {
+        fs.writeFileSync(outputPath, response.stdout);
+      }
+      return { ...response, stdout: '' };
+    }
+    if (key === 'unzip manifest' && !fs.existsSync(args[1])) {
+      return { status: 11, stdout: '', stderr: 'Archive path is missing.' };
+    }
+    return response;
   };
 }
 
@@ -519,6 +559,9 @@ describe('Android Play release contract', () => {
 
   it('packages release symbols and required source notices', () => {
     const appGradle = read('apps/mobile/android/app/build.gradle');
+    const featureRenderer = read(
+      'apps/mobile/store-assets/android/render-feature-graphic.swift',
+    );
     const strings = read(
       'apps/mobile/android/app/src/main/res/values/strings.xml',
     );
@@ -563,7 +606,56 @@ describe('Android Play release contract', () => {
       bitDepth: 8,
       colorType: 2,
     });
+    expect(featureRenderer).toContain('let rgbBitmap = NSBitmapImageRep(');
+    expect(featureRenderer).toContain('samplesPerPixel: 3');
+    expect(featureRenderer).toContain('hasAlpha: false');
+    expect(featureRenderer).toContain('rgbBitmap.representation(using: .png');
   });
+
+  (process.platform === 'darwin' ? it : it.skip)(
+    'renders the Play feature graphic reproducibly as RGB without alpha',
+    () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'chessticize-feature-render-'));
+    const renderedPng = path.join(directory, 'rendered.png');
+    const renderedBmp = path.join(directory, 'rendered.bmp');
+    const checkedBmp = path.join(directory, 'checked.bmp');
+    try {
+      const renderer = path.join(
+        mobileRoot,
+        'store-assets/android/render-feature-graphic.swift',
+      );
+      const swift = spawnSync('/usr/bin/swift', [renderer, renderedPng], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          CLANG_MODULE_CACHE_PATH: path.join(directory, 'module-cache'),
+          SWIFT_MODULECACHE_PATH: path.join(directory, 'module-cache'),
+        },
+      });
+      expect(swift.status).toBe(0);
+      expect(pngMetadataAt(renderedPng)).toEqual({
+        width: 1024,
+        height: 500,
+        bitDepth: 8,
+        colorType: 2,
+      });
+      for (const [input, output] of [
+        [renderedPng, renderedBmp],
+        [path.join(mobileRoot, 'store-assets/android/feature-graphic-1024x500.png'), checkedBmp],
+      ]) {
+        expect(spawnSync('/usr/bin/sips', [
+          '-s', 'format', 'bmp', input, '--out', output,
+        ], { encoding: 'utf8' }).status).toBe(0);
+      }
+      const bitmapDigest = filePath => crypto.createHash('sha256')
+        .update(fs.readFileSync(filePath))
+        .digest('hex');
+      expect(bitmapDigest(renderedBmp)).toBe(bitmapDigest(checkedBmp));
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+    },
+  );
 
   it('pins every transitive Android library build to the canonical NDK', () => {
     const rootGradle = read('apps/mobile/android/build.gradle');
@@ -1301,6 +1393,71 @@ describe('Android Play release contract', () => {
     expect(authenticatedArchiveCall.options.input).toContain(token);
     expect(signedArchiveCall.args).toContain('--location');
     expect(signedArchiveCall.options?.input).toBeUndefined();
+    const outputIndex = signedArchiveCall.args.indexOf('--output');
+    expect(outputIndex).toBeGreaterThan(0);
+    const archivePath = signedArchiveCall.args[outputIndex + 1];
+    expect(signedArchiveCall.options?.maxBuffer).toBeUndefined();
+    expect(fs.existsSync(archivePath)).toBe(false);
+    expect(fs.existsSync(path.dirname(archivePath))).toBe(false);
+  });
+
+  it('streams a protected artifact larger than 256 MiB without buffering it', () => {
+    const archiveSize = 256 * 1024 * 1024 + 1;
+    const archiveDigest = repeatedByteDigest(0, archiveSize);
+    const sourceRelease = validOwnerEvidence().sourceRelease;
+    sourceRelease.sourceManifest.workflowArtifactSha256 = archiveDigest;
+    let outputPath;
+    const fakeRun = sourceReleaseRun({
+      'curl workflow artifact': {
+        status: 0,
+        stdout: JSON.stringify(publishedWorkflowArtifact({
+          digest: `sha256:${archiveDigest}`,
+        })),
+        stderr: '',
+      },
+      'curl workflow archive': {
+        status: 0,
+        stdout: '',
+        stderr: '',
+        writeOutput(filePath) {
+          outputPath = filePath;
+          fs.writeFileSync(filePath, '');
+          fs.truncateSync(filePath, archiveSize);
+        },
+      },
+    });
+
+    expect(inspectPublishedSourceRelease(sourceRelease, expectedCandidate, {
+      repoRoot,
+      run: fakeRun,
+    })).toEqual([]);
+    expect(outputPath).toBeDefined();
+    expect(fs.existsSync(outputPath)).toBe(false);
+    expect(fs.existsSync(path.dirname(outputPath))).toBe(false);
+  });
+
+  it('cleans the streamed archive path when the download fails', () => {
+    const calls = [];
+    const fakeRun = sourceReleaseRun({
+      'curl workflow archive': { status: 22, stdout: '', stderr: 'not found' },
+    });
+    const run = (command, args, options) => {
+      calls.push({ command, args, options });
+      return fakeRun(command, args, options);
+    };
+
+    expect(inspectPublishedSourceRelease(
+      validOwnerEvidence().sourceRelease,
+      expectedCandidate,
+      { repoRoot, run },
+    )).toEqual(expect.arrayContaining([
+      expect.stringContaining('workflow artifact could not be downloaded'),
+    ]));
+    const download = calls.find(call =>
+      call.args.at(-1).startsWith('https://artifact.example.test/'));
+    const archivePath = download.args[download.args.indexOf('--output') + 1];
+    expect(fs.existsSync(archivePath)).toBe(false);
+    expect(fs.existsSync(path.dirname(archivePath))).toBe(false);
   });
 
   it.each([

@@ -59,6 +59,24 @@ function sha256Bytes(bytes) {
   return crypto.createHash('sha256').update(bytes).digest('hex');
 }
 
+function sha256FileContents(filePath) {
+  const hash = crypto.createHash('sha256');
+  const descriptor = fs.openSync(filePath, 'r');
+  const chunk = Buffer.allocUnsafe(1024 * 1024);
+  try {
+    let bytesRead;
+    do {
+      bytesRead = fs.readSync(descriptor, chunk, 0, chunk.length, null);
+      if (bytesRead > 0) {
+        hash.update(chunk.subarray(0, bytesRead));
+      }
+    } while (bytesRead > 0);
+  } finally {
+    fs.closeSync(descriptor);
+  }
+  return hash.digest('hex');
+}
+
 function runGithubCurl(
   run,
   url,
@@ -120,20 +138,11 @@ function readGithubJson(run, url, label, errors, token) {
   }
 }
 
-function readZipEntry(run, archiveBytes, entry) {
-  const temporaryDirectory = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'chessticize-source-artifact-'),
-  );
-  try {
-    const archivePath = path.join(temporaryDirectory, 'artifact.zip');
-    fs.writeFileSync(archivePath, archiveBytes);
-    return run('unzip', ['-p', archivePath, entry], {
-      encoding: null,
-      maxBuffer: 16 * 1024 * 1024,
-    });
-  } finally {
-    fs.rmSync(temporaryDirectory, { recursive: true, force: true });
-  }
+function readZipEntry(run, archivePath, entry) {
+  return run('unzip', ['-p', archivePath, entry], {
+    encoding: null,
+    maxBuffer: 16 * 1024 * 1024,
+  });
 }
 
 function canonicalAndroidSourceTag(versionName, versionCode) {
@@ -795,38 +804,47 @@ function inspectPublishedSourceRelease(sourceRelease, expected, dependencies = {
     errors.push(workflowArchiveRedirect.error);
     return errors;
   }
-  const workflowArchiveResult = run('curl', [
-    '--fail',
-    '--location',
-    '--silent',
-    '--show-error',
-    workflowArchiveRedirect.url,
-  ], { encoding: null, maxBuffer: 256 * 1024 * 1024 });
-  if (workflowArchiveResult.status !== 0) {
-    errors.push('Protected source-manifest workflow artifact could not be downloaded.');
-    return errors;
-  }
-  const workflowArchiveBytes = outputBuffer(workflowArchiveResult.stdout);
-  requireEqual(
-    sha256Bytes(workflowArchiveBytes),
-    sourceManifest.workflowArtifactSha256.toLowerCase(),
-    'Downloaded protected workflow artifact SHA-256',
+  const workflowArchiveDirectory = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'chessticize-source-artifact-'),
   );
-
-  const protectedManifestResult = readZipEntry(
-    run,
-    workflowArchiveBytes,
-    sourceManifest.workflowArtifactEntry,
-  );
-  if (protectedManifestResult.status !== 0) {
-    errors.push('Protected workflow artifact does not contain the recorded source manifest entry.');
-    return errors;
-  }
-  const protectedManifestBytes = outputBuffer(protectedManifestResult.stdout);
-  if (!protectedManifestBytes.equals(sourceManifestBytes)) {
-    errors.push(
-      'Published source manifest bytes do not match the protected workflow artifact manifest.',
+  const workflowArchivePath = path.join(workflowArchiveDirectory, 'artifact.zip');
+  try {
+    const workflowArchiveResult = run('curl', [
+      '--fail',
+      '--location',
+      '--silent',
+      '--show-error',
+      '--output',
+      workflowArchivePath,
+      workflowArchiveRedirect.url,
+    ], { encoding: 'utf8' });
+    if (workflowArchiveResult.status !== 0) {
+      errors.push('Protected source-manifest workflow artifact could not be downloaded.');
+      return errors;
+    }
+    requireEqual(
+      sha256FileContents(workflowArchivePath),
+      sourceManifest.workflowArtifactSha256.toLowerCase(),
+      'Downloaded protected workflow artifact SHA-256',
     );
+
+    const protectedManifestResult = readZipEntry(
+      run,
+      workflowArchivePath,
+      sourceManifest.workflowArtifactEntry,
+    );
+    if (protectedManifestResult.status !== 0) {
+      errors.push('Protected workflow artifact does not contain the recorded source manifest entry.');
+      return errors;
+    }
+    const protectedManifestBytes = outputBuffer(protectedManifestResult.stdout);
+    if (!protectedManifestBytes.equals(sourceManifestBytes)) {
+      errors.push(
+        'Published source manifest bytes do not match the protected workflow artifact manifest.',
+      );
+    }
+  } finally {
+    fs.rmSync(workflowArchiveDirectory, { recursive: true, force: true });
   }
 
   const supportDocumentation = sourceRelease?.sourceDisclosure?.supportDocumentation;
