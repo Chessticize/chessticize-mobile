@@ -80,6 +80,60 @@ esac
   }
 }
 
+function runIsolatedApi24Preinstall({ testPackagePath = 'package:/data/app/test/base.apk' } = {}) {
+  const isolatedRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'chessticize-android-preinstall-'));
+  const scriptsDir = path.join(isolatedRoot, 'scripts');
+  const appApk = path.join(isolatedRoot, 'android/app/build/outputs/apk/e2e/app-e2e.apk');
+  const testApk = path.join(
+    isolatedRoot,
+    'android/app/build/outputs/apk/androidTest/e2e/app-e2e-androidTest.apk'
+  );
+  const fakeAdb = path.join(isolatedRoot, 'fake-adb');
+  const callsPath = path.join(isolatedRoot, 'adb-calls.txt');
+  fs.mkdirSync(scriptsDir, { recursive: true });
+  fs.mkdirSync(path.dirname(appApk), { recursive: true });
+  fs.mkdirSync(path.dirname(testApk), { recursive: true });
+  fs.copyFileSync(
+    path.join(mobileRoot, 'scripts/install-android-detox-apks.sh'),
+    path.join(scriptsDir, 'install-android-detox-apks.sh')
+  );
+  fs.writeFileSync(appApk, 'app');
+  fs.writeFileSync(testApk, 'test');
+  fs.writeFileSync(fakeAdb, `#!/bin/sh
+printf '%s\\n' "$*" >> "$FAKE_ADB_CALLS"
+case "$*" in
+  *"shell getprop ro.build.version.sdk"*) printf '24\\n' ;;
+  *" install -r -g -t "*) printf 'Performing Streamed Install\\nSuccess\\n' ;;
+  *"shell pm path com.chessticize.mobile.test"*) printf '%s\\n' "$FAKE_TEST_PACKAGE_PATH" ;;
+  *"shell pm path com.chessticize.mobile"*) printf 'package:/data/app/main/base.apk\\n' ;;
+  *"wait-for-device"*) ;;
+  *) printf 'Unexpected fake adb call: %s\\n' "$*" >&2; exit 9 ;;
+esac
+`);
+  fs.chmodSync(fakeAdb, 0o755);
+
+  try {
+    const result = spawnSync('sh', [path.join(scriptsDir, 'install-android-detox-apks.sh')], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        ADB_PATH: fakeAdb,
+        DETOX_ANDROID_DEVICE: 'emulator-5554',
+        FAKE_ADB_CALLS: callsPath,
+        FAKE_TEST_PACKAGE_PATH: testPackagePath,
+      },
+    });
+    return {
+      ...result,
+      calls: fs.existsSync(callsPath)
+        ? fs.readFileSync(callsPath, 'utf8').trim().split('\n')
+        : [],
+    };
+  } finally {
+    fs.rmSync(isolatedRoot, { recursive: true, force: true });
+  }
+}
+
 function completeAndroidFiles(sdkRoot, appDir, repoRoot) {
   return new Set([
     sdkRoot,
@@ -410,6 +464,24 @@ describe('Android launch baseline', () => {
     expect(ready.stdout).toContain('Android /data capacity ready');
     expect(insufficient.status).toBe(1);
     expect(insufficient.stderr).toContain('Android /data capacity is insufficient');
+  });
+
+  it('preinstalls both exact API 24 APKs once and fails closed on package verification', () => {
+    const ready = runIsolatedApi24Preinstall();
+    const missingTestPackage = runIsolatedApi24Preinstall({ testPackagePath: '' });
+
+    expect(ready.status).toBe(0);
+    expect(ready.calls.filter((call) => call.includes(' install -r -g -t '))).toHaveLength(2);
+    expect(ready.calls).toEqual(expect.arrayContaining([
+      expect.stringContaining('shell pm path com.chessticize.mobile'),
+      expect.stringContaining('shell pm path com.chessticize.mobile.test'),
+    ]));
+    expect(ready.stdout).toContain('Verified preinstalled package com.chessticize.mobile');
+    expect(ready.stdout).toContain('Verified preinstalled package com.chessticize.mobile.test');
+    expect(missingTestPackage.status).toBe(1);
+    expect(missingTestPackage.stderr).toContain(
+      'Expected exactly one installed APK for com.chessticize.mobile.test'
+    );
   });
 
   it('keeps the complete API 36 suites in the tested matrix runner', () => {

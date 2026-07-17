@@ -156,7 +156,15 @@ describe('Android Standard Practice release slice', () => {
       kind: 'prepare',
       command: 'apps/mobile/scripts/prepare-android-offline-e2e.sh',
     });
-    expect(api24Steps).toContainEqual({ kind: 'detox', suite: 'android-api24-smoke' });
+    expect(api24Steps[1]).toEqual({
+      kind: 'install',
+      command: 'apps/mobile/scripts/install-android-detox-apks.sh',
+    });
+    expect(api24Steps).toContainEqual({
+      kind: 'detox',
+      suite: 'android-api24-smoke',
+      reuseInstalledApp: true,
+    });
     expect(api36Steps[0]).toEqual({
       kind: 'prepare',
       command: 'apps/mobile/scripts/prepare-android-offline-e2e.sh',
