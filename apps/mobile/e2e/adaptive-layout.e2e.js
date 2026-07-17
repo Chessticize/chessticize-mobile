@@ -86,6 +86,10 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
         // unfocused application root while the Modal window owns focus.
         const accessibleMoves = await waitForAndroidPublicMoves(['c2b1', 'c2b3']);
         tapAndroidUiNode(accessibleMoves.c2b3);
+        // Give the native window transition one bounded startup interval before
+        // requesting a fresh hierarchy. The hierarchy predicate below, not
+        // this delay, remains the success condition.
+        await sleep(2000);
         await waitForAndroidUiState({
           presentResourceIds: ['session-mistakes'],
           absentResourceIds: [

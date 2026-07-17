@@ -108,7 +108,7 @@ describe('Detox suite configuration', () => {
   });
 
   it('reads and taps public Android UI nodes through their exposed hierarchy bounds', () => {
-    const hierarchy = '<node resource-id="com.chessticize.mobile:id/session-accessible-move-c2b3" clickable="true" bounds="[100,200][400,600]" />';
+    const hierarchy = '<hierarchy><node resource-id="com.chessticize.mobile:id/session-accessible-move-c2b3" clickable="true" bounds="[100,200][400,600]" /></hierarchy>';
     const run = jest.fn((_command, args) => (
       args.includes('exec-out') ? hierarchy : 'UI hierarchy dumped'
     ));
@@ -127,6 +127,10 @@ describe('Detox suite configuration', () => {
 
     expect(run.mock.calls).toEqual([
       ['/sdk/adb', [
+        '-s', 'emulator-6000', 'shell', 'rm', '-f',
+        '/sdcard/chessticize-public-window.xml'
+      ], expect.objectContaining({ encoding: 'utf8' })],
+      ['/sdk/adb', [
         '-s', 'emulator-6000', 'shell', 'uiautomator', 'dump',
         '/sdcard/chessticize-public-window.xml'
       ], expect.objectContaining({ encoding: 'utf8' })],
@@ -138,6 +142,25 @@ describe('Detox suite configuration', () => {
         '-s', 'emulator-6000', 'shell', 'input', 'tap', '250', '400'
       ], expect.objectContaining({ encoding: 'utf8' })],
     ]);
+  });
+
+  it('rejects a stale hierarchy when a fresh Android UI dump fails', () => {
+    const staleHierarchy = '<hierarchy><node resource-id="session-accessible-move-c2b3" /></hierarchy>';
+    let remoteHierarchy = staleHierarchy;
+    const run = jest.fn((_command, args) => {
+      if (args.includes('rm')) {
+        remoteHierarchy = '';
+        return '';
+      }
+      if (args.includes('uiautomator')) {
+        return 'ERROR: could not get idle state.';
+      }
+      return remoteHierarchy;
+    });
+
+    expect(() => readAndroidUiHierarchy({ ADB_PATH: '/sdk/adb' }, run))
+      .toThrow('Android UI hierarchy dump failed: ERROR: could not get idle state.');
+    expect(run.mock.calls.some(([, args]) => args.includes('exec-out'))).toBe(false);
   });
 
   it('fails closed for missing, ambiguous, or invalid public Android UI bounds', () => {
@@ -194,6 +217,63 @@ describe('Detox suite configuration', () => {
     });
     expect(readHierarchy).toHaveBeenCalledTimes(2);
     expect(delay).toHaveBeenCalledWith(5);
+  });
+
+  it('retries fresh Android UI dump and read failures before accepting public state', async () => {
+    const hierarchy = '<node resource-id="com.chessticize.mobile:id/session-mistakes" content-desc="Mistakes 1 of 3" bounds="[0,1600][1080,2200]" />';
+    const attempts = [
+      new Error('Android UI hierarchy dump failed: ERROR: could not get idle state.'),
+      new Error('Android UI hierarchy read returned empty XML'),
+      hierarchy,
+    ];
+    let clock = 0;
+    const delay = jest.fn(async (milliseconds) => {
+      clock += milliseconds;
+    });
+    const readHierarchy = jest.fn(() => {
+      const attempt = attempts.shift();
+      if (attempt instanceof Error) {
+        throw attempt;
+      }
+      return attempt;
+    });
+
+    await expect(waitForAndroidUiState({
+      presentResourceIds: ['session-mistakes'],
+      expectedAttributesByResourceId: {
+        'session-mistakes': { 'content-desc': 'Mistakes 1 of 3' },
+      },
+    }, {
+      delay,
+      now: () => clock,
+      pollIntervalMs: 5,
+      readHierarchy,
+      timeoutMs: 20,
+    })).resolves.toMatchObject({ hierarchy });
+
+    expect(readHierarchy).toHaveBeenCalledTimes(3);
+    expect(delay).toHaveBeenCalledTimes(2);
+  });
+
+  it('reports the latest fresh hierarchy read failure when polling times out', async () => {
+    let clock = 0;
+    const delay = async (milliseconds) => {
+      clock += milliseconds;
+    };
+
+    await expect(waitForAndroidUiState({
+      presentResourceIds: ['session-mistakes'],
+    }, {
+      delay,
+      now: () => clock,
+      pollIntervalMs: 5,
+      readHierarchy: () => {
+        throw new Error('Android UI hierarchy read returned empty XML');
+      },
+      timeoutMs: 10,
+    })).rejects.toThrow(
+      'latest=Android UI hierarchy read returned empty XML; hierarchy=<unavailable>'
+    );
   });
 
   it('times out with the missing public Android UI state in its diagnostic', async () => {
@@ -770,6 +850,11 @@ describe('Detox suite configuration', () => {
     expect(spec).not.toContain("playBoardMove('session-board', 'e2e6')");
     const publicAccessibleMoves = spec.indexOf("waitForAndroidPublicMoves(['c2b1', 'c2b3'])");
     const selectAccessibleMove = spec.indexOf('tapAndroidUiNode(accessibleMoves.c2b3)');
+    const settleAfterAccessibleMove = spec.indexOf('await sleep(2000)', selectAccessibleMove);
+    const verifyFreshAccessibleMoveState = spec.indexOf(
+      'await waitForAndroidUiState({',
+      settleAfterAccessibleMove
+    );
     const playBoardMove = spec.indexOf("playBoardMove('session-board', 'c4b5')");
     const firstAccessibleInput = spec.indexOf(
       "waitFor(element(by.id('session-accessible-moves-open'))).toBeVisible()"
@@ -790,6 +875,8 @@ describe('Detox suite configuration', () => {
     const verifyRestoredPuzzle = spec.indexOf('restoredPuzzleID', settlePublicRootFocus);
     expect(publicAccessibleMoves).toBeGreaterThan(firstAccessibleInput);
     expect(selectAccessibleMove).toBeGreaterThan(publicAccessibleMoves);
+    expect(settleAfterAccessibleMove).toBeGreaterThan(selectAccessibleMove);
+    expect(verifyFreshAccessibleMoveState).toBeGreaterThan(settleAfterAccessibleMove);
     expect(playBoardMove).toBeGreaterThan(selectAccessibleMove);
     expect(accessibleInputCount).toBe(1);
     expect(spec).not.toContain("waitFor(element(by.id('session-accessible-moves-dialog')))");

@@ -142,8 +142,25 @@ function readAndroidUiHierarchy(
     maxBuffer: 5 * 1024 * 1024,
     timeout: 30000,
   };
-  run(adb, ['-s', serial, 'shell', 'uiautomator', 'dump', remotePath], options);
-  return String(run(adb, ['-s', serial, 'exec-out', 'cat', remotePath], options) ?? '');
+  // uiautomator can return exit code zero after printing "could not get idle
+  // state" and leave the previous XML untouched. Remove the prior attempt
+  // first and do not read the path unless this attempt reports no dump error.
+  run(adb, ['-s', serial, 'shell', 'rm', '-f', remotePath], options);
+  const dumpOutput = String(
+    run(adb, ['-s', serial, 'shell', 'uiautomator', 'dump', remotePath], options) ?? ''
+  ).trim();
+  if (/\berror\b|could not get idle state/i.test(dumpOutput)) {
+    throw new Error(`Android UI hierarchy dump failed: ${dumpOutput || '<no output>'}`);
+  }
+  const hierarchy = String(
+    run(adb, ['-s', serial, 'exec-out', 'cat', remotePath], options) ?? ''
+  ).trim();
+  if (!hierarchy || !/<hierarchy\b/i.test(hierarchy)) {
+    throw new Error(
+      `Android UI hierarchy read returned ${hierarchy ? 'invalid' : 'empty'} XML`
+    );
+  }
+  return hierarchy;
 }
 
 function androidUiAttribute(node, attribute) {
@@ -239,10 +256,11 @@ async function waitForAndroidUiState(
     throw new Error('Android UI state requires at least one present or absent resource ID');
   }
   const deadline = now() + timeoutMs;
-  let latestHierarchy = '';
+  let latestHierarchy = '<unavailable>';
   let latestFailure = 'not observed';
   while (true) {
     try {
+      latestHierarchy = '<unavailable>';
       latestHierarchy = String(readHierarchy() ?? '');
       const nodes = {};
       for (const resourceId of presentResourceIds) {
