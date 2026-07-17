@@ -498,6 +498,13 @@ Pre-launch Report triage, Data Safety/privacy review, license/source checks,
 
 ### ANDROID-12 — Publish the Play-signed universal APK to GitHub Releases
 
+**Status:** Repository-owned protected preparation/publication automation,
+fail-closed artifact/API/APK verification, checksum evidence, release guidance,
+and the Android Settings link are implemented by #187. Live Play access,
+Generated APK evidence, protected approvals, cross-channel installation, and
+the documented #186/#187 canonical-release ordering conflict remain owner
+evidence before the issue can close.
+
 **Depends on:** ANDROID-11
 
 **Outcome:** GitHub users receive the same production-signed build as Play

@@ -5002,6 +5002,31 @@ describe("PracticePocScreen", () => {
     expect(collectText(renderer.root)).not.toContain("iCloud");
   });
 
+  it("opens the official Android GitHub Releases page only after a user gesture", () => {
+    const renderer = renderScreen({
+      progressProtection: { kind: "android_managed_backup" },
+      applicationMetadata: {
+        releasePageUrl: "https://github.com/Chessticize/chessticize-mobile/releases"
+      }
+    });
+    const openURLSpy = jest.spyOn(ReactNative.Linking, "openURL").mockResolvedValue(undefined);
+
+    press(renderer, "settings-tab");
+
+    const releases = findByTestId(renderer, "settings-android-releases");
+    expect(collectText(releases)).toContain("Android Releases");
+    expect(collectText(releases)).toContain("Manual Play-signed APK downloads");
+    expect(collectText(releases)).toContain("Open GitHub Releases");
+    expect(openURLSpy).not.toHaveBeenCalled();
+
+    press(renderer, "settings-android-releases");
+    expect(openURLSpy).toHaveBeenCalledTimes(1);
+    expect(openURLSpy).toHaveBeenCalledWith(
+      "https://github.com/Chessticize/chessticize-mobile/releases",
+    );
+    openURLSpy.mockRestore();
+  });
+
   it("renders installed application metadata from the platform capability bundle", () => {
     const renderer = renderScreen({
       applicationMetadata: {

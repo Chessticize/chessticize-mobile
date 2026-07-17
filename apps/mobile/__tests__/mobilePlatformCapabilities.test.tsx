@@ -66,8 +66,25 @@ describe('mobile platform capabilities', () => {
     expect(capabilities.reminders.platform).toBe('android');
     expect(capabilities.reminders.scheduler).not.toBeNull();
     expect(capabilities.reminders.notificationClient).not.toBeNull();
-    expect(capabilities.applicationMetadata).toBe(installedApplicationMetadata);
+    expect(capabilities.applicationMetadata).toEqual({
+      ...installedApplicationMetadata,
+      releasePageUrl: 'https://github.com/Chessticize/chessticize-mobile/releases',
+    });
     delete (NativeModules as Record<string, unknown>).ReviewReminderNotifications;
+  });
+
+  it('exposes the manual GitHub Releases link only through Android capabilities', () => {
+    const service = createMobilePracticeService('random1000');
+    expect(composeAndroidMobilePlatformCapabilities(
+      service,
+      installedApplicationMetadata,
+    ).applicationMetadata.releasePageUrl).toBe(
+      'https://github.com/Chessticize/chessticize-mobile/releases',
+    );
+    expect(composeIOSMobilePlatformCapabilities(
+      service,
+      installedApplicationMetadata,
+    ).applicationMetadata.releasePageUrl).toBeUndefined();
   });
 
   it('fails closed when installed artifact metadata is unavailable or incomplete', () => {

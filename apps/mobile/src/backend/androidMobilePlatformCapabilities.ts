@@ -5,6 +5,7 @@ import {
   createPersistentMobilePracticeServiceSync,
 } from './mobilePractice.ts';
 import {
+  MOBILE_ANDROID_RELEASES_URL,
   type MobileApplicationMetadata,
   type MobilePlatformCapabilities,
 } from './mobilePlatformCapabilities.ts';
@@ -56,6 +57,9 @@ export function composeAndroidMobilePlatformCapabilities(
       scheduler: createNativeReviewReminderScheduler(),
       notificationClient: createNativeReviewReminderNotificationClient(),
     },
-    applicationMetadata,
+    applicationMetadata: {
+      ...applicationMetadata,
+      releasePageUrl: MOBILE_ANDROID_RELEASES_URL,
+    },
   };
 }

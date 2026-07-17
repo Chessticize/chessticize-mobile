@@ -27,6 +27,7 @@
     "verify:android:abis": "node scripts/verify-android-apk-abis.js android/app/build/outputs/apk/e2e/app-e2e.apk",
     "verify:android:backup": "node scripts/verify-android-progress-backup.js",
     "verify:android:release": "node scripts/android-play-release.js",
+    "verify:android:github-release": "node scripts/android-github-release-cli.js",
     "version:ios:sync": "node scripts/ios-release-version.js",
     "version:ios:check": "node scripts/ios-release-version.js --check"
   },
