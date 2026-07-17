@@ -449,6 +449,23 @@ describe('Android launch baseline', () => {
     expect(workflow).not.toMatch(/^\s+pull_request:/m);
   });
 
+  it('reclaims unrelated hosted-runner toolchains and fails early without Android build headroom', () => {
+    const workflow = read('../../.github/workflows/mobile-android.yml');
+    const cleanup = workflow.indexOf('name: Reclaim hosted runner disk for Android native build');
+    const headroom = workflow.indexOf('name: Require Android native build disk headroom');
+    const nativeBuild = workflow.indexOf('name: Build self-contained E2E app and Detox test APK');
+
+    expect(cleanup).toBeGreaterThan(0);
+    expect(headroom).toBeGreaterThan(cleanup);
+    expect(headroom).toBeLessThan(nativeBuild);
+    expect(workflow).toContain('/opt/hostedtoolcache/CodeQL');
+    expect(workflow).toContain('/usr/local/.ghcup');
+    expect(workflow).toContain('/usr/share/dotnet');
+    expect(workflow).toContain('docker system prune --all --force');
+    expect(workflow).toContain('minimum_kib=$((20 * 1024 * 1024))');
+    expect(workflow).toContain('Insufficient hosted-runner disk for the Android native build');
+  });
+
   it('gives both Android API emulators enough memory and data capacity for the packaged app', () => {
     const workflow = read('../../.github/workflows/mobile-android.yml');
     const prepareScript = read('scripts/prepare-android-offline-e2e.sh');
