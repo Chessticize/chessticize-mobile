@@ -78,26 +78,23 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
       await waitFor(element(by.id('session-accessible-moves-dialog'))).toExist().withTimeout(10000);
       // Familiar 15's first Standard puzzle is a versioned product fixture:
       // c2b3 is legal but wrong, while alternate mate c2b1 is accepted. Confirm
-      // the public accessibility surface exposes that fixture before touching
-      // the physical board, rather than reading a hidden domain answer.
+      // the public accessibility surface exposes that fixture, then use the
+      // same public non-gesture surface to submit the first wrong move rather
+      // than reading a hidden domain answer.
       await waitForAccessibleMove('c2b1');
-      await element(by.id('session-accessible-moves-close')).tap();
+      await waitForAccessibleMove('c2b3');
+      await element(by.id('session-accessible-move-c2b3')).tap();
       await waitFor(element(by.id('session-accessible-moves-dialog'))).not.toExist().withTimeout(10000);
-      await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
-      await playBoardMove('session-board', 'c2b3');
       await waitFor(element(by.id('move-feedback-overlay'))).toExist().withTimeout(10000);
       await waitFor(element(by.label('Mistakes 1 of 3')).atIndex(0)).toExist().withTimeout(10000);
       await waitFor(element(by.id('move-feedback-overlay'))).not.toExist().withTimeout(10000);
 
-      await waitFor(element(by.id('session-accessible-moves-open'))).toBeVisible().withTimeout(10000);
-      await element(by.id('session-accessible-moves-open')).tap();
-      await waitFor(element(by.id('session-accessible-moves-dialog'))).toExist().withTimeout(10000);
       // A terminal wrong result advances the sprint to Familiar 15 puzzle two;
       // c4b5 is its maintained legal-wrong fixture move (also used by the full
-      // public-UI sprint failure journey).
-      await waitForAccessibleMove('c4b5');
-      await element(by.id('session-accessible-move-c4b5')).tap();
-      await waitFor(element(by.id('session-accessible-moves-dialog'))).not.toExist().withTimeout(10000);
+      // public-UI sprint failure journey). Submit that move through the real
+      // board to retain coordinate-mapping evidence on every display profile.
+      await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
+      await playBoardMove('session-board', 'c4b5');
       await waitFor(element(by.id('move-feedback-overlay'))).toExist().withTimeout(10000);
       await waitFor(element(by.label('Mistakes 2 of 3')).atIndex(0)).toExist().withTimeout(10000);
       await waitFor(element(by.id('session-progress'))).toHaveText('0 / 15').withTimeout(10000);

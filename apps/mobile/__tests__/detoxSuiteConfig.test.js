@@ -652,15 +652,15 @@ describe('Detox suite configuration', () => {
     expect(screen).not.toContain('session-current-expected-move');
     expect(spec).toContain("session-accessible-moves-open");
     expect(spec).not.toContain("playBoardMove('session-board', 'e2e6')");
-    const closeMoveDialog = spec.indexOf("element(by.id('session-accessible-moves-close')).tap()");
     const waitForMoveDialogClose = spec.indexOf("element(by.id('session-accessible-moves-dialog'))).not.toExist()");
     const fixtureOption = spec.indexOf("waitForAccessibleMove('c2b1')");
-    const playBoardMove = spec.indexOf("playBoardMove('session-board', 'c2b3')");
-    const nextFixtureOption = spec.lastIndexOf("waitForAccessibleMove('c4b5')");
-    const selectAccessibleMove = spec.lastIndexOf("element(by.id('session-accessible-move-c4b5')).tap()");
+    const accessibleWrongOption = spec.indexOf("waitForAccessibleMove('c2b3')");
+    const selectAccessibleMove = spec.indexOf("element(by.id('session-accessible-move-c2b3')).tap()");
+    const playBoardMove = spec.indexOf("playBoardMove('session-board', 'c4b5')");
     const firstAccessibleInput = spec.indexOf(
       "waitFor(element(by.id('session-accessible-moves-open'))).toBeVisible()"
     );
+    const accessibleInputCount = spec.match(/element\(by\.id\('session-accessible-moves-open'\)\)\.tap\(\)/g)?.length ?? 0;
     const restorePortrait = spec.indexOf(
       "await setAdaptiveOrientation('portrait')",
       captureLandscape
@@ -674,14 +674,12 @@ describe('Detox suite configuration', () => {
       settleRestoredPortrait
     );
     const verifyRestoredPuzzle = spec.indexOf('restoredPuzzleID', settlePublicRootFocus);
-    expect(closeMoveDialog).toBeGreaterThan(0);
     expect(fixtureOption).toBeGreaterThan(0);
-    expect(closeMoveDialog).toBeGreaterThan(fixtureOption);
-    expect(waitForMoveDialogClose).toBeGreaterThan(closeMoveDialog);
+    expect(accessibleWrongOption).toBeGreaterThan(fixtureOption);
+    expect(selectAccessibleMove).toBeGreaterThan(accessibleWrongOption);
+    expect(waitForMoveDialogClose).toBeGreaterThan(selectAccessibleMove);
     expect(playBoardMove).toBeGreaterThan(waitForMoveDialogClose);
-    expect(nextFixtureOption).toBeGreaterThan(playBoardMove);
-    expect(selectAccessibleMove).toBeGreaterThan(playBoardMove);
-    expect(selectAccessibleMove).toBeGreaterThan(nextFixtureOption);
+    expect(accessibleInputCount).toBe(1);
     expect(restorePortrait).toBeGreaterThan(captureLandscape);
     expect(settleRestoredPortrait).toBeGreaterThan(restorePortrait);
     expect(settlePublicRootFocus).toBeGreaterThan(settleRestoredPortrait);
