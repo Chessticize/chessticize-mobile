@@ -51,6 +51,7 @@ describe('Android Standard Practice release slice', () => {
     expect(appGradle).toContain('matchingFallbacks = ["debug"]');
     expect(appGradle).toContain('manifestPlaceholders = [usesCleartextTraffic: false]');
     expect(appGradle).toContain('hermesCommand = "$rootDir/../node_modules/hermes-compiler/hermesc/%OS-BIN%/hermesc"');
+    expect(e2eManifest).toContain('android.permission.INTERNET');
     expect(e2eManifest).toContain('android:networkSecurityConfig="@xml/network_security_config"');
     expect(e2eNetworkSecurityConfig).toContain('<base-config cleartextTrafficPermitted="false"');
     expect(e2eNetworkSecurityConfig).toContain('<domain-config cleartextTrafficPermitted="true"');
