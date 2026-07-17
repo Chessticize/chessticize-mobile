@@ -1058,6 +1058,18 @@ describe('Detox suite configuration', () => {
       .toEqual(ANDROID_ADAPTIVE_LAYOUT_TEST_MATCH);
   });
 
+  it('resets Stockfish state without uninstalling the attached Android test app', () => {
+    const stockfishSpecs = [
+      '../e2e/android-stockfish-smoke.e2e.js',
+      '../e2e/android-stockfish.e2e.js',
+    ].map(relativePath => fs.readFileSync(path.resolve(__dirname, relativePath), 'utf8'));
+
+    for (const spec of stockfishSpecs) {
+      expect(spec).toContain('resetAppState: true');
+      expect(spec).not.toContain('delete: true');
+    }
+  });
+
   it('drives Predictive Back through the Android edge gesture and can verify root delegation', () => {
     const run = jest.fn((_, args) => {
       if (args.includes('size')) {

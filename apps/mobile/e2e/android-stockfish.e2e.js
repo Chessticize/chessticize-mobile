@@ -11,7 +11,7 @@ const {
 describe('Android on-device Stockfish analysis', () => {
   beforeAll(async () => {
     await withAndroidUiDiagnostics(async () => {
-      await launchWithDisabledSynchronization({ delete: true, newInstance: true });
+      await launchWithDisabledSynchronization({ resetAppState: true, newInstance: true });
     });
   });
 
