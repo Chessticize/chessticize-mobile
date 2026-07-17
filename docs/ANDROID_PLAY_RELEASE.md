@@ -82,15 +82,31 @@ console screenshots, or signing material.
 
 The owner evidence schema v3 adds the mandatory `sourceRelease` record. After
 the protected candidate workflow passes, attach its unchanged
-`android-source-manifest.json` to the canonical public GitHub release and record
-the release and asset IDs plus the manifest SHA-256. The final verifier checks
-the local tag object and resolved commit, queries the live GitHub release API,
-matches the published release and retained asset, downloads the asset, verifies
-its digest, and binds the protected artifact-only audit inside it to the exact
-commit, AAB, package, version, and code. Plausible hand-authored URLs or IDs do
-not satisfy this check. A missing tag, unpublished or draft release, unavailable
-API, missing asset digest, or mismatched manifest fails closed. This repository
-does not currently claim that the owner-only tag or release exists.
+`android-source-manifest.json` to the canonical public GitHub release. Record
+both the GitHub release asset ID and the protected Actions workflow run,
+artifact ID, artifact name, archive SHA-256, and manifest entry path. The final
+verifier dereferences the live GitHub tag ref and annotated tag object to the
+exact candidate commit; verifies the published release, release notes, and
+retained asset; downloads the protected Actions artifact; and requires the
+manifest bytes in that artifact to exactly match the public release asset. It
+then binds the audit inside the manifest to the exact commit, AAB, package,
+version, and code.
+
+Set `CHESSTICIZE_GITHUB_TOKEN` or `GITHUB_TOKEN` to a GitHub token that can read
+the retained Actions artifact before requesting a `play-ready` verdict. The
+verifier passes this credential to `curl` through standard input, not command
+arguments. Do not put it in owner evidence or commit it.
+
+For Android version `1.1` build `1`, release notes and this support document must
+name the canonical source tag `android-v1.1.0-build-1` and the public source
+repository `https://github.com/Chessticize/chessticize-mobile`. The evidence
+record points to this document at the exact candidate commit and records its
+SHA-256. Plausible hand-authored URLs, IDs, or matching-looking JSON do not
+satisfy these checks. A missing or lightweight public tag, a different tag
+target, an unpublished or draft release, an unavailable API or artifact,
+mismatched archive or manifest bytes, or incomplete source disclosure fails
+closed. This repository does not currently claim that the owner-only tag or
+release exists.
 
 1. Complete Play developer account identity verification and register
    `com.chessticize.mobile` under Android developer verification.

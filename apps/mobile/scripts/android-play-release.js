@@ -31,7 +31,110 @@ const REQUIRED_RUNTIME_ASSETS = [
 ];
 const ANDROID_SOURCE_REPOSITORY_URL =
   'https://github.com/Chessticize/chessticize-mobile';
+const ANDROID_SOURCE_REPOSITORY_API_URL =
+  'https://api.github.com/repos/Chessticize/chessticize-mobile';
 const ANDROID_SOURCE_MANIFEST_NAME = 'android-source-manifest.json';
+const ANDROID_SOURCE_MANIFEST_ARTIFACT_ENTRY =
+  'artifacts/android-release/android-source-manifest.json';
+const ANDROID_RELEASE_WORKFLOW_NAME = 'Mobile Android release candidate';
+const ANDROID_RELEASE_WORKFLOW_PATH =
+  '.github/workflows/mobile-android-release-candidate.yml';
+const ANDROID_SOURCE_SUPPORT_PATH = 'docs/ANDROID_PLAY_RELEASE.md';
+
+function createErrorCollector() {
+  const errors = [];
+  const requireEqual = (actual, expectedValue, label) => {
+    if (actual !== expectedValue) {
+      errors.push(`${label} is ${JSON.stringify(actual)}; expected ${JSON.stringify(expectedValue)}.`);
+    }
+  };
+  return { errors, requireEqual };
+}
+
+function outputBuffer(value) {
+  return Buffer.isBuffer(value) ? value : Buffer.from(String(value ?? ''));
+}
+
+function sha256Bytes(bytes) {
+  return crypto.createHash('sha256').update(bytes).digest('hex');
+}
+
+function runGithubCurl(
+  run,
+  url,
+  { token, encoding = 'utf8', maxBuffer, captureHeaders = false } = {},
+) {
+  const args = [
+    '--fail',
+    '--silent',
+    '--show-error',
+    '--header',
+    'Accept: application/vnd.github+json',
+    '--header',
+    'X-GitHub-Api-Version: 2022-11-28',
+  ];
+  const options = { encoding, ...(maxBuffer ? { maxBuffer } : {}) };
+  if (token) {
+    args.push('--config', '-');
+    options.input = `header = "Authorization: Bearer ${token}"\n`;
+  } else {
+    args.push('--location');
+  }
+  if (captureHeaders) {
+    args.push('--dump-header', '-', '--output', '/dev/null');
+  }
+  args.push(url);
+  return run('curl', args, options);
+}
+
+function requestGithubDownloadRedirect(run, url, token) {
+  const result = runGithubCurl(run, url, { token, captureHeaders: true });
+  if (result.status !== 0) {
+    return { error: 'Protected workflow artifact redirect could not be requested.' };
+  }
+  const locations = [...String(result.stdout).matchAll(/^location:\s*(\S+)\s*$/gim)];
+  const location = locations.at(-1)?.[1];
+  let redirect;
+  try {
+    redirect = new URL(location);
+  } catch {
+    redirect = undefined;
+  }
+  if (redirect?.protocol !== 'https:' || redirect.username || redirect.password) {
+    return { error: 'Protected workflow artifact did not return a valid HTTPS download redirect.' };
+  }
+  return { url: redirect.href };
+}
+
+function readGithubJson(run, url, label, errors, token) {
+  const result = runGithubCurl(run, url, { token });
+  if (result.status !== 0) {
+    errors.push(`${label} could not be verified through the GitHub API.`);
+    return undefined;
+  }
+  try {
+    return JSON.parse(String(result.stdout));
+  } catch {
+    errors.push(`${label} GitHub API response is malformed.`);
+    return undefined;
+  }
+}
+
+function readZipEntry(run, archiveBytes, entry) {
+  const temporaryDirectory = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'chessticize-source-artifact-'),
+  );
+  try {
+    const archivePath = path.join(temporaryDirectory, 'artifact.zip');
+    fs.writeFileSync(archivePath, archiveBytes);
+    return run('unzip', ['-p', archivePath, entry], {
+      encoding: null,
+      maxBuffer: 16 * 1024 * 1024,
+    });
+  } finally {
+    fs.rmSync(temporaryDirectory, { recursive: true, force: true });
+  }
+}
 
 function canonicalAndroidSourceTag(versionName, versionCode) {
   const match = String(versionName).match(/^(\d+)\.(\d+)(?:\.(\d+))?$/);
@@ -100,12 +203,7 @@ function inspectBundleEntries(entries, { pageAlignment } = {}) {
 }
 
 function inspectOwnerEvidence(evidence, expected) {
-  const errors = [];
-  const requireEqual = (actual, expectedValue, label) => {
-    if (actual !== expectedValue) {
-      errors.push(`${label} is ${JSON.stringify(actual)}; expected ${JSON.stringify(expectedValue)}.`);
-    }
-  };
+  const { errors, requireEqual } = createErrorCollector();
   const candidateFields = [
     ['commitSha', 'commit SHA'],
     ['aabSha256', 'AAB SHA-256'],
@@ -184,7 +282,8 @@ function inspectOwnerEvidence(evidence, expected) {
   }
   const sourceManifest = sourceRelease?.sourceManifest;
   requireEqual(sourceManifest?.status, 'retained', 'Source manifest status');
-  if (!Number.isSafeInteger(sourceManifest?.artifactId) || sourceManifest.artifactId <= 0) {
+  if (!Number.isSafeInteger(sourceManifest?.releaseAssetId) ||
+      sourceManifest.releaseAssetId <= 0) {
     errors.push('Source manifest must record its retained GitHub release artifact ID.');
   }
   requireEqual(
@@ -215,7 +314,60 @@ function inspectOwnerEvidence(evidence, expected) {
     expected.commitSha,
     'Source manifest commit SHA',
   );
+  if (!Number.isSafeInteger(sourceManifest?.workflowRunId) ||
+      sourceManifest.workflowRunId <= 0) {
+    errors.push('Source manifest must record its protected workflow run ID.');
+  }
+  const expectedWorkflowReference =
+    `${ANDROID_SOURCE_REPOSITORY_URL}/actions/runs/${sourceManifest?.workflowRunId}`;
+  requireEqual(
+    sourceManifest?.workflowRunReference,
+    expectedWorkflowReference,
+    'Source manifest protected workflow run reference',
+  );
+  if (!Number.isSafeInteger(sourceManifest?.workflowArtifactId) ||
+      sourceManifest.workflowArtifactId <= 0) {
+    errors.push('Source manifest must record its protected workflow artifact ID.');
+  }
+  requireEqual(
+    sourceManifest?.workflowArtifactName,
+    `android-signed-release-candidate-${expected.commitSha}`,
+    'Source manifest protected workflow artifact name',
+  );
+  requireEqual(
+    sourceManifest?.workflowArtifactEntry,
+    ANDROID_SOURCE_MANIFEST_ARTIFACT_ENTRY,
+    'Source manifest protected workflow artifact entry',
+  );
+  if (typeof sourceManifest?.workflowArtifactSha256 !== 'string' ||
+      !/^[0-9a-f]{64}$/i.test(sourceManifest.workflowArtifactSha256)) {
+    errors.push('Source manifest must record its protected workflow artifact SHA-256 digest.');
+  }
   requireCandidateBinding(sourceManifest?.candidate, 'Source manifest');
+
+  const sourceDisclosure = sourceRelease?.sourceDisclosure;
+  requireEqual(
+    sourceDisclosure?.releaseNotesReference,
+    expectedSourceReleaseUrl,
+    'Source release notes reference',
+  );
+  const expectedSupportReference =
+    `https://raw.githubusercontent.com/Chessticize/chessticize-mobile/` +
+    `${expected.commitSha}/${ANDROID_SOURCE_SUPPORT_PATH}`;
+  const supportDocumentation = requireEvidenceRecord(
+    sourceDisclosure?.supportDocumentation,
+    'published',
+    'Public Android source support documentation',
+  );
+  requireEqual(
+    supportDocumentation?.reference,
+    expectedSupportReference,
+    'Public Android source support documentation URL',
+  );
+  if (typeof supportDocumentation?.sha256 !== 'string' ||
+      !/^[0-9a-f]{64}$/i.test(supportDocumentation.sha256)) {
+    errors.push('Public Android source support documentation must record its SHA-256 digest.');
+  }
 
   try {
     requireEqual(
@@ -242,6 +394,21 @@ function inspectOwnerEvidence(evidence, expected) {
       protectedUploadSigning.artifactId <= 0) {
     errors.push('Protected upload-signing workflow must record workflow and artifact IDs.');
   }
+  requireEqual(
+    sourceManifest?.workflowRunId,
+    protectedUploadSigning?.workflowRunId,
+    'Source manifest protected workflow run ID',
+  );
+  requireEqual(
+    sourceManifest?.workflowRunReference,
+    protectedUploadSigning?.reference,
+    'Source manifest protected workflow reference',
+  );
+  requireEqual(
+    sourceManifest?.workflowArtifactId,
+    protectedUploadSigning?.artifactId,
+    'Source manifest protected workflow artifact ID',
+  );
   requireEvidenceRecord(
     evidence?.signing?.playAppSigning,
     'enrolled',
@@ -351,13 +518,9 @@ function inspectOwnerEvidence(evidence, expected) {
 function inspectPublishedSourceRelease(sourceRelease, expected, dependencies = {}) {
   const run = dependencies.run ?? spawnSync;
   const repoRoot = dependencies.repoRoot ?? path.resolve(__dirname, '../../..');
-  const errors = [];
+  const environment = dependencies.environment ?? process.env;
+  const { errors, requireEqual } = createErrorCollector();
   const expectedTag = canonicalAndroidSourceTag(expected.versionName, expected.versionCode);
-  const requireEqual = (actual, expectedValue, label) => {
-    if (actual !== expectedValue) {
-      errors.push(`${label} is ${JSON.stringify(actual)}; expected ${JSON.stringify(expectedValue)}.`);
-    }
-  };
   const runGit = args => run('git', args, { cwd: repoRoot, encoding: 'utf8' });
 
   const tagObjectType = runGit(['cat-file', '-t', expectedTag]);
@@ -392,30 +555,59 @@ function inspectPublishedSourceRelease(sourceRelease, expected, dependencies = {
     }
   }
 
-  const releaseApiUrl =
-    `https://api.github.com/repos/Chessticize/chessticize-mobile/releases/` +
-    `${sourceRelease?.releaseId}`;
-  const releaseResult = run('curl', [
-    '--fail',
-    '--location',
-    '--silent',
-    '--show-error',
-    '--header',
-    'Accept: application/vnd.github+json',
-    '--header',
-    'X-GitHub-Api-Version: 2022-11-28',
-    releaseApiUrl,
-  ], { encoding: 'utf8' });
-  if (releaseResult.status !== 0) {
-    errors.push('Public Android source release could not be verified through the GitHub API.');
+  const tagRef = readGithubJson(
+    run,
+    `${ANDROID_SOURCE_REPOSITORY_API_URL}/git/ref/tags/${encodeURIComponent(expectedTag)}`,
+    'Published GitHub tag ref',
+    errors,
+  );
+  if (!tagRef) {
+    return errors;
+  }
+  requireEqual(tagRef?.ref, `refs/tags/${expectedTag}`, 'Published GitHub tag ref name');
+  if (tagRef?.object?.type !== 'tag') {
+    errors.push('The published GitHub tag ref must target an annotated tag object.');
+    return errors;
+  }
+  if (typeof tagRef?.object?.sha !== 'string' ||
+      !/^[0-9a-f]{40}$/i.test(tagRef.object.sha)) {
+    errors.push('Published GitHub tag ref has no valid annotated tag object SHA.');
     return errors;
   }
 
-  let release;
-  try {
-    release = JSON.parse(String(releaseResult.stdout));
-  } catch {
-    errors.push('Public Android source release GitHub API response is malformed.');
+  const publishedTag = readGithubJson(
+    run,
+    `${ANDROID_SOURCE_REPOSITORY_API_URL}/git/tags/${tagRef.object.sha}`,
+    'Published GitHub annotated tag object',
+    errors,
+  );
+  if (!publishedTag) {
+    return errors;
+  }
+  requireEqual(publishedTag?.tag, expectedTag, 'Published GitHub annotated tag name');
+  requireEqual(
+    publishedTag?.object?.type,
+    'commit',
+    'Published GitHub annotated tag target type',
+  );
+  requireEqual(
+    publishedTag?.object?.sha,
+    expected.commitSha,
+    'Published GitHub annotated tag commit SHA',
+  );
+  if (sourceRelease?.tagType === 'signed' && publishedTag?.verification?.verified !== true) {
+    errors.push('Published GitHub source tag is recorded as signed but is not verified by GitHub.');
+  }
+
+  const releaseApiUrl =
+    `${ANDROID_SOURCE_REPOSITORY_API_URL}/releases/${sourceRelease?.releaseId}`;
+  const release = readGithubJson(
+    run,
+    releaseApiUrl,
+    'Public Android source release',
+    errors,
+  );
+  if (!release) {
     return errors;
   }
 
@@ -427,10 +619,15 @@ function inspectPublishedSourceRelease(sourceRelease, expected, dependencies = {
       !Number.isFinite(Date.parse(release.published_at))) {
     errors.push('Public Android source release is not a published non-draft GitHub release.');
   }
+  const releaseBody = String(release?.body ?? '');
+  if (!releaseBody.includes(expectedTag) ||
+      !releaseBody.includes(ANDROID_SOURCE_REPOSITORY_URL)) {
+    errors.push('Published GitHub release notes must disclose the exact source tag and repository URL.');
+  }
 
   const sourceManifest = sourceRelease?.sourceManifest;
   const releaseAsset = Array.isArray(release?.assets)
-    ? release.assets.find(asset => asset?.id === sourceManifest?.artifactId)
+    ? release.assets.find(asset => asset?.id === sourceManifest?.releaseAssetId)
     : undefined;
   if (!releaseAsset) {
     errors.push('Retained source manifest is not present in the published GitHub release.');
@@ -464,11 +661,9 @@ function inspectPublishedSourceRelease(sourceRelease, expected, dependencies = {
     errors.push('Retained source manifest could not be downloaded from the GitHub release.');
     return errors;
   }
-  const sourceManifestBytes = Buffer.isBuffer(sourceManifestResult.stdout)
-    ? sourceManifestResult.stdout
-    : Buffer.from(String(sourceManifestResult.stdout ?? ''));
+  const sourceManifestBytes = outputBuffer(sourceManifestResult.stdout);
   requireEqual(
-    crypto.createHash('sha256').update(sourceManifestBytes).digest('hex'),
+    sha256Bytes(sourceManifestBytes),
     sourceManifest.sha256.toLowerCase(),
     'Downloaded source manifest SHA-256',
   );
@@ -511,6 +706,152 @@ function inspectPublishedSourceRelease(sourceRelease, expected, dependencies = {
       downloadedSourceManifest?.bundle?.[field],
       expectedField,
       `Downloaded source manifest ${label}`,
+    );
+  }
+
+  const githubToken = environment.CHESSTICIZE_GITHUB_TOKEN ?? environment.GITHUB_TOKEN;
+  if (typeof githubToken !== 'string' || !/^[A-Za-z0-9_-]+$/.test(githubToken)) {
+    errors.push(
+      'CHESSTICIZE_GITHUB_TOKEN or GITHUB_TOKEN is required to verify the protected workflow artifact.',
+    );
+    return errors;
+  }
+
+  const workflowRun = readGithubJson(
+    run,
+    `${ANDROID_SOURCE_REPOSITORY_API_URL}/actions/runs/${sourceManifest.workflowRunId}`,
+    'Protected source-manifest workflow run',
+    errors,
+    githubToken,
+  );
+  if (!workflowRun) {
+    return errors;
+  }
+  requireEqual(workflowRun?.id, sourceManifest.workflowRunId, 'Protected workflow run ID');
+  requireEqual(workflowRun?.name, ANDROID_RELEASE_WORKFLOW_NAME, 'Protected workflow name');
+  requireEqual(workflowRun?.path, ANDROID_RELEASE_WORKFLOW_PATH, 'Protected workflow path');
+  requireEqual(workflowRun?.event, 'workflow_dispatch', 'Protected workflow event');
+  requireEqual(workflowRun?.status, 'completed', 'Protected workflow status');
+  requireEqual(workflowRun?.conclusion, 'success', 'Protected workflow conclusion');
+  requireEqual(workflowRun?.head_sha, expected.commitSha, 'Protected workflow head SHA');
+  requireEqual(
+    workflowRun?.html_url,
+    sourceManifest.workflowRunReference,
+    'Protected workflow run URL',
+  );
+
+  const workflowArtifact = readGithubJson(
+    run,
+    `${ANDROID_SOURCE_REPOSITORY_API_URL}/actions/artifacts/` +
+      `${sourceManifest.workflowArtifactId}`,
+    'Protected source-manifest workflow artifact',
+    errors,
+    githubToken,
+  );
+  if (!workflowArtifact) {
+    return errors;
+  }
+  const expectedArchiveUrl =
+    `${ANDROID_SOURCE_REPOSITORY_API_URL}/actions/artifacts/` +
+    `${sourceManifest.workflowArtifactId}/zip`;
+  requireEqual(
+    workflowArtifact?.id,
+    sourceManifest.workflowArtifactId,
+    'Protected workflow artifact ID',
+  );
+  requireEqual(
+    workflowArtifact?.name,
+    sourceManifest.workflowArtifactName,
+    'Protected workflow artifact name',
+  );
+  requireEqual(workflowArtifact?.expired, false, 'Protected workflow artifact expired state');
+  requireEqual(
+    String(workflowArtifact?.digest ?? '').toLowerCase(),
+    `sha256:${sourceManifest.workflowArtifactSha256.toLowerCase()}`,
+    'Protected workflow artifact digest',
+  );
+  requireEqual(
+    workflowArtifact?.archive_download_url,
+    expectedArchiveUrl,
+    'Protected workflow artifact archive URL',
+  );
+  requireEqual(
+    workflowArtifact?.workflow_run?.id,
+    sourceManifest.workflowRunId,
+    'Protected workflow artifact run ID',
+  );
+  requireEqual(
+    workflowArtifact?.workflow_run?.head_sha,
+    expected.commitSha,
+    'Protected workflow artifact head SHA',
+  );
+
+  const workflowArchiveRedirect = requestGithubDownloadRedirect(
+    run,
+    expectedArchiveUrl,
+    githubToken,
+  );
+  if (workflowArchiveRedirect.error) {
+    errors.push(workflowArchiveRedirect.error);
+    return errors;
+  }
+  const workflowArchiveResult = run('curl', [
+    '--fail',
+    '--location',
+    '--silent',
+    '--show-error',
+    workflowArchiveRedirect.url,
+  ], { encoding: null, maxBuffer: 256 * 1024 * 1024 });
+  if (workflowArchiveResult.status !== 0) {
+    errors.push('Protected source-manifest workflow artifact could not be downloaded.');
+    return errors;
+  }
+  const workflowArchiveBytes = outputBuffer(workflowArchiveResult.stdout);
+  requireEqual(
+    sha256Bytes(workflowArchiveBytes),
+    sourceManifest.workflowArtifactSha256.toLowerCase(),
+    'Downloaded protected workflow artifact SHA-256',
+  );
+
+  const protectedManifestResult = readZipEntry(
+    run,
+    workflowArchiveBytes,
+    sourceManifest.workflowArtifactEntry,
+  );
+  if (protectedManifestResult.status !== 0) {
+    errors.push('Protected workflow artifact does not contain the recorded source manifest entry.');
+    return errors;
+  }
+  const protectedManifestBytes = outputBuffer(protectedManifestResult.stdout);
+  if (!protectedManifestBytes.equals(sourceManifestBytes)) {
+    errors.push(
+      'Published source manifest bytes do not match the protected workflow artifact manifest.',
+    );
+  }
+
+  const supportDocumentation = sourceRelease?.sourceDisclosure?.supportDocumentation;
+  const supportResult = run('curl', [
+    '--fail',
+    '--location',
+    '--silent',
+    '--show-error',
+    supportDocumentation?.reference,
+  ], { encoding: null, maxBuffer: 16 * 1024 * 1024 });
+  if (supportResult.status !== 0) {
+    errors.push('Public Android source support documentation could not be downloaded.');
+    return errors;
+  }
+  const supportBytes = outputBuffer(supportResult.stdout);
+  requireEqual(
+    sha256Bytes(supportBytes),
+    String(supportDocumentation?.sha256 ?? '').toLowerCase(),
+    'Downloaded source support documentation SHA-256',
+  );
+  const supportText = supportBytes.toString('utf8');
+  if (!supportText.includes(expectedTag) ||
+      !supportText.includes(ANDROID_SOURCE_REPOSITORY_URL)) {
+    errors.push(
+      'Public Android source support documentation must disclose the exact source tag and repository URL.',
     );
   }
 
@@ -804,7 +1145,7 @@ function inspectAndroidPlayRelease(options, dependencies = {}) {
     const sourceReleaseErrors = inspectPublishedSourceRelease(
       evidence.sourceRelease,
       expectedOwnerEvidence,
-      { repoRoot, run },
+      { repoRoot, run, environment },
     );
     if (sourceReleaseErrors.length > 0) {
       throw new Error(

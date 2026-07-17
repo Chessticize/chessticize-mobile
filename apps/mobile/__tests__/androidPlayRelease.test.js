@@ -33,6 +33,19 @@ const expectedCandidate = {
   versionCode: releaseVersion.androidVersionCode,
   uploadCertificateSha256: '11'.repeat(32),
 };
+const originalGitHubToken = process.env.GITHUB_TOKEN;
+
+beforeAll(() => {
+  process.env.GITHUB_TOKEN = 'test-only-github-token';
+});
+
+afterAll(() => {
+  if (originalGitHubToken === undefined) {
+    delete process.env.GITHUB_TOKEN;
+  } else {
+    process.env.GITHUB_TOKEN = originalGitHubToken;
+  }
+});
 
 function read(relativePath) {
   return fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
@@ -98,6 +111,29 @@ function retainedSourceManifestSha256(overrides = {}) {
     .digest('hex');
 }
 
+function protectedWorkflowArchiveBytes() {
+  return Buffer.from('deterministic-protected-workflow-archive');
+}
+
+function protectedWorkflowArchiveSha256() {
+  return crypto.createHash('sha256')
+    .update(protectedWorkflowArchiveBytes())
+    .digest('hex');
+}
+
+function sourceSupportDocumentationBytes(overrides = {}) {
+  const tag = overrides.tag ?? 'android-v1.1.0-build-1';
+  const repository = overrides.repository ??
+    'https://github.com/Chessticize/chessticize-mobile';
+  return Buffer.from(`Public Android source: ${repository} at ${tag}.\n`);
+}
+
+function sourceSupportDocumentationSha256(overrides = {}) {
+  return crypto.createHash('sha256')
+    .update(sourceSupportDocumentationBytes(overrides))
+    .digest('hex');
+}
+
 function validOwnerEvidence(overrides = {}) {
   const sourceTag = 'android-v1.1.0-build-1';
   const sourceReleaseUrl =
@@ -115,7 +151,7 @@ function validOwnerEvidence(overrides = {}) {
       published: true,
       sourceManifest: {
         status: 'retained',
-        artifactId: 456,
+        releaseAssetId: 456,
         assetName: 'android-source-manifest.json',
         sha256: retainedSourceManifestSha256(),
         reference:
@@ -124,7 +160,25 @@ function validOwnerEvidence(overrides = {}) {
         releaseId: 123,
         tagName: sourceTag,
         commitSha: expectedCandidate.commitSha,
+        workflowRunId: 123,
+        workflowRunReference:
+          'https://github.com/Chessticize/chessticize-mobile/actions/runs/123',
+        workflowArtifactId: 789,
+        workflowArtifactName:
+          `android-signed-release-candidate-${expectedCandidate.commitSha}`,
+        workflowArtifactEntry:
+          'artifacts/android-release/android-source-manifest.json',
+        workflowArtifactSha256: protectedWorkflowArchiveSha256(),
         candidate: candidateBinding(),
+      },
+      sourceDisclosure: {
+        releaseNotesReference: sourceReleaseUrl,
+        supportDocumentation: evidenceRecord('published', 'source-support-123', {
+          reference:
+            'https://raw.githubusercontent.com/Chessticize/chessticize-mobile/' +
+            `${expectedCandidate.commitSha}/docs/ANDROID_PLAY_RELEASE.md`,
+          sha256: sourceSupportDocumentationSha256(),
+        }),
       },
     }),
     signing: {
@@ -133,7 +187,7 @@ function validOwnerEvidence(overrides = {}) {
       protectedUploadSigning: evidenceRecord('pass', 'upload-workflow-123', {
         reference: 'https://github.com/Chessticize/chessticize-mobile/actions/runs/123',
         workflowRunId: 123,
-        artifactId: 456,
+        artifactId: 789,
       }),
       playAppSigning: evidenceRecord('enrolled', 'play-app-signing-789'),
     },
@@ -196,13 +250,72 @@ function publishedSourceRelease(overrides = {}) {
     tag_name: sourceRelease.tagName,
     draft: false,
     published_at: '2026-07-17T00:00:00Z',
+    body:
+      `Source tag: ${sourceRelease.tagName}\n` +
+      `Repository: ${sourceRelease.repositoryUrl}`,
     assets: [{
-      id: sourceRelease.sourceManifest.artifactId,
+      id: sourceRelease.sourceManifest.releaseAssetId,
       name: sourceRelease.sourceManifest.assetName,
       state: 'uploaded',
       browser_download_url: sourceRelease.sourceManifest.reference,
       digest: `sha256:${sourceRelease.sourceManifest.sha256}`,
     }],
+    ...overrides,
+  };
+}
+
+function publishedWorkflowRun(overrides = {}) {
+  return {
+    id: 123,
+    name: 'Mobile Android release candidate',
+    path: '.github/workflows/mobile-android-release-candidate.yml',
+    event: 'workflow_dispatch',
+    status: 'completed',
+    conclusion: 'success',
+    head_sha: expectedCandidate.commitSha,
+    html_url: 'https://github.com/Chessticize/chessticize-mobile/actions/runs/123',
+    ...overrides,
+  };
+}
+
+function publishedWorkflowArtifact(overrides = {}) {
+  return {
+    id: 789,
+    name: `android-signed-release-candidate-${expectedCandidate.commitSha}`,
+    expired: false,
+    digest: `sha256:${protectedWorkflowArchiveSha256()}`,
+    archive_download_url:
+      'https://api.github.com/repos/Chessticize/chessticize-mobile/' +
+      'actions/artifacts/789/zip',
+    workflow_run: {
+      id: 123,
+      head_sha: expectedCandidate.commitSha,
+    },
+    ...overrides,
+  };
+}
+
+function publishedTagRef(overrides = {}) {
+  return {
+    ref: 'refs/tags/android-v1.1.0-build-1',
+    object: {
+      type: 'tag',
+      sha: 'd'.repeat(40),
+    },
+    ...overrides,
+  };
+}
+
+function publishedTagObject(overrides = {}) {
+  return {
+    tag: 'android-v1.1.0-build-1',
+    object: {
+      type: 'commit',
+      sha: expectedCandidate.commitSha,
+    },
+    verification: {
+      verified: true,
+    },
     ...overrides,
   };
 }
@@ -229,17 +342,75 @@ function sourceReleaseRun(overrides = {}) {
       stdout: JSON.stringify(publishedSourceRelease()),
       stderr: '',
     },
+    'curl tag ref': {
+      status: 0,
+      stdout: JSON.stringify(publishedTagRef()),
+      stderr: '',
+    },
+    'curl tag object': {
+      status: 0,
+      stdout: JSON.stringify(publishedTagObject()),
+      stderr: '',
+    },
+    'curl workflow run': {
+      status: 0,
+      stdout: JSON.stringify(publishedWorkflowRun()),
+      stderr: '',
+    },
+    'curl workflow artifact': {
+      status: 0,
+      stdout: JSON.stringify(publishedWorkflowArtifact()),
+      stderr: '',
+    },
+    'curl workflow archive redirect': {
+      status: 0,
+      stdout:
+        'HTTP/2 302 Found\r\n' +
+        'location: https://artifact.example.test/signed/android-release.zip\r\n\r\n',
+      stderr: '',
+    },
+    'curl workflow archive': {
+      status: 0,
+      stdout: protectedWorkflowArchiveBytes(),
+      stderr: '',
+    },
     'curl manifest': {
+      status: 0,
+      stdout: retainedSourceManifestBytes(),
+      stderr: '',
+    },
+    'curl support documentation': {
+      status: 0,
+      stdout: sourceSupportDocumentationBytes(),
+      stderr: '',
+    },
+    'unzip manifest': {
       status: 0,
       stdout: retainedSourceManifestBytes(),
       stderr: '',
     },
     ...overrides,
   };
-  return (command, args) => responses[command === 'curl'
-    ? (args.at(-1).startsWith('https://api.github.com/')
-      ? 'curl release'
-      : 'curl manifest')
+  return (command, args) => responses[command === 'unzip'
+    ? 'unzip manifest'
+    : command === 'curl'
+    ? (args.at(-1).includes('/git/ref/tags/')
+      ? 'curl tag ref'
+      : args.at(-1).includes('/git/tags/')
+        ? 'curl tag object'
+        : args.at(-1).includes('/actions/runs/')
+          ? 'curl workflow run'
+          : args.at(-1).endsWith('/zip')
+            ? 'curl workflow archive redirect'
+            : args.at(-1).startsWith('https://artifact.example.test/')
+              ? 'curl workflow archive'
+            : args.at(-1).includes('/actions/artifacts/')
+              ? 'curl workflow artifact'
+              : args.at(-1).startsWith('https://raw.githubusercontent.com/')
+                ? 'curl support documentation'
+        : args.at(-1).startsWith('https://api.github.com/')
+          ? 'curl release'
+          : 'curl manifest')
     : `${command} ${args.join(' ')}`] ?? {
     status: 1,
     stdout: '',
@@ -513,8 +684,16 @@ describe('Android Play release contract', () => {
       published: false,
       sourceManifest: expect.objectContaining({
         status: 'pending',
-        artifactId: 0,
+        releaseAssetId: 0,
         assetName: 'android-source-manifest.json',
+        workflowRunId: 0,
+        workflowArtifactId: 0,
+        workflowArtifactEntry: 'artifacts/android-release/android-source-manifest.json',
+      }),
+      sourceDisclosure: expect.objectContaining({
+        releaseNotesReference:
+          'https://github.com/Chessticize/chessticize-mobile/releases/tag/' +
+          'android-v1.1.0-build-1',
       }),
     }));
   });
@@ -649,7 +828,7 @@ describe('Android Play release contract', () => {
       evidence.sourceRelease.sourceManifest.status = 'pending';
     }, 'Source manifest status'],
     ['missing artifact ID', evidence => {
-      evidence.sourceRelease.sourceManifest.artifactId = 0;
+      evidence.sourceRelease.sourceManifest.releaseAssetId = 0;
     }, 'retained GitHub release artifact ID'],
     ['unsafe name', evidence => {
       evidence.sourceRelease.sourceManifest.assetName = '../manifest.json';
@@ -688,6 +867,73 @@ describe('Android Play release contract', () => {
       evidence.sourceRelease.sourceManifest.candidate.versionCode = 2;
     }, 'Source manifest candidate version code'],
   ])('rejects retained source-manifest evidence with %s',
+    (_label, mutate, expectedMessage) => {
+      const evidence = validOwnerEvidence();
+      mutate(evidence);
+
+      expect(inspectOwnerEvidence(evidence, expectedCandidate)).toEqual(
+        expect.arrayContaining([expect.stringContaining(expectedMessage)]),
+      );
+    });
+
+  it.each([
+    ['workflow run ID', evidence => {
+      evidence.sourceRelease.sourceManifest.workflowRunId = 0;
+    }, 'protected workflow run ID'],
+    ['workflow run reference', evidence => {
+      evidence.sourceRelease.sourceManifest.workflowRunReference += '?wrong=1';
+    }, 'protected workflow run reference'],
+    ['workflow artifact ID', evidence => {
+      evidence.sourceRelease.sourceManifest.workflowArtifactId = 0;
+    }, 'protected workflow artifact ID'],
+    ['workflow artifact name', evidence => {
+      evidence.sourceRelease.sourceManifest.workflowArtifactName = 'other-artifact';
+    }, 'protected workflow artifact name'],
+    ['workflow artifact entry', evidence => {
+      evidence.sourceRelease.sourceManifest.workflowArtifactEntry = '../manifest.json';
+    }, 'protected workflow artifact entry'],
+    ['workflow artifact digest', evidence => {
+      evidence.sourceRelease.sourceManifest.workflowArtifactSha256 = 'not-a-digest';
+    }, 'protected workflow artifact SHA-256'],
+    ['protected run binding', evidence => {
+      evidence.sourceRelease.sourceManifest.workflowRunId = 999;
+      evidence.sourceRelease.sourceManifest.workflowRunReference =
+        'https://github.com/Chessticize/chessticize-mobile/actions/runs/999';
+    }, 'Source manifest protected workflow run ID'],
+    ['protected run URL binding', evidence => {
+      evidence.signing.protectedUploadSigning.reference += '?wrong=1';
+    }, 'Source manifest protected workflow reference'],
+    ['protected artifact binding', evidence => {
+      evidence.sourceRelease.sourceManifest.workflowArtifactId = 999;
+    }, 'Source manifest protected workflow artifact ID'],
+  ])('rejects source-manifest workflow provenance with mismatched %s',
+    (_label, mutate, expectedMessage) => {
+      const evidence = validOwnerEvidence();
+      mutate(evidence);
+
+      expect(inspectOwnerEvidence(evidence, expectedCandidate)).toEqual(
+        expect.arrayContaining([expect.stringContaining(expectedMessage)]),
+      );
+    });
+
+  it.each([
+    ['release notes reference', evidence => {
+      evidence.sourceRelease.sourceDisclosure.releaseNotesReference += '?wrong=1';
+    }, 'Source release notes reference'],
+    ['missing support record', evidence => {
+      delete evidence.sourceRelease.sourceDisclosure.supportDocumentation;
+    }, 'support documentation status'],
+    ['support URL', evidence => {
+      evidence.sourceRelease.sourceDisclosure.supportDocumentation.reference += '?wrong=1';
+    }, 'support documentation URL'],
+    ['support digest', evidence => {
+      evidence.sourceRelease.sourceDisclosure.supportDocumentation.sha256 = 'not-a-digest';
+    }, 'support documentation must record its SHA-256'],
+    ['support candidate binding', evidence => {
+      evidence.sourceRelease.sourceDisclosure.supportDocumentation.candidate.commitSha =
+        'c'.repeat(40);
+    }, 'support documentation candidate commit SHA'],
+  ])('rejects source-disclosure evidence with mismatched %s',
     (_label, mutate, expectedMessage) => {
       const evidence = validOwnerEvidence();
       mutate(evidence);
@@ -757,6 +1003,25 @@ describe('Android Play release contract', () => {
       })).toEqual(expect.arrayContaining([expect.stringContaining(expectedMessage)]));
     });
 
+  it('rejects a public lightweight tag even when a local annotated tag has the same name', () => {
+    const sourceRelease = validOwnerEvidence().sourceRelease;
+
+    expect(inspectPublishedSourceRelease(sourceRelease, expectedCandidate, {
+      repoRoot,
+      run: sourceReleaseRun({
+        'curl tag ref': {
+          status: 0,
+          stdout: JSON.stringify(publishedTagRef({
+            object: { type: 'commit', sha: expectedCandidate.commitSha },
+          })),
+          stderr: '',
+        },
+      }),
+    })).toEqual(expect.arrayContaining([
+      expect.stringContaining('published GitHub tag ref must target an annotated tag object'),
+    ]));
+  });
+
   it('accepts a signed tag only when the local annotated tag carries a signature', () => {
     const sourceRelease = validOwnerEvidence().sourceRelease;
     sourceRelease.tagType = 'signed';
@@ -797,6 +1062,312 @@ describe('Android Play release contract', () => {
     })).toEqual(expect.arrayContaining([
       expect.stringContaining('GitHub API response is malformed'),
     ]));
+  });
+
+  it.each([
+    ['unavailable tag ref', {
+      'curl tag ref': { status: 22, stdout: '', stderr: 'not found' },
+    }, 'Published GitHub tag ref could not be verified'],
+    ['malformed tag ref', {
+      'curl tag ref': { status: 0, stdout: '{not-json', stderr: '' },
+    }, 'Published GitHub tag ref GitHub API response is malformed'],
+    ['wrong tag ref name', {
+      'curl tag ref': {
+        status: 0,
+        stdout: JSON.stringify(publishedTagRef({ ref: 'refs/tags/other' })),
+        stderr: '',
+      },
+    }, 'Published GitHub tag ref name'],
+    ['invalid tag object SHA', {
+      'curl tag ref': {
+        status: 0,
+        stdout: JSON.stringify(publishedTagRef({ object: { type: 'tag', sha: 'bad' } })),
+        stderr: '',
+      },
+    }, 'no valid annotated tag object SHA'],
+    ['unavailable tag object', {
+      'curl tag object': { status: 22, stdout: '', stderr: 'not found' },
+    }, 'annotated tag object could not be verified'],
+    ['malformed tag object', {
+      'curl tag object': { status: 0, stdout: '{not-json', stderr: '' },
+    }, 'annotated tag object GitHub API response is malformed'],
+    ['wrong annotated tag name', {
+      'curl tag object': {
+        status: 0,
+        stdout: JSON.stringify(publishedTagObject({ tag: 'other' })),
+        stderr: '',
+      },
+    }, 'annotated tag name'],
+    ['non-commit annotated target', {
+      'curl tag object': {
+        status: 0,
+        stdout: JSON.stringify(publishedTagObject({
+          object: { type: 'tree', sha: expectedCandidate.commitSha },
+        })),
+        stderr: '',
+      },
+    }, 'annotated tag target type'],
+    ['wrong public tag commit', {
+      'curl tag object': {
+        status: 0,
+        stdout: JSON.stringify(publishedTagObject({
+          object: { type: 'commit', sha: 'c'.repeat(40) },
+        })),
+        stderr: '',
+      },
+    }, 'annotated tag commit SHA'],
+  ])('fails closed for %s', (_label, overrides, expectedMessage) => {
+    const sourceRelease = validOwnerEvidence().sourceRelease;
+
+    expect(inspectPublishedSourceRelease(sourceRelease, expectedCandidate, {
+      repoRoot,
+      run: sourceReleaseRun(overrides),
+    })).toEqual(expect.arrayContaining([expect.stringContaining(expectedMessage)]));
+  });
+
+  it('requires a tag recorded as signed to be verified both locally and by GitHub', () => {
+    const sourceRelease = validOwnerEvidence().sourceRelease;
+    sourceRelease.tagType = 'signed';
+
+    expect(inspectPublishedSourceRelease(sourceRelease, expectedCandidate, {
+      repoRoot,
+      run: sourceReleaseRun({
+        'git cat-file tag android-v1.1.0-build-1': {
+          status: 0,
+          stdout: 'tag android-v1.1.0-build-1\n-----BEGIN PGP SIGNATURE-----\nsig\n',
+          stderr: '',
+        },
+        'curl tag object': {
+          status: 0,
+          stdout: JSON.stringify(publishedTagObject({
+            verification: { verified: false },
+          })),
+          stderr: '',
+        },
+      }),
+    })).toEqual(expect.arrayContaining([
+      expect.stringContaining('not verified by GitHub'),
+    ]));
+  });
+
+  it.each([
+    ['download failure', null, {
+      'curl manifest': { status: 22, stdout: '', stderr: 'not found' },
+    }, 'could not be downloaded from the GitHub release'],
+    ['malformed JSON', null, {
+      'curl manifest': { status: 0, stdout: '{not-json', stderr: '' },
+    }, 'malformed JSON'],
+    ['digest mismatch', null, {
+      'curl manifest': {
+        status: 0,
+        stdout: Buffer.concat([retainedSourceManifestBytes(), Buffer.from(' ')]),
+        stderr: '',
+      },
+    }, 'Downloaded source manifest SHA-256'],
+    ['schema', { schemaVersion: 2 }, null, 'Downloaded source manifest schemaVersion'],
+    ['status', { status: 'play-ready' }, null, 'Downloaded source manifest verifier status'],
+    ['commit', { commitSha: 'c'.repeat(40) }, null, 'Downloaded source manifest commit SHA'],
+    ['worktree', { worktreeClean: false }, null,
+      'Downloaded source manifest clean-worktree result'],
+    ['bundle digest', { bundle: {
+      ...retainedSourceManifest().bundle,
+      sha256: 'c'.repeat(64),
+    } }, null, 'Downloaded source manifest AAB SHA-256'],
+    ['application ID', { bundle: {
+      ...retainedSourceManifest().bundle,
+      applicationId: 'com.example.other',
+    } }, null, 'Downloaded source manifest application ID'],
+    ['version', { bundle: {
+      ...retainedSourceManifest().bundle,
+      versionName: '9.9',
+    } }, null, 'Downloaded source manifest version name'],
+    ['version code', { bundle: {
+      ...retainedSourceManifest().bundle,
+      versionCode: 999,
+    } }, null, 'Downloaded source manifest version code'],
+  ])('rejects a retained source manifest with mismatched %s',
+    (_label, manifestOverrides, commandOverrides, expectedMessage) => {
+      const sourceRelease = validOwnerEvidence().sourceRelease;
+      const overrides = commandOverrides ?? {
+        'curl manifest': {
+          status: 0,
+          stdout: retainedSourceManifestBytes(manifestOverrides),
+          stderr: '',
+        },
+      };
+
+      expect(inspectPublishedSourceRelease(sourceRelease, expectedCandidate, {
+        repoRoot,
+        run: sourceReleaseRun(overrides),
+      })).toEqual(expect.arrayContaining([expect.stringContaining(expectedMessage)]));
+    });
+
+  it.each([
+    ['unavailable run', null, { status: 22, stdout: '', stderr: 'not found' },
+      'workflow run could not be verified'],
+    ['malformed run', null, { status: 0, stdout: '{not-json', stderr: '' },
+      'workflow run GitHub API response is malformed'],
+    ['run ID', { id: 999 }, null, 'Protected workflow run ID'],
+    ['workflow name', { name: 'Other' }, null, 'Protected workflow name'],
+    ['workflow path', { path: '.github/workflows/other.yml' }, null,
+      'Protected workflow path'],
+    ['event', { event: 'push' }, null, 'Protected workflow event'],
+    ['status', { status: 'in_progress' }, null, 'Protected workflow status'],
+    ['conclusion', { conclusion: 'failure' }, null, 'Protected workflow conclusion'],
+    ['head SHA', { head_sha: 'c'.repeat(40) }, null, 'Protected workflow head SHA'],
+    ['run URL', { html_url: 'https://github.com/example/other/actions/runs/123' }, null,
+      'Protected workflow run URL'],
+  ])('rejects protected workflow provenance with mismatched %s',
+    (_label, runOverrides, responseOverride, expectedMessage) => {
+      const response = responseOverride ?? {
+        status: 0,
+        stdout: JSON.stringify(publishedWorkflowRun(runOverrides)),
+        stderr: '',
+      };
+
+      expect(inspectPublishedSourceRelease(
+        validOwnerEvidence().sourceRelease,
+        expectedCandidate,
+        { repoRoot, run: sourceReleaseRun({ 'curl workflow run': response }) },
+      )).toEqual(expect.arrayContaining([expect.stringContaining(expectedMessage)]));
+    });
+
+  it.each([
+    ['unavailable artifact', null, { status: 22, stdout: '', stderr: 'not found' },
+      'workflow artifact could not be verified'],
+    ['malformed artifact', null, { status: 0, stdout: '{not-json', stderr: '' },
+      'workflow artifact GitHub API response is malformed'],
+    ['artifact ID', { id: 999 }, null, 'Protected workflow artifact ID'],
+    ['artifact name', { name: 'other' }, null, 'Protected workflow artifact name'],
+    ['expired artifact', { expired: true }, null, 'artifact expired state'],
+    ['artifact digest', { digest: `sha256:${'c'.repeat(64)}` }, null,
+      'Protected workflow artifact digest'],
+    ['archive URL', { archive_download_url: 'https://api.github.com/other' }, null,
+      'Protected workflow artifact archive URL'],
+    ['workflow run ID', { workflow_run: {
+      id: 999,
+      head_sha: expectedCandidate.commitSha,
+    } }, null, 'Protected workflow artifact run ID'],
+    ['workflow head SHA', { workflow_run: {
+      id: 123,
+      head_sha: 'c'.repeat(40),
+    } }, null, 'Protected workflow artifact head SHA'],
+  ])('rejects protected workflow artifact provenance with mismatched %s',
+    (_label, artifactOverrides, responseOverride, expectedMessage) => {
+      const response = responseOverride ?? {
+        status: 0,
+        stdout: JSON.stringify(publishedWorkflowArtifact(artifactOverrides)),
+        stderr: '',
+      };
+
+      expect(inspectPublishedSourceRelease(
+        validOwnerEvidence().sourceRelease,
+        expectedCandidate,
+        { repoRoot, run: sourceReleaseRun({ 'curl workflow artifact': response }) },
+      )).toEqual(expect.arrayContaining([expect.stringContaining(expectedMessage)]));
+    });
+
+  it('requires authenticated access to the retained protected workflow artifact', () => {
+    expect(inspectPublishedSourceRelease(
+      validOwnerEvidence().sourceRelease,
+      expectedCandidate,
+      { repoRoot, environment: {}, run: sourceReleaseRun() },
+    )).toEqual(expect.arrayContaining([
+      expect.stringContaining('GITHUB_TOKEN is required'),
+    ]));
+  });
+
+  it('keeps the GitHub token out of spawned command arguments', () => {
+    const calls = [];
+    const fakeRun = sourceReleaseRun();
+    const token = 'test_secret_token';
+    const run = (command, args, options) => {
+      calls.push({ command, args, options });
+      return fakeRun(command, args, options);
+    };
+
+    expect(inspectPublishedSourceRelease(
+      validOwnerEvidence().sourceRelease,
+      expectedCandidate,
+      { repoRoot, environment: { GITHUB_TOKEN: token }, run },
+    )).toEqual([]);
+    expect(calls.flatMap(call => call.args).join(' ')).not.toContain(token);
+    expect(calls.some(call => String(call.options?.input ?? '').includes(token))).toBe(true);
+    const authenticatedArchiveCall = calls.find(call =>
+      call.args.at(-1).endsWith('/actions/artifacts/789/zip'));
+    const signedArchiveCall = calls.find(call =>
+      call.args.at(-1).startsWith('https://artifact.example.test/'));
+    expect(authenticatedArchiveCall.args).not.toContain('--location');
+    expect(authenticatedArchiveCall.options.input).toContain(token);
+    expect(signedArchiveCall.args).toContain('--location');
+    expect(signedArchiveCall.options?.input).toBeUndefined();
+  });
+
+  it.each([
+    ['archive redirect request', {
+      'curl workflow archive redirect': { status: 22, stdout: '', stderr: 'not found' },
+    }, 'workflow artifact redirect could not be requested'],
+    ['missing archive redirect', {
+      'curl workflow archive redirect': { status: 0, stdout: 'HTTP/2 302 Found\r\n\r\n', stderr: '' },
+    }, 'valid HTTPS download redirect'],
+    ['insecure archive redirect', {
+      'curl workflow archive redirect': {
+        status: 0,
+        stdout: 'HTTP/2 302 Found\r\nlocation: http://artifact.example.test/file.zip\r\n\r\n',
+        stderr: '',
+      },
+    }, 'valid HTTPS download redirect'],
+    ['archive download', {
+      'curl workflow archive': { status: 22, stdout: '', stderr: 'not found' },
+    }, 'workflow artifact could not be downloaded'],
+    ['archive digest', {
+      'curl workflow archive': { status: 0, stdout: Buffer.from('other-archive'), stderr: '' },
+    }, 'Downloaded protected workflow artifact SHA-256'],
+    ['missing archive entry', {
+      'unzip manifest': { status: 11, stdout: '', stderr: 'missing entry' },
+    }, 'does not contain the recorded source manifest entry'],
+    ['manifest byte identity', {
+      'unzip manifest': {
+        status: 0,
+        stdout: retainedSourceManifestBytes({ commitSha: 'c'.repeat(40) }),
+        stderr: '',
+      },
+    }, 'do not match the protected workflow artifact manifest'],
+  ])('fails closed for protected artifact %s', (_label, overrides, expectedMessage) => {
+    expect(inspectPublishedSourceRelease(
+      validOwnerEvidence().sourceRelease,
+      expectedCandidate,
+      { repoRoot, run: sourceReleaseRun(overrides) },
+    )).toEqual(expect.arrayContaining([expect.stringContaining(expectedMessage)]));
+  });
+
+  it.each([
+    ['release notes disclosure', {
+      'curl release': {
+        status: 0,
+        stdout: JSON.stringify(publishedSourceRelease({ body: 'No source disclosure.' })),
+        stderr: '',
+      },
+    }, 'release notes must disclose'],
+    ['support download', {
+      'curl support documentation': { status: 22, stdout: '', stderr: 'not found' },
+    }, 'support documentation could not be downloaded'],
+    ['support digest', {
+      'curl support documentation': { status: 0, stdout: Buffer.from('other'), stderr: '' },
+    }, 'Downloaded source support documentation SHA-256'],
+    ['support content disclosure', {
+      'curl support documentation': {
+        status: 0,
+        stdout: sourceSupportDocumentationBytes({ tag: 'other', repository: 'other' }),
+        stderr: '',
+      },
+    }, 'support documentation must disclose'],
+  ])('fails closed for mismatched %s', (_label, overrides, expectedMessage) => {
+    expect(inspectPublishedSourceRelease(
+      validOwnerEvidence().sourceRelease,
+      expectedCandidate,
+      { repoRoot, run: sourceReleaseRun(overrides) },
+    )).toEqual(expect.arrayContaining([expect.stringContaining(expectedMessage)]));
   });
 
   it.each([
@@ -952,6 +1523,7 @@ describe('Android Play release contract', () => {
     );
     const runbook = read('docs/ANDROID_PLAY_RELEASE.md');
     const listing = read('docs/ANDROID_PLAY_LISTING.md');
+    const verifier = read('apps/mobile/scripts/android-play-release.js');
 
     expect(workflow).toContain('workflow_dispatch:');
     expect(workflow).not.toContain('pull_request:');
@@ -969,9 +1541,14 @@ describe('Android Play release contract', () => {
     expect(workflow).toContain('retention-days: 30');
     expect(runbook).toContain('cannot produce a `play-ready` verdict');
     expect(runbook).toContain('owner evidence schema v3');
-    expect(runbook).toContain('live GitHub release API');
+    expect(runbook).toContain('live GitHub tag ref');
+    expect(runbook).toContain('protected Actions artifact');
     expect(runbook).toContain('android-source-manifest.json');
+    expect(runbook).toContain('CHESSTICIZE_GITHUB_TOKEN');
+    expect(runbook).toContain('android-v1.1.0-build-1');
+    expect(runbook).toContain('https://github.com/Chessticize/chessticize-mobile');
     expect(runbook).toContain('do not start the rollout in #186');
+    expect(verifier).toContain('{ repoRoot, run, environment },');
     expect(listing).toContain('Data collected: No');
     expect(listing).toContain('production manifest intentionally has no `INTERNET` permission');
   });
