@@ -1351,15 +1351,28 @@ describe("PracticePocScreen", () => {
   });
 
   it("keeps the stable native board synchronized across the Familiar 15 failure sequence", async () => {
-    const renderer = renderScreen({ practiceService: createMobilePracticeService("familiar15") });
+    const service = createMobilePracticeService("familiar15");
+    const renderer = renderScreen({ practiceService: service });
 
     startStandardSprint(renderer);
+    const stableBoardReset = findByTestId(renderer, "mock-chessboard").props.mockResetBoard;
     await boardMove(renderer, "c2b3");
+    const secondPuzzleFen = activeSprintForTest(service).currentPuzzle?.currentFen;
+    expect(secondPuzzleFen).toBeTruthy();
+    expect(stableBoardReset).not.toHaveBeenCalledWith(secondPuzzleFen);
     await settleFeedbackSnapshot();
+    expect(stableBoardReset).toHaveBeenCalledWith(secondPuzzleFen);
+    expect(stableBoardReset).toHaveBeenCalledTimes(1);
     await boardMove(renderer, "c4b5");
+    const thirdPuzzleFen = activeSprintForTest(service).currentPuzzle?.currentFen;
+    expect(thirdPuzzleFen).toBeTruthy();
+    expect(stableBoardReset).not.toHaveBeenCalledWith(thirdPuzzleFen);
     await settleFeedbackSnapshot();
+    expect(stableBoardReset).toHaveBeenCalledWith(thirdPuzzleFen);
+    expect(stableBoardReset).toHaveBeenCalledTimes(2);
 
     expect(findByTestId(renderer, "session-board")).toBeTruthy();
+    expect(findByTestId(renderer, "mock-chessboard").props.mockResetBoard).toBe(stableBoardReset);
     expect(() => findByTestId(renderer, "error-panel")).toThrow();
     await boardMove(renderer, "g6g5");
     await settleFeedbackSnapshot();

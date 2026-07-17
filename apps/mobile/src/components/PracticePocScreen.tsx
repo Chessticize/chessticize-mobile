@@ -1858,6 +1858,16 @@ export function PracticePocScreen({
     feedbackSnapshotTimerRef.current = setTimeout(() => {
       const current = feedbackSnapshotRef.current;
       if (current?.puzzleId === submittedPuzzle.puzzle.id) {
+        // The session board is keyed to the Sprint, not the puzzle, so it owns
+        // one native chess instance across puzzle advances. Synchronize that
+        // instance before revealing the next puzzle. Relying on the fen-prop
+        // effect alone leaves the stable native board holding the submitted
+        // position during the render that changes puzzle orientation/state.
+        resetBoardToFen(
+          nextPuzzle?.currentFen,
+          "feedback-snapshot-complete",
+          nextPuzzle?.puzzle.id ?? null
+        );
         commitFeedbackSnapshot(null);
         commitBoardInputLocked(false, "feedback-snapshot-complete", nextPuzzle?.puzzle.id ?? null);
       }
