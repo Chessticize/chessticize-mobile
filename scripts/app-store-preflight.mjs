@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadStockfishArtifacts } from "./lib/stockfish-artifacts.mjs";
+import { loadIOSReleaseIdentity } from "./lib/ios-release-identity.mjs";
 
 const repoRoot = dirname(fileURLToPath(new URL("../package.json", import.meta.url)));
 const outputJson = process.argv.includes("--json");
@@ -92,6 +93,7 @@ const thirdPartyAudit = spawnSync(
     encoding: "utf8"
   }
 );
+const iosReleaseIdentity = loadIOSReleaseIdentity(repoRoot);
 let thirdPartyAuditPayload = null;
 try {
   thirdPartyAuditPayload = JSON.parse(thirdPartyAudit.stdout || "{}");
@@ -99,8 +101,6 @@ try {
   thirdPartyAuditPayload = null;
 }
 
-const marketingVersions = uniqueMatches(pbxproj, /MARKETING_VERSION = ([^;]+);/g);
-const buildNumbers = uniqueMatches(pbxproj, /CURRENT_PROJECT_VERSION = ([^;]+);/g);
 const bundleIdentifiers = uniqueMatches(pbxproj, /PRODUCT_BUNDLE_IDENTIFIER = ([^;]+);/g);
 const deviceFamilies = uniqueMatches(pbxproj, /TARGETED_DEVICE_FAMILY = ([^;]+);/g);
 const targetedDeviceFamily = deviceFamilies.length === 1 ? unquoteBuildSetting(deviceFamilies[0]) : "";
@@ -177,11 +177,8 @@ check(
 );
 
 check(
-  "iOS release identity is fixed for 1.1",
-  marketingVersions.length === 1 &&
-    marketingVersions[0] === "1.1" &&
-    buildNumbers.length === 1 &&
-    buildNumbers[0] === "2" &&
+  `iOS release identity is fixed for ${iosReleaseIdentity.version}`,
+  iosReleaseIdentity.valid &&
     bundleIdentifiers.length === 1 &&
     bundleIdentifiers[0] === "com.chessticize.mobile" &&
     deviceFamilies.length === 1 &&
@@ -189,14 +186,14 @@ check(
     !fullScreenLocked &&
     stringArrayEquals(iphoneOrientations, expectedIphoneOrientations) &&
     stringArrayEquals(ipadOrientations, expectedIpadOrientations),
-  `Found marketingVersions=${marketingVersions.join(",")}, buildNumbers=${buildNumbers.join(",")}, bundleIdentifiers=${bundleIdentifiers.join(",")}, deviceFamilies=${deviceFamilies.join(",")}, fullScreenLocked=${fullScreenLocked}, iphoneOrientations=${iphoneOrientations.join("|")}, ipadOrientations=${ipadOrientations.join("|")}.`
+  `Found canonicalVersion=${iosReleaseIdentity.version}, canonicalBuild=${iosReleaseIdentity.build}, configMatchesCanonical=${iosReleaseIdentity.configMatchesCanonical}, projectUsesGeneratedConfig=${iosReleaseIdentity.projectUsesGeneratedConfig}, bundleIdentifiers=${bundleIdentifiers.join(",")}, deviceFamilies=${deviceFamilies.join(",")}, fullScreenLocked=${fullScreenLocked}, iphoneOrientations=${iphoneOrientations.join("|")}, ipadOrientations=${ipadOrientations.join("|")}.`
 );
 
 check(
   "Export compliance flag is set",
   infoPlist.includes("<key>ITSAppUsesNonExemptEncryption</key>") &&
     infoPlist.includes("<false/>"),
-  "Info.plist must declare ITSAppUsesNonExemptEncryption=false for the 1.1 app."
+  `Info.plist must declare ITSAppUsesNonExemptEncryption=false for the ${iosReleaseIdentity.version} app.`
 );
 
 check(
@@ -301,7 +298,7 @@ manualGate(
 );
 manualGate(
   "Create the public source release tag",
-  "Tag the exact commit used for the App Store Connect binary as ios-v1.1.0-build-2 and publish the GitHub release."
+  `Tag the exact commit used for the App Store Connect binary as ios-v${iosReleaseIdentity.version.split(".").length === 2 ? `${iosReleaseIdentity.version}.0` : iosReleaseIdentity.version}-build-${iosReleaseIdentity.build} and publish the GitHub release.`
 );
 manualGate(
   "Configure Apple signing team and Xcode account",
@@ -313,7 +310,7 @@ manualGate(
 );
 manualGate(
   "Execute the internal TestFlight physical-device pass",
-  "Upload the build to App Store Connect, distribute it to Internal 1.1 QA, install from TestFlight on physical iPhone and iPad hardware, and fill docs/TESTFLIGHT_QA.md evidence."
+  `Upload the build to App Store Connect, distribute it to Internal ${iosReleaseIdentity.version} QA, install from TestFlight on physical iPhone and iPad hardware, and fill docs/TESTFLIGHT_QA.md evidence.`
 );
 
 const failed = checks.filter((entry) => entry.status === "fail");

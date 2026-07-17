@@ -51,6 +51,10 @@ test("App Store release manifest reports source identity and hashed release arti
     authors: string;
     nnue: string[];
   };
+  const releaseVersion = JSON.parse(readFileSync(resolve("apps/mobile/release-version.json"), "utf8")) as {
+    publicVersion: string;
+    iosBuildNumber: number;
+  };
   const stockfishPath = (path: string) => `apps/mobile/${stockfishArtifacts.root}/${path}`;
   if (puzzleManifest.format === "sqlite" && !existsSync(resolve("fixtures/puzzles/bundled-core-pack.sqlite"))) {
     t.skip("core pack artifact not fetched; run pnpm fetch:core-pack before generating a release manifest");
@@ -70,13 +74,16 @@ test("App Store release manifest reports source identity and hashed release arti
 
   assert.equal(manifest.schema, "chessticize-mobile.app-store-release-manifest.v1");
   assert.match(manifest.sourceCommit, /^[0-9a-f]{40}$/u);
-  assert.equal(manifest.releaseTagSuggestion, "ios-v1.1.0-build-2");
+  const tagVersion = releaseVersion.publicVersion.split(".").length === 2
+    ? `${releaseVersion.publicVersion}.0`
+    : releaseVersion.publicVersion;
+  assert.equal(manifest.releaseTagSuggestion, `ios-v${tagVersion}-build-${releaseVersion.iosBuildNumber}`);
   assert.equal(manifest.packageManager, "pnpm@11.1.2");
   assert.deepEqual(manifest.app, {
     displayName: "Chessticize",
     bundleIdentifier: "com.chessticize.mobile",
-    version: "1.1",
-    build: "2",
+    version: releaseVersion.publicVersion,
+    build: String(releaseVersion.iosBuildNumber),
     targetedDeviceFamily: "1,2",
     platform: "ios"
   });
@@ -93,8 +100,10 @@ test("App Store release manifest reports source identity and hashed release arti
   const artifactsByPath = new Map(manifest.artifacts.map((artifact) => [artifact.path, artifact]));
   for (const path of [
     "pnpm-lock.yaml",
+    "apps/mobile/release-version.json",
     "apps/mobile/Gemfile.lock",
     "apps/mobile/ios/Podfile.lock",
+    "apps/mobile/ios/Config/ReleaseVersion.xcconfig",
     "THIRD_PARTY_NOTICES.md",
     "apps/mobile/stockfish-artifacts.json",
     puzzleManifest.format === "sqlite" ? "fixtures/puzzles/bundled-core-pack.sqlite" : "fixtures/puzzles/bundled-core-pack.json",
