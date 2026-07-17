@@ -1,4 +1,88 @@
 import groovy.json.JsonSlurper
+import org.gradle.api.file.ConfigurableFileCollection
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.file.FileSystemOperations
+import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.tasks.InputFile
+import org.gradle.api.tasks.InputFiles
+import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
+import org.gradle.api.tasks.TaskAction
+
+import javax.inject.Inject
+
+abstract class GenerateChessticizeAssets extends DefaultTask {
+    @InputFile
+    @PathSensitive(PathSensitivity.RELATIVE)
+    abstract RegularFileProperty getPuzzlePack()
+
+    @InputFiles
+    @PathSensitive(PathSensitivity.RELATIVE)
+    abstract ConfigurableFileCollection getNnueFiles()
+
+    @InputFile
+    @PathSensitive(PathSensitivity.RELATIVE)
+    abstract RegularFileProperty getStockfishManifest()
+
+    @InputFile
+    @PathSensitive(PathSensitivity.RELATIVE)
+    abstract RegularFileProperty getProjectLicense()
+
+    @InputFile
+    @PathSensitive(PathSensitivity.RELATIVE)
+    abstract RegularFileProperty getThirdPartyNotices()
+
+    @InputFile
+    @PathSensitive(PathSensitivity.RELATIVE)
+    abstract RegularFileProperty getStockfishCopying()
+
+    @InputFile
+    @PathSensitive(PathSensitivity.RELATIVE)
+    abstract RegularFileProperty getStockfishAuthors()
+
+    @OutputDirectory
+    abstract DirectoryProperty getOutputDirectory()
+
+    @Inject
+    abstract FileSystemOperations getFileSystemOperations()
+
+    @TaskAction
+    void generateAssets() {
+        def missingNetworks = nnueFiles.files.findAll { source -> !source.isFile() }
+        if (!missingNetworks.isEmpty()) {
+            throw new GradleException(
+                "Canonical Stockfish NNUE assets are missing: ${missingNetworks.join(', ')}"
+            )
+        }
+
+        fileSystemOperations.sync { spec ->
+            spec.into(outputDirectory)
+            spec.from(puzzlePack.get().asFile) {
+                into "puzzle-packs"
+            }
+            spec.from(nnueFiles) {
+                into "stockfish"
+            }
+            spec.from(stockfishManifest.get().asFile) {
+                into "stockfish"
+            }
+            spec.from(projectLicense.get().asFile) {
+                into "licenses"
+            }
+            spec.from(thirdPartyNotices.get().asFile) {
+                into "licenses"
+            }
+            spec.from(stockfishCopying.get().asFile) {
+                into "licenses/stockfish"
+                rename { "COPYING.txt" }
+            }
+            spec.from(stockfishAuthors.get().asFile) {
+                into "licenses/stockfish"
+            }
+        }
+    }
+}
 
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
@@ -146,56 +230,11 @@ def enableProguardInReleaseBuilds = false
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 def puzzlePackSource = file("$rootDir/../../../fixtures/puzzles/bundled-core-pack.sqlite")
-def generatedPuzzlePackAssetsDir = "$buildDir/generated/assets/puzzle-pack"
 def stockfishArtifactsFile = file("$rootDir/../stockfish-artifacts.json")
 def stockfishArtifacts = new JsonSlurper().parse(stockfishArtifactsFile)
 def stockfishRoot = file("$rootDir/../${stockfishArtifacts.root}")
 def stockfishNnueFiles = stockfishArtifacts.nnue.collect { relativePath ->
     file("$stockfishRoot/$relativePath")
-}
-def generatedStockfishAssetsDir = "$buildDir/generated/assets/stockfish-nnue"
-def generatedReleaseNoticeAssetsDir = "$buildDir/generated/assets/release-notices"
-
-def copyPuzzlePackAsset = tasks.register("copyPuzzlePackAsset", Copy) {
-    from(puzzlePackSource) {
-        into "puzzle-packs"
-    }
-    into generatedPuzzlePackAssetsDir
-}
-
-def copyStockfishNnueAssets = tasks.register("copyStockfishNnueAssets", Sync) {
-    from(stockfishNnueFiles) {
-        into "stockfish"
-    }
-    from(stockfishArtifactsFile) {
-        into "stockfish"
-    }
-    into generatedStockfishAssetsDir
-    doFirst {
-        def missingFiles = stockfishNnueFiles.findAll { source -> !source.isFile() }
-        if (!missingFiles.isEmpty()) {
-            throw new GradleException(
-                "Canonical Stockfish NNUE assets are missing: ${missingFiles.join(', ')}"
-            )
-        }
-    }
-}
-
-def copyReleaseNoticeAssets = tasks.register("copyReleaseNoticeAssets", Sync) {
-    from(file("$rootDir/../../../LICENSE")) {
-        into "licenses"
-    }
-    from(file("$rootDir/../../../THIRD_PARTY_NOTICES.md")) {
-        into "licenses"
-    }
-    from(file("$stockfishRoot/Copying.txt")) {
-        into "licenses/stockfish"
-        rename { "COPYING.txt" }
-    }
-    from(file("$stockfishRoot/AUTHORS")) {
-        into "licenses/stockfish"
-    }
-    into generatedReleaseNoticeAssetsDir
 }
 
 android {
@@ -219,15 +258,6 @@ android {
             cmake {
                 arguments "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
             }
-        }
-    }
-    sourceSets {
-        main {
-            // Passing the task providers preserves the producer relationship for
-            // every consumer, including Gradle 9 release-lint model generation.
-            assets.srcDir(copyPuzzlePackAsset)
-            assets.srcDir(copyStockfishNnueAssets)
-            assets.srcDir(copyReleaseNoticeAssets)
         }
     }
     externalNativeBuild {
@@ -276,6 +306,29 @@ android {
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
             proguardFile "${rootProject.projectDir}/../node_modules/detox/android/detox/proguard-rules-app.pro"
+        }
+    }
+}
+
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        def generatedAssets = tasks.register(
+            "generate${variant.name.capitalize()}ChessticizeAssets",
+            GenerateChessticizeAssets
+        ) {
+            puzzlePack.set(puzzlePackSource)
+            nnueFiles.from(stockfishNnueFiles)
+            stockfishManifest.set(stockfishArtifactsFile)
+            projectLicense.set(file("$rootDir/../../../LICENSE"))
+            thirdPartyNotices.set(file("$rootDir/../../../THIRD_PARTY_NOTICES.md"))
+            stockfishCopying.set(file("$stockfishRoot/Copying.txt"))
+            stockfishAuthors.set(file("$stockfishRoot/AUTHORS"))
+            outputDirectory.set(
+                layout.buildDirectory.dir("generated/assets/chessticize/${variant.name}")
+            )
+        }
+        variant.sources.assets.addGeneratedSourceDirectory(generatedAssets) { task ->
+            task.outputDirectory
         }
     }
 }

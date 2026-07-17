@@ -130,20 +130,18 @@ describe('Android Play release contract', () => {
     );
 
     expect(appGradle).toContain("debugSymbolLevel 'FULL'");
-    expect(appGradle).toContain('copyReleaseNoticeAssets');
+    expect(appGradle).toContain('class GenerateChessticizeAssets');
     expect(appGradle).toContain('THIRD_PARTY_NOTICES.md');
     expect(appGradle).toContain('Copying.txt');
     expect(appGradle).toContain('AUTHORS');
-    expect(appGradle).toContain('assets.srcDir(copyPuzzlePackAsset)');
-    expect(appGradle).toContain('assets.srcDir(copyStockfishNnueAssets)');
-    expect(appGradle).toContain('assets.srcDir(copyReleaseNoticeAssets)');
-    expect(appGradle).toContain('from(puzzlePackSource) {');
+    expect(appGradle).toContain('variant.sources.assets.addGeneratedSourceDirectory');
+    expect(appGradle).toContain('generated/assets/chessticize/${variant.name}');
+    expect(appGradle).not.toContain('assets.srcDir(');
+    expect(appGradle).toContain('spec.from(puzzlePack.get().asFile) {');
     expect(appGradle).toContain('into "puzzle-packs"');
-    expect(appGradle).toContain('into generatedPuzzlePackAssetsDir');
-    expect(appGradle).toContain('from(stockfishNnueFiles) {');
-    expect(appGradle).toContain('from(stockfishArtifactsFile) {');
+    expect(appGradle).toContain('spec.from(nnueFiles) {');
+    expect(appGradle).toContain('spec.from(stockfishManifest.get().asFile) {');
     expect(appGradle).toContain('into "stockfish"');
-    expect(appGradle).toContain('into generatedStockfishAssetsDir');
     expect(strings).toContain('<string name="app_name">Chessticize</string>');
     expect(fs.existsSync(path.join(
       mobileRoot,

@@ -41,10 +41,10 @@ describe('Android Stockfish native contract', () => {
     expect(cmake).not.toMatch(/nn-[a-f0-9]+\.nnue/);
     expect(cmake).toContain('-Wl,-z,max-page-size=16384');
     expect(gradle).toContain('stockfish-artifacts.json');
-    expect(gradle).toContain('copyStockfishNnueAssets');
+    expect(gradle).toContain('GenerateChessticizeAssets');
     expect(gradle).toContain('stockfishArtifacts.nnue');
-    expect(gradle).toContain('from(stockfishArtifactsFile)');
-    expect(gradle).toContain('generatedStockfishAssetsDir');
+    expect(gradle).toContain('stockfishManifest.set(stockfishArtifactsFile)');
+    expect(gradle).toContain('variant.sources.assets.addGeneratedSourceDirectory');
     expect(module).toContain('noBackupFilesDir');
     expect(module).toContain('@Synchronized');
     expect(module).toContain('MessageDigest.getInstance("SHA-256")');

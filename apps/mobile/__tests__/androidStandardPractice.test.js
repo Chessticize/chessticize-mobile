@@ -25,7 +25,8 @@ describe('Android Standard Practice release slice', () => {
     expect(databaseLayout).toContain('puzzle-packs');
     expect(deviceStore).toContain('MOBILE_DATABASE_LAYOUT.progressDatabaseName');
     expect(deviceStore).toContain('MOBILE_DATABASE_LAYOUT.bundledPuzzlePackDatabaseName');
-    expect(appGradle).toContain('generated/assets/puzzle-pack');
+    expect(appGradle).toContain('puzzlePack.set(puzzlePackSource)');
+    expect(appGradle).toContain('variant.sources.assets.addGeneratedSourceDirectory');
     expect(appGradle).toContain('puzzle-packs');
     expect(appGradle).not.toContain('fixtures/migrations');
   });
