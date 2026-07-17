@@ -807,6 +807,82 @@ describe('Android GitHub release automation', () => {
       publicationApproved: true,
     }, { github: tamperedBodyGithub })).rejects.toThrow('release body changed');
 
+    const bodyMismatchApk = {
+      id: 49,
+      name: identity.apkName,
+      sha256: apkSha256,
+      size: apkBytes.length,
+    };
+    const bodyMismatchGithub = new FakeGitHubReleasesClient({
+      release: {
+        ...github.release,
+        body: `${sourceReleaseNotes(identity)}\nunapproved notes`,
+      },
+      asset: sourceAsset,
+      assets: [sourceAsset, bodyMismatchApk],
+      nextAssetId: 50,
+    });
+    await expect(publishBinaryRelease({
+      ...input,
+      publicationApproved: true,
+    }, { github: bodyMismatchGithub })).rejects.toThrow('release body changed');
+    expect(bodyMismatchGithub.deletedAssets).toEqual([49]);
+
+    const bodyCleanupFailureGithub = new FakeGitHubReleasesClient({
+      release: {
+        ...github.release,
+        body: `${sourceReleaseNotes(identity)}\nunapproved notes`,
+      },
+      asset: sourceAsset,
+      assets: [sourceAsset, bodyMismatchApk],
+      nextAssetId: 50,
+    });
+    bodyCleanupFailureGithub.deleteAsset = async assetId => {
+      bodyCleanupFailureGithub.deletedAssets.push(assetId);
+      throw new Error('GitHub body-mismatch APK cleanup HTTP 403');
+    };
+    await expect(publishBinaryRelease({
+      ...input,
+      publicationApproved: true,
+    }, { github: bodyCleanupFailureGithub })).rejects.toThrow(
+      'Binary publication cleanup failed for APK asset 49',
+    );
+
+    const mismatchedSourceAsset = {
+      ...sourceAsset,
+      sha256: 'f'.repeat(64),
+    };
+    const sourceMismatchGithub = new FakeGitHubReleasesClient({
+      release: { ...github.release },
+      asset: mismatchedSourceAsset,
+      assets: [mismatchedSourceAsset, bodyMismatchApk],
+      nextAssetId: 50,
+    });
+    await expect(publishBinaryRelease({
+      ...input,
+      publicationApproved: true,
+    }, { github: sourceMismatchGithub })).rejects.toThrow(
+      'source manifest asset changed',
+    );
+    expect(sourceMismatchGithub.deletedAssets).toEqual([49]);
+
+    const sourceCleanupFailureGithub = new FakeGitHubReleasesClient({
+      release: { ...github.release },
+      asset: mismatchedSourceAsset,
+      assets: [mismatchedSourceAsset, bodyMismatchApk],
+      nextAssetId: 50,
+    });
+    sourceCleanupFailureGithub.deleteAsset = async assetId => {
+      sourceCleanupFailureGithub.deletedAssets.push(assetId);
+      throw new Error('GitHub source-mismatch APK cleanup HTTP 403');
+    };
+    await expect(publishBinaryRelease({
+      ...input,
+      publicationApproved: true,
+    }, { github: sourceCleanupFailureGithub })).rejects.toThrow(
+      'Binary publication cleanup failed for APK asset 49',
+    );
+
     const tamperedGithub = new FakeGitHubReleasesClient({
       release: { ...github.release },
       asset: sourceAsset,
@@ -820,6 +896,137 @@ describe('Android GitHub release automation', () => {
       ...input,
       publicationApproved: true,
     }, { github: tamperedGithub })).rejects.toThrow('unexpected release asset');
+    expect(tamperedGithub.deletedAssets).toEqual([49]);
+
+    const unexpectedCleanupFailureGithub = new FakeGitHubReleasesClient({
+      release: { ...github.release },
+      asset: sourceAsset,
+      assets: [
+        sourceAsset,
+        { id: 49, name: 'unapproved-side-load.apk', sha256: 'f'.repeat(64), size: 9 },
+      ],
+      nextAssetId: 50,
+    });
+    unexpectedCleanupFailureGithub.deleteAsset = async assetId => {
+      unexpectedCleanupFailureGithub.deletedAssets.push(assetId);
+      throw new Error('GitHub unexpected APK cleanup HTTP 403');
+    };
+    await expect(publishBinaryRelease({
+      ...input,
+      publicationApproved: true,
+    }, { github: unexpectedCleanupFailureGithub })).rejects.toThrow(
+      'Binary publication cleanup failed for APK asset 49',
+    );
+
+    const wrongApkGithub = new FakeGitHubReleasesClient({
+      release: { ...github.release },
+      asset: sourceAsset,
+      assets: [
+        sourceAsset,
+        { id: 48, name: identity.apkName, sha256: 'f'.repeat(64), size: apkBytes.length },
+      ],
+      nextAssetId: 50,
+    });
+    await expect(publishBinaryRelease({
+      ...input,
+      publicationApproved: true,
+    }, { github: wrongApkGithub })).rejects.toThrow(
+      'conflicting Play-generated APK asset',
+    );
+    expect(wrongApkGithub.deletedAssets).toEqual([48]);
+
+    const wrongApkCleanupFailureGithub = new FakeGitHubReleasesClient({
+      release: { ...github.release },
+      asset: sourceAsset,
+      assets: [
+        sourceAsset,
+        { id: 48, name: identity.apkName, sha256: 'f'.repeat(64), size: apkBytes.length },
+      ],
+      nextAssetId: 50,
+    });
+    wrongApkCleanupFailureGithub.deleteAsset = async assetId => {
+      wrongApkCleanupFailureGithub.deletedAssets.push(assetId);
+      throw new Error('GitHub wrong APK cleanup HTTP 403');
+    };
+    await expect(publishBinaryRelease({
+      ...input,
+      publicationApproved: true,
+    }, { github: wrongApkCleanupFailureGithub })).rejects.toThrow(
+      'Binary publication cleanup failed for APK asset 48',
+    );
+
+    const duplicateApkGithub = new FakeGitHubReleasesClient({
+      release: { ...github.release },
+      asset: sourceAsset,
+      assets: [
+        sourceAsset,
+        { id: 47, name: identity.apkName, sha256: apkSha256, size: apkBytes.length },
+        { id: 48, name: identity.apkName, sha256: apkSha256, size: apkBytes.length },
+      ],
+      nextAssetId: 50,
+    });
+    await expect(publishBinaryRelease({
+      ...input,
+      publicationApproved: true,
+    }, { github: duplicateApkGithub })).rejects.toThrow(
+      'conflicting Play-generated APK asset',
+    );
+    expect(duplicateApkGithub.deletedAssets).toEqual([47, 48]);
+
+    const duplicateApkCleanupFailureGithub = new FakeGitHubReleasesClient({
+      release: { ...github.release },
+      asset: sourceAsset,
+      assets: [
+        sourceAsset,
+        { id: 47, name: identity.apkName, sha256: apkSha256, size: apkBytes.length },
+        { id: 48, name: identity.apkName, sha256: apkSha256, size: apkBytes.length },
+      ],
+      nextAssetId: 50,
+    });
+    const deleteDuplicateApk = duplicateApkCleanupFailureGithub.deleteAsset.bind(
+      duplicateApkCleanupFailureGithub,
+    );
+    duplicateApkCleanupFailureGithub.deleteAsset = async assetId => {
+      if (assetId === 48) {
+        duplicateApkCleanupFailureGithub.deletedAssets.push(assetId);
+        throw new Error('GitHub duplicate APK cleanup HTTP 403');
+      }
+      await deleteDuplicateApk(assetId);
+    };
+    await expect(publishBinaryRelease({
+      ...input,
+      publicationApproved: true,
+    }, { github: duplicateApkCleanupFailureGithub })).rejects.toThrow(
+      'Binary publication cleanup failed for APK asset 48',
+    );
+    expect(duplicateApkCleanupFailureGithub.deletedAssets).toEqual([47, 48]);
+
+    const unsafeApkAsset = {
+      id: 59,
+      name: identity.apkName,
+      sha256: apkSha256,
+      size: apkBytes.length,
+    };
+    const strandedApkGithub = new FakeGitHubReleasesClient({
+      release: { ...github.release },
+      asset: sourceAsset,
+      assets: [sourceAsset, unsafeApkAsset],
+      nextAssetId: 60,
+    });
+    strandedApkGithub.uploadAsset = async () => {
+      throw new Error('GitHub checksum upload HTTP 503');
+    };
+    strandedApkGithub.deleteAsset = async assetId => {
+      strandedApkGithub.deletedAssets.push(assetId);
+      throw new Error('GitHub APK cleanup HTTP 403');
+    };
+    await expect(publishBinaryRelease({
+      ...input,
+      publicationApproved: true,
+    }, { github: strandedApkGithub })).rejects.toThrow(
+      'Binary publication cleanup failed for APK asset 59',
+    );
+    expect(strandedApkGithub.deletedAssets).toEqual([59]);
 
     const failingGithub = new FakeGitHubReleasesClient({
       release: { ...github.release },
@@ -838,8 +1045,16 @@ describe('Android GitHub release automation', () => {
       ...input,
       publicationApproved: true,
     }, { github: failingGithub })).rejects.toThrow('GitHub upload HTTP 503');
-    expect(failingGithub.deletedAssets).toEqual([60]);
-    expect(failingGithub.updatedReleases).toEqual([]);
+    expect(failingGithub.uploadedAssets).toEqual([
+      { releaseId: 41, name: identity.checksumName, bytes: checksumBytes },
+    ]);
+    expect(failingGithub.deletedAssets).toEqual([]);
+    expect(failingGithub.updatedReleases).toEqual([
+      expect.objectContaining({
+        releaseId: 41,
+        body: `${sourceReleaseNotes(identity)}\n\n---\n\n${binaryEvidence.releaseNotes}`,
+      }),
+    ]);
 
     const evidence = await publishBinaryRelease({
       ...input,
@@ -847,8 +1062,8 @@ describe('Android GitHub release automation', () => {
     }, { github });
 
     expect(github.uploadedAssets).toEqual([
-      { releaseId: 41, name: identity.apkName, bytes: apkBytes },
       { releaseId: 41, name: identity.checksumName, bytes: checksumBytes },
+      { releaseId: 41, name: identity.apkName, bytes: apkBytes },
     ]);
     expect(github.updatedReleases).toEqual([
       expect.objectContaining({ releaseId: 41, draft: false }),
@@ -856,8 +1071,8 @@ describe('Android GitHub release automation', () => {
     expect(evidence).toEqual(expect.objectContaining({
       phase: 'binary-published',
       publicationApproved: true,
-      apkAssetId: 50,
-      checksumAssetId: 51,
+      apkAssetId: 51,
+      checksumAssetId: 50,
     }));
     expect(github.deletedAssets).toEqual([]);
 
@@ -893,7 +1108,7 @@ describe('Android GitHub release automation', () => {
     }, { github: responseLossGithub })).rejects.toThrow(
       'response lost after binary publication',
     );
-    expect(responseLossGithub.deletedAssets).toEqual([70, 71]);
+    expect(responseLossGithub.deletedAssets).toEqual([]);
 
     const recovered = await publishBinaryRelease({
       ...input,
@@ -901,10 +1116,81 @@ describe('Android GitHub release automation', () => {
     }, { github: responseLossGithub });
     expect(recovered).toEqual(expect.objectContaining({
       phase: 'binary-published',
-      apkAssetId: 72,
-      checksumAssetId: 73,
+      apkAssetId: 71,
+      checksumAssetId: 70,
     }));
     expect(responseLossGithub.updatedReleases).toHaveLength(1);
+
+    const apkResponseLossGithub = new FakeGitHubReleasesClient({
+      release: {
+        id: 41,
+        tagName: identity.tagName,
+        targetCommitish: 'main',
+        draft: false,
+        prerelease: false,
+        body: sourceReleaseNotes(identity),
+      },
+      asset: sourceAsset,
+      assets: [sourceAsset],
+      nextAssetId: 80,
+    });
+    const uploadWithResponseLoss = apkResponseLossGithub.uploadAsset.bind(
+      apkResponseLossGithub,
+    );
+    apkResponseLossGithub.uploadAsset = async upload => {
+      const uploaded = await uploadWithResponseLoss(upload);
+      if (upload.name === identity.apkName) {
+        throw new Error('GitHub response lost after APK upload');
+      }
+      return uploaded;
+    };
+    const responseLossRecovered = await publishBinaryRelease({
+      ...input,
+      publicationApproved: true,
+    }, { github: apkResponseLossGithub });
+    expect(responseLossRecovered).toEqual(expect.objectContaining({
+      phase: 'binary-published',
+      apkAssetId: 81,
+      checksumAssetId: 80,
+    }));
+    expect(apkResponseLossGithub.deletedAssets).toEqual([]);
+
+    const tamperedResponseLossGithub = new FakeGitHubReleasesClient({
+      release: {
+        id: 41,
+        tagName: identity.tagName,
+        targetCommitish: 'main',
+        draft: false,
+        prerelease: false,
+        body: sourceReleaseNotes(identity),
+      },
+      asset: sourceAsset,
+      assets: [sourceAsset],
+      nextAssetId: 80,
+    });
+    const uploadBeforeTamper = tamperedResponseLossGithub.uploadAsset.bind(
+      tamperedResponseLossGithub,
+    );
+    tamperedResponseLossGithub.uploadAsset = async upload => {
+      const uploaded = await uploadBeforeTamper(upload);
+      if (upload.name === identity.apkName) {
+        tamperedResponseLossGithub.assets.push({
+          id: 82,
+          name: 'concurrent-side-load.apk',
+          sha256: 'f'.repeat(64),
+          size: 9,
+        });
+        throw new Error('GitHub response lost with concurrent APK mutation');
+      }
+      return uploaded;
+    };
+    await expect(publishBinaryRelease({
+      ...input,
+      publicationApproved: true,
+    }, { github: tamperedResponseLossGithub })).rejects.toThrow(
+      'response lost with concurrent APK mutation',
+    );
+    expect(tamperedResponseLossGithub.deletedAssets).toEqual([81, 82]);
   });
 
   it('wires four manual protected phases without any push, tag, or unapproved publication path', () => {
@@ -1107,6 +1393,10 @@ describe('Android GitHub release automation', () => {
       repoRoot,
       'apps/mobile/scripts/download-android-release-artifact.sh',
     );
+    const fakeGhSource = path.join(
+      repoRoot,
+      'apps/mobile/test-support/fakeAndroidReleaseArtifactGh.sh',
+    );
 
     try {
       fs.mkdirSync(payloadDirectory);
@@ -1121,23 +1411,7 @@ describe('Android GitHub release automation', () => {
         .update(fs.readFileSync(archive))
         .digest('hex');
       const fakeGh = path.join(fakeBin, 'gh');
-      fs.writeFileSync(fakeGh, `#!/usr/bin/env bash
-set -euo pipefail
-case "\${2:-}" in
-  repos/*/actions/artifacts/123)
-    printf '{"expired":false,"name":"android-source-draft-456","workflow_run":{"id":456},"digest":"sha256:%s"}' "$FAKE_ARCHIVE_SHA256"
-    ;;
-  repos/*/actions/runs/456)
-    printf '{"path":".github/workflows/mobile-android-github-release.yml","event":"workflow_dispatch","conclusion":"success","head_sha":"%s"}' "$GITHUB_SHA"
-    ;;
-  repos/*/actions/artifacts/123/zip)
-    command cat "$FAKE_ARCHIVE"
-    ;;
-  *)
-    exit 1
-    ;;
-esac
-`);
+      fs.copyFileSync(fakeGhSource, fakeGh);
       fs.chmodSync(fakeGh, 0o755);
 
       const result = spawnSync('bash', [
@@ -1156,8 +1430,8 @@ esac
           GITHUB_REPOSITORY: 'Chessticize/chessticize-mobile',
           GITHUB_SHA: commitSha,
           GITHUB_OUTPUT: output,
-          FAKE_ARCHIVE: archive,
-          FAKE_ARCHIVE_SHA256: archiveSha256,
+          FAKE_SINGLE_ARCHIVE: archive,
+          FAKE_SINGLE_ARCHIVE_SHA256: archiveSha256,
         },
       });
 
@@ -1189,12 +1463,360 @@ esac
           GITHUB_REPOSITORY: 'Chessticize/chessticize-mobile',
           GITHUB_SHA: commitSha,
           GITHUB_OUTPUT: path.join(directory, 'rejected-output'),
-          FAKE_ARCHIVE: archive,
-          FAKE_ARCHIVE_SHA256: 'f'.repeat(64),
+          FAKE_SINGLE_ARCHIVE: archive,
+          FAKE_SINGLE_ARCHIVE_SHA256: 'f'.repeat(64),
         },
       });
       expect(rejected.status).not.toBe(0);
       expect(fs.existsSync(path.join(rejectedDestination, 'evidence.json'))).toBe(false);
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('runs retained artifact provenance through real prepare-binary and publish-binary CLI processes', () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'chessticize-binary-cli-'));
+    const repoRoot = path.resolve(__dirname, '../../..');
+    const cli = path.join(repoRoot, 'apps/mobile/scripts/android-github-release-cli.js');
+    const downloader = path.join(
+      repoRoot,
+      'apps/mobile/scripts/download-android-release-artifact.sh',
+    );
+    const fakeFetch = path.join(
+      repoRoot,
+      'apps/mobile/test-support/fakeAndroidBinaryReleaseFetch.js',
+    );
+    const fakeGhSource = path.join(
+      repoRoot,
+      'apps/mobile/test-support/fakeAndroidReleaseArtifactGh.sh',
+    );
+    const fakeToolSource = path.join(
+      repoRoot,
+      'apps/mobile/test-support/fakeAndroidReleaseTool.sh',
+    );
+    const canonicalVersion = JSON.parse(fs.readFileSync(
+      path.join(repoRoot, 'apps/mobile/release-version.json'),
+      'utf8',
+    ));
+    const identity = createAndroidReleaseIdentity(canonicalVersion);
+    const commitSha = 'a'.repeat(40);
+    const certificateSha256 = 'd'.repeat(64);
+    const candidate = {
+      commitSha,
+      aabSha256: 'b'.repeat(64),
+      applicationId: identity.applicationId,
+      versionName: identity.publicVersion,
+      versionCode: identity.versionCode,
+    };
+    const hashFile = filePath => crypto.createHash('sha256')
+      .update(fs.readFileSync(filePath))
+      .digest('hex');
+    const writeJson = (filePath, value) => {
+      fs.mkdirSync(path.dirname(filePath), { recursive: true });
+      fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`);
+    };
+    const zipDirectory = (sourceDirectory, archivePath) => {
+      const result = spawnSync('zip', ['-q', '-r', archivePath, '.'], {
+        cwd: sourceDirectory,
+        encoding: 'utf8',
+      });
+      expect(result).toEqual(expect.objectContaining({ status: 0, stderr: '' }));
+    };
+    const parseOutputFile = outputPath => Object.fromEntries(
+      fs.readFileSync(outputPath, 'utf8')
+        .trim()
+        .split('\n')
+        .map(line => {
+          const separator = line.indexOf('=');
+          return [line.slice(0, separator), line.slice(separator + 1)];
+        }),
+    );
+
+    try {
+      const candidatePayload = path.join(directory, 'candidate-payload');
+      const sourcePayload = path.join(directory, 'source-payload');
+      const candidateManifestPath = path.join(
+        candidatePayload,
+        'artifacts/android-release/android-source-manifest.json',
+      );
+      const exactManifest = sourceManifest({
+        bundle: {
+          sha256: candidate.aabSha256,
+          applicationId: identity.applicationId,
+          versionName: identity.publicVersion,
+          versionCode: identity.versionCode,
+        },
+      });
+      writeJson(candidateManifestPath, exactManifest);
+      const sourceManifestBytes = fs.readFileSync(candidateManifestPath);
+      const sourceManifestSha256 = crypto.createHash('sha256')
+        .update(sourceManifestBytes)
+        .digest('hex');
+      writeJson(
+        path.join(sourcePayload, 'android-source-publication-evidence.json'),
+        {
+          schemaVersion: 1,
+          phase: 'source-published',
+          publicationApproved: true,
+          releaseId: 41,
+          releaseAssetId: 42,
+          tagName: identity.tagName,
+          commitSha,
+          sourceManifestSha256,
+          candidate,
+        },
+      );
+      const candidateArchive = path.join(directory, 'candidate.zip');
+      const sourceArchive = path.join(directory, 'source.zip');
+      zipDirectory(candidatePayload, candidateArchive);
+      zipDirectory(sourcePayload, sourceArchive);
+
+      const fakeBin = path.join(directory, 'bin');
+      fs.mkdirSync(fakeBin);
+      const fakeGh = path.join(fakeBin, 'gh');
+      fs.copyFileSync(fakeGhSource, fakeGh);
+      fs.chmodSync(fakeGh, 0o755);
+      const artifactEnvironment = {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+        GH_TOKEN: 'fake-actions-token',
+        GITHUB_REPOSITORY: 'Chessticize/chessticize-mobile',
+        GITHUB_SHA: commitSha,
+        FAKE_COMMIT_SHA: commitSha,
+        FAKE_CANDIDATE_ARCHIVE: candidateArchive,
+        FAKE_CANDIDATE_ARCHIVE_SHA256: hashFile(candidateArchive),
+        FAKE_SOURCE_ARCHIVE: sourceArchive,
+        FAKE_SOURCE_ARCHIVE_SHA256: hashFile(sourceArchive),
+      };
+      const downloadArtifact = ({ id, workflow, name, destination }) => {
+        const outputPath = path.join(directory, `artifact-${id}.output`);
+        const archivePath = path.join(directory, `artifact-${id}.zip`);
+        const result = spawnSync('bash', [
+          downloader,
+          String(id),
+          workflow,
+          name,
+          destination,
+          archivePath,
+        ], {
+          encoding: 'utf8',
+          env: { ...artifactEnvironment, GITHUB_OUTPUT: outputPath },
+        });
+        expect(result).toEqual(expect.objectContaining({ status: 0, stderr: '' }));
+        return parseOutputFile(outputPath);
+      };
+      const candidateDirectory = path.join(directory, 'candidate');
+      const sourceDirectory = path.join(directory, 'source-publication');
+      const candidateProvenance = downloadArtifact({
+        id: 201,
+        workflow: '.github/workflows/mobile-android-release-candidate.yml',
+        name: 'android-signed-release-candidate-{sha}',
+        destination: candidateDirectory,
+      });
+      const sourceProvenance = downloadArtifact({
+        id: 202,
+        workflow: '.github/workflows/mobile-android-github-release.yml',
+        name: 'android-source-publication-{run_id}',
+        destination: sourceDirectory,
+      });
+
+      const apkPayload = path.join(directory, 'apk-payload');
+      const stockfishArtifacts = JSON.parse(fs.readFileSync(
+        path.join(repoRoot, 'apps/mobile/stockfish-artifacts.json'),
+        'utf8',
+      ));
+      for (const relativePath of [
+        'assets/stockfish/stockfish-artifacts.json',
+        ...stockfishArtifacts.nnue.map(
+          artifactPath => `assets/stockfish/${path.basename(artifactPath)}`,
+        ),
+        'lib/arm64-v8a/libappmodules.so',
+        'lib/arm64-v8a/libstockfish.so',
+        'lib/x86_64/libappmodules.so',
+        'lib/x86_64/libstockfish.so',
+      ]) {
+        const filePath = path.join(apkPayload, relativePath);
+        fs.mkdirSync(path.dirname(filePath), { recursive: true });
+        fs.writeFileSync(filePath, relativePath.startsWith('lib/') ? 'ELF' : '{}');
+      }
+      const playApk = path.join(directory, 'play-generated.apk');
+      zipDirectory(apkPayload, playApk);
+      const apkBytes = fs.statSync(playApk).size;
+
+      const playReadyPath = path.join(directory, 'play-ready.json');
+      const ownerEvidencePath = path.join(directory, 'owner-evidence.json');
+      writeJson(playReadyPath, {
+        schemaVersion: 1,
+        status: 'play-ready',
+        worktreeClean: true,
+        commitSha,
+        bundle: {
+          sha256: candidate.aabSha256,
+          applicationId: identity.applicationId,
+          versionName: identity.publicVersion,
+          versionCode: identity.versionCode,
+        },
+      });
+      writeJson(ownerEvidencePath, {
+        candidate,
+        signing: { appSigningCertificateSha256: certificateSha256 },
+        artifacts: {
+          generatedApkSizes: {
+            universalApkBytes: apkBytes,
+            universalApkExpectation: {
+              minimumBytes: apkBytes,
+              maximumBytes: apkBytes,
+            },
+          },
+        },
+      });
+
+      const androidHome = path.join(directory, 'android-sdk');
+      const hostTag = process.platform === 'darwin' ? 'darwin-x86_64' : 'linux-x86_64';
+      for (const relativePath of [
+        'build-tools/36.0.0/aapt2',
+        'build-tools/36.0.0/apksigner',
+        'build-tools/36.0.0/zipalign',
+        `ndk/27.1.12297006/toolchains/llvm/prebuilt/${hostTag}/bin/llvm-readelf`,
+      ]) {
+        const toolPath = path.join(androidHome, relativePath);
+        fs.mkdirSync(path.dirname(toolPath), { recursive: true });
+        fs.copyFileSync(fakeToolSource, toolPath);
+        fs.chmodSync(toolPath, 0o755);
+      }
+      const binaryPreparationDirectory = path.join(directory, 'binary-preparation');
+      const commonCliEnvironment = {
+        ...process.env,
+        NODE_OPTIONS: [
+          process.env.NODE_OPTIONS,
+          `--require=${fakeFetch}`,
+        ].filter(Boolean).join(' '),
+        GITHUB_TOKEN: 'fake-cli-token',
+        PLAY_ACCESS_TOKEN: 'fake-play-token',
+        ANDROID_HOME: androidHome,
+        FAKE_COMMIT_SHA: commitSha,
+        FAKE_TAG_NAME: identity.tagName,
+        FAKE_PUBLIC_VERSION: identity.publicVersion,
+        FAKE_VERSION_CODE: String(identity.versionCode),
+        FAKE_SIGNING_CERTIFICATE_SHA256: certificateSha256,
+        FAKE_SOURCE_MANIFEST_PATH: path.join(
+          candidateDirectory,
+          'artifacts/android-release/android-source-manifest.json',
+        ),
+        FAKE_PLAY_APK_PATH: playApk,
+      };
+      const prepareResult = spawnSync(process.execPath, [
+        cli,
+        '--phase', 'prepare-binary',
+        '--public-version', identity.publicVersion,
+        '--version-code', String(identity.versionCode),
+        '--output-dir', binaryPreparationDirectory,
+        '--source-manifest', commonCliEnvironment.FAKE_SOURCE_MANIFEST_PATH,
+        '--source-publication-evidence', path.join(
+          sourceDirectory,
+          'android-source-publication-evidence.json',
+        ),
+        '--play-ready-evidence', playReadyPath,
+        '--owner-evidence', ownerEvidencePath,
+        '--candidate-run-id', candidateProvenance.run_id,
+        '--candidate-artifact-id', candidateProvenance.artifact_id,
+        '--candidate-artifact-name', candidateProvenance.artifact_name,
+        '--candidate-archive-sha256', candidateProvenance.archive_sha256,
+        '--prior-run-id', sourceProvenance.run_id,
+        '--prior-artifact-id', sourceProvenance.artifact_id,
+        '--prior-artifact-name', sourceProvenance.artifact_name,
+        '--prior-archive-sha256', sourceProvenance.archive_sha256,
+      ], { encoding: 'utf8', env: commonCliEnvironment });
+      expect(prepareResult).toEqual(expect.objectContaining({ status: 0, stderr: '' }));
+      const preparedEvidence = JSON.parse(prepareResult.stdout);
+      expect(preparedEvidence.retainedInputs).toEqual({
+        signedCandidate: {
+          runId: 301,
+          artifactId: 201,
+          artifactName: `android-signed-release-candidate-${commitSha}`,
+          archiveSha256: candidateProvenance.archive_sha256,
+        },
+        sourcePublication: {
+          runId: 302,
+          artifactId: 202,
+          artifactName: 'android-source-publication-302',
+          archiveSha256: sourceProvenance.archive_sha256,
+        },
+      });
+      expect(fs.readFileSync(
+        path.join(binaryPreparationDirectory, identity.apkName),
+      )).toEqual(fs.readFileSync(playApk));
+      fs.copyFileSync(
+        commonCliEnvironment.FAKE_SOURCE_MANIFEST_PATH,
+        path.join(binaryPreparationDirectory, 'android-source-manifest.json'),
+      );
+
+      const binaryArchive = path.join(directory, 'binary-preparation.zip');
+      zipDirectory(binaryPreparationDirectory, binaryArchive);
+      artifactEnvironment.FAKE_BINARY_ARCHIVE = binaryArchive;
+      artifactEnvironment.FAKE_BINARY_ARCHIVE_SHA256 = hashFile(binaryArchive);
+      const binaryDirectory = path.join(directory, 'binary-publication-input');
+      const binaryProvenance = downloadArtifact({
+        id: 203,
+        workflow: '.github/workflows/mobile-android-github-release.yml',
+        name: 'android-binary-preparation-{run_id}',
+        destination: binaryDirectory,
+      });
+
+      const publicationDirectory = path.join(directory, 'binary-publication');
+      const publicationLog = path.join(directory, 'publication-http.log');
+      const publishResult = spawnSync(process.execPath, [
+        cli,
+        '--phase', 'publish-binary',
+        '--public-version', identity.publicVersion,
+        '--version-code', String(identity.versionCode),
+        '--output-dir', publicationDirectory,
+        '--source-manifest', path.join(binaryDirectory, 'android-source-manifest.json'),
+        '--binary-evidence', path.join(
+          binaryDirectory,
+          'android-binary-preparation-evidence.json',
+        ),
+        '--apk', path.join(binaryDirectory, identity.apkName),
+        '--checksum', path.join(binaryDirectory, identity.checksumName),
+        '--prior-run-id', binaryProvenance.run_id,
+        '--prior-artifact-id', binaryProvenance.artifact_id,
+        '--prior-artifact-name', binaryProvenance.artifact_name,
+        '--prior-archive-sha256', binaryProvenance.archive_sha256,
+      ], {
+        encoding: 'utf8',
+        env: {
+          ...commonCliEnvironment,
+          CHESSTICIZE_ANDROID_BINARY_PUBLICATION_APPROVED: 'true',
+          FAKE_SOURCE_MANIFEST_PATH: path.join(
+            binaryDirectory,
+            'android-source-manifest.json',
+          ),
+          FAKE_RELEASE_HTTP_LOG: publicationLog,
+        },
+      });
+      expect(publishResult).toEqual(expect.objectContaining({ status: 0, stderr: '' }));
+      const publicationEvidence = JSON.parse(publishResult.stdout);
+      expect(publicationEvidence).toEqual(expect.objectContaining({
+        phase: 'binary-published',
+        publicationApproved: true,
+        apkAssetId: 51,
+        checksumAssetId: 50,
+        binaryPreparationWorkflow: {
+          runId: 303,
+          artifactId: 203,
+          artifactName: 'android-binary-preparation-303',
+          archiveSha256: binaryProvenance.archive_sha256,
+        },
+      }));
+      expect(fs.readFileSync(publicationLog, 'utf8').trim().split('\n')).toEqual([
+        `upload:${identity.checksumName}`,
+        'patch:release-notes',
+        `upload:${identity.apkName}`,
+      ]);
+      expect(JSON.parse(fs.readFileSync(
+        path.join(publicationDirectory, 'android-binary-publication-evidence.json'),
+        'utf8',
+      ))).toEqual(publicationEvidence);
     } finally {
       fs.rmSync(directory, { recursive: true, force: true });
     }

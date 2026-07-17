@@ -39,9 +39,12 @@ source tag, and release:
 4. `publish-binary` accepts only that exact preparation artifact. After a
    different protected publication approval, it rechecks the live canonical
    release, exact source asset, APK bytes, checksum, notes, version, package,
-   ABI set, signing certificate, and provenance. It then attaches the APK and
-   checksum to the already-public release. A partial upload is removed before
-   the phase fails, so a retry starts from a known state.
+   ABI set, signing certificate, and provenance. It publishes the checksum
+   first, then the exact binary notes, and attaches the executable APK last.
+   Any incomplete, unexpected, duplicate, or mismatched pre-existing APK is
+   removed before the phase continues. APK cleanup failures stop with the exact
+   asset ID and require manual removal; they are never hidden behind the
+   original API failure.
 
 There is no push, pull-request, scheduled, tag-creation, Play-upload, or Play
 rollout trigger. Preparation never implies publication, and a publication job
@@ -158,6 +161,9 @@ the Android physical-device release gate.
 
 Do not weaken a failure into a warning. Fix repository defects with regression
 tests and rerun from a clean exact head. For transient Google, GitHub, or Actions
-failures, retry only after confirming no release mutation occurred or after the
-automated partial-upload cleanup completed. A successful dry preparation is not
-publication evidence, and no phase authorizes a Production rollout.
+failures, retry only after confirming that no APK exists without its exact
+checksum and binary notes. The automation reconciles an exact complete state,
+retains safe checksum/notes preparation for retry, and removes any incomplete
+APK. If APK deletion fails, remove the reported asset manually and confirm the
+release state before retrying. A successful dry preparation is not publication
+evidence, and no phase authorizes a Production rollout.

@@ -700,44 +700,89 @@ async function publishBinaryRelease(input, { github }) {
     github.getAsset(evidence.sourceManifestAssetId),
     github.getReleaseAssets(evidence.releaseId),
   ]);
+  if (!Array.isArray(existingAssets)) {
+    throw new Error(
+      'GitHub release assets API response is unavailable; manually confirm no APK is public.',
+    );
+  }
   if (!tag || !['annotated', 'signed'].includes(tag.tagType) ||
       tag.commitSha?.toLowerCase() !== evidence.candidate?.commitSha) {
-    throw new Error('Canonical Android tag changed before binary publication.');
+    const conflict = new Error('Canonical Android tag changed before binary publication.');
+    await cleanupApkAssets(existingAssets, conflict);
+    throw conflict;
   }
   if (!release || release.id !== evidence.releaseId ||
       release.tagName !== identity.tagName ||
       release.draft !== false || release.prerelease !== false) {
-    throw new Error('Canonical source release changed before binary publication.');
+    const conflict = new Error('Canonical source release changed before binary publication.');
+    await cleanupApkAssets(existingAssets, conflict);
+    throw conflict;
   }
   const sourceBody = sourceReleaseNotes(identity);
   const desiredBody = `${sourceBody}\n\n---\n\n${evidence.releaseNotes}`;
   const releaseBody = String(release.body ?? '');
   if (releaseBody !== sourceBody && releaseBody !== desiredBody) {
-    throw new Error('Canonical Android release body changed before binary publication.');
+    const conflict = new Error(
+      'Canonical Android release body changed before binary publication.',
+    );
+    await cleanupApkAssets(existingAssets, conflict);
+    throw conflict;
   }
   if (!sourceAsset || sourceAsset.id !== evidence.sourceManifestAssetId ||
       sourceAsset.name !== 'android-source-manifest.json' ||
       sourceAsset.sha256?.toLowerCase() !== evidence.sourceManifestSha256) {
-    throw new Error('Canonical source manifest asset changed before binary publication.');
+    const conflict = new Error(
+      'Canonical source manifest asset changed before binary publication.',
+    );
+    await cleanupApkAssets(existingAssets, conflict);
+    throw conflict;
   }
-  if (!Array.isArray(existingAssets)) {
-    throw new Error('GitHub release assets API response is unavailable or malformed.');
-  }
-  const reservedNames = new Set([identity.apkName, identity.checksumName]);
   const expectedAssets = new Map([
-    [identity.apkName, {
-      bytes: input.apkBytes,
-      sha256: verifiedApk.sha256,
-      size: verifiedApk.bytes,
-      label: 'Play-generated APK',
-    }],
     [identity.checksumName, {
       bytes: input.checksumBytes,
       sha256: evidence.checksum.sha256,
       size: expectedChecksumBytes.length,
       label: 'APK checksum',
     }],
+    [identity.apkName, {
+      bytes: input.apkBytes,
+      sha256: verifiedApk.sha256,
+      size: verifiedApk.bytes,
+      label: 'Play-generated APK',
+    }],
   ]);
+  async function cleanupApkAssets(assets, originalError) {
+    const apkAssets = assets.filter(asset =>
+      typeof asset?.name === 'string' && asset.name.toLowerCase().endsWith('.apk'));
+    const invalidAssets = apkAssets.filter(
+      asset => !Number.isSafeInteger(asset?.id) || asset.id < 1,
+    );
+    const apkAssetIds = apkAssets
+      .filter(asset => Number.isSafeInteger(asset?.id) && asset.id > 0)
+      .map(asset => asset.id);
+    const cleanupResults = await Promise.allSettled(
+      apkAssetIds.map(assetId => github.deleteAsset(assetId)),
+    );
+    const failedIds = cleanupResults
+      .map((result, index) => result.status === 'rejected' ? apkAssetIds[index] : null)
+      .filter(assetId => assetId !== null);
+    if (invalidAssets.length > 0 || failedIds.length > 0) {
+      const originalMessage = originalError instanceof Error
+        ? originalError.message
+        : String(originalError);
+      const failureDetail = [
+        failedIds.length > 0 ? `asset ${failedIds.join(', ')}` : null,
+        invalidAssets.length > 0
+          ? `asset with missing ID (${invalidAssets.map(asset => asset.name).join(', ')})`
+          : null,
+      ].filter(Boolean).join(' and ');
+      throw new Error(
+        `Binary publication cleanup failed for APK ${failureDetail}; ` +
+        `manual removal is required before retry. Original failure: ${originalMessage}`,
+        { cause: originalError },
+      );
+    }
+  }
   const allowedNames = new Set([
     'android-source-manifest.json',
     ...expectedAssets.keys(),
@@ -750,7 +795,9 @@ async function publishBinaryRelease(input, { github }) {
       listedSourceAssets[0]?.id !== sourceAsset.id ||
       listedSourceAssets[0]?.sha256?.toLowerCase() !== evidence.sourceManifestSha256 ||
       listedSourceAssets[0]?.size !== input.sourceManifestBytes.length) {
-    throw new Error('Canonical release contains an unexpected release asset.');
+    const conflict = new Error('Canonical release contains an unexpected release asset.');
+    await cleanupApkAssets(existingAssets, conflict);
+    throw conflict;
   }
   const reconciledAssets = new Map();
   for (const [name, expectedAsset] of expectedAssets) {
@@ -759,47 +806,16 @@ async function publishBinaryRelease(input, { github }) {
         (!Number.isSafeInteger(matches[0].id) || matches[0].id < 1 ||
          matches[0].sha256?.toLowerCase() !== expectedAsset.sha256 ||
          matches[0].size !== expectedAsset.size))) {
-      throw new Error(`Canonical release contains a conflicting ${expectedAsset.label} asset.`);
+      const conflict = new Error(
+        `Canonical release contains a conflicting ${expectedAsset.label} asset.`,
+      );
+      await cleanupApkAssets(existingAssets, conflict);
+      throw conflict;
     }
     if (matches.length === 1) reconciledAssets.set(name, matches[0]);
   }
 
-  const initialAssetIds = new Set(
-    existingAssets
-      .filter(asset => Number.isSafeInteger(asset?.id) && asset.id > 0)
-      .map(asset => asset.id),
-  );
-  const createdAssetIds = new Set();
-  try {
-    for (const [name, expectedAsset] of expectedAssets) {
-      if (reconciledAssets.has(name)) continue;
-      const uploaded = await github.uploadAsset({
-        releaseId: release.id,
-        name,
-        bytes: expectedAsset.bytes,
-      });
-      if (Number.isSafeInteger(uploaded?.id) && uploaded.id > 0) {
-        createdAssetIds.add(uploaded.id);
-      }
-      if (!uploaded || !Number.isSafeInteger(uploaded.id) || uploaded.id < 1 ||
-          uploaded.name !== name || uploaded.sha256?.toLowerCase() !== expectedAsset.sha256 ||
-          uploaded.size !== expectedAsset.size) {
-        throw new Error(`GitHub did not retain the exact ${expectedAsset.label} bytes.`);
-      }
-      reconciledAssets.set(name, uploaded);
-    }
-
-    const updated = desiredBody === releaseBody
-      ? release
-      : await github.updateRelease({
-        releaseId: release.id,
-        body: desiredBody,
-        draft: false,
-      });
-    if (!updated || updated.id !== release.id || updated.tagName !== identity.tagName ||
-        updated.draft !== false || String(updated.body ?? '') !== desiredBody) {
-      throw new Error('GitHub did not preserve the canonical published release state.');
-    }
+  const publishedEvidence = () => {
     const apkAsset = reconciledAssets.get(identity.apkName);
     const checksumAsset = reconciledAssets.get(identity.checksumName);
     return {
@@ -809,21 +825,116 @@ async function publishBinaryRelease(input, { github }) {
       apkAssetId: apkAsset.id,
       checksumAssetId: checksumAsset.id,
     };
-  } catch (error) {
-    let cleanupIds = [...createdAssetIds];
-    try {
-      const currentAssets = await github.getReleaseAssets(release.id);
-      if (Array.isArray(currentAssets)) {
-        cleanupIds = currentAssets
-          .filter(asset => reservedNames.has(asset?.name) &&
-            Number.isSafeInteger(asset?.id) && asset.id > 0 &&
-            !initialAssetIds.has(asset.id))
-          .map(asset => asset.id);
-      }
-    } catch {
-      // Best-effort cleanup; the next protected retry reconciles exact assets.
+  };
+  const exactPublishedState = (candidateRelease, assets) => {
+    if (!candidateRelease || candidateRelease.id !== release.id ||
+        candidateRelease.tagName !== identity.tagName ||
+        candidateRelease.draft !== false || candidateRelease.prerelease !== false ||
+        String(candidateRelease.body ?? '') !== desiredBody || !Array.isArray(assets) ||
+        assets.length !== 3) {
+      return null;
     }
-    await Promise.allSettled(cleanupIds.map(assetId => github.deleteAsset(assetId)));
+    const exactAsset = (name, expected) => {
+      const matches = assets.filter(asset => asset?.name === name);
+      const asset = matches[0];
+      return matches.length === 1 && Number.isSafeInteger(asset?.id) && asset.id > 0 &&
+        asset.sha256?.toLowerCase() === expected.sha256 && asset.size === expected.size
+        ? asset
+        : null;
+    };
+    const exactSource = exactAsset('android-source-manifest.json', {
+      sha256: evidence.sourceManifestSha256,
+      size: input.sourceManifestBytes.length,
+    });
+    const exactChecksum = exactAsset(
+      identity.checksumName,
+      expectedAssets.get(identity.checksumName),
+    );
+    const exactApk = exactAsset(identity.apkName, expectedAssets.get(identity.apkName));
+    if (!exactSource || exactSource.id !== sourceAsset.id || !exactChecksum || !exactApk) {
+      return null;
+    }
+    return { apk: exactApk, checksum: exactChecksum };
+  };
+  const initialPublishedState = exactPublishedState(release, existingAssets);
+  if (initialPublishedState) {
+    reconciledAssets.set(identity.apkName, initialPublishedState.apk);
+    reconciledAssets.set(identity.checksumName, initialPublishedState.checksum);
+    return publishedEvidence();
+  }
+  const existingApk = reconciledAssets.get(identity.apkName);
+  if (existingApk &&
+      (!reconciledAssets.has(identity.checksumName) || releaseBody !== desiredBody)) {
+    await cleanupApkAssets(
+      [existingApk],
+      new Error('A public APK existed before its exact checksum and release notes.'),
+    );
+    reconciledAssets.delete(identity.apkName);
+  }
+
+  try {
+    const uploadExpectedAsset = async name => {
+      const expectedAsset = expectedAssets.get(name);
+      const uploaded = await github.uploadAsset({
+        releaseId: release.id,
+        name,
+        bytes: expectedAsset.bytes,
+      });
+      if (!uploaded || !Number.isSafeInteger(uploaded.id) || uploaded.id < 1 ||
+          uploaded.name !== name || uploaded.sha256?.toLowerCase() !== expectedAsset.sha256 ||
+          uploaded.size !== expectedAsset.size) {
+        throw new Error(`GitHub did not retain the exact ${expectedAsset.label} bytes.`);
+      }
+      reconciledAssets.set(name, uploaded);
+    };
+    if (!reconciledAssets.has(identity.checksumName)) {
+      await uploadExpectedAsset(identity.checksumName);
+    }
+    if (releaseBody !== desiredBody) {
+      const updated = await github.updateRelease({
+        releaseId: release.id,
+        body: desiredBody,
+        draft: false,
+      });
+      if (!updated || updated.id !== release.id || updated.tagName !== identity.tagName ||
+          updated.draft !== false || String(updated.body ?? '') !== desiredBody) {
+        throw new Error('GitHub did not preserve the canonical published release state.');
+      }
+    }
+    if (!reconciledAssets.has(identity.apkName)) {
+      await uploadExpectedAsset(identity.apkName);
+    }
+    return publishedEvidence();
+  } catch (error) {
+    let currentRelease;
+    let currentAssets;
+    try {
+      [currentRelease, currentAssets] = await Promise.all([
+        github.getRelease(release.id),
+        github.getReleaseAssets(release.id),
+      ]);
+    } catch (reconciliationError) {
+      throw new Error(
+        `Binary publication state could not be reconciled after failure: ${
+          error instanceof Error ? error.message : String(error)
+        }. ${reconciliationError instanceof Error
+          ? reconciliationError.message
+          : String(reconciliationError)}`,
+        { cause: error },
+      );
+    }
+    if (!Array.isArray(currentAssets)) {
+      throw new Error('Binary publication assets could not be reconciled after failure.', {
+        cause: error,
+      });
+    }
+    const recoveredState = exactPublishedState(currentRelease, currentAssets);
+    if (recoveredState) {
+      reconciledAssets.set(identity.checksumName, recoveredState.checksum);
+      reconciledAssets.set(identity.apkName, recoveredState.apk);
+      return publishedEvidence();
+    }
+    await cleanupApkAssets(currentAssets, error);
     throw error;
   }
 }
