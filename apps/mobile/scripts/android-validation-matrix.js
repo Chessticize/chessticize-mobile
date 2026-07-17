@@ -164,14 +164,15 @@ function requiredEnvironment(name, environment) {
 }
 
 function parseCliArgs(args) {
+  const normalizedArgs = args[0] === '--' ? args.slice(1) : args;
   const parsed = {};
-  for (let index = 0; index < args.length; index += 1) {
-    const argument = args[index];
+  for (let index = 0; index < normalizedArgs.length; index += 1) {
+    const argument = normalizedArgs[index];
     if (argument === '--api-level') {
-      parsed.apiLevel = Number(args[index + 1]);
+      parsed.apiLevel = Number(normalizedArgs[index + 1]);
       index += 1;
     } else if (argument === '--output') {
-      parsed.outputPath = args[index + 1];
+      parsed.outputPath = normalizedArgs[index + 1];
       index += 1;
     } else {
       throw new Error(`Unknown Android validation argument ${argument}.`);

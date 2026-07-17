@@ -4,6 +4,7 @@ const path = require('node:path');
 
 const {
   createAndroidValidationEvidence,
+  parseCliArgs,
   runAndroidValidationMatrix,
   validationStepsForApiLevel,
 } = require('../scripts/android-validation-matrix');
@@ -130,6 +131,26 @@ describe('Android validation matrix', () => {
     expect(() => validationStepsForApiLevel(30)).toThrow(
       'Unsupported Android validation API level 30. Expected 24 or 36.'
     );
+  });
+
+  it('accepts direct CLI arguments and one conventional leading separator only', () => {
+    const expected = {
+      apiLevel: 24,
+      outputPath: 'apps/mobile/artifacts/android-validation/api-24.json',
+    };
+    const argumentsWithoutSeparator = [
+      '--api-level',
+      '24',
+      '--output',
+      expected.outputPath,
+    ];
+
+    expect(parseCliArgs(argumentsWithoutSeparator)).toEqual(expected);
+    expect(parseCliArgs(['--', ...argumentsWithoutSeparator])).toEqual(expected);
+    expect(() => parseCliArgs(['--', '--', ...argumentsWithoutSeparator]))
+      .toThrow('Unknown Android validation argument --.');
+    expect(() => parseCliArgs([...argumentsWithoutSeparator, '--']))
+      .toThrow('Unknown Android validation argument --.');
   });
 
   it('records exact-head commands, device matrix, suite results, and a clean worktree', () => {
