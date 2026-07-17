@@ -1,7 +1,6 @@
-const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
-const { androidAdbPath } = require('./androidNetwork');
+const { runAndroidAdbShell } = require('./androidAdbShell');
 const {
   androidAppIsResumed,
   failStandardSprint,
@@ -159,19 +158,7 @@ describe('Android Review reminders through public and system surfaces', () => {
 });
 
 function adbShell(args) {
-  return String(execFileSync(adbPath(), ['-s', serial(), 'shell', ...args], {
-    encoding: 'utf8',
-    maxBuffer: 10 * 1024 * 1024,
-    timeout: 30_000,
-  }) ?? '');
-}
-
-function adbPath() {
-  return androidAdbPath(process.env);
-}
-
-function serial() {
-  return process.env.DETOX_ANDROID_DEVICE || 'emulator-5554';
+  return runAndroidAdbShell(args);
 }
 
 function resetNotificationPermission() {
