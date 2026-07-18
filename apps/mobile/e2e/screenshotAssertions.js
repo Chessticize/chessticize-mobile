@@ -143,10 +143,10 @@ async function settleBeforeDeadline(operation, {
   });
 
   let operationValue;
-  let operationIsPromiseLike;
+  let operationThen;
   try {
     operationValue = operation();
-    operationIsPromiseLike = isPromiseLike(operationValue);
+    operationThen = getCallableThen(operationValue);
   } catch (error) {
     const outcome = {status: 'rejected', error};
     cancelTimeout(timeoutHandle);
@@ -156,7 +156,7 @@ async function settleBeforeDeadline(operation, {
     return outcome;
   }
 
-  if (!operationIsPromiseLike) {
+  if (operationThen === null) {
     const outcome = {status: 'fulfilled', value: operationValue};
     cancelTimeout(timeoutHandle);
     if (!allowSynchronousCompletionAfterDeadline && now() >= deadline) {
@@ -167,7 +167,7 @@ async function settleBeforeDeadline(operation, {
 
   // Turn rejection into a settled value before racing so a rejection that
   // arrives after the deadline is still observed and cannot leak unhandled.
-  const operationOutcome = Promise.resolve(operationValue).then(
+  const operationOutcome = assimilateThenable(operationValue, operationThen).then(
     (value) => ({status: 'fulfilled', value}),
     (error) => ({status: 'rejected', error})
   );
@@ -183,10 +183,22 @@ async function settleBeforeDeadline(operation, {
   return outcome;
 }
 
-function isPromiseLike(value) {
-  return value !== null
-    && (typeof value === 'object' || typeof value === 'function')
-    && typeof value.then === 'function';
+function getCallableThen(value) {
+  if (value === null || (typeof value !== 'object' && typeof value !== 'function')) {
+    return null;
+  }
+  const then = value.then;
+  return typeof then === 'function' ? then : null;
+}
+
+function assimilateThenable(value, then) {
+  // Promise.resolve supplies asynchronous invocation, first-settlement-wins,
+  // and thrown-error handling without rereading the original then getter.
+  return Promise.resolve({
+    then(resolve, reject) {
+      Reflect.apply(then, value, [resolve, reject]);
+    },
+  });
 }
 
 function readinessDiagnostic(message, screenshotPath) {

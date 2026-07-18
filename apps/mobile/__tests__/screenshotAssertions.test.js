@@ -37,10 +37,7 @@ describe('screenshot assertions', () => {
 
   it('waits for a rotated board screenshot to contain rendered pieces', async () => {
     const emptyScreenshot = writeSyntheticBoard('empty-after-rotation.png');
-    const renderedScreenshot = writeSyntheticBoard('rendered-after-rotation.png', [
-      [6, 2, [20, 25, 32, 255]],
-      [7, 0, [245, 245, 245, 255]],
-    ]);
+    const renderedScreenshot = writeRenderedBoard('rendered-after-rotation.png');
     const screenshots = [emptyScreenshot, renderedScreenshot];
     const captureScreenshot = jest.fn(async () => screenshots.shift());
     let clock = 0;
@@ -93,10 +90,7 @@ describe('screenshot assertions', () => {
 
   it('accepts and archives a rendered retry captured before inspection crosses the deadline', async () => {
     const emptyScreenshot = writeSyntheticBoard('boundary-empty.png');
-    const renderedScreenshot = writeSyntheticBoard('boundary-rendered.png', [
-      [6, 2, [20, 25, 32, 255]],
-      [7, 0, [245, 245, 245, 255]],
-    ]);
+    const renderedScreenshot = writeRenderedBoard('boundary-rendered.png');
     const screenshots = [emptyScreenshot, renderedScreenshot];
     const captureScreenshot = jest.fn(async () => screenshots.shift());
     const archiveScreenshot = createAdaptiveScreenshotArchiver(
@@ -146,10 +140,7 @@ describe('screenshot assertions', () => {
   });
 
   it('propagates a real archive rejection unchanged after one capture without inspection or retry', async () => {
-    const renderedScreenshot = writeSyntheticBoard('archive-rejection.png', [
-      [6, 2, [20, 25, 32, 255]],
-      [7, 0, [245, 245, 245, 255]],
-    ]);
+    const renderedScreenshot = writeRenderedBoard('archive-rejection.png');
     const screenshotLabel = 'android-phone-landscape-standard-sprint';
     const realArchiveScreenshot = createAdaptiveScreenshotArchiver(
       path.join(temporaryDirectory, 'collision-profile', 'orientation.txt')
@@ -200,10 +191,7 @@ describe('screenshot assertions', () => {
   });
 
   it('rejects a rendered screenshot whose capture completes after the hard deadline', async () => {
-    const renderedScreenshot = writeSyntheticBoard('late-capture.png', [
-      [6, 2, [20, 25, 32, 255]],
-      [7, 0, [245, 245, 245, 255]],
-    ]);
+    const renderedScreenshot = writeRenderedBoard('late-capture.png');
     let clock = 0;
     const captureScreenshot = jest.fn(async () => {
       clock = 5001;
@@ -226,10 +214,7 @@ describe('screenshot assertions', () => {
   });
 
   it('accepts a rendered screenshot captured before synchronous inspection crosses the deadline', async () => {
-    const renderedScreenshot = writeSyntheticBoard('late-inspection.png', [
-      [6, 2, [20, 25, 32, 255]],
-      [7, 0, [245, 245, 245, 255]],
-    ]);
+    const renderedScreenshot = writeRenderedBoard('late-inspection.png');
     let clock = 0;
     const inspectScreenshot = jest.fn((...args) => {
       expectBoardScreenshotContainsPieces(...args);
@@ -250,10 +235,7 @@ describe('screenshot assertions', () => {
   });
 
   it('times out when asynchronous screenshot inspection completes after the deadline', async () => {
-    const renderedScreenshot = writeSyntheticBoard('late-async-inspection.png', [
-      [6, 2, [20, 25, 32, 255]],
-      [7, 0, [245, 245, 245, 255]],
-    ]);
+    const renderedScreenshot = writeRenderedBoard('late-async-inspection.png');
     let clock = 0;
     const inspectScreenshot = jest.fn(async (...args) => {
       expectBoardScreenshotContainsPieces(...args);
@@ -274,6 +256,191 @@ describe('screenshot assertions', () => {
     );
 
     expect(inspectScreenshot).toHaveBeenCalledTimes(1);
+  });
+
+  it('assimilates a resolving foreign thenable once with its original receiver', async () => {
+    const renderedScreenshot = writeRenderedBoard('foreign-thenable-resolve.png');
+    const ignoredLaterError = new Error('ignored after foreign inspection resolved');
+    const handles = [];
+    const scheduleTimeout = jest.fn((callback, milliseconds) => {
+      const handle = {callback, milliseconds};
+      handles.push(handle);
+      return handle;
+    });
+    const cancelTimeout = jest.fn();
+    let getterReads = 0;
+    let thenCalls = 0;
+    let inspectionThenable;
+    const then = function(resolve, reject) {
+      expect(this).toBe(inspectionThenable);
+      thenCalls += 1;
+      resolve();
+      reject(ignoredLaterError);
+      throw ignoredLaterError;
+    };
+    inspectionThenable = Object.defineProperty({}, 'then', {
+      get() {
+        getterReads += 1;
+        return then;
+      },
+    });
+
+    await expect(waitForBoardScreenshotContainsPieces({
+      boardFrame: fullBoardFrame(),
+      captureScreenshot: async () => renderedScreenshot,
+      screenFrame: fullBoardFrame(),
+      screenshotLabel: 'foreign-thenable-resolve',
+    }, {
+      cancelTimeout,
+      inspectScreenshot: () => inspectionThenable,
+      scheduleTimeout,
+    })).resolves.toBe(renderedScreenshot);
+
+    expect(getterReads).toBe(1);
+    expect(thenCalls).toBe(1);
+    expect(cancelTimeout.mock.calls).toEqual(handles.map((handle) => [handle]));
+  });
+
+  it('assimilates a rejecting foreign thenable once and preserves its error identity', async () => {
+    const renderedScreenshot = writeRenderedBoard('foreign-thenable-reject.png');
+    const inspectionError = new Error('foreign inspection rejected');
+    const ignoredLaterError = new Error('ignored after foreign inspection rejected');
+    const handles = [];
+    const scheduleTimeout = jest.fn((callback, milliseconds) => {
+      const handle = {callback, milliseconds};
+      handles.push(handle);
+      return handle;
+    });
+    const cancelTimeout = jest.fn();
+    let getterReads = 0;
+    let thenCalls = 0;
+    let inspectionThenable;
+    const then = function(resolve, reject) {
+      expect(this).toBe(inspectionThenable);
+      thenCalls += 1;
+      reject(inspectionError);
+      resolve();
+      throw ignoredLaterError;
+    };
+    inspectionThenable = Object.defineProperty({}, 'then', {
+      get() {
+        getterReads += 1;
+        return then;
+      },
+    });
+
+    await expect(waitForBoardScreenshotContainsPieces({
+      boardFrame: fullBoardFrame(),
+      captureScreenshot: async () => renderedScreenshot,
+      screenFrame: fullBoardFrame(),
+      screenshotLabel: 'foreign-thenable-reject',
+    }, {
+      cancelTimeout,
+      inspectScreenshot: () => inspectionThenable,
+      scheduleTimeout,
+    })).rejects.toBe(inspectionError);
+
+    expect(getterReads).toBe(1);
+    expect(thenCalls).toBe(1);
+    expect(cancelTimeout.mock.calls).toEqual(handles.map((handle) => [handle]));
+  });
+
+  it('preserves a foreign thenable getter error and clears its deadline timer', async () => {
+    const renderedScreenshot = writeRenderedBoard('foreign-thenable-getter-error.png');
+    const getterError = new Error('foreign then getter failed');
+    const handles = [];
+    const scheduleTimeout = jest.fn((callback, milliseconds) => {
+      const handle = {callback, milliseconds};
+      handles.push(handle);
+      return handle;
+    });
+    const cancelTimeout = jest.fn();
+    let getterReads = 0;
+    const inspectionThenable = Object.defineProperty({}, 'then', {
+      get() {
+        getterReads += 1;
+        throw getterError;
+      },
+    });
+
+    await expect(waitForBoardScreenshotContainsPieces({
+      boardFrame: fullBoardFrame(),
+      captureScreenshot: async () => renderedScreenshot,
+      screenFrame: fullBoardFrame(),
+      screenshotLabel: 'foreign-thenable-getter-error',
+    }, {
+      cancelTimeout,
+      inspectScreenshot: () => inspectionThenable,
+      scheduleTimeout,
+    })).rejects.toBe(getterError);
+
+    expect(getterReads).toBe(1);
+    expect(cancelTimeout.mock.calls).toEqual(handles.map((handle) => [handle]));
+  });
+
+  it('uses a one-shot resolving then getter without reading its later throwing state', async () => {
+    const renderedScreenshot = writeRenderedBoard('one-shot-resolving-thenable.png');
+    const unexpectedSecondRead = new Error('then getter read twice');
+    let getterReads = 0;
+    let thenCalls = 0;
+    let inspectionThenable;
+    const then = function(resolve) {
+      expect(this).toBe(inspectionThenable);
+      thenCalls += 1;
+      resolve();
+    };
+    inspectionThenable = Object.defineProperty({}, 'then', {
+      get() {
+        getterReads += 1;
+        if (getterReads > 1) {
+          throw unexpectedSecondRead;
+        }
+        return then;
+      },
+    });
+
+    await expect(waitForBoardScreenshotContainsPieces({
+      boardFrame: fullBoardFrame(),
+      captureScreenshot: async () => renderedScreenshot,
+      screenFrame: fullBoardFrame(),
+      screenshotLabel: 'one-shot-resolving-thenable',
+    }, {
+      inspectScreenshot: () => inspectionThenable,
+    })).resolves.toBe(renderedScreenshot);
+
+    expect(getterReads).toBe(1);
+    expect(thenCalls).toBe(1);
+  });
+
+  it('invokes a one-shot rejecting then instead of accepting its later non-callable state', async () => {
+    const renderedScreenshot = writeRenderedBoard('one-shot-rejecting-thenable.png');
+    const inspectionError = new Error('one-shot inspection rejected');
+    let getterReads = 0;
+    let thenCalls = 0;
+    let inspectionThenable;
+    const then = function(resolve, reject) {
+      expect(this).toBe(inspectionThenable);
+      thenCalls += 1;
+      reject(inspectionError);
+    };
+    inspectionThenable = Object.defineProperty({}, 'then', {
+      get() {
+        getterReads += 1;
+        return getterReads === 1 ? then : undefined;
+      },
+    });
+
+    await expect(waitForBoardScreenshotContainsPieces({
+      boardFrame: fullBoardFrame(),
+      captureScreenshot: async () => renderedScreenshot,
+      screenFrame: fullBoardFrame(),
+      screenshotLabel: 'one-shot-rejecting-thenable',
+    }, {
+      inspectScreenshot: () => inspectionThenable,
+    })).rejects.toBe(inspectionError);
+
+    expect(getterReads).toBe(1);
+    expect(thenCalls).toBe(1);
   });
 
   it('times out a late typed empty-board inspection with its latest diagnostic and no retry', async () => {
@@ -392,10 +559,7 @@ describe('screenshot assertions', () => {
   });
 
   it('hard-times out a pending inspection and safely observes its late rejection', async () => {
-    const renderedScreenshot = writeSyntheticBoard('pending-inspection.png', [
-      [6, 2, [20, 25, 32, 255]],
-      [7, 0, [245, 245, 245, 255]],
-    ]);
+    const renderedScreenshot = writeRenderedBoard('pending-inspection.png');
     const lateInspectionError = new Error('inspection rejected after timeout');
     let rejectInspection;
     const inspectionPromise = new Promise((resolve, reject) => {
@@ -440,11 +604,65 @@ describe('screenshot assertions', () => {
     await Promise.resolve();
   });
 
+  it('hard-times out a pending foreign thenable and observes its late rejection', async () => {
+    const renderedScreenshot = writeRenderedBoard('pending-foreign-thenable.png');
+    const lateInspectionError = new Error('foreign inspection rejected after timeout');
+    let rejectInspection;
+    let getterReads = 0;
+    let thenCalls = 0;
+    let inspectionThenable;
+    const then = function(resolve, reject) {
+      expect(this).toBe(inspectionThenable);
+      thenCalls += 1;
+      rejectInspection = reject;
+    };
+    inspectionThenable = Object.defineProperty({}, 'then', {
+      get() {
+        getterReads += 1;
+        return then;
+      },
+    });
+    const timeoutCallbacks = [];
+    const timeoutHandles = [];
+    const scheduleTimeout = jest.fn((callback, milliseconds) => {
+      timeoutCallbacks.push(callback);
+      const handle = {milliseconds};
+      timeoutHandles.push(handle);
+      return handle;
+    });
+    const cancelTimeout = jest.fn();
+
+    const waiting = waitForBoardScreenshotContainsPieces({
+      boardFrame: fullBoardFrame(),
+      captureScreenshot: async () => renderedScreenshot,
+      screenFrame: fullBoardFrame(),
+      screenshotLabel: 'pending-foreign-thenable',
+    }, {
+      cancelTimeout,
+      inspectScreenshot: () => inspectionThenable,
+      scheduleTimeout,
+    });
+
+    await flushMicrotasksUntil(() => (
+      scheduleTimeout.mock.calls.length === 2 && thenCalls === 1
+    ));
+    expect(getterReads).toBe(1);
+    expect(cancelTimeout).toHaveBeenCalledWith(timeoutHandles[0]);
+    timeoutCallbacks[1]();
+
+    await expect(waiting).rejects.toThrow(
+      'Timed out waiting for rendered chess pieces after 5000ms; '
+      + `latest=Screenshot inspection did not complete before the deadline; screenshot=${renderedScreenshot}`
+    );
+    expect(cancelTimeout).toHaveBeenCalledTimes(1);
+
+    rejectInspection(lateInspectionError);
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
   it('clears every hard-deadline timer when capture and inspection finish early', async () => {
-    const renderedScreenshot = writeSyntheticBoard('early-rendered.png', [
-      [6, 2, [20, 25, 32, 255]],
-      [7, 0, [245, 245, 245, 255]],
-    ]);
+    const renderedScreenshot = writeRenderedBoard('early-rendered.png');
     const handles = [];
     const scheduleTimeout = jest.fn((callback, milliseconds) => {
       const handle = {callback, milliseconds};
@@ -485,10 +703,7 @@ describe('screenshot assertions', () => {
   });
 
   it('propagates unrelated inspector errors with their original identity', async () => {
-    const renderedScreenshot = writeSyntheticBoard('inspector-error.png', [
-      [6, 2, [20, 25, 32, 255]],
-      [7, 0, [245, 245, 245, 255]],
-    ]);
+    const renderedScreenshot = writeRenderedBoard('inspector-error.png');
     const inspectionError = new Error('unexpected inspector failure');
     const inspectScreenshot = jest.fn(() => {
       throw inspectionError;
@@ -510,10 +725,7 @@ describe('screenshot assertions', () => {
   });
 
   it('preserves a synchronous inspector error that crosses the deadline', async () => {
-    const renderedScreenshot = writeSyntheticBoard('late-inspector-error.png', [
-      [6, 2, [20, 25, 32, 255]],
-      [7, 0, [245, 245, 245, 255]],
-    ]);
+    const renderedScreenshot = writeRenderedBoard('late-inspector-error.png');
     const inspectionError = new Error('late unexpected inspector failure');
     let clock = 0;
     const inspectScreenshot = jest.fn(() => {
@@ -546,6 +758,13 @@ function writeSyntheticBoard(filename, pieces = []) {
   const screenshotPath = path.join(temporaryDirectory, filename);
   fs.writeFileSync(screenshotPath, encodeRgbaPng(png));
   return screenshotPath;
+}
+
+function writeRenderedBoard(filename) {
+  return writeSyntheticBoard(filename, [
+    [6, 2, [20, 25, 32, 255]],
+    [7, 0, [245, 245, 245, 255]],
+  ]);
 }
 
 function encodeRgbaPng(png) {
