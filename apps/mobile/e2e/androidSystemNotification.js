@@ -75,7 +75,7 @@ async function waitForAndTapExactAndroidNotificationFromPublicUi({
 function parseAndroidUiNodes(hierarchy) {
   const roots = [];
   const stack = [];
-  const tokens = String(hierarchy).match(/<\/?node\b[^>]*\/?\s*>/g) ?? [];
+  const tokens = String(hierarchy).match(/<\/?node(?=[\s/>])[^>]*\/?\s*>/g) ?? [];
 
   for (const token of tokens) {
     if (token.startsWith('</')) {

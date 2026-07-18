@@ -77,6 +77,32 @@ const MALFORMED_ANDROID_UI_HIERARCHIES = [
     `<hierarchy>${EXACT_ANDROID_NOTIFICATION_ROW}</hierarchy><broken`,
   ],
 ];
+const ILLEGAL_XML_CHARACTER_HIERARCHIES = [
+  ['decimal NUL reference', '&#0;'],
+  ['hex NUL reference', '&#x0;'],
+  ['surrogate reference', '&#xD800;'],
+  ['out-of-range reference', '&#x110000;'],
+  ['raw forbidden control', String.fromCharCode(0x01)],
+  ['raw lone surrogate', String.fromCharCode(0xD800)],
+].map(([kind, value]) => [
+  kind,
+  `<hierarchy invalid="${value}">${EXACT_ANDROID_NOTIFICATION_ROW}</hierarchy>`,
+]);
+const LOOKALIKE_ANDROID_NOTIFICATION_HIERARCHIES = [
+  'node-fake',
+  'node:fake',
+].map((tagName) => [
+  tagName,
+  [
+    '<hierarchy>',
+    `<${tagName} resource-id="lookalike-notification-row" `
+      + 'clickable="true" bounds="[42,568][1038,786]">',
+    `<${tagName} text="Chessticize" clickable="false" />`,
+    `<${tagName} text="3 reviews are ready" clickable="false" />`,
+    `</${tagName}>`,
+    '</hierarchy>',
+  ].join(''),
+]);
 
 describe('Detox suite configuration', () => {
   it('owns Android public hierarchy evidence behind one focused interface', () => {
@@ -332,6 +358,97 @@ describe('Detox suite configuration', () => {
     }
   );
 
+  it.each(ILLEGAL_XML_CHARACTER_HIERARCHIES)(
+    'does not tap an exact notification row containing %s',
+    async (_kind, hierarchy) => {
+      const run = jest.fn((_command, args) => (
+        args.includes('exec-out') ? hierarchy : 'UI hierarchy dumped'
+      ));
+      const tapBounds = jest.fn();
+
+      await expect(waitForAndTapExactAndroidNotificationFromPublicUi({
+        body: '3 reviews are ready',
+        environment: { ADB_PATH: '/sdk/adb' },
+        run,
+        tapBounds,
+        timeoutMs: 15,
+        title: 'Chessticize',
+      })).rejects.toThrow('Android UI hierarchy read returned invalid XML');
+      expect(tapBounds).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(ILLEGAL_XML_CHARACTER_HIERARCHIES)(
+    'rejects %s at the maintained Android public hierarchy reader',
+    (_kind, hierarchy) => {
+      const run = jest.fn((_command, args) => (
+        args.includes('exec-out') ? hierarchy : 'UI hierarchy dumped'
+      ));
+
+      expect(() => readAndroidUiHierarchy({ ADB_PATH: '/sdk/adb' }, run))
+        .toThrow('Android UI hierarchy read returned invalid XML');
+    }
+  );
+
+  it.each(LOOKALIKE_ANDROID_NOTIFICATION_HIERARCHIES)(
+    'does not tap notification evidence exposed only through <%s> lookalikes',
+    async (_tagName, hierarchy) => {
+      let clock = 0;
+      const run = jest.fn((_command, args) => (
+        args.includes('exec-out') ? hierarchy : 'UI hierarchy dumped'
+      ));
+      const tapBounds = jest.fn();
+
+      await expect(waitForAndTapExactAndroidNotificationFromPublicUi({
+        body: '3 reviews are ready',
+        delay: async (milliseconds) => { clock += milliseconds; },
+        environment: { ADB_PATH: '/sdk/adb' },
+        now: () => clock,
+        pollIntervalMs: 5,
+        run,
+        tapBounds,
+        timeoutMs: 15,
+        title: 'Chessticize',
+      })).rejects.toThrow('Timed out waiting for exact Android SystemUI notification row');
+      expect(tapBounds).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(LOOKALIKE_ANDROID_NOTIFICATION_HIERARCHIES)(
+    'ignores <%s> lookalikes at exact notification and public-node parser seams',
+    (_tagName, hierarchy) => {
+      expect(findExactAndroidNotificationRow(hierarchy, {
+        body: '3 reviews are ready',
+        title: 'Chessticize',
+      })).toBeNull();
+      expect(() => findUniqueAndroidUiNode(hierarchy, 'lookalike-notification-row'))
+        .toThrow('Missing visible Android UI node lookalike-notification-row');
+    }
+  );
+
+  it('accepts exact node tags at the public notification read and tap seam', async () => {
+    const hierarchy = `<hierarchy>${EXACT_ANDROID_NOTIFICATION_ROW}</hierarchy>`;
+    const run = jest.fn((_command, args) => (
+      args.includes('exec-out') ? hierarchy : 'UI hierarchy dumped'
+    ));
+    const tapBounds = jest.fn();
+
+    await expect(waitForAndTapExactAndroidNotificationFromPublicUi({
+      body: '3 reviews are ready',
+      environment: { ADB_PATH: '/sdk/adb' },
+      run,
+      tapBounds,
+      timeoutMs: 15,
+      title: 'Chessticize',
+    })).resolves.toMatchObject({ hierarchy });
+    expect(tapBounds).toHaveBeenCalledWith({
+      bottom: 786,
+      left: 42,
+      right: 1038,
+      top: 568,
+    });
+  });
+
   it.each(MALFORMED_ANDROID_UI_HIERARCHIES)(
     'rejects %s XML at the maintained Android public hierarchy reader',
     (_kind, hierarchy) => {
@@ -348,7 +465,8 @@ describe('Detox suite configuration', () => {
     const hierarchy = [
       "<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>",
       '<hierarchy rotation="0">',
-      '  <node text="A &amp; B &lt; C &quot;quoted&quot;" />',
+      '  <node text="A &amp; B &lt; C &quot;quoted&quot; &apos;ok&apos; '
+        + '&#9; &#xA; &#32; &#x1F642;" />',
       '</hierarchy>',
       '',
     ].join('\n');

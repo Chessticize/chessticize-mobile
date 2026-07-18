@@ -17,6 +17,7 @@ const ANDROID_UI_ATTRIBUTE = new RegExp(
   'y'
 );
 const ANDROID_UI_XML_DECLARATION = /^<\?xml\s+version\s*=\s*(?:"1\.[01]"|'1\.[01]')(?:\s+encoding\s*=\s*(?:"[A-Za-z][\w.-]*"|'[A-Za-z][\w.-]*'))?(?:\s+standalone\s*=\s*(?:"(?:yes|no)"|'(?:yes|no)'))?\s*\?>$/;
+const XML_NUMERIC_CHARACTER_REFERENCE = /&#(x[\dA-Fa-f]+|\d+);/g;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -57,6 +58,9 @@ function readAndroidUiHierarchy(
 
 function isWellFormedAndroidUiHierarchy(hierarchy) {
   const xml = String(hierarchy);
+  if (!hasOnlyValidXml10Characters(xml)) {
+    return false;
+  }
   const stack = [];
   const tokenPattern = /<[^<>]*>/g;
   let cursor = 0;
@@ -112,6 +116,39 @@ function isWellFormedAndroidUiHierarchy(hierarchy) {
   return rootSeen && stack.length === 0 && !xml.slice(cursor).trim();
 }
 
+function hasOnlyValidXml10Characters(xml) {
+  for (let cursor = 0; cursor < xml.length;) {
+    const codePoint = xml.codePointAt(cursor);
+    if (!isValidXml10Character(codePoint)) {
+      return false;
+    }
+    cursor += codePoint > 0xFFFF ? 2 : 1;
+  }
+
+  for (const reference of xml.matchAll(XML_NUMERIC_CHARACTER_REFERENCE)) {
+    const hexadecimal = reference[1][0] === 'x';
+    const digits = reference[1].slice(hexadecimal ? 1 : 0);
+    const significantDigits = digits.replace(/^0+/, '') || '0';
+    if (significantDigits.length > (hexadecimal ? 6 : 7)) {
+      return false;
+    }
+    const codePoint = Number.parseInt(significantDigits, hexadecimal ? 16 : 10);
+    if (!isValidXml10Character(codePoint)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function isValidXml10Character(codePoint) {
+  return codePoint === 0x09
+    || codePoint === 0x0A
+    || codePoint === 0x0D
+    || (codePoint >= 0x20 && codePoint <= 0xD7FF)
+    || (codePoint >= 0xE000 && codePoint <= 0xFFFD)
+    || (codePoint >= 0x10000 && codePoint <= 0x10FFFF);
+}
+
 function hasDuplicateXmlAttributes(token, elementName) {
   const names = new Set();
   let cursor = elementName.length + 1;
@@ -136,7 +173,7 @@ function androidUiAttribute(node, attribute) {
 
 function visibleAndroidUiNodesByResourceId(hierarchy, resourceId) {
   const normalizedResourceId = String(resourceId).toLowerCase();
-  const nodes = String(hierarchy).match(/<node\b[^>]*\/?\s*>/g) ?? [];
+  const nodes = String(hierarchy).match(/<node(?=[\s/>])[^>]*\/?\s*>/g) ?? [];
   return nodes.filter((node) => {
     const actualResourceId = androidUiAttribute(node, 'resource-id').toLowerCase();
     const exactResourceId = actualResourceId === normalizedResourceId
