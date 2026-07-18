@@ -328,6 +328,22 @@ describe('Android E2E shell transport', () => {
     expect(runShell).toHaveBeenCalledTimes(1);
   });
 
+  it.each([
+    ['single-segment Android system package', 'android', '55', 0],
+    ['exact target package', 'com.chessticize.mobile', '182', 1],
+    ['letter-led segments with digits and underscores', 'a.b2.c_d.E3_f', '7', 0],
+  ])('accepts %s', async (_kind, packageName, notificationId, expectedCount) => {
+    const activeState = `0|${packageName}|${notificationId}|null|1000`;
+    const runShell = jest.fn(() => activeState);
+
+    await expect(waitForAndroidNotificationIdentity(
+      reviewNotification,
+      expectedCount,
+      800,
+      { now: () => 1_000, runShell }
+    )).resolves.toBe(activeState);
+  });
+
   it('counts one exact target only from a structural record prefix', async () => {
     const activeState = [
       API_36_SYSTEM_AGGREGATE_NOTIFICATION_STATE,
@@ -409,6 +425,12 @@ describe('Android E2E shell transport', () => {
     ['invalid user id', 'system|android|55|null|1000'],
     ['empty package', '-1||55|null|1000'],
     ['invalid package', '-1|android package|55|null|1000'],
+    ['dot-only package', '-1|.|55|null|1000'],
+    ['digit-led package', '-1|1bad|55|null|1000'],
+    ['empty package segment', '-1|com..bad|55|null|1000'],
+    ['digit-led nested package segment', '-1|com.1bad|55|null|1000'],
+    ['trailing empty package segment', '-1|com.bad.|55|null|1000'],
+    ['underscore-led package', '-1|_bad|55|null|1000'],
     ['missing notification id', '-1|android||null|1000'],
     ['invalid notification id', '-1|android|notification|null|1000'],
     ['truncated before notification id', '-1|android'],

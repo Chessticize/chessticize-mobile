@@ -7,6 +7,11 @@ const ADB_RESPONSIVENESS_TIMEOUT_MS = 2_000;
 const ADB_RESPONSIVENESS_MARKER = 'chessticize-adb-shell-ready';
 const DEFAULT_POLL_INTERVAL_MS = 400;
 const DEFAULT_POLL_SHELL_TIMEOUT_MS = 5_000;
+const ANDROID_PACKAGE_SEGMENT_SOURCE = '[A-Za-z][A-Za-z0-9_]*';
+const ACTIVE_NOTIFICATION_RECORD = new RegExp(
+  `^(-?\\d+)\\|(${ANDROID_PACKAGE_SEGMENT_SOURCE}`
+  + `(?:\\.${ANDROID_PACKAGE_SEGMENT_SOURCE})*)\\|(-?\\d+)\\|([^\\r\\n]+)$`
+);
 
 function runAndroidAdbShell(args, options = {}) {
   const environment = options.environment ?? process.env;
@@ -191,8 +196,7 @@ function parseActiveAndroidNotificationList(state) {
     return [];
   }
   const lines = withoutFinalLineEnding.split(/\r?\n/);
-  const supportedRecordPrefix = /^(-?\d+)\|([A-Za-z0-9._]+)\|(-?\d+)\|([^\r\n]+)$/;
-  const records = lines.map((line) => supportedRecordPrefix.exec(line));
+  const records = lines.map((line) => ACTIVE_NOTIFICATION_RECORD.exec(line));
   if (records.some((record) => !record)) {
     throw new Error(
       `Malformed Android active notification list: ${output.trimEnd() || '<empty>'}`
