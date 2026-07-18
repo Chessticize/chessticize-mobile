@@ -10,6 +10,7 @@ const {
   startPracticeMode,
   selectTestPuzzleSource,
   waitForVisibleInPracticeScroll,
+  waitForElementAccessibilityLabelContaining,
   waitForElementTextContaining,
   waitForRunningStockfishDepth,
   failStandardSprint
@@ -95,8 +96,8 @@ describe('Practice POC', () => {
     await playBoardMove('session-board', 'c2b1');
     await waitFor(element(by.id('sprint-unclear-prompt'))).toBeVisible().withTimeout(10000);
     await element(by.id('sprint-unclear-toggle')).tap();
-    await waitFor(element(by.id('sprint-unclear-toggle')))
-      .toHaveText('Marked unclear · Undo')
+    await waitFor(element(by.text('Marked unclear · Undo')))
+      .toBeVisible()
       .withTimeout(10000);
 
     // Let the normal feedback snapshot advance to the next board. The prompt
@@ -106,7 +107,7 @@ describe('Practice POC', () => {
     await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(5000);
     await element(by.id('session-abandon-confirm')).tap();
     await waitFor(element(by.text('Sprint failed'))).toBeVisible().withTimeout(10000);
-    await expect(element(by.id('sprint-unclear-toggle'))).toHaveText('Marked unclear · Undo');
+    await expect(element(by.text('Marked unclear · Undo'))).toBeVisible();
 
     // Recreate the process so History reads the marker from SQLite rather than
     // component state from the sprint that created it.
@@ -116,11 +117,14 @@ describe('Practice POC', () => {
       delete: false
     });
     await openStandardHistoryTrend();
-    await waitForElementTextContaining('history-filter-unclear', 'Unclear (1)', 10000);
+    await waitForElementAccessibilityLabelContaining(
+      'history-filter-unclear',
+      '1 unclear attempts',
+      10000
+    );
     await element(by.id('history-filter-unclear')).tap();
-    await waitFor(element(by.text('Correct move')).atIndex(0)).toExist().withTimeout(10000);
-
-    const resultAttributes = await element(by.text('Correct move')).atIndex(0).getAttributes();
+    await waitFor(element(by.text('Correct')).atIndex(0)).toExist().withTimeout(10000);
+    const resultAttributes = await element(by.text('Correct')).atIndex(0).getAttributes();
     const resultIdentifier = (Array.isArray(resultAttributes) ? resultAttributes[0] : resultAttributes).identifier;
     if (typeof resultIdentifier !== 'string' || !resultIdentifier.endsWith('-result')) {
       throw new Error(`Could not resolve unclear History row from ${String(resultIdentifier)}`);
@@ -146,7 +150,11 @@ describe('Practice POC', () => {
       delete: false
     });
     await openStandardHistoryTrend();
-    await waitForElementTextContaining('history-filter-unclear', 'Unclear (0)', 10000);
+    await waitForElementAccessibilityLabelContaining(
+      'history-filter-unclear',
+      '0 unclear attempts',
+      10000
+    );
   });
 
   it('opens last sprint mistake review with navigation and analysis arrows', async () => {
