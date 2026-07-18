@@ -3,7 +3,7 @@ const path = require('node:path');
 const {
   countActiveAndroidNotifications,
   runAndroidAdbShell,
-  waitForAndroidAdbShellText,
+  waitForAndroidNotificationIdentity,
 } = require('./androidAdbShell');
 const {
   androidAppIsResumed,
@@ -110,9 +110,9 @@ describe('Android Review reminders through public and system surfaces', () => {
       adbShell(['input', 'keyevent', 'KEYCODE_HOME']);
       await sleep(500);
       adbShell(['am', 'kill', APP_ID]);
-      await waitForNotification('3 reviews are ready', 20000);
+      await waitForReviewNotificationCount(1, 20000);
       adbShell(['cmd', 'statusbar', 'expand-notifications']);
-      await tapNotificationSystemNode(['3 reviews are ready', 'Chessticize']);
+      await tapReviewNotificationSystemNode();
       await waitFor(element(by.id('review-panel'))).toExist().withTimeout(180000);
       recordSystemEvidence('cold-tap-route');
 
@@ -133,10 +133,10 @@ describe('Android Review reminders through public and system surfaces', () => {
       await setDeviceTimezone(changedTimezone);
       const alarmAfterTimezone = await waitForReviewAlarmRebased(alarmBeforeTimezone, 5000);
       recordAlarmReconstructionEvidence(alarmBeforeTimezone, alarmAfterTimezone);
-      await waitForNotification('3 reviews are ready', 20000);
+      await waitForReviewNotificationCount(1, 20000);
       assertActiveReviewNotificationCount(1);
       adbShell(['cmd', 'statusbar', 'expand-notifications']);
-      await tapNotificationSystemNode(['3 reviews are ready', 'Chessticize']);
+      await tapReviewNotificationSystemNode();
       await waitFor(element(by.id('review-panel'))).toExist().withTimeout(30000);
       recordSystemEvidence('foreground-tap-route');
 
@@ -146,7 +146,7 @@ describe('Android Review reminders through public and system surfaces', () => {
       await waitForElementTextContaining('settings-review-reminders', 'Reminders are off', 10000);
       await setDeviceTimezone(originalTimezone);
       await sleep(REMINDER_DELAY_MS + 2_000);
-      await assertNotificationAbsent('3 reviews are ready');
+      await waitForReviewNotificationCount(0, 5_000);
       assertActiveReviewNotificationCount(0);
 
       await launchWithDisabledSynchronization({
@@ -160,7 +160,7 @@ describe('Android Review reminders through public and system surfaces', () => {
       await openTab('settings-tab', 'settings-review-reminders');
       await waitForElementTextContaining('settings-review-reminders', 'Reminders are off', 10000);
       await sleep(REMINDER_DELAY_MS + 2_000);
-      await assertNotificationAbsent('3 reviews are ready');
+      await waitForReviewNotificationCount(0, 5_000);
       recordSystemEvidence('disabled-after-event-relaunch');
     });
   });
@@ -212,6 +212,23 @@ async function tapNotificationSystemNode(candidates, timeoutMs = 15_000) {
   throw new Error('Notification tap did not resume the Chessticize app');
 }
 
+async function tapReviewNotificationSystemNode(timeoutMs = 15_000) {
+  const titleRow = await waitForSystemNode(
+    [REVIEW_NOTIFICATION.title],
+    timeoutMs,
+    { clickableAncestor: true }
+  );
+  const bodyRow = await waitForSystemNode(
+    ['3 reviews are ready'],
+    timeoutMs,
+    { clickableAncestor: true }
+  );
+  if (titleRow !== bodyRow) {
+    throw new Error('Review notification title and body were not exposed in the same SystemUI row');
+  }
+  await tapNotificationSystemNode(['3 reviews are ready'], timeoutMs);
+}
+
 async function waitForSystemNode(candidates, timeoutMs = 15_000, options = {}) {
   const deadline = Date.now() + timeoutMs;
   let latest = '';
@@ -227,15 +244,11 @@ async function waitForSystemNode(candidates, timeoutMs = 15_000, options = {}) {
   throw new Error(`System UI did not expose ${candidates.join(' or ')}. Latest hierarchy: ${latest}`);
 }
 
-async function waitForNotification(text, timeoutMs) {
-  await waitForAndroidAdbShellText(
-    ['dumpsys', 'notification', '--noredact'],
-    text,
-    true,
-    timeoutMs,
-    {
-      activeNotification: REVIEW_NOTIFICATION,
-    }
+async function waitForReviewNotificationCount(expectedCount, timeoutMs) {
+  return waitForAndroidNotificationIdentity(
+    REVIEW_NOTIFICATION,
+    expectedCount,
+    timeoutMs
   );
 }
 
@@ -250,16 +263,6 @@ async function waitForShellText(args, text, present, timeoutMs) {
     await sleep(400);
   }
   throw new Error(`Expected shell ${args.join(' ')} to ${present ? 'contain' : 'omit'} ${text}. Latest: ${latest}`);
-}
-
-async function assertNotificationAbsent(text) {
-  await waitForAndroidAdbShellText(
-    ['dumpsys', 'notification', '--noredact'],
-    text,
-    false,
-    5_000,
-    { activeNotification: REVIEW_NOTIFICATION }
-  );
 }
 
 function pendingReviewAlarmSnapshot() {
@@ -321,7 +324,7 @@ function recordSystemEvidence(name) {
     `recorded-at=${new Date().toISOString()}`,
     adbShell(['dumpsys', 'package', APP_ID]),
     adbShell(['dumpsys', 'alarm']),
-    adbShell(['dumpsys', 'notification', '--noredact']),
+    adbShell(['cmd', 'notification', 'list']),
   ].join('\n\n');
   fs.writeFileSync(path.join(ARTIFACT_DIR, `${name}.txt`), evidence);
 }

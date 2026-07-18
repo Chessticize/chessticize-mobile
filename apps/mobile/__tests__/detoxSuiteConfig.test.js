@@ -111,10 +111,22 @@ describe('Detox suite configuration', () => {
       ['3 reviews are ready', 'Chessticize'],
       { clickableAncestor: true }
     );
+    const titleTarget = findAndroidSystemNode(
+      hierarchy,
+      ['Chessticize'],
+      { clickableAncestor: true }
+    );
+    const bodyTarget = findAndroidSystemNode(
+      hierarchy,
+      ['3 reviews are ready'],
+      { clickableAncestor: true }
+    );
 
     expect(target).toContain('resource-id="com.android.systemui:id/expandableNotificationRow"');
     expect(target).toContain('clickable="true"');
     expect(target).toContain('bounds="[42,568][1038,786]"');
+    expect(titleTarget).toBe(target);
+    expect(bodyTarget).toBe(target);
   });
 
   it('refuses to tap matching system text without a clickable target', () => {
@@ -1206,6 +1218,12 @@ describe('Detox suite configuration', () => {
     expect(spec).toContain("permission_deny_button");
     expect(spec).toContain("statusbar', 'expand-notifications");
     expect(spec).toContain('tapNotificationSystemNode');
+    expect(spec).toContain(
+      "tapNotificationSystemNode(['3 reviews are ready'], timeoutMs)"
+    );
+    expect(spec).toContain('if (titleRow !== bodyRow)');
+    expect(spec).not.toContain("tapNotificationSystemNode(['3 reviews are ready', 'Chessticize'])");
+    expect(spec).not.toContain("['dumpsys', 'notification', '--noredact']");
     expect(spec).toContain('androidAppIsResumed()');
     expect(spec).toContain("3 reviews are ready");
     expect(spec).toContain("review-panel");

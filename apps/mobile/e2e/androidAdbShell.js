@@ -91,85 +91,45 @@ function runAndroidAdbShell(args, options = {}) {
   }
 }
 
-async function waitForAndroidAdbShellText(args, text, present, timeoutMs, options = {}) {
+async function waitForAndroidNotificationIdentity(
+  notification,
+  expectedCount,
+  timeoutMs,
+  options = {}
+) {
   const now = options.now ?? Date.now;
   const sleep = options.sleep ?? defaultSleep;
   const runShell = options.runShell ?? runAndroidAdbShell;
-  const activeNotification = options.activeNotification;
   const pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
   const shellTimeoutMs = options.shellTimeoutMs ?? DEFAULT_POLL_SHELL_TIMEOUT_MS;
   const deadline = now() + timeoutMs;
   let latest = '';
-  let latestActiveState = '';
-  let latestActiveRecord = '';
+  let latestCount = null;
 
   while (now() < deadline) {
-    if (activeNotification) {
-      const activeStateOptions = pollingShellOptions(
-        deadline,
-        now,
-        shellTimeoutMs,
-        options.shellOptions
-      );
-      if (activeStateOptions === null) {
-        break;
-      }
-      latestActiveState = runShell(['cmd', 'notification', 'list'], activeStateOptions);
-      const activeCount = countActiveAndroidNotifications(
-        latestActiveState,
-        activeNotification
-      );
-      if (!present && activeCount === 0) {
-        return latestActiveState;
-      }
-      if (activeCount !== 1) {
-        await sleepUntilNextPoll(deadline, now, pollIntervalMs, sleep);
-        continue;
-      }
-      if (!present) {
-        await sleepUntilNextPoll(deadline, now, pollIntervalMs, sleep);
-        continue;
-      }
-    }
-
-    const dumpOptions = pollingShellOptions(
+    const shellOptions = pollingShellOptions(
       deadline,
       now,
       shellTimeoutMs,
       options.shellOptions
     );
-    if (dumpOptions === null) {
+    if (shellOptions === null) {
       break;
     }
-    latest = runShell(args, dumpOptions);
-    latestActiveRecord = activeNotification
-      ? findActiveAndroidNotificationRecord(latest, activeNotification)
-      : '';
-    const shellStateMatches = activeNotification
-      ? activeAndroidNotificationRecordMatches(
-        latestActiveRecord,
-        activeNotification,
-        text
-      )
-      : latest.includes(text) === present;
-    if (shellStateMatches) {
+    latest = runShell(['cmd', 'notification', 'list'], shellOptions);
+    latestCount = countActiveAndroidNotifications(latest, notification);
+    if (latestCount === expectedCount) {
       return latest;
     }
 
     await sleepUntilNextPoll(deadline, now, pollIntervalMs, sleep);
   }
 
-  if (activeNotification) {
-    throw new Error(
-      `Expected active Android notification ${activeNotification.packageName}/`
-      + `${activeNotification.notificationId} to ${present ? 'contain' : 'omit'} ${text}. `
-      + `Latest active state: ${latestActiveState.trimEnd() || '<empty>'}. `
-      + `Latest matching active record: ${latestActiveRecord.trimEnd() || '<none>'}`
-    );
-  }
   throw new Error(
-    `Expected shell ${args.join(' ')} to ${present ? 'contain' : 'omit'} ${text}. `
-    + `Latest: ${latest.trimEnd()}`
+    `Expected exactly ${expectedCount} active Android notification(s) for `
+    + `${notification.packageName}/${notification.notificationId}; `
+    + `latest count was ${latestCount ?? '<unread>'}. `
+    + `Latest active state: ${latest.trimEnd() || '<empty>'}`
   );
 }
 
@@ -216,58 +176,6 @@ function countActiveAndroidNotifications(state, notification) {
     .length;
 }
 
-function findActiveAndroidNotificationRecord(state, notification) {
-  const lines = state.split('\n');
-  let inNotificationList = false;
-  let matchingRecord = null;
-
-  for (const line of lines) {
-    if (!inNotificationList) {
-      inNotificationList = /^ {2}Notification List:\s*$/.test(line);
-      continue;
-    }
-    if (/^ {2}\S/.test(line)) {
-      break;
-    }
-    if (/^ {4}NotificationRecord\(/.test(line)) {
-      if (matchingRecord !== null) {
-        break;
-      }
-      matchingRecord = notificationRecordHeaderMatches(line, notification) ? [line] : null;
-      continue;
-    }
-    if (matchingRecord !== null) {
-      matchingRecord.push(line);
-    }
-  }
-
-  return matchingRecord?.join('\n') ?? '';
-}
-
-function notificationRecordHeaderMatches(header, notification) {
-  const packageMarker = `pkg=${notification.packageName} `;
-  const idMarker = `id=${notification.notificationId} `;
-  return header.includes(packageMarker) && header.includes(idMarker);
-}
-
-function activeAndroidNotificationRecordMatches(record, notification, body) {
-  if (!record || typeof notification.title !== 'string') {
-    return false;
-  }
-  const titleMatches = notificationRecordFieldMatches(
-    record,
-    'android.title',
-    notification.title
-  );
-  const bodyMatches = notificationRecordFieldMatches(record, 'android.text', body)
-    || notificationRecordFieldMatches(record, 'android.bigText', body);
-  return titleMatches && bodyMatches;
-}
-
-function notificationRecordFieldMatches(record, field, value) {
-  return record.includes(`${field}=String (${value})`);
-}
-
 async function sleepUntilNextPoll(deadline, now, pollIntervalMs, sleep) {
   const remainingMs = deadline - now();
   if (remainingMs > 0) {
@@ -282,5 +190,5 @@ function defaultSleep(durationMs) {
 module.exports = {
   countActiveAndroidNotifications,
   runAndroidAdbShell,
-  waitForAndroidAdbShellText,
+  waitForAndroidNotificationIdentity,
 };
