@@ -2,6 +2,21 @@ const { execFileSync } = require('node:child_process');
 const { androidAdbPath } = require('./androidNetwork');
 
 const ANDROID_PUBLIC_UI_HIERARCHY_PATH = '/sdcard/chessticize-public-window.xml';
+const XML_NAME_SOURCE = '[A-Za-z_][\\w.:-]*';
+const XML_ENTITY_SOURCE = '&(?:amp|lt|gt|quot|apos|#\\d+|#x[\\dA-Fa-f]+);';
+const XML_DOUBLE_QUOTED_VALUE_SOURCE = `"(?:[^"<&]|${XML_ENTITY_SOURCE})*"`;
+const XML_SINGLE_QUOTED_VALUE_SOURCE = `'(?:[^'<&]|${XML_ENTITY_SOURCE})*'`;
+const ANDROID_UI_OPENING_TAG = new RegExp(
+  `^<(${XML_NAME_SOURCE})(?:\\s+${XML_NAME_SOURCE}\\s*=\\s*`
+  + `(?:${XML_DOUBLE_QUOTED_VALUE_SOURCE}|${XML_SINGLE_QUOTED_VALUE_SOURCE}))*`
+  + '\\s*(/?)>$'
+);
+const ANDROID_UI_ATTRIBUTE = new RegExp(
+  `\\s+(${XML_NAME_SOURCE})\\s*=\\s*`
+  + `(?:${XML_DOUBLE_QUOTED_VALUE_SOURCE}|${XML_SINGLE_QUOTED_VALUE_SOURCE})`,
+  'y'
+);
+const ANDROID_UI_XML_DECLARATION = /^<\?xml\s+version\s*=\s*(?:"1\.[01]"|'1\.[01]')(?:\s+encoding\s*=\s*(?:"[A-Za-z][\w.-]*"|'[A-Za-z][\w.-]*'))?(?:\s+standalone\s*=\s*(?:"(?:yes|no)"|'(?:yes|no)'))?\s*\?>$/;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -32,12 +47,87 @@ function readAndroidUiHierarchy(
   const hierarchy = String(
     run(adb, ['-s', serial, 'exec-out', 'cat', remotePath], options) ?? ''
   ).trim();
-  if (!hierarchy || !/<hierarchy\b/i.test(hierarchy)) {
+  if (!hierarchy || !isWellFormedAndroidUiHierarchy(hierarchy)) {
     throw new Error(
       `Android UI hierarchy read returned ${hierarchy ? 'invalid' : 'empty'} XML`
     );
   }
   return hierarchy;
+}
+
+function isWellFormedAndroidUiHierarchy(hierarchy) {
+  const xml = String(hierarchy);
+  const stack = [];
+  const tokenPattern = /<[^<>]*>/g;
+  let cursor = 0;
+  let declarationSeen = false;
+  let rootSeen = false;
+  let tokenMatch;
+
+  while ((tokenMatch = tokenPattern.exec(xml)) !== null) {
+    if (xml.slice(cursor, tokenMatch.index).trim()) {
+      return false;
+    }
+    const token = tokenMatch[0];
+    if (token.startsWith('<?xml')) {
+      if (
+        declarationSeen
+        || rootSeen
+        || !ANDROID_UI_XML_DECLARATION.test(token)
+      ) {
+        return false;
+      }
+      declarationSeen = true;
+      cursor = tokenPattern.lastIndex;
+      continue;
+    }
+
+    const closing = /^<\/([A-Za-z_][\w.:-]*)\s*>$/.exec(token);
+    if (closing) {
+      if (stack.pop() !== closing[1]) {
+        return false;
+      }
+      cursor = tokenPattern.lastIndex;
+      continue;
+    }
+
+    const opening = ANDROID_UI_OPENING_TAG.exec(token);
+    if (!opening || hasDuplicateXmlAttributes(token, opening[1])) {
+      return false;
+    }
+    if (stack.length === 0) {
+      if (rootSeen || opening[1] !== 'hierarchy') {
+        return false;
+      }
+      rootSeen = true;
+    } else if (opening[1] === 'hierarchy') {
+      return false;
+    }
+    if (!opening[2]) {
+      stack.push(opening[1]);
+    }
+    cursor = tokenPattern.lastIndex;
+  }
+
+  return rootSeen && stack.length === 0 && !xml.slice(cursor).trim();
+}
+
+function hasDuplicateXmlAttributes(token, elementName) {
+  const names = new Set();
+  let cursor = elementName.length + 1;
+  while (cursor < token.length) {
+    ANDROID_UI_ATTRIBUTE.lastIndex = cursor;
+    const attribute = ANDROID_UI_ATTRIBUTE.exec(token);
+    if (!attribute) {
+      return false;
+    }
+    if (names.has(attribute[1])) {
+      return true;
+    }
+    names.add(attribute[1]);
+    cursor = ANDROID_UI_ATTRIBUTE.lastIndex;
+  }
+  return false;
 }
 
 function androidUiAttribute(node, attribute) {

@@ -49,6 +49,35 @@ const {
   waitForAndroidUiState,
 } = require('../e2e/androidPublicUiEvidence');
 
+const EXACT_ANDROID_NOTIFICATION_ROW = [
+  '<node clickable="true" bounds="[42,568][1038,786]">',
+  '<node text="Chessticize" clickable="false" />',
+  '<node text="3 reviews are ready" clickable="false" />',
+  '</node>',
+].join('');
+const MALFORMED_ANDROID_UI_HIERARCHIES = [
+  [
+    'truncated hierarchy',
+    `<?xml version='1.0' encoding='UTF-8' ?><hierarchy>${EXACT_ANDROID_NOTIFICATION_ROW}`,
+  ],
+  [
+    'mismatched closing tag',
+    `<hierarchy>${EXACT_ANDROID_NOTIFICATION_ROW}</node>`,
+  ],
+  [
+    'missing hierarchy root',
+    EXACT_ANDROID_NOTIFICATION_ROW,
+  ],
+  [
+    'duplicate hierarchy roots',
+    `<hierarchy /> <hierarchy>${EXACT_ANDROID_NOTIFICATION_ROW}</hierarchy>`,
+  ],
+  [
+    'trailing malformed content',
+    `<hierarchy>${EXACT_ANDROID_NOTIFICATION_ROW}</hierarchy><broken`,
+  ],
+];
+
 describe('Detox suite configuration', () => {
   it('owns Android public hierarchy evidence behind one focused interface', () => {
     const androidPublicUiEvidence = require('../e2e/androidPublicUiEvidence');
@@ -281,6 +310,53 @@ describe('Detox suite configuration', () => {
       title: 'Chessticize',
     })).rejects.toThrow('Android UI hierarchy dump failed');
     expect(tapBounds).not.toHaveBeenCalled();
+  });
+
+  it.each(MALFORMED_ANDROID_UI_HIERARCHIES)(
+    'does not tap an exact notification row from %s XML',
+    async (_kind, hierarchy) => {
+      const run = jest.fn((_command, args) => (
+        args.includes('exec-out') ? hierarchy : 'UI hierarchy dumped'
+      ));
+      const tapBounds = jest.fn();
+
+      await expect(waitForAndTapExactAndroidNotificationFromPublicUi({
+        body: '3 reviews are ready',
+        environment: { ADB_PATH: '/sdk/adb' },
+        run,
+        tapBounds,
+        timeoutMs: 15,
+        title: 'Chessticize',
+      })).rejects.toThrow('Android UI hierarchy read returned invalid XML');
+      expect(tapBounds).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(MALFORMED_ANDROID_UI_HIERARCHIES)(
+    'rejects %s XML at the maintained Android public hierarchy reader',
+    (_kind, hierarchy) => {
+      const run = jest.fn((_command, args) => (
+        args.includes('exec-out') ? hierarchy : 'UI hierarchy dumped'
+      ));
+
+      expect(() => readAndroidUiHierarchy({ ADB_PATH: '/sdk/adb' }, run))
+        .toThrow('Android UI hierarchy read returned invalid XML');
+    }
+  );
+
+  it('accepts the UIAutomator XML declaration, whitespace, self-closing nodes, and escapes', () => {
+    const hierarchy = [
+      "<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>",
+      '<hierarchy rotation="0">',
+      '  <node text="A &amp; B &lt; C &quot;quoted&quot;" />',
+      '</hierarchy>',
+      '',
+    ].join('\n');
+    const run = jest.fn((_command, args) => (
+      args.includes('exec-out') ? hierarchy : 'UI hierarchy dumped'
+    ));
+
+    expect(readAndroidUiHierarchy({ ADB_PATH: '/sdk/adb' }, run)).toBe(hierarchy.trim());
   });
 
   it.each([
