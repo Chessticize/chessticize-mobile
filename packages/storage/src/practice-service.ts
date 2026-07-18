@@ -218,6 +218,10 @@ export class PracticeService {
     return this.store.listAttempts(filter);
   }
 
+  setAttemptUnclear(attemptId: string, unclear: boolean, updatedAt = new Date().toISOString()): AttemptHistoryRow {
+    return this.store.setAttemptUnclear(attemptId, unclear, updatedAt);
+  }
+
   listCompletedReviewsForDay(now = new Date().toISOString()): CompletedReviewItem[] {
     const reviewDay = reviewDayFor(now);
     const conservativeSince = new Date(new Date(now).getTime() - 36 * 60 * 60 * 1000).toISOString();
@@ -277,6 +281,14 @@ export class PracticeService {
 
   getHistoryView(query: HistoryQuery): HistoryView {
     return this.store.getHistoryView(query);
+  }
+
+  enrollReview(context: ReviewContext, now = new Date().toISOString()): ReviewQueueState {
+    return this.store.enrollReview(context, now);
+  }
+
+  getReviewQueueState(context: ReviewContext): ReviewQueueState | undefined {
+    return this.store.getReviewQueueState(context);
   }
 
   getRating(ratingKey: string): RatingRecord {

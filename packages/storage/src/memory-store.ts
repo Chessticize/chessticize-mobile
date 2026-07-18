@@ -2,6 +2,7 @@ import {
   buildHistoryView,
   createDefaultRating,
   defaultSprintConfig,
+  enrollReviewContext,
   filterHistoryAttemptsForQuery,
   normalizeRatingRecord,
   orderReviewQueue,
@@ -11,7 +12,8 @@ import {
   resolveHistoryRange,
   scheduleMistakeForContext,
   scheduleReview,
-  sideToMoveForHistoryPuzzle
+  sideToMoveForHistoryPuzzle,
+  updateAttemptUnclearState
 } from "../../core/src/index.ts";
 import type {
   AttemptEvent,
@@ -37,6 +39,7 @@ import type { ReviewReminderPreference } from "./practice-store.ts";
 import type { ReviewReminderSettings } from "../../core/src/index.ts";
 import { selectUniquePuzzles } from "./puzzle-selection.ts";
 import { preferredSprintSession, sameSprintSession } from "./sprint-session-sync.ts";
+import { cloneAttemptHistoryRow, preferredAttemptHistoryRow, sameAttemptHistoryRow } from "./attempt-sync.ts";
 
 export class MemoryStore implements PracticeStore {
   private readonly puzzles = new Map<string, Puzzle>();
@@ -163,7 +166,18 @@ export class MemoryStore implements PracticeStore {
   }
 
   recordAttempt(attempt: AttemptEvent): void {
-    this.attempts.push(attempt);
+    this.attempts.push(cloneAttemptHistoryRow(attempt));
+  }
+
+  setAttemptUnclear(attemptId: string, unclear: boolean, updatedAt: string): AttemptHistoryRow {
+    const index = this.attempts.findIndex((attempt) => attempt.id === attemptId);
+    const attempt = this.attempts[index];
+    if (!attempt) {
+      throw new Error(`Attempt ${attemptId} was not found`);
+    }
+    const next = updateAttemptUnclearState(attempt, unclear, updatedAt);
+    this.attempts[index] = next;
+    return cloneAttemptHistoryRow(next);
   }
 
   listAttempts(filter: HistoryFilter = {}): AttemptHistoryRow[] {
@@ -188,7 +202,10 @@ export class MemoryStore implements PracticeStore {
         completedAt: attempt.completedAt,
         ratingBefore: attempt.ratingBefore,
         ...(attempt.ratingAfter === undefined ? {} : { ratingAfter: attempt.ratingAfter }),
-        ...(attempt.arrowDuelCandidateOrder === undefined ? {} : { arrowDuelCandidateOrder: [...attempt.arrowDuelCandidateOrder] })
+        ...(attempt.arrowDuelCandidateOrder === undefined ? {} : { arrowDuelCandidateOrder: [...attempt.arrowDuelCandidateOrder] }),
+        ...(attempt.unclearUpdatedAt === undefined
+          ? {}
+          : { unclear: Boolean(attempt.unclear), unclearUpdatedAt: attempt.unclearUpdatedAt })
       }))
       .sort((left, right) => right.completedAt.localeCompare(left.completedAt) || right.id.localeCompare(left.id));
   }
@@ -270,16 +287,21 @@ export class MemoryStore implements PracticeStore {
       });
       result.sprintSessions += 1;
     }
-    const existingAttempts = new Set(this.attempts.map((attempt) => attempt.id));
     for (const attempt of data.attempts) {
-      if (existingAttempts.has(attempt.id) || !this.getPuzzle(attempt.puzzleId)) {
+      const existingIndex = this.attempts.findIndex((candidate) => candidate.id === attempt.id);
+      if (existingIndex < 0 && !this.getPuzzle(attempt.puzzleId)) {
         continue;
       }
-      this.attempts.push({
-        ...attempt,
-        ...(attempt.arrowDuelCandidateOrder === undefined ? {} : { arrowDuelCandidateOrder: [...attempt.arrowDuelCandidateOrder] })
-      });
-      existingAttempts.add(attempt.id);
+      const previous = existingIndex < 0 ? undefined : cloneAttemptHistoryRow(this.attempts[existingIndex]!);
+      const next = previous ? preferredAttemptHistoryRow(previous, attempt) : cloneAttemptHistoryRow(attempt);
+      if (sameAttemptHistoryRow(previous, next)) {
+        continue;
+      }
+      if (existingIndex < 0) {
+        this.attempts.push(next);
+      } else {
+        this.attempts[existingIndex] = next;
+      }
       result.attempts += 1;
     }
     for (const importedReview of data.reviewQueue) {
@@ -326,6 +348,13 @@ export class MemoryStore implements PracticeStore {
   scheduleMistakeReview(context: ReviewContext, now: string): ReviewQueueState {
     const previous = this.getReviewQueueState(context);
     const next = scheduleMistakeForContext(context, now, previous);
+    this.reviewQueue.set(reviewQueueKey(context), next);
+    return next;
+  }
+
+  enrollReview(context: ReviewContext, now: string): ReviewQueueState {
+    const previous = this.getReviewQueueState(context);
+    const next = enrollReviewContext(context, now, previous);
     this.reviewQueue.set(reviewQueueKey(context), next);
     return next;
   }
@@ -397,10 +426,17 @@ export class MemoryStore implements PracticeStore {
     const allAttempts = this.historyAttemptsForRange(query.ratingKey, range.since, range.until);
     const reviews = [...this.reviewQueue.values()];
     const attempts = filterHistoryAttemptsForQuery({ attempts: allAttempts, query, reviews });
+    const { unclear: _unclear, ...queryWithoutUnclear } = query;
+    const unclearCount = filterHistoryAttemptsForQuery({
+      attempts: allAttempts,
+      query: queryWithoutUnclear,
+      reviews
+    }).filter((attempt) => Boolean(attempt.unclear)).length;
     return buildHistoryView({
       query,
       ratingKeys: this.listPlayedRatings(),
       attempts,
+      unclearCount,
       elo: query.ratingKey ? this.eloPointsForRange(query.ratingKey, range.since, range.until) : [],
       reviews,
       allAttemptsForOptions: allAttempts
@@ -513,7 +549,7 @@ function preferredReviewQueue(
   if (!local) {
     return incoming;
   }
-  const reviewComparison = incoming.lastReviewedAt.localeCompare(local.lastReviewedAt);
+  const reviewComparison = reviewActivityAt(incoming).localeCompare(reviewActivityAt(local));
   if (reviewComparison !== 0) {
     return reviewComparison > 0 ? incoming : local;
   }
@@ -535,7 +571,12 @@ function sameReviewQueue(left: ReviewQueueState | undefined, right: ReviewQueueS
     left.successStreak === right.successStreak &&
     left.lapseCount === right.lapseCount &&
     left.lastResult === right.lastResult &&
-    left.lastReviewedAt === right.lastReviewedAt;
+    left.lastReviewedAt === right.lastReviewedAt &&
+    left.enrolledAt === right.enrolledAt;
+}
+
+function reviewActivityAt(review: ReviewQueueState): string {
+  return review.lastReviewedAt ?? review.enrolledAt ?? "";
 }
 
 function isOpenSprint(session: SprintState): boolean {

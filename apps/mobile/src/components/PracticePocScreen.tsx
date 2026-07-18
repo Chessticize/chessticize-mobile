@@ -32,6 +32,7 @@ import {
   formatSideToMoveScore,
   historyAttemptReplayAvailability,
   historyAttemptSpeedSeconds,
+  isUnclearAttemptEligible,
   isReviewOverdue,
   normalizeHistoryAttemptDetail,
   reviewDueState,
@@ -226,6 +227,12 @@ type FeedbackBoardSnapshot = {
   boardFen: string;
   currentPuzzle: CurrentPuzzleState;
   feedback: PuzzleFeedback;
+  puzzleId: string;
+};
+
+type UnclearPromptState = {
+  attemptId: string;
+  marked: boolean;
   puzzleId: string;
 };
 
@@ -491,6 +498,7 @@ export function PracticePocScreen({
   const [lastBoardMove, setLastBoardMove] = useState<BoardMove | null>(null);
   const [feedbackPuzzleId, setFeedbackPuzzleId] = useState<string | null>(null);
   const [feedbackSnapshot, setFeedbackSnapshot] = useState<FeedbackBoardSnapshot | null>(null);
+  const [unclearPrompt, setUnclearPrompt] = useState<UnclearPromptState | null>(null);
   const [boardInputLocked, setBoardInputLocked] = useState(false);
   const [boardInputLockMode, setBoardInputLockMode] = useState<BoardInputLockMode>("hard");
   const [chessboardDebugEvents, setChessboardDebugEvents] = useState<string[]>([]);
@@ -501,6 +509,7 @@ export function PracticePocScreen({
   const [historyThemeFilter, setHistoryThemeFilter] = useState<string>("all");
   const [historyRatingRangeFilter, setHistoryRatingRangeFilter] = useState<HistoryRatingRangeFilter>("all");
   const [historyReviewStatusFilter, setHistoryReviewStatusFilter] = useState<"all" | HistoryReviewStatus>("all");
+  const [historyUnclearOnly, setHistoryUnclearOnly] = useState(false);
   const [historyPageOffset, setHistoryPageOffset] = useState(0);
   const [historyRatingKey, setHistoryRatingKey] = useState<string | null>(null);
   const [historyReviewEntries, setHistoryReviewEntries] = useState<ReviewEntry[]>([]);
@@ -1161,6 +1170,7 @@ export function PracticePocScreen({
       setLastBoardMove(null);
       setFeedback(null);
       setFeedbackPuzzleId(null);
+      setUnclearPrompt(null);
       pendingPremoveRef.current = null;
       commitBoardInputLocked(false, "start", started.currentPuzzle?.puzzle.id ?? null);
       clearFeedbackSnapshot();
@@ -1388,6 +1398,15 @@ export function PracticePocScreen({
     try {
       const next = service.submitMove(move, nowIso());
       const nextFeedback = (next.feedback as SessionFeedback) ?? null;
+      if (next.attempt) {
+        setUnclearPrompt(isUnclearAttemptEligible(next.attempt)
+          ? {
+              attemptId: next.attempt.id,
+              marked: Boolean(next.attempt.unclear),
+              puzzleId: next.attempt.puzzleId
+            }
+          : null);
+      }
       commitState(next.state);
       setFeedback(nextFeedback);
       setFeedbackPuzzleId(submittedPuzzleId);
@@ -1476,6 +1495,7 @@ export function PracticePocScreen({
     setSessionMistakeReviewItems([]);
     setFeedback(null);
     setFeedbackPuzzleId(null);
+    setUnclearPrompt(null);
     clearFeedbackSnapshot();
     setError(null);
     pendingPremoveRef.current = null;
@@ -1538,16 +1558,14 @@ export function PracticePocScreen({
       ...(historyResultFilter === "all" ? {} : { result: historyResultFilter }),
       ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
       ...(historyThemeFilter === "all" ? {} : { theme: historyThemeFilter }),
-      ...(historyReviewStatusFilter === "all" ? {} : { reviewStatus: historyReviewStatusFilter })
+      ...(historyReviewStatusFilter === "all" ? {} : { reviewStatus: historyReviewStatusFilter }),
+      ...(historyUnclearOnly ? { unclear: true } : {})
     }).attempts;
     const selectedAttempt = historyReviewAttempts.find((attempt) => attempt.id === attemptId);
     if (!selectedAttempt) {
       return;
     }
     const selectedPuzzle = service.getPuzzle(selectedAttempt.puzzleId);
-    if (!selectedPuzzle) {
-      return;
-    }
     const selectedReplayAvailability = historyAttemptReplayAvailability({
       attempt: selectedAttempt,
       puzzle: selectedPuzzle
@@ -1565,7 +1583,7 @@ export function PracticePocScreen({
         const puzzle = service.getPuzzle(attempt.puzzleId);
         const replayAvailability = puzzle
           ? historyAttemptReplayAvailability({ attempt, puzzle })
-          : { status: "unavailable" as const, reason: "invalid-context" as const };
+          : { status: "unavailable" as const, reason: "puzzle-unavailable" as const };
         return puzzle && replayAvailability.status === "available"
           ? {
               puzzle,
@@ -1584,6 +1602,40 @@ export function PracticePocScreen({
     setHistoryUnavailableAttempt(null);
     setHistoryReviewEntries(entries);
     setHistoryReviewInitialIndex(nextIndex);
+  }
+
+  function toggleUnclearPrompt(): void {
+    if (!unclearPrompt) {
+      return;
+    }
+    try {
+      const updated = service.setAttemptUnclear(
+        unclearPrompt.attemptId,
+        !unclearPrompt.marked,
+        new Date(currentTimeMs()).toISOString()
+      );
+      setUnclearPrompt((current) => current?.attemptId === updated.id
+        ? { ...current, marked: Boolean(updated.unclear) }
+        : current);
+      refreshState();
+    } catch (caught) {
+      setError(errorMessage(caught));
+    }
+  }
+
+  function clearHistoryAttemptUnclear(attemptId: string): void {
+    try {
+      const updated = service.setAttemptUnclear(attemptId, false, new Date(currentTimeMs()).toISOString());
+      setHistoryReviewEntries((entries) => entries.map((entry) => entry.attempt?.id === attemptId
+        ? { ...entry, attempt: withAttemptClarity(entry.attempt, updated) }
+        : entry));
+      setHistoryUnavailableAttempt((current) => current?.attempt.id === attemptId
+        ? { ...current, attempt: withAttemptClarity(current.attempt, updated) }
+        : current);
+      refreshState();
+    } catch (caught) {
+      setError(errorMessage(caught));
+    }
   }
 
   function syncBoardAfterMove(
@@ -1983,6 +2035,7 @@ export function PracticePocScreen({
         ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
         ...(historyThemeFilter === "all" ? {} : { theme: historyThemeFilter }),
         ...(historyReviewStatusFilter === "all" ? {} : { reviewStatus: historyReviewStatusFilter }),
+        ...(historyUnclearOnly ? { unclear: true } : {}),
         page: { limit: HISTORY_PAGE_LIMIT, offset: historyPageOffset }
       })
     : null;
@@ -1995,7 +2048,8 @@ export function PracticePocScreen({
         ...(historySourceFilter === "all" ? {} : { source: historySourceFilter }),
         ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
         ...(historyThemeFilter === "all" ? {} : { theme: historyThemeFilter }),
-        ...(historyReviewStatusFilter === "all" ? {} : { reviewStatus: historyReviewStatusFilter })
+        ...(historyReviewStatusFilter === "all" ? {} : { reviewStatus: historyReviewStatusFilter }),
+        ...(historyUnclearOnly ? { unclear: true } : {})
       })
     : null;
   const contentOwnsHeader = tab === "review" || tab === "history";
@@ -2348,7 +2402,18 @@ export function PracticePocScreen({
     <SessionScoreStrip state={state} />
   ) : null;
   const practicePromptNode = shouldShowSessionBoard ? (
-    <PracticePrompt currentPuzzle={displayedPuzzle} mode={mode} />
+    <View style={styles.practicePromptStack}>
+      <PracticePrompt currentPuzzle={displayedPuzzle} mode={mode} />
+      {unclearPrompt ? (
+        <UnclearAttemptPrompt
+          marked={unclearPrompt.marked}
+          question={isShowingFeedbackSnapshot && displayedPuzzle?.puzzle.id === unclearPrompt.puzzleId
+            ? "Was it clear why that move was correct?"
+            : "Was it clear why the previous move was correct?"}
+          onToggle={toggleUnclearPrompt}
+        />
+      ) : null}
+    </View>
   ) : null;
   const errorNode = error ? <ErrorPanel error={error} /> : null;
   const practiceAnnouncement = error
@@ -2548,6 +2613,8 @@ export function PracticePocScreen({
                   <SprintSummary
                     state={state}
                     elapsedMs={Math.min(sprintElapsedMs, state ? state.config.durationSeconds * 1000 : sprintElapsedMs)}
+                    unclearPrompt={unclearPrompt}
+                    onToggleUnclear={toggleUnclearPrompt}
                     onReplay={() => startSprint(mode)}
                     onBack={resetToIdle}
                     onOpenHistory={() => {
@@ -2573,7 +2640,11 @@ export function PracticePocScreen({
                 <HistoryAttemptReplayUnavailable
                   adaptiveLayout={adaptiveLayout}
                   attempt={historyUnavailableAttempt.attempt}
+                  currentTimeMs={currentTimeMs}
+                  service={service}
                   replayAvailability={historyUnavailableAttempt.replayAvailability}
+                  onClearUnclear={() => clearHistoryAttemptUnclear(historyUnavailableAttempt.attempt.id)}
+                  onReviewChanged={refreshState}
                   onReturn={() => setHistoryUnavailableAttempt(null)}
                 />
               ) : historyReviewEntries.length > 0 ? (
@@ -2588,7 +2659,9 @@ export function PracticePocScreen({
                   service={service}
                   systemBackCommand={reviewBackCommand}
                   onAnalysisActiveChange={setReviewAnalysisOpen}
+                  onAttemptClearUnclear={clearHistoryAttemptUnclear}
                   onComplete={() => setHistoryReviewEntries([])}
+                  onReviewEnrollmentChanged={refreshState}
                   onReturnToOwner={() => setHistoryReviewEntries([])}
                   stockfish={stockfish}
                 />
@@ -2608,6 +2681,8 @@ export function PracticePocScreen({
                   availableThemes={historyView.availableThemes}
                   page={historyView.page}
                   reviewStatusFilter={historyReviewStatusFilter}
+                  unclearCount={historyView.unclearCount}
+                  unclearOnly={historyUnclearOnly}
                   sprintOnly={historySourceFilter === "sprint"}
                   wrongOnly={historyWrongOnly}
                   filtersExpanded={historyFiltersExpanded}
@@ -2644,6 +2719,10 @@ export function PracticePocScreen({
                     setHistoryReviewStatusFilter(status);
                     setHistoryPageOffset(0);
                   }}
+                  onToggleUnclearOnly={() => {
+                    setHistoryPageOffset(0);
+                    setHistoryUnclearOnly((current) => !current);
+                  }}
                   onPageOffsetChange={setHistoryPageOffset}
                   onOpenAttempt={openHistoryReview}
                   onResetFilters={() => {
@@ -2654,6 +2733,7 @@ export function PracticePocScreen({
                     setHistoryThemeFilter("all");
                     setHistoryRatingRangeFilter("all");
                     setHistoryReviewStatusFilter("all");
+                    setHistoryUnclearOnly(false);
                     setHistoryPageOffset(0);
                     setHistoryRatingKey(null);
                   }}
@@ -4022,9 +4102,46 @@ function ActiveMistakeIndicator({
   );
 }
 
+function UnclearAttemptPrompt({
+  marked,
+  onToggle,
+  question
+}: {
+  marked: boolean;
+  onToggle: () => void;
+  question: string;
+}): React.JSX.Element {
+  return (
+    <View
+      accessibilityLabel={`${question} ${marked ? "Marked unclear. Activate to undo." : "Not yet. Activate to mark unclear."}`}
+      style={[styles.unclearPrompt, marked ? styles.unclearPromptMarked : null]}
+      testID="sprint-unclear-prompt"
+    >
+      <View style={styles.unclearPromptCopy}>
+        <BookmarkGlyph marked={marked} />
+        <Text style={styles.unclearPromptQuestion} testID="sprint-unclear-question">{question}</Text>
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={marked ? "Undo unclear mark" : "Mark this attempt unclear"}
+        accessibilityState={{ selected: marked }}
+        style={styles.unclearPromptButton}
+        testID="sprint-unclear-toggle"
+        onPress={onToggle}
+      >
+        <Text style={[styles.unclearPromptButtonText, marked ? styles.unclearPromptButtonTextMarked : null]}>
+          {marked ? "Marked unclear · Undo" : "Not yet"}
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
 function SprintSummary({
   state,
   elapsedMs,
+  unclearPrompt,
+  onToggleUnclear,
   onReplay,
   onBack,
   onOpenHistory,
@@ -4032,6 +4149,8 @@ function SprintSummary({
 }: {
   state: SprintState;
   elapsedMs: number;
+  unclearPrompt: UnclearPromptState | null;
+  onToggleUnclear: () => void;
   onReplay: () => void;
   onBack: () => void;
   onOpenHistory: () => void;
@@ -4092,6 +4211,14 @@ function SprintSummary({
           <Text style={styles.resultAccuracy} testID="sprint-result-accuracy">{accuracy}% Accuracy</Text>
         </View>
       </View>
+
+      {unclearPrompt ? (
+        <UnclearAttemptPrompt
+          marked={unclearPrompt.marked}
+          question="Was it clear why the last correct move worked?"
+          onToggle={onToggleUnclear}
+        />
+      ) : null}
 
       <ResultHistoryShortcut
         delta={delta}
@@ -4761,6 +4888,8 @@ function HistoryPanel({
   availableThemes,
   page,
   reviewStatusFilter,
+  unclearCount,
+  unclearOnly,
   sprintOnly,
   wrongOnly,
   onRatingKeyChange,
@@ -4776,6 +4905,7 @@ function HistoryPanel({
   onFiltersExpandedChange,
   onResetFilters,
   onToggleSprintOnly,
+  onToggleUnclearOnly,
   onToggleWrongOnly
 }: {
   adaptiveLayout: AdaptiveLayout;
@@ -4793,6 +4923,8 @@ function HistoryPanel({
   availableThemes: string[];
   page: { limit: number; offset: number; total: number; hasMore: boolean };
   reviewStatusFilter: "all" | HistoryReviewStatus;
+  unclearCount: number;
+  unclearOnly: boolean;
   sprintOnly: boolean;
   wrongOnly: boolean;
   onRatingKeyChange: (ratingKey: string | null) => void;
@@ -4808,6 +4940,7 @@ function HistoryPanel({
   onFiltersExpandedChange: (expanded: boolean) => void;
   onResetFilters: () => void;
   onToggleSprintOnly: () => void;
+  onToggleUnclearOnly: () => void;
   onToggleWrongOnly: () => void;
 }): React.JSX.Element {
   const visibleAttempts = attempts;
@@ -4821,7 +4954,8 @@ function HistoryPanel({
     sideFilter,
     sourceFilter,
     themeFilter,
-    timeRange
+    timeRange,
+    unclearOnly
   });
   return (
     <View style={[styles.historyPanel, adaptiveLayout.usesWideContent ? styles.historyPanelWide : null]} testID="history-panel">
@@ -4895,6 +5029,13 @@ function HistoryPanel({
             controlTestID="history-filter-sprint-only"
             label="Sprint only"
             onPress={onToggleSprintOnly}
+          />
+          <HistoryQuickToggle
+            active={unclearOnly}
+            accessibilityLabel={`${unclearCount} unclear attempts in the current filters`}
+            controlTestID="history-filter-unclear"
+            label={`Unclear (${unclearCount})`}
+            onPress={onToggleUnclearOnly}
           />
         </View>
       </View>
@@ -5027,6 +5168,7 @@ type HistoryActiveFilterInput = {
   sourceFilter: "all" | AttemptSource;
   themeFilter: string;
   timeRange: HistoryTimeRange;
+  unclearOnly: boolean;
 };
 
 function historyActiveFilterLabels({
@@ -5037,7 +5179,8 @@ function historyActiveFilterLabels({
   sideFilter,
   sourceFilter,
   themeFilter,
-  timeRange
+  timeRange,
+  unclearOnly
 }: HistoryActiveFilterInput): string[] {
   const labels = [
     historyRangeLabel(timeRange),
@@ -5060,6 +5203,9 @@ function historyActiveFilterLabels({
   }
   if (themeFilter !== "all") {
     labels.push(themeFilter);
+  }
+  if (unclearOnly) {
+    labels.push("Unclear");
   }
   return labels;
 }
@@ -5383,6 +5529,26 @@ function ResultBadgeGlyph({ tone }: { tone: "correct" | "wrong" | "alert" }): Re
   );
 }
 
+function BookmarkGlyph({ marked, small = false }: { marked: boolean; small?: boolean }): React.JSX.Element {
+  const color = marked ? "#D97706" : "#64748B";
+  return (
+    <View
+      style={[styles.bookmarkGlyphCanvas, small ? styles.bookmarkGlyphCanvasSmall : null]}
+      testID="bookmark-glyph"
+    >
+      <View
+        style={[
+          styles.bookmarkGlyphBody,
+          small ? styles.bookmarkGlyphBodySmall : null,
+          { borderColor: color, backgroundColor: marked ? color : "transparent" }
+        ]}
+      />
+      <View style={[styles.bookmarkGlyphTail, styles.bookmarkGlyphTailLeft, small ? styles.bookmarkGlyphTailSmall : null, { backgroundColor: color }]} />
+      <View style={[styles.bookmarkGlyphTail, styles.bookmarkGlyphTailRight, small ? styles.bookmarkGlyphTailSmall : null, { backgroundColor: color }]} />
+    </View>
+  );
+}
+
 function HistoryChipRow({
   children,
   testID
@@ -5466,6 +5632,7 @@ function HistoryAttemptRow({
     `Open ${historyAttemptModeLabel(detail.mode)} puzzle history`,
     resultLabel,
     submittedMoveLabel,
+    attempt.unclear ? "Marked unclear" : null,
     puzzleIdentity,
     compactContext,
     compactMeta
@@ -5501,6 +5668,12 @@ function HistoryAttemptRow({
         <Text testID={`history-attempt-${attempt.id}-context`} style={styles.helperText}>{compactContext}</Text>
         <Text testID={`history-attempt-${attempt.id}-meta`} style={styles.helperText}>{compactMeta}</Text>
       </View>
+      {attempt.unclear ? (
+        <View style={styles.historyUnclearBadge} testID={`history-attempt-${attempt.id}-unclear`}>
+          <BookmarkGlyph marked small />
+          <Text style={styles.historyUnclearBadgeText}>Unclear</Text>
+        </View>
+      ) : null}
       <View style={styles.historyAttemptChevron} testID={`history-attempt-${attempt.id}-chevron`}>
         <ChevronGlyph direction="right" />
       </View>
@@ -5847,6 +6020,18 @@ type HistoryUnavailableAttempt = {
   attempt: HistoryAttemptView;
   replayAvailability: Extract<HistoryAttemptReplayAvailability, { status: "unavailable" }>;
 };
+
+function withAttemptClarity<T extends AttemptEvent | HistoryAttemptView>(
+  attempt: T,
+  clarity: Pick<AttemptEvent, "unclear" | "unclearUpdatedAt">
+): T {
+  const { unclear: _unclear, unclearUpdatedAt: _unclearUpdatedAt, ...base } = attempt;
+  return {
+    ...base,
+    unclear: Boolean(clarity.unclear),
+    ...(clarity.unclearUpdatedAt ? { unclearUpdatedAt: clarity.unclearUpdatedAt } : {})
+  } as T;
+}
 
 type ReviewQueueFilter =
   | "all"
@@ -6326,7 +6511,9 @@ function ReviewQueueItemCard({
   onPress: () => void;
 }): React.JSX.Element {
   const primaryTheme = item.puzzle.themes[0] ?? "mixed";
-  const lastWrongDate = formatLocalCalendarDate(item.review.lastReviewedAt);
+  const activityLabel = item.review.lastReviewedAt
+    ? `Last wrong ${formatLocalCalendarDate(item.review.lastReviewedAt)}`
+    : `Added manually ${formatLocalCalendarDate(item.review.enrolledAt ?? item.review.dueDay)}`;
   const dueKind = reviewDueState(item.review, nowMs);
   const dueState = dueKind === "overdue"
     ? "Overdue"
@@ -6339,7 +6526,7 @@ function ReviewQueueItemCard({
   const rowTestId = `review-due-item-${item.puzzle.id}-${safeTestId(item.review.mode)}`;
   const accessibilityLabel = [
     `Start ${modeLabel(item.review.mode)} ${primaryTheme} review`,
-    `Last wrong ${lastWrongDate}`,
+    activityLabel,
     dueState,
     `${item.review.intervalDays} day interval`,
     source,
@@ -6357,7 +6544,7 @@ function ReviewQueueItemCard({
     >
       <View style={styles.reviewItemCopy}>
         <Text style={styles.historyRowTitle}>{modeLabel(item.review.mode)}</Text>
-        <Text testID={`${rowTestId}-context`} style={styles.helperText}>{primaryTheme} · Last wrong {lastWrongDate}</Text>
+        <Text testID={`${rowTestId}-context`} style={styles.helperText}>{primaryTheme} · {activityLabel}</Text>
         <Text testID={`${rowTestId}-meta`} style={styles.helperText}>
           {dueState} · {item.review.intervalDays}d interval · {compactSource}
         </Text>
@@ -6443,7 +6630,9 @@ function ReviewSession({
   entries,
   initialIndex = 0,
   onAnalysisActiveChange,
+  onAttemptClearUnclear,
   onComplete,
+  onReviewEnrollmentChanged,
   onReturnToOwner,
   scheduledReviewCompletedCount = 0,
   scheduledReviewTotal = entries.length,
@@ -6459,7 +6648,9 @@ function ReviewSession({
   entries: ReviewEntry[];
   initialIndex?: number;
   onAnalysisActiveChange?: (active: boolean) => void;
+  onAttemptClearUnclear?: (attemptId: string) => void;
   onComplete: (source: ReviewEntry["source"]) => void;
+  onReviewEnrollmentChanged?: () => void;
   onReturnToOwner: (source: ReviewEntry["source"]) => void;
   scheduledReviewCompletedCount?: number;
   scheduledReviewTotal?: number;
@@ -7226,7 +7417,21 @@ function ReviewSession({
       </View>
 
       {currentEntry.source === "history" && currentEntry.attempt ? (
-        <HistoryAttemptDetailCard attempt={currentEntry.attempt} />
+        <>
+          <HistoryAttemptDetailCard
+            attempt={currentEntry.attempt}
+            onClearUnclear={currentEntry.attempt.unclear && onAttemptClearUnclear
+              ? () => onAttemptClearUnclear(currentEntry.attempt!.id)
+              : undefined}
+          />
+          <HistoryReviewEnrollment
+            key={currentEntry.attempt.id}
+            attempt={currentEntry.attempt}
+            currentTimeMs={currentTimeMs}
+            service={service}
+            onReviewChanged={onReviewEnrollmentChanged}
+          />
+        </>
       ) : null}
 
       <View style={[styles.reviewBoardLayout, adaptiveLayout.usesSessionRail ? styles.reviewBoardLayoutWide : null]}>
@@ -7460,16 +7665,85 @@ function ReviewSession({
   );
 }
 
+function HistoryReviewEnrollment({
+  attempt,
+  currentTimeMs,
+  onReviewChanged,
+  service
+}: {
+  attempt: AttemptEvent | HistoryAttemptView;
+  currentTimeMs: () => number;
+  onReviewChanged?: () => void;
+  service: PracticeService;
+}): React.JSX.Element {
+  const detail = normalizeHistoryAttemptDetail(attempt);
+  const context = detail.mode && detail.ratingKey && service.getPuzzle(attempt.puzzleId)
+    ? { puzzleId: attempt.puzzleId, mode: detail.mode, ratingKey: detail.ratingKey }
+    : null;
+  const [review, setReview] = useState<ReviewQueueState | undefined>(() => context
+    ? service.getReviewQueueState(context)
+    : undefined);
+
+  if (review) {
+    return (
+      <View style={styles.historyReviewEnrollment} testID="history-review-enrollment-status">
+        <View style={styles.historyReviewEnrollmentCopy}>
+          <Text style={styles.historyAttemptUnclearTitle}>In Review</Text>
+          <Text style={styles.helperText}>Due {formatReviewDay(review.dueDay)}</Text>
+        </View>
+        <BookmarkGlyph marked small />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.historyReviewEnrollment} testID="history-review-enrollment">
+      <View style={styles.historyReviewEnrollmentCopy}>
+        <Text style={styles.historyAttemptUnclearTitle}>Review this context</Text>
+        <Text style={styles.helperText}>
+          {context ? "First review is due tomorrow." : "The exact puzzle context is unavailable."}
+        </Text>
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Add this puzzle context to Review"
+        accessibilityState={{ disabled: context === null }}
+        disabled={context === null}
+        style={[styles.historyAddReviewButton, context === null ? styles.disabledButton : null]}
+        testID="history-add-to-review"
+        onPress={() => {
+          if (!context) {
+            return;
+          }
+          const enrolled = service.enrollReview(context, new Date(currentTimeMs()).toISOString());
+          setReview(enrolled);
+          onReviewChanged?.();
+        }}
+      >
+        <Text style={styles.historyAddReviewButtonText}>Add to Review</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 function HistoryAttemptReplayUnavailable({
   adaptiveLayout,
   attempt,
+  currentTimeMs,
+  onClearUnclear,
+  onReviewChanged,
   onReturn,
-  replayAvailability
+  replayAvailability,
+  service
 }: {
   adaptiveLayout: AdaptiveLayout;
   attempt: HistoryAttemptView;
+  currentTimeMs: () => number;
+  onClearUnclear: () => void;
+  onReviewChanged: () => void;
   onReturn: () => void;
   replayAvailability: Extract<HistoryAttemptReplayAvailability, { status: "unavailable" }>;
+  service: PracticeService;
 }): React.JSX.Element {
   return (
     <View
@@ -7493,21 +7767,40 @@ function HistoryAttemptReplayUnavailable({
           </View>
         </View>
       </View>
-      <HistoryAttemptDetailCard attempt={attempt} replayAvailability={replayAvailability} />
+      <HistoryAttemptDetailCard
+        attempt={attempt}
+        replayAvailability={replayAvailability}
+        {...(attempt.unclear ? { onClearUnclear } : {})}
+      />
+      <HistoryReviewEnrollment
+        attempt={attempt}
+        currentTimeMs={currentTimeMs}
+        service={service}
+        onReviewChanged={onReviewChanged}
+      />
     </View>
   );
 }
 
 function HistoryAttemptDetailCard({
   attempt,
+  onClearUnclear,
   replayAvailability
 }: {
   attempt: AttemptEvent | HistoryAttemptView;
+  onClearUnclear?: () => void;
   replayAvailability?: HistoryAttemptReplayAvailability;
 }): React.JSX.Element {
   const detail = normalizeHistoryAttemptDetail(attempt);
   const arrowCandidatesUnavailable = detail.arrowDuelCandidateOrderStatus === "corrupt" ||
     (replayAvailability?.status === "unavailable" && replayAvailability.reason === "arrow-candidates-unavailable");
+  const replayUnavailableMessage = replayAvailability?.status === "unavailable"
+    ? replayAvailability.reason === "arrow-candidates-unavailable"
+      ? "Original Arrow Duel candidates are unavailable, so this attempt cannot be replayed safely."
+      : replayAvailability.reason === "puzzle-unavailable"
+        ? "This puzzle is no longer available on this device, so the attempt cannot be replayed."
+        : "The saved mode or rating context is invalid, so this attempt cannot be replayed safely."
+    : null;
   const sourceLabel = historyAttemptSourceLabel(detail.source);
   const resultLabel = detail.result === "wrong"
     ? "Wrong move"
@@ -7533,6 +7826,32 @@ function HistoryAttemptDetailCard({
 
   return (
     <View style={styles.historyPerformanceCard} testID="history-attempt-detail">
+      {attempt.unclear ? (
+        <View
+          accessibilityLabel="This attempt is marked unclear"
+          style={styles.historyAttemptUnclearBanner}
+          testID="history-attempt-unclear"
+        >
+          <View style={styles.historyAttemptUnclearCopy}>
+            <BookmarkGlyph marked />
+            <View>
+              <Text style={styles.historyAttemptUnclearTitle}>Marked unclear</Text>
+              <Text style={styles.helperText}>Saved for History analysis</Text>
+            </View>
+          </View>
+          {onClearUnclear ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Clear unclear mark"
+              style={styles.historyAttemptClearButton}
+              testID="history-attempt-clear-unclear"
+              onPress={onClearUnclear}
+            >
+              <Text style={styles.historyAttemptClearButtonText}>Clear</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
       <View style={styles.historyPerformanceHeader}>
         <View style={styles.historyAttemptCopy}>
           <Text style={styles.panelTitle} testID="history-attempt-detail-title">Persisted attempt</Text>
@@ -7566,9 +7885,9 @@ function HistoryAttemptDetailCard({
           Some persisted attempt details are unavailable.
         </Text>
       ) : null}
-      {arrowCandidatesUnavailable ? (
+      {replayUnavailableMessage ? (
         <Text style={styles.errorText} testID="history-attempt-detail-replay-unavailable">
-          Original Arrow Duel candidates are unavailable, so this attempt cannot be replayed safely.
+          {replayUnavailableMessage}
         </Text>
       ) : null}
     </View>
@@ -10739,6 +11058,52 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4
   },
+  practicePromptStack: {
+    gap: 6
+  },
+  unclearPrompt: {
+    alignItems: "center",
+    backgroundColor: "#F8FAFC",
+    borderColor: "#CBD5E1",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 8,
+    minHeight: 44,
+    paddingHorizontal: 10,
+    paddingVertical: 7
+  },
+  unclearPromptMarked: {
+    backgroundColor: "#FFFBEB",
+    borderColor: "#F59E0B"
+  },
+  unclearPromptCopy: {
+    alignItems: "center",
+    flex: 1,
+    flexDirection: "row",
+    gap: 8,
+    minWidth: 0
+  },
+  unclearPromptQuestion: {
+    color: "#334155",
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "700"
+  },
+  unclearPromptButton: {
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 30,
+    paddingHorizontal: 6
+  },
+  unclearPromptButtonText: {
+    color: "#2563EB",
+    fontSize: 11,
+    fontWeight: "900"
+  },
+  unclearPromptButtonTextMarked: {
+    color: "#B45309"
+  },
   promptIcon: {
     alignItems: "center",
     backgroundColor: "#1F2937",
@@ -11919,6 +12284,49 @@ const styles = StyleSheet.create({
     position: "relative",
     width: 18
   },
+  bookmarkGlyphCanvas: {
+    height: 22,
+    position: "relative",
+    width: 18
+  },
+  bookmarkGlyphCanvasSmall: {
+    height: 17,
+    width: 14
+  },
+  bookmarkGlyphBody: {
+    borderBottomWidth: 0,
+    borderRadius: 2,
+    borderWidth: 2,
+    height: 15,
+    left: 2,
+    position: "absolute",
+    top: 1,
+    width: 14
+  },
+  bookmarkGlyphBodySmall: {
+    height: 11,
+    left: 2,
+    width: 10
+  },
+  bookmarkGlyphTail: {
+    borderRadius: 999,
+    bottom: 3,
+    height: 2,
+    position: "absolute",
+    width: 9
+  },
+  bookmarkGlyphTailSmall: {
+    bottom: 2,
+    width: 7
+  },
+  bookmarkGlyphTailLeft: {
+    left: 2,
+    transform: [{ rotate: "42deg" }]
+  },
+  bookmarkGlyphTailRight: {
+    right: 2,
+    transform: [{ rotate: "-42deg" }]
+  },
   resultBadgeGlyphLine: {
     backgroundColor: "#FFFFFF",
     borderRadius: 999,
@@ -11965,6 +12373,83 @@ const styles = StyleSheet.create({
   historyAttemptCopy: {
     flex: 1,
     gap: 3
+  },
+  historyUnclearBadge: {
+    alignItems: "center",
+    backgroundColor: "#FFFBEB",
+    borderColor: "#F59E0B",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 4
+  },
+  historyUnclearBadgeText: {
+    color: "#B45309",
+    fontSize: 10,
+    fontWeight: "900"
+  },
+  historyAttemptUnclearBanner: {
+    alignItems: "center",
+    backgroundColor: "#FFFBEB",
+    borderColor: "#F59E0B",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "space-between",
+    padding: 10
+  },
+  historyAttemptUnclearCopy: {
+    alignItems: "center",
+    flex: 1,
+    flexDirection: "row",
+    gap: 8
+  },
+  historyAttemptUnclearTitle: {
+    color: "#334155",
+    fontSize: 13,
+    fontWeight: "900"
+  },
+  historyAttemptClearButton: {
+    alignItems: "center",
+    minHeight: 32,
+    justifyContent: "center",
+    paddingHorizontal: 8
+  },
+  historyAttemptClearButtonText: {
+    color: "#B45309",
+    fontSize: 12,
+    fontWeight: "900"
+  },
+  historyReviewEnrollment: {
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "space-between",
+    padding: 10
+  },
+  historyReviewEnrollmentCopy: {
+    flex: 1,
+    gap: 2
+  },
+  historyAddReviewButton: {
+    alignItems: "center",
+    backgroundColor: "#2563EB",
+    borderRadius: 8,
+    justifyContent: "center",
+    minHeight: 34,
+    paddingHorizontal: 10
+  },
+  historyAddReviewButtonText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "900"
   },
   historyAttemptHeader: {
     alignItems: "center",

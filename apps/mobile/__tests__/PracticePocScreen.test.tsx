@@ -354,6 +354,61 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "practice-home")).toBeTruthy();
   });
 
+  it("binds the Unclear bookmark to the completed correct attempt through feedback and Sprint Result", async () => {
+    const service = createMobilePracticeService("random1000");
+    const renderer = renderScreen({ practiceService: service, standardTargetCorrect: 1 });
+
+    startStandardSprint(renderer);
+    await boardMove(renderer, "e2e6");
+    expect(() => findByTestId(renderer, "sprint-unclear-prompt")).toThrow();
+    await settleFeedbackSnapshot();
+
+    await boardMove(renderer, "e6f7");
+    expect(collectText(findByTestId(renderer, "sprint-unclear-question"))).toBe(
+      "Was it clear why that move was correct?"
+    );
+    expect(collectText(findByTestId(renderer, "sprint-unclear-toggle"))).toBe("Not yet");
+    press(renderer, "sprint-unclear-toggle");
+    const attemptId = (service.listHistory() as AttemptEvent[])[0]?.id;
+    expect(attemptId).toBeTruthy();
+    expect((service.listHistory() as AttemptEvent[])[0]).toMatchObject({ unclear: true });
+    expect(collectText(findByTestId(renderer, "sprint-unclear-toggle"))).toBe("Marked unclear · Undo");
+    expect(findByTestId(renderer, "bookmark-glyph")).toBeTruthy();
+
+    await settleFeedbackSnapshot();
+    expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
+    expect(findByTestId(renderer, "sprint-unclear-prompt")).toBeTruthy();
+    press(renderer, "sprint-unclear-toggle");
+    expect((service.listHistory() as AttemptEvent[])[0]).toMatchObject({
+      id: attemptId,
+      unclear: false
+    });
+    expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
+  });
+
+  it("keeps the Unclear prompt on the previous attempt until the next puzzle completes", async () => {
+    const service = createMobilePracticeService("random1000");
+    const renderer = renderScreen({ practiceService: service });
+
+    startStandardSprint(renderer);
+    await boardMove(renderer, "e2e6");
+    await settleFeedbackSnapshot();
+    await boardMove(renderer, "e6f7");
+    const completedAttemptId = (service.listHistory() as AttemptEvent[])[0]?.id;
+    await settleFeedbackSnapshot();
+
+    expect(collectText(findByTestId(renderer, "sprint-unclear-question"))).toBe(
+      "Was it clear why the previous move was correct?"
+    );
+    press(renderer, "sprint-unclear-toggle");
+    expect((service.listHistory() as AttemptEvent[]).find((attempt) => attempt.id === completedAttemptId)).toMatchObject({
+      unclear: true
+    });
+
+    await boardMove(renderer, "g6g5");
+    expect(() => findByTestId(renderer, "sprint-unclear-prompt")).toThrow();
+  });
+
   it.each([
     {
       name: "History filters",
@@ -2977,6 +3032,62 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-panel")).toBeTruthy();
   });
 
+  it("filters Unclear attempts, clears the marker in History review, and enrolls the exact context", () => {
+    const store = new MemoryStore();
+    store.seedPuzzles([sharedHistoryPuzzle()]);
+    store.recordAttempt({
+      id: "unclear-history-attempt",
+      source: "sprint",
+      sessionId: "unclear-history-session",
+      puzzleId: "shared-history",
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      result: "correct",
+      submittedMove: "e2e4",
+      expectedMove: "e2e4",
+      startedAt: "2026-07-17T11:59:55.000Z",
+      completedAt: "2026-07-17T12:00:00.000Z",
+      ratingBefore: 600
+    });
+    const service = new PracticeService(store);
+    service.setAttemptUnclear("unclear-history-attempt", true, "2026-07-17T12:01:00.000Z");
+    const renderer = renderScreen({
+      currentTimeMs: () => Date.parse("2026-07-17T12:02:00.000Z"),
+      practiceService: service
+    });
+
+    press(renderer, "history-tab");
+    expect(collectText(findByTestId(renderer, "history-filter-unclear"))).toBe("Unclear (1)");
+    expect(findByTestId(renderer, "history-attempt-unclear-history-attempt-unclear")).toBeTruthy();
+    press(renderer, "history-filter-unclear");
+    expect(findByTestId(renderer, "history-filter-unclear").props.accessibilityState).toEqual({ checked: true });
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Unclear");
+
+    press(renderer, "history-attempt-unclear-history-attempt");
+    expect(findByTestId(renderer, "history-attempt-unclear")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "history-add-to-review"))).toBe("Add to Review");
+    press(renderer, "history-add-to-review");
+    expect(service.getReviewQueueState({
+      puzzleId: "shared-history",
+      mode: "standard",
+      ratingKey: "standard 5/20"
+    })).toMatchObject({
+      reviewCount: 0,
+      lastResult: null,
+      lastReviewedAt: null
+    });
+    expect(collectText(findByTestId(renderer, "history-review-enrollment-status"))).toContain("In Review");
+
+    press(renderer, "history-attempt-clear-unclear");
+    expect(findByTestId(renderer, "history-attempt-detail")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-unclear")).toThrow();
+    expect((service.listHistory() as AttemptEvent[])[0]).toMatchObject({ unclear: false });
+
+    press(renderer, "review-exit");
+    expect(findByTestId(renderer, "history-filter-unclear").props.accessibilityState).toEqual({ checked: true });
+    expect(findByTestId(renderer, "history-empty-state")).toBeTruthy();
+  });
+
   it("resets history filters to the default sprint-only view", () => {
     const renderer = renderStandardSequenceScreen();
 
@@ -3298,8 +3409,12 @@ describe("PracticePocScreen", () => {
       "Rating bucket unavailable"
     );
     expect(collectText(findByTestId(renderer, "history-attempt-detail-result"))).toBe("Result unavailable");
+    expect(collectText(findByTestId(renderer, "history-attempt-detail-replay-unavailable"))).toBe(
+      "The saved mode or rating context is invalid, so this attempt cannot be replayed safely."
+    );
     expect(() => findByTestId(renderer, "review-board")).toThrow();
     expect(() => findByTestId(renderer, "review-analysis-button")).toThrow();
+    expect(findByTestId(renderer, "history-add-to-review").props.accessibilityState).toEqual({ disabled: true });
 
     expect(systemBack.invoke()).toBe(true);
     expect(findByTestId(renderer, "history-panel")).toBeTruthy();
@@ -3309,6 +3424,7 @@ describe("PracticePocScreen", () => {
     );
     expect(() => findByTestId(renderer, "review-board")).toThrow();
     expect(() => findByTestId(renderer, "review-analysis-button")).toThrow();
+    expect(findByTestId(renderer, "history-add-to-review").props.accessibilityState).toEqual({ disabled: false });
     expect(systemBack.invoke()).toBe(true);
     expect(findByTestId(renderer, "history-panel")).toBeTruthy();
     press(renderer, "history-attempt-semantic-corrupt-arrow-attempt");

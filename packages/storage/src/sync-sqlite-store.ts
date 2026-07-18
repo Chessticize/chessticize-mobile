@@ -2,6 +2,7 @@ import {
   buildHistoryView,
   buildSessionMistakeReview,
   createDefaultRating,
+  enrollReviewContext,
   filterHistoryAttemptsForQuery,
   normalizeRatingRecord,
   orderReviewQueue,
@@ -10,7 +11,8 @@ import {
   reviewDayFor,
   scheduleMistakeForContext,
   scheduleReview,
-  sideToMoveForHistoryPuzzle
+  sideToMoveForHistoryPuzzle,
+  updateAttemptUnclearState
 } from "../../core/src/index.ts";
 import type {
   AttemptEvent,
@@ -47,10 +49,13 @@ import { preferredSprintSession, sameSprintSession } from "./sprint-session-sync
 import { assignLegacyRatingGenerations } from "./rating-history.ts";
 import type { ReviewReminderPreference } from "./practice-store.ts";
 import type { ReviewReminderSettings } from "../../core/src/index.ts";
+import { cloneAttemptHistoryRow, preferredAttemptHistoryRow, sameAttemptHistoryRow } from "./attempt-sync.ts";
 
-interface AttemptHistoryDbRow extends Omit<AttemptHistoryRow, "ratingAfter" | "arrowDuelCandidateOrder"> {
+interface AttemptHistoryDbRow extends Omit<AttemptHistoryRow, "ratingAfter" | "arrowDuelCandidateOrder" | "unclear" | "unclearUpdatedAt"> {
   ratingAfter: number | null;
   arrowDuelCandidateOrderJson: string | null;
+  unclear: number;
+  unclearUpdatedAt: string | null;
 }
 
 interface HistoryAttemptDbRow extends PuzzleRow {
@@ -66,6 +71,8 @@ interface HistoryAttemptDbRow extends PuzzleRow {
   rating_before: number;
   rating_after: number | null;
   arrow_duel_candidate_order_json: string | null;
+  unclear: number;
+  unclear_updated_at: string | null;
   rating_key: string;
 }
 
@@ -111,8 +118,9 @@ interface ReviewRow {
   review_count: number;
   success_streak: number;
   lapse_count: number;
-  last_result: AttemptResult;
-  last_reviewed_at: string;
+  last_result: AttemptResult | null;
+  last_reviewed_at: string | null;
+  enrolled_at: string | null;
 }
 
 interface CustomSprintConfigRow {
@@ -167,7 +175,7 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 4;
+export const CURRENT_SCHEMA_VERSION = 5;
 
 interface SQLiteMigration {
   from: number;
@@ -179,7 +187,8 @@ const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
   { from: 0, to: 1, apply: migrateUnversionedSchemaToV1 },
   { from: 1, to: 2, apply: migrateV1ToV2 },
   { from: 2, to: 3, apply: migrateV2ToV3 },
-  { from: 3, to: 4, apply: migrateV3ToV4 }
+  { from: 3, to: 4, apply: migrateV3ToV4 },
+  { from: 4, to: 5, apply: migrateV4ToV5 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
@@ -533,8 +542,9 @@ export class SyncSQLiteStore implements PracticeStore {
   }
 
   recordAttempt(attempt: AttemptEvent): void {
-    if (attempt.source === "scheduled_review") {
-      this.ensureSyntheticReviewSession(attempt);
+    const storedAttempt = cloneAttemptHistoryRow(attempt);
+    if (storedAttempt.source === "scheduled_review") {
+      this.ensureSyntheticReviewSession(storedAttempt);
     }
     this.db
       .prepare(
@@ -552,25 +562,44 @@ export class SyncSQLiteStore implements PracticeStore {
           completed_at,
           rating_before,
           rating_after,
-          arrow_duel_candidate_order_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          arrow_duel_candidate_order_json,
+          unclear,
+          unclear_updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
-        attempt.id,
-        attempt.source,
-        attempt.sessionId,
-        attempt.puzzleId,
-        attempt.mode,
-        attempt.ratingKey,
-        attempt.result,
-        attempt.submittedMove,
-        attempt.expectedMove,
-        attempt.startedAt,
-        attempt.completedAt,
-        attempt.ratingBefore,
-        attempt.ratingAfter ?? null,
-        attempt.arrowDuelCandidateOrder ? JSON.stringify(attempt.arrowDuelCandidateOrder) : null
+        storedAttempt.id,
+        storedAttempt.source,
+        storedAttempt.sessionId,
+        storedAttempt.puzzleId,
+        storedAttempt.mode,
+        storedAttempt.ratingKey,
+        storedAttempt.result,
+        storedAttempt.submittedMove,
+        storedAttempt.expectedMove,
+        storedAttempt.startedAt,
+        storedAttempt.completedAt,
+        storedAttempt.ratingBefore,
+        storedAttempt.ratingAfter ?? null,
+        storedAttempt.arrowDuelCandidateOrder ? JSON.stringify(storedAttempt.arrowDuelCandidateOrder) : null,
+        storedAttempt.unclear ? 1 : 0,
+        storedAttempt.unclearUpdatedAt ?? null
       );
+  }
+
+  setAttemptUnclear(attemptId: string, unclear: boolean, updatedAt: string): AttemptHistoryRow {
+    const attempt = this.attemptById(attemptId);
+    if (!attempt) {
+      throw new Error(`Attempt ${attemptId} was not found`);
+    }
+    const next = updateAttemptUnclearState(attempt, unclear, updatedAt);
+    if (next === attempt) {
+      return attempt;
+    }
+    this.db
+      .prepare("UPDATE attempts SET unclear = ?, unclear_updated_at = ? WHERE id = ?")
+      .run(next.unclear ? 1 : 0, next.unclearUpdatedAt ?? null, attemptId);
+    return cloneAttemptHistoryRow(next);
   }
 
   listAttempts(filter: HistoryFilter = {}): AttemptHistoryRow[] {
@@ -617,22 +646,43 @@ export class SyncSQLiteStore implements PracticeStore {
           completed_at AS completedAt,
           rating_before AS ratingBefore,
           rating_after AS ratingAfter,
-          arrow_duel_candidate_order_json AS arrowDuelCandidateOrderJson
+          arrow_duel_candidate_order_json AS arrowDuelCandidateOrderJson,
+          unclear,
+          unclear_updated_at AS unclearUpdatedAt
          FROM attempts
          ${where}
          ORDER BY completed_at DESC, id DESC`
       )
       .all(...params) as AttemptHistoryDbRow[];
 
-    return rows.map((row) => {
-      const candidateOrder = optionalStringArrayFromJson(row.arrowDuelCandidateOrderJson);
-      const { ratingAfter, arrowDuelCandidateOrderJson: _arrowDuelCandidateOrderJson, ...attempt } = row;
-      return {
-        ...attempt,
-        ...(ratingAfter === null ? {} : { ratingAfter }),
-        ...(candidateOrder === undefined ? {} : { arrowDuelCandidateOrder: candidateOrder })
-      };
-    });
+    return rows.map(attemptHistoryRowFromDbRow);
+  }
+
+  private attemptById(attemptId: string): AttemptHistoryRow | undefined {
+    const row = this.db
+      .prepare(
+        `SELECT
+          id,
+          source,
+          session_id AS sessionId,
+          puzzle_id AS puzzleId,
+          mode,
+          rating_key AS ratingKey,
+          result,
+          submitted_move AS submittedMove,
+          expected_move AS expectedMove,
+          started_at AS startedAt,
+          completed_at AS completedAt,
+          rating_before AS ratingBefore,
+          rating_after AS ratingAfter,
+          arrow_duel_candidate_order_json AS arrowDuelCandidateOrderJson,
+          unclear,
+          unclear_updated_at AS unclearUpdatedAt
+         FROM attempts
+         WHERE id = ?`
+      )
+      .get(attemptId) as AttemptHistoryDbRow | undefined;
+    return row ? attemptHistoryRowFromDbRow(row) : undefined;
   }
 
   exportLocalData(): LocalDataExport {
@@ -717,6 +767,13 @@ export class SyncSQLiteStore implements PracticeStore {
   scheduleMistakeReview(context: ReviewContext, now: string): ReviewQueueState {
     const previous = this.getReviewQueueState(context);
     const next = scheduleMistakeForContext(context, now, previous);
+    this.saveReviewQueueState(next);
+    return next;
+  }
+
+  enrollReview(context: ReviewContext, now: string): ReviewQueueState {
+    const previous = this.getReviewQueueState(context);
+    const next = enrollReviewContext(context, now, previous);
     this.saveReviewQueueState(next);
     return next;
   }
@@ -816,10 +873,17 @@ export class SyncSQLiteStore implements PracticeStore {
     const allAttempts = this.selectHistoryAttempts(query.ratingKey, range.since, range.until);
     const reviews = this.listAllReviewQueueStates();
     const attempts = filterHistoryAttemptsForQuery({ attempts: allAttempts, query, reviews });
+    const { unclear: _unclear, ...queryWithoutUnclear } = query;
+    const unclearCount = filterHistoryAttemptsForQuery({
+      attempts: allAttempts,
+      query: queryWithoutUnclear,
+      reviews
+    }).filter((attempt) => Boolean(attempt.unclear)).length;
     return buildHistoryView({
       query,
       ratingKeys: this.listPlayedRatings(),
       attempts,
+      unclearCount,
       elo: query.ratingKey ? this.selectHistoryElo(query.ratingKey, range.since, range.until) : [],
       reviews,
       allAttemptsForOptions: allAttempts
@@ -839,8 +903,9 @@ export class SyncSQLiteStore implements PracticeStore {
           success_streak,
           lapse_count,
           last_result,
-          last_reviewed_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          last_reviewed_at,
+          enrolled_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         state.puzzleId,
@@ -852,7 +917,8 @@ export class SyncSQLiteStore implements PracticeStore {
         state.successStreak,
         state.lapseCount,
         state.lastResult,
-        state.lastReviewedAt
+        state.lastReviewedAt,
+        state.enrolledAt ?? null
       );
   }
 
@@ -884,6 +950,8 @@ export class SyncSQLiteStore implements PracticeStore {
           a.rating_before,
           a.rating_after,
           a.arrow_duel_candidate_order_json,
+          a.unclear,
+          a.unclear_updated_at,
           COALESCE(a.rating_key, s.rating_key) AS rating_key,
           p.*
          FROM attempts a
@@ -913,6 +981,9 @@ export class SyncSQLiteStore implements PracticeStore {
         ...(row.rating_after === null ? {} : { ratingAfter: row.rating_after }),
         ...(candidateOrder.status === "valid" ? { arrowDuelCandidateOrder: candidateOrder.value } : {}),
         ...(candidateOrder.status === "corrupt" ? { arrowDuelCandidateOrderStatus: "corrupt" as const } : {}),
+        ...(row.unclear_updated_at === null
+          ? {}
+          : { unclear: row.unclear === 1, unclearUpdatedAt: row.unclear_updated_at }),
         puzzleRating: puzzle.rating,
         side: sideToMoveForHistoryPuzzle({ puzzle, mode: row.mode }),
         themes: puzzle.themes
@@ -1080,12 +1151,22 @@ export class SyncSQLiteStore implements PracticeStore {
   }
 
   private importAttempt(attempt: AttemptEvent): boolean {
-    const existing = this.db.prepare("SELECT id FROM attempts WHERE id = ?").get(attempt.id);
-    if (existing || !this.getPuzzle(attempt.puzzleId)) {
+    const existing = this.attemptById(attempt.id);
+    if (existing) {
+      const next = preferredAttemptHistoryRow(existing, attempt);
+      if (sameAttemptHistoryRow(existing, next)) {
+        return false;
+      }
+      this.db
+        .prepare("UPDATE attempts SET unclear = ?, unclear_updated_at = ? WHERE id = ?")
+        .run(next.unclear ? 1 : 0, next.unclearUpdatedAt ?? null, attempt.id);
+      return true;
+    }
+    if (!this.getPuzzle(attempt.puzzleId)) {
       return false;
     }
     this.ensureSessionForAttempt(attempt);
-    this.recordAttempt(attempt);
+    this.recordAttempt(cloneAttemptHistoryRow(attempt));
     return true;
   }
 
@@ -1379,6 +1460,72 @@ function ensureColumn(db: SyncSqliteDatabase, table: string, column: string, alt
   }
 }
 
+function migrateV4ToV5(db: SyncSqliteDatabase): void {
+  db.exec(`
+    ALTER TABLE attempts
+      ADD COLUMN unclear INTEGER NOT NULL DEFAULT 0
+      CHECK (unclear IN (0, 1));
+    ALTER TABLE attempts
+      ADD COLUMN unclear_updated_at TEXT;
+
+    CREATE INDEX attempts_unclear_completed_at_idx
+      ON attempts(unclear, completed_at DESC);
+
+    CREATE TABLE review_queue_v5 (
+      puzzle_id TEXT NOT NULL,
+      mode TEXT NOT NULL DEFAULT 'standard',
+      rating_key TEXT NOT NULL DEFAULT 'standard 5/20',
+      due_day TEXT NOT NULL,
+      interval_days INTEGER NOT NULL,
+      review_count INTEGER NOT NULL,
+      success_streak INTEGER NOT NULL,
+      lapse_count INTEGER NOT NULL,
+      last_result TEXT,
+      last_reviewed_at TEXT,
+      enrolled_at TEXT,
+      PRIMARY KEY (puzzle_id, mode, rating_key),
+      FOREIGN KEY (puzzle_id) REFERENCES puzzles(id),
+      CHECK (
+        (last_result IS NOT NULL AND last_reviewed_at IS NOT NULL)
+        OR
+        (last_result IS NULL AND last_reviewed_at IS NULL AND enrolled_at IS NOT NULL)
+      )
+    );
+
+    INSERT INTO review_queue_v5 (
+      puzzle_id,
+      mode,
+      rating_key,
+      due_day,
+      interval_days,
+      review_count,
+      success_streak,
+      lapse_count,
+      last_result,
+      last_reviewed_at,
+      enrolled_at
+    )
+    SELECT
+      puzzle_id,
+      mode,
+      rating_key,
+      due_day,
+      interval_days,
+      review_count,
+      success_streak,
+      lapse_count,
+      last_result,
+      last_reviewed_at,
+      NULL
+    FROM review_queue;
+
+    DROP TABLE review_queue;
+    ALTER TABLE review_queue_v5 RENAME TO review_queue;
+    CREATE INDEX review_queue_due_day_order_idx
+      ON review_queue(due_day, puzzle_id, mode, rating_key);
+  `);
+}
+
 function readSchemaVersion(db: SyncSqliteDatabase): number {
   const row = db.prepare("PRAGMA user_version").get() as { user_version?: unknown } | undefined;
   const version = row?.user_version;
@@ -1442,7 +1589,8 @@ function reviewFromRow(row: ReviewRow): ReviewQueueState {
     successStreak: row.success_streak,
     lapseCount: row.lapse_count,
     lastResult: row.last_result,
-    lastReviewedAt: row.last_reviewed_at
+    lastReviewedAt: row.last_reviewed_at,
+    ...(row.enrolled_at === null ? {} : { enrolledAt: row.enrolled_at })
   };
 }
 
@@ -1490,7 +1638,7 @@ function preferredReviewQueue(
   if (!local) {
     return incoming;
   }
-  const reviewComparison = incoming.lastReviewedAt.localeCompare(local.lastReviewedAt);
+  const reviewComparison = reviewActivityAt(incoming).localeCompare(reviewActivityAt(local));
   if (reviewComparison !== 0) {
     return reviewComparison > 0 ? incoming : local;
   }
@@ -1512,7 +1660,29 @@ function sameReviewQueue(left: ReviewQueueState | undefined, right: ReviewQueueS
     left.successStreak === right.successStreak &&
     left.lapseCount === right.lapseCount &&
     left.lastResult === right.lastResult &&
-    left.lastReviewedAt === right.lastReviewedAt;
+    left.lastReviewedAt === right.lastReviewedAt &&
+    left.enrolledAt === right.enrolledAt;
+}
+
+function reviewActivityAt(review: ReviewQueueState): string {
+  return review.lastReviewedAt ?? review.enrolledAt ?? "";
+}
+
+function attemptHistoryRowFromDbRow(row: AttemptHistoryDbRow): AttemptHistoryRow {
+  const candidateOrder = optionalStringArrayFromJson(row.arrowDuelCandidateOrderJson);
+  const {
+    ratingAfter,
+    arrowDuelCandidateOrderJson: _arrowDuelCandidateOrderJson,
+    unclear,
+    unclearUpdatedAt,
+    ...attempt
+  } = row;
+  return {
+    ...attempt,
+    ...(ratingAfter === null ? {} : { ratingAfter }),
+    ...(candidateOrder === undefined ? {} : { arrowDuelCandidateOrder: candidateOrder }),
+    ...(unclearUpdatedAt === null ? {} : { unclear: unclear === 1, unclearUpdatedAt })
+  };
 }
 
 function attemptEventFromHistoryRow(row: AttemptHistoryRow): AttemptEvent {
@@ -1530,7 +1700,10 @@ function attemptEventFromHistoryRow(row: AttemptHistoryRow): AttemptEvent {
     completedAt: row.completedAt,
     ratingBefore: row.ratingBefore,
     ...(row.ratingAfter === undefined ? {} : { ratingAfter: row.ratingAfter }),
-    ...(row.arrowDuelCandidateOrder === undefined ? {} : { arrowDuelCandidateOrder: row.arrowDuelCandidateOrder })
+    ...(row.arrowDuelCandidateOrder === undefined ? {} : { arrowDuelCandidateOrder: row.arrowDuelCandidateOrder }),
+    ...(row.unclearUpdatedAt === undefined
+      ? {}
+      : { unclear: Boolean(row.unclear), unclearUpdatedAt: row.unclearUpdatedAt })
   };
 }
 

@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   addReviewDays,
+  enrollReviewContext,
   isReviewDue,
   isReviewOverdue,
   orderReviewQueue,
@@ -24,6 +25,31 @@ test("first mistake is scheduled for the next review day", () => {
   assert.equal(scheduled.reviewCount, 0);
   assert.equal(scheduled.successStreak, 0);
   assert.equal(scheduled.lapseCount, 0);
+});
+
+test("manual Review Enrollment is idempotent and first becomes due tomorrow", () => {
+  const context = { puzzleId: "p1", mode: "standard" as const, ratingKey: "standard 5/20" };
+  const enrolled = enrollReviewContext(context, "2026-06-20T12:00:00.000Z", undefined, UTC);
+
+  assert.deepEqual(enrolled, {
+    ...context,
+    dueDay: "2026-06-21",
+    intervalDays: 1,
+    reviewCount: 0,
+    successStreak: 0,
+    lapseCount: 0,
+    lastResult: null,
+    lastReviewedAt: null,
+    enrolledAt: "2026-06-20T12:00:00.000Z"
+  });
+  assert.equal(
+    enrollReviewContext(context, "2026-06-20T13:00:00.000Z", enrolled, UTC),
+    enrolled
+  );
+  assert.equal(
+    enrollReviewContext(context, "2026-07-18T08:30:00.000Z", undefined, "America/Los_Angeles").dueDay,
+    "2026-07-19"
+  );
 });
 
 test("successful reviews follow 1, 3, 7, 14, 30, and capped 60 day intervals", () => {

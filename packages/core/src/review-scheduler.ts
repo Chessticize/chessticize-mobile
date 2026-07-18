@@ -90,6 +90,46 @@ export function scheduleMistakeForContext(
   };
 }
 
+export function enrollReviewContext(
+  context: ReviewContext,
+  now: string,
+  previous?: ReviewQueueState,
+  timeZone?: string
+): ReviewQueueState {
+  if (previous) {
+    return previous;
+  }
+  const nowDate = new Date(now);
+  if (Number.isNaN(nowDate.getTime())) {
+    throw new Error("now must be a valid ISO timestamp");
+  }
+  const intervalDays = successIntervalAt(0);
+  return {
+    ...context,
+    dueDay: addReviewDays(localCalendarDayFor(nowDate, timeZone), intervalDays),
+    intervalDays,
+    reviewCount: 0,
+    successStreak: 0,
+    lapseCount: 0,
+    lastResult: null,
+    lastReviewedAt: null,
+    enrolledAt: nowDate.toISOString()
+  };
+}
+
+function localCalendarDayFor(date: Date, timeZone?: string): string {
+  if (!timeZone) {
+    return localReviewDay(date.getFullYear(), date.getMonth() + 1, date.getDate());
+  }
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date);
+  return `${datePart(parts, "year")}-${datePart(parts, "month")}-${datePart(parts, "day")}`;
+}
+
 export function reviewDueState(
   review: Pick<ReviewQueueState, "dueDay">,
   now: string | number | Date,

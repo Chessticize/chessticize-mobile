@@ -263,6 +263,9 @@ test("SQLite migration backfills attempt rating keys and replaces superseded ind
 
     const legacyDb = new DatabaseSync(dbPath);
     legacyDb.exec(`
+      DROP INDEX attempts_unclear_completed_at_idx;
+      ALTER TABLE attempts DROP COLUMN unclear_updated_at;
+      ALTER TABLE attempts DROP COLUMN unclear;
       PRAGMA user_version = 1;
       UPDATE attempts SET rating_key = NULL;
       DROP INDEX puzzles_rating_id_idx;

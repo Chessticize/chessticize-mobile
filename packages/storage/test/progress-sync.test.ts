@@ -161,6 +161,54 @@ test("review sync resolves conflicts by last review time and then due day", asyn
   assert.equal(mergeLocalDataExports(local, sameTimeRemote).reviewQueue[0]?.dueDay, "2026-07-12");
 });
 
+test("attempt clarity sync uses the latest action and favors clearing exact timestamp ties", async () => {
+  const service = new PracticeService(await seededMemoryStore());
+  const local = service.exportLocalData();
+  const baseAttempt = {
+    id: "shared-correct-attempt",
+    source: "sprint" as const,
+    sessionId: "shared-session",
+    puzzleId: "00008",
+    mode: "standard" as const,
+    ratingKey: "standard 5/20",
+    result: "correct" as const,
+    submittedMove: "e6e7",
+    expectedMove: "e6e7",
+    startedAt: "2026-07-17T11:59:55.000Z",
+    completedAt: "2026-07-17T12:00:00.000Z",
+    ratingBefore: 600
+  };
+  local.attempts = [{
+    ...baseAttempt,
+    unclear: true,
+    unclearUpdatedAt: "2026-07-17T12:01:00.000Z"
+  }];
+
+  const newerClear = structuredClone(local);
+  newerClear.attempts = [{
+    ...baseAttempt,
+    unclear: false,
+    unclearUpdatedAt: "2026-07-17T12:02:00.000Z"
+  }];
+  assert.deepEqual(mergeLocalDataExports(local, newerClear).attempts[0], newerClear.attempts[0]);
+
+  const tiedClear = structuredClone(local);
+  tiedClear.attempts = [{
+    ...baseAttempt,
+    unclear: false,
+    unclearUpdatedAt: "2026-07-17T12:01:00.000Z"
+  }];
+  assert.deepEqual(mergeLocalDataExports(local, tiedClear).attempts[0], tiedClear.attempts[0]);
+
+  const laterMark = structuredClone(tiedClear);
+  laterMark.attempts = [{
+    ...baseAttempt,
+    unclear: true,
+    unclearUpdatedAt: "2026-07-17T12:03:00.000Z"
+  }];
+  assert.deepEqual(mergeLocalDataExports(tiedClear, laterMark).attempts[0], laterMark.attempts[0]);
+});
+
 test("pack-backed SQLite sync makes remote progress readable when referenced puzzles only exist in the bundled pack", async () => {
   const bundledPuzzleStore = await seededMemoryStore();
   const remoteService = new PracticeService(bundledPuzzleStore);

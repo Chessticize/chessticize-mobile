@@ -153,6 +153,8 @@ export interface AttemptEvent {
   ratingBefore: number;
   ratingAfter?: number;
   arrowDuelCandidateOrder?: string[];
+  unclear?: boolean;
+  unclearUpdatedAt?: string;
 }
 
 export interface SessionMistakeReviewItem {
@@ -175,8 +177,9 @@ export interface ReviewQueueState {
   reviewCount: number;
   successStreak: number;
   lapseCount: number;
-  lastResult: AttemptResult;
-  lastReviewedAt: string;
+  lastResult: AttemptResult | null;
+  lastReviewedAt: string | null;
+  enrolledAt?: string;
 }
 
 export interface ReviewQueueItem {

@@ -87,6 +87,68 @@ describe('Practice POC', () => {
 
   });
 
+  it('persists an unclear sprint attempt and clears it from filtered History', async () => {
+    await selectTestPuzzleSource('familiar15');
+    await startPracticeMode('standard');
+    await waitForVisibleInPracticeScroll('session-board');
+
+    await playBoardMove('session-board', 'c2b1');
+    await waitFor(element(by.id('sprint-unclear-prompt'))).toBeVisible().withTimeout(10000);
+    await element(by.id('sprint-unclear-toggle')).tap();
+    await waitFor(element(by.id('sprint-unclear-toggle')))
+      .toHaveText('Marked unclear · Undo')
+      .withTimeout(10000);
+
+    // Let the normal feedback snapshot advance to the next board. The prompt
+    // remains bound to the completed attempt rather than the newly shown puzzle.
+    await waitForElementTextContaining('sprint-unclear-question', 'previous move', 10000);
+    await element(by.id('session-abandon')).tap();
+    await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(5000);
+    await element(by.id('session-abandon-confirm')).tap();
+    await waitFor(element(by.text('Sprint failed'))).toBeVisible().withTimeout(10000);
+    await expect(element(by.id('sprint-unclear-toggle'))).toHaveText('Marked unclear · Undo');
+
+    // Recreate the process so History reads the marker from SQLite rather than
+    // component state from the sprint that created it.
+    await device.terminateApp();
+    await launchWithDisabledSynchronization({
+      newInstance: true,
+      delete: false
+    });
+    await openStandardHistoryTrend();
+    await waitForElementTextContaining('history-filter-unclear', 'Unclear (1)', 10000);
+    await element(by.id('history-filter-unclear')).tap();
+    await waitFor(element(by.text('Correct move')).atIndex(0)).toExist().withTimeout(10000);
+
+    const resultAttributes = await element(by.text('Correct move')).atIndex(0).getAttributes();
+    const resultIdentifier = (Array.isArray(resultAttributes) ? resultAttributes[0] : resultAttributes).identifier;
+    if (typeof resultIdentifier !== 'string' || !resultIdentifier.endsWith('-result')) {
+      throw new Error(`Could not resolve unclear History row from ${String(resultIdentifier)}`);
+    }
+    await element(by.id(resultIdentifier.replace(/-result$/, ''))).tap();
+    await waitFor(element(by.id('history-attempt-unclear'))).toBeVisible().withTimeout(10000);
+
+    await waitForVisibleInPracticeScroll('history-add-to-review');
+    await element(by.id('history-add-to-review')).tap();
+    await waitFor(element(by.id('history-review-enrollment-status'))).toExist().withTimeout(10000);
+    await waitForVisibleInPracticeScroll('history-attempt-clear-unclear');
+    await element(by.id('history-attempt-clear-unclear')).tap();
+    await waitFor(element(by.id('history-attempt-unclear'))).not.toExist().withTimeout(10000);
+    await element(by.id('practice-main-scroll')).scrollTo('top');
+    await element(by.id('review-exit')).tap();
+    await waitFor(element(by.id('history-empty-state'))).toExist().withTimeout(10000);
+
+    // Clearing is also durable: a fresh process sees no unclear attempt in the
+    // same rating/range scope.
+    await device.terminateApp();
+    await launchWithDisabledSynchronization({
+      newInstance: true,
+      delete: false
+    });
+    await openStandardHistoryTrend();
+    await waitForElementTextContaining('history-filter-unclear', 'Unclear (0)', 10000);
+  });
+
   it('opens last sprint mistake review with navigation and analysis arrows', async () => {
     await failStandardSprint();
     await waitFor(element(by.id('review-mistakes-button'))).toBeVisible().withTimeout(10000);

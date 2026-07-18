@@ -106,6 +106,7 @@ export interface PracticeStore {
   createSprintSession(state: SprintState): void;
   updateSprintSession(state: SprintState): void;
   recordAttempt(attempt: AttemptEvent): void;
+  setAttemptUnclear(attemptId: string, unclear: boolean, updatedAt: string): AttemptHistoryRow;
   listAttempts(filter?: HistoryFilter): AttemptHistoryRow[];
   listSprintSessions(): ExportedSprintSession[];
   exportLocalData(): LocalDataExport;
@@ -113,6 +114,7 @@ export interface PracticeStore {
   clearLocalHistory(): ClearLocalHistoryResult;
   getSessionMistakeReview(sessionId: string): SessionMistakeReviewItem[];
   scheduleMistakeReview(context: ReviewContext, now: string): ReviewQueueState;
+  enrollReview(context: ReviewContext, now: string): ReviewQueueState;
   recordReviewResult(context: ReviewContext, result: AttemptResult, now: string): ReviewQueueState;
   getReviewQueueState(context: ReviewContext): ReviewQueueState | undefined;
   listReviewQueue(): ReviewQueueState[];
@@ -148,7 +150,8 @@ export function normalizeImportedReviewQueueState(
       successStreak: review.successStreak,
       lapseCount: review.lapseCount,
       lastResult: review.lastResult,
-      lastReviewedAt: review.lastReviewedAt
+      lastReviewedAt: review.lastReviewedAt,
+      ...(review.enrolledAt === undefined ? {} : { enrolledAt: review.enrolledAt })
     };
   }
   if (!("dueAt" in review) || !("intervalHours" in review)) {
@@ -164,6 +167,7 @@ export function normalizeImportedReviewQueueState(
     successStreak: review.successStreak,
     lapseCount: review.lapseCount,
     lastResult: review.lastResult,
-    lastReviewedAt: review.lastReviewedAt
+    lastReviewedAt: review.lastReviewedAt,
+    ...(review.enrolledAt === undefined ? {} : { enrolledAt: review.enrolledAt })
   };
 }

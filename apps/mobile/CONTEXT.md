@@ -16,6 +16,14 @@ _Avoid_: Android sync, Google Drive sync
 The local target time after which the mobile operating system may deliver a review notification. It is not a guarantee of exact-minute delivery.
 _Avoid_: Exact reminder time, alarm time
 
+**Unclear Attempt**:
+A correct completed sprint attempt the user marks at completion because they do not yet understand why the move worked. It can later be cleared and remains independent of the Review schedule until the user explicitly adds its puzzle context to Review.
+_Avoid_: Unclear puzzle, mistake, Review item
+
+**Manual Review Enrollment**:
+The user's explicit addition of an exact puzzle, mode, and rating-key context to the Review schedule without implying that an attempt was wrong.
+_Avoid_: Manual mistake, forced review
+
 **Mobile Stockfish Engine**:
 The single bundled Stockfish C++ source tree used by both mobile platforms. Platform-specific iOS and Android bridges adapt that shared engine to the same JavaScript contract without owning separate engine versions.
 _Avoid_: iOS Stockfish, Android Stockfish

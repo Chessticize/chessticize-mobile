@@ -119,6 +119,10 @@ export class PackBackedPracticeStore implements PracticeStore {
     this.userStore.recordAttempt(attempt);
   }
 
+  setAttemptUnclear(attemptId: string, unclear: boolean, updatedAt: string): AttemptHistoryRow {
+    return this.userStore.setAttemptUnclear(attemptId, unclear, updatedAt);
+  }
+
   listAttempts(filter?: HistoryFilter): AttemptHistoryRow[] {
     return this.userStore.listAttempts(filter);
   }
@@ -160,6 +164,10 @@ export class PackBackedPracticeStore implements PracticeStore {
 
   scheduleMistakeReview(context: ReviewContext, now: string): ReviewQueueState {
     return this.userStore.scheduleMistakeReview(context, now);
+  }
+
+  enrollReview(context: ReviewContext, now: string): ReviewQueueState {
+    return this.userStore.enrollReview(context, now);
   }
 
   recordReviewResult(context: ReviewContext, result: AttemptResult, now: string): ReviewQueueState {
@@ -219,6 +227,9 @@ function attemptEventFromHistoryRow(row: AttemptHistoryRow): AttemptEvent {
     completedAt: row.completedAt,
     ratingBefore: row.ratingBefore,
     ...(row.ratingAfter === undefined ? {} : { ratingAfter: row.ratingAfter }),
-    ...(row.arrowDuelCandidateOrder === undefined ? {} : { arrowDuelCandidateOrder: row.arrowDuelCandidateOrder })
+    ...(row.arrowDuelCandidateOrder === undefined ? {} : { arrowDuelCandidateOrder: row.arrowDuelCandidateOrder }),
+    ...(row.unclearUpdatedAt === undefined
+      ? {}
+      : { unclear: Boolean(row.unclear), unclearUpdatedAt: row.unclearUpdatedAt })
   };
 }
