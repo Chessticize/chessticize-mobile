@@ -26,7 +26,7 @@ function runAndroidAdbShell(args, options = {}) {
   try {
     return runShell();
   } catch (error) {
-    if (isAdbDeviceOffline(error)) {
+    if (isAdbDeviceOffline(error) && !isAdbShellTimeout(error)) {
       const waitTimeout = recoveryTimeout(
         timeoutRecoveryDeadlineMs,
         now,

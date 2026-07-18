@@ -116,6 +116,46 @@ describe('Android E2E shell transport', () => {
     ]);
   });
 
+  it('requires the responsiveness probe when a timeout also reports device offline', () => {
+    const timeout = timedOutShellError();
+    timeout.stderr = 'adb: device offline\n';
+    const exec = jest
+      .fn()
+      .mockImplementationOnce(() => { throw timeout; })
+      .mockReturnValueOnce('')
+      .mockReturnValueOnce('chessticize-adb-shell-ready\n')
+      .mockReturnValueOnce('notification-state\n');
+
+    const output = runAndroidAdbShell(['dumpsys', 'notification', '--noredact'], {
+      environment,
+      execFileSync: exec,
+      now: () => 10_000,
+      shellTimeoutMs: 5_000,
+      timeoutRecoveryDeadlineMs: 20_000,
+    });
+
+    expect(output).toBe('notification-state\n');
+    expect(exec.mock.calls.map(([, args]) => args)).toEqual([
+      ['-s', 'emulator-5554', 'shell', 'dumpsys', 'notification', '--noredact'],
+      ['-s', 'emulator-5554', 'wait-for-device'],
+      ['-s', 'emulator-5554', 'shell', 'echo', 'chessticize-adb-shell-ready'],
+      ['-s', 'emulator-5554', 'shell', 'dumpsys', 'notification', '--noredact'],
+    ]);
+  });
+
+  it('does not downgrade a timeout with offline stderr when recovery has no deadline', () => {
+    const timeout = timedOutShellError();
+    timeout.stderr = 'adb: device offline\n';
+    const exec = jest.fn(() => { throw timeout; });
+
+    expect(() => runAndroidAdbShell(['dumpsys', 'notification', '--noredact'], {
+      environment,
+      execFileSync: exec,
+      shellTimeoutMs: 5_000,
+    })).toThrow(timeout);
+    expect(exec).toHaveBeenCalledTimes(1);
+  });
+
   it('preserves the second timeout when the retried shell query still hangs', () => {
     const firstTimeout = timedOutShellError();
     const secondTimeout = timedOutShellError();
