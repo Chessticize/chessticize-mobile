@@ -17,6 +17,7 @@ const {
   waitForAndroidUiState,
 } = require('./androidPublicUiEvidence');
 const {
+  expectBoardScreenshotContainsPieces,
   expectFrameContained,
   waitForBoardScreenshotContainsPieces,
 } = require('./screenshotAssertions');
@@ -57,7 +58,7 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
       if (rotatedPuzzleID !== puzzleID) {
         throw new Error(`Rotation replaced the active puzzle: ${puzzleID} -> ${rotatedPuzzleID}`);
       }
-      await captureSprint('landscape');
+      await captureSprint('landscape', { waitForPieces: true });
     }
 
     const needsPortraitRestore = includeLandscape || initialOrientation === 'landscape';
@@ -131,19 +132,26 @@ async function captureHome(orientation) {
   await device.takeScreenshot(`${deviceLabel}-${orientation}-home`);
 }
 
-async function captureSprint(orientation) {
+async function captureSprint(orientation, { waitForPieces = false } = {}) {
   const screenFrame = await frameFor(element(by.id('adaptive-layout')));
   const layoutFrame = await frameForIfPresent('active-session-adaptive-layout') ?? screenFrame;
   const boardFrame = await frameFor(element(by.id('session-board')));
   expectOrientationFrame(screenFrame, orientation);
   expectFrameContained(boardFrame, layoutFrame, `${deviceLabel} ${orientation} session board`);
 
-  await waitForBoardScreenshotContainsPieces({
-    boardFrame,
-    captureScreenshot: (label) => device.takeScreenshot(label),
-    screenFrame,
-    screenshotLabel: `${deviceLabel}-${orientation}-standard-sprint`,
-  });
+  const screenshotLabel = `${deviceLabel}-${orientation}-standard-sprint`;
+  if (waitForPieces) {
+    await waitForBoardScreenshotContainsPieces({
+      boardFrame,
+      captureScreenshot: (label) => device.takeScreenshot(label),
+      screenFrame,
+      screenshotLabel,
+    });
+    return;
+  }
+
+  const screenshotPath = await device.takeScreenshot(screenshotLabel);
+  expectBoardScreenshotContainsPieces(screenshotPath, boardFrame, screenFrame);
 }
 
 async function launchForOrientation(orientation) {

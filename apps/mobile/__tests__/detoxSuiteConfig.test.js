@@ -1319,7 +1319,10 @@ describe('Detox suite configuration', () => {
       "waitForSettledSprintLayout('landscape')",
       requestLandscape
     );
-    const captureLandscape = spec.indexOf("captureSprint('landscape')", requestLandscape);
+    const captureLandscape = spec.indexOf(
+      "captureSprint('landscape', { waitForPieces: true })",
+      requestLandscape
+    );
     const settledLayoutHelperStart = spec.indexOf('async function waitForSettledSprintLayout');
     const settledLayoutHelperEnd = spec.indexOf('async function waitForHomeTopFrame', settledLayoutHelperStart);
     const settledLayoutHelper = spec.slice(settledLayoutHelperStart, settledLayoutHelperEnd);
@@ -1340,9 +1343,13 @@ describe('Detox suite configuration', () => {
     expect(spec).toContain('Timed out waiting for ${orientation} layout');
     expect(spec).toContain('Timed out waiting for ${orientation} session layout geometry');
     expect(spec).toContain('last observed frames=${JSON.stringify(lastFrames)}');
+    expect(spec).toContain('await captureSprint(initialOrientation);');
+    expect(spec).toContain("await captureSprint('landscape', { waitForPieces: true });");
+    expect(spec).toContain('async function captureSprint(orientation, { waitForPieces = false } = {})');
+    expect(spec).toContain('if (waitForPieces) {');
     expect(spec).toContain('await waitForBoardScreenshotContainsPieces({');
     expect(spec).toContain('captureScreenshot: (label) => device.takeScreenshot(label)');
-    expect(spec).not.toContain('expectBoardScreenshotContainsPieces');
+    expect(spec).toContain('expectBoardScreenshotContainsPieces(screenshotPath, boardFrame, screenFrame);');
     expect(spec).not.toContain('await sleep(5000)');
     expect(settledLayoutHelper).toContain("frameForIfPresent('active-session-adaptive-layout')");
     expect(settledLayoutHelper).toContain("frameFor(element(by.id('session-board')))");

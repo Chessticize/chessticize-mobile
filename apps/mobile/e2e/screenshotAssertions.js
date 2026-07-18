@@ -34,31 +34,122 @@ async function waitForBoardScreenshotContainsPieces({
   inspectScreenshot = expectBoardScreenshotContainsPieces,
   now = Date.now,
   pollIntervalMs = 250,
+  cancelTimeout = clearTimeout,
+  scheduleTimeout = setTimeout,
   timeoutMs = 5000,
 } = {}) {
-  const startedAt = now();
+  const deadline = now() + timeoutMs;
+  let latestReadinessFailure = null;
 
   while (true) {
-    const screenshotPath = await captureScreenshot(screenshotLabel);
-    try {
-      inspectScreenshot(screenshotPath, boardFrame, screenFrame);
-      return screenshotPath;
-    } catch (error) {
-      if (!(error instanceof BoardScreenshotPiecesError)) {
-        throw error;
-      }
+    const captureOutcome = await settleBeforeDeadline(
+      () => captureScreenshot(screenshotLabel),
+      {cancelTimeout, deadline, now, scheduleTimeout}
+    );
+    if (captureOutcome.status === 'timed-out') {
+      const completedCapture = captureOutcome.completed;
+      const captureDiagnostic = completedCapture?.status === 'fulfilled'
+        ? readinessDiagnostic(
+          'Screenshot capture completed after the deadline',
+          completedCapture.value
+        )
+        : readinessDiagnostic('Screenshot capture did not complete before the deadline', '<pending>');
+      throw boardScreenshotTimeoutError(
+        timeoutMs,
+        latestReadinessFailure ?? captureDiagnostic
+      );
+    }
+    if (captureOutcome.status === 'rejected') {
+      throw captureOutcome.error;
+    }
 
-      const elapsedMs = now() - startedAt;
-      if (elapsedMs >= timeoutMs) {
-        throw new Error(
-          `Timed out waiting for rendered chess pieces after ${timeoutMs}ms; `
-          + `latest=${error.message}; screenshot=${screenshotPath}`
+    const screenshotPath = captureOutcome.value;
+    const inspectionOutcome = await settleBeforeDeadline(
+      () => inspectScreenshot(screenshotPath, boardFrame, screenFrame),
+      {cancelTimeout, deadline, now, scheduleTimeout}
+    );
+    if (inspectionOutcome.status === 'timed-out') {
+      const completedInspection = inspectionOutcome.completed;
+      const inspectionDiagnostic = completedInspection?.status === 'rejected'
+        && completedInspection.error instanceof BoardScreenshotPiecesError
+        ? readinessDiagnostic(completedInspection.error.message, screenshotPath)
+        : latestReadinessFailure ?? readinessDiagnostic(
+          completedInspection?.status === 'fulfilled'
+            ? 'Screenshot inspection completed after the deadline'
+            : 'Screenshot inspection did not complete before the deadline',
+          screenshotPath
         );
-      }
+      throw boardScreenshotTimeoutError(
+        timeoutMs,
+        inspectionDiagnostic
+      );
+    }
+    if (inspectionOutcome.status === 'fulfilled') {
+      return screenshotPath;
+    }
 
-      await delay(Math.min(pollIntervalMs, timeoutMs - elapsedMs));
+    const error = inspectionOutcome.error;
+    if (!(error instanceof BoardScreenshotPiecesError)) {
+      throw error;
+    }
+
+    latestReadinessFailure = readinessDiagnostic(error.message, screenshotPath);
+    const remainingMs = deadline - now();
+    if (remainingMs <= 0) {
+      throw boardScreenshotTimeoutError(timeoutMs, latestReadinessFailure);
+    }
+
+    await delay(Math.min(pollIntervalMs, remainingMs));
+  }
+}
+
+async function settleBeforeDeadline(operation, {
+  cancelTimeout,
+  deadline,
+  now,
+  scheduleTimeout,
+}) {
+  const remainingMs = deadline - now();
+  if (remainingMs <= 0) {
+    return {status: 'timed-out'};
+  }
+
+  // Turn rejection into a settled value before racing so a rejection that
+  // arrives after the deadline is still observed and cannot leak unhandled.
+  const operationOutcome = Promise.resolve()
+    .then(operation)
+    .then(
+      (value) => ({status: 'fulfilled', value}),
+      (error) => ({status: 'rejected', error})
+    );
+  let timeoutHandle;
+  const timeoutOutcome = new Promise((resolve) => {
+    timeoutHandle = scheduleTimeout(
+      () => resolve({status: 'timed-out'}),
+      remainingMs
+    );
+  });
+  const outcome = await Promise.race([operationOutcome, timeoutOutcome]);
+
+  if (outcome.status !== 'timed-out') {
+    cancelTimeout(timeoutHandle);
+    if (now() >= deadline) {
+      return {completed: outcome, status: 'timed-out'};
     }
   }
+
+  return outcome;
+}
+
+function readinessDiagnostic(message, screenshotPath) {
+  return {message, screenshotPath};
+}
+
+function boardScreenshotTimeoutError(timeoutMs, diagnostic) {
+  return new Error(
+    `Timed out waiting for rendered chess pieces after ${timeoutMs}ms; `
+    + `latest=${diagnostic.message}; screenshot=${diagnostic.screenshotPath}`
+  );
 }
 
 function wait(milliseconds) {
