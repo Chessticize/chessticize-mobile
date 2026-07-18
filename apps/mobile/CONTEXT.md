@@ -21,11 +21,11 @@ A correct completed sprint attempt the user marks at completion because they do 
 _Avoid_: Unclear puzzle, mistake, Review item
 
 **Manual Review Enrollment**:
-The user's explicit addition of an exact puzzle, mode, and rating-key context from a Review-owned session without implying that an attempt was wrong.
+The user's explicit addition of an exact puzzle, mode, and rating-key context from a Review-owned session or a History replay without implying that an attempt was wrong. When an Unclear History attempt initiates enrollment, the same atomic operation clears only that attempt's Unclear marker.
 _Avoid_: Manual mistake, forced review
 
 **Review Schedule Control**:
-The two-state product affordance shown only inside a Review-owned session; it displays whether that exact Review Context is scheduled and lets the user manually enroll it or remove its existing Review Schedule. Manual enrollment acts immediately, while removal requires confirmation. Practice, Sprint Result, and History do not expose this control.
+The two-state product affordance shown inside a Review-owned session or a History replay; it displays whether that exact Review Context is scheduled and lets the user manually enroll it or remove its existing Review Schedule. Manual enrollment acts immediately, while removal requires confirmation. Active Practice and Sprint Result do not expose this control.
 _Avoid_: Review toggle, Review checkbox
 
 **Review Due Label**:

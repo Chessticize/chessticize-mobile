@@ -1640,7 +1640,18 @@ export function PracticePocScreen({
     }
   }
 
-  function reviewScheduleChanged(): void {
+  function reviewScheduleChanged(clearedAttemptId?: string): void {
+    if (clearedAttemptId) {
+      const updated = service.listHistory().find((attempt) => attempt.id === clearedAttemptId);
+      if (updated) {
+        setHistoryReviewEntries((entries) => entries.map((entry) => entry.attempt?.id === clearedAttemptId
+          ? { ...entry, attempt: withAttemptClarity(entry.attempt, updated) }
+          : entry));
+        setHistoryUnavailableAttempt((current) => current?.attempt.id === clearedAttemptId
+          ? { ...current, attempt: withAttemptClarity(current.attempt, updated) }
+          : current);
+      }
+    }
     refreshState();
   }
 
@@ -2663,9 +2674,12 @@ export function PracticePocScreen({
                 <HistoryAttemptReplayUnavailable
                   adaptiveLayout={adaptiveLayout}
                   attempt={historyUnavailableAttempt.attempt}
+                  currentTimeMs={currentTimeMs}
                   replayAvailability={historyUnavailableAttempt.replayAvailability}
                   onClearUnclear={() => clearHistoryAttemptUnclear(historyUnavailableAttempt.attempt.id)}
+                  onReviewChanged={reviewScheduleChanged}
                   onReturn={() => setHistoryUnavailableAttempt(null)}
+                  service={service}
                 />
               ) : historyReviewEntries.length > 0 ? (
                 <ReviewSession
@@ -2681,7 +2695,9 @@ export function PracticePocScreen({
                   onAnalysisActiveChange={setReviewAnalysisOpen}
                   onAttemptClearUnclear={clearHistoryAttemptUnclear}
                   onComplete={() => setHistoryReviewEntries([])}
+                  onReviewEnrollmentChanged={reviewScheduleChanged}
                   onReturnToOwner={() => setHistoryReviewEntries([])}
+                  reviewScheduleControlVisible
                   stockfish={stockfish}
                 />
               ) : historyView ? (
@@ -6660,7 +6676,7 @@ function ReviewSession({
   onAnalysisActiveChange?: (active: boolean) => void;
   onAttemptClearUnclear?: (attemptId: string) => void;
   onComplete: (source: ReviewEntry["source"]) => void;
-  onReviewEnrollmentChanged?: () => void;
+  onReviewEnrollmentChanged?: (clearedAttemptId?: string) => void;
   onReturnToOwner: (source: ReviewEntry["source"]) => void;
   reviewScheduleControlVisible?: boolean;
   scheduledReviewCompletedCount?: number;
@@ -7358,15 +7374,14 @@ function ReviewSession({
             ) : null}
           </View>
           <View style={styles.iconButtonRow} testID="review-header-actions">
-          <AccessibleMoveControls
-            allowedMoves={reviewState.kind === "arrow_duel" && !analysisEnabled
-              ? reviewState.duel.candidates
-              : undefined}
-            disabled={!boardGestureEnabled}
-            fen={displayFen}
-            testIDPrefix="review"
-            onSelect={playAccessibleReviewMove}
-          />
+          {currentEntry.mode !== "arrow_duel" ? (
+            <AccessibleMoveControls
+              disabled={!boardGestureEnabled}
+              fen={displayFen}
+              testIDPrefix="review"
+              onSelect={playAccessibleReviewMove}
+            />
+          ) : null}
           {currentEntry.source === "session" || currentEntry.source === "history" ? (
             <>
               <Pressable
@@ -7429,15 +7444,6 @@ function ReviewSession({
           ) : null}
         </View>
       </View>
-
-      {currentEntry.source === "history" && currentEntry.attempt ? (
-        <HistoryAttemptDetailCard
-          attempt={currentEntry.attempt}
-          onClearUnclear={currentEntry.attempt.unclear && onAttemptClearUnclear
-            ? () => onAttemptClearUnclear(currentEntry.attempt!.id)
-            : undefined}
-        />
-      ) : null}
 
       <View style={[styles.reviewBoardLayout, adaptiveLayout.usesSessionRail ? styles.reviewBoardLayoutWide : null]}>
         <View style={styles.reviewBoardLane} testID="review-board-lane">
@@ -7676,6 +7682,9 @@ function ReviewSession({
             ratingKey: currentEntry.ratingKey
           }}
           currentTimeMs={currentTimeMs}
+          initiatingAttemptId={currentEntry.source === "history" && currentEntry.attempt?.unclear
+            ? currentEntry.attempt.id
+            : undefined}
           service={service}
           onReviewChanged={onReviewEnrollmentChanged}
           onRemoved={currentEntry.source === "due" && !reviewResultRecorded
@@ -7683,6 +7692,9 @@ function ReviewSession({
             : undefined}
           refreshToken={reviewResultRecorded}
         />
+      ) : null}
+      {currentEntry.source === "history" && currentEntry.attempt?.unclear && onAttemptClearUnclear ? (
+        <HistoryUnclearAction onClear={() => onAttemptClearUnclear(currentEntry.attempt!.id)} />
       ) : null}
     </View>
   );
@@ -7692,6 +7704,7 @@ function ReviewScheduleControl({
   compact = false,
   context,
   currentTimeMs,
+  initiatingAttemptId,
   onReviewChanged,
   onRemoved,
   refreshToken,
@@ -7700,7 +7713,8 @@ function ReviewScheduleControl({
   compact?: boolean;
   context: ReviewContext;
   currentTimeMs: () => number;
-  onReviewChanged?: () => void;
+  initiatingAttemptId?: string;
+  onReviewChanged?: (clearedAttemptId?: string) => void;
   onRemoved?: () => void;
   refreshToken?: unknown;
   service: PracticeService;
@@ -7721,9 +7735,13 @@ function ReviewScheduleControl({
   function addToReview(): void {
     setFailure(null);
     try {
-      const enrolled = service.enrollReview(context, new Date(currentTimeMs()).toISOString());
+      const enrolled = service.enrollReview(
+        context,
+        new Date(currentTimeMs()).toISOString(),
+        initiatingAttemptId
+      );
       setReview(enrolled);
-      onReviewChanged?.();
+      onReviewChanged?.(initiatingAttemptId);
     } catch {
       setFailure("Couldn't add to Review. Try again.");
     }
@@ -7814,16 +7832,23 @@ function ReviewScheduleControl({
 function HistoryAttemptReplayUnavailable({
   adaptiveLayout,
   attempt,
+  currentTimeMs,
   onClearUnclear,
+  onReviewChanged,
   onReturn,
-  replayAvailability
+  replayAvailability,
+  service
 }: {
   adaptiveLayout: AdaptiveLayout;
   attempt: HistoryAttemptView;
+  currentTimeMs: () => number;
   onClearUnclear: () => void;
+  onReviewChanged: (clearedAttemptId?: string) => void;
   onReturn: () => void;
   replayAvailability: Extract<HistoryAttemptReplayAvailability, { status: "unavailable" }>;
+  service: PracticeService;
 }): React.JSX.Element {
+  const reviewContext = reviewContextForHistoryAttempt(attempt);
   return (
     <View
       style={[styles.reviewSessionPanel, adaptiveLayout.usesWideContent ? styles.reviewSessionPanelWide : null]}
@@ -7842,125 +7867,65 @@ function HistoryAttemptReplayUnavailable({
           </Pressable>
           <View style={styles.reviewTitleBlock}>
             <Text style={styles.panelTitle}>History</Text>
-            <Text style={styles.helperText}>Attempt details only</Text>
+            <Text style={styles.helperText}>Replay unavailable</Text>
           </View>
         </View>
       </View>
-      <HistoryAttemptDetailCard
-        attempt={attempt}
-        replayAvailability={replayAvailability}
-        {...(attempt.unclear ? { onClearUnclear } : {})}
-      />
+      <Text style={styles.errorText} testID="history-replay-unavailable">
+        {historyReplayUnavailableMessage(replayAvailability)}
+      </Text>
+      {reviewContext ? (
+        <ReviewScheduleControl
+          context={reviewContext}
+          currentTimeMs={currentTimeMs}
+          initiatingAttemptId={attempt.unclear ? attempt.id : undefined}
+          onReviewChanged={onReviewChanged}
+          service={service}
+        />
+      ) : null}
+      {attempt.unclear ? <HistoryUnclearAction onClear={onClearUnclear} /> : null}
     </View>
   );
 }
 
-function HistoryAttemptDetailCard({
-  attempt,
-  onClearUnclear,
-  replayAvailability
-}: {
-  attempt: AttemptEvent | HistoryAttemptView;
-  onClearUnclear?: () => void;
-  replayAvailability?: HistoryAttemptReplayAvailability;
-}): React.JSX.Element {
-  const detail = normalizeHistoryAttemptDetail(attempt);
-  const arrowCandidatesUnavailable = detail.arrowDuelCandidateOrderStatus === "corrupt" ||
-    (replayAvailability?.status === "unavailable" && replayAvailability.reason === "arrow-candidates-unavailable");
-  const replayUnavailableMessage = replayAvailability?.status === "unavailable"
-    ? replayAvailability.reason === "arrow-candidates-unavailable"
-      ? "Original Arrow Duel candidates are unavailable, so this attempt cannot be replayed safely."
-      : replayAvailability.reason === "puzzle-unavailable"
-        ? "This puzzle is no longer available on this device, so the attempt cannot be replayed."
-        : "The saved mode or rating context is invalid, so this attempt cannot be replayed safely."
-    : null;
-  const sourceLabel = historyAttemptSourceLabel(detail.source);
-  const resultLabel = detail.result === "wrong"
-    ? "Wrong move"
-    : detail.result === "correct"
-      ? "Correct"
-      : "Result unavailable";
-  const timingLabel = detail.completedAt
-    ? `${formatLocalCalendarDate(detail.completedAt)} · ${detail.elapsedSeconds === null ? "Duration unavailable" : `${detail.elapsedSeconds}s`}`
-    : "Date and duration unavailable";
-  const movesLabel = detail.submittedMove && detail.expectedMove
-    ? `Played ${detail.submittedMove} · Best ${detail.expectedMove}`
-    : "Moves unavailable";
-  const ratingLabel = detail.ratingBefore === null
-    ? "Rating unavailable"
-    : detail.ratingAfterStatus === "invalid"
-      ? `Rating ${detail.ratingBefore} · Rating change unavailable`
-      : detail.ratingAfterStatus === "absent" || detail.ratingDelta === null
-      ? `Rating ${detail.ratingBefore} · No run change`
-      : `Rating ${detail.ratingBefore} → ${detail.ratingAfter} · ${detail.ratingDelta > 0 ? "+" : ""}${detail.ratingDelta}`;
-  const ratingKeyLabel = detail.ratingKey === null
-    ? "Rating bucket unavailable"
-    : historyRatingKeyLabel(detail.ratingKey);
-
+function HistoryUnclearAction({ onClear }: { onClear: () => void }): React.JSX.Element {
   return (
-    <View style={styles.historyPerformanceCard} testID="history-attempt-detail">
-      {attempt.unclear ? (
-        <View
-          accessibilityLabel="This attempt is marked unclear"
-          style={styles.historyAttemptUnclearBanner}
-          testID="history-attempt-unclear"
-        >
-          <View style={styles.historyAttemptUnclearCopy}>
-            <Text style={styles.historyAttemptUnclearTitle}>Marked as unclear</Text>
-          </View>
-          {onClearUnclear ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Clear unclear mark"
-              style={styles.historyAttemptClearButton}
-              testID="history-attempt-clear-unclear"
-              onPress={onClearUnclear}
-            >
-              <Text style={styles.historyAttemptClearButtonText}>Clear</Text>
-            </Pressable>
-          ) : null}
-        </View>
-      ) : null}
-      <View style={styles.historyPerformanceHeader}>
-        <View style={styles.historyAttemptCopy}>
-          <Text style={styles.panelTitle} testID="history-attempt-detail-title">Attempt</Text>
-          <Text style={styles.helperText} testID="history-attempt-detail-context">
-            {historyAttemptModeLabel(detail.mode)} · {sourceLabel}
-          </Text>
-        </View>
-        <Text
-          accessibilityLabel={`Result ${resultLabel}`}
-          style={[
-            styles.historyReviewState,
-            detail.result === "wrong" ? styles.errorText : detail.result === "correct" ? styles.positive : styles.helperText
-          ]}
-          testID="history-attempt-detail-result"
-        >
-          {resultLabel}
-        </Text>
+    <View
+      accessibilityLabel="This attempt is marked unclear"
+      style={styles.historyAttemptUnclearBanner}
+      testID="history-attempt-unclear"
+    >
+      <View style={styles.historyAttemptUnclearCopy}>
+        <Text style={styles.historyAttemptUnclearTitle}>Marked as unclear</Text>
       </View>
-      <Text
-        accessibilityLabel={detail.ratingKey === null ? "Rating bucket unavailable" : `Rating bucket ${detail.ratingKey}`}
-        style={styles.helperText}
-        testID="history-attempt-detail-rating-key"
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Clear unclear mark"
+        style={styles.historyAttemptClearButton}
+        testID="history-attempt-clear-unclear"
+        onPress={onClear}
       >
-        {ratingKeyLabel}
-      </Text>
-      <Text style={styles.listText} testID="history-attempt-detail-moves">{movesLabel}</Text>
-      <Text style={styles.helperText} testID="history-attempt-detail-timing">{timingLabel}</Text>
-      <Text style={styles.helperText} testID="history-attempt-detail-rating">{ratingLabel}</Text>
-      {detail.dataStatus === "partial" || arrowCandidatesUnavailable ? (
-        <Text style={styles.errorText} testID="history-attempt-detail-partial">
-          Some attempt details are unavailable.
-        </Text>
-      ) : null}
-      {replayUnavailableMessage ? (
-        <Text style={styles.errorText} testID="history-attempt-detail-replay-unavailable">
-          {replayUnavailableMessage}
-        </Text>
-      ) : null}
+        <Text style={styles.historyAttemptClearButtonText}>Clear</Text>
+      </Pressable>
     </View>
   );
+}
+
+function reviewContextForHistoryAttempt(attempt: AttemptEvent | HistoryAttemptView): ReviewContext | null {
+  const detail = normalizeHistoryAttemptDetail(attempt);
+  return detail.mode && detail.ratingKey && attempt.puzzleId
+    ? { puzzleId: attempt.puzzleId, mode: detail.mode, ratingKey: detail.ratingKey }
+    : null;
+}
+
+function historyReplayUnavailableMessage(
+  replayAvailability: Extract<HistoryAttemptReplayAvailability, { status: "unavailable" }>
+): string {
+  return replayAvailability.reason === "arrow-candidates-unavailable"
+    ? "Original Arrow Duel candidates are unavailable, so this attempt cannot be replayed safely."
+    : replayAvailability.reason === "puzzle-unavailable"
+      ? "This puzzle is no longer available on this device, so the attempt cannot be replayed."
+      : "The saved mode or rating context is invalid, so this attempt cannot be replayed safely.";
 }
 
 function formatAnalysisLineMoveLabel(line: ReviewAnalysisLine, index: number): string {

@@ -1223,7 +1223,7 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "review-board").props.accessibilityRole).toBe("image");
     expect(findByTestId(renderer, "review-announcement").props.accessibilityLiveRegion).toBe("polite");
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-result"))).toBe("Wrong move");
+    expect(() => findByTestId(renderer, "history-attempt-detail")).toThrow();
     const reviewRecordsBeforeAnalysis = {
       dueItems: service.getDueReviewItems(now),
       history: service.listHistory(),
@@ -1271,7 +1271,7 @@ describe("PracticePocScreen", () => {
       `Analysis Local hint. ${expectedAnalysisSide} to move. Last move ${legalAnalysisMoveFrom} to ${legalAnalysisMoveTo}.`
     );
     expect(findByTestId(renderer, "review-announcement").props.accessibilityLabel).not.toBe(announcementBeforeMove);
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-result"))).toBe("Wrong move");
+    expect(() => findByTestId(renderer, "history-attempt-detail")).toThrow();
     expect({
       dueItems: service.getDueReviewItems(now),
       history: service.listHistory(),
@@ -3191,17 +3191,29 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Unclear");
 
     press(renderer, "history-attempt-unclear-history-attempt");
-    expect(findByTestId(renderer, "history-attempt-unclear")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-title"))).toBe("Attempt");
+    expect(findByTestId(renderer, "review-board")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-detail")).toThrow();
     expect(collectText(findByTestId(renderer, "history-attempt-unclear"))).toContain("Marked as unclear");
+    expect(findByTestId(renderer, "history-attempt-clear-unclear")).toBeTruthy();
+    expect(testIdOrder(renderer, "review-schedule-control", "history-attempt-unclear")).toBeLessThan(0);
     expect(() => findByTestId(renderer, "bookmark-glyph")).toThrow();
-    expect(() => findByTestId(renderer, "review-schedule-control")).toThrow();
+    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Not scheduled for Review");
+    expect(collectText(findByTestId(renderer, "review-schedule-add"))).toBe("Add to Review");
     expect(service.listHistory()).toHaveLength(1);
     expect((service.listHistory() as AttemptEvent[])[0]).toMatchObject({ unclear: true });
 
+    press(renderer, "review-schedule-add");
+    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Due tomorrow");
+    expect(() => findByTestId(renderer, "history-attempt-unclear")).toThrow();
+    expect((service.listHistory() as AttemptEvent[])[0]).toMatchObject({ unclear: false });
+
+    press(renderer, "review-schedule-remove");
+    press(renderer, "review-schedule-removal-confirm");
+    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Not scheduled for Review");
+
     press(renderer, "review-exit");
     expect(findByTestId(renderer, "history-filter-unclear").props.accessibilityState).toEqual({ checked: true });
-    expect(findByTestId(renderer, "history-attempt-unclear-history-attempt")).toBeTruthy();
+    expect(findByTestId(renderer, "history-empty-state")).toBeTruthy();
   });
 
   it("keeps Review Schedule removal failures unchanged and retryable inside Review", () => {
@@ -3454,7 +3466,7 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "history-attempt-run-scored-attempt-review-due")).toThrow();
   });
 
-  it("inspects the exact attempt before starting analysis and normalizes partial fields", () => {
+  it("opens replayable History attempts without a detail panel and explains unavailable replays", () => {
     const store = new MemoryStore();
     store.seedPuzzles([sharedHistoryPuzzle()]);
     store.recordAttempt({
@@ -3540,16 +3552,8 @@ describe("PracticePocScreen", () => {
     press(renderer, "history-source-all");
     press(renderer, "history-attempt-custom-detail-attempt");
 
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-title"))).toBe("Attempt");
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-context"))).toBe("Custom · Sprint");
-    expect(findByTestId(renderer, "history-attempt-detail-rating-key").props.accessibilityLabel).toBe(
-      "Rating bucket hangingPiece custom 5/20"
-    );
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-result"))).toBe("Wrong move");
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-timing"))).toBe("Jun 20, 2026 · 15s");
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-moves"))).toBe("Played e2e4 · Best e2e3");
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-rating"))).toBe("Rating 600 → 584 · -16");
-    expect(() => findByTestId(renderer, "history-attempt-detail-partial")).toThrow();
+    expect(() => findByTestId(renderer, "history-attempt-detail")).toThrow();
+    expect(findByTestId(renderer, "review-board")).toBeTruthy();
     expect(findByTestId(renderer, "review-analysis-button")).toBeTruthy();
     expect(() => findByTestId(renderer, "review-close-analysis")).toThrow();
 
@@ -3562,15 +3566,8 @@ describe("PracticePocScreen", () => {
     );
     press(renderer, "history-attempt-partial-detail-attempt");
 
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-context"))).toBe("Standard · Sprint");
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-timing"))).toBe("Jun 20, 2026 · Duration unavailable");
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-moves"))).toBe("Moves unavailable");
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-rating"))).toBe(
-      "Rating 600 · Rating change unavailable"
-    );
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-partial"))).toBe(
-      "Some attempt details are unavailable."
-    );
+    expect(() => findByTestId(renderer, "history-attempt-detail")).toThrow();
+    expect(findByTestId(renderer, "review-board")).toBeTruthy();
 
     press(renderer, "review-exit");
     expect(collectText(findByTestId(renderer, "history-attempt-malformed-context-attempt-result"))).toBe(
@@ -3580,14 +3577,8 @@ describe("PracticePocScreen", () => {
       "Unknown source"
     );
     press(renderer, "history-attempt-malformed-context-attempt");
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-context"))).toBe(
-      "Unknown mode · Unknown source"
-    );
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-rating-key"))).toBe(
-      "Rating bucket unavailable"
-    );
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-result"))).toBe("Result unavailable");
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-replay-unavailable"))).toBe(
+    expect(() => findByTestId(renderer, "history-attempt-detail")).toThrow();
+    expect(collectText(findByTestId(renderer, "history-replay-unavailable"))).toBe(
       "The saved mode or rating context is invalid, so this attempt cannot be replayed safely."
     );
     expect(() => findByTestId(renderer, "review-board")).toThrow();
@@ -3597,25 +3588,28 @@ describe("PracticePocScreen", () => {
     expect(systemBack.invoke()).toBe(true);
     expect(findByTestId(renderer, "history-panel")).toBeTruthy();
     press(renderer, "history-attempt-corrupt-arrow-attempt");
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-replay-unavailable"))).toBe(
+    expect(() => findByTestId(renderer, "history-attempt-detail")).toThrow();
+    expect(collectText(findByTestId(renderer, "history-replay-unavailable"))).toBe(
       "Original Arrow Duel candidates are unavailable, so this attempt cannot be replayed safely."
     );
     expect(() => findByTestId(renderer, "review-board")).toThrow();
     expect(() => findByTestId(renderer, "review-analysis-button")).toThrow();
-    expect(() => findByTestId(renderer, "review-schedule-control")).toThrow();
+    expect(findByTestId(renderer, "review-schedule-control")).toBeTruthy();
     expect(systemBack.invoke()).toBe(true);
     expect(findByTestId(renderer, "history-panel")).toBeTruthy();
     press(renderer, "history-attempt-semantic-corrupt-arrow-attempt");
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-replay-unavailable"))).toBe(
+    expect(() => findByTestId(renderer, "history-attempt-detail")).toThrow();
+    expect(collectText(findByTestId(renderer, "history-replay-unavailable"))).toBe(
       "Original Arrow Duel candidates are unavailable, so this attempt cannot be replayed safely."
     );
     expect(() => findByTestId(renderer, "review-board")).toThrow();
     expect(() => findByTestId(renderer, "review-analysis-button")).toThrow();
+    expect(findByTestId(renderer, "review-schedule-control")).toBeTruthy();
     expect(systemBack.invoke()).toBe(true);
     expect(findByTestId(renderer, "history-panel")).toBeTruthy();
   });
 
-  it("keeps malformed persisted rating keys out of History buckets while preserving readable detail", () => {
+  it("keeps malformed persisted rating keys out of History buckets and shows only replay feedback", () => {
     const store = new MemoryStore();
     store.seedPuzzles([sharedHistoryPuzzle()]);
     store.recordAttempt({
@@ -3643,12 +3637,9 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-attempt-malformed-rating-key-attempt")).toBeTruthy();
 
     press(renderer, "history-attempt-malformed-rating-key-attempt");
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-rating-key"))).toBe(
-      "Rating bucket unavailable"
-    );
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-moves"))).toBe("Played e2e4 · Best e2e3");
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-partial"))).toBe(
-      "Some attempt details are unavailable."
+    expect(() => findByTestId(renderer, "history-attempt-detail")).toThrow();
+    expect(collectText(findByTestId(renderer, "history-replay-unavailable"))).toBe(
+      "The saved mode or rating context is invalid, so this attempt cannot be replayed safely."
     );
   });
 
@@ -3670,7 +3661,8 @@ describe("PracticePocScreen", () => {
     press(firstRenderer, "history-rating-standard 5/20");
     press(firstRenderer, "history-filter-wrong-only");
     press(firstRenderer, "history-attempt-process-local-filter-attempt");
-    expect(findByTestId(firstRenderer, "history-attempt-detail")).toBeTruthy();
+    expect(findByTestId(firstRenderer, "review-board")).toBeTruthy();
+    expect(() => findByTestId(firstRenderer, "history-attempt-detail")).toThrow();
 
     expect(firstSystemBack.invoke()).toBe(true);
     expect(findByTestId(firstRenderer, "history-panel")).toBeTruthy();
@@ -3752,6 +3744,8 @@ describe("PracticePocScreen", () => {
 
     expectText(renderer, "1 / 1 · Arrow Duel");
     expect(findByTestId(renderer, "review-arrow-duel-candidate-overlay-order-f2g3-b2b1")).toBeTruthy();
+    expect(() => findByTestId(renderer, "review-accessible-moves-open")).toThrow();
+    expect(findByTestId(renderer, "review-schedule-control")).toBeTruthy();
   });
 
   it("shows a review button after a failed sprint with mistakes", async () => {
@@ -4425,10 +4419,8 @@ describe("PracticePocScreen", () => {
       (node) => typeof node.props.testID === "string" && node.props.testID.startsWith("history-attempt-")
     )[0];
     press(renderer, historyAttemptRow.props.testID);
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-context"))).toBe("Standard · Review");
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-result"))).toBe("Wrong move");
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-moves"))).toBe("Played c4b5 · Best e2e6");
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-rating"))).toBe("Rating 600 · No run change");
+    expect(findByTestId(renderer, "review-board")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-detail")).toThrow();
     press(renderer, "review-analysis-button");
 
     expect(service.listHistory({ source: "scheduled_review" }) as unknown[]).toHaveLength(1);
@@ -5000,6 +4992,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "review-mistakes-button");
 
     expectText(renderer, "1 / 3 · Arrow Duel");
+    expect(() => findByTestId(renderer, "review-accessible-moves-open")).toThrow();
     expect(() => findByTestId(renderer, "review-arrow-legend")).toThrow();
     expect(() => findByTestId(renderer, "review-arrow-choice-marker")).toThrow();
     expect(collectText(renderer.root)).not.toContain("Green = best move");
@@ -5170,6 +5163,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "review-start-due");
 
     expectText(renderer, "1 / 3 · Arrow Duel");
+    expect(() => findByTestId(renderer, "review-accessible-moves-open")).toThrow();
     expect(() => findByTestId(renderer, "review-line-continue")).toThrow();
 
     await boardMove(renderer, wrongMoves[0] as string);

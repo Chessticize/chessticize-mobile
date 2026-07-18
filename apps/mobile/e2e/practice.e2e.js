@@ -88,7 +88,7 @@ describe('Practice POC', () => {
 
   });
 
-  it('persists a simplified unclear marker without exposing Review Schedule in History', async () => {
+  it('persists Unclear, places its History action at the bottom, and manages Review Schedule there', async () => {
     await selectTestPuzzleSource('familiar15');
     await startPracticeMode('standard');
     await waitForVisibleInPracticeScroll('session-board');
@@ -130,12 +130,23 @@ describe('Practice POC', () => {
       throw new Error(`Could not resolve unclear History row from ${String(resultIdentifier)}`);
     }
     await element(by.id(resultIdentifier.replace(/-result$/, ''))).tap();
-    await waitFor(element(by.id('history-attempt-unclear'))).toBeVisible().withTimeout(10000);
-    await expect(element(by.id('review-schedule-control'))).not.toExist();
+    await waitForVisibleInPracticeScroll('review-schedule-add');
+    await waitForVisibleInPracticeScroll('history-attempt-unclear');
+    await expect(element(by.id('history-attempt-detail'))).not.toExist();
     await expect(element(by.id('bookmark-glyph'))).not.toExist();
+    await element(by.id('review-schedule-add')).tap();
+    await waitFor(element(by.id('review-schedule-state'))).toHaveText('Due tomorrow').withTimeout(10000);
+    await waitFor(element(by.id('history-attempt-unclear'))).not.toExist().withTimeout(10000);
 
-    // The marker remains durable across another process lifetime, and the
-    // filter label does not expose an implementation count.
+    await element(by.id('review-schedule-remove')).tap();
+    await waitFor(element(by.id('review-schedule-removal-confirmation'))).toBeVisible().withTimeout(10000);
+    await sleep(500);
+    await element(by.id('review-schedule-removal-confirm')).tap();
+    await waitFor(element(by.id('review-schedule-state')))
+      .toHaveText('Not scheduled for Review')
+      .withTimeout(10000);
+
+    // Enrollment atomically cleared the marker, and removal does not restore it.
     await device.terminateApp();
     await launchWithDisabledSynchronization({
       newInstance: true,
@@ -148,7 +159,7 @@ describe('Practice POC', () => {
       10000
     );
     await element(by.id('history-filter-unclear')).tap();
-    await waitFor(element(by.text('Correct')).atIndex(0)).toExist().withTimeout(10000);
+    await waitFor(element(by.id('history-empty-state'))).toExist().withTimeout(10000);
   });
 
   it('opens last sprint mistake review with navigation and analysis arrows', async () => {

@@ -102,17 +102,10 @@ describe(`Android Arrow Duel offline journey (${fixture.puzzle.id})`, () => {
       await element(by.id(resultIdentifier.replace(/-result$/, ''))).tap();
 
       await waitFor(element(by.id('review-session'))).toExist().withTimeout(10000);
-      await waitForElementTextContaining('history-attempt-detail-context', 'Arrow Duel · Sprint', 10000);
-      await waitForElementTextContaining('history-attempt-detail-result', 'Correct', 10000);
-      await waitForElementTextContaining('history-attempt-detail-moves', fixture.correctMove, 10000);
-      await expect(element(by.id('history-attempt-detail-rating-key'))).toHaveLabel(
-        'Rating bucket arrow_duel 5/30'
-      );
-      await waitForElementTextContaining(
-        'history-attempt-detail-rating',
-        String(fixture.expectedRatingAfter),
-        10000
-      );
+      await waitForVisibleInPracticeScroll('review-board');
+      await expect(element(by.id('history-attempt-detail'))).not.toExist();
+      await expect(element(by.id('review-accessible-moves-open'))).not.toExist();
+      await waitForVisibleInPracticeScroll('review-schedule-control');
       await waitForVisibleInPracticeScroll('review-analysis-button');
       await element(by.id('review-analysis-button')).tap();
       await waitFor(element(by.id('review-close-analysis'))).toBeVisible().withTimeout(10000);
