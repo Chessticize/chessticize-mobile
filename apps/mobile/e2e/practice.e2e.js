@@ -27,6 +27,7 @@ describe('Practice POC', () => {
     // React Native, Skia, and native engine startup can keep Detox synchronization
     // busy after the first visible frame, so launch args disable synchronization
     // before Detox waits on app readiness.
+    await device.setOrientation('portrait');
     await launchWithDisabledSynchronization({
       newInstance: true,
       delete: true,
@@ -88,7 +89,7 @@ describe('Practice POC', () => {
 
   });
 
-  it('persists Unclear, places its History action at the bottom, and manages Review Schedule there', async () => {
+  it('persists Unclear, places its History actions responsively, and manages Review Schedule there', async () => {
     await selectTestPuzzleSource('familiar15');
     await startPracticeMode('standard');
     await waitForVisibleInPracticeScroll('session-board');
@@ -134,6 +135,17 @@ describe('Practice POC', () => {
     await waitForVisibleInPracticeScroll('history-attempt-unclear');
     await expect(element(by.id('history-attempt-detail'))).not.toExist();
     await expect(element(by.id('bookmark-glyph'))).not.toExist();
+
+    await device.setOrientation('landscape');
+    await waitFor(element(by.id('review-context-actions-rail'))).toBeVisible().withTimeout(10000);
+    await expect(element(by.id('review-schedule-control'))).toBeVisible();
+    await expect(element(by.id('history-attempt-unclear'))).toBeVisible();
+    const boardFrame = await frameFor(element(by.id('review-board')));
+    const actionRailFrame = await frameFor(element(by.id('review-context-actions-rail')));
+    expect(actionRailFrame.x).toBeGreaterThanOrEqual(boardFrame.x + boardFrame.width);
+    const responsiveScreenshot = await device.takeScreenshot('history-review-actions-landscape');
+    expect(fs.existsSync(responsiveScreenshot)).toBe(true);
+
     await element(by.id('review-schedule-add')).tap();
     await waitFor(element(by.id('review-schedule-state'))).toHaveText('Due tomorrow').withTimeout(10000);
     await waitFor(element(by.id('history-attempt-unclear'))).not.toExist().withTimeout(10000);
@@ -147,6 +159,7 @@ describe('Practice POC', () => {
       .withTimeout(10000);
 
     // Enrollment atomically cleared the marker, and removal does not restore it.
+    await device.setOrientation('portrait');
     await device.terminateApp();
     await launchWithDisabledSynchronization({
       newInstance: true,

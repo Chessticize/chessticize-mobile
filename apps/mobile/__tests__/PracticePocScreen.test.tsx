@@ -1110,6 +1110,27 @@ describe("PracticePocScreen", () => {
     expect(flattenTestStyle(findByTestId(renderer, "review-analysis-panel").props.style).width).toBeUndefined();
   });
 
+  it.each([
+    { actionContainer: "review-context-actions-bottom", height: 932, label: "phone portrait", width: 430 },
+    { actionContainer: "review-context-actions-rail", height: 390, label: "phone landscape", width: 844 },
+    { actionContainer: "review-context-actions-rail", height: 820, label: "iPad landscape", width: 1180 }
+  ])("places History Review actions in the available $label layout", ({ actionContainer, height, width }) => {
+    (ReactNative as unknown as {
+      __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
+    }).__setWindowDimensions?.({ width, height, scale: 2, fontScale: 1 });
+
+    const renderer = renderScreen({
+      currentTimeMs: () => Date.parse("2026-07-17T12:02:00.000Z"),
+      practiceService: createUnclearHistoryReviewService()
+    });
+    press(renderer, "history-tab");
+    press(renderer, "history-attempt-responsive-unclear-attempt");
+
+    const actions = findByTestId(renderer, actionContainer);
+    expect(actions.findByProps({ testID: "review-schedule-control" })).toBeTruthy();
+    expect(actions.findByProps({ testID: "history-attempt-unclear" })).toBeTruthy();
+  });
+
   it("preserves the active sprint and its accessible move dialog across a live resize", () => {
     const service = createMobilePracticeService("familiar15");
     (ReactNative as unknown as {
@@ -5994,6 +6015,28 @@ function sharedHistoryPuzzle(): Puzzle {
     source: "lichess",
     stockfishBestMove: "e2e3"
   };
+}
+
+function createUnclearHistoryReviewService(): PracticeService {
+  const store = new MemoryStore();
+  store.seedPuzzles([sharedHistoryPuzzle()]);
+  store.recordAttempt({
+    id: "responsive-unclear-attempt",
+    source: "sprint",
+    sessionId: "responsive-unclear-session",
+    puzzleId: "shared-history",
+    mode: "standard",
+    ratingKey: "standard 5/20",
+    result: "correct",
+    submittedMove: "e2e4",
+    expectedMove: "e2e4",
+    startedAt: "2026-07-17T11:59:55.000Z",
+    completedAt: "2026-07-17T12:00:00.000Z",
+    ratingBefore: 600
+  });
+  const service = new PracticeService(store);
+  service.setAttemptUnclear("responsive-unclear-attempt", true, "2026-07-17T12:01:00.000Z");
+  return service;
 }
 
 function createDueReviewService(count: number): PracticeService {

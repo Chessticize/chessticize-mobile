@@ -7327,6 +7327,34 @@ function ReviewSession({
     boardRef.current?.resetBoard(previous);
   }
 
+  const reviewScheduleControlNode = reviewScheduleControlVisible ? (
+    <ReviewScheduleControl
+      key={`${currentEntry.puzzle.id}:${currentEntry.mode}:${currentEntry.ratingKey}`}
+      compact
+      context={{
+        puzzleId: currentEntry.puzzle.id,
+        mode: currentEntry.mode,
+        ratingKey: currentEntry.ratingKey
+      }}
+      currentTimeMs={currentTimeMs}
+      initiatingAttemptId={currentEntry.source === "history" && currentEntry.attempt?.unclear
+        ? currentEntry.attempt.id
+        : undefined}
+      service={service}
+      onReviewChanged={onReviewEnrollmentChanged}
+      onRemoved={currentEntry.source === "due" && !reviewResultRecorded
+        ? goToNextDueReview
+        : undefined}
+      refreshToken={reviewResultRecorded}
+    />
+  ) : null;
+  const historyUnclearActionNode = currentEntry.source === "history"
+    && currentEntry.attempt?.unclear
+    && onAttemptClearUnclear ? (
+      <HistoryUnclearAction onClear={() => onAttemptClearUnclear(currentEntry.attempt!.id)} />
+    ) : null;
+  const hasReviewContextActions = reviewScheduleControlNode !== null || historyUnclearActionNode !== null;
+
   return (
     <View style={[styles.reviewSessionPanel, adaptiveLayout.usesWideContent ? styles.reviewSessionPanelWide : null]} testID="review-session">
       <View
@@ -7530,12 +7558,13 @@ function ReviewSession({
 
         <View
           style={[
-            styles.analysisPanel,
+            styles.reviewAnalysisColumn,
             adaptiveLayout.usesSessionRail ? styles.reviewAnalysisPanelWide : null,
             adaptiveLayout.usesSessionRail ? { width: adaptiveLayout.sessionRailWidth } : null
           ]}
-          testID="review-analysis-panel"
+          testID="review-analysis-column"
         >
+          <View style={styles.analysisPanel} testID="review-analysis-panel">
           <PracticePrompt
             currentPuzzle={currentPuzzle}
             mode={currentEntry.mode}
@@ -7670,31 +7699,20 @@ function ReviewSession({
               ))}
             </>
           ) : null}
+          </View>
+          {adaptiveLayout.usesSessionRail && hasReviewContextActions ? (
+            <View style={styles.reviewContextActions} testID="review-context-actions-rail">
+              {reviewScheduleControlNode}
+              {historyUnclearActionNode}
+            </View>
+          ) : null}
         </View>
       </View>
-      {reviewScheduleControlVisible ? (
-        <ReviewScheduleControl
-          key={`${currentEntry.puzzle.id}:${currentEntry.mode}:${currentEntry.ratingKey}`}
-          compact
-          context={{
-            puzzleId: currentEntry.puzzle.id,
-            mode: currentEntry.mode,
-            ratingKey: currentEntry.ratingKey
-          }}
-          currentTimeMs={currentTimeMs}
-          initiatingAttemptId={currentEntry.source === "history" && currentEntry.attempt?.unclear
-            ? currentEntry.attempt.id
-            : undefined}
-          service={service}
-          onReviewChanged={onReviewEnrollmentChanged}
-          onRemoved={currentEntry.source === "due" && !reviewResultRecorded
-            ? goToNextDueReview
-            : undefined}
-          refreshToken={reviewResultRecorded}
-        />
-      ) : null}
-      {currentEntry.source === "history" && currentEntry.attempt?.unclear && onAttemptClearUnclear ? (
-        <HistoryUnclearAction onClear={() => onAttemptClearUnclear(currentEntry.attempt!.id)} />
+      {!adaptiveLayout.usesSessionRail && hasReviewContextActions ? (
+        <View style={styles.reviewContextActions} testID="review-context-actions-bottom">
+          {reviewScheduleControlNode}
+          {historyUnclearActionNode}
+        </View>
       ) : null}
     </View>
   );
@@ -11912,6 +11930,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     minWidth: 0
   },
+  reviewAnalysisColumn: {
+    gap: 12
+  },
   analysisPanel: {
     backgroundColor: "#FFFFFF",
     borderColor: "#E2E8F0",
@@ -11931,6 +11952,9 @@ const styles = StyleSheet.create({
   reviewAnalysisPanelWide: {
     flexGrow: 0,
     flexShrink: 0
+  },
+  reviewContextActions: {
+    gap: 12
   },
   analysisToolbar: {
     alignItems: "center",
