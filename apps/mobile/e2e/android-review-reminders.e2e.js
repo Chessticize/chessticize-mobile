@@ -1,6 +1,9 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const { runAndroidAdbShell } = require('./androidAdbShell');
+const {
+  runAndroidAdbShell,
+  waitForAndroidAdbShellText,
+} = require('./androidAdbShell');
 const {
   androidAppIsResumed,
   failStandardSprint,
@@ -219,7 +222,12 @@ async function waitForSystemNode(candidates, timeoutMs = 15_000, options = {}) {
 }
 
 async function waitForNotification(text, timeoutMs) {
-  await waitForShellText(['dumpsys', 'notification', '--noredact'], text, true, timeoutMs);
+  await waitForAndroidAdbShellText(
+    ['dumpsys', 'notification', '--noredact'],
+    text,
+    true,
+    timeoutMs
+  );
 }
 
 async function waitForShellText(args, text, present, timeoutMs) {
