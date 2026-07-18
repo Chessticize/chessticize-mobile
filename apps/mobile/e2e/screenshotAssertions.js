@@ -74,9 +74,18 @@ async function waitForBoardScreenshotContainsPieces({
     }
 
     const screenshotPath = captureOutcome.value;
+    // PNG inspection is synchronous CPU work, so a timer cannot preempt it.
+    // Accept that one in-flight synchronous result when capture started and
+    // finished before the deadline; asynchronous inspection remains bounded.
     const inspectionOutcome = await settleBeforeDeadline(
       () => inspectScreenshot(screenshotPath, boardFrame, screenFrame),
-      {cancelTimeout, deadline, now, scheduleTimeout}
+      {
+        allowSynchronousCompletionAfterDeadline: true,
+        cancelTimeout,
+        deadline,
+        now,
+        scheduleTimeout,
+      }
     );
     if (inspectionOutcome.status === 'timed-out') {
       const completedInspection = inspectionOutcome.completed;
@@ -114,6 +123,7 @@ async function waitForBoardScreenshotContainsPieces({
 }
 
 async function settleBeforeDeadline(operation, {
+  allowSynchronousCompletionAfterDeadline = false,
   cancelTimeout,
   deadline,
   now,
@@ -124,14 +134,6 @@ async function settleBeforeDeadline(operation, {
     return {status: 'timed-out'};
   }
 
-  // Turn rejection into a settled value before racing so a rejection that
-  // arrives after the deadline is still observed and cannot leak unhandled.
-  const operationOutcome = Promise.resolve()
-    .then(operation)
-    .then(
-      (value) => ({status: 'fulfilled', value}),
-      (error) => ({status: 'rejected', error})
-    );
   let timeoutHandle;
   const timeoutOutcome = new Promise((resolve) => {
     timeoutHandle = scheduleTimeout(
@@ -139,6 +141,36 @@ async function settleBeforeDeadline(operation, {
       remainingMs
     );
   });
+
+  let operationValue;
+  let operationIsPromiseLike;
+  try {
+    operationValue = operation();
+    operationIsPromiseLike = isPromiseLike(operationValue);
+  } catch (error) {
+    const outcome = {status: 'rejected', error};
+    cancelTimeout(timeoutHandle);
+    if (!allowSynchronousCompletionAfterDeadline && now() >= deadline) {
+      return {completed: outcome, status: 'timed-out'};
+    }
+    return outcome;
+  }
+
+  if (!operationIsPromiseLike) {
+    const outcome = {status: 'fulfilled', value: operationValue};
+    cancelTimeout(timeoutHandle);
+    if (!allowSynchronousCompletionAfterDeadline && now() >= deadline) {
+      return {completed: outcome, status: 'timed-out'};
+    }
+    return outcome;
+  }
+
+  // Turn rejection into a settled value before racing so a rejection that
+  // arrives after the deadline is still observed and cannot leak unhandled.
+  const operationOutcome = Promise.resolve(operationValue).then(
+    (value) => ({status: 'fulfilled', value}),
+    (error) => ({status: 'rejected', error})
+  );
   const outcome = await Promise.race([operationOutcome, timeoutOutcome]);
 
   if (outcome.status !== 'timed-out') {
@@ -149,6 +181,12 @@ async function settleBeforeDeadline(operation, {
   }
 
   return outcome;
+}
+
+function isPromiseLike(value) {
+  return value !== null
+    && (typeof value === 'object' || typeof value === 'function')
+    && typeof value.then === 'function';
 }
 
 function readinessDiagnostic(message, screenshotPath) {

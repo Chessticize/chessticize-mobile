@@ -91,7 +91,7 @@ describe('screenshot assertions', () => {
     expect(captureScreenshot).toHaveBeenCalledTimes(2);
   });
 
-  it('archives each retry under a durable label when the final rendered frame crosses the deadline', async () => {
+  it('accepts and archives a rendered retry captured before inspection crosses the deadline', async () => {
     const emptyScreenshot = writeSyntheticBoard('boundary-empty.png');
     const renderedScreenshot = writeSyntheticBoard('boundary-rendered.png', [
       [6, 2, [20, 25, 32, 255]],
@@ -128,11 +128,7 @@ describe('screenshot assertions', () => {
       now: () => clock,
       pollIntervalMs: 25,
       timeoutMs: 50,
-    })).rejects.toThrow(
-      'Timed out waiting for rendered chess pieces after 50ms; '
-      + 'latest=Expected rendered chess pieces, found only 0 occupied board squares; '
-      + `screenshot=${emptyScreenshot}`
-    );
+    })).resolves.toBe(renderedScreenshot);
 
     expect(captureScreenshot.mock.calls).toEqual([
       [screenshotLabel],
@@ -229,15 +225,15 @@ describe('screenshot assertions', () => {
     expect(captureScreenshot).toHaveBeenCalledTimes(1);
   });
 
-  it('rejects a rendered screenshot whose inspection completes after the hard deadline', async () => {
+  it('accepts a rendered screenshot captured before synchronous inspection crosses the deadline', async () => {
     const renderedScreenshot = writeSyntheticBoard('late-inspection.png', [
       [6, 2, [20, 25, 32, 255]],
       [7, 0, [245, 245, 245, 255]],
     ]);
     let clock = 0;
-    const inspectScreenshot = jest.fn(async (...args) => {
-      clock = 5001;
+    const inspectScreenshot = jest.fn((...args) => {
       expectBoardScreenshotContainsPieces(...args);
+      clock = 5001;
     });
 
     await expect(waitForBoardScreenshotContainsPieces({
@@ -248,12 +244,70 @@ describe('screenshot assertions', () => {
     }, {
       inspectScreenshot,
       now: () => clock,
+    })).resolves.toBe(renderedScreenshot);
+
+    expect(inspectScreenshot).toHaveBeenCalledTimes(1);
+  });
+
+  it('times out when asynchronous screenshot inspection completes after the deadline', async () => {
+    const renderedScreenshot = writeSyntheticBoard('late-async-inspection.png', [
+      [6, 2, [20, 25, 32, 255]],
+      [7, 0, [245, 245, 245, 255]],
+    ]);
+    let clock = 0;
+    const inspectScreenshot = jest.fn(async (...args) => {
+      expectBoardScreenshotContainsPieces(...args);
+      clock = 5001;
+    });
+
+    await expect(waitForBoardScreenshotContainsPieces({
+      boardFrame: fullBoardFrame(),
+      captureScreenshot: async () => renderedScreenshot,
+      screenFrame: fullBoardFrame(),
+      screenshotLabel: 'late-async-inspection',
+    }, {
+      inspectScreenshot,
+      now: () => clock,
     })).rejects.toThrow(
       'Timed out waiting for rendered chess pieces after 5000ms; '
       + `latest=Screenshot inspection completed after the deadline; screenshot=${renderedScreenshot}`
     );
 
     expect(inspectScreenshot).toHaveBeenCalledTimes(1);
+  });
+
+  it('times out a late typed empty-board inspection with its latest diagnostic and no retry', async () => {
+    const emptyScreenshot = writeSyntheticBoard('late-empty-inspection.png');
+    let clock = 0;
+    const captureScreenshot = jest.fn(async () => emptyScreenshot);
+    const delay = jest.fn();
+    const inspectScreenshot = jest.fn((...args) => {
+      try {
+        expectBoardScreenshotContainsPieces(...args);
+      } catch (error) {
+        clock = 5001;
+        throw error;
+      }
+    });
+
+    await expect(waitForBoardScreenshotContainsPieces({
+      boardFrame: fullBoardFrame(),
+      captureScreenshot,
+      screenFrame: fullBoardFrame(),
+      screenshotLabel: 'late-empty-inspection',
+    }, {
+      delay,
+      inspectScreenshot,
+      now: () => clock,
+    })).rejects.toThrow(
+      'Timed out waiting for rendered chess pieces after 5000ms; '
+      + 'latest=Expected rendered chess pieces, found only 0 occupied board squares; '
+      + `screenshot=${emptyScreenshot}`
+    );
+
+    expect(captureScreenshot).toHaveBeenCalledTimes(1);
+    expect(inspectScreenshot).toHaveBeenCalledTimes(1);
+    expect(delay).not.toHaveBeenCalled();
   });
 
   it('pins the 250ms poll and 5000ms deadline defaults with an injected clock', async () => {
@@ -337,6 +391,55 @@ describe('screenshot assertions', () => {
     await Promise.resolve();
   });
 
+  it('hard-times out a pending inspection and safely observes its late rejection', async () => {
+    const renderedScreenshot = writeSyntheticBoard('pending-inspection.png', [
+      [6, 2, [20, 25, 32, 255]],
+      [7, 0, [245, 245, 245, 255]],
+    ]);
+    const lateInspectionError = new Error('inspection rejected after timeout');
+    let rejectInspection;
+    const inspectionPromise = new Promise((resolve, reject) => {
+      rejectInspection = reject;
+    });
+    const inspectScreenshot = jest.fn(() => inspectionPromise);
+    const timeoutCallbacks = [];
+    const timeoutHandles = [];
+    const scheduleTimeout = jest.fn((callback, milliseconds) => {
+      timeoutCallbacks.push(callback);
+      const handle = {milliseconds};
+      timeoutHandles.push(handle);
+      return handle;
+    });
+    const cancelTimeout = jest.fn();
+
+    const waiting = waitForBoardScreenshotContainsPieces({
+      boardFrame: fullBoardFrame(),
+      captureScreenshot: async () => renderedScreenshot,
+      screenFrame: fullBoardFrame(),
+      screenshotLabel: 'pending-inspection',
+    }, {
+      cancelTimeout,
+      inspectScreenshot,
+      scheduleTimeout,
+    });
+
+    await flushMicrotasksUntil(() => scheduleTimeout.mock.calls.length === 2);
+    expect(scheduleTimeout).toHaveBeenCalledTimes(2);
+    expect(cancelTimeout).toHaveBeenCalledWith(timeoutHandles[0]);
+    timeoutCallbacks[1]();
+
+    await expect(waiting).rejects.toThrow(
+      'Timed out waiting for rendered chess pieces after 5000ms; '
+      + `latest=Screenshot inspection did not complete before the deadline; screenshot=${renderedScreenshot}`
+    );
+    expect(inspectScreenshot).toHaveBeenCalledTimes(1);
+    expect(cancelTimeout).toHaveBeenCalledTimes(1);
+
+    rejectInspection(lateInspectionError);
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
   it('clears every hard-deadline timer when capture and inspection finish early', async () => {
     const renderedScreenshot = writeSyntheticBoard('early-rendered.png', [
       [6, 2, [20, 25, 32, 255]],
@@ -400,6 +503,34 @@ describe('screenshot assertions', () => {
     }, {
       delay,
       inspectScreenshot,
+    })).rejects.toBe(inspectionError);
+
+    expect(inspectScreenshot).toHaveBeenCalledTimes(1);
+    expect(delay).not.toHaveBeenCalled();
+  });
+
+  it('preserves a synchronous inspector error that crosses the deadline', async () => {
+    const renderedScreenshot = writeSyntheticBoard('late-inspector-error.png', [
+      [6, 2, [20, 25, 32, 255]],
+      [7, 0, [245, 245, 245, 255]],
+    ]);
+    const inspectionError = new Error('late unexpected inspector failure');
+    let clock = 0;
+    const inspectScreenshot = jest.fn(() => {
+      clock = 5001;
+      throw inspectionError;
+    });
+    const delay = jest.fn();
+
+    await expect(waitForBoardScreenshotContainsPieces({
+      boardFrame: fullBoardFrame(),
+      captureScreenshot: async () => renderedScreenshot,
+      screenFrame: fullBoardFrame(),
+      screenshotLabel: 'late-inspector-failure',
+    }, {
+      delay,
+      inspectScreenshot,
+      now: () => clock,
     })).rejects.toBe(inspectionError);
 
     expect(inspectScreenshot).toHaveBeenCalledTimes(1);
@@ -502,4 +633,14 @@ function writePixel(data, width, x, y, color) {
 
 function fullBoardFrame() {
   return { height: 800, width: 800, x: 0, y: 0 };
+}
+
+async function flushMicrotasksUntil(predicate, maximumTurns = 20) {
+  for (let turn = 0; turn < maximumTurns; turn += 1) {
+    if (predicate()) {
+      return;
+    }
+    await Promise.resolve();
+  }
+  throw new Error(`Condition did not settle after ${maximumTurns} microtask turns`);
 }
