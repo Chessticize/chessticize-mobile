@@ -102,7 +102,7 @@ describe('Practice POC', () => {
 
     // Let the normal feedback snapshot advance to the next board. The prompt
     // remains bound to the completed attempt rather than the newly shown puzzle.
-    await waitForElementTextContaining('sprint-unclear-question', 'previous move', 10000);
+    await waitForElementTextContaining('sprint-unclear-question', 'previous puzzle', 10000);
     await element(by.id('session-abandon')).tap();
     await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(5000);
     await element(by.id('session-abandon-confirm')).tap();
