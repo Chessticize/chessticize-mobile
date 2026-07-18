@@ -7,6 +7,11 @@ const environment = {
   ADB_PATH: '/sdk/adb',
   DETOX_ANDROID_DEVICE: 'emulator-5554',
 };
+const reviewNotification = Object.freeze({
+  notificationId: '182',
+  packageName: 'com.chessticize.mobile',
+  title: 'Chessticize',
+});
 
 function offlineError(message = 'adb: device offline') {
   return Object.assign(new Error(message), {
@@ -260,7 +265,7 @@ describe('Android E2E shell transport', () => {
     ]);
   });
 
-  it('does not accept a historical title before the exact notification becomes active', async () => {
+  it('does not accept a historical body before the exact notification becomes active', async () => {
     const historicalDump = [
       'Current Notification Manager state:',
       '  Notification List:',
@@ -271,7 +276,9 @@ describe('Android E2E shell transport', () => {
       '  Historical notifications:',
       '    NotificationRecord(0x02: pkg=com.chessticize.mobile user=UserHandle{0} id=182 tag=null)',
       '      extras={',
-      '        android.title=String (3 reviews are ready)',
+      '        android.title=String (Chessticize)',
+      '        android.text=String (3 reviews are ready)',
+      '        android.bigText=String (3 reviews are ready)',
       '      }',
     ].join('\n');
     const activeState = [
@@ -292,10 +299,7 @@ describe('Android E2E shell transport', () => {
       true,
       800,
       {
-        activeNotification: {
-          notificationId: '182',
-          packageName: 'com.chessticize.mobile',
-        },
+        activeNotification: reviewNotification,
         now: () => nowMs,
         pollIntervalMs: 400,
         runShell,
@@ -310,20 +314,26 @@ describe('Android E2E shell transport', () => {
     ))).toBe(true);
   });
 
-  it('accepts the expected title only from the exact active notification record', async () => {
+  it('accepts the production title and expected body from the exact active notification record', async () => {
     const activeState = '0|com.chessticize.mobile|182|null|10246\n';
     const activeDump = [
       'Current Notification Manager state:',
       '  Notification List:',
       '    NotificationRecord(0x01: pkg=com.chessticize.mobile user=UserHandle{0} id=182 tag=null)',
       '      extras={',
-      '        android.title=String (3 reviews are ready)',
+      '        android.title=String (Chessticize)',
+      '        android.text=String (3 reviews are ready)',
+      '        android.bigText=String (3 reviews are ready)',
       '      }',
       '  mArchive=Archive (0 notifications)',
     ].join('\n');
+    let nowMs = 1_000;
     const runShell = jest.fn((args) => (
       args[0] === 'cmd' ? activeState : activeDump
     ));
+    const sleep = jest.fn(async (durationMs) => {
+      nowMs += durationMs;
+    });
 
     await expect(waitForAndroidAdbShellText(
       ['dumpsys', 'notification', '--noredact'],
@@ -331,12 +341,11 @@ describe('Android E2E shell transport', () => {
       true,
       800,
       {
-        activeNotification: {
-          notificationId: '182',
-          packageName: 'com.chessticize.mobile',
-        },
-        now: () => 1_000,
+        activeNotification: reviewNotification,
+        now: () => nowMs,
+        pollIntervalMs: 400,
         runShell,
+        sleep,
       }
     )).resolves.toBe(activeDump);
     expect(runShell.mock.calls.map(([args]) => args.join(' '))).toEqual([
@@ -345,19 +354,23 @@ describe('Android E2E shell transport', () => {
     ]);
   });
 
-  it('rejects historical expected text when the exact active record has another title', async () => {
+  it('rejects the expected body found only in history when the active body differs', async () => {
     const activeState = '0|com.chessticize.mobile|182|null|10246\n';
     const wrongActiveDump = [
       'Current Notification Manager state:',
       '  Notification List:',
       '    NotificationRecord(0x01: pkg=com.chessticize.mobile user=UserHandle{0} id=182 tag=null)',
       '      extras={',
-      '        android.title=String (Different active title)',
+      '        android.title=String (Chessticize)',
+      '        android.text=String (Different active body)',
+      '        android.bigText=String (Different active body)',
       '      }',
       '  Historical notifications:',
       '    NotificationRecord(0x02: pkg=com.chessticize.mobile user=UserHandle{0} id=182 tag=null)',
       '      extras={',
-      '        android.title=String (3 reviews are ready)',
+      '        android.title=String (Chessticize)',
+      '        android.text=String (3 reviews are ready)',
+      '        android.bigText=String (3 reviews are ready)',
       '      }',
     ].join('\n');
     let nowMs = 1_000;
@@ -374,10 +387,7 @@ describe('Android E2E shell transport', () => {
       true,
       800,
       {
-        activeNotification: {
-          notificationId: '182',
-          packageName: 'com.chessticize.mobile',
-        },
+        activeNotification: reviewNotification,
         now: () => nowMs,
         pollIntervalMs: 400,
         runShell,
@@ -387,6 +397,90 @@ describe('Android E2E shell transport', () => {
       'Expected active Android notification com.chessticize.mobile/182 '
       + 'to contain 3 reviews are ready'
     );
+  });
+
+  it('rejects the expected body when the exact active record has the wrong title', async () => {
+    const activeState = '0|com.chessticize.mobile|182|null|10246\n';
+    const wrongTitleDump = [
+      'Current Notification Manager state:',
+      '  Notification List:',
+      '    NotificationRecord(0x01: pkg=com.chessticize.mobile user=UserHandle{0} id=182 tag=null)',
+      '      extras={',
+      '        android.title=String (Another app)',
+      '        android.text=String (3 reviews are ready)',
+      '        android.bigText=String (3 reviews are ready)',
+      '      }',
+    ].join('\n');
+    let nowMs = 1_000;
+    const runShell = jest.fn((args) => (
+      args[0] === 'cmd' ? activeState : wrongTitleDump
+    ));
+    const sleep = jest.fn(async (durationMs) => {
+      nowMs += durationMs;
+    });
+
+    await expect(waitForAndroidAdbShellText(
+      ['dumpsys', 'notification', '--noredact'],
+      '3 reviews are ready',
+      true,
+      800,
+      {
+        activeNotification: reviewNotification,
+        now: () => nowMs,
+        pollIntervalMs: 400,
+        runShell,
+        sleep,
+      }
+    )).rejects.toThrow(
+      'Expected active Android notification com.chessticize.mobile/182 '
+      + 'to contain 3 reviews are ready'
+    );
+  });
+
+  it('accepts disabled state when the body remains only in notification history', async () => {
+    const activeState = [
+      '-1|android|55|null|1000',
+      '-1|android|19|null|1000',
+    ].join('\n');
+    const historicalDump = [
+      'Current Notification Manager state:',
+      '  Notification List:',
+      '    NotificationRecord(0x01: pkg=android user=UserHandle{-1} id=55 tag=null)',
+      '      extras={',
+      '        android.title=String (Serial console enabled)',
+      '      }',
+      '  Historical notifications:',
+      '    NotificationRecord(0x02: pkg=com.chessticize.mobile user=UserHandle{0} id=182 tag=null)',
+      '      extras={',
+      '        android.title=String (Chessticize)',
+      '        android.text=String (3 reviews are ready)',
+      '        android.bigText=String (3 reviews are ready)',
+      '      }',
+    ].join('\n');
+    let nowMs = 1_000;
+    const runShell = jest.fn((args) => (
+      args[0] === 'cmd' ? activeState : historicalDump
+    ));
+    const sleep = jest.fn(async (durationMs) => {
+      nowMs += durationMs;
+    });
+
+    await expect(waitForAndroidAdbShellText(
+      ['dumpsys', 'notification', '--noredact'],
+      '3 reviews are ready',
+      false,
+      800,
+      {
+        activeNotification: reviewNotification,
+        now: () => nowMs,
+        pollIntervalMs: 400,
+        runShell,
+        sleep,
+      }
+    )).resolves.toBe(activeState);
+    expect(runShell.mock.calls.map(([args]) => args.join(' '))).toEqual([
+      'cmd notification list',
+    ]);
   });
 
   it('does not retry ordinary shell or product failures', () => {

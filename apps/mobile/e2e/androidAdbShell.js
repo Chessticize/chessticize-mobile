@@ -115,7 +115,18 @@ async function waitForAndroidAdbShellText(args, text, present, timeoutMs, option
         break;
       }
       latestActiveState = runShell(['cmd', 'notification', 'list'], activeStateOptions);
-      if (countActiveAndroidNotifications(latestActiveState, activeNotification) !== 1) {
+      const activeCount = countActiveAndroidNotifications(
+        latestActiveState,
+        activeNotification
+      );
+      if (!present && activeCount === 0) {
+        return latestActiveState;
+      }
+      if (activeCount !== 1) {
+        await sleepUntilNextPoll(deadline, now, pollIntervalMs, sleep);
+        continue;
+      }
+      if (!present) {
         await sleepUntilNextPoll(deadline, now, pollIntervalMs, sleep);
         continue;
       }
@@ -134,9 +145,14 @@ async function waitForAndroidAdbShellText(args, text, present, timeoutMs, option
     latestActiveRecord = activeNotification
       ? findActiveAndroidNotificationRecord(latest, activeNotification)
       : '';
-    const activeNotificationMatches = !activeNotification
-      || latestActiveRecord.includes(`android.title=String (${text})`);
-    if (latest.includes(text) === present && activeNotificationMatches) {
+    const shellStateMatches = activeNotification
+      ? activeAndroidNotificationRecordMatches(
+        latestActiveRecord,
+        activeNotification,
+        text
+      )
+      : latest.includes(text) === present;
+    if (shellStateMatches) {
       return latest;
     }
 
@@ -234,6 +250,24 @@ function notificationRecordHeaderMatches(header, notification) {
   return header.includes(packageMarker) && header.includes(idMarker);
 }
 
+function activeAndroidNotificationRecordMatches(record, notification, body) {
+  if (!record || typeof notification.title !== 'string') {
+    return false;
+  }
+  const titleMatches = notificationRecordFieldMatches(
+    record,
+    'android.title',
+    notification.title
+  );
+  const bodyMatches = notificationRecordFieldMatches(record, 'android.text', body)
+    || notificationRecordFieldMatches(record, 'android.bigText', body);
+  return titleMatches && bodyMatches;
+}
+
+function notificationRecordFieldMatches(record, field, value) {
+  return record.includes(`${field}=String (${value})`);
+}
+
 async function sleepUntilNextPoll(deadline, now, pollIntervalMs, sleep) {
   const remainingMs = deadline - now();
   if (remainingMs > 0) {
@@ -246,6 +280,7 @@ function defaultSleep(durationMs) {
 }
 
 module.exports = {
+  countActiveAndroidNotifications,
   runAndroidAdbShell,
   waitForAndroidAdbShellText,
 };
