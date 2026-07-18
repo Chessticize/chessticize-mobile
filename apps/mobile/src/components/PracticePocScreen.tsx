@@ -2306,7 +2306,7 @@ export function PracticePocScreen({
     />
   ) : null;
   const sessionBoardNode = shouldShowSessionBoard ? (
-    <View style={styles.boardWrapper}>
+    <View key="session-board" style={styles.boardWrapper}>
       {arePracticeTestControlsEnabled() || isStoreAssetCaptureEnabled() ? (
         <Text testID="session-current-puzzle-id" style={styles.reviewDueHiddenMetric}>
           {displayedPuzzle?.puzzle.id ?? ""}
@@ -2527,11 +2527,27 @@ export function PracticePocScreen({
             ) : null}
             {tab === "practice" ? (
               <>
-                {sessionUsesRail ? (
-                  <View style={styles.activeSessionAdaptiveLayout} testID="active-session-adaptive-layout">
-                    <View style={styles.activeSessionBoardLane} testID="active-session-board-lane">
-                      {sessionBoardNode}
-                    </View>
+                {/* Keep the native Chessboard under the same parents when the
+                    session switches between stacked and rail layouts. Moving
+                    it between conditional branches remounts Skia and can leave
+                    the piece sprite atlas blank while the board background is
+                    already visible after rotation. */}
+                <View
+                  style={sessionUsesRail ? styles.activeSessionAdaptiveLayout : styles.activeSessionStack}
+                  testID={sessionUsesRail ? "active-session-adaptive-layout" : undefined}
+                >
+                  <View
+                    style={sessionUsesRail ? styles.activeSessionBoardLane : styles.activeSessionStack}
+                    testID={sessionUsesRail ? "active-session-board-lane" : undefined}
+                  >
+                    {!sessionUsesRail ? sessionStatusNode : null}
+                    {!sessionUsesRail ? pausedSessionNode : null}
+                    {sessionBoardNode}
+                    {!sessionUsesRail ? sessionScoreNode : null}
+                    {!sessionUsesRail ? practicePromptNode : null}
+                    {!sessionUsesRail ? errorNode : null}
+                  </View>
+                  {sessionUsesRail ? (
                     <ScrollView
                       style={[styles.activeSessionControlRailScroll, { width: adaptiveLayout.sessionRailWidth }]}
                       contentContainerStyle={styles.activeSessionControlRail}
@@ -2542,17 +2558,8 @@ export function PracticePocScreen({
                       {practicePromptNode}
                       {errorNode}
                     </ScrollView>
-                  </View>
-                ) : (
-                  <>
-                    {sessionStatusNode}
-                    {pausedSessionNode}
-                    {sessionBoardNode}
-                    {sessionScoreNode}
-                    {practicePromptNode}
-                    {errorNode}
-                  </>
-                )}
+                  ) : null}
+                </View>
 
                 {!isOpenSession && state === null && mode !== "custom" ? (
                   <PracticeHome
@@ -10809,6 +10816,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 14,
     justifyContent: "center"
+  },
+  activeSessionStack: {
+    gap: 12
   },
   activeSessionBoardLane: {
     alignItems: "center",

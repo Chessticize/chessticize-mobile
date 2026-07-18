@@ -1,6 +1,7 @@
 /* global by, describe, device, element, it, waitFor */
 
 const fs = require('node:fs');
+const path = require('node:path');
 const {
   elementText,
   frameFor,
@@ -142,6 +143,7 @@ async function captureSprint(orientation, { waitForPieces = false } = {}) {
   const screenshotLabel = `${deviceLabel}-${orientation}-standard-sprint`;
   if (waitForPieces) {
     await waitForBoardScreenshotContainsPieces({
+      archiveScreenshot: archiveAdaptiveScreenshot,
       boardFrame,
       captureScreenshot: (label) => device.takeScreenshot(label),
       screenFrame,
@@ -152,6 +154,19 @@ async function captureSprint(orientation, { waitForPieces = false } = {}) {
 
   const screenshotPath = await device.takeScreenshot(screenshotLabel);
   expectBoardScreenshotContainsPieces(screenshotPath, boardFrame, screenFrame);
+}
+
+function archiveAdaptiveScreenshot(screenshotPath, screenshotLabel) {
+  const orientationEvidencePath = process.env.CHESSTICIZE_ADAPTIVE_ORIENTATION_EVIDENCE;
+  if (!orientationEvidencePath) {
+    return;
+  }
+  const attemptDirectory = path.join(path.dirname(orientationEvidencePath), 'screenshot-attempts');
+  fs.mkdirSync(attemptDirectory, { recursive: true });
+  fs.copyFileSync(
+    screenshotPath,
+    path.join(attemptDirectory, `${sanitizeScreenshotLabel(screenshotLabel)}.png`)
+  );
 }
 
 async function launchForOrientation(orientation) {

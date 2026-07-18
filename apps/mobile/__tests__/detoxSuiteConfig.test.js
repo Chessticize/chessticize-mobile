@@ -1348,7 +1348,10 @@ describe('Detox suite configuration', () => {
     expect(spec).toContain('async function captureSprint(orientation, { waitForPieces = false } = {})');
     expect(spec).toContain('if (waitForPieces) {');
     expect(spec).toContain('await waitForBoardScreenshotContainsPieces({');
+    expect(spec).toContain('archiveScreenshot: archiveAdaptiveScreenshot');
     expect(spec).toContain('captureScreenshot: (label) => device.takeScreenshot(label)');
+    expect(spec).toContain("path.dirname(orientationEvidencePath), 'screenshot-attempts'");
+    expect(spec).toContain('fs.copyFileSync(');
     expect(spec).toContain('expectBoardScreenshotContainsPieces(screenshotPath, boardFrame, screenFrame);');
     expect(spec).not.toContain('await sleep(5000)');
     expect(settledLayoutHelper).toContain("frameForIfPresent('active-session-adaptive-layout')");

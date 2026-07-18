@@ -88,6 +88,57 @@ describe('screenshot assertions', () => {
     expect(captureScreenshot).toHaveBeenCalledTimes(2);
   });
 
+  it('archives each retry under a durable label when the final rendered frame crosses the deadline', async () => {
+    const emptyScreenshot = writeSyntheticBoard('boundary-empty.png');
+    const renderedScreenshot = writeSyntheticBoard('boundary-rendered.png', [
+      [6, 2, [20, 25, 32, 255]],
+      [7, 0, [245, 245, 245, 255]],
+    ]);
+    const screenshots = [emptyScreenshot, renderedScreenshot];
+    const captureScreenshot = jest.fn(async () => screenshots.shift());
+    const archiveScreenshot = jest.fn();
+    let clock = 0;
+    let inspections = 0;
+    const inspectScreenshot = jest.fn((...args) => {
+      inspections += 1;
+      expectBoardScreenshotContainsPieces(...args);
+      if (inspections === 2) {
+        clock = 51;
+      }
+    });
+    const delay = async (milliseconds) => {
+      clock += milliseconds;
+    };
+    const screenshotLabel = 'android-phone-landscape-standard-sprint';
+
+    await expect(waitForBoardScreenshotContainsPieces({
+      archiveScreenshot,
+      boardFrame: fullBoardFrame(),
+      captureScreenshot,
+      screenFrame: fullBoardFrame(),
+      screenshotLabel,
+    }, {
+      delay,
+      inspectScreenshot,
+      now: () => clock,
+      pollIntervalMs: 25,
+      timeoutMs: 50,
+    })).rejects.toThrow(
+      'Timed out waiting for rendered chess pieces after 50ms; '
+      + 'latest=Expected rendered chess pieces, found only 0 occupied board squares; '
+      + `screenshot=${emptyScreenshot}`
+    );
+
+    expect(captureScreenshot.mock.calls).toEqual([
+      [screenshotLabel],
+      [`${screenshotLabel}-attempt-2`],
+    ]);
+    expect(archiveScreenshot.mock.calls).toEqual([
+      [emptyScreenshot, screenshotLabel],
+      [renderedScreenshot, `${screenshotLabel}-attempt-2`],
+    ]);
+  });
+
   it('rejects a rendered screenshot whose capture completes after the hard deadline', async () => {
     const renderedScreenshot = writeSyntheticBoard('late-capture.png', [
       [6, 2, [20, 25, 32, 255]],

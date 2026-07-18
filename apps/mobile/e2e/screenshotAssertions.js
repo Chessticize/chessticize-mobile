@@ -25,6 +25,7 @@ function expectBoardScreenshotContainsPieces(screenshotPath, boardFrame, screenF
 }
 
 async function waitForBoardScreenshotContainsPieces({
+  archiveScreenshot,
   boardFrame,
   captureScreenshot,
   screenFrame,
@@ -39,11 +40,20 @@ async function waitForBoardScreenshotContainsPieces({
   timeoutMs = 5000,
 } = {}) {
   const deadline = now() + timeoutMs;
+  let captureAttempt = 0;
   let latestReadinessFailure = null;
 
   while (true) {
+    captureAttempt += 1;
+    const attemptLabel = captureAttempt === 1
+      ? screenshotLabel
+      : `${screenshotLabel}-attempt-${captureAttempt}`;
     const captureOutcome = await settleBeforeDeadline(
-      () => captureScreenshot(screenshotLabel),
+      async () => {
+        const screenshotPath = await captureScreenshot(attemptLabel);
+        await archiveScreenshot?.(screenshotPath, attemptLabel);
+        return screenshotPath;
+      },
       {cancelTimeout, deadline, now, scheduleTimeout}
     );
     if (captureOutcome.status === 'timed-out') {

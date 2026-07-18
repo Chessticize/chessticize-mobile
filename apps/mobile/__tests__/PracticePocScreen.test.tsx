@@ -1471,6 +1471,48 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "1 / 15");
   });
 
+  it("keeps the native board mounted across an adaptive size change without replacing the active puzzle", () => {
+    const windowDimensions = ReactNative as unknown as {
+      __setWindowDimensions?: (dimensions: {
+        fontScale: number;
+        height: number;
+        scale: number;
+        width: number;
+      }) => void;
+    };
+    windowDimensions.__setWindowDimensions?.({
+      width: 430,
+      height: 932,
+      scale: 3,
+      fontScale: 1
+    });
+    const service = createMobilePracticeService("familiar15");
+    const renderer = renderScreen({ practiceService: service });
+
+    startStandardSprint(renderer);
+    const portraitBoard = findByTestId(renderer, "mock-chessboard");
+    const activePuzzleId = activeSprintForTest(service).currentPuzzle?.puzzle.id;
+    const activeFen = portraitBoard.props.fen;
+    const portraitResetBoard = portraitBoard.props.mockResetBoard;
+
+    act(() => {
+      windowDimensions.__setWindowDimensions?.({
+        width: 844,
+        height: 390,
+        scale: 3,
+        fontScale: 1
+      });
+    });
+
+    const landscapeBoard = findByTestId(renderer, "mock-chessboard");
+    expect(findByTestId(renderer, "adaptive-layout").props.accessibilityLabel)
+      .toBe("Layout compactLandscape");
+    expect(landscapeBoard.props.boardSize).toBe(358);
+    expect(landscapeBoard.props.fen).toBe(activeFen);
+    expect(activeSprintForTest(service).currentPuzzle?.puzzle.id).toBe(activePuzzleId);
+    expect(landscapeBoard.props.mockResetBoard).toBe(portraitResetBoard);
+  });
+
   it("keeps the stable native board synchronized across the Familiar 15 failure sequence", async () => {
     const service = createMobilePracticeService("familiar15");
     const renderer = renderScreen({ practiceService: service });
