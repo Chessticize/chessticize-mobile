@@ -226,7 +226,13 @@ async function waitForNotification(text, timeoutMs) {
     ['dumpsys', 'notification', '--noredact'],
     text,
     true,
-    timeoutMs
+    timeoutMs,
+    {
+      activeNotification: {
+        notificationId: REVIEW_NOTIFICATION_ID,
+        packageName: APP_ID,
+      },
+    }
   );
 }
 

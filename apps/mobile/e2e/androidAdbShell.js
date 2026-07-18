@@ -95,29 +95,62 @@ async function waitForAndroidAdbShellText(args, text, present, timeoutMs, option
   const now = options.now ?? Date.now;
   const sleep = options.sleep ?? defaultSleep;
   const runShell = options.runShell ?? runAndroidAdbShell;
+  const activeNotification = options.activeNotification;
   const pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
   const shellTimeoutMs = options.shellTimeoutMs ?? DEFAULT_POLL_SHELL_TIMEOUT_MS;
   const deadline = now() + timeoutMs;
   let latest = '';
+  let latestActiveState = '';
+  let latestActiveRecord = '';
 
   while (now() < deadline) {
-    const remainingMs = Math.max(1, deadline - now());
-    latest = runShell(args, {
-      ...(options.shellOptions ?? {}),
+    if (activeNotification) {
+      const activeStateOptions = pollingShellOptions(
+        deadline,
+        now,
+        shellTimeoutMs,
+        options.shellOptions
+      );
+      if (activeStateOptions === null) {
+        break;
+      }
+      latestActiveState = runShell(['cmd', 'notification', 'list'], activeStateOptions);
+      if (countActiveAndroidNotifications(latestActiveState, activeNotification) !== 1) {
+        await sleepUntilNextPoll(deadline, now, pollIntervalMs, sleep);
+        continue;
+      }
+    }
+
+    const dumpOptions = pollingShellOptions(
+      deadline,
       now,
-      shellTimeoutMs: Math.min(shellTimeoutMs, remainingMs),
-      timeoutRecoveryDeadlineMs: deadline,
-    });
-    if (latest.includes(text) === present) {
+      shellTimeoutMs,
+      options.shellOptions
+    );
+    if (dumpOptions === null) {
+      break;
+    }
+    latest = runShell(args, dumpOptions);
+    latestActiveRecord = activeNotification
+      ? findActiveAndroidNotificationRecord(latest, activeNotification)
+      : '';
+    const activeNotificationMatches = !activeNotification
+      || latestActiveRecord.includes(`android.title=String (${text})`);
+    if (latest.includes(text) === present && activeNotificationMatches) {
       return latest;
     }
 
-    const remainingAfterAttemptMs = deadline - now();
-    if (remainingAfterAttemptMs > 0) {
-      await sleep(Math.min(pollIntervalMs, remainingAfterAttemptMs));
-    }
+    await sleepUntilNextPoll(deadline, now, pollIntervalMs, sleep);
   }
 
+  if (activeNotification) {
+    throw new Error(
+      `Expected active Android notification ${activeNotification.packageName}/`
+      + `${activeNotification.notificationId} to ${present ? 'contain' : 'omit'} ${text}. `
+      + `Latest active state: ${latestActiveState.trimEnd() || '<empty>'}. `
+      + `Latest matching active record: ${latestActiveRecord.trimEnd() || '<none>'}`
+    );
+  }
   throw new Error(
     `Expected shell ${args.join(' ')} to ${present ? 'contain' : 'omit'} ${text}. `
     + `Latest: ${latest.trimEnd()}`
@@ -144,6 +177,68 @@ function recoveryTimeout(deadlineMs, now, maximumMs) {
   }
   const remainingMs = Math.floor(deadlineMs - now());
   return remainingMs > 0 ? Math.min(maximumMs, remainingMs) : null;
+}
+
+function pollingShellOptions(deadline, now, shellTimeoutMs, shellOptions) {
+  const remainingMs = Math.floor(deadline - now());
+  if (remainingMs <= 0) {
+    return null;
+  }
+  return {
+    ...(shellOptions ?? {}),
+    now,
+    shellTimeoutMs: Math.min(shellTimeoutMs, remainingMs),
+    timeoutRecoveryDeadlineMs: deadline,
+  };
+}
+
+function countActiveAndroidNotifications(state, notification) {
+  const marker = `|${notification.packageName}|${notification.notificationId}|`;
+  return state
+    .split('\n')
+    .filter((line) => line.includes(marker))
+    .length;
+}
+
+function findActiveAndroidNotificationRecord(state, notification) {
+  const lines = state.split('\n');
+  let inNotificationList = false;
+  let matchingRecord = null;
+
+  for (const line of lines) {
+    if (!inNotificationList) {
+      inNotificationList = /^ {2}Notification List:\s*$/.test(line);
+      continue;
+    }
+    if (/^ {2}\S/.test(line)) {
+      break;
+    }
+    if (/^ {4}NotificationRecord\(/.test(line)) {
+      if (matchingRecord !== null) {
+        break;
+      }
+      matchingRecord = notificationRecordHeaderMatches(line, notification) ? [line] : null;
+      continue;
+    }
+    if (matchingRecord !== null) {
+      matchingRecord.push(line);
+    }
+  }
+
+  return matchingRecord?.join('\n') ?? '';
+}
+
+function notificationRecordHeaderMatches(header, notification) {
+  const packageMarker = `pkg=${notification.packageName} `;
+  const idMarker = `id=${notification.notificationId} `;
+  return header.includes(packageMarker) && header.includes(idMarker);
+}
+
+async function sleepUntilNextPoll(deadline, now, pollIntervalMs, sleep) {
+  const remainingMs = deadline - now();
+  if (remainingMs > 0) {
+    await sleep(Math.min(pollIntervalMs, remainingMs));
+  }
 }
 
 function defaultSleep(durationMs) {

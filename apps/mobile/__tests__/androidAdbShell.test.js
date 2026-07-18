@@ -260,6 +260,135 @@ describe('Android E2E shell transport', () => {
     ]);
   });
 
+  it('does not accept a historical title before the exact notification becomes active', async () => {
+    const historicalDump = [
+      'Current Notification Manager state:',
+      '  Notification List:',
+      '    NotificationRecord(0x01: pkg=android user=UserHandle{-1} id=55 tag=null)',
+      '      extras={',
+      '        android.title=String (Serial console enabled)',
+      '      }',
+      '  Historical notifications:',
+      '    NotificationRecord(0x02: pkg=com.chessticize.mobile user=UserHandle{0} id=182 tag=null)',
+      '      extras={',
+      '        android.title=String (3 reviews are ready)',
+      '      }',
+    ].join('\n');
+    const activeState = [
+      '-1|android|55|null|1000',
+      '-1|android|19|null|1000',
+    ].join('\n');
+    let nowMs = 1_000;
+    const runShell = jest.fn((args) => (
+      args[0] === 'dumpsys' ? historicalDump : activeState
+    ));
+    const sleep = jest.fn(async (durationMs) => {
+      nowMs += durationMs;
+    });
+
+    await expect(waitForAndroidAdbShellText(
+      ['dumpsys', 'notification', '--noredact'],
+      '3 reviews are ready',
+      true,
+      800,
+      {
+        activeNotification: {
+          notificationId: '182',
+          packageName: 'com.chessticize.mobile',
+        },
+        now: () => nowMs,
+        pollIntervalMs: 400,
+        runShell,
+        sleep,
+      }
+    )).rejects.toThrow(
+      'Expected active Android notification com.chessticize.mobile/182 '
+      + 'to contain 3 reviews are ready'
+    );
+    expect(runShell.mock.calls.some(([args]) => (
+      args.join(' ') === 'cmd notification list'
+    ))).toBe(true);
+  });
+
+  it('accepts the expected title only from the exact active notification record', async () => {
+    const activeState = '0|com.chessticize.mobile|182|null|10246\n';
+    const activeDump = [
+      'Current Notification Manager state:',
+      '  Notification List:',
+      '    NotificationRecord(0x01: pkg=com.chessticize.mobile user=UserHandle{0} id=182 tag=null)',
+      '      extras={',
+      '        android.title=String (3 reviews are ready)',
+      '      }',
+      '  mArchive=Archive (0 notifications)',
+    ].join('\n');
+    const runShell = jest.fn((args) => (
+      args[0] === 'cmd' ? activeState : activeDump
+    ));
+
+    await expect(waitForAndroidAdbShellText(
+      ['dumpsys', 'notification', '--noredact'],
+      '3 reviews are ready',
+      true,
+      800,
+      {
+        activeNotification: {
+          notificationId: '182',
+          packageName: 'com.chessticize.mobile',
+        },
+        now: () => 1_000,
+        runShell,
+      }
+    )).resolves.toBe(activeDump);
+    expect(runShell.mock.calls.map(([args]) => args.join(' '))).toEqual([
+      'cmd notification list',
+      'dumpsys notification --noredact',
+    ]);
+  });
+
+  it('rejects historical expected text when the exact active record has another title', async () => {
+    const activeState = '0|com.chessticize.mobile|182|null|10246\n';
+    const wrongActiveDump = [
+      'Current Notification Manager state:',
+      '  Notification List:',
+      '    NotificationRecord(0x01: pkg=com.chessticize.mobile user=UserHandle{0} id=182 tag=null)',
+      '      extras={',
+      '        android.title=String (Different active title)',
+      '      }',
+      '  Historical notifications:',
+      '    NotificationRecord(0x02: pkg=com.chessticize.mobile user=UserHandle{0} id=182 tag=null)',
+      '      extras={',
+      '        android.title=String (3 reviews are ready)',
+      '      }',
+    ].join('\n');
+    let nowMs = 1_000;
+    const runShell = jest.fn((args) => (
+      args[0] === 'cmd' ? activeState : wrongActiveDump
+    ));
+    const sleep = jest.fn(async (durationMs) => {
+      nowMs += durationMs;
+    });
+
+    await expect(waitForAndroidAdbShellText(
+      ['dumpsys', 'notification', '--noredact'],
+      '3 reviews are ready',
+      true,
+      800,
+      {
+        activeNotification: {
+          notificationId: '182',
+          packageName: 'com.chessticize.mobile',
+        },
+        now: () => nowMs,
+        pollIntervalMs: 400,
+        runShell,
+        sleep,
+      }
+    )).rejects.toThrow(
+      'Expected active Android notification com.chessticize.mobile/182 '
+      + 'to contain 3 reviews are ready'
+    );
+  });
+
   it('does not retry ordinary shell or product failures', () => {
     const permissionFailure = Object.assign(new Error('Permission Denial'), {
       status: 1,
