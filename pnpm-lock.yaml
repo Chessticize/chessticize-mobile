@@ -5,6 +5,7 @@ settings:
   excludeLinksFromLockfile: false
 
 patchedDependencies:
+  detox@20.51.4: 8665ed2b14db496cc3a500c5b9d00a3527ca4d75cf66535ff974b3610bec341e
   react-native-chessboard@0.2.0: be3b3806fb95d626a6b7c9be5d6cd2eba33c4f2658416c1124c72ea09f3a3392
 
 importers:
@@ -108,7 +109,7 @@ importers:
         version: 29.7.0(@babel/core@7.29.7)
       detox:
         specifier: 20.51.4
-        version: 20.51.4(@jest/environment@29.7.0)(@jest/types@29.6.3)(expect@29.7.0)(jest-environment-node@29.7.0)(jest@29.7.0(@types/node@26.0.0))
+        version: 20.51.4(patch_hash=8665ed2b14db496cc3a500c5b9d00a3527ca4d75cf66535ff974b3610bec341e)(@jest/environment@29.7.0)(@jest/types@29.6.3)(expect@29.7.0)(jest-environment-node@29.7.0)(jest@29.7.0(@types/node@26.0.0))
       eslint:
         specifier: ^8.19.0
         version: 8.57.1
@@ -5740,10 +5741,10 @@ snapshots:
     optionalDependencies:
       expect: 29.7.0
 
-  '@wix-pilot/detox@1.0.13(@wix-pilot/core@3.4.2(expect@29.7.0))(detox@20.51.4(@jest/environment@29.7.0)(@jest/types@29.6.3)(expect@29.7.0)(jest-environment-node@29.7.0)(jest@29.7.0(@types/node@26.0.0)))(expect@29.7.0)':
+  '@wix-pilot/detox@1.0.13(@wix-pilot/core@3.4.2(expect@29.7.0))(detox@20.51.4(patch_hash=8665ed2b14db496cc3a500c5b9d00a3527ca4d75cf66535ff974b3610bec341e)(@jest/environment@29.7.0)(@jest/types@29.6.3)(expect@29.7.0)(jest-environment-node@29.7.0)(jest@29.7.0(@types/node@26.0.0)))(expect@29.7.0)':
     dependencies:
       '@wix-pilot/core': 3.4.2(expect@29.7.0)
-      detox: 20.51.4(@jest/environment@29.7.0)(@jest/types@29.6.3)(expect@29.7.0)(jest-environment-node@29.7.0)(jest@29.7.0(@types/node@26.0.0))
+      detox: 20.51.4(patch_hash=8665ed2b14db496cc3a500c5b9d00a3527ca4d75cf66535ff974b3610bec341e)(@jest/environment@29.7.0)(@jest/types@29.6.3)(expect@29.7.0)(jest-environment-node@29.7.0)(jest@29.7.0(@types/node@26.0.0))
       expect: 29.7.0
 
   abort-controller@3.0.0:
@@ -6354,10 +6355,10 @@ snapshots:
 
   detect-newline@3.1.0: {}
 
-  detox@20.51.4(@jest/environment@29.7.0)(@jest/types@29.6.3)(expect@29.7.0)(jest-environment-node@29.7.0)(jest@29.7.0(@types/node@26.0.0)):
+  detox@20.51.4(patch_hash=8665ed2b14db496cc3a500c5b9d00a3527ca4d75cf66535ff974b3610bec341e)(@jest/environment@29.7.0)(@jest/types@29.6.3)(expect@29.7.0)(jest-environment-node@29.7.0)(jest@29.7.0(@types/node@26.0.0)):
     dependencies:
       '@wix-pilot/core': 3.4.2(expect@29.7.0)
-      '@wix-pilot/detox': 1.0.13(@wix-pilot/core@3.4.2(expect@29.7.0))(detox@20.51.4(@jest/environment@29.7.0)(@jest/types@29.6.3)(expect@29.7.0)(jest-environment-node@29.7.0)(jest@29.7.0(@types/node@26.0.0)))(expect@29.7.0)
+      '@wix-pilot/detox': 1.0.13(@wix-pilot/core@3.4.2(expect@29.7.0))(detox@20.51.4(patch_hash=8665ed2b14db496cc3a500c5b9d00a3527ca4d75cf66535ff974b3610bec341e)(@jest/environment@29.7.0)(@jest/types@29.6.3)(expect@29.7.0)(jest-environment-node@29.7.0)(jest@29.7.0(@types/node@26.0.0)))(expect@29.7.0)
       ajv: 8.20.0
       bunyan: 1.8.15
       bunyan-debug-stream: 3.1.1(bunyan@1.8.15)

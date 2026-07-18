@@ -1,0 +1,20 @@
+diff --git a/src/devices/common/drivers/android/exec/ADB.js b/src/devices/common/drivers/android/exec/ADB.js
+index 27ddcfb7..df194a2b 100644
+--- a/src/devices/common/drivers/android/exec/ADB.js
++++ b/src/devices/common/drivers/android/exec/ADB.js
+@@ -382,3 +382,14 @@ class ADB {
+   async reverseRemove(deviceId, port) {
+-    return this.adbCmd(deviceId, `reverse --remove tcp:${port}`);
++    try {
++      return await this.adbCmd(deviceId, `reverse --remove tcp:${port}`);
++    } catch (error) {
++      const stderr = _.get(error, 'stderr', '').trim();
++      const missingListenerError = `adb: error: listener 'tcp:${port}' not found`;
++
++      if (stderr === missingListenerError) {
++        return;
++      }
++
++      throw error;
++    }
+   }
