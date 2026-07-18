@@ -155,6 +155,36 @@ read_installed_package_apk_paths() {
   done <<< "$ANDROID_DEVICE_COMMAND_OUTPUT"
 }
 
+read_single_installed_base_apk_path() {
+  local package_name="$1"
+  local installed_paths
+  local line
+  local path
+  local selected_path=''
+  local path_count=0
+
+  if ! installed_paths="$(read_installed_package_apk_paths "$package_name")"; then
+    return 1
+  fi
+  while IFS= read -r line; do
+    path_count=$((path_count + 1))
+    path="${line#package:}"
+    if [[ "$path" == */base.apk ]]; then
+      if [[ -n "$selected_path" ]]; then
+        echo "Installed APK path output contained multiple base.apk paths for $package_name." >&2
+        return 1
+      fi
+      selected_path="$path"
+    fi
+  done <<< "$installed_paths"
+
+  if (( path_count != 1 )) || [[ -z "$selected_path" ]]; then
+    echo "Expected exactly one installed base.apk path for $package_name; found $path_count validated APK paths." >&2
+    return 1
+  fi
+  printf '%s' "$selected_path"
+}
+
 read_device_file_size() {
   local path="$1"
 

@@ -320,7 +320,7 @@ describe('Android Progress Backup', () => {
     expect(evidenceScript).toContain('$MODE-dumpsys-backup.txt');
     expect(evidenceScript).toContain('bmgr init "$D2D_TRANSPORT"');
     expect(evidenceScript).toContain('pm uninstall --user 0');
-    expect(evidenceScript).toContain('install-multiple -t --user 0');
+    expect(evidenceScript).toContain('install_device_apk "$RETAINED_APK_PATH"');
     expect(restoreJourney).toContain("delete: false");
     expect(restoreJourney).toMatch(
       /['"]released-fixture['"]:\s*['"]1780920000000['"]/,
@@ -485,6 +485,7 @@ describe('Android Progress Backup', () => {
 
   it('proves installed APK identity from a retained exact source without reverse streaming', () => {
     const policyEvidenceScript = read('scripts/android-progress-backup-policy-evidence.sh');
+    const restoreEvidenceScript = read('scripts/android-progress-backup-evidence.sh');
     const deviceInspection = read('scripts/android-device-inspection.sh');
     const api30RestoreScript = read(
       'scripts/android-progress-backup-api30-restore-evidence.sh',
@@ -532,6 +533,25 @@ describe('Android Progress Backup', () => {
     expect(deviceInspection).not.toContain('sha256sum');
     expect(policyEvidenceScript).toContain(
       'adb_cmd exec-out run-as "$APP_ID" cat "$relative_path"',
+    );
+
+    expect(restoreEvidenceScript).not.toContain('adb_cmd pull');
+    expect(restoreEvidenceScript).not.toContain('install-multiple');
+    expect(restoreEvidenceScript).toContain('CHESSTICIZE_ANDROID_E2E_APK');
+    expect(restoreEvidenceScript).toContain(
+      'push_host_file_to_device "$APK" "$RETAINED_APK_PATH"',
+    );
+    expect(restoreEvidenceScript).toContain(
+      'install_device_apk "$RETAINED_APK_PATH"',
+    );
+    expect(restoreEvidenceScript).toContain(
+      'read_single_installed_base_apk_path "$APP_ID"',
+    );
+    expect(restoreEvidenceScript).toContain(
+      'capture_installed_apk_provenance before-backup',
+    );
+    expect(restoreEvidenceScript).toContain(
+      'capture_installed_apk_provenance after-restore',
     );
 
     for (const artifact of [
@@ -686,6 +706,86 @@ describe('Android Progress Backup', () => {
     ]) {
       expect(inspect('cleanup', mode)).toMatch(/^status=[1-9][0-9]*\noutput=<>\n$/);
     }
+  });
+
+  it('accepts only one validated installed base APK path', () => {
+    const deviceInspectionPath = join(
+      appRoot,
+      'scripts/android-device-inspection.sh',
+    );
+
+    const inspect = (mode) => {
+      const command = `
+        set -u
+        APP_ID=com.chessticize.mobile
+        INSPECTION_MODE=${mode}
+        adb_cmd() {
+          case "$INSPECTION_MODE" in
+            success)
+              printf '__CHESSTICIZE_DEVICE_STATUS__=0\\npackage:/data/app/~~token==/com.chessticize.mobile-token==/base.apk\\n'
+              ;;
+            multiple)
+              printf '__CHESSTICIZE_DEVICE_STATUS__=0\\npackage:/data/app/app/base.apk\\npackage:/data/app/app/split_config.apk\\n'
+              ;;
+            multiple-base)
+              printf '__CHESSTICIZE_DEVICE_STATUS__=0\\npackage:/data/app/app/base.apk\\npackage:/data/app/other/base.apk\\n'
+              ;;
+            no-base)
+              printf '__CHESSTICIZE_DEVICE_STATUS__=0\\npackage:/data/app/app/split_config.apk\\n'
+              ;;
+            malformed)
+              printf '__CHESSTICIZE_DEVICE_STATUS__=0\\nnot-a-package-path\\n'
+              ;;
+            unsafe)
+              printf '__CHESSTICIZE_DEVICE_STATUS__=0\\npackage:/data/app/bad path/base.apk\\n'
+              ;;
+            device-error)
+              printf '__CHESSTICIZE_DEVICE_STATUS__=1\\npackage missing\\n'
+              ;;
+            outer-failure)
+              return 42
+              ;;
+          esac
+        }
+        source ${JSON.stringify(deviceInspectionPath)}
+        set +e
+        installed_path="$(read_single_installed_base_apk_path "$APP_ID")"
+        installed_status=$?
+        set -e
+        printf 'status=%s\\npath=<%s>\\n' "$installed_status" "$installed_path"
+      `;
+      const result = spawnSync('/bin/bash', ['-c', command], {
+        encoding: 'utf8',
+      });
+      expect(result.status).toBe(0);
+      return result;
+    };
+
+    const success = inspect('success');
+    expect(success.stdout).toBe(
+      'status=0\npath=</data/app/~~token==/com.chessticize.mobile-token==/base.apk>\n',
+    );
+    expect(success.stderr).toBe('');
+    for (const mode of [
+      'multiple',
+      'multiple-base',
+      'no-base',
+      'malformed',
+      'unsafe',
+      'device-error',
+      'outer-failure',
+    ]) {
+      expect(inspect(mode).stdout).toMatch(/^status=[1-9][0-9]*\npath=<>\n$/);
+    }
+    expect(inspect('multiple').stderr).toContain(
+      'Expected exactly one installed base.apk path',
+    );
+    expect(inspect('multiple-base').stderr).toContain(
+      'multiple base.apk paths',
+    );
+    expect(inspect('malformed').stderr).toContain(
+      'Installed APK path output was malformed',
+    );
   });
 
   it('keeps synthetic SQLite sidecars stable by proving the app process is quiescent', () => {
