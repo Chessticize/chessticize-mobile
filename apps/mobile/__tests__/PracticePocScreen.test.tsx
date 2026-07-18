@@ -355,7 +355,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "practice-home")).toBeTruthy();
   });
 
-  it("binds Unclear to the completed attempt and replaces the action with a neutral confirmation", async () => {
+  it("binds Unclear to the completed attempt and replaces the yellow action with a yellow confirmation", async () => {
     const service = createMobilePracticeService("random1000");
     const renderer = renderScreen({ practiceService: service, standardTargetCorrect: 1 });
 
@@ -368,13 +368,17 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "sprint-unclear-question"))).toBe(
       "Was it clear why that move was correct?"
     );
-    expect(collectText(findByTestId(renderer, "sprint-unclear-toggle"))).toBe("Not yet");
+    expect(collectText(findByTestId(renderer, "sprint-unclear-toggle"))).toBe("Mark as unclear");
+    expect(styleContains(findByTestId(renderer, "sprint-unclear-toggle").props.style, "#FFFBEB")).toBe(true);
+    expect(styleContains(findByTestId(renderer, "sprint-unclear-toggle").props.style, "#F59E0B")).toBe(true);
     const promptStyle = findByTestId(renderer, "sprint-unclear-prompt").props.style;
     press(renderer, "sprint-unclear-toggle");
     const attemptId = (service.listHistory() as AttemptEvent[])[0]?.id;
     expect(attemptId).toBeTruthy();
     expect((service.listHistory() as AttemptEvent[])[0]).toMatchObject({ unclear: true });
     expect(collectText(findByTestId(renderer, "sprint-unclear-marked"))).toBe("Marked as unclear");
+    expect(styleContains(findByTestId(renderer, "sprint-unclear-marked").props.style, "#FFFBEB")).toBe(true);
+    expect(styleContains(findByTestId(renderer, "sprint-unclear-marked").props.style, "#F59E0B")).toBe(true);
     expect(() => findByTestId(renderer, "sprint-unclear-toggle")).toThrow();
     expect(() => findByTestId(renderer, "bookmark-glyph")).toThrow();
     expect(findByTestId(renderer, "sprint-unclear-prompt").props.style).toEqual(promptStyle);
@@ -423,7 +427,7 @@ describe("PracticePocScreen", () => {
     await settleFeedbackSnapshot();
 
     expect(collectText(findByTestId(renderer, "sprint-unclear-question"))).toBe(
-      "Was it clear why the previous puzzle was correct?"
+      "Was the previous puzzle clear?"
     );
     press(renderer, "sprint-unclear-toggle");
     expect((service.listHistory() as AttemptEvent[]).find((attempt) => attempt.id === completedAttemptId)).toMatchObject({

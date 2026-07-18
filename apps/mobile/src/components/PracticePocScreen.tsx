@@ -2426,7 +2426,7 @@ export function PracticePocScreen({
           marked={unclearPrompt.marked}
           question={isShowingFeedbackSnapshot && displayedPuzzle?.puzzle.id === unclearPrompt.puzzleId
             ? "Was it clear why that move was correct?"
-            : "Was it clear why the previous puzzle was correct?"}
+            : "Was the previous puzzle clear?"}
           onToggle={toggleUnclearPrompt}
         />
       ) : null}
@@ -4148,7 +4148,7 @@ function UnclearAttemptPrompt({
 }): React.JSX.Element {
   return (
     <View
-      accessibilityLabel={`${question} ${marked ? "Marked as unclear." : "Not yet. Activate to mark unclear."}`}
+      accessibilityLabel={`${question} ${marked ? "Marked as unclear." : "Mark as unclear. Activate to mark unclear."}`}
       style={styles.unclearPrompt}
       testID="sprint-unclear-prompt"
     >
@@ -4156,9 +4156,9 @@ function UnclearAttemptPrompt({
         <Text style={styles.unclearPromptQuestion} testID="sprint-unclear-question">{question}</Text>
       </View>
       {marked ? (
-        <Text style={styles.unclearPromptButtonText} testID="sprint-unclear-marked">
-          Marked as unclear
-        </Text>
+        <View style={styles.unclearPromptButton} testID="sprint-unclear-marked">
+          <Text style={styles.unclearPromptButtonText}>Marked as unclear</Text>
+        </View>
       ) : (
         <Pressable
           accessibilityRole="button"
@@ -4167,7 +4167,7 @@ function UnclearAttemptPrompt({
           testID="sprint-unclear-toggle"
           onPress={onToggle}
         >
-          <Text style={styles.unclearPromptButtonText}>Not yet</Text>
+          <Text style={styles.unclearPromptButtonText}>Mark as unclear</Text>
         </Pressable>
       )}
     </View>
@@ -11125,12 +11125,16 @@ const styles = StyleSheet.create({
   },
   unclearPromptButton: {
     alignItems: "center",
+    backgroundColor: "#FFFBEB",
+    borderColor: "#F59E0B",
+    borderRadius: 8,
+    borderWidth: 1,
     justifyContent: "center",
     minHeight: 30,
-    paddingHorizontal: 6
+    paddingHorizontal: 8
   },
   unclearPromptButtonText: {
-    color: "#2563EB",
+    color: "#B45309",
     fontSize: 11,
     fontWeight: "900"
   },
