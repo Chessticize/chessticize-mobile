@@ -1,6 +1,6 @@
 const {
   runAndroidAdbShell,
-  waitForAndroidAdbShellText,
+  waitForAndroidNotificationIdentity,
 } = require('../e2e/androidAdbShell');
 
 const environment = {
@@ -12,6 +12,11 @@ const reviewNotification = Object.freeze({
   packageName: 'com.chessticize.mobile',
   title: 'Chessticize',
 });
+const API_36_SYSTEM_AGGREGATE_NOTIFICATION_STATE = [
+  '-1|android|55|null|1000',
+  '-1|android|1|-1|android|g:Aggregate_SilentSection|1000|-1|android|g:Aggregate_SilentSection',
+  '-1|android|19|null|1000',
+].join('\n');
 
 function offlineError(message = 'adb: device offline') {
   return Object.assign(new Error(message), {
@@ -272,17 +277,260 @@ describe('Android E2E shell transport', () => {
     expect(exec).toHaveBeenCalledTimes(3);
   });
 
-  it('bounds every notification poll attempt by the outer deadline and fails on missing state', async () => {
+  it('accepts the exact active identity without invoking an unsafe full notification dump', async () => {
+    const activeState = '0|com.chessticize.mobile|182|null|10246\n';
+    const broadDumpOffline = offlineError();
+    const runShell = jest.fn((args) => {
+      if (args.join(' ') === 'cmd notification list') {
+        return activeState;
+      }
+      throw broadDumpOffline;
+    });
+
+    await expect(waitForAndroidNotificationIdentity(
+      reviewNotification,
+      1,
+      800,
+      {
+        now: () => 1_000,
+        runShell,
+      }
+    )).resolves.toBe(activeState);
+    expect(runShell.mock.calls.map(([args]) => args.join(' '))).toEqual([
+      'cmd notification list',
+    ]);
+  });
+
+  it('accepts expected absence from an exact zero active count', async () => {
+    const activeState = '-1|android|55|null|1000\n';
+    const runShell = jest.fn(() => activeState);
+    const sleep = jest.fn();
+
+    await expect(waitForAndroidNotificationIdentity(
+      reviewNotification,
+      0,
+      800,
+      { now: () => 1_000, runShell, sleep }
+    )).resolves.toBe(activeState);
+    expect(runShell).toHaveBeenCalledTimes(1);
+    expect(sleep).not.toHaveBeenCalled();
+  });
+
+  it('accepts legitimate API 36 aggregate records as exact target absence', async () => {
+    const runShell = jest.fn(() => API_36_SYSTEM_AGGREGATE_NOTIFICATION_STATE);
+
+    await expect(waitForAndroidNotificationIdentity(
+      reviewNotification,
+      0,
+      800,
+      { now: () => 1_000, runShell }
+    )).resolves.toBe(API_36_SYSTEM_AGGREGATE_NOTIFICATION_STATE);
+    expect(runShell).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['single-segment Android system package', 'android', '55', 0],
+    ['exact target package', 'com.chessticize.mobile', '182', 1],
+    ['letter-led segments with digits and underscores', 'a.b2.c_d.E3_f', '7', 0],
+  ])('accepts %s', async (_kind, packageName, notificationId, expectedCount) => {
+    const activeState = `0|${packageName}|${notificationId}|null|1000`;
+    const runShell = jest.fn(() => activeState);
+
+    await expect(waitForAndroidNotificationIdentity(
+      reviewNotification,
+      expectedCount,
+      800,
+      { now: () => 1_000, runShell }
+    )).resolves.toBe(activeState);
+  });
+
+  it('counts one exact target only from a structural record prefix', async () => {
+    const activeState = [
+      API_36_SYSTEM_AGGREGATE_NOTIFICATION_STATE,
+      '0|com.chessticize.mobile|182|null|10246|opaque|platform|payload',
+    ].join('\n');
+    const runShell = jest.fn(() => activeState);
+
+    await expect(waitForAndroidNotificationIdentity(
+      reviewNotification,
+      1,
+      800,
+      { now: () => 1_000, runShell }
+    )).resolves.toBe(activeState);
+  });
+
+  it('counts duplicate exact targets from their structural record prefixes', async () => {
+    const activeState = [
+      '0|com.chessticize.mobile|182|null|10246',
+      '0|com.chessticize.mobile|182|opaque|payload|with|pipes',
+    ].join('\n');
     let nowMs = 1_000;
-    const runShell = jest.fn(() => 'unrelated notification state\n');
+    const runShell = jest.fn(() => activeState);
     const sleep = jest.fn(async (durationMs) => {
       nowMs += durationMs;
     });
 
-    await expect(waitForAndroidAdbShellText(
-      ['dumpsys', 'notification', '--noredact'],
-      '3 reviews are ready',
-      true,
+    await expect(waitForAndroidNotificationIdentity(
+      reviewNotification,
+      1,
+      800,
+      {
+        now: () => nowMs,
+        pollIntervalMs: 400,
+        runShell,
+        sleep,
+      }
+    )).rejects.toThrow('latest count was 2');
+  });
+
+  it('does not count a target-looking identity embedded in an opaque suffix', async () => {
+    const activeState = [
+      '-1|android|1|-1|com.chessticize.mobile|182|null|1000',
+      '-1|android|55|null|1000',
+    ].join('\n');
+    const runShell = jest.fn(() => activeState);
+
+    await expect(waitForAndroidNotificationIdentity(
+      reviewNotification,
+      0,
+      800,
+      { now: () => 1_000, runShell }
+    )).resolves.toBe(activeState);
+  });
+
+  it('accepts an empty supported active list as exact absence', async () => {
+    const runShell = jest.fn(() => '');
+
+    await expect(waitForAndroidNotificationIdentity(
+      reviewNotification,
+      0,
+      800,
+      { now: () => 1_000, runShell }
+    )).resolves.toBe('');
+  });
+
+  it('fails closed instead of accepting malformed nonempty output as absence', async () => {
+    const runShell = jest.fn(() => 'adb: error: notification service unavailable\n');
+
+    await expect(waitForAndroidNotificationIdentity(
+      reviewNotification,
+      0,
+      800,
+      { now: () => 1_000, runShell }
+    )).rejects.toThrow('Malformed Android active notification list');
+  });
+
+  it.each([
+    ['missing user id', '|android|55|null|1000'],
+    ['invalid user id', 'system|android|55|null|1000'],
+    ['empty package', '-1||55|null|1000'],
+    ['invalid package', '-1|android package|55|null|1000'],
+    ['dot-only package', '-1|.|55|null|1000'],
+    ['digit-led package', '-1|1bad|55|null|1000'],
+    ['empty package segment', '-1|com..bad|55|null|1000'],
+    ['digit-led nested package segment', '-1|com.1bad|55|null|1000'],
+    ['trailing empty package segment', '-1|com.bad.|55|null|1000'],
+    ['underscore-led package', '-1|_bad|55|null|1000'],
+    ['missing notification id', '-1|android||null|1000'],
+    ['invalid notification id', '-1|android|notification|null|1000'],
+    ['truncated before notification id', '-1|android'],
+    ['truncated after notification id', '-1|android|55'],
+    ['empty platform payload', '-1|android|55|'],
+    ['arbitrary garbage', 'notification service unavailable'],
+  ])('rejects %s instead of proving target absence', async (_kind, activeState) => {
+    const runShell = jest.fn(() => activeState);
+
+    await expect(waitForAndroidNotificationIdentity(
+      reviewNotification,
+      0,
+      800,
+      { now: () => 1_000, runShell }
+    )).rejects.toThrow('Malformed Android active notification list');
+  });
+
+  it('rejects zero active matches when one exact identity is required', async () => {
+    let nowMs = 1_000;
+    const runShell = jest.fn(() => '-1|android|55|null|1000\n');
+    const sleep = jest.fn(async (durationMs) => {
+      nowMs += durationMs;
+    });
+
+    await expect(waitForAndroidNotificationIdentity(
+      reviewNotification,
+      1,
+      800,
+      {
+        now: () => nowMs,
+        pollIntervalMs: 400,
+        runShell,
+        sleep,
+      }
+    )).rejects.toThrow(
+      'Expected exactly 1 active Android notification(s) for '
+      + 'com.chessticize.mobile/182; latest count was 0'
+    );
+  });
+
+  it('rejects active notifications with the wrong package or notification id', async () => {
+    const wrongIdentityState = [
+      '0|com.other.app|182|null|10246',
+      '0|com.chessticize.mobile|999|null|10246',
+    ].join('\n');
+    let nowMs = 1_000;
+    const runShell = jest.fn(() => wrongIdentityState);
+    const sleep = jest.fn(async (durationMs) => {
+      nowMs += durationMs;
+    });
+
+    await expect(waitForAndroidNotificationIdentity(
+      reviewNotification,
+      1,
+      800,
+      {
+        now: () => nowMs,
+        pollIntervalMs: 400,
+        runShell,
+        sleep,
+      }
+    )).rejects.toThrow(
+      'latest count was 0'
+    );
+  });
+
+  it('rejects a duplicated exact active identity', async () => {
+    const duplicatedState = [
+      '0|com.chessticize.mobile|182|null|10246',
+      '0|com.chessticize.mobile|182|null|10246',
+    ].join('\n');
+    let nowMs = 1_000;
+    const runShell = jest.fn(() => duplicatedState);
+    const sleep = jest.fn(async (durationMs) => {
+      nowMs += durationMs;
+    });
+
+    await expect(waitForAndroidNotificationIdentity(
+      reviewNotification,
+      1,
+      800,
+      {
+        now: () => nowMs,
+        pollIntervalMs: 400,
+        runShell,
+        sleep,
+      }
+    )).rejects.toThrow('latest count was 2');
+  });
+
+  it('bounds each exact-identity poll and its recovery by the outer deadline', async () => {
+    let nowMs = 1_000;
+    const runShell = jest.fn(() => '0|com.other.app|999|null|10001\n');
+    const sleep = jest.fn(async (durationMs) => {
+      nowMs += durationMs;
+    });
+
+    await expect(waitForAndroidNotificationIdentity(
+      reviewNotification,
+      1,
       800,
       {
         now: () => nowMs,
@@ -291,10 +539,7 @@ describe('Android E2E shell transport', () => {
         shellTimeoutMs: 5_000,
         sleep,
       }
-    )).rejects.toThrow(
-      'Expected shell dumpsys notification --noredact to contain 3 reviews are ready. '
-      + 'Latest: unrelated notification state'
-    );
+    )).rejects.toThrow('latest count was 0');
     expect(runShell.mock.calls.map(([, options]) => options.shellTimeoutMs)).toEqual([
       800,
       400,
@@ -305,222 +550,67 @@ describe('Android E2E shell transport', () => {
     ]);
   });
 
-  it('does not accept a historical body before the exact notification becomes active', async () => {
-    const historicalDump = [
-      'Current Notification Manager state:',
-      '  Notification List:',
-      '    NotificationRecord(0x01: pkg=android user=UserHandle{-1} id=55 tag=null)',
-      '      extras={',
-      '        android.title=String (Serial console enabled)',
-      '      }',
-      '  Historical notifications:',
-      '    NotificationRecord(0x02: pkg=com.chessticize.mobile user=UserHandle{0} id=182 tag=null)',
-      '      extras={',
-      '        android.title=String (Chessticize)',
-      '        android.text=String (3 reviews are ready)',
-      '        android.bigText=String (3 reviews are ready)',
-      '      }',
-    ].join('\n');
-    const activeState = [
-      '-1|android|55|null|1000',
-      '-1|android|19|null|1000',
-    ].join('\n');
+  it('rejects an expected identity returned after the outer deadline', async () => {
     let nowMs = 1_000;
-    const runShell = jest.fn((args) => (
-      args[0] === 'dumpsys' ? historicalDump : activeState
-    ));
-    const sleep = jest.fn(async (durationMs) => {
-      nowMs += durationMs;
+    const runShell = jest.fn(() => {
+      nowMs = 1_801;
+      return '0|com.chessticize.mobile|182|null|10246\n';
     });
 
-    await expect(waitForAndroidAdbShellText(
-      ['dumpsys', 'notification', '--noredact'],
-      '3 reviews are ready',
-      true,
+    await expect(waitForAndroidNotificationIdentity(
+      reviewNotification,
+      1,
       800,
-      {
-        activeNotification: reviewNotification,
-        now: () => nowMs,
-        pollIntervalMs: 400,
-        runShell,
-        sleep,
-      }
+      { now: () => nowMs, runShell }
     )).rejects.toThrow(
-      'Expected active Android notification com.chessticize.mobile/182 '
-      + 'to contain 3 reviews are ready'
+      'Expected exactly 1 active Android notification(s) for '
+      + 'com.chessticize.mobile/182'
     );
-    expect(runShell.mock.calls.some(([args]) => (
-      args.join(' ') === 'cmd notification list'
-    ))).toBe(true);
   });
 
-  it('accepts the production title and expected body from the exact active notification record', async () => {
-    const activeState = '0|com.chessticize.mobile|182|null|10246\n';
-    const activeDump = [
-      'Current Notification Manager state:',
-      '  Notification List:',
-      '    NotificationRecord(0x01: pkg=com.chessticize.mobile user=UserHandle{0} id=182 tag=null)',
-      '      extras={',
-      '        android.title=String (Chessticize)',
-      '        android.text=String (3 reviews are ready)',
-      '        android.bigText=String (3 reviews are ready)',
-      '      }',
-      '  mArchive=Archive (0 notifications)',
-    ].join('\n');
-    let nowMs = 1_000;
-    const runShell = jest.fn((args) => (
-      args[0] === 'cmd' ? activeState : activeDump
-    ));
-    const sleep = jest.fn(async (durationMs) => {
-      nowMs += durationMs;
-    });
+  it('recovers one transient offline identity query within the outer deadline', async () => {
+    const transientOffline = offlineError();
+    const exec = jest
+      .fn()
+      .mockImplementationOnce(() => { throw transientOffline; })
+      .mockReturnValueOnce('')
+      .mockReturnValueOnce('0|com.chessticize.mobile|182|null|10246\n');
 
-    await expect(waitForAndroidAdbShellText(
-      ['dumpsys', 'notification', '--noredact'],
-      '3 reviews are ready',
-      true,
+    await expect(waitForAndroidNotificationIdentity(
+      reviewNotification,
+      1,
       800,
       {
-        activeNotification: reviewNotification,
-        now: () => nowMs,
-        pollIntervalMs: 400,
-        runShell,
-        sleep,
+        now: () => 1_000,
+        shellOptions: { environment, execFileSync: exec },
       }
-    )).resolves.toBe(activeDump);
-    expect(runShell.mock.calls.map(([args]) => args.join(' '))).toEqual([
-      'cmd notification list',
-      'dumpsys notification --noredact',
+    )).resolves.toContain('|com.chessticize.mobile|182|');
+    expect(exec.mock.calls.map(([, args]) => args)).toEqual([
+      ['-s', 'emulator-5554', 'shell', 'cmd', 'notification', 'list'],
+      ['-s', 'emulator-5554', 'wait-for-device'],
+      ['-s', 'emulator-5554', 'shell', 'cmd', 'notification', 'list'],
     ]);
   });
 
-  it('rejects the expected body found only in history when the active body differs', async () => {
-    const activeState = '0|com.chessticize.mobile|182|null|10246\n';
-    const wrongActiveDump = [
-      'Current Notification Manager state:',
-      '  Notification List:',
-      '    NotificationRecord(0x01: pkg=com.chessticize.mobile user=UserHandle{0} id=182 tag=null)',
-      '      extras={',
-      '        android.title=String (Chessticize)',
-      '        android.text=String (Different active body)',
-      '        android.bigText=String (Different active body)',
-      '      }',
-      '  Historical notifications:',
-      '    NotificationRecord(0x02: pkg=com.chessticize.mobile user=UserHandle{0} id=182 tag=null)',
-      '      extras={',
-      '        android.title=String (Chessticize)',
-      '        android.text=String (3 reviews are ready)',
-      '        android.bigText=String (3 reviews are ready)',
-      '      }',
-    ].join('\n');
-    let nowMs = 1_000;
-    const runShell = jest.fn((args) => (
-      args[0] === 'cmd' ? activeState : wrongActiveDump
-    ));
-    const sleep = jest.fn(async (durationMs) => {
-      nowMs += durationMs;
-    });
+  it('preserves a persistent offline failure from the retried identity query', async () => {
+    const firstOffline = offlineError('adb: device offline');
+    const persistentOffline = offlineError('error: device offline');
+    const exec = jest
+      .fn()
+      .mockImplementationOnce(() => { throw firstOffline; })
+      .mockReturnValueOnce('')
+      .mockImplementationOnce(() => { throw persistentOffline; });
 
-    await expect(waitForAndroidAdbShellText(
-      ['dumpsys', 'notification', '--noredact'],
-      '3 reviews are ready',
-      true,
+    await expect(waitForAndroidNotificationIdentity(
+      reviewNotification,
+      1,
       800,
       {
-        activeNotification: reviewNotification,
-        now: () => nowMs,
-        pollIntervalMs: 400,
-        runShell,
-        sleep,
+        now: () => 1_000,
+        shellOptions: { environment, execFileSync: exec },
       }
-    )).rejects.toThrow(
-      'Expected active Android notification com.chessticize.mobile/182 '
-      + 'to contain 3 reviews are ready'
-    );
-  });
-
-  it('rejects the expected body when the exact active record has the wrong title', async () => {
-    const activeState = '0|com.chessticize.mobile|182|null|10246\n';
-    const wrongTitleDump = [
-      'Current Notification Manager state:',
-      '  Notification List:',
-      '    NotificationRecord(0x01: pkg=com.chessticize.mobile user=UserHandle{0} id=182 tag=null)',
-      '      extras={',
-      '        android.title=String (Another app)',
-      '        android.text=String (3 reviews are ready)',
-      '        android.bigText=String (3 reviews are ready)',
-      '      }',
-    ].join('\n');
-    let nowMs = 1_000;
-    const runShell = jest.fn((args) => (
-      args[0] === 'cmd' ? activeState : wrongTitleDump
-    ));
-    const sleep = jest.fn(async (durationMs) => {
-      nowMs += durationMs;
-    });
-
-    await expect(waitForAndroidAdbShellText(
-      ['dumpsys', 'notification', '--noredact'],
-      '3 reviews are ready',
-      true,
-      800,
-      {
-        activeNotification: reviewNotification,
-        now: () => nowMs,
-        pollIntervalMs: 400,
-        runShell,
-        sleep,
-      }
-    )).rejects.toThrow(
-      'Expected active Android notification com.chessticize.mobile/182 '
-      + 'to contain 3 reviews are ready'
-    );
-  });
-
-  it('accepts disabled state when the body remains only in notification history', async () => {
-    const activeState = [
-      '-1|android|55|null|1000',
-      '-1|android|19|null|1000',
-    ].join('\n');
-    const historicalDump = [
-      'Current Notification Manager state:',
-      '  Notification List:',
-      '    NotificationRecord(0x01: pkg=android user=UserHandle{-1} id=55 tag=null)',
-      '      extras={',
-      '        android.title=String (Serial console enabled)',
-      '      }',
-      '  Historical notifications:',
-      '    NotificationRecord(0x02: pkg=com.chessticize.mobile user=UserHandle{0} id=182 tag=null)',
-      '      extras={',
-      '        android.title=String (Chessticize)',
-      '        android.text=String (3 reviews are ready)',
-      '        android.bigText=String (3 reviews are ready)',
-      '      }',
-    ].join('\n');
-    let nowMs = 1_000;
-    const runShell = jest.fn((args) => (
-      args[0] === 'cmd' ? activeState : historicalDump
-    ));
-    const sleep = jest.fn(async (durationMs) => {
-      nowMs += durationMs;
-    });
-
-    await expect(waitForAndroidAdbShellText(
-      ['dumpsys', 'notification', '--noredact'],
-      '3 reviews are ready',
-      false,
-      800,
-      {
-        activeNotification: reviewNotification,
-        now: () => nowMs,
-        pollIntervalMs: 400,
-        runShell,
-        sleep,
-      }
-    )).resolves.toBe(activeState);
-    expect(runShell.mock.calls.map(([args]) => args.join(' '))).toEqual([
-      'cmd notification list',
-    ]);
+    )).rejects.toBe(persistentOffline);
+    expect(exec).toHaveBeenCalledTimes(3);
   });
 
   it('does not retry ordinary shell or product failures', () => {

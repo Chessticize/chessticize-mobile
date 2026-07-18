@@ -2,6 +2,11 @@ const { execFileSync, spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const { androidAdbPath } = require('./androidNetwork');
+const {
+  findExactAndroidNotificationRow,
+  waitForAndTapExactAndroidNotificationFromPublicUi,
+  waitForAndTapExactAndroidNotificationRow,
+} = require('./androidSystemNotification');
 
 const ANDROID_UI_DIAGNOSTICS_DIR = path.resolve(__dirname, '../artifacts/android-ui');
 const PREDICTIVE_BACK_STARTED_MARKER = 'CHESSTICIZE_PREDICTIVE_BACK_STARTED';
@@ -835,6 +840,7 @@ module.exports = {
   sleep,
   frameFor,
   findAndroidSystemNode,
+  findExactAndroidNotificationRow,
   findPendingAndroidAlarms,
   grantAndroidRuntimePermission,
   playBoardMove,
@@ -846,6 +852,8 @@ module.exports = {
   tapUntilExists,
   waitForElementAccessibilityLabelContaining,
   waitForElementTextContaining,
+  waitForAndTapExactAndroidNotificationFromPublicUi,
+  waitForAndTapExactAndroidNotificationRow,
   waitForRunningStockfishDepth,
   withAndroidUiDiagnostics,
   accessibilityLabelFromAttributes,
