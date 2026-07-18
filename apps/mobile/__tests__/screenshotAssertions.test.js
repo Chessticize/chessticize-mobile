@@ -7,6 +7,9 @@ const {
   expectBoardScreenshotContainsPieces,
   waitForBoardScreenshotContainsPieces,
 } = require('../e2e/screenshotAssertions');
+const {
+  createAdaptiveScreenshotArchiver,
+} = require('../e2e/adaptiveScreenshotEvidence');
 
 let temporaryDirectory;
 
@@ -96,7 +99,9 @@ describe('screenshot assertions', () => {
     ]);
     const screenshots = [emptyScreenshot, renderedScreenshot];
     const captureScreenshot = jest.fn(async () => screenshots.shift());
-    const archiveScreenshot = jest.fn();
+    const archiveScreenshot = createAdaptiveScreenshotArchiver(
+      path.join(temporaryDirectory, 'adaptive-profile', 'orientation.txt')
+    );
     let clock = 0;
     let inspections = 0;
     const inspectScreenshot = jest.fn((...args) => {
@@ -133,10 +138,69 @@ describe('screenshot assertions', () => {
       [screenshotLabel],
       [`${screenshotLabel}-attempt-2`],
     ]);
-    expect(archiveScreenshot.mock.calls).toEqual([
-      [emptyScreenshot, screenshotLabel],
-      [renderedScreenshot, `${screenshotLabel}-attempt-2`],
+    const attemptDirectory = path.join(
+      temporaryDirectory,
+      'adaptive-profile',
+      'screenshot-attempts'
+    );
+    expect(fs.readFileSync(path.join(attemptDirectory, `${screenshotLabel}.png`)))
+      .toEqual(fs.readFileSync(emptyScreenshot));
+    expect(fs.readFileSync(path.join(attemptDirectory, `${screenshotLabel}-attempt-2.png`)))
+      .toEqual(fs.readFileSync(renderedScreenshot));
+  });
+
+  it('propagates a real archive rejection unchanged after one capture without inspection or retry', async () => {
+    const renderedScreenshot = writeSyntheticBoard('archive-rejection.png', [
+      [6, 2, [20, 25, 32, 255]],
+      [7, 0, [245, 245, 245, 255]],
     ]);
+    const screenshotLabel = 'android-phone-landscape-standard-sprint';
+    const realArchiveScreenshot = createAdaptiveScreenshotArchiver(
+      path.join(temporaryDirectory, 'collision-profile', 'orientation.txt')
+    );
+    realArchiveScreenshot(renderedScreenshot, screenshotLabel);
+    let archiveError;
+    let captureCount = 0;
+    let inspectionCount = 0;
+    let delayCount = 0;
+
+    const archiveScreenshot = (...args) => {
+      try {
+        return realArchiveScreenshot(...args);
+      } catch (error) {
+        archiveError = error;
+        throw error;
+      }
+    };
+
+    let rejectedError;
+    try {
+      await waitForBoardScreenshotContainsPieces({
+        archiveScreenshot,
+        boardFrame: fullBoardFrame(),
+        captureScreenshot: async () => {
+          captureCount += 1;
+          return renderedScreenshot;
+        },
+        screenFrame: fullBoardFrame(),
+        screenshotLabel,
+      }, {
+        delay: async () => {
+          delayCount += 1;
+        },
+        inspectScreenshot: () => {
+          inspectionCount += 1;
+        },
+      });
+    } catch (error) {
+      rejectedError = error;
+    }
+
+    expect(archiveError).toMatchObject({code: 'EEXIST'});
+    expect(rejectedError).toBe(archiveError);
+    expect(captureCount).toBe(1);
+    expect(inspectionCount).toBe(0);
+    expect(delayCount).toBe(0);
   });
 
   it('rejects a rendered screenshot whose capture completes after the hard deadline', async () => {

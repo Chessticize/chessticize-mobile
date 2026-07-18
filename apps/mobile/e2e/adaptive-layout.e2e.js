@@ -1,7 +1,6 @@
 /* global by, describe, device, element, it, waitFor */
 
 const fs = require('node:fs');
-const path = require('node:path');
 const {
   elementText,
   frameFor,
@@ -22,16 +21,23 @@ const {
   expectFrameContained,
   waitForBoardScreenshotContainsPieces,
 } = require('./screenshotAssertions');
+const {
+  createAdaptiveScreenshotArchiver,
+  sanitizeAdaptiveScreenshotLabel,
+} = require('./adaptiveScreenshotEvidence');
 
 const describeAdaptiveLayout = process.env.CHESSTICIZE_CAPTURE_ADAPTIVE_LAYOUT === '1'
   || process.env.DETOX_ACTIVE_SUITE === 'android-adaptive-layout'
   ? describe
   : describe.skip;
 
-const deviceLabel = sanitizeScreenshotLabel(process.env.CHESSTICIZE_ADAPTIVE_DEVICE_LABEL || 'simulator');
+const deviceLabel = sanitizeAdaptiveScreenshotLabel(
+  process.env.CHESSTICIZE_ADAPTIVE_DEVICE_LABEL || 'simulator'
+);
 const includeLandscape = process.env.CHESSTICIZE_ADAPTIVE_INCLUDE_LANDSCAPE === '1';
 const expectReviewStripVisible = process.env.CHESSTICIZE_ADAPTIVE_EXPECT_REVIEW_STRIP === '1';
 const onlyOrientation = process.env.CHESSTICIZE_ADAPTIVE_ONLY_ORIENTATION;
+const archiveAdaptiveScreenshot = createAdaptiveScreenshotArchiver();
 
 describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
   it('captures representative layouts and preserves the active puzzle through rotation', async () => {
@@ -156,19 +162,6 @@ async function captureSprint(orientation, { waitForPieces = false } = {}) {
   expectBoardScreenshotContainsPieces(screenshotPath, boardFrame, screenFrame);
 }
 
-function archiveAdaptiveScreenshot(screenshotPath, screenshotLabel) {
-  const orientationEvidencePath = process.env.CHESSTICIZE_ADAPTIVE_ORIENTATION_EVIDENCE;
-  if (!orientationEvidencePath) {
-    return;
-  }
-  const attemptDirectory = path.join(path.dirname(orientationEvidencePath), 'screenshot-attempts');
-  fs.mkdirSync(attemptDirectory, { recursive: true });
-  fs.copyFileSync(
-    screenshotPath,
-    path.join(attemptDirectory, `${sanitizeScreenshotLabel(screenshotLabel)}.png`)
-  );
-}
-
 async function launchForOrientation(orientation) {
   await launchWithDisabledSynchronization({
     newInstance: true,
@@ -267,10 +260,6 @@ async function frameForIfPresent(testID) {
   } catch {
     return null;
   }
-}
-
-function sanitizeScreenshotLabel(label) {
-  return label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
 function expectOrientationFrame(frame, orientation) {

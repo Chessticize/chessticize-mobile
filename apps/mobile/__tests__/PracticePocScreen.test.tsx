@@ -1490,10 +1490,22 @@ describe("PracticePocScreen", () => {
     const renderer = renderScreen({ practiceService: service });
 
     startStandardSprint(renderer);
+    const portraitSessionBoard = findByTestId(renderer, "session-board");
     const portraitBoard = findByTestId(renderer, "mock-chessboard");
+    const portraitCoordinateOverlay = findByTestId(renderer, "board-coordinate-overlay");
     const activePuzzleId = activeSprintForTest(service).currentPuzzle?.puzzle.id;
     const activeFen = portraitBoard.props.fen;
     const portraitResetBoard = portraitBoard.props.mockResetBoard;
+    const portraitOnIllegalMove = portraitBoard.props.onIllegalMove;
+    const portraitOnMove = portraitBoard.props.onMove;
+
+    expect(renderedTestIdCount(renderer, "stacked-session-layout")).toBe(1);
+    expect(renderedSessionBoardAccessibilityCount(renderer)).toBe(1);
+    expect(renderedTestIdCount(renderer, "mock-chessboard")).toBe(1);
+    expect(renderedTestIdCount(renderer, "board-coordinate-overlay")).toBe(1);
+    expect(portraitBoard.props.gestureEnabled).toBe(true);
+    expect(portraitBoard.props.draggableColor).toBeNull();
+    expect(() => findByTestId(renderer, "active-session-control-rail")).toThrow();
 
     act(() => {
       windowDimensions.__setWindowDimensions?.({
@@ -1504,13 +1516,52 @@ describe("PracticePocScreen", () => {
       });
     });
 
+    const landscapeSessionBoard = findByTestId(renderer, "session-board");
     const landscapeBoard = findByTestId(renderer, "mock-chessboard");
+    const landscapeCoordinateOverlay = findByTestId(renderer, "board-coordinate-overlay");
     expect(findByTestId(renderer, "adaptive-layout").props.accessibilityLabel)
       .toBe("Layout compactLandscape");
+    expect(renderedTestIdCount(renderer, "stacked-session-layout")).toBe(0);
+    expect(renderedTestIdCount(renderer, "active-session-adaptive-layout")).toBe(1);
+    expect(renderedSessionBoardAccessibilityCount(renderer)).toBe(1);
+    expect(renderedTestIdCount(renderer, "mock-chessboard")).toBe(1);
+    expect(renderedTestIdCount(renderer, "board-coordinate-overlay")).toBe(1);
+    expect(landscapeSessionBoard).toBe(portraitSessionBoard);
+    expect(landscapeCoordinateOverlay).toBe(portraitCoordinateOverlay);
     expect(landscapeBoard.props.boardSize).toBe(358);
     expect(landscapeBoard.props.fen).toBe(activeFen);
     expect(activeSprintForTest(service).currentPuzzle?.puzzle.id).toBe(activePuzzleId);
     expect(landscapeBoard.props.mockResetBoard).toBe(portraitResetBoard);
+    expect(landscapeBoard.props.onIllegalMove).toBe(portraitOnIllegalMove);
+    expect(landscapeBoard.props.onMove).toBe(portraitOnMove);
+    expect(landscapeBoard.props.gestureEnabled).toBe(true);
+    expect(landscapeBoard.props.draggableColor).toBeNull();
+    expect(findByTestId(renderer, "active-session-adaptive-layout")).toBeTruthy();
+    expect(findByTestId(renderer, "active-session-board-lane")).toBeTruthy();
+    expect(findByTestId(renderer, "active-session-control-rail")).toBeTruthy();
+    expect(renderedTestIdCount(renderer, "active-session-control-rail")).toBe(1);
+    expect(renderedTestIdCount(renderer, "session-score-strip")).toBe(1);
+    expect(renderedTestIdCount(renderer, "practice-prompt")).toBe(1);
+  });
+
+  it("does not leave an empty session layout item on idle, Custom setup, or Sprint Result", () => {
+    const renderer = renderScreen({ practiceService: createMobilePracticeService("familiar15") });
+
+    expect(findByTestId(renderer, "practice-home")).toBeTruthy();
+    expectNoSessionLayoutResidue(renderer);
+
+    press(renderer, "practice-mode-custom");
+    expect(findByTestId(renderer, "custom-sprint-setup")).toBeTruthy();
+    expectNoSessionLayoutResidue(renderer);
+
+    const resultRenderer = renderStandardSequenceScreen();
+    startStandardSprint(resultRenderer);
+    act(() => {
+      jest.advanceTimersByTime(301_000);
+    });
+
+    expect(findByTestId(resultRenderer, "sprint-summary-panel")).toBeTruthy();
+    expectNoSessionLayoutResidue(resultRenderer);
   });
 
   it("keeps the stable native board synchronized across the Familiar 15 failure sequence", async () => {
@@ -6042,6 +6093,48 @@ async function waitForAssertion(assertion: () => void, attempts = 10): Promise<v
 
 function findByTestId(renderer: TestRenderer.ReactTestRenderer, testID: string): TestRenderer.ReactTestInstance {
   return renderer.root.findByProps({ testID });
+}
+
+function expectNoSessionLayoutResidue(renderer: TestRenderer.ReactTestRenderer): void {
+  const anonymousEmptyTwelvePointItems = renderer.root.findAll(
+    (node) => flattenTestStyle(node.props.style).gap === 12
+      && collectText(node) === ""
+      && collectTestIds(node).length === 0
+  );
+
+  expect(renderedTestIdCount(renderer, "stacked-session-layout")).toBe(0);
+  expect(renderedTestIdCount(renderer, "active-session-adaptive-layout")).toBe(0);
+  expect(renderedSessionBoardAccessibilityCount(renderer)).toBe(0);
+  expect(renderedTestIdCount(renderer, "mock-chessboard")).toBe(0);
+  expect(renderedTestIdCount(renderer, "board-coordinate-overlay")).toBe(0);
+  expect(anonymousEmptyTwelvePointItems).toHaveLength(0);
+}
+
+function renderedTestIdCount(renderer: TestRenderer.ReactTestRenderer, testID: string): number {
+  return renderedNodeCount(renderer.toJSON(), (props) => props.testID === testID);
+}
+
+function renderedSessionBoardAccessibilityCount(renderer: TestRenderer.ReactTestRenderer): number {
+  return renderedNodeCount(renderer.toJSON(), (props) =>
+    props.testID === "session-board"
+      && props.accessible === true
+      && props.accessibilityRole === "image"
+  );
+}
+
+function renderedNodeCount(
+  node: unknown,
+  matches: (props: Record<string, unknown>) => boolean
+): number {
+  if (Array.isArray(node)) {
+    return node.reduce((count, child) => count + renderedNodeCount(child, matches), 0);
+  }
+  if (node === null || typeof node !== "object") {
+    return 0;
+  }
+  const renderedNode = node as { children?: unknown[]; props?: Record<string, unknown> };
+  return (renderedNode.props && matches(renderedNode.props) ? 1 : 0)
+    + renderedNodeCount(renderedNode.children ?? [], matches);
 }
 
 function expectText(renderer: TestRenderer.ReactTestRenderer, expected: string): void {

@@ -2416,6 +2416,12 @@ export function PracticePocScreen({
     </View>
   ) : null;
   const errorNode = error ? <ErrorPanel error={error} /> : null;
+  const hasSessionLayoutContent = sessionStatusNode !== null
+    || pausedSessionNode !== null
+    || sessionBoardNode !== null
+    || sessionScoreNode !== null
+    || practicePromptNode !== null
+    || errorNode !== null;
   const practiceAnnouncement = error
     ? `Error. ${error}`
     : boardFeedback
@@ -2532,34 +2538,36 @@ export function PracticePocScreen({
                     it between conditional branches remounts Skia and can leave
                     the piece sprite atlas blank while the board background is
                     already visible after rotation. */}
-                <View
-                  style={sessionUsesRail ? styles.activeSessionAdaptiveLayout : styles.activeSessionStack}
-                  testID={sessionUsesRail ? "active-session-adaptive-layout" : undefined}
-                >
+                {hasSessionLayoutContent ? (
                   <View
-                    style={sessionUsesRail ? styles.activeSessionBoardLane : styles.activeSessionStack}
-                    testID={sessionUsesRail ? "active-session-board-lane" : undefined}
+                    style={sessionUsesRail ? styles.activeSessionAdaptiveLayout : styles.activeSessionStack}
+                    testID={sessionUsesRail ? "active-session-adaptive-layout" : "stacked-session-layout"}
                   >
-                    {!sessionUsesRail ? sessionStatusNode : null}
-                    {!sessionUsesRail ? pausedSessionNode : null}
-                    {sessionBoardNode}
-                    {!sessionUsesRail ? sessionScoreNode : null}
-                    {!sessionUsesRail ? practicePromptNode : null}
-                    {!sessionUsesRail ? errorNode : null}
-                  </View>
-                  {sessionUsesRail ? (
-                    <ScrollView
-                      style={[styles.activeSessionControlRailScroll, { width: adaptiveLayout.sessionRailWidth }]}
-                      contentContainerStyle={styles.activeSessionControlRail}
-                      testID="active-session-control-rail"
+                    <View
+                      style={sessionUsesRail ? styles.activeSessionBoardLane : styles.activeSessionStack}
+                      testID={sessionUsesRail ? "active-session-board-lane" : undefined}
                     >
-                      {sessionStatusNode}
-                      {sessionScoreNode}
-                      {practicePromptNode}
-                      {errorNode}
-                    </ScrollView>
-                  ) : null}
-                </View>
+                      {!sessionUsesRail ? sessionStatusNode : null}
+                      {!sessionUsesRail ? pausedSessionNode : null}
+                      {sessionBoardNode}
+                      {!sessionUsesRail ? sessionScoreNode : null}
+                      {!sessionUsesRail ? practicePromptNode : null}
+                      {!sessionUsesRail ? errorNode : null}
+                    </View>
+                    {sessionUsesRail ? (
+                      <ScrollView
+                        style={[styles.activeSessionControlRailScroll, { width: adaptiveLayout.sessionRailWidth }]}
+                        contentContainerStyle={styles.activeSessionControlRail}
+                        testID="active-session-control-rail"
+                      >
+                        {sessionStatusNode}
+                        {sessionScoreNode}
+                        {practicePromptNode}
+                        {errorNode}
+                      </ScrollView>
+                    ) : null}
+                  </View>
+                ) : null}
 
                 {!isOpenSession && state === null && mode !== "custom" ? (
                   <PracticeHome
