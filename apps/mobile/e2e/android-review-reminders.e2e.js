@@ -1,6 +1,10 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const { runAndroidAdbShell } = require('./androidAdbShell');
+const {
+  countActiveAndroidNotifications,
+  runAndroidAdbShell,
+  waitForAndroidAdbShellText,
+} = require('./androidAdbShell');
 const {
   androidAppIsResumed,
   failStandardSprint,
@@ -21,6 +25,11 @@ const REMINDER_ACTION = 'com.chessticize.mobile.action.DELIVER_REVIEW_REMINDER';
 const ARTIFACT_DIR = path.resolve(__dirname, '../artifacts/android-review-reminders');
 const REMINDER_DELAY_MS = 10_000;
 const REVIEW_NOTIFICATION_ID = '182';
+const REVIEW_NOTIFICATION = Object.freeze({
+  notificationId: REVIEW_NOTIFICATION_ID,
+  packageName: APP_ID,
+  title: 'Chessticize',
+});
 
 describe('Android Review reminders through public and system surfaces', () => {
   beforeAll(() => {
@@ -137,7 +146,7 @@ describe('Android Review reminders through public and system surfaces', () => {
       await waitForElementTextContaining('settings-review-reminders', 'Reminders are off', 10000);
       await setDeviceTimezone(originalTimezone);
       await sleep(REMINDER_DELAY_MS + 2_000);
-      assertNotificationAbsent('3 reviews are ready');
+      await assertNotificationAbsent('3 reviews are ready');
       assertActiveReviewNotificationCount(0);
 
       await launchWithDisabledSynchronization({
@@ -151,7 +160,7 @@ describe('Android Review reminders through public and system surfaces', () => {
       await openTab('settings-tab', 'settings-review-reminders');
       await waitForElementTextContaining('settings-review-reminders', 'Reminders are off', 10000);
       await sleep(REMINDER_DELAY_MS + 2_000);
-      assertNotificationAbsent('3 reviews are ready');
+      await assertNotificationAbsent('3 reviews are ready');
       recordSystemEvidence('disabled-after-event-relaunch');
     });
   });
@@ -219,7 +228,15 @@ async function waitForSystemNode(candidates, timeoutMs = 15_000, options = {}) {
 }
 
 async function waitForNotification(text, timeoutMs) {
-  await waitForShellText(['dumpsys', 'notification', '--noredact'], text, true, timeoutMs);
+  await waitForAndroidAdbShellText(
+    ['dumpsys', 'notification', '--noredact'],
+    text,
+    true,
+    timeoutMs,
+    {
+      activeNotification: REVIEW_NOTIFICATION,
+    }
+  );
 }
 
 async function waitForShellText(args, text, present, timeoutMs) {
@@ -235,11 +252,14 @@ async function waitForShellText(args, text, present, timeoutMs) {
   throw new Error(`Expected shell ${args.join(' ')} to ${present ? 'contain' : 'omit'} ${text}. Latest: ${latest}`);
 }
 
-function assertNotificationAbsent(text) {
-  const state = adbShell(['dumpsys', 'notification', '--noredact']);
-  if (state.includes(`android.title=String (${text})`) || state.includes(`android.text=String (${text})`)) {
-    throw new Error(`Unexpected active review reminder after disabling: ${text}`);
-  }
+async function assertNotificationAbsent(text) {
+  await waitForAndroidAdbShellText(
+    ['dumpsys', 'notification', '--noredact'],
+    text,
+    false,
+    5_000,
+    { activeNotification: REVIEW_NOTIFICATION }
+  );
 }
 
 function pendingReviewAlarmSnapshot() {
@@ -275,10 +295,7 @@ async function waitForReviewAlarmRebased(before, timeoutMs) {
 
 function assertActiveReviewNotificationCount(expected) {
   const state = adbShell(['cmd', 'notification', 'list']);
-  const count = state
-    .split('\n')
-    .filter((line) => line.includes(`|${APP_ID}|${REVIEW_NOTIFICATION_ID}|`))
-    .length;
+  const count = countActiveAndroidNotifications(state, REVIEW_NOTIFICATION);
   if (count !== expected) {
     throw new Error(`Expected ${expected} active review notifications, found ${count}. State:\n${state}`);
   }
