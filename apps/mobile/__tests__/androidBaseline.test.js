@@ -37,7 +37,7 @@ function read(relativePath) {
 
 function runIsolatedOfflinePreparation(
   availableDataKib,
-  { rootMode = 'already-root', trimDenied = false } = {},
+  { rootMode = 'already-root', trimDenied = false, waitDelaySeconds = '0' } = {},
 ) {
   const isolatedRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'chessticize-android-capacity-'));
   const scriptsDir = path.join(isolatedRoot, 'scripts');
@@ -109,6 +109,9 @@ case "$*" in
     wait_count="$(cat "$FAKE_WAIT_COUNT")"
     wait_count=$((wait_count + 1))
     printf '%s\\n' "$wait_count" > "$FAKE_WAIT_COUNT"
+    if [ "$FAKE_WAIT_DELAY_SECONDS" != "0" ]; then
+      sleep "$FAKE_WAIT_DELAY_SECONDS"
+    fi
     if [ "$FAKE_ROOT_MODE" = "recovery-wait-timeout" ] && [ "$wait_count" -ge 2 ]; then
       while :; do :; done
     fi
@@ -124,13 +127,16 @@ esac
       env: {
         ...process.env,
         ADB_PATH: fakeAdb,
-        ANDROID_OFFLINE_ADB_RECOVERY_WAIT_ATTEMPTS: '2',
+        // Keep the fake's recovery bound short, but leave enough scheduler
+        // headroom for this process-based harness in parallel hosted CI.
+        ANDROID_OFFLINE_ADB_RECOVERY_WAIT_ATTEMPTS: '100',
         ANDROID_OFFLINE_ADB_RECOVERY_WAIT_INTERVAL_SECONDS: '0.01',
         DETOX_ANDROID_DEVICE: 'emulator-5554',
         FAKE_ADB_CALLS: callsPath,
         FAKE_ROOT_COUNT: rootCountPath,
         FAKE_ROOT_MODE: rootMode,
         FAKE_TRIM_DENIED: trimDenied ? '1' : '0',
+        FAKE_WAIT_DELAY_SECONDS: waitDelaySeconds,
         FAKE_WAIT_COUNT: waitCountPath,
       },
     });
@@ -596,6 +602,22 @@ describe('Android launch baseline', () => {
     expect(result.calls.filter((call) => call.endsWith(' root'))).toHaveLength(1);
     expect(result.calls.filter((call) => call.endsWith(' wait-for-device'))).toHaveLength(2);
     expect(result.calls.filter((call) => call.endsWith(' shell id -u'))).toHaveLength(2);
+  });
+
+  it('keeps bounded root recovery deterministic under delayed fake-adb scheduling', () => {
+    const successfulRestart = runIsolatedOfflinePreparation(700000, {
+      rootMode: 'root-success',
+      waitDelaySeconds: '0.05',
+    });
+    const persistentFailure = runIsolatedOfflinePreparation(700000, {
+      rootMode: 'persistent-closed',
+      waitDelaySeconds: '0.05',
+    });
+
+    expect([
+      successfulRestart.status,
+      persistentFailure.calls.filter((call) => call.endsWith(' root')).length,
+    ]).toEqual([0, 2]);
   });
 
   it('fails after one retry when the adb root transport failure persists', () => {
