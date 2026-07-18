@@ -16,6 +16,10 @@ const {
   GitHubReleasesClient,
   PlayGeneratedApksClient,
 } = require('../scripts/android-github-release-clients');
+const {
+  requireDigest,
+  requireSafePositiveInteger,
+} = require('../scripts/android-release-validation');
 
 const crypto = require('node:crypto');
 const { spawnSync } = require('node:child_process');
@@ -137,7 +141,116 @@ class FakePlayGeneratedApksClient {
   }
 }
 
+function binaryPublicationFixture() {
+  const identity = createAndroidReleaseIdentity(releaseVersion);
+  const apkBytes = Buffer.from('deterministic-play-generated-universal-apk');
+  const apkSha256 = crypto.createHash('sha256').update(apkBytes).digest('hex');
+  const checksumBytes = Buffer.from(`${apkSha256}  ${identity.apkName}\n`);
+  const sourceBytes = manifestBytes();
+  const sourceSha256 = crypto.createHash('sha256').update(sourceBytes).digest('hex');
+  const binaryEvidence = {
+    schemaVersion: 1,
+    phase: 'binary-prepared',
+    publicationApproved: false,
+    releaseId: 41,
+    sourceManifestAssetId: 42,
+    sourceManifestSha256: sourceSha256,
+    tagName: identity.tagName,
+    candidate: {
+      commitSha: 'a'.repeat(40),
+      aabSha256: 'b'.repeat(64),
+      applicationId: identity.applicationId,
+      versionName: identity.publicVersion,
+      versionCode: identity.versionCode,
+    },
+    playDownloadId: 'universal-download-7',
+    apk: {
+      name: identity.apkName,
+      bytes: apkBytes.length,
+      sha256: apkSha256,
+      applicationId: identity.applicationId,
+      versionName: identity.publicVersion,
+      versionCode: identity.versionCode,
+      signerCertificateSha256: 'd'.repeat(64),
+      abis: ['arm64-v8a', 'x86_64'],
+      pageSizeCompatibility: '16-kib-compatible',
+    },
+    checksum: {
+      name: identity.checksumName,
+      sha256: crypto.createHash('sha256').update(checksumBytes).digest('hex'),
+    },
+    releaseNotes: binaryReleaseNotes(identity, {
+      applicationId: identity.applicationId,
+      signerCertificateSha256: 'd'.repeat(64),
+      sha256: apkSha256,
+    }),
+  };
+  const inspection = {
+    applicationId: identity.applicationId,
+    versionName: identity.publicVersion,
+    versionCode: identity.versionCode,
+    signerCertificateSha256: 'd'.repeat(64),
+    abis: ['arm64-v8a', 'x86_64'],
+    zipAligned16KiB: true,
+    elfAligned16KiB: true,
+    debuggable: false,
+    testOnly: false,
+    internetPermission: false,
+  };
+  const sourceAsset = {
+    id: 42,
+    name: 'android-source-manifest.json',
+    sha256: sourceSha256,
+    size: sourceBytes.length,
+  };
+  const github = new FakeGitHubReleasesClient({
+    release: {
+      id: 41,
+      tagName: identity.tagName,
+      targetCommitish: 'main',
+      draft: false,
+      prerelease: false,
+      body: sourceReleaseNotes(identity),
+    },
+    asset: sourceAsset,
+    assets: [sourceAsset],
+    nextAssetId: 50,
+  });
+  const input = {
+    releaseVersion,
+    binaryEvidence,
+    sourceManifestBytes: sourceBytes,
+    apkBytes,
+    checksumBytes,
+    apkInspection: inspection,
+  };
+  return {
+    identity,
+    apkBytes,
+    apkSha256,
+    checksumBytes,
+    sourceBytes,
+    sourceSha256,
+    binaryEvidence,
+    inspection,
+    sourceAsset,
+    github,
+    input,
+  };
+}
+
 describe('Android GitHub release automation', () => {
+  it('shares strict retained-evidence integer and digest validation', () => {
+    expect(requireSafePositiveInteger(1, 'Workflow ID')).toBeUndefined();
+    expect(() => requireSafePositiveInteger(0, 'Workflow ID')).toThrow(
+      'Workflow ID must be a positive integer',
+    );
+    expect(requireDigest('A'.repeat(64), 'Archive digest')).toBe('a'.repeat(64));
+    expect(() => requireDigest('not-a-digest', 'Archive digest')).toThrow(
+      'Archive digest must be a SHA-256 digest',
+    );
+  });
+
   it('derives the canonical Android release identity from the unified release version', () => {
     expect(createAndroidReleaseIdentity({
       publicVersion: '1.1',
@@ -704,88 +817,18 @@ describe('Android GitHub release automation', () => {
   });
 
   it('publishes the exact prepared binary only after separate protected approval', async () => {
-    const identity = createAndroidReleaseIdentity(releaseVersion);
-    const apkBytes = Buffer.from('deterministic-play-generated-universal-apk');
-    const apkSha256 = crypto.createHash('sha256').update(apkBytes).digest('hex');
-    const checksumBytes = Buffer.from(`${apkSha256}  ${identity.apkName}\n`);
-    const sourceBytes = manifestBytes();
-    const sourceSha256 = crypto.createHash('sha256').update(sourceBytes).digest('hex');
-    const binaryEvidence = {
-      schemaVersion: 1,
-      phase: 'binary-prepared',
-      publicationApproved: false,
-      releaseId: 41,
-      sourceManifestAssetId: 42,
-      sourceManifestSha256: sourceSha256,
-      tagName: identity.tagName,
-      candidate: {
-        commitSha: 'a'.repeat(40),
-        aabSha256: 'b'.repeat(64),
-        applicationId: identity.applicationId,
-        versionName: identity.publicVersion,
-        versionCode: identity.versionCode,
-      },
-      playDownloadId: 'universal-download-7',
-      apk: {
-        name: identity.apkName,
-        bytes: apkBytes.length,
-        sha256: apkSha256,
-        applicationId: identity.applicationId,
-        versionName: identity.publicVersion,
-        versionCode: identity.versionCode,
-        signerCertificateSha256: 'd'.repeat(64),
-        abis: ['arm64-v8a', 'x86_64'],
-        pageSizeCompatibility: '16-kib-compatible',
-      },
-      checksum: {
-        name: identity.checksumName,
-        sha256: crypto.createHash('sha256').update(checksumBytes).digest('hex'),
-      },
-      releaseNotes: binaryReleaseNotes(identity, {
-        applicationId: identity.applicationId,
-        signerCertificateSha256: 'd'.repeat(64),
-        sha256: apkSha256,
-      }),
-    };
-    const inspection = {
-      applicationId: identity.applicationId,
-      versionName: identity.publicVersion,
-      versionCode: identity.versionCode,
-      signerCertificateSha256: 'd'.repeat(64),
-      abis: ['arm64-v8a', 'x86_64'],
-      zipAligned16KiB: true,
-      elfAligned16KiB: true,
-      debuggable: false,
-      testOnly: false,
-      internetPermission: false,
-    };
-    const sourceAsset = {
-      id: 42,
-      name: 'android-source-manifest.json',
-      sha256: sourceSha256,
-      size: sourceBytes.length,
-    };
-    const github = new FakeGitHubReleasesClient({
-      release: {
-        id: 41,
-        tagName: identity.tagName,
-        targetCommitish: 'main',
-        draft: false,
-        prerelease: false,
-        body: sourceReleaseNotes(identity),
-      },
-      asset: sourceAsset,
-      assets: [sourceAsset],
-      nextAssetId: 50,
-    });
-    const input = {
-      releaseVersion,
-      binaryEvidence,
-      sourceManifestBytes: sourceBytes,
+    const {
+      identity,
       apkBytes,
+      apkSha256,
       checksumBytes,
-      apkInspection: inspection,
-    };
+      sourceBytes,
+      sourceSha256,
+      binaryEvidence,
+      sourceAsset,
+      github,
+      input,
+    } = binaryPublicationFixture();
 
     await expect(publishBinaryRelease({
       ...input,
@@ -1191,6 +1234,101 @@ describe('Android GitHub release automation', () => {
       'response lost with concurrent APK mutation',
     );
     expect(tamperedResponseLossGithub.deletedAssets).toEqual([81, 82]);
+  });
+
+  it('rejects corrupted retained checksum bytes before contacting GitHub', async () => {
+    const { github, input } = binaryPublicationFixture();
+    github.getReleaseAssets = jest.fn(github.getReleaseAssets.bind(github));
+
+    await expect(publishBinaryRelease({
+      ...input,
+      checksumBytes: Buffer.from('corrupted retained checksum bytes\n'),
+      publicationApproved: true,
+    }, { github })).rejects.toThrow(
+      'Prepared SHA-256 checksum does not match the exact APK',
+    );
+
+    expect(github.getReleaseAssets).not.toHaveBeenCalled();
+    expect(github.uploadedAssets).toEqual([]);
+    expect(github.updatedReleases).toEqual([]);
+    expect(github.deletedAssets).toEqual([]);
+    expect(github.assets.some(asset => asset.name.endsWith('.apk'))).toBe(false);
+  });
+
+  it('fails closed and permits a clean retry when the first checksum upload fails', async () => {
+    const { identity, github, input } = binaryPublicationFixture();
+    const uploadAsset = github.uploadAsset.bind(github);
+    github.uploadAsset = jest.fn(async upload => {
+      expect(upload.name).toBe(identity.checksumName);
+      throw new Error('GitHub checksum upload HTTP 503');
+    });
+
+    await expect(publishBinaryRelease({
+      ...input,
+      publicationApproved: true,
+    }, { github })).rejects.toThrow('GitHub checksum upload HTTP 503');
+
+    expect(github.uploadedAssets).toEqual([]);
+    expect(github.updatedReleases).toEqual([]);
+    expect(github.deletedAssets).toEqual([]);
+    expect(github.assets.some(asset => asset.name.endsWith('.apk'))).toBe(false);
+
+    github.uploadAsset = uploadAsset;
+    await expect(publishBinaryRelease({
+      ...input,
+      publicationApproved: true,
+    }, { github })).resolves.toEqual(expect.objectContaining({
+      phase: 'binary-published',
+      publicationApproved: true,
+    }));
+  });
+
+  it('fails closed without mutation when the initial release asset list is unavailable', async () => {
+    const { github, input } = binaryPublicationFixture();
+    github.getReleaseAssets = jest.fn(async () => {
+      throw new Error('GitHub release asset-list HTTP 503');
+    });
+
+    await expect(publishBinaryRelease({
+      ...input,
+      publicationApproved: true,
+    }, { github })).rejects.toThrow(
+      'manually confirm no APK is public before retry',
+    );
+
+    expect(github.uploadedAssets).toEqual([]);
+    expect(github.updatedReleases).toEqual([]);
+    expect(github.deletedAssets).toEqual([]);
+    expect(github.assets.some(asset => asset.name.endsWith('.apk'))).toBe(false);
+  });
+
+  it('requires manual confirmation when the asset list fails during reconciliation', async () => {
+    const { identity, github, input } = binaryPublicationFixture();
+    const getReleaseAssets = github.getReleaseAssets.bind(github);
+    let assetListCalls = 0;
+    github.getReleaseAssets = jest.fn(async releaseId => {
+      assetListCalls += 1;
+      if (assetListCalls > 1) {
+        throw new Error('GitHub reconciliation asset-list HTTP 503');
+      }
+      return getReleaseAssets(releaseId);
+    });
+    github.uploadAsset = jest.fn(async upload => {
+      expect(upload.name).toBe(identity.checksumName);
+      throw new Error('GitHub checksum upload HTTP 503');
+    });
+
+    await expect(publishBinaryRelease({
+      ...input,
+      publicationApproved: true,
+    }, { github })).rejects.toThrow(
+      'manually confirm no APK is public before retry',
+    );
+
+    expect(github.uploadedAssets).toEqual([]);
+    expect(github.updatedReleases).toEqual([]);
+    expect(github.deletedAssets).toEqual([]);
+    expect(github.assets.some(asset => asset.name.endsWith('.apk'))).toBe(false);
   });
 
   it('wires four manual protected phases without any push, tag, or unapproved publication path', () => {

@@ -9,6 +9,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { ANDROID_REQUIREMENTS } = require('./android-requirements');
+const {
+  requireDigest,
+  requireSafePositiveInteger,
+} = require('./android-release-validation');
 const { verifyApk } = require('./verify-android-apk-abis');
 
 const ANDROID_APPLICATION_ID = 'com.chessticize.mobile';
@@ -60,19 +64,6 @@ function measureArtifact(artifact) {
     throw new Error('Artifact file must not be empty.');
   }
   return { bytes, sha256: sha256File(filePath) };
-}
-
-function requireSafePositiveInteger(value, label) {
-  if (!Number.isSafeInteger(value) || value < 1) {
-    throw new Error(`${label} must be a positive integer.`);
-  }
-}
-
-function requireDigest(value, label) {
-  if (typeof value !== 'string' || !/^[0-9a-f]{64}$/i.test(value)) {
-    throw new Error(`${label} must be a SHA-256 digest.`);
-  }
-  return value.toLowerCase();
 }
 
 function requireExactSourceManifest(manifest, identity) {
@@ -694,15 +685,25 @@ async function publishBinaryRelease(input, { github }) {
     throw new Error('Prepared Android release notes are missing or changed.');
   }
 
+  const existingAssetsPromise = github.getReleaseAssets(evidence.releaseId).catch(error => {
+    throw new Error(
+      'GitHub release assets could not be listed before binary publication; ' +
+      `manually confirm no APK is public before retry. ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      { cause: error },
+    );
+  });
   const [tag, release, sourceAsset, existingAssets] = await Promise.all([
     github.getTag(identity.tagName),
     github.getRelease(evidence.releaseId),
     github.getAsset(evidence.sourceManifestAssetId),
-    github.getReleaseAssets(evidence.releaseId),
+    existingAssetsPromise,
   ]);
   if (!Array.isArray(existingAssets)) {
     throw new Error(
-      'GitHub release assets API response is unavailable; manually confirm no APK is public.',
+      'GitHub release assets API response is unavailable; ' +
+      'manually confirm no APK is public before retry.',
     );
   }
   if (!tag || !['annotated', 'signed'].includes(tag.tagType) ||
@@ -919,14 +920,17 @@ async function publishBinaryRelease(input, { github }) {
           error instanceof Error ? error.message : String(error)
         }. ${reconciliationError instanceof Error
           ? reconciliationError.message
-          : String(reconciliationError)}`,
+          : String(reconciliationError)}; ` +
+        'manually confirm no APK is public before retry.',
         { cause: error },
       );
     }
     if (!Array.isArray(currentAssets)) {
-      throw new Error('Binary publication assets could not be reconciled after failure.', {
-        cause: error,
-      });
+      throw new Error(
+        'Binary publication assets could not be reconciled after failure; ' +
+        'manually confirm no APK is public before retry.',
+        { cause: error },
+      );
     }
     const recoveredState = exactPublishedState(currentRelease, currentAssets);
     if (recoveredState) {
