@@ -118,8 +118,12 @@ async function waitForAndroidNotificationIdentity(
     }
     latest = runShell(['cmd', 'notification', 'list'], shellOptions);
     latestCount = countActiveAndroidNotifications(latest, notification);
-    if (latestCount === expectedCount) {
+    if (latestCount === expectedCount && now() <= deadline) {
       return latest;
+    }
+
+    if (now() > deadline) {
+      break;
     }
 
     await sleepUntilNextPoll(deadline, now, pollIntervalMs, sleep);
@@ -170,10 +174,28 @@ function pollingShellOptions(deadline, now, shellTimeoutMs, shellOptions) {
 
 function countActiveAndroidNotifications(state, notification) {
   const marker = `|${notification.packageName}|${notification.notificationId}|`;
-  return state
-    .split('\n')
+  return parseActiveAndroidNotificationList(state)
     .filter((line) => line.includes(marker))
     .length;
+}
+
+function parseActiveAndroidNotificationList(state) {
+  const output = String(state);
+  if (output === '') {
+    return [];
+  }
+  const withoutFinalLineEnding = output.replace(/(?:\r\n|\n)$/, '');
+  if (withoutFinalLineEnding === '') {
+    return [];
+  }
+  const lines = withoutFinalLineEnding.split(/\r?\n/);
+  const supportedRecord = /^-?\d+\|[A-Za-z0-9._]+\|-?\d+\|[^|\r\n]*\|-?\d+$/;
+  if (lines.some((line) => !supportedRecord.test(line))) {
+    throw new Error(
+      `Malformed Android active notification list: ${output.trimEnd() || '<empty>'}`
+    );
+  }
+  return lines;
 }
 
 async function sleepUntilNextPoll(deadline, now, pollIntervalMs, sleep) {

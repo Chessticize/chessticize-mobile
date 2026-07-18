@@ -14,6 +14,7 @@ const {
   launchWithFreshAndroidRuntimePermission,
   openTab,
   sleep,
+  waitForAndTapExactAndroidNotificationRow,
   waitForElementTextContaining,
   waitForVisibleInPracticeScroll,
   withAndroidUiDiagnostics,
@@ -191,17 +192,27 @@ async function tapSystemNode(candidates, timeoutMs = 15_000, options = {}) {
   if (!bounds) {
     throw new Error(`System node has no tappable bounds: ${node}`);
   }
-  const centerX = Math.round((Number(bounds[1]) + Number(bounds[3])) / 2);
-  const centerY = Math.round((Number(bounds[2]) + Number(bounds[4])) / 2);
-  adbShell(['input', 'tap', String(centerX), String(centerY)]);
+  tapSystemBounds({
+    bottom: Number(bounds[4]),
+    left: Number(bounds[1]),
+    right: Number(bounds[3]),
+    top: Number(bounds[2]),
+  });
 }
 
 async function tapPermissionSystemNode(candidates, timeoutMs = 15_000) {
   await tapSystemNode(candidates, timeoutMs, { exact: true });
 }
 
-async function tapNotificationSystemNode(candidates, timeoutMs = 15_000) {
-  await tapSystemNode(candidates, timeoutMs, { clickableAncestor: true });
+async function tapReviewNotificationSystemNode(timeoutMs = 15_000) {
+  await waitForAndTapExactAndroidNotificationRow({
+    body: '3 reviews are ready',
+    delay: sleep,
+    readHierarchy: readSystemHierarchy,
+    tapBounds: tapSystemBounds,
+    timeoutMs,
+    title: REVIEW_NOTIFICATION.title,
+  });
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (androidAppIsResumed()) {
@@ -212,29 +223,22 @@ async function tapNotificationSystemNode(candidates, timeoutMs = 15_000) {
   throw new Error('Notification tap did not resume the Chessticize app');
 }
 
-async function tapReviewNotificationSystemNode(timeoutMs = 15_000) {
-  const titleRow = await waitForSystemNode(
-    [REVIEW_NOTIFICATION.title],
-    timeoutMs,
-    { clickableAncestor: true }
-  );
-  const bodyRow = await waitForSystemNode(
-    ['3 reviews are ready'],
-    timeoutMs,
-    { clickableAncestor: true }
-  );
-  if (titleRow !== bodyRow) {
-    throw new Error('Review notification title and body were not exposed in the same SystemUI row');
-  }
-  await tapNotificationSystemNode(['3 reviews are ready'], timeoutMs);
+function tapSystemBounds(bounds) {
+  const centerX = Math.round((bounds.left + bounds.right) / 2);
+  const centerY = Math.round((bounds.top + bounds.bottom) / 2);
+  adbShell(['input', 'tap', String(centerX), String(centerY)]);
+}
+
+function readSystemHierarchy() {
+  adbShell(['uiautomator', 'dump', '/sdcard/chessticize-reminder-window.xml']);
+  return adbShell(['cat', '/sdcard/chessticize-reminder-window.xml']);
 }
 
 async function waitForSystemNode(candidates, timeoutMs = 15_000, options = {}) {
   const deadline = Date.now() + timeoutMs;
   let latest = '';
   while (Date.now() < deadline) {
-    adbShell(['uiautomator', 'dump', '/sdcard/chessticize-reminder-window.xml']);
-    latest = adbShell(['cat', '/sdcard/chessticize-reminder-window.xml']);
+    latest = readSystemHierarchy();
     const found = findAndroidSystemNode(latest, candidates, options);
     if (found) {
       return found;

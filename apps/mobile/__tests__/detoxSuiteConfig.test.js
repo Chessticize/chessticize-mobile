@@ -29,6 +29,7 @@ const {
   androidAppIsResumed,
   beginAndroidPredictiveBackGesture,
   collectAndroidUiDiagnostics,
+  findExactAndroidNotificationRow,
   findPendingAndroidAlarms,
   findAndroidSystemNode,
   grantAndroidRuntimePermission,
@@ -36,6 +37,7 @@ const {
   launchWithFreshAndroidRuntimePermission,
   performAndroidPredictiveBackGesture,
   setAndroidDisplayOrientation,
+  waitForAndTapExactAndroidNotificationRow,
   waitForRunningStockfishDepth,
   withAndroidUiDiagnostics,
 } = require('../e2e/helpers');
@@ -99,7 +101,7 @@ describe('Detox suite configuration', () => {
       '<node resource-id="com.android.systemui:id/notification_stack_scroller" clickable="false" bounds="[0,0][1080,1836]">',
       '<node resource-id="com.android.systemui:id/expandableNotificationRow" clickable="true" bounds="[42,568][1038,786]">',
       '<node resource-id="android:id/notification_headerless_view_column" clickable="false" bounds="[179,620][891,734]">',
-      '<node text="ChessticizeMobile" resource-id="android:id/title" clickable="false" bounds="[179,620][480,671]" />',
+      '<node text="Chessticize" resource-id="android:id/title" clickable="false" bounds="[179,620][480,671]" />',
       '<node text="3 reviews are ready" resource-id="android:id/text" clickable="false" bounds="[179,676][891,729]" />',
       '</node>',
       '</node>',
@@ -127,6 +129,109 @@ describe('Detox suite configuration', () => {
     expect(target).toContain('bounds="[42,568][1038,786]"');
     expect(titleTarget).toBe(target);
     expect(bodyTarget).toBe(target);
+  });
+
+  it('rejects title and body supersets when finding an exact notification row', () => {
+    const titleSuperset = [
+      '<node clickable="true" bounds="[42,568][1038,786]">',
+      '<node text="ChessticizeMobile" clickable="false" />',
+      '<node text="3 reviews are ready" clickable="false" />',
+      '</node>',
+    ].join('');
+    const bodyPrefix = [
+      '<node clickable="true" bounds="[42,568][1038,786]">',
+      '<node text="Chessticize" clickable="false" />',
+      '<node text="Soon: 3 reviews are ready" clickable="false" />',
+      '</node>',
+    ].join('');
+    const bodySuffix = [
+      '<node clickable="true" bounds="[42,568][1038,786]">',
+      '<node text="Chessticize" clickable="false" />',
+      '<node text="3 reviews are ready now" clickable="false" />',
+      '</node>',
+    ].join('');
+    const expected = {
+      body: '3 reviews are ready',
+      title: 'Chessticize',
+    };
+
+    expect(findExactAndroidNotificationRow(titleSuperset, expected)).toBeNull();
+    expect(findExactAndroidNotificationRow(bodyPrefix, expected)).toBeNull();
+    expect(findExactAndroidNotificationRow(bodySuffix, expected)).toBeNull();
+  });
+
+  it('rejects title and body split across separate clickable notification rows', () => {
+    const hierarchy = [
+      '<node clickable="true" bounds="[42,100][1038,300]">',
+      '<node text="Chessticize" clickable="false" />',
+      '</node>',
+      '<node clickable="true" bounds="[42,568][1038,786]">',
+      '<node text="3 reviews are ready" clickable="false" />',
+      '</node>',
+    ].join('');
+
+    expect(findExactAndroidNotificationRow(hierarchy, {
+      body: '3 reviews are ready',
+      title: 'Chessticize',
+    })).toBeNull();
+  });
+
+  it('does not combine alternating SystemUI snapshots before tapping a notification row', async () => {
+    const titleOnly = [
+      '<node clickable="true" bounds="[42,568][1038,786]">',
+      '<node text="Chessticize" clickable="false" />',
+      '</node>',
+    ].join('');
+    const bodyOnly = [
+      '<node clickable="true" bounds="[42,568][1038,786]">',
+      '<node text="3 reviews are ready" clickable="false" />',
+      '</node>',
+    ].join('');
+    let clock = 0;
+    let snapshot = 0;
+    const readHierarchy = jest.fn(() => (
+      snapshot++ % 2 === 0 ? titleOnly : bodyOnly
+    ));
+    const tapBounds = jest.fn();
+
+    await expect(waitForAndTapExactAndroidNotificationRow({
+      body: '3 reviews are ready',
+      delay: async (milliseconds) => { clock += milliseconds; },
+      now: () => clock,
+      pollIntervalMs: 5,
+      readHierarchy,
+      tapBounds,
+      timeoutMs: 15,
+      title: 'Chessticize',
+    })).rejects.toThrow('Timed out waiting for exact Android SystemUI notification row');
+    expect(readHierarchy).toHaveBeenCalledTimes(3);
+    expect(tapBounds).not.toHaveBeenCalled();
+  });
+
+  it('taps bounds from the single snapshot that proves exact body and title', async () => {
+    const hierarchy = [
+      '<node clickable="true" bounds="[42,568][1038,786]">',
+      '<node text="Chessticize" clickable="false" />',
+      '<node text="3 reviews are ready" clickable="false" />',
+      '</node>',
+    ].join('');
+    const readHierarchy = jest.fn(() => hierarchy);
+    const tapBounds = jest.fn();
+
+    await expect(waitForAndTapExactAndroidNotificationRow({
+      body: '3 reviews are ready',
+      readHierarchy,
+      tapBounds,
+      timeoutMs: 15,
+      title: 'Chessticize',
+    })).resolves.toMatchObject({ hierarchy });
+    expect(readHierarchy).toHaveBeenCalledTimes(1);
+    expect(tapBounds).toHaveBeenCalledWith({
+      bottom: 786,
+      left: 42,
+      right: 1038,
+      top: 568,
+    });
   });
 
   it('refuses to tap matching system text without a clickable target', () => {
@@ -1217,12 +1322,14 @@ describe('Detox suite configuration', () => {
     expect(spec).toContain("permission_allow_button");
     expect(spec).toContain("permission_deny_button");
     expect(spec).toContain("statusbar', 'expand-notifications");
-    expect(spec).toContain('tapNotificationSystemNode');
-    expect(spec).toContain(
-      "tapNotificationSystemNode(['3 reviews are ready'], timeoutMs)"
-    );
-    expect(spec).toContain('if (titleRow !== bodyRow)');
-    expect(spec).not.toContain("tapNotificationSystemNode(['3 reviews are ready', 'Chessticize'])");
+    expect(spec).toContain('waitForAndTapExactAndroidNotificationRow({');
+    expect(spec).toContain("body: '3 reviews are ready'");
+    expect(spec).toContain('readHierarchy: readSystemHierarchy');
+    expect(spec).toContain('tapBounds: tapSystemBounds');
+    expect(spec).toContain('title: REVIEW_NOTIFICATION.title');
+    expect(spec).not.toContain('function tapNotificationSystemNode');
+    expect(spec).not.toContain('titleRow');
+    expect(spec).not.toContain('bodyRow');
     expect(spec).not.toContain("['dumpsys', 'notification', '--noredact']");
     expect(spec).toContain('androidAppIsResumed()');
     expect(spec).toContain("3 reviews are ready");

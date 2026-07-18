@@ -311,6 +311,28 @@ describe('Android E2E shell transport', () => {
     expect(sleep).not.toHaveBeenCalled();
   });
 
+  it('accepts an empty supported active list as exact absence', async () => {
+    const runShell = jest.fn(() => '');
+
+    await expect(waitForAndroidNotificationIdentity(
+      reviewNotification,
+      0,
+      800,
+      { now: () => 1_000, runShell }
+    )).resolves.toBe('');
+  });
+
+  it('fails closed instead of accepting malformed nonempty output as absence', async () => {
+    const runShell = jest.fn(() => 'adb: error: notification service unavailable\n');
+
+    await expect(waitForAndroidNotificationIdentity(
+      reviewNotification,
+      0,
+      800,
+      { now: () => 1_000, runShell }
+    )).rejects.toThrow('Malformed Android active notification list');
+  });
+
   it('rejects zero active matches when one exact identity is required', async () => {
     let nowMs = 1_000;
     const runShell = jest.fn(() => '-1|android|55|null|1000\n');
@@ -386,7 +408,7 @@ describe('Android E2E shell transport', () => {
 
   it('bounds each exact-identity poll and its recovery by the outer deadline', async () => {
     let nowMs = 1_000;
-    const runShell = jest.fn(() => 'unrelated notification state\n');
+    const runShell = jest.fn(() => '0|com.other.app|999|null|10001\n');
     const sleep = jest.fn(async (durationMs) => {
       nowMs += durationMs;
     });
@@ -411,6 +433,24 @@ describe('Android E2E shell transport', () => {
       1_800,
       1_800,
     ]);
+  });
+
+  it('rejects an expected identity returned after the outer deadline', async () => {
+    let nowMs = 1_000;
+    const runShell = jest.fn(() => {
+      nowMs = 1_801;
+      return '0|com.chessticize.mobile|182|null|10246\n';
+    });
+
+    await expect(waitForAndroidNotificationIdentity(
+      reviewNotification,
+      1,
+      800,
+      { now: () => nowMs, runShell }
+    )).rejects.toThrow(
+      'Expected exactly 1 active Android notification(s) for '
+      + 'com.chessticize.mobile/182'
+    );
   });
 
   it('recovers one transient offline identity query within the outer deadline', async () => {
