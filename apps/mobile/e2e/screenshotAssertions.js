@@ -4,6 +4,13 @@
 const fs = require('fs');
 const zlib = require('zlib');
 
+class BoardScreenshotPiecesError extends Error {
+  constructor(occupiedSquares) {
+    super(`Expected rendered chess pieces, found only ${occupiedSquares} occupied board squares`);
+    this.name = 'BoardScreenshotPiecesError';
+  }
+}
+
 function expectBoardScreenshotContainsPieces(screenshotPath, boardFrame, screenFrame) {
   const png = readRgbaPng(screenshotPath);
   const boardPixels = pixelFrameForElement(png, boardFrame, screenFrame);
@@ -13,8 +20,150 @@ function expectBoardScreenshotContainsPieces(screenshotPath, boardFrame, screenF
   // relative to the two board colors so low-material puzzles remain valid at
   // any screenshot scale while an empty checkerboard still fails closed.
   if (occupiedSquares < 2) {
-    throw new Error(`Expected rendered chess pieces, found only ${occupiedSquares} occupied board squares`);
+    throw new BoardScreenshotPiecesError(occupiedSquares);
   }
+}
+
+async function waitForBoardScreenshotContainsPieces({
+  archiveScreenshot,
+  boardFrame,
+  captureScreenshot,
+  screenFrame,
+  screenshotLabel,
+}, {
+  delay = wait,
+  inspectScreenshot = expectBoardScreenshotContainsPieces,
+  now = Date.now,
+  pollIntervalMs = 250,
+  cancelTimeout = clearTimeout,
+  scheduleTimeout = setTimeout,
+  timeoutMs = 5000,
+} = {}) {
+  const deadline = now() + timeoutMs;
+  let captureAttempt = 0;
+  let latestReadinessFailure = null;
+
+  while (true) {
+    captureAttempt += 1;
+    const attemptLabel = captureAttempt === 1
+      ? screenshotLabel
+      : `${screenshotLabel}-attempt-${captureAttempt}`;
+    const captureOutcome = await settleBeforeDeadline(
+      async () => {
+        const screenshotPath = await captureScreenshot(attemptLabel);
+        await archiveScreenshot?.(screenshotPath, attemptLabel);
+        return screenshotPath;
+      },
+      {cancelTimeout, deadline, now, scheduleTimeout}
+    );
+    if (captureOutcome.status === 'timed-out') {
+      const completedCapture = captureOutcome.completed;
+      const captureDiagnostic = completedCapture?.status === 'fulfilled'
+        ? readinessDiagnostic(
+          'Screenshot capture completed after the deadline',
+          completedCapture.value
+        )
+        : readinessDiagnostic('Screenshot capture did not complete before the deadline', '<pending>');
+      throw boardScreenshotTimeoutError(
+        timeoutMs,
+        latestReadinessFailure ?? captureDiagnostic
+      );
+    }
+    if (captureOutcome.status === 'rejected') {
+      throw captureOutcome.error;
+    }
+
+    const screenshotPath = captureOutcome.value;
+    const inspectionOutcome = await settleBeforeDeadline(
+      () => inspectScreenshot(screenshotPath, boardFrame, screenFrame),
+      {cancelTimeout, deadline, now, scheduleTimeout}
+    );
+    if (inspectionOutcome.status === 'timed-out') {
+      const completedInspection = inspectionOutcome.completed;
+      const inspectionDiagnostic = completedInspection?.status === 'rejected'
+        && completedInspection.error instanceof BoardScreenshotPiecesError
+        ? readinessDiagnostic(completedInspection.error.message, screenshotPath)
+        : latestReadinessFailure ?? readinessDiagnostic(
+          completedInspection?.status === 'fulfilled'
+            ? 'Screenshot inspection completed after the deadline'
+            : 'Screenshot inspection did not complete before the deadline',
+          screenshotPath
+        );
+      throw boardScreenshotTimeoutError(
+        timeoutMs,
+        inspectionDiagnostic
+      );
+    }
+    if (inspectionOutcome.status === 'fulfilled') {
+      return screenshotPath;
+    }
+
+    const error = inspectionOutcome.error;
+    if (!(error instanceof BoardScreenshotPiecesError)) {
+      throw error;
+    }
+
+    latestReadinessFailure = readinessDiagnostic(error.message, screenshotPath);
+    const remainingMs = deadline - now();
+    if (remainingMs <= 0) {
+      throw boardScreenshotTimeoutError(timeoutMs, latestReadinessFailure);
+    }
+
+    await delay(Math.min(pollIntervalMs, remainingMs));
+  }
+}
+
+async function settleBeforeDeadline(operation, {
+  cancelTimeout,
+  deadline,
+  now,
+  scheduleTimeout,
+}) {
+  const remainingMs = deadline - now();
+  if (remainingMs <= 0) {
+    return {status: 'timed-out'};
+  }
+
+  // Turn rejection into a settled value before racing so a rejection that
+  // arrives after the deadline is still observed and cannot leak unhandled.
+  const operationOutcome = Promise.resolve()
+    .then(operation)
+    .then(
+      (value) => ({status: 'fulfilled', value}),
+      (error) => ({status: 'rejected', error})
+    );
+  let timeoutHandle;
+  const timeoutOutcome = new Promise((resolve) => {
+    timeoutHandle = scheduleTimeout(
+      () => resolve({status: 'timed-out'}),
+      remainingMs
+    );
+  });
+  const outcome = await Promise.race([operationOutcome, timeoutOutcome]);
+
+  if (outcome.status !== 'timed-out') {
+    cancelTimeout(timeoutHandle);
+    if (now() >= deadline) {
+      return {completed: outcome, status: 'timed-out'};
+    }
+  }
+
+  return outcome;
+}
+
+function readinessDiagnostic(message, screenshotPath) {
+  return {message, screenshotPath};
+}
+
+function boardScreenshotTimeoutError(timeoutMs, diagnostic) {
+  return new Error(
+    `Timed out waiting for rendered chess pieces after ${timeoutMs}ms; `
+    + `latest=${diagnostic.message}; screenshot=${diagnostic.screenshotPath}`
+  );
+}
+
+function wait(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
 function countOccupiedBoardSquares(png, boardPixels) {
@@ -257,7 +406,9 @@ function clamp(value, min, max) {
 }
 
 module.exports = {
+  BoardScreenshotPiecesError,
   countOccupiedBoardSquares,
   expectBoardScreenshotContainsPieces,
-  expectFrameContained
+  expectFrameContained,
+  waitForBoardScreenshotContainsPieces,
 };
