@@ -11,7 +11,12 @@ MODE="${1:-}"
 SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
 ADB="${ADB_PATH:-${SDK_ROOT:+$SDK_ROOT/platform-tools/adb}}"
 DEVICE="${DETOX_ANDROID_DEVICE:-emulator-5554}"
+APK="${CHESSTICIZE_ANDROID_E2E_APK:-$APP_DIR/android/app/build/outputs/apk/e2e/app-e2e.apk}"
 ARTIFACT_DIR="${ANDROID_BACKUP_ARTIFACT_DIR:-$APP_DIR/artifacts/android-progress-backup}"
+RETAINED_APK_PATH="/data/local/tmp/chessticize-progress-backup-exact-head.apk"
+WORKFLOW_APK_SIZE=''
+WORKFLOW_APK_HASH=''
+RETAINED_APK_SIZE=''
 
 if [[ ! "$MODE" =~ ^(cloud-encrypted|device-transfer-released-fixture|seed-released-fixture)$ ]]; then
   echo "Usage: $0 cloud-encrypted|device-transfer-released-fixture|seed-released-fixture" >&2
@@ -20,6 +25,10 @@ fi
 if [[ -z "$ADB" || ! -x "$ADB" ]]; then
   echo "Set ADB_PATH, ANDROID_HOME, or ANDROID_SDK_ROOT to an executable adb." >&2
   exit 69
+fi
+if [[ "$MODE" != "seed-released-fixture" && ( ! -f "$APK" || ! -s "$APK" ) ]]; then
+  echo "Exact-head Android Progress Backup APK does not exist or is empty: $APK" >&2
+  exit 66
 fi
 
 mkdir -p "$ARTIFACT_DIR"
@@ -30,6 +39,111 @@ adb_cmd() {
 }
 
 source "$APP_DIR/scripts/android-device-inspection.sh"
+
+prepare_retained_apk_install_source() {
+  if ! WORKFLOW_APK_SIZE="$(wc -c < "$APK" | tr -d '[:space:]')"; then
+    echo "Unable to measure the exact-head workflow APK: $APK" >&2
+    exit 1
+  fi
+  if [[ ! "$WORKFLOW_APK_SIZE" =~ ^[1-9][0-9]*$ ]]; then
+    echo "Exact-head workflow APK has an invalid size: ${WORKFLOW_APK_SIZE:-<empty>}" >&2
+    exit 1
+  fi
+  printf '%s\n' "$WORKFLOW_APK_SIZE" \
+    > "$ARTIFACT_DIR/$MODE-workflow-artifact-apk-size.txt"
+  if ! sha256sum "$APK" \
+      > "$ARTIFACT_DIR/$MODE-workflow-artifact-apk-sha256.txt"; then
+    echo "Unable to hash the exact-head workflow APK: $APK" >&2
+    exit 1
+  fi
+  WORKFLOW_APK_HASH="$(cut -d ' ' -f 1 \
+    "$ARTIFACT_DIR/$MODE-workflow-artifact-apk-sha256.txt")"
+  if [[ ! "$WORKFLOW_APK_HASH" =~ ^[0-9a-f]{64}$ ]]; then
+    echo "Exact-head workflow APK has an invalid SHA-256: ${WORKFLOW_APK_HASH:-<empty>}" >&2
+    exit 1
+  fi
+
+  if ! remove_device_file "$RETAINED_APK_PATH"; then
+    echo "Unable to clear the retained APK path before Android Progress Backup evidence." >&2
+    exit 1
+  fi
+  if ! require_device_path_state any "$RETAINED_APK_PATH" absent; then
+    echo "Retained APK path was not absent before the exact-head push." >&2
+    exit 1
+  fi
+  printf '%s\n' "$RETAINED_APK_PATH" \
+    > "$ARTIFACT_DIR/$MODE-retained-install-source-apk-path.txt"
+  if ! push_host_file_to_device "$APK" "$RETAINED_APK_PATH" \
+      > "$ARTIFACT_DIR/$MODE-retained-apk-push.txt" 2>&1; then
+    cat "$ARTIFACT_DIR/$MODE-retained-apk-push.txt" >&2
+    echo "Unable to push the exact-head workflow APK to its retained install path." >&2
+    exit 1
+  fi
+  if ! require_device_path_state file "$RETAINED_APK_PATH" present; then
+    echo "Retained exact-head APK was not present after the push." >&2
+    exit 1
+  fi
+  if ! RETAINED_APK_SIZE="$(read_device_file_size "$RETAINED_APK_PATH")"; then
+    echo "Unable to measure the retained exact-head APK." >&2
+    exit 1
+  fi
+  if [[ ! "$RETAINED_APK_SIZE" =~ ^[1-9][0-9]*$ \
+      || "$RETAINED_APK_SIZE" != "$WORKFLOW_APK_SIZE" ]]; then
+    echo "Retained APK size does not match the exact-head workflow APK." >&2
+    exit 1
+  fi
+  printf '%s\n' "$RETAINED_APK_SIZE" \
+    > "$ARTIFACT_DIR/$MODE-retained-install-source-apk-size.txt"
+}
+
+capture_installed_apk_provenance() {
+  local evidence_prefix="$1"
+  local installed_path
+  local installed_size
+
+  if ! installed_path="$(read_single_installed_base_apk_path "$APP_ID")"; then
+    echo "Unable to select exactly one installed base.apk for $MODE $evidence_prefix provenance." >&2
+    exit 1
+  fi
+  printf 'package:%s\n' "$installed_path" \
+    > "$ARTIFACT_DIR/$MODE-$evidence_prefix-installed-apk-paths.txt"
+  if ! installed_size="$(read_device_file_size "$installed_path")"; then
+    echo "Unable to measure the installed APK for $MODE $evidence_prefix provenance." >&2
+    exit 1
+  fi
+  if [[ ! "$installed_size" =~ ^[1-9][0-9]*$ \
+      || "$installed_size" != "$WORKFLOW_APK_SIZE" \
+      || "$installed_size" != "$RETAINED_APK_SIZE" ]]; then
+    echo "Installed APK size does not match the exact-head retained source for $MODE $evidence_prefix." >&2
+    exit 1
+  fi
+  printf '%s\n' "$installed_size" \
+    > "$ARTIFACT_DIR/$MODE-$evidence_prefix-installed-apk-size.txt"
+  if ! require_device_files_identical "$RETAINED_APK_PATH" "$installed_path"; then
+    echo "Installed APK is not byte-identical to the exact-head retained source for $MODE $evidence_prefix." >&2
+    exit 1
+  fi
+  {
+    echo "source-path=$RETAINED_APK_PATH"
+    echo "installed-path=$installed_path"
+    echo "source-size=$RETAINED_APK_SIZE"
+    echo "installed-size=$installed_size"
+    echo "device-status=0"
+    echo "result=identical"
+  } > "$ARTIFACT_DIR/$MODE-$evidence_prefix-installed-apk-cmp.txt"
+  printf '%s  %s\n' "$WORKFLOW_APK_HASH" "$installed_path" \
+    > "$ARTIFACT_DIR/$MODE-$evidence_prefix-installed-apk-sha256.txt"
+}
+
+install_retained_apk() {
+  local install_output
+
+  if ! install_output="$(install_device_apk "$RETAINED_APK_PATH")"; then
+    echo "Unable to reinstall the exact-head retained APK after the clean user uninstall." >&2
+    exit 1
+  fi
+  printf '%s\n' "$install_output" > "$ARTIFACT_DIR/$MODE-retained-apk-install.txt"
+}
 
 remote_file_size() {
   local relative_path="$1"
@@ -180,17 +294,36 @@ if [[ "$MODE" == "seed-released-fixture" ]]; then
 fi
 
 original_transport="$(adb_cmd shell bmgr list transports | awk '$1 == "*" { print $2; exit }')"
-apk_dir="$(mktemp -d "${TMPDIR:-/tmp}/chessticize-backup-apks.XXXXXX")"
 
 cleanup() {
+  local exit_status=$?
+  local retained_cleanup_status=0
+  trap - EXIT
+  set +e
+  if {
+    remove_device_file "$RETAINED_APK_PATH" \
+      && require_device_path_state any "$RETAINED_APK_PATH" absent
+  } > "$ARTIFACT_DIR/$MODE-retained-apk-cleanup.txt" 2>&1; then
+    printf 'result=removed\n' > "$ARTIFACT_DIR/$MODE-retained-apk-cleanup.txt"
+  else
+    retained_cleanup_status=$?
+  fi
   adb_cmd shell settings put secure backup_enable_d2d_test_mode 0 >/dev/null 2>&1 || true
   adb_cmd shell settings delete secure backup_local_transport_parameters >/dev/null 2>&1 || true
   if [[ -n "$original_transport" ]]; then
     adb_cmd shell bmgr transport "$original_transport" >/dev/null 2>&1 || true
   fi
-  rm -rf "$apk_dir"
+  if (( exit_status == 0 && retained_cleanup_status != 0 )); then
+    cat "$ARTIFACT_DIR/$MODE-retained-apk-cleanup.txt" >&2
+    echo "Unable to remove the retained exact-head APK during cleanup." >&2
+    exit_status=1
+  fi
+  exit "$exit_status"
 }
 trap cleanup EXIT
+
+prepare_retained_apk_install_source
+capture_installed_apk_provenance before-backup
 
 adb_cmd shell bmgr enable true
 if [[ "$MODE" == "cloud-encrypted" ]]; then
@@ -228,22 +361,16 @@ if (( backup_status != 0 )); then
 fi
 grep -F "Package $APP_ID with result: Success" "$ARTIFACT_DIR/$MODE-backupnow.txt"
 
-apk_index=0
-while IFS= read -r apk_line; do
-  [[ "$apk_line" == package:* ]] || continue
-  apk_index=$((apk_index + 1))
-  adb_cmd pull "${apk_line#package:}" "$apk_dir/app-$apk_index.apk"
-done < <(adb_cmd shell pm path "$APP_ID")
-if (( apk_index == 0 )); then
-  echo "No installed APKs found for $APP_ID." >&2
+if ! adb_cmd shell pm uninstall --user 0 "$APP_ID" \
+    | tr -d '\r' | tee "$ARTIFACT_DIR/$MODE-user-uninstall.txt" | grep -Fx 'Success'; then
+  echo "Package Manager did not complete the clean user uninstall for $APP_ID." >&2
   exit 1
 fi
-
-adb_cmd shell pm uninstall --user 0 "$APP_ID"
 if [[ "$MODE" == "device-transfer-released-fixture" ]]; then
   adb_cmd shell bmgr transport "$GMS_TRANSPORT" | grep -F "Selected transport"
 fi
-adb_cmd install-multiple -t --user 0 "$apk_dir"/*.apk
+install_retained_apk
+capture_installed_apk_provenance after-restore
 if [[ "$MODE" == "device-transfer-released-fixture" ]]; then
   # Match Android's documented single-device D2D cleanup after restore so a
   # later run cannot reuse this migration dataset.
