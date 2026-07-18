@@ -355,7 +355,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "practice-home")).toBeTruthy();
   });
 
-  it("binds the Unclear bookmark to the completed correct attempt through feedback and Sprint Result", async () => {
+  it("binds Unclear to the completed attempt and replaces the action with a neutral confirmation", async () => {
     const service = createMobilePracticeService("random1000");
     const renderer = renderScreen({ practiceService: service, standardTargetCorrect: 1 });
 
@@ -369,54 +369,46 @@ describe("PracticePocScreen", () => {
       "Was it clear why that move was correct?"
     );
     expect(collectText(findByTestId(renderer, "sprint-unclear-toggle"))).toBe("Not yet");
+    const promptStyle = findByTestId(renderer, "sprint-unclear-prompt").props.style;
     press(renderer, "sprint-unclear-toggle");
     const attemptId = (service.listHistory() as AttemptEvent[])[0]?.id;
     expect(attemptId).toBeTruthy();
     expect((service.listHistory() as AttemptEvent[])[0]).toMatchObject({ unclear: true });
-    expect(collectText(findByTestId(renderer, "sprint-unclear-toggle"))).toBe("Marked unclear · Undo");
-    expect(findByTestId(renderer, "bookmark-glyph")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "sprint-unclear-marked"))).toBe("Marked as unclear");
+    expect(() => findByTestId(renderer, "sprint-unclear-toggle")).toThrow();
+    expect(() => findByTestId(renderer, "bookmark-glyph")).toThrow();
+    expect(findByTestId(renderer, "sprint-unclear-prompt").props.style).toEqual(promptStyle);
 
     await settleFeedbackSnapshot();
     expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
     expect(findByTestId(renderer, "sprint-unclear-prompt")).toBeTruthy();
-    press(renderer, "sprint-unclear-toggle");
     expect((service.listHistory() as AttemptEvent[])[0]).toMatchObject({
       id: attemptId,
-      unclear: false
+      unclear: true
     });
-    expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "sprint-unclear-marked"))).toBe("Marked as unclear");
   });
 
-  it("adds the displayed Practice puzzle to Review and clears only its initiating Unclear attempt", async () => {
+  it("keeps Review Schedule controls out of active Practice and Sprint Result", async () => {
     const service = createMobilePracticeService("random1000");
     const renderer = renderScreen({
-      currentTimeMs: () => Date.parse("2026-07-17T12:02:00.000Z"),
       practiceService: service,
       standardTargetCorrect: 1
     });
 
     startStandardSprint(renderer);
+    expect(() => findByTestId(renderer, "review-schedule-control")).toThrow();
     await boardMove(renderer, "e2e6");
     await settleFeedbackSnapshot();
     await boardMove(renderer, "e6f7");
     press(renderer, "sprint-unclear-toggle");
 
-    const attempt = (service.listHistory() as AttemptEvent[])[0];
-    expect(attempt).toMatchObject({ unclear: true });
-    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Not scheduled for Review");
-
-    press(renderer, "review-schedule-add");
-
-    expect(service.listReviewQueue()).toHaveLength(1);
-    expect(service.listHistory()).toEqual([
-      expect.objectContaining({ id: attempt?.id, unclear: false })
-    ]);
-    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Due tomorrow");
-    expect(collectText(findByTestId(renderer, "sprint-unclear-toggle"))).toBe("Not yet");
+    expect((service.listHistory() as AttemptEvent[])[0]).toMatchObject({ unclear: true });
+    expect(() => findByTestId(renderer, "review-schedule-control")).toThrow();
 
     await settleFeedbackSnapshot();
     expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Due tomorrow");
+    expect(() => findByTestId(renderer, "review-schedule-control")).toThrow();
   });
 
   it("keeps the Unclear prompt on the previous attempt until the next puzzle completes", async () => {
@@ -3160,7 +3152,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-panel")).toBeTruthy();
   });
 
-  it("filters Unclear attempts and atomically enrolls the initiating History context", () => {
+  it("puts Unclear first in a scrollable three-toggle History row without a count or icon", () => {
     const store = new MemoryStore();
     store.seedPuzzles([sharedHistoryPuzzle()]);
     store.recordAttempt({
@@ -3185,154 +3177,93 @@ describe("PracticePocScreen", () => {
     });
 
     press(renderer, "history-tab");
-    expect(collectText(findByTestId(renderer, "history-filter-unclear"))).toBe("Unclear (1)");
+    expect(findByTestId(renderer, "history-quick-filters").props.horizontal).toBe(true);
+    expect(collectText(findByTestId(renderer, "history-filter-unclear"))).toBe("Unclear");
+    expect(findByTestId(renderer, "history-filter-unclear").props.accessibilityLabel).toBe(
+      "Unclear attempts only"
+    );
+    expect(testIdOrder(renderer, "history-filter-unclear", "history-filter-wrong-only")).toBeLessThan(0);
+    expect(testIdOrder(renderer, "history-filter-wrong-only", "history-filter-sprint-only")).toBeLessThan(0);
     expect(findByTestId(renderer, "history-attempt-unclear-history-attempt-unclear")).toBeTruthy();
+    expect(() => findByTestId(renderer, "bookmark-glyph")).toThrow();
     press(renderer, "history-filter-unclear");
     expect(findByTestId(renderer, "history-filter-unclear").props.accessibilityState).toEqual({ checked: true });
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Unclear");
 
     press(renderer, "history-attempt-unclear-history-attempt");
     expect(findByTestId(renderer, "history-attempt-unclear")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Not scheduled for Review");
-    expect(collectText(findByTestId(renderer, "review-schedule-add"))).toBe("Add to Review");
-    press(renderer, "review-schedule-add");
-    expect(service.getReviewQueueState({
-      puzzleId: "shared-history",
-      mode: "standard",
-      ratingKey: "standard 5/20"
-    })).toMatchObject({
-      reviewCount: 0,
-      lastResult: null,
-      lastReviewedAt: null
-    });
-    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Due tomorrow");
-    expect(findByTestId(renderer, "history-attempt-detail")).toBeTruthy();
-    expect(() => findByTestId(renderer, "history-attempt-unclear")).toThrow();
-    expect((service.listHistory() as AttemptEvent[])[0]).toMatchObject({ unclear: false });
-
-    press(renderer, "review-schedule-remove");
-    expect(findByTestId(renderer, "review-schedule-removal-confirmation")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "review-schedule-removal-confirmation"))).toContain(
-      "Your attempts, History, analysis, and ratings stay unchanged"
-    );
-    expect(collectText(findByTestId(renderer, "review-schedule-removal-confirmation"))).not.toContain("Undo");
-    press(renderer, "review-schedule-removal-cancel");
-    expect(service.getReviewQueueState({
-      puzzleId: "shared-history",
-      mode: "standard",
-      ratingKey: "standard 5/20"
-    })).toBeTruthy();
-
-    press(renderer, "review-schedule-remove");
-    press(renderer, "review-schedule-removal-confirm");
-    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Not scheduled for Review");
+    expect(collectText(findByTestId(renderer, "history-attempt-detail-title"))).toBe("Attempt");
+    expect(collectText(findByTestId(renderer, "history-attempt-unclear"))).toContain("Marked as unclear");
+    expect(() => findByTestId(renderer, "bookmark-glyph")).toThrow();
+    expect(() => findByTestId(renderer, "review-schedule-control")).toThrow();
     expect(service.listHistory()).toHaveLength(1);
-    expect((service.listHistory() as AttemptEvent[])[0]).toMatchObject({ unclear: false });
+    expect((service.listHistory() as AttemptEvent[])[0]).toMatchObject({ unclear: true });
 
     press(renderer, "review-exit");
     expect(findByTestId(renderer, "history-filter-unclear").props.accessibilityState).toEqual({ checked: true });
-    expect(findByTestId(renderer, "history-empty-state")).toBeTruthy();
+    expect(findByTestId(renderer, "history-attempt-unclear-history-attempt")).toBeTruthy();
   });
 
-  it("keeps Review Schedule store failures unchanged and retryable", () => {
+  it("keeps Review Schedule removal failures unchanged and retryable inside Review", () => {
     const store = new FailingReviewScheduleStore();
     store.seedPuzzles([sharedHistoryPuzzle()]);
-    store.recordAttempt({
-      id: "retryable-review-attempt",
-      source: "sprint",
-      sessionId: "retryable-review-session",
-      puzzleId: "shared-history",
-      mode: "standard",
-      ratingKey: "standard 5/20",
-      result: "correct",
-      submittedMove: "e2e4",
-      expectedMove: "e2e4",
-      startedAt: "2026-07-17T11:59:55.000Z",
-      completedAt: "2026-07-17T12:00:00.000Z",
-      ratingBefore: 600
-    });
-    const service = new PracticeService(store);
-    service.setAttemptUnclear("retryable-review-attempt", true, "2026-07-17T12:01:00.000Z");
-    const renderer = renderScreen({
-      currentTimeMs: () => Date.parse("2026-07-17T12:02:00.000Z"),
-      practiceService: service
-    });
-
-    press(renderer, "history-tab");
-    press(renderer, "history-attempt-retryable-review-attempt");
-    store.setEnrollmentFailure(new Error("write failed"));
-    press(renderer, "review-schedule-add");
-
-    expect(collectText(findByTestId(renderer, "review-schedule-error"))).toBe(
-      "Couldn't add to Review. Try again."
-    );
-    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Not scheduled for Review");
-    expect(service.getReviewQueueState({
+    store.scheduleMistakeReview({
       puzzleId: "shared-history",
       mode: "standard",
       ratingKey: "standard 5/20"
-    })).toBeUndefined();
-    expect(service.listHistory()).toEqual([
-      expect.objectContaining({ id: "retryable-review-attempt", unclear: true })
-    ]);
+    }, "2026-07-17T12:00:00.000Z");
+    const service = new PracticeService(store);
+    const renderer = renderScreen({
+      currentTimeMs: () => Date.parse("2026-07-18T12:02:00.000Z"),
+      practiceService: service
+    });
 
-    store.setEnrollmentFailure(undefined);
-    press(renderer, "review-schedule-add");
-    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Due tomorrow");
-    expect(service.listHistory()).toEqual([
-      expect.objectContaining({ id: "retryable-review-attempt", unclear: false })
-    ]);
-
+    press(renderer, "review-tab");
+    press(renderer, "review-start-due");
+    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Due today");
     store.setRemovalFailure(new Error("delete failed"));
     press(renderer, "review-schedule-remove");
     press(renderer, "review-schedule-removal-confirm");
     expect(collectText(findByTestId(renderer, "review-schedule-error"))).toBe(
       "Couldn't remove from Review. Try again."
     );
-    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Due tomorrow");
+    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Due today");
     expect(service.listReviewQueue()).toHaveLength(1);
 
     store.setRemovalFailure(undefined);
     press(renderer, "review-schedule-removal-confirm");
-    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Not scheduled for Review");
     expect(service.listReviewQueue()).toHaveLength(0);
+    expect(findByTestId(renderer, "review-panel")).toBeTruthy();
+    expect(() => findByTestId(renderer, "review-session")).toThrow();
   });
 
-  it("keeps committed Review Schedule changes when reminder reconciliation fails", async () => {
+  it("keeps a committed Review removal when reminder reconciliation fails", async () => {
     const scheduler = new FakeReviewReminderScheduler();
     scheduler.setFailure(new Error("notification unavailable"));
     const store = new MemoryStore();
     store.seedPuzzles([sharedHistoryPuzzle()]);
-    store.recordAttempt(historyAttempt({
-      id: "reminder-independent-attempt",
+    store.scheduleMistakeReview({
+      puzzleId: "shared-history",
       mode: "standard",
-      ratingKey: "standard 5/20",
-      completedAt: "2026-07-17T12:00:00.000Z"
-    }));
+      ratingKey: "standard 5/20"
+    }, "2026-07-17T12:00:00.000Z");
     const service = new PracticeService(store);
     const renderer = renderScreen({
-      currentTimeMs: () => Date.parse("2026-07-17T12:02:00.000Z"),
+      currentTimeMs: () => Date.parse("2026-07-18T12:02:00.000Z"),
       practiceService: service,
       reviewReminderScheduler: scheduler
     });
     await act(async () => {});
 
-    press(renderer, "history-tab");
-    press(renderer, "history-attempt-reminder-independent-attempt");
-    press(renderer, "review-schedule-add");
-    await act(async () => {});
-
-    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Due tomorrow");
-    expect(service.listReviewQueue()).toHaveLength(1);
-    expect(scheduler.calls.length).toBeGreaterThan(0);
-
+    press(renderer, "review-tab");
+    press(renderer, "review-start-due");
     press(renderer, "review-schedule-remove");
     press(renderer, "review-schedule-removal-confirm");
     await act(async () => {});
 
-    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Not scheduled for Review");
     expect(service.listReviewQueue()).toHaveLength(0);
-    expect(service.listHistory()).toHaveLength(1);
+    expect(service.listHistory()).toHaveLength(0);
+    expect(scheduler.calls.length).toBeGreaterThan(0);
   });
 
   it("resets history filters to the default sprint-only view", () => {
@@ -3523,7 +3454,7 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "history-attempt-run-scored-attempt-review-due")).toThrow();
   });
 
-  it("inspects the exact persisted attempt before starting analysis and normalizes partial fields", () => {
+  it("inspects the exact attempt before starting analysis and normalizes partial fields", () => {
     const store = new MemoryStore();
     store.seedPuzzles([sharedHistoryPuzzle()]);
     store.recordAttempt({
@@ -3609,7 +3540,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "history-source-all");
     press(renderer, "history-attempt-custom-detail-attempt");
 
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-title"))).toBe("Persisted attempt");
+    expect(collectText(findByTestId(renderer, "history-attempt-detail-title"))).toBe("Attempt");
     expect(collectText(findByTestId(renderer, "history-attempt-detail-context"))).toBe("Custom · Sprint");
     expect(findByTestId(renderer, "history-attempt-detail-rating-key").props.accessibilityLabel).toBe(
       "Rating bucket hangingPiece custom 5/20"
@@ -3638,7 +3569,7 @@ describe("PracticePocScreen", () => {
       "Rating 600 · Rating change unavailable"
     );
     expect(collectText(findByTestId(renderer, "history-attempt-detail-partial"))).toBe(
-      "Some persisted attempt details are unavailable."
+      "Some attempt details are unavailable."
     );
 
     press(renderer, "review-exit");
@@ -3671,7 +3602,7 @@ describe("PracticePocScreen", () => {
     );
     expect(() => findByTestId(renderer, "review-board")).toThrow();
     expect(() => findByTestId(renderer, "review-analysis-button")).toThrow();
-    expect(findByTestId(renderer, "review-schedule-add")).toBeTruthy();
+    expect(() => findByTestId(renderer, "review-schedule-control")).toThrow();
     expect(systemBack.invoke()).toBe(true);
     expect(findByTestId(renderer, "history-panel")).toBeTruthy();
     press(renderer, "history-attempt-semantic-corrupt-arrow-attempt");
@@ -3717,7 +3648,7 @@ describe("PracticePocScreen", () => {
     );
     expect(collectText(findByTestId(renderer, "history-attempt-detail-moves"))).toBe("Played e2e4 · Best e2e3");
     expect(collectText(findByTestId(renderer, "history-attempt-detail-partial"))).toBe(
-      "Some persisted attempt details are unavailable."
+      "Some attempt details are unavailable."
     );
   });
 
@@ -3878,6 +3809,12 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "review-session")).toBeTruthy();
     expect(findByTestId(renderer, "review-board")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Due tomorrow");
+    expect(collectText(findByTestId(renderer, "review-schedule-remove"))).toBe("Remove from Review");
+    press(renderer, "review-schedule-remove");
+    press(renderer, "review-schedule-removal-confirm");
+    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Not scheduled for Review");
+    expect(collectText(findByTestId(renderer, "review-schedule-add"))).toBe("Add to Review");
     expectText(renderer, "1 / 3 · Standard");
     expect(findByTestId(renderer, "review-previous").props.disabled).toBe(true);
     expect(findByTestId(renderer, "review-next").props.disabled).toBe(false);

@@ -88,7 +88,7 @@ describe('Practice POC', () => {
 
   });
 
-  it('persists an unclear sprint attempt and atomically manages its Review Schedule from History', async () => {
+  it('persists a simplified unclear marker without exposing Review Schedule in History', async () => {
     await selectTestPuzzleSource('familiar15');
     await startPracticeMode('standard');
     await waitForVisibleInPracticeScroll('session-board');
@@ -96,7 +96,7 @@ describe('Practice POC', () => {
     await playBoardMove('session-board', 'c2b1');
     await waitFor(element(by.id('sprint-unclear-prompt'))).toBeVisible().withTimeout(10000);
     await element(by.id('sprint-unclear-toggle')).tap();
-    await waitFor(element(by.text('Marked unclear · Undo')))
+    await waitFor(element(by.text('Marked as unclear')))
       .toBeVisible()
       .withTimeout(10000);
 
@@ -107,7 +107,7 @@ describe('Practice POC', () => {
     await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(5000);
     await element(by.id('session-abandon-confirm')).tap();
     await waitFor(element(by.text('Sprint failed'))).toBeVisible().withTimeout(10000);
-    await expect(element(by.text('Marked unclear · Undo'))).toBeVisible();
+    await expect(element(by.text('Marked as unclear'))).toBeVisible();
 
     // Recreate the process so History reads the marker from SQLite rather than
     // component state from the sprint that created it.
@@ -119,7 +119,7 @@ describe('Practice POC', () => {
     await openStandardHistoryTrend();
     await waitForElementAccessibilityLabelContaining(
       'history-filter-unclear',
-      '1 unclear attempts',
+      'Unclear attempts only',
       10000
     );
     await element(by.id('history-filter-unclear')).tap();
@@ -131,29 +131,11 @@ describe('Practice POC', () => {
     }
     await element(by.id(resultIdentifier.replace(/-result$/, ''))).tap();
     await waitFor(element(by.id('history-attempt-unclear'))).toBeVisible().withTimeout(10000);
+    await expect(element(by.id('review-schedule-control'))).not.toExist();
+    await expect(element(by.id('bookmark-glyph'))).not.toExist();
 
-    await waitForVisibleInPracticeScroll('review-schedule-add');
-    await element(by.id('review-schedule-add')).tap();
-    await waitFor(element(by.id('review-schedule-state'))).toHaveText('Due tomorrow').withTimeout(10000);
-    await waitFor(element(by.id('history-attempt-unclear'))).not.toExist().withTimeout(10000);
-
-    await element(by.id('review-schedule-remove')).tap();
-    await waitFor(element(by.id('review-schedule-removal-confirmation'))).toBeVisible().withTimeout(10000);
-    await sleep(500);
-    await element(by.id('review-schedule-removal-confirm')).tap();
-    await waitFor(element(by.id('review-schedule-state')))
-      .toHaveText('Not scheduled for Review')
-      .withTimeout(10000);
-    await waitFor(element(by.id('review-schedule-removal-confirmation')))
-      .not.toExist()
-      .withTimeout(10000);
-    await sleep(500);
-    await element(by.id('practice-main-scroll')).scrollTo('top');
-    await element(by.id('review-exit')).tap();
-    await waitFor(element(by.id('history-empty-state'))).toExist().withTimeout(10000);
-
-    // Clearing is also durable: a fresh process sees no unclear attempt in the
-    // same rating/range scope.
+    // The marker remains durable across another process lifetime, and the
+    // filter label does not expose an implementation count.
     await device.terminateApp();
     await launchWithDisabledSynchronization({
       newInstance: true,
@@ -162,9 +144,11 @@ describe('Practice POC', () => {
     await openStandardHistoryTrend();
     await waitForElementAccessibilityLabelContaining(
       'history-filter-unclear',
-      '0 unclear attempts',
+      'Unclear attempts only',
       10000
     );
+    await element(by.id('history-filter-unclear')).tap();
+    await waitFor(element(by.text('Correct')).atIndex(0)).toExist().withTimeout(10000);
   });
 
   it('opens last sprint mistake review with navigation and analysis arrows', async () => {
@@ -232,7 +216,7 @@ describe('Practice POC', () => {
     expectScreenshotContainsGreenAnalysisArrow(screenshotPath);
 
     // Kill the process with a real native runner active, relaunch against the
-    // persisted attempt, and start analysis again through public History UI.
+    // saved attempt, and start analysis again through public History UI.
     // This proves a fresh native runner can prewarm after process recreation.
     await device.terminateApp();
     await launchWithDisabledSynchronization({

@@ -17,15 +17,15 @@ The local target time after which the mobile operating system may deliver a revi
 _Avoid_: Exact reminder time, alarm time
 
 **Unclear Attempt**:
-A correct completed sprint attempt the user marks at completion because they do not yet understand why the move worked. It can later be cleared; enrolling from that attempt clears only its marker as part of the same committed operation.
+A correct completed sprint attempt the user marks at completion because they do not yet understand why the move worked. It can later be cleared from History.
 _Avoid_: Unclear puzzle, mistake, Review item
 
 **Manual Review Enrollment**:
-The user's explicit addition of an exact puzzle, mode, and rating-key context to the Review schedule without implying that an attempt was wrong.
+The user's explicit addition of an exact puzzle, mode, and rating-key context from a Review-owned session without implying that an attempt was wrong.
 _Avoid_: Manual mistake, forced review
 
 **Review Schedule Control**:
-The two-state product affordance shown when a surface identifies an exact Review Context; it displays whether that context is scheduled and lets the user manually enroll it or remove its existing Review Schedule. Manual enrollment acts immediately, while removal requires confirmation; the control never guesses a missing mode or rating key.
+The two-state product affordance shown only inside a Review-owned session; it displays whether that exact Review Context is scheduled and lets the user manually enroll it or remove its existing Review Schedule. Manual enrollment acts immediately, while removal requires confirmation. Practice, Sprint Result, and History do not expose this control.
 _Avoid_: Review toggle, Review checkbox
 
 **Review Due Label**:

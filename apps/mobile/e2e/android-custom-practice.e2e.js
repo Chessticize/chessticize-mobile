@@ -103,7 +103,7 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
       );
 
       // The completed result's History shortcut owns the route to the exact
-      // persisted attempt and its Android Stockfish analysis.
+      // saved attempt and its Android Stockfish analysis.
       await element(by.id('sprint-result-history-button')).tap();
       await waitFor(element(by.id('history-performance-card'))).toExist().withTimeout(10000);
       await openFirstCorrectHistoryAttempt();

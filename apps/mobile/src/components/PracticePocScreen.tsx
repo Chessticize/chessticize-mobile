@@ -1640,23 +1640,7 @@ export function PracticePocScreen({
     }
   }
 
-  function reviewScheduleChanged(clearedAttemptId?: string): void {
-    if (!clearedAttemptId) {
-      refreshState();
-      return;
-    }
-    const updated = service.listHistory().find((attempt) => attempt.id === clearedAttemptId);
-    if (updated) {
-      setHistoryReviewEntries((entries) => entries.map((entry) => entry.attempt?.id === clearedAttemptId
-        ? { ...entry, attempt: withAttemptClarity(entry.attempt, updated) }
-        : entry));
-      setHistoryUnavailableAttempt((current) => current?.attempt.id === clearedAttemptId
-        ? { ...current, attempt: withAttemptClarity(current.attempt, updated) }
-        : current);
-      setUnclearPrompt((current) => current?.attemptId === clearedAttemptId
-        ? { ...current, marked: Boolean(updated.unclear) }
-        : current);
-    }
+  function reviewScheduleChanged(): void {
     refreshState();
   }
 
@@ -2423,21 +2407,6 @@ export function PracticePocScreen({
   const sessionScoreNode = state?.status === "active" ? (
     <SessionScoreStrip state={state} />
   ) : null;
-  const displayedPracticeReviewContext: ReviewContext | null = displayedPuzzle && state
-    ? {
-        puzzleId: displayedPuzzle.puzzle.id,
-        mode: state.config.mode,
-        ratingKey: state.config.ratingKey
-      }
-    : null;
-  const displayedPracticeInitiatingAttemptId = unclearPrompt?.marked &&
-    unclearPrompt.puzzleId === displayedPracticeReviewContext?.puzzleId
-    ? unclearPrompt.attemptId
-    : undefined;
-  const summaryAttempt = unclearPrompt
-    ? attempts.find((attempt) => attempt.id === unclearPrompt.attemptId)
-    : undefined;
-  const summaryReviewContext = summaryAttempt ? reviewContextForHistoryAttempt(summaryAttempt) : null;
   const practicePromptNode = shouldShowSessionBoard ? (
     <View style={styles.practicePromptStack}>
       <PracticePrompt currentPuzzle={displayedPuzzle} mode={mode} />
@@ -2448,17 +2417,6 @@ export function PracticePocScreen({
             ? "Was it clear why that move was correct?"
             : "Was it clear why the previous move was correct?"}
           onToggle={toggleUnclearPrompt}
-        />
-      ) : null}
-      {displayedPracticeReviewContext ? (
-        <ReviewScheduleControl
-          key={`${displayedPracticeReviewContext.puzzleId}:${displayedPracticeReviewContext.mode}:${displayedPracticeReviewContext.ratingKey}`}
-          compact
-          context={displayedPracticeReviewContext}
-          currentTimeMs={currentTimeMs}
-          initiatingAttemptId={displayedPracticeInitiatingAttemptId}
-          service={service}
-          onReviewChanged={reviewScheduleChanged}
         />
       ) : null}
     </View>
@@ -2688,15 +2646,6 @@ export function PracticePocScreen({
                       }}
                       onReview={state.mistakeCount > 0 ? showReviewMistakes : undefined}
                     />
-                    {summaryReviewContext ? (
-                      <ReviewScheduleControl
-                        context={summaryReviewContext}
-                        currentTimeMs={currentTimeMs}
-                        initiatingAttemptId={unclearPrompt?.marked ? unclearPrompt.attemptId : undefined}
-                        service={service}
-                        onReviewChanged={reviewScheduleChanged}
-                      />
-                    ) : null}
                   </>
                 ) : null}
 
@@ -2714,11 +2663,8 @@ export function PracticePocScreen({
                 <HistoryAttemptReplayUnavailable
                   adaptiveLayout={adaptiveLayout}
                   attempt={historyUnavailableAttempt.attempt}
-                  currentTimeMs={currentTimeMs}
-                  service={service}
                   replayAvailability={historyUnavailableAttempt.replayAvailability}
                   onClearUnclear={() => clearHistoryAttemptUnclear(historyUnavailableAttempt.attempt.id)}
-                  onReviewChanged={reviewScheduleChanged}
                   onReturn={() => setHistoryUnavailableAttempt(null)}
                 />
               ) : historyReviewEntries.length > 0 ? (
@@ -2735,7 +2681,6 @@ export function PracticePocScreen({
                   onAnalysisActiveChange={setReviewAnalysisOpen}
                   onAttemptClearUnclear={clearHistoryAttemptUnclear}
                   onComplete={() => setHistoryReviewEntries([])}
-                  onReviewEnrollmentChanged={reviewScheduleChanged}
                   onReturnToOwner={() => setHistoryReviewEntries([])}
                   stockfish={stockfish}
                 />
@@ -2755,7 +2700,6 @@ export function PracticePocScreen({
                   availableThemes={historyView.availableThemes}
                   page={historyView.page}
                   reviewStatusFilter={historyReviewStatusFilter}
-                  unclearCount={historyView.unclearCount}
                   unclearOnly={historyUnclearOnly}
                   sprintOnly={historySourceFilter === "sprint"}
                   wrongOnly={historyWrongOnly}
@@ -4188,26 +4132,28 @@ function UnclearAttemptPrompt({
 }): React.JSX.Element {
   return (
     <View
-      accessibilityLabel={`${question} ${marked ? "Marked unclear. Activate to undo." : "Not yet. Activate to mark unclear."}`}
-      style={[styles.unclearPrompt, marked ? styles.unclearPromptMarked : null]}
+      accessibilityLabel={`${question} ${marked ? "Marked as unclear." : "Not yet. Activate to mark unclear."}`}
+      style={styles.unclearPrompt}
       testID="sprint-unclear-prompt"
     >
       <View style={styles.unclearPromptCopy}>
-        <BookmarkGlyph marked={marked} />
         <Text style={styles.unclearPromptQuestion} testID="sprint-unclear-question">{question}</Text>
       </View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={marked ? "Undo unclear mark" : "Mark this attempt unclear"}
-        accessibilityState={{ selected: marked }}
-        style={styles.unclearPromptButton}
-        testID="sprint-unclear-toggle"
-        onPress={onToggle}
-      >
-        <Text style={[styles.unclearPromptButtonText, marked ? styles.unclearPromptButtonTextMarked : null]}>
-          {marked ? "Marked unclear · Undo" : "Not yet"}
+      {marked ? (
+        <Text style={styles.unclearPromptButtonText} testID="sprint-unclear-marked">
+          Marked as unclear
         </Text>
-      </Pressable>
+      ) : (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Mark this attempt as unclear"
+          style={styles.unclearPromptButton}
+          testID="sprint-unclear-toggle"
+          onPress={onToggle}
+        >
+          <Text style={styles.unclearPromptButtonText}>Not yet</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -4963,7 +4909,6 @@ function HistoryPanel({
   availableThemes,
   page,
   reviewStatusFilter,
-  unclearCount,
   unclearOnly,
   sprintOnly,
   wrongOnly,
@@ -4998,7 +4943,6 @@ function HistoryPanel({
   availableThemes: string[];
   page: { limit: number; offset: number; total: number; hasMore: boolean };
   reviewStatusFilter: "all" | HistoryReviewStatus;
-  unclearCount: number;
   unclearOnly: boolean;
   sprintOnly: boolean;
   wrongOnly: boolean;
@@ -5090,7 +5034,19 @@ function HistoryPanel({
             />
           ))}
         </HistoryChipRow>
-        <View style={styles.historyQuickFilterRow}>
+        <ScrollView
+          contentContainerStyle={styles.historyQuickFilterRow}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          testID="history-quick-filters"
+        >
+          <HistoryQuickToggle
+            active={unclearOnly}
+            accessibilityLabel="Unclear attempts only"
+            controlTestID="history-filter-unclear"
+            label="Unclear"
+            onPress={onToggleUnclearOnly}
+          />
           <HistoryQuickToggle
             active={wrongOnly}
             accessibilityLabel="Wrong puzzles only"
@@ -5105,14 +5061,7 @@ function HistoryPanel({
             label="Sprint only"
             onPress={onToggleSprintOnly}
           />
-          <HistoryQuickToggle
-            active={unclearOnly}
-            accessibilityLabel={`${unclearCount} unclear attempts in the current filters`}
-            controlTestID="history-filter-unclear"
-            label={`Unclear (${unclearCount})`}
-            onPress={onToggleUnclearOnly}
-          />
-        </View>
+        </ScrollView>
       </View>
 
       {selectedRatingKey ? (
@@ -5604,26 +5553,6 @@ function ResultBadgeGlyph({ tone }: { tone: "correct" | "wrong" | "alert" }): Re
   );
 }
 
-function BookmarkGlyph({ marked, small = false }: { marked: boolean; small?: boolean }): React.JSX.Element {
-  const color = marked ? "#D97706" : "#64748B";
-  return (
-    <View
-      style={[styles.bookmarkGlyphCanvas, small ? styles.bookmarkGlyphCanvasSmall : null]}
-      testID="bookmark-glyph"
-    >
-      <View
-        style={[
-          styles.bookmarkGlyphBody,
-          small ? styles.bookmarkGlyphBodySmall : null,
-          { borderColor: color, backgroundColor: marked ? color : "transparent" }
-        ]}
-      />
-      <View style={[styles.bookmarkGlyphTail, styles.bookmarkGlyphTailLeft, small ? styles.bookmarkGlyphTailSmall : null, { backgroundColor: color }]} />
-      <View style={[styles.bookmarkGlyphTail, styles.bookmarkGlyphTailRight, small ? styles.bookmarkGlyphTailSmall : null, { backgroundColor: color }]} />
-    </View>
-  );
-}
-
 function HistoryChipRow({
   children,
   testID
@@ -5745,7 +5674,6 @@ function HistoryAttemptRow({
       </View>
       {attempt.unclear ? (
         <View style={styles.historyUnclearBadge} testID={`history-attempt-${attempt.id}-unclear`}>
-          <BookmarkGlyph marked small />
           <Text style={styles.historyUnclearBadgeText}>Unclear</Text>
         </View>
       ) : null}
@@ -6300,6 +6228,7 @@ function ReviewPanel({
         onAnalysisActiveChange={onAnalysisActiveChange}
         onComplete={(source) => finishActiveReview(source, activeReviewGeneration)}
         onReturnToOwner={returnActiveReviewToOwner}
+        reviewScheduleControlVisible
         stockfish={stockfish}
         systemBackCommand={systemBackCommand}
       />
@@ -6714,6 +6643,7 @@ function ReviewSession({
   onComplete,
   onReviewEnrollmentChanged,
   onReturnToOwner,
+  reviewScheduleControlVisible = false,
   scheduledReviewCompletedCount = 0,
   scheduledReviewTotal = entries.length,
   service,
@@ -6730,8 +6660,9 @@ function ReviewSession({
   onAnalysisActiveChange?: (active: boolean) => void;
   onAttemptClearUnclear?: (attemptId: string) => void;
   onComplete: (source: ReviewEntry["source"]) => void;
-  onReviewEnrollmentChanged?: (clearedAttemptId?: string) => void;
+  onReviewEnrollmentChanged?: () => void;
   onReturnToOwner: (source: ReviewEntry["source"]) => void;
+  reviewScheduleControlVisible?: boolean;
   scheduledReviewCompletedCount?: number;
   scheduledReviewTotal?: number;
   service: PracticeService;
@@ -7735,25 +7666,24 @@ function ReviewSession({
           ) : null}
         </View>
       </View>
-      <ReviewScheduleControl
-        key={`${currentEntry.puzzle.id}:${currentEntry.mode}:${currentEntry.ratingKey}`}
-        compact
-        context={{
-          puzzleId: currentEntry.puzzle.id,
-          mode: currentEntry.mode,
-          ratingKey: currentEntry.ratingKey
-        }}
-        currentTimeMs={currentTimeMs}
-        initiatingAttemptId={currentEntry.source === "history" && currentEntry.attempt?.unclear
-          ? currentEntry.attempt.id
-          : undefined}
-        service={service}
-        onReviewChanged={onReviewEnrollmentChanged}
-        onRemoved={currentEntry.source === "due" && !reviewResultRecorded
-          ? goToNextDueReview
-          : undefined}
-        refreshToken={reviewResultRecorded}
-      />
+      {reviewScheduleControlVisible ? (
+        <ReviewScheduleControl
+          key={`${currentEntry.puzzle.id}:${currentEntry.mode}:${currentEntry.ratingKey}`}
+          compact
+          context={{
+            puzzleId: currentEntry.puzzle.id,
+            mode: currentEntry.mode,
+            ratingKey: currentEntry.ratingKey
+          }}
+          currentTimeMs={currentTimeMs}
+          service={service}
+          onReviewChanged={onReviewEnrollmentChanged}
+          onRemoved={currentEntry.source === "due" && !reviewResultRecorded
+            ? goToNextDueReview
+            : undefined}
+          refreshToken={reviewResultRecorded}
+        />
+      ) : null}
     </View>
   );
 }
@@ -7762,7 +7692,6 @@ function ReviewScheduleControl({
   compact = false,
   context,
   currentTimeMs,
-  initiatingAttemptId,
   onReviewChanged,
   onRemoved,
   refreshToken,
@@ -7771,8 +7700,7 @@ function ReviewScheduleControl({
   compact?: boolean;
   context: ReviewContext;
   currentTimeMs: () => number;
-  initiatingAttemptId?: string;
-  onReviewChanged?: (clearedAttemptId?: string) => void;
+  onReviewChanged?: () => void;
   onRemoved?: () => void;
   refreshToken?: unknown;
   service: PracticeService;
@@ -7793,13 +7721,9 @@ function ReviewScheduleControl({
   function addToReview(): void {
     setFailure(null);
     try {
-      const enrolled = service.enrollReview(
-        context,
-        new Date(currentTimeMs()).toISOString(),
-        initiatingAttemptId
-      );
+      const enrolled = service.enrollReview(context, new Date(currentTimeMs()).toISOString());
       setReview(enrolled);
-      onReviewChanged?.(initiatingAttemptId);
+      onReviewChanged?.();
     } catch {
       setFailure("Couldn't add to Review. Try again.");
     }
@@ -7890,23 +7814,16 @@ function ReviewScheduleControl({
 function HistoryAttemptReplayUnavailable({
   adaptiveLayout,
   attempt,
-  currentTimeMs,
   onClearUnclear,
-  onReviewChanged,
   onReturn,
-  replayAvailability,
-  service
+  replayAvailability
 }: {
   adaptiveLayout: AdaptiveLayout;
   attempt: HistoryAttemptView;
-  currentTimeMs: () => number;
   onClearUnclear: () => void;
-  onReviewChanged: (clearedAttemptId?: string) => void;
   onReturn: () => void;
   replayAvailability: Extract<HistoryAttemptReplayAvailability, { status: "unavailable" }>;
-  service: PracticeService;
 }): React.JSX.Element {
-  const reviewContext = reviewContextForHistoryAttempt(attempt);
   return (
     <View
       style={[styles.reviewSessionPanel, adaptiveLayout.usesWideContent ? styles.reviewSessionPanelWide : null]}
@@ -7925,7 +7842,7 @@ function HistoryAttemptReplayUnavailable({
           </Pressable>
           <View style={styles.reviewTitleBlock}>
             <Text style={styles.panelTitle}>History</Text>
-            <Text style={styles.helperText}>Persisted details only</Text>
+            <Text style={styles.helperText}>Attempt details only</Text>
           </View>
         </View>
       </View>
@@ -7934,24 +7851,8 @@ function HistoryAttemptReplayUnavailable({
         replayAvailability={replayAvailability}
         {...(attempt.unclear ? { onClearUnclear } : {})}
       />
-      {reviewContext ? (
-        <ReviewScheduleControl
-          context={reviewContext}
-          currentTimeMs={currentTimeMs}
-          initiatingAttemptId={attempt.unclear ? attempt.id : undefined}
-          service={service}
-          onReviewChanged={onReviewChanged}
-        />
-      ) : null}
     </View>
   );
-}
-
-function reviewContextForHistoryAttempt(attempt: AttemptEvent | HistoryAttemptView): ReviewContext | null {
-  const detail = normalizeHistoryAttemptDetail(attempt);
-  return detail.mode && detail.ratingKey && attempt.puzzleId
-    ? { puzzleId: attempt.puzzleId, mode: detail.mode, ratingKey: detail.ratingKey }
-    : null;
 }
 
 function HistoryAttemptDetailCard({
@@ -8005,11 +7906,7 @@ function HistoryAttemptDetailCard({
           testID="history-attempt-unclear"
         >
           <View style={styles.historyAttemptUnclearCopy}>
-            <BookmarkGlyph marked />
-            <View>
-              <Text style={styles.historyAttemptUnclearTitle}>Marked unclear</Text>
-              <Text style={styles.helperText}>Saved for History analysis</Text>
-            </View>
+            <Text style={styles.historyAttemptUnclearTitle}>Marked as unclear</Text>
           </View>
           {onClearUnclear ? (
             <Pressable
@@ -8026,13 +7923,13 @@ function HistoryAttemptDetailCard({
       ) : null}
       <View style={styles.historyPerformanceHeader}>
         <View style={styles.historyAttemptCopy}>
-          <Text style={styles.panelTitle} testID="history-attempt-detail-title">Persisted attempt</Text>
+          <Text style={styles.panelTitle} testID="history-attempt-detail-title">Attempt</Text>
           <Text style={styles.helperText} testID="history-attempt-detail-context">
             {historyAttemptModeLabel(detail.mode)} · {sourceLabel}
           </Text>
         </View>
         <Text
-          accessibilityLabel={`Persisted result ${resultLabel}`}
+          accessibilityLabel={`Result ${resultLabel}`}
           style={[
             styles.historyReviewState,
             detail.result === "wrong" ? styles.errorText : detail.result === "correct" ? styles.positive : styles.helperText
@@ -8054,7 +7951,7 @@ function HistoryAttemptDetailCard({
       <Text style={styles.helperText} testID="history-attempt-detail-rating">{ratingLabel}</Text>
       {detail.dataStatus === "partial" || arrowCandidatesUnavailable ? (
         <Text style={styles.errorText} testID="history-attempt-detail-partial">
-          Some persisted attempt details are unavailable.
+          Some attempt details are unavailable.
         </Text>
       ) : null}
       {replayUnavailableMessage ? (
@@ -11248,10 +11145,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 7
   },
-  unclearPromptMarked: {
-    backgroundColor: "#FFFBEB",
-    borderColor: "#F59E0B"
-  },
   unclearPromptCopy: {
     alignItems: "center",
     flex: 1,
@@ -11275,9 +11168,6 @@ const styles = StyleSheet.create({
     color: "#2563EB",
     fontSize: 11,
     fontWeight: "900"
-  },
-  unclearPromptButtonTextMarked: {
-    color: "#B45309"
   },
   promptIcon: {
     alignItems: "center",
@@ -12237,12 +12127,13 @@ const styles = StyleSheet.create({
   historyQuickFilterRow: {
     alignItems: "center",
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10
+    gap: 10,
+    paddingRight: 4
   },
   historyQuickToggle: {
     alignItems: "center",
     flexDirection: "row",
+    flexShrink: 0,
     gap: 10,
     minHeight: 36,
     paddingHorizontal: 8
@@ -12458,49 +12349,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     position: "relative",
     width: 18
-  },
-  bookmarkGlyphCanvas: {
-    height: 22,
-    position: "relative",
-    width: 18
-  },
-  bookmarkGlyphCanvasSmall: {
-    height: 17,
-    width: 14
-  },
-  bookmarkGlyphBody: {
-    borderBottomWidth: 0,
-    borderRadius: 2,
-    borderWidth: 2,
-    height: 15,
-    left: 2,
-    position: "absolute",
-    top: 1,
-    width: 14
-  },
-  bookmarkGlyphBodySmall: {
-    height: 11,
-    left: 2,
-    width: 10
-  },
-  bookmarkGlyphTail: {
-    borderRadius: 999,
-    bottom: 3,
-    height: 2,
-    position: "absolute",
-    width: 9
-  },
-  bookmarkGlyphTailSmall: {
-    bottom: 2,
-    width: 7
-  },
-  bookmarkGlyphTailLeft: {
-    left: 2,
-    transform: [{ rotate: "42deg" }]
-  },
-  bookmarkGlyphTailRight: {
-    right: 2,
-    transform: [{ rotate: "-42deg" }]
   },
   resultBadgeGlyphLine: {
     backgroundColor: "#FFFFFF",
