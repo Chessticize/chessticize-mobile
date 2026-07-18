@@ -23,6 +23,7 @@ export interface HistoryQuery {
   mode?: SprintMode;
   speedSeconds?: number;
   reviewStatus?: HistoryReviewStatus;
+  unclear?: boolean;
   page?: HistoryPageQuery;
 }
 
@@ -54,6 +55,8 @@ export interface HistoryAttemptView {
   ratingAfter?: number;
   arrowDuelCandidateOrder?: string[];
   arrowDuelCandidateOrderStatus?: "corrupt";
+  unclear?: boolean;
+  unclearUpdatedAt?: string;
   puzzleRating: number;
   side: PuzzleSide;
   themes: string[];
@@ -98,6 +101,7 @@ export interface HistoryView {
   ratingKeys: RatingRecord[];
   availableThemes: string[];
   availableSpeeds: number[];
+  unclearCount: number;
   attempts: HistoryAttemptView[];
   elo: HistoryEloPoint[];
   puzzleStats: HistoryPuzzleStats[];
@@ -126,7 +130,7 @@ export interface HistoryAttemptDetail {
 
 export type HistoryAttemptReplayAvailability =
   | { status: "available"; mode: SprintMode; ratingKey: string }
-  | { status: "unavailable"; reason: "invalid-context" | "arrow-candidates-unavailable" };
+  | { status: "unavailable"; reason: "invalid-context" | "puzzle-unavailable" | "arrow-candidates-unavailable" };
 
 export function resolveHistoryRange(now: string, timeRange: HistoryTimeRange): HistoryResolvedRange {
   const end = new Date(now);
@@ -206,11 +210,14 @@ export function normalizeHistoryAttemptDetail(attempt: AttemptEvent | HistoryAtt
 
 export function historyAttemptReplayAvailability(input: {
   attempt: AttemptEvent | HistoryAttemptView;
-  puzzle: Puzzle;
+  puzzle?: Puzzle;
 }): HistoryAttemptReplayAvailability {
   const detail = normalizeHistoryAttemptDetail(input.attempt);
   if (detail.source === null || detail.mode === null || detail.ratingKey === null || detail.result === null) {
     return { status: "unavailable", reason: "invalid-context" };
+  }
+  if (!input.puzzle) {
+    return { status: "unavailable", reason: "puzzle-unavailable" };
   }
   if (detail.mode !== "arrow_duel") {
     return { status: "available", mode: detail.mode, ratingKey: detail.ratingKey };
@@ -353,6 +360,7 @@ export function buildHistoryView(input: {
   reviews: ReviewQueueState[];
   availableThemes?: string[];
   availableSpeeds?: number[];
+  unclearCount?: number;
   allAttemptsForOptions?: HistoryAttemptView[];
 }): HistoryView {
   const query = validateHistoryQuery(input.query);
@@ -370,6 +378,7 @@ export function buildHistoryView(input: {
     ratingKeys: input.ratingKeys,
     availableThemes,
     availableSpeeds,
+    unclearCount: input.unclearCount ?? attemptsForOptions.filter((attempt) => Boolean(attempt.unclear)).length,
     attempts,
     elo: input.elo,
     puzzleStats,
@@ -379,7 +388,7 @@ export function buildHistoryView(input: {
 
 export function filterHistoryAttemptsForQuery(input: {
   attempts: HistoryAttemptView[];
-  query: Pick<HistoryQuery, "result" | "source" | "mode" | "side" | "minRating" | "maxRating" | "theme" | "speedSeconds" | "reviewStatus">;
+  query: Pick<HistoryQuery, "result" | "source" | "mode" | "side" | "minRating" | "maxRating" | "theme" | "speedSeconds" | "reviewStatus" | "unclear">;
   reviews: ReviewQueueState[];
 }): HistoryAttemptView[] {
   return input.attempts
@@ -391,6 +400,7 @@ export function filterHistoryAttemptsForQuery(input: {
     .filter((attempt) => input.query.maxRating === undefined || attempt.puzzleRating <= input.query.maxRating)
     .filter((attempt) => !input.query.theme || attempt.themes.includes(input.query.theme))
     .filter((attempt) => input.query.speedSeconds === undefined || historyAttemptSpeedSeconds(attempt) === input.query.speedSeconds)
+    .filter((attempt) => input.query.unclear === undefined || Boolean(attempt.unclear) === input.query.unclear)
     .filter((attempt) => {
       if (input.query.reviewStatus === undefined) {
         return true;

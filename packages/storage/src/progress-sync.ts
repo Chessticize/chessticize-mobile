@@ -15,6 +15,7 @@ import type {
 } from "./practice-store.ts";
 import { exportReviewQueueState, normalizeImportedReviewQueueState } from "./practice-store.ts";
 import { preferredSprintSession } from "./sprint-session-sync.ts";
+import { cloneAttemptHistoryRow, preferredAttemptHistoryRow } from "./attempt-sync.ts";
 
 export interface ProgressSyncSnapshot {
   schemaVersion: 1;
@@ -109,11 +110,11 @@ export function mergeLocalDataExports(local: LocalDataExport, remote: LocalDataI
   const remoteSessions = assignLegacyRatingGenerations(remote.ratings, remote.sprintSessions);
   const attempts = new Map<string, AttemptHistoryRow>();
   for (const attempt of local.attempts) {
-    attempts.set(attempt.id, cloneAttempt(attempt));
+    attempts.set(attempt.id, cloneAttemptHistoryRow(attempt));
   }
   for (const attempt of remote.attempts) {
     const previous = attempts.get(attempt.id);
-    attempts.set(attempt.id, previous ? preferredAttempt(previous, attempt) : cloneAttempt(attempt));
+    attempts.set(attempt.id, previous ? preferredAttemptHistoryRow(previous, attempt) : cloneAttemptHistoryRow(attempt));
   }
 
   const sprintSessions = new Map<string, ExportedSprintSession>();
@@ -176,14 +177,6 @@ function addImportResult(target: LocalDataImportResult, incoming: LocalDataImpor
   target.sprintSessions += incoming.sprintSessions;
 }
 
-function preferredAttempt(local: AttemptHistoryRow, incoming: AttemptHistoryRow): AttemptHistoryRow {
-  const completedComparison = incoming.completedAt.localeCompare(local.completedAt);
-  if (completedComparison !== 0) {
-    return completedComparison > 0 ? cloneAttempt(incoming) : cloneAttempt(local);
-  }
-  return incoming.startedAt >= local.startedAt ? cloneAttempt(incoming) : cloneAttempt(local);
-}
-
 function preferredReviewQueue(
   local: ReviewQueueState | undefined,
   incoming: ReviewQueueState
@@ -191,7 +184,7 @@ function preferredReviewQueue(
   if (!local) {
     return { ...incoming };
   }
-  const reviewComparison = incoming.lastReviewedAt.localeCompare(local.lastReviewedAt);
+  const reviewComparison = reviewActivityAt(incoming).localeCompare(reviewActivityAt(local));
   if (reviewComparison !== 0) {
     return reviewComparison > 0 ? { ...incoming } : { ...local };
   }
@@ -202,15 +195,12 @@ function preferredReviewQueue(
   return { ...incoming };
 }
 
-function cloneAttempt(attempt: AttemptHistoryRow): AttemptHistoryRow {
-  return {
-    ...attempt,
-    ...(attempt.arrowDuelCandidateOrder === undefined ? {} : { arrowDuelCandidateOrder: [...attempt.arrowDuelCandidateOrder] })
-  };
-}
-
 function reviewQueueKey(context: ReviewQueueState): string {
   return `${context.puzzleId}\u0000${context.mode}\u0000${context.ratingKey}`;
+}
+
+function reviewActivityAt(review: ReviewQueueState): string {
+  return review.lastReviewedAt ?? review.enrolledAt ?? "";
 }
 
 function compareAttempts(left: AttemptHistoryRow, right: AttemptHistoryRow): number {

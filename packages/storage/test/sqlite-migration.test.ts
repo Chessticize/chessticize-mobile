@@ -132,6 +132,9 @@ test("SQLite v3 migration tags only safely inferred current-generation sprint se
         'legacy-review', '00008', 'standard', 'standard 5/20', 'correct',
         '2026-06-20T12:00:00.000Z', '2026-06-25T04:00:00.000Z', 72
       );
+      DROP INDEX attempts_unclear_completed_at_idx;
+      ALTER TABLE attempts DROP COLUMN unclear_updated_at;
+      ALTER TABLE attempts DROP COLUMN unclear;
       PRAGMA user_version = 2;
     `);
     legacy.close();
@@ -191,9 +194,15 @@ test("SQLite migrates the released iOS 1.0.0 database without losing user semant
       const ratingColumns = store.db.prepare("PRAGMA table_info(ratings)").all() as Array<{ name: string }>;
       assert.ok(ratingColumns.some((column) => column.name === "rating_deviation"));
       assert.ok(ratingColumns.some((column) => column.name === "volatility"));
-      const reviewQueueColumns = store.db.prepare("PRAGMA table_info(review_queue)").all() as Array<{ name: string }>;
+      const attemptColumns = store.db.prepare("PRAGMA table_info(attempts)").all() as Array<{ name: string }>;
+      assert.ok(attemptColumns.some((column) => column.name === "unclear"));
+      assert.ok(attemptColumns.some((column) => column.name === "unclear_updated_at"));
+      const reviewQueueColumns = store.db.prepare("PRAGMA table_info(review_queue)").all() as Array<{ name: string; notnull: number }>;
       assert.ok(reviewQueueColumns.some((column) => column.name === "due_day"));
       assert.ok(reviewQueueColumns.some((column) => column.name === "interval_days"));
+      assert.ok(reviewQueueColumns.some((column) => column.name === "enrolled_at"));
+      assert.equal(reviewQueueColumns.find((column) => column.name === "last_result")?.notnull, 0);
+      assert.equal(reviewQueueColumns.find((column) => column.name === "last_reviewed_at")?.notnull, 0);
       assert.ok(!reviewQueueColumns.some((column) => column.name === "due_at"));
       assert.deepEqual(service.getRating("standard 5/20"), {
         key: "standard 5/20",
@@ -289,6 +298,9 @@ test("SQLite migrates the released iOS 1.0.0 database without losing user semant
         store.listAttempts({ mode: "arrow_duel" })[0]?.arrowDuelCandidateOrder,
         ["b2b1", "f2g3", "h6c1"]
       );
+      assert.ok(store.listAttempts().every((attempt) => attempt.unclear !== true));
+      assert.ok(store.listAttempts().every((attempt) => attempt.unclearUpdatedAt === undefined));
+      assert.ok(service.listReviewQueue().every((review) => review.enrolledAt === undefined));
 
       service.saveSettings({
         sync: { iCloudEnabled: false },

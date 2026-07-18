@@ -106,6 +106,37 @@ test("history view validates paging and slices visible attempts", () => {
   );
 });
 
+test("history filters Unclear Attempts and keeps the count scoped outside the Unclear toggle", () => {
+  const unclear = attempt({
+    id: "unclear",
+    puzzleId: "p1",
+    result: "correct",
+    completedAt: "2026-06-20T00:00:00.000Z",
+    unclear: true
+  });
+  const clear = attempt({
+    id: "clear",
+    puzzleId: "p2",
+    result: "correct",
+    completedAt: "2026-06-20T00:01:00.000Z"
+  });
+
+  assert.deepEqual(
+    filterHistoryAttemptsForQuery({ attempts: [unclear, clear], query: { unclear: true }, reviews: [] })
+      .map((attemptView) => attemptView.id),
+    ["unclear"]
+  );
+  assert.equal(buildHistoryView({
+    query: { now: "2026-06-21T12:00:00.000Z", timeRange: "max", unclear: true },
+    ratingKeys: [],
+    attempts: [unclear],
+    allAttemptsForOptions: [unclear, clear],
+    unclearCount: 1,
+    elo: [],
+    reviews: []
+  }).unclearCount, 1);
+});
+
 test("history performance and puzzle stats use the full filtered range, not the visible page", () => {
   const attempts: HistoryAttemptView[] = [
     attempt({ id: "a3", puzzleId: "p3", result: "correct", completedAt: "2026-06-20T00:02:00.000Z" }),
@@ -562,6 +593,7 @@ function attempt(input: {
   completedAt: string;
   mode?: HistoryAttemptView["mode"];
   ratingKey?: string;
+  unclear?: boolean;
 }): HistoryAttemptView {
   return {
     id: input.id,
@@ -576,6 +608,7 @@ function attempt(input: {
     startedAt: "2026-06-20T00:00:00.000Z",
     completedAt: input.completedAt,
     ratingBefore: 600,
+    ...(input.unclear === undefined ? {} : { unclear: input.unclear }),
     puzzleRating: 900,
     side: "white",
     themes: ["fork"]
