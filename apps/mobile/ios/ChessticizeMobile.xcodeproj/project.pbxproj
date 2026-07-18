@@ -39,8 +39,8 @@
 		9D2E4F5C2D2C400100A00001 /* ICloudProgressSync.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = ICloudProgressSync.m; path = ChessticizeMobile/ICloudProgressSync.m; sourceTree = "<group>"; };
 		9D2E4F5D2D2C400100A00001 /* ChessticizeMobile.entitlements */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.entitlements; name = ChessticizeMobile.entitlements; path = ChessticizeMobile/ChessticizeMobile.entitlements; sourceTree = "<group>"; };
 		9D2E4F5E2D2C400100A00001 /* CloudKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CloudKit.framework; path = System/Library/Frameworks/CloudKit.framework; sourceTree = SDKROOT; };
-		A10000012E60000100A00001 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = "Config/Debug.xcconfig"; path = Config/Debug.xcconfig; sourceTree = "<group>"; };
-		A10000022E60000100A00001 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = "Config/Release.xcconfig"; path = Config/Release.xcconfig; sourceTree = "<group>"; };
+		A10000012E60000100A00001 /* Config/Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Config/Debug.xcconfig; path = Config/Debug.xcconfig; sourceTree = "<group>"; };
+		A10000022E60000100A00001 /* Config/Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Config/Release.xcconfig; path = Config/Release.xcconfig; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
@@ -96,8 +96,8 @@
 		83CBB9F61A601CBA00E9B192 = {
 			isa = PBXGroup;
 			children = (
-				A10000012E60000100A00001 /* Debug.xcconfig */,
-				A10000022E60000100A00001 /* Release.xcconfig */,
+				A10000012E60000100A00001 /* Config/Debug.xcconfig */,
+				A10000022E60000100A00001 /* Config/Release.xcconfig */,
 				13B07FAE1A68108700A75B9A /* ChessticizeMobile */,
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
@@ -294,7 +294,7 @@
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = A10000012E60000100A00001 /* Debug.xcconfig */;
+			baseConfigurationReference = A10000012E60000100A00001 /* Config/Debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
@@ -327,7 +327,7 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = A10000022E60000100A00001 /* Release.xcconfig */;
+			baseConfigurationReference = A10000022E60000100A00001 /* Config/Release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
