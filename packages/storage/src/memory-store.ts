@@ -6,12 +6,15 @@ import {
   filterHistoryAttemptsForQuery,
   normalizeRatingRecord,
   orderReviewQueue,
+  preferredReviewScheduleChange,
+  removeReviewContext,
   resetRating as resetRatingRecord,
   buildSessionMistakeReview,
   reviewDayFor,
   resolveHistoryRange,
   scheduleMistakeForContext,
   scheduleReview,
+  sameReviewContext,
   sideToMoveForHistoryPuzzle,
   updateAttemptUnclearState
 } from "../../core/src/index.ts";
@@ -28,6 +31,8 @@ import type {
   ReviewContext,
   ReviewQueueItem,
   ReviewQueueState,
+  ReviewScheduleChange,
+  ReviewScheduleRemoval,
   SessionMistakeReviewItem,
   SprintState
 } from "../../core/src/index.ts";
@@ -48,6 +53,7 @@ export class MemoryStore implements PracticeStore {
   private readonly sessions = new Map<string, SprintState>();
   private readonly attempts: AttemptEvent[] = [];
   private readonly reviewQueue = new Map<string, ReviewQueueState>();
+  private readonly reviewRemovals = new Map<string, ReviewScheduleRemoval>();
   private settings = defaultPracticeSettings();
 
   seedPuzzles(puzzles: Puzzle[]): void {
@@ -217,6 +223,7 @@ export class MemoryStore implements PracticeStore {
       ratings: this.listRatings(),
       attempts: this.listAttempts(),
       reviewQueue: this.listReviewQueue().map(exportReviewQueueState),
+      reviewRemovals: this.listReviewRemovals(),
       sprintSessions: this.listSprintSessions()
     };
   }
@@ -304,16 +311,18 @@ export class MemoryStore implements PracticeStore {
       }
       result.attempts += 1;
     }
-    for (const importedReview of data.reviewQueue) {
-      const review = normalizeImportedReviewQueueState(importedReview);
-      if (!this.getPuzzle(review.puzzleId)) {
+    const importedReviewChanges: ReviewScheduleChange[] = [
+      ...data.reviewQueue.map((review): ReviewScheduleChange => ({
+        kind: "scheduled",
+        review: normalizeImportedReviewQueueState(review)
+      })),
+      ...(data.reviewRemovals ?? []).map((removal): ReviewScheduleChange => ({ kind: "removed", removal }))
+    ];
+    for (const change of importedReviewChanges) {
+      if (!this.getPuzzle(reviewContextForChange(change).puzzleId)) {
         continue;
       }
-      const key = reviewQueueKey(review);
-      const previous = this.reviewQueue.get(key);
-      const next = preferredReviewQueue(previous, review);
-      if (!sameReviewQueue(previous, next)) {
-        this.reviewQueue.set(key, next);
+      if (this.applyReviewScheduleChange(change)) {
         result.reviewQueue += 1;
       }
     }
@@ -329,6 +338,7 @@ export class MemoryStore implements PracticeStore {
     };
     this.attempts.splice(0, this.attempts.length);
     this.reviewQueue.clear();
+    this.reviewRemovals.clear();
     for (const [id, session] of this.sessions) {
       if (!isOpenSprint(session)) {
         this.sessions.delete(id);
@@ -348,21 +358,60 @@ export class MemoryStore implements PracticeStore {
   scheduleMistakeReview(context: ReviewContext, now: string): ReviewQueueState {
     const previous = this.getReviewQueueState(context);
     const next = scheduleMistakeForContext(context, now, previous);
-    this.reviewQueue.set(reviewQueueKey(context), next);
+    this.commitScheduledReview(next);
     return next;
   }
 
-  enrollReview(context: ReviewContext, now: string): ReviewQueueState {
+  enrollReview(context: ReviewContext, now: string, initiatingAttemptId?: string): ReviewQueueState {
     const previous = this.getReviewQueueState(context);
     const next = enrollReviewContext(context, now, previous);
+    let initiatingAttempt: { index: number; next: AttemptHistoryRow } | undefined;
+    if (initiatingAttemptId) {
+      const index = this.attempts.findIndex((attempt) => attempt.id === initiatingAttemptId);
+      const attempt = this.attempts[index];
+      if (!attempt) {
+        throw new Error(`Attempt ${initiatingAttemptId} was not found`);
+      }
+      if (!sameReviewContext(attempt, context)) {
+        throw new Error("The initiating attempt must identify the same Review Context");
+      }
+      initiatingAttempt = { index, next: updateAttemptUnclearState(attempt, false, now) };
+    }
+    this.assertScheduledReviewWins(next);
     this.reviewQueue.set(reviewQueueKey(context), next);
+    this.reviewRemovals.delete(reviewQueueKey(context));
+    if (initiatingAttempt) {
+      this.attempts[initiatingAttempt.index] = initiatingAttempt.next;
+    }
     return next;
+  }
+
+  removeReview(context: ReviewContext, now: string): ReviewScheduleRemoval {
+    const key = reviewQueueKey(context);
+    const previousReview = this.reviewQueue.get(key);
+    const previousRemoval = this.reviewRemovals.get(key);
+    if (!previousReview && previousRemoval) {
+      return previousRemoval;
+    }
+    const removal = removeReviewContext(context, now, previousReview ? undefined : previousRemoval);
+    if (previousReview) {
+      const winner = preferredReviewScheduleChange(
+        { kind: "scheduled", review: previousReview },
+        { kind: "removed", removal }
+      );
+      if (winner.kind !== "removed") {
+        throw new Error("Review removal must not be older than the active Review Schedule");
+      }
+    }
+    this.reviewQueue.delete(key);
+    this.reviewRemovals.set(key, removal);
+    return removal;
   }
 
   recordReviewResult(context: ReviewContext, result: AttemptResult, now: string): ReviewQueueState {
     const previous = this.getReviewQueueState(context);
     const next = previous ? scheduleReview({ previous, result, now }) : scheduleReview({ context, result, now });
-    this.reviewQueue.set(reviewQueueKey(context), next);
+    this.commitScheduledReview(next);
     return next;
   }
 
@@ -380,6 +429,11 @@ export class MemoryStore implements PracticeStore {
       if (!this.puzzles.has(review.puzzleId)) {
         this.reviewQueue.delete(reviewQueueKey(review));
         removed += 1;
+      }
+    }
+    for (const removal of this.reviewRemovals.values()) {
+      if (!this.puzzles.has(removal.puzzleId)) {
+        this.reviewRemovals.delete(reviewQueueKey(removal));
       }
     }
     return removed;
@@ -445,6 +499,57 @@ export class MemoryStore implements PracticeStore {
 
   transaction<T>(work: () => T): T {
     return work();
+  }
+
+  private listReviewRemovals(): ReviewScheduleRemoval[] {
+    return [...this.reviewRemovals.values()]
+      .map((removal) => ({ ...removal }))
+      .sort((left, right) => reviewQueueKey(left).localeCompare(reviewQueueKey(right)));
+  }
+
+  private assertScheduledReviewWins(review: ReviewQueueState): void {
+    const removal = this.reviewRemovals.get(reviewQueueKey(review));
+    if (!removal) {
+      return;
+    }
+    const winner = preferredReviewScheduleChange(
+      { kind: "removed", removal },
+      { kind: "scheduled", review }
+    );
+    if (winner.kind !== "scheduled") {
+      throw new Error("Review enrollment must occur after the latest Review removal");
+    }
+  }
+
+  private commitScheduledReview(review: ReviewQueueState): void {
+    this.assertScheduledReviewWins(review);
+    const key = reviewQueueKey(review);
+    this.reviewQueue.set(key, review);
+    this.reviewRemovals.delete(key);
+  }
+
+  private applyReviewScheduleChange(incoming: ReviewScheduleChange): boolean {
+    const context = reviewContextForChange(incoming);
+    const key = reviewQueueKey(context);
+    const localReview = this.reviewQueue.get(key);
+    const localRemoval = this.reviewRemovals.get(key);
+    const local: ReviewScheduleChange | undefined = localRemoval
+      ? { kind: "removed", removal: localRemoval }
+      : localReview
+        ? { kind: "scheduled", review: localReview }
+        : undefined;
+    const next = preferredReviewScheduleChange(local, incoming);
+    if (sameReviewScheduleChange(local, next)) {
+      return false;
+    }
+    if (next.kind === "scheduled") {
+      this.reviewQueue.set(key, next.review);
+      this.reviewRemovals.delete(key);
+    } else {
+      this.reviewQueue.delete(key);
+      this.reviewRemovals.set(key, next.removal);
+    }
+    return true;
   }
 
   private historyAttemptsForRange(ratingKey: string | undefined, since: string | undefined, until: string): HistoryAttemptView[] {
@@ -521,6 +626,25 @@ function reviewQueueKey(context: ReviewContext): string {
   return `${context.puzzleId}\u0000${context.mode}\u0000${context.ratingKey}`;
 }
 
+function reviewContextForChange(change: ReviewScheduleChange): ReviewContext {
+  return change.kind === "scheduled" ? change.review : change.removal;
+}
+
+function sameReviewScheduleChange(
+  left: ReviewScheduleChange | undefined,
+  right: ReviewScheduleChange
+): boolean {
+  if (!left || left.kind !== right.kind) {
+    return false;
+  }
+  if (left.kind === "removed" && right.kind === "removed") {
+    return left.removal.removedAt === right.removal.removedAt &&
+      sameReviewContext(left.removal, right.removal);
+  }
+  return left.kind === "scheduled" && right.kind === "scheduled" &&
+    sameReviewQueue(left.review, right.review);
+}
+
 function preferredRating(local: RatingRecord, incoming: RatingRecord): RatingRecord {
   const normalizedLocal = normalizeRatingRecord(local);
   const normalizedIncoming = normalizeRatingRecord(incoming);
@@ -542,24 +666,6 @@ function sameRating(left: RatingRecord, right: RatingRecord): boolean {
     left.volatility === right.volatility;
 }
 
-function preferredReviewQueue(
-  local: ReviewQueueState | undefined,
-  incoming: ReviewQueueState
-): ReviewQueueState {
-  if (!local) {
-    return incoming;
-  }
-  const reviewComparison = reviewActivityAt(incoming).localeCompare(reviewActivityAt(local));
-  if (reviewComparison !== 0) {
-    return reviewComparison > 0 ? incoming : local;
-  }
-  const dueComparison = incoming.dueDay.localeCompare(local.dueDay);
-  if (dueComparison !== 0) {
-    return dueComparison > 0 ? incoming : local;
-  }
-  return incoming;
-}
-
 function sameReviewQueue(left: ReviewQueueState | undefined, right: ReviewQueueState): boolean {
   return left !== undefined &&
     left.puzzleId === right.puzzleId &&
@@ -573,10 +679,6 @@ function sameReviewQueue(left: ReviewQueueState | undefined, right: ReviewQueueS
     left.lastResult === right.lastResult &&
     left.lastReviewedAt === right.lastReviewedAt &&
     left.enrolledAt === right.enrolledAt;
-}
-
-function reviewActivityAt(review: ReviewQueueState): string {
-  return review.lastReviewedAt ?? review.enrolledAt ?? "";
 }
 
 function isOpenSprint(session: SprintState): boolean {

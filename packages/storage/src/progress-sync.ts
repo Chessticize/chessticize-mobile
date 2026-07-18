@@ -1,4 +1,10 @@
-import { orderReviewQueue, type RatingRecord, type ReviewQueueState } from "../../core/src/index.ts";
+import {
+  orderReviewQueue,
+  preferredReviewScheduleChange,
+  reviewContextKey,
+  type RatingRecord,
+  type ReviewScheduleChange
+} from "../../core/src/index.ts";
 import { clonePracticeSettings } from "./practice-settings.ts";
 import {
   assignLegacyRatingGenerations,
@@ -140,23 +146,37 @@ export function mergeLocalDataExports(local: LocalDataExport, remote: LocalDataI
     );
   }
 
-  const reviewQueue = new Map<string, ReviewQueueState>();
+  const reviewChanges = new Map<string, ReviewScheduleChange>();
   for (const exportedReview of local.reviewQueue) {
     const review = normalizeImportedReviewQueueState(exportedReview);
-    reviewQueue.set(reviewQueueKey(review), { ...review });
+    mergeReviewChange(reviewChanges, { kind: "scheduled", review: { ...review } });
+  }
+  for (const removal of local.reviewRemovals ?? []) {
+    mergeReviewChange(reviewChanges, { kind: "removed", removal: { ...removal } });
   }
   for (const importedReview of remote.reviewQueue) {
     const review = normalizeImportedReviewQueueState(importedReview);
-    const key = reviewQueueKey(review);
-    reviewQueue.set(key, preferredReviewQueue(reviewQueue.get(key), review));
+    mergeReviewChange(reviewChanges, { kind: "scheduled", review: { ...review } });
   }
+  for (const removal of remote.reviewRemovals ?? []) {
+    mergeReviewChange(reviewChanges, { kind: "removed", removal: { ...removal } });
+  }
+
+  const reviews = [...reviewChanges.values()]
+    .filter((change): change is Extract<ReviewScheduleChange, { kind: "scheduled" }> => change.kind === "scheduled")
+    .map((change) => change.review);
+  const removals = [...reviewChanges.values()]
+    .filter((change): change is Extract<ReviewScheduleChange, { kind: "removed" }> => change.kind === "removed")
+    .map((change) => ({ ...change.removal }))
+    .sort((left, right) => reviewContextKey(left).localeCompare(reviewContextKey(right)));
 
   return {
     schemaVersion: 1,
     settings: clonePracticeSettings(local.settings),
     ratings: [...ratings.values()].sort((left, right) => left.key.localeCompare(right.key)),
     attempts: [...attempts.values()].sort(compareAttempts),
-    reviewQueue: orderReviewQueue([...reviewQueue.values()]).map(exportReviewQueueState),
+    reviewQueue: orderReviewQueue(reviews).map(exportReviewQueueState),
+    reviewRemovals: removals,
     sprintSessions: [...sprintSessions.values()].sort(compareSprintSessions)
   };
 }
@@ -177,30 +197,13 @@ function addImportResult(target: LocalDataImportResult, incoming: LocalDataImpor
   target.sprintSessions += incoming.sprintSessions;
 }
 
-function preferredReviewQueue(
-  local: ReviewQueueState | undefined,
-  incoming: ReviewQueueState
-): ReviewQueueState {
-  if (!local) {
-    return { ...incoming };
-  }
-  const reviewComparison = reviewActivityAt(incoming).localeCompare(reviewActivityAt(local));
-  if (reviewComparison !== 0) {
-    return reviewComparison > 0 ? { ...incoming } : { ...local };
-  }
-  const dueComparison = incoming.dueDay.localeCompare(local.dueDay);
-  if (dueComparison !== 0) {
-    return dueComparison > 0 ? { ...incoming } : { ...local };
-  }
-  return { ...incoming };
-}
-
-function reviewQueueKey(context: ReviewQueueState): string {
-  return `${context.puzzleId}\u0000${context.mode}\u0000${context.ratingKey}`;
-}
-
-function reviewActivityAt(review: ReviewQueueState): string {
-  return review.lastReviewedAt ?? review.enrolledAt ?? "";
+function mergeReviewChange(
+  changes: Map<string, ReviewScheduleChange>,
+  incoming: ReviewScheduleChange
+): void {
+  const context = incoming.kind === "scheduled" ? incoming.review : incoming.removal;
+  const key = reviewContextKey(context);
+  changes.set(key, preferredReviewScheduleChange(changes.get(key), incoming));
 }
 
 function compareAttempts(left: AttemptHistoryRow, right: AttemptHistoryRow): number {

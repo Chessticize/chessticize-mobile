@@ -36,6 +36,7 @@ import {
   isReviewOverdue,
   normalizeHistoryAttemptDetail,
   reviewDueState,
+  reviewDueLabel,
   reviewQueueForecast,
   submitArrowDuelChoice,
   submitLineMove
@@ -63,6 +64,7 @@ import type {
   ReviewReminderDecision,
   ReviewQueueItem,
   ReviewQueueState,
+  ReviewContext,
   SessionMistakeReviewItem,
   SprintConfig,
   SprintMode,
@@ -1638,6 +1640,26 @@ export function PracticePocScreen({
     }
   }
 
+  function reviewScheduleChanged(clearedAttemptId?: string): void {
+    if (!clearedAttemptId) {
+      refreshState();
+      return;
+    }
+    const updated = service.listHistory().find((attempt) => attempt.id === clearedAttemptId);
+    if (updated) {
+      setHistoryReviewEntries((entries) => entries.map((entry) => entry.attempt?.id === clearedAttemptId
+        ? { ...entry, attempt: withAttemptClarity(entry.attempt, updated) }
+        : entry));
+      setHistoryUnavailableAttempt((current) => current?.attempt.id === clearedAttemptId
+        ? { ...current, attempt: withAttemptClarity(current.attempt, updated) }
+        : current);
+      setUnclearPrompt((current) => current?.attemptId === clearedAttemptId
+        ? { ...current, marked: Boolean(updated.unclear) }
+        : current);
+    }
+    refreshState();
+  }
+
   function syncBoardAfterMove(
     nextState: SprintState,
     nextFeedback: SessionFeedback,
@@ -2401,6 +2423,21 @@ export function PracticePocScreen({
   const sessionScoreNode = state?.status === "active" ? (
     <SessionScoreStrip state={state} />
   ) : null;
+  const displayedPracticeReviewContext: ReviewContext | null = displayedPuzzle && state
+    ? {
+        puzzleId: displayedPuzzle.puzzle.id,
+        mode: state.config.mode,
+        ratingKey: state.config.ratingKey
+      }
+    : null;
+  const displayedPracticeInitiatingAttemptId = unclearPrompt?.marked &&
+    unclearPrompt.puzzleId === displayedPracticeReviewContext?.puzzleId
+    ? unclearPrompt.attemptId
+    : undefined;
+  const summaryAttempt = unclearPrompt
+    ? attempts.find((attempt) => attempt.id === unclearPrompt.attemptId)
+    : undefined;
+  const summaryReviewContext = summaryAttempt ? reviewContextForHistoryAttempt(summaryAttempt) : null;
   const practicePromptNode = shouldShowSessionBoard ? (
     <View style={styles.practicePromptStack}>
       <PracticePrompt currentPuzzle={displayedPuzzle} mode={mode} />
@@ -2411,6 +2448,17 @@ export function PracticePocScreen({
             ? "Was it clear why that move was correct?"
             : "Was it clear why the previous move was correct?"}
           onToggle={toggleUnclearPrompt}
+        />
+      ) : null}
+      {displayedPracticeReviewContext ? (
+        <ReviewScheduleControl
+          key={`${displayedPracticeReviewContext.puzzleId}:${displayedPracticeReviewContext.mode}:${displayedPracticeReviewContext.ratingKey}`}
+          compact
+          context={displayedPracticeReviewContext}
+          currentTimeMs={currentTimeMs}
+          initiatingAttemptId={displayedPracticeInitiatingAttemptId}
+          service={service}
+          onReviewChanged={reviewScheduleChanged}
         />
       ) : null}
     </View>
@@ -2625,20 +2673,31 @@ export function PracticePocScreen({
                 ) : null}
 
                 {isFinished && !isShowingFeedbackSnapshot ? (
-                  <SprintSummary
-                    state={state}
-                    elapsedMs={Math.min(sprintElapsedMs, state ? state.config.durationSeconds * 1000 : sprintElapsedMs)}
-                    unclearPrompt={unclearPrompt}
-                    onToggleUnclear={toggleUnclearPrompt}
-                    onReplay={() => startSprint(mode)}
-                    onBack={resetToIdle}
-                    onOpenHistory={() => {
-                      setHistoryRatingKey(state.config.ratingKey);
-                      setHistoryPageOffset(0);
-                      navigateToTab("history");
-                    }}
-                    onReview={state.mistakeCount > 0 ? showReviewMistakes : undefined}
-                  />
+                  <>
+                    <SprintSummary
+                      state={state}
+                      elapsedMs={Math.min(sprintElapsedMs, state ? state.config.durationSeconds * 1000 : sprintElapsedMs)}
+                      unclearPrompt={unclearPrompt}
+                      onToggleUnclear={toggleUnclearPrompt}
+                      onReplay={() => startSprint(mode)}
+                      onBack={resetToIdle}
+                      onOpenHistory={() => {
+                        setHistoryRatingKey(state.config.ratingKey);
+                        setHistoryPageOffset(0);
+                        navigateToTab("history");
+                      }}
+                      onReview={state.mistakeCount > 0 ? showReviewMistakes : undefined}
+                    />
+                    {summaryReviewContext ? (
+                      <ReviewScheduleControl
+                        context={summaryReviewContext}
+                        currentTimeMs={currentTimeMs}
+                        initiatingAttemptId={unclearPrompt?.marked ? unclearPrompt.attemptId : undefined}
+                        service={service}
+                        onReviewChanged={reviewScheduleChanged}
+                      />
+                    ) : null}
+                  </>
                 ) : null}
 
                 {!isActive && state === null && arePracticeTestControlsEnabled() && configurePuzzleSource ? (
@@ -2659,7 +2718,7 @@ export function PracticePocScreen({
                   service={service}
                   replayAvailability={historyUnavailableAttempt.replayAvailability}
                   onClearUnclear={() => clearHistoryAttemptUnclear(historyUnavailableAttempt.attempt.id)}
-                  onReviewChanged={refreshState}
+                  onReviewChanged={reviewScheduleChanged}
                   onReturn={() => setHistoryUnavailableAttempt(null)}
                 />
               ) : historyReviewEntries.length > 0 ? (
@@ -2676,7 +2735,7 @@ export function PracticePocScreen({
                   onAnalysisActiveChange={setReviewAnalysisOpen}
                   onAttemptClearUnclear={clearHistoryAttemptUnclear}
                   onComplete={() => setHistoryReviewEntries([])}
-                  onReviewEnrollmentChanged={refreshState}
+                  onReviewEnrollmentChanged={reviewScheduleChanged}
                   onReturnToOwner={() => setHistoryReviewEntries([])}
                   stockfish={stockfish}
                 />
@@ -2789,6 +2848,7 @@ export function PracticePocScreen({
                   scheduledReviewAttemptCountRef.current = nextScheduledReviewAttemptCount;
                   refreshState();
                 }}
+                onReviewScheduleChanged={reviewScheduleChanged}
                 onPromoteNextFutureReviewsToDue={arePracticeTestControlsEnabled() ? promoteNextFutureReviewsToDue : undefined}
                 onScheduleTestReviewReminder={arePracticeTestControlsEnabled() ? scheduleDevReviewReminderNotification : undefined}
                 onSessionSourceChange={setReviewSessionSource}
@@ -6077,6 +6137,7 @@ function ReviewPanel({
   onOpenPractice,
   onPromoteNextFutureReviewsToDue,
   onReviewRecorded,
+  onReviewScheduleChanged,
   onSessionSourceChange,
   onScheduleTestReviewReminder,
   reviewQueue,
@@ -6099,6 +6160,7 @@ function ReviewPanel({
   onOpenPractice: () => void;
   onPromoteNextFutureReviewsToDue?: () => ReviewQueueDuePromotionResult;
   onReviewRecorded: (completedAt: string) => void;
+  onReviewScheduleChanged: (clearedAttemptId?: string) => void;
   onSessionSourceChange?: (source: ReviewEntry["source"] | null) => void;
   onScheduleTestReviewReminder?: () => Promise<ReviewReminderScheduleResult>;
   reviewQueue: ReviewQueueState[];
@@ -6234,6 +6296,7 @@ function ReviewPanel({
         scheduledReviewTotal={dailyReviewTotal}
         service={service}
         onReviewRecorded={onReviewRecorded}
+        onReviewEnrollmentChanged={onReviewScheduleChanged}
         onAnalysisActiveChange={onAnalysisActiveChange}
         onComplete={(source) => finishActiveReview(source, activeReviewGeneration)}
         onReturnToOwner={returnActiveReviewToOwner}
@@ -6667,7 +6730,7 @@ function ReviewSession({
   onAnalysisActiveChange?: (active: boolean) => void;
   onAttemptClearUnclear?: (attemptId: string) => void;
   onComplete: (source: ReviewEntry["source"]) => void;
-  onReviewEnrollmentChanged?: () => void;
+  onReviewEnrollmentChanged?: (clearedAttemptId?: string) => void;
   onReturnToOwner: (source: ReviewEntry["source"]) => void;
   scheduledReviewCompletedCount?: number;
   scheduledReviewTotal?: number;
@@ -6926,7 +6989,8 @@ function ReviewSession({
       setBoardLocked(false);
       return;
     }
-    goToNextDueReview();
+    setBoardLocked(false);
+    setLineReviewNeedsContinue(true);
   }
 
   function goToNextDueReview(): void {
@@ -7048,7 +7112,8 @@ function ReviewSession({
         boardRef.current?.resetBoard(submittedFen);
         setFeedback(null);
         if (currentEntry.source === "due") {
-          goToNextDueReview();
+          setLineReviewNeedsContinue(true);
+          setBoardLocked(false);
           return;
         }
         setBoardLocked(false);
@@ -7151,7 +7216,8 @@ function ReviewSession({
     });
     await sleep(FEEDBACK_SNAPSHOT_MS);
     if (currentEntry.source === "due") {
-      goToNextDueReview();
+      setLineReviewNeedsContinue(true);
+      setBoardLocked(false);
       return;
     }
     const replyMoves = result.feedback.autoPlayedMoves.slice(1);
@@ -7434,21 +7500,12 @@ function ReviewSession({
       </View>
 
       {currentEntry.source === "history" && currentEntry.attempt ? (
-        <>
-          <HistoryAttemptDetailCard
-            attempt={currentEntry.attempt}
-            onClearUnclear={currentEntry.attempt.unclear && onAttemptClearUnclear
-              ? () => onAttemptClearUnclear(currentEntry.attempt!.id)
-              : undefined}
-          />
-          <HistoryReviewEnrollment
-            key={currentEntry.attempt.id}
-            attempt={currentEntry.attempt}
-            currentTimeMs={currentTimeMs}
-            service={service}
-            onReviewChanged={onReviewEnrollmentChanged}
-          />
-        </>
+        <HistoryAttemptDetailCard
+          attempt={currentEntry.attempt}
+          onClearUnclear={currentEntry.attempt.unclear && onAttemptClearUnclear
+            ? () => onAttemptClearUnclear(currentEntry.attempt!.id)
+            : undefined}
+        />
       ) : null}
 
       <View style={[styles.reviewBoardLayout, adaptiveLayout.usesSessionRail ? styles.reviewBoardLayoutWide : null]}>
@@ -7584,7 +7641,7 @@ function ReviewSession({
               ))}
             </View>
           ) : null}
-          {analysisEnabled || currentEntry.source !== "due" ? (
+          {analysisEnabled || currentEntry.source !== "due" || reviewResultRecorded ? (
           <View style={styles.analysisToolbar} testID="review-analysis-toolbar">
             {analysisEnabled ? (
               <>
@@ -7678,67 +7735,154 @@ function ReviewSession({
           ) : null}
         </View>
       </View>
+      <ReviewScheduleControl
+        key={`${currentEntry.puzzle.id}:${currentEntry.mode}:${currentEntry.ratingKey}`}
+        compact
+        context={{
+          puzzleId: currentEntry.puzzle.id,
+          mode: currentEntry.mode,
+          ratingKey: currentEntry.ratingKey
+        }}
+        currentTimeMs={currentTimeMs}
+        initiatingAttemptId={currentEntry.source === "history" && currentEntry.attempt?.unclear
+          ? currentEntry.attempt.id
+          : undefined}
+        service={service}
+        onReviewChanged={onReviewEnrollmentChanged}
+        onRemoved={currentEntry.source === "due" && !reviewResultRecorded
+          ? goToNextDueReview
+          : undefined}
+        refreshToken={reviewResultRecorded}
+      />
     </View>
   );
 }
 
-function HistoryReviewEnrollment({
-  attempt,
+function ReviewScheduleControl({
+  compact = false,
+  context,
   currentTimeMs,
+  initiatingAttemptId,
   onReviewChanged,
+  onRemoved,
+  refreshToken,
   service
 }: {
-  attempt: AttemptEvent | HistoryAttemptView;
+  compact?: boolean;
+  context: ReviewContext;
   currentTimeMs: () => number;
-  onReviewChanged?: () => void;
+  initiatingAttemptId?: string;
+  onReviewChanged?: (clearedAttemptId?: string) => void;
+  onRemoved?: () => void;
+  refreshToken?: unknown;
   service: PracticeService;
 }): React.JSX.Element {
-  const detail = normalizeHistoryAttemptDetail(attempt);
-  const context = detail.mode && detail.ratingKey && service.getPuzzle(attempt.puzzleId)
-    ? { puzzleId: attempt.puzzleId, mode: detail.mode, ratingKey: detail.ratingKey }
-    : null;
-  const [review, setReview] = useState<ReviewQueueState | undefined>(() => context
-    ? service.getReviewQueueState(context)
-    : undefined);
+  const contextKey = `${context.puzzleId}\u0000${context.mode}\u0000${context.ratingKey}`;
+  const [review, setReview] = useState<ReviewQueueState | undefined>(() => service.getReviewQueueState(context));
+  const [confirmationVisible, setConfirmationVisible] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
 
-  if (review) {
-    return (
-      <View style={styles.historyReviewEnrollment} testID="history-review-enrollment-status">
-        <View style={styles.historyReviewEnrollmentCopy}>
-          <Text style={styles.historyAttemptUnclearTitle}>In Review</Text>
-          <Text style={styles.helperText}>Due {formatReviewDay(review.dueDay)}</Text>
-        </View>
-        <BookmarkGlyph marked small />
-      </View>
-    );
+  useEffect(() => {
+    setReview(service.getReviewQueueState(context));
+    setConfirmationVisible(false);
+    setFailure(null);
+    // contextKey is the stable exact-context identity for this control.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contextKey, refreshToken, service]);
+
+  function addToReview(): void {
+    setFailure(null);
+    try {
+      const enrolled = service.enrollReview(
+        context,
+        new Date(currentTimeMs()).toISOString(),
+        initiatingAttemptId
+      );
+      setReview(enrolled);
+      onReviewChanged?.(initiatingAttemptId);
+    } catch {
+      setFailure("Couldn't add to Review. Try again.");
+    }
+  }
+
+  function confirmRemoval(): void {
+    setFailure(null);
+    try {
+      service.removeReview(context, new Date(currentTimeMs()).toISOString());
+      setReview(undefined);
+      setConfirmationVisible(false);
+      onReviewChanged?.();
+      onRemoved?.();
+    } catch {
+      setFailure("Couldn't remove from Review. Try again.");
+    }
   }
 
   return (
-    <View style={styles.historyReviewEnrollment} testID="history-review-enrollment">
-      <View style={styles.historyReviewEnrollmentCopy}>
-        <Text style={styles.historyAttemptUnclearTitle}>Review this context</Text>
-        <Text style={styles.helperText}>
-          {context ? "First review is due tomorrow." : "The exact puzzle context is unavailable."}
+    <View
+      style={[styles.reviewScheduleControl, compact ? styles.reviewScheduleControlCompact : null]}
+      testID="review-schedule-control"
+    >
+      <View style={styles.reviewScheduleControlCopy}>
+        <Text style={styles.reviewScheduleState} testID="review-schedule-state">
+          {review ? reviewDueLabel(review, currentTimeMs()) : "Not scheduled for Review"}
         </Text>
+        {failure ? <Text style={styles.errorText} testID="review-schedule-error">{failure}</Text> : null}
       </View>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Add this puzzle context to Review"
-        accessibilityState={{ disabled: context === null }}
-        disabled={context === null}
-        style={[styles.historyAddReviewButton, context === null ? styles.disabledButton : null]}
-        testID="history-add-to-review"
-        onPress={() => {
-          if (!context) {
-            return;
-          }
-          const enrolled = service.enrollReview(context, new Date(currentTimeMs()).toISOString());
-          setReview(enrolled);
-          onReviewChanged?.();
-        }}
+        accessibilityLabel={review ? "Remove this puzzle from Review" : "Add this puzzle to Review"}
+        style={styles.reviewScheduleAction}
+        testID={review ? "review-schedule-remove" : "review-schedule-add"}
+        onPress={review ? () => setConfirmationVisible(true) : addToReview}
       >
-        <Text style={styles.historyAddReviewButtonText}>Add to Review</Text>
+        <Text style={review ? styles.reviewScheduleRemoveText : styles.reviewScheduleAddText}>
+          {review ? "Remove from Review" : "Add to Review"}
+        </Text>
       </Pressable>
+      <Modal
+        animationType="fade"
+        onRequestClose={() => setConfirmationVisible(false)}
+        transparent
+        visible={confirmationVisible}
+      >
+        <View style={styles.accessibleMoveModalBackdrop}>
+          <View
+            accessibilityViewIsModal
+            style={styles.reviewScheduleConfirmation}
+            testID="review-schedule-removal-confirmation"
+          >
+            <Text style={styles.panelTitle}>Remove from Review?</Text>
+            <Text style={styles.helperText}>
+              Future reviews for this puzzle will be removed. Your attempts, History, analysis, and ratings stay unchanged. Review workload and reminders may change.
+            </Text>
+            {failure ? <Text style={styles.errorText}>{failure}</Text> : null}
+            <View style={styles.confirmationActionRow}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Cancel removing this puzzle from Review"
+                style={styles.secondaryButton}
+                testID="review-schedule-removal-cancel"
+                onPress={() => {
+                  setConfirmationVisible(false);
+                  setFailure(null);
+                }}
+              >
+                <Text style={styles.secondaryButtonText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Confirm removing this puzzle from Review"
+                style={styles.destructiveButton}
+                testID="review-schedule-removal-confirm"
+                onPress={confirmRemoval}
+              >
+                <Text style={styles.destructiveButtonText}>Remove from Review</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -7757,11 +7901,12 @@ function HistoryAttemptReplayUnavailable({
   attempt: HistoryAttemptView;
   currentTimeMs: () => number;
   onClearUnclear: () => void;
-  onReviewChanged: () => void;
+  onReviewChanged: (clearedAttemptId?: string) => void;
   onReturn: () => void;
   replayAvailability: Extract<HistoryAttemptReplayAvailability, { status: "unavailable" }>;
   service: PracticeService;
 }): React.JSX.Element {
+  const reviewContext = reviewContextForHistoryAttempt(attempt);
   return (
     <View
       style={[styles.reviewSessionPanel, adaptiveLayout.usesWideContent ? styles.reviewSessionPanelWide : null]}
@@ -7789,14 +7934,24 @@ function HistoryAttemptReplayUnavailable({
         replayAvailability={replayAvailability}
         {...(attempt.unclear ? { onClearUnclear } : {})}
       />
-      <HistoryReviewEnrollment
-        attempt={attempt}
-        currentTimeMs={currentTimeMs}
-        service={service}
-        onReviewChanged={onReviewChanged}
-      />
+      {reviewContext ? (
+        <ReviewScheduleControl
+          context={reviewContext}
+          currentTimeMs={currentTimeMs}
+          initiatingAttemptId={attempt.unclear ? attempt.id : undefined}
+          service={service}
+          onReviewChanged={onReviewChanged}
+        />
+      ) : null}
     </View>
   );
+}
+
+function reviewContextForHistoryAttempt(attempt: AttemptEvent | HistoryAttemptView): ReviewContext | null {
+  const detail = normalizeHistoryAttemptDetail(attempt);
+  return detail.mode && detail.ratingKey && attempt.puzzleId
+    ? { puzzleId: attempt.puzzleId, mode: detail.mode, ratingKey: detail.ratingKey }
+    : null;
 }
 
 function HistoryAttemptDetailCard({
@@ -12443,7 +12598,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "900"
   },
-  historyReviewEnrollment: {
+  reviewScheduleControl: {
     alignItems: "center",
     backgroundColor: "#FFFFFF",
     borderColor: "#E2E8F0",
@@ -12454,22 +12609,43 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     padding: 10
   },
-  historyReviewEnrollmentCopy: {
+  reviewScheduleControlCompact: {
+    marginTop: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8
+  },
+  reviewScheduleControlCopy: {
     flex: 1,
     gap: 2
   },
-  historyAddReviewButton: {
+  reviewScheduleState: {
+    color: "#475569",
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  reviewScheduleAction: {
     alignItems: "center",
-    backgroundColor: "#2563EB",
-    borderRadius: 8,
     justifyContent: "center",
     minHeight: 34,
-    paddingHorizontal: 10
+    paddingHorizontal: 6
   },
-  historyAddReviewButtonText: {
-    color: "#FFFFFF",
-    fontSize: 11,
+  reviewScheduleAddText: {
+    color: "#2563EB",
+    fontSize: 12,
     fontWeight: "900"
+  },
+  reviewScheduleRemoveText: {
+    color: "#B91C1C",
+    fontSize: 12,
+    fontWeight: "900"
+  },
+  reviewScheduleConfirmation: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    gap: 12,
+    maxWidth: 440,
+    padding: 18,
+    width: "100%"
   },
   historyAttemptHeader: {
     alignItems: "center",

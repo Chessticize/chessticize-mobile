@@ -88,7 +88,7 @@ describe('Practice POC', () => {
 
   });
 
-  it('persists an unclear sprint attempt and clears it from filtered History', async () => {
+  it('persists an unclear sprint attempt and atomically manages its Review Schedule from History', async () => {
     await selectTestPuzzleSource('familiar15');
     await startPracticeMode('standard');
     await waitForVisibleInPracticeScroll('session-board');
@@ -132,12 +132,22 @@ describe('Practice POC', () => {
     await element(by.id(resultIdentifier.replace(/-result$/, ''))).tap();
     await waitFor(element(by.id('history-attempt-unclear'))).toBeVisible().withTimeout(10000);
 
-    await waitForVisibleInPracticeScroll('history-add-to-review');
-    await element(by.id('history-add-to-review')).tap();
-    await waitFor(element(by.id('history-review-enrollment-status'))).toExist().withTimeout(10000);
-    await waitForVisibleInPracticeScroll('history-attempt-clear-unclear');
-    await element(by.id('history-attempt-clear-unclear')).tap();
+    await waitForVisibleInPracticeScroll('review-schedule-add');
+    await element(by.id('review-schedule-add')).tap();
+    await waitFor(element(by.id('review-schedule-state'))).toHaveText('Due tomorrow').withTimeout(10000);
     await waitFor(element(by.id('history-attempt-unclear'))).not.toExist().withTimeout(10000);
+
+    await element(by.id('review-schedule-remove')).tap();
+    await waitFor(element(by.id('review-schedule-removal-confirmation'))).toBeVisible().withTimeout(10000);
+    await sleep(500);
+    await element(by.id('review-schedule-removal-confirm')).tap();
+    await waitFor(element(by.id('review-schedule-state')))
+      .toHaveText('Not scheduled for Review')
+      .withTimeout(10000);
+    await waitFor(element(by.id('review-schedule-removal-confirmation')))
+      .not.toExist()
+      .withTimeout(10000);
+    await sleep(500);
     await element(by.id('practice-main-scroll')).scrollTo('top');
     await element(by.id('review-exit')).tap();
     await waitFor(element(by.id('history-empty-state'))).toExist().withTimeout(10000);
