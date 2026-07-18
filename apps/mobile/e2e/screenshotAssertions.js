@@ -4,6 +4,13 @@
 const fs = require('fs');
 const zlib = require('zlib');
 
+class BoardScreenshotPiecesError extends Error {
+  constructor(occupiedSquares) {
+    super(`Expected rendered chess pieces, found only ${occupiedSquares} occupied board squares`);
+    this.name = 'BoardScreenshotPiecesError';
+  }
+}
+
 function expectBoardScreenshotContainsPieces(screenshotPath, boardFrame, screenFrame) {
   const png = readRgbaPng(screenshotPath);
   const boardPixels = pixelFrameForElement(png, boardFrame, screenFrame);
@@ -13,8 +20,49 @@ function expectBoardScreenshotContainsPieces(screenshotPath, boardFrame, screenF
   // relative to the two board colors so low-material puzzles remain valid at
   // any screenshot scale while an empty checkerboard still fails closed.
   if (occupiedSquares < 2) {
-    throw new Error(`Expected rendered chess pieces, found only ${occupiedSquares} occupied board squares`);
+    throw new BoardScreenshotPiecesError(occupiedSquares);
   }
+}
+
+async function waitForBoardScreenshotContainsPieces({
+  boardFrame,
+  captureScreenshot,
+  screenFrame,
+  screenshotLabel,
+}, {
+  delay = wait,
+  inspectScreenshot = expectBoardScreenshotContainsPieces,
+  now = Date.now,
+  pollIntervalMs = 250,
+  timeoutMs = 5000,
+} = {}) {
+  const startedAt = now();
+
+  while (true) {
+    const screenshotPath = await captureScreenshot(screenshotLabel);
+    try {
+      inspectScreenshot(screenshotPath, boardFrame, screenFrame);
+      return screenshotPath;
+    } catch (error) {
+      if (!(error instanceof BoardScreenshotPiecesError)) {
+        throw error;
+      }
+
+      const elapsedMs = now() - startedAt;
+      if (elapsedMs >= timeoutMs) {
+        throw new Error(
+          `Timed out waiting for rendered chess pieces after ${timeoutMs}ms; `
+          + `latest=${error.message}; screenshot=${screenshotPath}`
+        );
+      }
+
+      await delay(Math.min(pollIntervalMs, timeoutMs - elapsedMs));
+    }
+  }
+}
+
+function wait(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
 function countOccupiedBoardSquares(png, boardPixels) {
@@ -257,7 +305,9 @@ function clamp(value, min, max) {
 }
 
 module.exports = {
+  BoardScreenshotPiecesError,
   countOccupiedBoardSquares,
   expectBoardScreenshotContainsPieces,
-  expectFrameContained
+  expectFrameContained,
+  waitForBoardScreenshotContainsPieces,
 };

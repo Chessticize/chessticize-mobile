@@ -1340,6 +1340,10 @@ describe('Detox suite configuration', () => {
     expect(spec).toContain('Timed out waiting for ${orientation} layout');
     expect(spec).toContain('Timed out waiting for ${orientation} session layout geometry');
     expect(spec).toContain('last observed frames=${JSON.stringify(lastFrames)}');
+    expect(spec).toContain('await waitForBoardScreenshotContainsPieces({');
+    expect(spec).toContain('captureScreenshot: (label) => device.takeScreenshot(label)');
+    expect(spec).not.toContain('expectBoardScreenshotContainsPieces');
+    expect(spec).not.toContain('await sleep(5000)');
     expect(settledLayoutHelper).toContain("frameForIfPresent('active-session-adaptive-layout')");
     expect(settledLayoutHelper).toContain("frameFor(element(by.id('session-board')))");
     expect(settledLayoutHelper).toContain('expectFrameContained(');

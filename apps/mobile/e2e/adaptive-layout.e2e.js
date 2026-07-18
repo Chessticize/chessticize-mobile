@@ -17,8 +17,8 @@ const {
   waitForAndroidUiState,
 } = require('./androidPublicUiEvidence');
 const {
-  expectBoardScreenshotContainsPieces,
-  expectFrameContained
+  expectFrameContained,
+  waitForBoardScreenshotContainsPieces,
 } = require('./screenshotAssertions');
 
 const describeAdaptiveLayout = process.env.CHESSTICIZE_CAPTURE_ADAPTIVE_LAYOUT === '1'
@@ -138,8 +138,12 @@ async function captureSprint(orientation) {
   expectOrientationFrame(screenFrame, orientation);
   expectFrameContained(boardFrame, layoutFrame, `${deviceLabel} ${orientation} session board`);
 
-  const screenshotPath = await device.takeScreenshot(`${deviceLabel}-${orientation}-standard-sprint`);
-  expectBoardScreenshotContainsPieces(screenshotPath, boardFrame, screenFrame);
+  await waitForBoardScreenshotContainsPieces({
+    boardFrame,
+    captureScreenshot: (label) => device.takeScreenshot(label),
+    screenFrame,
+    screenshotLabel: `${deviceLabel}-${orientation}-standard-sprint`,
+  });
 }
 
 async function launchForOrientation(orientation) {
