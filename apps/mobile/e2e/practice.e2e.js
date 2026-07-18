@@ -27,7 +27,6 @@ describe('Practice POC', () => {
     // React Native, Skia, and native engine startup can keep Detox synchronization
     // busy after the first visible frame, so launch args disable synchronization
     // before Detox waits on app readiness.
-    await device.setOrientation('portrait');
     await launchWithDisabledSynchronization({
       newInstance: true,
       delete: true,
@@ -35,6 +34,7 @@ describe('Practice POC', () => {
         chessticizePuzzleSelectionSeed: PRACTICE_RENDER_PUZZLE_SELECTION_SEED
       }
     });
+    await device.setOrientation('portrait');
   });
 
   it('renders the standard sprint board', async () => {
