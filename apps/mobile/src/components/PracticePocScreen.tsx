@@ -2426,7 +2426,7 @@ export function PracticePocScreen({
           marked={unclearPrompt.marked}
           question={isShowingFeedbackSnapshot && displayedPuzzle?.puzzle.id === unclearPrompt.puzzleId
             ? "Was it clear why that move was correct?"
-            : "Was it clear why the previous move was correct?"}
+            : "Was it clear why the previous puzzle was correct?"}
           onToggle={toggleUnclearPrompt}
         />
       ) : null}

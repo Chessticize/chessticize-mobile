@@ -423,7 +423,7 @@ describe("PracticePocScreen", () => {
     await settleFeedbackSnapshot();
 
     expect(collectText(findByTestId(renderer, "sprint-unclear-question"))).toBe(
-      "Was it clear why the previous move was correct?"
+      "Was it clear why the previous puzzle was correct?"
     );
     press(renderer, "sprint-unclear-toggle");
     expect((service.listHistory() as AttemptEvent[]).find((attempt) => attempt.id === completedAttemptId)).toMatchObject({
