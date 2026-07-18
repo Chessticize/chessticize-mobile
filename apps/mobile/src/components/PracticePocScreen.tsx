@@ -6025,7 +6025,9 @@ function withAttemptClarity<T extends AttemptEvent | HistoryAttemptView>(
   attempt: T,
   clarity: Pick<AttemptEvent, "unclear" | "unclearUpdatedAt">
 ): T {
-  const { unclear: _unclear, unclearUpdatedAt: _unclearUpdatedAt, ...base } = attempt;
+  const base = { ...attempt };
+  delete base.unclear;
+  delete base.unclearUpdatedAt;
   return {
     ...base,
     unclear: Boolean(clarity.unclear),
