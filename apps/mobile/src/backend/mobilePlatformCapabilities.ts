@@ -34,6 +34,7 @@ export interface MobileReminderCapabilities {
 export interface MobileApplicationMetadata {
   versionName: string;
   buildNumber?: string;
+  releasePageUrl?: string;
   sourceLicenseUrl: string;
   sourceRepositoryUrl: string;
   stockfishSourceUrl: string;
@@ -43,6 +44,7 @@ export interface MobileApplicationMetadata {
 
 const SOURCE_REPOSITORY_URL =
   'https://github.com/Chessticize/chessticize-mobile';
+export const MOBILE_ANDROID_RELEASES_URL = `${SOURCE_REPOSITORY_URL}/releases`;
 const SUPPORT_EMAIL = 'support@chessticize.com';
 
 export const MOBILE_APPLICATION_METADATA_LINKS: Omit<

@@ -7893,6 +7893,7 @@ function SettingsPanel({
 }): React.JSX.Element {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const bundledCoreManifest = getBundledCorePackManifest();
+  const releasePageUrl = applicationMetadata.releasePageUrl;
 
   return (
     <View style={[styles.settingsPanel, adaptiveLayout.usesWideContent ? styles.settingsPanelWide : null]} testID="settings-panel">
@@ -8050,6 +8051,18 @@ function SettingsPanel({
             : applicationMetadata.versionName}
           testID="settings-app-version"
         />
+        {releasePageUrl ? (
+          <SettingsExternalLinkRow
+            label="Android Releases"
+            value="GitHub"
+            detail="Manual Play-signed APK downloads"
+            linkLabel="Open GitHub Releases"
+            testID="settings-android-releases"
+            onPress={() => {
+              void Linking.openURL(releasePageUrl);
+            }}
+          />
+        ) : null}
         <SettingsExternalLinkRow
           label="License"
           value="GPL-3.0-or-later"

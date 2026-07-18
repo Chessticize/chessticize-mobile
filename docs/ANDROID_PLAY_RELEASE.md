@@ -81,8 +81,9 @@ protected release record; do not commit credentials, tester identities, private
 console screenshots, or signing material.
 
 The owner evidence schema v3 adds the mandatory `sourceRelease` record. After
-the protected candidate workflow passes, attach its unchanged
-`android-source-manifest.json` to the canonical public GitHub release. Record
+the protected candidate workflow passes, use the `prepare-source-draft` and
+`publish-source` phases in `docs/ANDROID_GITHUB_RELEASE.md` to attach its
+unchanged `android-source-manifest.json` to the canonical public GitHub release. Record
 both the GitHub release asset ID and the protected Actions workflow run,
 artifact ID, artifact name, archive SHA-256, and manifest entry path. The final
 verifier dereferences the live GitHub tag ref and annotated tag object to the
@@ -150,6 +151,8 @@ pnpm mobile:verify:android:release -- \
 Only `status: "play-ready"` from this exact-artifact gate proves #186. Public
 Production launch, the Play-signed GitHub APK, physical ARM64 release approval,
 and final release-candidate convergence remain later release work.
+Continue with the protected `prepare-binary` and `publish-binary` phases in
+`docs/ANDROID_GITHUB_RELEASE.md`; do not rebuild or substitute the candidate.
 
 ## Official requirements checked on 2026-07-17
 
