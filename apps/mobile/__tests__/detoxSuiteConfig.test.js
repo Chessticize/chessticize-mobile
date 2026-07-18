@@ -37,6 +37,7 @@ const {
   launchWithFreshAndroidRuntimePermission,
   performAndroidPredictiveBackGesture,
   setAndroidDisplayOrientation,
+  waitForAndTapExactAndroidNotificationFromPublicUi,
   waitForAndTapExactAndroidNotificationRow,
   waitForRunningStockfishDepth,
   withAndroidUiDiagnostics,
@@ -59,6 +60,14 @@ describe('Detox suite configuration', () => {
       path.resolve(__dirname, '../e2e/adaptive-layout.e2e.js'),
       'utf8'
     );
+    const notificationSource = fs.readFileSync(
+      path.resolve(__dirname, '../e2e/androidSystemNotification.js'),
+      'utf8'
+    );
+    const reminderSource = fs.readFileSync(
+      path.resolve(__dirname, '../e2e/android-review-reminders.e2e.js'),
+      'utf8'
+    );
 
     expect(Object.keys(androidPublicUiEvidence).sort()).toEqual([
       'findUniqueAndroidUiNode',
@@ -69,6 +78,10 @@ describe('Detox suite configuration', () => {
     expect(helpersSource).not.toContain('function readAndroidUiHierarchy');
     expect(helpersSource).not.toContain('function waitForAndroidUiState');
     expect(adaptiveSource).toContain("require('./androidPublicUiEvidence')");
+    expect(notificationSource).toContain("require('./androidPublicUiEvidence')");
+    expect(reminderSource).toContain("require('./androidPublicUiEvidence')");
+    expect(reminderSource).not.toContain('function readSystemHierarchy');
+    expect(reminderSource).not.toContain('chessticize-reminder-window.xml');
   });
 
   it('discovers Android notification settings through partial system labels', () => {
@@ -232,6 +245,54 @@ describe('Detox suite configuration', () => {
       right: 1038,
       top: 568,
     });
+  });
+
+  it('rejects stale notification XML when the fresh SystemUI dump reports an error', async () => {
+    const staleHierarchy = [
+      '<hierarchy>',
+      '<node clickable="true" bounds="[42,568][1038,786]">',
+      '<node text="Chessticize" clickable="false" />',
+      '<node text="3 reviews are ready" clickable="false" />',
+      '</node>',
+      '</hierarchy>',
+    ].join('');
+    let remoteHierarchy = staleHierarchy;
+    const run = jest.fn((_command, args) => {
+      if (args.includes('rm')) {
+        remoteHierarchy = '';
+        return '';
+      }
+      if (args.includes('uiautomator')) {
+        return 'ERROR: could not get idle state.';
+      }
+      return remoteHierarchy;
+    });
+    const tapBounds = jest.fn();
+
+    await expect(waitForAndTapExactAndroidNotificationFromPublicUi({
+      body: '3 reviews are ready',
+      environment: {
+        ADB_PATH: '/sdk/adb',
+        DETOX_ANDROID_DEVICE: 'emulator-6000',
+      },
+      run,
+      tapBounds,
+      timeoutMs: 15,
+      title: 'Chessticize',
+    })).rejects.toThrow('Android UI hierarchy dump failed');
+    expect(tapBounds).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['empty', ''],
+    ['invalid', '<node text="not a hierarchy root" />'],
+  ])('rejects %s fresh Android public hierarchy XML', (_kind, hierarchy) => {
+    const run = jest.fn((_command, args) => (
+      args.includes('exec-out') ? hierarchy : 'UI hierarchy dumped'
+    ));
+
+    expect(() => readAndroidUiHierarchy({ ADB_PATH: '/sdk/adb' }, run))
+      .toThrow(`Android UI hierarchy read returned ${hierarchy ? 'invalid' : 'empty'} XML`);
   });
 
   it('refuses to tap matching system text without a clickable target', () => {
@@ -1322,14 +1383,14 @@ describe('Detox suite configuration', () => {
     expect(spec).toContain("permission_allow_button");
     expect(spec).toContain("permission_deny_button");
     expect(spec).toContain("statusbar', 'expand-notifications");
-    expect(spec).toContain('waitForAndTapExactAndroidNotificationRow({');
+    expect(spec).toContain('waitForAndTapExactAndroidNotificationFromPublicUi({');
     expect(spec).toContain("body: '3 reviews are ready'");
-    expect(spec).toContain('readHierarchy: readSystemHierarchy');
     expect(spec).toContain('tapBounds: tapSystemBounds');
     expect(spec).toContain('title: REVIEW_NOTIFICATION.title');
     expect(spec).not.toContain('function tapNotificationSystemNode');
     expect(spec).not.toContain('titleRow');
     expect(spec).not.toContain('bodyRow');
+    expect(spec).not.toContain('readSystemHierarchy');
     expect(spec).not.toContain("['dumpsys', 'notification', '--noredact']");
     expect(spec).toContain('androidAppIsResumed()');
     expect(spec).toContain("3 reviews are ready");

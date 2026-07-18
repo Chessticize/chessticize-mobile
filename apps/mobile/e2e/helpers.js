@@ -4,6 +4,7 @@ const path = require('node:path');
 const { androidAdbPath } = require('./androidNetwork');
 const {
   findExactAndroidNotificationRow,
+  waitForAndTapExactAndroidNotificationFromPublicUi,
   waitForAndTapExactAndroidNotificationRow,
 } = require('./androidSystemNotification');
 
@@ -851,6 +852,7 @@ module.exports = {
   tapUntilExists,
   waitForElementAccessibilityLabelContaining,
   waitForElementTextContaining,
+  waitForAndTapExactAndroidNotificationFromPublicUi,
   waitForAndTapExactAndroidNotificationRow,
   waitForRunningStockfishDepth,
   withAndroidUiDiagnostics,

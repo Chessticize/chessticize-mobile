@@ -5,6 +5,7 @@ const {
   runAndroidAdbShell,
   waitForAndroidNotificationIdentity,
 } = require('./androidAdbShell');
+const { readAndroidUiHierarchy } = require('./androidPublicUiEvidence');
 const {
   androidAppIsResumed,
   failStandardSprint,
@@ -14,7 +15,7 @@ const {
   launchWithFreshAndroidRuntimePermission,
   openTab,
   sleep,
-  waitForAndTapExactAndroidNotificationRow,
+  waitForAndTapExactAndroidNotificationFromPublicUi,
   waitForElementTextContaining,
   waitForVisibleInPracticeScroll,
   withAndroidUiDiagnostics,
@@ -205,10 +206,9 @@ async function tapPermissionSystemNode(candidates, timeoutMs = 15_000) {
 }
 
 async function tapReviewNotificationSystemNode(timeoutMs = 15_000) {
-  await waitForAndTapExactAndroidNotificationRow({
+  await waitForAndTapExactAndroidNotificationFromPublicUi({
     body: '3 reviews are ready',
     delay: sleep,
-    readHierarchy: readSystemHierarchy,
     tapBounds: tapSystemBounds,
     timeoutMs,
     title: REVIEW_NOTIFICATION.title,
@@ -229,16 +229,11 @@ function tapSystemBounds(bounds) {
   adbShell(['input', 'tap', String(centerX), String(centerY)]);
 }
 
-function readSystemHierarchy() {
-  adbShell(['uiautomator', 'dump', '/sdcard/chessticize-reminder-window.xml']);
-  return adbShell(['cat', '/sdcard/chessticize-reminder-window.xml']);
-}
-
 async function waitForSystemNode(candidates, timeoutMs = 15_000, options = {}) {
   const deadline = Date.now() + timeoutMs;
   let latest = '';
   while (Date.now() < deadline) {
-    latest = readSystemHierarchy();
+    latest = readAndroidUiHierarchy();
     const found = findAndroidSystemNode(latest, candidates, options);
     if (found) {
       return found;

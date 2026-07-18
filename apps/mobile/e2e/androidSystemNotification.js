@@ -1,3 +1,5 @@
+const { readAndroidUiHierarchy } = require('./androidPublicUiEvidence');
+
 const DEFAULT_POLL_INTERVAL_MS = 400;
 
 function findExactAndroidNotificationRow(hierarchy, { title, body }) {
@@ -57,6 +59,17 @@ async function waitForAndTapExactAndroidNotificationRow({
     + `title=${JSON.stringify(title)} body=${JSON.stringify(body)}. `
     + `Latest hierarchy: ${latestHierarchy || '<empty>'}`
   );
+}
+
+async function waitForAndTapExactAndroidNotificationFromPublicUi({
+  environment = process.env,
+  run,
+  ...options
+}) {
+  return waitForAndTapExactAndroidNotificationRow({
+    ...options,
+    readHierarchy: () => readAndroidUiHierarchy(environment, run),
+  });
 }
 
 function parseAndroidUiNodes(hierarchy) {
@@ -164,5 +177,6 @@ function defaultDelay(durationMs) {
 
 module.exports = {
   findExactAndroidNotificationRow,
+  waitForAndTapExactAndroidNotificationFromPublicUi,
   waitForAndTapExactAndroidNotificationRow,
 };
