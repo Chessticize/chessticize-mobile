@@ -1,6 +1,15 @@
 const { readAndroidUiHierarchy } = require('./androidPublicUiEvidence');
 
 const DEFAULT_POLL_INTERVAL_MS = 400;
+const XML_S_SOURCE = '[\\x20\\x09\\x0D\\x0A]';
+const ANDROID_UI_ATTRIBUTE = new RegExp(
+  `([\\w:-]+)${XML_S_SOURCE}*=${XML_S_SOURCE}*"([^"]*)"`,
+  'g'
+);
+const ANDROID_UI_NODE = new RegExp(
+  `</?node(?=${XML_S_SOURCE}|[/>])[^>]*>`,
+  'g'
+);
 
 function findExactAndroidNotificationRow(hierarchy, { title, body }) {
   const nodes = parseAndroidUiNodes(hierarchy);
@@ -75,7 +84,7 @@ async function waitForAndTapExactAndroidNotificationFromPublicUi({
 function parseAndroidUiNodes(hierarchy) {
   const roots = [];
   const stack = [];
-  const tokens = String(hierarchy).match(/<\/?node(?=[\s/>])[^>]*\/?\s*>/g) ?? [];
+  const tokens = String(hierarchy).match(ANDROID_UI_NODE) ?? [];
 
   for (const token of tokens) {
     if (token.startsWith('</')) {
@@ -104,7 +113,7 @@ function parseAndroidUiNodes(hierarchy) {
 
 function parseAndroidUiAttributes(token) {
   const attributes = {};
-  for (const match of token.matchAll(/([\w:-]+)="([^"]*)"/g)) {
+  for (const match of token.matchAll(ANDROID_UI_ATTRIBUTE)) {
     attributes[match[1]] = decodeAndroidUiAttribute(match[2]);
   }
   return attributes;

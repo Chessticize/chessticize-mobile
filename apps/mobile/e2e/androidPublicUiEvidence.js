@@ -3,20 +3,36 @@ const { androidAdbPath } = require('./androidNetwork');
 
 const ANDROID_PUBLIC_UI_HIERARCHY_PATH = '/sdcard/chessticize-public-window.xml';
 const XML_NAME_SOURCE = '[A-Za-z_][\\w.:-]*';
+const XML_S_SOURCE = '[\\x20\\x09\\x0D\\x0A]';
 const XML_ENTITY_SOURCE = '&(?:amp|lt|gt|quot|apos|#\\d+|#x[\\dA-Fa-f]+);';
 const XML_DOUBLE_QUOTED_VALUE_SOURCE = `"(?:[^"<&]|${XML_ENTITY_SOURCE})*"`;
 const XML_SINGLE_QUOTED_VALUE_SOURCE = `'(?:[^'<&]|${XML_ENTITY_SOURCE})*'`;
 const ANDROID_UI_OPENING_TAG = new RegExp(
-  `^<(${XML_NAME_SOURCE})(?:\\s+${XML_NAME_SOURCE}\\s*=\\s*`
+  `^<(${XML_NAME_SOURCE})(?:${XML_S_SOURCE}+${XML_NAME_SOURCE}`
+  + `${XML_S_SOURCE}*=${XML_S_SOURCE}*`
   + `(?:${XML_DOUBLE_QUOTED_VALUE_SOURCE}|${XML_SINGLE_QUOTED_VALUE_SOURCE}))*`
-  + '\\s*(/?)>$'
+  + `${XML_S_SOURCE}*(/?)>$`
 );
 const ANDROID_UI_ATTRIBUTE = new RegExp(
-  `\\s+(${XML_NAME_SOURCE})\\s*=\\s*`
+  `${XML_S_SOURCE}+(${XML_NAME_SOURCE})${XML_S_SOURCE}*=${XML_S_SOURCE}*`
   + `(?:${XML_DOUBLE_QUOTED_VALUE_SOURCE}|${XML_SINGLE_QUOTED_VALUE_SOURCE})`,
   'y'
 );
-const ANDROID_UI_XML_DECLARATION = /^<\?xml\s+version\s*=\s*(?:"1\.[01]"|'1\.[01]')(?:\s+encoding\s*=\s*(?:"[A-Za-z][\w.-]*"|'[A-Za-z][\w.-]*'))?(?:\s+standalone\s*=\s*(?:"(?:yes|no)"|'(?:yes|no)'))?\s*\?>$/;
+const ANDROID_UI_XML_DECLARATION = new RegExp(
+  `^<\\?xml${XML_S_SOURCE}+version${XML_S_SOURCE}*=${XML_S_SOURCE}*`
+  + `(?:"1\\.[01]"|'1\\.[01]')`
+  + `(?:${XML_S_SOURCE}+encoding${XML_S_SOURCE}*=${XML_S_SOURCE}*`
+  + `(?:"[A-Za-z][\\w.-]*"|'[A-Za-z][\\w.-]*'))?`
+  + `(?:${XML_S_SOURCE}+standalone${XML_S_SOURCE}*=${XML_S_SOURCE}*`
+  + `(?:"(?:yes|no)"|'(?:yes|no)'))?${XML_S_SOURCE}*\\?>$`
+);
+const ANDROID_UI_CLOSING_TAG = new RegExp(
+  `^</(${XML_NAME_SOURCE})${XML_S_SOURCE}*>$`
+);
+const ANDROID_UI_NODE = new RegExp(
+  `<node(?=${XML_S_SOURCE}|[/>])[^>]*>`,
+  'g'
+);
 const XML_NUMERIC_CHARACTER_REFERENCE = /&#(x[\dA-Fa-f]+|\d+);/g;
 
 function sleep(ms) {
@@ -47,13 +63,14 @@ function readAndroidUiHierarchy(
   }
   const hierarchy = String(
     run(adb, ['-s', serial, 'exec-out', 'cat', remotePath], options) ?? ''
-  ).trim();
-  if (!hierarchy || !isWellFormedAndroidUiHierarchy(hierarchy)) {
+  );
+  const normalizedHierarchy = trimXmlWhitespace(hierarchy);
+  if (!normalizedHierarchy || !isWellFormedAndroidUiHierarchy(normalizedHierarchy)) {
     throw new Error(
-      `Android UI hierarchy read returned ${hierarchy ? 'invalid' : 'empty'} XML`
+      `Android UI hierarchy read returned ${normalizedHierarchy ? 'invalid' : 'empty'} XML`
     );
   }
-  return hierarchy;
+  return normalizedHierarchy;
 }
 
 function isWellFormedAndroidUiHierarchy(hierarchy) {
@@ -69,7 +86,7 @@ function isWellFormedAndroidUiHierarchy(hierarchy) {
   let tokenMatch;
 
   while ((tokenMatch = tokenPattern.exec(xml)) !== null) {
-    if (xml.slice(cursor, tokenMatch.index).trim()) {
+    if (!containsOnlyXmlWhitespace(xml.slice(cursor, tokenMatch.index))) {
       return false;
     }
     const token = tokenMatch[0];
@@ -86,7 +103,7 @@ function isWellFormedAndroidUiHierarchy(hierarchy) {
       continue;
     }
 
-    const closing = /^<\/([A-Za-z_][\w.:-]*)\s*>$/.exec(token);
+    const closing = ANDROID_UI_CLOSING_TAG.exec(token);
     if (closing) {
       if (stack.pop() !== closing[1]) {
         return false;
@@ -113,7 +130,37 @@ function isWellFormedAndroidUiHierarchy(hierarchy) {
     cursor = tokenPattern.lastIndex;
   }
 
-  return rootSeen && stack.length === 0 && !xml.slice(cursor).trim();
+  return rootSeen
+    && stack.length === 0
+    && containsOnlyXmlWhitespace(xml.slice(cursor));
+}
+
+function trimXmlWhitespace(value) {
+  let start = 0;
+  let end = value.length;
+  while (start < end && isXmlWhitespace(value.charCodeAt(start))) {
+    start += 1;
+  }
+  while (end > start && isXmlWhitespace(value.charCodeAt(end - 1))) {
+    end -= 1;
+  }
+  return value.slice(start, end);
+}
+
+function containsOnlyXmlWhitespace(value) {
+  for (let index = 0; index < value.length; index += 1) {
+    if (!isXmlWhitespace(value.charCodeAt(index))) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function isXmlWhitespace(codeUnit) {
+  return codeUnit === 0x20
+    || codeUnit === 0x09
+    || codeUnit === 0x0A
+    || codeUnit === 0x0D;
 }
 
 function hasOnlyValidXml10Characters(xml) {
@@ -168,12 +215,14 @@ function hasDuplicateXmlAttributes(token, elementName) {
 }
 
 function androidUiAttribute(node, attribute) {
-  return node.match(new RegExp(`\\b${attribute}="([^"]*)"`))?.[1] ?? '';
+  return node.match(new RegExp(
+    `\\b${attribute}${XML_S_SOURCE}*=${XML_S_SOURCE}*"([^"]*)"`
+  ))?.[1] ?? '';
 }
 
 function visibleAndroidUiNodesByResourceId(hierarchy, resourceId) {
   const normalizedResourceId = String(resourceId).toLowerCase();
-  const nodes = String(hierarchy).match(/<node(?=[\s/>])[^>]*\/?\s*>/g) ?? [];
+  const nodes = String(hierarchy).match(ANDROID_UI_NODE) ?? [];
   return nodes.filter((node) => {
     const actualResourceId = androidUiAttribute(node, 'resource-id').toLowerCase();
     const exactResourceId = actualResourceId === normalizedResourceId

@@ -103,6 +103,44 @@ const LOOKALIKE_ANDROID_NOTIFICATION_HIERARCHIES = [
     '</hierarchy>',
   ].join(''),
 ]);
+const FORBIDDEN_XML_GRAMMAR_WHITESPACE = [
+  ['NBSP', '\u00A0'],
+  ['EM SPACE', '\u2003'],
+  ['IDEOGRAPHIC SPACE', '\u3000'],
+  ['FEFF', '\uFEFF'],
+];
+const FORBIDDEN_XML_WHITESPACE_POSITIONS = [
+  ['before root', (whitespace) => (
+    `${whitespace}<hierarchy>${EXACT_ANDROID_NOTIFICATION_ROW}</hierarchy>`
+  )],
+  ['between declaration and root', (whitespace) => (
+    `<?xml version='1.0'?>${whitespace}`
+      + `<hierarchy>${EXACT_ANDROID_NOTIFICATION_ROW}</hierarchy>`
+  )],
+  ['as root attribute separator', (whitespace) => (
+    `<hierarchy${whitespace}rotation="0">${EXACT_ANDROID_NOTIFICATION_ROW}</hierarchy>`
+  )],
+  ['around attribute equals', (whitespace) => (
+    `<hierarchy rotation${whitespace}=${whitespace}"0">`
+      + `${EXACT_ANDROID_NOTIFICATION_ROW}</hierarchy>`
+  )],
+  ['as node tag separator', (whitespace) => (
+    `<hierarchy><node${whitespace}/>${EXACT_ANDROID_NOTIFICATION_ROW}</hierarchy>`
+  )],
+  ['before closing-tag angle', (whitespace) => (
+    `<hierarchy>${EXACT_ANDROID_NOTIFICATION_ROW}</hierarchy${whitespace}>`
+  )],
+  ['after root', (whitespace) => (
+    `<hierarchy>${EXACT_ANDROID_NOTIFICATION_ROW}</hierarchy>${whitespace}`
+  )],
+];
+const FORBIDDEN_XML_WHITESPACE_HIERARCHIES = FORBIDDEN_XML_GRAMMAR_WHITESPACE
+  .flatMap(([whitespaceName, whitespace]) => (
+    FORBIDDEN_XML_WHITESPACE_POSITIONS.map(([position, buildHierarchy]) => [
+      `${whitespaceName} ${position}`,
+      buildHierarchy(whitespace),
+    ])
+  ));
 
 describe('Detox suite configuration', () => {
   it('owns Android public hierarchy evidence behind one focused interface', () => {
@@ -428,6 +466,68 @@ describe('Detox suite configuration', () => {
 
   it('accepts exact node tags at the public notification read and tap seam', async () => {
     const hierarchy = `<hierarchy>${EXACT_ANDROID_NOTIFICATION_ROW}</hierarchy>`;
+    const run = jest.fn((_command, args) => (
+      args.includes('exec-out') ? hierarchy : 'UI hierarchy dumped'
+    ));
+    const tapBounds = jest.fn();
+
+    await expect(waitForAndTapExactAndroidNotificationFromPublicUi({
+      body: '3 reviews are ready',
+      environment: { ADB_PATH: '/sdk/adb' },
+      run,
+      tapBounds,
+      timeoutMs: 15,
+      title: 'Chessticize',
+    })).resolves.toMatchObject({ hierarchy });
+    expect(tapBounds).toHaveBeenCalledWith({
+      bottom: 786,
+      left: 42,
+      right: 1038,
+      top: 568,
+    });
+  });
+
+  it.each(FORBIDDEN_XML_WHITESPACE_HIERARCHIES)(
+    'does not tap an exact notification row with %s',
+    async (_kind, hierarchy) => {
+      const run = jest.fn((_command, args) => (
+        args.includes('exec-out') ? hierarchy : 'UI hierarchy dumped'
+      ));
+      const tapBounds = jest.fn();
+
+      await expect(waitForAndTapExactAndroidNotificationFromPublicUi({
+        body: '3 reviews are ready',
+        environment: { ADB_PATH: '/sdk/adb' },
+        run,
+        tapBounds,
+        timeoutMs: 15,
+        title: 'Chessticize',
+      })).rejects.toThrow('Android UI hierarchy read returned invalid XML');
+      expect(tapBounds).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(FORBIDDEN_XML_WHITESPACE_HIERARCHIES)(
+    'rejects %s at the maintained Android public hierarchy reader',
+    (_kind, hierarchy) => {
+      const run = jest.fn((_command, args) => (
+        args.includes('exec-out') ? hierarchy : 'UI hierarchy dumped'
+      ));
+
+      expect(() => readAndroidUiHierarchy({ ADB_PATH: '/sdk/adb' }, run))
+        .toThrow('Android UI hierarchy read returned invalid XML');
+    }
+  );
+
+  it('accepts every XML 1.0 S character at the exact notification tap seam', async () => {
+    const hierarchy = [
+      '<hierarchy rotation \t=\r\n"0">',
+      '<node\tclickable \r=\n"true" bounds = "[42,568][1038,786]">',
+      '<node\rtext = "Chessticize" clickable="false" />',
+      '<node\ntext\t=\t"3 reviews are ready" clickable="false" />',
+      '</node\t>',
+      '</hierarchy\r>',
+    ].join('');
     const run = jest.fn((_command, args) => (
       args.includes('exec-out') ? hierarchy : 'UI hierarchy dumped'
     ));
