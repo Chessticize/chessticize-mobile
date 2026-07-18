@@ -173,9 +173,11 @@ function pollingShellOptions(deadline, now, shellTimeoutMs, shellOptions) {
 }
 
 function countActiveAndroidNotifications(state, notification) {
-  const marker = `|${notification.packageName}|${notification.notificationId}|`;
   return parseActiveAndroidNotificationList(state)
-    .filter((line) => line.includes(marker))
+    .filter((record) => (
+      record.packageName === notification.packageName
+      && record.notificationId === String(notification.notificationId)
+    ))
     .length;
 }
 
@@ -189,13 +191,19 @@ function parseActiveAndroidNotificationList(state) {
     return [];
   }
   const lines = withoutFinalLineEnding.split(/\r?\n/);
-  const supportedRecord = /^-?\d+\|[A-Za-z0-9._]+\|-?\d+\|[^|\r\n]*\|-?\d+$/;
-  if (lines.some((line) => !supportedRecord.test(line))) {
+  const supportedRecordPrefix = /^(-?\d+)\|([A-Za-z0-9._]+)\|(-?\d+)\|([^\r\n]+)$/;
+  const records = lines.map((line) => supportedRecordPrefix.exec(line));
+  if (records.some((record) => !record)) {
     throw new Error(
       `Malformed Android active notification list: ${output.trimEnd() || '<empty>'}`
     );
   }
-  return lines;
+  return records.map((record) => ({
+    notificationId: record[3],
+    packageName: record[2],
+    payload: record[4],
+    userId: record[1],
+  }));
 }
 
 async function sleepUntilNextPoll(deadline, now, pollIntervalMs, sleep) {

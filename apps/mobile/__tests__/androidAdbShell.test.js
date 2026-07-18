@@ -12,6 +12,11 @@ const reviewNotification = Object.freeze({
   packageName: 'com.chessticize.mobile',
   title: 'Chessticize',
 });
+const API_36_SYSTEM_AGGREGATE_NOTIFICATION_STATE = [
+  '-1|android|55|null|1000',
+  '-1|android|1|-1|android|g:Aggregate_SilentSection|1000|-1|android|g:Aggregate_SilentSection',
+  '-1|android|19|null|1000',
+].join('\n');
 
 function offlineError(message = 'adb: device offline') {
   return Object.assign(new Error(message), {
@@ -311,6 +316,72 @@ describe('Android E2E shell transport', () => {
     expect(sleep).not.toHaveBeenCalled();
   });
 
+  it('accepts legitimate API 36 aggregate records as exact target absence', async () => {
+    const runShell = jest.fn(() => API_36_SYSTEM_AGGREGATE_NOTIFICATION_STATE);
+
+    await expect(waitForAndroidNotificationIdentity(
+      reviewNotification,
+      0,
+      800,
+      { now: () => 1_000, runShell }
+    )).resolves.toBe(API_36_SYSTEM_AGGREGATE_NOTIFICATION_STATE);
+    expect(runShell).toHaveBeenCalledTimes(1);
+  });
+
+  it('counts one exact target only from a structural record prefix', async () => {
+    const activeState = [
+      API_36_SYSTEM_AGGREGATE_NOTIFICATION_STATE,
+      '0|com.chessticize.mobile|182|null|10246|opaque|platform|payload',
+    ].join('\n');
+    const runShell = jest.fn(() => activeState);
+
+    await expect(waitForAndroidNotificationIdentity(
+      reviewNotification,
+      1,
+      800,
+      { now: () => 1_000, runShell }
+    )).resolves.toBe(activeState);
+  });
+
+  it('counts duplicate exact targets from their structural record prefixes', async () => {
+    const activeState = [
+      '0|com.chessticize.mobile|182|null|10246',
+      '0|com.chessticize.mobile|182|opaque|payload|with|pipes',
+    ].join('\n');
+    let nowMs = 1_000;
+    const runShell = jest.fn(() => activeState);
+    const sleep = jest.fn(async (durationMs) => {
+      nowMs += durationMs;
+    });
+
+    await expect(waitForAndroidNotificationIdentity(
+      reviewNotification,
+      1,
+      800,
+      {
+        now: () => nowMs,
+        pollIntervalMs: 400,
+        runShell,
+        sleep,
+      }
+    )).rejects.toThrow('latest count was 2');
+  });
+
+  it('does not count a target-looking identity embedded in an opaque suffix', async () => {
+    const activeState = [
+      '-1|android|1|-1|com.chessticize.mobile|182|null|1000',
+      '-1|android|55|null|1000',
+    ].join('\n');
+    const runShell = jest.fn(() => activeState);
+
+    await expect(waitForAndroidNotificationIdentity(
+      reviewNotification,
+      0,
+      800,
+      { now: () => 1_000, runShell }
+    )).resolves.toBe(activeState);
+  });
+
   it('accepts an empty supported active list as exact absence', async () => {
     const runShell = jest.fn(() => '');
 
@@ -324,6 +395,28 @@ describe('Android E2E shell transport', () => {
 
   it('fails closed instead of accepting malformed nonempty output as absence', async () => {
     const runShell = jest.fn(() => 'adb: error: notification service unavailable\n');
+
+    await expect(waitForAndroidNotificationIdentity(
+      reviewNotification,
+      0,
+      800,
+      { now: () => 1_000, runShell }
+    )).rejects.toThrow('Malformed Android active notification list');
+  });
+
+  it.each([
+    ['missing user id', '|android|55|null|1000'],
+    ['invalid user id', 'system|android|55|null|1000'],
+    ['empty package', '-1||55|null|1000'],
+    ['invalid package', '-1|android package|55|null|1000'],
+    ['missing notification id', '-1|android||null|1000'],
+    ['invalid notification id', '-1|android|notification|null|1000'],
+    ['truncated before notification id', '-1|android'],
+    ['truncated after notification id', '-1|android|55'],
+    ['empty platform payload', '-1|android|55|'],
+    ['arbitrary garbage', 'notification service unavailable'],
+  ])('rejects %s instead of proving target absence', async (_kind, activeState) => {
+    const runShell = jest.fn(() => activeState);
 
     await expect(waitForAndroidNotificationIdentity(
       reviewNotification,
