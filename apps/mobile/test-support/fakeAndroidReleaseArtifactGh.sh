@@ -21,7 +21,7 @@ case "${2:-}" in
     ;;
   repos/*/actions/runs/301)
     printf '{"path":".github/workflows/mobile-android-release-candidate.yml","event":"workflow_dispatch","conclusion":"success","head_sha":"%s"}' \
-      "$GITHUB_SHA"
+      "$FAKE_COMMIT_SHA"
     ;;
   repos/*/actions/runs/456)
     printf '{"path":".github/workflows/mobile-android-github-release.yml","event":"workflow_dispatch","conclusion":"success","head_sha":"%s"}' \

@@ -1369,6 +1369,8 @@ describe('Android GitHub release automation', () => {
     expect(workflow).toContain('google-github-actions/auth@v3');
     expect(workflow).toContain('android-binary-preparation-${{ github.run_id }}');
     expect(workflow.match(/download-android-release-artifact\.sh/g)).toHaveLength(5);
+    expect(workflow.match(/resolve-android-release-candidate-commit\.sh/g)).toHaveLength(2);
+    expect(workflow.match(/"\$candidate_sha"/g)).toHaveLength(2);
     for (const value of [
       '.github/workflows/mobile-android-release-candidate.yml',
       '.github/workflows/mobile-android-github-release.yml',
@@ -1384,7 +1386,8 @@ describe('Android GitHub release automation', () => {
     expect(artifactDownloader).toContain('jq -r .path');
     expect(artifactDownloader).toContain('jq -r .event)" = "workflow_dispatch"');
     expect(artifactDownloader).toContain('jq -r .conclusion)" = "success"');
-    expect(artifactDownloader).toContain('jq -r .head_sha)" = "$GITHUB_SHA"');
+    expect(artifactDownloader).toContain('expected_head_sha="${6:-$GITHUB_SHA}"');
+    expect(artifactDownloader).toContain('jq -r .head_sha)" = "$expected_head_sha"');
     expect(artifactDownloader).toContain('^sha256:[0-9a-fA-F]{64}$');
     expect(artifactDownloader).toContain("sha256sum --help 2>&1 | grep -q -- '--check'");
     expect(artifactDownloader).toContain('sha256sum --check');
@@ -1430,6 +1433,8 @@ describe('Android GitHub release automation', () => {
     expect(runbook).toContain('does not strictly resolve that wording conflict');
     expect(runbook).toContain('Generated APKs API');
     expect(runbook).toContain('no automatic GitHub update checks');
+    expect(runbook).toContain('Only the original signed-candidate artifact may cross');
+    expect(runbook).toContain('remain bound to the current protected workflow');
   });
 
   it('forwards every protected workflow phase through the nested pnpm scripts without a stray delimiter', () => {
@@ -1647,6 +1652,150 @@ describe('Android GitHub release automation', () => {
       });
       expect(rejected.status).not.toBe(0);
       expect(fs.existsSync(path.join(rejectedDestination, 'evidence.json'))).toBe(false);
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('authenticates a retained candidate against its canonical tagged commit after main advances', () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'chessticize-candidate-recovery-'));
+    const payloadDirectory = path.join(directory, 'payload');
+    const destination = path.join(directory, 'destination');
+    const archive = path.join(directory, 'candidate.zip');
+    const downloadedArchive = path.join(directory, 'downloaded.zip');
+    const output = path.join(directory, 'github-output');
+    const fakeBin = path.join(directory, 'bin');
+    const candidateSha = 'a'.repeat(40);
+    const currentMainSha = 'b'.repeat(40);
+    const repoRoot = path.resolve(__dirname, '../../..');
+    const downloader = path.join(
+      repoRoot,
+      'apps/mobile/scripts/download-android-release-artifact.sh',
+    );
+    const fakeGhSource = path.join(
+      repoRoot,
+      'apps/mobile/test-support/fakeAndroidReleaseArtifactGh.sh',
+    );
+
+    try {
+      fs.mkdirSync(payloadDirectory);
+      fs.mkdirSync(fakeBin);
+      fs.writeFileSync(path.join(payloadDirectory, 'candidate.json'), '{"retained":true}\n');
+      const zipResult = spawnSync('zip', ['-q', archive, 'candidate.json'], {
+        cwd: payloadDirectory,
+        encoding: 'utf8',
+      });
+      expect(zipResult.status).toBe(0);
+      const archiveSha256 = crypto.createHash('sha256')
+        .update(fs.readFileSync(archive))
+        .digest('hex');
+      const fakeGh = path.join(fakeBin, 'gh');
+      fs.copyFileSync(fakeGhSource, fakeGh);
+      fs.chmodSync(fakeGh, 0o755);
+      const environment = {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH}`,
+        GH_TOKEN: 'fake-token',
+        GITHUB_REPOSITORY: 'Chessticize/chessticize-mobile',
+        GITHUB_SHA: currentMainSha,
+        GITHUB_OUTPUT: output,
+        FAKE_COMMIT_SHA: candidateSha,
+        FAKE_CANDIDATE_ARCHIVE: archive,
+        FAKE_CANDIDATE_ARCHIVE_SHA256: archiveSha256,
+      };
+      const args = [
+        downloader,
+        '201',
+        '.github/workflows/mobile-android-release-candidate.yml',
+        'android-signed-release-candidate-{sha}',
+        destination,
+        downloadedArchive,
+        candidateSha,
+      ];
+      const result = spawnSync('bash', args, {
+        encoding: 'utf8',
+        env: environment,
+      });
+
+      expect(result).toEqual(expect.objectContaining({ status: 0, stderr: '' }));
+      expect(fs.readFileSync(path.join(destination, 'candidate.json'), 'utf8'))
+        .toBe('{"retained":true}\n');
+      expect(fs.readFileSync(output, 'utf8')).toContain(
+        `artifact_name=android-signed-release-candidate-${candidateSha}`,
+      );
+
+      const rejected = spawnSync('bash', [
+        ...args.slice(0, -3),
+        path.join(directory, 'rejected-destination'),
+        path.join(directory, 'rejected.zip'),
+        'f'.repeat(40),
+      ], {
+        encoding: 'utf8',
+        env: { ...environment, GITHUB_OUTPUT: path.join(directory, 'rejected-output') },
+      });
+      expect(rejected.status).not.toBe(0);
+      expect(fs.existsSync(path.join(directory, 'rejected-destination', 'candidate.json')))
+        .toBe(false);
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('resolves only the canonical annotated Android tag to the retained candidate commit', () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'chessticize-tag-resolution-'));
+    const repoRoot = path.resolve(__dirname, '../../..');
+    const resolver = path.join(
+      repoRoot,
+      'apps/mobile/scripts/resolve-android-release-candidate-commit.sh',
+    );
+    const canonicalVersion = JSON.parse(fs.readFileSync(
+      path.join(repoRoot, 'apps/mobile/release-version.json'),
+      'utf8',
+    ));
+    const identity = createAndroidReleaseIdentity(canonicalVersion);
+    const runGit = (cwd, args) => spawnSync('git', args, { cwd, encoding: 'utf8' });
+    const createRemote = ({ annotated }) => {
+      const remote = path.join(directory, annotated ? 'annotated.git' : 'lightweight.git');
+      const checkout = path.join(directory, annotated ? 'annotated' : 'lightweight');
+      expect(runGit(directory, ['init', '--bare', remote]).status).toBe(0);
+      expect(runGit(directory, ['init', checkout]).status).toBe(0);
+      expect(runGit(checkout, ['config', 'user.name', 'Release Test']).status).toBe(0);
+      expect(runGit(checkout, ['config', 'user.email', 'release-test@example.com']).status).toBe(0);
+      fs.writeFileSync(path.join(checkout, 'candidate.txt'), 'candidate\n');
+      expect(runGit(checkout, ['add', 'candidate.txt']).status).toBe(0);
+      expect(runGit(checkout, ['commit', '-m', 'candidate']).status).toBe(0);
+      const tagArgs = annotated
+        ? ['tag', '-a', identity.tagName, '-m', 'Android candidate']
+        : ['tag', identity.tagName];
+      expect(runGit(checkout, tagArgs).status).toBe(0);
+      expect(runGit(checkout, ['remote', 'add', 'origin', remote]).status).toBe(0);
+      expect(runGit(checkout, ['push', 'origin', `refs/tags/${identity.tagName}`]).status).toBe(0);
+      const commitSha = runGit(checkout, ['rev-parse', 'HEAD']).stdout.trim();
+      expect(runGit(checkout, ['tag', '-d', identity.tagName]).status).toBe(0);
+      return { checkout, commitSha };
+    };
+
+    try {
+      const annotated = createRemote({ annotated: true });
+      const resolved = spawnSync('bash', [
+        resolver,
+        canonicalVersion.publicVersion,
+        String(canonicalVersion.androidVersionCode),
+      ], { cwd: annotated.checkout, encoding: 'utf8' });
+      expect(resolved).toEqual(expect.objectContaining({
+        status: 0,
+        stdout: `${annotated.commitSha}\n`,
+        stderr: '',
+      }));
+
+      const lightweight = createRemote({ annotated: false });
+      const rejected = spawnSync('bash', [
+        resolver,
+        canonicalVersion.publicVersion,
+        String(canonicalVersion.androidVersionCode),
+      ], { cwd: lightweight.checkout, encoding: 'utf8' });
+      expect(rejected.status).not.toBe(0);
+      expect(rejected.stderr).toContain('must be an annotated tag');
     } finally {
       fs.rmSync(directory, { recursive: true, force: true });
     }
