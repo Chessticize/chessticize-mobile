@@ -213,6 +213,10 @@ function expectedLauncherResources(canonicalPng) {
       encodePng(resizeBox(source, legacySize, legacySize)),
     );
     resources.set(
+      `mipmap-${density.name}/ic_launcher_round.png`,
+      encodePng(resizeBox(source, legacySize, legacySize)),
+    );
+    resources.set(
       `mipmap-${density.name}/ic_launcher_foreground.png`,
       encodePng(renderAdaptiveLayer(source, density.scale)),
     );

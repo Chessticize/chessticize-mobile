@@ -30,7 +30,7 @@ describe('Android launcher icon parity', () => {
     const canonical = fs.readFileSync(canonicalPath);
     const expected = expectedLauncherResources(canonical);
 
-    expect(expected.size).toBe(DENSITIES.length * 2);
+    expect(expected.size).toBe(DENSITIES.length * 3);
     for (const [relativePath, expectedPng] of expected) {
       const packagedPath = path.join(resourceRoot, relativePath);
       expect(fs.existsSync(packagedPath)).toBe(true);
