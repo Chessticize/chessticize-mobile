@@ -1,10 +1,16 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const require = createRequire(import.meta.url);
+const {
+  canonicalAndroidSourceTag,
+  inspectAndroidReleaseDocumentation
+} = require("../apps/mobile/scripts/android-play-release.js");
 
 const read = (relativePath) => readFileSync(path.join(repoRoot, relativePath), "utf8");
 const count = (text, needle) => text.split(needle).length - 1;
@@ -44,6 +50,17 @@ const releaseDocs = [
   read("docs/APP_STORE_UPLOAD.md"),
   read("docs/RELEASE_SOURCE_POLICY.md")
 ];
+
+const releaseVersion = JSON.parse(read("apps/mobile/release-version.json"));
+const androidPlayRunbook = read("docs/ANDROID_PLAY_RELEASE.md");
+const androidReleasePlan = read("apps/mobile/docs/ANDROID_RELEASE_PLAN.md");
+const androidOwnerEvidence = JSON.parse(
+  read("docs/android-play-owner-evidence.example.json")
+);
+const canonicalAndroidTag = canonicalAndroidSourceTag(
+  releaseVersion.publicVersion,
+  releaseVersion.androidVersionCode
+);
 
 assert.equal(count(coreWorkflow, "run: pnpm test:unit"), 1);
 assert.equal(count(coreWorkflow, "run: pnpm test:integration"), 1);
@@ -183,6 +200,62 @@ for (const releaseDoc of releaseDocs) {
   assert.match(releaseDoc, /GitHub Mobile iOS\/Detox/);
   assert.match(releaseDoc, /exact/);
 }
+
+assert.equal(releaseVersion.publicVersion, "1.1");
+assert.equal(releaseVersion.androidVersionCode, 2);
+assert.ok(
+  androidPlayRunbook.includes(
+    `Android version code: \`apps/mobile/release-version.json\` ` +
+      `(\`${releaseVersion.androidVersionCode}\`)`
+  )
+);
+assert.deepEqual(
+  inspectAndroidReleaseDocumentation({
+    releaseVersion,
+    playRunbook: androidPlayRunbook,
+    releasePlan: androidReleasePlan
+  }),
+  []
+);
+assert.equal(
+  androidOwnerEvidence.candidate.versionName,
+  releaseVersion.publicVersion
+);
+assert.equal(
+  androidOwnerEvidence.candidate.versionCode,
+  releaseVersion.androidVersionCode
+);
+assert.equal(androidOwnerEvidence.sourceRelease.tagName, canonicalAndroidTag);
+assert.equal(
+  androidOwnerEvidence.sourceRelease.reference,
+  `https://github.com/Chessticize/chessticize-mobile/releases/tag/${canonicalAndroidTag}`
+);
+assert.equal(
+  androidOwnerEvidence.sourceRelease.sourceManifest.tagName,
+  canonicalAndroidTag
+);
+assert.equal(
+  androidOwnerEvidence.sourceRelease.sourceManifest.reference,
+  `https://github.com/Chessticize/chessticize-mobile/releases/download/` +
+    `${canonicalAndroidTag}/android-source-manifest.json`
+);
+
+const assertAndroidCandidateBindings = (value) => {
+  if (!value || typeof value !== "object") {
+    return;
+  }
+  if (value.candidate) {
+    assert.equal(value.candidate.versionName, releaseVersion.publicVersion);
+    assert.equal(
+      value.candidate.versionCode,
+      releaseVersion.androidVersionCode
+    );
+  }
+  for (const nested of Object.values(value)) {
+    assertAndroidCandidateBindings(nested);
+  }
+};
+assertAndroidCandidateBindings(androidOwnerEvidence);
 
 const syntaxCheck = spawnSync("bash", ["-n", localE2eRunner], { encoding: "utf8" });
 assert.equal(syntaxCheck.status, 0, syntaxCheck.stderr);

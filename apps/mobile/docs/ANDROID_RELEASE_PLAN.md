@@ -524,8 +524,9 @@ users without exposing the production app-signing private key.
   actual size delta. The planning estimate is roughly 25–35 MB; the measured
   value becomes authoritative.
 - Generate `Chessticize-Android-<version>.apk` and the matching `.sha256` file.
-- Create or update a draft GitHub Release using a platform tag such as
-  `android-v1.1.0-build-1`. Require human approval before publication.
+- Create or update a draft GitHub Release using the current platform tag
+  `android-v1.1.0-build-2`. Require human approval before publication. The
+  build-1 tag and artifact remain immutable historical evidence.
 - Include manual-update instructions and state that installing a newer signed
   APK preserves local progress.
 
