@@ -234,6 +234,10 @@ describe('Key user flows', () => {
     await waitFor(element(by.id('history-filter-wrong-only')))
       .toHaveValue(historyToggleValue('Wrong puzzles only', true))
       .withTimeout(10000);
+    await waitFor(element(by.id('history-filter-sprint-only')))
+      .toBeVisible()
+      .whileElement(by.id('history-quick-filters'))
+      .scroll(120, 'right');
     await element(by.id('history-filter-sprint-only')).tap();
     await waitFor(element(by.id('history-filter-sprint-only')))
       .toHaveValue(historyToggleValue('Sprint attempts only', false))
