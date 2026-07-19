@@ -1,0 +1,64 @@
+name: Mobile Interaction Lab
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/mobile-lab.yml"
+      - "apps/mobile-lab/**"
+      - "apps/mobile/src/**"
+      - "package.json"
+      - "packages/**"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "tsconfig.json"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+    paths:
+      - ".github/workflows/mobile-lab.yml"
+      - "apps/mobile-lab/**"
+      - "apps/mobile/src/**"
+      - "package.json"
+      - "packages/**"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "tsconfig.json"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-lab-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Interaction Lab typecheck and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout without LFS assets
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.1.2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26.x
+          cache: pnpm
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck, registry tests, and static Storybook build
+        run: pnpm mobile:lab:validate
+
+      - name: Reject stale New Scenario Markers
+        env:
+          ALLOW_NEW_SCENARIOS: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft && 'true' || 'false' }}
+        run: pnpm mobile:lab:check-markers

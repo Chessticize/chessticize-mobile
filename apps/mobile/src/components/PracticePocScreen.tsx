@@ -135,6 +135,7 @@ interface Props {
   currentTimeMs?: () => number;
   puzzleSelectionId?: string;
   puzzleSelectionSeed?: string;
+  sprintStartDelayMs?: number;
   standardTargetCorrect?: number;
   systemBack?: MobileSystemBackSource;
 }
@@ -426,6 +427,7 @@ export function PracticePocScreen({
   currentTimeMs = Date.now,
   puzzleSelectionId,
   puzzleSelectionSeed,
+  sprintStartDelayMs = ARROW_DUEL_LOADING_TRANSITION_MS,
   standardTargetCorrect,
   systemBack
 }: Props): React.JSX.Element {
@@ -1075,7 +1077,7 @@ export function PracticePocScreen({
       setStartingMode(nextMode);
       sprintStartTimerRef.current = setTimeout(() => {
         finishDelayedSprintStart(nextMode, useCustomTiming);
-      }, ARROW_DUEL_LOADING_TRANSITION_MS);
+      }, sprintStartDelayMs);
       return;
     }
     performStartSprint(nextMode, useCustomTiming);

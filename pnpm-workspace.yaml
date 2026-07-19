@@ -4,6 +4,7 @@ packages:
 allowBuilds:
   detox: true
   dtrace-provider: true
+  esbuild: true
   unrs-resolver: true
 patchedDependencies:
   detox@20.51.4: patches/detox@20.51.4.patch

@@ -35,6 +35,7 @@ real boundary is part of the risk.
 | Storage integration | Real persistence and repository contracts | SQLite migrations, reopen behavior, transactions, review queue, ratings, sync merge | `pnpm test:integration` |
 | CLI E2E | Real process and public protocol boundary | Standard sprint, Arrow Duel, serialized history/review/rating state | `pnpm test:e2e` |
 | Mobile component | Rendered public UI behavior with native rendering boundaries replaced | Navigation, timers, filters, settings, injected sync/notification clients, board callback wiring | `pnpm mobile:test` |
+| Interaction Lab | Browser design alignment and living UI documentation using real shared React Native components | Responsive layout, copy, hierarchy, deterministic page/state flows, Board Placeholder callbacks | `pnpm mobile:storybook` |
 | Mobile Detox | Full app, real simulator, real writable SQLite, real native rendering/modules | Critical journeys, relaunch persistence, chessboard gestures, Stockfish, screenshots | `pnpm mobile:e2e:test:ios` |
 | Release/manual native | External account and physical-device acceptance | Real iCloud account/container, delivered notification taps, TestFlight upgrade, device-specific behavior | Release runbook |
 
@@ -148,6 +149,26 @@ Representative component coverage includes:
 The mocked chessboard proves props, callback wiring, and UI state. It does not
 prove real piece rendering, coordinate mapping, drag competition, or promotion
 interaction on iOS.
+
+## Interaction Lab Boundary
+
+`apps/mobile-lab` is the fast design-alignment layer between component tests
+and native acceptance. It imports the real shared React Native screen and
+presentation components, renders them through React Native Web, and seeds
+deterministic scenarios through `PracticeService`, `MemoryStore`, and maintained
+native-boundary fakes. It must not introduce a parallel hand-written mockup UI.
+
+The Board Placeholder preserves geometry and the minimum board ref/callback
+contract so board-adjacent feedback, review, and result states remain reachable.
+It does not validate real chessboard rendering, gestures, Safe Area behavior,
+native Back, notifications, iCloud, SQLite, or Stockfish. Those boundaries stay
+in component, Detox, integration, and release/manual validation as applicable.
+
+Every Lab Scenario declares its Scenario Scope and has a stable Storybook URL.
+The typed registry exhaustively maps the mobile navigation unions to a scenario
+or an explicit not-cataloged reason. Temporary New Scenario Markers are allowed
+on draft design-review branches, but CI rejects them on ready pull requests and
+`main`.
 
 ## Detox Regression Scope
 

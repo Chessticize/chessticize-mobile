@@ -1,0 +1,34 @@
+{
+  "name": "ChessticizeMobileLab",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "storybook": "storybook dev --port 6006 --host 0.0.0.0",
+    "build-storybook": "storybook build",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test src/scenarioRegistry.test.ts",
+    "check:new-scenarios": "node --experimental-strip-types scripts/check-new-scenarios.ts",
+    "validate": "pnpm typecheck && pnpm test && pnpm build-storybook"
+  },
+  "dependencies": {
+    "chess.js": "^1.4.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.0",
+    "react-native-safe-area-context": "^5.5.2",
+    "react-native-web": "0.21.2"
+  },
+  "devDependencies": {
+    "@storybook/react-native-web-vite": "10.5.2",
+    "@types/node": "^26.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "19.2.3",
+    "storybook": "10.5.2",
+    "typescript": "^5.9.0",
+    "vite": "8.1.5"
+  },
+  "engines": {
+    "node": ">= 22.11.0"
+  }
+}

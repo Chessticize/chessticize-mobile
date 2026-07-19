@@ -2,7 +2,7 @@
 
 Chessticize Mobile is an offline-first, open-source iOS and Android training app for Puzzle Sprint and Arrow Duel: timed tactics sprints, per-mode ELO, and spaced-repetition review of mistakes, all computed on device from a bundled puzzle pack.
 
-The repository contains the React Native app shell (`apps/mobile`), a pure TypeScript domain core (`packages/core`), storage services (`packages/storage`), a stdio CLI harness (`apps/cli`), and bundled puzzle fixtures (`fixtures/puzzles`).
+The repository contains the React Native app shell (`apps/mobile`), the browser-based Interaction Lab (`apps/mobile-lab`), a pure TypeScript domain core (`packages/core`), storage services (`packages/storage`), a stdio CLI harness (`apps/cli`), and bundled puzzle fixtures (`fixtures/puzzles`).
 
 ## Documents
 
@@ -29,8 +29,17 @@ The repository now includes the GUI-independent backend core, a plain stdio CLI,
 - `packages/storage` contains real SQLite migrations and repositories for puzzles, attempts, sprint sessions, ratings, history filters, and review queues.
 - `apps/cli` exposes the core through a machine-readable JSONL protocol for E2E testing without a mobile simulator.
 - `apps/mobile` contains the React Native app shell and Practice screen that reuses `react-native-chessboard`.
+- `apps/mobile-lab` renders those real React Native components through React Native Web for fast, deterministic design review.
 
 ## Local Mobile Preview
+
+For browser-based UI proposals and flow review, start the Interaction Lab:
+
+```sh
+pnpm mobile:storybook
+```
+
+Storybook prints the local and LAN URLs. A phone on the same Wi-Fi network can open the LAN URL, and every scenario exposes a reset action and a direct full-screen permalink. The lab uses deterministic in-memory data and a clearly marked Board Placeholder; it does not read local SQLite or replace native simulator/device acceptance.
 
 For normal UI work, do not use the iOS simulator as the default validation loop. Run component tests and type checks first:
 

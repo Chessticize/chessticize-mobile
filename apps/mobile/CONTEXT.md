@@ -4,6 +4,26 @@ The Mobile context delivers the Chessticize practice experience on supported mob
 
 ## Language
 
+**Interaction Lab**:
+The browser-based, development-only rendering of the real shared React Native UI used as the living UI documentation baseline and for phone-accessible design review before native wiring and acceptance. It uses React Native Web, deterministic in-memory data, and stable Lab Scenario URLs.
+_Avoid_: HTML mockup, simulator replacement, production web app
+
+**Board Placeholder**:
+The browser-only replacement for `react-native-chessboard` that preserves board geometry, reports board and input-lock state, implements the screen's minimum ref/callback contract, and exposes clearly marked development controls for reaching surrounding UI states.
+_Avoid_: Web chessboard, production board fallback
+
+**Lab Scenario**:
+A deterministic Interaction Lab entry for one meaningful page, subflow, transient, detail, or failure state, backed by maintained fakes and public product interfaces.
+_Avoid_: Screenshot fixture, mock page
+
+**Scenario Scope**:
+The page under design review plus its own subflows, transients, and details. Navigation intents that eventually leave an extracted scope are documented and intercepted at the boundary; whole-screen monolith scenarios remain explicitly free roaming until that seam exists.
+_Avoid_: Test isolation, disabled navigation
+
+**New Scenario Marker**:
+A temporary branch-only `new` flag on a Lab Scenario under design review. It feeds the Storybook `new` tag and the phone-friendly What's New index, and must be cleared before a pull request becomes ready or reaches `main`.
+_Avoid_: Permanent new badge, release note
+
 **Android Local-First Release**:
 The first production Android release for 64-bit phones and tablets, providing the complete offline practice experience available on iOS without cross-platform progress synchronization. Foldables and ChromeOS receive basic compatibility rather than dedicated experiences; other Android form factors are excluded.
 _Avoid_: Android MVP, Android port
