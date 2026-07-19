@@ -649,9 +649,8 @@ describe("PracticePocScreen", () => {
     await settleFeedbackSnapshot();
 
     expect(findByTestId(renderer, "review-session")).toBeTruthy();
-    expect(findByTestId(renderer, "review-line-continue")).toBeTruthy();
-    press(renderer, "review-line-continue");
     expect(collectText(findByTestId(renderer, "review-timer"))).not.toBe(firstTimer);
+    expect(() => findByTestId(renderer, "review-line-continue")).toThrow();
   });
 
   it("previews Practice for session-mistake review while analysis returns to the review first", async () => {
@@ -1222,7 +1221,7 @@ describe("PracticePocScreen", () => {
     expect(moveIDs).toEqual(candidates.map((move) => `session-accessible-move-${move}`).sort());
   });
 
-  it("advances Analysis through non-gesture Review controls without mutating review records", async () => {
+  it("advances Review analysis through the board without mutating review records", async () => {
     const now = "2026-06-20T12:00:00.000Z";
     const service = createDueReviewService(1);
     service.recordReviewAttempt({
@@ -1259,33 +1258,23 @@ describe("PracticePocScreen", () => {
     const analysisStartFen = findByTestId(renderer, "mock-chessboard").props.fen;
     const announcementBeforeMove = findByTestId(renderer, "review-announcement").props.accessibilityLabel;
 
-    press(renderer, "review-accessible-moves-open");
-    expect(findByTestId(renderer, "review-accessible-moves-dialog").props.accessibilityViewIsModal).toBe(true);
-    const legalAnalysisMove = renderer.root.findAll((node) =>
-      typeof node.props.testID === "string"
-        && node.props.testID.startsWith("review-accessible-move-")
-        && node.props.accessibilityRole === "button"
-    )[0];
+    expect(() => findByTestId(renderer, "review-accessible-moves-open")).toThrow();
+    const legalAnalysisMove = new Chess(analysisStartFen).moves({ verbose: true })[0];
     if (!legalAnalysisMove) {
-      throw new Error("Expected at least one public legal Analysis move");
+      throw new Error("Expected at least one legal Analysis move");
     }
-    const legalAnalysisMoveTestID = legalAnalysisMove.props.testID as string;
-    const legalAnalysisMoveUci = legalAnalysisMoveTestID.replace("review-accessible-move-", "");
-    const legalAnalysisMoveFrom = legalAnalysisMoveUci.slice(0, 2);
-    const legalAnalysisMoveTo = legalAnalysisMoveUci.slice(2, 4);
+    const legalAnalysisMoveFrom = legalAnalysisMove.from;
+    const legalAnalysisMoveTo = legalAnalysisMove.to;
+    const legalAnalysisMoveUci = `${legalAnalysisMoveFrom}${legalAnalysisMoveTo}${legalAnalysisMove.promotion ?? ""}`;
     const expectedAnalysisPosition = new Chess(analysisStartFen);
     expect(expectedAnalysisPosition.move({
       from: legalAnalysisMoveFrom,
       to: legalAnalysisMoveTo,
-      ...(legalAnalysisMoveUci.length > 4 ? { promotion: legalAnalysisMoveUci.slice(4, 5) } : {})
+      ...(legalAnalysisMove.promotion ? { promotion: legalAnalysisMove.promotion } : {})
     })).toBeTruthy();
     const expectedAnalysisSide = expectedAnalysisPosition.turn() === "w" ? "White" : "Black";
-    expect(legalAnalysisMove.props.accessibilityRole).toBe("button");
-    expect(legalAnalysisMove.props.accessibilityLabel).toContain(
-      `${legalAnalysisMoveFrom} to ${legalAnalysisMoveTo}`
-    );
 
-    await pressAsync(renderer, legalAnalysisMoveTestID);
+    await boardMove(renderer, legalAnalysisMoveUci);
 
     expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(expectedAnalysisPosition.fen());
     expect(findByTestId(renderer, "mock-chessboard").props.fen).not.toBe(analysisStartFen);
@@ -3846,13 +3835,13 @@ describe("PracticePocScreen", () => {
     press(renderer, "review-previous");
     expectText(renderer, "1 / 3 · Standard");
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
-    expect(findByTestId(renderer, "mock-chessboard").props.draggableColor).toBe("w");
+    const reviewFen = findByTestId(renderer, "mock-chessboard").props.fen;
+    expect(findByTestId(renderer, "mock-chessboard").props.draggableColor).toBe(new Chess(reviewFen).turn());
     expect(findByTestId(renderer, "mock-chessboard").props.withLetters).toBe(false);
     expect(findByTestId(renderer, "mock-chessboard").props.withNumbers).toBe(false);
-    expect(collectText(findByTestId(renderer, "board-coordinate-overlay"))).toContain("abcdefgh");
-    expect(collectText(findByTestId(renderer, "board-coordinate-overlay"))).toContain("87654321");
-    const reviewFen = findByTestId(renderer, "mock-chessboard").props.fen;
-
+    const reviewBoardFlipped = findByTestId(renderer, "mock-chessboard").props.flipped;
+    expect(collectText(findByTestId(renderer, "board-coordinate-overlay"))).toContain(reviewBoardFlipped ? "hgfedcba" : "abcdefgh");
+    expect(collectText(findByTestId(renderer, "board-coordinate-overlay"))).toContain(reviewBoardFlipped ? "12345678" : "87654321");
     await boardMove(renderer, "e2e6");
 
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
@@ -4280,7 +4269,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "review-timer"))).toBe("00:40");
   });
 
-  it("chains the default due review start across visible context groups", async () => {
+  it("auto-chains the default due review start across visible context groups", async () => {
     const service = createMobilePracticeService("random1000");
     service.startSprint(
       { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
@@ -4302,13 +4291,12 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "review-session")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "review-timer"))).toBe("00:40");
+    expect(() => findByTestId(renderer, "review-accessible-moves-open")).toThrow();
 
     await boardMove(renderer, "c4b5");
     await settleFeedbackSnapshot();
 
     expect(findByTestId(renderer, "review-session")).toBeTruthy();
-    expect(findByTestId(renderer, "review-line-continue")).toBeTruthy();
-    press(renderer, "review-line-continue");
     expect(collectText(findByTestId(renderer, "review-timer"))).toBe("01:00");
     expect(() => findByTestId(renderer, "review-line-continue")).toThrow();
     expect(() => findByTestId(renderer, "review-source-pill")).toThrow();
@@ -4343,7 +4331,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "review-total-count"))).toBe("0");
   });
 
-  it("stays on an answered result after removal and leaves navigation to Continue", async () => {
+  it("returns to the Review panel automatically after the last due answer", async () => {
     jest.setSystemTime(new Date("2026-06-21T12:00:00.000Z"));
     const service = createMobilePracticeService("random1000");
     service.startSprint(
@@ -4361,23 +4349,11 @@ describe("PracticePocScreen", () => {
     await settleFeedbackSnapshot();
 
     expect(service.listHistory({ source: "scheduled_review" })).toHaveLength(1);
-    expect(findByTestId(renderer, "review-line-continue")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Due tomorrow");
-    press(renderer, "review-analysis-button");
-    expect(findByTestId(renderer, "review-close-analysis")).toBeTruthy();
-
-    press(renderer, "review-schedule-remove");
-    press(renderer, "review-schedule-removal-confirm");
-
-    expect(findByTestId(renderer, "review-session")).toBeTruthy();
-    expect(findByTestId(renderer, "review-close-analysis")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Not scheduled for Review");
-    expect(service.listHistory({ source: "scheduled_review" })).toHaveLength(1);
-    expect(service.listReviewQueue()).toHaveLength(0);
-
-    press(renderer, "review-close-analysis");
-    press(renderer, "review-line-continue");
+    expect(service.listReviewQueue()).toHaveLength(1);
+    expect(() => findByTestId(renderer, "review-session")).toThrow();
+    expect(() => findByTestId(renderer, "review-line-continue")).toThrow();
     expect(findByTestId(renderer, "review-panel")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "review-due-count"))).toBe("1 / 1");
   });
 
   it("starts the canonical oldest due item before a lexically earlier newer context", () => {
@@ -4434,9 +4410,8 @@ describe("PracticePocScreen", () => {
     const officialReviewAttempts = service.listHistory({ source: "scheduled_review" }) as Array<{ result: string; submittedMove: string }>;
     expect(officialReviewAttempts).toHaveLength(1);
     expect(officialReviewAttempts[0]).toMatchObject({ result: "wrong", submittedMove: "c4b5" });
-    expect(findByTestId(renderer, "review-session")).toBeTruthy();
-    expect(findByTestId(renderer, "review-line-continue")).toBeTruthy();
-    press(renderer, "review-line-continue");
+    expect(() => findByTestId(renderer, "review-session")).toThrow();
+    expect(() => findByTestId(renderer, "review-line-continue")).toThrow();
     expect(findByTestId(renderer, "review-panel")).toBeTruthy();
 
     press(renderer, "history-tab");
@@ -4485,9 +4460,8 @@ describe("PracticePocScreen", () => {
     await boardMove(renderer, "e6f7");
     await settleFeedbackSnapshot();
 
-    expect(findByTestId(renderer, "review-session")).toBeTruthy();
-    expect(findByTestId(renderer, "review-line-continue")).toBeTruthy();
-    press(renderer, "review-line-continue");
+    expect(() => findByTestId(renderer, "review-session")).toThrow();
+    expect(() => findByTestId(renderer, "review-line-continue")).toThrow();
     expect(findByTestId(renderer, "review-panel")).toBeTruthy();
     const officialReviewAttempts = service.listHistory({ source: "scheduled_review" }) as Array<{
       expectedMove: string;
@@ -4627,11 +4601,11 @@ describe("PracticePocScreen", () => {
     act(() => {
       jest.advanceTimersByTime(40_500);
     });
-    expect(collectText(findByTestId(renderer, "review-timer"))).toBe("Time expired");
-    press(renderer, "review-line-continue");
     const secondPuzzleId = collectText(findByTestId(renderer, "review-current-puzzle-id"));
     expect(secondPuzzleId).not.toBe(firstPuzzleId);
     expectText(renderer, "2 / 2 · Standard");
+    expect(collectText(findByTestId(renderer, "review-timer"))).toBe("00:40");
+    expect(() => findByTestId(renderer, "review-line-continue")).toThrow();
 
     press(renderer, "review-exit");
     expect(service.listHistory({ source: "scheduled_review" })).toHaveLength(1);
@@ -5196,8 +5170,6 @@ describe("PracticePocScreen", () => {
 
     await boardMove(renderer, wrongMoves[0] as string);
     await settleFeedbackSnapshot();
-    expect(findByTestId(renderer, "review-line-continue")).toBeTruthy();
-    press(renderer, "review-line-continue");
     expectText(renderer, "2 / 3 · Arrow Duel");
     expect(() => findByTestId(renderer, "review-line-continue")).toThrow();
     expect(service.listHistory({ source: "scheduled_review" })).toEqual([
@@ -5789,7 +5761,7 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "review-reminder-permission-prompt")).toThrow();
   });
 
-  it("dismisses the review reminder prompt before its underlying Review session", async () => {
+  it("dismisses the review reminder prompt before its underlying Review panel", async () => {
     const systemBack = createTestSystemBackSource("android");
     const notificationClient = new FakeReviewReminderNotificationClient("not_determined", "authorized");
     const service = createMobilePracticeService("random1000");
@@ -5813,7 +5785,8 @@ describe("PracticePocScreen", () => {
 
     expect(systemBack.invoke()).toBe(true);
     expect(() => findByTestId(renderer, "review-reminder-permission-prompt")).toThrow();
-    expect(findByTestId(renderer, "review-session")).toBeTruthy();
+    expect(() => findByTestId(renderer, "review-session")).toThrow();
+    expect(findByTestId(renderer, "review-panel")).toBeTruthy();
     expect(notificationClient.requestCount).toBe(0);
   });
 });

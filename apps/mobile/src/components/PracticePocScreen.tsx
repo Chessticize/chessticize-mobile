@@ -6709,8 +6709,6 @@ function ReviewSession({
   const [reviewStartedAtMs, setReviewStartedAtMs] = useState(() => currentTimeMs());
   const [reviewNowMs, setReviewNowMs] = useState(() => currentTimeMs());
   const [reviewTimedOut, setReviewTimedOut] = useState(false);
-  const [punishmentLineComplete, setPunishmentLineComplete] = useState(false);
-  const [lineReviewNeedsContinue, setLineReviewNeedsContinue] = useState(false);
   const [scheduledReviewProgress] = useState(() => {
     const firstEntry = entries[initialIndex] ?? entries[0];
     return firstEntry?.source === "due"
@@ -6787,7 +6785,7 @@ function ReviewSession({
       ? currentExpectedMove(reviewState.line)
       : undefined;
   const isArrowDuelFollowUpReview = currentEntry.mode === "arrow_duel" && reviewState.kind === "line";
-  const boardGestureEnabled = !boardLocked && (!lineReviewNeedsContinue || analysisEnabled);
+  const boardGestureEnabled = !boardLocked;
   const boardDraggableColor = boardGestureEnabled ? sideToMove(displayFen) : null;
   const reviewSideToMove = sideToMove(displayFen);
   const canNavigateReview = (currentEntry.source === "session" || currentEntry.source === "history") && !boardLocked;
@@ -6898,7 +6896,7 @@ function ReviewSession({
       finishReviewSession();
       return;
     }
-    setLineReviewNeedsContinue(true);
+    goToNextDueReview();
     // The timer state is the trigger; the render-local recorder must not restart the effect.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentEntry.source, currentPuzzle, reviewRemainingSeconds, reviewResultRecorded, reviewTimedOut]);
@@ -6911,7 +6909,6 @@ function ReviewSession({
     setLastMove(null);
     setBoardLocked(false);
     setWrongSeen(false);
-    setPunishmentLineComplete(false);
     setAnalysisEnabled(false);
     setAnalysisFen(null);
     setEngineAnalysisLines([]);
@@ -6925,7 +6922,6 @@ function ReviewSession({
     setReviewStartedAtMs(now);
     setReviewNowMs(now);
     setReviewTimedOut(false);
-    setLineReviewNeedsContinue(false);
     reviewResultRecordedRef.current = false;
     reviewSuppressedBoardMovesRef.current = [];
   }
@@ -6936,8 +6932,7 @@ function ReviewSession({
       setBoardLocked(false);
       return;
     }
-    setBoardLocked(false);
-    setLineReviewNeedsContinue(true);
+    goToNextDueReview();
   }
 
   function goToNextDueReview(): void {
@@ -7008,10 +7003,6 @@ function ReviewSession({
       boardRef.current?.resetBoard(currentFen);
       return;
     }
-    if (lineReviewNeedsContinue && !analysisEnabled) {
-      boardRef.current?.resetBoard(currentFen);
-      return;
-    }
     const submittedFen = currentFen;
     const submittedMoveFen = fenAfterMove(submittedFen, move);
     if (!submittedMoveFen) {
@@ -7033,17 +7024,6 @@ function ReviewSession({
     await submitReviewLineMove(move, submittedFen);
   }
 
-  async function playAccessibleReviewMove(option: AccessibleMoveOption): Promise<void> {
-    if (!boardRef.current || !boardGestureEnabled) {
-      return;
-    }
-    await boardRef.current.move({
-      from: option.from,
-      to: option.to,
-      ...(option.promotion ? { promotion: option.promotion } : {})
-    });
-  }
-
   async function submitReviewLineMove(move: string, submittedFen: string): Promise<void> {
     setBoardLocked(true);
     try {
@@ -7059,8 +7039,7 @@ function ReviewSession({
         boardRef.current?.resetBoard(submittedFen);
         setFeedback(null);
         if (currentEntry.source === "due") {
-          setLineReviewNeedsContinue(true);
-          setBoardLocked(false);
+          goToNextDueReview();
           return;
         }
         setBoardLocked(false);
@@ -7163,8 +7142,7 @@ function ReviewSession({
     });
     await sleep(FEEDBACK_SNAPSHOT_MS);
     if (currentEntry.source === "due") {
-      setLineReviewNeedsContinue(true);
-      setBoardLocked(false);
+      goToNextDueReview();
       return;
     }
     const replyMoves = result.feedback.autoPlayedMoves.slice(1);
@@ -7210,21 +7188,6 @@ function ReviewSession({
       setReviewState({ kind: "line", line: result.state });
       if (result.feedback.puzzleSolved) {
         await sleep(FEEDBACK_SNAPSHOT_MS);
-        if (currentEntry.source === "due") {
-          // A wrong Arrow Duel review stays on the same puzzle after the
-          // punishment line; the user advances with the Continue button.
-          recordCurrentReviewResult("wrong", {
-            submittedMove: result.feedback.submittedMove,
-            expectedMove: result.feedback.expectedMove
-          });
-          if (!hasNextScheduledReview) {
-            goToNextDueReview();
-            return;
-          }
-          setPunishmentLineComplete(true);
-          setBoardLocked(false);
-          return;
-        }
         advanceReview("wrong", {
           submittedMove: result.feedback.submittedMove,
           expectedMove: result.feedback.expectedMove
@@ -7402,14 +7365,6 @@ function ReviewSession({
             ) : null}
           </View>
           <View style={styles.iconButtonRow} testID="review-header-actions">
-          {currentEntry.mode !== "arrow_duel" ? (
-            <AccessibleMoveControls
-              disabled={!boardGestureEnabled}
-              fen={displayFen}
-              testIDPrefix="review"
-              onSelect={playAccessibleReviewMove}
-            />
-          ) : null}
           {currentEntry.source === "session" || currentEntry.source === "history" ? (
             <>
               <Pressable
@@ -7579,17 +7534,6 @@ function ReviewSession({
                 : undefined
             }
           />
-          {((punishmentLineComplete && currentEntry.source === "due") || lineReviewNeedsContinue) && !analysisEnabled ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Continue to next review"
-              testID="review-line-continue"
-              style={[styles.primaryButton, styles.reviewContinueButton]}
-              onPress={goToNextDueReview}
-            >
-              <Text style={styles.primaryButtonText}>Continue</Text>
-            </Pressable>
-          ) : null}
           {!analysisEnabled && guidedEvalLines.length > 0 ? (
             <View testID="review-guided-eval-list">
               {guidedEvalLines.map((line, index) => (
@@ -10850,9 +10794,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 8,
     padding: 10
-  },
-  reviewContinueButton: {
-    marginBottom: 8
   },
   activeSessionAdaptiveLayout: {
     alignItems: "center",
