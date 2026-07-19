@@ -3230,7 +3230,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-empty-state")).toBeTruthy();
   });
 
-  it("keeps Review Schedule removal failures unchanged and retryable inside Review", () => {
+  it("keeps Review Schedule removal failures unchanged and retryable inside History Review", () => {
     const store = new FailingReviewScheduleStore();
     store.seedPuzzles([sharedHistoryPuzzle()]);
     store.scheduleMistakeReview({
@@ -3238,14 +3238,28 @@ describe("PracticePocScreen", () => {
       mode: "standard",
       ratingKey: "standard 5/20"
     }, "2026-07-17T12:00:00.000Z");
+    store.recordAttempt({
+      id: "review-removal-failure",
+      source: "sprint",
+      sessionId: "review-removal-session",
+      puzzleId: "shared-history",
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      result: "correct",
+      submittedMove: "e2e4",
+      expectedMove: "e2e4",
+      startedAt: "2026-07-17T12:00:05.000Z",
+      completedAt: "2026-07-17T12:00:10.000Z",
+      ratingBefore: 600
+    });
     const service = new PracticeService(store);
     const renderer = renderScreen({
       currentTimeMs: () => Date.parse("2026-07-18T12:02:00.000Z"),
       practiceService: service
     });
 
-    press(renderer, "review-tab");
-    press(renderer, "review-start-due");
+    press(renderer, "history-tab");
+    press(renderer, "history-attempt-review-removal-failure");
     expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Due today");
     store.setRemovalFailure(new Error("delete failed"));
     press(renderer, "review-schedule-remove");
@@ -3259,8 +3273,7 @@ describe("PracticePocScreen", () => {
     store.setRemovalFailure(undefined);
     press(renderer, "review-schedule-removal-confirm");
     expect(service.listReviewQueue()).toHaveLength(0);
-    expect(findByTestId(renderer, "review-panel")).toBeTruthy();
-    expect(() => findByTestId(renderer, "review-session")).toThrow();
+    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Not scheduled for Review");
   });
 
   it("keeps a committed Review removal when reminder reconciliation fails", async () => {
@@ -3273,6 +3286,20 @@ describe("PracticePocScreen", () => {
       mode: "standard",
       ratingKey: "standard 5/20"
     }, "2026-07-17T12:00:00.000Z");
+    store.recordAttempt({
+      id: "review-reminder-failure",
+      source: "sprint",
+      sessionId: "review-reminder-session",
+      puzzleId: "shared-history",
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      result: "correct",
+      submittedMove: "e2e4",
+      expectedMove: "e2e4",
+      startedAt: "2026-07-17T12:00:05.000Z",
+      completedAt: "2026-07-17T12:00:10.000Z",
+      ratingBefore: 600
+    });
     const service = new PracticeService(store);
     const renderer = renderScreen({
       currentTimeMs: () => Date.parse("2026-07-18T12:02:00.000Z"),
@@ -3281,14 +3308,14 @@ describe("PracticePocScreen", () => {
     });
     await act(async () => {});
 
-    press(renderer, "review-tab");
-    press(renderer, "review-start-due");
+    press(renderer, "history-tab");
+    press(renderer, "history-attempt-review-reminder-failure");
     press(renderer, "review-schedule-remove");
     press(renderer, "review-schedule-removal-confirm");
     await act(async () => {});
 
     expect(service.listReviewQueue()).toHaveLength(0);
-    expect(service.listHistory()).toHaveLength(0);
+    expect(service.listHistory()).toHaveLength(1);
     expect(scheduler.calls.length).toBeGreaterThan(0);
   });
 
@@ -4097,9 +4124,8 @@ describe("PracticePocScreen", () => {
     press(renderer, "review-tab");
 
     expect(collectText(findByTestId(renderer, "review-due-summary"))).toBe("Overdue now");
-    expect(collectText(findByTestId(renderer, "review-overdue-count"))).toBe("1");
-    expect(collectText(findByTestId(renderer, "review-overdue-summary"))).toBe("1Overdue");
-    expect(flattenTestStyle(findByTestId(renderer, "review-overdue-summary").props.style).flexDirection).toBe("row");
+    expect(() => findByTestId(renderer, "review-overdue-count")).toThrow();
+    expect(() => findByTestId(renderer, "review-overdue-summary")).toThrow();
     expect(findByTestId(renderer, "review-due-card").props.accessibilityLabel).toContain("All due · Overdue now");
     press(renderer, "review-filter-toggle");
     press(renderer, "review-filter-overdue");
@@ -4311,32 +4337,20 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "review-panel")).toThrow();
   });
 
-  it("removes an unanswered due puzzle, advances, and records no fake attempt", () => {
+  it("keeps scheduled Review status read-only and centers its header", () => {
     jest.setSystemTime(new Date("2026-06-21T12:00:00.000Z"));
     const service = createDueReviewService(2);
     const renderer = renderScreen({ practiceService: service });
 
     press(renderer, "review-tab");
     press(renderer, "review-start-due");
-    const removedPuzzleId = collectText(findByTestId(renderer, "review-current-puzzle-id"));
     expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Due today");
-
-    press(renderer, "review-schedule-remove");
-    press(renderer, "review-schedule-removal-confirm");
-
-    expect(findByTestId(renderer, "review-session")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "review-current-puzzle-id"))).not.toBe(removedPuzzleId);
+    expect(() => findByTestId(renderer, "review-schedule-remove")).toThrow();
+    expect(flattenTestStyle(findByTestId(renderer, "review-header-actions").props.style).width).toBe(
+      flattenTestStyle(findByTestId(renderer, "review-exit").props.style).width
+    );
     expect(service.listHistory({ source: "scheduled_review" })).toHaveLength(0);
-    expect(service.listReviewQueue()).toHaveLength(1);
-
-    press(renderer, "review-schedule-remove");
-    press(renderer, "review-schedule-removal-confirm");
-
-    expect(findByTestId(renderer, "review-panel")).toBeTruthy();
-    expect(service.listHistory({ source: "scheduled_review" })).toHaveLength(0);
-    expect(service.listReviewQueue()).toHaveLength(0);
-    expect(collectText(findByTestId(renderer, "review-due-count"))).toBe("0");
-    expect(collectText(findByTestId(renderer, "review-total-count"))).toBe("0");
+    expect(service.listReviewQueue()).toHaveLength(2);
   });
 
   it("returns to the Review panel automatically after the last due answer", async () => {

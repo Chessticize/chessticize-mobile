@@ -6289,14 +6289,6 @@ function ReviewPanel({
         </View>
         <View style={styles.reviewDueCountBlock}>
           <Text testID="review-due-count" style={styles.reviewDueBigCount}>{dailyReviewProgressLabel}</Text>
-          {queueSummary.overdueCount > 0 ? (
-            <View style={styles.reviewDueOverdueRow} testID="review-overdue-summary">
-              <Text testID="review-overdue-count" style={[styles.reviewDueOverdueCount, styles.errorText]}>
-                {queueSummary.overdueCount}
-              </Text>
-              <Text style={styles.reviewDueOverdueLabel}>Overdue</Text>
-            </View>
-          ) : null}
         </View>
       </View>
 
@@ -7293,6 +7285,7 @@ function ReviewSession({
   const reviewScheduleControlNode = reviewScheduleControlVisible ? (
     <ReviewScheduleControl
       key={`${currentEntry.puzzle.id}:${currentEntry.mode}:${currentEntry.ratingKey}`}
+      actionVisible={currentEntry.source !== "due"}
       compact
       context={{
         puzzleId: currentEntry.puzzle.id,
@@ -7364,7 +7357,13 @@ function ReviewSession({
               </>
             ) : null}
           </View>
-          <View style={styles.iconButtonRow} testID="review-header-actions">
+          <View
+            style={[
+              styles.iconButtonRow,
+              currentEntry.source === "due" ? styles.reviewHeaderDueActionsPlaceholder : null
+            ]}
+            testID="review-header-actions"
+          >
           {currentEntry.source === "session" || currentEntry.source === "history" ? (
             <>
               <Pressable
@@ -7663,6 +7662,7 @@ function ReviewSession({
 }
 
 function ReviewScheduleControl({
+  actionVisible = true,
   compact = false,
   context,
   currentTimeMs,
@@ -7672,6 +7672,7 @@ function ReviewScheduleControl({
   refreshToken,
   service
 }: {
+  actionVisible?: boolean;
   compact?: boolean;
   context: ReviewContext;
   currentTimeMs: () => number;
@@ -7733,60 +7734,64 @@ function ReviewScheduleControl({
         </Text>
         {failure ? <Text style={styles.errorText} testID="review-schedule-error">{failure}</Text> : null}
       </View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={review ? "Remove this puzzle from Review" : "Add this puzzle to Review"}
-        style={styles.reviewScheduleAction}
-        testID={review ? "review-schedule-remove" : "review-schedule-add"}
-        onPress={review ? () => setConfirmationVisible(true) : addToReview}
-      >
-        <Text style={review ? styles.reviewScheduleRemoveText : styles.reviewScheduleAddText}>
-          {review ? "Remove from Review" : "Add to Review"}
-        </Text>
-      </Pressable>
-      <Modal
-        animationType="fade"
-        onRequestClose={() => setConfirmationVisible(false)}
-        transparent
-        visible={confirmationVisible}
-      >
-        <View style={styles.accessibleMoveModalBackdrop}>
-          <View
-            accessibilityViewIsModal
-            style={styles.reviewScheduleConfirmation}
-            testID="review-schedule-removal-confirmation"
+      {actionVisible ? (
+        <>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={review ? "Remove this puzzle from Review" : "Add this puzzle to Review"}
+            style={styles.reviewScheduleAction}
+            testID={review ? "review-schedule-remove" : "review-schedule-add"}
+            onPress={review ? () => setConfirmationVisible(true) : addToReview}
           >
-            <Text style={styles.panelTitle}>Remove from Review?</Text>
-            <Text style={styles.helperText}>
-              Future reviews for this puzzle will be removed. Your attempts, History, analysis, and ratings stay unchanged. Review workload and reminders may change.
+            <Text style={review ? styles.reviewScheduleRemoveText : styles.reviewScheduleAddText}>
+              {review ? "Remove from Review" : "Add to Review"}
             </Text>
-            {failure ? <Text style={styles.errorText}>{failure}</Text> : null}
-            <View style={styles.confirmationActionRow}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Cancel removing this puzzle from Review"
-                style={styles.secondaryButton}
-                testID="review-schedule-removal-cancel"
-                onPress={() => {
-                  setConfirmationVisible(false);
-                  setFailure(null);
-                }}
+          </Pressable>
+          <Modal
+            animationType="fade"
+            onRequestClose={() => setConfirmationVisible(false)}
+            transparent
+            visible={confirmationVisible}
+          >
+            <View style={styles.accessibleMoveModalBackdrop}>
+              <View
+                accessibilityViewIsModal
+                style={styles.reviewScheduleConfirmation}
+                testID="review-schedule-removal-confirmation"
               >
-                <Text style={styles.secondaryButtonText}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Confirm removing this puzzle from Review"
-                style={styles.destructiveButton}
-                testID="review-schedule-removal-confirm"
-                onPress={confirmRemoval}
-              >
-                <Text style={styles.destructiveButtonText}>Remove from Review</Text>
-              </Pressable>
+                <Text style={styles.panelTitle}>Remove from Review?</Text>
+                <Text style={styles.helperText}>
+                  Future reviews for this puzzle will be removed. Your attempts, History, analysis, and ratings stay unchanged. Review workload and reminders may change.
+                </Text>
+                {failure ? <Text style={styles.errorText}>{failure}</Text> : null}
+                <View style={styles.confirmationActionRow}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Cancel removing this puzzle from Review"
+                    style={styles.secondaryButton}
+                    testID="review-schedule-removal-cancel"
+                    onPress={() => {
+                      setConfirmationVisible(false);
+                      setFailure(null);
+                    }}
+                  >
+                    <Text style={styles.secondaryButtonText}>Cancel</Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Confirm removing this puzzle from Review"
+                    style={styles.destructiveButton}
+                    testID="review-schedule-removal-confirm"
+                    onPress={confirmRemoval}
+                  >
+                    <Text style={styles.destructiveButtonText}>Remove from Review</Text>
+                  </Pressable>
+                </View>
+              </View>
             </View>
-          </View>
-        </View>
-      </Modal>
+          </Modal>
+        </>
+      ) : null}
     </View>
   );
 }
@@ -10678,25 +10683,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     minWidth: 58
   },
-  reviewDueOverdueCount: {
-    fontSize: 12,
-    fontWeight: "900",
-    lineHeight: 14,
-    textAlign: "center"
-  },
-  reviewDueOverdueLabel: {
-    color: "#64748B",
-    fontSize: 9,
-    fontWeight: "800",
-    lineHeight: 11,
-    textAlign: "center"
-  },
-  reviewDueOverdueRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 4,
-    justifyContent: "center"
-  },
   reviewDueHiddenMetric: FABRIC_SAFE_HIDDEN_TEXT_STYLE,
   reviewFilterScroller: {
     marginHorizontal: -UI_PADDING
@@ -11837,6 +11823,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flex: 1,
     gap: 2
+  },
+  reviewHeaderDueActionsPlaceholder: {
+    width: 38
   },
   reviewContextStrip: {
     alignItems: "center",
