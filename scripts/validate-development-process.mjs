@@ -123,6 +123,7 @@ const uiCalibrationRunnerSource = read(
 assert.match(uiCalibrationRunnerSource, /pnpm mobile:e2e:build:ios:release/);
 assert.match(uiCalibrationRunnerSource, /pnpm mobile:e2e:store-assets:ios:release/);
 assert.match(uiCalibrationRunnerSource, /git status --porcelain --untracked-files=normal/);
+assert.match(uiCalibrationRunnerSource, /brew --prefix ruby@3\.3/);
 
 const localE2eRunnerSource = read(
   ".codex/skills/chessticize-mobile-local-e2e/scripts/run-local-e2e.sh"

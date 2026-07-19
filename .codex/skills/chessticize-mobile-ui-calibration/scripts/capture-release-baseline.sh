@@ -25,6 +25,12 @@ cd "$REPO_ROOT"
 
 [[ "$(uname -s)" == "Darwin" ]] || fail "Release simulator calibration requires macOS."
 git rev-parse --show-toplevel >/dev/null 2>&1 || fail "Run inside the Chessticize Mobile repository."
+command -v brew >/dev/null 2>&1 || fail "Homebrew is required to select the locked Ruby 3.3 toolchain."
+
+RUBY_PREFIX="$(brew --prefix ruby@3.3 2>/dev/null)" || \
+  fail "Install Homebrew ruby@3.3 before running UI calibration."
+[[ -x "$RUBY_PREFIX/bin/ruby" ]] || fail "Homebrew ruby@3.3 is not available at $RUBY_PREFIX."
+export PATH="$RUBY_PREFIX/bin:$PATH"
 
 HEAD_BEFORE="$(git rev-parse HEAD)"
 SHORT_SHA="$(git rev-parse --short=7 HEAD)"
