@@ -4,6 +4,8 @@ All repository documentation must be written in English. User-facing GUI copy mu
 
 For development-loop decisions, use the repo-local skill at `.codex/skills/chessticize-mobile-dev-loop/SKILL.md`. It defines the preferred order for core/backend tests, CLI E2E checks, mobile component tests, and iOS simulator/Detox screenshot verification.
 
+For Android release orchestration, use the repo-local skill at `.codex/skills/chessticize-android-release/SKILL.md`. It governs clean-machine preflight, exact-artifact Play and GitHub publication, protected recovery, physical ARM64 validation, and final issue closure.
+
 ## Agent wayfinding
 
 ### Issue tracker
