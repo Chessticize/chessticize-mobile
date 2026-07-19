@@ -169,8 +169,7 @@ function inspectAndroidReleaseDocumentation({
   const requiredSourceTagField =
     `- Required source tag before any Play track upload: \`${tagName}\``;
   const currentReleasePlanField =
-    '- Create or update a draft GitHub Release using the current platform tag\n' +
-    `  \`${tagName}\`.`;
+    `- Current release tag: \`${tagName}\``;
   const errors = [];
 
   if (!String(playRunbook).includes(requiredSourceTagField)) {

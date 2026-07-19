@@ -328,6 +328,9 @@ Design approved 2026-07-03; the "Review Reminder Notifications" section of
    `pnpm app-store:signing-readiness` reports the current upload machine's
    Apple Developer Team ID, Xcode command line tools, and Apple distribution
    signing identity readiness before archive/upload.
+   This full matrix is the first-launch 1.1 gate. Later bounded build-number
+   deltas use exact-head fast checks plus the owner's installed TestFlight smoke
+   and repeat only the manual/native checks affected by the change.
 
 ## Milestone 6 — Automated coverage of key user flows
 

@@ -29,17 +29,24 @@ pnpm typecheck
 pnpm mobile:test
 pnpm mobile:typecheck
 pnpm mobile:doctor:ios
+```
+
+For first launch, a new App Store version, screenshot/metadata changes, or broad
+native risk, also generate the full evidence bundle:
+
+```sh
 pnpm app-store:testflight-evidence -- --screenshot-root scratch/store-assets/final
 ```
 
-Before archiving, manually dispatch or verify the GitHub Mobile iOS/Detox
-workflow for this exact `main` commit and require both `flows` and `practice` to
-pass. Record the workflow URL with the TestFlight evidence; the nightly run is
-acceptable only when it tested the exact release candidate.
+Before archiving, record whether this is a delta, targeted, or full native
+release under `docs/TESTING_ARCHITECTURE.md`. A delta requires the exact-head
+fast checks above and the physical TestFlight smoke below; it does not require
+a fresh full Detox run. Record the affected suite for targeted risk, or both
+`flows` and `practice` for broad native risk.
 
-The evidence command must report `dirty: false`, `status: "pass"`, and
-`releaseReady: true`. Keep the generated `scratch/testflight-qa/<timestamp>/`
-folder for the physical-device QA record.
+When the evidence command is applicable, it must report `dirty: false`,
+`status: "pass"`, and `releaseReady: true`. A build-number-only delta with
+unchanged store metadata and screenshots does not regenerate that bundle.
 
 ## Public Source Tag
 
@@ -162,8 +169,11 @@ valid while this signing-account gate is still incomplete.
    `ITSAppUsesNonExemptEncryption = false`.
 4. Configure the TestFlight test information from `docs/TESTFLIGHT_QA.md`.
 5. Add the build to the `Internal 1.1 QA` internal testing group.
-6. Install the build from the TestFlight app on a physical iPhone and a
-   representative iPad.
-7. Run the full checklist in `docs/TESTFLIGHT_QA.md`.
+6. Install the build from the TestFlight app on the owner's physical device and
+   run the delta smoke: installed version, cold launch, one real Practice path,
+   and the changed behavior.
+7. Run only the applicable targeted checks in `docs/TESTFLIGHT_QA.md`. Repeat
+   the full iPhone/iPad checklist for first launch, broad native risk, or a
+   store/device compatibility concern.
 8. Fill the evidence log with the source commit, release tag, build, device,
    tester, result, blocking issues, and evidence folder.

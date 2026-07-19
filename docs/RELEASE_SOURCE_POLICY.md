@@ -33,19 +33,21 @@ https://github.com/Chessticize/chessticize-mobile
 - Run `pnpm app-store:signing-readiness` on the upload machine and resolve any
   missing Apple Developer Team ID, Xcode, or Apple distribution identity before
   archiving.
-- Manually dispatch or verify GitHub Mobile iOS/Detox for the exact candidate
-  commit on `main`, require both `flows` and `practice` to pass, and record the
-  run URL with the release evidence.
+- Record the release validation scope from `docs/TESTING_ARCHITECTURE.md`.
+  Ordinary deltas use exact-head fast checks plus owner physical-device smoke;
+  targeted changes run the affected native suite, and only broad native changes
+  require both `flows` and `practice`.
 - Run `pnpm app-store:third-party-audit` from the final lockfile and resolve
   any stale package, Stockfish, NNUE, or puzzle-data notice.
-- After final screenshot export, run `pnpm app-store:screenshot-audit` and
-  resolve any missing scene or invalid pixel size before uploading screenshots.
+- When screenshots or store metadata changed, run
+  `pnpm app-store:screenshot-audit` after final export and resolve any missing
+  scene or invalid pixel size before uploading screenshots.
 - Run `pnpm app-store:release-manifest` from the clean release commit and save
   the JSON output with the GitHub release or the TestFlight QA evidence.
-- Run `pnpm app-store:testflight-evidence -- --screenshot-root scratch/store-assets/final`
-  from the clean candidate commit to collect the automatable preflight,
-  notice-audit, signing-readiness, release-manifest, and screenshot-audit
-  outputs in `scratch/testflight-qa/`.
+- For first launch, a new App Store version, screenshot/metadata changes, or
+  broad native risk, run
+  `pnpm app-store:testflight-evidence -- --screenshot-root scratch/store-assets/final`
+  from the clean candidate commit to collect the full evidence bundle.
 - Follow `docs/APP_STORE_UPLOAD.md` to archive and upload with
   `apps/mobile/ios/ExportOptions.app-store-connect.plist`.
 - `LICENSE` contains GPL-3.0-or-later.
@@ -55,13 +57,17 @@ https://github.com/Chessticize/chessticize-mobile
 - The shipped Stockfish version and bundled NNUE files are listed in
   `THIRD_PARTY_NOTICES.md`.
 - The App Store binary was built from the tagged release commit.
-- For Android, follow `docs/ANDROID_PLAY_RELEASE.md`, retain the exact signed
-  AAB and artifact-only verifier output, and require the final `play-ready`
-  evidence verdict before Production launch.
+- For Android, follow `docs/ANDROID_PLAY_RELEASE.md` and retain the exact signed
+  AAB plus artifact-only verifier output. Require the full `play-ready` evidence
+  contract for first Production launch or an explicitly full release; ordinary
+  deltas use its risk-scoped path.
 - The Android AAB contains `LICENSE`, `THIRD_PARTY_NOTICES.md`, Stockfish
   `COPYING.txt`, and Stockfish `AUTHORS`, plus native debug symbols.
 - The Play candidate was built from the exact `android-v<version>-build-<code>`
   tagged commit and every Play track references the same AAB/version code.
+- Any GitHub APK is downloaded from Play only after that version is published
+  and owner-smoke-tested. It uses the same source Release and Play app-signing
+  certificate; CI never rebuilds a second APK for redistribution.
 
 ## Release Manifest
 

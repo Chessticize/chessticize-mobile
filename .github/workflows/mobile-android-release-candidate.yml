@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: mobile-android-release-candidate
@@ -67,6 +67,14 @@ jobs:
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Run exact-head fast release checks
+        run: |
+          pnpm process:validate
+          pnpm test
+          pnpm typecheck
+          pnpm mobile:test
+          pnpm mobile:typecheck
+
       - name: Fetch canonical core pack
         run: pnpm fetch:core-pack
 
@@ -121,6 +129,23 @@ jobs:
           path: |
             apps/mobile/android/app/build/outputs/bundle/release/app-release.aab
             apps/mobile/artifacts/android-release/android-source-manifest.json
+
+      - name: Publish exact corresponding source
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/source-publication"
+          pnpm mobile:verify:android:github-release \
+            --source-manifest apps/mobile/artifacts/android-release/android-source-manifest.json \
+            --output-dir "$RUNNER_TEMP/source-publication"
+
+      - name: Retain source publication evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-source-publication-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 30
+          path: ${{ runner.temp }}/source-publication/
 
       - name: Destroy upload keystore
         if: always()

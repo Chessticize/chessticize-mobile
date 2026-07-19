@@ -190,7 +190,7 @@ CHESSTICIZE_E2E_SCOPE=practice \
 
 Replace `practice` with `flows` or `full` as required. Record the scope, exact commit SHA, build result, commands, results, and clean-worktree confirmation in the PR. Any later code change invalidates native evidence. All relevant fast CI checks must still pass.
 
-Nightly GitHub Detox builds once and runs both suites against the latest `main` as an integration signal. Do not wait for it to merge a routine PR. Before a release, manually dispatch or verify Mobile iOS/Detox for the exact release candidate commit on `main`; both suites must pass.
+Nightly GitHub Detox builds once and runs both suites against the latest `main` as an integration signal. Do not wait for it to merge a routine PR. Release candidates use the same risk scopes: a delta needs exact-head fast checks plus owner device smoke, targeted native risk needs the affected suite, and only broad native risk requires both suites.
 
 ## Screenshot Verification
 

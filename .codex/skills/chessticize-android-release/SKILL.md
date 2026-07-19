@@ -1,12 +1,14 @@
 ---
 name: chessticize-android-release
-description: Audit, prepare, advance, recover, and complete Chessticize Mobile Android releases across exact source tags, signed AABs, Play Console tracks, protected GitHub source and binary publication, Play-generated APKs, physical ARM64 validation, and issues #171, #186, #187, #188, and #200. Use for Android release status checks, clean-Mac release setup, release-candidate builds, Play readiness, Android GitHub Releases, versionCode bumps, protected-workflow recovery, tester or device gates, and final launch evidence.
+description: Audit, prepare, advance, recover, and complete Chessticize Mobile Android releases across exact source tags, protected signed AABs, Google Play tracks, post-Play APK mirroring, risk-scoped validation, and owner physical-device smoke. Use for release status, local or CI builds, Play readiness, versionCode bumps, source-publication recovery, and launch evidence.
 ---
 
 # Chessticize Android Release
 
-Treat an Android release as one immutable artifact-and-evidence chain. Never
-equate a green repository build with Play readiness or launch approval.
+Google Play distributes Android binaries first. GitHub publishes corresponding
+source and may mirror the exact Play-signed universal APK after owner
+acceptance. Treat the signed AAB, annotated tag, source manifest, Play version
+code, mirrored APK, and owner device result as one release identity.
 
 ## Load the authoritative contracts
 
@@ -22,39 +24,30 @@ Read these files completely before acting:
 - `docs/ANDROID_PRIVACY_DISCLOSURE.md`
 - `.github/workflows/mobile-android-release-candidate.yml`
 - `.github/workflows/mobile-android-github-release.yml`
+- `.github/workflows/mobile-android-source-recovery.yml`
 
-Use those files for phase details, commands, evidence fields, Console copy, and
-workflow inputs. Keep this skill limited to routing and cross-phase invariants.
-If live issues and repository docs disagree, stop the affected mutation,
-record the conflict, and obtain an owner decision rather than inventing policy.
-
-Refresh issue #171, every child and comment, open PRs, workflow runs, releases,
-protected environments, and Play Console before relying on a handoff. Treat
-SHAs, artifact IDs, tester requirements, environment policies, and Console
-state as point-in-time evidence.
+Use them for commands, evidence fields, Console copy, and workflow inputs. Live
+store/account requirements override repository assumptions. ADR-0009 replaces
+the historical multi-phase GitHub publication protocol with one post-Play APK
+mirror job.
 
 ## Select the operating mode
 
-- For status or closability, perform a strict read-only audit. Do not fetch
-  refs, install dependencies, post comments, close issues, dispatch workflows,
-  change environments, move tags, publish, or roll out. Use GitHub APIs for
-  current remote facts and read-only Git commands for local facts.
-- For advance work, execute only the next dependency-ready phase and prove its
-  postconditions before continuing.
-- For recovery, preserve failed evidence, determine exactly which local and
-  external state exists, then apply the recovery rules below.
-- For repository code changes, follow `AGENTS.md` and the active issue or user
-  instructions for worktrees, implementation, review, CI, and merge policy.
+- For status, perform a read-only audit of exact tags, releases, workflow runs,
+  artifacts, open PRs, and visible Play state.
+- For advance work, execute the next dependency-ready action and verify its
+  postcondition.
+- For recovery, preserve failed evidence and reuse only the exact retained
+  candidate artifact.
+- For repository changes, follow `AGENTS.md` and the user's requested scope.
 
 Prefer CLI or APIs for auditable state. Use Computer Use only for Play Console
-surfaces without a supported API, and never to bypass authentication, protected
+surfaces without a supported API, and never bypass authentication, protected
 approval, account verification, or explicit owner authorization.
 
 ## Establish a trustworthy checkout
 
-For advance or recovery on a new or uncertain Mac, start from current
-`origin/main` and run the clean-machine preflight. Never copy `node_modules`,
-Pods, Gradle output, temporary worktrees, or other machine-local build state.
+For a new or uncertain Mac, begin with a clean synchronized checkout and run:
 
 ```sh
 gh auth status
@@ -62,121 +55,103 @@ git fetch --all --prune
 git lfs install
 git lfs pull
 git status --short --branch
-git worktree list --porcelain
 pnpm install --frozen-lockfile
 pnpm fetch:core-pack
 pnpm mobile:doctor:android
-adb devices -l
-emulator -list-avds
 pnpm process:validate
 pnpm mobile:typecheck
 pnpm mobile:test
+adb devices -l
 ```
 
-Require Node 22 LTS at least 22.11.0, repository pnpm 11.1.2, Java 17 or
-newer, and the SDK/packages named by `docs/ANDROID_VALIDATION.md`. Run
-`pnpm mobile:install:android-sdk` only when required packages are missing.
-Report PASS/WARN/FAIL and fix required failures before release mutation. A
-missing physical device is WARN until #200/#188 and FAIL at that release gate.
+Require Node 22 LTS, pnpm 11.1.2, Java 17 or newer, and the Android packages in
+`docs/ANDROID_VALIDATION.md`. Report PASS/WARN/FAIL. Do not run this mutating
+setup during a strict read-only audit.
 
-Do not run this mutating setup block during strict read-only audit mode.
+## Resolve the live identity
 
-## Resolve the live identity and frontier
+1. Read `publicVersion` and `androidVersionCode` from
+   `apps/mobile/release-version.json` and derive the canonical tag with
+   `canonicalAndroidSourceTag`.
+2. Distinguish a retained signed candidate from a proposed replacement. A code
+   or version change is not a candidate until its own signed AAB exists.
+3. Record commit, annotated tag, package, public version, version code,
+   candidate workflow/run/artifact ID, AAB digest, source Release, Play track,
+   and owner device-smoke state.
+4. Never infer Play state from issue checkboxes. Mark unobserved Console gates
+   UNKNOWN.
 
-1. Require a clean, synchronized primary `main` checkout before mutation.
-2. Read `publicVersion` and `androidVersionCode` from
-   `apps/mobile/release-version.json`. Derive the tag through
-   `canonicalAndroidSourceTag` in
-   `apps/mobile/scripts/android-play-release.js`; it normalizes a missing patch
-   component to zero (`1.1` becomes `1.1.0`) and rejects ambiguity.
-3. Distinguish the **retained candidate** from a **proposed replacement**. The
-   retained candidate is the last signed AAB preserved by the candidate
-   workflow. A version-bump PR is only a proposed replacement until its own
-   signed candidate artifact exists.
-4. Inspect open PR heads, reviews, threads, checks, worktrees, the canonical
-   tag/ref, GitHub release, workflow artifacts, and Play tracks. Resume live
-   work instead of duplicating it.
-5. Record retained and proposed tuples separately: commit, tag, package,
-   public version, version code, signing identity, workflow run, artifact ID,
-   archive digest, AAB digest, and distribution state.
+## Select the release scope
 
-Never infer external state from issue checkboxes. If Play Console cannot be
-inspected because of scope, authentication, or access, mark every unobserved
-Console gate UNKNOWN and state why.
+- **Delta:** bounded JavaScript, copy, styling, test, documentation, or release
+  metadata changes. Require exact-head fast checks, the protected signed
+  AAB/source job, and owner physical-device smoke.
+- **Targeted:** navigation, one multi-screen journey, relaunch persistence,
+  board rendering/input, adaptive layout, or one native-module boundary. Add
+  the affected suite or manual native check.
+- **Full:** startup, shared navigation/storage wiring, schema/migration, global
+  fixtures, native build configuration/dependencies, signing/release
+  infrastructure, backup, Stockfish, notifications, or unbounded native risk.
+  Run both suites and the applicable compatibility/manual matrix.
 
-## Route the next phase
+Every release is installed on the owner's physical device. A delta smoke records
+installed version/build, cold launch, one real Practice completion, and the
+changed behavior. Do not repeat unchanged listing, account, screenshot, closed
+test, pre-launch, size, backup, or compatibility gates unless this is first
+launch, the boundary changed, or Play reports a problem.
 
-Read the listed contract immediately before executing a row. Require its
-postcondition before advancing a dependent phase. The rows are not wholly
-serial: run #200 as soon as the retained exact candidate and an authorized
-physical device are available.
+## Route the release
 
-| Phase | Authoritative contract | Required postcondition |
-| --- | --- | --- |
-| Repository and native convergence | `docs/ANDROID_VALIDATION.md`, #171 dependency graph | Required implementation PRs are merged; exact candidate Android and iOS evidence is green and clean. |
-| Retain signed candidate | `docs/ANDROID_PLAY_RELEASE.md`, candidate workflow | The annotated canonical tag is created **and published** on the exact commit; one signed AAB and source manifest are retained and independently verified. |
-| Publish corresponding source | `docs/ANDROID_GITHUB_RELEASE.md` phases `prepare-source-draft` then `publish-source` | The canonical public source release and manifest match the retained artifact byte-for-byte before any Play-track distribution. |
-| Complete #186 | Owner sequence in `docs/ANDROID_PLAY_RELEASE.md` | The retained AAB is installed through Internal **or** Closed testing; any Closed tester/duration rule is satisfied only if the live account requires it; exact owner evidence yields `status: "play-ready"`; Production is prepared but not started. |
-| Complete #187 | `docs/ANDROID_GITHUB_RELEASE.md` phases `prepare-binary` then `publish-binary` | The exact Play-generated universal APK and checksum are public and reverified; the documented #186/#187 ordering conflict is owner-ratified or corrected. |
-| Complete #200 independently | Stockfish subset of the physical checklist in `docs/ANDROID_VALIDATION.md`, live #200 acceptance | Exact-candidate physical ARM64 install, engine, cancellation/reuse, background/resume, and force-stop/restart evidence passes. |
-| Complete #188 final launch | Live #188 acceptance after #186, #187, and #200 | The full physical, backup, upgrade, and cross-channel contract passes; the approved Production artifact launches directly to 100 percent. |
+| Action | Required postcondition |
+| --- | --- |
+| Prepare identity | Clean exact commit and published annotated canonical tag; monotonically increasing version code. |
+| Build candidate | One `android-production` approval produces a verified production-signed AAB, retained source manifest, and public matching source-first Release. |
+| Recover source | The manual recovery workflow authenticates the original candidate artifact and idempotently publishes the same source manifest; no rebuild or token substitution. |
+| Validate | Exact-head fast checks plus the selected delta, targeted, or full scope pass. |
+| Test on device | The Play-delivered candidate passes owner smoke and any changed-boundary checks. |
+| Promote | The same retained AAB/version code advances through the selected Play track; applicable live Console errors are resolved. |
+| Mirror APK | After Play publication and owner smoke, one manual CI job downloads the Play-signed universal APK, verifies identity, and adds it plus SHA-256 to the source Release. |
 
-Preparation never authorizes publication, and publication never authorizes a
-Production rollout. Honor each protected environment as a separate approval.
+Both GitHub mutations use the built-in `github.token` with `contents: write`.
+The mirror obtains a short-lived Play token through configured workload identity
+or a least-privilege service account; it never asks the operator for a temporary
+token. Do not add prepare/publish phases or a second APK build.
 
-## Preserve cross-phase invariants
+## Preserve invariants
 
 - Publish matching source before or with every distributed binary, including
-  Internal and Closed testing.
-- Reuse one retained AAB across every Play track and the Production draft. Do
-  not rebuild between phases.
-- Use the original candidate artifact ID through source preparation and binary
-  preparation. Authenticate every retained prior-phase artifact by numeric ID,
-  name, run, and archive digest.
-- Accept only the documented package, public version, Android version code,
-  upload certificate, Play app-signing certificate, ABIs, 16 KB result,
-  license/source assets, symbols, permissions, size, and checksums.
-- Keep credentials, signing material, tester identities, private owner
-  evidence, and private Console screenshots out of commits and public comments.
-- Do not weaken tests, verifiers, approvals, source disclosure, tester rules,
-  physical evidence, or issue acceptance criteria.
+  Internal and Closed tracks.
+- Reuse one retained AAB across every Play track and Production; never rebuild
+  between tracks.
+- Publish only the universal APK returned by Play after the owner accepts the
+  Play-delivered release; never publish an upload-key or locally rebuilt APK.
+- Preserve package, versions, upload signing identity, ABIs, 16 KB result,
+  license/source assets, symbols, and AAB digest.
+- Keep credentials, signing material, tester identities, private evidence, and
+  Console screenshots out of commits and public comments.
+- Do not weaken Google requirements, GPL disclosure, changed-boundary tests, or
+  physical-device acceptance.
 
-## Recover without weakening the chain
+## Recover without broadening the protocol
 
-- For a repository defect, add a regression test, fix it through the repository
-  PR/review policy, and rerun every invalidated exact-head gate.
-- For an external failure, inspect partial state before retrying. Reuse only
-  authenticated retained inputs and reconcile incomplete release assets as the
-  GitHub release runbook specifies.
-- If no artifact, Play upload, or release exists, follow the governing issue
-  before recreating or moving a tag. Require explicit owner authorization for
-  any tag mutation.
-- Once Play consumes a version code or a candidate is distributed, never move
-  its tag, rebuild it, or reuse its version code. Preserve and publish its
-  matching source; create a reviewed higher-code replacement separately.
-- Treat a missing source release as a hard stop before a version bump. If
-  historical recovery requires temporarily allowing `main` in protected
-  environments, require explicit owner authorization naming the environments
-  and purpose, minimize the exception, remove it immediately, and verify the
-  final policy.
-- If an artifact expires, restart from the earliest phase whose exact
-  authenticated input still exists. Never substitute a local lookalike.
-- Preserve failed runs and findings. Do not hand-edit evidence or recast a
-  failure as WARN.
+- Add regression coverage for repository defects and rerun only invalidated
+  exact-head gates.
+- For a source-publication failure, use the recovery workflow with the original
+  candidate artifact ID. It can recover an artifact retained before the normal
+  workflow's later source step failed.
+- Once Play consumes a version code or distributes a candidate, never move its
+  tag, rebuild it, or reuse its code. Create a higher-code replacement.
+- If the retained artifact expires, build a new reviewed candidate with a new
+  version code. Never substitute a local lookalike.
+- Preserve failed runs and report external waits as UNKNOWN or blocked; do not
+  hand-edit evidence.
+- A failed APK mirror is retried idempotently against the same Play version
+  code. It does not invalidate the already accepted Play release or trigger a
+  rebuild.
 
-## Report and close precisely
+## Report completion
 
-For every audit or phase, report the retained and proposed tuples, a concise
-PASS/WARN/FAIL table with direct evidence, UNKNOWN external surfaces, active
-PR/worktree/CI state, owner-only gates, and the next dependency-ready action.
-In advance or recovery mode, post changed evidence to the governing issue. In
-read-only mode, report the proposed issue update without posting it.
-
-Close #186 only on exact retained-artifact `play-ready` evidence. Close #187
-only after binary publication evidence **and** owner ratification or correction
-of the documented ordering conflict. Close #200 and #188 only on their live
-physical and launch contracts. Close #171 only when every child is closed and
-no actionable review, CI, publication, or release evidence remains.
-
-Stop when the requested phase is proven or the next action requires new owner
-authority, external waiting, or a material policy decision.
+Report the exact identity tuple, validation scope and rationale, fast-check
+results, workflow/artifact/source state, owner device result, Play state, and
+remaining owner-only gates. Stop when the requested release outcome is proven
+or the next action needs new owner authority or external waiting.

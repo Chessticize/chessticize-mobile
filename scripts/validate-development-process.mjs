@@ -138,29 +138,26 @@ for (const releaseContract of [
   assert.match(androidReleaseSkill, new RegExp(releaseContract.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 }
 
-for (const protectedPhase of [
-  "prepare-source-draft",
-  "publish-source",
-  "prepare-binary",
-  "publish-binary"
-]) {
-  assert.match(androidReleaseSkill, new RegExp("`" + protectedPhase + "`"));
-}
-
-assert.match(androidReleaseSkill, /status: \"play-ready\"/);
-assert.match(androidReleaseSkill, /physical ARM64/);
-assert.match(androidReleaseSkill, /directly to 100 percent/);
-assert.match(androidReleaseSkill, /never move\s+its tag, rebuild it, or reuse its version code/);
-assert.match(androidReleaseSkill, /strict read-only audit mode/);
+assert.match(androidReleaseSkill, /Google Play distributes Android binaries/);
+assert.match(androidReleaseSkill, /GitHub publishes corresponding\s+source/);
+assert.match(androidReleaseSkill, /\*\*Delta:\*\*/);
+assert.match(androidReleaseSkill, /\*\*Targeted:\*\*/);
+assert.match(androidReleaseSkill, /\*\*Full:\*\*/);
+assert.match(androidReleaseSkill, /built-in `github\.token`/);
+assert.match(androidReleaseSkill, /Mirror APK/);
+assert.match(androidReleaseSkill, /Play-signed universal APK/);
+assert.match(androidReleaseSkill, /never publish an upload-key or locally rebuilt APK/);
+assert.match(androidReleaseSkill, /mobile-android-source-recovery\.yml/);
+assert.match(androidReleaseSkill, /physical device/);
+assert.match(androidReleaseSkill, /never move its\s+tag, rebuild it, or reuse its code/);
+assert.match(androidReleaseSkill, /strict read-only audit/);
 assert.match(androidReleaseSkill, /canonicalAndroidSourceTag/);
-assert.match(androidReleaseSkill, /retained candidate/);
+assert.match(androidReleaseSkill, /retained signed candidate/);
 assert.match(androidReleaseSkill, /proposed replacement/);
-assert.match(androidReleaseSkill, /mark every unobserved\s+Console gate UNKNOWN/);
-assert.match(androidReleaseSkill, /created \*\*and published\*\*/);
-assert.match(androidReleaseSkill, /Internal \*\*or\*\* Closed testing/);
-assert.match(androidReleaseSkill, /ordering conflict is owner-ratified or corrected/);
-assert.match(androidReleaseSkill, /Complete #200 independently/);
-assert.match(androidReleaseSkill, /#188 acceptance after #186, #187, and #200/);
+assert.match(androidReleaseSkill, /Mark unobserved Console gates\s+UNKNOWN/);
+assert.match(androidReleaseSkill, /published annotated canonical tag/);
+assert.match(androidReleaseSkill, /Internal and Closed tracks/);
+assert.match(androidReleaseSkill, /first\s+launch, the boundary changed, or Play reports a problem/);
 assert.match(agents, /\.codex\/skills\/chessticize-android-release\/SKILL\.md/);
 
 assert.match(localE2eSkill, /CHESSTICIZE_E2E_SCOPE/);
@@ -197,8 +194,9 @@ for (const option of [
 }
 
 for (const releaseDoc of releaseDocs) {
-  assert.match(releaseDoc, /GitHub Mobile iOS\/Detox/);
   assert.match(releaseDoc, /exact/);
+  assert.match(releaseDoc, /delta/i);
+  assert.match(releaseDoc, /physical/i);
 }
 
 assert.equal(releaseVersion.publicVersion, "1.1");

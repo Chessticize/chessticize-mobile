@@ -211,4 +211,4 @@ When a PR requires native validation, add a PR comment containing:
 - Total duration.
 - Confirmation that the worktree remained clean and `HEAD` did not change.
 
-Then verify all relevant fast checks before merging. Any code change after the recorded SHA invalidates the evidence. Nightly and release runs must use `full` and require both suites.
+Then verify all relevant fast checks before merging. Any code change after the recorded SHA invalidates the evidence. Nightly integration uses `full`; release runs use delta, targeted, or full scope, and require both suites only for broad native risk.

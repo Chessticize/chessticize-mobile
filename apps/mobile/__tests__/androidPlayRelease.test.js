@@ -619,10 +619,8 @@ describe('Android Play release contract', () => {
     ['current release-plan tag field', ({ releasePlan, ...documents }) => ({
       ...documents,
       releasePlan: releasePlan.replace(
-        '- Create or update a draft GitHub Release using the current platform tag\n' +
-          `  \`${expectedSourceTag}\`.`,
-        '- Create or update a draft GitHub Release using the current platform tag\n' +
-          '  `android-v1.1.0-build-1`.',
+        `- Current release tag: \`${expectedSourceTag}\``,
+        '- Current release tag: `android-v1.1.0-build-1`',
       ),
     }), 'release plan'],
   ])('fails closed for a stale %s', (_label, mutate, expectedMessage) => {
@@ -1817,6 +1815,8 @@ describe('Android Play release contract', () => {
     expect(workflow).not.toContain('pull_request:');
     expect(workflow).not.toContain('push:');
     expect(workflow).toContain('environment: android-production');
+    expect(workflow).toContain('contents: write');
+    expect(workflow).toContain('Run exact-head fast release checks');
     expect(workflow).toContain('ANDROID_RELEASE_KEYSTORE_BASE64');
     expect(workflow).toContain('ANDROID_UPLOAD_CERT_SHA256');
     expect(workflow).toContain('--artifact-only');
@@ -1827,15 +1827,17 @@ describe('Android Play release contract', () => {
       'apps/mobile/artifacts/android-release/android-source-manifest.json',
     );
     expect(workflow).toContain('retention-days: 30');
+    expect(workflow).toContain('Publish exact corresponding source');
+    expect(workflow).toContain('GITHUB_TOKEN: ${{ github.token }}');
     expect(runbook).toContain('cannot produce a `play-ready` verdict');
-    expect(runbook).toContain('owner evidence schema v3');
-    expect(runbook).toContain('live GitHub tag ref');
-    expect(runbook).toContain('protected Actions artifact');
+    expect(runbook).toContain('### Ordinary delta');
+    expect(runbook).toContain('### First launch and change-triggered gates');
+    expect(runbook).toContain('not required for every ordinary delta');
     expect(runbook).toContain('android-source-manifest.json');
-    expect(runbook).toContain('CHESSTICIZE_GITHUB_TOKEN');
+    expect(runbook).toContain('No temporary GitHub token');
     expect(runbook).toContain(expectedSourceTag);
     expect(runbook).toContain('https://github.com/Chessticize/chessticize-mobile');
-    expect(runbook).toContain('do not start the rollout in #186');
+    expect(runbook).toContain('owner device smoke');
     expect(verifier).toContain('{ repoRoot, run, environment },');
     expect(listing).toContain('Data collected: No');
     expect(listing).toContain('production manifest intentionally has no `INTERNET` permission');
