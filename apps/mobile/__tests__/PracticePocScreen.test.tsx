@@ -3842,7 +3842,8 @@ describe("PracticePocScreen", () => {
     const reviewBoardFlipped = findByTestId(renderer, "mock-chessboard").props.flipped;
     expect(collectText(findByTestId(renderer, "board-coordinate-overlay"))).toContain(reviewBoardFlipped ? "hgfedcba" : "abcdefgh");
     expect(collectText(findByTestId(renderer, "board-coordinate-overlay"))).toContain(reviewBoardFlipped ? "12345678" : "87654321");
-    await boardMove(renderer, "e2e6");
+    const firstExpectedReviewMove = collectText(findByTestId(renderer, "review-current-expected-move"));
+    await boardMove(renderer, firstExpectedReviewMove);
 
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
     expect(hasStyleValue(renderer.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
@@ -3852,7 +3853,8 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "1 / 3 · Standard");
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
 
-    await boardMove(renderer, "e6f7");
+    const secondExpectedReviewMove = collectText(findByTestId(renderer, "review-current-expected-move"));
+    await boardMove(renderer, secondExpectedReviewMove);
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
     expect(hasStyleValue(renderer.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
 
