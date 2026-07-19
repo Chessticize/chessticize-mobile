@@ -6,6 +6,7 @@ const { spawnSync } = require('node:child_process');
 
 const {
   canonicalAndroidSourceTag,
+  inspectAndroidReleaseDocumentation,
   inspectBundleEntries,
   inspectOwnerEvidence,
   inspectPublishedSourceRelease,
@@ -530,6 +531,7 @@ describe('Android Play release contract', () => {
       releaseVersion.androidVersionCode,
     );
     const runbook = read('docs/ANDROID_PLAY_RELEASE.md');
+    const releasePlan = read('apps/mobile/docs/ANDROID_RELEASE_PLAN.md');
     const expectedIdentityBinding = {
       applicationId: expectedCandidate.applicationId,
       versionName: expectedCandidate.versionName,
@@ -571,7 +573,42 @@ describe('Android Play release contract', () => {
     expect(runbook).toContain(
       'Android version code: `apps/mobile/release-version.json` (`2`)',
     );
-    expect(runbook).toContain('android-v1.1.0-build-2');
+    expect(inspectAndroidReleaseDocumentation({
+      releaseVersion,
+      playRunbook: runbook,
+      releasePlan,
+    })).toEqual([]);
+  });
+
+  it.each([
+    ['canonical runbook source-tag field', ({ playRunbook, ...documents }) => ({
+      ...documents,
+      playRunbook: playRunbook.replace(
+        `- Required source tag before any Play track upload: \`${expectedSourceTag}\``,
+        '- Required source tag before any Play track upload: `android-v1.1.0-build-1`',
+      ),
+    }), 'Required source tag'],
+    ['current release-plan tag field', ({ releasePlan, ...documents }) => ({
+      ...documents,
+      releasePlan: releasePlan.replace(
+        '- Create or update a draft GitHub Release using the current platform tag\n' +
+          `  \`${expectedSourceTag}\`.`,
+        '- Create or update a draft GitHub Release using the current platform tag\n' +
+          '  `android-v1.1.0-build-1`.',
+      ),
+    }), 'release plan'],
+  ])('fails closed for a stale %s', (_label, mutate, expectedMessage) => {
+    const documents = {
+      releaseVersion,
+      playRunbook: read('docs/ANDROID_PLAY_RELEASE.md'),
+      releasePlan: read('apps/mobile/docs/ANDROID_RELEASE_PLAN.md'),
+    };
+    const staleDocuments = mutate(documents);
+
+    expect(staleDocuments).not.toEqual(documents);
+    expect(inspectAndroidReleaseDocumentation(staleDocuments)).toEqual(
+      expect.arrayContaining([expect.stringContaining(expectedMessage)]),
+    );
   });
 
   it('uses one public semantic version while Android keeps an independent version code', () => {

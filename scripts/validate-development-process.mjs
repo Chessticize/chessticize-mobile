@@ -1,10 +1,16 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const require = createRequire(import.meta.url);
+const {
+  canonicalAndroidSourceTag,
+  inspectAndroidReleaseDocumentation
+} = require("../apps/mobile/scripts/android-play-release.js");
 
 const read = (relativePath) => readFileSync(path.join(repoRoot, relativePath), "utf8");
 const count = (text, needle) => text.split(needle).length - 1;
@@ -47,16 +53,14 @@ const releaseDocs = [
 
 const releaseVersion = JSON.parse(read("apps/mobile/release-version.json"));
 const androidPlayRunbook = read("docs/ANDROID_PLAY_RELEASE.md");
+const androidReleasePlan = read("apps/mobile/docs/ANDROID_RELEASE_PLAN.md");
 const androidOwnerEvidence = JSON.parse(
   read("docs/android-play-owner-evidence.example.json")
 );
-const androidVersionParts = releaseVersion.publicVersion.split(".");
-while (androidVersionParts.length < 3) {
-  androidVersionParts.push("0");
-}
-const canonicalAndroidTag = `android-v${androidVersionParts.join(".")}-build-${
+const canonicalAndroidTag = canonicalAndroidSourceTag(
+  releaseVersion.publicVersion,
   releaseVersion.androidVersionCode
-}`;
+);
 
 assert.equal(count(coreWorkflow, "run: pnpm test:unit"), 1);
 assert.equal(count(coreWorkflow, "run: pnpm test:integration"), 1);
@@ -205,7 +209,14 @@ assert.ok(
       `(\`${releaseVersion.androidVersionCode}\`)`
   )
 );
-assert.match(androidPlayRunbook, new RegExp(canonicalAndroidTag));
+assert.deepEqual(
+  inspectAndroidReleaseDocumentation({
+    releaseVersion,
+    playRunbook: androidPlayRunbook,
+    releasePlan: androidReleasePlan
+  }),
+  []
+);
 assert.equal(
   androidOwnerEvidence.candidate.versionName,
   releaseVersion.publicVersion

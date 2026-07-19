@@ -157,6 +157,35 @@ function canonicalAndroidSourceTag(versionName, versionCode) {
   return `android-v${components.join('.')}-build-${versionCode}`;
 }
 
+function inspectAndroidReleaseDocumentation({
+  releaseVersion,
+  playRunbook,
+  releasePlan,
+}) {
+  const tagName = canonicalAndroidSourceTag(
+    releaseVersion?.publicVersion,
+    releaseVersion?.androidVersionCode,
+  );
+  const requiredSourceTagField =
+    `- Required source tag before any Play track upload: \`${tagName}\``;
+  const currentReleasePlanField =
+    '- Create or update a draft GitHub Release using the current platform tag\n' +
+    `  \`${tagName}\`.`;
+  const errors = [];
+
+  if (!String(playRunbook).includes(requiredSourceTagField)) {
+    errors.push(
+      `Android Play runbook Required source tag field must be ${tagName}.`,
+    );
+  }
+  if (!String(releasePlan).includes(currentReleasePlanField)) {
+    errors.push(
+      `Android release plan current release tag field must be ${tagName}.`,
+    );
+  }
+  return errors;
+}
+
 function normalizeFingerprint(value) {
   const normalized = String(value ?? '').replace(/:/g, '').trim().toUpperCase();
   if (!/^[0-9A-F]{64}$/.test(normalized)) {
@@ -1203,6 +1232,7 @@ module.exports = {
   REQUIRED_NOTICES,
   REQUIRED_RUNTIME_ASSETS,
   canonicalAndroidSourceTag,
+  inspectAndroidReleaseDocumentation,
   inspectAndroidPlayRelease,
   inspectBundleEntries,
   inspectOwnerEvidence,

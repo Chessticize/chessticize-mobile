@@ -105,6 +105,28 @@ archive SHA-256. The workflow downloads artifacts by immutable numeric ID,
 rejects expired artifacts, verifies the archive digest before extraction, and
 binds those values into the next evidence JSON.
 
+### Source-only recovery for an already distributed immutable candidate
+
+If a Play testing upload occurred before a defect in this workflow was fixed,
+do not move the candidate's canonical tag, rebuild its artifact, or rerun the
+old workflow embedded in that tag.
+The workflow execution ref is separate from the canonical source tag. The
+protected source-only phases may execute the reviewed fix from a newer commit
+while the authenticated candidate manifest, release tag, release target commit,
+and retained artifact remain unchanged.
+
+This recovery is allowed only while the repaired execution ref's canonical
+`release-version.json` still exactly matches the historical candidate. Add any
+temporary protected-environment deployment-branch exception only with explicit
+owner approval, retain normal reviewer approval for both source phases, and
+remove the exception after publication. Dispatch `prepare-source-draft` and
+`publish-source` from that repaired ref, then verify the public release, tag
+target, manifest asset bytes, and retained workflow evidence through the normal
+verifier. Complete and verify this source-only recovery before advancing the
+canonical Android build number. If the canonical version has already advanced,
+stop and implement a separately reviewed historical-source recovery contract;
+never bypass `release-version.json` identity validation.
+
 1. Dispatch `prepare-source-draft` with `public_version`, `version_code`, and
    the retained #186 `candidate_artifact_id`.
 2. Inspect the resulting `android-source-draft-<run-id>` artifact. Dispatch

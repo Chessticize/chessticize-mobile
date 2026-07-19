@@ -1463,6 +1463,12 @@ describe('Android GitHub release automation', () => {
     expect(runbook).toContain('#186 requires the canonical source release to be public');
     expect(runbook).toContain('#187 literally asks automation to create a draft release');
     expect(runbook).toContain('does not strictly resolve that wording conflict');
+    expect(runbook).toContain(
+      'The workflow execution ref is separate from the canonical source tag',
+    );
+    expect(runbook).toContain(
+      'Complete and verify this source-only recovery',
+    );
     expect(runbook).toContain('Generated APKs API');
     expect(runbook).toContain('no automatic GitHub update checks');
     expect(runbook).toContain('Only the original signed-candidate artifact may cross');

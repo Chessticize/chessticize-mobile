@@ -10,6 +10,14 @@ protected-environment setup, or any console result is a blocker; never replace
 it with a debug key, a scratch key, an emulator claim, or a hand-edited passing
 JSON file.
 
+Build 2 must not be tagged, uploaded, or treated as the current source-release
+chain until the immutable Play-distributed build 1 has its matching public
+GitHub source release. Recover build 1 through the protected source-only
+procedure in `docs/ANDROID_GITHUB_RELEASE.md`, verify the unchanged tag target,
+candidate manifest, retained artifact provenance, and public manifest asset,
+then retain that evidence as build-1 audit history. The build-2 source and
+binary phases remain a separate exact-artifact chain.
+
 ## Canonical identity
 
 - Application ID: `com.chessticize.mobile`
