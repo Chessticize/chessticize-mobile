@@ -1,11 +1,13 @@
 # Android Play Release Candidate
 
 This runbook builds and audits the current production-upload-signed Android App
-Bundle. Build 1 remains an immutable audit record because version code 1 was
+Bundle. Builds 1 and 2 remain immutable audit records. Version code 1 was
 uploaded to Play before a later protected source-publication workflow defect was
-fixed. The exact-main retry keeps public version 1.1 and advances only the
-Android build number to 2. It deliberately separates repository-owned checks
-from owner-only Play Console evidence. Missing signing material,
+fixed. Version code 2 produced a valid signed candidate, but exact-tag Android
+validation found a stale adaptive E2E dependency on a deliberately removed
+public control. The reviewed replacement keeps public version 1.1 and advances
+only the Android build number to 3. This runbook deliberately separates
+repository-owned checks from owner-only Play Console evidence. Missing signing material,
 protected-environment setup, or any console result is a blocker; never replace
 it with a debug key, a scratch key, an emulator claim, or a hand-edited passing
 JSON file.
@@ -24,18 +26,41 @@ was published on 2026-07-19 and retains this immutable audit evidence:
   `77c3d891ba1dda1fe17b2b385b20efa96a49634ae4226a720d0c07f2d78162a7`.
 
 Do not move the build-1 tag, rebuild its AAB, replace either artifact, or reuse
-version code 1. The build-2 source and binary phases remain a separate
-exact-artifact chain.
+version code 1.
+
+Build 2 is an immutable failed-validation candidate and was never distributed:
+
+- annotated tag: `android-v1.1.0-build-2`, targeting
+  `585ad836d7a01d3969f5aeb5e9af976956850e97`;
+- successful protected candidate workflow run:
+  [`29704109543`](https://github.com/Chessticize/chessticize-mobile/actions/runs/29704109543);
+- retained candidate artifact: ID `8447504169`, name
+  `android-signed-release-candidate-585ad836d7a01d3969f5aeb5e9af976956850e97`,
+  archive SHA-256
+  `6b9c07b67743b4599366704de6e417d792a871ab7ee08ea2205803c52edf6935`;
+- signed AAB: 440,335,589 bytes, SHA-256
+  `3923be1602d7518255efca6d09799d5ed09cdf86fe11d678951ba3a2bf6adcad`;
+- source manifest SHA-256
+  `d81fe076b6493cfdfc1fd314ce8196f953938a966aa2019140e31b14d01d39f7`;
+- exact-tag Android matrix run:
+  [`29704116081`](https://github.com/Chessticize/chessticize-mobile/actions/runs/29704116081),
+  which completed 7/8 jobs successfully; only adaptive public UI failed because
+  the E2E still waited for `session-accessible-moves-open` after that control
+  was intentionally removed.
+
+No build-2 source release was created and its AAB was not uploaded to Play. Do
+not move or reuse its tag, artifact, or version code, and do not resume its
+source or binary publication phases. Build 3 is the next release candidate.
 
 ## Canonical identity
 
 - Application ID: `com.chessticize.mobile`
 - Public version: `apps/mobile/release-version.json` (`1.1`)
-- Android version code: `apps/mobile/release-version.json` (`2`)
+- Android version code: `apps/mobile/release-version.json` (`3`)
 - iOS build number: `apps/mobile/release-version.json` (`2`, independent from Android)
 - Supported ABIs: `arm64-v8a`, `x86_64`
 - Target SDK: API 36
-- Required source tag before any Play track upload: `android-v1.1.0-build-2`
+- Required source tag before any Play track upload: `android-v1.1.0-build-3`
 
 Android `versionCode` must increase for every later Play upload. The public
 version must continue to match iOS. Settings reads `versionName` and
@@ -119,8 +144,8 @@ the retained Actions artifact before requesting a `play-ready` verdict. The
 verifier passes this credential to `curl` through standard input, not command
 arguments. Do not put it in owner evidence or commit it.
 
-For Android version `1.1` build `2`, release notes and this support document must
-name the canonical source tag `android-v1.1.0-build-2` and the public source
+For Android version `1.1` build `3`, release notes and this support document must
+name the canonical source tag `android-v1.1.0-build-3` and the public source
 repository `https://github.com/Chessticize/chessticize-mobile`. The evidence
 record points to this document at the exact candidate commit and records its
 SHA-256. Plausible hand-authored URLs, IDs, or matching-looking JSON do not

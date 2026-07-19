@@ -13,10 +13,6 @@ const {
   withAndroidUiDiagnostics
 } = require('./helpers');
 const {
-  tapAndroidUiNode,
-  waitForAndroidUiState,
-} = require('./androidPublicUiEvidence');
-const {
   expectBoardScreenshotContainsPieces,
   expectFrameContained,
   waitForBoardScreenshotContainsPieces,
@@ -72,9 +68,9 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
     if (device.getPlatform() === 'android' && needsPortraitRestore) {
       // API 36 large-screen activities ignore requested-orientation hints, so
       // the evidence harness rotates the physical display. Return to the
-      // natural orientation and reacquire the public app root before opening
-      // a native Modal; otherwise the rotated base window can remain the
-      // unfocused Espresso root while the dialog is being attached.
+      // natural orientation and reacquire the public app root before tapping
+      // the real board; otherwise the rotated base window can remain the
+      // unfocused Espresso root while board input is submitted.
       await setAdaptiveOrientation('portrait');
       await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
       await waitForSettledSprintLayout('portrait');
@@ -87,19 +83,14 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
 
     if (device.getPlatform() === 'android') {
       await withAndroidUiDiagnostics(async () => {
-        await waitFor(element(by.id('session-accessible-moves-open'))).toBeVisible().withTimeout(10000);
-        await element(by.id('session-accessible-moves-open')).tap();
         // Familiar 15's first Standard puzzle is a versioned product fixture:
-        // c2b3 is legal but wrong, while alternate mate c2b1 is accepted. The
-        // chooser is a native Modal, so inspect its fresh public hierarchy and
-        // tap the exact exposed action instead of asking Espresso to select an
-        // unfocused application root while the Modal window owns focus.
-        const accessibleMoves = await waitForAndroidPublicMoves(['c2b1', 'c2b3']);
-        tapAndroidUiNode(accessibleMoves.c2b3);
-        // Once the Modal dismisses, return to the focused application window.
-        // The active Sprint clock intentionally keeps that window non-idle for
-        // shell UIAutomator, so prove the post-state through Detox's public UI.
-        await waitFor(element(by.id('session-accessible-move-c2b3'))).not.toExist().withTimeout(10000);
+        // c2b3 is legal but wrong, while alternate mate c2b1 is accepted.
+        // Submit the move through the real board so every adaptive profile
+        // retains coordinate-mapping evidence after the public move chooser
+        // was removed from the product.
+        await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
+        await playBoardMove('session-board', 'c2b3');
+        await waitFor(element(by.id('move-feedback-overlay'))).toExist().withTimeout(10000);
         await waitFor(element(by.label('Mistakes 1 of 3')).atIndex(0)).toExist().withTimeout(10000);
         await waitFor(element(by.id('move-feedback-overlay'))).not.toExist().withTimeout(10000);
 
@@ -122,16 +113,6 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
     }
   });
 });
-
-async function waitForAndroidPublicMoves(moves) {
-  const state = await waitForAndroidUiState({
-    presentResourceIds: moves.map((move) => `session-accessible-move-${move}`),
-  });
-  return Object.fromEntries(moves.map((move) => [
-    move,
-    state.nodes[`session-accessible-move-${move}`],
-  ]));
-}
 
 async function captureHome(orientation) {
   const homeFrame = await frameFor(element(by.id('adaptive-layout')));

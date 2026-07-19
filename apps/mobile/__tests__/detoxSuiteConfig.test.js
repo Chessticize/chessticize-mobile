@@ -171,7 +171,7 @@ describe('Detox suite configuration', () => {
     ]);
     expect(helpersSource).not.toContain('function readAndroidUiHierarchy');
     expect(helpersSource).not.toContain('function waitForAndroidUiState');
-    expect(adaptiveSource).toContain("require('./androidPublicUiEvidence')");
+    expect(adaptiveSource).not.toContain("require('./androidPublicUiEvidence')");
     expect(notificationSource).toContain("require('./androidPublicUiEvidence')");
     expect(reminderSource).toContain("require('./androidPublicUiEvidence')");
     expect(reminderSource).not.toContain('function readSystemHierarchy');
@@ -1361,28 +1361,21 @@ describe('Detox suite configuration', () => {
     expect(spec).toContain("elementText('session-current-puzzle-id')");
     expect(spec).not.toContain('session-current-expected-move');
     expect(screen).not.toContain('session-current-expected-move');
-    expect(spec).toContain("session-accessible-moves-open");
+    expect(spec).not.toContain("session-accessible-moves-open");
+    expect(spec).not.toContain('waitForAndroidPublicMoves');
+    expect(spec).not.toContain('tapAndroidUiNode');
+    expect(spec).not.toContain('waitForAndroidUiState');
     expect(spec).not.toContain("playBoardMove('session-board', 'e2e6')");
-    const publicAccessibleMoves = spec.indexOf("waitForAndroidPublicMoves(['c2b1', 'c2b3'])");
-    const selectAccessibleMove = spec.indexOf('tapAndroidUiNode(accessibleMoves.c2b3)');
-    const accessibleChooserGone = spec.indexOf(
-      "waitFor(element(by.id('session-accessible-move-c2b3'))).not.toExist()",
-      selectAccessibleMove
-    );
-    const verifyAccessibleMoveResult = spec.indexOf(
+    const submitFirstWrongBoardMove = spec.indexOf("playBoardMove('session-board', 'c2b3')");
+    const verifyFirstWrongMoveResult = spec.indexOf(
       "waitFor(element(by.label('Mistakes 1 of 3')).atIndex(0)).toExist()",
-      selectAccessibleMove
+      submitFirstWrongBoardMove
     );
     const waitForFeedbackToSettle = spec.indexOf(
       "waitFor(element(by.id('move-feedback-overlay'))).not.toExist()",
-      verifyAccessibleMoveResult
+      verifyFirstWrongMoveResult
     );
-    const playBoardMove = spec.indexOf("playBoardMove('session-board', 'c4b5')");
-    const postAccessibleTap = spec.slice(selectAccessibleMove, playBoardMove);
-    const firstAccessibleInput = spec.indexOf(
-      "waitFor(element(by.id('session-accessible-moves-open'))).toBeVisible()"
-    );
-    const accessibleInputCount = spec.match(/element\(by\.id\('session-accessible-moves-open'\)\)\.tap\(\)/g)?.length ?? 0;
+    const submitSecondWrongBoardMove = spec.indexOf("playBoardMove('session-board', 'c4b5')");
     const restorePortrait = spec.indexOf(
       "await setAdaptiveOrientation('portrait')",
       captureLandscape
@@ -1396,22 +1389,16 @@ describe('Detox suite configuration', () => {
       settleRestoredPortrait
     );
     const verifyRestoredPuzzle = spec.indexOf('restoredPuzzleID', settlePublicRootFocus);
-    expect(publicAccessibleMoves).toBeGreaterThan(firstAccessibleInput);
-    expect(selectAccessibleMove).toBeGreaterThan(publicAccessibleMoves);
-    expect(accessibleChooserGone).toBeGreaterThan(selectAccessibleMove);
-    expect(verifyAccessibleMoveResult).toBeGreaterThan(accessibleChooserGone);
-    expect(waitForFeedbackToSettle).toBeGreaterThan(verifyAccessibleMoveResult);
-    expect(playBoardMove).toBeGreaterThan(selectAccessibleMove);
-    expect(postAccessibleTap).not.toContain('waitForAndroidUiState');
-    expect(postAccessibleTap).not.toContain('readAndroidUiHierarchy');
-    expect(accessibleInputCount).toBe(1);
+    expect(submitFirstWrongBoardMove).toBeGreaterThan(verifyRestoredPuzzle);
+    expect(verifyFirstWrongMoveResult).toBeGreaterThan(submitFirstWrongBoardMove);
+    expect(waitForFeedbackToSettle).toBeGreaterThan(verifyFirstWrongMoveResult);
+    expect(submitSecondWrongBoardMove).toBeGreaterThan(waitForFeedbackToSettle);
     expect(spec).not.toContain("waitFor(element(by.id('session-accessible-moves-dialog')))");
     expect(spec).toContain('withAndroidUiDiagnostics(async () =>');
     expect(restorePortrait).toBeGreaterThan(captureLandscape);
     expect(settleRestoredPortrait).toBeGreaterThan(restorePortrait);
     expect(settlePublicRootFocus).toBeGreaterThan(settleRestoredPortrait);
     expect(verifyRestoredPuzzle).toBeGreaterThan(settlePublicRootFocus);
-    expect(firstAccessibleInput).toBeGreaterThan(verifyRestoredPuzzle);
     expect(spec).toContain('setAndroidDisplayOrientation(orientation)');
     expect(spec).toContain('actual-root-bounds=${frame.width}x${frame.height}');
     expect(adaptiveOrientationHelper.indexOf('setAndroidDisplayOrientation(orientation)')).toBeGreaterThan(0);
