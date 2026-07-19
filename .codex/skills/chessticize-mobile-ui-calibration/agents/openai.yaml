@@ -1,0 +1,4 @@
+interface:
+  display_name: "Chessticize UI Calibration"
+  short_description: "Calibrate Storybook against Release simulator UI"
+  default_prompt: "Use $chessticize-mobile-ui-calibration to capture and compare the eight Release simulator UI baseline scenes."

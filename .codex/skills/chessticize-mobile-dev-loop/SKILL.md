@@ -194,6 +194,10 @@ Nightly GitHub Detox builds once and runs both suites against the latest `main` 
 
 ## Screenshot Verification
 
+For repeatable Storybook-to-Release comparison across the maintained eight
+scenes, use `$chessticize-mobile-ui-calibration`. Keep this section's manual
+flow for one-off screenshots outside that baseline.
+
 Take or inspect screenshots when validating:
 
 - Real chessboard piece rendering.

@@ -28,9 +28,14 @@ const triageLabels = read(agentDocPaths[2]);
 const uiFlowDesign = read(agentDocPaths[3]);
 const devLoopSkill = read(".codex/skills/chessticize-mobile-dev-loop/SKILL.md");
 const localE2eSkill = read(".codex/skills/chessticize-mobile-local-e2e/SKILL.md");
+const uiCalibrationSkill = read(".codex/skills/chessticize-mobile-ui-calibration/SKILL.md");
 const localE2eRunner = path.join(
   repoRoot,
   ".codex/skills/chessticize-mobile-local-e2e/scripts/run-local-e2e.sh"
+);
+const uiCalibrationRunner = path.join(
+  repoRoot,
+  ".codex/skills/chessticize-mobile-ui-calibration/scripts/capture-release-baseline.sh"
 );
 const prTemplate = read(".github/pull_request_template.md");
 const releaseDocs = [
@@ -87,6 +92,7 @@ for (const requiredLabel of [
 assert.equal(count(processWorkflow, '- "docs/agents/**"'), 2);
 assert.equal(count(processWorkflow, '- "README.md"'), 2);
 assert.equal(count(processWorkflow, '- "apps/mobile-lab/README.md"'), 2);
+assert.equal(count(processWorkflow, '- ".codex/skills/chessticize-mobile-ui-calibration/**"'), 2);
 
 for (const policy of [agents, devLoopSkill, labReadme]) {
   assert.match(policy, /Storybook-first UI flow gate/i);
@@ -106,6 +112,17 @@ assert.match(prTemplate, /Design approval record:/);
 assert.match(localE2eSkill, /CHESSTICIZE_E2E_SCOPE/);
 assert.match(localE2eSkill, /Replace `practice` with `flows` or `full`/);
 assert.doesNotMatch(localE2eSkill, /Routine PRs require passing local `flows` and `practice`/);
+assert.match(agents, /chessticize-mobile-ui-calibration\/SKILL\.md/);
+assert.match(devLoopSkill, /\$chessticize-mobile-ui-calibration/);
+assert.match(uiCalibrationSkill, /app-store-07-custom-setup/);
+assert.match(uiCalibrationSkill, /app-store-08-review-session/);
+
+const uiCalibrationRunnerSource = read(
+  ".codex/skills/chessticize-mobile-ui-calibration/scripts/capture-release-baseline.sh"
+);
+assert.match(uiCalibrationRunnerSource, /pnpm mobile:e2e:build:ios:release/);
+assert.match(uiCalibrationRunnerSource, /pnpm mobile:e2e:store-assets:ios:release/);
+assert.match(uiCalibrationRunnerSource, /git status --porcelain --untracked-files=normal/);
 
 const localE2eRunnerSource = read(
   ".codex/skills/chessticize-mobile-local-e2e/scripts/run-local-e2e.sh"
@@ -131,6 +148,8 @@ for (const releaseDoc of releaseDocs) {
 
 const syntaxCheck = spawnSync("bash", ["-n", localE2eRunner], { encoding: "utf8" });
 assert.equal(syntaxCheck.status, 0, syntaxCheck.stderr);
+const uiCalibrationSyntaxCheck = spawnSync("bash", ["-n", uiCalibrationRunner], { encoding: "utf8" });
+assert.equal(uiCalibrationSyntaxCheck.status, 0, uiCalibrationSyntaxCheck.stderr);
 
 const invalidScope = spawnSync(localE2eRunner, [], {
   encoding: "utf8",

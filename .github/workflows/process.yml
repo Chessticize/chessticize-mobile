@@ -5,6 +5,7 @@ on:
     paths:
       - ".codex/skills/chessticize-mobile-dev-loop/**"
       - ".codex/skills/chessticize-mobile-local-e2e/**"
+      - ".codex/skills/chessticize-mobile-ui-calibration/**"
       - "apps/mobile-lab/README.md"
       - ".github/pull_request_template.md"
       - ".github/workflows/**"
@@ -23,6 +24,7 @@ on:
     paths:
       - ".codex/skills/chessticize-mobile-dev-loop/**"
       - ".codex/skills/chessticize-mobile-local-e2e/**"
+      - ".codex/skills/chessticize-mobile-ui-calibration/**"
       - "apps/mobile-lab/README.md"
       - ".github/pull_request_template.md"
       - ".github/workflows/**"
