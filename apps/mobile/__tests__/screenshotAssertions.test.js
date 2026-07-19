@@ -69,6 +69,19 @@ describe('screenshot assertions', () => {
     )).toThrow('Board piece positions differ; missing=a1; unexpected=h8');
   });
 
+  it('maps density-independent board frames onto physical screenshot pixels', () => {
+    const screenshotPath = writeRenderedBoard('two-times-density.png');
+    const densityIndependentFrame = { height: 400, width: 400, x: 0, y: 0 };
+
+    expect(() => expectBoardScreenshotMatchesOccupiedSquares(
+      screenshotPath,
+      densityIndependentFrame,
+      ['a1', 'c2'],
+      false,
+      densityIndependentFrame
+    )).not.toThrow();
+  });
+
   it('waits for a rotated board screenshot to contain rendered pieces', async () => {
     const emptyScreenshot = writeSyntheticBoard('empty-after-rotation.png');
     const renderedScreenshot = writeRenderedBoard('rendered-after-rotation.png');

@@ -1552,6 +1552,22 @@ describe('Detox suite configuration', () => {
       .toEqual(ANDROID_ADAPTIVE_LAYOUT_TEST_MATCH);
   });
 
+  it('scales Android board-orientation screenshots through the public screen frame', () => {
+    const spec = fs.readFileSync(
+      path.resolve(__dirname, '../e2e/android-board-orientation.e2e.js'),
+      'utf8'
+    );
+
+    expect(spec).toContain(
+      "const screenFrame = await frameFor(element(by.id('adaptive-layout')));"
+    );
+    expect(spec).toContain([
+      '        occupiedSquares(startingPosition),',
+      '        flipped,',
+      '        screenFrame',
+    ].join('\n'));
+  });
+
   it('resets Stockfish state without uninstalling the attached Android test app', () => {
     const stockfishSpecs = [
       '../e2e/android-stockfish-smoke.e2e.js',

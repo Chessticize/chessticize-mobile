@@ -71,6 +71,7 @@ describe('Android board orientation integrity', () => {
     await selectTestPuzzleSource('familiar15');
     await startPracticeMode('standard');
     await waitForVisibleInPracticeScroll('session-board');
+    const screenFrame = await frameFor(element(by.id('adaptive-layout')));
 
     let previousFlipped = null;
     let unflippedToFlipped = 0;
@@ -110,7 +111,8 @@ describe('Android board orientation integrity', () => {
         screenshotPath,
         boardFrame,
         occupiedSquares(startingPosition),
-        flipped
+        flipped,
+        screenFrame
       );
 
       const userMoves = USER_MOVES_BY_PUZZLE[puzzleId];
