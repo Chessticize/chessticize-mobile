@@ -42,6 +42,11 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Install Android emulator runtime libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libpulse0
+
       - name: Require protected release inputs
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
