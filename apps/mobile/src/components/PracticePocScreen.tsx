@@ -5060,7 +5060,7 @@ function HistoryPanel({
             active={unclearOnly}
             accessibilityLabel="Unclear attempts only"
             controlTestID="history-filter-unclear"
-            label="Unclear"
+            label="Unclear only"
             onPress={onToggleUnclearOnly}
           />
           <HistoryQuickToggle
@@ -6290,12 +6290,12 @@ function ReviewPanel({
         <View style={styles.reviewDueCountBlock}>
           <Text testID="review-due-count" style={styles.reviewDueBigCount}>{dailyReviewProgressLabel}</Text>
           {queueSummary.overdueCount > 0 ? (
-            <>
+            <View style={styles.reviewDueOverdueRow} testID="review-overdue-summary">
               <Text testID="review-overdue-count" style={[styles.reviewDueOverdueCount, styles.errorText]}>
                 {queueSummary.overdueCount}
               </Text>
               <Text style={styles.reviewDueOverdueLabel}>Overdue</Text>
-            </>
+            </View>
           ) : null}
         </View>
       </View>
@@ -10690,6 +10690,12 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     lineHeight: 11,
     textAlign: "center"
+  },
+  reviewDueOverdueRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 4,
+    justifyContent: "center"
   },
   reviewDueHiddenMetric: FABRIC_SAFE_HIDDEN_TEXT_STYLE,
   reviewFilterScroller: {

@@ -3166,7 +3166,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-panel")).toBeTruthy();
   });
 
-  it("puts Unclear first in a scrollable three-toggle History row without a count or icon", () => {
+  it("puts Unclear only first in a scrollable three-toggle History row without a count or icon", () => {
     const store = new MemoryStore();
     store.seedPuzzles([sharedHistoryPuzzle()]);
     store.recordAttempt({
@@ -3192,7 +3192,7 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "history-tab");
     expect(findByTestId(renderer, "history-quick-filters").props.horizontal).toBe(true);
-    expect(collectText(findByTestId(renderer, "history-filter-unclear"))).toBe("Unclear");
+    expect(collectText(findByTestId(renderer, "history-filter-unclear"))).toBe("Unclear only");
     expect(findByTestId(renderer, "history-filter-unclear").props.accessibilityLabel).toBe(
       "Unclear attempts only"
     );
@@ -3803,9 +3803,10 @@ describe("PracticePocScreen", () => {
   it("reviews missed puzzles from the completed sprint using the solving board", async () => {
     const service = createMobilePracticeService("random1000");
     const recordReviewAttempt = jest.spyOn(service, "recordReviewAttempt");
+    jest.setSystemTime(new Date("2026-07-18T12:00:00.000Z"));
     const renderer = renderScreen({
-      currentTimeMs: () => Date.parse("2026-07-18T12:00:00.000Z"),
-      practiceService: service
+      practiceService: service,
+      puzzleSelectionSeed: "history-review-6"
     });
 
     startStandardSprint(renderer);
@@ -3819,6 +3820,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "review-mistakes-button");
 
     expect(findByTestId(renderer, "review-session")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "review-current-puzzle-id"))).toBe("000hf");
     expect(findByTestId(renderer, "review-board")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Due tomorrow");
     expect(collectText(findByTestId(renderer, "review-schedule-remove"))).toBe("Remove from Review");
@@ -3834,9 +3836,11 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "2 / 3 · Standard");
     press(renderer, "review-previous");
     expectText(renderer, "1 / 3 · Standard");
-    expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
     const reviewFen = findByTestId(renderer, "mock-chessboard").props.fen;
-    expect(findByTestId(renderer, "mock-chessboard").props.draggableColor).toBe(new Chess(reviewFen).turn());
+    await waitForAssertion(() => {
+      expect(findByTestId(renderer, "mock-chessboard").props.draggableColor).toBe(new Chess(reviewFen).turn());
+    });
+    expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
     expect(findByTestId(renderer, "mock-chessboard").props.withLetters).toBe(false);
     expect(findByTestId(renderer, "mock-chessboard").props.withNumbers).toBe(false);
     const reviewBoardFlipped = findByTestId(renderer, "mock-chessboard").props.flipped;
@@ -4094,6 +4098,8 @@ describe("PracticePocScreen", () => {
 
     expect(collectText(findByTestId(renderer, "review-due-summary"))).toBe("Overdue now");
     expect(collectText(findByTestId(renderer, "review-overdue-count"))).toBe("1");
+    expect(collectText(findByTestId(renderer, "review-overdue-summary"))).toBe("1Overdue");
+    expect(flattenTestStyle(findByTestId(renderer, "review-overdue-summary").props.style).flexDirection).toBe("row");
     expect(findByTestId(renderer, "review-due-card").props.accessibilityLabel).toContain("All due · Overdue now");
     press(renderer, "review-filter-toggle");
     press(renderer, "review-filter-overdue");
