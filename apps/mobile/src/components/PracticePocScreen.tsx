@@ -135,6 +135,7 @@ interface Props {
   currentTimeMs?: () => number;
   puzzleSelectionId?: string;
   puzzleSelectionSeed?: string;
+  sprintStartDelayMs?: number;
   standardTargetCorrect?: number;
   systemBack?: MobileSystemBackSource;
 }
@@ -426,6 +427,7 @@ export function PracticePocScreen({
   currentTimeMs = Date.now,
   puzzleSelectionId,
   puzzleSelectionSeed,
+  sprintStartDelayMs = ARROW_DUEL_LOADING_TRANSITION_MS,
   standardTargetCorrect,
   systemBack
 }: Props): React.JSX.Element {
@@ -1075,7 +1077,7 @@ export function PracticePocScreen({
       setStartingMode(nextMode);
       sprintStartTimerRef.current = setTimeout(() => {
         finishDelayedSprintStart(nextMode, useCustomTiming);
-      }, ARROW_DUEL_LOADING_TRANSITION_MS);
+      }, sprintStartDelayMs);
       return;
     }
     performStartSprint(nextMode, useCustomTiming);
@@ -3339,8 +3341,7 @@ function CustomSprintSetup({
           testID="custom-mode-row"
           onChange={onCustomModeChange}
         />
-        <CustomChoiceRow
-          label="Theme"
+        <CustomThemeChoiceRow
           value={customThemeLabel(theme)}
           options={CUSTOM_THEME_OPTIONS.map(customThemeLabel)}
           testID="custom-theme-row"
@@ -3636,29 +3637,25 @@ function CustomValueRow({
   );
 }
 
-function CustomChoiceRow({
-  label,
+function CustomThemeChoiceRow({
   onChange,
   options,
   testID,
   value
 }: {
-  label: string;
   onChange: (next: string) => void;
   options: string[];
   testID: string;
   value: string;
 }): React.JSX.Element {
   return (
-    <View style={styles.customConfigRow} testID={testID}>
-      <View style={styles.customChoiceCopy}>
-        <Text style={styles.listText}>{label}</Text>
-      </View>
-      <View style={styles.customInlineOptions}>
+    <View style={[styles.customConfigRow, styles.customThemeRow]} testID={testID}>
+      <View style={[styles.customInlineOptions, styles.customThemeOptions]}>
         {options.map((option) => (
           <Pressable
             key={option}
             accessibilityRole="button"
+            accessibilityLabel={`${option} puzzle theme`}
             accessibilityState={{ selected: value === option }}
             testID={`custom-theme-${safeTestId(option)}`}
             style={[styles.customMiniChip, value === option ? styles.customMiniChipActive : null]}
@@ -10583,7 +10580,9 @@ const styles = StyleSheet.create({
     marginTop: 2
   },
   reviewStartButton: {
-    flex: 0
+    flexBasis: "auto",
+    flexGrow: 0,
+    flexShrink: 0
   },
   reviewDevControls: {
     alignItems: "stretch",
@@ -11109,6 +11108,13 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 6,
     justifyContent: "flex-end"
+  },
+  customThemeRow: {
+    justifyContent: "center"
+  },
+  customThemeOptions: {
+    flex: 1,
+    justifyContent: "center"
   },
   customMiniChip: {
     alignItems: "center",

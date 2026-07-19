@@ -2,6 +2,18 @@
 
 - <!-- Describe the coherent goal and user/developer impact. -->
 
+## UI flow design gate
+
+Select exactly one. For a new UI flow, the Storybook design slice and explicit
+approval must predate production wiring. See `docs/agents/ui-flow-design.md`.
+
+- [ ] Not a new UI flow
+- [ ] Storybook-first design approved before product wiring
+
+Storybook URL:
+
+Design approval record:
+
 ## Validation scope
 
 Select exactly one native-validation scope and explain why it proves the changed boundary.

@@ -887,6 +887,23 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "session-board")).toBeTruthy();
   });
 
+  it("keeps the preparing state available for deterministic interaction-lab review", () => {
+    const service = createMobilePracticeService("familiar15");
+    const renderer = renderScreen({
+      practiceService: service,
+      sprintStartDelayMs: 60_000
+    });
+
+    press(renderer, "practice-mode-arrow-duel");
+    press(renderer, "practice-start-button");
+    act(() => {
+      jest.advanceTimersByTime(5_000);
+    });
+
+    expect(findByTestId(renderer, "sprint-loading-overlay")).toBeTruthy();
+    expect(service.getActiveSprint()).toBeUndefined();
+  });
+
   it("keeps first-select Arrow Duel progress on its own ELO after startup sync completes", async () => {
     const service = createMobilePracticeService("familiar15");
     service.setRating(defaultSprintConfig("standard").ratingKey, 1_106);
@@ -2505,6 +2522,8 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "custom-theme-row")).toBeTruthy();
     expect(findByTestId(renderer, "custom-theme-fork")).toBeTruthy();
     expect(findByTestId(renderer, "custom-theme-hanging-piece")).toBeTruthy();
+    expect(findByTestId(renderer, "custom-theme-fork").props.accessibilityLabel).toBe("Fork puzzle theme");
+    expect(collectText(findByTestId(renderer, "custom-theme-row"))).not.toContain("Theme");
     expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("Sacrifice");
     expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("Promotion");
     expect(() => findByTestId(renderer, "custom-summary-card")).toThrow();
@@ -5816,7 +5835,7 @@ function createScriptedStockfishTransport(
 }
 
 type RenderScreenOptions = TestMobilePlatformCapabilityOverrides &
-  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "puzzleSelectionId" | "puzzleSelectionSeed" | "standardTargetCorrect" | "systemBack"> & {
+  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "puzzleSelectionId" | "puzzleSelectionSeed" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack"> & {
     platformCapabilities?: MobilePlatformCapabilities;
   };
 
@@ -5864,6 +5883,7 @@ function renderScreen({
   debugTrace,
   puzzleSelectionId,
   puzzleSelectionSeed,
+  sprintStartDelayMs,
   standardTargetCorrect,
   systemBack,
   ...capabilityOverrides
@@ -5879,6 +5899,7 @@ function renderScreen({
         debugTrace={debugTrace}
         puzzleSelectionId={puzzleSelectionId}
         puzzleSelectionSeed={puzzleSelectionSeed}
+        sprintStartDelayMs={sprintStartDelayMs}
         standardTargetCorrect={standardTargetCorrect}
         systemBack={systemBack}
       />

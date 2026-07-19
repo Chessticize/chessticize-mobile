@@ -12,7 +12,9 @@ const expectedScenes = [
   "app-store-03-history-tab",
   "app-store-04-settings-tab",
   "app-store-05-standard-sprint",
-  "app-store-06-arrow-duel"
+  "app-store-06-arrow-duel",
+  "app-store-07-custom-setup",
+  "app-store-08-review-session"
 ];
 const requiredGroups = [
   {

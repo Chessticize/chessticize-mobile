@@ -2,7 +2,7 @@
 
 Chessticize Mobile is an offline-first, open-source iOS and Android training app for Puzzle Sprint and Arrow Duel: timed tactics sprints, per-mode ELO, and spaced-repetition review of mistakes, all computed on device from a bundled puzzle pack.
 
-The repository contains the React Native app shell (`apps/mobile`), a pure TypeScript domain core (`packages/core`), storage services (`packages/storage`), a stdio CLI harness (`apps/cli`), and bundled puzzle fixtures (`fixtures/puzzles`).
+The repository contains the React Native app shell (`apps/mobile`), the browser-based Interaction Lab (`apps/mobile-lab`), a pure TypeScript domain core (`packages/core`), storage services (`packages/storage`), a stdio CLI harness (`apps/cli`), and bundled puzzle fixtures (`fixtures/puzzles`).
 
 ## Documents
 
@@ -16,6 +16,7 @@ The repository contains the React Native app shell (`apps/mobile`), a pure TypeS
 - [Privacy Policy](docs/PRIVACY_POLICY.md) — 1.1 data, user-controllable iCloud Sync, and tracking disclosure
 - [iOS Device Targets](docs/DEVICE_TARGETS.md) — 1.1 iPhone+iPad adaptive orientation release target
 - [Android Validation](docs/ANDROID_VALIDATION.md) — exact-head API, adaptive, backup, and physical-device evidence contract
+- [UI Flow Design Gate](docs/agents/ui-flow-design.md) — required Storybook-first approval workflow for new UI flows
 - [Android Play Release](docs/ANDROID_PLAY_RELEASE.md) — signed AAB and owner-only Play readiness runbook
 - [Android Play Listing](docs/ANDROID_PLAY_LISTING.md) — truthful English listing, device, permission, privacy, and Data safety contract
 - [Agent Instructions](AGENTS.md) — architecture boundary, testing philosophy, and PR workflow
@@ -29,8 +30,22 @@ The repository now includes the GUI-independent backend core, a plain stdio CLI,
 - `packages/storage` contains real SQLite migrations and repositories for puzzles, attempts, sprint sessions, ratings, history filters, and review queues.
 - `apps/cli` exposes the core through a machine-readable JSONL protocol for E2E testing without a mobile simulator.
 - `apps/mobile` contains the React Native app shell and Practice screen that reuses `react-native-chessboard`.
+- `apps/mobile-lab` renders those real React Native components through React Native Web for fast, deterministic design review.
 
 ## Local Mobile Preview
+
+For browser-based UI proposals and flow review, start the Interaction Lab:
+
+```sh
+pnpm mobile:storybook
+```
+
+New UI flows are Storybook-first. Before production navigation, backend,
+storage, native-module, analytics, or rollout wiring begins, publish the
+interactive design slice in the Interaction Lab and record explicit design
+approval. See [UI Flow Design Gate](docs/agents/ui-flow-design.md).
+
+Storybook prints the local and LAN URLs. A phone on the same Wi-Fi network can open the LAN URL, and every scenario exposes a reset action and a direct full-screen permalink. The lab uses deterministic in-memory data and a clearly marked Board Placeholder; it does not read local SQLite or replace native simulator/device acceptance.
 
 For normal UI work, do not use the iOS simulator as the default validation loop. Run component tests and type checks first:
 

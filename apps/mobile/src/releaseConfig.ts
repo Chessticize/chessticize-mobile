@@ -9,7 +9,10 @@ export function isReactNativeDevBuild(globals: ReleaseConfigGlobals = globalThis
 }
 
 export function arePracticeTestControlsEnabled(globals: ReleaseConfigGlobals = globalThis): boolean {
-  return isReactNativeDevBuild(globals) || globals.__CHESSTICIZE_ENABLE_TEST_CONTROLS__ === true;
+  if (globals.__CHESSTICIZE_ENABLE_TEST_CONTROLS__ !== undefined) {
+    return globals.__CHESSTICIZE_ENABLE_TEST_CONTROLS__;
+  }
+  return isReactNativeDevBuild(globals);
 }
 
 export function isPracticeDebugEnabled(globals: ReleaseConfigGlobals = globalThis): boolean {

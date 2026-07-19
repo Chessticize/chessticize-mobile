@@ -19,6 +19,7 @@ coverage/
 dist/
 build/
 apps/mobile/artifacts/
+apps/mobile-lab/storybook-static/
 scratch/
 
 # Tooling

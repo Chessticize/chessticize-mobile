@@ -242,6 +242,8 @@ check(
     storeAssetsE2e.includes("describe.skip") &&
     storeAssetsE2e.includes("app-store-01-practice-tab") &&
     storeAssetsE2e.includes("app-store-06-arrow-duel") &&
+    storeAssetsE2e.includes("app-store-07-custom-setup") &&
+    storeAssetsE2e.includes("app-store-08-review-session") &&
     storeAssets.includes("pnpm app-store:screenshot-audit") &&
     storeAssets.includes("iphone-6.9") &&
     storeAssets.includes("iphone-6.1") &&
