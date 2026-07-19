@@ -1580,7 +1580,9 @@ describe('Detox suite configuration', () => {
     expect(spec).toContain(
       '`Last move ${autoReply.slice(0, 2)} to ${autoReply.slice(2, 4)}`'
     );
-    expect(spec).toContain('if (puzzleIndex === PUZZLE_ORDER.length - 1) {');
+    expect(spec).toContain(
+      'if (puzzleIndex === FAMILIAR_15_PUZZLES.length - 1) {'
+    );
     expect(spec).not.toContain(
       "waitFor(element(by.id('move-feedback-overlay'))).toExist()"
     );

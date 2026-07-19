@@ -1,5 +1,3 @@
-const { Chess } = require('chess.js');
-const regressionPuzzles = require('../../../fixtures/puzzles/presolved-1000.json');
 const {
   frameFor,
   launchWithDisabledSynchronization,
@@ -13,49 +11,11 @@ const {
 const {
   expectBoardScreenshotMatchesOccupiedSquares,
 } = require('./screenshotAssertions');
-
-const DUAL_MATE_IN_ONE = {
-  id: 'test-dual-mate-in-one',
-  initialFen: '8/8/8/8/8/8/k1Q5/2K5 b - - 0 1',
-  solutionMoves: ['a2a1', 'c2a4'],
-};
-const PUZZLE_ORDER = [
-  'test-dual-mate-in-one',
-  '000hf',
-  '00Kbj',
-  '00VoA',
-  '07KI8',
-  '04wsf',
-  '08Hmx',
-  '0AqXs',
-  '0DR07',
-  '01gEg',
-  '00tgU',
-  '04QUG',
-  '063T7',
-  '00qk4',
-  '04Phf',
-];
-const USER_MOVES_BY_PUZZLE = {
-  'test-dual-mate-in-one': ['c2b1'],
-  '000hf': ['e2e6', 'e6f7'],
-  '00Kbj': ['f4g3', 'a2a1', 'a1d1'],
-  '00VoA': ['c2c6', 'c1c6'],
-  '07KI8': ['d2c4', 'f2h2', 'g1h2'],
-  '04wsf': ['b5c7', 'f4c7'],
-  '08Hmx': ['e3e8', 'e8b8'],
-  '0AqXs': ['b8f8'],
-  '0DR07': ['h4g3', 'f8f2', 'g3f2'],
-  '01gEg': ['d8d3', 'g3h1'],
-  '00tgU': ['d5e7', 'g6h7'],
-  '04QUG': ['c7d6', 'e8e1', 'g7c3', 'c3f6'],
-  '063T7': ['d7h3', 'h3h2'],
-  '00qk4': ['b4c2', 'd8d1'],
-};
-const PUZZLES_BY_ID = new Map([
-  [DUAL_MATE_IN_ONE.id, DUAL_MATE_IN_ONE],
-  ...regressionPuzzles.map((puzzle) => [puzzle.id, puzzle]),
-]);
+const {
+  FAMILIAR_15_PUZZLES,
+  familiar15StartingPosition,
+  familiar15UserMoves,
+} = require('./familiar15Fixture');
 
 describe('Android board orientation integrity', () => {
   beforeEach(async () => {
@@ -76,17 +36,13 @@ describe('Android board orientation integrity', () => {
     let unflippedToFlipped = 0;
     let flippedToUnflipped = 0;
 
-    for (const [puzzleIndex, puzzleId] of PUZZLE_ORDER.entries()) {
-      const puzzle = PUZZLES_BY_ID.get(puzzleId);
-      if (!puzzle) {
-        throw new Error(`Missing familiar puzzle fixture ${puzzleId}`);
-      }
+    for (const [puzzleIndex, puzzle] of FAMILIAR_15_PUZZLES.entries()) {
+      const puzzleId = puzzle.id;
 
       await waitForElementTextContaining('session-current-puzzle-id', puzzleId, 15000);
       await waitFor(element(by.id('move-feedback-overlay'))).not.toExist().withTimeout(15000);
 
-      const startingPosition = new Chess(puzzle.initialFen);
-      startingPosition.move(puzzle.solutionMoves[0]);
+      const startingPosition = familiar15StartingPosition(puzzle);
       const flipped = startingPosition.turn() === 'b';
       await waitForElementAccessibilityLabelContaining(
         'session-side-to-move',
@@ -117,11 +73,11 @@ describe('Android board orientation integrity', () => {
       // The final fixture contains promotion moves, which require a separate
       // chooser interaction. Its starting screenshot completes the 15-puzzle
       // transition evidence without expanding this focused orientation test.
-      if (puzzleIndex === PUZZLE_ORDER.length - 1) {
+      if (puzzleIndex === FAMILIAR_15_PUZZLES.length - 1) {
         continue;
       }
 
-      const userMoves = USER_MOVES_BY_PUZZLE[puzzleId];
+      const userMoves = familiar15UserMoves(puzzle);
       for (const [userMoveIndex, userMove] of userMoves.entries()) {
         await playBoardMove('session-board', userMove, flipped);
         const autoReply = puzzle.solutionMoves[(userMoveIndex * 2) + 2];

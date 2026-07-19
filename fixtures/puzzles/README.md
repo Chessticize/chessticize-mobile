@@ -50,6 +50,12 @@ puzzle source. Do not import the JSON file in release runtime code.
 `presolved-1000.json` is retained as a stable regression/test fixture. It is not
 the release-default mobile puzzle source.
 
+`familiar-15-e2e.manifest.json` is the shared deterministic manifest for the
+mobile Familiar 15 product source and its long-running E2E flows. It owns the
+puzzle order, the synthetic dual-mate record, and the one accepted alternate
+user move. Referenced source puzzles and their solution lines remain canonical
+in `presolved-1000.json`; E2E user turns are derived from those lines.
+
 `regression-samples.json` names stable puzzle IDs from `presolved-1000.json` for recurring regression coverage, such as promotion lines, multi-move lines, and check positions. Tests should load the real puzzle from `presolved-1000.json` by ID instead of copying full puzzle records into another fixture.
 
 Lichess currently publishes database exports under Creative Commons CC0 on the

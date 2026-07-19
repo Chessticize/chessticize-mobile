@@ -7,29 +7,16 @@ import { MOBILE_DATABASE_LAYOUT } from "./mobileDatabaseLayout.ts";
 
 const bundledCoreManifest = require("../../../../fixtures/puzzles/bundled-core-pack.manifest.json") as PuzzlePackManifest;
 const regressionPuzzles = require("../../../../fixtures/puzzles/presolved-1000.json") as Puzzle[];
+const familiar15Manifest = require("../../../../fixtures/puzzles/familiar-15-e2e.manifest.json") as {
+  puzzles: Array<{ fixture?: Puzzle; id: string }>;
+  sourceFixture: string;
+};
 
 export type MobilePuzzleSource = "bundledCore" | "familiar15" | "random1000";
 const DEFAULT_PUZZLE_SOURCE: MobilePuzzleSource = "bundledCore";
 const BUNDLED_CORE_PACK_OPTIONS = {
   allPuzzlesArrowDuelEligible: bundledCoreManifest.arrowDuelCount === bundledCoreManifest.puzzleCount
 } as const;
-
-const FAMILIAR_PUZZLE_IDS = [
-  "000hf",
-  "00Kbj",
-  "00VoA",
-  "07KI8",
-  "04wsf",
-  "08Hmx",
-  "0AqXs",
-  "0DR07",
-  "01gEg",
-  "00tgU",
-  "04QUG",
-  "063T7",
-  "00qk4",
-  "04Phf"
-] as const;
 
 let persistentPracticeService: PracticeService | undefined;
 const seededPuzzleSources = new WeakMap<PracticeService, Set<MobilePuzzleSource>>();
@@ -192,11 +179,15 @@ function bundledCoreFixturePuzzles(): Puzzle[] {
 
 function familiarPuzzles(): Puzzle[] {
   const byId = new Map(regressionPuzzles.map((puzzle) => [puzzle.id, puzzle]));
-  const classicPuzzles = FAMILIAR_PUZZLE_IDS.flatMap((id) => {
-    const puzzle = byId.get(id);
-    return puzzle === undefined ? [] : [puzzle];
+  return familiar15Manifest.puzzles.map((entry) => {
+    const puzzle = entry.fixture ?? byId.get(entry.id);
+    if (puzzle === undefined) {
+      throw new Error(
+        `Familiar 15 manifest puzzle ${entry.id} is missing from ${familiar15Manifest.sourceFixture}`
+      );
+    }
+    return puzzle;
   });
-  return [DUAL_MATE_IN_ONE_SAMPLE_PUZZLE, ...classicPuzzles];
 }
 
 function canonicalPositionFen(fen: string): string {
@@ -206,13 +197,3 @@ function canonicalPositionFen(fen: string): string {
   }
   return fields.slice(0, 4).join(" ");
 }
-
-const DUAL_MATE_IN_ONE_SAMPLE_PUZZLE: Puzzle = {
-  id: "test-dual-mate-in-one",
-  initialFen: "8/8/8/8/8/8/k1Q5/2K5 b - - 0 1",
-  solutionMoves: ["a2a1", "c2a4"],
-  rating: 800,
-  themes: ["mate", "short", "regression", "multipleMate"],
-  source: "synthetic",
-  stockfishBestMove: "c2a4"
-};
