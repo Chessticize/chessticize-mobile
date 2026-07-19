@@ -24,6 +24,7 @@ const issueTracker = read(agentDocPaths[1]);
 const triageLabels = read(agentDocPaths[2]);
 const devLoopSkill = read(".codex/skills/chessticize-mobile-dev-loop/SKILL.md");
 const localE2eSkill = read(".codex/skills/chessticize-mobile-local-e2e/SKILL.md");
+const androidReleaseSkill = read(".codex/skills/chessticize-android-release/SKILL.md");
 const localE2eRunner = path.join(
   repoRoot,
   ".codex/skills/chessticize-mobile-local-e2e/scripts/run-local-e2e.sh"
@@ -80,7 +81,44 @@ for (const requiredLabel of [
   assert.match(triageLabels, new RegExp("`" + requiredLabel + "`"));
 }
 
+assert.equal(count(processWorkflow, '- ".codex/skills/**"'), 2);
 assert.equal(count(processWorkflow, '- "docs/agents/**"'), 2);
+
+for (const releaseContract of [
+  "docs/RELEASE_SOURCE_POLICY.md",
+  "docs/ANDROID_PLAY_RELEASE.md",
+  "docs/ANDROID_GITHUB_RELEASE.md",
+  "docs/ANDROID_VALIDATION.md",
+  "docs/ANDROID_PLAY_LISTING.md",
+  "docs/ANDROID_PRIVACY_DISCLOSURE.md"
+]) {
+  assert.match(androidReleaseSkill, new RegExp(releaseContract.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+}
+
+for (const protectedPhase of [
+  "prepare-source-draft",
+  "publish-source",
+  "prepare-binary",
+  "publish-binary"
+]) {
+  assert.match(androidReleaseSkill, new RegExp("`" + protectedPhase + "`"));
+}
+
+assert.match(androidReleaseSkill, /status: \"play-ready\"/);
+assert.match(androidReleaseSkill, /physical ARM64/);
+assert.match(androidReleaseSkill, /directly to 100 percent/);
+assert.match(androidReleaseSkill, /never move\s+its tag, rebuild it, or reuse its version code/);
+assert.match(androidReleaseSkill, /strict read-only audit mode/);
+assert.match(androidReleaseSkill, /canonicalAndroidSourceTag/);
+assert.match(androidReleaseSkill, /retained candidate/);
+assert.match(androidReleaseSkill, /proposed replacement/);
+assert.match(androidReleaseSkill, /mark every unobserved\s+Console gate UNKNOWN/);
+assert.match(androidReleaseSkill, /created \*\*and published\*\*/);
+assert.match(androidReleaseSkill, /Internal \*\*or\*\* Closed testing/);
+assert.match(androidReleaseSkill, /ordering conflict is owner-ratified or corrected/);
+assert.match(androidReleaseSkill, /Complete #200 independently/);
+assert.match(androidReleaseSkill, /#188 acceptance after #186, #187, and #200/);
+assert.match(agents, /\.codex\/skills\/chessticize-android-release\/SKILL\.md/);
 
 assert.match(localE2eSkill, /CHESSTICIZE_E2E_SCOPE/);
 assert.match(localE2eSkill, /Replace `practice` with `flows` or `full`/);
