@@ -12,6 +12,7 @@ const {
   ANDROID_CUSTOM_PRACTICE_TEST_MATCH,
   ANDROID_HISTORY_TEST_MATCH,
   ANDROID_STANDARD_PRACTICE_TEST_MATCH,
+  ANDROID_BOARD_ORIENTATION_TEST_MATCH,
   ANDROID_ARROW_DUEL_TEST_MATCH,
   ANDROID_MIGRATION_TEST_MATCH,
   ANDROID_OFFLINE_PRACTICE_TEST_MATCH,
@@ -1510,6 +1511,9 @@ describe('Detox suite configuration', () => {
     expect(ACTIVE_E2E_TEST_MATCH).not.toContain(ANDROID_LAUNCH_TEST_MATCH[0]);
     expect(resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'android-standard-practice' }))
       .toEqual(ANDROID_STANDARD_PRACTICE_TEST_MATCH);
+    expect(resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'android-board-orientation' }))
+      .toEqual(ANDROID_BOARD_ORIENTATION_TEST_MATCH);
+    expect(ACTIVE_E2E_TEST_MATCH).not.toContain(ANDROID_BOARD_ORIENTATION_TEST_MATCH[0]);
     expect(resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'android-arrow-duel' }))
       .toEqual(ANDROID_ARROW_DUEL_TEST_MATCH);
     expect(resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'android-custom-practice' }))
@@ -1546,6 +1550,46 @@ describe('Detox suite configuration', () => {
       .toEqual(ANDROID_REVIEW_REMINDERS_TEST_MATCH);
     expect(resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'android-adaptive-layout' }))
       .toEqual(ANDROID_ADAPTIVE_LAYOUT_TEST_MATCH);
+  });
+
+  it('scales Android board-orientation screenshots through the public screen frame', () => {
+    const spec = fs.readFileSync(
+      path.resolve(__dirname, '../e2e/android-board-orientation.e2e.js'),
+      'utf8'
+    );
+
+    expect(spec).toContain(
+      "const screenFrame = await frameFor(element(by.id('adaptive-layout')));"
+    );
+    expect(spec).toContain([
+      '        occupiedSquares(startingPosition),',
+      '        flipped,',
+      '        screenFrame',
+    ].join('\n'));
+  });
+
+  it('advances Android board-orientation evidence through stable public state', () => {
+    const spec = fs.readFileSync(
+      path.resolve(__dirname, '../e2e/android-board-orientation.e2e.js'),
+      'utf8'
+    );
+
+    expect(spec).toContain(
+      'const autoReply = puzzle.solutionMoves[(userMoveIndex * 2) + 2];'
+    );
+    expect(spec).toContain(
+      '`Last move ${autoReply.slice(0, 2)} to ${autoReply.slice(2, 4)}`'
+    );
+    expect(spec).toContain(
+      'if (puzzleIndex === FAMILIAR_15_PUZZLES.length - 1) {'
+    );
+    expect(spec).not.toContain(
+      "waitFor(element(by.id('move-feedback-overlay'))).toExist()"
+    );
+    expect(spec).not.toContain('expect(unflippedToFlipped)');
+    expect(spec).toContain(
+      'if (unflippedToFlipped === 0 || flippedToUnflipped === 0) {'
+    );
   });
 
   it('resets Stockfish state without uninstalling the attached Android test app', () => {

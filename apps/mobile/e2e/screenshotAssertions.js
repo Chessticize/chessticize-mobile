@@ -24,6 +24,28 @@ function expectBoardScreenshotContainsPieces(screenshotPath, boardFrame, screenF
   }
 }
 
+function expectBoardScreenshotMatchesOccupiedSquares(
+  screenshotPath,
+  boardFrame,
+  expectedOccupiedSquares,
+  flipped = false,
+  screenFrame
+) {
+  const png = readRgbaPng(screenshotPath);
+  const boardPixels = pixelFrameForElement(png, boardFrame, screenFrame);
+  const actual = new Set(detectOccupiedBoardSquares(png, boardPixels, flipped));
+  const expected = new Set(expectedOccupiedSquares);
+  const missing = [...expected].filter((square) => !actual.has(square)).sort();
+  const unexpected = [...actual].filter((square) => !expected.has(square)).sort();
+
+  if (missing.length > 0 || unexpected.length > 0) {
+    throw new Error(
+      `Board piece positions differ; missing=${missing.join(',') || '<none>'}; `
+      + `unexpected=${unexpected.join(',') || '<none>'}`
+    );
+  }
+}
+
 async function waitForBoardScreenshotContainsPieces({
   archiveScreenshot,
   boardFrame,
@@ -217,6 +239,10 @@ function wait(milliseconds) {
 }
 
 function countOccupiedBoardSquares(png, boardPixels) {
+  return detectOccupiedBoardSquares(png, boardPixels, false).length;
+}
+
+function detectOccupiedBoardSquares(png, boardPixels, flipped = false) {
   const squareWidth = boardPixels.width / 8;
   const squareHeight = boardPixels.height / 8;
   const backgroundSamples = [[], []];
@@ -239,7 +265,7 @@ function countOccupiedBoardSquares(png, boardPixels) {
 
   const backgrounds = backgroundSamples.map(medianColor);
   const sampleStep = Math.max(1, Math.floor(Math.min(squareWidth, squareHeight) / 32));
-  let occupiedSquares = 0;
+  const occupiedSquares = [];
 
   for (let row = 0; row < 8; row += 1) {
     for (let column = 0; column < 8; column += 1) {
@@ -267,12 +293,18 @@ function countOccupiedBoardSquares(png, boardPixels) {
       }
 
       if (sampledPixels > 0 && contrastingPixels / sampledPixels >= 0.03) {
-        occupiedSquares += 1;
+        occupiedSquares.push(logicalSquareAtScreenCell(row, column, flipped));
       }
     }
   }
 
   return occupiedSquares;
+}
+
+function logicalSquareAtScreenCell(row, column, flipped) {
+  const logicalColumn = flipped ? 7 - column : column;
+  const logicalRank = flipped ? row + 1 : 8 - row;
+  return `${String.fromCharCode('a'.charCodeAt(0) + logicalColumn)}${logicalRank}`;
 }
 
 function pixelAt(png, x, y) {
@@ -329,14 +361,26 @@ function pixelFrameForElement(png, elementFrame, screenFrame) {
     width: elementFrame.x * 2 + elementFrame.width,
     height: elementFrame.y * 2 + elementFrame.height
   };
-  const scaleX = png.width / referenceFrame.width;
-  const scaleY = png.height / referenceFrame.height;
+  // Detox reports Android frames as absolute physical pixels, including the
+  // system-bar inset, while iOS can report logical points. A root frame that
+  // already spans most of either screenshot axis is therefore 1x. Otherwise,
+  // infer one uniform point-to-pixel scale from the horizontal display span;
+  // independent height scaling is invalid when the screenshot includes bars
+  // outside the app root.
+  const frameAlreadyUsesPhysicalPixels = screenFrame !== undefined && (
+    referenceFrame.width / png.width >= 0.75
+    || referenceFrame.height / png.height >= 0.75
+  );
+  const logicalDisplayWidth = screenFrame === undefined
+    ? referenceFrame.width
+    : referenceFrame.x + referenceFrame.width;
+  const scale = frameAlreadyUsesPhysicalPixels ? 1 : png.width / logicalDisplayWidth;
 
   return {
-    x: clamp(Math.floor((elementFrame.x - referenceFrame.x) * scaleX), 0, png.width),
-    y: clamp(Math.floor((elementFrame.y - referenceFrame.y) * scaleY), 0, png.height),
-    width: clamp(Math.ceil(elementFrame.width * scaleX), 0, png.width),
-    height: clamp(Math.ceil(elementFrame.height * scaleY), 0, png.height)
+    x: clamp(Math.floor(elementFrame.x * scale), 0, png.width),
+    y: clamp(Math.floor(elementFrame.y * scale), 0, png.height),
+    width: clamp(Math.ceil(elementFrame.width * scale), 0, png.width),
+    height: clamp(Math.ceil(elementFrame.height * scale), 0, png.height)
   };
 }
 
@@ -460,7 +504,9 @@ function clamp(value, min, max) {
 module.exports = {
   BoardScreenshotPiecesError,
   countOccupiedBoardSquares,
+  detectOccupiedBoardSquares,
   expectBoardScreenshotContainsPieces,
+  expectBoardScreenshotMatchesOccupiedSquares,
   expectFrameContained,
   waitForBoardScreenshotContainsPieces,
 };

@@ -11,6 +11,7 @@ const ANDROID_LAUNCH_TEST_MATCH = ['<rootDir>/e2e/android-launch.e2e.js'];
 const ANDROID_CUSTOM_PRACTICE_TEST_MATCH = ['<rootDir>/e2e/android-custom-practice.e2e.js'];
 const ANDROID_HISTORY_TEST_MATCH = ['<rootDir>/e2e/android-history.e2e.js'];
 const ANDROID_STANDARD_PRACTICE_TEST_MATCH = ['<rootDir>/e2e/android-standard-practice.e2e.js'];
+const ANDROID_BOARD_ORIENTATION_TEST_MATCH = ['<rootDir>/e2e/android-board-orientation.e2e.js'];
 const ANDROID_ARROW_DUEL_TEST_MATCH = ['<rootDir>/e2e/android-arrow-duel.e2e.js'];
 const ANDROID_MIGRATION_TEST_MATCH = ['<rootDir>/e2e/android-migration.e2e.js'];
 const ANDROID_OFFLINE_PRACTICE_TEST_MATCH = [
@@ -69,6 +70,10 @@ function resolveDetoxTestMatch(environment = process.env) {
 
   if (activeSuite === 'android-standard-practice') {
     return ANDROID_STANDARD_PRACTICE_TEST_MATCH;
+  }
+
+  if (activeSuite === 'android-board-orientation') {
+    return ANDROID_BOARD_ORIENTATION_TEST_MATCH;
   }
 
   if (activeSuite === 'android-arrow-duel') {
@@ -150,6 +155,7 @@ module.exports = {
   ANDROID_CUSTOM_PRACTICE_TEST_MATCH,
   ANDROID_HISTORY_TEST_MATCH,
   ANDROID_STANDARD_PRACTICE_TEST_MATCH,
+  ANDROID_BOARD_ORIENTATION_TEST_MATCH,
   ANDROID_ARROW_DUEL_TEST_MATCH,
   ANDROID_MIGRATION_TEST_MATCH,
   ANDROID_OFFLINE_PRACTICE_TEST_MATCH,

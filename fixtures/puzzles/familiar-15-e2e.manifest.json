@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "sourceFixture": "presolved-1000.json",
+  "puzzles": [
+    {
+      "id": "test-dual-mate-in-one",
+      "fixture": {
+        "id": "test-dual-mate-in-one",
+        "initialFen": "8/8/8/8/8/8/k1Q5/2K5 b - - 0 1",
+        "solutionMoves": ["a2a1", "c2a4"],
+        "rating": 800,
+        "themes": ["mate", "short", "regression", "multipleMate"],
+        "source": "synthetic",
+        "stockfishBestMove": "c2a4"
+      },
+      "userMoveOverrides": ["c2b1"]
+    },
+    { "id": "000hf" },
+    { "id": "00Kbj" },
+    { "id": "00VoA" },
+    { "id": "07KI8" },
+    { "id": "04wsf" },
+    { "id": "08Hmx" },
+    { "id": "0AqXs" },
+    { "id": "0DR07" },
+    { "id": "01gEg" },
+    { "id": "00tgU" },
+    { "id": "04QUG" },
+    { "id": "063T7" },
+    { "id": "00qk4" },
+    { "id": "04Phf" }
+  ]
+}

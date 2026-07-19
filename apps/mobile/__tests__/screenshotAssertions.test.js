@@ -4,7 +4,9 @@ const path = require('node:path');
 const zlib = require('node:zlib');
 const {
   countOccupiedBoardSquares,
+  detectOccupiedBoardSquares,
   expectBoardScreenshotContainsPieces,
+  expectBoardScreenshotMatchesOccupiedSquares,
   waitForBoardScreenshotContainsPieces,
 } = require('../e2e/screenshotAssertions');
 const {
@@ -41,6 +43,60 @@ describe('screenshot assertions', () => {
     paintCoordinateLabel(png, 1, 0, [245, 245, 245, 255]);
 
     expect(countOccupiedBoardSquares(png, fullBoardFrame())).toBe(0);
+  });
+
+  it('maps detected piece pixels back to logical squares in either orientation', () => {
+    const png = syntheticBoard();
+    paintPiece(png, 0, 0, [20, 25, 32, 255]);
+    paintPiece(png, 7, 7, [20, 25, 32, 255]);
+
+    expect(detectOccupiedBoardSquares(png, fullBoardFrame(), false)).toEqual(['a8', 'h1']);
+    expect(detectOccupiedBoardSquares(png, fullBoardFrame(), true)).toEqual(['h1', 'a8']);
+  });
+
+  it('fails position integrity when a flipped piece remains on its unflipped square', () => {
+    // A logical a1 piece belongs at the top-right when flipped. Paint it at
+    // bottom-left instead, the exact 180-degree mirror seen on Android.
+    const screenshotPath = writeSyntheticBoard('mirrored-a1.png', [
+      [7, 0, [245, 245, 245, 255]],
+    ]);
+
+    expect(() => expectBoardScreenshotMatchesOccupiedSquares(
+      screenshotPath,
+      fullBoardFrame(),
+      ['a1'],
+      true
+    )).toThrow('Board piece positions differ; missing=a1; unexpected=h8');
+  });
+
+  it('maps density-independent board frames onto physical screenshot pixels', () => {
+    const screenshotPath = writeRenderedBoard('two-times-density.png');
+    const densityIndependentFrame = { height: 400, width: 400, x: 0, y: 0 };
+
+    expect(() => expectBoardScreenshotMatchesOccupiedSquares(
+      screenshotPath,
+      densityIndependentFrame,
+      ['a1', 'c2'],
+      false,
+      densityIndependentFrame
+    )).not.toThrow();
+  });
+
+  it('keeps absolute element coordinates when the app root starts below a system inset', () => {
+    const boardPixels = { height: 800, width: 800, x: 100, y: 200 };
+    const png = syntheticScreenWithBoard(1000, 1200, boardPixels);
+    paintPieceInBoard(png, boardPixels, 6, 2, [20, 25, 32, 255]);
+    paintPieceInBoard(png, boardPixels, 7, 0, [245, 245, 245, 255]);
+    const screenshotPath = path.join(temporaryDirectory, 'inset-screen.png');
+    fs.writeFileSync(screenshotPath, encodeRgbaPng(png));
+
+    expect(() => expectBoardScreenshotMatchesOccupiedSquares(
+      screenshotPath,
+      { height: 400, width: 400, x: 50, y: 100 },
+      ['a1', 'c2'],
+      false,
+      { height: 560, width: 500, x: 0, y: 40 }
+    )).not.toThrow();
   });
 
   it('waits for a rotated board screenshot to contain rendered pieces', async () => {
@@ -846,6 +902,42 @@ function paintPiece(png, row, column, color) {
   const originY = row * 100;
   for (let y = originY + 20; y < originY + 80; y += 1) {
     for (let x = originX + 25; x < originX + 75; x += 1) {
+      writePixel(png.data, png.width, x, y, color);
+    }
+  }
+}
+
+function syntheticScreenWithBoard(width, height, boardFrame) {
+  const data = Buffer.alloc(width * height * 4);
+  const colors = [
+    [230, 232, 235, 255],
+    [123, 135, 148, 255]
+  ];
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      let color = [15, 20, 25, 255];
+      if (
+        x >= boardFrame.x && x < boardFrame.x + boardFrame.width
+        && y >= boardFrame.y && y < boardFrame.y + boardFrame.height
+      ) {
+        const row = Math.floor(((y - boardFrame.y) * 8) / boardFrame.height);
+        const column = Math.floor(((x - boardFrame.x) * 8) / boardFrame.width);
+        color = colors[(row + column) % 2];
+      }
+      writePixel(data, width, x, y, color);
+    }
+  }
+  return { data, height, width };
+}
+
+function paintPieceInBoard(png, boardFrame, row, column, color) {
+  const squareWidth = boardFrame.width / 8;
+  const squareHeight = boardFrame.height / 8;
+  const originX = boardFrame.x + column * squareWidth;
+  const originY = boardFrame.y + row * squareHeight;
+  for (let y = originY + squareHeight * 0.2; y < originY + squareHeight * 0.8; y += 1) {
+    for (let x = originX + squareWidth * 0.25; x < originX + squareWidth * 0.75; x += 1) {
       writePixel(png.data, png.width, x, y, color);
     }
   }
