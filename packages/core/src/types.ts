@@ -193,6 +193,10 @@ export interface ReviewContext {
   ratingKey: string;
 }
 
+export interface ReviewScheduleRemoval extends ReviewContext {
+  removedAt: string;
+}
+
 export interface ReviewScheduleInput {
   context?: ReviewContext;
   previous?: ReviewQueueState;

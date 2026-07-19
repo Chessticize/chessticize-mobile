@@ -83,7 +83,7 @@ jobs:
           source_manifest="$RUNNER_TEMP/candidate/artifacts/android-release/android-source-manifest.json"
           test -f "$source_manifest"
           mkdir -p "$RUNNER_TEMP/source-draft"
-          pnpm mobile:verify:android:github-release -- \
+          pnpm mobile:verify:android:github-release \
             --phase prepare-source-draft \
             --public-version "$PUBLIC_VERSION" \
             --version-code "$VERSION_CODE" \
@@ -146,7 +146,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/source-publication"
-          pnpm mobile:verify:android:github-release -- \
+          pnpm mobile:verify:android:github-release \
             --phase publish-source \
             --public-version "$PUBLIC_VERSION" \
             --version-code "$VERSION_CODE" \
@@ -270,7 +270,7 @@ jobs:
           set -euo pipefail
           source_manifest="$RUNNER_TEMP/candidate/artifacts/android-release/android-source-manifest.json"
           mkdir -p "$RUNNER_TEMP/binary-preparation"
-          pnpm mobile:verify:android:github-release -- \
+          pnpm mobile:verify:android:github-release \
             --phase prepare-binary \
             --public-version "$PUBLIC_VERSION" \
             --version-code "$VERSION_CODE" \
@@ -353,7 +353,7 @@ jobs:
           apk="$RUNNER_TEMP/prior/Chessticize-Android-${PUBLIC_VERSION}.apk"
           checksum="$apk.sha256"
           mkdir -p "$RUNNER_TEMP/binary-publication"
-          pnpm mobile:verify:android:github-release -- \
+          pnpm mobile:verify:android:github-release \
             --phase publish-binary \
             --public-version "$PUBLIC_VERSION" \
             --version-code "$VERSION_CODE" \

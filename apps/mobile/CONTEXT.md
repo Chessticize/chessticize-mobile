@@ -37,12 +37,20 @@ The local target time after which the mobile operating system may deliver a revi
 _Avoid_: Exact reminder time, alarm time
 
 **Unclear Attempt**:
-A correct completed sprint attempt the user marks at completion because they do not yet understand why the move worked. It can later be cleared and remains independent of the Review schedule until the user explicitly adds its puzzle context to Review.
+A correct completed sprint attempt the user marks at completion because they do not yet understand why the move worked. It can later be cleared from History.
 _Avoid_: Unclear puzzle, mistake, Review item
 
 **Manual Review Enrollment**:
-The user's explicit addition of an exact puzzle, mode, and rating-key context to the Review schedule without implying that an attempt was wrong.
+The user's explicit addition of an exact puzzle, mode, and rating-key context from a Review-owned session or a History replay without implying that an attempt was wrong. When an Unclear History attempt initiates enrollment, the same atomic operation clears only that attempt's Unclear marker.
 _Avoid_: Manual mistake, forced review
+
+**Review Schedule Control**:
+The two-state product affordance shown inside a Review-owned session or a History replay; it displays whether that exact Review Context is scheduled and lets the user manually enroll it or remove its existing Review Schedule. Manual enrollment acts immediately, while removal requires confirmation. Active Practice and Sprint Result do not expose this control.
+_Avoid_: Review toggle, Review checkbox
+
+**Review Due Label**:
+The localized due-day summary shown by a Review Schedule Control: **Due today** for due or overdue schedules, **Due tomorrow** for the next local calendar day, and **Due {date}** for later schedules.
+_Avoid_: Overdue warning, Review interval
 
 **Mobile Stockfish Engine**:
 The single bundled Stockfish C++ source tree used by both mobile platforms. Platform-specific iOS and Android bridges adapt that shared engine to the same JavaScript contract without owning separate engine versions.

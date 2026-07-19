@@ -1,0 +1,848 @@
+[
+  {
+    "name": "app_settings",
+    "columns": [
+      {
+        "name": "id",
+        "type": "TEXT",
+        "notNull": false,
+        "defaultValue": null,
+        "primaryKeyIndex": 1
+      },
+      {
+        "name": "review_reminder_fixed_local_time",
+        "type": "TEXT",
+        "notNull": false,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "review_reminder_mode",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "sync_icloud_enabled",
+        "type": "INTEGER",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "sync_upload_allowed",
+        "type": "INTEGER",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      }
+    ],
+    "indexes": [],
+    "foreignKeys": []
+  },
+  {
+    "name": "attempts",
+    "columns": [
+      {
+        "name": "arrow_duel_candidate_order_json",
+        "type": "TEXT",
+        "notNull": false,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "completed_at",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "expected_move",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "id",
+        "type": "TEXT",
+        "notNull": false,
+        "defaultValue": null,
+        "primaryKeyIndex": 1
+      },
+      {
+        "name": "mode",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "puzzle_id",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "rating_after",
+        "type": "INTEGER",
+        "notNull": false,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "rating_before",
+        "type": "INTEGER",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "rating_key",
+        "type": "TEXT",
+        "notNull": false,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "result",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "session_id",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "source",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": "'sprint'",
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "started_at",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "submitted_move",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "unclear",
+        "type": "INTEGER",
+        "notNull": true,
+        "defaultValue": "0",
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "unclear_updated_at",
+        "type": "TEXT",
+        "notNull": false,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      }
+    ],
+    "indexes": [
+      {
+        "name": "attempts_completed_at_id_idx",
+        "unique": false,
+        "columns": [
+          "completed_at",
+          "id"
+        ]
+      },
+      {
+        "name": "attempts_puzzle_id_completed_at_id_idx",
+        "unique": false,
+        "columns": [
+          "puzzle_id",
+          "completed_at",
+          "id"
+        ]
+      },
+      {
+        "name": "attempts_rating_key_completed_at_id_idx",
+        "unique": false,
+        "columns": [
+          "rating_key",
+          "completed_at",
+          "id"
+        ]
+      },
+      {
+        "name": "attempts_session_result_completed_at_id_idx",
+        "unique": false,
+        "columns": [
+          "session_id",
+          "result",
+          "completed_at",
+          "id"
+        ]
+      },
+      {
+        "name": "attempts_unclear_completed_at_idx",
+        "unique": false,
+        "columns": [
+          "unclear",
+          "completed_at"
+        ]
+      }
+    ],
+    "foreignKeys": [
+      {
+        "table": "puzzles",
+        "from": "puzzle_id",
+        "to": "id",
+        "onUpdate": "NO ACTION",
+        "onDelete": "NO ACTION"
+      },
+      {
+        "table": "sprint_sessions",
+        "from": "session_id",
+        "to": "id",
+        "onUpdate": "NO ACTION",
+        "onDelete": "NO ACTION"
+      }
+    ]
+  },
+  {
+    "name": "custom_sprint_configs",
+    "columns": [
+      {
+        "name": "duration_seconds",
+        "type": "INTEGER",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "id",
+        "type": "TEXT",
+        "notNull": false,
+        "defaultValue": null,
+        "primaryKeyIndex": 1
+      },
+      {
+        "name": "last_started_at",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "max_mistakes",
+        "type": "INTEGER",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "mode",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "per_puzzle_seconds",
+        "type": "INTEGER",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "play_count",
+        "type": "INTEGER",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "rating_key",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "target_correct",
+        "type": "INTEGER",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "theme",
+        "type": "TEXT",
+        "notNull": false,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      }
+    ],
+    "indexes": [
+      {
+        "name": "custom_sprint_configs_last_started_at_id_idx",
+        "unique": false,
+        "columns": [
+          "last_started_at",
+          "id"
+        ]
+      }
+    ],
+    "foreignKeys": []
+  },
+  {
+    "name": "puzzles",
+    "columns": [
+      {
+        "name": "game_url",
+        "type": "TEXT",
+        "notNull": false,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "id",
+        "type": "TEXT",
+        "notNull": false,
+        "defaultValue": null,
+        "primaryKeyIndex": 1
+      },
+      {
+        "name": "initial_fen",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "moves_json",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "nb_plays",
+        "type": "INTEGER",
+        "notNull": false,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "opening_tags_json",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": "'[]'",
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "popularity",
+        "type": "INTEGER",
+        "notNull": false,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "rating",
+        "type": "INTEGER",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "rating_deviation",
+        "type": "INTEGER",
+        "notNull": false,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "source",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "stockfish_bestmove",
+        "type": "TEXT",
+        "notNull": false,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "stockfish_eval",
+        "type": "REAL",
+        "notNull": false,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "stockfish_eval_after_first_move",
+        "type": "REAL",
+        "notNull": false,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "themes_json",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      }
+    ],
+    "indexes": [
+      {
+        "name": "puzzles_rating_id_idx",
+        "unique": false,
+        "columns": [
+          "rating",
+          "id"
+        ]
+      }
+    ],
+    "foreignKeys": []
+  },
+  {
+    "name": "ratings",
+    "columns": [
+      {
+        "name": "games",
+        "type": "INTEGER",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "generation",
+        "type": "INTEGER",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 2
+      },
+      {
+        "name": "key",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 1
+      },
+      {
+        "name": "rating",
+        "type": "INTEGER",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "rating_deviation",
+        "type": "REAL",
+        "notNull": true,
+        "defaultValue": "350",
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "volatility",
+        "type": "REAL",
+        "notNull": true,
+        "defaultValue": "0.06",
+        "primaryKeyIndex": 0
+      }
+    ],
+    "indexes": [],
+    "foreignKeys": []
+  },
+  {
+    "name": "review_events",
+    "columns": [
+      {
+        "name": "id",
+        "type": "TEXT",
+        "notNull": false,
+        "defaultValue": null,
+        "primaryKeyIndex": 1
+      },
+      {
+        "name": "interval_days",
+        "type": "INTEGER",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "mode",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": "'standard'",
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "next_due_day",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "puzzle_id",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "rating_key",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": "'standard 5/20'",
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "result",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "reviewed_at",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      }
+    ],
+    "indexes": [
+      {
+        "name": "review_events_puzzle_id_idx",
+        "unique": false,
+        "columns": [
+          "puzzle_id"
+        ]
+      },
+      {
+        "name": "review_events_reviewed_at_idx",
+        "unique": false,
+        "columns": [
+          "reviewed_at"
+        ]
+      }
+    ],
+    "foreignKeys": [
+      {
+        "table": "puzzles",
+        "from": "puzzle_id",
+        "to": "id",
+        "onUpdate": "NO ACTION",
+        "onDelete": "NO ACTION"
+      }
+    ]
+  },
+  {
+    "name": "review_queue",
+    "columns": [
+      {
+        "name": "due_day",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "enrolled_at",
+        "type": "TEXT",
+        "notNull": false,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "interval_days",
+        "type": "INTEGER",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "lapse_count",
+        "type": "INTEGER",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "last_result",
+        "type": "TEXT",
+        "notNull": false,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "last_reviewed_at",
+        "type": "TEXT",
+        "notNull": false,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "mode",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": "'standard'",
+        "primaryKeyIndex": 2
+      },
+      {
+        "name": "puzzle_id",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 1
+      },
+      {
+        "name": "rating_key",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": "'standard 5/20'",
+        "primaryKeyIndex": 3
+      },
+      {
+        "name": "review_count",
+        "type": "INTEGER",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "success_streak",
+        "type": "INTEGER",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      }
+    ],
+    "indexes": [
+      {
+        "name": "review_queue_due_day_order_idx",
+        "unique": false,
+        "columns": [
+          "due_day",
+          "puzzle_id",
+          "mode",
+          "rating_key"
+        ]
+      }
+    ],
+    "foreignKeys": [
+      {
+        "table": "puzzles",
+        "from": "puzzle_id",
+        "to": "id",
+        "onUpdate": "NO ACTION",
+        "onDelete": "NO ACTION"
+      }
+    ]
+  },
+  {
+    "name": "review_schedule_removals",
+    "columns": [
+      {
+        "name": "mode",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 2
+      },
+      {
+        "name": "puzzle_id",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 1
+      },
+      {
+        "name": "rating_key",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 3
+      },
+      {
+        "name": "removed_at",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      }
+    ],
+    "indexes": [
+      {
+        "name": "review_schedule_removals_removed_at_idx",
+        "unique": false,
+        "columns": [
+          "removed_at",
+          "puzzle_id",
+          "mode",
+          "rating_key"
+        ]
+      }
+    ],
+    "foreignKeys": [
+      {
+        "table": "puzzles",
+        "from": "puzzle_id",
+        "to": "id",
+        "onUpdate": "NO ACTION",
+        "onDelete": "NO ACTION"
+      }
+    ]
+  },
+  {
+    "name": "sprint_sessions",
+    "columns": [
+      {
+        "name": "completed_at",
+        "type": "TEXT",
+        "notNull": false,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "config_json",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "correct_count",
+        "type": "INTEGER",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "deadline_at",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "end_reason",
+        "type": "TEXT",
+        "notNull": false,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "id",
+        "type": "TEXT",
+        "notNull": false,
+        "defaultValue": null,
+        "primaryKeyIndex": 1
+      },
+      {
+        "name": "mistake_count",
+        "type": "INTEGER",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "mode",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "rating_after",
+        "type": "INTEGER",
+        "notNull": false,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "rating_before",
+        "type": "INTEGER",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "rating_generation",
+        "type": "INTEGER",
+        "notNull": false,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "rating_key",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "started_at",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "status",
+        "type": "TEXT",
+        "notNull": true,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      }
+    ],
+    "indexes": [
+      {
+        "name": "sprint_sessions_rating_generation_completed_at_id_idx",
+        "unique": false,
+        "columns": [
+          "rating_key",
+          "rating_generation",
+          "completed_at",
+          "id"
+        ]
+      },
+      {
+        "name": "sprint_sessions_rating_key_completed_at_id_idx",
+        "unique": false,
+        "columns": [
+          "rating_key",
+          "completed_at",
+          "id"
+        ]
+      },
+      {
+        "name": "sprint_sessions_started_at_id_idx",
+        "unique": false,
+        "columns": [
+          "started_at",
+          "id"
+        ]
+      }
+    ],
+    "foreignKeys": []
+  }
+]

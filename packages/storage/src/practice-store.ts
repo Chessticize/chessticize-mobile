@@ -7,6 +7,7 @@ import type {
   ReviewContext,
   ReviewQueueItem,
   ReviewQueueState,
+  ReviewScheduleRemoval,
   SessionMistakeReviewItem,
   SprintMode,
   SprintState
@@ -52,6 +53,7 @@ export interface LocalDataExport {
   ratings: RatingRecord[];
   attempts: AttemptHistoryRow[];
   reviewQueue: ExportedReviewQueueState[];
+  reviewRemovals?: ReviewScheduleRemoval[];
   sprintSessions: ExportedSprintSession[];
 }
 
@@ -114,7 +116,8 @@ export interface PracticeStore {
   clearLocalHistory(): ClearLocalHistoryResult;
   getSessionMistakeReview(sessionId: string): SessionMistakeReviewItem[];
   scheduleMistakeReview(context: ReviewContext, now: string): ReviewQueueState;
-  enrollReview(context: ReviewContext, now: string): ReviewQueueState;
+  enrollReview(context: ReviewContext, now: string, initiatingAttemptId?: string): ReviewQueueState;
+  removeReview(context: ReviewContext, now: string): ReviewScheduleRemoval;
   recordReviewResult(context: ReviewContext, result: AttemptResult, now: string): ReviewQueueState;
   getReviewQueueState(context: ReviewContext): ReviewQueueState | undefined;
   listReviewQueue(): ReviewQueueState[];

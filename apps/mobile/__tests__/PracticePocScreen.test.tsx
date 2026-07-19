@@ -25,6 +25,7 @@ import {
   type TestMobilePlatformCapabilityOverrides
 } from "../src/testing/testMobilePlatformCapabilities";
 import { FailingAttemptStore } from "../test-support/FailingAttemptStore";
+import { FailingReviewScheduleStore } from "../test-support/FailingReviewScheduleStore";
 import {
   expectNoRenderedTextHasNonPositiveFontSize,
   flattenTestStyle
@@ -354,7 +355,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "practice-home")).toBeTruthy();
   });
 
-  it("binds the Unclear bookmark to the completed correct attempt through feedback and Sprint Result", async () => {
+  it("binds Unclear to the completed attempt and replaces the yellow action with a yellow confirmation", async () => {
     const service = createMobilePracticeService("random1000");
     const renderer = renderScreen({ practiceService: service, standardTargetCorrect: 1 });
 
@@ -365,25 +366,53 @@ describe("PracticePocScreen", () => {
 
     await boardMove(renderer, "e6f7");
     expect(collectText(findByTestId(renderer, "sprint-unclear-question"))).toBe(
-      "Was it clear why that move was correct?"
+      "Was the previous puzzle clear?"
     );
-    expect(collectText(findByTestId(renderer, "sprint-unclear-toggle"))).toBe("Not yet");
+    expect(collectText(findByTestId(renderer, "sprint-unclear-toggle"))).toBe("Mark as unclear");
+    expect(styleContains(findByTestId(renderer, "sprint-unclear-toggle").props.style, "#FFFBEB")).toBe(true);
+    expect(styleContains(findByTestId(renderer, "sprint-unclear-toggle").props.style, "#F59E0B")).toBe(true);
+    const promptStyle = findByTestId(renderer, "sprint-unclear-prompt").props.style;
     press(renderer, "sprint-unclear-toggle");
     const attemptId = (service.listHistory() as AttemptEvent[])[0]?.id;
     expect(attemptId).toBeTruthy();
     expect((service.listHistory() as AttemptEvent[])[0]).toMatchObject({ unclear: true });
-    expect(collectText(findByTestId(renderer, "sprint-unclear-toggle"))).toBe("Marked unclear · Undo");
-    expect(findByTestId(renderer, "bookmark-glyph")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "sprint-unclear-marked"))).toBe("Marked");
+    expect(styleContains(findByTestId(renderer, "sprint-unclear-marked").props.style, "#FFFBEB")).toBe(true);
+    expect(styleContains(findByTestId(renderer, "sprint-unclear-marked").props.style, "#F59E0B")).toBe(true);
+    expect(() => findByTestId(renderer, "sprint-unclear-toggle")).toThrow();
+    expect(() => findByTestId(renderer, "bookmark-glyph")).toThrow();
+    expect(findByTestId(renderer, "sprint-unclear-prompt").props.style).toEqual(promptStyle);
 
     await settleFeedbackSnapshot();
     expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
     expect(findByTestId(renderer, "sprint-unclear-prompt")).toBeTruthy();
-    press(renderer, "sprint-unclear-toggle");
     expect((service.listHistory() as AttemptEvent[])[0]).toMatchObject({
       id: attemptId,
-      unclear: false
+      unclear: true
     });
+    expect(collectText(findByTestId(renderer, "sprint-unclear-marked"))).toBe("Marked");
+  });
+
+  it("keeps Review Schedule controls out of active Practice and Sprint Result", async () => {
+    const service = createMobilePracticeService("random1000");
+    const renderer = renderScreen({
+      practiceService: service,
+      standardTargetCorrect: 1
+    });
+
+    startStandardSprint(renderer);
+    expect(() => findByTestId(renderer, "review-schedule-control")).toThrow();
+    await boardMove(renderer, "e2e6");
+    await settleFeedbackSnapshot();
+    await boardMove(renderer, "e6f7");
+    press(renderer, "sprint-unclear-toggle");
+
+    expect((service.listHistory() as AttemptEvent[])[0]).toMatchObject({ unclear: true });
+    expect(() => findByTestId(renderer, "review-schedule-control")).toThrow();
+
+    await settleFeedbackSnapshot();
     expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
+    expect(() => findByTestId(renderer, "review-schedule-control")).toThrow();
   });
 
   it("keeps the Unclear prompt on the previous attempt until the next puzzle completes", async () => {
@@ -398,7 +427,7 @@ describe("PracticePocScreen", () => {
     await settleFeedbackSnapshot();
 
     expect(collectText(findByTestId(renderer, "sprint-unclear-question"))).toBe(
-      "Was it clear why the previous move was correct?"
+      "Was the previous puzzle clear?"
     );
     press(renderer, "sprint-unclear-toggle");
     expect((service.listHistory() as AttemptEvent[]).find((attempt) => attempt.id === completedAttemptId)).toMatchObject({
@@ -621,6 +650,7 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "review-session")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "review-timer"))).not.toBe(firstTimer);
+    expect(() => findByTestId(renderer, "review-line-continue")).toThrow();
   });
 
   it("previews Practice for session-mistake review while analysis returns to the review first", async () => {
@@ -1073,10 +1103,9 @@ describe("PracticePocScreen", () => {
       node.props.testID === "safe-area-shell" || String(node.type) === "SafeAreaView"
     ));
     expect(flattenTestStyle(safeAreaShell.props.style).paddingTop).toBe(topInset);
-    const moves = findByTestId(renderer, "session-accessible-moves-open");
-    expect(moves.props.accessibilityRole).toBe("button");
-    expect(moves.props.accessibilityState).toEqual({ expanded: false });
-    expect(Number(flattenTestStyle(moves.props.style).height)).toBeGreaterThanOrEqual(48);
+    const pause = findByTestId(renderer, "session-pause");
+    expect(pause.props.accessibilityRole).toBe("button");
+    expect(Number(flattenTestStyle(pause.props.style).height)).toBeGreaterThanOrEqual(48);
   });
 
   it("stacks the review board and analysis panel on an iPad in portrait", () => {
@@ -1096,7 +1125,28 @@ describe("PracticePocScreen", () => {
     expect(flattenTestStyle(findByTestId(renderer, "review-analysis-panel").props.style).width).toBeUndefined();
   });
 
-  it("preserves the active sprint and its accessible move dialog across a live resize", () => {
+  it.each([
+    { actionContainer: "review-context-actions-bottom", height: 932, label: "phone portrait", width: 430 },
+    { actionContainer: "review-context-actions-rail", height: 390, label: "phone landscape", width: 844 },
+    { actionContainer: "review-context-actions-rail", height: 820, label: "iPad landscape", width: 1180 }
+  ])("places History Review actions in the available $label layout", ({ actionContainer, height, width }) => {
+    (ReactNative as unknown as {
+      __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
+    }).__setWindowDimensions?.({ width, height, scale: 2, fontScale: 1 });
+
+    const renderer = renderScreen({
+      currentTimeMs: () => Date.parse("2026-07-17T12:02:00.000Z"),
+      practiceService: createUnclearHistoryReviewService()
+    });
+    press(renderer, "history-tab");
+    press(renderer, "history-attempt-responsive-unclear-attempt");
+
+    const actions = findByTestId(renderer, actionContainer);
+    expect(actions.findByProps({ testID: "review-schedule-control" })).toBeTruthy();
+    expect(actions.findByProps({ testID: "history-attempt-unclear" })).toBeTruthy();
+  });
+
+  it("preserves the active sprint across a live resize", () => {
     const service = createMobilePracticeService("familiar15");
     (ReactNative as unknown as {
       __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
@@ -1106,8 +1156,7 @@ describe("PracticePocScreen", () => {
     startStandardSprint(renderer);
     const sprintId = activeSprintForTest(service).id;
     const puzzleId = activeSprintForTest(service).currentPuzzle?.puzzle.id;
-    press(renderer, "session-accessible-moves-open");
-    expect(findByTestId(renderer, "session-accessible-moves-dialog")).toBeTruthy();
+    expect(() => findByTestId(renderer, "session-accessible-moves-open")).toThrow();
 
     act(() => {
       (ReactNative as unknown as {
@@ -1118,8 +1167,19 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "adaptive-layout").props.accessibilityLabel).toBe("Layout compactLandscape");
     expect(activeSprintForTest(service).id).toBe(sprintId);
     expect(activeSprintForTest(service).currentPuzzle?.puzzle.id).toBe(puzzleId);
-    expect(findByTestId(renderer, "session-accessible-moves-dialog")).toBeTruthy();
+    expect(() => findByTestId(renderer, "session-accessible-moves-open")).toThrow();
     expect(findByTestId(renderer, "active-session-control-rail")).toBeTruthy();
+  });
+
+  it("removes the Sprint Moves action and centers its title", () => {
+    const renderer = renderScreen({ practiceService: createMobilePracticeService("familiar15") });
+
+    startStandardSprint(renderer);
+
+    expect(() => findByTestId(renderer, "session-accessible-moves-open")).toThrow();
+    expect(flattenTestStyle(findByTestId(renderer, "session-nav-actions").props.style).width).toBe(
+      flattenTestStyle(findByTestId(renderer, "session-abandon").props.style).width
+    );
   });
 
   it("keeps board geometry inside narrow resizable windows and reserves room for large text", () => {
@@ -1142,52 +1202,7 @@ describe("PracticePocScreen", () => {
     expect(flattenTestStyle(findByTestId(largeTextRenderer, "session-board").props.style).width).toBeLessThanOrEqual(860);
   });
 
-  it("offers public non-gesture move actions and announces changing session state", async () => {
-    const service = createMobilePracticeService("familiar15");
-    const renderer = renderScreen({ practiceService: service });
-    startStandardSprint(renderer);
-
-    const open = findByTestId(renderer, "session-accessible-moves-open");
-    expect(open.props.accessibilityRole).toBe("button");
-    expect(open.props.accessibilityState).toEqual({ expanded: false });
-    expect(findByTestId(renderer, "practice-announcement").props.accessibilityLiveRegion).toBe("polite");
-
-    press(renderer, "session-accessible-moves-open");
-    const dialog = findByTestId(renderer, "session-accessible-moves-dialog");
-    expect(dialog.props.accessibilityViewIsModal).toBe(true);
-    const moveButtons = renderer.root.findAll((node) =>
-      typeof node.props.testID === "string" && node.props.testID.startsWith("session-accessible-move-")
-    );
-    expect(moveButtons.length).toBeGreaterThan(0);
-    expect(moveButtons.every((node) => node.props.accessibilityRole === "button")).toBe(true);
-    expect(moveButtons.every((node) => Number(flattenTestStyle(node.props.style).minHeight) >= 48)).toBe(true);
-
-    const fixtureMove = findByTestId(renderer, "session-accessible-move-c2b1");
-    expect(fixtureMove.props.accessibilityLabel).toContain("c2 to b1");
-
-    await act(async () => {
-      fixtureMove.props.onPress();
-      await Promise.resolve();
-    });
-    expect(activeSprintForTest(service).correctCount).toBe(1);
-    expect(findByTestId(renderer, "practice-announcement").props.accessibilityLiveRegion).toBe("polite");
-  });
-
-  it("limits non-gesture Arrow Duel actions to the visible candidate contract", () => {
-    const service = createMobilePracticeService("random1000");
-    const renderer = renderScreen({ practiceService: service });
-    startArrowDuelSprint(renderer);
-    const candidates = requireArrowDuelState(activeSprintForTest(service)).candidates;
-
-    press(renderer, "session-accessible-moves-open");
-    const moveIDs = Array.from(new Set(renderer.root.findAll((node) =>
-      typeof node.props.testID === "string" && node.props.testID.startsWith("session-accessible-move-")
-    ).map((node) => String(node.props.testID))));
-
-    expect(moveIDs).toEqual(candidates.map((move) => `session-accessible-move-${move}`).sort());
-  });
-
-  it("advances Analysis through non-gesture Review controls without mutating review records", async () => {
+  it("advances Review analysis through the board without mutating review records", async () => {
     const now = "2026-06-20T12:00:00.000Z";
     const service = createDueReviewService(1);
     service.recordReviewAttempt({
@@ -1213,7 +1228,7 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "review-board").props.accessibilityRole).toBe("image");
     expect(findByTestId(renderer, "review-announcement").props.accessibilityLiveRegion).toBe("polite");
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-result"))).toBe("Wrong move");
+    expect(() => findByTestId(renderer, "history-attempt-detail")).toThrow();
     const reviewRecordsBeforeAnalysis = {
       dueItems: service.getDueReviewItems(now),
       history: service.listHistory(),
@@ -1224,33 +1239,23 @@ describe("PracticePocScreen", () => {
     const analysisStartFen = findByTestId(renderer, "mock-chessboard").props.fen;
     const announcementBeforeMove = findByTestId(renderer, "review-announcement").props.accessibilityLabel;
 
-    press(renderer, "review-accessible-moves-open");
-    expect(findByTestId(renderer, "review-accessible-moves-dialog").props.accessibilityViewIsModal).toBe(true);
-    const legalAnalysisMove = renderer.root.findAll((node) =>
-      typeof node.props.testID === "string"
-        && node.props.testID.startsWith("review-accessible-move-")
-        && node.props.accessibilityRole === "button"
-    )[0];
+    expect(() => findByTestId(renderer, "review-accessible-moves-open")).toThrow();
+    const legalAnalysisMove = new Chess(analysisStartFen).moves({ verbose: true })[0];
     if (!legalAnalysisMove) {
-      throw new Error("Expected at least one public legal Analysis move");
+      throw new Error("Expected at least one legal Analysis move");
     }
-    const legalAnalysisMoveTestID = legalAnalysisMove.props.testID as string;
-    const legalAnalysisMoveUci = legalAnalysisMoveTestID.replace("review-accessible-move-", "");
-    const legalAnalysisMoveFrom = legalAnalysisMoveUci.slice(0, 2);
-    const legalAnalysisMoveTo = legalAnalysisMoveUci.slice(2, 4);
+    const legalAnalysisMoveFrom = legalAnalysisMove.from;
+    const legalAnalysisMoveTo = legalAnalysisMove.to;
+    const legalAnalysisMoveUci = `${legalAnalysisMoveFrom}${legalAnalysisMoveTo}${legalAnalysisMove.promotion ?? ""}`;
     const expectedAnalysisPosition = new Chess(analysisStartFen);
     expect(expectedAnalysisPosition.move({
       from: legalAnalysisMoveFrom,
       to: legalAnalysisMoveTo,
-      ...(legalAnalysisMoveUci.length > 4 ? { promotion: legalAnalysisMoveUci.slice(4, 5) } : {})
+      ...(legalAnalysisMove.promotion ? { promotion: legalAnalysisMove.promotion } : {})
     })).toBeTruthy();
     const expectedAnalysisSide = expectedAnalysisPosition.turn() === "w" ? "White" : "Black";
-    expect(legalAnalysisMove.props.accessibilityRole).toBe("button");
-    expect(legalAnalysisMove.props.accessibilityLabel).toContain(
-      `${legalAnalysisMoveFrom} to ${legalAnalysisMoveTo}`
-    );
 
-    await pressAsync(renderer, legalAnalysisMoveTestID);
+    await boardMove(renderer, legalAnalysisMoveUci);
 
     expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(expectedAnalysisPosition.fen());
     expect(findByTestId(renderer, "mock-chessboard").props.fen).not.toBe(analysisStartFen);
@@ -1261,7 +1266,7 @@ describe("PracticePocScreen", () => {
       `Analysis Local hint. ${expectedAnalysisSide} to move. Last move ${legalAnalysisMoveFrom} to ${legalAnalysisMoveTo}.`
     );
     expect(findByTestId(renderer, "review-announcement").props.accessibilityLabel).not.toBe(announcementBeforeMove);
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-result"))).toBe("Wrong move");
+    expect(() => findByTestId(renderer, "history-attempt-detail")).toThrow();
     expect({
       dueItems: service.getDueReviewItems(now),
       history: service.listHistory(),
@@ -3144,7 +3149,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-panel")).toBeTruthy();
   });
 
-  it("filters Unclear attempts, clears the marker in History review, and enrolls the exact context", () => {
+  it("puts Unclear only first in a scrollable three-toggle History row without a count or icon", () => {
     const store = new MemoryStore();
     store.seedPuzzles([sharedHistoryPuzzle()]);
     store.recordAttempt({
@@ -3169,35 +3174,133 @@ describe("PracticePocScreen", () => {
     });
 
     press(renderer, "history-tab");
-    expect(collectText(findByTestId(renderer, "history-filter-unclear"))).toBe("Unclear (1)");
+    expect(findByTestId(renderer, "history-quick-filters").props.horizontal).toBe(true);
+    expect(collectText(findByTestId(renderer, "history-filter-unclear"))).toBe("Unclear only");
+    expect(findByTestId(renderer, "history-filter-unclear").props.accessibilityLabel).toBe(
+      "Unclear attempts only"
+    );
+    expect(testIdOrder(renderer, "history-filter-unclear", "history-filter-wrong-only")).toBeLessThan(0);
+    expect(testIdOrder(renderer, "history-filter-wrong-only", "history-filter-sprint-only")).toBeLessThan(0);
     expect(findByTestId(renderer, "history-attempt-unclear-history-attempt-unclear")).toBeTruthy();
+    expect(() => findByTestId(renderer, "bookmark-glyph")).toThrow();
     press(renderer, "history-filter-unclear");
     expect(findByTestId(renderer, "history-filter-unclear").props.accessibilityState).toEqual({ checked: true });
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Unclear");
 
     press(renderer, "history-attempt-unclear-history-attempt");
-    expect(findByTestId(renderer, "history-attempt-unclear")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "history-add-to-review"))).toBe("Add to Review");
-    press(renderer, "history-add-to-review");
-    expect(service.getReviewQueueState({
-      puzzleId: "shared-history",
-      mode: "standard",
-      ratingKey: "standard 5/20"
-    })).toMatchObject({
-      reviewCount: 0,
-      lastResult: null,
-      lastReviewedAt: null
-    });
-    expect(collectText(findByTestId(renderer, "history-review-enrollment-status"))).toContain("In Review");
+    expect(findByTestId(renderer, "review-board")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-detail")).toThrow();
+    expect(collectText(findByTestId(renderer, "history-attempt-unclear"))).toContain("Marked");
+    expect(collectText(findByTestId(renderer, "history-attempt-unclear"))).not.toContain("Marked as unclear");
+    expect(findByTestId(renderer, "history-attempt-clear-unclear")).toBeTruthy();
+    expect(testIdOrder(renderer, "review-schedule-control", "history-attempt-unclear")).toBeLessThan(0);
+    expect(() => findByTestId(renderer, "bookmark-glyph")).toThrow();
+    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Not scheduled for Review");
+    expect(collectText(findByTestId(renderer, "review-schedule-add"))).toBe("Add to Review");
+    expect(service.listHistory()).toHaveLength(1);
+    expect((service.listHistory() as AttemptEvent[])[0]).toMatchObject({ unclear: true });
 
-    press(renderer, "history-attempt-clear-unclear");
-    expect(findByTestId(renderer, "history-attempt-detail")).toBeTruthy();
+    press(renderer, "review-schedule-add");
+    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Due tomorrow");
     expect(() => findByTestId(renderer, "history-attempt-unclear")).toThrow();
     expect((service.listHistory() as AttemptEvent[])[0]).toMatchObject({ unclear: false });
+
+    press(renderer, "review-schedule-remove");
+    press(renderer, "review-schedule-removal-confirm");
+    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Not scheduled for Review");
 
     press(renderer, "review-exit");
     expect(findByTestId(renderer, "history-filter-unclear").props.accessibilityState).toEqual({ checked: true });
     expect(findByTestId(renderer, "history-empty-state")).toBeTruthy();
+  });
+
+  it("keeps Review Schedule removal failures unchanged and retryable inside History Review", () => {
+    const store = new FailingReviewScheduleStore();
+    store.seedPuzzles([sharedHistoryPuzzle()]);
+    store.scheduleMistakeReview({
+      puzzleId: "shared-history",
+      mode: "standard",
+      ratingKey: "standard 5/20"
+    }, "2026-07-17T12:00:00.000Z");
+    store.recordAttempt({
+      id: "review-removal-failure",
+      source: "sprint",
+      sessionId: "review-removal-session",
+      puzzleId: "shared-history",
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      result: "correct",
+      submittedMove: "e2e4",
+      expectedMove: "e2e4",
+      startedAt: "2026-07-17T12:00:05.000Z",
+      completedAt: "2026-07-17T12:00:10.000Z",
+      ratingBefore: 600
+    });
+    const service = new PracticeService(store);
+    const renderer = renderScreen({
+      currentTimeMs: () => Date.parse("2026-07-18T12:02:00.000Z"),
+      practiceService: service
+    });
+
+    press(renderer, "history-tab");
+    press(renderer, "history-attempt-review-removal-failure");
+    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Due today");
+    store.setRemovalFailure(new Error("delete failed"));
+    press(renderer, "review-schedule-remove");
+    press(renderer, "review-schedule-removal-confirm");
+    expect(collectText(findByTestId(renderer, "review-schedule-error"))).toBe(
+      "Couldn't remove from Review. Try again."
+    );
+    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Due today");
+    expect(service.listReviewQueue()).toHaveLength(1);
+
+    store.setRemovalFailure(undefined);
+    press(renderer, "review-schedule-removal-confirm");
+    expect(service.listReviewQueue()).toHaveLength(0);
+    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Not scheduled for Review");
+  });
+
+  it("keeps a committed Review removal when reminder reconciliation fails", async () => {
+    const scheduler = new FakeReviewReminderScheduler();
+    scheduler.setFailure(new Error("notification unavailable"));
+    const store = new MemoryStore();
+    store.seedPuzzles([sharedHistoryPuzzle()]);
+    store.scheduleMistakeReview({
+      puzzleId: "shared-history",
+      mode: "standard",
+      ratingKey: "standard 5/20"
+    }, "2026-07-17T12:00:00.000Z");
+    store.recordAttempt({
+      id: "review-reminder-failure",
+      source: "sprint",
+      sessionId: "review-reminder-session",
+      puzzleId: "shared-history",
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      result: "correct",
+      submittedMove: "e2e4",
+      expectedMove: "e2e4",
+      startedAt: "2026-07-17T12:00:05.000Z",
+      completedAt: "2026-07-17T12:00:10.000Z",
+      ratingBefore: 600
+    });
+    const service = new PracticeService(store);
+    const renderer = renderScreen({
+      currentTimeMs: () => Date.parse("2026-07-18T12:02:00.000Z"),
+      practiceService: service,
+      reviewReminderScheduler: scheduler
+    });
+    await act(async () => {});
+
+    press(renderer, "history-tab");
+    press(renderer, "history-attempt-review-reminder-failure");
+    press(renderer, "review-schedule-remove");
+    press(renderer, "review-schedule-removal-confirm");
+    await act(async () => {});
+
+    expect(service.listReviewQueue()).toHaveLength(0);
+    expect(service.listHistory()).toHaveLength(1);
+    expect(scheduler.calls.length).toBeGreaterThan(0);
   });
 
   it("resets history filters to the default sprint-only view", () => {
@@ -3388,7 +3491,7 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "history-attempt-run-scored-attempt-review-due")).toThrow();
   });
 
-  it("inspects the exact persisted attempt before starting analysis and normalizes partial fields", () => {
+  it("opens replayable History attempts without a detail panel and explains unavailable replays", () => {
     const store = new MemoryStore();
     store.seedPuzzles([sharedHistoryPuzzle()]);
     store.recordAttempt({
@@ -3474,16 +3577,8 @@ describe("PracticePocScreen", () => {
     press(renderer, "history-source-all");
     press(renderer, "history-attempt-custom-detail-attempt");
 
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-title"))).toBe("Persisted attempt");
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-context"))).toBe("Custom · Sprint");
-    expect(findByTestId(renderer, "history-attempt-detail-rating-key").props.accessibilityLabel).toBe(
-      "Rating bucket hangingPiece custom 5/20"
-    );
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-result"))).toBe("Wrong move");
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-timing"))).toBe("Jun 20, 2026 · 15s");
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-moves"))).toBe("Played e2e4 · Best e2e3");
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-rating"))).toBe("Rating 600 → 584 · -16");
-    expect(() => findByTestId(renderer, "history-attempt-detail-partial")).toThrow();
+    expect(() => findByTestId(renderer, "history-attempt-detail")).toThrow();
+    expect(findByTestId(renderer, "review-board")).toBeTruthy();
     expect(findByTestId(renderer, "review-analysis-button")).toBeTruthy();
     expect(() => findByTestId(renderer, "review-close-analysis")).toThrow();
 
@@ -3496,15 +3591,8 @@ describe("PracticePocScreen", () => {
     );
     press(renderer, "history-attempt-partial-detail-attempt");
 
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-context"))).toBe("Standard · Sprint");
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-timing"))).toBe("Jun 20, 2026 · Duration unavailable");
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-moves"))).toBe("Moves unavailable");
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-rating"))).toBe(
-      "Rating 600 · Rating change unavailable"
-    );
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-partial"))).toBe(
-      "Some persisted attempt details are unavailable."
-    );
+    expect(() => findByTestId(renderer, "history-attempt-detail")).toThrow();
+    expect(findByTestId(renderer, "review-board")).toBeTruthy();
 
     press(renderer, "review-exit");
     expect(collectText(findByTestId(renderer, "history-attempt-malformed-context-attempt-result"))).toBe(
@@ -3514,42 +3602,39 @@ describe("PracticePocScreen", () => {
       "Unknown source"
     );
     press(renderer, "history-attempt-malformed-context-attempt");
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-context"))).toBe(
-      "Unknown mode · Unknown source"
-    );
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-rating-key"))).toBe(
-      "Rating bucket unavailable"
-    );
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-result"))).toBe("Result unavailable");
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-replay-unavailable"))).toBe(
+    expect(() => findByTestId(renderer, "history-attempt-detail")).toThrow();
+    expect(collectText(findByTestId(renderer, "history-replay-unavailable"))).toBe(
       "The saved mode or rating context is invalid, so this attempt cannot be replayed safely."
     );
     expect(() => findByTestId(renderer, "review-board")).toThrow();
     expect(() => findByTestId(renderer, "review-analysis-button")).toThrow();
-    expect(findByTestId(renderer, "history-add-to-review").props.accessibilityState).toEqual({ disabled: true });
+    expect(() => findByTestId(renderer, "review-schedule-control")).toThrow();
 
     expect(systemBack.invoke()).toBe(true);
     expect(findByTestId(renderer, "history-panel")).toBeTruthy();
     press(renderer, "history-attempt-corrupt-arrow-attempt");
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-replay-unavailable"))).toBe(
+    expect(() => findByTestId(renderer, "history-attempt-detail")).toThrow();
+    expect(collectText(findByTestId(renderer, "history-replay-unavailable"))).toBe(
       "Original Arrow Duel candidates are unavailable, so this attempt cannot be replayed safely."
     );
     expect(() => findByTestId(renderer, "review-board")).toThrow();
     expect(() => findByTestId(renderer, "review-analysis-button")).toThrow();
-    expect(findByTestId(renderer, "history-add-to-review").props.accessibilityState).toEqual({ disabled: false });
+    expect(findByTestId(renderer, "review-schedule-control")).toBeTruthy();
     expect(systemBack.invoke()).toBe(true);
     expect(findByTestId(renderer, "history-panel")).toBeTruthy();
     press(renderer, "history-attempt-semantic-corrupt-arrow-attempt");
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-replay-unavailable"))).toBe(
+    expect(() => findByTestId(renderer, "history-attempt-detail")).toThrow();
+    expect(collectText(findByTestId(renderer, "history-replay-unavailable"))).toBe(
       "Original Arrow Duel candidates are unavailable, so this attempt cannot be replayed safely."
     );
     expect(() => findByTestId(renderer, "review-board")).toThrow();
     expect(() => findByTestId(renderer, "review-analysis-button")).toThrow();
+    expect(findByTestId(renderer, "review-schedule-control")).toBeTruthy();
     expect(systemBack.invoke()).toBe(true);
     expect(findByTestId(renderer, "history-panel")).toBeTruthy();
   });
 
-  it("keeps malformed persisted rating keys out of History buckets while preserving readable detail", () => {
+  it("keeps malformed persisted rating keys out of History buckets and shows only replay feedback", () => {
     const store = new MemoryStore();
     store.seedPuzzles([sharedHistoryPuzzle()]);
     store.recordAttempt({
@@ -3577,12 +3662,9 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-attempt-malformed-rating-key-attempt")).toBeTruthy();
 
     press(renderer, "history-attempt-malformed-rating-key-attempt");
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-rating-key"))).toBe(
-      "Rating bucket unavailable"
-    );
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-moves"))).toBe("Played e2e4 · Best e2e3");
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-partial"))).toBe(
-      "Some persisted attempt details are unavailable."
+    expect(() => findByTestId(renderer, "history-attempt-detail")).toThrow();
+    expect(collectText(findByTestId(renderer, "history-replay-unavailable"))).toBe(
+      "The saved mode or rating context is invalid, so this attempt cannot be replayed safely."
     );
   });
 
@@ -3604,7 +3686,8 @@ describe("PracticePocScreen", () => {
     press(firstRenderer, "history-rating-standard 5/20");
     press(firstRenderer, "history-filter-wrong-only");
     press(firstRenderer, "history-attempt-process-local-filter-attempt");
-    expect(findByTestId(firstRenderer, "history-attempt-detail")).toBeTruthy();
+    expect(findByTestId(firstRenderer, "review-board")).toBeTruthy();
+    expect(() => findByTestId(firstRenderer, "history-attempt-detail")).toThrow();
 
     expect(firstSystemBack.invoke()).toBe(true);
     expect(findByTestId(firstRenderer, "history-panel")).toBeTruthy();
@@ -3686,6 +3769,8 @@ describe("PracticePocScreen", () => {
 
     expectText(renderer, "1 / 1 · Arrow Duel");
     expect(findByTestId(renderer, "review-arrow-duel-candidate-overlay-order-f2g3-b2b1")).toBeTruthy();
+    expect(() => findByTestId(renderer, "review-accessible-moves-open")).toThrow();
+    expect(findByTestId(renderer, "review-schedule-control")).toBeTruthy();
   });
 
   it("shows a review button after a failed sprint with mistakes", async () => {
@@ -3729,7 +3814,11 @@ describe("PracticePocScreen", () => {
   it("reviews missed puzzles from the completed sprint using the solving board", async () => {
     const service = createMobilePracticeService("random1000");
     const recordReviewAttempt = jest.spyOn(service, "recordReviewAttempt");
-    const renderer = renderScreen({ practiceService: service });
+    jest.setSystemTime(new Date("2026-07-18T12:00:00.000Z"));
+    const renderer = renderScreen({
+      practiceService: service,
+      puzzleSelectionSeed: "history-review-6"
+    });
 
     startStandardSprint(renderer);
     await boardMove(renderer, "c4b5");
@@ -3742,7 +3831,14 @@ describe("PracticePocScreen", () => {
     press(renderer, "review-mistakes-button");
 
     expect(findByTestId(renderer, "review-session")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "review-current-puzzle-id"))).toBe("000hf");
     expect(findByTestId(renderer, "review-board")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Due tomorrow");
+    expect(collectText(findByTestId(renderer, "review-schedule-remove"))).toBe("Remove from Review");
+    press(renderer, "review-schedule-remove");
+    press(renderer, "review-schedule-removal-confirm");
+    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Not scheduled for Review");
+    expect(collectText(findByTestId(renderer, "review-schedule-add"))).toBe("Add to Review");
     expectText(renderer, "1 / 3 · Standard");
     expect(findByTestId(renderer, "review-previous").props.disabled).toBe(true);
     expect(findByTestId(renderer, "review-next").props.disabled).toBe(false);
@@ -3751,15 +3847,18 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "2 / 3 · Standard");
     press(renderer, "review-previous");
     expectText(renderer, "1 / 3 · Standard");
+    const reviewFen = findByTestId(renderer, "mock-chessboard").props.fen;
+    await waitForAssertion(() => {
+      expect(findByTestId(renderer, "mock-chessboard").props.draggableColor).toBe(new Chess(reviewFen).turn());
+    });
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
-    expect(findByTestId(renderer, "mock-chessboard").props.draggableColor).toBe("w");
     expect(findByTestId(renderer, "mock-chessboard").props.withLetters).toBe(false);
     expect(findByTestId(renderer, "mock-chessboard").props.withNumbers).toBe(false);
-    expect(collectText(findByTestId(renderer, "board-coordinate-overlay"))).toContain("abcdefgh");
-    expect(collectText(findByTestId(renderer, "board-coordinate-overlay"))).toContain("87654321");
-    const reviewFen = findByTestId(renderer, "mock-chessboard").props.fen;
-
-    await boardMove(renderer, "e2e6");
+    const reviewBoardFlipped = findByTestId(renderer, "mock-chessboard").props.flipped;
+    expect(collectText(findByTestId(renderer, "board-coordinate-overlay"))).toContain(reviewBoardFlipped ? "hgfedcba" : "abcdefgh");
+    expect(collectText(findByTestId(renderer, "board-coordinate-overlay"))).toContain(reviewBoardFlipped ? "12345678" : "87654321");
+    const firstExpectedReviewMove = collectText(findByTestId(renderer, "review-current-expected-move"));
+    await boardMove(renderer, firstExpectedReviewMove);
 
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
     expect(hasStyleValue(renderer.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
@@ -3769,7 +3868,8 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "1 / 3 · Standard");
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
 
-    await boardMove(renderer, "e6f7");
+    const secondExpectedReviewMove = collectText(findByTestId(renderer, "review-current-expected-move"));
+    await boardMove(renderer, secondExpectedReviewMove);
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
     expect(hasStyleValue(renderer.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
 
@@ -4008,7 +4108,8 @@ describe("PracticePocScreen", () => {
     press(renderer, "review-tab");
 
     expect(collectText(findByTestId(renderer, "review-due-summary"))).toBe("Overdue now");
-    expect(collectText(findByTestId(renderer, "review-overdue-count"))).toBe("1");
+    expect(() => findByTestId(renderer, "review-overdue-count")).toThrow();
+    expect(() => findByTestId(renderer, "review-overdue-summary")).toThrow();
     expect(findByTestId(renderer, "review-due-card").props.accessibilityLabel).toContain("All due · Overdue now");
     press(renderer, "review-filter-toggle");
     press(renderer, "review-filter-overdue");
@@ -4186,7 +4287,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "review-timer"))).toBe("00:40");
   });
 
-  it("chains the default due review start across visible context groups", async () => {
+  it("auto-chains the default due review start across visible context groups", async () => {
     const service = createMobilePracticeService("random1000");
     service.startSprint(
       { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
@@ -4208,6 +4309,7 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "review-session")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "review-timer"))).toBe("00:40");
+    expect(() => findByTestId(renderer, "review-accessible-moves-open")).toThrow();
 
     await boardMove(renderer, "c4b5");
     await settleFeedbackSnapshot();
@@ -4217,6 +4319,49 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "review-line-continue")).toThrow();
     expect(() => findByTestId(renderer, "review-source-pill")).toThrow();
     expect(() => findByTestId(renderer, "review-panel")).toThrow();
+  });
+
+  it("hides scheduling controls from scheduled Review and centers its header", () => {
+    jest.setSystemTime(new Date("2026-06-21T12:00:00.000Z"));
+    const service = createDueReviewService(2);
+    const renderer = renderScreen({ practiceService: service });
+
+    press(renderer, "review-tab");
+    press(renderer, "review-start-due");
+    expect(() => findByTestId(renderer, "review-schedule-control")).toThrow();
+    expect(() => findByTestId(renderer, "review-schedule-state")).toThrow();
+    expect(() => findByTestId(renderer, "review-schedule-remove")).toThrow();
+    expect(() => findByTestId(renderer, "review-context-actions-bottom")).toThrow();
+    expect(flattenTestStyle(findByTestId(renderer, "review-header-actions").props.style).width).toBe(
+      flattenTestStyle(findByTestId(renderer, "review-exit").props.style).width
+    );
+    expect(service.listHistory({ source: "scheduled_review" })).toHaveLength(0);
+    expect(service.listReviewQueue()).toHaveLength(2);
+  });
+
+  it("returns to the Review panel automatically after the last due answer", async () => {
+    jest.setSystemTime(new Date("2026-06-21T12:00:00.000Z"));
+    const service = createMobilePracticeService("random1000");
+    service.startSprint(
+      { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
+      "2026-06-20T00:00:00.000Z"
+    );
+    service.submitMove("c4b5", "2026-06-20T00:00:05.000Z");
+    const renderer = renderScreen({ practiceService: service });
+
+    press(renderer, "review-tab");
+    press(renderer, "review-start-due");
+    await boardMove(renderer, "e2e6");
+    await settleFeedbackSnapshot();
+    await boardMove(renderer, "e6f7");
+    await settleFeedbackSnapshot();
+
+    expect(service.listHistory({ source: "scheduled_review" })).toHaveLength(1);
+    expect(service.listReviewQueue()).toHaveLength(1);
+    expect(() => findByTestId(renderer, "review-session")).toThrow();
+    expect(() => findByTestId(renderer, "review-line-continue")).toThrow();
+    expect(findByTestId(renderer, "review-panel")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "review-due-count"))).toBe("1 / 1");
   });
 
   it("starts the canonical oldest due item before a lexically earlier newer context", () => {
@@ -4274,8 +4419,8 @@ describe("PracticePocScreen", () => {
     expect(officialReviewAttempts).toHaveLength(1);
     expect(officialReviewAttempts[0]).toMatchObject({ result: "wrong", submittedMove: "c4b5" });
     expect(() => findByTestId(renderer, "review-session")).toThrow();
-    expect(findByTestId(renderer, "review-panel")).toBeTruthy();
     expect(() => findByTestId(renderer, "review-line-continue")).toThrow();
+    expect(findByTestId(renderer, "review-panel")).toBeTruthy();
 
     press(renderer, "history-tab");
     press(renderer, "history-filter-toggle");
@@ -4285,10 +4430,8 @@ describe("PracticePocScreen", () => {
       (node) => typeof node.props.testID === "string" && node.props.testID.startsWith("history-attempt-")
     )[0];
     press(renderer, historyAttemptRow.props.testID);
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-context"))).toBe("Standard · Review");
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-result"))).toBe("Wrong move");
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-moves"))).toBe("Played c4b5 · Best e2e6");
-    expect(collectText(findByTestId(renderer, "history-attempt-detail-rating"))).toBe("Rating 600 · No run change");
+    expect(findByTestId(renderer, "review-board")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-detail")).toThrow();
     press(renderer, "review-analysis-button");
 
     expect(service.listHistory({ source: "scheduled_review" }) as unknown[]).toHaveLength(1);
@@ -4326,6 +4469,7 @@ describe("PracticePocScreen", () => {
     await settleFeedbackSnapshot();
 
     expect(() => findByTestId(renderer, "review-session")).toThrow();
+    expect(() => findByTestId(renderer, "review-line-continue")).toThrow();
     expect(findByTestId(renderer, "review-panel")).toBeTruthy();
     const officialReviewAttempts = service.listHistory({ source: "scheduled_review" }) as Array<{
       expectedMove: string;
@@ -4465,11 +4609,11 @@ describe("PracticePocScreen", () => {
     act(() => {
       jest.advanceTimersByTime(40_500);
     });
-    expect(collectText(findByTestId(renderer, "review-timer"))).toBe("Time expired");
-    press(renderer, "review-line-continue");
     const secondPuzzleId = collectText(findByTestId(renderer, "review-current-puzzle-id"));
     expect(secondPuzzleId).not.toBe(firstPuzzleId);
     expectText(renderer, "2 / 2 · Standard");
+    expect(collectText(findByTestId(renderer, "review-timer"))).toBe("00:40");
+    expect(() => findByTestId(renderer, "review-line-continue")).toThrow();
 
     press(renderer, "review-exit");
     expect(service.listHistory({ source: "scheduled_review" })).toHaveLength(1);
@@ -4858,6 +5002,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "review-mistakes-button");
 
     expectText(renderer, "1 / 3 · Arrow Duel");
+    expect(() => findByTestId(renderer, "review-accessible-moves-open")).toThrow();
     expect(() => findByTestId(renderer, "review-arrow-legend")).toThrow();
     expect(() => findByTestId(renderer, "review-arrow-choice-marker")).toThrow();
     expect(collectText(renderer.root)).not.toContain("Green = best move");
@@ -5028,6 +5173,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "review-start-due");
 
     expectText(renderer, "1 / 3 · Arrow Duel");
+    expect(() => findByTestId(renderer, "review-accessible-moves-open")).toThrow();
     expect(() => findByTestId(renderer, "review-line-continue")).toThrow();
 
     await boardMove(renderer, wrongMoves[0] as string);
@@ -5623,7 +5769,7 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "review-reminder-permission-prompt")).toThrow();
   });
 
-  it("dismisses the review reminder prompt before its underlying Review session", async () => {
+  it("dismisses the review reminder prompt before its underlying Review panel", async () => {
     const systemBack = createTestSystemBackSource("android");
     const notificationClient = new FakeReviewReminderNotificationClient("not_determined", "authorized");
     const service = createMobilePracticeService("random1000");
@@ -5647,6 +5793,7 @@ describe("PracticePocScreen", () => {
 
     expect(systemBack.invoke()).toBe(true);
     expect(() => findByTestId(renderer, "review-reminder-permission-prompt")).toThrow();
+    expect(() => findByTestId(renderer, "review-session")).toThrow();
     expect(findByTestId(renderer, "review-panel")).toBeTruthy();
     expect(notificationClient.requestCount).toBe(0);
   });
@@ -5854,6 +6001,28 @@ function sharedHistoryPuzzle(): Puzzle {
     source: "lichess",
     stockfishBestMove: "e2e3"
   };
+}
+
+function createUnclearHistoryReviewService(): PracticeService {
+  const store = new MemoryStore();
+  store.seedPuzzles([sharedHistoryPuzzle()]);
+  store.recordAttempt({
+    id: "responsive-unclear-attempt",
+    source: "sprint",
+    sessionId: "responsive-unclear-session",
+    puzzleId: "shared-history",
+    mode: "standard",
+    ratingKey: "standard 5/20",
+    result: "correct",
+    submittedMove: "e2e4",
+    expectedMove: "e2e4",
+    startedAt: "2026-07-17T11:59:55.000Z",
+    completedAt: "2026-07-17T12:00:00.000Z",
+    ratingBefore: 600
+  });
+  const service = new PracticeService(store);
+  service.setAttemptUnclear("responsive-unclear-attempt", true, "2026-07-17T12:01:00.000Z");
+  return service;
 }
 
 function createDueReviewService(count: number): PracticeService {

@@ -1709,4 +1709,17 @@ describe('Android Play release contract', () => {
     expect(listing).toContain('Data collected: No');
     expect(listing).toContain('production manifest intentionally has no `INTERNET` permission');
   });
+
+  it('installs the Android emulator runtime libraries before running the release doctor', () => {
+    const workflow = read(
+      '.github/workflows/mobile-android-release-candidate.yml',
+    );
+    const runtimeInstall = 'sudo apt-get install --yes libpulse0';
+    const doctor = 'run: pnpm mobile:doctor:android';
+
+    expect(workflow).toContain(runtimeInstall);
+    expect(workflow.indexOf(runtimeInstall)).toBeLessThan(
+      workflow.indexOf(doctor),
+    );
+  });
 });

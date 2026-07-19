@@ -23,6 +23,7 @@ import type {
   ReviewContext,
   ReviewQueueItem,
   ReviewQueueState,
+  ReviewScheduleRemoval,
   SessionMistakeReviewItem,
   SprintConfig,
   SprintMode,
@@ -283,8 +284,16 @@ export class PracticeService {
     return this.store.getHistoryView(query);
   }
 
-  enrollReview(context: ReviewContext, now = new Date().toISOString()): ReviewQueueState {
-    return this.store.enrollReview(context, now);
+  enrollReview(
+    context: ReviewContext,
+    now = new Date().toISOString(),
+    initiatingAttemptId?: string
+  ): ReviewQueueState {
+    return this.store.transaction(() => this.store.enrollReview(context, now, initiatingAttemptId));
+  }
+
+  removeReview(context: ReviewContext, now = new Date().toISOString()): ReviewScheduleRemoval {
+    return this.store.transaction(() => this.store.removeReview(context, now));
   }
 
   getReviewQueueState(context: ReviewContext): ReviewQueueState | undefined {

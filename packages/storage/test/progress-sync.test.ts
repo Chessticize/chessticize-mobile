@@ -161,6 +161,36 @@ test("review sync resolves conflicts by last review time and then due day", asyn
   assert.equal(mergeLocalDataExports(local, sameTimeRemote).reviewQueue[0]?.dueDay, "2026-07-12");
 });
 
+test("review sync keeps newer removals, favors removal ties, and accepts genuinely later enrollment", async () => {
+  const service = new PracticeService(await seededMemoryStore());
+  const context = { puzzleId: "00008", mode: "standard" as const, ratingKey: "standard 5/20" };
+  service.enrollReview(context, "2026-07-17T12:00:00.000Z");
+  const scheduled = service.exportLocalData();
+  service.removeReview(context, "2026-07-17T12:01:00.000Z");
+  const removed = service.exportLocalData();
+
+  const removalWinsOlderSchedule = mergeLocalDataExports(removed, scheduled);
+  assert.deepEqual(removalWinsOlderSchedule.reviewQueue, []);
+  assert.equal(removalWinsOlderSchedule.reviewRemovals?.[0]?.removedAt, "2026-07-17T12:01:00.000Z");
+
+  const tiedSchedule = structuredClone(scheduled);
+  tiedSchedule.reviewQueue[0] = {
+    ...tiedSchedule.reviewQueue[0]!,
+    enrolledAt: "2026-07-17T12:01:00.000Z"
+  };
+  assert.deepEqual(mergeLocalDataExports(tiedSchedule, removed).reviewQueue, []);
+
+  const laterEnrollment = structuredClone(scheduled);
+  laterEnrollment.reviewQueue[0] = {
+    ...laterEnrollment.reviewQueue[0]!,
+    enrolledAt: "2026-07-17T12:02:00.000Z",
+    dueDay: "2026-07-18"
+  };
+  const reenrolled = mergeLocalDataExports(removed, laterEnrollment);
+  assert.equal(reenrolled.reviewQueue[0]?.enrolledAt, "2026-07-17T12:02:00.000Z");
+  assert.deepEqual(reenrolled.reviewRemovals, []);
+});
+
 test("attempt clarity sync uses the latest action and favors clearing exact timestamp ties", async () => {
   const service = new PracticeService(await seededMemoryStore());
   const local = service.exportLocalData();

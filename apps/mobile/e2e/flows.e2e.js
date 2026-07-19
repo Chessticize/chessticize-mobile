@@ -125,6 +125,8 @@ describe('Key user flows', () => {
     await expect(element(by.id('review-source-pill'))).not.toExist();
     await expect(element(by.id('review-theme-pill'))).not.toExist();
     await expect(element(by.id('review-analysis-button'))).not.toExist();
+    await expect(element(by.id('review-accessible-moves-open'))).not.toExist();
+    await expect(element(by.id('review-line-continue'))).not.toExist();
 
     // Exiting an unanswered review leaves it due and restores the same fixed
     // daily position when the user comes back.
@@ -146,6 +148,7 @@ describe('Key user flows', () => {
     await waitFor(element(by.id('move-feedback-overlay'))).toExist().withTimeout(5000);
 
     await waitFor(element(by.id('review-progress'))).toHaveText('2 / 3 · Standard').withTimeout(30000);
+    await expect(element(by.id('review-line-continue'))).not.toExist();
     await element(by.id('review-exit')).tap();
     await waitFor(element(by.id('review-due-count'))).toHaveText('1 / 3').withTimeout(10000);
     await waitFor(element(by.id('review-today-history'))).toExist().withTimeout(10000);
@@ -231,6 +234,10 @@ describe('Key user flows', () => {
     await waitFor(element(by.id('history-filter-wrong-only')))
       .toHaveValue(historyToggleValue('Wrong puzzles only', true))
       .withTimeout(10000);
+    await waitFor(element(by.id('history-filter-sprint-only')))
+      .toBeVisible()
+      .whileElement(by.id('history-quick-filters'))
+      .scroll(120, 'right');
     await element(by.id('history-filter-sprint-only')).tap();
     await waitFor(element(by.id('history-filter-sprint-only')))
       .toHaveValue(historyToggleValue('Sprint attempts only', false))
