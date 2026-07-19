@@ -1432,6 +1432,46 @@ describe('Android GitHub release automation', () => {
     expect(runbook).toContain('no automatic GitHub update checks');
   });
 
+  it('forwards every protected workflow phase through the nested pnpm scripts without a stray delimiter', () => {
+    const repoRoot = path.resolve(__dirname, '../../..');
+    const workflow = fs.readFileSync(
+      path.join(repoRoot, '.github/workflows/mobile-android-github-release.yml'),
+      'utf8',
+    );
+    const phases = [
+      'prepare-source-draft',
+      'publish-source',
+      'prepare-binary',
+      'publish-binary',
+    ];
+    const invocations = [...workflow.matchAll(
+      /pnpm mobile:verify:android:github-release( --)? \\\n\s+--phase ([a-z-]+) \\/g,
+    )];
+
+    expect(invocations.map(match => match[2])).toEqual(phases);
+    expect(invocations.every(match => match[1] === undefined)).toBe(true);
+
+    for (const phase of phases) {
+      const result = spawnSync('pnpm', [
+        'mobile:verify:android:github-release',
+        '--phase', phase,
+      ], {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          CI: 'true',
+          NO_COLOR: '1',
+        },
+      });
+      const output = `${result.stdout}${result.stderr}`;
+
+      expect(result.status).toBe(1);
+      expect(output).toContain(`--public-version is required for phase ${phase}.`);
+      expect(output).not.toContain('Missing value for --.');
+    }
+  });
+
   it('dispatches through the executable CLI and rejects a non-canonical identity before I/O', () => {
     const cli = path.resolve(__dirname, '../scripts/android-github-release-cli.js');
     const result = spawnSync(process.execPath, [
