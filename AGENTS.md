@@ -8,6 +8,8 @@ For repeatable Storybook-to-Release simulator calibration across the maintained
 eight-scene UI baseline, use
 `.codex/skills/chessticize-mobile-ui-calibration/SKILL.md`.
 
+For Android release orchestration, use the repo-local skill at `.codex/skills/chessticize-android-release/SKILL.md`. It governs clean-machine preflight, exact-artifact Play and GitHub publication, protected recovery, physical ARM64 validation, and final issue closure.
+
 ## Agent wayfinding
 
 ### Storybook-first UI flow gate

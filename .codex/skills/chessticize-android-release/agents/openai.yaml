@@ -1,0 +1,4 @@
+interface:
+  display_name: "Chessticize Android Release"
+  short_description: "Advance exact-artifact Android releases safely"
+  default_prompt: "Use $chessticize-android-release to audit and advance the current Android release frontier safely."

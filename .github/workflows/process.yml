@@ -3,9 +3,7 @@ name: Development Process
 on:
   pull_request:
     paths:
-      - ".codex/skills/chessticize-mobile-dev-loop/**"
-      - ".codex/skills/chessticize-mobile-local-e2e/**"
-      - ".codex/skills/chessticize-mobile-ui-calibration/**"
+      - ".codex/skills/**"
       - "apps/mobile-lab/README.md"
       - ".github/pull_request_template.md"
       - ".github/workflows/**"
@@ -22,9 +20,7 @@ on:
     branches:
       - main
     paths:
-      - ".codex/skills/chessticize-mobile-dev-loop/**"
-      - ".codex/skills/chessticize-mobile-local-e2e/**"
-      - ".codex/skills/chessticize-mobile-ui-calibration/**"
+      - ".codex/skills/**"
       - "apps/mobile-lab/README.md"
       - ".github/pull_request_template.md"
       - ".github/workflows/**"
