@@ -277,6 +277,7 @@ test("SQLite migration backfills attempt rating keys and replaces superseded ind
       DROP INDEX sprint_sessions_started_at_id_idx;
       DROP INDEX custom_sprint_configs_last_started_at_id_idx;
       DROP INDEX review_queue_due_day_order_idx;
+      DROP TABLE review_schedule_removals;
       DROP TABLE review_events;
       DROP TABLE review_queue;
       CREATE TABLE review_queue (

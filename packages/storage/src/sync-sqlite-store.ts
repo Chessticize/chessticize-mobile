@@ -6,11 +6,14 @@ import {
   filterHistoryAttemptsForQuery,
   normalizeRatingRecord,
   orderReviewQueue,
+  preferredReviewScheduleChange,
+  removeReviewContext,
   resetRating as resetRatingRecord,
   resolveHistoryRange,
   reviewDayFor,
   scheduleMistakeForContext,
   scheduleReview,
+  sameReviewContext,
   sideToMoveForHistoryPuzzle,
   updateAttemptUnclearState
 } from "../../core/src/index.ts";
@@ -27,6 +30,8 @@ import type {
   ReviewContext,
   ReviewQueueItem,
   ReviewQueueState,
+  ReviewScheduleChange,
+  ReviewScheduleRemoval,
   SessionMistakeReviewItem,
   SprintMode,
   SprintState
@@ -123,6 +128,13 @@ interface ReviewRow {
   enrolled_at: string | null;
 }
 
+interface ReviewRemovalRow {
+  puzzle_id: string;
+  mode: SprintMode;
+  rating_key: string;
+  removed_at: string;
+}
+
 interface CustomSprintConfigRow {
   id: string;
   mode: SprintMode;
@@ -175,7 +187,7 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 5;
+export const CURRENT_SCHEMA_VERSION = 6;
 
 interface SQLiteMigration {
   from: number;
@@ -188,7 +200,8 @@ const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
   { from: 1, to: 2, apply: migrateV1ToV2 },
   { from: 2, to: 3, apply: migrateV2ToV3 },
   { from: 3, to: 4, apply: migrateV3ToV4 },
-  { from: 4, to: 5, apply: migrateV4ToV5 }
+  { from: 4, to: 5, apply: migrateV4ToV5 },
+  { from: 5, to: 6, apply: migrateV5ToV6 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
@@ -692,6 +705,7 @@ export class SyncSQLiteStore implements PracticeStore {
       ratings: this.listRatings(),
       attempts: this.listAttempts(),
       reviewQueue: this.listReviewQueue().map(exportReviewQueueState),
+      reviewRemovals: this.listReviewRemovals(),
       sprintSessions: this.listSprintSessions()
     };
   }
@@ -726,15 +740,18 @@ export class SyncSQLiteStore implements PracticeStore {
           result.attempts += 1;
         }
       }
-      for (const importedReview of data.reviewQueue) {
-        const review = normalizeImportedReviewQueueState(importedReview);
-        if (!this.getPuzzle(review.puzzleId)) {
+      const importedReviewChanges: ReviewScheduleChange[] = [
+        ...data.reviewQueue.map((review): ReviewScheduleChange => ({
+          kind: "scheduled",
+          review: normalizeImportedReviewQueueState(review)
+        })),
+        ...(data.reviewRemovals ?? []).map((removal): ReviewScheduleChange => ({ kind: "removed", removal }))
+      ];
+      for (const change of importedReviewChanges) {
+        if (!this.getPuzzle(reviewContextForChange(change).puzzleId)) {
           continue;
         }
-        const previous = this.getReviewQueueState(review);
-        const next = preferredReviewQueue(previous, review);
-        if (!sameReviewQueue(previous, next)) {
-          this.saveReviewQueueState(next);
+        if (this.applyReviewScheduleChange(change)) {
           result.reviewQueue += 1;
         }
       }
@@ -752,6 +769,7 @@ export class SyncSQLiteStore implements PracticeStore {
     this.db.prepare("DELETE FROM attempts").run();
     this.db.prepare("DELETE FROM review_events").run();
     this.db.prepare("DELETE FROM review_queue").run();
+    this.db.prepare("DELETE FROM review_schedule_removals").run();
     this.db.prepare("DELETE FROM sprint_sessions WHERE status NOT IN ('active', 'paused')").run();
     return result;
   }
@@ -767,15 +785,52 @@ export class SyncSQLiteStore implements PracticeStore {
   scheduleMistakeReview(context: ReviewContext, now: string): ReviewQueueState {
     const previous = this.getReviewQueueState(context);
     const next = scheduleMistakeForContext(context, now, previous);
-    this.saveReviewQueueState(next);
+    this.commitScheduledReview(next);
     return next;
   }
 
-  enrollReview(context: ReviewContext, now: string): ReviewQueueState {
+  enrollReview(context: ReviewContext, now: string, initiatingAttemptId?: string): ReviewQueueState {
     const previous = this.getReviewQueueState(context);
     const next = enrollReviewContext(context, now, previous);
-    this.saveReviewQueueState(next);
+    let initiatingAttempt: AttemptHistoryRow | undefined;
+    if (initiatingAttemptId) {
+      initiatingAttempt = this.attemptById(initiatingAttemptId);
+      if (!initiatingAttempt) {
+        throw new Error(`Attempt ${initiatingAttemptId} was not found`);
+      }
+      if (!sameReviewContext(initiatingAttempt, context)) {
+        throw new Error("The initiating attempt must identify the same Review Context");
+      }
+      updateAttemptUnclearState(initiatingAttempt, false, now);
+    }
+    this.commitScheduledReview(next);
+    if (initiatingAttempt) {
+      this.setAttemptUnclear(initiatingAttempt.id, false, now);
+    }
     return next;
+  }
+
+  removeReview(context: ReviewContext, now: string): ReviewScheduleRemoval {
+    const previousReview = this.getReviewQueueState(context);
+    const previousRemoval = this.getReviewRemoval(context);
+    if (!previousReview && previousRemoval) {
+      return previousRemoval;
+    }
+    const removal = removeReviewContext(context, now, previousReview ? undefined : previousRemoval);
+    if (previousReview) {
+      const winner = preferredReviewScheduleChange(
+        { kind: "scheduled", review: previousReview },
+        { kind: "removed", removal }
+      );
+      if (winner.kind !== "removed") {
+        throw new Error("Review removal must not be older than the active Review Schedule");
+      }
+    }
+    this.saveReviewRemoval(removal);
+    this.db
+      .prepare("DELETE FROM review_queue WHERE puzzle_id = ? AND mode = ? AND rating_key = ?")
+      .run(context.puzzleId, context.mode, context.ratingKey);
+    return removal;
   }
 
   recordReviewResult(context: ReviewContext, result: AttemptResult, now: string): ReviewQueueState {
@@ -783,7 +838,7 @@ export class SyncSQLiteStore implements PracticeStore {
     const next = previous
       ? scheduleReview({ previous, result, now })
       : scheduleReview({ context, result, now });
-    this.saveReviewQueueState(next);
+    this.commitScheduledReview(next);
     this.db
       .prepare(
         `INSERT INTO review_events (
@@ -819,6 +874,9 @@ export class SyncSQLiteStore implements PracticeStore {
         .prepare("DELETE FROM review_queue WHERE NOT EXISTS (SELECT 1 FROM puzzles WHERE puzzles.id = review_queue.puzzle_id)")
         .run();
     }
+    this.db
+      .prepare("DELETE FROM review_schedule_removals WHERE NOT EXISTS (SELECT 1 FROM puzzles WHERE puzzles.id = review_schedule_removals.puzzle_id)")
+      .run();
     return removed;
   }
 
@@ -920,6 +978,73 @@ export class SyncSQLiteStore implements PracticeStore {
         state.lastReviewedAt,
         state.enrolledAt ?? null
       );
+  }
+
+  private listReviewRemovals(): ReviewScheduleRemoval[] {
+    const rows = this.db
+      .prepare("SELECT * FROM review_schedule_removals ORDER BY puzzle_id ASC, mode ASC, rating_key ASC")
+      .all() as ReviewRemovalRow[];
+    return rows.map(reviewRemovalFromRow);
+  }
+
+  private getReviewRemoval(context: ReviewContext): ReviewScheduleRemoval | undefined {
+    const row = this.db
+      .prepare("SELECT * FROM review_schedule_removals WHERE puzzle_id = ? AND mode = ? AND rating_key = ?")
+      .get(context.puzzleId, context.mode, context.ratingKey) as ReviewRemovalRow | undefined;
+    return row ? reviewRemovalFromRow(row) : undefined;
+  }
+
+  private saveReviewRemoval(removal: ReviewScheduleRemoval): void {
+    this.db
+      .prepare(
+        `INSERT OR REPLACE INTO review_schedule_removals (puzzle_id, mode, rating_key, removed_at)
+         VALUES (?, ?, ?, ?)`
+      )
+      .run(removal.puzzleId, removal.mode, removal.ratingKey, removal.removedAt);
+  }
+
+  private commitScheduledReview(review: ReviewQueueState): void {
+    const removal = this.getReviewRemoval(review);
+    if (removal) {
+      const winner = preferredReviewScheduleChange(
+        { kind: "removed", removal },
+        { kind: "scheduled", review }
+      );
+      if (winner.kind !== "scheduled") {
+        throw new Error("Review enrollment must occur after the latest Review removal");
+      }
+    }
+    this.saveReviewQueueState(review);
+    this.db
+      .prepare("DELETE FROM review_schedule_removals WHERE puzzle_id = ? AND mode = ? AND rating_key = ?")
+      .run(review.puzzleId, review.mode, review.ratingKey);
+  }
+
+  private applyReviewScheduleChange(incoming: ReviewScheduleChange): boolean {
+    const context = reviewContextForChange(incoming);
+    const localRemoval = this.getReviewRemoval(context);
+    const localReview = this.getReviewQueueState(context);
+    const local: ReviewScheduleChange | undefined = localRemoval
+      ? { kind: "removed", removal: localRemoval }
+      : localReview
+        ? { kind: "scheduled", review: localReview }
+        : undefined;
+    const next = preferredReviewScheduleChange(local, incoming);
+    if (sameReviewScheduleChange(local, next)) {
+      return false;
+    }
+    if (next.kind === "scheduled") {
+      this.saveReviewQueueState(next.review);
+      this.db
+        .prepare("DELETE FROM review_schedule_removals WHERE puzzle_id = ? AND mode = ? AND rating_key = ?")
+        .run(context.puzzleId, context.mode, context.ratingKey);
+    } else {
+      this.saveReviewRemoval(next.removal);
+      this.db
+        .prepare("DELETE FROM review_queue WHERE puzzle_id = ? AND mode = ? AND rating_key = ?")
+        .run(context.puzzleId, context.mode, context.ratingKey);
+    }
+    return true;
   }
 
   private selectHistoryAttempts(ratingKey: string | undefined, since: string | undefined, until: string): HistoryAttemptView[] {
@@ -1526,6 +1651,22 @@ function migrateV4ToV5(db: SyncSqliteDatabase): void {
   `);
 }
 
+function migrateV5ToV6(db: SyncSqliteDatabase): void {
+  db.exec(`
+    CREATE TABLE review_schedule_removals (
+      puzzle_id TEXT NOT NULL,
+      mode TEXT NOT NULL,
+      rating_key TEXT NOT NULL,
+      removed_at TEXT NOT NULL,
+      PRIMARY KEY (puzzle_id, mode, rating_key),
+      FOREIGN KEY (puzzle_id) REFERENCES puzzles(id)
+    );
+
+    CREATE INDEX review_schedule_removals_removed_at_idx
+      ON review_schedule_removals(removed_at, puzzle_id, mode, rating_key);
+  `);
+}
+
 function readSchemaVersion(db: SyncSqliteDatabase): number {
   const row = db.prepare("PRAGMA user_version").get() as { user_version?: unknown } | undefined;
   const version = row?.user_version;
@@ -1594,6 +1735,15 @@ function reviewFromRow(row: ReviewRow): ReviewQueueState {
   };
 }
 
+function reviewRemovalFromRow(row: ReviewRemovalRow): ReviewScheduleRemoval {
+  return {
+    puzzleId: row.puzzle_id,
+    mode: row.mode,
+    ratingKey: row.rating_key,
+    removedAt: row.removed_at
+  };
+}
+
 function settingsFromRow(row: AppSettingsRow): PracticeSettings {
   const reminder = normalizeReviewReminderPreference(
     row.review_reminder_mode === "fixed"
@@ -1631,24 +1781,6 @@ function sameRating(left: RatingRecord, right: RatingRecord): boolean {
     left.volatility === right.volatility;
 }
 
-function preferredReviewQueue(
-  local: ReviewQueueState | undefined,
-  incoming: ReviewQueueState
-): ReviewQueueState {
-  if (!local) {
-    return incoming;
-  }
-  const reviewComparison = reviewActivityAt(incoming).localeCompare(reviewActivityAt(local));
-  if (reviewComparison !== 0) {
-    return reviewComparison > 0 ? incoming : local;
-  }
-  const dueComparison = incoming.dueDay.localeCompare(local.dueDay);
-  if (dueComparison !== 0) {
-    return dueComparison > 0 ? incoming : local;
-  }
-  return incoming;
-}
-
 function sameReviewQueue(left: ReviewQueueState | undefined, right: ReviewQueueState): boolean {
   return left !== undefined &&
     left.puzzleId === right.puzzleId &&
@@ -1664,8 +1796,23 @@ function sameReviewQueue(left: ReviewQueueState | undefined, right: ReviewQueueS
     left.enrolledAt === right.enrolledAt;
 }
 
-function reviewActivityAt(review: ReviewQueueState): string {
-  return review.lastReviewedAt ?? review.enrolledAt ?? "";
+function reviewContextForChange(change: ReviewScheduleChange): ReviewContext {
+  return change.kind === "scheduled" ? change.review : change.removal;
+}
+
+function sameReviewScheduleChange(
+  left: ReviewScheduleChange | undefined,
+  right: ReviewScheduleChange
+): boolean {
+  if (!left || left.kind !== right.kind) {
+    return false;
+  }
+  if (left.kind === "removed" && right.kind === "removed") {
+    return left.removal.removedAt === right.removal.removedAt &&
+      sameReviewContext(left.removal, right.removal);
+  }
+  return left.kind === "scheduled" && right.kind === "scheduled" &&
+    sameReviewQueue(left.review, right.review);
 }
 
 function attemptHistoryRowFromDbRow(row: AttemptHistoryDbRow): AttemptHistoryRow {

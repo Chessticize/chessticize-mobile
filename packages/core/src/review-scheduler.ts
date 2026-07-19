@@ -1,4 +1,5 @@
 import type { ReviewContext, ReviewQueueState, ReviewScheduleInput } from "./types.ts";
+import { formatReviewDay } from "./local-date.ts";
 
 const SUCCESS_INTERVALS_DAYS = [1, 3, 7, 14, 30, 60];
 export const REVIEW_DAY_ROLLOVER_HOUR = 4;
@@ -162,6 +163,26 @@ export function isReviewOverdue(
   timeZone?: string
 ): boolean {
   return reviewDueState(review, now, timeZone) === "overdue";
+}
+
+export function reviewDueLabel(
+  review: Pick<ReviewQueueState, "dueDay">,
+  now: string | number | Date,
+  timeZone?: string,
+  locale?: string
+): string {
+  const nowDate = now instanceof Date ? new Date(now) : new Date(now);
+  if (!Number.isFinite(nowDate.getTime())) {
+    throw new Error("now must be a valid date");
+  }
+  const today = localCalendarDayFor(nowDate, timeZone);
+  if (review.dueDay <= today) {
+    return "Due today";
+  }
+  if (review.dueDay === addReviewDays(today, 1)) {
+    return "Due tomorrow";
+  }
+  return `Due ${formatReviewDay(review.dueDay, locale ? { locale } : {})}`;
 }
 
 export function reviewDayFor(now: string | number | Date, timeZone?: string): string {

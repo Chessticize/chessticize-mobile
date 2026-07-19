@@ -15,6 +15,10 @@ const {
   waitForRunningStockfishDepth,
   failStandardSprint
 } = require('./helpers');
+const {
+  expectFrameContained,
+  waitForBoardScreenshotContainsPieces,
+} = require('./screenshotAssertions');
 
 // The visual assertion measures absolute painted arrow area. Pin the public
 // service's packaged-core selection to two long candidate vectors so random
@@ -34,6 +38,9 @@ describe('Practice POC', () => {
         chessticizePuzzleSelectionSeed: PRACTICE_RENDER_PUZZLE_SELECTION_SEED
       }
     });
+    if (process.env.CHESSTICIZE_EXPECT_FULL_HISTORY_BOARD !== '1') {
+      await device.setOrientation('portrait');
+    }
   });
 
   it('renders the standard sprint board', async () => {
@@ -88,7 +95,8 @@ describe('Practice POC', () => {
 
   });
 
-  it('persists an unclear sprint attempt and clears it from filtered History', async () => {
+  it('persists Unclear, places its History actions responsively, and manages Review Schedule there', async () => {
+    const expectsRegularLayout = process.env.CHESSTICIZE_EXPECT_FULL_HISTORY_BOARD === '1';
     await selectTestPuzzleSource('familiar15');
     await startPracticeMode('standard');
     await waitForVisibleInPracticeScroll('session-board');
@@ -96,18 +104,18 @@ describe('Practice POC', () => {
     await playBoardMove('session-board', 'c2b1');
     await waitFor(element(by.id('sprint-unclear-prompt'))).toBeVisible().withTimeout(10000);
     await element(by.id('sprint-unclear-toggle')).tap();
-    await waitFor(element(by.text('Marked unclear · Undo')))
+    await waitFor(element(by.text('Marked')))
       .toBeVisible()
       .withTimeout(10000);
 
     // Let the normal feedback snapshot advance to the next board. The prompt
     // remains bound to the completed attempt rather than the newly shown puzzle.
-    await waitForElementTextContaining('sprint-unclear-question', 'previous move', 10000);
+    await waitForElementTextContaining('sprint-unclear-question', 'previous puzzle', 10000);
     await element(by.id('session-abandon')).tap();
     await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(5000);
     await element(by.id('session-abandon-confirm')).tap();
     await waitFor(element(by.text('Sprint failed'))).toBeVisible().withTimeout(10000);
-    await expect(element(by.text('Marked unclear · Undo'))).toBeVisible();
+    await expect(element(by.text('Marked'))).toBeVisible();
 
     // Recreate the process so History reads the marker from SQLite rather than
     // component state from the sprint that created it.
@@ -119,7 +127,7 @@ describe('Practice POC', () => {
     await openStandardHistoryTrend();
     await waitForElementAccessibilityLabelContaining(
       'history-filter-unclear',
-      '1 unclear attempts',
+      'Unclear attempts only',
       10000
     );
     await element(by.id('history-filter-unclear')).tap();
@@ -130,20 +138,71 @@ describe('Practice POC', () => {
       throw new Error(`Could not resolve unclear History row from ${String(resultIdentifier)}`);
     }
     await element(by.id(resultIdentifier.replace(/-result$/, ''))).tap();
-    await waitFor(element(by.id('history-attempt-unclear'))).toBeVisible().withTimeout(10000);
+    await waitForVisibleInPracticeScroll('review-schedule-add');
+    await waitForVisibleInPracticeScroll('history-attempt-unclear');
+    await expect(element(by.id('history-attempt-detail'))).not.toExist();
+    await expect(element(by.id('bookmark-glyph'))).not.toExist();
 
-    await waitForVisibleInPracticeScroll('history-add-to-review');
-    await element(by.id('history-add-to-review')).tap();
-    await waitFor(element(by.id('history-review-enrollment-status'))).toExist().withTimeout(10000);
-    await waitForVisibleInPracticeScroll('history-attempt-clear-unclear');
-    await element(by.id('history-attempt-clear-unclear')).tap();
-    await waitFor(element(by.id('history-attempt-unclear'))).not.toExist().withTimeout(10000);
+    if (!expectsRegularLayout) {
+      await device.setOrientation('landscape');
+    }
+    await waitForElementAccessibilityLabelContaining(
+      'adaptive-layout',
+      expectsRegularLayout ? 'regularLandscape' : 'compactLandscape',
+      10000
+    );
     await element(by.id('practice-main-scroll')).scrollTo('top');
-    await element(by.id('review-exit')).tap();
-    await waitFor(element(by.id('history-empty-state'))).toExist().withTimeout(10000);
+    await waitFor(element(by.id('review-context-actions-rail'))).toExist().withTimeout(10000);
+    await expect(element(by.id('review-schedule-control'))).toBeVisible();
+    await expect(element(by.id('history-attempt-unclear'))).toBeVisible();
+    const screenFrame = await frameFor(element(by.id('safe-area-shell')));
+    const boardFrame = await frameFor(element(by.id('review-board')));
+    const actionRailFrame = await frameFor(element(by.id('review-context-actions-rail')));
+    const fullBoardVisible = frameIsContained(boardFrame, screenFrame);
+    if (process.env.CHESSTICIZE_EXPECT_FULL_HISTORY_BOARD === '1') {
+      expectFrameContained(boardFrame, screenFrame, 'History review landscape board');
+    }
+    if (actionRailFrame.x < boardFrame.x + boardFrame.width) {
+      throw new Error(
+        `Expected History actions to the right of the board; board=${JSON.stringify(boardFrame)} `
+        + `actions=${JSON.stringify(actionRailFrame)}`
+      );
+    }
+    const responsiveScreenshot = fullBoardVisible
+      ? await waitForBoardScreenshotContainsPieces({
+        boardFrame,
+        captureScreenshot: (label) => device.takeScreenshot(label),
+        screenFrame,
+        screenshotLabel: 'history-review-actions-landscape',
+      }, {timeoutMs: 15000})
+      : await device.takeScreenshot('history-review-actions-landscape');
+    if (!fs.existsSync(responsiveScreenshot)) {
+      throw new Error(`Expected responsive History screenshot at ${responsiveScreenshot}`);
+    }
 
-    // Clearing is also durable: a fresh process sees no unclear attempt in the
-    // same rating/range scope.
+    if (!expectsRegularLayout) {
+      await device.setOrientation('portrait');
+      await waitForElementAccessibilityLabelContaining(
+        'adaptive-layout',
+        'compactPortrait',
+        10000
+      );
+    }
+    await waitForVisibleInPracticeScroll('review-schedule-add');
+
+    await element(by.id('review-schedule-add')).tap();
+    await waitFor(element(by.id('review-schedule-state'))).toHaveText('Due tomorrow').withTimeout(10000);
+    await waitFor(element(by.id('history-attempt-unclear'))).not.toExist().withTimeout(10000);
+
+    await element(by.id('review-schedule-remove')).tap();
+    await waitFor(element(by.id('review-schedule-removal-confirmation'))).toBeVisible().withTimeout(10000);
+    await sleep(500);
+    await element(by.id('review-schedule-removal-confirm')).tap();
+    await waitFor(element(by.id('review-schedule-state')))
+      .toHaveText('Not scheduled for Review')
+      .withTimeout(10000);
+
+    // Enrollment atomically cleared the marker, and removal does not restore it.
     await device.terminateApp();
     await launchWithDisabledSynchronization({
       newInstance: true,
@@ -152,9 +211,11 @@ describe('Practice POC', () => {
     await openStandardHistoryTrend();
     await waitForElementAccessibilityLabelContaining(
       'history-filter-unclear',
-      '0 unclear attempts',
+      'Unclear attempts only',
       10000
     );
+    await element(by.id('history-filter-unclear')).tap();
+    await waitFor(element(by.id('history-empty-state'))).toExist().withTimeout(10000);
   });
 
   it('opens last sprint mistake review with navigation and analysis arrows', async () => {
@@ -222,7 +283,7 @@ describe('Practice POC', () => {
     expectScreenshotContainsGreenAnalysisArrow(screenshotPath);
 
     // Kill the process with a real native runner active, relaunch against the
-    // persisted attempt, and start analysis again through public History UI.
+    // saved attempt, and start analysis again through public History UI.
     // This proves a fresh native runner can prewarm after process recreation.
     await device.terminateApp();
     await launchWithDisabledSynchronization({
@@ -269,6 +330,14 @@ function expectBoardScreenshotContainsPieces(screenshotPath, boardFrame) {
   if (pieceLikePixels <= 1000) {
     throw new Error(`Expected rendered chess pieces, found only ${pieceLikePixels} piece-like pixels`);
   }
+}
+
+function frameIsContained(childFrame, parentFrame) {
+  const tolerance = 1;
+  return childFrame.x >= parentFrame.x - tolerance
+    && childFrame.y >= parentFrame.y - tolerance
+    && childFrame.x + childFrame.width <= parentFrame.x + parentFrame.width + tolerance
+    && childFrame.y + childFrame.height <= parentFrame.y + parentFrame.height + tolerance;
 }
 
 function expectBoardScreenshotContainsNeutralArrows(screenshotPath, boardFrame) {

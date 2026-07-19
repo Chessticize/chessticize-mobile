@@ -48,11 +48,9 @@ describe('Android Practice History', () => {
       }
       await element(by.id(resultIdentifier.replace(/-result$/, ''))).tap();
 
-      await waitFor(element(by.id('history-attempt-detail'))).toExist().withTimeout(10000);
-      await waitForElementTextContaining('history-attempt-detail-context', 'Standard · Sprint', 10000);
-      await waitForElementTextContaining('history-attempt-detail-result', 'Wrong move', 10000);
-      await waitForElementTextContaining('history-attempt-detail-moves', 'Played', 10000);
-      await expect(element(by.id('history-attempt-detail-rating-key'))).toHaveLabel('Rating bucket standard 5/20');
+      await waitForVisibleInPracticeScroll('review-board');
+      await expect(element(by.id('history-attempt-detail'))).not.toExist();
+      await waitForVisibleInPracticeScroll('review-schedule-control');
       await waitForVisibleInPracticeScroll('review-analysis-button');
       await expect(element(by.id('review-close-analysis'))).not.toExist();
 
@@ -111,9 +109,9 @@ describe('Android Practice History', () => {
       }
       await element(by.id(reviewResultIdentifier.replace(/-result$/, ''))).tap();
 
-      await waitForElementTextContaining('history-attempt-detail-context', 'Standard · Review', 10000);
-      await waitForElementTextContaining('history-attempt-detail-moves', 'Played e6f7 · Best e6f7', 10000);
-      await waitForElementTextContaining('history-attempt-detail-timing', 'Jul 15, 2026', 10000);
+      await waitForVisibleInPracticeScroll('review-board');
+      await expect(element(by.id('history-attempt-detail'))).not.toExist();
+      await waitForVisibleInPracticeScroll('review-schedule-control');
       await waitForVisibleInPracticeScroll('review-analysis-button');
       await element(by.id('review-analysis-button')).tap();
       await waitFor(element(by.id('review-close-analysis'))).toExist().withTimeout(10000);

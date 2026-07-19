@@ -1,0 +1,3 @@
+# Order Review Schedule changes by event time
+
+When devices synchronize changes for the same Review Context, Chessticize resolves a Review Schedule and its removal by when the user action occurred rather than when synchronization occurred. A removal defeats older schedule state even if that state arrives later, while a genuinely later qualifying attempt may create a new Review Schedule; if enrollment and removal have the same event time, removal wins. This prevents stale resurrection without turning **Remove from Review** into a permanent block and gives exact timestamp ties a deterministic outcome.

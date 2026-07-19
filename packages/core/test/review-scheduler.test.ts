@@ -6,6 +6,9 @@ import {
   isReviewDue,
   isReviewOverdue,
   orderReviewQueue,
+  preferredReviewScheduleChange,
+  removeReviewContext,
+  reviewDueLabel,
   reviewDayFor,
   reviewDueState,
   reviewQueueForecast,
@@ -50,6 +53,47 @@ test("manual Review Enrollment is idempotent and first becomes due tomorrow", ()
     enrollReviewContext(context, "2026-07-18T08:30:00.000Z", undefined, "America/Los_Angeles").dueDay,
     "2026-07-19"
   );
+});
+
+test("Review Schedule Removal is exact-context, idempotent, and wins event-time ties", () => {
+  const standard = { puzzleId: "p1", mode: "standard" as const, ratingKey: "standard 5/20" };
+  const custom = { puzzleId: "p1", mode: "custom" as const, ratingKey: "fork custom 5/20" };
+  const scheduled = enrollReviewContext(standard, "2026-06-20T12:00:00.000Z", undefined, UTC);
+  const removed = removeReviewContext(standard, "2026-06-20T13:00:00.000Z");
+
+  assert.deepEqual(removed, { ...standard, removedAt: "2026-06-20T13:00:00.000Z" });
+  assert.equal(removeReviewContext(standard, "2026-06-21T13:00:00.000Z", removed), removed);
+  assert.deepEqual(removeReviewContext(custom, "2026-06-20T13:00:00.000Z"), {
+    ...custom,
+    removedAt: "2026-06-20T13:00:00.000Z"
+  });
+  assert.deepEqual(
+    preferredReviewScheduleChange(
+      { kind: "scheduled", review: { ...scheduled, enrolledAt: removed.removedAt } },
+      { kind: "removed", removal: removed }
+    ),
+    { kind: "removed", removal: removed }
+  );
+  assert.equal(
+    preferredReviewScheduleChange(
+      { kind: "removed", removal: removed },
+      {
+        kind: "scheduled",
+        review: enrollReviewContext(standard, "2026-06-20T13:00:01.000Z", undefined, UTC)
+      }
+    ).kind,
+    "scheduled"
+  );
+});
+
+test("Review due labels collapse overdue work into today and name tomorrow separately", () => {
+  const now = "2026-06-20T12:00:00.000Z";
+
+  assert.equal(reviewDueLabel({ dueDay: "2026-06-19" }, now, UTC), "Due today");
+  assert.equal(reviewDueLabel({ dueDay: "2026-06-20" }, now, UTC), "Due today");
+  assert.equal(reviewDueLabel({ dueDay: "2026-06-21" }, now, UTC), "Due tomorrow");
+  assert.equal(reviewDueLabel({ dueDay: "2026-06-25" }, now, UTC), "Due Jun 25, 2026");
+  assert.equal(reviewDueLabel({ dueDay: "2026-06-20" }, "2026-06-20T02:00:00.000Z", UTC), "Due today");
 });
 
 test("successful reviews follow 1, 3, 7, 14, 30, and capped 60 day intervals", () => {

@@ -10,6 +10,7 @@ import type {
   ReviewContext,
   ReviewQueueItem,
   ReviewQueueState,
+  ReviewScheduleRemoval,
   SessionMistakeReviewItem,
   SprintState
 } from "../../core/src/index.ts";
@@ -138,7 +139,8 @@ export class PackBackedPracticeStore implements PracticeStore {
   importLocalData(data: LocalDataImport): LocalDataImportResult {
     const referencedPuzzleIds = new Set([
       ...data.attempts.map((attempt) => attempt.puzzleId),
-      ...data.reviewQueue.map((review) => review.puzzleId)
+      ...data.reviewQueue.map((review) => review.puzzleId),
+      ...(data.reviewRemovals ?? []).map((removal) => removal.puzzleId)
     ]);
     const missingReferencedPuzzles = [...referencedPuzzleIds]
       .filter((puzzleId) => this.userStore.getPuzzle(puzzleId) === undefined)
@@ -166,8 +168,12 @@ export class PackBackedPracticeStore implements PracticeStore {
     return this.userStore.scheduleMistakeReview(context, now);
   }
 
-  enrollReview(context: ReviewContext, now: string): ReviewQueueState {
-    return this.userStore.enrollReview(context, now);
+  enrollReview(context: ReviewContext, now: string, initiatingAttemptId?: string): ReviewQueueState {
+    return this.userStore.enrollReview(context, now, initiatingAttemptId);
+  }
+
+  removeReview(context: ReviewContext, now: string): ReviewScheduleRemoval {
+    return this.userStore.removeReview(context, now);
   }
 
   recordReviewResult(context: ReviewContext, result: AttemptResult, now: string): ReviewQueueState {

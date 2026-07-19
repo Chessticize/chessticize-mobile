@@ -31,6 +31,7 @@ const SNAPSHOT_TABLES = [
   "attempts",
   "custom_sprint_configs",
   "review_queue",
+  "review_schedule_removals",
   "review_events"
 ] as const;
 
@@ -135,6 +136,7 @@ test("SQLite v3 migration tags only safely inferred current-generation sprint se
       DROP INDEX attempts_unclear_completed_at_idx;
       ALTER TABLE attempts DROP COLUMN unclear_updated_at;
       ALTER TABLE attempts DROP COLUMN unclear;
+      DROP TABLE review_schedule_removals;
       PRAGMA user_version = 2;
     `);
     legacy.close();
@@ -204,6 +206,10 @@ test("SQLite migrates the released iOS 1.0.0 database without losing user semant
       assert.equal(reviewQueueColumns.find((column) => column.name === "last_result")?.notnull, 0);
       assert.equal(reviewQueueColumns.find((column) => column.name === "last_reviewed_at")?.notnull, 0);
       assert.ok(!reviewQueueColumns.some((column) => column.name === "due_at"));
+      assert.deepEqual(
+        store.db.prepare("PRAGMA table_info(review_schedule_removals)").all().map((row) => (row as { name: string }).name),
+        ["puzzle_id", "mode", "rating_key", "removed_at"]
+      );
       assert.deepEqual(service.getRating("standard 5/20"), {
         key: "standard 5/20",
         generation: 1,

@@ -20,7 +20,6 @@ import {
   applyMovesToFen,
   beginArrowDuelPuzzle,
   beginLinePuzzle,
-  buildAccessibleMoveOptions,
   buildCurrentPositionEvaluationLine,
   buildPuzzleGuidedAnalysisLines,
   buildSprintConfig,
@@ -36,13 +35,13 @@ import {
   isReviewOverdue,
   normalizeHistoryAttemptDetail,
   reviewDueState,
+  reviewDueLabel,
   reviewQueueForecast,
   submitArrowDuelChoice,
   submitLineMove
 } from "../../../../packages/core/src/index.ts";
 import type {
   AttemptEvent,
-  AccessibleMoveOption,
   AttemptSource,
   ArrowDuelState,
   CurrentPuzzleState,
@@ -63,6 +62,7 @@ import type {
   ReviewReminderDecision,
   ReviewQueueItem,
   ReviewQueueState,
+  ReviewContext,
   SessionMistakeReviewItem,
   SprintConfig,
   SprintMode,
@@ -1368,20 +1368,6 @@ export function PracticePocScreen({
     });
   }
 
-  async function playAccessibleSessionMove(option: AccessibleMoveOption): Promise<void> {
-    if (!boardRef.current || boardInputLockedRef.current || stateRef.current?.status !== "active") {
-      return;
-    }
-    const played = await boardRef.current.move({
-      from: option.from,
-      to: option.to,
-      ...(option.promotion ? { promotion: option.promotion } : {})
-    });
-    if (!played) {
-      setError(`Move ${option.label} is no longer available. Choose another move.`);
-    }
-  }
-
   async function submitAcceptedMove({
     move,
     nextVisualFen,
@@ -1636,6 +1622,21 @@ export function PracticePocScreen({
     } catch (caught) {
       setError(errorMessage(caught));
     }
+  }
+
+  function reviewScheduleChanged(clearedAttemptId?: string): void {
+    if (clearedAttemptId) {
+      const updated = service.listHistory().find((attempt) => attempt.id === clearedAttemptId);
+      if (updated) {
+        setHistoryReviewEntries((entries) => entries.map((entry) => entry.attempt?.id === clearedAttemptId
+          ? { ...entry, attempt: withAttemptClarity(entry.attempt, updated) }
+          : entry));
+        setHistoryUnavailableAttempt((current) => current?.attempt.id === clearedAttemptId
+          ? { ...current, attempt: withAttemptClarity(current.attempt, updated) }
+          : current);
+      }
+    }
+    refreshState();
   }
 
   function syncBoardAfterMove(
@@ -2274,18 +2275,8 @@ export function PracticePocScreen({
         perPuzzleSeconds: customPerPuzzleSeconds,
         ...(customThemeValue ? { theme: customThemeValue } : {})
       });
-  const sessionAccessibleMoves = displayedBoardFen ? (
-    <AccessibleMoveControls
-      allowedMoves={displayedPuzzle?.kind === "arrow_duel" ? displayedPuzzle.candidates : undefined}
-      disabled={!isActive || boardInputLocked}
-      fen={displayedBoardFen}
-      testIDPrefix="session"
-      onSelect={playAccessibleSessionMove}
-    />
-  ) : null;
   const sessionStatusNode = state && (isOpenSession || isShowingFeedbackSnapshot) ? (
     <SessionStatusBar
-      accessibleMoves={sessionAccessibleMoves}
       compactMetrics={sessionUsesRail}
       mode={mode}
       state={state}
@@ -2407,9 +2398,7 @@ export function PracticePocScreen({
       {unclearPrompt ? (
         <UnclearAttemptPrompt
           marked={unclearPrompt.marked}
-          question={isShowingFeedbackSnapshot && displayedPuzzle?.puzzle.id === unclearPrompt.puzzleId
-            ? "Was it clear why that move was correct?"
-            : "Was it clear why the previous move was correct?"}
+          question="Was the previous puzzle clear?"
           onToggle={toggleUnclearPrompt}
         />
       ) : null}
@@ -2625,20 +2614,22 @@ export function PracticePocScreen({
                 ) : null}
 
                 {isFinished && !isShowingFeedbackSnapshot ? (
-                  <SprintSummary
-                    state={state}
-                    elapsedMs={Math.min(sprintElapsedMs, state ? state.config.durationSeconds * 1000 : sprintElapsedMs)}
-                    unclearPrompt={unclearPrompt}
-                    onToggleUnclear={toggleUnclearPrompt}
-                    onReplay={() => startSprint(mode)}
-                    onBack={resetToIdle}
-                    onOpenHistory={() => {
-                      setHistoryRatingKey(state.config.ratingKey);
-                      setHistoryPageOffset(0);
-                      navigateToTab("history");
-                    }}
-                    onReview={state.mistakeCount > 0 ? showReviewMistakes : undefined}
-                  />
+                  <>
+                    <SprintSummary
+                      state={state}
+                      elapsedMs={Math.min(sprintElapsedMs, state ? state.config.durationSeconds * 1000 : sprintElapsedMs)}
+                      unclearPrompt={unclearPrompt}
+                      onToggleUnclear={toggleUnclearPrompt}
+                      onReplay={() => startSprint(mode)}
+                      onBack={resetToIdle}
+                      onOpenHistory={() => {
+                        setHistoryRatingKey(state.config.ratingKey);
+                        setHistoryPageOffset(0);
+                        navigateToTab("history");
+                      }}
+                      onReview={state.mistakeCount > 0 ? showReviewMistakes : undefined}
+                    />
+                  </>
                 ) : null}
 
                 {!isActive && state === null && arePracticeTestControlsEnabled() && configurePuzzleSource ? (
@@ -2656,11 +2647,11 @@ export function PracticePocScreen({
                   adaptiveLayout={adaptiveLayout}
                   attempt={historyUnavailableAttempt.attempt}
                   currentTimeMs={currentTimeMs}
-                  service={service}
                   replayAvailability={historyUnavailableAttempt.replayAvailability}
                   onClearUnclear={() => clearHistoryAttemptUnclear(historyUnavailableAttempt.attempt.id)}
-                  onReviewChanged={refreshState}
+                  onReviewChanged={reviewScheduleChanged}
                   onReturn={() => setHistoryUnavailableAttempt(null)}
+                  service={service}
                 />
               ) : historyReviewEntries.length > 0 ? (
                 <ReviewSession
@@ -2676,8 +2667,9 @@ export function PracticePocScreen({
                   onAnalysisActiveChange={setReviewAnalysisOpen}
                   onAttemptClearUnclear={clearHistoryAttemptUnclear}
                   onComplete={() => setHistoryReviewEntries([])}
-                  onReviewEnrollmentChanged={refreshState}
+                  onReviewEnrollmentChanged={reviewScheduleChanged}
                   onReturnToOwner={() => setHistoryReviewEntries([])}
+                  reviewScheduleControlVisible
                   stockfish={stockfish}
                 />
               ) : historyView ? (
@@ -2696,7 +2688,6 @@ export function PracticePocScreen({
                   availableThemes={historyView.availableThemes}
                   page={historyView.page}
                   reviewStatusFilter={historyReviewStatusFilter}
-                  unclearCount={historyView.unclearCount}
                   unclearOnly={historyUnclearOnly}
                   sprintOnly={historySourceFilter === "sprint"}
                   wrongOnly={historyWrongOnly}
@@ -2789,6 +2780,7 @@ export function PracticePocScreen({
                   scheduledReviewAttemptCountRef.current = nextScheduledReviewAttemptCount;
                   refreshState();
                 }}
+                onReviewScheduleChanged={reviewScheduleChanged}
                 onPromoteNextFutureReviewsToDue={arePracticeTestControlsEnabled() ? promoteNextFutureReviewsToDue : undefined}
                 onScheduleTestReviewReminder={arePracticeTestControlsEnabled() ? scheduleDevReviewReminderNotification : undefined}
                 onSessionSourceChange={setReviewSessionSource}
@@ -3825,104 +3817,7 @@ function TestPuzzleSourceControl({
   );
 }
 
-function AccessibleMoveControls({
-  allowedMoves,
-  disabled,
-  fen,
-  testIDPrefix,
-  onSelect
-}: {
-  allowedMoves?: string[];
-  disabled: boolean;
-  fen: string;
-  testIDPrefix: string;
-  onSelect: (option: AccessibleMoveOption) => void | Promise<void>;
-}): React.JSX.Element {
-  const [open, setOpen] = useState(false);
-  const options = useMemo(() => {
-    const allOptions = buildAccessibleMoveOptions(fen);
-    if (!allowedMoves) {
-      return allOptions;
-    }
-    const allowed = new Set(allowedMoves.map(normalizeUci));
-    return allOptions.filter((option) => allowed.has(option.uci));
-  }, [allowedMoves, fen]);
-  const unavailable = disabled || options.length === 0;
-
-  return (
-    <>
-      <Pressable
-        accessibilityHint="Opens a list of legal moves so the board can be used without dragging pieces"
-        accessibilityLabel="Choose move without gestures"
-        accessibilityRole="button"
-        accessibilityState={{ expanded: open, ...(unavailable ? { disabled: true } : {}) }}
-        disabled={unavailable}
-        onPress={() => setOpen(true)}
-        style={[styles.accessibleMoveOpenButton, unavailable ? styles.disabledButton : null]}
-        testID={`${testIDPrefix}-accessible-moves-open`}
-      >
-        <Text style={styles.accessibleMoveOpenButtonText}>Moves</Text>
-      </Pressable>
-      <Modal
-        animationType="fade"
-        onRequestClose={() => setOpen(false)}
-        transparent
-        visible={open}
-      >
-        <View style={styles.accessibleMoveModalBackdrop}>
-          <View
-            accessible={false}
-            accessibilityViewIsModal
-            style={styles.accessibleMoveDialog}
-            testID={`${testIDPrefix}-accessible-moves-dialog`}
-          >
-            <View style={styles.accessibleMoveDialogHeader}>
-              <View style={styles.accessibleMoveDialogTitleBlock}>
-                <Text accessibilityRole="header" style={styles.panelTitle}>Choose a legal move</Text>
-                <Text style={styles.helperText}>Select the same move you would play on the board.</Text>
-              </View>
-              <Pressable
-                accessibilityLabel="Close move chooser"
-                accessibilityRole="button"
-                onPress={() => setOpen(false)}
-                style={styles.iconButton}
-                testID={`${testIDPrefix}-accessible-moves-close`}
-              >
-                <CloseGlyph />
-              </Pressable>
-            </View>
-            <ScrollView
-              contentContainerStyle={styles.accessibleMoveList}
-              testID={`${testIDPrefix}-accessible-moves-list`}
-            >
-              {options.map((option) => (
-                <Pressable
-                  key={option.uci}
-                  accessibilityLabel={option.label}
-                  accessibilityRole="button"
-                  onPress={() => {
-                    setOpen(false);
-                    void onSelect(option);
-                  }}
-                  style={styles.accessibleMoveOption}
-                  testID={`${testIDPrefix}-accessible-move-${option.uci}`}
-                >
-                  <Text style={styles.accessibleMoveSan}>{option.san}</Text>
-                  <Text style={styles.accessibleMoveCoordinates}>
-                    {option.from} → {option.to}{option.promotion ? ` = ${option.promotion.toUpperCase()}` : ""}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-    </>
-  );
-}
-
 function SessionStatusBar({
-  accessibleMoves,
   compactMetrics = false,
   confirmAbandon,
   mode,
@@ -3934,7 +3829,6 @@ function SessionStatusBar({
   onPause,
   onResume
 }: {
-  accessibleMoves?: React.JSX.Element | null;
   compactMetrics?: boolean;
   confirmAbandon: boolean;
   mode: SprintMode;
@@ -3963,8 +3857,7 @@ function SessionStatusBar({
           <View style={styles.sessionNavButton} />
         )}
         <Text style={styles.sessionNavTitle}>{modeLabel(mode)}</Text>
-        <View style={styles.sessionNavActions}>
-          {accessibleMoves}
+        <View style={styles.sessionNavActions} testID="session-nav-actions">
           {onPause ? (
             <Pressable
               accessibilityRole="button"
@@ -4128,26 +4021,28 @@ function UnclearAttemptPrompt({
 }): React.JSX.Element {
   return (
     <View
-      accessibilityLabel={`${question} ${marked ? "Marked unclear. Activate to undo." : "Not yet. Activate to mark unclear."}`}
-      style={[styles.unclearPrompt, marked ? styles.unclearPromptMarked : null]}
+      accessibilityLabel={`${question} ${marked ? "Marked as unclear." : "Mark as unclear. Activate to mark unclear."}`}
+      style={styles.unclearPrompt}
       testID="sprint-unclear-prompt"
     >
       <View style={styles.unclearPromptCopy}>
-        <BookmarkGlyph marked={marked} />
         <Text style={styles.unclearPromptQuestion} testID="sprint-unclear-question">{question}</Text>
       </View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={marked ? "Undo unclear mark" : "Mark this attempt unclear"}
-        accessibilityState={{ selected: marked }}
-        style={styles.unclearPromptButton}
-        testID="sprint-unclear-toggle"
-        onPress={onToggle}
-      >
-        <Text style={[styles.unclearPromptButtonText, marked ? styles.unclearPromptButtonTextMarked : null]}>
-          {marked ? "Marked unclear · Undo" : "Not yet"}
-        </Text>
-      </Pressable>
+      {marked ? (
+        <View style={styles.unclearPromptButton} testID="sprint-unclear-marked">
+          <Text style={styles.unclearPromptButtonText}>Marked</Text>
+        </View>
+      ) : (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Mark this attempt as unclear"
+          style={styles.unclearPromptButton}
+          testID="sprint-unclear-toggle"
+          onPress={onToggle}
+        >
+          <Text style={styles.unclearPromptButtonText}>Mark as unclear</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -4903,7 +4798,6 @@ function HistoryPanel({
   availableThemes,
   page,
   reviewStatusFilter,
-  unclearCount,
   unclearOnly,
   sprintOnly,
   wrongOnly,
@@ -4938,7 +4832,6 @@ function HistoryPanel({
   availableThemes: string[];
   page: { limit: number; offset: number; total: number; hasMore: boolean };
   reviewStatusFilter: "all" | HistoryReviewStatus;
-  unclearCount: number;
   unclearOnly: boolean;
   sprintOnly: boolean;
   wrongOnly: boolean;
@@ -5030,7 +4923,19 @@ function HistoryPanel({
             />
           ))}
         </HistoryChipRow>
-        <View style={styles.historyQuickFilterRow}>
+        <ScrollView
+          contentContainerStyle={styles.historyQuickFilterRow}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          testID="history-quick-filters"
+        >
+          <HistoryQuickToggle
+            active={unclearOnly}
+            accessibilityLabel="Unclear attempts only"
+            controlTestID="history-filter-unclear"
+            label="Unclear only"
+            onPress={onToggleUnclearOnly}
+          />
           <HistoryQuickToggle
             active={wrongOnly}
             accessibilityLabel="Wrong puzzles only"
@@ -5045,14 +4950,7 @@ function HistoryPanel({
             label="Sprint only"
             onPress={onToggleSprintOnly}
           />
-          <HistoryQuickToggle
-            active={unclearOnly}
-            accessibilityLabel={`${unclearCount} unclear attempts in the current filters`}
-            controlTestID="history-filter-unclear"
-            label={`Unclear (${unclearCount})`}
-            onPress={onToggleUnclearOnly}
-          />
-        </View>
+        </ScrollView>
       </View>
 
       {selectedRatingKey ? (
@@ -5544,26 +5442,6 @@ function ResultBadgeGlyph({ tone }: { tone: "correct" | "wrong" | "alert" }): Re
   );
 }
 
-function BookmarkGlyph({ marked, small = false }: { marked: boolean; small?: boolean }): React.JSX.Element {
-  const color = marked ? "#D97706" : "#64748B";
-  return (
-    <View
-      style={[styles.bookmarkGlyphCanvas, small ? styles.bookmarkGlyphCanvasSmall : null]}
-      testID="bookmark-glyph"
-    >
-      <View
-        style={[
-          styles.bookmarkGlyphBody,
-          small ? styles.bookmarkGlyphBodySmall : null,
-          { borderColor: color, backgroundColor: marked ? color : "transparent" }
-        ]}
-      />
-      <View style={[styles.bookmarkGlyphTail, styles.bookmarkGlyphTailLeft, small ? styles.bookmarkGlyphTailSmall : null, { backgroundColor: color }]} />
-      <View style={[styles.bookmarkGlyphTail, styles.bookmarkGlyphTailRight, small ? styles.bookmarkGlyphTailSmall : null, { backgroundColor: color }]} />
-    </View>
-  );
-}
-
 function HistoryChipRow({
   children,
   testID
@@ -5685,7 +5563,6 @@ function HistoryAttemptRow({
       </View>
       {attempt.unclear ? (
         <View style={styles.historyUnclearBadge} testID={`history-attempt-${attempt.id}-unclear`}>
-          <BookmarkGlyph marked small />
           <Text style={styles.historyUnclearBadgeText}>Unclear</Text>
         </View>
       ) : null}
@@ -6077,6 +5954,7 @@ function ReviewPanel({
   onOpenPractice,
   onPromoteNextFutureReviewsToDue,
   onReviewRecorded,
+  onReviewScheduleChanged,
   onSessionSourceChange,
   onScheduleTestReviewReminder,
   reviewQueue,
@@ -6099,6 +5977,7 @@ function ReviewPanel({
   onOpenPractice: () => void;
   onPromoteNextFutureReviewsToDue?: () => ReviewQueueDuePromotionResult;
   onReviewRecorded: (completedAt: string) => void;
+  onReviewScheduleChanged: (clearedAttemptId?: string) => void;
   onSessionSourceChange?: (source: ReviewEntry["source"] | null) => void;
   onScheduleTestReviewReminder?: () => Promise<ReviewReminderScheduleResult>;
   reviewQueue: ReviewQueueState[];
@@ -6234,9 +6113,11 @@ function ReviewPanel({
         scheduledReviewTotal={dailyReviewTotal}
         service={service}
         onReviewRecorded={onReviewRecorded}
+        onReviewEnrollmentChanged={onReviewScheduleChanged}
         onAnalysisActiveChange={onAnalysisActiveChange}
         onComplete={(source) => finishActiveReview(source, activeReviewGeneration)}
         onReturnToOwner={returnActiveReviewToOwner}
+        reviewScheduleControlVisible
         stockfish={stockfish}
         systemBackCommand={systemBackCommand}
       />
@@ -6281,14 +6162,6 @@ function ReviewPanel({
         </View>
         <View style={styles.reviewDueCountBlock}>
           <Text testID="review-due-count" style={styles.reviewDueBigCount}>{dailyReviewProgressLabel}</Text>
-          {queueSummary.overdueCount > 0 ? (
-            <>
-              <Text testID="review-overdue-count" style={[styles.reviewDueOverdueCount, styles.errorText]}>
-                {queueSummary.overdueCount}
-              </Text>
-              <Text style={styles.reviewDueOverdueLabel}>Overdue</Text>
-            </>
-          ) : null}
         </View>
       </View>
 
@@ -6651,6 +6524,7 @@ function ReviewSession({
   onComplete,
   onReviewEnrollmentChanged,
   onReturnToOwner,
+  reviewScheduleControlVisible = false,
   scheduledReviewCompletedCount = 0,
   scheduledReviewTotal = entries.length,
   service,
@@ -6667,8 +6541,9 @@ function ReviewSession({
   onAnalysisActiveChange?: (active: boolean) => void;
   onAttemptClearUnclear?: (attemptId: string) => void;
   onComplete: (source: ReviewEntry["source"]) => void;
-  onReviewEnrollmentChanged?: () => void;
+  onReviewEnrollmentChanged?: (clearedAttemptId?: string) => void;
   onReturnToOwner: (source: ReviewEntry["source"]) => void;
+  reviewScheduleControlVisible?: boolean;
   scheduledReviewCompletedCount?: number;
   scheduledReviewTotal?: number;
   service: PracticeService;
@@ -6699,8 +6574,6 @@ function ReviewSession({
   const [reviewStartedAtMs, setReviewStartedAtMs] = useState(() => currentTimeMs());
   const [reviewNowMs, setReviewNowMs] = useState(() => currentTimeMs());
   const [reviewTimedOut, setReviewTimedOut] = useState(false);
-  const [punishmentLineComplete, setPunishmentLineComplete] = useState(false);
-  const [lineReviewNeedsContinue, setLineReviewNeedsContinue] = useState(false);
   const [scheduledReviewProgress] = useState(() => {
     const firstEntry = entries[initialIndex] ?? entries[0];
     return firstEntry?.source === "due"
@@ -6777,7 +6650,7 @@ function ReviewSession({
       ? currentExpectedMove(reviewState.line)
       : undefined;
   const isArrowDuelFollowUpReview = currentEntry.mode === "arrow_duel" && reviewState.kind === "line";
-  const boardGestureEnabled = !boardLocked && (!lineReviewNeedsContinue || analysisEnabled);
+  const boardGestureEnabled = !boardLocked;
   const boardDraggableColor = boardGestureEnabled ? sideToMove(displayFen) : null;
   const reviewSideToMove = sideToMove(displayFen);
   const canNavigateReview = (currentEntry.source === "session" || currentEntry.source === "history") && !boardLocked;
@@ -6888,7 +6761,7 @@ function ReviewSession({
       finishReviewSession();
       return;
     }
-    setLineReviewNeedsContinue(true);
+    goToNextDueReview();
     // The timer state is the trigger; the render-local recorder must not restart the effect.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentEntry.source, currentPuzzle, reviewRemainingSeconds, reviewResultRecorded, reviewTimedOut]);
@@ -6901,7 +6774,6 @@ function ReviewSession({
     setLastMove(null);
     setBoardLocked(false);
     setWrongSeen(false);
-    setPunishmentLineComplete(false);
     setAnalysisEnabled(false);
     setAnalysisFen(null);
     setEngineAnalysisLines([]);
@@ -6915,7 +6787,6 @@ function ReviewSession({
     setReviewStartedAtMs(now);
     setReviewNowMs(now);
     setReviewTimedOut(false);
-    setLineReviewNeedsContinue(false);
     reviewResultRecordedRef.current = false;
     reviewSuppressedBoardMovesRef.current = [];
   }
@@ -6997,10 +6868,6 @@ function ReviewSession({
       boardRef.current?.resetBoard(currentFen);
       return;
     }
-    if (lineReviewNeedsContinue && !analysisEnabled) {
-      boardRef.current?.resetBoard(currentFen);
-      return;
-    }
     const submittedFen = currentFen;
     const submittedMoveFen = fenAfterMove(submittedFen, move);
     if (!submittedMoveFen) {
@@ -7020,17 +6887,6 @@ function ReviewSession({
       return;
     }
     await submitReviewLineMove(move, submittedFen);
-  }
-
-  async function playAccessibleReviewMove(option: AccessibleMoveOption): Promise<void> {
-    if (!boardRef.current || !boardGestureEnabled) {
-      return;
-    }
-    await boardRef.current.move({
-      from: option.from,
-      to: option.to,
-      ...(option.promotion ? { promotion: option.promotion } : {})
-    });
   }
 
   async function submitReviewLineMove(move: string, submittedFen: string): Promise<void> {
@@ -7197,21 +7053,6 @@ function ReviewSession({
       setReviewState({ kind: "line", line: result.state });
       if (result.feedback.puzzleSolved) {
         await sleep(FEEDBACK_SNAPSHOT_MS);
-        if (currentEntry.source === "due") {
-          // A wrong Arrow Duel review stays on the same puzzle after the
-          // punishment line; the user advances with the Continue button.
-          recordCurrentReviewResult("wrong", {
-            submittedMove: result.feedback.submittedMove,
-            expectedMove: result.feedback.expectedMove
-          });
-          if (!hasNextScheduledReview) {
-            goToNextDueReview();
-            return;
-          }
-          setPunishmentLineComplete(true);
-          setBoardLocked(false);
-          return;
-        }
         advanceReview("wrong", {
           submittedMove: result.feedback.submittedMove,
           expectedMove: result.feedback.expectedMove
@@ -7314,6 +7155,32 @@ function ReviewSession({
     boardRef.current?.resetBoard(previous);
   }
 
+  const reviewScheduleControlNode = reviewScheduleControlVisible && currentEntry.source !== "due" ? (
+    <ReviewScheduleControl
+      key={`${currentEntry.puzzle.id}:${currentEntry.mode}:${currentEntry.ratingKey}`}
+      actionVisible
+      compact
+      context={{
+        puzzleId: currentEntry.puzzle.id,
+        mode: currentEntry.mode,
+        ratingKey: currentEntry.ratingKey
+      }}
+      currentTimeMs={currentTimeMs}
+      initiatingAttemptId={currentEntry.source === "history" && currentEntry.attempt?.unclear
+        ? currentEntry.attempt.id
+        : undefined}
+      service={service}
+      onReviewChanged={onReviewEnrollmentChanged}
+      refreshToken={reviewResultRecorded}
+    />
+  ) : null;
+  const historyUnclearActionNode = currentEntry.source === "history"
+    && currentEntry.attempt?.unclear
+    && onAttemptClearUnclear ? (
+      <HistoryUnclearAction onClear={() => onAttemptClearUnclear(currentEntry.attempt!.id)} />
+    ) : null;
+  const hasReviewContextActions = reviewScheduleControlNode !== null || historyUnclearActionNode !== null;
+
   return (
     <View style={[styles.reviewSessionPanel, adaptiveLayout.usesWideContent ? styles.reviewSessionPanelWide : null]} testID="review-session">
       <View
@@ -7360,16 +7227,13 @@ function ReviewSession({
               </>
             ) : null}
           </View>
-          <View style={styles.iconButtonRow} testID="review-header-actions">
-          <AccessibleMoveControls
-            allowedMoves={reviewState.kind === "arrow_duel" && !analysisEnabled
-              ? reviewState.duel.candidates
-              : undefined}
-            disabled={!boardGestureEnabled}
-            fen={displayFen}
-            testIDPrefix="review"
-            onSelect={playAccessibleReviewMove}
-          />
+          <View
+            style={[
+              styles.iconButtonRow,
+              currentEntry.source === "due" ? styles.reviewHeaderDueActionsPlaceholder : null
+            ]}
+            testID="review-header-actions"
+          >
           {currentEntry.source === "session" || currentEntry.source === "history" ? (
             <>
               <Pressable
@@ -7432,24 +7296,6 @@ function ReviewSession({
           ) : null}
         </View>
       </View>
-
-      {currentEntry.source === "history" && currentEntry.attempt ? (
-        <>
-          <HistoryAttemptDetailCard
-            attempt={currentEntry.attempt}
-            onClearUnclear={currentEntry.attempt.unclear && onAttemptClearUnclear
-              ? () => onAttemptClearUnclear(currentEntry.attempt!.id)
-              : undefined}
-          />
-          <HistoryReviewEnrollment
-            key={currentEntry.attempt.id}
-            attempt={currentEntry.attempt}
-            currentTimeMs={currentTimeMs}
-            service={service}
-            onReviewChanged={onReviewEnrollmentChanged}
-          />
-        </>
-      ) : null}
 
       <View style={[styles.reviewBoardLayout, adaptiveLayout.usesSessionRail ? styles.reviewBoardLayoutWide : null]}>
         <View style={styles.reviewBoardLane} testID="review-board-lane">
@@ -7536,12 +7382,13 @@ function ReviewSession({
 
         <View
           style={[
-            styles.analysisPanel,
+            styles.reviewAnalysisColumn,
             adaptiveLayout.usesSessionRail ? styles.reviewAnalysisPanelWide : null,
             adaptiveLayout.usesSessionRail ? { width: adaptiveLayout.sessionRailWidth } : null
           ]}
-          testID="review-analysis-panel"
+          testID="review-analysis-column"
         >
+          <View style={styles.analysisPanel} testID="review-analysis-panel">
           <PracticePrompt
             currentPuzzle={currentPuzzle}
             mode={currentEntry.mode}
@@ -7556,17 +7403,6 @@ function ReviewSession({
                 : undefined
             }
           />
-          {((punishmentLineComplete && currentEntry.source === "due") || lineReviewNeedsContinue) && !analysisEnabled ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Continue to next review"
-              testID="review-line-continue"
-              style={[styles.primaryButton, styles.reviewContinueButton]}
-              onPress={goToNextDueReview}
-            >
-              <Text style={styles.primaryButtonText}>Continue</Text>
-            </Pressable>
-          ) : null}
           {!analysisEnabled && guidedEvalLines.length > 0 ? (
             <View testID="review-guided-eval-list">
               {guidedEvalLines.map((line, index) => (
@@ -7584,7 +7420,7 @@ function ReviewSession({
               ))}
             </View>
           ) : null}
-          {analysisEnabled || currentEntry.source !== "due" ? (
+          {analysisEnabled || currentEntry.source !== "due" || reviewResultRecorded ? (
           <View style={styles.analysisToolbar} testID="review-analysis-toolbar">
             {analysisEnabled ? (
               <>
@@ -7676,69 +7512,156 @@ function ReviewSession({
               ))}
             </>
           ) : null}
+          </View>
+          {adaptiveLayout.usesSessionRail && hasReviewContextActions ? (
+            <View style={styles.reviewContextActions} testID="review-context-actions-rail">
+              {reviewScheduleControlNode}
+              {historyUnclearActionNode}
+            </View>
+          ) : null}
         </View>
       </View>
+      {!adaptiveLayout.usesSessionRail && hasReviewContextActions ? (
+        <View style={styles.reviewContextActions} testID="review-context-actions-bottom">
+          {reviewScheduleControlNode}
+          {historyUnclearActionNode}
+        </View>
+      ) : null}
     </View>
   );
 }
 
-function HistoryReviewEnrollment({
-  attempt,
+function ReviewScheduleControl({
+  actionVisible = true,
+  compact = false,
+  context,
   currentTimeMs,
+  initiatingAttemptId,
   onReviewChanged,
+  onRemoved,
+  refreshToken,
   service
 }: {
-  attempt: AttemptEvent | HistoryAttemptView;
+  actionVisible?: boolean;
+  compact?: boolean;
+  context: ReviewContext;
   currentTimeMs: () => number;
-  onReviewChanged?: () => void;
+  initiatingAttemptId?: string;
+  onReviewChanged?: (clearedAttemptId?: string) => void;
+  onRemoved?: () => void;
+  refreshToken?: unknown;
   service: PracticeService;
 }): React.JSX.Element {
-  const detail = normalizeHistoryAttemptDetail(attempt);
-  const context = detail.mode && detail.ratingKey && service.getPuzzle(attempt.puzzleId)
-    ? { puzzleId: attempt.puzzleId, mode: detail.mode, ratingKey: detail.ratingKey }
-    : null;
-  const [review, setReview] = useState<ReviewQueueState | undefined>(() => context
-    ? service.getReviewQueueState(context)
-    : undefined);
+  const contextKey = `${context.puzzleId}\u0000${context.mode}\u0000${context.ratingKey}`;
+  const [review, setReview] = useState<ReviewQueueState | undefined>(() => service.getReviewQueueState(context));
+  const [confirmationVisible, setConfirmationVisible] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
 
-  if (review) {
-    return (
-      <View style={styles.historyReviewEnrollment} testID="history-review-enrollment-status">
-        <View style={styles.historyReviewEnrollmentCopy}>
-          <Text style={styles.historyAttemptUnclearTitle}>In Review</Text>
-          <Text style={styles.helperText}>Due {formatReviewDay(review.dueDay)}</Text>
-        </View>
-        <BookmarkGlyph marked small />
-      </View>
-    );
+  useEffect(() => {
+    setReview(service.getReviewQueueState(context));
+    setConfirmationVisible(false);
+    setFailure(null);
+    // contextKey is the stable exact-context identity for this control.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contextKey, refreshToken, service]);
+
+  function addToReview(): void {
+    setFailure(null);
+    try {
+      const enrolled = service.enrollReview(
+        context,
+        new Date(currentTimeMs()).toISOString(),
+        initiatingAttemptId
+      );
+      setReview(enrolled);
+      onReviewChanged?.(initiatingAttemptId);
+    } catch {
+      setFailure("Couldn't add to Review. Try again.");
+    }
+  }
+
+  function confirmRemoval(): void {
+    setFailure(null);
+    try {
+      service.removeReview(context, new Date(currentTimeMs()).toISOString());
+      setReview(undefined);
+      setConfirmationVisible(false);
+      onReviewChanged?.();
+      onRemoved?.();
+    } catch {
+      setFailure("Couldn't remove from Review. Try again.");
+    }
   }
 
   return (
-    <View style={styles.historyReviewEnrollment} testID="history-review-enrollment">
-      <View style={styles.historyReviewEnrollmentCopy}>
-        <Text style={styles.historyAttemptUnclearTitle}>Review this context</Text>
-        <Text style={styles.helperText}>
-          {context ? "First review is due tomorrow." : "The exact puzzle context is unavailable."}
+    <View
+      style={[styles.reviewScheduleControl, compact ? styles.reviewScheduleControlCompact : null]}
+      testID="review-schedule-control"
+    >
+      <View style={styles.reviewScheduleControlCopy}>
+        <Text style={styles.reviewScheduleState} testID="review-schedule-state">
+          {review ? reviewDueLabel(review, currentTimeMs()) : "Not scheduled for Review"}
         </Text>
+        {failure ? <Text style={styles.errorText} testID="review-schedule-error">{failure}</Text> : null}
       </View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Add this puzzle context to Review"
-        accessibilityState={{ disabled: context === null }}
-        disabled={context === null}
-        style={[styles.historyAddReviewButton, context === null ? styles.disabledButton : null]}
-        testID="history-add-to-review"
-        onPress={() => {
-          if (!context) {
-            return;
-          }
-          const enrolled = service.enrollReview(context, new Date(currentTimeMs()).toISOString());
-          setReview(enrolled);
-          onReviewChanged?.();
-        }}
-      >
-        <Text style={styles.historyAddReviewButtonText}>Add to Review</Text>
-      </Pressable>
+      {actionVisible ? (
+        <>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={review ? "Remove this puzzle from Review" : "Add this puzzle to Review"}
+            style={styles.reviewScheduleAction}
+            testID={review ? "review-schedule-remove" : "review-schedule-add"}
+            onPress={review ? () => setConfirmationVisible(true) : addToReview}
+          >
+            <Text style={review ? styles.reviewScheduleRemoveText : styles.reviewScheduleAddText}>
+              {review ? "Remove from Review" : "Add to Review"}
+            </Text>
+          </Pressable>
+          <Modal
+            animationType="fade"
+            onRequestClose={() => setConfirmationVisible(false)}
+            transparent
+            visible={confirmationVisible}
+          >
+            <View style={styles.accessibleMoveModalBackdrop}>
+              <View
+                accessibilityViewIsModal
+                style={styles.reviewScheduleConfirmation}
+                testID="review-schedule-removal-confirmation"
+              >
+                <Text style={styles.panelTitle}>Remove from Review?</Text>
+                <Text style={styles.helperText}>
+                  Future reviews for this puzzle will be removed. Your attempts, History, analysis, and ratings stay unchanged. Review workload and reminders may change.
+                </Text>
+                {failure ? <Text style={styles.errorText}>{failure}</Text> : null}
+                <View style={styles.confirmationActionRow}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Cancel removing this puzzle from Review"
+                    style={styles.secondaryButton}
+                    testID="review-schedule-removal-cancel"
+                    onPress={() => {
+                      setConfirmationVisible(false);
+                      setFailure(null);
+                    }}
+                  >
+                    <Text style={styles.secondaryButtonText}>Cancel</Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Confirm removing this puzzle from Review"
+                    style={styles.destructiveButton}
+                    testID="review-schedule-removal-confirm"
+                    onPress={confirmRemoval}
+                  >
+                    <Text style={styles.destructiveButtonText}>Remove from Review</Text>
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+          </Modal>
+        </>
+      ) : null}
     </View>
   );
 }
@@ -7757,11 +7680,12 @@ function HistoryAttemptReplayUnavailable({
   attempt: HistoryAttemptView;
   currentTimeMs: () => number;
   onClearUnclear: () => void;
-  onReviewChanged: () => void;
+  onReviewChanged: (clearedAttemptId?: string) => void;
   onReturn: () => void;
   replayAvailability: Extract<HistoryAttemptReplayAvailability, { status: "unavailable" }>;
   service: PracticeService;
 }): React.JSX.Element {
+  const reviewContext = reviewContextForHistoryAttempt(attempt);
   return (
     <View
       style={[styles.reviewSessionPanel, adaptiveLayout.usesWideContent ? styles.reviewSessionPanelWide : null]}
@@ -7780,135 +7704,65 @@ function HistoryAttemptReplayUnavailable({
           </Pressable>
           <View style={styles.reviewTitleBlock}>
             <Text style={styles.panelTitle}>History</Text>
-            <Text style={styles.helperText}>Persisted details only</Text>
+            <Text style={styles.helperText}>Replay unavailable</Text>
           </View>
         </View>
       </View>
-      <HistoryAttemptDetailCard
-        attempt={attempt}
-        replayAvailability={replayAvailability}
-        {...(attempt.unclear ? { onClearUnclear } : {})}
-      />
-      <HistoryReviewEnrollment
-        attempt={attempt}
-        currentTimeMs={currentTimeMs}
-        service={service}
-        onReviewChanged={onReviewChanged}
-      />
+      <Text style={styles.errorText} testID="history-replay-unavailable">
+        {historyReplayUnavailableMessage(replayAvailability)}
+      </Text>
+      {reviewContext ? (
+        <ReviewScheduleControl
+          context={reviewContext}
+          currentTimeMs={currentTimeMs}
+          initiatingAttemptId={attempt.unclear ? attempt.id : undefined}
+          onReviewChanged={onReviewChanged}
+          service={service}
+        />
+      ) : null}
+      {attempt.unclear ? <HistoryUnclearAction onClear={onClearUnclear} /> : null}
     </View>
   );
 }
 
-function HistoryAttemptDetailCard({
-  attempt,
-  onClearUnclear,
-  replayAvailability
-}: {
-  attempt: AttemptEvent | HistoryAttemptView;
-  onClearUnclear?: () => void;
-  replayAvailability?: HistoryAttemptReplayAvailability;
-}): React.JSX.Element {
-  const detail = normalizeHistoryAttemptDetail(attempt);
-  const arrowCandidatesUnavailable = detail.arrowDuelCandidateOrderStatus === "corrupt" ||
-    (replayAvailability?.status === "unavailable" && replayAvailability.reason === "arrow-candidates-unavailable");
-  const replayUnavailableMessage = replayAvailability?.status === "unavailable"
-    ? replayAvailability.reason === "arrow-candidates-unavailable"
-      ? "Original Arrow Duel candidates are unavailable, so this attempt cannot be replayed safely."
-      : replayAvailability.reason === "puzzle-unavailable"
-        ? "This puzzle is no longer available on this device, so the attempt cannot be replayed."
-        : "The saved mode or rating context is invalid, so this attempt cannot be replayed safely."
-    : null;
-  const sourceLabel = historyAttemptSourceLabel(detail.source);
-  const resultLabel = detail.result === "wrong"
-    ? "Wrong move"
-    : detail.result === "correct"
-      ? "Correct"
-      : "Result unavailable";
-  const timingLabel = detail.completedAt
-    ? `${formatLocalCalendarDate(detail.completedAt)} · ${detail.elapsedSeconds === null ? "Duration unavailable" : `${detail.elapsedSeconds}s`}`
-    : "Date and duration unavailable";
-  const movesLabel = detail.submittedMove && detail.expectedMove
-    ? `Played ${detail.submittedMove} · Best ${detail.expectedMove}`
-    : "Moves unavailable";
-  const ratingLabel = detail.ratingBefore === null
-    ? "Rating unavailable"
-    : detail.ratingAfterStatus === "invalid"
-      ? `Rating ${detail.ratingBefore} · Rating change unavailable`
-      : detail.ratingAfterStatus === "absent" || detail.ratingDelta === null
-      ? `Rating ${detail.ratingBefore} · No run change`
-      : `Rating ${detail.ratingBefore} → ${detail.ratingAfter} · ${detail.ratingDelta > 0 ? "+" : ""}${detail.ratingDelta}`;
-  const ratingKeyLabel = detail.ratingKey === null
-    ? "Rating bucket unavailable"
-    : historyRatingKeyLabel(detail.ratingKey);
-
+function HistoryUnclearAction({ onClear }: { onClear: () => void }): React.JSX.Element {
   return (
-    <View style={styles.historyPerformanceCard} testID="history-attempt-detail">
-      {attempt.unclear ? (
-        <View
-          accessibilityLabel="This attempt is marked unclear"
-          style={styles.historyAttemptUnclearBanner}
-          testID="history-attempt-unclear"
-        >
-          <View style={styles.historyAttemptUnclearCopy}>
-            <BookmarkGlyph marked />
-            <View>
-              <Text style={styles.historyAttemptUnclearTitle}>Marked unclear</Text>
-              <Text style={styles.helperText}>Saved for History analysis</Text>
-            </View>
-          </View>
-          {onClearUnclear ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Clear unclear mark"
-              style={styles.historyAttemptClearButton}
-              testID="history-attempt-clear-unclear"
-              onPress={onClearUnclear}
-            >
-              <Text style={styles.historyAttemptClearButtonText}>Clear</Text>
-            </Pressable>
-          ) : null}
-        </View>
-      ) : null}
-      <View style={styles.historyPerformanceHeader}>
-        <View style={styles.historyAttemptCopy}>
-          <Text style={styles.panelTitle} testID="history-attempt-detail-title">Persisted attempt</Text>
-          <Text style={styles.helperText} testID="history-attempt-detail-context">
-            {historyAttemptModeLabel(detail.mode)} · {sourceLabel}
-          </Text>
-        </View>
-        <Text
-          accessibilityLabel={`Persisted result ${resultLabel}`}
-          style={[
-            styles.historyReviewState,
-            detail.result === "wrong" ? styles.errorText : detail.result === "correct" ? styles.positive : styles.helperText
-          ]}
-          testID="history-attempt-detail-result"
-        >
-          {resultLabel}
-        </Text>
+    <View
+      accessibilityLabel="This attempt is marked unclear"
+      style={styles.historyAttemptUnclearBanner}
+      testID="history-attempt-unclear"
+    >
+      <View style={styles.historyAttemptUnclearCopy}>
+        <Text style={styles.historyAttemptUnclearTitle}>Marked</Text>
       </View>
-      <Text
-        accessibilityLabel={detail.ratingKey === null ? "Rating bucket unavailable" : `Rating bucket ${detail.ratingKey}`}
-        style={styles.helperText}
-        testID="history-attempt-detail-rating-key"
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Clear unclear mark"
+        style={styles.historyAttemptClearButton}
+        testID="history-attempt-clear-unclear"
+        onPress={onClear}
       >
-        {ratingKeyLabel}
-      </Text>
-      <Text style={styles.listText} testID="history-attempt-detail-moves">{movesLabel}</Text>
-      <Text style={styles.helperText} testID="history-attempt-detail-timing">{timingLabel}</Text>
-      <Text style={styles.helperText} testID="history-attempt-detail-rating">{ratingLabel}</Text>
-      {detail.dataStatus === "partial" || arrowCandidatesUnavailable ? (
-        <Text style={styles.errorText} testID="history-attempt-detail-partial">
-          Some persisted attempt details are unavailable.
-        </Text>
-      ) : null}
-      {replayUnavailableMessage ? (
-        <Text style={styles.errorText} testID="history-attempt-detail-replay-unavailable">
-          {replayUnavailableMessage}
-        </Text>
-      ) : null}
+        <Text style={styles.historyAttemptClearButtonText}>Clear</Text>
+      </Pressable>
     </View>
   );
+}
+
+function reviewContextForHistoryAttempt(attempt: AttemptEvent | HistoryAttemptView): ReviewContext | null {
+  const detail = normalizeHistoryAttemptDetail(attempt);
+  return detail.mode && detail.ratingKey && attempt.puzzleId
+    ? { puzzleId: attempt.puzzleId, mode: detail.mode, ratingKey: detail.ratingKey }
+    : null;
+}
+
+function historyReplayUnavailableMessage(
+  replayAvailability: Extract<HistoryAttemptReplayAvailability, { status: "unavailable" }>
+): string {
+  return replayAvailability.reason === "arrow-candidates-unavailable"
+    ? "Original Arrow Duel candidates are unavailable, so this attempt cannot be replayed safely."
+    : replayAvailability.reason === "puzzle-unavailable"
+      ? "This puzzle is no longer available on this device, so the attempt cannot be replayed."
+      : "The saved mode or rating context is invalid, so this attempt cannot be replayed safely.";
 }
 
 function formatAnalysisLineMoveLabel(line: ReviewAnalysisLine, index: number): string {
@@ -9852,75 +9706,12 @@ const styles = StyleSheet.create({
     top: 0,
     width: 1
   },
-  accessibleMoveOpenButton: {
-    alignItems: "center",
-    borderColor: "#CBD5E1",
-    borderRadius: 8,
-    borderWidth: 1,
-    height: 48,
-    justifyContent: "center",
-    minWidth: 56,
-    paddingHorizontal: 7
-  },
-  accessibleMoveOpenButtonText: {
-    color: "#334155",
-    fontSize: 11,
-    fontWeight: "800"
-  },
   accessibleMoveModalBackdrop: {
     alignItems: "center",
     backgroundColor: "rgba(15, 23, 42, 0.48)",
     flex: 1,
     justifyContent: "center",
     padding: 20
-  },
-  accessibleMoveDialog: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 14,
-    maxHeight: "86%",
-    maxWidth: 620,
-    padding: 16,
-    width: "100%"
-  },
-  accessibleMoveDialogHeader: {
-    alignItems: "flex-start",
-    flexDirection: "row",
-    gap: 12,
-    justifyContent: "space-between",
-    marginBottom: 12
-  },
-  accessibleMoveDialogTitleBlock: {
-    flex: 1,
-    gap: 4,
-    minWidth: 0
-  },
-  accessibleMoveList: {
-    gap: 8,
-    paddingBottom: 8
-  },
-  accessibleMoveOption: {
-    alignItems: "center",
-    backgroundColor: "#F8FAFC",
-    borderColor: "#CBD5E1",
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 12,
-    justifyContent: "space-between",
-    minHeight: 48,
-    paddingHorizontal: 14,
-    paddingVertical: 10
-  },
-  accessibleMoveSan: {
-    color: "#111827",
-    flex: 1,
-    fontSize: 16,
-    fontWeight: "800"
-  },
-  accessibleMoveCoordinates: {
-    color: "#475569",
-    fontSize: 13,
-    fontWeight: "700"
   },
   predictiveBackStage: {
     backgroundColor: "#DCE7F5",
@@ -10699,19 +10490,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     minWidth: 58
   },
-  reviewDueOverdueCount: {
-    fontSize: 12,
-    fontWeight: "900",
-    lineHeight: 14,
-    textAlign: "center"
-  },
-  reviewDueOverdueLabel: {
-    color: "#64748B",
-    fontSize: 9,
-    fontWeight: "800",
-    lineHeight: 11,
-    textAlign: "center"
-  },
   reviewDueHiddenMetric: FABRIC_SAFE_HIDDEN_TEXT_STYLE,
   reviewFilterScroller: {
     marginHorizontal: -UI_PADDING
@@ -10816,9 +10594,6 @@ const styles = StyleSheet.create({
     gap: 8,
     padding: 10
   },
-  reviewContinueButton: {
-    marginBottom: 8
-  },
   activeSessionAdaptiveLayout: {
     alignItems: "center",
     flexDirection: "row",
@@ -10864,7 +10639,8 @@ const styles = StyleSheet.create({
   sessionNavActions: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 4
+    justifyContent: "center",
+    width: 48
   },
   sessionNavTitle: {
     color: "#111827",
@@ -11093,10 +10869,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 7
   },
-  unclearPromptMarked: {
-    backgroundColor: "#FFFBEB",
-    borderColor: "#F59E0B"
-  },
   unclearPromptCopy: {
     alignItems: "center",
     flex: 1,
@@ -11112,17 +10884,18 @@ const styles = StyleSheet.create({
   },
   unclearPromptButton: {
     alignItems: "center",
+    backgroundColor: "#FFFBEB",
+    borderColor: "#F59E0B",
+    borderRadius: 8,
+    borderWidth: 1,
     justifyContent: "center",
     minHeight: 30,
-    paddingHorizontal: 6
+    paddingHorizontal: 8
   },
   unclearPromptButtonText: {
-    color: "#2563EB",
+    color: "#B45309",
     fontSize: 11,
     fontWeight: "900"
-  },
-  unclearPromptButtonTextMarked: {
-    color: "#B45309"
   },
   promptIcon: {
     alignItems: "center",
@@ -11859,6 +11632,9 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 2
   },
+  reviewHeaderDueActionsPlaceholder: {
+    width: 38
+  },
   reviewContextStrip: {
     alignItems: "center",
     flexDirection: "row",
@@ -11898,6 +11674,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     minWidth: 0
   },
+  reviewAnalysisColumn: {
+    gap: 12
+  },
   analysisPanel: {
     backgroundColor: "#FFFFFF",
     borderColor: "#E2E8F0",
@@ -11917,6 +11696,9 @@ const styles = StyleSheet.create({
   reviewAnalysisPanelWide: {
     flexGrow: 0,
     flexShrink: 0
+  },
+  reviewContextActions: {
+    gap: 12
   },
   analysisToolbar: {
     alignItems: "center",
@@ -12082,12 +11864,13 @@ const styles = StyleSheet.create({
   historyQuickFilterRow: {
     alignItems: "center",
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10
+    gap: 10,
+    paddingRight: 4
   },
   historyQuickToggle: {
     alignItems: "center",
     flexDirection: "row",
+    flexShrink: 0,
     gap: 10,
     minHeight: 36,
     paddingHorizontal: 8
@@ -12304,49 +12087,6 @@ const styles = StyleSheet.create({
     position: "relative",
     width: 18
   },
-  bookmarkGlyphCanvas: {
-    height: 22,
-    position: "relative",
-    width: 18
-  },
-  bookmarkGlyphCanvasSmall: {
-    height: 17,
-    width: 14
-  },
-  bookmarkGlyphBody: {
-    borderBottomWidth: 0,
-    borderRadius: 2,
-    borderWidth: 2,
-    height: 15,
-    left: 2,
-    position: "absolute",
-    top: 1,
-    width: 14
-  },
-  bookmarkGlyphBodySmall: {
-    height: 11,
-    left: 2,
-    width: 10
-  },
-  bookmarkGlyphTail: {
-    borderRadius: 999,
-    bottom: 3,
-    height: 2,
-    position: "absolute",
-    width: 9
-  },
-  bookmarkGlyphTailSmall: {
-    bottom: 2,
-    width: 7
-  },
-  bookmarkGlyphTailLeft: {
-    left: 2,
-    transform: [{ rotate: "42deg" }]
-  },
-  bookmarkGlyphTailRight: {
-    right: 2,
-    transform: [{ rotate: "-42deg" }]
-  },
   resultBadgeGlyphLine: {
     backgroundColor: "#FFFFFF",
     borderRadius: 999,
@@ -12443,7 +12183,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "900"
   },
-  historyReviewEnrollment: {
+  reviewScheduleControl: {
     alignItems: "center",
     backgroundColor: "#FFFFFF",
     borderColor: "#E2E8F0",
@@ -12454,22 +12194,43 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     padding: 10
   },
-  historyReviewEnrollmentCopy: {
+  reviewScheduleControlCompact: {
+    marginTop: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8
+  },
+  reviewScheduleControlCopy: {
     flex: 1,
     gap: 2
   },
-  historyAddReviewButton: {
+  reviewScheduleState: {
+    color: "#475569",
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  reviewScheduleAction: {
     alignItems: "center",
-    backgroundColor: "#2563EB",
-    borderRadius: 8,
     justifyContent: "center",
     minHeight: 34,
-    paddingHorizontal: 10
+    paddingHorizontal: 6
   },
-  historyAddReviewButtonText: {
-    color: "#FFFFFF",
-    fontSize: 11,
+  reviewScheduleAddText: {
+    color: "#2563EB",
+    fontSize: 12,
     fontWeight: "900"
+  },
+  reviewScheduleRemoveText: {
+    color: "#B91C1C",
+    fontSize: 12,
+    fontWeight: "900"
+  },
+  reviewScheduleConfirmation: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    gap: 12,
+    maxWidth: 440,
+    padding: 18,
+    width: "100%"
   },
   historyAttemptHeader: {
     alignItems: "center",
