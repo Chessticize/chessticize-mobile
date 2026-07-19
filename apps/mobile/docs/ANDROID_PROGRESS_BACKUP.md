@@ -68,7 +68,12 @@ the allowlist.
   `selected=false`, `emitted=0`, no payload log, and no transport archive. It
   accepts exactly one target-package result and one successful overall result;
   duplicate or contradictory framework records fail. The base XML restore rules
-  also contain no include.
+  also contain no include. Before synthetic fixture seeding, the evidence lane
+  uses a bounded launch recovery to prove `stopped=false` and
+  `notLaunched=false`, then returns the app process to a quiescent state. It
+  records and rechecks those flags with no live process immediately before
+  `bmgr backupnow`; `Backup is not allowed` remains a failed validation, not an
+  accepted substitute for the agent-owned rejection.
 - API 28-30 XML contains one path-only main-database include for inherited file
   restore. Its former duplicated `requireFlags` backup conditions were
   redundant because the custom agent never invokes default XML backup
@@ -113,7 +118,8 @@ pnpm mobile:verify:android:backup -- --adb-device emulator-5554 --json
 The exact-head Android workflow gates the pure Java policy and canonical-file
 selector before building the APK, then runs that APK against the Android backup
 framework and LocalTransport on API 24, API 30, and API 36. API 24 proves the
-pre-flags agent path fails closed. API 30 proves a delivered mask of `0` emits
+pre-flags agent path fails closed after separately proving that package launch
+eligibility, rather than a package-manager race, reached the agent. API 30 proves a delivered mask of `0` emits
 no app-data payload or archive through the same agent policy used on newer
 releases and that LocalTransport reports the package as rejected while the
 overall backup operation completes. It then downloads the same-run, exact-head

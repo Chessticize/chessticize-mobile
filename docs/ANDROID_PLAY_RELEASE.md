@@ -1,12 +1,14 @@
 # Android Play Release Candidate
 
 This runbook builds and audits the current production-upload-signed Android App
-Bundle. Builds 1 and 2 remain immutable audit records. Version code 1 was
+Bundle. Builds 1 through 3 remain immutable audit records. Version code 1 was
 uploaded to Play before a later protected source-publication workflow defect was
 fixed. Version code 2 produced a valid signed candidate, but exact-tag Android
 validation found a stale adaptive E2E dependency on a deliberately removed
-public control. The reviewed replacement keeps public version 1.1 and advances
-only the Android build number to 3. This runbook deliberately separates
+public control. Version code 3 fixed that stale UI dependency, but exact-tag API
+24 validation exposed a launch/package-manager state race in the evidence
+harness. The reviewed replacement keeps public version 1.1 and advances only
+the Android build number to 4. This runbook deliberately separates
 repository-owned checks from owner-only Play Console evidence. Missing signing material,
 protected-environment setup, or any console result is a blocker; never replace
 it with a debug key, a scratch key, an emulator claim, or a hand-edited passing
@@ -50,17 +52,47 @@ Build 2 is an immutable failed-validation candidate and was never distributed:
 
 No build-2 source release was created and its AAB was not uploaded to Play. Do
 not move or reuse its tag, artifact, or version code, and do not resume its
-source or binary publication phases. Build 3 is the next release candidate.
+source or binary publication phases.
+
+Build 3 is also an immutable failed-validation candidate and was never
+distributed:
+
+- annotated tag: `android-v1.1.0-build-3`, targeting
+  `925d3d763008af102eb732797693dee0552cee71`;
+- successful protected candidate workflow run:
+  [`29705924044`](https://github.com/Chessticize/chessticize-mobile/actions/runs/29705924044);
+- retained candidate artifact: ID `8448037753`, archive SHA-256
+  `74f259c9f0175ca5cd374f09f408ca1a6a33df0219ecad7473910880f0618ab6`;
+- signed AAB: 440,335,573 bytes, SHA-256
+  `87924938fd0994436e3a3421f08f58679cae7ddeddeb3eebd7ba056b651de791`;
+- source manifest SHA-256
+  `96d3ac5ed2d4774e07c5702a26e5107b247699a32699006a90de35fd76f5d0fe`;
+- exact-tag Android matrix run:
+  [`29705924909`](https://github.com/Chessticize/chessticize-mobile/actions/runs/29705924909),
+  whose API 24 backup-policy job
+  [`88244129794`](https://github.com/Chessticize/chessticize-mobile/actions/runs/29705924909/job/88244129794)
+  failed because the installed package still reported `stopped=true` and
+  `notLaunched=true` when `bmgr backupnow` ran, so Android returned the
+  framework-level `Backup is not allowed` before the fail-closed BackupAgent
+  policy could execute;
+- exact-tag iOS workflow run:
+  [`29705926506`](https://github.com/Chessticize/chessticize-mobile/actions/runs/29705926506),
+  which passed Mobile JS plus the complete `flows` and `practice` suites.
+
+The API 24 evidence contract still requires the exact single `Transport
+rejected package` result and does not accept `Backup is not allowed`. No build-3 source release was created and its AAB was not uploaded to Play. Do not
+move or reuse its tag, artifact, or version code, and do not resume its source
+or binary publication phases. Build 4 is the next release candidate.
 
 ## Canonical identity
 
 - Application ID: `com.chessticize.mobile`
 - Public version: `apps/mobile/release-version.json` (`1.1`)
-- Android version code: `apps/mobile/release-version.json` (`3`)
+- Android version code: `apps/mobile/release-version.json` (`4`)
 - iOS build number: `apps/mobile/release-version.json` (`2`, independent from Android)
 - Supported ABIs: `arm64-v8a`, `x86_64`
 - Target SDK: API 36
-- Required source tag before any Play track upload: `android-v1.1.0-build-3`
+- Required source tag before any Play track upload: `android-v1.1.0-build-4`
 
 Android `versionCode` must increase for every later Play upload. The public
 version must continue to match iOS. Settings reads `versionName` and
@@ -144,8 +176,8 @@ the retained Actions artifact before requesting a `play-ready` verdict. The
 verifier passes this credential to `curl` through standard input, not command
 arguments. Do not put it in owner evidence or commit it.
 
-For Android version `1.1` build `3`, release notes and this support document must
-name the canonical source tag `android-v1.1.0-build-3` and the public source
+For Android version `1.1` build `4`, release notes and this support document must
+name the canonical source tag `android-v1.1.0-build-4` and the public source
 repository `https://github.com/Chessticize/chessticize-mobile`. The evidence
 record points to this document at the exact candidate commit and records its
 SHA-256. Plausible hand-authored URLs, IDs, or matching-looking JSON do not
