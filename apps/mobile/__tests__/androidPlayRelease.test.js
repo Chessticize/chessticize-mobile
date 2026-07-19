@@ -525,7 +525,7 @@ function signedAabFixture({ appendUnsigned = false, addUnexpectedSigner = false 
 }
 
 describe('Android Play release contract', () => {
-  it('pins the current Play retry to public version 1.1 build 2', () => {
+  it('pins the current Play retry to public version 1.1 build 3', () => {
     const sourceTag = canonicalAndroidSourceTag(
       releaseVersion.publicVersion,
       releaseVersion.androidVersionCode,
@@ -555,10 +555,10 @@ describe('Android Play release contract', () => {
     expect(releaseVersion).toEqual(
       expect.objectContaining({
         publicVersion: '1.1',
-        androidVersionCode: 2,
+        androidVersionCode: 3,
       }),
     );
-    expect(sourceTag).toBe('android-v1.1.0-build-2');
+    expect(sourceTag).toBe('android-v1.1.0-build-3');
     expect(ownerEvidenceExample.candidate).toEqual(
       expect.objectContaining(expectedIdentityBinding),
     );
@@ -571,7 +571,7 @@ describe('Android Play release contract', () => {
       ownerEvidenceExample.sourceRelease.reference.endsWith(sourceTag),
     ).toBe(true);
     expect(runbook).toContain(
-      'Android version code: `apps/mobile/release-version.json` (`2`)',
+      'Android version code: `apps/mobile/release-version.json` (`3`)',
     );
     for (const value of [
       'The build-1 source-publication gate is complete.',
@@ -579,6 +579,14 @@ describe('Android Play release contract', () => {
       '29703293904',
       '8447113926',
       'cf07dc2d83d0b6ba2d5d402f95d6a957fa68c28d88d9f4fda45bbcc716b3e872',
+      'Build 2 is an immutable failed-validation candidate',
+      '29704109543',
+      '8447504169',
+      '6b9c07b67743b4599366704de6e417d792a871ab7ee08ea2205803c52edf6935',
+      '3923be1602d7518255efca6d09799d5ed09cdf86fe11d678951ba3a2bf6adcad',
+      '29704116081',
+      'completed 7/8 jobs successfully',
+      'No build-2 source release was created and its AAB was not uploaded to Play.',
     ]) {
       expect(runbook).toContain(value);
     }
