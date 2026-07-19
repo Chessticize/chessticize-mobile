@@ -105,17 +105,17 @@ for (const protectedPhase of [
 }
 
 assert.match(androidReleaseSkill, /status: \"play-ready\"/);
-assert.match(androidReleaseSkill, /physical `arm64-v8a` device/);
+assert.match(androidReleaseSkill, /physical ARM64/);
 assert.match(androidReleaseSkill, /directly to 100 percent/);
-assert.match(androidReleaseSkill, /never move its tag, rebuild it, or reuse its version code/);
-assert.match(androidReleaseSkill, /at most two dependency-independent/);
-assert.match(androidReleaseSkill, /\$implement/);
-assert.match(androidReleaseSkill, /\$code-review/);
+assert.match(androidReleaseSkill, /never move\s+its tag, rebuild it, or reuse its version code/);
 assert.match(androidReleaseSkill, /strict read-only audit mode/);
 assert.match(androidReleaseSkill, /canonicalAndroidSourceTag/);
 assert.match(androidReleaseSkill, /retained candidate/);
 assert.match(androidReleaseSkill, /proposed replacement/);
-assert.match(androidReleaseSkill, /mark every unobserved Console gate UNKNOWN/);
+assert.match(androidReleaseSkill, /mark every unobserved\s+Console gate UNKNOWN/);
+assert.match(androidReleaseSkill, /created \*\*and published\*\*/);
+assert.match(androidReleaseSkill, /Internal \*\*or\*\* Closed testing/);
+assert.match(androidReleaseSkill, /ordering conflict is owner-ratified or corrected/);
 assert.match(agents, /\.codex\/skills\/chessticize-android-release\/SKILL\.md/);
 
 assert.match(localE2eSkill, /CHESSTICIZE_E2E_SCOPE/);
