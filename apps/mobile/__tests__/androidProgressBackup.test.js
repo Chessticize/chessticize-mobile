@@ -1215,6 +1215,7 @@ describe('Android Progress Backup', () => {
     expect(backupContract).toContain(
       'API 24 requires the exact legacy package rejection with one fail-closed agent decision',
     );
+    expect(policyEvidenceScript).not.toContain('Backup is not allowed');
     expect(policyEvidenceScript).toContain(
       'API24 requires one pre-transport-flags fail-closed decision, exactly one legacy package rejection and successful overall result, no payload log, and no archive',
     );
@@ -1533,6 +1534,113 @@ describe('Android Progress Backup', () => {
     );
     expect(policyEvidenceScript).toMatch(
       /if \(\( SDK_LEVEL == 24 \)\); then\s+wait_for_api24_backup_manager_ready\s+fi\s+adb_cmd shell bmgr enable true/,
+    );
+  });
+
+  it('recovers API 24 launch eligibility and quiesces the app before backup invocation', () => {
+    const policyEvidenceScript = read('scripts/android-progress-backup-policy-evidence.sh');
+    const helperStart = policyEvidenceScript.indexOf(
+      'record_api24_package_launch_state() {',
+    );
+    const helperEnd = policyEvidenceScript.indexOf(
+      '\nwrite_fixture_file() {',
+      helperStart,
+    );
+    const processHelperStart = policyEvidenceScript.indexOf(
+      'assert_app_process_absent() {',
+    );
+    const processHelperEnd = policyEvidenceScript.indexOf(
+      '\nremote_file_size() {',
+      processHelperStart,
+    );
+    const processHelpers = policyEvidenceScript.slice(
+      processHelperStart,
+      processHelperEnd,
+    );
+    const launchStateHelpers = policyEvidenceScript.slice(helperStart, helperEnd);
+    const runCase = policyEvidenceScript.slice(
+      policyEvidenceScript.indexOf('run_case() {'),
+      policyEvidenceScript.indexOf('mkdir -p "$ARTIFACT_ROOT"'),
+    );
+    const mainSetup = policyEvidenceScript.slice(
+      policyEvidenceScript.lastIndexOf('\nprepare_retained_apk_install_source'),
+      policyEvidenceScript.lastIndexOf('\nif (( SDK_LEVEL == 24 )); then\n  run_case'),
+    );
+
+    expect(helperStart).toBeGreaterThan(-1);
+    expect(helperEnd).toBeGreaterThan(helperStart);
+    expect(policyEvidenceScript).toContain('API24_PACKAGE_LAUNCH_STATE_ATTEMPTS');
+    expect(mainSetup.indexOf('recover_api24_package_launch_state'))
+      .toBeLessThan(mainSetup.indexOf('seed_app_data_fixture'));
+    expect(runCase.indexOf('assert_api24_backup_invocation_ready "$case_name"'))
+      .toBeLessThan(runCase.indexOf('adb_cmd shell bmgr backupnow "$APP_ID"'));
+
+    const command = `
+      set -u
+      APP_ID=com.chessticize.mobile
+      SDK_LEVEL=24
+      API24_PACKAGE_LAUNCH_STATE_ATTEMPTS=3
+      STATE_DIR="$(mktemp -d)"
+      ARTIFACT_DIR="$STATE_DIR/artifacts"
+      mkdir -p "$ARTIFACT_DIR"
+      trap 'rm -rf "$STATE_DIR"' EXIT
+      printf 'stopped=true notLaunched=true\n' > "$STATE_DIR/package-state"
+      printf 'absent\n' > "$STATE_DIR/process-state"
+      : > "$STATE_DIR/trace"
+      adb_cmd() {
+        if [[ "$1" == shell && "$2" == dumpsys && "$3" == package ]]; then
+          printf 'User 0: installed=true %s enabled=0\n' "$(cat "$STATE_DIR/package-state")"
+          return 0
+        fi
+        if [[ "$1" == shell && "$2" == am && "$3" == start ]]; then
+          printf 'launch\n' >> "$STATE_DIR/trace"
+          printf 'running\n' > "$STATE_DIR/process-state"
+          printf 'Status: ok\n'
+          return 0
+        fi
+        if [[ "$1" == shell && "$2" == input ]]; then
+          printf 'home\n' >> "$STATE_DIR/trace"
+          return 0
+        fi
+        if [[ "$1" == shell && "$2" == kill ]]; then
+          printf 'kill\n' >> "$STATE_DIR/trace"
+          printf 'absent\n' > "$STATE_DIR/process-state"
+          return 0
+        fi
+        if [[ "$1" == shell && "$2" == bmgr && "$3" == backupnow ]]; then
+          printf 'bmgr:%s\n' "$(cat "$STATE_DIR/package-state")" >> "$STATE_DIR/trace"
+          printf 'Package %s with result: Transport rejected package\n' "$APP_ID"
+          printf 'Backup finished with result: Success\n'
+          return 0
+        fi
+        return 64
+      }
+      read_app_process_ids() {
+        if [[ "$(cat "$STATE_DIR/process-state")" == running ]]; then
+          printf '4242\n'
+        fi
+      }
+      sleep() {
+        printf 'sleep:%s\n' "$1" >> "$STATE_DIR/trace"
+        if [[ "$1" == 1 ]]; then
+          printf 'stopped=false notLaunched=false\n' > "$STATE_DIR/package-state"
+        fi
+      }
+      ${processHelpers}
+      ${launchStateHelpers}
+      recover_api24_package_launch_state
+      assert_api24_backup_invocation_ready pre-flags-api
+      adb_cmd shell bmgr backupnow "$APP_ID" >/dev/null
+      cat "$STATE_DIR/trace"
+    `;
+    const result = spawnSync('/bin/bash', ['-c', command], {
+      encoding: 'utf8',
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(result.stdout).toBe(
+      'Status: ok\nlaunch\nsleep:1\nhome\nkill\nbmgr:stopped=false notLaunched=false\n',
     );
   });
 

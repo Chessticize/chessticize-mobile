@@ -525,7 +525,7 @@ function signedAabFixture({ appendUnsigned = false, addUnexpectedSigner = false 
 }
 
 describe('Android Play release contract', () => {
-  it('pins the current Play retry to public version 1.1 build 3', () => {
+  it('pins the current Play retry to public version 1.1 build 4', () => {
     const sourceTag = canonicalAndroidSourceTag(
       releaseVersion.publicVersion,
       releaseVersion.androidVersionCode,
@@ -555,10 +555,10 @@ describe('Android Play release contract', () => {
     expect(releaseVersion).toEqual(
       expect.objectContaining({
         publicVersion: '1.1',
-        androidVersionCode: 3,
+        androidVersionCode: 4,
       }),
     );
-    expect(sourceTag).toBe('android-v1.1.0-build-3');
+    expect(sourceTag).toBe('android-v1.1.0-build-4');
     expect(ownerEvidenceExample.candidate).toEqual(
       expect.objectContaining(expectedIdentityBinding),
     );
@@ -571,7 +571,7 @@ describe('Android Play release contract', () => {
       ownerEvidenceExample.sourceRelease.reference.endsWith(sourceTag),
     ).toBe(true);
     expect(runbook).toContain(
-      'Android version code: `apps/mobile/release-version.json` (`3`)',
+      'Android version code: `apps/mobile/release-version.json` (`4`)',
     );
     for (const value of [
       'The build-1 source-publication gate is complete.',
@@ -587,6 +587,17 @@ describe('Android Play release contract', () => {
       '29704116081',
       'completed 7/8 jobs successfully',
       'No build-2 source release was created and its AAB was not uploaded to Play.',
+      'Build 3 is also an immutable failed-validation candidate',
+      '29705924044',
+      '8448037753',
+      '74f259c9f0175ca5cd374f09f408ca1a6a33df0219ecad7473910880f0618ab6',
+      '87924938fd0994436e3a3421f08f58679cae7ddeddeb3eebd7ba056b651de791',
+      '96d3ac5ed2d4774e07c5702a26e5107b247699a32699006a90de35fd76f5d0fe',
+      '29705924909',
+      '88244129794',
+      'Backup is not allowed',
+      '29705926506',
+      'No build-3 source release was created and its AAB was not uploaded to Play.',
     ]) {
       expect(runbook).toContain(value);
     }

@@ -18,6 +18,7 @@ ADB_CLEANUP_TIMEOUT_SECONDS="${ANDROID_BACKUP_POLICY_CLEANUP_ADB_TIMEOUT_SECONDS
 BACKUP_MANAGER_READINESS_TIMEOUT_SECONDS="${ANDROID_BACKUP_POLICY_READINESS_TIMEOUT_SECONDS:-15}"
 BACKUP_MANAGER_READINESS_ATTEMPTS="${ANDROID_BACKUP_POLICY_READINESS_ATTEMPTS:-6}"
 ADB_ROOT_RECOVERY_ATTEMPTS="${ANDROID_BACKUP_POLICY_ADB_ROOT_RECOVERY_ATTEMPTS:-3}"
+API24_PACKAGE_LAUNCH_STATE_ATTEMPTS="${ANDROID_BACKUP_POLICY_API24_LAUNCH_STATE_ATTEMPTS:-3}"
 
 # API 30's Android 11 LocalTransport recognizes only fake_encryption_flag and
 # non_incremental_only. It cannot be used as evidence for a real encryption or D2D capability:
@@ -270,6 +271,110 @@ wait_for_api24_backup_manager_ready() {
   done
   echo "API 24 BackupManager did not become ready after $BACKUP_MANAGER_READINESS_ATTEMPTS bounded attempts." >&2
   exit 1
+}
+
+record_api24_package_launch_state() {
+  local label="$1"
+  local package_state="$ARTIFACT_DIR/api24-package-state-$label.txt"
+  local state_summary="$ARTIFACT_DIR/api24-package-state-$label-summary.txt"
+  local user_state
+  local user_state_count
+  local stopped
+  local not_launched
+
+  if ! adb_cmd shell dumpsys package "$APP_ID" > "$package_state"; then
+    echo "Unable to inspect API 24 package launch state at $label." >&2
+    return 1
+  fi
+  user_state_count="$(grep -Ec '^[[:space:]]*User 0:.*stopped=' "$package_state" || true)"
+  if [[ "$user_state_count" != "1" ]]; then
+    echo "Expected exactly one API 24 User 0 package state at $label; found $user_state_count." >&2
+    return 1
+  fi
+  user_state="$(grep -E '^[[:space:]]*User 0:.*stopped=' "$package_state")"
+  if [[ ! "$user_state" =~ (^|[[:space:]])stopped=(true|false)($|[[:space:]]) ]]; then
+    echo "API 24 package state did not expose a strict stopped flag at $label." >&2
+    return 1
+  fi
+  stopped="${BASH_REMATCH[2]}"
+  if [[ ! "$user_state" =~ (^|[[:space:]])notLaunched=(true|false)($|[[:space:]]) ]]; then
+    echo "API 24 package state did not expose a strict notLaunched flag at $label." >&2
+    return 1
+  fi
+  not_launched="${BASH_REMATCH[2]}"
+  {
+    printf 'stopped=%s\n' "$stopped"
+    printf 'notLaunched=%s\n' "$not_launched"
+  } > "$state_summary"
+  if [[ "$stopped" == "false" && "$not_launched" == "false" ]]; then
+    return 0
+  fi
+  return 2
+}
+
+recover_api24_package_launch_state() {
+  local attempt=1
+  local state_status=0
+  local launch_artifact
+
+  if [[ ! "$API24_PACKAGE_LAUNCH_STATE_ATTEMPTS" =~ ^[1-5]$ ]]; then
+    echo "ANDROID_BACKUP_POLICY_API24_LAUNCH_STATE_ATTEMPTS must be an integer from 1 through 5." >&2
+    return 64
+  fi
+  while (( attempt <= API24_PACKAGE_LAUNCH_STATE_ATTEMPTS )); do
+    state_status=0
+    if record_api24_package_launch_state "recovery-before-$attempt"; then
+      state_status=0
+    else
+      state_status=$?
+    fi
+    if (( state_status != 0 && state_status != 2 )); then
+      echo "Unexpected API 24 package launch-state probe status $state_status." >&2
+      return "$state_status"
+    fi
+    if (( state_status != 0 )); then
+      launch_artifact="$ARTIFACT_DIR/api24-launch-recovery-attempt-$attempt.txt"
+      if ! adb_cmd shell am start -W -n "$APP_ID/.MainActivity" \
+          | tee "$launch_artifact" | grep -F 'Status: ok'; then
+        echo "API 24 launch-state recovery attempt $attempt did not start MainActivity." >&2
+        return 1
+      fi
+      # am start -W can report success before PackageManager persists the
+      # stopped/notLaunched transition. Keep this settle bounded per attempt.
+      sleep 1
+    fi
+    quiesce_app_process_for_fixture
+    state_status=0
+    if record_api24_package_launch_state "recovery-after-$attempt"; then
+      assert_app_process_absent "api24-launch-recovery-after-$attempt"
+      return
+    else
+      state_status=$?
+    fi
+    if (( state_status != 2 )); then
+      echo "Unexpected API 24 package launch-state verification status $state_status." >&2
+      return "$state_status"
+    fi
+    attempt=$((attempt + 1))
+    if (( attempt <= API24_PACKAGE_LAUNCH_STATE_ATTEMPTS )); then
+      sleep 1
+    fi
+  done
+  echo "API 24 package remained stopped or notLaunched after $API24_PACKAGE_LAUNCH_STATE_ATTEMPTS bounded recovery attempts." >&2
+  return 1
+}
+
+assert_api24_backup_invocation_ready() {
+  local label="$1"
+
+  if (( SDK_LEVEL != 24 )); then
+    return
+  fi
+  if ! record_api24_package_launch_state "$label-pre-backup"; then
+    echo "API 24 package is stopped, notLaunched, or unreadable immediately before $label backup." >&2
+    return 1
+  fi
+  assert_app_process_absent "$label-pre-backup"
 }
 
 write_fixture_file() {
@@ -763,6 +868,7 @@ run_case() {
   adb_cmd shell settings put secure backup_local_transport_parameters "$transport_parameters"
   adb_cmd shell bmgr transport "$LOCAL_TRANSPORT" | grep -F 'Selected transport'
   reset_local_transport
+  assert_api24_backup_invocation_ready "$case_name"
   adb_cmd logcat -c
   adb_cmd shell bmgr backupnow "$APP_ID" \
     | tee "$ARTIFACT_DIR/$case_name-backupnow.txt" || backup_status=$?
@@ -866,14 +972,21 @@ trap cleanup EXIT
 
 prepare_retained_apk_install_source
 install_retained_apk
-adb_cmd shell am start -W -n "$APP_ID/.MainActivity" \
-  | tee "$ARTIFACT_DIR/launch.txt" | grep -F 'Status: ok'
+if (( SDK_LEVEL == 24 )); then
+  recover_api24_package_launch_state
+else
+  adb_cmd shell am start -W -n "$APP_ID/.MainActivity" \
+    | tee "$ARTIFACT_DIR/launch.txt" | grep -F 'Status: ok'
+fi
 capture_installed_apk
 seed_app_data_fixture
 if (( SDK_LEVEL == 24 )); then
   wait_for_api24_backup_manager_ready
 fi
 adb_cmd shell bmgr enable true
+if (( SDK_LEVEL == 24 )); then
+  assert_api24_backup_invocation_ready post-fixture
+fi
 
 {
   echo "api-level=$SDK_LEVEL"
