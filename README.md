@@ -16,6 +16,7 @@ The repository contains the React Native app shell (`apps/mobile`), the browser-
 - [Privacy Policy](docs/PRIVACY_POLICY.md) — 1.1 data, user-controllable iCloud Sync, and tracking disclosure
 - [iOS Device Targets](docs/DEVICE_TARGETS.md) — 1.1 iPhone+iPad adaptive orientation release target
 - [Android Validation](docs/ANDROID_VALIDATION.md) — exact-head API, adaptive, backup, and physical-device evidence contract
+- [UI Flow Design Gate](docs/agents/ui-flow-design.md) — required Storybook-first approval workflow for new UI flows
 - [Android Play Release](docs/ANDROID_PLAY_RELEASE.md) — signed AAB and owner-only Play readiness runbook
 - [Android Play Listing](docs/ANDROID_PLAY_LISTING.md) — truthful English listing, device, permission, privacy, and Data safety contract
 - [Agent Instructions](AGENTS.md) — architecture boundary, testing philosophy, and PR workflow
@@ -38,6 +39,11 @@ For browser-based UI proposals and flow review, start the Interaction Lab:
 ```sh
 pnpm mobile:storybook
 ```
+
+New UI flows are Storybook-first. Before production navigation, backend,
+storage, native-module, analytics, or rollout wiring begins, publish the
+interactive design slice in the Interaction Lab and record explicit design
+approval. See [UI Flow Design Gate](docs/agents/ui-flow-design.md).
 
 Storybook prints the local and LAN URLs. A phone on the same Wi-Fi network can open the LAN URL, and every scenario exposes a reset action and a direct full-screen permalink. The lab uses deterministic in-memory data and a clearly marked Board Placeholder; it does not read local SQLite or replace native simulator/device acceptance.
 

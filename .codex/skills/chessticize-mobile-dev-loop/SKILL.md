@@ -7,7 +7,28 @@ description: Use when developing Chessticize Mobile features, choosing the right
 
 Use this skill before changing Chessticize Mobile behavior or declaring work complete. Prefer the cheapest test layer that proves the behavior, then escalate only when the change crosses a boundary that cheaper tests cannot cover.
 
-## Default Order
+## Storybook-First UI Flow Gate
+
+For every new UI flow, stop before product wiring and complete the Interaction
+Lab design phase first. Follow `docs/agents/ui-flow-design.md`.
+
+1. Add the production-intended presentation component and deterministic
+   Storybook scenario, including the important entry, interaction, success,
+   loading, empty, error, or permission states that apply.
+2. Keep this phase isolated from production navigation entries, backend or
+   storage mutations, native-module wiring, analytics, and rollout logic.
+3. Add the New Scenario Marker while review is active, run the Lab checks, and
+   provide the stable Storybook URL for review.
+4. Record explicit design approval in the PR before starting product wiring.
+5. After approval, retain the Storybook scenario as living UI documentation and
+   continue with the implementation and validation order below.
+
+This gate applies to a new screen, navigation destination, stateful modal or
+sheet, multi-step journey, or materially new loading, empty, error, or
+permission path. A small fix to an already approved flow does not automatically
+restart the gate unless it materially changes the journey.
+
+## Default Order After Design Approval
 
 1. **Core/backend logic first**
    - Put sprint rules, ELO, puzzle selection, Arrow Duel correctness, review scheduling, history filtering, pack validation, sync merge, and engine orchestration outside React components.

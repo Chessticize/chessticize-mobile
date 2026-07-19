@@ -170,6 +170,12 @@ or an explicit not-cataloged reason. Temporary New Scenario Markers are allowed
 on draft design-review branches, but CI rejects them on ready pull requests and
 `main`.
 
+New UI flows must pass the Storybook-first design gate before production
+navigation, backend, storage, native-module, analytics, or rollout wiring
+begins. The approved scenario remains the living presentation contract during
+implementation. See `docs/agents/ui-flow-design.md`; this process gate does not
+change the native-risk validation scope described below.
+
 ## Detox Regression Scope
 
 Detox should cover representative cross-layer journeys rather than the

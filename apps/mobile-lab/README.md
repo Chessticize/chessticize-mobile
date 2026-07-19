@@ -4,6 +4,19 @@ The Interaction Lab is the development-only browser rendering of the real shared
 
 It is not a separate HTML mockup and is not a production web app. Stories render `apps/mobile/src/components/PracticePocScreen.tsx` through React Native Web with deterministic `PracticeService` and `MemoryStore` fixtures.
 
+## Storybook-first UI flow gate
+
+Every new UI flow starts here before product wiring. Build the interactive
+design slice with production-intended presentation components and deterministic
+fixtures, publish its stable Storybook URL, and obtain explicit design approval.
+During this phase, do not add the production navigation entry, backend or
+storage mutations, native-module wiring, analytics, or rollout logic. After
+approval, keep the scenario as living UI documentation while wiring the real
+product boundaries.
+
+The complete definition, exceptions, approval record, and handoff checklist are
+in [`docs/agents/ui-flow-design.md`](../../docs/agents/ui-flow-design.md).
+
 ## Start the lab
 
 From the repository root:
@@ -64,9 +77,11 @@ Whole-screen stories are currently marked `free-roam`, matching the monolithic `
 
 ## Add or change a scenario
 
-1. Seed starting data through `PracticeService`, `MemoryStore`, or an interface-compatible native-boundary fake in `LabScenario.tsx`.
-2. Add the typed definition and navigation coverage in `scenarioRegistry.ts`.
-3. Export a Storybook story in the appropriate product group. A short play function may drive public UI actions after seeding.
-4. While design review is active, add `isNew: true` and a one-line `changeNote` to the registry entry. This adds the Storybook `new` tag and the What's New card.
-5. Clear the marker before marking the pull request ready. CI allows markers on draft pull requests and rejects them on ready pull requests or `main`.
-6. Keep focused mobile component tests for shared production UI changes. Use native validation only when the changed boundary requires it under the repository risk rules.
+1. For a new UI flow, confirm that the PR is still in the Storybook design phase described in `docs/agents/ui-flow-design.md`.
+2. Seed starting data through `PracticeService`, `MemoryStore`, or an interface-compatible native-boundary fake in `LabScenario.tsx`.
+3. Add the typed definition and navigation coverage in `scenarioRegistry.ts`.
+4. Export a Storybook story in the appropriate product group. A short play function may drive public UI actions after seeding.
+5. While design review is active, add `isNew: true` and a one-line `changeNote` to the registry entry. This adds the Storybook `new` tag and the What's New card.
+6. Record the stable Storybook URL and explicit design approval in the PR before product wiring starts.
+7. Clear the marker before marking the pull request ready. CI allows markers on draft pull requests and rejects them on ready pull requests or `main`.
+8. Keep focused mobile component tests for shared production UI changes. Use native validation only when the changed boundary requires it under the repository risk rules.

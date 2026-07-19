@@ -5,9 +5,11 @@ on:
     paths:
       - ".codex/skills/chessticize-mobile-dev-loop/**"
       - ".codex/skills/chessticize-mobile-local-e2e/**"
+      - "apps/mobile-lab/README.md"
       - ".github/pull_request_template.md"
       - ".github/workflows/**"
       - "AGENTS.md"
+      - "README.md"
       - "docs/APP_STORE_UPLOAD.md"
       - "docs/RELEASE_SOURCE_POLICY.md"
       - "docs/TESTFLIGHT_QA.md"
@@ -21,9 +23,11 @@ on:
     paths:
       - ".codex/skills/chessticize-mobile-dev-loop/**"
       - ".codex/skills/chessticize-mobile-local-e2e/**"
+      - "apps/mobile-lab/README.md"
       - ".github/pull_request_template.md"
       - ".github/workflows/**"
       - "AGENTS.md"
+      - "README.md"
       - "docs/APP_STORE_UPLOAD.md"
       - "docs/RELEASE_SOURCE_POLICY.md"
       - "docs/TESTFLIGHT_QA.md"

@@ -6,6 +6,22 @@ For development-loop decisions, use the repo-local skill at `.codex/skills/chess
 
 ## Agent wayfinding
 
+### Storybook-first UI flow gate
+
+Before production implementation of any new UI flow, create the interactive
+design slice in the Interaction Lab and obtain explicit design approval. The
+Storybook phase may add production-intended presentation components and
+deterministic fixtures, but it must not add the production navigation entry,
+storage or backend mutations, native-module wiring, analytics, or rollout
+logic. After approval, keep the approved Storybook scenario as living UI
+documentation while completing the product wiring. Follow
+`docs/agents/ui-flow-design.md` and the repo-local development-loop skill.
+
+A new screen, navigation destination, stateful modal or sheet, multi-step
+journey, or materially new loading, empty, error, or permission path counts as
+a new UI flow. Small fixes to an already approved flow do not automatically
+restart this gate unless they materially change the journey.
+
 ### Issue tracker
 
 Issues and PRDs are tracked in GitHub Issues. See `docs/agents/issue-tracker.md`.
