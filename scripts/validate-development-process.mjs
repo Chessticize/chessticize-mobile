@@ -116,6 +116,8 @@ assert.match(androidReleaseSkill, /mark every unobserved\s+Console gate UNKNOWN/
 assert.match(androidReleaseSkill, /created \*\*and published\*\*/);
 assert.match(androidReleaseSkill, /Internal \*\*or\*\* Closed testing/);
 assert.match(androidReleaseSkill, /ordering conflict is owner-ratified or corrected/);
+assert.match(androidReleaseSkill, /Complete #200 independently/);
+assert.match(androidReleaseSkill, /#188 acceptance after #186, #187, and #200/);
 assert.match(agents, /\.codex\/skills\/chessticize-android-release\/SKILL\.md/);
 
 assert.match(localE2eSkill, /CHESSTICIZE_E2E_SCOPE/);

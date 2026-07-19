@@ -107,7 +107,9 @@ Console gate UNKNOWN and state why.
 ## Route the next phase
 
 Read the listed contract immediately before executing a row. Require its
-postcondition before moving down the table.
+postcondition before advancing a dependent phase. The rows are not wholly
+serial: run #200 as soon as the retained exact candidate and an authorized
+physical device are available.
 
 | Phase | Authoritative contract | Required postcondition |
 | --- | --- | --- |
@@ -116,7 +118,8 @@ postcondition before moving down the table.
 | Publish corresponding source | `docs/ANDROID_GITHUB_RELEASE.md` phases `prepare-source-draft` then `publish-source` | The canonical public source release and manifest match the retained artifact byte-for-byte before any Play-track distribution. |
 | Complete #186 | Owner sequence in `docs/ANDROID_PLAY_RELEASE.md` | The retained AAB is installed through Internal **or** Closed testing; any Closed tester/duration rule is satisfied only if the live account requires it; exact owner evidence yields `status: "play-ready"`; Production is prepared but not started. |
 | Complete #187 | `docs/ANDROID_GITHUB_RELEASE.md` phases `prepare-binary` then `publish-binary` | The exact Play-generated universal APK and checksum are public and reverified; the documented #186/#187 ordering conflict is owner-ratified or corrected. |
-| Complete #200 and #188 | Physical checklist in `docs/ANDROID_VALIDATION.md`, live issue acceptance | Exact-candidate physical ARM64, install, engine, lifecycle, backup, upgrade, and cross-channel evidence passes; the approved Production artifact launches directly to 100 percent. |
+| Complete #200 independently | Stockfish subset of the physical checklist in `docs/ANDROID_VALIDATION.md`, live #200 acceptance | Exact-candidate physical ARM64 install, engine, cancellation/reuse, background/resume, and force-stop/restart evidence passes. |
+| Complete #188 final launch | Live #188 acceptance after #186, #187, and #200 | The full physical, backup, upgrade, and cross-channel contract passes; the approved Production artifact launches directly to 100 percent. |
 
 Preparation never authorizes publication, and publication never authorizes a
 Production rollout. Honor each protected environment as a separate approval.
