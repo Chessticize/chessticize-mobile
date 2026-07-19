@@ -10,13 +10,22 @@ protected-environment setup, or any console result is a blocker; never replace
 it with a debug key, a scratch key, an emulator claim, or a hand-edited passing
 JSON file.
 
-Build 2 must not be tagged, uploaded, or treated as the current source-release
-chain until the immutable Play-distributed build 1 has its matching public
-GitHub source release. Recover build 1 through the protected source-only
-procedure in `docs/ANDROID_GITHUB_RELEASE.md`, verify the unchanged tag target,
-candidate manifest, retained artifact provenance, and public manifest asset,
-then retain that evidence as build-1 audit history. The build-2 source and
-binary phases remain a separate exact-artifact chain.
+The build-1 source-publication gate is complete. The public source release
+[`android-v1.1.0-build-1`](https://github.com/Chessticize/chessticize-mobile/releases/tag/android-v1.1.0-build-1)
+was published on 2026-07-19 and retains this immutable audit evidence:
+
+- annotated tag target: `2c4c17a53773db407dc0f865d912976188235708`;
+- protected source-publication workflow run:
+  [`29703293904`](https://github.com/Chessticize/chessticize-mobile/actions/runs/29703293904);
+- retained source-publication artifact: ID `8447113926`, name
+  `android-source-publication-29703293904`, archive SHA-256
+  `cf07dc2d83d0b6ba2d5d402f95d6a957fa68c28d88d9f4fda45bbcc716b3e872`;
+- public `android-source-manifest.json` asset: ID `482719712`, SHA-256
+  `77c3d891ba1dda1fe17b2b385b20efa96a49634ae4226a720d0c07f2d78162a7`.
+
+Do not move the build-1 tag, rebuild its AAB, replace either artifact, or reuse
+version code 1. The build-2 source and binary phases remain a separate
+exact-artifact chain.
 
 ## Canonical identity
 

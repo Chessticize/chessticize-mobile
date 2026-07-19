@@ -573,6 +573,15 @@ describe('Android Play release contract', () => {
     expect(runbook).toContain(
       'Android version code: `apps/mobile/release-version.json` (`2`)',
     );
+    for (const value of [
+      'The build-1 source-publication gate is complete.',
+      '2c4c17a53773db407dc0f865d912976188235708',
+      '29703293904',
+      '8447113926',
+      'cf07dc2d83d0b6ba2d5d402f95d6a957fa68c28d88d9f4fda45bbcc716b3e872',
+    ]) {
+      expect(runbook).toContain(value);
+    }
     expect(inspectAndroidReleaseDocumentation({
       releaseVersion,
       playRunbook: runbook,
