@@ -1584,6 +1584,10 @@ describe('Detox suite configuration', () => {
     expect(spec).not.toContain(
       "waitFor(element(by.id('move-feedback-overlay'))).toExist()"
     );
+    expect(spec).not.toContain('expect(unflippedToFlipped)');
+    expect(spec).toContain(
+      'if (unflippedToFlipped === 0 || flippedToUnflipped === 0) {'
+    );
   });
 
   it('resets Stockfish state without uninstalling the attached Android test app', () => {

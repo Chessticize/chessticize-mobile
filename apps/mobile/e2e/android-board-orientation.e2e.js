@@ -136,8 +136,12 @@ describe('Android board orientation integrity', () => {
       }
     }
 
-    expect(unflippedToFlipped).toBeGreaterThan(0);
-    expect(flippedToUnflipped).toBeGreaterThan(0);
+    if (unflippedToFlipped === 0 || flippedToUnflipped === 0) {
+      throw new Error(
+        'Familiar 15 did not exercise both orientation transitions: '
+        + `white-to-black=${unflippedToFlipped}, black-to-white=${flippedToUnflipped}`
+      );
+    }
   });
 });
 
