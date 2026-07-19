@@ -670,10 +670,32 @@ index 983112b3bfd62a93c150077851c9cdc0e6fc5c48..f8fa26ab3fac55f953cd29f3e108dcba
  
      // Handle en passant - remove the captured pawn
 diff --git a/lib/commonjs/state/use-board-state.js b/lib/commonjs/state/use-board-state.js
-index 0a6faf6b1ec0b5ac518104d513f3e1a0a9c1a9b6..f0a6b84915dffd222515509afacfd51695484987 100644
+index 0a6faf6b1ec0b5ac518104d513f3e1a0a9c1a9b6..6b0b5b6fe5880f5f4f8299343dd3473487a140c1 100644
 --- a/lib/commonjs/state/use-board-state.js
 +++ b/lib/commonjs/state/use-board-state.js
-@@ -155,6 +155,14 @@ const useBoardState = (initialFen, pieceSize, flipped = false) => {
+@@ -125,8 +125,11 @@ const useBoardState = (initialFen, pieceSize, flipped = false) => {
+   // squareStates were created once with the *initial* flipped value, so toggling
+   // `flipped` at runtime would otherwise leave un-moved pieces stuck at their
+   // original positions. A flip/resize is an orientation/scale change, not a
+-  // move, so snap every occupied square to its new logical position instantly
+-  // — springing them would make all pieces fly across the board at once.
++  // move, so snap every logical square slot to its new position instantly —
++  // springing them would make all pieces fly across the board at once. Do not
++  // consult the piece SharedValue here: resetBoard writes can still be queued
++  // on Android when this effect runs, so its current value may describe the
++  // previous FEN and cause newly occupied squares to keep the old orientation.
+   const isFirstLayoutRef = (0, _react.useRef)(true);
+   (0, _react.useEffect)(() => {
+     if (isFirstLayoutRef.current) {
+@@ -135,7 +138,6 @@ const useBoardState = (initialFen, pieceSize, flipped = false) => {
+     }
+     for (const square of _types.SQUARES) {
+       const state = squareStates[square];
+-      if (state.piece.get() === null) continue;
+       const pos = squareToPosition(square, pieceSize, flipped);
+       state.translateX.set(pos.x);
+       state.translateY.set(pos.y);
+@@ -155,6 +157,14 @@ const useBoardState = (initialFen, pieceSize, flipped = false) => {
        isFirstFenRef.current = false;
        return;
      }
@@ -1360,10 +1382,32 @@ index f2f179f71c94846c9cbe456e5889ac1b5c0714d9..480964882e0888e30a23534d29df5b95
  
      // Handle en passant - remove the captured pawn
 diff --git a/lib/module/state/use-board-state.js b/lib/module/state/use-board-state.js
-index 70c2cecb9088e81c71bbda522458e5602b3ccfe6..9d563aa5f475e81ed83a3eb55d713e51b0f1e94d 100644
+index 70c2cecb9088e81c71bbda522458e5602b3ccfe6..e6176c954853f394e9a1f7f5334fa51a52799ea1 100644
 --- a/lib/module/state/use-board-state.js
 +++ b/lib/module/state/use-board-state.js
-@@ -147,6 +147,14 @@ export const useBoardState = (initialFen, pieceSize, flipped = false) => {
+@@ -117,8 +117,11 @@ export const useBoardState = (initialFen, pieceSize, flipped = false) => {
+   // squareStates were created once with the *initial* flipped value, so toggling
+   // `flipped` at runtime would otherwise leave un-moved pieces stuck at their
+   // original positions. A flip/resize is an orientation/scale change, not a
+-  // move, so snap every occupied square to its new logical position instantly
+-  // — springing them would make all pieces fly across the board at once.
++  // move, so snap every logical square slot to its new position instantly —
++  // springing them would make all pieces fly across the board at once. Do not
++  // consult the piece SharedValue here: resetBoard writes can still be queued
++  // on Android when this effect runs, so its current value may describe the
++  // previous FEN and cause newly occupied squares to keep the old orientation.
+   const isFirstLayoutRef = useRef(true);
+   useEffect(() => {
+     if (isFirstLayoutRef.current) {
+@@ -127,7 +130,6 @@ export const useBoardState = (initialFen, pieceSize, flipped = false) => {
+     }
+     for (const square of SQUARES) {
+       const state = squareStates[square];
+-      if (state.piece.get() === null) continue;
+       const pos = squareToPosition(square, pieceSize, flipped);
+       state.translateX.set(pos.x);
+       state.translateY.set(pos.y);
+@@ -147,6 +149,14 @@ export const useBoardState = (initialFen, pieceSize, flipped = false) => {
        isFirstFenRef.current = false;
        return;
      }
@@ -2337,10 +2381,32 @@ index 2b02a76df0c9b736fe0c9f1089787dac919ae336..9b7139a692e2bdd344cc08284d36c4ab
    durations: {
      move: number;
 diff --git a/src/state/use-board-state.ts b/src/state/use-board-state.ts
-index d5b8613d6bba6d895247254b9497733d4838ba13..6a170313defb6c8607151ea4803af1a7755fa2bc 100644
+index d5b8613d6bba6d895247254b9497733d4838ba13..db2c18e65c92b6ea3d0af61bbf55250549b440ae 100644
 --- a/src/state/use-board-state.ts
 +++ b/src/state/use-board-state.ts
-@@ -177,6 +177,14 @@ export const useBoardState = (
+@@ -147,8 +147,11 @@ export const useBoardState = (
+   // squareStates were created once with the *initial* flipped value, so toggling
+   // `flipped` at runtime would otherwise leave un-moved pieces stuck at their
+   // original positions. A flip/resize is an orientation/scale change, not a
+-  // move, so snap every occupied square to its new logical position instantly
+-  // — springing them would make all pieces fly across the board at once.
++  // move, so snap every logical square slot to its new position instantly —
++  // springing them would make all pieces fly across the board at once. Do not
++  // consult the piece SharedValue here: resetBoard writes can still be queued
++  // on Android when this effect runs, so its current value may describe the
++  // previous FEN and cause newly occupied squares to keep the old orientation.
+   const isFirstLayoutRef = useRef(true);
+   useEffect(() => {
+     if (isFirstLayoutRef.current) {
+@@ -157,7 +160,6 @@ export const useBoardState = (
+     }
+     for (const square of SQUARES) {
+       const state = squareStates[square];
+-      if (state.piece.get() === null) continue;
+       const pos = squareToPosition(square, pieceSize, flipped);
+       state.translateX.set(pos.x);
+       state.translateY.set(pos.y);
+@@ -177,6 +179,14 @@ export const useBoardState = (
        isFirstFenRef.current = false;
        return;
      }

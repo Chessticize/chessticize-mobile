@@ -182,6 +182,29 @@ describe("react-native-chessboard gesture patch", () => {
     expect(patch).toContain("if (initialFen && chess.fen() === initialFen)");
   });
 
+  it("reprojects every logical square slot on orientation and size changes", () => {
+    const packageRoot = dirname(require.resolve("react-native-chessboard/package.json"));
+    const sources = [
+      resolve(packageRoot, "src/state/use-board-state.ts"),
+      resolve(packageRoot, "lib/module/state/use-board-state.js"),
+      resolve(packageRoot, "lib/commonjs/state/use-board-state.js")
+    ];
+
+    for (const sourcePath of sources) {
+      expectBoardStateSourceReprojectsAllSquares(readFileSync(sourcePath, "utf8"), sourcePath);
+    }
+  });
+
+  it("keeps all-square layout reprojection in the durable package patch", () => {
+    const patch = readFileSync(
+      resolve(__dirname, "../../../patches/react-native-chessboard@0.2.0.patch"),
+      "utf8"
+    );
+
+    expect(patch).toContain("snap every logical square slot to its new position instantly");
+    expect(patch.match(/^-\s+if \(state\.piece\.get\(\) === null\) continue;$/gm)).toHaveLength(3);
+  });
+
   it("snaps a cancelled drag home instead of deriving a drop from it", () => {
     const packageRoot = dirname(require.resolve("react-native-chessboard/package.json"));
     const sources = [
@@ -520,5 +543,22 @@ function expectBoardStateSourceSkipsRedundantFenReset(source, sourcePath) {
   expect(skipReturnIndex).toBeGreaterThan(skipIndex);
   expect(loadIndex).toBeGreaterThan(skipIndex);
   expect(resetIndex).toBeGreaterThan(skipIndex);
+  expect(sourcePath).toBeTruthy();
+}
+
+function expectBoardStateSourceReprojectsAllSquares(source, sourcePath) {
+  const commentIndex = source.indexOf("snap every logical square slot to its new position instantly");
+  const firstLayoutGuardIndex = source.indexOf("if (isFirstLayoutRef.current)", commentIndex);
+  const squareLoopIndex = source.indexOf("for (const square of", firstLayoutGuardIndex);
+  const positionIndex = source.indexOf("const pos = squareToPosition(square, pieceSize, flipped);", squareLoopIndex);
+  const effectEndIndex = source.indexOf("[flipped, pieceSize, squareStates]", positionIndex);
+  const layoutLoop = source.slice(squareLoopIndex, effectEndIndex);
+
+  expect(commentIndex).toBeGreaterThanOrEqual(0);
+  expect(firstLayoutGuardIndex).toBeGreaterThan(commentIndex);
+  expect(squareLoopIndex).toBeGreaterThan(firstLayoutGuardIndex);
+  expect(positionIndex).toBeGreaterThan(squareLoopIndex);
+  expect(effectEndIndex).toBeGreaterThan(positionIndex);
+  expect(layoutLoop).not.toContain("state.piece.get()");
   expect(sourcePath).toBeTruthy();
 }

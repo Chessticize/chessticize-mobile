@@ -4,7 +4,9 @@ const path = require('node:path');
 const zlib = require('node:zlib');
 const {
   countOccupiedBoardSquares,
+  detectOccupiedBoardSquares,
   expectBoardScreenshotContainsPieces,
+  expectBoardScreenshotMatchesOccupiedSquares,
   waitForBoardScreenshotContainsPieces,
 } = require('../e2e/screenshotAssertions');
 const {
@@ -41,6 +43,30 @@ describe('screenshot assertions', () => {
     paintCoordinateLabel(png, 1, 0, [245, 245, 245, 255]);
 
     expect(countOccupiedBoardSquares(png, fullBoardFrame())).toBe(0);
+  });
+
+  it('maps detected piece pixels back to logical squares in either orientation', () => {
+    const png = syntheticBoard();
+    paintPiece(png, 0, 0, [20, 25, 32, 255]);
+    paintPiece(png, 7, 7, [20, 25, 32, 255]);
+
+    expect(detectOccupiedBoardSquares(png, fullBoardFrame(), false)).toEqual(['a8', 'h1']);
+    expect(detectOccupiedBoardSquares(png, fullBoardFrame(), true)).toEqual(['h1', 'a8']);
+  });
+
+  it('fails position integrity when a flipped piece remains on its unflipped square', () => {
+    // A logical a1 piece belongs at the top-right when flipped. Paint it at
+    // bottom-left instead, the exact 180-degree mirror seen on Android.
+    const screenshotPath = writeSyntheticBoard('mirrored-a1.png', [
+      [7, 0, [245, 245, 245, 255]],
+    ]);
+
+    expect(() => expectBoardScreenshotMatchesOccupiedSquares(
+      screenshotPath,
+      fullBoardFrame(),
+      ['a1'],
+      true
+    )).toThrow('Board piece positions differ; missing=a1; unexpected=h8');
   });
 
   it('waits for a rotated board screenshot to contain rendered pieces', async () => {
