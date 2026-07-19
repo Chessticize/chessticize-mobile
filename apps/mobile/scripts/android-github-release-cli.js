@@ -78,6 +78,21 @@ function requireDispatchIdentity(options, releaseVersion) {
   return identity;
 }
 
+const GITHUB_RELEASE_MUTATION_PHASES = new Set([
+  'prepare-source-draft',
+  'publish-source',
+  'publish-binary',
+]);
+
+function requireGitHubReleaseToken(phase, environment) {
+  const token = environment.GITHUB_TOKEN;
+  if (GITHUB_RELEASE_MUTATION_PHASES.has(phase) &&
+      (typeof token !== 'string' || token.trim().length === 0)) {
+    throw new Error(`Protected GitHub Release token is required for ${phase}.`);
+  }
+  return token;
+}
+
 function retainedWorkflowInput(options, prefix) {
   const runId = Number(requiredOption(options, `${prefix}-run-id`));
   const artifactId = Number(requiredOption(options, `${prefix}-artifact-id`));
@@ -98,8 +113,9 @@ async function runCli(options, environment = process.env) {
     'release-version.json',
   );
   const identity = requireDispatchIdentity(options, releaseVersion);
+  const githubToken = requireGitHubReleaseToken(options.phase, environment);
   const outputDirectory = path.resolve(requiredOption(options, 'output-dir'));
-  const github = new GitHubReleasesClient({ token: environment.GITHUB_TOKEN });
+  const github = new GitHubReleasesClient({ token: githubToken });
   const sourceManifestPath = path.resolve(requiredOption(options, 'source-manifest'));
   const sourceManifestBytes = fs.readFileSync(sourceManifestPath);
   const sourceManifest = readJson(sourceManifestPath, 'Source manifest');

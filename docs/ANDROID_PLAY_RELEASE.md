@@ -109,6 +109,12 @@ mismatched archive or manifest bytes, or incomplete source disclosure fails
 closed. This repository does not currently claim that the owner-only tag or
 release exists.
 
+Before those protected GitHub Release phases, configure the temporary
+fine-grained `ANDROID_GITHUB_RELEASE_TOKEN` in the three environments exactly as
+specified by `docs/ANDROID_GITHUB_RELEASE.md`. Remove the environment secrets
+and revoke/delete the token after the selected Internal or Closed release flow
+and its required GitHub source/binary publication are complete.
+
 1. Complete Play developer account identity verification and register
    `com.chessticize.mobile` under Android developer verification.
 2. Create the production Play app identity, accept Play App Signing, register

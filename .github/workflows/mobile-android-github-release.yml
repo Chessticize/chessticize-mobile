@@ -43,7 +43,7 @@ jobs:
     environment: android-production
     permissions:
       actions: read
-      contents: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -80,7 +80,7 @@ jobs:
 
       - name: Prepare the one canonical source draft
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ secrets.ANDROID_GITHUB_RELEASE_TOKEN }}
           PUBLIC_VERSION: ${{ inputs.public_version }}
           VERSION_CODE: ${{ inputs.version_code }}
         run: |
@@ -114,7 +114,7 @@ jobs:
     environment: android-source-publication
     permissions:
       actions: read
-      contents: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -144,7 +144,7 @@ jobs:
 
       - name: Publish the source-only canonical release after approval
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ secrets.ANDROID_GITHUB_RELEASE_TOKEN }}
           CHESSTICIZE_ANDROID_SOURCE_PUBLICATION_APPROVED: "true"
           PUBLIC_VERSION: ${{ inputs.public_version }}
           VERSION_CODE: ${{ inputs.version_code }}
@@ -318,7 +318,7 @@ jobs:
     environment: android-binary-publication
     permissions:
       actions: read
-      contents: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -354,7 +354,7 @@ jobs:
 
       - name: Publish exact APK and checksum after separate approval
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ secrets.ANDROID_GITHUB_RELEASE_TOKEN }}
           CHESSTICIZE_ANDROID_BINARY_PUBLICATION_APPROVED: "true"
           PUBLIC_VERSION: ${{ inputs.public_version }}
           VERSION_CODE: ${{ inputs.version_code }}
