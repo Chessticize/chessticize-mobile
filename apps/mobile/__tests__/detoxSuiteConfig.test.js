@@ -1568,6 +1568,24 @@ describe('Detox suite configuration', () => {
     ].join('\n'));
   });
 
+  it('advances Android board-orientation evidence through stable public state', () => {
+    const spec = fs.readFileSync(
+      path.resolve(__dirname, '../e2e/android-board-orientation.e2e.js'),
+      'utf8'
+    );
+
+    expect(spec).toContain(
+      'const autoReply = puzzle.solutionMoves[(userMoveIndex * 2) + 2];'
+    );
+    expect(spec).toContain(
+      '`Last move ${autoReply.slice(0, 2)} to ${autoReply.slice(2, 4)}`'
+    );
+    expect(spec).toContain('if (puzzleIndex === PUZZLE_ORDER.length - 1) {');
+    expect(spec).not.toContain(
+      "waitFor(element(by.id('move-feedback-overlay'))).toExist()"
+    );
+  });
+
   it('resets Stockfish state without uninstalling the attached Android test app', () => {
     const stockfishSpecs = [
       '../e2e/android-stockfish-smoke.e2e.js',
