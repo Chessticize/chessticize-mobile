@@ -23,6 +23,15 @@ describe("release configuration gates", () => {
     ).toBe(true);
   });
 
+  it("lets a production-like development shell explicitly disable test controls", () => {
+    expect(
+      arePracticeTestControlsEnabled({
+        __CHESSTICIZE_ENABLE_TEST_CONTROLS__: false,
+        __DEV__: true
+      })
+    ).toBe(false);
+  });
+
   it("keeps debug tracing behind an explicit debug flag", () => {
     expect(isPracticeDebugEnabled({ __CHESSTICIZE_PRACTICE_DEBUG__: true })).toBe(true);
     expect(isPracticeDebugEnabled({ __DEV__: true })).toBe(false);

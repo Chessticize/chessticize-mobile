@@ -1,6 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react-native-web-vite";
 import { LabScenario } from "./LabScenario.tsx";
-import { clickTestId, openReviewQueue, waitForTestId } from "./storyPlay.ts";
+import {
+  clickTestId,
+  expectTestIdAbsent,
+  openReviewQueue,
+  waitForTestId,
+  waitForVisibleTestId
+} from "./storyPlay.ts";
 
 const meta = {
   title: "Review",
@@ -24,7 +30,8 @@ export const DueQueue: Story = {
   args: { scenarioId: "review-due" },
   play: async ({ canvasElement }) => {
     await openReviewQueue(canvasElement);
-    await waitForTestId(canvasElement, "review-due-items");
+    await waitForVisibleTestId(canvasElement, "review-start-due");
+    expectTestIdAbsent(canvasElement, "review-dev-controls");
   }
 };
 

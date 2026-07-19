@@ -10802,7 +10802,9 @@ const styles = StyleSheet.create({
     marginTop: 2
   },
   reviewStartButton: {
-    flex: 0
+    flexBasis: "auto",
+    flexGrow: 0,
+    flexShrink: 0
   },
   reviewDevControls: {
     alignItems: "stretch",

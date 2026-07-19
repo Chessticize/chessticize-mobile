@@ -10,6 +10,21 @@ export async function waitForTestId(canvasElement: HTMLElement, testID: string):
   await page.findByTestId(testID, {}, { timeout: 4_000 });
 }
 
+export async function waitForVisibleTestId(canvasElement: HTMLElement, testID: string): Promise<void> {
+  const page = within(canvasElement.ownerDocument.body);
+  const element = await page.findByTestId(testID, {}, { timeout: 4_000 });
+  if (element.getBoundingClientRect().height <= 0) {
+    throw new Error(`${testID} must have a visible height`);
+  }
+}
+
+export function expectTestIdAbsent(canvasElement: HTMLElement, testID: string): void {
+  const page = within(canvasElement.ownerDocument.body);
+  if (page.queryByTestId(testID)) {
+    throw new Error(`${testID} must not be rendered in the production-like lab`);
+  }
+}
+
 export async function openPracticeSession(canvasElement: HTMLElement): Promise<void> {
   await clickTestId(canvasElement, "practice-mode-standard");
   await clickTestId(canvasElement, "practice-start-button");
