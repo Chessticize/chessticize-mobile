@@ -1353,6 +1353,14 @@ describe('Android GitHub release automation', () => {
       path.join(repoRoot, 'package.json'),
       'utf8',
     ));
+    const jobBlock = jobName => {
+      const marker = `  ${jobName}:\n`;
+      const start = workflow.indexOf(marker);
+      expect(start).toBeGreaterThan(-1);
+      const remainder = workflow.slice(start + marker.length);
+      const nextJob = remainder.search(/^  [a-z][a-z-]+:\n/m);
+      return nextJob === -1 ? remainder : remainder.slice(0, nextJob);
+    };
 
     expect(workflow).toContain('workflow_dispatch:');
     expect(workflow).not.toMatch(/^\s*(push|pull_request|schedule):/m);
@@ -1371,6 +1379,29 @@ describe('Android GitHub release automation', () => {
     expect(workflow.match(/download-android-release-artifact\.sh/g)).toHaveLength(5);
     expect(workflow.match(/resolve-android-release-candidate-commit\.sh/g)).toHaveLength(2);
     expect(workflow.match(/"\$candidate_sha"/g)).toHaveLength(2);
+    expect(workflow.match(
+      /GITHUB_TOKEN: \$\{\{ secrets\.ANDROID_GITHUB_RELEASE_TOKEN \}\}/g,
+    )).toHaveLength(3);
+    expect(workflow.match(/GH_TOKEN: \$\{\{ github\.token \}\}/g)).toHaveLength(5);
+    expect(workflow.match(/^\s+GITHUB_TOKEN: \$\{\{ github\.token \}\}$/gm))
+      .toHaveLength(1);
+    expect(workflow.match(/^\s+contents: read$/gm)).toHaveLength(4);
+    expect(workflow).not.toContain('contents: write');
+    for (const [jobName, environment] of [
+      ['prepare-source-draft', 'android-production'],
+      ['publish-source', 'android-source-publication'],
+      ['publish-binary', 'android-binary-publication'],
+    ]) {
+      const job = jobBlock(jobName);
+      expect(job).toContain(`environment: ${environment}`);
+      expect(job.match(
+        /GITHUB_TOKEN: \$\{\{ secrets\.ANDROID_GITHUB_RELEASE_TOKEN \}\}/g,
+      )).toHaveLength(1);
+      expect(job).toContain('contents: read');
+    }
+    expect(jobBlock('prepare-binary')).not.toContain('ANDROID_GITHUB_RELEASE_TOKEN');
+    expect(workflow.slice(0, workflow.indexOf('\njobs:\n')))
+      .not.toContain('ANDROID_GITHUB_RELEASE_TOKEN');
     for (const value of [
       '.github/workflows/mobile-android-release-candidate.yml',
       '.github/workflows/mobile-android-github-release.yml',
@@ -1424,6 +1455,7 @@ describe('Android GitHub release automation', () => {
       workflowRunBodies.push(body.join('\n'));
     }
     expect(workflowRunBodies.join('\n')).not.toMatch(/\$\{\{\s*inputs\./);
+    expect(workflowRunBodies.join('\n')).not.toContain('ANDROID_GITHUB_RELEASE_TOKEN');
     expect(mobilePackage.scripts['verify:android:github-release'])
       .toBe('node scripts/android-github-release-cli.js');
     expect(rootPackage.scripts['mobile:verify:android:github-release'])
@@ -1435,6 +1467,19 @@ describe('Android GitHub release automation', () => {
     expect(runbook).toContain('no automatic GitHub update checks');
     expect(runbook).toContain('Only the original signed-candidate artifact may cross');
     expect(runbook).toContain('remain bound to the current protected workflow');
+    for (const value of [
+      '`ANDROID_GITHUB_RELEASE_TOKEN`',
+      'resource owner is `Chessticize`',
+      'limited to `chessticize-mobile`',
+      '**Contents: Read and write**',
+      '**Metadata: Read**',
+      '`android-production`',
+      '`android-source-publication`',
+      '`android-binary-publication`',
+      'revoke/delete the\nfine-grained token',
+    ]) {
+      expect(runbook).toContain(value);
+    }
   });
 
   it('forwards every protected workflow phase through the nested pnpm scripts without a stray delimiter', () => {
@@ -1493,6 +1538,39 @@ describe('Android GitHub release automation', () => {
     expect(result.stderr).toContain(
       'Dispatched public version/build does not match release-version.json.',
     );
+  });
+
+  it.each([
+    'prepare-source-draft',
+    'publish-source',
+    'publish-binary',
+  ])('fails closed before I/O when %s has no protected GitHub Release token', phase => {
+    const repoRoot = path.resolve(__dirname, '../../..');
+    const cli = path.join(repoRoot, 'apps/mobile/scripts/android-github-release-cli.js');
+    const canonicalVersion = JSON.parse(fs.readFileSync(
+      path.join(repoRoot, 'apps/mobile/release-version.json'),
+      'utf8',
+    ));
+    const result = spawnSync(process.execPath, [
+      cli,
+      '--phase', phase,
+      '--public-version', canonicalVersion.publicVersion,
+      '--version-code', String(canonicalVersion.androidVersionCode),
+    ], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        GITHUB_TOKEN: '',
+        GH_TOKEN: 'artifact-token-must-not-be-a-release-token-fallback',
+      },
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toContain(
+      `Protected GitHub Release token is required for ${phase}.`,
+    );
+    expect(result.stderr).not.toContain('--output-dir is required');
   });
 
   it('runs a successful source preparation through the real CLI process and fake HTTP boundary', () => {

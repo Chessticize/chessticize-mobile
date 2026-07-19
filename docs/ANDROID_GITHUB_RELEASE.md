@@ -67,6 +67,16 @@ require reviewers:
 Keep all credentials and private evidence in protected environment secrets;
 never commit them or put them in workflow inputs:
 
+- `ANDROID_GITHUB_RELEASE_TOKEN` is a temporary fine-grained personal access
+  token whose resource owner is `Chessticize`, whose repository access is
+  limited to `chessticize-mobile`, and whose only repository permissions are
+  **Contents: Read and write** plus GitHub's required **Metadata: Read**. Store
+  the same secret name in `android-production`,
+  `android-source-publication`, and `android-binary-publication`. The workflow
+  exposes it only to `prepare-source-draft`, `publish-source`, and
+  `publish-binary`, where GitHub Release mutation requires Contents write.
+  Actions artifact downloads and read-only release verification continue to use
+  the job-scoped `github.token` with read permissions.
 - `ANDROID_RELEASE_KEYSTORE_BASE64`, `ANDROID_RELEASE_STORE_PASSWORD`,
   `ANDROID_RELEASE_KEY_ALIAS`, `ANDROID_RELEASE_KEY_PASSWORD`, and
   `ANDROID_UPLOAD_CERT_SHA256` remain the #186 candidate inputs.
@@ -80,6 +90,12 @@ never commit them or put them in workflow inputs:
 
 The service account does not need permission to edit a Play release or rollout.
 Do not substitute upload-key credentials for the Play app-signing certificate.
+Do not put the GitHub Release token in a workflow input, shell command, evidence
+file, or log, and do not grant it Actions, Administration, or organization-wide
+repository access. After the selected Internal or Closed release flow and its
+required GitHub source/binary publication are complete, delete
+`ANDROID_GITHUB_RELEASE_TOKEN` from all three environments and revoke/delete the
+fine-grained token.
 
 ## Dispatch and retained-evidence chain
 
