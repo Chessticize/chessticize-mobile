@@ -28,6 +28,8 @@
     "verify:android:backup": "node scripts/verify-android-progress-backup.js",
     "verify:android:release": "node scripts/android-play-release.js",
     "verify:android:github-release": "node scripts/android-github-release-cli.js",
+    "generate:android:launcher-icons": "node scripts/android-launcher-icons.js",
+    "check:android:launcher-icons": "node scripts/android-launcher-icons.js --check",
     "version:ios:sync": "node scripts/ios-release-version.js",
     "version:ios:check": "node scripts/ios-release-version.js --check"
   },
