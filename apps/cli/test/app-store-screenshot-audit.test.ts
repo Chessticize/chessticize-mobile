@@ -11,7 +11,9 @@ const scenes = [
   "app-store-03-history-tab",
   "app-store-04-settings-tab",
   "app-store-05-standard-sprint",
-  "app-store-06-arrow-duel"
+  "app-store-06-arrow-duel",
+  "app-store-07-custom-setup",
+  "app-store-08-review-session"
 ];
 
 function pngFixture(width: number, height: number) {
@@ -67,15 +69,15 @@ test("App Store screenshot audit accepts complete iPhone and iPad portrait sets"
 
     assert.equal(payload.status, "pass");
     assert.equal(payload.summary.failed, 0);
-    assert.equal(payload.expectedScenes.length, 6);
+    assert.equal(payload.expectedScenes.length, 8);
     assert.equal(payload.groups.length, 3);
     assert.deepEqual(
       payload.groups.map((group: { group: string }) => group.group),
       ["iphone-6.9", "iphone-6.1", "ipad-13"]
     );
-    assert.equal(payload.groups[0].images.length, 6);
-    assert.equal(payload.groups[1].images.length, 6);
-    assert.equal(payload.groups[2].images.length, 6);
+    assert.equal(payload.groups[0].images.length, 8);
+    assert.equal(payload.groups[1].images.length, 8);
+    assert.equal(payload.groups[2].images.length, 8);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
