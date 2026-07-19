@@ -376,7 +376,7 @@ describe("PracticePocScreen", () => {
     const attemptId = (service.listHistory() as AttemptEvent[])[0]?.id;
     expect(attemptId).toBeTruthy();
     expect((service.listHistory() as AttemptEvent[])[0]).toMatchObject({ unclear: true });
-    expect(collectText(findByTestId(renderer, "sprint-unclear-marked"))).toBe("Marked as unclear");
+    expect(collectText(findByTestId(renderer, "sprint-unclear-marked"))).toBe("Marked");
     expect(styleContains(findByTestId(renderer, "sprint-unclear-marked").props.style, "#FFFBEB")).toBe(true);
     expect(styleContains(findByTestId(renderer, "sprint-unclear-marked").props.style, "#F59E0B")).toBe(true);
     expect(() => findByTestId(renderer, "sprint-unclear-toggle")).toThrow();
@@ -390,7 +390,7 @@ describe("PracticePocScreen", () => {
       id: attemptId,
       unclear: true
     });
-    expect(collectText(findByTestId(renderer, "sprint-unclear-marked"))).toBe("Marked as unclear");
+    expect(collectText(findByTestId(renderer, "sprint-unclear-marked"))).toBe("Marked");
   });
 
   it("keeps Review Schedule controls out of active Practice and Sprint Result", async () => {
@@ -3171,7 +3171,8 @@ describe("PracticePocScreen", () => {
     press(renderer, "history-attempt-unclear-history-attempt");
     expect(findByTestId(renderer, "review-board")).toBeTruthy();
     expect(() => findByTestId(renderer, "history-attempt-detail")).toThrow();
-    expect(collectText(findByTestId(renderer, "history-attempt-unclear"))).toContain("Marked as unclear");
+    expect(collectText(findByTestId(renderer, "history-attempt-unclear"))).toContain("Marked");
+    expect(collectText(findByTestId(renderer, "history-attempt-unclear"))).not.toContain("Marked as unclear");
     expect(findByTestId(renderer, "history-attempt-clear-unclear")).toBeTruthy();
     expect(testIdOrder(renderer, "review-schedule-control", "history-attempt-unclear")).toBeLessThan(0);
     expect(() => findByTestId(renderer, "bookmark-glyph")).toThrow();

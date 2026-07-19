@@ -4030,7 +4030,7 @@ function UnclearAttemptPrompt({
       </View>
       {marked ? (
         <View style={styles.unclearPromptButton} testID="sprint-unclear-marked">
-          <Text style={styles.unclearPromptButtonText}>Marked as unclear</Text>
+          <Text style={styles.unclearPromptButtonText}>Marked</Text>
         </View>
       ) : (
         <Pressable
@@ -7733,7 +7733,7 @@ function HistoryUnclearAction({ onClear }: { onClear: () => void }): React.JSX.E
       testID="history-attempt-unclear"
     >
       <View style={styles.historyAttemptUnclearCopy}>
-        <Text style={styles.historyAttemptUnclearTitle}>Marked as unclear</Text>
+        <Text style={styles.historyAttemptUnclearTitle}>Marked</Text>
       </View>
       <Pressable
         accessibilityRole="button"

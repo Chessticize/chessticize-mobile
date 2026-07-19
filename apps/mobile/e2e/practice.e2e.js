@@ -104,7 +104,7 @@ describe('Practice POC', () => {
     await playBoardMove('session-board', 'c2b1');
     await waitFor(element(by.id('sprint-unclear-prompt'))).toBeVisible().withTimeout(10000);
     await element(by.id('sprint-unclear-toggle')).tap();
-    await waitFor(element(by.text('Marked as unclear')))
+    await waitFor(element(by.text('Marked')))
       .toBeVisible()
       .withTimeout(10000);
 
@@ -115,7 +115,7 @@ describe('Practice POC', () => {
     await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(5000);
     await element(by.id('session-abandon-confirm')).tap();
     await waitFor(element(by.text('Sprint failed'))).toBeVisible().withTimeout(10000);
-    await expect(element(by.text('Marked as unclear'))).toBeVisible();
+    await expect(element(by.text('Marked'))).toBeVisible();
 
     // Recreate the process so History reads the marker from SQLite rather than
     // component state from the sprint that created it.
