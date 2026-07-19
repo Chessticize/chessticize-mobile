@@ -101,6 +101,8 @@ async function completeOneWrongReview() {
     'review-arrow-duel-candidate-overlay',
     'review-current-puzzle-id'
   );
+  await sleep(500);
+  await device.takeScreenshot('app-store-08-review-session');
   await playBoardMove('review-board', fixture.wrongMove, fixture.flipped);
   await waitFor(element(by.id('review-reminder-permission-prompt'))).toExist().withTimeout(10000);
   await element(by.id('review-reminder-permission-dismiss')).tap();
@@ -123,6 +125,17 @@ async function captureMainTabScenes() {
   }
   await sleep(1200);
   await device.takeScreenshot('app-store-01-practice-tab');
+
+  await element(by.id('practice-mode-custom')).tap();
+  await waitFor(element(by.id('custom-sprint-setup'))).toExist().withTimeout(10000);
+  await element(by.id('practice-main-scroll')).scrollTo('top');
+  await waitFor(element(by.id('custom-mode-regular'))).toBeVisible().withTimeout(10000);
+  await waitFor(element(by.id('custom-theme-row'))).toExist().withTimeout(10000);
+  await expect(element(by.text('Theme'))).not.toExist();
+  await sleep(1200);
+  await device.takeScreenshot('app-store-07-custom-setup');
+  await element(by.id('custom-close')).tap();
+  await waitFor(element(by.id('practice-mode-arrow-duel'))).toBeVisible().withTimeout(10000);
 
   await openTab('review-tab', 'review-start-due');
   await element(by.id('practice-main-scroll')).scrollTo('top');

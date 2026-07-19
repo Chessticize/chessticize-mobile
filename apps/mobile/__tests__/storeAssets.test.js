@@ -71,6 +71,9 @@ describe("App Store assets document", () => {
     expect(storeAssetsE2e).toContain("by.text('1-3 of 3')");
     expect(storeAssetsE2e).toContain("app-store-01-practice-tab");
     expect(storeAssetsE2e).toContain("app-store-06-arrow-duel");
+    expect(storeAssetsE2e).toContain("app-store-07-custom-setup");
+    expect(storeAssetsE2e).toContain("app-store-08-review-session");
+    expect(storeAssetsE2e).toContain("expect(element(by.text('Theme'))).not.toExist()");
     expect(storeAssetsDoc).toContain("pnpm mobile:e2e:build:ios:release");
     expect(storeAssetsDoc).toContain("pnpm mobile:e2e:store-assets:ios:release");
     expect(storeAssetsDoc).toContain("pnpm app-store:screenshot-audit");
@@ -82,6 +85,8 @@ describe("App Store assets document", () => {
     expect(storeAssetsDoc).toContain("ipad-13");
     expect(storeAssetsDoc).toContain("app-store-04-settings-tab");
     expect(storeAssetsDoc).toContain("app-store-05-standard-sprint");
+    expect(storeAssetsDoc).toContain("app-store-07-custom-setup");
+    expect(storeAssetsDoc).toContain("app-store-08-review-session");
   });
 
   it("marks the App Store plan store-assets item implementation complete", () => {

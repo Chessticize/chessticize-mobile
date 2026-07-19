@@ -84,7 +84,7 @@ per-bucket/theme counts. The artifact is published as the immutable
 ## Screenshot Set
 
 Use a release or production-like build, not a Metro debug screenshot. Capture
-the same six scenes for each required display group:
+the same eight scenes for each required display group:
 
 1. Practice tab with local ratings and the bundled offline pack.
 2. Review tab showing the local review queue state.
@@ -92,6 +92,8 @@ the same six scenes for each required display group:
 4. Settings tab showing local-only settings, source, and license context.
 5. Standard Puzzle Sprint with the board, timer, progress, and mistake counter.
 6. Arrow Duel with both candidate arrows visible.
+7. Custom Sprint setup with the complete compact configuration surface.
+8. Review session with the board and scheduled puzzle context.
 
 Save local raw captures under `scratch/store-assets/raw/`. The `scratch/`
 folder is ignored and may contain private iteration artifacts. Only commit
@@ -127,6 +129,8 @@ Detox screenshots:
 | `app-store-04-settings-tab` | Settings tab with local-only settings, source, and license context. |
 | `app-store-05-standard-sprint` | Standard Puzzle Sprint board, timer, progress, and mistakes. |
 | `app-store-06-arrow-duel` | Arrow Duel board with both candidate choices available. |
+| `app-store-07-custom-setup` | Custom Sprint setup with compact mode and theme choices; the theme row intentionally has no `Theme` heading. |
+| `app-store-08-review-session` | Active Review session with the scheduled puzzle board and progress context. |
 
 The capture suite builds one deterministic active-player profile through the
 public app UI before taking any screenshots. It raises Standard difficulty to
@@ -170,6 +174,8 @@ scratch/store-assets/final/
     app-store-04-settings-tab.png
     app-store-05-standard-sprint.png
     app-store-06-arrow-duel.png
+    app-store-07-custom-setup.png
+    app-store-08-review-session.png
   iphone-6.1/
     app-store-01-practice-tab.png
     app-store-02-review-tab.png
@@ -177,6 +183,8 @@ scratch/store-assets/final/
     app-store-04-settings-tab.png
     app-store-05-standard-sprint.png
     app-store-06-arrow-duel.png
+    app-store-07-custom-setup.png
+    app-store-08-review-session.png
   ipad-13/
     app-store-01-practice-tab.png
     app-store-02-review-tab.png
@@ -184,6 +192,8 @@ scratch/store-assets/final/
     app-store-04-settings-tab.png
     app-store-05-standard-sprint.png
     app-store-06-arrow-duel.png
+    app-store-07-custom-setup.png
+    app-store-08-review-session.png
 ```
 
 Then run:
