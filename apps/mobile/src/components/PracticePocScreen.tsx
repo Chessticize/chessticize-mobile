@@ -3349,8 +3349,7 @@ function CustomSprintSetup({
           testID="custom-mode-row"
           onChange={onCustomModeChange}
         />
-        <CustomChoiceRow
-          label="Theme"
+        <CustomThemeChoiceRow
           value={customThemeLabel(theme)}
           options={CUSTOM_THEME_OPTIONS.map(customThemeLabel)}
           testID="custom-theme-row"
@@ -3646,29 +3645,25 @@ function CustomValueRow({
   );
 }
 
-function CustomChoiceRow({
-  label,
+function CustomThemeChoiceRow({
   onChange,
   options,
   testID,
   value
 }: {
-  label: string;
   onChange: (next: string) => void;
   options: string[];
   testID: string;
   value: string;
 }): React.JSX.Element {
   return (
-    <View style={styles.customConfigRow} testID={testID}>
-      <View style={styles.customChoiceCopy}>
-        <Text style={styles.listText}>{label}</Text>
-      </View>
-      <View style={styles.customInlineOptions}>
+    <View style={[styles.customConfigRow, styles.customThemeRow]} testID={testID}>
+      <View style={[styles.customInlineOptions, styles.customThemeOptions]}>
         {options.map((option) => (
           <Pressable
             key={option}
             accessibilityRole="button"
+            accessibilityLabel={`${option} puzzle theme`}
             accessibilityState={{ selected: value === option }}
             testID={`custom-theme-${safeTestId(option)}`}
             style={[styles.customMiniChip, value === option ? styles.customMiniChipActive : null]}
@@ -11338,6 +11333,13 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 6,
     justifyContent: "flex-end"
+  },
+  customThemeRow: {
+    justifyContent: "center"
+  },
+  customThemeOptions: {
+    flex: 1,
+    justifyContent: "center"
   },
   customMiniChip: {
     alignItems: "center",

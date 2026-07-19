@@ -2517,6 +2517,8 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "custom-theme-row")).toBeTruthy();
     expect(findByTestId(renderer, "custom-theme-fork")).toBeTruthy();
     expect(findByTestId(renderer, "custom-theme-hanging-piece")).toBeTruthy();
+    expect(findByTestId(renderer, "custom-theme-fork").props.accessibilityLabel).toBe("Fork puzzle theme");
+    expect(collectText(findByTestId(renderer, "custom-theme-row"))).not.toContain("Theme");
     expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("Sacrifice");
     expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("Promotion");
     expect(() => findByTestId(renderer, "custom-summary-card")).toThrow();
