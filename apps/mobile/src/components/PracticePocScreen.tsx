@@ -20,7 +20,6 @@ import {
   applyMovesToFen,
   beginArrowDuelPuzzle,
   beginLinePuzzle,
-  buildAccessibleMoveOptions,
   buildCurrentPositionEvaluationLine,
   buildPuzzleGuidedAnalysisLines,
   buildSprintConfig,
@@ -43,7 +42,6 @@ import {
 } from "../../../../packages/core/src/index.ts";
 import type {
   AttemptEvent,
-  AccessibleMoveOption,
   AttemptSource,
   ArrowDuelState,
   CurrentPuzzleState,
@@ -1370,20 +1368,6 @@ export function PracticePocScreen({
     });
   }
 
-  async function playAccessibleSessionMove(option: AccessibleMoveOption): Promise<void> {
-    if (!boardRef.current || boardInputLockedRef.current || stateRef.current?.status !== "active") {
-      return;
-    }
-    const played = await boardRef.current.move({
-      from: option.from,
-      to: option.to,
-      ...(option.promotion ? { promotion: option.promotion } : {})
-    });
-    if (!played) {
-      setError(`Move ${option.label} is no longer available. Choose another move.`);
-    }
-  }
-
   async function submitAcceptedMove({
     move,
     nextVisualFen,
@@ -2291,18 +2275,8 @@ export function PracticePocScreen({
         perPuzzleSeconds: customPerPuzzleSeconds,
         ...(customThemeValue ? { theme: customThemeValue } : {})
       });
-  const sessionAccessibleMoves = displayedBoardFen ? (
-    <AccessibleMoveControls
-      allowedMoves={displayedPuzzle?.kind === "arrow_duel" ? displayedPuzzle.candidates : undefined}
-      disabled={!isActive || boardInputLocked}
-      fen={displayedBoardFen}
-      testIDPrefix="session"
-      onSelect={playAccessibleSessionMove}
-    />
-  ) : null;
   const sessionStatusNode = state && (isOpenSession || isShowingFeedbackSnapshot) ? (
     <SessionStatusBar
-      accessibleMoves={sessionAccessibleMoves}
       compactMetrics={sessionUsesRail}
       mode={mode}
       state={state}
@@ -2424,9 +2398,7 @@ export function PracticePocScreen({
       {unclearPrompt ? (
         <UnclearAttemptPrompt
           marked={unclearPrompt.marked}
-          question={isShowingFeedbackSnapshot && displayedPuzzle?.puzzle.id === unclearPrompt.puzzleId
-            ? "Was it clear why that move was correct?"
-            : "Was the previous puzzle clear?"}
+          question="Was the previous puzzle clear?"
           onToggle={toggleUnclearPrompt}
         />
       ) : null}
@@ -3845,104 +3817,7 @@ function TestPuzzleSourceControl({
   );
 }
 
-function AccessibleMoveControls({
-  allowedMoves,
-  disabled,
-  fen,
-  testIDPrefix,
-  onSelect
-}: {
-  allowedMoves?: string[];
-  disabled: boolean;
-  fen: string;
-  testIDPrefix: string;
-  onSelect: (option: AccessibleMoveOption) => void | Promise<void>;
-}): React.JSX.Element {
-  const [open, setOpen] = useState(false);
-  const options = useMemo(() => {
-    const allOptions = buildAccessibleMoveOptions(fen);
-    if (!allowedMoves) {
-      return allOptions;
-    }
-    const allowed = new Set(allowedMoves.map(normalizeUci));
-    return allOptions.filter((option) => allowed.has(option.uci));
-  }, [allowedMoves, fen]);
-  const unavailable = disabled || options.length === 0;
-
-  return (
-    <>
-      <Pressable
-        accessibilityHint="Opens a list of legal moves so the board can be used without dragging pieces"
-        accessibilityLabel="Choose move without gestures"
-        accessibilityRole="button"
-        accessibilityState={{ expanded: open, ...(unavailable ? { disabled: true } : {}) }}
-        disabled={unavailable}
-        onPress={() => setOpen(true)}
-        style={[styles.accessibleMoveOpenButton, unavailable ? styles.disabledButton : null]}
-        testID={`${testIDPrefix}-accessible-moves-open`}
-      >
-        <Text style={styles.accessibleMoveOpenButtonText}>Moves</Text>
-      </Pressable>
-      <Modal
-        animationType="fade"
-        onRequestClose={() => setOpen(false)}
-        transparent
-        visible={open}
-      >
-        <View style={styles.accessibleMoveModalBackdrop}>
-          <View
-            accessible={false}
-            accessibilityViewIsModal
-            style={styles.accessibleMoveDialog}
-            testID={`${testIDPrefix}-accessible-moves-dialog`}
-          >
-            <View style={styles.accessibleMoveDialogHeader}>
-              <View style={styles.accessibleMoveDialogTitleBlock}>
-                <Text accessibilityRole="header" style={styles.panelTitle}>Choose a legal move</Text>
-                <Text style={styles.helperText}>Select the same move you would play on the board.</Text>
-              </View>
-              <Pressable
-                accessibilityLabel="Close move chooser"
-                accessibilityRole="button"
-                onPress={() => setOpen(false)}
-                style={styles.iconButton}
-                testID={`${testIDPrefix}-accessible-moves-close`}
-              >
-                <CloseGlyph />
-              </Pressable>
-            </View>
-            <ScrollView
-              contentContainerStyle={styles.accessibleMoveList}
-              testID={`${testIDPrefix}-accessible-moves-list`}
-            >
-              {options.map((option) => (
-                <Pressable
-                  key={option.uci}
-                  accessibilityLabel={option.label}
-                  accessibilityRole="button"
-                  onPress={() => {
-                    setOpen(false);
-                    void onSelect(option);
-                  }}
-                  style={styles.accessibleMoveOption}
-                  testID={`${testIDPrefix}-accessible-move-${option.uci}`}
-                >
-                  <Text style={styles.accessibleMoveSan}>{option.san}</Text>
-                  <Text style={styles.accessibleMoveCoordinates}>
-                    {option.from} → {option.to}{option.promotion ? ` = ${option.promotion.toUpperCase()}` : ""}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-    </>
-  );
-}
-
 function SessionStatusBar({
-  accessibleMoves,
   compactMetrics = false,
   confirmAbandon,
   mode,
@@ -3954,7 +3829,6 @@ function SessionStatusBar({
   onPause,
   onResume
 }: {
-  accessibleMoves?: React.JSX.Element | null;
   compactMetrics?: boolean;
   confirmAbandon: boolean;
   mode: SprintMode;
@@ -3983,8 +3857,7 @@ function SessionStatusBar({
           <View style={styles.sessionNavButton} />
         )}
         <Text style={styles.sessionNavTitle}>{modeLabel(mode)}</Text>
-        <View style={styles.sessionNavActions}>
-          {accessibleMoves}
+        <View style={styles.sessionNavActions} testID="session-nav-actions">
           {onPause ? (
             <Pressable
               accessibilityRole="button"
@@ -7282,10 +7155,10 @@ function ReviewSession({
     boardRef.current?.resetBoard(previous);
   }
 
-  const reviewScheduleControlNode = reviewScheduleControlVisible ? (
+  const reviewScheduleControlNode = reviewScheduleControlVisible && currentEntry.source !== "due" ? (
     <ReviewScheduleControl
       key={`${currentEntry.puzzle.id}:${currentEntry.mode}:${currentEntry.ratingKey}`}
-      actionVisible={currentEntry.source !== "due"}
+      actionVisible
       compact
       context={{
         puzzleId: currentEntry.puzzle.id,
@@ -7298,9 +7171,6 @@ function ReviewSession({
         : undefined}
       service={service}
       onReviewChanged={onReviewEnrollmentChanged}
-      onRemoved={currentEntry.source === "due" && !reviewResultRecorded
-        ? goToNextDueReview
-        : undefined}
       refreshToken={reviewResultRecorded}
     />
   ) : null;
@@ -9836,75 +9706,12 @@ const styles = StyleSheet.create({
     top: 0,
     width: 1
   },
-  accessibleMoveOpenButton: {
-    alignItems: "center",
-    borderColor: "#CBD5E1",
-    borderRadius: 8,
-    borderWidth: 1,
-    height: 48,
-    justifyContent: "center",
-    minWidth: 56,
-    paddingHorizontal: 7
-  },
-  accessibleMoveOpenButtonText: {
-    color: "#334155",
-    fontSize: 11,
-    fontWeight: "800"
-  },
   accessibleMoveModalBackdrop: {
     alignItems: "center",
     backgroundColor: "rgba(15, 23, 42, 0.48)",
     flex: 1,
     justifyContent: "center",
     padding: 20
-  },
-  accessibleMoveDialog: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 14,
-    maxHeight: "86%",
-    maxWidth: 620,
-    padding: 16,
-    width: "100%"
-  },
-  accessibleMoveDialogHeader: {
-    alignItems: "flex-start",
-    flexDirection: "row",
-    gap: 12,
-    justifyContent: "space-between",
-    marginBottom: 12
-  },
-  accessibleMoveDialogTitleBlock: {
-    flex: 1,
-    gap: 4,
-    minWidth: 0
-  },
-  accessibleMoveList: {
-    gap: 8,
-    paddingBottom: 8
-  },
-  accessibleMoveOption: {
-    alignItems: "center",
-    backgroundColor: "#F8FAFC",
-    borderColor: "#CBD5E1",
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 12,
-    justifyContent: "space-between",
-    minHeight: 48,
-    paddingHorizontal: 14,
-    paddingVertical: 10
-  },
-  accessibleMoveSan: {
-    color: "#111827",
-    flex: 1,
-    fontSize: 16,
-    fontWeight: "800"
-  },
-  accessibleMoveCoordinates: {
-    color: "#475569",
-    fontSize: 13,
-    fontWeight: "700"
   },
   predictiveBackStage: {
     backgroundColor: "#DCE7F5",
@@ -10832,7 +10639,8 @@ const styles = StyleSheet.create({
   sessionNavActions: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 4
+    justifyContent: "center",
+    width: 48
   },
   sessionNavTitle: {
     color: "#111827",

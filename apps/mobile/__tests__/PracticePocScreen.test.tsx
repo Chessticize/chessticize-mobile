@@ -366,7 +366,7 @@ describe("PracticePocScreen", () => {
 
     await boardMove(renderer, "e6f7");
     expect(collectText(findByTestId(renderer, "sprint-unclear-question"))).toBe(
-      "Was it clear why that move was correct?"
+      "Was the previous puzzle clear?"
     );
     expect(collectText(findByTestId(renderer, "sprint-unclear-toggle"))).toBe("Mark as unclear");
     expect(styleContains(findByTestId(renderer, "sprint-unclear-toggle").props.style, "#FFFBEB")).toBe(true);
@@ -1086,10 +1086,9 @@ describe("PracticePocScreen", () => {
       node.props.testID === "safe-area-shell" || String(node.type) === "SafeAreaView"
     ));
     expect(flattenTestStyle(safeAreaShell.props.style).paddingTop).toBe(topInset);
-    const moves = findByTestId(renderer, "session-accessible-moves-open");
-    expect(moves.props.accessibilityRole).toBe("button");
-    expect(moves.props.accessibilityState).toEqual({ expanded: false });
-    expect(Number(flattenTestStyle(moves.props.style).height)).toBeGreaterThanOrEqual(48);
+    const pause = findByTestId(renderer, "session-pause");
+    expect(pause.props.accessibilityRole).toBe("button");
+    expect(Number(flattenTestStyle(pause.props.style).height)).toBeGreaterThanOrEqual(48);
   });
 
   it("stacks the review board and analysis panel on an iPad in portrait", () => {
@@ -1130,7 +1129,7 @@ describe("PracticePocScreen", () => {
     expect(actions.findByProps({ testID: "history-attempt-unclear" })).toBeTruthy();
   });
 
-  it("preserves the active sprint and its accessible move dialog across a live resize", () => {
+  it("preserves the active sprint across a live resize", () => {
     const service = createMobilePracticeService("familiar15");
     (ReactNative as unknown as {
       __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
@@ -1140,8 +1139,7 @@ describe("PracticePocScreen", () => {
     startStandardSprint(renderer);
     const sprintId = activeSprintForTest(service).id;
     const puzzleId = activeSprintForTest(service).currentPuzzle?.puzzle.id;
-    press(renderer, "session-accessible-moves-open");
-    expect(findByTestId(renderer, "session-accessible-moves-dialog")).toBeTruthy();
+    expect(() => findByTestId(renderer, "session-accessible-moves-open")).toThrow();
 
     act(() => {
       (ReactNative as unknown as {
@@ -1152,8 +1150,19 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "adaptive-layout").props.accessibilityLabel).toBe("Layout compactLandscape");
     expect(activeSprintForTest(service).id).toBe(sprintId);
     expect(activeSprintForTest(service).currentPuzzle?.puzzle.id).toBe(puzzleId);
-    expect(findByTestId(renderer, "session-accessible-moves-dialog")).toBeTruthy();
+    expect(() => findByTestId(renderer, "session-accessible-moves-open")).toThrow();
     expect(findByTestId(renderer, "active-session-control-rail")).toBeTruthy();
+  });
+
+  it("removes the Sprint Moves action and centers its title", () => {
+    const renderer = renderScreen({ practiceService: createMobilePracticeService("familiar15") });
+
+    startStandardSprint(renderer);
+
+    expect(() => findByTestId(renderer, "session-accessible-moves-open")).toThrow();
+    expect(flattenTestStyle(findByTestId(renderer, "session-nav-actions").props.style).width).toBe(
+      flattenTestStyle(findByTestId(renderer, "session-abandon").props.style).width
+    );
   });
 
   it("keeps board geometry inside narrow resizable windows and reserves room for large text", () => {
@@ -1174,51 +1183,6 @@ describe("PracticePocScreen", () => {
     expect(styleEntryMatches(findByTestId(largeTextRenderer, "practice-home-layout").props.style, "flexDirection", "row")).toBe(false);
     startStandardSprint(largeTextRenderer);
     expect(flattenTestStyle(findByTestId(largeTextRenderer, "session-board").props.style).width).toBeLessThanOrEqual(860);
-  });
-
-  it("offers public non-gesture move actions and announces changing session state", async () => {
-    const service = createMobilePracticeService("familiar15");
-    const renderer = renderScreen({ practiceService: service });
-    startStandardSprint(renderer);
-
-    const open = findByTestId(renderer, "session-accessible-moves-open");
-    expect(open.props.accessibilityRole).toBe("button");
-    expect(open.props.accessibilityState).toEqual({ expanded: false });
-    expect(findByTestId(renderer, "practice-announcement").props.accessibilityLiveRegion).toBe("polite");
-
-    press(renderer, "session-accessible-moves-open");
-    const dialog = findByTestId(renderer, "session-accessible-moves-dialog");
-    expect(dialog.props.accessibilityViewIsModal).toBe(true);
-    const moveButtons = renderer.root.findAll((node) =>
-      typeof node.props.testID === "string" && node.props.testID.startsWith("session-accessible-move-")
-    );
-    expect(moveButtons.length).toBeGreaterThan(0);
-    expect(moveButtons.every((node) => node.props.accessibilityRole === "button")).toBe(true);
-    expect(moveButtons.every((node) => Number(flattenTestStyle(node.props.style).minHeight) >= 48)).toBe(true);
-
-    const fixtureMove = findByTestId(renderer, "session-accessible-move-c2b1");
-    expect(fixtureMove.props.accessibilityLabel).toContain("c2 to b1");
-
-    await act(async () => {
-      fixtureMove.props.onPress();
-      await Promise.resolve();
-    });
-    expect(activeSprintForTest(service).correctCount).toBe(1);
-    expect(findByTestId(renderer, "practice-announcement").props.accessibilityLiveRegion).toBe("polite");
-  });
-
-  it("limits non-gesture Arrow Duel actions to the visible candidate contract", () => {
-    const service = createMobilePracticeService("random1000");
-    const renderer = renderScreen({ practiceService: service });
-    startArrowDuelSprint(renderer);
-    const candidates = requireArrowDuelState(activeSprintForTest(service)).candidates;
-
-    press(renderer, "session-accessible-moves-open");
-    const moveIDs = Array.from(new Set(renderer.root.findAll((node) =>
-      typeof node.props.testID === "string" && node.props.testID.startsWith("session-accessible-move-")
-    ).map((node) => String(node.props.testID))));
-
-    expect(moveIDs).toEqual(candidates.map((move) => `session-accessible-move-${move}`).sort());
   });
 
   it("advances Review analysis through the board without mutating review records", async () => {
@@ -4337,15 +4301,17 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "review-panel")).toThrow();
   });
 
-  it("keeps scheduled Review status read-only and centers its header", () => {
+  it("hides scheduling controls from scheduled Review and centers its header", () => {
     jest.setSystemTime(new Date("2026-06-21T12:00:00.000Z"));
     const service = createDueReviewService(2);
     const renderer = renderScreen({ practiceService: service });
 
     press(renderer, "review-tab");
     press(renderer, "review-start-due");
-    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Due today");
+    expect(() => findByTestId(renderer, "review-schedule-control")).toThrow();
+    expect(() => findByTestId(renderer, "review-schedule-state")).toThrow();
     expect(() => findByTestId(renderer, "review-schedule-remove")).toThrow();
+    expect(() => findByTestId(renderer, "review-context-actions-bottom")).toThrow();
     expect(flattenTestStyle(findByTestId(renderer, "review-header-actions").props.style).width).toBe(
       flattenTestStyle(findByTestId(renderer, "review-exit").props.style).width
     );
