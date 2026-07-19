@@ -33,6 +33,10 @@ const expectedCandidate = {
   versionCode: releaseVersion.androidVersionCode,
   uploadCertificateSha256: '11'.repeat(32),
 };
+const expectedSourceTag = canonicalAndroidSourceTag(
+  expectedCandidate.versionName,
+  expectedCandidate.versionCode,
+);
 const originalGitHubToken = process.env.GITHUB_TOKEN;
 
 beforeAll(() => {
@@ -138,7 +142,7 @@ function protectedWorkflowArchiveSha256() {
 }
 
 function sourceSupportDocumentationBytes(overrides = {}) {
-  const tag = overrides.tag ?? 'android-v1.1.0-build-1';
+  const tag = overrides.tag ?? expectedSourceTag;
   const repository = overrides.repository ??
     'https://github.com/Chessticize/chessticize-mobile';
   return Buffer.from(`Public Android source: ${repository} at ${tag}.\n`);
@@ -151,7 +155,7 @@ function sourceSupportDocumentationSha256(overrides = {}) {
 }
 
 function validOwnerEvidence(overrides = {}) {
-  const sourceTag = 'android-v1.1.0-build-1';
+  const sourceTag = expectedSourceTag;
   const sourceReleaseUrl =
     `https://github.com/Chessticize/chessticize-mobile/releases/tag/${sourceTag}`;
   return {
@@ -313,7 +317,7 @@ function publishedWorkflowArtifact(overrides = {}) {
 
 function publishedTagRef(overrides = {}) {
   return {
-    ref: 'refs/tags/android-v1.1.0-build-1',
+    ref: `refs/tags/${expectedSourceTag}`,
     object: {
       type: 'tag',
       sha: 'd'.repeat(40),
@@ -324,7 +328,7 @@ function publishedTagRef(overrides = {}) {
 
 function publishedTagObject(overrides = {}) {
   return {
-    tag: 'android-v1.1.0-build-1',
+    tag: expectedSourceTag,
     object: {
       type: 'commit',
       sha: expectedCandidate.commitSha,
@@ -338,19 +342,19 @@ function publishedTagObject(overrides = {}) {
 
 function sourceReleaseRun(overrides = {}) {
   const responses = {
-    'git cat-file -t android-v1.1.0-build-1': {
+    [`git cat-file -t ${expectedSourceTag}`]: {
       status: 0,
       stdout: 'tag\n',
       stderr: '',
     },
-    'git rev-list -n 1 android-v1.1.0-build-1': {
+    [`git rev-list -n 1 ${expectedSourceTag}`]: {
       status: 0,
       stdout: `${expectedCandidate.commitSha}\n`,
       stderr: '',
     },
-    'git cat-file tag android-v1.1.0-build-1': {
+    [`git cat-file tag ${expectedSourceTag}`]: {
       status: 0,
-      stdout: 'object candidate\ntype commit\ntag android-v1.1.0-build-1\n',
+      stdout: `object candidate\ntype commit\ntag ${expectedSourceTag}\n`,
       stderr: '',
     },
     'curl release': {
@@ -520,6 +524,56 @@ function signedAabFixture({ appendUnsigned = false, addUnexpectedSigner = false 
 }
 
 describe('Android Play release contract', () => {
+  it('pins the current Play retry to public version 1.1 build 2', () => {
+    const sourceTag = canonicalAndroidSourceTag(
+      releaseVersion.publicVersion,
+      releaseVersion.androidVersionCode,
+    );
+    const runbook = read('docs/ANDROID_PLAY_RELEASE.md');
+    const expectedIdentityBinding = {
+      applicationId: expectedCandidate.applicationId,
+      versionName: expectedCandidate.versionName,
+      versionCode: expectedCandidate.versionCode,
+    };
+    const candidateBindings = [];
+    const collectCandidateBindings = value => {
+      if (!value || typeof value !== 'object') {
+        return;
+      }
+      if (value.candidate) {
+        candidateBindings.push(value.candidate);
+      }
+      for (const nested of Object.values(value)) {
+        collectCandidateBindings(nested);
+      }
+    };
+
+    collectCandidateBindings(ownerEvidenceExample);
+
+    expect(releaseVersion).toEqual(
+      expect.objectContaining({
+        publicVersion: '1.1',
+        androidVersionCode: 2,
+      }),
+    );
+    expect(sourceTag).toBe('android-v1.1.0-build-2');
+    expect(ownerEvidenceExample.candidate).toEqual(
+      expect.objectContaining(expectedIdentityBinding),
+    );
+    expect(candidateBindings.length).toBeGreaterThan(0);
+    for (const binding of candidateBindings) {
+      expect(binding).toEqual(expect.objectContaining(expectedIdentityBinding));
+    }
+    expect(ownerEvidenceExample.sourceRelease.tagName).toBe(sourceTag);
+    expect(
+      ownerEvidenceExample.sourceRelease.reference.endsWith(sourceTag),
+    ).toBe(true);
+    expect(runbook).toContain(
+      'Android version code: `apps/mobile/release-version.json` (`2`)',
+    );
+    expect(runbook).toContain('android-v1.1.0-build-2');
+  });
+
   it('uses one public semantic version while Android keeps an independent version code', () => {
     const appGradle = read('apps/mobile/android/app/build.gradle');
     const iosProject = read(
@@ -770,7 +824,7 @@ describe('Android Play release contract', () => {
     expect(ownerEvidenceExample.sourceRelease).toEqual(expect.objectContaining({
       status: 'pending',
       repositoryUrl: 'https://github.com/Chessticize/chessticize-mobile',
-      tagName: 'android-v1.1.0-build-1',
+      tagName: expectedSourceTag,
       tagType: 'pending',
       releaseId: 0,
       published: false,
@@ -785,7 +839,7 @@ describe('Android Play release contract', () => {
       sourceDisclosure: expect.objectContaining({
         releaseNotesReference:
           'https://github.com/Chessticize/chessticize-mobile/releases/tag/' +
-          'android-v1.1.0-build-1',
+          expectedSourceTag,
       }),
     }));
   });
@@ -832,7 +886,7 @@ describe('Android Play release contract', () => {
     evidence.sourceRelease.sourceManifest.assetName = 'other-source.json';
     evidence.sourceRelease.sourceManifest.reference =
       'https://github.com/Chessticize/chessticize-mobile/releases/download/' +
-      'android-v1.1.0-build-1/other-source.json';
+      `${expectedSourceTag}/other-source.json`;
 
     expect(inspectOwnerEvidence(evidence, expectedCandidate)).toEqual(
       expect.arrayContaining([
@@ -884,7 +938,7 @@ describe('Android Play release contract', () => {
       evidence.sourceRelease.candidate.versionName = '1.2';
     }, 'Public Android source release candidate version name'],
     ['version-code binding', evidence => {
-      evidence.sourceRelease.candidate.versionCode = 2;
+      evidence.sourceRelease.candidate.versionCode = expectedCandidate.versionCode + 1;
     }, 'Public Android source release candidate version code'],
     ['repository', evidence => {
       evidence.sourceRelease.repositoryUrl = 'https://github.com/example/other';
@@ -893,7 +947,7 @@ describe('Android Play release contract', () => {
       evidence.sourceRelease.reference += '?unpublished=1';
     }, 'Public Android source release URL'],
     ['normalized tag', evidence => {
-      evidence.sourceRelease.tagName = 'android-v1.1-build-1';
+      evidence.sourceRelease.tagName = `android-v1.1-build-${expectedCandidate.versionCode}`;
     }, 'Public Android source tag'],
     ['tag commit', evidence => {
       evidence.sourceRelease.tagCommitSha = 'c'.repeat(40);
@@ -935,7 +989,8 @@ describe('Android Play release contract', () => {
       evidence.sourceRelease.sourceManifest.releaseId = 999;
     }, 'Source manifest GitHub release ID'],
     ['tag provenance', evidence => {
-      evidence.sourceRelease.sourceManifest.tagName = 'android-v1.1.0-build-2';
+      evidence.sourceRelease.sourceManifest.tagName =
+        canonicalAndroidSourceTag('1.1', expectedCandidate.versionCode + 1);
     }, 'Source manifest tag'],
     ['commit provenance', evidence => {
       evidence.sourceRelease.sourceManifest.commitSha = 'c'.repeat(40);
@@ -956,7 +1011,8 @@ describe('Android Play release contract', () => {
       evidence.sourceRelease.sourceManifest.candidate.versionName = '1.2';
     }, 'Source manifest candidate version name'],
     ['candidate version-code provenance', evidence => {
-      evidence.sourceRelease.sourceManifest.candidate.versionCode = 2;
+      evidence.sourceRelease.sourceManifest.candidate.versionCode =
+        expectedCandidate.versionCode + 1;
     }, 'Source manifest candidate version code'],
   ])('rejects retained source-manifest evidence with %s',
     (_label, mutate, expectedMessage) => {
@@ -1040,7 +1096,9 @@ describe('Android Play release contract', () => {
     ['release URL', release => {
       release.html_url = 'https://github.com/Chessticize/chessticize-mobile/releases/tag/other';
     }, 'Published GitHub release URL'],
-    ['release tag', release => { release.tag_name = 'android-v1.1.0-build-2'; },
+    ['release tag', release => {
+      release.tag_name = canonicalAndroidSourceTag('1.1', expectedCandidate.versionCode + 1);
+    },
       'Published GitHub release tag'],
     ['draft state', release => { release.draft = true; },
       'not a published non-draft GitHub release'],
@@ -1073,13 +1131,21 @@ describe('Android Play release contract', () => {
 
   it.each([
     ['missing local tag', {
-      'git cat-file -t android-v1.1.0-build-1': { status: 1, stdout: '', stderr: 'missing' },
+      [`git cat-file -t ${expectedSourceTag}`]: {
+        status: 1,
+        stdout: '',
+        stderr: 'missing',
+      },
     }, 'could not be inspected locally'],
     ['lightweight local tag', {
-      'git cat-file -t android-v1.1.0-build-1': { status: 0, stdout: 'commit\n', stderr: '' },
+      [`git cat-file -t ${expectedSourceTag}`]: {
+        status: 0,
+        stdout: 'commit\n',
+        stderr: '',
+      },
     }, 'Git object type'],
     ['wrong local tag commit', {
-      'git rev-list -n 1 android-v1.1.0-build-1': {
+      [`git rev-list -n 1 ${expectedSourceTag}`]: {
         status: 0,
         stdout: `${'c'.repeat(40)}\n`,
         stderr: '',
@@ -1120,9 +1186,9 @@ describe('Android Play release contract', () => {
     expect(inspectPublishedSourceRelease(sourceRelease, expectedCandidate, {
       repoRoot,
       run: sourceReleaseRun({
-        'git cat-file tag android-v1.1.0-build-1': {
+        [`git cat-file tag ${expectedSourceTag}`]: {
           status: 0,
-          stdout: 'tag android-v1.1.0-build-1\n-----BEGIN PGP SIGNATURE-----\nsig\n',
+          stdout: `tag ${expectedSourceTag}\n-----BEGIN PGP SIGNATURE-----\nsig\n`,
           stderr: '',
         },
       }),
@@ -1224,9 +1290,9 @@ describe('Android Play release contract', () => {
     expect(inspectPublishedSourceRelease(sourceRelease, expectedCandidate, {
       repoRoot,
       run: sourceReleaseRun({
-        'git cat-file tag android-v1.1.0-build-1': {
+        [`git cat-file tag ${expectedSourceTag}`]: {
           status: 0,
-          stdout: 'tag android-v1.1.0-build-1\n-----BEGIN PGP SIGNATURE-----\nsig\n',
+          stdout: `tag ${expectedSourceTag}\n-----BEGIN PGP SIGNATURE-----\nsig\n`,
           stderr: '',
         },
         'curl tag object': {
@@ -1702,7 +1768,7 @@ describe('Android Play release contract', () => {
     expect(runbook).toContain('protected Actions artifact');
     expect(runbook).toContain('android-source-manifest.json');
     expect(runbook).toContain('CHESSTICIZE_GITHUB_TOKEN');
-    expect(runbook).toContain('android-v1.1.0-build-1');
+    expect(runbook).toContain(expectedSourceTag);
     expect(runbook).toContain('https://github.com/Chessticize/chessticize-mobile');
     expect(runbook).toContain('do not start the rollout in #186');
     expect(verifier).toContain('{ repoRoot, run, environment },');

@@ -1,20 +1,24 @@
 # Android Play Release Candidate
 
-This runbook builds and audits the first production-upload-signed Android App
-Bundle. It deliberately separates repository-owned checks from owner-only Play
-Console evidence. Missing signing material, protected-environment setup, or any
-console result is a blocker; never replace it with a debug key, a scratch key,
-an emulator claim, or a hand-edited passing JSON file.
+This runbook builds and audits the current production-upload-signed Android App
+Bundle. Build 1 remains an immutable audit record because version code 1 was
+uploaded to Play before a later protected source-publication workflow defect was
+fixed. The exact-main retry keeps public version 1.1 and advances only the
+Android build number to 2. It deliberately separates repository-owned checks
+from owner-only Play Console evidence. Missing signing material,
+protected-environment setup, or any console result is a blocker; never replace
+it with a debug key, a scratch key, an emulator claim, or a hand-edited passing
+JSON file.
 
 ## Canonical identity
 
 - Application ID: `com.chessticize.mobile`
 - Public version: `apps/mobile/release-version.json` (`1.1`)
-- Android version code: `apps/mobile/release-version.json` (`1`)
+- Android version code: `apps/mobile/release-version.json` (`2`)
 - iOS build number: `apps/mobile/release-version.json` (`2`, independent from Android)
 - Supported ABIs: `arm64-v8a`, `x86_64`
 - Target SDK: API 36
-- Required source tag before any Play track upload: `android-v1.1.0-build-1`
+- Required source tag before any Play track upload: `android-v1.1.0-build-2`
 
 Android `versionCode` must increase for every later Play upload. The public
 version must continue to match iOS. Settings reads `versionName` and
@@ -98,8 +102,8 @@ the retained Actions artifact before requesting a `play-ready` verdict. The
 verifier passes this credential to `curl` through standard input, not command
 arguments. Do not put it in owner evidence or commit it.
 
-For Android version `1.1` build `1`, release notes and this support document must
-name the canonical source tag `android-v1.1.0-build-1` and the public source
+For Android version `1.1` build `2`, release notes and this support document must
+name the canonical source tag `android-v1.1.0-build-2` and the public source
 repository `https://github.com/Chessticize/chessticize-mobile`. The evidence
 record points to this document at the exact candidate commit and records its
 SHA-256. Plausible hand-authored URLs, IDs, or matching-looking JSON do not
