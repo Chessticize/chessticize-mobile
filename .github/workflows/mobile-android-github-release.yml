@@ -65,13 +65,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           ARTIFACT_ID: ${{ inputs.candidate_artifact_id }}
+          PUBLIC_VERSION: ${{ inputs.public_version }}
+          VERSION_CODE: ${{ inputs.version_code }}
         run: |
+          candidate_sha="$(bash apps/mobile/scripts/resolve-android-release-candidate-commit.sh \
+            "$PUBLIC_VERSION" "$VERSION_CODE")"
           bash apps/mobile/scripts/download-android-release-artifact.sh \
             "$ARTIFACT_ID" \
             ".github/workflows/mobile-android-release-candidate.yml" \
             'android-signed-release-candidate-{sha}' \
             "$RUNNER_TEMP/candidate" \
-            "$RUNNER_TEMP/candidate.zip"
+            "$RUNNER_TEMP/candidate.zip" \
+            "$candidate_sha"
 
       - name: Prepare the one canonical source draft
         env:
@@ -204,13 +209,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           ARTIFACT_ID: ${{ inputs.candidate_artifact_id }}
+          PUBLIC_VERSION: ${{ inputs.public_version }}
+          VERSION_CODE: ${{ inputs.version_code }}
         run: |
+          candidate_sha="$(bash apps/mobile/scripts/resolve-android-release-candidate-commit.sh \
+            "$PUBLIC_VERSION" "$VERSION_CODE")"
           bash apps/mobile/scripts/download-android-release-artifact.sh \
             "$ARTIFACT_ID" \
             ".github/workflows/mobile-android-release-candidate.yml" \
             'android-signed-release-candidate-{sha}' \
             "$RUNNER_TEMP/candidate" \
-            "$RUNNER_TEMP/candidate.zip"
+            "$RUNNER_TEMP/candidate.zip" \
+            "$candidate_sha"
 
       - name: Download and authenticate exact source-publication evidence
         id: prior

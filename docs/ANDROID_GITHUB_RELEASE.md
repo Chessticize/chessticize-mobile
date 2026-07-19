@@ -108,6 +108,34 @@ APK between phases. If an artifact expires, restart from the earliest phase
 whose authenticated input still exists. Any identity, evidence, digest, API,
 inspection, asset, or publication mismatch fails closed.
 
+### One-time recovery from repaired `main`
+
+A retained signed candidate can predate a repository-only release-automation
+fix. When protected-environment branch policy permits dispatch only from
+`main`, rerun `prepare-source-draft` or `prepare-binary` from the repaired
+`main` workflow with the original candidate artifact ID, public version, and
+version code. This is a recovery path for the retained immutable candidate; it
+does not make the current `main` commit the candidate source.
+
+The workflow derives the canonical Android tag from the dispatched public
+version and version code, fetches that exact tag, requires its Git object to be
+an annotated tag, and dereferences it to an exact commit. The candidate
+artifact downloader then requires the candidate workflow run SHA and
+`android-signed-release-candidate-<sha>` name to match that dereferenced commit.
+Its workflow path, dispatch event, successful conclusion, numeric artifact ID,
+artifact name, archive digest, and extracted manifest remain mandatory. The
+later phase verifier independently requires the manifest commit and live
+canonical tag target to match the same candidate.
+
+Only the original signed-candidate artifact may cross this repaired-`main`
+boundary. Source-draft, source-publication, binary-preparation, and
+binary-publication artifacts remain bound to the current protected workflow's
+`GITHUB_SHA`; rerun from the earliest repaired phase if one of those artifacts
+was created on another commit. A missing, lightweight, conflicting, or moved
+canonical tag, a mismatched candidate run SHA/name, or any digest mismatch is a
+hard stop. Never move the tag, rebuild the AAB, substitute an artifact, or reuse
+the version code to make recovery pass.
+
 ## Verified binary contract
 
 The official [Generated APKs API list
