@@ -3814,7 +3814,10 @@ describe("PracticePocScreen", () => {
   it("reviews missed puzzles from the completed sprint using the solving board", async () => {
     const service = createMobilePracticeService("random1000");
     const recordReviewAttempt = jest.spyOn(service, "recordReviewAttempt");
-    const renderer = renderScreen({ practiceService: service });
+    const renderer = renderScreen({
+      currentTimeMs: () => Date.parse("2026-07-18T12:00:00.000Z"),
+      practiceService: service
+    });
 
     startStandardSprint(renderer);
     await boardMove(renderer, "c4b5");
