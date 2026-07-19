@@ -361,14 +361,26 @@ function pixelFrameForElement(png, elementFrame, screenFrame) {
     width: elementFrame.x * 2 + elementFrame.width,
     height: elementFrame.y * 2 + elementFrame.height
   };
-  const scaleX = png.width / referenceFrame.width;
-  const scaleY = png.height / referenceFrame.height;
+  // Detox reports Android frames as absolute physical pixels, including the
+  // system-bar inset, while iOS can report logical points. A root frame that
+  // already spans most of either screenshot axis is therefore 1x. Otherwise,
+  // infer one uniform point-to-pixel scale from the horizontal display span;
+  // independent height scaling is invalid when the screenshot includes bars
+  // outside the app root.
+  const frameAlreadyUsesPhysicalPixels = screenFrame !== undefined && (
+    referenceFrame.width / png.width >= 0.75
+    || referenceFrame.height / png.height >= 0.75
+  );
+  const logicalDisplayWidth = screenFrame === undefined
+    ? referenceFrame.width
+    : referenceFrame.x + referenceFrame.width;
+  const scale = frameAlreadyUsesPhysicalPixels ? 1 : png.width / logicalDisplayWidth;
 
   return {
-    x: clamp(Math.floor((elementFrame.x - referenceFrame.x) * scaleX), 0, png.width),
-    y: clamp(Math.floor((elementFrame.y - referenceFrame.y) * scaleY), 0, png.height),
-    width: clamp(Math.ceil(elementFrame.width * scaleX), 0, png.width),
-    height: clamp(Math.ceil(elementFrame.height * scaleY), 0, png.height)
+    x: clamp(Math.floor(elementFrame.x * scale), 0, png.width),
+    y: clamp(Math.floor(elementFrame.y * scale), 0, png.height),
+    width: clamp(Math.ceil(elementFrame.width * scale), 0, png.width),
+    height: clamp(Math.ceil(elementFrame.height * scale), 0, png.height)
   };
 }
 
