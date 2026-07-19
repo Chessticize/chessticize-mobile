@@ -35,6 +35,14 @@ describe('screenshot assertions', () => {
     expect(countOccupiedBoardSquares(syntheticBoard(), fullBoardFrame())).toBe(0);
   });
 
+  it('does not mistake coordinate labels for rendered pieces', () => {
+    const png = syntheticBoard();
+    paintCoordinateLabel(png, 0, 0, [20, 25, 32, 255]);
+    paintCoordinateLabel(png, 1, 0, [245, 245, 245, 255]);
+
+    expect(countOccupiedBoardSquares(png, fullBoardFrame())).toBe(0);
+  });
+
   it('waits for a rotated board screenshot to contain rendered pieces', async () => {
     const emptyScreenshot = writeSyntheticBoard('empty-after-rotation.png');
     const renderedScreenshot = writeSyntheticBoard('rendered-after-rotation.png', [
@@ -488,6 +496,16 @@ function paintPiece(png, row, column, color) {
   const originY = row * 100;
   for (let y = originY + 20; y < originY + 80; y += 1) {
     for (let x = originX + 25; x < originX + 75; x += 1) {
+      writePixel(png.data, png.width, x, y, color);
+    }
+  }
+}
+
+function paintCoordinateLabel(png, row, column, color) {
+  const originX = column * 100;
+  const originY = row * 100;
+  for (let y = originY + 8; y < originY + 36; y += 1) {
+    for (let x = originX + 8; x < originX + 32; x += 1) {
       writePixel(png.data, png.width, x, y, color);
     }
   }

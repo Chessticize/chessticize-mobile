@@ -15,6 +15,10 @@ const {
   waitForRunningStockfishDepth,
   failStandardSprint
 } = require('./helpers');
+const {
+  expectFrameContained,
+  waitForBoardScreenshotContainsPieces,
+} = require('./screenshotAssertions');
 
 // The visual assertion measures absolute painted arrow area. Pin the public
 // service's packaged-core selection to two long candidate vectors so random
@@ -34,7 +38,9 @@ describe('Practice POC', () => {
         chessticizePuzzleSelectionSeed: PRACTICE_RENDER_PUZZLE_SELECTION_SEED
       }
     });
-    await device.setOrientation('portrait');
+    if (process.env.CHESSTICIZE_EXPECT_FULL_HISTORY_BOARD !== '1') {
+      await device.setOrientation('portrait');
+    }
   });
 
   it('renders the standard sprint board', async () => {
@@ -90,6 +96,7 @@ describe('Practice POC', () => {
   });
 
   it('persists Unclear, places its History actions responsively, and manages Review Schedule there', async () => {
+    const expectsRegularLayout = process.env.CHESSTICIZE_EXPECT_FULL_HISTORY_BOARD === '1';
     await selectTestPuzzleSource('familiar15');
     await startPracticeMode('standard');
     await waitForVisibleInPracticeScroll('session-board');
@@ -136,15 +143,52 @@ describe('Practice POC', () => {
     await expect(element(by.id('history-attempt-detail'))).not.toExist();
     await expect(element(by.id('bookmark-glyph'))).not.toExist();
 
-    await device.setOrientation('landscape');
-    await waitFor(element(by.id('review-context-actions-rail'))).toBeVisible().withTimeout(10000);
+    if (!expectsRegularLayout) {
+      await device.setOrientation('landscape');
+    }
+    await waitForElementAccessibilityLabelContaining(
+      'adaptive-layout',
+      expectsRegularLayout ? 'regularLandscape' : 'compactLandscape',
+      10000
+    );
+    await element(by.id('practice-main-scroll')).scrollTo('top');
+    await waitFor(element(by.id('review-context-actions-rail'))).toExist().withTimeout(10000);
     await expect(element(by.id('review-schedule-control'))).toBeVisible();
     await expect(element(by.id('history-attempt-unclear'))).toBeVisible();
+    const screenFrame = await frameFor(element(by.id('safe-area-shell')));
     const boardFrame = await frameFor(element(by.id('review-board')));
     const actionRailFrame = await frameFor(element(by.id('review-context-actions-rail')));
-    expect(actionRailFrame.x).toBeGreaterThanOrEqual(boardFrame.x + boardFrame.width);
-    const responsiveScreenshot = await device.takeScreenshot('history-review-actions-landscape');
-    expect(fs.existsSync(responsiveScreenshot)).toBe(true);
+    const fullBoardVisible = frameIsContained(boardFrame, screenFrame);
+    if (process.env.CHESSTICIZE_EXPECT_FULL_HISTORY_BOARD === '1') {
+      expectFrameContained(boardFrame, screenFrame, 'History review landscape board');
+    }
+    if (actionRailFrame.x < boardFrame.x + boardFrame.width) {
+      throw new Error(
+        `Expected History actions to the right of the board; board=${JSON.stringify(boardFrame)} `
+        + `actions=${JSON.stringify(actionRailFrame)}`
+      );
+    }
+    const responsiveScreenshot = fullBoardVisible
+      ? await waitForBoardScreenshotContainsPieces({
+        boardFrame,
+        captureScreenshot: (label) => device.takeScreenshot(label),
+        screenFrame,
+        screenshotLabel: 'history-review-actions-landscape',
+      }, {timeoutMs: 15000})
+      : await device.takeScreenshot('history-review-actions-landscape');
+    if (!fs.existsSync(responsiveScreenshot)) {
+      throw new Error(`Expected responsive History screenshot at ${responsiveScreenshot}`);
+    }
+
+    if (!expectsRegularLayout) {
+      await device.setOrientation('portrait');
+      await waitForElementAccessibilityLabelContaining(
+        'adaptive-layout',
+        'compactPortrait',
+        10000
+      );
+    }
+    await waitForVisibleInPracticeScroll('review-schedule-add');
 
     await element(by.id('review-schedule-add')).tap();
     await waitFor(element(by.id('review-schedule-state'))).toHaveText('Due tomorrow').withTimeout(10000);
@@ -159,7 +203,6 @@ describe('Practice POC', () => {
       .withTimeout(10000);
 
     // Enrollment atomically cleared the marker, and removal does not restore it.
-    await device.setOrientation('portrait');
     await device.terminateApp();
     await launchWithDisabledSynchronization({
       newInstance: true,
@@ -287,6 +330,14 @@ function expectBoardScreenshotContainsPieces(screenshotPath, boardFrame) {
   if (pieceLikePixels <= 1000) {
     throw new Error(`Expected rendered chess pieces, found only ${pieceLikePixels} piece-like pixels`);
   }
+}
+
+function frameIsContained(childFrame, parentFrame) {
+  const tolerance = 1;
+  return childFrame.x >= parentFrame.x - tolerance
+    && childFrame.y >= parentFrame.y - tolerance
+    && childFrame.x + childFrame.width <= parentFrame.x + parentFrame.width + tolerance
+    && childFrame.y + childFrame.height <= parentFrame.y + parentFrame.height + tolerance;
 }
 
 function expectBoardScreenshotContainsNeutralArrows(screenshotPath, boardFrame) {

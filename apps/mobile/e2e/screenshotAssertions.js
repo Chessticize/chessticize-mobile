@@ -194,10 +194,12 @@ function countOccupiedBoardSquares(png, boardPixels) {
   for (let row = 0; row < 8; row += 1) {
     for (let column = 0; column < 8; column += 1) {
       const background = backgrounds[(row + column) % 2];
-      const left = Math.floor(boardPixels.x + ((column + 0.16) * squareWidth));
-      const right = Math.ceil(boardPixels.x + ((column + 0.84) * squareWidth));
-      const top = Math.floor(boardPixels.y + ((row + 0.16) * squareHeight));
-      const bottom = Math.ceil(boardPixels.y + ((row + 0.84) * squareHeight));
+      // Board coordinates sit in the outer corners of each square. Inspect the
+      // central region so those labels cannot satisfy the piece-readiness check.
+      const left = Math.floor(boardPixels.x + ((column + 0.28) * squareWidth));
+      const right = Math.ceil(boardPixels.x + ((column + 0.72) * squareWidth));
+      const top = Math.floor(boardPixels.y + ((row + 0.28) * squareHeight));
+      const bottom = Math.ceil(boardPixels.y + ((row + 0.72) * squareHeight));
       let contrastingPixels = 0;
       let sampledPixels = 0;
 
