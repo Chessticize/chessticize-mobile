@@ -103,6 +103,12 @@ Do not start the simulator for every UI text/layout/state change. If `react-nati
 
 Use this when a change affects native or rendered behavior:
 
+Before booting or creating a simulator, inspect the existing simulator devices
+and reuse a compatible device whenever it satisfies the required runtime,
+device profile, and test-isolation boundary. Start a different simulator only
+when no existing device is suitable. Continue to keep manual testing and Detox
+on separate devices as described below.
+
 ```sh
 pnpm mobile:doctor:ios
 pnpm mobile:e2e:build:ios
