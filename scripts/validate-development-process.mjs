@@ -127,6 +127,25 @@ assert.match(uiFlowDesign, /explicit design approval/);
 assert.match(prTemplate, /Storybook-first design approved before product wiring/);
 assert.match(prTemplate, /Design approval record:/);
 
+for (const reviewPolicy of [agents, devLoopSkill]) {
+  assert.match(reviewPolicy, /prefer incremental\s+review/i);
+  assert.match(reviewPolicy, /Reviewed-Through/);
+  assert.match(reviewPolicy, /40-character commit SHA/i);
+  assert.match(reviewPolicy, /ancestor of the\s+current head/i);
+  assert.match(reviewPolicy, /PR merge base/i);
+  assert.match(reviewPolicy, /git range-diff/);
+  assert.match(reviewPolicy, /semantic (impact|blast radius)/i);
+  assert.match(reviewPolicy, /exact[- ]head/i);
+}
+
+assert.match(prTemplate, /Incremental review/);
+assert.match(prTemplate, /Full review/);
+assert.match(prTemplate, /Review-Baseline: <40-character commit SHA>/);
+assert.match(prTemplate, /Reviewed-Through: <40-character commit SHA>/);
+assert.match(prTemplate, /Review-Result: pending\|findings\|pass/);
+assert.match(prTemplate, /PR merge base/);
+assert.match(prTemplate, /full-review trigger/i);
+
 for (const releaseContract of [
   "docs/RELEASE_SOURCE_POLICY.md",
   "docs/ANDROID_PLAY_RELEASE.md",
