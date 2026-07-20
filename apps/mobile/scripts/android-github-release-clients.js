@@ -195,7 +195,9 @@ class PlayGeneratedApksClient {
   url({ packageName, versionCode, downloadId }) {
     const base = `${PLAY_API_ROOT}/${encodeURIComponent(packageName)}` +
       `/generatedApks/${versionCode}`;
-    return downloadId ? `${base}/downloads/${encodeURIComponent(downloadId)}:download` : base;
+    return downloadId
+      ? `${base}/downloads/${encodeURIComponent(downloadId)}:download?alt=media`
+      : base;
   }
 
   async request(input) {

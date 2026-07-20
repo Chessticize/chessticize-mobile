@@ -558,11 +558,15 @@ describe('Android GitHub release automation', () => {
       destinationPath,
       fetchImpl: async (url, options) => {
         calls.push({ url, options });
-        return url.endsWith(':download')
-          ? new Response(apkBytes)
-          : new Response(JSON.stringify({ generatedApks: [] }), {
-            headers: { 'Content-Type': 'application/json' },
-          });
+        const requestUrl = new URL(url);
+        if (requestUrl.pathname.endsWith(':download')) {
+          return requestUrl.searchParams.get('alt') === 'media'
+            ? new Response(apkBytes)
+            : new Response(null);
+        }
+        return new Response(JSON.stringify({ generatedApks: [] }), {
+          headers: { 'Content-Type': 'application/json' },
+        });
       },
     });
 
@@ -579,7 +583,7 @@ describe('Android GitHub release automation', () => {
 
       expect(calls.map(call => call.url)).toEqual([
         'https://androidpublisher.googleapis.com/androidpublisher/v3/applications/com.chessticize.mobile/generatedApks/7',
-        'https://androidpublisher.googleapis.com/androidpublisher/v3/applications/com.chessticize.mobile/generatedApks/7/downloads/official-download-id:download',
+        'https://androidpublisher.googleapis.com/androidpublisher/v3/applications/com.chessticize.mobile/generatedApks/7/downloads/official-download-id:download?alt=media',
       ]);
       expect(calls[0].options.headers).toEqual({
         Authorization: 'Bearer external-boundary-token',

@@ -76,7 +76,8 @@ global.fetch = async (input, options = {}) => {
         }],
       });
     }
-    if (url.pathname.endsWith('/downloads/universal-download-7:download')) {
+    if (url.pathname.endsWith('/downloads/universal-download-7:download') &&
+        url.searchParams.get('alt') === 'media') {
       return new ResponseImplementation(apkBytes, { status: 200 });
     }
   }
