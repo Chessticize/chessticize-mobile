@@ -69,8 +69,11 @@ async function runCli(options, environment = process.env) {
   }
 
   const repoRoot = path.resolve(__dirname, '../../..');
+  const releaseVersionPath = options['release-version-file']
+    ? path.resolve(options['release-version-file'])
+    : path.join(repoRoot, 'apps/mobile/release-version.json');
   const releaseVersion = readJson(
-    path.join(repoRoot, 'apps/mobile/release-version.json'),
+    releaseVersionPath,
     'release-version.json',
   );
   const sourceManifestPath = path.resolve(requiredOption(options, 'source-manifest'));
@@ -78,6 +81,12 @@ async function runCli(options, environment = process.env) {
   const sourceManifest = readJson(sourceManifestPath, 'Source manifest');
   const outputDirectory = path.resolve(requiredOption(options, 'output-dir'));
   const github = new GitHubReleasesClient({ token });
+
+  const hasDispatchIdentity =
+    options['public-version'] !== undefined || options['version-code'] !== undefined;
+  if (hasDispatchIdentity) {
+    requireDispatchIdentity(options, releaseVersion);
+  }
 
   if (options.operation === 'publish-source') {
     const result = await publishCorrespondingSource({

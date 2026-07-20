@@ -36,7 +36,7 @@ jobs:
         with:
           node-version: 22.x
 
-      - name: Resolve and checkout the exact canonical tag
+      - name: Resolve the exact canonical tag without replacing current tooling
         id: candidate
         env:
           PUBLIC_VERSION: ${{ inputs.public_version }}
@@ -48,7 +48,9 @@ jobs:
             const { canonicalAndroidSourceTag } = require("./apps/mobile/scripts/android-play-release");
             process.stdout.write(canonicalAndroidSourceTag(process.argv[1], Number(process.argv[2])));
           ' "$PUBLIC_VERSION" "$VERSION_CODE")"
-          git checkout --detach "$candidate_sha"
+          git show "${candidate_sha}:apps/mobile/release-version.json" \
+            > "$RUNNER_TEMP/candidate-release-version.json"
+          test -s "$RUNNER_TEMP/candidate-release-version.json"
           echo "sha=$candidate_sha" >> "$GITHUB_OUTPUT"
           echo "tag=$tag_name" >> "$GITHUB_OUTPUT"
 
@@ -107,6 +109,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/apk-mirror"
           node apps/mobile/scripts/android-github-release-cli.js \
             --operation mirror-play-apk \
+            --release-version-file "$RUNNER_TEMP/candidate-release-version.json" \
             --public-version "${{ inputs.public_version }}" \
             --version-code "${{ inputs.version_code }}" \
             --source-manifest "$RUNNER_TEMP/source/android-source-manifest.json" \

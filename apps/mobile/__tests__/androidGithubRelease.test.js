@@ -839,6 +839,24 @@ describe('Android GitHub release automation', () => {
     expect([sourceWorkflows, mirrorWorkflow].join('\n')).not.toContain('publish-binary');
   });
 
+  it('keeps current release tooling checked out while binding exceptional flows to the tagged candidate', () => {
+    const repoRoot = path.resolve(__dirname, '../../..');
+    const workflows = [
+      '.github/workflows/mobile-android-source-recovery.yml',
+      '.github/workflows/mobile-android-github-release.yml',
+    ].map(file => fs.readFileSync(path.join(repoRoot, file), 'utf8'));
+
+    for (const workflow of workflows) {
+      expect(workflow).not.toContain('git checkout --detach "$candidate_sha"');
+      expect(workflow).toContain(
+        'git show "${candidate_sha}:apps/mobile/release-version.json"',
+      );
+      expect(workflow).toContain('--release-version-file');
+      expect(workflow).toContain('--public-version');
+      expect(workflow).toContain('--version-code');
+    }
+  });
+
   it('fails closed before I/O when the built-in GitHub token is missing', () => {
     const repoRoot = path.resolve(__dirname, '../../..');
     const cli = path.join(repoRoot, 'apps/mobile/scripts/android-github-release-cli.js');
@@ -861,11 +879,9 @@ describe('Android GitHub release automation', () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'chessticize-release-cli-'));
     const outputDirectory = path.join(directory, 'output');
     const sourceManifestPath = path.join(directory, 'android-source-manifest.json');
+    const releaseVersionPath = path.join(directory, 'release-version.json');
     const repoRoot = path.resolve(__dirname, '../../..');
-    const canonicalVersion = JSON.parse(fs.readFileSync(
-      path.join(repoRoot, 'apps/mobile/release-version.json'),
-      'utf8',
-    ));
+    const canonicalVersion = releaseVersion;
     const exactManifest = sourceManifest({
       bundle: {
         sha256: 'b'.repeat(64),
@@ -875,6 +891,7 @@ describe('Android GitHub release automation', () => {
       },
     });
     fs.writeFileSync(sourceManifestPath, `${JSON.stringify(exactManifest, null, 2)}\n`);
+    fs.writeFileSync(releaseVersionPath, `${JSON.stringify(canonicalVersion, null, 2)}\n`);
     const cli = path.join(repoRoot, 'apps/mobile/scripts/android-github-release-cli.js');
     const fakeFetch = path.join(
       repoRoot,
@@ -884,6 +901,9 @@ describe('Android GitHub release automation', () => {
     try {
       const result = spawnSync(process.execPath, [
         cli,
+        '--release-version-file', releaseVersionPath,
+        '--public-version', canonicalVersion.publicVersion,
+        '--version-code', String(canonicalVersion.androidVersionCode),
         '--output-dir', outputDirectory,
         '--source-manifest', sourceManifestPath,
       ], {
@@ -912,6 +932,26 @@ describe('Android GitHub release automation', () => {
         phase: 'source-published',
         tagName: createAndroidReleaseIdentity(canonicalVersion).tagName,
       }));
+
+      const rejected = spawnSync(process.execPath, [
+        cli,
+        '--release-version-file', releaseVersionPath,
+        '--public-version', canonicalVersion.publicVersion,
+        '--version-code', String(canonicalVersion.androidVersionCode + 1),
+        '--output-dir', path.join(directory, 'rejected-output'),
+        '--source-manifest', sourceManifestPath,
+      ], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          GITHUB_TOKEN: 'fake-cli-token',
+        },
+      });
+      expect(rejected.status).toBe(1);
+      expect(rejected.stdout).toBe('');
+      expect(rejected.stderr).toContain(
+        'Dispatched public version/build does not match release-version.json.',
+      );
     } finally {
       fs.rmSync(directory, { recursive: true, force: true });
     }
