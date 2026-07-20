@@ -38,13 +38,17 @@ and `version_code`.
 
 The workflow has one job and no protected publication environment. It:
 
-1. resolves and checks out the canonical annotated tag;
-2. downloads the existing `android-source-manifest.json` from that Release;
-3. obtains a short-lived Android Publisher access token;
-4. downloads the universal APK from the Generated APKs API;
-5. checks package name, public version, version code, Play app-signing
+1. keeps the current release tooling checked out, resolves the canonical
+   annotated tag, and reads its immutable `release-version.json` with
+   `git show` without detaching to the historical commit;
+2. validates that historical identity against the dispatch inputs before any
+   GitHub source download or Google Play authentication;
+3. downloads the existing `android-source-manifest.json` from that Release;
+4. obtains a short-lived Android Publisher access token;
+5. downloads the universal APK from the Generated APKs API;
+6. checks package name, public version, version code, Play app-signing
    certificate, non-empty bytes, and SHA-256;
-6. uploads the checksum, updates the Release notes, uploads the APK, and retains
+7. uploads the checksum, updates the Release notes, uploads the APK, and retains
    a small `android-apk-mirror-evidence.json` receipt.
 
 The mirror does not run Gradle, install project dependencies, rebuild the AAB

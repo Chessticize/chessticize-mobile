@@ -839,6 +839,81 @@ describe('Android GitHub release automation', () => {
     expect([sourceWorkflows, mirrorWorkflow].join('\n')).not.toContain('publish-binary');
   });
 
+  it('keeps current release tooling checked out while binding exceptional flows to the tagged candidate', () => {
+    const repoRoot = path.resolve(__dirname, '../../..');
+    const workflows = [
+      '.github/workflows/mobile-android-source-recovery.yml',
+      '.github/workflows/mobile-android-github-release.yml',
+    ].map(file => fs.readFileSync(path.join(repoRoot, file), 'utf8'));
+
+    for (const workflow of workflows) {
+      expect(workflow).not.toContain('git checkout --detach "$candidate_sha"');
+      expect(workflow).toContain(
+        'git show "${candidate_sha}:apps/mobile/release-version.json"',
+      );
+      expect(workflow).toContain('--release-version-file');
+      expect(workflow).toContain('--public-version');
+      expect(workflow).toContain('--version-code');
+    }
+  });
+
+  it('rejects a mismatched mirror identity before source download or Play authentication', () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'chessticize-mirror-identity-'));
+    const repoRoot = path.resolve(__dirname, '../../..');
+    const releaseVersionPath = path.join(directory, 'release-version.json');
+    const cli = path.join(repoRoot, 'apps/mobile/scripts/android-github-release-cli.js');
+
+    try {
+      fs.writeFileSync(releaseVersionPath, `${JSON.stringify({
+        ...releaseVersion,
+        androidVersionCode: releaseVersion.androidVersionCode + 1,
+      }, null, 2)}\n`);
+      const result = spawnSync(process.execPath, [
+        cli,
+        '--operation', 'validate-identity',
+        '--release-version-file', releaseVersionPath,
+        '--public-version', releaseVersion.publicVersion,
+        '--version-code', String(releaseVersion.androidVersionCode),
+      ], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          GITHUB_TOKEN: '',
+          PLAY_ACCESS_TOKEN: '',
+        },
+      });
+
+      expect(result.status).not.toBe(0);
+      expect(result.stdout).toBe('');
+      expect(result.stderr).toContain(
+        'Dispatched public version/build does not match release-version.json.',
+      );
+
+      const mirrorWorkflow = fs.readFileSync(
+        path.join(repoRoot, '.github/workflows/mobile-android-github-release.yml'),
+        'utf8',
+      );
+      const validationPosition = mirrorWorkflow.indexOf('--operation validate-identity');
+      const sourceDownloadPosition = mirrorWorkflow.indexOf('gh release download');
+      const workloadIdentityPosition = mirrorWorkflow.indexOf('google-github-actions/auth@v3');
+      const fallbackIdentityPosition = mirrorWorkflow.lastIndexOf('google-github-actions/auth@v3');
+      expect(validationPosition).toBeGreaterThan(-1);
+      expect(validationPosition).toBeLessThan(sourceDownloadPosition);
+      expect(validationPosition).toBeLessThan(workloadIdentityPosition);
+      expect(validationPosition).toBeLessThan(fallbackIdentityPosition);
+
+      const runbook = fs.readFileSync(
+        path.join(repoRoot, 'docs/ANDROID_GITHUB_RELEASE.md'),
+        'utf8',
+      );
+      expect(runbook).not.toContain('resolves and checks out the canonical annotated tag');
+      expect(runbook).toContain('keeps the current release tooling checked out');
+      expect(runbook).toContain('git show');
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it('fails closed before I/O when the built-in GitHub token is missing', () => {
     const repoRoot = path.resolve(__dirname, '../../..');
     const cli = path.join(repoRoot, 'apps/mobile/scripts/android-github-release-cli.js');
@@ -861,11 +936,9 @@ describe('Android GitHub release automation', () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'chessticize-release-cli-'));
     const outputDirectory = path.join(directory, 'output');
     const sourceManifestPath = path.join(directory, 'android-source-manifest.json');
+    const releaseVersionPath = path.join(directory, 'release-version.json');
     const repoRoot = path.resolve(__dirname, '../../..');
-    const canonicalVersion = JSON.parse(fs.readFileSync(
-      path.join(repoRoot, 'apps/mobile/release-version.json'),
-      'utf8',
-    ));
+    const canonicalVersion = releaseVersion;
     const exactManifest = sourceManifest({
       bundle: {
         sha256: 'b'.repeat(64),
@@ -875,6 +948,7 @@ describe('Android GitHub release automation', () => {
       },
     });
     fs.writeFileSync(sourceManifestPath, `${JSON.stringify(exactManifest, null, 2)}\n`);
+    fs.writeFileSync(releaseVersionPath, `${JSON.stringify(canonicalVersion, null, 2)}\n`);
     const cli = path.join(repoRoot, 'apps/mobile/scripts/android-github-release-cli.js');
     const fakeFetch = path.join(
       repoRoot,
@@ -884,6 +958,9 @@ describe('Android GitHub release automation', () => {
     try {
       const result = spawnSync(process.execPath, [
         cli,
+        '--release-version-file', releaseVersionPath,
+        '--public-version', canonicalVersion.publicVersion,
+        '--version-code', String(canonicalVersion.androidVersionCode),
         '--output-dir', outputDirectory,
         '--source-manifest', sourceManifestPath,
       ], {
@@ -912,6 +989,102 @@ describe('Android GitHub release automation', () => {
         phase: 'source-published',
         tagName: createAndroidReleaseIdentity(canonicalVersion).tagName,
       }));
+
+      const rejected = spawnSync(process.execPath, [
+        cli,
+        '--release-version-file', releaseVersionPath,
+        '--public-version', canonicalVersion.publicVersion,
+        '--version-code', String(canonicalVersion.androidVersionCode + 1),
+        '--output-dir', path.join(directory, 'rejected-output'),
+        '--source-manifest', sourceManifestPath,
+      ], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          GITHUB_TOKEN: 'fake-cli-token',
+        },
+      });
+      expect(rejected.status).toBe(1);
+      expect(rejected.stdout).toBe('');
+      expect(rejected.stderr).toContain(
+        'Dispatched public version/build does not match release-version.json.',
+      );
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects a mismatched recovery identity before artifact GitHub I/O', () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'chessticize-recovery-identity-'));
+    const repoRoot = path.resolve(__dirname, '../../..');
+    const downloader = path.join(
+      repoRoot,
+      'apps/mobile/scripts/download-android-release-artifact.sh',
+    );
+    const releaseVersionPath = path.join(directory, 'release-version.json');
+    const fakeBin = path.join(directory, 'bin');
+    const fakeGh = path.join(fakeBin, 'gh');
+    const ghCallMarker = path.join(directory, 'gh-called');
+    const expectedHeadSha = 'a'.repeat(40);
+
+    try {
+      fs.mkdirSync(fakeBin);
+      fs.writeFileSync(releaseVersionPath, `${JSON.stringify({
+        ...releaseVersion,
+        androidVersionCode: releaseVersion.androidVersionCode + 1,
+      }, null, 2)}\n`);
+      fs.writeFileSync(fakeGh, [
+        '#!/usr/bin/env bash',
+        'set -euo pipefail',
+        ': > "$FAKE_GH_CALL_MARKER"',
+        'exit 99',
+        '',
+      ].join('\n'));
+      fs.chmodSync(fakeGh, 0o755);
+
+      const result = spawnSync('bash', [
+        downloader,
+        '201',
+        '.github/workflows/mobile-android-release-candidate.yml',
+        'android-signed-release-candidate-{sha}',
+        path.join(directory, 'destination'),
+        path.join(directory, 'candidate.zip'),
+        expectedHeadSha,
+        'allow-failed-run',
+        releaseVersionPath,
+        releaseVersion.publicVersion,
+        String(releaseVersion.androidVersionCode),
+      ], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${fakeBin}:${process.env.PATH}`,
+          GH_TOKEN: 'fake-token',
+          GITHUB_REPOSITORY: 'Chessticize/chessticize-mobile',
+          GITHUB_SHA: expectedHeadSha,
+          GITHUB_OUTPUT: path.join(directory, 'github-output'),
+          FAKE_GH_CALL_MARKER: ghCallMarker,
+        },
+      });
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain(
+        'Dispatched public version/build does not match release-version.json.',
+      );
+      expect(fs.existsSync(ghCallMarker)).toBe(false);
+
+      const recoveryWorkflow = fs.readFileSync(
+        path.join(repoRoot, '.github/workflows/mobile-android-source-recovery.yml'),
+        'utf8',
+      );
+      const downloadStart = recoveryWorkflow.indexOf(
+        'bash apps/mobile/scripts/download-android-release-artifact.sh',
+      );
+      const downloadEnd = recoveryWorkflow.indexOf('\n\n', downloadStart);
+      const downloadInvocation = recoveryWorkflow.slice(downloadStart, downloadEnd);
+      expect(downloadInvocation).toContain('"$RUNNER_TEMP/candidate-release-version.json"');
+      expect(downloadInvocation).toContain('"${{ inputs.public_version }}"');
+      expect(downloadInvocation).toContain('"${{ inputs.version_code }}"');
     } finally {
       fs.rmSync(directory, { recursive: true, force: true });
     }
@@ -1019,6 +1192,7 @@ describe('Android GitHub release automation', () => {
     const archive = path.join(directory, 'candidate.zip');
     const downloadedArchive = path.join(directory, 'downloaded.zip');
     const output = path.join(directory, 'github-output');
+    const releaseVersionPath = path.join(directory, 'release-version.json');
     const fakeBin = path.join(directory, 'bin');
     const candidateSha = 'a'.repeat(40);
     const currentMainSha = 'b'.repeat(40);
@@ -1036,6 +1210,7 @@ describe('Android GitHub release automation', () => {
       fs.mkdirSync(payloadDirectory);
       fs.mkdirSync(fakeBin);
       fs.writeFileSync(path.join(payloadDirectory, 'candidate.json'), '{"retained":true}\n');
+      fs.writeFileSync(releaseVersionPath, `${JSON.stringify(releaseVersion, null, 2)}\n`);
       const zipResult = spawnSync('zip', ['-q', archive, 'candidate.json'], {
         cwd: payloadDirectory,
         encoding: 'utf8',
@@ -1058,15 +1233,20 @@ describe('Android GitHub release automation', () => {
         FAKE_CANDIDATE_ARCHIVE: archive,
         FAKE_CANDIDATE_ARCHIVE_SHA256: archiveSha256,
       };
-      const args = [
+      const recoveryArgs = (destinationPath, archivePath, headSha) => [
         downloader,
         '201',
         '.github/workflows/mobile-android-release-candidate.yml',
         'android-signed-release-candidate-{sha}',
-        destination,
-        downloadedArchive,
-        candidateSha,
+        destinationPath,
+        archivePath,
+        headSha,
+        'allow-failed-run',
+        releaseVersionPath,
+        releaseVersion.publicVersion,
+        String(releaseVersion.androidVersionCode),
       ];
+      const args = recoveryArgs(destination, downloadedArchive, candidateSha);
       const result = spawnSync('bash', args, {
         encoding: 'utf8',
         env: environment,
@@ -1079,12 +1259,11 @@ describe('Android GitHub release automation', () => {
         `artifact_name=android-signed-release-candidate-${candidateSha}`,
       );
 
-      const rejected = spawnSync('bash', [
-        ...args.slice(0, -3),
+      const rejected = spawnSync('bash', recoveryArgs(
         path.join(directory, 'rejected-destination'),
         path.join(directory, 'rejected.zip'),
         'f'.repeat(40),
-      ], {
+      ), {
         encoding: 'utf8',
         env: { ...environment, GITHUB_OUTPUT: path.join(directory, 'rejected-output') },
       });

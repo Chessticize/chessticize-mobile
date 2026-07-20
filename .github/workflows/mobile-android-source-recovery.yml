@@ -46,7 +46,7 @@ jobs:
           node-version: 22.x
           cache: pnpm
 
-      - name: Resolve and checkout the exact canonical tag
+      - name: Resolve the exact canonical tag without replacing current tooling
         id: candidate
         env:
           PUBLIC_VERSION: ${{ inputs.public_version }}
@@ -54,7 +54,9 @@ jobs:
         run: |
           candidate_sha="$(bash apps/mobile/scripts/resolve-android-release-candidate-commit.sh \
             "$PUBLIC_VERSION" "$VERSION_CODE")"
-          git checkout --detach "$candidate_sha"
+          git show "${candidate_sha}:apps/mobile/release-version.json" \
+            > "$RUNNER_TEMP/candidate-release-version.json"
+          test -s "$RUNNER_TEMP/candidate-release-version.json"
           echo "sha=$candidate_sha" >> "$GITHUB_OUTPUT"
 
       - name: Install locked dependencies
@@ -73,7 +75,10 @@ jobs:
             "$RUNNER_TEMP/candidate" \
             "$RUNNER_TEMP/candidate.zip" \
             "$CANDIDATE_SHA" \
-            allow-failed-run
+            allow-failed-run \
+            "$RUNNER_TEMP/candidate-release-version.json" \
+            "${{ inputs.public_version }}" \
+            "${{ inputs.version_code }}"
 
       - name: Publish exact corresponding source
         env:
@@ -83,6 +88,9 @@ jobs:
           test -f "$source_manifest"
           mkdir -p "$RUNNER_TEMP/source-publication"
           pnpm mobile:verify:android:github-release \
+            --release-version-file "$RUNNER_TEMP/candidate-release-version.json" \
+            --public-version "${{ inputs.public_version }}" \
+            --version-code "${{ inputs.version_code }}" \
             --source-manifest "$source_manifest" \
             --output-dir "$RUNNER_TEMP/source-publication"
           cp "$source_manifest" "$RUNNER_TEMP/source-publication/android-source-manifest.json"
