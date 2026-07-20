@@ -198,6 +198,31 @@ Replace `practice` with `flows` or `full` as required. Record the scope, exact c
 
 Nightly GitHub Detox builds once and runs both suites against the latest `main` as an integration signal. Do not wait for it to merge a routine PR. Release candidates use the same risk scopes: a delta needs exact-head fast checks plus owner device smoke, targeted native risk needs the affected suite, and only broad native risk requires both suites.
 
+### Prefer Incremental Review
+
+After a coherent PR has an accepted review baseline, review only the new diff,
+its directly affected contracts, and unresolved findings by default. Record the
+checkpoint in the PR body or a new PR comment as `Review-Mode`,
+`Review-Baseline`, `Reviewed-Through`, and `Review-Result: pass`, with full
+40-character commit SHAs. On the next pass, use the latest passing
+`Reviewed-Through` SHA only after confirming that it is an ancestor of the
+current head, then review `Reviewed-Through..current-head`. The first full PR
+review uses the PR merge base as `Review-Baseline`; an incremental review uses
+the prior passing `Reviewed-Through`. Re-anchor a non-ancestor checkpoint only
+when `git range-diff` or equivalent evidence proves patch equivalence. Do not
+repeat an unchanged full review for a small follow-up or CI retry, and do not
+rerun unaffected tests merely to make the review look fresh.
+
+Escalate to a full review of the coherent change set only when the accepted
+baseline cannot be trusted, the goal/specification or architecture boundary
+materially changes, **Full native validation** is selected, release identity or
+signing changes, privacy/security or schema/migration behavior changes, global
+launch/test infrastructure changes, a serious finding invalidates earlier
+assumptions, or accumulated follow-ups no longer have a bounded semantic impact.
+Use semantic blast radius rather than line count. Reusing review does not reuse
+native evidence: all required fast checks and native evidence must still match
+the exact current head.
+
 ## Screenshot Verification
 
 For repeatable Storybook-to-Release comparison across the maintained eight

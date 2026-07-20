@@ -34,6 +34,28 @@ Rationale:
 
 Commands and results:
 
+## Review mode
+
+Select one. Incremental is the default after an accepted review baseline exists;
+full means the complete coherent PR change set, not the entire repository.
+
+- [ ] Incremental review
+- [ ] Full review
+
+Review checkpoint (update in the PR body or append a new PR comment after review):
+
+```text
+Review-Mode: incremental|full
+Review-Baseline: <40-character commit SHA>
+Reviewed-Through: <40-character commit SHA>
+Review-Result: pending|findings|pass
+```
+
+For the first full review, use the PR merge base as `Review-Baseline`. For an
+incremental review, use the prior passing `Reviewed-Through`.
+
+Rationale or full-review trigger:
+
 ## Release follow-up
 
 Check any conditional release gates created or changed by this PR.

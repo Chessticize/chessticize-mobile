@@ -57,6 +57,43 @@ ADR is not itself a defect.
 - Before a release, require exact-head fast checks plus the release scope selected below. An ordinary delta may ship after the owner passes the physical-device smoke without rerunning full Detox. Run the affected suite for targeted native risk and both suites only for broad native risk. An unresolved exact-head or nightly failure that touches the changed boundary is a release blocker; an unrelated or superseded nightly failure is not.
 - Delete or reuse stale `codex/*` branches after their PR merges.
 
+### Review Cadence
+
+- The first review of a coherent PR establishes an accepted review baseline for
+  that PR's complete change set. After that baseline exists, prefer incremental
+  review of the diff from the last reviewed commit to the current head, its
+  directly affected contracts, and any unresolved findings. Do not restart a
+  full review solely because a small follow-up commit, comment edit, or CI retry
+  changed the head SHA.
+- A successful review must leave a durable checkpoint in the PR body or a new
+  PR comment with `Review-Mode`, `Review-Baseline`, `Reviewed-Through`, and
+  `Review-Result: pass`, using full 40-character commit SHAs. The next reviewer
+  uses the latest passing `Reviewed-Through` commit only after verifying that it
+  is an ancestor of the current head, then reviews
+  `Reviewed-Through..current-head`. For the first full PR review,
+  `Review-Baseline` is the PR merge base; for an incremental review, it is the
+  prior passing `Reviewed-Through`. A missing, ambiguous, or non-passing
+  checkpoint is not reusable. A non-ancestor checkpoint may be re-anchored only
+  after `git range-diff` or equivalent evidence proves the reviewed change set
+  is patch-equivalent; otherwise use full review. A release review may reuse the
+  exact commit's accepted PR checkpoint and add only the release-identity and
+  evidence audit.
+- Full review means reviewing the coherent PR or release change set again, not
+  reviewing the entire repository. Trigger it only when there is no trustworthy
+  accepted baseline; the stated goal, specification, or architecture boundary
+  materially changes; the change selects **Full native validation**; signing,
+  source/artifact identity, privacy/security, schema/migration, global launch or
+  test infrastructure changes; a serious finding invalidates earlier review
+  assumptions; or accumulated follow-ups can no longer be bounded to the
+  previously reviewed behavior.
+- Diff size alone does not choose the mode. Documentation, copy, styling,
+  test-only corrections, and focused fixes remain incremental unless their
+  semantic impact meets a full-review trigger. A small native, persistence,
+  signing, privacy, or release-identity change may still require full review.
+- Review reuse does not reuse stale validation evidence. Required fast checks
+  must pass on the current head, and any required native evidence remains
+  exact-head evidence under the rules below.
+
 ### PR Validation Scope
 
 Choose the smallest validation layer that proves the changed boundary. Record the selected scope and rationale in the PR body. File paths can automate which fast CI jobs run, but the PR author must make the native-risk decision because a single React Native file can contain either harmless copy or release-critical native wiring.
