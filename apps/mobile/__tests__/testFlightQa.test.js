@@ -39,7 +39,7 @@ describe("TestFlight QA checklist", () => {
     }
   });
 
-  it("requires fast preflight checks and exact-candidate GitHub Detox before upload", () => {
+  it("requires fast preflight checks and risk-scoped exact-candidate native validation before upload", () => {
     const requiredCommands = [
       "pnpm app-store:preflight",
       "pnpm test",
@@ -53,13 +53,25 @@ describe("TestFlight QA checklist", () => {
     }
 
     for (const document of [testFlightDoc, appStoreUploadDoc, releasePolicy]) {
-      expect(document).toContain("GitHub Mobile iOS/Detox");
       expect(document).toContain("exact");
+      expect(document).toMatch(/delta/i);
+      expect(document).toMatch(/targeted/i);
+      expect(document).toMatch(/broad/i);
+    }
+
+    for (const document of [appStoreUploadDoc, releasePolicy]) {
       expect(document).toContain("`flows`");
       expect(document).toContain("`practice`");
     }
 
-    expect(testFlightDoc).toContain("record the run URL");
+    expect(testFlightDoc).toContain("affected Detox suite");
+    expect(testFlightDoc).toMatch(/both suites only for\s+broad native risk/);
+    expect(appStoreUploadDoc).toMatch(
+      /does not require\s+a fresh full Detox run/
+    );
+    expect(releasePolicy).toMatch(
+      /Ordinary deltas use exact-head fast checks plus owner physical-device smoke/
+    );
   });
 
   it("requires evidence before the App Store plan item can be completed", () => {

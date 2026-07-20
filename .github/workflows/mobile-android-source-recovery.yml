@@ -1,0 +1,96 @@
+name: Recover Android corresponding-source publication
+
+on:
+  workflow_dispatch:
+    inputs:
+      public_version:
+        description: Canonical public version
+        required: true
+        type: string
+      version_code:
+        description: Canonical Android build number
+        required: true
+        type: string
+      candidate_artifact_id:
+        description: Retained signed-candidate artifact ID
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: recover-android-source-${{ inputs.public_version }}-${{ inputs.version_code }}
+  cancel-in-progress: false
+
+jobs:
+  publish-corresponding-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout release tooling
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.1.2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: pnpm
+
+      - name: Resolve and checkout the exact canonical tag
+        id: candidate
+        env:
+          PUBLIC_VERSION: ${{ inputs.public_version }}
+          VERSION_CODE: ${{ inputs.version_code }}
+        run: |
+          candidate_sha="$(bash apps/mobile/scripts/resolve-android-release-candidate-commit.sh \
+            "$PUBLIC_VERSION" "$VERSION_CODE")"
+          git checkout --detach "$candidate_sha"
+          echo "sha=$candidate_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download and authenticate the retained signed candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ inputs.candidate_artifact_id }}
+          CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
+        run: |
+          bash apps/mobile/scripts/download-android-release-artifact.sh \
+            "$ARTIFACT_ID" \
+            ".github/workflows/mobile-android-release-candidate.yml" \
+            'android-signed-release-candidate-{sha}' \
+            "$RUNNER_TEMP/candidate" \
+            "$RUNNER_TEMP/candidate.zip" \
+            "$CANDIDATE_SHA" \
+            allow-failed-run
+
+      - name: Publish exact corresponding source
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          source_manifest="$RUNNER_TEMP/candidate/artifacts/android-release/android-source-manifest.json"
+          test -f "$source_manifest"
+          mkdir -p "$RUNNER_TEMP/source-publication"
+          pnpm mobile:verify:android:github-release \
+            --source-manifest "$source_manifest" \
+            --output-dir "$RUNNER_TEMP/source-publication"
+          cp "$source_manifest" "$RUNNER_TEMP/source-publication/android-source-manifest.json"
+
+      - name: Retain recovery evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-source-publication-recovery-${{ github.run_id }}
+          if-no-files-found: error
+          retention-days: 30
+          path: ${{ runner.temp }}/source-publication/

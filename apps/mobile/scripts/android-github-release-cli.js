@@ -4,25 +4,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {
   createAndroidReleaseIdentity,
-  downloadPlayUniversalApk,
-  inspectGeneratedApk,
-  measureArtifact,
-  prepareBinaryEvidence,
-  prepareSourceDraft,
-  publishBinaryRelease,
-  publishSourceRelease,
-  requirePublishedSourceRelease,
-  requirePlayReadyInputs,
-  verifyGeneratedApkContract,
+  mirrorPlayGeneratedApk,
+  publishCorrespondingSource,
 } = require('./android-github-release');
 const {
   GitHubReleasesClient,
   PlayGeneratedApksClient,
 } = require('./android-github-release-clients');
-const {
-  requireDigest,
-  requireSafePositiveInteger,
-} = require('./android-release-validation');
 
 function readJson(filePath, label) {
   try {
@@ -49,22 +37,18 @@ function parseArguments(argv) {
     options[name.slice(2)] = value;
     index += 1;
   }
-  const phases = new Set([
-    'prepare-source-draft',
-    'publish-source',
-    'prepare-binary',
-    'publish-binary',
-  ]);
-  if (!phases.has(options.phase)) {
-    throw new Error('--phase must select one supported protected release phase.');
+  const operation = options.operation ?? 'publish-source';
+  if (!['publish-source', 'mirror-play-apk'].includes(operation)) {
+    throw new Error('--operation must be publish-source or mirror-play-apk.');
   }
+  options.operation = operation;
   return options;
 }
 
 function requiredOption(options, name) {
   const value = options[name];
   if (typeof value !== 'string' || value.length === 0) {
-    throw new Error(`--${name} is required for phase ${options.phase}.`);
+    throw new Error(`--${name} is required.`);
   }
   return value;
 }
@@ -78,163 +62,60 @@ function requireDispatchIdentity(options, releaseVersion) {
   return identity;
 }
 
-const GITHUB_RELEASE_MUTATION_PHASES = new Set([
-  'prepare-source-draft',
-  'publish-source',
-  'publish-binary',
-]);
-
-function requireGitHubReleaseToken(phase, environment) {
-  const token = environment.GITHUB_TOKEN;
-  if (GITHUB_RELEASE_MUTATION_PHASES.has(phase) &&
-      (typeof token !== 'string' || token.trim().length === 0)) {
-    throw new Error(`Protected GitHub Release token is required for ${phase}.`);
-  }
-  return token;
-}
-
-function retainedWorkflowInput(options, prefix) {
-  const runId = Number(requiredOption(options, `${prefix}-run-id`));
-  const artifactId = Number(requiredOption(options, `${prefix}-artifact-id`));
-  const artifactName = requiredOption(options, `${prefix}-artifact-name`);
-  const archiveSha256 = requireDigest(
-    requiredOption(options, `${prefix}-archive-sha256`),
-    `${prefix} artifact archive digest`,
-  );
-  requireSafePositiveInteger(runId, `${prefix} workflow run ID`);
-  requireSafePositiveInteger(artifactId, `${prefix} workflow artifact ID`);
-  return { runId, artifactId, artifactName, archiveSha256 };
-}
-
 async function runCli(options, environment = process.env) {
+  const token = environment.GITHUB_TOKEN;
+  if (typeof token !== 'string' || token.trim().length === 0) {
+    throw new Error('GITHUB_TOKEN with contents: write is required.');
+  }
+
   const repoRoot = path.resolve(__dirname, '../../..');
   const releaseVersion = readJson(
     path.join(repoRoot, 'apps/mobile/release-version.json'),
     'release-version.json',
   );
-  const identity = requireDispatchIdentity(options, releaseVersion);
-  const githubToken = requireGitHubReleaseToken(options.phase, environment);
-  const outputDirectory = path.resolve(requiredOption(options, 'output-dir'));
-  const github = new GitHubReleasesClient({ token: githubToken });
   const sourceManifestPath = path.resolve(requiredOption(options, 'source-manifest'));
   const sourceManifestBytes = fs.readFileSync(sourceManifestPath);
   const sourceManifest = readJson(sourceManifestPath, 'Source manifest');
+  const outputDirectory = path.resolve(requiredOption(options, 'output-dir'));
+  const github = new GitHubReleasesClient({ token });
 
-  if (options.phase === 'prepare-source-draft') {
-    const result = await prepareSourceDraft({
+  if (options.operation === 'publish-source') {
+    const result = await publishCorrespondingSource({
       releaseVersion,
       sourceManifest,
       sourceManifestBytes,
-      protectedWorkflow: retainedWorkflowInput(options, 'candidate'),
     }, { github });
-    writeJson(path.join(outputDirectory, 'android-source-draft-evidence.json'), result);
-    return result;
-  }
-
-  if (options.phase === 'publish-source') {
-    const result = await publishSourceRelease({
-      releaseVersion,
-      sourceManifest,
-      sourceManifestBytes,
-      draftEvidence: readJson(
-        path.resolve(requiredOption(options, 'source-draft-evidence')),
-        'Source draft evidence',
-      ),
-      publicationApproved:
-        environment.CHESSTICIZE_ANDROID_SOURCE_PUBLICATION_APPROVED === 'true',
-    }, { github });
-    result.sourceDraftWorkflow = retainedWorkflowInput(options, 'prior');
     writeJson(path.join(outputDirectory, 'android-source-publication-evidence.json'), result);
     return result;
   }
 
-  if (options.phase === 'prepare-binary') {
-    const playReady = readJson(
-      path.resolve(requiredOption(options, 'play-ready-evidence')),
-      'Play-ready evidence',
-    );
-    const ownerEvidence = readJson(
-      path.resolve(requiredOption(options, 'owner-evidence')),
-      'Owner evidence',
-    );
-    const sourcePublicationEvidence = readJson(
-      path.resolve(requiredOption(options, 'source-publication-evidence')),
-      'Source publication evidence',
-    );
-    const expected = requirePlayReadyInputs({
-      identity,
-      sourceManifest,
-      playReady,
-      ownerEvidence,
-    });
-    await requirePublishedSourceRelease({
-      identity,
-      candidate: expected.candidate,
-      evidence: sourcePublicationEvidence,
-      sourceManifestBytes,
-    }, { github });
-    const destinationPath = path.join(outputDirectory, identity.apkName);
-    const play = new PlayGeneratedApksClient({
-      accessToken: environment.PLAY_ACCESS_TOKEN,
-      destinationPath,
-    });
-    const downloaded = await downloadPlayUniversalApk({
-      identity,
-      appSigningCertificateSha256: expected.appSigningCertificateSha256,
-    }, { play });
-    const inspection = inspectGeneratedApk(destinationPath, { environment });
-    const measurement = measureArtifact(downloaded.apkBytes);
-    const verifiedApk = verifyGeneratedApkContract({
-      apkBytes: downloaded.apkBytes,
-      inspection,
-      expected: {
-        identity,
-        appSigningCertificateSha256: expected.appSigningCertificateSha256,
-        minimumBytes: expected.minimumBytes,
-        maximumBytes: expected.maximumBytes,
-        recordedBytes: expected.recordedBytes,
-        expectedSha256: measurement.sha256,
-      },
-    });
-    const prepared = prepareBinaryEvidence({
-      releaseVersion,
-      candidate: expected.candidate,
-      sourcePublicationEvidence,
-      playDownloadId: downloaded.downloadId,
-      verifiedApk,
-      apkBytes: downloaded.apkBytes,
-    });
-    prepared.evidence.retainedInputs = {
-      signedCandidate: retainedWorkflowInput(options, 'candidate'),
-      sourcePublication: retainedWorkflowInput(options, 'prior'),
-    };
-    fs.writeFileSync(
-      path.join(outputDirectory, identity.checksumName),
-      prepared.files.checksum.bytes,
-      { mode: 0o600 },
-    );
-    writeJson(path.join(outputDirectory, 'android-binary-preparation-evidence.json'), prepared.evidence);
-    return prepared.evidence;
+  const identity = requireDispatchIdentity(options, releaseVersion);
+  const playAccessToken = environment.PLAY_ACCESS_TOKEN;
+  if (typeof playAccessToken !== 'string' || playAccessToken.trim().length === 0) {
+    throw new Error('PLAY_ACCESS_TOKEN is required for the post-Play APK mirror.');
   }
-
-  const binaryEvidence = readJson(
-    path.resolve(requiredOption(options, 'binary-evidence')),
-    'Binary preparation evidence',
-  );
-  const apkPath = path.resolve(requiredOption(options, 'apk'));
-  const checksumBytes = fs.readFileSync(path.resolve(requiredOption(options, 'checksum')));
-  const result = await publishBinaryRelease({
+  const appSigningCertificateSha256 = environment.ANDROID_PLAY_APP_SIGNING_CERT_SHA256;
+  if (typeof appSigningCertificateSha256 !== 'string' ||
+      appSigningCertificateSha256.trim().length === 0) {
+    throw new Error('ANDROID_PLAY_APP_SIGNING_CERT_SHA256 is required.');
+  }
+  const destinationPath = path.join(outputDirectory, identity.apkName);
+  const play = new PlayGeneratedApksClient({
+    accessToken: playAccessToken,
+    destinationPath,
+  });
+  const result = await mirrorPlayGeneratedApk({
     releaseVersion,
-    binaryEvidence,
+    sourceManifest,
     sourceManifestBytes,
-    apkBytes: { path: apkPath },
-    checksumBytes,
-    apkInspection: inspectGeneratedApk(apkPath, { environment }),
-    publicationApproved:
-      environment.CHESSTICIZE_ANDROID_BINARY_PUBLICATION_APPROVED === 'true',
-  }, { github });
-  result.binaryPreparationWorkflow = retainedWorkflowInput(options, 'prior');
-  writeJson(path.join(outputDirectory, 'android-binary-publication-evidence.json'), result);
+    appSigningCertificateSha256,
+  }, { github, play });
+  fs.writeFileSync(
+    path.join(outputDirectory, identity.checksumName),
+    `${result.apk.sha256}  ${identity.apkName}\n`,
+    { mode: 0o600 },
+  );
+  writeJson(path.join(outputDirectory, 'android-apk-mirror-evidence.json'), result);
   return result;
 }
 
@@ -255,6 +136,5 @@ if (require.main === module) {
 module.exports = {
   parseArguments,
   requireDispatchIdentity,
-  retainedWorkflowInput,
   runCli,
 };

@@ -51,7 +51,7 @@ Use three different gates instead of treating every PR as a release candidate:
 | --- | --- | --- |
 | Pull request | Prove the changed behavior at the cheapest reliable layer | Path-scoped fast CI plus the risk-scoped native validation below |
 | Nightly `main` | Detect integration failures across a batch of merged work | One iOS build followed by complete `flows` and `practice` suites |
-| Release candidate | Prove the exact source intended for distribution | Manually dispatched exact-head complete Detox plus applicable release/manual checks |
+| Release candidate | Prove the exact source intended for distribution | Exact-head fast checks, risk-scoped native validation, and owner physical-device smoke |
 
 Every PR must pass its relevant unit, integration, CLI E2E, component, and
 typecheck jobs. GitHub workflow path filters select the applicable fast jobs.
@@ -91,12 +91,14 @@ adaptive contract. The fail-closed runner is
 `pnpm mobile:validate:android:matrix`, and `docs/ANDROID_VALIDATION.md` defines
 its evidence schema and commands.
 
-Before any release, manually dispatch Mobile iOS/Detox for the exact release
-candidate commit on `main` (or verify an existing run for that exact commit) and
-require both suites to pass. If `main` Detox fails, diagnose and fix the
-failure, then rerun it until green before releasing. Real CloudKit,
-notification delivery, TestFlight upgrade, physical-device, schema-upgrade,
-and App Store screenshot checks remain conditional release gates.
+Before any release, run exact-head fast checks and select the same no-native,
+targeted, or full scope used for PRs. An ordinary delta does not rerun complete
+Detox; the owner installs the candidate and performs the documented smoke on a
+physical device. Run one affected suite for targeted risk and both suites only
+for broad native risk. Real CloudKit, notification delivery, TestFlight
+upgrade, schema-upgrade, compatibility-matrix, and App Store screenshot checks
+remain conditional gates when that boundary changed or the store reports a
+problem.
 
 Android physical ARM64 checks are owner-recorded release evidence, not a
 routine feature-PR gate. They cover install, real board input, Stockfish
@@ -403,14 +405,14 @@ test both compatibility contracts deliberately.
 
 | Change | Minimum PR validation | Later gate |
 | --- | --- | --- |
-| Pure sprint/ELO/review/history rule | Focused core unit tests, `pnpm test:unit`, typecheck; no mobile Detox | Nightly and release full Detox provide integration coverage |
-| Repository/store behavior | Real SQLite integration tests, `pnpm test:integration`; targeted mobile persistence spec only when adapter wiring changed | Nightly and release full Detox |
+| Pure sprint/ELO/review/history rule | Focused core unit tests, `pnpm test:unit`, typecheck; no mobile Detox | Nightly integration; release native checks only if the boundary is targeted/full |
+| Repository/store behavior | Real SQLite integration tests, `pnpm test:integration`; targeted mobile persistence spec only when adapter wiring changed | Nightly integration; release persistence check when changed |
 | SQLite schema or migration | Released-fixture migration matrix and rollback/idempotency checks | Native upgrade smoke before release |
 | CLI command or protocol | `pnpm test:e2e`; no mobile Detox | None unless a mobile boundary also changed |
-| React Native copy, state, styling, accessibility, or wiring | Focused component tests, `pnpm mobile:test`, `pnpm mobile:typecheck`; no mobile Detox by default | Nightly and release full Detox |
-| Navigation or cross-component journey | Component coverage plus the affected Detox spec or suite on the exact PR head | Nightly and release full Detox |
-| Real chessboard/native rendering or adaptive layout | Targeted Detox or focused simulator screenshot inspection | Nightly and release full Detox |
-| App startup, shared native wiring, launch fixtures, build configuration, or Detox infrastructure | Exact-head full `flows` and `practice` | Nightly and release full Detox |
+| React Native copy, state, styling, accessibility, or wiring | Focused component tests, `pnpm mobile:test`, `pnpm mobile:typecheck`; no mobile Detox by default | Nightly integration plus owner delta smoke |
+| Navigation or cross-component journey | Component coverage plus the affected Detox spec or suite on the exact PR head | Same targeted suite for a release if changed afterward |
+| Real chessboard/native rendering or adaptive layout | Targeted Detox or focused simulator screenshot inspection | Targeted release/device check when changed |
+| App startup, shared native wiring, launch fixtures, build configuration, or Detox infrastructure | Exact-head full `flows` and `practice` | Full release scope while that risk is present |
 | CloudKit behavior | Fake transport integration; targeted native validation only when adapter wiring changed | Signed staging/manual release validation |
 | Notification scheduling/routing | Fake/native fixture tests; targeted native validation only when routing changed | Physical-device release smoke |
 

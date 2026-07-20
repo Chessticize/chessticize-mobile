@@ -21,9 +21,10 @@ Recheck Apple's live documentation before the pass:
    feedback email or support path.
 3. Create or reuse an internal testing group.
 4. Add the build to that internal testing group.
-5. Install the build from the TestFlight app on at least one physical iPhone and
-   one representative iPad.
-6. Run the full checklist below on the physical devices.
+5. Install every build from TestFlight on the owner's physical device.
+6. For a delta, verify installed version, cold launch, one real Practice path,
+   and the changed behavior. Use the full iPhone/iPad checklist only for first
+   launch or broad native risk.
 7. Record the result in the evidence log.
 
 Do not count simulator-only testing as the TestFlight pass. Simulator and Detox
@@ -49,15 +50,16 @@ Run these before uploading the build:
 - [ ] `pnpm typecheck`
 - [ ] `pnpm mobile:test`
 - [ ] `pnpm mobile:typecheck`
-- [ ] Manually dispatch or verify the GitHub Mobile iOS/Detox workflow for the
-      exact release-candidate commit on `main`; record the run URL and require
-      both `flows` and `practice` to pass.
+- [ ] Record the delta, targeted, or full release-validation scope. Require the
+      affected Detox suite for targeted native risk and both suites only for
+      broad native risk.
 - [ ] Confirm `apps/mobile/ios/ChessticizeMobile/Info.plist` still declares
       `ITSAppUsesNonExemptEncryption = false`.
 - [ ] Confirm the Release Source Rule is satisfied for the uploaded commit.
 - [ ] Confirm the build is not a Metro/debug build and no development puzzle
       source switch is visible.
-- [ ] Generate an automatable evidence bundle:
+- [ ] For first launch, a new App Store version, screenshot/metadata changes,
+      or broad native risk, generate an automatable evidence bundle:
       `pnpm app-store:testflight-evidence -- --screenshot-root scratch/store-assets/final`
       after the final screenshot export is present. Use `-- --allow-dirty`
       only for local rehearsal, never for submitted-binary evidence.
@@ -66,8 +68,8 @@ Run these before uploading the build:
 
 ## Physical Device Matrix
 
-Record at least one physical iPhone and one representative iPad before marking
-the pass complete.
+Record the owner's physical device for every delta. Add a representative iPad
+for first launch, adaptive-layout changes, or other broad native risk.
 
 | Device | iOS version | Apple ID role | Network state | Result |
 | --- | --- | --- | --- | --- |

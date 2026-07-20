@@ -18,7 +18,7 @@ const sourceBody = [
   `Android source release ${tagName}.`,
   '',
   'Corresponding source: https://github.com/Chessticize/chessticize-mobile',
-  'The installable Play-signed APK is published separately only after protected human approval.',
+  'Google Play distributes the release binary first. Its Play-signed universal APK may be mirrored here afterward for manual installation.',
 ].join('\n');
 const release = {
   id: 41,
@@ -92,6 +92,9 @@ global.fetch = async (input, options = {}) => {
       object: { type: 'commit', sha: commitSha },
       verification: { verified: false },
     });
+  }
+  if (method === 'GET' && url.pathname.includes('/releases/tags/')) {
+    return jsonResponse(release);
   }
   if (method === 'GET' && url.pathname.endsWith('/releases/41/assets')) {
     return jsonResponse(assets);

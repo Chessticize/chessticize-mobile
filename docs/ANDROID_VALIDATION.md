@@ -122,6 +122,12 @@ This is owner-recorded release evidence. The Stockfish lifecycle subset remains
 tracked by #200, and the complete checklist is approved with release issue
 #188. Physical hardware availability is not a routine feature-PR blocker.
 
+For an ordinary delta, record only the exact installed version/build, cold
+launch, one real Practice completion, and the changed behavior. Add the
+applicable items below when the change touches them. Run the complete checklist
+for first launch or broad native risk; do not repeat unchanged items solely
+because the build number advanced.
+
 Record the exact candidate SHA, AAB/APK identity and checksum, signing
 certificate, device model, Android version, `arm64-v8a` ABI, commands,
 timestamps, results, retries, and redacted evidence links before checking any
@@ -149,11 +155,11 @@ item.
   progress database and required sidecars are protected, bundled puzzles,
   Stockfish networks, caches, and test artifacts are excluded, and a restore or
   device transfer retains writable migrated progress within quota.
-- [ ] **Supported upgrade and cross-channel update:** install the candidate over
+- [ ] **Supported upgrade:** install the candidate over
   the supported previous build without clearing app data, then verify ratings,
   attempts, active session, review queue, Custom configurations, History, and
-  settings before making one new write. Repeat the permitted Play/GitHub channel
-  directions at #188 with matching production identity and signing.
+  settings before making one new write. This is required for storage/schema,
+  signing, or install-path changes, not for every bounded delta.
 
 Any physical failure blocks release approval. Fix it, rerun the complete
 affected scope on the exact replacement candidate, and retain both the failed
@@ -161,10 +167,12 @@ and passing evidence.
 
 ## Play-signed release boundary
 
-The automated API/adaptive/backup matrix proves the exact source commit and
-native behavior; it does not prove upload signing, Play App Signing, store
-declarations, or Play-delivered installation. For an Android release candidate,
-also follow `docs/ANDROID_PLAY_RELEASE.md`. The final Play gate binds the matrix
-commit to one retained AAB SHA-256 and rejects missing Internal-or-Closed
-installation, pre-launch, developer-verification, Data safety, symbol, notice,
-or size evidence. Never describe matrix-only evidence as a Play-ready artifact.
+The selected automated scope proves source behavior; it does not prove upload
+signing, Play App Signing, store declarations, or Play-delivered installation.
+For an Android release candidate, also follow `docs/ANDROID_PLAY_RELEASE.md`.
+The signed-candidate job binds one exact AAB SHA-256 to its corresponding source
+manifest. Google Play distributes and signs the binary first. The later GitHub
+APK mirror checks only immutable package/version/signing identity and digest;
+it does not repeat product or native validation. Account setup, pre-launch
+reports, listing review, and full compatibility matrices are first-launch or
+change-triggered evidence rather than automatic delta gates.

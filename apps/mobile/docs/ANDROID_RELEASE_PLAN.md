@@ -33,7 +33,7 @@ The Android Local-First Release includes:
 - Android-managed backup and device-to-device restore for user progress;
 - phones and tablets in portrait and landscape;
 - basic foldable and ChromeOS compatibility;
-- Google Play and GitHub Releases distribution of the same signed build.
+- Google Play binary distribution with matching corresponding source on GitHub.
 
 It excludes:
 
@@ -53,7 +53,7 @@ The accepted decisions are recorded in:
 - [ADR 0004: one product-aware Back contract](./adr/0004-use-one-product-aware-mobile-back-contract.md)
 - [ADR 0005: shared product UI](./adr/0005-share-the-product-ui-across-mobile-platforms.md)
 - [ADR 0006: zero app telemetry](./adr/0006-keep-mobile-releases-free-of-app-telemetry.md)
-- [ADR 0007: one Android build through Play and GitHub](./adr/0007-publish-one-android-build-through-play-and-github.md)
+- [ADR 0009: post-Play APK mirror](./adr/0009-mirror-play-signed-android-apk-after-play-release.md)
 
 ## Repository and reuse model
 
@@ -79,7 +79,7 @@ The maintenance split is:
 | Stockfish orchestration and JavaScript contract | Reuse directly | Kotlin/JNI/CMake bridge and Android lifecycle handling |
 | Review-reminder policy | Reuse `computeNextReminder` and scheduler contract | AlarmManager, notification permission/channel, receivers, routing |
 | Tests | Reuse unit, integration, component, and journey intent | Android build/device configurations and platform-specific system assertions |
-| Distribution | Share product version and release evidence | Play signing, AAB, generated universal APK, GitHub Release workflow |
+| Distribution | Share product version and release evidence | Play signing/AAB plus source-first GitHub Release and post-Play APK mirror |
 
 Platform checks must stay at adapter or presentation boundaries. Shared domain
 code must not import React Native or branch on `Platform.OS` to make product
@@ -100,7 +100,7 @@ flowchart TD
   A9["ANDROID-09: Back and adaptive UI parity"]
   A10["ANDROID-10: complete Android E2E matrix"]
   A11["ANDROID-11: Play release readiness"]
-  A12["ANDROID-12: GitHub APK distribution"]
+  A12["ANDROID-12: simplified post-Play APK mirror"]
   A13["ANDROID-13: release candidate and launch"]
 
   A1 --> A2
@@ -126,10 +126,8 @@ flowchart TD
   A7 --> A11
   A8 --> A11
   A9 --> A11
-  A11 --> A12
   A10 --> A13
   A11 --> A13
-  A12 --> A13
 ```
 
 After ANDROID-01, the dev-loop, capability, storage, and shared-Stockfish work
@@ -221,7 +219,7 @@ iCloud as the generic mobile sync model.
   platform exposes one.
 - Replace the hard-coded App Version value with native version name and build
   metadata.
-- Add an Android-only “Open GitHub Releases” action. It opens the browser only
+- Add an Android-only “Open Source Releases” action. It opens the browser only
   after a user gesture and never polls GitHub in the background.
 
 **Acceptance:** iOS Settings behavior is unchanged; Android contains no iCloud
@@ -496,80 +494,49 @@ debug key or test controls.
 Pre-launch Report triage, Data Safety/privacy review, license/source checks,
 16 KB native-library verification, and the release privacy regression suite.
 
-### ANDROID-12 — Publish the Play-signed universal APK to GitHub Releases
+### ANDROID-12 — Simplified post-Play APK mirror
 
-**Status:** Repository-owned protected preparation/publication automation,
-fail-closed artifact/API/APK verification, checksum evidence, release guidance,
-and the Android Settings link are implemented by #187. Live Play access,
-Generated APK evidence, protected approvals, cross-channel installation, and
-the documented #186/#187 canonical-release ordering conflict remain owner
-evidence before the issue can close.
-
-**Depends on:** ANDROID-11
-
-**Outcome:** GitHub users receive the same production-signed build as Play
-users without exposing the production app-signing private key.
-
-**Work:**
-
-- Add a manually triggered workflow in a protected GitHub Environment.
-- Accept the unified public version and Android `versionCode`; reject values
-  that disagree with the uploaded bundle or Git tag.
-- Use a least-privilege Android Publisher service account to list and download
-  the Play-generated universal APK.
-- Verify application ID, version name, version code, production certificate
-  fingerprint, `arm64-v8a` plus `x86_64` contents, 16 KB alignment, and absence
-  of debug/test configuration.
-- Compare the universal APK with the generated ARM64-only APK and record the
-  actual size delta. The planning estimate is roughly 25–35 MB; the measured
-  value becomes authoritative.
-- Generate `Chessticize-Android-<version>.apk` and the matching `.sha256` file.
-- Create or update a draft GitHub Release using the current platform tag
-  `android-v1.1.0-build-4`. Require human approval before publication. The
-  build-1 and failed-validation build-2/build-3 tags and artifacts remain
-  immutable historical evidence.
-- Include manual-update instructions and state that installing a newer signed
-  APK preserves local progress.
-
-**Acceptance:** The GitHub APK verifies against the production Play signing
-certificate, can install fresh, can update a Play install and be updated by
-Play, contains both approved ABIs, and has a published checksum. Ordinary pushes
-and tags cannot publish it automatically.
-
-**Validation:** Workflow dry run against an Internal/Closed bundle, APK
-signature and manifest inspection, checksum verification, clean-device install,
-GitHub-to-GitHub update, Play-to-GitHub update, and GitHub-to-Play update.
+**Status:** Reframed by ADR-0009. Google Play remains the primary binary
+channel. After the owner publishes and smoke-tests the Play build, one manual
+CI job downloads the Play-generated universal APK and attaches it with a
+SHA-256 checksum to the already-public corresponding-source Release. The job
+does not rebuild, rerun product tests, consume owner evidence, or use separate
+prepare/publish phases. A temporary GitHub token and additional publication
+environments are not release dependencies. Build 4 is the current candidate;
+the build-1 release and failed-validation build-2/build-3 records remain
+immutable historical evidence.
 
 ### ANDROID-13 — Validate the release candidate and launch
 
-**Depends on:** ANDROID-10, ANDROID-11, and ANDROID-12
+**Depends on:** ANDROID-11 plus the validation scope selected from ANDROID-10
 
-**Outcome:** One exact `main` commit is released through Play and GitHub with a
-complete evidence record.
+- Current release tag: `android-v1.1.0-build-4`
+
+**Outcome:** One exact commit is distributed through Play with its matching
+source published on GitHub and proportionate evidence.
 
 **Work:**
 
 - Freeze the release-candidate commit and confirm a clean worktree and matching
   shared public version.
-- Run unit, integration, CLI E2E, mobile component, typecheck, process, complete
-  iOS Detox, complete Android API 36 Detox, API 24 smoke, and adaptive-layout
-  smoke for that exact commit.
-- Run physical ARM64 Stockfish, notification, backup/restore, migration, and
-  upgrade checks.
-- Confirm Internal and Closed Testing install/upgrade evidence, Pre-launch
-  Report, Android Vitals, privacy, licenses, native symbols, 16 KB compatibility,
-  and developer verification.
+- Run exact-head fast checks and the delta, targeted, or broad native scope for
+  the changed boundary. Full Detox, API 24, and adaptive jobs are not automatic
+  delta gates.
+- Run the owner physical-device smoke every time; add Stockfish, notification,
+  backup/restore, migration, and upgrade checks only when those boundaries
+  changed.
+- Complete Internal/Closed, pre-launch, listing, privacy, and account checks for
+  first launch or when Play requires or the corresponding configuration changes.
 - Promote the validated AAB to Production at 100 percent.
-- Run the protected GitHub workflow, approve the platform-specific tag and
-  Release, download the public APK, and verify its checksum and signature from
-  a clean device.
-- Record the final Play version code, GitHub Release URL, APK checksum,
-  certificate fingerprint, exact commit SHA, and all release evidence.
+- Confirm the signed-candidate workflow published the matching source Release
+  using the built-in token. After Play publication and device smoke, dispatch
+  the single post-Play APK mirror job.
+- Record the final Play version code, GitHub source Release URL, AAB checksum,
+  exact commit SHA, selected validation scope, and owner device-smoke result.
 
-**Acceptance:** All required gates are green on the exact released commit;
-Play and GitHub distribute the same signed Android build; both fresh install and
-cross-channel update preserve expected behavior and local progress; no known
-release blocker remains.
+**Acceptance:** All risk-scoped gates are green on the exact released commit;
+Play distributes the signed Android build, GitHub publishes its corresponding
+source, the owner device smoke passes, and no known relevant blocker remains.
 
 This work package is a release operation and evidence issue, not a feature PR.
 
@@ -581,7 +548,9 @@ This work package is a release operation and evidence issue, not a feature PR.
 | Targeted native PR | Affected Android spec or one affected suite on the exact PR head |
 | Broad native PR | One build plus complete Android `flows` and `practice` on the exact PR head |
 | Nightly `main` | API 36 `x86_64` phone, complete `flows` and `practice` |
-| Release candidate | API 36 complete suites; API 24 compatibility smoke; API 36 tablet/foldable smoke; physical ARM64 native/backup/upgrade smoke; Play Internal/Closed/Pre-launch evidence |
+| Delta release candidate | Exact-head fast checks, production-signed AAB/source publication job, and owner physical-device smoke |
+| Targeted release candidate | Delta gates plus the affected Android suite or native/manual boundary |
+| Broad native or first launch | API 36 complete suites; relevant API 24/adaptive/backup checks; full physical ARM64 checklist; applicable Play console evidence |
 
 SQLite schema changes still require the released-fixture migration matrix and a
 native upgrade smoke. Android backup rule changes require a real restore. Native
@@ -605,8 +574,8 @@ The following checks should happen before the dependent work grows:
    when application ID, signing certificate, and monotonically increasing
    version code agree.
 5. **Generated universal APK:** The Play API exposes a universal APK only when
-   Play generated one for the bundle. ANDROID-12 must prove this before the
-   release workflow is considered complete.
+   Play generated one for the bundle. The post-Play mirror fails safely and can
+   be retried if this file is not yet available.
 6. **Developer verification:** The package and signing identity must be
    registered before regional enforcement and the planned global expansion of
    Android developer verification affect sideload installation.
@@ -629,8 +598,8 @@ The Android Local-First Release is ready only when:
 - Play listing, privacy, Data Safety, developer verification, signing, and
   release evidence are complete;
 - Production is released directly to 100 percent;
-- the matching Play-signed universal APK and checksum are public in the Android
-  GitHub Release;
+- the matching corresponding-source manifest is public before distribution and
+  the exact Play-signed APK plus checksum is mirrored after owner acceptance;
 - the app contains no cross-platform sync promise, background updater, or app
   telemetry pipeline.
 
@@ -642,5 +611,4 @@ The Android Local-First Release is ready only when:
 - [Android Auto Backup](https://developer.android.com/identity/data/autobackup)
 - [Android alarm guidance](https://developer.android.com/develop/background-work/services/alarms)
 - [Predictive Back](https://developer.android.com/guide/navigation/custom-back/predictive-back-gesture)
-- [Play-generated APK download API](https://developers.google.com/android-publisher/download-apks)
 - [Android developer verification](https://developer.android.com/developer-verification/guides)

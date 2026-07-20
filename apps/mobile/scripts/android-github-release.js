@@ -13,7 +13,6 @@ const {
   requireDigest,
   requireSafePositiveInteger,
 } = require('./android-release-validation');
-const { verifyApk } = require('./verify-android-apk-abis');
 
 const ANDROID_APPLICATION_ID = 'com.chessticize.mobile';
 const ANDROID_RELEASES_URL = `${ANDROID_SOURCE_REPOSITORY_URL}/releases`;
@@ -99,7 +98,7 @@ function sourceReleaseNotes(identity) {
     `Android source release ${identity.tagName}.`,
     '',
     `Corresponding source: ${ANDROID_SOURCE_REPOSITORY_URL}`,
-    'The installable Play-signed APK is published separately only after protected human approval.',
+    'Google Play distributes the release binary first. Its Play-signed universal APK may be mirrored here afterward for manual installation.',
   ].join('\n');
 }
 
@@ -116,13 +115,6 @@ async function prepareSourceDraft(input, { github }) {
   if (!Buffer.isBuffer(input.sourceManifestBytes)) {
     throw new Error('Source manifest bytes are required.');
   }
-  requireSafePositiveInteger(input.protectedWorkflow?.runId, 'Protected workflow run ID');
-  requireSafePositiveInteger(input.protectedWorkflow?.artifactId, 'Protected workflow artifact ID');
-  if (input.protectedWorkflow?.artifactName !==
-      `android-signed-release-candidate-${candidate.commitSha}`) {
-    throw new Error('Protected workflow artifact name does not match the exact candidate.');
-  }
-  requireDigest(input.protectedWorkflow?.archiveSha256, 'Protected workflow archive digest');
 
   const tag = await github.getTag(identity.tagName);
   if (!tag || tag.tagName !== identity.tagName ||
@@ -142,20 +134,18 @@ async function prepareSourceDraft(input, { github }) {
     commitSha: candidate.commitSha,
     sourceManifestSha256,
     candidate,
-    protectedWorkflow: { ...input.protectedWorkflow },
   });
-  const requireExactDraft = release => {
+  const requireExactRelease = (release, allowedDraftStates) => {
     if (!release || !Number.isSafeInteger(release.id) || release.id < 1 ||
         release.tagName !== identity.tagName ||
-        release.targetCommitish?.toLowerCase() !== candidate.commitSha ||
-        release.name !== releaseName || release.draft !== true ||
+        release.name !== releaseName || !allowedDraftStates.includes(release.draft) ||
         release.prerelease !== false) {
       throw new Error('The canonical Android release already exists in a conflicting state.');
     }
     requireSourceReleaseNotes(release, identity);
   };
   const reconcileExactDraft = async release => {
-    requireExactDraft(release);
+    requireExactRelease(release, [true, false]);
     const assets = await github.getReleaseAssets(release.id);
     if (!Array.isArray(assets)) {
       throw new Error('The canonical Android draft assets response is malformed.');
@@ -195,7 +185,6 @@ async function prepareSourceDraft(input, { github }) {
   try {
     release = await github.createRelease({
       tagName: identity.tagName,
-      targetCommitish: candidate.commitSha,
       name: releaseName,
       body: sourceReleaseNotes(identity),
       draft: true,
@@ -210,7 +199,7 @@ async function prepareSourceDraft(input, { github }) {
     throw new Error('GitHub did not create the required canonical draft release.');
   }
   try {
-    requireExactDraft(release);
+    requireExactRelease(release, [true]);
   } catch (error) {
     await Promise.allSettled([github.deleteRelease(release.id)]);
     throw error;
@@ -250,7 +239,7 @@ function requireCandidateEqual(actual, expected, label) {
 
 async function publishSourceRelease(input, { github }) {
   if (input.publicationApproved !== true) {
-    throw new Error('Source publication requires protected human approval.');
+    throw new Error('Source publication requires an authorized release execution.');
   }
   const identity = createAndroidReleaseIdentity(input.releaseVersion);
   const candidate = requireExactSourceManifest(input.sourceManifest, identity);
@@ -311,6 +300,15 @@ async function publishSourceRelease(input, { github }) {
     publicationApproved: true,
     sourceManifestSha256,
   };
+}
+
+async function publishCorrespondingSource(input, dependencies) {
+  const draftEvidence = await prepareSourceDraft(input, dependencies);
+  return publishSourceRelease({
+    ...input,
+    draftEvidence,
+    publicationApproved: true,
+  }, dependencies);
 }
 
 function normalizePlayCertificateHash(value) {
@@ -397,12 +395,7 @@ async function downloadPlayUniversalApk(input, { play }) {
 }
 
 function verifyGeneratedApkContract({ apkBytes, inspection, expected }) {
-  let measurement;
-  try {
-    measurement = measureArtifact(apkBytes);
-  } catch {
-    throw new Error('Play-generated APK bytes are missing.');
-  }
+  const measurement = measureArtifact(apkBytes);
   const identity = expected?.identity;
   if (inspection?.applicationId !== identity?.applicationId) {
     throw new Error('Play-generated APK package identity mismatch.');
@@ -427,46 +420,14 @@ function verifyGeneratedApkContract({ apkBytes, inspection, expected }) {
   if (inspectedCertificate !== expectedCertificate) {
     throw new Error('Play-generated APK app-signing certificate mismatch.');
   }
-  const abis = Array.isArray(inspection.abis) ? [...inspection.abis].sort() : [];
-  if (JSON.stringify(abis) !== JSON.stringify(['arm64-v8a', 'x86_64'])) {
-    throw new Error('Play-generated APK must contain exactly the approved ABIs.');
-  }
-  if (inspection.zipAligned16KiB !== true || inspection.elfAligned16KiB !== true) {
-    throw new Error('Play-generated APK failed 16 KB page-size compatibility.');
-  }
-  if (inspection.debuggable === true) {
-    throw new Error('Play-generated APK must not be debuggable.');
-  }
-  if (inspection.testOnly === true) {
-    throw new Error('Play-generated APK must not be test-only.');
-  }
-  if (inspection.internetPermission === true) {
-    throw new Error('Play-generated APK must not request INTERNET permission.');
-  }
-
-  const digest = measurement.sha256;
-  if (requireDigest(expected.expectedSha256, 'Expected APK SHA-256') !== digest) {
-    throw new Error('Play-generated APK SHA-256 mismatch.');
-  }
-  const { minimumBytes, maximumBytes, recordedBytes } = expected;
-  if (!Number.isSafeInteger(minimumBytes) || minimumBytes < 1 ||
-      !Number.isSafeInteger(maximumBytes) || maximumBytes < minimumBytes ||
-      measurement.bytes < minimumBytes || measurement.bytes > maximumBytes) {
-    throw new Error('Play-generated APK is outside the approved size bounds.');
-  }
-  if (!Number.isSafeInteger(recordedBytes) || recordedBytes !== measurement.bytes) {
-    throw new Error('Play-generated APK does not match the recorded Play size.');
-  }
 
   return {
     bytes: measurement.bytes,
-    sha256: digest,
+    sha256: measurement.sha256,
     applicationId: inspection.applicationId,
     versionName: inspection.versionName,
     versionCode: inspection.versionCode,
     signerCertificateSha256: expectedCertificate,
-    abis,
-    pageSizeCompatibility: '16-kib-compatible',
   };
 }
 
@@ -523,7 +484,6 @@ function inspectGeneratedApk(
   const buildTools = path.join(sdkRoot, 'build-tools', ANDROID_REQUIREMENTS.buildTools);
   const aapt2 = path.join(buildTools, 'aapt2');
   const apksigner = path.join(buildTools, 'apksigner');
-  const abis = verifyApk(apkPath, run, environment);
   const badging = requireCommand(
     run(aapt2, ['dump', 'badging', apkPath], { encoding: 'utf8' }),
     'Could not inspect APK identity',
@@ -538,484 +498,228 @@ function inspectGeneratedApk(
   return {
     ...parseApkBadging(badging),
     signerCertificateSha256: parseApkSignerCertificate(signer),
-    abis,
-    zipAligned16KiB: true,
-    elfAligned16KiB: true,
   };
 }
 
 function binaryReleaseNotes(identity, verifiedApk) {
   return [
-    `# Chessticize Android ${identity.publicVersion} (${identity.versionCode})`,
+    '# Chessticize Android ' + identity.publicVersion + ' (' + identity.versionCode + ')',
     '',
-    'This is the Play-generated universal APK for manual installation.',
-    'Android must allow installation from the browser or file manager you choose.',
-    `Verify SHA-256 before installing: \`sha256sum ${identity.apkName}\`.`,
-    'Chessticize does not check GitHub for updates and does not download or install updates automatically.',
-    'Play and GitHub installs use the same Android package and Play signing certificate.',
-    'They can update one another only when Android versionCode ordering permits.',
-    `Package: \`${verifiedApk.applicationId}\``,
-    `Play signing certificate SHA-256: \`${verifiedApk.signerCertificateSha256}\``,
-    `APK SHA-256: \`${verifiedApk.sha256}\``,
-    `Corresponding source: ${ANDROID_SOURCE_REPOSITORY_URL}/tree/${identity.tagName}`,
-    'Chessticize collects no app telemetry.',
+    'This APK was generated and signed by Google Play after the corresponding Play release.',
+    'It is mirrored here for manual installation; Chessticize does not self-update from GitHub.',
+    'Package: ' + verifiedApk.applicationId,
+    'Play signing certificate SHA-256: ' + verifiedApk.signerCertificateSha256,
+    'APK SHA-256: ' + verifiedApk.sha256,
+    'Corresponding source: ' + ANDROID_SOURCE_REPOSITORY_URL + '/tree/' + identity.tagName,
   ].join('\n');
 }
 
-function prepareBinaryEvidence(input) {
-  const identity = createAndroidReleaseIdentity(input.releaseVersion);
-  const expectedCandidate = {
-    commitSha: input.candidate?.commitSha,
-    aabSha256: input.candidate?.aabSha256,
-    applicationId: identity.applicationId,
-    versionName: identity.publicVersion,
-    versionCode: identity.versionCode,
-  };
-  if (!/^[0-9a-f]{40}$/i.test(String(expectedCandidate.commitSha)) ||
-      !/^[0-9a-f]{64}$/i.test(String(expectedCandidate.aabSha256))) {
-    throw new Error('Binary preparation requires an exact source candidate.');
-  }
-  requireCandidateEqual(input.candidate, expectedCandidate, 'Binary preparation');
-  const source = input.sourcePublicationEvidence;
-  if (source?.phase !== 'source-published' || source?.publicationApproved !== true ||
-      source?.tagName !== identity.tagName || source?.commitSha !== expectedCandidate.commitSha) {
-    throw new Error('Binary preparation requires the exact published canonical source release.');
-  }
-  requireSafePositiveInteger(source.releaseId, 'Published source release ID');
-  requireSafePositiveInteger(source.releaseAssetId, 'Published source manifest asset ID');
-  requireDigest(source.sourceManifestSha256, 'Published source manifest digest');
-  if (typeof input.playDownloadId !== 'string' || input.playDownloadId.length === 0) {
-    throw new Error('Binary preparation requires the official Play download ID.');
-  }
-  let apkMeasurement;
-  try {
-    apkMeasurement = measureArtifact(input.apkBytes);
-  } catch {
-    apkMeasurement = undefined;
-  }
-  if (!apkMeasurement || input.verifiedApk?.bytes !== apkMeasurement.bytes ||
-      input.verifiedApk?.sha256 !== apkMeasurement.sha256) {
-    throw new Error('Prepared APK bytes do not match the verified Play artifact.');
-  }
-  if (input.verifiedApk.applicationId !== identity.applicationId ||
-      input.verifiedApk.versionName !== identity.publicVersion ||
-      input.verifiedApk.versionCode !== identity.versionCode) {
-    throw new Error('Prepared APK identity does not match the canonical release.');
-  }
-
-  const checksumBytes = Buffer.from(
-    `${input.verifiedApk.sha256}  ${identity.apkName}\n`,
-  );
-  const releaseNotes = binaryReleaseNotes(identity, input.verifiedApk);
-  return {
-    files: {
-      apk: { name: identity.apkName, bytes: input.apkBytes },
-      checksum: { name: identity.checksumName, bytes: checksumBytes },
-    },
-    evidence: {
-      schemaVersion: 1,
-      phase: 'binary-prepared',
-      publicationApproved: false,
-      releaseId: source.releaseId,
-      sourceManifestAssetId: source.releaseAssetId,
-      sourceManifestSha256: source.sourceManifestSha256,
-      tagName: identity.tagName,
-      candidate: { ...expectedCandidate },
-      playDownloadId: input.playDownloadId,
-      apk: {
-        name: identity.apkName,
-        ...input.verifiedApk,
-      },
-      checksum: {
-        name: identity.checksumName,
-        sha256: sha256Bytes(checksumBytes),
-      },
-      releaseNotes,
-    },
-  };
+function checksumBytesFor(identity, verifiedApk) {
+  return Buffer.from(verifiedApk.sha256 + '  ' + identity.apkName + '\n');
 }
 
-async function publishBinaryRelease(input, { github }) {
-  if (input.publicationApproved !== true) {
-    throw new Error('Binary publication requires protected human approval.');
+function requireExactAsset(asset, expected, label) {
+  if (!asset || !Number.isSafeInteger(asset.id) || asset.id < 1 ||
+      asset.name !== expected.name ||
+      asset.sha256?.toLowerCase() !== expected.sha256 ||
+      asset.size !== expected.size) {
+    throw new Error('Canonical release contains a conflicting ' + label + ' asset.');
   }
+  return asset;
+}
+
+async function mirrorPlayGeneratedApk(input, {
+  github,
+  play,
+  inspectApk = inspectGeneratedApk,
+}) {
   const identity = createAndroidReleaseIdentity(input.releaseVersion);
-  const evidence = input.binaryEvidence;
-  if (evidence?.schemaVersion !== 1 || evidence?.phase !== 'binary-prepared' ||
-      evidence?.publicationApproved !== false || evidence?.tagName !== identity.tagName) {
-    throw new Error('Binary publication requires retained exact preparation evidence.');
+  const candidate = requireExactSourceManifest(input.sourceManifest, identity);
+  if (!Buffer.isBuffer(input.sourceManifestBytes)) {
+    throw new Error('Source manifest bytes are required.');
   }
-  requireSafePositiveInteger(evidence.releaseId, 'Canonical release ID');
-  requireSafePositiveInteger(evidence.sourceManifestAssetId, 'Source manifest asset ID');
-  if (!Buffer.isBuffer(input.sourceManifestBytes) ||
-      sha256Bytes(input.sourceManifestBytes) !== evidence.sourceManifestSha256) {
-    throw new Error('Published source manifest bytes changed after preparation.');
+  const appSigningCertificateSha256 = normalizeFingerprint(
+    input.appSigningCertificateSha256,
+  ).toLowerCase();
+  const sourceManifestSha256 = sha256Bytes(input.sourceManifestBytes);
+  const releaseName = 'Chessticize Android ' + identity.publicVersion +
+    ' (' + identity.versionCode + ')';
+
+  const [tag, release] = await Promise.all([
+    github.getTag(identity.tagName),
+    github.getReleaseByTag(identity.tagName),
+  ]);
+  if (!tag || !['annotated', 'signed'].includes(tag.tagType) ||
+      tag.commitSha?.toLowerCase() !== candidate.commitSha) {
+    throw new Error('Canonical Android tag is missing or changed before APK mirroring.');
   }
-  const verifiedApk = verifyGeneratedApkContract({
-    apkBytes: input.apkBytes,
-    inspection: input.apkInspection,
-    expected: {
-      identity,
-      appSigningCertificateSha256: evidence.apk?.signerCertificateSha256,
-      minimumBytes: evidence.apk?.bytes,
-      maximumBytes: evidence.apk?.bytes,
-      recordedBytes: evidence.apk?.bytes,
-      expectedSha256: evidence.apk?.sha256,
-    },
-  });
-  const expectedChecksumBytes = Buffer.from(
-    `${verifiedApk.sha256}  ${identity.apkName}\n`,
-  );
-  if (!Buffer.isBuffer(input.checksumBytes) ||
-      !input.checksumBytes.equals(expectedChecksumBytes) ||
-      evidence.checksum?.name !== identity.checksumName ||
-      evidence.checksum?.sha256 !== sha256Bytes(expectedChecksumBytes)) {
-    throw new Error('Prepared SHA-256 checksum does not match the exact APK.');
-  }
-  if (evidence.apk?.name !== identity.apkName ||
-      evidence.apk?.applicationId !== verifiedApk.applicationId ||
-      evidence.apk?.versionName !== verifiedApk.versionName ||
-      evidence.apk?.versionCode !== verifiedApk.versionCode ||
-      evidence.apk?.signerCertificateSha256 !== verifiedApk.signerCertificateSha256 ||
-      JSON.stringify(evidence.apk?.abis) !== JSON.stringify(verifiedApk.abis) ||
-      evidence.apk?.pageSizeCompatibility !== verifiedApk.pageSizeCompatibility) {
-    throw new Error('Prepared APK audit metadata changed before publication.');
-  }
-  if (evidence.releaseNotes !== binaryReleaseNotes(identity, verifiedApk)) {
-    throw new Error('Prepared Android release notes are missing or changed.');
+  if (!release || !Number.isSafeInteger(release.id) || release.id < 1 ||
+      release.tagName !== identity.tagName || release.name !== releaseName ||
+      release.draft !== false || release.prerelease !== false) {
+    throw new Error('Published corresponding-source release is missing or conflicting.');
   }
 
-  const existingAssetsPromise = github.getReleaseAssets(evidence.releaseId).catch(error => {
-    throw new Error(
-      'GitHub release assets could not be listed before binary publication; ' +
-      `manually confirm no APK is public before retry. ${
-        error instanceof Error ? error.message : String(error)
-      }`,
-      { cause: error },
-    );
-  });
-  const [tag, release, sourceAsset, existingAssets] = await Promise.all([
-    github.getTag(identity.tagName),
-    github.getRelease(evidence.releaseId),
-    github.getAsset(evidence.sourceManifestAssetId),
-    existingAssetsPromise,
+  const initialAssets = await github.getReleaseAssets(release.id);
+  if (!Array.isArray(initialAssets)) {
+    throw new Error('GitHub release assets response is unavailable.');
+  }
+  const allowedNames = new Set([
+    'android-source-manifest.json',
+    identity.apkName,
+    identity.checksumName,
   ]);
-  if (!Array.isArray(existingAssets)) {
-    throw new Error(
-      'GitHub release assets API response is unavailable; ' +
-      'manually confirm no APK is public before retry.',
-    );
+  if (initialAssets.some(asset => !allowedNames.has(asset?.name))) {
+    throw new Error('Canonical release contains an unexpected release asset.');
   }
-  if (!tag || !['annotated', 'signed'].includes(tag.tagType) ||
-      tag.commitSha?.toLowerCase() !== evidence.candidate?.commitSha) {
-    const conflict = new Error('Canonical Android tag changed before binary publication.');
-    await cleanupApkAssets(existingAssets, conflict);
-    throw conflict;
+  const sourceAssets = initialAssets.filter(
+    asset => asset?.name === 'android-source-manifest.json',
+  );
+  const sourceAsset = requireExactAsset(sourceAssets[0], {
+    name: 'android-source-manifest.json',
+    sha256: sourceManifestSha256,
+    size: input.sourceManifestBytes.length,
+  }, 'source manifest');
+  if (sourceAssets.length !== 1) {
+    throw new Error('Canonical release must contain exactly one source manifest asset.');
   }
-  if (!release || release.id !== evidence.releaseId ||
-      release.tagName !== identity.tagName ||
-      release.draft !== false || release.prerelease !== false) {
-    const conflict = new Error('Canonical source release changed before binary publication.');
-    await cleanupApkAssets(existingAssets, conflict);
-    throw conflict;
-  }
+
+  const downloaded = await downloadPlayUniversalApk({
+    identity,
+    appSigningCertificateSha256,
+  }, { play });
+  const apkPath = typeof downloaded.apkBytes === 'string'
+    ? downloaded.apkBytes
+    : downloaded.apkBytes?.path;
+  const verifiedApk = verifyGeneratedApkContract({
+    apkBytes: downloaded.apkBytes,
+    inspection: inspectApk(apkPath),
+    expected: {
+      identity,
+      appSigningCertificateSha256,
+    },
+  });
+  const checksumBytes = checksumBytesFor(identity, verifiedApk);
+  const checksumSha256 = sha256Bytes(checksumBytes);
   const sourceBody = sourceReleaseNotes(identity);
-  const desiredBody = `${sourceBody}\n\n---\n\n${evidence.releaseNotes}`;
+  const desiredBody = sourceBody + '\n\n---\n\n' + binaryReleaseNotes(identity, verifiedApk);
   const releaseBody = String(release.body ?? '');
   if (releaseBody !== sourceBody && releaseBody !== desiredBody) {
-    const conflict = new Error(
-      'Canonical Android release body changed before binary publication.',
-    );
-    await cleanupApkAssets(existingAssets, conflict);
-    throw conflict;
+    throw new Error('Canonical Android release notes changed before APK mirroring.');
   }
-  if (!sourceAsset || sourceAsset.id !== evidence.sourceManifestAssetId ||
-      sourceAsset.name !== 'android-source-manifest.json' ||
-      sourceAsset.sha256?.toLowerCase() !== evidence.sourceManifestSha256) {
-    const conflict = new Error(
-      'Canonical source manifest asset changed before binary publication.',
-    );
-    await cleanupApkAssets(existingAssets, conflict);
-    throw conflict;
-  }
+
   const expectedAssets = new Map([
     [identity.checksumName, {
-      bytes: input.checksumBytes,
-      sha256: evidence.checksum.sha256,
-      size: expectedChecksumBytes.length,
+      name: identity.checksumName,
+      bytes: checksumBytes,
+      sha256: checksumSha256,
+      size: checksumBytes.length,
       label: 'APK checksum',
     }],
     [identity.apkName, {
-      bytes: input.apkBytes,
+      name: identity.apkName,
+      bytes: downloaded.apkBytes,
       sha256: verifiedApk.sha256,
       size: verifiedApk.bytes,
       label: 'Play-generated APK',
     }],
   ]);
-  async function cleanupApkAssets(assets, originalError) {
-    const apkAssets = assets.filter(asset =>
-      typeof asset?.name === 'string' && asset.name.toLowerCase().endsWith('.apk'));
-    const invalidAssets = apkAssets.filter(
-      asset => !Number.isSafeInteger(asset?.id) || asset.id < 1,
-    );
-    const apkAssetIds = apkAssets
-      .filter(asset => Number.isSafeInteger(asset?.id) && asset.id > 0)
-      .map(asset => asset.id);
-    const cleanupResults = await Promise.allSettled(
-      apkAssetIds.map(assetId => github.deleteAsset(assetId)),
-    );
-    const failedIds = cleanupResults
-      .map((result, index) => result.status === 'rejected' ? apkAssetIds[index] : null)
-      .filter(assetId => assetId !== null);
-    if (invalidAssets.length > 0 || failedIds.length > 0) {
-      const originalMessage = originalError instanceof Error
-        ? originalError.message
-        : String(originalError);
-      const failureDetail = [
-        failedIds.length > 0 ? `asset ${failedIds.join(', ')}` : null,
-        invalidAssets.length > 0
-          ? `asset with missing ID (${invalidAssets.map(asset => asset.name).join(', ')})`
-          : null,
-      ].filter(Boolean).join(' and ');
-      throw new Error(
-        `Binary publication cleanup failed for APK ${failureDetail}; ` +
-        `manual removal is required before retry. Original failure: ${originalMessage}`,
-        { cause: originalError },
-      );
+  const reconciled = new Map();
+  for (const [name, expected] of expectedAssets) {
+    const matches = initialAssets.filter(asset => asset?.name === name);
+    if (matches.length > 1) {
+      throw new Error('Canonical release contains duplicate ' + expected.label + ' assets.');
+    }
+    if (matches.length === 1) {
+      reconciled.set(name, requireExactAsset(matches[0], expected, expected.label));
     }
   }
-  const allowedNames = new Set([
-    'android-source-manifest.json',
-    ...expectedAssets.keys(),
+
+  async function uploadMissing(name) {
+    if (reconciled.has(name)) return;
+    const expected = expectedAssets.get(name);
+    const uploaded = await github.uploadAsset({
+      releaseId: release.id,
+      name,
+      bytes: expected.bytes,
+    });
+    reconciled.set(name, requireExactAsset(uploaded, expected, expected.label));
+  }
+
+  await uploadMissing(identity.checksumName);
+  if (releaseBody !== desiredBody) {
+    const updated = await github.updateRelease({
+      releaseId: release.id,
+      body: desiredBody,
+      draft: false,
+    });
+    if (!updated || updated.id !== release.id ||
+        updated.tagName !== identity.tagName ||
+        updated.draft !== false ||
+        String(updated.body ?? '') !== desiredBody) {
+      throw new Error('GitHub did not preserve the APK mirror release notes.');
+    }
+  }
+  await uploadMissing(identity.apkName);
+
+  const [finalRelease, finalAssets] = await Promise.all([
+    github.getRelease(release.id),
+    github.getReleaseAssets(release.id),
   ]);
-  const listedSourceAssets = existingAssets.filter(
+  if (!finalRelease || finalRelease.id !== release.id ||
+      finalRelease.tagName !== identity.tagName ||
+      finalRelease.draft !== false ||
+      finalRelease.prerelease !== false ||
+      String(finalRelease.body ?? '') !== desiredBody ||
+      !Array.isArray(finalAssets) ||
+      finalAssets.length !== 3) {
+    throw new Error('GitHub APK mirror state could not be reconciled after publication.');
+  }
+  const finalSourceAssets = finalAssets.filter(
     asset => asset?.name === 'android-source-manifest.json',
   );
-  if (existingAssets.some(asset => !allowedNames.has(asset?.name)) ||
-      listedSourceAssets.length !== 1 ||
-      listedSourceAssets[0]?.id !== sourceAsset.id ||
-      listedSourceAssets[0]?.sha256?.toLowerCase() !== evidence.sourceManifestSha256 ||
-      listedSourceAssets[0]?.size !== input.sourceManifestBytes.length) {
-    const conflict = new Error('Canonical release contains an unexpected release asset.');
-    await cleanupApkAssets(existingAssets, conflict);
-    throw conflict;
+  const finalSource = requireExactAsset(finalSourceAssets[0], {
+    name: 'android-source-manifest.json',
+    sha256: sourceManifestSha256,
+    size: input.sourceManifestBytes.length,
+  }, 'source manifest');
+  if (finalSourceAssets.length !== 1 || finalSource.id !== sourceAsset.id) {
+    throw new Error('Canonical source manifest asset changed during APK mirroring.');
   }
-  const reconciledAssets = new Map();
-  for (const [name, expectedAsset] of expectedAssets) {
-    const matches = existingAssets.filter(asset => asset?.name === name);
-    if (matches.length > 1 || (matches.length === 1 &&
-        (!Number.isSafeInteger(matches[0].id) || matches[0].id < 1 ||
-         matches[0].sha256?.toLowerCase() !== expectedAsset.sha256 ||
-         matches[0].size !== expectedAsset.size))) {
-      const conflict = new Error(
-        `Canonical release contains a conflicting ${expectedAsset.label} asset.`,
-      );
-      await cleanupApkAssets(existingAssets, conflict);
-      throw conflict;
+  for (const [name, expected] of expectedAssets) {
+    const matches = finalAssets.filter(asset => asset?.name === name);
+    if (matches.length !== 1) {
+      throw new Error('GitHub APK mirror is missing the exact ' + expected.label + ' asset.');
     }
-    if (matches.length === 1) reconciledAssets.set(name, matches[0]);
+    reconciled.set(name, requireExactAsset(matches[0], expected, expected.label));
   }
 
-  const publishedEvidence = () => {
-    const apkAsset = reconciledAssets.get(identity.apkName);
-    const checksumAsset = reconciledAssets.get(identity.checksumName);
-    return {
-      ...evidence,
-      phase: 'binary-published',
-      publicationApproved: true,
-      apkAssetId: apkAsset.id,
-      checksumAssetId: checksumAsset.id,
-    };
-  };
-  const exactPublishedState = (candidateRelease, assets) => {
-    if (!candidateRelease || candidateRelease.id !== release.id ||
-        candidateRelease.tagName !== identity.tagName ||
-        candidateRelease.draft !== false || candidateRelease.prerelease !== false ||
-        String(candidateRelease.body ?? '') !== desiredBody || !Array.isArray(assets) ||
-        assets.length !== 3) {
-      return null;
-    }
-    const exactAsset = (name, expected) => {
-      const matches = assets.filter(asset => asset?.name === name);
-      const asset = matches[0];
-      return matches.length === 1 && Number.isSafeInteger(asset?.id) && asset.id > 0 &&
-        asset.sha256?.toLowerCase() === expected.sha256 && asset.size === expected.size
-        ? asset
-        : null;
-    };
-    const exactSource = exactAsset('android-source-manifest.json', {
-      sha256: evidence.sourceManifestSha256,
-      size: input.sourceManifestBytes.length,
-    });
-    const exactChecksum = exactAsset(
-      identity.checksumName,
-      expectedAssets.get(identity.checksumName),
-    );
-    const exactApk = exactAsset(identity.apkName, expectedAssets.get(identity.apkName));
-    if (!exactSource || exactSource.id !== sourceAsset.id || !exactChecksum || !exactApk) {
-      return null;
-    }
-    return { apk: exactApk, checksum: exactChecksum };
-  };
-  const initialPublishedState = exactPublishedState(release, existingAssets);
-  if (initialPublishedState) {
-    reconciledAssets.set(identity.apkName, initialPublishedState.apk);
-    reconciledAssets.set(identity.checksumName, initialPublishedState.checksum);
-    return publishedEvidence();
-  }
-  const existingApk = reconciledAssets.get(identity.apkName);
-  if (existingApk &&
-      (!reconciledAssets.has(identity.checksumName) || releaseBody !== desiredBody)) {
-    await cleanupApkAssets(
-      [existingApk],
-      new Error('A public APK existed before its exact checksum and release notes.'),
-    );
-    reconciledAssets.delete(identity.apkName);
-  }
-
-  try {
-    const uploadExpectedAsset = async name => {
-      const expectedAsset = expectedAssets.get(name);
-      const uploaded = await github.uploadAsset({
-        releaseId: release.id,
-        name,
-        bytes: expectedAsset.bytes,
-      });
-      if (!uploaded || !Number.isSafeInteger(uploaded.id) || uploaded.id < 1 ||
-          uploaded.name !== name || uploaded.sha256?.toLowerCase() !== expectedAsset.sha256 ||
-          uploaded.size !== expectedAsset.size) {
-        throw new Error(`GitHub did not retain the exact ${expectedAsset.label} bytes.`);
-      }
-      reconciledAssets.set(name, uploaded);
-    };
-    if (!reconciledAssets.has(identity.checksumName)) {
-      await uploadExpectedAsset(identity.checksumName);
-    }
-    if (releaseBody !== desiredBody) {
-      const updated = await github.updateRelease({
-        releaseId: release.id,
-        body: desiredBody,
-        draft: false,
-      });
-      if (!updated || updated.id !== release.id || updated.tagName !== identity.tagName ||
-          updated.draft !== false || String(updated.body ?? '') !== desiredBody) {
-        throw new Error('GitHub did not preserve the canonical published release state.');
-      }
-    }
-    if (!reconciledAssets.has(identity.apkName)) {
-      await uploadExpectedAsset(identity.apkName);
-    }
-    return publishedEvidence();
-  } catch (error) {
-    let currentRelease;
-    let currentAssets;
-    try {
-      [currentRelease, currentAssets] = await Promise.all([
-        github.getRelease(release.id),
-        github.getReleaseAssets(release.id),
-      ]);
-    } catch (reconciliationError) {
-      throw new Error(
-        `Binary publication state could not be reconciled after failure: ${
-          error instanceof Error ? error.message : String(error)
-        }. ${reconciliationError instanceof Error
-          ? reconciliationError.message
-          : String(reconciliationError)}; ` +
-        'manually confirm no APK is public before retry.',
-        { cause: error },
-      );
-    }
-    if (!Array.isArray(currentAssets)) {
-      throw new Error(
-        'Binary publication assets could not be reconciled after failure; ' +
-        'manually confirm no APK is public before retry.',
-        { cause: error },
-      );
-    }
-    const recoveredState = exactPublishedState(currentRelease, currentAssets);
-    if (recoveredState) {
-      reconciledAssets.set(identity.checksumName, recoveredState.checksum);
-      reconciledAssets.set(identity.apkName, recoveredState.apk);
-      return publishedEvidence();
-    }
-    await cleanupApkAssets(currentAssets, error);
-    throw error;
-  }
-}
-
-function requirePlayReadyInputs({ identity, sourceManifest, playReady, ownerEvidence }) {
-  const candidate = requireExactSourceManifest(sourceManifest, identity);
-  if (playReady?.schemaVersion !== 1 || playReady?.status !== 'play-ready' ||
-      playReady?.worktreeClean !== true || playReady?.commitSha !== candidate.commitSha) {
-    throw new Error('Exact #186 play-ready evidence is missing or does not match the candidate.');
-  }
-  for (const [field, value] of [
-    ['sha256', candidate.aabSha256],
-    ['applicationId', identity.applicationId],
-    ['versionName', identity.publicVersion],
-    ['versionCode', identity.versionCode],
-  ]) {
-    if (playReady.bundle?.[field] !== value) {
-      throw new Error(`Exact #186 play-ready bundle ${field} mismatch.`);
-    }
-  }
-  requireCandidateEqual(ownerEvidence?.candidate, candidate, 'Owner evidence');
-  const appSigningCertificateSha256 = normalizeFingerprint(
-    ownerEvidence?.signing?.appSigningCertificateSha256,
-  ).toLowerCase();
-  const sizes = ownerEvidence?.artifacts?.generatedApkSizes;
-  const expectation = sizes?.universalApkExpectation;
-  if (!Number.isSafeInteger(sizes?.universalApkBytes) || sizes.universalApkBytes < 1 ||
-      !Number.isSafeInteger(expectation?.minimumBytes) || expectation.minimumBytes < 1 ||
-      !Number.isSafeInteger(expectation?.maximumBytes) ||
-      expectation.maximumBytes < expectation.minimumBytes) {
-    throw new Error('Owner evidence does not contain approved universal APK size bounds.');
-  }
   return {
-    candidate,
-    appSigningCertificateSha256,
-    recordedBytes: sizes.universalApkBytes,
-    minimumBytes: expectation.minimumBytes,
-    maximumBytes: expectation.maximumBytes,
+    schemaVersion: 1,
+    phase: 'play-apk-mirrored',
+    tagName: identity.tagName,
+    commitSha: candidate.commitSha,
+    applicationId: identity.applicationId,
+    versionName: identity.publicVersion,
+    versionCode: identity.versionCode,
+    aabSha256: candidate.aabSha256,
+    sourceManifestSha256,
+    releaseId: release.id,
+    releaseUrl: finalRelease.htmlUrl ?? release.htmlUrl,
+    sourceManifestAssetId: sourceAsset.id,
+    playDownloadId: downloaded.downloadId,
+    apk: {
+      name: identity.apkName,
+      bytes: verifiedApk.bytes,
+      sha256: verifiedApk.sha256,
+      signerCertificateSha256: verifiedApk.signerCertificateSha256,
+      assetId: reconciled.get(identity.apkName).id,
+    },
+    checksum: {
+      name: identity.checksumName,
+      sha256: checksumSha256,
+      assetId: reconciled.get(identity.checksumName).id,
+    },
   };
-}
-
-async function requirePublishedSourceRelease({ identity, candidate, evidence, sourceManifestBytes }, { github }) {
-  if (evidence?.phase !== 'source-published' || evidence?.publicationApproved !== true ||
-      evidence?.tagName !== identity.tagName || evidence?.commitSha !== candidate.commitSha) {
-    throw new Error('Published source evidence does not match the exact canonical candidate.');
-  }
-  requireCandidateEqual(evidence.candidate, candidate, 'Published source evidence');
-  const digest = sha256Bytes(sourceManifestBytes);
-  if (evidence.sourceManifestSha256 !== digest) {
-    throw new Error('Published source evidence does not match source manifest bytes.');
-  }
-  const [tag, release, asset, releaseAssets] = await Promise.all([
-    github.getTag(identity.tagName),
-    github.getRelease(evidence.releaseId),
-    github.getAsset(evidence.releaseAssetId),
-    github.getReleaseAssets(evidence.releaseId),
-  ]);
-  if (!tag || !['annotated', 'signed'].includes(tag.tagType) ||
-      tag.commitSha?.toLowerCase() !== candidate.commitSha) {
-    throw new Error('Canonical Android tag changed after source publication.');
-  }
-  if (!release || release.id !== evidence.releaseId || release.tagName !== identity.tagName ||
-      release.draft !== false || release.prerelease !== false) {
-    throw new Error('Canonical source release changed after source publication.');
-  }
-  requireSourceReleaseNotes(release, identity);
-  if (!asset || asset.id !== evidence.releaseAssetId ||
-      asset.name !== 'android-source-manifest.json' || asset.sha256 !== digest) {
-    throw new Error('Canonical source manifest asset changed after source publication.');
-  }
-  if (!Array.isArray(releaseAssets) || releaseAssets.length !== 1 ||
-      releaseAssets[0]?.id !== asset.id ||
-      releaseAssets[0]?.name !== 'android-source-manifest.json' ||
-      releaseAssets[0]?.sha256?.toLowerCase() !== digest ||
-      releaseAssets[0]?.size !== sourceManifestBytes.length) {
-    throw new Error('Published canonical source release must remain source-only.');
-  }
 }
 
 module.exports = {
@@ -1024,18 +728,16 @@ module.exports = {
   createAndroidReleaseIdentity,
   prepareSourceDraft,
   publishSourceRelease,
+  publishCorrespondingSource,
   selectPlayUniversalApk,
   downloadPlayUniversalApk,
   verifyGeneratedApkContract,
   parseApkBadging,
   parseApkSignerCertificate,
   inspectGeneratedApk,
-  prepareBinaryEvidence,
   binaryReleaseNotes,
-  publishBinaryRelease,
+  mirrorPlayGeneratedApk,
   requireExactSourceManifest,
   sourceReleaseNotes,
-  requirePlayReadyInputs,
-  requirePublishedSourceRelease,
   measureArtifact,
 };

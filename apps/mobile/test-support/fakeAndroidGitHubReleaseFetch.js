@@ -4,6 +4,8 @@ const { Buffer } = require('node:buffer');
 const ResponseImplementation = global.Response;
 const commitSha = 'a'.repeat(40);
 const annotatedTagSha = 'e'.repeat(40);
+let release;
+let sourceAsset;
 
 function jsonResponse(value, status = 200) {
   return new ResponseImplementation(JSON.stringify(value), {
@@ -35,33 +37,51 @@ global.fetch = async (input, options = {}) => {
       verification: { verified: false },
     });
   }
-  if (method === 'GET' && url.pathname.endsWith('/releases')) {
-    return jsonResponse([]);
+  if (method === 'GET' && url.pathname.includes('/releases/tags/')) {
+    return release ? jsonResponse(release) : jsonResponse({ message: 'not found' }, 404);
   }
   if (method === 'POST' && url.hostname === 'api.github.com' &&
       url.pathname.endsWith('/releases')) {
-    const release = JSON.parse(String(options.body));
-    return jsonResponse({
+    const inputRelease = JSON.parse(String(options.body));
+    if (Object.hasOwn(inputRelease, 'target_commitish')) {
+      return jsonResponse({ message: 'target_commitish must be omitted for an existing tag' }, 422);
+    }
+    release = {
       id: 41,
-      tag_name: release.tag_name,
-      target_commitish: release.target_commitish,
-      name: release.name,
-      body: release.body,
-      draft: release.draft,
-      prerelease: release.prerelease,
-      html_url: `https://github.com/Chessticize/chessticize-mobile/releases/tag/${release.tag_name}`,
-    }, 201);
+      tag_name: inputRelease.tag_name,
+      target_commitish: 'main',
+      name: inputRelease.name,
+      body: inputRelease.body,
+      draft: inputRelease.draft,
+      prerelease: inputRelease.prerelease,
+      html_url: `https://github.com/Chessticize/chessticize-mobile/releases/tag/${inputRelease.tag_name}`,
+    };
+    return jsonResponse(release, 201);
   }
   if (method === 'POST' && url.hostname === 'uploads.github.com' &&
       url.pathname.endsWith('/assets')) {
     const bytes = await readRequestBytes(options.body);
-    return jsonResponse({
+    sourceAsset = {
       id: 42,
       name: url.searchParams.get('name'),
       size: bytes.length,
       digest: `sha256:${crypto.createHash('sha256').update(bytes).digest('hex')}`,
       browser_download_url: 'https://example.invalid/android-source-manifest.json',
-    }, 201);
+    };
+    return jsonResponse(sourceAsset, 201);
+  }
+  if (method === 'GET' && url.pathname.endsWith('/releases/41')) {
+    return jsonResponse(release);
+  }
+  if (method === 'GET' && url.pathname.endsWith('/releases/assets/42')) {
+    return jsonResponse(sourceAsset);
+  }
+  if (method === 'GET' && url.pathname.endsWith('/releases/41/assets')) {
+    return jsonResponse(sourceAsset ? [sourceAsset] : []);
+  }
+  if (method === 'PATCH' && url.pathname.endsWith('/releases/41')) {
+    release = { ...release, ...JSON.parse(String(options.body)) };
+    return jsonResponse(release);
   }
 
   return jsonResponse({ message: `unexpected fake request: ${method} ${url}` }, 500);

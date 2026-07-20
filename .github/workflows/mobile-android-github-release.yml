@@ -1,385 +1,121 @@
-name: Mobile Android GitHub release
+name: Publish Play-generated Android APK
 
 on:
   workflow_dispatch:
     inputs:
-      phase:
-        description: Protected release phase to execute
-        required: true
-        type: choice
-        options:
-          - prepare-source-draft
-          - publish-source
-          - prepare-binary
-          - publish-binary
       public_version:
-        description: Canonical unified public version
+        description: Canonical public version already published through Play
         required: true
         type: string
       version_code:
-        description: Canonical Android build number
+        description: Canonical Android build number already verified on device
         required: true
         type: string
-      candidate_artifact_id:
-        description: Retained #186 signed-candidate artifact ID; required by source preparation and binary preparation
-        required: false
-        default: "0"
-        type: string
-      prior_artifact_id:
-        description: Exact prior-phase evidence artifact ID; required by publication and binary phases
-        required: false
-        default: "0"
-        type: string
+
+permissions:
+  contents: write
+  id-token: write
 
 concurrency:
-  group: mobile-android-github-release-${{ inputs.phase }}
+  group: mirror-play-apk-${{ inputs.public_version }}-${{ inputs.version_code }}
   cancel-in-progress: false
 
 jobs:
-  prepare-source-draft:
-    if: inputs.phase == 'prepare-source-draft'
+  mirror-play-apk:
+    name: Mirror Play-signed universal APK
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    environment: android-production
-    permissions:
-      actions: read
-      contents: read
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout release tooling
+        uses: actions/checkout@v4
         with:
-          lfs: true
+          fetch-depth: 0
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.1.2
-
-      - uses: actions/setup-node@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: 22.x
-          cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
-
-      - name: Download and authenticate the exact signed-candidate artifact
+      - name: Resolve and checkout the exact canonical tag
         id: candidate
         env:
-          GH_TOKEN: ${{ github.token }}
-          ARTIFACT_ID: ${{ inputs.candidate_artifact_id }}
           PUBLIC_VERSION: ${{ inputs.public_version }}
           VERSION_CODE: ${{ inputs.version_code }}
         run: |
           candidate_sha="$(bash apps/mobile/scripts/resolve-android-release-candidate-commit.sh \
             "$PUBLIC_VERSION" "$VERSION_CODE")"
-          bash apps/mobile/scripts/download-android-release-artifact.sh \
-            "$ARTIFACT_ID" \
-            ".github/workflows/mobile-android-release-candidate.yml" \
-            'android-signed-release-candidate-{sha}' \
-            "$RUNNER_TEMP/candidate" \
-            "$RUNNER_TEMP/candidate.zip" \
-            "$candidate_sha"
+          tag_name="$(node -e '
+            const { canonicalAndroidSourceTag } = require("./apps/mobile/scripts/android-play-release");
+            process.stdout.write(canonicalAndroidSourceTag(process.argv[1], Number(process.argv[2])));
+          ' "$PUBLIC_VERSION" "$VERSION_CODE")"
+          git checkout --detach "$candidate_sha"
+          echo "sha=$candidate_sha" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag_name" >> "$GITHUB_OUTPUT"
 
-      - name: Prepare the one canonical source draft
-        env:
-          GITHUB_TOKEN: ${{ secrets.ANDROID_GITHUB_RELEASE_TOKEN }}
-          PUBLIC_VERSION: ${{ inputs.public_version }}
-          VERSION_CODE: ${{ inputs.version_code }}
-        run: |
-          set -euo pipefail
-          source_manifest="$RUNNER_TEMP/candidate/artifacts/android-release/android-source-manifest.json"
-          test -f "$source_manifest"
-          mkdir -p "$RUNNER_TEMP/source-draft"
-          pnpm mobile:verify:android:github-release \
-            --phase prepare-source-draft \
-            --public-version "$PUBLIC_VERSION" \
-            --version-code "$VERSION_CODE" \
-            --source-manifest "$source_manifest" \
-            --candidate-run-id "${{ steps.candidate.outputs.run_id }}" \
-            --candidate-artifact-id "${{ steps.candidate.outputs.artifact_id }}" \
-            --candidate-artifact-name "${{ steps.candidate.outputs.artifact_name }}" \
-            --candidate-archive-sha256 "${{ steps.candidate.outputs.archive_sha256 }}" \
-            --output-dir "$RUNNER_TEMP/source-draft"
-          cp "$source_manifest" "$RUNNER_TEMP/source-draft/android-source-manifest.json"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: android-source-draft-${{ github.run_id }}
-          if-no-files-found: error
-          retention-days: 30
-          path: ${{ runner.temp }}/source-draft/
-
-  publish-source:
-    if: inputs.phase == 'publish-source'
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    environment: android-source-publication
-    permissions:
-      actions: read
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.1.2
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22.x
-          cache: pnpm
-
-      - run: pnpm install --frozen-lockfile
-
-      - name: Download and authenticate exact source-draft evidence
-        id: prior
-        env:
-          GH_TOKEN: ${{ github.token }}
-          ARTIFACT_ID: ${{ inputs.prior_artifact_id }}
-        run: |
-          bash apps/mobile/scripts/download-android-release-artifact.sh \
-            "$ARTIFACT_ID" \
-            ".github/workflows/mobile-android-github-release.yml" \
-            'android-source-draft-{run_id}' \
-            "$RUNNER_TEMP/prior" \
-            "$RUNNER_TEMP/prior.zip"
-
-      - name: Publish the source-only canonical release after approval
-        env:
-          GITHUB_TOKEN: ${{ secrets.ANDROID_GITHUB_RELEASE_TOKEN }}
-          CHESSTICIZE_ANDROID_SOURCE_PUBLICATION_APPROVED: "true"
-          PUBLIC_VERSION: ${{ inputs.public_version }}
-          VERSION_CODE: ${{ inputs.version_code }}
-        run: |
-          set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/source-publication"
-          pnpm mobile:verify:android:github-release \
-            --phase publish-source \
-            --public-version "$PUBLIC_VERSION" \
-            --version-code "$VERSION_CODE" \
-            --source-manifest "$RUNNER_TEMP/prior/android-source-manifest.json" \
-            --source-draft-evidence "$RUNNER_TEMP/prior/android-source-draft-evidence.json" \
-            --prior-run-id "${{ steps.prior.outputs.run_id }}" \
-            --prior-artifact-id "${{ steps.prior.outputs.artifact_id }}" \
-            --prior-artifact-name "${{ steps.prior.outputs.artifact_name }}" \
-            --prior-archive-sha256 "${{ steps.prior.outputs.archive_sha256 }}" \
-            --output-dir "$RUNNER_TEMP/source-publication"
-          cp "$RUNNER_TEMP/prior/android-source-manifest.json" "$RUNNER_TEMP/source-publication/"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: android-source-publication-${{ github.run_id }}
-          if-no-files-found: error
-          retention-days: 30
-          path: ${{ runner.temp }}/source-publication/
-
-  prepare-binary:
-    if: inputs.phase == 'prepare-binary'
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    environment: android-production
-    permissions:
-      actions: read
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          lfs: true
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.1.2
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22.x
-          cache: pnpm
-
-      - uses: actions/setup-java@v4
+      - name: Setup Java
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
-      - uses: android-actions/setup-android@v3
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
 
-      - run: pnpm install --frozen-lockfile
+      - name: Install APK inspection tools only
+        run: sdkmanager "build-tools;36.0.0"
 
-      - run: pnpm mobile:install:android-sdk
-
-      - name: Download and authenticate the exact signed-candidate artifact
-        id: candidate
+      - name: Download the already-published corresponding-source manifest
         env:
           GH_TOKEN: ${{ github.token }}
-          ARTIFACT_ID: ${{ inputs.candidate_artifact_id }}
-          PUBLIC_VERSION: ${{ inputs.public_version }}
-          VERSION_CODE: ${{ inputs.version_code }}
+          TAG_NAME: ${{ steps.candidate.outputs.tag }}
         run: |
-          candidate_sha="$(bash apps/mobile/scripts/resolve-android-release-candidate-commit.sh \
-            "$PUBLIC_VERSION" "$VERSION_CODE")"
-          bash apps/mobile/scripts/download-android-release-artifact.sh \
-            "$ARTIFACT_ID" \
-            ".github/workflows/mobile-android-release-candidate.yml" \
-            'android-signed-release-candidate-{sha}' \
-            "$RUNNER_TEMP/candidate" \
-            "$RUNNER_TEMP/candidate.zip" \
-            "$candidate_sha"
+          mkdir -p "$RUNNER_TEMP/source"
+          gh release download "$TAG_NAME" \
+            --pattern android-source-manifest.json \
+            --dir "$RUNNER_TEMP/source"
 
-      - name: Download and authenticate exact source-publication evidence
-        id: prior
-        env:
-          GH_TOKEN: ${{ github.token }}
-          ARTIFACT_ID: ${{ inputs.prior_artifact_id }}
-        run: |
-          bash apps/mobile/scripts/download-android-release-artifact.sh \
-            "$ARTIFACT_ID" \
-            ".github/workflows/mobile-android-github-release.yml" \
-            'android-source-publication-{run_id}' \
-            "$RUNNER_TEMP/prior" \
-            "$RUNNER_TEMP/prior.zip"
+      - name: Authenticate to Google Play with workload identity
+        id: play-auth-wif
+        if: vars.GOOGLE_WORKLOAD_IDENTITY_PROVIDER != ''
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GOOGLE_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
 
-      - name: Materialize protected owner evidence
-        env:
-          OWNER_EVIDENCE_BASE64: ${{ secrets.ANDROID_PLAY_OWNER_EVIDENCE_BASE64 }}
-        run: |
-          set -euo pipefail
-          test -n "$OWNER_EVIDENCE_BASE64"
-          printf '%s' "$OWNER_EVIDENCE_BASE64" | base64 --decode > "$RUNNER_TEMP/android-play-owner-evidence.json"
-          chmod 0600 "$RUNNER_TEMP/android-play-owner-evidence.json"
-
-      - name: Download pinned bundletool
-        run: |
-          curl --fail --location --silent --show-error \
-            --output "$RUNNER_TEMP/bundletool.jar" \
-            https://github.com/google/bundletool/releases/download/1.18.3/bundletool-all-1.18.3.jar
-          echo "a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29  $RUNNER_TEMP/bundletool.jar" | sha256sum --check
-
-      - name: Re-prove #186 play-ready on the retained exact AAB
-        env:
-          CHESSTICIZE_ANDROID_UPLOAD_CERT_SHA256: ${{ secrets.ANDROID_UPLOAD_CERT_SHA256 }}
-          CHESSTICIZE_GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          pnpm mobile:verify:android:release -- \
-            --bundle "$RUNNER_TEMP/candidate/android/app/build/outputs/bundle/release/app-release.aab" \
-            --bundletool "$RUNNER_TEMP/bundletool.jar" \
-            --owner-evidence "$RUNNER_TEMP/android-play-owner-evidence.json" \
-            --output "$RUNNER_TEMP/play-ready.json"
-
-      - id: play-auth
+      - name: Authenticate to Google Play with the protected fallback credential
+        id: play-auth-key
+        if: vars.GOOGLE_WORKLOAD_IDENTITY_PROVIDER == ''
         uses: google-github-actions/auth@v3
         with:
           credentials_json: ${{ secrets.ANDROID_PUBLISHER_SERVICE_ACCOUNT_JSON }}
           token_format: access_token
           access_token_scopes: https://www.googleapis.com/auth/androidpublisher
 
-      - name: Download and verify the official Play-generated universal APK
+      - name: Require the stable Play app-signing identity
+        env:
+          APP_SIGNING_CERT_SHA256: ${{ vars.ANDROID_PLAY_APP_SIGNING_CERT_SHA256 }}
+        run: test -n "$APP_SIGNING_CERT_SHA256"
+
+      - name: Download, identity-check, and publish the Play-generated APK
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          PLAY_ACCESS_TOKEN: ${{ steps.play-auth.outputs.access_token }}
-          PUBLIC_VERSION: ${{ inputs.public_version }}
-          VERSION_CODE: ${{ inputs.version_code }}
+          PLAY_ACCESS_TOKEN: ${{ steps.play-auth-wif.outputs.access_token || steps.play-auth-key.outputs.access_token }}
+          ANDROID_PLAY_APP_SIGNING_CERT_SHA256: ${{ vars.ANDROID_PLAY_APP_SIGNING_CERT_SHA256 }}
         run: |
-          set -euo pipefail
-          source_manifest="$RUNNER_TEMP/candidate/artifacts/android-release/android-source-manifest.json"
-          mkdir -p "$RUNNER_TEMP/binary-preparation"
-          pnpm mobile:verify:android:github-release \
-            --phase prepare-binary \
-            --public-version "$PUBLIC_VERSION" \
-            --version-code "$VERSION_CODE" \
-            --source-manifest "$source_manifest" \
-            --source-publication-evidence "$RUNNER_TEMP/prior/android-source-publication-evidence.json" \
-            --play-ready-evidence "$RUNNER_TEMP/play-ready.json" \
-            --owner-evidence "$RUNNER_TEMP/android-play-owner-evidence.json" \
-            --candidate-run-id "${{ steps.candidate.outputs.run_id }}" \
-            --candidate-artifact-id "${{ steps.candidate.outputs.artifact_id }}" \
-            --candidate-artifact-name "${{ steps.candidate.outputs.artifact_name }}" \
-            --candidate-archive-sha256 "${{ steps.candidate.outputs.archive_sha256 }}" \
-            --prior-run-id "${{ steps.prior.outputs.run_id }}" \
-            --prior-artifact-id "${{ steps.prior.outputs.artifact_id }}" \
-            --prior-artifact-name "${{ steps.prior.outputs.artifact_name }}" \
-            --prior-archive-sha256 "${{ steps.prior.outputs.archive_sha256 }}" \
-            --output-dir "$RUNNER_TEMP/binary-preparation"
-          cp "$source_manifest" "$RUNNER_TEMP/binary-preparation/android-source-manifest.json"
+          mkdir -p "$RUNNER_TEMP/apk-mirror"
+          node apps/mobile/scripts/android-github-release-cli.js \
+            --operation mirror-play-apk \
+            --public-version "${{ inputs.public_version }}" \
+            --version-code "${{ inputs.version_code }}" \
+            --source-manifest "$RUNNER_TEMP/source/android-source-manifest.json" \
+            --output-dir "$RUNNER_TEMP/apk-mirror"
 
-      - uses: actions/upload-artifact@v4
+      - name: Retain the small mirror receipt
+        uses: actions/upload-artifact@v4
         with:
-          name: android-binary-preparation-${{ github.run_id }}
+          name: android-apk-mirror-${{ steps.candidate.outputs.sha }}
           if-no-files-found: error
           retention-days: 30
-          compression-level: 0
-          path: ${{ runner.temp }}/binary-preparation/
-
-      - name: Destroy protected owner evidence
-        if: always()
-        run: rm -f "$RUNNER_TEMP/android-play-owner-evidence.json"
-
-  publish-binary:
-    if: inputs.phase == 'publish-binary'
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    environment: android-binary-publication
-    permissions:
-      actions: read
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          lfs: true
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.1.2
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22.x
-          cache: pnpm
-
-      - uses: android-actions/setup-android@v3
-
-      - run: pnpm install --frozen-lockfile
-
-      - run: pnpm mobile:install:android-sdk
-
-      - name: Download and authenticate exact binary-preparation evidence
-        id: prior
-        env:
-          GH_TOKEN: ${{ github.token }}
-          ARTIFACT_ID: ${{ inputs.prior_artifact_id }}
-        run: |
-          bash apps/mobile/scripts/download-android-release-artifact.sh \
-            "$ARTIFACT_ID" \
-            ".github/workflows/mobile-android-github-release.yml" \
-            'android-binary-preparation-{run_id}' \
-            "$RUNNER_TEMP/prior" \
-            "$RUNNER_TEMP/prior.zip"
-
-      - name: Publish exact APK and checksum after separate approval
-        env:
-          GITHUB_TOKEN: ${{ secrets.ANDROID_GITHUB_RELEASE_TOKEN }}
-          CHESSTICIZE_ANDROID_BINARY_PUBLICATION_APPROVED: "true"
-          PUBLIC_VERSION: ${{ inputs.public_version }}
-          VERSION_CODE: ${{ inputs.version_code }}
-        run: |
-          set -euo pipefail
-          apk="$RUNNER_TEMP/prior/Chessticize-Android-${PUBLIC_VERSION}.apk"
-          checksum="$apk.sha256"
-          mkdir -p "$RUNNER_TEMP/binary-publication"
-          pnpm mobile:verify:android:github-release \
-            --phase publish-binary \
-            --public-version "$PUBLIC_VERSION" \
-            --version-code "$VERSION_CODE" \
-            --source-manifest "$RUNNER_TEMP/prior/android-source-manifest.json" \
-            --binary-evidence "$RUNNER_TEMP/prior/android-binary-preparation-evidence.json" \
-            --apk "$apk" \
-            --checksum "$checksum" \
-            --prior-run-id "${{ steps.prior.outputs.run_id }}" \
-            --prior-artifact-id "${{ steps.prior.outputs.artifact_id }}" \
-            --prior-artifact-name "${{ steps.prior.outputs.artifact_name }}" \
-            --prior-archive-sha256 "${{ steps.prior.outputs.archive_sha256 }}" \
-            --output-dir "$RUNNER_TEMP/binary-publication"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: android-binary-publication-${{ github.run_id }}
-          if-no-files-found: error
-          retention-days: 30
-          path: ${{ runner.temp }}/binary-publication/
+          path: ${{ runner.temp }}/apk-mirror/android-apk-mirror-evidence.json

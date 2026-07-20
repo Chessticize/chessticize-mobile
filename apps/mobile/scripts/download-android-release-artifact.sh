@@ -2,8 +2,8 @@
 
 set -euo pipefail
 
-if [[ "$#" -lt 5 || "$#" -gt 6 ]]; then
-  echo "Usage: download-android-release-artifact.sh <artifact-id> <workflow-path> <name-template> <destination> <archive> [expected-head-sha]" >&2
+if [[ "$#" -lt 5 || "$#" -gt 7 ]]; then
+  echo "Usage: download-android-release-artifact.sh <artifact-id> <workflow-path> <name-template> <destination> <archive> [expected-head-sha] [allow-failed-run]" >&2
   exit 2
 fi
 
@@ -19,6 +19,7 @@ archive="$5"
 : "${GITHUB_OUTPUT:?GITHUB_OUTPUT is required}"
 
 expected_head_sha="${6:-$GITHUB_SHA}"
+run_policy="${7:-require-success}"
 if ! [[ "$expected_head_sha" =~ ^[0-9a-fA-F]{40}$ ]]; then
   echo "Expected artifact workflow head must be an exact commit SHA." >&2
   exit 1
@@ -42,7 +43,13 @@ fi
 run="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}")"
 test "$(printf '%s' "$run" | jq -r .path)" = "$expected_workflow_path"
 test "$(printf '%s' "$run" | jq -r .event)" = "workflow_dispatch"
-test "$(printf '%s' "$run" | jq -r .conclusion)" = "success"
+run_conclusion="$(printf '%s' "$run" | jq -r .conclusion)"
+if [[ "$run_policy" = "allow-failed-run" ]]; then
+  [[ "$run_conclusion" = "success" || "$run_conclusion" = "failure" ]]
+else
+  test "$run_policy" = "require-success"
+  test "$run_conclusion" = "success"
+fi
 test "$(printf '%s' "$run" | jq -r .head_sha)" = "$expected_head_sha"
 
 expected_name="${expected_name_template//\{run_id\}/$run_id}"

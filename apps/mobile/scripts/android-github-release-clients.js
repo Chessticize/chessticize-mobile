@@ -96,8 +96,10 @@ class GitHubReleasesClient {
   }
 
   async getReleaseByTag(tagName) {
-    const releases = await this.request(`${GITHUB_API_ROOT}/releases?per_page=100`);
-    return mapGithubRelease(releases.find(release => release.tag_name === tagName));
+    return mapGithubRelease(await this.request(
+      `${GITHUB_API_ROOT}/releases/tags/${encodeURIComponent(tagName)}`,
+      { allowNotFound: true },
+    ));
   }
 
   async getRelease(releaseId) {
@@ -113,7 +115,6 @@ class GitHubReleasesClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         tag_name: input.tagName,
-        target_commitish: input.targetCommitish,
         name: input.name,
         body: input.body,
         draft: input.draft,
