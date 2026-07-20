@@ -2,8 +2,8 @@
 
 set -euo pipefail
 
-if [[ "$#" -lt 5 || "$#" -gt 7 ]]; then
-  echo "Usage: download-android-release-artifact.sh <artifact-id> <workflow-path> <name-template> <destination> <archive> [expected-head-sha] [allow-failed-run]" >&2
+if [[ "$#" -lt 5 || ( "$#" -gt 7 && "$#" -ne 10 ) ]]; then
+  echo "Usage: download-android-release-artifact.sh <artifact-id> <workflow-path> <name-template> <destination> <archive> [expected-head-sha] [allow-failed-run [release-version-file public-version version-code]]" >&2
   exit 2
 fi
 
@@ -20,6 +20,27 @@ archive="$5"
 
 expected_head_sha="${6:-$GITHUB_SHA}"
 run_policy="${7:-require-success}"
+if [[ "$run_policy" = "allow-failed-run" ]]; then
+  if [[ "$#" -ne 10 ]]; then
+    echo "Source recovery requires the tagged release identity before artifact access." >&2
+    exit 1
+  fi
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  node -e '
+    const fs = require("node:fs");
+    const { requireDispatchIdentity } = require(process.argv[1]);
+    try {
+      const releaseVersion = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+      requireDispatchIdentity({
+        "public-version": process.argv[3],
+        "version-code": process.argv[4],
+      }, releaseVersion);
+    } catch (error) {
+      process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+      process.exit(1);
+    }
+  ' "$script_dir/android-github-release-cli.js" "$8" "$9" "${10}"
+fi
 if ! [[ "$expected_head_sha" =~ ^[0-9a-fA-F]{40}$ ]]; then
   echo "Expected artifact workflow head must be an exact commit SHA." >&2
   exit 1

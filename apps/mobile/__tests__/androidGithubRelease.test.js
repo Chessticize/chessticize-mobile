@@ -957,6 +957,82 @@ describe('Android GitHub release automation', () => {
     }
   });
 
+  it('rejects a mismatched recovery identity before artifact GitHub I/O', () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'chessticize-recovery-identity-'));
+    const repoRoot = path.resolve(__dirname, '../../..');
+    const downloader = path.join(
+      repoRoot,
+      'apps/mobile/scripts/download-android-release-artifact.sh',
+    );
+    const releaseVersionPath = path.join(directory, 'release-version.json');
+    const fakeBin = path.join(directory, 'bin');
+    const fakeGh = path.join(fakeBin, 'gh');
+    const ghCallMarker = path.join(directory, 'gh-called');
+    const expectedHeadSha = 'a'.repeat(40);
+
+    try {
+      fs.mkdirSync(fakeBin);
+      fs.writeFileSync(releaseVersionPath, `${JSON.stringify({
+        ...releaseVersion,
+        androidVersionCode: releaseVersion.androidVersionCode + 1,
+      }, null, 2)}\n`);
+      fs.writeFileSync(fakeGh, [
+        '#!/usr/bin/env bash',
+        'set -euo pipefail',
+        ': > "$FAKE_GH_CALL_MARKER"',
+        'exit 99',
+        '',
+      ].join('\n'));
+      fs.chmodSync(fakeGh, 0o755);
+
+      const result = spawnSync('bash', [
+        downloader,
+        '201',
+        '.github/workflows/mobile-android-release-candidate.yml',
+        'android-signed-release-candidate-{sha}',
+        path.join(directory, 'destination'),
+        path.join(directory, 'candidate.zip'),
+        expectedHeadSha,
+        'allow-failed-run',
+        releaseVersionPath,
+        releaseVersion.publicVersion,
+        String(releaseVersion.androidVersionCode),
+      ], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${fakeBin}:${process.env.PATH}`,
+          GH_TOKEN: 'fake-token',
+          GITHUB_REPOSITORY: 'Chessticize/chessticize-mobile',
+          GITHUB_SHA: expectedHeadSha,
+          GITHUB_OUTPUT: path.join(directory, 'github-output'),
+          FAKE_GH_CALL_MARKER: ghCallMarker,
+        },
+      });
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain(
+        'Dispatched public version/build does not match release-version.json.',
+      );
+      expect(fs.existsSync(ghCallMarker)).toBe(false);
+
+      const recoveryWorkflow = fs.readFileSync(
+        path.join(repoRoot, '.github/workflows/mobile-android-source-recovery.yml'),
+        'utf8',
+      );
+      const downloadStart = recoveryWorkflow.indexOf(
+        'bash apps/mobile/scripts/download-android-release-artifact.sh',
+      );
+      const downloadEnd = recoveryWorkflow.indexOf('\n\n', downloadStart);
+      const downloadInvocation = recoveryWorkflow.slice(downloadStart, downloadEnd);
+      expect(downloadInvocation).toContain('"$RUNNER_TEMP/candidate-release-version.json"');
+      expect(downloadInvocation).toContain('"${{ inputs.public_version }}"');
+      expect(downloadInvocation).toContain('"${{ inputs.version_code }}"');
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it('authenticates and extracts a GitHub Actions artifact through the real shell process', () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'chessticize-artifact-'));
     const payloadDirectory = path.join(directory, 'payload');
@@ -1059,6 +1135,7 @@ describe('Android GitHub release automation', () => {
     const archive = path.join(directory, 'candidate.zip');
     const downloadedArchive = path.join(directory, 'downloaded.zip');
     const output = path.join(directory, 'github-output');
+    const releaseVersionPath = path.join(directory, 'release-version.json');
     const fakeBin = path.join(directory, 'bin');
     const candidateSha = 'a'.repeat(40);
     const currentMainSha = 'b'.repeat(40);
@@ -1076,6 +1153,7 @@ describe('Android GitHub release automation', () => {
       fs.mkdirSync(payloadDirectory);
       fs.mkdirSync(fakeBin);
       fs.writeFileSync(path.join(payloadDirectory, 'candidate.json'), '{"retained":true}\n');
+      fs.writeFileSync(releaseVersionPath, `${JSON.stringify(releaseVersion, null, 2)}\n`);
       const zipResult = spawnSync('zip', ['-q', archive, 'candidate.json'], {
         cwd: payloadDirectory,
         encoding: 'utf8',
@@ -1098,15 +1176,20 @@ describe('Android GitHub release automation', () => {
         FAKE_CANDIDATE_ARCHIVE: archive,
         FAKE_CANDIDATE_ARCHIVE_SHA256: archiveSha256,
       };
-      const args = [
+      const recoveryArgs = (destinationPath, archivePath, headSha) => [
         downloader,
         '201',
         '.github/workflows/mobile-android-release-candidate.yml',
         'android-signed-release-candidate-{sha}',
-        destination,
-        downloadedArchive,
-        candidateSha,
+        destinationPath,
+        archivePath,
+        headSha,
+        'allow-failed-run',
+        releaseVersionPath,
+        releaseVersion.publicVersion,
+        String(releaseVersion.androidVersionCode),
       ];
+      const args = recoveryArgs(destination, downloadedArchive, candidateSha);
       const result = spawnSync('bash', args, {
         encoding: 'utf8',
         env: environment,
@@ -1119,12 +1202,11 @@ describe('Android GitHub release automation', () => {
         `artifact_name=android-signed-release-candidate-${candidateSha}`,
       );
 
-      const rejected = spawnSync('bash', [
-        ...args.slice(0, -3),
+      const rejected = spawnSync('bash', recoveryArgs(
         path.join(directory, 'rejected-destination'),
         path.join(directory, 'rejected.zip'),
         'f'.repeat(40),
-      ], {
+      ), {
         encoding: 'utf8',
         env: { ...environment, GITHUB_OUTPUT: path.join(directory, 'rejected-output') },
       });

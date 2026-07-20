@@ -75,7 +75,10 @@ jobs:
             "$RUNNER_TEMP/candidate" \
             "$RUNNER_TEMP/candidate.zip" \
             "$CANDIDATE_SHA" \
-            allow-failed-run
+            allow-failed-run \
+            "$RUNNER_TEMP/candidate-release-version.json" \
+            "${{ inputs.public_version }}" \
+            "${{ inputs.version_code }}"
 
       - name: Publish exact corresponding source
         env:
