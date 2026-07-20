@@ -94,21 +94,11 @@ gh variable list --repo Chessticize/chessticize-mobile
 gh secret list --repo Chessticize/chessticize-mobile
 ```
 
-The repository must contain `ANDROID_PLAY_APP_SIGNING_CERT_SHA256` plus exactly
-one Android Publisher authentication path:
-
-- preferred: `GOOGLE_WORKLOAD_IDENTITY_PROVIDER` and
-  `GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT`; or
-- fallback: `ANDROID_PUBLISHER_SERVICE_ACCOUNT_JSON`.
-
-Do not configure both paths. For the fallback, send the JSON file through
-standard input so its contents do not appear in the command arguments:
-
-```sh
-gh secret set ANDROID_PUBLISHER_SERVICE_ACCOUNT_JSON \
-  --repo Chessticize/chessticize-mobile \
-  < /secure/path/android-publisher-service-account.json
-```
+Confirm that the names required by [Authentication setup](#authentication-setup)
+are present. When both authentication paths are stored during a migration, the
+workflow uses Workload Identity Federation whenever
+`GOOGLE_WORKLOAD_IDENTITY_PROVIDER` is non-empty and ignores the JSON fallback.
+If that variable is absent or empty, the workflow selects the JSON fallback.
 
 The Publisher identity must have only the Google Play permissions required to
 read the released app-bundle version and download its generated APKs. It does
@@ -118,47 +108,79 @@ a new Play release.
 ### 2. Verify the immutable release prerequisites
 
 For Android `1.1` build `4`, verify the public source Release and its sole
-pre-mirror asset:
+pre-mirror asset, prove that the canonical tag is annotated, and compare its
+dereferenced commit with the source manifest:
 
 ```sh
 gh release view android-v1.1.0-build-4 \
   --repo Chessticize/chessticize-mobile \
   --json tagName,isDraft,isPrerelease,publishedAt,url,assets
+
+tag_object_sha="$(gh api \
+  repos/Chessticize/chessticize-mobile/git/ref/tags/android-v1.1.0-build-4 \
+  --jq '.object | select(.type == "tag") | .sha')"
+test -n "$tag_object_sha"
+
+tagged_commit_sha="$(gh api \
+  "repos/Chessticize/chessticize-mobile/git/tags/$tag_object_sha" \
+  --jq '.object | select(.type == "commit") | .sha')"
+test -n "$tagged_commit_sha"
+
+mkdir -p scratch/android-apk-mirror/build-4/preflight
+gh release download android-v1.1.0-build-4 \
+  --repo Chessticize/chessticize-mobile \
+  --pattern android-source-manifest.json \
+  --dir scratch/android-apk-mirror/build-4/preflight \
+  --clobber
+
+manifest_commit_sha="$(jq -r '.commitSha' \
+  scratch/android-apk-mirror/build-4/preflight/android-source-manifest.json)"
+test "$tagged_commit_sha" = "$manifest_commit_sha"
+printf 'candidate commit: %s\n' "$tagged_commit_sha"
 ```
 
-The tag must resolve to the retained candidate commit, the Release must be
-public, and `android-source-manifest.json` must be present. Separately record
-the active Play track and the accepted owner device-smoke evidence. An issue
-checkbox or emulator result does not replace either live Play state or the
-physical-device result.
+The tag query must return an annotated tag object, the tag and manifest commits
+must match the retained candidate commit, the Release must be public, and
+`android-source-manifest.json` must be its only asset before mirroring.
+Separately record the active Play track and the accepted owner device-smoke
+evidence. An issue checkbox or emulator result does not replace either live
+Play state or the physical-device result.
 
 ### 3. Dispatch and monitor the mirror
 
 Dispatch from current `main`; the workflow resolves the historical candidate
-from the immutable tag and does not rebuild it:
+from the immutable tag and does not rebuild it. Capture the returned run URL so
+later checks remain bound to this dispatch:
 
 ```sh
-gh workflow run mobile-android-github-release.yml \
+dispatch_started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+run_url="$(gh workflow run mobile-android-github-release.yml \
   --repo Chessticize/chessticize-mobile \
   --ref main \
   -f public_version=1.1 \
-  -f version_code=4
+  -f version_code=4)"
+printf '%s\n' "$run_url"
 ```
 
-Use the run URL returned by `gh`, or find the newest dispatch, then wait for its
-exact result:
+Extract the numeric run ID from that URL and wait for its exact result. Do not
+substitute the newest workflow run, which could belong to another operator:
 
 ```sh
-gh run list \
+run_id="${run_url##*/}"
+test -n "$run_id"
+gh run view "$run_id" \
   --repo Chessticize/chessticize-mobile \
-  --workflow mobile-android-github-release.yml \
-  --event workflow_dispatch \
-  --limit 1
-
-gh run watch <run-id> \
+  --json url,event,headBranch,headSha,workflowName
+gh run watch "$run_id" \
   --repo Chessticize/chessticize-mobile \
   --exit-status
 ```
+
+If the installed `gh` version does not return a URL, use
+`dispatch_started_at` to narrow the Actions UI or `gh run list --created`
+results. Continue only after identifying a single run created by this dispatch
+and confirming its `public_version`, `version_code`, workflow, and `main` head;
+otherwise stop without selecting a run by recency alone.
 
 ### 4. Verify the public APK and retained receipt
 
@@ -183,8 +205,10 @@ gh release download android-v1.1.0-build-4 \
   --pattern 'Chessticize-Android-1.1.apk*' \
   --dir scratch/android-apk-mirror/build-4/public
 
-cd scratch/android-apk-mirror/build-4/public
-shasum -a 256 -c Chessticize-Android-1.1.apk.sha256
+(
+  cd scratch/android-apk-mirror/build-4/public
+  shasum -a 256 -c Chessticize-Android-1.1.apk.sha256
+)
 ```
 
 Download the small workflow receipt separately and retain its release URL,
@@ -192,7 +216,7 @@ asset IDs, Play download ID, APK byte size, APK SHA-256, and Play app-signing
 certificate SHA-256:
 
 ```sh
-gh run download <run-id> \
+gh run download "$run_id" \
   --repo Chessticize/chessticize-mobile \
   --name android-apk-mirror-<candidate-commit-sha> \
   --dir scratch/android-apk-mirror/build-4/receipt
