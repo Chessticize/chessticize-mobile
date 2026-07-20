@@ -128,6 +128,10 @@ Before declaring code work complete:
 
 ## Emulator Refresh Expectation
 
+- Before booting or creating a simulator, inspect the existing simulator devices
+  and reuse a compatible device whenever it satisfies the required runtime,
+  device profile, and test-isolation boundary. Start a different simulator only
+  when no existing device is suitable.
 - Refresh the iOS simulator after changes that affect real rendering, board interaction, navigation geometry, animation, Safe Area/adaptive layout, native modules, or an explicitly requested manual acceptance flow.
 - Ordinary copy, state, styling, accessibility, and service-wiring changes do not require a simulator refresh when component behavior tests prove the public behavior.
 - When a refresh is required, the normal order is focused component tests, mobile typecheck, then simulator refresh.
