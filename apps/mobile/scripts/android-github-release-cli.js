@@ -38,8 +38,8 @@ function parseArguments(argv) {
     index += 1;
   }
   const operation = options.operation ?? 'publish-source';
-  if (!['publish-source', 'mirror-play-apk'].includes(operation)) {
-    throw new Error('--operation must be publish-source or mirror-play-apk.');
+  if (!['publish-source', 'mirror-play-apk', 'validate-identity'].includes(operation)) {
+    throw new Error('--operation must be publish-source, mirror-play-apk, or validate-identity.');
   }
   options.operation = operation;
   return options;
@@ -63,11 +63,6 @@ function requireDispatchIdentity(options, releaseVersion) {
 }
 
 async function runCli(options, environment = process.env) {
-  const token = environment.GITHUB_TOKEN;
-  if (typeof token !== 'string' || token.trim().length === 0) {
-    throw new Error('GITHUB_TOKEN with contents: write is required.');
-  }
-
   const repoRoot = path.resolve(__dirname, '../../..');
   const releaseVersionPath = options['release-version-file']
     ? path.resolve(options['release-version-file'])
@@ -76,6 +71,15 @@ async function runCli(options, environment = process.env) {
     releaseVersionPath,
     'release-version.json',
   );
+  if (options.operation === 'validate-identity') {
+    return requireDispatchIdentity(options, releaseVersion);
+  }
+
+  const token = environment.GITHUB_TOKEN;
+  if (typeof token !== 'string' || token.trim().length === 0) {
+    throw new Error('GITHUB_TOKEN with contents: write is required.');
+  }
+
   const sourceManifestPath = path.resolve(requiredOption(options, 'source-manifest'));
   const sourceManifestBytes = fs.readFileSync(sourceManifestPath);
   const sourceManifest = readJson(sourceManifestPath, 'Source manifest');

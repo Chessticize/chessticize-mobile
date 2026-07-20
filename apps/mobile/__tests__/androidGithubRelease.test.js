@@ -857,6 +857,63 @@ describe('Android GitHub release automation', () => {
     }
   });
 
+  it('rejects a mismatched mirror identity before source download or Play authentication', () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'chessticize-mirror-identity-'));
+    const repoRoot = path.resolve(__dirname, '../../..');
+    const releaseVersionPath = path.join(directory, 'release-version.json');
+    const cli = path.join(repoRoot, 'apps/mobile/scripts/android-github-release-cli.js');
+
+    try {
+      fs.writeFileSync(releaseVersionPath, `${JSON.stringify({
+        ...releaseVersion,
+        androidVersionCode: releaseVersion.androidVersionCode + 1,
+      }, null, 2)}\n`);
+      const result = spawnSync(process.execPath, [
+        cli,
+        '--operation', 'validate-identity',
+        '--release-version-file', releaseVersionPath,
+        '--public-version', releaseVersion.publicVersion,
+        '--version-code', String(releaseVersion.androidVersionCode),
+      ], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          GITHUB_TOKEN: '',
+          PLAY_ACCESS_TOKEN: '',
+        },
+      });
+
+      expect(result.status).not.toBe(0);
+      expect(result.stdout).toBe('');
+      expect(result.stderr).toContain(
+        'Dispatched public version/build does not match release-version.json.',
+      );
+
+      const mirrorWorkflow = fs.readFileSync(
+        path.join(repoRoot, '.github/workflows/mobile-android-github-release.yml'),
+        'utf8',
+      );
+      const validationPosition = mirrorWorkflow.indexOf('--operation validate-identity');
+      const sourceDownloadPosition = mirrorWorkflow.indexOf('gh release download');
+      const workloadIdentityPosition = mirrorWorkflow.indexOf('google-github-actions/auth@v3');
+      const fallbackIdentityPosition = mirrorWorkflow.lastIndexOf('google-github-actions/auth@v3');
+      expect(validationPosition).toBeGreaterThan(-1);
+      expect(validationPosition).toBeLessThan(sourceDownloadPosition);
+      expect(validationPosition).toBeLessThan(workloadIdentityPosition);
+      expect(validationPosition).toBeLessThan(fallbackIdentityPosition);
+
+      const runbook = fs.readFileSync(
+        path.join(repoRoot, 'docs/ANDROID_GITHUB_RELEASE.md'),
+        'utf8',
+      );
+      expect(runbook).not.toContain('resolves and checks out the canonical annotated tag');
+      expect(runbook).toContain('keeps the current release tooling checked out');
+      expect(runbook).toContain('git show');
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it('fails closed before I/O when the built-in GitHub token is missing', () => {
     const repoRoot = path.resolve(__dirname, '../../..');
     const cli = path.join(repoRoot, 'apps/mobile/scripts/android-github-release-cli.js');

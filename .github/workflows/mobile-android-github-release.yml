@@ -51,6 +51,11 @@ jobs:
           git show "${candidate_sha}:apps/mobile/release-version.json" \
             > "$RUNNER_TEMP/candidate-release-version.json"
           test -s "$RUNNER_TEMP/candidate-release-version.json"
+          node apps/mobile/scripts/android-github-release-cli.js \
+            --operation validate-identity \
+            --release-version-file "$RUNNER_TEMP/candidate-release-version.json" \
+            --public-version "$PUBLIC_VERSION" \
+            --version-code "$VERSION_CODE"
           echo "sha=$candidate_sha" >> "$GITHUB_OUTPUT"
           echo "tag=$tag_name" >> "$GITHUB_OUTPUT"
 
