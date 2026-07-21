@@ -39,6 +39,8 @@ const devLoopSkill = read(".codex/skills/chessticize-mobile-dev-loop/SKILL.md");
 const issueTriageSkill = read(".codex/skills/chessticize-issue-triage/SKILL.md");
 const scenarioRegistry = read("apps/mobile-lab/src/scenarioRegistry.ts");
 const markerCheck = read("apps/mobile-lab/scripts/check-new-scenarios.ts");
+const markerPolicy = read("apps/mobile-lab/src/scenarioMarkerPolicy.ts");
+const markerManifest = JSON.parse(read("apps/mobile-lab/src/newScenarioMarkers.json"));
 const localE2eSkill = read(".codex/skills/chessticize-mobile-local-e2e/SKILL.md");
 const uiCalibrationSkill = read(".codex/skills/chessticize-mobile-ui-calibration/SKILL.md");
 const androidReleaseSkill = read(".codex/skills/chessticize-android-release/SKILL.md");
@@ -184,11 +186,17 @@ for (const lifecycleContract of [issueTriage, issueTriageSkill, uiFlowDesign, pr
   assert.doesNotMatch(lifecycleContract, /sites\/storybook-previews|preview-manifest/);
 }
 
-assert.match(scenarioRegistry, /isNew: true; issueNumber: number; changeNote: string/);
-assert.match(markerCheck, /Number\.isInteger\(scenario\.issueNumber\)/);
+assert.match(scenarioRegistry, /newScenarioMarkerData/);
+assert.match(markerPolicy, /Number\.isInteger\(issueNumber\)/);
+assert.match(markerCheck, /verifyRemovedMarkerIssuesAreClosed/);
+assert.match(markerCheck, /issueStates\.get\(issueNumber\) !== "closed"/);
 assert.doesNotMatch(markerCheck, /ALLOW_NEW_SCENARIOS/);
 assert.match(mobileLabWorkflow, /Validate issue-owned New Scenario Markers/);
+assert.match(mobileLabWorkflow, /issues: read/);
+assert.match(mobileLabWorkflow, /BASE_REF:/);
 assert.doesNotMatch(mobileLabWorkflow, /ALLOW_NEW_SCENARIOS|Reject stale New Scenario Markers/);
+assert.equal(typeof markerManifest, "object");
+assert.equal(Array.isArray(markerManifest), false);
 
 for (const reviewPolicy of [agents, devLoopSkill]) {
   assert.match(reviewPolicy, /prefer incremental\s+review/i);

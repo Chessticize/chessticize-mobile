@@ -4,6 +4,7 @@ import type {
   MobileBackTab,
   MobileBackTransient
 } from "../../mobile/src/navigation/mobileBackContract.ts";
+import newScenarioMarkerData from "./newScenarioMarkers.json" with { type: "json" };
 
 export type LabScenarioId =
   | "practice-home"
@@ -38,11 +39,7 @@ export type LabScenarioId =
 
 export type LabScenarioGroup = "Practice" | "Review" | "History" | "Settings" | "System";
 
-type ScenarioMarker =
-  | { isNew: true; issueNumber: number; changeNote: string }
-  | { isNew?: false; issueNumber?: never; changeNote?: never };
-
-export type LabScenarioDefinition = ScenarioMarker & {
+type LabScenarioMetadata = {
   id: LabScenarioId;
   group: LabScenarioGroup;
   title: string;
@@ -56,7 +53,22 @@ export type LabScenarioDefinition = ScenarioMarker & {
   };
 };
 
-export const scenarioRegistry: Record<LabScenarioId, LabScenarioDefinition> = {
+export type NewScenarioMarker = {
+  issueNumber: number;
+  changeNote: string;
+};
+
+type ScenarioMarker =
+  | ({ isNew: true } & NewScenarioMarker)
+  | { isNew?: false; issueNumber?: never; changeNote?: never };
+
+export type LabScenarioDefinition = ScenarioMarker & LabScenarioMetadata;
+
+export const newScenarioMarkers = newScenarioMarkerData as Partial<
+  Record<LabScenarioId, NewScenarioMarker>
+>;
+
+const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
   "practice-home": defineScenario("practice-home", "Practice", "Home", "practice--home", "Idle Practice home with deterministic ratings and no persisted progress.", "practice", ["Mode selection", "Progress summary", "Review workload strip"], ["Review", "History", "Settings"]),
   "practice-custom-setup": defineScenario("practice-custom-setup", "Practice", "Custom sprint setup", "practice--custom-setup", "Custom timing, theme, mode, rating, and start controls.", "practice", ["Custom configuration", "Steppers", "Theme choices"], ["Practice home"]),
   "practice-custom-rating-editor": defineScenario("practice-custom-rating-editor", "Practice", "Custom rating editor", "practice--custom-rating-editor", "Expanded ELO adjustment for a previously played custom rating bucket.", "practice", ["Custom setup", "Rating adjustment"], ["Practice home"]),
@@ -87,6 +99,13 @@ export const scenarioRegistry: Record<LabScenarioId, LabScenarioDefinition> = {
   "system-error": defineScenario("system-error", "System", "Error", "system--error", "Real start failure rendered with an empty in-memory puzzle service.", "system", ["Error message", "Recovery context"], ["Practice"]),
   "system-full-app": defineScenario("system-full-app", "System", "Full App (free roam)", "system--full-app-free-roam", "Unconstrained whole-screen scenario for exploratory flow walking.", "system", ["All current tabs and non-native interactions"], ["External links", "Native-only services"])
 };
+
+export const scenarioRegistry = Object.fromEntries(
+  Object.entries(scenarioDefinitions).map(([id, scenario]) => {
+    const marker = newScenarioMarkers[id as LabScenarioId];
+    return [id, marker ? { ...scenario, ...marker, isNew: true as const } : scenario];
+  })
+) as Record<LabScenarioId, LabScenarioDefinition>;
 
 type CatalogCoverage =
   | { kind: "scenario"; scenario: LabScenarioId }
@@ -120,8 +139,14 @@ export const navigationCoverage = {
   } satisfies Record<MobileBackDetail["kind"], CatalogCoverage>
 };
 
+export type NewScenarioDefinition = LabScenarioDefinition & {
+  isNew: true;
+  issueNumber: number;
+  changeNote: string;
+};
+
 export const newScenarios = Object.values(scenarioRegistry).filter(
-  (scenario): scenario is LabScenarioDefinition & { isNew: true; issueNumber: number; changeNote: string } => scenario.isNew === true
+  (scenario): scenario is NewScenarioDefinition => scenario.isNew === true
 );
 
 export function storyTagsForScenario(id: LabScenarioId): string[] {
@@ -137,7 +162,7 @@ function defineScenario(
   owner: MobileBackPrimaryTab | "system",
   includes: readonly string[],
   exits: readonly string[]
-): LabScenarioDefinition {
+): LabScenarioMetadata {
   return {
     id,
     group,

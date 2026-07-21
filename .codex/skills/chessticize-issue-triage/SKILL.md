@@ -77,8 +77,9 @@ analytics, rollout, or release wiring.
 For an authorized preview:
 
 - Use `codex/storybook-issue-<number>-<goal>` for exactly one issue.
-- Add `isNew: true`, the owning `issueNumber`, and a concise `changeNote` to
-  every new or materially changed scenario for that issue.
+- Add every new or materially changed scenario for that issue to
+  `newScenarioMarkers.json` with its owning `issueNumber` and a concise
+  `changeNote`; the registry derives `isNew: true` from it.
 - Link the issue in the PR and link the PR back from the issue.
 - Run `pnpm mobile:lab:validate` plus focused component or type checks required
   by the presentation boundary.
@@ -90,8 +91,8 @@ For an authorized preview:
   not explicit approval and does not begin implementation. Continue later
   feedback from current `main` and update the same scenario and issue site.
 - Keep the New Scenario Marker on `main` until the linked GitHub issue is closed.
-  Remove only the marker after closure and retain the scenario as living UI
-  documentation.
+  Pull-request CI verifies closure before accepting marker removal. Retain the
+  scenario as living UI documentation.
 - Stop after the design handoff. Do not mark the product issue
   `ready-for-agent` for implementation until the design decision and remaining
   acceptance criteria are explicit.

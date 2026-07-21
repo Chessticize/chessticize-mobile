@@ -36,8 +36,8 @@ rollout, or release integration yet.
 3. Exercise public actions in the Story play function where useful. Keep board
    and native boundaries behind the conspicuous Lab placeholders or maintained
    fakes.
-4. Mark the scenario with `isNew: true`, its owning `issueNumber`, and a concise
-   `changeNote`.
+4. Add the scenario to `newScenarioMarkers.json` with its owning `issueNumber`
+   and a concise `changeNote`; the registry derives `isNew: true` from it.
 5. Run `pnpm mobile:lab:validate`, the relevant component tests, and browser
    checks at the viewports affected by the design.
 6. Deploy the full Storybook from the exact reviewed commit. Share its manager
@@ -59,7 +59,8 @@ PR may become ready and merge to `main` before approval or implementation.
 Continue later feedback rounds from current `main`, update the same scenario,
 and redeploy the issue's full Storybook. Keep its New Scenario Marker on `main`
 until the linked GitHub issue is closed; then remove only the marker in a cleanup
-change and retain the scenario as living UI documentation.
+change and retain the scenario as living UI documentation. Pull-request CI
+checks the issue state before allowing that removal.
 
 Do not infer approval from a passing test, an open PR, or the absence of
 comments. Approval must be an affirmative user or designer decision recorded in

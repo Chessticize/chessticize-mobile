@@ -1,8 +1,12 @@
 import React from "react";
 import type { Meta, StoryObj } from "@storybook/react-native-web-vite";
-import { newScenarios } from "./scenarioRegistry.ts";
+import { newScenarios, type NewScenarioDefinition } from "./scenarioRegistry.ts";
 
-function WhatsNewIndex(): React.JSX.Element {
+export function WhatsNewIndex({
+  scenarios = newScenarios
+}: {
+  scenarios?: readonly NewScenarioDefinition[];
+} = {}): React.JSX.Element {
   return (
     <main style={styles.page}>
       <section style={styles.hero}>
@@ -13,14 +17,14 @@ function WhatsNewIndex(): React.JSX.Element {
           Open a card on your phone to walk the real React Native UI in full screen.
         </p>
       </section>
-      {newScenarios.length === 0 ? (
+      {scenarios.length === 0 ? (
         <section style={styles.empty}>
           <h2 style={styles.cardTitle}>Baseline is current</h2>
           <p style={styles.cardCopy}>No scenarios are marked new for an open issue.</p>
         </section>
       ) : (
         <section style={styles.grid}>
-          {newScenarios.map((scenario) => (
+          {scenarios.map((scenario) => (
             <article key={scenario.id} style={styles.card}>
               <div style={styles.cardMeta}>
                 <span style={styles.badge}>NEW</span>

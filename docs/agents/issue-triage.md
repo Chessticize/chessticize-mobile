@@ -136,8 +136,9 @@ When preview work is explicitly authorized:
    For native-only behavior, show its reachable presentation states and mark
    the unproven native exit explicitly.
 2. Create a branch named `codex/storybook-issue-<number>-<goal>` for one issue.
-3. Mark every new or materially changed scenario owned by that issue with
-   `isNew: true`, its `issueNumber`, and a concise `changeNote`.
+3. Add every new or materially changed scenario owned by that issue to
+   `newScenarioMarkers.json` with its `issueNumber` and a concise `changeNote`;
+   the registry derives `isNew: true` from it.
 4. Add deterministic variants and important states to the complete Interaction
    Lab catalog.
    Prefer two or three structurally different directions when the decision is
@@ -156,7 +157,8 @@ redeploy the same issue preview until the design is approved for implementation.
 
 The New Scenario Marker remains on `main` for as long as its linked issue is
 open. Remove the marker only in a cleanup change after GitHub records that issue
-as closed; retain the scenario itself as living UI documentation.
+as closed; pull-request CI verifies the issue state. Retain the scenario itself
+as living UI documentation.
 
 The Storybook phase must not add production navigation, persistent storage or
 backend mutation, native-module wiring, analytics, rollout, or release logic.
