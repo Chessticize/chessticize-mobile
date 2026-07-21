@@ -7,6 +7,8 @@ decision-ready backlog. The repo-local execution guide is
 Triage evaluates and routes work. It does not begin product implementation.
 Storybook prototypes created during authorized preview work are design
 artifacts under `docs/agents/ui-flow-design.md`, not production wiring.
+For any UI/UX or functional ticket with a presentation change, use that flow
+from the existing product-clone story and preserve its stable Storybook URL.
 
 ## 1. Establish Scope And Authority
 
@@ -16,6 +18,9 @@ First identify both the issue set and the allowed writes:
   labels, comments, branches, or PRs.
 - Tracker triage may update labels and comments when requested, but it does not
   implicitly authorize closing issues or marking them `wontfix`.
+- Relationship suggestions are advisory. Do not consolidate tickets, close one
+  as a duplicate, move its scope, or create a shared handling track without
+  explicit human approval for that exact action.
 - Prototype publication requires explicit branch or preview authorization.
 - Product implementation requires a later explicit request. For a new UI flow,
   it also requires recorded design approval.
@@ -112,7 +117,7 @@ Do not mark a new UI flow ready for product implementation while its Storybook
 design choice is unapproved. The prototype PR may be ready for design review
 while the product issue remains in triage.
 
-## 7. Relate Issues Without Sharing Design Ownership
+## 7. Relate Issues Without Consolidating Them
 
 Each feedback issue owns its own Storybook design track, even when several
 issues touch the same screen or may later share an implementation. Link related
@@ -123,10 +128,13 @@ issues and record shared dependencies, but give each issue its own:
 - Full-Storybook deployment URL.
 - Approval record and implementation handoff.
 
-Decide implementation grouping separately. A later feature-scoped
-implementation PR may resolve multiple approved issues when they share one user
-journey, state contract, or interaction model. Native diagnosis, data changes,
-or platform work may instead remain separate.
+Relationship suggestions are advisory. Triage may suggest that shared handling
+could be considered, but it must present that as a question for human review,
+not as a grouping decision. Do not consolidate tickets, close one as a
+duplicate, combine acceptance criteria, create one Storybook track, or schedule
+one implementation track without explicit human approval. Until that approval
+is recorded, keep each ticket independently actionable and independently
+closable.
 
 ## 8. Prototype UI And Functional Feedback
 
@@ -136,9 +144,10 @@ When preview work is explicitly authorized:
    For native-only behavior, show its reachable presentation states and mark
    the unproven native exit explicitly.
    When the affected product screen already exists in the catalog, change that
-   existing clone incrementally and preserve its stable URL; do not invent a
-   separate page for the feature. The full Storybook should represent the
-   expected product after implementation, with `new` highlighting the delta.
+   existing product-clone story incrementally and preserve its stable URL; do
+   not invent a separate page for the feature. The full Storybook should
+   represent the expected product after implementation, with `new` highlighting
+   the delta.
 2. Create a branch named `codex/storybook-issue-<number>-<goal>` for one issue.
 3. Add every new or materially changed scenario owned by that issue to
    `newScenarioMarkers.json` with its `issueNumber` and a concise `changeNote`;
@@ -199,6 +208,8 @@ Use one concise comment per issue:
 Dependencies or missing evidence: <none or explicit list>
 
 Related issues: <none, or links plus shared dependency or implementation boundary>
+
+Relationship review: <none, or advisory suggestion requiring explicit human approval before consolidation or shared handling>
 ```
 
 For a published prototype, add a second comment containing the issue-scoped PR,
@@ -213,7 +224,7 @@ Finish with:
 - The audited issue count and scope.
 - A table sorted by priority, then dependency order.
 - Category, effort, and uncertainty for every issue.
-- Related issues, shared dependencies, and possible implementation groupings.
+- Related-issue suggestions and shared dependencies awaiting human review.
 - Issue-scoped Storybook branches, deployments, and check status, if authorized.
 - Missing information, native/owner gates, and the next decision.
 

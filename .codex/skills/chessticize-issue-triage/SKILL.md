@@ -1,6 +1,6 @@
 ---
 name: chessticize-issue-triage
-description: Triage new Chessticize GitHub issues into evidence-backed categories, effort bands, priorities, tracker states, dependencies, and issue-scoped UI design tracks. Use when evaluating an issue batch, processing user feedback, deciding what is ready for an agent or human, estimating issue scope, linking related issues, or preparing Storybook-only design previews before implementation.
+description: Triage new Chessticize GitHub issues into evidence-backed categories, effort bands, priorities, tracker states, dependencies, and issue-scoped UI design tracks without consolidating related tickets by default. Use when evaluating an issue batch, processing user feedback, deciding what is ready for an agent or human, estimating issue scope, suggesting related issues for human review, or routing Storybook-only UI design previews before implementation.
 ---
 
 # Chessticize Issue Triage
@@ -14,7 +14,8 @@ Before acting, read:
 - `docs/agents/issue-tracker.md` for GitHub operations.
 - `docs/agents/triage-labels.md` for exact labels and the live-label preflight.
 - `docs/agents/issue-triage.md` for the authoritative evaluation rubric and comment format.
-- `docs/agents/ui-flow-design.md` when an issue changes a UI journey.
+- `docs/agents/ui-flow-design.md` for every UI/UX or functional issue with a
+  presentation change, before preview work or product implementation.
 
 Treat missing required labels as a tracker setup blocker. Do not substitute a
 similar label.
@@ -28,6 +29,10 @@ similar label.
   authorizes prototypes or preview publication.
 - Never infer authorization to close, mark `wontfix`, or start product
   implementation.
+- Relationship suggestions are advisory. Do not consolidate tickets, close one
+  as a duplicate, move its acceptance criteria, or create shared design or
+  implementation handling without explicit human approval for that exact
+  action.
 
 Storybook is a design artifact, not product implementation. It may contain
 production-intended presentation components and deterministic fixtures, but no
@@ -51,15 +56,21 @@ analytics, rollout, or release wiring.
 4. **Resolve ambiguity safely.** Use `needs-info` for missing reproduction or
    outcome details. Use `needs-triage` when maintainer decisions remain. Do not
    disguise high uncertainty as a small estimate.
-5. **Relate issues without sharing design ownership.** Link issues that share a
-   journey, data contract, dependency, or likely implementation, but keep one
-   Storybook design track, marker lifecycle, deployment, and approval record per
-   issue. Decide later implementation grouping separately.
+5. **Suggest relationships without consolidating tickets.** Note issues that
+   share a journey, data contract, dependency, or likely implementation, but
+   describe the relationship as advisory and leave shared handling as a human
+   review question. Keep one Storybook design track, marker lifecycle,
+   deployment, approval record, tracker state, and closure decision per issue.
+   Do not consolidate, close as duplicate, or group implementation without
+   explicit human approval.
 6. **Prototype authorized UI issues.** For preview-enabled triage, represent
    every UI or functional-feature issue in a Storybook design slice, including
-   the reachable presentation states around a native-only boundary. Create one
-   issue-numbered Storybook branch and PR per issue. Prefer two or three
-   structurally distinct directions when a real design choice exists.
+   the reachable presentation states around a native-only boundary. Follow
+   `docs/agents/ui-flow-design.md`: update the existing product-clone story
+   incrementally, preserve its stable URL, and make the full Storybook show the
+   expected post-implementation product. Create one issue-numbered Storybook
+   branch and PR per issue. Prefer two or three structurally distinct directions
+   when a real design choice exists.
 7. **Preserve native boundaries.** Storybook can specify perceived response,
    layout, states, and handoff copy. It cannot prove board latency, gestures,
    audio, haptics, native modules, persistence, or device behavior. Record the
@@ -69,14 +80,17 @@ analytics, rollout, or release wiring.
    commit, deterministic variant/state parameters, validation result, and
    explicit approval gate.
 9. **Hand off by priority.** Report the complete issue count, sorted triage
-   matrix, relationships, possible implementation groupings, preview links,
-   blockers, and the next human decision.
+   matrix, advisory relationship suggestions, preview links, blockers, and the
+   next human decision. Do not present shared handling as decided.
 
 ## Storybook Preview Gate
 
 For an authorized preview:
 
 - Use `codex/storybook-issue-<number>-<goal>` for exactly one issue.
+- Follow `docs/agents/ui-flow-design.md`: modify the existing product-clone
+  story incrementally whenever it exists, preserve its stable URL, and expose
+  the issue-owned delta inside the complete product catalog.
 - Add every new or materially changed scenario for that issue to
   `newScenarioMarkers.json` with its owning `issueNumber` and a concise
   `changeNote`; the registry derives `isNew: true` from it.
@@ -100,8 +114,9 @@ For an authorized preview:
 ## Completion Standard
 
 Do not call triage complete until every issue in the inventory has a recorded
-category, priority, effort, rationale, dependency or grouping decision, and
-next state. Make uncertainty and owner-only decisions visible.
+category, priority, effort, rationale, dependency or advisory relationship
+assessment, and next state. Make uncertainty and human-review decisions
+visible. Triage completion never implies approval to consolidate tickets.
 
 ## Hosted Preview Handoff
 

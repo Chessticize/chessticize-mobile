@@ -51,6 +51,11 @@ related-issue analysis, and issue-scoped Storybook preview handoff, use
 `.codex/skills/chessticize-issue-triage/SKILL.md` and follow
 `docs/agents/issue-triage.md`. Triage must stop before product implementation;
 Storybook design artifacts remain behind the explicit approval gate.
+Route every UI/UX or functional ticket with a presentation change through
+`docs/agents/ui-flow-design.md`, starting from the existing product-clone story
+and the full-catalog Storybook workflow. Relationship suggestions are advisory:
+do not consolidate tickets, close one as a duplicate, or share a design or
+implementation track without explicit human approval for that action.
 
 ### Tracker labels
 
