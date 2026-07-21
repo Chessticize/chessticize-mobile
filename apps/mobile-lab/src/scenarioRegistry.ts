@@ -75,9 +75,9 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
     "Practice",
     "Custom sprint setup",
     "practice--custom-setup",
-    "Existing Custom Sprint setup with independent theme toggles and Mixed exclusivity.",
+    "Existing Custom Sprint setup with independent theme toggles and an enforced All fallback.",
     "practice",
-    ["Complete custom configuration", "Independent theme toggles", "Mixed exclusivity", "Empty theme selection"],
+    ["Complete custom configuration", "Independent theme toggles", "All exclusivity", "Non-empty theme fallback"],
     ["Practice home", "Starting or saving the multi-theme configuration after explicit design approval"]
   ),
   "practice-custom-rating-editor": defineScenario("practice-custom-rating-editor", "Practice", "Custom rating editor", "practice--custom-rating-editor", "Expanded ELO adjustment for a previously played custom rating bucket.", "practice", ["Custom setup", "Rating adjustment"], ["Practice home"]),

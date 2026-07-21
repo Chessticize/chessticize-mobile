@@ -2562,9 +2562,9 @@ describe("PracticePocScreen", () => {
     press(renderer, "custom-theme-mate");
     expectText(renderer, "Mate");
     expect(findByTestId(renderer, "custom-broaden-theme")).toBeTruthy();
-    expect(findByTestId(renderer, "custom-broaden-theme").props.accessibilityLabel).toBe("Broaden from Mate to Mixed theme");
+    expect(findByTestId(renderer, "custom-broaden-theme").props.accessibilityLabel).toBe("Broaden from Mate to All themes");
     press(renderer, "custom-broaden-theme");
-    expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("Mixed");
+    expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("All");
     expect(() => findByTestId(renderer, "custom-broaden-theme")).toThrow();
     press(renderer, "custom-theme-mate");
     press(renderer, "custom-mode-arrow-duel");
@@ -2598,25 +2598,51 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "custom-duration-stepper")).toBeTruthy();
     expect(findByTestId(renderer, "custom-initial-rating-row")).toBeTruthy();
     expect(findByTestId(renderer, "custom-previous-configs")).toBeTruthy();
-    expect(themeChecked(renderer, "fork")).toBe(true);
-    expect(themeChecked(renderer, "mate")).toBe(false);
+    expect(themeSelected(renderer, "fork")).toBe(true);
+    expect(themeSelected(renderer, "mate")).toBe(false);
+    expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("All");
+    expect(() => findByTestId(renderer, "custom-broaden-theme")).toThrow();
 
     press(renderer, "custom-theme-mate");
-    expect(themeChecked(renderer, "fork")).toBe(true);
-    expect(themeChecked(renderer, "mate")).toBe(true);
+    expect(themeSelected(renderer, "fork")).toBe(true);
+    expect(themeSelected(renderer, "mate")).toBe(true);
+    expect(() => findByTestId(renderer, "custom-broaden-theme")).toThrow();
 
     press(renderer, "custom-theme-fork");
-    expect(themeChecked(renderer, "fork")).toBe(false);
-    expect(themeChecked(renderer, "mate")).toBe(true);
+    expect(themeSelected(renderer, "fork")).toBe(false);
+    expect(themeSelected(renderer, "mate")).toBe(true);
+
+    press(renderer, "custom-theme-mate");
+    expect(themeSelected(renderer, "mate")).toBe(false);
+    expect(themeSelected(renderer, "mixed")).toBe(true);
 
     press(renderer, "custom-theme-mixed");
-    expect(themeChecked(renderer, "mixed")).toBe(true);
-    expect(themeChecked(renderer, "mate")).toBe(false);
+    expect(themeSelected(renderer, "mixed")).toBe(true);
+
+    press(renderer, "custom-theme-fork");
+    expect(themeSelected(renderer, "mixed")).toBe(false);
+    expect(themeSelected(renderer, "fork")).toBe(true);
 
     press(renderer, "custom-theme-mixed");
-    expect(themeChecked(renderer, "mixed")).toBe(false);
+    expect(themeSelected(renderer, "mixed")).toBe(true);
+    expect(themeSelected(renderer, "fork")).toBe(false);
+    expect(JSON.stringify(renderer.toJSON())).not.toContain("Use Mixed");
+    expect(JSON.stringify(renderer.toJSON())).not.toContain("Use All");
     expect(JSON.stringify(renderer.toJSON())).not.toContain("✓");
     expect(JSON.stringify(renderer.toJSON())).not.toContain("Targeting");
+  });
+
+  it("renders All as the selected non-empty fallback for an empty multi-theme value", () => {
+    const renderer = renderMultiThemeSetupScreen([]);
+
+    press(renderer, "practice-mode-custom");
+    const allThemes = findByTestId(renderer, "custom-theme-mixed");
+    expect(allThemes.props.accessibilityRole).toBe("button");
+    expect(allThemes.props.accessibilityLabel).toBe("All puzzle themes");
+    expect(allThemes.props.accessibilityState).toEqual({ selected: true });
+
+    press(renderer, "custom-theme-mixed");
+    expect(themeSelected(renderer, "mixed")).toBe(true);
   });
 
   it("shows persisted previous custom sprint configs and can reuse one", () => {
@@ -5967,11 +5993,12 @@ function renderMultiThemeSetupScreen(
   return renderer;
 }
 
-function themeChecked(
+function themeSelected(
   renderer: TestRenderer.ReactTestRenderer,
   theme: string
 ): boolean {
-  return findByTestId(renderer, `custom-theme-${theme}`).props.accessibilityState.checked;
+  const state = findByTestId(renderer, `custom-theme-${theme}`).props.accessibilityState;
+  return state.checked ?? state.selected ?? false;
 }
 
 function createTestSystemBackSource(platform: "android" | "ios"): MobileSystemBackSource & {

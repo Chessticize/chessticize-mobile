@@ -282,8 +282,9 @@ const CUSTOM_INITIAL_RATING_MIN = 600;
 const CUSTOM_INITIAL_RATING_MAX = 2200;
 const CUSTOM_INITIAL_RATING_STEP = 100;
 const ARROW_DUEL_LOADING_TRANSITION_MS = 200;
+const ALL_THEMES_FILTER: CustomThemeFilter = "mixed";
 const CUSTOM_THEME_OPTIONS: ReadonlyArray<CustomThemeFilter> = [
-  "mixed",
+  ALL_THEMES_FILTER,
   "mate",
   "endgame",
   "fork",
@@ -528,7 +529,7 @@ export function PracticePocScreen({
   const [customSprintMode, setCustomSprintMode] = useState<"custom" | "arrow_duel">("custom");
   const [customDurationSeconds, setCustomDurationSeconds] = useState(5 * 60);
   const [customPerPuzzleSeconds, setCustomPerPuzzleSeconds] = useState(20);
-  const [customTheme, setCustomTheme] = useState<CustomThemeFilter>("mixed");
+  const [customTheme, setCustomTheme] = useState<CustomThemeFilter>(ALL_THEMES_FILTER);
   const [customInitialRating, setCustomInitialRating] = useState(CUSTOM_INITIAL_RATING_MIN);
   const [reviewReminderPreference, setReviewReminderPreference] = useState<ReviewReminderPreference>(() => service.getReviewReminderPreference());
   const [notificationPermissionStatus, setNotificationPermissionStatus] = useState<ReviewReminderPermissionStatus>("unavailable");
@@ -3329,7 +3330,11 @@ function CustomSprintSetup({
   const previousRows = previousConfigs.slice(0, 5).map((config) =>
     previousCustomConfigRowModel(config, ratingForKey(config.ratingKey))
   );
-  const selectedThemes = customThemeSelection?.selectedThemes ?? [theme];
+  const selectedThemes = customThemeSelection
+    ? customThemeSelection.selectedThemes.length > 0
+      ? customThemeSelection.selectedThemes
+      : [ALL_THEMES_FILTER]
+    : [theme];
   const themeLabel = customThemeSelection
     ? customThemeSelectionLabel(selectedThemes)
     : customThemeLabel(theme);
@@ -3413,14 +3418,10 @@ function CustomSprintSetup({
         availablePuzzleCount={availablePuzzleCount}
         hasEnoughLocalPuzzles={hasEnoughLocalPuzzles}
         onBroadenTheme={
-          selectedThemes.includes("mixed")
+          customThemeSelection || selectedThemes.includes(ALL_THEMES_FILTER)
             ? undefined
             : () => {
-              if (customThemeSelection) {
-                customThemeSelection.onChange(["mixed"]);
-                return;
-              }
-              onThemeChange("mixed");
+              onThemeChange(ALL_THEMES_FILTER);
             }
         }
         requiredPuzzleCount={requiredPuzzleCount}
@@ -3478,12 +3479,12 @@ function CustomEligibilityNotice({
       {onBroadenTheme ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Broaden from ${theme} to Mixed theme`}
+          accessibilityLabel={`Broaden from ${theme} to All themes`}
           testID="custom-broaden-theme"
           style={[styles.secondaryButton, styles.customEligibilityAction]}
           onPress={onBroadenTheme}
         >
-          <Text style={styles.secondaryButtonText}>Use Mixed</Text>
+          <Text style={styles.secondaryButtonText}>Use All</Text>
         </Pressable>
       ) : null}
     </View>
@@ -3687,18 +3688,19 @@ function CustomThemeChoiceRow({
         {CUSTOM_THEME_OPTIONS.map((option) => {
           const selected = selectedThemes.includes(option);
           const label = customThemeLabel(option);
+          const representsAllThemes = option === ALL_THEMES_FILTER;
           return (
             <Pressable
               key={option}
               accessibilityHint={multiple
-                ? option === "mixed"
-                  ? "Clears all named theme selections"
+                ? representsAllThemes
+                  ? "Selects all themes and clears named theme selections"
                   : "Adds or removes this theme"
                 : undefined}
-              accessibilityRole={multiple ? "checkbox" : "button"}
-              accessibilityLabel={`${label} puzzle theme`}
-              accessibilityState={multiple ? { checked: selected } : { selected }}
-              testID={`custom-theme-${safeTestId(label)}`}
+              accessibilityRole={multiple && !representsAllThemes ? "checkbox" : "button"}
+              accessibilityLabel={multiple && representsAllThemes ? "All puzzle themes" : `${label} puzzle theme`}
+              accessibilityState={multiple && !representsAllThemes ? { checked: selected } : { selected }}
+              testID={`custom-theme-${representsAllThemes ? "mixed" : safeTestId(label)}`}
               style={[styles.customMiniChip, selected ? styles.customMiniChipActive : null]}
               onPress={() => onChange(option)}
             >
@@ -9515,12 +9517,12 @@ function sprintConfigFor(
 }
 
 function themeForCustomSprint(theme: CustomThemeFilter): string | undefined {
-  return theme === "mixed" ? undefined : theme;
+  return theme === ALL_THEMES_FILTER ? undefined : theme;
 }
 
 function customThemeLabel(theme: CustomThemeFilter): string {
-  if (theme === "mixed") {
-    return "Mixed";
+  if (theme === ALL_THEMES_FILTER) {
+    return "All";
   }
   return theme
     .replace(/([a-z])([A-Z])/g, "$1 $2")
@@ -9529,7 +9531,7 @@ function customThemeLabel(theme: CustomThemeFilter): string {
 
 function customThemeSelectionLabel(themes: readonly CustomThemeFilter[]): string {
   if (themes.length === 0) {
-    return "no selected themes";
+    return customThemeLabel(ALL_THEMES_FILTER);
   }
   return themes.map(customThemeLabel).join(", ");
 }
@@ -9538,14 +9540,17 @@ export function nextCustomThemeSelection(
   selectedThemes: readonly CustomThemeFilter[],
   tappedTheme: CustomThemeFilter
 ): CustomThemeFilter[] {
-  if (tappedTheme === "mixed") {
-    return selectedThemes.includes("mixed") ? [] : ["mixed"];
+  if (tappedTheme === ALL_THEMES_FILTER) {
+    return [ALL_THEMES_FILTER];
   }
 
-  const namedThemes = selectedThemes.filter((theme) => theme !== "mixed");
-  return namedThemes.includes(tappedTheme)
-    ? namedThemes.filter((theme) => theme !== tappedTheme)
-    : [...namedThemes, tappedTheme];
+  const namedThemes = selectedThemes.filter((theme) => theme !== ALL_THEMES_FILTER);
+  if (!namedThemes.includes(tappedTheme)) {
+    return [...namedThemes, tappedTheme];
+  }
+
+  const remainingThemes = namedThemes.filter((theme) => theme !== tappedTheme);
+  return remainingThemes.length > 0 ? remainingThemes : [ALL_THEMES_FILTER];
 }
 
 function previousCustomConfigRowModel(
@@ -9599,7 +9604,7 @@ function customThemeFromStoredValue(theme: string | undefined): CustomThemeFilte
   if (theme && CUSTOM_THEME_OPTIONS.includes(theme)) {
     return theme;
   }
-  return "mixed";
+  return ALL_THEMES_FILTER;
 }
 
 function formatConfigLastPlayed(lastStartedAt: string): string {
