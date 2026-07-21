@@ -1254,6 +1254,9 @@ describe('Detox suite configuration', () => {
     expect(reminderCase).toContain("'|3|3 reviews are ready|review'");
     expect(reminderCase).toContain("settings-review-reminder-off");
     expect(flowsSpec).toContain('expectedInstalledBuildNumber()');
+    expect(flowsSpec).toContain('expectedInstalledPublicVersion()');
+    expect(flowsSpec).toContain('releaseVersion.publicVersion');
+    expect(flowsSpec).toContain('releaseVersion.iosPublicVersion');
     expect(flowsSpec).toContain('releaseVersion.androidVersionCode');
     expect(flowsSpec).toContain('releaseVersion.iosBuildNumber');
     expect(flowsSpec).toContain("historyToggleValue('Wrong puzzles only', false)");

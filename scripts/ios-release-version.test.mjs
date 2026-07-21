@@ -23,7 +23,8 @@ test("the shared iOS release renderer validates and renders the xcconfig contrac
   assert.equal(
     sharedRenderer.renderIOSReleaseVersion({
       schemaVersion: 1,
-      publicVersion: "9.8.7",
+      publicVersion: "1.1",
+      iosPublicVersion: "9.8.7",
       iosBuildNumber: 42
     }),
     "// Generated from apps/mobile/release-version.json. Do not edit.\n" +
@@ -33,11 +34,12 @@ test("the shared iOS release renderer validates and renders the xcconfig contrac
 
   for (const invalid of [
     undefined,
-    { schemaVersion: 2, publicVersion: "9.8.7", iosBuildNumber: 42 },
-    { schemaVersion: 1, publicVersion: "9", iosBuildNumber: 42 },
-    { schemaVersion: 1, publicVersion: "9.8.7-beta", iosBuildNumber: 42 },
-    { schemaVersion: 1, publicVersion: "9.8.7", iosBuildNumber: 0 },
-    { schemaVersion: 1, publicVersion: "9.8.7", iosBuildNumber: 1.5 }
+    { schemaVersion: 2, iosPublicVersion: "9.8.7", iosBuildNumber: 42 },
+    { schemaVersion: 1, publicVersion: "1.1", iosBuildNumber: 42 },
+    { schemaVersion: 1, iosPublicVersion: "9", iosBuildNumber: 42 },
+    { schemaVersion: 1, iosPublicVersion: "9.8.7-beta", iosBuildNumber: 42 },
+    { schemaVersion: 1, iosPublicVersion: "9.8.7", iosBuildNumber: 0 },
+    { schemaVersion: 1, iosPublicVersion: "9.8.7", iosBuildNumber: 1.5 }
   ]) {
     assert.throws(
       () => sharedRenderer.renderIOSReleaseVersion(invalid),

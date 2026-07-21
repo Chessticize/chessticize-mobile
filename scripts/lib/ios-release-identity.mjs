@@ -18,7 +18,7 @@ export function loadIOSReleaseIdentity(repoRoot) {
     !/CURRENT_PROJECT_VERSION = \d/u.test(project);
 
   return {
-    version: releaseVersion.publicVersion,
+    version: releaseVersion.iosPublicVersion,
     build: String(releaseVersion.iosBuildNumber),
     configMatchesCanonical: generatedConfig === expectedConfig,
     projectUsesGeneratedConfig,
