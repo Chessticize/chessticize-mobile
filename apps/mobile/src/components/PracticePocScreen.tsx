@@ -282,8 +282,9 @@ const CUSTOM_INITIAL_RATING_MIN = 600;
 const CUSTOM_INITIAL_RATING_MAX = 2200;
 const CUSTOM_INITIAL_RATING_STEP = 100;
 const ARROW_DUEL_LOADING_TRANSITION_MS = 200;
+const ALL_THEMES_FILTER: CustomThemeFilter = "mixed";
 const CUSTOM_THEME_OPTIONS: ReadonlyArray<CustomThemeFilter> = [
-  "mixed",
+  ALL_THEMES_FILTER,
   "mate",
   "endgame",
   "fork",
@@ -528,7 +529,7 @@ export function PracticePocScreen({
   const [customSprintMode, setCustomSprintMode] = useState<"custom" | "arrow_duel">("custom");
   const [customDurationSeconds, setCustomDurationSeconds] = useState(5 * 60);
   const [customPerPuzzleSeconds, setCustomPerPuzzleSeconds] = useState(20);
-  const [customTheme, setCustomTheme] = useState<CustomThemeFilter>("mixed");
+  const [customTheme, setCustomTheme] = useState<CustomThemeFilter>(ALL_THEMES_FILTER);
   const [customInitialRating, setCustomInitialRating] = useState(CUSTOM_INITIAL_RATING_MIN);
   const [reviewReminderPreference, setReviewReminderPreference] = useState<ReviewReminderPreference>(() => service.getReviewReminderPreference());
   const [notificationPermissionStatus, setNotificationPermissionStatus] = useState<ReviewReminderPermissionStatus>("unavailable");
@@ -3332,7 +3333,7 @@ function CustomSprintSetup({
   const selectedThemes = customThemeSelection
     ? customThemeSelection.selectedThemes.length > 0
       ? customThemeSelection.selectedThemes
-      : ["mixed"]
+      : [ALL_THEMES_FILTER]
     : [theme];
   const themeLabel = customThemeSelection
     ? customThemeSelectionLabel(selectedThemes)
@@ -3417,10 +3418,10 @@ function CustomSprintSetup({
         availablePuzzleCount={availablePuzzleCount}
         hasEnoughLocalPuzzles={hasEnoughLocalPuzzles}
         onBroadenTheme={
-          customThemeSelection || selectedThemes.includes("mixed")
+          customThemeSelection || selectedThemes.includes(ALL_THEMES_FILTER)
             ? undefined
             : () => {
-              onThemeChange("mixed");
+              onThemeChange(ALL_THEMES_FILTER);
             }
         }
         requiredPuzzleCount={requiredPuzzleCount}
@@ -3687,18 +3688,19 @@ function CustomThemeChoiceRow({
         {CUSTOM_THEME_OPTIONS.map((option) => {
           const selected = selectedThemes.includes(option);
           const label = customThemeLabel(option);
+          const representsAllThemes = option === ALL_THEMES_FILTER;
           return (
             <Pressable
               key={option}
               accessibilityHint={multiple
-                ? option === "mixed"
+                ? representsAllThemes
                   ? "Selects all themes and clears named theme selections"
                   : "Adds or removes this theme"
                 : undefined}
-              accessibilityRole={multiple ? "checkbox" : "button"}
-              accessibilityLabel={`${label} puzzle theme`}
-              accessibilityState={multiple ? { checked: selected } : { selected }}
-              testID={`custom-theme-${option === "mixed" ? "mixed" : safeTestId(label)}`}
+              accessibilityRole={multiple && !representsAllThemes ? "checkbox" : "button"}
+              accessibilityLabel={multiple && representsAllThemes ? "All puzzle themes" : `${label} puzzle theme`}
+              accessibilityState={multiple && !representsAllThemes ? { checked: selected } : { selected }}
+              testID={`custom-theme-${representsAllThemes ? "mixed" : safeTestId(label)}`}
               style={[styles.customMiniChip, selected ? styles.customMiniChipActive : null]}
               onPress={() => onChange(option)}
             >
@@ -9515,11 +9517,11 @@ function sprintConfigFor(
 }
 
 function themeForCustomSprint(theme: CustomThemeFilter): string | undefined {
-  return theme === "mixed" ? undefined : theme;
+  return theme === ALL_THEMES_FILTER ? undefined : theme;
 }
 
 function customThemeLabel(theme: CustomThemeFilter): string {
-  if (theme === "mixed") {
+  if (theme === ALL_THEMES_FILTER) {
     return "All";
   }
   return theme
@@ -9529,7 +9531,7 @@ function customThemeLabel(theme: CustomThemeFilter): string {
 
 function customThemeSelectionLabel(themes: readonly CustomThemeFilter[]): string {
   if (themes.length === 0) {
-    return customThemeLabel("mixed");
+    return customThemeLabel(ALL_THEMES_FILTER);
   }
   return themes.map(customThemeLabel).join(", ");
 }
@@ -9538,17 +9540,17 @@ export function nextCustomThemeSelection(
   selectedThemes: readonly CustomThemeFilter[],
   tappedTheme: CustomThemeFilter
 ): CustomThemeFilter[] {
-  if (tappedTheme === "mixed") {
-    return ["mixed"];
+  if (tappedTheme === ALL_THEMES_FILTER) {
+    return [ALL_THEMES_FILTER];
   }
 
-  const namedThemes = selectedThemes.filter((theme) => theme !== "mixed");
+  const namedThemes = selectedThemes.filter((theme) => theme !== ALL_THEMES_FILTER);
   if (!namedThemes.includes(tappedTheme)) {
     return [...namedThemes, tappedTheme];
   }
 
   const remainingThemes = namedThemes.filter((theme) => theme !== tappedTheme);
-  return remainingThemes.length > 0 ? remainingThemes : ["mixed"];
+  return remainingThemes.length > 0 ? remainingThemes : [ALL_THEMES_FILTER];
 }
 
 function previousCustomConfigRowModel(
@@ -9602,7 +9604,7 @@ function customThemeFromStoredValue(theme: string | undefined): CustomThemeFilte
   if (theme && CUSTOM_THEME_OPTIONS.includes(theme)) {
     return theme;
   }
-  return "mixed";
+  return ALL_THEMES_FILTER;
 }
 
 function formatConfigLastPlayed(lastStartedAt: string): string {
