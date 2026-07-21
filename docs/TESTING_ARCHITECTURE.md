@@ -168,9 +168,10 @@ in component, Detox, integration, and release/manual validation as applicable.
 
 Every Lab Scenario declares its Scenario Scope and has a stable Storybook URL.
 The typed registry exhaustively maps the mobile navigation unions to a scenario
-or an explicit not-cataloged reason. Temporary New Scenario Markers are allowed
-on draft design-review branches, but CI rejects them on ready pull requests and
-`main`.
+or an explicit not-cataloged reason. An issue-owned New Scenario Marker records
+the linked GitHub issue and remains valid on ready pull requests and `main`
+until that issue closes. Pull-request CI compares the marker manifest to the
+base commit and verifies GitHub issue state before allowing removal.
 
 New UI flows must pass the Storybook-first design gate before production
 navigation, backend, storage, native-module, analytics, or rollout wiring

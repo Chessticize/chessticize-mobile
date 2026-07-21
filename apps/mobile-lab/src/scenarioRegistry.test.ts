@@ -35,7 +35,19 @@ test("every typed navigation coverage entry points to a registered scenario", ()
   }
 });
 
-test("the completed baseline ships without active New Scenario Markers", () => {
-  assert.deepEqual(newScenarios, []);
-  assert.deepEqual(storyTagsForScenario("practice-home" as LabScenarioId), []);
+test("New Scenario Markers retain open-issue ownership on the full catalog", () => {
+  const scenarios = Object.values(scenarioRegistry);
+  assert.deepEqual(newScenarios, scenarios.filter((scenario) => scenario.isNew));
+
+  for (const scenario of scenarios) {
+    assert.deepEqual(
+      storyTagsForScenario(scenario.id as LabScenarioId),
+      scenario.isNew ? ["new"] : []
+    );
+    if (scenario.isNew) {
+      assert.ok(Number.isInteger(scenario.issueNumber));
+      assert.ok(scenario.issueNumber > 0);
+      assert.ok(scenario.changeNote.trim().length > 0);
+    }
+  }
 });

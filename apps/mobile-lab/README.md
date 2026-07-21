@@ -64,12 +64,14 @@ The lab does not replace native validation for board rendering and gestures, Saf
 
 ## Scenario registry and scope
 
-`src/scenarioRegistry.ts` is the typed catalog. Every scenario declares:
+`src/scenarioRegistry.ts` is the typed catalog, and
+`src/newScenarioMarkers.json` is the review-lifecycle manifest. Every scenario
+declares:
 
 - A stable Storybook story ID.
 - A Scenario Scope with included interactions and documented exits.
 - A containment mode.
-- An optional New Scenario Marker.
+- An optional issue-owned New Scenario Marker.
 
 The registry maps every member of `MobileBackTab`, `MobileBackTransient`, and `MobileBackDetail["kind"]` to a Lab Scenario or an explicit not-cataloged reason. Adding a navigation union member without updating that map fails typecheck.
 
@@ -81,7 +83,9 @@ Whole-screen stories are currently marked `free-roam`, matching the monolithic `
 2. Seed starting data through `PracticeService`, `MemoryStore`, or an interface-compatible native-boundary fake in `LabScenario.tsx`.
 3. Add the typed definition and navigation coverage in `scenarioRegistry.ts`.
 4. Export a Storybook story in the appropriate product group. A short play function may drive public UI actions after seeding.
-5. While design review is active, add `isNew: true` and a one-line `changeNote` to the registry entry. This adds the Storybook `new` tag and the What's New card.
-6. Record the stable Storybook URL and explicit design approval in the PR before product wiring starts.
-7. Clear the marker before marking the pull request ready. CI allows markers on draft pull requests and rejects them on ready pull requests or `main`.
-8. Keep focused mobile component tests for shared production UI changes. Use native validation only when the changed boundary requires it under the repository risk rules.
+5. Add the scenario ID, owning `issueNumber`, and a one-line `changeNote` to `newScenarioMarkers.json` for each new or materially changed scenario. This adds `isNew: true`, the Storybook `new` tag, and the What's New card.
+6. Build and deploy the full Storybook for the issue's exact commit. Record both the manager URL and direct story URL in the issue and PR; generated bundles and hosting result files stay untracked.
+7. A coherent design increment may merge to `main` before implementation. Continue later feedback in a new PR from `main`, updating the same issue-owned scenario and deployment.
+8. Keep the marker while the linked issue remains open. Pull-request CI verifies GitHub records the issue as closed before accepting marker removal; retain the scenario as living UI documentation.
+9. Record explicit design approval before product wiring starts.
+10. Keep focused mobile component tests for shared production UI changes. Use native validation only when the changed boundary requires it under the repository risk rules.
