@@ -30,6 +30,18 @@ must be handled as an explicit repository setup action.
 When a skill mentions a triage role, use the corresponding required tracker
 label from this table.
 
+## Issue classification
+
+| Classification | Required tracker label | Meaning |
+| -------------- | ---------------------- | ------- |
+| Defect | `bug` | Existing behavior is incorrect or unreliable |
+| Product change | `enhancement` | New or materially changed product behavior |
+| Documentation | `documentation` | Repository or user documentation work |
+| Direct feedback | `user-feedback` | Issue originated as user feedback |
+
+Classification labels describe what the issue is. Triage-role labels describe
+what should happen next. Apply both dimensions when appropriate.
+
 ## Wayfinder roles
 
 | Wayfinder role | Required tracker label |

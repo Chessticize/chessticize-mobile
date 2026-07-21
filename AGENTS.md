@@ -32,6 +32,14 @@ restart this gate unless they materially change the journey.
 
 Issues and PRDs are tracked in GitHub Issues. See `docs/agents/issue-tracker.md`.
 
+### Issue triage
+
+For new-issue evaluation, effort and priority ratings, tracker routing,
+coherent UI grouping, and Storybook-only preview handoff, use
+`.codex/skills/chessticize-issue-triage/SKILL.md` and follow
+`docs/agents/issue-triage.md`. Triage must stop before product implementation;
+Storybook design artifacts remain behind the explicit approval gate.
+
 ### Tracker labels
 
 The required triage and Wayfinder label vocabulary, plus the live tracker

@@ -3,6 +3,11 @@
 Issues and PRDs for this repo live as GitHub issues. Use the `gh` CLI for all
 operations and follow the repository's GitHub CLI escalation rules.
 
+For new-issue evaluation, priority and effort ratings, tracker routing,
+coherent UI grouping, and optional Storybook preview handoff, follow
+`docs/agents/issue-triage.md` and use the repo-local
+`chessticize-issue-triage` skill.
+
 Before any label-dependent write, run the live tracker preflight in
 `docs/agents/triage-labels.md`. A missing required label is a tracker setup
 blocker; do not silently substitute a similar stock label.

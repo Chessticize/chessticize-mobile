@@ -41,6 +41,13 @@ rollout, or release integration yet.
    checks at the viewports affected by the design.
 6. Share the stable Storybook URL and record explicit design approval in the PR.
 
+When remote preview publication is authorized and Sites is available, publish
+the active design groups through `sites/storybook-previews` and record the
+hosted URL in every covered issue and PR. A Sites deployment is a production
+URL, but it remains a design artifact: it does not count as approval or product
+implementation. Save a Sites version without deploying it when only a
+reviewable candidate is authorized.
+
 Do not infer approval from a passing test, an open PR, or the absence of
 comments. Approval must be an affirmative user or designer decision recorded in
 the PR description or discussion.

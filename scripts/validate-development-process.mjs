@@ -26,13 +26,22 @@ const agentDocPaths = [
   "docs/agents/domain.md",
   "docs/agents/issue-tracker.md",
   "docs/agents/triage-labels.md",
-  "docs/agents/ui-flow-design.md"
+  "docs/agents/ui-flow-design.md",
+  "docs/agents/issue-triage.md"
 ];
 const domainDocs = read(agentDocPaths[0]);
 const issueTracker = read(agentDocPaths[1]);
 const triageLabels = read(agentDocPaths[2]);
 const uiFlowDesign = read(agentDocPaths[3]);
+const issueTriage = read(agentDocPaths[4]);
 const devLoopSkill = read(".codex/skills/chessticize-mobile-dev-loop/SKILL.md");
+const issueTriageSkill = read(".codex/skills/chessticize-issue-triage/SKILL.md");
+const storybookPreviewSitePackage = JSON.parse(
+  read("sites/storybook-previews/package.json")
+);
+const storybookPreviewManifest = JSON.parse(
+  read("sites/storybook-previews/preview-manifest.json")
+);
 const localE2eSkill = read(".codex/skills/chessticize-mobile-local-e2e/SKILL.md");
 const uiCalibrationSkill = read(".codex/skills/chessticize-mobile-ui-calibration/SKILL.md");
 const androidReleaseSkill = read(".codex/skills/chessticize-android-release/SKILL.md");
@@ -91,6 +100,7 @@ assert.match(domainDocs, /lazy artifacts/);
 assert.match(domainDocs, /CONTEXT-MAP\.md/);
 assert.match(issueTracker, /--json number,title,body,state,labels,comments/);
 assert.match(issueTracker, /docs\/agents\/triage-labels\.md/);
+assert.match(issueTracker, /docs\/agents\/issue-triage\.md/);
 
 for (const requiredLabel of [
   "needs-triage",
@@ -98,6 +108,10 @@ for (const requiredLabel of [
   "ready-for-agent",
   "ready-for-human",
   "wontfix",
+  "bug",
+  "enhancement",
+  "documentation",
+  "user-feedback",
   "wayfinder:map",
   "wayfinder:research",
   "wayfinder:prototype",
@@ -126,6 +140,59 @@ assert.match(uiFlowDesign, /stable Storybook URL/);
 assert.match(uiFlowDesign, /explicit design approval/);
 assert.match(prTemplate, /Storybook-first design approved before product wiring/);
 assert.match(prTemplate, /Design approval record:/);
+
+for (const triagePolicy of [agents, issueTriageSkill]) {
+  assert.match(triagePolicy, /docs\/agents\/issue-triage\.md/);
+  assert.match(triagePolicy, /Storybook/);
+  assert.match(triagePolicy, /product implementation/i);
+}
+
+for (const priority of ["P0", "P1", "P2", "P3"]) {
+  assert.match(issueTriage, new RegExp(priority));
+}
+
+for (const triageContract of [issueTriage, issueTriageSkill]) {
+  assert.match(triageContract, /high uncertainty/i);
+  assert.match(triageContract, /coherent/i);
+  assert.match(triageContract, /stable Storybook URL/i);
+  assert.match(triageContract, /explicit approval/i);
+}
+
+assert.match(issueTriage, /0\.5–2 engineering days/);
+assert.match(issueTriage, /3–5 engineering days/);
+assert.match(issueTriage, /1–2 engineering weeks/);
+assert.match(issueTriage, /2–4\+ engineering weeks/);
+assert.match(issueTriage, /do not invent or apply them/i);
+assert.match(issueTriage, /Use a subagent per independent UI group/);
+assert.match(issueTriage, /design grouping and implementation grouping separately/i);
+assert.match(issueTriage, /every UI or functional-feature issue/);
+assert.match(issueTriage, /native-only behavior/);
+assert.match(issueTriageSkill, /delegate independent UI groups to separate subagents/i);
+assert.match(issueTriageSkill, /design grouping and\s+implementation grouping separately/i);
+assert.match(issueTriageSkill, /every UI or functional-feature issue/);
+assert.match(issueTriageSkill, /do not invent priority\s+labels/i);
+assert.match(issueTriageSkill, /codex\/storybook-<coherent-goal>/);
+assert.match(issueTriageSkill, /sites\/storybook-previews\/preview-manifest\.json/);
+assert.match(issueTriageSkill, /owner-only deployment/i);
+assert.match(issueTriage, /sites\/storybook-previews/);
+assert.match(issueTriage, /Every Sites deployment URL is production/);
+assert.match(uiFlowDesign, /sites\/storybook-previews/);
+
+assert.equal(
+  storybookPreviewSitePackage.scripts["build:with-previews"],
+  "npm run previews:sync -- --build && npm run build"
+);
+assert.equal(storybookPreviewManifest.previews.length, 4);
+assert.equal(
+  new Set(storybookPreviewManifest.previews.map(({ id }) => id)).size,
+  storybookPreviewManifest.previews.length
+);
+for (const preview of storybookPreviewManifest.previews) {
+  assert.match(preview.id, /^[a-z][a-z0-9-]+$/);
+  assert.match(preview.branch, /^codex\/storybook-[a-z0-9-]+$/);
+  assert.match(preview.commit, /^[0-9a-f]{40}$/);
+  assert.ok(preview.issues.length > 0);
+}
 
 for (const reviewPolicy of [agents, devLoopSkill]) {
   assert.match(reviewPolicy, /prefer incremental\s+review/i);

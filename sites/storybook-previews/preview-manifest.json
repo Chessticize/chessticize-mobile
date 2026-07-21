@@ -1,0 +1,52 @@
+{
+  "previews": [
+    {
+      "id": "personalized-training",
+      "title": "Personalized training",
+      "area": "Practice configuration",
+      "summary": "Connect tactical weakness evidence to multi-theme sprint setup and a saved or pinned Practice shortcut.",
+      "issues": [245, 250, 253],
+      "branch": "codex/storybook-personalized-training",
+      "commit": "4a80c9f8f1605d7576de101d25cd76e7b4849356",
+      "pullRequest": 256,
+      "storyPath": "iframe.html?id=practice-personalized-training--prototype&viewMode=story&variant=coach",
+      "variants": ["Guided coach", "Profile workbench", "Home-first organizer"]
+    },
+    {
+      "id": "sprint-attention",
+      "title": "Truthful sprint outcomes",
+      "area": "Results and history",
+      "summary": "Separate solved puzzles from attempts while keeping slow, timeout, wrong, unclear, and Review states understandable.",
+      "issues": [248, 249, 252],
+      "branch": "codex/storybook-sprint-attention",
+      "commit": "ed85f5c1cc0543c5467664625190e559ae0c28f1",
+      "pullRequest": 255,
+      "storyPath": "iframe.html?id=practice-sprint-attention-prototype--truthful-outcomes&viewMode=story&variant=evidence&state=completed&screen=result",
+      "variants": ["Evidence first", "Attempt ledger", "Coach debrief"]
+    },
+    {
+      "id": "move-response",
+      "title": "Move response contract",
+      "area": "Board interaction",
+      "summary": "Make input acceptance, locked state, feedback, and next-move readiness visible without pretending Storybook proves native timing.",
+      "issues": [246, 247],
+      "branch": "codex/storybook-move-response",
+      "commit": "9836966b23d89383da5a35b1f7985d9d0af27053",
+      "pullRequest": 254,
+      "storyPath": "iframe.html?id=practice-move-response-contract--prototype&viewMode=story&variant=A&state=ready",
+      "variants": ["Response rail", "Move receipt", "Board pulse"]
+    },
+    {
+      "id": "feedback-entry",
+      "title": "Feedback entry",
+      "area": "Settings and support",
+      "summary": "Compare lightweight and prominent GitHub issue entry points with an explicit external-browser and privacy handoff.",
+      "issues": [251],
+      "branch": "codex/storybook-feedback-entry",
+      "commit": "02556b0cbbe26930c925f68bff1cb2f14567cfb9",
+      "pullRequest": 257,
+      "storyPath": "iframe.html?id=settings--feedback-entry-design&viewMode=story&variant=compact",
+      "variants": ["About row", "Support card", "Preflight chooser"]
+    }
+  ]
+}
