@@ -168,6 +168,7 @@ function MoveReceiptVariant(props: VariantProps & { compact: boolean }): React.J
       testID="move-response-variant-b"
     >
       <PrototypeHeader
+        appearance="inverse"
         kicker="B · MOVE RECEIPT"
         summary="Keep a persistent audit trail beside the board so every accepted or ignored tap has an explanation."
         title="One move, one clear receipt"
@@ -237,19 +238,24 @@ function BoardPulseVariant(props: VariantProps): React.JSX.Element {
 }
 
 function PrototypeHeader({
+  appearance = "default",
   kicker,
   summary,
   title
 }: {
+  appearance?: "default" | "inverse";
   kicker: string;
   summary: string;
   title: string;
 }): React.JSX.Element {
+  const inverse = appearance === "inverse";
   return (
     <View style={styles.header}>
-      <Text style={styles.kicker}>{kicker} · DESIGN PROTOTYPE · #246 + #247</Text>
-      <Text style={styles.title}>{title}</Text>
-      <Text style={styles.summary}>{summary}</Text>
+      <Text style={[styles.kicker, inverse ? styles.kickerInverse : null]}>
+        {kicker} · DESIGN PROTOTYPE · #246 + #247
+      </Text>
+      <Text style={[styles.title, inverse ? styles.titleInverse : null]}>{title}</Text>
+      <Text style={[styles.summary, inverse ? styles.summaryInverse : null]}>{summary}</Text>
     </View>
   );
 }
@@ -539,6 +545,9 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     letterSpacing: 1.1
   },
+  kickerInverse: {
+    color: "#9ED0AE"
+  },
   title: {
     color: "#17251C",
     fontSize: 30,
@@ -546,11 +555,17 @@ const styles = StyleSheet.create({
     letterSpacing: -0.8,
     lineHeight: 34
   },
+  titleInverse: {
+    color: "#F7FAF8"
+  },
   summary: {
     color: "#53665A",
     fontSize: 14,
     lineHeight: 20,
     maxWidth: 700
+  },
+  summaryInverse: {
+    color: "#CBD9D1"
   },
   feedback: {
     alignSelf: "stretch",
