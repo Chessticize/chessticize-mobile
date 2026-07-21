@@ -3329,7 +3329,11 @@ function CustomSprintSetup({
   const previousRows = previousConfigs.slice(0, 5).map((config) =>
     previousCustomConfigRowModel(config, ratingForKey(config.ratingKey))
   );
-  const selectedThemes = customThemeSelection?.selectedThemes ?? [theme];
+  const selectedThemes = customThemeSelection
+    ? customThemeSelection.selectedThemes.length > 0
+      ? customThemeSelection.selectedThemes
+      : ["mixed"]
+    : [theme];
   const themeLabel = customThemeSelection
     ? customThemeSelectionLabel(selectedThemes)
     : customThemeLabel(theme);
@@ -3413,13 +3417,9 @@ function CustomSprintSetup({
         availablePuzzleCount={availablePuzzleCount}
         hasEnoughLocalPuzzles={hasEnoughLocalPuzzles}
         onBroadenTheme={
-          selectedThemes.includes("mixed")
+          customThemeSelection || selectedThemes.includes("mixed")
             ? undefined
             : () => {
-              if (customThemeSelection) {
-                customThemeSelection.onChange(["mixed"]);
-                return;
-              }
               onThemeChange("mixed");
             }
         }
@@ -3478,12 +3478,12 @@ function CustomEligibilityNotice({
       {onBroadenTheme ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Broaden from ${theme} to Mixed theme`}
+          accessibilityLabel={`Broaden from ${theme} to All themes`}
           testID="custom-broaden-theme"
           style={[styles.secondaryButton, styles.customEligibilityAction]}
           onPress={onBroadenTheme}
         >
-          <Text style={styles.secondaryButtonText}>Use Mixed</Text>
+          <Text style={styles.secondaryButtonText}>Use All</Text>
         </Pressable>
       ) : null}
     </View>
@@ -3692,13 +3692,13 @@ function CustomThemeChoiceRow({
               key={option}
               accessibilityHint={multiple
                 ? option === "mixed"
-                  ? "Clears all named theme selections"
+                  ? "Selects all themes and clears named theme selections"
                   : "Adds or removes this theme"
                 : undefined}
               accessibilityRole={multiple ? "checkbox" : "button"}
               accessibilityLabel={`${label} puzzle theme`}
               accessibilityState={multiple ? { checked: selected } : { selected }}
-              testID={`custom-theme-${safeTestId(label)}`}
+              testID={`custom-theme-${option === "mixed" ? "mixed" : safeTestId(label)}`}
               style={[styles.customMiniChip, selected ? styles.customMiniChipActive : null]}
               onPress={() => onChange(option)}
             >
@@ -9520,7 +9520,7 @@ function themeForCustomSprint(theme: CustomThemeFilter): string | undefined {
 
 function customThemeLabel(theme: CustomThemeFilter): string {
   if (theme === "mixed") {
-    return "Mixed";
+    return "All";
   }
   return theme
     .replace(/([a-z])([A-Z])/g, "$1 $2")
@@ -9529,7 +9529,7 @@ function customThemeLabel(theme: CustomThemeFilter): string {
 
 function customThemeSelectionLabel(themes: readonly CustomThemeFilter[]): string {
   if (themes.length === 0) {
-    return "no selected themes";
+    return customThemeLabel("mixed");
   }
   return themes.map(customThemeLabel).join(", ");
 }
@@ -9539,13 +9539,16 @@ export function nextCustomThemeSelection(
   tappedTheme: CustomThemeFilter
 ): CustomThemeFilter[] {
   if (tappedTheme === "mixed") {
-    return selectedThemes.includes("mixed") ? [] : ["mixed"];
+    return ["mixed"];
   }
 
   const namedThemes = selectedThemes.filter((theme) => theme !== "mixed");
-  return namedThemes.includes(tappedTheme)
-    ? namedThemes.filter((theme) => theme !== tappedTheme)
-    : [...namedThemes, tappedTheme];
+  if (!namedThemes.includes(tappedTheme)) {
+    return [...namedThemes, tappedTheme];
+  }
+
+  const remainingThemes = namedThemes.filter((theme) => theme !== tappedTheme);
+  return remainingThemes.length > 0 ? remainingThemes : ["mixed"];
 }
 
 function previousCustomConfigRowModel(
