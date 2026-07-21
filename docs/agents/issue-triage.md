@@ -112,21 +112,21 @@ Do not mark a new UI flow ready for product implementation while its Storybook
 design choice is unapproved. The prototype PR may be ready for design review
 while the product issue remains in triage.
 
-## 7. Group Related Issues
+## 7. Relate Issues Without Sharing Design Ownership
 
-Decide design grouping and implementation grouping separately. Use one
-coherent design group when issues share:
+Each feedback issue owns its own Storybook design track, even when several
+issues touch the same screen or may later share an implementation. Link related
+issues and record shared dependencies, but give each issue its own:
 
-- One user journey from entry to outcome.
-- One data or state contract.
-- One interaction model whose pieces would be confusing if designed apart.
+- Issue-numbered Storybook branch and PR history.
+- New Scenario Marker ownership.
+- Full-Storybook deployment URL.
+- Approval record and implementation handoff.
 
-Do not group issues merely because they share a screen, component, assignee, or
-release window. A shared Storybook contract does not require one later
-implementation branch: native diagnosis, data changes, or platform work may
-remain separate. If grouped for design, comment on every issue with links to the
-others and explain why one interaction model is more coherent. Use one
-Storybook branch and one draft PR for that design group.
+Decide implementation grouping separately. A later feature-scoped
+implementation PR may resolve multiple approved issues when they share one user
+journey, state contract, or interaction model. Native diagnosis, data changes,
+or platform work may instead remain separate.
 
 ## 8. Prototype UI And Functional Feedback
 
@@ -135,14 +135,28 @@ When preview work is explicitly authorized:
 1. Represent every UI or functional-feature issue in a Storybook design slice.
    For native-only behavior, show its reachable presentation states and mark
    the unproven native exit explicitly.
-2. Use a subagent per independent UI group when subagents are available.
-3. Create a branch named `codex/storybook-<coherent-goal>`.
-4. Add a stable Storybook URL with deterministic variants and important states.
+2. Create a branch named `codex/storybook-issue-<number>-<goal>` for one issue.
+3. Mark every new or materially changed scenario owned by that issue with
+   `isNew: true`, its `issueNumber`, and a concise `changeNote`.
+4. Add deterministic variants and important states to the complete Interaction
+   Lab catalog.
    Prefer two or three structurally different directions when the decision is
    genuinely open.
-5. Keep the New Scenario Marker and draft PR until explicit approval.
-6. Validate the Interaction Lab and inspect affected phone and wide viewports.
-7. Link the issues and design rationale in both directions.
+5. Validate the Interaction Lab and inspect affected phone and wide viewports.
+6. Deploy the full Storybook from the exact reviewed commit and make the
+   issue-owned scenarios easy to find through the `new` tag and What's New page.
+7. Link the issue, PR, deployment, exact commit, and design rationale in both
+   directions.
+
+A design PR may become ready and merge to `main` when its current interaction
+increment is coherent and its required checks pass. Merging design artifacts is
+not design approval and does not authorize product wiring. Continue later
+feedback rounds from current `main`, update the same issue-owned scenarios, and
+redeploy the same issue preview until the design is approved for implementation.
+
+The New Scenario Marker remains on `main` for as long as its linked issue is
+open. Remove the marker only in a cleanup change after GitHub records that issue
+as closed; retain the scenario itself as living UI documentation.
 
 The Storybook phase must not add production navigation, persistent storage or
 backend mutation, native-module wiring, analytics, rollout, or release logic.
@@ -151,14 +165,15 @@ record those as later diagnostic or validation work.
 
 ### Hosted preview handoff
 
-When remote preview publication is authorized and Sites is available, publish
-all active design groups through the shared project at
-`sites/storybook-previews`. Pin every preview to its exact branch commit in
-`preview-manifest.json`, build the Storybook bundles, validate the hub, and
-deploy the resulting Sites version with owner-only access when possible.
+When remote preview publication is authorized and Sites is available, build and
+deploy the complete `apps/mobile-lab` Storybook for that issue's exact commit.
+Use a stable issue-specific site or deployment so the reviewer can browse the
+catalog like local Storybook, while the `new` tag and What's New page identify
+the issue-owned delta.
 
-One hosted hub may cover several design groups, but each group retains its own
-Storybook branch and draft PR. Add the production Sites URL to every covered
+Do not commit `storybook-static`, copied bundles, a preview manifest, or hosting
+result files to the application branch. Generate deployment input in ignored or
+temporary storage and keep the source commit as the identity recorded in the
 issue and PR. A hosted preview does not approve a design or begin product
 implementation. Every Sites deployment URL is production; save without
 deploying when the request authorizes only a reviewable candidate.
@@ -177,12 +192,13 @@ Use one concise comment per issue:
 
 Dependencies or missing evidence: <none or explicit list>
 
-Design grouping: <standalone, or links to grouped issues and why one design is coherent>
+Related issues: <none, or links plus shared dependency or implementation boundary>
 ```
 
-For a published prototype, add a second comment containing the draft PR,
-branch, stable story URL, variant/state parameters, exact commit, validation
-result, excluded production boundaries, and explicit approval gate.
+For a published prototype, add a second comment containing the issue-scoped PR,
+branch, full Storybook URL, direct story URL, variant/state parameters, exact
+commit, validation result, excluded production boundaries, and explicit
+approval gate.
 
 ## 10. Report The Backlog
 
@@ -191,8 +207,8 @@ Finish with:
 - The audited issue count and scope.
 - A table sorted by priority, then dependency order.
 - Category, effort, and uncertainty for every issue.
-- Coherent issue groups and standalone items.
-- Storybook preview branches and check status, if authorized.
+- Related issues, shared dependencies, and possible implementation groupings.
+- Issue-scoped Storybook branches, deployments, and check status, if authorized.
 - Missing information, native/owner gates, and the next decision.
 
 Keep local verification distinct from remote CI, and keep completed triage

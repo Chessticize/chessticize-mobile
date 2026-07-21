@@ -1,15 +1,21 @@
 import { newScenarios } from "../src/scenarioRegistry.ts";
 
-const markersAllowed = process.env.ALLOW_NEW_SCENARIOS === "true";
+const invalidScenarios = newScenarios.filter(
+  (scenario) =>
+    !Number.isInteger(scenario.issueNumber) ||
+    scenario.issueNumber <= 0 ||
+    scenario.changeNote.trim().length === 0
+);
 
-if (newScenarios.length > 0 && !markersAllowed) {
-  console.error("New Scenario Markers must be cleared before a ready PR or main build:");
-  for (const scenario of newScenarios) {
-    console.error(`- ${scenario.group} / ${scenario.title}: ${scenario.changeNote}`);
+if (invalidScenarios.length > 0) {
+  console.error("New Scenario Markers must identify a positive GitHub issue and describe the change:");
+  for (const scenario of invalidScenarios) {
+    console.error(`- ${scenario.group} / ${scenario.title}`);
   }
   process.exitCode = 1;
-} else if (newScenarios.length > 0) {
-  console.log(`Draft design review includes ${newScenarios.length} New Scenario Marker(s).`);
 } else {
-  console.log("No active New Scenario Markers.");
+  console.log(`Validated ${newScenarios.length} issue-owned New Scenario Marker(s).`);
+  for (const scenario of newScenarios) {
+    console.log(`- Issue #${scenario.issueNumber}: ${scenario.group} / ${scenario.title}`);
+  }
 }

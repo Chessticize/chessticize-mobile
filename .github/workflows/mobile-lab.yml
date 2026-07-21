@@ -58,7 +58,5 @@ jobs:
       - name: Typecheck, registry tests, and static Storybook build
         run: pnpm mobile:lab:validate
 
-      - name: Reject stale New Scenario Markers
-        env:
-          ALLOW_NEW_SCENARIOS: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft && 'true' || 'false' }}
+      - name: Validate issue-owned New Scenario Markers
         run: pnpm mobile:lab:check-markers

@@ -9,29 +9,40 @@ function WhatsNewIndex(): React.JSX.Element {
         <p style={styles.eyebrow}>INTERACTION LAB</p>
         <h1 style={styles.title}>What&apos;s New</h1>
         <p style={styles.lede}>
-          New Scenario Markers collect the pages and states currently under design review.
+          New Scenario Markers collect the pages and states attached to open design issues.
           Open a card on your phone to walk the real React Native UI in full screen.
         </p>
       </section>
       {newScenarios.length === 0 ? (
         <section style={styles.empty}>
           <h2 style={styles.cardTitle}>Baseline is current</h2>
-          <p style={styles.cardCopy}>No scenarios are marked new. Feature branches add markers during design review and clear them before merge.</p>
+          <p style={styles.cardCopy}>No scenarios are marked new for an open issue.</p>
         </section>
       ) : (
         <section style={styles.grid}>
           {newScenarios.map((scenario) => (
-            <a
-              key={scenario.id}
-              href={`./iframe.html?id=${scenario.storyId}&viewMode=story`}
-              style={styles.card}
-            >
-              <span style={styles.badge}>NEW</span>
-              <span style={styles.group}>{scenario.group}</span>
-              <strong style={styles.cardTitle}>{scenario.title}</strong>
-              <span style={styles.cardCopy}>{scenario.changeNote}</span>
-              <span style={styles.open}>Open full-screen scenario →</span>
-            </a>
+            <article key={scenario.id} style={styles.card}>
+              <div style={styles.cardMeta}>
+                <span style={styles.badge}>NEW</span>
+                <a
+                  href={`https://github.com/Chessticize/chessticize-mobile/issues/${scenario.issueNumber}`}
+                  rel="noreferrer"
+                  style={styles.issueLink}
+                  target="_blank"
+                >
+                  Issue #{scenario.issueNumber}
+                </a>
+              </div>
+              <a
+                href={`./iframe.html?id=${scenario.storyId}&viewMode=story`}
+                style={styles.storyLink}
+              >
+                <span style={styles.group}>{scenario.group}</span>
+                <strong style={styles.cardTitle}>{scenario.title}</strong>
+                <span style={styles.cardCopy}>{scenario.changeNote}</span>
+                <span style={styles.open}>Open full-screen scenario →</span>
+              </a>
+            </article>
           ))}
         </section>
       )}
@@ -97,12 +108,13 @@ const styles: Record<string, React.CSSProperties> = {
     background: "#FFFFFF",
     border: "1px solid #CBD5E1",
     borderRadius: 16,
-    color: "inherit",
+    padding: 20
+  },
+  cardMeta: {
+    alignItems: "center",
     display: "flex",
-    flexDirection: "column",
-    gap: 8,
-    padding: 20,
-    textDecoration: "none"
+    justifyContent: "space-between",
+    marginBottom: 10
   },
   badge: {
     alignSelf: "flex-start",
@@ -113,6 +125,19 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 900,
     letterSpacing: 1,
     padding: "5px 8px"
+  },
+  issueLink: {
+    color: "#2563EB",
+    fontSize: 12,
+    fontWeight: 800,
+    textDecoration: "none"
+  },
+  storyLink: {
+    color: "inherit",
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+    textDecoration: "none"
   },
   group: {
     color: "#64748B",

@@ -14,7 +14,6 @@ on:
       - "docs/TESTFLIGHT_QA.md"
       - "docs/TESTING_ARCHITECTURE.md"
       - "docs/agents/**"
-      - "sites/storybook-previews/**"
       - "package.json"
       - "scripts/validate-development-process.mjs"
   push:
@@ -32,7 +31,6 @@ on:
       - "docs/TESTFLIGHT_QA.md"
       - "docs/TESTING_ARCHITECTURE.md"
       - "docs/agents/**"
-      - "sites/storybook-previews/**"
       - "package.json"
       - "scripts/validate-development-process.mjs"
 

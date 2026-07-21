@@ -8,9 +8,22 @@ Select exactly one. For a new UI flow, the Storybook design slice and explicit
 approval must predate production wiring. See `docs/agents/ui-flow-design.md`.
 
 - [ ] Not a new UI flow
+- [ ] Storybook-only design increment; no product wiring
 - [ ] Storybook-first design approved before product wiring
 
-Storybook URL:
+Linked UI issue:
+
+Full Storybook manager URL:
+
+Direct story URL:
+
+Storybook source commit:
+
+New Scenario Marker lifecycle (select one):
+
+- [ ] Not applicable
+- [ ] Added or retained for an open linked issue
+- [ ] Removed after the linked issue was closed
 
 Design approval record:
 

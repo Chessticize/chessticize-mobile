@@ -17,6 +17,7 @@ const count = (text, needle) => text.split(needle).length - 1;
 
 const coreWorkflow = read(".github/workflows/core.yml");
 const mobileWorkflow = read(".github/workflows/mobile-ios.yml");
+const mobileLabWorkflow = read(".github/workflows/mobile-lab.yml");
 const processWorkflow = read(".github/workflows/process.yml");
 const agents = read("AGENTS.md");
 const rootReadme = read("README.md");
@@ -36,12 +37,8 @@ const uiFlowDesign = read(agentDocPaths[3]);
 const issueTriage = read(agentDocPaths[4]);
 const devLoopSkill = read(".codex/skills/chessticize-mobile-dev-loop/SKILL.md");
 const issueTriageSkill = read(".codex/skills/chessticize-issue-triage/SKILL.md");
-const storybookPreviewSitePackage = JSON.parse(
-  read("sites/storybook-previews/package.json")
-);
-const storybookPreviewManifest = JSON.parse(
-  read("sites/storybook-previews/preview-manifest.json")
-);
+const scenarioRegistry = read("apps/mobile-lab/src/scenarioRegistry.ts");
+const markerCheck = read("apps/mobile-lab/scripts/check-new-scenarios.ts");
 const localE2eSkill = read(".codex/skills/chessticize-mobile-local-e2e/SKILL.md");
 const uiCalibrationSkill = read(".codex/skills/chessticize-mobile-ui-calibration/SKILL.md");
 const androidReleaseSkill = read(".codex/skills/chessticize-android-release/SKILL.md");
@@ -138,8 +135,15 @@ for (const policy of [agents, rootReadme, labReadme, testingArchitecture, devLoo
 assert.match(uiFlowDesign, /must not begin\s+production wiring/i);
 assert.match(uiFlowDesign, /stable Storybook URL/);
 assert.match(uiFlowDesign, /explicit design approval/);
+assert.match(uiFlowDesign, /full Storybook/i);
+assert.match(uiFlowDesign, /linked GitHub issue is closed/i);
+assert.match(uiFlowDesign, /Do not commit generated\s+Storybook bundles/i);
 assert.match(prTemplate, /Storybook-first design approved before product wiring/);
+assert.match(prTemplate, /Storybook-only design increment/);
+assert.match(prTemplate, /Full Storybook manager URL:/);
+assert.match(prTemplate, /Removed after the linked issue was closed/);
 assert.match(prTemplate, /Design approval record:/);
+assert.match(agents, /Storybook-only PR[\s\S]*may merge while the linked product issue remains open/);
 
 for (const triagePolicy of [agents, issueTriageSkill]) {
   assert.match(triagePolicy, /docs\/agents\/issue-triage\.md/);
@@ -153,9 +157,11 @@ for (const priority of ["P0", "P1", "P2", "P3"]) {
 
 for (const triageContract of [issueTriage, issueTriageSkill]) {
   assert.match(triageContract, /high uncertainty/i);
-  assert.match(triageContract, /coherent/i);
-  assert.match(triageContract, /stable Storybook URL/i);
-  assert.match(triageContract, /explicit approval/i);
+  assert.match(triageContract, /full Storybook/i);
+  assert.match(triageContract, /issueNumber/);
+  assert.match(triageContract, /explicit\s+(design\s+)?approval/i);
+  assert.match(triageContract, /merge to `main`/i);
+  assert.match(triageContract, /issue\s+(?:is|as)\s+closed/i);
 }
 
 assert.match(issueTriage, /0\.5–2 engineering days/);
@@ -163,36 +169,26 @@ assert.match(issueTriage, /3–5 engineering days/);
 assert.match(issueTriage, /1–2 engineering weeks/);
 assert.match(issueTriage, /2–4\+ engineering weeks/);
 assert.match(issueTriage, /do not invent or apply them/i);
-assert.match(issueTriage, /Use a subagent per independent UI group/);
-assert.match(issueTriage, /design grouping and implementation grouping separately/i);
+assert.match(issueTriage, /Each feedback issue owns its own Storybook design track/i);
+assert.match(issueTriage, /Decide implementation grouping separately/i);
 assert.match(issueTriage, /every UI or functional-feature issue/);
 assert.match(issueTriage, /native-only behavior/);
-assert.match(issueTriageSkill, /delegate independent UI groups to separate subagents/i);
-assert.match(issueTriageSkill, /design grouping and\s+implementation grouping separately/i);
+assert.match(issueTriageSkill, /one\s+Storybook design track.*per\s+issue/is);
+assert.match(issueTriageSkill, /Decide later implementation grouping separately/i);
 assert.match(issueTriageSkill, /every UI or functional-feature issue/);
 assert.match(issueTriageSkill, /do not invent priority\s+labels/i);
-assert.match(issueTriageSkill, /codex\/storybook-<coherent-goal>/);
-assert.match(issueTriageSkill, /sites\/storybook-previews\/preview-manifest\.json/);
+assert.match(issueTriageSkill, /codex\/storybook-issue-<number>-<goal>/);
 assert.match(issueTriageSkill, /owner-only deployment/i);
-assert.match(issueTriage, /sites\/storybook-previews/);
 assert.match(issueTriage, /Every Sites deployment URL is production/);
-assert.match(uiFlowDesign, /sites\/storybook-previews/);
-
-assert.equal(
-  storybookPreviewSitePackage.scripts["build:with-previews"],
-  "npm run previews:sync -- --build && npm run build"
-);
-assert.equal(storybookPreviewManifest.previews.length, 4);
-assert.equal(
-  new Set(storybookPreviewManifest.previews.map(({ id }) => id)).size,
-  storybookPreviewManifest.previews.length
-);
-for (const preview of storybookPreviewManifest.previews) {
-  assert.match(preview.id, /^[a-z][a-z0-9-]+$/);
-  assert.match(preview.branch, /^codex\/storybook-[a-z0-9-]+$/);
-  assert.match(preview.commit, /^[0-9a-f]{40}$/);
-  assert.ok(preview.issues.length > 0);
+for (const lifecycleContract of [issueTriage, issueTriageSkill, uiFlowDesign, processWorkflow]) {
+  assert.doesNotMatch(lifecycleContract, /sites\/storybook-previews|preview-manifest/);
 }
+
+assert.match(scenarioRegistry, /isNew: true; issueNumber: number; changeNote: string/);
+assert.match(markerCheck, /Number\.isInteger\(scenario\.issueNumber\)/);
+assert.doesNotMatch(markerCheck, /ALLOW_NEW_SCENARIOS/);
+assert.match(mobileLabWorkflow, /Validate issue-owned New Scenario Markers/);
+assert.doesNotMatch(mobileLabWorkflow, /ALLOW_NEW_SCENARIOS|Reject stale New Scenario Markers/);
 
 for (const reviewPolicy of [agents, devLoopSkill]) {
   assert.match(reviewPolicy, /prefer incremental\s+review/i);

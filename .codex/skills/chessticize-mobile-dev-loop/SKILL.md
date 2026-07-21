@@ -17,10 +17,14 @@ Lab design phase first. Follow `docs/agents/ui-flow-design.md`.
    loading, empty, error, or permission states that apply.
 2. Keep this phase isolated from production navigation entries, backend or
    storage mutations, native-module wiring, analytics, and rollout logic.
-3. Add the New Scenario Marker while review is active, run the Lab checks, and
-   provide the stable Storybook URL for review.
-4. Record explicit design approval in the PR before starting product wiring.
-5. After approval, retain the Storybook scenario as living UI documentation and
+3. Add the issue-owned New Scenario Marker, run the Lab checks, and deploy the
+   full Storybook from the exact commit for review. Generated deployment files
+   stay outside the application branch.
+4. Merge coherent design increments to `main` and iterate from current `main`;
+   retain the marker until the linked issue closes.
+5. Record explicit design approval in the issue or PR before starting product
+   wiring.
+6. After approval, retain the Storybook scenario as living UI documentation and
    continue with the implementation and validation order below.
 
 This gate applies to a new screen, navigation destination, stateful modal or

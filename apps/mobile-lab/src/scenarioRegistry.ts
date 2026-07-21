@@ -39,8 +39,8 @@ export type LabScenarioId =
 export type LabScenarioGroup = "Practice" | "Review" | "History" | "Settings" | "System";
 
 type ScenarioMarker =
-  | { isNew: true; changeNote: string }
-  | { isNew?: false; changeNote?: never };
+  | { isNew: true; issueNumber: number; changeNote: string }
+  | { isNew?: false; issueNumber?: never; changeNote?: never };
 
 export type LabScenarioDefinition = ScenarioMarker & {
   id: LabScenarioId;
@@ -121,7 +121,7 @@ export const navigationCoverage = {
 };
 
 export const newScenarios = Object.values(scenarioRegistry).filter(
-  (scenario): scenario is LabScenarioDefinition & { isNew: true; changeNote: string } => scenario.isNew === true
+  (scenario): scenario is LabScenarioDefinition & { isNew: true; issueNumber: number; changeNote: string } => scenario.isNew === true
 );
 
 export function storyTagsForScenario(id: LabScenarioId): string[] {
