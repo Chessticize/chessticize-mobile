@@ -35,7 +35,11 @@ test("every typed navigation coverage entry points to a registered scenario", ()
   }
 });
 
-test("the completed baseline ships without active New Scenario Markers", () => {
-  assert.deepEqual(newScenarios, []);
+test("the personalized training design review has one active New Scenario Marker", () => {
+  assert.deepEqual(
+    newScenarios.map((scenario) => scenario.id),
+    ["practice-personalized-training-prototype"]
+  );
   assert.deepEqual(storyTagsForScenario("practice-home" as LabScenarioId), []);
+  assert.deepEqual(storyTagsForScenario("practice-personalized-training-prototype"), ["new"]);
 });

@@ -9,6 +9,7 @@ export type LabScenarioId =
   | "practice-home"
   | "practice-custom-setup"
   | "practice-custom-rating-editor"
+  | "practice-personalized-training-prototype"
   | "practice-preparing"
   | "practice-active"
   | "practice-paused"
@@ -60,6 +61,21 @@ export const scenarioRegistry: Record<LabScenarioId, LabScenarioDefinition> = {
   "practice-home": defineScenario("practice-home", "Practice", "Home", "practice--home", "Idle Practice home with deterministic ratings and no persisted progress.", "practice", ["Mode selection", "Progress summary", "Review workload strip"], ["Review", "History", "Settings"]),
   "practice-custom-setup": defineScenario("practice-custom-setup", "Practice", "Custom sprint setup", "practice--custom-setup", "Custom timing, theme, mode, rating, and start controls.", "practice", ["Custom configuration", "Steppers", "Theme choices"], ["Practice home"]),
   "practice-custom-rating-editor": defineScenario("practice-custom-rating-editor", "Practice", "Custom rating editor", "practice--custom-rating-editor", "Expanded ELO adjustment for a previously played custom rating bucket.", "practice", ["Custom setup", "Rating adjustment"], ["Practice home"]),
+  "practice-personalized-training-prototype": {
+    ...defineScenario(
+      "practice-personalized-training-prototype",
+      "Practice",
+      "Personalized training prototype",
+      "practice-personalized-training--prototype",
+      "Design-only comparison linking a tactical weakness profile to multi-theme configuration and a pinned Practice-home sprint.",
+      "practice",
+      ["Tactical weakness insight", "Multi-theme sprint selection", "Saved and pinned Practice-home result", "Three URL-shareable structural variants"],
+      ["Production wiring after explicit design approval"],
+      "contained"
+    ),
+    isNew: true,
+    changeNote: "Three design directions connect weakness evidence, multi-theme sprint setup, and a pinned Practice-home preset for #245, #250, and #253."
+  },
   "practice-preparing": defineScenario("practice-preparing", "Practice", "Preparing", "practice--preparing", "Stable preparing overlay before an Arrow Duel sprint starts.", "practice", ["Preparing overlay", "Cancel through Back intent"], ["Active sprint", "Practice home"]),
   "practice-active": defineScenario("practice-active", "Practice", "Active session", "practice--active-session", "Active Standard sprint with the development-only Board Placeholder.", "practice", ["Timer", "Progress", "Board state", "Pause", "Accessible moves"], ["Sprint result"]),
   "practice-paused": defineScenario("practice-paused", "Practice", "Paused session", "practice--paused-session", "Paused sprint with resume and abandon actions.", "practice", ["Paused state", "Resume", "Abandon"], ["Active sprint", "Sprint result"]),
@@ -136,7 +152,8 @@ function defineScenario(
   description: string,
   owner: MobileBackPrimaryTab | "system",
   includes: readonly string[],
-  exits: readonly string[]
+  exits: readonly string[],
+  containment: "contained" | "free-roam" = "free-roam"
 ): LabScenarioDefinition {
   return {
     id,
@@ -148,7 +165,7 @@ function defineScenario(
       owner,
       includes,
       exits,
-      containment: "free-roam"
+      containment
     }
   };
 }
