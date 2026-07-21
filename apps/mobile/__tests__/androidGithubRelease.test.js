@@ -233,6 +233,20 @@ describe('Android GitHub release automation', () => {
     });
   });
 
+  it('puts the exact platform customer-note link before technical source details', () => {
+    const identity = createAndroidReleaseIdentity(releaseVersion);
+    const notes = sourceReleaseNotes(identity);
+    const customerNotesUrl =
+      `https://github.com/Chessticize/chessticize-mobile/blob/${identity.tagName}` +
+      `/docs/releases/${identity.tagName}.md`;
+
+    expect(notes).toContain(`[What changed in this Android release](${customerNotesUrl})`);
+    expect(notes).toContain(`Source tag: \`${identity.tagName}\``);
+    expect(notes.indexOf(customerNotesUrl)).toBeLessThan(
+      notes.indexOf('Corresponding source:'),
+    );
+  });
+
   it('prepares one canonical source draft without publishing it', async () => {
     const github = new FakeGitHubReleasesClient();
     const bytes = manifestBytes();

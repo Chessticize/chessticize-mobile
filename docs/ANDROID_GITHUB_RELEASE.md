@@ -60,6 +60,17 @@ The operation is idempotent. A retry accepts exact existing assets and fills in
 only missing state. Conflicting source, APK, checksum, tag, version, signer, or
 Release notes fail without deleting or replacing the public artifact.
 
+## Customer release notes
+
+Before creating the annotated tag, approve the exact Android customer note
+under `docs/releases/` as required by `docs/RELEASE_NOTES.md`. Its store block
+contains two or three Android-only bullets, stays within 300 Unicode
+characters, and links this exact GitHub Release for details and source.
+
+The generated GitHub body puts a prominent link to that checked-in note first,
+then preserves the source, signing, checksum, and manual-installation details.
+Do not hand-edit or replace the generated body with store copy.
+
 ## Authentication setup
 
 GitHub publication always uses the built-in `github.token`; do not create a

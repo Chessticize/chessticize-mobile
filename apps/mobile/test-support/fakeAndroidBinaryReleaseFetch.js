@@ -1,6 +1,10 @@
 const crypto = require('node:crypto');
 const { Buffer } = require('node:buffer');
 const fs = require('node:fs');
+const {
+  createAndroidReleaseIdentity,
+  sourceReleaseNotes,
+} = require('../scripts/android-github-release');
 
 const ResponseImplementation = global.Response;
 const commitSha = process.env.FAKE_COMMIT_SHA;
@@ -14,12 +18,10 @@ const sourceManifestSha256 = crypto.createHash('sha256')
   .digest('hex');
 const apkBytes = fs.readFileSync(process.env.FAKE_PLAY_APK_PATH);
 const annotatedTagSha = 'e'.repeat(40);
-const sourceBody = [
-  `Android source release ${tagName}.`,
-  '',
-  'Corresponding source: https://github.com/Chessticize/chessticize-mobile',
-  'Google Play distributes the release binary first. Its Play-signed universal APK may be mirrored here afterward for manual installation.',
-].join('\n');
+const sourceBody = sourceReleaseNotes(createAndroidReleaseIdentity({
+  publicVersion,
+  androidVersionCode: versionCode,
+}));
 const release = {
   id: 41,
   tag_name: tagName,

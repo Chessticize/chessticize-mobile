@@ -54,10 +54,16 @@ const uiCalibrationRunner = path.join(
   ".codex/skills/chessticize-mobile-ui-calibration/scripts/capture-release-baseline.sh"
 );
 const prTemplate = read(".github/pull_request_template.md");
+const releaseNotes = read("docs/RELEASE_NOTES.md");
+const releaseNotesTemplate = read("docs/releases/RELEASE_NOTES_TEMPLATE.md");
+const releaseSourcePolicy = read("docs/RELEASE_SOURCE_POLICY.md");
+const appStoreUpload = read("docs/APP_STORE_UPLOAD.md");
+const androidPlayRelease = read("docs/ANDROID_PLAY_RELEASE.md");
+const androidGitHubRelease = read("docs/ANDROID_GITHUB_RELEASE.md");
 const releaseDocs = [
   read("docs/TESTFLIGHT_QA.md"),
-  read("docs/APP_STORE_UPLOAD.md"),
-  read("docs/RELEASE_SOURCE_POLICY.md")
+  appStoreUpload,
+  releaseSourcePolicy
 ];
 
 const releaseVersion = JSON.parse(read("apps/mobile/release-version.json"));
@@ -125,6 +131,8 @@ assert.equal(count(processWorkflow, '- ".codex/skills/**"'), 2);
 assert.equal(count(processWorkflow, '- "docs/agents/**"'), 2);
 assert.equal(count(processWorkflow, '- "README.md"'), 2);
 assert.equal(count(processWorkflow, '- "apps/mobile-lab/README.md"'), 2);
+assert.equal(count(processWorkflow, '- "docs/RELEASE_NOTES.md"'), 2);
+assert.equal(count(processWorkflow, '- "docs/releases/**"'), 2);
 
 for (const policy of [agents, devLoopSkill, labReadme]) {
   assert.match(policy, /Storybook-first UI flow gate/i);
@@ -215,6 +223,7 @@ assert.match(prTemplate, /full-review trigger/i);
 
 for (const releaseContract of [
   "docs/RELEASE_SOURCE_POLICY.md",
+  "docs/RELEASE_NOTES.md",
   "docs/ANDROID_PLAY_RELEASE.md",
   "docs/ANDROID_GITHUB_RELEASE.md",
   "docs/ANDROID_VALIDATION.md",
@@ -245,6 +254,32 @@ assert.match(androidReleaseSkill, /published annotated canonical tag/);
 assert.match(androidReleaseSkill, /Internal and Closed tracks/);
 assert.match(androidReleaseSkill, /first\s+launch, the boundary changed, or Play reports a problem/);
 assert.match(agents, /\.codex\/skills\/chessticize-android-release\/SKILL\.md/);
+
+assert.match(rootReadme, /\[Release Notes\]\(docs\/RELEASE_NOTES\.md\)/);
+for (const releaseProcessDoc of [
+  releaseSourcePolicy,
+  appStoreUpload,
+  androidPlayRelease,
+  androidGitHubRelease
+]) {
+  assert.match(releaseProcessDoc, /docs\/RELEASE_NOTES\.md/);
+}
+assert.match(releaseNotes, /docs\/releases\/ios-v<version>-build-<build>\.md/);
+assert.match(releaseNotes, /docs\/releases\/android-v<version>-build-<version-code>\.md/);
+assert.match(releaseNotes, /before its source tag is created/);
+assert.match(releaseNotes, /up to 4,000 characters/);
+assert.match(releaseNotes, /up to 500 Unicode characters per language/);
+assert.match(releaseNotes, /at or below 300\s+Unicode characters/);
+assert.match(releaseNotes, /two\s+or three short bullets/);
+assert.match(releaseNotes, /Details and source:/);
+assert.match(releaseNotes, /https:\/\/github\.com\/Chessticize\/chessticize-mobile/);
+assert.match(releaseNotesTemplate, /- Status: Draft/);
+assert.match(releaseNotesTemplate, /## Store copy \(`en-US`\)/);
+assert.match(releaseNotesTemplate, /## GitHub customer summary/);
+assert.match(releaseNotesTemplate, /## Release-note review/);
+assert.match(releaseNotesTemplate, /at most 300 Unicode\s+characters/);
+assert.match(releaseNotesTemplate, /releases\/tag\/<ios\|android>/);
+assert.match(releaseNotesTemplate, /release owner approved the copy before the source tag was created/i);
 
 assert.match(localE2eSkill, /CHESSTICIZE_E2E_SCOPE/);
 assert.match(localE2eSkill, /Replace `practice` with `flows` or `full`/);
