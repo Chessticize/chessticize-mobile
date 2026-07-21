@@ -1,0 +1,4 @@
+interface:
+  display_name: "Chessticize Issue Triage"
+  short_description: "Evaluate and route new Chessticize issues"
+  default_prompt: "Use $chessticize-issue-triage to triage the new GitHub issues."
