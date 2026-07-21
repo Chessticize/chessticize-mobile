@@ -189,7 +189,8 @@ for (const lifecycleContract of [issueTriage, issueTriageSkill, uiFlowDesign, pr
 assert.match(scenarioRegistry, /newScenarioMarkerData/);
 assert.match(markerPolicy, /Number\.isInteger\(issueNumber\)/);
 assert.match(markerCheck, /verifyRemovedMarkerIssuesAreClosed/);
-assert.match(markerCheck, /issueStates\.get\(issueNumber\) !== "closed"/);
+assert.match(markerPolicy, /issueStates\.get\(issueNumber\) !== "closed"/);
+assert.match(markerPolicy, /createGitHubIssueStateReader/);
 assert.doesNotMatch(markerCheck, /ALLOW_NEW_SCENARIOS/);
 assert.match(mobileLabWorkflow, /Validate issue-owned New Scenario Markers/);
 assert.match(mobileLabWorkflow, /issues: read/);

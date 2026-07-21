@@ -2,6 +2,8 @@ import { execFileSync } from "node:child_process";
 import newScenarioMarkerData from "../src/newScenarioMarkers.json" with { type: "json" };
 import { newScenarios, scenarioRegistry } from "../src/scenarioRegistry.ts";
 import {
+  assertRemovedScenarioMarkerIssuesClosed,
+  createGitHubIssueStateReader,
   findRemovedScenarioMarkers,
   validateScenarioMarkers,
   type ScenarioMarkerRecord
@@ -63,50 +65,15 @@ function readBaseMarkers(baseRef: string): ScenarioMarkerRecord {
 async function verifyRemovedMarkerIssuesAreClosed(
   removedMarkers: readonly { scenarioId: string; issueNumber: number }[]
 ): Promise<void> {
-  const token = process.env.GITHUB_TOKEN;
-  const repository = process.env.GITHUB_REPOSITORY;
-  if (!token || !repository) {
-    throw new Error(
-      "BASE_REF marker-removal checks require GITHUB_TOKEN and GITHUB_REPOSITORY."
-    );
-  }
-
-  const issueStates = new Map<number, string>();
-  for (const { issueNumber } of removedMarkers) {
-    if (issueStates.has(issueNumber)) {
-      continue;
-    }
-    const response = await fetch(
-      `https://api.github.com/repos/${repository}/issues/${issueNumber}`,
-      {
-        headers: {
-          Accept: "application/vnd.github+json",
-          Authorization: `Bearer ${token}`,
-          "X-GitHub-Api-Version": "2022-11-28"
-        }
-      }
-    );
-    if (!response.ok) {
-      throw new Error(
-        `Unable to verify issue #${issueNumber}: GitHub returned ${response.status}.`
-      );
-    }
-    const issue = (await response.json()) as { state?: string };
-    issueStates.set(issueNumber, issue.state ?? "unknown");
-  }
-
-  const blocked = removedMarkers.filter(
-    ({ issueNumber }) => issueStates.get(issueNumber) !== "closed"
+  const readIssueState = createGitHubIssueStateReader({
+    token: process.env.GITHUB_TOKEN,
+    repository: process.env.GITHUB_REPOSITORY
+  });
+  const messages = await assertRemovedScenarioMarkerIssuesClosed(
+    removedMarkers,
+    readIssueState
   );
-  if (blocked.length > 0) {
-    console.error("New Scenario Markers may be removed only after their linked issues close:");
-    for (const { scenarioId, issueNumber } of blocked) {
-      console.error(`- ${scenarioId}: issue #${issueNumber} is ${issueStates.get(issueNumber)}.`);
-    }
-    process.exit(1);
-  }
-
-  for (const { scenarioId, issueNumber } of removedMarkers) {
-    console.log(`Verified marker cleanup for ${scenarioId}: issue #${issueNumber} is closed.`);
+  for (const message of messages) {
+    console.log(message);
   }
 }
