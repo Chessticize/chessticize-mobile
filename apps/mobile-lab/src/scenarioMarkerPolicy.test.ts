@@ -109,7 +109,10 @@ test("GitHub issue-state reader maps absent response state to unknown", async ()
     token: "secret",
     repository: "owner/repo",
     fetchIssue: async (input, init) => {
-      requests.push({ input, authorization: init.headers.Authorization });
+      requests.push({
+        input,
+        authorization: init.headers.Authorization ?? ""
+      });
       return { ok: true, status: 200, json: async () => ({}) };
     }
   });

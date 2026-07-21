@@ -66,8 +66,8 @@ export function createGitHubIssueStateReader({
   repository,
   fetchIssue = fetch
 }: {
-  token?: string;
-  repository?: string;
+  token?: string | undefined;
+  repository?: string | undefined;
   fetchIssue?: FetchIssue;
 }): IssueStateReader {
   if (!token || !repository) {
