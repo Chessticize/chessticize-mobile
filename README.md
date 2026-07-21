@@ -11,6 +11,7 @@ The repository contains the React Native app shell (`apps/mobile`), the browser-
 - [Testing Architecture](docs/TESTING_ARCHITECTURE.md) — test-layer responsibilities, critical E2E regression scope, and SQLite migration compatibility design
 - [App Store Plan](docs/APP_STORE_PLAN.md) — active goal and milestone plan toward the 1.1 submission
 - [App Store Assets](docs/STORE_ASSETS.md) — 1.1 App Store metadata and screenshot capture plan
+- [Release Notes](docs/RELEASE_NOTES.md) — per-binary customer-facing notes, review, and publication contract
 - [App Store Upload](docs/APP_STORE_UPLOAD.md) — owner-executed archive and App Store Connect upload runbook
 - [TestFlight QA](docs/TESTFLIGHT_QA.md) — internal TestFlight pass checklist and evidence log
 - [Privacy Policy](docs/PRIVACY_POLICY.md) — 1.1 data, user-controllable iCloud Sync, and tracking disclosure
@@ -98,7 +99,9 @@ Every binary submitted to App Store Connect or Google Play must be built from a 
 source release in this repository. Do not submit an App Store binary from an
 untagged commit. The release tag must identify the exact source, native code,
 bundled puzzle artifact, Stockfish source, and notices used for that binary.
-See [Release Source Policy](docs/RELEASE_SOURCE_POLICY.md). Android candidate
+Prepare and approve the matching customer-facing note under `docs/releases/`
+before creating that tag; see [Release Notes](docs/RELEASE_NOTES.md) and
+[Release Source Policy](docs/RELEASE_SOURCE_POLICY.md). Android candidate
 construction and Play readiness are documented in
 [Android Play Release](docs/ANDROID_PLAY_RELEASE.md).
 

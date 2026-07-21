@@ -14,11 +14,14 @@ For each submitted binary:
 2. Create a signed or annotated platform repository tag for the submitted
    version and build, for example `ios-v1.0.0-build-1` or
    `android-v1.1.0-build-1`.
-3. Publish a GitHub release for that tag before or at the same time as App
+3. Create and approve the matching customer-facing file under `docs/releases/`
+   as defined by `docs/RELEASE_NOTES.md`. Its filename must match the platform
+   source tag, and it must be part of the exact tagged commit.
+4. Publish a GitHub release for that tag before or at the same time as App
    Store submission.
-4. Mention the tag and public repository URL in release notes and support
+5. Mention the tag and public repository URL in release notes and support
    documentation so recipients can obtain the corresponding source.
-5. Do not submit a binary built from an untagged commit. A Play Internal or
+6. Do not submit a binary built from an untagged commit. A Play Internal or
    Closed candidate is still a distributed binary and follows this rule.
 
 ## Current Public Source Location
@@ -29,6 +32,10 @@ https://github.com/Chessticize/chessticize-mobile
 
 ## Release Checklist
 
+- Create the exact build-specific file from
+  `docs/releases/RELEASE_NOTES_TEMPLATE.md`, verify all customer-facing claims,
+  approve it, and commit it before tagging. Follow `docs/RELEASE_NOTES.md` for
+  store limits, copy rules, publication evidence, and replacement builds.
 - Run `pnpm app-store:preflight` and resolve any failed automatable checks.
 - Run `pnpm app-store:signing-readiness` on the upload machine and resolve any
   missing Apple Developer Team ID, Xcode, or Apple distribution identity before
@@ -57,6 +64,10 @@ https://github.com/Chessticize/chessticize-mobile
 - The shipped Stockfish version and bundled NNUE files are listed in
   `THIRD_PARTY_NOTICES.md`.
 - The App Store binary was built from the tagged release commit.
+- When the destination exposes a release-note field, the submitted App Store
+  or Play copy exactly matches the approved `Store copy` section for the
+  platform binary, including the direct details-and-source link to its exact
+  GitHub Release.
 - For Android, follow `docs/ANDROID_PLAY_RELEASE.md` and retain the exact signed
   AAB plus artifact-only verifier output. Require the full `play-ready` evidence
   contract for first Production launch or an explicitly full release; ordinary

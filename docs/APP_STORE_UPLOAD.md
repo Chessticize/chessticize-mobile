@@ -38,6 +38,13 @@ native risk, also generate the full evidence bundle:
 pnpm app-store:testflight-evidence -- --screenshot-root scratch/store-assets/final
 ```
 
+Before creating the source tag or archive, create and approve
+`docs/releases/ios-v<normalized-version>-build-<build>.md` from the template in
+`docs/RELEASE_NOTES.md`. Verify the exact `Store copy` against this candidate,
+including its two-or-three-bullet, 300-character limit and direct link to the
+exact iOS GitHub Release. The approved file must be present in the clean commit
+that is tagged and archived.
+
 Before archiving, record whether this is a delta, targeted, or full native
 release under `docs/TESTING_ARCHITECTURE.md`. A delta requires the exact-head
 fast checks above and the physical TestFlight smoke below; it does not require
@@ -177,3 +184,13 @@ valid while this signing-account gate is still incomplete.
    store/device compatibility concern.
 8. Fill the evidence log with the source commit, release tag, build, device,
    tester, result, blocking issues, and evidence folder.
+9. For an App Store version update, copy the approved `Store copy` from the
+   exact build-specific release-note file into **What’s New in this Version**.
+   App Store Connect does not expose that field for the first App Store version;
+   keep the checked-in and GitHub notes in that case.
+10. Before submission, recheck Apple’s live character limit, compare the saved
+    text byte-for-byte with the approved file, and retain a screenshot or
+    exported metadata record with the release evidence.
+11. After release, compare the live App Store notes with the approved file and
+    record the result. A mismatch blocks completion until corrected and
+    reverified.
