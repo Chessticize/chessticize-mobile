@@ -74,8 +74,9 @@ checks the issue state before allowing that removal.
 
 If an open issue's marker was attached to a mistaken parallel prototype,
 consolidate that prototype into the existing product-clone scenario and move
-the same issue ownership to it. This is a marker correction, not marker cleanup;
-the issue must remain represented by a `new` marker until it closes.
+the same issue ownership to it only as an unambiguous one-to-one correction.
+This is a marker correction, not marker cleanup; the issue must remain
+represented by a `new` marker until it closes.
 
 Do not infer approval from a passing test, an open PR, or the absence of
 comments. Approval must be an affirmative user or designer decision recorded in

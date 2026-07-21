@@ -52,6 +52,20 @@ test("marker cleanup follows issue ownership across a corrective scenario move",
   ]);
 });
 
+test("one remaining marker cannot hide partial cleanup for the same open issue", () => {
+  const baseMarkers = {
+    "practice-home": { issueNumber: 245, changeNote: "First changed scenario" },
+    "practice-custom-setup": { issueNumber: 245, changeNote: "Second changed scenario" }
+  };
+  const currentMarkers = {
+    "practice-custom-setup": { issueNumber: 245, changeNote: "Still under review" }
+  };
+
+  assert.deepEqual(findRemovedScenarioMarkers(baseMarkers, currentMarkers), [
+    { scenarioId: "practice-home", issueNumber: 245 }
+  ]);
+});
+
 test("marker removal passes only when every linked issue is closed", async () => {
   const reads: number[] = [];
   const messages = await assertRemovedScenarioMarkerIssuesClosed(

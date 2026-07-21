@@ -53,16 +53,25 @@ export function findRemovedScenarioMarkers(
   baseMarkers: ScenarioMarkerRecord,
   currentMarkers: ScenarioMarkerRecord
 ): RemovedScenarioMarker[] {
-  const currentIssueNumbers = new Set(
-    Object.values(currentMarkers).map((marker) => marker.issueNumber)
-  );
+  const baseIssueMarkerCounts = countMarkersByIssue(baseMarkers);
+  const currentIssueMarkerCounts = countMarkersByIssue(currentMarkers);
   return Object.entries(baseMarkers).flatMap(([scenarioId, marker]) => {
     const currentMarker = currentMarkers[scenarioId];
+    const isOneToOneMove = baseIssueMarkerCounts.get(marker.issueNumber) === 1 &&
+      currentIssueMarkerCounts.get(marker.issueNumber) === 1;
     return currentMarker?.issueNumber === marker.issueNumber ||
-      currentIssueNumbers.has(marker.issueNumber)
+      isOneToOneMove
       ? []
       : [{ scenarioId, issueNumber: marker.issueNumber }];
   });
+}
+
+function countMarkersByIssue(markers: ScenarioMarkerRecord): Map<number, number> {
+  const counts = new Map<number, number>();
+  for (const { issueNumber } of Object.values(markers)) {
+    counts.set(issueNumber, (counts.get(issueNumber) ?? 0) + 1);
+  }
+  return counts;
 }
 
 export function createGitHubIssueStateReader({
