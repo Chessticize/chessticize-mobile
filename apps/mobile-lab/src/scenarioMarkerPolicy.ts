@@ -53,9 +53,13 @@ export function findRemovedScenarioMarkers(
   baseMarkers: ScenarioMarkerRecord,
   currentMarkers: ScenarioMarkerRecord
 ): RemovedScenarioMarker[] {
+  const currentIssueNumbers = new Set(
+    Object.values(currentMarkers).map((marker) => marker.issueNumber)
+  );
   return Object.entries(baseMarkers).flatMap(([scenarioId, marker]) => {
     const currentMarker = currentMarkers[scenarioId];
-    return currentMarker?.issueNumber === marker.issueNumber
+    return currentMarker?.issueNumber === marker.issueNumber ||
+      currentIssueNumbers.has(marker.issueNumber)
       ? []
       : [{ scenarioId, issueNumber: marker.issueNumber }];
   });

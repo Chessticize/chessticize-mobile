@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import type { AttemptEvent, SprintMode, SprintState } from "../../../packages/core/src/index.ts";
 import { defaultSprintConfig } from "../../../packages/core/src/index.ts";
 import { MemoryStore } from "../../../packages/storage/src/memory-store.ts";
@@ -34,13 +34,19 @@ type ScenarioRuntime = {
 
 export function LabScenario({ scenarioId }: { scenarioId: LabScenarioId }): React.JSX.Element {
   const runtime = useMemo(() => createScenarioRuntime(scenarioId), [scenarioId]);
+  const [selectedCustomThemes, setSelectedCustomThemes] = useState<string[]>(["fork", "pin"]);
 
   setLabPracticeService(runtime.service);
   useEffect(() => () => clearLabPracticeService(runtime.service), [runtime.service]);
+  useEffect(() => setSelectedCustomThemes(["fork", "pin"]), [scenarioId]);
 
   return (
     <LabScenarioShell scenarioId={scenarioId}>
       <PracticePocScreen
+        customThemeSelection={{
+          selectedThemes: selectedCustomThemes,
+          onChange: setSelectedCustomThemes
+        }}
         platformCapabilities={runtime.platformCapabilities}
         {...runtime.screenProps}
       />

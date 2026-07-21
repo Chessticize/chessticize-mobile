@@ -33,13 +33,13 @@ test("New Scenario Marker records require registered scenarios and complete issu
   );
 });
 
-test("marker removal includes deleted and reassigned scenario ownership", () => {
+test("marker cleanup follows issue ownership across a corrective scenario move", () => {
   const baseMarkers = {
     "practice-home": { issueNumber: 245, changeNote: "First" },
     "review-due": { issueNumber: 246, changeNote: "Second" }
   };
   const currentMarkers = {
-    "practice-home": { issueNumber: 245, changeNote: "Updated" },
+    "practice-custom-setup": { issueNumber: 245, changeNote: "Moved to the existing product screen" },
     "review-due": { issueNumber: 247, changeNote: "Reassigned" }
   };
 

@@ -23,6 +23,12 @@ logic. After approval, keep the approved Storybook scenario as living UI
 documentation while completing the product wiring. Follow
 `docs/agents/ui-flow-design.md` and the repo-local development-loop skill.
 
+When the product screen or flow already exists in the Interaction Lab, update
+that product clone incrementally and preserve its stable story URL. Do not
+create a standalone prototype page that repeats existing product context. The
+full Storybook should show the expected post-implementation product, while the
+issue-owned `new` marker identifies the changed scenario.
+
 Each feedback issue owns its Storybook design track and full-catalog deployment.
 A coherent design increment may merge to `main` before implementation; its
 issue-numbered New Scenario Marker remains until the linked issue is closed.

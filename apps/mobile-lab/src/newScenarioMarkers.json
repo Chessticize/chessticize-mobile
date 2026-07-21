@@ -1,6 +1,6 @@
 {
-  "practice-multi-theme-choice": {
+  "practice-custom-setup": {
     "issueNumber": 245,
-    "changeNote": "Custom Sprint themes can be toggled independently; selecting Mixed clears every named theme."
+    "changeNote": "The existing Custom Sprint setup now previews independent theme toggles; selecting Mixed clears every named theme."
   }
 }

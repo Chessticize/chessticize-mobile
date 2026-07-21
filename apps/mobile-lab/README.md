@@ -80,12 +80,13 @@ Whole-screen stories are currently marked `free-roam`, matching the monolithic `
 ## Add or change a scenario
 
 1. For a new UI flow, confirm that the PR is still in the Storybook design phase described in `docs/agents/ui-flow-design.md`.
-2. Seed starting data through `PracticeService`, `MemoryStore`, or an interface-compatible native-boundary fake in `LabScenario.tsx`.
-3. Add the typed definition and navigation coverage in `scenarioRegistry.ts`.
-4. Export a Storybook story in the appropriate product group. A short play function may drive public UI actions after seeding.
-5. Add the scenario ID, owning `issueNumber`, and a one-line `changeNote` to `newScenarioMarkers.json` for each new or materially changed scenario. This adds `isNew: true`, the Storybook `new` tag, and the What's New card.
-6. Build and deploy the full Storybook for the issue's exact commit. Record both the manager URL and direct story URL in the issue and PR; generated bundles and hosting result files stay untracked.
-7. A coherent design increment may merge to `main` before implementation. Continue later feedback in a new PR from `main`, updating the same issue-owned scenario and deployment.
-8. Keep the marker while the linked issue remains open. Pull-request CI verifies GitHub records the issue as closed before accepting marker removal; retain the scenario as living UI documentation.
-9. Record explicit design approval before product wiring starts.
-10. Keep focused mobile component tests for shared production UI changes. Use native validation only when the changed boundary requires it under the repository risk rules.
+2. Find the existing product-clone story for the affected screen or state and update it incrementally, preserving its stable URL. Do not add a parallel standalone page for a control that belongs on an existing screen. Add a new scenario only when the product would actually gain a new destination or materially distinct state.
+3. Seed starting data through `PracticeService`, `MemoryStore`, or an interface-compatible native-boundary fake in `LabScenario.tsx`.
+4. Add or update the typed definition and navigation coverage in `scenarioRegistry.ts`.
+5. Export or update the Storybook story in the appropriate product group. A short play function may drive public UI actions after seeding. The complete catalog should show the expected post-implementation product; the `new` tag highlights the issue-owned delta.
+6. Add the scenario ID, owning `issueNumber`, and a one-line `changeNote` to `newScenarioMarkers.json` for each new or materially changed scenario. This adds `isNew: true`, the Storybook `new` tag, and the What's New card.
+7. Build and deploy the full Storybook for the issue's exact commit. Record both the manager URL and direct story URL in the issue and PR; generated bundles and hosting result files stay untracked.
+8. A coherent design increment may merge to `main` before implementation. Continue later feedback in a new PR from `main`, updating the same issue-owned scenario and deployment.
+9. Keep the marker while the linked issue remains open. Pull-request CI verifies GitHub records the issue as closed before accepting marker removal; retain the scenario as living UI documentation. A corrective move from a mistaken parallel prototype to the existing product-clone scenario is allowed only when the same open issue remains marked.
+10. Record explicit design approval before product wiring starts.
+11. Keep focused mobile component tests for shared production UI changes. Use native validation only when the changed boundary requires it under the repository risk rules.
