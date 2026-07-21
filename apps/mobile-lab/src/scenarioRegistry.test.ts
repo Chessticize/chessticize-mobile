@@ -51,3 +51,12 @@ test("New Scenario Markers retain open-issue ownership on the full catalog", () 
     }
   }
 });
+
+test("the multiple-theme design review has one active New Scenario Marker", () => {
+  assert.deepEqual(
+    newScenarios.map((scenario) => scenario.id),
+    ["practice-multi-theme-choice"]
+  );
+  assert.deepEqual(storyTagsForScenario("practice-home" as LabScenarioId), []);
+  assert.deepEqual(storyTagsForScenario("practice-multi-theme-choice"), ["new"]);
+});
