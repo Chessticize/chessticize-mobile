@@ -42,7 +42,7 @@ describe("iOS App Store identity artifacts", () => {
     expect(generatedConfig).toBe(renderIOSReleaseVersion(releaseVersion));
     expect(renderIOSReleaseVersion({
       ...releaseVersion,
-      publicVersion: "9.8.7",
+      iosPublicVersion: "9.8.7",
       iosBuildNumber: 42,
     })).toContain("MARKETING_VERSION = 9.8.7\nCURRENT_PROJECT_VERSION = 42\n");
   });

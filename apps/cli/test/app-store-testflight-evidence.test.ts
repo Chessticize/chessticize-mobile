@@ -135,7 +135,7 @@ test("TestFlight evidence CLI writes validator outputs and a release summary", (
     assert.equal(JSON.parse(readFileSync(join(output, "screenshot-audit.json"), "utf8")).status, "pass");
     assert.equal(
       JSON.parse(readFileSync(join(output, "release-manifest.json"), "utf8")).releaseTagSuggestion,
-      "ios-v1.1.0-build-3"
+      "ios-v1.1.1-build-4"
     );
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
