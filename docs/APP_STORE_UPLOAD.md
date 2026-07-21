@@ -51,11 +51,11 @@ unchanged store metadata and screenshots does not regenerate that bundle.
 ## Public Source Tag
 
 Create and publish the source tag before or at the same time as the App Store
-Connect upload. The current iOS 1.1.1 build-4 tag is:
+Connect upload. The current iOS 1.1.1 build-1 tag is:
 
 ```sh
-git tag -a ios-v1.1.1-build-4 -m "iOS 1.1.1 build 4"
-git push origin ios-v1.1.1-build-4
+git tag -a ios-v1.1.1-build-1 -m "iOS 1.1.1 build 1"
+git push origin ios-v1.1.1-build-1
 ```
 
 Then publish a GitHub release for that tag and attach or copy the
@@ -164,7 +164,7 @@ valid while this signing-account gate is still incomplete.
 ## After Upload
 
 1. Wait for App Store Connect processing to complete.
-2. Confirm the uploaded build number is `4` for version `1.1.1`.
+2. Confirm the uploaded build number is `1` for version `1.1.1`.
 3. Confirm export compliance is accepted for
    `ITSAppUsesNonExemptEncryption = false`.
 4. Configure the TestFlight test information from `docs/TESTFLIGHT_QA.md`.
