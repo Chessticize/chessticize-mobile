@@ -1,4 +1,4 @@
 interface:
   display_name: "Chessticize Issue Triage"
-  short_description: "Evaluate and route new Chessticize issues"
-  default_prompt: "Use $chessticize-issue-triage to triage the new GitHub issues."
+  short_description: "Route issues without automatic consolidation"
+  default_prompt: "Use $chessticize-issue-triage to triage new GitHub issues, route UI changes through the design flow, and leave consolidation for human review."

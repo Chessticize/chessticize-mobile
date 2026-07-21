@@ -165,6 +165,22 @@ for (const triagePolicy of [agents, issueTriageSkill]) {
   assert.match(triagePolicy, /product implementation/i);
 }
 
+for (const triagePolicy of [agents, issueTracker, issueTriage, issueTriageSkill]) {
+  assert.match(triagePolicy, /docs\/agents\/ui-flow-design\.md/);
+  assert.match(triagePolicy, /relationship suggestions are advisory/i);
+  assert.match(triagePolicy, /do not consolidate/i);
+  assert.match(triagePolicy, /explicit human\s+approval/i);
+}
+
+for (const uiTriagePolicy of [issueTriage, issueTriageSkill]) {
+  assert.match(uiTriagePolicy, /existing product-clone/i);
+}
+
+assert.doesNotMatch(issueTriage, /possible implementation groupings/i);
+assert.doesNotMatch(issueTriageSkill, /possible implementation groupings/i);
+assert.doesNotMatch(issueTriage, /Decide implementation grouping separately/i);
+assert.doesNotMatch(issueTriageSkill, /Decide later implementation grouping separately/i);
+
 for (const priority of ["P0", "P1", "P2", "P3"]) {
   assert.match(issueTriage, new RegExp(priority));
 }
@@ -184,11 +200,9 @@ assert.match(issueTriage, /1–2 engineering weeks/);
 assert.match(issueTriage, /2–4\+ engineering weeks/);
 assert.match(issueTriage, /do not invent or apply them/i);
 assert.match(issueTriage, /Each feedback issue owns its own Storybook design track/i);
-assert.match(issueTriage, /Decide implementation grouping separately/i);
 assert.match(issueTriage, /every UI or functional-feature issue/);
 assert.match(issueTriage, /native-only behavior/);
 assert.match(issueTriageSkill, /one\s+Storybook design track.*per\s+issue/is);
-assert.match(issueTriageSkill, /Decide later implementation grouping separately/i);
 assert.match(issueTriageSkill, /every UI or functional-feature issue/);
 assert.match(issueTriageSkill, /do not invent priority\s+labels/i);
 assert.match(issueTriageSkill, /codex\/storybook-issue-<number>-<goal>/);
