@@ -5,6 +5,14 @@ implementation begins. The Interaction Lab is the presentation contract: it
 uses production-intended React Native components with deterministic browser
 fixtures, not a parallel HTML mockup.
 
+The full catalog must read as the expected post-implementation product. If the
+affected screen or flow already has a product-clone story, modify that existing
+story incrementally and preserve its stable URL.
+Do not create a parallel standalone page merely to isolate the new control.
+Create a new scenario only for a destination or materially distinct state that
+would actually be new in the product. The `new` tag highlights the delta; it
+does not separate that delta from the rest of the product UI.
+
 ## What Requires The Gate
 
 Use this gate for any new:
@@ -29,7 +37,9 @@ production wiring: do not add the production navigation entry, persistent
 storage or backend mutation, native-module integration, analytics, feature
 rollout, or release integration yet.
 
-1. Add the typed Lab Scenario and stable Storybook URL.
+1. Locate the existing product-clone scenario first. Update it in place and
+   retain its stable Storybook URL. Add a typed scenario only when no existing
+   product destination or state can represent the proposed change.
 2. Cover the entry state, primary interaction, and resulting state. Add loading,
    empty, error, permission, or recovery variants when they materially affect
    the flow.
@@ -61,6 +71,12 @@ and redeploy the issue's full Storybook. Keep its New Scenario Marker on `main`
 until the linked GitHub issue is closed; then remove only the marker in a cleanup
 change and retain the scenario as living UI documentation. Pull-request CI
 checks the issue state before allowing that removal.
+
+If an open issue's marker was attached to a mistaken parallel prototype,
+consolidate that prototype into the existing product-clone scenario and move
+the same issue ownership to it only as an unambiguous one-to-one correction.
+This is a marker correction, not marker cleanup; the issue must remain
+represented by a `new` marker until it closes.
 
 Do not infer approval from a passing test, an open PR, or the absence of
 comments. Approval must be an affirmative user or designer decision recorded in

@@ -130,6 +130,7 @@ import { Chess, type Move, type PieceSymbol, type Square } from "chess.js";
 interface Props {
   platformCapabilities: MobilePlatformCapabilities;
   arrowDuelTargetCorrect?: number;
+  customThemeSelection?: CustomThemeSelection;
   customTargetCorrect?: number;
   debugTrace?: (event: PracticeDebugTraceEvent) => void;
   currentTimeMs?: () => number;
@@ -139,6 +140,11 @@ interface Props {
   standardTargetCorrect?: number;
   systemBack?: MobileSystemBackSource;
 }
+
+export type CustomThemeSelection = {
+  selectedThemes: readonly CustomThemeFilter[];
+  onChange: (selectedThemes: CustomThemeFilter[]) => void;
+};
 
 type Tab = MobileBackTab;
 
@@ -422,6 +428,7 @@ function buildAdaptiveLayout({
 export function PracticePocScreen({
   platformCapabilities,
   arrowDuelTargetCorrect,
+  customThemeSelection,
   customTargetCorrect,
   debugTrace,
   currentTimeMs = Date.now,
@@ -2582,6 +2589,7 @@ export function PracticePocScreen({
                     durationSeconds={customDurationSeconds}
                     perPuzzleSeconds={customPerPuzzleSeconds}
                     theme={customTheme}
+                    customThemeSelection={customThemeSelection}
                     targetCorrect={selectedConfig.targetCorrect}
                     maxMistakes={selectedConfig.maxMistakes}
                     availablePuzzleCount={customEligiblePuzzleCount}
@@ -3269,6 +3277,7 @@ function formatSprintDurationLabel(seconds: number): string {
 function CustomSprintSetup({
   availablePuzzleCount,
   customMode,
+  customThemeSelection,
   durationSeconds,
   initialRating,
   initialRatingEditorOpen,
@@ -3292,6 +3301,7 @@ function CustomSprintSetup({
 }: {
   availablePuzzleCount: number;
   customMode: "custom" | "arrow_duel";
+  customThemeSelection?: CustomThemeSelection;
   durationSeconds: number;
   initialRating: number;
   initialRatingEditorOpen: boolean;
@@ -3319,6 +3329,10 @@ function CustomSprintSetup({
   const previousRows = previousConfigs.slice(0, 5).map((config) =>
     previousCustomConfigRowModel(config, ratingForKey(config.ratingKey))
   );
+  const selectedThemes = customThemeSelection?.selectedThemes ?? [theme];
+  const themeLabel = customThemeSelection
+    ? customThemeSelectionLabel(selectedThemes)
+    : customThemeLabel(theme);
 
   return (
     <View style={styles.customSetupPanel} testID="custom-sprint-setup">
@@ -3342,10 +3356,18 @@ function CustomSprintSetup({
           onChange={onCustomModeChange}
         />
         <CustomThemeChoiceRow
-          value={customThemeLabel(theme)}
-          options={CUSTOM_THEME_OPTIONS.map(customThemeLabel)}
+          multiple={customThemeSelection !== undefined}
+          selectedThemes={selectedThemes}
           testID="custom-theme-row"
-          onChange={(label) => onThemeChange(customThemeFromLabel(label))}
+          onChange={(nextTheme) => {
+            if (customThemeSelection) {
+              customThemeSelection.onChange(
+                nextCustomThemeSelection(selectedThemes, nextTheme)
+              );
+              return;
+            }
+            onThemeChange(nextTheme);
+          }}
         />
         <CustomOptionRow
           label="Duration"
@@ -3390,9 +3412,19 @@ function CustomSprintSetup({
       <CustomEligibilityNotice
         availablePuzzleCount={availablePuzzleCount}
         hasEnoughLocalPuzzles={hasEnoughLocalPuzzles}
-        onBroadenTheme={theme === "mixed" ? undefined : () => onThemeChange("mixed")}
+        onBroadenTheme={
+          selectedThemes.includes("mixed")
+            ? undefined
+            : () => {
+              if (customThemeSelection) {
+                customThemeSelection.onChange(["mixed"]);
+                return;
+              }
+              onThemeChange("mixed");
+            }
+        }
         requiredPuzzleCount={requiredPuzzleCount}
-        theme={customThemeLabel(theme)}
+        theme={themeLabel}
       />
 
       <PracticeProgressCard currentRating={initialRating} mode={customMode} progress={progress} />
@@ -3411,6 +3443,7 @@ function CustomSprintSetup({
               onDurationChange(config.durationSeconds);
               onPerPuzzleChange(config.perPuzzleSeconds);
               onThemeChange(config.theme);
+              customThemeSelection?.onChange([config.theme]);
             }}
           />
         ))}
@@ -3638,32 +3671,41 @@ function CustomValueRow({
 }
 
 function CustomThemeChoiceRow({
+  multiple,
   onChange,
-  options,
+  selectedThemes,
   testID,
-  value
 }: {
-  onChange: (next: string) => void;
-  options: string[];
+  multiple: boolean;
+  onChange: (next: CustomThemeFilter) => void;
+  selectedThemes: readonly CustomThemeFilter[];
   testID: string;
-  value: string;
 }): React.JSX.Element {
   return (
     <View style={[styles.customConfigRow, styles.customThemeRow]} testID={testID}>
       <View style={[styles.customInlineOptions, styles.customThemeOptions]}>
-        {options.map((option) => (
-          <Pressable
-            key={option}
-            accessibilityRole="button"
-            accessibilityLabel={`${option} puzzle theme`}
-            accessibilityState={{ selected: value === option }}
-            testID={`custom-theme-${safeTestId(option)}`}
-            style={[styles.customMiniChip, value === option ? styles.customMiniChipActive : null]}
-            onPress={() => onChange(option)}
-          >
-            <Text style={[styles.customMiniChipText, value === option ? styles.customMiniChipTextActive : null]}>{option}</Text>
-          </Pressable>
-        ))}
+        {CUSTOM_THEME_OPTIONS.map((option) => {
+          const selected = selectedThemes.includes(option);
+          const label = customThemeLabel(option);
+          return (
+            <Pressable
+              key={option}
+              accessibilityHint={multiple
+                ? option === "mixed"
+                  ? "Clears all named theme selections"
+                  : "Adds or removes this theme"
+                : undefined}
+              accessibilityRole={multiple ? "checkbox" : "button"}
+              accessibilityLabel={`${label} puzzle theme`}
+              accessibilityState={multiple ? { checked: selected } : { selected }}
+              testID={`custom-theme-${safeTestId(label)}`}
+              style={[styles.customMiniChip, selected ? styles.customMiniChipActive : null]}
+              onPress={() => onChange(option)}
+            >
+              <Text style={[styles.customMiniChipText, selected ? styles.customMiniChipTextActive : null]}>{label}</Text>
+            </Pressable>
+          );
+        })}
       </View>
     </View>
   );
@@ -9485,8 +9527,25 @@ function customThemeLabel(theme: CustomThemeFilter): string {
     .replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
-function customThemeFromLabel(label: string): CustomThemeFilter {
-  return CUSTOM_THEME_OPTIONS.find((theme) => customThemeLabel(theme) === label) ?? "mixed";
+function customThemeSelectionLabel(themes: readonly CustomThemeFilter[]): string {
+  if (themes.length === 0) {
+    return "no selected themes";
+  }
+  return themes.map(customThemeLabel).join(", ");
+}
+
+export function nextCustomThemeSelection(
+  selectedThemes: readonly CustomThemeFilter[],
+  tappedTheme: CustomThemeFilter
+): CustomThemeFilter[] {
+  if (tappedTheme === "mixed") {
+    return selectedThemes.includes("mixed") ? [] : ["mixed"];
+  }
+
+  const namedThemes = selectedThemes.filter((theme) => theme !== "mixed");
+  return namedThemes.includes(tappedTheme)
+    ? namedThemes.filter((theme) => theme !== tappedTheme)
+    : [...namedThemes, tappedTheme];
 }
 
 function previousCustomConfigRowModel(

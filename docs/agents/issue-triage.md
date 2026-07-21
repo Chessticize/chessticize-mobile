@@ -135,6 +135,10 @@ When preview work is explicitly authorized:
 1. Represent every UI or functional-feature issue in a Storybook design slice.
    For native-only behavior, show its reachable presentation states and mark
    the unproven native exit explicitly.
+   When the affected product screen already exists in the catalog, change that
+   existing clone incrementally and preserve its stable URL; do not invent a
+   separate page for the feature. The full Storybook should represent the
+   expected product after implementation, with `new` highlighting the delta.
 2. Create a branch named `codex/storybook-issue-<number>-<goal>` for one issue.
 3. Add every new or materially changed scenario owned by that issue to
    `newScenarioMarkers.json` with its `issueNumber` and a concise `changeNote`;

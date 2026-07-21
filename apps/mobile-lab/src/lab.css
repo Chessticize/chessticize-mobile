@@ -22,13 +22,6 @@ body {
   width: 100%;
 }
 
-.multi-theme-lab-stage {
-  background: #eef2f7;
-  height: 100%;
-  overflow: auto;
-  width: 100%;
-}
-
 .lab-toolbar {
   bottom: 10px;
   left: 10px;

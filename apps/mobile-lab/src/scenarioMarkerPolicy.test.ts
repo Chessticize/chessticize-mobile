@@ -33,13 +33,13 @@ test("New Scenario Marker records require registered scenarios and complete issu
   );
 });
 
-test("marker removal includes deleted and reassigned scenario ownership", () => {
+test("marker cleanup follows issue ownership across a corrective scenario move", () => {
   const baseMarkers = {
     "practice-home": { issueNumber: 245, changeNote: "First" },
     "review-due": { issueNumber: 246, changeNote: "Second" }
   };
   const currentMarkers = {
-    "practice-home": { issueNumber: 245, changeNote: "Updated" },
+    "practice-custom-setup": { issueNumber: 245, changeNote: "Moved to the existing product screen" },
     "review-due": { issueNumber: 247, changeNote: "Reassigned" }
   };
 
@@ -49,6 +49,20 @@ test("marker removal includes deleted and reassigned scenario ownership", () => 
   assert.deepEqual(findRemovedScenarioMarkers(baseMarkers, {}), [
     { scenarioId: "practice-home", issueNumber: 245 },
     { scenarioId: "review-due", issueNumber: 246 }
+  ]);
+});
+
+test("one remaining marker cannot hide partial cleanup for the same open issue", () => {
+  const baseMarkers = {
+    "practice-home": { issueNumber: 245, changeNote: "First changed scenario" },
+    "practice-custom-setup": { issueNumber: 245, changeNote: "Second changed scenario" }
+  };
+  const currentMarkers = {
+    "practice-custom-setup": { issueNumber: 245, changeNote: "Still under review" }
+  };
+
+  assert.deepEqual(findRemovedScenarioMarkers(baseMarkers, currentMarkers), [
+    { scenarioId: "practice-home", issueNumber: 245 }
   ]);
 });
 

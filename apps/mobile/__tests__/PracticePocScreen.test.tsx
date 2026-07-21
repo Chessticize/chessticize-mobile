@@ -2590,6 +2590,35 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "0 / 6");
   });
 
+  it("previews multiple theme selection inside the complete Custom Sprint setup", () => {
+    const renderer = renderMultiThemeSetupScreen(["fork"]);
+
+    press(renderer, "practice-mode-custom");
+    expect(findByTestId(renderer, "custom-sprint-setup")).toBeTruthy();
+    expect(findByTestId(renderer, "custom-duration-stepper")).toBeTruthy();
+    expect(findByTestId(renderer, "custom-initial-rating-row")).toBeTruthy();
+    expect(findByTestId(renderer, "custom-previous-configs")).toBeTruthy();
+    expect(themeChecked(renderer, "fork")).toBe(true);
+    expect(themeChecked(renderer, "mate")).toBe(false);
+
+    press(renderer, "custom-theme-mate");
+    expect(themeChecked(renderer, "fork")).toBe(true);
+    expect(themeChecked(renderer, "mate")).toBe(true);
+
+    press(renderer, "custom-theme-fork");
+    expect(themeChecked(renderer, "fork")).toBe(false);
+    expect(themeChecked(renderer, "mate")).toBe(true);
+
+    press(renderer, "custom-theme-mixed");
+    expect(themeChecked(renderer, "mixed")).toBe(true);
+    expect(themeChecked(renderer, "mate")).toBe(false);
+
+    press(renderer, "custom-theme-mixed");
+    expect(themeChecked(renderer, "mixed")).toBe(false);
+    expect(JSON.stringify(renderer.toJSON())).not.toContain("✓");
+    expect(JSON.stringify(renderer.toJSON())).not.toContain("Targeting");
+  });
+
   it("shows persisted previous custom sprint configs and can reuse one", () => {
     const service = createMobilePracticeService("familiar15");
     const savedSprint = service.startSprint(
@@ -5910,6 +5939,39 @@ function renderScreen({
   }
   renderers.push(renderer);
   return renderer;
+}
+
+function renderMultiThemeSetupScreen(
+  initialSelectedThemes: readonly string[]
+): TestRenderer.ReactTestRenderer {
+  function MultiThemeSetupHarness(): React.JSX.Element {
+    const [selectedThemes, setSelectedThemes] = React.useState<string[]>([
+      ...initialSelectedThemes
+    ]);
+    return (
+      <PracticePocScreen
+        customThemeSelection={{ selectedThemes, onChange: setSelectedThemes }}
+        platformCapabilities={createTestMobilePlatformCapabilities()}
+      />
+    );
+  }
+
+  let renderer: TestRenderer.ReactTestRenderer | undefined;
+  act(() => {
+    renderer = TestRenderer.create(<MultiThemeSetupHarness />);
+  });
+  if (!renderer) {
+    throw new Error("Multi-theme Custom Sprint setup did not render");
+  }
+  renderers.push(renderer);
+  return renderer;
+}
+
+function themeChecked(
+  renderer: TestRenderer.ReactTestRenderer,
+  theme: string
+): boolean {
+  return findByTestId(renderer, `custom-theme-${theme}`).props.accessibilityState.checked;
 }
 
 function createTestSystemBackSource(platform: "android" | "ios"): MobileSystemBackSource & {
