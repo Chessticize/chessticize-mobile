@@ -35,7 +35,10 @@ test("every typed navigation coverage entry points to a registered scenario", ()
   }
 });
 
-test("the completed baseline ships without active New Scenario Markers", () => {
-  assert.deepEqual(newScenarios, []);
+test("New Scenario Markers produce review tags and actionable change notes", () => {
   assert.deepEqual(storyTagsForScenario("practice-home" as LabScenarioId), []);
+  for (const scenario of newScenarios) {
+    assert.ok(scenario.changeNote.length > 0);
+    assert.deepEqual(storyTagsForScenario(scenario.id), ["new"]);
+  }
 });

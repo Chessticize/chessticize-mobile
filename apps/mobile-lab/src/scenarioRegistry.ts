@@ -14,6 +14,7 @@ export type LabScenarioId =
   | "practice-paused"
   | "practice-exit-confirmation"
   | "practice-summary"
+  | "sprint-attention-prototype"
   | "practice-reminder-prompt"
   | "review-empty"
   | "review-due"
@@ -65,6 +66,20 @@ export const scenarioRegistry: Record<LabScenarioId, LabScenarioDefinition> = {
   "practice-paused": defineScenario("practice-paused", "Practice", "Paused session", "practice--paused-session", "Paused sprint with resume and abandon actions.", "practice", ["Paused state", "Resume", "Abandon"], ["Active sprint", "Sprint result"]),
   "practice-exit-confirmation": defineScenario("practice-exit-confirmation", "Practice", "Exit confirmation", "practice--exit-confirmation", "Guarded abandon confirmation over an active sprint.", "practice", ["Confirmation", "Cancel", "Confirm abandon"], ["Active sprint", "Sprint result"]),
   "practice-summary": defineScenario("practice-summary", "Practice", "Sprint summary", "practice--sprint-summary", "Completed one-puzzle sprint summary reached through the public board callback.", "practice", ["Result", "Rating change", "History and review actions"], ["Practice home", "History", "Review"]),
+  "sprint-attention-prototype": {
+    ...defineScenario(
+      "sprint-attention-prototype",
+      "Practice",
+      "Sprint attention prototype",
+      "practice-sprint-attention-prototype--truthful-outcomes",
+      "Design-only comparison of truthful Sprint outcomes, attention-aware History, and separate Review and unclear decisions.",
+      "practice",
+      ["Three ?variant= layouts", "Completed and timed-out result states", "Slow, timeout, wrong, unclear, and Review filters"],
+      ["Design approval before product wiring"]
+    ),
+    isNew: true,
+    changeNote: "Compare three Sprint result and History structures for #248, #249, and #252."
+  },
   "practice-reminder-prompt": defineScenario("practice-reminder-prompt", "Practice", "Review reminder prompt", "practice--review-reminder-prompt", "First-mistake notification-permission prompt driven by a maintained fake client.", "practice", ["Permission rationale", "Enable", "Dismiss"], ["Active sprint"]),
   "review-empty": defineScenario("review-empty", "Review", "Empty queue", "review--empty-queue", "Review with no due or future items.", "review", ["Empty state", "Practice return"], ["Practice"]),
   "review-due": defineScenario("review-due", "Review", "Due queue", "review--due-queue", "Deterministic due workload with multiple contexts.", "review", ["Due metrics", "Forecast", "Queue rows", "Start review"], ["Review session", "Practice"]),
