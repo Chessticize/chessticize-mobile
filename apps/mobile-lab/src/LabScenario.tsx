@@ -33,11 +33,29 @@ type ScenarioRuntime = {
 };
 
 export function LabScenario({ scenarioId }: { scenarioId: LabScenarioId }): React.JSX.Element {
-  const definition = scenarioRegistry[scenarioId];
   const runtime = useMemo(() => createScenarioRuntime(scenarioId), [scenarioId]);
 
   setLabPracticeService(runtime.service);
   useEffect(() => () => clearLabPracticeService(runtime.service), [runtime.service]);
+
+  return (
+    <LabScenarioShell scenarioId={scenarioId}>
+      <PracticePocScreen
+        platformCapabilities={runtime.platformCapabilities}
+        {...runtime.screenProps}
+      />
+    </LabScenarioShell>
+  );
+}
+
+export function LabScenarioShell({
+  children,
+  scenarioId
+}: {
+  children: React.ReactNode;
+  scenarioId: LabScenarioId;
+}): React.JSX.Element {
+  const definition = scenarioRegistry[scenarioId];
 
   return (
     <div className="lab-scenario-shell">
@@ -49,7 +67,9 @@ export function LabScenario({ scenarioId }: { scenarioId: LabScenarioId }): Reac
             <p><strong>Scenario Scope:</strong> {definition.scope.includes.join(" · ")}</p>
             <p><strong>Boundary exits:</strong> {definition.scope.exits.join(" · ")}</p>
             <p className="lab-containment-note">
-              Whole-screen scenario: free roaming remains enabled until this presentation area is extracted.
+              {definition.scope.containment === "contained"
+                ? "Contained design slice: actions remain inside deterministic prototype state."
+                : "Whole-screen scenario: free roaming remains enabled until this presentation area is extracted."}
             </p>
             <div className="lab-toolbar-actions">
               <button type="button" onClick={() => globalThis.location.reload()}>Reset scenario</button>
@@ -59,10 +79,7 @@ export function LabScenario({ scenarioId }: { scenarioId: LabScenarioId }): Reac
         </details>
       </aside>
       <main className="lab-app-surface" data-testid="lab-app-surface">
-        <PracticePocScreen
-          platformCapabilities={runtime.platformCapabilities}
-          {...runtime.screenProps}
-        />
+        {children}
       </main>
     </div>
   );
