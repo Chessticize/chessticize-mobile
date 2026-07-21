@@ -35,7 +35,8 @@ test("every typed navigation coverage entry points to a registered scenario", ()
   }
 });
 
-test("the completed baseline ships without active New Scenario Markers", () => {
-  assert.deepEqual(newScenarios, []);
+test("the feedback design slice carries an active New Scenario Marker", () => {
+  assert.deepEqual(newScenarios.map((scenario) => scenario.id), ["settings-feedback-entry"]);
+  assert.deepEqual(storyTagsForScenario("settings-feedback-entry"), ["new"]);
   assert.deepEqual(storyTagsForScenario("practice-home" as LabScenarioId), []);
 });
