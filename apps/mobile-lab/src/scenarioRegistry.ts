@@ -15,6 +15,7 @@ export type LabScenarioId =
   | "practice-exit-confirmation"
   | "practice-summary"
   | "practice-reminder-prompt"
+  | "practice-move-response-prototype"
   | "review-empty"
   | "review-due"
   | "review-overdue"
@@ -66,6 +67,21 @@ export const scenarioRegistry: Record<LabScenarioId, LabScenarioDefinition> = {
   "practice-exit-confirmation": defineScenario("practice-exit-confirmation", "Practice", "Exit confirmation", "practice--exit-confirmation", "Guarded abandon confirmation over an active sprint.", "practice", ["Confirmation", "Cancel", "Confirm abandon"], ["Active sprint", "Sprint result"]),
   "practice-summary": defineScenario("practice-summary", "Practice", "Sprint summary", "practice--sprint-summary", "Completed one-puzzle sprint summary reached through the public board callback.", "practice", ["Result", "Rating change", "History and review actions"], ["Practice home", "History", "Review"]),
   "practice-reminder-prompt": defineScenario("practice-reminder-prompt", "Practice", "Review reminder prompt", "practice--review-reminder-prompt", "First-mistake notification-permission prompt driven by a maintained fake client.", "practice", ["Permission rationale", "Enable", "Dismiss"], ["Active sprint"]),
+  "practice-move-response-prototype": {
+    ...defineScenario(
+      "practice-move-response-prototype",
+      "Practice",
+      "Move response contract",
+      "practice-move-response-contract--prototype",
+      "Three shareable design variants for accepted, ignored, and locked move input plus visible, sound, and haptic feedback representation.",
+      "practice",
+      ["Three structural variants", "Deterministic timing states", "Visible fallback", "Feedback preferences"],
+      ["Native board diagnosis (#246)", "Native audio and haptic validation (#247)"],
+      "contained"
+    ),
+    isNew: true,
+    changeNote: "Compare three move-response contracts for fast two-move puzzles and multimodal feedback."
+  },
   "review-empty": defineScenario("review-empty", "Review", "Empty queue", "review--empty-queue", "Review with no due or future items.", "review", ["Empty state", "Practice return"], ["Practice"]),
   "review-due": defineScenario("review-due", "Review", "Due queue", "review--due-queue", "Deterministic due workload with multiple contexts.", "review", ["Due metrics", "Forecast", "Queue rows", "Start review"], ["Review session", "Practice"]),
   "review-overdue": defineScenario("review-overdue", "Review", "Overdue queue", "review--overdue-queue", "Overdue workload and danger treatment.", "review", ["Overdue count", "Due rows", "Forecast"], ["Review session", "Practice"]),
@@ -136,7 +152,8 @@ function defineScenario(
   description: string,
   owner: MobileBackPrimaryTab | "system",
   includes: readonly string[],
-  exits: readonly string[]
+  exits: readonly string[],
+  containment: LabScenarioDefinition["scope"]["containment"] = "free-roam"
 ): LabScenarioDefinition {
   return {
     id,
@@ -148,7 +165,7 @@ function defineScenario(
       owner,
       includes,
       exits,
-      containment: "free-roam"
+      containment
     }
   };
 }

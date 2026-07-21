@@ -35,7 +35,8 @@ test("every typed navigation coverage entry points to a registered scenario", ()
   }
 });
 
-test("the completed baseline ships without active New Scenario Markers", () => {
-  assert.deepEqual(newScenarios, []);
+test("the move-response prototype carries a New Scenario Marker while design review is active", () => {
+  assert.deepEqual(newScenarios.map((scenario) => scenario.id), ["practice-move-response-prototype"]);
+  assert.deepEqual(storyTagsForScenario("practice-move-response-prototype" as LabScenarioId), ["new"]);
   assert.deepEqual(storyTagsForScenario("practice-home" as LabScenarioId), []);
 });

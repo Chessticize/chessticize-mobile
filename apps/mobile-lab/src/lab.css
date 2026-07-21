@@ -81,3 +81,56 @@ body {
   padding: 7px 9px;
   text-decoration: none;
 }
+
+.prototype-variant-switcher {
+  align-items: center;
+  background: rgba(8, 15, 12, 0.97);
+  border: 1px solid #5f7168;
+  border-radius: 999px;
+  bottom: 16px;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.34);
+  color: #f8fafc;
+  display: flex;
+  gap: 8px;
+  left: 50%;
+  max-width: calc(100vw - 24px);
+  padding: 5px;
+  position: fixed;
+  transform: translateX(-50%);
+  z-index: 100001;
+}
+
+.prototype-variant-switcher button {
+  align-items: center;
+  background: #e9ff5b;
+  border: 0;
+  border-radius: 999px;
+  color: #11170c;
+  cursor: pointer;
+  display: flex;
+  font-size: 18px;
+  font-weight: 900;
+  height: 40px;
+  justify-content: center;
+  width: 40px;
+}
+
+.prototype-variant-label {
+  display: flex;
+  flex-direction: column;
+  min-width: min(184px, 52vw);
+  padding: 0 5px;
+  text-align: center;
+}
+
+.prototype-variant-label small {
+  color: #a9bbb1;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 1.2px;
+}
+
+.prototype-variant-label strong {
+  font-size: 12px;
+  line-height: 17px;
+}

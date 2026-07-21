@@ -23,6 +23,7 @@ type BoardPlaceholderProps = {
   fen: string;
   flipped?: boolean;
   gestureEnabled?: boolean;
+  labExpectedMove?: string;
   onIllegalMove?: (from: string, to: string) => void;
   onMove?: (result: BoardMoveResult) => void;
 };
@@ -41,7 +42,15 @@ type BoardPlaceholderRef = {
 };
 
 const BoardPlaceholder = forwardRef<BoardPlaceholderRef, BoardPlaceholderProps>(function BoardPlaceholder(
-  { boardSize = 320, fen, flipped = false, gestureEnabled = true, onIllegalMove, onMove },
+  {
+    boardSize = 320,
+    fen,
+    flipped = false,
+    gestureEnabled = true,
+    labExpectedMove,
+    onIllegalMove,
+    onMove
+  },
   ref
 ) {
   const chessRef = useRef(createChess(fen));
@@ -113,7 +122,7 @@ const BoardPlaceholder = forwardRef<BoardPlaceholderRef, BoardPlaceholderProps>(
     })),
     []
   );
-  const expected = expectedMoveForLab();
+  const expected = labExpectedMove ?? expectedMoveForLab();
   const locked = isInputLocked(gestureEnabled);
 
   return (
