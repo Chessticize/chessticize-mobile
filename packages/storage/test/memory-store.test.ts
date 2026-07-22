@@ -18,6 +18,10 @@ test("MemoryStore supports the practice service contract used by the mobile POC"
     store.selectPuzzles({ mode: "standard", limit: 10, theme: "hangingPiece" }).map((puzzle) => puzzle.id),
     ["00008"]
   );
+  assert.deepEqual(
+    store.selectPuzzles({ mode: "standard", limit: 10, themes: ["mate", "hangingPiece"] }).map((puzzle) => puzzle.id),
+    ["000hf", "00008"]
+  );
 
   const sprint = service.startSprint(
     {
@@ -553,6 +557,43 @@ test("PracticeService persists MemoryStore custom sprint configs after successfu
       theme: "hangingPiece",
       lastStartedAt: "2026-06-21T00:00:00.000Z",
       playCount: 2
+    }
+  ]);
+});
+
+test("PracticeService selects and persists a canonical multiple-theme custom sprint", async () => {
+  const store = new MemoryStore();
+  store.seedPuzzles(await loadFixturePuzzles());
+  const service = new PracticeService(store);
+
+  const sprint = service.startSprint(
+    {
+      mode: "custom",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      targetCorrect: 2,
+      maxMistakes: 3,
+      themes: ["mate", "hangingPiece", "mate"],
+      persistCustomConfig: true
+    },
+    "2026-07-21T12:00:00.000Z"
+  );
+
+  assert.equal(sprint.config.ratingKey, "hangingPiece+mate custom 5/20");
+  assert.deepEqual(sprint.config.themes, ["hangingPiece", "mate"]);
+  assert.deepEqual(sprint.puzzles.map((puzzle) => puzzle.id), ["000hf", "00008"]);
+  assert.deepEqual(service.listCustomSprintConfigs(), [
+    {
+      id: "custom-custom-300-20-hangingPiece+mate",
+      mode: "custom",
+      ratingKey: "hangingPiece+mate custom 5/20",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      targetCorrect: 2,
+      maxMistakes: 3,
+      themes: ["hangingPiece", "mate"],
+      lastStartedAt: "2026-07-21T12:00:00.000Z",
+      playCount: 1
     }
   ]);
 });

@@ -768,6 +768,49 @@ test("PracticeService persists SQLite custom sprint configs after successful cus
   }
 });
 
+test("SQLiteStore round-trips multiple themes through the legacy theme column", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "chessticize-mobile-multi-theme-config-"));
+  const databasePath = join(directory, "config.sqlite");
+  try {
+    {
+      const store = new SQLiteStore(databasePath);
+      store.migrate();
+      store.saveCustomSprintConfig({
+        id: "custom-custom-300-20-fork+mate+pin",
+        mode: "custom",
+        ratingKey: "fork+mate+pin custom 5/20",
+        durationSeconds: 300,
+        perPuzzleSeconds: 20,
+        targetCorrect: 15,
+        maxMistakes: 3,
+        themes: ["fork", "mate", "pin"],
+        lastStartedAt: "2026-07-21T12:00:00.000Z",
+        playCount: 1
+      });
+      store.close();
+    }
+
+    const store = new SQLiteStore(databasePath);
+    assert.deepEqual(store.listCustomSprintConfigs(), [
+      {
+        id: "custom-custom-300-20-fork+mate+pin",
+        mode: "custom",
+        ratingKey: "fork+mate+pin custom 5/20",
+        durationSeconds: 300,
+        perPuzzleSeconds: 20,
+        targetCorrect: 15,
+        maxMistakes: 3,
+        themes: ["fork", "mate", "pin"],
+        lastStartedAt: "2026-07-21T12:00:00.000Z",
+        playCount: 1
+      }
+    ]);
+    store.close();
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("PracticeService persists SQLite settings across store reopen", async () => {
   const directory = await mkdtemp(join(tmpdir(), "chessticize-mobile-settings-"));
   const databasePath = join(directory, "settings.sqlite");

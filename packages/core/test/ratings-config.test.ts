@@ -8,6 +8,7 @@ import {
   createDefaultRating,
   DEFAULT_RATING_DEVIATION,
   DEFAULT_VOLATILITY,
+  normalizeThemeSelection,
   ratingKeyForConfig,
   resetRating
 } from "../src/index.ts";
@@ -21,6 +22,37 @@ test("ratingKeyForConfig and buildSprintConfig keep custom sprint buckets separa
       theme: "fork"
     }),
     "fork custom 3/15"
+  );
+
+  assert.deepEqual(
+    normalizeThemeSelection({ themes: ["pin", "fork", "pin"] }),
+    ["fork", "pin"]
+  );
+  assert.equal(
+    ratingKeyForConfig({
+      mode: "custom",
+      durationSeconds: 180,
+      perPuzzleSeconds: 15,
+      themes: ["pin", "fork", "fork"]
+    }),
+    "fork+pin custom 3/15"
+  );
+  assert.deepEqual(
+    buildSprintConfig({
+      mode: "custom",
+      durationSeconds: 180,
+      perPuzzleSeconds: 15,
+      themes: ["pin", "fork", "pin"]
+    }),
+    {
+      mode: "custom",
+      durationSeconds: 180,
+      perPuzzleSeconds: 15,
+      targetCorrect: 12,
+      maxMistakes: 3,
+      ratingKey: "fork+pin custom 3/15",
+      themes: ["fork", "pin"]
+    }
   );
 
   assert.deepEqual(

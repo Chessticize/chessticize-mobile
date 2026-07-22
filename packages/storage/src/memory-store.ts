@@ -62,8 +62,10 @@ export class MemoryStore implements PracticeStore {
     }
   }
 
-  countPuzzles(): number {
-    return this.puzzles.size;
+  countPuzzles(filter?: PuzzleSelectionFilter): number {
+    return filter === undefined
+      ? this.puzzles.size
+      : this.selectPuzzles(filter).length;
   }
 
   getPuzzle(id: string): Puzzle | undefined {
@@ -79,6 +81,7 @@ export class MemoryStore implements PracticeStore {
       ...(filter.minRating === undefined ? {} : { minRating: filter.minRating }),
       ...(filter.maxRating === undefined ? {} : { maxRating: filter.maxRating }),
       ...(filter.theme === undefined ? {} : { theme: filter.theme }),
+      ...(filter.themes === undefined ? {} : { themes: filter.themes }),
       ...(filter.includeIds === undefined ? {} : { includeIds: filter.includeIds }),
       ...(filter.excludeIds === undefined ? {} : { excludeIds: filter.excludeIds }),
       ...(filter.randomSeed === undefined ? {} : { randomSeed: filter.randomSeed })
@@ -127,13 +130,15 @@ export class MemoryStore implements PracticeStore {
   }
 
   saveCustomSprintConfig(config: CustomSprintConfigRecord): void {
-    this.customSprintConfigs.set(config.id, config);
+    this.customSprintConfigs.set(config.id, cloneCustomSprintConfig(config));
   }
 
   listCustomSprintConfigs(): CustomSprintConfigRecord[] {
-    return [...this.customSprintConfigs.values()].sort((left, right) =>
-      right.lastStartedAt.localeCompare(left.lastStartedAt) || left.id.localeCompare(right.id)
-    );
+    return [...this.customSprintConfigs.values()]
+      .map(cloneCustomSprintConfig)
+      .sort((left, right) =>
+        right.lastStartedAt.localeCompare(left.lastStartedAt) || left.id.localeCompare(right.id)
+      );
   }
 
   getSettings(): PracticeSettings {
@@ -593,6 +598,13 @@ export class MemoryStore implements PracticeStore {
       }))
       .sort((left, right) => left.completedAt.localeCompare(right.completedAt) || left.sessionId.localeCompare(right.sessionId));
   }
+}
+
+function cloneCustomSprintConfig(config: CustomSprintConfigRecord): CustomSprintConfigRecord {
+  return {
+    ...config,
+    ...(config.themes === undefined ? {} : { themes: [...config.themes] })
+  };
 }
 
 function exportedSprintSessionFromState(session: SprintState): ExportedSprintSession {

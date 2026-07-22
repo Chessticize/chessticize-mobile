@@ -48,6 +48,27 @@ test("CLI drives a multi-step sprint and exposes machine-readable history", asyn
   await cli.stop();
 });
 
+test("CLI accepts multiple themes as an OR-filtered sprint contract", async (t) => {
+  const cli = await startCli(t);
+
+  const start = await cli.command({
+    command: "startSprint",
+    mode: "custom",
+    durationSeconds: 300,
+    perPuzzleSeconds: 20,
+    targetCorrect: 2,
+    maxMistakes: 3,
+    themes: ["mate", "hangingPiece"],
+    now: "2026-07-21T00:00:00.000Z"
+  });
+
+  assert.equal(start.ok, true);
+  assert.equal(start.state.ratingKey, "hangingPiece+mate custom 5/20");
+  assert.ok(["00008", "000hf"].includes(start.state.currentPuzzle.puzzleId));
+
+  await cli.stop();
+});
+
 test("CLI supports Arrow Duel wrong-choice review arrows and review scheduling", async (t) => {
   const cli = await startCli(t);
 

@@ -34,6 +34,7 @@ import {
   isUnclearAttemptEligible,
   isReviewOverdue,
   normalizeHistoryAttemptDetail,
+  normalizeThemeSelection,
   reviewDueState,
   reviewDueLabel,
   reviewQueueForecast,
@@ -529,7 +530,7 @@ export function PracticePocScreen({
   const [customSprintMode, setCustomSprintMode] = useState<"custom" | "arrow_duel">("custom");
   const [customDurationSeconds, setCustomDurationSeconds] = useState(5 * 60);
   const [customPerPuzzleSeconds, setCustomPerPuzzleSeconds] = useState(20);
-  const [customTheme, setCustomTheme] = useState<CustomThemeFilter>(ALL_THEMES_FILTER);
+  const [customThemes, setCustomThemes] = useState<CustomThemeFilter[]>([ALL_THEMES_FILTER]);
   const [customInitialRating, setCustomInitialRating] = useState(CUSTOM_INITIAL_RATING_MIN);
   const [reviewReminderPreference, setReviewReminderPreference] = useState<ReviewReminderPreference>(() => service.getReviewReminderPreference());
   const [notificationPermissionStatus, setNotificationPermissionStatus] = useState<ReviewReminderPermissionStatus>("unavailable");
@@ -565,9 +566,23 @@ export function PracticePocScreen({
       setPracticeExitConfirmationVisible(false);
     }
   }, [isOpenSession, practiceExitConfirmationVisible]);
+  const selectedCustomThemes = useMemo(
+    () => normalizeCustomThemeSelection(customThemeSelection?.selectedThemes ?? customThemes),
+    [customThemeSelection?.selectedThemes, customThemes]
+  );
+  const selectedSprintThemes = useMemo(
+    () => themesForCustomSprint(selectedCustomThemes),
+    [selectedCustomThemes]
+  );
   const selectedConfig = useMemo(
-    () => sprintConfigFor(mode === "custom" ? customSprintMode : mode, customDurationSeconds, customPerPuzzleSeconds, mode === "custom", themeForCustomSprint(customTheme)),
-    [customDurationSeconds, customPerPuzzleSeconds, customSprintMode, customTheme, mode]
+    () => sprintConfigFor(
+      mode === "custom" ? customSprintMode : mode,
+      customDurationSeconds,
+      customPerPuzzleSeconds,
+      mode === "custom",
+      selectedSprintThemes
+    ),
+    [customDurationSeconds, customPerPuzzleSeconds, customSprintMode, mode, selectedSprintThemes]
   );
   const selectedRatingRecord = service.getRating(selectedConfig.ratingKey);
   const currentRating = selectedRatingRecord.rating;
@@ -1140,8 +1155,8 @@ export function PracticePocScreen({
   function performStartSprint(nextMode: SprintMode, useCustomTiming: boolean): void {
     setError(null);
     try {
-      const customThemeValue = useCustomTiming ? themeForCustomSprint(customTheme) : undefined;
-      const config = sprintConfigFor(nextMode, customDurationSeconds, customPerPuzzleSeconds, useCustomTiming, customThemeValue);
+      const customThemeValues = useCustomTiming ? selectedSprintThemes : [];
+      const config = sprintConfigFor(nextMode, customDurationSeconds, customPerPuzzleSeconds, useCustomTiming, customThemeValues);
       if (useCustomTiming) {
         const rating = service.getRating(config.ratingKey);
         if (rating.games === 0 && rating.rating !== customInitialRating) {
@@ -1156,7 +1171,9 @@ export function PracticePocScreen({
           mode: nextMode,
           durationSeconds: config.durationSeconds,
           perPuzzleSeconds: config.perPuzzleSeconds,
-          ...(customThemeValue ? { theme: customThemeValue, persistCustomConfig: true } : useCustomTiming ? { persistCustomConfig: true } : {}),
+          ...(customThemeValues.length > 0
+            ? { themes: customThemeValues, persistCustomConfig: true }
+            : useCustomTiming ? { persistCustomConfig: true } : {}),
           ...(nextMode === "standard" && standardTargetCorrect !== undefined
             ? { targetCorrect: standardTargetCorrect }
             : {}),
@@ -2276,15 +2293,30 @@ export function PracticePocScreen({
   );
   const dueTodayCount = dueReviewItems.length;
   const overdueCount = dueReviewItems.filter((item) => isReviewOverdue(item.review, nowMs)).length;
-  const customThemeValue = themeForCustomSprint(customTheme);
-  const customEligiblePuzzleCount = puzzleSource === "bundledCore"
-    ? bundledCoreCustomEligiblePuzzleCount(customThemeValue)
-    : service.countEligibleSprintPuzzles({
+  const customEligiblePuzzleCount = useMemo(() => {
+    if (puzzleSource === "bundledCore" && selectedSprintThemes.length <= 1) {
+      return bundledCoreCustomEligiblePuzzleCount(selectedSprintThemes[0]);
+    }
+    return service.countEligibleSprintPuzzles(
+      {
         mode: customSprintMode,
         durationSeconds: customDurationSeconds,
         perPuzzleSeconds: customPerPuzzleSeconds,
-        ...(customThemeValue ? { theme: customThemeValue } : {})
-      });
+        ...(selectedSprintThemes.length === 0 ? {} : { themes: selectedSprintThemes })
+      },
+      selectedConfig.targetCorrect + selectedConfig.maxMistakes
+    );
+  }, [
+    customDurationSeconds,
+    customPerPuzzleSeconds,
+    customSprintMode,
+    currentRating,
+    puzzleSource,
+    selectedSprintThemes,
+    selectedConfig.maxMistakes,
+    selectedConfig.targetCorrect,
+    service
+  ]);
   const sessionStatusNode = state && (isOpenSession || isShowingFeedbackSnapshot) ? (
     <SessionStatusBar
       compactMetrics={sessionUsesRail}
@@ -2589,8 +2621,7 @@ export function PracticePocScreen({
                   <CustomSprintSetup
                     durationSeconds={customDurationSeconds}
                     perPuzzleSeconds={customPerPuzzleSeconds}
-                    theme={customTheme}
-                    customThemeSelection={customThemeSelection}
+                    selectedThemes={selectedCustomThemes}
                     targetCorrect={selectedConfig.targetCorrect}
                     maxMistakes={selectedConfig.maxMistakes}
                     availablePuzzleCount={customEligiblePuzzleCount}
@@ -2617,7 +2648,14 @@ export function PracticePocScreen({
                     customMode={customSprintMode}
                     onCustomModeChange={setCustomSprintMode}
                     onPerPuzzleChange={setCustomPerPuzzleSeconds}
-                    onThemeChange={setCustomTheme}
+                    onThemesChange={(nextThemes) => {
+                      const normalizedThemes = normalizeCustomThemeSelection(nextThemes);
+                      if (customThemeSelection) {
+                        customThemeSelection.onChange(normalizedThemes);
+                        return;
+                      }
+                      setCustomThemes(normalizedThemes);
+                    }}
                     previousConfigs={service.listCustomSprintConfigs()}
                     ratingForKey={(key) => service.getRating(key).rating}
                     onStart={() => startSprint(customSprintMode, true)}
@@ -3278,7 +3316,6 @@ function formatSprintDurationLabel(seconds: number): string {
 function CustomSprintSetup({
   availablePuzzleCount,
   customMode,
-  customThemeSelection,
   durationSeconds,
   initialRating,
   initialRatingEditorOpen,
@@ -3292,17 +3329,16 @@ function CustomSprintSetup({
   progress,
   previousConfigs,
   ratingForKey,
+  selectedThemes,
   targetCorrect,
-  theme,
   ratingKey,
   onDurationChange,
   onPerPuzzleChange,
-  onThemeChange,
+  onThemesChange,
   onStart
 }: {
   availablePuzzleCount: number;
   customMode: "custom" | "arrow_duel";
-  customThemeSelection?: CustomThemeSelection;
   durationSeconds: number;
   initialRating: number;
   initialRatingEditorOpen: boolean;
@@ -3316,12 +3352,12 @@ function CustomSprintSetup({
   progress: PracticeProgressSummary;
   previousConfigs: CustomSprintConfigRecord[];
   ratingForKey: (ratingKey: string) => number;
+  selectedThemes: readonly CustomThemeFilter[];
   targetCorrect: number;
-  theme: CustomThemeFilter;
   ratingKey: string;
   onDurationChange: (next: number) => void;
   onPerPuzzleChange: (next: number) => void;
-  onThemeChange: (next: CustomThemeFilter) => void;
+  onThemesChange: (next: CustomThemeFilter[]) => void;
   onStart: () => void;
 }): React.JSX.Element {
   const requiredPuzzleCount = targetCorrect + maxMistakes;
@@ -3330,15 +3366,6 @@ function CustomSprintSetup({
   const previousRows = previousConfigs.slice(0, 5).map((config) =>
     previousCustomConfigRowModel(config, ratingForKey(config.ratingKey))
   );
-  const selectedThemes = customThemeSelection
-    ? customThemeSelection.selectedThemes.length > 0
-      ? customThemeSelection.selectedThemes
-      : [ALL_THEMES_FILTER]
-    : [theme];
-  const themeLabel = customThemeSelection
-    ? customThemeSelectionLabel(selectedThemes)
-    : customThemeLabel(theme);
-
   return (
     <View style={styles.customSetupPanel} testID="custom-sprint-setup">
       <SprintStartHeader
@@ -3361,17 +3388,10 @@ function CustomSprintSetup({
           onChange={onCustomModeChange}
         />
         <CustomThemeChoiceRow
-          multiple={customThemeSelection !== undefined}
           selectedThemes={selectedThemes}
           testID="custom-theme-row"
           onChange={(nextTheme) => {
-            if (customThemeSelection) {
-              customThemeSelection.onChange(
-                nextCustomThemeSelection(selectedThemes, nextTheme)
-              );
-              return;
-            }
-            onThemeChange(nextTheme);
+            onThemesChange(nextCustomThemeSelection(selectedThemes, nextTheme));
           }}
         />
         <CustomOptionRow
@@ -3417,15 +3437,7 @@ function CustomSprintSetup({
       <CustomEligibilityNotice
         availablePuzzleCount={availablePuzzleCount}
         hasEnoughLocalPuzzles={hasEnoughLocalPuzzles}
-        onBroadenTheme={
-          customThemeSelection || selectedThemes.includes(ALL_THEMES_FILTER)
-            ? undefined
-            : () => {
-              onThemeChange(ALL_THEMES_FILTER);
-            }
-        }
         requiredPuzzleCount={requiredPuzzleCount}
-        theme={themeLabel}
       />
 
       <PracticeProgressCard currentRating={initialRating} mode={customMode} progress={progress} />
@@ -3443,8 +3455,7 @@ function CustomSprintSetup({
               onCustomModeChange(config.customMode);
               onDurationChange(config.durationSeconds);
               onPerPuzzleChange(config.perPuzzleSeconds);
-              onThemeChange(config.theme);
-              customThemeSelection?.onChange([config.theme]);
+              onThemesChange(config.themes);
             }}
           />
         ))}
@@ -3456,15 +3467,11 @@ function CustomSprintSetup({
 function CustomEligibilityNotice({
   availablePuzzleCount,
   hasEnoughLocalPuzzles,
-  onBroadenTheme,
-  requiredPuzzleCount,
-  theme
+  requiredPuzzleCount
 }: {
   availablePuzzleCount: number;
   hasEnoughLocalPuzzles: boolean;
-  onBroadenTheme?: () => void;
   requiredPuzzleCount: number;
-  theme: string;
 }): React.JSX.Element | null {
   if (hasEnoughLocalPuzzles) {
     return null;
@@ -3476,17 +3483,6 @@ function CustomEligibilityNotice({
       <Text style={styles.helperText}>
         Current offline pack has {availablePuzzleCount} eligible puzzles; this setup may need up to {requiredPuzzleCount}. Broaden theme or rating coverage before a scored release pack.
       </Text>
-      {onBroadenTheme ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Broaden from ${theme} to All themes`}
-          testID="custom-broaden-theme"
-          style={[styles.secondaryButton, styles.customEligibilityAction]}
-          onPress={onBroadenTheme}
-        >
-          <Text style={styles.secondaryButtonText}>Use All</Text>
-        </Pressable>
-      ) : null}
     </View>
   );
 }
@@ -3672,12 +3668,10 @@ function CustomValueRow({
 }
 
 function CustomThemeChoiceRow({
-  multiple,
   onChange,
   selectedThemes,
   testID,
 }: {
-  multiple: boolean;
   onChange: (next: CustomThemeFilter) => void;
   selectedThemes: readonly CustomThemeFilter[];
   testID: string;
@@ -3692,14 +3686,12 @@ function CustomThemeChoiceRow({
           return (
             <Pressable
               key={option}
-              accessibilityHint={multiple
-                ? representsAllThemes
-                  ? "Selects all themes and clears named theme selections"
-                  : "Adds or removes this theme"
-                : undefined}
-              accessibilityRole={multiple && !representsAllThemes ? "checkbox" : "button"}
-              accessibilityLabel={multiple && representsAllThemes ? "All puzzle themes" : `${label} puzzle theme`}
-              accessibilityState={multiple && !representsAllThemes ? { checked: selected } : { selected }}
+              accessibilityHint={representsAllThemes
+                ? "Selects all themes and clears named theme selections"
+                : "Adds or removes this theme"}
+              accessibilityRole={representsAllThemes ? "button" : "checkbox"}
+              accessibilityLabel={representsAllThemes ? "All puzzle themes" : `${label} puzzle theme`}
+              accessibilityState={representsAllThemes ? { selected } : { checked: selected }}
               testID={`custom-theme-${representsAllThemes ? "mixed" : safeTestId(label)}`}
               style={[styles.customMiniChip, selected ? styles.customMiniChipActive : null]}
               onPress={() => onChange(option)}
@@ -3782,7 +3774,7 @@ type PreviousCustomConfig = {
   id: string;
   mode: string;
   perPuzzleSeconds: number;
-  theme: CustomThemeFilter;
+  themes: CustomThemeFilter[];
   themeLabel: string;
   timing: string;
   lastPlayed: string;
@@ -9495,7 +9487,7 @@ function sprintConfigFor(
   customDurationSeconds: number,
   customPerPuzzleSeconds: number,
   useCustomTiming = mode === "custom",
-  theme?: string
+  themes: readonly string[] = []
 ): SprintConfig {
   if (!useCustomTiming) {
     return defaultSprintConfig(mode);
@@ -9504,20 +9496,30 @@ function sprintConfigFor(
     mode: SprintMode;
     durationSeconds: number;
     perPuzzleSeconds: number;
-    theme?: string;
+    themes?: readonly string[];
   } = {
     mode,
     durationSeconds: customDurationSeconds,
     perPuzzleSeconds: customPerPuzzleSeconds
   };
-  if (theme) {
-    input.theme = theme;
+  if (themes.length > 0) {
+    input.themes = themes;
   }
   return buildSprintConfig(input);
 }
 
-function themeForCustomSprint(theme: CustomThemeFilter): string | undefined {
-  return theme === ALL_THEMES_FILTER ? undefined : theme;
+function normalizeCustomThemeSelection(
+  themes: readonly CustomThemeFilter[]
+): CustomThemeFilter[] {
+  const selected = new Set(themes);
+  const namedThemes = CUSTOM_THEME_OPTIONS.filter(
+    (theme) => theme !== ALL_THEMES_FILTER && selected.has(theme)
+  );
+  return namedThemes.length > 0 ? namedThemes : [ALL_THEMES_FILTER];
+}
+
+function themesForCustomSprint(themes: readonly CustomThemeFilter[]): string[] {
+  return themes.includes(ALL_THEMES_FILTER) ? [] : normalizeThemeSelection({ themes });
 }
 
 function customThemeLabel(theme: CustomThemeFilter): string {
@@ -9557,13 +9559,13 @@ function previousCustomConfigRowModel(
   config: CustomSprintConfigRecord,
   rating: number
 ): PreviousCustomConfig {
-  const theme = customThemeFromStoredValue(config.theme);
+  const themes = customThemesFromStoredValue(config);
   return {
     id: safeTestId(config.id),
     mode: config.mode === "arrow_duel" ? "Arrow Duel" : "Regular Puzzles",
     customMode: config.mode === "arrow_duel" ? "arrow_duel" : "custom",
-    theme,
-    themeLabel: customThemeLabel(theme),
+    themes,
+    themeLabel: customThemeSelectionLabel(themes),
     durationSeconds: config.durationSeconds,
     perPuzzleSeconds: config.perPuzzleSeconds,
     timing: formatSprintTimingLabel(config),
@@ -9600,11 +9602,10 @@ function sortHistoryRatingKeys(
   });
 }
 
-function customThemeFromStoredValue(theme: string | undefined): CustomThemeFilter {
-  if (theme && CUSTOM_THEME_OPTIONS.includes(theme)) {
-    return theme;
-  }
-  return ALL_THEMES_FILTER;
+function customThemesFromStoredValue(
+  config: Pick<CustomSprintConfigRecord, "theme" | "themes">
+): CustomThemeFilter[] {
+  return normalizeCustomThemeSelection(normalizeThemeSelection(config));
 }
 
 function formatConfigLastPlayed(lastStartedAt: string): string {
@@ -11213,12 +11214,6 @@ const styles = StyleSheet.create({
   customEligibilityWarning: {
     backgroundColor: "#FFFBEB",
     borderColor: "#FBBF24"
-  },
-  customEligibilityAction: {
-    alignSelf: "flex-start",
-    flex: 0,
-    height: 34,
-    marginTop: 4
   },
   previousConfigList: {
     gap: 8

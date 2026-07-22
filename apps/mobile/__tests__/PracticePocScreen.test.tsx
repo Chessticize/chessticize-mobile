@@ -2561,11 +2561,16 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "custom-mistake-limit-stepper")).toThrow();
     press(renderer, "custom-theme-mate");
     expectText(renderer, "Mate");
-    expect(findByTestId(renderer, "custom-broaden-theme")).toBeTruthy();
-    expect(findByTestId(renderer, "custom-broaden-theme").props.accessibilityLabel).toBe("Broaden from Mate to All themes");
-    press(renderer, "custom-broaden-theme");
-    expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("All");
     expect(() => findByTestId(renderer, "custom-broaden-theme")).toThrow();
+    press(renderer, "custom-theme-fork");
+    expect(themeSelected(renderer, "mate")).toBe(true);
+    expect(themeSelected(renderer, "fork")).toBe(true);
+    press(renderer, "custom-theme-mate");
+    expect(themeSelected(renderer, "mate")).toBe(false);
+    expect(themeSelected(renderer, "fork")).toBe(true);
+    press(renderer, "custom-theme-mixed");
+    expect(themeSelected(renderer, "mixed")).toBe(true);
+    expect(themeSelected(renderer, "fork")).toBe(false);
     press(renderer, "custom-theme-mate");
     press(renderer, "custom-mode-arrow-duel");
     expect(findByTestId(renderer, "custom-mode-regular").props.accessibilityState).toEqual({ selected: false });
@@ -2630,6 +2635,32 @@ describe("PracticePocScreen", () => {
     expect(JSON.stringify(renderer.toJSON())).not.toContain("Use All");
     expect(JSON.stringify(renderer.toJSON())).not.toContain("✓");
     expect(JSON.stringify(renderer.toJSON())).not.toContain("Targeting");
+  });
+
+  it("starts and persists the production Custom Sprint with every selected theme", () => {
+    const service = createMobilePracticeService("random1000");
+    const renderer = renderScreen({
+      customTargetCorrect: 1,
+      practiceService: service,
+      puzzleSelectionSeed: "multi-theme-production"
+    });
+
+    press(renderer, "practice-mode-custom");
+    expect(themeSelected(renderer, "mixed")).toBe(true);
+    press(renderer, "custom-theme-mate");
+    press(renderer, "custom-theme-fork");
+    expect(themeSelected(renderer, "mixed")).toBe(false);
+    expect(themeSelected(renderer, "mate")).toBe(true);
+    expect(themeSelected(renderer, "fork")).toBe(true);
+
+    press(renderer, "start-sprint-button");
+
+    expect(service.getActiveSprint()?.config.themes).toEqual(["fork", "mate"]);
+    expect(service.getActiveSprint()?.config.ratingKey).toBe("fork+mate custom 5/20");
+    expect(service.listCustomSprintConfigs()[0]).toMatchObject({
+      themes: ["fork", "mate"],
+      ratingKey: "fork+mate custom 5/20"
+    });
   });
 
   it("renders All as the selected non-empty fallback for an empty multi-theme value", () => {
@@ -2713,16 +2744,37 @@ describe("PracticePocScreen", () => {
       rating: 1025,
       games: 1
     });
+    store.saveCustomSprintConfig({
+      id: "custom-custom-300-20-fork+mate",
+      mode: "custom",
+      ratingKey: "fork+mate custom 5/20",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      targetCorrect: 15,
+      maxMistakes: 3,
+      themes: ["fork", "mate"],
+      lastStartedAt: "2026-07-05T00:00:00.000Z",
+      playCount: 1
+    });
+    store.saveRating({
+      key: "fork+mate custom 5/20",
+      generation: 0,
+      rating: 1100,
+      games: 1
+    });
     const renderer = renderScreen({ practiceService: new PracticeService(store) });
 
     press(renderer, "practice-mode-custom");
 
     const mateConfig = findByTestId(renderer, "custom-previous-custom-custom-180-30-mate");
     const forkConfig = findByTestId(renderer, "custom-previous-custom-custom-300-20-fork");
+    const multiConfig = findByTestId(renderer, "custom-previous-custom-custom-300-20-fork-mate");
     expect(collectText(mateConfig)).toContain("875");
     expect(mateConfig.props.accessibilityLabel).toContain("ELO 875");
     expect(collectText(forkConfig)).toContain("1025");
     expect(forkConfig.props.accessibilityLabel).toContain("ELO 1025");
+    expect(collectText(multiConfig)).toContain("Mate, Fork");
+    expect(multiConfig.props.accessibilityLabel).toContain("ELO 1100");
 
     press(renderer, "custom-previous-custom-custom-180-30-mate");
     expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("Mate");
@@ -2733,6 +2785,12 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("Fork");
     expect(collectText(findByTestId(renderer, "custom-target-count"))).toBe("~15");
     expect(collectText(findByTestId(renderer, "custom-initial-rating-value"))).toBe("ELO 1025");
+
+    press(renderer, "custom-previous-custom-custom-300-20-fork-mate");
+    expect(themeSelected(renderer, "mixed")).toBe(false);
+    expect(themeSelected(renderer, "fork")).toBe(true);
+    expect(themeSelected(renderer, "mate")).toBe(true);
+    expect(collectText(findByTestId(renderer, "custom-initial-rating-value"))).toBe("ELO 1100");
   });
 
   it("keeps played custom ELO editable as a difficulty control", () => {

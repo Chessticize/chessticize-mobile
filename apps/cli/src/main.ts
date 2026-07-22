@@ -80,6 +80,7 @@ async function handleCommand(service: PracticeService, input: JsonCommand): Prom
       targetCorrect?: number;
       maxMistakes?: number;
       theme?: string;
+      themes?: string[];
       minRating?: number;
       maxRating?: number;
     } = {
@@ -90,6 +91,7 @@ async function handleCommand(service: PracticeService, input: JsonCommand): Prom
     setOptional(startCommand, "targetCorrect", optionalNumber(input.targetCorrect));
     setOptional(startCommand, "maxMistakes", optionalNumber(input.maxMistakes));
     setOptional(startCommand, "theme", optionalString(input.theme));
+    setOptional(startCommand, "themes", optionalStringArray(input.themes));
     setOptional(startCommand, "minRating", optionalNumber(input.minRating));
     setOptional(startCommand, "maxRating", optionalNumber(input.maxRating));
     const state = service.startSprint(startCommand, optionalString(input.now) ?? new Date().toISOString());
@@ -210,6 +212,16 @@ function optionalNumber(value: unknown): number | undefined {
   }
   if (typeof value !== "number" || !Number.isFinite(value)) {
     throw new Error(`Expected number, received ${String(value)}`);
+  }
+  return value;
+}
+
+function optionalStringArray(value: unknown): string[] | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (!Array.isArray(value) || value.some((entry) => typeof entry !== "string" || entry.length === 0)) {
+    throw new Error("Expected an array of non-empty strings");
   }
   return value;
 }

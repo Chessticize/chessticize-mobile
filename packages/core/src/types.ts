@@ -38,6 +38,7 @@ export interface SprintConfig {
   maxMistakes: number;
   ratingKey: string;
   theme?: string;
+  themes?: string[];
 }
 
 export interface CustomSprintConfigRecord {
@@ -49,6 +50,7 @@ export interface CustomSprintConfigRecord {
   targetCorrect: number;
   maxMistakes: number;
   theme?: string;
+  themes?: string[];
   lastStartedAt: string;
   playCount: number;
 }
