@@ -14,23 +14,68 @@ export const Home: Story = {
   args: { scenarioId: "practice-home" }
 };
 
+export const EditAndReorderRuns: Story = {
+  name: "Edit and reorder runs",
+  args: { scenarioId: "practice-home-edit" },
+  play: async ({ canvasElement }) => {
+    await clickTestId(canvasElement, "practice-run-home-edit");
+    await clickTestId(canvasElement, "practice-run-move-up-endgame-sprint");
+    await waitForTestId(canvasElement, "practice-run-notice");
+  }
+};
+
 export const CustomSetup: Story = {
-  name: "Custom sprint setup",
+  name: "New Run",
   args: { scenarioId: "practice-custom-setup" },
   play: async ({ canvasElement }) => {
-    await clickTestId(canvasElement, "practice-mode-custom");
-    await waitForTestId(canvasElement, "custom-sprint-setup");
+    await clickTestId(canvasElement, "practice-add-run");
+    await waitForTestId(canvasElement, "practice-run-editor");
+  }
+};
+
+export const RunNameValidation: Story = {
+  name: "Run name validation",
+  args: { scenarioId: "practice-run-name-validation" },
+  play: async ({ canvasElement }) => {
+    await clickTestId(canvasElement, "practice-add-run");
+    await clickTestId(canvasElement, "practice-run-save");
+    await waitForTestId(canvasElement, "practice-run-name-error");
+  }
+};
+
+export const BuiltInRunEditor: Story = {
+  name: "Built-in run editor",
+  args: { scenarioId: "practice-run-standard-editor" },
+  play: async ({ canvasElement }) => {
+    await clickTestId(canvasElement, "practice-run-home-edit");
+    await clickTestId(canvasElement, "practice-run-edit-standard");
+    await waitForTestId(canvasElement, "practice-run-fixed-name");
   }
 };
 
 export const CustomRatingEditor: Story = {
-  name: "Custom rating editor",
+  name: "Custom run editor",
   args: { scenarioId: "practice-custom-rating-editor" },
   play: async ({ canvasElement }) => {
-    await clickTestId(canvasElement, "practice-mode-custom");
-    await clickTestId(canvasElement, "custom-initial-rating-row");
-    await waitForTestId(canvasElement, "custom-initial-rating-editor");
+    await clickTestId(canvasElement, "practice-run-home-edit");
+    await clickTestId(canvasElement, "practice-run-edit-tactics-focus");
+    await waitForTestId(canvasElement, "practice-run-elo-row");
   }
+};
+
+export const RemoveRunConfirmation: Story = {
+  name: "Remove run confirmation",
+  args: { scenarioId: "practice-run-remove-confirmation" },
+  play: async ({ canvasElement }) => {
+    await clickTestId(canvasElement, "practice-run-home-edit");
+    await clickTestId(canvasElement, "practice-run-remove-standard");
+    await waitForTestId(canvasElement, "practice-run-remove-confirmation");
+  }
+};
+
+export const EmptyHomeAndRestore: Story = {
+  name: "Empty Home and restore",
+  args: { scenarioId: "practice-runs-empty" }
 };
 
 export const Preparing: Story = {

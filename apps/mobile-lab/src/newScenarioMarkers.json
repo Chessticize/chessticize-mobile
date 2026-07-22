@@ -1,1 +1,38 @@
-{}
+{
+  "practice-home": {
+    "issueNumber": 253,
+    "changeNote": "Named reusable runs appear on Home with Add Run and edit entry points."
+  },
+  "practice-home-edit": {
+    "issueNumber": 253,
+    "changeNote": "Edit mode exposes ordering, editing, and removal controls for every run."
+  },
+  "practice-custom-setup": {
+    "issueNumber": 253,
+    "changeNote": "Custom Sprint setup becomes New Run and saves to Home without starting."
+  },
+  "practice-run-name-validation": {
+    "issueNumber": 253,
+    "changeNote": "Custom run names are required and unique with inline errors."
+  },
+  "practice-run-standard-editor": {
+    "issueNumber": 253,
+    "changeNote": "Built-in run editing moves current ELO controls out of Settings."
+  },
+  "practice-custom-rating-editor": {
+    "issueNumber": 253,
+    "changeNote": "Named Custom Runs can update configuration, name, and current ELO."
+  },
+  "practice-run-remove-confirmation": {
+    "issueNumber": 253,
+    "changeNote": "Removing from Home retains ELO and history and supports later restoration."
+  },
+  "practice-runs-empty": {
+    "issueNumber": 253,
+    "changeNote": "An empty Home exposes both Add Run and retained-run restore paths."
+  },
+  "settings-advanced-ratings": {
+    "issueNumber": 253,
+    "changeNote": "Settings no longer owns ELO controls; each run editor owns its current ELO."
+  }
+}

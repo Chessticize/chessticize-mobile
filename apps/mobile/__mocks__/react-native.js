@@ -95,6 +95,7 @@ module.exports = {
   ScrollView: component('ScrollView'),
   StatusBar: component('StatusBar'),
   Text: component('Text'),
+  TextInput: component('TextInput'),
   TouchableOpacity: component('TouchableOpacity'),
   Image: component('Image'),
   Modal: component('Modal'),

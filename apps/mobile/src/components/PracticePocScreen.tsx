@@ -9,6 +9,7 @@ import {
   StatusBar,
   StyleSheet,
   Text,
+  TextInput,
   useWindowDimensions,
   View
 } from "react-native";
@@ -137,6 +138,8 @@ interface Props {
   currentTimeMs?: () => number;
   puzzleSelectionId?: string;
   puzzleSelectionSeed?: string;
+  runManagementPresentation?: PracticeRunManagementPresentation;
+  runEloEditingMovedToHome?: boolean;
   sprintStartDelayMs?: number;
   standardTargetCorrect?: number;
   systemBack?: MobileSystemBackSource;
@@ -145,6 +148,56 @@ interface Props {
 export type CustomThemeSelection = {
   selectedThemes: readonly CustomThemeFilter[];
   onChange: (selectedThemes: CustomThemeFilter[]) => void;
+};
+
+export type PracticeRunKind = "standard" | "arrow_duel" | "custom";
+
+export type PracticeRunPresentation = {
+  id: string;
+  name: string;
+  kind: PracticeRunKind;
+  mode: "standard" | "custom" | "arrow_duel";
+  elo: number;
+  durationSeconds: number;
+  perPuzzleSeconds: number;
+  themes: readonly string[];
+};
+
+export type PracticeRunDraft = Omit<PracticeRunPresentation, "id"> & {
+  id?: string;
+};
+
+export type PracticeRunManagementIntent =
+  | { type: "add-run" }
+  | { type: "cancel-edit" }
+  | { type: "change-duration"; durationSeconds: number }
+  | { type: "change-elo"; elo: number }
+  | { type: "change-mode"; mode: "custom" | "arrow_duel" }
+  | { type: "change-name"; name: string }
+  | { type: "change-per-puzzle"; perPuzzleSeconds: number }
+  | { type: "change-themes"; themes: string[] }
+  | { type: "confirm-remove" }
+  | { type: "dismiss-remove" }
+  | { type: "edit-run"; runId: string }
+  | { type: "move-run"; direction: "up" | "down"; runId: string }
+  | { type: "remove-run"; runId: string }
+  | { type: "restore-run"; runId: string }
+  | { type: "save-run" }
+  | { type: "select-run"; runId: string }
+  | { type: "start-selected-run" }
+  | { type: "toggle-home-edit" };
+
+export type PracticeRunManagementPresentation = {
+  draft: PracticeRunDraft | null;
+  hiddenRuns: readonly PracticeRunPresentation[];
+  homeEditing: boolean;
+  nameError: string | null;
+  notice: string | null;
+  removeCandidateId: string | null;
+  runs: readonly PracticeRunPresentation[];
+  screen: "home" | "create" | "edit";
+  selectedRunId: string | null;
+  onIntent: (intent: PracticeRunManagementIntent) => void;
 };
 
 type Tab = MobileBackTab;
@@ -436,6 +489,8 @@ export function PracticePocScreen({
   currentTimeMs = Date.now,
   puzzleSelectionId,
   puzzleSelectionSeed,
+  runManagementPresentation,
+  runEloEditingMovedToHome = false,
   sprintStartDelayMs = ARROW_DUEL_LOADING_TRANSITION_MS,
   standardTargetCorrect,
   systemBack
@@ -2600,15 +2655,21 @@ export function PracticePocScreen({
                   </View>
                 ) : null}
 
-                {!isOpenSession && state === null && mode !== "custom" ? (
+                {!isOpenSession && state === null && (
+                  runManagementPresentation?.screen === "home"
+                  || (!runManagementPresentation && mode !== "custom")
+                ) ? (
                   <PracticeHome
                     adaptiveLayout={adaptiveLayout}
                     mode={mode}
                     modes={practiceModeSummaries}
-                    currentRating={currentRating}
+                    currentRating={runManagementPresentation
+                      ? runManagementPresentation.runs.find((run) => run.id === runManagementPresentation.selectedRunId)?.elo ?? 600
+                      : currentRating}
                     dueReviewCount={dueTodayCount}
                     overdueReviewCount={overdueCount}
                     progress={practiceProgress}
+                    runManagement={runManagementPresentation}
                     resumableSprint={resumableSprint}
                     onSelectMode={setMode}
                     onStartMode={(nextMode) => startSprint(nextMode)}
@@ -2617,7 +2678,11 @@ export function PracticePocScreen({
                   />
                 ) : null}
 
-                {!isOpenSession && state === null && mode === "custom" ? (
+                {!isOpenSession && state === null && runManagementPresentation && runManagementPresentation.screen !== "home" ? (
+                  <PracticeRunEditor presentation={runManagementPresentation} />
+                ) : null}
+
+                {!isOpenSession && state === null && !runManagementPresentation && mode === "custom" ? (
                   <CustomSprintSetup
                     durationSeconds={customDurationSeconds}
                     perPuzzleSeconds={customPerPuzzleSeconds}
@@ -2861,6 +2926,7 @@ export function PracticePocScreen({
                 reminderPlatform={reminderPlatform}
                 reviewReminderScheduleStatus={reviewReminderScheduleStatus}
                 reviewReminderPreference={reviewReminderPreference}
+                showRatingControls={!runEloEditingMovedToHome}
                 iCloudSyncEnabled={iCloudSyncEnabled}
                 iCloudSyncStatus={iCloudSyncStatus}
                 advancedRatingsOpen={settingsAdvancedRatingsOpen}
@@ -2933,6 +2999,7 @@ type PracticeModeSummary = {
 };
 
 function SprintStartHeader({
+  actionLabel = "Start",
   closeAccessibilityLabel,
   closeTestID,
   headerTestID,
@@ -2944,6 +3011,7 @@ function SprintStartHeader({
   onClose,
   onStart
 }: {
+  actionLabel?: string;
   closeAccessibilityLabel?: string;
   closeTestID?: string;
   headerTestID: string;
@@ -2982,7 +3050,7 @@ function SprintStartHeader({
         style={[styles.sprintHeaderStartButton, startDisabled ? styles.disabledButton : null]}
         onPress={onStart}
       >
-        <Text style={styles.primaryButtonText}>Start</Text>
+        <Text style={styles.primaryButtonText}>{actionLabel}</Text>
       </Pressable>
     </View>
   );
@@ -2996,6 +3064,7 @@ function PracticeHome({
   dueReviewCount,
   overdueReviewCount,
   progress,
+  runManagement,
   resumableSprint,
   onSelectMode,
   onStartMode,
@@ -3009,12 +3078,15 @@ function PracticeHome({
   dueReviewCount: number;
   overdueReviewCount: number;
   progress: PracticeProgressSummary;
+  runManagement?: PracticeRunManagementPresentation;
   resumableSprint: SprintState | null;
   onSelectMode: (next: SprintMode) => void;
   onStartMode: (next: SprintMode) => void;
   onResumeSprint: (sprint: SprintState) => void;
   onOpenReview: () => void;
 }): React.JSX.Element {
+  const selectedRun = runManagement?.runs.find((run) => run.id === runManagement.selectedRunId) ?? null;
+  const progressMode = selectedRun?.mode ?? mode;
   const reviewStatusLabel = overdueReviewCount > 0
     ? "Overdue"
     : dueReviewCount > 0
@@ -3034,29 +3106,50 @@ function PracticeHome({
         style={adaptiveLayout.usesWideContent ? styles.practiceHomeColumns : styles.practiceHomeStack}
         testID="practice-home-layout"
       >
-        <View style={styles.practiceHomePrimaryColumn}>
-          <SprintStartHeader
-            headerTestID="practice-action-header"
-            startAccessibilityLabel={`Start ${modeLabel(mode)} sprint`}
-            startTestID="practice-start-button"
-            title="Start a Sprint"
-            titleTestID="practice-header-title"
-            onStart={() => onStartMode(mode)}
-          />
-          <View style={styles.modeList}>
-            {modes.map((item) => (
-              <PracticeModeCard
-                key={item.mode}
-                active={mode === item.mode}
-                item={item}
-                onPress={() => onSelectMode(item.mode)}
+        <View style={[
+          styles.practiceHomePrimaryColumn,
+          !adaptiveLayout.usesWideContent ? styles.practiceHomeColumnStacked : null
+        ]}>
+          {runManagement ? (
+            <PracticeRunHome presentation={runManagement} />
+          ) : (
+            <>
+              <SprintStartHeader
+                headerTestID="practice-action-header"
+                startAccessibilityLabel={`Start ${modeLabel(mode)} sprint`}
+                startTestID="practice-start-button"
+                title="Start a Sprint"
+                titleTestID="practice-header-title"
+                onStart={() => onStartMode(mode)}
               />
-            ))}
-          </View>
+              <View style={styles.modeList}>
+                {modes.map((item) => (
+                  <PracticeModeCard
+                    key={item.mode}
+                    active={mode === item.mode}
+                    item={item}
+                    onPress={() => onSelectMode(item.mode)}
+                  />
+                ))}
+              </View>
+            </>
+          )}
         </View>
 
-        <View style={styles.practiceHomeSecondaryColumn}>
-          <PracticeProgressCard currentRating={currentRating} mode={mode} progress={progress} />
+        <View style={[
+          styles.practiceHomeSecondaryColumn,
+          !adaptiveLayout.usesWideContent ? styles.practiceHomeColumnStacked : null
+        ]}>
+          {runManagement && !selectedRun ? (
+            <PracticeNoRunProgressCard />
+          ) : (
+            <PracticeProgressCard
+              currentRating={currentRating}
+              mode={progressMode}
+              progress={progress}
+              ratingContextLabel={selectedRun?.name}
+            />
+          )}
 
           <Text style={styles.sectionLabel}>Review</Text>
           <Pressable
@@ -3105,14 +3198,491 @@ function PracticeHome({
   );
 }
 
+function PracticeRunHome({
+  presentation
+}: {
+  presentation: PracticeRunManagementPresentation;
+}): React.JSX.Element {
+  const selectedRun = presentation.runs.find((run) => run.id === presentation.selectedRunId) ?? null;
+  const showRestore = presentation.hiddenRuns.length > 0
+    && (presentation.homeEditing || presentation.runs.length === 0);
+
+  return (
+    <View style={styles.runManagementPanel} testID="practice-run-management">
+      <SprintStartHeader
+        actionLabel={presentation.homeEditing ? "Done" : "Start"}
+        headerTestID="practice-action-header"
+        startAccessibilityLabel={presentation.homeEditing
+          ? "Finish editing runs"
+          : selectedRun
+            ? `Start ${selectedRun.name}`
+            : "Start a run"}
+        startDisabled={!presentation.homeEditing && !selectedRun}
+        startTestID={presentation.homeEditing ? "practice-run-home-done" : "practice-run-start"}
+        title={presentation.homeEditing ? "Edit Runs" : "Start a Run"}
+        titleTestID="practice-header-title"
+        onStart={() => presentation.onIntent({
+          type: presentation.homeEditing ? "toggle-home-edit" : "start-selected-run"
+        })}
+      />
+
+      <View style={styles.runManagementToolbar}>
+        <Text style={styles.helperText}>
+          {presentation.homeEditing
+            ? "Use the arrow controls to change their order."
+            : "Choose a saved run, then start when you are ready."}
+        </Text>
+        <View style={styles.runManagementToolbarActions}>
+          {!presentation.homeEditing ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Edit runs"
+              style={styles.secondaryCompactButton}
+              testID="practice-run-home-edit"
+              onPress={() => presentation.onIntent({ type: "toggle-home-edit" })}
+            >
+              <Text style={styles.secondaryCompactButtonText}>Edit</Text>
+            </Pressable>
+          ) : null}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Add a run"
+            style={styles.primaryCompactButton}
+            testID="practice-add-run"
+            onPress={() => presentation.onIntent({ type: "add-run" })}
+          >
+            <Text style={styles.primarySmallButtonText}>+ Add Run</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      {presentation.notice ? (
+        <View
+          accessibilityLiveRegion="polite"
+          style={styles.runNotice}
+          testID="practice-run-notice"
+        >
+          <Text style={styles.runNoticeText}>{presentation.notice}</Text>
+        </View>
+      ) : null}
+
+      {presentation.runs.length === 0 ? (
+        <View style={styles.runEmptyState} testID="practice-runs-empty">
+          <Text style={styles.sectionLabel}>No runs on Home</Text>
+          <Text style={styles.helperText}>
+            Add a new run or restore one below. Saved ELO and history are still available.
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Add a new run"
+            style={[styles.primaryButton, styles.runEmptyAction]}
+            testID="practice-empty-add-run"
+            onPress={() => presentation.onIntent({ type: "add-run" })}
+          >
+            <Text style={styles.primaryButtonText}>Add a Run</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <View style={styles.modeList} testID="practice-run-list">
+          {presentation.runs.map((run, index) => (
+            <PracticeRunCard
+              key={run.id}
+              active={run.id === presentation.selectedRunId}
+              editing={presentation.homeEditing}
+              index={index}
+              isLast={index === presentation.runs.length - 1}
+              run={run}
+              onIntent={presentation.onIntent}
+            />
+          ))}
+        </View>
+      )}
+
+      {presentation.removeCandidateId ? (
+        <RunRemovalConfirmation
+          run={presentation.runs.find((run) => run.id === presentation.removeCandidateId) ?? null}
+          onIntent={presentation.onIntent}
+        />
+      ) : null}
+
+      {showRestore ? (
+        <View style={styles.runRestoreSection} testID="practice-run-restore-section">
+          <Text style={styles.sectionLabel}>Restore to Home</Text>
+          <Text style={styles.helperText}>Restoring a run keeps its existing ELO and history.</Text>
+          <View style={styles.runRestoreList}>
+            {presentation.hiddenRuns.map((run) => (
+              <View key={run.id} style={styles.runRestoreRow}>
+                <View style={styles.runRestoreCopy}>
+                  <Text style={styles.listText}>{run.name}</Text>
+                  <Text style={styles.helperText}>ELO {run.elo}</Text>
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Restore ${run.name} to Home`}
+                  style={styles.secondaryCompactButton}
+                  testID={`practice-run-restore-${safeTestId(run.id)}`}
+                  onPress={() => presentation.onIntent({ type: "restore-run", runId: run.id })}
+                >
+                  <Text style={styles.secondaryCompactButtonText}>Restore</Text>
+                </Pressable>
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function PracticeRunCard({
+  active,
+  editing,
+  index,
+  isLast,
+  onIntent,
+  run
+}: {
+  active: boolean;
+  editing: boolean;
+  index: number;
+  isLast: boolean;
+  onIntent: PracticeRunManagementPresentation["onIntent"];
+  run: PracticeRunPresentation;
+}): React.JSX.Element {
+  const details = run.kind === "custom"
+    ? `${run.themes.map(customThemeLabel).join(" + ")} · ${formatSprintTimingLabel({
+        ...defaultSprintConfig(run.mode),
+        durationSeconds: run.durationSeconds,
+        perPuzzleSeconds: run.perPuzzleSeconds
+      })}`
+    : run.kind === "arrow_duel"
+      ? "Choose between two candidate moves"
+      : "Find the best move";
+
+  return (
+    <View
+      style={[
+        styles.practiceModeCard,
+        active && !editing ? styles.practiceModeCardActive : null,
+        editing ? styles.runCardEditing : null
+      ]}
+      testID={`practice-run-${safeTestId(run.id)}`}
+    >
+      {editing ? (
+        <View
+          accessibilityLabel={`${run.name} reorder handle`}
+          style={styles.runDragHandle}
+          testID={`practice-run-drag-${safeTestId(run.id)}`}
+        >
+          <Text style={styles.runDragHandleText}>☰</Text>
+        </View>
+      ) : null}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ selected: active && !editing }}
+        accessibilityLabel={editing ? `Edit ${run.name}` : `Select ${run.name}, ELO ${run.elo}, ${details}`}
+        style={styles.practiceModeSelectArea}
+        onPress={() => presentationRunPress(editing, run.id, onIntent)}
+      >
+        <View style={[styles.practiceModeIcon, active && !editing ? styles.practiceModeIconActive : null]}>
+          <PracticeModeGlyph mode={run.mode} />
+        </View>
+        <View style={styles.practiceModeCopy}>
+          <Text style={styles.practiceModeTitle}>{run.name}</Text>
+          <Text ellipsizeMode="tail" numberOfLines={1} style={styles.practiceModeDescription}>{details}</Text>
+        </View>
+      </Pressable>
+      <View style={[styles.practiceModeMeta, editing ? styles.runEditingMeta : null]}>
+        <Text style={styles.practiceModeRating}>ELO {run.elo}</Text>
+        {editing ? (
+          <View style={styles.runEditActions}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Edit ${run.name}`}
+              style={styles.runEditButton}
+              testID={`practice-run-edit-${safeTestId(run.id)}`}
+              onPress={() => onIntent({ type: "edit-run", runId: run.id })}
+            >
+              <Text style={styles.runEditButtonText}>Edit</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Move ${run.name} up`}
+              accessibilityState={{ disabled: index === 0 }}
+              disabled={index === 0}
+              style={[styles.runIconButton, index === 0 ? styles.disabledButton : null]}
+              testID={`practice-run-move-up-${safeTestId(run.id)}`}
+              onPress={() => onIntent({ type: "move-run", direction: "up", runId: run.id })}
+            >
+              <Text style={styles.runIconButtonText}>↑</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Move ${run.name} down`}
+              accessibilityState={{ disabled: isLast }}
+              disabled={isLast}
+              style={[styles.runIconButton, isLast ? styles.disabledButton : null]}
+              testID={`practice-run-move-down-${safeTestId(run.id)}`}
+              onPress={() => onIntent({ type: "move-run", direction: "down", runId: run.id })}
+            >
+              <Text style={styles.runIconButtonText}>↓</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Remove ${run.name} from Home`}
+              style={[styles.runIconButton, styles.runRemoveButton]}
+              testID={`practice-run-remove-${safeTestId(run.id)}`}
+              onPress={() => onIntent({ type: "remove-run", runId: run.id })}
+            >
+              <Text style={styles.runRemoveButtonText}>−</Text>
+            </Pressable>
+          </View>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+function presentationRunPress(
+  editing: boolean,
+  runId: string,
+  onIntent: PracticeRunManagementPresentation["onIntent"]
+): void {
+  onIntent(editing ? { type: "edit-run", runId } : { type: "select-run", runId });
+}
+
+function RunRemovalConfirmation({
+  onIntent,
+  run
+}: {
+  onIntent: PracticeRunManagementPresentation["onIntent"];
+  run: PracticeRunPresentation | null;
+}): React.JSX.Element | null {
+  if (!run) {
+    return null;
+  }
+  return (
+    <View style={styles.runRemovalConfirmation} testID="practice-run-remove-confirmation">
+      <View style={styles.runRemovalCopy}>
+        <Text style={styles.listText}>Remove {run.name} from Home?</Text>
+        <Text style={styles.helperText}>
+          Its ELO and history will be kept. You can restore this run later.
+        </Text>
+      </View>
+      <View style={styles.runRemovalActions}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Cancel run removal"
+          style={styles.secondaryButton}
+          testID="practice-run-remove-cancel"
+          onPress={() => onIntent({ type: "dismiss-remove" })}
+        >
+          <Text style={styles.secondaryButtonText}>Cancel</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Confirm removing ${run.name} from Home`}
+          style={styles.destructiveButton}
+          testID="practice-run-remove-confirm"
+          onPress={() => onIntent({ type: "confirm-remove" })}
+        >
+          <Text style={styles.destructiveButtonText}>Remove</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+function PracticeRunEditor({
+  presentation
+}: {
+  presentation: PracticeRunManagementPresentation;
+}): React.JSX.Element | null {
+  const draft = presentation.draft;
+  if (!draft) {
+    return null;
+  }
+  const isCustom = draft.kind === "custom";
+  const isCreate = presentation.screen === "create";
+  const customMode = draft.mode === "arrow_duel" ? "arrow_duel" : "custom";
+
+  return (
+    <View style={styles.customSetupPanel} testID="practice-run-editor">
+      <SprintStartHeader
+        actionLabel={isCreate ? "Add" : "Save"}
+        closeAccessibilityLabel="Close run editor"
+        closeTestID="practice-run-editor-close"
+        headerTestID="practice-run-editor-header"
+        startAccessibilityLabel={isCreate ? "Add run to Home" : "Save run changes"}
+        startTestID="practice-run-save"
+        title={isCreate ? "New Run" : `Edit ${draft.name}`}
+        titleTestID="practice-run-editor-title"
+        onClose={() => presentation.onIntent({ type: "cancel-edit" })}
+        onStart={() => presentation.onIntent({ type: "save-run" })}
+      />
+
+      <View style={styles.runEditorIntro}>
+        <Text style={styles.helperText}>
+          {isCreate
+            ? "Saving adds this run to Home. It does not start a sprint."
+            : "Changes apply the next time this run starts."}
+        </Text>
+      </View>
+
+      <View style={styles.customConfigCard} testID="practice-run-editor-fields">
+        {isCustom ? (
+          <View style={[styles.customConfigRow, styles.runNameRow]}>
+            <View style={styles.runNameCopy}>
+              <Text style={styles.listText}>Name</Text>
+              <Text style={styles.requiredFieldLabel}>Required · unique</Text>
+            </View>
+            <TextInput
+              accessibilityLabel="Run name"
+              autoCapitalize="words"
+              autoCorrect={false}
+              maxLength={40}
+              placeholder="e.g. Tactics Focus"
+              placeholderTextColor="#94A3B8"
+              style={[styles.runNameInput, presentation.nameError ? styles.runNameInputError : null]}
+              testID="practice-run-name-input"
+              value={draft.name}
+              onChangeText={(name) => presentation.onIntent({ type: "change-name", name })}
+            />
+          </View>
+        ) : (
+          <CustomValueRow
+            detail="Built-in run names stay fixed"
+            label="Name"
+            testID="practice-run-fixed-name"
+            value={draft.name}
+          />
+        )}
+
+        {presentation.nameError ? (
+          <View
+            accessibilityLiveRegion="polite"
+            style={styles.runNameError}
+            testID="practice-run-name-error"
+          >
+            <Text style={styles.runNameErrorText}>{presentation.nameError}</Text>
+          </View>
+        ) : null}
+
+        {isCustom ? (
+          <>
+            <CustomModeChoiceRow
+              value={customMode}
+              testID="practice-run-mode-row"
+              onChange={(mode) => presentation.onIntent({ type: "change-mode", mode })}
+            />
+            <View style={styles.runThemeLabelRow}>
+              <Text style={styles.listText}>Themes</Text>
+              <Text style={styles.requiredFieldLabel}>Choose one or more</Text>
+            </View>
+            <CustomThemeChoiceRow
+              selectedThemes={draft.themes}
+              testID="practice-run-theme-row"
+              onChange={(nextTheme) => presentation.onIntent({
+                type: "change-themes",
+                themes: nextCustomThemeSelection(draft.themes, nextTheme)
+              })}
+            />
+            <CustomOptionRow
+              label="Duration"
+              value={formatDurationLabel(draft.durationSeconds)}
+              stepperTestID="practice-run-duration-stepper"
+              options={CUSTOM_DURATION_OPTIONS.map((option) => ({
+                value: option,
+                label: formatDurationLabel(option),
+                testID: `practice-run-duration-${option}`
+              }))}
+              selected={draft.durationSeconds as (typeof CUSTOM_DURATION_OPTIONS)[number]}
+              onChange={(durationSeconds) => presentation.onIntent({ type: "change-duration", durationSeconds })}
+            />
+            <CustomOptionRow
+              label="Time per puzzle"
+              value={`${draft.perPuzzleSeconds} sec`}
+              stepperTestID="practice-run-per-puzzle-stepper"
+              options={CUSTOM_PER_PUZZLE_OPTIONS.map((option) => ({
+                value: option,
+                label: `${option}s`,
+                testID: `practice-run-per-puzzle-${option}`
+              }))}
+              selected={draft.perPuzzleSeconds as (typeof CUSTOM_PER_PUZZLE_OPTIONS)[number]}
+              onChange={(perPuzzleSeconds) => presentation.onIntent({ type: "change-per-puzzle", perPuzzleSeconds })}
+            />
+          </>
+        ) : (
+          <CustomValueRow
+            label="Format"
+            testID="practice-run-fixed-format"
+            value={draft.kind === "arrow_duel" ? "Arrow Duel" : "Standard puzzles"}
+          />
+        )}
+
+        <PracticeRunEloRow
+          isCreate={isCreate}
+          value={draft.elo}
+          onChange={(elo) => presentation.onIntent({ type: "change-elo", elo })}
+        />
+      </View>
+    </View>
+  );
+}
+
+function PracticeRunEloRow({
+  isCreate,
+  onChange,
+  value
+}: {
+  isCreate: boolean;
+  onChange: (elo: number) => void;
+  value: number;
+}): React.JSX.Element {
+  const canDecrease = value > 600;
+  return (
+    <View style={styles.customConfigRow} testID="practice-run-elo-row">
+      <View style={styles.customChoiceCopy}>
+        <Text style={styles.listText}>{isCreate ? "Starting ELO" : "Current ELO"}</Text>
+        <Text style={styles.requiredFieldLabel}>Adjusts by 25 · minimum 600</Text>
+      </View>
+      <View style={styles.advancedRatingControls}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Decrease run ELO"
+          accessibilityState={{ disabled: !canDecrease }}
+          disabled={!canDecrease}
+          style={[styles.customStepperButton, !canDecrease ? styles.disabledButton : null]}
+          testID="practice-run-elo-decrease"
+          onPress={() => onChange(Math.max(600, value - 25))}
+        >
+          <MinusGlyph />
+        </Pressable>
+        <Text style={styles.settingsRowValue} testID="practice-run-elo-value">ELO {value}</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Increase run ELO"
+          style={styles.customStepperButton}
+          testID="practice-run-elo-increase"
+          onPress={() => onChange(value + 25)}
+        >
+          <PlusGlyph />
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 function PracticeProgressCard({
   currentRating,
   mode,
-  progress
+  progress,
+  ratingContextLabel
 }: {
   currentRating: number;
   mode: SprintMode;
   progress: PracticeProgressSummary;
+  ratingContextLabel?: string;
 }): React.JSX.Element {
   const progressDelta = progress.correctThisWeek + progress.wrongThisWeek === 0
     ? "Start training"
@@ -3143,7 +3713,7 @@ function PracticeProgressCard({
         testID="practice-progress-summary"
       >
         <View style={styles.progressMetric} testID="practice-progress-rating-metric">
-          <Text style={styles.progressMetricLabel}>ELO ({modeLabel(mode)})</Text>
+          <Text style={styles.progressMetricLabel}>ELO ({ratingContextLabel ?? modeLabel(mode)})</Text>
           <Text style={styles.progressValue}>{currentRating}</Text>
           <Text testID="practice-progress-rating-delta" style={[styles.progressDelta, ratingDeltaTone]}>{ratingDeltaLabel}</Text>
         </View>
@@ -3154,6 +3724,18 @@ function PracticeProgressCard({
           <Text testID="practice-progress-weekly-delta" style={[styles.progressDelta, progressTone]}>{progressDelta}</Text>
           <Text testID="practice-progress-weekly-context" style={styles.progressContextText}>{progressContext}</Text>
         </View>
+      </View>
+    </>
+  );
+}
+
+function PracticeNoRunProgressCard(): React.JSX.Element {
+  return (
+    <>
+      <Text style={styles.sectionLabel}>Progress</Text>
+      <View style={styles.runNoSelectionCard} testID="practice-progress-no-run">
+        <Text style={styles.listText}>No run selected</Text>
+        <Text style={styles.helperText}>Add or restore a run to see its current ELO.</Text>
       </View>
     </>
   );
@@ -8091,6 +8673,7 @@ function SettingsPanel({
   ratings,
   reviewReminderScheduleStatus,
   reviewReminderPreference,
+  showRatingControls,
   standardRating
 }: {
   advancedRatingsOpen: boolean;
@@ -8112,6 +8695,7 @@ function SettingsPanel({
   ratings: Array<{ label: string; record: RatingRecord }>;
   reviewReminderScheduleStatus: string;
   reviewReminderPreference: ReviewReminderPreference;
+  showRatingControls: boolean;
   standardRating: number;
 }): React.JSX.Element {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -8247,24 +8831,26 @@ function SettingsPanel({
         ) : null}
       </SettingsSection>
 
-      <SettingsSection title="Profile" testID="settings-profile-section" wide={adaptiveLayout.usesWideContent}>
-        <SettingsRow
-          label="Edit ELO"
-          value={`ELO ${standardRating}`}
-          detail="Standard and Arrow Duel difficulty"
-          testID="settings-standard-elo-row"
-          onPress={() => onAdvancedRatingsOpenChange(!advancedRatingsOpen)}
-        />
-        {advancedRatingsOpen ? (
-          <AdvancedRatingsPanel
-            ratings={ratings}
-            onAdjust={(ratingKey, nextRating) => {
-              const next = onAdjustRating(ratingKey, nextRating);
-              setStatusMessage(`${ratingLabelFromKey(ratingKey)} rating set to ${next.rating}`);
-            }}
+      {showRatingControls ? (
+        <SettingsSection title="Profile" testID="settings-profile-section" wide={adaptiveLayout.usesWideContent}>
+          <SettingsRow
+            label="Edit ELO"
+            value={`ELO ${standardRating}`}
+            detail="Standard and Arrow Duel difficulty"
+            testID="settings-standard-elo-row"
+            onPress={() => onAdvancedRatingsOpenChange(!advancedRatingsOpen)}
           />
-        ) : null}
-      </SettingsSection>
+          {advancedRatingsOpen ? (
+            <AdvancedRatingsPanel
+              ratings={ratings}
+              onAdjust={(ratingKey, nextRating) => {
+                const next = onAdjustRating(ratingKey, nextRating);
+                setStatusMessage(`${ratingLabelFromKey(ratingKey)} rating set to ${next.rating}`);
+              }}
+            />
+          ) : null}
+        </SettingsSection>
+      ) : null}
 
       <SettingsSection title="About" testID="settings-about-section" wide={adaptiveLayout.usesWideContent}>
         <SettingsRow
@@ -10100,6 +10686,259 @@ const styles = StyleSheet.create({
     flex: 0.9,
     gap: 12,
     minWidth: 280
+  },
+  practiceHomeColumnStacked: {
+    flexBasis: "auto",
+    flexGrow: 0,
+    flexShrink: 0,
+    width: "100%"
+  },
+  runManagementPanel: {
+    gap: 10
+  },
+  runManagementToolbar: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    justifyContent: "space-between"
+  },
+  runManagementToolbarActions: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8
+  },
+  primaryCompactButton: {
+    alignItems: "center",
+    backgroundColor: "#2563EB",
+    borderRadius: 8,
+    height: 36,
+    justifyContent: "center",
+    paddingHorizontal: 12
+  },
+  secondaryCompactButton: {
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderColor: "#CBD5E1",
+    borderRadius: 8,
+    borderWidth: 1,
+    height: 36,
+    justifyContent: "center",
+    paddingHorizontal: 12
+  },
+  secondaryCompactButtonText: {
+    color: "#334155",
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  runNotice: {
+    backgroundColor: "#EFF6FF",
+    borderColor: "#93C5FD",
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 8
+  },
+  runNoticeText: {
+    color: "#1D4ED8",
+    fontSize: 12,
+    fontWeight: "700"
+  },
+  runEmptyState: {
+    alignItems: "flex-start",
+    backgroundColor: "#FFFFFF",
+    borderColor: "#CBD5E1",
+    borderRadius: 8,
+    borderStyle: "dashed",
+    borderWidth: 1,
+    gap: 6,
+    padding: 14
+  },
+  runEmptyAction: {
+    flex: 0,
+    marginTop: 4
+  },
+  runNoSelectionCard: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 4,
+    minHeight: 76,
+    padding: 14
+  },
+  runCardEditing: {
+    alignItems: "center",
+    flexWrap: "wrap",
+    paddingVertical: 10
+  },
+  runDragHandle: {
+    alignItems: "center",
+    height: 34,
+    justifyContent: "center",
+    width: 24
+  },
+  runDragHandleText: {
+    color: "#64748B",
+    fontSize: 17,
+    fontWeight: "800"
+  },
+  runEditingMeta: {
+    borderTopColor: "#E2E8F0",
+    borderTopWidth: StyleSheet.hairlineWidth,
+    justifyContent: "space-between",
+    marginTop: 6,
+    paddingLeft: 32,
+    paddingTop: 8,
+    width: "100%"
+  },
+  runEditActions: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 6
+  },
+  runEditButton: {
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderColor: "#CBD5E1",
+    borderRadius: 8,
+    borderWidth: 1,
+    height: 32,
+    justifyContent: "center",
+    paddingHorizontal: 9
+  },
+  runEditButtonText: {
+    color: "#334155",
+    fontSize: 11,
+    fontWeight: "800"
+  },
+  runIconButton: {
+    alignItems: "center",
+    backgroundColor: "#F8FAFC",
+    borderColor: "#CBD5E1",
+    borderRadius: 8,
+    borderWidth: 1,
+    height: 32,
+    justifyContent: "center",
+    width: 34
+  },
+  runIconButtonText: {
+    color: "#334155",
+    fontSize: 17,
+    fontWeight: "800",
+    lineHeight: 20
+  },
+  runRemoveButton: {
+    backgroundColor: "#FEF2F2",
+    borderColor: "#FCA5A5"
+  },
+  runRemoveButtonText: {
+    color: "#DC2626",
+    fontSize: 20,
+    fontWeight: "900",
+    lineHeight: 22
+  },
+  runRemovalConfirmation: {
+    backgroundColor: "#FEF2F2",
+    borderColor: "#FCA5A5",
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 10,
+    padding: 12
+  },
+  runRemovalCopy: {
+    gap: 3
+  },
+  runRemovalActions: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "flex-end"
+  },
+  runRestoreSection: {
+    gap: 6,
+    marginTop: 4
+  },
+  runRestoreList: {
+    gap: 6
+  },
+  runRestoreRow: {
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "space-between",
+    minHeight: 54,
+    paddingHorizontal: 12,
+    paddingVertical: 8
+  },
+  runRestoreCopy: {
+    flex: 1,
+    gap: 2,
+    minWidth: 0
+  },
+  runEditorIntro: {
+    backgroundColor: "#EFF6FF",
+    borderColor: "#BFDBFE",
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 9
+  },
+  runNameRow: {
+    alignItems: "flex-start"
+  },
+  runNameCopy: {
+    flexShrink: 0,
+    gap: 2,
+    paddingTop: 2
+  },
+  requiredFieldLabel: {
+    color: "#64748B",
+    fontSize: 10,
+    fontWeight: "700"
+  },
+  runNameInput: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#CBD5E1",
+    borderRadius: 8,
+    borderWidth: 1,
+    color: "#111827",
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "700",
+    minHeight: 40,
+    minWidth: 160,
+    paddingHorizontal: 10,
+    paddingVertical: 8
+  },
+  runNameInputError: {
+    borderColor: "#DC2626"
+  },
+  runNameError: {
+    backgroundColor: "#FEF2F2",
+    borderBottomColor: "#FCA5A5",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 12,
+    paddingVertical: 8
+  },
+  runNameErrorText: {
+    color: "#B91C1C",
+    fontSize: 12,
+    fontWeight: "700"
+  },
+  runThemeLabelRow: {
+    alignItems: "center",
+    borderBottomColor: "#E2E8F0",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    minHeight: 42,
+    paddingHorizontal: 12,
+    paddingVertical: 8
   },
   sectionHeaderRow: {
     alignItems: "center",
