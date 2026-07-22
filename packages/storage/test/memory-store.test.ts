@@ -443,7 +443,9 @@ test("PracticeService builds MemoryStore history view for a required time range 
   assert.equal(view.attempts[0]?.puzzleRating, 1485);
   assert.equal(service.getHistoryView({ ...view.query, maxRating: 1485 }).attempts.length, 1);
   assert.equal(service.getHistoryView({ ...view.query, minRating: 1486 }).attempts.length, 0);
-  assert.ok(view.availableThemes.includes("mate"));
+  assert.deepEqual(view.query.themes, ["mate"]);
+  assert.ok(view.availableThemes.includes("mateIn2"));
+  assert.ok(!view.availableThemes.includes("mate"));
   assert.equal(view.elo.length, 1);
   assert.deepEqual(view.puzzleStats, [
     {
@@ -596,6 +598,25 @@ test("PracticeService selects and persists a canonical multiple-theme custom spr
       playCount: 1
     }
   ]);
+});
+
+test("PracticeService accepts a legacy singular theme command without broadening selection", async () => {
+  const store = new MemoryStore();
+  store.seedPuzzles(await loadFixturePuzzles());
+  const service = new PracticeService(store);
+
+  const sprint = service.startSprint({
+    mode: "custom",
+    durationSeconds: 300,
+    perPuzzleSeconds: 20,
+    targetCorrect: 1,
+    maxMistakes: 3,
+    theme: "mate"
+  }, "2026-07-21T12:00:00.000Z");
+
+  assert.deepEqual(sprint.config.themes, ["mate"]);
+  assert.equal(sprint.config.ratingKey, "mate custom 5/20");
+  assert.deepEqual(sprint.puzzles.map((puzzle) => puzzle.id), ["000hf"]);
 });
 
 test("PracticeService clears MemoryStore local history without resetting ratings or puzzles", async () => {

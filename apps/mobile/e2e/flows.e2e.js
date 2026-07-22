@@ -242,6 +242,17 @@ describe('Key user flows', () => {
     await waitFor(element(by.id('history-filter-sprint-only')))
       .toHaveValue(historyToggleValue('Sprint attempts only', false))
       .withTimeout(10000);
+    await element(by.id('history-filter-toggle')).tap();
+    await waitForVisibleInPracticeScroll('history-theme-mate-in-2');
+    await element(by.id('history-theme-mate-in-2')).tap();
+    await waitForVisibleInPracticeScroll('history-theme-mate-in-3');
+    await element(by.id('history-theme-mate-in-3')).tap();
+    await waitFor(element(
+      by.text('Mate in 2').withAncestor(by.id('history-active-filter-summary'))
+    )).toExist().withTimeout(10000);
+    await waitFor(element(
+      by.text('Mate in 3').withAncestor(by.id('history-active-filter-summary'))
+    )).toExist().withTimeout(10000);
     await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
 
     const resultAttributes = await element(by.text('Wrong move')).atIndex(0).getAttributes();
@@ -249,9 +260,13 @@ describe('Key user flows', () => {
     if (typeof resultIdentifier !== 'string' || !resultIdentifier.endsWith('-result')) {
       throw new Error(`Could not resolve history attempt row from ${String(resultIdentifier)}`);
     }
-    await element(by.id(resultIdentifier.replace(/-result$/, ''))).tap();
+    const resultRowIdentifier = resultIdentifier.replace(/-result$/, '');
+    await waitForVisibleInPracticeScroll(resultRowIdentifier);
+    await element(by.id(resultRowIdentifier)).tap();
     await waitFor(element(by.id('review-session'))).toExist().withTimeout(10000);
     await expect(element(by.id('review-source-pill'))).not.toExist();
+    await waitFor(element(by.id('review-theme-rail'))).toExist().withTimeout(10000);
+    await expect(element(by.text('Themes'))).not.toExist();
     await element(by.id('practice-main-scroll')).scrollTo('top');
     await waitFor(element(by.id('review-exit'))).toBeVisible().withTimeout(10000);
     await element(by.id('review-exit')).tap();
@@ -261,8 +276,12 @@ describe('Key user flows', () => {
     await waitFor(element(by.id('history-filter-sprint-only')))
       .toHaveValue(historyToggleValue('Sprint attempts only', false))
       .withTimeout(10000);
-    await expect(element(by.id('history-filter-reset'))).not.toExist();
-    await element(by.id('history-filter-toggle')).tap();
+    await expect(element(
+      by.text('Mate in 2').withAncestor(by.id('history-active-filter-summary'))
+    )).toExist();
+    await expect(element(
+      by.text('Mate in 3').withAncestor(by.id('history-active-filter-summary'))
+    )).toExist();
     await waitFor(element(by.id('history-filter-reset'))).toBeVisible().withTimeout(10000);
     await expect(element(by.text('Reset filters'))).toExist();
     await element(by.id('history-filter-reset')).tap();
@@ -284,6 +303,8 @@ describe('Key user flows', () => {
     await element(by.id('custom-duration-stepper-decrease')).tap();
     await waitForElementTextContaining('custom-target-count', '9', 5000);
 
+    await element(by.id('practice-main-scroll')).scrollTo('top');
+    await waitFor(element(by.id('start-sprint-button'))).toBeVisible().withTimeout(5000);
     await element(by.id('start-sprint-button')).tap();
     await waitFor(element(by.id('session-board'))).toExist().withTimeout(15000);
 
@@ -300,8 +321,15 @@ describe('Key user flows', () => {
     await openTab('practice-tab', 'practice-mode-custom');
     await element(by.id('practice-mode-custom')).tap();
     await waitForVisibleInPracticeScroll('custom-target-count');
+    await waitForVisibleInPracticeScroll('custom-theme-mate-in-2');
+    await element(by.id('custom-theme-mate-in-2')).tap();
+    await waitForVisibleInPracticeScroll('custom-theme-fork');
+    await element(by.id('custom-theme-fork')).tap();
+    await waitForVisibleInPracticeScroll('custom-target-count');
     await element(by.id('custom-duration-stepper-decrease')).tap();
     await waitForElementTextContaining('custom-target-count', '9', 5000);
+    await element(by.id('practice-main-scroll')).scrollTo('top');
+    await waitFor(element(by.id('start-sprint-button'))).toBeVisible().withTimeout(5000);
     await element(by.id('start-sprint-button')).tap();
     await waitFor(element(by.id('session-board'))).toExist().withTimeout(15000);
     await element(by.id('session-abandon')).tap();
@@ -334,6 +362,17 @@ describe('Key user flows', () => {
     await openTab('practice-tab', 'practice-mode-custom');
     await element(by.id('practice-mode-custom')).tap();
     await waitFor(element(by.id('custom-previous-configs'))).toExist().withTimeout(10000);
+    await waitForVisibleInPracticeScroll('custom-previous-custom-custom-180-20-fork-matein2');
+    await waitForElementTextContaining(
+      'custom-previous-custom-custom-180-20-fork-matein2-meta',
+      'Mate in 2',
+      10000
+    );
+    await waitForElementTextContaining(
+      'custom-previous-custom-custom-180-20-fork-matein2-meta',
+      'Fork',
+      10000
+    );
   });
 });
 

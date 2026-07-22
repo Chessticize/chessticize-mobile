@@ -1,7 +1,8 @@
 import {
   buildServerEloPuzzleSelectionStrategies,
   isServerCompatibleArrowDuelPuzzle,
-  normalizeThemeSelection
+  normalizeThemeSelection,
+  puzzleMatchesAnyTheme
 } from "../../core/src/index.ts";
 import type { Puzzle, SprintMode } from "../../core/src/index.ts";
 
@@ -107,7 +108,7 @@ function isEligiblePuzzle(
   if (puzzle.rating < (filter.minRating ?? 0) || puzzle.rating > (filter.maxRating ?? 4000)) {
     return false;
   }
-  if (selectedThemes.length > 0 && !selectedThemes.some((theme) => puzzle.themes.includes(theme))) {
+  if (!puzzleMatchesAnyTheme(puzzle.themes, selectedThemes)) {
     return false;
   }
   if (filter.mode !== "arrow_duel") {

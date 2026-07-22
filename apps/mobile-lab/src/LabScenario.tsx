@@ -54,13 +54,6 @@ function LabScenarioContent({
   scenarioId: LabScenarioId;
 }): React.JSX.Element {
   const [selectedCustomThemes, setSelectedCustomThemes] = useState<string[]>([]);
-  const showsThemeCatalogPrototype = [
-    "practice-custom-setup",
-    "practice-run-name-validation",
-    "history-populated",
-    "history-filters",
-    "history-attempt-detail"
-  ].includes(scenarioId);
   const [runManagementState, dispatchRunManagement] = useReducer(
     runManagementFixtureReducer,
     scenarioId === "practice-runs-empty" ? "empty" : "populated",
@@ -82,9 +75,7 @@ function LabScenarioContent({
           onChange: setSelectedCustomThemes
         }}
         platformCapabilities={runtime.platformCapabilities}
-        themeCatalogPresentation={showsThemeCatalogPrototype
-          ? SERVER_CURATED_THEME_PRESENTATION
-          : undefined}
+        themeCatalogPresentation={SERVER_CURATED_THEME_PRESENTATION}
         runEloEditingMovedToHome
         runManagementPresentation={runManagementPresentation}
         {...runtime.screenProps}

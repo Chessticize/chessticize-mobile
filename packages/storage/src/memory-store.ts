@@ -1,5 +1,6 @@
 import {
   buildHistoryView,
+  curatedPuzzleThemes,
   createDefaultRating,
   defaultSprintConfig,
   enrollReviewContext,
@@ -580,7 +581,8 @@ export class MemoryStore implements PracticeStore {
       ratingKey,
       puzzleRating: puzzle.rating,
       side: sideToMoveForHistoryPuzzle({ puzzle, mode: attempt.mode }),
-      themes: puzzle.themes
+      themes: puzzle.themes,
+      curatedThemes: curatedPuzzleThemes(puzzle.themes)
     };
   }
 

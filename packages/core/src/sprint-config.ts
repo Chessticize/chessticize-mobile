@@ -1,4 +1,5 @@
 import type { SprintConfig, SprintMode } from "./types.ts";
+import { normalizeThemeSelection } from "./theme-catalog.ts";
 
 const DEFAULT_DURATION_SECONDS = 5 * 60;
 
@@ -67,10 +68,6 @@ export function ratingKeyForConfig(input: {
   const selectedThemes = normalizeThemeSelection(input.themes);
   const themePrefix = selectedThemes.length > 0 ? `${selectedThemes.join("+")} ` : "";
   return `${themePrefix}${input.mode} ${minutes}/${input.perPuzzleSeconds}`;
-}
-
-export function normalizeThemeSelection(themes?: readonly string[]): string[] {
-  return [...new Set((themes ?? []).map((theme) => theme.trim()).filter((theme) => theme.length > 0))].sort();
 }
 
 function formatDurationMinutes(durationSeconds: number): string {

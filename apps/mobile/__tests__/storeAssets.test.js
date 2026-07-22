@@ -73,7 +73,7 @@ describe("App Store assets document", () => {
     expect(storeAssetsE2e).toContain("app-store-06-arrow-duel");
     expect(storeAssetsE2e).toContain("app-store-07-custom-setup");
     expect(storeAssetsE2e).toContain("app-store-08-review-session");
-    expect(storeAssetsE2e).toContain("expect(element(by.text('Theme'))).not.toExist()");
+    expect(storeAssetsE2e).toContain("expect(element(by.text('Themes'))).toExist()");
     expect(storeAssetsDoc).toContain("pnpm mobile:e2e:build:ios:release");
     expect(storeAssetsDoc).toContain("pnpm mobile:e2e:store-assets:ios:release");
     expect(storeAssetsDoc).toContain("pnpm app-store:screenshot-audit");

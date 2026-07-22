@@ -15,7 +15,7 @@ test("the prototype exposes the 24 unique server-curated themes", () => {
 });
 
 test("the deterministic fixtures cover the full catalog and the seven-tag density case", () => {
-  const fixtureThemes = new Set(THEME_CATALOG_LAB_PUZZLES.flatMap((puzzle) => puzzle.themes));
+  const fixtureThemes = new Set<string>(THEME_CATALOG_LAB_PUZZLES.flatMap((puzzle) => puzzle.themes));
   const curatedThemes = new Set<string>(SERVER_CURATED_THEMES);
   assert.deepEqual(
     SERVER_CURATED_THEMES.filter((theme) => !fixtureThemes.has(theme)),

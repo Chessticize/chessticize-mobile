@@ -179,15 +179,25 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
     filter: PuzzleSelectionFilter,
     limit: number
   ): PuzzlePackRow[] {
-    const rowsById = new Map<string, PuzzlePackRow>();
-    for (const themeId of themeIds) {
-      for (const row of this.queryCandidateRows(filter, themeId, limit)) {
-        rowsById.set(row.id, row);
+    const rowsByTheme = themeIds.map((themeId) => this.queryCandidateRows(filter, themeId, limit));
+    const selected: PuzzlePackRow[] = [];
+    const seenIds = new Set<string>();
+    const maximumRows = Math.max(0, ...rowsByTheme.map((rows) => rows.length));
+
+    for (let rowIndex = 0; rowIndex < maximumRows && selected.length < limit; rowIndex += 1) {
+      for (const rows of rowsByTheme) {
+        const row = rows[rowIndex];
+        if (!row || seenIds.has(row.id)) {
+          continue;
+        }
+        seenIds.add(row.id);
+        selected.push(row);
+        if (selected.length >= limit) {
+          break;
+        }
       }
     }
-    return [...rowsById.values()]
-      .sort((left, right) => left.rating - right.rating || left.id.localeCompare(right.id))
-      .slice(0, limit);
+    return selected;
   }
 
   private queryCandidateRows(

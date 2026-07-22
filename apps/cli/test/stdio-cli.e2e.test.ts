@@ -69,18 +69,39 @@ test("CLI accepts multiple themes as an OR-filtered sprint contract", async (t) 
   await cli.stop();
 });
 
-test("CLI rejects the removed single-theme field instead of silently broadening selection", async (t) => {
+test("CLI accepts the legacy single-theme field without broadening selection", async (t) => {
   const cli = await startCli(t);
 
   const response = await cli.command({
     command: "startSprint",
     mode: "custom",
-    theme: "mate"
+    durationSeconds: 300,
+    perPuzzleSeconds: 20,
+    targetCorrect: 1,
+    maxMistakes: 3,
+    theme: "mate",
+    now: "2026-07-21T00:00:00.000Z"
+  });
+
+  assert.equal(response.ok, true);
+  assert.equal(response.state.ratingKey, "mate custom 5/20");
+  assert.equal(response.state.currentPuzzle.puzzleId, "000hf");
+
+  await cli.stop();
+});
+
+test("CLI rejects a blank legacy single-theme field instead of broadening to All", async (t) => {
+  const cli = await startCli(t);
+
+  const response = await cli.command({
+    command: "startSprint",
+    mode: "custom",
+    theme: "   "
   });
 
   assert.equal(response.ok, false);
   assert.equal(response.error.code, "command_failed");
-  assert.equal(response.error.message, "theme is no longer supported; use themes");
+  assert.equal(response.error.message, "theme must be a non-empty string");
 
   await cli.stop();
 });

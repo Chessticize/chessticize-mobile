@@ -2711,7 +2711,15 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "custom-theme-fork")).toBeTruthy();
     expect(findByTestId(renderer, "custom-theme-hanging-piece")).toBeTruthy();
     expect(findByTestId(renderer, "custom-theme-fork").props.accessibilityLabel).toBe("Fork puzzle theme");
-    expect(collectText(findByTestId(renderer, "custom-theme-row"))).not.toContain("Theme");
+    expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("ThemesChoose one or more");
+    expect(new Set(renderer.root.findAll((node) => (
+      typeof node.props.testID === "string"
+      && /^custom-theme-(?!mixed$|row$)/.test(node.props.testID)
+    )).map((node) => node.props.testID)).size).toBe(24);
+    expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("Checkmates");
+    expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("Piece tactics");
+    expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("Forcing motifs");
+    expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("Pawns & endings");
     expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("Sacrifice");
     expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("Promotion");
     expect(() => findByTestId(renderer, "custom-summary-card")).toThrow();
@@ -2747,19 +2755,19 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "custom-config-list"))).not.toContain("›");
     expect(collectText(findByTestId(renderer, "custom-config-list"))).not.toContain("Allowed values");
     expect(() => findByTestId(renderer, "custom-mistake-limit-stepper")).toThrow();
-    press(renderer, "custom-theme-mate");
-    expectText(renderer, "Mate");
+    press(renderer, "custom-theme-mate-in-2");
+    expectText(renderer, "Mate in 2");
     expect(() => findByTestId(renderer, "custom-broaden-theme")).toThrow();
     press(renderer, "custom-theme-fork");
-    expect(themeSelected(renderer, "mate")).toBe(true);
+    expect(themeSelected(renderer, "mate-in-2")).toBe(true);
     expect(themeSelected(renderer, "fork")).toBe(true);
-    press(renderer, "custom-theme-mate");
-    expect(themeSelected(renderer, "mate")).toBe(false);
+    press(renderer, "custom-theme-mate-in-2");
+    expect(themeSelected(renderer, "mate-in-2")).toBe(false);
     expect(themeSelected(renderer, "fork")).toBe(true);
     press(renderer, "custom-theme-mixed");
     expect(themeSelected(renderer, "mixed")).toBe(true);
     expect(themeSelected(renderer, "fork")).toBe(false);
-    press(renderer, "custom-theme-mate");
+    press(renderer, "custom-theme-mate-in-2");
     press(renderer, "custom-mode-arrow-duel");
     expect(findByTestId(renderer, "custom-mode-regular").props.accessibilityState).toEqual({ selected: false });
     expect(findByTestId(renderer, "custom-mode-arrow-duel").props.accessibilityState).toEqual({ selected: true });
@@ -2792,21 +2800,21 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "custom-initial-rating-row")).toBeTruthy();
     expect(findByTestId(renderer, "custom-previous-configs")).toBeTruthy();
     expect(themeSelected(renderer, "fork")).toBe(true);
-    expect(themeSelected(renderer, "mate")).toBe(false);
+    expect(themeSelected(renderer, "mate-in-2")).toBe(false);
     expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("All");
     expect(() => findByTestId(renderer, "custom-broaden-theme")).toThrow();
 
-    press(renderer, "custom-theme-mate");
+    press(renderer, "custom-theme-mate-in-2");
     expect(themeSelected(renderer, "fork")).toBe(true);
-    expect(themeSelected(renderer, "mate")).toBe(true);
+    expect(themeSelected(renderer, "mate-in-2")).toBe(true);
     expect(() => findByTestId(renderer, "custom-broaden-theme")).toThrow();
 
     press(renderer, "custom-theme-fork");
     expect(themeSelected(renderer, "fork")).toBe(false);
-    expect(themeSelected(renderer, "mate")).toBe(true);
+    expect(themeSelected(renderer, "mate-in-2")).toBe(true);
 
-    press(renderer, "custom-theme-mate");
-    expect(themeSelected(renderer, "mate")).toBe(false);
+    press(renderer, "custom-theme-mate-in-2");
+    expect(themeSelected(renderer, "mate-in-2")).toBe(false);
     expect(themeSelected(renderer, "mixed")).toBe(true);
 
     press(renderer, "custom-theme-mixed");
@@ -2856,19 +2864,19 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "practice-mode-custom");
     expect(themeSelected(renderer, "mixed")).toBe(true);
-    press(renderer, "custom-theme-mate");
+    press(renderer, "custom-theme-mate-in-2");
     press(renderer, "custom-theme-fork");
     expect(themeSelected(renderer, "mixed")).toBe(false);
-    expect(themeSelected(renderer, "mate")).toBe(true);
+    expect(themeSelected(renderer, "mate-in-2")).toBe(true);
     expect(themeSelected(renderer, "fork")).toBe(true);
 
     press(renderer, "start-sprint-button");
 
-    expect(service.getActiveSprint()?.config.themes).toEqual(["fork", "mate"]);
-    expect(service.getActiveSprint()?.config.ratingKey).toBe("fork+mate custom 5/20");
+    expect(service.getActiveSprint()?.config.themes).toEqual(["fork", "mateIn2"]);
+    expect(service.getActiveSprint()?.config.ratingKey).toBe("fork+mateIn2 custom 5/20");
     expect(service.listCustomSprintConfigs()[0]).toMatchObject({
-      themes: ["fork", "mate"],
-      ratingKey: "fork+mate custom 5/20"
+      themes: ["fork", "mateIn2"],
+      ratingKey: "fork+mateIn2 custom 5/20"
     });
   });
 
@@ -2954,19 +2962,19 @@ describe("PracticePocScreen", () => {
       games: 1
     });
     store.saveCustomSprintConfig({
-      id: "custom-custom-300-20-fork+mate",
+      id: "custom-custom-300-20-fork+mateIn2",
       mode: "custom",
-      ratingKey: "fork+mate custom 5/20",
+      ratingKey: "fork+mateIn2 custom 5/20",
       durationSeconds: 300,
       perPuzzleSeconds: 20,
       targetCorrect: 15,
       maxMistakes: 3,
-      themes: ["fork", "mate"],
+      themes: ["fork", "mateIn2"],
       lastStartedAt: "2026-07-05T00:00:00.000Z",
       playCount: 1
     });
     store.saveRating({
-      key: "fork+mate custom 5/20",
+      key: "fork+mateIn2 custom 5/20",
       generation: 0,
       rating: 1100,
       games: 1
@@ -2977,12 +2985,12 @@ describe("PracticePocScreen", () => {
 
     const mateConfig = findByTestId(renderer, "custom-previous-custom-custom-180-30-mate");
     const forkConfig = findByTestId(renderer, "custom-previous-custom-custom-300-20-fork");
-    const multiConfig = findByTestId(renderer, "custom-previous-custom-custom-300-20-fork-mate");
+    const multiConfig = findByTestId(renderer, "custom-previous-custom-custom-300-20-fork-matein2");
     expect(collectText(mateConfig)).toContain("875");
     expect(mateConfig.props.accessibilityLabel).toContain("ELO 875");
     expect(collectText(forkConfig)).toContain("1025");
     expect(forkConfig.props.accessibilityLabel).toContain("ELO 1025");
-    expect(collectText(multiConfig)).toContain("Mate, Fork");
+    expect(collectText(multiConfig)).toContain("Mate in 2, Fork");
     expect(multiConfig.props.accessibilityLabel).toContain("ELO 1100");
 
     press(renderer, "custom-previous-custom-custom-180-30-mate");
@@ -2995,10 +3003,10 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "custom-target-count"))).toBe("~15");
     expect(collectText(findByTestId(renderer, "custom-initial-rating-value"))).toBe("ELO 1025");
 
-    press(renderer, "custom-previous-custom-custom-300-20-fork-mate");
+    press(renderer, "custom-previous-custom-custom-300-20-fork-matein2");
     expect(themeSelected(renderer, "mixed")).toBe(false);
     expect(themeSelected(renderer, "fork")).toBe(true);
-    expect(themeSelected(renderer, "mate")).toBe(true);
+    expect(themeSelected(renderer, "mate-in-2")).toBe(true);
     expect(collectText(findByTestId(renderer, "custom-initial-rating-value"))).toBe("ELO 1100");
   });
 
@@ -3443,8 +3451,9 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-identity`))).toMatch(
       /^ID .+ · Rating \d+$/
     );
-    expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-context`))).toContain("20s pace");
-    expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-context`))).toMatch(/^[A-Z]/);
+    const historyAttemptThemes = collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-themes`));
+    expect(historyAttemptThemes).toMatch(/^[A-Z]/);
+    expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-pace`))).toContain("20s pace");
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-meta`))).toMatch(
       /Sprint · \d+s · (Today|Yesterday|\d+ days ago|\d+w ago|\d+mo ago|\d+y ago|Scheduled) · [A-Z][a-z]{2} \d{1,2}, \d{4}/
     );
@@ -3463,7 +3472,8 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "review-side-to-move").props.accessibilityLabel).toBe("Black to move");
     expect(findByTestId(renderer, "move-side-black-glyph")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "review-side-to-move-label"))).toBe("Black to move");
-    expect(findByTestId(renderer, "review-theme-pill")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "review-theme-rail"))).toBe(historyAttemptThemes);
+    expect(() => findByTestId(renderer, "review-theme-pill")).toThrow();
     expect(findByTestId(renderer, "review-reset-puzzle")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "review-exit"))).toBe("");
     expect(collectText(findByTestId(renderer, "review-reset-puzzle"))).toBe("↺");
@@ -3533,8 +3543,21 @@ describe("PracticePocScreen", () => {
     press(renderer, "history-filter-toggle");
     expect(collectText(findByTestId(renderer, "history-theme-filters"))).toContain("Capturing Defender");
     expect(findByTestId(renderer, "history-theme-filter-rail-curated")).toBeTruthy();
+    expect(findByTestId(renderer, "history-theme-mate-in-3")).toBeTruthy();
+    expect(historyThemeSelected(renderer, "all")).toBe(true);
     press(renderer, "history-theme-pin");
+    press(renderer, "history-theme-promotion");
+    expect(historyThemeSelected(renderer, "all")).toBe(false);
+    expect(historyThemeSelected(renderer, "pin")).toBe(true);
+    expect(historyThemeSelected(renderer, "promotion")).toBe(true);
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Pin");
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Promotion");
+    press(renderer, "history-theme-pin");
+    expect(historyThemeSelected(renderer, "promotion")).toBe(true);
+    press(renderer, "history-theme-promotion");
+    expect(historyThemeSelected(renderer, "all")).toBe(true);
+    press(renderer, "history-theme-pin");
+    press(renderer, "history-theme-promotion");
     press(renderer, "history-attempt-curated-density");
     expect(findByTestId(renderer, "review-session")).toBeTruthy();
     const replayThemes = collectText(findByTestId(renderer, "review-theme-rail"));
@@ -3546,6 +3569,11 @@ describe("PracticePocScreen", () => {
     expect(testIdOrder(renderer, "review-board", "review-theme-catalog")).toBeLessThan(0);
     expect(flattenTestStyle(replayThemeCatalog.props.style).alignItems).toBe("center");
     expect(() => findByTestId(renderer, "review-theme-pill")).toThrow();
+    press(renderer, "review-exit");
+    expect(historyThemeSelected(renderer, "pin")).toBe(true);
+    expect(historyThemeSelected(renderer, "promotion")).toBe(true);
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Pin");
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Promotion");
   });
 
   it("puts Unclear only first in a scrollable three-toggle History row without a count or icon", () => {
@@ -6398,6 +6426,15 @@ function themeSelected(
 ): boolean {
   const state = findByTestId(renderer, `custom-theme-${theme}`).props.accessibilityState;
   return state.checked ?? state.selected ?? false;
+}
+
+function historyThemeSelected(
+  renderer: TestRenderer.ReactTestRenderer,
+  theme: string
+): boolean {
+  return renderer.root.findAllByProps({ testID: `history-theme-${theme}` }).some(
+    (node) => node.props.accessibilityState?.selected === true
+  );
 }
 
 function createTestSystemBackSource(platform: "android" | "ios"): MobileSystemBackSource & {
