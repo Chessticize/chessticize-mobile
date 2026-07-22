@@ -327,9 +327,13 @@ describe('Key user flows', () => {
 
     await openTab('practice-tab', 'practice-add-run');
     await element(by.id('practice-run-home-edit')).tap();
+    await element(by.id('practice-main-scroll')).scrollTo('top');
+    await waitFor(element(by.id('practice-run-edit-standard'))).toBeVisible().withTimeout(10000);
     await element(by.id('practice-run-edit-standard')).tap();
     await element(by.id('practice-run-elo-increase')).tap();
     await element(by.id('practice-run-save')).tap();
+    await element(by.id('practice-main-scroll')).scrollTo('top');
+    await waitFor(element(by.id('practice-run-home-done'))).toBeVisible().withTimeout(10000);
     await element(by.id('practice-run-home-done')).tap();
     await waitForElementTextContaining('practice-mode-standard-rating', 'ELO 625', 5000);
 
