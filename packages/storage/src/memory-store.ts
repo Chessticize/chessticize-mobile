@@ -1,5 +1,6 @@
 import {
   buildHistoryView,
+  curatedPuzzleThemes,
   clonePracticeRun,
   createDefaultRating,
   defaultPracticeRuns,
@@ -621,7 +622,8 @@ export class MemoryStore implements PracticeStore {
         : { perPuzzleSeconds: session.config.perPuzzleSeconds }),
       puzzleRating: puzzle.rating,
       side: sideToMoveForHistoryPuzzle({ puzzle, mode: attempt.mode }),
-      themes: puzzle.themes
+      themes: puzzle.themes,
+      curatedThemes: curatedPuzzleThemes(puzzle.themes)
     };
   }
 

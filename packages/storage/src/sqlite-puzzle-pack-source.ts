@@ -1,7 +1,7 @@
 import {
   buildServerEloPuzzleSelectionStrategies,
   isServerCompatibleArrowDuelPuzzle,
-  normalizeThemeSelection,
+  namedThemesForSelection,
   SERVER_PUZZLE_MAX_RATING,
   SERVER_PUZZLE_MIN_RATING
 } from "../../core/src/index.ts";
@@ -48,7 +48,7 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
           filter.includeIds !== undefined || filter.excludeIds !== undefined) {
         return this.selectPuzzles(filter).length;
       }
-      const selectedThemes = normalizeThemeSelection(filter.themes);
+      const selectedThemes = namedThemesForSelection(filter.themes);
       const minRating = filter.minRating ?? (filter.rating === undefined ? 0 : SERVER_PUZZLE_MIN_RATING);
       const maxRating = filter.maxRating ?? (filter.rating === undefined ? 4000 : SERVER_PUZZLE_MAX_RATING);
       if (selectedThemes.length === 0) {
@@ -112,7 +112,7 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
     const excludedIds = new Set(filter.excludeIds ?? []);
     const strategies = buildServerEloPuzzleSelectionStrategies({
       rating,
-      themes: normalizeThemeSelection(filter.themes)
+      themes: namedThemesForSelection(filter.themes)
     });
 
     for (const strategy of strategies) {
@@ -150,7 +150,7 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
   }
 
   private queryCandidates(filter: PuzzleSelectionFilter): Puzzle[] {
-    const selectedThemes = normalizeThemeSelection(filter.themes);
+    const selectedThemes = namedThemesForSelection(filter.themes);
     const themeIds = selectedThemes
       .map((theme) => this.themeId(theme))
       .filter((themeId): themeId is number => themeId !== undefined);
@@ -179,15 +179,25 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
     filter: PuzzleSelectionFilter,
     limit: number
   ): PuzzlePackRow[] {
-    const rowsById = new Map<string, PuzzlePackRow>();
-    for (const themeId of themeIds) {
-      for (const row of this.queryCandidateRows(filter, themeId, limit)) {
-        rowsById.set(row.id, row);
+    const rowsByTheme = themeIds.map((themeId) => this.queryCandidateRows(filter, themeId, limit));
+    const selected: PuzzlePackRow[] = [];
+    const seenIds = new Set<string>();
+    const maximumRows = Math.max(0, ...rowsByTheme.map((rows) => rows.length));
+
+    for (let rowIndex = 0; rowIndex < maximumRows && selected.length < limit; rowIndex += 1) {
+      for (const rows of rowsByTheme) {
+        const row = rows[rowIndex];
+        if (!row || seenIds.has(row.id)) {
+          continue;
+        }
+        seenIds.add(row.id);
+        selected.push(row);
+        if (selected.length >= limit) {
+          break;
+        }
       }
     }
-    return [...rowsById.values()]
-      .sort((left, right) => left.rating - right.rating || left.id.localeCompare(right.id))
-      .slice(0, limit);
+    return selected;
   }
 
   private queryCandidateRows(

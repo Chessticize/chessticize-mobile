@@ -1,4 +1,8 @@
-import type { PracticeRunKind, PracticeRunRecord } from "../../../../packages/core/src/index.ts";
+import type {
+  CustomSprintConfigRecord,
+  PracticeRunKind,
+  PracticeRunRecord
+} from "../../../../packages/core/src/index.ts";
 
 export type { PracticeRunKind } from "../../../../packages/core/src/index.ts";
 
@@ -26,11 +30,12 @@ export type PracticeRunManagementIntent =
   | { type: "change-mode"; mode: "custom" | "arrow_duel" }
   | { type: "change-name"; name: string }
   | { type: "change-per-puzzle"; perPuzzleSeconds: number }
-  | { type: "change-themes"; themes: string[] }
+  | { type: "toggle-theme"; theme: string }
   | { type: "confirm-remove" }
   | { type: "dismiss-remove" }
   | { type: "edit-run"; runId: string }
   | { type: "move-run"; runId: string; targetRunId: string }
+  | { type: "prefill-previous-config"; configId: string }
   | { type: "remove-run"; runId: string }
   | { type: "restore-run"; runId: string }
   | { type: "save-run" }
@@ -45,6 +50,10 @@ export type PracticeRunManagementPresentation = {
   homeEditing: boolean;
   nameError: string | null;
   notice: string | null;
+  previousConfigs?: readonly {
+    config: CustomSprintConfigRecord;
+    rating: number;
+  }[];
   removeCandidateId: string | null;
   runs: readonly PracticeRunPresentation[];
   screen: "home" | "create" | "edit";

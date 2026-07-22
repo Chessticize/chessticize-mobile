@@ -62,6 +62,8 @@ export interface StartSprintCommand {
   targetCorrect?: number;
   maxMistakes?: number;
   themes?: string[];
+  /** @deprecated Accept legacy callers, then normalize to themes. */
+  theme?: string;
   minRating?: number;
   maxRating?: number;
   puzzleSelectionSeed?: string | number;
@@ -585,7 +587,10 @@ export class PracticeService {
     if (command.maxMistakes !== undefined) {
       configInput.maxMistakes = command.maxMistakes;
     }
-    const themes = normalizeThemeSelection(command.themes);
+    const themes = normalizeThemeSelection([
+      ...(command.themes ?? []),
+      ...(command.theme === undefined ? [] : [command.theme])
+    ]);
     if (themes.length > 0) {
       configInput.themes = themes;
     }

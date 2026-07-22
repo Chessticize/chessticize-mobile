@@ -105,7 +105,7 @@ describe('Practice POC', () => {
     await waitFor(element(by.id('practice-run-home-done'))).toBeVisible().withTimeout(10000);
 
     await element(by.label('Remove Calculation Lab from Home')).tap();
-    await waitFor(element(by.id('practice-run-remove-confirmation'))).toExist().withTimeout(10000);
+    await waitForVisibleInPracticeScroll('practice-run-remove-confirm');
     await element(by.id('practice-run-remove-confirm')).tap();
     await waitFor(element(by.label('Restore Calculation Lab to Home'))).toExist().withTimeout(10000);
     await element(by.label('Restore Calculation Lab to Home')).tap();

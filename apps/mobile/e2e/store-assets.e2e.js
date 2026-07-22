@@ -136,7 +136,7 @@ async function captureMainTabScenes() {
   await element(by.id('practice-main-scroll')).scrollTo('top');
   await waitFor(element(by.id('custom-mode-regular'))).toBeVisible().withTimeout(10000);
   await waitFor(element(by.id('custom-theme-row'))).toExist().withTimeout(10000);
-  await expect(element(by.text('Theme'))).not.toExist();
+  await expect(element(by.text('Themes'))).toExist();
   await sleep(1200);
   await device.takeScreenshot('app-store-07-custom-setup');
   await element(by.id('practice-run-editor-close')).tap();

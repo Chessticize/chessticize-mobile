@@ -11,7 +11,8 @@ const limit = 18;
 const rating = 1500;
 const cases = [
   { name: "one-theme", themes: ["fork"] },
-  { name: "five-themes", themes: ["mate", "endgame", "fork", "pin", "skewer"] }
+  { name: "five-themes", themes: ["fork", "pin", "sacrifice", "advancedPawn", "mateIn2"] },
+  { name: "all", themes: [] }
 ];
 
 if (!existsSync(packPath)) {
@@ -29,20 +30,33 @@ try {
   const results = cases.map((benchmarkCase) => benchmarkSelection(source, benchmarkCase));
   const oneTheme = results[0];
   const fiveThemes = results[1];
-  const plan = indexedThemePlan(database, cases[1].themes[0]);
+  const allThemes = results[2];
+  const queryPlans = Object.fromEntries(cases.map((benchmarkCase) => [
+    benchmarkCase.name,
+    selectionPlans(database, benchmarkCase.themes)
+  ]));
+  const indexes = database.prepare(`
+    SELECT name, sql
+    FROM sqlite_master
+    WHERE type = 'index'
+      AND tbl_name IN ('puzzles', 'puzzle_themes')
+    ORDER BY name ASC
+  `).all();
 
   process.stdout.write(`${JSON.stringify({
     packPath,
-    puzzleCount: source.countPuzzles(),
+    dataset: {
+      puzzleCount: source.countPuzzles(),
+      themeCount: database.prepare("SELECT COUNT(*) AS count FROM themes").get().count,
+      puzzleThemeRelationCount: database.prepare("SELECT COUNT(*) AS count FROM puzzle_themes").get().count,
+      indexes
+    },
     iterations,
     input: { limit, rating },
     results,
     fiveToOneMedianRatio: round(fiveThemes.selection.medianMs / oneTheme.selection.medianMs),
-    queryPlan: {
-      usesCompositeThemeIndex: plan.some((detail) => detail.includes("puzzle_themes_theme_rating_idx")),
-      usesTemporarySort: plan.some((detail) => detail.includes("TEMP B-TREE")),
-      details: plan
-    }
+    fiveToAllMedianRatio: round(fiveThemes.selection.medianMs / allThemes.selection.medianMs),
+    queryPlans
   }, null, 2)}\n`);
 } finally {
   database.close();
@@ -60,6 +74,9 @@ function benchmarkSelection(source, benchmarkCase) {
     if (puzzles.length !== limit) {
       throw new Error(`${benchmarkCase.name} returned ${puzzles.length} puzzles; expected ${limit}`);
     }
+    if (new Set(puzzles.map((puzzle) => puzzle.id)).size !== puzzles.length) {
+      throw new Error(`${benchmarkCase.name} returned duplicate puzzle ids`);
+    }
   }
   samples.sort((left, right) => left - right);
 
@@ -75,6 +92,8 @@ function benchmarkSelection(source, benchmarkCase) {
   return {
     name: benchmarkCase.name,
     themes: benchmarkCase.themes,
+    returnedPuzzleCount: limit,
+    duplicatePuzzleIds: 0,
     selection: {
       medianMs: round(percentile(samples, 0.5)),
       p95Ms: round(percentile(samples, 0.95)),
@@ -99,6 +118,27 @@ function select(source, benchmarkCase, randomSeed) {
   });
 }
 
+function selectionPlans(database, themes) {
+  if (themes.length === 0) {
+    const details = database.prepare(`
+      EXPLAIN QUERY PLAN
+      SELECT puzzles.*
+      FROM puzzles
+      WHERE puzzles.rating >= ?
+        AND puzzles.rating <= ?
+      ORDER BY puzzles.rating ASC, puzzles.id ASC
+      LIMIT ?
+    `).all(rating - 100, rating + 100, limit * 50).map((row) => row.detail);
+    return summarizePlans([{ label: "all", details }]);
+  }
+
+  const plans = themes.map((theme) => ({
+    label: theme,
+    details: indexedThemePlan(database, theme)
+  }));
+  return summarizePlans(plans);
+}
+
 function indexedThemePlan(database, theme) {
   const themeId = database.prepare("SELECT id FROM themes WHERE name = ?").get(theme)?.id;
   if (themeId === undefined) {
@@ -114,6 +154,16 @@ function indexedThemePlan(database, theme) {
     ORDER BY puzzle_themes.rating ASC, puzzle_themes.puzzle_id ASC
     LIMIT ?
   `).all(themeId, rating - 100, rating + 100, limit * 50).map((row) => row.detail);
+}
+
+function summarizePlans(plans) {
+  const details = plans.flatMap((plan) => plan.details);
+  return {
+    usesPuzzleRatingIndex: details.some((detail) => detail.includes("puzzles_rating_idx")),
+    usesCompositeThemeIndex: details.some((detail) => detail.includes("puzzle_themes_theme_rating_idx")),
+    usesTemporarySort: details.some((detail) => detail.includes("TEMP B-TREE")),
+    scans: plans
+  };
 }
 
 function percentile(sorted, percentileValue) {

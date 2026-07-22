@@ -242,6 +242,17 @@ describe('Key user flows', () => {
     await waitFor(element(by.id('history-filter-sprint-only')))
       .toHaveValue(historyToggleValue('Sprint attempts only', false))
       .withTimeout(10000);
+    await element(by.id('history-filter-toggle')).tap();
+    await waitForVisibleInPracticeScroll('history-theme-mate-in-2');
+    await element(by.id('history-theme-mate-in-2')).tap();
+    await waitForVisibleInPracticeScroll('history-theme-mate-in-3');
+    await element(by.id('history-theme-mate-in-3')).tap();
+    await waitFor(element(
+      by.text('Mate in 2').withAncestor(by.id('history-active-filter-summary'))
+    )).toExist().withTimeout(10000);
+    await waitFor(element(
+      by.text('Mate in 3').withAncestor(by.id('history-active-filter-summary'))
+    )).toExist().withTimeout(10000);
     await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
 
     const resultAttributes = await element(by.text('Wrong move')).atIndex(0).getAttributes();
@@ -249,9 +260,13 @@ describe('Key user flows', () => {
     if (typeof resultIdentifier !== 'string' || !resultIdentifier.endsWith('-result')) {
       throw new Error(`Could not resolve history attempt row from ${String(resultIdentifier)}`);
     }
-    await element(by.id(resultIdentifier.replace(/-result$/, ''))).tap();
+    const resultRowIdentifier = resultIdentifier.replace(/-result$/, '');
+    await waitForVisibleInPracticeScroll(resultRowIdentifier);
+    await element(by.id(resultRowIdentifier)).tap();
     await waitFor(element(by.id('review-session'))).toExist().withTimeout(10000);
     await expect(element(by.id('review-source-pill'))).not.toExist();
+    await waitFor(element(by.id('review-theme-rail'))).toExist().withTimeout(10000);
+    await expect(element(by.text('Themes'))).not.toExist();
     await element(by.id('practice-main-scroll')).scrollTo('top');
     await waitFor(element(by.id('review-exit'))).toBeVisible().withTimeout(10000);
     await element(by.id('review-exit')).tap();
@@ -261,8 +276,12 @@ describe('Key user flows', () => {
     await waitFor(element(by.id('history-filter-sprint-only')))
       .toHaveValue(historyToggleValue('Sprint attempts only', false))
       .withTimeout(10000);
-    await expect(element(by.id('history-filter-reset'))).not.toExist();
-    await element(by.id('history-filter-toggle')).tap();
+    await expect(element(
+      by.text('Mate in 2').withAncestor(by.id('history-active-filter-summary'))
+    )).toExist();
+    await expect(element(
+      by.text('Mate in 3').withAncestor(by.id('history-active-filter-summary'))
+    )).toExist();
     await waitFor(element(by.id('history-filter-reset'))).toBeVisible().withTimeout(10000);
     await expect(element(by.text('Reset filters'))).toExist();
     await element(by.id('history-filter-reset')).tap();
@@ -291,8 +310,11 @@ describe('Key user flows', () => {
     await failStandardSprint();
     await dismissSprintSummary();
 
-    await openTab('practice-tab', 'practice-run-management');
-    await createSavedCustomRun('Persistent Focus', { shorterDuration: true });
+    await openTab('practice-tab', 'practice-add-run');
+    await createSavedCustomRun('Persistent Focus', {
+      shorterDuration: true,
+      themes: ['mate-in-2', 'fork']
+    });
     await element(by.text('Persistent Focus')).tap();
     await element(by.id('practice-main-scroll')).scrollTo('top');
     await element(by.id('practice-run-start')).tap();
@@ -303,11 +325,15 @@ describe('Key user flows', () => {
     await waitFor(element(by.text('Sprint failed'))).toBeVisible().withTimeout(10000);
     await dismissSprintSummary();
 
-    await openTab('practice-tab', 'practice-run-management');
+    await openTab('practice-tab', 'practice-add-run');
     await element(by.id('practice-run-home-edit')).tap();
+    await element(by.id('practice-main-scroll')).scrollTo('top');
+    await waitFor(element(by.id('practice-run-edit-standard'))).toBeVisible().withTimeout(10000);
     await element(by.id('practice-run-edit-standard')).tap();
     await element(by.id('practice-run-elo-increase')).tap();
     await element(by.id('practice-run-save')).tap();
+    await element(by.id('practice-main-scroll')).scrollTo('top');
+    await waitFor(element(by.id('practice-run-home-done'))).toBeVisible().withTimeout(10000);
     await element(by.id('practice-run-home-done')).tap();
     await waitForElementTextContaining('practice-mode-standard-rating', 'ELO 625', 5000);
 
@@ -326,25 +352,32 @@ describe('Key user flows', () => {
     await openTab('settings-tab', 'settings-app-version');
     await expect(element(by.id('settings-standard-elo-row'))).not.toExist();
 
-    await openTab('practice-tab', 'practice-run-management');
+    await openTab('practice-tab', 'practice-add-run');
     await waitFor(element(by.text('Persistent Focus'))).toExist().withTimeout(10000);
+    await waitFor(element(by.text('Fork + Mate in 2 · 3 min · 20s pace')))
+      .toExist()
+      .withTimeout(10000);
     await waitForElementTextContaining('practice-mode-standard-rating', 'ELO 625', 5000);
   });
 });
 
-async function createSavedCustomRun(name, { shorterDuration = false } = {}) {
+async function createSavedCustomRun(name, { shorterDuration = false, themes = [] } = {}) {
   await waitFor(element(by.id('practice-add-run'))).toBeVisible().withTimeout(10000);
   await element(by.id('practice-add-run')).tap();
   await waitFor(element(by.id('practice-run-editor'))).toExist().withTimeout(10000);
   await element(by.id('practice-run-name-input')).replaceText(name);
+  await element(by.id('practice-run-name-input')).tapReturnKey();
   if (shorterDuration) {
     await waitForVisibleInPracticeScroll('practice-run-duration-stepper-decrease');
     await element(by.id('practice-run-duration-stepper-decrease')).tap();
   }
+  for (const theme of themes) {
+    await waitForVisibleInPracticeScroll(`custom-theme-${theme}`);
+    await element(by.id(`custom-theme-${theme}`)).tap();
+  }
   await element(by.id('practice-main-scroll')).scrollTo('top');
   await element(by.id('practice-run-save')).tap();
-  await waitFor(element(by.id('practice-run-home-done'))).toBeVisible().withTimeout(10000);
-  await element(by.id('practice-run-home-done')).tap();
+  await waitFor(element(by.id('practice-run-home-edit'))).toBeVisible().withTimeout(10000);
   await waitFor(element(by.text(name))).toExist().withTimeout(10000);
 }
 

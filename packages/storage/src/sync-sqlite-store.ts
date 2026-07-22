@@ -1,5 +1,6 @@
 import {
   buildHistoryView,
+  curatedPuzzleThemes,
   clonePracticeRun,
   buildSessionMistakeReview,
   createDefaultRating,
@@ -1216,7 +1217,8 @@ export class SyncSQLiteStore implements PracticeStore {
         ...(perPuzzleSeconds === undefined ? {} : { perPuzzleSeconds }),
         puzzleRating: puzzle.rating,
         side: sideToMoveForHistoryPuzzle({ puzzle, mode: row.mode }),
-        themes: puzzle.themes
+        themes: puzzle.themes,
+        curatedThemes: curatedPuzzleThemes(puzzle.themes)
       };
     });
   }

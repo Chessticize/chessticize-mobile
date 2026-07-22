@@ -1,6 +1,11 @@
 // Keep the deterministic Lab fixture on the root TypeScript boundary, which
 // intentionally excludes React Native TSX. LabScenario's prop assignment still
 // checks this structural contract against PracticePocScreen during Lab typecheck.
+import {
+  ALL_THEME_SELECTION,
+  applyThemeChoiceIntent
+} from "../../../packages/core/src/index.ts";
+
 type PracticeRunPresentation = {
   id: string;
   ratingKey?: string;
@@ -25,11 +30,12 @@ type PracticeRunManagementIntent =
   | { type: "change-mode"; mode: "custom" | "arrow_duel" }
   | { type: "change-name"; name: string }
   | { type: "change-per-puzzle"; perPuzzleSeconds: number }
-  | { type: "change-themes"; themes: string[] }
+  | { type: "toggle-theme"; theme: string }
   | { type: "confirm-remove" }
   | { type: "dismiss-remove" }
   | { type: "edit-run"; runId: string }
   | { type: "move-run"; runId: string; targetRunId: string }
+  | { type: "prefill-previous-config"; configId: string }
   | { type: "remove-run"; runId: string }
   | { type: "restore-run"; runId: string }
   | { type: "save-run" }
@@ -63,7 +69,7 @@ const BASE_RUNS: readonly PracticeRunPresentation[] = [
     elo: 925,
     durationSeconds: 300,
     perPuzzleSeconds: 20,
-    themes: ["mixed"]
+    themes: [ALL_THEME_SELECTION]
   },
   {
     id: "arrow-duel",
@@ -74,7 +80,7 @@ const BASE_RUNS: readonly PracticeRunPresentation[] = [
     elo: 875,
     durationSeconds: 300,
     perPuzzleSeconds: 20,
-    themes: ["mixed"]
+    themes: [ALL_THEME_SELECTION]
   },
   {
     id: "tactics-focus",
@@ -153,9 +159,14 @@ export function runManagementFixtureReducer(
       return state.screen === "create"
         ? updateDraft(state, { perPuzzleSeconds: intent.perPuzzleSeconds })
         : state;
-    case "change-themes":
+    case "toggle-theme":
       return state.screen === "create"
-        ? updateDraft(state, { themes: intent.themes.length > 0 ? intent.themes : ["mixed"] })
+        ? updateDraft(state, {
+            themes: applyThemeChoiceIntent(
+              state.draft?.themes ?? [ALL_THEME_SELECTION],
+              { type: "toggle-theme", theme: intent.theme }
+            )
+          })
         : state;
     case "confirm-remove":
       return confirmRemoval(state);
@@ -178,6 +189,8 @@ export function runManagementFixtureReducer(
     }
     case "move-run":
       return moveRun(state, intent.runId, intent.targetRunId);
+    case "prefill-previous-config":
+      return state;
     case "remove-run":
       return state.runs.some((run) => run.id === intent.runId)
         ? { ...state, removeCandidateId: intent.runId, notice: null }
@@ -214,7 +227,7 @@ function newRunDraft(): PracticeRunDraft {
     elo: 900,
     durationSeconds: 300,
     perPuzzleSeconds: 20,
-    themes: ["mixed"]
+    themes: [ALL_THEME_SELECTION]
   };
 }
 

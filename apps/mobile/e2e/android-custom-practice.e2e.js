@@ -65,8 +65,7 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
 
       await element(by.id('practice-main-scroll')).scrollTo('top');
       await element(by.id('practice-run-save')).tap();
-      await waitFor(element(by.id('practice-run-home-done'))).toBeVisible().withTimeout(10000);
-      await element(by.id('practice-run-home-done')).tap();
+      await waitFor(element(by.id('practice-run-home-edit'))).toBeVisible().withTimeout(10000);
       await waitFor(element(by.text(CUSTOM_RUN_NAME))).toExist().withTimeout(10000);
       await element(by.text(CUSTOM_RUN_NAME)).tap();
       await element(by.id('practice-main-scroll')).scrollTo('top');

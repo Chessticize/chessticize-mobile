@@ -1,4 +1,9 @@
 import { beginArrowDuelPuzzle, beginLinePuzzle } from "./puzzle-session.ts";
+import {
+  curatedPuzzleThemes,
+  namedThemesForSelection,
+  puzzleMatchesAnyTheme
+} from "./theme-catalog.ts";
 import { isPracticeRunRatingKey } from "./practice-runs.ts";
 import type { AttemptEvent, AttemptResult, AttemptSource, Puzzle, RatingRecord, ReviewQueueState, SprintMode } from "./types.ts";
 
@@ -20,6 +25,8 @@ export interface HistoryQuery {
   source?: AttemptSource;
   result?: AttemptResult;
   side?: PuzzleSide;
+  themes?: string[];
+  /** @deprecated Accept legacy callers, then normalize to themes. */
   theme?: string;
   mode?: SprintMode;
   speedSeconds?: number;
@@ -64,6 +71,7 @@ export interface HistoryAttemptView {
   puzzleRating: number;
   side: PuzzleSide;
   themes: string[];
+  curatedThemes: string[];
 }
 
 export interface HistoryEloPoint {
@@ -305,11 +313,21 @@ export function validateHistoryQuery(query: HistoryQuery): HistoryQuery {
     throw new Error("minRating must be less than or equal to maxRating");
   }
   const page = query.page ? validateHistoryPageQuery(query.page) : undefined;
-  const { ratingKey: rawRatingKey, ...queryWithoutRatingKey } = query;
+  const {
+    ratingKey: rawRatingKey,
+    theme: legacyTheme,
+    themes: rawThemes,
+    ...queryWithoutRatingAndThemes
+  } = query;
   const ratingKey = normalizeHistoryRatingKey(rawRatingKey?.trim());
+  const themes = namedThemesForSelection([
+    ...(rawThemes ?? []),
+    ...(legacyTheme === undefined ? [] : [legacyTheme])
+  ]);
   const normalized: HistoryQuery = {
-    ...queryWithoutRatingKey,
-    ...(ratingKey ? { ratingKey } : {})
+    ...queryWithoutRatingAndThemes,
+    ...(ratingKey ? { ratingKey } : {}),
+    ...(themes.length > 0 ? { themes } : {})
   };
   if (page) {
     normalized.page = page;
@@ -393,9 +411,10 @@ export function buildHistoryView(input: {
 
 export function filterHistoryAttemptsForQuery(input: {
   attempts: HistoryAttemptView[];
-  query: Pick<HistoryQuery, "result" | "source" | "mode" | "side" | "minRating" | "maxRating" | "theme" | "speedSeconds" | "reviewStatus" | "unclear">;
+  query: Pick<HistoryQuery, "result" | "source" | "mode" | "side" | "minRating" | "maxRating" | "theme" | "themes" | "speedSeconds" | "reviewStatus" | "unclear">;
   reviews: ReviewQueueState[];
 }): HistoryAttemptView[] {
+  const selectedThemes = historyThemesForQuery(input.query);
   return input.attempts
     .filter((attempt) => !input.query.result || normalizeHistoryResult(attempt.result) === input.query.result)
     .filter((attempt) => !input.query.source || normalizeHistorySource(attempt.source) === input.query.source)
@@ -403,7 +422,7 @@ export function filterHistoryAttemptsForQuery(input: {
     .filter((attempt) => !input.query.side || attempt.side === input.query.side)
     .filter((attempt) => input.query.minRating === undefined || attempt.puzzleRating >= input.query.minRating)
     .filter((attempt) => input.query.maxRating === undefined || attempt.puzzleRating <= input.query.maxRating)
-    .filter((attempt) => !input.query.theme || attempt.themes.includes(input.query.theme))
+    .filter((attempt) => puzzleMatchesAnyTheme(attempt.themes, selectedThemes))
     .filter((attempt) => input.query.speedSeconds === undefined || historyAttemptSpeedSeconds(attempt) === input.query.speedSeconds)
     .filter((attempt) => input.query.unclear === undefined || Boolean(attempt.unclear) === input.query.unclear)
     .filter((attempt) => {
@@ -413,6 +432,15 @@ export function filterHistoryAttemptsForQuery(input: {
       const queued = historyAttemptHasReviewQueued(attempt, input.reviews);
       return input.query.reviewStatus === "queued" ? queued : !queued;
     });
+}
+
+export function historyThemesForQuery(
+  query: Pick<HistoryQuery, "theme" | "themes">
+): string[] {
+  return namedThemesForSelection([
+    ...(query.themes ?? []),
+    ...(query.theme === undefined ? [] : [query.theme])
+  ]);
 }
 
 export function historyAttemptSpeedSeconds(
@@ -586,7 +614,7 @@ function buildAttemptPerformanceChart(
 }
 
 function collectThemes(attempts: HistoryAttemptView[]): string[] {
-  return [...new Set(attempts.flatMap((attempt) => attempt.themes))].sort();
+  return curatedPuzzleThemes(attempts.flatMap((attempt) => attempt.themes));
 }
 
 function historyRangeDays(timeRange: HistoryTimeRange): number {
