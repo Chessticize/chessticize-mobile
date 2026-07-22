@@ -10,6 +10,7 @@ import {
   type PracticeDebugTraceEvent,
   type PracticeRunManagementPresentation
 } from "../src/components/PracticePocScreen";
+import { LabScenario } from "../../mobile-lab/src/LabScenario";
 import {
   createMobilePracticeService,
   configureMobilePracticePuzzleSource,
@@ -888,6 +889,67 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "custom-theme-mate-in-4");
     expect(onIntent).toHaveBeenLastCalledWith({ type: "change-themes", themes: ["mateIn4"] });
+  });
+
+  it("keeps the full curated theme catalog when New Run opens from the Home story", async () => {
+    const renderer = renderLabScenario("practice-home");
+    await flushMicrotasks();
+
+    press(renderer, "practice-add-run");
+
+    const themeTestIDs = new Set(
+      collectTestIds(findByTestId(renderer, "practice-run-theme-row"))
+        .filter((testID) => testID.startsWith("custom-theme-") && testID !== "custom-theme-mixed")
+    );
+    expect(themeTestIDs.size).toBe(24);
+    expect(themeTestIDs).toContain("custom-theme-capturing-defender");
+    expect(themeTestIDs).toContain("custom-theme-zugzwang");
+  });
+
+  it("keeps the seven curated puzzle tags in the Populated History story", async () => {
+    const renderer = renderLabScenario("history-populated");
+    await flushMicrotasks();
+
+    press(renderer, "history-tab");
+
+    const railTestIDs = new Set(
+      collectTestIds(findByTestId(renderer, "history-attempt-history-unclear-themes"))
+        .filter((testID) => testID.startsWith("history-attempt-history-unclear-themes-"))
+    );
+    expect(railTestIDs.size).toBe(7);
+    expect(railTestIDs).toContain("history-attempt-history-unclear-themes-matein3");
+  });
+
+  it("keeps the seven curated puzzle tags when replay opens from History", async () => {
+    const renderer = renderLabScenario("history-attempt-detail");
+    await flushMicrotasks();
+
+    press(renderer, "history-tab");
+    press(renderer, "history-attempt-history-unclear");
+
+    const railTestIDs = new Set(
+      collectTestIds(findByTestId(renderer, "review-theme-rail"))
+        .filter((testID) => testID.startsWith("review-theme-rail-"))
+    );
+    expect(railTestIDs.size).toBe(7);
+    expect(railTestIDs).toContain("review-theme-rail-matein3");
+  });
+
+  it("keeps all 24 curated choices in the History Filters story", async () => {
+    const renderer = renderLabScenario("history-filters");
+    await flushMicrotasks();
+
+    press(renderer, "history-tab");
+    press(renderer, "history-filter-toggle");
+
+    const themeTestIDs = new Set(
+      collectTestIds(findByTestId(renderer, "history-theme-filters"))
+        .filter((testID) => testID.startsWith("history-theme-")
+          && testID !== "history-theme-filters"
+          && testID !== "history-theme-all"
+          && !testID.startsWith("history-theme-filter-rail-"))
+    );
+    expect(themeTestIDs.size).toBe(24);
   });
 
   it("limits an existing Custom Run editor to Current ELO", () => {
@@ -6384,6 +6446,20 @@ function renderScreen({
   });
   if (!renderer) {
     throw new Error("PracticePocScreen did not render");
+  }
+  renderers.push(renderer);
+  return renderer;
+}
+
+function renderLabScenario(
+  scenarioId: React.ComponentProps<typeof LabScenario>["scenarioId"]
+): TestRenderer.ReactTestRenderer {
+  let renderer: TestRenderer.ReactTestRenderer | undefined;
+  act(() => {
+    renderer = TestRenderer.create(<LabScenario scenarioId={scenarioId} />);
+  });
+  if (!renderer) {
+    throw new Error("LabScenario did not render");
   }
   renderers.push(renderer);
   return renderer;
