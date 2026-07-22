@@ -20,6 +20,8 @@ export const CustomSetup: Story = {
   play: async ({ canvasElement }) => {
     await clickTestId(canvasElement, "practice-mode-custom");
     await waitForTestId(canvasElement, "custom-sprint-setup");
+    await clickTestId(canvasElement, "custom-theme-fork");
+    await clickTestId(canvasElement, "custom-theme-pin");
   }
 };
 

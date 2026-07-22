@@ -77,7 +77,7 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
     "practice--custom-setup",
     "Existing Custom Sprint setup using the approved grouped presentation for the server-curated 24-theme catalog.",
     "practice",
-    ["Complete custom configuration", "24 curated themes", "Independent theme toggles", "All exclusivity", "Non-empty theme fallback"],
+    ["Complete custom configuration", "24 curated themes", "Deterministic All-to-multiple selection", "All exclusivity", "Non-empty theme fallback"],
     ["Practice home", "Native SQLite persistence and a scored practice session"]
   ),
   "practice-custom-rating-editor": defineScenario("practice-custom-rating-editor", "Practice", "Custom rating editor", "practice--custom-rating-editor", "Expanded ELO adjustment for a previously played custom rating bucket.", "practice", ["Custom setup", "Rating adjustment"], ["Practice home"]),

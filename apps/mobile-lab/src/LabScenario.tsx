@@ -38,7 +38,7 @@ type ScenarioRuntime = {
 
 export function LabScenario({ scenarioId }: { scenarioId: LabScenarioId }): React.JSX.Element {
   const runtime = useMemo(() => createScenarioRuntime(scenarioId), [scenarioId]);
-  const [selectedCustomThemes, setSelectedCustomThemes] = useState<string[]>(["fork", "pin"]);
+  const [selectedCustomThemes, setSelectedCustomThemes] = useState<string[]>([]);
   const showsThemeCatalogPrototype = [
     "practice-custom-setup",
     "history-populated",
@@ -48,7 +48,7 @@ export function LabScenario({ scenarioId }: { scenarioId: LabScenarioId }): Reac
 
   setLabPracticeService(runtime.service);
   useEffect(() => () => clearLabPracticeService(runtime.service), [runtime.service]);
-  useEffect(() => setSelectedCustomThemes(["fork", "pin"]), [scenarioId]);
+  useEffect(() => setSelectedCustomThemes([]), [scenarioId]);
 
   return (
     <LabScenarioShell scenarioId={scenarioId}>
