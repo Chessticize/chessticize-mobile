@@ -1,50 +1,102 @@
 {
   "history-populated": {
-    "issueNumber": 273,
-    "changeNote": "Uses the selected horizontal tag rail, including a real seven-theme density case."
+    "issues": [
+      {
+        "issueNumber": 273,
+        "changeNote": "Uses the selected horizontal tag rail, including a real seven-theme density case."
+      }
+    ]
   },
   "history-filters": {
-    "issueNumber": 273,
-    "changeNote": "Adds the complete categorized 24-theme catalog to the existing History filters."
+    "issues": [
+      {
+        "issueNumber": 273,
+        "changeNote": "Adds the complete categorized 24-theme catalog to the existing History filters."
+      }
+    ]
   },
   "history-attempt-detail": {
-    "issueNumber": 273,
-    "changeNote": "Shows all curated puzzle themes in the real replay flow reached from History."
+    "issues": [
+      {
+        "issueNumber": 273,
+        "changeNote": "Shows all curated puzzle themes in the real replay flow reached from History."
+      }
+    ]
   },
   "practice-home": {
-    "issueNumber": 253,
-    "changeNote": "Named reusable runs use centered bordered cards on Home with Add Run and edit entry points."
+    "issues": [
+      {
+        "issueNumber": 253,
+        "changeNote": "Named reusable runs use centered bordered cards on Home with Add Run and edit entry points."
+      }
+    ]
   },
   "practice-home-edit": {
-    "issueNumber": 253,
-    "changeNote": "Whole Run cards reorder in real time with animated insertion plus arrow-button fallbacks."
+    "issues": [
+      {
+        "issueNumber": 253,
+        "changeNote": "Whole Run cards reorder in real time with animated insertion plus arrow-button fallbacks."
+      }
+    ]
   },
   "practice-custom-setup": {
-    "issueNumber": 253,
-    "changeNote": "New Run defaults to All themes and saves to Home without starting."
+    "issues": [
+      {
+        "issueNumber": 253,
+        "changeNote": "New Run defaults to All themes and saves to Home without starting."
+      },
+      {
+        "issueNumber": 273,
+        "changeNote": "Uses the selected grouped layout for the server-curated 24-theme catalog."
+      }
+    ]
   },
   "practice-run-name-validation": {
-    "issueNumber": 253,
-    "changeNote": "Custom run names are required and unique with inline errors."
+    "issues": [
+      {
+        "issueNumber": 253,
+        "changeNote": "Custom run names are required and unique with inline errors."
+      }
+    ]
   },
   "practice-run-standard-editor": {
-    "issueNumber": 253,
-    "changeNote": "Built-in ELO editing shows the Run name and returns to Home edit mode after Save or Cancel."
+    "issues": [
+      {
+        "issueNumber": 253,
+        "changeNote": "Built-in ELO editing shows the Run name and returns to Home edit mode after Save or Cancel."
+      }
+    ]
   },
   "practice-custom-rating-editor": {
-    "issueNumber": 253,
-    "changeNote": "Custom ELO editing shows the Run name, keeps creation settings fixed, and returns to Home edit mode."
+    "issues": [
+      {
+        "issueNumber": 253,
+        "changeNote": "Custom ELO editing shows the Run name, keeps creation settings fixed, and returns to Home edit mode."
+      }
+    ]
   },
   "practice-run-remove-confirmation": {
-    "issueNumber": 253,
-    "changeNote": "Removal expands an inline warning directly below the selected Run and retains ELO and history."
+    "issues": [
+      {
+        "issueNumber": 253,
+        "changeNote": "Removal expands an inline warning directly below the selected Run and retains ELO and history."
+      }
+    ]
   },
   "practice-runs-empty": {
-    "issueNumber": 253,
-    "changeNote": "An empty Home exposes both Add Run and retained-run restore paths."
+    "issues": [
+      {
+        "issueNumber": 253,
+        "changeNote": "An empty Home exposes both Add Run and retained-run restore paths."
+      }
+    ]
   },
   "settings-advanced-ratings": {
-    "issueNumber": 253,
-    "changeNote": "Settings no longer owns ELO controls; each run editor owns its current ELO."
+    "issues": [
+      {
+        "issueNumber": 253,
+        "changeNote": "Settings no longer owns ELO controls; each run editor owns its current ELO."
+      }
+    ]
   }
 }

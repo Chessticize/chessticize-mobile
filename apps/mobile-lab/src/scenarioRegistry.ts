@@ -58,14 +58,18 @@ type LabScenarioMetadata = {
   };
 };
 
-export type NewScenarioMarker = {
+export type NewScenarioIssue = {
   issueNumber: number;
   changeNote: string;
 };
 
+export type NewScenarioMarker = {
+  issues: readonly NewScenarioIssue[];
+};
+
 type ScenarioMarker =
   | ({ isNew: true } & NewScenarioMarker)
-  | { isNew?: false; issueNumber?: never; changeNote?: never };
+  | { isNew?: false; issues?: never };
 
 export type LabScenarioDefinition = ScenarioMarker & LabScenarioMetadata;
 
@@ -161,8 +165,7 @@ export const navigationCoverage = {
 
 export type NewScenarioDefinition = LabScenarioDefinition & {
   isNew: true;
-  issueNumber: number;
-  changeNote: string;
+  issues: readonly NewScenarioIssue[];
 };
 
 export const newScenarios = Object.values(scenarioRegistry).filter(

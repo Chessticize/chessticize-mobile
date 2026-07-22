@@ -92,8 +92,9 @@ For an authorized preview:
   story incrementally whenever it exists, preserve its stable URL, and expose
   the issue-owned delta inside the complete product catalog.
 - Add every new or materially changed scenario for that issue to
-  `newScenarioMarkers.json` with its owning `issueNumber` and a concise
-  `changeNote`; the registry derives `isNew: true` from it.
+  `newScenarioMarkers.json`. Add an ownership record with its `issueNumber` and
+  concise `changeNote` to the scenario's `issues` array without removing other
+  open issue owners; the registry derives `isNew: true` from that array.
 - Link the issue in the PR and link the PR back from the issue.
 - Run `pnpm mobile:lab:validate` plus focused component or type checks required
   by the presentation boundary.
@@ -103,10 +104,12 @@ For an authorized preview:
   tag highlights the issue-owned delta.
 - A coherent design increment may become ready and merge to `main`; merging is
   not explicit approval and does not begin implementation. Continue later
-  feedback from current `main` and update the same scenario and issue site.
-- Keep the New Scenario Marker on `main` until the linked GitHub issue is closed.
-  Pull-request CI verifies closure before accepting marker removal. Retain the
-  scenario as living UI documentation.
+  feedback from current `main`, update the same scenario, and use the new
+  branch's dedicated site.
+- Keep each New Scenario Marker ownership on `main` until its linked GitHub
+  issue is closed. Pull-request CI verifies closure before accepting ownership
+  removal; remove the marker only after no ownership remains. Retain the scenario
+  as living UI documentation.
 - Stop after the design handoff. Do not mark the product issue
   `ready-for-agent` for implementation until the design decision and remaining
   acceptance criteria are explicit.

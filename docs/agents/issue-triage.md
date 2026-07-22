@@ -150,8 +150,9 @@ When preview work is explicitly authorized:
    the delta.
 2. Create a branch named `codex/storybook-issue-<number>-<goal>` for one issue.
 3. Add every new or materially changed scenario owned by that issue to
-   `newScenarioMarkers.json` with its `issueNumber` and a concise `changeNote`;
-   the registry derives `isNew: true` from it.
+   `newScenarioMarkers.json`. Add its `issueNumber` and concise `changeNote` to
+   the scenario's `issues` array without removing any other open issue owner;
+   the registry derives `isNew: true` from the non-empty array.
 4. Add deterministic variants and important states to the complete Interaction
    Lab catalog.
    Prefer two or three structurally different directions when the decision is
@@ -168,10 +169,11 @@ not design approval and does not authorize product wiring. Continue later
 feedback rounds from current `main`, update the same issue-owned scenarios, and
 redeploy the same issue preview until the design is approved for implementation.
 
-The New Scenario Marker remains on `main` for as long as its linked issue is
-open. Remove the marker only in a cleanup change after GitHub records that issue
-as closed; pull-request CI verifies the issue state. Retain the scenario itself
-as living UI documentation.
+Each New Scenario Marker ownership remains on `main` for as long as its linked
+issue is open. Remove only that ownership in a cleanup change after GitHub
+records the issue as closed; remove the marker only when no ownership remains.
+Pull-request CI verifies every removed ownership. Retain the scenario itself as
+living UI documentation.
 
 The Storybook phase must not add production navigation, persistent storage or
 backend mutation, native-module wiring, analytics, rollout, or release logic.
@@ -181,11 +183,12 @@ record those as later diagnostic or validation work.
 ### Hosted preview handoff
 
 When remote preview publication is authorized and Sites is available, build and
-deploy the complete `apps/mobile-lab` Storybook for that issue's exact commit.
-Use a stable issue-specific site or deployment so the reviewer can browse the
-catalog like local Storybook, while the `new` tag and What's New page identify
-the issue-owned delta. Every Storybook review site, including the main-branch
-catalog and every branch-owned site, is public and must not require
+deploy the complete `apps/mobile-lab` Storybook from the reviewed branch's exact
+commit through a Sites project dedicated to that branch. Reuse the site only for
+later commits on the same branch; a new branch gets a new project and URL, even
+for the same issue. Stop if the recorded source branch or commit does not match
+the reviewed application branch. Every Storybook review site, including the
+main-branch catalog and every branch-owned site, is public and must not require
 authentication. Set Sites access mode to public and verify that an
 unauthenticated request to `/storybook/` returns HTTP 200 before handoff.
 

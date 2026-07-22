@@ -28,14 +28,19 @@ export function WhatsNewIndex({
             <article key={scenario.id} style={styles.card}>
               <div style={styles.cardMeta}>
                 <span style={styles.badge}>NEW</span>
-                <a
-                  href={`https://github.com/Chessticize/chessticize-mobile/issues/${scenario.issueNumber}`}
-                  rel="noreferrer"
-                  style={styles.issueLink}
-                  target="_blank"
-                >
-                  Issue #{scenario.issueNumber}
-                </a>
+                <span style={styles.issueLinks}>
+                  {scenario.issues.map(({ issueNumber }) => (
+                    <a
+                      href={`https://github.com/Chessticize/chessticize-mobile/issues/${issueNumber}`}
+                      key={issueNumber}
+                      rel="noreferrer"
+                      style={styles.issueLink}
+                      target="_blank"
+                    >
+                      Issue #{issueNumber}
+                    </a>
+                  ))}
+                </span>
               </div>
               <a
                 href={`./iframe.html?id=${scenario.storyId}&viewMode=story`}
@@ -43,7 +48,9 @@ export function WhatsNewIndex({
               >
                 <span style={styles.group}>{scenario.group}</span>
                 <strong style={styles.cardTitle}>{scenario.title}</strong>
-                <span style={styles.cardCopy}>{scenario.changeNote}</span>
+                {scenario.issues.map(({ issueNumber, changeNote }) => (
+                  <span key={issueNumber} style={styles.cardCopy}>{changeNote}</span>
+                ))}
                 <span style={styles.open}>Open full-screen scenario →</span>
               </a>
             </article>
@@ -135,6 +142,12 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 12,
     fontWeight: 800,
     textDecoration: "none"
+  },
+  issueLinks: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 8,
+    justifyContent: "flex-end"
   },
   storyLink: {
     color: "inherit",

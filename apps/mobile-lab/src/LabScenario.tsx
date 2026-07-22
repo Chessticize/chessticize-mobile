@@ -56,6 +56,7 @@ function LabScenarioContent({
   const [selectedCustomThemes, setSelectedCustomThemes] = useState<string[]>([]);
   const showsThemeCatalogPrototype = [
     "practice-custom-setup",
+    "practice-run-name-validation",
     "history-populated",
     "history-filters",
     "history-attempt-detail"

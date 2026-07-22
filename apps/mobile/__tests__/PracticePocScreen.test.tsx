@@ -882,6 +882,8 @@ describe("PracticePocScreen", () => {
 
     expect(themeSelected(renderer, "mixed")).toBe(true);
     expect(findByTestId(renderer, "custom-theme-mate-in-4")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "practice-run-editor")).match(/Themes/g)).toHaveLength(1);
+    expect(collectText(findByTestId(renderer, "practice-run-theme-row"))).toContain("Choose one or more");
 
     press(renderer, "custom-theme-mate-in-4");
     expect(onIntent).toHaveBeenLastCalledWith({ type: "change-themes", themes: ["mateIn4"] });

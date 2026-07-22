@@ -3860,10 +3860,12 @@ function PracticeRunEditor({
                   testID="practice-run-mode-row"
                   onChange={(mode) => presentation.onIntent({ type: "change-mode", mode })}
                 />
-                <View style={styles.runThemeLabelRow}>
-                  <Text style={styles.listText}>Themes</Text>
-                  <Text style={styles.requiredFieldLabel}>Choose one or more</Text>
-                </View>
+                {!themeCatalogPresentation ? (
+                  <View style={styles.runThemeLabelRow}>
+                    <Text style={styles.listText}>Themes</Text>
+                    <Text style={styles.requiredFieldLabel}>Choose one or more</Text>
+                  </View>
+                ) : null}
                 <CustomThemeChoiceRow
                   selectedThemes={draft.themes}
                   themeCatalogPresentation={themeCatalogPresentation}
@@ -4608,7 +4610,10 @@ function ThemeCatalogChoiceRow({
   return (
     <View style={styles.themeCatalogSection} testID={testID}>
       <View style={styles.themeCatalogHeadingRow}>
-        <Text style={styles.themeCatalogTitle}>Themes</Text>
+        <View>
+          <Text style={styles.themeCatalogTitle}>Themes</Text>
+          <Text style={styles.requiredFieldLabel}>Choose one or more</Text>
+        </View>
         {allChip}
       </View>
       <View style={styles.themeCatalogGroupGrid}>
