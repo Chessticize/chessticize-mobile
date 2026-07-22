@@ -17,6 +17,8 @@ export type LabScenarioId =
   | "practice-runs-empty"
   | "practice-preparing"
   | "practice-active"
+  | "practice-arrow-duel-prompt"
+  | "practice-blunder-move-preview"
   | "practice-paused"
   | "practice-exit-confirmation"
   | "practice-summary"
@@ -26,6 +28,7 @@ export type LabScenarioId =
   | "review-overdue"
   | "review-filters"
   | "review-session"
+  | "review-blunder-move-preview"
   | "review-feedback-analysis"
   | "history-empty"
   | "history-populated"
@@ -97,6 +100,8 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
   "practice-runs-empty": defineScenario("practice-runs-empty", "Practice", "Empty Home and restore", "practice--empty-home-and-restore", "Home after every run is hidden, with clear Add Run and restore paths that preserve prior ELO.", "practice", ["Empty state", "Add Run", "Retained run list", "Restore to Home"], ["New Run", "Practice home"]),
   "practice-preparing": defineScenario("practice-preparing", "Practice", "Preparing", "practice--preparing", "Stable preparing overlay before an Arrow Duel sprint starts.", "practice", ["Preparing overlay", "Cancel through Back intent"], ["Active sprint", "Practice home"]),
   "practice-active": defineScenario("practice-active", "Practice", "Active session", "practice--active-session", "Active Standard sprint with the development-only Board Placeholder.", "practice", ["Timer", "Progress", "Board state", "Pause", "Accessible moves"], ["Sprint result"]),
+  "practice-arrow-duel-prompt": defineScenario("practice-arrow-duel-prompt", "Practice", "Arrow Duel prompt card", "practice--arrow-duel-prompt", "Active Arrow Duel session with the unchanged prompt copy in a rounded card above the board and a black board-piece King.", "practice", ["Black King prompt icon", "Arrow Duel copy", "Prompt card above board", "Candidate arrows"], ["Sprint result"]),
+  "practice-blunder-move-preview": defineScenario("practice-blunder-move-preview", "Practice", "Blunder move preview", "practice--blunder-move-preview", "Standard puzzle entry that animates the opponent blunder before unlocking the white-to-move Board Placeholder.", "practice", ["Blunder replay", "White King prompt icon", "Rounded prompt card above board", "Input lock"], ["Active sprint"]),
   "practice-paused": defineScenario("practice-paused", "Practice", "Paused session", "practice--paused-session", "Paused sprint with resume and abandon actions.", "practice", ["Paused state", "Resume", "Abandon"], ["Active sprint", "Sprint result"]),
   "practice-exit-confirmation": defineScenario("practice-exit-confirmation", "Practice", "Exit confirmation", "practice--exit-confirmation", "Guarded abandon confirmation over an active sprint.", "practice", ["Confirmation", "Cancel", "Confirm abandon"], ["Active sprint", "Sprint result"]),
   "practice-summary": defineScenario("practice-summary", "Practice", "Sprint summary", "practice--sprint-summary", "Completed one-puzzle sprint summary reached through the public board callback.", "practice", ["Result", "Rating change", "History and review actions"], ["Practice home", "History", "Review"]),
@@ -106,6 +111,7 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
   "review-overdue": defineScenario("review-overdue", "Review", "Overdue queue", "review--overdue-queue", "Overdue workload and danger treatment.", "review", ["Overdue count", "Due rows", "Forecast"], ["Review session", "Practice"]),
   "review-filters": defineScenario("review-filters", "Review", "Filters", "review--filters", "Expanded filters with an active overdue selection.", "review", ["Mode, speed, theme, and overdue filters", "Active filter summary"], ["Review session", "Practice"]),
   "review-session": defineScenario("review-session", "Review", "Review session", "review--review-session", "Due Review session using the Board Placeholder and public queue state.", "review", ["Board", "Timer", "Context", "Previous and next"], ["Review queue"]),
+  "review-blunder-move-preview": defineScenario("review-blunder-move-preview", "Review", "Review blunder move preview", "review--blunder-move-preview", "Due Review entry that replays the original blunder before the user retries the puzzle as White.", "review", ["Blunder replay", "White King prompt icon", "Rounded prompt card above board", "Input lock"], ["Review queue"]),
   "review-feedback-analysis": defineScenario("review-feedback-analysis", "Review", "Feedback and analysis", "review--feedback-and-analysis", "Wrong-move feedback followed by the browser-safe fallback analysis surface.", "review", ["Move feedback", "Analysis lines", "Reset and flip controls"], ["Review session"]),
   "history-empty": defineScenario("history-empty", "History", "Empty history", "history--empty-history", "History with no attempts or rating points.", "history", ["Empty state", "Primary filters"], ["Practice", "Review", "Settings"]),
   "history-populated": defineScenario("history-populated", "History", "Populated history", "history--populated-history", "Deterministic attempts showing every curated theme, including a seven-theme density case.", "history", ["All curated attempt tags", "Rating chart", "Quick filters"], ["Attempt detail", "Review"]),

@@ -28,3 +28,15 @@ export const LAB_PUZZLES: Puzzle[] = seeds.map(({ id, pawnFile, rating, themes }
 }));
 
 export const PRIMARY_LAB_PUZZLE = LAB_PUZZLES[0]!;
+
+export const ISSUE_272_LAB_PUZZLE: Puzzle = {
+  id: "lab-issue-272-white-to-move",
+  initialFen: "4k3/8/8/8/8/8/4P3/4K3 b - - 0 1",
+  solutionMoves: ["e8d7", "e2e4"],
+  rating: 820,
+  themes: ["endgame"],
+  source: "synthetic",
+  stockfishEval: 140,
+  stockfishBestMove: "e8f7",
+  stockfishEvalAfterFirstMove: -180
+};

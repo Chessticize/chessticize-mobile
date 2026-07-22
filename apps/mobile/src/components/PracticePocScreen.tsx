@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Animated,
   AppState,
+  Image,
   LayoutAnimation,
   Linking,
   Modal,
@@ -2441,7 +2442,6 @@ export function PracticePocScreen({
       compactMetrics={sessionUsesRail}
       mode={mode}
       state={state}
-      sideToMove={displayedSideToMove}
       timerText={timerText}
       confirmAbandon={practiceExitConfirmationVisible}
       onAbandon={isOpenSession ? abandonSprint : undefined}
@@ -2554,8 +2554,12 @@ export function PracticePocScreen({
     <SessionScoreStrip state={state} />
   ) : null;
   const practicePromptNode = shouldShowSessionBoard ? (
-    <View style={styles.practicePromptStack}>
-      <PracticePrompt currentPuzzle={displayedPuzzle} mode={mode} />
+    <View style={[styles.practicePromptStack, { width: boardSize }]}>
+      <PracticePrompt
+        currentPuzzle={displayedPuzzle}
+        kingPieceSize={kingGlyphSizeForBoard(boardSize)}
+        mode={mode}
+      />
       {unclearPrompt ? (
         <UnclearAttemptPrompt
           marked={unclearPrompt.marked}
@@ -2699,9 +2703,9 @@ export function PracticePocScreen({
                     >
                       {!sessionUsesRail ? sessionStatusNode : null}
                       {!sessionUsesRail ? pausedSessionNode : null}
+                      {practicePromptNode}
                       {sessionBoardNode}
                       {!sessionUsesRail ? sessionScoreNode : null}
-                      {!sessionUsesRail ? practicePromptNode : null}
                       {!sessionUsesRail ? errorNode : null}
                     </View>
                     {sessionUsesRail ? (
@@ -2712,7 +2716,6 @@ export function PracticePocScreen({
                       >
                         {sessionStatusNode}
                         {sessionScoreNode}
-                        {practicePromptNode}
                         {errorNode}
                       </ScrollView>
                     ) : null}
@@ -5097,7 +5100,6 @@ function SessionStatusBar({
   confirmAbandon,
   mode,
   state,
-  sideToMove,
   timerText,
   onAbandon,
   onConfirmAbandonChange,
@@ -5108,7 +5110,6 @@ function SessionStatusBar({
   confirmAbandon: boolean;
   mode: SprintMode;
   state: SprintState;
-  sideToMove: MoveSide | null;
   timerText: string;
   onAbandon?: () => void;
   onConfirmAbandonChange: (visible: boolean) => void;
@@ -5170,11 +5171,7 @@ function SessionStatusBar({
       >
         <View
           accessibilityLabel={`Progress ${state.correctCount} of ${state.config.targetCorrect}`}
-          style={[
-            styles.sessionMetricBlock,
-            compactMetrics ? styles.sessionMetricBlockCompact : null,
-            compactMetrics ? styles.sessionProgressBlockCompact : null
-          ]}
+          style={styles.sessionMetricBlock}
           testID="session-progress-block"
         >
           <Text numberOfLines={1} testID="session-progress" style={styles.sessionProgressValue}>
@@ -5183,35 +5180,14 @@ function SessionStatusBar({
         </View>
         <View
           accessibilityLabel={`Timer ${timerText}`}
-          style={[
-            styles.sessionMetricBlock,
-            styles.sessionTimerBlock,
-            compactMetrics ? styles.sessionMetricBlockCompact : null,
-            compactMetrics ? styles.sessionTimerBlockCompact : null
-          ]}
+          style={styles.sessionMetricBlock}
           testID="session-timer-block"
         >
           <Text numberOfLines={1} testID="session-timer" style={styles.timerText}>{timerText}</Text>
         </View>
         <View
-          accessibilityLabel={sideToMove ? sideToMoveAccessibilityLabel(sideToMove) : "Side to move unavailable"}
-          style={[
-            styles.sessionMetricBlock,
-            styles.sessionSideToMoveBlock,
-            compactMetrics ? styles.sessionMetricBlockCompact : null,
-            compactMetrics ? styles.sessionSideToMoveBlockCompact : null
-          ]}
-          testID="session-side-to-move-block"
-        >
-          {sideToMove ? <MoveSideBadge badgeTestID="session-side-to-move" compact side={sideToMove} /> : null}
-        </View>
-        <View
           accessibilityLabel={`Mistakes ${state.mistakeCount} of ${state.config.maxMistakes}`}
-          style={[
-            styles.sessionMetricBlock,
-            compactMetrics ? styles.sessionMetricBlockCompact : null,
-            compactMetrics ? styles.sessionMistakesBlockCompact : null
-          ]}
+          style={styles.sessionMetricBlock}
           testID="session-mistakes-block"
         >
           <ActiveMistakeIndicator
@@ -5559,11 +5535,13 @@ function ErrorPanel({ error }: { error: string }): React.JSX.Element {
 
 function PracticePrompt({
   currentPuzzle,
+  kingPieceSize,
   mode,
   promptText,
   promptHint
 }: {
   currentPuzzle: CurrentPuzzleState | undefined;
+  kingPieceSize: number;
   mode: SprintMode;
   promptText?: string | null;
   promptHint?: string | null;
@@ -5571,9 +5549,9 @@ function PracticePrompt({
   if (!currentPuzzle) {
     return null;
   }
-  const side = sideToMove(currentPuzzle.currentFen) === "b" ? "black" : "white";
+  const promptSide = sideToMove(currentPuzzle.currentFen);
+  const side = promptSide === "b" ? "black" : "white";
   const isArrowDuel = currentPuzzle.kind === "arrow_duel";
-  const promptMode = mode === "arrow_duel" ? "arrow_duel" : "standard";
   const defaultPromptTitle = isArrowDuel ? "Choose the best move" : "Find the best move";
   const defaultPromptContext = isArrowDuel
     ? `For ${side}, between the two arrows.`
@@ -5585,8 +5563,15 @@ function PracticePrompt({
 
   return (
     <View style={styles.promptPanel} testID="practice-prompt">
-      <View style={styles.promptIcon} testID="practice-prompt-icon">
-        <PracticeModeGlyph mode={promptMode} inverse />
+      <View
+        style={[styles.promptIcon, { height: kingPieceSize, width: kingPieceSize }]}
+        testID="practice-prompt-icon"
+      >
+        <MoveSideGlyph
+          kingPieceSize={kingPieceSize}
+          side={promptSide}
+          testID="practice-prompt-side-glyph"
+        />
       </View>
       <View style={styles.promptCopy}>
         <Text style={styles.promptTitle}>{promptText === undefined ? defaultPromptTitle : modeLabel(mode)}</Text>
@@ -5735,48 +5720,42 @@ function SessionScoreGlyph({ tone }: { tone: "positive" | "negative" | "neutral"
   );
 }
 
-function MoveSideBadge({
-  badgeTestID,
-  compact = false,
-  side
+function MoveSideGlyph({
+  kingPieceSize = 22,
+  side,
+  testID = `move-side-${side === "w" ? "white" : "black"}-glyph`
 }: {
-  badgeTestID: string;
-  compact?: boolean;
+  kingPieceSize?: number;
   side: MoveSide;
+  testID?: string;
 }): React.JSX.Element {
-  const sideLabel = sideToMoveLabel(side);
   return (
     <View
-      accessible
-      accessibilityLabel={sideToMoveAccessibilityLabel(side)}
-      style={styles.moveSideBadge}
-      testID={badgeTestID}
+      style={[styles.moveSideKingGlyph, { height: kingPieceSize, width: kingPieceSize }]}
+      testID={testID}
     >
-      <MoveSideGlyph side={side} />
-      <Text numberOfLines={1} style={styles.moveSideBadgeText} testID={`${badgeTestID}-label`}>
-        {compact ? sideLabel : `${sideLabel} to move`}
-      </Text>
+      <Image
+        accessible={false}
+        accessibilityIgnoresInvertColors
+        resizeMode="stretch"
+        source={CHESS_PIECE_SPRITE}
+        style={[
+          styles.moveSideKingSprite,
+          {
+            height: kingPieceSize * 2,
+            left: -kingPieceSize * 5,
+            top: side === "w" ? 0 : -kingPieceSize,
+            width: kingPieceSize * 6
+          }
+        ]}
+        testID={`chessboard-king-${side === "w" ? "white" : "black"}-sprite`}
+      />
     </View>
   );
 }
 
-function MoveSideGlyph({ side }: { side: MoveSide }): React.JSX.Element {
-  return (
-    <View
-      style={[
-        styles.moveSideGlyph,
-        side === "w" ? styles.moveSideGlyphWhite : styles.moveSideGlyphBlack
-      ]}
-      testID={`move-side-${side === "w" ? "white" : "black"}-glyph`}
-    >
-      <View
-        style={[
-          styles.moveSideGlyphBase,
-          side === "w" ? styles.moveSideGlyphWhiteBase : styles.moveSideGlyphBlackBase
-        ]}
-      />
-    </View>
-  );
+function kingGlyphSizeForBoard(boardSize: number): number {
+  return Math.max(1, Math.round(boardSize / 8));
 }
 
 function BoardCoordinateOverlay({
@@ -8616,6 +8595,29 @@ function ReviewSession({
       <HistoryUnclearAction onClear={() => onAttemptClearUnclear(currentEntry.attempt!.id)} />
     ) : null;
   const hasReviewContextActions = reviewScheduleControlNode !== null || historyUnclearActionNode !== null;
+  const hasAnalysisPanelContent = guidedEvalLines.length > 0
+    || analysisEnabled
+    || currentEntry.source !== "due"
+    || reviewResultRecorded;
+  const reviewPromptNode = (
+    <View style={[styles.practicePromptStack, { width: boardSize }]}>
+      <PracticePrompt
+        currentPuzzle={currentPuzzle}
+        kingPieceSize={kingGlyphSizeForBoard(boardSize)}
+        mode={currentEntry.mode}
+        promptText={
+          isArrowDuelFollowUpReview
+            ? null
+            : undefined
+        }
+        promptHint={
+          isArrowDuelFollowUpReview
+            ? "Blue arrows show the next move in the punishment line. Follow them to see why the choice is bad."
+            : undefined
+        }
+      />
+    </View>
+  );
 
   return (
     <View style={[styles.reviewSessionPanel, adaptiveLayout.usesWideContent ? styles.reviewSessionPanelWide : null]} testID="review-session">
@@ -8717,7 +8719,6 @@ function ReviewSession({
               <Text style={styles.reviewContextPillText}>Sprint review</Text>
             </View>
           ) : null}
-          <MoveSideBadge badgeTestID="review-side-to-move" side={reviewSideToMove} />
           {!(themeCatalogPresentation && currentEntry.source === "history")
             && currentEntry.source !== "due" ? (
             <View style={styles.reviewContextPill} testID="review-theme-pill">
@@ -8725,8 +8726,14 @@ function ReviewSession({
             </View>
           ) : null}
           {reviewRemainingSeconds !== null ? (
-            <View style={[styles.reviewContextPill, reviewRemainingSeconds === 0 ? styles.reviewContextPillDanger : null]}>
-              <Text testID="review-timer" style={[styles.reviewContextPillText, reviewRemainingSeconds === 0 ? styles.errorText : null]}>
+            <View style={[styles.reviewContextPill, styles.reviewTimerPill, reviewRemainingSeconds === 0 ? styles.reviewContextPillDanger : null]}>
+              <Text
+                numberOfLines={1}
+                testID="review-timer"
+                style={reviewRemainingSeconds === 0
+                  ? [styles.reviewContextPillText, styles.errorText]
+                  : styles.reviewTimerText}
+              >
                 {reviewRemainingSeconds === 0 ? "Time expired" : formatDuration(reviewRemainingSeconds)}
               </Text>
             </View>
@@ -8736,6 +8743,7 @@ function ReviewSession({
 
       <View style={[styles.reviewBoardLayout, adaptiveLayout.usesSessionRail ? styles.reviewBoardLayoutWide : null]}>
         <View style={styles.reviewBoardLane} testID="review-board-lane">
+          {reviewPromptNode}
           <View
             accessible
             accessibilityLabel={sessionBoardAccessibilityLabel(reviewSideToMove, lastMove)}
@@ -8827,29 +8835,17 @@ function ReviewSession({
           ) : null}
         </View>
 
-        <View
-          style={[
-            styles.reviewAnalysisColumn,
-            adaptiveLayout.usesSessionRail ? styles.reviewAnalysisPanelWide : null,
-            adaptiveLayout.usesSessionRail ? { width: adaptiveLayout.sessionRailWidth } : null
-          ]}
-          testID="review-analysis-column"
-        >
-          <View style={styles.analysisPanel} testID="review-analysis-panel">
-          <PracticePrompt
-            currentPuzzle={currentPuzzle}
-            mode={currentEntry.mode}
-            promptText={
-              isArrowDuelFollowUpReview
-                ? null
-                : undefined
-            }
-            promptHint={
-              isArrowDuelFollowUpReview
-                ? "Blue arrows show the next move in the punishment line. Follow them to see why the choice is bad."
-                : undefined
-            }
-          />
+        {hasAnalysisPanelContent || (adaptiveLayout.usesSessionRail && hasReviewContextActions) ? (
+          <View
+            style={[
+              styles.reviewAnalysisColumn,
+              adaptiveLayout.usesSessionRail ? styles.reviewAnalysisPanelWide : null,
+              adaptiveLayout.usesSessionRail ? { width: adaptiveLayout.sessionRailWidth } : null
+            ]}
+            testID="review-analysis-column"
+          >
+          {hasAnalysisPanelContent ? (
+            <View style={styles.analysisPanel} testID="review-analysis-panel">
           {!analysisEnabled && guidedEvalLines.length > 0 ? (
             <View testID="review-guided-eval-list">
               {guidedEvalLines.map((line, index) => (
@@ -8959,14 +8955,16 @@ function ReviewSession({
               ))}
             </>
           ) : null}
-          </View>
+            </View>
+          ) : null}
           {adaptiveLayout.usesSessionRail && hasReviewContextActions ? (
             <View style={styles.reviewContextActions} testID="review-context-actions-rail">
               {reviewScheduleControlNode}
               {historyUnclearActionNode}
             </View>
           ) : null}
-        </View>
+          </View>
+        ) : null}
       </View>
       {!adaptiveLayout.usesSessionRail && hasReviewContextActions ? (
         <View style={styles.reviewContextActions} testID="review-context-actions-bottom">
@@ -9180,7 +9178,7 @@ function HistoryUnclearAction({ onClear }: { onClear: () => void }): React.JSX.E
       testID="history-attempt-unclear"
     >
       <View style={styles.historyAttemptUnclearCopy}>
-        <Text style={styles.historyAttemptUnclearTitle}>Marked</Text>
+        <Text style={styles.historyAttemptUnclearTitle}>Marked as unclear</Text>
       </View>
       <Pressable
         accessibilityRole="button"
@@ -12378,6 +12376,7 @@ const styles = StyleSheet.create({
   activeSessionBoardLane: {
     alignItems: "center",
     flex: 1,
+    gap: 12,
     justifyContent: "center",
     minWidth: 0
   },
@@ -12427,14 +12426,12 @@ const styles = StyleSheet.create({
     gap: 6,
     justifyContent: "space-between",
     minHeight: 36,
-    paddingHorizontal: 8,
+    paddingHorizontal: 0,
     paddingVertical: 1
   },
   sessionActiveMetricRowCompact: {
-    flexWrap: "wrap",
-    justifyContent: "center",
+    gap: 2,
     paddingHorizontal: 0,
-    rowGap: 6
   },
   sessionMetricBlock: {
     alignItems: "center",
@@ -12442,10 +12439,6 @@ const styles = StyleSheet.create({
     gap: 3,
     justifyContent: "center",
     minWidth: 0
-  },
-  sessionMetricBlockCompact: {
-    flex: 0,
-    flexShrink: 0
   },
   activeMistakeIndicator: {
     alignItems: "center",
@@ -12488,82 +12481,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8
   },
-  sessionTimerBlock: {
-    alignItems: "center",
-    flex: 1.25
-  },
-  sessionProgressBlockCompact: {
-    minWidth: 54
-  },
-  sessionTimerBlockCompact: {
-    minWidth: 78
-  },
-  sessionSideToMoveBlock: {
-    minWidth: 70
-  },
-  sessionSideToMoveBlockCompact: {
-    minWidth: 72
-  },
-  sessionMistakesBlockCompact: {
-    minWidth: 42
-  },
   sessionProgressValue: {
     color: "#111827",
-    fontSize: 13,
+    fontSize: 21,
     fontWeight: "800",
     textAlign: "center"
   },
-  moveSideBadge: {
-    alignItems: "center",
-    alignSelf: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 5,
-    justifyContent: "center",
-    minHeight: 30,
-    paddingHorizontal: 7
+  moveSideKingGlyph: {
+    overflow: "hidden",
+    position: "relative"
   },
-  moveSideBadgeText: {
-    color: "#334155",
-    flexShrink: 0,
-    fontSize: 11,
-    fontWeight: "900",
-    textAlign: "center"
-  },
-  moveSideGlyph: {
-    alignItems: "center",
-    borderRadius: 999,
-    borderWidth: 1.5,
-    height: 16,
-    justifyContent: "center",
-    position: "relative",
-    width: 16
-  },
-  moveSideGlyphWhite: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#0F172A"
-  },
-  moveSideGlyphBlack: {
-    backgroundColor: "#0F172A",
-    borderColor: "#0F172A"
-  },
-  moveSideGlyphBase: {
-    borderRadius: 999,
-    bottom: -3,
-    height: 5,
-    position: "absolute",
-    width: 12
-  },
-  moveSideGlyphWhiteBase: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#0F172A",
-    borderWidth: 1.5
-  },
-  moveSideGlyphBlackBase: {
-    backgroundColor: "#0F172A"
+  moveSideKingSprite: {
+    position: "absolute"
   },
   timerText: {
     color: "#111827",
@@ -12620,14 +12549,23 @@ const styles = StyleSheet.create({
   },
   promptPanel: {
     alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
     flexDirection: "row",
     gap: 10,
-    minHeight: 44,
-    paddingHorizontal: 8,
-    paddingVertical: 4
+    minHeight: 72,
+    paddingHorizontal: 12,
+    paddingVertical: 9
   },
   practicePromptStack: {
     gap: 6
+  },
+  promptIcon: {
+    alignItems: "center",
+    flexShrink: 0,
+    justifyContent: "center"
   },
   unclearPrompt: {
     alignItems: "center",
@@ -12669,21 +12607,14 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "900"
   },
-  promptIcon: {
-    alignItems: "center",
-    backgroundColor: "#1F2937",
-    borderRadius: 999,
-    height: 28,
-    justifyContent: "center",
-    width: 32
-  },
   promptCopy: {
     flex: 1,
-    gap: 2
+    gap: 2,
+    minWidth: 0
   },
   promptTitle: {
     color: "#111827",
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "800"
   },
   promptText: {
@@ -13482,6 +13413,19 @@ const styles = StyleSheet.create({
   reviewContextPillDanger: {
     borderColor: "#FCA5A5"
   },
+  reviewTimerPill: {
+    justifyContent: "center",
+    minHeight: 38,
+    minWidth: 78
+  },
+  reviewTimerText: {
+    color: "#111827",
+    fontFamily: "menlo",
+    fontSize: 21,
+    fontWeight: "800",
+    fontVariant: ["tabular-nums"],
+    letterSpacing: 0.2
+  },
   reviewContextPillText: {
     color: "#334155",
     fontSize: 12,
@@ -13498,6 +13442,7 @@ const styles = StyleSheet.create({
   reviewBoardLane: {
     alignItems: "center",
     flex: 1,
+    gap: 12,
     justifyContent: "center",
     minWidth: 0
   },
