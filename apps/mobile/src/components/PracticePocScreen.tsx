@@ -4301,9 +4301,9 @@ function PracticePrompt({
   if (!currentPuzzle) {
     return null;
   }
-  const side = sideToMove(currentPuzzle.currentFen) === "b" ? "black" : "white";
+  const promptSide = sideToMove(currentPuzzle.currentFen);
+  const side = promptSide === "b" ? "black" : "white";
   const isArrowDuel = currentPuzzle.kind === "arrow_duel";
-  const promptMode = mode === "arrow_duel" ? "arrow_duel" : "standard";
   const defaultPromptTitle = isArrowDuel ? "Choose the best move" : "Find the best move";
   const defaultPromptContext = isArrowDuel
     ? `For ${side}, between the two arrows.`
@@ -4316,7 +4316,7 @@ function PracticePrompt({
   return (
     <View style={styles.promptPanel} testID="practice-prompt">
       <View style={styles.promptIcon} testID="practice-prompt-icon">
-        <PracticeModeGlyph mode={promptMode} inverse />
+        <MoveSideGlyph king side={promptSide} testID="practice-prompt-side-glyph" />
       </View>
       <View style={styles.promptCopy}>
         <Text style={styles.promptTitle}>{promptText === undefined ? defaultPromptTitle : modeLabel(mode)}</Text>
@@ -4486,7 +4486,15 @@ function MoveSideBadge({
   );
 }
 
-function MoveSideGlyph({ king, side }: { king: boolean; side: MoveSide }): React.JSX.Element {
+function MoveSideGlyph({
+  king,
+  side,
+  testID = `move-side-${side === "w" ? "white" : "black"}-glyph`
+}: {
+  king: boolean;
+  side: MoveSide;
+  testID?: string;
+}): React.JSX.Element {
   if (!king) {
     return (
       <View
@@ -4494,7 +4502,7 @@ function MoveSideGlyph({ king, side }: { king: boolean; side: MoveSide }): React
           styles.moveSideGlyph,
           side === "w" ? styles.moveSideGlyphWhite : styles.moveSideGlyphBlack
         ]}
-        testID={`move-side-${side === "w" ? "white" : "black"}-glyph`}
+        testID={testID}
       >
         <View
           style={[
@@ -4508,7 +4516,7 @@ function MoveSideGlyph({ king, side }: { king: boolean; side: MoveSide }): React
   return (
     <View
       style={styles.moveSideKingGlyph}
-      testID={`move-side-${side === "w" ? "white" : "black"}-glyph`}
+      testID={testID}
     >
       <Text style={styles.moveSideKingGlyphText}>{side === "w" ? "♔" : "♚"}</Text>
     </View>
@@ -10941,11 +10949,10 @@ const styles = StyleSheet.create({
   },
   promptIcon: {
     alignItems: "center",
-    backgroundColor: "#1F2937",
-    borderRadius: 999,
+    flexShrink: 0,
     height: 28,
     justifyContent: "center",
-    width: 32
+    width: 24
   },
   promptCopy: {
     flex: 1,

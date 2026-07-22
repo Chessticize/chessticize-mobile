@@ -50,6 +50,16 @@ export const ActiveSession: Story = {
   }
 };
 
+export const ArrowDuelPrompt: Story = {
+  name: "Arrow Duel prompt icon",
+  args: { scenarioId: "practice-arrow-duel-prompt" },
+  play: async ({ canvasElement }) => {
+    await clickTestId(canvasElement, "practice-mode-arrow-duel");
+    await clickTestId(canvasElement, "practice-start-button");
+    await waitForTestId(canvasElement, "session-board");
+  }
+};
+
 export const BlunderMovePreview: Story = {
   name: "Blunder move preview",
   args: { scenarioId: "practice-blunder-move-preview" },

@@ -1440,7 +1440,8 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "session-status-metrics"))).not.toContain("0/3");
     expect(collectText(findByTestId(renderer, "session-progress"))).toBe("0 / 15");
     expect(styleEntryMatches(findByTestId(renderer, "practice-prompt").props.style, "borderWidth", 1)).toBe(false);
-    expect(collectText(findByTestId(renderer, "practice-prompt-icon"))).toBe("");
+    expect(collectText(findByTestId(renderer, "practice-prompt-icon"))).toBe("♔");
+    expect(styleEntryMatches(findByTestId(renderer, "practice-prompt-icon").props.style, "backgroundColor", "#1F2937")).toBe(false);
     expectText(renderer, "Find the best move");
     expect(collectText(findByTestId(renderer, "practice-prompt"))).not.toContain("For white.");
   });
@@ -2406,6 +2407,8 @@ describe("PracticePocScreen", () => {
 
     startArrowDuelSprint(renderer);
     const arrow = requireArrowDuelState(activeSprintForTest(service));
+    const arrowSide = new Chess(arrow.currentFen).turn() === "w" ? "white" : "black";
+    const arrowKing = arrowSide === "white" ? "♔" : "♚";
 
     expect(findByTestId(renderer, "mock-chessboard").props.flipped).toBe(new Chess(arrow.currentFen).turn() === "b");
     expect(collectText(renderer.root)).not.toContain("Choose one candidate move");
@@ -2417,7 +2420,7 @@ describe("PracticePocScreen", () => {
       .find((node) => node.props.accessible === true);
     expect(accessibleCandidateOverlay?.props.accessibilityLabel)
       .toBe(`Arrow Duel candidates: ${arrow.candidates.join(", ")}`);
-    expect(collectText(findByTestId(renderer, "practice-prompt-icon"))).toBe("");
+    expect(collectText(findByTestId(renderer, "practice-prompt-icon"))).toBe(arrowKing);
     expect(testIdOrder(renderer, "session-board", "session-score-strip")).toBeLessThan(0);
     expect(testIdOrder(renderer, "session-score-strip", "practice-prompt")).toBeLessThan(0);
     expect(findByTestId(renderer, "session-score-strip").props.accessibilityLabel).toBe("Session score: solved 0, mistakes 0, left 10");
@@ -2425,7 +2428,6 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "session-score-strip"))).toBe("0010");
     expect(collectText(findByTestId(renderer, "practice-prompt"))).toContain("Choose the best move");
     expect(collectText(findByTestId(renderer, "practice-prompt"))).toContain("between the two arrows");
-    const arrowSide = new Chess(arrow.currentFen).turn() === "w" ? "white" : "black";
     expect(collectText(findByTestId(renderer, `move-side-${arrowSide}-glyph`))).toBe("");
     expectText(renderer, "Watch for checks, captures, and attacks!");
     const neutralArrowBodies = countStyleEntry(findByTestId(renderer, "session-board"), "backgroundColor", "#2563EB");
@@ -3148,6 +3150,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "move-side-black-glyph"))).toBe("♚");
     expect(collectText(findByTestId(renderer, "review-side-to-move-label"))).toBe("Black to move");
     expect(testIdOrder(renderer, "practice-prompt", "review-board")).toBeLessThan(0);
+    expect(collectText(findByTestId(renderer, "practice-prompt-icon"))).toBe("♚");
     expect(collectText(findByTestId(renderer, "practice-prompt"))).toContain("Find the best move");
     expect(collectText(findByTestId(renderer, "practice-prompt"))).not.toContain("For black.");
     expect(findByTestId(renderer, "review-theme-pill")).toBeTruthy();
@@ -5011,6 +5014,9 @@ describe("PracticePocScreen", () => {
     press(renderer, "review-mistakes-button");
 
     expectText(renderer, "1 / 3 · Arrow Duel");
+    const reviewArrowSide = new Chess(findByTestId(renderer, "mock-chessboard").props.fen).turn();
+    expect(collectText(findByTestId(renderer, "practice-prompt-icon")))
+      .toBe(reviewArrowSide === "w" ? "♔" : "♚");
     expect(() => findByTestId(renderer, "review-accessible-moves-open")).toThrow();
     expect(() => findByTestId(renderer, "review-arrow-legend")).toThrow();
     expect(() => findByTestId(renderer, "review-arrow-choice-marker")).toThrow();

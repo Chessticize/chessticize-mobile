@@ -39,11 +39,13 @@ test("every typed navigation coverage entry points to a registered scenario", ()
 
 test("the issue #272 design slice keeps its New Scenario Markers active", () => {
   assert.deepEqual(newScenarios.map((scenario) => scenario.id), [
+    "practice-arrow-duel-prompt",
     "practice-blunder-move-preview",
     "review-blunder-move-preview"
   ]);
   assert.deepEqual(storyTagsForScenario("practice-home" as LabScenarioId), []);
   assert.deepEqual(storyTagsForScenario("practice-blunder-move-preview"), ["new"]);
+  assert.deepEqual(storyTagsForScenario("practice-arrow-duel-prompt"), ["new"]);
 });
 
 test("the issue #272 preview hands the board to Black after the blunder", () => {
