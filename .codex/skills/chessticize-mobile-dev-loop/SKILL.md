@@ -24,8 +24,10 @@ Lab design phase first. Follow `docs/agents/ui-flow-design.md`.
 3. Keep this phase isolated from production navigation entries, backend or
    storage mutations, native-module wiring, analytics, and rollout logic.
 4. Add the issue-owned New Scenario Marker, run the Lab checks, and deploy the
-   full Storybook from the exact commit for review. Generated deployment files
-   stay outside the application branch.
+   full Storybook from the exact commit through a site dedicated to the current
+   feature branch. Never reuse that Sites project or URL for another branch;
+   stop if the deployment input names a different branch or commit. Generated
+   deployment files stay outside the application branch.
 5. Merge coherent design increments to `main` and iterate from current `main`;
    retain the marker until the linked issue closes.
 6. Record explicit design approval in the issue or PR before starting product

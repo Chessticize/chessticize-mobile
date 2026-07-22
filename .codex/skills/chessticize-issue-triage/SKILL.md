@@ -123,7 +123,12 @@ visible. Triage completion never implies approval to consolidate tickets.
 When the request authorizes remote preview publication and Sites is available:
 
 - Build the complete `apps/mobile-lab` Storybook from the issue branch's exact
-  reviewed commit and deploy it to a stable issue-specific site or deployment.
+  reviewed commit and deploy it through a Sites project dedicated to that exact
+  branch. Never reuse its project ID or URL for another branch; a later branch
+  for the same issue receives a different site.
+- Before publishing, compare the deployment input's recorded branch and commit
+  with the reviewed application branch. Stop on any mismatch instead of
+  overwriting the existing branch owner's site.
 - Follow the Sites build and hosting skills. Package the matching static build,
   save one version, and prefer an owner-only deployment when it still allows
   the intended reviewer to access it.
@@ -132,8 +137,8 @@ When the request authorizes remote preview publication and Sites is available:
   or temporary storage for generated deployment input.
 - Treat every deployed Sites URL as production. If the user asks only for a
   reviewable candidate, save a version without deploying it.
-- Add the full Storybook manager URL and direct story URL to the issue and PR,
-  along with the exact source commit and explicit approval gate.
+- Add the source branch, full Storybook manager URL, direct story URL, and exact
+  source commit to the issue and PR, along with the explicit approval gate.
 
 If Sites is unavailable, keep the pushed Storybook branch and stable local URL
 as the fallback; do not weaken the design gate.

@@ -56,13 +56,18 @@ rollout, or release integration yet.
 7. Record explicit design approval in the issue or PR before product wiring.
 
 When remote preview publication is authorized and Sites is available, publish
-the complete `apps/mobile-lab` Storybook to an issue-specific site or deployment
-and record the exact source commit in the issue and PR. Do not commit generated
-Storybook bundles, copied preview files, or hosting result files to the
-application branch. A Sites deployment is a production URL, but it remains a
-design artifact: it does not count as approval or product implementation. Save
-a Sites version without deploying it when only a reviewable candidate is
-authorized.
+the complete `apps/mobile-lab` Storybook to a site and Sites project dedicated
+to the exact feature branch. Never reuse that project ID or live URL for a
+different source branch, including another branch for the same issue. Reuse the
+site only for later commits on its owning branch. Before every deployment,
+verify that the recorded source branch and commit match the application branch
+being reviewed; a mismatch is a publication blocker, not permission to replace
+the existing site. Record the branch, exact source commit, and branch-owned URL
+in the issue and PR. Do not commit generated Storybook bundles, copied preview
+files, Sites project metadata, or hosting result files to the application
+branch. A Sites deployment is a production URL, but it remains a design
+artifact: it does not count as approval or product implementation. Save a Sites
+version without deploying it when only a reviewable candidate is authorized.
 
 When the current interaction increment is coherent and checks pass, the design
 PR may become ready and merge to `main` before approval or implementation.

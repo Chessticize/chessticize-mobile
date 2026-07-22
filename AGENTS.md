@@ -29,11 +29,14 @@ create a standalone prototype page that repeats existing product context. The
 full Storybook should show the expected post-implementation product, while the
 issue-owned `new` marker identifies the changed scenario.
 
-Each feedback issue owns its Storybook design track and full-catalog deployment.
-A coherent design increment may merge to `main` before implementation; its
-issue-numbered New Scenario Marker remains until the linked issue is closed.
-Generated Storybook deployment files are not committed to the application
-branch.
+Each feedback issue owns its Storybook design track. Every feature branch also
+owns a dedicated full-catalog Storybook site and Sites project; never deploy a
+different branch through that project or overwrite another branch's review URL.
+Later commits on the same branch reuse its site, while a new branch gets a new
+site even when it continues the same issue. A coherent design increment may
+merge to `main` before implementation; its issue-numbered New Scenario Marker
+remains until the linked issue is closed. Generated Storybook deployment files
+are not committed to the application branch.
 
 A new screen, navigation destination, stateful modal or sheet, multi-step
 journey, or materially new loading, empty, error, or permission path counts as

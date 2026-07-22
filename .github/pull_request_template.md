@@ -13,6 +13,8 @@ approval must predate production wiring. See `docs/agents/ui-flow-design.md`.
 
 Linked UI issue:
 
+Storybook source branch:
+
 Full Storybook manager URL:
 
 Direct story URL:
