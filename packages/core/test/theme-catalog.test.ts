@@ -56,6 +56,14 @@ test("legacy named selections remain usable while new choices follow catalog ord
   );
 });
 
+test("retired legacy themes remain matchable but are omitted from curated display", () => {
+  const restoredSelection = normalizeThemeChoiceSelection(["mate", "fork"]);
+
+  assert.deepEqual(restoredSelection, ["fork", "mate"]);
+  assert.equal(puzzleMatchesAnyTheme(["mate"], restoredSelection), true);
+  assert.deepEqual(curatedPuzzleThemes(restoredSelection), ["fork"]);
+});
+
 test("theme matching uses OR semantics and treats All as unrestricted", () => {
   assert.equal(puzzleMatchesAnyTheme(["pin"], ["fork", "pin"]), true);
   assert.equal(puzzleMatchesAnyTheme(["skewer"], ["fork", "pin"]), false);

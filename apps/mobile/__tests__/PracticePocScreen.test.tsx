@@ -2893,7 +2893,7 @@ describe("PracticePocScreen", () => {
     expect(themeSelected(renderer, "mixed")).toBe(true);
   });
 
-  it("shows persisted previous custom sprint configs and can reuse one", () => {
+  it("keeps a retired theme visible and reusable in a previous custom sprint", () => {
     const service = createMobilePracticeService("familiar15");
     const savedSprint = service.startSprint(
       {
@@ -2917,9 +2917,12 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "custom-previous-custom-custom-180-30-mate").props.accessibilityLabel).toContain("Use Custom · 30s pace custom sprint");
     expect(findByTestId(renderer, "custom-previous-custom-custom-180-30-mate").props.accessibilityLabel).toContain("ELO 850");
     press(renderer, "custom-previous-custom-custom-180-30-mate");
-    expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("Mate");
+    expect(() => findByTestId(renderer, "custom-theme-mate")).toThrow();
     expect(collectText(findByTestId(renderer, "custom-target-count"))).toBe("~6");
     expect(collectText(findByTestId(renderer, "custom-initial-rating-value"))).toBe("ELO 850");
+
+    press(renderer, "start-sprint-button");
+    expect(service.getActiveSprint()?.config.themes).toEqual(["mate"]);
   });
 
   it("keeps multiple previous custom configs attached to their own ELO buckets", () => {
@@ -3493,7 +3496,8 @@ describe("PracticePocScreen", () => {
         "pin",
         "promotion",
         "sacrifice",
-        "endgame"
+        "endgame",
+        "mate"
       ]
     }]);
     const completedAt = new Date(Date.now() - 60_000).toISOString();
@@ -3564,6 +3568,7 @@ describe("PracticePocScreen", () => {
     expect(replayThemes).toContain("Advanced Pawn");
     expect(replayThemes).toContain("Sacrifice");
     expect(replayThemes).not.toContain("Endgame");
+    expect(() => findByTestId(renderer, "review-theme-rail-mate")).toThrow();
     const replayThemeCatalog = findByTestId(renderer, "review-theme-catalog");
     expect(collectText(replayThemeCatalog)).not.toContain("Themes");
     expect(testIdOrder(renderer, "review-board", "review-theme-catalog")).toBeLessThan(0);
