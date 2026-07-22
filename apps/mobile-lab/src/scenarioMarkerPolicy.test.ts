@@ -12,7 +12,12 @@ test("New Scenario Marker records require registered scenarios and complete issu
   assert.deepEqual(
     validateScenarioMarkers(
       {
-        "practice-home": { issueNumber: 245, changeNote: "Try multiple themes." }
+        "practice-home": {
+          issues: [
+            { issueNumber: 245, changeNote: "Try multiple themes." },
+            { issueNumber: 246, changeNote: "Name the saved run." }
+          ]
+        }
       },
       knownScenarioIds
     ),
@@ -21,15 +26,26 @@ test("New Scenario Marker records require registered scenarios and complete issu
   assert.deepEqual(
     validateScenarioMarkers(
       {
-        missing: { issueNumber: 0, changeNote: "" }
+        missing: {
+          issues: [
+            { issueNumber: 0, changeNote: "" },
+            { issueNumber: 247, changeNote: "Valid ownership." },
+            { issueNumber: 247, changeNote: "Duplicate ownership." }
+          ]
+        }
       },
       knownScenarioIds
     ),
     [
       "missing: scenario is not registered.",
-      "missing: issueNumber must be a positive integer.",
-      "missing: changeNote must be a non-empty string."
+      "missing: issues[0].issueNumber must be a positive integer.",
+      "missing: issues[0].changeNote must be a non-empty string.",
+      "missing: issue #247 is listed more than once."
     ]
+  );
+  assert.deepEqual(
+    validateScenarioMarkers({ "practice-home": { issues: [] } }, knownScenarioIds),
+    ["practice-home: issues must be a non-empty array."]
   );
 });
 
@@ -39,8 +55,12 @@ test("marker cleanup follows issue ownership across a corrective scenario move",
     "review-due": { issueNumber: 246, changeNote: "Second" }
   };
   const currentMarkers = {
-    "practice-custom-setup": { issueNumber: 245, changeNote: "Moved to the existing product screen" },
-    "review-due": { issueNumber: 247, changeNote: "Reassigned" }
+    "practice-custom-setup": {
+      issues: [{ issueNumber: 245, changeNote: "Moved to the existing product screen" }]
+    },
+    "review-due": {
+      issues: [{ issueNumber: 247, changeNote: "Reassigned" }]
+    }
   };
 
   assert.deepEqual(findRemovedScenarioMarkers(baseMarkers, currentMarkers), [
@@ -54,15 +74,41 @@ test("marker cleanup follows issue ownership across a corrective scenario move",
 
 test("one remaining marker cannot hide partial cleanup for the same open issue", () => {
   const baseMarkers = {
-    "practice-home": { issueNumber: 245, changeNote: "First changed scenario" },
-    "practice-custom-setup": { issueNumber: 245, changeNote: "Second changed scenario" }
+    "practice-home": {
+      issues: [{ issueNumber: 245, changeNote: "First changed scenario" }]
+    },
+    "practice-custom-setup": {
+      issues: [{ issueNumber: 245, changeNote: "Second changed scenario" }]
+    }
   };
   const currentMarkers = {
-    "practice-custom-setup": { issueNumber: 245, changeNote: "Still under review" }
+    "practice-custom-setup": {
+      issues: [{ issueNumber: 245, changeNote: "Still under review" }]
+    }
   };
 
   assert.deepEqual(findRemovedScenarioMarkers(baseMarkers, currentMarkers), [
     { scenarioId: "practice-home", issueNumber: 245 }
+  ]);
+});
+
+test("shared scenarios retain each issue ownership independently", () => {
+  const baseMarkers = {
+    "practice-custom-setup": {
+      issues: [
+        { issueNumber: 253, changeNote: "Named runs" },
+        { issueNumber: 273, changeNote: "Curated themes" }
+      ]
+    }
+  };
+  const currentMarkers = {
+    "practice-custom-setup": {
+      issues: [{ issueNumber: 253, changeNote: "Named runs" }]
+    }
+  };
+
+  assert.deepEqual(findRemovedScenarioMarkers(baseMarkers, currentMarkers), [
+    { scenarioId: "practice-custom-setup", issueNumber: 273 }
   ]);
 });
 

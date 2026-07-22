@@ -58,14 +58,18 @@ type LabScenarioMetadata = {
   };
 };
 
-export type NewScenarioMarker = {
+export type NewScenarioIssue = {
   issueNumber: number;
   changeNote: string;
 };
 
+export type NewScenarioMarker = {
+  issues: readonly NewScenarioIssue[];
+};
+
 type ScenarioMarker =
   | ({ isNew: true } & NewScenarioMarker)
-  | { isNew?: false; issueNumber?: never; changeNote?: never };
+  | { isNew?: false; issues?: never };
 
 export type LabScenarioDefinition = ScenarioMarker & LabScenarioMetadata;
 
@@ -81,9 +85,9 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
     "Practice",
     "New Run",
     "practice--custom-setup",
-    "New named run editor that defaults to All themes and saves to Home without starting, with independent theme toggles and an enforced All fallback.",
+    "New named run editor that defaults to All themes, exposes the grouped server-curated 24-theme catalog, and saves to Home without starting.",
     "practice",
-    ["Required unique name", "Custom configuration", "Multiple themes", "Starting ELO", "Add to Home"],
+    ["Required unique name", "Custom configuration", "24 curated themes", "Deterministic All-to-multiple selection", "All exclusivity", "Starting ELO", "Add to Home"],
     ["Practice home", "Native run persistence", "Scored practice session"]
   ),
   "practice-run-name-validation": defineScenario("practice-run-name-validation", "Practice", "Run name validation", "practice--run-name-validation", "New Run with inline required-name validation; entering an existing name exposes the unique-name error.", "practice", ["Required-name error", "Unique-name rule", "Accessible field feedback"], ["Practice home", "Saved run"]),
@@ -104,9 +108,9 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
   "review-session": defineScenario("review-session", "Review", "Review session", "review--review-session", "Due Review session using the Board Placeholder and public queue state.", "review", ["Board", "Timer", "Context", "Previous and next"], ["Review queue"]),
   "review-feedback-analysis": defineScenario("review-feedback-analysis", "Review", "Feedback and analysis", "review--feedback-and-analysis", "Wrong-move feedback followed by the browser-safe fallback analysis surface.", "review", ["Move feedback", "Analysis lines", "Reset and flip controls"], ["Review session"]),
   "history-empty": defineScenario("history-empty", "History", "Empty history", "history--empty-history", "History with no attempts or rating points.", "history", ["Empty state", "Primary filters"], ["Practice", "Review", "Settings"]),
-  "history-populated": defineScenario("history-populated", "History", "Populated history", "history--populated-history", "Deterministic correct, wrong, and unclear attempts with a rating trend.", "history", ["Attempt rows", "Rating chart", "Quick filters"], ["Attempt detail", "Review"]),
-  "history-filters": defineScenario("history-filters", "History", "Filters and active filters", "history--filters-and-active-filters", "Expanded history filters with a visible Wrong-only summary.", "history", ["Advanced filters", "Active filter summary", "Reset"], ["Attempt detail"]),
-  "history-attempt-detail": defineScenario("history-attempt-detail", "History", "Attempt detail", "history--attempt-detail", "Replayable persisted attempt detail reached through the History row.", "history", ["Persisted result", "Moves", "Rating", "Review enrollment"], ["History"]),
+  "history-populated": defineScenario("history-populated", "History", "Populated history", "history--populated-history", "Deterministic attempts showing every curated theme, including a seven-theme density case.", "history", ["All curated attempt tags", "Rating chart", "Quick filters"], ["Attempt detail", "Review"]),
+  "history-filters": defineScenario("history-filters", "History", "Filters and active filters", "history--filters-and-active-filters", "Expanded History filters with the complete curated theme catalog in categorized horizontal rails.", "history", ["Advanced filters", "24-theme catalog", "Active filter summary", "Reset"], ["Replay puzzle"]),
+  "history-attempt-detail": defineScenario("history-attempt-detail", "History", "Replay puzzle", "history--attempt-detail", "The real puzzle replay reached by tapping a History row, with every curated puzzle theme centered in a horizontally scrollable tag rail below the board.", "history", ["Puzzle replay", "Curated theme rail", "Review enrollment"], ["History"]),
   "history-replay-unavailable": defineScenario("history-replay-unavailable", "History", "Replay unavailable", "history--replay-unavailable", "Legacy Arrow Duel attempt whose candidate order cannot be reconstructed safely.", "history", ["Persisted details", "Replay-unavailable explanation"], ["History"]),
   "settings-ios-sync": defineScenario("settings-ios-sync", "Settings", "iOS sync", "settings--ios-sync", "iOS capabilities with iCloud Sync controls, run ELO editing omitted, and no real account access.", "settings", ["iCloud Sync", "Notifications", "About"], ["Run editor", "Stockfish diagnostics"]),
   "settings-android-backup": defineScenario("settings-android-backup", "Settings", "Android backup", "settings--android-backup", "Android managed-backup variant with iCloud controls omitted.", "settings", ["Android Progress Backup", "Notifications", "About"], ["Stockfish diagnostics"]),
@@ -161,8 +165,7 @@ export const navigationCoverage = {
 
 export type NewScenarioDefinition = LabScenarioDefinition & {
   isNew: true;
-  issueNumber: number;
-  changeNote: string;
+  issues: readonly NewScenarioIssue[];
 };
 
 export const newScenarios = Object.values(scenarioRegistry).filter(

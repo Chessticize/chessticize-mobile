@@ -34,18 +34,18 @@ export const FiltersAndActiveFilters: Story = {
   play: async ({ canvasElement }) => {
     await openHistory(canvasElement);
     await clickTestId(canvasElement, "history-filter-toggle");
-    await clickTestId(canvasElement, "history-filter-wrong-only");
-    await waitForTestId(canvasElement, "history-active-filter-summary");
+    await waitForTestId(canvasElement, "history-theme-filters");
   }
 };
 
 export const AttemptDetail: Story = {
-  name: "Attempt detail",
+  name: "Replay puzzle",
   args: { scenarioId: "history-attempt-detail" },
   play: async ({ canvasElement }) => {
     await openHistory(canvasElement);
     await clickTestId(canvasElement, "history-attempt-history-unclear");
-    await waitForTestId(canvasElement, "history-attempt-detail");
+    await waitForTestId(canvasElement, "review-session");
+    await waitForTestId(canvasElement, "review-theme-rail");
   }
 };
 

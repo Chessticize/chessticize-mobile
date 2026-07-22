@@ -60,6 +60,8 @@ export const CustomSetup: Story = {
   play: async ({ canvasElement }) => {
     await clickTestId(canvasElement, "practice-add-run");
     await waitForTestId(canvasElement, "practice-run-editor");
+    await clickTestId(canvasElement, "custom-theme-fork");
+    await clickTestId(canvasElement, "custom-theme-pin");
   }
 };
 

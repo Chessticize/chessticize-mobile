@@ -1,6 +1,13 @@
+export type ScenarioMarkerOwnership = {
+  issueNumber: number;
+  changeNote: string;
+};
+
+type LegacyScenarioMarker = ScenarioMarkerOwnership;
+
 export type ScenarioMarkerRecord = Record<
   string,
-  { issueNumber: number; changeNote: string }
+  { issues: ScenarioMarkerOwnership[] } | LegacyScenarioMarker
 >;
 
 export type RemovedScenarioMarker = {
@@ -38,12 +45,28 @@ export function validateScenarioMarkers(
       errors.push(`${scenarioId}: marker must be an object.`);
       continue;
     }
-    const { issueNumber, changeNote } = marker as Record<string, unknown>;
-    if (!Number.isInteger(issueNumber) || (issueNumber as number) <= 0) {
-      errors.push(`${scenarioId}: issueNumber must be a positive integer.`);
+    const { issues } = marker as Record<string, unknown>;
+    if (!Array.isArray(issues) || issues.length === 0) {
+      errors.push(`${scenarioId}: issues must be a non-empty array.`);
+      continue;
     }
-    if (typeof changeNote !== "string" || changeNote.trim().length === 0) {
-      errors.push(`${scenarioId}: changeNote must be a non-empty string.`);
+    const issueNumbers = new Set<number>();
+    for (const [index, issue] of issues.entries()) {
+      if (typeof issue !== "object" || issue === null || Array.isArray(issue)) {
+        errors.push(`${scenarioId}: issues[${index}] must be an object.`);
+        continue;
+      }
+      const { issueNumber, changeNote } = issue as Record<string, unknown>;
+      if (!Number.isInteger(issueNumber) || (issueNumber as number) <= 0) {
+        errors.push(`${scenarioId}: issues[${index}].issueNumber must be a positive integer.`);
+      } else if (issueNumbers.has(issueNumber as number)) {
+        errors.push(`${scenarioId}: issue #${issueNumber} is listed more than once.`);
+      } else {
+        issueNumbers.add(issueNumber as number);
+      }
+      if (typeof changeNote !== "string" || changeNote.trim().length === 0) {
+        errors.push(`${scenarioId}: issues[${index}].changeNote must be a non-empty string.`);
+      }
     }
   }
   return errors;
@@ -57,21 +80,33 @@ export function findRemovedScenarioMarkers(
   const currentIssueMarkerCounts = countMarkersByIssue(currentMarkers);
   return Object.entries(baseMarkers).flatMap(([scenarioId, marker]) => {
     const currentMarker = currentMarkers[scenarioId];
-    const isOneToOneMove = baseIssueMarkerCounts.get(marker.issueNumber) === 1 &&
-      currentIssueMarkerCounts.get(marker.issueNumber) === 1;
-    return currentMarker?.issueNumber === marker.issueNumber ||
-      isOneToOneMove
-      ? []
-      : [{ scenarioId, issueNumber: marker.issueNumber }];
+    const currentIssueNumbers = new Set(
+      currentMarker ? markerOwnerships(currentMarker).map(({ issueNumber }) => issueNumber) : []
+    );
+    return markerOwnerships(marker).flatMap(({ issueNumber }) => {
+      const isOneToOneMove = baseIssueMarkerCounts.get(issueNumber) === 1 &&
+        currentIssueMarkerCounts.get(issueNumber) === 1;
+      return currentIssueNumbers.has(issueNumber) || isOneToOneMove
+        ? []
+        : [{ scenarioId, issueNumber }];
+    });
   });
 }
 
 function countMarkersByIssue(markers: ScenarioMarkerRecord): Map<number, number> {
   const counts = new Map<number, number>();
-  for (const { issueNumber } of Object.values(markers)) {
-    counts.set(issueNumber, (counts.get(issueNumber) ?? 0) + 1);
+  for (const marker of Object.values(markers)) {
+    for (const { issueNumber } of markerOwnerships(marker)) {
+      counts.set(issueNumber, (counts.get(issueNumber) ?? 0) + 1);
+    }
   }
   return counts;
+}
+
+function markerOwnerships(
+  marker: ScenarioMarkerRecord[string]
+): readonly ScenarioMarkerOwnership[] {
+  return "issues" in marker ? marker.issues : [marker];
 }
 
 export function createGitHubIssueStateReader({
