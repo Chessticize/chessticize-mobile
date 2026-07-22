@@ -2395,7 +2395,7 @@ export function PracticePocScreen({
     <SessionScoreStrip state={state} />
   ) : null;
   const practicePromptNode = shouldShowSessionBoard ? (
-    <View style={styles.practicePromptStack}>
+    <View style={[styles.practicePromptStack, mode === "arrow_duel" ? null : { width: boardSize }]}>
       <PracticePrompt currentPuzzle={displayedPuzzle} mode={mode} />
       {unclearPrompt ? (
         <UnclearAttemptPrompt
@@ -2540,9 +2540,10 @@ export function PracticePocScreen({
                     >
                       {!sessionUsesRail ? sessionStatusNode : null}
                       {!sessionUsesRail ? pausedSessionNode : null}
+                      {mode === "arrow_duel" ? null : practicePromptNode}
                       {sessionBoardNode}
                       {!sessionUsesRail ? sessionScoreNode : null}
-                      {!sessionUsesRail ? practicePromptNode : null}
+                      {!sessionUsesRail && mode === "arrow_duel" ? practicePromptNode : null}
                       {!sessionUsesRail ? errorNode : null}
                     </View>
                     {sessionUsesRail ? (
@@ -2553,7 +2554,7 @@ export function PracticePocScreen({
                       >
                         {sessionStatusNode}
                         {sessionScoreNode}
-                        {practicePromptNode}
+                        {mode === "arrow_duel" ? practicePromptNode : null}
                         {errorNode}
                       </ScrollView>
                     ) : null}
@@ -3925,7 +3926,14 @@ function SessionStatusBar({
           ]}
           testID="session-side-to-move-block"
         >
-          {sideToMove ? <MoveSideBadge badgeTestID="session-side-to-move" compact side={sideToMove} /> : null}
+          {sideToMove ? (
+            <MoveSideBadge
+              badgeTestID="session-side-to-move"
+              compact
+              king={mode !== "arrow_duel"}
+              side={sideToMove}
+            />
+          ) : null}
         </View>
         <View
           accessibilityLabel={`Mistakes ${state.mistakeCount} of ${state.config.maxMistakes}`}
@@ -4299,7 +4307,7 @@ function PracticePrompt({
   const defaultPromptTitle = isArrowDuel ? "Choose the best move" : "Find the best move";
   const defaultPromptContext = isArrowDuel
     ? `For ${side}, between the two arrows.`
-    : `For ${side}.`;
+    : null;
   const displayedPromptText = promptText === undefined ? defaultPromptContext : promptText;
   const displayedPromptHint = promptHint === undefined
     ? (isArrowDuel ? "Watch for checks, captures, and attacks!" : null)
@@ -4454,10 +4462,12 @@ function SessionScoreGlyph({ tone }: { tone: "positive" | "negative" | "neutral"
 function MoveSideBadge({
   badgeTestID,
   compact = false,
+  king = false,
   side
 }: {
   badgeTestID: string;
   compact?: boolean;
+  king?: boolean;
   side: MoveSide;
 }): React.JSX.Element {
   const sideLabel = sideToMoveLabel(side);
@@ -4468,7 +4478,7 @@ function MoveSideBadge({
       style={styles.moveSideBadge}
       testID={badgeTestID}
     >
-      <MoveSideGlyph side={side} />
+      <MoveSideGlyph king={king} side={side} />
       <Text numberOfLines={1} style={styles.moveSideBadgeText} testID={`${badgeTestID}-label`}>
         {compact ? sideLabel : `${sideLabel} to move`}
       </Text>
@@ -4476,21 +4486,31 @@ function MoveSideBadge({
   );
 }
 
-function MoveSideGlyph({ side }: { side: MoveSide }): React.JSX.Element {
-  return (
-    <View
-      style={[
-        styles.moveSideGlyph,
-        side === "w" ? styles.moveSideGlyphWhite : styles.moveSideGlyphBlack
-      ]}
-      testID={`move-side-${side === "w" ? "white" : "black"}-glyph`}
-    >
+function MoveSideGlyph({ king, side }: { king: boolean; side: MoveSide }): React.JSX.Element {
+  if (!king) {
+    return (
       <View
         style={[
-          styles.moveSideGlyphBase,
-          side === "w" ? styles.moveSideGlyphWhiteBase : styles.moveSideGlyphBlackBase
+          styles.moveSideGlyph,
+          side === "w" ? styles.moveSideGlyphWhite : styles.moveSideGlyphBlack
         ]}
-      />
+        testID={`move-side-${side === "w" ? "white" : "black"}-glyph`}
+      >
+        <View
+          style={[
+            styles.moveSideGlyphBase,
+            side === "w" ? styles.moveSideGlyphWhiteBase : styles.moveSideGlyphBlackBase
+          ]}
+        />
+      </View>
+    );
+  }
+  return (
+    <View
+      style={styles.moveSideKingGlyph}
+      testID={`move-side-${side === "w" ? "white" : "black"}-glyph`}
+    >
+      <Text style={styles.moveSideKingGlyphText}>{side === "w" ? "♔" : "♚"}</Text>
     </View>
   );
 }
@@ -7177,6 +7197,24 @@ function ReviewSession({
       <HistoryUnclearAction onClear={() => onAttemptClearUnclear(currentEntry.attempt!.id)} />
     ) : null;
   const hasReviewContextActions = reviewScheduleControlNode !== null || historyUnclearActionNode !== null;
+  const reviewPromptNode = (
+    <View style={[styles.practicePromptStack, currentEntry.mode === "arrow_duel" ? null : { width: boardSize }]}>
+      <PracticePrompt
+        currentPuzzle={currentPuzzle}
+        mode={currentEntry.mode}
+        promptText={
+          isArrowDuelFollowUpReview
+            ? null
+            : undefined
+        }
+        promptHint={
+          isArrowDuelFollowUpReview
+            ? "Blue arrows show the next move in the punishment line. Follow them to see why the choice is bad."
+            : undefined
+        }
+      />
+    </View>
+  );
 
   return (
     <View style={[styles.reviewSessionPanel, adaptiveLayout.usesWideContent ? styles.reviewSessionPanelWide : null]} testID="review-session">
@@ -7278,7 +7316,11 @@ function ReviewSession({
               <Text style={styles.reviewContextPillText}>Sprint review</Text>
             </View>
           ) : null}
-          <MoveSideBadge badgeTestID="review-side-to-move" side={reviewSideToMove} />
+          <MoveSideBadge
+            badgeTestID="review-side-to-move"
+            king={currentEntry.mode !== "arrow_duel"}
+            side={reviewSideToMove}
+          />
           {currentEntry.source !== "due" ? (
             <View style={styles.reviewContextPill} testID="review-theme-pill">
               <Text style={styles.reviewContextPillText}>{reviewPrimaryTheme}</Text>
@@ -7296,6 +7338,7 @@ function ReviewSession({
 
       <View style={[styles.reviewBoardLayout, adaptiveLayout.usesSessionRail ? styles.reviewBoardLayoutWide : null]}>
         <View style={styles.reviewBoardLane} testID="review-board-lane">
+          {currentEntry.mode === "arrow_duel" ? null : reviewPromptNode}
           <View
             accessible
             accessibilityLabel={sessionBoardAccessibilityLabel(reviewSideToMove, lastMove)}
@@ -7386,20 +7429,7 @@ function ReviewSession({
           testID="review-analysis-column"
         >
           <View style={styles.analysisPanel} testID="review-analysis-panel">
-          <PracticePrompt
-            currentPuzzle={currentPuzzle}
-            mode={currentEntry.mode}
-            promptText={
-              isArrowDuelFollowUpReview
-                ? null
-                : undefined
-            }
-            promptHint={
-              isArrowDuelFollowUpReview
-                ? "Blue arrows show the next move in the punishment line. Follow them to see why the choice is bad."
-                : undefined
-            }
-          />
+          {currentEntry.mode === "arrow_duel" ? reviewPromptNode : null}
           {!analysisEnabled && guidedEvalLines.length > 0 ? (
             <View testID="review-guided-eval-list">
               {guidedEvalLines.map((line, index) => (
@@ -10791,6 +10821,19 @@ const styles = StyleSheet.create({
   },
   moveSideGlyphBlackBase: {
     backgroundColor: "#0F172A"
+  },
+  moveSideKingGlyph: {
+    alignItems: "center",
+    height: 22,
+    justifyContent: "center",
+    width: 20
+  },
+  moveSideKingGlyphText: {
+    color: "#0F172A",
+    fontSize: 21,
+    fontWeight: "700",
+    lineHeight: 23,
+    textAlign: "center"
   },
   timerText: {
     color: "#111827",

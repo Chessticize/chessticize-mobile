@@ -19,7 +19,7 @@ import {
   type MobilePuzzleSource
 } from "./browserMobilePractice.ts";
 import { clearLabPracticeService, setLabPracticeService } from "./boardController.ts";
-import { LAB_PUZZLES, PRIMARY_LAB_PUZZLE } from "./labPuzzles.ts";
+import { ISSUE_272_LAB_PUZZLE, LAB_PUZZLES, PRIMARY_LAB_PUZZLE } from "./labPuzzles.ts";
 import { scenarioRegistry, type LabScenarioId } from "./scenarioRegistry.ts";
 
 export const LAB_NOW_MS = new Date("2026-07-18T18:00:00.000Z").getTime();
@@ -36,7 +36,12 @@ export function LabScenario({ scenarioId }: { scenarioId: LabScenarioId }): Reac
   const definition = scenarioRegistry[scenarioId];
   const runtime = useMemo(() => createScenarioRuntime(scenarioId), [scenarioId]);
 
-  setLabPracticeService(runtime.service);
+  const entryPreviewEnabled = isPuzzleEntryPreviewScenario(scenarioId);
+  setLabPracticeService(
+    runtime.service,
+    entryPreviewEnabled,
+    entryPreviewEnabled ? ISSUE_272_LAB_PUZZLE.id : null
+  );
   useEffect(() => () => clearLabPracticeService(runtime.service), [runtime.service]);
 
   return (
@@ -83,6 +88,10 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
   };
 
   switch (scenarioId) {
+    case "practice-blunder-move-preview":
+      service = createIssue272Service(false);
+      configurePuzzleSource = false;
+      break;
     case "practice-custom-rating-editor":
       service = createPlayedCustomService();
       break;
@@ -98,6 +107,10 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     case "review-session":
     case "review-feedback-analysis":
       service = createReviewService("due");
+      break;
+    case "review-blunder-move-preview":
+      service = createIssue272Service(true);
+      configurePuzzleSource = false;
       break;
     case "review-overdue":
     case "review-filters":
@@ -147,9 +160,27 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
   };
 }
 
+function isPuzzleEntryPreviewScenario(scenarioId: LabScenarioId): boolean {
+  return scenarioId === "practice-blunder-move-preview"
+    || scenarioId === "review-blunder-move-preview";
+}
+
 function createSeededService(): PracticeService {
   const store = new MemoryStore();
   store.seedPuzzles(LAB_PUZZLES);
+  return new PracticeService(store);
+}
+
+function createIssue272Service(withDueReview: boolean): PracticeService {
+  const store = new MemoryStore();
+  store.seedPuzzles([ISSUE_272_LAB_PUZZLE]);
+  if (withDueReview) {
+    store.scheduleMistakeReview({
+      puzzleId: ISSUE_272_LAB_PUZZLE.id,
+      mode: "standard",
+      ratingKey: "standard 5/20"
+    }, "2026-07-17T12:00:00.000Z");
+  }
   return new PracticeService(store);
 }
 

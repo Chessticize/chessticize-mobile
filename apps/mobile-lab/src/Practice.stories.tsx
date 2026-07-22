@@ -50,6 +50,15 @@ export const ActiveSession: Story = {
   }
 };
 
+export const BlunderMovePreview: Story = {
+  name: "Blunder move preview",
+  args: { scenarioId: "practice-blunder-move-preview" },
+  play: async ({ canvasElement }) => {
+    await openPracticeSession(canvasElement);
+    await waitForTestId(canvasElement, "lab-blunder-preview-complete");
+  }
+};
+
 export const PausedSession: Story = {
   name: "Paused session",
   args: { scenarioId: "practice-paused" },

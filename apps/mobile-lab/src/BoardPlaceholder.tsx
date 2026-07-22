@@ -1,8 +1,12 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import { Chess } from "chess.js";
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from "react-native";
+import { Chess, type Color, type PieceSymbol, type Square } from "chess.js";
 import { currentExpectedMove } from "../../../packages/core/src/index.ts";
-import { getLabPracticeService } from "./boardController.ts";
+import {
+  getLabPracticeService,
+  getLabPuzzleEntryPreviewPuzzleId,
+  isLabPuzzleEntryPreviewEnabled
+} from "./boardController.ts";
 
 type BoardMove = {
   from: string;
@@ -40,20 +44,91 @@ type BoardPlaceholderRef = {
   resetBoard: (fen?: string) => void;
 };
 
+type EntryPreviewPhase = "idle" | "watching" | "ready";
+
+type EntryPreviewPlan = {
+  blunderMove: string;
+  finalFen: string;
+  initialFen: string;
+  puzzleId: string;
+};
+
+type AnimatedPreviewMove = BoardMove & { glyph: string };
+
 const BoardPlaceholder = forwardRef<BoardPlaceholderRef, BoardPlaceholderProps>(function BoardPlaceholder(
   { boardSize = 320, fen, flipped = false, gestureEnabled = true, onIllegalMove, onMove },
   ref
 ) {
   const chessRef = useRef(createChess(fen));
   const [displayFen, setDisplayFen] = useState(fen);
+  const [entryPreviewPhase, setEntryPreviewPhase] = useState<EntryPreviewPhase>("idle");
+  const [animatedPreviewMove, setAnimatedPreviewMove] = useState<AnimatedPreviewMove | null>(null);
+  const [previewLastMove, setPreviewLastMove] = useState<BoardMove | null>(null);
+  const [previewReplayToken, setPreviewReplayToken] = useState(0);
+  const previewProgress = useRef(new Animated.Value(0)).current;
+  const previewedKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
-    chessRef.current = createChess(fen);
-    setDisplayFen(chessRef.current.fen());
-  }, [fen]);
+    const plan = entryPreviewPlan(fen);
+    const previewKey = plan ? `${plan.puzzleId}:${previewReplayToken}` : null;
+    if (!plan || previewedKeyRef.current === previewKey) {
+      chessRef.current = createChess(fen);
+      setDisplayFen(chessRef.current.fen());
+      if (!plan) {
+        setEntryPreviewPhase("idle");
+        setPreviewLastMove(null);
+      }
+      return;
+    }
+
+    previewedKeyRef.current = previewKey;
+    const previewChess = createChess(plan.initialFen);
+    const move = parseUci(plan.blunderMove);
+    const piece = previewChess.get(move.from as Square);
+    if (!piece) {
+      chessRef.current = createChess(plan.finalFen);
+      setDisplayFen(chessRef.current.fen());
+      setEntryPreviewPhase("ready");
+      return;
+    }
+
+    let cancelled = false;
+    let animation: Animated.CompositeAnimation | null = null;
+    chessRef.current = previewChess;
+    setDisplayFen(previewChess.fen());
+    setAnimatedPreviewMove({ ...move, glyph: pieceGlyph(piece.color, piece.type) });
+    setPreviewLastMove(null);
+    setEntryPreviewPhase("watching");
+    previewProgress.setValue(0);
+
+    const startTimer = setTimeout(() => {
+      animation = Animated.timing(previewProgress, {
+        duration: 760,
+        easing: Easing.inOut(Easing.cubic),
+        toValue: 1,
+        useNativeDriver: false
+      });
+      animation.start(({ finished }) => {
+        if (!finished || cancelled) {
+          return;
+        }
+        chessRef.current = createChess(plan.finalFen);
+        setDisplayFen(chessRef.current.fen());
+        setAnimatedPreviewMove(null);
+        setPreviewLastMove(move);
+        setEntryPreviewPhase("ready");
+      });
+    }, 350);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(startTimer);
+      animation?.stop();
+    };
+  }, [fen, previewProgress, previewReplayToken]);
 
   async function playMove(input: BoardMove): Promise<BoardMove | undefined> {
-    if (isInputLocked(gestureEnabled)) {
+    if (isInputLocked(gestureEnabled) || entryPreviewPhase === "watching") {
       return undefined;
     }
     let played: ReturnType<Chess["move"]> | null = null;
@@ -114,7 +189,11 @@ const BoardPlaceholder = forwardRef<BoardPlaceholderRef, BoardPlaceholderProps>(
     []
   );
   const expected = expectedMoveForLab();
-  const locked = isInputLocked(gestureEnabled);
+  const previewPlan = entryPreviewPlan(fen);
+  const locked = isInputLocked(gestureEnabled) || entryPreviewPhase === "watching";
+  const animatedMoveGeometry = animatedPreviewMove
+    ? previewMoveGeometry(animatedPreviewMove, boardSize, flipped)
+    : null;
 
   return (
     <View
@@ -134,10 +213,26 @@ const BoardPlaceholder = forwardRef<BoardPlaceholderRef, BoardPlaceholderProps>(
           />
         ))}
       </View>
+      {previewLastMove ? (
+        <View pointerEvents="none" style={styles.previewMoveOverlay} testID="lab-blunder-last-move">
+          <View style={[styles.previewMoveSquare, squareFrame(previewLastMove.from, boardSize, flipped)]} />
+          <View style={[styles.previewMoveSquare, squareFrame(previewLastMove.to, boardSize, flipped)]} />
+        </View>
+      ) : null}
       <View pointerEvents="box-none" style={styles.overlay}>
         <View style={styles.badge}>
           <Text style={styles.badgeText}>LAB ONLY · BOARD PLACEHOLDER</Text>
         </View>
+        {entryPreviewPhase !== "idle" ? (
+          <View
+            style={[styles.previewStatus, entryPreviewPhase === "ready" ? styles.previewStatusReady : null]}
+            testID={entryPreviewPhase === "ready" ? "lab-blunder-preview-complete" : "lab-blunder-preview-status"}
+          >
+            <Text style={styles.previewStatusText}>
+              {entryPreviewPhase === "watching" ? "Watch the blunder" : "Your turn"}
+            </Text>
+          </View>
+        ) : null}
         <View style={styles.stateCard}>
           <Text style={styles.stateTitle}>{flipped ? "Black orientation" : "White orientation"}</Text>
           <Text numberOfLines={2} style={styles.fenText}>FEN {displayFen}</Text>
@@ -177,8 +272,47 @@ const BoardPlaceholder = forwardRef<BoardPlaceholderRef, BoardPlaceholderProps>(
               }
             }}
           />
+          {previewPlan ? (
+            <LabButton
+              disabled={entryPreviewPhase !== "ready"}
+              label="Replay blunder"
+              testID="lab-board-replay-blunder"
+              onPress={() => setPreviewReplayToken((token) => token + 1)}
+            />
+          ) : null}
         </View>
       </View>
+      {animatedPreviewMove && animatedMoveGeometry ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.animatedPreviewPiece,
+            {
+              height: squareSize,
+              width: squareSize,
+              transform: [
+                {
+                  translateX: previewProgress.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [animatedMoveGeometry.fromX, animatedMoveGeometry.toX]
+                  })
+                },
+                {
+                  translateY: previewProgress.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [animatedMoveGeometry.fromY, animatedMoveGeometry.toY]
+                  })
+                }
+              ]
+            }
+          ]}
+          testID="lab-blunder-moving-piece"
+        >
+          <Text style={[styles.animatedPreviewPieceText, { fontSize: squareSize * 0.7 }]}>
+            {animatedPreviewMove.glyph}
+          </Text>
+        </Animated.View>
+      ) : null}
     </View>
   );
 });
@@ -260,6 +394,79 @@ function isInputLocked(gestureEnabled: boolean): boolean {
   return !gestureEnabled || Boolean(globalThis.document?.querySelector('[data-testid="board-input-blocker"]'));
 }
 
+function entryPreviewPlan(finalFen: string): EntryPreviewPlan | null {
+  if (!isLabPuzzleEntryPreviewEnabled()) {
+    return null;
+  }
+  const service = getLabPracticeService();
+  const activePuzzle = service?.getActiveSprint()?.currentPuzzle;
+  const reviewPuzzleId = globalThis.document
+    ?.querySelector<HTMLElement>('[data-testid="review-current-puzzle-id"]')
+    ?.textContent
+    ?.trim();
+  const configuredPreviewPuzzleId = getLabPuzzleEntryPreviewPuzzleId();
+  const fallbackPuzzleId = configuredPreviewPuzzleId ?? reviewPuzzleId;
+  const puzzle = activePuzzle?.kind === "line"
+    ? activePuzzle.puzzle
+    : fallbackPuzzleId
+      ? service?.getPuzzle(fallbackPuzzleId)
+      : undefined;
+  const blunderMove = puzzle?.solutionMoves[0];
+  if (!puzzle || !blunderMove || normalizedFen(finalFen) === normalizedFen(puzzle.initialFen)) {
+    return null;
+  }
+  return {
+    blunderMove,
+    finalFen,
+    initialFen: puzzle.initialFen,
+    puzzleId: puzzle.id
+  };
+}
+
+function normalizedFen(fen: string): string {
+  return createChess(fen).fen();
+}
+
+function pieceGlyph(color: Color, type: PieceSymbol): string {
+  return PIECE_GLYPHS[color][type];
+}
+
+function previewMoveGeometry(move: BoardMove, boardSize: number, flipped: boolean): {
+  fromX: number;
+  fromY: number;
+  toX: number;
+  toY: number;
+} {
+  const from = squareOrigin(move.from, boardSize, flipped);
+  const to = squareOrigin(move.to, boardSize, flipped);
+  return { fromX: from.left, fromY: from.top, toX: to.left, toY: to.top };
+}
+
+function squareFrame(square: string, boardSize: number, flipped: boolean): {
+  height: number;
+  left: number;
+  top: number;
+  width: number;
+} {
+  const origin = squareOrigin(square, boardSize, flipped);
+  const size = boardSize / 8;
+  return { ...origin, height: size, width: size };
+}
+
+function squareOrigin(square: string, boardSize: number, flipped: boolean): { left: number; top: number } {
+  const file = Math.max(0, Math.min(7, square.charCodeAt(0) - 97));
+  const rank = Math.max(1, Math.min(8, Number(square[1]) || 1));
+  const displayFile = flipped ? 7 - file : file;
+  const displayRank = flipped ? rank - 1 : 8 - rank;
+  const size = boardSize / 8;
+  return { left: displayFile * size, top: displayRank * size };
+}
+
+const PIECE_GLYPHS: Record<Color, Record<PieceSymbol, string>> = {
+  w: { p: "♙", n: "♘", b: "♗", r: "♖", q: "♕", k: "♔" },
+  b: { p: "♟", n: "♞", b: "♝", r: "♜", q: "♛", k: "♚" }
+};
+
 const styles = StyleSheet.create({
   root: {
     backgroundColor: "#CBD5E1",
@@ -287,6 +494,29 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0
   },
+  previewMoveOverlay: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 2
+  },
+  previewMoveSquare: {
+    backgroundColor: "rgba(245, 158, 11, 0.28)",
+    borderColor: "#D97706",
+    borderWidth: 2,
+    position: "absolute"
+  },
+  animatedPreviewPiece: {
+    alignItems: "center",
+    justifyContent: "center",
+    left: 0,
+    position: "absolute",
+    top: 0,
+    zIndex: 20
+  },
+  animatedPreviewPieceText: {
+    color: "#0F172A",
+    fontWeight: "700",
+    textAlign: "center"
+  },
   badge: {
     backgroundColor: "#FDE68A",
     borderColor: "#92400E",
@@ -300,6 +530,23 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "800",
     letterSpacing: 0.5
+  },
+  previewStatus: {
+    backgroundColor: "#FFF7ED",
+    borderColor: "#EA580C",
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 5
+  },
+  previewStatusReady: {
+    backgroundColor: "#ECFDF5",
+    borderColor: "#16A34A"
+  },
+  previewStatusText: {
+    color: "#1E293B",
+    fontSize: 11,
+    fontWeight: "800"
   },
   stateCard: {
     backgroundColor: "rgba(15, 23, 42, 0.88)",
@@ -335,6 +582,7 @@ const styles = StyleSheet.create({
   },
   controls: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 5,
     justifyContent: "center",
     width: "100%"

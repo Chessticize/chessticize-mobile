@@ -65,6 +65,16 @@ export const ReviewSession: Story = {
   }
 };
 
+export const BlunderMovePreview: Story = {
+  name: "Blunder move preview",
+  args: { scenarioId: "review-blunder-move-preview" },
+  play: async ({ canvasElement }) => {
+    await openReviewQueue(canvasElement);
+    await clickTestId(canvasElement, "review-start-due");
+    await waitForTestId(canvasElement, "lab-blunder-preview-complete");
+  }
+};
+
 export const FeedbackAndAnalysis: Story = {
   name: "Feedback and analysis",
   args: { scenarioId: "review-feedback-analysis" },

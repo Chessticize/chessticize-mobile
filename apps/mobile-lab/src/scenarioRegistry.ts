@@ -11,6 +11,7 @@ export type LabScenarioId =
   | "practice-custom-rating-editor"
   | "practice-preparing"
   | "practice-active"
+  | "practice-blunder-move-preview"
   | "practice-paused"
   | "practice-exit-confirmation"
   | "practice-summary"
@@ -20,6 +21,7 @@ export type LabScenarioId =
   | "review-overdue"
   | "review-filters"
   | "review-session"
+  | "review-blunder-move-preview"
   | "review-feedback-analysis"
   | "history-empty"
   | "history-populated"
@@ -62,6 +64,7 @@ export const scenarioRegistry: Record<LabScenarioId, LabScenarioDefinition> = {
   "practice-custom-rating-editor": defineScenario("practice-custom-rating-editor", "Practice", "Custom rating editor", "practice--custom-rating-editor", "Expanded ELO adjustment for a previously played custom rating bucket.", "practice", ["Custom setup", "Rating adjustment"], ["Practice home"]),
   "practice-preparing": defineScenario("practice-preparing", "Practice", "Preparing", "practice--preparing", "Stable preparing overlay before an Arrow Duel sprint starts.", "practice", ["Preparing overlay", "Cancel through Back intent"], ["Active sprint", "Practice home"]),
   "practice-active": defineScenario("practice-active", "Practice", "Active session", "practice--active-session", "Active Standard sprint with the development-only Board Placeholder.", "practice", ["Timer", "Progress", "Board state", "Pause", "Accessible moves"], ["Sprint result"]),
+  "practice-blunder-move-preview": defineScenario("practice-blunder-move-preview", "Practice", "Blunder move preview", "practice--blunder-move-preview", "Standard puzzle entry that animates the opponent blunder before unlocking the Board Placeholder.", "practice", ["Blunder replay", "King side badge", "Prompt above board", "Input lock"], ["Active sprint"], { isNew: true, changeNote: "Issue #272: animate the blunder, use a king side icon, and move the prompt above the board." }),
   "practice-paused": defineScenario("practice-paused", "Practice", "Paused session", "practice--paused-session", "Paused sprint with resume and abandon actions.", "practice", ["Paused state", "Resume", "Abandon"], ["Active sprint", "Sprint result"]),
   "practice-exit-confirmation": defineScenario("practice-exit-confirmation", "Practice", "Exit confirmation", "practice--exit-confirmation", "Guarded abandon confirmation over an active sprint.", "practice", ["Confirmation", "Cancel", "Confirm abandon"], ["Active sprint", "Sprint result"]),
   "practice-summary": defineScenario("practice-summary", "Practice", "Sprint summary", "practice--sprint-summary", "Completed one-puzzle sprint summary reached through the public board callback.", "practice", ["Result", "Rating change", "History and review actions"], ["Practice home", "History", "Review"]),
@@ -71,6 +74,7 @@ export const scenarioRegistry: Record<LabScenarioId, LabScenarioDefinition> = {
   "review-overdue": defineScenario("review-overdue", "Review", "Overdue queue", "review--overdue-queue", "Overdue workload and danger treatment.", "review", ["Overdue count", "Due rows", "Forecast"], ["Review session", "Practice"]),
   "review-filters": defineScenario("review-filters", "Review", "Filters", "review--filters", "Expanded filters with an active overdue selection.", "review", ["Mode, speed, theme, and overdue filters", "Active filter summary"], ["Review session", "Practice"]),
   "review-session": defineScenario("review-session", "Review", "Review session", "review--review-session", "Due Review session using the Board Placeholder and public queue state.", "review", ["Board", "Timer", "Context", "Previous and next"], ["Review queue"]),
+  "review-blunder-move-preview": defineScenario("review-blunder-move-preview", "Review", "Review blunder move preview", "review--blunder-move-preview", "Due Review entry that replays the original blunder before the user retries the puzzle.", "review", ["Blunder replay", "King side badge", "Prompt above board", "Input lock"], ["Review queue"], { isNew: true, changeNote: "Issue #272: carry the approved puzzle-entry hierarchy into Review." }),
   "review-feedback-analysis": defineScenario("review-feedback-analysis", "Review", "Feedback and analysis", "review--feedback-and-analysis", "Wrong-move feedback followed by the browser-safe fallback analysis surface.", "review", ["Move feedback", "Analysis lines", "Reset and flip controls"], ["Review session"]),
   "history-empty": defineScenario("history-empty", "History", "Empty history", "history--empty-history", "History with no attempts or rating points.", "history", ["Empty state", "Primary filters"], ["Practice", "Review", "Settings"]),
   "history-populated": defineScenario("history-populated", "History", "Populated history", "history--populated-history", "Deterministic correct, wrong, and unclear attempts with a rating trend.", "history", ["Attempt rows", "Rating chart", "Quick filters"], ["Attempt detail", "Review"]),
@@ -136,9 +140,11 @@ function defineScenario(
   description: string,
   owner: MobileBackPrimaryTab | "system",
   includes: readonly string[],
-  exits: readonly string[]
+  exits: readonly string[],
+  marker: ScenarioMarker = {}
 ): LabScenarioDefinition {
   return {
+    ...marker,
     id,
     group,
     title,

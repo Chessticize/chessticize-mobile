@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { Chess } from "chess.js";
+import { ISSUE_272_LAB_PUZZLE } from "./labPuzzles.ts";
 import {
   navigationCoverage,
   newScenarios,
@@ -35,7 +37,20 @@ test("every typed navigation coverage entry points to a registered scenario", ()
   }
 });
 
-test("the completed baseline ships without active New Scenario Markers", () => {
-  assert.deepEqual(newScenarios, []);
+test("the issue #272 design slice keeps its New Scenario Markers active", () => {
+  assert.deepEqual(newScenarios.map((scenario) => scenario.id), [
+    "practice-blunder-move-preview",
+    "review-blunder-move-preview"
+  ]);
   assert.deepEqual(storyTagsForScenario("practice-home" as LabScenarioId), []);
+  assert.deepEqual(storyTagsForScenario("practice-blunder-move-preview"), ["new"]);
+});
+
+test("the issue #272 preview hands the board to Black after the blunder", () => {
+  const chess = new Chess(ISSUE_272_LAB_PUZZLE.initialFen);
+
+  chess.move(ISSUE_272_LAB_PUZZLE.solutionMoves[0]!);
+
+  assert.equal(chess.turn(), "b");
+  assert.equal(chess.fen(), "4k3/4p3/8/8/8/8/3K4/8 b - - 1 1");
 });
