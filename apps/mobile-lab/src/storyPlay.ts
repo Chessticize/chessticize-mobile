@@ -81,6 +81,48 @@ export async function expectReorderAnimation(canvasElement: HTMLElement): Promis
   });
 }
 
+export async function expectRunCardInsets(
+  canvasElement: HTMLElement,
+  testID: string
+): Promise<void> {
+  const page = within(canvasElement.ownerDocument.body);
+  const card = await page.findByTestId(testID, {}, { timeout: 4_000 });
+  const view = canvasElement.ownerDocument.defaultView;
+  if (!view) {
+    throw new Error("Expected a browser window for Run card layout verification");
+  }
+  await waitFor(() => {
+    const style = view.getComputedStyle(card);
+    if (style.paddingLeft !== "12px" || style.paddingRight !== "12px") {
+      throw new Error(`Expected ${testID} to preserve 12px horizontal content insets`);
+    }
+    if (style.paddingTop !== "10px" || style.paddingBottom !== "10px") {
+      throw new Error(`Expected ${testID} to preserve 10px edit-mode vertical insets`);
+    }
+  });
+}
+
+export async function expectUniformRunDropTarget(
+  canvasElement: HTMLElement,
+  testID: string
+): Promise<void> {
+  const page = within(canvasElement.ownerDocument.body);
+  const card = await page.findByTestId(testID, {}, { timeout: 4_000 });
+  const view = canvasElement.ownerDocument.defaultView;
+  if (!view) {
+    throw new Error("Expected a browser window for Run drop-target verification");
+  }
+  await waitFor(() => {
+    const style = view.getComputedStyle(card);
+    if (style.borderTopWidth !== style.borderBottomWidth) {
+      throw new Error(`Expected ${testID} to use an even border on every edge`);
+    }
+    if (style.boxShadow.includes("-3px") || !style.boxShadow.includes("0px 0px 0px 2px")) {
+      throw new Error(`Expected ${testID} to use a uniform focus ring without a thick top edge`);
+    }
+  });
+}
+
 export async function openPracticeSession(canvasElement: HTMLElement): Promise<void> {
   await clickTestId(canvasElement, "practice-mode-standard");
   await clickTestId(canvasElement, "practice-start-button");

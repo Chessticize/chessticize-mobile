@@ -3594,6 +3594,11 @@ type WebRunElement = {
   getBoundingClientRect: () => WebRunRect;
 };
 
+type WebRunStyle = React.CSSProperties & {
+  paddingHorizontal?: React.CSSProperties["paddingLeft"];
+  paddingVertical?: React.CSSProperties["paddingTop"];
+};
+
 function RunCardDropSurface({
   children,
   draggable,
@@ -3624,7 +3629,12 @@ function RunCardDropSurface({
   onDrop: () => void;
 }): React.JSX.Element {
   if (Platform.OS === "web") {
-    const flattenedStyle = StyleSheet.flatten(style) as React.CSSProperties;
+    const flattenedStyle = StyleSheet.flatten(style) as WebRunStyle;
+    const {
+      paddingHorizontal,
+      paddingVertical,
+      ...webStyle
+    } = flattenedStyle;
     return (
       <div
         aria-grabbed={draggable ? dragging : undefined}
@@ -3633,15 +3643,19 @@ function RunCardDropSurface({
         draggable={draggable}
         ref={(element) => onElementChange(runId, element as unknown as WebRunElement | null)}
         style={{
-          ...flattenedStyle,
+          ...webStyle,
           boxShadow: dragging
             ? "0 12px 28px rgba(15, 23, 42, 0.20)"
             : dropTarget
-              ? "0 -3px 0 #2563EB, 0 2px 8px rgba(15, 23, 42, 0.08)"
+              ? "0 0 0 2px rgba(37, 99, 235, 0.16), 0 4px 12px rgba(15, 23, 42, 0.10)"
               : "0 1px 3px rgba(15, 23, 42, 0.08)",
           boxSizing: "border-box",
           cursor: draggable ? (dragging ? "grabbing" : "grab") : "default",
           display: "flex",
+          paddingBottom: webStyle.paddingBottom ?? paddingVertical,
+          paddingLeft: webStyle.paddingLeft ?? paddingHorizontal,
+          paddingRight: webStyle.paddingRight ?? paddingHorizontal,
+          paddingTop: webStyle.paddingTop ?? paddingVertical,
           touchAction: draggable ? "none" : undefined,
           transition: "border-color 140ms ease, box-shadow 140ms ease, opacity 140ms ease",
           userSelect: draggable ? "none" : undefined,
@@ -11044,8 +11058,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10
   },
   runCardDropTarget: {
-    borderColor: "#2563EB",
-    borderWidth: 1.5
+    borderColor: "#2563EB"
   },
   runCardDragging: {
     opacity: 0.9

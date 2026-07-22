@@ -4,8 +4,10 @@ import {
   clickTestId,
   dragTestId,
   expectReorderAnimation,
+  expectRunCardInsets,
   expectTestIdAbsent,
   expectTestIdsInOrder,
+  expectUniformRunDropTarget,
   openPracticeSession,
   waitForTestId
 } from "./storyPlay.ts";
@@ -27,6 +29,7 @@ export const EditAndReorderRuns: Story = {
   args: { scenarioId: "practice-home-edit" },
   play: async ({ canvasElement }) => {
     await clickTestId(canvasElement, "practice-run-home-edit");
+    await expectRunCardInsets(canvasElement, "practice-run-standard");
     await dragTestId(
       canvasElement,
       "practice-run-endgame-sprint",
@@ -36,7 +39,10 @@ export const EditAndReorderRuns: Story = {
         "practice-run-endgame-sprint",
         "practice-run-arrow-duel",
         "practice-run-tactics-focus"
-      ]).then(() => expectReorderAnimation(canvasElement))
+      ]).then(async () => {
+        await expectReorderAnimation(canvasElement);
+        await expectUniformRunDropTarget(canvasElement, "practice-run-arrow-duel");
+      })
     );
     await expectTestIdsInOrder(canvasElement, [
       "practice-run-standard",
