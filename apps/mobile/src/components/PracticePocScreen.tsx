@@ -3776,6 +3776,20 @@ function RunCardDropSurface({
   const nativeDragCompensationRef = useRef(0);
   const nativeDragDyRef = useRef(0);
   const nativeLayoutYRef = useRef<number | null>(null);
+  const nativeDragHandlersRef = useRef({
+    runId,
+    onDragEnd,
+    onDragStart,
+    onDrop,
+    onNativeDragMove
+  });
+  nativeDragHandlersRef.current = {
+    runId,
+    onDragEnd,
+    onDragStart,
+    onDrop,
+    onNativeDragMove
+  };
   const nativePanResponder = useMemo(() => {
     const shouldClaimNativeDrag = (_event: unknown, gesture: PanResponderGestureState): boolean => (
       Math.abs(gesture.dy) > 6
@@ -3785,20 +3799,22 @@ function RunCardDropSurface({
     onMoveShouldSetPanResponder: shouldClaimNativeDrag,
     onMoveShouldSetPanResponderCapture: shouldClaimNativeDrag,
     onPanResponderGrant: () => {
+      const handlers = nativeDragHandlersRef.current;
       nativeDragActiveRef.current = true;
       nativeDragCompensationRef.current = 0;
       nativeDragDyRef.current = 0;
       nativeDragOffset.stopAnimation();
-      onDragStart(runId);
+      handlers.onDragStart(handlers.runId);
     },
     onPanResponderMove: (_event, gesture: PanResponderGestureState) => {
+      const handlers = nativeDragHandlersRef.current;
       nativeDragDyRef.current = gesture.dy;
       nativeDragOffset.setValue(gesture.dy + nativeDragCompensationRef.current);
-      onNativeDragMove(runId, gesture.dy);
+      handlers.onNativeDragMove(handlers.runId, gesture.dy);
     },
     onPanResponderRelease: () => {
       nativeDragActiveRef.current = false;
-      onDrop();
+      nativeDragHandlersRef.current.onDrop();
       Animated.spring(nativeDragOffset, {
         toValue: 0,
         damping: 24,
@@ -3812,7 +3828,7 @@ function RunCardDropSurface({
     },
     onPanResponderTerminate: () => {
       nativeDragActiveRef.current = false;
-      onDragEnd();
+      nativeDragHandlersRef.current.onDragEnd();
       Animated.spring(nativeDragOffset, {
         toValue: 0,
         damping: 24,
@@ -3823,7 +3839,7 @@ function RunCardDropSurface({
     },
     onPanResponderTerminationRequest: () => false
     });
-  }, [nativeDragOffset, onDragEnd, onDragStart, onDrop, onNativeDragMove, runId]);
+  }, [nativeDragOffset]);
 
   const handleNativeLayout = (event: LayoutChangeEvent): void => {
     const layout = event.nativeEvent.layout;

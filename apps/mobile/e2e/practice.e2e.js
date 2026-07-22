@@ -68,11 +68,11 @@ describe('Practice POC', () => {
     }
     await element(by.id('practice-run-standard')).longPressAndDrag(
       300,
-      NaN,
-      NaN,
+      0.5,
+      0.5,
       element(by.id('practice-run-arrow-duel')),
-      NaN,
-      NaN,
+      0.5,
+      0.9,
       'slow',
       200
     );
