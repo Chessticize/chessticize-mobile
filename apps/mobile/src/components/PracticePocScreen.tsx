@@ -5788,22 +5788,26 @@ function HistoryThemeList({
 }
 
 function ThemeTagRail({
-  fill = false,
+  centered = false,
   testID,
   themes
 }: {
-  fill?: boolean;
+  centered?: boolean;
   testID: string;
   themes: readonly string[];
 }): React.JSX.Element {
   return (
     <ScrollView
       horizontal
+      contentContainerStyle={centered ? styles.themeTagRailCenteredContent : undefined}
       showsHorizontalScrollIndicator={false}
-      style={fill ? styles.themeTagRailFillViewport : styles.themeTagRailViewport}
+      style={[
+        styles.themeTagRailViewport,
+        centered ? styles.themeTagRailCenteredViewport : null
+      ]}
       testID={testID}
     >
-      <View style={styles.historyThemeRail}>
+      <View style={[styles.historyThemeRail, centered ? styles.historyThemeRailCentered : null]}>
         {themes.map((theme) => (
           <View key={theme} style={styles.historyThemeChip} testID={`${testID}-${safeTestId(theme)}`}>
             <Text style={styles.historyThemeChipText}>{customThemeLabel(theme)}</Text>
@@ -7528,14 +7532,8 @@ function ReviewSession({
             </View>
           ) : null}
           <MoveSideBadge badgeTestID="review-side-to-move" side={reviewSideToMove} />
-          {themeCatalogPresentation && currentEntry.source === "history" ? (
-            reviewCuratedThemes.length > 0 ? (
-              <View style={styles.reviewThemeCatalogRow} testID="review-theme-catalog">
-                <Text style={styles.reviewThemeCatalogLabel}>Themes</Text>
-                <ThemeTagRail fill testID="review-theme-rail" themes={reviewCuratedThemes} />
-              </View>
-            ) : null
-          ) : currentEntry.source !== "due" ? (
+          {!(themeCatalogPresentation && currentEntry.source === "history")
+            && currentEntry.source !== "due" ? (
             <View style={styles.reviewContextPill} testID="review-theme-pill">
               <Text style={styles.reviewContextPillText}>{reviewPrimaryTheme}</Text>
             </View>
@@ -7631,6 +7629,16 @@ function ReviewSession({
               />
             ) : null}
           </View>
+          {themeCatalogPresentation
+            && currentEntry.source === "history"
+            && reviewCuratedThemes.length > 0 ? (
+            <View
+              style={[styles.reviewThemeCatalogRail, { width: boardSize }]}
+              testID="review-theme-catalog"
+            >
+              <ThemeTagRail centered testID="review-theme-rail" themes={reviewCuratedThemes} />
+            </View>
+          ) : null}
         </View>
 
         <View
@@ -11991,19 +11999,11 @@ const styles = StyleSheet.create({
     gap: 8,
     justifyContent: "center"
   },
-  reviewThemeCatalogRow: {
+  reviewThemeCatalogRail: {
     alignItems: "center",
-    flexDirection: "row",
-    gap: 8,
+    marginTop: 8,
+    maxWidth: "100%",
     minWidth: 0,
-    width: "100%"
-  },
-  reviewThemeCatalogLabel: {
-    color: "#64748B",
-    flexShrink: 0,
-    fontSize: 11,
-    fontWeight: "900",
-    textTransform: "uppercase"
   },
   reviewContextPill: {
     alignItems: "center",
@@ -12510,15 +12510,22 @@ const styles = StyleSheet.create({
     maxWidth: "100%",
     minWidth: 0
   },
-  themeTagRailFillViewport: {
-    flex: 1,
-    minWidth: 0
+  themeTagRailCenteredViewport: {
+    width: "100%"
+  },
+  themeTagRailCenteredContent: {
+    flexGrow: 1,
+    justifyContent: "center"
   },
   historyThemeRail: {
     flexDirection: "row",
     gap: 4,
     paddingRight: 10,
     paddingTop: 2
+  },
+  historyThemeRailCentered: {
+    paddingLeft: 10,
+    paddingRight: 10
   },
   historyThemeChip: {
     backgroundColor: "#F8FAFC",

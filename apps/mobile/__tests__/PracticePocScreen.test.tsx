@@ -3353,6 +3353,10 @@ describe("PracticePocScreen", () => {
     expect(replayThemes).toContain("Advanced Pawn");
     expect(replayThemes).toContain("Sacrifice");
     expect(replayThemes).not.toContain("Endgame");
+    const replayThemeCatalog = findByTestId(renderer, "review-theme-catalog");
+    expect(collectText(replayThemeCatalog)).not.toContain("Themes");
+    expect(testIdOrder(renderer, "review-board", "review-theme-catalog")).toBeLessThan(0);
+    expect(flattenTestStyle(replayThemeCatalog.props.style).alignItems).toBe("center");
     expect(() => findByTestId(renderer, "review-theme-pill")).toThrow();
   });
 
