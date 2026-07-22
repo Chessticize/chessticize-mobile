@@ -63,15 +63,15 @@ describe('Practice POC', () => {
     await waitFor(element(by.id('practice-run-home-done'))).toBeVisible().withTimeout(10000);
 
     const standardBeforeScroll = await frameFor(element(by.id('practice-run-standard')));
-    await element(by.id('practice-run-standard')).swipe('up', 'fast', 0.1, 0.5, 0.5);
+    await element(by.id('practice-run-standard')).swipe('up', 'slow', 0.1, 0.5, 0.5);
     await sleep(400);
     const standardAfterScroll = await frameFor(element(by.id('practice-run-standard')));
     const arrowAfterScroll = await frameFor(element(by.id('practice-run-arrow-duel')));
     if (standardAfterScroll.y >= standardBeforeScroll.y - 5) {
-      throw new Error('Expected a quick swipe starting on a Run card to scroll Edit Runs');
+      throw new Error('Expected a slow non-hold swipe starting on a Run card to scroll Edit Runs');
     }
     if (standardAfterScroll.y >= arrowAfterScroll.y) {
-      throw new Error('Expected a quick Edit Runs scroll gesture to preserve Run order');
+      throw new Error('Expected a slow non-hold Edit Runs scroll gesture to preserve Run order');
     }
     await element(by.id('practice-main-scroll')).scrollTo('top');
     await waitFor(element(by.id('practice-run-standard'))).toBeVisible().withTimeout(10000);

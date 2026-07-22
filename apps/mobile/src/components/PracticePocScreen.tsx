@@ -3811,11 +3811,16 @@ function RunCardDropSurface({
     onNativeDragMove
   };
   const nativePanResponder = useMemo(() => {
-    const shouldClaimNativeDrag = (_event: unknown, gesture: PanResponderGestureState): boolean => (
-      nativeDragArmedRef.current
-        && Math.abs(gesture.dy) > 6
-        && Math.abs(gesture.dy) > Math.abs(gesture.dx)
-    );
+    const shouldClaimNativeDrag = (_event: unknown, gesture: PanResponderGestureState): boolean => {
+      const movedPastThreshold = Math.abs(gesture.dy) > 6 || Math.abs(gesture.dx) > 6;
+      if (!nativeDragArmedRef.current) {
+        if (movedPastThreshold) {
+          disarmNativeDrag();
+        }
+        return false;
+      }
+      return Math.abs(gesture.dy) > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx);
+    };
     return PanResponder.create({
     onMoveShouldSetPanResponder: shouldClaimNativeDrag,
     onMoveShouldSetPanResponderCapture: shouldClaimNativeDrag,
