@@ -31,6 +31,7 @@ type PracticeRunManagementIntent =
   | { type: "change-mode"; mode: "custom" | "arrow_duel" }
   | { type: "change-name"; name: string }
   | { type: "change-per-puzzle"; perPuzzleSeconds: number }
+  | { type: "step-elo-input"; direction: -1 | 1 }
   | { type: "toggle-theme"; theme: string }
   | { type: "confirm-remove" }
   | { type: "dismiss-remove" }
@@ -176,6 +177,8 @@ export function runManagementFixtureReducer(
       return state.screen === "create"
         ? updateDraft(state, { perPuzzleSeconds: intent.perPuzzleSeconds })
         : state;
+    case "step-elo-input":
+      return stepEloInput(state, intent.direction);
     case "toggle-theme":
       return state.screen === "create"
         ? updateDraft(state, {
@@ -334,6 +337,23 @@ function changeEloInput(
     eloError,
     eloInput: value
   };
+}
+
+function stepEloInput(
+  state: RunManagementFixtureState,
+  direction: -1 | 1
+): RunManagementFixtureState {
+  if (!state.draft) {
+    return state;
+  }
+  const parsed = Number(state.eloInput);
+  const current = typeof state.eloInput === "string"
+    && /^\d{1,4}$/.test(state.eloInput)
+    && Number.isInteger(parsed)
+    ? parsed
+    : state.draft.elo;
+  const next = Math.min(RUN_ELO_MAX, Math.max(RUN_ELO_MIN, current + direction * 100));
+  return changeEloInput(state, String(next));
 }
 
 function validateEloInput(value: string): string | null {

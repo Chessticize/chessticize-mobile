@@ -1070,24 +1070,24 @@ describe("PracticePocScreen", () => {
       "blurAndSubmit"
     );
     expect(hasStyleEntry(findByTestId(renderer, "practice-run-name-row"), "gap", 16)).toBe(true);
-    for (const inputColumn of [
-      findByTestId(renderer, "practice-run-name-input"),
-      findByTestId(renderer, "practice-run-elo-input-shell")
-    ]) {
-      expect(hasStyleEntry(inputColumn, "flex", 1)).toBe(true);
-      expect(hasStyleEntry(inputColumn, "minWidth", 160)).toBe(true);
-      expect(hasStyleEntry(inputColumn, "maxWidth", 200)).toBe(true);
-    }
+    expect(hasStyleEntry(findByTestId(renderer, "practice-run-name-input"), "maxWidth", 200)).toBe(true);
+    expect(hasStyleEntry(findByTestId(renderer, "practice-run-elo-stepper"), "flexDirection", "row")).toBe(true);
+    expect(hasStyleEntry(findByTestId(renderer, "practice-run-elo-input-shell"), "width", 72)).toBe(true);
     expect(findByTestId(renderer, "practice-run-elo-input").props.value).toBe("925");
     expect(findByTestId(renderer, "practice-run-elo-input").props.keyboardType).toBe("number-pad");
+    expect(findByTestId(renderer, "practice-run-elo-input").props.maxLength).toBe(4);
     expect(collectText(findByTestId(renderer, "practice-run-elo-row"))).toContain(
-      "Whole number from 600 to 2200"
+      "600–2200 · ±100 buttons"
     );
-    expect(collectText(findByTestId(renderer, "practice-run-elo-row"))).toBe(
-      "Current ELOWhole number from 600 to 2200"
+    expect(findByTestId(renderer, "practice-run-elo-decrease").props.accessibilityLabel).toBe(
+      "Decrease run ELO by 100"
     );
-    expect(() => findByTestId(renderer, "practice-run-elo-increase")).toThrow();
-    expect(() => findByTestId(renderer, "practice-run-elo-decrease")).toThrow();
+    expect(findByTestId(renderer, "practice-run-elo-increase").props.accessibilityLabel).toBe(
+      "Increase run ELO by 100"
+    );
+
+    press(renderer, "practice-run-elo-decrease");
+    press(renderer, "practice-run-elo-increase");
 
     act(() => {
       findByTestId(renderer, "practice-run-name-input").props.onChangeText("Morning Warm-up");
@@ -1096,6 +1096,8 @@ describe("PracticePocScreen", () => {
     press(renderer, "practice-run-save");
 
     expect(onIntent.mock.calls.map(([intent]) => intent)).toEqual([
+      { type: "step-elo-input", direction: -1 },
+      { type: "step-elo-input", direction: 1 },
       { type: "change-name", name: "Morning Warm-up" },
       { type: "change-elo-input", value: "1375" },
       { type: "save-run" }
@@ -1127,6 +1129,12 @@ describe("PracticePocScreen", () => {
       "Enter a whole-number ELO from 600 to 2200."
     );
     expect(findByTestId(renderer, "practice-run-save").props.accessibilityState).toEqual({
+      disabled: true
+    });
+    expect(findByTestId(renderer, "practice-run-elo-decrease").props.accessibilityState).toEqual({
+      disabled: false
+    });
+    expect(findByTestId(renderer, "practice-run-elo-increase").props.accessibilityState).toEqual({
       disabled: true
     });
   });

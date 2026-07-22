@@ -120,6 +120,22 @@ test("direct ELO entry enforces the existing 600-2200 content range", () => {
   assert.equal(state.draft?.elo, 1600);
 });
 
+test("direct ELO buttons adjust by 100 and stop at the content bounds", () => {
+  let state = createRunManagementFixtureState();
+  state = runManagementFixtureReducer(state, { type: "edit-run", runId: "arrow-duel" });
+  state = runManagementFixtureReducer(state, { type: "step-elo-input", direction: 1 });
+  assert.equal(state.eloInput, "975");
+  assert.equal(state.draft?.elo, 975);
+
+  state = runManagementFixtureReducer(state, { type: "change-elo-input", value: "2190" });
+  state = runManagementFixtureReducer(state, { type: "step-elo-input", direction: 1 });
+  assert.equal(state.eloInput, "2200");
+
+  state = runManagementFixtureReducer(state, { type: "change-elo-input", value: "650" });
+  state = runManagementFixtureReducer(state, { type: "step-elo-input", direction: -1 });
+  assert.equal(state.eloInput, "600");
+});
+
 test("renaming an existing run still enforces unique names", () => {
   let state = createRunManagementFixtureState();
   state = runManagementFixtureReducer(state, { type: "edit-run", runId: "tactics-focus" });

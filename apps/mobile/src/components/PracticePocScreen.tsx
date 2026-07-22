@@ -4222,6 +4222,7 @@ function PracticeRunEditor({
               value={draft.elo}
               onChange={(elo) => presentation.onIntent({ type: "change-elo", elo })}
               onInputChange={(value) => presentation.onIntent({ type: "change-elo-input", value })}
+              onInputStep={(direction) => presentation.onIntent({ type: "step-elo-input", direction })}
             />
           </>
         ) : (
@@ -4244,6 +4245,7 @@ function PracticeRunEditor({
               value={draft.elo}
               onChange={(elo) => presentation.onIntent({ type: "change-elo", elo })}
               onInputChange={(value) => presentation.onIntent({ type: "change-elo-input", value })}
+              onInputStep={(direction) => presentation.onIntent({ type: "step-elo-input", direction })}
             />
           </>
         )}
@@ -4275,6 +4277,7 @@ function PracticeRunEloRow({
   isCreate,
   onChange,
   onInputChange,
+  onInputStep,
   value
 }: {
   directEntry?: boolean;
@@ -4283,33 +4286,64 @@ function PracticeRunEloRow({
   isCreate: boolean;
   onChange: (elo: number) => void;
   onInputChange?: (value: string) => void;
+  onInputStep?: (direction: -1 | 1) => void;
   value: number;
 }): React.JSX.Element {
   if (directEntry) {
+    const parsedInput = Number(inputValue);
+    const stepValue = /^\d{1,4}$/.test(inputValue ?? "") && Number.isInteger(parsedInput)
+      ? parsedInput
+      : value;
+    const canDecrease = Boolean(onInputStep) && stepValue > CUSTOM_INITIAL_RATING_MIN;
+    const canIncrease = Boolean(onInputStep) && stepValue < CUSTOM_INITIAL_RATING_MAX;
     return (
       <>
         <View style={styles.customConfigRow} testID="practice-run-elo-row">
           <View style={styles.customChoiceCopy}>
             <Text style={styles.listText}>{isCreate ? "Starting ELO" : "Current ELO"}</Text>
             <Text style={styles.requiredFieldLabel}>
-              Whole number from {CUSTOM_INITIAL_RATING_MIN} to {CUSTOM_INITIAL_RATING_MAX}
+              {CUSTOM_INITIAL_RATING_MIN}–{CUSTOM_INITIAL_RATING_MAX} · ±100 buttons
             </Text>
           </View>
-          <View
-            style={[styles.runEloInputShell, error ? styles.runEloInputShellError : null]}
-            testID="practice-run-elo-input-shell"
-          >
-            <TextInput
-              accessibilityLabel={isCreate ? "Starting ELO" : "Current ELO"}
-              inputMode="numeric"
-              keyboardType="number-pad"
-              maxLength={4}
-              selectTextOnFocus
-              style={styles.runEloInput}
-              testID="practice-run-elo-input"
-              value={inputValue ?? String(value)}
-              onChangeText={onInputChange}
-            />
+          <View style={styles.runEloStepper} testID="practice-run-elo-stepper">
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Decrease run ELO by 100"
+              accessibilityState={{ disabled: !canDecrease }}
+              disabled={!canDecrease}
+              style={[styles.customStepperButton, !canDecrease ? styles.disabledButton : null]}
+              testID="practice-run-elo-decrease"
+              onPress={() => onInputStep?.(-1)}
+            >
+              <MinusGlyph />
+            </Pressable>
+            <View
+              style={[styles.runEloInputShell, error ? styles.runEloInputShellError : null]}
+              testID="practice-run-elo-input-shell"
+            >
+              <TextInput
+                accessibilityLabel={isCreate ? "Starting ELO" : "Current ELO"}
+                inputMode="numeric"
+                keyboardType="number-pad"
+                maxLength={4}
+                selectTextOnFocus
+                style={styles.runEloInput}
+                testID="practice-run-elo-input"
+                value={inputValue ?? String(value)}
+                onChangeText={onInputChange}
+              />
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Increase run ELO by 100"
+              accessibilityState={{ disabled: !canIncrease }}
+              disabled={!canIncrease}
+              style={[styles.customStepperButton, !canIncrease ? styles.disabledButton : null]}
+              testID="practice-run-elo-increase"
+              onPress={() => onInputStep?.(1)}
+            >
+              <PlusGlyph />
+            </Pressable>
           </View>
         </View>
         {error ? (
@@ -11923,12 +11957,10 @@ const styles = StyleSheet.create({
     borderColor: "#CBD5E1",
     borderRadius: 8,
     borderWidth: 1,
-    flex: 1,
     flexDirection: "row",
-    maxWidth: 200,
     minHeight: 40,
-    minWidth: 160,
-    overflow: "hidden"
+    overflow: "hidden",
+    width: 72
   },
   runEloInputShellError: {
     borderColor: "#DC2626"
@@ -11942,7 +11974,13 @@ const styles = StyleSheet.create({
     minWidth: 64,
     paddingHorizontal: 8,
     paddingVertical: 7,
-    textAlign: "right"
+    textAlign: "center"
+  },
+  runEloStepper: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexShrink: 0,
+    gap: 6
   },
   runNameError: {
     backgroundColor: "#FEF2F2",
