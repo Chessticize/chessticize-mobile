@@ -167,7 +167,8 @@ A design PR may become ready and merge to `main` when its current interaction
 increment is coherent and its required checks pass. Merging design artifacts is
 not design approval and does not authorize product wiring. Continue later
 feedback rounds from current `main`, update the same issue-owned scenarios, and
-redeploy the same issue preview until the design is approved for implementation.
+deploy through the new branch's dedicated site, project, and URL until the
+design is approved for implementation.
 
 Each New Scenario Marker ownership remains on `main` for as long as its linked
 issue is open. Remove only that ownership in a cleanup change after GitHub
