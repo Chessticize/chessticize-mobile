@@ -144,6 +144,11 @@ import type {
   PracticeRunManagementPresentation,
   PracticeRunPresentation
 } from "./practiceRunPresentation.ts";
+import {
+  puzzleEntryPreviewPlan,
+  schedulePuzzleEntryPreview,
+  type PuzzleEntryPreviewMove
+} from "./puzzleEntryPreview.ts";
 
 export type {
   PracticeRunDraft,
@@ -506,6 +511,7 @@ export function PracticePocScreen({
   const suppressedBoardMovesRef = useRef<string[]>([]);
   const boardSyncInProgressRef = useRef(false);
   const boardInputLockedRef = useRef(false);
+  const puzzleEntryPreviewLockedRef = useRef(false);
   const boardInputLockModeRef = useRef<BoardInputLockMode>("hard");
   const pendingPremoveRef = useRef<PendingPremove | null>(null);
   const boardVisualFenRef = useRef<string | null>(null);
@@ -1406,7 +1412,7 @@ export function PracticePocScreen({
       });
       return;
     }
-    if (boardSyncInProgressRef.current || boardInputLockedRef.current) {
+    if (boardSyncInProgressRef.current || boardInputLockedRef.current || puzzleEntryPreviewLockedRef.current) {
       if (queuePremoveIfOpen(move, result, context)) {
         return;
       }
@@ -1555,7 +1561,7 @@ export function PracticePocScreen({
   function onIllegalMove(from: Square, to: Square, context: BoardMoveContext): void {
     const activeState = stateRef.current;
     const move = `${from}${to}`;
-    if (boardSyncInProgressRef.current || boardInputLockedRef.current) {
+    if (boardSyncInProgressRef.current || boardInputLockedRef.current || puzzleEntryPreviewLockedRef.current) {
       if (queuePremoveIfOpen(move, null, context)) {
         return;
       }
@@ -2100,7 +2106,19 @@ export function PracticePocScreen({
   const timerText = formatDuration(Math.max(0, Math.floor(remainingMs / 1000)));
   const currentBoardFen = boardFen ?? currentPuzzle?.currentFen ?? null;
   const displayedPuzzle = feedbackSnapshot?.currentPuzzle ?? currentPuzzle;
-  const displayedBoardFen = feedbackSnapshot?.boardFen ?? currentBoardFen;
+  const sessionEntryPreview = usePuzzleEntryPreview({
+    boardRef,
+    currentPuzzle: feedbackSnapshot ? undefined : currentPuzzle,
+    entryKey: !feedbackSnapshot && isActive && state && currentPuzzle
+      ? `${state.id}:${state.currentPuzzleIndex}:${currentPuzzle.puzzle.id}`
+      : null,
+    onLastMove: setLastBoardMove,
+    suppressedMovesRef: suppressedBoardMovesRef
+  });
+  puzzleEntryPreviewLockedRef.current = sessionEntryPreview.locked;
+  const displayedBoardFen = sessionEntryPreview.displayFen
+    ?? feedbackSnapshot?.boardFen
+    ?? currentBoardFen;
   sessionBoardHandlersRef.current = {
     onIllegalMove(from, to) {
       onIllegalMove(from, to, {
@@ -2124,7 +2142,10 @@ export function PracticePocScreen({
   // session, not just the lock windows.
   const practiceScrollLocked = shouldShowSessionBoard;
   const boardGestureEnabled = Boolean(
-    isActive && !isShowingFeedbackSnapshot && (!boardInputLocked || boardPremoveWindow)
+    isActive
+      && !isShowingFeedbackSnapshot
+      && !sessionEntryPreview.locked
+      && (!boardInputLocked || boardPremoveWindow)
   );
   const displayedSideToMove = displayedBoardFen ? sideToMove(displayedBoardFen) : null;
   const submittedMoveForCurrentPuzzle =
@@ -2508,13 +2529,7 @@ export function PracticePocScreen({
         ) : null}
 
         {!boardGestureEnabled ? (
-          <Pressable
-            accessibilityElementsHidden
-            importantForAccessibility="no-hide-descendants"
-            onPress={() => undefined}
-            style={styles.boardInputBlocker}
-            testID="board-input-blocker"
-          />
+          <BoardInputBlocker />
         ) : null}
 
         {displayedLastBoardMove ? (
@@ -5592,6 +5607,105 @@ function PracticePrompt({
   );
 }
 
+function BoardInputBlocker(): React.JSX.Element {
+  return (
+    <Pressable
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      onPress={() => undefined}
+      style={styles.boardInputBlocker}
+      testID="board-input-blocker"
+    />
+  );
+}
+
+function usePuzzleEntryPreview({
+  boardRef,
+  currentPuzzle,
+  entryKey,
+  onLastMove,
+  suppressedMovesRef
+}: {
+  boardRef: { current: ChessboardRef | null };
+  currentPuzzle: CurrentPuzzleState | undefined;
+  entryKey: string | null;
+  onLastMove: (move: BoardMove | null) => void;
+  suppressedMovesRef: { current: string[] };
+}): {
+  displayFen: string | null;
+  locked: boolean;
+  replay: () => void;
+} {
+  const [completedKey, setCompletedKey] = useState<string | null>(null);
+  const [replayToken, setReplayToken] = useState(0);
+  const onLastMoveRef = useRef(onLastMove);
+  onLastMoveRef.current = onLastMove;
+  const plan = useMemo(
+    () => entryKey ? puzzleEntryPreviewPlan(currentPuzzle) : null,
+    [currentPuzzle, entryKey]
+  );
+  const previewKey = plan && entryKey ? `${entryKey}:${replayToken}` : null;
+  const locked = Boolean(previewKey && completedKey !== previewKey);
+
+  useEffect(() => {
+    if (!locked || !plan || !previewKey) {
+      return;
+    }
+
+    onLastMoveRef.current(null);
+    return schedulePuzzleEntryPreview({
+      plan,
+      playMove: (move: PuzzleEntryPreviewMove) => {
+        const board = boardRef.current;
+        if (!board) {
+          return undefined;
+        }
+        const suppressedMove = boardMoveToUci(move);
+        suppressedMovesRef.current.push(suppressedMove);
+        const played = board.move({
+          from: move.from as Square,
+          to: move.to as Square,
+          ...(move.promotion ? { promotion: move.promotion as PieceSymbol } : {})
+        });
+        if (isPromiseLike(played)) {
+          return played.then((resolvedMove) => {
+            if (!resolvedMove) {
+              consumeSuppressedBoardMove(suppressedMove, suppressedMovesRef.current);
+            }
+            return resolvedMove;
+          });
+        }
+        if (!played) {
+          consumeSuppressedBoardMove(suppressedMove, suppressedMovesRef.current);
+        }
+        return played;
+      },
+      onComplete: (played) => {
+        if (!played) {
+          boardRef.current?.resetBoard(plan.finalFen);
+        }
+        onLastMoveRef.current(plan.move);
+        setCompletedKey(previewKey);
+      }
+    });
+  }, [boardRef, locked, plan, previewKey, suppressedMovesRef]);
+
+  return {
+    displayFen: locked && plan ? plan.initialFen : null,
+    locked,
+    replay: useCallback(() => setReplayToken((token) => token + 1), [])
+  };
+}
+
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+  return Boolean(
+    value
+    && typeof value === "object"
+    && "then" in value
+    && typeof (value as { then?: unknown }).then === "function"
+  );
+}
+
 function PracticeModeGlyph({
   inverse = false,
   mode,
@@ -8030,7 +8144,18 @@ function ReviewSession({
   const hasNextScheduledReview = entryIndex + 1 < entries.length;
   const currentPuzzle = currentReviewPuzzleState(reviewState);
   const currentFen = currentPuzzle.currentFen;
-  const displayFen = analysisEnabled ? (analysisFen ?? currentFen) : currentFen;
+  const reviewEntryPreview = usePuzzleEntryPreview({
+    boardRef,
+    currentPuzzle: analysisEnabled ? undefined : currentPuzzle,
+    entryKey: analysisEnabled
+      ? null
+      : `${currentEntry.source}:${entryIndex}:${currentEntry.puzzle.id}`,
+    onLastMove: setLastMove,
+    suppressedMovesRef: reviewSuppressedBoardMovesRef
+  });
+  const displayFen = analysisEnabled
+    ? (analysisFen ?? currentFen)
+    : (reviewEntryPreview.displayFen ?? currentFen);
   const baseBoardFlipped = reviewStartingPerspectiveFlipped(currentEntry);
   const boardFlipped = manualBoardFlip ? !baseBoardFlipped : baseBoardFlipped;
   const feedbackMove = feedback?.submittedMove && feedback.submittedMove !== "__illegal__" ? arrowFromTo(feedback.submittedMove) : null;
@@ -8070,7 +8195,8 @@ function ReviewSession({
       ? currentExpectedMove(reviewState.line)
       : undefined;
   const isArrowDuelFollowUpReview = currentEntry.mode === "arrow_duel" && reviewState.kind === "line";
-  const boardGestureEnabled = !boardLocked;
+  const reviewBoardLocked = boardLocked || reviewEntryPreview.locked;
+  const boardGestureEnabled = !reviewBoardLocked;
   const boardDraggableColor = boardGestureEnabled ? sideToMove(displayFen) : null;
   const reviewSideToMove = sideToMove(displayFen);
   const canNavigateReview = (currentEntry.source === "session" || currentEntry.source === "history") && !boardLocked;
@@ -8270,10 +8396,11 @@ function ReviewSession({
   }
 
   function resetReviewPuzzle(): void {
-    if (boardLocked) {
+    if (reviewBoardLocked) {
       return;
     }
     resetCurrentReview(entryIndex);
+    reviewEntryPreview.replay();
   }
 
   async function onReviewBoardMove(result: MoveResult): Promise<void> {
@@ -8287,7 +8414,7 @@ function ReviewSession({
       return;
     }
 
-    if (boardLocked) {
+    if (reviewBoardLocked) {
       boardRef.current?.resetBoard(currentFen);
       return;
     }
@@ -8668,7 +8795,7 @@ function ReviewSession({
                   {boardFlipped ? "flipped" : "normal"}
                 </Text>
                 <Text testID="review-board-state" style={styles.reviewDueHiddenMetric}>
-                  {boardLocked ? "locked" : "ready"}
+                  {reviewBoardLocked ? "locked" : "ready"}
                 </Text>
               </>
             ) : null}
@@ -8710,10 +8837,10 @@ function ReviewSession({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Reset puzzle"
-              accessibilityState={{ disabled: boardLocked }}
-              disabled={boardLocked}
+              accessibilityState={{ disabled: reviewBoardLocked }}
+              disabled={reviewBoardLocked}
               testID="review-reset-puzzle"
-              style={[styles.iconButton, boardLocked ? styles.disabledButton : null]}
+              style={[styles.iconButton, reviewBoardLocked ? styles.disabledButton : null]}
               onPress={resetReviewPuzzle}
             >
               <Text style={styles.iconButtonText}>↺</Text>
@@ -8791,6 +8918,7 @@ function ReviewSession({
               boardSize={boardSize}
               flipped={boardFlipped}
             />
+            {!boardGestureEnabled ? <BoardInputBlocker /> : null}
             {lastMove && !feedback ? (
               <LastMoveOverlay
                 boardSize={boardSize}

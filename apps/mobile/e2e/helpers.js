@@ -24,6 +24,10 @@ async function frameFor(detoxElement) {
 }
 
 async function playBoardMove(testID, move, flipped = false) {
+  // Practice and Review render the same public blocker while a blunder entry,
+  // reply, or reset animation owns the real board. Coordinate gestures must
+  // wait for that UI lock to leave instead of racing the native board.
+  await waitFor(element(by.id('board-input-blocker'))).not.toExist().withTimeout(10000);
   const board = element(by.id(testID));
   const boardFrame = await frameFor(board);
   const platform = device.getPlatform();

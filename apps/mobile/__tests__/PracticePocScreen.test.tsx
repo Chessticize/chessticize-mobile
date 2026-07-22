@@ -1901,6 +1901,132 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "practice-prompt"))).toContain("For white.");
   });
 
+  it("locks Standard input on the first rendered frame until the blunder animation completes", async () => {
+    const service = createMobilePracticeService("familiar15");
+    const renderer = renderScreen({ practiceService: service });
+
+    press(renderer, "practice-mode-standard");
+    press(renderer, "practice-start-button");
+
+    const activePuzzle = activeSprintForTest(service).currentPuzzle;
+    if (!activePuzzle || activePuzzle.kind !== "line") {
+      throw new Error("Expected a line puzzle for the entry-preview regression");
+    }
+    const board = findByTestId(renderer, "mock-chessboard");
+    const imperativeMove = board.props.mockImperativeMove as jest.Mock;
+
+    expect(findByTestId(renderer, "board-input-blocker")).toBeTruthy();
+    expect(board.props.fen).toBe(activePuzzle.puzzle.initialFen);
+    expect(imperativeMove).not.toHaveBeenCalled();
+
+    await advanceEntryPreviewBy(175);
+    act(() => {
+      (ReactNative as unknown as {
+        __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
+      }).__setWindowDimensions?.({ width: 429, height: 932, scale: 3, fontScale: 1 });
+    });
+    await advanceEntryPreviewBy(174);
+    expect(findByTestId(renderer, "board-input-blocker")).toBeTruthy();
+    expect(imperativeMove).not.toHaveBeenCalled();
+
+    await advanceEntryPreviewBy(1);
+    expect(imperativeMove).toHaveBeenCalledTimes(1);
+    expect(imperativeMove).toHaveBeenCalledWith(parseBoardMove(activePuzzle.puzzle.solutionMoves[0]!));
+    expect(() => findByTestId(renderer, "board-input-blocker")).toThrow();
+    expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(activePuzzle.currentFen);
+  });
+
+  it("cancels a pending Standard blunder callback when the screen unmounts", async () => {
+    const service = createMobilePracticeService("familiar15");
+    const renderer = renderScreen({ practiceService: service });
+
+    press(renderer, "practice-mode-standard");
+    press(renderer, "practice-start-button");
+
+    const imperativeMove = findByTestId(renderer, "mock-chessboard").props.mockImperativeMove as jest.Mock;
+    expect(findByTestId(renderer, "board-input-blocker")).toBeTruthy();
+
+    act(() => {
+      renderer.unmount();
+    });
+    const rendererIndex = renderers.indexOf(renderer);
+    if (rendererIndex >= 0) {
+      renderers.splice(rendererIndex, 1);
+    }
+
+    await advanceEntryPreviewBy(1_000);
+    expect(imperativeMove).not.toHaveBeenCalled();
+  });
+
+  it("cancels a pending Standard blunder callback when the session exits", async () => {
+    const service = createMobilePracticeService("familiar15");
+    const renderer = renderScreen({ practiceService: service });
+
+    press(renderer, "practice-mode-standard");
+    press(renderer, "practice-start-button");
+
+    const imperativeMove = findByTestId(renderer, "mock-chessboard").props.mockImperativeMove as jest.Mock;
+    expect(findByTestId(renderer, "board-input-blocker")).toBeTruthy();
+
+    abandonSprint(renderer);
+    expect(() => findByTestId(renderer, "session-board")).toThrow();
+
+    await advanceEntryPreviewBy(1_000);
+    expect(imperativeMove).not.toHaveBeenCalled();
+  });
+
+  it("relocks Review reset until its blunder animation completes", async () => {
+    const renderer = renderStandardSequenceScreen();
+    await openSessionMistakeReview(renderer);
+
+    const initialBoard = findByTestId(renderer, "mock-chessboard");
+    expect(initialBoard.props.gestureEnabled).toBe(false);
+    expect(findByTestId(renderer, "board-input-blocker")).toBeTruthy();
+    expect(findByTestId(renderer, "review-reset-puzzle").props.disabled).toBe(true);
+
+    await settleEntryPreview();
+    const readyBoard = findByTestId(renderer, "mock-chessboard");
+    const readyFen = readyBoard.props.fen;
+    const imperativeMove = readyBoard.props.mockImperativeMove as jest.Mock;
+    expect(readyBoard.props.gestureEnabled).toBe(true);
+    expect(() => findByTestId(renderer, "board-input-blocker")).toThrow();
+    expect(findByTestId(renderer, "review-reset-puzzle").props.disabled).toBe(false);
+
+    imperativeMove.mockClear();
+    press(renderer, "review-reset-puzzle");
+
+    expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(false);
+    expect(findByTestId(renderer, "board-input-blocker")).toBeTruthy();
+    expect(findByTestId(renderer, "mock-chessboard").props.fen).not.toBe(readyFen);
+    expect(imperativeMove).not.toHaveBeenCalled();
+
+    await settleEntryPreview();
+    expect(imperativeMove).toHaveBeenCalledTimes(1);
+    expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
+    expect(() => findByTestId(renderer, "board-input-blocker")).toThrow();
+    expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(readyFen);
+  });
+
+  it("cancels the old Review preview when navigating to a new puzzle", async () => {
+    const renderer = renderStandardSequenceScreen();
+    await openSessionMistakeReview(renderer);
+
+    const oldImperativeMove = findByTestId(renderer, "mock-chessboard").props.mockImperativeMove as jest.Mock;
+    expect(findByTestId(renderer, "review-next").props.disabled).toBe(false);
+
+    press(renderer, "review-next");
+
+    const newImperativeMove = findByTestId(renderer, "mock-chessboard").props.mockImperativeMove as jest.Mock;
+    expectText(renderer, "2 / 3 · Standard");
+    expect(findByTestId(renderer, "board-input-blocker")).toBeTruthy();
+
+    await settleEntryPreview();
+
+    expect(oldImperativeMove).not.toHaveBeenCalled();
+    expect(newImperativeMove).toHaveBeenCalledTimes(1);
+    expect(() => findByTestId(renderer, "board-input-blocker")).toThrow();
+  });
+
   it("starts a sprint on the injected clock used by store screenshots", () => {
     const nowMs = Date.parse("2026-07-09T18:00:00.000Z");
     const service = createMobilePracticeService("familiar15");
@@ -2861,8 +2987,12 @@ describe("PracticePocScreen", () => {
 
     startArrowDuelSprint(renderer);
     const arrow = requireArrowDuelState(activeSprintForTest(service));
+    const arrowBoard = findByTestId(renderer, "mock-chessboard");
 
-    expect(findByTestId(renderer, "mock-chessboard").props.flipped).toBe(new Chess(arrow.currentFen).turn() === "b");
+    expect(arrowBoard.props.flipped).toBe(new Chess(arrow.currentFen).turn() === "b");
+    expect(arrowBoard.props.gestureEnabled).toBe(true);
+    expect(arrowBoard.props.mockImperativeMove).not.toHaveBeenCalled();
+    expect(() => findByTestId(renderer, "board-input-blocker")).toThrow();
     expect(collectText(renderer.root)).not.toContain("Choose one candidate move");
     expect(() => findByTestId(renderer, "arrow-duel-candidates")).toThrow();
     expect(() => findByTestId(renderer, "arrow-duel-candidate-a")).toThrow();
@@ -4022,7 +4152,7 @@ describe("PracticePocScreen", () => {
     )).toBe(true);
   });
 
-  it("navigates history review across the full filtered result set, not just the visible page", () => {
+  it("navigates history review across the full filtered result set, not just the visible page", async () => {
     const service = createMobilePracticeService("random1000");
     for (let index = 0; index < 22; index += 1) {
       service.recordReviewAttempt({
@@ -4064,6 +4194,7 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "21 / 22 · Standard");
     expect(findByTestId(renderer, "review-previous").props.disabled).toBe(false);
     press(renderer, "review-previous");
+    await settleEntryPreview();
     expectText(renderer, "20 / 22 · Standard");
   });
 
@@ -4549,8 +4680,10 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "review-next").props.disabled).toBe(false);
     expect(findByTestId(renderer, "review-header-actions").findByProps({ testID: "review-reset-puzzle" })).toBeTruthy();
     press(renderer, "review-next");
+    await settleEntryPreview();
     expectText(renderer, "2 / 3 · Standard");
     press(renderer, "review-previous");
+    await settleEntryPreview();
     expectText(renderer, "1 / 3 · Standard");
     const reviewFen = findByTestId(renderer, "mock-chessboard").props.fen;
     await waitForAssertion(() => {
@@ -4583,6 +4716,9 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "review-next").props.disabled).toBe(false);
     expect(recordReviewAttempt).not.toHaveBeenCalled();
     press(renderer, "review-reset-puzzle");
+    expect(findByTestId(renderer, "mock-chessboard").props.fen).not.toBe(reviewFen);
+    expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(false);
+    await settleEntryPreview();
     expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(reviewFen);
     expectText(renderer, "1 / 3 · Standard");
     press(renderer, "review-next");
@@ -5164,6 +5300,8 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "review-side-to-move")).toThrow();
     expect(styleEntryMatches(findByTestId(renderer, "review-context-strip").props.style, "justifyContent", "center")).toBe(true);
     expect(collectText(findByTestId(renderer, "review-current-expected-move"))).toBe("e2e6");
+    expect(collectText(findByTestId(renderer, "review-board-state"))).toBe("locked");
+    await settleEntryPreview();
     expect(collectText(findByTestId(renderer, "review-board-state"))).toBe("ready");
 
     await boardMove(renderer, "e2e6");
@@ -5393,6 +5531,7 @@ describe("PracticePocScreen", () => {
     await boardMove(renderer, "a4b6");
     await settleFeedbackSnapshot();
     press(renderer, "review-mistakes-button");
+    await settleEntryPreview();
 
     const reviewFen = findByTestId(renderer, "mock-chessboard").props.fen;
     expect(collectText(renderer.root)).toContain("Analysis");
@@ -5459,6 +5598,9 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(analysisFen);
 
     press(renderer, "review-reset-puzzle");
+    expect(findByTestId(renderer, "mock-chessboard").props.fen).not.toBe(reviewFen);
+    expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(false);
+    await settleEntryPreview();
     expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(reviewFen);
     expect(() => findByTestId(renderer, "review-close-analysis")).toThrow();
     expect(() => findByTestId(renderer, "review-analysis-line-0")).toThrow();
@@ -6962,6 +7104,9 @@ async function pressAsync(renderer: TestRenderer.ReactTestRenderer, testID: stri
 function startStandardSprint(renderer: TestRenderer.ReactTestRenderer): void {
   press(renderer, "practice-mode-standard");
   press(renderer, "practice-start-button");
+  act(() => {
+    jest.advanceTimersByTime(350);
+  });
 }
 
 function startArrowDuelSprint(renderer: TestRenderer.ReactTestRenderer): void {
@@ -7009,6 +7154,12 @@ async function boardMove(
   move: string,
   options: { stateFen?: string | null } = {}
 ): Promise<void> {
+  if (
+    renderer.root.findAllByProps({ testID: "board-input-blocker" }).length > 0
+    || findByTestId(renderer, "mock-chessboard").props.gestureEnabled === false
+  ) {
+    await settleEntryPreview();
+  }
   await boardMoveOnBoard(findByTestId(renderer, "mock-chessboard"), move, options);
 }
 
@@ -7077,6 +7228,39 @@ async function settleFeedbackSnapshot(): Promise<void> {
     await Promise.resolve();
     await Promise.resolve();
   });
+  if (
+    renderers.some((renderer) => {
+      if (!renderer.root) {
+        return false;
+      }
+      const boards = renderer.root.findAllByProps({ testID: "mock-chessboard" });
+      return renderer.root.findAllByProps({ testID: "board-input-blocker" }).length > 0
+        || boards.some((board) => board.props.gestureEnabled === false);
+    })
+  ) {
+    await settleEntryPreview();
+  }
+}
+
+async function advanceEntryPreviewBy(milliseconds: number): Promise<void> {
+  await act(async () => {
+    jest.advanceTimersByTime(milliseconds);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+}
+
+async function settleEntryPreview(): Promise<void> {
+  await advanceEntryPreviewBy(350);
+}
+
+function parseBoardMove(move: string): { from: string; to: string; promotion?: string } {
+  return {
+    from: move.slice(0, 2),
+    to: move.slice(2, 4),
+    ...(move.length > 4 ? { promotion: move.slice(4, 5) } : {})
+  };
 }
 
 async function flushMicrotasks(): Promise<void> {

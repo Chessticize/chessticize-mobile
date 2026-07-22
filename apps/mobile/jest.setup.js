@@ -5,6 +5,7 @@ jest.mock('react-native-chessboard', () => {
   return React.forwardRef(function ChessboardMock(props, ref) {
     const chessRef = React.useRef(new Chess(props.fen));
     const latestFenRef = React.useRef(props.fen);
+    const playMoveRef = React.useRef(null);
     const [pendingPromotion, setPendingPromotion] = React.useState(null);
     const resetBoardMock = React.useMemo(() => jest.fn((fen) => {
       try {
@@ -46,10 +47,13 @@ jest.mock('react-native-chessboard', () => {
       return move;
     }
 
+    playMoveRef.current = playMove;
+    const imperativeMoveMock = React.useMemo(() => jest.fn((move) => {
+      return playMoveRef.current?.(move);
+    }), []);
+
     React.useImperativeHandle(ref, () => ({
-      move: async ({ from, to, promotion }) => {
-        return playMove({ from, to, promotion });
-      },
+      move: imperativeMoveMock,
       resetBoard: resetBoardMock,
       getState: () => ({
         fen: chessRef.current.fen(),
@@ -63,7 +67,13 @@ jest.mock('react-native-chessboard', () => {
 
     return React.createElement(
       'Chessboard',
-      { ...props, mockMove: playMove, mockResetBoard: resetBoardMock, testID: 'mock-chessboard' },
+      {
+        ...props,
+        mockImperativeMove: imperativeMoveMock,
+        mockMove: playMove,
+        mockResetBoard: resetBoardMock,
+        testID: 'mock-chessboard'
+      },
       pendingPromotion
         ? React.createElement(
           'PromotionDialog',
