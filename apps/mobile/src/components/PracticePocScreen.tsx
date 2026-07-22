@@ -3500,6 +3500,7 @@ function PracticeRunHome({
                 canMoveDown={index < presentation.runs.length - 1}
                 canMoveUp={index > 0}
                 dragging={run.id === draggedRunId}
+                directRunEditing={presentation.directRunEditing === true}
                 dropTarget={run.id === dropTargetRunId && run.id !== draggedRunId}
                 editing={presentation.homeEditing}
                 run={run}
@@ -3558,6 +3559,7 @@ function PracticeRunCard({
   active,
   canMoveDown,
   canMoveUp,
+  directRunEditing,
   dragging,
   dropTarget,
   editing,
@@ -3575,6 +3577,7 @@ function PracticeRunCard({
   active: boolean;
   canMoveDown: boolean;
   canMoveUp: boolean;
+  directRunEditing: boolean;
   dragging: boolean;
   dropTarget: boolean;
   editing: boolean;
@@ -3627,7 +3630,9 @@ function PracticeRunCard({
       <Pressable
         accessibilityRole="button"
         accessibilityState={{ selected: active && !editing }}
-        accessibilityLabel={editing ? `Edit ${run.name} ELO` : `Select ${run.name}, ELO ${run.elo}, ${details}`}
+        accessibilityLabel={editing
+          ? directRunEditing ? `Edit ${run.name}` : `Edit ${run.name} ELO`
+          : `Select ${run.name}, ELO ${run.elo}, ${details}`}
         style={styles.practiceModeSelectArea}
         testID={`practice-run-select-${safeTestId(run.id)}`}
         onPress={() => presentationRunPress(editing, run.id, onIntent)}
@@ -3687,12 +3692,12 @@ function PracticeRunCard({
             </Pressable>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Edit ${run.name} ELO`}
+              accessibilityLabel={directRunEditing ? `Edit ${run.name}` : `Edit ${run.name} ELO`}
               style={styles.runEditButton}
               testID={`practice-run-edit-${safeTestId(run.id)}`}
               onPress={() => onIntent({ type: "edit-run", runId: run.id })}
             >
-              <Text style={styles.runEditButtonText}>Edit ELO</Text>
+              <Text style={styles.runEditButtonText}>{directRunEditing ? "Edit" : "Edit ELO"}</Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
@@ -4059,6 +4064,8 @@ function PracticeRunEditor({
   }
   const isCustom = draft.kind === "custom";
   const isCreate = presentation.screen === "create";
+  const directRunEditing = presentation.directRunEditing === true;
+  const canEditName = (isCreate && isCustom) || (!isCreate && directRunEditing);
   const customMode = draft.mode === "arrow_duel" ? "arrow_duel" : "custom";
 
   return (
@@ -4068,17 +4075,19 @@ function PracticeRunEditor({
         closeAccessibilityLabel="Close run editor"
         closeTestID="practice-run-editor-close"
         headerTestID="practice-run-editor-header"
-        startAccessibilityLabel={isCreate ? "Add run to Home" : `Save ${draft.name} ELO`}
+        startAccessibilityLabel={isCreate
+          ? "Add run to Home"
+          : directRunEditing ? `Save ${draft.name} run` : `Save ${draft.name} ELO`}
         startDisabled={presentation.canSave === false}
         startTestID="practice-run-save"
-        title={isCreate ? "New Run" : "Edit ELO"}
+        title={isCreate ? "New Run" : directRunEditing ? "Edit Run" : "Edit ELO"}
         titleTestID="practice-run-editor-title"
         onClose={() => presentation.onIntent({ type: "cancel-edit" })}
         onStart={() => presentation.onIntent({ type: "save-run" })}
       />
 
       <View style={styles.runEditorIntro}>
-        {!isCreate ? (
+        {!isCreate && !directRunEditing ? (
           <Text style={styles.runEditorRunName} testID="practice-run-editor-run-name">
             {draft.name}
           </Text>
@@ -4086,7 +4095,9 @@ function PracticeRunEditor({
         <Text style={styles.helperText}>
           {isCreate
             ? "Saving adds this run to Home. It does not start a sprint."
-            : "Adjust the current ELO. Run settings stay fixed."}
+            : directRunEditing
+              ? "Change the name or current ELO. Format and training settings stay fixed."
+              : "Adjust the current ELO. Run settings stay fixed."}
         </Text>
       </View>
 
@@ -4104,46 +4115,46 @@ function PracticeRunEditor({
       ) : null}
 
       <View style={styles.customConfigCard} testID="practice-run-editor-fields">
+        {canEditName ? (
+          <View style={[styles.customConfigRow, styles.runNameRow]}>
+            <View style={styles.runNameCopy}>
+              <Text style={styles.listText}>Name</Text>
+              <Text style={styles.requiredFieldLabel}>Required · unique</Text>
+            </View>
+            <TextInput
+              accessibilityLabel="Run name"
+              autoCapitalize="words"
+              autoCorrect={false}
+              maxLength={PRACTICE_RUN_NAME_MAX_LENGTH}
+              placeholder="e.g. Tactics Focus"
+              placeholderTextColor="#94A3B8"
+              style={[styles.runNameInput, presentation.nameError ? styles.runNameInputError : null]}
+              testID="practice-run-name-input"
+              value={draft.name}
+              onChangeText={(name) => presentation.onIntent({ type: "change-name", name })}
+            />
+          </View>
+        ) : isCreate ? (
+          <CustomValueRow
+            detail="Built-in run names stay fixed"
+            label="Name"
+            testID="practice-run-fixed-name"
+            value={draft.name}
+          />
+        ) : null}
+
+        {canEditName && presentation.nameError ? (
+          <View
+            accessibilityLiveRegion="polite"
+            style={styles.runNameError}
+            testID="practice-run-name-error"
+          >
+            <Text style={styles.runNameErrorText}>{presentation.nameError}</Text>
+          </View>
+        ) : null}
+
         {isCreate ? (
           <>
-            {isCustom ? (
-              <View style={[styles.customConfigRow, styles.runNameRow]}>
-                <View style={styles.runNameCopy}>
-                  <Text style={styles.listText}>Name</Text>
-                  <Text style={styles.requiredFieldLabel}>Required · unique</Text>
-                </View>
-                <TextInput
-                  accessibilityLabel="Run name"
-                  autoCapitalize="words"
-                  autoCorrect={false}
-                  maxLength={PRACTICE_RUN_NAME_MAX_LENGTH}
-                  placeholder="e.g. Tactics Focus"
-                  placeholderTextColor="#94A3B8"
-                  style={[styles.runNameInput, presentation.nameError ? styles.runNameInputError : null]}
-                  testID="practice-run-name-input"
-                  value={draft.name}
-                  onChangeText={(name) => presentation.onIntent({ type: "change-name", name })}
-                />
-              </View>
-            ) : (
-              <CustomValueRow
-                detail="Built-in run names stay fixed"
-                label="Name"
-                testID="practice-run-fixed-name"
-                value={draft.name}
-              />
-            )}
-
-            {presentation.nameError ? (
-              <View
-                accessibilityLiveRegion="polite"
-                style={styles.runNameError}
-                testID="practice-run-name-error"
-              >
-                <Text style={styles.runNameErrorText}>{presentation.nameError}</Text>
-              </View>
-            ) : null}
-
             {isCustom ? (
               <>
                 <CustomModeChoiceRow
@@ -4200,17 +4211,37 @@ function PracticeRunEditor({
             )}
 
             <PracticeRunEloRow
+              directEntry={directRunEditing}
+              error={presentation.eloError ?? null}
+              inputValue={presentation.eloInput ?? String(draft.elo)}
               isCreate
               value={draft.elo}
               onChange={(elo) => presentation.onIntent({ type: "change-elo", elo })}
+              onInputChange={(value) => presentation.onIntent({ type: "change-elo-input", value })}
             />
           </>
         ) : (
-          <PracticeRunEloRow
-            isCreate={false}
-            value={draft.elo}
-            onChange={(elo) => presentation.onIntent({ type: "change-elo", elo })}
-          />
+          <>
+            {directRunEditing ? (
+              <CustomValueRow
+                detail="Cannot be changed after creation"
+                label="Format"
+                testID="practice-run-fixed-format"
+                value={draft.mode === "arrow_duel"
+                  ? "Arrow Duel"
+                  : draft.kind === "standard" ? "Standard puzzles" : "Regular puzzles"}
+              />
+            ) : null}
+            <PracticeRunEloRow
+              directEntry={directRunEditing}
+              error={presentation.eloError ?? null}
+              inputValue={presentation.eloInput ?? String(draft.elo)}
+              isCreate={false}
+              value={draft.elo}
+              onChange={(elo) => presentation.onIntent({ type: "change-elo", elo })}
+              onInputChange={(value) => presentation.onIntent({ type: "change-elo-input", value })}
+            />
+          </>
         )}
       </View>
     </View>
@@ -4218,14 +4249,59 @@ function PracticeRunEditor({
 }
 
 function PracticeRunEloRow({
+  directEntry = false,
+  error,
+  inputValue,
   isCreate,
   onChange,
+  onInputChange,
   value
 }: {
+  directEntry?: boolean;
+  error?: string | null;
+  inputValue?: string;
   isCreate: boolean;
   onChange: (elo: number) => void;
+  onInputChange?: (value: string) => void;
   value: number;
 }): React.JSX.Element {
+  if (directEntry) {
+    return (
+      <>
+        <View style={styles.customConfigRow} testID="practice-run-elo-row">
+          <View style={styles.customChoiceCopy}>
+            <Text style={styles.listText}>{isCreate ? "Starting ELO" : "Current ELO"}</Text>
+            <Text style={styles.requiredFieldLabel}>
+              Whole number from {CUSTOM_INITIAL_RATING_MIN} to {CUSTOM_INITIAL_RATING_MAX}
+            </Text>
+          </View>
+          <View style={[styles.runEloInputShell, error ? styles.runEloInputShellError : null]}>
+            <Text style={styles.runEloInputPrefix}>ELO</Text>
+            <TextInput
+              accessibilityLabel={isCreate ? "Starting ELO" : "Current ELO"}
+              inputMode="numeric"
+              keyboardType="number-pad"
+              maxLength={4}
+              selectTextOnFocus
+              style={styles.runEloInput}
+              testID="practice-run-elo-input"
+              value={inputValue ?? String(value)}
+              onChangeText={onInputChange}
+            />
+          </View>
+        </View>
+        {error ? (
+          <View
+            accessibilityLiveRegion="polite"
+            style={styles.runNameError}
+            testID="practice-run-elo-error"
+          >
+            <Text style={styles.runNameErrorText}>{error}</Text>
+          </View>
+        ) : null}
+      </>
+    );
+  }
   const canDecrease = value > RATING_FLOOR;
   return (
     <View style={styles.customConfigRow} testID="practice-run-elo-row">
@@ -11778,6 +11854,36 @@ const styles = StyleSheet.create({
   },
   runNameInputError: {
     borderColor: "#DC2626"
+  },
+  runEloInputShell: {
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderColor: "#CBD5E1",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    flexShrink: 0,
+    minHeight: 40,
+    overflow: "hidden"
+  },
+  runEloInputShellError: {
+    borderColor: "#DC2626"
+  },
+  runEloInputPrefix: {
+    color: "#64748B",
+    fontSize: 12,
+    fontWeight: "800",
+    paddingLeft: 10
+  },
+  runEloInput: {
+    color: "#111827",
+    fontSize: 15,
+    fontWeight: "800",
+    minHeight: 40,
+    minWidth: 64,
+    paddingHorizontal: 8,
+    paddingVertical: 7,
+    textAlign: "right"
   },
   runNameError: {
     backgroundColor: "#FEF2F2",

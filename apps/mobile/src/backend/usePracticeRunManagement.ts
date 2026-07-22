@@ -83,6 +83,10 @@ export function usePracticeRunManagement({
       case "change-elo":
         setView((current) => updateDraft(current, { elo: clampManualRating(intent.elo) }));
         return;
+      case "change-elo-input":
+        // Reserved for the Interaction Lab direct-entry proposal. Product
+        // validation and persistence remain intentionally unwired in this phase.
+        return;
       case "change-mode":
         setView((current) => current.screen === "create"
           ? updateDraft(current, { mode: intent.mode })

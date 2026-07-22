@@ -1026,6 +1026,95 @@ describe("PracticePocScreen", () => {
     ]);
   });
 
+  it("renders the Storybook-only Edit Run design with editable name and direct bounded ELO input", () => {
+    const onIntent = jest.fn();
+    const home = renderScreen({
+      runManagementPresentation: runManagementPresentation({
+        directRunEditing: true,
+        homeEditing: true
+      })
+    });
+    expect(collectText(findByTestId(home, "practice-run-edit-tactics-focus"))).toBe("Edit");
+
+    const renderer = renderScreen({
+      runManagementPresentation: runManagementPresentation({
+        directRunEditing: true,
+        draft: {
+          id: "standard",
+          name: "Standard",
+          kind: "standard",
+          mode: "standard",
+          elo: 925,
+          durationSeconds: 300,
+          perPuzzleSeconds: 20,
+          themes: ["mixed"]
+        },
+        eloError: null,
+        eloInput: "925",
+        homeEditing: true,
+        onIntent,
+        screen: "edit"
+      })
+    });
+
+    expect(collectText(findByTestId(renderer, "practice-run-editor-title"))).toBe("Edit Run");
+    expect(collectText(findByTestId(renderer, "practice-run-editor"))).toContain(
+      "Change the name or current ELO. Format and training settings stay fixed."
+    );
+    expect(findByTestId(renderer, "practice-run-name-input").props.value).toBe("Standard");
+    expect(findByTestId(renderer, "practice-run-name-input").props.maxLength).toBe(
+      PRACTICE_RUN_NAME_MAX_LENGTH
+    );
+    expect(findByTestId(renderer, "practice-run-elo-input").props.value).toBe("925");
+    expect(findByTestId(renderer, "practice-run-elo-input").props.keyboardType).toBe("number-pad");
+    expect(collectText(findByTestId(renderer, "practice-run-elo-row"))).toContain(
+      "Whole number from 600 to 2200"
+    );
+    expect(() => findByTestId(renderer, "practice-run-elo-increase")).toThrow();
+    expect(() => findByTestId(renderer, "practice-run-elo-decrease")).toThrow();
+
+    act(() => {
+      findByTestId(renderer, "practice-run-name-input").props.onChangeText("Morning Warm-up");
+      findByTestId(renderer, "practice-run-elo-input").props.onChangeText("1375");
+    });
+    press(renderer, "practice-run-save");
+
+    expect(onIntent.mock.calls.map(([intent]) => intent)).toEqual([
+      { type: "change-name", name: "Morning Warm-up" },
+      { type: "change-elo-input", value: "1375" },
+      { type: "save-run" }
+    ]);
+  });
+
+  it("shows direct ELO validation and disables Save outside 600-2200", () => {
+    const renderer = renderScreen({
+      runManagementPresentation: runManagementPresentation({
+        canSave: false,
+        directRunEditing: true,
+        draft: {
+          id: "tactics-focus",
+          name: "Tactics Focus",
+          kind: "custom",
+          mode: "custom",
+          elo: 1040,
+          durationSeconds: 600,
+          perPuzzleSeconds: 30,
+          themes: ["fork", "pin"]
+        },
+        eloError: "Enter a whole-number ELO from 600 to 2200.",
+        eloInput: "2201",
+        screen: "edit"
+      })
+    });
+
+    expect(collectText(findByTestId(renderer, "practice-run-elo-error"))).toBe(
+      "Enter a whole-number ELO from 600 to 2200."
+    );
+    expect(findByTestId(renderer, "practice-run-save").props.accessibilityState).toEqual({
+      disabled: true
+    });
+  });
+
   it("lets the Storybook clone move Settings ELO ownership to run editors", () => {
     const renderer = renderScreen({ runEloEditingMovedToHome: true });
 

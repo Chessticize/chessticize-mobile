@@ -82,7 +82,7 @@ export const newScenarioMarkers = newScenarioMarkerData as Partial<
 
 const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
   "practice-home": defineScenario("practice-home", "Practice", "Home", "practice--home", "Practice home with vertically centered bordered Run cards, named reusable runs, deterministic ELO, and no persisted mutations.", "practice", ["Centered bordered Run cards", "Saved run selection", "Add Run entry", "Edit mode entry", "Progress summary", "Review workload strip"], ["Run editor", "Review", "History", "Settings"]),
-  "practice-home-edit": defineScenario("practice-home-edit", "Practice", "Edit and reorder runs", "practice--edit-and-reorder-runs", "Home edit mode with whole-card drag, real-time animated insertion, arrow-button fallbacks, ELO-only edit actions, and removal actions.", "practice", ["Whole-card drag", "Real-time insertion animation", "Arrow-button fallback", "ELO-only edit actions", "Format-specific icons", "Removal entry"], ["ELO editor", "Removal confirmation", "Practice home"]),
+  "practice-home-edit": defineScenario("practice-home-edit", "Practice", "Edit and reorder runs", "practice--edit-and-reorder-runs", "Home edit mode with whole-card drag, real-time animated insertion, arrow-button fallbacks, Run edit actions, and removal actions.", "practice", ["Whole-card drag", "Real-time insertion animation", "Arrow-button fallback", "Run edit actions", "Format-specific icons", "Removal entry"], ["Run editor", "Removal confirmation", "Practice home"]),
   "practice-custom-setup": defineScenario(
     "practice-custom-setup",
     "Practice",
@@ -90,12 +90,12 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
     "practice--custom-setup",
     "New named run editor that defaults to All themes, exposes the grouped server-curated 24-theme catalog, and saves to Home without starting.",
     "practice",
-    ["Required unique name", "Custom configuration", "24 curated themes", "Deterministic All-to-multiple selection", "All exclusivity", "Starting ELO", "Add to Home"],
+    ["Required unique name", "Custom configuration", "24 curated themes", "Deterministic All-to-multiple selection", "All exclusivity", "Direct 600-2200 Starting ELO", "Add to Home"],
     ["Practice home", "Native run persistence", "Scored practice session"]
   ),
   "practice-run-name-validation": defineScenario("practice-run-name-validation", "Practice", "Run name validation", "practice--run-name-validation", "New Run with inline required-name validation; entering an existing name exposes the unique-name error.", "practice", ["Required-name error", "Unique-name rule", "Accessible field feedback"], ["Practice home", "Saved run"]),
-  "practice-run-standard-editor": defineScenario("practice-run-standard-editor", "Practice", "Built-in ELO editor", "practice--built-in-run-editor", "Existing Standard run editor names its Run, exposes only the same 25-point Current ELO rule, and returns to Home edit mode after Save or Cancel.", "practice", ["Visible Run name", "Fixed run settings", "Current ELO adjustment", "Return to Home edit mode"], ["Practice home edit mode"]),
-  "practice-custom-rating-editor": defineScenario("practice-custom-rating-editor", "Practice", "Custom Run ELO editor", "practice--custom-rating-editor", "Existing Custom Run editor names its Run and exposes only Current ELO; Save or Cancel returns to Home edit mode while creation settings stay fixed.", "practice", ["Visible Run name", "Fixed run settings", "Current ELO adjustment", "Return to Home edit mode"], ["Practice home edit mode"]),
+  "practice-run-standard-editor": defineScenario("practice-run-standard-editor", "Practice", "Built-in Run editor", "practice--built-in-run-editor", "Existing Standard Run editor allows a unique name and direct whole-number ELO entry from 600 to 2200 while preserving its fixed format and stable identity.", "practice", ["Editable unique name", "Direct 600-2200 ELO entry", "Fixed Run format", "Stable identity", "Return to Home edit mode"], ["Practice home edit mode"]),
+  "practice-custom-rating-editor": defineScenario("practice-custom-rating-editor", "Practice", "Custom Run editor and validation", "practice--custom-rating-editor", "Existing Custom Run editor allows renaming and direct ELO entry while keeping creation settings fixed; an out-of-range value demonstrates inline validation and disabled Save.", "practice", ["Editable unique name", "Direct ELO entry", "600-2200 validation", "Disabled invalid Save", "Fixed creation settings", "Return to Home edit mode"], ["Practice home edit mode"]),
   "practice-run-remove-confirmation": defineScenario("practice-run-remove-confirmation", "Practice", "Remove run confirmation", "practice--remove-run-confirmation", "Inline warning directly below the selected Run before it is removed from Home, explicitly retaining its ELO and history for later restoration.", "practice", ["Inline removal warning", "Selected Run context", "Retained ELO and history", "Cancel", "Confirm removal"], ["Edit runs", "Restore run"]),
   "practice-runs-empty": defineScenario("practice-runs-empty", "Practice", "Empty Home and restore", "practice--empty-home-and-restore", "Home after every run is hidden, with clear Add Run and restore paths that preserve prior ELO.", "practice", ["Empty state", "Add Run", "Retained run list", "Restore to Home"], ["New Run", "Practice home"]),
   "practice-preparing": defineScenario("practice-preparing", "Practice", "Preparing", "practice--preparing", "Stable preparing overlay before an Arrow Duel sprint starts.", "practice", ["Preparing overlay", "Cancel through Back intent"], ["Active sprint", "Practice home"]),
@@ -156,7 +156,7 @@ export const navigationCoverage = {
     "review-reminder-prompt": coveredBy("practice-reminder-prompt"),
     "history-filters": coveredBy("history-filters"),
     "review-filters": coveredBy("review-filters"),
-    "settings-advanced-ratings": notCataloged("Issue 253 moves Current ELO editing into each run's ELO-only editor."),
+    "settings-advanced-ratings": notCataloged("Issue 253 moves name and Current ELO editing into each Run editor."),
     "custom-rating-editor": coveredBy("practice-custom-rating-editor"),
     "starting-practice": coveredBy("practice-preparing")
   } satisfies Record<MobileBackTransient, CatalogCoverage>,

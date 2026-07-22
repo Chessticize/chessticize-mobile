@@ -23,6 +23,7 @@ export type PracticeRunManagementIntent =
   | { type: "cancel-edit" }
   | { type: "change-duration"; durationSeconds: number }
   | { type: "change-elo"; elo: number }
+  | { type: "change-elo-input"; value: string }
   | { type: "change-mode"; mode: "custom" | "arrow_duel" }
   | { type: "change-name"; name: string }
   | { type: "change-per-puzzle"; perPuzzleSeconds: number }
@@ -40,7 +41,10 @@ export type PracticeRunManagementIntent =
 
 export type PracticeRunManagementPresentation = {
   canSave?: boolean;
+  directRunEditing?: boolean;
   draft: PracticeRunDraft | null;
+  eloError?: string | null;
+  eloInput?: string | null;
   hiddenRuns: readonly PracticeRunPresentation[];
   homeEditing: boolean;
   nameError: string | null;

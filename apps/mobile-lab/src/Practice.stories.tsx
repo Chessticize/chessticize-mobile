@@ -9,6 +9,7 @@ import {
   expectTestIdsInOrder,
   expectUniformRunDropTarget,
   openPracticeSession,
+  replaceTextTestId,
   waitForTestId
 } from "./storyPlay.ts";
 
@@ -76,32 +77,31 @@ export const RunNameValidation: Story = {
 };
 
 export const BuiltInRunEditor: Story = {
-  name: "Built-in ELO editor",
+  name: "Built-in Run editor",
   args: { scenarioId: "practice-run-standard-editor" },
   play: async ({ canvasElement }) => {
     await clickTestId(canvasElement, "practice-run-home-edit");
     await clickTestId(canvasElement, "practice-run-edit-standard");
-    await waitForTestId(canvasElement, "practice-run-elo-row");
-    expectTestIdAbsent(canvasElement, "practice-run-fixed-name");
-    await clickTestId(canvasElement, "practice-run-editor-close");
-    await waitForTestId(canvasElement, "practice-run-home-done");
+    await waitForTestId(canvasElement, "practice-run-name-input");
+    await waitForTestId(canvasElement, "practice-run-elo-input");
+    expectTestIdAbsent(canvasElement, "practice-run-elo-increase");
   }
 };
 
 export const CustomRatingEditor: Story = {
-  name: "Custom Run ELO editor",
+  name: "Custom Run editor and validation",
   args: { scenarioId: "practice-custom-rating-editor" },
   play: async ({ canvasElement }) => {
     await clickTestId(canvasElement, "practice-run-home-edit");
     await clickTestId(canvasElement, "practice-run-edit-tactics-focus");
-    await waitForTestId(canvasElement, "practice-run-elo-row");
-    expectTestIdAbsent(canvasElement, "practice-run-name-input");
+    await waitForTestId(canvasElement, "practice-run-name-input");
+    await waitForTestId(canvasElement, "practice-run-elo-input");
     expectTestIdAbsent(canvasElement, "practice-run-mode-row");
     expectTestIdAbsent(canvasElement, "practice-run-theme-row");
     expectTestIdAbsent(canvasElement, "practice-run-duration-stepper");
     expectTestIdAbsent(canvasElement, "practice-run-per-puzzle-stepper");
-    await clickTestId(canvasElement, "practice-run-save");
-    await waitForTestId(canvasElement, "practice-run-home-done");
+    await replaceTextTestId(canvasElement, "practice-run-elo-input", "2201");
+    await waitForTestId(canvasElement, "practice-run-elo-error");
   }
 };
 
