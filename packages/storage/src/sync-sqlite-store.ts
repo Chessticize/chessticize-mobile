@@ -9,6 +9,7 @@ import {
   normalizeRatingRecord,
   mergePracticeRunCatalogs,
   orderReviewQueue,
+  practiceRunsFromLegacyCustomConfigs,
   preferredReviewScheduleChange,
   removeReviewContext,
   resetRating as resetRatingRecord,
@@ -218,7 +219,7 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 7;
+export const CURRENT_SCHEMA_VERSION = 8;
 
 interface SQLiteMigration {
   from: number;
@@ -233,7 +234,8 @@ const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
   { from: 3, to: 4, apply: migrateV3ToV4 },
   { from: 4, to: 5, apply: migrateV4ToV5 },
   { from: 5, to: 6, apply: migrateV5ToV6 },
-  { from: 6, to: 7, apply: migrateV6ToV7 }
+  { from: 6, to: 7, apply: migrateV6ToV7 },
+  { from: 7, to: 8, apply: migrateV7ToV8 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
@@ -466,18 +468,7 @@ export class SyncSQLiteStore implements PracticeStore {
     const rows = this.db
       .prepare("SELECT * FROM custom_sprint_configs ORDER BY last_started_at DESC, id ASC")
       .all() as CustomSprintConfigRow[];
-    return rows.map((row) => ({
-      id: row.id,
-      mode: row.mode,
-      ratingKey: row.rating_key,
-      durationSeconds: row.duration_seconds,
-      perPuzzleSeconds: row.per_puzzle_seconds,
-      targetCorrect: row.target_correct,
-      maxMistakes: row.max_mistakes,
-      ...decodeStoredThemeSelection(row.theme),
-      lastStartedAt: row.last_started_at,
-      playCount: row.play_count
-    }));
+    return rows.map(customSprintConfigFromRow);
   }
 
   savePracticeRun(run: PracticeRunRecord): void {
@@ -1845,6 +1836,39 @@ function migrateV6ToV7(db: SyncSqliteDatabase): void {
   `);
 }
 
+function migrateV7ToV8(db: SyncSqliteDatabase): void {
+  const configs = (db.prepare(
+    "SELECT * FROM custom_sprint_configs ORDER BY last_started_at DESC, id ASC"
+  ).all() as CustomSprintConfigRow[]).map(customSprintConfigFromRow);
+  const existingRuns = (db.prepare(
+    "SELECT * FROM practice_runs ORDER BY archived ASC, home_order ASC, id ASC"
+  ).all() as PracticeRunRow[]).map(practiceRunFromRow);
+  const migratedRuns = practiceRunsFromLegacyCustomConfigs(configs, existingRuns);
+  const statement = db.prepare(`
+    INSERT OR IGNORE INTO practice_runs (
+      id, kind, name, mode, rating_key, duration_seconds, per_puzzle_seconds,
+      target_correct, max_mistakes, themes_json, home_order, archived, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const run of migratedRuns) {
+    statement.run(
+      run.id,
+      run.kind,
+      run.name,
+      run.mode,
+      run.ratingKey,
+      run.durationSeconds,
+      run.perPuzzleSeconds,
+      run.targetCorrect,
+      run.maxMistakes,
+      run.themes === undefined ? null : JSON.stringify(run.themes),
+      run.homeOrder,
+      boolToInt(run.archived),
+      run.updatedAt
+    );
+  }
+}
+
 function readSchemaVersion(db: SyncSqliteDatabase): number {
   const row = db.prepare("PRAGMA user_version").get() as { user_version?: unknown } | undefined;
   const version = row?.user_version;
@@ -1871,6 +1895,21 @@ function encodeStoredThemeSelection(config: CustomSprintConfigRecord): string | 
     return null;
   }
   return themes.length === 1 ? themes[0] as string : JSON.stringify(themes);
+}
+
+function customSprintConfigFromRow(row: CustomSprintConfigRow): CustomSprintConfigRecord {
+  return {
+    id: row.id,
+    mode: row.mode,
+    ratingKey: row.rating_key,
+    durationSeconds: row.duration_seconds,
+    perPuzzleSeconds: row.per_puzzle_seconds,
+    targetCorrect: row.target_correct,
+    maxMistakes: row.max_mistakes,
+    ...decodeStoredThemeSelection(row.theme),
+    lastStartedAt: row.last_started_at,
+    playCount: row.play_count
+  };
 }
 
 function decodeStoredThemeSelection(value: string | null): {
