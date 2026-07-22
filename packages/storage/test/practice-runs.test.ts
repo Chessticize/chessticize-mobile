@@ -10,6 +10,7 @@ import {
 } from "../../core/src/index.ts";
 import {
   MemoryStore,
+  PracticeRunAvailabilityError,
   PracticeService,
   SQLiteStore
 } from "../src/index.ts";
@@ -34,6 +35,26 @@ for (const backend of ["memory", "sqlite"] as const) {
         perPuzzleSeconds: 20,
         initialRating: 900
       }, 1), 1);
+      assert.deepEqual(service.listRatings(), ratingsBeforeEligibilityCheck);
+
+      const catalogBeforeUnavailableCreate = service.listPracticeRuns();
+      assert.equal(service.canCreatePracticeRun({
+        name: "Unavailable Run",
+        mode: "custom",
+        durationSeconds: 300,
+        perPuzzleSeconds: 20,
+        themes: ["theme-not-in-local-pack"],
+        initialRating: 900
+      }), false);
+      assert.throws(() => service.createPracticeRun({
+        name: "Unavailable Run",
+        mode: "custom",
+        durationSeconds: 300,
+        perPuzzleSeconds: 20,
+        themes: ["theme-not-in-local-pack"],
+        initialRating: 900
+      }), PracticeRunAvailabilityError);
+      assert.deepEqual(service.listPracticeRuns(), catalogBeforeUnavailableCreate);
       assert.deepEqual(service.listRatings(), ratingsBeforeEligibilityCheck);
 
       assert.deepEqual(
@@ -127,13 +148,13 @@ test("SQLite practice Runs survive reopen with their ELO and archived state", as
     const store = new SQLiteStore(databasePath);
     store.migrate();
     const service = new PracticeService(store);
+    service.loadFixturePuzzles(await loadFixturePuzzles());
     const run = service.createPracticeRun({
       id: "saved-run",
       name: "Saved Run",
       mode: "custom",
       durationSeconds: 180,
       perPuzzleSeconds: 10,
-      themes: ["mixed"],
       initialRating: 875
     }, "2026-07-22T11:00:00.000Z");
     service.archivePracticeRun(run.id, "2026-07-22T11:01:00.000Z");
@@ -153,15 +174,16 @@ test("SQLite practice Runs survive reopen with their ELO and archived state", as
   }
 });
 
-test("practice Run sync imports catalog identity, setup, and ELO together", () => {
+test("practice Run sync imports catalog identity, setup, and ELO together", async () => {
   const source = new PracticeService(new MemoryStore());
+  source.loadFixturePuzzles(await loadFixturePuzzles());
   const run = source.createPracticeRun({
     id: "synced-run",
     name: "Synced Run",
     mode: "custom",
     durationSeconds: 180,
     perPuzzleSeconds: 10,
-    themes: ["fork"],
+    themes: ["hangingPiece"],
     initialRating: 950
   }, "2026-07-22T12:00:00.000Z");
   source.archivePracticeRun(run.id, "2026-07-22T12:01:00.000Z");
@@ -179,11 +201,12 @@ test("practice Run sync imports catalog identity, setup, and ELO together", () =
   assert.equal(destination.getRating(run.ratingKey).rating, 950);
 });
 
-test("SQLite import resolves concurrent duplicate Run names without a transient unique-name failure", () => {
+test("SQLite import resolves concurrent duplicate Run names without a transient unique-name failure", async () => {
   const localStore = new SQLiteStore(":memory:");
   localStore.migrate();
   try {
     const local = new PracticeService(localStore);
+    local.loadFixturePuzzles(await loadFixturePuzzles());
     local.createPracticeRun({
       id: "z-local",
       name: "Focus",
@@ -193,6 +216,7 @@ test("SQLite import resolves concurrent duplicate Run names without a transient 
       initialRating: 900
     }, "2026-07-22T12:00:00.000Z");
     const remote = new PracticeService(new MemoryStore());
+    remote.loadFixturePuzzles(await loadFixturePuzzles());
     remote.createPracticeRun({
       id: "a-remote",
       name: "focus",

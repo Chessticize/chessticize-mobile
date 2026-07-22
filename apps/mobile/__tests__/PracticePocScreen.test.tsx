@@ -4040,7 +4040,6 @@ describe("PracticePocScreen", () => {
       durationSeconds: 300,
       perPuzzleSeconds: 20,
       targetCorrect: 1,
-      themes: ["mixed"],
       initialRating: 900
     }, "2026-06-20T11:59:00.000Z");
     service.startSprint(

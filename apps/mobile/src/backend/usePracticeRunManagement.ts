@@ -6,7 +6,10 @@ import {
   PracticeRunNameError,
   type PracticeRunRecord
 } from "../../../../packages/core/src/index.ts";
-import type { PracticeService } from "../../../../packages/storage/src/practice-service.ts";
+import type {
+  CreatePracticeRunCommand,
+  PracticeService
+} from "../../../../packages/storage/src/practice-service.ts";
 import type {
   PracticeRunDraft,
   PracticeRunManagementIntent,
@@ -167,17 +170,11 @@ export function usePracticeRunManagement({
         }
         try {
           if (view.screen === "create") {
-            if (!canCreateRunWithLocalPuzzles(service, draft)) {
+            const command = createPracticeRunCommand(draft);
+            if (!service.canCreatePracticeRun(command)) {
               return;
             }
-            const run = service.createPracticeRun({
-              name: draft.name,
-              mode: draft.mode === "arrow_duel" ? "arrow_duel" : "custom",
-              durationSeconds: draft.durationSeconds,
-              perPuzzleSeconds: draft.perPuzzleSeconds,
-              themes: [...draft.themes],
-              initialRating: draft.elo
-            });
+            const run = service.createPracticeRun(command);
             const nextCatalog = service.listPracticeRuns();
             setCatalog(nextCatalog);
             setView((current) => ({
@@ -236,7 +233,7 @@ export function usePracticeRunManagement({
       ...view,
       canSave: view.screen !== "create" || view.draft === null
         ? true
-        : canCreateRunWithLocalPuzzles(service, view.draft),
+        : service.canCreatePracticeRun(createPracticeRunCommand(view.draft)),
       hiddenRuns: catalog.filter((run) => run.archived).map((run) => presentationForRun(service, run)),
       runs: catalog.filter((run) => !run.archived).map((run) => presentationForRun(service, run)),
       onIntent
@@ -285,19 +282,16 @@ function presentationForRun(service: PracticeService, run: PracticeRunRecord): P
   };
 }
 
-function canCreateRunWithLocalPuzzles(
-  service: PracticeService,
-  draft: PracticeRunDraft
-): boolean {
+function createPracticeRunCommand(draft: PracticeRunDraft): CreatePracticeRunCommand {
   const themes = draft.themes.filter((theme) => theme !== "mixed");
-  return service.countEligiblePracticeRunPuzzles({
+  return {
     name: draft.name,
     mode: draft.mode === "arrow_duel" ? "arrow_duel" : "custom",
     durationSeconds: draft.durationSeconds,
     perPuzzleSeconds: draft.perPuzzleSeconds,
     initialRating: draft.elo,
     ...(themes.length === 0 ? {} : { themes })
-  }, 1) > 0;
+  };
 }
 
 function selectedActiveRunId(catalog: readonly PracticeRunRecord[], preferredId: string | null): string | null {

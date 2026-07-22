@@ -81,6 +81,13 @@ export interface CreatePracticeRunCommand {
   initialRating: number;
 }
 
+export class PracticeRunAvailabilityError extends Error {
+  constructor() {
+    super("No eligible puzzles are available for this Practice Run");
+    this.name = "PracticeRunAvailabilityError";
+  }
+}
+
 export interface RecordReviewAttemptCommand extends ReviewContext {
   result: AttemptResult;
   submittedMove: string;
@@ -375,6 +382,9 @@ export class PracticeService {
       updatedAt: now,
       existingRuns
     });
+    if (!this.canCreatePracticeRun(command)) {
+      throw new PracticeRunAvailabilityError();
+    }
     this.store.transaction(() => {
       this.store.savePracticeRun(run);
       this.store.saveRating({
@@ -459,6 +469,10 @@ export class PracticeService {
       ...this.puzzleFilterForCommand(command, config, command.initialRating),
       limit: maximum
     });
+  }
+
+  canCreatePracticeRun(command: CreatePracticeRunCommand): boolean {
+    return this.countEligiblePracticeRunPuzzles(command, 1) > 0;
   }
 
   resetRating(ratingKey: string): unknown {
