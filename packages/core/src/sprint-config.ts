@@ -1,5 +1,5 @@
 import type { SprintConfig, SprintMode } from "./types.ts";
-import { normalizeThemeSelection } from "./theme-catalog.ts";
+import { namedThemesForSelection } from "./theme-catalog.ts";
 
 const DEFAULT_DURATION_SECONDS = 5 * 60;
 
@@ -39,7 +39,7 @@ export function buildSprintConfig(input: {
     throw new Error("maxMistakes must be a positive integer");
   }
 
-  const selectedThemes = normalizeThemeSelection(input.themes);
+  const selectedThemes = namedThemesForSelection(input.themes);
   const ratingKey = ratingKeyForConfig({
     mode: input.mode,
     durationSeconds: input.durationSeconds,
@@ -65,7 +65,7 @@ export function ratingKeyForConfig(input: {
   themes?: readonly string[];
 }): string {
   const minutes = formatDurationMinutes(input.durationSeconds);
-  const selectedThemes = normalizeThemeSelection(input.themes);
+  const selectedThemes = namedThemesForSelection(input.themes);
   const themePrefix = selectedThemes.length > 0 ? `${selectedThemes.join("+")} ` : "";
   return `${themePrefix}${input.mode} ${minutes}/${input.perPuzzleSeconds}`;
 }
