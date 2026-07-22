@@ -3434,7 +3434,7 @@ function PracticeRunHome({
           {presentation.homeEditing
             ? Platform.OS === "web"
               ? "Drag a card to reorder, or use the arrow buttons."
-              : "Touch and hold a card to drag, or use the arrow buttons."
+              : "Drag a card vertically to reorder, or use the arrow buttons."
             : "Choose a saved run, then start when you are ready."}
         </Text>
         <View style={styles.runManagementToolbarActions}>
@@ -3776,30 +3776,9 @@ function RunCardDropSurface({
   const nativeDragCompensationRef = useRef(0);
   const nativeDragDyRef = useRef(0);
   const nativeLayoutYRef = useRef<number | null>(null);
-  const nativeDragArmedRef = useRef(false);
-  const nativeDragArmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const disarmNativeDrag = useCallback((): void => {
-    if (nativeDragArmTimerRef.current) {
-      clearTimeout(nativeDragArmTimerRef.current);
-      nativeDragArmTimerRef.current = null;
-    }
-    nativeDragArmedRef.current = false;
-  }, []);
-  const armNativeDrag = useCallback((): void => {
-    disarmNativeDrag();
-    if (!draggable) {
-      return;
-    }
-    nativeDragArmTimerRef.current = setTimeout(() => {
-      nativeDragArmTimerRef.current = null;
-      nativeDragArmedRef.current = true;
-    }, 180);
-  }, [disarmNativeDrag, draggable]);
-  useEffect(() => disarmNativeDrag, [disarmNativeDrag]);
   const nativePanResponder = useMemo(() => {
     const shouldClaimNativeDrag = (_event: unknown, gesture: PanResponderGestureState): boolean => (
-      nativeDragArmedRef.current
-        && Math.abs(gesture.dy) > 6
+      Math.abs(gesture.dy) > 6
         && Math.abs(gesture.dy) > Math.abs(gesture.dx)
     );
     return PanResponder.create({
@@ -3818,7 +3797,6 @@ function RunCardDropSurface({
       onNativeDragMove(runId, gesture.dy);
     },
     onPanResponderRelease: () => {
-      disarmNativeDrag();
       nativeDragActiveRef.current = false;
       onDrop();
       Animated.spring(nativeDragOffset, {
@@ -3833,7 +3811,6 @@ function RunCardDropSurface({
       });
     },
     onPanResponderTerminate: () => {
-      disarmNativeDrag();
       nativeDragActiveRef.current = false;
       onDragEnd();
       Animated.spring(nativeDragOffset, {
@@ -3846,7 +3823,7 @@ function RunCardDropSurface({
     },
     onPanResponderTerminationRequest: () => false
     });
-  }, [disarmNativeDrag, nativeDragOffset, onDragEnd, onDragStart, onDrop, onNativeDragMove, runId]);
+  }, [nativeDragOffset, onDragEnd, onDragStart, onDrop, onNativeDragMove, runId]);
 
   const handleNativeLayout = (event: LayoutChangeEvent): void => {
     const layout = event.nativeEvent.layout;
@@ -3927,11 +3904,8 @@ function RunCardDropSurface({
   return (
     <Animated.View
       {...(draggable ? nativePanResponder.panHandlers : {})}
-      accessibilityHint={draggable ? "Touch and hold, then drag vertically to reorder this run. Arrow buttons are also available." : undefined}
+      accessibilityHint={draggable ? "Drag vertically to reorder this run. Arrow buttons are also available." : undefined}
       onLayout={handleNativeLayout}
-      onTouchCancel={disarmNativeDrag}
-      onTouchEnd={disarmNativeDrag}
-      onTouchStart={armNativeDrag}
       style={[
         style,
         draggable ? { transform: [{ translateY: nativeDragOffset }] } : null,
