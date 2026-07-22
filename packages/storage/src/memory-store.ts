@@ -1,11 +1,14 @@
 import {
   buildHistoryView,
   curatedPuzzleThemes,
+  clonePracticeRun,
   createDefaultRating,
+  defaultPracticeRuns,
   defaultSprintConfig,
   enrollReviewContext,
   filterHistoryAttemptsForQuery,
   normalizeRatingRecord,
+  mergePracticeRunCatalogs,
   orderReviewQueue,
   preferredReviewScheduleChange,
   removeReviewContext,
@@ -15,6 +18,7 @@ import {
   resolveHistoryRange,
   scheduleMistakeForContext,
   scheduleReview,
+  samePracticeRun,
   sameReviewContext,
   sideToMoveForHistoryPuzzle,
   updateAttemptUnclearState
@@ -28,6 +32,7 @@ import type {
   HistoryQuery,
   HistoryView,
   Puzzle,
+  PracticeRunRecord,
   RatingRecord,
   ReviewContext,
   ReviewQueueItem,
@@ -51,6 +56,9 @@ export class MemoryStore implements PracticeStore {
   private readonly puzzles = new Map<string, Puzzle>();
   private readonly ratings = new Map<string, RatingRecord>();
   private readonly customSprintConfigs = new Map<string, CustomSprintConfigRecord>();
+  private readonly practiceRuns = new Map<string, PracticeRunRecord>(
+    defaultPracticeRuns().map((run) => [run.id, run])
+  );
   private readonly sessions = new Map<string, SprintState>();
   private readonly attempts: AttemptEvent[] = [];
   private readonly reviewQueue = new Map<string, ReviewQueueState>();
@@ -141,6 +149,18 @@ export class MemoryStore implements PracticeStore {
       );
   }
 
+  savePracticeRun(run: PracticeRunRecord): void {
+    this.practiceRuns.set(run.id, clonePracticeRun(run));
+  }
+
+  listPracticeRuns(): PracticeRunRecord[] {
+    return [...this.practiceRuns.values()]
+      .map(clonePracticeRun)
+      .sort((left, right) => Number(left.archived) - Number(right.archived)
+        || left.homeOrder - right.homeOrder
+        || left.id.localeCompare(right.id));
+  }
+
   getSettings(): PracticeSettings {
     return clonePracticeSettings(this.settings);
   }
@@ -200,6 +220,12 @@ export class MemoryStore implements PracticeStore {
       .filter((attempt) => !filter.puzzleId || attempt.puzzleId === filter.puzzleId)
       .filter((attempt) => !filter.sessionId || attempt.sessionId === filter.sessionId)
       .map((attempt) => ({
+        ...(this.sessions.get(attempt.sessionId)?.run === undefined
+          ? {}
+          : {
+              runId: this.sessions.get(attempt.sessionId)!.run!.id,
+              runName: this.sessions.get(attempt.sessionId)!.run!.name
+            }),
         id: attempt.id,
         source: attempt.source,
         sessionId: attempt.sessionId,
@@ -229,7 +255,8 @@ export class MemoryStore implements PracticeStore {
       attempts: this.listAttempts(),
       reviewQueue: this.listReviewQueue().map(exportReviewQueueState),
       reviewRemovals: this.listReviewRemovals(),
-      sprintSessions: this.listSprintSessions()
+      sprintSessions: this.listSprintSessions(),
+      practiceRuns: this.listPracticeRuns()
     };
   }
 
@@ -244,12 +271,20 @@ export class MemoryStore implements PracticeStore {
       ratings: 0,
       attempts: 0,
       reviewQueue: 0,
-      sprintSessions: 0
+      sprintSessions: 0,
+      practiceRuns: 0
     };
     this.saveSettings({
       ...this.getSettings(),
       notifications: clonePracticeSettings(data.settings).notifications
     });
+    const previousRuns = new Map(this.listPracticeRuns().map((run) => [run.id, run]));
+    for (const run of mergePracticeRunCatalogs(this.listPracticeRuns(), data.practiceRuns ?? [])) {
+      if (!samePracticeRun(previousRuns.get(run.id), run)) {
+        this.savePracticeRun(run);
+        result.practiceRuns += 1;
+      }
+    }
     for (const rating of data.ratings) {
       const previous = this.getRating(rating.key);
       const next = preferredRating(previous, rating);
@@ -273,16 +308,18 @@ export class MemoryStore implements PracticeStore {
       const {
         ratingGeneration: _existingRatingGeneration,
         ratingAfter: _existingRatingAfter,
+        run: _existingRun,
         ...existingBase
       } = existing ?? {};
       this.sessions.set(next.id, {
         ...existingBase,
         id: next.id,
         config: {
-          ...(existing?.config ?? defaultSprintConfig(next.mode)),
+          ...(next.config ?? existing?.config ?? defaultSprintConfig(next.mode)),
           ratingKey: next.ratingKey
         },
         ...(next.ratingGeneration === undefined ? {} : { ratingGeneration: next.ratingGeneration }),
+        ...(next.run === undefined ? {} : { run: { ...next.run } }),
         status: next.status,
         startedAt: next.startedAt,
         deadlineAt: completedAt,
@@ -579,6 +616,10 @@ export class MemoryStore implements PracticeStore {
     return {
       ...attempt,
       ratingKey,
+      ...(session?.run === undefined ? {} : { runId: session.run.id, runName: session.run.name }),
+      ...(session?.config.perPuzzleSeconds === undefined
+        ? {}
+        : { perPuzzleSeconds: session.config.perPuzzleSeconds }),
       puzzleRating: puzzle.rating,
       side: sideToMoveForHistoryPuzzle({ puzzle, mode: attempt.mode }),
       themes: puzzle.themes,
@@ -620,7 +661,12 @@ function exportedSprintSessionFromState(session: SprintState): ExportedSprintSes
     correctCount: session.correctCount,
     mistakeCount: session.mistakeCount,
     ratingBefore: session.ratingBefore,
-    ...(session.ratingAfter === undefined ? {} : { ratingAfter: session.ratingAfter })
+    ...(session.ratingAfter === undefined ? {} : { ratingAfter: session.ratingAfter }),
+    ...(session.run === undefined ? {} : { run: { ...session.run } }),
+    config: {
+      ...session.config,
+      ...(session.config.themes === undefined ? {} : { themes: [...session.config.themes] })
+    }
   };
 }
 

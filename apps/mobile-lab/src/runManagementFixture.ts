@@ -3,6 +3,7 @@
 // checks this structural contract against PracticePocScreen during Lab typecheck.
 type PracticeRunPresentation = {
   id: string;
+  ratingKey?: string;
   name: string;
   kind: "standard" | "arrow_duel" | "custom";
   mode: "standard" | "custom" | "arrow_duel";
@@ -29,6 +30,7 @@ type PracticeRunManagementIntent =
   | { type: "dismiss-remove" }
   | { type: "edit-run"; runId: string }
   | { type: "move-run"; runId: string; targetRunId: string }
+  | { type: "prefill-previous-config"; configId: string }
   | { type: "remove-run"; runId: string }
   | { type: "restore-run"; runId: string }
   | { type: "save-run" }
@@ -37,6 +39,7 @@ type PracticeRunManagementIntent =
   | { type: "toggle-home-edit" };
 
 type PracticeRunManagementPresentation = {
+  canSave?: boolean;
   draft: PracticeRunDraft | null;
   hiddenRuns: readonly PracticeRunPresentation[];
   homeEditing: boolean;
@@ -54,6 +57,7 @@ export type RunManagementFixtureState = Omit<PracticeRunManagementPresentation, 
 const BASE_RUNS: readonly PracticeRunPresentation[] = [
   {
     id: "standard",
+    ratingKey: "standard 5/20",
     name: "Standard",
     kind: "standard",
     mode: "standard",
@@ -64,6 +68,7 @@ const BASE_RUNS: readonly PracticeRunPresentation[] = [
   },
   {
     id: "arrow-duel",
+    ratingKey: "arrow_duel 5/30",
     name: "Arrow Duel",
     kind: "arrow_duel",
     mode: "arrow_duel",
@@ -74,6 +79,7 @@ const BASE_RUNS: readonly PracticeRunPresentation[] = [
   },
   {
     id: "tactics-focus",
+    ratingKey: "run:tactics-focus",
     name: "Tactics Focus",
     kind: "custom",
     mode: "custom",
@@ -84,6 +90,7 @@ const BASE_RUNS: readonly PracticeRunPresentation[] = [
   },
   {
     id: "endgame-sprint",
+    ratingKey: "run:endgame-sprint",
     name: "Endgame Sprint",
     kind: "custom",
     mode: "custom",
@@ -172,6 +179,8 @@ export function runManagementFixtureReducer(
     }
     case "move-run":
       return moveRun(state, intent.runId, intent.targetRunId);
+    case "prefill-previous-config":
+      return state;
     case "remove-run":
       return state.runs.some((run) => run.id === intent.runId)
         ? { ...state, removeCandidateId: intent.runId, notice: null }

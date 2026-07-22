@@ -54,6 +54,11 @@ function LabScenarioContent({
   scenarioId: LabScenarioId;
 }): React.JSX.Element {
   const [selectedCustomThemes, setSelectedCustomThemes] = useState<string[]>([]);
+  const showsThemeCatalogPrototype = isRunManagementScenario(scenarioId) || [
+    "history-populated",
+    "history-filters",
+    "history-attempt-detail"
+  ].includes(scenarioId);
   const [runManagementState, dispatchRunManagement] = useReducer(
     runManagementFixtureReducer,
     scenarioId === "practice-runs-empty" ? "empty" : "populated",
@@ -75,7 +80,9 @@ function LabScenarioContent({
           onChange: setSelectedCustomThemes
         }}
         platformCapabilities={runtime.platformCapabilities}
-        themeCatalogPresentation={SERVER_CURATED_THEME_PRESENTATION}
+        themeCatalogPresentation={showsThemeCatalogPrototype
+          ? SERVER_CURATED_THEME_PRESENTATION
+          : undefined}
         runEloEditingMovedToHome
         runManagementPresentation={runManagementPresentation}
         {...runtime.screenProps}
@@ -121,7 +128,14 @@ export function LabScenarioShell({
                 : "Whole-screen scenario: free roaming remains enabled until this presentation area is extracted."}
             </p>
             <div className="lab-toolbar-actions">
-              <button type="button" onClick={() => globalThis.location.reload()}>Reset scenario</button>
+              <button
+                type="button"
+                onClick={() => (
+                  globalThis as typeof globalThis & { location: { reload: () => void } }
+                ).location.reload()}
+              >
+                Reset scenario
+              </button>
               <a href={`./iframe.html?id=${definition.storyId}&viewMode=story`}>Full-screen URL</a>
             </div>
           </div>
@@ -173,6 +187,7 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     case "history-filters":
     case "history-attempt-detail":
       service = createHistoryService(false, THEME_CATALOG_LAB_PUZZLES);
+      configurePuzzleSource = false;
       break;
     case "history-replay-unavailable":
       service = createHistoryService(true);

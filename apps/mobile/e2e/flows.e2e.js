@@ -293,19 +293,11 @@ describe('Key user flows', () => {
       .withTimeout(10000);
   });
 
-  it('configures and starts a custom sprint', async () => {
-    await waitForVisibleInPracticeScroll('practice-mode-custom');
-    await element(by.id('practice-mode-custom')).tap();
-    // The setup panel is taller than the viewport, so wait on a child row.
-    await waitForVisibleInPracticeScroll('custom-target-count');
-
-    await waitForElementTextContaining('custom-target-count', '15', 5000);
-    await element(by.id('custom-duration-stepper-decrease')).tap();
-    await waitForElementTextContaining('custom-target-count', '9', 5000);
-
+  it('adds and starts a saved custom Run', async () => {
+    await createSavedCustomRun('Flow Focus', { shorterDuration: true });
+    await element(by.text('Flow Focus')).tap();
     await element(by.id('practice-main-scroll')).scrollTo('top');
-    await waitFor(element(by.id('start-sprint-button'))).toBeVisible().withTimeout(5000);
-    await element(by.id('start-sprint-button')).tap();
+    await element(by.id('practice-run-start')).tap();
     await waitFor(element(by.id('session-board'))).toExist().withTimeout(15000);
 
     await element(by.id('session-abandon')).tap();
@@ -314,23 +306,18 @@ describe('Key user flows', () => {
     await waitFor(element(by.text('Sprint failed'))).toBeVisible().withTimeout(10000);
   });
 
-  it('persists rating, history, review queue, and custom configs after relaunch', async () => {
+  it('persists rating, history, review queue, and saved Runs after relaunch', async () => {
     await failStandardSprint();
     await dismissSprintSummary();
 
-    await openTab('practice-tab', 'practice-mode-custom');
-    await element(by.id('practice-mode-custom')).tap();
-    await waitForVisibleInPracticeScroll('custom-target-count');
-    await waitForVisibleInPracticeScroll('custom-theme-mate-in-2');
-    await element(by.id('custom-theme-mate-in-2')).tap();
-    await waitForVisibleInPracticeScroll('custom-theme-fork');
-    await element(by.id('custom-theme-fork')).tap();
-    await waitForVisibleInPracticeScroll('custom-target-count');
-    await element(by.id('custom-duration-stepper-decrease')).tap();
-    await waitForElementTextContaining('custom-target-count', '9', 5000);
+    await openTab('practice-tab', 'practice-run-management');
+    await createSavedCustomRun('Persistent Focus', {
+      shorterDuration: true,
+      themes: ['mate-in-2', 'fork']
+    });
+    await element(by.text('Persistent Focus')).tap();
     await element(by.id('practice-main-scroll')).scrollTo('top');
-    await waitFor(element(by.id('start-sprint-button'))).toBeVisible().withTimeout(5000);
-    await element(by.id('start-sprint-button')).tap();
+    await element(by.id('practice-run-start')).tap();
     await waitFor(element(by.id('session-board'))).toExist().withTimeout(15000);
     await element(by.id('session-abandon')).tap();
     await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(5000);
@@ -338,11 +325,13 @@ describe('Key user flows', () => {
     await waitFor(element(by.text('Sprint failed'))).toBeVisible().withTimeout(10000);
     await dismissSprintSummary();
 
-    await openTab('settings-tab', 'settings-standard-elo-row');
-    await element(by.id('settings-standard-elo-row')).tap();
-    await waitForVisibleInPracticeScroll('settings-advanced-rating-standard-increase');
-    await element(by.id('settings-advanced-rating-standard-increase')).tap();
-    await waitForElementTextContaining('settings-standard-elo-row', 'ELO 625', 5000);
+    await openTab('practice-tab', 'practice-run-management');
+    await element(by.id('practice-run-home-edit')).tap();
+    await element(by.id('practice-run-edit-standard')).tap();
+    await element(by.id('practice-run-elo-increase')).tap();
+    await element(by.id('practice-run-save')).tap();
+    await element(by.id('practice-run-home-done')).tap();
+    await waitForElementTextContaining('practice-mode-standard-rating', 'ELO 625', 5000);
 
     await device.terminateApp();
     await launchWithDisabledSynchronization({
@@ -356,25 +345,37 @@ describe('Key user flows', () => {
     await openTab('review-tab', 'review-empty-state');
     await expect(element(by.id('review-empty-practice'))).toBeVisible();
 
-    await openTab('settings-tab', 'settings-standard-elo-row');
-    await waitForElementTextContaining('settings-standard-elo-row', 'ELO 625', 5000);
+    await openTab('settings-tab', 'settings-app-version');
+    await expect(element(by.id('settings-standard-elo-row'))).not.toExist();
 
-    await openTab('practice-tab', 'practice-mode-custom');
-    await element(by.id('practice-mode-custom')).tap();
-    await waitFor(element(by.id('custom-previous-configs'))).toExist().withTimeout(10000);
-    await waitForVisibleInPracticeScroll('custom-previous-custom-custom-180-20-fork-matein2');
-    await waitForElementTextContaining(
-      'custom-previous-custom-custom-180-20-fork-matein2-meta',
-      'Mate in 2',
-      10000
-    );
-    await waitForElementTextContaining(
-      'custom-previous-custom-custom-180-20-fork-matein2-meta',
-      'Fork',
-      10000
-    );
+    await openTab('practice-tab', 'practice-run-management');
+    await waitFor(element(by.text('Persistent Focus'))).toExist().withTimeout(10000);
+    await waitFor(element(by.text('Fork + Mate in 2 · 3 min · 20s pace')))
+      .toExist()
+      .withTimeout(10000);
+    await waitForElementTextContaining('practice-mode-standard-rating', 'ELO 625', 5000);
   });
 });
+
+async function createSavedCustomRun(name, { shorterDuration = false, themes = [] } = {}) {
+  await waitFor(element(by.id('practice-add-run'))).toBeVisible().withTimeout(10000);
+  await element(by.id('practice-add-run')).tap();
+  await waitFor(element(by.id('practice-run-editor'))).toExist().withTimeout(10000);
+  await element(by.id('practice-run-name-input')).replaceText(name);
+  if (shorterDuration) {
+    await waitForVisibleInPracticeScroll('practice-run-duration-stepper-decrease');
+    await element(by.id('practice-run-duration-stepper-decrease')).tap();
+  }
+  for (const theme of themes) {
+    await waitForVisibleInPracticeScroll(`custom-theme-${theme}`);
+    await element(by.id(`custom-theme-${theme}`)).tap();
+  }
+  await element(by.id('practice-main-scroll')).scrollTo('top');
+  await element(by.id('practice-run-save')).tap();
+  await waitFor(element(by.id('practice-run-home-done'))).toBeVisible().withTimeout(10000);
+  await element(by.id('practice-run-home-done')).tap();
+  await waitFor(element(by.text(name))).toExist().withTimeout(10000);
+}
 
 function durationTextToSeconds(value) {
   const match = /^(\d+):(\d{2})$/.exec(value);

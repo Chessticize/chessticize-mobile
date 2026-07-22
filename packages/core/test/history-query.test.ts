@@ -98,6 +98,8 @@ test("history rating filters collect only runtime-valid persisted rating keys", 
     "arrow duel 5/30",
     "arrow_duel 5/30",
     "hangingPiece custom 5/20",
+    "run:history-focus",
+    "run:invalid id",
     "standard 0/20",
     "standard 5/0",
     null
@@ -105,7 +107,8 @@ test("history rating filters collect only runtime-valid persisted rating keys", 
     "standard 5/20",
     "arrow duel 5/30",
     "arrow_duel 5/30",
-    "hangingPiece custom 5/20"
+    "hangingPiece custom 5/20",
+    "run:history-focus"
   ]);
 });
 
@@ -308,7 +311,8 @@ test("history view filters speed and review status before paging", () => {
   const attempts: HistoryAttemptView[] = [
     attempt({ id: "a1", puzzleId: "p1", result: "wrong", completedAt: "2026-06-20T00:00:00.000Z", ratingKey: "standard 5/20" }),
     attempt({ id: "a2", puzzleId: "p2", result: "wrong", completedAt: "2026-06-20T00:01:00.000Z", ratingKey: "standard 5/30" }),
-    attempt({ id: "a3", puzzleId: "p3", result: "wrong", completedAt: "2026-06-20T00:02:00.000Z", ratingKey: "standard 5/20" })
+    attempt({ id: "a3", puzzleId: "p3", result: "wrong", completedAt: "2026-06-20T00:02:00.000Z", ratingKey: "standard 5/20" }),
+    { ...attempt({ id: "a4", puzzleId: "p4", result: "correct", completedAt: "2026-06-20T00:03:00.000Z", ratingKey: "run:focus" }), perPuzzleSeconds: 45 }
   ];
   const reviews = [
     {
@@ -355,7 +359,11 @@ test("history view filters speed and review status before paging", () => {
     total: 1,
     hasMore: false
   });
-  assert.deepEqual(view.availableSpeeds, [20, 30]);
+  assert.deepEqual(view.availableSpeeds, [20, 30, 45]);
+  assert.deepEqual(
+    filterHistoryAttemptsForQuery({ attempts, query: { speedSeconds: 45 }, reviews }).map((attemptView) => attemptView.id),
+    ["a4"]
+  );
   assert.equal(historyAttemptHasReviewQueued(attempts[0] as HistoryAttemptView, reviews), false);
   assert.equal(historyAttemptHasReviewQueued(attempts[2] as HistoryAttemptView, reviews), true);
 });

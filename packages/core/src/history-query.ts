@@ -4,6 +4,7 @@ import {
   namedThemesForSelection,
   puzzleMatchesAnyTheme
 } from "./theme-catalog.ts";
+import { isPracticeRunRatingKey } from "./practice-runs.ts";
 import type { AttemptEvent, AttemptResult, AttemptSource, Puzzle, RatingRecord, ReviewQueueState, SprintMode } from "./types.ts";
 
 export type HistoryTimeRange = "7d" | "30d" | "90d" | "1y" | "max";
@@ -64,6 +65,9 @@ export interface HistoryAttemptView {
   arrowDuelCandidateOrderStatus?: "corrupt";
   unclear?: boolean;
   unclearUpdatedAt?: string;
+  runId?: string;
+  runName?: string;
+  perPuzzleSeconds?: number;
   puzzleRating: number;
   side: PuzzleSide;
   themes: string[];
@@ -259,7 +263,8 @@ export function normalizeHistoryRatingKey(value: unknown): string | null {
   if (normalized === null || normalized !== value) {
     return null;
   }
-  return /^(?:\S+ )?(?:standard|blitz|custom|arrow(?:_| )duel) (?:[1-9]\d*|[1-9]\d*s)\/[1-9]\d*$/.test(normalized)
+  return isPracticeRunRatingKey(normalized)
+    || /^(?:\S+ )?(?:standard|blitz|custom|arrow(?:_| )duel) (?:[1-9]\d*|[1-9]\d*s)\/[1-9]\d*$/.test(normalized)
     ? normalized
     : null;
 }
@@ -438,12 +443,19 @@ export function historyThemesForQuery(
   ]);
 }
 
-export function historyAttemptSpeedSeconds(attempt: Pick<HistoryAttemptView, "ratingKey">): number | null {
+export function historyAttemptSpeedSeconds(
+  attempt: Pick<HistoryAttemptView, "ratingKey" | "perPuzzleSeconds">
+): number | null {
+  if (attempt.perPuzzleSeconds !== undefined) {
+    return attempt.perPuzzleSeconds;
+  }
   const match = normalizeHistoryRatingKey(attempt.ratingKey)?.match(/\/(\d+)\b/);
   return match ? Number(match[1]) : null;
 }
 
-export function collectHistorySpeeds(attempts: Array<Pick<HistoryAttemptView, "ratingKey">>): number[] {
+export function collectHistorySpeeds(
+  attempts: Array<Pick<HistoryAttemptView, "ratingKey" | "perPuzzleSeconds">>
+): number[] {
   const speeds = new Set<number>();
   for (const attempt of attempts) {
     const speed = historyAttemptSpeedSeconds(attempt);

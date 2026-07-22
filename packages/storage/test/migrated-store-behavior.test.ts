@@ -219,6 +219,7 @@ for (const label of STORE_LABELS) {
       assert.deepEqual(reimported, {
         ratings: 0,
         attempts: 0,
+        practiceRuns: 0,
         reviewQueue: 0,
         sprintSessions: 0
       });
