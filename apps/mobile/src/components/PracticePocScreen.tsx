@@ -3796,10 +3796,15 @@ function RunCardDropSurface({
     }, 180);
   }, [disarmNativeDrag, draggable]);
   useEffect(() => disarmNativeDrag, [disarmNativeDrag]);
-  const nativePanResponder = useMemo(() => PanResponder.create({
-    onMoveShouldSetPanResponder: (_event, gesture) => nativeDragArmedRef.current
-      && Math.abs(gesture.dy) > 6
-      && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+  const nativePanResponder = useMemo(() => {
+    const shouldClaimNativeDrag = (_event: unknown, gesture: PanResponderGestureState): boolean => (
+      nativeDragArmedRef.current
+        && Math.abs(gesture.dy) > 6
+        && Math.abs(gesture.dy) > Math.abs(gesture.dx)
+    );
+    return PanResponder.create({
+    onMoveShouldSetPanResponder: shouldClaimNativeDrag,
+    onMoveShouldSetPanResponderCapture: shouldClaimNativeDrag,
     onPanResponderGrant: () => {
       nativeDragActiveRef.current = true;
       nativeDragCompensationRef.current = 0;
@@ -3840,7 +3845,8 @@ function RunCardDropSurface({
       }).start();
     },
     onPanResponderTerminationRequest: () => false
-  }), [disarmNativeDrag, nativeDragOffset, onDragEnd, onDragStart, onDrop, onNativeDragMove, runId]);
+    });
+  }, [disarmNativeDrag, nativeDragOffset, onDragEnd, onDragStart, onDrop, onNativeDragMove, runId]);
 
   const handleNativeLayout = (event: LayoutChangeEvent): void => {
     const layout = event.nativeEvent.layout;

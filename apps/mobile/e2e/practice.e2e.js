@@ -50,8 +50,10 @@ describe('Practice POC', () => {
 
     await element(by.id('practice-add-run')).tap();
     await waitFor(element(by.id('practice-run-editor'))).toExist().withTimeout(10000);
-    await expect(element(by.id('custom-theme-mixed'))).toHaveValue('1');
+    await expect(element(by.id('custom-theme-mixed').and(by.traits(['selected'])))).toExist();
     await element(by.id('practice-run-name-input')).replaceText('Calculation Lab');
+    await element(by.id('practice-run-name-input')).tapReturnKey();
+    await element(by.id('practice-main-scroll')).scrollTo('top');
     await element(by.id('practice-run-save')).tap();
 
     await waitFor(element(by.id('practice-run-home-edit'))).toBeVisible().withTimeout(10000);
