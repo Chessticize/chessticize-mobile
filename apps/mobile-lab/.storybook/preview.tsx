@@ -24,9 +24,19 @@ const preview: Preview = {
     viewport: {
       defaultViewport: "phonePortrait",
       options: {
+        compactPhone: {
+          name: "Compact phone",
+          styles: { width: "320px", height: "693px" },
+          type: "mobile"
+        },
         phonePortrait: {
           name: "Phone portrait",
           styles: { width: "390px", height: "844px" },
+          type: "mobile"
+        },
+        largePhone: {
+          name: "Large phone",
+          styles: { width: "430px", height: "932px" },
           type: "mobile"
         },
         phoneLandscape: {

@@ -25,6 +25,10 @@ import {
   runManagementFixtureReducer
 } from "./runManagementFixture.ts";
 import { scenarioRegistry, type LabScenarioId } from "./scenarioRegistry.ts";
+import {
+  SERVER_CURATED_THEME_PRESENTATION,
+  THEME_CATALOG_LAB_PUZZLES
+} from "./themeCatalogPrototype.ts";
 
 export const LAB_NOW_MS = new Date("2026-07-18T18:00:00.000Z").getTime();
 
@@ -49,7 +53,14 @@ function LabScenarioContent({
   runtime: ScenarioRuntime;
   scenarioId: LabScenarioId;
 }): React.JSX.Element {
-  const [selectedCustomThemes, setSelectedCustomThemes] = useState<string[]>(["fork", "pin"]);
+  const [selectedCustomThemes, setSelectedCustomThemes] = useState<string[]>([]);
+  const showsThemeCatalogPrototype = [
+    "practice-custom-setup",
+    "practice-run-name-validation",
+    "history-populated",
+    "history-filters",
+    "history-attempt-detail"
+  ].includes(scenarioId);
   const [runManagementState, dispatchRunManagement] = useReducer(
     runManagementFixtureReducer,
     scenarioId === "practice-runs-empty" ? "empty" : "populated",
@@ -66,7 +77,7 @@ function LabScenarioContent({
     entryPreviewEnabled ? ISSUE_272_LAB_PUZZLE.id : null
   );
   useEffect(() => () => clearLabPracticeService(runtime.service), [runtime.service]);
-  useEffect(() => setSelectedCustomThemes(["fork", "pin"]), [scenarioId]);
+  useEffect(() => setSelectedCustomThemes([]), [scenarioId]);
 
   return (
     <LabScenarioShell scenarioId={scenarioId}>
@@ -76,6 +87,9 @@ function LabScenarioContent({
           onChange: setSelectedCustomThemes
         }}
         platformCapabilities={runtime.platformCapabilities}
+        themeCatalogPresentation={showsThemeCatalogPrototype
+          ? SERVER_CURATED_THEME_PRESENTATION
+          : undefined}
         runEloEditingMovedToHome
         runManagementPresentation={runManagementPresentation}
         {...runtime.screenProps}
@@ -180,7 +194,7 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     case "history-populated":
     case "history-filters":
     case "history-attempt-detail":
-      service = createHistoryService(false);
+      service = createHistoryService(false, THEME_CATALOG_LAB_PUZZLES);
       break;
     case "history-replay-unavailable":
       service = createHistoryService(true);
@@ -282,9 +296,12 @@ function createReviewService(kind: "due" | "overdue"): PracticeService {
   return new PracticeService(store);
 }
 
-function createHistoryService(replayUnavailableOnly: boolean): PracticeService {
+function createHistoryService(
+  replayUnavailableOnly: boolean,
+  puzzles = LAB_PUZZLES
+): PracticeService {
   const store = new MemoryStore();
-  store.seedPuzzles(LAB_PUZZLES);
+  store.seedPuzzles(puzzles);
   if (replayUnavailableOnly) {
     store.recordAttempt({
       id: "history-arrow-legacy",

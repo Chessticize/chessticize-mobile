@@ -47,16 +47,36 @@ test("New Scenario Markers retain open-issue ownership on the full catalog", () 
       scenario.isNew ? ["new"] : []
     );
     if (scenario.isNew) {
-      assert.ok(Number.isInteger(scenario.issueNumber));
-      assert.ok(scenario.issueNumber > 0);
-      assert.ok(scenario.changeNote.trim().length > 0);
+      assert.ok(scenario.issues.length > 0);
+      for (const issue of scenario.issues) {
+        assert.ok(Number.isInteger(issue.issueNumber));
+        assert.ok(issue.issueNumber > 0);
+        assert.ok(issue.changeNote.trim().length > 0);
+      }
     }
   }
 });
 
-test("Issue 253 owns the complete run-management design track", () => {
-  const issue253Scenarios = newScenarios.filter((scenario) => scenario.issueNumber === 253);
+test("issue 273 owns every theme-catalog surface including the shared New Run", () => {
+  const issue273Scenarios = newScenarios.filter((scenario) =>
+    scenario.issues.some(({ issueNumber }) => issueNumber === 273)
+  );
+  assert.deepEqual(issue273Scenarios.map((scenario) => scenario.id), [
+    "practice-custom-setup",
+    "history-populated",
+    "history-filters",
+    "history-attempt-detail"
+  ]);
+  assert.deepEqual(storyTagsForScenario("practice-custom-setup"), ["new"]);
+  assert.deepEqual(storyTagsForScenario("history-populated"), ["new"]);
+  assert.deepEqual(storyTagsForScenario("history-filters"), ["new"]);
+  assert.deepEqual(storyTagsForScenario("history-attempt-detail"), ["new"]);
+});
 
+test("Issue 253 owns the complete run-management design track", () => {
+  const issue253Scenarios = newScenarios.filter((scenario) =>
+    scenario.issues.some(({ issueNumber }) => issueNumber === 253)
+  );
   assert.deepEqual(
     issue253Scenarios.map((scenario) => scenario.id),
     [
@@ -79,7 +99,9 @@ test("Issue 253 owns the complete run-management design track", () => {
 test("Issue 272 owns the blunder-entry and Arrow Duel prompt design track", () => {
   assert.deepEqual(
     newScenarios
-      .filter((scenario) => scenario.issueNumber === 272)
+      .filter((scenario) =>
+        scenario.issues.some(({ issueNumber }) => issueNumber === 272)
+      )
       .map((scenario) => scenario.id),
     [
       "practice-arrow-duel-prompt",

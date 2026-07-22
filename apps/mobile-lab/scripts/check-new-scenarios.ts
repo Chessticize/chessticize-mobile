@@ -24,7 +24,8 @@ if (markerErrors.length > 0) {
 
 console.log(`Validated ${newScenarios.length} issue-owned New Scenario Marker(s).`);
 for (const scenario of newScenarios) {
-  console.log(`- Issue #${scenario.issueNumber}: ${scenario.group} / ${scenario.title}`);
+  const issues = scenario.issues.map(({ issueNumber }) => `#${issueNumber}`).join(", ");
+  console.log(`- Issues ${issues}: ${scenario.group} / ${scenario.title}`);
 }
 
 const baseRef = process.env.BASE_REF;

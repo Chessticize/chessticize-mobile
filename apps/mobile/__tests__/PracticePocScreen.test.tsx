@@ -857,6 +857,39 @@ describe("PracticePocScreen", () => {
     ]);
   });
 
+  it("renders the injected grouped theme catalog in New Run with All selected by default", () => {
+    const onIntent = jest.fn();
+    const renderer = renderScreen({
+      runManagementPresentation: runManagementPresentation({
+        draft: {
+          name: "",
+          kind: "custom",
+          mode: "custom",
+          elo: 900,
+          durationSeconds: 300,
+          perPuzzleSeconds: 20,
+          themes: ["mixed"]
+        },
+        onIntent,
+        screen: "create"
+      }),
+      themeCatalogPresentation: {
+        groups: [
+          { label: "Checkmates", themes: ["mateIn4"] },
+          { label: "Piece tactics", themes: ["fork"] }
+        ]
+      }
+    });
+
+    expect(themeSelected(renderer, "mixed")).toBe(true);
+    expect(findByTestId(renderer, "custom-theme-mate-in-4")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "practice-run-editor")).match(/Themes/g)).toHaveLength(1);
+    expect(collectText(findByTestId(renderer, "practice-run-theme-row"))).toContain("Choose one or more");
+
+    press(renderer, "custom-theme-mate-in-4");
+    expect(onIntent).toHaveBeenLastCalledWith({ type: "change-themes", themes: ["mateIn4"] });
+  });
+
   it("limits an existing Custom Run editor to Current ELO", () => {
     const onIntent = jest.fn();
     const renderer = renderScreen({
@@ -2802,6 +2835,27 @@ describe("PracticePocScreen", () => {
     expect(JSON.stringify(renderer.toJSON())).not.toContain("Targeting");
   });
 
+  it("renders and toggles every injected theme in the selected grouped catalog", () => {
+    const renderer = renderScreen({
+      themeCatalogPresentation: {
+        groups: [
+          { label: "Checkmates", themes: ["mateIn4", "backRankMate"] },
+          { label: "Piece tactics", themes: ["fork", "capturingDefender"] }
+        ]
+      }
+    });
+
+    press(renderer, "practice-mode-custom");
+    expect(themeSelected(renderer, "mixed")).toBe(true);
+    expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("Capturing Defender");
+    expect(findByTestId(renderer, "custom-theme-mate-in-4")).toBeTruthy();
+    press(renderer, "custom-theme-mate-in-4");
+    expect(themeSelected(renderer, "mate-in-4")).toBe(true);
+    expect(themeSelected(renderer, "mixed")).toBe(false);
+    press(renderer, "custom-theme-mate-in-4");
+    expect(themeSelected(renderer, "mixed")).toBe(true);
+  });
+
   it("starts and persists the production Custom Sprint with every selected theme", () => {
     const service = createMobilePracticeService("random1000");
     const renderer = renderScreen({
@@ -3432,6 +3486,83 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "review-reset-puzzle"))).toBe("↺");
     press(renderer, "review-exit");
     expect(findByTestId(renderer, "history-panel")).toBeTruthy();
+  });
+
+  it("shows curated tags in History rows, filters, and puzzle replay", () => {
+    const store = new MemoryStore();
+    store.seedPuzzles([{
+      ...sharedHistoryPuzzle(),
+      themes: [
+        "advancedPawn",
+        "attraction",
+        "discoveredAttack",
+        "mateIn3",
+        "pin",
+        "promotion",
+        "sacrifice",
+        "endgame"
+      ]
+    }]);
+    const completedAt = new Date(Date.now() - 60_000).toISOString();
+    store.recordAttempt({
+      id: "curated-density",
+      source: "sprint",
+      sessionId: "curated-density-session",
+      puzzleId: "shared-history",
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      result: "correct",
+      submittedMove: "e2e4",
+      expectedMove: "e2e4",
+      startedAt: new Date(new Date(completedAt).getTime() - 8_000).toISOString(),
+      completedAt,
+      ratingBefore: 900,
+      ratingAfter: 912
+    });
+    const renderer = renderScreen({
+      practiceService: new PracticeService(store),
+      themeCatalogPresentation: {
+        groups: [{
+          label: "Curated",
+          themes: [
+            "advancedPawn",
+            "attraction",
+            "discoveredAttack",
+            "mateIn3",
+            "pin",
+            "promotion",
+            "sacrifice",
+            "capturingDefender"
+          ]
+        }]
+      }
+    });
+
+    press(renderer, "history-tab");
+    const themes = collectText(findByTestId(renderer, "history-attempt-curated-density-themes"));
+    expect(themes).toContain("Advanced Pawn");
+    expect(themes).toContain("Discovered Attack");
+    expect(themes).toContain("Mate in 3");
+    expect(themes).toContain("Sacrifice");
+    expect(themes).not.toContain("Endgame");
+    expect(findByTestId(renderer, "history-attempt-curated-density-pace")).toBeTruthy();
+
+    press(renderer, "history-filter-toggle");
+    expect(collectText(findByTestId(renderer, "history-theme-filters"))).toContain("Capturing Defender");
+    expect(findByTestId(renderer, "history-theme-filter-rail-curated")).toBeTruthy();
+    press(renderer, "history-theme-pin");
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Pin");
+    press(renderer, "history-attempt-curated-density");
+    expect(findByTestId(renderer, "review-session")).toBeTruthy();
+    const replayThemes = collectText(findByTestId(renderer, "review-theme-rail"));
+    expect(replayThemes).toContain("Advanced Pawn");
+    expect(replayThemes).toContain("Sacrifice");
+    expect(replayThemes).not.toContain("Endgame");
+    const replayThemeCatalog = findByTestId(renderer, "review-theme-catalog");
+    expect(collectText(replayThemeCatalog)).not.toContain("Themes");
+    expect(testIdOrder(renderer, "review-board", "review-theme-catalog")).toBeLessThan(0);
+    expect(flattenTestStyle(replayThemeCatalog.props.style).alignItems).toBe("center");
+    expect(() => findByTestId(renderer, "review-theme-pill")).toThrow();
   });
 
   it("puts Unclear only first in a scrollable three-toggle History row without a count or icon", () => {
@@ -6126,7 +6257,7 @@ function createScriptedStockfishTransport(
 }
 
 type RenderScreenOptions = TestMobilePlatformCapabilityOverrides &
-  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEloEditingMovedToHome" | "runManagementPresentation" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack"> & {
+  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEloEditingMovedToHome" | "runManagementPresentation" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "themeCatalogPresentation"> & {
     platformCapabilities?: MobilePlatformCapabilities;
   };
 
@@ -6228,6 +6359,7 @@ function renderScreen({
   sprintStartDelayMs,
   standardTargetCorrect,
   systemBack,
+  themeCatalogPresentation,
   ...capabilityOverrides
 }: RenderScreenOptions = {}): TestRenderer.ReactTestRenderer {
   let renderer: TestRenderer.ReactTestRenderer | undefined;
@@ -6246,6 +6378,7 @@ function renderScreen({
         sprintStartDelayMs={sprintStartDelayMs}
         standardTargetCorrect={standardTargetCorrect}
         systemBack={systemBack}
+        themeCatalogPresentation={themeCatalogPresentation}
       />
     );
   });

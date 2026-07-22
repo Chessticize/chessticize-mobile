@@ -12,8 +12,10 @@ body,
   width: 100%;
 }
 
-body {
-  overflow: hidden;
+html {
+  -webkit-overflow-scrolling: touch;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .lab-scenario-shell,

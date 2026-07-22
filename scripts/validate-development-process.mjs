@@ -206,7 +206,21 @@ assert.match(issueTriageSkill, /one\s+Storybook design track.*per\s+issue/is);
 assert.match(issueTriageSkill, /every UI or functional-feature issue/);
 assert.match(issueTriageSkill, /do not invent priority\s+labels/i);
 assert.match(issueTriageSkill, /codex\/storybook-issue-<number>-<goal>/);
-assert.match(issueTriageSkill, /owner-only deployment/i);
+for (const publicStorybookPolicy of [
+  agents,
+  labReadme,
+  uiFlowDesign,
+  issueTriage,
+  issueTriageSkill,
+  devLoopSkill,
+  prTemplate
+]) {
+  assert.match(
+    publicStorybookPolicy,
+    /public\s+and\s+must\s+not\s+require\s+authentication/i
+  );
+}
+assert.doesNotMatch(issueTriageSkill, /owner-only deployment/i);
 assert.match(issueTriage, /Every Sites deployment URL is production/);
 for (const lifecycleContract of [issueTriage, issueTriageSkill, uiFlowDesign, processWorkflow]) {
   assert.doesNotMatch(lifecycleContract, /sites\/storybook-previews|preview-manifest/);
@@ -214,6 +228,8 @@ for (const lifecycleContract of [issueTriage, issueTriageSkill, uiFlowDesign, pr
 
 assert.match(scenarioRegistry, /newScenarioMarkerData/);
 assert.match(markerPolicy, /Number\.isInteger\(issueNumber\)/);
+assert.match(markerPolicy, /issues must be a non-empty array/);
+assert.match(markerPolicy, /markerOwnerships/);
 assert.match(markerCheck, /verifyRemovedMarkerIssuesAreClosed/);
 assert.match(markerPolicy, /issueStates\.get\(issueNumber\) !== "closed"/);
 assert.match(markerPolicy, /createGitHubIssueStateReader/);

@@ -46,8 +46,10 @@ rollout, or release integration yet.
 3. Exercise public actions in the Story play function where useful. Keep board
    and native boundaries behind the conspicuous Lab placeholders or maintained
    fakes.
-4. Add the scenario to `newScenarioMarkers.json` with its owning `issueNumber`
-   and a concise `changeNote`; the registry derives `isNew: true` from it.
+4. Add the scenario to `newScenarioMarkers.json` with an `issues` array. Give
+   each owning issue its own `issueNumber` and concise `changeNote`; a scenario
+   changed by multiple open issues retains every ownership entry. The registry
+   derives `isNew: true` from the non-empty array.
 5. Run `pnpm mobile:lab:validate`, the relevant component tests, and browser
    checks at the viewports affected by the design.
 6. Deploy the full Storybook from the exact reviewed commit. Share its manager
@@ -56,21 +58,31 @@ rollout, or release integration yet.
 7. Record explicit design approval in the issue or PR before product wiring.
 
 When remote preview publication is authorized and Sites is available, publish
-the complete `apps/mobile-lab` Storybook to an issue-specific site or deployment
-and record the exact source commit in the issue and PR. Do not commit generated
-Storybook bundles, copied preview files, or hosting result files to the
-application branch. A Sites deployment is a production URL, but it remains a
-design artifact: it does not count as approval or product implementation. Save
-a Sites version without deploying it when only a reviewable candidate is
-authorized.
+the complete `apps/mobile-lab` Storybook to a site and Sites project dedicated
+to the exact feature branch. Never reuse that project ID or live URL for a
+different source branch, including another branch for the same issue. Reuse the
+site only for later commits on its owning branch. Before every deployment,
+verify that the recorded source branch and commit match the application branch
+being reviewed; a mismatch is a publication blocker, not permission to replace
+the existing site. Every Storybook review site, including the main-branch
+catalog and every branch-owned site, is public and must not require
+authentication. Set the Sites access mode to public and verify that an
+unauthenticated request to `/storybook/` returns HTTP 200 before handoff. Record
+the branch, exact source commit, and branch-owned URL in the issue and PR.
+Do not commit generated Storybook bundles, copied preview files, Sites project
+metadata, or hosting result files to the application branch. A Sites deployment
+is a production URL, but it remains a design artifact: it does not count as approval
+or product implementation. Save a Sites version without deploying it when only
+a reviewable candidate is authorized.
 
 When the current interaction increment is coherent and checks pass, the design
 PR may become ready and merge to `main` before approval or implementation.
 Continue later feedback rounds from current `main`, update the same scenario,
-and redeploy the issue's full Storybook. Keep its New Scenario Marker on `main`
-until the linked GitHub issue is closed; then remove only the marker in a cleanup
-change and retain the scenario as living UI documentation. Pull-request CI
-checks the issue state before allowing that removal.
+and deploy through the new branch's dedicated site. Keep each issue ownership
+entry on `main` until its linked GitHub issue is closed; then remove only that
+entry in a cleanup change. Remove the marker only when no open issue ownership
+remains, and retain the scenario as living UI documentation. Pull-request CI
+checks each removed ownership's issue state.
 
 If an open issue's marker was attached to a mistaken parallel prototype,
 consolidate that prototype into the existing product-clone scenario and move
