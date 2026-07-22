@@ -148,8 +148,6 @@ export type CustomThemeSelection = {
   onChange: (selectedThemes: CustomThemeFilter[]) => void;
 };
 
-export type ThemeCatalogLayout = "wrap" | "rails" | "groups";
-
 export type ThemeCatalogGroup = {
   label: string;
   themes: readonly string[];
@@ -157,7 +155,6 @@ export type ThemeCatalogGroup = {
 
 export type ThemeCatalogPresentation = {
   groups: readonly ThemeCatalogGroup[];
-  layout: ThemeCatalogLayout;
 };
 
 type Tab = MobileBackTab;
@@ -2734,6 +2731,7 @@ export function PracticePocScreen({
                   initialIndex={historyReviewInitialIndex}
                   service={service}
                   systemBackCommand={reviewBackCommand}
+                  themeCatalogPresentation={themeCatalogPresentation}
                   onAnalysisActiveChange={setReviewAnalysisOpen}
                   onAttemptClearUnclear={clearHistoryAttemptUnclear}
                   onComplete={() => setHistoryReviewEntries([])}
@@ -3750,57 +3748,6 @@ function ThemeCatalogChoiceRow({
       onPress={() => onChange(ALL_THEMES_FILTER)}
     />
   );
-
-  if (presentation.layout === "wrap") {
-    return (
-      <View style={styles.themeCatalogSection} testID={testID}>
-        <Text style={styles.themeCatalogTitle}>Themes</Text>
-        <View style={styles.themeCatalogWrap} testID="custom-theme-wrap-options">
-          {allChip}
-          {themeCatalogThemes(presentation).map((theme) => (
-            <ThemeChoiceChip
-              key={theme}
-              option={theme}
-              selected={selectedThemes.includes(theme)}
-              onPress={() => onChange(theme)}
-            />
-          ))}
-        </View>
-      </View>
-    );
-  }
-
-  if (presentation.layout === "rails") {
-    return (
-      <View style={styles.themeCatalogSection} testID={testID}>
-        <View style={styles.themeCatalogHeadingRow}>
-          <Text style={styles.themeCatalogTitle}>Themes</Text>
-          {allChip}
-        </View>
-        {presentation.groups.map((group) => (
-          <View key={group.label} style={styles.themeCatalogGroup}>
-            <Text style={styles.themeCatalogGroupLabel}>{group.label}</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              testID={`custom-theme-rail-${safeTestId(group.label)}`}
-            >
-              <View style={styles.themeCatalogRailContent}>
-                {group.themes.map((theme) => (
-                  <ThemeChoiceChip
-                    key={theme}
-                    option={theme}
-                    selected={selectedThemes.includes(theme)}
-                    onPress={() => onChange(theme)}
-                  />
-                ))}
-              </View>
-            </ScrollView>
-          </View>
-        ))}
-      </View>
-    );
-  }
 
   return (
     <View style={styles.themeCatalogSection} testID={testID}>
@@ -5191,7 +5138,13 @@ function HistoryPanel({
             <FilterButton active={sideFilter === "white"} label="White" testID="history-side-white" onPress={() => onSideFilterChange("white")} />
             <FilterButton active={sideFilter === "black"} label="Black" testID="history-side-black" onPress={() => onSideFilterChange("black")} />
           </HistoryChipRow>
-          {availableThemes.length > 0 ? (
+          {themeCatalogPresentation ? (
+            <HistoryThemeCatalogFilter
+              presentation={themeCatalogPresentation}
+              selectedTheme={themeFilter}
+              onThemeChange={onThemeFilterChange}
+            />
+          ) : availableThemes.length > 0 ? (
             <HistoryChipRow testID="history-theme-filters">
               <FilterButton active={themeFilter === "all"} label="All themes" testID="history-theme-all" onPress={() => onThemeFilterChange("all")} />
               {availableThemes.slice(0, 8).map((theme) => (
@@ -5260,6 +5213,52 @@ function HistoryPanel({
   );
 }
 
+function HistoryThemeCatalogFilter({
+  onThemeChange,
+  presentation,
+  selectedTheme
+}: {
+  onThemeChange: (theme: string) => void;
+  presentation: ThemeCatalogPresentation;
+  selectedTheme: string;
+}): React.JSX.Element {
+  return (
+    <View style={styles.historyThemeFilterSection} testID="history-theme-filters">
+      <View style={styles.themeCatalogHeadingRow}>
+        <Text style={styles.themeCatalogTitle}>Themes</Text>
+        <FilterButton
+          active={selectedTheme === "all"}
+          label="All themes"
+          testID="history-theme-all"
+          onPress={() => onThemeChange("all")}
+        />
+      </View>
+      {presentation.groups.map((group) => (
+        <View key={group.label} style={styles.themeCatalogGroup}>
+          <Text style={styles.themeCatalogGroupLabel}>{group.label}</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            testID={`history-theme-filter-rail-${safeTestId(group.label)}`}
+          >
+            <View style={styles.themeCatalogRailContent}>
+              {group.themes.map((theme) => (
+                <FilterButton
+                  key={theme}
+                  active={selectedTheme === theme}
+                  label={customThemeLabel(theme)}
+                  testID={`history-theme-${safeTestId(theme)}`}
+                  onPress={() => onThemeChange(theme)}
+                />
+              ))}
+            </View>
+          </ScrollView>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 type HistoryActiveFilterInput = {
   ratingKey: string | null;
   ratingRangeFilter: HistoryRatingRangeFilter;
@@ -5303,7 +5302,7 @@ function historyActiveFilterLabels({
     labels.push(sideFilter === "white" ? "White" : "Black");
   }
   if (themeFilter !== "all") {
-    labels.push(themeFilter);
+    labels.push(customThemeLabel(themeFilter));
   }
   if (unclearOnly) {
     labels.push("Unclear");
@@ -5755,11 +5754,7 @@ function HistoryAttemptRow({
         </View>
         <Text testID={`history-attempt-${attempt.id}-identity`} style={styles.helperText}>{puzzleIdentity}</Text>
         {themeCatalogPresentation && visibleThemes.length > 0 ? (
-          <HistoryThemeList
-            attemptId={attempt.id}
-            layout={themeCatalogPresentation.layout}
-            themes={visibleThemes}
-          />
+          <HistoryThemeList attemptId={attempt.id} themes={visibleThemes} />
         ) : (
           <Text testID={`history-attempt-${attempt.id}-context`} style={styles.helperText}>{compactContext}</Text>
         )}
@@ -5782,44 +5777,40 @@ function HistoryAttemptRow({
 
 function HistoryThemeList({
   attemptId,
-  layout,
   themes
 }: {
   attemptId: string;
-  layout: ThemeCatalogLayout;
   themes: readonly string[];
 }): React.JSX.Element {
-  if (layout === "groups") {
-    return (
-      <View style={styles.historyThemeTextRow} testID={`history-attempt-${attemptId}-themes`}>
-        <Text style={styles.historyThemeTextLabel}>Themes</Text>
-        <Text style={styles.historyThemeText}>{themes.map(customThemeLabel).join(" · ")}</Text>
-      </View>
-    );
-  }
-
-  const chips = themes.map((theme) => (
-    <View key={theme} style={styles.historyThemeChip}>
-      <Text style={styles.historyThemeChipText}>{customThemeLabel(theme)}</Text>
-    </View>
-  ));
-
-  if (layout === "rails") {
-    return (
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        testID={`history-attempt-${attemptId}-themes`}
-      >
-        <View style={styles.historyThemeRail}>{chips}</View>
-      </ScrollView>
-    );
-  }
-
   return (
-    <View style={styles.historyThemeWrap} testID={`history-attempt-${attemptId}-themes`}>
-      {chips}
-    </View>
+    <ThemeTagRail testID={`history-attempt-${attemptId}-themes`} themes={themes} />
+  );
+}
+
+function ThemeTagRail({
+  fill = false,
+  testID,
+  themes
+}: {
+  fill?: boolean;
+  testID: string;
+  themes: readonly string[];
+}): React.JSX.Element {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={fill ? styles.themeTagRailFillViewport : styles.themeTagRailViewport}
+      testID={testID}
+    >
+      <View style={styles.historyThemeRail}>
+        {themes.map((theme) => (
+          <View key={theme} style={styles.historyThemeChip} testID={`${testID}-${safeTestId(theme)}`}>
+            <Text style={styles.historyThemeChipText}>{customThemeLabel(theme)}</Text>
+          </View>
+        ))}
+      </View>
+    </ScrollView>
   );
 }
 
@@ -6780,7 +6771,8 @@ function ReviewSession({
   service,
   onReviewRecorded,
   stockfish,
-  systemBackCommand
+  systemBackCommand,
+  themeCatalogPresentation
 }: {
   adaptiveLayout: AdaptiveLayout;
   boardSize: number;
@@ -6800,6 +6792,7 @@ function ReviewSession({
   onReviewRecorded?: (completedAt: string) => void;
   stockfish: MobileStockfishCapabilities;
   systemBackCommand: ReviewBackCommand | null;
+  themeCatalogPresentation?: ThemeCatalogPresentation;
 }): React.JSX.Element {
   const boardRef = useRef<ChessboardRef | null>(null);
   const reviewSuppressedBoardMovesRef = useRef<string[]>([]);
@@ -6915,6 +6908,9 @@ function ReviewSession({
   const reviewProgressTotal = scheduledReviewProgress?.total ?? entries.length;
   const reviewPerPuzzleSeconds = perPuzzleSecondsForReviewEntry(currentEntry);
   const reviewPrimaryTheme = currentEntry.puzzle.themes[0] ?? "mixed";
+  const reviewCuratedThemes = themeCatalogPresentation && currentEntry.source === "history"
+    ? curatedHistoryThemes(currentEntry.puzzle.themes, themeCatalogThemes(themeCatalogPresentation))
+    : [];
   const reviewRemainingSeconds =
     currentEntry.source === "due" && (!reviewResultRecorded || reviewTimedOut)
       ? Math.max(0, reviewPerPuzzleSeconds - Math.floor((reviewNowMs - reviewStartedAtMs) / 1000))
@@ -7532,7 +7528,14 @@ function ReviewSession({
             </View>
           ) : null}
           <MoveSideBadge badgeTestID="review-side-to-move" side={reviewSideToMove} />
-          {currentEntry.source !== "due" ? (
+          {themeCatalogPresentation && currentEntry.source === "history" ? (
+            reviewCuratedThemes.length > 0 ? (
+              <View style={styles.reviewThemeCatalogRow} testID="review-theme-catalog">
+                <Text style={styles.reviewThemeCatalogLabel}>Themes</Text>
+                <ThemeTagRail fill testID="review-theme-rail" themes={reviewCuratedThemes} />
+              </View>
+            ) : null
+          ) : currentEntry.source !== "due" ? (
             <View style={styles.reviewContextPill} testID="review-theme-pill">
               <Text style={styles.reviewContextPillText}>{reviewPrimaryTheme}</Text>
             </View>
@@ -11453,11 +11456,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "900"
   },
-  themeCatalogWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6
-  },
   themeCatalogGroup: {
     gap: 6
   },
@@ -11993,6 +11991,20 @@ const styles = StyleSheet.create({
     gap: 8,
     justifyContent: "center"
   },
+  reviewThemeCatalogRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+    minWidth: 0,
+    width: "100%"
+  },
+  reviewThemeCatalogLabel: {
+    color: "#64748B",
+    flexShrink: 0,
+    fontSize: 11,
+    fontWeight: "900",
+    textTransform: "uppercase"
+  },
   reviewContextPill: {
     alignItems: "center",
     backgroundColor: "#FFFFFF",
@@ -12248,6 +12260,14 @@ const styles = StyleSheet.create({
   historyAdvancedFilters: {
     gap: 8
   },
+  historyThemeFilterSection: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 10,
+    padding: 10
+  },
   historyPerformanceCard: {
     backgroundColor: "#FFFFFF",
     borderColor: "#E2E8F0",
@@ -12485,11 +12505,14 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 3
   },
-  historyThemeWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 4,
-    paddingTop: 2
+  themeTagRailViewport: {
+    flexShrink: 1,
+    maxWidth: "100%",
+    minWidth: 0
+  },
+  themeTagRailFillViewport: {
+    flex: 1,
+    minWidth: 0
   },
   historyThemeRail: {
     flexDirection: "row",
@@ -12509,24 +12532,6 @@ const styles = StyleSheet.create({
     color: "#475569",
     fontSize: 10,
     fontWeight: "800"
-  },
-  historyThemeTextRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 4,
-    paddingTop: 2
-  },
-  historyThemeTextLabel: {
-    color: "#64748B",
-    fontSize: 11,
-    fontWeight: "900"
-  },
-  historyThemeText: {
-    color: "#475569",
-    flex: 1,
-    fontSize: 11,
-    fontWeight: "700",
-    lineHeight: 16
   },
   historyUnclearBadge: {
     alignItems: "center",

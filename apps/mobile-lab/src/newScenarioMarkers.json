@@ -1,10 +1,18 @@
 {
   "practice-custom-setup": {
     "issueNumber": 273,
-    "changeNote": "Compares three layouts for selecting the server-curated 24-theme catalog."
+    "changeNote": "Uses the selected grouped layout for the server-curated 24-theme catalog."
   },
   "history-populated": {
     "issueNumber": 273,
-    "changeNote": "Shows every curated puzzle theme, including a real seven-theme density case."
+    "changeNote": "Uses the selected horizontal tag rail, including a real seven-theme density case."
+  },
+  "history-filters": {
+    "issueNumber": 273,
+    "changeNote": "Adds the complete categorized 24-theme catalog to the existing History filters."
+  },
+  "history-attempt-detail": {
+    "issueNumber": 273,
+    "changeNote": "Shows all curated puzzle themes in the real replay flow reached from History."
   }
 }

@@ -82,55 +82,8 @@ body {
   text-decoration: none;
 }
 
-.lab-variant-switcher {
-  background: rgba(255, 255, 255, 0.97);
-  border: 1px solid #cbd5e1;
-  border-radius: 10px;
-  bottom: 10px;
-  box-shadow: 0 12px 34px rgba(15, 23, 42, 0.2);
-  color: #0f172a;
-  font-size: 11px;
-  max-width: calc(100vw - 20px);
-  padding: 8px;
-  position: fixed;
-  right: 10px;
-  z-index: 100000;
-}
-
-.lab-variant-switcher strong {
-  display: block;
-  margin: 0 2px 6px;
-}
-
-.lab-variant-options {
-  display: flex;
-  gap: 5px;
-}
-
-.lab-variant-options button {
-  background: #f8fafc;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  color: #334155;
-  cursor: pointer;
-  font: inherit;
-  font-weight: 750;
-  padding: 6px 8px;
-}
-
-.lab-variant-options button.is-active {
-  background: #eff6ff;
-  border-color: #2563eb;
-  color: #1d4ed8;
-}
-
 @media (max-width: 520px) {
   .lab-toolbar {
     bottom: 62px;
-  }
-
-  .lab-variant-switcher {
-    left: 10px;
-    right: auto;
   }
 }

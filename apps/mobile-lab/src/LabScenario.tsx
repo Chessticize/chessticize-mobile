@@ -21,12 +21,7 @@ import {
 import { clearLabPracticeService, setLabPracticeService } from "./boardController.ts";
 import { LAB_PUZZLES, PRIMARY_LAB_PUZZLE } from "./labPuzzles.ts";
 import { scenarioRegistry, type LabScenarioId } from "./scenarioRegistry.ts";
-import {
-  isThemeCatalogPrototypeVariant,
-  themeCatalogPresentationFor,
-  THEME_CATALOG_PROTOTYPE_VARIANTS,
-  type ThemeCatalogPrototypeVariant
-} from "./themeCatalogPrototype.ts";
+import { SERVER_CURATED_THEME_PRESENTATION } from "./themeCatalogPrototype.ts";
 
 export const LAB_NOW_MS = new Date("2026-07-18T18:00:00.000Z").getTime();
 
@@ -41,24 +36,19 @@ type ScenarioRuntime = {
 export function LabScenario({ scenarioId }: { scenarioId: LabScenarioId }): React.JSX.Element {
   const runtime = useMemo(() => createScenarioRuntime(scenarioId), [scenarioId]);
   const [selectedCustomThemes, setSelectedCustomThemes] = useState<string[]>(["fork", "pin"]);
-  const [themeCatalogVariant, setThemeCatalogVariant] = useState<ThemeCatalogPrototypeVariant>(
-    requestedThemeCatalogVariant
-  );
-  const showsThemeCatalogPrototype = scenarioId === "practice-custom-setup" || scenarioId === "history-populated";
+  const showsThemeCatalogPrototype = [
+    "practice-custom-setup",
+    "history-populated",
+    "history-filters",
+    "history-attempt-detail"
+  ].includes(scenarioId);
 
   setLabPracticeService(runtime.service);
   useEffect(() => () => clearLabPracticeService(runtime.service), [runtime.service]);
   useEffect(() => setSelectedCustomThemes(["fork", "pin"]), [scenarioId]);
 
   return (
-    <LabScenarioShell
-      scenarioId={scenarioId}
-      themeCatalogVariant={showsThemeCatalogPrototype ? themeCatalogVariant : undefined}
-      onThemeCatalogVariantChange={showsThemeCatalogPrototype ? (nextVariant) => {
-        setThemeCatalogVariant(nextVariant);
-        replaceThemeCatalogVariant(nextVariant);
-      } : undefined}
-    >
+    <LabScenarioShell scenarioId={scenarioId}>
       <PracticePocScreen
         customThemeSelection={{
           selectedThemes: selectedCustomThemes,
@@ -66,7 +56,7 @@ export function LabScenario({ scenarioId }: { scenarioId: LabScenarioId }): Reac
         }}
         platformCapabilities={runtime.platformCapabilities}
         themeCatalogPresentation={showsThemeCatalogPrototype
-          ? themeCatalogPresentationFor(themeCatalogVariant)
+          ? SERVER_CURATED_THEME_PRESENTATION
           : undefined}
         {...runtime.screenProps}
       />
@@ -76,14 +66,10 @@ export function LabScenario({ scenarioId }: { scenarioId: LabScenarioId }): Reac
 
 export function LabScenarioShell({
   children,
-  scenarioId,
-  themeCatalogVariant,
-  onThemeCatalogVariantChange
+  scenarioId
 }: {
   children: React.ReactNode;
   scenarioId: LabScenarioId;
-  themeCatalogVariant?: ThemeCatalogPrototypeVariant;
-  onThemeCatalogVariantChange?: (variant: ThemeCatalogPrototypeVariant) => void;
 }): React.JSX.Element {
   const definition = scenarioRegistry[scenarioId];
 
@@ -111,64 +97,8 @@ export function LabScenarioShell({
       <main className="lab-app-surface" data-testid="lab-app-surface">
         {children}
       </main>
-      {themeCatalogVariant && onThemeCatalogVariantChange ? (
-        <aside className="lab-variant-switcher" aria-label="Theme catalog design variants">
-          <strong>Theme catalog prototype</strong>
-          <div className="lab-variant-options">
-            {THEME_CATALOG_PROTOTYPE_VARIANTS.map((variant) => (
-              <button
-                aria-pressed={variant.id === themeCatalogVariant}
-                className={variant.id === themeCatalogVariant ? "is-active" : undefined}
-                key={variant.id}
-                title={variant.note}
-                type="button"
-                onClick={() => onThemeCatalogVariantChange(variant.id)}
-              >
-                {variant.label}
-              </button>
-            ))}
-          </div>
-        </aside>
-      ) : null}
     </div>
   );
-}
-
-function requestedThemeCatalogVariant(): ThemeCatalogPrototypeVariant {
-  const searches: string[] = [];
-  if (typeof window !== "undefined") {
-    searches.push(window.location.search);
-  }
-  try {
-    if (window.parent && window.parent !== window && window.parent.location.search) {
-      searches.unshift(window.parent.location.search);
-    }
-  } catch {
-    // Embedded review surfaces may not permit access to their parent URL.
-  }
-  for (const search of searches) {
-    const value = new URLSearchParams(search).get("variant");
-    if (isThemeCatalogPrototypeVariant(value)) {
-      return value;
-    }
-  }
-  return "wrap";
-}
-
-function replaceThemeCatalogVariant(variant: ThemeCatalogPrototypeVariant): void {
-  const replace = (target: Window): void => {
-    const url = new URL(target.location.href);
-    url.searchParams.set("variant", variant);
-    target.history.replaceState(target.history.state, "", url);
-  };
-  replace(window);
-  try {
-    if (window.parent && window.parent !== window) {
-      replace(window.parent);
-    }
-  } catch {
-    // The local Storybook manager is same-origin; hosted wrappers may not be.
-  }
 }
 
 function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {

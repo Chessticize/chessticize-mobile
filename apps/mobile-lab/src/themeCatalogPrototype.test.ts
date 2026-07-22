@@ -4,8 +4,7 @@ import { LAB_PUZZLES } from "./labPuzzles.ts";
 import {
   SERVER_CURATED_THEME_GROUPS,
   SERVER_CURATED_THEMES,
-  THEME_CATALOG_PROTOTYPE_VARIANTS,
-  isThemeCatalogPrototypeVariant
+  SERVER_CURATED_THEME_PRESENTATION
 } from "./themeCatalogPrototype.ts";
 
 test("the prototype exposes the 24 unique server-curated themes", () => {
@@ -27,12 +26,6 @@ test("the deterministic fixtures cover the full catalog and the seven-tag densit
   );
 });
 
-test("all three shareable prototype variants are recognized", () => {
-  assert.deepEqual(THEME_CATALOG_PROTOTYPE_VARIANTS.map((variant) => variant.id), [
-    "wrap",
-    "rails",
-    "groups"
-  ]);
-  assert.equal(isThemeCatalogPrototypeVariant("wrap"), true);
-  assert.equal(isThemeCatalogPrototypeVariant("unknown"), false);
+test("the selected presentation uses the complete grouped catalog", () => {
+  assert.equal(SERVER_CURATED_THEME_PRESENTATION.groups, SERVER_CURATED_THEME_GROUPS);
 });
