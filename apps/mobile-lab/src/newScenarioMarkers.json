@@ -1,6 +1,1 @@
-{
-  "practice-custom-setup": {
-    "issueNumber": 245,
-    "changeNote": "The existing Custom Sprint setup now previews independent theme toggles; All clears every named theme and remains selected as the non-empty fallback."
-  }
-}
+{}

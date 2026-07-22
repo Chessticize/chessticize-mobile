@@ -52,11 +52,8 @@ test("New Scenario Markers retain open-issue ownership on the full catalog", () 
   }
 });
 
-test("the multiple-theme design review has one active New Scenario Marker", () => {
-  assert.deepEqual(
-    newScenarios.map((scenario) => scenario.id),
-    ["practice-custom-setup"]
-  );
+test("the closed multiple-theme issue has no active New Scenario Marker", () => {
+  assert.deepEqual(newScenarios, []);
   assert.deepEqual(storyTagsForScenario("practice-home" as LabScenarioId), []);
-  assert.deepEqual(storyTagsForScenario("practice-custom-setup"), ["new"]);
+  assert.deepEqual(storyTagsForScenario("practice-custom-setup"), []);
 });
