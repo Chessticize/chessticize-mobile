@@ -4101,7 +4101,9 @@ function PracticeRunEditor({
                   maxLength={40}
                   placeholder="e.g. Tactics Focus"
                   placeholderTextColor="#94A3B8"
+                  returnKeyType="done"
                   style={[styles.runNameInput, presentation.nameError ? styles.runNameInputError : null]}
+                  submitBehavior="blurAndSubmit"
                   testID="practice-run-name-input"
                   value={draft.name}
                   onChangeText={(name) => presentation.onIntent({ type: "change-name", name })}
