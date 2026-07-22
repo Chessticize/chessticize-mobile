@@ -1070,6 +1070,9 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "practice-run-elo-row"))).toContain(
       "Whole number from 600 to 2200"
     );
+    expect(collectText(findByTestId(renderer, "practice-run-elo-row"))).toBe(
+      "Current ELOWhole number from 600 to 2200"
+    );
     expect(() => findByTestId(renderer, "practice-run-elo-increase")).toThrow();
     expect(() => findByTestId(renderer, "practice-run-elo-decrease")).toThrow();
 

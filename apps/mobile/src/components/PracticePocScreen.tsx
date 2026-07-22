@@ -4276,7 +4276,6 @@ function PracticeRunEloRow({
             </Text>
           </View>
           <View style={[styles.runEloInputShell, error ? styles.runEloInputShellError : null]}>
-            <Text style={styles.runEloInputPrefix}>ELO</Text>
             <TextInput
               accessibilityLabel={isCreate ? "Starting ELO" : "Current ELO"}
               inputMode="numeric"
@@ -11868,12 +11867,6 @@ const styles = StyleSheet.create({
   },
   runEloInputShellError: {
     borderColor: "#DC2626"
-  },
-  runEloInputPrefix: {
-    color: "#64748B",
-    fontSize: 12,
-    fontWeight: "800",
-    paddingLeft: 10
   },
   runEloInput: {
     color: "#111827",
