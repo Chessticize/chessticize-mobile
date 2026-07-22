@@ -1069,6 +1069,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "practice-run-name-input").props.submitBehavior).toBe(
       "blurAndSubmit"
     );
+    expect(hasStyleEntry(findByTestId(renderer, "practice-run-name-row"), "gap", 16)).toBe(true);
     expect(findByTestId(renderer, "practice-run-elo-input").props.value).toBe("925");
     expect(findByTestId(renderer, "practice-run-elo-input").props.keyboardType).toBe("number-pad");
     expect(collectText(findByTestId(renderer, "practice-run-elo-row"))).toContain(

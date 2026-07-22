@@ -4121,7 +4121,7 @@ function PracticeRunEditor({
 
       <View style={styles.customConfigCard} testID="practice-run-editor-fields">
         {canEditName ? (
-          <View style={[styles.customConfigRow, styles.runNameRow]}>
+          <View style={[styles.customConfigRow, styles.runNameRow]} testID="practice-run-name-row">
             <View style={styles.runNameCopy}>
               <Text style={styles.listText}>Name</Text>
               <Text style={styles.requiredFieldLabel}>Required · unique</Text>
@@ -11883,7 +11883,8 @@ const styles = StyleSheet.create({
     lineHeight: 19
   },
   runNameRow: {
-    alignItems: "flex-start"
+    alignItems: "flex-start",
+    gap: 16
   },
   runNameCopy: {
     flexShrink: 0,
