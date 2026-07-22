@@ -4,6 +4,7 @@ import {
   buildHistoryPuzzleStats,
   buildHistoryView,
   collectHistoryRatingKeys,
+  curatedPuzzleThemes,
   filterHistoryAttemptsForQuery,
   historyAttemptHasReviewQueued,
   historyAttemptReplayAvailability,
@@ -34,6 +35,58 @@ test("history query accepts optional ratingKey and resolves supported time range
     validateHistoryQuery({ now: "2026-06-21T12:00:00.000Z", timeRange: "30d", ratingKey: " " }),
     { now: "2026-06-21T12:00:00.000Z", timeRange: "30d" }
   );
+});
+
+test("history normalizes legacy singular themes into the multi-theme OR contract", () => {
+  assert.deepEqual(
+    validateHistoryQuery({
+      now: "2026-06-21T12:00:00.000Z",
+      timeRange: "max",
+      theme: " pin ",
+      themes: ["fork", "pin"]
+    }),
+    {
+      now: "2026-06-21T12:00:00.000Z",
+      timeRange: "max",
+      themes: ["fork", "pin"]
+    }
+  );
+
+  const attempts = [
+    attempt({ id: "fork", puzzleId: "fork-puzzle", result: "correct", completedAt: "2026-06-20T00:00:00.000Z", themes: ["fork"] }),
+    attempt({ id: "pin", puzzleId: "pin-puzzle", result: "correct", completedAt: "2026-06-20T00:01:00.000Z", themes: ["pin"] }),
+    attempt({ id: "skewer", puzzleId: "skewer-puzzle", result: "correct", completedAt: "2026-06-20T00:02:00.000Z", themes: ["skewer"] })
+  ];
+  assert.deepEqual(
+    filterHistoryAttemptsForQuery({ attempts, query: { themes: ["fork", "pin"] }, reviews: [] })
+      .map((historyAttempt) => historyAttempt.id),
+    ["fork", "pin"]
+  );
+  assert.deepEqual(
+    filterHistoryAttemptsForQuery({ attempts, query: { theme: "pin" }, reviews: [] })
+      .map((historyAttempt) => historyAttempt.id),
+    ["pin"]
+  );
+});
+
+test("history exposes only server-curated themes as filter options", () => {
+  const view = buildHistoryView({
+    query: { now: "2026-06-21T12:00:00.000Z", timeRange: "max" },
+    ratingKeys: [],
+    attempts: [
+      attempt({
+        id: "curated",
+        puzzleId: "curated-puzzle",
+        result: "correct",
+        completedAt: "2026-06-20T00:00:00.000Z",
+        themes: ["endgame", "pin", "mateIn2"]
+      })
+    ],
+    elo: [],
+    reviews: []
+  });
+
+  assert.deepEqual(view.availableThemes, ["mateIn2", "pin"]);
 });
 
 test("history rating filters collect only runtime-valid persisted rating keys", () => {
@@ -602,7 +655,9 @@ function attempt(input: {
   mode?: HistoryAttemptView["mode"];
   ratingKey?: string;
   unclear?: boolean;
+  themes?: string[];
 }): HistoryAttemptView {
+  const themes = input.themes ?? ["fork"];
   return {
     id: input.id,
     source: "sprint",
@@ -619,7 +674,8 @@ function attempt(input: {
     ...(input.unclear === undefined ? {} : { unclear: input.unclear }),
     puzzleRating: 900,
     side: "white",
-    themes: ["fork"]
+    themes,
+    curatedThemes: curatedPuzzleThemes(themes)
   };
 }
 

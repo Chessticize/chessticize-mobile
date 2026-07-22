@@ -923,7 +923,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "practice-run-theme-row"))).toContain("Choose one or more");
 
     press(renderer, "custom-theme-mate-in-4");
-    expect(onIntent).toHaveBeenLastCalledWith({ type: "change-themes", themes: ["mateIn4"] });
+    expect(onIntent).toHaveBeenLastCalledWith({ type: "toggle-theme", theme: "mateIn4" });
   });
 
   it("keeps the full curated theme catalog when New Run opens from the Home story", async () => {
@@ -1064,6 +1064,10 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "practice-run-name-input").props.value).toBe("Standard");
     expect(findByTestId(renderer, "practice-run-name-input").props.maxLength).toBe(
       PRACTICE_RUN_NAME_MAX_LENGTH
+    );
+    expect(findByTestId(renderer, "practice-run-name-input").props.returnKeyType).toBe("done");
+    expect(findByTestId(renderer, "practice-run-name-input").props.submitBehavior).toBe(
+      "blurAndSubmit"
     );
     expect(findByTestId(renderer, "practice-run-elo-input").props.value).toBe("925");
     expect(findByTestId(renderer, "practice-run-elo-input").props.keyboardType).toBe("number-pad");
@@ -1991,6 +1995,132 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "practice-prompt-icon")).toBeTruthy();
     expectText(renderer, "Find the best move");
     expect(collectText(findByTestId(renderer, "practice-prompt"))).toContain("For white.");
+  });
+
+  it("locks Standard input on the first rendered frame until the blunder animation completes", async () => {
+    const service = createMobilePracticeService("familiar15");
+    const renderer = renderScreen({ practiceService: service });
+
+    press(renderer, "practice-mode-standard");
+    press(renderer, "practice-start-button");
+
+    const activePuzzle = activeSprintForTest(service).currentPuzzle;
+    if (!activePuzzle || activePuzzle.kind !== "line") {
+      throw new Error("Expected a line puzzle for the entry-preview regression");
+    }
+    const board = findByTestId(renderer, "mock-chessboard");
+    const imperativeMove = board.props.mockImperativeMove as jest.Mock;
+
+    expect(findByTestId(renderer, "board-input-blocker")).toBeTruthy();
+    expect(board.props.fen).toBe(activePuzzle.puzzle.initialFen);
+    expect(imperativeMove).not.toHaveBeenCalled();
+
+    await advanceEntryPreviewBy(175);
+    act(() => {
+      (ReactNative as unknown as {
+        __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
+      }).__setWindowDimensions?.({ width: 429, height: 932, scale: 3, fontScale: 1 });
+    });
+    await advanceEntryPreviewBy(174);
+    expect(findByTestId(renderer, "board-input-blocker")).toBeTruthy();
+    expect(imperativeMove).not.toHaveBeenCalled();
+
+    await advanceEntryPreviewBy(1);
+    expect(imperativeMove).toHaveBeenCalledTimes(1);
+    expect(imperativeMove).toHaveBeenCalledWith(parseBoardMove(activePuzzle.puzzle.solutionMoves[0]!));
+    expect(() => findByTestId(renderer, "board-input-blocker")).toThrow();
+    expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(activePuzzle.currentFen);
+  });
+
+  it("cancels a pending Standard blunder callback when the screen unmounts", async () => {
+    const service = createMobilePracticeService("familiar15");
+    const renderer = renderScreen({ practiceService: service });
+
+    press(renderer, "practice-mode-standard");
+    press(renderer, "practice-start-button");
+
+    const imperativeMove = findByTestId(renderer, "mock-chessboard").props.mockImperativeMove as jest.Mock;
+    expect(findByTestId(renderer, "board-input-blocker")).toBeTruthy();
+
+    act(() => {
+      renderer.unmount();
+    });
+    const rendererIndex = renderers.indexOf(renderer);
+    if (rendererIndex >= 0) {
+      renderers.splice(rendererIndex, 1);
+    }
+
+    await advanceEntryPreviewBy(1_000);
+    expect(imperativeMove).not.toHaveBeenCalled();
+  });
+
+  it("cancels a pending Standard blunder callback when the session exits", async () => {
+    const service = createMobilePracticeService("familiar15");
+    const renderer = renderScreen({ practiceService: service });
+
+    press(renderer, "practice-mode-standard");
+    press(renderer, "practice-start-button");
+
+    const imperativeMove = findByTestId(renderer, "mock-chessboard").props.mockImperativeMove as jest.Mock;
+    expect(findByTestId(renderer, "board-input-blocker")).toBeTruthy();
+
+    abandonSprint(renderer);
+    expect(() => findByTestId(renderer, "session-board")).toThrow();
+
+    await advanceEntryPreviewBy(1_000);
+    expect(imperativeMove).not.toHaveBeenCalled();
+  });
+
+  it("relocks Review reset until its blunder animation completes", async () => {
+    const renderer = renderStandardSequenceScreen();
+    await openSessionMistakeReview(renderer);
+
+    const initialBoard = findByTestId(renderer, "mock-chessboard");
+    expect(initialBoard.props.gestureEnabled).toBe(false);
+    expect(findByTestId(renderer, "board-input-blocker")).toBeTruthy();
+    expect(findByTestId(renderer, "review-reset-puzzle").props.disabled).toBe(true);
+
+    await settleEntryPreview();
+    const readyBoard = findByTestId(renderer, "mock-chessboard");
+    const readyFen = readyBoard.props.fen;
+    const imperativeMove = readyBoard.props.mockImperativeMove as jest.Mock;
+    expect(readyBoard.props.gestureEnabled).toBe(true);
+    expect(() => findByTestId(renderer, "board-input-blocker")).toThrow();
+    expect(findByTestId(renderer, "review-reset-puzzle").props.disabled).toBe(false);
+
+    imperativeMove.mockClear();
+    press(renderer, "review-reset-puzzle");
+
+    expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(false);
+    expect(findByTestId(renderer, "board-input-blocker")).toBeTruthy();
+    expect(findByTestId(renderer, "mock-chessboard").props.fen).not.toBe(readyFen);
+    expect(imperativeMove).not.toHaveBeenCalled();
+
+    await settleEntryPreview();
+    expect(imperativeMove).toHaveBeenCalledTimes(1);
+    expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
+    expect(() => findByTestId(renderer, "board-input-blocker")).toThrow();
+    expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(readyFen);
+  });
+
+  it("cancels the old Review preview when navigating to a new puzzle", async () => {
+    const renderer = renderStandardSequenceScreen();
+    await openSessionMistakeReview(renderer);
+
+    const oldImperativeMove = findByTestId(renderer, "mock-chessboard").props.mockImperativeMove as jest.Mock;
+    expect(findByTestId(renderer, "review-next").props.disabled).toBe(false);
+
+    press(renderer, "review-next");
+
+    const newImperativeMove = findByTestId(renderer, "mock-chessboard").props.mockImperativeMove as jest.Mock;
+    expectText(renderer, "2 / 3 · Standard");
+    expect(findByTestId(renderer, "board-input-blocker")).toBeTruthy();
+
+    await settleEntryPreview();
+
+    expect(oldImperativeMove).not.toHaveBeenCalled();
+    expect(newImperativeMove).toHaveBeenCalledTimes(1);
+    expect(() => findByTestId(renderer, "board-input-blocker")).toThrow();
   });
 
   it("starts a sprint on the injected clock used by store screenshots", () => {
@@ -2953,8 +3083,12 @@ describe("PracticePocScreen", () => {
 
     startArrowDuelSprint(renderer);
     const arrow = requireArrowDuelState(activeSprintForTest(service));
+    const arrowBoard = findByTestId(renderer, "mock-chessboard");
 
-    expect(findByTestId(renderer, "mock-chessboard").props.flipped).toBe(new Chess(arrow.currentFen).turn() === "b");
+    expect(arrowBoard.props.flipped).toBe(new Chess(arrow.currentFen).turn() === "b");
+    expect(arrowBoard.props.gestureEnabled).toBe(true);
+    expect(arrowBoard.props.mockImperativeMove).not.toHaveBeenCalled();
+    expect(() => findByTestId(renderer, "board-input-blocker")).toThrow();
     expect(collectText(renderer.root)).not.toContain("Choose one candidate move");
     expect(() => findByTestId(renderer, "arrow-duel-candidates")).toThrow();
     expect(() => findByTestId(renderer, "arrow-duel-candidate-a")).toThrow();
@@ -3075,7 +3209,15 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "custom-theme-fork")).toBeTruthy();
     expect(findByTestId(renderer, "custom-theme-hanging-piece")).toBeTruthy();
     expect(findByTestId(renderer, "custom-theme-fork").props.accessibilityLabel).toBe("Fork puzzle theme");
-    expect(collectText(findByTestId(renderer, "custom-theme-row"))).not.toContain("Theme");
+    expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("ThemesChoose one or more");
+    expect(new Set(renderer.root.findAll((node) => (
+      typeof node.props.testID === "string"
+      && /^custom-theme-(?!mixed$|row$)/.test(node.props.testID)
+    )).map((node) => node.props.testID)).size).toBe(24);
+    expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("Checkmates");
+    expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("Piece tactics");
+    expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("Forcing motifs");
+    expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("Pawns & endings");
     expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("Sacrifice");
     expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("Promotion");
     expect(() => findByTestId(renderer, "custom-summary-card")).toThrow();
@@ -3111,19 +3253,19 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "custom-config-list"))).not.toContain("›");
     expect(collectText(findByTestId(renderer, "custom-config-list"))).not.toContain("Allowed values");
     expect(() => findByTestId(renderer, "custom-mistake-limit-stepper")).toThrow();
-    press(renderer, "custom-theme-mate");
-    expectText(renderer, "Mate");
+    press(renderer, "custom-theme-mate-in-2");
+    expectText(renderer, "Mate in 2");
     expect(() => findByTestId(renderer, "custom-broaden-theme")).toThrow();
     press(renderer, "custom-theme-fork");
-    expect(themeSelected(renderer, "mate")).toBe(true);
+    expect(themeSelected(renderer, "mate-in-2")).toBe(true);
     expect(themeSelected(renderer, "fork")).toBe(true);
-    press(renderer, "custom-theme-mate");
-    expect(themeSelected(renderer, "mate")).toBe(false);
+    press(renderer, "custom-theme-mate-in-2");
+    expect(themeSelected(renderer, "mate-in-2")).toBe(false);
     expect(themeSelected(renderer, "fork")).toBe(true);
     press(renderer, "custom-theme-mixed");
     expect(themeSelected(renderer, "mixed")).toBe(true);
     expect(themeSelected(renderer, "fork")).toBe(false);
-    press(renderer, "custom-theme-mate");
+    press(renderer, "custom-theme-mate-in-2");
     press(renderer, "custom-mode-arrow-duel");
     expect(findByTestId(renderer, "custom-mode-regular").props.accessibilityState).toEqual({ selected: false });
     expect(findByTestId(renderer, "custom-mode-arrow-duel").props.accessibilityState).toEqual({ selected: true });
@@ -3156,21 +3298,21 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "custom-initial-rating-row")).toBeTruthy();
     expect(findByTestId(renderer, "custom-previous-configs")).toBeTruthy();
     expect(themeSelected(renderer, "fork")).toBe(true);
-    expect(themeSelected(renderer, "mate")).toBe(false);
+    expect(themeSelected(renderer, "mate-in-2")).toBe(false);
     expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("All");
     expect(() => findByTestId(renderer, "custom-broaden-theme")).toThrow();
 
-    press(renderer, "custom-theme-mate");
+    press(renderer, "custom-theme-mate-in-2");
     expect(themeSelected(renderer, "fork")).toBe(true);
-    expect(themeSelected(renderer, "mate")).toBe(true);
+    expect(themeSelected(renderer, "mate-in-2")).toBe(true);
     expect(() => findByTestId(renderer, "custom-broaden-theme")).toThrow();
 
     press(renderer, "custom-theme-fork");
     expect(themeSelected(renderer, "fork")).toBe(false);
-    expect(themeSelected(renderer, "mate")).toBe(true);
+    expect(themeSelected(renderer, "mate-in-2")).toBe(true);
 
-    press(renderer, "custom-theme-mate");
-    expect(themeSelected(renderer, "mate")).toBe(false);
+    press(renderer, "custom-theme-mate-in-2");
+    expect(themeSelected(renderer, "mate-in-2")).toBe(false);
     expect(themeSelected(renderer, "mixed")).toBe(true);
 
     press(renderer, "custom-theme-mixed");
@@ -3220,19 +3362,19 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "practice-mode-custom");
     expect(themeSelected(renderer, "mixed")).toBe(true);
-    press(renderer, "custom-theme-mate");
+    press(renderer, "custom-theme-mate-in-2");
     press(renderer, "custom-theme-fork");
     expect(themeSelected(renderer, "mixed")).toBe(false);
-    expect(themeSelected(renderer, "mate")).toBe(true);
+    expect(themeSelected(renderer, "mate-in-2")).toBe(true);
     expect(themeSelected(renderer, "fork")).toBe(true);
 
     press(renderer, "start-sprint-button");
 
-    expect(service.getActiveSprint()?.config.themes).toEqual(["fork", "mate"]);
-    expect(service.getActiveSprint()?.config.ratingKey).toBe("fork+mate custom 5/20");
+    expect(service.getActiveSprint()?.config.themes).toEqual(["fork", "mateIn2"]);
+    expect(service.getActiveSprint()?.config.ratingKey).toBe("fork+mateIn2 custom 5/20");
     expect(service.listCustomSprintConfigs()[0]).toMatchObject({
-      themes: ["fork", "mate"],
-      ratingKey: "fork+mate custom 5/20"
+      themes: ["fork", "mateIn2"],
+      ratingKey: "fork+mateIn2 custom 5/20"
     });
   });
 
@@ -3249,7 +3391,7 @@ describe("PracticePocScreen", () => {
     expect(themeSelected(renderer, "mixed")).toBe(true);
   });
 
-  it("shows persisted previous custom sprint configs and can reuse one", () => {
+  it("prefills Add Run from a previous custom sprint with a retired theme", () => {
     const service = createMobilePracticeService("familiar15");
     const savedSprint = service.startSprint(
       {
@@ -3265,17 +3407,26 @@ describe("PracticePocScreen", () => {
     );
     service.abandonSprint("2026-06-20T00:00:05.000Z");
     service.setRating(savedSprint.config.ratingKey, 850);
-    const renderer = renderScreen({ practiceService: service });
+    const renderer = renderScreen({ practiceService: service, runManagementEnabled: true });
 
-    press(renderer, "practice-mode-custom");
+    press(renderer, "practice-add-run");
 
     expect(collectText(findByTestId(renderer, "custom-previous-custom-custom-180-30-mate-meta"))).toContain("Mate · 3 min · 30s pace · Last");
     expect(findByTestId(renderer, "custom-previous-custom-custom-180-30-mate").props.accessibilityLabel).toContain("Use Custom · 30s pace custom sprint");
     expect(findByTestId(renderer, "custom-previous-custom-custom-180-30-mate").props.accessibilityLabel).toContain("ELO 850");
     press(renderer, "custom-previous-custom-custom-180-30-mate");
-    expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("Mate");
-    expect(collectText(findByTestId(renderer, "custom-target-count"))).toBe("~6");
-    expect(collectText(findByTestId(renderer, "custom-initial-rating-value"))).toBe("ELO 850");
+    expect(() => findByTestId(renderer, "custom-theme-mate")).toThrow();
+    expect(collectText(findByTestId(renderer, "practice-run-elo-row"))).toContain("ELO 850");
+    act(() => {
+      findByTestId(renderer, "practice-run-name-input").props.onChangeText("Legacy Mates");
+    });
+    press(renderer, "practice-run-save");
+
+    const saved = service.listPracticeRuns().find((run) => run.name === "Legacy Mates");
+    expect(saved?.themes).toEqual(["mate"]);
+    press(renderer, `practice-run-select-${saved?.id}`);
+    press(renderer, "practice-run-start");
+    expect(service.getActiveSprint()?.config.themes).toEqual(["mate"]);
   });
 
   it("keeps multiple previous custom configs attached to their own ELO buckets", () => {
@@ -3318,19 +3469,19 @@ describe("PracticePocScreen", () => {
       games: 1
     });
     store.saveCustomSprintConfig({
-      id: "custom-custom-300-20-fork+mate",
+      id: "custom-custom-300-20-fork+mateIn2",
       mode: "custom",
-      ratingKey: "fork+mate custom 5/20",
+      ratingKey: "fork+mateIn2 custom 5/20",
       durationSeconds: 300,
       perPuzzleSeconds: 20,
       targetCorrect: 15,
       maxMistakes: 3,
-      themes: ["fork", "mate"],
+      themes: ["fork", "mateIn2"],
       lastStartedAt: "2026-07-05T00:00:00.000Z",
       playCount: 1
     });
     store.saveRating({
-      key: "fork+mate custom 5/20",
+      key: "fork+mateIn2 custom 5/20",
       generation: 0,
       rating: 1100,
       games: 1
@@ -3341,12 +3492,12 @@ describe("PracticePocScreen", () => {
 
     const mateConfig = findByTestId(renderer, "custom-previous-custom-custom-180-30-mate");
     const forkConfig = findByTestId(renderer, "custom-previous-custom-custom-300-20-fork");
-    const multiConfig = findByTestId(renderer, "custom-previous-custom-custom-300-20-fork-mate");
+    const multiConfig = findByTestId(renderer, "custom-previous-custom-custom-300-20-fork-matein2");
     expect(collectText(mateConfig)).toContain("875");
     expect(mateConfig.props.accessibilityLabel).toContain("ELO 875");
     expect(collectText(forkConfig)).toContain("1025");
     expect(forkConfig.props.accessibilityLabel).toContain("ELO 1025");
-    expect(collectText(multiConfig)).toContain("Mate, Fork");
+    expect(collectText(multiConfig)).toContain("Mate in 2, Fork");
     expect(multiConfig.props.accessibilityLabel).toContain("ELO 1100");
 
     press(renderer, "custom-previous-custom-custom-180-30-mate");
@@ -3359,10 +3510,10 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "custom-target-count"))).toBe("~15");
     expect(collectText(findByTestId(renderer, "custom-initial-rating-value"))).toBe("ELO 1025");
 
-    press(renderer, "custom-previous-custom-custom-300-20-fork-mate");
+    press(renderer, "custom-previous-custom-custom-300-20-fork-matein2");
     expect(themeSelected(renderer, "mixed")).toBe(false);
     expect(themeSelected(renderer, "fork")).toBe(true);
-    expect(themeSelected(renderer, "mate")).toBe(true);
+    expect(themeSelected(renderer, "mate-in-2")).toBe(true);
     expect(collectText(findByTestId(renderer, "custom-initial-rating-value"))).toBe("ELO 1100");
   });
 
@@ -3807,8 +3958,9 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-identity`))).toMatch(
       /^ID .+ · Rating \d+$/
     );
-    expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-context`))).toContain("20s pace");
-    expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-context`))).toMatch(/^[A-Z]/);
+    const historyAttemptThemes = collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-themes`));
+    expect(historyAttemptThemes).toMatch(/^[A-Z]/);
+    expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-pace`))).toContain("20s pace");
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-meta`))).toMatch(
       /Sprint · \d+s · (Today|Yesterday|\d+ days ago|\d+w ago|\d+mo ago|\d+y ago|Scheduled) · [A-Z][a-z]{2} \d{1,2}, \d{4}/
     );
@@ -3834,7 +3986,8 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "practice-prompt-icon")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "practice-prompt"))).toContain("Find the best move");
     expect(collectText(findByTestId(renderer, "practice-prompt"))).toContain("For black.");
-    expect(findByTestId(renderer, "review-theme-pill")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "review-theme-rail"))).toBe(historyAttemptThemes);
+    expect(() => findByTestId(renderer, "review-theme-pill")).toThrow();
     expect(findByTestId(renderer, "review-reset-puzzle")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "review-exit"))).toBe("");
     expect(collectText(findByTestId(renderer, "review-reset-puzzle"))).toBe("↺");
@@ -3854,7 +4007,8 @@ describe("PracticePocScreen", () => {
         "pin",
         "promotion",
         "sacrifice",
-        "endgame"
+        "endgame",
+        "mate"
       ]
     }]);
     const completedAt = new Date(Date.now() - 60_000).toISOString();
@@ -3904,19 +4058,38 @@ describe("PracticePocScreen", () => {
     press(renderer, "history-filter-toggle");
     expect(collectText(findByTestId(renderer, "history-theme-filters"))).toContain("Capturing Defender");
     expect(findByTestId(renderer, "history-theme-filter-rail-curated")).toBeTruthy();
+    expect(findByTestId(renderer, "history-theme-mate-in-3")).toBeTruthy();
+    expect(historyThemeSelected(renderer, "all")).toBe(true);
     press(renderer, "history-theme-pin");
+    press(renderer, "history-theme-promotion");
+    expect(historyThemeSelected(renderer, "all")).toBe(false);
+    expect(historyThemeSelected(renderer, "pin")).toBe(true);
+    expect(historyThemeSelected(renderer, "promotion")).toBe(true);
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Pin");
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Promotion");
+    press(renderer, "history-theme-pin");
+    expect(historyThemeSelected(renderer, "promotion")).toBe(true);
+    press(renderer, "history-theme-promotion");
+    expect(historyThemeSelected(renderer, "all")).toBe(true);
+    press(renderer, "history-theme-pin");
+    press(renderer, "history-theme-promotion");
     press(renderer, "history-attempt-curated-density");
     expect(findByTestId(renderer, "review-session")).toBeTruthy();
     const replayThemes = collectText(findByTestId(renderer, "review-theme-rail"));
     expect(replayThemes).toContain("Advanced Pawn");
     expect(replayThemes).toContain("Sacrifice");
     expect(replayThemes).not.toContain("Endgame");
+    expect(() => findByTestId(renderer, "review-theme-rail-mate")).toThrow();
     const replayThemeCatalog = findByTestId(renderer, "review-theme-catalog");
     expect(collectText(replayThemeCatalog)).not.toContain("Themes");
     expect(testIdOrder(renderer, "review-board", "review-theme-catalog")).toBeLessThan(0);
     expect(flattenTestStyle(replayThemeCatalog.props.style).alignItems).toBe("center");
     expect(() => findByTestId(renderer, "review-theme-pill")).toThrow();
+    press(renderer, "review-exit");
+    expect(historyThemeSelected(renderer, "pin")).toBe(true);
+    expect(historyThemeSelected(renderer, "promotion")).toBe(true);
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Pin");
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Promotion");
   });
 
   it("puts Unclear only first in a scrollable three-toggle History row without a count or icon", () => {
@@ -4114,7 +4287,7 @@ describe("PracticePocScreen", () => {
     )).toBe(true);
   });
 
-  it("navigates history review across the full filtered result set, not just the visible page", () => {
+  it("navigates history review across the full filtered result set, not just the visible page", async () => {
     const service = createMobilePracticeService("random1000");
     for (let index = 0; index < 22; index += 1) {
       service.recordReviewAttempt({
@@ -4156,6 +4329,7 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "21 / 22 · Standard");
     expect(findByTestId(renderer, "review-previous").props.disabled).toBe(false);
     press(renderer, "review-previous");
+    await settleEntryPreview();
     expectText(renderer, "20 / 22 · Standard");
   });
 
@@ -4630,6 +4804,9 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "review-session")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "review-current-puzzle-id"))).toBe("000hf");
     expect(findByTestId(renderer, "review-board")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "review-theme-rail"))).toContain("Mate in 2");
+    expect(() => findByTestId(renderer, "review-theme-rail-mate")).toThrow();
+    expect(() => findByTestId(renderer, "review-theme-pill")).toThrow();
     expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Due tomorrow");
     expect(collectText(findByTestId(renderer, "review-schedule-remove"))).toBe("Remove from Review");
     press(renderer, "review-schedule-remove");
@@ -4641,8 +4818,10 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "review-next").props.disabled).toBe(false);
     expect(findByTestId(renderer, "review-header-actions").findByProps({ testID: "review-reset-puzzle" })).toBeTruthy();
     press(renderer, "review-next");
+    await settleEntryPreview();
     expectText(renderer, "2 / 3 · Standard");
     press(renderer, "review-previous");
+    await settleEntryPreview();
     expectText(renderer, "1 / 3 · Standard");
     const reviewFen = findByTestId(renderer, "mock-chessboard").props.fen;
     await waitForAssertion(() => {
@@ -4675,6 +4854,9 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "review-next").props.disabled).toBe(false);
     expect(recordReviewAttempt).not.toHaveBeenCalled();
     press(renderer, "review-reset-puzzle");
+    expect(findByTestId(renderer, "mock-chessboard").props.fen).not.toBe(reviewFen);
+    expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(false);
+    await settleEntryPreview();
     expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(reviewFen);
     expectText(renderer, "1 / 3 · Standard");
     press(renderer, "review-next");
@@ -5256,6 +5438,8 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "review-side-to-move")).toThrow();
     expect(styleEntryMatches(findByTestId(renderer, "review-context-strip").props.style, "justifyContent", "center")).toBe(true);
     expect(collectText(findByTestId(renderer, "review-current-expected-move"))).toBe("e2e6");
+    expect(collectText(findByTestId(renderer, "review-board-state"))).toBe("locked");
+    await settleEntryPreview();
     expect(collectText(findByTestId(renderer, "review-board-state"))).toBe("ready");
 
     await boardMove(renderer, "e2e6");
@@ -5485,6 +5669,7 @@ describe("PracticePocScreen", () => {
     await boardMove(renderer, "a4b6");
     await settleFeedbackSnapshot();
     press(renderer, "review-mistakes-button");
+    await settleEntryPreview();
 
     const reviewFen = findByTestId(renderer, "mock-chessboard").props.fen;
     expect(collectText(renderer.root)).toContain("Analysis");
@@ -5551,6 +5736,9 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(analysisFen);
 
     press(renderer, "review-reset-puzzle");
+    expect(findByTestId(renderer, "mock-chessboard").props.fen).not.toBe(reviewFen);
+    expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(false);
+    await settleEntryPreview();
     expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(reviewFen);
     expect(() => findByTestId(renderer, "review-close-analysis")).toThrow();
     expect(() => findByTestId(renderer, "review-analysis-line-0")).toThrow();
@@ -6823,6 +7011,15 @@ function themeSelected(
   return state.checked ?? state.selected ?? false;
 }
 
+function historyThemeSelected(
+  renderer: TestRenderer.ReactTestRenderer,
+  theme: string
+): boolean {
+  return renderer.root.findAllByProps({ testID: `history-theme-${theme}` }).some(
+    (node) => node.props.accessibilityState?.selected === true
+  );
+}
+
 function createTestSystemBackSource(platform: "android" | "ios"): MobileSystemBackSource & {
   cancelPredictive: () => void;
   commitPredictive: () => boolean;
@@ -7054,6 +7251,9 @@ async function pressAsync(renderer: TestRenderer.ReactTestRenderer, testID: stri
 function startStandardSprint(renderer: TestRenderer.ReactTestRenderer): void {
   press(renderer, "practice-mode-standard");
   press(renderer, "practice-start-button");
+  act(() => {
+    jest.advanceTimersByTime(350);
+  });
 }
 
 function startArrowDuelSprint(renderer: TestRenderer.ReactTestRenderer): void {
@@ -7101,6 +7301,12 @@ async function boardMove(
   move: string,
   options: { stateFen?: string | null } = {}
 ): Promise<void> {
+  if (
+    renderer.root.findAllByProps({ testID: "board-input-blocker" }).length > 0
+    || findByTestId(renderer, "mock-chessboard").props.gestureEnabled === false
+  ) {
+    await settleEntryPreview();
+  }
   await boardMoveOnBoard(findByTestId(renderer, "mock-chessboard"), move, options);
 }
 
@@ -7169,6 +7375,39 @@ async function settleFeedbackSnapshot(): Promise<void> {
     await Promise.resolve();
     await Promise.resolve();
   });
+  if (
+    renderers.some((renderer) => {
+      if (!renderer.root) {
+        return false;
+      }
+      const boards = renderer.root.findAllByProps({ testID: "mock-chessboard" });
+      return renderer.root.findAllByProps({ testID: "board-input-blocker" }).length > 0
+        || boards.some((board) => board.props.gestureEnabled === false);
+    })
+  ) {
+    await settleEntryPreview();
+  }
+}
+
+async function advanceEntryPreviewBy(milliseconds: number): Promise<void> {
+  await act(async () => {
+    jest.advanceTimersByTime(milliseconds);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+}
+
+async function settleEntryPreview(): Promise<void> {
+  await advanceEntryPreviewBy(350);
+}
+
+function parseBoardMove(move: string): { from: string; to: string; promotion?: string } {
+  return {
+    from: move.slice(0, 2),
+    to: move.slice(2, 4),
+    ...(move.length > 4 ? { promotion: move.slice(4, 5) } : {})
+  };
 }
 
 async function flushMicrotasks(): Promise<void> {

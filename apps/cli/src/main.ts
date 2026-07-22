@@ -89,10 +89,15 @@ async function handleCommand(service: PracticeService, input: JsonCommand): Prom
     setOptional(startCommand, "perPuzzleSeconds", optionalNumber(input.perPuzzleSeconds));
     setOptional(startCommand, "targetCorrect", optionalNumber(input.targetCorrect));
     setOptional(startCommand, "maxMistakes", optionalNumber(input.maxMistakes));
+    const themes = optionalStringArray(input.themes) ?? [];
     if (input.theme !== undefined) {
-      throw new Error("theme is no longer supported; use themes");
+      const legacyTheme = optionalString(input.theme);
+      if (!legacyTheme?.trim()) {
+        throw new Error("theme must be a non-empty string");
+      }
+      themes.push(legacyTheme);
     }
-    setOptional(startCommand, "themes", optionalStringArray(input.themes));
+    setOptional(startCommand, "themes", themes.length > 0 ? themes : undefined);
     setOptional(startCommand, "minRating", optionalNumber(input.minRating));
     setOptional(startCommand, "maxRating", optionalNumber(input.maxRating));
     const state = service.startSprint(startCommand, optionalString(input.now) ?? new Date().toISOString());

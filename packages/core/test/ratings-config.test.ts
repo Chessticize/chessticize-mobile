@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  ALL_THEME_SELECTION,
   applySprintRatingChange,
   assertValidManualRating,
   buildSprintConfig,
@@ -84,6 +85,35 @@ test("ratingKeyForConfig and buildSprintConfig keep custom sprint buckets separa
       maxMistakes: 2,
       ratingKey: "custom 95s/10"
     }
+  );
+});
+
+test("All theme selection shares the unrestricted config and rating bucket", () => {
+  const unrestricted = buildSprintConfig({
+    mode: "custom",
+    durationSeconds: 300,
+    perPuzzleSeconds: 20
+  });
+  const explicitAll = buildSprintConfig({
+    mode: "custom",
+    durationSeconds: 300,
+    perPuzzleSeconds: 20,
+    themes: [ALL_THEME_SELECTION]
+  });
+
+  assert.deepEqual(explicitAll, unrestricted);
+  assert.equal(
+    ratingKeyForConfig({
+      mode: "custom",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      themes: [ALL_THEME_SELECTION]
+    }),
+    ratingKeyForConfig({
+      mode: "custom",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20
+    })
   );
 });
 

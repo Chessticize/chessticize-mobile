@@ -69,6 +69,7 @@ const BoardPlaceholder = forwardRef<BoardPlaceholderRef, BoardPlaceholderProps>(
   const [previewReplayToken, setPreviewReplayToken] = useState(0);
   const previewProgress = useRef(new Animated.Value(0)).current;
   const previewedKeyRef = useRef<string | null>(null);
+  const previewMoveWaitersRef = useRef<Array<(move: BoardMove | undefined) => void>>([]);
 
   useEffect(() => {
     const plan = entryPreviewPlan(fen);
@@ -119,6 +120,9 @@ const BoardPlaceholder = forwardRef<BoardPlaceholderRef, BoardPlaceholderProps>(
         setAnimatedPreviewMove(null);
         setPreviewLastMove(move);
         setEntryPreviewPhase("ready");
+        for (const resolve of previewMoveWaitersRef.current.splice(0)) {
+          resolve(move);
+        }
       });
     }, 350);
 
@@ -126,11 +130,23 @@ const BoardPlaceholder = forwardRef<BoardPlaceholderRef, BoardPlaceholderProps>(
       cancelled = true;
       clearTimeout(startTimer);
       animation?.stop();
+      for (const resolve of previewMoveWaitersRef.current.splice(0)) {
+        resolve(undefined);
+      }
     };
   }, [fen, previewProgress, previewReplayToken]);
 
   async function playMove(input: BoardMove): Promise<BoardMove | undefined> {
-    if (isInputLocked(gestureEnabled) || entryPreviewPhase === "watching") {
+    if (entryPreviewPhase === "watching") {
+      const plan = entryPreviewPlan(fen);
+      if (plan && sameBoardMove(input, parseUci(plan.blunderMove))) {
+        return new Promise((resolve) => {
+          previewMoveWaitersRef.current.push(resolve);
+        });
+      }
+      return undefined;
+    }
+    if (isInputLocked(gestureEnabled)) {
       return undefined;
     }
     let played: ReturnType<Chess["move"]> | null = null;
@@ -414,15 +430,40 @@ function entryPreviewPlan(finalFen: string): EntryPreviewPlan | null {
       ? service?.getPuzzle(fallbackPuzzleId)
       : undefined;
   const blunderMove = puzzle?.solutionMoves[0];
-  if (!puzzle || !blunderMove || normalizedFen(finalFen) === normalizedFen(puzzle.initialFen)) {
+  if (!puzzle || !blunderMove) {
+    return null;
+  }
+  const previewChess = createChess(puzzle.initialFen);
+  const previewMove = parseUci(blunderMove);
+  let played: ReturnType<Chess["move"]> | null = null;
+  try {
+    played = previewChess.move(previewMove);
+  } catch {
+    played = null;
+  }
+  if (!played) {
+    return null;
+  }
+  const expectedFinalFen = previewChess.fen();
+  const normalizedInputFen = normalizedFen(finalFen);
+  if (
+    normalizedInputFen !== normalizedFen(puzzle.initialFen)
+    && normalizedInputFen !== normalizedFen(expectedFinalFen)
+  ) {
     return null;
   }
   return {
     blunderMove,
-    finalFen,
+    finalFen: expectedFinalFen,
     initialFen: puzzle.initialFen,
     puzzleId: puzzle.id
   };
+}
+
+function sameBoardMove(left: BoardMove, right: BoardMove): boolean {
+  return left.from === right.from
+    && left.to === right.to
+    && (left.promotion ?? null) === (right.promotion ?? null);
 }
 
 function normalizedFen(fen: string): string {

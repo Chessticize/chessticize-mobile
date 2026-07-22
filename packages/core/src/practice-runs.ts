@@ -1,4 +1,5 @@
-import { defaultSprintConfig, normalizeThemeSelection } from "./sprint-config.ts";
+import { defaultSprintConfig } from "./sprint-config.ts";
+import { normalizeThemeSelection } from "./theme-catalog.ts";
 import type { CustomSprintConfigRecord, PracticeRunRecord, SprintConfig } from "./types.ts";
 
 export const STANDARD_PRACTICE_RUN_ID = "standard";

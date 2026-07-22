@@ -1,7 +1,8 @@
 import {
   buildServerEloPuzzleSelectionStrategies,
   isServerCompatibleArrowDuelPuzzle,
-  normalizeThemeSelection
+  namedThemesForSelection,
+  puzzleMatchesAnyTheme
 } from "../../core/src/index.ts";
 import type { Puzzle, SprintMode } from "../../core/src/index.ts";
 
@@ -33,7 +34,7 @@ function selectPuzzlesByServerEloFallback(input: SelectUniquePuzzlesInput & { ra
   const excludedIds = new Set(input.excludeIds ?? []);
   const strategies = buildServerEloPuzzleSelectionStrategies({
     rating: input.rating,
-    themes: normalizeThemeSelection(input.themes)
+    themes: namedThemesForSelection(input.themes)
   });
 
   for (const strategy of strategies) {
@@ -76,7 +77,7 @@ function selectMatchingPuzzles(
   const selected: Puzzle[] = [];
   const includedIds = input.includeIds === undefined ? undefined : new Set(input.includeIds);
   const candidates = input.randomSeed === undefined ? input.puzzles : seededShuffle(input.puzzles, input.randomSeed);
-  const selectedThemes = normalizeThemeSelection(input.themes);
+  const selectedThemes = namedThemesForSelection(input.themes);
 
   for (const puzzle of candidates) {
     if (includedIds !== undefined && !includedIds.has(puzzle.id)) {
@@ -107,7 +108,7 @@ function isEligiblePuzzle(
   if (puzzle.rating < (filter.minRating ?? 0) || puzzle.rating > (filter.maxRating ?? 4000)) {
     return false;
   }
-  if (selectedThemes.length > 0 && !selectedThemes.some((theme) => puzzle.themes.includes(theme))) {
+  if (!puzzleMatchesAnyTheme(puzzle.themes, selectedThemes)) {
     return false;
   }
   if (filter.mode !== "arrow_duel") {

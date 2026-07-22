@@ -26,7 +26,7 @@ test("SQLitePuzzlePackSource selects puzzles from a read-only pack schema", asyn
     );
     assert.deepEqual(
       source.selectPuzzles({ mode: "standard", limit: 10, themes: ["mate", "hangingPiece"] }).map((puzzle) => puzzle.id),
-      ["000hf", "00008"]
+      ["00008", "000hf"]
     );
     assert.equal(source.countPuzzles({ mode: "standard", limit: 1, themes: ["mate", "hangingPiece"] }), 1);
     assert.equal(source.countPuzzles({ mode: "standard", limit: 10, themes: ["mate", "hangingPiece"] }), 2);
@@ -58,6 +58,28 @@ test("SQLitePuzzlePackSource skips repeated Arrow Duel validation for a manifest
     assert.deepEqual(
       source.selectPuzzles({ mode: "arrow_duel", limit: 10 }).map((puzzle) => puzzle.id).sort(),
       puzzles.map((puzzle) => puzzle.id).sort()
+    );
+  } finally {
+    packDb.close();
+  }
+});
+
+test("SQLitePuzzlePackSource treats the All theme sentinel as unrestricted", async () => {
+  const packDb = buildPackDatabase(await loadFixturePuzzles());
+  try {
+    const source = new SQLitePuzzlePackSource(new NodeSqliteDatabase(packDb));
+
+    const unrestrictedIds = source
+      .selectPuzzles({ mode: "standard", limit: 10, themes: [] })
+      .map((puzzle) => puzzle.id);
+    const allThemeIds = source
+      .selectPuzzles({ mode: "standard", limit: 10, themes: ["mixed"] })
+      .map((puzzle) => puzzle.id);
+
+    assert.deepEqual(allThemeIds, unrestrictedIds);
+    assert.equal(
+      source.countPuzzles({ mode: "standard", limit: 10, themes: ["mixed"] }),
+      source.countPuzzles({ mode: "standard", limit: 10, themes: [] })
     );
   } finally {
     packDb.close();
@@ -129,6 +151,7 @@ test("SQLitePuzzlePackSource merges indexed theme scans for OR matching without 
     });
 
     assert.deepEqual(selected.map((puzzle) => puzzle.id), ["00008", "001h8"]);
+    assert.equal(new Set(selected.map((puzzle) => puzzle.id)).size, selected.length);
     const candidateSql = preparedSql.filter((sql) => sql.includes("FROM puzzle_themes JOIN puzzles"));
     assert.equal(candidateSql.length, 3);
     assert.ok(candidateSql.every((sql) => /puzzle_themes\.theme_id = \?/.test(sql)));
@@ -140,6 +163,32 @@ test("SQLitePuzzlePackSource merges indexed theme scans for OR matching without 
       assert.ok(plan.some((row) => row.detail.includes("puzzle_themes_theme_rating_idx") && row.detail.includes("rating>?")));
       assert.ok(plan.every((row) => !row.detail.includes("TEMP B-TREE")));
     }
+  } finally {
+    packDb.close();
+  }
+});
+
+test("SQLitePuzzlePackSource fairly merges selected themes before filling from common themes", () => {
+  const packDb = buildPackDatabase([
+    selectionPuzzle("common-low", 800, ["fork"]),
+    selectionPuzzle("common-next", 810, ["fork"]),
+    selectionPuzzle("rare", 1200, ["pin"])
+  ]);
+  try {
+    const source = new SQLitePuzzlePackSource(new NodeSqliteDatabase(packDb), {
+      allPuzzlesArrowDuelEligible: true
+    });
+
+    const selected = source.selectPuzzles({
+      mode: "standard",
+      limit: 2,
+      themes: ["fork", "pin"],
+      minRating: 600,
+      maxRating: 2200
+    });
+
+    assert.deepEqual(selected.map((puzzle) => puzzle.id), ["common-low", "rare"]);
+    assert.equal(new Set(selected.map((puzzle) => puzzle.id)).size, selected.length);
   } finally {
     packDb.close();
   }
@@ -180,7 +229,7 @@ test("PackBackedPracticeStore queries pack puzzles without preloading the user d
     });
     assert.equal(history.attempts.length, 1);
     assert.equal(history.attempts[0]?.puzzleId, "00008");
-    assert.deepEqual(history.availableThemes, ["crushing", "hangingPiece", "long", "middlegame"]);
+    assert.deepEqual(history.availableThemes, ["hangingPiece"]);
   } finally {
     userStore.close();
     packDb.close();
@@ -381,6 +430,25 @@ function buildPackDatabase(puzzles: Puzzle[]): DatabaseSync {
     throw error;
   }
   return db;
+}
+
+function selectionPuzzle(id: string, rating: number, themes: string[]): Puzzle {
+  const initialFen = id === "common-next"
+    ? "8/8/8/8/8/8/3K4/6k1 w - - 0 1"
+    : id === "rare"
+      ? "8/8/8/8/8/8/2K5/6k1 w - - 0 1"
+      : "8/8/8/8/8/8/4K3/6k1 w - - 0 1";
+  return {
+    id,
+    initialFen,
+    solutionMoves: ["e2e3"],
+    rating,
+    themes,
+    source: "synthetic",
+    stockfishEval: 0,
+    stockfishBestMove: "e2e3",
+    stockfishEvalAfterFirstMove: 0
+  };
 }
 
 async function loadFixturePuzzles(): Promise<Puzzle[]> {
