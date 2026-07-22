@@ -91,6 +91,30 @@
       }
     ]
   },
+  "practice-arrow-duel-prompt": {
+    "issues": [
+      {
+        "issueNumber": 272,
+        "changeNote": "Place the Arrow Duel prompt card above the board and replace its target icon with the side-to-move King."
+      }
+    ]
+  },
+  "practice-blunder-move-preview": {
+    "issues": [
+      {
+        "issueNumber": 272,
+        "changeNote": "Animate the blunder and place the rounded prompt card with the side-to-move board King above the board."
+      }
+    ]
+  },
+  "review-blunder-move-preview": {
+    "issues": [
+      {
+        "issueNumber": 272,
+        "changeNote": "Carry the revised King prompt card and puzzle-entry hierarchy into Review."
+      }
+    ]
+  },
   "settings-advanced-ratings": {
     "issues": [
       {

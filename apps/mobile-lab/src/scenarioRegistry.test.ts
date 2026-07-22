@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { Chess } from "chess.js";
+import { ISSUE_272_LAB_PUZZLE } from "./labPuzzles.ts";
 import {
   navigationCoverage,
   newScenarios,
@@ -92,4 +94,30 @@ test("Issue 253 owns the complete run-management design track", () => {
   for (const scenario of issue253Scenarios) {
     assert.deepEqual(storyTagsForScenario(scenario.id), ["new"]);
   }
+});
+
+test("Issue 272 owns the blunder-entry and Arrow Duel prompt design track", () => {
+  assert.deepEqual(
+    newScenarios
+      .filter((scenario) =>
+        scenario.issues.some(({ issueNumber }) => issueNumber === 272)
+      )
+      .map((scenario) => scenario.id),
+    [
+      "practice-arrow-duel-prompt",
+      "practice-blunder-move-preview",
+      "review-blunder-move-preview"
+    ]
+  );
+  assert.deepEqual(storyTagsForScenario("practice-blunder-move-preview"), ["new"]);
+  assert.deepEqual(storyTagsForScenario("practice-arrow-duel-prompt"), ["new"]);
+});
+
+test("the issue #272 preview hands the board to White after the blunder", () => {
+  const chess = new Chess(ISSUE_272_LAB_PUZZLE.initialFen);
+
+  chess.move(ISSUE_272_LAB_PUZZLE.solutionMoves[0]!);
+
+  assert.equal(chess.turn(), "w");
+  assert.equal(chess.fen(), "8/3k4/8/8/8/8/4P3/4K3 w - - 1 2");
 });
