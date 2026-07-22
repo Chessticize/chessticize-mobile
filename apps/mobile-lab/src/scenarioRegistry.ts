@@ -78,7 +78,7 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
     "Existing Custom Sprint setup with independent theme toggles and an enforced All fallback.",
     "practice",
     ["Complete custom configuration", "Independent theme toggles", "All exclusivity", "Non-empty theme fallback"],
-    ["Practice home", "Starting or saving the multi-theme configuration after explicit design approval"]
+    ["Practice home", "Native SQLite persistence and a scored practice session"]
   ),
   "practice-custom-rating-editor": defineScenario("practice-custom-rating-editor", "Practice", "Custom rating editor", "practice--custom-rating-editor", "Expanded ELO adjustment for a previously played custom rating bucket.", "practice", ["Custom setup", "Rating adjustment"], ["Practice home"]),
   "practice-preparing": defineScenario("practice-preparing", "Practice", "Preparing", "practice--preparing", "Stable preparing overlay before an Arrow Duel sprint starts.", "practice", ["Preparing overlay", "Cancel through Back intent"], ["Active sprint", "Practice home"]),

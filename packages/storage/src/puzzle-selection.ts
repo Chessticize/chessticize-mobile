@@ -1,6 +1,7 @@
 import {
   buildServerEloPuzzleSelectionStrategies,
-  isServerCompatibleArrowDuelPuzzle
+  isServerCompatibleArrowDuelPuzzle,
+  normalizeThemeSelection
 } from "../../core/src/index.ts";
 import type { Puzzle, SprintMode } from "../../core/src/index.ts";
 
@@ -12,7 +13,7 @@ export interface SelectUniquePuzzlesInput {
   rating?: number;
   minRating?: number;
   maxRating?: number;
-  theme?: string;
+  themes?: string[];
   includeIds?: string[];
   excludeIds?: string[];
   randomSeed?: string | number;
@@ -32,7 +33,7 @@ function selectPuzzlesByServerEloFallback(input: SelectUniquePuzzlesInput & { ra
   const excludedIds = new Set(input.excludeIds ?? []);
   const strategies = buildServerEloPuzzleSelectionStrategies({
     rating: input.rating,
-    themes: input.theme === undefined ? [] : [input.theme]
+    themes: normalizeThemeSelection(input.themes)
   });
 
   for (const strategy of strategies) {
@@ -49,7 +50,7 @@ function selectPuzzlesByServerEloFallback(input: SelectUniquePuzzlesInput & { ra
           : { allPuzzlesArrowDuelEligible: input.allPuzzlesArrowDuelEligible }),
         minRating: strategy.minRating,
         maxRating: strategy.maxRating,
-        ...(strategy.themes.length === 0 ? {} : { theme: strategy.themes[0] }),
+        themes: strategy.themes,
         ...(input.includeIds === undefined ? {} : { includeIds: input.includeIds }),
         ...(input.randomSeed === undefined
           ? {}
@@ -75,12 +76,13 @@ function selectMatchingPuzzles(
   const selected: Puzzle[] = [];
   const includedIds = input.includeIds === undefined ? undefined : new Set(input.includeIds);
   const candidates = input.randomSeed === undefined ? input.puzzles : seededShuffle(input.puzzles, input.randomSeed);
+  const selectedThemes = normalizeThemeSelection(input.themes);
 
   for (const puzzle of candidates) {
     if (includedIds !== undefined && !includedIds.has(puzzle.id)) {
       continue;
     }
-    if (excludedIds.has(puzzle.id) || !isEligiblePuzzle(puzzle, input)) {
+    if (excludedIds.has(puzzle.id) || !isEligiblePuzzle(puzzle, input, selectedThemes)) {
       continue;
     }
     const key = puzzleFingerprint(puzzle);
@@ -99,12 +101,13 @@ function selectMatchingPuzzles(
 
 function isEligiblePuzzle(
   puzzle: Puzzle,
-  filter: Omit<SelectUniquePuzzlesInput, "puzzles" | "limit" | "rating" | "excludeIds">
+  filter: Omit<SelectUniquePuzzlesInput, "puzzles" | "limit" | "rating" | "excludeIds">,
+  selectedThemes: readonly string[]
 ): boolean {
   if (puzzle.rating < (filter.minRating ?? 0) || puzzle.rating > (filter.maxRating ?? 4000)) {
     return false;
   }
-  if (filter.theme && !puzzle.themes.includes(filter.theme)) {
+  if (selectedThemes.length > 0 && !selectedThemes.some((theme) => puzzle.themes.includes(theme))) {
     return false;
   }
   if (filter.mode !== "arrow_duel") {

@@ -90,7 +90,7 @@ export interface ReviewQueueDuePromotionResult {
 
 export interface PracticeStore {
   seedPuzzles(puzzles: Puzzle[]): void;
-  countPuzzles(): number;
+  countPuzzles(filter?: PuzzleSelectionFilter): number;
   getPuzzle(id: string): Puzzle | undefined;
   selectPuzzles(filter: PuzzleSelectionFilter): Puzzle[];
   getRating(key: string): RatingRecord;

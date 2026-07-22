@@ -21,9 +21,15 @@ test("SQLitePuzzlePackSource selects puzzles from a read-only pack schema", asyn
     assert.equal(source.getPuzzle("00008")?.stockfishBestMove, "b2b1");
     assert.equal(source.getPuzzle("00008")?.initialFen.split(" ").length, 6);
     assert.deepEqual(
-      source.selectPuzzles({ mode: "standard", limit: 10, theme: "hangingPiece" }).map((puzzle) => puzzle.id),
+      source.selectPuzzles({ mode: "standard", limit: 10, themes: ["hangingPiece"] }).map((puzzle) => puzzle.id),
       ["00008"]
     );
+    assert.deepEqual(
+      source.selectPuzzles({ mode: "standard", limit: 10, themes: ["mate", "hangingPiece"] }).map((puzzle) => puzzle.id),
+      ["000hf", "00008"]
+    );
+    assert.equal(source.countPuzzles({ mode: "standard", limit: 1, themes: ["mate", "hangingPiece"] }), 1);
+    assert.equal(source.countPuzzles({ mode: "standard", limit: 10, themes: ["mate", "hangingPiece"] }), 2);
     assert.deepEqual(
       source.selectPuzzles({ mode: "arrow_duel", limit: 10 }).map((puzzle) => puzzle.id).sort(),
       ["00008", "0018S", "001h8"]
@@ -85,7 +91,7 @@ test("SQLitePuzzlePackSource preserves themed candidate results while using the 
       .all(themeId, 1700, 1900, 10) as Array<{ id: string }>).map((row) => row.id);
 
     const selectedIds = source
-      .selectPuzzles({ mode: "standard", limit: 10, theme: "crushing", minRating: 1700, maxRating: 1900 })
+      .selectPuzzles({ mode: "standard", limit: 10, themes: ["crushing"], minRating: 1700, maxRating: 1900 })
       .map((puzzle) => puzzle.id);
 
     assert.deepEqual(selectedIds, legacyIds);
@@ -96,6 +102,44 @@ test("SQLitePuzzlePackSource preserves themed candidate results while using the 
     const plan = packDb.prepare(`EXPLAIN QUERY PLAN ${candidateSql}`).all(themeId, 1700, 1900, 10) as Array<{ detail: string }>;
     assert.ok(plan.some((row) => row.detail.includes("puzzle_themes_theme_rating_idx") && row.detail.includes("rating>?")));
     assert.ok(plan.every((row) => !row.detail.includes("TEMP B-TREE")));
+  } finally {
+    packDb.close();
+  }
+});
+
+test("SQLitePuzzlePackSource merges indexed theme scans for OR matching without duplicate puzzles", async () => {
+  const packDb = buildPackDatabase(await loadFixturePuzzles());
+  try {
+    const nodeDb = new NodeSqliteDatabase(packDb);
+    const preparedSql: string[] = [];
+    const source = new SQLitePuzzlePackSource({
+      exec: (sql) => nodeDb.exec(sql),
+      prepare: (sql) => {
+        preparedSql.push(sql);
+        return nodeDb.prepare(sql);
+      }
+    });
+
+    const selected = source.selectPuzzles({
+      mode: "standard",
+      limit: 10,
+      themes: ["middlegame", "crushing", "hangingPiece"],
+      minRating: 1700,
+      maxRating: 1900
+    });
+
+    assert.deepEqual(selected.map((puzzle) => puzzle.id), ["00008", "001h8"]);
+    const candidateSql = preparedSql.filter((sql) => sql.includes("FROM puzzle_themes JOIN puzzles"));
+    assert.equal(candidateSql.length, 3);
+    assert.ok(candidateSql.every((sql) => /puzzle_themes\.theme_id = \?/.test(sql)));
+    const themeIds = ["crushing", "hangingPiece", "middlegame"].map((theme) =>
+      (packDb.prepare("SELECT id FROM themes WHERE name = ?").get(theme) as { id: number }).id
+    );
+    for (const [index, sql] of candidateSql.entries()) {
+      const plan = packDb.prepare(`EXPLAIN QUERY PLAN ${sql}`).all(themeIds[index], 1700, 1900, 10) as Array<{ detail: string }>;
+      assert.ok(plan.some((row) => row.detail.includes("puzzle_themes_theme_rating_idx") && row.detail.includes("rating>?")));
+      assert.ok(plan.every((row) => !row.detail.includes("TEMP B-TREE")));
+    }
   } finally {
     packDb.close();
   }
@@ -118,7 +162,7 @@ test("PackBackedPracticeStore queries pack puzzles without preloading the user d
         perPuzzleSeconds: 20,
         targetCorrect: 1,
         maxMistakes: 3,
-        theme: "hangingPiece"
+        themes: ["hangingPiece"]
       },
       "2026-06-20T00:00:00.000Z"
     );
@@ -261,7 +305,7 @@ test("PackBackedPracticeStore treats seeded includeIds as a local source scope",
       store.selectPuzzles({
         mode: "standard",
         limit: 1,
-        theme: "mate",
+        themes: ["mate"],
         includeIds: [localPuzzle.id]
       }),
       []

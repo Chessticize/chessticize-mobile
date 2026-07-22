@@ -249,7 +249,7 @@ test("SQLite migrates the released iOS 1.0.0 database without losing user semant
           perPuzzleSeconds: 30,
           targetCorrect: 10,
           maxMistakes: 2,
-          theme: "endgame",
+          themes: ["endgame"],
           lastStartedAt: "2026-06-06T12:00:00.000Z",
           playCount: 1
         },
@@ -261,7 +261,7 @@ test("SQLite migrates the released iOS 1.0.0 database without losing user semant
           perPuzzleSeconds: 20,
           targetCorrect: 5,
           maxMistakes: 3,
-          theme: "hangingPiece",
+          themes: ["hangingPiece"],
           lastStartedAt: "2026-06-04T12:00:00.000Z",
           playCount: 3
         }

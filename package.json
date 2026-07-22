@@ -20,6 +20,7 @@
     "app-store:testflight-evidence": "node scripts/app-store-testflight-evidence.mjs",
     "process:validate": "node scripts/validate-development-process.mjs",
     "generate:offline-puzzles": "node --experimental-strip-types scripts/generate-offline-puzzle-fixture.mjs",
+    "benchmark:multi-theme-query": "node --experimental-strip-types scripts/benchmark-multi-theme-query.mjs",
     "update:offline-puzzle-presolve": "node --experimental-strip-types scripts/update-offline-puzzle-pack-presolve.mjs",
     "typecheck": "tsc --noEmit",
     "mobile:start": "pnpm --filter ChessticizeMobile start",
