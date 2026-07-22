@@ -798,6 +798,25 @@ describe("PracticePocScreen", () => {
     expect(onIntent).toHaveBeenCalledWith({ type: "edit-run", runId: "tactics-focus" });
   });
 
+  it("renders removal confirmation directly below the selected Run card", () => {
+    const renderer = renderScreen({
+      runManagementPresentation: runManagementPresentation({
+        homeEditing: true,
+        removeCandidateId: "standard"
+      })
+    });
+    const runList = findByTestId(renderer, "practice-run-list");
+    const testIDs = collectTestIds(runList);
+
+    expect(runList.findByProps({ testID: "practice-run-remove-confirmation" })).toBeTruthy();
+    expect(testIDs.indexOf("practice-run-standard")).toBeLessThan(
+      testIDs.indexOf("practice-run-remove-confirmation")
+    );
+    expect(testIDs.indexOf("practice-run-remove-confirmation")).toBeLessThan(
+      testIDs.indexOf("practice-run-tactics-focus")
+    );
+  });
+
   it("renders the New Run validation and 25-point ELO editing contract", () => {
     const onIntent = jest.fn();
     const renderer = renderScreen({

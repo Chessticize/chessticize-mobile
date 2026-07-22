@@ -3302,36 +3302,33 @@ function PracticeRunHome({
       ) : (
         <View style={styles.modeList} testID="practice-run-list">
           {presentation.runs.map((run) => (
-            <PracticeRunCard
-              key={run.id}
-              active={run.id === presentation.selectedRunId}
-              dragging={run.id === draggedRunId}
-              dropTarget={run.id === dropTargetRunId && run.id !== draggedRunId}
-              editing={presentation.homeEditing}
-              run={run}
-              onIntent={presentation.onIntent}
-              onDragEnd={() => {
-                setDraggedRunId(null);
-                setDropTargetRunId(null);
-              }}
-              onDragEnter={(runId) => setDropTargetRunId(runId)}
-              onDragStart={(runId) => {
-                setDraggedRunId(runId);
-                setDropTargetRunId(null);
-              }}
-              onDrop={reorderRun}
-              onKeyboardReorder={reorderRunWithKeyboard}
-            />
+            <React.Fragment key={run.id}>
+              <PracticeRunCard
+                active={run.id === presentation.selectedRunId}
+                dragging={run.id === draggedRunId}
+                dropTarget={run.id === dropTargetRunId && run.id !== draggedRunId}
+                editing={presentation.homeEditing}
+                run={run}
+                onIntent={presentation.onIntent}
+                onDragEnd={() => {
+                  setDraggedRunId(null);
+                  setDropTargetRunId(null);
+                }}
+                onDragEnter={(runId) => setDropTargetRunId(runId)}
+                onDragStart={(runId) => {
+                  setDraggedRunId(runId);
+                  setDropTargetRunId(null);
+                }}
+                onDrop={reorderRun}
+                onKeyboardReorder={reorderRunWithKeyboard}
+              />
+              {presentation.removeCandidateId === run.id ? (
+                <RunRemovalConfirmation run={run} onIntent={presentation.onIntent} />
+              ) : null}
+            </React.Fragment>
           ))}
         </View>
       )}
-
-      {presentation.removeCandidateId ? (
-        <RunRemovalConfirmation
-          run={presentation.runs.find((run) => run.id === presentation.removeCandidateId) ?? null}
-          onIntent={presentation.onIntent}
-        />
-      ) : null}
 
       {showRestore ? (
         <View style={styles.runRestoreSection} testID="practice-run-restore-section">

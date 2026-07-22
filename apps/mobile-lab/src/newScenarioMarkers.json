@@ -25,7 +25,7 @@
   },
   "practice-run-remove-confirmation": {
     "issueNumber": 253,
-    "changeNote": "Removing from Home retains ELO and history and supports later restoration."
+    "changeNote": "Removal expands an inline warning directly below the selected Run and retains ELO and history."
   },
   "practice-runs-empty": {
     "issueNumber": 253,

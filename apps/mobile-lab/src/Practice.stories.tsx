@@ -93,6 +93,11 @@ export const RemoveRunConfirmation: Story = {
     await clickTestId(canvasElement, "practice-run-home-edit");
     await clickTestId(canvasElement, "practice-run-remove-standard");
     await waitForTestId(canvasElement, "practice-run-remove-confirmation");
+    await expectTestIdsInOrder(canvasElement, [
+      "practice-run-standard",
+      "practice-run-remove-confirmation",
+      "practice-run-arrow-duel"
+    ]);
   }
 };
 
