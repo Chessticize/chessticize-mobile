@@ -5,7 +5,9 @@ import {
   createCustomPracticeRun,
   defaultPracticeRuns,
   mergePracticeRunCatalogs,
+  practiceRunsFromLegacyCustomConfigs,
   practiceRunSprintConfig,
+  PRACTICE_RUN_NAME_MAX_LENGTH,
   reorderPracticeRuns,
   restorePracticeRun,
   validatePracticeRunName,
@@ -93,6 +95,81 @@ test("Run names are trimmed, required, limited, unique case-insensitively, and r
   assert.throws(() => validatePracticeRunName("tAcTiCs FoCuS", existing), errorCode("duplicate"));
   assert.throws(() => validatePracticeRunName("Standard", []), errorCode("duplicate"));
   assert.throws(() => validatePracticeRunName("x".repeat(41), existing), errorCode("too_long"));
+});
+
+test("legacy Custom Sprint configs become named Home Runs without changing their ELO buckets", () => {
+  const existing = defaultPracticeRuns();
+  const migrated = practiceRunsFromLegacyCustomConfigs([
+    {
+      id: "custom-custom-300-20-endgame+pin",
+      mode: "custom",
+      ratingKey: "endgame+pin custom 5/20",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      targetCorrect: 15,
+      maxMistakes: 3,
+      themes: ["endgame", "pin"],
+      lastStartedAt: "2026-07-21T12:00:00.000Z",
+      playCount: 2
+    },
+    {
+      id: "custom-arrow_duel-300-20-sacrifice",
+      mode: "arrow_duel",
+      ratingKey: "sacrifice arrow_duel 5/20",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      targetCorrect: 15,
+      maxMistakes: 3,
+      themes: ["sacrifice"],
+      lastStartedAt: "2026-07-09T12:00:00.000Z",
+      playCount: 1
+    },
+    {
+      id: "custom-custom-300-20-mate",
+      mode: "custom",
+      ratingKey: "mate custom 5/20",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      targetCorrect: 15,
+      maxMistakes: 3,
+      themes: ["mate"],
+      lastStartedAt: "2026-07-08T12:00:00.000Z",
+      playCount: 1
+    }
+  ], existing);
+
+  assert.deepEqual(migrated.map((run) => ({
+    name: run.name,
+    mode: run.mode,
+    ratingKey: run.ratingKey,
+    themes: run.themes,
+    homeOrder: run.homeOrder
+  })), [
+    {
+      name: "Regular Puzzle 1",
+      mode: "custom",
+      ratingKey: "endgame+pin custom 5/20",
+      themes: ["endgame", "pin"],
+      homeOrder: 2
+    },
+    {
+      name: "Arrow Duel 1",
+      mode: "arrow_duel",
+      ratingKey: "sacrifice arrow_duel 5/20",
+      themes: ["sacrifice"],
+      homeOrder: 3
+    },
+    {
+      name: "Regular Puzzle 2",
+      mode: "custom",
+      ratingKey: "mate custom 5/20",
+      themes: ["mate"],
+      homeOrder: 4
+    }
+  ]);
+  assert.equal(new Set(migrated.map((run) => run.id)).size, migrated.length);
+  assert.ok(migrated.every((run) => /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(run.id)));
+  assert.ok(migrated.every((run) => run.name.length <= PRACTICE_RUN_NAME_MAX_LENGTH));
 });
 
 test("reorder, archive, and restore preserve identity and append restored Runs", () => {

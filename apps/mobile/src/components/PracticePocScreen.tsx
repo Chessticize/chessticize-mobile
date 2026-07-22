@@ -44,6 +44,7 @@ import {
   MANUAL_RATING_STEP,
   normalizeHistoryAttemptDetail,
   normalizeThemeSelection,
+  PRACTICE_RUN_NAME_MAX_LENGTH,
   RATING_FLOOR,
   reviewDueState,
   reviewDueLabel,
@@ -3624,7 +3625,14 @@ function PracticeRunCard({
           />
         </View>
         <View style={styles.practiceModeCopy}>
-          <Text style={styles.practiceModeTitle}>{run.name}</Text>
+          <Text
+            ellipsizeMode="tail"
+            numberOfLines={1}
+            style={styles.practiceModeTitle}
+            testID={`practice-run-name-${safeTestId(run.id)}`}
+          >
+            {run.name}
+          </Text>
           <Text ellipsizeMode="tail" numberOfLines={1} style={styles.practiceModeDescription}>{details}</Text>
         </View>
       </Pressable>
@@ -4098,7 +4106,7 @@ function PracticeRunEditor({
                   accessibilityLabel="Run name"
                   autoCapitalize="words"
                   autoCorrect={false}
-                  maxLength={40}
+                  maxLength={PRACTICE_RUN_NAME_MAX_LENGTH}
                   placeholder="e.g. Tactics Focus"
                   placeholderTextColor="#94A3B8"
                   returnKeyType="done"

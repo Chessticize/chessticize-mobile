@@ -1,6 +1,6 @@
 import { defaultSprintConfig } from "./sprint-config.ts";
 import { normalizeThemeSelection } from "./theme-catalog.ts";
-import type { PracticeRunRecord, SprintConfig } from "./types.ts";
+import type { CustomSprintConfigRecord, PracticeRunRecord, SprintConfig } from "./types.ts";
 
 export const STANDARD_PRACTICE_RUN_ID = "standard";
 export const ARROW_DUEL_PRACTICE_RUN_ID = "arrow-duel";
@@ -104,6 +104,61 @@ export function validatePracticeRunName(
     throw new PracticeRunNameError("duplicate");
   }
   return name;
+}
+
+export function practiceRunsFromLegacyCustomConfigs(
+  configs: readonly CustomSprintConfigRecord[],
+  existingRuns: readonly PracticeRunRecord[] = defaultPracticeRuns()
+): PracticeRunRecord[] {
+  const usedIds = new Set(existingRuns.map((run) => run.id));
+  const usedNames = new Set(existingRuns.map((run) => normalizePracticeRunName(run.name)));
+  const usedRatingKeys = new Set(existingRuns.map((run) => run.ratingKey));
+  const nextNumber = { custom: 1, arrow_duel: 1 };
+  let homeOrder = existingRuns.reduce(
+    (maximum, run) => run.archived ? maximum : Math.max(maximum, run.homeOrder + 1),
+    0
+  );
+  const promoted: PracticeRunRecord[] = [];
+  const orderedConfigs = [...configs].sort(
+    (left, right) => right.lastStartedAt.localeCompare(left.lastStartedAt) || left.id.localeCompare(right.id)
+  );
+
+  for (const config of orderedConfigs) {
+    if ((config.mode !== "custom" && config.mode !== "arrow_duel") || usedRatingKeys.has(config.ratingKey)) {
+      continue;
+    }
+    const mode = config.mode;
+    const namePrefix = mode === "arrow_duel" ? "Arrow Duel" : "Regular Puzzle";
+    let name: string;
+    do {
+      name = `${namePrefix} ${nextNumber[mode]}`;
+      nextNumber[mode] += 1;
+    } while (usedNames.has(normalizePracticeRunName(name)));
+
+    const id = uniqueLegacyPracticeRunId(config.id, usedIds);
+    const themes = normalizedRunThemes(config.themes);
+    promoted.push({
+      id,
+      kind: "custom",
+      name,
+      mode,
+      ratingKey: config.ratingKey,
+      durationSeconds: config.durationSeconds,
+      perPuzzleSeconds: config.perPuzzleSeconds,
+      targetCorrect: config.targetCorrect,
+      maxMistakes: config.maxMistakes,
+      ...(themes.length === 0 ? {} : { themes }),
+      homeOrder,
+      archived: false,
+      updatedAt: config.lastStartedAt
+    });
+    usedIds.add(id);
+    usedNames.add(normalizePracticeRunName(name));
+    usedRatingKeys.add(config.ratingKey);
+    homeOrder += 1;
+  }
+
+  return promoted;
 }
 
 export function practiceRunSprintConfig(run: PracticeRunRecord): SprintConfig {
@@ -278,6 +333,31 @@ function uniquifyPracticeRunNames(runs: PracticeRunRecord[]): PracticeRunRecord[
 
 function normalizePracticeRunName(name: string): string {
   return name.trim().toLocaleLowerCase("en-US");
+}
+
+function uniqueLegacyPracticeRunId(sourceId: string, usedIds: ReadonlySet<string>): string {
+  const slug = sourceId
+    .replace(/[^A-Za-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 96) || "config";
+  const fingerprint = stableTextFingerprint(sourceId);
+  const base = `legacy-${slug}-${fingerprint}`;
+  let candidate = base;
+  let suffix = 2;
+  while (usedIds.has(candidate)) {
+    candidate = `${base.slice(0, 128 - String(suffix).length - 1)}-${suffix}`;
+    suffix += 1;
+  }
+  return candidate;
+}
+
+function stableTextFingerprint(value: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(36);
 }
 
 function normalizedRunThemes(themes?: readonly string[]): string[] {

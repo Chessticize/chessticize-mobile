@@ -20,7 +20,7 @@ import {
 } from "../src/backend/mobilePractice";
 import { fixtureNeedsAtLeast, PracticeService } from "../../../packages/storage/src/practice-service";
 import { MemoryStore } from "../../../packages/storage/src/memory-store";
-import { defaultSprintConfig, formatLocalCalendarDate, formatReviewDay, practiceRunSprintConfig, type ArrowDuelState, type AttemptEvent, type Puzzle, type SprintState, type UciEngineTransport } from "../../../packages/core/src/index";
+import { defaultSprintConfig, formatLocalCalendarDate, formatReviewDay, practiceRunSprintConfig, PRACTICE_RUN_NAME_MAX_LENGTH, type ArrowDuelState, type AttemptEvent, type Puzzle, type SprintState, type UciEngineTransport } from "../../../packages/core/src/index";
 import { FakeReviewReminderNotificationClient, FakeReviewReminderScheduler } from "../src/backend/reviewReminderScheduler";
 import { FakeICloudProgressSyncClient } from "../src/backend/iCloudProgressSync";
 import type { MobilePlatformCapabilities } from "../src/backend/mobilePlatformCapabilities";
@@ -778,6 +778,41 @@ describe("PracticePocScreen", () => {
       { type: "add-run" },
       { type: "start-selected-run" }
     ]);
+  });
+
+  it("keeps the 40-character Run name contract while truncating long Home titles visually", () => {
+    const longName = "R".repeat(PRACTICE_RUN_NAME_MAX_LENGTH);
+    const presentation = runManagementPresentation();
+    const renderer = renderScreen({
+      runManagementPresentation: runManagementPresentation({
+        runs: presentation.runs.map((run) => run.id === "tactics-focus"
+          ? { ...run, name: longName }
+          : run)
+      })
+    });
+
+    const title = findByTestId(renderer, "practice-run-name-tactics-focus");
+    expect(collectText(title)).toBe(longName);
+    expect(title.props.numberOfLines).toBe(1);
+    expect(title.props.ellipsizeMode).toBe("tail");
+
+    const editor = renderScreen({
+      runManagementPresentation: runManagementPresentation({
+        draft: {
+          name: "",
+          kind: "custom",
+          mode: "custom",
+          elo: 900,
+          durationSeconds: 300,
+          perPuzzleSeconds: 20,
+          themes: ["mixed"]
+        },
+        screen: "create"
+      })
+    });
+    expect(findByTestId(editor, "practice-run-name-input").props.maxLength).toBe(
+      PRACTICE_RUN_NAME_MAX_LENGTH
+    );
   });
 
   it("uses whole-card drag guidance and arrow fallbacks while editing Home runs", () => {
