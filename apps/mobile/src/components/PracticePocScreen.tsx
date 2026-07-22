@@ -2284,7 +2284,6 @@ export function PracticePocScreen({
       compactMetrics={sessionUsesRail}
       mode={mode}
       state={state}
-      sideToMove={displayedSideToMove}
       timerText={timerText}
       confirmAbandon={practiceExitConfirmationVisible}
       onAbandon={isOpenSession ? abandonSprint : undefined}
@@ -3824,7 +3823,6 @@ function SessionStatusBar({
   confirmAbandon,
   mode,
   state,
-  sideToMove,
   timerText,
   onAbandon,
   onConfirmAbandonChange,
@@ -3835,7 +3833,6 @@ function SessionStatusBar({
   confirmAbandon: boolean;
   mode: SprintMode;
   state: SprintState;
-  sideToMove: MoveSide | null;
   timerText: string;
   onAbandon?: () => void;
   onConfirmAbandonChange: (visible: boolean) => void;
@@ -3897,12 +3894,7 @@ function SessionStatusBar({
       >
         <View
           accessibilityLabel={`Progress ${state.correctCount} of ${state.config.targetCorrect}`}
-          style={[
-            styles.sessionMetricBlock,
-            styles.sessionProgressBlock,
-            compactMetrics ? styles.sessionMetricBlockCompact : null,
-            compactMetrics ? styles.sessionProgressBlockCompact : null
-          ]}
+          style={styles.sessionMetricBlock}
           testID="session-progress-block"
         >
           <Text numberOfLines={1} testID="session-progress" style={styles.sessionProgressValue}>
@@ -3911,41 +3903,14 @@ function SessionStatusBar({
         </View>
         <View
           accessibilityLabel={`Timer ${timerText}`}
-          style={[
-            styles.sessionMetricBlock,
-            styles.sessionTimerBlock,
-            compactMetrics ? styles.sessionMetricBlockCompact : null,
-            compactMetrics ? styles.sessionTimerBlockCompact : null
-          ]}
+          style={styles.sessionMetricBlock}
           testID="session-timer-block"
         >
           <Text numberOfLines={1} testID="session-timer" style={styles.timerText}>{timerText}</Text>
         </View>
         <View
-          accessibilityLabel={sideToMove ? sideToMoveAccessibilityLabel(sideToMove) : "Side to move unavailable"}
-          style={[
-            styles.sessionMetricBlock,
-            styles.sessionSideToMoveBlock,
-            compactMetrics ? styles.sessionMetricBlockCompact : null,
-            compactMetrics ? styles.sessionSideToMoveBlockCompact : null
-          ]}
-          testID="session-side-to-move-block"
-        >
-          {sideToMove ? (
-            <MoveSideBadge
-              badgeTestID="session-side-to-move"
-              compact
-              side={sideToMove}
-            />
-          ) : null}
-        </View>
-        <View
           accessibilityLabel={`Mistakes ${state.mistakeCount} of ${state.config.maxMistakes}`}
-          style={[
-            styles.sessionMetricBlock,
-            compactMetrics ? styles.sessionMetricBlockCompact : null,
-            compactMetrics ? styles.sessionMistakesBlockCompact : null
-          ]}
+          style={styles.sessionMetricBlock}
           testID="session-mistakes-block"
         >
           <ActiveMistakeIndicator
@@ -4323,7 +4288,6 @@ function PracticePrompt({
     <View style={styles.promptPanel} testID="practice-prompt">
       <View style={styles.promptIcon} testID="practice-prompt-icon">
         <MoveSideGlyph
-          king
           kingPieceSize={kingPieceSize}
           side={promptSide}
           testID="practice-prompt-side-glyph"
@@ -4470,64 +4434,15 @@ function SessionScoreGlyph({ tone }: { tone: "positive" | "negative" | "neutral"
   );
 }
 
-function MoveSideBadge({
-  badgeTestID,
-  compact = false,
-  king = false,
-  kingPieceSize,
-  side
-}: {
-  badgeTestID: string;
-  compact?: boolean;
-  king?: boolean;
-  kingPieceSize?: number;
-  side: MoveSide;
-}): React.JSX.Element {
-  const sideLabel = sideToMoveLabel(side);
-  return (
-    <View
-      accessible
-      accessibilityLabel={sideToMoveAccessibilityLabel(side)}
-      style={styles.moveSideBadge}
-      testID={badgeTestID}
-    >
-      <MoveSideGlyph king={king} kingPieceSize={kingPieceSize} side={side} />
-      <Text numberOfLines={1} style={styles.moveSideBadgeText} testID={`${badgeTestID}-label`}>
-        {compact ? sideLabel : `${sideLabel} to move`}
-      </Text>
-    </View>
-  );
-}
-
 function MoveSideGlyph({
-  king,
   kingPieceSize = 22,
   side,
   testID = `move-side-${side === "w" ? "white" : "black"}-glyph`
 }: {
-  king: boolean;
   kingPieceSize?: number;
   side: MoveSide;
   testID?: string;
 }): React.JSX.Element {
-  if (!king) {
-    return (
-      <View
-        style={[
-          styles.moveSideGlyph,
-          side === "w" ? styles.moveSideGlyphWhite : styles.moveSideGlyphBlack
-        ]}
-        testID={testID}
-      >
-        <View
-          style={[
-            styles.moveSideGlyphBase,
-            side === "w" ? styles.moveSideGlyphWhiteBase : styles.moveSideGlyphBlackBase
-          ]}
-        />
-      </View>
-    );
-  }
   return (
     <View
       style={[styles.moveSideKingGlyph, { height: kingPieceSize, width: kingPieceSize }]}
@@ -7363,10 +7278,6 @@ function ReviewSession({
               <Text style={styles.reviewContextPillText}>Sprint review</Text>
             </View>
           ) : null}
-          <MoveSideBadge
-            badgeTestID="review-side-to-move"
-            side={reviewSideToMove}
-          />
           {currentEntry.source !== "due" ? (
             <View style={styles.reviewContextPill} testID="review-theme-pill">
               <Text style={styles.reviewContextPillText}>{reviewPrimaryTheme}</Text>
@@ -10744,10 +10655,8 @@ const styles = StyleSheet.create({
     paddingVertical: 1
   },
   sessionActiveMetricRowCompact: {
-    flexWrap: "wrap",
-    justifyContent: "center",
+    gap: 2,
     paddingHorizontal: 0,
-    rowGap: 6
   },
   sessionMetricBlock: {
     alignItems: "center",
@@ -10755,10 +10664,6 @@ const styles = StyleSheet.create({
     gap: 3,
     justifyContent: "center",
     minWidth: 0
-  },
-  sessionMetricBlockCompact: {
-    flex: 0,
-    flexShrink: 0
   },
   activeMistakeIndicator: {
     alignItems: "center",
@@ -10801,86 +10706,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8
   },
-  sessionTimerBlock: {
-    alignItems: "center",
-    flex: 1.25
-  },
-  sessionProgressBlock: {
-    minWidth: 72
-  },
-  sessionProgressBlockCompact: {
-    minWidth: 78
-  },
-  sessionTimerBlockCompact: {
-    minWidth: 78
-  },
-  sessionSideToMoveBlock: {
-    minWidth: 70
-  },
-  sessionSideToMoveBlockCompact: {
-    minWidth: 72
-  },
-  sessionMistakesBlockCompact: {
-    minWidth: 42
-  },
   sessionProgressValue: {
     color: "#111827",
     fontSize: 21,
     fontWeight: "800",
     textAlign: "center"
-  },
-  moveSideBadge: {
-    alignItems: "center",
-    alignSelf: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 2,
-    justifyContent: "center",
-    minHeight: 30,
-    paddingLeft: 1,
-    paddingRight: 8
-  },
-  moveSideBadgeText: {
-    color: "#334155",
-    flexShrink: 0,
-    fontSize: 11,
-    fontWeight: "900",
-    textAlign: "center"
-  },
-  moveSideGlyph: {
-    alignItems: "center",
-    borderRadius: 999,
-    borderWidth: 1.5,
-    height: 16,
-    justifyContent: "center",
-    position: "relative",
-    width: 16
-  },
-  moveSideGlyphWhite: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#0F172A"
-  },
-  moveSideGlyphBlack: {
-    backgroundColor: "#0F172A",
-    borderColor: "#0F172A"
-  },
-  moveSideGlyphBase: {
-    borderRadius: 999,
-    bottom: -3,
-    height: 5,
-    position: "absolute",
-    width: 12
-  },
-  moveSideGlyphWhiteBase: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#0F172A",
-    borderWidth: 1.5
-  },
-  moveSideGlyphBlackBase: {
-    backgroundColor: "#0F172A"
   },
   moveSideKingGlyph: {
     overflow: "hidden",
