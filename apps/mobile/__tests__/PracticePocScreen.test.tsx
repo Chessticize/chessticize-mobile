@@ -1421,7 +1421,9 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "session-side-to-move-block").props.accessibilityLabel).toBe("White to move");
     expect(findByTestId(renderer, "session-side-to-move").props.accessibilityLabel).toBe("White to move");
     expect(findByTestId(renderer, "move-side-white-glyph")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "move-side-white-glyph"))).toBe("♔");
+    expect(collectText(findByTestId(renderer, "move-side-white-glyph"))).toBe("");
+    expect(findByTestId(renderer, "chessboard-king-white-sprite")).toBeTruthy();
+    expect(styleEntryMatches(findByTestId(renderer, "move-side-white-glyph").props.style, "width", 45)).toBe(true);
     expect(collectText(findByTestId(renderer, "session-side-to-move-label"))).toBe("White");
     expect(findByTestId(renderer, "session-mistakes-block").props.accessibilityLabel).toBe("Mistakes 0 of 3");
     expect(findByTestId(renderer, "session-mistakes").props.accessibilityLabel).toBe("Mistakes 0 of 3");
@@ -1440,8 +1442,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "session-status-metrics"))).not.toContain("0/3");
     expect(collectText(findByTestId(renderer, "session-progress"))).toBe("0 / 15");
     expect(styleEntryMatches(findByTestId(renderer, "practice-prompt").props.style, "borderWidth", 1)).toBe(false);
-    expect(collectText(findByTestId(renderer, "practice-prompt-icon"))).toBe("♔");
-    expect(styleEntryMatches(findByTestId(renderer, "practice-prompt-icon").props.style, "backgroundColor", "#1F2937")).toBe(false);
+    expect(() => findByTestId(renderer, "practice-prompt-icon")).toThrow();
     expectText(renderer, "Find the best move");
     expect(collectText(findByTestId(renderer, "practice-prompt"))).not.toContain("For white.");
   });
@@ -1781,7 +1782,8 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "session-side-to-move").props.accessible).toBe(true);
     expect(findByTestId(renderer, "session-side-to-move").props.accessibilityLabel).toBe("Black to move");
-    expect(collectText(findByTestId(renderer, "move-side-black-glyph"))).toBe("♚");
+    expect(collectText(findByTestId(renderer, "move-side-black-glyph"))).toBe("");
+    expect(findByTestId(renderer, "chessboard-king-black-sprite")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "session-side-to-move-label"))).toBe("Black");
     expect(findByTestId(renderer, "session-progress-block").props.accessibilityLabel).toBe("Progress 0 of 1");
   });
@@ -2408,7 +2410,6 @@ describe("PracticePocScreen", () => {
     startArrowDuelSprint(renderer);
     const arrow = requireArrowDuelState(activeSprintForTest(service));
     const arrowSide = new Chess(arrow.currentFen).turn() === "w" ? "white" : "black";
-    const arrowKing = arrowSide === "white" ? "♔" : "♚";
 
     expect(findByTestId(renderer, "mock-chessboard").props.flipped).toBe(new Chess(arrow.currentFen).turn() === "b");
     expect(collectText(renderer.root)).not.toContain("Choose one candidate move");
@@ -2420,7 +2421,7 @@ describe("PracticePocScreen", () => {
       .find((node) => node.props.accessible === true);
     expect(accessibleCandidateOverlay?.props.accessibilityLabel)
       .toBe(`Arrow Duel candidates: ${arrow.candidates.join(", ")}`);
-    expect(collectText(findByTestId(renderer, "practice-prompt-icon"))).toBe(arrowKing);
+    expect(() => findByTestId(renderer, "practice-prompt-icon")).toThrow();
     expect(testIdOrder(renderer, "session-board", "session-score-strip")).toBeLessThan(0);
     expect(testIdOrder(renderer, "session-score-strip", "practice-prompt")).toBeLessThan(0);
     expect(findByTestId(renderer, "session-score-strip").props.accessibilityLabel).toBe("Session score: solved 0, mistakes 0, left 10");
@@ -3147,10 +3148,11 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "review-source-pill")).toThrow();
     expect(findByTestId(renderer, "review-side-to-move").props.accessibilityLabel).toBe("Black to move");
     expect(findByTestId(renderer, "move-side-black-glyph")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "move-side-black-glyph"))).toBe("♚");
+    expect(collectText(findByTestId(renderer, "move-side-black-glyph"))).toBe("");
+    expect(findByTestId(renderer, "chessboard-king-black-sprite")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "review-side-to-move-label"))).toBe("Black to move");
     expect(testIdOrder(renderer, "practice-prompt", "review-board")).toBeLessThan(0);
-    expect(collectText(findByTestId(renderer, "practice-prompt-icon"))).toBe("♚");
+    expect(() => findByTestId(renderer, "practice-prompt-icon")).toThrow();
     expect(collectText(findByTestId(renderer, "practice-prompt"))).toContain("Find the best move");
     expect(collectText(findByTestId(renderer, "practice-prompt"))).not.toContain("For black.");
     expect(findByTestId(renderer, "review-theme-pill")).toBeTruthy();
@@ -5014,9 +5016,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "review-mistakes-button");
 
     expectText(renderer, "1 / 3 · Arrow Duel");
-    const reviewArrowSide = new Chess(findByTestId(renderer, "mock-chessboard").props.fen).turn();
-    expect(collectText(findByTestId(renderer, "practice-prompt-icon")))
-      .toBe(reviewArrowSide === "w" ? "♔" : "♚");
+    expect(() => findByTestId(renderer, "practice-prompt-icon")).toThrow();
     expect(() => findByTestId(renderer, "review-accessible-moves-open")).toThrow();
     expect(() => findByTestId(renderer, "review-arrow-legend")).toThrow();
     expect(() => findByTestId(renderer, "review-arrow-choice-marker")).toThrow();

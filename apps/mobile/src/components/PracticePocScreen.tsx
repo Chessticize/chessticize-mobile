@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   AppState,
+  Image,
   Linking,
   Modal,
   Pressable,
@@ -323,6 +324,7 @@ const BOARD_FILES_FLIPPED = ["h", "g", "f", "e", "d", "c", "b", "a"] as const;
 const BOARD_RANKS = ["8", "7", "6", "5", "4", "3", "2", "1"] as const;
 const BOARD_RANKS_FLIPPED = ["1", "2", "3", "4", "5", "6", "7", "8"] as const;
 const CHESS_PIECE_SPRITE = require("../assets/chess-pieces-sprite.png") as ImageSourcePropType;
+const KING_GLYPH_MAX_SIZE = 52;
 const LICHESS_PUZZLE_DATABASE_URL = "https://database.lichess.org/#puzzles";
 const ANALYSIS_DIAGNOSTIC_POSITIONS = [
   {
@@ -2280,6 +2282,7 @@ export function PracticePocScreen({
   const sessionStatusNode = state && (isOpenSession || isShowingFeedbackSnapshot) ? (
     <SessionStatusBar
       compactMetrics={sessionUsesRail}
+      kingPieceSize={kingGlyphSizeForBoard(boardSize)}
       mode={mode}
       state={state}
       sideToMove={displayedSideToMove}
@@ -3818,6 +3821,7 @@ function TestPuzzleSourceControl({
 function SessionStatusBar({
   compactMetrics = false,
   confirmAbandon,
+  kingPieceSize,
   mode,
   state,
   sideToMove,
@@ -3829,6 +3833,7 @@ function SessionStatusBar({
 }: {
   compactMetrics?: boolean;
   confirmAbandon: boolean;
+  kingPieceSize: number;
   mode: SprintMode;
   state: SprintState;
   sideToMove: MoveSide | null;
@@ -3931,6 +3936,7 @@ function SessionStatusBar({
               badgeTestID="session-side-to-move"
               compact
               king={mode !== "arrow_duel"}
+              kingPieceSize={kingPieceSize}
               side={sideToMove}
             />
           ) : null}
@@ -4301,8 +4307,7 @@ function PracticePrompt({
   if (!currentPuzzle) {
     return null;
   }
-  const promptSide = sideToMove(currentPuzzle.currentFen);
-  const side = promptSide === "b" ? "black" : "white";
+  const side = sideToMove(currentPuzzle.currentFen) === "b" ? "black" : "white";
   const isArrowDuel = currentPuzzle.kind === "arrow_duel";
   const defaultPromptTitle = isArrowDuel ? "Choose the best move" : "Find the best move";
   const defaultPromptContext = isArrowDuel
@@ -4315,9 +4320,6 @@ function PracticePrompt({
 
   return (
     <View style={styles.promptPanel} testID="practice-prompt">
-      <View style={styles.promptIcon} testID="practice-prompt-icon">
-        <MoveSideGlyph king side={promptSide} testID="practice-prompt-side-glyph" />
-      </View>
       <View style={styles.promptCopy}>
         <Text style={styles.promptTitle}>{promptText === undefined ? defaultPromptTitle : modeLabel(mode)}</Text>
         {displayedPromptText ? <Text style={styles.promptText}>{displayedPromptText}</Text> : null}
@@ -4463,11 +4465,13 @@ function MoveSideBadge({
   badgeTestID,
   compact = false,
   king = false,
+  kingPieceSize,
   side
 }: {
   badgeTestID: string;
   compact?: boolean;
   king?: boolean;
+  kingPieceSize?: number;
   side: MoveSide;
 }): React.JSX.Element {
   const sideLabel = sideToMoveLabel(side);
@@ -4478,7 +4482,7 @@ function MoveSideBadge({
       style={styles.moveSideBadge}
       testID={badgeTestID}
     >
-      <MoveSideGlyph king={king} side={side} />
+      <MoveSideGlyph king={king} kingPieceSize={kingPieceSize} side={side} />
       <Text numberOfLines={1} style={styles.moveSideBadgeText} testID={`${badgeTestID}-label`}>
         {compact ? sideLabel : `${sideLabel} to move`}
       </Text>
@@ -4488,10 +4492,12 @@ function MoveSideBadge({
 
 function MoveSideGlyph({
   king,
+  kingPieceSize = 22,
   side,
   testID = `move-side-${side === "w" ? "white" : "black"}-glyph`
 }: {
   king: boolean;
+  kingPieceSize?: number;
   side: MoveSide;
   testID?: string;
 }): React.JSX.Element {
@@ -4515,12 +4521,30 @@ function MoveSideGlyph({
   }
   return (
     <View
-      style={styles.moveSideKingGlyph}
+      style={[styles.moveSideKingGlyph, { height: kingPieceSize, width: kingPieceSize }]}
       testID={testID}
     >
-      <Text style={styles.moveSideKingGlyphText}>{side === "w" ? "♔" : "♚"}</Text>
+      <Image
+        accessibilityIgnoresInvertColors
+        resizeMode="stretch"
+        source={CHESS_PIECE_SPRITE}
+        style={[
+          styles.moveSideKingSprite,
+          {
+            height: kingPieceSize * 2,
+            left: -kingPieceSize * 5,
+            top: side === "w" ? 0 : -kingPieceSize,
+            width: kingPieceSize * 6
+          }
+        ]}
+        testID={`chessboard-king-${side === "w" ? "white" : "black"}-sprite`}
+      />
     </View>
   );
+}
+
+function kingGlyphSizeForBoard(boardSize: number): number {
+  return Math.max(1, Math.min(KING_GLYPH_MAX_SIZE, Math.round(boardSize / 8)));
 }
 
 function BoardCoordinateOverlay({
@@ -7327,6 +7351,7 @@ function ReviewSession({
           <MoveSideBadge
             badgeTestID="review-side-to-move"
             king={currentEntry.mode !== "arrow_duel"}
+            kingPieceSize={kingGlyphSizeForBoard(boardSize)}
             side={reviewSideToMove}
           />
           {currentEntry.source !== "due" ? (
@@ -10786,10 +10811,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
-    gap: 5,
+    gap: 2,
     justifyContent: "center",
     minHeight: 30,
-    paddingHorizontal: 7
+    paddingLeft: 1,
+    paddingRight: 8
   },
   moveSideBadgeText: {
     color: "#334155",
@@ -10831,17 +10857,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#0F172A"
   },
   moveSideKingGlyph: {
-    alignItems: "center",
-    height: 22,
-    justifyContent: "center",
-    width: 20
+    overflow: "hidden",
+    position: "relative"
   },
-  moveSideKingGlyphText: {
-    color: "#0F172A",
-    fontSize: 21,
-    fontWeight: "700",
-    lineHeight: 23,
-    textAlign: "center"
+  moveSideKingSprite: {
+    position: "absolute"
   },
   timerText: {
     color: "#111827",
@@ -10897,12 +10917,10 @@ const styles = StyleSheet.create({
     textShadowColor: "rgba(15, 23, 42, 0.55)"
   },
   promptPanel: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 10,
-    minHeight: 44,
-    paddingHorizontal: 8,
-    paddingVertical: 4
+    alignItems: "flex-start",
+    minHeight: 34,
+    paddingHorizontal: 2,
+    paddingVertical: 3
   },
   practicePromptStack: {
     gap: 6
@@ -10946,13 +10964,6 @@ const styles = StyleSheet.create({
     color: "#B45309",
     fontSize: 11,
     fontWeight: "900"
-  },
-  promptIcon: {
-    alignItems: "center",
-    flexShrink: 0,
-    height: 28,
-    justifyContent: "center",
-    width: 24
   },
   promptCopy: {
     flex: 1,

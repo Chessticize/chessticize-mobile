@@ -48,11 +48,11 @@ test("the issue #272 design slice keeps its New Scenario Markers active", () => 
   assert.deepEqual(storyTagsForScenario("practice-arrow-duel-prompt"), ["new"]);
 });
 
-test("the issue #272 preview hands the board to Black after the blunder", () => {
+test("the issue #272 preview hands the board to White after the blunder", () => {
   const chess = new Chess(ISSUE_272_LAB_PUZZLE.initialFen);
 
   chess.move(ISSUE_272_LAB_PUZZLE.solutionMoves[0]!);
 
-  assert.equal(chess.turn(), "b");
-  assert.equal(chess.fen(), "4k3/4p3/8/8/8/8/3K4/8 b - - 1 1");
+  assert.equal(chess.turn(), "w");
+  assert.equal(chess.fen(), "8/3k4/8/8/8/8/4P3/4K3 w - - 1 2");
 });
