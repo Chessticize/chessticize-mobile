@@ -3668,8 +3668,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "history-attempt-unclear-history-attempt");
     expect(findByTestId(renderer, "review-board")).toBeTruthy();
     expect(() => findByTestId(renderer, "history-attempt-detail")).toThrow();
-    expect(collectText(findByTestId(renderer, "history-attempt-unclear"))).toContain("Marked");
-    expect(collectText(findByTestId(renderer, "history-attempt-unclear"))).not.toContain("Marked as unclear");
+    expect(collectText(findByTestId(renderer, "history-attempt-unclear"))).toContain("Marked as unclear");
     expect(findByTestId(renderer, "history-attempt-clear-unclear")).toBeTruthy();
     expect(testIdOrder(renderer, "review-schedule-control", "history-attempt-unclear")).toBeLessThan(0);
     expect(() => findByTestId(renderer, "bookmark-glyph")).toThrow();

@@ -8868,7 +8868,7 @@ function HistoryUnclearAction({ onClear }: { onClear: () => void }): React.JSX.E
       testID="history-attempt-unclear"
     >
       <View style={styles.historyAttemptUnclearCopy}>
-        <Text style={styles.historyAttemptUnclearTitle}>Marked</Text>
+        <Text style={styles.historyAttemptUnclearTitle}>Marked as unclear</Text>
       </View>
       <Pressable
         accessibilityRole="button"
