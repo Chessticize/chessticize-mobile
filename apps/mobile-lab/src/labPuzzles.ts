@@ -8,30 +8,10 @@ type LabPuzzleSeed = {
 };
 
 const seeds: LabPuzzleSeed[] = [
-  {
-    id: "lab-fork-01",
-    pawnFile: "e",
-    rating: 780,
-    themes: ["advancedPawn", "attraction", "discoveredAttack", "mateIn3", "pin", "promotion", "sacrifice", "endgame"]
-  },
-  {
-    id: "lab-pin-02",
-    pawnFile: "d",
-    rating: 920,
-    themes: ["fork", "mateIn1", "mateIn2", "deflection", "hangingPiece", "backRankMate", "middlegame"]
-  },
-  {
-    id: "lab-skewer-03",
-    pawnFile: "c",
-    rating: 1080,
-    themes: ["pawnEndgame", "skewer", "intermezzo", "trappedPiece", "zugzwang", "endgame"]
-  },
-  {
-    id: "lab-sacrifice-04",
-    pawnFile: "f",
-    rating: 1240,
-    themes: ["capturingDefender", "doubleCheck", "mateIn4", "interference", "smotheredMate", "xRayAttack", "middlegame"]
-  },
+  { id: "lab-fork-01", pawnFile: "e", rating: 780, themes: ["fork", "endgame"] },
+  { id: "lab-pin-02", pawnFile: "d", rating: 920, themes: ["pin", "middlegame"] },
+  { id: "lab-skewer-03", pawnFile: "c", rating: 1080, themes: ["skewer", "endgame"] },
+  { id: "lab-sacrifice-04", pawnFile: "f", rating: 1240, themes: ["sacrifice", "middlegame"] },
   { id: "lab-promotion-05", pawnFile: "g", rating: 1380, themes: ["promotion", "endgame"] }
 ];
 

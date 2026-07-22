@@ -75,7 +75,7 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
     "Practice",
     "Custom sprint setup",
     "practice--custom-setup",
-    "Existing Custom Sprint setup comparing three presentations for the server-curated 24-theme catalog.",
+    "Existing Custom Sprint setup using the approved grouped presentation for the server-curated 24-theme catalog.",
     "practice",
     ["Complete custom configuration", "24 curated themes", "Independent theme toggles", "All exclusivity", "Non-empty theme fallback"],
     ["Practice home", "Native SQLite persistence and a scored practice session"]

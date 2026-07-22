@@ -2648,6 +2648,7 @@ describe("PracticePocScreen", () => {
     });
 
     press(renderer, "practice-mode-custom");
+    expect(themeSelected(renderer, "mixed")).toBe(true);
     expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("Capturing Defender");
     expect(findByTestId(renderer, "custom-theme-mate-in-4")).toBeTruthy();
     press(renderer, "custom-theme-mate-in-4");

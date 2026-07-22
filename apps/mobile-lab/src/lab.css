@@ -81,9 +81,3 @@ body {
   padding: 7px 9px;
   text-decoration: none;
 }
-
-@media (max-width: 520px) {
-  .lab-toolbar {
-    bottom: 62px;
-  }
-}
