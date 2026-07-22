@@ -4295,7 +4295,10 @@ function PracticeRunEloRow({
               Whole number from {CUSTOM_INITIAL_RATING_MIN} to {CUSTOM_INITIAL_RATING_MAX}
             </Text>
           </View>
-          <View style={[styles.runEloInputShell, error ? styles.runEloInputShellError : null]}>
+          <View
+            style={[styles.runEloInputShell, error ? styles.runEloInputShellError : null]}
+            testID="practice-run-elo-input-shell"
+          >
             <TextInput
               accessibilityLabel={isCreate ? "Starting ELO" : "Current ELO"}
               inputMode="numeric"
@@ -11905,6 +11908,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     fontWeight: "700",
+    maxWidth: 200,
     minHeight: 40,
     minWidth: 160,
     paddingHorizontal: 10,
@@ -11919,9 +11923,11 @@ const styles = StyleSheet.create({
     borderColor: "#CBD5E1",
     borderRadius: 8,
     borderWidth: 1,
+    flex: 1,
     flexDirection: "row",
-    flexShrink: 0,
+    maxWidth: 200,
     minHeight: 40,
+    minWidth: 160,
     overflow: "hidden"
   },
   runEloInputShellError: {
@@ -11929,6 +11935,7 @@ const styles = StyleSheet.create({
   },
   runEloInput: {
     color: "#111827",
+    flex: 1,
     fontSize: 15,
     fontWeight: "800",
     minHeight: 40,

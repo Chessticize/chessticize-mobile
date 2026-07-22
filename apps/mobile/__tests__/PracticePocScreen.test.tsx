@@ -1070,6 +1070,14 @@ describe("PracticePocScreen", () => {
       "blurAndSubmit"
     );
     expect(hasStyleEntry(findByTestId(renderer, "practice-run-name-row"), "gap", 16)).toBe(true);
+    for (const inputColumn of [
+      findByTestId(renderer, "practice-run-name-input"),
+      findByTestId(renderer, "practice-run-elo-input-shell")
+    ]) {
+      expect(hasStyleEntry(inputColumn, "flex", 1)).toBe(true);
+      expect(hasStyleEntry(inputColumn, "minWidth", 160)).toBe(true);
+      expect(hasStyleEntry(inputColumn, "maxWidth", 200)).toBe(true);
+    }
     expect(findByTestId(renderer, "practice-run-elo-input").props.value).toBe("925");
     expect(findByTestId(renderer, "practice-run-elo-input").props.keyboardType).toBe("number-pad");
     expect(collectText(findByTestId(renderer, "practice-run-elo-row"))).toContain(
