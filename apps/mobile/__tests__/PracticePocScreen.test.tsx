@@ -1465,6 +1465,10 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "session-score-strip")).toBeTruthy();
     expect(findByTestId(renderer, "practice-prompt")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "practice-prompt"))).toContain("Find the best move");
+    expect(flattenTestStyle(findByTestId(renderer, "chessboard-king-white-sprite").props.style).width)
+      .toBe(Math.round(boardSize / 8) * 6);
+    expect(flattenTestStyle(findByTestId(renderer, "practice-prompt-icon").props.style).width)
+      .toBe(Math.round(boardSize / 8));
     if (sessionRail) {
       expect(findByTestId(renderer, "active-session-adaptive-layout")).toBeTruthy();
       expect(findByTestId(renderer, "active-session-board-lane")).toBeTruthy();
@@ -1837,7 +1841,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "chessboard-king-white-sprite")).toBeTruthy();
     expect(findByTestId(renderer, "practice-prompt-side-glyph")).toBeTruthy();
     expect(flattenTestStyle(findByTestId(renderer, "chessboard-king-white-sprite").props.style).width).toBe(
-      Math.min(52, Math.round(Number(flattenTestStyle(findByTestId(renderer, "session-board").props.style).width) / 8)) * 6
+      Math.round(Number(flattenTestStyle(findByTestId(renderer, "session-board").props.style).width) / 8) * 6
     );
     expect(findByTestId(renderer, "session-mistakes-block").props.accessibilityLabel).toBe("Mistakes 0 of 3");
     expect(findByTestId(renderer, "session-mistakes").props.accessibilityLabel).toBe("Mistakes 0 of 3");
@@ -2199,7 +2203,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "chessboard-king-black-sprite")).toBeTruthy();
     expect(findByTestId(renderer, "practice-prompt-side-glyph")).toBeTruthy();
     expect(flattenTestStyle(findByTestId(renderer, "chessboard-king-black-sprite").props.style).width).toBe(
-      Math.min(52, Math.round(Number(flattenTestStyle(findByTestId(renderer, "session-board").props.style).width) / 8)) * 6
+      Math.round(Number(flattenTestStyle(findByTestId(renderer, "session-board").props.style).width) / 8) * 6
     );
     expect(findByTestId(renderer, "session-progress-block").props.accessibilityLabel).toBe("Progress 0 of 1");
   });
@@ -3697,7 +3701,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "chessboard-king-black-sprite")).toBeTruthy();
     expect(findByTestId(renderer, "practice-prompt-side-glyph")).toBeTruthy();
     expect(flattenTestStyle(findByTestId(renderer, "chessboard-king-black-sprite").props.style).width).toBe(
-      Math.min(52, Math.round(Number(flattenTestStyle(findByTestId(renderer, "review-board").props.style).width) / 8)) * 6
+      Math.round(Number(flattenTestStyle(findByTestId(renderer, "review-board").props.style).width) / 8) * 6
     );
     expect(testIdOrder(renderer, "practice-prompt", "review-board")).toBeLessThan(0);
     expect(findByTestId(renderer, "practice-prompt-icon")).toBeTruthy();

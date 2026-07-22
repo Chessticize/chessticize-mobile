@@ -367,7 +367,6 @@ const BOARD_FILES_FLIPPED = ["h", "g", "f", "e", "d", "c", "b", "a"] as const;
 const BOARD_RANKS = ["8", "7", "6", "5", "4", "3", "2", "1"] as const;
 const BOARD_RANKS_FLIPPED = ["1", "2", "3", "4", "5", "6", "7", "8"] as const;
 const CHESS_PIECE_SPRITE = require("../assets/chess-pieces-sprite.png") as ImageSourcePropType;
-const KING_GLYPH_MAX_SIZE = 52;
 const LICHESS_PUZZLE_DATABASE_URL = "https://database.lichess.org/#puzzles";
 const ANALYSIS_DIAGNOSTIC_POSITIONS = [
   {
@@ -5564,7 +5563,10 @@ function PracticePrompt({
 
   return (
     <View style={styles.promptPanel} testID="practice-prompt">
-      <View style={styles.promptIcon} testID="practice-prompt-icon">
+      <View
+        style={[styles.promptIcon, { height: kingPieceSize, width: kingPieceSize }]}
+        testID="practice-prompt-icon"
+      >
         <MoveSideGlyph
           kingPieceSize={kingPieceSize}
           side={promptSide}
@@ -5753,7 +5755,7 @@ function MoveSideGlyph({
 }
 
 function kingGlyphSizeForBoard(boardSize: number): number {
-  return Math.max(1, Math.min(KING_GLYPH_MAX_SIZE, Math.round(boardSize / 8)));
+  return Math.max(1, Math.round(boardSize / 8));
 }
 
 function BoardCoordinateOverlay({
@@ -12563,9 +12565,7 @@ const styles = StyleSheet.create({
   promptIcon: {
     alignItems: "center",
     flexShrink: 0,
-    height: 48,
-    justifyContent: "center",
-    width: 48
+    justifyContent: "center"
   },
   unclearPrompt: {
     alignItems: "center",

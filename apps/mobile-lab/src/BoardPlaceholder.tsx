@@ -61,7 +61,9 @@ const BoardPlaceholder = forwardRef<BoardPlaceholderRef, BoardPlaceholderProps>(
 ) {
   const chessRef = useRef(createChess(fen));
   const [displayFen, setDisplayFen] = useState(fen);
-  const [entryPreviewPhase, setEntryPreviewPhase] = useState<EntryPreviewPhase>("idle");
+  const [entryPreviewPhase, setEntryPreviewPhase] = useState<EntryPreviewPhase>(() =>
+    entryPreviewPlan(fen) ? "watching" : "idle"
+  );
   const [animatedPreviewMove, setAnimatedPreviewMove] = useState<AnimatedPreviewMove | null>(null);
   const [previewLastMove, setPreviewLastMove] = useState<BoardMove | null>(null);
   const [previewReplayToken, setPreviewReplayToken] = useState(0);
@@ -352,8 +354,8 @@ function expectedMoveForLab(): string | undefined {
   if (activePuzzle?.kind === "line") {
     return currentExpectedMove(activePuzzle);
   }
-  const reviewExpectedMove = globalThis.document
-    ?.querySelector<HTMLElement>('[data-testid="review-current-expected-move"]')
+  const reviewExpectedMove = labDocument()
+    ?.querySelector('[data-testid="review-current-expected-move"]')
     ?.textContent
     ?.trim();
   return reviewExpectedMove || undefined;
@@ -391,7 +393,7 @@ function createChess(fen: string): Chess {
 }
 
 function isInputLocked(gestureEnabled: boolean): boolean {
-  return !gestureEnabled || Boolean(globalThis.document?.querySelector('[data-testid="board-input-blocker"]'));
+  return !gestureEnabled || Boolean(labDocument()?.querySelector('[data-testid="board-input-blocker"]'));
 }
 
 function entryPreviewPlan(finalFen: string): EntryPreviewPlan | null {
@@ -400,8 +402,8 @@ function entryPreviewPlan(finalFen: string): EntryPreviewPlan | null {
   }
   const service = getLabPracticeService();
   const activePuzzle = service?.getActiveSprint()?.currentPuzzle;
-  const reviewPuzzleId = globalThis.document
-    ?.querySelector<HTMLElement>('[data-testid="review-current-puzzle-id"]')
+  const reviewPuzzleId = labDocument()
+    ?.querySelector('[data-testid="review-current-puzzle-id"]')
     ?.textContent
     ?.trim();
   const configuredPreviewPuzzleId = getLabPuzzleEntryPreviewPuzzleId();
@@ -425,6 +427,14 @@ function entryPreviewPlan(finalFen: string): EntryPreviewPlan | null {
 
 function normalizedFen(fen: string): string {
   return createChess(fen).fen();
+}
+
+function labDocument(): {
+  querySelector: (selector: string) => { textContent?: string | null } | null;
+} | undefined {
+  return (globalThis as typeof globalThis & {
+    document?: { querySelector: (selector: string) => { textContent?: string | null } | null };
+  }).document;
 }
 
 function pieceGlyph(color: Color, type: PieceSymbol): string {
