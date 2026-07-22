@@ -19,7 +19,7 @@ import {
 } from "../src/backend/mobilePractice";
 import { fixtureNeedsAtLeast, PracticeService } from "../../../packages/storage/src/practice-service";
 import { MemoryStore } from "../../../packages/storage/src/memory-store";
-import { defaultSprintConfig, formatLocalCalendarDate, formatReviewDay, type ArrowDuelState, type AttemptEvent, type Puzzle, type SprintState, type UciEngineTransport } from "../../../packages/core/src/index";
+import { defaultSprintConfig, formatLocalCalendarDate, formatReviewDay, practiceRunSprintConfig, type ArrowDuelState, type AttemptEvent, type Puzzle, type SprintState, type UciEngineTransport } from "../../../packages/core/src/index";
 import { FakeReviewReminderNotificationClient, FakeReviewReminderScheduler } from "../src/backend/reviewReminderScheduler";
 import { FakeICloudProgressSyncClient } from "../src/backend/iCloudProgressSync";
 import type { MobilePlatformCapabilities } from "../src/backend/mobilePlatformCapabilities";
@@ -802,37 +802,6 @@ describe("PracticePocScreen", () => {
     ]);
   });
 
-  it("live-inserts native Run cards while the whole card is dragged", () => {
-    const service = createMobilePracticeService("random1000");
-    const renderer = renderScreen({ practiceService: service, runManagementEnabled: true });
-    press(renderer, "practice-run-home-edit");
-
-    const standard = renderer.root.findAllByProps({ testID: "practice-run-standard" })
-      .find((node) => typeof node.props.onLayout === "function")!;
-    const arrowDuel = renderer.root.findAllByProps({ testID: "practice-run-arrow-duel" })
-      .find((node) => typeof node.props.onLayout === "function")!;
-    act(() => {
-      standard.props.onLayout({ nativeEvent: { layout: { x: 0, y: 0, width: 320, height: 100 } } });
-      arrowDuel.props.onLayout({ nativeEvent: { layout: { x: 0, y: 110, width: 320, height: 100 } } });
-      standard.props.onTouchStart();
-      expect(standard.props.onMoveShouldSetPanResponder({}, { dx: 1, dy: 12 })).toBe(false);
-      jest.advanceTimersByTime(180);
-      expect(standard.props.onMoveShouldSetPanResponder({}, { dx: 1, dy: 12 })).toBe(true);
-      standard.props.onPanResponderGrant();
-      standard.props.onPanResponderMove({}, { dx: 1, dy: 110 });
-    });
-
-    expect(service.listPracticeRuns().filter((run) => !run.archived).map((run) => run.id)).toEqual([
-      "arrow-duel",
-      "standard"
-    ]);
-    act(() => {
-      renderer.root.findAllByProps({ testID: "practice-run-standard" })
-        .find((node) => typeof node.props.onPanResponderRelease === "function")!
-        .props.onPanResponderRelease();
-    });
-  });
-
   it("renders removal confirmation directly below the selected Run card", () => {
     const renderer = renderScreen({
       runManagementPresentation: runManagementPresentation({
@@ -990,6 +959,23 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "settings-tab");
     expect(() => findByTestId(renderer, "settings-standard-elo-row")).toThrow();
+  });
+
+  it("blocks a New Run with no matching local puzzles and keeps its setup editable", () => {
+    const service = new PracticeService(new MemoryStore());
+    const renderer = renderScreen({ practiceService: service, runManagementEnabled: true });
+
+    press(renderer, "practice-add-run");
+    act(() => {
+      findByTestId(renderer, "practice-run-name-input").props.onChangeText("Unavailable Run");
+    });
+
+    expect(findByTestId(renderer, "practice-run-save").props.accessibilityState).toEqual({ disabled: true });
+    expect(collectText(findByTestId(renderer, "practice-run-availability-error"))).toContain(
+      "Choose different themes or settings"
+    );
+    expect(findByTestId(renderer, "practice-run-theme-row")).toBeTruthy();
+    expect(service.listPracticeRuns().some((run) => run.name === "Unavailable Run")).toBe(false);
   });
 
   it("returns a managed Run editor to Home through Android system Back", () => {
@@ -1307,6 +1293,58 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "practice-progress-weekly-solved"))).toBe("1");
     expect(collectText(findByTestId(renderer, "practice-progress-weekly-delta"))).toBe("+1 net");
     expect(collectText(findByTestId(renderer, "practice-progress-weekly-context"))).toBe("100% accuracy · 0 mistakes");
+  });
+
+  it("scopes managed Home progress to the selected Custom Run rating bucket", () => {
+    const store = new MemoryStore();
+    store.seedPuzzles([sharedHistoryPuzzle()]);
+    const service = new PracticeService(store);
+    const customRun = service.createPracticeRun({
+      id: "calculation-lab",
+      name: "Calculation Lab",
+      mode: "custom",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      initialRating: 1000
+    }, "2026-07-07T00:00:00.000Z");
+    store.createSprintSession({
+      ...completedRatingSprintState({
+        id: "managed-custom-session",
+        mode: "custom",
+        completedAt: "2026-07-07T00:02:00.000Z",
+        ratingBefore: 800,
+        ratingAfter: 1000
+      }),
+      config: practiceRunSprintConfig(customRun),
+      run: { id: customRun.id, kind: customRun.kind, name: customRun.name }
+    });
+    for (const [index, result] of (["correct", "wrong"] as const).entries()) {
+      store.recordAttempt({
+        id: `managed-custom-attempt-${index}`,
+        source: "sprint",
+        sessionId: "managed-custom-session",
+        puzzleId: "shared-history",
+        mode: "custom",
+        ratingKey: customRun.ratingKey,
+        result,
+        submittedMove: "e2e4",
+        expectedMove: result === "correct" ? "e2e4" : "e2e3",
+        startedAt: `2026-07-07T00:01:0${index}.000Z`,
+        completedAt: `2026-07-07T00:01:1${index}.000Z`,
+        ratingBefore: 800
+      });
+    }
+
+    const renderer = renderScreen({
+      currentTimeMs: () => Date.parse("2026-07-08T12:00:00.000Z"),
+      practiceService: service,
+      runManagementEnabled: true
+    });
+    press(renderer, "practice-run-select-calculation-lab");
+
+    expect(collectText(findByTestId(renderer, "practice-progress-rating-metric"))).toContain("ELO (Calculation Lab)1000");
+    expect(collectText(findByTestId(renderer, "practice-progress-weekly-solved"))).toBe("1");
+    expect(collectText(findByTestId(renderer, "practice-progress-weekly-context"))).toBe("50% accuracy · 1 mistake");
   });
 
   it("does not scan the bundled Core Pack when rendering custom sprint availability", () => {
@@ -6403,6 +6441,7 @@ function runManagementPresentation(
     runs: [
       {
         id: "standard",
+        ratingKey: "standard 5/20",
         name: "Standard",
         kind: "standard",
         mode: "standard",
@@ -6413,6 +6452,7 @@ function runManagementPresentation(
       },
       {
         id: "tactics-focus",
+        ratingKey: "run:tactics-focus",
         name: "Tactics Focus",
         kind: "custom",
         mode: "custom",
@@ -6423,6 +6463,7 @@ function runManagementPresentation(
       },
       {
         id: "candidate-sprint",
+        ratingKey: "run:candidate-sprint",
         name: "Candidate Sprint",
         kind: "custom",
         mode: "arrow_duel",

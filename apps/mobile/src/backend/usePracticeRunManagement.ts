@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  clampManualRating,
+  DEFAULT_NEW_PRACTICE_RUN_RATING,
+  defaultSprintConfig,
   PracticeRunNameError,
   type PracticeRunRecord
 } from "../../../../packages/core/src/index.ts";
@@ -75,7 +78,7 @@ export function usePracticeRunManagement({
           : current);
         return;
       case "change-elo":
-        setView((current) => updateDraft(current, { elo: Math.max(600, intent.elo) }));
+        setView((current) => updateDraft(current, { elo: clampManualRating(intent.elo) }));
         return;
       case "change-mode":
         setView((current) => current.screen === "create"
@@ -164,6 +167,9 @@ export function usePracticeRunManagement({
         }
         try {
           if (view.screen === "create") {
+            if (!canCreateRunWithLocalPuzzles(service, draft)) {
+              return;
+            }
             const run = service.createPracticeRun({
               name: draft.name,
               mode: draft.mode === "arrow_duel" ? "arrow_duel" : "custom",
@@ -228,6 +234,9 @@ export function usePracticeRunManagement({
     }
     return {
       ...view,
+      canSave: view.screen !== "create" || view.draft === null
+        ? true
+        : canCreateRunWithLocalPuzzles(service, view.draft),
       hiddenRuns: catalog.filter((run) => run.archived).map((run) => presentationForRun(service, run)),
       runs: catalog.filter((run) => !run.archived).map((run) => presentationForRun(service, run)),
       onIntent
@@ -250,20 +259,22 @@ function initialView(catalog: readonly PracticeRunRecord[]): RunManagementViewSt
 }
 
 function newRunDraft(): PracticeRunDraft {
+  const config = defaultSprintConfig("custom");
   return {
     name: "",
     kind: "custom",
     mode: "custom",
-    elo: 900,
-    durationSeconds: 300,
-    perPuzzleSeconds: 20,
-    themes: ["mixed"]
+    elo: DEFAULT_NEW_PRACTICE_RUN_RATING,
+    durationSeconds: config.durationSeconds,
+    perPuzzleSeconds: config.perPuzzleSeconds,
+    themes: config.themes ?? ["mixed"]
   };
 }
 
 function presentationForRun(service: PracticeService, run: PracticeRunRecord): PracticeRunPresentation {
   return {
     id: run.id,
+    ratingKey: run.ratingKey,
     name: run.name,
     kind: run.kind,
     mode: run.mode,
@@ -272,6 +283,21 @@ function presentationForRun(service: PracticeService, run: PracticeRunRecord): P
     perPuzzleSeconds: run.perPuzzleSeconds,
     themes: run.themes ?? ["mixed"]
   };
+}
+
+function canCreateRunWithLocalPuzzles(
+  service: PracticeService,
+  draft: PracticeRunDraft
+): boolean {
+  const themes = draft.themes.filter((theme) => theme !== "mixed");
+  return service.countEligiblePracticeRunPuzzles({
+    name: draft.name,
+    mode: draft.mode === "arrow_duel" ? "arrow_duel" : "custom",
+    durationSeconds: draft.durationSeconds,
+    perPuzzleSeconds: draft.perPuzzleSeconds,
+    initialRating: draft.elo,
+    ...(themes.length === 0 ? {} : { themes })
+  }, 1) > 0;
 }
 
 function selectedActiveRunId(catalog: readonly PracticeRunRecord[], preferredId: string | null): string | null {

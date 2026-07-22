@@ -39,13 +39,16 @@ import {
   historyAttemptSpeedSeconds,
   isUnclearAttemptEligible,
   isReviewOverdue,
+  MANUAL_RATING_STEP,
   normalizeHistoryAttemptDetail,
   normalizeThemeSelection,
+  RATING_FLOOR,
   reviewDueState,
   reviewDueLabel,
   reviewQueueForecast,
   submitArrowDuelChoice,
-  submitLineMove
+  submitLineMove,
+  stepManualRating
 } from "../../../../packages/core/src/index.ts";
 import type {
   AttemptEvent,
@@ -64,6 +67,7 @@ import type {
   Puzzle,
   PuzzleFeedback,
   PuzzleLineState,
+  PracticeRunRecord,
   RatingRecord,
   ReviewAnalysisLine,
   ReviewReminderDecision,
@@ -1140,8 +1144,10 @@ export function PracticePocScreen({
   }
 
   function startPracticeRun(runId: string): void {
-    const run = service.listPracticeRuns().find((candidate) => candidate.id === runId && !candidate.archived);
-    if (!run) {
+    let run: PracticeRunRecord;
+    try {
+      run = service.getActivePracticeRun(runId);
+    } catch {
       setError("This run is no longer available on Home.");
       internalRunManagement.refresh();
       return;
@@ -2388,14 +2394,18 @@ export function PracticePocScreen({
   // Quantized to the minute so the 500ms countdown tick does not rescan the
   // full attempt history on every render during an active sprint.
   const practiceProgressNowMs = Math.floor(nowMs / 60000) * 60000;
+  const selectedManagedRun = activeRunManagementPresentation?.runs.find(
+    (run) => run.id === activeRunManagementPresentation.selectedRunId
+  );
+  const practiceProgressRatingKey = selectedManagedRun?.ratingKey ?? selectedConfig.ratingKey;
   const practiceProgress = useMemo(
     () => buildPracticeProgressSummary(
       attempts,
       sprintSessions,
       practiceProgressNowMs,
-      selectedConfig.ratingKey
+      practiceProgressRatingKey
     ),
-    [attempts, sprintSessions, practiceProgressNowMs, selectedConfig.ratingKey]
+    [attempts, sprintSessions, practiceProgressNowMs, practiceProgressRatingKey]
   );
   const dueTodayCount = dueReviewItems.length;
   const overdueCount = dueReviewItems.filter((item) => isReviewOverdue(item.review, nowMs)).length;
@@ -2718,7 +2728,7 @@ export function PracticePocScreen({
                     mode={mode}
                     modes={practiceModeSummaries}
                     currentRating={activeRunManagementPresentation
-                      ? activeRunManagementPresentation.runs.find((run) => run.id === activeRunManagementPresentation.selectedRunId)?.elo ?? 600
+                      ? selectedManagedRun?.elo ?? RATING_FLOOR
                       : currentRating}
                     dueReviewCount={dueTodayCount}
                     overdueReviewCount={overdueCount}
@@ -4021,6 +4031,7 @@ function PracticeRunEditor({
         closeTestID="practice-run-editor-close"
         headerTestID="practice-run-editor-header"
         startAccessibilityLabel={isCreate ? "Add run to Home" : `Save ${draft.name} ELO`}
+        startDisabled={presentation.canSave === false}
         startTestID="practice-run-save"
         title={isCreate ? "New Run" : "Edit ELO"}
         titleTestID="practice-run-editor-title"
@@ -4040,6 +4051,19 @@ function PracticeRunEditor({
             : "Adjust the current ELO. Run settings stay fixed."}
         </Text>
       </View>
+
+      {isCreate && presentation.canSave === false ? (
+        <View
+          accessibilityLiveRegion="polite"
+          style={[styles.customEligibilityCard, styles.customEligibilityWarning]}
+          testID="practice-run-availability-error"
+        >
+          <Text style={styles.sectionLabel}>No matching local puzzles</Text>
+          <Text style={styles.helperText}>
+            Choose different themes or settings before adding this Run to Home.
+          </Text>
+        </View>
+      ) : null}
 
       <View style={styles.customConfigCard} testID="practice-run-editor-fields">
         {isCreate ? (
@@ -4164,12 +4188,14 @@ function PracticeRunEloRow({
   onChange: (elo: number) => void;
   value: number;
 }): React.JSX.Element {
-  const canDecrease = value > 600;
+  const canDecrease = value > RATING_FLOOR;
   return (
     <View style={styles.customConfigRow} testID="practice-run-elo-row">
       <View style={styles.customChoiceCopy}>
         <Text style={styles.listText}>{isCreate ? "Starting ELO" : "Current ELO"}</Text>
-        <Text style={styles.requiredFieldLabel}>Adjusts by 25 · minimum 600</Text>
+        <Text style={styles.requiredFieldLabel}>
+          Adjusts by {MANUAL_RATING_STEP} · minimum {RATING_FLOOR}
+        </Text>
       </View>
       <View style={styles.advancedRatingControls}>
         <Pressable
@@ -4179,7 +4205,7 @@ function PracticeRunEloRow({
           disabled={!canDecrease}
           style={[styles.customStepperButton, !canDecrease ? styles.disabledButton : null]}
           testID="practice-run-elo-decrease"
-          onPress={() => onChange(Math.max(600, value - 25))}
+          onPress={() => onChange(stepManualRating(value, -1))}
         >
           <MinusGlyph />
         </Pressable>
@@ -4189,7 +4215,7 @@ function PracticeRunEloRow({
           accessibilityLabel="Increase run ELO"
           style={styles.customStepperButton}
           testID="practice-run-elo-increase"
-          onPress={() => onChange(value + 25)}
+          onPress={() => onChange(stepManualRating(value, 1))}
         >
           <PlusGlyph />
         </Pressable>
@@ -9949,7 +9975,7 @@ function AdvancedRatingRow({
   record: RatingRecord;
   testID: string;
 }): React.JSX.Element {
-  const decrementDisabled = record.rating <= 600;
+  const decrementDisabled = record.rating <= RATING_FLOOR;
   return (
     <View style={styles.advancedRatingRow} testID={testID}>
       <View style={styles.advancedRatingCopy}>
@@ -9964,7 +9990,7 @@ function AdvancedRatingRow({
           disabled={decrementDisabled}
           testID={`${testID}-decrease`}
           style={[styles.customStepperButton, decrementDisabled ? styles.disabledButton : null]}
-          onPress={() => onAdjust(record.key, Math.max(600, record.rating - 25))}
+          onPress={() => onAdjust(record.key, stepManualRating(record.rating, -1))}
         >
           <MinusGlyph />
         </Pressable>
@@ -9974,7 +10000,7 @@ function AdvancedRatingRow({
           accessibilityLabel={`Increase ${label} rating`}
           testID={`${testID}-increase`}
           style={styles.customStepperButton}
-          onPress={() => onAdjust(record.key, record.rating + 25)}
+          onPress={() => onAdjust(record.key, stepManualRating(record.rating, 1))}
         >
           <PlusGlyph />
         </Pressable>

@@ -1,10 +1,13 @@
-export type PracticeRunKind = "standard" | "arrow_duel" | "custom";
+import type { PracticeRunKind, PracticeRunRecord } from "../../../../packages/core/src/index.ts";
+
+export type { PracticeRunKind } from "../../../../packages/core/src/index.ts";
 
 export type PracticeRunPresentation = {
   id: string;
+  ratingKey?: string;
   name: string;
   kind: PracticeRunKind;
-  mode: "standard" | "custom" | "arrow_duel";
+  mode: PracticeRunRecord["mode"];
   elo: number;
   durationSeconds: number;
   perPuzzleSeconds: number;
@@ -36,6 +39,7 @@ export type PracticeRunManagementIntent =
   | { type: "toggle-home-edit" };
 
 export type PracticeRunManagementPresentation = {
+  canSave?: boolean;
   draft: PracticeRunDraft | null;
   hiddenRuns: readonly PracticeRunPresentation[];
   homeEditing: boolean;

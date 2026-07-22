@@ -17,6 +17,7 @@ import {
   resolveHistoryRange,
   scheduleMistakeForContext,
   scheduleReview,
+  samePracticeRun,
   sameReviewContext,
   sideToMoveForHistoryPuzzle,
   updateAttemptUnclearState
@@ -720,10 +721,6 @@ function sameRating(left: RatingRecord, right: RatingRecord): boolean {
     left.games === right.games &&
     left.ratingDeviation === right.ratingDeviation &&
     left.volatility === right.volatility;
-}
-
-function samePracticeRun(left: PracticeRunRecord | undefined, right: PracticeRunRecord): boolean {
-  return left !== undefined && JSON.stringify(clonePracticeRun(left)) === JSON.stringify(clonePracticeRun(right));
 }
 
 function sameReviewQueue(left: ReviewQueueState | undefined, right: ReviewQueueState): boolean {

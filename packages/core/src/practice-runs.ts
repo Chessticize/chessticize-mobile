@@ -5,6 +5,7 @@ export const STANDARD_PRACTICE_RUN_ID = "standard";
 export const ARROW_DUEL_PRACTICE_RUN_ID = "arrow-duel";
 export const PRACTICE_RUN_NAME_MAX_LENGTH = 40;
 export const PRACTICE_RUN_RATING_KEY_PREFIX = "run:";
+export const DEFAULT_NEW_PRACTICE_RUN_RATING = 900;
 const PRACTICE_RUN_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
 const BUILT_IN_UPDATED_AT = "1970-01-01T00:00:00.000Z";
@@ -188,6 +189,13 @@ export function mergePracticeRunCatalogs(
 
 export function clonePracticeRun(run: PracticeRunRecord): PracticeRunRecord {
   return { ...run, ...(run.themes === undefined ? {} : { themes: [...run.themes] }) };
+}
+
+export function samePracticeRun(
+  left: PracticeRunRecord | undefined,
+  right: PracticeRunRecord
+): boolean {
+  return left !== undefined && stablePracticeRunValue(left) === stablePracticeRunValue(right);
 }
 
 export function isPracticeRunRatingKey(value: string): boolean {

@@ -26,6 +26,16 @@ for (const backend of ["memory", "sqlite"] as const) {
       store.seedPuzzles(await loadFixturePuzzles());
       const service = new PracticeService(store);
 
+      const ratingsBeforeEligibilityCheck = service.listRatings();
+      assert.equal(service.countEligiblePracticeRunPuzzles({
+        name: "Draft Run",
+        mode: "custom",
+        durationSeconds: 300,
+        perPuzzleSeconds: 20,
+        initialRating: 900
+      }, 1), 1);
+      assert.deepEqual(service.listRatings(), ratingsBeforeEligibilityCheck);
+
       assert.deepEqual(
         service.listPracticeRuns().map(({ id, ratingKey }) => ({ id, ratingKey })),
         [
@@ -72,8 +82,10 @@ for (const backend of ["memory", "sqlite"] as const) {
 
       service.archivePracticeRun(tactics.id, "2026-07-22T10:03:00.000Z");
       assert.equal(service.listPracticeRuns().find((run) => run.id === tactics.id)?.archived, true);
+      assert.throws(() => service.getActivePracticeRun(tactics.id), /not available/);
       assert.equal(service.getRating(tactics.ratingKey).rating, 1025);
       service.restorePracticeRun(tactics.id, "2026-07-22T10:04:00.000Z");
+      assert.equal(service.getActivePracticeRun(tactics.id).name, "Tactics Focus");
       assert.equal(service.listPracticeRuns().filter((run) => !run.archived).at(-1)?.id, tactics.id);
       assert.equal(service.getRating(tactics.ratingKey).rating, 1025);
 

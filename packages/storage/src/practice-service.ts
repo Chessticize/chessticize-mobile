@@ -2,6 +2,7 @@ import {
   abandonSprint as abandonSprintCore,
   applySprintRatingChange,
   archivePracticeRun,
+  assertValidManualRating,
   buildSprintConfig,
   clonePracticeRun,
   createCustomPracticeRun,
@@ -13,7 +14,6 @@ import {
   reorderPracticeRuns,
   restorePracticeRun,
   pauseSprint as pauseSprintCore,
-  RATING_FLOOR,
   reviewDayFor,
   resumeSprint as resumeSprintCore,
   serializeSprintView,
@@ -111,13 +111,7 @@ export class PracticeService {
     const practiceRun = command.practiceRunId === undefined
       ? undefined
       : this.requirePracticeRun(command.practiceRunId, false);
-    const storedRunConfig = practiceRun ? practiceRunSprintConfig(practiceRun) : undefined;
-    const config = storedRunConfig
-      ? {
-          ...storedRunConfig,
-          ...(command.targetCorrect === undefined ? {} : { targetCorrect: command.targetCorrect })
-        }
-      : this.sprintConfigForCommand(command);
+    const config = this.resolveSprintConfig(command, practiceRun);
     const rating = this.store.getRating(config.ratingKey);
     const puzzles = this.store.selectPuzzles(this.puzzleFilterForCommand(command, config, rating.rating));
     if (puzzles.length === 0) {
@@ -415,6 +409,10 @@ export class PracticeService {
     return current.rating === rating ? current : this.setRating(run.ratingKey, rating);
   }
 
+  getActivePracticeRun(runId: string): PracticeRunRecord {
+    return clonePracticeRun(this.requirePracticeRun(runId, false));
+  }
+
   getSettings(): PracticeSettings {
     return this.store.getSettings();
   }
@@ -443,16 +441,22 @@ export class PracticeService {
     const practiceRun = command.practiceRunId === undefined
       ? undefined
       : this.requirePracticeRun(command.practiceRunId, false);
-    const storedRunConfig = practiceRun ? practiceRunSprintConfig(practiceRun) : undefined;
-    const config = storedRunConfig
-      ? {
-          ...storedRunConfig,
-          ...(command.targetCorrect === undefined ? {} : { targetCorrect: command.targetCorrect })
-        }
-      : this.sprintConfigForCommand(command);
+    const config = this.resolveSprintConfig(command, practiceRun);
     const rating = this.store.getRating(config.ratingKey);
     return this.store.countPuzzles({
       ...this.puzzleFilterForCommand(command, config, rating.rating),
+      limit: maximum
+    });
+  }
+
+  countEligiblePracticeRunPuzzles(
+    command: CreatePracticeRunCommand,
+    maximum = Number.MAX_SAFE_INTEGER
+  ): number {
+    assertValidManualRating(command.initialRating);
+    const config = this.sprintConfigForCommand(command);
+    return this.store.countPuzzles({
+      ...this.puzzleFilterForCommand(command, config, command.initialRating),
       limit: maximum
     });
   }
@@ -572,6 +576,19 @@ export class PracticeService {
       configInput.themes = themes;
     }
     return buildSprintConfig(configInput);
+  }
+
+  private resolveSprintConfig(
+    command: StartSprintCommand,
+    practiceRun: PracticeRunRecord | undefined
+  ): SprintConfig {
+    const storedRunConfig = practiceRun ? practiceRunSprintConfig(practiceRun) : undefined;
+    return storedRunConfig
+      ? {
+          ...storedRunConfig,
+          ...(command.targetCorrect === undefined ? {} : { targetCorrect: command.targetCorrect })
+        }
+      : this.sprintConfigForCommand(command);
   }
 
   private puzzleFilterForCommand(command: StartSprintCommand, config: SprintConfig, rating: number): {
@@ -703,15 +720,6 @@ function customSprintConfigId(config: SprintConfig): string {
     config.perPuzzleSeconds,
     themes.length > 0 ? themes.join("+") : "mixed"
   ].join("-");
-}
-
-function assertValidManualRating(rating: number): void {
-  if (!Number.isInteger(rating)) {
-    throw new Error("Rating must be an integer");
-  }
-  if (rating < RATING_FLOOR) {
-    throw new Error(`Rating must be at least ${RATING_FLOOR}`);
-  }
 }
 
 function generatePracticeRunId(): string {

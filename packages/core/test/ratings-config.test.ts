@@ -2,16 +2,29 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   applySprintRatingChange,
+  assertValidManualRating,
   buildSprintConfig,
   calculateSprintRatingChange,
   calculateRatingUpdate,
+  clampManualRating,
   createDefaultRating,
   DEFAULT_RATING_DEVIATION,
   DEFAULT_VOLATILITY,
   normalizeThemeSelection,
   ratingKeyForConfig,
-  resetRating
+  resetRating,
+  stepManualRating
 } from "../src/index.ts";
+
+test("manual rating edits share the 25-point step and 600 floor", () => {
+  assert.equal(stepManualRating(625, -1), 600);
+  assert.equal(stepManualRating(600, -1), 600);
+  assert.equal(stepManualRating(600, 1), 625);
+  assert.equal(clampManualRating(575), 600);
+  assert.doesNotThrow(() => assertValidManualRating(600));
+  assert.throws(() => assertValidManualRating(599), /at least 600/);
+  assert.throws(() => clampManualRating(600.5), /integer/);
+});
 
 test("ratingKeyForConfig and buildSprintConfig keep custom sprint buckets separate", () => {
   assert.equal(

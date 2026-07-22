@@ -54,8 +54,10 @@ describe('Practice POC', () => {
     await element(by.id('practice-run-name-input')).replaceText('Calculation Lab');
     await element(by.id('practice-run-save')).tap();
 
-    await waitFor(element(by.id('practice-run-home-done'))).toBeVisible().withTimeout(10000);
+    await waitFor(element(by.id('practice-run-home-edit'))).toBeVisible().withTimeout(10000);
     await expect(element(by.text('Calculation Lab'))).toExist();
+    await element(by.id('practice-run-home-edit')).tap();
+    await waitFor(element(by.id('practice-run-home-done'))).toBeVisible().withTimeout(10000);
 
     const standardBefore = await frameFor(element(by.id('practice-run-standard')));
     const arrowBefore = await frameFor(element(by.id('practice-run-arrow-duel')));

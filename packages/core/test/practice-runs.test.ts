@@ -37,6 +37,44 @@ test("Custom Runs use stable independent rating keys even with identical configu
     () => createRun("invalid id", "Invalid ID", [...existingRuns, first, second]),
     /opaque alphanumeric identifier/
   );
+  const validInput = {
+    id: "valid-input",
+    name: "Valid input",
+    mode: "custom" as const,
+    durationSeconds: 600,
+    perPuzzleSeconds: 30,
+    targetCorrect: 20,
+    maxMistakes: 3,
+    themes: ["fork", "pin"],
+    homeOrder: existingRuns.length,
+    updatedAt: NOW,
+    existingRuns: [...existingRuns, first, second]
+  };
+  for (const [field, value] of [
+    ["durationSeconds", 0],
+    ["perPuzzleSeconds", -1],
+    ["targetCorrect", 1.5],
+    ["maxMistakes", 0]
+  ] as const) {
+    assert.throws(
+      () => createCustomPracticeRun({
+        ...validInput,
+        id: `invalid-${field}`,
+        name: `Invalid ${field}`,
+        [field]: value,
+      }),
+      /positive integer/
+    );
+  }
+  assert.throws(
+    () => createCustomPracticeRun({
+      ...validInput,
+      id: "invalid-home-order",
+      name: "Invalid home order",
+      homeOrder: -1,
+    }),
+    /non-negative integer/
+  );
   assert.deepEqual(practiceRunSprintConfig(first), {
     mode: "custom",
     durationSeconds: 600,
@@ -76,18 +114,30 @@ test("reorder, archive, and restore preserve identity and append restored Runs",
 
 test("sync merge is deterministic, uses last-write-wins per identity, and resolves concurrent names", () => {
   const base = defaultPracticeRuns();
-  const local = createRun("run-a", "Focus", base);
-  const remote = {
-    ...createRun("run-b", "focus", base),
+  const local = { ...createRun("run-a", "Focus", base), updatedAt: "2026-07-22T18:30:00.000Z" };
+  const remoteEdit = {
+    ...local,
+    name: "Focus Updated",
     archived: true,
     updatedAt: "2026-07-22T19:00:00.000Z"
   };
-  const localEdit = { ...local, archived: false, updatedAt: "2026-07-22T18:30:00.000Z" };
-  const left = mergePracticeRunCatalogs([...base, localEdit], [remote]);
-  const right = mergePracticeRunCatalogs([remote], [...base, localEdit]);
+  const concurrentName = {
+    ...createRun("run-b", "focus updated", base),
+    updatedAt: "2026-07-22T18:45:00.000Z"
+  };
+  const left = mergePracticeRunCatalogs([...base, local], [remoteEdit, concurrentName]);
+  const right = mergePracticeRunCatalogs([remoteEdit, concurrentName], [...base, local]);
   assert.deepEqual(left, right);
-  assert.deepEqual(left.filter((run) => run.kind === "custom").map((run) => run.name), ["Focus", "focus (2)"]);
-  assert.equal(left.find((run) => run.id === "run-b")?.archived, true);
+  assert.deepEqual(left.filter((run) => run.kind === "custom").map((run) => run.name), ["focus updated", "Focus Updated (2)"]);
+  assert.equal(left.find((run) => run.id === "run-a")?.archived, true);
+  assert.equal(left.find((run) => run.id === "run-a")?.name, "Focus Updated (2)");
+
+  const tieLeft = { ...local, name: "Alpha", updatedAt: NOW };
+  const tieRight = { ...local, name: "Omega", updatedAt: NOW };
+  assert.deepEqual(
+    mergePracticeRunCatalogs([tieLeft], [tieRight]),
+    mergePracticeRunCatalogs([tieRight], [tieLeft])
+  );
 });
 
 function createRun(id: string, name: string, existingRuns: ReturnType<typeof defaultPracticeRuns>) {
