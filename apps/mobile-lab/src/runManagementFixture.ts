@@ -1,9 +1,53 @@
-import type {
-  PracticeRunDraft,
-  PracticeRunManagementIntent,
-  PracticeRunManagementPresentation,
-  PracticeRunPresentation
-} from "../../mobile/src/components/PracticePocScreen.tsx";
+// Keep the deterministic Lab fixture on the root TypeScript boundary, which
+// intentionally excludes React Native TSX. LabScenario's prop assignment still
+// checks this structural contract against PracticePocScreen during Lab typecheck.
+type PracticeRunPresentation = {
+  id: string;
+  name: string;
+  kind: "standard" | "arrow_duel" | "custom";
+  mode: "standard" | "custom" | "arrow_duel";
+  elo: number;
+  durationSeconds: number;
+  perPuzzleSeconds: number;
+  themes: readonly string[];
+};
+
+type PracticeRunDraft = Omit<PracticeRunPresentation, "id"> & {
+  id?: string;
+};
+
+type PracticeRunManagementIntent =
+  | { type: "add-run" }
+  | { type: "cancel-edit" }
+  | { type: "change-duration"; durationSeconds: number }
+  | { type: "change-elo"; elo: number }
+  | { type: "change-mode"; mode: "custom" | "arrow_duel" }
+  | { type: "change-name"; name: string }
+  | { type: "change-per-puzzle"; perPuzzleSeconds: number }
+  | { type: "change-themes"; themes: string[] }
+  | { type: "confirm-remove" }
+  | { type: "dismiss-remove" }
+  | { type: "edit-run"; runId: string }
+  | { type: "move-run"; direction: "up" | "down"; runId: string }
+  | { type: "remove-run"; runId: string }
+  | { type: "restore-run"; runId: string }
+  | { type: "save-run" }
+  | { type: "select-run"; runId: string }
+  | { type: "start-selected-run" }
+  | { type: "toggle-home-edit" };
+
+type PracticeRunManagementPresentation = {
+  draft: PracticeRunDraft | null;
+  hiddenRuns: readonly PracticeRunPresentation[];
+  homeEditing: boolean;
+  nameError: string | null;
+  notice: string | null;
+  removeCandidateId: string | null;
+  runs: readonly PracticeRunPresentation[];
+  screen: "home" | "create" | "edit";
+  selectedRunId: string | null;
+  onIntent: (intent: PracticeRunManagementIntent) => void;
+};
 
 export type RunManagementFixtureState = Omit<PracticeRunManagementPresentation, "onIntent">;
 
