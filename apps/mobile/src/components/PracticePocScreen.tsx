@@ -132,6 +132,7 @@ interface Props {
   platformCapabilities: MobilePlatformCapabilities;
   arrowDuelTargetCorrect?: number;
   customThemeSelection?: CustomThemeSelection;
+  themeCatalogPresentation?: ThemeCatalogPresentation;
   customTargetCorrect?: number;
   debugTrace?: (event: PracticeDebugTraceEvent) => void;
   currentTimeMs?: () => number;
@@ -145,6 +146,18 @@ interface Props {
 export type CustomThemeSelection = {
   selectedThemes: readonly CustomThemeFilter[];
   onChange: (selectedThemes: CustomThemeFilter[]) => void;
+};
+
+export type ThemeCatalogLayout = "wrap" | "rails" | "groups";
+
+export type ThemeCatalogGroup = {
+  label: string;
+  themes: readonly string[];
+};
+
+export type ThemeCatalogPresentation = {
+  groups: readonly ThemeCatalogGroup[];
+  layout: ThemeCatalogLayout;
 };
 
 type Tab = MobileBackTab;
@@ -431,6 +444,7 @@ export function PracticePocScreen({
   platformCapabilities,
   arrowDuelTargetCorrect,
   customThemeSelection,
+  themeCatalogPresentation,
   customTargetCorrect,
   debugTrace,
   currentTimeMs = Date.now,
@@ -567,8 +581,11 @@ export function PracticePocScreen({
     }
   }, [isOpenSession, practiceExitConfirmationVisible]);
   const selectedCustomThemes = useMemo(
-    () => normalizeCustomThemeSelection(customThemeSelection?.selectedThemes ?? customThemes),
-    [customThemeSelection?.selectedThemes, customThemes]
+    () => normalizeCustomThemeSelection(
+      customThemeSelection?.selectedThemes ?? customThemes,
+      themeCatalogPresentation ? themeCatalogThemes(themeCatalogPresentation) : undefined
+    ),
+    [customThemeSelection?.selectedThemes, customThemes, themeCatalogPresentation]
   );
   const selectedSprintThemes = useMemo(
     () => themesForCustomSprint(selectedCustomThemes),
@@ -2622,6 +2639,7 @@ export function PracticePocScreen({
                     durationSeconds={customDurationSeconds}
                     perPuzzleSeconds={customPerPuzzleSeconds}
                     selectedThemes={selectedCustomThemes}
+                    themeCatalogPresentation={themeCatalogPresentation}
                     targetCorrect={selectedConfig.targetCorrect}
                     maxMistakes={selectedConfig.maxMistakes}
                     availablePuzzleCount={customEligiblePuzzleCount}
@@ -2649,7 +2667,10 @@ export function PracticePocScreen({
                     onCustomModeChange={setCustomSprintMode}
                     onPerPuzzleChange={setCustomPerPuzzleSeconds}
                     onThemesChange={(nextThemes) => {
-                      const normalizedThemes = normalizeCustomThemeSelection(nextThemes);
+                      const normalizedThemes = normalizeCustomThemeSelection(
+                        nextThemes,
+                        themeCatalogPresentation ? themeCatalogThemes(themeCatalogPresentation) : undefined
+                      );
                       if (customThemeSelection) {
                         customThemeSelection.onChange(normalizedThemes);
                         return;
@@ -2740,6 +2761,7 @@ export function PracticePocScreen({
                   unclearOnly={historyUnclearOnly}
                   sprintOnly={historySourceFilter === "sprint"}
                   wrongOnly={historyWrongOnly}
+                  themeCatalogPresentation={themeCatalogPresentation}
                   filtersExpanded={historyFiltersExpanded}
                   onFiltersExpandedChange={setHistoryFiltersExpanded}
                   onRatingKeyChange={(ratingKey) => {
@@ -3330,6 +3352,7 @@ function CustomSprintSetup({
   previousConfigs,
   ratingForKey,
   selectedThemes,
+  themeCatalogPresentation,
   targetCorrect,
   ratingKey,
   onDurationChange,
@@ -3353,6 +3376,7 @@ function CustomSprintSetup({
   previousConfigs: CustomSprintConfigRecord[];
   ratingForKey: (ratingKey: string) => number;
   selectedThemes: readonly CustomThemeFilter[];
+  themeCatalogPresentation?: ThemeCatalogPresentation;
   targetCorrect: number;
   ratingKey: string;
   onDurationChange: (next: number) => void;
@@ -3389,6 +3413,7 @@ function CustomSprintSetup({
         />
         <CustomThemeChoiceRow
           selectedThemes={selectedThemes}
+          themeCatalogPresentation={themeCatalogPresentation}
           testID="custom-theme-row"
           onChange={(nextTheme) => {
             onThemesChange(nextCustomThemeSelection(selectedThemes, nextTheme));
@@ -3670,38 +3695,165 @@ function CustomValueRow({
 function CustomThemeChoiceRow({
   onChange,
   selectedThemes,
+  themeCatalogPresentation,
   testID,
 }: {
   onChange: (next: CustomThemeFilter) => void;
   selectedThemes: readonly CustomThemeFilter[];
+  themeCatalogPresentation?: ThemeCatalogPresentation;
   testID: string;
 }): React.JSX.Element {
+  if (themeCatalogPresentation) {
+    return (
+      <ThemeCatalogChoiceRow
+        onChange={onChange}
+        presentation={themeCatalogPresentation}
+        selectedThemes={selectedThemes}
+        testID={testID}
+      />
+    );
+  }
+
   return (
     <View style={[styles.customConfigRow, styles.customThemeRow]} testID={testID}>
       <View style={[styles.customInlineOptions, styles.customThemeOptions]}>
         {CUSTOM_THEME_OPTIONS.map((option) => {
-          const selected = selectedThemes.includes(option);
-          const label = customThemeLabel(option);
-          const representsAllThemes = option === ALL_THEMES_FILTER;
           return (
-            <Pressable
+            <ThemeChoiceChip
               key={option}
-              accessibilityHint={representsAllThemes
-                ? "Selects all themes and clears named theme selections"
-                : "Adds or removes this theme"}
-              accessibilityRole={representsAllThemes ? "button" : "checkbox"}
-              accessibilityLabel={representsAllThemes ? "All puzzle themes" : `${label} puzzle theme`}
-              accessibilityState={representsAllThemes ? { selected } : { checked: selected }}
-              testID={`custom-theme-${representsAllThemes ? "mixed" : safeTestId(label)}`}
-              style={[styles.customMiniChip, selected ? styles.customMiniChipActive : null]}
+              option={option}
+              selected={selectedThemes.includes(option)}
               onPress={() => onChange(option)}
-            >
-              <Text style={[styles.customMiniChipText, selected ? styles.customMiniChipTextActive : null]}>{label}</Text>
-            </Pressable>
+            />
           );
         })}
       </View>
     </View>
+  );
+}
+
+function ThemeCatalogChoiceRow({
+  onChange,
+  presentation,
+  selectedThemes,
+  testID
+}: {
+  onChange: (next: CustomThemeFilter) => void;
+  presentation: ThemeCatalogPresentation;
+  selectedThemes: readonly CustomThemeFilter[];
+  testID: string;
+}): React.JSX.Element {
+  const allChip = (
+    <ThemeChoiceChip
+      option={ALL_THEMES_FILTER}
+      selected={selectedThemes.includes(ALL_THEMES_FILTER)}
+      onPress={() => onChange(ALL_THEMES_FILTER)}
+    />
+  );
+
+  if (presentation.layout === "wrap") {
+    return (
+      <View style={styles.themeCatalogSection} testID={testID}>
+        <Text style={styles.themeCatalogTitle}>Themes</Text>
+        <View style={styles.themeCatalogWrap} testID="custom-theme-wrap-options">
+          {allChip}
+          {themeCatalogThemes(presentation).map((theme) => (
+            <ThemeChoiceChip
+              key={theme}
+              option={theme}
+              selected={selectedThemes.includes(theme)}
+              onPress={() => onChange(theme)}
+            />
+          ))}
+        </View>
+      </View>
+    );
+  }
+
+  if (presentation.layout === "rails") {
+    return (
+      <View style={styles.themeCatalogSection} testID={testID}>
+        <View style={styles.themeCatalogHeadingRow}>
+          <Text style={styles.themeCatalogTitle}>Themes</Text>
+          {allChip}
+        </View>
+        {presentation.groups.map((group) => (
+          <View key={group.label} style={styles.themeCatalogGroup}>
+            <Text style={styles.themeCatalogGroupLabel}>{group.label}</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              testID={`custom-theme-rail-${safeTestId(group.label)}`}
+            >
+              <View style={styles.themeCatalogRailContent}>
+                {group.themes.map((theme) => (
+                  <ThemeChoiceChip
+                    key={theme}
+                    option={theme}
+                    selected={selectedThemes.includes(theme)}
+                    onPress={() => onChange(theme)}
+                  />
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+        ))}
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.themeCatalogSection} testID={testID}>
+      <View style={styles.themeCatalogHeadingRow}>
+        <Text style={styles.themeCatalogTitle}>Themes</Text>
+        {allChip}
+      </View>
+      <View style={styles.themeCatalogGroupGrid}>
+        {presentation.groups.map((group) => (
+          <View key={group.label} style={styles.themeCatalogGroupCard}>
+            <Text style={styles.themeCatalogGroupLabel}>{group.label}</Text>
+            <View style={styles.themeCatalogGroupOptions}>
+              {group.themes.map((theme) => (
+                <ThemeChoiceChip
+                  key={theme}
+                  option={theme}
+                  selected={selectedThemes.includes(theme)}
+                  onPress={() => onChange(theme)}
+                />
+              ))}
+            </View>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function ThemeChoiceChip({
+  onPress,
+  option,
+  selected
+}: {
+  onPress: () => void;
+  option: CustomThemeFilter;
+  selected: boolean;
+}): React.JSX.Element {
+  const label = customThemeLabel(option);
+  const representsAllThemes = option === ALL_THEMES_FILTER;
+  return (
+    <Pressable
+      accessibilityHint={representsAllThemes
+        ? "Selects all themes and clears named theme selections"
+        : "Adds or removes this theme"}
+      accessibilityRole={representsAllThemes ? "button" : "checkbox"}
+      accessibilityLabel={representsAllThemes ? "All puzzle themes" : `${label} puzzle theme`}
+      accessibilityState={representsAllThemes ? { selected } : { checked: selected }}
+      testID={`custom-theme-${representsAllThemes ? "mixed" : safeTestId(label)}`}
+      style={[styles.customMiniChip, selected ? styles.customMiniChipActive : null]}
+      onPress={onPress}
+    >
+      <Text style={[styles.customMiniChipText, selected ? styles.customMiniChipTextActive : null]}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -4834,6 +4986,7 @@ function HistoryPanel({
   unclearOnly,
   sprintOnly,
   wrongOnly,
+  themeCatalogPresentation,
   onRatingKeyChange,
   onTimeRangeChange,
   onSourceFilterChange,
@@ -4868,6 +5021,7 @@ function HistoryPanel({
   unclearOnly: boolean;
   sprintOnly: boolean;
   wrongOnly: boolean;
+  themeCatalogPresentation?: ThemeCatalogPresentation;
   onRatingKeyChange: (ratingKey: string | null) => void;
   onTimeRangeChange: (range: HistoryTimeRange) => void;
   onSourceFilterChange: (source: "all" | AttemptSource) => void;
@@ -5098,6 +5252,7 @@ function HistoryPanel({
         <HistoryAttemptRow
           key={attempt.id}
           attempt={attempt}
+          themeCatalogPresentation={themeCatalogPresentation}
           onOpen={() => onOpenAttempt(attempt.id)}
         />
       ))}
@@ -5528,9 +5683,11 @@ function HistoryQuickToggle({
 
 function HistoryAttemptRow({
   attempt,
+  themeCatalogPresentation,
   onOpen
 }: {
   attempt: HistoryAttemptView;
+  themeCatalogPresentation?: ThemeCatalogPresentation;
   onOpen: () => void;
 }): React.JSX.Element {
   const detail = normalizeHistoryAttemptDetail(attempt);
@@ -5541,6 +5698,9 @@ function HistoryAttemptRow({
     ? "Date unavailable"
     : `${historyAttemptRecencyLabel(completedAtMs)} · ${formatLocalCalendarDate(detail.completedAt)}`;
   const primaryTheme = historyAttemptThemeLabel(attempt);
+  const visibleThemes = themeCatalogPresentation
+    ? curatedHistoryThemes(attempt.themes, themeCatalogThemes(themeCatalogPresentation))
+    : [];
   const pace = historyAttemptSpeedSeconds(attempt);
   const paceLabel = pace === null ? null : `${pace}s pace`;
   const resultLabel = isWrong ? "Wrong move" : isCorrect ? "Correct" : "Result unavailable";
@@ -5550,7 +5710,10 @@ function HistoryAttemptRow({
       ? `Played ${detail.submittedMove} · Best ${detail.expectedMove}`
       : `Move ${detail.submittedMove}`;
   const sourceLabel = historyAttemptSourceLabel(detail.source);
-  const compactContext = [primaryTheme, paceLabel].filter(Boolean).join(" · ");
+  const themeContext = visibleThemes.length > 0
+    ? visibleThemes.map(customThemeLabel).join(", ")
+    : primaryTheme;
+  const compactContext = [themeContext, paceLabel].filter(Boolean).join(" · ");
   const puzzleIdentity = `ID ${attempt.puzzleId} · Rating ${attempt.puzzleRating}`;
   const durationLabel = detail.elapsedSeconds === null ? "Duration unavailable" : `${detail.elapsedSeconds}s`;
   const compactMeta = `${sourceLabel} · ${durationLabel} · ${dateLabel}`;
@@ -5591,7 +5754,18 @@ function HistoryAttemptRow({
           <Text testID={`history-attempt-${attempt.id}-result`} style={styles.helperText}>{resultLabel}</Text>
         </View>
         <Text testID={`history-attempt-${attempt.id}-identity`} style={styles.helperText}>{puzzleIdentity}</Text>
-        <Text testID={`history-attempt-${attempt.id}-context`} style={styles.helperText}>{compactContext}</Text>
+        {themeCatalogPresentation && visibleThemes.length > 0 ? (
+          <HistoryThemeList
+            attemptId={attempt.id}
+            layout={themeCatalogPresentation.layout}
+            themes={visibleThemes}
+          />
+        ) : (
+          <Text testID={`history-attempt-${attempt.id}-context`} style={styles.helperText}>{compactContext}</Text>
+        )}
+        {themeCatalogPresentation && paceLabel ? (
+          <Text testID={`history-attempt-${attempt.id}-pace`} style={styles.helperText}>{paceLabel}</Text>
+        ) : null}
         <Text testID={`history-attempt-${attempt.id}-meta`} style={styles.helperText}>{compactMeta}</Text>
       </View>
       {attempt.unclear ? (
@@ -5603,6 +5777,49 @@ function HistoryAttemptRow({
         <ChevronGlyph direction="right" />
       </View>
     </Pressable>
+  );
+}
+
+function HistoryThemeList({
+  attemptId,
+  layout,
+  themes
+}: {
+  attemptId: string;
+  layout: ThemeCatalogLayout;
+  themes: readonly string[];
+}): React.JSX.Element {
+  if (layout === "groups") {
+    return (
+      <View style={styles.historyThemeTextRow} testID={`history-attempt-${attemptId}-themes`}>
+        <Text style={styles.historyThemeTextLabel}>Themes</Text>
+        <Text style={styles.historyThemeText}>{themes.map(customThemeLabel).join(" · ")}</Text>
+      </View>
+    );
+  }
+
+  const chips = themes.map((theme) => (
+    <View key={theme} style={styles.historyThemeChip}>
+      <Text style={styles.historyThemeChipText}>{customThemeLabel(theme)}</Text>
+    </View>
+  ));
+
+  if (layout === "rails") {
+    return (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        testID={`history-attempt-${attemptId}-themes`}
+      >
+        <View style={styles.historyThemeRail}>{chips}</View>
+      </ScrollView>
+    );
+  }
+
+  return (
+    <View style={styles.historyThemeWrap} testID={`history-attempt-${attemptId}-themes`}>
+      {chips}
+    </View>
   );
 }
 
@@ -9509,13 +9726,26 @@ function sprintConfigFor(
 }
 
 function normalizeCustomThemeSelection(
-  themes: readonly CustomThemeFilter[]
+  themes: readonly CustomThemeFilter[],
+  availableThemes: readonly CustomThemeFilter[] = CUSTOM_THEME_OPTIONS
 ): CustomThemeFilter[] {
   const selected = new Set(themes);
-  const namedThemes = CUSTOM_THEME_OPTIONS.filter(
+  const namedThemes = availableThemes.filter(
     (theme) => theme !== ALL_THEMES_FILTER && selected.has(theme)
   );
   return namedThemes.length > 0 ? namedThemes : [ALL_THEMES_FILTER];
+}
+
+function themeCatalogThemes(presentation: ThemeCatalogPresentation): string[] {
+  return presentation.groups.flatMap((group) => group.themes);
+}
+
+function curatedHistoryThemes(
+  puzzleThemes: readonly string[],
+  curatedThemes: readonly string[]
+): string[] {
+  const puzzleThemeSet = new Set(puzzleThemes);
+  return curatedThemes.filter((theme) => puzzleThemeSet.has(theme));
 }
 
 function themesForCustomSprint(themes: readonly CustomThemeFilter[]): string[] {
@@ -9528,7 +9758,10 @@ function customThemeLabel(theme: CustomThemeFilter): string {
   }
   return theme
     .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .replace(/\b\w/g, (character) => character.toUpperCase());
+    .replace(/([A-Za-z])(\d)/g, "$1 $2")
+    .replace(/\b\w/g, (character) => character.toUpperCase())
+    .replace(/^Mate In (\d+)$/, "Mate in $1")
+    .replace(/^X Ray Attack$/, "X-Ray Attack");
 }
 
 function customThemeSelectionLabel(themes: readonly CustomThemeFilter[]): string {
@@ -11203,6 +11436,59 @@ const styles = StyleSheet.create({
   customMiniChipTextActive: {
     color: "#1D4ED8"
   },
+  themeCatalogSection: {
+    borderBottomColor: "#E2E8F0",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12
+  },
+  themeCatalogHeadingRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between"
+  },
+  themeCatalogTitle: {
+    color: "#1E293B",
+    fontSize: 14,
+    fontWeight: "900"
+  },
+  themeCatalogWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6
+  },
+  themeCatalogGroup: {
+    gap: 6
+  },
+  themeCatalogGroupLabel: {
+    color: "#64748B",
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0.5,
+    textTransform: "uppercase"
+  },
+  themeCatalogRailContent: {
+    flexDirection: "row",
+    gap: 6,
+    paddingRight: 12
+  },
+  themeCatalogGroupGrid: {
+    gap: 8
+  },
+  themeCatalogGroupCard: {
+    backgroundColor: "#F8FAFC",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 7,
+    padding: 9
+  },
+  themeCatalogGroupOptions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6
+  },
   customEligibilityCard: {
     backgroundColor: "#FFFFFF",
     borderColor: "#E2E8F0",
@@ -12198,6 +12484,49 @@ const styles = StyleSheet.create({
   historyAttemptCopy: {
     flex: 1,
     gap: 3
+  },
+  historyThemeWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 4,
+    paddingTop: 2
+  },
+  historyThemeRail: {
+    flexDirection: "row",
+    gap: 4,
+    paddingRight: 10,
+    paddingTop: 2
+  },
+  historyThemeChip: {
+    backgroundColor: "#F8FAFC",
+    borderColor: "#CBD5E1",
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 7,
+    paddingVertical: 3
+  },
+  historyThemeChipText: {
+    color: "#475569",
+    fontSize: 10,
+    fontWeight: "800"
+  },
+  historyThemeTextRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 4,
+    paddingTop: 2
+  },
+  historyThemeTextLabel: {
+    color: "#64748B",
+    fontSize: 11,
+    fontWeight: "900"
+  },
+  historyThemeText: {
+    color: "#475569",
+    flex: 1,
+    fontSize: 11,
+    fontWeight: "700",
+    lineHeight: 16
   },
   historyUnclearBadge: {
     alignItems: "center",

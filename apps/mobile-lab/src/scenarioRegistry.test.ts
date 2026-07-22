@@ -52,8 +52,13 @@ test("New Scenario Markers retain open-issue ownership on the full catalog", () 
   }
 });
 
-test("the closed multiple-theme issue has no active New Scenario Marker", () => {
-  assert.deepEqual(newScenarios, []);
+test("the closed multiple-theme issue marker is replaced by issue 273 ownership", () => {
+  assert.deepEqual(newScenarios.map((scenario) => scenario.id), [
+    "practice-custom-setup",
+    "history-populated"
+  ]);
+  assert.ok(newScenarios.every((scenario) => scenario.issueNumber === 273));
   assert.deepEqual(storyTagsForScenario("practice-home" as LabScenarioId), []);
-  assert.deepEqual(storyTagsForScenario("practice-custom-setup"), []);
+  assert.deepEqual(storyTagsForScenario("practice-custom-setup"), ["new"]);
+  assert.deepEqual(storyTagsForScenario("history-populated"), ["new"]);
 });

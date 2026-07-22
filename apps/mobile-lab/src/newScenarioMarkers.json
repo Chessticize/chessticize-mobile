@@ -1,1 +1,10 @@
-{}
+{
+  "practice-custom-setup": {
+    "issueNumber": 273,
+    "changeNote": "Compares three layouts for selecting the server-curated 24-theme catalog."
+  },
+  "history-populated": {
+    "issueNumber": 273,
+    "changeNote": "Shows every curated puzzle theme, including a real seven-theme density case."
+  }
+}

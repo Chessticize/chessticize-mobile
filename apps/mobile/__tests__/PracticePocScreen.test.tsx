@@ -2637,6 +2637,30 @@ describe("PracticePocScreen", () => {
     expect(JSON.stringify(renderer.toJSON())).not.toContain("Targeting");
   });
 
+  it.each(["wrap", "rails", "groups"] as const)(
+    "renders and toggles every injected theme in the %s catalog presentation",
+    (layout) => {
+      const renderer = renderScreen({
+        themeCatalogPresentation: {
+          layout,
+          groups: [
+            { label: "Checkmates", themes: ["mateIn4", "backRankMate"] },
+            { label: "Piece tactics", themes: ["fork", "capturingDefender"] }
+          ]
+        }
+      });
+
+      press(renderer, "practice-mode-custom");
+      expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("Capturing Defender");
+      expect(findByTestId(renderer, "custom-theme-mate-in-4")).toBeTruthy();
+      press(renderer, "custom-theme-mate-in-4");
+      expect(themeSelected(renderer, "mate-in-4")).toBe(true);
+      expect(themeSelected(renderer, "mixed")).toBe(false);
+      press(renderer, "custom-theme-mate-in-4");
+      expect(themeSelected(renderer, "mixed")).toBe(true);
+    }
+  );
+
   it("starts and persists the production Custom Sprint with every selected theme", () => {
     const service = createMobilePracticeService("random1000");
     const renderer = renderScreen({
@@ -3261,6 +3285,69 @@ describe("PracticePocScreen", () => {
     press(renderer, "review-exit");
     expect(findByTestId(renderer, "history-panel")).toBeTruthy();
   });
+
+  it.each(["wrap", "rails", "groups"] as const)(
+    "shows every curated History tag and omits non-curated metadata in the %s presentation",
+    (layout) => {
+      const store = new MemoryStore();
+      store.seedPuzzles([{
+        ...sharedHistoryPuzzle(),
+        themes: [
+          "advancedPawn",
+          "attraction",
+          "discoveredAttack",
+          "mateIn3",
+          "pin",
+          "promotion",
+          "sacrifice",
+          "endgame"
+        ]
+      }]);
+      const completedAt = new Date(Date.now() - 60_000).toISOString();
+      store.recordAttempt({
+        id: "curated-density",
+        source: "sprint",
+        sessionId: "curated-density-session",
+        puzzleId: "shared-history",
+        mode: "standard",
+        ratingKey: "standard 5/20",
+        result: "correct",
+        submittedMove: "e2e4",
+        expectedMove: "e2e4",
+        startedAt: new Date(new Date(completedAt).getTime() - 8_000).toISOString(),
+        completedAt,
+        ratingBefore: 900,
+        ratingAfter: 912
+      });
+      const renderer = renderScreen({
+        practiceService: new PracticeService(store),
+        themeCatalogPresentation: {
+          layout,
+          groups: [{
+            label: "Curated",
+            themes: [
+              "advancedPawn",
+              "attraction",
+              "discoveredAttack",
+              "mateIn3",
+              "pin",
+              "promotion",
+              "sacrifice"
+            ]
+          }]
+        }
+      });
+
+      press(renderer, "history-tab");
+      const themes = collectText(findByTestId(renderer, "history-attempt-curated-density-themes"));
+      expect(themes).toContain("Advanced Pawn");
+      expect(themes).toContain("Discovered Attack");
+      expect(themes).toContain("Mate in 3");
+      expect(themes).toContain("Sacrifice");
+      expect(themes).not.toContain("Endgame");
+      expect(findByTestId(renderer, "history-attempt-curated-density-pace")).toBeTruthy();
+    }
+  );
 
   it("puts Unclear only first in a scrollable three-toggle History row without a count or icon", () => {
     const store = new MemoryStore();
@@ -5948,7 +6035,7 @@ function createScriptedStockfishTransport(
 }
 
 type RenderScreenOptions = TestMobilePlatformCapabilityOverrides &
-  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "puzzleSelectionId" | "puzzleSelectionSeed" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack"> & {
+  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "puzzleSelectionId" | "puzzleSelectionSeed" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "themeCatalogPresentation"> & {
     platformCapabilities?: MobilePlatformCapabilities;
   };
 
@@ -5999,6 +6086,7 @@ function renderScreen({
   sprintStartDelayMs,
   standardTargetCorrect,
   systemBack,
+  themeCatalogPresentation,
   ...capabilityOverrides
 }: RenderScreenOptions = {}): TestRenderer.ReactTestRenderer {
   let renderer: TestRenderer.ReactTestRenderer | undefined;
@@ -6015,6 +6103,7 @@ function renderScreen({
         sprintStartDelayMs={sprintStartDelayMs}
         standardTargetCorrect={standardTargetCorrect}
         systemBack={systemBack}
+        themeCatalogPresentation={themeCatalogPresentation}
       />
     );
   });
