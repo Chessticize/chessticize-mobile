@@ -37,7 +37,6 @@ export interface SprintConfig {
   targetCorrect: number;
   maxMistakes: number;
   ratingKey: string;
-  theme?: string;
   themes?: string[];
 }
 
@@ -49,7 +48,6 @@ export interface CustomSprintConfigRecord {
   perPuzzleSeconds: number;
   targetCorrect: number;
   maxMistakes: number;
-  theme?: string;
   themes?: string[];
   lastStartedAt: string;
   playCount: number;

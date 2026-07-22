@@ -19,13 +19,13 @@ test("ratingKeyForConfig and buildSprintConfig keep custom sprint buckets separa
       mode: "custom",
       durationSeconds: 180,
       perPuzzleSeconds: 15,
-      theme: "fork"
+      themes: ["fork"]
     }),
     "fork custom 3/15"
   );
 
   assert.deepEqual(
-    normalizeThemeSelection({ themes: ["pin", "fork", "pin"] }),
+    normalizeThemeSelection(["pin", "fork", "pin"]),
     ["fork", "pin"]
   );
   assert.equal(

@@ -15,7 +15,7 @@ test("CLI drives a multi-step sprint and exposes machine-readable history", asyn
     perPuzzleSeconds: 20,
     targetCorrect: 1,
     maxMistakes: 3,
-    theme: "hangingPiece",
+    themes: ["hangingPiece"],
     now: "2026-06-20T00:00:00.000Z"
   });
   assert.equal(start.ok, true);
@@ -65,6 +65,22 @@ test("CLI accepts multiple themes as an OR-filtered sprint contract", async (t) 
   assert.equal(start.ok, true);
   assert.equal(start.state.ratingKey, "hangingPiece+mate custom 5/20");
   assert.ok(["00008", "000hf"].includes(start.state.currentPuzzle.puzzleId));
+
+  await cli.stop();
+});
+
+test("CLI rejects the removed single-theme field instead of silently broadening selection", async (t) => {
+  const cli = await startCli(t);
+
+  const response = await cli.command({
+    command: "startSprint",
+    mode: "custom",
+    theme: "mate"
+  });
+
+  assert.equal(response.ok, false);
+  assert.equal(response.error.code, "command_failed");
+  assert.equal(response.error.message, "theme is no longer supported; use themes");
 
   await cli.stop();
 });

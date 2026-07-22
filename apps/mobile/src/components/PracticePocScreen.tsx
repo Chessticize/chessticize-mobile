@@ -9519,7 +9519,7 @@ function normalizeCustomThemeSelection(
 }
 
 function themesForCustomSprint(themes: readonly CustomThemeFilter[]): string[] {
-  return themes.includes(ALL_THEMES_FILTER) ? [] : normalizeThemeSelection({ themes });
+  return themes.includes(ALL_THEMES_FILTER) ? [] : normalizeThemeSelection(themes);
 }
 
 function customThemeLabel(theme: CustomThemeFilter): string {
@@ -9603,9 +9603,9 @@ function sortHistoryRatingKeys(
 }
 
 function customThemesFromStoredValue(
-  config: Pick<CustomSprintConfigRecord, "theme" | "themes">
+  config: Pick<CustomSprintConfigRecord, "themes">
 ): CustomThemeFilter[] {
-  return normalizeCustomThemeSelection(normalizeThemeSelection(config));
+  return normalizeCustomThemeSelection(normalizeThemeSelection(config.themes));
 }
 
 function formatConfigLastPlayed(lastStartedAt: string): string {

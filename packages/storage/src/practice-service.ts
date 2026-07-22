@@ -11,8 +11,7 @@ import {
   resumeSprint as resumeSprintCore,
   serializeSprintView,
   startSprint,
-  submitSprintMove,
-  themeSelectionFields
+  submitSprintMove
 } from "../../core/src/index.ts";
 import type {
   AttemptEvent,
@@ -54,7 +53,6 @@ export interface StartSprintCommand {
   perPuzzleSeconds?: number;
   targetCorrect?: number;
   maxMistakes?: number;
-  theme?: string;
   themes?: string[];
   minRating?: number;
   maxRating?: number;
@@ -439,7 +437,6 @@ export class PracticeService {
       perPuzzleSeconds: number;
       targetCorrect?: number;
       maxMistakes?: number;
-      theme?: string;
       themes?: string[];
     } = {
       mode: command.mode,
@@ -452,7 +449,10 @@ export class PracticeService {
     if (command.maxMistakes !== undefined) {
       configInput.maxMistakes = command.maxMistakes;
     }
-    Object.assign(configInput, themeSelectionFields(normalizeThemeSelection(command)));
+    const themes = normalizeThemeSelection(command.themes);
+    if (themes.length > 0) {
+      configInput.themes = themes;
+    }
     return buildSprintConfig(configInput);
   }
 
@@ -462,7 +462,6 @@ export class PracticeService {
     rating?: number;
     minRating?: number;
     maxRating?: number;
-    theme?: string;
     themes?: string[];
     includeIds?: string[];
     randomSeed?: string | number;
@@ -473,7 +472,6 @@ export class PracticeService {
       rating?: number;
       minRating?: number;
       maxRating?: number;
-      theme?: string;
       themes?: string[];
       includeIds?: string[];
       randomSeed?: string | number;
@@ -488,7 +486,9 @@ export class PracticeService {
     if (command.maxRating !== undefined) {
       puzzleFilter.maxRating = command.maxRating;
     }
-    Object.assign(puzzleFilter, themeSelectionFields(normalizeThemeSelection(config)));
+    if (config.themes !== undefined) {
+      puzzleFilter.themes = [...config.themes];
+    }
     if (this.puzzleSelectionScopeIds !== undefined) {
       puzzleFilter.includeIds = this.puzzleSelectionScopeIds;
     }
@@ -570,14 +570,14 @@ function buildCustomSprintConfigRecord(input: {
     perPuzzleSeconds: input.config.perPuzzleSeconds,
     targetCorrect: input.config.targetCorrect,
     maxMistakes: input.config.maxMistakes,
-    ...themeSelectionFields(normalizeThemeSelection(input.config)),
+    ...(input.config.themes === undefined ? {} : { themes: [...input.config.themes] }),
     lastStartedAt: input.lastStartedAt,
     playCount: (input.previous?.playCount ?? 0) + 1
   };
 }
 
 function customSprintConfigId(config: SprintConfig): string {
-  const themes = normalizeThemeSelection(config);
+  const themes = normalizeThemeSelection(config.themes);
   return [
     "custom",
     config.mode,

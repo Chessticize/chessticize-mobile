@@ -3,8 +3,7 @@ import {
   isServerCompatibleArrowDuelPuzzle,
   normalizeThemeSelection,
   SERVER_PUZZLE_MAX_RATING,
-  SERVER_PUZZLE_MIN_RATING,
-  themeSelectionFields
+  SERVER_PUZZLE_MIN_RATING
 } from "../../core/src/index.ts";
 import type { Puzzle } from "../../core/src/index.ts";
 import type { PuzzleSelectionFilter } from "./query-types.ts";
@@ -49,7 +48,7 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
           filter.includeIds !== undefined || filter.excludeIds !== undefined) {
         return this.selectPuzzles(filter).length;
       }
-      const selectedThemes = normalizeThemeSelection(filter);
+      const selectedThemes = normalizeThemeSelection(filter.themes);
       const minRating = filter.minRating ?? (filter.rating === undefined ? 0 : SERVER_PUZZLE_MIN_RATING);
       const maxRating = filter.maxRating ?? (filter.rating === undefined ? 4000 : SERVER_PUZZLE_MAX_RATING);
       if (selectedThemes.length === 0) {
@@ -101,7 +100,6 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
       ...(filter.rating === undefined ? {} : { rating: filter.rating }),
       ...(filter.minRating === undefined ? {} : { minRating: filter.minRating }),
       ...(filter.maxRating === undefined ? {} : { maxRating: filter.maxRating }),
-      ...(filter.theme === undefined ? {} : { theme: filter.theme }),
       ...(filter.themes === undefined ? {} : { themes: filter.themes }),
       ...(filter.includeIds === undefined ? {} : { includeIds: filter.includeIds }),
       ...(filter.excludeIds === undefined ? {} : { excludeIds: filter.excludeIds }),
@@ -114,7 +112,7 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
     const excludedIds = new Set(filter.excludeIds ?? []);
     const strategies = buildServerEloPuzzleSelectionStrategies({
       rating,
-      themes: normalizeThemeSelection(filter)
+      themes: normalizeThemeSelection(filter.themes)
     });
 
     for (const strategy of strategies) {
@@ -123,14 +121,12 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
       }
       const candidateFilter: PuzzleSelectionFilter = {
         ...filter,
-          minRating: strategy.minRating,
-          maxRating: strategy.maxRating,
-          excludeIds: [...excludedIds],
-          limit: filter.limit - selected.length
+        minRating: strategy.minRating,
+        maxRating: strategy.maxRating,
+        themes: strategy.themes,
+        excludeIds: [...excludedIds],
+        limit: filter.limit - selected.length
       };
-      delete candidateFilter.theme;
-      delete candidateFilter.themes;
-      Object.assign(candidateFilter, themeSelectionFields(strategy.themes));
       const additional = selectUniquePuzzles({
         puzzles: this.queryCandidates(candidateFilter),
         mode: filter.mode,
@@ -138,7 +134,7 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
         ...(this.allPuzzlesArrowDuelEligible ? { allPuzzlesArrowDuelEligible: true } : {}),
         minRating: strategy.minRating,
         maxRating: strategy.maxRating,
-        ...themeSelectionFields(strategy.themes),
+        themes: strategy.themes,
         ...(filter.includeIds === undefined ? {} : { includeIds: filter.includeIds }),
         ...(filter.randomSeed === undefined
           ? {}
@@ -154,7 +150,7 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
   }
 
   private queryCandidates(filter: PuzzleSelectionFilter): Puzzle[] {
-    const selectedThemes = normalizeThemeSelection(filter);
+    const selectedThemes = normalizeThemeSelection(filter.themes);
     const themeIds = selectedThemes
       .map((theme) => this.themeId(theme))
       .filter((themeId): themeId is number => themeId !== undefined);

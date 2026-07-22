@@ -1,8 +1,7 @@
 import {
   buildServerEloPuzzleSelectionStrategies,
   isServerCompatibleArrowDuelPuzzle,
-  normalizeThemeSelection,
-  themeSelectionFields
+  normalizeThemeSelection
 } from "../../core/src/index.ts";
 import type { Puzzle, SprintMode } from "../../core/src/index.ts";
 
@@ -14,7 +13,6 @@ export interface SelectUniquePuzzlesInput {
   rating?: number;
   minRating?: number;
   maxRating?: number;
-  theme?: string;
   themes?: string[];
   includeIds?: string[];
   excludeIds?: string[];
@@ -35,7 +33,7 @@ function selectPuzzlesByServerEloFallback(input: SelectUniquePuzzlesInput & { ra
   const excludedIds = new Set(input.excludeIds ?? []);
   const strategies = buildServerEloPuzzleSelectionStrategies({
     rating: input.rating,
-    themes: normalizeThemeSelection(input)
+    themes: normalizeThemeSelection(input.themes)
   });
 
   for (const strategy of strategies) {
@@ -52,7 +50,7 @@ function selectPuzzlesByServerEloFallback(input: SelectUniquePuzzlesInput & { ra
           : { allPuzzlesArrowDuelEligible: input.allPuzzlesArrowDuelEligible }),
         minRating: strategy.minRating,
         maxRating: strategy.maxRating,
-        ...themeSelectionFields(strategy.themes),
+        themes: strategy.themes,
         ...(input.includeIds === undefined ? {} : { includeIds: input.includeIds }),
         ...(input.randomSeed === undefined
           ? {}
@@ -78,7 +76,7 @@ function selectMatchingPuzzles(
   const selected: Puzzle[] = [];
   const includedIds = input.includeIds === undefined ? undefined : new Set(input.includeIds);
   const candidates = input.randomSeed === undefined ? input.puzzles : seededShuffle(input.puzzles, input.randomSeed);
-  const selectedThemes = normalizeThemeSelection(input);
+  const selectedThemes = normalizeThemeSelection(input.themes);
 
   for (const puzzle of candidates) {
     if (includedIds !== undefined && !includedIds.has(puzzle.id)) {

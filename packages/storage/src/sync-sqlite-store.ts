@@ -16,7 +16,6 @@ import {
   scheduleReview,
   sameReviewContext,
   sideToMoveForHistoryPuzzle,
-  themeSelectionFields,
   updateAttemptUnclearState
 } from "../../core/src/index.ts";
 import type {
@@ -322,7 +321,6 @@ export class SyncSQLiteStore implements PracticeStore {
       ...(filter.rating === undefined ? {} : { rating: filter.rating }),
       ...(filter.minRating === undefined ? {} : { minRating: filter.minRating }),
       ...(filter.maxRating === undefined ? {} : { maxRating: filter.maxRating }),
-      ...(filter.theme === undefined ? {} : { theme: filter.theme }),
       ...(filter.themes === undefined ? {} : { themes: filter.themes }),
       ...(filter.includeIds === undefined ? {} : { includeIds: filter.includeIds }),
       ...(filter.excludeIds === undefined ? {} : { excludeIds: filter.excludeIds }),
@@ -1694,7 +1692,7 @@ function assertForeignKeyIntegrity(db: SyncSqliteDatabase): void {
 }
 
 function encodeStoredThemeSelection(config: CustomSprintConfigRecord): string | null {
-  const themes = normalizeThemeSelection(config);
+  const themes = normalizeThemeSelection(config.themes);
   if (themes.length === 0) {
     return null;
   }
@@ -1702,7 +1700,6 @@ function encodeStoredThemeSelection(config: CustomSprintConfigRecord): string | 
 }
 
 function decodeStoredThemeSelection(value: string | null): {
-  theme?: string;
   themes?: string[];
 } {
   if (value === null) {
@@ -1712,13 +1709,18 @@ function decodeStoredThemeSelection(value: string | null): {
     try {
       const parsed = JSON.parse(value) as unknown;
       if (Array.isArray(parsed) && parsed.every((theme) => typeof theme === "string")) {
-        return themeSelectionFields(parsed);
+        return decodedThemeSelection(parsed);
       }
     } catch {
       // Treat malformed or legacy scalar values as one theme below.
     }
   }
-  return themeSelectionFields([value]);
+  return decodedThemeSelection([value]);
+}
+
+function decodedThemeSelection(themes: readonly string[]): { themes?: string[] } {
+  const normalizedThemes = normalizeThemeSelection(themes);
+  return normalizedThemes.length === 0 ? {} : { themes: normalizedThemes };
 }
 
 function puzzleFromRow(row: PuzzleRow): Puzzle {

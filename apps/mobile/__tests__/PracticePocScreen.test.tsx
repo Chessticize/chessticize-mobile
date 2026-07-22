@@ -1820,7 +1820,7 @@ describe("PracticePocScreen", () => {
       perPuzzleSeconds: 30,
       ratingKey: "fork custom 3/30",
       targetCorrect: 1,
-      theme: "fork"
+      themes: ["fork"]
     });
     expect(service.getActiveSprint()?.currentPuzzle?.puzzle).toMatchObject({
       id: androidPracticeFixture.puzzle.id,
@@ -2685,7 +2685,7 @@ describe("PracticePocScreen", () => {
         perPuzzleSeconds: 30,
         targetCorrect: 6,
         maxMistakes: 3,
-        theme: "mate",
+        themes: ["mate"],
         persistCustomConfig: true
       },
       "2026-06-20T00:00:00.000Z"
@@ -2716,7 +2716,7 @@ describe("PracticePocScreen", () => {
       perPuzzleSeconds: 30,
       targetCorrect: 6,
       maxMistakes: 3,
-      theme: "mate",
+      themes: ["mate"],
       lastStartedAt: "2026-07-07T00:00:00.000Z",
       playCount: 2
     });
@@ -2734,7 +2734,7 @@ describe("PracticePocScreen", () => {
       perPuzzleSeconds: 20,
       targetCorrect: 15,
       maxMistakes: 3,
-      theme: "fork",
+      themes: ["fork"],
       lastStartedAt: "2026-07-06T00:00:00.000Z",
       playCount: 1
     });

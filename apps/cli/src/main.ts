@@ -79,7 +79,6 @@ async function handleCommand(service: PracticeService, input: JsonCommand): Prom
       perPuzzleSeconds?: number;
       targetCorrect?: number;
       maxMistakes?: number;
-      theme?: string;
       themes?: string[];
       minRating?: number;
       maxRating?: number;
@@ -90,7 +89,9 @@ async function handleCommand(service: PracticeService, input: JsonCommand): Prom
     setOptional(startCommand, "perPuzzleSeconds", optionalNumber(input.perPuzzleSeconds));
     setOptional(startCommand, "targetCorrect", optionalNumber(input.targetCorrect));
     setOptional(startCommand, "maxMistakes", optionalNumber(input.maxMistakes));
-    setOptional(startCommand, "theme", optionalString(input.theme));
+    if (input.theme !== undefined) {
+      throw new Error("theme is no longer supported; use themes");
+    }
     setOptional(startCommand, "themes", optionalStringArray(input.themes));
     setOptional(startCommand, "minRating", optionalNumber(input.minRating));
     setOptional(startCommand, "maxRating", optionalNumber(input.maxRating));

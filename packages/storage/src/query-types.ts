@@ -6,7 +6,6 @@ export interface PuzzleSelectionFilter {
   rating?: number;
   minRating?: number;
   maxRating?: number;
-  theme?: string;
   themes?: string[];
   includeIds?: string[];
   excludeIds?: string[];

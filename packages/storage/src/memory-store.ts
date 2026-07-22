@@ -80,7 +80,6 @@ export class MemoryStore implements PracticeStore {
       ...(filter.rating === undefined ? {} : { rating: filter.rating }),
       ...(filter.minRating === undefined ? {} : { minRating: filter.minRating }),
       ...(filter.maxRating === undefined ? {} : { maxRating: filter.maxRating }),
-      ...(filter.theme === undefined ? {} : { theme: filter.theme }),
       ...(filter.themes === undefined ? {} : { themes: filter.themes }),
       ...(filter.includeIds === undefined ? {} : { includeIds: filter.includeIds }),
       ...(filter.excludeIds === undefined ? {} : { excludeIds: filter.excludeIds }),

@@ -21,7 +21,7 @@ test("SQLitePuzzlePackSource selects puzzles from a read-only pack schema", asyn
     assert.equal(source.getPuzzle("00008")?.stockfishBestMove, "b2b1");
     assert.equal(source.getPuzzle("00008")?.initialFen.split(" ").length, 6);
     assert.deepEqual(
-      source.selectPuzzles({ mode: "standard", limit: 10, theme: "hangingPiece" }).map((puzzle) => puzzle.id),
+      source.selectPuzzles({ mode: "standard", limit: 10, themes: ["hangingPiece"] }).map((puzzle) => puzzle.id),
       ["00008"]
     );
     assert.deepEqual(
@@ -91,7 +91,7 @@ test("SQLitePuzzlePackSource preserves themed candidate results while using the 
       .all(themeId, 1700, 1900, 10) as Array<{ id: string }>).map((row) => row.id);
 
     const selectedIds = source
-      .selectPuzzles({ mode: "standard", limit: 10, theme: "crushing", minRating: 1700, maxRating: 1900 })
+      .selectPuzzles({ mode: "standard", limit: 10, themes: ["crushing"], minRating: 1700, maxRating: 1900 })
       .map((puzzle) => puzzle.id);
 
     assert.deepEqual(selectedIds, legacyIds);
@@ -162,7 +162,7 @@ test("PackBackedPracticeStore queries pack puzzles without preloading the user d
         perPuzzleSeconds: 20,
         targetCorrect: 1,
         maxMistakes: 3,
-        theme: "hangingPiece"
+        themes: ["hangingPiece"]
       },
       "2026-06-20T00:00:00.000Z"
     );
@@ -305,7 +305,7 @@ test("PackBackedPracticeStore treats seeded includeIds as a local source scope",
       store.selectPuzzles({
         mode: "standard",
         limit: 1,
-        theme: "mate",
+        themes: ["mate"],
         includeIds: [localPuzzle.id]
       }),
       []

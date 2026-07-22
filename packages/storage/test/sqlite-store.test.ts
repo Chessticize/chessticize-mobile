@@ -20,7 +20,7 @@ test("SQLite store seeds fixture puzzles and filters Arrow Duel eligibility", as
     const arrowPuzzles = store.selectPuzzles({ mode: "arrow_duel", limit: 10 });
     assert.deepEqual(arrowPuzzles.map((puzzle) => puzzle.id).sort(), ["00008", "0018S", "001h8"]);
 
-    const themePuzzles = store.selectPuzzles({ mode: "standard", limit: 10, theme: "hangingPiece" });
+    const themePuzzles = store.selectPuzzles({ mode: "standard", limit: 10, themes: ["hangingPiece"] });
     assert.deepEqual(themePuzzles.map((puzzle) => puzzle.id), ["00008"]);
   } finally {
     store.close();
@@ -727,7 +727,7 @@ test("PracticeService persists SQLite custom sprint configs after successful cus
         perPuzzleSeconds: 20,
         targetCorrect: 1,
         maxMistakes: 3,
-        theme: "hangingPiece",
+        themes: ["hangingPiece"],
         persistCustomConfig: true
       },
       "2026-06-20T00:00:00.000Z"
@@ -742,7 +742,7 @@ test("PracticeService persists SQLite custom sprint configs after successful cus
         perPuzzleSeconds: 20,
         targetCorrect: 1,
         maxMistakes: 3,
-        theme: "hangingPiece",
+        themes: ["hangingPiece"],
         persistCustomConfig: true
       },
       "2026-06-21T00:00:00.000Z"
@@ -758,7 +758,7 @@ test("PracticeService persists SQLite custom sprint configs after successful cus
         perPuzzleSeconds: 20,
         targetCorrect: 1,
         maxMistakes: 3,
-        theme: "hangingPiece",
+        themes: ["hangingPiece"],
         lastStartedAt: "2026-06-21T00:00:00.000Z",
         playCount: 2
       }
@@ -1066,7 +1066,7 @@ test("PracticeService repairs an inflated SQLite rating from completed sprint hi
         perPuzzleSeconds: 20,
         targetCorrect: 1,
         maxMistakes: 3,
-        theme: "hangingPiece"
+        themes: ["hangingPiece"]
       },
       "2026-06-20T00:00:00.000Z"
     );
@@ -1100,7 +1100,7 @@ test("PracticeService preserves a manually anchored SQLite rating across restart
         perPuzzleSeconds: 20,
         targetCorrect: 1,
         maxMistakes: 3,
-        theme: "hangingPiece"
+        themes: ["hangingPiece"]
       },
       "2026-06-20T00:00:00.000Z"
     );
@@ -1361,7 +1361,7 @@ test("PracticeService records a completed sprint and persists updated ELO", asyn
         perPuzzleSeconds: 20,
         targetCorrect: 1,
         maxMistakes: 3,
-        theme: "hangingPiece"
+        themes: ["hangingPiece"]
       },
       "2026-06-20T00:00:00.000Z"
     );
@@ -1401,7 +1401,7 @@ test("PracticeService restores a completed Standard attempt, rating, progress, a
           perPuzzleSeconds: 20,
           targetCorrect: 1,
           maxMistakes: 3,
-          theme: "hangingPiece"
+          themes: ["hangingPiece"]
         },
         "2026-07-14T12:00:00.000Z"
       );
