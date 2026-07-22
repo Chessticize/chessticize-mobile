@@ -785,7 +785,7 @@ describe("PracticePocScreen", () => {
     });
 
     expect(collectText(findByTestId(renderer, "practice-run-management"))).toContain(
-      "Drag a card vertically to reorder, or use the arrow buttons."
+      "Touch and hold a card to drag, or use the arrow buttons."
     );
     expect(() => findByTestId(renderer, "practice-run-drag-tactics-focus")).toThrow();
     expect(findByTestId(renderer, "practice-run-move-up-tactics-focus")).toBeTruthy();

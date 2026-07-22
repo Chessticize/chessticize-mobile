@@ -8,6 +8,7 @@ const {
   openStandardHistoryTrend,
   playBoardMove,
   startPracticeMode,
+  tapUntilExists,
   selectTestPuzzleSource,
   waitForVisibleInPracticeScroll,
   waitForElementAccessibilityLabelContaining,
@@ -54,12 +55,26 @@ describe('Practice POC', () => {
     await element(by.id('practice-run-name-input')).replaceText('Calculation Lab');
     await element(by.id('practice-run-name-input')).tapReturnKey();
     await element(by.id('practice-main-scroll')).scrollTo('top');
-    await element(by.id('practice-run-save')).tap();
+    await tapUntilExists('practice-run-save', 'practice-run-home-edit', 3);
 
     await waitFor(element(by.id('practice-run-home-edit'))).toBeVisible().withTimeout(10000);
     await expect(element(by.text('Calculation Lab'))).toExist();
     await element(by.id('practice-run-home-edit')).tap();
     await waitFor(element(by.id('practice-run-home-done'))).toBeVisible().withTimeout(10000);
+
+    const standardBeforeScroll = await frameFor(element(by.id('practice-run-standard')));
+    await element(by.id('practice-run-standard')).swipe('up', 'fast', 0.1, 0.5, 0.5);
+    await sleep(400);
+    const standardAfterScroll = await frameFor(element(by.id('practice-run-standard')));
+    const arrowAfterScroll = await frameFor(element(by.id('practice-run-arrow-duel')));
+    if (standardAfterScroll.y >= standardBeforeScroll.y - 5) {
+      throw new Error('Expected a quick swipe starting on a Run card to scroll Edit Runs');
+    }
+    if (standardAfterScroll.y >= arrowAfterScroll.y) {
+      throw new Error('Expected a quick Edit Runs scroll gesture to preserve Run order');
+    }
+    await element(by.id('practice-main-scroll')).scrollTo('top');
+    await waitFor(element(by.id('practice-run-standard'))).toBeVisible().withTimeout(10000);
 
     const standardBefore = await frameFor(element(by.id('practice-run-standard')));
     const arrowBefore = await frameFor(element(by.id('practice-run-arrow-duel')));
