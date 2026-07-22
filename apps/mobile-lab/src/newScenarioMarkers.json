@@ -1,15 +1,15 @@
 {
   "practice-home": {
     "issueNumber": 253,
-    "changeNote": "Named reusable runs appear on Home with Add Run and edit entry points."
+    "changeNote": "Named reusable runs use centered bordered cards on Home with Add Run and edit entry points."
   },
   "practice-home-edit": {
     "issueNumber": 253,
-    "changeNote": "Edit mode exposes drag-and-drop ordering, ELO-only editing, and removal controls for every run."
+    "changeNote": "Whole Run cards reorder in real time with animated insertion plus arrow-button fallbacks."
   },
   "practice-custom-setup": {
     "issueNumber": 253,
-    "changeNote": "Custom Sprint setup becomes New Run and saves to Home without starting."
+    "changeNote": "New Run defaults to All themes and saves to Home without starting."
   },
   "practice-run-name-validation": {
     "issueNumber": 253,
@@ -17,11 +17,11 @@
   },
   "practice-run-standard-editor": {
     "issueNumber": 253,
-    "changeNote": "Built-in Run editing is limited to Current ELO and moves those controls out of Settings."
+    "changeNote": "Built-in ELO editing shows the Run name and returns to Home edit mode after Save or Cancel."
   },
   "practice-custom-rating-editor": {
     "issueNumber": 253,
-    "changeNote": "Existing Custom Runs can update only Current ELO; creation settings remain fixed."
+    "changeNote": "Custom ELO editing shows the Run name, keeps creation settings fixed, and returns to Home edit mode."
   },
   "practice-run-remove-confirmation": {
     "issueNumber": 253,

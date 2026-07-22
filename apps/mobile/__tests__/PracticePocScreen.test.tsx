@@ -778,24 +778,28 @@ describe("PracticePocScreen", () => {
     ]);
   });
 
-  it("uses drag handles and ELO-only actions while editing Home runs", () => {
+  it("uses whole-card drag guidance and arrow fallbacks while editing Home runs", () => {
     const onIntent = jest.fn();
     const renderer = renderScreen({
       runManagementPresentation: runManagementPresentation({ homeEditing: true, onIntent })
     });
 
     expect(collectText(findByTestId(renderer, "practice-run-management"))).toContain(
-      "Drag the handle to reorder runs."
+      "Drag a card to reorder, or use the arrow buttons."
     );
-    expect(findByTestId(renderer, "practice-run-drag-tactics-focus").props.accessibilityLabel).toBe(
-      "Drag Tactics Focus to reorder"
-    );
+    expect(() => findByTestId(renderer, "practice-run-drag-tactics-focus")).toThrow();
+    expect(findByTestId(renderer, "practice-run-move-up-tactics-focus")).toBeTruthy();
+    expect(findByTestId(renderer, "practice-run-move-down-tactics-focus")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "practice-run-edit-tactics-focus"))).toBe("Edit ELO");
-    expect(() => findByTestId(renderer, "practice-run-move-up-tactics-focus")).toThrow();
-    expect(() => findByTestId(renderer, "practice-run-move-down-tactics-focus")).toThrow();
+    expect(hasStyleEntry(findByTestId(renderer, "practice-run-tactics-focus"), "borderColor", "#CBD5E1")).toBe(true);
+    expect(hasStyleEntry(findByTestId(renderer, "practice-run-tactics-focus"), "borderStyle", "solid")).toBe(true);
 
+    press(renderer, "practice-run-move-down-tactics-focus");
     press(renderer, "practice-run-edit-tactics-focus");
-    expect(onIntent).toHaveBeenCalledWith({ type: "edit-run", runId: "tactics-focus" });
+    expect(onIntent.mock.calls.map(([intent]) => intent)).toEqual([
+      { type: "move-run", runId: "tactics-focus", targetRunId: "candidate-sprint" },
+      { type: "edit-run", runId: "tactics-focus" }
+    ]);
   });
 
   it("renders removal confirmation directly below the selected Run card", () => {
@@ -872,6 +876,7 @@ describe("PracticePocScreen", () => {
     });
 
     expect(collectText(findByTestId(renderer, "practice-run-editor-title"))).toBe("Edit ELO");
+    expect(collectText(findByTestId(renderer, "practice-run-editor-run-name"))).toBe("Tactics Focus");
     expect(collectText(findByTestId(renderer, "practice-run-editor"))).toContain(
       "Run settings stay fixed."
     );

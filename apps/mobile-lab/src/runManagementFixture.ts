@@ -127,7 +127,7 @@ export function runManagementFixtureReducer(
         screen: "create"
       };
     case "cancel-edit":
-      return returnHome(state);
+      return returnHome(state, state.screen === "edit");
     case "change-duration":
       return state.screen === "create"
         ? updateDraft(state, { durationSeconds: intent.durationSeconds })
@@ -163,7 +163,7 @@ export function runManagementFixtureReducer(
       return {
         ...state,
         draft: cloneRun(run),
-        homeEditing: false,
+        homeEditing: true,
         nameError: null,
         notice: null,
         removeCandidateId: null,
@@ -208,7 +208,7 @@ function newRunDraft(): PracticeRunDraft {
     elo: 900,
     durationSeconds: 300,
     perPuzzleSeconds: 20,
-    themes: ["fork", "pin"]
+    themes: ["mixed"]
   };
 }
 
@@ -219,10 +219,14 @@ function updateDraft(
   return state.draft ? { ...state, draft: { ...state.draft, ...patch } } : state;
 }
 
-function returnHome(state: RunManagementFixtureState): RunManagementFixtureState {
+function returnHome(
+  state: RunManagementFixtureState,
+  homeEditing = false
+): RunManagementFixtureState {
   return {
     ...state,
     draft: null,
+    homeEditing,
     nameError: null,
     notice: null,
     removeCandidateId: null,
@@ -259,7 +263,7 @@ function saveRun(state: RunManagementFixtureState): RunManagementFixtureState {
   return {
     ...state,
     draft: null,
-    homeEditing: false,
+    homeEditing: existing,
     nameError: null,
     notice: `${saved.name} ${existing ? "updated" : "added to Home"}.`,
     removeCandidateId: null,

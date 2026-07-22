@@ -28,7 +28,8 @@ export function expectTestIdAbsent(canvasElement: HTMLElement, testID: string): 
 export async function dragTestId(
   canvasElement: HTMLElement,
   sourceTestID: string,
-  targetTestID: string
+  targetTestID: string,
+  onPreview?: () => Promise<void> | void
 ): Promise<void> {
   const page = within(canvasElement.ownerDocument.body);
   const source = await page.findByTestId(sourceTestID, {}, { timeout: 4_000 });
@@ -50,6 +51,7 @@ export async function dragTestId(
   dispatchDragEvent(source, "dragstart");
   dispatchDragEvent(target, "dragenter");
   dispatchDragEvent(target, "dragover");
+  await onPreview?.();
   dispatchDragEvent(target, "drop");
   dispatchDragEvent(source, "dragend");
 }
@@ -67,6 +69,14 @@ export async function expectTestIdsInOrder(
       if (!current || !next || (current.compareDocumentPosition(next) & 4) === 0) {
         throw new Error(`Expected ${testIDs.join(", ")} in DOM order`);
       }
+    }
+  });
+}
+
+export async function expectReorderAnimation(canvasElement: HTMLElement): Promise<void> {
+  await waitFor(() => {
+    if (!canvasElement.ownerDocument.body.querySelector('[data-reorder-animation="moving"]')) {
+      throw new Error("Expected the surrounding Run cards to animate into their new positions");
     }
   });
 }

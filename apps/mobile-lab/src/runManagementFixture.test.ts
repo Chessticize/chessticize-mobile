@@ -8,6 +8,7 @@ import {
 test("a new run requires a unique non-empty name before it is added to Home", () => {
   let state = createRunManagementFixtureState();
   state = runManagementFixtureReducer(state, { type: "add-run" });
+  assert.deepEqual(state.draft?.themes, ["mixed"]);
   state = runManagementFixtureReducer(state, { type: "save-run" });
   assert.equal(state.nameError, "Enter a name for this run.");
   assert.equal(state.screen, "create");
@@ -42,9 +43,11 @@ test("run order changes without changing stable run identity", () => {
 
 test("editing an existing run changes ELO only", () => {
   let state = createRunManagementFixtureState();
+  state = runManagementFixtureReducer(state, { type: "toggle-home-edit" });
   state = runManagementFixtureReducer(state, { type: "edit-run", runId: "tactics-focus" });
   const original = state.draft;
   assert.ok(original);
+  assert.equal(state.homeEditing, true);
 
   state = runManagementFixtureReducer(state, { type: "change-name", name: "Renamed" });
   state = runManagementFixtureReducer(state, { type: "change-mode", mode: "arrow_duel" });
@@ -55,6 +58,22 @@ test("editing an existing run changes ELO only", () => {
 
   state = runManagementFixtureReducer(state, { type: "change-elo", elo: 1065 });
   assert.equal(state.draft?.elo, 1065);
+});
+
+test("saving or cancelling an ELO edit returns to Home edit mode", () => {
+  let state = createRunManagementFixtureState();
+  state = runManagementFixtureReducer(state, { type: "toggle-home-edit" });
+  state = runManagementFixtureReducer(state, { type: "edit-run", runId: "standard" });
+  state = runManagementFixtureReducer(state, { type: "cancel-edit" });
+  assert.equal(state.screen, "home");
+  assert.equal(state.homeEditing, true);
+
+  state = runManagementFixtureReducer(state, { type: "edit-run", runId: "standard" });
+  state = runManagementFixtureReducer(state, { type: "change-elo", elo: 950 });
+  state = runManagementFixtureReducer(state, { type: "save-run" });
+  assert.equal(state.screen, "home");
+  assert.equal(state.homeEditing, true);
+  assert.equal(state.runs.find((run) => run.id === "standard")?.elo, 950);
 });
 
 test("removing and restoring a run retains its ELO and identity", () => {

@@ -3,6 +3,7 @@ import { LabScenario } from "./LabScenario.tsx";
 import {
   clickTestId,
   dragTestId,
+  expectReorderAnimation,
   expectTestIdAbsent,
   expectTestIdsInOrder,
   openPracticeSession,
@@ -28,8 +29,14 @@ export const EditAndReorderRuns: Story = {
     await clickTestId(canvasElement, "practice-run-home-edit");
     await dragTestId(
       canvasElement,
-      "practice-run-drag-endgame-sprint",
-      "practice-run-arrow-duel"
+      "practice-run-endgame-sprint",
+      "practice-run-arrow-duel",
+      async () => expectTestIdsInOrder(canvasElement, [
+        "practice-run-standard",
+        "practice-run-endgame-sprint",
+        "practice-run-arrow-duel",
+        "practice-run-tactics-focus"
+      ]).then(() => expectReorderAnimation(canvasElement))
     );
     await expectTestIdsInOrder(canvasElement, [
       "practice-run-standard",
@@ -68,6 +75,8 @@ export const BuiltInRunEditor: Story = {
     await clickTestId(canvasElement, "practice-run-edit-standard");
     await waitForTestId(canvasElement, "practice-run-elo-row");
     expectTestIdAbsent(canvasElement, "practice-run-fixed-name");
+    await clickTestId(canvasElement, "practice-run-editor-close");
+    await waitForTestId(canvasElement, "practice-run-home-done");
   }
 };
 
@@ -83,6 +92,8 @@ export const CustomRatingEditor: Story = {
     expectTestIdAbsent(canvasElement, "practice-run-theme-row");
     expectTestIdAbsent(canvasElement, "practice-run-duration-stepper");
     expectTestIdAbsent(canvasElement, "practice-run-per-puzzle-stepper");
+    await clickTestId(canvasElement, "practice-run-save");
+    await waitForTestId(canvasElement, "practice-run-home-done");
   }
 };
 

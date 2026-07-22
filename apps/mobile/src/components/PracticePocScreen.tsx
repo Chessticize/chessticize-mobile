@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   AppState,
@@ -3206,15 +3206,47 @@ function PracticeRunHome({
 }): React.JSX.Element {
   const [draggedRunId, setDraggedRunId] = useState<string | null>(null);
   const [dropTargetRunId, setDropTargetRunId] = useState<string | null>(null);
+  const draggedRunIdRef = useRef<string | null>(null);
+  const dropTargetRunIdRef = useRef<string | null>(null);
+  const runElementsRef = useRef(new Map<string, WebRunElement>());
+  const previousRunRectsRef = useRef<Map<string, WebRunRect> | null>(null);
   const selectedRun = presentation.runs.find((run) => run.id === presentation.selectedRunId) ?? null;
   const showRestore = presentation.hiddenRuns.length > 0
     && (presentation.homeEditing || presentation.runs.length === 0);
+  const registerRunElement = useCallback((runId: string, element: WebRunElement | null): void => {
+    if (element) {
+      runElementsRef.current.set(runId, element);
+    } else {
+      runElementsRef.current.delete(runId);
+    }
+  }, []);
+  const captureRunPositions = (): void => {
+    if (Platform.OS !== "web") {
+      return;
+    }
+    previousRunRectsRef.current = new Map(
+      [...runElementsRef.current].map(([runId, element]) => [runId, element.getBoundingClientRect()])
+    );
+  };
   const reorderRun = (runId: string, targetRunId: string): void => {
     if (runId !== targetRunId) {
+      captureRunPositions();
       presentation.onIntent({ type: "move-run", runId, targetRunId });
     }
+  };
+  const finishRunDrag = (): void => {
+    draggedRunIdRef.current = null;
+    dropTargetRunIdRef.current = null;
     setDraggedRunId(null);
     setDropTargetRunId(null);
+  };
+  const previewRunReorder = (runId: string, targetRunId: string): void => {
+    if (runId === targetRunId || dropTargetRunIdRef.current === targetRunId) {
+      return;
+    }
+    dropTargetRunIdRef.current = targetRunId;
+    setDropTargetRunId(targetRunId);
+    reorderRun(runId, targetRunId);
   };
   const reorderRunWithKeyboard = (runId: string, direction: "up" | "down"): void => {
     const index = presentation.runs.findIndex((run) => run.id === runId);
@@ -3223,6 +3255,41 @@ function PracticeRunHome({
       reorderRun(runId, target.id);
     }
   };
+
+  useLayoutEffect(() => {
+    const previousRects = previousRunRectsRef.current;
+    previousRunRectsRef.current = null;
+    if (Platform.OS !== "web" || !previousRects) {
+      return;
+    }
+    for (const [runId, element] of runElementsRef.current) {
+      const previousRect = previousRects.get(runId);
+      if (!previousRect || typeof element.animate !== "function") {
+        continue;
+      }
+      const nextRect = element.getBoundingClientRect();
+      const deltaY = previousRect.top - nextRect.top;
+      if (Math.abs(deltaY) < 0.5) {
+        continue;
+      }
+      element.getAnimations?.().forEach((animation) => animation.cancel());
+      element.dataset.reorderAnimation = "moving";
+      const animation = element.animate([
+        { transform: `translate3d(0, ${deltaY}px, 0)` },
+        { transform: "translate3d(0, 0, 0)" }
+      ], {
+        duration: 220,
+        easing: "cubic-bezier(0.22, 1, 0.36, 1)"
+      });
+      const clearAnimationState = (): void => {
+        if (element.dataset.reorderAnimation === "moving") {
+          delete element.dataset.reorderAnimation;
+        }
+      };
+      animation.onfinish = clearAnimationState;
+      animation.oncancel = clearAnimationState;
+    }
+  }, [presentation.runs]);
 
   return (
     <View style={styles.runManagementPanel} testID="practice-run-management">
@@ -3246,7 +3313,7 @@ function PracticeRunHome({
       <View style={styles.runManagementToolbar}>
         <Text style={styles.helperText}>
           {presentation.homeEditing
-            ? "Drag the handle to reorder runs."
+            ? "Drag a card to reorder, or use the arrow buttons."
             : "Choose a saved run, then start when you are ready."}
         </Text>
         <View style={styles.runManagementToolbarActions}>
@@ -3301,25 +3368,31 @@ function PracticeRunHome({
         </View>
       ) : (
         <View style={styles.modeList} testID="practice-run-list">
-          {presentation.runs.map((run) => (
+          {presentation.runs.map((run, index) => (
             <React.Fragment key={run.id}>
               <PracticeRunCard
                 active={run.id === presentation.selectedRunId}
+                canMoveDown={index < presentation.runs.length - 1}
+                canMoveUp={index > 0}
                 dragging={run.id === draggedRunId}
                 dropTarget={run.id === dropTargetRunId && run.id !== draggedRunId}
                 editing={presentation.homeEditing}
                 run={run}
                 onIntent={presentation.onIntent}
-                onDragEnd={() => {
-                  setDraggedRunId(null);
-                  setDropTargetRunId(null);
+                onCardElement={registerRunElement}
+                onDragEnd={finishRunDrag}
+                onDragEnter={(targetRunId) => {
+                  if (draggedRunIdRef.current) {
+                    previewRunReorder(draggedRunIdRef.current, targetRunId);
+                  }
                 }}
-                onDragEnter={(runId) => setDropTargetRunId(runId)}
                 onDragStart={(runId) => {
+                  draggedRunIdRef.current = runId;
+                  dropTargetRunIdRef.current = null;
                   setDraggedRunId(runId);
                   setDropTargetRunId(null);
                 }}
-                onDrop={reorderRun}
+                onDrop={finishRunDrag}
                 onKeyboardReorder={reorderRunWithKeyboard}
               />
               {presentation.removeCandidateId === run.id ? (
@@ -3361,10 +3434,13 @@ function PracticeRunHome({
 
 function PracticeRunCard({
   active,
+  canMoveDown,
+  canMoveUp,
   dragging,
   dropTarget,
   editing,
   onIntent,
+  onCardElement,
   onDragEnd,
   onDragEnter,
   onDragStart,
@@ -3373,14 +3449,17 @@ function PracticeRunCard({
   run
 }: {
   active: boolean;
+  canMoveDown: boolean;
+  canMoveUp: boolean;
   dragging: boolean;
   dropTarget: boolean;
   editing: boolean;
   onIntent: PracticeRunManagementPresentation["onIntent"];
+  onCardElement: (runId: string, element: WebRunElement | null) => void;
   onDragEnd: () => void;
-  onDragEnter: (runId: string) => void;
+  onDragEnter: (targetRunId: string) => void;
   onDragStart: (runId: string) => void;
-  onDrop: (runId: string, targetRunId: string) => void;
+  onDrop: () => void;
   onKeyboardReorder: (runId: string, direction: "up" | "down") => void;
   run: PracticeRunPresentation;
 }): React.JSX.Element {
@@ -3396,28 +3475,27 @@ function PracticeRunCard({
 
   return (
     <RunCardDropSurface
+      draggable={editing}
+      dragging={dragging}
       dropTarget={dropTarget}
       runId={run.id}
+      runName={run.name}
       style={[
         styles.practiceModeCard,
+        styles.managedRunCard,
         active && !editing ? styles.practiceModeCardActive : null,
+        active && !editing ? styles.managedRunCardActive : null,
         editing ? styles.runCardEditing : null,
         dropTarget ? styles.runCardDropTarget : null,
         dragging ? styles.runCardDragging : null
       ]}
       testID={`practice-run-${safeTestId(run.id)}`}
+      onDragEnd={onDragEnd}
       onDragEnter={onDragEnter}
+      onDragStart={onDragStart}
+      onElementChange={onCardElement}
       onDrop={onDrop}
     >
-      {editing ? (
-        <RunDragHandle
-          runId={run.id}
-          runName={run.name}
-          onDragEnd={onDragEnd}
-          onDragStart={onDragStart}
-          onKeyboardReorder={onKeyboardReorder}
-        />
-      ) : null}
       <Pressable
         accessibilityRole="button"
         accessibilityState={{ selected: active && !editing }}
@@ -3440,6 +3518,28 @@ function PracticeRunCard({
         <Text style={styles.practiceModeRating}>ELO {run.elo}</Text>
         {editing ? (
           <View style={styles.runEditActions}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Move ${run.name} up`}
+              accessibilityState={{ disabled: !canMoveUp }}
+              disabled={!canMoveUp}
+              style={[styles.runIconButton, styles.runReorderButton, !canMoveUp ? styles.disabledButton : null]}
+              testID={`practice-run-move-up-${safeTestId(run.id)}`}
+              onPress={() => onKeyboardReorder(run.id, "up")}
+            >
+              <ChevronGlyph direction="up" />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Move ${run.name} down`}
+              accessibilityState={{ disabled: !canMoveDown }}
+              disabled={!canMoveDown}
+              style={[styles.runIconButton, styles.runReorderButton, !canMoveDown ? styles.disabledButton : null]}
+              testID={`practice-run-move-down-${safeTestId(run.id)}`}
+              onPress={() => onKeyboardReorder(run.id, "down")}
+            >
+              <ChevronGlyph direction="down" />
+            </Pressable>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Edit ${run.name} ELO`}
@@ -3470,33 +3570,85 @@ const RUN_DRAG_DATA_TYPE = "text/plain";
 type WebRunDataTransfer = {
   dropEffect: string;
   effectAllowed: string;
-  getData: (format: string) => string;
   setData: (format: string, value: string) => void;
+};
+
+type WebRunRect = {
+  top: number;
+};
+
+type WebRunAnimation = {
+  cancel: () => void;
+  oncancel: (() => void) | null;
+  onfinish: (() => void) | null;
+};
+
+type WebRunElement = {
+  animate?: (
+    keyframes: readonly { transform: string }[],
+    options: { duration: number; easing: string }
+  ) => WebRunAnimation;
+  closest?: (selectors: string) => unknown;
+  dataset: Record<string, string | undefined>;
+  getAnimations?: () => WebRunAnimation[];
+  getBoundingClientRect: () => WebRunRect;
 };
 
 function RunCardDropSurface({
   children,
+  draggable,
+  dragging,
   dropTarget,
   runId,
+  runName,
   style,
   testID,
+  onDragEnd,
   onDragEnter,
+  onDragStart,
+  onElementChange,
   onDrop
 }: {
   children: React.ReactNode;
+  draggable: boolean;
+  dragging: boolean;
   dropTarget: boolean;
   runId: string;
+  runName: string;
   style: React.ComponentProps<typeof View>["style"];
   testID: string;
-  onDragEnter: (runId: string) => void;
-  onDrop: (runId: string, targetRunId: string) => void;
+  onDragEnd: () => void;
+  onDragEnter: (targetRunId: string) => void;
+  onDragStart: (runId: string) => void;
+  onElementChange: (runId: string, element: WebRunElement | null) => void;
+  onDrop: () => void;
 }): React.JSX.Element {
   if (Platform.OS === "web") {
+    const flattenedStyle = StyleSheet.flatten(style) as React.CSSProperties;
     return (
       <div
+        aria-grabbed={draggable ? dragging : undefined}
         aria-dropeffect={dropTarget ? "move" : undefined}
         data-testid={testID}
-        style={StyleSheet.flatten(style) as React.CSSProperties}
+        draggable={draggable}
+        ref={(element) => onElementChange(runId, element as unknown as WebRunElement | null)}
+        style={{
+          ...flattenedStyle,
+          boxShadow: dragging
+            ? "0 12px 28px rgba(15, 23, 42, 0.20)"
+            : dropTarget
+              ? "0 -3px 0 #2563EB, 0 2px 8px rgba(15, 23, 42, 0.08)"
+              : "0 1px 3px rgba(15, 23, 42, 0.08)",
+          boxSizing: "border-box",
+          cursor: draggable ? (dragging ? "grabbing" : "grab") : "default",
+          display: "flex",
+          touchAction: draggable ? "none" : undefined,
+          transition: "border-color 140ms ease, box-shadow 140ms ease, opacity 140ms ease",
+          userSelect: draggable ? "none" : undefined,
+          willChange: draggable ? "transform" : undefined
+        }}
+        title={draggable ? `Drag ${runName} to reorder` : undefined}
+        onDragEnd={onDragEnd}
         onDragEnter={(event) => {
           event.preventDefault();
           onDragEnter(runId);
@@ -3507,11 +3659,20 @@ function RunCardDropSurface({
         }}
         onDrop={(event) => {
           event.preventDefault();
-          const sourceRunId = (event.dataTransfer as unknown as WebRunDataTransfer)
-            .getData(RUN_DRAG_DATA_TYPE);
-          if (sourceRunId) {
-            onDrop(sourceRunId, runId);
+          onDrop();
+        }}
+        onDragStart={(event) => {
+          const blockedControl = (event.target as unknown as WebRunElement).closest?.(
+            '[data-testid^="practice-run-move-"], [data-testid^="practice-run-edit-"], [data-testid^="practice-run-remove-"]'
+          );
+          if (!draggable || blockedControl) {
+            event.preventDefault();
+            return;
           }
+          const dataTransfer = event.dataTransfer as unknown as WebRunDataTransfer;
+          dataTransfer.effectAllowed = "move";
+          dataTransfer.setData(RUN_DRAG_DATA_TYPE, runId);
+          onDragStart(runId);
         }}
       >
         {children}
@@ -3519,86 +3680,6 @@ function RunCardDropSurface({
     );
   }
   return <View style={style} testID={testID}>{children}</View>;
-}
-
-function RunDragHandle({
-  runId,
-  runName,
-  onDragEnd,
-  onDragStart,
-  onKeyboardReorder
-}: {
-  runId: string;
-  runName: string;
-  onDragEnd: () => void;
-  onDragStart: (runId: string) => void;
-  onKeyboardReorder: (runId: string, direction: "up" | "down") => void;
-}): React.JSX.Element {
-  const grip = (
-    <View accessibilityElementsHidden style={styles.runDragGrip}>
-      {[0, 1, 2, 3, 4, 5].map((dot) => (
-        <View key={dot} style={styles.runDragDot} />
-      ))}
-    </View>
-  );
-  const accessibilityLabel = `Drag ${runName} to reorder`;
-  const testID = `practice-run-drag-${safeTestId(runId)}`;
-
-  if (Platform.OS === "web") {
-    return (
-      <div
-        aria-label={`${accessibilityLabel}. Use arrow keys when focused.`}
-        data-testid={testID}
-        draggable
-        role="button"
-        style={{
-          ...(StyleSheet.flatten(styles.runDragHandle) as React.CSSProperties),
-          cursor: "grab",
-          userSelect: "none"
-        }}
-        tabIndex={0}
-        title="Drag to reorder"
-        onDragEnd={onDragEnd}
-        onDragStart={(event) => {
-          const dataTransfer = event.dataTransfer as unknown as WebRunDataTransfer;
-          dataTransfer.effectAllowed = "move";
-          dataTransfer.setData(RUN_DRAG_DATA_TYPE, runId);
-          onDragStart(runId);
-        }}
-        onKeyDown={(event) => {
-          if (event.key === "ArrowUp" || event.key === "ArrowDown") {
-            event.preventDefault();
-            onKeyboardReorder(runId, event.key === "ArrowUp" ? "up" : "down");
-          }
-        }}
-      >
-        {grip}
-      </div>
-    );
-  }
-
-  return (
-    <View
-      accessible
-      accessibilityActions={[
-        { name: "decrement", label: `Move ${runName} up` },
-        { name: "increment", label: `Move ${runName} down` }
-      ]}
-      accessibilityLabel={accessibilityLabel}
-      accessibilityRole="adjustable"
-      style={styles.runDragHandle}
-      testID={testID}
-      onAccessibilityAction={(event) => {
-        if (event.nativeEvent.actionName === "decrement") {
-          onKeyboardReorder(runId, "up");
-        } else if (event.nativeEvent.actionName === "increment") {
-          onKeyboardReorder(runId, "down");
-        }
-      }}
-    >
-      {grip}
-    </View>
-  );
 }
 
 function presentationRunPress(
@@ -3680,10 +3761,15 @@ function PracticeRunEditor({
       />
 
       <View style={styles.runEditorIntro}>
+        {!isCreate ? (
+          <Text style={styles.runEditorRunName} testID="practice-run-editor-run-name">
+            {draft.name}
+          </Text>
+        ) : null}
         <Text style={styles.helperText}>
           {isCreate
             ? "Saving adds this run to Home. It does not start a sprint."
-            : `Adjust the current ELO for ${draft.name}. Run settings stay fixed.`}
+            : "Adjust the current ELO. Run settings stay fixed."}
         </Text>
       </View>
 
@@ -6520,10 +6606,21 @@ function ResultTrendGlyph(): React.JSX.Element {
   );
 }
 
-function ChevronGlyph({ direction }: { direction: "left" | "right" }): React.JSX.Element {
+function ChevronGlyph({
+  direction
+}: {
+  direction: "down" | "left" | "right" | "up";
+}): React.JSX.Element {
+  const directionStyle = direction === "left"
+    ? styles.chevronGlyphLeft
+    : direction === "right"
+      ? styles.chevronGlyphRight
+      : direction === "up"
+        ? styles.chevronGlyphUp
+        : styles.chevronGlyphDown;
   return (
     <View style={styles.chevronGlyphCanvas} testID={`chevron-${direction}-glyph`}>
-      <View style={[styles.chevronGlyph, direction === "left" ? styles.chevronGlyphLeft : styles.chevronGlyphRight]} />
+      <View style={[styles.chevronGlyph, directionStyle]} />
     </View>
   );
 }
@@ -10947,40 +11044,17 @@ const styles = StyleSheet.create({
     paddingVertical: 10
   },
   runCardDropTarget: {
-    backgroundColor: "#EFF6FF",
-    borderColor: "#2563EB"
+    borderColor: "#2563EB",
+    borderWidth: 1.5
   },
   runCardDragging: {
-    opacity: 0.52
-  },
-  runDragHandle: {
-    alignItems: "center",
-    backgroundColor: "#F8FAFC",
-    borderColor: "#CBD5E1",
-    borderRadius: 7,
-    borderWidth: 1,
-    height: 34,
-    justifyContent: "center",
-    width: 28
-  },
-  runDragGrip: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 3,
-    width: 9
-  },
-  runDragDot: {
-    backgroundColor: "#64748B",
-    borderRadius: 999,
-    height: 3,
-    width: 3
+    opacity: 0.9
   },
   runEditingMeta: {
     borderTopColor: "#E2E8F0",
     borderTopWidth: StyleSheet.hairlineWidth,
     justifyContent: "space-between",
     marginTop: 6,
-    paddingLeft: 32,
     paddingTop: 8,
     width: "100%"
   },
@@ -11013,6 +11087,10 @@ const styles = StyleSheet.create({
     height: 32,
     justifyContent: "center",
     width: 34
+  },
+  runReorderButton: {
+    backgroundColor: "#EFF6FF",
+    borderColor: "#BFDBFE"
   },
   runRemoveButton: {
     backgroundColor: "#FEF2F2",
@@ -11071,8 +11149,15 @@ const styles = StyleSheet.create({
     borderColor: "#BFDBFE",
     borderRadius: 8,
     borderWidth: 1,
+    gap: 3,
     paddingHorizontal: 12,
     paddingVertical: 9
+  },
+  runEditorRunName: {
+    color: "#111827",
+    fontSize: 15,
+    fontWeight: "900",
+    lineHeight: 19
   },
   runNameRow: {
     alignItems: "flex-start"
@@ -11186,11 +11271,21 @@ const styles = StyleSheet.create({
     backgroundColor: "#EFF6FF",
     borderColor: "#93C5FD"
   },
+  managedRunCard: {
+    borderColor: "#CBD5E1",
+    borderStyle: "solid",
+    minHeight: 62
+  },
+  managedRunCardActive: {
+    borderColor: "#60A5FA"
+  },
   practiceModeSelectArea: {
     alignItems: "center",
     flex: 1,
     flexDirection: "row",
     gap: 9,
+    justifyContent: "center",
+    minHeight: 40,
     minWidth: 0
   },
   practiceModeIcon: {
@@ -11294,6 +11389,7 @@ const styles = StyleSheet.create({
   practiceModeCopy: {
     flex: 1,
     gap: 2,
+    justifyContent: "center",
     minWidth: 0
   },
   practiceModeTitleRow: {
@@ -11305,12 +11401,14 @@ const styles = StyleSheet.create({
   practiceModeTitle: {
     color: "#111827",
     fontSize: 14,
-    fontWeight: "800"
+    fontWeight: "800",
+    lineHeight: 18
   },
   practiceModeDescription: {
     color: "#64748B",
     fontSize: 12,
-    fontWeight: "600"
+    fontWeight: "600",
+    lineHeight: 16
   },
   practiceModeDetailProbe: {
     height: 0,
@@ -11322,12 +11420,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     gap: 4,
-    justifyContent: "flex-end"
+    justifyContent: "center"
   },
   practiceModeRating: {
     color: "#64748B",
     fontSize: 11,
-    fontWeight: "800"
+    fontWeight: "800",
+    lineHeight: 14
   },
   practiceModeDisclosure: {
     alignItems: "center",
@@ -13767,6 +13866,16 @@ const styles = StyleSheet.create({
   chevronGlyphRight: {
     borderRightWidth: 2.5,
     borderTopWidth: 2.5,
+    transform: [{ rotate: "45deg" }]
+  },
+  chevronGlyphUp: {
+    borderLeftWidth: 2.5,
+    borderTopWidth: 2.5,
+    transform: [{ rotate: "45deg" }]
+  },
+  chevronGlyphDown: {
+    borderBottomWidth: 2.5,
+    borderRightWidth: 2.5,
     transform: [{ rotate: "45deg" }]
   },
   flipGlyph: {
