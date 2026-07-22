@@ -310,7 +310,7 @@ describe('Key user flows', () => {
     await failStandardSprint();
     await dismissSprintSummary();
 
-    await openTab('practice-tab', 'practice-run-management');
+    await openTab('practice-tab', 'practice-add-run');
     await createSavedCustomRun('Persistent Focus', {
       shorterDuration: true,
       themes: ['mate-in-2', 'fork']
@@ -325,7 +325,7 @@ describe('Key user flows', () => {
     await waitFor(element(by.text('Sprint failed'))).toBeVisible().withTimeout(10000);
     await dismissSprintSummary();
 
-    await openTab('practice-tab', 'practice-run-management');
+    await openTab('practice-tab', 'practice-add-run');
     await element(by.id('practice-run-home-edit')).tap();
     await element(by.id('practice-run-edit-standard')).tap();
     await element(by.id('practice-run-elo-increase')).tap();
@@ -348,7 +348,7 @@ describe('Key user flows', () => {
     await openTab('settings-tab', 'settings-app-version');
     await expect(element(by.id('settings-standard-elo-row'))).not.toExist();
 
-    await openTab('practice-tab', 'practice-run-management');
+    await openTab('practice-tab', 'practice-add-run');
     await waitFor(element(by.text('Persistent Focus'))).toExist().withTimeout(10000);
     await waitFor(element(by.text('Fork + Mate in 2 · 3 min · 20s pace')))
       .toExist()
@@ -362,6 +362,7 @@ async function createSavedCustomRun(name, { shorterDuration = false, themes = []
   await element(by.id('practice-add-run')).tap();
   await waitFor(element(by.id('practice-run-editor'))).toExist().withTimeout(10000);
   await element(by.id('practice-run-name-input')).replaceText(name);
+  await element(by.id('practice-run-name-input')).tapReturnKey();
   if (shorterDuration) {
     await waitForVisibleInPracticeScroll('practice-run-duration-stepper-decrease');
     await element(by.id('practice-run-duration-stepper-decrease')).tap();
