@@ -1,4 +1,4 @@
-import { userEvent, within } from "storybook/test";
+import { userEvent, waitFor, within } from "storybook/test";
 
 export async function clickTestId(canvasElement: HTMLElement, testID: string): Promise<void> {
   const page = within(canvasElement.ownerDocument.body);
@@ -23,6 +23,52 @@ export function expectTestIdAbsent(canvasElement: HTMLElement, testID: string): 
   if (page.queryByTestId(testID)) {
     throw new Error(`${testID} must not be rendered in the production-like lab`);
   }
+}
+
+export async function dragTestId(
+  canvasElement: HTMLElement,
+  sourceTestID: string,
+  targetTestID: string
+): Promise<void> {
+  const page = within(canvasElement.ownerDocument.body);
+  const source = await page.findByTestId(sourceTestID, {}, { timeout: 4_000 });
+  const target = await page.findByTestId(targetTestID, {}, { timeout: 4_000 });
+  const DataTransferConstructor = canvasElement.ownerDocument.defaultView?.DataTransfer;
+  const DragEventConstructor = canvasElement.ownerDocument.defaultView?.DragEvent;
+  if (!DataTransferConstructor || !DragEventConstructor) {
+    throw new Error("This browser does not expose the APIs required to test drag-and-drop");
+  }
+  const dataTransfer = new DataTransferConstructor();
+  const dispatchDragEvent = (element: HTMLElement, type: string): void => {
+    element.dispatchEvent(new DragEventConstructor(type, {
+      bubbles: true,
+      cancelable: true,
+      dataTransfer
+    }));
+  };
+
+  dispatchDragEvent(source, "dragstart");
+  dispatchDragEvent(target, "dragenter");
+  dispatchDragEvent(target, "dragover");
+  dispatchDragEvent(target, "drop");
+  dispatchDragEvent(source, "dragend");
+}
+
+export async function expectTestIdsInOrder(
+  canvasElement: HTMLElement,
+  testIDs: readonly string[]
+): Promise<void> {
+  const page = within(canvasElement.ownerDocument.body);
+  await waitFor(() => {
+    const elements = testIDs.map((testID) => page.getByTestId(testID));
+    for (let index = 0; index < elements.length - 1; index += 1) {
+      const current = elements[index];
+      const next = elements[index + 1];
+      if (!current || !next || (current.compareDocumentPosition(next) & 4) === 0) {
+        throw new Error(`Expected ${testIDs.join(", ")} in DOM order`);
+      }
+    }
+  });
 }
 
 export async function openPracticeSession(canvasElement: HTMLElement): Promise<void> {

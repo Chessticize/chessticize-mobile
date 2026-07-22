@@ -28,7 +28,7 @@ type PracticeRunManagementIntent =
   | { type: "confirm-remove" }
   | { type: "dismiss-remove" }
   | { type: "edit-run"; runId: string }
-  | { type: "move-run"; direction: "up" | "down"; runId: string }
+  | { type: "move-run"; runId: string; targetRunId: string }
   | { type: "remove-run"; runId: string }
   | { type: "restore-run"; runId: string }
   | { type: "save-run" }
@@ -129,20 +129,28 @@ export function runManagementFixtureReducer(
     case "cancel-edit":
       return returnHome(state);
     case "change-duration":
-      return updateDraft(state, { durationSeconds: intent.durationSeconds });
+      return state.screen === "create"
+        ? updateDraft(state, { durationSeconds: intent.durationSeconds })
+        : state;
     case "change-elo":
       return updateDraft(state, { elo: Math.max(600, intent.elo) });
     case "change-mode":
-      return updateDraft(state, { mode: intent.mode });
+      return state.screen === "create" ? updateDraft(state, { mode: intent.mode }) : state;
     case "change-name":
-      return {
-        ...updateDraft(state, { name: intent.name }),
-        nameError: null
-      };
+      return state.screen === "create"
+        ? {
+            ...updateDraft(state, { name: intent.name }),
+            nameError: null
+          }
+        : state;
     case "change-per-puzzle":
-      return updateDraft(state, { perPuzzleSeconds: intent.perPuzzleSeconds });
+      return state.screen === "create"
+        ? updateDraft(state, { perPuzzleSeconds: intent.perPuzzleSeconds })
+        : state;
     case "change-themes":
-      return updateDraft(state, { themes: intent.themes.length > 0 ? intent.themes : ["mixed"] });
+      return state.screen === "create"
+        ? updateDraft(state, { themes: intent.themes.length > 0 ? intent.themes : ["mixed"] })
+        : state;
     case "confirm-remove":
       return confirmRemoval(state);
     case "dismiss-remove":
@@ -163,7 +171,7 @@ export function runManagementFixtureReducer(
       };
     }
     case "move-run":
-      return moveRun(state, intent.runId, intent.direction);
+      return moveRun(state, intent.runId, intent.targetRunId);
     case "remove-run":
       return state.runs.some((run) => run.id === intent.runId)
         ? { ...state, removeCandidateId: intent.runId, notice: null }
@@ -309,10 +317,10 @@ function restoreRun(state: RunManagementFixtureState, runId: string): RunManagem
 function moveRun(
   state: RunManagementFixtureState,
   runId: string,
-  direction: "up" | "down"
+  targetRunId: string
 ): RunManagementFixtureState {
   const from = state.runs.findIndex((run) => run.id === runId);
-  const to = from + (direction === "up" ? -1 : 1);
+  const to = state.runs.findIndex((run) => run.id === targetRunId);
   if (from < 0 || to < 0 || to >= state.runs.length) {
     return state;
   }
@@ -324,7 +332,7 @@ function moveRun(
   runs.splice(to, 0, moved);
   return {
     ...state,
-    notice: `${moved.name} moved to position ${to + 1}.`,
+    notice: null,
     runs
   };
 }

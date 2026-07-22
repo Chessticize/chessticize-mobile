@@ -14,6 +14,12 @@ function component(name) {
 module.exports = {
   ActivityIndicator: component('ActivityIndicator'),
   NativeModules: {},
+  Platform: {
+    OS: 'ios',
+    select(options) {
+      return options.ios ?? options.default;
+    }
+  },
   __setWindowDimensions(nextDimensions) {
     windowDimensions = { ...windowDimensions, ...nextDimensions };
     for (const listener of Array.from(windowDimensionListeners)) {

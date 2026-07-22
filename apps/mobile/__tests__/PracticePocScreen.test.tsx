@@ -763,6 +763,8 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "practice-run-management")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "practice-run-standard"))).toContain("Standard");
     expect(collectText(findByTestId(renderer, "practice-run-tactics-focus"))).toContain("Tactics Focus");
+    expect(findByTestId(renderer, "practice-run-tactics-focus-glyph-standard-outer")).toBeTruthy();
+    expect(findByTestId(renderer, "practice-run-candidate-sprint-glyph-arrow-a-shaft")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "practice-progress-summary"))).toContain("ELO (Standard)");
 
     press(renderer, "practice-run-home-edit");
@@ -774,6 +776,26 @@ describe("PracticePocScreen", () => {
       { type: "add-run" },
       { type: "start-selected-run" }
     ]);
+  });
+
+  it("uses drag handles and ELO-only actions while editing Home runs", () => {
+    const onIntent = jest.fn();
+    const renderer = renderScreen({
+      runManagementPresentation: runManagementPresentation({ homeEditing: true, onIntent })
+    });
+
+    expect(collectText(findByTestId(renderer, "practice-run-management"))).toContain(
+      "Drag the handle to reorder runs."
+    );
+    expect(findByTestId(renderer, "practice-run-drag-tactics-focus").props.accessibilityLabel).toBe(
+      "Drag Tactics Focus to reorder"
+    );
+    expect(collectText(findByTestId(renderer, "practice-run-edit-tactics-focus"))).toBe("Edit ELO");
+    expect(() => findByTestId(renderer, "practice-run-move-up-tactics-focus")).toThrow();
+    expect(() => findByTestId(renderer, "practice-run-move-down-tactics-focus")).toThrow();
+
+    press(renderer, "practice-run-edit-tactics-focus");
+    expect(onIntent).toHaveBeenCalledWith({ type: "edit-run", runId: "tactics-focus" });
   });
 
   it("renders the New Run validation and 25-point ELO editing contract", () => {
@@ -807,6 +829,44 @@ describe("PracticePocScreen", () => {
     expect(onIntent.mock.calls.map(([intent]) => intent)).toEqual([
       { type: "change-name", name: "Calculation Lab" },
       { type: "change-elo", elo: 925 },
+      { type: "save-run" }
+    ]);
+  });
+
+  it("limits an existing Custom Run editor to Current ELO", () => {
+    const onIntent = jest.fn();
+    const renderer = renderScreen({
+      runManagementPresentation: runManagementPresentation({
+        draft: {
+          id: "tactics-focus",
+          name: "Tactics Focus",
+          kind: "custom",
+          mode: "custom",
+          elo: 1040,
+          durationSeconds: 600,
+          perPuzzleSeconds: 30,
+          themes: ["fork", "pin"]
+        },
+        onIntent,
+        screen: "edit"
+      })
+    });
+
+    expect(collectText(findByTestId(renderer, "practice-run-editor-title"))).toBe("Edit ELO");
+    expect(collectText(findByTestId(renderer, "practice-run-editor"))).toContain(
+      "Run settings stay fixed."
+    );
+    expect(collectText(findByTestId(renderer, "practice-run-elo-row"))).toContain("Current ELO");
+    expect(() => findByTestId(renderer, "practice-run-name-input")).toThrow();
+    expect(() => findByTestId(renderer, "practice-run-mode-row")).toThrow();
+    expect(() => findByTestId(renderer, "practice-run-theme-row")).toThrow();
+    expect(() => findByTestId(renderer, "practice-run-duration-stepper")).toThrow();
+    expect(() => findByTestId(renderer, "practice-run-per-puzzle-stepper")).toThrow();
+
+    press(renderer, "practice-run-elo-increase");
+    press(renderer, "practice-run-save");
+    expect(onIntent.mock.calls.map(([intent]) => intent)).toEqual([
+      { type: "change-elo", elo: 1065 },
       { type: "save-run" }
     ]);
   });
@@ -6053,6 +6113,16 @@ function runManagementPresentation(
         durationSeconds: 600,
         perPuzzleSeconds: 30,
         themes: ["fork", "pin"]
+      },
+      {
+        id: "candidate-sprint",
+        name: "Candidate Sprint",
+        kind: "custom",
+        mode: "arrow_duel",
+        elo: 880,
+        durationSeconds: 300,
+        perPuzzleSeconds: 20,
+        themes: ["mixed"]
       }
     ],
     screen: "home",

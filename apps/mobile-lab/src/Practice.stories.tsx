@@ -1,6 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/react-native-web-vite";
 import { LabScenario } from "./LabScenario.tsx";
-import { clickTestId, openPracticeSession, waitForTestId } from "./storyPlay.ts";
+import {
+  clickTestId,
+  dragTestId,
+  expectTestIdAbsent,
+  expectTestIdsInOrder,
+  openPracticeSession,
+  waitForTestId
+} from "./storyPlay.ts";
 
 const meta = {
   title: "Practice",
@@ -19,8 +26,18 @@ export const EditAndReorderRuns: Story = {
   args: { scenarioId: "practice-home-edit" },
   play: async ({ canvasElement }) => {
     await clickTestId(canvasElement, "practice-run-home-edit");
-    await clickTestId(canvasElement, "practice-run-move-up-endgame-sprint");
-    await waitForTestId(canvasElement, "practice-run-notice");
+    await dragTestId(
+      canvasElement,
+      "practice-run-drag-endgame-sprint",
+      "practice-run-arrow-duel"
+    );
+    await expectTestIdsInOrder(canvasElement, [
+      "practice-run-standard",
+      "practice-run-endgame-sprint",
+      "practice-run-arrow-duel",
+      "practice-run-tactics-focus"
+    ]);
+    expectTestIdAbsent(canvasElement, "practice-run-notice");
   }
 };
 
@@ -44,22 +61,28 @@ export const RunNameValidation: Story = {
 };
 
 export const BuiltInRunEditor: Story = {
-  name: "Built-in run editor",
+  name: "Built-in ELO editor",
   args: { scenarioId: "practice-run-standard-editor" },
   play: async ({ canvasElement }) => {
     await clickTestId(canvasElement, "practice-run-home-edit");
     await clickTestId(canvasElement, "practice-run-edit-standard");
-    await waitForTestId(canvasElement, "practice-run-fixed-name");
+    await waitForTestId(canvasElement, "practice-run-elo-row");
+    expectTestIdAbsent(canvasElement, "practice-run-fixed-name");
   }
 };
 
 export const CustomRatingEditor: Story = {
-  name: "Custom run editor",
+  name: "Custom Run ELO editor",
   args: { scenarioId: "practice-custom-rating-editor" },
   play: async ({ canvasElement }) => {
     await clickTestId(canvasElement, "practice-run-home-edit");
     await clickTestId(canvasElement, "practice-run-edit-tactics-focus");
     await waitForTestId(canvasElement, "practice-run-elo-row");
+    expectTestIdAbsent(canvasElement, "practice-run-name-input");
+    expectTestIdAbsent(canvasElement, "practice-run-mode-row");
+    expectTestIdAbsent(canvasElement, "practice-run-theme-row");
+    expectTestIdAbsent(canvasElement, "practice-run-duration-stepper");
+    expectTestIdAbsent(canvasElement, "practice-run-per-puzzle-stepper");
   }
 };
 

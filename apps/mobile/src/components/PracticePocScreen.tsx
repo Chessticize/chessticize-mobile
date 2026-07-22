@@ -4,6 +4,7 @@ import {
   AppState,
   Linking,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StatusBar,
@@ -179,7 +180,7 @@ export type PracticeRunManagementIntent =
   | { type: "confirm-remove" }
   | { type: "dismiss-remove" }
   | { type: "edit-run"; runId: string }
-  | { type: "move-run"; direction: "up" | "down"; runId: string }
+  | { type: "move-run"; runId: string; targetRunId: string }
   | { type: "remove-run"; runId: string }
   | { type: "restore-run"; runId: string }
   | { type: "save-run" }
@@ -3203,9 +3204,25 @@ function PracticeRunHome({
 }: {
   presentation: PracticeRunManagementPresentation;
 }): React.JSX.Element {
+  const [draggedRunId, setDraggedRunId] = useState<string | null>(null);
+  const [dropTargetRunId, setDropTargetRunId] = useState<string | null>(null);
   const selectedRun = presentation.runs.find((run) => run.id === presentation.selectedRunId) ?? null;
   const showRestore = presentation.hiddenRuns.length > 0
     && (presentation.homeEditing || presentation.runs.length === 0);
+  const reorderRun = (runId: string, targetRunId: string): void => {
+    if (runId !== targetRunId) {
+      presentation.onIntent({ type: "move-run", runId, targetRunId });
+    }
+    setDraggedRunId(null);
+    setDropTargetRunId(null);
+  };
+  const reorderRunWithKeyboard = (runId: string, direction: "up" | "down"): void => {
+    const index = presentation.runs.findIndex((run) => run.id === runId);
+    const target = presentation.runs[index + (direction === "up" ? -1 : 1)];
+    if (target) {
+      reorderRun(runId, target.id);
+    }
+  };
 
   return (
     <View style={styles.runManagementPanel} testID="practice-run-management">
@@ -3229,7 +3246,7 @@ function PracticeRunHome({
       <View style={styles.runManagementToolbar}>
         <Text style={styles.helperText}>
           {presentation.homeEditing
-            ? "Use the arrow controls to change their order."
+            ? "Drag the handle to reorder runs."
             : "Choose a saved run, then start when you are ready."}
         </Text>
         <View style={styles.runManagementToolbarActions}>
@@ -3284,15 +3301,26 @@ function PracticeRunHome({
         </View>
       ) : (
         <View style={styles.modeList} testID="practice-run-list">
-          {presentation.runs.map((run, index) => (
+          {presentation.runs.map((run) => (
             <PracticeRunCard
               key={run.id}
               active={run.id === presentation.selectedRunId}
+              dragging={run.id === draggedRunId}
+              dropTarget={run.id === dropTargetRunId && run.id !== draggedRunId}
               editing={presentation.homeEditing}
-              index={index}
-              isLast={index === presentation.runs.length - 1}
               run={run}
               onIntent={presentation.onIntent}
+              onDragEnd={() => {
+                setDraggedRunId(null);
+                setDropTargetRunId(null);
+              }}
+              onDragEnter={(runId) => setDropTargetRunId(runId)}
+              onDragStart={(runId) => {
+                setDraggedRunId(runId);
+                setDropTargetRunId(null);
+              }}
+              onDrop={reorderRun}
+              onKeyboardReorder={reorderRunWithKeyboard}
             />
           ))}
         </View>
@@ -3336,17 +3364,27 @@ function PracticeRunHome({
 
 function PracticeRunCard({
   active,
+  dragging,
+  dropTarget,
   editing,
-  index,
-  isLast,
   onIntent,
+  onDragEnd,
+  onDragEnter,
+  onDragStart,
+  onDrop,
+  onKeyboardReorder,
   run
 }: {
   active: boolean;
+  dragging: boolean;
+  dropTarget: boolean;
   editing: boolean;
-  index: number;
-  isLast: boolean;
   onIntent: PracticeRunManagementPresentation["onIntent"];
+  onDragEnd: () => void;
+  onDragEnter: (runId: string) => void;
+  onDragStart: (runId: string) => void;
+  onDrop: (runId: string, targetRunId: string) => void;
+  onKeyboardReorder: (runId: string, direction: "up" | "down") => void;
   run: PracticeRunPresentation;
 }): React.JSX.Element {
   const details = run.kind === "custom"
@@ -3360,32 +3398,41 @@ function PracticeRunCard({
       : "Find the best move";
 
   return (
-    <View
+    <RunCardDropSurface
+      dropTarget={dropTarget}
+      runId={run.id}
       style={[
         styles.practiceModeCard,
         active && !editing ? styles.practiceModeCardActive : null,
-        editing ? styles.runCardEditing : null
+        editing ? styles.runCardEditing : null,
+        dropTarget ? styles.runCardDropTarget : null,
+        dragging ? styles.runCardDragging : null
       ]}
       testID={`practice-run-${safeTestId(run.id)}`}
+      onDragEnter={onDragEnter}
+      onDrop={onDrop}
     >
       {editing ? (
-        <View
-          accessibilityLabel={`${run.name} reorder handle`}
-          style={styles.runDragHandle}
-          testID={`practice-run-drag-${safeTestId(run.id)}`}
-        >
-          <Text style={styles.runDragHandleText}>☰</Text>
-        </View>
+        <RunDragHandle
+          runId={run.id}
+          runName={run.name}
+          onDragEnd={onDragEnd}
+          onDragStart={onDragStart}
+          onKeyboardReorder={onKeyboardReorder}
+        />
       ) : null}
       <Pressable
         accessibilityRole="button"
         accessibilityState={{ selected: active && !editing }}
-        accessibilityLabel={editing ? `Edit ${run.name}` : `Select ${run.name}, ELO ${run.elo}, ${details}`}
+        accessibilityLabel={editing ? `Edit ${run.name} ELO` : `Select ${run.name}, ELO ${run.elo}, ${details}`}
         style={styles.practiceModeSelectArea}
         onPress={() => presentationRunPress(editing, run.id, onIntent)}
       >
         <View style={[styles.practiceModeIcon, active && !editing ? styles.practiceModeIconActive : null]}>
-          <PracticeModeGlyph mode={run.mode} />
+          <PracticeModeGlyph
+            mode={run.mode === "arrow_duel" ? "arrow_duel" : "standard"}
+            testIDPrefix={`practice-run-${safeTestId(run.id)}-glyph`}
+          />
         </View>
         <View style={styles.practiceModeCopy}>
           <Text style={styles.practiceModeTitle}>{run.name}</Text>
@@ -3398,34 +3445,12 @@ function PracticeRunCard({
           <View style={styles.runEditActions}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Edit ${run.name}`}
+              accessibilityLabel={`Edit ${run.name} ELO`}
               style={styles.runEditButton}
               testID={`practice-run-edit-${safeTestId(run.id)}`}
               onPress={() => onIntent({ type: "edit-run", runId: run.id })}
             >
-              <Text style={styles.runEditButtonText}>Edit</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Move ${run.name} up`}
-              accessibilityState={{ disabled: index === 0 }}
-              disabled={index === 0}
-              style={[styles.runIconButton, index === 0 ? styles.disabledButton : null]}
-              testID={`practice-run-move-up-${safeTestId(run.id)}`}
-              onPress={() => onIntent({ type: "move-run", direction: "up", runId: run.id })}
-            >
-              <Text style={styles.runIconButtonText}>↑</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Move ${run.name} down`}
-              accessibilityState={{ disabled: isLast }}
-              disabled={isLast}
-              style={[styles.runIconButton, isLast ? styles.disabledButton : null]}
-              testID={`practice-run-move-down-${safeTestId(run.id)}`}
-              onPress={() => onIntent({ type: "move-run", direction: "down", runId: run.id })}
-            >
-              <Text style={styles.runIconButtonText}>↓</Text>
+              <Text style={styles.runEditButtonText}>Edit ELO</Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
@@ -3439,6 +3464,142 @@ function PracticeRunCard({
           </View>
         ) : null}
       </View>
+    </RunCardDropSurface>
+  );
+}
+
+const RUN_DRAG_DATA_TYPE = "text/plain";
+
+type WebRunDataTransfer = {
+  dropEffect: string;
+  effectAllowed: string;
+  getData: (format: string) => string;
+  setData: (format: string, value: string) => void;
+};
+
+function RunCardDropSurface({
+  children,
+  dropTarget,
+  runId,
+  style,
+  testID,
+  onDragEnter,
+  onDrop
+}: {
+  children: React.ReactNode;
+  dropTarget: boolean;
+  runId: string;
+  style: React.ComponentProps<typeof View>["style"];
+  testID: string;
+  onDragEnter: (runId: string) => void;
+  onDrop: (runId: string, targetRunId: string) => void;
+}): React.JSX.Element {
+  if (Platform.OS === "web") {
+    return (
+      <div
+        aria-dropeffect={dropTarget ? "move" : undefined}
+        data-testid={testID}
+        style={StyleSheet.flatten(style) as React.CSSProperties}
+        onDragEnter={(event) => {
+          event.preventDefault();
+          onDragEnter(runId);
+        }}
+        onDragOver={(event) => {
+          event.preventDefault();
+          (event.dataTransfer as unknown as WebRunDataTransfer).dropEffect = "move";
+        }}
+        onDrop={(event) => {
+          event.preventDefault();
+          const sourceRunId = (event.dataTransfer as unknown as WebRunDataTransfer)
+            .getData(RUN_DRAG_DATA_TYPE);
+          if (sourceRunId) {
+            onDrop(sourceRunId, runId);
+          }
+        }}
+      >
+        {children}
+      </div>
+    );
+  }
+  return <View style={style} testID={testID}>{children}</View>;
+}
+
+function RunDragHandle({
+  runId,
+  runName,
+  onDragEnd,
+  onDragStart,
+  onKeyboardReorder
+}: {
+  runId: string;
+  runName: string;
+  onDragEnd: () => void;
+  onDragStart: (runId: string) => void;
+  onKeyboardReorder: (runId: string, direction: "up" | "down") => void;
+}): React.JSX.Element {
+  const grip = (
+    <View accessibilityElementsHidden style={styles.runDragGrip}>
+      {[0, 1, 2, 3, 4, 5].map((dot) => (
+        <View key={dot} style={styles.runDragDot} />
+      ))}
+    </View>
+  );
+  const accessibilityLabel = `Drag ${runName} to reorder`;
+  const testID = `practice-run-drag-${safeTestId(runId)}`;
+
+  if (Platform.OS === "web") {
+    return (
+      <div
+        aria-label={`${accessibilityLabel}. Use arrow keys when focused.`}
+        data-testid={testID}
+        draggable
+        role="button"
+        style={{
+          ...(StyleSheet.flatten(styles.runDragHandle) as React.CSSProperties),
+          cursor: "grab",
+          userSelect: "none"
+        }}
+        tabIndex={0}
+        title="Drag to reorder"
+        onDragEnd={onDragEnd}
+        onDragStart={(event) => {
+          const dataTransfer = event.dataTransfer as unknown as WebRunDataTransfer;
+          dataTransfer.effectAllowed = "move";
+          dataTransfer.setData(RUN_DRAG_DATA_TYPE, runId);
+          onDragStart(runId);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+            event.preventDefault();
+            onKeyboardReorder(runId, event.key === "ArrowUp" ? "up" : "down");
+          }
+        }}
+      >
+        {grip}
+      </div>
+    );
+  }
+
+  return (
+    <View
+      accessible
+      accessibilityActions={[
+        { name: "decrement", label: `Move ${runName} up` },
+        { name: "increment", label: `Move ${runName} down` }
+      ]}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="adjustable"
+      style={styles.runDragHandle}
+      testID={testID}
+      onAccessibilityAction={(event) => {
+        if (event.nativeEvent.actionName === "decrement") {
+          onKeyboardReorder(runId, "up");
+        } else if (event.nativeEvent.actionName === "increment") {
+          onKeyboardReorder(runId, "down");
+        }
+      }}
+    >
+      {grip}
     </View>
   );
 }
@@ -3513,9 +3674,9 @@ function PracticeRunEditor({
         closeAccessibilityLabel="Close run editor"
         closeTestID="practice-run-editor-close"
         headerTestID="practice-run-editor-header"
-        startAccessibilityLabel={isCreate ? "Add run to Home" : "Save run changes"}
+        startAccessibilityLabel={isCreate ? "Add run to Home" : `Save ${draft.name} ELO`}
         startTestID="practice-run-save"
-        title={isCreate ? "New Run" : `Edit ${draft.name}`}
+        title={isCreate ? "New Run" : "Edit ELO"}
         titleTestID="practice-run-editor-title"
         onClose={() => presentation.onIntent({ type: "cancel-edit" })}
         onStart={() => presentation.onIntent({ type: "save-run" })}
@@ -3525,106 +3686,116 @@ function PracticeRunEditor({
         <Text style={styles.helperText}>
           {isCreate
             ? "Saving adds this run to Home. It does not start a sprint."
-            : "Changes apply the next time this run starts."}
+            : `Adjust the current ELO for ${draft.name}. Run settings stay fixed.`}
         </Text>
       </View>
 
       <View style={styles.customConfigCard} testID="practice-run-editor-fields">
-        {isCustom ? (
-          <View style={[styles.customConfigRow, styles.runNameRow]}>
-            <View style={styles.runNameCopy}>
-              <Text style={styles.listText}>Name</Text>
-              <Text style={styles.requiredFieldLabel}>Required · unique</Text>
-            </View>
-            <TextInput
-              accessibilityLabel="Run name"
-              autoCapitalize="words"
-              autoCorrect={false}
-              maxLength={40}
-              placeholder="e.g. Tactics Focus"
-              placeholderTextColor="#94A3B8"
-              style={[styles.runNameInput, presentation.nameError ? styles.runNameInputError : null]}
-              testID="practice-run-name-input"
-              value={draft.name}
-              onChangeText={(name) => presentation.onIntent({ type: "change-name", name })}
-            />
-          </View>
-        ) : (
-          <CustomValueRow
-            detail="Built-in run names stay fixed"
-            label="Name"
-            testID="practice-run-fixed-name"
-            value={draft.name}
-          />
-        )}
-
-        {presentation.nameError ? (
-          <View
-            accessibilityLiveRegion="polite"
-            style={styles.runNameError}
-            testID="practice-run-name-error"
-          >
-            <Text style={styles.runNameErrorText}>{presentation.nameError}</Text>
-          </View>
-        ) : null}
-
-        {isCustom ? (
+        {isCreate ? (
           <>
-            <CustomModeChoiceRow
-              value={customMode}
-              testID="practice-run-mode-row"
-              onChange={(mode) => presentation.onIntent({ type: "change-mode", mode })}
-            />
-            <View style={styles.runThemeLabelRow}>
-              <Text style={styles.listText}>Themes</Text>
-              <Text style={styles.requiredFieldLabel}>Choose one or more</Text>
-            </View>
-            <CustomThemeChoiceRow
-              selectedThemes={draft.themes}
-              testID="practice-run-theme-row"
-              onChange={(nextTheme) => presentation.onIntent({
-                type: "change-themes",
-                themes: nextCustomThemeSelection(draft.themes, nextTheme)
-              })}
-            />
-            <CustomOptionRow
-              label="Duration"
-              value={formatDurationLabel(draft.durationSeconds)}
-              stepperTestID="practice-run-duration-stepper"
-              options={CUSTOM_DURATION_OPTIONS.map((option) => ({
-                value: option,
-                label: formatDurationLabel(option),
-                testID: `practice-run-duration-${option}`
-              }))}
-              selected={draft.durationSeconds as (typeof CUSTOM_DURATION_OPTIONS)[number]}
-              onChange={(durationSeconds) => presentation.onIntent({ type: "change-duration", durationSeconds })}
-            />
-            <CustomOptionRow
-              label="Time per puzzle"
-              value={`${draft.perPuzzleSeconds} sec`}
-              stepperTestID="practice-run-per-puzzle-stepper"
-              options={CUSTOM_PER_PUZZLE_OPTIONS.map((option) => ({
-                value: option,
-                label: `${option}s`,
-                testID: `practice-run-per-puzzle-${option}`
-              }))}
-              selected={draft.perPuzzleSeconds as (typeof CUSTOM_PER_PUZZLE_OPTIONS)[number]}
-              onChange={(perPuzzleSeconds) => presentation.onIntent({ type: "change-per-puzzle", perPuzzleSeconds })}
+            {isCustom ? (
+              <View style={[styles.customConfigRow, styles.runNameRow]}>
+                <View style={styles.runNameCopy}>
+                  <Text style={styles.listText}>Name</Text>
+                  <Text style={styles.requiredFieldLabel}>Required · unique</Text>
+                </View>
+                <TextInput
+                  accessibilityLabel="Run name"
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                  maxLength={40}
+                  placeholder="e.g. Tactics Focus"
+                  placeholderTextColor="#94A3B8"
+                  style={[styles.runNameInput, presentation.nameError ? styles.runNameInputError : null]}
+                  testID="practice-run-name-input"
+                  value={draft.name}
+                  onChangeText={(name) => presentation.onIntent({ type: "change-name", name })}
+                />
+              </View>
+            ) : (
+              <CustomValueRow
+                detail="Built-in run names stay fixed"
+                label="Name"
+                testID="practice-run-fixed-name"
+                value={draft.name}
+              />
+            )}
+
+            {presentation.nameError ? (
+              <View
+                accessibilityLiveRegion="polite"
+                style={styles.runNameError}
+                testID="practice-run-name-error"
+              >
+                <Text style={styles.runNameErrorText}>{presentation.nameError}</Text>
+              </View>
+            ) : null}
+
+            {isCustom ? (
+              <>
+                <CustomModeChoiceRow
+                  value={customMode}
+                  testID="practice-run-mode-row"
+                  onChange={(mode) => presentation.onIntent({ type: "change-mode", mode })}
+                />
+                <View style={styles.runThemeLabelRow}>
+                  <Text style={styles.listText}>Themes</Text>
+                  <Text style={styles.requiredFieldLabel}>Choose one or more</Text>
+                </View>
+                <CustomThemeChoiceRow
+                  selectedThemes={draft.themes}
+                  testID="practice-run-theme-row"
+                  onChange={(nextTheme) => presentation.onIntent({
+                    type: "change-themes",
+                    themes: nextCustomThemeSelection(draft.themes, nextTheme)
+                  })}
+                />
+                <CustomOptionRow
+                  label="Duration"
+                  value={formatDurationLabel(draft.durationSeconds)}
+                  stepperTestID="practice-run-duration-stepper"
+                  options={CUSTOM_DURATION_OPTIONS.map((option) => ({
+                    value: option,
+                    label: formatDurationLabel(option),
+                    testID: `practice-run-duration-${option}`
+                  }))}
+                  selected={draft.durationSeconds as (typeof CUSTOM_DURATION_OPTIONS)[number]}
+                  onChange={(durationSeconds) => presentation.onIntent({ type: "change-duration", durationSeconds })}
+                />
+                <CustomOptionRow
+                  label="Time per puzzle"
+                  value={`${draft.perPuzzleSeconds} sec`}
+                  stepperTestID="practice-run-per-puzzle-stepper"
+                  options={CUSTOM_PER_PUZZLE_OPTIONS.map((option) => ({
+                    value: option,
+                    label: `${option}s`,
+                    testID: `practice-run-per-puzzle-${option}`
+                  }))}
+                  selected={draft.perPuzzleSeconds as (typeof CUSTOM_PER_PUZZLE_OPTIONS)[number]}
+                  onChange={(perPuzzleSeconds) => presentation.onIntent({ type: "change-per-puzzle", perPuzzleSeconds })}
+                />
+              </>
+            ) : (
+              <CustomValueRow
+                label="Format"
+                testID="practice-run-fixed-format"
+                value={draft.kind === "arrow_duel" ? "Arrow Duel" : "Standard puzzles"}
+              />
+            )}
+
+            <PracticeRunEloRow
+              isCreate
+              value={draft.elo}
+              onChange={(elo) => presentation.onIntent({ type: "change-elo", elo })}
             />
           </>
         ) : (
-          <CustomValueRow
-            label="Format"
-            testID="practice-run-fixed-format"
-            value={draft.kind === "arrow_duel" ? "Arrow Duel" : "Standard puzzles"}
+          <PracticeRunEloRow
+            isCreate={false}
+            value={draft.elo}
+            onChange={(elo) => presentation.onIntent({ type: "change-elo", elo })}
           />
         )}
-
-        <PracticeRunEloRow
-          isCreate={isCreate}
-          value={draft.elo}
-          onChange={(elo) => presentation.onIntent({ type: "change-elo", elo })}
-        />
       </View>
     </View>
   );
@@ -4952,8 +5123,14 @@ function PracticeModeGlyph({
   if (mode === "standard") {
     return (
       <View style={styles.modeGlyphCanvas}>
-        <View style={[styles.modeTargetOuter, { borderColor: color }]} />
-        <View style={[styles.modeTargetInner, { borderColor: color }]} />
+        <View
+          style={[styles.modeTargetOuter, { borderColor: color }]}
+          testID={testIDPrefix ? `${testIDPrefix}-standard-outer` : undefined}
+        />
+        <View
+          style={[styles.modeTargetInner, { borderColor: color }]}
+          testID={testIDPrefix ? `${testIDPrefix}-standard-inner` : undefined}
+        />
       </View>
     );
   }
@@ -10772,16 +10949,34 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     paddingVertical: 10
   },
+  runCardDropTarget: {
+    backgroundColor: "#EFF6FF",
+    borderColor: "#2563EB"
+  },
+  runCardDragging: {
+    opacity: 0.52
+  },
   runDragHandle: {
     alignItems: "center",
+    backgroundColor: "#F8FAFC",
+    borderColor: "#CBD5E1",
+    borderRadius: 7,
+    borderWidth: 1,
     height: 34,
     justifyContent: "center",
-    width: 24
+    width: 28
   },
-  runDragHandleText: {
-    color: "#64748B",
-    fontSize: 17,
-    fontWeight: "800"
+  runDragGrip: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 3,
+    width: 9
+  },
+  runDragDot: {
+    backgroundColor: "#64748B",
+    borderRadius: 999,
+    height: 3,
+    width: 3
   },
   runEditingMeta: {
     borderTopColor: "#E2E8F0",
@@ -10821,12 +11016,6 @@ const styles = StyleSheet.create({
     height: 32,
     justifyContent: "center",
     width: 34
-  },
-  runIconButtonText: {
-    color: "#334155",
-    fontSize: 17,
-    fontWeight: "800",
-    lineHeight: 20
   },
   runRemoveButton: {
     backgroundColor: "#FEF2F2",

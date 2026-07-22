@@ -5,7 +5,7 @@
   },
   "practice-home-edit": {
     "issueNumber": 253,
-    "changeNote": "Edit mode exposes ordering, editing, and removal controls for every run."
+    "changeNote": "Edit mode exposes drag-and-drop ordering, ELO-only editing, and removal controls for every run."
   },
   "practice-custom-setup": {
     "issueNumber": 253,
@@ -17,11 +17,11 @@
   },
   "practice-run-standard-editor": {
     "issueNumber": 253,
-    "changeNote": "Built-in run editing moves current ELO controls out of Settings."
+    "changeNote": "Built-in Run editing is limited to Current ELO and moves those controls out of Settings."
   },
   "practice-custom-rating-editor": {
     "issueNumber": 253,
-    "changeNote": "Named Custom Runs can update configuration, name, and current ELO."
+    "changeNote": "Existing Custom Runs can update only Current ELO; creation settings remain fixed."
   },
   "practice-run-remove-confirmation": {
     "issueNumber": 253,

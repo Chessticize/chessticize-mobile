@@ -28,16 +28,33 @@ test("run order changes without changing stable run identity", () => {
   const initial = createRunManagementFixtureState();
   const moved = runManagementFixtureReducer(initial, {
     type: "move-run",
-    direction: "up",
-    runId: "endgame-sprint"
+    runId: "endgame-sprint",
+    targetRunId: "arrow-duel"
   });
   assert.deepEqual(moved.runs.map((run) => run.id), [
     "standard",
-    "arrow-duel",
     "endgame-sprint",
+    "arrow-duel",
     "tactics-focus"
   ]);
-  assert.equal(moved.notice, "Endgame Sprint moved to position 3.");
+  assert.equal(moved.notice, null);
+});
+
+test("editing an existing run changes ELO only", () => {
+  let state = createRunManagementFixtureState();
+  state = runManagementFixtureReducer(state, { type: "edit-run", runId: "tactics-focus" });
+  const original = state.draft;
+  assert.ok(original);
+
+  state = runManagementFixtureReducer(state, { type: "change-name", name: "Renamed" });
+  state = runManagementFixtureReducer(state, { type: "change-mode", mode: "arrow_duel" });
+  state = runManagementFixtureReducer(state, { type: "change-themes", themes: ["endgame"] });
+  state = runManagementFixtureReducer(state, { type: "change-duration", durationSeconds: 180 });
+  state = runManagementFixtureReducer(state, { type: "change-per-puzzle", perPuzzleSeconds: 10 });
+  assert.deepEqual(state.draft, original);
+
+  state = runManagementFixtureReducer(state, { type: "change-elo", elo: 1065 });
+  assert.equal(state.draft?.elo, 1065);
 });
 
 test("removing and restoring a run retains its ELO and identity", () => {
