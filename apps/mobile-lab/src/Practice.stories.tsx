@@ -51,7 +51,7 @@ export const ActiveSession: Story = {
 };
 
 export const ArrowDuelPrompt: Story = {
-  name: "Arrow Duel prompt layout",
+  name: "Arrow Duel prompt card",
   args: { scenarioId: "practice-arrow-duel-prompt" },
   play: async ({ canvasElement }) => {
     await clickTestId(canvasElement, "practice-mode-arrow-duel");

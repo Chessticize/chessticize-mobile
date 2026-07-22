@@ -2282,7 +2282,6 @@ export function PracticePocScreen({
   const sessionStatusNode = state && (isOpenSession || isShowingFeedbackSnapshot) ? (
     <SessionStatusBar
       compactMetrics={sessionUsesRail}
-      kingPieceSize={kingGlyphSizeForBoard(boardSize)}
       mode={mode}
       state={state}
       sideToMove={displayedSideToMove}
@@ -2398,8 +2397,12 @@ export function PracticePocScreen({
     <SessionScoreStrip state={state} />
   ) : null;
   const practicePromptNode = shouldShowSessionBoard ? (
-    <View style={[styles.practicePromptStack, mode === "arrow_duel" ? null : { width: boardSize }]}>
-      <PracticePrompt currentPuzzle={displayedPuzzle} mode={mode} />
+    <View style={[styles.practicePromptStack, { width: boardSize }]}>
+      <PracticePrompt
+        currentPuzzle={displayedPuzzle}
+        kingPieceSize={kingGlyphSizeForBoard(boardSize)}
+        mode={mode}
+      />
       {unclearPrompt ? (
         <UnclearAttemptPrompt
           marked={unclearPrompt.marked}
@@ -2543,10 +2546,9 @@ export function PracticePocScreen({
                     >
                       {!sessionUsesRail ? sessionStatusNode : null}
                       {!sessionUsesRail ? pausedSessionNode : null}
-                      {mode === "arrow_duel" ? null : practicePromptNode}
+                      {practicePromptNode}
                       {sessionBoardNode}
                       {!sessionUsesRail ? sessionScoreNode : null}
-                      {!sessionUsesRail && mode === "arrow_duel" ? practicePromptNode : null}
                       {!sessionUsesRail ? errorNode : null}
                     </View>
                     {sessionUsesRail ? (
@@ -2557,7 +2559,6 @@ export function PracticePocScreen({
                       >
                         {sessionStatusNode}
                         {sessionScoreNode}
-                        {mode === "arrow_duel" ? practicePromptNode : null}
                         {errorNode}
                       </ScrollView>
                     ) : null}
@@ -3821,7 +3822,6 @@ function TestPuzzleSourceControl({
 function SessionStatusBar({
   compactMetrics = false,
   confirmAbandon,
-  kingPieceSize,
   mode,
   state,
   sideToMove,
@@ -3833,7 +3833,6 @@ function SessionStatusBar({
 }: {
   compactMetrics?: boolean;
   confirmAbandon: boolean;
-  kingPieceSize: number;
   mode: SprintMode;
   state: SprintState;
   sideToMove: MoveSide | null;
@@ -3900,6 +3899,7 @@ function SessionStatusBar({
           accessibilityLabel={`Progress ${state.correctCount} of ${state.config.targetCorrect}`}
           style={[
             styles.sessionMetricBlock,
+            styles.sessionProgressBlock,
             compactMetrics ? styles.sessionMetricBlockCompact : null,
             compactMetrics ? styles.sessionProgressBlockCompact : null
           ]}
@@ -3935,8 +3935,6 @@ function SessionStatusBar({
             <MoveSideBadge
               badgeTestID="session-side-to-move"
               compact
-              king={mode !== "arrow_duel"}
-              kingPieceSize={kingPieceSize}
               side={sideToMove}
             />
           ) : null}
@@ -4295,11 +4293,13 @@ function ErrorPanel({ error }: { error: string }): React.JSX.Element {
 
 function PracticePrompt({
   currentPuzzle,
+  kingPieceSize,
   mode,
   promptText,
   promptHint
 }: {
   currentPuzzle: CurrentPuzzleState | undefined;
+  kingPieceSize: number;
   mode: SprintMode;
   promptText?: string | null;
   promptHint?: string | null;
@@ -4307,12 +4307,13 @@ function PracticePrompt({
   if (!currentPuzzle) {
     return null;
   }
-  const side = sideToMove(currentPuzzle.currentFen) === "b" ? "black" : "white";
+  const promptSide = sideToMove(currentPuzzle.currentFen);
+  const side = promptSide === "b" ? "black" : "white";
   const isArrowDuel = currentPuzzle.kind === "arrow_duel";
   const defaultPromptTitle = isArrowDuel ? "Choose the best move" : "Find the best move";
   const defaultPromptContext = isArrowDuel
     ? `For ${side}, between the two arrows.`
-    : null;
+    : `For ${side}.`;
   const displayedPromptText = promptText === undefined ? defaultPromptContext : promptText;
   const displayedPromptHint = promptHint === undefined
     ? (isArrowDuel ? "Watch for checks, captures, and attacks!" : null)
@@ -4320,6 +4321,14 @@ function PracticePrompt({
 
   return (
     <View style={styles.promptPanel} testID="practice-prompt">
+      <View style={styles.promptIcon} testID="practice-prompt-icon">
+        <MoveSideGlyph
+          king
+          kingPieceSize={kingPieceSize}
+          side={promptSide}
+          testID="practice-prompt-side-glyph"
+        />
+      </View>
       <View style={styles.promptCopy}>
         <Text style={styles.promptTitle}>{promptText === undefined ? defaultPromptTitle : modeLabel(mode)}</Text>
         {displayedPromptText ? <Text style={styles.promptText}>{displayedPromptText}</Text> : null}
@@ -4525,6 +4534,7 @@ function MoveSideGlyph({
       testID={testID}
     >
       <Image
+        accessible={false}
         accessibilityIgnoresInvertColors
         resizeMode="stretch"
         source={CHESS_PIECE_SPRITE}
@@ -7229,10 +7239,15 @@ function ReviewSession({
       <HistoryUnclearAction onClear={() => onAttemptClearUnclear(currentEntry.attempt!.id)} />
     ) : null;
   const hasReviewContextActions = reviewScheduleControlNode !== null || historyUnclearActionNode !== null;
+  const hasAnalysisPanelContent = guidedEvalLines.length > 0
+    || analysisEnabled
+    || currentEntry.source !== "due"
+    || reviewResultRecorded;
   const reviewPromptNode = (
-    <View style={[styles.practicePromptStack, currentEntry.mode === "arrow_duel" ? null : { width: boardSize }]}>
+    <View style={[styles.practicePromptStack, { width: boardSize }]}>
       <PracticePrompt
         currentPuzzle={currentPuzzle}
+        kingPieceSize={kingGlyphSizeForBoard(boardSize)}
         mode={currentEntry.mode}
         promptText={
           isArrowDuelFollowUpReview
@@ -7350,8 +7365,6 @@ function ReviewSession({
           ) : null}
           <MoveSideBadge
             badgeTestID="review-side-to-move"
-            king={currentEntry.mode !== "arrow_duel"}
-            kingPieceSize={kingGlyphSizeForBoard(boardSize)}
             side={reviewSideToMove}
           />
           {currentEntry.source !== "due" ? (
@@ -7360,8 +7373,14 @@ function ReviewSession({
             </View>
           ) : null}
           {reviewRemainingSeconds !== null ? (
-            <View style={[styles.reviewContextPill, reviewRemainingSeconds === 0 ? styles.reviewContextPillDanger : null]}>
-              <Text testID="review-timer" style={[styles.reviewContextPillText, reviewRemainingSeconds === 0 ? styles.errorText : null]}>
+            <View style={[styles.reviewContextPill, styles.reviewTimerPill, reviewRemainingSeconds === 0 ? styles.reviewContextPillDanger : null]}>
+              <Text
+                numberOfLines={1}
+                testID="review-timer"
+                style={reviewRemainingSeconds === 0
+                  ? [styles.reviewContextPillText, styles.errorText]
+                  : styles.reviewTimerText}
+              >
                 {reviewRemainingSeconds === 0 ? "Time expired" : formatDuration(reviewRemainingSeconds)}
               </Text>
             </View>
@@ -7371,7 +7390,7 @@ function ReviewSession({
 
       <View style={[styles.reviewBoardLayout, adaptiveLayout.usesSessionRail ? styles.reviewBoardLayoutWide : null]}>
         <View style={styles.reviewBoardLane} testID="review-board-lane">
-          {currentEntry.mode === "arrow_duel" ? null : reviewPromptNode}
+          {reviewPromptNode}
           <View
             accessible
             accessibilityLabel={sessionBoardAccessibilityLabel(reviewSideToMove, lastMove)}
@@ -7453,16 +7472,17 @@ function ReviewSession({
           </View>
         </View>
 
-        <View
-          style={[
-            styles.reviewAnalysisColumn,
-            adaptiveLayout.usesSessionRail ? styles.reviewAnalysisPanelWide : null,
-            adaptiveLayout.usesSessionRail ? { width: adaptiveLayout.sessionRailWidth } : null
-          ]}
-          testID="review-analysis-column"
-        >
-          <View style={styles.analysisPanel} testID="review-analysis-panel">
-          {currentEntry.mode === "arrow_duel" ? reviewPromptNode : null}
+        {hasAnalysisPanelContent || (adaptiveLayout.usesSessionRail && hasReviewContextActions) ? (
+          <View
+            style={[
+              styles.reviewAnalysisColumn,
+              adaptiveLayout.usesSessionRail ? styles.reviewAnalysisPanelWide : null,
+              adaptiveLayout.usesSessionRail ? { width: adaptiveLayout.sessionRailWidth } : null
+            ]}
+            testID="review-analysis-column"
+          >
+          {hasAnalysisPanelContent ? (
+            <View style={styles.analysisPanel} testID="review-analysis-panel">
           {!analysisEnabled && guidedEvalLines.length > 0 ? (
             <View testID="review-guided-eval-list">
               {guidedEvalLines.map((line, index) => (
@@ -7572,14 +7592,16 @@ function ReviewSession({
               ))}
             </>
           ) : null}
-          </View>
+            </View>
+          ) : null}
           {adaptiveLayout.usesSessionRail && hasReviewContextActions ? (
             <View style={styles.reviewContextActions} testID="review-context-actions-rail">
               {reviewScheduleControlNode}
               {historyUnclearActionNode}
             </View>
           ) : null}
-        </View>
+          </View>
+        ) : null}
       </View>
       {!adaptiveLayout.usesSessionRail && hasReviewContextActions ? (
         <View style={styles.reviewContextActions} testID="review-context-actions-bottom">
@@ -10668,6 +10690,7 @@ const styles = StyleSheet.create({
   activeSessionBoardLane: {
     alignItems: "center",
     flex: 1,
+    gap: 12,
     justifyContent: "center",
     minWidth: 0
   },
@@ -10717,7 +10740,7 @@ const styles = StyleSheet.create({
     gap: 6,
     justifyContent: "space-between",
     minHeight: 36,
-    paddingHorizontal: 8,
+    paddingHorizontal: 0,
     paddingVertical: 1
   },
   sessionActiveMetricRowCompact: {
@@ -10782,8 +10805,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flex: 1.25
   },
+  sessionProgressBlock: {
+    minWidth: 72
+  },
   sessionProgressBlockCompact: {
-    minWidth: 54
+    minWidth: 78
   },
   sessionTimerBlockCompact: {
     minWidth: 78
@@ -10799,7 +10825,7 @@ const styles = StyleSheet.create({
   },
   sessionProgressValue: {
     color: "#111827",
-    fontSize: 13,
+    fontSize: 21,
     fontWeight: "800",
     textAlign: "center"
   },
@@ -10917,13 +10943,26 @@ const styles = StyleSheet.create({
     textShadowColor: "rgba(15, 23, 42, 0.55)"
   },
   promptPanel: {
-    alignItems: "flex-start",
-    minHeight: 34,
-    paddingHorizontal: 2,
-    paddingVertical: 3
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    minHeight: 72,
+    paddingHorizontal: 12,
+    paddingVertical: 9
   },
   practicePromptStack: {
     gap: 6
+  },
+  promptIcon: {
+    alignItems: "center",
+    flexShrink: 0,
+    height: 48,
+    justifyContent: "center",
+    width: 48
   },
   unclearPrompt: {
     alignItems: "center",
@@ -10967,11 +11006,12 @@ const styles = StyleSheet.create({
   },
   promptCopy: {
     flex: 1,
-    gap: 2
+    gap: 2,
+    minWidth: 0
   },
   promptTitle: {
     color: "#111827",
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "800"
   },
   promptText: {
@@ -11722,6 +11762,19 @@ const styles = StyleSheet.create({
   reviewContextPillDanger: {
     borderColor: "#FCA5A5"
   },
+  reviewTimerPill: {
+    justifyContent: "center",
+    minHeight: 38,
+    minWidth: 78
+  },
+  reviewTimerText: {
+    color: "#111827",
+    fontFamily: "menlo",
+    fontSize: 21,
+    fontWeight: "800",
+    fontVariant: ["tabular-nums"],
+    letterSpacing: 0.2
+  },
   reviewContextPillText: {
     color: "#334155",
     fontSize: 12,
@@ -11738,6 +11791,7 @@ const styles = StyleSheet.create({
   reviewBoardLane: {
     alignItems: "center",
     flex: 1,
+    gap: 12,
     justifyContent: "center",
     minWidth: 0
   },
