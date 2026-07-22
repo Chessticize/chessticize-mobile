@@ -88,7 +88,7 @@ interface HistoryAttemptDbRow extends PuzzleRow {
   rating_key: string;
   run_id: string | null;
   run_name: string | null;
-  per_puzzle_seconds: number;
+  session_config_json: string;
 }
 
 interface HistoryEloDbRow {
@@ -1185,7 +1185,7 @@ export class SyncSQLiteStore implements PracticeStore {
           COALESCE(a.rating_key, s.rating_key) AS rating_key,
           s.run_id,
           s.run_name,
-          s.per_puzzle_seconds,
+          s.config_json AS session_config_json,
           p.*
          FROM attempts a
          JOIN sprint_sessions s ON s.id = a.session_id
@@ -1198,6 +1198,7 @@ export class SyncSQLiteStore implements PracticeStore {
     return rows.map((row) => {
       const puzzle = puzzleFromRow(row);
       const candidateOrder = optionalHistoryStringArrayFromJson(row.arrow_duel_candidate_order_json);
+      const perPuzzleSeconds = positivePerPuzzleSecondsFromConfigJson(row.session_config_json);
       return {
         id: row.attempt_id,
         source: row.attempt_source,
@@ -1220,7 +1221,7 @@ export class SyncSQLiteStore implements PracticeStore {
         ...(row.run_id === null || row.run_name === null
           ? {}
           : { runId: row.run_id, runName: row.run_name }),
-        perPuzzleSeconds: row.per_puzzle_seconds,
+        ...(perPuzzleSeconds === undefined ? {} : { perPuzzleSeconds }),
         puzzleRating: puzzle.rating,
         side: sideToMoveForHistoryPuzzle({ puzzle, mode: row.mode }),
         themes: puzzle.themes
@@ -2092,6 +2093,19 @@ function optionalHistoryStringArrayFromJson(value: string | null):
     // Keep the row readable, but preserve the corruption so consumers cannot
     // silently fabricate a different Arrow Duel candidate set for replay.
     return { status: "corrupt" };
+  }
+}
+
+function positivePerPuzzleSecondsFromConfigJson(value: string): number | undefined {
+  try {
+    const parsed = JSON.parse(value) as { perPuzzleSeconds?: unknown };
+    return typeof parsed.perPuzzleSeconds === "number" &&
+      Number.isInteger(parsed.perPuzzleSeconds) &&
+      parsed.perPuzzleSeconds > 0
+      ? parsed.perPuzzleSeconds
+      : undefined;
+  } catch {
+    return undefined;
   }
 }
 

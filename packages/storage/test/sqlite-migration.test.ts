@@ -301,17 +301,27 @@ test("SQLite migrates the released iOS 1.0.0 database without losing user semant
           }
         ]
       );
+      const migratedStandardHistory = service.getHistoryView({
+        now: "2026-07-01T00:00:00.000Z",
+        timeRange: "max",
+        ratingKey: "standard 5/20"
+      }).attempts;
       assert.deepEqual(
-        service.getHistoryView({
-          now: "2026-07-01T00:00:00.000Z",
-          timeRange: "max",
-          ratingKey: "standard 5/20"
-        }).attempts.map((attempt) => attempt.id),
+        migratedStandardHistory.map((attempt) => attempt.id),
         [
           "legacy-attempt-review-correct",
           "legacy-attempt-standard-wrong",
           "legacy-attempt-standard-correct"
         ]
+      );
+      assert.ok(
+        migratedStandardHistory
+          .filter((attempt) => attempt.source === "sprint")
+          .every((attempt) => attempt.perPuzzleSeconds === 20)
+      );
+      assert.equal(
+        migratedStandardHistory.find((attempt) => attempt.source === "scheduled_review")?.perPuzzleSeconds,
+        undefined
       );
       assert.deepEqual(
         store.listAttempts({ mode: "arrow_duel" })[0]?.arrowDuelCandidateOrder,
