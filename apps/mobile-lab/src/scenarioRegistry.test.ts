@@ -52,17 +52,38 @@ test("New Scenario Markers retain open-issue ownership on the full catalog", () 
   }
 });
 
-test("issue 273 owns every selected theme-catalog surface", () => {
-  assert.deepEqual(newScenarios.map((scenario) => scenario.id), [
-    "practice-custom-setup",
+test("issue 273 owns its three unique theme-catalog surfaces", () => {
+  const issue273Scenarios = newScenarios.filter((scenario) => scenario.issueNumber === 273);
+  assert.deepEqual(issue273Scenarios.map((scenario) => scenario.id), [
     "history-populated",
     "history-filters",
     "history-attempt-detail"
   ]);
-  assert.ok(newScenarios.every((scenario) => scenario.issueNumber === 273));
-  assert.deepEqual(storyTagsForScenario("practice-home" as LabScenarioId), []);
+  assert.ok(issue273Scenarios.every((scenario) => scenario.issueNumber === 273));
   assert.deepEqual(storyTagsForScenario("practice-custom-setup"), ["new"]);
   assert.deepEqual(storyTagsForScenario("history-populated"), ["new"]);
   assert.deepEqual(storyTagsForScenario("history-filters"), ["new"]);
   assert.deepEqual(storyTagsForScenario("history-attempt-detail"), ["new"]);
+});
+
+test("Issue 253 owns the complete run-management design track", () => {
+  const issue253Scenarios = newScenarios.filter((scenario) => scenario.issueNumber === 253);
+  assert.deepEqual(
+    issue253Scenarios.map((scenario) => scenario.id),
+    [
+      "practice-home",
+      "practice-home-edit",
+      "practice-custom-setup",
+      "practice-run-name-validation",
+      "practice-run-standard-editor",
+      "practice-custom-rating-editor",
+      "practice-run-remove-confirmation",
+      "practice-runs-empty",
+      "settings-advanced-ratings"
+    ]
+  );
+  for (const scenario of issue253Scenarios) {
+    assert.equal(scenario.issueNumber, 253);
+    assert.deepEqual(storyTagsForScenario(scenario.id), ["new"]);
+  }
 });

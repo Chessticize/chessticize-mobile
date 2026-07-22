@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useReducer, useState } from "react";
 import type { AttemptEvent, SprintMode, SprintState } from "../../../packages/core/src/index.ts";
 import { defaultSprintConfig } from "../../../packages/core/src/index.ts";
 import { MemoryStore } from "../../../packages/storage/src/memory-store.ts";
@@ -20,6 +20,10 @@ import {
 } from "./browserMobilePractice.ts";
 import { clearLabPracticeService, setLabPracticeService } from "./boardController.ts";
 import { LAB_PUZZLES, PRIMARY_LAB_PUZZLE } from "./labPuzzles.ts";
+import {
+  createRunManagementFixtureState,
+  runManagementFixtureReducer
+} from "./runManagementFixture.ts";
 import { scenarioRegistry, type LabScenarioId } from "./scenarioRegistry.ts";
 import {
   SERVER_CURATED_THEME_PRESENTATION,
@@ -38,6 +42,17 @@ type ScenarioRuntime = {
 
 export function LabScenario({ scenarioId }: { scenarioId: LabScenarioId }): React.JSX.Element {
   const runtime = useMemo(() => createScenarioRuntime(scenarioId), [scenarioId]);
+
+  return <LabScenarioContent key={scenarioId} runtime={runtime} scenarioId={scenarioId} />;
+}
+
+function LabScenarioContent({
+  runtime,
+  scenarioId
+}: {
+  runtime: ScenarioRuntime;
+  scenarioId: LabScenarioId;
+}): React.JSX.Element {
   const [selectedCustomThemes, setSelectedCustomThemes] = useState<string[]>([]);
   const showsThemeCatalogPrototype = [
     "practice-custom-setup",
@@ -45,6 +60,14 @@ export function LabScenario({ scenarioId }: { scenarioId: LabScenarioId }): Reac
     "history-filters",
     "history-attempt-detail"
   ].includes(scenarioId);
+  const [runManagementState, dispatchRunManagement] = useReducer(
+    runManagementFixtureReducer,
+    scenarioId === "practice-runs-empty" ? "empty" : "populated",
+    createRunManagementFixtureState
+  );
+  const runManagementPresentation = isRunManagementScenario(scenarioId)
+    ? { ...runManagementState, onIntent: dispatchRunManagement }
+    : undefined;
 
   setLabPracticeService(runtime.service);
   useEffect(() => () => clearLabPracticeService(runtime.service), [runtime.service]);
@@ -61,10 +84,25 @@ export function LabScenario({ scenarioId }: { scenarioId: LabScenarioId }): Reac
         themeCatalogPresentation={showsThemeCatalogPrototype
           ? SERVER_CURATED_THEME_PRESENTATION
           : undefined}
+        runEloEditingMovedToHome
+        runManagementPresentation={runManagementPresentation}
         {...runtime.screenProps}
       />
     </LabScenarioShell>
   );
+}
+
+function isRunManagementScenario(scenarioId: LabScenarioId): boolean {
+  return [
+    "practice-home",
+    "practice-home-edit",
+    "practice-custom-setup",
+    "practice-run-name-validation",
+    "practice-run-standard-editor",
+    "practice-custom-rating-editor",
+    "practice-run-remove-confirmation",
+    "practice-runs-empty"
+  ].includes(scenarioId);
 }
 
 export function LabScenarioShell({

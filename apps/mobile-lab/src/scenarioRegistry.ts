@@ -8,8 +8,13 @@ import newScenarioMarkerData from "./newScenarioMarkers.json" with { type: "json
 
 export type LabScenarioId =
   | "practice-home"
+  | "practice-home-edit"
   | "practice-custom-setup"
+  | "practice-run-name-validation"
+  | "practice-run-standard-editor"
   | "practice-custom-rating-editor"
+  | "practice-run-remove-confirmation"
+  | "practice-runs-empty"
   | "practice-preparing"
   | "practice-active"
   | "practice-paused"
@@ -69,18 +74,23 @@ export const newScenarioMarkers = newScenarioMarkerData as Partial<
 >;
 
 const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
-  "practice-home": defineScenario("practice-home", "Practice", "Home", "practice--home", "Idle Practice home with deterministic ratings and no persisted progress.", "practice", ["Mode selection", "Progress summary", "Review workload strip"], ["Review", "History", "Settings"]),
+  "practice-home": defineScenario("practice-home", "Practice", "Home", "practice--home", "Practice home with vertically centered bordered Run cards, named reusable runs, deterministic ELO, and no persisted mutations.", "practice", ["Centered bordered Run cards", "Saved run selection", "Add Run entry", "Edit mode entry", "Progress summary", "Review workload strip"], ["Run editor", "Review", "History", "Settings"]),
+  "practice-home-edit": defineScenario("practice-home-edit", "Practice", "Edit and reorder runs", "practice--edit-and-reorder-runs", "Home edit mode with whole-card drag, real-time animated insertion, arrow-button fallbacks, ELO-only edit actions, and removal actions.", "practice", ["Whole-card drag", "Real-time insertion animation", "Arrow-button fallback", "ELO-only edit actions", "Format-specific icons", "Removal entry"], ["ELO editor", "Removal confirmation", "Practice home"]),
   "practice-custom-setup": defineScenario(
     "practice-custom-setup",
     "Practice",
-    "Custom sprint setup",
+    "New Run",
     "practice--custom-setup",
-    "Existing Custom Sprint setup using the approved grouped presentation for the server-curated 24-theme catalog.",
+    "New named run editor that defaults to All themes, exposes the grouped server-curated 24-theme catalog, and saves to Home without starting.",
     "practice",
-    ["Complete custom configuration", "24 curated themes", "Deterministic All-to-multiple selection", "All exclusivity", "Non-empty theme fallback"],
-    ["Practice home", "Native SQLite persistence and a scored practice session"]
+    ["Required unique name", "Custom configuration", "24 curated themes", "Deterministic All-to-multiple selection", "All exclusivity", "Starting ELO", "Add to Home"],
+    ["Practice home", "Native run persistence", "Scored practice session"]
   ),
-  "practice-custom-rating-editor": defineScenario("practice-custom-rating-editor", "Practice", "Custom rating editor", "practice--custom-rating-editor", "Expanded ELO adjustment for a previously played custom rating bucket.", "practice", ["Custom setup", "Rating adjustment"], ["Practice home"]),
+  "practice-run-name-validation": defineScenario("practice-run-name-validation", "Practice", "Run name validation", "practice--run-name-validation", "New Run with inline required-name validation; entering an existing name exposes the unique-name error.", "practice", ["Required-name error", "Unique-name rule", "Accessible field feedback"], ["Practice home", "Saved run"]),
+  "practice-run-standard-editor": defineScenario("practice-run-standard-editor", "Practice", "Built-in ELO editor", "practice--built-in-run-editor", "Existing Standard run editor names its Run, exposes only the same 25-point Current ELO rule, and returns to Home edit mode after Save or Cancel.", "practice", ["Visible Run name", "Fixed run settings", "Current ELO adjustment", "Return to Home edit mode"], ["Practice home edit mode"]),
+  "practice-custom-rating-editor": defineScenario("practice-custom-rating-editor", "Practice", "Custom Run ELO editor", "practice--custom-rating-editor", "Existing Custom Run editor names its Run and exposes only Current ELO; Save or Cancel returns to Home edit mode while creation settings stay fixed.", "practice", ["Visible Run name", "Fixed run settings", "Current ELO adjustment", "Return to Home edit mode"], ["Practice home edit mode"]),
+  "practice-run-remove-confirmation": defineScenario("practice-run-remove-confirmation", "Practice", "Remove run confirmation", "practice--remove-run-confirmation", "Inline warning directly below the selected Run before it is removed from Home, explicitly retaining its ELO and history for later restoration.", "practice", ["Inline removal warning", "Selected Run context", "Retained ELO and history", "Cancel", "Confirm removal"], ["Edit runs", "Restore run"]),
+  "practice-runs-empty": defineScenario("practice-runs-empty", "Practice", "Empty Home and restore", "practice--empty-home-and-restore", "Home after every run is hidden, with clear Add Run and restore paths that preserve prior ELO.", "practice", ["Empty state", "Add Run", "Retained run list", "Restore to Home"], ["New Run", "Practice home"]),
   "practice-preparing": defineScenario("practice-preparing", "Practice", "Preparing", "practice--preparing", "Stable preparing overlay before an Arrow Duel sprint starts.", "practice", ["Preparing overlay", "Cancel through Back intent"], ["Active sprint", "Practice home"]),
   "practice-active": defineScenario("practice-active", "Practice", "Active session", "practice--active-session", "Active Standard sprint with the development-only Board Placeholder.", "practice", ["Timer", "Progress", "Board state", "Pause", "Accessible moves"], ["Sprint result"]),
   "practice-paused": defineScenario("practice-paused", "Practice", "Paused session", "practice--paused-session", "Paused sprint with resume and abandon actions.", "practice", ["Paused state", "Resume", "Abandon"], ["Active sprint", "Sprint result"]),
@@ -98,11 +108,11 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
   "history-filters": defineScenario("history-filters", "History", "Filters and active filters", "history--filters-and-active-filters", "Expanded History filters with the complete curated theme catalog in categorized horizontal rails.", "history", ["Advanced filters", "24-theme catalog", "Active filter summary", "Reset"], ["Replay puzzle"]),
   "history-attempt-detail": defineScenario("history-attempt-detail", "History", "Replay puzzle", "history--attempt-detail", "The real puzzle replay reached by tapping a History row, with every curated puzzle theme centered in a horizontally scrollable tag rail below the board.", "history", ["Puzzle replay", "Curated theme rail", "Review enrollment"], ["History"]),
   "history-replay-unavailable": defineScenario("history-replay-unavailable", "History", "Replay unavailable", "history--replay-unavailable", "Legacy Arrow Duel attempt whose candidate order cannot be reconstructed safely.", "history", ["Persisted details", "Replay-unavailable explanation"], ["History"]),
-  "settings-ios-sync": defineScenario("settings-ios-sync", "Settings", "iOS sync", "settings--ios-sync", "iOS capabilities with iCloud Sync controls and no real account access.", "settings", ["iCloud Sync", "Profile", "About"], ["Stockfish diagnostics"]),
+  "settings-ios-sync": defineScenario("settings-ios-sync", "Settings", "iOS sync", "settings--ios-sync", "iOS capabilities with iCloud Sync controls, run ELO editing omitted, and no real account access.", "settings", ["iCloud Sync", "Notifications", "About"], ["Run editor", "Stockfish diagnostics"]),
   "settings-android-backup": defineScenario("settings-android-backup", "Settings", "Android backup", "settings--android-backup", "Android managed-backup variant with iCloud controls omitted.", "settings", ["Android Progress Backup", "Notifications", "About"], ["Stockfish diagnostics"]),
   "settings-notifications-denied": defineScenario("settings-notifications-denied", "Settings", "Notifications denied", "settings--notifications-denied", "Denied notification permission with a public system-settings action.", "settings", ["Permission state", "Reminder preferences", "Open settings"], ["System settings"]),
   "settings-notifications-not-determined": defineScenario("settings-notifications-not-determined", "Settings", "Notifications not determined", "settings--notifications-not-determined", "Notification permission has not yet been requested.", "settings", ["Permission request", "Reminder preferences"], ["System permission prompt"]),
-  "settings-advanced-ratings": defineScenario("settings-advanced-ratings", "Settings", "Advanced rating editor", "settings--advanced-rating-editor", "Expanded rating adjustment and reset controls.", "settings", ["Rating editor", "Adjustment controls"], ["Settings"]),
+  "settings-advanced-ratings": defineScenario("settings-advanced-ratings", "Settings", "ELO controls moved to runs", "settings--advanced-rating-editor", "Stable former ELO-editor URL now documents Settings without rating controls; current ELO lives in each run editor.", "settings", ["Settings without Profile ELO", "Run-editor ownership"], ["Built-in run editor", "Custom run editor"]),
   "settings-stockfish-diagnostics": defineScenario("settings-stockfish-diagnostics", "Settings", "Stockfish diagnostics", "settings--stockfish-diagnostics", "Development diagnostics with the engine boundary unavailable in the browser.", "settings", ["Diagnostic positions", "Unavailable engine state"], ["Settings"]),
   "system-loading": defineScenario("system-loading", "System", "Loading", "system--loading", "Reusable full-screen loading treatment shown through the real sprint start transition.", "system", ["Progress indicator", "Loading copy"], ["Practice"]),
   "system-error": defineScenario("system-error", "System", "Error", "system--error", "Real start failure rendered with an empty in-memory puzzle service.", "system", ["Error message", "Recovery context"], ["Practice"]),
@@ -121,6 +131,7 @@ type CatalogCoverage =
   | { kind: "not-cataloged"; reason: string };
 
 const coveredBy = (scenario: LabScenarioId): CatalogCoverage => ({ kind: "scenario", scenario });
+const notCataloged = (reason: string): CatalogCoverage => ({ kind: "not-cataloged", reason });
 
 export const navigationCoverage = {
   tabs: {
@@ -135,7 +146,7 @@ export const navigationCoverage = {
     "review-reminder-prompt": coveredBy("practice-reminder-prompt"),
     "history-filters": coveredBy("history-filters"),
     "review-filters": coveredBy("review-filters"),
-    "settings-advanced-ratings": coveredBy("settings-advanced-ratings"),
+    "settings-advanced-ratings": notCataloged("Issue 253 moves Current ELO editing into each run's ELO-only editor."),
     "custom-rating-editor": coveredBy("practice-custom-rating-editor"),
     "starting-practice": coveredBy("practice-preparing")
   } satisfies Record<MobileBackTransient, CatalogCoverage>,
