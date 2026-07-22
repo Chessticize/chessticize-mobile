@@ -61,6 +61,56 @@ test("SQLite migrates an empty database to the current schema version", async ()
   }
 });
 
+test("SQLite v8 promotes legacy Custom Sprint configs even after an interim v7 install", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "chessticize-v8-run-migration-"));
+  const databasePath = join(directory, "practice.sqlite");
+  try {
+    const setup = new SQLiteStore(databasePath);
+    setup.migrate();
+    setup.saveCustomSprintConfig({
+      id: "legacy-regular",
+      mode: "custom",
+      ratingKey: "pin custom 5/20",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      targetCorrect: 15,
+      maxMistakes: 3,
+      themes: ["pin"],
+      lastStartedAt: "2026-07-21T12:00:00.000Z",
+      playCount: 2
+    });
+    setup.saveCustomSprintConfig({
+      id: "legacy-arrow",
+      mode: "arrow_duel",
+      ratingKey: "sacrifice arrow_duel 5/20",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      targetCorrect: 15,
+      maxMistakes: 3,
+      themes: ["sacrifice"],
+      lastStartedAt: "2026-07-09T12:00:00.000Z",
+      playCount: 1
+    });
+    setup.db.exec("PRAGMA user_version = 7");
+    setup.close();
+
+    const migrated = new SQLiteStore(databasePath);
+    migrated.migrate();
+    try {
+      assert.equal(schemaVersionForStore(migrated), CURRENT_SCHEMA_VERSION);
+      assert.deepEqual(
+        new PracticeService(migrated).listPracticeRuns().map((run) => run.name),
+        ["Standard", "Arrow Duel", "Regular Puzzle 1", "Arrow Duel 1"]
+      );
+      assert.deepEqual(migrated.db.prepare("PRAGMA foreign_key_check").all(), []);
+    } finally {
+      migrated.close();
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("SQLite v3 migration tags only safely inferred current-generation sprint sessions", async () => {
   const directory = await mkdtemp(join(tmpdir(), "chessticize-generation-migration-"));
   const databasePath = join(directory, "practice.sqlite");
@@ -204,13 +254,44 @@ test("SQLite migrates the released iOS 1.0.0 database without losing user semant
       assert.ok(sessionColumns.some((column) => column.name === "run_id"));
       assert.ok(sessionColumns.some((column) => column.name === "run_kind"));
       assert.ok(sessionColumns.some((column) => column.name === "run_name"));
-      assert.deepEqual(
-        store.db.prepare("SELECT id, name, rating_key FROM practice_runs ORDER BY home_order").all().map(sqliteRow),
-        [
-          { id: "standard", name: "Standard", rating_key: "standard 5/20" },
-          { id: "arrow-duel", name: "Arrow Duel", rating_key: "arrow_duel 5/30" }
-        ]
-      );
+      assert.deepEqual(service.listPracticeRuns().map((run) => ({
+        name: run.name,
+        mode: run.mode,
+        ratingKey: run.ratingKey,
+        themes: run.themes,
+        homeOrder: run.homeOrder
+      })), [
+        {
+          name: "Standard",
+          mode: "standard",
+          ratingKey: "standard 5/20",
+          themes: undefined,
+          homeOrder: 0
+        },
+        {
+          name: "Arrow Duel",
+          mode: "arrow_duel",
+          ratingKey: "arrow_duel 5/30",
+          themes: undefined,
+          homeOrder: 1
+        },
+        {
+          name: "Regular Puzzle 1",
+          mode: "custom",
+          ratingKey: "endgame custom 10/30",
+          themes: ["endgame"],
+          homeOrder: 2
+        },
+        {
+          name: "Regular Puzzle 2",
+          mode: "custom",
+          ratingKey: "hangingPiece custom 5/20",
+          themes: ["hangingPiece"],
+          homeOrder: 3
+        }
+      ]);
+      assert.equal(service.getRating("endgame custom 10/30").rating, 900);
+      assert.equal(service.getRating("hangingPiece custom 5/20").rating, 805);
       assert.deepEqual(store.db.prepare("PRAGMA foreign_key_list(practice_runs)").all(), []);
       const reviewQueueColumns = store.db.prepare("PRAGMA table_info(review_queue)").all() as Array<{ name: string; notnull: number }>;
       assert.ok(reviewQueueColumns.some((column) => column.name === "due_day"));
