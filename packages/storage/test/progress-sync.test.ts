@@ -34,6 +34,7 @@ test("syncPracticeProgress does not touch transport while iCloud sync is disable
     imported: {
       ratings: 0,
       attempts: 0,
+      practiceRuns: 0,
       reviewQueue: 0,
       sprintSessions: 0
     },
@@ -270,6 +271,7 @@ test("pack-backed SQLite sync makes remote progress readable when referenced puz
     assert.deepEqual(result.imported, {
       ratings: 1,
       attempts: 1,
+      practiceRuns: 0,
       reviewQueue: 1,
       sprintSessions: 1
     });

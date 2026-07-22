@@ -163,6 +163,7 @@ export const navigationCoverage = {
   details: {
     "review-analysis": coveredBy("review-feedback-analysis"),
     "review-session": coveredBy("review-session"),
+    "practice-run-editor": coveredBy("practice-run-name-validation"),
     "custom-practice": coveredBy("practice-custom-setup"),
     "sprint-result": coveredBy("practice-summary"),
     "stockfish-diagnostics": coveredBy("settings-stockfish-diagnostics")

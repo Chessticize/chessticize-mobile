@@ -1,10 +1,13 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   AppState,
   Image,
+  LayoutAnimation,
   Linking,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -16,6 +19,7 @@ import {
   View
 } from "react-native";
 import type { ImageSourcePropType } from "react-native";
+import type { LayoutChangeEvent, PanResponderGestureState } from "react-native";
 import type { MoveResult } from "react-native-chessboard";
 import Chessboard, { type ChessboardRef } from "react-native-chessboard";
 import {
@@ -36,13 +40,16 @@ import {
   historyAttemptSpeedSeconds,
   isUnclearAttemptEligible,
   isReviewOverdue,
+  MANUAL_RATING_STEP,
   normalizeHistoryAttemptDetail,
   normalizeThemeSelection,
+  RATING_FLOOR,
   reviewDueState,
   reviewDueLabel,
   reviewQueueForecast,
   submitArrowDuelChoice,
-  submitLineMove
+  submitLineMove,
+  stepManualRating
 } from "../../../../packages/core/src/index.ts";
 import type {
   AttemptEvent,
@@ -61,6 +68,7 @@ import type {
   Puzzle,
   PuzzleFeedback,
   PuzzleLineState,
+  PracticeRunRecord,
   RatingRecord,
   ReviewAnalysisLine,
   ReviewReminderDecision,
@@ -105,6 +113,7 @@ import type {
 } from "../backend/mobilePlatformCapabilities.ts";
 import { arePracticeTestControlsEnabled, isPracticeDebugEnabled } from "../releaseConfig.ts";
 import { isStoreAssetCaptureEnabled } from "../backend/testLaunchConfig.ts";
+import { usePracticeRunManagement } from "../backend/usePracticeRunManagement.ts";
 import {
   canonicalFen,
   decidePremoveQueue,
@@ -130,6 +139,18 @@ import type {
 } from "../navigation/mobileSystemBack.ts";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Chess, type Move, type PieceSymbol, type Square } from "chess.js";
+import type {
+  PracticeRunManagementPresentation,
+  PracticeRunPresentation
+} from "./practiceRunPresentation.ts";
+
+export type {
+  PracticeRunDraft,
+  PracticeRunKind,
+  PracticeRunManagementIntent,
+  PracticeRunManagementPresentation,
+  PracticeRunPresentation
+} from "./practiceRunPresentation.ts";
 
 interface Props {
   platformCapabilities: MobilePlatformCapabilities;
@@ -141,6 +162,7 @@ interface Props {
   currentTimeMs?: () => number;
   puzzleSelectionId?: string;
   puzzleSelectionSeed?: string;
+  runManagementEnabled?: boolean;
   runManagementPresentation?: PracticeRunManagementPresentation;
   runEloEditingMovedToHome?: boolean;
   sprintStartDelayMs?: number;
@@ -161,57 +183,6 @@ export type ThemeCatalogGroup = {
 export type ThemeCatalogPresentation = {
   groups: readonly ThemeCatalogGroup[];
 };
-
-export type PracticeRunKind = "standard" | "arrow_duel" | "custom";
-
-export type PracticeRunPresentation = {
-  id: string;
-  name: string;
-  kind: PracticeRunKind;
-  mode: "standard" | "custom" | "arrow_duel";
-  elo: number;
-  durationSeconds: number;
-  perPuzzleSeconds: number;
-  themes: readonly string[];
-};
-
-export type PracticeRunDraft = Omit<PracticeRunPresentation, "id"> & {
-  id?: string;
-};
-
-export type PracticeRunManagementIntent =
-  | { type: "add-run" }
-  | { type: "cancel-edit" }
-  | { type: "change-duration"; durationSeconds: number }
-  | { type: "change-elo"; elo: number }
-  | { type: "change-mode"; mode: "custom" | "arrow_duel" }
-  | { type: "change-name"; name: string }
-  | { type: "change-per-puzzle"; perPuzzleSeconds: number }
-  | { type: "change-themes"; themes: string[] }
-  | { type: "confirm-remove" }
-  | { type: "dismiss-remove" }
-  | { type: "edit-run"; runId: string }
-  | { type: "move-run"; runId: string; targetRunId: string }
-  | { type: "remove-run"; runId: string }
-  | { type: "restore-run"; runId: string }
-  | { type: "save-run" }
-  | { type: "select-run"; runId: string }
-  | { type: "start-selected-run" }
-  | { type: "toggle-home-edit" };
-
-export type PracticeRunManagementPresentation = {
-  draft: PracticeRunDraft | null;
-  hiddenRuns: readonly PracticeRunPresentation[];
-  homeEditing: boolean;
-  nameError: string | null;
-  notice: string | null;
-  removeCandidateId: string | null;
-  runs: readonly PracticeRunPresentation[];
-  screen: "home" | "create" | "edit";
-  selectedRunId: string | null;
-  onIntent: (intent: PracticeRunManagementIntent) => void;
-};
-
 type Tab = MobileBackTab;
 
 type MobileBackPreview = MobileBackDestination & {
@@ -503,6 +474,7 @@ export function PracticePocScreen({
   currentTimeMs = Date.now,
   puzzleSelectionId,
   puzzleSelectionSeed,
+  runManagementEnabled = false,
   runManagementPresentation,
   runEloEditingMovedToHome = false,
   sprintStartDelayMs = ARROW_DUEL_LOADING_TRANSITION_MS,
@@ -540,6 +512,7 @@ export function PracticePocScreen({
   const feedbackSnapshotTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sprintStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startingModeRef = useRef<SprintMode | null>(null);
+  const startingPracticeRunIdRef = useRef<string | null>(null);
   const deferredBackTransitionsRef = useRef(new Map<string, () => void>());
   const resumeDeferredBackTransitionsRef = useRef<(() => void) | null>(null);
   const predictiveBackIntentRef = useRef<MobileBackIntent | null>(null);
@@ -616,6 +589,13 @@ export function PracticePocScreen({
   const [iCloudSyncEnabled, setICloudSyncEnabled] = useState(() => service.getSettings().sync.iCloudEnabled);
   const [iCloudSyncStatus, setICloudSyncStatus] = useState(() => service.getSettings().sync.iCloudEnabled ? "Ready" : "Off");
   const [, setSettingsRevision] = useState(0);
+  const internalRunManagement = usePracticeRunManagement({
+    enabled: runManagementEnabled && runManagementPresentation === undefined,
+    onStartRun: startPracticeRun,
+    service
+  });
+  const activeRunManagementPresentation = runManagementPresentation ?? internalRunManagement.presentation;
+  const ratingEditingMovedToHome = runEloEditingMovedToHome || activeRunManagementPresentation !== undefined;
 
   const adaptiveLayout = useMemo(
     () => buildAdaptiveLayout({ fontScale, height, insets, width }),
@@ -849,6 +829,7 @@ export function PracticePocScreen({
         sprintStartTimerRef.current = null;
       }
       startingModeRef.current = null;
+      startingPracticeRunIdRef.current = null;
       deferredBackTransitions.clear();
       globals.__CHESSTICIZE_CHESSBOARD_DEBUG__ = undefined;
       globals.__CHESSTICIZE_CHESSBOARD_DEBUG_SINK__ = undefined;
@@ -889,6 +870,7 @@ export function PracticePocScreen({
     setReviews(service.getDueReviews(nowIso()));
     setReviewQueue(service.listReviewQueue());
     setDueReviewItems(service.getDueReviewItems(nowIso()));
+    internalRunManagement.refresh();
     setReviewReminderPreference(service.getReviewReminderPreference());
     const activeSprint = service.getActiveSprint();
     setResumableSprint(
@@ -1163,34 +1145,61 @@ export function PracticePocScreen({
     }
   }
 
-  function startSprint(nextMode: SprintMode = mode, useCustomTiming = nextMode === "custom"): void {
+  function startPracticeRun(runId: string): void {
+    let run: PracticeRunRecord;
+    try {
+      run = service.getActivePracticeRun(runId);
+    } catch {
+      setError("This run is no longer available on Home.");
+      internalRunManagement.refresh();
+      return;
+    }
+    startSprint(run.mode, run.kind === "custom", run.id);
+  }
+
+  function startSprint(
+    nextMode: SprintMode = mode,
+    useCustomTiming = nextMode === "custom",
+    practiceRunId?: string
+  ): void {
     if (startingModeRef.current !== null) {
       return;
     }
     if (nextMode === "arrow_duel") {
       startingModeRef.current = nextMode;
+      startingPracticeRunIdRef.current = practiceRunId ?? null;
       setStartingMode(nextMode);
       sprintStartTimerRef.current = setTimeout(() => {
-        finishDelayedSprintStart(nextMode, useCustomTiming);
+        finishDelayedSprintStart(nextMode, useCustomTiming, practiceRunId);
       }, sprintStartDelayMs);
       return;
     }
-    performStartSprint(nextMode, useCustomTiming);
+    performStartSprint(nextMode, useCustomTiming, practiceRunId);
   }
 
-  function finishDelayedSprintStart(nextMode: SprintMode, useCustomTiming: boolean): void {
+  function finishDelayedSprintStart(
+    nextMode: SprintMode,
+    useCustomTiming: boolean,
+    practiceRunId?: string
+  ): void {
     sprintStartTimerRef.current = null;
-    if (startingModeRef.current !== nextMode) {
+    if (
+      startingModeRef.current !== nextMode
+      || startingPracticeRunIdRef.current !== (practiceRunId ?? null)
+    ) {
       return;
     }
     if (deferBackRelevantTransition("delayed-sprint-start", () => {
-      if (startingModeRef.current === nextMode) {
-        performStartSprint(nextMode, useCustomTiming);
+      if (
+        startingModeRef.current === nextMode
+        && startingPracticeRunIdRef.current === (practiceRunId ?? null)
+      ) {
+        performStartSprint(nextMode, useCustomTiming, practiceRunId);
       }
     })) {
       return;
     }
-    performStartSprint(nextMode, useCustomTiming);
+    performStartSprint(nextMode, useCustomTiming, practiceRunId);
   }
 
   function deferBackRelevantTransition(key: string, resumeAfterCancel: () => void): boolean {
@@ -1221,15 +1230,22 @@ export function PracticePocScreen({
     }
     deferredBackTransitionsRef.current.delete("delayed-sprint-start");
     startingModeRef.current = null;
+    startingPracticeRunIdRef.current = null;
     setStartingMode(null);
   }
 
-  function performStartSprint(nextMode: SprintMode, useCustomTiming: boolean): void {
+  function performStartSprint(
+    nextMode: SprintMode,
+    useCustomTiming: boolean,
+    practiceRunId?: string
+  ): void {
     setError(null);
     try {
       const customThemeValues = useCustomTiming ? selectedSprintThemes : [];
-      const config = sprintConfigFor(nextMode, customDurationSeconds, customPerPuzzleSeconds, useCustomTiming, customThemeValues);
-      if (useCustomTiming) {
+      const config = practiceRunId === undefined
+        ? sprintConfigFor(nextMode, customDurationSeconds, customPerPuzzleSeconds, useCustomTiming, customThemeValues)
+        : null;
+      if (useCustomTiming && config) {
         const rating = service.getRating(config.ratingKey);
         if (rating.games === 0 && rating.rating !== customInitialRating) {
           service.setRating(config.ratingKey, customInitialRating);
@@ -1238,27 +1254,40 @@ export function PracticePocScreen({
       if (puzzleSelectionId) {
         service.setPuzzleSelectionScopeIds([puzzleSelectionId]);
       }
+      const randomSelection = configurePuzzleSource && shouldRandomizePuzzleSelection(puzzleSource)
+        ? { puzzleSelectionSeed: puzzleSelectionSeed ?? `${Date.now()}-${Math.random()}` }
+        : {};
+      const runTargetCorrect = useCustomTiming
+        ? customTargetCorrect
+        : nextMode === "standard"
+          ? standardTargetCorrect
+          : arrowDuelTargetCorrect;
       const started = service.startSprint(
-        {
-          mode: nextMode,
-          durationSeconds: config.durationSeconds,
-          perPuzzleSeconds: config.perPuzzleSeconds,
-          ...(customThemeValues.length > 0
-            ? { themes: customThemeValues, persistCustomConfig: true }
-            : useCustomTiming ? { persistCustomConfig: true } : {}),
-          ...(nextMode === "standard" && standardTargetCorrect !== undefined
-            ? { targetCorrect: standardTargetCorrect }
-            : {}),
-          ...(nextMode === "arrow_duel" && arrowDuelTargetCorrect !== undefined
-            ? { targetCorrect: arrowDuelTargetCorrect }
-            : {}),
-          ...(useCustomTiming && customTargetCorrect !== undefined
-            ? { targetCorrect: customTargetCorrect }
-            : {}),
-          ...(configurePuzzleSource && shouldRandomizePuzzleSelection(puzzleSource)
-            ? { puzzleSelectionSeed: puzzleSelectionSeed ?? `${Date.now()}-${Math.random()}` }
-            : {})
-        },
+        practiceRunId !== undefined
+          ? {
+              mode: nextMode,
+              practiceRunId,
+              ...(runTargetCorrect === undefined ? {} : { targetCorrect: runTargetCorrect }),
+              ...randomSelection
+            }
+          : {
+              mode: nextMode,
+              durationSeconds: config!.durationSeconds,
+              perPuzzleSeconds: config!.perPuzzleSeconds,
+              ...(customThemeValues.length > 0
+                ? { themes: customThemeValues, persistCustomConfig: true }
+                : useCustomTiming ? { persistCustomConfig: true } : {}),
+              ...(nextMode === "standard" && standardTargetCorrect !== undefined
+                ? { targetCorrect: standardTargetCorrect }
+                : {}),
+              ...(nextMode === "arrow_duel" && arrowDuelTargetCorrect !== undefined
+                ? { targetCorrect: arrowDuelTargetCorrect }
+                : {}),
+              ...(useCustomTiming && customTargetCorrect !== undefined
+                ? { targetCorrect: customTargetCorrect }
+                : {}),
+              ...randomSelection
+            },
         captureLiveNowIso()
       );
       setMode(nextMode);
@@ -1279,6 +1308,7 @@ export function PracticePocScreen({
       setError(errorMessage(caught));
     } finally {
       startingModeRef.current = null;
+      startingPracticeRunIdRef.current = null;
       setStartingMode(null);
     }
   }
@@ -2113,6 +2143,12 @@ export function PracticePocScreen({
     ),
     [attempts, service, sprintSessions]
   );
+  const historyRunsByRatingKey = new Map(
+    service.listPracticeRuns().map((run) => [run.ratingKey, {
+      name: run.name,
+      perPuzzleSeconds: run.perPuzzleSeconds
+    }])
+  );
   const activeHistoryRatingKey = historyRatingKey;
   const historyWrongOnly = historyResultFilter === "wrong";
   const historyRatingRangeQuery = historyRatingRangeFilterToQuery(historyRatingRangeFilter);
@@ -2169,6 +2205,7 @@ export function PracticePocScreen({
               : tab === "practice" && mode === "custom" && customRatingEditorOpen
                 ? "custom-rating-editor"
                 : null;
+  const activeRunManagementScreen = activeRunManagementPresentation?.screen;
   const backDetail = useMemo<MobileBackDetail | null>(
     () => reviewAnalysisOpen && (tab === "history" || tab === "review")
       ? { kind: "review-analysis", owner: tab }
@@ -2181,10 +2218,13 @@ export function PracticePocScreen({
           ? { kind: "stockfish-diagnostics", owner: "settings" }
           : isFinished
             ? { kind: "sprint-result", owner: "practice" }
+            : tab === "practice" && state === null && activeRunManagementScreen !== undefined
+                && activeRunManagementScreen !== "home"
+              ? { kind: "practice-run-editor", owner: "practice" }
             : tab === "practice" && state === null && mode === "custom"
               ? { kind: "custom-practice", owner: "practice" }
               : null,
-    [isFinished, mode, reviewAnalysisOpen, reviewSessionSource, reviewSurfaceOpen, state, tab]
+    [activeRunManagementScreen, isFinished, mode, reviewAnalysisOpen, reviewSessionSource, reviewSurfaceOpen, state, tab]
   );
   const mobileBackState: MobileBackState = {
     activePractice: isOpenSession,
@@ -2230,6 +2270,8 @@ export function PracticePocScreen({
           }
         } else if (resolvedState.detail?.kind === "stockfish-diagnostics") {
           navigateToTab("settings");
+        } else if (resolvedState.detail?.kind === "practice-run-editor") {
+          activeRunManagementPresentation?.onIntent({ type: "cancel-edit" });
         } else if (resolvedState.detail?.kind === "custom-practice") {
           setCustomRatingEditorOpen(false);
           setMode("standard");
@@ -2354,18 +2396,25 @@ export function PracticePocScreen({
   // Quantized to the minute so the 500ms countdown tick does not rescan the
   // full attempt history on every render during an active sprint.
   const practiceProgressNowMs = Math.floor(nowMs / 60000) * 60000;
+  const selectedManagedRun = activeRunManagementPresentation?.runs.find(
+    (run) => run.id === activeRunManagementPresentation.selectedRunId
+  );
+  const practiceProgressRatingKey = selectedManagedRun?.ratingKey ?? selectedConfig.ratingKey;
   const practiceProgress = useMemo(
     () => buildPracticeProgressSummary(
       attempts,
       sprintSessions,
       practiceProgressNowMs,
-      selectedConfig.ratingKey
+      practiceProgressRatingKey
     ),
-    [attempts, sprintSessions, practiceProgressNowMs, selectedConfig.ratingKey]
+    [attempts, sprintSessions, practiceProgressNowMs, practiceProgressRatingKey]
   );
   const dueTodayCount = dueReviewItems.length;
   const overdueCount = dueReviewItems.filter((item) => isReviewOverdue(item.review, nowMs)).length;
   const customEligiblePuzzleCount = useMemo(() => {
+    if (!Number.isFinite(currentRating)) {
+      return 0;
+    }
     if (puzzleSource === "bundledCore" && selectedSprintThemes.length <= 1) {
       return bundledCoreCustomEligiblePuzzleCount(selectedSprintThemes[0]);
     }
@@ -2675,20 +2724,20 @@ export function PracticePocScreen({
                 ) : null}
 
                 {!isOpenSession && state === null && (
-                  runManagementPresentation?.screen === "home"
-                  || (!runManagementPresentation && mode !== "custom")
+                  activeRunManagementPresentation?.screen === "home"
+                  || (!activeRunManagementPresentation && mode !== "custom")
                 ) ? (
                   <PracticeHome
                     adaptiveLayout={adaptiveLayout}
                     mode={mode}
                     modes={practiceModeSummaries}
-                    currentRating={runManagementPresentation
-                      ? runManagementPresentation.runs.find((run) => run.id === runManagementPresentation.selectedRunId)?.elo ?? 600
+                    currentRating={activeRunManagementPresentation
+                      ? selectedManagedRun?.elo ?? RATING_FLOOR
                       : currentRating}
                     dueReviewCount={dueTodayCount}
                     overdueReviewCount={overdueCount}
                     progress={practiceProgress}
-                    runManagement={runManagementPresentation}
+                    runManagement={activeRunManagementPresentation}
                     resumableSprint={resumableSprint}
                     onSelectMode={setMode}
                     onStartMode={(nextMode) => startSprint(nextMode)}
@@ -2697,14 +2746,14 @@ export function PracticePocScreen({
                   />
                 ) : null}
 
-                {!isOpenSession && state === null && runManagementPresentation && runManagementPresentation.screen !== "home" ? (
+                {!isOpenSession && state === null && activeRunManagementPresentation && activeRunManagementPresentation.screen !== "home" ? (
                   <PracticeRunEditor
-                    presentation={runManagementPresentation}
+                    presentation={activeRunManagementPresentation}
                     themeCatalogPresentation={themeCatalogPresentation}
                   />
                 ) : null}
 
-                {!isOpenSession && state === null && !runManagementPresentation && mode === "custom" ? (
+                {!isOpenSession && state === null && !activeRunManagementPresentation && mode === "custom" ? (
                   <CustomSprintSetup
                     durationSeconds={customDurationSeconds}
                     perPuzzleSeconds={customPerPuzzleSeconds}
@@ -2819,6 +2868,7 @@ export function PracticePocScreen({
                   attempts={historyView.attempts}
                   performance={historyPerformanceView?.performance ?? emptyHistoryPerformance()}
                   ratingKeys={historyRatingKeys}
+                  runsByRatingKey={historyRunsByRatingKey}
                   selectedRatingKey={activeHistoryRatingKey}
                   timeRange={historyTimeRange}
                   sourceFilter={historySourceFilter}
@@ -2954,7 +3004,7 @@ export function PracticePocScreen({
                 reminderPlatform={reminderPlatform}
                 reviewReminderScheduleStatus={reviewReminderScheduleStatus}
                 reviewReminderPreference={reviewReminderPreference}
-                showRatingControls={!runEloEditingMovedToHome}
+                showRatingControls={!ratingEditingMovedToHome}
                 iCloudSyncEnabled={iCloudSyncEnabled}
                 iCloudSyncStatus={iCloudSyncStatus}
                 advancedRatingsOpen={settingsAdvancedRatingsOpen}
@@ -3236,6 +3286,9 @@ function PracticeRunHome({
   const draggedRunIdRef = useRef<string | null>(null);
   const dropTargetRunIdRef = useRef<string | null>(null);
   const runElementsRef = useRef(new Map<string, WebRunElement>());
+  const nativeRunLayoutsRef = useRef(new Map<string, NativeRunLayout>());
+  const nativeDragOriginCenterRef = useRef<number | null>(null);
+  const nativeDragPreviousCenterRef = useRef<number | null>(null);
   const previousRunRectsRef = useRef<Map<string, WebRunRect> | null>(null);
   const selectedRun = presentation.runs.find((run) => run.id === presentation.selectedRunId) ?? null;
   const showRestore = presentation.hiddenRuns.length > 0
@@ -3258,17 +3311,60 @@ function PracticeRunHome({
   const reorderRun = (runId: string, targetRunId: string): void => {
     if (runId !== targetRunId) {
       captureRunPositions();
+      configureNativeRunLayoutAnimation();
       presentation.onIntent({ type: "move-run", runId, targetRunId });
     }
   };
   const finishRunDrag = (): void => {
+    nativeDragOriginCenterRef.current = null;
+    nativeDragPreviousCenterRef.current = null;
     draggedRunIdRef.current = null;
     dropTargetRunIdRef.current = null;
     setDraggedRunId(null);
     setDropTargetRunId(null);
   };
+  const startRunDrag = (runId: string): void => {
+    const layout = nativeRunLayoutsRef.current.get(runId);
+    nativeDragOriginCenterRef.current = layout ? layout.y + layout.height / 2 : null;
+    nativeDragPreviousCenterRef.current = nativeDragOriginCenterRef.current;
+    draggedRunIdRef.current = runId;
+    dropTargetRunIdRef.current = null;
+    setDraggedRunId(runId);
+    setDropTargetRunId(null);
+  };
+  const moveNativeRunDrag = (runId: string, translationY: number): void => {
+    const originCenter = nativeDragOriginCenterRef.current;
+    if (originCenter === null) {
+      return;
+    }
+    const fingerCenter = originCenter + translationY;
+    const previousCenter = nativeDragPreviousCenterRef.current ?? originCenter;
+    nativeDragPreviousCenterRef.current = fingerCenter;
+    const movingDown = fingerCenter > previousCenter;
+    if (fingerCenter === previousCenter) {
+      return;
+    }
+    const target = presentation.runs
+      .filter((run) => run.id !== runId)
+      .map((run) => ({ run, layout: nativeRunLayoutsRef.current.get(run.id) }))
+      .filter((entry): entry is { run: PracticeRunPresentation; layout: NativeRunLayout } => entry.layout !== undefined)
+      .filter((entry) => {
+        const targetCenter = entry.layout.y + entry.layout.height / 2;
+        return movingDown
+          ? targetCenter > previousCenter && targetCenter <= fingerCenter
+          : targetCenter < previousCenter && targetCenter >= fingerCenter;
+      })
+      .sort((left, right) => {
+        const leftCenter = left.layout.y + left.layout.height / 2;
+        const rightCenter = right.layout.y + right.layout.height / 2;
+        return movingDown ? rightCenter - leftCenter : leftCenter - rightCenter;
+      })[0];
+    if (target) {
+      previewRunReorder(runId, target.run.id);
+    }
+  };
   const previewRunReorder = (runId: string, targetRunId: string): void => {
-    if (runId === targetRunId || dropTargetRunIdRef.current === targetRunId) {
+    if (runId === targetRunId) {
       return;
     }
     dropTargetRunIdRef.current = targetRunId;
@@ -3340,7 +3436,9 @@ function PracticeRunHome({
       <View style={styles.runManagementToolbar}>
         <Text style={styles.helperText}>
           {presentation.homeEditing
-            ? "Drag a card to reorder, or use the arrow buttons."
+            ? Platform.OS === "web"
+              ? "Drag a card to reorder, or use the arrow buttons."
+              : "Touch and hold a card to drag, or use the arrow buttons."
             : "Choose a saved run, then start when you are ready."}
         </Text>
         <View style={styles.runManagementToolbarActions}>
@@ -3413,14 +3511,11 @@ function PracticeRunHome({
                     previewRunReorder(draggedRunIdRef.current, targetRunId);
                   }
                 }}
-                onDragStart={(runId) => {
-                  draggedRunIdRef.current = runId;
-                  dropTargetRunIdRef.current = null;
-                  setDraggedRunId(runId);
-                  setDropTargetRunId(null);
-                }}
+                onDragStart={startRunDrag}
                 onDrop={finishRunDrag}
                 onKeyboardReorder={reorderRunWithKeyboard}
+                onNativeDragMove={moveNativeRunDrag}
+                onNativeLayout={(runId, layout) => nativeRunLayoutsRef.current.set(runId, layout)}
               />
               {presentation.removeCandidateId === run.id ? (
                 <RunRemovalConfirmation run={run} onIntent={presentation.onIntent} />
@@ -3471,6 +3566,8 @@ function PracticeRunCard({
   onDragEnd,
   onDragEnter,
   onDragStart,
+  onNativeDragMove,
+  onNativeLayout,
   onDrop,
   onKeyboardReorder,
   run
@@ -3486,6 +3583,8 @@ function PracticeRunCard({
   onDragEnd: () => void;
   onDragEnter: (targetRunId: string) => void;
   onDragStart: (runId: string) => void;
+  onNativeDragMove: (runId: string, translationY: number) => void;
+  onNativeLayout: (runId: string, layout: NativeRunLayout) => void;
   onDrop: () => void;
   onKeyboardReorder: (runId: string, direction: "up" | "down") => void;
   run: PracticeRunPresentation;
@@ -3521,6 +3620,8 @@ function PracticeRunCard({
       onDragEnter={onDragEnter}
       onDragStart={onDragStart}
       onElementChange={onCardElement}
+      onNativeDragMove={onNativeDragMove}
+      onNativeLayout={onNativeLayout}
       onDrop={onDrop}
     >
       <Pressable
@@ -3528,6 +3629,7 @@ function PracticeRunCard({
         accessibilityState={{ selected: active && !editing }}
         accessibilityLabel={editing ? `Edit ${run.name} ELO` : `Select ${run.name}, ELO ${run.elo}, ${details}`}
         style={styles.practiceModeSelectArea}
+        testID={`practice-run-select-${safeTestId(run.id)}`}
         onPress={() => presentationRunPress(editing, run.id, onIntent)}
       >
         <View style={[styles.practiceModeIcon, active && !editing ? styles.practiceModeIconActive : null]}>
@@ -3542,7 +3644,16 @@ function PracticeRunCard({
         </View>
       </Pressable>
       <View style={[styles.practiceModeMeta, editing ? styles.runEditingMeta : null]}>
-        <Text style={styles.practiceModeRating}>ELO {run.elo}</Text>
+        <Text
+          style={styles.practiceModeRating}
+          testID={run.kind === "standard"
+            ? "practice-mode-standard-rating"
+            : run.kind === "arrow_duel"
+              ? "practice-mode-arrow-duel-rating"
+              : undefined}
+        >
+          ELO {run.elo}
+        </Text>
         {editing ? (
           <View style={styles.runEditActions}>
             <Pressable
@@ -3604,6 +3715,11 @@ type WebRunRect = {
   top: number;
 };
 
+type NativeRunLayout = {
+  height: number;
+  y: number;
+};
+
 type WebRunAnimation = {
   cancel: () => void;
   oncancel: (() => void) | null;
@@ -3639,6 +3755,8 @@ function RunCardDropSurface({
   onDragEnter,
   onDragStart,
   onElementChange,
+  onNativeDragMove,
+  onNativeLayout,
   onDrop
 }: {
   children: React.ReactNode;
@@ -3653,8 +3771,119 @@ function RunCardDropSurface({
   onDragEnter: (targetRunId: string) => void;
   onDragStart: (runId: string) => void;
   onElementChange: (runId: string, element: WebRunElement | null) => void;
+  onNativeDragMove: (runId: string, translationY: number) => void;
+  onNativeLayout: (runId: string, layout: NativeRunLayout) => void;
   onDrop: () => void;
 }): React.JSX.Element {
+  const nativeDragOffset = useRef(new Animated.Value(0)).current;
+  const nativeDragActiveRef = useRef(false);
+  const nativeDragCompensationRef = useRef(0);
+  const nativeDragDyRef = useRef(0);
+  const nativeLayoutYRef = useRef<number | null>(null);
+  const nativeDragArmedRef = useRef(false);
+  const nativeDragArmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const disarmNativeDrag = useCallback((): void => {
+    if (nativeDragArmTimerRef.current) {
+      clearTimeout(nativeDragArmTimerRef.current);
+      nativeDragArmTimerRef.current = null;
+    }
+    nativeDragArmedRef.current = false;
+  }, []);
+  const armNativeDrag = useCallback((): void => {
+    disarmNativeDrag();
+    if (!draggable) {
+      return;
+    }
+    nativeDragArmTimerRef.current = setTimeout(() => {
+      nativeDragArmTimerRef.current = null;
+      nativeDragArmedRef.current = true;
+    }, 180);
+  }, [disarmNativeDrag, draggable]);
+  useEffect(() => disarmNativeDrag, [disarmNativeDrag]);
+  const nativeDragHandlersRef = useRef({
+    runId,
+    onDragEnd,
+    onDragStart,
+    onDrop,
+    onNativeDragMove
+  });
+  nativeDragHandlersRef.current = {
+    runId,
+    onDragEnd,
+    onDragStart,
+    onDrop,
+    onNativeDragMove
+  };
+  const nativePanResponder = useMemo(() => {
+    const shouldClaimNativeDrag = (_event: unknown, gesture: PanResponderGestureState): boolean => {
+      const movedPastThreshold = Math.abs(gesture.dy) > 6 || Math.abs(gesture.dx) > 6;
+      if (!nativeDragArmedRef.current) {
+        if (movedPastThreshold) {
+          disarmNativeDrag();
+        }
+        return false;
+      }
+      return Math.abs(gesture.dy) > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx);
+    };
+    return PanResponder.create({
+    onMoveShouldSetPanResponder: shouldClaimNativeDrag,
+    onMoveShouldSetPanResponderCapture: shouldClaimNativeDrag,
+    onPanResponderGrant: () => {
+      const handlers = nativeDragHandlersRef.current;
+      nativeDragActiveRef.current = true;
+      nativeDragCompensationRef.current = 0;
+      nativeDragDyRef.current = 0;
+      nativeDragOffset.stopAnimation();
+      handlers.onDragStart(handlers.runId);
+    },
+    onPanResponderMove: (_event, gesture: PanResponderGestureState) => {
+      const handlers = nativeDragHandlersRef.current;
+      nativeDragDyRef.current = gesture.dy;
+      nativeDragOffset.setValue(gesture.dy + nativeDragCompensationRef.current);
+      handlers.onNativeDragMove(handlers.runId, gesture.dy);
+    },
+    onPanResponderRelease: () => {
+      disarmNativeDrag();
+      nativeDragActiveRef.current = false;
+      nativeDragHandlersRef.current.onDrop();
+      Animated.spring(nativeDragOffset, {
+        toValue: 0,
+        damping: 24,
+        stiffness: 260,
+        mass: 0.8,
+        useNativeDriver: true
+      }).start(() => {
+        nativeDragCompensationRef.current = 0;
+        nativeDragDyRef.current = 0;
+      });
+    },
+    onPanResponderTerminate: () => {
+      disarmNativeDrag();
+      nativeDragActiveRef.current = false;
+      nativeDragHandlersRef.current.onDragEnd();
+      Animated.spring(nativeDragOffset, {
+        toValue: 0,
+        damping: 24,
+        stiffness: 260,
+        mass: 0.8,
+        useNativeDriver: true
+      }).start();
+    },
+    onPanResponderTerminationRequest: () => false
+    });
+  }, [disarmNativeDrag, nativeDragOffset]);
+
+  const handleNativeLayout = (event: LayoutChangeEvent): void => {
+    const layout = event.nativeEvent.layout;
+    const previousY = nativeLayoutYRef.current;
+    if (nativeDragActiveRef.current && previousY !== null && previousY !== layout.y) {
+      nativeDragCompensationRef.current += previousY - layout.y;
+      nativeDragOffset.setValue(nativeDragDyRef.current + nativeDragCompensationRef.current);
+    }
+    nativeLayoutYRef.current = layout.y;
+    onNativeLayout(runId, { y: layout.y, height: layout.height });
+  };
+
   if (Platform.OS === "web") {
     const flattenedStyle = StyleSheet.flatten(style) as WebRunStyle;
     const {
@@ -3720,7 +3949,44 @@ function RunCardDropSurface({
       </div>
     );
   }
-  return <View style={style} testID={testID}>{children}</View>;
+  return (
+    <Animated.View
+      {...(draggable ? nativePanResponder.panHandlers : {})}
+      accessibilityHint={draggable ? "Touch and hold, then drag vertically to reorder this run. Arrow buttons are also available." : undefined}
+      onLayout={handleNativeLayout}
+      onTouchCancel={disarmNativeDrag}
+      onTouchEnd={disarmNativeDrag}
+      onTouchStart={armNativeDrag}
+      style={[
+        style,
+        draggable ? { transform: [{ translateY: nativeDragOffset }] } : null,
+        dragging ? styles.runCardNativeDragging : null
+      ]}
+      testID={testID}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
+function configureNativeRunLayoutAnimation(): void {
+  if (Platform.OS === "web") {
+    return;
+  }
+  LayoutAnimation.configureNext({
+    duration: 220,
+    create: {
+      type: LayoutAnimation.Types.easeInEaseOut,
+      property: LayoutAnimation.Properties.opacity
+    },
+    update: {
+      type: LayoutAnimation.Types.easeInEaseOut
+    },
+    delete: {
+      type: LayoutAnimation.Types.easeInEaseOut,
+      property: LayoutAnimation.Properties.opacity
+    }
+  });
 }
 
 function presentationRunPress(
@@ -3796,6 +4062,7 @@ function PracticeRunEditor({
         closeTestID="practice-run-editor-close"
         headerTestID="practice-run-editor-header"
         startAccessibilityLabel={isCreate ? "Add run to Home" : `Save ${draft.name} ELO`}
+        startDisabled={presentation.canSave === false}
         startTestID="practice-run-save"
         title={isCreate ? "New Run" : "Edit ELO"}
         titleTestID="practice-run-editor-title"
@@ -3815,6 +4082,19 @@ function PracticeRunEditor({
             : "Adjust the current ELO. Run settings stay fixed."}
         </Text>
       </View>
+
+      {isCreate && presentation.canSave === false ? (
+        <View
+          accessibilityLiveRegion="polite"
+          style={[styles.customEligibilityCard, styles.customEligibilityWarning]}
+          testID="practice-run-availability-error"
+        >
+          <Text style={styles.sectionLabel}>No matching local puzzles</Text>
+          <Text style={styles.helperText}>
+            Choose different themes or settings before adding this Run to Home.
+          </Text>
+        </View>
+      ) : null}
 
       <View style={styles.customConfigCard} testID="practice-run-editor-fields">
         {isCreate ? (
@@ -3939,12 +4219,14 @@ function PracticeRunEloRow({
   onChange: (elo: number) => void;
   value: number;
 }): React.JSX.Element {
-  const canDecrease = value > 600;
+  const canDecrease = value > RATING_FLOOR;
   return (
     <View style={styles.customConfigRow} testID="practice-run-elo-row">
       <View style={styles.customChoiceCopy}>
         <Text style={styles.listText}>{isCreate ? "Starting ELO" : "Current ELO"}</Text>
-        <Text style={styles.requiredFieldLabel}>Adjusts by 25 · minimum 600</Text>
+        <Text style={styles.requiredFieldLabel}>
+          Adjusts by {MANUAL_RATING_STEP} · minimum {RATING_FLOOR}
+        </Text>
       </View>
       <View style={styles.advancedRatingControls}>
         <Pressable
@@ -3954,7 +4236,7 @@ function PracticeRunEloRow({
           disabled={!canDecrease}
           style={[styles.customStepperButton, !canDecrease ? styles.disabledButton : null]}
           testID="practice-run-elo-decrease"
-          onPress={() => onChange(Math.max(600, value - 25))}
+          onPress={() => onChange(stepManualRating(value, -1))}
         >
           <MinusGlyph />
         </Pressable>
@@ -3964,7 +4246,7 @@ function PracticeRunEloRow({
           accessibilityLabel="Increase run ELO"
           style={styles.customStepperButton}
           testID="practice-run-elo-increase"
-          onPress={() => onChange(value + 25)}
+          onPress={() => onChange(stepManualRating(value, 1))}
         >
           <PlusGlyph />
         </Pressable>
@@ -5764,6 +6046,7 @@ function HistoryPanel({
   filtersExpanded,
   performance,
   ratingKeys,
+  runsByRatingKey,
   selectedRatingKey,
   timeRange,
   sourceFilter,
@@ -5799,6 +6082,7 @@ function HistoryPanel({
   filtersExpanded: boolean;
   performance: HistoryPerformance;
   ratingKeys: string[];
+  runsByRatingKey: ReadonlyMap<string, { name: string; perPuzzleSeconds: number }>;
   selectedRatingKey: string | null;
   timeRange: HistoryTimeRange;
   sourceFilter: "all" | AttemptSource;
@@ -5832,8 +6116,11 @@ function HistoryPanel({
   const visibleAttempts = attempts;
   const ratingPoints = performance.charts.rating;
   const latestRating = ratingPoints[ratingPoints.length - 1]?.value;
+  const selectedRun = selectedRatingKey ? runsByRatingKey.get(selectedRatingKey) : undefined;
   const activeFilterLabels = historyActiveFilterLabels({
     ratingKey: selectedRatingKey,
+    runName: selectedRun?.name,
+    runPerPuzzleSeconds: selectedRun?.perPuzzleSeconds,
     ratingRangeFilter,
     resultFilter,
     reviewStatusFilter,
@@ -5884,7 +6171,11 @@ function HistoryPanel({
             <FilterButton
               key={ratingKey}
               active={selectedRatingKey === ratingKey}
-              label={historyRatingKeyLabel(ratingKey)}
+              label={historyRatingKeyLabel(
+                ratingKey,
+                runsByRatingKey.get(ratingKey)?.name,
+                runsByRatingKey.get(ratingKey)?.perPuzzleSeconds
+              )}
               testID={`history-rating-${ratingKey}`}
               onPress={() => onRatingKeyChange(ratingKey)}
             />
@@ -5937,7 +6228,7 @@ function HistoryPanel({
             <View>
               <Text style={styles.panelTitle}>Rating Trend</Text>
               <Text testID="history-performance-context" style={styles.helperText}>
-                {`${historyRatingKeyLabel(selectedRatingKey)} · ${historyRangeLabel(timeRange)}`}
+                {`${historyRatingKeyLabel(selectedRatingKey, selectedRun?.name, selectedRun?.perPuzzleSeconds)} · ${historyRangeLabel(timeRange)}`}
               </Text>
             </View>
             <View style={styles.historyMetricSummary}>
@@ -6105,6 +6396,8 @@ function HistoryThemeCatalogFilter({
 
 type HistoryActiveFilterInput = {
   ratingKey: string | null;
+  runName?: string;
+  runPerPuzzleSeconds?: number;
   ratingRangeFilter: HistoryRatingRangeFilter;
   resultFilter: "all" | "correct" | "wrong";
   reviewStatusFilter: "all" | "queued" | "clear";
@@ -6117,6 +6410,8 @@ type HistoryActiveFilterInput = {
 
 function historyActiveFilterLabels({
   ratingKey,
+  runName,
+  runPerPuzzleSeconds,
   ratingRangeFilter,
   resultFilter,
   reviewStatusFilter,
@@ -6128,7 +6423,7 @@ function historyActiveFilterLabels({
 }: HistoryActiveFilterInput): string[] {
   const labels = [
     historyRangeLabel(timeRange),
-    ratingKey ? historyRatingKeyLabel(ratingKey) : "All puzzles"
+    ratingKey ? historyRatingKeyLabel(ratingKey, runName, runPerPuzzleSeconds) : "All puzzles"
   ];
   if (sourceFilter !== "all") {
     labels.push(sourceFilter === "scheduled_review" ? "Review" : "Sprint");
@@ -6440,10 +6735,14 @@ function emptyHistoryPerformance(): HistoryPerformance {
   };
 }
 
-function historyRatingKeyLabel(ratingKey: string): string {
-  const speed = ratingKey.match(/\/(\d+)\b/)?.[1];
+function historyRatingKeyLabel(
+  ratingKey: string,
+  runName?: string,
+  runPerPuzzleSeconds?: number
+): string {
+  const speed = runPerPuzzleSeconds ?? Number(ratingKey.match(/\/(\d+)\b/)?.[1]);
   const speedLabel = speed ? ` · ${speed}s pace` : "";
-  return `${ratingLabelFromKey(ratingKey)}${speedLabel}`;
+  return `${runName ?? ratingLabelFromKey(ratingKey)}${speedLabel}`;
 }
 
 function ResultBadgeGlyph({ tone }: { tone: "correct" | "wrong" | "alert" }): React.JSX.Element {
@@ -6593,7 +6892,7 @@ function HistoryAttemptRow({
       </View>
       <View style={styles.historyAttemptCopy}>
         <View style={styles.historyAttemptHeader}>
-          <Text style={styles.historyRowTitle}>{historyAttemptModeLabel(detail.mode)}</Text>
+          <Text style={styles.historyRowTitle}>{attempt.runName ?? historyAttemptModeLabel(detail.mode)}</Text>
           <Text testID={`history-attempt-${attempt.id}-result`} style={styles.helperText}>{resultLabel}</Text>
         </View>
         <Text testID={`history-attempt-${attempt.id}-identity`} style={styles.helperText}>{puzzleIdentity}</Text>
@@ -7104,6 +7403,9 @@ function ReviewPanel({
   const appliedPreferredEntriesKeyRef = useRef(preferredEntriesKey);
   const [queueFilter, setQueueFilter] = useState<ReviewQueueFilter>("all");
   const [devStatus, setDevStatus] = useState<string | null>(null);
+  const reviewRunsByRatingKey = new Map(
+    service.listPracticeRuns().map((run) => [run.ratingKey, run])
+  );
   const completedReviews = service.listCompletedReviewsForDay(new Date(nowMs).toISOString());
   const completedReviewEntries = completedReviews.map((item): ReviewEntry => ({
     puzzle: item.puzzle,
@@ -7394,7 +7696,13 @@ function ReviewPanel({
             >
               <View>
                 <Text style={styles.historyRowTitle}>{modeLabel(group.mode)}</Text>
-                <Text style={styles.helperText}>{historyRatingKeyLabel(group.ratingKey)}</Text>
+                <Text style={styles.helperText}>
+                  {historyRatingKeyLabel(
+                    group.ratingKey,
+                    reviewRunsByRatingKey.get(group.ratingKey)?.name,
+                    reviewRunsByRatingKey.get(group.ratingKey)?.perPuzzleSeconds
+                  )}
+                </Text>
               </View>
               <View style={styles.reviewContextMeta}>
                 <Text style={styles.reviewContextCount}>{group.entries.length}</Text>
@@ -9690,7 +9998,7 @@ function AdvancedRatingRow({
   record: RatingRecord;
   testID: string;
 }): React.JSX.Element {
-  const decrementDisabled = record.rating <= 600;
+  const decrementDisabled = record.rating <= RATING_FLOOR;
   return (
     <View style={styles.advancedRatingRow} testID={testID}>
       <View style={styles.advancedRatingCopy}>
@@ -9705,7 +10013,7 @@ function AdvancedRatingRow({
           disabled={decrementDisabled}
           testID={`${testID}-decrease`}
           style={[styles.customStepperButton, decrementDisabled ? styles.disabledButton : null]}
-          onPress={() => onAdjust(record.key, Math.max(600, record.rating - 25))}
+          onPress={() => onAdjust(record.key, stepManualRating(record.rating, -1))}
         >
           <MinusGlyph />
         </Pressable>
@@ -9715,7 +10023,7 @@ function AdvancedRatingRow({
           accessibilityLabel={`Increase ${label} rating`}
           testID={`${testID}-increase`}
           style={styles.customStepperButton}
-          onPress={() => onAdjust(record.key, record.rating + 25)}
+          onPress={() => onAdjust(record.key, stepManualRating(record.rating, 1))}
         >
           <PlusGlyph />
         </Pressable>
@@ -11313,6 +11621,14 @@ const styles = StyleSheet.create({
   },
   runCardDragging: {
     opacity: 0.9
+  },
+  runCardNativeDragging: {
+    elevation: 8,
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 14,
+    zIndex: 20
   },
   runEditingMeta: {
     borderTopColor: "#E2E8F0",

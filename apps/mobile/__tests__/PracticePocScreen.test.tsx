@@ -20,7 +20,7 @@ import {
 } from "../src/backend/mobilePractice";
 import { fixtureNeedsAtLeast, PracticeService } from "../../../packages/storage/src/practice-service";
 import { MemoryStore } from "../../../packages/storage/src/memory-store";
-import { defaultSprintConfig, formatLocalCalendarDate, formatReviewDay, type ArrowDuelState, type AttemptEvent, type Puzzle, type SprintState, type UciEngineTransport } from "../../../packages/core/src/index";
+import { defaultSprintConfig, formatLocalCalendarDate, formatReviewDay, practiceRunSprintConfig, type ArrowDuelState, type AttemptEvent, type Puzzle, type SprintState, type UciEngineTransport } from "../../../packages/core/src/index";
 import { FakeReviewReminderNotificationClient, FakeReviewReminderScheduler } from "../src/backend/reviewReminderScheduler";
 import { FakeICloudProgressSyncClient } from "../src/backend/iCloudProgressSync";
 import type { MobilePlatformCapabilities } from "../src/backend/mobilePlatformCapabilities";
@@ -787,7 +787,7 @@ describe("PracticePocScreen", () => {
     });
 
     expect(collectText(findByTestId(renderer, "practice-run-management"))).toContain(
-      "Drag a card to reorder, or use the arrow buttons."
+      "Touch and hold a card to drag, or use the arrow buttons."
     );
     expect(() => findByTestId(renderer, "practice-run-drag-tactics-focus")).toThrow();
     expect(findByTestId(renderer, "practice-run-move-up-tactics-focus")).toBeTruthy();
@@ -999,6 +999,115 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "settings-about-section")).toBeTruthy();
     expect(() => findByTestId(renderer, "settings-profile-section")).toThrow();
     expect(() => findByTestId(renderer, "settings-standard-elo-row")).toThrow();
+  });
+
+  it("creates a real saved Run with All themes without starting a sprint", () => {
+    const service = createMobilePracticeService("random1000");
+    const renderer = renderScreen({ practiceService: service, runManagementEnabled: true });
+
+    expect(collectText(findByTestId(renderer, "practice-run-standard"))).toContain("Standard");
+    expect(collectText(findByTestId(renderer, "practice-run-arrow-duel"))).toContain("Arrow Duel");
+    press(renderer, "practice-add-run");
+    expect(collectText(findByTestId(renderer, "practice-run-theme-row"))).toContain("All");
+    act(() => {
+      findByTestId(renderer, "practice-run-name-input").props.onChangeText("Calculation Lab");
+    });
+    press(renderer, "practice-run-save");
+
+    const saved = service.listPracticeRuns().find((run) => run.name === "Calculation Lab");
+    expect(saved).toMatchObject({ archived: false, mode: "custom" });
+    expect(saved?.themes).toBeUndefined();
+    expect(service.getActiveSprint()).toBeUndefined();
+    expect(collectText(findByTestId(renderer, `practice-run-${saved?.id}`))).toContain("Calculation Lab");
+
+    press(renderer, "settings-tab");
+    expect(() => findByTestId(renderer, "settings-standard-elo-row")).toThrow();
+  });
+
+  it("blocks a New Run with no matching local puzzles and keeps its setup editable", () => {
+    const service = new PracticeService(new MemoryStore());
+    const renderer = renderScreen({ practiceService: service, runManagementEnabled: true });
+
+    press(renderer, "practice-add-run");
+    act(() => {
+      findByTestId(renderer, "practice-run-name-input").props.onChangeText("Unavailable Run");
+    });
+
+    expect(findByTestId(renderer, "practice-run-save").props.accessibilityState).toEqual({ disabled: true });
+    expect(collectText(findByTestId(renderer, "practice-run-availability-error"))).toContain(
+      "Choose different themes or settings"
+    );
+    expect(findByTestId(renderer, "practice-run-theme-row")).toBeTruthy();
+    expect(service.listPracticeRuns().some((run) => run.name === "Unavailable Run")).toBe(false);
+  });
+
+  it("returns a managed Run editor to Home through Android system Back", () => {
+    const systemBack = createTestSystemBackSource("android");
+    const renderer = renderScreen({ runManagementEnabled: true, systemBack });
+
+    press(renderer, "practice-add-run");
+    expect(findByTestId(renderer, "practice-run-editor")).toBeTruthy();
+    expect(systemBack.setPredictiveBackEnabled).toHaveBeenLastCalledWith(true);
+    expect(systemBack.invoke()).toBe(true);
+    expect(() => findByTestId(renderer, "practice-run-editor")).toThrow();
+    expect(findByTestId(renderer, "practice-run-management")).toBeTruthy();
+    expect(systemBack.setPredictiveBackEnabled).toHaveBeenLastCalledWith(false);
+  });
+
+  it("persists Run ELO edits and returns to Home edit mode", () => {
+    const service = createMobilePracticeService("random1000");
+    const renderer = renderScreen({ practiceService: service, runManagementEnabled: true });
+
+    press(renderer, "practice-run-home-edit");
+    press(renderer, "practice-run-edit-standard");
+    expect(collectText(findByTestId(renderer, "practice-run-editor-run-name"))).toBe("Standard");
+    press(renderer, "practice-run-elo-increase");
+    press(renderer, "practice-run-save");
+
+    expect(collectText(findByTestId(renderer, "practice-header-title"))).toBe("Edit Runs");
+    expect(service.getRating("standard 5/20")).toMatchObject({ generation: 1, rating: 625 });
+    expect(collectText(findByTestId(renderer, "practice-run-standard"))).toContain("ELO 625");
+  });
+
+  it("archives a Run from its inline confirmation and restores the same ELO", () => {
+    const service = createMobilePracticeService("random1000");
+    const renderer = renderScreen({ practiceService: service, runManagementEnabled: true });
+
+    press(renderer, "practice-run-home-edit");
+    press(renderer, "practice-run-remove-standard");
+    expect(findByTestId(renderer, "practice-run-remove-confirmation")).toBeTruthy();
+    press(renderer, "practice-run-remove-confirm");
+
+    expect(() => findByTestId(renderer, "practice-run-standard")).toThrow();
+    expect(service.listPracticeRuns().find((run) => run.id === "standard")?.archived).toBe(true);
+    expect(service.getRating("standard 5/20").rating).toBe(600);
+    press(renderer, "practice-run-restore-standard");
+
+    expect(findByTestId(renderer, "practice-run-standard")).toBeTruthy();
+    expect(service.listPracticeRuns().filter((run) => !run.archived).at(-1)?.id).toBe("standard");
+    expect(service.getRating("standard 5/20").rating).toBe(600);
+  });
+
+  it("starts the selected saved Run with its stable identity snapshot", () => {
+    const service = createMobilePracticeService("random1000");
+    const renderer = renderScreen({
+      practiceService: service,
+      puzzleSelectionSeed: "managed-run-start",
+      runManagementEnabled: true
+    });
+
+    press(renderer, "practice-run-select-arrow-duel");
+    press(renderer, "practice-run-start");
+    act(() => {
+      jest.runOnlyPendingTimers();
+    });
+
+    expect(service.getActiveSprint()?.run).toEqual({
+      id: "arrow-duel",
+      kind: "arrow_duel",
+      name: "Arrow Duel"
+    });
+    expect(findByTestId(renderer, "session-board")).toBeTruthy();
   });
 
   it("exposes the mobile app shell automation contract", () => {
@@ -1247,6 +1356,58 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "practice-progress-weekly-solved"))).toBe("1");
     expect(collectText(findByTestId(renderer, "practice-progress-weekly-delta"))).toBe("+1 net");
     expect(collectText(findByTestId(renderer, "practice-progress-weekly-context"))).toBe("100% accuracy · 0 mistakes");
+  });
+
+  it("scopes managed Home progress to the selected Custom Run rating bucket", () => {
+    const store = new MemoryStore();
+    store.seedPuzzles([sharedHistoryPuzzle()]);
+    const service = new PracticeService(store);
+    const customRun = service.createPracticeRun({
+      id: "calculation-lab",
+      name: "Calculation Lab",
+      mode: "custom",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      initialRating: 1000
+    }, "2026-07-07T00:00:00.000Z");
+    store.createSprintSession({
+      ...completedRatingSprintState({
+        id: "managed-custom-session",
+        mode: "custom",
+        completedAt: "2026-07-07T00:02:00.000Z",
+        ratingBefore: 800,
+        ratingAfter: 1000
+      }),
+      config: practiceRunSprintConfig(customRun),
+      run: { id: customRun.id, kind: customRun.kind, name: customRun.name }
+    });
+    for (const [index, result] of (["correct", "wrong"] as const).entries()) {
+      store.recordAttempt({
+        id: `managed-custom-attempt-${index}`,
+        source: "sprint",
+        sessionId: "managed-custom-session",
+        puzzleId: "shared-history",
+        mode: "custom",
+        ratingKey: customRun.ratingKey,
+        result,
+        submittedMove: "e2e4",
+        expectedMove: result === "correct" ? "e2e4" : "e2e3",
+        startedAt: `2026-07-07T00:01:0${index}.000Z`,
+        completedAt: `2026-07-07T00:01:1${index}.000Z`,
+        ratingBefore: 800
+      });
+    }
+
+    const renderer = renderScreen({
+      currentTimeMs: () => Date.parse("2026-07-08T12:00:00.000Z"),
+      practiceService: service,
+      runManagementEnabled: true
+    });
+    press(renderer, "practice-run-select-calculation-lab");
+
+    expect(collectText(findByTestId(renderer, "practice-progress-rating-metric"))).toContain("ELO (Calculation Lab)1000");
+    expect(collectText(findByTestId(renderer, "practice-progress-weekly-solved"))).toBe("1");
+    expect(collectText(findByTestId(renderer, "practice-progress-weekly-context"))).toBe("50% accuracy · 1 mistake");
   });
 
   it("does not scan the bundled Core Pack when rendering custom sprint availability", () => {
@@ -3947,6 +4108,34 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "history-attempt-standard-attempt-difficulty")).toThrow();
   });
 
+  it("shows the immutable saved Run name in History after the Run is archived", () => {
+    const service = createMobilePracticeService("familiar15");
+    service.setPuzzleSelectionScopeIds(["test-dual-mate-in-one"]);
+    const run = service.createPracticeRun({
+      id: "history-focus",
+      name: "History Focus",
+      mode: "custom",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      targetCorrect: 1,
+      initialRating: 900
+    }, "2026-06-20T11:59:00.000Z");
+    service.startSprint(
+      { mode: "custom", practiceRunId: run.id },
+      "2026-06-20T12:00:00.000Z"
+    );
+    service.submitMove("c2b1", "2026-06-20T12:00:05.000Z");
+    service.archivePracticeRun(run.id, "2026-06-20T12:01:00.000Z");
+    const renderer = renderScreen({ practiceService: service, runManagementEnabled: true });
+
+    press(renderer, "history-tab");
+    press(renderer, "history-range-max");
+    expect(collectText(findByTestId(renderer, `history-rating-${run.ratingKey}`))).toBe(
+      "History Focus · 20s pace"
+    );
+    expectText(renderer, "History Focus");
+  });
+
   it("omits run-level rating deltas from individual history attempts", () => {
     const store = new MemoryStore();
     store.seedPuzzles([sharedHistoryPuzzle()]);
@@ -6318,7 +6507,7 @@ function createScriptedStockfishTransport(
 }
 
 type RenderScreenOptions = TestMobilePlatformCapabilityOverrides &
-  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEloEditingMovedToHome" | "runManagementPresentation" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "themeCatalogPresentation"> & {
+  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEloEditingMovedToHome" | "runManagementEnabled" | "runManagementPresentation" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "themeCatalogPresentation"> & {
     platformCapabilities?: MobilePlatformCapabilities;
   };
 
@@ -6335,6 +6524,7 @@ function runManagementPresentation(
     runs: [
       {
         id: "standard",
+        ratingKey: "standard 5/20",
         name: "Standard",
         kind: "standard",
         mode: "standard",
@@ -6345,6 +6535,7 @@ function runManagementPresentation(
       },
       {
         id: "tactics-focus",
+        ratingKey: "run:tactics-focus",
         name: "Tactics Focus",
         kind: "custom",
         mode: "custom",
@@ -6355,6 +6546,7 @@ function runManagementPresentation(
       },
       {
         id: "candidate-sprint",
+        ratingKey: "run:candidate-sprint",
         name: "Candidate Sprint",
         kind: "custom",
         mode: "arrow_duel",
@@ -6416,6 +6608,7 @@ function renderScreen({
   puzzleSelectionId,
   puzzleSelectionSeed,
   runEloEditingMovedToHome,
+  runManagementEnabled,
   runManagementPresentation,
   sprintStartDelayMs,
   standardTargetCorrect,
@@ -6435,6 +6628,7 @@ function renderScreen({
         puzzleSelectionId={puzzleSelectionId}
         puzzleSelectionSeed={puzzleSelectionSeed}
         runEloEditingMovedToHome={runEloEditingMovedToHome}
+        runManagementEnabled={runManagementEnabled}
         runManagementPresentation={runManagementPresentation}
         sprintStartDelayMs={sprintStartDelayMs}
         standardTargetCorrect={standardTargetCorrect}

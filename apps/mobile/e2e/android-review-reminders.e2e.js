@@ -96,7 +96,7 @@ describe('Android Review reminders through public and system surfaces', () => {
       await element(by.id('settings-review-reminder-off')).tap();
       await waitForElementTextContaining('settings-review-reminders', 'Reminders are off', 10000);
 
-      await openTab('practice-tab', 'practice-mode-standard');
+      await openTab('practice-tab', 'practice-run-standard');
       await failStandardSprint();
       await element(by.id('back-practice-button')).tap();
       await waitFor(element(by.id('practice-tab'))).toBeVisible().withTimeout(10000);

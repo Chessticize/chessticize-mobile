@@ -47,12 +47,12 @@ async function playBoardMove(testID, move, flipped = false) {
 }
 
 async function startPracticeMode(mode) {
-  const modeCardId = `practice-mode-${mode}`;
-  await waitForVisibleInPracticeScroll(modeCardId);
-  await element(by.id(modeCardId)).tap();
+  const runCardId = `practice-run-${mode}`;
+  await waitForVisibleInPracticeScroll(runCardId);
+  await element(by.id(`practice-run-select-${mode}`)).tap();
   await element(by.id('practice-main-scroll')).scrollTo('top');
-  await waitFor(element(by.id('practice-start-button'))).toBeVisible().withTimeout(10000);
-  await tapUntilExists('practice-start-button', 'session-board', 3);
+  await waitFor(element(by.id('practice-run-start'))).toBeVisible().withTimeout(10000);
+  await tapUntilExists('practice-run-start', 'session-board', 3);
 }
 
 function bringAndroidAppToForeground(

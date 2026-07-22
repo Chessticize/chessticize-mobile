@@ -1,5 +1,6 @@
 import {
   orderReviewQueue,
+  mergePracticeRunCatalogs,
   preferredReviewScheduleChange,
   reviewContextKey,
   type RatingRecord,
@@ -177,7 +178,8 @@ export function mergeLocalDataExports(local: LocalDataExport, remote: LocalDataI
     attempts: [...attempts.values()].sort(compareAttempts),
     reviewQueue: orderReviewQueue(reviews).map(exportReviewQueueState),
     reviewRemovals: removals,
-    sprintSessions: [...sprintSessions.values()].sort(compareSprintSessions)
+    sprintSessions: [...sprintSessions.values()].sort(compareSprintSessions),
+    practiceRuns: mergePracticeRunCatalogs(local.practiceRuns, remote.practiceRuns ?? [])
   };
 }
 
@@ -186,7 +188,8 @@ function emptyImportResult(): LocalDataImportResult {
     ratings: 0,
     attempts: 0,
     reviewQueue: 0,
-    sprintSessions: 0
+    sprintSessions: 0,
+    practiceRuns: 0
   };
 }
 
@@ -195,6 +198,7 @@ function addImportResult(target: LocalDataImportResult, incoming: LocalDataImpor
   target.attempts += incoming.attempts;
   target.reviewQueue += incoming.reviewQueue;
   target.sprintSessions += incoming.sprintSessions;
+  target.practiceRuns += incoming.practiceRuns;
 }
 
 function mergeReviewChange(
