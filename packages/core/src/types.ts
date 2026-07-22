@@ -53,6 +53,30 @@ export interface CustomSprintConfigRecord {
   playCount: number;
 }
 
+export type PracticeRunKind = "standard" | "arrow_duel" | "custom";
+
+export interface PracticeRunRecord {
+  id: string;
+  kind: PracticeRunKind;
+  name: string;
+  mode: "standard" | "custom" | "arrow_duel";
+  ratingKey: string;
+  durationSeconds: number;
+  perPuzzleSeconds: number;
+  targetCorrect: number;
+  maxMistakes: number;
+  themes?: string[];
+  homeOrder: number;
+  archived: boolean;
+  updatedAt: string;
+}
+
+export interface PracticeRunSnapshot {
+  id: string;
+  kind: PracticeRunKind;
+  name: string;
+}
+
 export interface RatingRecord {
   key: string;
   generation: number;
@@ -111,6 +135,7 @@ export interface ArrowDuelReviewArrow {
 export interface SprintState {
   id: string;
   config: SprintConfig;
+  run?: PracticeRunSnapshot;
   ratingGeneration?: number;
   status: SprintStatus;
   startedAt: string;

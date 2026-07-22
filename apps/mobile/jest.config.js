@@ -11,4 +11,5 @@ module.exports = {
     '^react-native-safe-area-context$': '<rootDir>/__mocks__/react-native-safe-area-context.js',
   },
   transformIgnorePatterns: [],
+  testPathIgnorePatterns: ['/node_modules/', '/\\._'],
 };

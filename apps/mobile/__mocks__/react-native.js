@@ -11,8 +11,32 @@ function component(name) {
   };
 }
 
+class AnimatedValue {
+  constructor(value) {
+    this.value = value;
+  }
+
+  setValue(value) {
+    this.value = value;
+  }
+
+  stopAnimation() {}
+}
+
 module.exports = {
   ActivityIndicator: component('ActivityIndicator'),
+  Animated: {
+    Value: AnimatedValue,
+    View: component('Animated.View'),
+    spring(value, configuration) {
+      return {
+        start(callback) {
+          value.setValue(configuration.toValue);
+          callback?.();
+        }
+      };
+    }
+  },
   NativeModules: {},
   Platform: {
     OS: 'ios',
@@ -38,6 +62,16 @@ module.exports = {
   Linking: {
     openURL() {
       return Promise.resolve();
+    }
+  },
+  LayoutAnimation: {
+    Types: { easeInEaseOut: 'easeInEaseOut' },
+    Properties: { opacity: 'opacity' },
+    configureNext() {}
+  },
+  PanResponder: {
+    create(handlers) {
+      return { panHandlers: handlers };
     }
   },
   AppState: {

@@ -30,6 +30,7 @@ const SNAPSHOT_TABLES = [
   "sprint_sessions",
   "attempts",
   "custom_sprint_configs",
+  "practice_runs",
   "review_queue",
   "review_schedule_removals",
   "review_events"
@@ -199,6 +200,18 @@ test("SQLite migrates the released iOS 1.0.0 database without losing user semant
       const attemptColumns = store.db.prepare("PRAGMA table_info(attempts)").all() as Array<{ name: string }>;
       assert.ok(attemptColumns.some((column) => column.name === "unclear"));
       assert.ok(attemptColumns.some((column) => column.name === "unclear_updated_at"));
+      const sessionColumns = store.db.prepare("PRAGMA table_info(sprint_sessions)").all() as Array<{ name: string }>;
+      assert.ok(sessionColumns.some((column) => column.name === "run_id"));
+      assert.ok(sessionColumns.some((column) => column.name === "run_kind"));
+      assert.ok(sessionColumns.some((column) => column.name === "run_name"));
+      assert.deepEqual(
+        store.db.prepare("SELECT id, name, rating_key FROM practice_runs ORDER BY home_order").all().map(sqliteRow),
+        [
+          { id: "standard", name: "Standard", rating_key: "standard 5/20" },
+          { id: "arrow-duel", name: "Arrow Duel", rating_key: "arrow_duel 5/30" }
+        ]
+      );
+      assert.deepEqual(store.db.prepare("PRAGMA foreign_key_list(practice_runs)").all(), []);
       const reviewQueueColumns = store.db.prepare("PRAGMA table_info(review_queue)").all() as Array<{ name: string; notnull: number }>;
       assert.ok(reviewQueueColumns.some((column) => column.name === "due_day"));
       assert.ok(reviewQueueColumns.some((column) => column.name === "interval_days"));

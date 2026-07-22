@@ -1,11 +1,13 @@
 import {
   buildHistoryView,
+  clonePracticeRun,
   buildSessionMistakeReview,
   createDefaultRating,
   enrollReviewContext,
   filterHistoryAttemptsForQuery,
   normalizeThemeSelection,
   normalizeRatingRecord,
+  mergePracticeRunCatalogs,
   orderReviewQueue,
   preferredReviewScheduleChange,
   removeReviewContext,
@@ -27,6 +29,8 @@ import type {
   HistoryQuery,
   HistoryView,
   Puzzle,
+  PracticeRunKind,
+  PracticeRunRecord,
   RatingRecord,
   ReviewContext,
   ReviewQueueItem,
@@ -57,11 +61,13 @@ import type { ReviewReminderPreference } from "./practice-store.ts";
 import type { ReviewReminderSettings } from "../../core/src/index.ts";
 import { cloneAttemptHistoryRow, preferredAttemptHistoryRow, sameAttemptHistoryRow } from "./attempt-sync.ts";
 
-interface AttemptHistoryDbRow extends Omit<AttemptHistoryRow, "ratingAfter" | "arrowDuelCandidateOrder" | "unclear" | "unclearUpdatedAt"> {
+interface AttemptHistoryDbRow extends Omit<AttemptHistoryRow, "ratingAfter" | "arrowDuelCandidateOrder" | "unclear" | "unclearUpdatedAt" | "runId" | "runName"> {
   ratingAfter: number | null;
   arrowDuelCandidateOrderJson: string | null;
   unclear: number;
   unclearUpdatedAt: string | null;
+  runId: string | null;
+  runName: string | null;
 }
 
 interface HistoryAttemptDbRow extends PuzzleRow {
@@ -80,6 +86,9 @@ interface HistoryAttemptDbRow extends PuzzleRow {
   unclear: number;
   unclear_updated_at: string | null;
   rating_key: string;
+  run_id: string | null;
+  run_name: string | null;
+  per_puzzle_seconds: number;
 }
 
 interface HistoryEloDbRow {
@@ -149,6 +158,22 @@ interface CustomSprintConfigRow {
   play_count: number;
 }
 
+interface PracticeRunRow {
+  id: string;
+  kind: PracticeRunKind;
+  name: string;
+  mode: PracticeRunRecord["mode"];
+  rating_key: string;
+  duration_seconds: number;
+  per_puzzle_seconds: number;
+  target_correct: number;
+  max_mistakes: number;
+  themes_json: string | null;
+  home_order: number;
+  archived: number;
+  updated_at: string;
+}
+
 interface AppSettingsRow {
   id: string;
   sync_icloud_enabled: number;
@@ -169,6 +194,10 @@ interface SprintSessionExportRow {
   mistakeCount: number;
   ratingBefore: number;
   ratingAfter: number | null;
+  configJson?: string;
+  runId?: string | null;
+  runKind?: PracticeRunKind | null;
+  runName?: string | null;
 }
 
 export type SyncSqliteValue = string | number | null;
@@ -188,7 +217,7 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 6;
+export const CURRENT_SCHEMA_VERSION = 7;
 
 interface SQLiteMigration {
   from: number;
@@ -202,7 +231,8 @@ const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
   { from: 2, to: 3, apply: migrateV2ToV3 },
   { from: 3, to: 4, apply: migrateV3ToV4 },
   { from: 4, to: 5, apply: migrateV4ToV5 },
-  { from: 5, to: 6, apply: migrateV5ToV6 }
+  { from: 5, to: 6, apply: migrateV5ToV6 },
+  { from: 6, to: 7, apply: migrateV6ToV7 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
@@ -449,6 +479,49 @@ export class SyncSQLiteStore implements PracticeStore {
     }));
   }
 
+  savePracticeRun(run: PracticeRunRecord): void {
+    this.db.prepare(
+      `INSERT INTO practice_runs (
+        id, kind, name, mode, rating_key, duration_seconds, per_puzzle_seconds,
+        target_correct, max_mistakes, themes_json, home_order, archived, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        kind = excluded.kind,
+        name = excluded.name,
+        mode = excluded.mode,
+        rating_key = excluded.rating_key,
+        duration_seconds = excluded.duration_seconds,
+        per_puzzle_seconds = excluded.per_puzzle_seconds,
+        target_correct = excluded.target_correct,
+        max_mistakes = excluded.max_mistakes,
+        themes_json = excluded.themes_json,
+        home_order = excluded.home_order,
+        archived = excluded.archived,
+        updated_at = excluded.updated_at`
+    ).run(
+      run.id,
+      run.kind,
+      run.name,
+      run.mode,
+      run.ratingKey,
+      run.durationSeconds,
+      run.perPuzzleSeconds,
+      run.targetCorrect,
+      run.maxMistakes,
+      run.themes === undefined ? null : JSON.stringify(run.themes),
+      run.homeOrder,
+      boolToInt(run.archived),
+      run.updatedAt
+    );
+  }
+
+  listPracticeRuns(): PracticeRunRecord[] {
+    const rows = this.db.prepare(
+      "SELECT * FROM practice_runs ORDER BY archived ASC, home_order ASC, id ASC"
+    ).all() as PracticeRunRow[];
+    return rows.map(practiceRunFromRow);
+  }
+
   getSettings(): PracticeSettings {
     const row = this.db.prepare("SELECT * FROM app_settings WHERE id = 'default'").get() as AppSettingsRow | undefined;
     if (!row) {
@@ -509,6 +582,9 @@ export class SyncSQLiteStore implements PracticeStore {
           mode,
           rating_key,
           rating_generation,
+          run_id,
+          run_kind,
+          run_name,
           config_json,
           started_at,
           deadline_at,
@@ -516,13 +592,16 @@ export class SyncSQLiteStore implements PracticeStore {
           correct_count,
           mistake_count,
           rating_before
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         state.id,
         state.config.mode,
         state.config.ratingKey,
         state.ratingGeneration ?? this.getRating(state.config.ratingKey).generation,
+        state.run?.id ?? null,
+        state.run?.kind ?? null,
+        state.run?.name ?? null,
         JSON.stringify(state.config),
         state.startedAt,
         state.deadlineAt,
@@ -623,52 +702,55 @@ export class SyncSQLiteStore implements PracticeStore {
     const clauses: string[] = [];
     const params: SyncSqliteValue[] = [];
     if (filter.source !== undefined) {
-      clauses.push("source = ?");
+      clauses.push("a.source = ?");
       params.push(filter.source);
     }
     if (filter.result !== undefined) {
-      clauses.push("result = ?");
+      clauses.push("a.result = ?");
       params.push(filter.result);
     }
     if (filter.mode !== undefined) {
-      clauses.push("mode = ?");
+      clauses.push("a.mode = ?");
       params.push(filter.mode);
     }
     if (filter.since !== undefined) {
-      clauses.push("completed_at >= ?");
+      clauses.push("a.completed_at >= ?");
       params.push(filter.since);
     }
     if (filter.puzzleId !== undefined) {
-      clauses.push("puzzle_id = ?");
+      clauses.push("a.puzzle_id = ?");
       params.push(filter.puzzleId);
     }
     if (filter.sessionId !== undefined) {
-      clauses.push("session_id = ?");
+      clauses.push("a.session_id = ?");
       params.push(filter.sessionId);
     }
     const where = clauses.length === 0 ? "" : `WHERE ${clauses.join(" AND ")}`;
     const rows = this.db
       .prepare(
         `SELECT
-          id,
-          source,
-          session_id AS sessionId,
-          puzzle_id AS puzzleId,
-          mode,
-          rating_key AS ratingKey,
-          result,
-          submitted_move AS submittedMove,
-          expected_move AS expectedMove,
-          started_at AS startedAt,
-          completed_at AS completedAt,
-          rating_before AS ratingBefore,
-          rating_after AS ratingAfter,
-          arrow_duel_candidate_order_json AS arrowDuelCandidateOrderJson,
-          unclear,
-          unclear_updated_at AS unclearUpdatedAt
-         FROM attempts
+          a.id,
+          a.source,
+          a.session_id AS sessionId,
+          a.puzzle_id AS puzzleId,
+          a.mode,
+          a.rating_key AS ratingKey,
+          a.result,
+          a.submitted_move AS submittedMove,
+          a.expected_move AS expectedMove,
+          a.started_at AS startedAt,
+          a.completed_at AS completedAt,
+          a.rating_before AS ratingBefore,
+          a.rating_after AS ratingAfter,
+          a.arrow_duel_candidate_order_json AS arrowDuelCandidateOrderJson,
+          a.unclear,
+          a.unclear_updated_at AS unclearUpdatedAt,
+          s.run_id AS runId,
+          s.run_name AS runName
+         FROM attempts a
+         JOIN sprint_sessions s ON s.id = a.session_id
          ${where}
-         ORDER BY completed_at DESC, id DESC`
+         ORDER BY a.completed_at DESC, a.id DESC`
       )
       .all(...params) as AttemptHistoryDbRow[];
 
@@ -679,24 +761,27 @@ export class SyncSQLiteStore implements PracticeStore {
     const row = this.db
       .prepare(
         `SELECT
-          id,
-          source,
-          session_id AS sessionId,
-          puzzle_id AS puzzleId,
-          mode,
-          rating_key AS ratingKey,
-          result,
-          submitted_move AS submittedMove,
-          expected_move AS expectedMove,
-          started_at AS startedAt,
-          completed_at AS completedAt,
-          rating_before AS ratingBefore,
-          rating_after AS ratingAfter,
-          arrow_duel_candidate_order_json AS arrowDuelCandidateOrderJson,
-          unclear,
-          unclear_updated_at AS unclearUpdatedAt
-         FROM attempts
-         WHERE id = ?`
+          a.id,
+          a.source,
+          a.session_id AS sessionId,
+          a.puzzle_id AS puzzleId,
+          a.mode,
+          a.rating_key AS ratingKey,
+          a.result,
+          a.submitted_move AS submittedMove,
+          a.expected_move AS expectedMove,
+          a.started_at AS startedAt,
+          a.completed_at AS completedAt,
+          a.rating_before AS ratingBefore,
+          a.rating_after AS ratingAfter,
+          a.arrow_duel_candidate_order_json AS arrowDuelCandidateOrderJson,
+          a.unclear,
+          a.unclear_updated_at AS unclearUpdatedAt,
+          s.run_id AS runId,
+          s.run_name AS runName
+         FROM attempts a
+         JOIN sprint_sessions s ON s.id = a.session_id
+         WHERE a.id = ?`
       )
       .get(attemptId) as AttemptHistoryDbRow | undefined;
     return row ? attemptHistoryRowFromDbRow(row) : undefined;
@@ -710,7 +795,8 @@ export class SyncSQLiteStore implements PracticeStore {
       attempts: this.listAttempts(),
       reviewQueue: this.listReviewQueue().map(exportReviewQueueState),
       reviewRemovals: this.listReviewRemovals(),
-      sprintSessions: this.listSprintSessions()
+      sprintSessions: this.listSprintSessions(),
+      practiceRuns: this.listPracticeRuns()
     };
   }
 
@@ -719,13 +805,28 @@ export class SyncSQLiteStore implements PracticeStore {
       ratings: 0,
       attempts: 0,
       reviewQueue: 0,
-      sprintSessions: 0
+      sprintSessions: 0,
+      practiceRuns: 0
     };
     this.transaction(() => {
       this.saveSettings({
         ...this.getSettings(),
         notifications: clonePracticeSettings(data.settings).notifications
       });
+      const currentRuns = this.listPracticeRuns();
+      const previousRuns = new Map(currentRuns.map((run) => [run.id, run]));
+      const mergedRuns = mergePracticeRunCatalogs(currentRuns, data.practiceRuns ?? []);
+      const changedRunCount = mergedRuns.filter((run) => !samePracticeRun(previousRuns.get(run.id), run)).length;
+      if (changedRunCount > 0) {
+        // The catalog owns no incoming foreign keys, so replacing it inside
+        // this transaction safely avoids transient NOCASE name collisions
+        // when two devices concurrently create the same user-facing name.
+        this.db.prepare("DELETE FROM practice_runs").run();
+        for (const run of mergedRuns) {
+          this.savePracticeRun(run);
+        }
+        result.practiceRuns = changedRunCount;
+      }
       for (const rating of data.ratings) {
         const previous = this.getRating(rating.key);
         const next = preferredRating(previous, rating);
@@ -1082,6 +1183,9 @@ export class SyncSQLiteStore implements PracticeStore {
           a.unclear,
           a.unclear_updated_at,
           COALESCE(a.rating_key, s.rating_key) AS rating_key,
+          s.run_id,
+          s.run_name,
+          s.per_puzzle_seconds,
           p.*
          FROM attempts a
          JOIN sprint_sessions s ON s.id = a.session_id
@@ -1113,6 +1217,10 @@ export class SyncSQLiteStore implements PracticeStore {
         ...(row.unclear_updated_at === null
           ? {}
           : { unclear: row.unclear === 1, unclearUpdatedAt: row.unclear_updated_at }),
+        ...(row.run_id === null || row.run_name === null
+          ? {}
+          : { runId: row.run_id, runName: row.run_name }),
+        perPuzzleSeconds: row.per_puzzle_seconds,
         puzzleRating: puzzle.rating,
         side: sideToMoveForHistoryPuzzle({ puzzle, mode: row.mode }),
         themes: puzzle.themes
@@ -1166,6 +1274,10 @@ export class SyncSQLiteStore implements PracticeStore {
           mode,
           rating_key AS ratingKey,
           rating_generation AS ratingGeneration,
+          config_json AS configJson,
+          run_id AS runId,
+          run_kind AS runKind,
+          run_name AS runName,
           started_at AS startedAt,
           completed_at AS completedAt,
           status,
@@ -1189,6 +1301,10 @@ export class SyncSQLiteStore implements PracticeStore {
           mode,
           rating_key AS ratingKey,
           rating_generation AS ratingGeneration,
+          config_json AS configJson,
+          run_id AS runId,
+          run_kind AS runKind,
+          run_name AS runName,
           started_at AS startedAt,
           completed_at AS completedAt,
           status,
@@ -1217,6 +1333,10 @@ export class SyncSQLiteStore implements PracticeStore {
            SET mode = ?,
                rating_key = ?,
                rating_generation = ?,
+               config_json = ?,
+               run_id = ?,
+               run_kind = ?,
+               run_name = ?,
                started_at = ?,
                deadline_at = ?,
                completed_at = ?,
@@ -1231,6 +1351,10 @@ export class SyncSQLiteStore implements PracticeStore {
           next.mode,
           next.ratingKey,
           next.ratingGeneration ?? null,
+          JSON.stringify(next.config ?? { source: "icloud_sync", mode: next.mode, ratingKey: next.ratingKey }),
+          next.run?.id ?? null,
+          next.run?.kind ?? null,
+          next.run?.name ?? null,
           next.startedAt,
           completedAt,
           completedAt,
@@ -1250,6 +1374,9 @@ export class SyncSQLiteStore implements PracticeStore {
           mode,
           rating_key,
           rating_generation,
+          run_id,
+          run_kind,
+          run_name,
           config_json,
           started_at,
           deadline_at,
@@ -1259,14 +1386,17 @@ export class SyncSQLiteStore implements PracticeStore {
           mistake_count,
           rating_before,
           rating_after
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         next.id,
         next.mode,
         next.ratingKey,
         next.ratingGeneration ?? null,
-        JSON.stringify({ source: "icloud_sync", mode: next.mode, ratingKey: next.ratingKey }),
+        next.run?.id ?? null,
+        next.run?.kind ?? null,
+        next.run?.name ?? null,
+        JSON.stringify(next.config ?? { source: "icloud_sync", mode: next.mode, ratingKey: next.ratingKey }),
         next.startedAt,
         completedAt,
         completedAt,
@@ -1671,6 +1801,48 @@ function migrateV5ToV6(db: SyncSqliteDatabase): void {
   `);
 }
 
+function migrateV6ToV7(db: SyncSqliteDatabase): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS practice_runs (
+      id TEXT PRIMARY KEY,
+      kind TEXT NOT NULL CHECK (kind IN ('standard', 'arrow_duel', 'custom')),
+      name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+      mode TEXT NOT NULL CHECK (mode IN ('standard', 'arrow_duel', 'custom')),
+      rating_key TEXT NOT NULL UNIQUE,
+      duration_seconds INTEGER NOT NULL CHECK (duration_seconds > 0),
+      per_puzzle_seconds INTEGER NOT NULL CHECK (per_puzzle_seconds > 0),
+      target_correct INTEGER NOT NULL CHECK (target_correct > 0),
+      max_mistakes INTEGER NOT NULL CHECK (max_mistakes > 0),
+      themes_json TEXT,
+      home_order INTEGER NOT NULL CHECK (home_order >= 0),
+      archived INTEGER NOT NULL DEFAULT 0 CHECK (archived IN (0, 1)),
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS practice_runs_home_order_idx
+      ON practice_runs(archived, home_order, id);
+    CREATE INDEX IF NOT EXISTS practice_runs_updated_at_idx
+      ON practice_runs(updated_at, id);
+
+    INSERT OR IGNORE INTO practice_runs (
+      id, kind, name, mode, rating_key, duration_seconds, per_puzzle_seconds,
+      target_correct, max_mistakes, themes_json, home_order, archived, updated_at
+    ) VALUES
+      ('standard', 'standard', 'Standard', 'standard', 'standard 5/20', 300, 20,
+       15, 3, NULL, 0, 0, '1970-01-01T00:00:00.000Z'),
+      ('arrow-duel', 'arrow_duel', 'Arrow Duel', 'arrow_duel', 'arrow_duel 5/30', 300, 30,
+       10, 3, NULL, 1, 0, '1970-01-01T00:00:00.000Z');
+
+  `);
+  ensureColumn(db, "sprint_sessions", "run_id", "ALTER TABLE sprint_sessions ADD COLUMN run_id TEXT");
+  ensureColumn(db, "sprint_sessions", "run_kind", "ALTER TABLE sprint_sessions ADD COLUMN run_kind TEXT");
+  ensureColumn(db, "sprint_sessions", "run_name", "ALTER TABLE sprint_sessions ADD COLUMN run_name TEXT");
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS sprint_sessions_run_id_started_at_idx
+      ON sprint_sessions(run_id, started_at DESC, id DESC);
+  `);
+}
+
 function readSchemaVersion(db: SyncSqliteDatabase): number {
   const row = db.prepare("PRAGMA user_version").get() as { user_version?: unknown } | undefined;
   const version = row?.user_version;
@@ -1817,6 +1989,10 @@ function sameRating(left: RatingRecord, right: RatingRecord): boolean {
     left.volatility === right.volatility;
 }
 
+function samePracticeRun(left: PracticeRunRecord | undefined, right: PracticeRunRecord): boolean {
+  return left !== undefined && JSON.stringify(clonePracticeRun(left)) === JSON.stringify(clonePracticeRun(right));
+}
+
 function sameReviewQueue(left: ReviewQueueState | undefined, right: ReviewQueueState): boolean {
   return left !== undefined &&
     left.puzzleId === right.puzzleId &&
@@ -1858,13 +2034,17 @@ function attemptHistoryRowFromDbRow(row: AttemptHistoryDbRow): AttemptHistoryRow
     arrowDuelCandidateOrderJson: _arrowDuelCandidateOrderJson,
     unclear,
     unclearUpdatedAt,
+    runId,
+    runName,
     ...attempt
   } = row;
   return {
     ...attempt,
     ...(ratingAfter === null ? {} : { ratingAfter }),
     ...(candidateOrder === undefined ? {} : { arrowDuelCandidateOrder: candidateOrder }),
-    ...(unclearUpdatedAt === null ? {} : { unclear: unclear === 1, unclearUpdatedAt })
+    ...(unclearUpdatedAt === null ? {} : { unclear: unclear === 1, unclearUpdatedAt }),
+    ...(runId === null || runId === undefined ? {} : { runId }),
+    ...(runName === null || runName === undefined ? {} : { runName })
   };
 }
 
@@ -1921,6 +2101,9 @@ function countRows(db: SyncSqliteDatabase, table: string, where?: string): numbe
 }
 
 function exportedSprintSessionFromRow(row: SprintSessionExportRow): ExportedSprintSession {
+  const config = row.configJson === undefined
+    ? undefined
+    : JSON.parse(row.configJson) as ExportedSprintSession["config"];
   return {
     id: row.id,
     mode: row.mode,
@@ -1932,7 +2115,30 @@ function exportedSprintSessionFromRow(row: SprintSessionExportRow): ExportedSpri
     correctCount: row.correctCount,
     mistakeCount: row.mistakeCount,
     ratingBefore: row.ratingBefore,
-    ...(row.ratingAfter === null ? {} : { ratingAfter: row.ratingAfter })
+    ...(row.ratingAfter === null ? {} : { ratingAfter: row.ratingAfter }),
+    ...(row.runId == null || row.runKind == null || row.runName == null
+      ? {}
+      : { run: { id: row.runId, kind: row.runKind, name: row.runName } }),
+    ...(config === undefined ? {} : { config })
+  };
+}
+
+function practiceRunFromRow(row: PracticeRunRow): PracticeRunRecord {
+  const themes = optionalStringArrayFromJson(row.themes_json);
+  return {
+    id: row.id,
+    kind: row.kind,
+    name: row.name,
+    mode: row.mode,
+    ratingKey: row.rating_key,
+    durationSeconds: row.duration_seconds,
+    perPuzzleSeconds: row.per_puzzle_seconds,
+    targetCorrect: row.target_correct,
+    maxMistakes: row.max_mistakes,
+    ...(themes === undefined ? {} : { themes }),
+    homeOrder: row.home_order,
+    archived: intToBool(row.archived),
+    updatedAt: row.updated_at
   };
 }
 

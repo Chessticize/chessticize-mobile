@@ -43,6 +43,61 @@ describe('Practice POC', () => {
     }
   });
 
+  it('creates, reorders, edits, archives, restores, and relaunches a saved Run', async () => {
+    await waitFor(element(by.id('practice-run-management'))).toExist().withTimeout(180000);
+    await waitFor(element(by.id('practice-run-standard'))).toBeVisible().withTimeout(10000);
+    await waitFor(element(by.id('practice-run-arrow-duel'))).toBeVisible().withTimeout(10000);
+
+    await element(by.id('practice-add-run')).tap();
+    await waitFor(element(by.id('practice-run-editor'))).toExist().withTimeout(10000);
+    await expect(element(by.id('custom-theme-mixed'))).toHaveValue('1');
+    await element(by.id('practice-run-name-input')).replaceText('Calculation Lab');
+    await element(by.id('practice-run-save')).tap();
+
+    await waitFor(element(by.id('practice-run-home-done'))).toBeVisible().withTimeout(10000);
+    await expect(element(by.text('Calculation Lab'))).toExist();
+
+    const standardBefore = await frameFor(element(by.id('practice-run-standard')));
+    const arrowBefore = await frameFor(element(by.id('practice-run-arrow-duel')));
+    if (standardBefore.y >= arrowBefore.y) {
+      throw new Error('Expected Standard to begin before Arrow Duel');
+    }
+    await element(by.id('practice-run-standard')).longPressAndDrag(
+      300,
+      NaN,
+      NaN,
+      element(by.id('practice-run-arrow-duel')),
+      NaN,
+      NaN,
+      'slow',
+      200
+    );
+    await sleep(750);
+    const standardAfter = await frameFor(element(by.id('practice-run-standard')));
+    const arrowAfter = await frameFor(element(by.id('practice-run-arrow-duel')));
+    if (standardAfter.y <= arrowAfter.y) {
+      throw new Error('Expected the whole-card drag to live-insert Standard after Arrow Duel');
+    }
+
+    await element(by.text('Calculation Lab')).tap();
+    await waitFor(element(by.id('practice-run-editor-run-name'))).toHaveText('Calculation Lab').withTimeout(10000);
+    await element(by.id('practice-run-elo-increase')).tap();
+    await element(by.id('practice-run-save')).tap();
+    await waitFor(element(by.id('practice-run-home-done'))).toBeVisible().withTimeout(10000);
+
+    await element(by.label('Remove Calculation Lab from Home')).tap();
+    await waitFor(element(by.id('practice-run-remove-confirmation'))).toExist().withTimeout(10000);
+    await element(by.id('practice-run-remove-confirm')).tap();
+    await waitFor(element(by.label('Restore Calculation Lab to Home'))).toExist().withTimeout(10000);
+    await element(by.label('Restore Calculation Lab to Home')).tap();
+    await expect(element(by.text('Calculation Lab'))).toExist();
+
+    await device.terminateApp();
+    await launchWithDisabledSynchronization({ newInstance: true, delete: false });
+    await waitFor(element(by.text('Calculation Lab'))).toExist().withTimeout(180000);
+    await waitFor(element(by.text('ELO 925'))).toExist().withTimeout(10000);
+  });
+
   it('renders the standard sprint board', async () => {
     await startPracticeMode('standard');
     await waitForVisibleInPracticeScroll('session-board');

@@ -87,7 +87,7 @@ describe(`Android Arrow Duel offline journey (${fixture.puzzle.id})`, () => {
         String(fixture.expectedRatingAfter),
         10000
       );
-      await element(by.id('practice-mode-arrow-duel')).tap();
+      await element(by.id('practice-run-select-arrow-duel')).tap();
       await waitForElementTextContaining('practice-progress-weekly-solved', '1', 10000);
       await waitForElementTextContaining('practice-progress-rating-delta', '+175 this week', 10000);
 

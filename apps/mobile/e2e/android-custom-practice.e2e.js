@@ -11,8 +11,7 @@ const practiceFixture = require('../../../fixtures/puzzles/android-standard-prac
 
 const TEST_NOW_MS = '1784030400000';
 const RELAUNCH_TEST_NOW_MS = String(Number(TEST_NOW_MS) + 5 * 60_000);
-const CUSTOM_RATING_KEY = 'fork custom 3/30';
-const CUSTOM_CONFIG_ROW_ID = 'custom-previous-custom-custom-180-30-fork';
+const CUSTOM_RUN_NAME = 'Fork Focus';
 const EXPECTED_AUTO_REPLY_MOVE = practiceFixture.puzzle.solutionMoves[2];
 const EXPECTED_RATING_DELTA = practiceFixture.expectedRatingAfter - practiceFixture.puzzle.rating;
 
@@ -37,30 +36,42 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
     await withAndroidUiDiagnostics(async () => {
       await waitFor(element(by.id('practice-home'))).toExist().withTimeout(180000);
 
-      // Configuration is a child destination. Android Back returns to idle
-      // Practice without starting a session or losing the shared defaults.
-      await openCustomSetup();
+      // New Run is a child destination. Android Back returns to the saved-run
+      // Home without creating or starting anything.
+      await openNewRunEditor();
       await device.pressBack();
-      await waitFor(element(by.id('practice-home'))).toExist().withTimeout(10000);
+      await waitFor(element(by.id('practice-run-management'))).toExist().withTimeout(10000);
+      await expect(element(by.text(CUSTOM_RUN_NAME))).not.toExist();
 
-      await openCustomSetup();
+      await openNewRunEditor();
+      await element(by.id('practice-run-name-input')).replaceText(CUSTOM_RUN_NAME);
       await element(by.id('custom-mode-arrow-duel')).tap();
       await element(by.id('custom-mode-regular')).tap();
       await waitForVisibleInPracticeScroll('custom-theme-fork');
       await element(by.id('custom-theme-fork')).tap();
-      await waitForVisibleInPracticeScroll('custom-duration-stepper-decrease');
-      await element(by.id('custom-duration-stepper-decrease')).tap();
-      await waitForVisibleInPracticeScroll('custom-per-puzzle-stepper-increase');
-      await element(by.id('custom-per-puzzle-stepper-increase')).tap();
-      await waitForVisibleInPracticeScroll('custom-initial-rating-stepper-increase');
-      await element(by.id('custom-initial-rating-stepper-increase')).tap();
-      await waitForElementTextContaining('custom-initial-rating-value', 'ELO 700', 5000);
-      await element(by.id('custom-initial-rating-stepper-decrease')).tap();
-      await waitForElementTextContaining('custom-initial-rating-value', 'ELO 600', 5000);
+      await waitForVisibleInPracticeScroll('practice-run-duration-stepper-decrease');
+      await element(by.id('practice-run-duration-stepper-decrease')).tap();
+      await waitForVisibleInPracticeScroll('practice-run-per-puzzle-stepper-increase');
+      await element(by.id('practice-run-per-puzzle-stepper-increase')).tap();
+      await waitForVisibleInPracticeScroll('practice-run-elo-increase');
+      await element(by.id('practice-run-elo-increase')).tap();
+      await waitForElementTextContaining('practice-run-elo-value', 'ELO 925', 5000);
+      await element(by.id('practice-run-elo-decrease')).tap();
+      await waitForElementTextContaining('practice-run-elo-value', 'ELO 900', 5000);
+      for (let index = 0; index < 12; index += 1) {
+        await element(by.id('practice-run-elo-decrease')).tap();
+      }
+      await waitForElementTextContaining('practice-run-elo-value', 'ELO 600', 5000);
 
       await element(by.id('practice-main-scroll')).scrollTo('top');
-      await waitFor(element(by.id('start-sprint-button'))).toBeVisible().withTimeout(10000);
-      await element(by.id('start-sprint-button')).tap();
+      await element(by.id('practice-run-save')).tap();
+      await waitFor(element(by.id('practice-run-home-done'))).toBeVisible().withTimeout(10000);
+      await element(by.id('practice-run-home-done')).tap();
+      await waitFor(element(by.text(CUSTOM_RUN_NAME))).toExist().withTimeout(10000);
+      await element(by.text(CUSTOM_RUN_NAME)).tap();
+      await element(by.id('practice-main-scroll')).scrollTo('top');
+      await waitFor(element(by.id('practice-run-start'))).toBeVisible().withTimeout(10000);
+      await element(by.id('practice-run-start')).tap();
       await waitFor(element(by.id('session-board'))).toExist().withTimeout(15000);
       await waitFor(element(by.id('session-progress'))).toHaveText('0 / 1').withTimeout(10000);
 
@@ -115,8 +126,8 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
       await waitForElementTextContaining('review-analysis-engine-status', 'SF 18 NNUE', 60000);
 
       // Back closes analysis first, then returns the attempt to History. The
-      // terminal Custom result remains the Practice destination until its own
-      // Back returns to its Custom setup parent, then setup Back reaches root.
+      // terminal saved-Run result remains the Practice destination until its
+      // own Back returns to the saved-run Home.
       await device.pressBack();
       await waitFor(element(by.id('review-analysis-button'))).toExist().withTimeout(10000);
       await expect(element(by.id('review-close-analysis'))).not.toExist();
@@ -125,9 +136,7 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
       await element(by.id('practice-tab')).tap();
       await waitFor(element(by.id('sprint-summary-panel'))).toExist().withTimeout(10000);
       await device.pressBack();
-      await waitFor(element(by.id('custom-sprint-setup'))).toExist().withTimeout(10000);
-      await device.pressBack();
-      await waitFor(element(by.id('practice-home'))).toExist().withTimeout(10000);
+      await waitFor(element(by.id('practice-run-management'))).toExist().withTimeout(10000);
 
       await device.terminateApp();
       await launchWithDisabledSynchronization({
@@ -139,22 +148,17 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
       await waitFor(element(by.id('practice-home'))).toExist().withTimeout(180000);
 
       await openTab('history-tab', 'history-action-header');
-      await waitForVisibleInPracticeScroll(`history-rating-${CUSTOM_RATING_KEY}`);
-      await element(by.id(`history-rating-${CUSTOM_RATING_KEY}`)).tap();
+      await waitFor(element(by.text(`${CUSTOM_RUN_NAME} · 30s pace`))).toExist().withTimeout(10000);
+      await element(by.text(`${CUSTOM_RUN_NAME} · 30s pace`)).tap();
       await waitForElementTextContaining('history-chart-value', String(practiceFixture.expectedRatingAfter), 10000);
       await waitFor(element(by.id('history-chart-line'))).toExist().withTimeout(10000);
+      await waitFor(element(by.text(CUSTOM_RUN_NAME)).atIndex(0)).toExist().withTimeout(10000);
       await waitFor(element(by.text('Correct')).atIndex(0)).toExist().withTimeout(10000);
 
-      await openTab('practice-tab', 'practice-mode-custom');
-      await element(by.id('practice-mode-custom')).tap();
-      await waitFor(element(by.id('custom-previous-configs'))).toExist().withTimeout(10000);
-      await waitForVisibleInPracticeScroll(CUSTOM_CONFIG_ROW_ID);
-      await waitForElementTextContaining(`${CUSTOM_CONFIG_ROW_ID}-meta`, 'Fork', 10000);
-      await waitForElementTextContaining(`${CUSTOM_CONFIG_ROW_ID}-meta`, '3 min', 10000);
-      await waitForElementTextContaining(`${CUSTOM_CONFIG_ROW_ID}-meta`, '30s pace', 10000);
-      await element(by.id(CUSTOM_CONFIG_ROW_ID)).tap();
-      await waitForElementTextContaining('custom-initial-rating-value', `ELO ${practiceFixture.expectedRatingAfter}`, 10000);
-      await element(by.id('practice-main-scroll')).scrollTo('top');
+      await openTab('practice-tab', 'practice-run-management');
+      await waitFor(element(by.text(CUSTOM_RUN_NAME))).toExist().withTimeout(10000);
+      await waitFor(element(by.text(`ELO ${practiceFixture.expectedRatingAfter}`))).toExist().withTimeout(10000);
+      await element(by.text(CUSTOM_RUN_NAME)).tap();
       await waitForVisibleInPracticeScroll('practice-progress-summary');
       await waitForElementAccessibilityLabelContaining(
         'practice-progress-summary',
@@ -173,10 +177,10 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
   });
 });
 
-async function openCustomSetup() {
-  await waitForVisibleInPracticeScroll('practice-mode-custom');
-  await element(by.id('practice-mode-custom')).tap();
-  await waitFor(element(by.id('custom-sprint-setup'))).toExist().withTimeout(10000);
+async function openNewRunEditor() {
+  await waitForVisibleInPracticeScroll('practice-add-run');
+  await element(by.id('practice-add-run')).tap();
+  await waitFor(element(by.id('practice-run-editor'))).toExist().withTimeout(10000);
   await element(by.id('practice-main-scroll')).scrollTo('top');
   await waitFor(element(by.id('custom-mode-regular'))).toBeVisible().withTimeout(10000);
 }

@@ -3,6 +3,8 @@ import type {
   AttemptResult,
   CustomSprintConfigRecord,
   Puzzle,
+  PracticeRunRecord,
+  PracticeRunSnapshot,
   RatingRecord,
   ReviewContext,
   ReviewQueueItem,
@@ -10,6 +12,7 @@ import type {
   ReviewScheduleRemoval,
   SessionMistakeReviewItem,
   SprintMode,
+  SprintConfig,
   SprintState
 } from "../../core/src/index.ts";
 import { isReviewDay, reviewDayFor } from "../../core/src/index.ts";
@@ -35,6 +38,8 @@ export interface ExportedSprintSession {
   mistakeCount: number;
   ratingBefore: number;
   ratingAfter?: number;
+  run?: PracticeRunSnapshot;
+  config?: SprintConfig;
 }
 
 export interface LegacyReviewQueueState extends Omit<ReviewQueueState, "dueDay" | "intervalDays"> {
@@ -55,10 +60,12 @@ export interface LocalDataExport {
   reviewQueue: ExportedReviewQueueState[];
   reviewRemovals?: ReviewScheduleRemoval[];
   sprintSessions: ExportedSprintSession[];
+  practiceRuns: PracticeRunRecord[];
 }
 
-export interface LocalDataImport extends Omit<LocalDataExport, "reviewQueue"> {
+export interface LocalDataImport extends Omit<LocalDataExport, "reviewQueue" | "practiceRuns"> {
   reviewQueue: Array<ReviewQueueState | ExportedReviewQueueState | LegacyReviewQueueState>;
+  practiceRuns?: PracticeRunRecord[];
 }
 
 export interface LocalDataImportResult {
@@ -66,6 +73,7 @@ export interface LocalDataImportResult {
   attempts: number;
   reviewQueue: number;
   sprintSessions: number;
+  practiceRuns: number;
 }
 
 export interface PracticeSettings {
@@ -100,6 +108,8 @@ export interface PracticeStore {
   resetRating(key: string): RatingRecord;
   saveCustomSprintConfig(config: CustomSprintConfigRecord): void;
   listCustomSprintConfigs(): CustomSprintConfigRecord[];
+  savePracticeRun(run: PracticeRunRecord): void;
+  listPracticeRuns(): PracticeRunRecord[];
   getSettings(): PracticeSettings;
   saveSettings(settings: PracticeSettings): void;
   getReviewReminderPreference(): ReviewReminderPreference;

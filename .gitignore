@@ -11,6 +11,7 @@ android/build/
 
 # Local artifacts
 .DS_Store
+._*
 *.log
 *.sqlite-shm
 *.sqlite-wal

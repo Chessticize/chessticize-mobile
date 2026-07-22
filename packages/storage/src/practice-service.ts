@@ -1,10 +1,17 @@
 import {
   abandonSprint as abandonSprintCore,
   applySprintRatingChange,
+  archivePracticeRun,
   buildSprintConfig,
+  clonePracticeRun,
+  createCustomPracticeRun,
+  createDefaultRating,
   DEFAULT_RATING_DEVIATION,
   DEFAULT_VOLATILITY,
   normalizeThemeSelection,
+  practiceRunSprintConfig,
+  reorderPracticeRuns,
+  restorePracticeRun,
   pauseSprint as pauseSprintCore,
   RATING_FLOOR,
   reviewDayFor,
@@ -20,6 +27,7 @@ import type {
   HistoryQuery,
   HistoryView,
   Puzzle,
+  PracticeRunRecord,
   RatingRecord,
   ReviewContext,
   ReviewQueueItem,
@@ -58,6 +66,19 @@ export interface StartSprintCommand {
   maxRating?: number;
   puzzleSelectionSeed?: string | number;
   persistCustomConfig?: boolean;
+  practiceRunId?: string;
+}
+
+export interface CreatePracticeRunCommand {
+  id?: string;
+  name: string;
+  mode: "custom" | "arrow_duel";
+  durationSeconds: number;
+  perPuzzleSeconds: number;
+  targetCorrect?: number;
+  maxMistakes?: number;
+  themes?: string[];
+  initialRating: number;
 }
 
 export interface RecordReviewAttemptCommand extends ReviewContext {
@@ -87,20 +108,35 @@ export class PracticeService {
     if (this.activeSprint && (this.activeSprint.status === "active" || this.activeSprint.status === "paused")) {
       throw new Error("Cannot start a new sprint while another sprint is active");
     }
-    const config = this.sprintConfigForCommand(command);
+    const practiceRun = command.practiceRunId === undefined
+      ? undefined
+      : this.requirePracticeRun(command.practiceRunId, false);
+    const storedRunConfig = practiceRun ? practiceRunSprintConfig(practiceRun) : undefined;
+    const config = storedRunConfig
+      ? {
+          ...storedRunConfig,
+          ...(command.targetCorrect === undefined ? {} : { targetCorrect: command.targetCorrect })
+        }
+      : this.sprintConfigForCommand(command);
     const rating = this.store.getRating(config.ratingKey);
     const puzzles = this.store.selectPuzzles(this.puzzleFilterForCommand(command, config, rating.rating));
     if (puzzles.length === 0) {
       throw new Error("No eligible puzzles are available for this sprint");
     }
 
-    const sprint = startSprint({
+    const coreSprint = startSprint({
       config,
       puzzles,
       ratingBefore: rating.rating,
       ratingBeforeRecord: rating,
       now
     });
+    const sprint: SprintState = practiceRun
+      ? {
+          ...coreSprint,
+          run: { id: practiceRun.id, kind: practiceRun.kind, name: practiceRun.name }
+        }
+      : coreSprint;
     this.activeSprint = sprint;
     this.store.transaction(() => {
       if (command.persistCustomConfig) {
@@ -321,6 +357,64 @@ export class PracticeService {
     return this.store.listCustomSprintConfigs();
   }
 
+  listPracticeRuns(): PracticeRunRecord[] {
+    return this.store.listPracticeRuns().map(clonePracticeRun);
+  }
+
+  createPracticeRun(
+    command: CreatePracticeRunCommand,
+    now = new Date().toISOString()
+  ): PracticeRunRecord {
+    assertValidManualRating(command.initialRating);
+    const existingRuns = this.store.listPracticeRuns();
+    const activeCount = existingRuns.filter((run) => !run.archived).length;
+    const run = createCustomPracticeRun({
+      id: command.id ?? generatePracticeRunId(),
+      name: command.name,
+      mode: command.mode,
+      durationSeconds: command.durationSeconds,
+      perPuzzleSeconds: command.perPuzzleSeconds,
+      targetCorrect: command.targetCorrect ?? Math.floor(command.durationSeconds / command.perPuzzleSeconds),
+      maxMistakes: command.maxMistakes ?? 3,
+      ...(command.themes === undefined ? {} : { themes: command.themes }),
+      homeOrder: activeCount,
+      updatedAt: now,
+      existingRuns
+    });
+    this.store.transaction(() => {
+      this.store.savePracticeRun(run);
+      this.store.saveRating({
+        ...createDefaultRating(run.ratingKey),
+        rating: command.initialRating
+      });
+    });
+    return clonePracticeRun(run);
+  }
+
+  reorderPracticeRun(runId: string, targetRunId: string, now = new Date().toISOString()): PracticeRunRecord[] {
+    this.requirePracticeRun(runId, false);
+    this.requirePracticeRun(targetRunId, false);
+    return this.savePracticeRunCatalog(
+      reorderPracticeRuns(this.store.listPracticeRuns(), runId, targetRunId, now)
+    );
+  }
+
+  archivePracticeRun(runId: string, now = new Date().toISOString()): PracticeRunRecord[] {
+    this.requirePracticeRun(runId, false);
+    return this.savePracticeRunCatalog(archivePracticeRun(this.store.listPracticeRuns(), runId, now));
+  }
+
+  restorePracticeRun(runId: string, now = new Date().toISOString()): PracticeRunRecord[] {
+    this.requirePracticeRun(runId, true);
+    return this.savePracticeRunCatalog(restorePracticeRun(this.store.listPracticeRuns(), runId, now));
+  }
+
+  setPracticeRunRating(runId: string, rating: number): RatingRecord {
+    const run = this.requirePracticeRun(runId);
+    const current = this.store.getRating(run.ratingKey);
+    return current.rating === rating ? current : this.setRating(run.ratingKey, rating);
+  }
+
   getSettings(): PracticeSettings {
     return this.store.getSettings();
   }
@@ -346,7 +440,16 @@ export class PracticeService {
     command: StartSprintCommand,
     maximum = Number.MAX_SAFE_INTEGER
   ): number {
-    const config = this.sprintConfigForCommand(command);
+    const practiceRun = command.practiceRunId === undefined
+      ? undefined
+      : this.requirePracticeRun(command.practiceRunId, false);
+    const storedRunConfig = practiceRun ? practiceRunSprintConfig(practiceRun) : undefined;
+    const config = storedRunConfig
+      ? {
+          ...storedRunConfig,
+          ...(command.targetCorrect === undefined ? {} : { targetCorrect: command.targetCorrect })
+        }
+      : this.sprintConfigForCommand(command);
     const rating = this.store.getRating(config.ratingKey);
     return this.store.countPuzzles({
       ...this.puzzleFilterForCommand(command, config, rating.rating),
@@ -359,12 +462,7 @@ export class PracticeService {
   }
 
   setRating(ratingKey: string, rating: number): RatingRecord {
-    if (!Number.isInteger(rating)) {
-      throw new Error("Rating must be an integer");
-    }
-    if (rating < RATING_FLOOR) {
-      throw new Error(`Rating must be at least ${RATING_FLOOR}`);
-    }
+    assertValidManualRating(rating);
     const current = this.store.getRating(ratingKey);
     const next: RatingRecord = {
       ...current,
@@ -378,6 +476,26 @@ export class PracticeService {
     };
     this.store.saveRating(next);
     return next;
+  }
+
+  private requirePracticeRun(runId: string, archived?: boolean): PracticeRunRecord {
+    const run = this.store.listPracticeRuns().find((candidate) => candidate.id === runId);
+    if (!run || (archived !== undefined && run.archived !== archived)) {
+      throw new Error(`Practice Run ${runId} is not available`);
+    }
+    return run;
+  }
+
+  private savePracticeRunCatalog(nextRuns: readonly PracticeRunRecord[]): PracticeRunRecord[] {
+    const previous = new Map(this.store.listPracticeRuns().map((run) => [run.id, run]));
+    this.store.transaction(() => {
+      for (const run of nextRuns) {
+        if (JSON.stringify(previous.get(run.id)) !== JSON.stringify(run)) {
+          this.store.savePracticeRun(run);
+        }
+      }
+    });
+    return this.listPracticeRuns();
   }
 
   recordReviewAttempt(command: RecordReviewAttemptCommand, now = new Date().toISOString()): {
@@ -585,6 +703,24 @@ function customSprintConfigId(config: SprintConfig): string {
     config.perPuzzleSeconds,
     themes.length > 0 ? themes.join("+") : "mixed"
   ].join("-");
+}
+
+function assertValidManualRating(rating: number): void {
+  if (!Number.isInteger(rating)) {
+    throw new Error("Rating must be an integer");
+  }
+  if (rating < RATING_FLOOR) {
+    throw new Error(`Rating must be at least ${RATING_FLOOR}`);
+  }
+}
+
+function generatePracticeRunId(): string {
+  const runtime = globalThis as typeof globalThis & { crypto?: { randomUUID?: () => string } };
+  const randomUuid = runtime.crypto?.randomUUID;
+  if (typeof randomUuid === "function") {
+    return randomUuid.call(runtime.crypto);
+  }
+  return `local-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }
 
 export function fixtureNeedsAtLeast(config: SprintConfig): number {
