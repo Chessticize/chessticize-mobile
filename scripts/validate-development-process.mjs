@@ -17,6 +17,7 @@ const count = (text, needle) => text.split(needle).length - 1;
 
 const coreWorkflow = read(".github/workflows/core.yml");
 const mobileWorkflow = read(".github/workflows/mobile-ios.yml");
+const mobileLabWorkflow = read(".github/workflows/mobile-lab.yml");
 const processWorkflow = read(".github/workflows/process.yml");
 const agents = read("AGENTS.md");
 const rootReadme = read("README.md");
@@ -36,12 +37,10 @@ const uiFlowDesign = read(agentDocPaths[3]);
 const issueTriage = read(agentDocPaths[4]);
 const devLoopSkill = read(".codex/skills/chessticize-mobile-dev-loop/SKILL.md");
 const issueTriageSkill = read(".codex/skills/chessticize-issue-triage/SKILL.md");
-const storybookPreviewSitePackage = JSON.parse(
-  read("sites/storybook-previews/package.json")
-);
-const storybookPreviewManifest = JSON.parse(
-  read("sites/storybook-previews/preview-manifest.json")
-);
+const scenarioRegistry = read("apps/mobile-lab/src/scenarioRegistry.ts");
+const markerCheck = read("apps/mobile-lab/scripts/check-new-scenarios.ts");
+const markerPolicy = read("apps/mobile-lab/src/scenarioMarkerPolicy.ts");
+const markerManifest = JSON.parse(read("apps/mobile-lab/src/newScenarioMarkers.json"));
 const localE2eSkill = read(".codex/skills/chessticize-mobile-local-e2e/SKILL.md");
 const uiCalibrationSkill = read(".codex/skills/chessticize-mobile-ui-calibration/SKILL.md");
 const androidReleaseSkill = read(".codex/skills/chessticize-android-release/SKILL.md");
@@ -54,10 +53,16 @@ const uiCalibrationRunner = path.join(
   ".codex/skills/chessticize-mobile-ui-calibration/scripts/capture-release-baseline.sh"
 );
 const prTemplate = read(".github/pull_request_template.md");
+const releaseNotes = read("docs/RELEASE_NOTES.md");
+const releaseNotesTemplate = read("docs/releases/RELEASE_NOTES_TEMPLATE.md");
+const releaseSourcePolicy = read("docs/RELEASE_SOURCE_POLICY.md");
+const appStoreUpload = read("docs/APP_STORE_UPLOAD.md");
+const androidPlayRelease = read("docs/ANDROID_PLAY_RELEASE.md");
+const androidGitHubRelease = read("docs/ANDROID_GITHUB_RELEASE.md");
 const releaseDocs = [
   read("docs/TESTFLIGHT_QA.md"),
-  read("docs/APP_STORE_UPLOAD.md"),
-  read("docs/RELEASE_SOURCE_POLICY.md")
+  appStoreUpload,
+  releaseSourcePolicy
 ];
 
 const releaseVersion = JSON.parse(read("apps/mobile/release-version.json"));
@@ -125,6 +130,8 @@ assert.equal(count(processWorkflow, '- ".codex/skills/**"'), 2);
 assert.equal(count(processWorkflow, '- "docs/agents/**"'), 2);
 assert.equal(count(processWorkflow, '- "README.md"'), 2);
 assert.equal(count(processWorkflow, '- "apps/mobile-lab/README.md"'), 2);
+assert.equal(count(processWorkflow, '- "docs/RELEASE_NOTES.md"'), 2);
+assert.equal(count(processWorkflow, '- "docs/releases/**"'), 2);
 
 for (const policy of [agents, devLoopSkill, labReadme]) {
   assert.match(policy, /Storybook-first UI flow gate/i);
@@ -138,8 +145,19 @@ for (const policy of [agents, rootReadme, labReadme, testingArchitecture, devLoo
 assert.match(uiFlowDesign, /must not begin\s+production wiring/i);
 assert.match(uiFlowDesign, /stable Storybook URL/);
 assert.match(uiFlowDesign, /explicit design approval/);
+assert.match(uiFlowDesign, /full Storybook/i);
+assert.match(uiFlowDesign, /linked GitHub issue is closed/i);
+assert.match(uiFlowDesign, /Do not commit generated\s+Storybook bundles/i);
+assert.match(uiFlowDesign, /modify that existing\s+story incrementally/i);
+assert.match(uiFlowDesign, /post-implementation product/i);
+assert.match(devLoopSkill, /existing product-clone story/i);
+assert.match(labReadme, /Do not add a parallel standalone page/i);
 assert.match(prTemplate, /Storybook-first design approved before product wiring/);
+assert.match(prTemplate, /Storybook-only design increment/);
+assert.match(prTemplate, /Full Storybook manager URL:/);
+assert.match(prTemplate, /Removed after the linked issue was closed/);
 assert.match(prTemplate, /Design approval record:/);
+assert.match(agents, /Storybook-only PR[\s\S]*may merge while the linked product issue remains open/);
 
 for (const triagePolicy of [agents, issueTriageSkill]) {
   assert.match(triagePolicy, /docs\/agents\/issue-triage\.md/);
@@ -147,15 +165,33 @@ for (const triagePolicy of [agents, issueTriageSkill]) {
   assert.match(triagePolicy, /product implementation/i);
 }
 
+for (const triagePolicy of [agents, issueTracker, issueTriage, issueTriageSkill]) {
+  assert.match(triagePolicy, /docs\/agents\/ui-flow-design\.md/);
+  assert.match(triagePolicy, /relationship suggestions are advisory/i);
+  assert.match(triagePolicy, /do not consolidate/i);
+  assert.match(triagePolicy, /explicit human\s+approval/i);
+}
+
+for (const uiTriagePolicy of [issueTriage, issueTriageSkill]) {
+  assert.match(uiTriagePolicy, /existing product-clone/i);
+}
+
+assert.doesNotMatch(issueTriage, /possible implementation groupings/i);
+assert.doesNotMatch(issueTriageSkill, /possible implementation groupings/i);
+assert.doesNotMatch(issueTriage, /Decide implementation grouping separately/i);
+assert.doesNotMatch(issueTriageSkill, /Decide later implementation grouping separately/i);
+
 for (const priority of ["P0", "P1", "P2", "P3"]) {
   assert.match(issueTriage, new RegExp(priority));
 }
 
 for (const triageContract of [issueTriage, issueTriageSkill]) {
   assert.match(triageContract, /high uncertainty/i);
-  assert.match(triageContract, /coherent/i);
-  assert.match(triageContract, /stable Storybook URL/i);
-  assert.match(triageContract, /explicit approval/i);
+  assert.match(triageContract, /full Storybook/i);
+  assert.match(triageContract, /issueNumber/);
+  assert.match(triageContract, /explicit\s+(design\s+)?approval/i);
+  assert.match(triageContract, /merge to `main`/i);
+  assert.match(triageContract, /issue\s+(?:is|as)\s+closed/i);
 }
 
 assert.match(issueTriage, /0\.5–2 engineering days/);
@@ -163,36 +199,31 @@ assert.match(issueTriage, /3–5 engineering days/);
 assert.match(issueTriage, /1–2 engineering weeks/);
 assert.match(issueTriage, /2–4\+ engineering weeks/);
 assert.match(issueTriage, /do not invent or apply them/i);
-assert.match(issueTriage, /Use a subagent per independent UI group/);
-assert.match(issueTriage, /design grouping and implementation grouping separately/i);
+assert.match(issueTriage, /Each feedback issue owns its own Storybook design track/i);
 assert.match(issueTriage, /every UI or functional-feature issue/);
 assert.match(issueTriage, /native-only behavior/);
-assert.match(issueTriageSkill, /delegate independent UI groups to separate subagents/i);
-assert.match(issueTriageSkill, /design grouping and\s+implementation grouping separately/i);
+assert.match(issueTriageSkill, /one\s+Storybook design track.*per\s+issue/is);
 assert.match(issueTriageSkill, /every UI or functional-feature issue/);
 assert.match(issueTriageSkill, /do not invent priority\s+labels/i);
-assert.match(issueTriageSkill, /codex\/storybook-<coherent-goal>/);
-assert.match(issueTriageSkill, /sites\/storybook-previews\/preview-manifest\.json/);
+assert.match(issueTriageSkill, /codex\/storybook-issue-<number>-<goal>/);
 assert.match(issueTriageSkill, /owner-only deployment/i);
-assert.match(issueTriage, /sites\/storybook-previews/);
 assert.match(issueTriage, /Every Sites deployment URL is production/);
-assert.match(uiFlowDesign, /sites\/storybook-previews/);
-
-assert.equal(
-  storybookPreviewSitePackage.scripts["build:with-previews"],
-  "npm run previews:sync -- --build && npm run build"
-);
-assert.equal(storybookPreviewManifest.previews.length, 4);
-assert.equal(
-  new Set(storybookPreviewManifest.previews.map(({ id }) => id)).size,
-  storybookPreviewManifest.previews.length
-);
-for (const preview of storybookPreviewManifest.previews) {
-  assert.match(preview.id, /^[a-z][a-z0-9-]+$/);
-  assert.match(preview.branch, /^codex\/storybook-[a-z0-9-]+$/);
-  assert.match(preview.commit, /^[0-9a-f]{40}$/);
-  assert.ok(preview.issues.length > 0);
+for (const lifecycleContract of [issueTriage, issueTriageSkill, uiFlowDesign, processWorkflow]) {
+  assert.doesNotMatch(lifecycleContract, /sites\/storybook-previews|preview-manifest/);
 }
+
+assert.match(scenarioRegistry, /newScenarioMarkerData/);
+assert.match(markerPolicy, /Number\.isInteger\(issueNumber\)/);
+assert.match(markerCheck, /verifyRemovedMarkerIssuesAreClosed/);
+assert.match(markerPolicy, /issueStates\.get\(issueNumber\) !== "closed"/);
+assert.match(markerPolicy, /createGitHubIssueStateReader/);
+assert.doesNotMatch(markerCheck, /ALLOW_NEW_SCENARIOS/);
+assert.match(mobileLabWorkflow, /Validate issue-owned New Scenario Markers/);
+assert.match(mobileLabWorkflow, /issues: read/);
+assert.match(mobileLabWorkflow, /BASE_REF:/);
+assert.doesNotMatch(mobileLabWorkflow, /ALLOW_NEW_SCENARIOS|Reject stale New Scenario Markers/);
+assert.equal(typeof markerManifest, "object");
+assert.equal(Array.isArray(markerManifest), false);
 
 for (const reviewPolicy of [agents, devLoopSkill]) {
   assert.match(reviewPolicy, /prefer incremental\s+review/i);
@@ -215,6 +246,7 @@ assert.match(prTemplate, /full-review trigger/i);
 
 for (const releaseContract of [
   "docs/RELEASE_SOURCE_POLICY.md",
+  "docs/RELEASE_NOTES.md",
   "docs/ANDROID_PLAY_RELEASE.md",
   "docs/ANDROID_GITHUB_RELEASE.md",
   "docs/ANDROID_VALIDATION.md",
@@ -245,6 +277,32 @@ assert.match(androidReleaseSkill, /published annotated canonical tag/);
 assert.match(androidReleaseSkill, /Internal and Closed tracks/);
 assert.match(androidReleaseSkill, /first\s+launch, the boundary changed, or Play reports a problem/);
 assert.match(agents, /\.codex\/skills\/chessticize-android-release\/SKILL\.md/);
+
+assert.match(rootReadme, /\[Release Notes\]\(docs\/RELEASE_NOTES\.md\)/);
+for (const releaseProcessDoc of [
+  releaseSourcePolicy,
+  appStoreUpload,
+  androidPlayRelease,
+  androidGitHubRelease
+]) {
+  assert.match(releaseProcessDoc, /docs\/RELEASE_NOTES\.md/);
+}
+assert.match(releaseNotes, /docs\/releases\/ios-v<version>-build-<build>\.md/);
+assert.match(releaseNotes, /docs\/releases\/android-v<version>-build-<version-code>\.md/);
+assert.match(releaseNotes, /before its source tag is created/);
+assert.match(releaseNotes, /up to 4,000 characters/);
+assert.match(releaseNotes, /up to 500 Unicode characters per language/);
+assert.match(releaseNotes, /at or below 300\s+Unicode characters/);
+assert.match(releaseNotes, /two\s+or three short bullets/);
+assert.match(releaseNotes, /Details and source:/);
+assert.match(releaseNotes, /https:\/\/github\.com\/Chessticize\/chessticize-mobile/);
+assert.match(releaseNotesTemplate, /- Status: Draft/);
+assert.match(releaseNotesTemplate, /## Store copy \(`en-US`\)/);
+assert.match(releaseNotesTemplate, /## GitHub customer summary/);
+assert.match(releaseNotesTemplate, /## Release-note review/);
+assert.match(releaseNotesTemplate, /at most 300 Unicode\s+characters/);
+assert.match(releaseNotesTemplate, /releases\/tag\/<ios\|android>/);
+assert.match(releaseNotesTemplate, /release owner approved the copy before the source tag was created/i);
 
 assert.match(localE2eSkill, /CHESSTICIZE_E2E_SCOPE/);
 assert.match(localE2eSkill, /Replace `practice` with `flows` or `full`/);

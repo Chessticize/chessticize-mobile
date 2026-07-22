@@ -52,7 +52,7 @@ test("App Store release manifest reports source identity and hashed release arti
     nnue: string[];
   };
   const releaseVersion = JSON.parse(readFileSync(resolve("apps/mobile/release-version.json"), "utf8")) as {
-    publicVersion: string;
+    iosPublicVersion: string;
     iosBuildNumber: number;
   };
   const stockfishPath = (path: string) => `apps/mobile/${stockfishArtifacts.root}/${path}`;
@@ -74,15 +74,15 @@ test("App Store release manifest reports source identity and hashed release arti
 
   assert.equal(manifest.schema, "chessticize-mobile.app-store-release-manifest.v1");
   assert.match(manifest.sourceCommit, /^[0-9a-f]{40}$/u);
-  const tagVersion = releaseVersion.publicVersion.split(".").length === 2
-    ? `${releaseVersion.publicVersion}.0`
-    : releaseVersion.publicVersion;
+  const tagVersion = releaseVersion.iosPublicVersion.split(".").length === 2
+    ? `${releaseVersion.iosPublicVersion}.0`
+    : releaseVersion.iosPublicVersion;
   assert.equal(manifest.releaseTagSuggestion, `ios-v${tagVersion}-build-${releaseVersion.iosBuildNumber}`);
   assert.equal(manifest.packageManager, "pnpm@11.1.2");
   assert.deepEqual(manifest.app, {
     displayName: "Chessticize",
     bundleIdentifier: "com.chessticize.mobile",
-    version: releaseVersion.publicVersion,
+    version: releaseVersion.iosPublicVersion,
     build: String(releaseVersion.iosBuildNumber),
     targetedDeviceFamily: "1,2",
     platform: "ios"

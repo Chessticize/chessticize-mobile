@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useReducer, useState } from "react";
 import type { AttemptEvent, SprintMode, SprintState } from "../../../packages/core/src/index.ts";
 import { defaultSprintConfig } from "../../../packages/core/src/index.ts";
 import { MemoryStore } from "../../../packages/storage/src/memory-store.ts";
@@ -20,6 +20,10 @@ import {
 } from "./browserMobilePractice.ts";
 import { clearLabPracticeService, setLabPracticeService } from "./boardController.ts";
 import { ISSUE_272_LAB_PUZZLE, LAB_PUZZLES, PRIMARY_LAB_PUZZLE } from "./labPuzzles.ts";
+import {
+  createRunManagementFixtureState,
+  runManagementFixtureReducer
+} from "./runManagementFixture.ts";
 import { scenarioRegistry, type LabScenarioId } from "./scenarioRegistry.ts";
 
 export const LAB_NOW_MS = new Date("2026-07-18T18:00:00.000Z").getTime();
@@ -33,16 +37,74 @@ type ScenarioRuntime = {
 };
 
 export function LabScenario({ scenarioId }: { scenarioId: LabScenarioId }): React.JSX.Element {
-  const definition = scenarioRegistry[scenarioId];
   const runtime = useMemo(() => createScenarioRuntime(scenarioId), [scenarioId]);
 
+  return <LabScenarioContent key={scenarioId} runtime={runtime} scenarioId={scenarioId} />;
+}
+
+function LabScenarioContent({
+  runtime,
+  scenarioId
+}: {
+  runtime: ScenarioRuntime;
+  scenarioId: LabScenarioId;
+}): React.JSX.Element {
+  const [selectedCustomThemes, setSelectedCustomThemes] = useState<string[]>(["fork", "pin"]);
+  const [runManagementState, dispatchRunManagement] = useReducer(
+    runManagementFixtureReducer,
+    scenarioId === "practice-runs-empty" ? "empty" : "populated",
+    createRunManagementFixtureState
+  );
+  const runManagementPresentation = isRunManagementScenario(scenarioId)
+    ? { ...runManagementState, onIntent: dispatchRunManagement }
+    : undefined;
   const entryPreviewEnabled = isPuzzleEntryPreviewScenario(scenarioId);
+
   setLabPracticeService(
     runtime.service,
     entryPreviewEnabled,
     entryPreviewEnabled ? ISSUE_272_LAB_PUZZLE.id : null
   );
   useEffect(() => () => clearLabPracticeService(runtime.service), [runtime.service]);
+  useEffect(() => setSelectedCustomThemes(["fork", "pin"]), [scenarioId]);
+
+  return (
+    <LabScenarioShell scenarioId={scenarioId}>
+      <PracticePocScreen
+        customThemeSelection={{
+          selectedThemes: selectedCustomThemes,
+          onChange: setSelectedCustomThemes
+        }}
+        platformCapabilities={runtime.platformCapabilities}
+        runEloEditingMovedToHome
+        runManagementPresentation={runManagementPresentation}
+        {...runtime.screenProps}
+      />
+    </LabScenarioShell>
+  );
+}
+
+function isRunManagementScenario(scenarioId: LabScenarioId): boolean {
+  return [
+    "practice-home",
+    "practice-home-edit",
+    "practice-custom-setup",
+    "practice-run-name-validation",
+    "practice-run-standard-editor",
+    "practice-custom-rating-editor",
+    "practice-run-remove-confirmation",
+    "practice-runs-empty"
+  ].includes(scenarioId);
+}
+
+export function LabScenarioShell({
+  children,
+  scenarioId
+}: {
+  children: React.ReactNode;
+  scenarioId: LabScenarioId;
+}): React.JSX.Element {
+  const definition = scenarioRegistry[scenarioId];
 
   return (
     <div className="lab-scenario-shell">
@@ -54,7 +116,9 @@ export function LabScenario({ scenarioId }: { scenarioId: LabScenarioId }): Reac
             <p><strong>Scenario Scope:</strong> {definition.scope.includes.join(" · ")}</p>
             <p><strong>Boundary exits:</strong> {definition.scope.exits.join(" · ")}</p>
             <p className="lab-containment-note">
-              Whole-screen scenario: free roaming remains enabled until this presentation area is extracted.
+              {definition.scope.containment === "contained"
+                ? "Contained design slice: actions remain inside deterministic prototype state."
+                : "Whole-screen scenario: free roaming remains enabled until this presentation area is extracted."}
             </p>
             <div className="lab-toolbar-actions">
               <button type="button" onClick={() => globalThis.location.reload()}>Reset scenario</button>
@@ -64,10 +128,7 @@ export function LabScenario({ scenarioId }: { scenarioId: LabScenarioId }): Reac
         </details>
       </aside>
       <main className="lab-app-surface" data-testid="lab-app-surface">
-        <PracticePocScreen
-          platformCapabilities={runtime.platformCapabilities}
-          {...runtime.screenProps}
-        />
+        {children}
       </main>
     </div>
   );

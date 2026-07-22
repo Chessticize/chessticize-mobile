@@ -23,6 +23,18 @@ logic. After approval, keep the approved Storybook scenario as living UI
 documentation while completing the product wiring. Follow
 `docs/agents/ui-flow-design.md` and the repo-local development-loop skill.
 
+When the product screen or flow already exists in the Interaction Lab, update
+that product clone incrementally and preserve its stable story URL. Do not
+create a standalone prototype page that repeats existing product context. The
+full Storybook should show the expected post-implementation product, while the
+issue-owned `new` marker identifies the changed scenario.
+
+Each feedback issue owns its Storybook design track and full-catalog deployment.
+A coherent design increment may merge to `main` before implementation; its
+issue-numbered New Scenario Marker remains until the linked issue is closed.
+Generated Storybook deployment files are not committed to the application
+branch.
+
 A new screen, navigation destination, stateful modal or sheet, multi-step
 journey, or materially new loading, empty, error, or permission path counts as
 a new UI flow. Small fixes to an already approved flow do not automatically
@@ -35,10 +47,15 @@ Issues and PRDs are tracked in GitHub Issues. See `docs/agents/issue-tracker.md`
 ### Issue triage
 
 For new-issue evaluation, effort and priority ratings, tracker routing,
-coherent UI grouping, and Storybook-only preview handoff, use
+related-issue analysis, and issue-scoped Storybook preview handoff, use
 `.codex/skills/chessticize-issue-triage/SKILL.md` and follow
 `docs/agents/issue-triage.md`. Triage must stop before product implementation;
 Storybook design artifacts remain behind the explicit approval gate.
+Route every UI/UX or functional ticket with a presentation change through
+`docs/agents/ui-flow-design.md`, starting from the existing product-clone story
+and the full-catalog Storybook workflow. Relationship suggestions are advisory:
+do not consolidate tickets, close one as a duplicate, or share a design or
+implementation track without explicit human approval for that action.
 
 ### Tracker labels
 
@@ -58,6 +75,7 @@ ADR is not itself a defect.
 - Prefer one feature-scoped PR per coherent goal (for example, one screen or one flow brought to design parity), not a separate PR per small polish tweak. Batch related polish into the active feature PR.
 - Use a draft PR only while its stated goal is still incomplete, and push to it frequently. Draft pushes run only path-scoped fast checks. The agent is authorized to `git push` to open PR branches in this repository without asking for per-push confirmation.
 - If the PR's stated goal is already complete when it is opened or first pushed, open it as ready for review rather than as a draft. If an existing draft becomes complete, mark it ready for review (`gh pr ready`) proactively, without waiting to be asked. Ready PRs run the Mobile JS checks; CI Detox is reserved for nightly `main` integration and risk-scoped native validation.
+- For a Storybook-only PR, the coherent issue-scoped design increment is the stated goal. It may merge while the linked product issue remains open; the absent product wiring is deliberately out of scope until explicit design approval.
 - The agent is authorized to merge a ready-for-review PR (`gh pr merge --squash --delete-branch`, matching this repo's existing squash-merge convention) once it is complete, every required fast check is green, and the risk-scoped validation described below is recorded. Do not wait for a nightly GitHub Detox run before merging a routine PR. Merge to main when the feature PR is complete, not after every increment. Do not create a new branch for each small follow-up while a feature PR is still open — push to the open PR instead.
 - `main` has no branch protection, so GitHub will not itself enforce this policy. Before merging, inspect the actual required check status (for example `gh pr checks`) and confirm any required exact-head local evidence. Do not treat an unverified assumption as local evidence.
 - Do not mark a PR ready or merge it while part of its stated goal is unfinished, a required check is red, its selected native-validation scope is incomplete, or the PR description calls out a known unresolved product issue.

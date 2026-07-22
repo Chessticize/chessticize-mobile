@@ -73,6 +73,8 @@ const stockfishArtifacts = loadStockfishArtifacts(repoRoot);
 const mobilePackage = readJson("apps/mobile/package.json");
 const readme = readText("README.md");
 const releasePolicy = readText("docs/RELEASE_SOURCE_POLICY.md");
+const releaseNotes = readText("docs/RELEASE_NOTES.md");
+const releaseNotesTemplate = readText("docs/releases/RELEASE_NOTES_TEMPLATE.md");
 const appStoreUpload = readText("docs/APP_STORE_UPLOAD.md");
 const storeAssets = readText("docs/STORE_ASSETS.md");
 const storeAssetsE2e = readText("apps/mobile/e2e/store-assets.e2e.js");
@@ -174,6 +176,22 @@ check(
     readme.includes("[Release Source Policy](docs/RELEASE_SOURCE_POLICY.md)") &&
     readme.includes("pnpm app-store:release-manifest"),
   "README and release policy must require a public source tag and release manifest for every submitted binary."
+);
+
+check(
+  "Release-note preparation is part of the release contract",
+  readme.includes("[Release Notes](docs/RELEASE_NOTES.md)") &&
+    releasePolicy.includes("docs/RELEASE_NOTES.md") &&
+    releasePolicy.includes("docs/releases/RELEASE_NOTES_TEMPLATE.md") &&
+    appStoreUpload.includes("docs/RELEASE_NOTES.md") &&
+    releaseNotes.includes("before its source tag is created") &&
+    /What’s New in this\s+Version/u.test(releaseNotes) &&
+    /at or below 300\s+Unicode characters/u.test(releaseNotes) &&
+    releaseNotes.includes("Details and source:") &&
+    releaseNotesTemplate.includes("## Store copy (`en-US`)") &&
+    /at most 300 Unicode\s+characters/u.test(releaseNotesTemplate) &&
+    releaseNotesTemplate.includes("## Release-note review"),
+  "README, source policy, upload runbook, release-note contract, and template must require approved build-specific customer copy before tagging."
 );
 
 check(
@@ -301,6 +319,10 @@ manualGate(
 manualGate(
   "Create the public source release tag",
   `Tag the exact commit used for the App Store Connect binary as ios-v${iosReleaseIdentity.version.split(".").length === 2 ? `${iosReleaseIdentity.version}.0` : iosReleaseIdentity.version}-build-${iosReleaseIdentity.build} and publish the GitHub release.`
+);
+manualGate(
+  "Approve and publish the exact iOS release notes",
+  `Create docs/releases/ios-v${iosReleaseIdentity.version.split(".").length === 2 ? `${iosReleaseIdentity.version}.0` : iosReleaseIdentity.version}-build-${iosReleaseIdentity.build}.md from the release-note template, approve it before tagging, copy its store text exactly when App Store Connect exposes the field, and retain publication evidence. If the immutable tag predates this contract, use the documented existing-tag transition without moving it.`
 );
 manualGate(
   "Configure Apple signing team and Xcode account",

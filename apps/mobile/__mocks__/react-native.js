@@ -14,6 +14,12 @@ function component(name) {
 module.exports = {
   ActivityIndicator: component('ActivityIndicator'),
   NativeModules: {},
+  Platform: {
+    OS: 'ios',
+    select(options) {
+      return options.ios ?? options.default;
+    }
+  },
   __setWindowDimensions(nextDimensions) {
     windowDimensions = { ...windowDimensions, ...nextDimensions };
     for (const listener of Array.from(windowDimensionListeners)) {
@@ -95,6 +101,7 @@ module.exports = {
   ScrollView: component('ScrollView'),
   StatusBar: component('StatusBar'),
   Text: component('Text'),
+  TextInput: component('TextInput'),
   TouchableOpacity: component('TouchableOpacity'),
   Image: component('Image'),
   Modal: component('Modal'),

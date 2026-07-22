@@ -4,6 +4,7 @@ import {
   createDefaultRating,
   enrollReviewContext,
   filterHistoryAttemptsForQuery,
+  normalizeThemeSelection,
   normalizeRatingRecord,
   orderReviewQueue,
   preferredReviewScheduleChange,
@@ -295,7 +296,10 @@ export class SyncSQLiteStore implements PracticeStore {
     }
   }
 
-  countPuzzles(): number {
+  countPuzzles(filter?: PuzzleSelectionFilter): number {
+    if (filter !== undefined) {
+      return this.selectPuzzles(filter).length;
+    }
     const row = this.db.prepare("SELECT COUNT(*) AS count FROM puzzles").get() as { count: number };
     return row.count;
   }
@@ -317,7 +321,7 @@ export class SyncSQLiteStore implements PracticeStore {
       ...(filter.rating === undefined ? {} : { rating: filter.rating }),
       ...(filter.minRating === undefined ? {} : { minRating: filter.minRating }),
       ...(filter.maxRating === undefined ? {} : { maxRating: filter.maxRating }),
-      ...(filter.theme === undefined ? {} : { theme: filter.theme }),
+      ...(filter.themes === undefined ? {} : { themes: filter.themes }),
       ...(filter.includeIds === undefined ? {} : { includeIds: filter.includeIds }),
       ...(filter.excludeIds === undefined ? {} : { excludeIds: filter.excludeIds }),
       ...(filter.randomSeed === undefined ? {} : { randomSeed: filter.randomSeed })
@@ -421,7 +425,7 @@ export class SyncSQLiteStore implements PracticeStore {
         config.perPuzzleSeconds,
         config.targetCorrect,
         config.maxMistakes,
-        config.theme ?? null,
+        encodeStoredThemeSelection(config),
         config.lastStartedAt,
         config.playCount
       );
@@ -439,7 +443,7 @@ export class SyncSQLiteStore implements PracticeStore {
       perPuzzleSeconds: row.per_puzzle_seconds,
       targetCorrect: row.target_correct,
       maxMistakes: row.max_mistakes,
-      ...(row.theme === null ? {} : { theme: row.theme }),
+      ...decodeStoredThemeSelection(row.theme),
       lastStartedAt: row.last_started_at,
       playCount: row.play_count
     }));
@@ -1685,6 +1689,38 @@ function assertForeignKeyIntegrity(db: SyncSqliteDatabase): void {
   if (violations.length > 0) {
     throw new Error(`SQLite migration found ${violations.length} foreign key violation(s)`);
   }
+}
+
+function encodeStoredThemeSelection(config: CustomSprintConfigRecord): string | null {
+  const themes = normalizeThemeSelection(config.themes);
+  if (themes.length === 0) {
+    return null;
+  }
+  return themes.length === 1 ? themes[0] as string : JSON.stringify(themes);
+}
+
+function decodeStoredThemeSelection(value: string | null): {
+  themes?: string[];
+} {
+  if (value === null) {
+    return {};
+  }
+  if (value.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      if (Array.isArray(parsed) && parsed.every((theme) => typeof theme === "string")) {
+        return decodedThemeSelection(parsed);
+      }
+    } catch {
+      // Treat malformed or legacy scalar values as one theme below.
+    }
+  }
+  return decodedThemeSelection([value]);
+}
+
+function decodedThemeSelection(themes: readonly string[]): { themes?: string[] } {
+  const normalizedThemes = normalizeThemeSelection(themes);
+  return normalizedThemes.length === 0 ? {} : { themes: normalizedThemes };
 }
 
 function puzzleFromRow(row: PuzzleRow): Puzzle {

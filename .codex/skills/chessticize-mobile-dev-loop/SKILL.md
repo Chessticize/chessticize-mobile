@@ -12,15 +12,25 @@ Use this skill before changing Chessticize Mobile behavior or declaring work com
 For every new UI flow, stop before product wiring and complete the Interaction
 Lab design phase first. Follow `docs/agents/ui-flow-design.md`.
 
-1. Add the production-intended presentation component and deterministic
-   Storybook scenario, including the important entry, interaction, success,
-   loading, empty, error, or permission states that apply.
-2. Keep this phase isolated from production navigation entries, backend or
+1. Start from the existing product-clone story whenever the affected screen or
+   flow already exists. Make an incremental change in that screen and keep its
+   stable Storybook URL; do not invent a separate page that repeats the product
+   context. Add a new scenario only when the product would truly gain a new
+   destination or materially distinct state with no existing clone.
+2. Make the complete Storybook show the expected product after implementation,
+   with the issue-owned `new` marker identifying only the changed scenario.
+   Include the important entry, interaction, success, loading, empty, error, or
+   permission states that apply.
+3. Keep this phase isolated from production navigation entries, backend or
    storage mutations, native-module wiring, analytics, and rollout logic.
-3. Add the New Scenario Marker while review is active, run the Lab checks, and
-   provide the stable Storybook URL for review.
-4. Record explicit design approval in the PR before starting product wiring.
-5. After approval, retain the Storybook scenario as living UI documentation and
+4. Add the issue-owned New Scenario Marker, run the Lab checks, and deploy the
+   full Storybook from the exact commit for review. Generated deployment files
+   stay outside the application branch.
+5. Merge coherent design increments to `main` and iterate from current `main`;
+   retain the marker until the linked issue closes.
+6. Record explicit design approval in the issue or PR before starting product
+   wiring.
+7. After approval, retain the Storybook scenario as living UI documentation and
    continue with the implementation and validation order below.
 
 This gate applies to a new screen, navigation destination, stateful modal or

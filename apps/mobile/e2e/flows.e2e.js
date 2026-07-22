@@ -32,7 +32,7 @@ describe('Key user flows', () => {
     await openTab('settings-tab', 'settings-app-version');
     await waitForElementTextContaining(
       'settings-app-version',
-      `${releaseVersion.publicVersion} (${expectedInstalledBuildNumber()})`,
+      `${expectedInstalledPublicVersion()} (${expectedInstalledBuildNumber()})`,
       10000
     );
   });
@@ -349,6 +349,12 @@ function expectedInstalledBuildNumber() {
   return device.getPlatform() === 'android'
     ? releaseVersion.androidVersionCode
     : releaseVersion.iosBuildNumber;
+}
+
+function expectedInstalledPublicVersion() {
+  return device.getPlatform() === 'android'
+    ? releaseVersion.publicVersion
+    : releaseVersion.iosPublicVersion;
 }
 
 function historyToggleValue(label, active) {

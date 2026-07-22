@@ -5,7 +5,11 @@ import { AppState } from "react-native";
 import * as ReactNative from "react-native";
 import * as SafeAreaContext from "react-native-safe-area-context";
 import TestRenderer, { act } from "react-test-renderer";
-import { PracticePocScreen, type PracticeDebugTraceEvent } from "../src/components/PracticePocScreen";
+import {
+  PracticePocScreen,
+  type PracticeDebugTraceEvent,
+  type PracticeRunManagementPresentation
+} from "../src/components/PracticePocScreen";
 import {
   createMobilePracticeService,
   configureMobilePracticePuzzleSource,
@@ -749,6 +753,157 @@ describe("PracticePocScreen", () => {
     });
 
     expect(prewarm).not.toHaveBeenCalled();
+  });
+
+  it("renders named Home runs and dispatches the Storybook presentation intents", () => {
+    const onIntent = jest.fn();
+    const renderer = renderScreen({
+      runManagementPresentation: runManagementPresentation({ onIntent })
+    });
+
+    expect(findByTestId(renderer, "practice-run-management")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "practice-run-standard"))).toContain("Standard");
+    expect(collectText(findByTestId(renderer, "practice-run-tactics-focus"))).toContain("Tactics Focus");
+    expect(findByTestId(renderer, "practice-run-tactics-focus-glyph-standard-outer")).toBeTruthy();
+    expect(findByTestId(renderer, "practice-run-candidate-sprint-glyph-arrow-a-shaft")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "practice-progress-summary"))).toContain("ELO (Standard)");
+
+    press(renderer, "practice-run-home-edit");
+    press(renderer, "practice-add-run");
+    press(renderer, "practice-run-start");
+
+    expect(onIntent.mock.calls.map(([intent]) => intent)).toEqual([
+      { type: "toggle-home-edit" },
+      { type: "add-run" },
+      { type: "start-selected-run" }
+    ]);
+  });
+
+  it("uses whole-card drag guidance and arrow fallbacks while editing Home runs", () => {
+    const onIntent = jest.fn();
+    const renderer = renderScreen({
+      runManagementPresentation: runManagementPresentation({ homeEditing: true, onIntent })
+    });
+
+    expect(collectText(findByTestId(renderer, "practice-run-management"))).toContain(
+      "Drag a card to reorder, or use the arrow buttons."
+    );
+    expect(() => findByTestId(renderer, "practice-run-drag-tactics-focus")).toThrow();
+    expect(findByTestId(renderer, "practice-run-move-up-tactics-focus")).toBeTruthy();
+    expect(findByTestId(renderer, "practice-run-move-down-tactics-focus")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "practice-run-edit-tactics-focus"))).toBe("Edit ELO");
+    expect(hasStyleEntry(findByTestId(renderer, "practice-run-tactics-focus"), "borderColor", "#CBD5E1")).toBe(true);
+    expect(hasStyleEntry(findByTestId(renderer, "practice-run-tactics-focus"), "borderStyle", "solid")).toBe(true);
+
+    press(renderer, "practice-run-move-down-tactics-focus");
+    press(renderer, "practice-run-edit-tactics-focus");
+    expect(onIntent.mock.calls.map(([intent]) => intent)).toEqual([
+      { type: "move-run", runId: "tactics-focus", targetRunId: "candidate-sprint" },
+      { type: "edit-run", runId: "tactics-focus" }
+    ]);
+  });
+
+  it("renders removal confirmation directly below the selected Run card", () => {
+    const renderer = renderScreen({
+      runManagementPresentation: runManagementPresentation({
+        homeEditing: true,
+        removeCandidateId: "standard"
+      })
+    });
+    const runList = findByTestId(renderer, "practice-run-list");
+    const testIDs = collectTestIds(runList);
+
+    expect(runList.findByProps({ testID: "practice-run-remove-confirmation" })).toBeTruthy();
+    expect(testIDs.indexOf("practice-run-standard")).toBeLessThan(
+      testIDs.indexOf("practice-run-remove-confirmation")
+    );
+    expect(testIDs.indexOf("practice-run-remove-confirmation")).toBeLessThan(
+      testIDs.indexOf("practice-run-tactics-focus")
+    );
+  });
+
+  it("renders the New Run validation and 25-point ELO editing contract", () => {
+    const onIntent = jest.fn();
+    const renderer = renderScreen({
+      runManagementPresentation: runManagementPresentation({
+        draft: {
+          name: "",
+          kind: "custom",
+          mode: "custom",
+          elo: 900,
+          durationSeconds: 300,
+          perPuzzleSeconds: 20,
+          themes: ["fork", "pin"]
+        },
+        nameError: "Enter a name for this run.",
+        onIntent,
+        screen: "create"
+      })
+    });
+
+    expect(collectText(findByTestId(renderer, "practice-run-name-error"))).toBe("Enter a name for this run.");
+    expect(collectText(findByTestId(renderer, "practice-run-elo-row"))).toContain("Adjusts by 25 · minimum 600");
+
+    act(() => {
+      findByTestId(renderer, "practice-run-name-input").props.onChangeText("Calculation Lab");
+    });
+    press(renderer, "practice-run-elo-increase");
+    press(renderer, "practice-run-save");
+
+    expect(onIntent.mock.calls.map(([intent]) => intent)).toEqual([
+      { type: "change-name", name: "Calculation Lab" },
+      { type: "change-elo", elo: 925 },
+      { type: "save-run" }
+    ]);
+  });
+
+  it("limits an existing Custom Run editor to Current ELO", () => {
+    const onIntent = jest.fn();
+    const renderer = renderScreen({
+      runManagementPresentation: runManagementPresentation({
+        draft: {
+          id: "tactics-focus",
+          name: "Tactics Focus",
+          kind: "custom",
+          mode: "custom",
+          elo: 1040,
+          durationSeconds: 600,
+          perPuzzleSeconds: 30,
+          themes: ["fork", "pin"]
+        },
+        onIntent,
+        screen: "edit"
+      })
+    });
+
+    expect(collectText(findByTestId(renderer, "practice-run-editor-title"))).toBe("Edit ELO");
+    expect(collectText(findByTestId(renderer, "practice-run-editor-run-name"))).toBe("Tactics Focus");
+    expect(collectText(findByTestId(renderer, "practice-run-editor"))).toContain(
+      "Run settings stay fixed."
+    );
+    expect(collectText(findByTestId(renderer, "practice-run-elo-row"))).toContain("Current ELO");
+    expect(() => findByTestId(renderer, "practice-run-name-input")).toThrow();
+    expect(() => findByTestId(renderer, "practice-run-mode-row")).toThrow();
+    expect(() => findByTestId(renderer, "practice-run-theme-row")).toThrow();
+    expect(() => findByTestId(renderer, "practice-run-duration-stepper")).toThrow();
+    expect(() => findByTestId(renderer, "practice-run-per-puzzle-stepper")).toThrow();
+
+    press(renderer, "practice-run-elo-increase");
+    press(renderer, "practice-run-save");
+    expect(onIntent.mock.calls.map(([intent]) => intent)).toEqual([
+      { type: "change-elo", elo: 1065 },
+      { type: "save-run" }
+    ]);
+  });
+
+  it("lets the Storybook clone move Settings ELO ownership to run editors", () => {
+    const renderer = renderScreen({ runEloEditingMovedToHome: true });
+
+    press(renderer, "settings-tab");
+
+    expect(findByTestId(renderer, "settings-about-section")).toBeTruthy();
+    expect(() => findByTestId(renderer, "settings-profile-section")).toThrow();
+    expect(() => findByTestId(renderer, "settings-standard-elo-row")).toThrow();
   });
 
   it("exposes the mobile app shell automation contract", () => {
@@ -1831,7 +1986,7 @@ describe("PracticePocScreen", () => {
       perPuzzleSeconds: 30,
       ratingKey: "fork custom 3/30",
       targetCorrect: 1,
-      theme: "fork"
+      themes: ["fork"]
     });
     expect(service.getActiveSprint()?.currentPuzzle?.puzzle).toMatchObject({
       id: androidPracticeFixture.puzzle.id,
@@ -2571,11 +2726,16 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "custom-mistake-limit-stepper")).toThrow();
     press(renderer, "custom-theme-mate");
     expectText(renderer, "Mate");
-    expect(findByTestId(renderer, "custom-broaden-theme")).toBeTruthy();
-    expect(findByTestId(renderer, "custom-broaden-theme").props.accessibilityLabel).toBe("Broaden from Mate to Mixed theme");
-    press(renderer, "custom-broaden-theme");
-    expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("Mixed");
     expect(() => findByTestId(renderer, "custom-broaden-theme")).toThrow();
+    press(renderer, "custom-theme-fork");
+    expect(themeSelected(renderer, "mate")).toBe(true);
+    expect(themeSelected(renderer, "fork")).toBe(true);
+    press(renderer, "custom-theme-mate");
+    expect(themeSelected(renderer, "mate")).toBe(false);
+    expect(themeSelected(renderer, "fork")).toBe(true);
+    press(renderer, "custom-theme-mixed");
+    expect(themeSelected(renderer, "mixed")).toBe(true);
+    expect(themeSelected(renderer, "fork")).toBe(false);
     press(renderer, "custom-theme-mate");
     press(renderer, "custom-mode-arrow-duel");
     expect(findByTestId(renderer, "custom-mode-regular").props.accessibilityState).toEqual({ selected: false });
@@ -2600,6 +2760,87 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "0 / 6");
   });
 
+  it("previews multiple theme selection inside the complete Custom Sprint setup", () => {
+    const renderer = renderMultiThemeSetupScreen(["fork"]);
+
+    press(renderer, "practice-mode-custom");
+    expect(findByTestId(renderer, "custom-sprint-setup")).toBeTruthy();
+    expect(findByTestId(renderer, "custom-duration-stepper")).toBeTruthy();
+    expect(findByTestId(renderer, "custom-initial-rating-row")).toBeTruthy();
+    expect(findByTestId(renderer, "custom-previous-configs")).toBeTruthy();
+    expect(themeSelected(renderer, "fork")).toBe(true);
+    expect(themeSelected(renderer, "mate")).toBe(false);
+    expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("All");
+    expect(() => findByTestId(renderer, "custom-broaden-theme")).toThrow();
+
+    press(renderer, "custom-theme-mate");
+    expect(themeSelected(renderer, "fork")).toBe(true);
+    expect(themeSelected(renderer, "mate")).toBe(true);
+    expect(() => findByTestId(renderer, "custom-broaden-theme")).toThrow();
+
+    press(renderer, "custom-theme-fork");
+    expect(themeSelected(renderer, "fork")).toBe(false);
+    expect(themeSelected(renderer, "mate")).toBe(true);
+
+    press(renderer, "custom-theme-mate");
+    expect(themeSelected(renderer, "mate")).toBe(false);
+    expect(themeSelected(renderer, "mixed")).toBe(true);
+
+    press(renderer, "custom-theme-mixed");
+    expect(themeSelected(renderer, "mixed")).toBe(true);
+
+    press(renderer, "custom-theme-fork");
+    expect(themeSelected(renderer, "mixed")).toBe(false);
+    expect(themeSelected(renderer, "fork")).toBe(true);
+
+    press(renderer, "custom-theme-mixed");
+    expect(themeSelected(renderer, "mixed")).toBe(true);
+    expect(themeSelected(renderer, "fork")).toBe(false);
+    expect(JSON.stringify(renderer.toJSON())).not.toContain("Use Mixed");
+    expect(JSON.stringify(renderer.toJSON())).not.toContain("Use All");
+    expect(JSON.stringify(renderer.toJSON())).not.toContain("✓");
+    expect(JSON.stringify(renderer.toJSON())).not.toContain("Targeting");
+  });
+
+  it("starts and persists the production Custom Sprint with every selected theme", () => {
+    const service = createMobilePracticeService("random1000");
+    const renderer = renderScreen({
+      customTargetCorrect: 1,
+      practiceService: service,
+      puzzleSelectionSeed: "multi-theme-production"
+    });
+
+    press(renderer, "practice-mode-custom");
+    expect(themeSelected(renderer, "mixed")).toBe(true);
+    press(renderer, "custom-theme-mate");
+    press(renderer, "custom-theme-fork");
+    expect(themeSelected(renderer, "mixed")).toBe(false);
+    expect(themeSelected(renderer, "mate")).toBe(true);
+    expect(themeSelected(renderer, "fork")).toBe(true);
+
+    press(renderer, "start-sprint-button");
+
+    expect(service.getActiveSprint()?.config.themes).toEqual(["fork", "mate"]);
+    expect(service.getActiveSprint()?.config.ratingKey).toBe("fork+mate custom 5/20");
+    expect(service.listCustomSprintConfigs()[0]).toMatchObject({
+      themes: ["fork", "mate"],
+      ratingKey: "fork+mate custom 5/20"
+    });
+  });
+
+  it("renders All as the selected non-empty fallback for an empty multi-theme value", () => {
+    const renderer = renderMultiThemeSetupScreen([]);
+
+    press(renderer, "practice-mode-custom");
+    const allThemes = findByTestId(renderer, "custom-theme-mixed");
+    expect(allThemes.props.accessibilityRole).toBe("button");
+    expect(allThemes.props.accessibilityLabel).toBe("All puzzle themes");
+    expect(allThemes.props.accessibilityState).toEqual({ selected: true });
+
+    press(renderer, "custom-theme-mixed");
+    expect(themeSelected(renderer, "mixed")).toBe(true);
+  });
+
   it("shows persisted previous custom sprint configs and can reuse one", () => {
     const service = createMobilePracticeService("familiar15");
     const savedSprint = service.startSprint(
@@ -2609,7 +2850,7 @@ describe("PracticePocScreen", () => {
         perPuzzleSeconds: 30,
         targetCorrect: 6,
         maxMistakes: 3,
-        theme: "mate",
+        themes: ["mate"],
         persistCustomConfig: true
       },
       "2026-06-20T00:00:00.000Z"
@@ -2640,7 +2881,7 @@ describe("PracticePocScreen", () => {
       perPuzzleSeconds: 30,
       targetCorrect: 6,
       maxMistakes: 3,
-      theme: "mate",
+      themes: ["mate"],
       lastStartedAt: "2026-07-07T00:00:00.000Z",
       playCount: 2
     });
@@ -2658,7 +2899,7 @@ describe("PracticePocScreen", () => {
       perPuzzleSeconds: 20,
       targetCorrect: 15,
       maxMistakes: 3,
-      theme: "fork",
+      themes: ["fork"],
       lastStartedAt: "2026-07-06T00:00:00.000Z",
       playCount: 1
     });
@@ -2668,16 +2909,37 @@ describe("PracticePocScreen", () => {
       rating: 1025,
       games: 1
     });
+    store.saveCustomSprintConfig({
+      id: "custom-custom-300-20-fork+mate",
+      mode: "custom",
+      ratingKey: "fork+mate custom 5/20",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      targetCorrect: 15,
+      maxMistakes: 3,
+      themes: ["fork", "mate"],
+      lastStartedAt: "2026-07-05T00:00:00.000Z",
+      playCount: 1
+    });
+    store.saveRating({
+      key: "fork+mate custom 5/20",
+      generation: 0,
+      rating: 1100,
+      games: 1
+    });
     const renderer = renderScreen({ practiceService: new PracticeService(store) });
 
     press(renderer, "practice-mode-custom");
 
     const mateConfig = findByTestId(renderer, "custom-previous-custom-custom-180-30-mate");
     const forkConfig = findByTestId(renderer, "custom-previous-custom-custom-300-20-fork");
+    const multiConfig = findByTestId(renderer, "custom-previous-custom-custom-300-20-fork-mate");
     expect(collectText(mateConfig)).toContain("875");
     expect(mateConfig.props.accessibilityLabel).toContain("ELO 875");
     expect(collectText(forkConfig)).toContain("1025");
     expect(forkConfig.props.accessibilityLabel).toContain("ELO 1025");
+    expect(collectText(multiConfig)).toContain("Mate, Fork");
+    expect(multiConfig.props.accessibilityLabel).toContain("ELO 1100");
 
     press(renderer, "custom-previous-custom-custom-180-30-mate");
     expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("Mate");
@@ -2688,6 +2950,12 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "custom-theme-row"))).toContain("Fork");
     expect(collectText(findByTestId(renderer, "custom-target-count"))).toBe("~15");
     expect(collectText(findByTestId(renderer, "custom-initial-rating-value"))).toBe("ELO 1025");
+
+    press(renderer, "custom-previous-custom-custom-300-20-fork-mate");
+    expect(themeSelected(renderer, "mixed")).toBe(false);
+    expect(themeSelected(renderer, "fork")).toBe(true);
+    expect(themeSelected(renderer, "mate")).toBe(true);
+    expect(collectText(findByTestId(renderer, "custom-initial-rating-value"))).toBe("ELO 1100");
   });
 
   it("keeps played custom ELO editable as a difficulty control", () => {
@@ -5858,9 +6126,58 @@ function createScriptedStockfishTransport(
 }
 
 type RenderScreenOptions = TestMobilePlatformCapabilityOverrides &
-  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "puzzleSelectionId" | "puzzleSelectionSeed" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack"> & {
+  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEloEditingMovedToHome" | "runManagementPresentation" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack"> & {
     platformCapabilities?: MobilePlatformCapabilities;
   };
+
+function runManagementPresentation(
+  overrides: Partial<PracticeRunManagementPresentation> = {}
+): PracticeRunManagementPresentation {
+  return {
+    draft: null,
+    hiddenRuns: [],
+    homeEditing: false,
+    nameError: null,
+    notice: null,
+    removeCandidateId: null,
+    runs: [
+      {
+        id: "standard",
+        name: "Standard",
+        kind: "standard",
+        mode: "standard",
+        elo: 925,
+        durationSeconds: 300,
+        perPuzzleSeconds: 20,
+        themes: ["mixed"]
+      },
+      {
+        id: "tactics-focus",
+        name: "Tactics Focus",
+        kind: "custom",
+        mode: "custom",
+        elo: 1040,
+        durationSeconds: 600,
+        perPuzzleSeconds: 30,
+        themes: ["fork", "pin"]
+      },
+      {
+        id: "candidate-sprint",
+        name: "Candidate Sprint",
+        kind: "custom",
+        mode: "arrow_duel",
+        elo: 880,
+        durationSeconds: 300,
+        perPuzzleSeconds: 20,
+        themes: ["mixed"]
+      }
+    ],
+    screen: "home",
+    selectedRunId: "standard",
+    onIntent: jest.fn(),
+    ...overrides
+  };
+}
 
 function createPlayedCustomService(): PracticeService {
   const store = new MemoryStore();
@@ -5906,6 +6223,8 @@ function renderScreen({
   debugTrace,
   puzzleSelectionId,
   puzzleSelectionSeed,
+  runEloEditingMovedToHome,
+  runManagementPresentation,
   sprintStartDelayMs,
   standardTargetCorrect,
   systemBack,
@@ -5922,6 +6241,8 @@ function renderScreen({
         debugTrace={debugTrace}
         puzzleSelectionId={puzzleSelectionId}
         puzzleSelectionSeed={puzzleSelectionSeed}
+        runEloEditingMovedToHome={runEloEditingMovedToHome}
+        runManagementPresentation={runManagementPresentation}
         sprintStartDelayMs={sprintStartDelayMs}
         standardTargetCorrect={standardTargetCorrect}
         systemBack={systemBack}
@@ -5933,6 +6254,40 @@ function renderScreen({
   }
   renderers.push(renderer);
   return renderer;
+}
+
+function renderMultiThemeSetupScreen(
+  initialSelectedThemes: readonly string[]
+): TestRenderer.ReactTestRenderer {
+  function MultiThemeSetupHarness(): React.JSX.Element {
+    const [selectedThemes, setSelectedThemes] = React.useState<string[]>([
+      ...initialSelectedThemes
+    ]);
+    return (
+      <PracticePocScreen
+        customThemeSelection={{ selectedThemes, onChange: setSelectedThemes }}
+        platformCapabilities={createTestMobilePlatformCapabilities()}
+      />
+    );
+  }
+
+  let renderer: TestRenderer.ReactTestRenderer | undefined;
+  act(() => {
+    renderer = TestRenderer.create(<MultiThemeSetupHarness />);
+  });
+  if (!renderer) {
+    throw new Error("Multi-theme Custom Sprint setup did not render");
+  }
+  renderers.push(renderer);
+  return renderer;
+}
+
+function themeSelected(
+  renderer: TestRenderer.ReactTestRenderer,
+  theme: string
+): boolean {
+  const state = findByTestId(renderer, `custom-theme-${theme}`).props.accessibilityState;
+  return state.checked ?? state.selected ?? false;
 }
 
 function createTestSystemBackSource(platform: "android" | "ios"): MobileSystemBackSource & {

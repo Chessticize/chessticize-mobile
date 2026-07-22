@@ -42,8 +42,14 @@ export class PackBackedPracticeStore implements PracticeStore {
     this.userStore.seedPuzzles(puzzles);
   }
 
-  countPuzzles(): number {
-    return this.puzzleSource.countPuzzles();
+  countPuzzles(filter?: PuzzleSelectionFilter): number {
+    if (filter === undefined) {
+      return this.puzzleSource.countPuzzles();
+    }
+    const localScopeIsSeeded = filter.includeIds?.some((id) => this.userStore.getPuzzle(id) !== undefined) ?? false;
+    return localScopeIsSeeded
+      ? this.userStore.countPuzzles(filter)
+      : this.puzzleSource.countPuzzles(filter);
   }
 
   getPuzzle(id: string): Puzzle | undefined {

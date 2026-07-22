@@ -17,6 +17,7 @@ Read these files completely before acting:
 - `AGENTS.md`
 - `apps/mobile/release-version.json`
 - `docs/RELEASE_SOURCE_POLICY.md`
+- `docs/RELEASE_NOTES.md`
 - `docs/ANDROID_PLAY_RELEASE.md`
 - `docs/ANDROID_GITHUB_RELEASE.md`
 - `docs/ANDROID_VALIDATION.md`
@@ -104,7 +105,7 @@ launch, the boundary changed, or Play reports a problem.
 
 | Action | Required postcondition |
 | --- | --- |
-| Prepare identity | Clean exact commit and published annotated canonical tag; monotonically increasing version code. |
+| Prepare identity | Clean exact commit containing the approved build-specific customer note, published annotated canonical tag, and monotonically increasing version code. |
 | Build candidate | One `android-production` approval produces a verified production-signed AAB, retained source manifest, and public matching source-first Release. |
 | Recover source | The manual recovery workflow authenticates the original candidate artifact and idempotently publishes the same source manifest; no rebuild or token substitution. |
 | Validate | Exact-head fast checks plus the selected delta, targeted, or full scope pass. |
@@ -121,6 +122,9 @@ token. Do not add prepare/publish phases or a second APK build.
 
 - Publish matching source before or with every distributed binary, including
   Internal and Closed tracks.
+- Publish the exact approved Play store copy and retain its metadata evidence.
+  Require two or three Android-only bullets, at most 300 Unicode characters,
+  and the direct exact-release details/source link.
 - Reuse one retained AAB across every Play track and Production; never rebuild
   between tracks.
 - Publish only the universal APK returned by Play after the owner accepts the

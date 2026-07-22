@@ -94,8 +94,14 @@ function requireExactSourceManifest(manifest, identity) {
 }
 
 function sourceReleaseNotes(identity) {
+  const customerReleaseNotesUrl =
+    `${ANDROID_SOURCE_REPOSITORY_URL}/blob/${identity.tagName}/docs/releases/${identity.tagName}.md`;
   return [
-    `Android source release ${identity.tagName}.`,
+    `# Chessticize Android ${identity.publicVersion} (${identity.versionCode})`,
+    '',
+    `[What changed in this Android release](${customerReleaseNotesUrl})`,
+    '',
+    `Source tag: \`${identity.tagName}\``,
     '',
     `Corresponding source: ${ANDROID_SOURCE_REPOSITORY_URL}`,
     'Google Play distributes the release binary first. Its Play-signed universal APK may be mirrored here afterward for manual installation.',

@@ -1,7 +1,7 @@
 # App Store Upload Runbook
 
-This runbook covers the owner-executed upload step for the 1.1 internal
-TestFlight pass. Recheck Apple's live documentation before executing it:
+This runbook covers the owner-executed upload step for the 1.1.x App Store
+release path. Recheck Apple's live documentation before executing it:
 
 - Upload builds:
   https://developer.apple.com/help/app-store-connect/manage-builds/upload-builds/
@@ -38,6 +38,13 @@ native risk, also generate the full evidence bundle:
 pnpm app-store:testflight-evidence -- --screenshot-root scratch/store-assets/final
 ```
 
+Before creating the source tag or archive, create and approve
+`docs/releases/ios-v<normalized-version>-build-<build>.md` from the template in
+`docs/RELEASE_NOTES.md`. Verify the exact `Store copy` against this candidate,
+including its two-or-three-bullet, 300-character limit and direct link to the
+exact iOS GitHub Release. The approved file must be present in the clean commit
+that is tagged and archived.
+
 Before archiving, record whether this is a delta, targeted, or full native
 release under `docs/TESTING_ARCHITECTURE.md`. A delta requires the exact-head
 fast checks above and the physical TestFlight smoke below; it does not require
@@ -51,11 +58,11 @@ unchanged store metadata and screenshots does not regenerate that bundle.
 ## Public Source Tag
 
 Create and publish the source tag before or at the same time as the App Store
-Connect upload. The current 1.1 build-3 tag is:
+Connect upload. The current iOS 1.1.1 build-1 tag is:
 
 ```sh
-git tag -a ios-v1.1.0-build-3 -m "iOS 1.1.0 build 3"
-git push origin ios-v1.1.0-build-3
+git tag -a ios-v1.1.1-build-1 -m "iOS 1.1.1 build 1"
+git push origin ios-v1.1.1-build-1
 ```
 
 Then publish a GitHub release for that tag and attach or copy the
@@ -164,7 +171,7 @@ valid while this signing-account gate is still incomplete.
 ## After Upload
 
 1. Wait for App Store Connect processing to complete.
-2. Confirm the uploaded build number is `3` for version `1.1`.
+2. Confirm the uploaded build number is `1` for version `1.1.1`.
 3. Confirm export compliance is accepted for
    `ITSAppUsesNonExemptEncryption = false`.
 4. Configure the TestFlight test information from `docs/TESTFLIGHT_QA.md`.
@@ -177,3 +184,13 @@ valid while this signing-account gate is still incomplete.
    store/device compatibility concern.
 8. Fill the evidence log with the source commit, release tag, build, device,
    tester, result, blocking issues, and evidence folder.
+9. For an App Store version update, copy the approved `Store copy` from the
+   exact build-specific release-note file into **What’s New in this Version**.
+   App Store Connect does not expose that field for the first App Store version;
+   keep the checked-in and GitHub notes in that case.
+10. Before submission, recheck Apple’s live character limit, compare the saved
+    text byte-for-byte with the approved file, and retain a screenshot or
+    exported metadata record with the release evidence.
+11. After release, compare the live App Store notes with the approved file and
+    record the result. A mismatch blocks completion until corrected and
+    reverified.

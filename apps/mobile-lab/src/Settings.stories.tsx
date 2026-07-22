@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-native-web-vite";
 import { LabScenario } from "./LabScenario.tsx";
-import { clickTestId, openSettings, waitForTestId } from "./storyPlay.ts";
+import { clickTestId, expectTestIdAbsent, openSettings, waitForTestId } from "./storyPlay.ts";
 
 const meta = {
   title: "Settings",
@@ -47,12 +47,12 @@ export const NotificationsNotDetermined: Story = {
 };
 
 export const AdvancedRatingEditor: Story = {
-  name: "Advanced rating editor",
+  name: "ELO controls moved to runs",
   args: { scenarioId: "settings-advanced-ratings" },
   play: async ({ canvasElement }) => {
     await openSettings(canvasElement);
-    await clickTestId(canvasElement, "settings-standard-elo-row");
-    await waitForTestId(canvasElement, "settings-advanced-ratings-panel");
+    expectTestIdAbsent(canvasElement, "settings-standard-elo-row");
+    expectTestIdAbsent(canvasElement, "settings-profile-section");
   }
 };
 

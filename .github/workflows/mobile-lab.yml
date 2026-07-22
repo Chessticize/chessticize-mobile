@@ -27,6 +27,7 @@ on:
 
 permissions:
   contents: read
+  issues: read
 
 concurrency:
   group: mobile-lab-${{ github.event.pull_request.number || github.ref }}
@@ -40,6 +41,8 @@ jobs:
     steps:
       - name: Checkout without LFS assets
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -58,7 +61,8 @@ jobs:
       - name: Typecheck, registry tests, and static Storybook build
         run: pnpm mobile:lab:validate
 
-      - name: Reject stale New Scenario Markers
+      - name: Validate issue-owned New Scenario Markers
         env:
-          ALLOW_NEW_SCENARIOS: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft && 'true' || 'false' }}
+          BASE_REF: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: pnpm mobile:lab:check-markers

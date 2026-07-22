@@ -4,6 +4,7 @@ import {
   buildSprintConfig,
   DEFAULT_RATING_DEVIATION,
   DEFAULT_VOLATILITY,
+  normalizeThemeSelection,
   pauseSprint as pauseSprintCore,
   RATING_FLOOR,
   reviewDayFor,
@@ -52,7 +53,7 @@ export interface StartSprintCommand {
   perPuzzleSeconds?: number;
   targetCorrect?: number;
   maxMistakes?: number;
-  theme?: string;
+  themes?: string[];
   minRating?: number;
   maxRating?: number;
   puzzleSelectionSeed?: string | number;
@@ -341,13 +342,16 @@ export class PracticeService {
     return this.store.getReviewReminderSettings();
   }
 
-  countEligibleSprintPuzzles(command: StartSprintCommand): number {
+  countEligibleSprintPuzzles(
+    command: StartSprintCommand,
+    maximum = Number.MAX_SAFE_INTEGER
+  ): number {
     const config = this.sprintConfigForCommand(command);
     const rating = this.store.getRating(config.ratingKey);
-    return this.store.selectPuzzles({
+    return this.store.countPuzzles({
       ...this.puzzleFilterForCommand(command, config, rating.rating),
-      limit: Number.MAX_SAFE_INTEGER
-    }).length;
+      limit: maximum
+    });
   }
 
   resetRating(ratingKey: string): unknown {
@@ -433,7 +437,7 @@ export class PracticeService {
       perPuzzleSeconds: number;
       targetCorrect?: number;
       maxMistakes?: number;
-      theme?: string;
+      themes?: string[];
     } = {
       mode: command.mode,
       durationSeconds: command.durationSeconds ?? 5 * 60,
@@ -445,8 +449,9 @@ export class PracticeService {
     if (command.maxMistakes !== undefined) {
       configInput.maxMistakes = command.maxMistakes;
     }
-    if (command.theme !== undefined) {
-      configInput.theme = command.theme;
+    const themes = normalizeThemeSelection(command.themes);
+    if (themes.length > 0) {
+      configInput.themes = themes;
     }
     return buildSprintConfig(configInput);
   }
@@ -457,7 +462,7 @@ export class PracticeService {
     rating?: number;
     minRating?: number;
     maxRating?: number;
-    theme?: string;
+    themes?: string[];
     includeIds?: string[];
     randomSeed?: string | number;
   } {
@@ -467,7 +472,7 @@ export class PracticeService {
       rating?: number;
       minRating?: number;
       maxRating?: number;
-      theme?: string;
+      themes?: string[];
       includeIds?: string[];
       randomSeed?: string | number;
     } = {
@@ -481,8 +486,8 @@ export class PracticeService {
     if (command.maxRating !== undefined) {
       puzzleFilter.maxRating = command.maxRating;
     }
-    if (command.theme !== undefined) {
-      puzzleFilter.theme = command.theme;
+    if (config.themes !== undefined) {
+      puzzleFilter.themes = [...config.themes];
     }
     if (this.puzzleSelectionScopeIds !== undefined) {
       puzzleFilter.includeIds = this.puzzleSelectionScopeIds;
@@ -565,19 +570,20 @@ function buildCustomSprintConfigRecord(input: {
     perPuzzleSeconds: input.config.perPuzzleSeconds,
     targetCorrect: input.config.targetCorrect,
     maxMistakes: input.config.maxMistakes,
-    ...(input.config.theme ? { theme: input.config.theme } : {}),
+    ...(input.config.themes === undefined ? {} : { themes: [...input.config.themes] }),
     lastStartedAt: input.lastStartedAt,
     playCount: (input.previous?.playCount ?? 0) + 1
   };
 }
 
 function customSprintConfigId(config: SprintConfig): string {
+  const themes = normalizeThemeSelection(config.themes);
   return [
     "custom",
     config.mode,
     config.durationSeconds,
     config.perPuzzleSeconds,
-    config.theme ?? "mixed"
+    themes.length > 0 ? themes.join("+") : "mixed"
   ].join("-");
 }
 

@@ -8,6 +8,10 @@ coherent UI grouping, and optional Storybook preview handoff, follow
 `docs/agents/issue-triage.md` and use the repo-local
 `chessticize-issue-triage` skill.
 
+For a UI/UX or functional ticket with a presentation change, route triage
+through `docs/agents/ui-flow-design.md`. Start with the existing product-clone
+story and preserve each issue's design ownership.
+
 Before any label-dependent write, run the live tracker preflight in
 `docs/agents/triage-labels.md`. A missing required label is a tracker setup
 blocker; do not silently substitute a similar stock label.
@@ -22,6 +26,18 @@ blocker; do not silently substitute a similar stock label.
 - **Close**: `gh issue close <number> --comment "..."`
 
 Infer the repo from `git remote -v` — `gh` does this automatically when run inside a clone.
+
+## Ticket Relationships And Consolidation
+
+Relationship suggestions are advisory. Triage may note that tickets appear
+related and explain the shared journey, contract, or dependency, but must not
+turn that suggestion into shared handling.
+
+Do not consolidate tickets, close one as a duplicate, transfer its acceptance
+criteria, convert the relationship into a parent/child consolidation, or place
+multiple tickets on one design or implementation track without explicit human
+approval for that exact action. Until approval is recorded, every ticket keeps
+its own state, scope, comments, approval record, and closure decision.
 
 ## Pull requests as a triage surface
 

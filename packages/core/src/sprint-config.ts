@@ -21,7 +21,7 @@ export function buildSprintConfig(input: {
   perPuzzleSeconds: number;
   targetCorrect?: number;
   maxMistakes?: number;
-  theme?: string;
+  themes?: readonly string[];
 }): SprintConfig {
   if (!Number.isInteger(input.durationSeconds) || input.durationSeconds <= 0) {
     throw new Error("durationSeconds must be a positive integer");
@@ -38,20 +38,13 @@ export function buildSprintConfig(input: {
     throw new Error("maxMistakes must be a positive integer");
   }
 
-  const ratingKeyInput: {
-    mode: SprintMode;
-    durationSeconds: number;
-    perPuzzleSeconds: number;
-    theme?: string;
-  } = {
+  const selectedThemes = normalizeThemeSelection(input.themes);
+  const ratingKey = ratingKeyForConfig({
     mode: input.mode,
     durationSeconds: input.durationSeconds,
-    perPuzzleSeconds: input.perPuzzleSeconds
-  };
-  if (input.theme) {
-    ratingKeyInput.theme = input.theme;
-  }
-  const ratingKey = ratingKeyForConfig(ratingKeyInput);
+    perPuzzleSeconds: input.perPuzzleSeconds,
+    themes: selectedThemes
+  });
 
   return {
     mode: input.mode,
@@ -60,7 +53,7 @@ export function buildSprintConfig(input: {
     targetCorrect,
     maxMistakes,
     ratingKey,
-    ...(input.theme ? { theme: input.theme } : {})
+    ...(selectedThemes.length === 0 ? {} : { themes: selectedThemes })
   };
 }
 
@@ -68,11 +61,16 @@ export function ratingKeyForConfig(input: {
   mode: SprintMode;
   durationSeconds: number;
   perPuzzleSeconds: number;
-  theme?: string;
+  themes?: readonly string[];
 }): string {
   const minutes = formatDurationMinutes(input.durationSeconds);
-  const themePrefix = input.theme ? `${input.theme} ` : "";
+  const selectedThemes = normalizeThemeSelection(input.themes);
+  const themePrefix = selectedThemes.length > 0 ? `${selectedThemes.join("+")} ` : "";
   return `${themePrefix}${input.mode} ${minutes}/${input.perPuzzleSeconds}`;
+}
+
+export function normalizeThemeSelection(themes?: readonly string[]): string[] {
+  return [...new Set((themes ?? []).map((theme) => theme.trim()).filter((theme) => theme.length > 0))].sort();
 }
 
 function formatDurationMinutes(durationSeconds: number): string {

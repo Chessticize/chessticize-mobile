@@ -126,9 +126,11 @@ token. No temporary GitHub token is used.
 ## Build and repository audit
 
 1. Start from a clean exact candidate commit containing the canonical puzzle
-   pack, Stockfish source and networks, license notices, and lockfile. Create
-   and publish the annotated `android-v<version>-build-<code>` source tag before
-   distributing the candidate through any Play testing track.
+   pack, Stockfish source and networks, license notices, lockfile, and approved
+   `docs/releases/android-v<version>-build-<code>.md` created under
+   `docs/RELEASE_NOTES.md`. Create and publish the annotated
+   `android-v<version>-build-<code>` source tag before distributing the
+   candidate through any Play testing track.
 2. Dispatch `Mobile Android release candidate` on that exact ref. The workflow
    materializes the upload keystore only in runner temp, builds one signed AAB,
    verifies every non-signature AAB entry is covered by exactly one approved
@@ -178,7 +180,11 @@ different tag target, an unpublished or draft source Release, mismatched
 manifest bytes, or incomplete source disclosure fails closed.
 
 1. Upload the retained AAB from the successful candidate workflow to the chosen
-   Play track; do not rebuild it locally.
+   Play track; do not rebuild it locally. Copy the approved `Store copy` from
+   the exact Android release-note file without paraphrasing. Require two or
+   three Android-only bullets, at most 300 Unicode characters in total, and the
+   direct link to this exact GitHub Release. Save the submitted metadata with
+   the release evidence.
 2. Install that Play-delivered build on the owner's physical device and record
    the installed version/build, cold launch, one real Practice completion, and
    the changed behavior.

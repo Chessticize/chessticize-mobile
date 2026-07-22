@@ -113,7 +113,7 @@ for (const label of STORE_LABELS) {
           perPuzzleSeconds: 20,
           targetCorrect: 1,
           maxMistakes: 3,
-          theme
+          themes: [theme]
         },
         "2026-06-20T12:00:00.000Z"
       );
@@ -159,7 +159,7 @@ for (const label of STORE_LABELS) {
           perPuzzleSeconds: 20,
           targetCorrect: 5,
           maxMistakes: 1,
-          theme
+          themes: [theme]
         },
         "2026-06-20T12:00:00.000Z"
       );
@@ -206,7 +206,7 @@ for (const label of STORE_LABELS) {
           perPuzzleSeconds: 20,
           targetCorrect: 1,
           maxMistakes: 3,
-          theme
+          themes: [theme]
         },
         "2026-06-20T00:00:00.000Z"
       );

@@ -37,13 +37,56 @@ test("every typed navigation coverage entry points to a registered scenario", ()
   }
 });
 
-test("the issue #272 design slice keeps its New Scenario Markers active", () => {
-  assert.deepEqual(newScenarios.map((scenario) => scenario.id), [
-    "practice-arrow-duel-prompt",
-    "practice-blunder-move-preview",
-    "review-blunder-move-preview"
-  ]);
-  assert.deepEqual(storyTagsForScenario("practice-home" as LabScenarioId), []);
+test("New Scenario Markers retain open-issue ownership on the full catalog", () => {
+  const scenarios = Object.values(scenarioRegistry);
+  assert.deepEqual(newScenarios, scenarios.filter((scenario) => scenario.isNew));
+
+  for (const scenario of scenarios) {
+    assert.deepEqual(
+      storyTagsForScenario(scenario.id as LabScenarioId),
+      scenario.isNew ? ["new"] : []
+    );
+    if (scenario.isNew) {
+      assert.ok(Number.isInteger(scenario.issueNumber));
+      assert.ok(scenario.issueNumber > 0);
+      assert.ok(scenario.changeNote.trim().length > 0);
+    }
+  }
+});
+
+test("Issue 253 owns the complete run-management design track", () => {
+  const issue253Scenarios = newScenarios.filter((scenario) => scenario.issueNumber === 253);
+
+  assert.deepEqual(
+    issue253Scenarios.map((scenario) => scenario.id),
+    [
+      "practice-home",
+      "practice-home-edit",
+      "practice-custom-setup",
+      "practice-run-name-validation",
+      "practice-run-standard-editor",
+      "practice-custom-rating-editor",
+      "practice-run-remove-confirmation",
+      "practice-runs-empty",
+      "settings-advanced-ratings"
+    ]
+  );
+  for (const scenario of issue253Scenarios) {
+    assert.deepEqual(storyTagsForScenario(scenario.id), ["new"]);
+  }
+});
+
+test("Issue 272 owns the blunder-entry and Arrow Duel prompt design track", () => {
+  assert.deepEqual(
+    newScenarios
+      .filter((scenario) => scenario.issueNumber === 272)
+      .map((scenario) => scenario.id),
+    [
+      "practice-arrow-duel-prompt",
+      "practice-blunder-move-preview",
+      "review-blunder-move-preview"
+    ]
+  );
   assert.deepEqual(storyTagsForScenario("practice-blunder-move-preview"), ["new"]);
   assert.deepEqual(storyTagsForScenario("practice-arrow-duel-prompt"), ["new"]);
 });
