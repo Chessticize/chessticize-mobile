@@ -1,1 +1,38 @@
-{}
+{
+  "practice-home": {
+    "issueNumber": 253,
+    "changeNote": "Named reusable runs use centered bordered cards on Home with Add Run and edit entry points."
+  },
+  "practice-home-edit": {
+    "issueNumber": 253,
+    "changeNote": "Whole Run cards reorder in real time with animated insertion plus arrow-button fallbacks."
+  },
+  "practice-custom-setup": {
+    "issueNumber": 253,
+    "changeNote": "New Run defaults to All themes and saves to Home without starting."
+  },
+  "practice-run-name-validation": {
+    "issueNumber": 253,
+    "changeNote": "Custom run names are required and unique with inline errors."
+  },
+  "practice-run-standard-editor": {
+    "issueNumber": 253,
+    "changeNote": "Built-in ELO editing shows the Run name and returns to Home edit mode after Save or Cancel."
+  },
+  "practice-custom-rating-editor": {
+    "issueNumber": 253,
+    "changeNote": "Custom ELO editing shows the Run name, keeps creation settings fixed, and returns to Home edit mode."
+  },
+  "practice-run-remove-confirmation": {
+    "issueNumber": 253,
+    "changeNote": "Removal expands an inline warning directly below the selected Run and retains ELO and history."
+  },
+  "practice-runs-empty": {
+    "issueNumber": 253,
+    "changeNote": "An empty Home exposes both Add Run and retained-run restore paths."
+  },
+  "settings-advanced-ratings": {
+    "issueNumber": 253,
+    "changeNote": "Settings no longer owns ELO controls; each run editor owns its current ELO."
+  }
+}

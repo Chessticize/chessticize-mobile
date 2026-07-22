@@ -5,7 +5,11 @@ import { AppState } from "react-native";
 import * as ReactNative from "react-native";
 import * as SafeAreaContext from "react-native-safe-area-context";
 import TestRenderer, { act } from "react-test-renderer";
-import { PracticePocScreen, type PracticeDebugTraceEvent } from "../src/components/PracticePocScreen";
+import {
+  PracticePocScreen,
+  type PracticeDebugTraceEvent,
+  type PracticeRunManagementPresentation
+} from "../src/components/PracticePocScreen";
 import {
   createMobilePracticeService,
   configureMobilePracticePuzzleSource,
@@ -748,6 +752,157 @@ describe("PracticePocScreen", () => {
     });
 
     expect(prewarm).not.toHaveBeenCalled();
+  });
+
+  it("renders named Home runs and dispatches the Storybook presentation intents", () => {
+    const onIntent = jest.fn();
+    const renderer = renderScreen({
+      runManagementPresentation: runManagementPresentation({ onIntent })
+    });
+
+    expect(findByTestId(renderer, "practice-run-management")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "practice-run-standard"))).toContain("Standard");
+    expect(collectText(findByTestId(renderer, "practice-run-tactics-focus"))).toContain("Tactics Focus");
+    expect(findByTestId(renderer, "practice-run-tactics-focus-glyph-standard-outer")).toBeTruthy();
+    expect(findByTestId(renderer, "practice-run-candidate-sprint-glyph-arrow-a-shaft")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "practice-progress-summary"))).toContain("ELO (Standard)");
+
+    press(renderer, "practice-run-home-edit");
+    press(renderer, "practice-add-run");
+    press(renderer, "practice-run-start");
+
+    expect(onIntent.mock.calls.map(([intent]) => intent)).toEqual([
+      { type: "toggle-home-edit" },
+      { type: "add-run" },
+      { type: "start-selected-run" }
+    ]);
+  });
+
+  it("uses whole-card drag guidance and arrow fallbacks while editing Home runs", () => {
+    const onIntent = jest.fn();
+    const renderer = renderScreen({
+      runManagementPresentation: runManagementPresentation({ homeEditing: true, onIntent })
+    });
+
+    expect(collectText(findByTestId(renderer, "practice-run-management"))).toContain(
+      "Drag a card to reorder, or use the arrow buttons."
+    );
+    expect(() => findByTestId(renderer, "practice-run-drag-tactics-focus")).toThrow();
+    expect(findByTestId(renderer, "practice-run-move-up-tactics-focus")).toBeTruthy();
+    expect(findByTestId(renderer, "practice-run-move-down-tactics-focus")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "practice-run-edit-tactics-focus"))).toBe("Edit ELO");
+    expect(hasStyleEntry(findByTestId(renderer, "practice-run-tactics-focus"), "borderColor", "#CBD5E1")).toBe(true);
+    expect(hasStyleEntry(findByTestId(renderer, "practice-run-tactics-focus"), "borderStyle", "solid")).toBe(true);
+
+    press(renderer, "practice-run-move-down-tactics-focus");
+    press(renderer, "practice-run-edit-tactics-focus");
+    expect(onIntent.mock.calls.map(([intent]) => intent)).toEqual([
+      { type: "move-run", runId: "tactics-focus", targetRunId: "candidate-sprint" },
+      { type: "edit-run", runId: "tactics-focus" }
+    ]);
+  });
+
+  it("renders removal confirmation directly below the selected Run card", () => {
+    const renderer = renderScreen({
+      runManagementPresentation: runManagementPresentation({
+        homeEditing: true,
+        removeCandidateId: "standard"
+      })
+    });
+    const runList = findByTestId(renderer, "practice-run-list");
+    const testIDs = collectTestIds(runList);
+
+    expect(runList.findByProps({ testID: "practice-run-remove-confirmation" })).toBeTruthy();
+    expect(testIDs.indexOf("practice-run-standard")).toBeLessThan(
+      testIDs.indexOf("practice-run-remove-confirmation")
+    );
+    expect(testIDs.indexOf("practice-run-remove-confirmation")).toBeLessThan(
+      testIDs.indexOf("practice-run-tactics-focus")
+    );
+  });
+
+  it("renders the New Run validation and 25-point ELO editing contract", () => {
+    const onIntent = jest.fn();
+    const renderer = renderScreen({
+      runManagementPresentation: runManagementPresentation({
+        draft: {
+          name: "",
+          kind: "custom",
+          mode: "custom",
+          elo: 900,
+          durationSeconds: 300,
+          perPuzzleSeconds: 20,
+          themes: ["fork", "pin"]
+        },
+        nameError: "Enter a name for this run.",
+        onIntent,
+        screen: "create"
+      })
+    });
+
+    expect(collectText(findByTestId(renderer, "practice-run-name-error"))).toBe("Enter a name for this run.");
+    expect(collectText(findByTestId(renderer, "practice-run-elo-row"))).toContain("Adjusts by 25 · minimum 600");
+
+    act(() => {
+      findByTestId(renderer, "practice-run-name-input").props.onChangeText("Calculation Lab");
+    });
+    press(renderer, "practice-run-elo-increase");
+    press(renderer, "practice-run-save");
+
+    expect(onIntent.mock.calls.map(([intent]) => intent)).toEqual([
+      { type: "change-name", name: "Calculation Lab" },
+      { type: "change-elo", elo: 925 },
+      { type: "save-run" }
+    ]);
+  });
+
+  it("limits an existing Custom Run editor to Current ELO", () => {
+    const onIntent = jest.fn();
+    const renderer = renderScreen({
+      runManagementPresentation: runManagementPresentation({
+        draft: {
+          id: "tactics-focus",
+          name: "Tactics Focus",
+          kind: "custom",
+          mode: "custom",
+          elo: 1040,
+          durationSeconds: 600,
+          perPuzzleSeconds: 30,
+          themes: ["fork", "pin"]
+        },
+        onIntent,
+        screen: "edit"
+      })
+    });
+
+    expect(collectText(findByTestId(renderer, "practice-run-editor-title"))).toBe("Edit ELO");
+    expect(collectText(findByTestId(renderer, "practice-run-editor-run-name"))).toBe("Tactics Focus");
+    expect(collectText(findByTestId(renderer, "practice-run-editor"))).toContain(
+      "Run settings stay fixed."
+    );
+    expect(collectText(findByTestId(renderer, "practice-run-elo-row"))).toContain("Current ELO");
+    expect(() => findByTestId(renderer, "practice-run-name-input")).toThrow();
+    expect(() => findByTestId(renderer, "practice-run-mode-row")).toThrow();
+    expect(() => findByTestId(renderer, "practice-run-theme-row")).toThrow();
+    expect(() => findByTestId(renderer, "practice-run-duration-stepper")).toThrow();
+    expect(() => findByTestId(renderer, "practice-run-per-puzzle-stepper")).toThrow();
+
+    press(renderer, "practice-run-elo-increase");
+    press(renderer, "practice-run-save");
+    expect(onIntent.mock.calls.map(([intent]) => intent)).toEqual([
+      { type: "change-elo", elo: 1065 },
+      { type: "save-run" }
+    ]);
+  });
+
+  it("lets the Storybook clone move Settings ELO ownership to run editors", () => {
+    const renderer = renderScreen({ runEloEditingMovedToHome: true });
+
+    press(renderer, "settings-tab");
+
+    expect(findByTestId(renderer, "settings-about-section")).toBeTruthy();
+    expect(() => findByTestId(renderer, "settings-profile-section")).toThrow();
+    expect(() => findByTestId(renderer, "settings-standard-elo-row")).toThrow();
   });
 
   it("exposes the mobile app shell automation contract", () => {
@@ -5948,9 +6103,58 @@ function createScriptedStockfishTransport(
 }
 
 type RenderScreenOptions = TestMobilePlatformCapabilityOverrides &
-  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "puzzleSelectionId" | "puzzleSelectionSeed" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack"> & {
+  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEloEditingMovedToHome" | "runManagementPresentation" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack"> & {
     platformCapabilities?: MobilePlatformCapabilities;
   };
+
+function runManagementPresentation(
+  overrides: Partial<PracticeRunManagementPresentation> = {}
+): PracticeRunManagementPresentation {
+  return {
+    draft: null,
+    hiddenRuns: [],
+    homeEditing: false,
+    nameError: null,
+    notice: null,
+    removeCandidateId: null,
+    runs: [
+      {
+        id: "standard",
+        name: "Standard",
+        kind: "standard",
+        mode: "standard",
+        elo: 925,
+        durationSeconds: 300,
+        perPuzzleSeconds: 20,
+        themes: ["mixed"]
+      },
+      {
+        id: "tactics-focus",
+        name: "Tactics Focus",
+        kind: "custom",
+        mode: "custom",
+        elo: 1040,
+        durationSeconds: 600,
+        perPuzzleSeconds: 30,
+        themes: ["fork", "pin"]
+      },
+      {
+        id: "candidate-sprint",
+        name: "Candidate Sprint",
+        kind: "custom",
+        mode: "arrow_duel",
+        elo: 880,
+        durationSeconds: 300,
+        perPuzzleSeconds: 20,
+        themes: ["mixed"]
+      }
+    ],
+    screen: "home",
+    selectedRunId: "standard",
+    onIntent: jest.fn(),
+    ...overrides
+  };
+}
 
 function createPlayedCustomService(): PracticeService {
   const store = new MemoryStore();
@@ -5996,6 +6200,8 @@ function renderScreen({
   debugTrace,
   puzzleSelectionId,
   puzzleSelectionSeed,
+  runEloEditingMovedToHome,
+  runManagementPresentation,
   sprintStartDelayMs,
   standardTargetCorrect,
   systemBack,
@@ -6012,6 +6218,8 @@ function renderScreen({
         debugTrace={debugTrace}
         puzzleSelectionId={puzzleSelectionId}
         puzzleSelectionSeed={puzzleSelectionSeed}
+        runEloEditingMovedToHome={runEloEditingMovedToHome}
+        runManagementPresentation={runManagementPresentation}
         sprintStartDelayMs={sprintStartDelayMs}
         standardTargetCorrect={standardTargetCorrect}
         systemBack={systemBack}

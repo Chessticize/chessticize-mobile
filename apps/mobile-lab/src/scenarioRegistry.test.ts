@@ -52,8 +52,23 @@ test("New Scenario Markers retain open-issue ownership on the full catalog", () 
   }
 });
 
-test("the closed multiple-theme issue has no active New Scenario Marker", () => {
-  assert.deepEqual(newScenarios, []);
-  assert.deepEqual(storyTagsForScenario("practice-home" as LabScenarioId), []);
-  assert.deepEqual(storyTagsForScenario("practice-custom-setup"), []);
+test("Issue 253 owns the complete run-management design track", () => {
+  assert.deepEqual(
+    newScenarios.map((scenario) => scenario.id),
+    [
+      "practice-home",
+      "practice-home-edit",
+      "practice-custom-setup",
+      "practice-run-name-validation",
+      "practice-run-standard-editor",
+      "practice-custom-rating-editor",
+      "practice-run-remove-confirmation",
+      "practice-runs-empty",
+      "settings-advanced-ratings"
+    ]
+  );
+  for (const scenario of newScenarios) {
+    assert.equal(scenario.issueNumber, 253);
+    assert.deepEqual(storyTagsForScenario(scenario.id), ["new"]);
+  }
 });
