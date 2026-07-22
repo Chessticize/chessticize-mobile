@@ -33,10 +33,14 @@ Each feedback issue owns its Storybook design track. Every feature branch also
 owns a dedicated full-catalog Storybook site and Sites project; never deploy a
 different branch through that project or overwrite another branch's review URL.
 Later commits on the same branch reuse its site, while a new branch gets a new
-site even when it continues the same issue. A coherent design increment may
-merge to `main` before implementation; its issue-numbered New Scenario Marker
-remains until the linked issue is closed. Generated Storybook deployment files
-are not committed to the application branch.
+site even when it continues the same issue. Every Storybook review site,
+including the main-branch catalog and every branch-owned site, is public and
+must not require authentication. Verify that an unauthenticated request to
+`/storybook/` returns HTTP 200 after every deployment or access-policy change.
+A coherent design increment may merge to `main` before implementation; its
+issue-numbered New Scenario Marker remains until the linked issue is closed.
+Generated Storybook deployment files are not committed to the application
+branch.
 
 A new screen, navigation destination, stateful modal or sheet, multi-step
 journey, or materially new loading, empty, error, or permission path counts as

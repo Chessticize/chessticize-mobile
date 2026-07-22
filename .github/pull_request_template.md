@@ -21,6 +21,8 @@ Direct story URL:
 
 Storybook source commit:
 
+Storybook anonymous access verification (the site is public and must not require authentication):
+
 New Scenario Marker lifecycle (select one):
 
 - [ ] Not applicable

@@ -184,7 +184,10 @@ When remote preview publication is authorized and Sites is available, build and
 deploy the complete `apps/mobile-lab` Storybook for that issue's exact commit.
 Use a stable issue-specific site or deployment so the reviewer can browse the
 catalog like local Storybook, while the `new` tag and What's New page identify
-the issue-owned delta.
+the issue-owned delta. Every Storybook review site, including the main-branch
+catalog and every branch-owned site, is public and must not require
+authentication. Set Sites access mode to public and verify that an
+unauthenticated request to `/storybook/` returns HTTP 200 before handoff.
 
 Do not commit `storybook-static`, copied bundles, a preview manifest, or hosting
 result files to the application branch. Generate deployment input in ignored or

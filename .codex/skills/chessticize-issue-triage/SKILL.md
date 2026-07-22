@@ -129,9 +129,11 @@ When the request authorizes remote preview publication and Sites is available:
 - Before publishing, compare the deployment input's recorded branch and commit
   with the reviewed application branch. Stop on any mismatch instead of
   overwriting the existing branch owner's site.
-- Follow the Sites build and hosting skills. Package the matching static build,
-  save one version, and prefer an owner-only deployment when it still allows
-  the intended reviewer to access it.
+- Every Storybook review site, including the main-branch catalog and every
+  branch-owned site, is public and must not require authentication. Follow the
+  Sites build and hosting skills, set access mode to public, and verify that an
+  unauthenticated request to `/storybook/` returns HTTP 200 before handoff.
+- Package the matching static build and save one version before deployment.
 - Keep `storybook-static`, copied bundles, preview manifests, Sites project
   metadata, and hosting result files out of the application branch. Use ignored
   or temporary storage for generated deployment input.

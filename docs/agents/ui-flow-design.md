@@ -62,12 +62,16 @@ different source branch, including another branch for the same issue. Reuse the
 site only for later commits on its owning branch. Before every deployment,
 verify that the recorded source branch and commit match the application branch
 being reviewed; a mismatch is a publication blocker, not permission to replace
-the existing site. Record the branch, exact source commit, and branch-owned URL
-in the issue and PR. Do not commit generated Storybook bundles, copied preview
-files, Sites project metadata, or hosting result files to the application
-branch. A Sites deployment is a production URL, but it remains a design
-artifact: it does not count as approval or product implementation. Save a Sites
-version without deploying it when only a reviewable candidate is authorized.
+the existing site. Every Storybook review site, including the main-branch
+catalog and every branch-owned site, is public and must not require
+authentication. Set the Sites access mode to public and verify that an
+unauthenticated request to `/storybook/` returns HTTP 200 before handoff. Record
+the branch, exact source commit, and branch-owned URL in the issue and PR.
+Do not commit generated Storybook bundles, copied preview files, Sites project
+metadata, or hosting result files to the application branch. A Sites deployment
+is a production URL, but it remains a design artifact: it does not count as approval
+or product implementation. Save a Sites version without deploying it when only
+a reviewable candidate is authorized.
 
 When the current interaction increment is coherent and checks pass, the design
 PR may become ready and merge to `main` before approval or implementation.

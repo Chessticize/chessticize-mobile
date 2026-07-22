@@ -27,7 +27,10 @@ Lab design phase first. Follow `docs/agents/ui-flow-design.md`.
    full Storybook from the exact commit through a site dedicated to the current
    feature branch. Never reuse that Sites project or URL for another branch;
    stop if the deployment input names a different branch or commit. Generated
-   deployment files stay outside the application branch.
+   deployment files stay outside the application branch. Every Storybook review
+   site, including the main-branch catalog and every branch-owned site, is public
+   and must not require authentication. Verify an unauthenticated request to
+   `/storybook/` returns HTTP 200 before handoff.
 5. Merge coherent design increments to `main` and iterate from current `main`;
    retain the marker until the linked issue closes.
 6. Record explicit design approval in the issue or PR before starting product
