@@ -888,7 +888,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "practice-run-theme-row"))).toContain("Choose one or more");
 
     press(renderer, "custom-theme-mate-in-4");
-    expect(onIntent).toHaveBeenLastCalledWith({ type: "change-themes", themes: ["mateIn4"] });
+    expect(onIntent).toHaveBeenLastCalledWith({ type: "toggle-theme", theme: "mateIn4" });
   });
 
   it("keeps the full curated theme catalog when New Run opens from the Home story", async () => {
@@ -4542,6 +4542,9 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "review-session")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "review-current-puzzle-id"))).toBe("000hf");
     expect(findByTestId(renderer, "review-board")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "review-theme-rail"))).toContain("Mate in 2");
+    expect(() => findByTestId(renderer, "review-theme-rail-mate")).toThrow();
+    expect(() => findByTestId(renderer, "review-theme-pill")).toThrow();
     expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Due tomorrow");
     expect(collectText(findByTestId(renderer, "review-schedule-remove"))).toBe("Remove from Review");
     press(renderer, "review-schedule-remove");

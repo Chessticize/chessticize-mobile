@@ -42,10 +42,7 @@ import {
   isUnclearAttemptEligible,
   isReviewOverdue,
   MANUAL_RATING_STEP,
-  namedThemesForSelection,
-  nextThemeChoiceSelection,
   normalizeHistoryAttemptDetail,
-  normalizeThemeChoiceSelection,
   normalizeThemeSelection,
   RATING_FLOOR,
   reviewDueState,
@@ -84,6 +81,7 @@ import type {
   SessionMistakeReviewItem,
   SprintConfig,
   SprintMode,
+  ThemeChoiceIntent,
   SprintState,
   UciEngineTransport
 } from "../../../../packages/core/src/index.ts";
@@ -120,6 +118,11 @@ import type {
 import { arePracticeTestControlsEnabled, isPracticeDebugEnabled } from "../releaseConfig.ts";
 import { isStoreAssetCaptureEnabled } from "../backend/testLaunchConfig.ts";
 import { usePracticeRunManagement } from "../backend/usePracticeRunManagement.ts";
+import {
+  normalizeStoredThemeChoiceSelection,
+  useThemeChoiceSelection
+} from "../backend/useThemeChoiceSelection.ts";
+import { buildReviewEntry, type ReviewEntry } from "../backend/reviewEntry.ts";
 import {
   canonicalFen,
   decidePremoveQueue,
@@ -556,7 +559,6 @@ export function PracticePocScreen({
   const [historySourceFilter, setHistorySourceFilter] = useState<"all" | AttemptSource>("sprint");
   const [historyResultFilter, setHistoryResultFilter] = useState<"all" | "correct" | "wrong">("all");
   const [historySideFilter, setHistorySideFilter] = useState<"all" | PuzzleSide>("all");
-  const [historyThemeSelection, setHistoryThemeSelection] = useState<string[]>([ALL_THEMES_FILTER]);
   const [historyRatingRangeFilter, setHistoryRatingRangeFilter] = useState<HistoryRatingRangeFilter>("all");
   const [historyReviewStatusFilter, setHistoryReviewStatusFilter] = useState<"all" | HistoryReviewStatus>("all");
   const [historyUnclearOnly, setHistoryUnclearOnly] = useState(false);
@@ -569,7 +571,6 @@ export function PracticePocScreen({
   const [customSprintMode, setCustomSprintMode] = useState<"custom" | "arrow_duel">("custom");
   const [customDurationSeconds, setCustomDurationSeconds] = useState(5 * 60);
   const [customPerPuzzleSeconds, setCustomPerPuzzleSeconds] = useState(20);
-  const [customThemes, setCustomThemes] = useState<CustomThemeFilter[]>([ALL_THEMES_FILTER]);
   const [customInitialRating, setCustomInitialRating] = useState(CUSTOM_INITIAL_RATING_MIN);
   const [reviewReminderPreference, setReviewReminderPreference] = useState<ReviewReminderPreference>(() => service.getReviewReminderPreference());
   const [notificationPermissionStatus, setNotificationPermissionStatus] = useState<ReviewReminderPermissionStatus>("unavailable");
@@ -593,6 +594,11 @@ export function PracticePocScreen({
   });
   const activeRunManagementPresentation = runManagementPresentation ?? internalRunManagement.presentation;
   const ratingEditingMovedToHome = runEloEditingMovedToHome || activeRunManagementPresentation !== undefined;
+  const customThemeChoices = useThemeChoiceSelection({
+    controlledSelection: customThemeSelection?.selectedThemes,
+    onControlledSelectionChange: customThemeSelection?.onChange
+  });
+  const historyThemeChoices = useThemeChoiceSelection();
 
   const adaptiveLayout = useMemo(
     () => buildAdaptiveLayout({ fontScale, height, insets, width }),
@@ -612,21 +618,9 @@ export function PracticePocScreen({
       setPracticeExitConfirmationVisible(false);
     }
   }, [isOpenSession, practiceExitConfirmationVisible]);
-  const selectedCustomThemes = useMemo(
-    () => normalizeThemeChoiceSelection(
-      customThemeSelection?.selectedThemes ?? customThemes,
-      themeCatalogPresentation ? themeCatalogThemes(themeCatalogPresentation) : undefined
-    ),
-    [customThemeSelection?.selectedThemes, customThemes, themeCatalogPresentation]
-  );
-  const selectedSprintThemes = useMemo(
-    () => namedThemesForSelection(selectedCustomThemes),
-    [selectedCustomThemes]
-  );
-  const selectedHistoryThemes = useMemo(
-    () => namedThemesForSelection(historyThemeSelection),
-    [historyThemeSelection]
-  );
+  const selectedCustomThemes = customThemeChoices.selection;
+  const selectedSprintThemes = customThemeChoices.namedThemes;
+  const selectedHistoryThemes = historyThemeChoices.namedThemes;
   const selectedConfig = useMemo(
     () => sprintConfigFor(
       mode === "custom" ? customSprintMode : mode,
@@ -1701,13 +1695,13 @@ export function PracticePocScreen({
           ? historyAttemptReplayAvailability({ attempt, puzzle })
           : { status: "unavailable" as const, reason: "puzzle-unavailable" as const };
         return puzzle && replayAvailability.status === "available"
-          ? {
+          ? buildReviewEntry({
               puzzle,
               mode: replayAvailability.mode,
               ratingKey: replayAvailability.ratingKey,
               source: "history",
               attempt
-            }
+            })
           : null;
       })
       .filter((entry): entry is ReviewEntry => Boolean(entry));
@@ -2786,17 +2780,7 @@ export function PracticePocScreen({
                     customMode={customSprintMode}
                     onCustomModeChange={setCustomSprintMode}
                     onPerPuzzleChange={setCustomPerPuzzleSeconds}
-                    onThemesChange={(nextThemes) => {
-                      const normalizedThemes = normalizeThemeChoiceSelection(
-                        nextThemes,
-                        themeCatalogPresentation ? themeCatalogThemes(themeCatalogPresentation) : undefined
-                      );
-                      if (customThemeSelection) {
-                        customThemeSelection.onChange(normalizedThemes);
-                        return;
-                      }
-                      setCustomThemes(normalizedThemes);
-                    }}
+                    onThemeIntent={customThemeChoices.dispatch}
                     previousConfigs={service.listCustomSprintConfigs()}
                     ratingForKey={(key) => service.getRating(key).rating}
                     onStart={() => startSprint(customSprintMode, true)}
@@ -2875,7 +2859,8 @@ export function PracticePocScreen({
                   resultFilter={historyResultFilter}
                   ratingRangeFilter={historyRatingRangeFilter}
                   sideFilter={historySideFilter}
-                  themeFilters={historyThemeSelection}
+                  themeFilters={historyThemeChoices.selection}
+                  namedThemeFilters={historyThemeChoices.namedThemes}
                   availableThemes={historyView.availableThemes}
                   page={historyView.page}
                   reviewStatusFilter={historyReviewStatusFilter}
@@ -2909,8 +2894,8 @@ export function PracticePocScreen({
                     setHistorySideFilter(side);
                     setHistoryPageOffset(0);
                   }}
-                  onThemeFiltersChange={(themes) => {
-                    setHistoryThemeSelection(themes);
+                  onThemeFilterIntent={(intent) => {
+                    historyThemeChoices.dispatch(intent);
                     setHistoryPageOffset(0);
                   }}
                   onReviewStatusFilterChange={(status) => {
@@ -2928,7 +2913,7 @@ export function PracticePocScreen({
                     setHistorySourceFilter("sprint");
                     setHistoryResultFilter("all");
                     setHistorySideFilter("all");
-                    setHistoryThemeSelection([ALL_THEMES_FILTER]);
+                    historyThemeChoices.dispatch({ type: "select-all-themes" });
                     setHistoryRatingRangeFilter("all");
                     setHistoryReviewStatusFilter("all");
                     setHistoryUnclearOnly(false);
@@ -4158,16 +4143,7 @@ function PracticeRunEditor({
                   selectedThemes={draft.themes}
                   themeCatalogPresentation={themeCatalogPresentation}
                   testID="practice-run-theme-row"
-                  onChange={(nextTheme) => presentation.onIntent({
-                    type: "change-themes",
-                    themes: nextThemeChoiceSelection(
-                      draft.themes,
-                      nextTheme,
-                      themeCatalogPresentation
-                        ? themeCatalogThemes(themeCatalogPresentation)
-                        : SERVER_CURATED_THEMES
-                    )
-                  })}
+                  onChange={(theme) => presentation.onIntent({ type: "toggle-theme", theme })}
                 />
                 <CustomOptionRow
                   label="Duration"
@@ -4525,7 +4501,7 @@ function CustomSprintSetup({
   ratingKey,
   onDurationChange,
   onPerPuzzleChange,
-  onThemesChange,
+  onThemeIntent,
   onStart
 }: {
   availablePuzzleCount: number;
@@ -4549,7 +4525,7 @@ function CustomSprintSetup({
   ratingKey: string;
   onDurationChange: (next: number) => void;
   onPerPuzzleChange: (next: number) => void;
-  onThemesChange: (next: CustomThemeFilter[]) => void;
+  onThemeIntent: (intent: ThemeChoiceIntent) => void;
   onStart: () => void;
 }): React.JSX.Element {
   const requiredPuzzleCount = targetCorrect + maxMistakes;
@@ -4583,15 +4559,7 @@ function CustomSprintSetup({
           selectedThemes={selectedThemes}
           themeCatalogPresentation={themeCatalogPresentation}
           testID="custom-theme-row"
-          onChange={(nextTheme) => {
-            onThemesChange(nextThemeChoiceSelection(
-              selectedThemes,
-              nextTheme,
-              themeCatalogPresentation
-                ? themeCatalogThemes(themeCatalogPresentation)
-                : SERVER_CURATED_THEMES
-            ));
-          }}
+          onChange={(theme) => onThemeIntent({ type: "toggle-theme", theme })}
         />
         <CustomOptionRow
           label="Duration"
@@ -4654,7 +4622,7 @@ function CustomSprintSetup({
               onCustomModeChange(config.customMode);
               onDurationChange(config.durationSeconds);
               onPerPuzzleChange(config.perPuzzleSeconds);
-              onThemesChange(config.themes);
+              onThemeIntent({ type: "replace-themes", themes: config.themes });
             }}
           />
         ))}
@@ -6089,6 +6057,7 @@ function HistoryPanel({
   ratingRangeFilter,
   sideFilter,
   themeFilters,
+  namedThemeFilters,
   availableThemes,
   page,
   reviewStatusFilter,
@@ -6102,7 +6071,7 @@ function HistoryPanel({
   onResultFilterChange,
   onRatingRangeFilterChange,
   onSideFilterChange,
-  onThemeFiltersChange,
+  onThemeFilterIntent,
   onReviewStatusFilterChange,
   onPageOffsetChange,
   onOpenAttempt,
@@ -6125,6 +6094,7 @@ function HistoryPanel({
   ratingRangeFilter: HistoryRatingRangeFilter;
   sideFilter: "all" | PuzzleSide;
   themeFilters: readonly string[];
+  namedThemeFilters: readonly string[];
   availableThemes: string[];
   page: { limit: number; offset: number; total: number; hasMore: boolean };
   reviewStatusFilter: "all" | HistoryReviewStatus;
@@ -6138,7 +6108,7 @@ function HistoryPanel({
   onResultFilterChange: (result: "all" | "correct" | "wrong") => void;
   onRatingRangeFilterChange: (ratingRange: HistoryRatingRangeFilter) => void;
   onSideFilterChange: (side: "all" | PuzzleSide) => void;
-  onThemeFiltersChange: (themes: string[]) => void;
+  onThemeFilterIntent: (intent: ThemeChoiceIntent) => void;
   onReviewStatusFilterChange: (status: "all" | HistoryReviewStatus) => void;
   onPageOffsetChange: (offset: number) => void;
   onOpenAttempt: (attemptId: string) => void;
@@ -6161,7 +6131,7 @@ function HistoryPanel({
     reviewStatusFilter,
     sideFilter,
     sourceFilter,
-    themeFilters,
+    themeFilters: namedThemeFilters,
     timeRange,
     unclearOnly
   });
@@ -6312,7 +6282,7 @@ function HistoryPanel({
             <HistoryThemeCatalogFilter
               presentation={themeCatalogPresentation}
               selectedThemes={themeFilters}
-              onThemesChange={onThemeFiltersChange}
+              onThemeIntent={onThemeFilterIntent}
             />
           ) : availableThemes.length > 0 ? (
             <HistoryChipRow testID="history-theme-filters">
@@ -6320,7 +6290,7 @@ function HistoryPanel({
                 active={themeFilters.includes(ALL_THEMES_FILTER)}
                 label="All themes"
                 testID="history-theme-all"
-                onPress={() => onThemeFiltersChange([ALL_THEMES_FILTER])}
+                onPress={() => onThemeFilterIntent({ type: "select-all-themes" })}
               />
               {availableThemes.slice(0, 8).map((theme) => (
                 <FilterButton
@@ -6328,11 +6298,7 @@ function HistoryPanel({
                   active={themeFilters.includes(theme)}
                   label={theme}
                   testID={`history-theme-${theme}`}
-                  onPress={() => onThemeFiltersChange(nextThemeChoiceSelection(
-                    themeFilters,
-                    theme,
-                    availableThemes
-                  ))}
+                  onPress={() => onThemeFilterIntent({ type: "toggle-theme", theme })}
                 />
               ))}
             </HistoryChipRow>
@@ -6392,15 +6358,14 @@ function HistoryPanel({
 }
 
 function HistoryThemeCatalogFilter({
-  onThemesChange,
+  onThemeIntent,
   presentation,
   selectedThemes
 }: {
-  onThemesChange: (themes: string[]) => void;
+  onThemeIntent: (intent: ThemeChoiceIntent) => void;
   presentation: ThemeCatalogPresentation;
   selectedThemes: readonly string[];
 }): React.JSX.Element {
-  const availableThemes = themeCatalogThemes(presentation);
   return (
     <View style={styles.historyThemeFilterSection} testID="history-theme-filters">
       <View style={styles.themeCatalogHeadingRow}>
@@ -6409,7 +6374,7 @@ function HistoryThemeCatalogFilter({
           active={selectedThemes.includes(ALL_THEMES_FILTER)}
           label="All themes"
           testID="history-theme-all"
-          onPress={() => onThemesChange([ALL_THEMES_FILTER])}
+          onPress={() => onThemeIntent({ type: "select-all-themes" })}
         />
       </View>
       {presentation.groups.map((group) => (
@@ -6427,11 +6392,7 @@ function HistoryThemeCatalogFilter({
                   active={selectedThemes.includes(theme)}
                   label={customThemeLabel(theme)}
                   testID={`history-theme-${safeTestId(customThemeLabel(theme))}`}
-                  onPress={() => onThemesChange(nextThemeChoiceSelection(
-                    selectedThemes,
-                    theme,
-                    availableThemes
-                  ))}
+                  onPress={() => onThemeIntent({ type: "toggle-theme", theme })}
                 />
               ))}
             </View>
@@ -6488,7 +6449,7 @@ function historyActiveFilterLabels({
   if (sideFilter !== "all") {
     labels.push(sideFilter === "white" ? "White" : "Black");
   }
-  labels.push(...namedThemesForSelection(themeFilters).map(customThemeLabel));
+  labels.push(...themeFilters.map(customThemeLabel));
   if (unclearOnly) {
     labels.push("Unclear");
   }
@@ -7333,14 +7294,6 @@ function safeTestId(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
-type ReviewEntry = {
-  puzzle: Puzzle;
-  mode: SprintMode;
-  ratingKey: string;
-  source: "session" | "due" | "history";
-  attempt?: AttemptEvent | HistoryAttemptView;
-};
-
 type HistoryUnavailableAttempt = {
   attempt: HistoryAttemptView;
   replayAvailability: Extract<HistoryAttemptReplayAvailability, { status: "unavailable" }>;
@@ -7420,7 +7373,7 @@ function ReviewPanel({
   stockfish: MobileStockfishCapabilities;
   systemBackCommand: ReviewBackCommand | null;
 }): React.JSX.Element {
-  const sessionEntries = sessionMistakeReviewItems.map((item): ReviewEntry => ({
+  const sessionEntries = sessionMistakeReviewItems.map((item): ReviewEntry => buildReviewEntry({
     puzzle: item.puzzle,
     mode: item.attempt.mode,
     ratingKey: item.attempt.ratingKey,
@@ -7441,7 +7394,7 @@ function ReviewPanel({
     service.listPracticeRuns().map((run) => [run.ratingKey, run])
   );
   const completedReviews = service.listCompletedReviewsForDay(new Date(nowMs).toISOString());
-  const completedReviewEntries = completedReviews.map((item): ReviewEntry => ({
+  const completedReviewEntries = completedReviews.map((item): ReviewEntry => buildReviewEntry({
     puzzle: item.puzzle,
     mode: item.attempt.mode,
     ratingKey: item.attempt.ratingKey,
@@ -7455,7 +7408,7 @@ function ReviewPanel({
   const themeFilters = collectReviewThemeFilters(dueReviewItems);
   const speedFilters = collectReviewSpeedFilters(dueReviewItems);
   const filteredDueReviewItems = filterReviewQueueItems(dueReviewItems, queueFilter, nowMs);
-  const filteredDueEntries = filteredDueReviewItems.map((item): ReviewEntry => ({
+  const filteredDueEntries = filteredDueReviewItems.map((item): ReviewEntry => buildReviewEntry({
     puzzle: item.puzzle,
     mode: item.review.mode,
     ratingKey: item.review.ratingKey,
@@ -7705,12 +7658,12 @@ function ReviewPanel({
               key={`${item.review.puzzleId}:${item.review.mode}:${item.review.ratingKey}`}
               item={item}
               nowMs={nowMs}
-              onPress={() => startReviewEntries([{
+              onPress={() => startReviewEntries([buildReviewEntry({
                 puzzle: item.puzzle,
                 mode: item.review.mode,
                 ratingKey: item.review.ratingKey,
                 source: "due"
-              }])}
+              })])}
             />
           ))}
         </View>
@@ -8106,12 +8059,7 @@ function ReviewSession({
     : entryIndex + 1;
   const reviewProgressTotal = scheduledReviewProgress?.total ?? entries.length;
   const reviewPerPuzzleSeconds = perPuzzleSecondsForReviewEntry(currentEntry);
-  const reviewPrimaryTheme = currentEntry.puzzle.themes[0] ?? "mixed";
-  const reviewCuratedThemes = currentEntry.source === "history"
-      && currentEntry.attempt
-      && "curatedThemes" in currentEntry.attempt
-    ? currentEntry.attempt.curatedThemes
-    : [];
+  const reviewCuratedThemes = currentEntry.curatedThemes;
   const reviewRemainingSeconds =
     currentEntry.source === "due" && (!reviewResultRecorded || reviewTimedOut)
       ? Math.max(0, reviewPerPuzzleSeconds - Math.floor((reviewNowMs - reviewStartedAtMs) / 1000))
@@ -8751,12 +8699,6 @@ function ReviewSession({
               <Text style={styles.reviewContextPillText}>Sprint review</Text>
             </View>
           ) : null}
-          {currentEntry.source !== "history"
-            && currentEntry.source !== "due" ? (
-            <View style={styles.reviewContextPill} testID="review-theme-pill">
-              <Text style={styles.reviewContextPillText}>{reviewPrimaryTheme}</Text>
-            </View>
-          ) : null}
           {reviewRemainingSeconds !== null ? (
             <View style={[styles.reviewContextPill, styles.reviewTimerPill, reviewRemainingSeconds === 0 ? styles.reviewContextPillDanger : null]}>
               <Text
@@ -8855,8 +8797,7 @@ function ReviewSession({
               />
             ) : null}
           </View>
-          {currentEntry.source === "history"
-            && reviewCuratedThemes.length > 0 ? (
+          {reviewCuratedThemes.length > 0 ? (
             <View
               style={[styles.reviewThemeCatalogRail, { width: boardSize }]}
               testID="review-theme-catalog"
@@ -10955,10 +10896,6 @@ function sprintConfigFor(
   return buildSprintConfig(input);
 }
 
-function themeCatalogThemes(presentation: ThemeCatalogPresentation): string[] {
-  return presentation.groups.flatMap((group) => group.themes);
-}
-
 function customThemeLabel(theme: CustomThemeFilter): string {
   if (theme === ALL_THEMES_FILTER) {
     return "All";
@@ -11028,7 +10965,7 @@ function sortHistoryRatingKeys(
 function customThemesFromStoredValue(
   config: Pick<CustomSprintConfigRecord, "themes">
 ): CustomThemeFilter[] {
-  return normalizeThemeChoiceSelection(config.themes, SERVER_CURATED_THEMES);
+  return normalizeStoredThemeChoiceSelection(config.themes);
 }
 
 function formatConfigLastPlayed(lastStartedAt: string): string {

@@ -5,6 +5,11 @@ export type ThemeCatalogGroup = {
   themes: readonly string[];
 };
 
+export type ThemeChoiceIntent =
+  | { type: "replace-themes"; themes: readonly string[] }
+  | { type: "select-all-themes" }
+  | { type: "toggle-theme"; theme: string };
+
 export const SERVER_CURATED_THEME_GROUPS = [
   {
     label: "Checkmates",
@@ -43,8 +48,6 @@ export const SERVER_CURATED_THEME_PRESENTATION: {
 } = {
   groups: SERVER_CURATED_THEME_GROUPS
 };
-
-const SERVER_CURATED_THEME_SET = new Set<string>(SERVER_CURATED_THEMES);
 
 export function normalizeThemeSelection(themes?: readonly string[]): string[] {
   return [...new Set((themes ?? []).map((theme) => theme.trim()).filter((theme) => theme.length > 0))].sort();
@@ -86,6 +89,20 @@ export function nextThemeChoiceSelection(
   return normalizeThemeChoiceSelection(nextThemes, availableThemes);
 }
 
+export function applyThemeChoiceIntent(
+  selectedThemes: readonly string[],
+  intent: ThemeChoiceIntent,
+  availableThemes: readonly string[] = SERVER_CURATED_THEMES
+): string[] {
+  if (intent.type === "select-all-themes") {
+    return [ALL_THEME_SELECTION];
+  }
+  if (intent.type === "replace-themes") {
+    return normalizeThemeChoiceSelection(intent.themes, availableThemes);
+  }
+  return nextThemeChoiceSelection(selectedThemes, intent.theme, availableThemes);
+}
+
 export function namedThemesForSelection(themes?: readonly string[]): string[] {
   return normalizeThemeSelection(themes).filter((theme) => theme !== ALL_THEME_SELECTION);
 }
@@ -105,10 +122,6 @@ export function puzzleMatchesAnyTheme(
 export function curatedPuzzleThemes(puzzleThemes: readonly string[]): string[] {
   const puzzleThemeSet = new Set(normalizeThemeSelection(puzzleThemes));
   return SERVER_CURATED_THEMES.filter((theme) => puzzleThemeSet.has(theme));
-}
-
-export function isServerCuratedTheme(theme: string): boolean {
-  return SERVER_CURATED_THEME_SET.has(theme);
 }
 
 function uniqueThemesInOrder(themes: readonly string[]): string[] {

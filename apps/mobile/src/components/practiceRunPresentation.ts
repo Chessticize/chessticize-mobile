@@ -30,7 +30,7 @@ export type PracticeRunManagementIntent =
   | { type: "change-mode"; mode: "custom" | "arrow_duel" }
   | { type: "change-name"; name: string }
   | { type: "change-per-puzzle"; perPuzzleSeconds: number }
-  | { type: "change-themes"; themes: string[] }
+  | { type: "toggle-theme"; theme: string }
   | { type: "confirm-remove" }
   | { type: "dismiss-remove" }
   | { type: "edit-run"; runId: string }

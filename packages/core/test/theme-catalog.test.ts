@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   ALL_THEME_SELECTION,
+  applyThemeChoiceIntent,
   curatedPuzzleThemes,
   namedThemesForSelection,
   nextThemeChoiceSelection,
@@ -43,6 +44,19 @@ test("theme choice toggles restore All after the last named theme is removed", (
   selection = nextThemeChoiceSelection(selection, "fork");
   assert.deepEqual(selection, [ALL_THEME_SELECTION]);
   assert.deepEqual(nextThemeChoiceSelection(selection, ALL_THEME_SELECTION), [ALL_THEME_SELECTION]);
+});
+
+test("theme choice intents keep selection rules outside presentation components", () => {
+  let selection = applyThemeChoiceIntent([ALL_THEME_SELECTION], { type: "toggle-theme", theme: "pin" });
+  assert.deepEqual(selection, ["pin"]);
+  selection = applyThemeChoiceIntent(selection, { type: "toggle-theme", theme: "fork" });
+  assert.deepEqual(selection, ["fork", "pin"]);
+  selection = applyThemeChoiceIntent(selection, { type: "replace-themes", themes: ["mate", "pin"] });
+  assert.deepEqual(selection, ["pin", "mate"]);
+  assert.deepEqual(
+    applyThemeChoiceIntent(selection, { type: "select-all-themes" }),
+    [ALL_THEME_SELECTION]
+  );
 });
 
 test("legacy named selections remain usable while new choices follow catalog order", () => {

@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  ALL_THEME_SELECTION,
+  applyThemeChoiceIntent,
   clampManualRating,
   DEFAULT_NEW_PRACTICE_RUN_RATING,
   defaultSprintConfig,
+  namedThemesForSelection,
   normalizeThemeChoiceSelection,
   PracticeRunNameError,
   type PracticeRunRecord
@@ -99,9 +102,14 @@ export function usePracticeRunManagement({
           ? updateDraft(current, { perPuzzleSeconds: intent.perPuzzleSeconds })
           : current);
         return;
-      case "change-themes":
+      case "toggle-theme":
         setView((current) => current.screen === "create"
-          ? updateDraft(current, { themes: intent.themes.length > 0 ? intent.themes : ["mixed"] })
+          ? updateDraft(current, {
+              themes: applyThemeChoiceIntent(
+                current.draft?.themes ?? [ALL_THEME_SELECTION],
+                { type: "toggle-theme", theme: intent.theme }
+              )
+            })
           : current);
         return;
       case "dismiss-remove":
@@ -290,7 +298,7 @@ function newRunDraft(): PracticeRunDraft {
     elo: DEFAULT_NEW_PRACTICE_RUN_RATING,
     durationSeconds: config.durationSeconds,
     perPuzzleSeconds: config.perPuzzleSeconds,
-    themes: config.themes ?? ["mixed"]
+    themes: config.themes ?? [ALL_THEME_SELECTION]
   };
 }
 
@@ -304,12 +312,12 @@ function presentationForRun(service: PracticeService, run: PracticeRunRecord): P
     elo: service.getRating(run.ratingKey).rating,
     durationSeconds: run.durationSeconds,
     perPuzzleSeconds: run.perPuzzleSeconds,
-    themes: run.themes ?? ["mixed"]
+    themes: run.themes ?? [ALL_THEME_SELECTION]
   };
 }
 
 function createPracticeRunCommand(draft: PracticeRunDraft): CreatePracticeRunCommand {
-  const themes = draft.themes.filter((theme) => theme !== "mixed");
+  const themes = namedThemesForSelection(draft.themes);
   return {
     name: draft.name,
     mode: draft.mode === "arrow_duel" ? "arrow_duel" : "custom",

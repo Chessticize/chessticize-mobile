@@ -64,6 +64,28 @@ test("SQLitePuzzlePackSource skips repeated Arrow Duel validation for a manifest
   }
 });
 
+test("SQLitePuzzlePackSource treats the All theme sentinel as unrestricted", async () => {
+  const packDb = buildPackDatabase(await loadFixturePuzzles());
+  try {
+    const source = new SQLitePuzzlePackSource(new NodeSqliteDatabase(packDb));
+
+    const unrestrictedIds = source
+      .selectPuzzles({ mode: "standard", limit: 10, themes: [] })
+      .map((puzzle) => puzzle.id);
+    const allThemeIds = source
+      .selectPuzzles({ mode: "standard", limit: 10, themes: ["mixed"] })
+      .map((puzzle) => puzzle.id);
+
+    assert.deepEqual(allThemeIds, unrestrictedIds);
+    assert.equal(
+      source.countPuzzles({ mode: "standard", limit: 10, themes: ["mixed"] }),
+      source.countPuzzles({ mode: "standard", limit: 10, themes: [] })
+    );
+  } finally {
+    packDb.close();
+  }
+});
+
 test("SQLitePuzzlePackSource preserves themed candidate results while using the composite theme index", async () => {
   const packDb = buildPackDatabase(await loadFixturePuzzles());
   try {

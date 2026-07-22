@@ -1,7 +1,7 @@
 import {
   buildServerEloPuzzleSelectionStrategies,
   isServerCompatibleArrowDuelPuzzle,
-  normalizeThemeSelection,
+  namedThemesForSelection,
   SERVER_PUZZLE_MAX_RATING,
   SERVER_PUZZLE_MIN_RATING
 } from "../../core/src/index.ts";
@@ -48,7 +48,7 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
           filter.includeIds !== undefined || filter.excludeIds !== undefined) {
         return this.selectPuzzles(filter).length;
       }
-      const selectedThemes = normalizeThemeSelection(filter.themes);
+      const selectedThemes = namedThemesForSelection(filter.themes);
       const minRating = filter.minRating ?? (filter.rating === undefined ? 0 : SERVER_PUZZLE_MIN_RATING);
       const maxRating = filter.maxRating ?? (filter.rating === undefined ? 4000 : SERVER_PUZZLE_MAX_RATING);
       if (selectedThemes.length === 0) {
@@ -112,7 +112,7 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
     const excludedIds = new Set(filter.excludeIds ?? []);
     const strategies = buildServerEloPuzzleSelectionStrategies({
       rating,
-      themes: normalizeThemeSelection(filter.themes)
+      themes: namedThemesForSelection(filter.themes)
     });
 
     for (const strategy of strategies) {
@@ -150,7 +150,7 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
   }
 
   private queryCandidates(filter: PuzzleSelectionFilter): Puzzle[] {
-    const selectedThemes = normalizeThemeSelection(filter.themes);
+    const selectedThemes = namedThemesForSelection(filter.themes);
     const themeIds = selectedThemes
       .map((theme) => this.themeId(theme))
       .filter((themeId): themeId is number => themeId !== undefined);

@@ -51,7 +51,7 @@ test("editing an existing run changes ELO only", () => {
 
   state = runManagementFixtureReducer(state, { type: "change-name", name: "Renamed" });
   state = runManagementFixtureReducer(state, { type: "change-mode", mode: "arrow_duel" });
-  state = runManagementFixtureReducer(state, { type: "change-themes", themes: ["endgame"] });
+  state = runManagementFixtureReducer(state, { type: "toggle-theme", theme: "endgame" });
   state = runManagementFixtureReducer(state, { type: "change-duration", durationSeconds: 180 });
   state = runManagementFixtureReducer(state, { type: "change-per-puzzle", perPuzzleSeconds: 10 });
   assert.deepEqual(state.draft, original);
