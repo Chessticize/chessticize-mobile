@@ -62,6 +62,17 @@ describe("mobile Back contract", () => {
       detail: { kind: "stockfish-diagnostics", owner: "settings" },
       tab: "analysis"
     }, "button")).toEqual({ kind: "return-to-owner", owner: "settings" });
+
+    const runEditorState: MobileBackState = {
+      ...rootState,
+      detail: { kind: "practice-run-editor", owner: "practice" }
+    };
+    const runEditorIntent = resolveMobileBackIntent(runEditorState, "button");
+    expect(runEditorIntent).toEqual({ kind: "return-to-owner", owner: "practice" });
+    expect(mobileBackDestination(runEditorIntent, runEditorState)).toEqual({
+      label: "Practice",
+      testID: "tab-practice"
+    });
   });
 
   it("guards active practice, returns non-root tabs to Practice, and delegates only at root", () => {

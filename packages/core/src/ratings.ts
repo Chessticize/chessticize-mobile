@@ -6,6 +6,7 @@ export const DEFAULT_RATING_DEVIATION = 350;
 export const DEFAULT_OPPONENT_RATING_DEVIATION = 50;
 export const DEFAULT_VOLATILITY = 0.06;
 export const MINIMUM_VOLATILITY = 0.04;
+export const MANUAL_RATING_STEP = 25;
 
 const GLICKO_SCALE = 173.7178;
 const SYSTEM_CONSTANT = 0.5;
@@ -37,6 +38,27 @@ export function createDefaultRating(key: string): RatingRecord {
     volatility: DEFAULT_VOLATILITY,
     games: 0
   };
+}
+
+export function assertValidManualRating(rating: number): void {
+  if (!Number.isInteger(rating)) {
+    throw new Error("Rating must be an integer");
+  }
+  if (rating < RATING_FLOOR) {
+    throw new Error(`Rating must be at least ${RATING_FLOOR}`);
+  }
+}
+
+export function clampManualRating(rating: number): number {
+  if (!Number.isInteger(rating)) {
+    throw new Error("Rating must be an integer");
+  }
+  return Math.max(RATING_FLOOR, rating);
+}
+
+export function stepManualRating(rating: number, direction: -1 | 1): number {
+  assertValidManualRating(rating);
+  return clampManualRating(rating + direction * MANUAL_RATING_STEP);
 }
 
 export function normalizeRatingRecord(record: RatingRecord): RatingRecord {

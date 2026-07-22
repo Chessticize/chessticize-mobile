@@ -129,7 +129,7 @@ Detox screenshots:
 | `app-store-04-settings-tab` | Settings tab with local-only settings, source, and license context. |
 | `app-store-05-standard-sprint` | Standard Puzzle Sprint board, timer, progress, and mistakes. |
 | `app-store-06-arrow-duel` | Arrow Duel board with both candidate choices available. |
-| `app-store-07-custom-setup` | Custom Sprint setup with compact mode and theme choices; the theme row intentionally has no `Theme` heading. |
+| `app-store-07-custom-setup` | New Run editor with a required name, compact mode and theme choices, and the default All theme selection. The stable asset name is retained for evidence continuity. |
 | `app-store-08-review-session` | Active Review session with the scheduled puzzle board and progress context. |
 
 The capture suite builds one deterministic active-player profile through the

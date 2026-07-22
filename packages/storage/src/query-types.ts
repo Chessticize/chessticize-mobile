@@ -38,4 +38,6 @@ export interface AttemptHistoryRow {
   arrowDuelCandidateOrder?: string[];
   unclear?: boolean;
   unclearUpdatedAt?: string;
+  runId?: string;
+  runName?: string;
 }

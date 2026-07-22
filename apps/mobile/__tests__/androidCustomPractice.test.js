@@ -34,7 +34,9 @@ describe('Android Custom Practice release slice', () => {
     expect(validationStepsForApiLevel(36))
       .toContainEqual({ kind: 'detox', suite: 'android-custom-practice' });
     expect(workflow).toContain('pnpm mobile:validate:android:matrix');
-    expect(spec).toContain("by.id('practice-mode-custom')");
+    expect(spec).toContain("by.id('practice-add-run')");
+    expect(spec).toContain("by.id('practice-run-name-input')");
+    expect(spec).toContain("by.id('practice-run-start')");
     expect(spec).toContain('android-standard-practice.fixture.json');
     expect(spec).toContain('chessticizePuzzleSelectionId: practiceFixture.puzzle.id');
     expect(spec).toContain("by.id('session-board')");

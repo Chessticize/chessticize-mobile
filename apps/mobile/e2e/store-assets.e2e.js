@@ -44,9 +44,8 @@ async function launchStoreAssetApp(nowMs, deleteData) {
 }
 
 async function setStoreAssetRatings({ standard, arrowDuel }) {
-  await openTab('settings-tab', 'settings-standard-elo-row');
-  await element(by.id('settings-standard-elo-row')).tap();
-  await waitForVisibleInPracticeScroll('settings-advanced-rating-arrow-duel-increase');
+  await openTab('practice-tab', 'practice-run-management');
+  await element(by.id('practice-run-home-edit')).tap();
 
   for (const [ratingKey, targetRating] of [
     ['standard', standard],
@@ -56,17 +55,23 @@ async function setStoreAssetRatings({ standard, arrowDuel }) {
     if (!Number.isInteger(stepCount) || stepCount < 0) {
       throw new Error(`Store-asset rating ${targetRating} must be at least 600 and use 25-point steps`);
     }
+    await waitForVisibleInPracticeScroll(`practice-run-edit-${ratingKey}`);
+    await element(by.id(`practice-run-edit-${ratingKey}`)).tap();
     for (let index = 0; index < stepCount; index += 1) {
-      await element(by.id(`settings-advanced-rating-${ratingKey}-increase`)).tap();
+      await element(by.id('practice-run-elo-increase')).tap();
     }
-    await waitFor(element(by.id(`settings-advanced-rating-${ratingKey}-value`)))
+    await waitFor(element(by.id('practice-run-elo-value')))
       .toHaveText(`ELO ${targetRating}`)
       .withTimeout(10000);
+    await element(by.id('practice-main-scroll')).scrollTo('top');
+    await element(by.id('practice-run-save')).tap();
   }
+  await element(by.id('practice-main-scroll')).scrollTo('top');
+  await element(by.id('practice-run-home-done')).tap();
 }
 
 async function failArrowDuelSprint() {
-  await openTab('practice-tab', 'practice-mode-arrow-duel');
+  await openTab('practice-tab', 'practice-run-arrow-duel');
   await startPracticeMode('arrow-duel');
   await waitForVisibleInPracticeScroll('session-board');
 
@@ -115,8 +120,8 @@ async function completeOneWrongReview() {
 }
 
 async function captureMainTabScenes() {
-  await openTab('practice-tab', 'practice-mode-arrow-duel');
-  await element(by.id('practice-mode-arrow-duel')).tap();
+  await openTab('practice-tab', 'practice-run-arrow-duel');
+  await element(by.id('practice-run-select-arrow-duel')).tap();
   await element(by.id('practice-main-scroll')).scrollTo('top');
   await waitFor(element(by.id('practice-review-due-count'))).toBeVisible().withTimeout(10000);
   const ratingText = textFromAttributes(await element(by.id('practice-mode-arrow-duel-rating')).getAttributes());
@@ -126,16 +131,16 @@ async function captureMainTabScenes() {
   await sleep(1200);
   await device.takeScreenshot('app-store-01-practice-tab');
 
-  await element(by.id('practice-mode-custom')).tap();
-  await waitFor(element(by.id('custom-sprint-setup'))).toExist().withTimeout(10000);
+  await element(by.id('practice-add-run')).tap();
+  await waitFor(element(by.id('practice-run-editor'))).toExist().withTimeout(10000);
   await element(by.id('practice-main-scroll')).scrollTo('top');
   await waitFor(element(by.id('custom-mode-regular'))).toBeVisible().withTimeout(10000);
   await waitFor(element(by.id('custom-theme-row'))).toExist().withTimeout(10000);
   await expect(element(by.text('Theme'))).not.toExist();
   await sleep(1200);
   await device.takeScreenshot('app-store-07-custom-setup');
-  await element(by.id('custom-close')).tap();
-  await waitFor(element(by.id('practice-mode-arrow-duel'))).toBeVisible().withTimeout(10000);
+  await element(by.id('practice-run-editor-close')).tap();
+  await waitFor(element(by.id('practice-run-arrow-duel'))).toBeVisible().withTimeout(10000);
 
   await openTab('review-tab', 'review-start-due');
   await element(by.id('practice-main-scroll')).scrollTo('top');
@@ -150,14 +155,14 @@ async function captureMainTabScenes() {
   await sleep(1200);
   await device.takeScreenshot('app-store-03-history-tab');
 
-  await openTab('settings-tab', 'settings-standard-elo-row');
+  await openTab('settings-tab', 'settings-app-version');
   await element(by.id('practice-main-scroll')).scrollTo('top');
   await sleep(1200);
   await device.takeScreenshot('app-store-04-settings-tab');
 }
 
 async function captureSprintScenes() {
-  await openTab('practice-tab', 'practice-mode-standard');
+  await openTab('practice-tab', 'practice-run-standard');
   await startPracticeMode('standard');
   await waitForVisibleInPracticeScroll('session-board');
   await sleep(500);

@@ -8,9 +8,15 @@ export function preferredSprintSession(
   const preferred = comparison >= 0 ? left : right;
   const other = comparison >= 0 ? right : left;
   const ratingGeneration = knownRatingGeneration(preferred, other);
+  const run = preferred.run ?? other.run;
+  const config = preferred.config ?? other.config;
   return {
     ...preferred,
-    ...(ratingGeneration === undefined ? {} : { ratingGeneration })
+    ...(ratingGeneration === undefined ? {} : { ratingGeneration }),
+    ...(run === undefined ? {} : { run: { ...run } }),
+    ...(config === undefined
+      ? {}
+      : { config: { ...config, ...(config.themes === undefined ? {} : { themes: [...config.themes] }) } })
   };
 }
 
@@ -29,7 +35,11 @@ export function sameSprintSession(
     left.correctCount === right.correctCount &&
     left.mistakeCount === right.mistakeCount &&
     left.ratingBefore === right.ratingBefore &&
-    left.ratingAfter === right.ratingAfter;
+    left.ratingAfter === right.ratingAfter &&
+    left.run?.id === right.run?.id &&
+    left.run?.kind === right.run?.kind &&
+    left.run?.name === right.run?.name &&
+    JSON.stringify(left.config) === JSON.stringify(right.config);
 }
 
 function compareSprintSessionVersions(
@@ -104,6 +114,10 @@ function stableSessionKey(session: ExportedSprintSession): string {
     session.mistakeCount,
     session.ratingBefore,
     session.ratingAfter ?? null,
-    session.ratingGeneration ?? null
+    session.ratingGeneration ?? null,
+    session.run?.id ?? null,
+    session.run?.kind ?? null,
+    session.run?.name ?? null,
+    session.config ?? null
   ]);
 }

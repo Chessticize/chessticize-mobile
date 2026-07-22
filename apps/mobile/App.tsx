@@ -74,6 +74,7 @@ function App() {
           customTargetCorrect={customTargetCorrect}
           puzzleSelectionId={puzzleSelectionId}
           puzzleSelectionSeed={puzzleSelectionSeed}
+          runManagementEnabled
           standardTargetCorrect={standardTargetCorrect}
           systemBack={systemBack}
         />

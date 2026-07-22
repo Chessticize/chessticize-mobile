@@ -6,6 +6,7 @@ import type {
   HistoryQuery,
   HistoryView,
   Puzzle,
+  PracticeRunRecord,
   RatingRecord,
   ReviewContext,
   ReviewQueueItem,
@@ -92,6 +93,14 @@ export class PackBackedPracticeStore implements PracticeStore {
 
   listCustomSprintConfigs(): CustomSprintConfigRecord[] {
     return this.userStore.listCustomSprintConfigs();
+  }
+
+  savePracticeRun(run: PracticeRunRecord): void {
+    this.userStore.savePracticeRun(run);
+  }
+
+  listPracticeRuns(): PracticeRunRecord[] {
+    return this.userStore.listPracticeRuns();
   }
 
   getSettings(): PracticeSettings {
