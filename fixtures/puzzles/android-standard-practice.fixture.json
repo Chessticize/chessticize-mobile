@@ -27,5 +27,6 @@
     "e7e1",
     "e8e1"
   ],
+  "expectedRatingBefore": 600,
   "expectedRatingAfter": 775
 }

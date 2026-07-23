@@ -102,6 +102,7 @@ describe('Android Standard Practice release slice', () => {
     expect(practiceJourney).toContain('resetAppState: true');
     expect(practiceJourney).not.toContain('delete: true');
     expect(standardFixture).toEqual(expect.objectContaining({
+      expectedRatingBefore: 600,
       puzzleSelectionSeed: 'android-standard-practice',
       puzzle: expect.objectContaining({
         id: 'MRbdN',
@@ -126,6 +127,8 @@ describe('Android Standard Practice release slice', () => {
     expect(practiceJourney).not.toContain('session-side-to-move');
     expect(practiceJourney).toContain('standardFixture.userMoves[0]');
     expect(practiceJourney).toContain('standardFixture.userMoves[1]');
+    expect(practiceJourney).toContain('standardFixture.expectedRatingBefore');
+    expect(practiceJourney).not.toContain('standardFixture.puzzle.rating} ->');
     expect(practiceJourney).not.toContain("'a3c1'");
     expect(practiceJourney).not.toContain("'c1d1'");
     expect(storageContract).toContain('android-standard-practice.fixture.json');
