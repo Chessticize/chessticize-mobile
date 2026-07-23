@@ -28,7 +28,7 @@ const {
 // The visual assertion measures absolute painted arrow area. Pin the public
 // service's packaged-core selection to two long candidate vectors so random
 // move geometry cannot turn that rendering check into a pixel-count lottery.
-const PRACTICE_RENDER_PUZZLE_SELECTION_SEED = 'practice-arrow-render-v1:4';
+const PRACTICE_RENDER_PUZZLE_SELECTION_SEED = 'practice-arrow-render-v2:54824';
 
 describe('Practice POC', () => {
   beforeEach(async () => {

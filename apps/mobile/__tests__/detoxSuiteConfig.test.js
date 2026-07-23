@@ -922,7 +922,7 @@ describe('Detox suite configuration', () => {
     const renderCase = practiceSpec.slice(renderCaseStart, renderCaseEnd);
 
     expect(practiceSpec).toContain(
-      "const PRACTICE_RENDER_PUZZLE_SELECTION_SEED = 'practice-arrow-render-v1:4';"
+      "const PRACTICE_RENDER_PUZZLE_SELECTION_SEED = 'practice-arrow-render-v2:54824';"
     );
     expect(practiceSpec).toContain(
       'chessticizePuzzleSelectionSeed: PRACTICE_RENDER_PUZZLE_SELECTION_SEED'
