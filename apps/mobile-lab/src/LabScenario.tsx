@@ -86,7 +86,6 @@ function LabScenarioContent({
               timedOutAttemptIds: ["history-wrong"]
             }
           : undefined}
-        historyTrainingFocusPreview={scenarioId === "history-tactical-profile"}
         {...runtime.screenProps}
       />
     </LabScenarioShell>
@@ -102,20 +101,31 @@ function sessionTimingPreviewFor(
   scenarioId: LabScenarioId
 ): React.ComponentProps<typeof PracticePocScreen>["sessionTimingPreview"] {
   if (scenarioId === "practice-active") {
-    return "normal";
+    return {
+      initialElapsedSeconds: 24,
+      warningSeconds: 40,
+      timeoutSeconds: 60
+    };
   }
   if (scenarioId === "practice-timing-warning") {
-    return "slow";
+    return {
+      initialElapsedSeconds: 41,
+      warningSeconds: 40,
+      timeoutSeconds: 60
+    };
   }
   if (scenarioId === "practice-timing-timeout") {
-    return "timed_out";
+    return {
+      initialElapsedSeconds: 52,
+      warningSeconds: 40,
+      timeoutSeconds: 60
+    };
   }
   return undefined;
 }
 
 function showsHistoryTimingPreview(scenarioId: LabScenarioId): boolean {
-  return scenarioId === "history-populated"
-    || scenarioId === "history-tactical-profile";
+  return scenarioId === "history-populated";
 }
 
 function isRunManagementScenario(scenarioId: LabScenarioId): boolean {
@@ -225,7 +235,6 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     case "history-populated":
     case "history-filters":
     case "history-attempt-detail":
-    case "history-tactical-profile":
       service = createHistoryService(false, THEME_CATALOG_LAB_PUZZLES);
       configurePuzzleSource = false;
       break;

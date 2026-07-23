@@ -167,6 +167,7 @@ export const PuzzleTimeout: Story = {
   play: async ({ canvasElement }) => {
     await openPracticeSession(canvasElement);
     await waitForTestId(canvasElement, "session-puzzle-timing");
+    await waitForTestId(canvasElement, "session-puzzle-countdown");
   }
 };
 

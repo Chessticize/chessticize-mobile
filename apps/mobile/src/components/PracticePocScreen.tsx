@@ -187,13 +187,18 @@ interface Props {
   runManagementPresentation?: PracticeRunManagementPresentation;
   runEloEditingMovedToHome?: boolean;
   runTimingEditorPreview?: boolean;
-  sessionTimingPreview?: "normal" | "slow" | "timed_out";
+  sessionTimingPreview?: SessionTimingDesignPreview;
   historyTimingPreview?: HistoryTimingDesignPreview;
-  historyTrainingFocusPreview?: boolean;
   sprintStartDelayMs?: number;
   standardTargetCorrect?: number;
   systemBack?: MobileSystemBackSource;
 }
+
+export type SessionTimingDesignPreview = {
+  initialElapsedSeconds: number;
+  timeoutSeconds: number;
+  warningSeconds: number;
+};
 
 export type HistoryTimingDesignPreview = {
   slowAttemptIds: readonly string[];
@@ -394,7 +399,6 @@ export function PracticePocScreen({
   runTimingEditorPreview = false,
   sessionTimingPreview,
   historyTimingPreview,
-  historyTrainingFocusPreview = false,
   sprintStartDelayMs = ARROW_DUEL_LOADING_TRANSITION_MS,
   standardTargetCorrect,
   systemBack
@@ -508,6 +512,7 @@ export function PracticePocScreen({
   const [iCloudSyncEnabled, setICloudSyncEnabled] = useState(() => service.getSettings().sync.iCloudEnabled);
   const [iCloudSyncStatus, setICloudSyncStatus] = useState(() => service.getSettings().sync.iCloudEnabled ? "Ready" : "Off");
   const [, setSettingsRevision] = useState(0);
+  const sessionTimingDesignState = useSessionTimingDesignPreview(sessionTimingPreview);
   const internalRunManagement = usePracticeRunManagement({
     enabled: runManagementEnabled && runManagementPresentation === undefined,
     onStartRun: startPracticeRun,
@@ -2405,9 +2410,11 @@ export function PracticePocScreen({
       onResume={isPaused && state ? () => resumeSprint(state) : undefined}
     />
   ) : null;
-  const sessionPuzzleTimingNode = shouldShowSessionBoard && sessionTimingPreview ? (
+  const sessionPuzzleTimingNode = shouldShowSessionBoard && sessionTimingDesignState ? (
     <PuzzleTimingIndicator
-      phase={sessionTimingPreview}
+      elapsedSeconds={sessionTimingDesignState.elapsedSeconds}
+      phase={sessionTimingDesignState.phase}
+      timeoutSeconds={sessionTimingPreview?.timeoutSeconds ?? 0}
       placement={sessionUsesRail ? "rail" : "board"}
     />
   ) : null;
@@ -2434,7 +2441,7 @@ export function PracticePocScreen({
       >
         {displayedBoardFen ? (
           <Chessboard
-            key={state?.id ?? "idle"}
+            key={`${state?.id ?? "idle"}:${sessionTimingDesignState?.cycle ?? 0}`}
             ref={boardRef}
             fen={displayedBoardFen}
             onMove={sessionBoardCallbacks.onMove}
@@ -2469,8 +2476,19 @@ export function PracticePocScreen({
 
         {!sessionUsesRail ? sessionPuzzleTimingNode : null}
 
-        {!boardGestureEnabled ? (
+        {!boardGestureEnabled || sessionTimingDesignState?.phase === "timed_out" ? (
           <BoardInputBlocker />
+        ) : null}
+
+        {sessionTimingDesignState?.phase === "timed_out" ? (
+          <View
+            accessibilityLiveRegion="assertive"
+            accessibilityRole="alert"
+            style={styles.puzzleTimeoutOverlay}
+            testID="session-puzzle-timeout-overlay"
+          >
+            <Text style={styles.puzzleTimeoutOverlayTitle}>Timed out</Text>
+          </View>
         ) : null}
 
         {displayedLastBoardMove ? (
@@ -2887,7 +2905,6 @@ export function PracticePocScreen({
                   slowOnly={historySlowOnly}
                   timedOutOnly={historyTimedOutOnly}
                   timingPreview={historyTimingPreview}
-                  trainingFocusPreview={historyTrainingFocusPreview}
                   themeCatalogPresentation={themeCatalogPresentation}
                   filtersExpanded={historyFiltersExpanded}
                   onFiltersExpandedChange={setHistoryFiltersExpanded}
@@ -4139,6 +4156,15 @@ function PracticeRunEditor({
         </View>
       ) : null}
 
+      {!isCreate && directRunEditing && showTimingPreview ? (
+        <Text
+          style={[styles.sectionLabel, styles.runEditorDetailsLabel]}
+          testID="practice-run-details-section"
+        >
+          Run details
+        </Text>
+      ) : null}
+
       <View style={styles.customConfigCard} testID="practice-run-editor-fields">
         {canEditName ? (
           <View style={[styles.customConfigRow, styles.runNameRow]} testID="practice-run-name-row">
@@ -4267,10 +4293,11 @@ function PracticeRunEditor({
               onInputChange={(value) => presentation.onIntent({ type: "change-elo-input", value })}
               onInputStep={(direction) => presentation.onIntent({ type: "step-elo-input", direction })}
             />
-            {directRunEditing && showTimingPreview ? <PracticeRunTimingPreview /> : null}
           </>
         )}
       </View>
+
+      {!isCreate && directRunEditing && showTimingPreview ? <PracticeRunTimingPreview /> : null}
 
       {isCreate && isCustom && previousRows.length > 0 ? (
         <View style={styles.previousConfigList} testID="custom-previous-configs">
@@ -4298,31 +4325,31 @@ function PracticeRunTimingPreview(): React.JSX.Element {
   const [timeoutSeconds, setTimeoutSeconds] = useState(60);
 
   return (
-    <View style={styles.runTimingSection} testID="practice-run-puzzle-timing">
-      <View style={styles.runTimingSectionHeader}>
-        <View style={styles.runTimingSectionCopy}>
-          <Text style={styles.listText}>Puzzle timing</Text>
-          <Text style={styles.helperText}>Typical time 0:20 · no ELO impact</Text>
-        </View>
+    <View style={styles.settingsSection} testID="practice-run-puzzle-timing">
+      <View style={styles.runTimingSectionCopy}>
+        <Text style={styles.sectionLabel}>Puzzle timing</Text>
+        <Text style={styles.helperText}>Typical time 0:20 · no ELO impact</Text>
       </View>
-      <RunTimingSettingRow
-        detail="Shows Slow; play continues."
-        enabled={warningEnabled}
-        label="Slow warning"
-        seconds={warningSeconds}
-        testID="practice-run-slow-warning"
-        onChange={(seconds) => setWarningSeconds(Math.min(seconds, timeoutSeconds - 5))}
-        onToggle={() => setWarningEnabled((current) => !current)}
-      />
-      <RunTimingSettingRow
-        detail="Marks Timed out and moves on."
-        enabled={timeoutEnabled}
-        label="Puzzle timeout"
-        seconds={timeoutSeconds}
-        testID="practice-run-puzzle-timeout"
-        onChange={(seconds) => setTimeoutSeconds(Math.max(seconds, warningSeconds + 5))}
-        onToggle={() => setTimeoutEnabled((current) => !current)}
-      />
+      <View style={styles.customConfigCard} testID="practice-run-puzzle-timing-card">
+        <RunTimingSettingRow
+          detail="Turns the puzzle clock yellow; play continues."
+          enabled={warningEnabled}
+          label="Slow warning"
+          seconds={warningSeconds}
+          testID="practice-run-slow-warning"
+          onChange={(seconds) => setWarningSeconds(Math.min(seconds, timeoutSeconds - 5))}
+          onToggle={() => setWarningEnabled((current) => !current)}
+        />
+        <RunTimingSettingRow
+          detail="Marks Timed out and moves on."
+          enabled={timeoutEnabled}
+          label="Puzzle timeout"
+          seconds={timeoutSeconds}
+          testID="practice-run-puzzle-timeout"
+          onChange={(seconds) => setTimeoutSeconds(Math.max(seconds, warningSeconds + 5))}
+          onToggle={() => setTimeoutEnabled((current) => !current)}
+        />
+      </View>
     </View>
   );
 }
@@ -5357,38 +5384,95 @@ function TestPuzzleSourceControl({
   );
 }
 
-function PuzzleTimingIndicator({
-  phase,
-  placement
-}: {
+type SessionTimingDesignState = {
+  cycle: number;
+  elapsedSeconds: number;
   phase: "normal" | "slow" | "timed_out";
-  placement: "board" | "rail";
-}): React.JSX.Element {
-  const [showTimedOut, setShowTimedOut] = useState(phase === "timed_out");
+};
+
+function useSessionTimingDesignPreview(
+  preview: SessionTimingDesignPreview | undefined
+): SessionTimingDesignState | null {
+  const initialElapsedSeconds = preview?.initialElapsedSeconds ?? 0;
+  const timeoutSeconds = preview?.timeoutSeconds ?? 0;
+  const warningSeconds = preview?.warningSeconds ?? 0;
+  const previewEnabled = preview !== undefined;
+  const [state, setState] = useState<SessionTimingDesignState>(() => ({
+    cycle: 0,
+    elapsedSeconds: initialElapsedSeconds,
+    phase: initialElapsedSeconds >= warningSeconds ? "slow" : "normal"
+  }));
 
   useEffect(() => {
-    if (phase !== "timed_out") {
-      setShowTimedOut(false);
+    if (!previewEnabled) {
       return undefined;
     }
-    setShowTimedOut(true);
-    const timeout = setTimeout(() => setShowTimedOut(false), FEEDBACK_SNAPSHOT_MS);
-    return () => clearTimeout(timeout);
-  }, [phase]);
+    setState({
+      cycle: 0,
+      elapsedSeconds: initialElapsedSeconds,
+      phase: initialElapsedSeconds >= warningSeconds ? "slow" : "normal"
+    });
+    const interval = setInterval(() => {
+      setState((current) => {
+        if (current.phase === "timed_out") {
+          return current;
+        }
+        const elapsedSeconds = Math.min(current.elapsedSeconds + 1, timeoutSeconds);
+        return {
+          ...current,
+          elapsedSeconds,
+          phase: elapsedSeconds >= timeoutSeconds
+            ? "timed_out"
+            : elapsedSeconds >= warningSeconds ? "slow" : "normal"
+        };
+      });
+    }, 1_000);
+    return () => clearInterval(interval);
+  }, [initialElapsedSeconds, previewEnabled, timeoutSeconds, warningSeconds]);
 
-  const visualPhase = phase === "timed_out" && !showTimedOut ? "normal" : phase;
-  const label = visualPhase === "timed_out"
-    ? "Timed out"
-    : visualPhase === "slow" ? "Slow 0:41" : phase === "timed_out" ? "Puzzle 0:02" : "Puzzle 0:24";
+  useEffect(() => {
+    if (!previewEnabled || state.phase !== "timed_out") {
+      return undefined;
+    }
+    const handoff = setTimeout(() => {
+      setState((current) => ({
+        cycle: current.cycle + 1,
+        elapsedSeconds: 0,
+        phase: "normal"
+      }));
+    }, FEEDBACK_SNAPSHOT_MS);
+    return () => clearTimeout(handoff);
+  }, [previewEnabled, state.phase]);
+
+  return previewEnabled ? state : null;
+}
+
+function PuzzleTimingIndicator({
+  elapsedSeconds,
+  phase,
+  placement,
+  timeoutSeconds
+}: {
+  elapsedSeconds: number;
+  phase: SessionTimingDesignState["phase"];
+  placement: "board" | "rail";
+  timeoutSeconds: number;
+}): React.JSX.Element {
+  const label = `Puzzle ${formatCompactDuration(elapsedSeconds)}`;
+  const remainingSeconds = timeoutSeconds - elapsedSeconds;
+  const countdownSeconds = phase !== "timed_out" && remainingSeconds <= 10
+    ? Math.max(remainingSeconds, 1)
+    : null;
+  const accessibilityLabel = countdownSeconds === null
+    ? label
+    : `${label}, ${countdownSeconds} seconds until timeout`;
 
   return (
     <View
-      accessibilityLiveRegion={visualPhase === "timed_out" ? "assertive" : "none"}
-      accessibilityLabel={label}
+      accessibilityLabel={accessibilityLabel}
       style={[
         styles.puzzleTimingIndicator,
-        visualPhase === "slow" ? styles.puzzleTimingIndicatorSlow : null,
-        visualPhase === "timed_out" ? styles.puzzleTimingIndicatorTimedOut : null,
+        phase !== "normal" ? styles.puzzleTimingIndicatorSlow : null,
         placement === "board" ? styles.puzzleTimingIndicatorBoard : styles.puzzleTimingIndicatorRail
       ]}
       testID="session-puzzle-timing"
@@ -5397,13 +5481,21 @@ function PuzzleTimingIndicator({
         numberOfLines={1}
         style={[
           styles.puzzleTimingIndicatorText,
-          visualPhase === "slow" ? styles.puzzleTimingIndicatorTextSlow : null,
-          visualPhase === "timed_out" ? styles.puzzleTimingIndicatorTextTimedOut : null
+          phase !== "normal" ? styles.puzzleTimingIndicatorTextSlow : null
         ]}
         testID="session-puzzle-timing-label"
       >
         {label}
       </Text>
+      {countdownSeconds === null ? null : (
+        <Text
+          accessibilityElementsHidden
+          style={styles.puzzleTimingCountdown}
+          testID="session-puzzle-countdown"
+        >
+          {countdownSeconds}s
+        </Text>
+      )}
     </View>
   );
 }
@@ -6401,7 +6493,6 @@ function HistoryPanel({
   slowOnly,
   timedOutOnly,
   timingPreview,
-  trainingFocusPreview,
   themeCatalogPresentation,
   onRatingKeyChange,
   onTimeRangeChange,
@@ -6444,7 +6535,6 @@ function HistoryPanel({
   slowOnly: boolean;
   timedOutOnly: boolean;
   timingPreview?: HistoryTimingDesignPreview;
-  trainingFocusPreview: boolean;
   themeCatalogPresentation?: ThemeCatalogPresentation;
   onRatingKeyChange: (ratingKey: string | null) => void;
   onTimeRangeChange: (range: HistoryTimeRange) => void;
@@ -6671,8 +6761,6 @@ function HistoryPanel({
       ) : null}
 
       <HistoryActiveFilterStrip labels={activeFilterLabels} />
-
-      {trainingFocusPreview ? <HistoryTrainingFocusCard /> : null}
 
       <View style={styles.historyPageRow}>
         <Text style={styles.helperText}>
@@ -7196,31 +7284,6 @@ function HistoryQuickToggle({
         <View style={[styles.historyToggleThumb, active ? styles.historyToggleThumbActive : null]} />
       </View>
     </Pressable>
-  );
-}
-
-function HistoryTrainingFocusCard(): React.JSX.Element {
-  const [added, setAdded] = useState(false);
-
-  return (
-    <View style={styles.historyTrainingFocusCard} testID="history-training-focus">
-      <View style={styles.historyTrainingFocusCopy}>
-        <Text style={styles.sectionLabel}>Training focus</Text>
-        <Text style={styles.listText}>Forks</Text>
-        <Text style={styles.helperText}>62% · 28s median</Text>
-      </View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={added ? "Fork Run added" : "Train forks"}
-        accessibilityState={{ disabled: added }}
-        disabled={added}
-        style={[styles.primarySmallButton, added ? styles.disabledButton : null]}
-        testID="history-training-focus-action"
-        onPress={() => setAdded(true)}
-      >
-        <Text style={styles.primarySmallButtonText}>{added ? "Added" : "Train"}</Text>
-      </Pressable>
-    </View>
   );
 }
 
@@ -12193,6 +12256,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 9
   },
+  runEditorDetailsLabel: {
+    marginBottom: -4
+  },
   runEditorRunName: {
     color: "#111827",
     fontSize: 15,
@@ -13008,6 +13074,8 @@ const styles = StyleSheet.create({
     borderColor: "#CBD5E1",
     borderRadius: 999,
     borderWidth: 1,
+    flexDirection: "row",
+    gap: 6,
     justifyContent: "center",
     minHeight: 26,
     paddingHorizontal: 9
@@ -13029,10 +13097,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFBEB",
     borderColor: "#F59E0B"
   },
-  puzzleTimingIndicatorTimedOut: {
-    backgroundColor: "#FEF2F2",
-    borderColor: "#EF4444"
-  },
   puzzleTimingIndicatorText: {
     color: "#475569",
     fontFamily: "menlo",
@@ -13043,8 +13107,31 @@ const styles = StyleSheet.create({
   puzzleTimingIndicatorTextSlow: {
     color: "#B45309"
   },
-  puzzleTimingIndicatorTextTimedOut: {
-    color: "#B91C1C"
+  puzzleTimingCountdown: {
+    backgroundColor: "#F59E0B",
+    borderRadius: 999,
+    color: "#FFFFFF",
+    fontFamily: "menlo",
+    fontSize: 10,
+    fontWeight: "900",
+    fontVariant: ["tabular-nums"],
+    minWidth: 25,
+    overflow: "hidden",
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    textAlign: "center"
+  },
+  puzzleTimeoutOverlay: {
+    ...StyleSheet.absoluteFill,
+    alignItems: "center",
+    backgroundColor: "rgba(15, 23, 42, 0.90)",
+    justifyContent: "center",
+    zIndex: 60
+  },
+  puzzleTimeoutOverlayTitle: {
+    color: "#FFFFFF",
+    fontSize: 22,
+    fontWeight: "900"
   },
   boardWrapper: {
     alignItems: "center",
@@ -13319,22 +13406,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10
   },
-  runTimingSection: {
-    borderTopColor: "#CBD5E1",
-    borderTopWidth: 1
-  },
-  runTimingSectionHeader: {
-    backgroundColor: "#F8FAFC",
-    paddingHorizontal: 12,
-    paddingVertical: 9
-  },
   runTimingSectionCopy: {
     gap: 2
   },
   runTimingRow: {
     alignItems: "center",
-    borderTopColor: "#E2E8F0",
-    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#E2E8F0",
+    borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
     gap: 8,
     justifyContent: "space-between",
@@ -14300,24 +14378,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 8,
     padding: 12
-  },
-  historyTrainingFocusCard: {
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 12,
-    justifyContent: "space-between",
-    minHeight: 72,
-    paddingHorizontal: 12,
-    paddingVertical: 10
-  },
-  historyTrainingFocusCopy: {
-    flex: 1,
-    gap: 2,
-    minWidth: 0
   },
   historyPerformanceHeader: {
     alignItems: "center",

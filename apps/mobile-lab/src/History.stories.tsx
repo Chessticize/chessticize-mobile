@@ -31,16 +31,6 @@ export const PopulatedHistory: Story = {
   }
 };
 
-export const TrainingFocus: Story = {
-  name: "Populated history · Training focus",
-  args: { scenarioId: "history-tactical-profile" },
-  tags: ["new"],
-  play: async ({ canvasElement }) => {
-    await openHistory(canvasElement);
-    await waitForTestId(canvasElement, "history-training-focus");
-  }
-};
-
 export const FiltersAndActiveFilters: Story = {
   name: "Filters and active filters",
   args: { scenarioId: "history-filters" },

@@ -1126,6 +1126,15 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "practice-run-elo-row"))).toContain(
       "600–2200 · ±100 buttons"
     );
+    expect(collectText(findByTestId(renderer, "practice-run-details-section"))).toBe(
+      "Run details"
+    );
+    expect(collectText(findByTestId(renderer, "practice-run-editor-fields"))).not.toContain(
+      "Puzzle timing"
+    );
+    expect(collectText(findByTestId(renderer, "practice-run-puzzle-timing-card"))).not.toContain(
+      "Puzzle timing"
+    );
     expect(findByTestId(renderer, "practice-run-elo-decrease").props.accessibilityLabel).toBe(
       "Decrease run ELO by 100"
     );
@@ -1136,7 +1145,7 @@ describe("PracticePocScreen", () => {
       "Typical time 0:20 · no ELO impact"
     );
     expect(collectText(findByTestId(renderer, "practice-run-slow-warning"))).toContain(
-      "Shows Slow; play continues."
+      "Turns the puzzle clock yellow; play continues."
     );
     expect(collectText(findByTestId(renderer, "practice-run-puzzle-timeout"))).toContain(
       "Marks Timed out and moves on."
@@ -1208,21 +1217,39 @@ describe("PracticePocScreen", () => {
       styleEntry[1]
     )).toBe(true);
     if (scenarioId === "practice-timing-warning") {
-      expect(collectText(findByTestId(renderer, "session-puzzle-timing-label"))).toBe("Slow 0:41");
+      expect(collectText(findByTestId(renderer, "session-puzzle-timing-label"))).toBe("Puzzle 0:41");
+      expect(collectText(findByTestId(renderer, "session-puzzle-timing"))).not.toContain("Slow");
+      expect(hasStyleEntry(
+        findByTestId(renderer, "session-puzzle-timing-label"),
+        "color",
+        "#B45309"
+      )).toBe(true);
       expect(findByTestId(renderer, "active-session-control-rail-content")).toBeTruthy();
     }
   });
 
-  it("briefly shows Timed out in the existing session before resetting for the next puzzle", () => {
+  it("counts down, locks the board under Timed out, then resets for the next puzzle", () => {
     const renderer = renderLabScenario("practice-timing-timeout");
 
     startStandardSprint(renderer);
-    expect(collectText(findByTestId(renderer, "session-puzzle-timing-label"))).toBe("Timed out");
+    expect(collectText(findByTestId(renderer, "session-puzzle-timing-label"))).toBe("Puzzle 0:52");
+    expect(collectText(findByTestId(renderer, "session-puzzle-countdown"))).toBe("8s");
+
+    act(() => {
+      jest.advanceTimersByTime(8_000);
+    });
+    expect(collectText(findByTestId(renderer, "session-puzzle-timing-label"))).toBe("Puzzle 1:00");
+    expect(collectText(findByTestId(renderer, "session-puzzle-timeout-overlay"))).toContain(
+      "Timed out"
+    );
+    expect(findByTestId(renderer, "board-input-blocker")).toBeTruthy();
 
     act(() => {
       jest.advanceTimersByTime(800);
     });
-    expect(collectText(findByTestId(renderer, "session-puzzle-timing-label"))).toBe("Puzzle 0:02");
+    expect(() => findByTestId(renderer, "session-puzzle-timeout-overlay")).toThrow();
+    expect(collectText(findByTestId(renderer, "session-puzzle-timing-label"))).toBe("Puzzle 0:00");
+    expect(() => findByTestId(renderer, "session-puzzle-countdown")).toThrow();
   });
 
   it("adds Slow and Timed out to the existing populated History controls and rows", async () => {
@@ -1242,21 +1269,13 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-attempt-history-correct")).toBeTruthy();
     expect(() => findByTestId(renderer, "history-attempt-history-wrong")).toThrow();
 
-    press(renderer, "history-filter-slow-only");
     press(renderer, "history-filter-timed-out-only");
+    expect(findByTestId(renderer, "history-attempt-history-correct")).toBeTruthy();
+    expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
+
+    press(renderer, "history-filter-slow-only");
     expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
     expect(() => findByTestId(renderer, "history-attempt-history-correct")).toThrow();
-  });
-
-  it("keeps the tactical recommendation inside the existing populated History baseline", async () => {
-    const renderer = renderLabScenario("history-tactical-profile");
-    await flushMicrotasks();
-
-    press(renderer, "history-tab");
-    expect(collectText(findByTestId(renderer, "history-training-focus"))).toContain("Training focus");
-    expect(collectText(findByTestId(renderer, "history-training-focus"))).toContain("Forks");
-    press(renderer, "history-training-focus-action");
-    expect(collectText(findByTestId(renderer, "history-training-focus-action"))).toBe("Added");
   });
 
   it("shows direct ELO validation and disables Save outside 600-2200", () => {
@@ -7249,7 +7268,7 @@ function createScriptedStockfishTransport(
 }
 
 type RenderScreenOptions = TestMobilePlatformCapabilityOverrides &
-  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "historyTimingPreview" | "historyTrainingFocusPreview" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEloEditingMovedToHome" | "runManagementEnabled" | "runManagementPresentation" | "runTimingEditorPreview" | "sessionTimingPreview" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "themeCatalogPresentation"> & {
+  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "historyTimingPreview" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEloEditingMovedToHome" | "runManagementEnabled" | "runManagementPresentation" | "runTimingEditorPreview" | "sessionTimingPreview" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "themeCatalogPresentation"> & {
     platformCapabilities?: MobilePlatformCapabilities;
   };
 
@@ -7355,7 +7374,6 @@ function renderScreen({
   runTimingEditorPreview,
   sessionTimingPreview,
   historyTimingPreview,
-  historyTrainingFocusPreview,
   sprintStartDelayMs,
   standardTargetCorrect,
   systemBack,
@@ -7379,7 +7397,6 @@ function renderScreen({
         runTimingEditorPreview={runTimingEditorPreview}
         sessionTimingPreview={sessionTimingPreview}
         historyTimingPreview={historyTimingPreview}
-        historyTrainingFocusPreview={historyTrainingFocusPreview}
         sprintStartDelayMs={sprintStartDelayMs}
         standardTargetCorrect={standardTargetCorrect}
         systemBack={systemBack}

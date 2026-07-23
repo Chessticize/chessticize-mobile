@@ -27,7 +27,7 @@
     "issues": [
       {
         "issueNumber": 248,
-        "changeNote": "Show compact puzzle elapsed time without adding another layout bar."
+        "changeNote": "Run a compact puzzle elapsed timer without adding another layout bar."
       }
     ]
   },
@@ -35,7 +35,7 @@
     "issues": [
       {
         "issueNumber": 248,
-        "changeNote": "Use a compact Slow state in the existing active session."
+        "changeNote": "Turn the existing compact puzzle clock amber after the Slow threshold."
       }
     ]
   },
@@ -43,7 +43,7 @@
     "issues": [
       {
         "issueNumber": 249,
-        "changeNote": "Briefly show Timed out, then reset the indicator for the next puzzle."
+        "changeNote": "Show the final countdown, lock the board under brief Timed out feedback, then reset for the next puzzle."
       }
     ]
   },
@@ -56,14 +56,6 @@
       {
         "issueNumber": 249,
         "changeNote": "Add Timed out to the existing History quick filters and attempt results."
-      }
-    ]
-  },
-  "history-tactical-profile": {
-    "issues": [
-      {
-        "issueNumber": 250,
-        "changeNote": "Add one compact theme-based training recommendation to populated History."
       }
     ]
   }
