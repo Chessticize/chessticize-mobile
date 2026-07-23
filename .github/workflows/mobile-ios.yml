@@ -59,6 +59,9 @@ jobs:
       - name: Fetch core puzzle pack
         run: pnpm fetch:core-pack
 
+      - name: Mobile lint
+        run: pnpm mobile:lint
+
       - name: Mobile typecheck
         run: pnpm mobile:typecheck
 

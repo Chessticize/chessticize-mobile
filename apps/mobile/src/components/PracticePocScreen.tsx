@@ -44,7 +44,6 @@ import {
   isReviewOverdue,
   MANUAL_RATING_STEP,
   normalizeHistoryAttemptDetail,
-  normalizeThemeSelection,
   PRACTICE_RUN_NAME_MAX_LENGTH,
   RATING_FLOOR,
   reviewDueState,
@@ -7113,14 +7112,6 @@ function historyAttemptRecencyLabel(completedAtMs: number): string {
   }
   const years = Math.floor(elapsedDays / 365);
   return `${years}y ago`;
-}
-
-function titleCase(value: string): string {
-  return value
-    .split(/[\s_-]+/)
-    .filter(Boolean)
-    .map((word) => word[0]?.toUpperCase() + word.slice(1))
-    .join(" ");
 }
 
 function FilterButton({

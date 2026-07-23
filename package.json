@@ -25,6 +25,7 @@
     "typecheck": "tsc --noEmit",
     "mobile:start": "pnpm --filter ChessticizeMobile start",
     "mobile:ios": "pnpm --filter ChessticizeMobile ios",
+    "mobile:lint": "pnpm --filter ChessticizeMobile lint",
     "mobile:test": "pnpm --filter ChessticizeMobile test",
     "mobile:typecheck": "pnpm --filter ChessticizeMobile typecheck",
     "mobile:storybook": "pnpm --filter ChessticizeMobileLab storybook",
