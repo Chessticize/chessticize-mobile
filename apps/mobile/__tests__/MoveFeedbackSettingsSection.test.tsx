@@ -55,6 +55,18 @@ describe("MoveFeedbackSettingsSection", () => {
     expect(text(find(renderer, "settings-move-feedback-previews"))).toContain(
       "Web demo only"
     );
+    expect(text(find(renderer, "settings-move-feedback-section"))).toContain(
+      "Brief board sounds for moves and captures."
+    );
+    expect(text(find(renderer, "settings-move-feedback-section"))).toContain(
+      "Light touch feedback for moves and captures."
+    );
+    expect(text(find(renderer, "settings-move-feedback-section"))).not.toContain(
+      "puzzle results"
+    );
+    expect(text(find(renderer, "settings-move-feedback-section"))).not.toContain(
+      "success, and mistakes"
+    );
     expect(find(renderer, "settings-move-feedback-preview-move")).toBeTruthy();
     expect(find(renderer, "settings-move-feedback-preview-capture")).toBeTruthy();
     expect(() => find(renderer, "settings-move-feedback-preview-success")).toThrow();

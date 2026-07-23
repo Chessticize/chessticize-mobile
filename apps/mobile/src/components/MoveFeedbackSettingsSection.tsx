@@ -59,7 +59,7 @@ export function MoveFeedbackSettingsSection({
       <Text style={styles.sectionLabel}>Move Feedback</Text>
       <View style={styles.card}>
         <FeedbackToggleRow
-          detail="Brief board sounds for moves, captures, and puzzle results."
+          detail="Brief board sounds for moves and captures."
           enabled={preferences.soundEnabled}
           label="Sound effects"
           controlTestID="settings-move-sound-toggle"
@@ -69,7 +69,7 @@ export function MoveFeedbackSettingsSection({
           }}
         />
         <FeedbackToggleRow
-          detail="Light touch feedback for your moves, success, and mistakes."
+          detail="Light touch feedback for moves and captures."
           enabled={preferences.hapticsEnabled}
           label="Haptic feedback"
           controlTestID="settings-move-haptics-toggle"
