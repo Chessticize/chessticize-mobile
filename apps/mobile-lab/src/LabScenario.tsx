@@ -212,6 +212,11 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     case "settings-notifications-denied":
       notificationStatus = "denied";
       break;
+    case "settings-feedback-entry-failure":
+      screenProps.feedbackIssuesOpener = async () => {
+        throw new Error("browser unavailable");
+      };
+      break;
     case "system-error":
       service = new PracticeService(new MemoryStore());
       configurePuzzleSource = false;

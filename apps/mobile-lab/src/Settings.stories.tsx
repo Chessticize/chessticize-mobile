@@ -56,6 +56,28 @@ export const AdvancedRatingEditor: Story = {
   }
 };
 
+export const FeedbackEntryDesign: Story = {
+  name: "Feedback entry",
+  args: { scenarioId: "settings-feedback-entry" },
+  play: async ({ canvasElement }) => {
+    await openSettings(canvasElement);
+    await waitForTestId(canvasElement, "settings-feedback-section");
+    await clickTestId(canvasElement, "settings-feedback-open-github");
+    await waitForTestId(canvasElement, "settings-feedback-handoff-confirmation");
+  }
+};
+
+export const FeedbackEntryFailure: Story = {
+  name: "Feedback handoff failure",
+  args: { scenarioId: "settings-feedback-entry-failure" },
+  play: async ({ canvasElement }) => {
+    await openSettings(canvasElement);
+    await clickTestId(canvasElement, "settings-feedback-open-github");
+    await clickTestId(canvasElement, "settings-feedback-handoff-continue");
+    await waitForTestId(canvasElement, "settings-feedback-handoff-error");
+  }
+};
+
 export const StockfishDiagnostics: Story = {
   name: "Stockfish diagnostics",
   args: { scenarioId: "settings-stockfish-diagnostics" },

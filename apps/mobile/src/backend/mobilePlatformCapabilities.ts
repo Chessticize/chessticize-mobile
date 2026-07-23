@@ -34,6 +34,7 @@ export interface MobileReminderCapabilities {
 export interface MobileApplicationMetadata {
   versionName: string;
   buildNumber?: string;
+  feedbackIssuesUrl: string;
   releasePageUrl?: string;
   sourceLicenseUrl: string;
   sourceRepositoryUrl: string;
@@ -51,6 +52,7 @@ export const MOBILE_APPLICATION_METADATA_LINKS: Omit<
   MobileApplicationMetadata,
   'versionName' | 'buildNumber'
 > = {
+  feedbackIssuesUrl: `${SOURCE_REPOSITORY_URL}/issues/new`,
   sourceLicenseUrl: `${SOURCE_REPOSITORY_URL}/blob/main/LICENSE`,
   sourceRepositoryUrl: SOURCE_REPOSITORY_URL,
   stockfishSourceUrl: `${SOURCE_REPOSITORY_URL}/tree/main/apps/mobile/native/stockfish`,
