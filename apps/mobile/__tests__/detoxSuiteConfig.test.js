@@ -895,7 +895,7 @@ describe('Detox suite configuration', () => {
     const waitForExist = helper.indexOf('.toExist().withTimeout(180000)');
     const restoreTop = helper.indexOf("element(by.id('practice-main-scroll')).scrollTo('top')");
     const requireVisible = helper.indexOf('.toBeVisible()');
-    const scrollDown = helper.indexOf(".scroll(100, 'down')");
+    const scrollDown = helper.indexOf(".scroll(100, 'down', 0.5, 0.5)");
 
     expect(waitForExist).toBeGreaterThan(0);
     expect(restoreTop).toBeGreaterThan(waitForExist);

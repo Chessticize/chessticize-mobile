@@ -1,14 +1,15 @@
 # Android Play Release Candidate
 
 This runbook builds and audits the current production-upload-signed Android App
-Bundle. Builds 1 through 3 remain immutable audit records. Version code 1 was
+Bundle. Builds 1 through 4 remain immutable audit records. Version code 1 was
 uploaded to Play before a later protected source-publication workflow defect was
 fixed. Version code 2 produced a valid signed candidate, but exact-tag Android
 validation found a stale adaptive E2E dependency on a deliberately removed
 public control. Version code 3 fixed that stale UI dependency, but exact-tag API
 24 validation exposed a launch/package-manager state race in the evidence
-harness. The reviewed replacement keeps public version 1.1 and advances only
-the Android build number to 4. This runbook deliberately separates
+harness. Version code 4 became the published Android 1.1 release. The next
+candidate advances the public version to 1.2 and the Android build number to 5.
+This runbook deliberately separates
 repository-owned checks from owner-only Play Console evidence. Missing signing material,
 protected-environment setup, or any console result is a blocker; never replace
 it with a debug key, a scratch key, an emulator claim, or a hand-edited passing
@@ -82,17 +83,31 @@ distributed:
 The API 24 evidence contract still requires the exact single `Transport
 rejected package` result and does not accept `Backup is not allowed`. No build-3 source release was created and its AAB was not uploaded to Play. Do not
 move or reuse its tag, artifact, or version code, and do not resume its source
-or binary publication phases. Build 4 is the next release candidate.
+or binary publication phases.
+
+Build 4 is the immutable published Android 1.1 release:
+
+- annotated tag: `android-v1.1.0-build-4`, targeting
+  `b6c604eec716cff02355fd931ba246317f3bbb9e`;
+- successful protected candidate workflow run:
+  [`29707311997`](https://github.com/Chessticize/chessticize-mobile/actions/runs/29707311997);
+- public corresponding-source release:
+  [`android-v1.1.0-build-4`](https://github.com/Chessticize/chessticize-mobile/releases/tag/android-v1.1.0-build-4);
+- Play-generated universal APK SHA-256:
+  `c53265becfdfcef2f3579f5cd1903a196d9ebab66e2a143ef66623af5c8f6a3d`.
+
+Do not move the build-4 tag, rebuild its AAB, replace its public artifacts, or
+reuse version code 4.
 
 ## Canonical identity
 
 - Application ID: `com.chessticize.mobile`
-- Public version: `apps/mobile/release-version.json` (`1.1`)
-- Android version code: `apps/mobile/release-version.json` (`4`)
-- iOS build number: `apps/mobile/release-version.json` (`2`, independent from Android)
+- Public version: `apps/mobile/release-version.json` (`1.2`)
+- Android version code: `apps/mobile/release-version.json` (`5`)
+- iOS build number: `apps/mobile/release-version.json` (`1`, independent from Android)
 - Supported ABIs: `arm64-v8a`, `x86_64`
 - Target SDK: API 36
-- Required source tag before any Play track upload: `android-v1.1.0-build-4`
+- Required source tag before any Play track upload: `android-v1.2.0-build-5`
 
 Android `versionCode` must increase for every later Play upload. The public
 version must continue to match iOS. Settings reads `versionName` and
@@ -171,8 +186,8 @@ Play-generated universal APK and its SHA-256 checksum.
 
 For a bounded follow-up release:
 
-For Android version `1.1` build `4`, release notes and this support document must
-name the canonical source tag `android-v1.1.0-build-4` and the public source
+For Android version `1.2` build `5`, release notes and this support document must
+name the canonical source tag `android-v1.2.0-build-5` and the public source
 repository `https://github.com/Chessticize/chessticize-mobile`. The evidence
 must bind the annotated tag, commit, application ID, version, version code, and
 AAB SHA-256 before Play distribution. A missing or lightweight public tag, a

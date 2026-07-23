@@ -118,17 +118,17 @@ a new Play release.
 
 ### 2. Verify the immutable release prerequisites
 
-For Android `1.1` build `4`, verify the public source Release and its sole
+For Android `1.2` build `5`, verify the public source Release and its sole
 pre-mirror asset, prove that the canonical tag is annotated, and compare its
 dereferenced commit with the source manifest:
 
 ```sh
-gh release view android-v1.1.0-build-4 \
+gh release view android-v1.2.0-build-5 \
   --repo Chessticize/chessticize-mobile \
   --json tagName,isDraft,isPrerelease,publishedAt,url,assets
 
 tag_object_sha="$(gh api \
-  repos/Chessticize/chessticize-mobile/git/ref/tags/android-v1.1.0-build-4 \
+  repos/Chessticize/chessticize-mobile/git/ref/tags/android-v1.2.0-build-5 \
   --jq '.object | select(.type == "tag") | .sha')"
 test -n "$tag_object_sha"
 
@@ -137,15 +137,15 @@ tagged_commit_sha="$(gh api \
   --jq '.object | select(.type == "commit") | .sha')"
 test -n "$tagged_commit_sha"
 
-mkdir -p scratch/android-apk-mirror/build-4/preflight
-gh release download android-v1.1.0-build-4 \
+mkdir -p scratch/android-apk-mirror/build-5/preflight
+gh release download android-v1.2.0-build-5 \
   --repo Chessticize/chessticize-mobile \
   --pattern android-source-manifest.json \
-  --dir scratch/android-apk-mirror/build-4/preflight \
+  --dir scratch/android-apk-mirror/build-5/preflight \
   --clobber
 
 manifest_commit_sha="$(jq -r '.commitSha' \
-  scratch/android-apk-mirror/build-4/preflight/android-source-manifest.json)"
+  scratch/android-apk-mirror/build-5/preflight/android-source-manifest.json)"
 test "$tagged_commit_sha" = "$manifest_commit_sha"
 printf 'candidate commit: %s\n' "$tagged_commit_sha"
 ```
@@ -168,8 +168,8 @@ dispatch_started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 run_url="$(gh workflow run mobile-android-github-release.yml \
   --repo Chessticize/chessticize-mobile \
   --ref main \
-  -f public_version=1.1 \
-  -f version_code=4)"
+  -f public_version=1.2 \
+  -f version_code=5)"
 printf '%s\n' "$run_url"
 ```
 
@@ -195,30 +195,30 @@ otherwise stop without selecting a run by recency alone.
 
 ### 4. Verify the public APK and retained receipt
 
-A successful Android `1.1` build `4` mirror leaves exactly these three public
+A successful Android `1.2` build `5` mirror leaves exactly these three public
 Release assets:
 
 - `android-source-manifest.json`
-- `Chessticize-Android-1.1.apk`
-- `Chessticize-Android-1.1.apk.sha256`
+- `Chessticize-Android-1.2.apk`
+- `Chessticize-Android-1.2.apk.sha256`
 
 Verify the public state, then download the APK and checksum into ignored local
 evidence storage:
 
 ```sh
-gh release view android-v1.1.0-build-4 \
+gh release view android-v1.2.0-build-5 \
   --repo Chessticize/chessticize-mobile \
   --json assets,url
 
-mkdir -p scratch/android-apk-mirror/build-4/public
-gh release download android-v1.1.0-build-4 \
+mkdir -p scratch/android-apk-mirror/build-5/public
+gh release download android-v1.2.0-build-5 \
   --repo Chessticize/chessticize-mobile \
-  --pattern 'Chessticize-Android-1.1.apk*' \
-  --dir scratch/android-apk-mirror/build-4/public
+  --pattern 'Chessticize-Android-1.2.apk*' \
+  --dir scratch/android-apk-mirror/build-5/public
 
 (
-  cd scratch/android-apk-mirror/build-4/public
-  shasum -a 256 -c Chessticize-Android-1.1.apk.sha256
+  cd scratch/android-apk-mirror/build-5/public
+  shasum -a 256 -c Chessticize-Android-1.2.apk.sha256
 )
 ```
 
@@ -230,7 +230,7 @@ certificate SHA-256:
 gh run download "$run_id" \
   --repo Chessticize/chessticize-mobile \
   --name android-apk-mirror-<candidate-commit-sha> \
-  --dir scratch/android-apk-mirror/build-4/receipt
+  --dir scratch/android-apk-mirror/build-5/receipt
 ```
 
 ### 5. Recover a failed mirror

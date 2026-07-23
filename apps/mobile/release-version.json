@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "publicVersion": "1.1",
-  "iosPublicVersion": "1.1.1",
-  "androidVersionCode": 4,
+  "publicVersion": "1.2",
+  "iosPublicVersion": "1.2",
+  "androidVersionCode": 5,
   "iosBuildNumber": 1
 }
