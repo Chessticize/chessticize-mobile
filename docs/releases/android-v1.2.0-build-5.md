@@ -17,7 +17,7 @@
 ## Store copy (`en-US`)
 
 ```text
-• Save named Practice Runs with independent ELO ratings.
+• Customize the Practice Runs shown on your Home screen.
 • See at a glance which side moves next in each puzzle.
 • Choose curated themes and combine multiple themes in one Run.
 
@@ -26,10 +26,10 @@ Details and source: https://github.com/Chessticize/chessticize-mobile/releases/t
 
 ## GitHub customer summary
 
-Chessticize 1.2 adds named, reusable Practice Runs with independent ELO ratings,
-curated multi-theme selection, and a clearer indication of which side moves
-next. It also previews the move that led to each puzzle and improves Sprint
-result and on-device analysis score presentation.
+Chessticize 1.2 adds customizable Home screen Practice Runs with independent ELO
+ratings, curated multi-theme selection, and a clearer indication of which side
+moves next. It also previews the move that led to each puzzle and improves
+Sprint result and on-device analysis score presentation.
 
 ## Release-note review
 
