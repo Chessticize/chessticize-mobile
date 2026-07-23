@@ -62,7 +62,10 @@ export const MoveFeedback: Story = {
     await openSettings(canvasElement);
     await waitForTestId(canvasElement, "settings-move-feedback-section");
     await waitForTestId(canvasElement, "settings-move-feedback-previews");
-    await waitForText(canvasElement, "Web demo only");
+    await waitForText(
+      canvasElement,
+      "Web demo only. Preview the proposed move and capture sounds; haptics require the native app. Check this tab and device volume if you do not hear them."
+    );
     await waitForTestId(canvasElement, "settings-move-feedback-preview-move");
     await waitForTestId(canvasElement, "settings-move-feedback-preview-capture");
     expectTestIdAbsent(canvasElement, "settings-move-feedback-preview-success");
