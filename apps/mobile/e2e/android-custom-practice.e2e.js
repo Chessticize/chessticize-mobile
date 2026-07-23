@@ -82,12 +82,8 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
       await waitFor(element(by.id('session-abandon-confirmation'))).not.toExist().withTimeout(10000);
       await expect(element(by.id('session-board'))).toExist();
 
-      await waitForElementAccessibilityLabelContaining(
-        'session-side-to-move',
-        'Black to move',
-        10000,
-        25
-      );
+      await waitForVisibleInPracticeScroll('practice-prompt');
+      await waitFor(element(by.text('For black.'))).toExist().withTimeout(10000);
       await waitForVisibleInPracticeScroll('session-board');
       await playBoardMove('session-board', practiceFixture.userMoves[0], true);
       await waitForElementAccessibilityLabelContaining(
@@ -96,12 +92,7 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
         10000,
         50
       );
-      await waitForElementAccessibilityLabelContaining(
-        'session-side-to-move',
-        'Black to move',
-        10000,
-        25
-      );
+      await waitFor(element(by.text('For black.'))).toExist().withTimeout(10000);
       await playBoardMove('session-board', practiceFixture.userMoves[1], true);
 
       await waitFor(element(by.text('Sprint complete'))).toBeVisible().withTimeout(30000);

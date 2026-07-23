@@ -40,6 +40,9 @@ describe('Android Custom Practice release slice', () => {
     expect(spec).toContain('android-standard-practice.fixture.json');
     expect(spec).toContain('chessticizePuzzleSelectionId: practiceFixture.puzzle.id');
     expect(spec).toContain("by.id('session-board')");
+    expect(spec).toContain("waitForVisibleInPracticeScroll('practice-prompt')");
+    expect(spec).toContain("by.text('For black.')");
+    expect(spec).not.toContain('session-side-to-move');
     expect(spec).toContain("by.id('sprint-result-history-button')");
     expect(spec).toContain("expect(element(by.id('history-attempt-detail'))).not.toExist()");
     expect(spec).toContain("waitForVisibleInPracticeScroll('review-schedule-control')");
