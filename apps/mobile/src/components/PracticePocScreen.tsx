@@ -227,6 +227,7 @@ type AdaptiveLayout = {
   isLandscape: boolean;
   isLargeText: boolean;
   isRegularWidth: boolean;
+  sessionRailGap: number;
   sessionRailWidth: number;
   sideNavigationExpanded: boolean;
   sideNavigationWidth: number;
@@ -303,7 +304,7 @@ type ReviewBackCommand = {
 type DeferBackRelevantTransition = (key: string, resumeAfterCancel: () => void) => boolean;
 
 const UI_PADDING = 16;
-const SESSION_RAIL_GAP = 14;
+const SESSION_RAIL_GAP_MIN = 14;
 const COMPACT_LANDSCAPE_RAIL_MIN = 220;
 const COMPACT_LANDSCAPE_RAIL_MAX = 300;
 const REGULAR_RAIL_MIN = 296;
@@ -431,7 +432,7 @@ function buildAdaptiveLayout({
     : Math.min(COMPACT_LANDSCAPE_RAIL_MAX, Math.max(COMPACT_LANDSCAPE_RAIL_MIN, Math.floor(sessionContentWidth * 0.34)));
   const sessionBoardSlotWidth = Math.max(
     0,
-    sessionContentWidth - UI_PADDING * 2 - sessionRailWidth - SESSION_RAIL_GAP
+    sessionContentWidth - UI_PADDING * 2 - sessionRailWidth - SESSION_RAIL_GAP_MIN
   );
   const sessionBoardSlotHeight = Math.max(
     0,
@@ -452,6 +453,17 @@ function buildAdaptiveLayout({
     ? Math.min(sessionBoardSlotWidth, sessionBoardSlotHeight)
     : Math.min(portraitBoardSlotWidth, portraitBoardSlotHeight);
   const boardSize = Math.floor(Math.max(0, Math.min(boardSlot, boardMax)));
+  const maximumSessionRailGap = Math.max(
+    0,
+    sessionContentWidth - UI_PADDING * 2 - boardSize - sessionRailWidth
+  );
+  const balancedSessionRailGap = Math.floor(
+    (width - boardSize - sessionRailWidth) / 3
+  );
+  const sessionRailGap = Math.min(
+    maximumSessionRailGap,
+    Math.max(SESSION_RAIL_GAP_MIN, balancedSessionRailGap)
+  );
 
   return {
     boardSize,
@@ -462,6 +474,7 @@ function buildAdaptiveLayout({
     isLandscape,
     isLargeText,
     isRegularWidth,
+    sessionRailGap,
     sessionRailWidth,
     sideNavigationExpanded,
     sideNavigationWidth,
@@ -2403,7 +2416,7 @@ export function PracticePocScreen({
   const sideNavigationVisible = appChromeVisible && adaptiveLayout.usesSideNavigation;
   const bottomTabsVisible = appChromeVisible && !sideNavigationVisible;
   const sessionUsesRail = shouldShowSessionBoard && adaptiveLayout.usesSessionRail;
-  const sessionPackedRowWidth = boardSize + adaptiveLayout.sessionRailWidth + SESSION_RAIL_GAP;
+  const sessionPackedRowWidth = boardSize + adaptiveLayout.sessionRailWidth + adaptiveLayout.sessionRailGap;
   const screenTitle = screenTitleFor(tab);
   const screenSubtitle = tab === "practice"
     ? `Offline-ready · ${seededPuzzleCount(puzzleSource)} puzzles`
@@ -2695,7 +2708,7 @@ export function PracticePocScreen({
             showsVerticalScrollIndicator={false}
             contentContainerStyle={[
               styles.content,
-              adaptiveLayout.usesWideContent ? styles.contentWide : null,
+              adaptiveLayout.usesWideContent && !sessionUsesRail ? styles.contentWide : null,
               bottomTabsVisible ? styles.contentWithBottomTabs : null,
               sessionUsesRail ? styles.contentSessionRail : null
             ]}
@@ -2718,7 +2731,13 @@ export function PracticePocScreen({
                 {hasSessionLayoutContent ? (
                   <View
                     style={sessionUsesRail
-                      ? [styles.activeSessionAdaptiveLayout, { width: sessionPackedRowWidth }]
+                      ? [
+                          styles.activeSessionAdaptiveLayout,
+                          {
+                            gap: adaptiveLayout.sessionRailGap,
+                            width: sessionPackedRowWidth
+                          }
+                        ]
                       : styles.activeSessionStack}
                     testID={sessionUsesRail ? "active-session-adaptive-layout" : "stacked-session-layout"}
                   >
@@ -12585,8 +12604,7 @@ const styles = StyleSheet.create({
   activeSessionAdaptiveLayout: {
     alignSelf: "center",
     alignItems: "center",
-    flexDirection: "row",
-    gap: SESSION_RAIL_GAP
+    flexDirection: "row"
   },
   activeSessionStack: {
     gap: 12
