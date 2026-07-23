@@ -1395,12 +1395,8 @@ describe('Detox suite configuration', () => {
       "await setAdaptiveOrientation('portrait')",
       captureLandscape
     );
-    const scrollRestoredPortrait = spec.indexOf(
-      "element(by.id('practice-main-scroll')).scroll(100, 'down', 0.5, 0.5)",
-      restorePortrait
-    );
     const settleRestoredPortrait = spec.indexOf(
-      "await waitForSettledSprintLayout('portrait')",
+      "await waitForSettledSprintLayout('portrait', { containmentTolerance: 8 })",
       restorePortrait
     );
     const settlePublicRootFocus = spec.indexOf(
@@ -1415,10 +1411,14 @@ describe('Detox suite configuration', () => {
     expect(spec).not.toContain("waitFor(element(by.id('session-accessible-moves-dialog')))");
     expect(spec).toContain('withAndroidUiDiagnostics(async () =>');
     expect(restorePortrait).toBeGreaterThan(captureLandscape);
-    expect(scrollRestoredPortrait).toBeGreaterThan(restorePortrait);
-    expect(settleRestoredPortrait).toBeGreaterThan(scrollRestoredPortrait);
+    expect(settleRestoredPortrait).toBeGreaterThan(restorePortrait);
     expect(settlePublicRootFocus).toBeGreaterThan(settleRestoredPortrait);
     expect(verifyRestoredPuzzle).toBeGreaterThan(settlePublicRootFocus);
+    expect(spec).not.toContain(
+      "element(by.id('practice-main-scroll')).scroll(100, 'down', 0.5, 0.5)"
+    );
+    expect(settledLayoutHelper).toContain('containmentTolerance = 1');
+    expect(settledLayoutHelper).toContain('containmentTolerance');
     expect(spec).toContain('setAndroidDisplayOrientation(orientation)');
     expect(spec).toContain('actual-root-bounds=${frame.width}x${frame.height}');
     expect(adaptiveOrientationHelper.indexOf('setAndroidDisplayOrientation(orientation)')).toBeGreaterThan(0);

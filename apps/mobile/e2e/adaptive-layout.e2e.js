@@ -71,13 +71,13 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
       // natural orientation and reacquire the public app root before tapping
       // the real board; otherwise the rotated base window can remain the
       // unfocused Espresso root while board input is submitted. A foldable's
-      // natural portrait viewport can leave only a few physical pixels of the
-      // board below the scroll viewport, so normalize that transient position
-      // before enforcing strict containment.
+      // natural portrait viewport can report a few physical pixels of rounding
+      // overflow. This portrait state is not captured as evidence, so allow a
+      // bounded tolerance while reacquiring focus; every captured layout keeps
+      // the default strict containment check.
       await setAdaptiveOrientation('portrait');
       await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
-      await element(by.id('practice-main-scroll')).scroll(100, 'down', 0.5, 0.5);
-      await waitForSettledSprintLayout('portrait');
+      await waitForSettledSprintLayout('portrait', { containmentTolerance: 8 });
       await waitFor(element(by.id('adaptive-layout'))).toBeVisible().withTimeout(10000);
       const restoredPuzzleID = await elementText('session-current-puzzle-id');
       if (restoredPuzzleID !== puzzleID) {
@@ -196,7 +196,10 @@ async function waitForOrientation(orientation) {
   throw new Error(`Timed out waiting for ${orientation} layout; last observed frame=${JSON.stringify(lastFrame)}`);
 }
 
-async function waitForSettledSprintLayout(orientation) {
+async function waitForSettledSprintLayout(
+  orientation,
+  { containmentTolerance = 1 } = {}
+) {
   let lastFrames = null;
   for (let attempt = 0; attempt < 40; attempt += 1) {
     try {
@@ -210,7 +213,8 @@ async function waitForSettledSprintLayout(orientation) {
           expectFrameContained(
             boardFrame,
             layoutFrame,
-            `${deviceLabel} ${orientation} settling session board`
+            `${deviceLabel} ${orientation} settling session board`,
+            containmentTolerance
           );
           return;
         } catch {

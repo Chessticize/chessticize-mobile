@@ -117,10 +117,11 @@ describe('Android Standard Practice release slice', () => {
     expect(practiceJourney).toContain('standardFixture.puzzleSelectionSeed');
     expect(practiceJourney).toContain('chessticizeStandardTargetCorrect');
     expect(practiceJourney).toContain('standardFixture.puzzle.solutionMoves[2]');
-    expect(practiceJourney).toMatch(/'session-side-to-move',\s*'Black to move'/);
+    expect(practiceJourney).toMatch(/'practice-prompt',\s*'For black\.'/);
     expect(practiceJourney).toContain(
-      "waitForVisibleInPracticeScroll('session-side-to-move')"
+      "waitForVisibleInPracticeScroll('practice-prompt')"
     );
+    expect(practiceJourney).not.toContain('session-side-to-move');
     expect(practiceJourney).toContain('standardFixture.userMoves[0]');
     expect(practiceJourney).toContain('standardFixture.userMoves[1]');
     expect(practiceJourney).not.toContain("'a3c1'");

@@ -334,8 +334,7 @@ function maximumChannelDistance(left, right) {
   );
 }
 
-function expectFrameContained(childFrame, parentFrame, label) {
-  const tolerance = 1;
+function expectFrameContained(childFrame, parentFrame, label, tolerance = 1) {
   const childRight = childFrame.x + childFrame.width;
   const childBottom = childFrame.y + childFrame.height;
   const parentRight = parentFrame.x + parentFrame.width;

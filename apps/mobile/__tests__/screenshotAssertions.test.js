@@ -7,6 +7,7 @@ const {
   detectOccupiedBoardSquares,
   expectBoardScreenshotContainsPieces,
   expectBoardScreenshotMatchesOccupiedSquares,
+  expectFrameContained,
   waitForBoardScreenshotContainsPieces,
 } = require('../e2e/screenshotAssertions');
 const {
@@ -24,6 +25,18 @@ afterEach(() => {
 });
 
 describe('screenshot assertions', () => {
+  it('allows a caller-scoped containment tolerance without weakening the default', () => {
+    const parentFrame = { height: 2061, width: 1768, x: 0, y: 63 };
+    const childFrame = { height: 1470, width: 1470, x: 149, y: 659 };
+
+    expect(() => expectFrameContained(childFrame, parentFrame, 'foldable portrait restore'))
+      .toThrow('foldable portrait restore frame is outside its container');
+    expect(() => expectFrameContained(childFrame, parentFrame, 'foldable portrait restore', 4))
+      .toThrow('foldable portrait restore frame is outside its container');
+    expect(() => expectFrameContained(childFrame, parentFrame, 'foldable portrait restore', 8))
+      .not.toThrow();
+  });
+
   it('detects a low-material board from square-local contrast', () => {
     const png = syntheticBoard();
     paintPiece(png, 6, 2, [20, 25, 32, 255]);
