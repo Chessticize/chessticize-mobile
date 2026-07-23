@@ -217,11 +217,9 @@ The following are repository observations, not measured timing results.
 
 ### iOS
 
-- The [Mobile iOS workflow](../.github/workflows/mobile-ios.yml) caches pnpm,
-  the Core Pack, the Detox iOS framework, and CocoaPods. It does not persist
-  the Xcode Derived Data path used by the Detox build. The macOS job also
-  installs `applesimutils`, Bundler dependencies, and Pods before building and
-  running two serial Detox suites with one worker.
+- The [Mobile JS workflow](../.github/workflows/mobile-js.yml) runs only
+  non-native PR checks on Ubuntu. GitHub Actions does not run Xcode or iOS
+  Detox; local iOS native validation is the release standard.
 - Xcode states that the first build compiles everything and subsequent builds
   are incremental, provided dependencies and script inputs/outputs are modeled
   accurately. See
@@ -266,11 +264,12 @@ The following are repository observations, not measured timing results.
 - Android's full manual evidence workflow boots several isolated emulators and
   exercises API 24, 30, and 36 behavior. Emulator startup and cross-version
   backup/restore behavior are product validation, not compilation.
-- iOS runs `flows` and `practice` serially in nightly integration. Release
-  validation now uses delta, targeted, and full risk scopes; both suites are
-  required only for broad native risk.
-- A source change after validation changes the candidate identity. Cache reuse
-  is acceptable; claiming old exact-head evidence for a new commit is not.
+- Local iOS validation runs `flows` and `practice` serially when full scope is
+  required. Release validation uses delta, targeted, and full risk scopes; both
+  suites are required only for broad native risk.
+- A source-tree change after validation changes the candidate identity. Cache
+  reuse is acceptable. A squash-merged commit may reuse evidence only when its
+  Git tree exactly matches the tested tree and both IDs are recorded.
 
 ### Distribution work
 

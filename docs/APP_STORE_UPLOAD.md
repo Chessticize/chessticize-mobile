@@ -32,22 +32,29 @@ pnpm mobile:typecheck
 pnpm mobile:doctor:ios
 ```
 
-Require the exact-main `Mobile iOS` release gate to run on the repository's
-pinned Xcode 26.6 toolchain and pass Mobile JS plus both Detox suites.
-CocoaPods deployment mode must pass in both the local checkout and the GitHub
-runner. React Native's Hermes compiler setting is intentionally patched to use
-a stable `PODS_ROOT`-based path; an absolute checkout path in an evaluated
+GitHub Actions does not run Xcode builds or iOS Detox. Local iOS native
+validation is the only iOS native release gate. Select delta, targeted, or full
+scope under `docs/TESTING_ARCHITECTURE.md`, then record the tested commit SHA
+and Git tree, Xcode version, dedicated simulator, build result, suite results,
+and clean-worktree confirmation. A squash-merged candidate may reuse passing
+PR-head evidence only when these commands report the same tree:
+
+```sh
+git rev-parse <tested-sha>^{tree}
+git rev-parse HEAD^{tree}
+```
+
+Any tree difference requires a new local build and the selected local Detox
+scope. React Native's Hermes compiler setting is intentionally patched to use a
+stable `PODS_ROOT`-based path; an absolute checkout path in an evaluated
 podspec makes `Podfile.lock` non-portable and is a release blocker, regardless
 of whether the dependency versions are unchanged. The locked installer removes
-only a restored `ios/Pods` sandbox whose `Manifest.lock` is missing or differs
+only a local `ios/Pods` sandbox whose `Manifest.lock` is missing or differs
 from the committed `Podfile.lock`, then runs CocoaPods in deployment mode.
-GitHub's Pods cache uses an exact key over both `Podfile.lock` and
-`pnpm-lock.yaml`; do not add a broad restore key that can reintroduce evaluated
-podspecs from a different dependency patch.
 
-After any failed complete release workflow, perform the cross-platform
+After any failed complete release validation pass, perform the cross-platform
 pre-retry convergence sweep in `docs/RELEASE_SOURCE_POLICY.md` before
-dispatching another full native run.
+starting another full local native run.
 
 For first launch, a new App Store version, screenshot/metadata changes, or broad
 native risk, also generate the full evidence bundle:

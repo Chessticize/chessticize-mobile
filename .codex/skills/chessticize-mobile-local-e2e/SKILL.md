@@ -1,6 +1,6 @@
 ---
 name: chessticize-mobile-local-e2e
-description: Prepare and validate the Chessticize Mobile macOS/iOS environment and fresh Git worktrees, run risk-scoped exact-head local Detox evidence for flows, practice, or the full suite, diagnose Xcode, Ruby, CocoaPods, Git LFS, Simulator, or Detox failures, and record auditable results. Use when a PR crosses an iOS native boundary, when nightly or release validation needs the complete suite, when setting up a Mac or worktree for Detox, or when measuring local E2E duration.
+description: Prepare and validate the Chessticize Mobile macOS/iOS environment and fresh Git worktrees, run risk-scoped exact-head local Detox evidence for flows, practice, or the full suite, diagnose Xcode, Ruby, CocoaPods, Git LFS, Simulator, or Detox failures, and record auditable results. Use when a PR crosses an iOS native boundary, when release validation needs a native suite, when setting up a Mac or worktree for Detox, or when measuring local E2E duration.
 ---
 
 # Chessticize Mobile Local E2E
@@ -12,9 +12,13 @@ Run the selected iOS Detox scope on a dedicated simulator and record evidence fo
 - Run only on macOS with full Xcode and an installed iOS Simulator runtime.
 - Use a dedicated simulator such as `iPhone 17-Detox`. Never use the simulator that holds manual-test data: Detox launches with `delete: true` and wipes the app sandbox.
 - Commit the intended code first and require a clean worktree before producing merge evidence.
-- Rebuild and rerun the selected scope after any code change. Evidence from an older commit is invalid.
+- Rebuild and rerun the selected scope after any source-tree change. A
+  squash-merged commit may reuse PR-head evidence only when both commits have
+  the same Git tree and both tree IDs are recorded.
 - Choose `flows`, `practice`, or `full` from the repository risk matrix. Do not default a routine PR to `full` without a broad native reason.
-- Do not wait for nightly GitHub Detox before merging a routine PR. All relevant fast CI checks must still pass.
+- GitHub Actions does not run Xcode builds or iOS Detox. Local iOS native
+  validation is the only iOS native release gate. All relevant fast CI checks
+  must still pass.
 - Do not weaken Ruby, package-manager, signing, or certificate checks to make setup pass.
 
 ## Prepare the Mac
@@ -130,9 +134,15 @@ pnpm --filter ChessticizeMobile exec detox build-framework-cache
 
 ## Choose The Scope
 
-- Use `flows` for affected app-shell, navigation, History, Settings, Analysis, or other flows-suite journeys.
-- Use `practice` for affected Practice, Review, sprint, board, or practice-suite journeys.
-- Use `full` for nightly/release validation and PRs that change app startup, shared navigation/storage wiring, global launch fixtures, native build configuration, Detox infrastructure, or risk that cannot be bounded to one suite.
+- **No mobile Detox** for changes fully proven by the lower test layers.
+- **Targeted native validation** uses `flows` for affected app-shell,
+  navigation, History, Settings, Analysis, or other flows-suite journeys, or
+  `practice` for affected Practice, Review, sprint, board, or practice-suite
+  journeys.
+- **Full native validation** uses `full` for broad release validation and PRs
+  that change app startup, shared navigation/storage wiring, global launch
+  fixtures, native build configuration, Detox infrastructure, or risk that
+  cannot be bounded to one suite.
 - Use a focused simulator screenshot instead of this runner for a visual-only acceptance check when no repeatable journey changed.
 
 Record the choice and rationale in the PR before running native validation.
@@ -204,6 +214,7 @@ Its presence proves the Detox app does not depend on Metro.
 When a PR requires native validation, add a PR comment containing:
 
 - Full tested commit SHA.
+- Full tested Git tree ID.
 - Selected scope and rationale.
 - Xcode version and simulator name.
 - Build command and success.
@@ -211,4 +222,9 @@ When a PR requires native validation, add a PR comment containing:
 - Total duration.
 - Confirmation that the worktree remained clean and `HEAD` did not change.
 
-Then verify all relevant fast checks before merging. Any code change after the recorded SHA invalidates the evidence. Nightly integration uses `full`; release runs use delta, targeted, or full scope, and require both suites only for broad native risk.
+Then verify all relevant fast checks before merging. Any source-tree change
+after the recorded evidence invalidates it. Release runs use delta, targeted,
+or full scope and require both suites only for broad native risk. After a
+squash merge, compare `git rev-parse <tested-sha>^{tree}` with
+`git rev-parse main^{tree}`; reuse the local result only when they match
+exactly, and record both IDs.

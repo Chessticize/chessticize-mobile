@@ -36,16 +36,16 @@ Do not immediately restart a complete release matrix after its first failure.
 Use one convergence pass to find and batch every issue that can be discovered
 without another full native run:
 
-1. Keep the failed workflow and its artifacts. Let independent jobs finish
-   unless continuing them is unsafe, because later jobs may expose additional
-   blockers without another build.
-2. Record the exact commit and inspect every failed, cancelled, or timed-out
-   job. Download its diagnostics and classify each result as a product
-   regression, stale deterministic evidence or fixture, infrastructure
-   failure, credential/signing gate, or store-console gate. A retry is not a
-   substitute for classification. For Android matrix failures, retain and
-   inspect `api-<level>.progress.json`; it identifies the last running step
-   even when the bounded matrix command is terminated.
+1. Keep failed command output and local artifacts. Let independent fast checks
+   finish unless continuing them is unsafe, because they may expose additional
+   blockers without another native build.
+2. Record the exact commit and Git tree, then inspect every failed, cancelled,
+   or timed-out step. Classify each result as a product regression, stale
+   deterministic evidence or fixture, local infrastructure failure,
+   credential/signing gate, or store-console gate. A retry is not a substitute
+   for classification. For Android matrix failures, retain and inspect
+   `api-<level>.progress.json`; it identifies the last running step even when
+   the bounded matrix command is terminated.
 3. Audit both platform identities together: public version, iOS build number,
    Android version code, proposed annotated tags, build-specific release-note
    filenames and links, and the absence of an immutable tag or store build that
@@ -62,9 +62,10 @@ without another full native run:
    rejected the mismatch before the native matrix.
 6. Recheck the diff, clean tracked worktree, exact PR head, open PRs, and remote
    `main`. Resolve all known blockers before spending the full native retry.
-7. Run the required exact-head local merge evidence once on the final PR head,
-   merge once, then dispatch the required iOS and Android workflows once on the
-   final exact `main` commit.
+7. Run the required exact-head local iOS evidence once on the final PR head and
+   merge once. If the release candidate is squash-merged, compare the tested
+   and final Git trees and reuse the evidence only when they match exactly.
+   Android release workflows remain governed by the Android release runbook.
 
 If that final run reveals a genuinely new deterministic failure, preserve it,
 extend the fast proving layer that missed it, and repeat this sweep. Never hide
