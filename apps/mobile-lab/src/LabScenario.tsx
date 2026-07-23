@@ -164,6 +164,9 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
       service = createIssue272Service(false);
       configurePuzzleSource = false;
       break;
+    case "practice-unclear-follow-up":
+      screenProps.arrowDuelTargetCorrect = 2;
+      break;
     case "practice-preparing":
     case "system-loading":
       screenProps.sprintStartDelayMs = 60_000;

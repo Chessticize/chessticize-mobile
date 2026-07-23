@@ -10,6 +10,19 @@ export async function waitForTestId(canvasElement: HTMLElement, testID: string):
   await page.findByTestId(testID, {}, { timeout: 4_000 });
 }
 
+export async function waitForEnabledTestId(
+  canvasElement: HTMLElement,
+  testID: string
+): Promise<void> {
+  const page = within(canvasElement.ownerDocument.body);
+  await waitFor(() => {
+    const element = page.getByTestId(testID);
+    if (element.getAttribute("aria-disabled") === "true" || element.hasAttribute("disabled")) {
+      throw new Error(`${testID} must be enabled`);
+    }
+  });
+}
+
 export async function waitForText(canvasElement: HTMLElement, text: string): Promise<void> {
   const page = within(canvasElement.ownerDocument.body);
   await page.findByText(text, {}, { timeout: 4_000 });

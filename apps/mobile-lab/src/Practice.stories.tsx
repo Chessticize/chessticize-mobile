@@ -10,6 +10,7 @@ import {
   expectUniformRunDropTarget,
   openPracticeSession,
   replaceTextTestId,
+  waitForEnabledTestId,
   waitForTestId
 } from "./storyPlay.ts";
 
@@ -139,6 +140,19 @@ export const ActiveSession: Story = {
   args: { scenarioId: "practice-active" },
   play: async ({ canvasElement }) => {
     await openPracticeSession(canvasElement);
+  }
+};
+
+export const UnclearFollowUp: Story = {
+  name: "Unclear follow-up",
+  args: { scenarioId: "practice-unclear-follow-up" },
+  play: async ({ canvasElement }) => {
+    await clickTestId(canvasElement, "practice-mode-arrow-duel");
+    await clickTestId(canvasElement, "practice-start-button");
+    await waitForTestId(canvasElement, "active-session-shell");
+    await waitForEnabledTestId(canvasElement, "lab-board-correct");
+    await clickTestId(canvasElement, "lab-board-correct");
+    await waitForTestId(canvasElement, "sprint-unclear-prompt");
   }
 };
 

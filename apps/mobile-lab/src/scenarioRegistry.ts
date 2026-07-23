@@ -17,6 +17,7 @@ export type LabScenarioId =
   | "practice-runs-empty"
   | "practice-preparing"
   | "practice-active"
+  | "practice-unclear-follow-up"
   | "practice-arrow-duel-prompt"
   | "practice-blunder-move-preview"
   | "practice-paused"
@@ -102,6 +103,16 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
   "practice-runs-empty": defineScenario("practice-runs-empty", "Practice", "Empty Home and restore", "practice--empty-home-and-restore", "Home after every run is hidden, with clear Add Run and restore paths that preserve prior ELO.", "practice", ["Empty state", "Add Run", "Retained run list", "Restore to Home"], ["New Run", "Practice home"]),
   "practice-preparing": defineScenario("practice-preparing", "Practice", "Preparing", "practice--preparing", "Stable preparing overlay before an Arrow Duel sprint starts.", "practice", ["Preparing overlay", "Cancel through Back intent"], ["Active sprint", "Practice home"]),
   "practice-active": defineScenario("practice-active", "Practice", "Active session", "practice--active-session", "Active Standard sprint with the development-only Board Placeholder.", "practice", ["Timer", "Progress", "Board state", "Pause", "Accessible moves"], ["Sprint result"]),
+  "practice-unclear-follow-up": defineScenario(
+    "practice-unclear-follow-up",
+    "Practice",
+    "Unclear follow-up",
+    "practice--unclear-follow-up",
+    "Active Arrow Duel sprint after one correct attempt, showing the shared real previous-attempt Unclear question while the next puzzle remains in progress.",
+    "practice",
+    ["Previous-attempt clarity question", "Mark as unclear action", "Stable board and score", "Portrait footer and landscape rail placement"],
+    ["Next puzzle", "History"]
+  ),
   "practice-arrow-duel-prompt": defineScenario("practice-arrow-duel-prompt", "Practice", "Arrow Duel prompt card", "practice--arrow-duel-prompt", "Active Arrow Duel session with the unchanged prompt copy in a rounded card above the board and a black board-piece King.", "practice", ["Black King prompt icon", "Arrow Duel copy", "Prompt card above board", "Candidate arrows"], ["Sprint result"]),
   "practice-blunder-move-preview": defineScenario("practice-blunder-move-preview", "Practice", "Blunder move preview", "practice--blunder-move-preview", "Standard puzzle entry that animates the opponent blunder before unlocking the white-to-move Board Placeholder.", "practice", ["Blunder replay", "White King prompt icon", "Rounded prompt card above board", "Input lock"], ["Active sprint"]),
   "practice-paused": defineScenario("practice-paused", "Practice", "Paused session", "practice--paused-session", "Paused sprint with resume and abandon actions.", "practice", ["Paused state", "Resume", "Abandon"], ["Active sprint", "Sprint result"]),
