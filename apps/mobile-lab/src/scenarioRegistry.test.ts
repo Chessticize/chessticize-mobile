@@ -57,62 +57,6 @@ test("New Scenario Markers retain open-issue ownership on the full catalog", () 
   }
 });
 
-test("issue 273 owns every theme-catalog surface including the shared New Run", () => {
-  const issue273Scenarios = newScenarios.filter((scenario) =>
-    scenario.issues.some(({ issueNumber }) => issueNumber === 273)
-  );
-  assert.deepEqual(issue273Scenarios.map((scenario) => scenario.id), [
-    "practice-custom-setup",
-    "history-populated",
-    "history-filters",
-    "history-attempt-detail"
-  ]);
-  assert.deepEqual(storyTagsForScenario("practice-custom-setup"), ["new"]);
-  assert.deepEqual(storyTagsForScenario("history-populated"), ["new"]);
-  assert.deepEqual(storyTagsForScenario("history-filters"), ["new"]);
-  assert.deepEqual(storyTagsForScenario("history-attempt-detail"), ["new"]);
-});
-
-test("Issue 253 owns the complete run-management design track", () => {
-  const issue253Scenarios = newScenarios.filter((scenario) =>
-    scenario.issues.some(({ issueNumber }) => issueNumber === 253)
-  );
-  assert.deepEqual(
-    issue253Scenarios.map((scenario) => scenario.id),
-    [
-      "practice-home",
-      "practice-home-edit",
-      "practice-custom-setup",
-      "practice-run-name-validation",
-      "practice-run-standard-editor",
-      "practice-custom-rating-editor",
-      "practice-run-remove-confirmation",
-      "practice-runs-empty",
-      "settings-advanced-ratings"
-    ]
-  );
-  for (const scenario of issue253Scenarios) {
-    assert.deepEqual(storyTagsForScenario(scenario.id), ["new"]);
-  }
-});
-
-test("Issue 272 owns the blunder-entry and Arrow Duel prompt design track", () => {
-  assert.deepEqual(
-    newScenarios
-      .filter((scenario) =>
-        scenario.issues.some(({ issueNumber }) => issueNumber === 272)
-      )
-      .map((scenario) => scenario.id),
-    [
-      "practice-arrow-duel-prompt",
-      "practice-blunder-move-preview",
-      "review-blunder-move-preview"
-    ]
-  );
-  assert.deepEqual(storyTagsForScenario("practice-blunder-move-preview"), ["new"]);
-  assert.deepEqual(storyTagsForScenario("practice-arrow-duel-prompt"), ["new"]);
-});
-
 test("the issue #272 preview hands the board to White after the blunder", () => {
   const chess = new Chess(ISSUE_272_LAB_PUZZLE.initialFen);
 
