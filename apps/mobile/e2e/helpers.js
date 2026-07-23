@@ -533,7 +533,7 @@ async function waitForVisibleInPracticeScroll(testID) {
   await waitFor(element(by.id(testID)))
     .toBeVisible()
     .whileElement(by.id('practice-main-scroll'))
-    .scroll(100, 'down');
+    .scroll(100, 'down', 0.5, 0.5);
 }
 
 async function tapUntilExists(tapTestID, expectedTestID, attempts) {

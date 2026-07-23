@@ -265,6 +265,9 @@ describe('Key user flows', () => {
     await element(by.id(resultRowIdentifier)).tap();
     await waitFor(element(by.id('review-session'))).toExist().withTimeout(10000);
     await expect(element(by.id('review-source-pill'))).not.toExist();
+    await expect(element(by.id('review-theme-rail'))).not.toExist();
+    await waitForVisibleInPracticeScroll('review-analysis-button');
+    await element(by.id('review-analysis-button')).tap();
     await waitFor(element(by.id('review-theme-rail'))).toExist().withTimeout(10000);
     await expect(element(by.text('Themes'))).not.toExist();
     await element(by.id('practice-main-scroll')).scrollTo('top');
@@ -330,6 +333,7 @@ describe('Key user flows', () => {
     await element(by.id('practice-main-scroll')).scrollTo('top');
     await waitFor(element(by.id('practice-run-edit-standard'))).toBeVisible().withTimeout(10000);
     await element(by.id('practice-run-edit-standard')).tap();
+    await waitFor(element(by.id('practice-run-name-input'))).toBeVisible().withTimeout(10000);
     await element(by.id('practice-run-name-input')).replaceText('Daily Standard');
     await element(by.id('practice-run-name-input')).tapReturnKey();
     await element(by.id('practice-run-elo-input')).replaceText('700');
