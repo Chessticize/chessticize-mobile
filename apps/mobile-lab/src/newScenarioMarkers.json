@@ -35,7 +35,7 @@
     "issues": [
       {
         "issueNumber": 253,
-        "changeNote": "Whole Run cards reorder in real time with animated insertion plus arrow-button fallbacks."
+        "changeNote": "Whole Run cards reorder in real time, and each Edit action opens name plus direct ELO editing."
       }
     ]
   },
@@ -43,7 +43,7 @@
     "issues": [
       {
         "issueNumber": 253,
-        "changeNote": "New Run defaults to All themes and saves to Home without starting."
+        "changeNote": "New Run defaults to All themes, accepts direct 600-2200 Starting ELO, and saves without starting."
       },
       {
         "issueNumber": 273,
@@ -63,7 +63,7 @@
     "issues": [
       {
         "issueNumber": 253,
-        "changeNote": "Built-in ELO editing shows the Run name and returns to Home edit mode after Save or Cancel."
+        "changeNote": "Built-in Run editing allows a unique name and direct 600-2200 ELO while retaining its format and identity."
       }
     ]
   },
@@ -71,7 +71,7 @@
     "issues": [
       {
         "issueNumber": 253,
-        "changeNote": "Custom ELO editing shows the Run name, keeps creation settings fixed, and returns to Home edit mode."
+        "changeNote": "Custom Run editing allows renaming and direct bounded ELO entry with inline validation."
       }
     ]
   },

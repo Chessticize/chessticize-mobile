@@ -27,9 +27,11 @@ type PracticeRunManagementIntent =
   | { type: "cancel-edit" }
   | { type: "change-duration"; durationSeconds: number }
   | { type: "change-elo"; elo: number }
+  | { type: "change-elo-input"; value: string }
   | { type: "change-mode"; mode: "custom" | "arrow_duel" }
   | { type: "change-name"; name: string }
   | { type: "change-per-puzzle"; perPuzzleSeconds: number }
+  | { type: "step-elo-input"; direction: -1 | 1 }
   | { type: "toggle-theme"; theme: string }
   | { type: "confirm-remove" }
   | { type: "dismiss-remove" }
@@ -45,7 +47,10 @@ type PracticeRunManagementIntent =
 
 type PracticeRunManagementPresentation = {
   canSave?: boolean;
+  directRunEditing?: boolean;
   draft: PracticeRunDraft | null;
+  eloError?: string | null;
+  eloInput?: string | null;
   hiddenRuns: readonly PracticeRunPresentation[];
   homeEditing: boolean;
   nameError: string | null;
@@ -58,6 +63,10 @@ type PracticeRunManagementPresentation = {
 };
 
 export type RunManagementFixtureState = Omit<PracticeRunManagementPresentation, "onIntent">;
+
+const RUN_ELO_MIN = 600;
+const RUN_ELO_MAX = 2200;
+const RUN_ELO_ERROR = `Enter a whole-number ELO from ${RUN_ELO_MIN} to ${RUN_ELO_MAX}.`;
 
 const BASE_RUNS: readonly PracticeRunPresentation[] = [
   {
@@ -111,7 +120,11 @@ export function createRunManagementFixtureState(
 ): RunManagementFixtureState {
   const runs = BASE_RUNS.map(cloneRun);
   return {
+    canSave: true,
+    directRunEditing: true,
     draft: null,
+    eloError: null,
+    eloInput: null,
     hiddenRuns: variant === "empty" ? runs : [],
     homeEditing: false,
     nameError: null,
@@ -131,7 +144,10 @@ export function runManagementFixtureReducer(
     case "add-run":
       return {
         ...state,
+        canSave: true,
         draft: newRunDraft(),
+        eloError: null,
+        eloInput: "900",
         homeEditing: false,
         nameError: null,
         notice: null,
@@ -145,11 +161,13 @@ export function runManagementFixtureReducer(
         ? updateDraft(state, { durationSeconds: intent.durationSeconds })
         : state;
     case "change-elo":
-      return updateDraft(state, { elo: Math.max(600, intent.elo) });
+      return updateDraft(state, { elo: Math.min(RUN_ELO_MAX, Math.max(RUN_ELO_MIN, intent.elo)) });
+    case "change-elo-input":
+      return changeEloInput(state, intent.value);
     case "change-mode":
       return state.screen === "create" ? updateDraft(state, { mode: intent.mode }) : state;
     case "change-name":
-      return state.screen === "create"
+      return state.screen === "create" || (state.screen === "edit" && state.directRunEditing === true)
         ? {
             ...updateDraft(state, { name: intent.name }),
             nameError: null
@@ -159,6 +177,8 @@ export function runManagementFixtureReducer(
       return state.screen === "create"
         ? updateDraft(state, { perPuzzleSeconds: intent.perPuzzleSeconds })
         : state;
+    case "step-elo-input":
+      return stepEloInput(state, intent.direction);
     case "toggle-theme":
       return state.screen === "create"
         ? updateDraft(state, {
@@ -179,7 +199,10 @@ export function runManagementFixtureReducer(
       }
       return {
         ...state,
+        canSave: true,
         draft: cloneRun(run),
+        eloError: null,
+        eloInput: String(run.elo),
         homeEditing: true,
         nameError: null,
         notice: null,
@@ -244,7 +267,10 @@ function returnHome(
 ): RunManagementFixtureState {
   return {
     ...state,
+    canSave: true,
     draft: null,
+    eloError: null,
+    eloInput: null,
     homeEditing,
     nameError: null,
     notice: null,
@@ -257,6 +283,10 @@ function saveRun(state: RunManagementFixtureState): RunManagementFixtureState {
   const draft = state.draft;
   if (!draft) {
     return state;
+  }
+  const eloError = validateEloInput(state.eloInput ?? String(draft.elo));
+  if (eloError) {
+    return { ...state, canSave: false, eloError };
   }
   const name = draft.name.trim();
   if (!name) {
@@ -281,7 +311,10 @@ function saveRun(state: RunManagementFixtureState): RunManagementFixtureState {
     : [...state.runs, saved];
   return {
     ...state,
+    canSave: true,
     draft: null,
+    eloError: null,
+    eloInput: null,
     homeEditing: existing,
     nameError: null,
     notice: `${saved.name} ${existing ? "updated" : "added to Home"}.`,
@@ -290,6 +323,47 @@ function saveRun(state: RunManagementFixtureState): RunManagementFixtureState {
     screen: "home",
     selectedRunId: saved.id
   };
+}
+
+function changeEloInput(
+  state: RunManagementFixtureState,
+  value: string
+): RunManagementFixtureState {
+  const eloError = validateEloInput(value);
+  const parsed = Number(value);
+  return {
+    ...(eloError ? state : updateDraft(state, { elo: parsed })),
+    canSave: eloError === null,
+    eloError,
+    eloInput: value
+  };
+}
+
+function stepEloInput(
+  state: RunManagementFixtureState,
+  direction: -1 | 1
+): RunManagementFixtureState {
+  if (!state.draft) {
+    return state;
+  }
+  const parsed = Number(state.eloInput);
+  const current = typeof state.eloInput === "string"
+    && /^\d{1,4}$/.test(state.eloInput)
+    && Number.isInteger(parsed)
+    ? parsed
+    : state.draft.elo;
+  const next = Math.min(RUN_ELO_MAX, Math.max(RUN_ELO_MIN, current + direction * 100));
+  return changeEloInput(state, String(next));
+}
+
+function validateEloInput(value: string): string | null {
+  if (!/^\d+$/.test(value)) {
+    return RUN_ELO_ERROR;
+  }
+  const elo = Number(value);
+  return Number.isInteger(elo) && elo >= RUN_ELO_MIN && elo <= RUN_ELO_MAX
+    ? null
+    : RUN_ELO_ERROR;
 }
 
 function uniqueRunId(name: string, state: RunManagementFixtureState): string {

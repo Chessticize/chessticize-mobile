@@ -10,6 +10,17 @@ export async function waitForTestId(canvasElement: HTMLElement, testID: string):
   await page.findByTestId(testID, {}, { timeout: 4_000 });
 }
 
+export async function replaceTextTestId(
+  canvasElement: HTMLElement,
+  testID: string,
+  value: string
+): Promise<void> {
+  const page = within(canvasElement.ownerDocument.body);
+  const input = await page.findByTestId(testID, {}, { timeout: 4_000 });
+  await userEvent.clear(input);
+  await userEvent.type(input, value);
+}
+
 export async function waitForVisibleTestId(canvasElement: HTMLElement, testID: string): Promise<void> {
   const page = within(canvasElement.ownerDocument.body);
   const element = await page.findByTestId(testID, {}, { timeout: 4_000 });
