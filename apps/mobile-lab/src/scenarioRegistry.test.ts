@@ -76,3 +76,9 @@ test("the issue #272 preview hands the board to White after the blunder", () => 
   assert.equal(chess.turn(), "w");
   assert.equal(chess.fen(), "8/3k4/8/8/8/8/4P3/4K3 w - - 1 2");
 });
+
+test("the active design review marks only Issue #247 move feedback as new", () => {
+  assert.deepEqual(newScenarios.map((scenario) => scenario.id), ["settings-move-feedback"]);
+  assert.deepEqual(storyTagsForScenario("settings-move-feedback"), ["new"]);
+  assert.deepEqual(storyTagsForScenario("practice-home" as LabScenarioId), []);
+});

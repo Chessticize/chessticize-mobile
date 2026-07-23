@@ -1,1 +1,10 @@
-{}
+{
+  "settings-move-feedback": {
+    "issues": [
+      {
+        "issueNumber": 247,
+        "changeNote": "Review separate sound and haptic controls, sample cues, and system-setting guidance."
+      }
+    ]
+  }
+}

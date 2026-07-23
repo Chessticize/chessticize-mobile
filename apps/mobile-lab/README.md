@@ -58,6 +58,9 @@ The path-scoped Interaction Lab workflow runs for changes under `apps/mobile-lab
 - `react-native-chessboard` resolves to `BoardPlaceholder.tsx`. It preserves the requested board geometry, displays FEN/orientation/input-lock state, implements `move`, `resetBoard`, and `getState`, and exposes conspicuous **LAB ONLY** controls for correct, wrong, and complete-puzzle transitions.
 - The mobile puzzle factory resolves to a browser adapter with a small deterministic synthetic pack and the real `PracticeService` plus `MemoryStore`.
 - Native notification scheduling resolves to a browser adapter. Permission variants use a maintained interface-compatible fake.
+- Move-feedback design stories synthesize short browser audio samples and request
+  the browser Vibration API when available. The samples are not release assets,
+  and the visual haptic fallback is not evidence of native iOS or Android feel.
 - No simulator, device, SQLite database, notification permission, iCloud account, bundled Stockfish process, or real user data is used.
 
 The lab does not replace native validation for board rendering and gestures, Safe Area behavior, native/predictive Back, real notification delivery, iCloud, SQLite, Stockfish, or final iOS and Android acceptance.

@@ -54,6 +54,17 @@ export const NotificationsNotDetermined: Story = {
   }
 };
 
+export const MoveFeedback: Story = {
+  name: "Move feedback",
+  args: { scenarioId: "settings-move-feedback" },
+  tags: ["new"],
+  play: async ({ canvasElement }) => {
+    await openSettings(canvasElement);
+    await waitForTestId(canvasElement, "settings-move-feedback-section");
+    await waitForTestId(canvasElement, "settings-move-feedback-previews");
+  }
+};
+
 export const AdvancedRatingEditor: Story = {
   name: "ELO controls moved to runs",
   args: { scenarioId: "settings-advanced-ratings" },
