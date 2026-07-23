@@ -460,6 +460,7 @@ export function PracticePocScreen({
   const [unclearPrompt, setUnclearPrompt] = useState<UnclearPromptState | null>(null);
   const [boardInputLocked, setBoardInputLocked] = useState(false);
   const [boardInputLockMode, setBoardInputLockMode] = useState<BoardInputLockMode>("hard");
+  const [readyArrowDuelBoardKey, setReadyArrowDuelBoardKey] = useState<string | null>(null);
   const [chessboardDebugEvents, setChessboardDebugEvents] = useState<string[]>([]);
   const [historyTimeRange, setHistoryTimeRange] = useState<HistoryTimeRange>("7d");
   const [historySourceFilter, setHistorySourceFilter] = useState<"all" | AttemptSource>("sprint");
@@ -2048,6 +2049,15 @@ export function PracticePocScreen({
       ? arrowFromTo(boardFeedback.submittedMove)
       : null;
   const displayedLastBoardMove = feedbackSnapshot || boardFeedback ? null : lastBoardMove;
+  const arrowDuelBoardRenderKey =
+    displayedPuzzle?.kind === "arrow_duel" && state && displayedBoardFen
+      ? `${state.id}:${displayedPuzzle.puzzle.id}:${displayedBoardFen}`
+      : null;
+  const markArrowDuelBoardReady = useCallback(() => {
+    if (arrowDuelBoardRenderKey) {
+      setReadyArrowDuelBoardKey(arrowDuelBoardRenderKey);
+    }
+  }, [arrowDuelBoardRenderKey]);
   const historyRatingKeys = useMemo(
     () => activeRunManagementPresentation
       ? activeRunManagementPresentation.runs.flatMap((run) => run.ratingKey ? [run.ratingKey] : [])
@@ -2414,6 +2424,7 @@ export function PracticePocScreen({
             durations={CHESSBOARD_DURATIONS}
             spriteSource={CHESS_PIECE_SPRITE}
             colors={CHESSBOARD_COLORS}
+            onReady={arrowDuelBoardRenderKey ? markArrowDuelBoardReady : undefined}
           />
         ) : (
           <View style={[styles.emptyBoard, { width: boardSize, height: boardSize }]}>
@@ -2450,7 +2461,9 @@ export function PracticePocScreen({
           />
         ) : null}
 
-        {displayedPuzzle?.kind === "arrow_duel" && !boardFeedback ? (
+        {displayedPuzzle?.kind === "arrow_duel"
+          && !boardFeedback
+          && readyArrowDuelBoardKey === arrowDuelBoardRenderKey ? (
           <ArrowCandidateOverlay
             boardSize={boardSize}
             flipped={boardFlipped}
