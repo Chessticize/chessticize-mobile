@@ -24,10 +24,11 @@ Not Disturb rules.
    Apple's guidance to keep a clear causal relationship between a haptic and the
    action it reinforces
    ([Apple Human Interface Guidelines: Playing haptics](https://developer.apple.com/design/human-interface-guidelines/playing-haptics)).
-3. Use one restrained move sound and one short/light haptic for the first
-   version. Capture, check, castling, and game-end variants can be considered
-   later, but a family of effects should not be added before the basic feedback
-   is evaluated on real devices. Apple and Android both recommend short,
+3. Use two restrained board sounds, **Move** and **Capture**, plus one
+   short/light haptic for the first version. A **Low Time** cue can be
+   considered later; check, castling, and game-end variants remain out of
+   scope until the basic feedback is evaluated on real devices. Apple and
+   Android both recommend short,
    semantically consistent haptics and warn against overuse or long, buzzy
    effects
    ([Apple](https://developer.apple.com/design/human-interface-guidelines/playing-haptics),
@@ -209,24 +210,88 @@ Storybook can still provide useful design evidence:
   it
   ([W3C Vibration API](https://www.w3.org/TR/vibration/)). Desktop review and
   unsupported mobile browsers will commonly produce no physical feedback. The
-  story should therefore show a conspicuous visual pulse and an event log such
-  as `Requested: light move haptic`. An optional **Try web vibration** button
-  can be labeled **Web approximation**, never as native acceptance evidence.
+  story should therefore state that haptics require the native app instead of
+  presenting a browser vibration request as a successful preview.
 
 The recommended Storybook slice is:
 
-1. Settings with separate **Move sounds** and **Move haptics** switches.
-2. A board feedback preview with **Make legal move**, **Preview sound**, and
-   **Try web vibration** actions.
-3. Deterministic device-policy fixtures for Normal, Silent, iOS Focus, Android
-   DND, and No haptic hardware. These are simulation controls for reviewers,
-   not production UI.
-4. An event log that distinguishes `requested`, `suppressed by app setting`,
-   and `suppressed by simulated device policy`.
-5. A clear note: **Native sound and haptics require later real-device
-   validation.**
+1. The existing Settings clone with separate **Sound effects** and
+   **Haptic feedback** switches.
+2. Web-only synthetic previews for **Move** and **Capture**. The samples may
+   use Lichess timing and interaction patterns as references but must not copy
+   the non-free Lichess standard files.
+3. A clear note that the browser demo can request audio but cannot preview
+   native haptic feel.
+4. No production navigation, persistence, native-module wiring, analytics, or
+   rollout behavior during the Storybook gate.
 
 ## Downloadable sound sources and license handling
+
+**Lichess conclusion: do not copy or redistribute its standard `Move.mp3` or
+`Capture.mp3` on the evidence currently available.** Both files are publicly
+downloadable, and Lichess's
+[round controller](https://github.com/lichess-org/lila/blob/master/ui/round/src/ctrl.ts)
+distinguishes an ordinary move from a capture, so they remain useful interaction
+references. Download availability is not reuse permission, however. The current
+official
+[`COPYING.md`](https://github.com/lichess-org/lila/blob/ebe4157a2881a8df0d25ea6b482f012aedb3bb7e/COPYING.md#L83-L101)
+places “the other sounds in `public/sound`” under **non-free** exceptions rather
+than the project's general AGPL grant. In the official asset-license audit,
+maintainer Niklas Fiekas explicitly classified the **standard** theme as
+non-free
+([issue #789 comment](https://github.com/lichess-org/lila/issues/789#issuecomment-253326817));
+the resulting
+[2016 audit commit](https://github.com/lichess-org/lila/commit/0a5310e27b53249337e55842c0ecbd2a74d86116)
+introduced that non-free exception. Lichess later opened
+[issue #6829](https://github.com/lichess-org/lila/issues/6829) specifically to
+either acquire a FOSS license for the standard set or replace it, and closed the
+issue as not planned.
+
+The repository history does not supply a separate usable grant. `Move.mp3`
+descends from `move3.mp3`, added in
+[commit `f7c6817`](https://github.com/lichess-org/lila/commit/f7c68175278c761d1756c43c7575465ead225d8a),
+and `Capture.mp3` descends from `take2.mp3`, added in
+[commit `14b2369`](https://github.com/lichess-org/lila/commit/14b236994a79cfebf14f55b465f32b383d2e11f9);
+both were renamed into the standard theme in
+[commit `8bf5f90`](https://github.com/lichess-org/lila/commit/8bf5f906ccb11a247b0dde36365cb47ac51a0167).
+The repository then had a general MIT `doc/LICENSE`, but neither asset-add
+commit identifies an audio author, source, purchase, or asset-specific license.
+That general software license is not sufficient evidence that Lichess could
+relicense third-party audio, particularly in light of its later, specific
+non-free audit. The MIT permission discussed in
+[issue #594](https://github.com/lichess-org/lila/issues/594#issuecomment-115862552)
+was accepted by the contributor of the new Piano and NES themes, which
+`COPYING.md` lists separately as free; it does not retroactively license the
+older standard theme. The latest
+[2022 sound-edit PR](https://github.com/lichess-org/lila/pull/10771) also gives
+no source or license for either edited file.
+
+Inspection of the embedded metadata in the exact current
+[`Move.mp3`](https://raw.githubusercontent.com/lichess-org/lila/ebe4157a2881a8df0d25ea6b482f012aedb3bb7e/public/sound/standard/Move.mp3)
+and
+[`Capture.mp3`](https://raw.githubusercontent.com/lichess-org/lila/ebe4157a2881a8df0d25ea6b482f012aedb3bb7e/public/sound/standard/Capture.mp3)
+blobs reports the title `Wooden piece - sharp hit` and
+`Copyright 2000, Sounddogs.com`. This traces the present files to SoundDogs but
+does not identify the catalog item or prove which party purchased it.
+SoundDogs's current
+[end-user license](https://sounddogs.com/Page/Sound-Effects-End-User-License)
+permits synchronized use in apps after purchase, but describes the license as
+non-transferable and prohibits giving away or distributing the unsynchronized
+effect without an additional license. A Lichess download therefore cannot
+transfer any SoundDogs license to Chessticize.
+
+Required next action: do not import either Lichess file into Storybook or the
+app. Prefer a separately sourced CC0 candidate below. If product direction
+requires these exact sounds, first obtain written permission that identifies
+the exact current blobs and grants Chessticize commercial mobile-app use and
+repository/app redistribution from SoundDogs or another demonstrated
+rightsholder; contact Lichess as well for any provenance or purchase record.
+The unresolved catalog identity and ownership chain make the present conclusion
+conservative rather than a definitive legal opinion. The Lichess
+[download forum thread](https://lichess.org/forum/lichess-feedback/download-lichess-sounds-)
+only explains how to clone or download the repository, while its
+[rights thread](https://lichess.org/forum/lichess-feedback/what-are-the-rights-for-the-standard-lichess-sound-effect-2)
+points back to the non-free classification; neither grants reuse permission.
 
 The easiest license chain for a prototype is a CC0 asset. Creative Commons
 states that CC0 material can be copied, modified, distributed, and performed,

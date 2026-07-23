@@ -1,4 +1,4 @@
-export type MoveFeedbackCue = "move" | "capture" | "success" | "mistake";
+export type MoveFeedbackCue = "move" | "capture";
 
 export type MoveFeedbackPreferences = {
   hapticsEnabled: boolean;

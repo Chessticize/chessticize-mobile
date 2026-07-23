@@ -47,17 +47,7 @@ type AudioContextConstructor = new () => AudioContextLike;
 
 type BrowserAudioGlobals = {
   AudioContext?: AudioContextConstructor;
-  navigator?: {
-    vibrate?: (pattern: number | number[]) => boolean;
-  };
   webkitAudioContext?: AudioContextConstructor;
-};
-
-const HAPTIC_PATTERNS: Record<MoveFeedbackCue, number | number[]> = {
-  move: 18,
-  capture: 30,
-  success: [22, 34, 34],
-  mistake: [42, 28, 42]
 };
 
 export async function previewBrowserMoveFeedback(
@@ -66,7 +56,7 @@ export async function previewBrowserMoveFeedback(
 ): Promise<MoveFeedbackPreviewResult> {
   const [sound, haptics] = await Promise.all([
     preferences.soundEnabled ? playSyntheticCue(cue) : Promise.resolve("off" as const),
-    Promise.resolve(preferences.hapticsEnabled ? requestBrowserVibration(cue) : "off" as const)
+    Promise.resolve(preferences.hapticsEnabled ? "visual-only" as const : "off" as const)
   ]);
   return { haptics, sound };
 }
@@ -83,21 +73,16 @@ async function playSyntheticCue(
   const context = new AudioContextClass();
   try {
     await context.resume();
-    if (cue === "success") {
-      scheduleTone(context, 440, 0, 0.07, 0.08);
-      scheduleTone(context, 660, 0.075, 0.13, 0.07);
-      await delay(230);
-      return "played";
-    }
-    if (cue === "mistake") {
-      scheduleTone(context, 210, 0, 0.08, 0.09);
-      scheduleTone(context, 145, 0.085, 0.16, 0.08);
-      await delay(250);
-      return "played";
-    }
-
-    scheduleWoodClick(context, cue === "capture" ? 190 : 360, cue === "capture" ? 0.1 : 0.065);
-    await delay(cue === "capture" ? 160 : 120);
+    const isCapture = cue === "capture";
+    scheduleWoodClick(context, isCapture ? 190 : 360, isCapture ? 0.14 : 0.12);
+    scheduleTone(
+      context,
+      isCapture ? 240 : 480,
+      0,
+      isCapture ? 0.14 : 0.12,
+      isCapture ? 0.13 : 0.11
+    );
+    await delay(isCapture ? 210 : 200);
     return "played";
   } catch {
     return "unavailable";
@@ -155,23 +140,6 @@ function scheduleWoodClick(
   filter.connect(gain);
   gain.connect(context.destination);
   source.start();
-}
-
-function requestBrowserVibration(
-  cue: MoveFeedbackCue
-): MoveFeedbackPreviewResult["haptics"] {
-  const browserNavigator = (globalThis as unknown as BrowserAudioGlobals).navigator;
-  if (!browserNavigator) {
-    return "visual-only";
-  }
-  if (typeof browserNavigator.vibrate !== "function") {
-    return "visual-only";
-  }
-  const pattern = HAPTIC_PATTERNS[cue];
-  if (pattern === undefined) {
-    return "visual-only";
-  }
-  return browserNavigator.vibrate(pattern) ? "requested" : "visual-only";
 }
 
 function delay(milliseconds: number): Promise<void> {

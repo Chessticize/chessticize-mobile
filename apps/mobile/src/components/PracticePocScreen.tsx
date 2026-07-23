@@ -9684,15 +9684,6 @@ function SettingsPanel({
         </SettingsSection>
       )}
 
-      {moveFeedbackPreferences && moveFeedbackPreviewer ? (
-        <MoveFeedbackSettingsSection
-          preferences={moveFeedbackPreferences}
-          wide={adaptiveLayout.usesWideContent}
-          onPreferencesChange={onMoveFeedbackPreferencesChange}
-          onPreview={moveFeedbackPreviewer}
-        />
-      ) : null}
-
       <SettingsSection title="Notifications" testID="settings-notifications-section" wide={adaptiveLayout.usesWideContent}>
         <SettingsRow
           label="Review Reminders"
@@ -9763,6 +9754,15 @@ function SettingsPanel({
           </Text>
         ) : null}
       </SettingsSection>
+
+      {moveFeedbackPreferences && moveFeedbackPreviewer ? (
+        <MoveFeedbackSettingsSection
+          preferences={moveFeedbackPreferences}
+          wide={adaptiveLayout.usesWideContent}
+          onPreferencesChange={onMoveFeedbackPreferencesChange}
+          onPreview={moveFeedbackPreviewer}
+        />
+      ) : null}
 
       {showRatingControls ? (
         <SettingsSection title="Profile" testID="settings-profile-section" wide={adaptiveLayout.usesWideContent}>

@@ -24,10 +24,8 @@ const CUES: ReadonlyArray<{
   detail: string;
   label: string;
 }> = [
-  { cue: "move", detail: "Light click", label: "Move" },
-  { cue: "capture", detail: "Deep click", label: "Capture" },
-  { cue: "success", detail: "Rising cue", label: "Success" },
-  { cue: "mistake", detail: "Low cue", label: "Mistake" }
+  { cue: "move", detail: "Light board cue", label: "Move" },
+  { cue: "capture", detail: "Deeper board cue", label: "Capture" }
 ];
 
 export function MoveFeedbackSettingsSection({
@@ -84,8 +82,9 @@ export function MoveFeedbackSettingsSection({
           <View style={styles.previewHeading}>
             <Text style={styles.rowLabel}>Try feedback</Text>
             <Text style={styles.helperText}>
-              Synthetic Lab samples only. They cannot verify Silent mode,
-              Do Not Disturb, Focus, or native haptic feel.
+              Web demo only. Preview the proposed move and capture sounds;
+              haptics require the native app. Check this tab and device volume
+              if you do not hear them.
             </Text>
           </View>
           <View style={styles.previewButtons}>
@@ -114,14 +113,6 @@ export function MoveFeedbackSettingsSection({
               {previewMessage}
             </Text>
           ) : null}
-        </View>
-        <View style={styles.deviceNote} testID="settings-move-feedback-device-note">
-          <Text style={styles.deviceNoteTitle}>Also follows your device settings</Text>
-          <Text style={styles.helperText}>
-            Silent mode, system volume, and system haptic preferences can
-            suppress feedback. Do Not Disturb and Focus remain under operating
-            system control; Chessticize will not request permission to override them.
-          </Text>
         </View>
       </View>
     </View>
@@ -166,15 +157,13 @@ function previewResultMessage(
   result: MoveFeedbackPreviewResult
 ): string {
   const sound = result.sound === "played"
-    ? "sound played"
+    ? "browser sound requested"
     : result.sound === "off"
       ? "sound off"
       : "sound unavailable";
-  const haptics = result.haptics === "requested"
-    ? "browser vibration requested"
-    : result.haptics === "off"
+  const haptics = result.haptics === "off"
       ? "haptics off"
-      : "visual haptic simulation only";
+      : "haptics require the native app";
   return `${capitalize(cue)} preview: ${sound}; ${haptics}.`;
 }
 
@@ -192,11 +181,9 @@ const styles = StyleSheet.create({
     minWidth: 300
   },
   sectionLabel: {
-    color: "#475569",
-    fontSize: 12,
-    fontWeight: "900",
-    letterSpacing: 0.8,
-    textTransform: "uppercase"
+    color: "#111827",
+    fontSize: 15,
+    fontWeight: "800"
   },
   card: {
     backgroundColor: "#FFFFFF",
@@ -300,16 +287,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     lineHeight: 17
-  },
-  deviceNote: {
-    backgroundColor: "#F8FAFC",
-    gap: 3,
-    paddingHorizontal: 12,
-    paddingVertical: 11
-  },
-  deviceNoteTitle: {
-    color: "#334155",
-    fontSize: 12,
-    fontWeight: "900"
   }
 });

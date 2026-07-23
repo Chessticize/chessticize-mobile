@@ -62,6 +62,12 @@ export const MoveFeedback: Story = {
     await openSettings(canvasElement);
     await waitForTestId(canvasElement, "settings-move-feedback-section");
     await waitForTestId(canvasElement, "settings-move-feedback-previews");
+    await waitForText(canvasElement, "Web demo only");
+    await waitForTestId(canvasElement, "settings-move-feedback-preview-move");
+    await waitForTestId(canvasElement, "settings-move-feedback-preview-capture");
+    expectTestIdAbsent(canvasElement, "settings-move-feedback-preview-success");
+    expectTestIdAbsent(canvasElement, "settings-move-feedback-preview-mistake");
+    expectTestIdAbsent(canvasElement, "settings-move-feedback-device-note");
   }
 };
 

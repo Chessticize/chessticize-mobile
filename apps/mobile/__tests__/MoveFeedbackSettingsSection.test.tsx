@@ -48,16 +48,18 @@ describe("MoveFeedbackSettingsSection", () => {
     );
     const renderer = renderHarness(onPreview);
 
-    await pressAsync(renderer, "settings-move-feedback-preview-success");
+    await pressAsync(renderer, "settings-move-feedback-preview-capture");
 
     expect(text(find(renderer, "settings-move-feedback-preview-status")))
-      .toBe("Success preview: sound played; visual haptic simulation only.");
-    expect(text(find(renderer, "settings-move-feedback-device-note"))).toContain(
-      "Also follows your device settings"
+      .toBe("Capture preview: browser sound requested; haptics require the native app.");
+    expect(text(find(renderer, "settings-move-feedback-previews"))).toContain(
+      "Web demo only"
     );
-    expect(text(find(renderer, "settings-move-feedback-device-note"))).toContain(
-      "Do Not Disturb and Focus"
-    );
+    expect(find(renderer, "settings-move-feedback-preview-move")).toBeTruthy();
+    expect(find(renderer, "settings-move-feedback-preview-capture")).toBeTruthy();
+    expect(() => find(renderer, "settings-move-feedback-preview-success")).toThrow();
+    expect(() => find(renderer, "settings-move-feedback-preview-mistake")).toThrow();
+    expect(() => find(renderer, "settings-move-feedback-device-note")).toThrow();
   });
 });
 
