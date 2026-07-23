@@ -2678,6 +2678,7 @@ export function PracticePocScreen({
           ) : null}
 
           <ScrollView
+            keyboardShouldPersistTaps="handled"
             testID="practice-main-scroll"
             scrollEnabled={!practiceScrollLocked}
             showsHorizontalScrollIndicator={false}

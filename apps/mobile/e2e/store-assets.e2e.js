@@ -51,17 +51,14 @@ async function setStoreAssetRatings({ standard, arrowDuel }) {
     ['standard', standard],
     ['arrow-duel', arrowDuel]
   ]) {
-    const stepCount = (targetRating - 600) / 25;
-    if (!Number.isInteger(stepCount) || stepCount < 0) {
-      throw new Error(`Store-asset rating ${targetRating} must be at least 600 and use 25-point steps`);
+    if (!Number.isInteger(targetRating) || targetRating < 600 || targetRating > 2200) {
+      throw new Error(`Store-asset rating ${targetRating} must be a whole number from 600 to 2200`);
     }
     await waitForVisibleInPracticeScroll(`practice-run-edit-${ratingKey}`);
     await element(by.id(`practice-run-edit-${ratingKey}`)).tap();
-    for (let index = 0; index < stepCount; index += 1) {
-      await element(by.id('practice-run-elo-increase')).tap();
-    }
-    await waitFor(element(by.id('practice-run-elo-value')))
-      .toHaveText(`ELO ${targetRating}`)
+    await element(by.id('practice-run-elo-input')).replaceText(String(targetRating));
+    await waitFor(element(by.id('practice-run-elo-input')))
+      .toHaveText(String(targetRating))
       .withTimeout(10000);
     await element(by.id('practice-main-scroll')).scrollTo('top');
     await element(by.id('practice-run-save')).tap();

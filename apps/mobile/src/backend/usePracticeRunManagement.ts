@@ -7,6 +7,8 @@ import {
   defaultSprintConfig,
   namedThemesForSelection,
   normalizeThemeChoiceSelection,
+  PRACTICE_RUN_RATING_MAX,
+  PRACTICE_RUN_RATING_MIN,
   PracticeRunNameError,
   type PracticeRunRecord
 } from "../../../../packages/core/src/index.ts";
@@ -23,6 +25,8 @@ import type {
 
 type RunManagementViewState = {
   draft: PracticeRunDraft | null;
+  eloError: string | null;
+  eloInput: string | null;
   homeEditing: boolean;
   nameError: string | null;
   notice: string | null;
@@ -35,6 +39,10 @@ export type PracticeRunManagementController = {
   presentation: PracticeRunManagementPresentation | undefined;
   refresh: () => void;
 };
+
+const PRACTICE_RUN_ELO_STEP = 100;
+const PRACTICE_RUN_ELO_ERROR =
+  `Enter a whole-number ELO from ${PRACTICE_RUN_RATING_MIN} to ${PRACTICE_RUN_RATING_MAX}.`;
 
 export function usePracticeRunManagement({
   enabled,
@@ -69,6 +77,8 @@ export function usePracticeRunManagement({
         setView((current) => ({
           ...current,
           draft: newRunDraft(),
+          eloError: null,
+          eloInput: String(DEFAULT_NEW_PRACTICE_RUN_RATING),
           homeEditing: false,
           nameError: null,
           notice: null,
@@ -85,12 +95,20 @@ export function usePracticeRunManagement({
           : current);
         return;
       case "change-elo":
-        setView((current) => updateDraft(current, { elo: clampManualRating(intent.elo) }));
+        setView((current) => {
+          const elo = Math.min(PRACTICE_RUN_RATING_MAX, clampManualRating(intent.elo));
+          return {
+            ...updateDraft(current, { elo }),
+            eloError: null,
+            eloInput: String(elo)
+          };
+        });
         return;
       case "change-elo-input":
+        setView((current) => changeEloInput(current, intent.value));
+        return;
       case "step-elo-input":
-        // Reserved for the Interaction Lab direct-entry proposal. Product
-        // validation and persistence remain intentionally unwired in this phase.
+        setView((current) => stepEloInput(current, intent.direction));
         return;
       case "change-mode":
         setView((current) => current.screen === "create"
@@ -98,7 +116,7 @@ export function usePracticeRunManagement({
           : current);
         return;
       case "change-name":
-        setView((current) => current.screen === "create"
+        setView((current) => current.screen === "create" || current.screen === "edit"
           ? { ...updateDraft(current, { name: intent.name }), nameError: null }
           : current);
         return;
@@ -128,6 +146,8 @@ export function usePracticeRunManagement({
         setView((current) => ({
           ...current,
           draft: presentationForRun(service, run),
+          eloError: null,
+          eloInput: String(service.getRating(run.ratingKey).rating),
           homeEditing: true,
           nameError: null,
           notice: null,
@@ -158,6 +178,8 @@ export function usePracticeRunManagement({
                 perPuzzleSeconds: config.perPuzzleSeconds,
                 themes: normalizeThemeChoiceSelection(config.themes)
               },
+              eloError: null,
+              eloInput: String(service.getRating(config.ratingKey).rating),
               nameError: null
             }
           : current);
@@ -200,7 +222,7 @@ export function usePracticeRunManagement({
       }
       case "save-run": {
         const draft = view.draft;
-        if (!draft) {
+        if (!draft || view.eloError || validateEloInput(view.eloInput ?? String(draft.elo))) {
           return;
         }
         try {
@@ -220,13 +242,15 @@ export function usePracticeRunManagement({
             return;
           }
           if (view.screen === "edit" && draft.id) {
-            const saved = service.setPracticeRunRating(draft.id, draft.elo);
-            const run = catalog.find((candidate) => candidate.id === draft.id);
+            const saved = service.updatePracticeRun(draft.id, {
+              name: draft.name,
+              rating: draft.elo
+            });
             const nextCatalog = service.listPracticeRuns();
             setCatalog(nextCatalog);
             setView((current) => ({
               ...returnHome(current, true),
-              notice: run ? `${run.name} ELO updated to ${saved.rating}.` : null,
+              notice: `${saved.run.name} updated.`,
               selectedRunId: selectedActiveRunId(nextCatalog, current.selectedRunId)
             }));
           }
@@ -258,7 +282,17 @@ export function usePracticeRunManagement({
         }));
         return;
     }
-  }, [catalog, onStartRun, service, view.draft, view.removeCandidateId, view.screen, view.selectedRunId]);
+  }, [
+    catalog,
+    onStartRun,
+    service,
+    view.draft,
+    view.eloError,
+    view.eloInput,
+    view.removeCandidateId,
+    view.screen,
+    view.selectedRunId
+  ]);
 
   const presentation = useMemo<PracticeRunManagementPresentation | undefined>(() => {
     if (!enabled) {
@@ -266,9 +300,12 @@ export function usePracticeRunManagement({
     }
     return {
       ...view,
-      canSave: view.screen !== "create" || view.draft === null
-        ? true
-        : service.canCreatePracticeRun(createPracticeRunCommand(view.draft)),
+      canSave: view.eloError === null && (
+        view.screen !== "create" || view.draft === null
+          ? true
+          : service.canCreatePracticeRun(createPracticeRunCommand(view.draft))
+      ),
+      directRunEditing: true,
       hiddenRuns: catalog.filter((run) => run.archived).map((run) => presentationForRun(service, run)),
       previousConfigs: service.listCustomSprintConfigs().map((config) => ({
         config,
@@ -285,6 +322,8 @@ export function usePracticeRunManagement({
 function initialView(catalog: readonly PracticeRunRecord[]): RunManagementViewState {
   return {
     draft: null,
+    eloError: null,
+    eloInput: null,
     homeEditing: false,
     nameError: null,
     notice: null,
@@ -347,10 +386,54 @@ function updateDraft(
   return view.draft ? { ...view, draft: { ...view.draft, ...patch } } : view;
 }
 
+function changeEloInput(view: RunManagementViewState, value: string): RunManagementViewState {
+  const eloError = validateEloInput(value);
+  const elo = Number(value);
+  return {
+    ...(eloError ? view : updateDraft(view, { elo })),
+    eloError,
+    eloInput: value
+  };
+}
+
+function stepEloInput(
+  view: RunManagementViewState,
+  direction: -1 | 1
+): RunManagementViewState {
+  if (!view.draft) {
+    return view;
+  }
+  const parsed = Number(view.eloInput);
+  const current = typeof view.eloInput === "string"
+    && /^\d{1,4}$/.test(view.eloInput)
+    && Number.isInteger(parsed)
+    ? parsed
+    : view.draft.elo;
+  const elo = Math.min(
+    PRACTICE_RUN_RATING_MAX,
+    Math.max(PRACTICE_RUN_RATING_MIN, current + direction * PRACTICE_RUN_ELO_STEP)
+  );
+  return changeEloInput(view, String(elo));
+}
+
+function validateEloInput(value: string): string | null {
+  if (!/^\d+$/.test(value)) {
+    return PRACTICE_RUN_ELO_ERROR;
+  }
+  const elo = Number(value);
+  return Number.isInteger(elo)
+    && elo >= PRACTICE_RUN_RATING_MIN
+    && elo <= PRACTICE_RUN_RATING_MAX
+    ? null
+    : PRACTICE_RUN_ELO_ERROR;
+}
+
 function returnHome(view: RunManagementViewState, homeEditing = false): RunManagementViewState {
   return {
     ...view,
     draft: null,
+    eloError: null,
+    eloInput: null,
     homeEditing,
     nameError: null,
     notice: null,

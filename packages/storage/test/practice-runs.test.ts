@@ -6,6 +6,7 @@ import { join, resolve } from "node:path";
 import type { Puzzle } from "../../core/src/index.ts";
 import {
   ARROW_DUEL_PRACTICE_RUN_ID,
+  defaultPracticeRuns,
   STANDARD_PRACTICE_RUN_ID
 } from "../../core/src/index.ts";
 import {
@@ -90,6 +91,41 @@ for (const backend of ["memory", "sqlite"] as const) {
       assert.equal(service.getRating(tactics.ratingKey).rating, 900);
       assert.equal(service.getRating(copy.ratingKey).rating, 900);
 
+      const standardBefore = service.getActivePracticeRun(STANDARD_PRACTICE_RUN_ID);
+      const updatedStandard = service.updatePracticeRun(STANDARD_PRACTICE_RUN_ID, {
+        name: "Morning Warm-up",
+        rating: 1375
+      }, "2026-07-22T10:01:30.000Z");
+      assert.deepEqual(updatedStandard.run, {
+        ...standardBefore,
+        name: "Morning Warm-up",
+        updatedAt: "2026-07-22T10:01:30.000Z"
+      });
+      assert.equal(updatedStandard.rating.rating, 1375);
+      assert.equal(updatedStandard.rating.generation, 1);
+      const unchangedStandard = service.updatePracticeRun(STANDARD_PRACTICE_RUN_ID, {
+        name: "Morning Warm-up",
+        rating: 1375
+      }, "2026-07-22T10:01:45.000Z");
+      assert.equal(unchangedStandard.run.updatedAt, "2026-07-22T10:01:30.000Z");
+      assert.equal(unchangedStandard.rating.generation, 1);
+      assert.throws(
+        () => service.updatePracticeRun(STANDARD_PRACTICE_RUN_ID, {
+          name: "Tactics Focus",
+          rating: 1400
+        }),
+        /already in use/
+      );
+      assert.throws(
+        () => service.updatePracticeRun(STANDARD_PRACTICE_RUN_ID, {
+          name: "Invalid ELO",
+          rating: 2201
+        }),
+        /at most 2200/
+      );
+      assert.equal(service.getActivePracticeRun(STANDARD_PRACTICE_RUN_ID).name, "Morning Warm-up");
+      assert.equal(service.getRating(standardBefore.ratingKey).rating, 1375);
+
       const changed = service.setPracticeRunRating(tactics.id, 1025);
       assert.equal(changed.generation, 1);
       assert.equal(service.setPracticeRunRating(tactics.id, 1025).generation, 1);
@@ -133,6 +169,21 @@ for (const backend of ["memory", "sqlite"] as const) {
       assert.equal(exported.practiceRuns.find((run) => run.id === tactics.id)?.name, "Tactics Focus");
       assert.deepEqual(exported.sprintSessions[0]?.run, sprint.run);
       assert.equal(exported.sprintSessions[0]?.config?.ratingKey, tactics.ratingKey);
+
+      service.updatePracticeRun(tactics.id, {
+        name: "Calculation Focus",
+        rating: 1025
+      }, "2026-07-22T10:06:00.000Z");
+      assert.equal(service.listHistory()[0]?.runName, "Tactics Focus");
+      const renamedSprint = service.startSprint(
+        { mode: "custom", practiceRunId: tactics.id, targetCorrect: 1, puzzleSelectionSeed: "renamed-run-test" },
+        "2026-07-22T10:07:00.000Z"
+      );
+      assert.deepEqual(renamedSprint.run, {
+        id: tactics.id,
+        kind: "custom",
+        name: "Calculation Focus"
+      });
     } finally {
       if (store instanceof SQLiteStore) {
         store.close();
@@ -157,6 +208,10 @@ test("SQLite practice Runs survive reopen with their ELO and archived state", as
       perPuzzleSeconds: 10,
       initialRating: 875
     }, "2026-07-22T11:00:00.000Z");
+    service.updatePracticeRun(run.id, {
+      name: "Renamed Saved Run",
+      rating: 1125
+    }, "2026-07-22T11:00:30.000Z");
     service.archivePracticeRun(run.id, "2026-07-22T11:01:00.000Z");
     store.close();
 
@@ -165,7 +220,8 @@ test("SQLite practice Runs survive reopen with their ELO and archived state", as
     try {
       const reopenedService = new PracticeService(reopened);
       assert.equal(reopenedService.listPracticeRuns().find((candidate) => candidate.id === run.id)?.archived, true);
-      assert.equal(reopenedService.getRating(run.ratingKey).rating, 875);
+      assert.equal(reopenedService.listPracticeRuns().find((candidate) => candidate.id === run.id)?.name, "Renamed Saved Run");
+      assert.equal(reopenedService.getRating(run.ratingKey).rating, 1125);
     } finally {
       reopened.close();
     }
@@ -199,6 +255,24 @@ test("practice Run sync imports catalog identity, setup, and ELO together", asyn
     updatedAt: "2026-07-22T12:01:00.000Z"
   });
   assert.equal(destination.getRating(run.ratingKey).rating, 950);
+});
+
+test("practice Run sync preserves a renamed built-in Run and its fixed identity", async () => {
+  const source = new PracticeService(new MemoryStore());
+  source.updatePracticeRun(STANDARD_PRACTICE_RUN_ID, {
+    name: "Morning Warm-up",
+    rating: 1350
+  }, "2026-07-22T12:30:00.000Z");
+
+  const destination = new PracticeService(new MemoryStore());
+  destination.importLocalData(source.exportLocalData());
+
+  assert.deepEqual(destination.getActivePracticeRun(STANDARD_PRACTICE_RUN_ID), {
+    ...defaultPracticeRuns()[0]!,
+    name: "Morning Warm-up",
+    updatedAt: "2026-07-22T12:30:00.000Z"
+  });
+  assert.equal(destination.getRating("standard 5/20").rating, 1350);
 });
 
 test("SQLite import resolves concurrent duplicate Run names without a transient unique-name failure", async () => {

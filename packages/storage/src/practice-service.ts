@@ -3,6 +3,7 @@ import {
   applySprintRatingChange,
   archivePracticeRun,
   assertValidManualRating,
+  assertValidPracticeRunRating,
   buildSprintConfig,
   clonePracticeRun,
   createCustomPracticeRun,
@@ -11,8 +12,10 @@ import {
   DEFAULT_VOLATILITY,
   normalizeThemeSelection,
   practiceRunSprintConfig,
+  renamePracticeRun,
   reorderPracticeRuns,
   restorePracticeRun,
+  samePracticeRun,
   pauseSprint as pauseSprintCore,
   reviewDayFor,
   resumeSprint as resumeSprintCore,
@@ -81,6 +84,11 @@ export interface CreatePracticeRunCommand {
   maxMistakes?: number;
   themes?: string[];
   initialRating: number;
+}
+
+export interface UpdatePracticeRunCommand {
+  name: string;
+  rating: number;
 }
 
 export class PracticeRunAvailabilityError extends Error {
@@ -368,7 +376,7 @@ export class PracticeService {
     command: CreatePracticeRunCommand,
     now = new Date().toISOString()
   ): PracticeRunRecord {
-    assertValidManualRating(command.initialRating);
+    assertValidPracticeRunRating(command.initialRating);
     const existingRuns = this.store.listPracticeRuns();
     const activeCount = existingRuns.filter((run) => !run.archived).length;
     const run = createCustomPracticeRun({
@@ -416,9 +424,39 @@ export class PracticeService {
   }
 
   setPracticeRunRating(runId: string, rating: number): RatingRecord {
+    assertValidPracticeRunRating(rating);
     const run = this.requirePracticeRun(runId);
     const current = this.store.getRating(run.ratingKey);
     return current.rating === rating ? current : this.setRating(run.ratingKey, rating);
+  }
+
+  updatePracticeRun(
+    runId: string,
+    command: UpdatePracticeRunCommand,
+    now = new Date().toISOString()
+  ): { run: PracticeRunRecord; rating: RatingRecord } {
+    assertValidPracticeRunRating(command.rating);
+    this.requirePracticeRun(runId, false);
+    const existingRuns = this.store.listPracticeRuns();
+    const currentRun = existingRuns.find((run) => run.id === runId)!;
+    const nextRun = renamePracticeRun(runId, command.name, existingRuns, now);
+    const currentRating = this.store.getRating(currentRun.ratingKey);
+    const nextRating = currentRating.rating === command.rating
+      ? currentRating
+      : nextManualRating(currentRating, command.rating);
+
+    this.store.transaction(() => {
+      if (!samePracticeRun(currentRun, nextRun)) {
+        this.store.savePracticeRun(nextRun);
+      }
+      if (currentRating.rating !== nextRating.rating) {
+        this.store.saveRating(nextRating);
+      }
+    });
+    return {
+      run: clonePracticeRun(nextRun),
+      rating: { ...nextRating }
+    };
   }
 
   getActivePracticeRun(runId: string): PracticeRunRecord {
@@ -465,7 +503,7 @@ export class PracticeService {
     command: CreatePracticeRunCommand,
     maximum = Number.MAX_SAFE_INTEGER
   ): number {
-    assertValidManualRating(command.initialRating);
+    assertValidPracticeRunRating(command.initialRating);
     const config = this.sprintConfigForCommand(command);
     return this.store.countPuzzles({
       ...this.puzzleFilterForCommand(command, config, command.initialRating),
@@ -484,16 +522,7 @@ export class PracticeService {
   setRating(ratingKey: string, rating: number): RatingRecord {
     assertValidManualRating(rating);
     const current = this.store.getRating(ratingKey);
-    const next: RatingRecord = {
-      ...current,
-      generation: current.generation + 1,
-      games: 0,
-      rating,
-      ratingDeviation: Math.min(
-        current.ratingDeviation ?? DEFAULT_RATING_DEVIATION,
-        MANUAL_RATING_DEVIATION_CAP
-      )
-    };
+    const next = nextManualRating(current, rating);
     this.store.saveRating(next);
     return next;
   }
@@ -682,6 +711,19 @@ export class PracticeService {
     });
     return repaired;
   }
+}
+
+function nextManualRating(current: RatingRecord, rating: number): RatingRecord {
+  return {
+    ...current,
+    generation: current.generation + 1,
+    games: 0,
+    rating,
+    ratingDeviation: Math.min(
+      current.ratingDeviation ?? DEFAULT_RATING_DEVIATION,
+      MANUAL_RATING_DEVIATION_CAP
+    )
+  };
 }
 
 export function sprintView(state: SprintState): unknown {

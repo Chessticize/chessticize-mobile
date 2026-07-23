@@ -8,6 +8,7 @@ import {
   practiceRunsFromLegacyCustomConfigs,
   practiceRunSprintConfig,
   PRACTICE_RUN_NAME_MAX_LENGTH,
+  renamePracticeRun,
   reorderPracticeRuns,
   restorePracticeRun,
   validatePracticeRunName,
@@ -91,10 +92,32 @@ test("Custom Runs use stable independent rating keys even with identical configu
 test("Run names are trimmed, required, limited, unique case-insensitively, and reserve built-ins", () => {
   const existing = [...defaultPracticeRuns(), createRun("run-a", "Tactics Focus", defaultPracticeRuns())];
   assert.equal(validatePracticeRunName("  Endgame Sprint  ", existing), "Endgame Sprint");
+  assert.equal(validatePracticeRunName(" Standard ", existing, "standard"), "Standard");
+  assert.equal(validatePracticeRunName("Arrow Duel", existing, "arrow-duel"), "Arrow Duel");
   assert.throws(() => validatePracticeRunName(" ", existing), errorCode("required"));
   assert.throws(() => validatePracticeRunName("tAcTiCs FoCuS", existing), errorCode("duplicate"));
   assert.throws(() => validatePracticeRunName("Standard", []), errorCode("duplicate"));
   assert.throws(() => validatePracticeRunName("x".repeat(41), existing), errorCode("too_long"));
+});
+
+test("renaming a Run preserves stable identity and fixed training settings", () => {
+  const existing = defaultPracticeRuns();
+  const before = existing[0]!;
+  const renamed = renamePracticeRun(before.id, " Morning Warm-up ", existing, NOW);
+
+  assert.deepEqual(renamed, {
+    ...before,
+    name: "Morning Warm-up",
+    updatedAt: NOW
+  });
+  assert.throws(
+    () => renamePracticeRun(before.id, "Arrow Duel", existing, NOW),
+    errorCode("duplicate")
+  );
+  assert.throws(
+    () => renamePracticeRun("missing", "Missing", existing, NOW),
+    /not available/
+  );
 });
 
 test("legacy Custom Sprint configs become named Home Runs without changing their ELO buckets", () => {
@@ -215,6 +238,25 @@ test("sync merge is deterministic, uses last-write-wins per identity, and resolv
     mergePracticeRunCatalogs([tieLeft], [tieRight]),
     mergePracticeRunCatalogs([tieRight], [tieLeft])
   );
+});
+
+test("sync merge preserves renamed built-in Runs while canonicalizing their fixed settings", () => {
+  const [standard] = defaultPracticeRuns();
+  const renamed = {
+    ...standard!,
+    name: "Morning Warm-up",
+    mode: "custom" as const,
+    ratingKey: "tampered-rating-key",
+    updatedAt: NOW
+  };
+
+  const merged = mergePracticeRunCatalogs([renamed], []);
+  const saved = merged.find((run) => run.id === standard!.id);
+
+  assert.equal(saved?.name, "Morning Warm-up");
+  assert.equal(saved?.mode, "standard");
+  assert.equal(saved?.ratingKey, "standard 5/20");
+  assert.equal(saved?.updatedAt, NOW);
 });
 
 function createRun(id: string, name: string, existingRuns: ReturnType<typeof defaultPracticeRuns>) {
