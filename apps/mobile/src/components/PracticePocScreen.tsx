@@ -20,6 +20,7 @@ import {
 } from "react-native";
 import type { ImageSourcePropType } from "react-native";
 import type { LayoutChangeEvent, PanResponderGestureState } from "react-native";
+import type { StyleProp, ViewStyle } from "react-native";
 import type { MoveResult } from "react-native-chessboard";
 import Chessboard, { type ChessboardRef } from "react-native-chessboard";
 import {
@@ -179,6 +180,7 @@ interface Props {
   themeCatalogPresentation?: ThemeCatalogPresentation;
   customTargetCorrect?: number;
   debugTrace?: (event: PracticeDebugTraceEvent) => void;
+  feedbackIssuesOpener?: (url: string) => Promise<void>;
   currentTimeMs?: () => number;
   puzzleSelectionId?: string;
   puzzleSelectionSeed?: string;
@@ -303,6 +305,11 @@ const CUSTOM_INITIAL_RATING_MIN = 600;
 const CUSTOM_INITIAL_RATING_MAX = 2200;
 const CUSTOM_INITIAL_RATING_STEP = 100;
 const ARROW_DUEL_LOADING_TRANSITION_MS = 200;
+
+function openFeedbackIssuesInBrowser(url: string): Promise<void> {
+  return Linking.openURL(url);
+}
+
 const ALL_THEMES_FILTER: CustomThemeFilter = ALL_THEME_SELECTION;
 const CUSTOM_THEME_OPTIONS: ReadonlyArray<CustomThemeFilter> = [
   ALL_THEMES_FILTER,
@@ -369,6 +376,7 @@ export function PracticePocScreen({
   themeCatalogPresentation = SERVER_CURATED_THEME_PRESENTATION,
   customTargetCorrect,
   debugTrace,
+  feedbackIssuesOpener = openFeedbackIssuesInBrowser,
   currentTimeMs = Date.now,
   puzzleSelectionId,
   puzzleSelectionSeed,
@@ -2914,6 +2922,7 @@ export function PracticePocScreen({
               <SettingsPanel
                 adaptiveLayout={adaptiveLayout}
                 applicationMetadata={platformCapabilities.applicationMetadata}
+                feedbackIssuesOpener={feedbackIssuesOpener}
                 progressProtection={progressProtection}
                 standardRating={readRating(service, defaultSprintConfig("standard").ratingKey)}
                 ratings={[
@@ -9615,6 +9624,7 @@ function SettingsPanel({
   advancedRatingsOpen,
   adaptiveLayout,
   applicationMetadata,
+  feedbackIssuesOpener,
   progressProtection,
   onOpenDiagnostics,
   onOpenNotificationSettings,
@@ -9637,6 +9647,7 @@ function SettingsPanel({
   advancedRatingsOpen: boolean;
   adaptiveLayout: AdaptiveLayout;
   applicationMetadata: MobileApplicationMetadata;
+  feedbackIssuesOpener: (url: string) => Promise<void>;
   progressProtection: MobilePlatformCapabilities["progressProtection"];
   onOpenDiagnostics?: () => void;
   onOpenNotificationSettings: () => Promise<void>;
@@ -9810,6 +9821,12 @@ function SettingsPanel({
         </SettingsSection>
       ) : null}
 
+      <FeedbackSupportCard
+        feedbackIssuesUrl={applicationMetadata.feedbackIssuesUrl}
+        openFeedbackIssues={feedbackIssuesOpener}
+        wide={adaptiveLayout.usesWideContent}
+      />
+
       <SettingsSection title="About" testID="settings-about-section" wide={adaptiveLayout.usesWideContent}>
         <SettingsRow
           label="App Version"
@@ -9873,7 +9890,7 @@ function SettingsPanel({
         <SettingsExternalLinkRow
           label="Support"
           value="Email"
-          detail="Questions, feedback, and support"
+          detail="Private questions and account support"
           linkLabel={applicationMetadata.supportEmail}
           testID="settings-support-email"
           onPress={() => {
@@ -9895,6 +9912,139 @@ function SettingsPanel({
         </Pressable>
       ) : null}
     </View>
+  );
+}
+
+function FeedbackSupportCard({
+  feedbackIssuesUrl,
+  openFeedbackIssues,
+  wide
+}: {
+  feedbackIssuesUrl: string;
+  openFeedbackIssues: (url: string) => Promise<void>;
+  wide: boolean;
+}): React.JSX.Element {
+  const [confirmationVisible, setConfirmationVisible] = useState(false);
+  const [handoffError, setHandoffError] = useState<string | null>(null);
+
+  function closeConfirmation(): void {
+    setConfirmationVisible(false);
+    setHandoffError(null);
+  }
+
+  async function continueToGitHub(): Promise<void> {
+    setHandoffError(null);
+    try {
+      await openFeedbackIssues(feedbackIssuesUrl);
+      setConfirmationVisible(false);
+    } catch {
+      setHandoffError("Couldn't open GitHub Issues. Try again.");
+    }
+  }
+
+  return (
+    <SettingsSection
+      cardStyle={styles.feedbackSupportSectionCard}
+      title="Help & Feedback"
+      testID="settings-feedback-section"
+      wide={wide}
+    >
+      <View style={styles.feedbackSupportCard}>
+        <View style={styles.feedbackSupportHeader}>
+          <View style={styles.feedbackSupportIcon}>
+            <Text style={styles.feedbackSupportIconText}>?</Text>
+          </View>
+          <View style={styles.feedbackSupportCopy}>
+            <Text style={styles.feedbackSupportTitle}>Help improve Chessticize</Text>
+            <Text style={styles.feedbackSupportDetail}>
+              Report a bug, request a feature, or see whether someone has already raised it.
+            </Text>
+          </View>
+        </View>
+        <View style={styles.feedbackPrivacyStrip}>
+          <Text style={styles.feedbackPrivacyTitle}>Your data stays in the app</Text>
+          <Text style={styles.feedbackPrivacyCopy}>
+            GitHub opens in your browser. Ratings, history, and puzzle data are not attached.
+          </Text>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Open GitHub Issues in browser"
+          testID="settings-feedback-open-github"
+          style={({ pressed }) => [
+            styles.feedbackSupportButton,
+            pressed ? styles.feedbackSupportButtonPressed : null
+          ]}
+          onPress={() => {
+            setHandoffError(null);
+            setConfirmationVisible(true);
+          }}
+        >
+          <Text style={styles.feedbackSupportButtonText}>Open GitHub Issues</Text>
+          <Text style={styles.feedbackSupportButtonArrow}>↗</Text>
+        </Pressable>
+        <Text style={styles.feedbackSubmissionCopy}>
+          You will review and submit your issue on GitHub.
+        </Text>
+      </View>
+      {confirmationVisible ? (
+        <Modal
+          animationType="fade"
+          onRequestClose={closeConfirmation}
+          transparent
+          visible
+        >
+          <View style={styles.accessibleMoveModalBackdrop}>
+            <View
+              accessibilityViewIsModal
+              style={styles.feedbackHandoffConfirmation}
+              testID="settings-feedback-handoff-confirmation"
+            >
+              <View style={styles.feedbackExternalBadge}>
+                <Text style={styles.feedbackExternalBadgeText}>EXTERNAL BROWSER</Text>
+              </View>
+              <Text style={styles.feedbackHandoffTitle}>Continue to GitHub?</Text>
+              <Text style={styles.feedbackHandoffCopy}>
+                A new issue will open on github.com in your default browser. Chessticize does not attach your account, rating, history, or puzzle data.
+              </Text>
+              <View style={styles.feedbackHandoffPrivacyCard}>
+                <Text style={styles.feedbackHandoffPrivacyTitle}>You stay in control</Text>
+                <Text style={styles.feedbackHandoffPrivacyCopy}>
+                  Review what you share and submit it on GitHub. This is not an in-app submission.
+                </Text>
+              </View>
+              {handoffError ? (
+                <Text style={styles.errorText} testID="settings-feedback-handoff-error">
+                  {handoffError}
+                </Text>
+              ) : null}
+              <View style={styles.confirmationActionRow}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Stay in Settings"
+                  style={styles.feedbackHandoffCancelButton}
+                  testID="settings-feedback-handoff-cancel"
+                  onPress={closeConfirmation}
+                >
+                  <Text style={styles.feedbackHandoffCancelButtonText}>Not now</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="link"
+                  accessibilityLabel="Continue to GitHub Issues"
+                  style={styles.feedbackHandoffContinueButton}
+                  testID="settings-feedback-handoff-continue"
+                  onPress={() => {
+                    void continueToGitHub();
+                  }}
+                >
+                  <Text style={styles.feedbackHandoffContinueButtonText}>Continue to GitHub</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      ) : null}
+    </SettingsSection>
   );
 }
 
@@ -10181,11 +10331,13 @@ function advancedRatingBucketLabel(label: string, ratingKey: string): string {
 }
 
 function SettingsSection({
+  cardStyle,
   children,
   testID,
   title,
   wide = false
 }: {
+  cardStyle?: StyleProp<ViewStyle>;
   children: React.ReactNode;
   testID: string;
   title: string;
@@ -10194,7 +10346,7 @@ function SettingsSection({
   return (
     <View style={[styles.settingsSection, wide ? styles.settingsSectionWide : null]} testID={testID}>
       <Text style={styles.sectionLabel}>{title}</Text>
-      <View style={styles.settingsSectionCard}>
+      <View style={[styles.settingsSectionCard, cardStyle]}>
         {children}
       </View>
     </View>
@@ -14225,6 +14377,172 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     overflow: "hidden"
+  },
+  feedbackSupportSectionCard: {
+    borderColor: "#BFDBFE",
+    borderRadius: 14
+  },
+  feedbackSupportCard: {
+    gap: 14,
+    padding: 16
+  },
+  feedbackSupportHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12
+  },
+  feedbackSupportIcon: {
+    alignItems: "center",
+    backgroundColor: "#DBEAFE",
+    borderRadius: 999,
+    height: 42,
+    justifyContent: "center",
+    width: 42
+  },
+  feedbackSupportIconText: {
+    color: "#1D4ED8",
+    fontSize: 22,
+    fontWeight: "900"
+  },
+  feedbackSupportCopy: {
+    flex: 1,
+    gap: 3,
+    minWidth: 0
+  },
+  feedbackSupportTitle: {
+    color: "#0F172A",
+    fontSize: 18,
+    fontWeight: "900"
+  },
+  feedbackSupportDetail: {
+    color: "#475569",
+    fontSize: 13,
+    fontWeight: "600",
+    lineHeight: 18
+  },
+  feedbackPrivacyStrip: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 9,
+    gap: 2,
+    padding: 11
+  },
+  feedbackPrivacyTitle: {
+    color: "#334155",
+    fontSize: 12,
+    fontWeight: "900"
+  },
+  feedbackPrivacyCopy: {
+    color: "#64748B",
+    fontSize: 11,
+    fontWeight: "600",
+    lineHeight: 16
+  },
+  feedbackSupportButton: {
+    alignItems: "center",
+    backgroundColor: "#2563EB",
+    borderRadius: 9,
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "center",
+    minHeight: 46,
+    paddingHorizontal: 16
+  },
+  feedbackSupportButtonPressed: {
+    backgroundColor: "#1D4ED8"
+  },
+  feedbackSupportButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "900"
+  },
+  feedbackSupportButtonArrow: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "900",
+    marginLeft: 8
+  },
+  feedbackSubmissionCopy: {
+    color: "#64748B",
+    fontSize: 10,
+    fontWeight: "700",
+    textAlign: "center"
+  },
+  feedbackHandoffConfirmation: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    gap: 14,
+    maxWidth: 430,
+    padding: 20,
+    width: "100%"
+  },
+  feedbackExternalBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: "#DBEAFE",
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 5
+  },
+  feedbackExternalBadgeText: {
+    color: "#1D4ED8",
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 0.8
+  },
+  feedbackHandoffTitle: {
+    color: "#0F172A",
+    fontSize: 22,
+    fontWeight: "900"
+  },
+  feedbackHandoffCopy: {
+    color: "#475569",
+    fontSize: 14,
+    fontWeight: "600",
+    lineHeight: 20
+  },
+  feedbackHandoffPrivacyCard: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 9,
+    gap: 3,
+    padding: 12
+  },
+  feedbackHandoffPrivacyTitle: {
+    color: "#334155",
+    fontSize: 12,
+    fontWeight: "900"
+  },
+  feedbackHandoffPrivacyCopy: {
+    color: "#64748B",
+    fontSize: 11,
+    fontWeight: "600",
+    lineHeight: 16
+  },
+  feedbackHandoffCancelButton: {
+    alignItems: "center",
+    borderColor: "#CBD5E1",
+    borderRadius: 9,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 44,
+    paddingHorizontal: 15
+  },
+  feedbackHandoffCancelButtonText: {
+    color: "#475569",
+    fontSize: 13,
+    fontWeight: "800"
+  },
+  feedbackHandoffContinueButton: {
+    alignItems: "center",
+    backgroundColor: "#2563EB",
+    borderRadius: 9,
+    justifyContent: "center",
+    minHeight: 44,
+    paddingHorizontal: 16
+  },
+  feedbackHandoffContinueButtonText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "900",
+    textAlign: "center"
   },
   settingsRow: {
     alignItems: "center",

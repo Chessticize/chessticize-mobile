@@ -6567,6 +6567,53 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "settings-panel"))).not.toContain("›");
   });
 
+  it("routes feedback to GitHub only after an explicit privacy handoff", async () => {
+    const renderer = renderScreen();
+    const openURLSpy = jest.spyOn(ReactNative.Linking, "openURL").mockResolvedValue(undefined);
+
+    press(renderer, "settings-tab");
+
+    const feedbackSection = findByTestId(renderer, "settings-feedback-section");
+    expect(collectText(feedbackSection)).toContain("Help & Feedback");
+    expect(collectText(feedbackSection)).toContain("Help improve Chessticize");
+    expect(collectText(feedbackSection)).toContain("Report a bug, request a feature");
+    expect(collectText(feedbackSection)).toContain("Your data stays in the app");
+    expect(collectText(feedbackSection)).toContain("Ratings, history, and puzzle data are not attached");
+    expect(collectText(feedbackSection)).toContain("You will review and submit your issue on GitHub");
+    expect(findByTestId(renderer, "settings-feedback-open-github").props.accessibilityRole).toBe("button");
+    expect(testIdOrder(renderer, "settings-profile-section", "settings-feedback-section")).toBeLessThan(0);
+    expect(testIdOrder(renderer, "settings-feedback-section", "settings-about-section")).toBeLessThan(0);
+    expect(() => findByTestId(renderer, "settings-feedback-handoff-confirmation")).toThrow();
+
+    press(renderer, "settings-feedback-open-github");
+
+    expect(openURLSpy).not.toHaveBeenCalled();
+    const confirmation = findByTestId(renderer, "settings-feedback-handoff-confirmation");
+    expect(collectText(confirmation)).toContain("Continue to GitHub?");
+    expect(collectText(confirmation)).toContain("does not attach your account, rating, history, or puzzle data");
+    expect(collectText(confirmation)).toContain("You stay in control");
+    press(renderer, "settings-feedback-handoff-cancel");
+    expect(() => findByTestId(renderer, "settings-feedback-handoff-confirmation")).toThrow();
+    expect(openURLSpy).not.toHaveBeenCalled();
+
+    press(renderer, "settings-feedback-open-github");
+    await pressAsync(renderer, "settings-feedback-handoff-continue");
+
+    expect(openURLSpy).toHaveBeenCalledTimes(1);
+    expect(openURLSpy).toHaveBeenCalledWith(
+      "https://github.com/Chessticize/chessticize-mobile/issues/new",
+    );
+    expect(() => findByTestId(renderer, "settings-feedback-handoff-confirmation")).toThrow();
+
+    openURLSpy.mockRejectedValueOnce(new Error("browser unavailable"));
+    press(renderer, "settings-feedback-open-github");
+    await pressAsync(renderer, "settings-feedback-handoff-continue");
+    expect(collectText(findByTestId(renderer, "settings-feedback-handoff-confirmation")))
+      .toContain("Couldn't open GitHub Issues. Try again.");
+    press(renderer, "settings-feedback-handoff-cancel");
+    openURLSpy.mockRestore();
+  });
+
   it("shows Android-managed restore protection without exposing iCloud controls", () => {
     const renderer = renderScreen({
       progressProtection: { kind: "android_managed_backup" }

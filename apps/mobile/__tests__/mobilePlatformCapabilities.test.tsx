@@ -87,6 +87,12 @@ describe('mobile platform capabilities', () => {
     ).applicationMetadata.releasePageUrl).toBeUndefined();
   });
 
+  it('uses the repository new-issue route for feedback handoff', () => {
+    expect(MOBILE_APPLICATION_METADATA_LINKS.feedbackIssuesUrl).toBe(
+      'https://github.com/Chessticize/chessticize-mobile/issues/new',
+    );
+  });
+
   it('fails closed when installed artifact metadata is unavailable or incomplete', () => {
     expect(() => readNativeApplicationMetadata(undefined)).toThrow(
       'Native ApplicationMetadata module is unavailable.',
