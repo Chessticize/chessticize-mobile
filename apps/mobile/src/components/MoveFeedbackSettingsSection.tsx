@@ -5,23 +5,19 @@ import {
   Text,
   View
 } from "react-native";
+import type {
+  MoveFeedbackCue,
+  MoveFeedbackPreferences,
+  MoveFeedbackPreviewer,
+  MoveFeedbackPreviewResult
+} from "./moveFeedbackPresentation.ts";
 
-export type MoveFeedbackCue = "move" | "capture" | "success" | "mistake";
-
-export type MoveFeedbackPreferences = {
-  hapticsEnabled: boolean;
-  soundEnabled: boolean;
-};
-
-export type MoveFeedbackPreviewResult = {
-  haptics: "off" | "requested" | "visual-only";
-  sound: "off" | "played" | "unavailable";
-};
-
-export type MoveFeedbackPreviewer = (
-  cue: MoveFeedbackCue,
-  preferences: MoveFeedbackPreferences
-) => Promise<MoveFeedbackPreviewResult>;
+export type {
+  MoveFeedbackCue,
+  MoveFeedbackPreferences,
+  MoveFeedbackPreviewer,
+  MoveFeedbackPreviewResult
+} from "./moveFeedbackPresentation.ts";
 
 const CUES: ReadonlyArray<{
   cue: MoveFeedbackCue;

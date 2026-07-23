@@ -2,7 +2,7 @@ import type {
   MoveFeedbackCue,
   MoveFeedbackPreferences,
   MoveFeedbackPreviewResult
-} from "../../mobile/src/components/MoveFeedbackSettingsSection.tsx";
+} from "../../mobile/src/components/moveFeedbackPresentation.ts";
 
 type AudioParamLike = {
   value: number;
@@ -167,7 +167,11 @@ function requestBrowserVibration(
   if (typeof browserNavigator.vibrate !== "function") {
     return "visual-only";
   }
-  return browserNavigator.vibrate(HAPTIC_PATTERNS[cue]) ? "requested" : "visual-only";
+  const pattern = HAPTIC_PATTERNS[cue];
+  if (pattern === undefined) {
+    return "visual-only";
+  }
+  return browserNavigator.vibrate(pattern) ? "requested" : "visual-only";
 }
 
 function delay(milliseconds: number): Promise<void> {
