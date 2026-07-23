@@ -105,8 +105,7 @@ async function completeOneWrongReview() {
     'review-arrow-duel-candidate-overlay',
     'review-current-puzzle-id'
   );
-  await sleep(500);
-  await device.takeScreenshot('app-store-08-review-session');
+  await takePortraitScreenshotAtTop('app-store-08-review-session');
   await takeLandscapeScreenshot('app-store-08-review-session');
   await playBoardMove('review-board', fixture.wrongMove, fixture.flipped);
   await waitFor(element(by.id('review-reminder-permission-prompt'))).toExist().withTimeout(10000);
@@ -166,8 +165,7 @@ async function captureSprintScenes() {
   await openTab('practice-tab', 'practice-run-standard');
   await startPracticeMode('standard');
   await waitForVisibleInPracticeScroll('session-board');
-  await sleep(500);
-  await device.takeScreenshot('app-store-05-standard-sprint');
+  await takePortraitScreenshotAtTop('app-store-05-standard-sprint');
   await takeLandscapeScreenshot('app-store-05-standard-sprint');
 
   await element(by.id('session-abandon')).tap();
@@ -180,9 +178,14 @@ async function captureSprintScenes() {
   await startPracticeMode('arrow-duel');
   await waitForVisibleInPracticeScroll('session-board');
   await waitFor(element(by.id('arrow-duel-candidate-overlay'))).toExist().withTimeout(10000);
-  await sleep(500);
-  await device.takeScreenshot('app-store-06-arrow-duel');
+  await takePortraitScreenshotAtTop('app-store-06-arrow-duel');
   await takeLandscapeScreenshot('app-store-06-arrow-duel');
+}
+
+async function takePortraitScreenshotAtTop(name) {
+  await element(by.id('practice-main-scroll')).scrollTo('top');
+  await sleep(500);
+  await device.takeScreenshot(name);
 }
 
 async function takeLandscapeScreenshot(name) {
