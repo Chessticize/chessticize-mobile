@@ -30,6 +30,42 @@ The public repository is:
 
 https://github.com/Chessticize/chessticize-mobile
 
+## Pre-Retry Convergence Sweep
+
+Do not immediately restart a complete release matrix after its first failure.
+Use one convergence pass to find and batch every issue that can be discovered
+without another full native run:
+
+1. Keep the failed workflow and its artifacts. Let independent jobs finish
+   unless continuing them is unsafe, because later jobs may expose additional
+   blockers without another build.
+2. Record the exact commit and inspect every failed, cancelled, or timed-out
+   job. Download its diagnostics and classify each result as a product
+   regression, stale deterministic evidence or fixture, infrastructure
+   failure, credential/signing gate, or store-console gate. A retry is not a
+   substitute for classification.
+3. Audit both platform identities together: public version, iOS build number,
+   Android version code, proposed annotated tags, build-specific release-note
+   filenames and links, and the absence of an immutable tag or store build that
+   would be reused accidentally.
+4. Run the complete fast proving layer on the proposed fix head: core/storage
+   tests, root and mobile typechecks, mobile component tests, lint, App Store
+   preflight/signing/third-party checks, screenshot audit when applicable, and
+   Android doctor plus release-policy tests. Run focused real-adapter tests for
+   every changed fixture or native boundary.
+5. Put all coherent release-validation fixes in one release-fix PR. For every
+   stale fixture or assertion, add a fast consistency test that would have
+   rejected the mismatch before the native matrix.
+6. Recheck the diff, clean tracked worktree, exact PR head, open PRs, and remote
+   `main`. Resolve all known blockers before spending the full native retry.
+7. Run the required exact-head local merge evidence once on the final PR head,
+   merge once, then dispatch the required iOS and Android workflows once on the
+   final exact `main` commit.
+
+If that final run reveals a genuinely new deterministic failure, preserve it,
+extend the fast proving layer that missed it, and repeat this sweep. Never hide
+an unexplained failure with a successful rerun.
+
 ## Release Checklist
 
 - Create the exact build-specific file from

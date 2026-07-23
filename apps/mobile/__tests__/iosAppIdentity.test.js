@@ -100,4 +100,15 @@ describe("iOS App Store identity artifacts", () => {
     expect(detoxBuildScript).toContain("ios/Pods/.last_build_configuration");
     expect(detoxBuildScript).toContain('[[ ! -f "$marker" ]]');
   });
+
+  it("keeps both Detox build paths pinned to the committed CocoaPods lockfile", () => {
+    const debugBuildScript = readText(join(appRoot, "scripts", "ios-build-for-detox.sh"));
+    const releaseBuildScript = readText(join(appRoot, "scripts", "ios-build-release-for-detox.sh"));
+    const lockedInstall = "bundle exec pod install --deployment --project-directory=ios";
+
+    expect(debugBuildScript).toContain(lockedInstall);
+    expect(releaseBuildScript).toContain(lockedInstall);
+    expect(debugBuildScript).not.toContain("pod update");
+    expect(releaseBuildScript).not.toContain("pod update");
+  });
 });
