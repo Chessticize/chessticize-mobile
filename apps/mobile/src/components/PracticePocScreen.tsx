@@ -6569,7 +6569,9 @@ function HistoryPanel({
     sourceFilter,
     themeFilters: namedThemeFilters,
     timeRange,
-    unclearOnly
+    unclearOnly,
+    slowOnly,
+    timedOutOnly
   });
   return (
     <View style={[styles.historyPanel, adaptiveLayout.usesWideContent ? styles.historyPanelWide : null]} testID="history-panel">
@@ -6639,43 +6641,50 @@ function HistoryPanel({
           showsHorizontalScrollIndicator={false}
           testID="history-quick-filters"
         >
-          <HistoryQuickToggle
+          <HistoryQuickChip
             active={unclearOnly}
-            accessibilityLabel="Unclear attempts only"
+            accessibilityLabel="Unclear attempts"
             controlTestID="history-filter-unclear"
-            label="Unclear only"
+            label="Unclear"
             onPress={onToggleUnclearOnly}
           />
           {timingPreview ? (
-            <>
-              <HistoryQuickToggle
+            <View
+              accessibilityLabel="Timing filters, select any"
+              role="group"
+              style={styles.historyQuickFacetGroup}
+              testID="history-timing-filter-group"
+            >
+              <View style={styles.historyQuickFacetDivider} />
+              <Text style={styles.historyQuickFacetLabel}>Timing</Text>
+              <HistoryQuickChip
                 active={slowOnly}
-                accessibilityLabel="Slow puzzles only"
+                accessibilityLabel="Slow attempts"
                 controlTestID="history-filter-slow-only"
                 label="Slow"
                 onPress={onToggleSlowOnly}
               />
-              <HistoryQuickToggle
+              <HistoryQuickChip
                 active={timedOutOnly}
-                accessibilityLabel="Timed out puzzles only"
+                accessibilityLabel="Timed out attempts"
                 controlTestID="history-filter-timed-out-only"
                 label="Timed out"
                 onPress={onToggleTimedOutOnly}
               />
-            </>
+            </View>
           ) : null}
-          <HistoryQuickToggle
+          <HistoryQuickChip
             active={wrongOnly}
-            accessibilityLabel="Wrong puzzles only"
+            accessibilityLabel="Wrong attempts"
             controlTestID="history-filter-wrong-only"
-            label="Wrong only"
+            label="Wrong"
             onPress={onToggleWrongOnly}
           />
-          <HistoryQuickToggle
+          <HistoryQuickChip
             active={sprintOnly}
-            accessibilityLabel="Sprint attempts only"
+            accessibilityLabel="Sprint attempts"
             controlTestID="history-filter-sprint-only"
-            label="Sprint only"
+            label="Sprint"
             onPress={onToggleSprintOnly}
           />
         </ScrollView>
@@ -6872,6 +6881,8 @@ type HistoryActiveFilterInput = {
   themeFilters: readonly string[];
   timeRange: HistoryTimeRange;
   unclearOnly: boolean;
+  slowOnly: boolean;
+  timedOutOnly: boolean;
 };
 
 function historyActiveFilterLabels({
@@ -6885,17 +6896,26 @@ function historyActiveFilterLabels({
   sourceFilter,
   themeFilters,
   timeRange,
-  unclearOnly
+  unclearOnly,
+  slowOnly,
+  timedOutOnly
 }: HistoryActiveFilterInput): string[] {
   const labels = [
     historyRangeLabel(timeRange),
     ratingKey ? historyRatingKeyLabel(ratingKey, runName, runPerPuzzleSeconds) : "All puzzles"
   ];
+  if (slowOnly && timedOutOnly) {
+    labels.push("Timing: Slow or timed out");
+  } else if (slowOnly) {
+    labels.push("Timing: Slow");
+  } else if (timedOutOnly) {
+    labels.push("Timing: Timed out");
+  }
   if (sourceFilter !== "all") {
-    labels.push(sourceFilter === "scheduled_review" ? "Review" : "Sprint");
+    labels.push(sourceFilter === "scheduled_review" ? "Source: Review" : "Source: Sprint");
   }
   if (resultFilter !== "all") {
-    labels.push(resultFilter === "correct" ? "Correct" : "Wrong only");
+    labels.push(resultFilter === "correct" ? "Result: Correct" : "Result: Wrong");
   }
   if (ratingRangeFilter !== "all") {
     labels.push(HISTORY_RATING_RANGE_FILTERS.find((filter) => filter.id === ratingRangeFilter)?.label ?? ratingRangeFilter);
@@ -7256,7 +7276,7 @@ function HistoryChipRow({
   );
 }
 
-function HistoryQuickToggle({
+function HistoryQuickChip({
   accessibilityLabel,
   active,
   controlTestID,
@@ -7271,17 +7291,35 @@ function HistoryQuickToggle({
 }): React.JSX.Element {
   return (
     <Pressable
-      accessibilityRole="switch"
+      accessibilityRole="checkbox"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ checked: active }}
-      accessibilityValue={{ text: active ? "On" : "Off" }}
       testID={controlTestID}
-      style={styles.historyQuickToggle}
+      style={styles.historyQuickChipTarget}
       onPress={onPress}
     >
-      <Text style={styles.filterButtonText}>{label}</Text>
-      <View style={[styles.historyToggleTrack, active ? styles.historyToggleTrackActive : null]}>
-        <View style={[styles.historyToggleThumb, active ? styles.historyToggleThumbActive : null]} />
+      <View
+        style={[styles.historyQuickChip, active ? styles.historyQuickChipActive : null]}
+        testID={`${controlTestID}-surface`}
+      >
+        {active ? (
+          <Text
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={styles.historyQuickChipCheck}
+            testID={`${controlTestID}-check`}
+          >
+            ✓
+          </Text>
+        ) : null}
+        <Text
+          style={[
+            styles.historyQuickChipText,
+            active ? styles.historyQuickChipTextActive : null
+          ]}
+        >
+          {label}
+        </Text>
       </View>
     </Pressable>
   );
@@ -14330,16 +14368,59 @@ const styles = StyleSheet.create({
   historyQuickFilterRow: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 10,
+    gap: 6,
     paddingRight: 4
   },
-  historyQuickToggle: {
+  historyQuickChipTarget: {
+    alignItems: "center",
+    flexShrink: 0,
+    justifyContent: "center",
+    minHeight: 44
+  },
+  historyQuickChip: {
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderColor: "#CBD5E1",
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 4,
+    minHeight: 34,
+    paddingHorizontal: 10
+  },
+  historyQuickChipActive: {
+    backgroundColor: "#2563EB",
+    borderColor: "#2563EB"
+  },
+  historyQuickChipCheck: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "900"
+  },
+  historyQuickChipText: {
+    color: "#334155",
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  historyQuickChipTextActive: {
+    color: "#FFFFFF"
+  },
+  historyQuickFacetGroup: {
     alignItems: "center",
     flexDirection: "row",
     flexShrink: 0,
-    gap: 10,
-    minHeight: 36,
-    paddingHorizontal: 8
+    gap: 6
+  },
+  historyQuickFacetDivider: {
+    backgroundColor: "#CBD5E1",
+    height: 20,
+    marginHorizontal: 2,
+    width: StyleSheet.hairlineWidth
+  },
+  historyQuickFacetLabel: {
+    color: "#64748B",
+    fontSize: 11,
+    fontWeight: "800"
   },
   historyToggleTrack: {
     backgroundColor: "#CBD5E1",

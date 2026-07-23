@@ -62,10 +62,13 @@ Keep the existing horizontal quick-filter row, but replace switch tracks with
 compact filter chips and make facet boundaries visible in the same row:
 
 ```text
-[Unclear]  [Wrong]  [Sprint]   |   Timing  [Slow] [Timed out]
+[Unclear]   |   Timing  [Slow] [Timed out]   [Wrong]  [Sprint]
 ```
 
 - Keep `Timing` and its two chips in one non-breaking horizontal group.
+- Keep the Timing group immediately after Unclear, preserving the existing
+  quick-filter order and making the new values visible before the rail scrolls
+  on typical phone widths.
 - Use a short label plus a slightly larger inter-group gap or subtle divider;
   do not add a new card, explanatory sentence, or second row.
 - Slow and Timed out remain independently selectable. Selecting the second
