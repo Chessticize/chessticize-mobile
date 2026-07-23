@@ -73,12 +73,14 @@ jobs:
     # Routine PRs use risk-scoped local native evidence. CI batches complete
     # coverage nightly on main and runs manually for an exact release candidate.
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
-    # macos-latest started resolving to macOS 26 in July 2026, where the first
-    # Detox launch can remain busy until the smoke test times out. Keep the
-    # release gate on the supported macOS 15 runner until Detox is qualified on
-    # macOS 26.
-    runs-on: macos-15
+    # Keep the release gate on the same supported Xcode used to create the
+    # submitted archive. The macOS 15 image's Xcode 16.4 resolves a different
+    # environment-dependent Hermes checksum and cannot verify this lockfile in
+    # CocoaPods deployment mode.
+    runs-on: macos-26
     timeout-minutes: 40
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
     steps:
       - name: Checkout
         uses: actions/checkout@v4

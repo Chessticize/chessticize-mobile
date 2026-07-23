@@ -111,4 +111,14 @@ describe("iOS App Store identity artifacts", () => {
     expect(debugBuildScript).not.toContain("pod update");
     expect(releaseBuildScript).not.toContain("pod update");
   });
+
+  it("runs the exact-main iOS gate on the supported Xcode 26.6 image", () => {
+    const workflow = readText(join(appRoot, "..", "..", ".github", "workflows", "mobile-ios.yml"));
+
+    expect(workflow).toContain("runs-on: macos-26");
+    expect(workflow).toContain(
+      "DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer"
+    );
+    expect(workflow).not.toContain("runs-on: macos-15");
+  });
 });
