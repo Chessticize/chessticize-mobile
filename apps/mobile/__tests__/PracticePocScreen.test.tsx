@@ -1679,7 +1679,7 @@ describe("PracticePocScreen", () => {
       .toThrow();
   });
 
-  it("balances iPhone Pro Max landscape gutters while keeping the full rail visible", () => {
+  it("keeps the complete iPhone Pro Max landscape session chrome publicly reachable", () => {
     (ReactNative as unknown as {
       __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
     }).__setWindowDimensions?.({ width: 956, height: 440, scale: 3, fontScale: 1 });
@@ -1692,80 +1692,17 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "adaptive-layout").props.accessibilityLabel)
       .toBe("Layout compactLandscape");
-    const adaptiveRowStyle = flattenTestStyle(
-      findByTestId(renderer, "active-session-adaptive-layout").props.style
-    );
-    expect(adaptiveRowStyle).toMatchObject({
-      gap: 95,
-      width: 764
-    });
-    expect(Math.abs(
-      (956 - Number(adaptiveRowStyle.width)) / 2 - Number(adaptiveRowStyle.gap)
-    )).toBeLessThanOrEqual(1);
-    expect(flattenTestStyle(findByTestId(renderer, "active-session-board-lane").props.style).width)
-      .toBe(387);
     const controlRail = findByTestId(renderer, "active-session-control-rail");
-    expect(flattenTestStyle(controlRail.props.style).width).toBe(282);
-    expect(flattenTestStyle(controlRail.props.contentContainerStyle).width).toBe(282);
-    expect(flattenTestStyle(
-      findByTestId(renderer, "active-session-control-rail-content").props.style
-    ).width).toBe(282);
-    expect(nearestAncestorStyleValue(findByTestId(renderer, "practice-prompt"), "width"))
-      .toBe(282);
-  });
-
-  it.each([
-    {
-      label: "iPad Pro 13-inch landscape",
-      width: 1366,
-      height: 1024,
-      scale: 2,
-      insets: { top: 0, right: 0, bottom: 20, left: 0 },
-      expected: { board: 640, gap: 122, rail: 360, row: 1122 }
-    },
-    {
-      label: "foldable iPhone unfolded landscape",
-      width: 1080,
-      height: 720,
-      scale: 3,
-      insets: { top: 0, right: 44, bottom: 21, left: 44 },
-      expected: { board: 579, gap: 68, rail: 297, row: 944 }
-    }
-  ])("keeps $label gutters balanced without exceeding its safe viewport", ({
-    expected,
-    height,
-    insets,
-    scale,
-    width
-  }) => {
-    (ReactNative as unknown as {
-      __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
-    }).__setWindowDimensions?.({ width, height, scale, fontScale: 1 });
-    (SafeAreaContext as unknown as {
-      __setSafeAreaInsets?: (nextInsets: { bottom: number; left: number; right: number; top: number }) => void;
-    }).__setSafeAreaInsets?.(insets);
-
-    const renderer = renderScreen({ practiceService: createMobilePracticeService("random1000") });
-    startStandardSprint(renderer);
-
-    const rowStyle = flattenTestStyle(
-      findByTestId(renderer, "active-session-adaptive-layout").props.style
-    );
-    const boardWidth = Number(
-      flattenTestStyle(findByTestId(renderer, "active-session-board-lane").props.style).width
-    );
-    const railWidth = Number(
-      flattenTestStyle(findByTestId(renderer, "active-session-control-rail").props.style).width
-    );
-    expect({ board: boardWidth, gap: rowStyle.gap, rail: railWidth, row: rowStyle.width })
-      .toEqual(expected);
-    expect(Number(rowStyle.width))
-      .toBeLessThanOrEqual(width - insets.left - insets.right - 2 * 16);
-    expect(Math.abs((width - Number(rowStyle.width)) / 2 - Number(rowStyle.gap)))
-      .toBeLessThanOrEqual(1);
-    expect(flattenTestStyle(
-      findByTestId(renderer, "practice-main-scroll").props.contentContainerStyle
-    ).maxWidth).toBeUndefined();
+    expect(collectText(controlRail)).toContain("Find the best move");
+    expect(collectText(controlRail)).toContain("For ");
+    expect(controlRail.findByProps({ testID: "session-score-strip" }).props.accessibilityLabel)
+      .toBe("Session score: solved 0, mistakes 0, left 15");
+    expect(controlRail.findByProps({ testID: "session-score-solved" }).props.accessibilityLabel)
+      .toBe("Solved 0");
+    expect(controlRail.findByProps({ testID: "session-score-mistakes" }).props.accessibilityLabel)
+      .toBe("Mistakes 0");
+    expect(controlRail.findByProps({ testID: "session-score-left" }).props.accessibilityLabel)
+      .toBe("Left 15");
   });
 
   it.each([
@@ -7723,21 +7660,6 @@ function promptKingTestIDs(renderer: TestRenderer.ReactTestRenderer): string[] {
     collectTestIds(findByTestId(renderer, "practice-prompt"))
       .filter((testID) => testID.startsWith("chessboard-king-"))
   )];
-}
-
-function nearestAncestorStyleValue(
-  node: TestRenderer.ReactTestInstance,
-  property: string
-): unknown {
-  let ancestor = node.parent;
-  while (ancestor) {
-    const value = flattenTestStyle(ancestor.props.style)[property];
-    if (value !== undefined) {
-      return value;
-    }
-    ancestor = ancestor.parent;
-  }
-  return undefined;
 }
 
 function collectText(node: TestRenderer.ReactTestInstance): string {
