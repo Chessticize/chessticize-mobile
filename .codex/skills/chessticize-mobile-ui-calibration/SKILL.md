@@ -1,13 +1,14 @@
 ---
 name: chessticize-mobile-ui-calibration
-description: Capture and visually calibrate Chessticize Mobile's Storybook Interaction Lab against an exact-head iOS Release simulator build across the eight maintained baseline scenes, archive local screenshots, enforce production-only UI, and record PR evidence. Use when UI work needs native screenshot parity, when Storybook may differ from the real app, when Custom Setup or Review controls need verification, when refreshing the project's foundational UI screenshots, or before preparing App Store screenshot sets.
+description: Capture and visually calibrate Chessticize Mobile's Storybook Interaction Lab against an exact-head iOS Release simulator build across the maintained portrait and landscape baseline scenes, archive local screenshots, enforce production-only UI, and record PR evidence. Use when UI work needs native screenshot parity, when Storybook may differ from the real app, when Custom Setup or Review controls need verification, when refreshing the project's foundational UI screenshots, or before preparing App Store screenshot sets.
 ---
 
 # Chessticize Mobile UI Calibration
 
 Compare the Storybook presentation contract with product-accurate Release
-simulator rendering. Use the maintained eight-scene Detox journey so future
-calibration stays repeatable instead of depending on manually seeded app data.
+simulator rendering. Use the maintained eight-scene Detox journey plus its four
+adaptive-layout landscape captures so future calibration stays repeatable
+instead of depending on manually seeded app data.
 
 ## Safety And Scope
 
@@ -54,8 +55,9 @@ The script:
 1. Requires macOS, a clean worktree, and a fixed Git `HEAD`.
 2. Runs `pnpm mobile:doctor:ios`.
 3. Builds the Release simulator app with bundled JavaScript.
-4. Runs the deterministic eight-scene store-assets journey with one worker.
-5. Copies the eight PNGs to
+4. Runs the deterministic eight-scene store-assets journey with one worker,
+   capturing four layout-sensitive scenes in both orientations.
+5. Copies the eight portrait and four landscape PNGs to
    `scratch/rendering-checks/<short-sha>/release/`.
 6. Confirms that `HEAD` and the tracked worktree did not change.
 
@@ -63,7 +65,7 @@ Set `CHESSTICIZE_IOS_PREPARE=1` only when the CocoaPods workspace or locked
 bundle genuinely needs preparation. Environment preparation must not update
 tracked lockfiles unintentionally.
 
-### 3. Inspect all eight scenes
+### 3. Inspect all twelve captures
 
 Open every PNG, not only the flow that originally changed:
 
@@ -77,6 +79,10 @@ Open every PNG, not only the flow that originally changed:
 | `app-store-06-arrow-duel` | Both candidate arrows render on the real board without clipping. |
 | `app-store-07-custom-setup` | The theme chips wrap cleanly and the theme row has no `Theme` heading. |
 | `app-store-08-review-session` | Review progress, timer, real board, arrows, and instruction are visible without overlap. |
+
+The `practice-tab`, `standard-sprint`, `arrow-duel`, and `review-session`
+landscape variants must preserve the native Safe Area, adaptive board/rail
+geometry, readable controls, and unclipped content at the same simulator size.
 
 Compare hierarchy, copy, wrapping, disabled states, Safe Area, board geometry,
 and bottom-tab overlap against Storybook. Treat Storybook as the design
@@ -119,7 +125,7 @@ dimensions are not an accepted App Store upload size.
 - If CocoaPods reports `pathname contains null byte`, treat it as an environment
   preparation problem involving pnpm-linked pod paths. Do not commit an
   unrelated `Podfile.lock` rewrite to make calibration pass.
-- If the screenshot command passes but fewer than eight PNGs are found, inspect
+- If the screenshot command passes but fewer than twelve PNGs are found, inspect
   the Detox artifact directory and the first failing scene before rerunning.
 - If Debug controls appear, confirm the build configuration is
   `ios.sim.release`; do not accept the images as a production baseline.

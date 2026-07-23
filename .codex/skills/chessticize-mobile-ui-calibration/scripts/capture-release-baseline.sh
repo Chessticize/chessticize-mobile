@@ -14,6 +14,10 @@ EXPECTED_SCENES=(
   app-store-06-arrow-duel
   app-store-07-custom-setup
   app-store-08-review-session
+  app-store-01-practice-tab-landscape
+  app-store-05-standard-sprint-landscape
+  app-store-06-arrow-duel-landscape
+  app-store-08-review-session-landscape
 )
 
 fail() {
@@ -39,6 +43,7 @@ STATUS_BEFORE="$(git status --porcelain --untracked-files=normal)"
 
 export DETOX_IOS_DEVICE="$DEVICE_NAME"
 export DETOX_MAX_WORKERS="$WORKER_COUNT"
+export CHESSTICIZE_CAPTURE_LANDSCAPE_ASSETS=1
 
 echo "Calibrating commit $HEAD_BEFORE on $DEVICE_NAME"
 pnpm mobile:doctor:ios
@@ -61,7 +66,7 @@ done < <(
     -print
 )
 
-[[ -n "$REVIEW_SCREENSHOT" ]] || fail "Could not find the new eight-scene Release capture."
+[[ -n "$REVIEW_SCREENSHOT" ]] || fail "Could not find the new Release calibration capture."
 SOURCE_DIR="$(dirname "$REVIEW_SCREENSHOT")"
 DESTINATION="$REPO_ROOT/scratch/rendering-checks/$SHORT_SHA/release"
 mkdir -p "$DESTINATION"

@@ -14,6 +14,7 @@ import {
   createTestMobilePlatformCapabilities,
   type TestMobilePlatformCapabilityOverrides
 } from "../../mobile/src/testing/testMobilePlatformCapabilities.ts";
+import { FakeICloudProgressSyncClient } from "../../mobile/src/platform/iCloudProgressSync.ts";
 import {
   configureMobilePracticePuzzleSource,
   type MobilePuzzleSource
@@ -197,6 +198,9 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
       reminderPlatform = "android";
       progressProtection = { kind: "android_managed_backup" };
       break;
+    case "settings-ios-sync":
+      notificationStatus = "not_determined";
+      break;
     case "settings-notifications-denied":
       notificationStatus = "denied";
       break;
@@ -218,7 +222,10 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     practiceService: service,
     reviewReminderNotificationClient: notificationClient,
     reminderPlatform,
-    progressProtection
+    progressProtection,
+    iCloudProgressSyncClient: reminderPlatform === "ios"
+      ? new FakeICloudProgressSyncClient(undefined, "no_account")
+      : null
   };
   if (configurePuzzleSource) {
     capabilityOverrides.configurePuzzleSource = (
