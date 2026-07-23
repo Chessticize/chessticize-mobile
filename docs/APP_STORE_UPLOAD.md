@@ -22,6 +22,7 @@ Run from a clean `main` checkout at the exact commit that will be uploaded:
 ```sh
 git status --short --branch
 pnpm install --frozen-lockfile
+(cd apps/mobile && bundle exec pod install --deployment --project-directory=ios)
 pnpm app-store:preflight
 pnpm app-store:signing-readiness
 pnpm test
@@ -30,6 +31,10 @@ pnpm mobile:test
 pnpm mobile:typecheck
 pnpm mobile:doctor:ios
 ```
+
+After any failed complete release workflow, perform the cross-platform
+pre-retry convergence sweep in `docs/RELEASE_SOURCE_POLICY.md` before
+dispatching another full native run.
 
 For first launch, a new App Store version, screenshot/metadata changes, or broad
 native risk, also generate the full evidence bundle:

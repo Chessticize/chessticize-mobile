@@ -140,6 +140,10 @@ token. No temporary GitHub token is used.
 
 ## Build and repository audit
 
+After any failed complete release workflow, perform the cross-platform
+pre-retry convergence sweep in `docs/RELEASE_SOURCE_POLICY.md` before
+dispatching another full native run.
+
 1. Start from a clean exact candidate commit containing the canonical puzzle
    pack, Stockfish source and networks, license notices, lockfile, and approved
    `docs/releases/android-v<version>-build-<code>.md` created under

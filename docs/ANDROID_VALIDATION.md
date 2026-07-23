@@ -8,6 +8,16 @@ modules, or test-only data-writing helpers directly.
 
 ## Local preflight and diagnostics
 
+Use a JDK 17 `JAVA_HOME` whose `java`, `jar`, `jarsigner`, and `keytool`
+binaries are on `PATH`. A Homebrew JDK may be installed without being
+registered with macOS, so `/usr/bin/java` can still report that no runtime is
+available. In that case, set the environment explicitly before the preflight:
+
+```sh
+export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
+export PATH="$JAVA_HOME/bin:$PATH"
+```
+
 Install the lockfile-pinned dependencies and puzzle pack before native work:
 
 ```sh
@@ -79,6 +89,16 @@ rejects an unsupported API, a missing or mismatched exact commit SHA, a dirty
 tracked worktree, a failed/missing step, or incomplete build/device data. It
 writes passing evidence only after every selected command succeeds and it has
 rechecked the checkout head and clean tracked worktree.
+
+CI gives the complete matrix command a 30-minute deadline inside a 40-minute
+job. This is deliberately much larger than the normal API 24 and API 36
+runtime, but shorter than an unproductive hosted-runner hang. The runner writes
+`api-<level>.progress.json` before and after every prepare, install, native, and
+Detox step. A failed or timed-out workflow uploads that progress file with any
+Android UI diagnostics, so classify the exact last running step before
+retrying. Only `api-<level>.json`, written after every step passes, is release
+evidence; the progress file is diagnostic evidence and never converts a
+partial run into a pass.
 
 ## Adaptive contract
 

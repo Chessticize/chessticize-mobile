@@ -10,7 +10,7 @@ if [[ "${CHESSTICIZE_IOS_PREPARE:-0}" == "1" ]]; then
   if ! bundle check; then
     bundle install
   fi
-  bundle exec pod install --project-directory=ios
+  bundle exec pod install --deployment --project-directory=ios
 fi
 
 (cd "$REPO_ROOT" && node scripts/fetch-core-pack.mjs)

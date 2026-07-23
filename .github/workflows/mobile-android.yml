@@ -141,7 +141,7 @@ jobs:
     name: Android offline practice API ${{ matrix.api-level }}
     needs: android-build
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
@@ -193,6 +193,7 @@ jobs:
           disable-animations: true
           emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           script: >-
+            timeout --signal=TERM --kill-after=30s 30m
             pnpm mobile:validate:android:matrix -- --api-level "${{ matrix.api-level }}"
             --output "apps/mobile/artifacts/android-validation/api-${{ matrix.api-level }}.json"
         env:
@@ -216,7 +217,9 @@ jobs:
         with:
           name: android-launch-diagnostics-api-${{ matrix.api-level }}
           if-no-files-found: warn
-          path: apps/mobile/artifacts/android-ui/
+          path: |
+            apps/mobile/artifacts/android-ui/
+            apps/mobile/artifacts/android-validation/
 
       - name: Upload Android review reminder evidence
         if: always() && matrix.api-level == 36
