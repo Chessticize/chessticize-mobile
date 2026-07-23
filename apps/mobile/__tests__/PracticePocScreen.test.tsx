@@ -4361,6 +4361,50 @@ describe("PracticePocScreen", () => {
     )).toBe(true);
   });
 
+  it("shows only Home runs in the History run filter and preserves their Home order", () => {
+    const service = createMobilePracticeService("random1000");
+    const defaultPresentation = runManagementPresentation();
+    const standardRun = defaultPresentation.runs.find((run) => run.id === "standard")!;
+    const hiddenRun = defaultPresentation.runs.find((run) => run.id === "tactics-focus")!;
+    const firstHomeRun = defaultPresentation.runs.find((run) => run.id === "candidate-sprint")!;
+    [
+      { ratingKey: standardRun.ratingKey!, completedAt: "2026-06-20T00:04:00.000Z" },
+      { ratingKey: hiddenRun.ratingKey!, completedAt: "2026-06-20T00:03:00.000Z" },
+      { ratingKey: "legacy custom 5/20", completedAt: "2026-06-20T00:02:00.000Z" },
+      { ratingKey: firstHomeRun.ratingKey!, completedAt: "2026-06-20T00:01:00.000Z" }
+    ].forEach(({ completedAt, ratingKey }) => {
+      service.recordReviewAttempt({
+        puzzleId: "000hf",
+        mode: "standard",
+        ratingKey,
+        result: "correct",
+        submittedMove: "c4b5",
+        expectedMove: "c4b5",
+        startedAt: "2026-06-20T00:00:00.000Z"
+      }, completedAt);
+    });
+    const renderer = renderScreen({
+      practiceService: service,
+      runManagementPresentation: runManagementPresentation({
+        runs: [firstHomeRun, standardRun],
+        hiddenRuns: [hiddenRun]
+      })
+    });
+
+    press(renderer, "history-tab");
+
+    const filterTestIDs = [...new Set(
+      collectTestIds(findByTestId(renderer, "history-rating-filters"))
+        .filter((testID) => testID.startsWith("history-rating-"))
+    )];
+    expect(filterTestIDs).toEqual([
+      "history-rating-filters",
+      "history-rating-all",
+      `history-rating-${firstHomeRun.ratingKey}`,
+      `history-rating-${standardRun.ratingKey}`
+    ]);
+  });
+
   it("navigates history review across the full filtered result set, not just the visible page", async () => {
     const service = createMobilePracticeService("random1000");
     for (let index = 0; index < 22; index += 1) {
@@ -4487,7 +4531,7 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "history-attempt-standard-attempt-difficulty")).toThrow();
   });
 
-  it("shows the immutable saved Run name in History after the Run is archived", () => {
+  it("keeps an archived Run name in History rows without exposing an archived Run filter", () => {
     const service = createMobilePracticeService("familiar15");
     service.setPuzzleSelectionScopeIds(["test-dual-mate-in-one"]);
     const run = service.createPracticeRun({
@@ -4509,9 +4553,7 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "history-tab");
     press(renderer, "history-range-max");
-    expect(collectText(findByTestId(renderer, `history-rating-${run.ratingKey}`))).toBe(
-      "History Focus · 20s pace"
-    );
+    expect(() => findByTestId(renderer, `history-rating-${run.ratingKey}`)).toThrow();
     expectText(renderer, "History Focus");
   });
 

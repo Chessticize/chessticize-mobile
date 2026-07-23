@@ -2150,21 +2150,25 @@ export function PracticePocScreen({
       : null;
   const displayedLastBoardMove = feedbackSnapshot || boardFeedback ? null : lastBoardMove;
   const historyRatingKeys = useMemo(
-    () => sortHistoryRatingKeys(
-      collectHistoryRatingKeys([
-        ...service.listPlayedRatings().map((rating) => rating.key),
-        ...attempts.map((attempt) => attempt.ratingKey)
-      ]),
-      attempts,
-      sprintSessions
-    ),
-    [attempts, service, sprintSessions]
+    () => activeRunManagementPresentation
+      ? activeRunManagementPresentation.runs.flatMap((run) => run.ratingKey ? [run.ratingKey] : [])
+      : sortHistoryRatingKeys(
+        collectHistoryRatingKeys([
+          ...service.listPlayedRatings().map((rating) => rating.key),
+          ...attempts.map((attempt) => attempt.ratingKey)
+        ]),
+        attempts,
+        sprintSessions
+      ),
+    [activeRunManagementPresentation, attempts, service, sprintSessions]
   );
   const historyRunsByRatingKey = new Map(
-    service.listPracticeRuns().map((run) => [run.ratingKey, {
-      name: run.name,
-      perPuzzleSeconds: run.perPuzzleSeconds
-    }])
+    (activeRunManagementPresentation?.runs ?? service.listPracticeRuns()).flatMap((run) => run.ratingKey
+      ? [[run.ratingKey, {
+        name: run.name,
+        perPuzzleSeconds: run.perPuzzleSeconds
+      }] as const]
+      : [])
   );
   const activeHistoryRatingKey = historyRatingKey;
   const historyWrongOnly = historyResultFilter === "wrong";
