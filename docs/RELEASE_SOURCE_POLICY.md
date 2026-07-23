@@ -43,7 +43,9 @@ without another full native run:
    job. Download its diagnostics and classify each result as a product
    regression, stale deterministic evidence or fixture, infrastructure
    failure, credential/signing gate, or store-console gate. A retry is not a
-   substitute for classification.
+   substitute for classification. For Android matrix failures, retain and
+   inspect `api-<level>.progress.json`; it identifies the last running step
+   even when the bounded matrix command is terminated.
 3. Audit both platform identities together: public version, iOS build number,
    Android version code, proposed annotated tags, build-specific release-note
    filenames and links, and the absence of an immutable tag or store build that

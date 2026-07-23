@@ -683,7 +683,8 @@ describe('Android launch baseline', () => {
     ]));
     expect(workflow).toContain('pnpm mobile:validate:android:matrix');
     expect(workflow).not.toContain('DETOX_ACTIVE_SUITE=');
-    expect(workflow).toContain('timeout-minutes: 75');
+    expect(workflow).toContain('timeout-minutes: 40');
+    expect(workflow).toContain('timeout --signal=TERM --kill-after=30s 30m');
   });
 
   it('keeps emulator-runner control flow in the tested Node runner', () => {

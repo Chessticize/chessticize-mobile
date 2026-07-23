@@ -189,6 +189,7 @@ describe('Android validation matrix', () => {
   it('executes the selected public matrix and writes auditable exact-head evidence', () => {
     const outputRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'android-matrix-'));
     const outputPath = path.join(outputRoot, 'api-24.json');
+    const progressPath = path.join(outputRoot, 'api-24.progress.json');
     const executed = [];
 
     const evidence = runAndroidValidationMatrix({
@@ -212,12 +213,34 @@ describe('Android validation matrix', () => {
 
     expect(executed).toEqual(validationStepsForApiLevel(24));
     expect(JSON.parse(fs.readFileSync(outputPath, 'utf8'))).toEqual(evidence);
+    expect(JSON.parse(fs.readFileSync(progressPath, 'utf8'))).toMatchObject({
+      schemaVersion: 1,
+      commitSha: EXACT_SHA,
+      apiLevel: 24,
+      currentStep: null,
+      result: 'pass',
+      steps: [
+        {
+          id: 'apps/mobile/scripts/prepare-android-offline-e2e.sh',
+          result: 'pass',
+        },
+        {
+          id: 'apps/mobile/scripts/install-android-detox-apks.sh',
+          result: 'pass',
+        },
+        {
+          id: 'android-api24-smoke',
+          result: 'pass',
+        },
+      ],
+    });
     expect(evidence.result).toBe('pass');
   });
 
-  it('stops at the first failed command and does not publish passing evidence', () => {
+  it('stops at the first failed command, preserves progress diagnostics, and does not publish passing evidence', () => {
     const outputRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'android-matrix-'));
     const outputPath = path.join(outputRoot, 'api-24.json');
+    const progressPath = path.join(outputRoot, 'api-24.progress.json');
     let calls = 0;
 
     expect(() => runAndroidValidationMatrix({
@@ -241,6 +264,19 @@ describe('Android validation matrix', () => {
 
     expect(calls).toBe(3);
     expect(fs.existsSync(outputPath)).toBe(false);
+    expect(JSON.parse(fs.readFileSync(progressPath, 'utf8'))).toMatchObject({
+      currentStep: 'android-api24-smoke',
+      result: 'fail',
+      steps: [
+        expect.objectContaining({ result: 'pass' }),
+        expect.objectContaining({ result: 'pass' }),
+        expect.objectContaining({
+          id: 'android-api24-smoke',
+          result: 'fail',
+          exitCode: 9,
+        }),
+      ],
+    });
   });
 
   it('rejects evidence when the requested SHA does not match the checkout', () => {
