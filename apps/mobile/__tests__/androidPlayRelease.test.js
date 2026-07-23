@@ -525,7 +525,7 @@ function signedAabFixture({ appendUnsigned = false, addUnexpectedSigner = false 
 }
 
 describe('Android Play release contract', () => {
-  it('pins the current Play retry to public version 1.1 build 4', () => {
+  it('pins the current Play release to public version 1.2 build 5', () => {
     const sourceTag = canonicalAndroidSourceTag(
       releaseVersion.publicVersion,
       releaseVersion.androidVersionCode,
@@ -554,11 +554,11 @@ describe('Android Play release contract', () => {
 
     expect(releaseVersion).toEqual(
       expect.objectContaining({
-        publicVersion: '1.1',
-        androidVersionCode: 4,
+        publicVersion: '1.2',
+        androidVersionCode: 5,
       }),
     );
-    expect(sourceTag).toBe('android-v1.1.0-build-4');
+    expect(sourceTag).toBe('android-v1.2.0-build-5');
     expect(ownerEvidenceExample.candidate).toEqual(
       expect.objectContaining(expectedIdentityBinding),
     );
@@ -571,7 +571,7 @@ describe('Android Play release contract', () => {
       ownerEvidenceExample.sourceRelease.reference.endsWith(sourceTag),
     ).toBe(true);
     expect(runbook).toContain(
-      'Android version code: `apps/mobile/release-version.json` (`4`)',
+      'Android version code: `apps/mobile/release-version.json` (`5`)',
     );
     for (const value of [
       'The build-1 source-publication gate is complete.',
@@ -998,7 +998,7 @@ describe('Android Play release contract', () => {
       evidence.sourceRelease.candidate.applicationId = 'com.example.other';
     }, 'Public Android source release candidate application ID'],
     ['version binding', evidence => {
-      evidence.sourceRelease.candidate.versionName = '1.2';
+      evidence.sourceRelease.candidate.versionName = '1.3';
     }, 'Public Android source release candidate version name'],
     ['version-code binding', evidence => {
       evidence.sourceRelease.candidate.versionCode = expectedCandidate.versionCode + 1;
@@ -1071,7 +1071,7 @@ describe('Android Play release contract', () => {
       evidence.sourceRelease.sourceManifest.candidate.applicationId = 'com.example.other';
     }, 'Source manifest candidate application ID'],
     ['candidate version provenance', evidence => {
-      evidence.sourceRelease.sourceManifest.candidate.versionName = '1.2';
+      evidence.sourceRelease.sourceManifest.candidate.versionName = '1.3';
     }, 'Source manifest candidate version name'],
     ['candidate version-code provenance', evidence => {
       evidence.sourceRelease.sourceManifest.candidate.versionCode =

@@ -502,15 +502,15 @@ CI job downloads the Play-generated universal APK and attaches it with a
 SHA-256 checksum to the already-public corresponding-source Release. The job
 does not rebuild, rerun product tests, consume owner evidence, or use separate
 prepare/publish phases. A temporary GitHub token and additional publication
-environments are not release dependencies. Build 4 is the current candidate;
-the build-1 release and failed-validation build-2/build-3 records remain
+environments are not release dependencies. Build 5 is the current candidate;
+the published build-1/build-4 releases and failed-validation build-2/build-3 records remain
 immutable historical evidence.
 
 ### ANDROID-13 — Validate the release candidate and launch
 
 **Depends on:** ANDROID-11 plus the validation scope selected from ANDROID-10
 
-- Current release tag: `android-v1.1.0-build-4`
+- Current release tag: `android-v1.2.0-build-5`
 
 **Outcome:** One exact commit is distributed through Play with its matching
 source published on GitHub and proportionate evidence.

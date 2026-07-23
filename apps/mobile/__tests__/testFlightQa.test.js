@@ -96,7 +96,7 @@ describe("TestFlight QA checklist", () => {
     expect(appStoreUploadDoc).toContain("DEVELOPMENT_TEAM=\"$APPLE_DEVELOPMENT_TEAM\"");
     expect(appStoreUploadDoc).toContain("-exportArchive");
     expect(appStoreUploadDoc).toContain("apps/mobile/ios/ExportOptions.app-store-connect.plist");
-    expect(appStoreUploadDoc).toContain("Internal 1.1 QA");
+    expect(appStoreUploadDoc).toContain("Internal 1.2 QA");
     expect(appStoreUploadDoc).toContain("Do not commit keys");
     expect(appStoreUploadDoc).toContain("Signing Troubleshooting");
     expect(appStoreUploadDoc).toContain("requires a development team");
