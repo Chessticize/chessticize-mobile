@@ -2566,7 +2566,7 @@ export function PracticePocScreen({
     <SessionScoreStrip state={state} />
   ) : null;
   const practicePromptNode = shouldShowSessionBoard ? (
-    <View style={[styles.practicePromptStack, { width: boardSize }]}>
+    <View style={[styles.practicePromptStack, { width: sessionUsesRail ? "100%" : boardSize }]}>
       <PracticePrompt
         currentPuzzle={displayedPuzzle}
         kingPieceSize={kingGlyphSizeForBoard(boardSize)}
@@ -12579,7 +12579,8 @@ const styles = StyleSheet.create({
   },
   activeSessionControlRail: {
     gap: 10,
-    paddingBottom: 4
+    paddingBottom: 4,
+    width: "100%"
   },
   activeSessionShell: {
     gap: 8

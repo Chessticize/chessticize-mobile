@@ -1679,6 +1679,20 @@ describe("PracticePocScreen", () => {
       .toThrow();
   });
 
+  it("constrains compact-landscape session chrome to the visible control rail", () => {
+    (ReactNative as unknown as {
+      __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
+    }).__setWindowDimensions?.({ width: 844, height: 390, scale: 3, fontScale: 1 });
+
+    const renderer = renderScreen({ practiceService: createMobilePracticeService("random1000") });
+    startStandardSprint(renderer);
+
+    const controlRail = findByTestId(renderer, "active-session-control-rail");
+    expect(flattenTestStyle(controlRail.props.contentContainerStyle).width).toBe("100%");
+    expect(nearestAncestorStyleValue(findByTestId(renderer, "practice-prompt"), "width"))
+      .toBe("100%");
+  });
+
   it.each([
     { fontScale: 1, label: "phone portrait", topInset: 24 },
     { fontScale: 1.5, label: "large-text phone portrait", topInset: 32 }
@@ -7592,6 +7606,21 @@ function promptKingTestIDs(renderer: TestRenderer.ReactTestRenderer): string[] {
     collectTestIds(findByTestId(renderer, "practice-prompt"))
       .filter((testID) => testID.startsWith("chessboard-king-"))
   )];
+}
+
+function nearestAncestorStyleValue(
+  node: TestRenderer.ReactTestInstance,
+  property: string
+): unknown {
+  let ancestor = node.parent;
+  while (ancestor) {
+    const value = flattenTestStyle(ancestor.props.style)[property];
+    if (value !== undefined) {
+      return value;
+    }
+    ancestor = ancestor.parent;
+  }
+  return undefined;
 }
 
 function collectText(node: TestRenderer.ReactTestInstance): string {
