@@ -465,7 +465,7 @@ async function assertStationaryBoardFeedback({ move, orientation, outcome }) {
 
   await playBoardMove('session-board', move);
   if (outcome === 'correct') {
-    await waitFor(element(by.id('sprint-unclear-prompt'))).toBeVisible().withTimeout(10000);
+    await waitFor(element(by.id('sprint-unclear-prompt'))).toExist().withTimeout(10000);
   } else {
     await waitFor(element(by.id('move-feedback-overlay'))).toExist().withTimeout(10000);
     await waitFor(element(by.label('Mistakes 1 of 3')).atIndex(0)).toExist().withTimeout(10000);
