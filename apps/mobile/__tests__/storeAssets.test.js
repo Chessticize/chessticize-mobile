@@ -67,12 +67,17 @@ describe("App Store assets document", () => {
     expect(storeAssetsE2e).toContain("CHESSTICIZE_CAPTURE_STORE_ASSETS");
     expect(storeAssetsE2e).toContain("chessticizeStoreAssetCapture");
     expect(storeAssetsE2e).toContain("setStoreAssetRatings({ standard: 800, arrowDuel: 850 })");
+    expect(storeAssetsE2e).toContain(
+      "waitFor(element(by.id('practice-run-name-input'))).toBeVisible().withTimeout(10000)"
+    );
     expect(storeAssetsE2e).toContain("toHaveText('1 / 3')");
     expect(storeAssetsE2e).toContain("by.text('1-3 of 3')");
     expect(storeAssetsE2e).toContain("app-store-01-practice-tab");
     expect(storeAssetsE2e).toContain("app-store-06-arrow-duel");
     expect(storeAssetsE2e).toContain("app-store-07-custom-setup");
     expect(storeAssetsE2e).toContain("app-store-08-review-session");
+    expect(storeAssetsE2e).toContain("by.id('practice-run-theme-row')");
+    expect(storeAssetsE2e).not.toContain("by.id('custom-theme-row')");
     expect(storeAssetsE2e).toContain("expect(element(by.text('Themes'))).toExist()");
     expect(storeAssetsDoc).toContain("pnpm mobile:e2e:build:ios:release");
     expect(storeAssetsDoc).toContain("pnpm mobile:e2e:store-assets:ios:release");

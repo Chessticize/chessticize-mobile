@@ -144,6 +144,18 @@ const FORBIDDEN_XML_WHITESPACE_HIERARCHIES = FORBIDDEN_XML_GRAMMAR_WHITESPACE
   ));
 
 describe('Detox suite configuration', () => {
+  it('opens tabs by a visible child instead of a potentially taller panel', () => {
+    const e2eDirectory = path.resolve(__dirname, '../e2e');
+    const invalidOpenTabCall = /openTab\([^,\n]+,\s*['"]practice-run-management['"]\)/;
+    const offenders = fs.readdirSync(e2eDirectory)
+      .filter((fileName) => fileName.endsWith('.e2e.js'))
+      .filter((fileName) => invalidOpenTabCall.test(
+        fs.readFileSync(path.join(e2eDirectory, fileName), 'utf8')
+      ));
+
+    expect(offenders).toEqual([]);
+  });
+
   it('owns Android public hierarchy evidence behind one focused interface', () => {
     const androidPublicUiEvidence = require('../e2e/androidPublicUiEvidence');
     const helpersSource = fs.readFileSync(

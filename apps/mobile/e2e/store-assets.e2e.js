@@ -44,7 +44,7 @@ async function launchStoreAssetApp(nowMs, deleteData) {
 }
 
 async function setStoreAssetRatings({ standard, arrowDuel }) {
-  await openTab('practice-tab', 'practice-run-management');
+  await openTab('practice-tab', 'practice-run-home-edit');
   await element(by.id('practice-run-home-edit')).tap();
 
   for (const [ratingKey, targetRating] of [
@@ -56,6 +56,7 @@ async function setStoreAssetRatings({ standard, arrowDuel }) {
     }
     await waitForVisibleInPracticeScroll(`practice-run-edit-${ratingKey}`);
     await element(by.id(`practice-run-edit-${ratingKey}`)).tap();
+    await waitFor(element(by.id('practice-run-name-input'))).toBeVisible().withTimeout(10000);
     await element(by.id('practice-run-elo-input')).replaceText(String(targetRating));
     await waitFor(element(by.id('practice-run-elo-input')))
       .toHaveText(String(targetRating))
@@ -132,7 +133,7 @@ async function captureMainTabScenes() {
   await waitFor(element(by.id('practice-run-editor'))).toExist().withTimeout(10000);
   await element(by.id('practice-main-scroll')).scrollTo('top');
   await waitFor(element(by.id('custom-mode-regular'))).toBeVisible().withTimeout(10000);
-  await waitFor(element(by.id('custom-theme-row'))).toExist().withTimeout(10000);
+  await waitFor(element(by.id('practice-run-theme-row'))).toExist().withTimeout(10000);
   await expect(element(by.text('Themes'))).toExist();
   await sleep(1200);
   await device.takeScreenshot('app-store-07-custom-setup');

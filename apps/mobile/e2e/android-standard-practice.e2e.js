@@ -36,7 +36,7 @@ describe(`Android Standard Practice offline persistence (${standardFixture.puzzl
   it('finishes a bundled Standard sprint and restores rating, progress, and history after relaunch', async () => {
     await waitFor(element(by.id('practice-home'))).toExist().withTimeout(180000);
     await startPracticeMode('standard');
-    await waitFor(element(by.id('session-side-to-move'))).toBeVisible().withTimeout(10000);
+    await waitForVisibleInPracticeScroll('session-side-to-move');
     await waitForElementAccessibilityLabelContaining(
       'session-side-to-move',
       'Black to move',
