@@ -1,3 +1,4 @@
+// Mobile platform adapter; kept outside the backend/domain seam.
 import { NativeEventEmitter, NativeModules } from "react-native";
 import type { UciEngineTransport } from "../../../../packages/core/src/index.ts";
 

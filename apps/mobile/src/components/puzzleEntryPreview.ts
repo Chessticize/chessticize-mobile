@@ -1,5 +1,6 @@
 import type { CurrentPuzzleState } from "../../../../packages/core/src/index.ts";
 import { canonicalFen, fenAfterMove, normalizeUci } from "../backend/premove.ts";
+import { isPromiseLike } from "./promiseLike.ts";
 
 export const PUZZLE_ENTRY_PREVIEW_DELAY_MS = 350;
 
@@ -91,15 +92,6 @@ export function schedulePuzzleEntryPreview({
       timer = null;
     }
   };
-}
-
-function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
-  return Boolean(
-    value
-    && typeof value === "object"
-    && "then" in value
-    && typeof (value as { then?: unknown }).then === "function"
-  );
 }
 
 function parsePreviewMove(move: string): PuzzleEntryPreviewMove {

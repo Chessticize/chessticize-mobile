@@ -1,3 +1,4 @@
+// Mobile platform composition belongs outside the backend/domain seam.
 import {
   createAndroidMobilePlatformCapabilities,
   createAndroidMobilePlatformCapabilitiesSync,

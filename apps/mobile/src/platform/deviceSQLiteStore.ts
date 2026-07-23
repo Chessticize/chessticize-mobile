@@ -1,3 +1,4 @@
+// Mobile platform adapter; kept outside the backend/domain seam.
 import { open, type DB, type Scalar } from "@op-engineering/op-sqlite";
 import { NativeModules, Platform } from "react-native";
 import {
@@ -10,7 +11,7 @@ import {
   type SyncSqliteStatement,
   type SyncSqliteValue
 } from "../../../../packages/storage/src/sync-sqlite-store.ts";
-import { MOBILE_DATABASE_LAYOUT } from "./mobileDatabaseLayout.ts";
+import { MOBILE_DATABASE_LAYOUT } from "../backend/mobileDatabaseLayout.ts";
 
 export class DeviceSQLiteStore extends SyncSQLiteStore {
   private readonly nativeDb: DB;

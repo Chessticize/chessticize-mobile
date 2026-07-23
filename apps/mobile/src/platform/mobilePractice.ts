@@ -1,9 +1,10 @@
+// Mobile platform storage composition belongs outside the backend/domain seam.
 import type { Puzzle, PuzzlePackManifest } from "../../../../packages/core/src/index.ts";
 import { MemoryStore } from "../../../../packages/storage/src/memory-store.ts";
 import { PackBackedPracticeStore } from "../../../../packages/storage/src/pack-backed-practice-store.ts";
 import { PracticeService } from "../../../../packages/storage/src/practice-service.ts";
 import type { PuzzleSource } from "../../../../packages/storage/src/puzzle-source.ts";
-import { MOBILE_DATABASE_LAYOUT } from "./mobileDatabaseLayout.ts";
+import { MOBILE_DATABASE_LAYOUT } from "../backend/mobileDatabaseLayout.ts";
 
 const bundledCoreManifest = require("../../../../fixtures/puzzles/bundled-core-pack.manifest.json") as PuzzlePackManifest;
 const regressionPuzzles = require("../../../../fixtures/puzzles/presolved-1000.json") as Puzzle[];

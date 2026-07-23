@@ -17,13 +17,13 @@ import {
   getBundledCorePackManifest,
   seededPuzzleCount,
   seededUniquePositionCount
-} from "../src/backend/mobilePractice";
+} from "../src/platform/mobilePractice";
 import { fixtureNeedsAtLeast, PracticeService } from "../../../packages/storage/src/practice-service";
 import { MemoryStore } from "../../../packages/storage/src/memory-store";
 import { defaultSprintConfig, formatLocalCalendarDate, formatReviewDay, practiceRunSprintConfig, PRACTICE_RUN_NAME_MAX_LENGTH, type ArrowDuelState, type AttemptEvent, type Puzzle, type SprintState, type UciEngineTransport } from "../../../packages/core/src/index";
-import { FakeReviewReminderNotificationClient, FakeReviewReminderScheduler } from "../src/backend/reviewReminderScheduler";
-import { FakeICloudProgressSyncClient } from "../src/backend/iCloudProgressSync";
-import type { MobilePlatformCapabilities } from "../src/backend/mobilePlatformCapabilities";
+import { FakeReviewReminderNotificationClient, FakeReviewReminderScheduler } from "../src/platform/reviewReminderScheduler";
+import { FakeICloudProgressSyncClient } from "../src/platform/iCloudProgressSync";
+import type { MobilePlatformCapabilities } from "../src/platform/mobilePlatformCapabilities";
 import type { MobileSystemBackSource } from "../src/navigation/mobileSystemBack";
 import {
   createTestMobilePlatformCapabilities,

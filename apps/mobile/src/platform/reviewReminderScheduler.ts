@@ -1,3 +1,4 @@
+// Mobile notification adapter; kept outside the backend/domain seam.
 import { NativeEventEmitter, NativeModules } from "react-native";
 import {
   computeNextReminder,

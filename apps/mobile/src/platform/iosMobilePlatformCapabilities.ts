@@ -1,3 +1,4 @@
+// Mobile platform composition belongs outside the backend/domain seam.
 import type { PracticeService } from '../../../../packages/storage/src/practice-service.ts';
 import { createNativeICloudProgressSyncClient } from './iCloudProgressSync.ts';
 import {

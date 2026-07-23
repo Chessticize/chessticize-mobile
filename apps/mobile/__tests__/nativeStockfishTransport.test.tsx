@@ -1,5 +1,5 @@
 import { NativeModules } from "react-native";
-import { createNativeStockfishTransport, prewarmNativeStockfishTransport } from "../src/backend/nativeStockfishTransport";
+import { createNativeStockfishTransport, prewarmNativeStockfishTransport } from "../src/platform/nativeStockfishTransport";
 
 type StockfishLineListener = (event: { line?: string }) => void;
 

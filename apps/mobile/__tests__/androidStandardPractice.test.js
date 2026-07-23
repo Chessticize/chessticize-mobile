@@ -17,7 +17,7 @@ function readRepo(relativePath) {
 describe('Android Standard Practice release slice', () => {
   it('keeps progress, puzzle-pack assets, and migration fixtures in distinguishable locations', () => {
     const databaseLayout = read('src/backend/mobileDatabaseLayout.ts');
-    const deviceStore = read('src/backend/deviceSQLiteStore.ts');
+    const deviceStore = read('src/platform/deviceSQLiteStore.ts');
     const appGradle = read('android/app/build.gradle');
 
     expect(databaseLayout).toContain('chessticize-mobile.sqlite');

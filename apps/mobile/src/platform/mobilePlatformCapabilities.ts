@@ -1,3 +1,4 @@
+// Mobile platform composition belongs outside the backend/domain seam.
 import type { UciEngineTransport } from '../../../../packages/core/src/index.ts';
 import type { PracticeService } from '../../../../packages/storage/src/practice-service.ts';
 import type { ICloudProgressSyncClient } from './iCloudProgressSync.ts';

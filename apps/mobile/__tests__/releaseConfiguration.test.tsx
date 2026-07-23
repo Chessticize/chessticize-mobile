@@ -1,7 +1,7 @@
 import React from "react";
 import TestRenderer, { act } from "react-test-renderer";
-import { createMobilePracticeService } from "../src/backend/mobilePractice";
-import { enableTestControlsFromLaunchConfig } from "../src/backend/testLaunchConfig";
+import { createMobilePracticeService } from "../src/platform/mobilePractice";
+import { enableTestControlsFromLaunchConfig } from "../src/platform/testLaunchConfig";
 import { PracticePocScreen } from "../src/components/PracticePocScreen";
 import { createTestMobilePlatformCapabilities } from "../src/testing/testMobilePlatformCapabilities";
 import {

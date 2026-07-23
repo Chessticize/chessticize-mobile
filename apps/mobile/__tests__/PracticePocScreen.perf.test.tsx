@@ -5,7 +5,7 @@ import TestRenderer, { act } from "react-test-renderer";
 // (see the doNotFake option below).
 const performance = (globalThis as unknown as { performance: { now(): number } }).performance;
 import { PracticePocScreen } from "../src/components/PracticePocScreen";
-import { createMobilePracticeService } from "../src/backend/mobilePractice";
+import { createMobilePracticeService } from "../src/platform/mobilePractice";
 import { createTestMobilePlatformCapabilities } from "../src/testing/testMobilePlatformCapabilities";
 import type { PracticeService } from "../../../packages/storage/src/practice-service";
 import type { SprintState } from "../../../packages/core/src/index";

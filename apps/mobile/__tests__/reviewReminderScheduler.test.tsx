@@ -6,8 +6,8 @@ import {
   FakeReviewReminderScheduler,
   reminderScheduleKey,
   rescheduleReviewReminder
-} from "../src/backend/reviewReminderScheduler";
-import { createMobilePracticeService } from "../src/backend/mobilePractice";
+} from "../src/platform/reviewReminderScheduler";
+import { createMobilePracticeService } from "../src/platform/mobilePractice";
 
 describe("review reminder scheduler", () => {
   afterEach(() => {
