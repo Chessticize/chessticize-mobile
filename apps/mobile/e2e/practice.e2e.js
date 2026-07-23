@@ -7,6 +7,7 @@ const {
   launchWithDisabledSynchronization,
   openStandardHistoryTrend,
   playBoardMove,
+  setAndroidDisplayOrientation,
   startPracticeMode,
   tapUntilExists,
   selectTestPuzzleSource,
@@ -20,6 +21,9 @@ const {
   expectFrameContained,
   waitForBoardScreenshotContainsPieces,
 } = require('./screenshotAssertions');
+const {
+  FIRST_STANDARD_FEEDBACK_MOVES,
+} = require('./familiar15Fixture');
 
 // The visual assertion measures absolute painted arrow area. Pin the public
 // service's packaged-core selection to two long candidate vectors so random
@@ -165,11 +169,36 @@ describe('Practice POC', () => {
     await startPracticeMode('standard');
     await waitForVisibleInPracticeScroll('session-board');
 
-    await playBoardMove('session-board', 'c2b1');
+    await playBoardMove('session-board', FIRST_STANDARD_FEEDBACK_MOVES.accepted);
 
     await waitFor(element(by.id('session-progress'))).toHaveText('1 / 15').withTimeout(10000);
 
   });
+
+  for (const orientation of ['portrait', 'landscape']) {
+    it(`keeps the full board stationary through correct and wrong feedback in ${orientation}`, async () => {
+      await assertStationaryBoardFeedback({
+        move: FIRST_STANDARD_FEEDBACK_MOVES.accepted,
+        orientation,
+        outcome: 'correct'
+      });
+
+      await launchWithDisabledSynchronization({
+        newInstance: true,
+        delete: true,
+        launchArgs: {
+          chessticizePuzzleSelectionSeed: PRACTICE_RENDER_PUZZLE_SELECTION_SEED
+        }
+      });
+      await setPracticeOrientation('portrait');
+
+      await assertStationaryBoardFeedback({
+        move: FIRST_STANDARD_FEEDBACK_MOVES.legalWrong,
+        orientation,
+        outcome: 'wrong'
+      });
+    });
+  }
 
   it('persists Unclear, places its History actions responsively, and manages Review Schedule there', async () => {
     const expectsRegularLayout = process.env.CHESSTICIZE_EXPECT_FULL_HISTORY_BOARD === '1';
@@ -177,7 +206,7 @@ describe('Practice POC', () => {
     await startPracticeMode('standard');
     await waitForVisibleInPracticeScroll('session-board');
 
-    await playBoardMove('session-board', 'c2b1');
+    await playBoardMove('session-board', FIRST_STANDARD_FEEDBACK_MOVES.accepted);
     await waitFor(element(by.id('sprint-unclear-prompt'))).toBeVisible().withTimeout(10000);
     await element(by.id('sprint-unclear-toggle')).tap();
     await waitFor(element(by.text('Marked')))
@@ -414,6 +443,83 @@ function frameIsContained(childFrame, parentFrame) {
     && childFrame.y >= parentFrame.y - tolerance
     && childFrame.x + childFrame.width <= parentFrame.x + parentFrame.width + tolerance
     && childFrame.y + childFrame.height <= parentFrame.y + parentFrame.height + tolerance;
+}
+
+async function assertStationaryBoardFeedback({ move, orientation, outcome }) {
+  await selectTestPuzzleSource('familiar15');
+  await startPracticeMode('standard');
+  await waitForVisibleInPracticeScroll('session-board');
+  await setPracticeOrientation(orientation);
+  await waitForElementAccessibilityLabelContaining(
+    'adaptive-layout',
+    orientation === 'landscape' ? 'Landscape' : 'Portrait',
+    10000
+  );
+  await element(by.id('practice-main-scroll')).scrollTo('top');
+  await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
+  await sleep(300);
+
+  const screenBefore = await frameFor(element(by.id('safe-area-shell')));
+  const boardBefore = await frameFor(element(by.id('session-board')));
+  expectFrameContained(boardBefore, screenBefore, `${orientation} board before ${outcome} feedback`);
+
+  await playBoardMove('session-board', move);
+  if (outcome === 'correct') {
+    await waitFor(element(by.id('sprint-unclear-prompt'))).toBeVisible().withTimeout(10000);
+  } else {
+    await waitFor(element(by.id('move-feedback-overlay'))).toExist().withTimeout(10000);
+    await waitFor(element(by.label('Mistakes 1 of 3')).atIndex(0)).toExist().withTimeout(10000);
+  }
+
+  const screenAfter = await frameFor(element(by.id('safe-area-shell')));
+  const boardAfter = await frameFor(element(by.id('session-board')));
+  expectFrameContained(boardAfter, screenAfter, `${orientation} board after ${outcome} feedback`);
+  expectFrameUnchanged(boardBefore, boardAfter, `${orientation} ${outcome} feedback`);
+
+  if (outcome !== 'correct') {
+    return;
+  }
+
+  const promptFrame = await frameFor(element(by.id('sprint-unclear-prompt')));
+  expectFrameContained(promptFrame, screenAfter, `${orientation} Unclear action`);
+  const scoreFrame = await frameFor(element(by.id('session-score-strip')));
+  if (promptFrame.y < scoreFrame.y + scoreFrame.height - 1) {
+    throw new Error(
+      `Expected the ${orientation} Unclear action below the score: `
+      + `score=${JSON.stringify(scoreFrame)}, prompt=${JSON.stringify(promptFrame)}`
+    );
+  }
+
+  if (orientation === 'landscape') {
+    const railFrame = await frameFor(element(by.id('active-session-control-rail')));
+    expectFrameContained(promptFrame, railFrame, 'Landscape Unclear action');
+    const bottomGap = railFrame.y + railFrame.height - (promptFrame.y + promptFrame.height);
+    if (bottomGap < -1 || bottomGap > 6) {
+      throw new Error(
+        `Expected the landscape Unclear action at the bottom of the control rail: `
+        + `rail=${JSON.stringify(railFrame)}, prompt=${JSON.stringify(promptFrame)}`
+      );
+    }
+  }
+}
+
+async function setPracticeOrientation(orientation) {
+  if (device.getPlatform() === 'android') {
+    await setAndroidDisplayOrientation(orientation);
+    return;
+  }
+  await device.setOrientation(orientation);
+}
+
+function expectFrameUnchanged(before, after, label) {
+  const tolerance = 1;
+  for (const key of ['x', 'y', 'width', 'height']) {
+    if (Math.abs(before[key] - after[key]) > tolerance) {
+      throw new Error(
+        `${label} changed board ${key}: before=${JSON.stringify(before)}, after=${JSON.stringify(after)}`
+      );
+    }
+  }
 }
 
 function expectBoardScreenshotContainsNeutralArrows(screenshotPath, boardFrame) {

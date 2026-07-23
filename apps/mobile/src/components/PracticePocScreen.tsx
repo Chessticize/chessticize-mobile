@@ -2482,13 +2482,24 @@ export function PracticePocScreen({
         kingPieceSize={kingGlyphSizeForBoard(boardSize)}
         mode={mode}
       />
-      {unclearPrompt ? (
-        <UnclearAttemptPrompt
-          marked={unclearPrompt.marked}
-          question="Was the previous puzzle clear?"
-          onToggle={toggleUnclearPrompt}
-        />
-      ) : null}
+    </View>
+  ) : null;
+  const sessionBottomFeedbackNode = shouldShowSessionBoard && unclearPrompt ? (
+    // Fabric must keep this wrapper as a native flex child so the landscape
+    // auto margin can pin feedback to the rail bottom instead of flattening it.
+    <View
+      collapsable={false}
+      style={[
+        styles.activeSessionBottomFeedback,
+        sessionUsesRail ? styles.activeSessionRailBottomFeedback : null,
+        { width: sessionUsesRail ? adaptiveLayout.sessionRailWidth : boardSize }
+      ]}
+    >
+      <UnclearAttemptPrompt
+        marked={unclearPrompt.marked}
+        question="Was the previous puzzle clear?"
+        onToggle={toggleUnclearPrompt}
+      />
     </View>
   ) : null;
   const errorNode = error ? <ErrorPanel error={error} /> : null;
@@ -2497,6 +2508,7 @@ export function PracticePocScreen({
     || sessionBoardNode !== null
     || sessionScoreNode !== null
     || practicePromptNode !== null
+    || sessionBottomFeedbackNode !== null
     || errorNode !== null;
   const practiceAnnouncement = error
     ? `Error. ${error}`
@@ -2640,20 +2652,33 @@ export function PracticePocScreen({
                       {sessionBoardNode}
                       {!sessionUsesRail ? sessionScoreNode : null}
                       {!sessionUsesRail ? errorNode : null}
+                      {!sessionUsesRail ? sessionBottomFeedbackNode : null}
                     </View>
                     {sessionUsesRail ? (
                       <ScrollView
-                        style={[styles.activeSessionControlRailScroll, { width: adaptiveLayout.sessionRailWidth }]}
+                        style={[
+                          styles.activeSessionControlRailScroll,
+                          {
+                            height: boardSize,
+                            width: adaptiveLayout.sessionRailWidth
+                          }
+                        ]}
                         contentContainerStyle={[
                           styles.activeSessionControlRailScrollContent,
-                          { width: adaptiveLayout.sessionRailWidth }
+                          {
+                            minHeight: boardSize,
+                            width: adaptiveLayout.sessionRailWidth
+                          }
                         ]}
                         testID="active-session-control-rail"
                       >
                         <View
                           style={[
                             styles.activeSessionControlRail,
-                            { width: adaptiveLayout.sessionRailWidth }
+                            {
+                              minHeight: boardSize,
+                              width: adaptiveLayout.sessionRailWidth
+                            }
                           ]}
                           testID="active-session-control-rail-content"
                         >
@@ -2661,6 +2686,7 @@ export function PracticePocScreen({
                           {practicePromptNode}
                           {sessionScoreNode}
                           {errorNode}
+                          {sessionBottomFeedbackNode}
                         </View>
                       </ScrollView>
                     ) : null}
@@ -12557,7 +12583,14 @@ const styles = StyleSheet.create({
     paddingBottom: 4
   },
   activeSessionControlRail: {
+    flexGrow: 1,
     gap: 10
+  },
+  activeSessionBottomFeedback: {
+    alignSelf: "center"
+  },
+  activeSessionRailBottomFeedback: {
+    marginTop: "auto"
   },
   activeSessionShell: {
     gap: 8

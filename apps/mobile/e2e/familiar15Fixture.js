@@ -53,8 +53,16 @@ function isPromotionMove(move) {
   return /^[a-h][1-8][a-h][18][qrbn]$/.test(move);
 }
 
+const firstStandardPuzzle = FAMILIAR_15_PUZZLES[0];
+const FIRST_STANDARD_FEEDBACK_MOVES = Object.freeze({
+  accepted: familiar15UserMoves(firstStandardPuzzle)[0],
+  legalWrong: 'c2b3',
+  puzzleId: firstStandardPuzzle.id,
+});
+
 module.exports = {
   FAMILIAR_15_PUZZLES,
+  FIRST_STANDARD_FEEDBACK_MOVES,
   familiar15StartingPosition,
   familiar15UserMoves,
 };

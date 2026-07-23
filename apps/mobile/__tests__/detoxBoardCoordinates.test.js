@@ -12,7 +12,9 @@ describe('Detox Android board coordinates', () => {
   it('routes practice-spec board moves through the platform-aware helper', () => {
     const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
 
-    expect(practiceSpec).toContain("playBoardMove('session-board', 'c2b1')");
+    expect(practiceSpec)
+      .toContain("playBoardMove('session-board', FIRST_STANDARD_FEEDBACK_MOVES.accepted)");
+    expect(practiceSpec).toContain('move: FIRST_STANDARD_FEEDBACK_MOVES.legalWrong');
     expect(practiceSpec).not.toContain("boardPoint(boardFrame, 'c2')");
     expect(practiceSpec).not.toContain("tapAtPoint(c2)");
   });

@@ -399,6 +399,48 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "sprint-unclear-marked"))).toBe("Marked");
   });
 
+  it.each([
+    { height: 932, label: "portrait", width: 430 },
+    { height: 390, label: "landscape", width: 844 }
+  ])("places Unclear after the board and score in $label", async ({
+    height,
+    width
+  }) => {
+    const windowDimensions = ReactNative as unknown as {
+      __setWindowDimensions?: (dimensions: {
+        fontScale: number;
+        height: number;
+        scale: number;
+        width: number;
+      }) => void;
+    };
+    windowDimensions.__setWindowDimensions?.({
+      width,
+      height,
+      scale: 3,
+      fontScale: 1
+    });
+
+    const renderer = renderScreen({
+      practiceService: createMobilePracticeService("familiar15")
+    });
+    startStandardSprint(renderer);
+    await boardMove(renderer, "c2b1");
+
+    expect(findByTestId(renderer, "session-board")).toBeTruthy();
+    expect(testIdOrder(renderer, "session-board", "sprint-unclear-prompt")).toBeLessThan(0);
+    expect(testIdOrder(renderer, "session-score-strip", "sprint-unclear-prompt")).toBeLessThan(0);
+
+    if (width > height) {
+      expect(findByTestId(renderer, "active-session-control-rail")
+        .findByProps({ testID: "sprint-unclear-prompt" })).toBeTruthy();
+      expect(() => findByTestId(renderer, "active-session-board-lane")
+        .findByProps({ testID: "sprint-unclear-prompt" })).toThrow();
+    } else {
+      expect(() => findByTestId(renderer, "active-session-control-rail")).toThrow();
+    }
+  });
+
   it("keeps Review Schedule controls out of active Practice and Sprint Result", async () => {
     const service = createMobilePracticeService("random1000");
     const renderer = renderScreen({
@@ -1726,7 +1768,7 @@ describe("PracticePocScreen", () => {
     const railTestIDs = collectTestIds(findByTestId(renderer, "active-session-control-rail"));
     expect(railTestIDs).toContain("sprint-unclear-prompt");
     expect(railTestIDs.indexOf("practice-prompt")).toBeLessThan(railTestIDs.indexOf("sprint-unclear-prompt"));
-    expect(railTestIDs.indexOf("sprint-unclear-prompt")).toBeLessThan(railTestIDs.indexOf("session-score-strip"));
+    expect(railTestIDs.indexOf("session-score-strip")).toBeLessThan(railTestIDs.indexOf("sprint-unclear-prompt"));
     expect(() => findByTestId(renderer, "active-session-board-lane").findByProps({ testID: "sprint-unclear-prompt" }))
       .toThrow();
   });
