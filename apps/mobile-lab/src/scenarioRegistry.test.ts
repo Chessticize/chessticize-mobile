@@ -22,6 +22,17 @@ test("the baseline catalog has unique stable story URLs and declared scopes", ()
   }
 });
 
+test("the Practice catalog covers the post-correct Unclear follow-up", () => {
+  const scenario = Object.values(scenarioRegistry).find(
+    (candidate) => candidate.storyId === "practice--unclear-follow-up"
+  );
+
+  assert.ok(scenario);
+  assert.equal(scenario.group, "Practice");
+  assert.ok(scenario.scope.includes.includes("Previous-attempt clarity question"));
+  assert.equal(scenario.isNew, undefined);
+});
+
 test("every typed navigation coverage entry points to a registered scenario", () => {
   const coverageEntries = [
     ...Object.values(navigationCoverage.tabs),
