@@ -15,6 +15,10 @@ export type LabScenarioId =
   | "practice-custom-rating-editor"
   | "practice-run-remove-confirmation"
   | "practice-runs-empty"
+  | "practice-timing-policy"
+  | "practice-timing-active"
+  | "practice-timing-warning"
+  | "practice-timing-timeout"
   | "practice-preparing"
   | "practice-active"
   | "practice-unclear-follow-up"
@@ -34,6 +38,8 @@ export type LabScenarioId =
   | "history-empty"
   | "history-populated"
   | "history-filters"
+  | "history-timing-attention"
+  | "history-tactical-profile"
   | "history-attempt-detail"
   | "history-replay-unavailable"
   | "settings-ios-sync"
@@ -101,6 +107,10 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
   "practice-custom-rating-editor": defineScenario("practice-custom-rating-editor", "Practice", "Custom Run editor and validation", "practice--custom-rating-editor", "Existing Custom Run editor allows renaming and direct ELO entry while keeping creation settings fixed; an out-of-range value demonstrates inline validation and disabled Save.", "practice", ["Editable unique name", "Direct ELO entry", "600-2200 validation", "Disabled invalid Save", "Fixed creation settings", "Return to Home edit mode"], ["Practice home edit mode"]),
   "practice-run-remove-confirmation": defineScenario("practice-run-remove-confirmation", "Practice", "Remove run confirmation", "practice--remove-run-confirmation", "Inline warning directly below the selected Run before it is removed from Home, explicitly retaining its ELO and history for later restoration.", "practice", ["Inline removal warning", "Selected Run context", "Retained ELO and history", "Cancel", "Confirm removal"], ["Edit runs", "Restore run"]),
   "practice-runs-empty": defineScenario("practice-runs-empty", "Practice", "Empty Home and restore", "practice--empty-home-and-restore", "Home after every run is hidden, with clear Add Run and restore paths that preserve prior ELO.", "practice", ["Empty state", "Add Run", "Retained run list", "Restore to Home"], ["New Run", "Practice home"]),
+  "practice-timing-policy": defineScenario("practice-timing-policy", "Practice", "Run puzzle timing", "practice-timing--run-policy", "Design-only Run timing editor with independent warning and timeout controls, a robust typical-time baseline, and explicit ELO identity continuity.", "practice", ["2x slow warning", "3x puzzle timeout", "Independent on/off controls", "Five-second adjustment", "Cold-start and personal-median baseline", "ELO continuity"], ["Production Run editor", "Persistence", "Sprint rules"], "contained"),
+  "practice-timing-active": defineScenario("practice-timing-active", "Practice", "Puzzle pace", "practice-timing--active-pace", "Active Sprint design with one dominant Sprint countdown and a secondary puzzle elapsed-time rail.", "practice", ["Sprint countdown", "Puzzle elapsed time", "Warning and timeout markers", "Board context"], ["Production timers", "Puzzle outcome mutation"], "contained"),
+  "practice-timing-warning": defineScenario("practice-timing-warning", "Practice", "Slow warning", "practice-timing--slow-warning", "Slow-threshold state that warns without interrupting play or inferring that the puzzle was unclear.", "practice", ["Amber text and icon treatment", "Elapsed puzzle time", "Time until puzzle timeout", "Clarity follow-up explanation"], ["Production timers", "Unclear persistence"], "contained"),
+  "practice-timing-timeout": defineScenario("practice-timing-timeout", "Practice", "Puzzle timeout", "practice-timing--puzzle-timeout", "Puzzle timeout transition that records a distinct Timed out attempt and advances without silently changing Unclear or Review.", "practice", ["Timed out transition", "Attempt receipt", "Next-puzzle handoff", "Separate clarity and Review states"], ["Production sprint rules", "History persistence", "ELO calculation"], "contained"),
   "practice-preparing": defineScenario("practice-preparing", "Practice", "Preparing", "practice--preparing", "Stable preparing overlay before an Arrow Duel sprint starts.", "practice", ["Preparing overlay", "Cancel through Back intent"], ["Active sprint", "Practice home"]),
   "practice-active": defineScenario("practice-active", "Practice", "Active session", "practice--active-session", "Active Standard sprint with the development-only Board Placeholder.", "practice", ["Timer", "Progress", "Board state", "Pause", "Accessible moves"], ["Sprint result"]),
   "practice-unclear-follow-up": defineScenario(
@@ -129,6 +139,8 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
   "history-empty": defineScenario("history-empty", "History", "Empty history", "history--empty-history", "History with no attempts or rating points.", "history", ["Empty state", "Primary filters"], ["Practice", "Review", "Settings"]),
   "history-populated": defineScenario("history-populated", "History", "Populated history", "history--populated-history", "Deterministic attempts showing every curated theme, including a seven-theme density case.", "history", ["All curated attempt tags", "Rating chart", "Quick filters"], ["Attempt detail", "Review"]),
   "history-filters": defineScenario("history-filters", "History", "Filters and active filters", "history--filters-and-active-filters", "Expanded History filters with the complete curated theme catalog in categorized horizontal rails.", "history", ["Advanced filters", "24-theme catalog", "Active filter summary", "Reset"], ["Replay puzzle"]),
+  "history-timing-attention": defineScenario("history-timing-attention", "History", "Timing attention", "history-timing--attention-history", "Attention-focused History design with Slow and Timed out filters, timeout-cause detail, and independent Unclear and Review actions.", "history", ["Needs-attention summary", "Slow filter", "Timed out filter", "Puzzle-limit and Sprint-end causes", "Unclear choice", "Review choice"], ["Production history query", "Persistent attempt detail"], "contained"),
+  "history-tactical-profile": defineScenario("history-tactical-profile", "History", "Tactical profile", "history-timing--tactical-profile", "Theme profile design that keeps accuracy, median correct time, relative pace, and sample size visible before creating a focus Run.", "history", ["Accuracy and pace axes", "Focus, Careful, Rushed, and Strong buckets", "Building-evidence state", "Selectable focus Run draft"], ["Production aggregation", "Run creation", "Persistence"], "contained"),
   "history-attempt-detail": defineScenario("history-attempt-detail", "History", "Replay puzzle", "history--attempt-detail", "The real puzzle replay reached by tapping a History row, with every curated puzzle theme centered in a horizontally scrollable tag rail below the board.", "history", ["Puzzle replay", "Curated theme rail", "Review enrollment"], ["History"]),
   "history-replay-unavailable": defineScenario("history-replay-unavailable", "History", "Replay unavailable", "history--replay-unavailable", "Legacy Arrow Duel attempt whose candidate order cannot be reconstructed safely.", "history", ["Persisted details", "Replay-unavailable explanation"], ["History"]),
   "settings-ios-sync": defineScenario("settings-ios-sync", "Settings", "iOS sync", "settings--ios-sync", "iOS capabilities with iCloud Sync controls, run ELO editing omitted, and no real account access.", "settings", ["iCloud Sync", "Notifications", "About"], ["Run editor", "Stockfish diagnostics"]),

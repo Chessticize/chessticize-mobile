@@ -1,1 +1,58 @@
-{}
+{
+  "practice-timing-policy": {
+    "issues": [
+      {
+        "issueNumber": 248,
+        "changeNote": "Configure a 2x Slow warning independently of Run ELO."
+      },
+      {
+        "issueNumber": 249,
+        "changeNote": "Configure a 3x puzzle timeout that records and advances."
+      }
+    ]
+  },
+  "practice-timing-active": {
+    "issues": [
+      {
+        "issueNumber": 248,
+        "changeNote": "Keep Sprint countdown primary and show puzzle elapsed time as a pace signal."
+      }
+    ]
+  },
+  "practice-timing-warning": {
+    "issues": [
+      {
+        "issueNumber": 248,
+        "changeNote": "Warn on a slow solve without automatically marking it Unclear."
+      }
+    ]
+  },
+  "practice-timing-timeout": {
+    "issues": [
+      {
+        "issueNumber": 249,
+        "changeNote": "Record Timed out separately from Wrong, Unclear, and Review."
+      }
+    ]
+  },
+  "history-timing-attention": {
+    "issues": [
+      {
+        "issueNumber": 248,
+        "changeNote": "Filter Slow attempts while preserving independent clarity and Review choices."
+      },
+      {
+        "issueNumber": 249,
+        "changeNote": "Show both puzzle-limit and Sprint-end timeout causes in History."
+      }
+    ]
+  },
+  "history-tactical-profile": {
+    "issues": [
+      {
+        "issueNumber": 250,
+        "changeNote": "Compare theme accuracy, median correct time, relative pace, and sample size before training."
+      }
+    ]
+  }
+}
