@@ -955,12 +955,15 @@ describe("PracticePocScreen", () => {
     expect(railTestIDs).toContain("history-attempt-history-unclear-themes-matein3");
   });
 
-  it("keeps the seven curated puzzle tags when replay opens from History", async () => {
+  it("reveals all seven curated puzzle tags only when replay Analysis opens", async () => {
     const renderer = renderLabScenario("history-attempt-detail");
     await flushMicrotasks();
 
     press(renderer, "history-tab");
     press(renderer, "history-attempt-history-unclear");
+    expect(() => findByTestId(renderer, "review-theme-rail")).toThrow();
+
+    press(renderer, "review-analysis-button");
 
     const railTestIDs = new Set(
       collectTestIds(findByTestId(renderer, "review-theme-rail"))
@@ -1699,6 +1702,59 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "active-session-control-rail")).toBeTruthy();
     const boardSize = Number(flattenTestStyle(findByTestId(renderer, "session-board").props.style).height);
     expect(boardSize + reservedSessionChrome).toBeLessThanOrEqual(viewportHeight);
+  });
+
+  it("keeps the iPad landscape board lane clear by moving the prompt and Unclear into the session rail", async () => {
+    (ReactNative as unknown as {
+      __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
+    }).__setWindowDimensions?.({ width: 1180, height: 820, scale: 2, fontScale: 1 });
+
+    const renderer = renderScreen({ practiceService: createMobilePracticeService("random1000") });
+    startStandardSprint(renderer);
+
+    expect(findByTestId(renderer, "adaptive-layout").props.accessibilityLabel)
+      .toBe("Layout regularLandscape");
+    expect(findByTestId(renderer, "active-session-control-rail").findByProps({ testID: "practice-prompt" }))
+      .toBeTruthy();
+    expect(() => findByTestId(renderer, "active-session-board-lane").findByProps({ testID: "practice-prompt" }))
+      .toThrow();
+
+    await boardMove(renderer, "e2e6");
+    await settleFeedbackSnapshot();
+    await boardMove(renderer, "e6f7");
+
+    const railTestIDs = collectTestIds(findByTestId(renderer, "active-session-control-rail"));
+    expect(railTestIDs).toContain("sprint-unclear-prompt");
+    expect(railTestIDs.indexOf("practice-prompt")).toBeLessThan(railTestIDs.indexOf("sprint-unclear-prompt"));
+    expect(railTestIDs.indexOf("sprint-unclear-prompt")).toBeLessThan(railTestIDs.indexOf("session-score-strip"));
+    expect(() => findByTestId(renderer, "active-session-board-lane").findByProps({ testID: "sprint-unclear-prompt" }))
+      .toThrow();
+  });
+
+  it("keeps the complete iPhone Pro Max landscape session chrome publicly reachable", () => {
+    (ReactNative as unknown as {
+      __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
+    }).__setWindowDimensions?.({ width: 956, height: 440, scale: 3, fontScale: 1 });
+    (SafeAreaContext as unknown as {
+      __setSafeAreaInsets?: (insets: { bottom: number; left: number; right: number; top: number }) => void;
+    }).__setSafeAreaInsets?.({ top: 0, right: 62, bottom: 21, left: 62 });
+
+    const renderer = renderScreen({ practiceService: createMobilePracticeService("random1000") });
+    startStandardSprint(renderer);
+
+    expect(findByTestId(renderer, "adaptive-layout").props.accessibilityLabel)
+      .toBe("Layout compactLandscape");
+    const controlRail = findByTestId(renderer, "active-session-control-rail");
+    expect(collectText(controlRail)).toContain("Find the best move");
+    expect(collectText(controlRail)).toContain("For ");
+    expect(controlRail.findByProps({ testID: "session-score-strip" }).props.accessibilityLabel)
+      .toBe("Session score: solved 0, mistakes 0, left 15");
+    expect(controlRail.findByProps({ testID: "session-score-solved" }).props.accessibilityLabel)
+      .toBe("Solved 0");
+    expect(controlRail.findByProps({ testID: "session-score-mistakes" }).props.accessibilityLabel)
+      .toBe("Mistakes 0");
+    expect(controlRail.findByProps({ testID: "session-score-left" }).props.accessibilityLabel)
+      .toBe("Left 15");
   });
 
   it.each([
@@ -4080,7 +4136,11 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "practice-prompt-icon")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "practice-prompt"))).toContain("Find the best move");
     expect(collectText(findByTestId(renderer, "practice-prompt"))).toContain("For black.");
+    expect(() => findByTestId(renderer, "review-theme-rail")).toThrow();
+    press(renderer, "review-analysis-button");
     expect(collectText(findByTestId(renderer, "review-theme-rail"))).toBe(historyAttemptThemes);
+    press(renderer, "review-close-analysis");
+    expect(() => findByTestId(renderer, "review-theme-rail")).toThrow();
     expect(() => findByTestId(renderer, "review-theme-pill")).toThrow();
     expect(findByTestId(renderer, "review-reset-puzzle")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "review-exit"))).toBe("");
@@ -4089,7 +4149,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-panel")).toBeTruthy();
   });
 
-  it("shows curated tags in History rows, filters, and puzzle replay", () => {
+  it("shows curated tags in History but reveals replay tags only during Analysis", () => {
     const store = new MemoryStore();
     store.seedPuzzles([{
       ...sharedHistoryPuzzle(),
@@ -4169,6 +4229,10 @@ describe("PracticePocScreen", () => {
     press(renderer, "history-theme-promotion");
     press(renderer, "history-attempt-curated-density");
     expect(findByTestId(renderer, "review-session")).toBeTruthy();
+    expect(() => findByTestId(renderer, "review-theme-rail")).toThrow();
+    expect(() => findByTestId(renderer, "review-theme-catalog")).toThrow();
+
+    press(renderer, "review-analysis-button");
     const replayThemes = collectText(findByTestId(renderer, "review-theme-rail"));
     expect(replayThemes).toContain("Advanced Pawn");
     expect(replayThemes).toContain("Sacrifice");
@@ -4179,6 +4243,9 @@ describe("PracticePocScreen", () => {
     expect(testIdOrder(renderer, "review-board", "review-theme-catalog")).toBeLessThan(0);
     expect(flattenTestStyle(replayThemeCatalog.props.style).alignItems).toBe("center");
     expect(() => findByTestId(renderer, "review-theme-pill")).toThrow();
+    press(renderer, "review-close-analysis");
+    expect(() => findByTestId(renderer, "review-theme-rail")).toThrow();
+    expect(() => findByTestId(renderer, "review-theme-catalog")).toThrow();
     press(renderer, "review-exit");
     expect(historyThemeSelected(renderer, "pin")).toBe(true);
     expect(historyThemeSelected(renderer, "promotion")).toBe(true);
@@ -4381,6 +4448,50 @@ describe("PracticePocScreen", () => {
     )).toBe(true);
   });
 
+  it("shows only Home runs in the History run filter and preserves their Home order", () => {
+    const service = createMobilePracticeService("random1000");
+    const defaultPresentation = runManagementPresentation();
+    const standardRun = defaultPresentation.runs.find((run) => run.id === "standard")!;
+    const hiddenRun = defaultPresentation.runs.find((run) => run.id === "tactics-focus")!;
+    const firstHomeRun = defaultPresentation.runs.find((run) => run.id === "candidate-sprint")!;
+    [
+      { ratingKey: standardRun.ratingKey!, completedAt: "2026-06-20T00:04:00.000Z" },
+      { ratingKey: hiddenRun.ratingKey!, completedAt: "2026-06-20T00:03:00.000Z" },
+      { ratingKey: "legacy custom 5/20", completedAt: "2026-06-20T00:02:00.000Z" },
+      { ratingKey: firstHomeRun.ratingKey!, completedAt: "2026-06-20T00:01:00.000Z" }
+    ].forEach(({ completedAt, ratingKey }) => {
+      service.recordReviewAttempt({
+        puzzleId: "000hf",
+        mode: "standard",
+        ratingKey,
+        result: "correct",
+        submittedMove: "c4b5",
+        expectedMove: "c4b5",
+        startedAt: "2026-06-20T00:00:00.000Z"
+      }, completedAt);
+    });
+    const renderer = renderScreen({
+      practiceService: service,
+      runManagementPresentation: runManagementPresentation({
+        runs: [firstHomeRun, standardRun],
+        hiddenRuns: [hiddenRun]
+      })
+    });
+
+    press(renderer, "history-tab");
+
+    const filterTestIDs = [...new Set(
+      collectTestIds(findByTestId(renderer, "history-rating-filters"))
+        .filter((testID) => testID.startsWith("history-rating-"))
+    )];
+    expect(filterTestIDs).toEqual([
+      "history-rating-filters",
+      "history-rating-all",
+      `history-rating-${firstHomeRun.ratingKey}`,
+      `history-rating-${standardRun.ratingKey}`
+    ]);
+  });
+
   it("navigates history review across the full filtered result set, not just the visible page", async () => {
     const service = createMobilePracticeService("random1000");
     for (let index = 0; index < 22; index += 1) {
@@ -4507,7 +4618,7 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "history-attempt-standard-attempt-difficulty")).toThrow();
   });
 
-  it("shows the immutable saved Run name in History after the Run is archived", () => {
+  it("keeps an archived Run name in History rows without exposing an archived Run filter", () => {
     const service = createMobilePracticeService("familiar15");
     service.setPuzzleSelectionScopeIds(["test-dual-mate-in-one"]);
     const run = service.createPracticeRun({
@@ -4529,9 +4640,7 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "history-tab");
     press(renderer, "history-range-max");
-    expect(collectText(findByTestId(renderer, `history-rating-${run.ratingKey}`))).toBe(
-      "History Focus · 20s pace"
-    );
+    expect(() => findByTestId(renderer, `history-rating-${run.ratingKey}`)).toThrow();
     expectText(renderer, "History Focus");
   });
 
@@ -4797,9 +4906,14 @@ describe("PracticePocScreen", () => {
     press(renderer, correctAttemptRow!.props.testID);
 
     const progressBeforeRetry = collectText(findByTestId(renderer, "review-progress"));
+    const initialPromptKingTestIDs = promptKingTestIDs(renderer);
+    expect(initialPromptKingTestIDs).toHaveLength(1);
     await boardMove(renderer, "e2e6");
     await settleFeedbackSnapshot();
     await boardMove(renderer, "e6f7");
+
+    expect(collectText(findByTestId(renderer, "practice-prompt"))).toBe("Solved");
+    expect(promptKingTestIDs(renderer)).toEqual(initialPromptKingTestIDs);
     await settleFeedbackSnapshot();
 
     expect(findByTestId(renderer, "review-session")).toBeTruthy();
@@ -4898,8 +5012,12 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "review-session")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "review-current-puzzle-id"))).toBe("000hf");
     expect(findByTestId(renderer, "review-board")).toBeTruthy();
+    expect(() => findByTestId(renderer, "review-theme-rail")).toThrow();
+    press(renderer, "review-analysis-button");
     expect(collectText(findByTestId(renderer, "review-theme-rail"))).toContain("Mate in 2");
     expect(() => findByTestId(renderer, "review-theme-rail-mate")).toThrow();
+    press(renderer, "review-close-analysis");
+    expect(() => findByTestId(renderer, "review-theme-rail")).toThrow();
     expect(() => findByTestId(renderer, "review-theme-pill")).toThrow();
     expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Due tomorrow");
     expect(collectText(findByTestId(renderer, "review-schedule-remove"))).toBe("Remove from Review");
@@ -5096,6 +5214,9 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "review-filter-mode-standard")).toBeTruthy();
     expect(findByTestId(renderer, "review-filter-arrow-duel")).toBeTruthy();
     expect(findByTestId(renderer, "review-filter-speed-20")).toBeTruthy();
+    expect(renderer.root.findAll(
+      (node) => typeof node.props.testID === "string" && node.props.testID.startsWith("review-filter-theme-")
+    )).toHaveLength(0);
     expect(findByTestId(renderer, "review-due-items")).toBeTruthy();
     expect(findByTestId(renderer, "review-context-list")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "review-context-list"))).toContain("Standard · 20s pace");
@@ -5111,9 +5232,11 @@ describe("PracticePocScreen", () => {
         && node.props.accessibilityRole === "button"
     );
     expect(dueItemRows.length).toBeGreaterThan(0);
+    expect(dueItemRows[0]!.props.accessibilityLabel).toMatch(/^Start Standard review,/);
     expect(dueItemRows[0]!.props.accessibilityLabel).toContain("Source sprint: Standard · 20s pace");
     expect(dueItemRows[0]!.props.accessibilityLabel).toContain("Review 1");
     expect(dueItemRows[0]!.props.accessibilityLabel).toContain("Lapses 0");
+    expect(collectText(findByTestId(renderer, `${dueItemRows[0]!.props.testID}-context`))).toBe(`Last wrong ${lastWrongDate}`);
     expect(collectText(findByTestId(renderer, `${dueItemRows[0]!.props.testID}-meta`))).toContain("Due now · 1d interval · Standard · 20s pace");
     expect(() => findByTestId(renderer, `${dueItemRows[0]!.props.testID}-badge`)).toThrow();
 
@@ -5535,6 +5658,8 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "review-board-state"))).toBe("locked");
     await settleEntryPreview();
     expect(collectText(findByTestId(renderer, "review-board-state"))).toBe("ready");
+    const initialPromptKingTestIDs = promptKingTestIDs(renderer);
+    expect(initialPromptKingTestIDs).toHaveLength(1);
 
     await boardMove(renderer, "e2e6");
     expect(collectText(findByTestId(renderer, "review-board-state"))).toBe("locked");
@@ -5544,6 +5669,9 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "review-board-state"))).toBe("ready");
 
     await boardMove(renderer, "e6f7");
+
+    expect(collectText(findByTestId(renderer, "practice-prompt"))).toBe("Solved");
+    expect(promptKingTestIDs(renderer)).toEqual(initialPromptKingTestIDs);
     await settleFeedbackSnapshot();
 
     expect(() => findByTestId(renderer, "review-session")).toThrow();
@@ -7602,6 +7730,13 @@ function collectTestIds(node: TestRenderer.ReactTestInstance): string[] {
     .filter((child): child is TestRenderer.ReactTestInstance => typeof child !== "string")
     .flatMap((child) => collectTestIds(child));
   return [...ownTestID, ...childTestIDs];
+}
+
+function promptKingTestIDs(renderer: TestRenderer.ReactTestRenderer): string[] {
+  return [...new Set(
+    collectTestIds(findByTestId(renderer, "practice-prompt"))
+      .filter((testID) => testID.startsWith("chessboard-king-"))
+  )];
 }
 
 function collectText(node: TestRenderer.ReactTestInstance): string {

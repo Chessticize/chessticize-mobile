@@ -158,6 +158,11 @@ import {
   schedulePuzzleEntryPreview,
   type PuzzleEntryPreviewMove
 } from "./puzzleEntryPreview.ts";
+import {
+  buildPracticeAdaptiveLayout,
+  PRACTICE_UI_PADDING as UI_PADDING,
+  type AdaptiveLayout
+} from "./adaptivePracticeLayout.ts";
 
 export type {
   PracticeRunDraft,
@@ -209,31 +214,6 @@ type SessionFeedback = PuzzleFeedback | null;
 type AnalysisEngineStatus = "idle" | "thinking" | "stockfish" | "fallback" | "error";
 type HistoryRatingRangeFilter = "all" | "under1000" | "1000-1399" | "1400-plus";
 type CustomThemeFilter = string;
-type AdaptiveLayoutClass = "compactPortrait" | "compactLandscape" | "regularPortrait" | "regularLandscape";
-
-type SafeAreaInsets = {
-  bottom: number;
-  left: number;
-  right: number;
-  top: number;
-};
-
-type AdaptiveLayout = {
-  boardSize: number;
-  className: AdaptiveLayoutClass;
-  contentHeight: number;
-  contentWidth: number;
-  isCompactLandscape: boolean;
-  isLandscape: boolean;
-  isLargeText: boolean;
-  isRegularWidth: boolean;
-  sessionRailWidth: number;
-  sideNavigationExpanded: boolean;
-  sideNavigationWidth: number;
-  usesSideNavigation: boolean;
-  usesSessionRail: boolean;
-  usesWideContent: boolean;
-};
 
 export type PracticeDebugTraceEvent = {
   type:
@@ -302,17 +282,6 @@ type ReviewBackCommand = {
 
 type DeferBackRelevantTransition = (key: string, resumeAfterCancel: () => void) => boolean;
 
-const UI_PADDING = 16;
-const COMPACT_LANDSCAPE_RAIL_MIN = 220;
-const COMPACT_LANDSCAPE_RAIL_MAX = 300;
-const REGULAR_RAIL_MIN = 296;
-const REGULAR_RAIL_MAX = 360;
-const COMPACT_LANDSCAPE_BOARD_MAX = 430;
-const PHONE_PORTRAIT_BOARD_MAX = 560;
-const REGULAR_LANDSCAPE_BOARD_MAX = 640;
-const REGULAR_PORTRAIT_BOARD_MAX = 860;
-const REGULAR_LANDSCAPE_RESERVED_SESSION_CHROME_HEIGHT = 120;
-const REGULAR_PORTRAIT_RESERVED_CONTROLS_HEIGHT = 240;
 const HISTORY_PAGE_LIMIT = 20;
 const NEUTRAL_ARROW = "#2563EB";
 const ARROW_VISUAL_STYLES = {
@@ -392,83 +361,6 @@ const ANALYSIS_DIAGNOSTIC_POSITIONS = [
     fen: "r1bq1rk1/pp1n1pbp/2pp1np1/4p3/2PPP3/2N2N2/PP3PPP/R1BQ1RK1 w - - 0 9"
   }
 ] as const;
-
-function buildAdaptiveLayout({
-  fontScale,
-  height,
-  insets,
-  width
-}: {
-  fontScale: number;
-  height: number;
-  insets: SafeAreaInsets;
-  width: number;
-}): AdaptiveLayout {
-  const viewportWidth = Math.max(0, width - insets.left - insets.right);
-  const contentHeight = Math.max(0, height - insets.top - insets.bottom);
-  const isLandscape = viewportWidth > contentHeight;
-  const isLargeText = fontScale >= 1.5;
-  const isRegularWidth = viewportWidth >= 768 && contentHeight >= 600;
-  const isCompactLandscape = isLandscape && !isRegularWidth;
-  const className: AdaptiveLayoutClass = isRegularWidth
-    ? isLandscape ? "regularLandscape" : "regularPortrait"
-    : isLandscape ? "compactLandscape" : "compactPortrait";
-  const usesSideNavigation = isCompactLandscape || isRegularWidth;
-  const sideNavigationExpanded = usesSideNavigation && viewportWidth >= 960 && !isLargeText;
-  const sideNavigationWidth = isRegularWidth
-    ? sideNavigationExpanded ? 168 : 76
-    : 64;
-  const contentWidth = Math.max(
-    0,
-    viewportWidth - (usesSideNavigation ? sideNavigationWidth : 0)
-  );
-  const sessionContentWidth = viewportWidth;
-  const usesWideContent = contentWidth >= 860 && !isLargeText;
-  const usesSessionRail = isCompactLandscape || (isRegularWidth && isLandscape);
-  const sessionRailWidth = isRegularWidth
-    ? Math.min(REGULAR_RAIL_MAX, Math.max(REGULAR_RAIL_MIN, Math.floor(sessionContentWidth * 0.3)))
-    : Math.min(COMPACT_LANDSCAPE_RAIL_MAX, Math.max(COMPACT_LANDSCAPE_RAIL_MIN, Math.floor(sessionContentWidth * 0.34)));
-  const sessionBoardSlotWidth = Math.max(
-    0,
-    sessionContentWidth - UI_PADDING * 2 - sessionRailWidth - 14
-  );
-  const sessionBoardSlotHeight = Math.max(
-    0,
-    contentHeight - (isRegularWidth && isLandscape
-      ? REGULAR_LANDSCAPE_RESERVED_SESSION_CHROME_HEIGHT
-      : UI_PADDING * 2)
-  );
-  const portraitBoardSlotWidth = Math.max(0, sessionContentWidth - UI_PADDING * 2);
-  const regularPortraitReservedControlsHeight = REGULAR_PORTRAIT_RESERVED_CONTROLS_HEIGHT +
-    (isLargeText ? Math.min(180, Math.round((fontScale - 1) * 120)) : 0);
-  const portraitBoardSlotHeight = isRegularWidth && !isLandscape
-    ? Math.max(0, contentHeight - UI_PADDING * 2 - regularPortraitReservedControlsHeight)
-    : portraitBoardSlotWidth;
-  const boardMax = isRegularWidth
-    ? isLandscape ? REGULAR_LANDSCAPE_BOARD_MAX : REGULAR_PORTRAIT_BOARD_MAX
-    : isCompactLandscape ? COMPACT_LANDSCAPE_BOARD_MAX : PHONE_PORTRAIT_BOARD_MAX;
-  const boardSlot = usesSessionRail
-    ? Math.min(sessionBoardSlotWidth, sessionBoardSlotHeight)
-    : Math.min(portraitBoardSlotWidth, portraitBoardSlotHeight);
-  const boardSize = Math.floor(Math.max(0, Math.min(boardSlot, boardMax)));
-
-  return {
-    boardSize,
-    className,
-    contentHeight,
-    contentWidth,
-    isCompactLandscape,
-    isLandscape,
-    isLargeText,
-    isRegularWidth,
-    sessionRailWidth,
-    sideNavigationExpanded,
-    sideNavigationWidth,
-    usesSideNavigation,
-    usesSessionRail,
-    usesWideContent
-  };
-}
 
 export function PracticePocScreen({
   platformCapabilities,
@@ -608,7 +500,7 @@ export function PracticePocScreen({
   const historyThemeChoices = useThemeChoiceSelection();
 
   const adaptiveLayout = useMemo(
-    () => buildAdaptiveLayout({ fontScale, height, insets, width }),
+    () => buildPracticeAdaptiveLayout({ fontScale, height, insets, width }),
     [fontScale, height, insets, width]
   );
   const boardSize = adaptiveLayout.boardSize;
@@ -2150,21 +2042,25 @@ export function PracticePocScreen({
       : null;
   const displayedLastBoardMove = feedbackSnapshot || boardFeedback ? null : lastBoardMove;
   const historyRatingKeys = useMemo(
-    () => sortHistoryRatingKeys(
-      collectHistoryRatingKeys([
-        ...service.listPlayedRatings().map((rating) => rating.key),
-        ...attempts.map((attempt) => attempt.ratingKey)
-      ]),
-      attempts,
-      sprintSessions
-    ),
-    [attempts, service, sprintSessions]
+    () => activeRunManagementPresentation
+      ? activeRunManagementPresentation.runs.flatMap((run) => run.ratingKey ? [run.ratingKey] : [])
+      : sortHistoryRatingKeys(
+        collectHistoryRatingKeys([
+          ...service.listPlayedRatings().map((rating) => rating.key),
+          ...attempts.map((attempt) => attempt.ratingKey)
+        ]),
+        attempts,
+        sprintSessions
+      ),
+    [activeRunManagementPresentation, attempts, service, sprintSessions]
   );
   const historyRunsByRatingKey = new Map(
-    service.listPracticeRuns().map((run) => [run.ratingKey, {
-      name: run.name,
-      perPuzzleSeconds: run.perPuzzleSeconds
-    }])
+    (activeRunManagementPresentation?.runs ?? service.listPracticeRuns()).flatMap((run) => run.ratingKey
+      ? [[run.ratingKey, {
+        name: run.name,
+        perPuzzleSeconds: run.perPuzzleSeconds
+      }] as const]
+      : [])
   );
   const activeHistoryRatingKey = historyRatingKey;
   const historyWrongOnly = historyResultFilter === "wrong";
@@ -2398,6 +2294,7 @@ export function PracticePocScreen({
   const sideNavigationVisible = appChromeVisible && adaptiveLayout.usesSideNavigation;
   const bottomTabsVisible = appChromeVisible && !sideNavigationVisible;
   const sessionUsesRail = shouldShowSessionBoard && adaptiveLayout.usesSessionRail;
+  const sessionPackedRowWidth = adaptiveLayout.sessionPackedRowWidth;
   const screenTitle = screenTitleFor(tab);
   const screenSubtitle = tab === "practice"
     ? `Offline-ready · ${seededPuzzleCount(puzzleSource)} puzzles`
@@ -2566,7 +2463,12 @@ export function PracticePocScreen({
     <SessionScoreStrip state={state} />
   ) : null;
   const practicePromptNode = shouldShowSessionBoard ? (
-    <View style={[styles.practicePromptStack, { width: boardSize }]}>
+    <View
+      style={[
+        styles.practicePromptStack,
+        { width: sessionUsesRail ? adaptiveLayout.sessionRailWidth : boardSize }
+      ]}
+    >
       <PracticePrompt
         currentPuzzle={displayedPuzzle}
         kingPieceSize={kingGlyphSizeForBoard(boardSize)}
@@ -2685,7 +2587,7 @@ export function PracticePocScreen({
             showsVerticalScrollIndicator={false}
             contentContainerStyle={[
               styles.content,
-              adaptiveLayout.usesWideContent ? styles.contentWide : null,
+              adaptiveLayout.usesWideContent && !sessionUsesRail ? styles.contentWide : null,
               bottomTabsVisible ? styles.contentWithBottomTabs : null,
               sessionUsesRail ? styles.contentSessionRail : null
             ]}
@@ -2707,16 +2609,26 @@ export function PracticePocScreen({
                     already visible after rotation. */}
                 {hasSessionLayoutContent ? (
                   <View
-                    style={sessionUsesRail ? styles.activeSessionAdaptiveLayout : styles.activeSessionStack}
+                    style={sessionUsesRail
+                      ? [
+                          styles.activeSessionAdaptiveLayout,
+                          {
+                            gap: adaptiveLayout.sessionRailGap,
+                            width: sessionPackedRowWidth
+                          }
+                        ]
+                      : styles.activeSessionStack}
                     testID={sessionUsesRail ? "active-session-adaptive-layout" : "stacked-session-layout"}
                   >
                     <View
-                      style={sessionUsesRail ? styles.activeSessionBoardLane : styles.activeSessionStack}
+                      style={sessionUsesRail
+                        ? [styles.activeSessionBoardLane, { width: boardSize }]
+                        : styles.activeSessionStack}
                       testID={sessionUsesRail ? "active-session-board-lane" : undefined}
                     >
                       {!sessionUsesRail ? sessionStatusNode : null}
                       {!sessionUsesRail ? pausedSessionNode : null}
-                      {practicePromptNode}
+                      {!sessionUsesRail ? practicePromptNode : null}
                       {sessionBoardNode}
                       {!sessionUsesRail ? sessionScoreNode : null}
                       {!sessionUsesRail ? errorNode : null}
@@ -2724,12 +2636,24 @@ export function PracticePocScreen({
                     {sessionUsesRail ? (
                       <ScrollView
                         style={[styles.activeSessionControlRailScroll, { width: adaptiveLayout.sessionRailWidth }]}
-                        contentContainerStyle={styles.activeSessionControlRail}
+                        contentContainerStyle={[
+                          styles.activeSessionControlRailScrollContent,
+                          { width: adaptiveLayout.sessionRailWidth }
+                        ]}
                         testID="active-session-control-rail"
                       >
-                        {sessionStatusNode}
-                        {sessionScoreNode}
-                        {errorNode}
+                        <View
+                          style={[
+                            styles.activeSessionControlRail,
+                            { width: adaptiveLayout.sessionRailWidth }
+                          ]}
+                          testID="active-session-control-rail-content"
+                        >
+                          {sessionStatusNode}
+                          {practicePromptNode}
+                          {sessionScoreNode}
+                          {errorNode}
+                        </View>
                       </ScrollView>
                     ) : null}
                   </View>
@@ -5677,29 +5601,38 @@ function PracticePrompt({
   currentPuzzle,
   kingPieceSize,
   mode,
+  promptSide,
+  solved = false,
   promptText,
   promptHint
 }: {
   currentPuzzle: CurrentPuzzleState | undefined;
   kingPieceSize: number;
   mode: SprintMode;
+  promptSide?: MoveSide;
+  solved?: boolean;
   promptText?: string | null;
   promptHint?: string | null;
 }): React.JSX.Element | null {
   if (!currentPuzzle) {
     return null;
   }
-  const promptSide = sideToMove(currentPuzzle.currentFen);
-  const side = promptSide === "b" ? "black" : "white";
+  const displayedSide = promptSide ?? sideToMove(currentPuzzle.currentFen);
+  const side = displayedSide === "b" ? "black" : "white";
   const isArrowDuel = currentPuzzle.kind === "arrow_duel";
   const defaultPromptTitle = isArrowDuel ? "Choose the best move" : "Find the best move";
   const defaultPromptContext = isArrowDuel
     ? `For ${side}, between the two arrows.`
     : `For ${side}.`;
-  const displayedPromptText = promptText === undefined ? defaultPromptContext : promptText;
-  const displayedPromptHint = promptHint === undefined
+  const displayedPromptText = solved ? null : promptText === undefined ? defaultPromptContext : promptText;
+  const displayedPromptHint = solved ? null : promptHint === undefined
     ? (isArrowDuel ? "Watch for checks, captures, and attacks!" : null)
     : promptHint;
+  const displayedPromptTitle = solved
+    ? "Solved"
+    : promptText === undefined
+      ? defaultPromptTitle
+      : modeLabel(mode);
 
   return (
     <View style={styles.promptPanel} testID="practice-prompt">
@@ -5709,12 +5642,12 @@ function PracticePrompt({
       >
         <MoveSideGlyph
           kingPieceSize={kingPieceSize}
-          side={promptSide}
+          side={displayedSide}
           testID="practice-prompt-side-glyph"
         />
       </View>
       <View style={styles.promptCopy}>
-        <Text style={styles.promptTitle}>{promptText === undefined ? defaultPromptTitle : modeLabel(mode)}</Text>
+        <Text style={styles.promptTitle}>{displayedPromptTitle}</Text>
         {displayedPromptText ? <Text style={styles.promptText}>{displayedPromptText}</Text> : null}
         {displayedPromptHint ? (
           <Text style={styles.promptHint}>{displayedPromptHint}</Text>
@@ -7414,16 +7347,6 @@ function groupReviewEntriesByContext(entries: ReviewEntry[]): ReviewEntryGroup[]
   return [...groups.values()];
 }
 
-function collectReviewThemeFilters(items: ReviewQueueItem[]): string[] {
-  const themes = new Set<string>();
-  for (const item of items) {
-    for (const theme of item.puzzle.themes.slice(0, 2)) {
-      themes.add(theme);
-    }
-  }
-  return [...themes].sort((left, right) => left.localeCompare(right)).slice(0, 4);
-}
-
 function collectReviewSpeedFilters(items: ReviewQueueItem[]): number[] {
   const speeds = new Set<number>();
   for (const item of items) {
@@ -7463,9 +7386,6 @@ function filterReviewQueueItems(items: ReviewQueueItem[], filter: ReviewQueueFil
     if (filter.startsWith("mode:")) {
       return item.review.mode === filter.slice("mode:".length);
     }
-    if (filter.startsWith("theme:")) {
-      return item.puzzle.themes.includes(filter.slice("theme:".length));
-    }
     if (filter.startsWith("speed:")) {
       return reviewItemSpeedSeconds(item) === Number(filter.slice("speed:".length));
     }
@@ -7488,9 +7408,6 @@ function reviewQueueFilterLabel(filter: ReviewQueueFilter): string {
   }
   if (filter.startsWith("mode:")) {
     return modeLabel(filter.slice("mode:".length) as SprintMode);
-  }
-  if (filter.startsWith("theme:")) {
-    return filter.slice("theme:".length);
   }
   if (filter.startsWith("speed:")) {
     return `${filter.slice("speed:".length)}s pace`;
@@ -7557,8 +7474,7 @@ type ReviewQueueFilter =
   | "failed"
   | "arrow_duel"
   | `mode:${SprintMode}`
-  | `speed:${number}`
-  | `theme:${string}`;
+  | `speed:${number}`;
 
 type ReviewPuzzleState =
   | { kind: "line"; line: PuzzleLineState }
@@ -7643,7 +7559,6 @@ function ReviewPanel({
   const dailyReviewProgressLabel = dailyReviewTotal === 0
     ? "0"
     : `${completedReviews.length} / ${dailyReviewTotal}`;
-  const themeFilters = collectReviewThemeFilters(dueReviewItems);
   const speedFilters = collectReviewSpeedFilters(dueReviewItems);
   const filteredDueReviewItems = filterReviewQueueItems(dueReviewItems, queueFilter, nowMs);
   const filteredDueEntries = filteredDueReviewItems.map((item): ReviewEntry => buildReviewEntry({
@@ -7876,15 +7791,6 @@ function ReviewPanel({
               onPress={() => setQueueFilter(`speed:${speed}`)}
             />
           ))}
-          {themeFilters.map((theme) => (
-            <FilterButton
-              key={theme}
-              active={queueFilter === `theme:${theme}`}
-              label={theme}
-              testID={`review-filter-theme-${safeTestId(theme)}`}
-              onPress={() => setQueueFilter(`theme:${theme}`)}
-            />
-          ))}
         </ScrollView>
       ) : null}
 
@@ -8033,7 +7939,6 @@ function ReviewQueueItemCard({
   nowMs: number;
   onPress: () => void;
 }): React.JSX.Element {
-  const primaryTheme = item.puzzle.themes[0] ?? "mixed";
   const activityLabel = item.review.lastReviewedAt
     ? `Last wrong ${formatLocalCalendarDate(item.review.lastReviewedAt)}`
     : `Added manually ${formatLocalCalendarDate(item.review.enrolledAt ?? item.review.dueDay)}`;
@@ -8048,7 +7953,7 @@ function ReviewQueueItemCard({
   const nextReviewNumber = item.review.reviewCount + 1;
   const rowTestId = `review-due-item-${item.puzzle.id}-${safeTestId(item.review.mode)}`;
   const accessibilityLabel = [
-    `Start ${modeLabel(item.review.mode)} ${primaryTheme} review`,
+    `Start ${modeLabel(item.review.mode)} review`,
     activityLabel,
     dueState,
     `${item.review.intervalDays} day interval`,
@@ -8067,7 +7972,7 @@ function ReviewQueueItemCard({
     >
       <View style={styles.reviewItemCopy}>
         <Text style={styles.historyRowTitle}>{modeLabel(item.review.mode)}</Text>
-        <Text testID={`${rowTestId}-context`} style={styles.helperText}>{primaryTheme} · {activityLabel}</Text>
+        <Text testID={`${rowTestId}-context`} style={styles.helperText}>{activityLabel}</Text>
         <Text testID={`${rowTestId}-meta`} style={styles.helperText}>
           {dueState} · {item.review.intervalDays}d interval · {compactSource}
         </Text>
@@ -8255,7 +8160,8 @@ function ReviewSession({
   const displayFen = analysisEnabled
     ? (analysisFen ?? currentFen)
     : (reviewEntryPreview.displayFen ?? currentFen);
-  const baseBoardFlipped = reviewStartingPerspectiveFlipped(currentEntry);
+  const reviewPromptSide = sideToMove(reviewStartingFen(currentEntry));
+  const baseBoardFlipped = reviewPromptSide === "b";
   const boardFlipped = manualBoardFlip ? !baseBoardFlipped : baseBoardFlipped;
   const feedbackMove = feedback?.submittedMove && feedback.submittedMove !== "__illegal__" ? arrowFromTo(feedback.submittedMove) : null;
   const shouldShowGuidedCurrentEval = !analysisEnabled && currentEntry.mode === "arrow_duel" && reviewState.kind === "line";
@@ -8836,6 +8742,8 @@ function ReviewSession({
         currentPuzzle={currentPuzzle}
         kingPieceSize={kingGlyphSizeForBoard(boardSize)}
         mode={currentEntry.mode}
+        promptSide={reviewPromptSide}
+        solved={feedback?.puzzleSolved === true}
         promptText={
           isArrowDuelFollowUpReview
             ? null
@@ -9049,7 +8957,7 @@ function ReviewSession({
               />
             ) : null}
           </View>
-          {reviewCuratedThemes.length > 0 ? (
+          {analysisEnabled && reviewCuratedThemes.length > 0 ? (
             <View
               style={[styles.reviewThemeCatalogRail, { width: boardSize }]}
               testID="review-theme-catalog"
@@ -9636,10 +9544,6 @@ function submitArrowDuelFollowUpMove(state: PuzzleLineState, move: string): {
 
 function reviewStartingFen(entry: ReviewEntry): string {
   return currentReviewPuzzleState(startReviewPuzzle(entry)).currentFen;
-}
-
-function reviewStartingPerspectiveFlipped(entry: ReviewEntry): boolean {
-  return sideToMove(reviewStartingFen(entry)) === "b";
 }
 
 function currentReviewPuzzleState(state: ReviewPuzzleState): CurrentPuzzleState {
@@ -12578,17 +12482,17 @@ const styles = StyleSheet.create({
     padding: 10
   },
   activeSessionAdaptiveLayout: {
+    alignSelf: "center",
     alignItems: "center",
-    flexDirection: "row",
-    gap: 14,
-    justifyContent: "center"
+    flexDirection: "row"
   },
   activeSessionStack: {
     gap: 12
   },
   activeSessionBoardLane: {
     alignItems: "center",
-    flex: 1,
+    flexGrow: 0,
+    flexShrink: 0,
     gap: 12,
     justifyContent: "center",
     minWidth: 0
@@ -12598,9 +12502,11 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     maxHeight: "100%"
   },
-  activeSessionControlRail: {
-    gap: 10,
+  activeSessionControlRailScrollContent: {
     paddingBottom: 4
+  },
+  activeSessionControlRail: {
+    gap: 10
   },
   activeSessionShell: {
     gap: 8
