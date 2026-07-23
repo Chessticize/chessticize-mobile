@@ -117,12 +117,14 @@ test("SQLitePuzzlePackSource preserves themed candidate results while using the 
       .map((puzzle) => puzzle.id);
 
     assert.deepEqual(selectedIds, legacyIds);
-    const candidateSql = preparedSql.find((sql) => sql.includes("FROM puzzle_themes JOIN puzzles"));
+    const candidateSql = preparedSql.find((sql) => sql.includes("ORDER BY puzzle_themes.rating ASC"));
     assert.ok(candidateSql);
     assert.match(candidateSql, /puzzle_themes\.rating >= \?/);
     assert.match(candidateSql, /ORDER BY puzzle_themes\.rating ASC, puzzle_themes\.puzzle_id ASC/);
+    assert.doesNotMatch(candidateSql, /JOIN puzzles/);
     const plan = packDb.prepare(`EXPLAIN QUERY PLAN ${candidateSql}`).all(themeId, 1700, 1900, 10) as Array<{ detail: string }>;
     assert.ok(plan.some((row) => row.detail.includes("puzzle_themes_theme_rating_idx") && row.detail.includes("rating>?")));
+    assert.ok(plan.every((row) => !row.detail.includes("SEARCH puzzles")));
     assert.ok(plan.every((row) => !row.detail.includes("TEMP B-TREE")));
   } finally {
     packDb.close();
@@ -152,15 +154,17 @@ test("SQLitePuzzlePackSource merges indexed theme scans for OR matching without 
 
     assert.deepEqual(selected.map((puzzle) => puzzle.id), ["00008", "001h8"]);
     assert.equal(new Set(selected.map((puzzle) => puzzle.id)).size, selected.length);
-    const candidateSql = preparedSql.filter((sql) => sql.includes("FROM puzzle_themes JOIN puzzles"));
+    const candidateSql = preparedSql.filter((sql) => sql.includes("ORDER BY puzzle_themes.rating ASC"));
     assert.equal(candidateSql.length, 3);
     assert.ok(candidateSql.every((sql) => /puzzle_themes\.theme_id = \?/.test(sql)));
+    assert.ok(candidateSql.every((sql) => !/JOIN puzzles/.test(sql)));
     const themeIds = ["crushing", "hangingPiece", "middlegame"].map((theme) =>
       (packDb.prepare("SELECT id FROM themes WHERE name = ?").get(theme) as { id: number }).id
     );
     for (const [index, sql] of candidateSql.entries()) {
       const plan = packDb.prepare(`EXPLAIN QUERY PLAN ${sql}`).all(themeIds[index], 1700, 1900, 10) as Array<{ detail: string }>;
       assert.ok(plan.some((row) => row.detail.includes("puzzle_themes_theme_rating_idx") && row.detail.includes("rating>?")));
+      assert.ok(plan.every((row) => !row.detail.includes("SEARCH puzzles")));
       assert.ok(plan.every((row) => !row.detail.includes("TEMP B-TREE")));
     }
   } finally {
@@ -189,6 +193,56 @@ test("SQLitePuzzlePackSource fairly merges selected themes before filling from c
 
     assert.deepEqual(selected.map((puzzle) => puzzle.id), ["common-low", "rare"]);
     assert.equal(new Set(selected.map((puzzle) => puzzle.id)).size, selected.length);
+  } finally {
+    packDb.close();
+  }
+});
+
+test("SQLitePuzzlePackSource seeded selection reaches beyond one fixed candidate prefix", () => {
+  const packDb = buildPackDatabase(
+    Array.from({ length: 2_000 }, (_, index) =>
+      samplingPuzzle(index, index % 2 === 0 ? ["fork", "middlegame"] : ["middlegame"])
+    )
+  );
+  try {
+    const source = new SQLitePuzzlePackSource(new NodeSqliteDatabase(packDb), {
+      allPuzzlesArrowDuelEligible: true
+    });
+    const selectForSeed = (randomSeed: string, themes?: string[]): string[] =>
+      source.selectPuzzles({
+        mode: "standard",
+        limit: 18,
+        minRating: 1400,
+        maxRating: 1600,
+        ...(themes === undefined ? {} : { themes }),
+        randomSeed
+      }).map((puzzle) => puzzle.id);
+    const selectedAcrossSeeds = (themes?: string[]): Set<string> => new Set(
+      Array.from({ length: 32 }, (_, seedIndex) => {
+        const selected = selectForSeed(`run-${seedIndex}`, themes);
+        assert.equal(selected.length, 18);
+        assert.equal(new Set(selected).size, selected.length);
+        return selected;
+      }).flat()
+    );
+
+    assert.deepEqual(
+      selectForSeed("repeatable-run", ["fork"]),
+      selectForSeed("repeatable-run", ["fork"]),
+      "the same seed and filter should remain deterministic"
+    );
+
+    const unrestricted = selectedAcrossSeeds();
+    assert.ok(
+      [...unrestricted].some((id) => Number(id.slice("sample-".length)) >= 900),
+      "different seeds should reach eligible puzzles beyond the first 900 rows"
+    );
+
+    const fork = selectedAcrossSeeds(["fork"]);
+    assert.ok(
+      [...fork].some((id) => Number(id.slice("sample-".length)) >= 1800),
+      "themed selection should reach beyond the first 900 matching theme rows"
+    );
   } finally {
     packDb.close();
   }
@@ -448,6 +502,20 @@ function selectionPuzzle(id: string, rating: number, themes: string[]): Puzzle {
     stockfishEval: 0,
     stockfishBestMove: "e2e3",
     stockfishEvalAfterFirstMove: 0
+  };
+}
+
+function samplingPuzzle(index: number, themes: string[]): Puzzle {
+  return {
+    id: `sample-${index.toString().padStart(4, "0")}`,
+    initialFen: `synthetic-position-${index}`,
+    solutionMoves: ["a2a3"],
+    rating: 1500,
+    themes,
+    source: "synthetic",
+    stockfishEval: 0,
+    stockfishBestMove: "a2a4",
+    stockfishEvalAfterFirstMove: 300
   };
 }
 
