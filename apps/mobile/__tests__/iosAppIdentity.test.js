@@ -121,18 +121,18 @@ describe("iOS App Store identity artifacts", () => {
     expect(lockedInstallScript).not.toContain("pod update");
   });
 
-  it("runs the exact-main iOS gate on the supported Xcode 26.6 image", () => {
-    const workflow = readText(join(appRoot, "..", "..", ".github", "workflows", "mobile-ios.yml"));
+  it("keeps GitHub iOS validation JS-only and leaves native release evidence local", () => {
+    const workflow = readText(join(appRoot, "..", "..", ".github", "workflows", "mobile-js.yml"));
 
-    expect(workflow).toContain("runs-on: macos-26");
-    expect(workflow).toContain(
-      "DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer"
-    );
-    expect(workflow).toContain(
-      "key: pods-${{ runner.os }}-${{ hashFiles('apps/mobile/ios/Podfile.lock', 'pnpm-lock.yaml') }}"
-    );
-    expect(workflow).not.toContain("restore-keys: pods-${{ runner.os }}-");
-    expect(workflow).not.toContain("runs-on: macos-15");
+    expect(workflow).toContain("pull_request:");
+    expect(workflow).toContain("name: Mobile JS checks");
+    expect(workflow).toContain("runs-on: ubuntu-latest");
+    expect(workflow).not.toContain("workflow_dispatch:");
+    expect(workflow).not.toContain("schedule:");
+    expect(workflow).not.toContain("runs-on: macos-");
+    expect(workflow).not.toContain("xcodebuild");
+    expect(workflow).not.toContain("Detox iOS");
+    expect(workflow).not.toContain("mobile:e2e:build:ios");
   });
 
   it("keeps the Hermes CocoaPods checksum portable across workspace paths", () => {

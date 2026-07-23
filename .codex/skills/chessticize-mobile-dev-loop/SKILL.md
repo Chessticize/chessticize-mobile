@@ -193,7 +193,7 @@ record build result, commands, device matrix, suite results, and clean tracked
 worktree confirmation. A later source change invalidates it. Physical ARM64
 evidence is owner-recorded at #200/#188 and is not a routine feature-PR blocker.
 
-## PR, Nightly, And Release Gates
+## PR, Local Native, And Release Gates
 
 Choose the smallest PR scope that proves the changed boundary:
 
@@ -209,9 +209,18 @@ CHESSTICIZE_E2E_SCOPE=practice \
   .codex/skills/chessticize-mobile-local-e2e/scripts/run-local-e2e.sh
 ```
 
-Replace `practice` with `flows` or `full` as required. Record the scope, exact commit SHA, build result, commands, results, and clean-worktree confirmation in the PR. Any later code change invalidates native evidence. All relevant fast CI checks must still pass.
+Replace `practice` with `flows` or `full` as required. Record the scope, exact
+commit SHA and Git tree, build result, commands, results, and clean-worktree
+confirmation in the PR. Any later source-tree change invalidates native
+evidence. All relevant fast CI checks must still pass.
 
-Nightly GitHub Detox builds once and runs both suites against the latest `main` as an integration signal. Do not wait for it to merge a routine PR. Release candidates use the same risk scopes: a delta needs exact-head fast checks plus owner device smoke, targeted native risk needs the affected suite, and only broad native risk requires both suites.
+GitHub Actions does not run Xcode builds or iOS Detox. Local iOS native
+validation is the only iOS native release gate. Release candidates use the
+same risk scopes: a delta needs exact-head fast checks plus owner device smoke,
+targeted native risk needs the affected suite, and only broad native risk
+requires both suites. After a squash merge, reuse PR-head native evidence only
+when the tested Git tree exactly matches the release-candidate Git tree, and
+record both tree IDs.
 
 ### Prefer Incremental Review
 
@@ -272,7 +281,8 @@ Before finalizing:
 - Run broader tests when touching shared core, storage, CLI, or native boundaries.
 - Record the selected native-validation scope and rationale in the PR.
 - When targeted or full native validation is required, record passing exact-head evidence.
-- Treat nightly `main` Detox as integration feedback, not a routine PR merge gate.
-- Before release, require a passing GitHub Detox run for the exact `main` release candidate.
+- Keep iOS native validation local; GitHub CI runs only the fast non-native jobs.
+- Before release, require the selected local native scope or an identical-tree
+  PR-head result recorded against the release candidate.
 - Mention any intentionally skipped layer, with the reason.
 - Keep generated artifacts out of git unless they are intentional fixtures.

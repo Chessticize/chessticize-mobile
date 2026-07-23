@@ -1,0 +1,65 @@
+name: Mobile JS
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/mobile-js.yml"
+      - "apps/mobile/**"
+      - "fixtures/**"
+      - "package.json"
+      - "packages/**"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "tsconfig.json"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-js-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mobile-checks:
+    name: Mobile JS checks
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.1.2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26.x
+          cache: pnpm
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache core puzzle pack
+        uses: actions/cache@v4
+        with:
+          path: fixtures/puzzles/bundled-core-pack.sqlite
+          key: core-pack-${{ hashFiles('fixtures/puzzles/bundled-core-pack.manifest.json') }}
+
+      - name: Fetch core puzzle pack
+        run: pnpm fetch:core-pack
+
+      - name: Mobile lint
+        run: pnpm mobile:lint
+
+      - name: Mobile typecheck
+        run: pnpm mobile:typecheck
+
+      - name: Mobile component tests
+        run: pnpm mobile:test
