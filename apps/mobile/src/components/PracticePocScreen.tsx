@@ -36,7 +36,7 @@ import {
   defaultSprintConfig,
   formatLocalCalendarDate,
   formatReviewDay,
-  formatSideToMoveScore,
+  formatWhitePerspectiveScore,
   historyAttemptReplayAvailability,
   historyAttemptSpeedSeconds,
   isUnclearAttemptEligible,
@@ -5458,7 +5458,8 @@ function SprintSummary({
   const delta = (state.ratingAfter ?? state.ratingBefore) - state.ratingBefore;
   const reason = formatEndReason(state.endReason);
   const shouldPrioritizeReview = Boolean(onReview);
-  const accuracy = Math.round((state.correctCount / Math.max(1, state.correctCount + state.mistakeCount)) * 100);
+  const attemptCount = state.correctCount + state.mistakeCount;
+  const accuracy = Math.round((state.correctCount / Math.max(1, attemptCount)) * 100);
   const ratingAfter = state.ratingAfter ?? state.ratingBefore;
   const reviewImpact = state.mistakeCount > 0
     ? `${state.mistakeCount} ${state.mistakeCount === 1 ? "mistake" : "mistakes"} queued`
@@ -5505,7 +5506,7 @@ function SprintSummary({
         <View style={styles.resultScoreBlock}>
           <Text style={styles.resultSolvedCount} testID="sprint-result-solved">
             {state.correctCount}
-            <Text style={styles.resultSolvedTarget}> / {state.config.targetCorrect}</Text>
+            <Text style={styles.resultSolvedTarget}> / {attemptCount}</Text>
           </Text>
           <Text style={styles.resultAccuracy} testID="sprint-result-accuracy">{accuracy}% Accuracy</Text>
         </View>
@@ -10831,7 +10832,7 @@ function StockfishDiagnosticsPanel({
         {lines.length > 0 ? (
           lines.map((line, index) => (
             <View key={`${line.multipv}-${line.move}-${line.depth}`} style={styles.analysisLineRow} testID={`stockfish-diagnostics-line-${index}`}>
-              <Text style={styles.analysisEvalText}>{formatSideToMoveScore(line.score)}</Text>
+              <Text style={styles.analysisEvalText}>{formatWhitePerspectiveScore(line.score)}</Text>
               <Text style={styles.analysisMoveText} numberOfLines={1}>
                 {line.multipv}. {sanForDiagnosticMove(selectedPosition.fen, line.move)}
               </Text>
@@ -10847,7 +10848,7 @@ function StockfishDiagnosticsPanel({
         <View style={styles.diagnosticPvPanel}>
           {lines.map((line) => (
             <Text key={`${line.multipv}-${line.move}-pv`} style={styles.diagnosticPvText} testID={`stockfish-diagnostics-pv-${line.multipv}`}>
-              {formatSideToMoveScore(line.score)} · d{line.depth} · {line.multipv}. {diagnosticPvSan(selectedPosition.fen, line.pv)}
+              {formatWhitePerspectiveScore(line.score)} · d{line.depth} · {line.multipv}. {diagnosticPvSan(selectedPosition.fen, line.pv)}
             </Text>
           ))}
         </View>

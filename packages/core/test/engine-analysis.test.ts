@@ -37,6 +37,36 @@ test("parses black-to-move centipawn scores without displaying the white-perspec
   assert.equal(line.score.whiteCentipawns, -453);
 });
 
+test("keeps live Stockfish display scores on the white perspective when the active color changes", () => {
+  const whiteToMove = buildCurrentPositionEvaluationLine({
+    fen: "8/8/8/8/8/8/2Q5/k1K5 w - - 0 1",
+    engineLines: [
+      {
+        move: "c2a4",
+        pv: ["c2a4"],
+        multipv: 1,
+        depth: 12,
+        score: { kind: "cp", sideToMoveCentipawns: 350, whiteCentipawns: 350 }
+      }
+    ]
+  });
+  const blackToMove = buildCurrentPositionEvaluationLine({
+    fen: samplePuzzle("00008").initialFen,
+    engineLines: [
+      {
+        move: "b2b1",
+        pv: ["b2b1"],
+        multipv: 1,
+        depth: 12,
+        score: { kind: "cp", sideToMoveCentipawns: -350, whiteCentipawns: 350 }
+      }
+    ]
+  });
+
+  assert.equal(whiteToMove.score, "+3.5");
+  assert.equal(blackToMove.score, "+3.5");
+});
+
 test("analyzes UCI output through a maintained fake transport", async () => {
   const fen = "8/8/8/8/8/8/2Q5/k1K5 w - - 0 1";
   const engine = new FakeUciEngine([
@@ -229,7 +259,7 @@ test("shows legal mate-in-one as M1 even when no engine output is available", ()
   assert.equal(lines[0]?.score, "M1");
 });
 
-test("formats presolved black best move eval from the side-to-move perspective", () => {
+test("formats presolved black best move eval from the white perspective", () => {
   const puzzle = samplePuzzle("00008");
   const lines = buildPuzzleGuidedAnalysisLines({
     fen: puzzle.initialFen,
@@ -237,7 +267,7 @@ test("formats presolved black best move eval from the side-to-move perspective",
   });
 
   assert.equal(lines[0]?.move, "b2b1");
-  assert.equal(lines[0]?.score, "+4.5");
+  assert.equal(lines[0]?.score, "-4.5");
 });
 
 test("formats Arrow Duel candidate evals from presolved best and blunder scores", () => {
@@ -247,10 +277,10 @@ test("formats Arrow Duel candidate evals from presolved best and blunder scores"
   assert.equal(lines[0]?.move, "b2b1");
   assert.equal(lines[0]?.san, "Qb1+");
   assert.equal(lines[0]?.label, "Top move");
-  assert.equal(lines[0]?.score, "+4.5");
+  assert.equal(lines[0]?.score, "-4.5");
   assert.equal(lines[1]?.move, "f2g3");
   assert.equal(lines[1]?.label, "Candidate");
-  assert.equal(lines[1]?.score, "-6.9");
+  assert.equal(lines[1]?.score, "+6.9");
 });
 
 test("formats Arrow Duel punishment review as the current position instead of initial candidates", () => {
@@ -270,7 +300,7 @@ test("formats Arrow Duel punishment review as the current position instead of in
     }
   });
 
-  assert.equal(line.score, "-M1");
+  assert.equal(line.score, "M1");
   assert.equal(line.san, "Current position");
   assert.equal(line.label, "Current position");
 });
@@ -370,7 +400,7 @@ test("keeps the puzzle move highest only on the puzzle solver side", () => {
 
   assert.equal(new Chess(blackToMoveFen).turn(), "b");
   assert.equal(blackLines[0]?.move, "d8h4");
-  assert.equal(blackLines[0]?.score, "M1");
+  assert.equal(blackLines[0]?.score, "-M1");
 });
 
 test("uses current puzzle state as the direct guided move during a review line", () => {
@@ -405,7 +435,7 @@ test("does not pad live engine analysis with unscored legal moves", () => {
 
   assert.equal(lines.length, 1);
   assert.equal(lines[0]?.move, "b2b1");
-  assert.equal(lines[0]?.score, "+4.5");
+  assert.equal(lines[0]?.score, "-4.5");
 });
 
 test("offline puzzles put the expected move first only on the puzzle solver side", () => {
