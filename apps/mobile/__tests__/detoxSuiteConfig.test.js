@@ -1395,6 +1395,10 @@ describe('Detox suite configuration', () => {
       "await setAdaptiveOrientation('portrait')",
       captureLandscape
     );
+    const scrollRestoredPortrait = spec.indexOf(
+      "element(by.id('practice-main-scroll')).scroll(100, 'down', 0.5, 0.5)",
+      restorePortrait
+    );
     const settleRestoredPortrait = spec.indexOf(
       "await waitForSettledSprintLayout('portrait')",
       restorePortrait
@@ -1411,7 +1415,8 @@ describe('Detox suite configuration', () => {
     expect(spec).not.toContain("waitFor(element(by.id('session-accessible-moves-dialog')))");
     expect(spec).toContain('withAndroidUiDiagnostics(async () =>');
     expect(restorePortrait).toBeGreaterThan(captureLandscape);
-    expect(settleRestoredPortrait).toBeGreaterThan(restorePortrait);
+    expect(scrollRestoredPortrait).toBeGreaterThan(restorePortrait);
+    expect(settleRestoredPortrait).toBeGreaterThan(scrollRestoredPortrait);
     expect(settlePublicRootFocus).toBeGreaterThan(settleRestoredPortrait);
     expect(verifyRestoredPuzzle).toBeGreaterThan(settlePublicRootFocus);
     expect(spec).toContain('setAndroidDisplayOrientation(orientation)');

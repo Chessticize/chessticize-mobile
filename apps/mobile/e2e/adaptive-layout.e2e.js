@@ -70,9 +70,13 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
       // the evidence harness rotates the physical display. Return to the
       // natural orientation and reacquire the public app root before tapping
       // the real board; otherwise the rotated base window can remain the
-      // unfocused Espresso root while board input is submitted.
+      // unfocused Espresso root while board input is submitted. A foldable's
+      // natural portrait viewport can leave only a few physical pixels of the
+      // board below the scroll viewport, so normalize that transient position
+      // before enforcing strict containment.
       await setAdaptiveOrientation('portrait');
       await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
+      await element(by.id('practice-main-scroll')).scroll(100, 'down', 0.5, 0.5);
       await waitForSettledSprintLayout('portrait');
       await waitFor(element(by.id('adaptive-layout'))).toBeVisible().withTimeout(10000);
       const restoredPuzzleID = await elementText('session-current-puzzle-id');
