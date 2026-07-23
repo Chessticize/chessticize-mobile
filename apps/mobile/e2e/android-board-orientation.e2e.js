@@ -44,12 +44,10 @@ describe('Android board orientation integrity', () => {
 
       const startingPosition = familiar15StartingPosition(puzzle);
       const flipped = startingPosition.turn() === 'b';
-      await waitForElementAccessibilityLabelContaining(
-        'session-side-to-move',
-        flipped ? 'Black to move' : 'White to move',
-        10000,
-        25
-      );
+      await waitFor(element(by.id('practice-prompt'))).toExist().withTimeout(10000);
+      await waitFor(element(by.text(flipped ? 'For black.' : 'For white.')))
+        .toExist()
+        .withTimeout(10000);
 
       if (previousFlipped === false && flipped === true) {
         unflippedToFlipped += 1;

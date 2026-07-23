@@ -56,9 +56,9 @@ describe('Sprint performance', () => {
         latencies.push(await measureBoardFeedbackLatency(step.move, step.flipped));
       } catch (error) {
         const progress = await element(by.id('session-progress')).getAttributes();
-        const side = await element(by.id('session-side-to-move')).getAttributes();
+        const promptSide = await element(by.id('practice-prompt-side-glyph')).getAttributes();
         const screenshot = await device.takeScreenshot(`sprint-perf-failure-${index + 1}-${step.move}`);
-        console.log(`[SPRINT_PERF_FAILURE] progress=${JSON.stringify(progress)} side=${JSON.stringify(side)} screenshot=${screenshot}`);
+        console.log(`[SPRINT_PERF_FAILURE] progress=${JSON.stringify(progress)} promptSide=${JSON.stringify(promptSide)} screenshot=${screenshot}`);
         throw error;
       }
       await sleep(1200);

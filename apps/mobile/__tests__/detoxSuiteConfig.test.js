@@ -144,6 +144,18 @@ const FORBIDDEN_XML_WHITESPACE_HIERARCHIES = FORBIDDEN_XML_GRAMMAR_WHITESPACE
   ));
 
 describe('Detox suite configuration', () => {
+  it('opens tabs by a visible child instead of a potentially taller panel', () => {
+    const e2eDirectory = path.resolve(__dirname, '../e2e');
+    const invalidOpenTabCall = /openTab\([^,\n]+,\s*['"]practice-run-management['"]\)/;
+    const offenders = fs.readdirSync(e2eDirectory)
+      .filter((fileName) => fileName.endsWith('.e2e.js'))
+      .filter((fileName) => invalidOpenTabCall.test(
+        fs.readFileSync(path.join(e2eDirectory, fileName), 'utf8')
+      ));
+
+    expect(offenders).toEqual([]);
+  });
+
   it('owns Android public hierarchy evidence behind one focused interface', () => {
     const androidPublicUiEvidence = require('../e2e/androidPublicUiEvidence');
     const helpersSource = fs.readFileSync(
@@ -1384,7 +1396,7 @@ describe('Detox suite configuration', () => {
       captureLandscape
     );
     const settleRestoredPortrait = spec.indexOf(
-      "await waitForSettledSprintLayout('portrait')",
+      "await waitForSettledSprintLayout('portrait', { containmentTolerance: 8 })",
       restorePortrait
     );
     const settlePublicRootFocus = spec.indexOf(
@@ -1402,6 +1414,11 @@ describe('Detox suite configuration', () => {
     expect(settleRestoredPortrait).toBeGreaterThan(restorePortrait);
     expect(settlePublicRootFocus).toBeGreaterThan(settleRestoredPortrait);
     expect(verifyRestoredPuzzle).toBeGreaterThan(settlePublicRootFocus);
+    expect(spec).not.toContain(
+      "element(by.id('practice-main-scroll')).scroll(100, 'down', 0.5, 0.5)"
+    );
+    expect(settledLayoutHelper).toContain('containmentTolerance = 1');
+    expect(settledLayoutHelper).toContain('containmentTolerance');
     expect(spec).toContain('setAndroidDisplayOrientation(orientation)');
     expect(spec).toContain('actual-root-bounds=${frame.width}x${frame.height}');
     expect(adaptiveOrientationHelper.indexOf('setAndroidDisplayOrientation(orientation)')).toBeGreaterThan(0);

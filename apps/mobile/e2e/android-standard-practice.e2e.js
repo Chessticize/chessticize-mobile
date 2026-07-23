@@ -36,13 +36,8 @@ describe(`Android Standard Practice offline persistence (${standardFixture.puzzl
   it('finishes a bundled Standard sprint and restores rating, progress, and history after relaunch', async () => {
     await waitFor(element(by.id('practice-home'))).toExist().withTimeout(180000);
     await startPracticeMode('standard');
-    await waitFor(element(by.id('session-side-to-move'))).toBeVisible().withTimeout(10000);
-    await waitForElementAccessibilityLabelContaining(
-      'session-side-to-move',
-      'Black to move',
-      10000,
-      25
-    );
+    await waitForVisibleInPracticeScroll('practice-prompt');
+    await waitFor(element(by.text('For black.'))).toExist().withTimeout(10000);
     await waitForVisibleInPracticeScroll('session-board');
 
     // The real SQLite pack adapter selects the seeded bundled line. The app
@@ -54,12 +49,7 @@ describe(`Android Standard Practice offline persistence (${standardFixture.puzzl
       10000,
       50
     );
-    await waitForElementAccessibilityLabelContaining(
-      'session-side-to-move',
-      'Black to move',
-      10000,
-      25
-    );
+    await waitFor(element(by.text('For black.'))).toExist().withTimeout(10000);
     await playBoardMove('session-board', standardFixture.userMoves[1], true);
 
     await waitFor(element(by.text('Sprint complete'))).toBeVisible().withTimeout(30000);

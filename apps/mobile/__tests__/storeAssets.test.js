@@ -68,8 +68,11 @@ describe("App Store assets document", () => {
     expect(storeAssetsE2e).toContain("CHESSTICIZE_CAPTURE_LANDSCAPE_ASSETS");
     expect(storeAssetsE2e).toContain("chessticizeStoreAssetCapture");
     expect(storeAssetsE2e).toContain("setStoreAssetRatings({ standard: 800, arrowDuel: 850 })");
-    expect(storeAssetsE2e).toContain("openTab('practice-tab', 'practice-run-arrow-duel')");
+    expect(storeAssetsE2e).toContain("openTab('practice-tab', 'practice-run-home-edit')");
     expect(storeAssetsE2e).not.toContain("openTab('practice-tab', 'practice-run-management')");
+    expect(storeAssetsE2e).toContain(
+      "waitFor(element(by.id('practice-run-name-input'))).toBeVisible().withTimeout(10000)"
+    );
     expect(storeAssetsE2e).toContain("by.id('practice-run-theme-row')");
     expect(storeAssetsE2e).not.toContain("by.id('custom-theme-row')");
     expect(storeAssetsE2e).toContain("toHaveText('1 / 3')");
