@@ -204,6 +204,8 @@ regression suite should include the following minimum journeys:
 9. Deterministic notification scheduling and disabling through the native test
    fixture.
 10. Real board and Arrow Duel rendering, plus Stockfish analysis integration.
+11. A Standard board that remains fully contained and frame-stable through
+    representative correct and wrong feedback in portrait and landscape.
 
 Do not add separate Detox tests for every timeout, abandon timing, Custom
 theme, History filter, iCloud merge result, illegal move, or review scheduling

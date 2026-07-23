@@ -153,6 +153,8 @@ Active Sprint:
 - Compact portrait keeps the current vertical stack.
 - Compact landscape and iPad landscape use board lane plus control rail. The board lane contains the board and any board-adjacent status. The control rail contains timer, progress, mistakes, side-to-move, prompt, pause, and abandon confirmation.
 - iPad portrait uses the same vertical task order as phone portrait, but with a larger capped board and wider supporting rows.
+- The entire board must remain inside the safe-area shell and keep the same `x`, `y`, `width`, and `height` before, during, and after correct or wrong move feedback. Score changes, feedback overlays, and the Unclear action must never shift or resize it.
+- Place the Unclear action after the board and score in portrait. In landscape, place it at the bottom of a board-height control rail; overflow belongs to that rail, not the board lane.
 - The prompt must not appear below the fold in landscape. If the prompt plus actions overflow, the control rail scrolls independently while the board remains fixed.
 - Arrow Duel candidate arrows stay on the board in every class. Do not move candidate selection into separate landscape buttons.
 
