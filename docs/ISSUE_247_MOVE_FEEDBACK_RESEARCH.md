@@ -36,6 +36,9 @@ Not Disturb rules.
 4. Do not request permissions or use flags that override device quieting
    policies. An enabled in-app switch means "the app may request this feedback";
    the operating system can still suppress it.
+5. Keep **Try feedback** in the Storybook design-review scenario only. The
+   formal Settings presentation contains the two preference switches but no
+   sound or haptic preview controls.
 
 One design decision should remain visible in Storybook: whether an engine or
 opponent move should also cause a haptic. The conservative recommendation is
@@ -217,13 +220,16 @@ The recommended Storybook slice is:
 
 1. The existing Settings clone with separate **Sound effects** and
    **Haptic feedback** switches.
-2. Web-only synthetic previews for **Move** and **Capture**. The samples may
+2. Web-only previews for **Move** and **Capture**, using the selected Freesound
+   CC0 `Piece Placement.mp3` and `Piece Capture.mp3` recordings. The samples may
    use Lichess timing and interaction patterns as references but must not copy
    the non-free Lichess standard files.
 3. A clear note that the browser demo can request audio but cannot preview
    native haptic feel.
-4. No production navigation, persistence, native-module wiring, analytics, or
-   rollout behavior during the Storybook gate.
+4. The entire **Try feedback** block is Storybook-only and must be absent from
+   the formal product Settings UI. There is no production navigation,
+   persistence, native-module wiring, analytics, or rollout behavior during the
+   Storybook gate.
 
 ## Downloadable sound sources and license handling
 
@@ -293,26 +299,101 @@ only explains how to clone or download the repository, while its
 [rights thread](https://lichess.org/forum/lichess-feedback/what-are-the-rights-for-the-standard-lichess-sound-effect-2)
 points back to the non-free classification; neither grants reuse permission.
 
-The easiest license chain for a prototype is a CC0 asset. Creative Commons
-states that CC0 material can be copied, modified, distributed, and performed,
-including commercially, without asking permission; it also warns that CC0 does
-not cover unrelated trademark, privacy, or publicity rights
+The easiest license chain for a public source repository is a CC0 asset.
+Creative Commons states that CC0 material can be copied, modified, distributed,
+and performed, including commercially, without asking permission; it also warns
+that CC0 does not cover unrelated trademark, privacy, or publicity rights
 ([CC0 1.0 deed](https://creativecommons.org/publicdomain/zero/1.0/)).
 
-| Source | Commercial-use position | Recommendation |
-| --- | --- | --- |
-| [Kenney UI Audio](https://www.kenney.nl/assets/ui-audio), [Interface Sounds](https://kenney.nl/assets/interface-sounds), and [Impact Sounds](https://kenney.nl/assets/impact-sounds) | Each asset page identifies the download as CC0; Kenney also states its asset-page game assets can be used in commercial projects without attribution ([Kenney support](https://www.kenney.nl/support)). | Best first stop for a Storybook candidate because the license is simple and the packs are small enough to audition quickly. |
-| [Freesound](https://freesound.org/) | Each sound has its own license. Freesound offers CC0, CC BY, and CC BY-NC; its FAQ says CC BY requires attribution and CC BY-NC cannot be used commercially ([Freesound licensing FAQ](https://freesound.org/help/faq/)). | Filter to **CC0** first. CC BY 4.0 is commercially usable only if the app preserves appropriate credit, license link, and modification notice ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)). Do not use CC BY-NC. |
-| [Sonniss GameAudioGDC archive](https://sonniss.com/gameaudiogdc/) | Sonniss states the archive is royalty-free, commercially usable, requires no attribution, and can be used on unlimited projects; its bundle EULA grants commercial synchronization in games and interactive projects ([bundle license](https://sonniss.com/gdc-bundle-license/)). | Strong professional source, but the bundles are very large; use only after identifying a specific suitable file. |
-| [Pixabay Sound Effects](https://pixabay.com/sound-effects/) | Pixabay grants a worldwide, non-exclusive, royalty-free commercial-use license, subject to prohibited uses including standalone redistribution, and warns that additional third-party rights may still apply ([Pixabay terms](https://pixabay.com/service/terms/)). | Usable, but retain the exact asset page and download date, and prefer a simple foley recording with no voice, music sample, brand, or recognizable person. |
+### Decision-oriented library shortlist
 
-For any selected file, retain the original filename, creator, exact asset URL,
-download date, license name/version, a copy of the license text, and a note
-describing edits. Before the sound ships in the native app, add it to the
-repository's [third-party notices](../THIRD_PARTY_NOTICES.md) even if
+| Source | Commercial app and repository rights | Attribution and evidence | Practical risk | Decision |
+| --- | --- | --- | --- | --- |
+| **Record and edit Chessticize's own board** | Chessticize owns the recording and may ship both the app and the raw asset in the public repository. | Keep the raw takes, editing project, recording date, equipment, and a short signed provenance note. | Lowest legal risk and the best chance of creating a distinctive physical identity. Recording quality and post-processing require a small amount of craft. | **Preferred production source.** Record this before selecting a stock or generated fallback. |
+| [Kenney Impact Sounds](https://www.kenney.nl/assets/impact-sounds), [UI Audio](https://www.kenney.nl/assets/ui-audio), and [Interface Sounds](https://www.kenney.nl/assets/interface-sounds) | Each named pack is CC0. Kenney says asset-page game assets may be used in commercial projects and attribution is not required ([Kenney support](https://www.kenney.nl/support)). CC0 permits redistribution of the raw asset, so a public Git repository is not a special problem. | Preserve the pack's included license and exact version. A courtesy credit is optional. | Very clean license chain, but the generic interface/impact palette may not sound like a real chess set without layering and editing. | **Safest free stock source.** Audition Impact Sounds first and use one quiet layer as raw material, not necessarily as the final unedited cue. |
+| [Freesound](https://freesound.org/) filtered to **CC0** | Freesound offers CC0, CC BY, and CC BY-NC. Its official FAQ says CC0 can be used commercially without attribution, CC BY requires attribution, and CC BY-NC cannot be used commercially; it also warns that user-uploaded material can still be unauthorized despite the uploader rules ([Freesound licensing FAQ](https://freesound.org/help/faq/)). CC0 permits raw repository redistribution. | Save the individual asset page, uploader, download date, original file, and a PDF or text snapshot of the page. Do not rely on a search badge. | Better variety than Kenney but weaker provenance because users supply the files. Avoid voices, brands, music, recognizable media, and suspicious reuploads. | **Primary stock audition pair:** el_boss's CC0 [`Piece Placement.mp3`](https://freesound.org/people/el_boss/sounds/546119/) is a 111 ms mono/48 kHz light snap, and CC0 [`Piece Capture.mp3`](https://freesound.org/people/el_boss/sounds/546120/) is a 236 ms mono/48 kHz louder capture. The creator says both were recorded on a wood board for Chess Puzzle Blitz, so the two files already express the exact Move/Capture distinction. If they are too bright or heavy, audition the synthesized CC0 [`wood-click-1`](https://freesound.org/people/husamalhomsi/sounds/500926/), [`wood-click-2`](https://freesound.org/people/husamalhomsi/sounds/500928/), and [`wood-click-3`](https://freesound.org/people/husamalhomsi/sounds/500927/) as secondary layers. |
+| [Pixabay Sound Effects](https://pixabay.com/sound-effects/) | Pixabay permits free use, modification, and use without attribution, but prohibits selling or distributing content on a **standalone** basis and warns that additional third-party rights may apply ([Pixabay Content License summary](https://pixabay.com/service/license-summary/)). An effect embedded in an app is a larger creative work; the same unchanged WAV committed to a public repository is a less comfortable case because it can be downloaded by itself. | Keep the asset URL, filename, contributor, download date, and current license text. Pixabay recommends retaining this evidence for audio without a download certificate ([Pixabay FAQ](https://pixabay.com/service/faq/)). | The custom license is less repository-friendly than CC0, and user-contributed provenance can still be imperfect. A search result such as [“Chess Pieces hitting wooden board”](https://pixabay.com/sound-effects/chess-pieces-hitting-wooden-board-99336/) is also a two-second multi-piece fall, not the restrained one-move cue required here. | **Do not make this the default for an open-source app.** Use only if a specific file is clearly superior and written confirmation covers raw storage in the public repository. |
+| [OpenGameArt](https://opengameart.org/) filtered to **CC0 downloadable audio** | OpenGameArt says CC0 works may be used commercially without credit, but its other supported licenses have attribution, share-alike, GPL, and/or DRM implications. Its App Store FAQ specifically warns that GPL, CC BY, and CC BY-SA assets may conflict with App Store terms unless the artist separately permits the use ([OpenGameArt licensing FAQ](https://opengameart.org/content/faq#q-proprietary)). It also says preview audio may be all-rights-reserved even when the downloadable submission is free ([preview FAQ](https://opengameart.org/content/faq#q-preview)). | Verify the license on the downloadable file, not the preview, and retain the submission page and original archive. | License choices vary per submission, provenance is user-supplied, and a preview may not share the download's license. | **CC0 downloads only.** Skip CC BY, CC BY-SA, OGA-BY, and GPL for this two-file mobile use case unless legal review and all required permissions are documented. |
+| [Sonniss GameAudioGDC archive](https://sonniss.com/gameaudiogdc/) | Sonniss grants royalty-free commercial synchronization in games and interactive projects and requires no attribution ([bundle license](https://sonniss.com/gdc-bundle-license/)). It is not CC0 and does not grant a general right to redistribute the raw library. | Preserve the specific bundle EULA, year, source file, and edits. | Excellent professional material, but a raw effect in a public repository can become an extractable standalone download rather than only a synchronized game asset. | **Private-project fallback, not the cleanest public-repository choice.** |
+
+For any selected third-party file, retain the original filename, creator, exact
+asset URL, download date, license name/version, a copy of the license text, and
+a note describing edits. Before the sound ships in the native app, add it to
+the repository's [third-party notices](../THIRD_PARTY_NOTICES.md) even if
 attribution is not legally required; this preserves the release evidence chain.
-Do not treat a search-result badge as the license record—verify the individual
-asset page at download time.
+
+### Generative sound-effect options
+
+Generated output is not automatically risk-free. Service terms govern whether
+the output can be used commercially or redistributed, and the output might not
+be exclusive. The U.S. Copyright Office says purely AI-generated material is
+not copyrightable where there is insufficient human control; prompting and
+selecting one result alone are normally insufficient, while creative human
+editing or arrangement can be protected
+([Copyright and AI, Part 2](https://www.copyright.gov/ai/Copyright-and-Artificial-Intelligence-Part-2-Copyrightability-Report.pdf)).
+This does not prevent app use, but it means a raw generated click may be easy
+for others to reuse and should not be treated as an exclusive brand asset.
+
+| Tool or model | Commercial and output terms | Repository fit and risk | Decision |
+| --- | --- | --- | --- |
+| [Adobe Firefly Generate Sound Effects](https://helpx.adobe.com/firefly/web/firefly-video-editor/generate-audio/generate-sound-effects.html) | The sound-effect tool accepts text plus optional voice timing and returns four variations up to 30 seconds. It is currently beta. Adobe says beta Firefly outputs may be used commercially unless the product explicitly says otherwise, and says Firefly models are trained on licensed and public-domain content ([Firefly FAQ](https://helpx.adobe.com/firefly/web/get-started/learn-the-basics/adobe-firefly-faq.html)). Adobe also states that Firefly outputs are customer content, it asserts no IP rights in them, and distribution channels are not restricted, while actual copyrightability depends on local law ([Adobe data and content usage](https://business.adobe.com/content/dam/dx/us/en/resources/sdk/adobe-firefly-data-and-content-usage/adobe-firefly-data-and-content-usage.pdf)). | Better public-repository fit than a stock license with a standalone-file ban. Beta outputs do not receive the same indemnification as eligible enterprise outputs, and the product must be checked for any explicit beta restriction at generation time. | **Best hosted AI experiment** if the available Firefly entitlement covers the generation. Archive the prompt, output, date, model/feature name, and terms snapshot. |
+| [ElevenLabs Sound Effects](https://elevenlabs.io/docs/eleven-creative/playground/sound-effects) | ElevenLabs says free-plan output is non-commercial; a paid-plan output can be used commercially and indefinitely if it is not a Beta Service ([publishing FAQ](https://help.elevenlabs.io/hc/en-us/articles/13313564601361-Can-I-publish-the-content-I-generate-on-the-platform)). Its terms say the customer retains rights in output, while outputs may not be unique ([Terms of Service](https://elevenlabs.io/terms-of-use)). Its Sound Effects terms allow the service to sublicense SFX outputs unless the user disables that setting; disabling it does not revoke earlier sublicenses ([Sound Effects Terms](https://elevenlabs.io/sound-effects-terms)). The prohibited-use policy also forbids commercial distribution of Sound Effects output on a standalone basis ([policy](https://elevenlabs.io/use-policy)). | Suitable for an effect embedded in the app, but committing the unchanged output as a directly downloadable raw file in a public repository is avoidable license ambiguity. Disable SFX sharing **before** generating; do not use a free plan, Beta Service, or community output. | **Good quality paid audition tool, not the cleanest final source for this public repository.** Use only after confirming the repository packaging with ElevenLabs in writing. |
+| [Stable Audio 3.0 Small SFX](https://stability.ai/news-updates/meet-stable-audio-3-the-model-family-built-for-artistic-experimentation-with-open-weight-models) | Stability says this open-weight model is for on-device sound-effect generation, is trained on fully licensed data, and that users own, distribute, and commercialize outputs. The Community License is free for organizations with less than USD 1 million in total annual revenue; commercial users must register, and organizations above that threshold need an Enterprise license ([license FAQ](https://stability.ai/license)). | It can be run locally, provides a clear output-distribution statement, and avoids uploading prompts or recordings to a hosted service. The revenue threshold, registration, AUP, model version, and license must be tracked. An AI-only output may still lack copyright exclusivity. | **Best free/open-weight AI option** if Chessticize is eligible and registers before commercial use. Generate candidates locally, then make substantial human edits and preserve the exact model hash, prompt, seed, raw output, edit project, and license snapshot. |
+| [Meta AudioCraft / AudioGen](https://github.com/facebookresearch/audiocraft) | The code is MIT, but Meta's released model weights are CC BY-NC 4.0. In the project's [commercial-license issue](https://github.com/facebookresearch/audiocraft/issues/198), a maintainer states that another license is not available because the source rights were negotiated for research use. | Using the weights to produce an app asset creates unnecessary commercial-use uncertainty. | **Do not use for Issue #247.** |
+
+### Recommended production path
+
+The recommended order is:
+
+1. **Record an original physical set.** Use a real wooden piece and board that
+   Chessticize owns, in a quiet soft-furnished room. Record mono at 48 kHz/24
+   bit from several distances and make at least 20 placements plus 20 capture
+   gestures. A recent phone can be sufficient for selection; a close microphone
+   gives more editing headroom. Do not sample a digital instrument's factory
+   ROM sounds; Freesound's own upload guidance warns that those recordings may
+   copy embedded samples
+   ([Freesound FAQ](https://freesound.org/help/faq/#what-sounds-are-legal-to-put-on-freesound)).
+2. If those recordings are not polished enough, audition the matched
+   **Freesound CC0 Piece Placement/Piece Capture pair** first, then **Kenney
+   CC0** and the three documented **Freesound CC0 wood clicks** as secondary
+   layers. Keep the real Chessticize transient dominant in any layered result
+   so it has an attributable human production history.
+3. In parallel, generate an AI palette with **Firefly** or eligible **Stable
+   Audio 3.0 Small SFX**. Treat AI as a source of raw material, not a one-click
+   final asset. Do not upload a Lichess sound as a reference and do not prompt
+   for “the Lichess sound”; describe physical properties instead.
+4. Put three candidate Move/Capture pairs into the existing Storybook story for
+   a blind product choice. Do not wire them into native code until one pair is
+   approved.
+
+Suggested generation prompts:
+
+- **Move:** “One subtle close-miked wooden chess piece placed on a solid maple
+  chessboard; single dry tactile click, soft felt base, premium natural
+  material, no clatter, no second impact, no room reverb, no music.”
+- **Capture:** “A restrained chess capture on a wooden board; two tightly spaced
+  natural transients, a quiet piece removal followed by a slightly lower,
+  firmer placement; close-miked and dry, no clatter, no long resonance, no
+  room reverb, no music.”
+
+Post-process every candidate rather than relying on the model's full clip:
+
+- Trim Move to roughly 70–110 ms and Capture to roughly 100–160 ms, with less
+  than 5 ms of pre-roll and a short click-free fade.
+- Make Capture distinguishable by its transient pattern and slightly lower
+  body, not merely by making it much louder.
+- Remove low-frequency table rumble and long room tails; keep enough midrange
+  energy to survive a phone speaker at low volume.
+- Export a mono 48 kHz WAV master, then derive the mobile asset from that
+  master. Keep peaks below clipping and compare perceived loudness on hardware.
+- Audition each pair through at least ten rapid alternating moves. Reject any
+  cue that becomes tiring, resembles a notification alert, masks spoken audio,
+  or cannot be distinguished at low volume.
+
+The final asset record should include raw takes or generator output, prompts
+and seeds, all edits, the chosen master hash, the service/model and plan used,
+the exact terms and license snapshot, and the human who selected and edited the
+result. This makes a future license or provenance audit reproducible.
 
 ## Validation required after Storybook approval
 

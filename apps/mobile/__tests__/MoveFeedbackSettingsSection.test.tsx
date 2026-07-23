@@ -73,10 +73,24 @@ describe("MoveFeedbackSettingsSection", () => {
     expect(() => find(renderer, "settings-move-feedback-preview-mistake")).toThrow();
     expect(() => find(renderer, "settings-move-feedback-device-note")).toThrow();
   });
+
+  it("omits the Storybook-only preview controls in the formal settings presentation", () => {
+    const renderer = renderHarness();
+
+    expect(find(renderer, "settings-move-sound-toggle")).toBeTruthy();
+    expect(find(renderer, "settings-move-haptics-toggle")).toBeTruthy();
+    expect(text(find(renderer, "settings-move-feedback-section"))).not.toContain(
+      "Try feedback"
+    );
+    expect(text(find(renderer, "settings-move-feedback-section"))).not.toContain(
+      "Web demo only"
+    );
+    expect(() => find(renderer, "settings-move-feedback-previews")).toThrow();
+  });
 });
 
 function renderHarness(
-  onPreview: MoveFeedbackPreviewer
+  onPreview?: MoveFeedbackPreviewer
 ): TestRenderer.ReactTestRenderer {
   function Harness(): React.JSX.Element {
     const [preferences, setPreferences] = useState<MoveFeedbackPreferences>({

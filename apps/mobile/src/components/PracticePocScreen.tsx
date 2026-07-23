@@ -9755,7 +9755,7 @@ function SettingsPanel({
         ) : null}
       </SettingsSection>
 
-      {moveFeedbackPreferences && moveFeedbackPreviewer ? (
+      {moveFeedbackPreferences ? (
         <MoveFeedbackSettingsSection
           preferences={moveFeedbackPreferences}
           wide={adaptiveLayout.usesWideContent}

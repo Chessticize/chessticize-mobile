@@ -35,13 +35,16 @@ export function MoveFeedbackSettingsSection({
   wide = false
 }: {
   onPreferencesChange: (preferences: MoveFeedbackPreferences) => void;
-  onPreview: MoveFeedbackPreviewer;
+  onPreview?: MoveFeedbackPreviewer;
   preferences: MoveFeedbackPreferences;
   wide?: boolean;
 }): React.JSX.Element {
   const [previewMessage, setPreviewMessage] = useState<string | null>(null);
 
   async function preview(cue: MoveFeedbackCue): Promise<void> {
+    if (!onPreview) {
+      return;
+    }
     setPreviewMessage(`Previewing ${cue} feedback…`);
     try {
       const result = await onPreview(cue, preferences);
@@ -78,42 +81,44 @@ export function MoveFeedbackSettingsSection({
             setPreviewMessage(hapticsEnabled ? "Haptic feedback on" : "Haptic feedback off");
           }}
         />
-        <View style={styles.previewBlock} testID="settings-move-feedback-previews">
-          <View style={styles.previewHeading}>
-            <Text style={styles.rowLabel}>Try feedback</Text>
-            <Text style={styles.helperText}>
-              Web demo only. Preview the proposed move and capture sounds;
-              haptics require the native app. Check this tab and device volume
-              if you do not hear them.
-            </Text>
-          </View>
-          <View style={styles.previewButtons}>
-            {CUES.map(({ cue, detail, label }) => (
-              <Pressable
-                key={cue}
-                accessibilityRole="button"
-                accessibilityLabel={`Preview ${cue} feedback`}
-                testID={`settings-move-feedback-preview-${cue}`}
-                style={styles.previewButton}
-                onPress={() => {
-                  void preview(cue);
-                }}
+        {onPreview ? (
+          <View style={styles.previewBlock} testID="settings-move-feedback-previews">
+            <View style={styles.previewHeading}>
+              <Text style={styles.rowLabel}>Try feedback</Text>
+              <Text style={styles.helperText}>
+                Web demo only. Preview the proposed move and capture sounds;
+                haptics require the native app. Check this tab and device volume
+                if you do not hear them.
+              </Text>
+            </View>
+            <View style={styles.previewButtons}>
+              {CUES.map(({ cue, detail, label }) => (
+                <Pressable
+                  key={cue}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Preview ${cue} feedback`}
+                  testID={`settings-move-feedback-preview-${cue}`}
+                  style={styles.previewButton}
+                  onPress={() => {
+                    void preview(cue);
+                  }}
+                >
+                  <Text style={styles.previewButtonLabel}>{label}</Text>
+                  <Text style={styles.previewButtonDetail}>{detail}</Text>
+                </Pressable>
+              ))}
+            </View>
+            {previewMessage ? (
+              <Text
+                accessibilityLiveRegion="polite"
+                style={styles.previewStatus}
+                testID="settings-move-feedback-preview-status"
               >
-                <Text style={styles.previewButtonLabel}>{label}</Text>
-                <Text style={styles.previewButtonDetail}>{detail}</Text>
-              </Pressable>
-            ))}
+                {previewMessage}
+              </Text>
+            ) : null}
           </View>
-          {previewMessage ? (
-            <Text
-              accessibilityLiveRegion="polite"
-              style={styles.previewStatus}
-              testID="settings-move-feedback-preview-status"
-            >
-              {previewMessage}
-            </Text>
-          ) : null}
-        </View>
+        ) : null}
       </View>
     </View>
   );
