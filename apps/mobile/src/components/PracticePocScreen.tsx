@@ -303,6 +303,7 @@ type ReviewBackCommand = {
 type DeferBackRelevantTransition = (key: string, resumeAfterCancel: () => void) => boolean;
 
 const UI_PADDING = 16;
+const SESSION_RAIL_GAP = 14;
 const COMPACT_LANDSCAPE_RAIL_MIN = 220;
 const COMPACT_LANDSCAPE_RAIL_MAX = 300;
 const REGULAR_RAIL_MIN = 296;
@@ -430,7 +431,7 @@ function buildAdaptiveLayout({
     : Math.min(COMPACT_LANDSCAPE_RAIL_MAX, Math.max(COMPACT_LANDSCAPE_RAIL_MIN, Math.floor(sessionContentWidth * 0.34)));
   const sessionBoardSlotWidth = Math.max(
     0,
-    sessionContentWidth - UI_PADDING * 2 - sessionRailWidth - 14
+    sessionContentWidth - UI_PADDING * 2 - sessionRailWidth - SESSION_RAIL_GAP
   );
   const sessionBoardSlotHeight = Math.max(
     0,
@@ -2402,6 +2403,7 @@ export function PracticePocScreen({
   const sideNavigationVisible = appChromeVisible && adaptiveLayout.usesSideNavigation;
   const bottomTabsVisible = appChromeVisible && !sideNavigationVisible;
   const sessionUsesRail = shouldShowSessionBoard && adaptiveLayout.usesSessionRail;
+  const sessionPackedRowWidth = boardSize + adaptiveLayout.sessionRailWidth + SESSION_RAIL_GAP;
   const screenTitle = screenTitleFor(tab);
   const screenSubtitle = tab === "practice"
     ? `Offline-ready · ${seededPuzzleCount(puzzleSource)} puzzles`
@@ -2715,11 +2717,15 @@ export function PracticePocScreen({
                     already visible after rotation. */}
                 {hasSessionLayoutContent ? (
                   <View
-                    style={sessionUsesRail ? styles.activeSessionAdaptiveLayout : styles.activeSessionStack}
+                    style={sessionUsesRail
+                      ? [styles.activeSessionAdaptiveLayout, { width: sessionPackedRowWidth }]
+                      : styles.activeSessionStack}
                     testID={sessionUsesRail ? "active-session-adaptive-layout" : "stacked-session-layout"}
                   >
                     <View
-                      style={sessionUsesRail ? styles.activeSessionBoardLane : styles.activeSessionStack}
+                      style={sessionUsesRail
+                        ? [styles.activeSessionBoardLane, { width: boardSize }]
+                        : styles.activeSessionStack}
                       testID={sessionUsesRail ? "active-session-board-lane" : undefined}
                     >
                       {!sessionUsesRail ? sessionStatusNode : null}
@@ -12577,18 +12583,18 @@ const styles = StyleSheet.create({
     padding: 10
   },
   activeSessionAdaptiveLayout: {
+    alignSelf: "center",
     alignItems: "center",
     flexDirection: "row",
-    gap: 14,
-    justifyContent: "center",
-    width: "100%"
+    gap: SESSION_RAIL_GAP
   },
   activeSessionStack: {
     gap: 12
   },
   activeSessionBoardLane: {
     alignItems: "center",
-    flex: 1,
+    flexGrow: 0,
+    flexShrink: 0,
     gap: 12,
     justifyContent: "center",
     minWidth: 0

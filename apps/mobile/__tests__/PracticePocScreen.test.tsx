@@ -1692,8 +1692,13 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "adaptive-layout").props.accessibilityLabel)
       .toBe("Layout compactLandscape");
-    expect(flattenTestStyle(findByTestId(renderer, "active-session-adaptive-layout").props.style).width)
-      .toBe("100%");
+    expect(flattenTestStyle(findByTestId(renderer, "active-session-adaptive-layout").props.style))
+      .toMatchObject({
+        gap: 14,
+        width: 683
+      });
+    expect(flattenTestStyle(findByTestId(renderer, "active-session-board-lane").props.style).width)
+      .toBe(387);
     const controlRail = findByTestId(renderer, "active-session-control-rail");
     expect(flattenTestStyle(controlRail.props.style).width).toBe(282);
     expect(flattenTestStyle(controlRail.props.contentContainerStyle).width).toBe(282);
