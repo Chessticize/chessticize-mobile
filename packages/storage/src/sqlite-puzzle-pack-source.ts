@@ -208,10 +208,12 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
     const clauses: string[] = [];
     const params: Array<string | number> = [];
     let from = "puzzles";
+    let selectedColumns = "puzzles.*";
     let ratingColumn = "puzzles.rating";
     let idColumn = "puzzles.id";
     if (themeId !== undefined) {
-      from = "puzzle_themes JOIN puzzles ON puzzles.id = puzzle_themes.puzzle_id";
+      from = "puzzle_themes";
+      selectedColumns = "puzzle_themes.puzzle_id AS id";
       ratingColumn = "puzzle_themes.rating";
       idColumn = "puzzle_themes.puzzle_id";
       clauses.push("puzzle_themes.theme_id = ?");
@@ -220,23 +222,76 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
     clauses.push(`${ratingColumn} >= ?`, `${ratingColumn} <= ?`);
     params.push(filter.minRating ?? 0, filter.maxRating ?? 4000);
     if (filter.includeIds !== undefined && filter.includeIds.length > 0 && filter.includeIds.length <= MAX_SQL_ID_FILTER_VALUES) {
-      clauses.push(`puzzles.id IN (${filter.includeIds.map(() => "?").join(", ")})`);
+      clauses.push(`${idColumn} IN (${filter.includeIds.map(() => "?").join(", ")})`);
       params.push(...filter.includeIds);
     }
     if (filter.excludeIds !== undefined && filter.excludeIds.length > 0 && filter.excludeIds.length <= MAX_SQL_ID_FILTER_VALUES) {
-      clauses.push(`puzzles.id NOT IN (${filter.excludeIds.map(() => "?").join(", ")})`);
+      clauses.push(`${idColumn} NOT IN (${filter.excludeIds.map(() => "?").join(", ")})`);
       params.push(...filter.excludeIds);
     }
 
-    const sql = `
-      SELECT puzzles.*
+    const rowsAtOffset = (rowLimit: number, offset?: number): Array<{ id: string }> => {
+      const offsetClause = offset === undefined ? "" : " OFFSET ?";
+      const sql = `
+        SELECT ${selectedColumns}
+        FROM ${from}
+        WHERE ${clauses.join(" AND ")}
+        ORDER BY ${ratingColumn} ASC, ${idColumn} ASC
+        LIMIT ?${offsetClause}
+      `;
+      return this.db.prepare(sql).all(
+        ...params,
+        rowLimit,
+        ...(offset === undefined ? [] : [offset])
+      ) as Array<{ id: string }>;
+    };
+    const hydrateCandidateRows = (rows: Array<{ id: string }>): PuzzlePackRow[] =>
+      themeId === undefined ? rows as PuzzlePackRow[] : this.puzzleRowsForIds(rows.map((row) => row.id));
+
+    if (filter.randomSeed === undefined) {
+      return hydrateCandidateRows(rowsAtOffset(limit));
+    }
+
+    const countRow = this.db.prepare(`
+      SELECT COUNT(*) AS count
       FROM ${from}
       WHERE ${clauses.join(" AND ")}
-      ORDER BY ${ratingColumn} ASC, ${idColumn} ASC
-      LIMIT ?
-    `;
-    params.push(limit);
-    return this.db.prepare(sql).all(...params) as PuzzlePackRow[];
+    `).get(...params) as { count: number };
+    if (countRow.count <= limit) {
+      return hydrateCandidateRows(rowsAtOffset(limit));
+    }
+
+    const offset = seededOffset(
+      filter.randomSeed,
+      `${themeId ?? "all"}:${filter.minRating ?? 0}:${filter.maxRating ?? 4000}`,
+      countRow.count
+    );
+    const rows = rowsAtOffset(limit, offset);
+    if (rows.length < limit) {
+      rows.push(...rowsAtOffset(limit - rows.length, 0));
+    }
+    return hydrateCandidateRows(rows);
+  }
+
+  private puzzleRowsForIds(ids: readonly string[]): PuzzlePackRow[] {
+    const rowsById = new Map<string, PuzzlePackRow>();
+    for (let offset = 0; offset < ids.length; offset += MAX_SQL_ID_FILTER_VALUES) {
+      const chunk = ids.slice(offset, offset + MAX_SQL_ID_FILTER_VALUES);
+      if (chunk.length === 0) {
+        continue;
+      }
+      const rows = this.db.prepare(`
+        SELECT *
+        FROM puzzles
+        WHERE id IN (${chunk.map(() => "?").join(", ")})
+      `).all(...chunk) as PuzzlePackRow[];
+      for (const row of rows) {
+        rowsById.set(row.id, row);
+      }
+    }
+    return ids
+      .map((id) => rowsById.get(id))
+      .filter((row): row is PuzzlePackRow => row !== undefined);
   }
 
   private puzzlesFromRows(rows: readonly PuzzlePackRow[]): Puzzle[] {
@@ -302,6 +357,16 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
     }
     return Math.max(limit * this.candidateMultiplier, limit + this.candidateFloor);
   }
+}
+
+function seededOffset(seedInput: string | number, scope: string, candidateCount: number): number {
+  let hash = 2166136261;
+  const input = `${seedInput}:${scope}`;
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) % candidateCount;
 }
 
 function expandFen(fen: string): string {
