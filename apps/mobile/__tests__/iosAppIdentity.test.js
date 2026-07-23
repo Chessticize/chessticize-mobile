@@ -104,12 +104,21 @@ describe("iOS App Store identity artifacts", () => {
   it("keeps both Detox build paths pinned to the committed CocoaPods lockfile", () => {
     const debugBuildScript = readText(join(appRoot, "scripts", "ios-build-for-detox.sh"));
     const releaseBuildScript = readText(join(appRoot, "scripts", "ios-build-release-for-detox.sh"));
-    const lockedInstall = "bundle exec pod install --deployment --project-directory=ios";
+    const lockedInstallScript = readText(
+      join(appRoot, "scripts", "ios-install-pods-locked.sh")
+    );
 
-    expect(debugBuildScript).toContain(lockedInstall);
-    expect(releaseBuildScript).toContain(lockedInstall);
+    expect(debugBuildScript).toContain("scripts/ios-install-pods-locked.sh");
+    expect(releaseBuildScript).toContain("scripts/ios-install-pods-locked.sh");
+    expect(lockedInstallScript).toContain(
+      "bundle exec pod install --deployment --project-directory=ios"
+    );
+    expect(lockedInstallScript).toContain("ios/Pods/Manifest.lock");
+    expect(lockedInstallScript).toContain("cmp -s");
+    expect(lockedInstallScript).toContain("rm -rf ios/Pods");
     expect(debugBuildScript).not.toContain("pod update");
     expect(releaseBuildScript).not.toContain("pod update");
+    expect(lockedInstallScript).not.toContain("pod update");
   });
 
   it("runs the exact-main iOS gate on the supported Xcode 26.6 image", () => {
@@ -119,6 +128,10 @@ describe("iOS App Store identity artifacts", () => {
     expect(workflow).toContain(
       "DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer"
     );
+    expect(workflow).toContain(
+      "key: pods-${{ runner.os }}-${{ hashFiles('apps/mobile/ios/Podfile.lock', 'pnpm-lock.yaml') }}"
+    );
+    expect(workflow).not.toContain("restore-keys: pods-${{ runner.os }}-");
     expect(workflow).not.toContain("runs-on: macos-15");
   });
 

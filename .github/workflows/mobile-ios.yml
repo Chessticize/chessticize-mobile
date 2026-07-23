@@ -172,8 +172,7 @@ jobs:
           path: |
             apps/mobile/ios/Pods
             ~/.cocoapods
-          key: pods-${{ runner.os }}-${{ hashFiles('apps/mobile/ios/Podfile.lock') }}
-          restore-keys: pods-${{ runner.os }}-
+          key: pods-${{ runner.os }}-${{ hashFiles('apps/mobile/ios/Podfile.lock', 'pnpm-lock.yaml') }}
 
       - name: iOS environment doctor
         run: pnpm mobile:doctor:ios
