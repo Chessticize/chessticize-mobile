@@ -5676,29 +5676,38 @@ function PracticePrompt({
   currentPuzzle,
   kingPieceSize,
   mode,
+  promptSide,
+  solved = false,
   promptText,
   promptHint
 }: {
   currentPuzzle: CurrentPuzzleState | undefined;
   kingPieceSize: number;
   mode: SprintMode;
+  promptSide?: MoveSide;
+  solved?: boolean;
   promptText?: string | null;
   promptHint?: string | null;
 }): React.JSX.Element | null {
   if (!currentPuzzle) {
     return null;
   }
-  const promptSide = sideToMove(currentPuzzle.currentFen);
-  const side = promptSide === "b" ? "black" : "white";
+  const displayedSide = promptSide ?? sideToMove(currentPuzzle.currentFen);
+  const side = displayedSide === "b" ? "black" : "white";
   const isArrowDuel = currentPuzzle.kind === "arrow_duel";
   const defaultPromptTitle = isArrowDuel ? "Choose the best move" : "Find the best move";
   const defaultPromptContext = isArrowDuel
     ? `For ${side}, between the two arrows.`
     : `For ${side}.`;
-  const displayedPromptText = promptText === undefined ? defaultPromptContext : promptText;
-  const displayedPromptHint = promptHint === undefined
+  const displayedPromptText = solved ? null : promptText === undefined ? defaultPromptContext : promptText;
+  const displayedPromptHint = solved ? null : promptHint === undefined
     ? (isArrowDuel ? "Watch for checks, captures, and attacks!" : null)
     : promptHint;
+  const displayedPromptTitle = solved
+    ? "Solved"
+    : promptText === undefined
+      ? defaultPromptTitle
+      : modeLabel(mode);
 
   return (
     <View style={styles.promptPanel} testID="practice-prompt">
@@ -5708,12 +5717,12 @@ function PracticePrompt({
       >
         <MoveSideGlyph
           kingPieceSize={kingPieceSize}
-          side={promptSide}
+          side={displayedSide}
           testID="practice-prompt-side-glyph"
         />
       </View>
       <View style={styles.promptCopy}>
-        <Text style={styles.promptTitle}>{promptText === undefined ? defaultPromptTitle : modeLabel(mode)}</Text>
+        <Text style={styles.promptTitle}>{displayedPromptTitle}</Text>
         {displayedPromptText ? <Text style={styles.promptText}>{displayedPromptText}</Text> : null}
         {displayedPromptHint ? (
           <Text style={styles.promptHint}>{displayedPromptHint}</Text>
@@ -8226,7 +8235,8 @@ function ReviewSession({
   const displayFen = analysisEnabled
     ? (analysisFen ?? currentFen)
     : (reviewEntryPreview.displayFen ?? currentFen);
-  const baseBoardFlipped = reviewStartingPerspectiveFlipped(currentEntry);
+  const reviewPromptSide = sideToMove(reviewStartingFen(currentEntry));
+  const baseBoardFlipped = reviewPromptSide === "b";
   const boardFlipped = manualBoardFlip ? !baseBoardFlipped : baseBoardFlipped;
   const feedbackMove = feedback?.submittedMove && feedback.submittedMove !== "__illegal__" ? arrowFromTo(feedback.submittedMove) : null;
   const shouldShowGuidedCurrentEval = !analysisEnabled && currentEntry.mode === "arrow_duel" && reviewState.kind === "line";
@@ -8807,6 +8817,8 @@ function ReviewSession({
         currentPuzzle={currentPuzzle}
         kingPieceSize={kingGlyphSizeForBoard(boardSize)}
         mode={currentEntry.mode}
+        promptSide={reviewPromptSide}
+        solved={feedback?.puzzleSolved === true}
         promptText={
           isArrowDuelFollowUpReview
             ? null
@@ -9607,10 +9619,6 @@ function submitArrowDuelFollowUpMove(state: PuzzleLineState, move: string): {
 
 function reviewStartingFen(entry: ReviewEntry): string {
   return currentReviewPuzzleState(startReviewPuzzle(entry)).currentFen;
-}
-
-function reviewStartingPerspectiveFlipped(entry: ReviewEntry): boolean {
-  return sideToMove(reviewStartingFen(entry)) === "b";
 }
 
 function currentReviewPuzzleState(state: ReviewPuzzleState): CurrentPuzzleState {

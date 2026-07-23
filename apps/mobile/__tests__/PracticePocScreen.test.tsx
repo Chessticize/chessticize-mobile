@@ -4761,9 +4761,14 @@ describe("PracticePocScreen", () => {
     press(renderer, correctAttemptRow!.props.testID);
 
     const progressBeforeRetry = collectText(findByTestId(renderer, "review-progress"));
+    const initialPromptKingTestIDs = promptKingTestIDs(renderer);
+    expect(initialPromptKingTestIDs).toHaveLength(1);
     await boardMove(renderer, "e2e6");
     await settleFeedbackSnapshot();
     await boardMove(renderer, "e6f7");
+
+    expect(collectText(findByTestId(renderer, "practice-prompt"))).toBe("Solved");
+    expect(promptKingTestIDs(renderer)).toEqual(initialPromptKingTestIDs);
     await settleFeedbackSnapshot();
 
     expect(findByTestId(renderer, "review-session")).toBeTruthy();
@@ -5508,6 +5513,8 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "review-board-state"))).toBe("locked");
     await settleEntryPreview();
     expect(collectText(findByTestId(renderer, "review-board-state"))).toBe("ready");
+    const initialPromptKingTestIDs = promptKingTestIDs(renderer);
+    expect(initialPromptKingTestIDs).toHaveLength(1);
 
     await boardMove(renderer, "e2e6");
     expect(collectText(findByTestId(renderer, "review-board-state"))).toBe("locked");
@@ -5517,6 +5524,9 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "review-board-state"))).toBe("ready");
 
     await boardMove(renderer, "e6f7");
+
+    expect(collectText(findByTestId(renderer, "practice-prompt"))).toBe("Solved");
+    expect(promptKingTestIDs(renderer)).toEqual(initialPromptKingTestIDs);
     await settleFeedbackSnapshot();
 
     expect(() => findByTestId(renderer, "review-session")).toThrow();
@@ -7575,6 +7585,13 @@ function collectTestIds(node: TestRenderer.ReactTestInstance): string[] {
     .filter((child): child is TestRenderer.ReactTestInstance => typeof child !== "string")
     .flatMap((child) => collectTestIds(child));
   return [...ownTestID, ...childTestIDs];
+}
+
+function promptKingTestIDs(renderer: TestRenderer.ReactTestRenderer): string[] {
+  return [...new Set(
+    collectTestIds(findByTestId(renderer, "practice-prompt"))
+      .filter((testID) => testID.startsWith("chessboard-king-"))
+  )];
 }
 
 function collectText(node: TestRenderer.ReactTestInstance): string {
