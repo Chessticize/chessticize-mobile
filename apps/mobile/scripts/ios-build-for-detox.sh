@@ -30,7 +30,7 @@ if ! bundle check; then
   bundle install
 fi
 
-bundle exec pod install --deployment --project-directory=ios
+scripts/ios-install-pods-locked.sh
 force_debug_prebuilt_refresh
 
 export FORCE_BUNDLING=1

@@ -22,7 +22,7 @@ Run from a clean `main` checkout at the exact commit that will be uploaded:
 ```sh
 git status --short --branch
 pnpm install --frozen-lockfile
-(cd apps/mobile && bundle exec pod install --deployment --project-directory=ios)
+(cd apps/mobile && scripts/ios-install-pods-locked.sh)
 pnpm app-store:preflight
 pnpm app-store:signing-readiness
 pnpm test
@@ -38,7 +38,12 @@ CocoaPods deployment mode must pass in both the local checkout and the GitHub
 runner. React Native's Hermes compiler setting is intentionally patched to use
 a stable `PODS_ROOT`-based path; an absolute checkout path in an evaluated
 podspec makes `Podfile.lock` non-portable and is a release blocker, regardless
-of whether the dependency versions are unchanged.
+of whether the dependency versions are unchanged. The locked installer removes
+only a restored `ios/Pods` sandbox whose `Manifest.lock` is missing or differs
+from the committed `Podfile.lock`, then runs CocoaPods in deployment mode.
+GitHub's Pods cache uses an exact key over both `Podfile.lock` and
+`pnpm-lock.yaml`; do not add a broad restore key that can reintroduce evaluated
+podspecs from a different dependency patch.
 
 After any failed complete release workflow, perform the cross-platform
 pre-retry convergence sweep in `docs/RELEASE_SOURCE_POLICY.md` before

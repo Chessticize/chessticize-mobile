@@ -54,7 +54,9 @@ without another full native run:
    tests, root and mobile typechecks, mobile component tests, lint, App Store
    preflight/signing/third-party checks, screenshot audit when applicable, and
    Android doctor plus release-policy tests. Run focused real-adapter tests for
-   every changed fixture or native boundary.
+   every changed fixture or native boundary. For iOS, run the locked CocoaPods
+   installer so a restored `Pods/Manifest.lock` is checked against the
+   committed `Podfile.lock` before another full native build.
 5. Put all coherent release-validation fixes in one release-fix PR. For every
    stale fixture or assertion, add a fast consistency test that would have
    rejected the mismatch before the native matrix.
