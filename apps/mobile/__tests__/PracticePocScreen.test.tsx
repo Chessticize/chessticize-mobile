@@ -1687,6 +1687,8 @@ describe("PracticePocScreen", () => {
     const renderer = renderScreen({ practiceService: createMobilePracticeService("random1000") });
     startStandardSprint(renderer);
 
+    expect(flattenTestStyle(findByTestId(renderer, "active-session-adaptive-layout").props.style).width)
+      .toBe("100%");
     const controlRail = findByTestId(renderer, "active-session-control-rail");
     expect(flattenTestStyle(controlRail.props.contentContainerStyle).width).toBe("100%");
     expect(nearestAncestorStyleValue(findByTestId(renderer, "practice-prompt"), "width"))

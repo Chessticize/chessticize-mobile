@@ -12560,7 +12560,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     gap: 14,
-    justifyContent: "center"
+    justifyContent: "center",
+    width: "100%"
   },
   activeSessionStack: {
     gap: 12
