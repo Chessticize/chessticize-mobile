@@ -69,5 +69,10 @@ installed package manifests currently report:
 | `react-native-worklets` | `0.9.2` | MIT | https://github.com/software-mansion/react-native-reanimated |
 | `chess.js` | `1.4.0` | BSD-2-Clause | https://github.com/jhlywa/chess.js |
 
+The React Native `0.86.0` package has a local build-path portability fix in
+`patches/react-native@0.86.0.patch`. It replaces an absolute Hermes compiler
+path in the evaluated CocoaPods specification with a stable `PODS_ROOT`-based
+path; it does not change app behavior.
+
 Before each App Store submission, refresh this inventory against the exact
 lockfile used for the submitted build.

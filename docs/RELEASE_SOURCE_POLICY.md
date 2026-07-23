@@ -135,7 +135,7 @@ for App Store Connect, TestFlight, or a public release tag.
 
 `pnpm app-store:third-party-audit` verifies the runtime package inventory in
 `THIRD_PARTY_NOTICES.md` against `pnpm-lock.yaml`, checks that the active
-`react-native-chessboard` patch is disclosed, and confirms that the Stockfish,
+runtime dependency patches are disclosed, and confirms that the Stockfish,
 NNUE, and Lichess puzzle-data notices match the bundled release artifacts.
 
 This audit is required before tagging a submitted App Store binary. It is still

@@ -1,5 +1,5 @@
 const { existsSync, readFileSync } = require("node:fs");
-const { join } = require("node:path");
+const { dirname, join } = require("node:path");
 const { renderIOSReleaseVersion } = require("../scripts/ios-release-version");
 
 const appRoot = process.cwd();
@@ -120,5 +120,24 @@ describe("iOS App Store identity artifacts", () => {
       "DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer"
     );
     expect(workflow).not.toContain("runs-on: macos-15");
+  });
+
+  it("keeps the Hermes CocoaPods checksum portable across workspace paths", () => {
+    const repositoryRoot = join(appRoot, "..", "..");
+    const workspace = readText(join(repositoryRoot, "pnpm-workspace.yaml"));
+    const reactNativeRoot = dirname(require.resolve("react-native/package.json"));
+    const hermesPodspec = readText(
+      join(reactNativeRoot, "sdks", "hermes-engine", "hermes-engine.podspec")
+    );
+
+    expect(workspace).toContain(
+      "react-native@0.86.0: patches/react-native@0.86.0.patch"
+    );
+    expect(hermesPodspec).toContain(
+      "'HERMES_CLI_PATH' => '${PODS_ROOT}/../../node_modules/hermes-compiler/hermesc/osx-bin/hermesc'"
+    );
+    expect(hermesPodspec).not.toContain(
+      'require.resolve(\\"hermes-compiler\\"'
+    );
   });
 });
