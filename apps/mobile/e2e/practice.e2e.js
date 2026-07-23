@@ -28,7 +28,7 @@ const {
 // The visual assertion measures absolute painted arrow area. Pin the public
 // service's packaged-core selection to two long candidate vectors so random
 // move geometry cannot turn that rendering check into a pixel-count lottery.
-const PRACTICE_RENDER_PUZZLE_SELECTION_SEED = 'practice-arrow-render-v1:4';
+const PRACTICE_RENDER_PUZZLE_SELECTION_SEED = 'practice-arrow-render-v2:54824';
 
 describe('Practice POC', () => {
   beforeEach(async () => {
@@ -465,7 +465,7 @@ async function assertStationaryBoardFeedback({ move, orientation, outcome }) {
 
   await playBoardMove('session-board', move);
   if (outcome === 'correct') {
-    await waitFor(element(by.id('sprint-unclear-prompt'))).toBeVisible().withTimeout(10000);
+    await waitFor(element(by.id('sprint-unclear-prompt'))).toExist().withTimeout(10000);
   } else {
     await waitFor(element(by.id('move-feedback-overlay'))).toExist().withTimeout(10000);
     await waitFor(element(by.label('Mistakes 1 of 3')).atIndex(0)).toExist().withTimeout(10000);

@@ -37,7 +37,7 @@ describe('Android Arrow Duel release slice', () => {
     const workflow = readRepo('.github/workflows/mobile-android.yml');
 
     expect(fixture).toEqual(expect.objectContaining({
-      puzzleSelectionSeed: 'android-arrow-duel:2',
+      puzzleSelectionSeed: 'android-arrow-duel-v2:90087',
       targetCorrect: 1,
       candidates: ['c3e4', 'h4f6'],
       wrongMove: 'c3e4',
