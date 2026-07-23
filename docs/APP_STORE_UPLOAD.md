@@ -32,6 +32,11 @@ pnpm mobile:typecheck
 pnpm mobile:doctor:ios
 ```
 
+Require the exact-main `Mobile iOS` release gate to run on the repository's
+pinned Xcode 26.6 toolchain and pass Mobile JS plus both Detox suites. Do not
+accept a run from an older Xcode whose environment-dependent CocoaPods
+checksums differ from the submitted archive toolchain.
+
 After any failed complete release workflow, perform the cross-platform
 pre-retry convergence sweep in `docs/RELEASE_SOURCE_POLICY.md` before
 dispatching another full native run.
