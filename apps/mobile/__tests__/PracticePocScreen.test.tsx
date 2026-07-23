@@ -1202,19 +1202,71 @@ describe("PracticePocScreen", () => {
     expect(systemBack.setPredictiveBackEnabled).toHaveBeenLastCalledWith(false);
   });
 
-  it("persists Run ELO edits and returns to Home edit mode", () => {
+  it("persists Run name and direct-entry ELO edits and returns to Home edit mode", () => {
     const service = createMobilePracticeService("random1000");
     const renderer = renderScreen({ practiceService: service, runManagementEnabled: true });
 
     press(renderer, "practice-run-home-edit");
     press(renderer, "practice-run-edit-standard");
-    expect(collectText(findByTestId(renderer, "practice-run-editor-run-name"))).toBe("Standard");
-    press(renderer, "practice-run-elo-increase");
+    expect(collectText(findByTestId(renderer, "practice-run-editor-title"))).toBe("Edit Run");
+    expect(findByTestId(renderer, "practice-run-name-input").props.value).toBe("Standard");
+    expect(findByTestId(renderer, "practice-run-elo-input").props.value).toBe("600");
+    act(() => {
+      findByTestId(renderer, "practice-run-name-input").props.onChangeText("Morning Warm-up");
+      findByTestId(renderer, "practice-run-elo-input").props.onChangeText("1375");
+    });
     press(renderer, "practice-run-save");
 
     expect(collectText(findByTestId(renderer, "practice-header-title"))).toBe("Edit Runs");
-    expect(service.getRating("standard 5/20")).toMatchObject({ generation: 1, rating: 625 });
-    expect(collectText(findByTestId(renderer, "practice-run-standard"))).toContain("ELO 625");
+    expect(service.getActivePracticeRun("standard")).toMatchObject({
+      id: "standard",
+      name: "Morning Warm-up",
+      mode: "standard",
+      ratingKey: "standard 5/20"
+    });
+    expect(service.getRating("standard 5/20")).toMatchObject({ generation: 1, rating: 1375 });
+    expect(collectText(findByTestId(renderer, "practice-run-standard"))).toContain("Morning Warm-up");
+    expect(collectText(findByTestId(renderer, "practice-run-standard"))).toContain("ELO 1375");
+  });
+
+  it("blocks duplicate Run names and out-of-range direct ELO without changing saved data", () => {
+    const service = createMobilePracticeService("random1000");
+    service.createPracticeRun({
+      id: "tactics-focus",
+      name: "Tactics Focus",
+      mode: "custom",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      initialRating: 900
+    });
+    const renderer = renderScreen({ practiceService: service, runManagementEnabled: true });
+
+    press(renderer, "practice-run-home-edit");
+    press(renderer, "practice-run-edit-standard");
+    act(() => {
+      findByTestId(renderer, "practice-run-name-input").props.onChangeText("Tactics Focus");
+      findByTestId(renderer, "practice-run-elo-input").props.onChangeText("2201");
+    });
+
+    expect(collectText(findByTestId(renderer, "practice-run-elo-error"))).toBe(
+      "Enter a whole-number ELO from 600 to 2200."
+    );
+    expect(findByTestId(renderer, "practice-run-save").props.accessibilityState).toEqual({
+      disabled: true
+    });
+    expect(service.getActivePracticeRun("standard").name).toBe("Standard");
+    expect(service.getRating("standard 5/20").rating).toBe(600);
+
+    act(() => {
+      findByTestId(renderer, "practice-run-elo-input").props.onChangeText("1300");
+    });
+    press(renderer, "practice-run-save");
+
+    expect(collectText(findByTestId(renderer, "practice-run-name-error"))).toBe(
+      "That name is already in use. Choose a unique name."
+    );
+    expect(service.getActivePracticeRun("standard").name).toBe("Standard");
+    expect(service.getRating("standard 5/20").rating).toBe(600);
   });
 
   it("archives a Run from its inline confirmation and restores the same ELO", () => {
@@ -3458,7 +3510,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "custom-previous-custom-custom-180-30-mate").props.accessibilityLabel).toContain("ELO 850");
     press(renderer, "custom-previous-custom-custom-180-30-mate");
     expect(() => findByTestId(renderer, "custom-theme-mate")).toThrow();
-    expect(collectText(findByTestId(renderer, "practice-run-elo-row"))).toContain("ELO 850");
+    expect(findByTestId(renderer, "practice-run-elo-input").props.value).toBe("850");
     act(() => {
       findByTestId(renderer, "practice-run-name-input").props.onChangeText("Legacy Mates");
     });

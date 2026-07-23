@@ -55,13 +55,13 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
       await element(by.id('practice-run-per-puzzle-stepper-increase')).tap();
       await waitForVisibleInPracticeScroll('practice-run-elo-increase');
       await element(by.id('practice-run-elo-increase')).tap();
-      await waitForElementTextContaining('practice-run-elo-value', 'ELO 925', 5000);
+      await waitFor(element(by.id('practice-run-elo-input'))).toHaveText('1000').withTimeout(5000);
       await element(by.id('practice-run-elo-decrease')).tap();
-      await waitForElementTextContaining('practice-run-elo-value', 'ELO 900', 5000);
-      for (let index = 0; index < 12; index += 1) {
+      await waitFor(element(by.id('practice-run-elo-input'))).toHaveText('900').withTimeout(5000);
+      for (let index = 0; index < 3; index += 1) {
         await element(by.id('practice-run-elo-decrease')).tap();
       }
-      await waitForElementTextContaining('practice-run-elo-value', 'ELO 600', 5000);
+      await waitFor(element(by.id('practice-run-elo-input'))).toHaveText('600').withTimeout(5000);
 
       await element(by.id('practice-main-scroll')).scrollTo('top');
       await element(by.id('practice-run-save')).tap();

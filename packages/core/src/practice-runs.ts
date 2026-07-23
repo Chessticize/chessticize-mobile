@@ -1,5 +1,6 @@
 import { defaultSprintConfig } from "./sprint-config.ts";
 import { normalizeThemeSelection } from "./theme-catalog.ts";
+import { assertValidManualRating, RATING_FLOOR } from "./ratings.ts";
 import type { CustomSprintConfigRecord, PracticeRunRecord, SprintConfig } from "./types.ts";
 
 export const STANDARD_PRACTICE_RUN_ID = "standard";
@@ -7,10 +8,15 @@ export const ARROW_DUEL_PRACTICE_RUN_ID = "arrow-duel";
 export const PRACTICE_RUN_NAME_MAX_LENGTH = 40;
 export const PRACTICE_RUN_RATING_KEY_PREFIX = "run:";
 export const DEFAULT_NEW_PRACTICE_RUN_RATING = 900;
+export const PRACTICE_RUN_RATING_MIN = RATING_FLOOR;
+export const PRACTICE_RUN_RATING_MAX = 2200;
 const PRACTICE_RUN_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
 const BUILT_IN_UPDATED_AT = "1970-01-01T00:00:00.000Z";
-const RESERVED_RUN_NAMES = new Set(["standard", "arrow duel"]);
+const RESERVED_RUN_NAME_OWNERS = new Map([
+  ["standard", STANDARD_PRACTICE_RUN_ID],
+  ["arrow duel", ARROW_DUEL_PRACTICE_RUN_ID]
+]);
 
 export type PracticeRunNameErrorCode = "required" | "too_long" | "duplicate";
 
@@ -96,7 +102,8 @@ export function validatePracticeRunName(
     throw new PracticeRunNameError("too_long");
   }
   const normalized = normalizePracticeRunName(name);
-  const duplicate = RESERVED_RUN_NAMES.has(normalized)
+  const reservedOwner = RESERVED_RUN_NAME_OWNERS.get(normalized);
+  const duplicate = (reservedOwner !== undefined && reservedOwner !== currentRunId)
     || existingRuns.some(
       (run) => run.id !== currentRunId && normalizePracticeRunName(run.name) === normalized
     );
@@ -104,6 +111,29 @@ export function validatePracticeRunName(
     throw new PracticeRunNameError("duplicate");
   }
   return name;
+}
+
+export function renamePracticeRun(
+  runId: string,
+  candidateName: string,
+  existingRuns: readonly PracticeRunRecord[],
+  updatedAt: string
+): PracticeRunRecord {
+  const run = existingRuns.find((candidate) => candidate.id === runId);
+  if (!run) {
+    throw new Error(`Practice Run ${runId} is not available`);
+  }
+  const name = validatePracticeRunName(candidateName, existingRuns, runId);
+  return name === run.name
+    ? clonePracticeRun(run)
+    : { ...clonePracticeRun(run), name, updatedAt };
+}
+
+export function assertValidPracticeRunRating(rating: number): void {
+  assertValidManualRating(rating);
+  if (rating > PRACTICE_RUN_RATING_MAX) {
+    throw new Error(`Practice Run rating must be at most ${PRACTICE_RUN_RATING_MAX}`);
+  }
 }
 
 export function practiceRunsFromLegacyCustomConfigs(
@@ -291,6 +321,7 @@ function canonicalizeBuiltInPracticeRun(run: PracticeRunRecord): PracticeRunReco
   const canonical = defaultPracticeRuns(run.updatedAt).find((candidate) => candidate.id === run.id)!;
   return {
     ...canonical,
+    name: run.name,
     archived: run.archived,
     homeOrder: run.homeOrder,
     updatedAt: run.updatedAt
@@ -315,15 +346,17 @@ function stablePracticeRunValue(run: PracticeRunRecord): string {
 function uniquifyPracticeRunNames(runs: PracticeRunRecord[]): PracticeRunRecord[] {
   const used = new Set<string>();
   return runs.map((run) => {
-    if (run.id === STANDARD_PRACTICE_RUN_ID || run.id === ARROW_DUEL_PRACTICE_RUN_ID) {
-      used.add(normalizePracticeRunName(run.name));
-      return clonePracticeRun(run);
-    }
-    let name = run.name.trim() || "Custom Run";
+    const fallbackName = run.id === STANDARD_PRACTICE_RUN_ID
+      ? "Standard"
+      : run.id === ARROW_DUEL_PRACTICE_RUN_ID
+        ? "Arrow Duel"
+        : "Custom Run";
+    const baseName = run.name.trim().slice(0, PRACTICE_RUN_NAME_MAX_LENGTH) || fallbackName;
+    let name = baseName;
     let suffix = 2;
     while (used.has(normalizePracticeRunName(name))) {
       const suffixText = ` (${suffix})`;
-      name = `${run.name.trim().slice(0, PRACTICE_RUN_NAME_MAX_LENGTH - suffixText.length)}${suffixText}`;
+      name = `${baseName.slice(0, PRACTICE_RUN_NAME_MAX_LENGTH - suffixText.length)}${suffixText}`;
       suffix += 1;
     }
     used.add(normalizePracticeRunName(name));

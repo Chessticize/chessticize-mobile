@@ -99,22 +99,24 @@ describe('Practice POC', () => {
     }
 
     await element(by.text('Calculation Lab')).tap();
-    await waitFor(element(by.id('practice-run-editor-run-name'))).toHaveText('Calculation Lab').withTimeout(10000);
-    await element(by.id('practice-run-elo-increase')).tap();
+    await waitFor(element(by.id('practice-run-name-input'))).toHaveText('Calculation Lab').withTimeout(10000);
+    await element(by.id('practice-run-name-input')).replaceText('Calculation Focus');
+    await element(by.id('practice-run-name-input')).tapReturnKey();
+    await element(by.id('practice-run-elo-input')).replaceText('1000');
     await element(by.id('practice-run-save')).tap();
     await waitFor(element(by.id('practice-run-home-done'))).toBeVisible().withTimeout(10000);
 
-    await element(by.label('Remove Calculation Lab from Home')).tap();
+    await element(by.label('Remove Calculation Focus from Home')).tap();
     await waitForVisibleInPracticeScroll('practice-run-remove-confirm');
     await element(by.id('practice-run-remove-confirm')).tap();
-    await waitFor(element(by.label('Restore Calculation Lab to Home'))).toExist().withTimeout(10000);
-    await element(by.label('Restore Calculation Lab to Home')).tap();
-    await expect(element(by.text('Calculation Lab'))).toExist();
+    await waitFor(element(by.label('Restore Calculation Focus to Home'))).toExist().withTimeout(10000);
+    await element(by.label('Restore Calculation Focus to Home')).tap();
+    await expect(element(by.text('Calculation Focus'))).toExist();
 
     await device.terminateApp();
     await launchWithDisabledSynchronization({ newInstance: true, delete: false });
-    await waitFor(element(by.text('Calculation Lab'))).toExist().withTimeout(180000);
-    await waitFor(element(by.text('ELO 925'))).toExist().withTimeout(10000);
+    await waitFor(element(by.text('Calculation Focus'))).toExist().withTimeout(180000);
+    await waitFor(element(by.text('ELO 1000'))).toExist().withTimeout(10000);
   });
 
   it('renders the standard sprint board', async () => {
