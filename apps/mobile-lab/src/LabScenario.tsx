@@ -1,15 +1,15 @@
-import React, { useEffect, useMemo, useReducer, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import type { AttemptEvent, SprintMode, SprintState } from "../../../packages/core/src/index.ts";
 import { defaultSprintConfig } from "../../../packages/core/src/index.ts";
 import { MemoryStore } from "../../../packages/storage/src/memory-store.ts";
 import { PracticeService } from "../../../packages/storage/src/practice-service.ts";
 import { PracticePocScreen } from "../../mobile/src/components/PracticePocScreen.tsx";
-import type { MobilePlatformCapabilities } from "../../mobile/src/backend/mobilePlatformCapabilities.ts";
+import type { MobilePlatformCapabilities } from "../../mobile/src/platform/mobilePlatformCapabilities.ts";
 import type {
   ReviewReminderNotificationClient,
   ReviewReminderNotificationRoute,
   ReviewReminderPermissionStatus
-} from "../../mobile/src/backend/reviewReminderScheduler.ts";
+} from "../../mobile/src/platform/reviewReminderScheduler.ts";
 import {
   createTestMobilePlatformCapabilities,
   type TestMobilePlatformCapabilityOverrides
@@ -20,10 +20,6 @@ import {
 } from "./browserMobilePractice.ts";
 import { clearLabPracticeService, setLabPracticeService } from "./boardController.ts";
 import { ISSUE_272_LAB_PUZZLE, LAB_PUZZLES, PRIMARY_LAB_PUZZLE } from "./labPuzzles.ts";
-import {
-  createRunManagementFixtureState,
-  runManagementFixtureReducer
-} from "./runManagementFixture.ts";
 import { scenarioRegistry, type LabScenarioId } from "./scenarioRegistry.ts";
 import {
   SERVER_CURATED_THEME_PRESENTATION,
@@ -59,14 +55,6 @@ function LabScenarioContent({
     "history-filters",
     "history-attempt-detail"
   ].includes(scenarioId);
-  const [runManagementState, dispatchRunManagement] = useReducer(
-    runManagementFixtureReducer,
-    scenarioId === "practice-runs-empty" ? "empty" : "populated",
-    createRunManagementFixtureState
-  );
-  const runManagementPresentation = isRunManagementScenario(scenarioId)
-    ? { ...runManagementState, onIntent: dispatchRunManagement }
-    : undefined;
   const entryPreviewEnabled = isPuzzleEntryPreviewScenario(scenarioId);
 
   setLabPracticeService(
@@ -89,7 +77,6 @@ function LabScenarioContent({
           ? SERVER_CURATED_THEME_PRESENTATION
           : undefined}
         runEloEditingMovedToHome
-        runManagementPresentation={runManagementPresentation}
         {...runtime.screenProps}
       />
     </LabScenarioShell>
@@ -166,14 +153,15 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     arrowDuelTargetCorrect: 1,
     customTargetCorrect: 1
   };
+  if (isRunManagementScenario(scenarioId)) {
+    service = createRunManagementService(scenarioId === "practice-runs-empty");
+    screenProps.runManagementEnabled = true;
+  }
 
   switch (scenarioId) {
     case "practice-blunder-move-preview":
       service = createIssue272Service(false);
       configurePuzzleSource = false;
-      break;
-    case "practice-custom-rating-editor":
-      service = createPlayedCustomService();
       break;
     case "practice-preparing":
     case "system-loading":
@@ -257,6 +245,36 @@ function createSeededService(): PracticeService {
   return new PracticeService(store);
 }
 
+function createRunManagementService(empty: boolean): PracticeService {
+  const service = createSeededService();
+  service.setPracticeRunRating("standard", 925);
+  service.setPracticeRunRating("arrow-duel", 875);
+  service.createPracticeRun({
+    id: "tactics-focus",
+    name: "Tactics Focus",
+    mode: "custom",
+    durationSeconds: 600,
+    perPuzzleSeconds: 30,
+    initialRating: 1040,
+    themes: ["fork", "pin"]
+  }, "2026-07-18T17:00:00.000Z");
+  service.createPracticeRun({
+    id: "endgame-sprint",
+    name: "Endgame Sprint",
+    mode: "custom",
+    durationSeconds: 180,
+    perPuzzleSeconds: 10,
+    initialRating: 810,
+    themes: ["endgame"]
+  }, "2026-07-18T17:01:00.000Z");
+  if (empty) {
+    for (const [index, run] of service.listPracticeRuns().entries()) {
+      service.archivePracticeRun(run.id, new Date(LAB_NOW_MS + index).toISOString());
+    }
+  }
+  return service;
+}
+
 function createIssue272Service(withDueReview: boolean): PracticeService {
   const store = new MemoryStore();
   store.seedPuzzles([ISSUE_272_LAB_PUZZLE]);
@@ -267,27 +285,6 @@ function createIssue272Service(withDueReview: boolean): PracticeService {
       ratingKey: "standard 5/20"
     }, "2026-07-17T12:00:00.000Z");
   }
-  return new PracticeService(store);
-}
-
-function createPlayedCustomService(): PracticeService {
-  const store = new MemoryStore();
-  store.seedPuzzles(LAB_PUZZLES);
-  store.saveRating({
-    key: "custom 5/20",
-    generation: 0,
-    rating: 940,
-    ratingDeviation: 180,
-    volatility: 0.05,
-    games: 1
-  });
-  store.createSprintSession(completedSprint({
-    id: "lab-custom-played",
-    mode: "custom",
-    completedAt: "2026-07-17T16:00:00.000Z",
-    ratingBefore: 900,
-    ratingAfter: 940
-  }));
   return new PracticeService(store);
 }
 

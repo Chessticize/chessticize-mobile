@@ -1,20 +1,20 @@
-import { createMobilePracticeService } from '../src/backend/mobilePractice';
+import { createMobilePracticeService } from '../src/platform/mobilePractice';
 import { NativeModules } from 'react-native';
-import { composeIOSMobilePlatformCapabilities } from '../src/backend/iosMobilePlatformCapabilities';
-import { composeAndroidMobilePlatformCapabilities } from '../src/backend/androidMobilePlatformCapabilities';
-import { mobilePlatformCapabilityFactoryFor } from '../src/backend/nativeMobilePlatformCapabilities';
-import { MOBILE_APPLICATION_METADATA_LINKS } from '../src/backend/mobilePlatformCapabilities';
-import { readNativeApplicationMetadata } from '../src/backend/nativeApplicationMetadata';
+import { composeIOSMobilePlatformCapabilities } from '../src/platform/iosMobilePlatformCapabilities';
+import { composeAndroidMobilePlatformCapabilities } from '../src/platform/androidMobilePlatformCapabilities';
+import { mobilePlatformCapabilityFactoryFor } from '../src/platform/nativeMobilePlatformCapabilities';
+import { MOBILE_APPLICATION_METADATA_LINKS } from '../src/platform/mobilePlatformCapabilities';
+import { readNativeApplicationMetadata } from '../src/platform/nativeApplicationMetadata';
 import { createTestMobilePlatformCapabilities } from '../src/testing/testMobilePlatformCapabilities';
-import { FakeICloudProgressSyncClient } from '../src/backend/iCloudProgressSync';
+import { FakeICloudProgressSyncClient } from '../src/platform/iCloudProgressSync';
 import {
   FakeReviewReminderNotificationClient,
   FakeReviewReminderScheduler,
-} from '../src/backend/reviewReminderScheduler';
+} from '../src/platform/reviewReminderScheduler';
 import {
   createNativeStockfishTransport,
   prewarmNativeStockfishTransport,
-} from '../src/backend/nativeStockfishTransport';
+} from '../src/platform/nativeStockfishTransport';
 
 describe('mobile platform capabilities', () => {
   const installedApplicationMetadata = {

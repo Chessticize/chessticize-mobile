@@ -11,7 +11,7 @@ function read(relativePath) {
 describe('Android Custom Practice release slice', () => {
   it('keeps the deterministic Custom target behind the maintained Android test boundary', () => {
     const app = read('App.tsx');
-    const launchConfig = read('src/backend/testLaunchConfig.ts');
+    const launchConfig = read('src/platform/testLaunchConfig.ts');
     const androidModule = read('android/app/src/main/java/com/chessticize/mobile/ChessticizeTestLaunchConfigModule.kt');
 
     expect(app).toContain('resolveTestCustomTargetCorrectFromLaunchConfig');

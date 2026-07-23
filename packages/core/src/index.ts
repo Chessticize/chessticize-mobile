@@ -16,3 +16,4 @@ export * from "./local-date.ts";
 export * from "./review-reminder.ts";
 export * from "./accessible-chess-moves.ts";
 export * from "./practice-runs.ts";
+export * from "./practice-run-management.ts";

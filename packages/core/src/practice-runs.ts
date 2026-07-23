@@ -91,7 +91,7 @@ export function createCustomPracticeRun(input: {
 
 export function validatePracticeRunName(
   candidate: string,
-  existingRuns: readonly PracticeRunRecord[],
+  existingRuns: readonly Pick<PracticeRunRecord, "id" | "name">[],
   currentRunId?: string
 ): string {
   const name = candidate.trim();

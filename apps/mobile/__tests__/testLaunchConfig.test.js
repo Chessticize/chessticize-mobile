@@ -10,7 +10,7 @@ const {
   resolveTestPuzzleSelectionIdFromLaunchConfig,
   resolveTestPuzzleSelectionSeedFromLaunchConfig,
   resolveTestStandardTargetCorrectFromLaunchConfig
-} = require("../src/backend/testLaunchConfig");
+} = require("../src/platform/testLaunchConfig");
 
 describe("test launch configuration", () => {
   it("bridges the deterministic puzzle-selection seed from iOS launch arguments", () => {

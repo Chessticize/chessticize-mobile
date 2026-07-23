@@ -4,6 +4,7 @@ import {
   schedulePuzzleEntryPreview,
   type PuzzleEntryPreviewPlan
 } from "../src/components/puzzleEntryPreview";
+import { isPromiseLike } from "../src/components/promiseLike";
 import {
   beginArrowDuelPuzzle,
   beginLinePuzzle,
@@ -62,6 +63,26 @@ it("cancels the pending timer when the preview owner unmounts", () => {
 
   expect(playMove).not.toHaveBeenCalled();
   expect(onComplete).not.toHaveBeenCalled();
+});
+
+it("completes synchronous board moves without treating plain values as promises", () => {
+  const playMove = jest.fn(() => plan.move);
+  const onComplete = jest.fn();
+  schedulePuzzleEntryPreview({ onComplete, plan, playMove });
+
+  jest.advanceTimersByTime(PUZZLE_ENTRY_PREVIEW_DELAY_MS);
+
+  expect(isPromiseLike(plan.move)).toBe(false);
+  expect(onComplete).toHaveBeenCalledWith(true);
+});
+
+it("recognizes native-style thenables through the shared promise-like contract", () => {
+  const thenable = { then: jest.fn() };
+
+  expect(isPromiseLike(Promise.resolve())).toBe(true);
+  expect(isPromiseLike(thenable)).toBe(true);
+  expect(isPromiseLike({ then: true })).toBe(false);
+  expect(isPromiseLike(null)).toBe(false);
 });
 
 it("ignores an old move completion after the puzzle switches", async () => {

@@ -3,7 +3,7 @@ import {
   createNativeICloudProgressSyncClient,
   FakeICloudProgressSyncClient,
   parseProgressSyncSnapshot
-} from "../src/backend/iCloudProgressSync";
+} from "../src/platform/iCloudProgressSync";
 import type { ProgressSyncSnapshot } from "../../../packages/storage/src/progress-sync";
 import { ProgressSyncConflictError } from "../../../packages/storage/src/progress-sync";
 

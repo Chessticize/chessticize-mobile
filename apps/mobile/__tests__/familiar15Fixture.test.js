@@ -7,7 +7,7 @@ const {
 } = require('../e2e/familiar15Fixture');
 const {
   createMobilePracticeService,
-} = require('../src/backend/mobilePractice');
+} = require('../src/platform/mobilePractice');
 
 describe('Familiar 15 shared E2E fixture', () => {
   it('matches the exact product puzzle order and solution records', () => {
@@ -62,7 +62,7 @@ describe('Familiar 15 shared E2E fixture', () => {
   it('keeps product and E2E consumers free of parallel identity and move tables', () => {
     const orientationSource = read('../e2e/android-board-orientation.e2e.js');
     const performanceSource = read('../e2e/sprint-performance.e2e.js');
-    const productSource = read('../src/backend/mobilePractice.ts');
+    const productSource = read('../src/platform/mobilePractice.ts');
 
     for (const source of [orientationSource, performanceSource]) {
       expect(source).toContain("require('./familiar15Fixture')");

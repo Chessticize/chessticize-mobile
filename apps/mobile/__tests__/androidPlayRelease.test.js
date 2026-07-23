@@ -654,10 +654,10 @@ describe('Android Play release contract', () => {
 
   it('reads displayed version and build values from each installed artifact', () => {
     const sharedMetadata = read(
-      'apps/mobile/src/backend/mobilePlatformCapabilities.ts',
+      'apps/mobile/src/platform/mobilePlatformCapabilities.ts',
     );
     const nativeMetadata = read(
-      'apps/mobile/src/backend/nativeApplicationMetadata.ts',
+      'apps/mobile/src/platform/nativeApplicationMetadata.ts',
     );
     const androidModule = read(
       'apps/mobile/android/app/src/main/java/com/chessticize/mobile/ApplicationMetadataModule.kt',

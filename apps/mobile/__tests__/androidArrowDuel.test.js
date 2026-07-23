@@ -16,7 +16,7 @@ function readRepo(relativePath) {
 describe('Android Arrow Duel release slice', () => {
   it('keeps the deterministic completion override behind the native test harness', () => {
     const app = read('App.tsx');
-    const launchConfig = read('src/backend/testLaunchConfig.ts');
+    const launchConfig = read('src/platform/testLaunchConfig.ts');
     const nativeLaunchConfig = read(
       'android/app/src/main/java/com/chessticize/mobile/ChessticizeTestLaunchConfigModule.kt'
     );

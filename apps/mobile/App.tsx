@@ -2,8 +2,8 @@ import React from "react";
 import { LogBox, Platform, StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { PracticePocScreen } from "./src/components/PracticePocScreen";
-import { mobilePlatformCapabilityFactoryFor } from "./src/backend/nativeMobilePlatformCapabilities";
-import type { MobilePlatformCapabilities } from "./src/backend/mobilePlatformCapabilities";
+import { mobilePlatformCapabilityFactoryFor } from "./src/platform/nativeMobilePlatformCapabilities";
+import type { MobilePlatformCapabilities } from "./src/platform/mobilePlatformCapabilities";
 import {
   createAdvancingTestClock,
   enableTestControlsFromLaunchConfig,
@@ -13,7 +13,7 @@ import {
   resolveTestPuzzleSelectionIdFromLaunchConfig,
   resolveTestPuzzleSelectionSeedFromLaunchConfig,
   resolveTestStandardTargetCorrectFromLaunchConfig
-} from "./src/backend/testLaunchConfig";
+} from "./src/platform/testLaunchConfig";
 import { shouldSuppressLogBoxWarnings } from "./src/releaseConfig";
 import { createMobileSystemBackSource } from "./src/navigation/mobileSystemBack";
 

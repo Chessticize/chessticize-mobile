@@ -1,21 +1,21 @@
 import type { PracticeService } from '../../../../packages/storage/src/practice-service.ts';
-import type { ICloudProgressSyncClient } from '../backend/iCloudProgressSync.ts';
+import type { ICloudProgressSyncClient } from '../platform/iCloudProgressSync.ts';
 import {
   configureMobilePracticePuzzleSource,
   createMobilePracticeService,
   type MobilePuzzleSource,
-} from '../backend/mobilePractice.ts';
+} from '../platform/mobilePractice.ts';
 import {
   MOBILE_APPLICATION_METADATA_LINKS,
   type MobileApplicationMetadata,
   type MobilePlatformCapabilities,
   type MobileProgressProtectionCapabilities,
   type MobileStockfishCapabilities,
-} from '../backend/mobilePlatformCapabilities.ts';
+} from '../platform/mobilePlatformCapabilities.ts';
 import type {
   ReviewReminderNotificationClient,
   ReviewReminderScheduler,
-} from '../backend/reviewReminderScheduler.ts';
+} from '../platform/reviewReminderScheduler.ts';
 
 export interface TestMobilePlatformCapabilityOverrides {
   practiceService?: PracticeService;

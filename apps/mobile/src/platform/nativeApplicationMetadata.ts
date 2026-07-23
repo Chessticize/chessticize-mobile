@@ -1,3 +1,4 @@
+// Mobile platform adapter; kept outside the backend/domain seam.
 import { NativeModules } from 'react-native';
 import {
   MOBILE_APPLICATION_METADATA_LINKS,

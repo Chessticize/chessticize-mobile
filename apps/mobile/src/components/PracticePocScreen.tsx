@@ -104,26 +104,26 @@ import {
   seededPuzzleCount,
   shouldRandomizePuzzleSelection,
   type MobilePuzzleSource
-} from "../backend/mobilePractice.ts";
+} from "../platform/mobilePractice.ts";
 import {
   computeReviewReminderDecision,
   reminderScheduleKey,
   type ReviewReminderPermissionStatus,
   type ReviewReminderScheduleResult
-} from "../backend/reviewReminderScheduler.ts";
-import type { ICloudAccountStatus } from "../backend/iCloudProgressSync.ts";
+} from "../platform/reviewReminderScheduler.ts";
+import type { ICloudAccountStatus } from "../platform/iCloudProgressSync.ts";
 import type {
   MobileApplicationMetadata,
   MobilePlatformCapabilities,
   MobileStockfishCapabilities
-} from "../backend/mobilePlatformCapabilities.ts";
+} from "../platform/mobilePlatformCapabilities.ts";
 import { arePracticeTestControlsEnabled, isPracticeDebugEnabled } from "../releaseConfig.ts";
-import { isStoreAssetCaptureEnabled } from "../backend/testLaunchConfig.ts";
-import { usePracticeRunManagement } from "../backend/usePracticeRunManagement.ts";
+import { isStoreAssetCaptureEnabled } from "../platform/testLaunchConfig.ts";
+import { usePracticeRunManagement } from "./usePracticeRunManagement.ts";
 import {
   normalizeStoredThemeChoiceSelection,
   useThemeChoiceSelection
-} from "../backend/useThemeChoiceSelection.ts";
+} from "./useThemeChoiceSelection.ts";
 import { buildReviewEntry, type ReviewEntry } from "../backend/reviewEntry.ts";
 import {
   canonicalFen,
@@ -155,15 +155,15 @@ import type {
   PracticeRunPresentation
 } from "./practiceRunPresentation.ts";
 import {
-  puzzleEntryPreviewPlan,
-  schedulePuzzleEntryPreview,
-  type PuzzleEntryPreviewMove
-} from "./puzzleEntryPreview.ts";
-import {
   buildPracticeAdaptiveLayout,
   PRACTICE_UI_PADDING as UI_PADDING,
   type AdaptiveLayout
 } from "./adaptivePracticeLayout.ts";
+import {
+  boardMoveToUci,
+  consumeSuppressedBoardMove
+} from "./boardMoveSuppression.ts";
+import { usePuzzleEntryPreview } from "./usePuzzleEntryPreview.ts";
 
 export type {
   PracticeRunDraft,
@@ -5678,93 +5678,6 @@ function BoardInputBlocker(): React.JSX.Element {
   );
 }
 
-function usePuzzleEntryPreview({
-  boardRef,
-  currentPuzzle,
-  entryKey,
-  onLastMove,
-  suppressedMovesRef
-}: {
-  boardRef: { current: ChessboardRef | null };
-  currentPuzzle: CurrentPuzzleState | undefined;
-  entryKey: string | null;
-  onLastMove: (move: BoardMove | null) => void;
-  suppressedMovesRef: { current: string[] };
-}): {
-  displayFen: string | null;
-  locked: boolean;
-  replay: () => void;
-} {
-  const [completedKey, setCompletedKey] = useState<string | null>(null);
-  const [replayToken, setReplayToken] = useState(0);
-  const onLastMoveRef = useRef(onLastMove);
-  onLastMoveRef.current = onLastMove;
-  const plan = useMemo(
-    () => entryKey ? puzzleEntryPreviewPlan(currentPuzzle) : null,
-    [currentPuzzle, entryKey]
-  );
-  const previewKey = plan && entryKey ? `${entryKey}:${replayToken}` : null;
-  const locked = Boolean(previewKey && completedKey !== previewKey);
-
-  useEffect(() => {
-    if (!locked || !plan || !previewKey) {
-      return;
-    }
-
-    onLastMoveRef.current(null);
-    return schedulePuzzleEntryPreview({
-      plan,
-      playMove: (move: PuzzleEntryPreviewMove) => {
-        const board = boardRef.current;
-        if (!board) {
-          return undefined;
-        }
-        const suppressedMove = boardMoveToUci(move);
-        suppressedMovesRef.current.push(suppressedMove);
-        const played = board.move({
-          from: move.from as Square,
-          to: move.to as Square,
-          ...(move.promotion ? { promotion: move.promotion as PieceSymbol } : {})
-        });
-        if (isPromiseLike(played)) {
-          return played.then((resolvedMove) => {
-            if (!resolvedMove) {
-              consumeSuppressedBoardMove(suppressedMove, suppressedMovesRef.current);
-            }
-            return resolvedMove;
-          });
-        }
-        if (!played) {
-          consumeSuppressedBoardMove(suppressedMove, suppressedMovesRef.current);
-        }
-        return played;
-      },
-      onComplete: (played) => {
-        if (!played) {
-          boardRef.current?.resetBoard(plan.finalFen);
-        }
-        onLastMoveRef.current(plan.move);
-        setCompletedKey(previewKey);
-      }
-    });
-  }, [boardRef, locked, plan, previewKey, suppressedMovesRef]);
-
-  return {
-    displayFen: locked && plan ? plan.initialFen : null,
-    locked,
-    replay: useCallback(() => setReplayToken((token) => token + 1), [])
-  };
-}
-
-function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
-  return Boolean(
-    value
-    && typeof value === "object"
-    && "then" in value
-    && typeof (value as { then?: unknown }).then === "function"
-  );
-}
-
 function PracticeModeGlyph({
   inverse = false,
   mode,
@@ -11103,20 +11016,6 @@ function TabGlyph({
 function formatUci(move: MoveResult["move"]): string {
   const promotion = move.promotion ? move.promotion.toLowerCase() : "";
   return `${move.from}${move.to}${promotion}`;
-}
-
-function boardMoveToUci(move: BoardMove): string {
-  return `${move.from}${move.to}${move.promotion?.toLowerCase() ?? ""}`;
-}
-
-function consumeSuppressedBoardMove(move: string, suppressedMoves: string[]): boolean {
-  const normalizedMove = move.toLowerCase();
-  const index = suppressedMoves.findIndex((suppressedMove) => suppressedMove.toLowerCase() === normalizedMove);
-  if (index === -1) {
-    return false;
-  }
-  suppressedMoves.splice(index, 1);
-  return true;
 }
 
 function isArrowDuelCandidate(candidates: string[], move: string): boolean {

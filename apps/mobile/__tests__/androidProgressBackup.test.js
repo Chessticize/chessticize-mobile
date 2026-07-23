@@ -67,8 +67,8 @@ describe('Android Progress Backup', () => {
 
   it('maps the allowlist to the production Android database path and minimal SQLite sidecars', () => {
     const databaseLayout = read('src/backend/mobileDatabaseLayout.ts');
-    const deviceStore = read('src/backend/deviceSQLiteStore.ts');
-    const mobilePractice = read('src/backend/mobilePractice.ts');
+    const deviceStore = read('src/platform/deviceSQLiteStore.ts');
+    const mobilePractice = read('src/platform/mobilePractice.ts');
     const migrationJourney = read('e2e/android-migration.e2e.js');
 
     expect(databaseLayout).toContain('progressDatabaseName: "chessticize-mobile.sqlite"');

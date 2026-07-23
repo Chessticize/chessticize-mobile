@@ -1,3 +1,4 @@
+// Mobile launch adapter; kept outside the backend/domain seam.
 import { NativeModules } from "react-native";
 import { arePracticeTestControlsEnabled } from "../releaseConfig.ts";
 
