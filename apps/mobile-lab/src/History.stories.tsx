@@ -45,6 +45,7 @@ export const AttemptDetail: Story = {
     await openHistory(canvasElement);
     await clickTestId(canvasElement, "history-attempt-history-unclear");
     await waitForTestId(canvasElement, "review-session");
+    await clickTestId(canvasElement, "review-analysis-button");
     await waitForTestId(canvasElement, "review-theme-rail");
   }
 };

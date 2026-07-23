@@ -375,21 +375,29 @@ Terminal and guided-line states:
 - If the current analysis/review position is checkmate, show the game result (`1-0` or `0-1`) instead of misleading candidate rows.
 - During Arrow Duel wrong-line playback, any eval shown under the board describes the current position. It must not reuse the original two candidate scores after the board has advanced.
 
-### Custom Sprint Setup
+### New Run Setup
 
 ![Mobile custom sprint setup rendered design](assets/mobile-custom-config-wireframe.png)
 
-Custom sprint layout:
+New Run layout:
 
-- Use a focused setup screen or bottom sheet rather than a desktop-style page.
-- Keep mode, theme, duration, and per-puzzle time as compact controls.
+- Use a focused New Run screen or bottom sheet rather than a desktop-style page.
+- Keep name, practice format, themes, duration, and per-puzzle time as compact controls.
 - Show computed puzzle count and ELO as a live summary.
-- Show previous configs below the setup area as compact reusable rows.
+- Saving creates a persistent named Run on Practice Home and does not start a Sprint.
+- Do not show a separate Previous configs list. During the schema v8 upgrade,
+  promote every legacy Previous config into a visible named Home Run in its
+  existing last-used order. Number Regular Puzzle and Arrow Duel names
+  independently, preserve the legacy rating key, ELO, themes, timing, and
+  History grouping, and keep the old config row for a non-destructive,
+  idempotent migration.
 
-Custom sprint controls:
+New Run controls:
 
-- Mode: Regular Puzzles or Arrow Duel.
-- Theme: Mixed plus supported tactical themes.
+- Name: required, unique across active and removed Runs, and limited to 40 characters.
+- Practice format: Regular Puzzles or Arrow Duel.
+- Themes: All or any combination of supported curated tactical themes; multiple
+  themes use OR eligibility.
 - Duration: use allowed sprint durations from the domain config.
 - Per-puzzle time: use allowed per-puzzle times from the domain config.
 - ELO: default to 600 for unplayed custom buckets. Show the `Initial ELO`
@@ -400,14 +408,13 @@ Custom sprint controls:
   Sprint setup.
 - Summary: target puzzle count only; avoid repeating mode, rating range, current
   rating, ELO type, or mistake limit as non-editable rows.
-- Previous configs: compact rows with mode, theme, timing, last played, and current ELO.
 
-Custom sprint behavior:
+New Run behavior:
 
 - Changing any control updates the summary immediately.
-- Start button is disabled only when the config is invalid or no eligible puzzles exist locally.
-- Once a custom bucket has rated games, its ELO remains editable from the Custom
-  Sprint screen only after opening the `Edit ELO` disclosure.
+- Add to Home is disabled only when the Run is invalid or no eligible puzzles exist locally.
+- Once a Run has rated games, its current ELO remains editable from that Run's
+  editor without changing its stable Run identity or History linkage.
 - If the selected puzzle pack lacks enough eligible puzzles, show a local pack
   warning and offer a broader theme.
 
@@ -416,8 +423,10 @@ Custom sprint behavior:
 ### Practice
 
 - Default entry opens Practice, not a landing page.
-- Quick choices: Standard Sprint, Arrow Duel, Custom.
-- Current ELO appears near each mode, but detailed rating management stays in Settings.
+- Practice Home lists persistent named Runs, including the built-in Standard and
+  Arrow Duel Runs, plus a separate Add Run action.
+- Current ELO appears on each Run and is edited from that Run's editor rather
+  than from a separate Settings rating surface.
 - The active session should remain readable at small phone widths.
 - The active session should remain playable in compact landscape without requiring vertical scrolling of the board lane.
 - On iPad, Practice should use available width to expose progress and due-review context beside mode choices, not by enlarging every card.
@@ -428,7 +437,7 @@ Custom sprint behavior:
 
 - The Review tab is for Scheduled Review, not free analysis.
 - First screen shows due mistake count and starts the official review flow.
-- Filters include due, overdue, failed again, mode, sprint speed, Arrow Duel only, and theme.
+- Filters include due, overdue, failed again, mode, sprint speed, and Arrow Duel only.
 - Scheduled Review should reuse the same board surface as Practice.
 - Scheduled Review should use the same adaptive board-slot sizing as active sprint, with review controls moving into the side/control rail in landscape and regular-width layouts.
 - Standard review items use the original puzzle-solving flow and preserve the relevant target pace, such as a 20-second item from a 20-second sprint. Legacy Blitz history may still be displayed for compatibility, but Blitz is no longer a current mobile practice entry.
@@ -442,12 +451,13 @@ Custom sprint behavior:
   rolls over at 04:00. Practice badges, Review summaries, filters, and queue
   rows must all use this shared core definition.
 - Empty state should say when the next review is due and offer regular practice.
-- Review cards should show mode, theme, last wrong date, due state, current interval, and source sprint type.
+- Review cards should show mode, last wrong date, due state, current interval, and source sprint type. They must not expose puzzle tags.
 - The default Review Queue surface shows Today, Tomorrow, Next 7 days, and
   Total workload counts; per-item review cards and grouped starts appear in the
   expanded filter view. Overdue appears only when the count is nonzero.
 - Review queue counts include only locally resolvable puzzles. If a queue row references a puzzle that is no longer available in the active local pack, the backend removes that row before the UI computes due, overdue, and total counts.
 - The user can stop a Scheduled Review session at any time. Completed items are saved; unseen items remain due or overdue.
+- Scheduled Review and replay hide puzzle tags while the user is solving so that tags cannot act as hints. The complete server-curated tag set appears only while Analysis is active and disappears again when Analysis closes.
 - After a Scheduled Review batch, the user may open Analysis Review for missed items. That follow-up inspection does not create history rows and does not update the schedule.
 - Post-sprint Analysis Review is also unrecorded. It is for same-day exploration only; the scheduled memory-curve review still starts from the stored due date, normally the next day after the miss.
 - Post-sprint mistake review is a one-shot immediate action from Sprint Results. If the user leaves the result screen, starts another sprint, or exits that immediate review, the Review tab must show only the scheduled review queue and must not auto-start those session mistakes again.
@@ -479,6 +489,13 @@ Custom sprint behavior:
 - Analysis Review launched from History supports retry, Stockfish analysis, and previous/next navigation through the current filtered History result set.
 - Previous/next navigation from History follows the active filter result order, not just the currently visible page.
 - History filters should be horizontally scrollable chips on phones.
+- History theme filters use multi-select OR semantics: an attempt matches when
+  it has any selected curated theme. `All` represents no named-theme constraint,
+  clears named selections, and is restored when the last named theme is removed.
+- History rows and theme filters show only server-curated theme tags. Rows show
+  the complete curated set for the puzzle rather than only the first raw
+  metadata tag. A History replay hides tags while solving and reveals the same
+  complete curated set only while Analysis is active.
 - On regular-width iPad, History may use a split view for filters/chart/list,
   but the default list remains All Puzzles and the trend chart appears only
   after a rating bucket is selected.

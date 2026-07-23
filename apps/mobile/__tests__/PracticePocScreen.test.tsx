@@ -955,12 +955,15 @@ describe("PracticePocScreen", () => {
     expect(railTestIDs).toContain("history-attempt-history-unclear-themes-matein3");
   });
 
-  it("keeps the seven curated puzzle tags when replay opens from History", async () => {
+  it("reveals all seven curated puzzle tags only when replay Analysis opens", async () => {
     const renderer = renderLabScenario("history-attempt-detail");
     await flushMicrotasks();
 
     press(renderer, "history-tab");
     press(renderer, "history-attempt-history-unclear");
+    expect(() => findByTestId(renderer, "review-theme-rail")).toThrow();
+
+    press(renderer, "review-analysis-button");
 
     const railTestIDs = new Set(
       collectTestIds(findByTestId(renderer, "review-theme-rail"))
@@ -4003,7 +4006,11 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "practice-prompt-icon")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "practice-prompt"))).toContain("Find the best move");
     expect(collectText(findByTestId(renderer, "practice-prompt"))).toContain("For black.");
+    expect(() => findByTestId(renderer, "review-theme-rail")).toThrow();
+    press(renderer, "review-analysis-button");
     expect(collectText(findByTestId(renderer, "review-theme-rail"))).toBe(historyAttemptThemes);
+    press(renderer, "review-close-analysis");
+    expect(() => findByTestId(renderer, "review-theme-rail")).toThrow();
     expect(() => findByTestId(renderer, "review-theme-pill")).toThrow();
     expect(findByTestId(renderer, "review-reset-puzzle")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "review-exit"))).toBe("");
@@ -4012,7 +4019,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-panel")).toBeTruthy();
   });
 
-  it("shows curated tags in History rows, filters, and puzzle replay", () => {
+  it("shows curated tags in History but reveals replay tags only during Analysis", () => {
     const store = new MemoryStore();
     store.seedPuzzles([{
       ...sharedHistoryPuzzle(),
@@ -4092,6 +4099,10 @@ describe("PracticePocScreen", () => {
     press(renderer, "history-theme-promotion");
     press(renderer, "history-attempt-curated-density");
     expect(findByTestId(renderer, "review-session")).toBeTruthy();
+    expect(() => findByTestId(renderer, "review-theme-rail")).toThrow();
+    expect(() => findByTestId(renderer, "review-theme-catalog")).toThrow();
+
+    press(renderer, "review-analysis-button");
     const replayThemes = collectText(findByTestId(renderer, "review-theme-rail"));
     expect(replayThemes).toContain("Advanced Pawn");
     expect(replayThemes).toContain("Sacrifice");
@@ -4102,6 +4113,9 @@ describe("PracticePocScreen", () => {
     expect(testIdOrder(renderer, "review-board", "review-theme-catalog")).toBeLessThan(0);
     expect(flattenTestStyle(replayThemeCatalog.props.style).alignItems).toBe("center");
     expect(() => findByTestId(renderer, "review-theme-pill")).toThrow();
+    press(renderer, "review-close-analysis");
+    expect(() => findByTestId(renderer, "review-theme-rail")).toThrow();
+    expect(() => findByTestId(renderer, "review-theme-catalog")).toThrow();
     press(renderer, "review-exit");
     expect(historyThemeSelected(renderer, "pin")).toBe(true);
     expect(historyThemeSelected(renderer, "promotion")).toBe(true);
@@ -4821,8 +4835,12 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "review-session")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "review-current-puzzle-id"))).toBe("000hf");
     expect(findByTestId(renderer, "review-board")).toBeTruthy();
+    expect(() => findByTestId(renderer, "review-theme-rail")).toThrow();
+    press(renderer, "review-analysis-button");
     expect(collectText(findByTestId(renderer, "review-theme-rail"))).toContain("Mate in 2");
     expect(() => findByTestId(renderer, "review-theme-rail-mate")).toThrow();
+    press(renderer, "review-close-analysis");
+    expect(() => findByTestId(renderer, "review-theme-rail")).toThrow();
     expect(() => findByTestId(renderer, "review-theme-pill")).toThrow();
     expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Due tomorrow");
     expect(collectText(findByTestId(renderer, "review-schedule-remove"))).toBe("Remove from Review");
@@ -5019,6 +5037,9 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "review-filter-mode-standard")).toBeTruthy();
     expect(findByTestId(renderer, "review-filter-arrow-duel")).toBeTruthy();
     expect(findByTestId(renderer, "review-filter-speed-20")).toBeTruthy();
+    expect(renderer.root.findAll(
+      (node) => typeof node.props.testID === "string" && node.props.testID.startsWith("review-filter-theme-")
+    )).toHaveLength(0);
     expect(findByTestId(renderer, "review-due-items")).toBeTruthy();
     expect(findByTestId(renderer, "review-context-list")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "review-context-list"))).toContain("Standard · 20s pace");
@@ -5034,9 +5055,11 @@ describe("PracticePocScreen", () => {
         && node.props.accessibilityRole === "button"
     );
     expect(dueItemRows.length).toBeGreaterThan(0);
+    expect(dueItemRows[0]!.props.accessibilityLabel).toMatch(/^Start Standard review,/);
     expect(dueItemRows[0]!.props.accessibilityLabel).toContain("Source sprint: Standard · 20s pace");
     expect(dueItemRows[0]!.props.accessibilityLabel).toContain("Review 1");
     expect(dueItemRows[0]!.props.accessibilityLabel).toContain("Lapses 0");
+    expect(collectText(findByTestId(renderer, `${dueItemRows[0]!.props.testID}-context`))).toBe(`Last wrong ${lastWrongDate}`);
     expect(collectText(findByTestId(renderer, `${dueItemRows[0]!.props.testID}-meta`))).toContain("Due now · 1d interval · Standard · 20s pace");
     expect(() => findByTestId(renderer, `${dueItemRows[0]!.props.testID}-badge`)).toThrow();
 

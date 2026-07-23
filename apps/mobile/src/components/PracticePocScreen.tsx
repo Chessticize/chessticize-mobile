@@ -7412,16 +7412,6 @@ function groupReviewEntriesByContext(entries: ReviewEntry[]): ReviewEntryGroup[]
   return [...groups.values()];
 }
 
-function collectReviewThemeFilters(items: ReviewQueueItem[]): string[] {
-  const themes = new Set<string>();
-  for (const item of items) {
-    for (const theme of item.puzzle.themes.slice(0, 2)) {
-      themes.add(theme);
-    }
-  }
-  return [...themes].sort((left, right) => left.localeCompare(right)).slice(0, 4);
-}
-
 function collectReviewSpeedFilters(items: ReviewQueueItem[]): number[] {
   const speeds = new Set<number>();
   for (const item of items) {
@@ -7461,9 +7451,6 @@ function filterReviewQueueItems(items: ReviewQueueItem[], filter: ReviewQueueFil
     if (filter.startsWith("mode:")) {
       return item.review.mode === filter.slice("mode:".length);
     }
-    if (filter.startsWith("theme:")) {
-      return item.puzzle.themes.includes(filter.slice("theme:".length));
-    }
     if (filter.startsWith("speed:")) {
       return reviewItemSpeedSeconds(item) === Number(filter.slice("speed:".length));
     }
@@ -7486,9 +7473,6 @@ function reviewQueueFilterLabel(filter: ReviewQueueFilter): string {
   }
   if (filter.startsWith("mode:")) {
     return modeLabel(filter.slice("mode:".length) as SprintMode);
-  }
-  if (filter.startsWith("theme:")) {
-    return filter.slice("theme:".length);
   }
   if (filter.startsWith("speed:")) {
     return `${filter.slice("speed:".length)}s pace`;
@@ -7555,8 +7539,7 @@ type ReviewQueueFilter =
   | "failed"
   | "arrow_duel"
   | `mode:${SprintMode}`
-  | `speed:${number}`
-  | `theme:${string}`;
+  | `speed:${number}`;
 
 type ReviewPuzzleState =
   | { kind: "line"; line: PuzzleLineState }
@@ -7641,7 +7624,6 @@ function ReviewPanel({
   const dailyReviewProgressLabel = dailyReviewTotal === 0
     ? "0"
     : `${completedReviews.length} / ${dailyReviewTotal}`;
-  const themeFilters = collectReviewThemeFilters(dueReviewItems);
   const speedFilters = collectReviewSpeedFilters(dueReviewItems);
   const filteredDueReviewItems = filterReviewQueueItems(dueReviewItems, queueFilter, nowMs);
   const filteredDueEntries = filteredDueReviewItems.map((item): ReviewEntry => buildReviewEntry({
@@ -7874,15 +7856,6 @@ function ReviewPanel({
               onPress={() => setQueueFilter(`speed:${speed}`)}
             />
           ))}
-          {themeFilters.map((theme) => (
-            <FilterButton
-              key={theme}
-              active={queueFilter === `theme:${theme}`}
-              label={theme}
-              testID={`review-filter-theme-${safeTestId(theme)}`}
-              onPress={() => setQueueFilter(`theme:${theme}`)}
-            />
-          ))}
         </ScrollView>
       ) : null}
 
@@ -8031,7 +8004,6 @@ function ReviewQueueItemCard({
   nowMs: number;
   onPress: () => void;
 }): React.JSX.Element {
-  const primaryTheme = item.puzzle.themes[0] ?? "mixed";
   const activityLabel = item.review.lastReviewedAt
     ? `Last wrong ${formatLocalCalendarDate(item.review.lastReviewedAt)}`
     : `Added manually ${formatLocalCalendarDate(item.review.enrolledAt ?? item.review.dueDay)}`;
@@ -8046,7 +8018,7 @@ function ReviewQueueItemCard({
   const nextReviewNumber = item.review.reviewCount + 1;
   const rowTestId = `review-due-item-${item.puzzle.id}-${safeTestId(item.review.mode)}`;
   const accessibilityLabel = [
-    `Start ${modeLabel(item.review.mode)} ${primaryTheme} review`,
+    `Start ${modeLabel(item.review.mode)} review`,
     activityLabel,
     dueState,
     `${item.review.intervalDays} day interval`,
@@ -8065,7 +8037,7 @@ function ReviewQueueItemCard({
     >
       <View style={styles.reviewItemCopy}>
         <Text style={styles.historyRowTitle}>{modeLabel(item.review.mode)}</Text>
-        <Text testID={`${rowTestId}-context`} style={styles.helperText}>{primaryTheme} · {activityLabel}</Text>
+        <Text testID={`${rowTestId}-context`} style={styles.helperText}>{activityLabel}</Text>
         <Text testID={`${rowTestId}-meta`} style={styles.helperText}>
           {dueState} · {item.review.intervalDays}d interval · {compactSource}
         </Text>
@@ -9047,7 +9019,7 @@ function ReviewSession({
               />
             ) : null}
           </View>
-          {reviewCuratedThemes.length > 0 ? (
+          {analysisEnabled && reviewCuratedThemes.length > 0 ? (
             <View
               style={[styles.reviewThemeCatalogRail, { width: boardSize }]}
               testID="review-theme-catalog"
