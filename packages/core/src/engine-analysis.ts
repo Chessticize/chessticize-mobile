@@ -326,7 +326,7 @@ export function buildPuzzleGuidedAnalysisLines({
       move: line.move,
       san: sanForMove(fen, line.move),
       label: index === 0 ? "Top move" : "Candidate",
-      score: line.score ? formatSideToMoveScore(line.score) : "eval --"
+      score: line.score ? formatWhitePerspectiveScore(line.score) : "eval --"
     }));
 }
 
@@ -361,7 +361,7 @@ export function buildArrowDuelCandidateAnalysisLines({
         move,
         san: sanForMove(positionFen, move),
         label: move === bestMove || (!bestMove && index === 0) ? "Top move" : "Candidate",
-        score: score ? formatSideToMoveScore(score) : "eval --"
+        score: score ? formatWhitePerspectiveScore(score) : "eval --"
       };
     });
 }
@@ -384,28 +384,28 @@ export function buildCurrentPositionEvaluationLine({
 
   const engineLine = sortEngineLines(engineLines)[0];
   if (engineLine) {
-    return currentPositionLine(formatSideToMoveScore(engineLine.score), "Current position");
+    return currentPositionLine(formatWhitePerspectiveScore(engineLine.score), "Current position");
   }
 
   const forcedMate = forcedMateScoreForLineState(fen, currentPuzzle);
   if (forcedMate) {
-    return currentPositionLine(formatSideToMoveScore(forcedMate), "Current position");
+    return currentPositionLine(formatWhitePerspectiveScore(forcedMate), "Current position");
   }
 
   const knownPositionScore = puzzle ? scoreForKnownPuzzlePosition(fen, puzzle) : undefined;
   if (knownPositionScore) {
-    return currentPositionLine(formatSideToMoveScore(knownPositionScore), "Current position");
+    return currentPositionLine(formatWhitePerspectiveScore(knownPositionScore), "Current position");
   }
 
   return currentPositionLine("eval --", "Current position");
 }
 
-export function formatSideToMoveScore(score: AnalysisScore): string {
+export function formatWhitePerspectiveScore(score: AnalysisScore): string {
   if (score.kind === "mate") {
-    return score.sideToMoveMate > 0 ? `M${Math.abs(score.sideToMoveMate)}` : `-M${Math.abs(score.sideToMoveMate)}`;
+    return score.whiteMate > 0 ? `M${Math.abs(score.whiteMate)}` : `-M${Math.abs(score.whiteMate)}`;
   }
 
-  const pawns = score.sideToMoveCentipawns / 100;
+  const pawns = score.whiteCentipawns / 100;
   return `${pawns >= 0 ? "+" : ""}${pawns.toFixed(1)}`;
 }
 

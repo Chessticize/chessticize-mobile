@@ -2499,6 +2499,31 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "sprint-result-solved"))).toContain("1 / 1");
   });
 
+  it("includes mistakes in the completed sprint result attempt count", async () => {
+    const store = new MemoryStore();
+    store.seedPuzzles(Array.from({ length: 4 }, (_, index) => ({
+      id: `result-attempt-count-${index}`,
+      initialFen: `4k3/${["8", "p7", "1p6", "2p5"][index]}/8/8/8/8/4P3/4K3 b - - 0 1`,
+      solutionMoves: ["e8e7", "e2e4"],
+      rating: 600,
+      themes: ["endgame"],
+      source: "synthetic"
+    } satisfies Puzzle)));
+    const renderer = renderScreen({
+      practiceService: new PracticeService(store),
+      standardTargetCorrect: 1
+    });
+
+    startStandardSprint(renderer);
+    await boardMove(renderer, "e2e3");
+    await settleFeedbackSnapshot();
+    await boardMove(renderer, "e2e4");
+    await settleFeedbackSnapshot();
+
+    expectText(renderer, "Sprint complete");
+    expect(collectText(findByTestId(renderer, "sprint-result-solved"))).toContain("1 / 2");
+  });
+
   it("keeps a deterministic Custom target inside the selected shared configuration", () => {
     const service = createMobilePracticeService();
     const renderer = renderScreen({
@@ -5933,8 +5958,8 @@ describe("PracticePocScreen", () => {
     await waitForAssertion(() => {
       expect(stockfish.commands).toContain("go depth 8");
       expect(collectText(findByTestId(renderer, "stockfish-diagnostics-status"))).toContain("Depth 4/20");
-      expect(collectText(findByTestId(renderer, "stockfish-diagnostics-line-0"))).toMatch(/^\+0\.2.*Qe8/);
-      expect(collectText(findByTestId(renderer, "stockfish-diagnostics-line-1"))).toMatch(/^\+0\.1.*Qxd6/);
+      expect(collectText(findByTestId(renderer, "stockfish-diagnostics-line-0"))).toMatch(/^-0\.2.*Qe8/);
+      expect(collectText(findByTestId(renderer, "stockfish-diagnostics-line-1"))).toMatch(/^-0\.1.*Qxd6/);
       expect(collectText(findByTestId(renderer, "stockfish-diagnostics-panel"))).not.toContain("eval --");
     });
 
@@ -5948,8 +5973,8 @@ describe("PracticePocScreen", () => {
     await waitForAssertion(() => {
       expect(stockfish.commands).toContain("go depth 20");
       expect(collectText(findByTestId(renderer, "stockfish-diagnostics-status"))).toContain("Done · Depth 12");
-      expect(collectText(findByTestId(renderer, "stockfish-diagnostics-line-0"))).toMatch(/^\+3\.6.*Qxd6/);
-      expect(collectText(findByTestId(renderer, "stockfish-diagnostics-line-1"))).toMatch(/^-1\.2.*Qe8/);
+      expect(collectText(findByTestId(renderer, "stockfish-diagnostics-line-0"))).toMatch(/^-3\.6.*Qxd6/);
+      expect(collectText(findByTestId(renderer, "stockfish-diagnostics-line-1"))).toMatch(/^\+1\.2.*Qe8/);
       expect(collectText(findByTestId(renderer, "stockfish-diagnostics-raw-lines"))).toContain("info depth 12 multipv 1 score cp 360 pv d8d6");
     });
   });
