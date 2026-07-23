@@ -2570,7 +2570,12 @@ export function PracticePocScreen({
     <SessionScoreStrip state={state} />
   ) : null;
   const practicePromptNode = shouldShowSessionBoard ? (
-    <View style={[styles.practicePromptStack, { width: sessionUsesRail ? "100%" : boardSize }]}>
+    <View
+      style={[
+        styles.practicePromptStack,
+        { width: sessionUsesRail ? adaptiveLayout.sessionRailWidth : boardSize }
+      ]}
+    >
       <PracticePrompt
         currentPuzzle={displayedPuzzle}
         kingPieceSize={kingGlyphSizeForBoard(boardSize)}
@@ -2727,13 +2732,24 @@ export function PracticePocScreen({
                     {sessionUsesRail ? (
                       <ScrollView
                         style={[styles.activeSessionControlRailScroll, { width: adaptiveLayout.sessionRailWidth }]}
-                        contentContainerStyle={styles.activeSessionControlRail}
+                        contentContainerStyle={[
+                          styles.activeSessionControlRailScrollContent,
+                          { width: adaptiveLayout.sessionRailWidth }
+                        ]}
                         testID="active-session-control-rail"
                       >
-                        {sessionStatusNode}
-                        {practicePromptNode}
-                        {sessionScoreNode}
-                        {errorNode}
+                        <View
+                          style={[
+                            styles.activeSessionControlRail,
+                            { width: adaptiveLayout.sessionRailWidth }
+                          ]}
+                          testID="active-session-control-rail-content"
+                        >
+                          {sessionStatusNode}
+                          {practicePromptNode}
+                          {sessionScoreNode}
+                          {errorNode}
+                        </View>
                       </ScrollView>
                     ) : null}
                   </View>
@@ -12582,10 +12598,11 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     maxHeight: "100%"
   },
+  activeSessionControlRailScrollContent: {
+    paddingBottom: 4
+  },
   activeSessionControlRail: {
-    gap: 10,
-    paddingBottom: 4,
-    width: "100%"
+    gap: 10
   },
   activeSessionShell: {
     gap: 8

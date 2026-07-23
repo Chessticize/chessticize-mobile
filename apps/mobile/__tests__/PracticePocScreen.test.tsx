@@ -1679,20 +1679,29 @@ describe("PracticePocScreen", () => {
       .toThrow();
   });
 
-  it("constrains compact-landscape session chrome to the visible control rail", () => {
+  it("gives iPhone Pro Max landscape session chrome the numeric visible rail width", () => {
     (ReactNative as unknown as {
       __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
-    }).__setWindowDimensions?.({ width: 844, height: 390, scale: 3, fontScale: 1 });
+    }).__setWindowDimensions?.({ width: 956, height: 440, scale: 3, fontScale: 1 });
+    (SafeAreaContext as unknown as {
+      __setSafeAreaInsets?: (insets: { bottom: number; left: number; right: number; top: number }) => void;
+    }).__setSafeAreaInsets?.({ top: 0, right: 62, bottom: 21, left: 62 });
 
     const renderer = renderScreen({ practiceService: createMobilePracticeService("random1000") });
     startStandardSprint(renderer);
 
+    expect(findByTestId(renderer, "adaptive-layout").props.accessibilityLabel)
+      .toBe("Layout compactLandscape");
     expect(flattenTestStyle(findByTestId(renderer, "active-session-adaptive-layout").props.style).width)
       .toBe("100%");
     const controlRail = findByTestId(renderer, "active-session-control-rail");
-    expect(flattenTestStyle(controlRail.props.contentContainerStyle).width).toBe("100%");
+    expect(flattenTestStyle(controlRail.props.style).width).toBe(282);
+    expect(flattenTestStyle(controlRail.props.contentContainerStyle).width).toBe(282);
+    expect(flattenTestStyle(
+      findByTestId(renderer, "active-session-control-rail-content").props.style
+    ).width).toBe(282);
     expect(nearestAncestorStyleValue(findByTestId(renderer, "practice-prompt"), "width"))
-      .toBe("100%");
+      .toBe(282);
   });
 
   it.each([
