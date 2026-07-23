@@ -11,6 +11,19 @@ module.exports = {
   },
   overrides: [
     {
+      files: ['scripts/**/*.js'],
+      env: {
+        node: true,
+      },
+    },
+    {
+      files: ['scripts/android-launcher-icons.js'],
+      rules: {
+        // PNG scanline decoding and CRC32 intentionally use byte-level operations.
+        'no-bitwise': 'off',
+      },
+    },
+    {
       files: ['__tests__/**/*.{js,jsx,ts,tsx}', 'jest.setup.js'],
       env: {
         jest: true,
