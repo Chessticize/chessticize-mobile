@@ -33,9 +33,12 @@ pnpm mobile:doctor:ios
 ```
 
 Require the exact-main `Mobile iOS` release gate to run on the repository's
-pinned Xcode 26.6 toolchain and pass Mobile JS plus both Detox suites. Do not
-accept a run from an older Xcode whose environment-dependent CocoaPods
-checksums differ from the submitted archive toolchain.
+pinned Xcode 26.6 toolchain and pass Mobile JS plus both Detox suites.
+CocoaPods deployment mode must pass in both the local checkout and the GitHub
+runner. React Native's Hermes compiler setting is intentionally patched to use
+a stable `PODS_ROOT`-based path; an absolute checkout path in an evaluated
+podspec makes `Podfile.lock` non-portable and is a release blocker, regardless
+of whether the dependency versions are unchanged.
 
 After any failed complete release workflow, perform the cross-platform
 pre-retry convergence sweep in `docs/RELEASE_SOURCE_POLICY.md` before

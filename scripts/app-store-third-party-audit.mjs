@@ -192,6 +192,13 @@ function main() {
       notices.includes("patches/react-native-chessboard@0.2.0.patch"),
     "The notice must disclose the local react-native-chessboard patch that is active in pnpm-lock.yaml."
   );
+  check(
+    checks,
+    "Patched React Native package is disclosed",
+    /^  react-native@0\.86\.0: [0-9a-f]+$/m.test(lockfile) &&
+      notices.includes("patches/react-native@0.86.0.patch"),
+    "The notice must disclose the local React Native patch that is active in pnpm-lock.yaml."
+  );
 
   check(
     checks,
