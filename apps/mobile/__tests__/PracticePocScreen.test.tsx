@@ -1652,6 +1652,33 @@ describe("PracticePocScreen", () => {
     expect(boardSize + reservedSessionChrome).toBeLessThanOrEqual(viewportHeight);
   });
 
+  it("keeps the iPad landscape board lane clear by moving the prompt and Unclear into the session rail", async () => {
+    (ReactNative as unknown as {
+      __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
+    }).__setWindowDimensions?.({ width: 1180, height: 820, scale: 2, fontScale: 1 });
+
+    const renderer = renderScreen({ practiceService: createMobilePracticeService("random1000") });
+    startStandardSprint(renderer);
+
+    expect(findByTestId(renderer, "adaptive-layout").props.accessibilityLabel)
+      .toBe("Layout regularLandscape");
+    expect(findByTestId(renderer, "active-session-control-rail").findByProps({ testID: "practice-prompt" }))
+      .toBeTruthy();
+    expect(() => findByTestId(renderer, "active-session-board-lane").findByProps({ testID: "practice-prompt" }))
+      .toThrow();
+
+    await boardMove(renderer, "e2e6");
+    await settleFeedbackSnapshot();
+    await boardMove(renderer, "e6f7");
+
+    const railTestIDs = collectTestIds(findByTestId(renderer, "active-session-control-rail"));
+    expect(railTestIDs).toContain("sprint-unclear-prompt");
+    expect(railTestIDs.indexOf("practice-prompt")).toBeLessThan(railTestIDs.indexOf("sprint-unclear-prompt"));
+    expect(railTestIDs.indexOf("sprint-unclear-prompt")).toBeLessThan(railTestIDs.indexOf("session-score-strip"));
+    expect(() => findByTestId(renderer, "active-session-board-lane").findByProps({ testID: "sprint-unclear-prompt" }))
+      .toThrow();
+  });
+
   it.each([
     { fontScale: 1, label: "phone portrait", topInset: 24 },
     { fontScale: 1.5, label: "large-text phone portrait", topInset: 32 }

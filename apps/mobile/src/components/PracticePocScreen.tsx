@@ -2715,7 +2715,7 @@ export function PracticePocScreen({
                     >
                       {!sessionUsesRail ? sessionStatusNode : null}
                       {!sessionUsesRail ? pausedSessionNode : null}
-                      {practicePromptNode}
+                      {!sessionUsesRail ? practicePromptNode : null}
                       {sessionBoardNode}
                       {!sessionUsesRail ? sessionScoreNode : null}
                       {!sessionUsesRail ? errorNode : null}
@@ -2727,6 +2727,7 @@ export function PracticePocScreen({
                         testID="active-session-control-rail"
                       >
                         {sessionStatusNode}
+                        {practicePromptNode}
                         {sessionScoreNode}
                         {errorNode}
                       </ScrollView>
