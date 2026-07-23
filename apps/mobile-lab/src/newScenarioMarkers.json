@@ -1,18 +1,1 @@
-{
-  "settings-feedback-entry": {
-    "issues": [
-      {
-        "issueNumber": 251,
-        "changeNote": "Add the approved Help & Feedback card and GitHub handoff."
-      }
-    ]
-  },
-  "settings-feedback-entry-failure": {
-    "issues": [
-      {
-        "issueNumber": 251,
-        "changeNote": "Show the retryable external-browser failure state."
-      }
-    ]
-  }
-}
+{}
