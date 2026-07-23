@@ -24,6 +24,10 @@ html {
   width: 100%;
 }
 
+.lab-app-surface {
+  display: flex;
+}
+
 .lab-toolbar {
   bottom: 10px;
   left: 10px;

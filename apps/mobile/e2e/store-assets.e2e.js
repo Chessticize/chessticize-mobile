@@ -11,6 +11,7 @@ const {
 } = require('./helpers');
 
 const describeStoreAssets = process.env.CHESSTICIZE_CAPTURE_STORE_ASSETS === '1' ? describe : describe.skip;
+const captureLandscapeAssets = process.env.CHESSTICIZE_CAPTURE_LANDSCAPE_ASSETS === '1';
 const puzzlePackPath = resolve(__dirname, '../../../fixtures/puzzles/bundled-core-pack.sqlite');
 const sprintNowMs = Date.parse('2026-07-08T18:00:00.000Z');
 const reviewNowMs = Date.parse('2026-07-09T18:00:00.000Z');
@@ -44,7 +45,7 @@ async function launchStoreAssetApp(nowMs, deleteData) {
 }
 
 async function setStoreAssetRatings({ standard, arrowDuel }) {
-  await openTab('practice-tab', 'practice-run-management');
+  await openTab('practice-tab', 'practice-run-arrow-duel');
   await element(by.id('practice-run-home-edit')).tap();
 
   for (const [ratingKey, targetRating] of [
@@ -105,6 +106,7 @@ async function completeOneWrongReview() {
   );
   await sleep(500);
   await device.takeScreenshot('app-store-08-review-session');
+  await takeLandscapeScreenshot('app-store-08-review-session');
   await playBoardMove('review-board', fixture.wrongMove, fixture.flipped);
   await waitFor(element(by.id('review-reminder-permission-prompt'))).toExist().withTimeout(10000);
   await element(by.id('review-reminder-permission-dismiss')).tap();
@@ -127,12 +129,13 @@ async function captureMainTabScenes() {
   }
   await sleep(1200);
   await device.takeScreenshot('app-store-01-practice-tab');
+  await takeLandscapeScreenshot('app-store-01-practice-tab');
 
   await element(by.id('practice-add-run')).tap();
   await waitFor(element(by.id('practice-run-editor'))).toExist().withTimeout(10000);
   await element(by.id('practice-main-scroll')).scrollTo('top');
   await waitFor(element(by.id('custom-mode-regular'))).toBeVisible().withTimeout(10000);
-  await waitFor(element(by.id('custom-theme-row'))).toExist().withTimeout(10000);
+  await waitFor(element(by.id('practice-run-theme-row'))).toExist().withTimeout(10000);
   await expect(element(by.text('Themes'))).toExist();
   await sleep(1200);
   await device.takeScreenshot('app-store-07-custom-setup');
@@ -164,6 +167,7 @@ async function captureSprintScenes() {
   await waitForVisibleInPracticeScroll('session-board');
   await sleep(500);
   await device.takeScreenshot('app-store-05-standard-sprint');
+  await takeLandscapeScreenshot('app-store-05-standard-sprint');
 
   await element(by.id('session-abandon')).tap();
   await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(5000);
@@ -177,6 +181,22 @@ async function captureSprintScenes() {
   await waitFor(element(by.id('arrow-duel-candidate-overlay'))).toExist().withTimeout(10000);
   await sleep(500);
   await device.takeScreenshot('app-store-06-arrow-duel');
+  await takeLandscapeScreenshot('app-store-06-arrow-duel');
+}
+
+async function takeLandscapeScreenshot(name) {
+  if (!captureLandscapeAssets) {
+    return;
+  }
+
+  await device.setOrientation('landscape');
+  try {
+    await sleep(500);
+    await device.takeScreenshot(`${name}-landscape`);
+  } finally {
+    await device.setOrientation('portrait');
+    await sleep(500);
+  }
 }
 
 async function resolveDisplayedArrowDuelFixture(overlayTestID, puzzleIDTestID) {

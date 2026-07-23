@@ -1,6 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react-native-web-vite";
 import { LabScenario } from "./LabScenario.tsx";
-import { clickTestId, expectTestIdAbsent, openSettings, waitForTestId } from "./storyPlay.ts";
+import {
+  clickTestId,
+  expectTestIdAbsent,
+  openSettings,
+  waitForTestId,
+  waitForText
+} from "./storyPlay.ts";
 
 const meta = {
   title: "Settings",
@@ -16,6 +22,8 @@ export const IosSync: Story = {
   play: async ({ canvasElement }) => {
     await openSettings(canvasElement);
     await waitForTestId(canvasElement, "settings-sync-section");
+    await waitForText(canvasElement, "Sign in to iCloud to sync");
+    await waitForText(canvasElement, "Permission not requested");
   }
 };
 

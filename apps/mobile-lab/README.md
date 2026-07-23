@@ -32,8 +32,8 @@ Each scenario reloads with the same fixed clock, puzzle selection, memory state,
 
 The viewport toolbar includes:
 
-- Phone portrait: 390 × 844.
-- Phone landscape: 844 × 390.
+- Phone portrait: 402 × 874, with the iPhone 17 Release Safe Area.
+- Phone landscape: 874 × 402, with the iPhone 17 Release Safe Area.
 - Regular width: 1180 × 820.
 
 ## Validate the lab

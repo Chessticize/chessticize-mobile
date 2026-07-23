@@ -17,3 +17,17 @@ test("the lab allows tall mobile stories to scroll vertically", async () => {
   assert.match(labCss, /html\s*\{[^}]*overflow-y:\s*auto;/s);
   assert.match(labCss, /html\s*\{[^}]*-webkit-overflow-scrolling:\s*touch;/s);
 });
+
+test("the lab app surface fills short Release screens", async () => {
+  const labCss = await readFile(new URL("./lab.css", import.meta.url), "utf8");
+
+  assert.match(labCss, /\.lab-app-surface\s*\{[^}]*display:\s*flex;/s);
+});
+
+test("the lab pins Release Safe Area values instead of accepting the browser's zero insets", async () => {
+  const preview = await readFile(new URL("../.storybook/preview.tsx", import.meta.url), "utf8");
+
+  assert.match(preview, /SafeAreaFrameContext\.Provider/);
+  assert.match(preview, /SafeAreaInsetsContext\.Provider/);
+  assert.doesNotMatch(preview, /<SafeAreaProvider/);
+});
