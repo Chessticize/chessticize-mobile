@@ -1,21 +1,33 @@
 {
-  "practice-timing-policy": {
+  "practice-run-standard-editor": {
     "issues": [
       {
         "issueNumber": 248,
-        "changeNote": "Configure a 2x Slow warning independently of Run ELO."
+        "changeNote": "Add the Slow warning to the existing Edit Run screen."
       },
       {
         "issueNumber": 249,
-        "changeNote": "Configure a 3x puzzle timeout that records and advances."
+        "changeNote": "Add puzzle timeout to the existing Edit Run screen without changing ELO."
       }
     ]
   },
-  "practice-timing-active": {
+  "practice-custom-rating-editor": {
     "issues": [
       {
         "issueNumber": 248,
-        "changeNote": "Keep Sprint countdown primary and show puzzle elapsed time as a pace signal."
+        "changeNote": "Keep the timing controls consistent in the existing Custom Run editor."
+      },
+      {
+        "issueNumber": 249,
+        "changeNote": "Keep puzzle timeout consistent in the existing Custom Run editor."
+      }
+    ]
+  },
+  "practice-active": {
+    "issues": [
+      {
+        "issueNumber": 248,
+        "changeNote": "Show compact puzzle elapsed time without adding another layout bar."
       }
     ]
   },
@@ -23,7 +35,7 @@
     "issues": [
       {
         "issueNumber": 248,
-        "changeNote": "Warn on a slow solve without automatically marking it Unclear."
+        "changeNote": "Use a compact Slow state in the existing active session."
       }
     ]
   },
@@ -31,19 +43,19 @@
     "issues": [
       {
         "issueNumber": 249,
-        "changeNote": "Record Timed out separately from Wrong, Unclear, and Review."
+        "changeNote": "Briefly show Timed out, then reset the indicator for the next puzzle."
       }
     ]
   },
-  "history-timing-attention": {
+  "history-populated": {
     "issues": [
       {
         "issueNumber": 248,
-        "changeNote": "Filter Slow attempts while preserving independent clarity and Review choices."
+        "changeNote": "Add Slow to the existing History quick filters and attempt labels."
       },
       {
         "issueNumber": 249,
-        "changeNote": "Show both puzzle-limit and Sprint-end timeout causes in History."
+        "changeNote": "Add Timed out to the existing History quick filters and attempt results."
       }
     ]
   },
@@ -51,7 +63,7 @@
     "issues": [
       {
         "issueNumber": 250,
-        "changeNote": "Compare theme accuracy, median correct time, relative pace, and sample size before training."
+        "changeNote": "Add one compact theme-based training recommendation to populated History."
       }
     ]
   }

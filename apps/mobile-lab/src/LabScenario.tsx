@@ -78,10 +78,44 @@ function LabScenarioContent({
           ? SERVER_CURATED_THEME_PRESENTATION
           : undefined}
         runEloEditingMovedToHome
+        runTimingEditorPreview={showsRunTimingEditorPreview(scenarioId)}
+        sessionTimingPreview={sessionTimingPreviewFor(scenarioId)}
+        historyTimingPreview={showsHistoryTimingPreview(scenarioId)
+          ? {
+              slowAttemptIds: ["history-correct"],
+              timedOutAttemptIds: ["history-wrong"]
+            }
+          : undefined}
+        historyTrainingFocusPreview={scenarioId === "history-tactical-profile"}
         {...runtime.screenProps}
       />
     </LabScenarioShell>
   );
+}
+
+function showsRunTimingEditorPreview(scenarioId: LabScenarioId): boolean {
+  return scenarioId === "practice-run-standard-editor"
+    || scenarioId === "practice-custom-rating-editor";
+}
+
+function sessionTimingPreviewFor(
+  scenarioId: LabScenarioId
+): React.ComponentProps<typeof PracticePocScreen>["sessionTimingPreview"] {
+  if (scenarioId === "practice-active") {
+    return "normal";
+  }
+  if (scenarioId === "practice-timing-warning") {
+    return "slow";
+  }
+  if (scenarioId === "practice-timing-timeout") {
+    return "timed_out";
+  }
+  return undefined;
+}
+
+function showsHistoryTimingPreview(scenarioId: LabScenarioId): boolean {
+  return scenarioId === "history-populated"
+    || scenarioId === "history-tactical-profile";
 }
 
 function isRunManagementScenario(scenarioId: LabScenarioId): boolean {
@@ -191,6 +225,7 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     case "history-populated":
     case "history-filters":
     case "history-attempt-detail":
+    case "history-tactical-profile":
       service = createHistoryService(false, THEME_CATALOG_LAB_PUZZLES);
       configurePuzzleSource = false;
       break;
