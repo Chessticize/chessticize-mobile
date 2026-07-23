@@ -104,12 +104,18 @@ describe('Android Standard Practice release slice', () => {
     expect(standardFixture).toEqual(expect.objectContaining({
       expectedRatingBefore: 600,
       puzzleSelectionSeed: 'android-standard-practice',
+      customRunTheme: {
+        id: 'mate-in-2',
+        label: 'Mate in 2',
+        puzzleTheme: 'mateIn2',
+      },
       puzzle: expect.objectContaining({
         id: 'MRbdN',
         solutionMoves: ['d2g5', 'e7e1', 'd1e1', 'e8e1'],
       }),
       userMoves: ['e7e1', 'e8e1'],
     }));
+    expect(standardFixture.puzzle.themes).toContain(standardFixture.customRunTheme.puzzleTheme);
     expect(standardFixture.userMoves).toEqual([
       standardFixture.puzzle.solutionMoves[1],
       standardFixture.puzzle.solutionMoves[3],
@@ -131,6 +137,8 @@ describe('Android Standard Practice release slice', () => {
     expect(practiceJourney).not.toContain('standardFixture.puzzle.rating} ->');
     expect(practiceJourney).not.toContain("'a3c1'");
     expect(practiceJourney).not.toContain("'c1d1'");
+    expect(read('e2e/android-custom-practice.e2e.js'))
+      .toContain('practiceFixture.customRunTheme.id');
     expect(storageContract).toContain('android-standard-practice.fixture.json');
     expect(storageContract).not.toContain('new DatabaseSync(resolve("fixtures/puzzles/bundled-core-pack.sqlite")');
     expect(componentContract).toContain('Progress 0 of 1');

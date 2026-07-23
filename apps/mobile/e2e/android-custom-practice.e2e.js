@@ -11,7 +11,8 @@ const practiceFixture = require('../../../fixtures/puzzles/android-standard-prac
 
 const TEST_NOW_MS = '1784030400000';
 const RELAUNCH_TEST_NOW_MS = String(Number(TEST_NOW_MS) + 5 * 60_000);
-const CUSTOM_RUN_NAME = 'Fork Focus';
+const CUSTOM_RUN_NAME = `${practiceFixture.customRunTheme.label} Focus`;
+const CUSTOM_RUN_THEME_TEST_ID = `custom-theme-${practiceFixture.customRunTheme.id}`;
 const EXPECTED_AUTO_REPLY_MOVE = practiceFixture.puzzle.solutionMoves[2];
 const EXPECTED_RATING_DELTA = practiceFixture.expectedRatingAfter - practiceFixture.puzzle.rating;
 
@@ -47,8 +48,8 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
       await element(by.id('practice-run-name-input')).replaceText(CUSTOM_RUN_NAME);
       await element(by.id('custom-mode-arrow-duel')).tap();
       await element(by.id('custom-mode-regular')).tap();
-      await waitForVisibleInPracticeScroll('custom-theme-fork');
-      await element(by.id('custom-theme-fork')).tap();
+      await waitForVisibleInPracticeScroll(CUSTOM_RUN_THEME_TEST_ID);
+      await element(by.id(CUSTOM_RUN_THEME_TEST_ID)).tap();
       await waitForVisibleInPracticeScroll('practice-run-duration-stepper-decrease');
       await element(by.id('practice-run-duration-stepper-decrease')).tap();
       await waitForVisibleInPracticeScroll('practice-run-per-puzzle-stepper-increase');

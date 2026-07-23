@@ -1,6 +1,11 @@
 {
   "puzzleSelectionSeed": "android-standard-practice",
   "targetCorrect": 1,
+  "customRunTheme": {
+    "id": "mate-in-2",
+    "label": "Mate in 2",
+    "puzzleTheme": "mateIn2"
+  },
   "puzzle": {
     "id": "MRbdN",
     "initialFen": "r3rk2/pnppqp2/1p4p1/6b1/3P4/2P4R/PP1B1PPP/RN1Q2K1 w - - 0 1",
