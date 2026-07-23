@@ -104,10 +104,10 @@ describe('Android Standard Practice release slice', () => {
     expect(standardFixture).toEqual(expect.objectContaining({
       puzzleSelectionSeed: 'android-standard-practice',
       puzzle: expect.objectContaining({
-        id: '0CwCS',
-        solutionMoves: ['d7c6', 'a3c1', 'd2d1', 'c1d1'],
+        id: 'MRbdN',
+        solutionMoves: ['d2g5', 'e7e1', 'd1e1', 'e8e1'],
       }),
-      userMoves: ['a3c1', 'c1d1'],
+      userMoves: ['e7e1', 'e8e1'],
     }));
     expect(standardFixture.userMoves).toEqual([
       standardFixture.puzzle.solutionMoves[1],

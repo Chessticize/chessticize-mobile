@@ -85,6 +85,9 @@ describe("App Store assets document", () => {
     expect(storeAssetsE2e).toContain("takeLandscapeScreenshot('app-store-05-standard-sprint')");
     expect(storeAssetsE2e).toContain("takeLandscapeScreenshot('app-store-06-arrow-duel')");
     expect(storeAssetsE2e).toContain("takeLandscapeScreenshot('app-store-08-review-session')");
+    expect(storeAssetsE2e).toContain("takePortraitScreenshotAtTop('app-store-05-standard-sprint')");
+    expect(storeAssetsE2e).toContain("takePortraitScreenshotAtTop('app-store-06-arrow-duel')");
+    expect(storeAssetsE2e).toContain("takePortraitScreenshotAtTop('app-store-08-review-session')");
     expect(storeAssetsE2e).toContain("device.setOrientation('landscape')");
     expect(storeAssetsE2e).toContain("device.setOrientation('portrait')");
     expect(storeAssetsE2e).toContain("expect(element(by.text('Themes'))).toExist()");
