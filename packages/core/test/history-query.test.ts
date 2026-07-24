@@ -193,6 +193,126 @@ test("history filters Unclear Attempts and keeps the count scoped outside the Un
   }).unclearCount, 1);
 });
 
+test("History attention flags use OR internally and AND with other facets", () => {
+  const attempts = [
+    attempt({
+      id: "wrong",
+      puzzleId: "wrong-puzzle",
+      result: "wrong",
+      completedAt: "2026-06-20T00:00:10.000Z",
+      themes: ["fork"]
+    }),
+    {
+      ...attempt({
+        id: "slow-correct",
+        puzzleId: "slow-puzzle",
+        result: "correct",
+        completedAt: "2026-06-20T00:00:20.000Z",
+        themes: ["pin"]
+      }),
+      timingStatus: "slow" as const
+    },
+    timedOutAttempt({
+        id: "timed-out",
+        puzzleId: "timeout-puzzle",
+        completedAt: "2026-06-20T00:00:30.000Z",
+        themes: ["pin"]
+    }),
+    attempt({
+      id: "unclear-correct",
+      puzzleId: "unclear-puzzle",
+      result: "correct",
+      completedAt: "2026-06-20T00:00:40.000Z",
+      unclear: true,
+      themes: ["fork"]
+    }),
+    attempt({
+      id: "normal",
+      puzzleId: "normal-puzzle",
+      result: "correct",
+      completedAt: "2026-06-20T00:00:50.000Z",
+      themes: ["pin"]
+    })
+  ];
+
+  assert.deepEqual(
+    filterHistoryAttemptsForQuery({
+      attempts,
+      query: { attentionOnly: true },
+      reviews: []
+    }).map((historyAttempt) => historyAttempt.id),
+    ["wrong", "slow-correct", "timed-out", "unclear-correct"]
+  );
+  assert.deepEqual(
+    filterHistoryAttemptsForQuery({
+      attempts,
+      query: {
+        attentionFlags: ["mistakes", "slow"],
+        result: "correct",
+        themes: ["pin"]
+      },
+      reviews: []
+    }).map((historyAttempt) => historyAttempt.id),
+    ["slow-correct"]
+  );
+});
+
+test("Timed out is excluded from Mistakes, Correct, Wrong, and performance", () => {
+  const timedOut = timedOutAttempt({
+      id: "timed-out",
+      puzzleId: "timeout-puzzle",
+      completedAt: "2026-06-20T00:01:00.000Z"
+  });
+  const attempts = [
+    timedOut,
+    attempt({
+      id: "wrong",
+      puzzleId: "wrong-puzzle",
+      result: "wrong",
+      completedAt: "2026-06-20T00:00:20.000Z"
+    }),
+    attempt({
+      id: "correct",
+      puzzleId: "correct-puzzle",
+      result: "correct",
+      completedAt: "2026-06-20T00:00:10.000Z"
+    })
+  ];
+
+  assert.deepEqual(
+    filterHistoryAttemptsForQuery({ attempts, query: { result: "correct" }, reviews: [] })
+      .map((historyAttempt) => historyAttempt.id),
+    ["correct"]
+  );
+  assert.deepEqual(
+    filterHistoryAttemptsForQuery({ attempts, query: { result: "wrong" }, reviews: [] })
+      .map((historyAttempt) => historyAttempt.id),
+    ["wrong"]
+  );
+  assert.deepEqual(
+    filterHistoryAttemptsForQuery({
+      attempts,
+      query: { attentionFlags: ["mistakes"] },
+      reviews: []
+    }).map((historyAttempt) => historyAttempt.id),
+    ["wrong"]
+  );
+
+  const view = buildHistoryView({
+    query: { now: "2026-06-21T12:00:00.000Z", timeRange: "max" },
+    ratingKeys: [],
+    attempts,
+    elo: [],
+    reviews: []
+  });
+  assert.equal(view.performance.correctCount, 1);
+  assert.equal(view.performance.wrongCount, 1);
+  assert.deepEqual(view.puzzleStats.map((stats) => stats.puzzleId), [
+    "correct-puzzle",
+    "wrong-puzzle"
+  ]);
+});
+
 test("history performance and puzzle stats use the full filtered range, not the visible page", () => {
   const attempts: HistoryAttemptView[] = [
     attempt({ id: "a3", puzzleId: "p3", result: "correct", completedAt: "2026-06-20T00:02:00.000Z" }),
@@ -647,16 +767,18 @@ test("history replay availability validates persisted Arrow candidates against t
   });
 });
 
-function attempt(input: {
+type AttemptFixtureInput = {
   id: string;
   puzzleId: string;
-  result: "correct" | "wrong";
+  result: HistoryAttemptView["result"];
   completedAt: string;
   mode?: HistoryAttemptView["mode"];
   ratingKey?: string;
   unclear?: boolean;
   themes?: string[];
-}): HistoryAttemptView {
+};
+
+function attempt(input: AttemptFixtureInput): HistoryAttemptView {
   const themes = input.themes ?? ["fork"];
   return {
     id: input.id,
@@ -676,6 +798,19 @@ function attempt(input: {
     side: "white",
     themes,
     curatedThemes: curatedPuzzleThemes(themes)
+  };
+}
+
+function timedOutAttempt(
+  input: Omit<AttemptFixtureInput, "result">
+): HistoryAttemptView {
+  const {
+    submittedMove: _submittedMove,
+    ...withoutSubmittedMove
+  } = attempt({ ...input, result: "timed_out" });
+  return {
+    ...withoutSubmittedMove,
+    timingStatus: "timed_out"
   };
 }
 

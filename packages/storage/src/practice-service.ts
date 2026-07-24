@@ -1,5 +1,6 @@
 import {
   abandonSprint as abandonSprintCore,
+  advanceSprintTime as advanceSprintTimeCore,
   applySprintRatingChange,
   archivePracticeRun,
   assertValidManualRating,
@@ -14,6 +15,7 @@ import {
   practiceRunSprintConfig,
   renamePracticeRun,
   reorderPracticeRuns,
+  resolvePuzzleTimingPolicy,
   restorePracticeRun,
   samePracticeRun,
   pauseSprint as pauseSprintCore,
@@ -21,7 +23,8 @@ import {
   resumeSprint as resumeSprintCore,
   serializeSprintView,
   startSprint,
-  submitSprintMove
+  submitSprintMove,
+  validatePuzzleTimingPolicy
 } from "../../core/src/index.ts";
 import type {
   AttemptEvent,
@@ -31,6 +34,7 @@ import type {
   HistoryView,
   Puzzle,
   PracticeRunRecord,
+  PuzzleTimingPolicy,
   RatingRecord,
   ReviewContext,
   ReviewQueueItem,
@@ -80,6 +84,7 @@ export interface CreatePracticeRunCommand {
   mode: "custom" | "arrow_duel";
   durationSeconds: number;
   perPuzzleSeconds: number;
+  puzzleTiming?: PuzzleTimingPolicy;
   targetCorrect?: number;
   maxMistakes?: number;
   themes?: string[];
@@ -89,6 +94,7 @@ export interface CreatePracticeRunCommand {
 export interface UpdatePracticeRunCommand {
   name: string;
   rating: number;
+  puzzleTiming?: PuzzleTimingPolicy;
 }
 
 export class PracticeRunAvailabilityError extends Error {
@@ -193,6 +199,8 @@ export class PracticeService {
 
       if (!isOpenSprint(result.state)) {
         this.persistCompletedSprint(result.state);
+      } else if (attemptToReturn) {
+        this.store.updateSprintSession(result.state);
       }
     });
 
@@ -216,6 +224,33 @@ export class PracticeService {
       response.attempt = attemptToReturn;
     }
     return response;
+  }
+
+  advanceSprintTime(now = new Date().toISOString()): {
+    state: SprintState;
+    attempt?: AttemptEvent;
+  } {
+    if (!this.activeSprint) {
+      throw new Error("No active sprint");
+    }
+    const result = advanceSprintTimeCore(this.activeSprint, now);
+    this.store.transaction(() => {
+      if (result.attempt) {
+        this.store.recordAttempt(result.attempt);
+      }
+      if (isOpenSprint(result.state)) {
+        if (result.attempt) {
+          this.store.updateSprintSession(result.state);
+        }
+      } else {
+        this.persistCompletedSprint(result.state);
+      }
+    });
+    this.activeSprint = isOpenSprint(result.state) ? result.state : undefined;
+    return {
+      state: result.state,
+      ...(result.attempt === undefined ? {} : { attempt: result.attempt })
+    };
   }
 
   abandonSprint(now = new Date().toISOString()): SprintState {
@@ -385,6 +420,7 @@ export class PracticeService {
       mode: command.mode,
       durationSeconds: command.durationSeconds,
       perPuzzleSeconds: command.perPuzzleSeconds,
+      ...(command.puzzleTiming === undefined ? {} : { puzzleTiming: command.puzzleTiming }),
       targetCorrect: command.targetCorrect ?? Math.floor(command.durationSeconds / command.perPuzzleSeconds),
       maxMistakes: command.maxMistakes ?? 3,
       ...(command.themes === undefined ? {} : { themes: command.themes }),
@@ -439,7 +475,16 @@ export class PracticeService {
     this.requirePracticeRun(runId, false);
     const existingRuns = this.store.listPracticeRuns();
     const currentRun = existingRuns.find((run) => run.id === runId)!;
-    const nextRun = renamePracticeRun(runId, command.name, existingRuns, now);
+    const renamedRun = renamePracticeRun(runId, command.name, existingRuns, now);
+    const updatedRun: PracticeRunRecord = {
+      ...renamedRun,
+      puzzleTiming: command.puzzleTiming === undefined
+        ? resolvePuzzleTimingPolicy(currentRun.puzzleTiming, currentRun.perPuzzleSeconds)
+        : validatePuzzleTimingPolicy(command.puzzleTiming)
+    };
+    const nextRun = samePracticeRun(currentRun, updatedRun)
+      ? clonePracticeRun(currentRun)
+      : { ...updatedRun, updatedAt: now };
     const currentRating = this.store.getRating(currentRun.ratingKey);
     const nextRating = currentRating.rating === command.rating
       ? currentRating

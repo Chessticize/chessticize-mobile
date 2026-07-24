@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  advanceSprintTime,
   abandonSprint,
   buildSprintConfig,
   defaultSprintConfig,
@@ -19,12 +20,182 @@ test("default sprint configs model minutes, target count, and max mistakes", () 
     mode: "standard",
     durationSeconds: 300,
     perPuzzleSeconds: 20,
+    puzzleTiming: {
+      slowAfterSeconds: 40,
+      timeoutAfterSeconds: 60
+    },
     targetCorrect: 15,
     maxMistakes: 3,
     ratingKey: "standard 5/20"
   });
   assert.equal(defaultSprintConfig("blitz").targetCorrect, 30);
   assert.equal(defaultSprintConfig("arrow_duel").targetCorrect, 10);
+});
+
+test("sprint initializes a per-puzzle deadline and records Slow from the puzzle start", () => {
+  let state = startSprint({
+    config: buildSprintConfig({
+      mode: "standard",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      targetCorrect: 2
+    }),
+    puzzles: [oneMovePuzzle("p1"), oneMovePuzzle("p2")],
+    ratingBefore: 900,
+    now: NOW
+  });
+
+  assert.equal(state.currentPuzzleStartedAt, NOW);
+  assert.equal(state.currentPuzzleDeadlineAt, "2026-06-20T00:01:00.000Z");
+
+  const solved = submitSprintMove(state, "e6e7", "2026-06-20T00:00:41.000Z");
+  assert.equal(solved.attempt?.startedAt, NOW);
+  assert.equal(solved.attempt?.elapsedMs, 41_000);
+  assert.equal(solved.attempt?.timingStatus, "slow");
+  assert.equal(solved.state.currentPuzzleStartedAt, "2026-06-20T00:00:41.000Z");
+  assert.equal(solved.state.currentPuzzleDeadlineAt, "2026-06-20T00:01:41.000Z");
+  state = solved.state;
+
+  const wrong = submitSprintMove(state, "e6d6", "2026-06-20T00:01:22.000Z");
+  assert.equal(wrong.attempt?.result, "wrong");
+  assert.equal(wrong.attempt?.timingStatus, "slow");
+});
+
+test("advanceSprintTime times out once, advances without correctness or ELO effects, and is idempotent", () => {
+  const started = startSprint({
+    config: buildSprintConfig({
+      mode: "standard",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      targetCorrect: 2
+    }),
+    puzzles: [oneMovePuzzle("p1"), oneMovePuzzle("p2")],
+    ratingBefore: 900,
+    now: NOW
+  });
+
+  assert.equal(advanceSprintTime(started, "2026-06-20T00:00:59.999Z").attempt, undefined);
+  const timedOut = advanceSprintTime(started, "2026-06-20T00:01:00.000Z");
+  assert.equal(timedOut.attempt?.result, "timed_out");
+  assert.equal(timedOut.attempt?.submittedMove, undefined);
+  assert.equal(timedOut.attempt?.timingStatus, "timed_out");
+  assert.equal(timedOut.attempt?.elapsedMs, 60_000);
+  assert.equal(timedOut.state.currentPuzzle?.puzzle.id, "p2");
+  assert.equal(timedOut.state.currentPuzzleStartedAt, "2026-06-20T00:01:00.000Z");
+  assert.equal(timedOut.state.currentPuzzleDeadlineAt, "2026-06-20T00:02:00.000Z");
+  assert.equal(timedOut.state.correctCount, 0);
+  assert.equal(timedOut.state.mistakeCount, 0);
+  assert.equal(timedOut.state.ratingAfter, undefined);
+
+  const repeated = advanceSprintTime(timedOut.state, "2026-06-20T00:01:00.000Z");
+  assert.equal(repeated.attempt, undefined);
+  assert.equal(repeated.state.currentPuzzle?.puzzle.id, "p2");
+});
+
+test("a delayed timeout tick records the deadline while starting the next puzzle at processing time", () => {
+  const started = startSprint({
+    config: buildSprintConfig({
+      mode: "standard",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      targetCorrect: 2
+    }),
+    puzzles: [oneMovePuzzle("p1"), oneMovePuzzle("p2")],
+    ratingBefore: 900,
+    now: NOW
+  });
+
+  const timedOut = advanceSprintTime(started, "2026-06-20T00:01:07.000Z");
+  assert.equal(timedOut.attempt?.completedAt, "2026-06-20T00:01:00.000Z");
+  assert.equal(timedOut.attempt?.elapsedMs, 60_000);
+  assert.equal(timedOut.state.currentPuzzleStartedAt, "2026-06-20T00:01:07.000Z");
+  assert.equal(timedOut.state.currentPuzzleDeadlineAt, "2026-06-20T00:02:07.000Z");
+});
+
+test("a move at the puzzle deadline returns only the timeout transition", () => {
+  const started = startSprint({
+    config: buildSprintConfig({
+      mode: "standard",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      targetCorrect: 2
+    }),
+    puzzles: [oneMovePuzzle("p1"), oneMovePuzzle("p2")],
+    ratingBefore: 900,
+    now: NOW
+  });
+
+  const result = submitSprintMove(started, "e6e7", "2026-06-20T00:01:00.000Z");
+  assert.equal(result.attempt?.result, "timed_out");
+  assert.equal(result.feedback, undefined);
+  assert.equal(result.state.currentPuzzle?.puzzle.id, "p2");
+  assert.equal(result.state.correctCount, 0);
+  assert.equal(result.state.mistakeCount, 0);
+});
+
+test("sprint deadline wins over the puzzle deadline", () => {
+  const state = startSprint({
+    config: buildSprintConfig({
+      mode: "standard",
+      durationSeconds: 60,
+      perPuzzleSeconds: 20,
+      targetCorrect: 2
+    }),
+    puzzles: [oneMovePuzzle("p1"), oneMovePuzzle("p2")],
+    ratingBefore: 900,
+    now: NOW
+  });
+
+  const expired = advanceSprintTime(state, "2026-06-20T00:01:00.000Z");
+  assert.equal(expired.attempt, undefined);
+  assert.equal(expired.state.status, "failed");
+  assert.equal(expired.state.endReason, "time_expired");
+});
+
+test("pause excludes paused time from puzzle timing and shifts its effective start", () => {
+  const state = startSprint({
+    config: buildSprintConfig({
+      mode: "standard",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      targetCorrect: 1
+    }),
+    puzzles: [oneMovePuzzle("p1")],
+    ratingBefore: 900,
+    now: NOW
+  });
+  const paused = pauseSprint(state, "2026-06-20T00:00:10.000Z");
+  const resumed = resumeSprint(paused, "2026-06-20T00:00:40.000Z");
+
+  assert.equal(resumed.currentPuzzleStartedAt, "2026-06-20T00:00:30.000Z");
+  assert.equal(resumed.currentPuzzleDeadlineAt, "2026-06-20T00:01:30.000Z");
+  assert.equal(advanceSprintTime(resumed, "2026-06-20T00:01:29.999Z").attempt, undefined);
+  const timedOut = advanceSprintTime(resumed, "2026-06-20T00:01:30.000Z");
+  assert.equal(timedOut.attempt?.elapsedMs, 60_000);
+});
+
+test("timeout with no next puzzle terminates safely without rating or count changes", () => {
+  const state = startSprint({
+    config: buildSprintConfig({
+      mode: "standard",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      targetCorrect: 2
+    }),
+    puzzles: [oneMovePuzzle("p1")],
+    ratingBefore: 900,
+    now: NOW
+  });
+
+  const timedOut = advanceSprintTime(state, "2026-06-20T00:01:00.000Z");
+  assert.equal(timedOut.attempt?.result, "timed_out");
+  assert.equal(timedOut.state.status, "failed");
+  assert.equal(timedOut.state.endReason, "puzzles_exhausted");
+  assert.equal(timedOut.state.currentPuzzle, undefined);
+  assert.equal(timedOut.state.ratingAfter, undefined);
+  assert.equal(timedOut.state.correctCount, 0);
+  assert.equal(timedOut.state.mistakeCount, 0);
+  assert.equal(advanceSprintTime(timedOut.state, "2026-06-20T00:02:00.000Z").attempt, undefined);
 });
 
 test("a multi-step solved puzzle can win a target-one sprint and raise ELO", () => {
@@ -249,7 +420,12 @@ test("exhausting the local puzzle set completes the sprint as a pass", () => {
 
 test("expired sprint fails before accepting another move", () => {
   const state = startSprint({
-    config: buildSprintConfig({ mode: "standard", durationSeconds: 1, perPuzzleSeconds: 1, targetCorrect: 1 }),
+    config: buildSprintConfig({
+      mode: "standard",
+      durationSeconds: 1,
+      perPuzzleSeconds: 1,
+      targetCorrect: 1
+    }),
     puzzles: [samplePuzzle("00008")],
     ratingBefore: 900,
     now: NOW
@@ -289,12 +465,16 @@ test("paused sprint ignores moves and resumes with the remaining time preserved"
   assert.equal(accepted.feedback?.result, "correct");
 });
 
-test("per-puzzle pace does not reject correct moves before the sprint deadline", () => {
+test("disabled puzzle timing does not reject correct moves before the sprint deadline", () => {
   const state = startSprint({
     config: buildSprintConfig({
       mode: "standard",
       durationSeconds: 300,
-      perPuzzleSeconds: 1,
+      perPuzzleSeconds: 10,
+      puzzleTiming: {
+        slowAfterSeconds: null,
+        timeoutAfterSeconds: null
+      },
       targetCorrect: 1,
       maxMistakes: 2
     }),

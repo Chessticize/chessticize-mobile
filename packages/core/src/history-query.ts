@@ -5,11 +5,21 @@ import {
   puzzleMatchesAnyTheme
 } from "./theme-catalog.ts";
 import { isPracticeRunRatingKey } from "./practice-runs.ts";
-import type { AttemptEvent, AttemptResult, AttemptSource, Puzzle, RatingRecord, ReviewQueueState, SprintMode } from "./types.ts";
+import type {
+  AttemptEvent,
+  AttemptOutcome,
+  AttemptResult,
+  AttemptSource,
+  Puzzle,
+  RatingRecord,
+  ReviewQueueState,
+  SprintMode
+} from "./types.ts";
 
 export type HistoryTimeRange = "7d" | "30d" | "90d" | "1y" | "max";
 export type PuzzleSide = "white" | "black";
 export type HistoryReviewStatus = "queued" | "clear";
+export type HistoryAttentionFlag = "mistakes" | "unclear" | "slow" | "timed_out";
 
 export interface HistoryPageQuery {
   limit: number;
@@ -32,6 +42,8 @@ export interface HistoryQuery {
   speedSeconds?: number;
   reviewStatus?: HistoryReviewStatus;
   unclear?: boolean;
+  attentionOnly?: boolean;
+  attentionFlags?: HistoryAttentionFlag[];
   page?: HistoryPageQuery;
 }
 
@@ -54,11 +66,13 @@ export interface HistoryAttemptView {
   puzzleId: string;
   mode: SprintMode;
   ratingKey: string;
-  result: AttemptResult;
-  submittedMove: string;
+  result: AttemptOutcome;
+  submittedMove?: string;
   expectedMove: string;
   startedAt: string;
   completedAt: string;
+  elapsedMs?: number;
+  timingStatus?: "slow" | "timed_out";
   ratingBefore: number;
   ratingAfter?: number;
   arrowDuelCandidateOrder?: string[];
@@ -126,7 +140,7 @@ export interface HistoryAttemptDetail {
   source: AttemptSource | null;
   mode: SprintMode | null;
   ratingKey: string | null;
-  result: AttemptResult | null;
+  result: AttemptOutcome | null;
   startedAt: string | null;
   completedAt: string | null;
   elapsedSeconds: number | null;
@@ -165,14 +179,20 @@ export function normalizeHistoryAttemptDetail(attempt: AttemptEvent | HistoryAtt
   const source = normalizeHistorySource(attempt.source);
   const mode = normalizeHistoryMode(attempt.mode);
   const ratingKey = normalizeHistoryRatingKey(attempt.ratingKey);
-  const result = normalizeHistoryResult(attempt.result);
+  const result = normalizeHistoryOutcome(attempt.result);
   const startedAt = normalizeHistoryTimestamp(attempt.startedAt);
   const completedAt = normalizeHistoryTimestamp(attempt.completedAt);
   const startedAtMs = startedAt === null ? Number.NaN : new Date(startedAt).getTime();
   const completedAtMs = completedAt === null ? Number.NaN : new Date(completedAt).getTime();
-  const elapsedSeconds = startedAt !== null && completedAt !== null && completedAtMs >= startedAtMs
-    ? Math.round((completedAtMs - startedAtMs) / 1000)
+  const elapsedMs = "elapsedMs" in attempt && typeof attempt.elapsedMs === "number" &&
+      Number.isInteger(attempt.elapsedMs) && attempt.elapsedMs >= 0
+    ? attempt.elapsedMs
     : null;
+  const elapsedSeconds = elapsedMs !== null
+    ? Math.round(elapsedMs / 1000)
+    : startedAt !== null && completedAt !== null && completedAtMs >= startedAtMs
+      ? Math.round((completedAtMs - startedAtMs) / 1000)
+      : null;
   const submittedMove = normalizeHistoryText(attempt.submittedMove);
   const expectedMove = normalizeHistoryText(attempt.expectedMove);
   const ratingBefore = Number.isFinite(attempt.ratingBefore) ? attempt.ratingBefore : null;
@@ -194,7 +214,7 @@ export function normalizeHistoryAttemptDetail(attempt: AttemptEvent | HistoryAtt
       : "valid";
   const dataStatus = source === null || mode === null || ratingKey === null || result === null ||
       startedAt === null || completedAt === null || elapsedSeconds === null ||
-      submittedMove === null || expectedMove === null || ratingBefore === null ||
+      (result !== "timed_out" && submittedMove === null) || expectedMove === null || ratingBefore === null ||
       ratingAfterStatus === "invalid" || arrowDuelCandidateOrderStatus === "corrupt"
     ? "partial"
     : "complete";
@@ -298,8 +318,8 @@ function normalizeHistoryMode(value: unknown): SprintMode | null {
     : null;
 }
 
-function normalizeHistoryResult(value: unknown): AttemptResult | null {
-  return value === "correct" || value === "wrong" ? value : null;
+function normalizeHistoryOutcome(value: unknown): AttemptOutcome | null {
+  return value === "correct" || value === "wrong" || value === "timed_out" ? value : null;
 }
 
 export function validateHistoryQuery(query: HistoryQuery): HistoryQuery {
@@ -317,6 +337,7 @@ export function validateHistoryQuery(query: HistoryQuery): HistoryQuery {
     ratingKey: rawRatingKey,
     theme: legacyTheme,
     themes: rawThemes,
+    attentionFlags: rawAttentionFlags,
     ...queryWithoutRatingAndThemes
   } = query;
   const ratingKey = normalizeHistoryRatingKey(rawRatingKey?.trim());
@@ -324,10 +345,12 @@ export function validateHistoryQuery(query: HistoryQuery): HistoryQuery {
     ...(rawThemes ?? []),
     ...(legacyTheme === undefined ? [] : [legacyTheme])
   ]);
+  const attentionFlags = normalizeHistoryAttentionFlags(rawAttentionFlags);
   const normalized: HistoryQuery = {
     ...queryWithoutRatingAndThemes,
     ...(ratingKey ? { ratingKey } : {}),
-    ...(themes.length > 0 ? { themes } : {})
+    ...(themes.length > 0 ? { themes } : {}),
+    ...(attentionFlags.length > 0 ? { attentionFlags } : {})
   };
   if (page) {
     normalized.page = page;
@@ -411,12 +434,18 @@ export function buildHistoryView(input: {
 
 export function filterHistoryAttemptsForQuery(input: {
   attempts: HistoryAttemptView[];
-  query: Pick<HistoryQuery, "result" | "source" | "mode" | "side" | "minRating" | "maxRating" | "theme" | "themes" | "speedSeconds" | "reviewStatus" | "unclear">;
+  query: Pick<HistoryQuery, "result" | "source" | "mode" | "side" | "minRating" | "maxRating" | "theme" | "themes" | "speedSeconds" | "reviewStatus" | "unclear" | "attentionOnly" | "attentionFlags">;
   reviews: ReviewQueueState[];
 }): HistoryAttemptView[] {
   const selectedThemes = historyThemesForQuery(input.query);
+  const selectedAttentionFlags = normalizeHistoryAttentionFlags(input.query.attentionFlags);
+  const effectiveAttentionFlags = selectedAttentionFlags.length > 0
+    ? selectedAttentionFlags
+    : input.query.attentionOnly
+      ? ALL_HISTORY_ATTENTION_FLAGS
+      : [];
   return input.attempts
-    .filter((attempt) => !input.query.result || normalizeHistoryResult(attempt.result) === input.query.result)
+    .filter((attempt) => !input.query.result || normalizeHistoryOutcome(attempt.result) === input.query.result)
     .filter((attempt) => !input.query.source || normalizeHistorySource(attempt.source) === input.query.source)
     .filter((attempt) => !input.query.mode || normalizeHistoryMode(attempt.mode) === input.query.mode)
     .filter((attempt) => !input.query.side || attempt.side === input.query.side)
@@ -425,6 +454,10 @@ export function filterHistoryAttemptsForQuery(input: {
     .filter((attempt) => puzzleMatchesAnyTheme(attempt.themes, selectedThemes))
     .filter((attempt) => input.query.speedSeconds === undefined || historyAttemptSpeedSeconds(attempt) === input.query.speedSeconds)
     .filter((attempt) => input.query.unclear === undefined || Boolean(attempt.unclear) === input.query.unclear)
+    .filter((attempt) =>
+      effectiveAttentionFlags.length === 0 ||
+      effectiveAttentionFlags.some((flag) => historyAttemptMatchesAttentionFlag(attempt, flag))
+    )
     .filter((attempt) => {
       if (input.query.reviewStatus === undefined) {
         return true;
@@ -470,7 +503,7 @@ export function historyAttemptHasReviewQueued(
   attempt: Pick<HistoryAttemptView, "puzzleId" | "mode" | "ratingKey" | "result">,
   reviews: ReviewQueueState[]
 ): boolean {
-  const result = normalizeHistoryResult(attempt.result);
+  const result = normalizeHistoryOutcome(attempt.result);
   const mode = normalizeHistoryMode(attempt.mode);
   const ratingKey = normalizeHistoryRatingKey(attempt.ratingKey);
   if (result !== "wrong" || mode === null || ratingKey === null) {
@@ -497,7 +530,12 @@ export function buildHistoryPuzzleStats(
 
   for (const attempt of attempts) {
     const detail = normalizeHistoryAttemptDetail(attempt);
-    if (detail.source === null || detail.result === null || detail.mode === null || detail.ratingKey === null) {
+    if (
+      detail.source === null ||
+      (detail.result !== "correct" && detail.result !== "wrong") ||
+      detail.mode === null ||
+      detail.ratingKey === null
+    ) {
       continue;
     }
     const normalizedContext = {
@@ -579,11 +617,49 @@ function partitionHistoryAttemptsByResult(attempts: HistoryAttemptView[]): Class
   const classified: ClassifiedHistoryAttempt[] = [];
   for (const attempt of attempts) {
     const detail = normalizeHistoryAttemptDetail(attempt);
-    if (detail.source !== null && detail.mode !== null && detail.ratingKey !== null && detail.result !== null) {
+    if (
+      detail.source !== null &&
+      detail.mode !== null &&
+      detail.ratingKey !== null &&
+      (detail.result === "correct" || detail.result === "wrong")
+    ) {
       classified.push({ attempt, result: detail.result });
     }
   }
   return classified;
+}
+
+const ALL_HISTORY_ATTENTION_FLAGS: readonly HistoryAttentionFlag[] = [
+  "mistakes",
+  "unclear",
+  "slow",
+  "timed_out"
+];
+
+function normalizeHistoryAttentionFlags(
+  flags: readonly HistoryAttentionFlag[] | undefined
+): HistoryAttentionFlag[] {
+  if (!flags) {
+    return [];
+  }
+  return ALL_HISTORY_ATTENTION_FLAGS.filter((flag) => flags.includes(flag));
+}
+
+export function historyAttemptMatchesAttentionFlag(
+  attempt: Pick<HistoryAttemptView, "result" | "unclear" | "timingStatus">,
+  flag: HistoryAttentionFlag
+): boolean {
+  if (flag === "mistakes") {
+    return normalizeHistoryOutcome(attempt.result) === "wrong";
+  }
+  if (flag === "unclear") {
+    return Boolean(attempt.unclear);
+  }
+  if (flag === "slow") {
+    return attempt.timingStatus === "slow";
+  }
+  return normalizeHistoryOutcome(attempt.result) === "timed_out" ||
+    attempt.timingStatus === "timed_out";
 }
 
 function buildAttemptPerformanceChart(

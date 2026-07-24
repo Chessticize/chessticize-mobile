@@ -23,6 +23,7 @@ import type {
 import { exportReviewQueueState, normalizeImportedReviewQueueState } from "./practice-store.ts";
 import { preferredSprintSession } from "./sprint-session-sync.ts";
 import { cloneAttemptHistoryRow, preferredAttemptHistoryRow } from "./attempt-sync.ts";
+import { compatiblePracticeRunMergeInputs } from "./practice-run-sync.ts";
 
 export interface ProgressSyncSnapshot {
   schemaVersion: 1;
@@ -113,6 +114,10 @@ export async function syncPracticeProgress(
 }
 
 export function mergeLocalDataExports(local: LocalDataExport, remote: LocalDataImport): LocalDataExport {
+  const compatibleRuns = compatiblePracticeRunMergeInputs(
+    local.practiceRuns,
+    remote.practiceRuns ?? []
+  );
   const localSessions = assignLegacyRatingGenerations(local.ratings, local.sprintSessions);
   const remoteSessions = assignLegacyRatingGenerations(remote.ratings, remote.sprintSessions);
   const attempts = new Map<string, AttemptHistoryRow>();
@@ -179,7 +184,10 @@ export function mergeLocalDataExports(local: LocalDataExport, remote: LocalDataI
     reviewQueue: orderReviewQueue(reviews).map(exportReviewQueueState),
     reviewRemovals: removals,
     sprintSessions: [...sprintSessions.values()].sort(compareSprintSessions),
-    practiceRuns: mergePracticeRunCatalogs(local.practiceRuns, remote.practiceRuns ?? [])
+    practiceRuns: mergePracticeRunCatalogs(
+      compatibleRuns.localRuns,
+      compatibleRuns.incomingRuns
+    )
   };
 }
 

@@ -1,7 +1,11 @@
-import type { SprintConfig, SprintMode } from "./types.ts";
+import type { PuzzleTimingPolicy, SprintConfig, SprintMode } from "./types.ts";
 import { namedThemesForSelection } from "./theme-catalog.ts";
 
 const DEFAULT_DURATION_SECONDS = 5 * 60;
+export const PUZZLE_TIMING_MIN_SECONDS = 10;
+export const PUZZLE_TIMING_MAX_SECONDS = 180;
+export const PUZZLE_TIMING_STEP_SECONDS = 5;
+export const PUZZLE_TIMING_MIN_GAP_SECONDS = 5;
 
 export function defaultSprintConfig(mode: SprintMode): SprintConfig {
   if (mode === "standard") {
@@ -20,6 +24,7 @@ export function buildSprintConfig(input: {
   mode: SprintMode;
   durationSeconds: number;
   perPuzzleSeconds: number;
+  puzzleTiming?: PuzzleTimingPolicy;
   targetCorrect?: number;
   maxMistakes?: number;
   themes?: readonly string[];
@@ -40,6 +45,10 @@ export function buildSprintConfig(input: {
   }
 
   const selectedThemes = namedThemesForSelection(input.themes);
+  const puzzleTiming = resolvePuzzleTimingPolicy(
+    input.puzzleTiming,
+    input.perPuzzleSeconds
+  );
   const ratingKey = ratingKeyForConfig({
     mode: input.mode,
     durationSeconds: input.durationSeconds,
@@ -51,11 +60,95 @@ export function buildSprintConfig(input: {
     mode: input.mode,
     durationSeconds: input.durationSeconds,
     perPuzzleSeconds: input.perPuzzleSeconds,
+    puzzleTiming,
     targetCorrect,
     maxMistakes,
     ratingKey,
     ...(selectedThemes.length === 0 ? {} : { themes: selectedThemes })
   };
+}
+
+export function defaultPuzzleTimingPolicy(perPuzzleSeconds: number): PuzzleTimingPolicy {
+  if (!Number.isInteger(perPuzzleSeconds) || perPuzzleSeconds <= 0) {
+    throw new Error("perPuzzleSeconds must be a positive integer");
+  }
+  const slowAfterSeconds = normalizeDefaultPuzzleTimingSeconds(
+    perPuzzleSeconds * 2,
+    PUZZLE_TIMING_MAX_SECONDS - PUZZLE_TIMING_MIN_GAP_SECONDS
+  );
+  const timeoutAfterSeconds = Math.max(
+    slowAfterSeconds + PUZZLE_TIMING_MIN_GAP_SECONDS,
+    normalizeDefaultPuzzleTimingSeconds(
+      perPuzzleSeconds * 3,
+      PUZZLE_TIMING_MAX_SECONDS
+    )
+  );
+  return validatePuzzleTimingPolicy({
+    slowAfterSeconds,
+    timeoutAfterSeconds
+  });
+}
+
+export function resolvePuzzleTimingPolicy(
+  puzzleTiming: PuzzleTimingPolicy | undefined,
+  perPuzzleSeconds: number
+): PuzzleTimingPolicy {
+  return puzzleTiming === undefined
+    ? defaultPuzzleTimingPolicy(perPuzzleSeconds)
+    : validatePuzzleTimingPolicy(puzzleTiming);
+}
+
+export function validatePuzzleTimingPolicy(
+  puzzleTiming: PuzzleTimingPolicy
+): PuzzleTimingPolicy {
+  const slowAfterSeconds = validateOptionalPuzzleTimingSeconds(
+    "slowAfterSeconds",
+    puzzleTiming.slowAfterSeconds
+  );
+  const timeoutAfterSeconds = validateOptionalPuzzleTimingSeconds(
+    "timeoutAfterSeconds",
+    puzzleTiming.timeoutAfterSeconds
+  );
+  if (
+    slowAfterSeconds !== null &&
+    timeoutAfterSeconds !== null &&
+    timeoutAfterSeconds - slowAfterSeconds < PUZZLE_TIMING_MIN_GAP_SECONDS
+  ) {
+    throw new Error(
+      `timeoutAfterSeconds must be at least ${PUZZLE_TIMING_MIN_GAP_SECONDS} seconds after slowAfterSeconds`
+    );
+  }
+  return { slowAfterSeconds, timeoutAfterSeconds };
+}
+
+function validateOptionalPuzzleTimingSeconds(
+  label: keyof PuzzleTimingPolicy,
+  value: number | null
+): number | null {
+  if (value === null) {
+    return null;
+  }
+  if (!Number.isInteger(value)) {
+    throw new Error(`${label} must be a whole number of seconds`);
+  }
+  if (value < PUZZLE_TIMING_MIN_SECONDS || value > PUZZLE_TIMING_MAX_SECONDS) {
+    throw new Error(
+      `${label} must be between ${PUZZLE_TIMING_MIN_SECONDS} and ${PUZZLE_TIMING_MAX_SECONDS} seconds`
+    );
+  }
+  if (value % PUZZLE_TIMING_STEP_SECONDS !== 0) {
+    throw new Error(`${label} must use ${PUZZLE_TIMING_STEP_SECONDS}-second increments`);
+  }
+  return value;
+}
+
+function normalizeDefaultPuzzleTimingSeconds(
+  value: number,
+  maximum: number
+): number {
+  const roundedUp =
+    Math.ceil(value / PUZZLE_TIMING_STEP_SECONDS) * PUZZLE_TIMING_STEP_SECONDS;
+  return Math.min(maximum, Math.max(PUZZLE_TIMING_MIN_SECONDS, roundedUp));
 }
 
 export function ratingKeyForConfig(input: {

@@ -1,6 +1,7 @@
 import {
   ALL_THEME_SELECTION,
   namedThemesForSelection,
+  resolvePuzzleTimingPolicy,
   type PracticeRunManagementAdapter,
   type PracticeRunManagementCatalog,
   type PracticeRunManagementDraft,
@@ -41,7 +42,8 @@ export function createPracticeRunManagementAdapter(
         case "update-run": {
           const saved = service.updatePracticeRun(command.runId, {
             name: command.name,
-            rating: command.elo
+            rating: command.elo,
+            puzzleTiming: command.puzzleTiming
           });
           changedRunId = saved.run.id;
           break;
@@ -82,6 +84,7 @@ function presentationForRun(
     elo: service.getRating(run.ratingKey).rating,
     durationSeconds: run.durationSeconds,
     perPuzzleSeconds: run.perPuzzleSeconds,
+    puzzleTiming: resolvePuzzleTimingPolicy(run.puzzleTiming, run.perPuzzleSeconds),
     themes: run.themes ?? [ALL_THEME_SELECTION]
   };
 }
@@ -95,6 +98,7 @@ function createPracticeRunCommand(
     mode: draft.mode === "arrow_duel" ? "arrow_duel" : "custom",
     durationSeconds: draft.durationSeconds,
     perPuzzleSeconds: draft.perPuzzleSeconds,
+    puzzleTiming: draft.puzzleTiming,
     initialRating: draft.elo,
     ...(themes.length === 0 ? {} : { themes })
   };

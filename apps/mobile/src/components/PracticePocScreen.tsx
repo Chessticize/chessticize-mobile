@@ -120,6 +120,10 @@ import { arePracticeTestControlsEnabled, isPracticeDebugEnabled } from "../relea
 import { isStoreAssetCaptureEnabled } from "../platform/testLaunchConfig.ts";
 import { usePracticeRunManagement } from "./usePracticeRunManagement.ts";
 import {
+  puzzleTimingEditorState,
+  updatePuzzleTimingFromEditor
+} from "./puzzleTimingEditor.ts";
+import {
   normalizeStoredThemeChoiceSelection,
   useThemeChoiceSelection
 } from "./useThemeChoiceSelection.ts";
@@ -195,26 +199,10 @@ interface Props {
   runManagementEnabled?: boolean;
   runManagementPresentation?: PracticeRunManagementPresentation;
   runEloEditingMovedToHome?: boolean;
-  runTimingEditorPreview?: boolean;
-  sessionTimingPreview?: SessionTimingDesignPreview;
-  historyTimingPreview?: HistoryTimingDesignPreview;
   sprintStartDelayMs?: number;
   standardTargetCorrect?: number;
   systemBack?: MobileSystemBackSource;
 }
-
-export type SessionTimingDesignPreview = {
-  initialElapsedSeconds: number;
-  nextPuzzleFen?: string;
-  timeoutSeconds: number;
-  warningSeconds: number;
-};
-
-type HistoryTimingStatus = "slow" | "timed_out";
-
-export type HistoryTimingDesignPreview = {
-  statusByAttemptId: Readonly<Record<string, HistoryTimingStatus>>;
-};
 
 type HistoryAttentionFlag = "mistakes" | "unclear" | "slow" | "timed_out";
 
@@ -293,7 +281,9 @@ type PendingPremove = {
 type FeedbackBoardSnapshot = {
   boardFen: string;
   currentPuzzle: CurrentPuzzleState;
-  feedback: PuzzleFeedback;
+  elapsedSeconds?: number;
+  feedback: PuzzleFeedback | null;
+  kind: "feedback" | "timed_out";
   puzzleId: string;
 };
 
@@ -410,9 +400,6 @@ export function PracticePocScreen({
   runManagementEnabled = false,
   runManagementPresentation,
   runEloEditingMovedToHome = false,
-  runTimingEditorPreview = false,
-  sessionTimingPreview,
-  historyTimingPreview,
   sprintStartDelayMs = ARROW_DUEL_LOADING_TRANSITION_MS,
   standardTargetCorrect,
   systemBack
@@ -447,6 +434,7 @@ export function PracticePocScreen({
   const pendingPremoveRef = useRef<PendingPremove | null>(null);
   const boardVisualFenRef = useRef<string | null>(null);
   const feedbackSnapshotTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const puzzleTimeoutInFlightRef = useRef<string | null>(null);
   const sprintStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startingModeRef = useRef<SprintMode | null>(null);
   const startingPracticeRunIdRef = useRef<string | null>(null);
@@ -496,9 +484,7 @@ export function PracticePocScreen({
   const [readyArrowDuelBoardKey, setReadyArrowDuelBoardKey] = useState<string | null>(null);
   const [chessboardDebugEvents, setChessboardDebugEvents] = useState<string[]>([]);
   const [historyTimeRange, setHistoryTimeRange] = useState<HistoryTimeRange>("7d");
-  const [historySourceFilter, setHistorySourceFilter] = useState<"all" | AttemptSource>(
-    historyTimingPreview ? "all" : "sprint"
-  );
+  const [historySourceFilter, setHistorySourceFilter] = useState<"all" | AttemptSource>("all");
   const [historyResultFilter, setHistoryResultFilter] = useState<"all" | "correct" | "wrong">("all");
   const [historySideFilter, setHistorySideFilter] = useState<"all" | PuzzleSide>("all");
   const [historyRatingRangeFilter, setHistoryRatingRangeFilter] = useState<HistoryRatingRangeFilter>("all");
@@ -537,7 +523,6 @@ export function PracticePocScreen({
     }
   );
   const [, setSettingsRevision] = useState(0);
-  const sessionTimingDesignState = useSessionTimingDesignPreview(sessionTimingPreview);
   const internalRunManagement = usePracticeRunManagement({
     enabled: runManagementEnabled && runManagementPresentation === undefined,
     onStartRun: startPracticeRun,
@@ -731,28 +716,75 @@ export function PracticePocScreen({
       return;
     }
 
-    const deadlineMs = new Date(state.deadlineAt).getTime();
-    if (nowMs <= deadlineMs) {
+    const sprintDeadlineMs = new Date(state.deadlineAt).getTime();
+    const puzzleDeadlineMs = state.currentPuzzleDeadlineAt
+      ? new Date(state.currentPuzzleDeadlineAt).getTime()
+      : null;
+    const sprintDeadlineReached = nowMs >= sprintDeadlineMs;
+    const puzzleDeadlineReached = puzzleDeadlineMs !== null && nowMs >= puzzleDeadlineMs;
+    if (!sprintDeadlineReached && !puzzleDeadlineReached) {
       return;
     }
 
-    const settleExpiredSprint = () => {
+    const settleExpiredTime = () => {
+      const submittedPuzzle = state.currentPuzzle;
+      const submittedPuzzleId = submittedPuzzle?.puzzle.id ?? null;
+      const submittedFen = submittedPuzzle?.currentFen ?? boardFenRef.current ?? null;
+      if (
+        puzzleDeadlineReached &&
+        !sprintDeadlineReached &&
+        submittedPuzzleId &&
+        puzzleTimeoutInFlightRef.current === submittedPuzzleId
+      ) {
+        return;
+      }
+      if (puzzleDeadlineReached && !sprintDeadlineReached && submittedPuzzleId) {
+        puzzleTimeoutInFlightRef.current = submittedPuzzleId;
+        commitBoardInputLocked(true, "puzzle-timeout", submittedPuzzleId);
+      }
       try {
-        const expired = service.submitMove("__expired__", new Date(nowMs).toISOString());
-        commitState(expired.state);
-        setFeedback((expired.feedback as SessionFeedback) ?? null);
+        const advanced = service.advanceSprintTime(new Date(nowMs).toISOString());
+        commitState(advanced.state);
+        setFeedback(null);
+        setFeedbackPuzzleId(null);
+        setUnclearPrompt(null);
+        if (
+          advanced.attempt?.timingStatus === "timed_out" &&
+          submittedPuzzle &&
+          submittedFen &&
+          advanced.state.status === "active" &&
+          advanced.state.currentPuzzle?.puzzle.id !== submittedPuzzleId
+        ) {
+          showTimeoutSnapshot(
+            advanced.state,
+            submittedPuzzle,
+            submittedFen,
+            Math.floor((advanced.attempt.elapsedMs ?? 0) / 1000)
+          );
+        } else {
+          puzzleTimeoutInFlightRef.current = null;
+          clearFeedbackSnapshot();
+          commitBoardInputLocked(
+            false,
+            sprintDeadlineReached ? "sprint-expired" : "puzzle-timeout-complete",
+            advanced.state.currentPuzzle?.puzzle.id ?? null
+          );
+          commitBoardFen(advanced.state.currentPuzzle?.currentFen ?? null);
+        }
         refreshState();
       } catch (caught) {
+        puzzleTimeoutInFlightRef.current = null;
+        commitBoardInputLocked(false, "time-advance-error", submittedPuzzleId);
         setError(errorMessage(caught));
       }
     };
     if (practiceExitConfirmationVisible) {
       return;
     }
-    if (deferBackRelevantTransition("active-sprint-expiry", settleExpiredSprint)) {
+    if (deferBackRelevantTransition("active-sprint-expiry", settleExpiredTime)) {
       return;
     }
-    settleExpiredSprint();
+    settleExpiredTime();
     // refreshState is deliberately omitted because its identity changes on each render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nowMs, practiceExitConfirmationVisible, service, state]);
@@ -1976,6 +2008,7 @@ export function PracticePocScreen({
       boardFen: submittedFen,
       currentPuzzle: submittedPuzzle,
       feedback: nextFeedback,
+      kind: "feedback",
       puzzleId: submittedPuzzle.puzzle.id
     });
     emitTrace({
@@ -2008,8 +2041,48 @@ export function PracticePocScreen({
     }, FEEDBACK_SNAPSHOT_MS);
   }
 
+  function showTimeoutSnapshot(
+    nextState: SprintState,
+    timedOutPuzzle: CurrentPuzzleState,
+    timedOutFen: string,
+    elapsedSeconds: number
+  ): void {
+    clearFeedbackSnapshotTimer();
+    const nextPuzzle = nextState.currentPuzzle;
+    commitFeedbackSnapshot({
+      boardFen: timedOutFen,
+      currentPuzzle: timedOutPuzzle,
+      elapsedSeconds,
+      feedback: null,
+      kind: "timed_out",
+      puzzleId: timedOutPuzzle.puzzle.id
+    });
+    emitTrace({
+      type: "feedback-snapshot",
+      reason: "puzzle-timeout-show",
+      puzzleId: timedOutPuzzle.puzzle.id,
+      nextPuzzleId: nextPuzzle?.puzzle.id ?? null
+    });
+    feedbackSnapshotTimerRef.current = setTimeout(() => {
+      const current = feedbackSnapshotRef.current;
+      if (current?.kind === "timed_out" && current.puzzleId === timedOutPuzzle.puzzle.id) {
+        resetBoardToFen(
+          nextPuzzle?.currentFen,
+          "puzzle-timeout-complete",
+          nextPuzzle?.puzzle.id ?? null
+        );
+        commitBoardFen(nextPuzzle?.currentFen ?? null);
+        commitFeedbackSnapshot(null);
+        puzzleTimeoutInFlightRef.current = null;
+        commitBoardInputLocked(false, "puzzle-timeout-complete", nextPuzzle?.puzzle.id ?? null);
+      }
+      feedbackSnapshotTimerRef.current = null;
+    }, FEEDBACK_SNAPSHOT_MS);
+  }
+
   function clearFeedbackSnapshot(): void {
     clearFeedbackSnapshotTimer();
+    puzzleTimeoutInFlightRef.current = null;
     commitFeedbackSnapshot(null);
   }
 
@@ -2046,8 +2119,15 @@ export function PracticePocScreen({
   }
 
   const currentPuzzle = state?.currentPuzzle;
-  const sprintElapsedMs = state ? Math.max(0, nowMs - new Date(state.startedAt).getTime()) : 0;
-  const remainingMs = state ? Math.max(0, new Date(state.deadlineAt).getTime() - nowMs) : 0;
+  const effectiveSessionNowMs = state?.status === "paused" && state.pausedAt
+    ? new Date(state.pausedAt).getTime()
+    : nowMs;
+  const sprintElapsedMs = state
+    ? Math.max(0, effectiveSessionNowMs - new Date(state.startedAt).getTime())
+    : 0;
+  const remainingMs = state
+    ? Math.max(0, new Date(state.deadlineAt).getTime() - effectiveSessionNowMs)
+    : 0;
   const timerText = formatDuration(Math.max(0, Math.floor(remainingMs / 1000)));
   const currentBoardFen = boardFen ?? currentPuzzle?.currentFen ?? null;
   const displayedPuzzle = feedbackSnapshot?.currentPuzzle ?? currentPuzzle;
@@ -2061,11 +2141,7 @@ export function PracticePocScreen({
     suppressedMovesRef: suppressedBoardMovesRef
   });
   puzzleEntryPreviewLockedRef.current = sessionEntryPreview.locked;
-  const timingPreviewBoardFen = sessionTimingDesignState && sessionTimingDesignState.cycle > 0
-    ? sessionTimingPreview?.nextPuzzleFen
-    : undefined;
-  const displayedBoardFen = timingPreviewBoardFen
-    ?? sessionEntryPreview.displayFen
+  const displayedBoardFen = sessionEntryPreview.displayFen
     ?? feedbackSnapshot?.boardFen
     ?? currentBoardFen;
   sessionBoardHandlersRef.current = {
@@ -2133,7 +2209,6 @@ export function PracticePocScreen({
       : [])
   );
   const activeHistoryRatingKey = historyRatingKey;
-  const historyWrongOnly = historyResultFilter === "wrong";
   const historyRatingRangeQuery = historyRatingRangeFilterToQuery(historyRatingRangeFilter);
   // History views scan the full attempt history, so they are computed only while
   // the history panel is on screen. Recomputing them on every render made active
@@ -2150,13 +2225,13 @@ export function PracticePocScreen({
         ...(activeHistoryRatingKey ? { ratingKey: activeHistoryRatingKey } : {}),
         ...historyRatingRangeQuery,
         ...(historySourceFilter === "all" ? {} : { source: historySourceFilter }),
-        ...(historyResultFilter === "all" || historyTimingPreview
-          ? {}
-          : { result: historyResultFilter }),
+        ...(historyResultFilter === "all" ? {} : { result: historyResultFilter }),
         ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
         ...(selectedHistoryThemes.length === 0 ? {} : { themes: selectedHistoryThemes }),
         ...(historyReviewStatusFilter === "all" ? {} : { reviewStatus: historyReviewStatusFilter }),
         ...(historyUnclearOnly ? { unclear: true } : {}),
+        ...(historyAttentionOnly ? { attentionOnly: true } : {}),
+        ...(historyAttentionFlags.length === 0 ? {} : { attentionFlags: historyAttentionFlags }),
         page: { limit: HISTORY_PAGE_LIMIT, offset: historyPageOffset }
       })
     : null;
@@ -2167,49 +2242,17 @@ export function PracticePocScreen({
         ratingKey: activeHistoryRatingKey,
         ...historyRatingRangeQuery,
         ...(historySourceFilter === "all" ? {} : { source: historySourceFilter }),
+        ...(historyResultFilter === "all" ? {} : { result: historyResultFilter }),
         ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
         ...(selectedHistoryThemes.length === 0 ? {} : { themes: selectedHistoryThemes }),
         ...(historyReviewStatusFilter === "all" ? {} : { reviewStatus: historyReviewStatusFilter }),
-        ...(historyUnclearOnly ? { unclear: true } : {})
+        ...(historyUnclearOnly ? { unclear: true } : {}),
+        ...(historyAttentionOnly ? { attentionOnly: true } : {}),
+        ...(historyAttentionFlags.length === 0 ? {} : { attentionFlags: historyAttentionFlags })
       })
     : null;
-  const visibleHistoryAttempts = historyView?.attempts.filter((attempt) => {
-    if (!historyTimingPreview) {
-      return true;
-    }
-    const timingStatus = historyTimingPreview.statusByAttemptId[attempt.id] ?? null;
-    const isTimedOut = timingStatus === "timed_out";
-    const matchesNeedsAttention = (
-      attempt.unclear
-      || (attempt.result === "wrong" && !isTimedOut)
-      || timingStatus === "slow"
-      || isTimedOut
-    );
-    const matchesResult = historyResultFilter === "all"
-      || (!isTimedOut && attempt.result === historyResultFilter);
-    const matchesSelectedFlag = historyAttentionFlags.length === 0 || historyAttentionFlags.some((flag) => (
-      flag === "mistakes"
-        ? attempt.result === "wrong" && !isTimedOut
-        : flag === "unclear"
-        ? Boolean(attempt.unclear)
-        : flag === "slow"
-          ? timingStatus === "slow"
-          : isTimedOut
-    ));
-    return matchesResult
-      && (!historyAttentionOnly || matchesNeedsAttention)
-      && matchesSelectedFlag;
-  }) ?? [];
-  const visibleHistoryPage = historyView
-    && historyTimingPreview
-    && (historyAttentionOnly || historyAttentionFlags.length > 0)
-    ? {
-        ...historyView.page,
-        hasMore: false,
-        offset: 0,
-        total: visibleHistoryAttempts.length
-      }
-    : historyView?.page;
+  const visibleHistoryAttempts = historyView?.attempts ?? [];
+  const visibleHistoryPage = historyView?.page;
   const contentOwnsHeader = tab === "review" || tab === "history";
   const reviewSurfaceOpen = reviewSessionSource !== null || historyReviewEntries.length > 0 || historyUnavailableAttempt !== null;
   const topBackTransient: MobileBackTransient | null = startingMode
@@ -2461,11 +2504,34 @@ export function PracticePocScreen({
     selectedConfig.targetCorrect,
     service
   ]);
-  const sessionPuzzleTimingNode = shouldShowSessionBoard && sessionTimingDesignState ? (
+  const resolvedPuzzleTiming = state ? state.config.puzzleTiming ?? {
+    slowAfterSeconds: state.config.perPuzzleSeconds * 2,
+    timeoutAfterSeconds: state.config.perPuzzleSeconds * 3
+  } : null;
+  const currentPuzzleElapsedSeconds = state?.currentPuzzleStartedAt
+    ? Math.max(0, Math.floor(
+      (effectiveSessionNowMs - new Date(state.currentPuzzleStartedAt).getTime()) / 1000
+    ))
+    : 0;
+  const sessionTimingState: SessionTimingState | null = state && resolvedPuzzleTiming
+    ? feedbackSnapshot?.kind === "timed_out"
+      ? {
+          elapsedSeconds: feedbackSnapshot.elapsedSeconds ?? currentPuzzleElapsedSeconds,
+          phase: "timed_out"
+        }
+      : {
+          elapsedSeconds: currentPuzzleElapsedSeconds,
+          phase: resolvedPuzzleTiming.slowAfterSeconds !== null
+            && currentPuzzleElapsedSeconds >= resolvedPuzzleTiming.slowAfterSeconds
+            ? "slow"
+            : "normal"
+        }
+    : null;
+  const sessionPuzzleTimingNode = shouldShowSessionBoard && sessionTimingState ? (
     <PuzzleTimingIndicator
-      elapsedSeconds={sessionTimingDesignState.elapsedSeconds}
-      phase={sessionTimingDesignState.phase}
-      timeoutSeconds={sessionTimingPreview?.timeoutSeconds ?? 0}
+      elapsedSeconds={sessionTimingState.elapsedSeconds}
+      phase={sessionTimingState.phase}
+      timeoutSeconds={resolvedPuzzleTiming?.timeoutAfterSeconds ?? null}
     />
   ) : null;
   const sessionStatusNode = state && (isOpenSession || isShowingFeedbackSnapshot) ? (
@@ -2507,7 +2573,7 @@ export function PracticePocScreen({
       >
         {displayedBoardFen ? (
           <Chessboard
-            key={`${state?.id ?? "idle"}:${sessionTimingDesignState?.cycle ?? 0}`}
+            key={state?.id ?? "idle"}
             ref={boardRef}
             fen={displayedBoardFen}
             onMove={sessionBoardCallbacks.onMove}
@@ -2541,11 +2607,11 @@ export function PracticePocScreen({
           />
         ) : null}
 
-        {!boardGestureEnabled || sessionTimingDesignState?.phase === "timed_out" ? (
+        {!boardGestureEnabled || feedbackSnapshot?.kind === "timed_out" ? (
           <BoardInputBlocker />
         ) : null}
 
-        {sessionTimingDesignState?.phase === "timed_out" ? (
+        {feedbackSnapshot?.kind === "timed_out" ? (
           <View
             accessibilityLiveRegion="assertive"
             accessibilityRole="alert"
@@ -2850,7 +2916,6 @@ export function PracticePocScreen({
                 {!isOpenSession && state === null && activeRunManagementPresentation && activeRunManagementPresentation.screen !== "home" ? (
                   <PracticeRunEditor
                     presentation={activeRunManagementPresentation}
-                    showTimingPreview={runTimingEditorPreview}
                     themeCatalogPresentation={themeCatalogPresentation}
                   />
                 ) : null}
@@ -2972,11 +3037,8 @@ export function PracticePocScreen({
                   page={visibleHistoryPage ?? historyView.page}
                   reviewStatusFilter={historyReviewStatusFilter}
                   unclearOnly={historyUnclearOnly}
-                  sprintOnly={historySourceFilter === "sprint"}
-                  wrongOnly={historyWrongOnly}
                   attentionOnly={historyAttentionOnly}
                   attentionFlags={historyAttentionFlags}
-                  timingPreview={historyTimingPreview}
                   themeCatalogPresentation={themeCatalogPresentation}
                   filtersExpanded={historyFiltersExpanded}
                   onFiltersExpandedChange={setHistoryFiltersExpanded}
@@ -3012,10 +3074,6 @@ export function PracticePocScreen({
                     setHistoryReviewStatusFilter(status);
                     setHistoryPageOffset(0);
                   }}
-                  onToggleUnclearOnly={() => {
-                    setHistoryPageOffset(0);
-                    setHistoryUnclearOnly((current) => !current);
-                  }}
                   onAttentionOnlyChange={(attentionOnly) => {
                     setHistoryPageOffset(0);
                     setHistoryAttentionOnly(attentionOnly);
@@ -3034,7 +3092,7 @@ export function PracticePocScreen({
                   onOpenAttempt={openHistoryReview}
                   onResetFilters={() => {
                     setHistoryTimeRange("7d");
-                    setHistorySourceFilter(historyTimingPreview ? "all" : "sprint");
+                    setHistorySourceFilter("all");
                     setHistoryResultFilter("all");
                     setHistorySideFilter("all");
                     historyThemeChoices.dispatch({ type: "select-all-themes" });
@@ -3045,14 +3103,6 @@ export function PracticePocScreen({
                     setHistoryAttentionFlags([]);
                     setHistoryPageOffset(0);
                     setHistoryRatingKey(null);
-                  }}
-                  onToggleSprintOnly={() => {
-                    setHistoryPageOffset(0);
-                    setHistorySourceFilter(historySourceFilter === "sprint" ? "all" : "sprint");
-                  }}
-                  onToggleWrongOnly={() => {
-                    setHistoryPageOffset(0);
-                    setHistoryResultFilter(historyWrongOnly ? "all" : "wrong");
                   }}
                 />
               ) : null
@@ -4171,11 +4221,9 @@ function RunRemovalConfirmation({
 
 function PracticeRunEditor({
   presentation,
-  showTimingPreview,
   themeCatalogPresentation
 }: {
   presentation: PracticeRunManagementPresentation;
-  showTimingPreview: boolean;
   themeCatalogPresentation?: ThemeCatalogPresentation;
 }): React.JSX.Element | null {
   const draft = presentation.draft;
@@ -4220,9 +4268,7 @@ function PracticeRunEditor({
           {isCreate
             ? "Saving adds this run to Home. It does not start a sprint."
             : directRunEditing
-              ? showTimingPreview
-                ? "Change this Run's name, ELO, and puzzle timing."
-                : "Change the name or current ELO. Format and training settings stay fixed."
+              ? "Change this Run's name, ELO, and puzzle timing."
               : "Adjust the current ELO. Run settings stay fixed."}
         </Text>
       </View>
@@ -4240,7 +4286,7 @@ function PracticeRunEditor({
         </View>
       ) : null}
 
-      {!isCreate && directRunEditing && showTimingPreview ? (
+      {!isCreate && directRunEditing ? (
         <Text
           style={[styles.sectionLabel, styles.runEditorDetailsLabel]}
           testID="practice-run-details-section"
@@ -4381,7 +4427,16 @@ function PracticeRunEditor({
         )}
       </View>
 
-      {!isCreate && directRunEditing && showTimingPreview ? <PracticeRunTimingPreview /> : null}
+      {!isCreate && directRunEditing ? (
+        <PracticeRunTimingSettings
+          perPuzzleSeconds={draft.perPuzzleSeconds}
+          puzzleTiming={draft.puzzleTiming}
+          onChange={(puzzleTiming) => presentation.onIntent({
+            type: "change-puzzle-timing",
+            puzzleTiming
+          })}
+        />
+      ) : null}
 
       {isCreate && isCustom && previousRows.length > 0 ? (
         <View style={styles.previousConfigList} testID="custom-previous-configs">
@@ -4402,36 +4457,74 @@ function PracticeRunEditor({
   );
 }
 
-function PracticeRunTimingPreview(): React.JSX.Element {
-  const [warningEnabled, setWarningEnabled] = useState(true);
-  const [timeoutEnabled, setTimeoutEnabled] = useState(true);
-  const [warningSeconds, setWarningSeconds] = useState(40);
-  const [timeoutSeconds, setTimeoutSeconds] = useState(60);
+function PracticeRunTimingSettings({
+  onChange,
+  perPuzzleSeconds,
+  puzzleTiming
+}: {
+  onChange: (puzzleTiming: {
+    slowAfterSeconds: number | null;
+    timeoutAfterSeconds: number | null;
+  }) => void;
+  perPuzzleSeconds: number;
+  puzzleTiming: {
+    slowAfterSeconds: number | null;
+    timeoutAfterSeconds: number | null;
+  } | undefined;
+}): React.JSX.Element {
+  const editor = puzzleTimingEditorState(puzzleTiming, perPuzzleSeconds);
+  const currentTiming = editor.policy;
+  const warningEnabled = currentTiming.slowAfterSeconds !== null;
+  const timeoutEnabled = currentTiming.timeoutAfterSeconds !== null;
+  const warningSeconds = editor.slowDisplaySeconds;
+  const timeoutSeconds = editor.timeoutDisplaySeconds;
 
   return (
     <View style={styles.settingsSection} testID="practice-run-puzzle-timing">
       <View style={styles.runTimingSectionCopy}>
         <Text style={styles.sectionLabel}>Puzzle timing</Text>
-        <Text style={styles.helperText}>Typical time 0:20 · no ELO impact</Text>
+        <Text style={styles.helperText}>
+          {`Typical time ${formatCompactDuration(perPuzzleSeconds)} · no ELO impact`}
+        </Text>
       </View>
       <View style={styles.customConfigCard} testID="practice-run-puzzle-timing-card">
         <RunTimingSettingRow
           detail="Turns the puzzle clock yellow; play continues."
           enabled={warningEnabled}
           label="Slow warning"
+          maximumSeconds={editor.slowMaximumSeconds}
+          minimumSeconds={10}
           seconds={warningSeconds}
           testID="practice-run-slow-warning"
-          onChange={(seconds) => setWarningSeconds(Math.min(seconds, timeoutSeconds - 5))}
-          onToggle={() => setWarningEnabled((current) => !current)}
+          onChange={(seconds) => onChange(updatePuzzleTimingFromEditor(
+            currentTiming,
+            perPuzzleSeconds,
+            { type: "set-slow", seconds }
+          ))}
+          onToggle={() => onChange(updatePuzzleTimingFromEditor(
+            currentTiming,
+            perPuzzleSeconds,
+            { type: "toggle-slow" }
+          ))}
         />
         <RunTimingSettingRow
           detail="Marks Timed out and moves on."
           enabled={timeoutEnabled}
           label="Puzzle timeout"
+          maximumSeconds={180}
+          minimumSeconds={editor.timeoutMinimumSeconds}
           seconds={timeoutSeconds}
           testID="practice-run-puzzle-timeout"
-          onChange={(seconds) => setTimeoutSeconds(Math.max(seconds, warningSeconds + 5))}
-          onToggle={() => setTimeoutEnabled((current) => !current)}
+          onChange={(seconds) => onChange(updatePuzzleTimingFromEditor(
+            currentTiming,
+            perPuzzleSeconds,
+            { type: "set-timeout", seconds }
+          ))}
+          onToggle={() => onChange(updatePuzzleTimingFromEditor(
+            currentTiming,
+            perPuzzleSeconds,
+            { type: "toggle-timeout" }
+          ))}
         />
       </View>
     </View>
@@ -4442,6 +4535,8 @@ function RunTimingSettingRow({
   detail,
   enabled,
   label,
+  maximumSeconds,
+  minimumSeconds,
   seconds,
   testID,
   onChange,
@@ -4450,6 +4545,8 @@ function RunTimingSettingRow({
   detail: string;
   enabled: boolean;
   label: string;
+  maximumSeconds: number;
+  minimumSeconds: number;
   seconds: number;
   testID: string;
   onChange: (seconds: number) => void;
@@ -4466,10 +4563,10 @@ function RunTimingSettingRow({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Decrease ${label.toLowerCase()}`}
-            disabled={!enabled || seconds <= 10}
+            disabled={!enabled || seconds <= minimumSeconds}
             style={styles.runTimingStepButton}
             testID={`${testID}-decrease`}
-            onPress={() => onChange(Math.max(10, seconds - 5))}
+            onPress={() => onChange(Math.max(minimumSeconds, seconds - 5))}
           >
             <Text style={styles.runTimingStepText}>−</Text>
           </Pressable>
@@ -4479,10 +4576,10 @@ function RunTimingSettingRow({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Increase ${label.toLowerCase()}`}
-            disabled={!enabled || seconds >= 180}
+            disabled={!enabled || seconds >= maximumSeconds}
             style={styles.runTimingStepButton}
             testID={`${testID}-increase`}
-            onPress={() => onChange(Math.min(180, seconds + 5))}
+            onPress={() => onChange(Math.min(maximumSeconds, seconds + 5))}
           >
             <Text style={styles.runTimingStepText}>+</Text>
           </Pressable>
@@ -5468,68 +5565,10 @@ function TestPuzzleSourceControl({
   );
 }
 
-type SessionTimingDesignState = {
-  cycle: number;
+type SessionTimingState = {
   elapsedSeconds: number;
   phase: "normal" | "slow" | "timed_out";
 };
-
-function useSessionTimingDesignPreview(
-  preview: SessionTimingDesignPreview | undefined
-): SessionTimingDesignState | null {
-  const initialElapsedSeconds = preview?.initialElapsedSeconds ?? 0;
-  const timeoutSeconds = preview?.timeoutSeconds ?? 0;
-  const warningSeconds = preview?.warningSeconds ?? 0;
-  const previewEnabled = preview !== undefined;
-  const [state, setState] = useState<SessionTimingDesignState>(() => ({
-    cycle: 0,
-    elapsedSeconds: initialElapsedSeconds,
-    phase: initialElapsedSeconds >= warningSeconds ? "slow" : "normal"
-  }));
-
-  useEffect(() => {
-    if (!previewEnabled) {
-      return undefined;
-    }
-    setState({
-      cycle: 0,
-      elapsedSeconds: initialElapsedSeconds,
-      phase: initialElapsedSeconds >= warningSeconds ? "slow" : "normal"
-    });
-    const interval = setInterval(() => {
-      setState((current) => {
-        if (current.phase === "timed_out") {
-          return current;
-        }
-        const elapsedSeconds = Math.min(current.elapsedSeconds + 1, timeoutSeconds);
-        return {
-          ...current,
-          elapsedSeconds,
-          phase: elapsedSeconds >= timeoutSeconds
-            ? "timed_out"
-            : elapsedSeconds >= warningSeconds ? "slow" : "normal"
-        };
-      });
-    }, 1_000);
-    return () => clearInterval(interval);
-  }, [initialElapsedSeconds, previewEnabled, timeoutSeconds, warningSeconds]);
-
-  useEffect(() => {
-    if (!previewEnabled || state.phase !== "timed_out") {
-      return undefined;
-    }
-    const handoff = setTimeout(() => {
-      setState((current) => ({
-        cycle: current.cycle + 1,
-        elapsedSeconds: 0,
-        phase: "normal"
-      }));
-    }, FEEDBACK_SNAPSHOT_MS);
-    return () => clearTimeout(handoff);
-  }, [previewEnabled, state.phase]);
-
-  return previewEnabled ? state : null;
-}
 
 function PuzzleTimingIndicator({
   elapsedSeconds,
@@ -5537,12 +5576,14 @@ function PuzzleTimingIndicator({
   timeoutSeconds
 }: {
   elapsedSeconds: number;
-  phase: SessionTimingDesignState["phase"];
-  timeoutSeconds: number;
+  phase: SessionTimingState["phase"];
+  timeoutSeconds: number | null;
 }): React.JSX.Element {
   const label = `Puzzle ${formatCompactDuration(elapsedSeconds)}`;
-  const remainingSeconds = timeoutSeconds - elapsedSeconds;
-  const countdownSeconds = phase !== "timed_out" && remainingSeconds <= 10
+  const remainingSeconds = timeoutSeconds === null ? null : timeoutSeconds - elapsedSeconds;
+  const countdownSeconds = phase !== "timed_out"
+    && remainingSeconds !== null
+    && remainingSeconds <= 10
     ? Math.max(remainingSeconds, 1)
     : null;
   const accessibilityLabel = countdownSeconds === null
@@ -6570,11 +6611,8 @@ function HistoryPanel({
   page,
   reviewStatusFilter,
   unclearOnly,
-  sprintOnly,
-  wrongOnly,
   attentionOnly,
   attentionFlags,
-  timingPreview,
   themeCatalogPresentation,
   onRatingKeyChange,
   onTimeRangeChange,
@@ -6589,10 +6627,7 @@ function HistoryPanel({
   onFiltersExpandedChange,
   onResetFilters,
   onAttentionOnlyChange,
-  onAttentionFlagToggle,
-  onToggleSprintOnly,
-  onToggleUnclearOnly,
-  onToggleWrongOnly
+  onAttentionFlagToggle
 }: {
   adaptiveLayout: AdaptiveLayout;
   attempts: HistoryAttemptView[];
@@ -6612,11 +6647,8 @@ function HistoryPanel({
   page: { limit: number; offset: number; total: number; hasMore: boolean };
   reviewStatusFilter: "all" | HistoryReviewStatus;
   unclearOnly: boolean;
-  sprintOnly: boolean;
-  wrongOnly: boolean;
   attentionOnly: boolean;
   attentionFlags: readonly HistoryAttentionFlag[];
-  timingPreview?: HistoryTimingDesignPreview;
   themeCatalogPresentation?: ThemeCatalogPresentation;
   onRatingKeyChange: (ratingKey: string | null) => void;
   onTimeRangeChange: (range: HistoryTimeRange) => void;
@@ -6632,9 +6664,6 @@ function HistoryPanel({
   onResetFilters: () => void;
   onAttentionOnlyChange: (attentionOnly: boolean) => void;
   onAttentionFlagToggle: (flag: HistoryAttentionFlag) => void;
-  onToggleSprintOnly: () => void;
-  onToggleUnclearOnly: () => void;
-  onToggleWrongOnly: () => void;
 }): React.JSX.Element {
   const visibleAttempts = attempts;
   const ratingPoints = performance.charts.rating;
@@ -6685,23 +6714,19 @@ function HistoryPanel({
 
       {filtersExpanded ? (
         <View style={styles.historyAdvancedFilters} testID="history-advanced-filters">
-          {timingPreview ? (
-            <>
-              <HistoryRatingFilters
-                ratingKeys={ratingKeys}
-                runsByRatingKey={runsByRatingKey}
-                selectedRatingKey={selectedRatingKey}
-                onRatingKeyChange={onRatingKeyChange}
-              />
-              <HistoryRangeFilters timeRange={timeRange} onTimeRangeChange={onTimeRangeChange} />
-              <HistoryAttentionFlagsFilter
-                selectedFlags={attentionFlags}
-                onToggle={onAttentionFlagToggle}
-              />
-            </>
-          ) : null}
+          <HistoryRatingFilters
+            ratingKeys={ratingKeys}
+            runsByRatingKey={runsByRatingKey}
+            selectedRatingKey={selectedRatingKey}
+            onRatingKeyChange={onRatingKeyChange}
+          />
+          <HistoryRangeFilters timeRange={timeRange} onTimeRangeChange={onTimeRangeChange} />
+          <HistoryAttentionFlagsFilter
+            selectedFlags={attentionFlags}
+            onToggle={onAttentionFlagToggle}
+          />
           <HistoryChipRow testID="history-source-filters">
-            <FilterButton active={sourceFilter === "all"} label={timingPreview ? "All sources" : "All"} testID="history-source-all" onPress={() => onSourceFilterChange("all")} />
+            <FilterButton active={sourceFilter === "all"} label="All sources" testID="history-source-all" onPress={() => onSourceFilterChange("all")} />
             <FilterButton active={sourceFilter === "sprint"} label="Sprint" testID="history-source-sprint" onPress={() => onSourceFilterChange("sprint")} />
             <FilterButton active={sourceFilter === "scheduled_review"} label="Review" testID="history-source-review" onPress={() => onSourceFilterChange("scheduled_review")} />
           </HistoryChipRow>
@@ -6763,50 +6788,10 @@ function HistoryPanel({
       ) : null}
 
       <View style={styles.historyTopFilterStack} testID="history-primary-filters">
-        {timingPreview ? (
-          <HistoryAttentionFilter
-            attentionOnly={attentionOnly}
-            onChange={onAttentionOnlyChange}
-          />
-        ) : (
-          <>
-            <HistoryRatingFilters
-              ratingKeys={ratingKeys}
-              runsByRatingKey={runsByRatingKey}
-              selectedRatingKey={selectedRatingKey}
-              onRatingKeyChange={onRatingKeyChange}
-            />
-            <HistoryRangeFilters timeRange={timeRange} onTimeRangeChange={onTimeRangeChange} />
-            <ScrollView
-              contentContainerStyle={styles.historyQuickFilterRow}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              testID="history-quick-filters"
-            >
-              <HistoryQuickChip
-                active={unclearOnly}
-                accessibilityLabel="Unclear attempts"
-                controlTestID="history-filter-unclear"
-                label="Unclear"
-                onPress={onToggleUnclearOnly}
-              />
-              <HistoryQuickChip
-                active={wrongOnly}
-                accessibilityLabel="Wrong attempts"
-                controlTestID="history-filter-wrong-only"
-                label="Wrong"
-                onPress={onToggleWrongOnly}
-              />
-              <HistoryQuickChip
-                active={sprintOnly}
-                accessibilityLabel="Sprint attempts"
-                controlTestID="history-filter-sprint-only"
-                label="Sprint"
-                onPress={onToggleSprintOnly}
-              />
-            </ScrollView>
-          </>
-        )}
+        <HistoryAttentionFilter
+          attentionOnly={attentionOnly}
+          onChange={onAttentionOnlyChange}
+        />
       </View>
 
       {selectedRatingKey ? (
@@ -6827,7 +6812,7 @@ function HistoryPanel({
         </View>
       ) : null}
 
-      <HistoryActiveFilterStrip compact={Boolean(timingPreview)} labels={activeFilterLabels} />
+      <HistoryActiveFilterStrip compact labels={activeFilterLabels} />
 
       <View style={styles.historyPageRow}>
         <Text style={styles.helperText}>
@@ -6871,7 +6856,6 @@ function HistoryPanel({
         <HistoryAttemptRow
           key={attempt.id}
           attempt={attempt}
-          timingStatus={timingPreview?.statusByAttemptId[attempt.id] ?? null}
           onOpen={() => onOpenAttempt(attempt.id)}
         />
       ))}
@@ -7604,15 +7588,15 @@ function HistoryQuickChip({
 
 function HistoryAttemptRow({
   attempt,
-  timingStatus,
   onOpen
 }: {
   attempt: HistoryAttemptView;
-  timingStatus: "slow" | "timed_out" | null;
   onOpen: () => void;
 }): React.JSX.Element {
   const detail = normalizeHistoryAttemptDetail(attempt);
-  const isTimedOut = timingStatus === "timed_out";
+  const timingStatus = attempt.timingStatus
+    ?? (attempt.result === "timed_out" ? "timed_out" : null);
+  const isTimedOut = timingStatus === "timed_out" || detail.result === "timed_out";
   const isWrong = detail.result === "wrong" && !isTimedOut;
   const isCorrect = detail.result === "correct";
   const completedAtMs = detail.completedAt === null ? null : new Date(detail.completedAt).getTime();
