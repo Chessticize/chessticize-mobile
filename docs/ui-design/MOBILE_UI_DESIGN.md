@@ -481,12 +481,16 @@ New Run behavior:
 - The four Needs attention reasons use OR. Every advanced facet combines with
   that union using AND. Keep the result count and category/value applied-filter
   summary near the list without displaying a Boolean formula.
-- The advanced `Attention flags` facet contains `Unclear`, `Slow`, and
-  `Timed out`. Its selected values use OR; `Wrong` remains in the separate
-  Result facet. Label Review membership `Review queue: All / In queue /
-  Not in queue`.
+- The advanced `Attention flags` facet contains `Mistakes`, `Unclear`, `Slow`,
+  and `Timed out`. Its selected values use OR. `Mistakes` intentionally
+  overlaps `Result: Wrong` so all four Needs attention reasons can be composed
+  in one group; keep Result as the independent `Correct / Wrong` facet. Label
+  Review membership `Review queue: All / In queue / Not in queue`.
 - Keep the full Themes facet collapsed when the History filter menu opens.
   Its disclosure shows `All themes` or the selected count before expanding.
+- Place the expanded advanced-filter region in one bordered container above
+  `All / Needs attention`. Keep Themes visually lightweight inside that
+  container, without its own full-width card border or background.
 - Selecting an ELO bucket supplies the mode, sprint config, and sprint-speed
   context for rating history. Do not show separate History mode or speed chips
   while the view can be focused through rating bucket chips.

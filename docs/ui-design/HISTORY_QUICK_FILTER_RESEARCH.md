@@ -16,12 +16,17 @@ Use one persistent, single-select segmented control:
 - Default the advanced Source facet to `All sources`.
 - Move range, Run/rating bucket, source, result, Review queue, side, attention
   flags, and theme controls into the existing filter menu.
-- Let `Unclear`, `Slow`, and `Timed out` be independently selectable
-  `Attention flags`. Multiple selected flags use OR. Keep `Wrong` in Result
-  rather than duplicating it in this group.
+- Let `Mistakes`, `Unclear`, `Slow`, and `Timed out` be independently
+  selectable `Attention flags`. Multiple selected flags use OR. `Mistakes`
+  intentionally overlaps `Result: Wrong` so that every reason behind
+  `Needs attention` can be composed inside one group; keep Result as the
+  independent `Correct / Wrong` dimension.
 - Label Review membership `Review queue: All / In queue / Not in queue`.
 - Keep the full Themes catalog collapsed when the menu opens. Its disclosure
   summary shows `All themes` or the number selected.
+- When expanded, present all advanced filters inside one bordered region above
+  `All / Needs attention`. Themes remains a plain disclosure subsection inside
+  that region rather than a second full-width card.
 - Keep the filter-menu button, result count, and compact applied-filter
   summary. They communicate state; they are not additional quick filters.
 - Keep no second quick filter in this iteration. Date range is the only
@@ -48,7 +53,7 @@ matching the WAI-ARIA single-selection contract
 ([W3C radio group pattern](https://www.w3.org/WAI/ARIA/apg/patterns/radio/)).
 
 Visible labels stay short. The full union is available in the accessible option
-label: `Needs attention: slow, wrong, unclear, or timed out`. No explanatory
+label: `Needs attention: mistakes, unclear, slow, or timed out`. No explanatory
 sentence or Boolean formula is added to the History screen.
 
 ## Naming
@@ -81,11 +86,12 @@ Needs attention AND Source: Review AND Range: 30 days
 The `Attention flags` facet follows normal multi-select behavior:
 
 ```text
-(Unclear OR Slow OR Timed out) AND Result: Correct
+(Mistakes OR Unclear OR Slow OR Timed out) AND Result: Correct
 ```
 
 Selecting no attention flag places no restriction on that facet. The applied
-state summary uses plain language such as `Attention: Unclear or Slow`.
+state summary uses plain language such as
+`Attention: Mistakes or Unclear or Slow`.
 
 Do not show the formula in the interface. Keep the selected view, result count,
 and category/value applied-state tokens close to the results.
@@ -110,12 +116,16 @@ filter token. It is equivalent to clearing that facet
 - An attempt matching multiple reasons appears once.
 - A normal correct, on-time, clear attempt is excluded.
 - Adding an advanced filter can only narrow the attention union.
-- `Unclear`, `Slow`, and `Timed out` can be selected independently; multiple
-  selections use OR and appear once in the applied-state summary.
+- `Mistakes`, `Unclear`, `Slow`, and `Timed out` can be selected
+  independently; multiple selections use OR and appear once in the
+  applied-state summary.
+- `Mistakes` may overlap `Result: Wrong` without duplicating an attempt.
 - Review membership reads `All / In queue / Not in queue`, not
   `All review states / Queued / Clear`.
 - Themes is collapsed when filters open, retains a compact selection summary,
   and reveals all 24 curated choices on demand.
+- The expanded filter region has one visible outer boundary and appears above
+  the primary History view selector; Themes does not add a nested card boundary.
 - Reset restores `All`, `All sources`, and the default range.
 - At 320-point width, both segments and the filter button remain visible
   without horizontal scrolling.

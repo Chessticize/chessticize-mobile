@@ -1330,6 +1330,9 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-attention-needs-attention").props.accessibilityState).toEqual({
       checked: true
     });
+    expect(findByTestId(renderer, "history-attention-needs-attention").props.accessibilityLabel).toBe(
+      "Needs attention: mistakes, unclear, slow, or timed out"
+    );
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toBe(
       "7 days·All puzzles"
     );
@@ -1339,6 +1342,27 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "history-attempt-history-clean")).toThrow();
 
     press(renderer, "history-filter-toggle");
+    expect(testIdOrder(renderer, "history-advanced-filters", "history-attention-filter")).toBeLessThan(0);
+    expect(hasStyleEntry(
+      findByTestId(renderer, "history-advanced-filters"),
+      "borderWidth",
+      1
+    )).toBe(true);
+    expect(hasStyleEntry(
+      findByTestId(renderer, "history-advanced-filters"),
+      "borderColor",
+      "#CBD5E1"
+    )).toBe(true);
+    expect(hasStyleEntry(
+      findByTestId(renderer, "history-advanced-filters"),
+      "backgroundColor",
+      "#FFFFFF"
+    )).toBe(true);
+    expect(hasStyleEntry(
+      findByTestId(renderer, "history-advanced-filters"),
+      "padding",
+      10
+    )).toBe(true);
     expect(findByTestId(renderer, "history-rating-filters")).toBeTruthy();
     expect(findByTestId(renderer, "history-range-filters")).toBeTruthy();
     expect(hasStyleEntry(
@@ -1350,22 +1374,32 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "history-attention-flags"))).toContain(
       "Attention flags"
     );
+    expect(findByTestId(renderer, "history-attention-flag-mistakes").props.accessibilityRole).toBe(
+      "checkbox"
+    );
+    expect(findByTestId(renderer, "history-attention-flag-mistakes").props.accessibilityState).toEqual({
+      checked: false
+    });
     expect(findByTestId(renderer, "history-attention-flag-unclear").props.accessibilityRole).toBe(
       "checkbox"
     );
     expect(findByTestId(renderer, "history-attention-flag-unclear").props.accessibilityState).toEqual({
       checked: false
     });
+    press(renderer, "history-attention-flag-mistakes");
+    expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-history-unclear")).toThrow();
+    expect(() => findByTestId(renderer, "history-attempt-history-correct")).toThrow();
     press(renderer, "history-attention-flag-unclear");
     expect(findByTestId(renderer, "history-attempt-history-unclear")).toBeTruthy();
     expect(() => findByTestId(renderer, "history-attempt-history-correct")).toThrow();
-    expect(() => findByTestId(renderer, "history-attempt-history-wrong")).toThrow();
+    expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
     press(renderer, "history-attention-flag-slow");
     expect(findByTestId(renderer, "history-attempt-history-unclear")).toBeTruthy();
     expect(findByTestId(renderer, "history-attempt-history-correct")).toBeTruthy();
-    expect(() => findByTestId(renderer, "history-attempt-history-wrong")).toThrow();
+    expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain(
-      "Attention: Unclear or Slow"
+      "Attention: Mistakes or Unclear or Slow"
     );
     press(renderer, "history-attention-flag-timed-out");
     expect(findByTestId(renderer, "history-attempt-history-unclear")).toBeTruthy();
@@ -1379,6 +1413,16 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-theme-disclosure").props.accessibilityState).toEqual({
       expanded: false
     });
+    expect(hasStyleEntry(
+      findByTestId(renderer, "history-theme-filters"),
+      "borderWidth",
+      1
+    )).toBe(false);
+    expect(hasStyleEntry(
+      findByTestId(renderer, "history-theme-filters"),
+      "backgroundColor",
+      "#FFFFFF"
+    )).toBe(false);
     expect(() => findByTestId(renderer, "history-theme-all")).toThrow();
     press(renderer, "history-theme-disclosure");
     expect(findByTestId(renderer, "history-theme-disclosure").props.accessibilityState).toEqual({

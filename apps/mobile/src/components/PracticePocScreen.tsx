@@ -205,7 +205,7 @@ export type HistoryTimingDesignPreview = {
   timedOutAttemptIds: readonly string[];
 };
 
-type HistoryAttentionFlag = "unclear" | "slow" | "timed_out";
+type HistoryAttentionFlag = "mistakes" | "unclear" | "slow" | "timed_out";
 
 export type CustomThemeSelection = {
   selectedThemes: readonly CustomThemeFilter[];
@@ -2143,7 +2143,9 @@ export function PracticePocScreen({
       || historyTimingPreview.timedOutAttemptIds.includes(attempt.id)
     );
     const matchesSelectedFlag = historyAttentionFlags.length === 0 || historyAttentionFlags.some((flag) => (
-      flag === "unclear"
+      flag === "mistakes"
+        ? attempt.result === "wrong"
+        : flag === "unclear"
         ? Boolean(attempt.unclear)
         : flag === "slow"
           ? historyTimingPreview.slowAttemptIds.includes(attempt.id)
@@ -6621,71 +6623,6 @@ function HistoryPanel({
         </View>
       </View>
 
-      <View style={styles.historyTopFilterStack} testID="history-primary-filters">
-        {timingPreview ? (
-          <HistoryAttentionFilter
-            attentionOnly={attentionOnly}
-            onChange={onAttentionOnlyChange}
-          />
-        ) : (
-          <>
-            <HistoryRatingFilters
-              ratingKeys={ratingKeys}
-              runsByRatingKey={runsByRatingKey}
-              selectedRatingKey={selectedRatingKey}
-              onRatingKeyChange={onRatingKeyChange}
-            />
-            <HistoryRangeFilters timeRange={timeRange} onTimeRangeChange={onTimeRangeChange} />
-            <ScrollView
-              contentContainerStyle={styles.historyQuickFilterRow}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              testID="history-quick-filters"
-            >
-              <HistoryQuickChip
-                active={unclearOnly}
-                accessibilityLabel="Unclear attempts"
-                controlTestID="history-filter-unclear"
-                label="Unclear"
-                onPress={onToggleUnclearOnly}
-              />
-              <HistoryQuickChip
-                active={wrongOnly}
-                accessibilityLabel="Wrong attempts"
-                controlTestID="history-filter-wrong-only"
-                label="Wrong"
-                onPress={onToggleWrongOnly}
-              />
-              <HistoryQuickChip
-                active={sprintOnly}
-                accessibilityLabel="Sprint attempts"
-                controlTestID="history-filter-sprint-only"
-                label="Sprint"
-                onPress={onToggleSprintOnly}
-              />
-            </ScrollView>
-          </>
-        )}
-      </View>
-
-      {selectedRatingKey ? (
-        <View style={styles.historyPerformanceCard} testID="history-performance-card">
-          <View style={styles.historyPerformanceHeader}>
-            <View>
-              <Text style={styles.panelTitle}>Rating Trend</Text>
-              <Text testID="history-performance-context" style={styles.helperText}>
-                {`${historyRatingKeyLabel(selectedRatingKey, selectedRun?.name, selectedRun?.perPuzzleSeconds)} · ${historyRangeLabel(timeRange)}`}
-              </Text>
-            </View>
-            <View style={styles.historyMetricSummary}>
-              <Text testID="history-chart-value" style={styles.historyAccuracy}>{latestRating ? String(latestRating) : "—"}</Text>
-              <Text testID="history-chart-label" style={styles.helperText}>Rating</Text>
-            </View>
-          </View>
-          <HistoryRatingTrendChart points={ratingPoints} />
-        </View>
-      ) : null}
-
       {filtersExpanded ? (
         <View style={styles.historyAdvancedFilters} testID="history-advanced-filters">
           {timingPreview ? (
@@ -6765,6 +6702,71 @@ function HistoryPanel({
         </View>
       ) : null}
 
+      <View style={styles.historyTopFilterStack} testID="history-primary-filters">
+        {timingPreview ? (
+          <HistoryAttentionFilter
+            attentionOnly={attentionOnly}
+            onChange={onAttentionOnlyChange}
+          />
+        ) : (
+          <>
+            <HistoryRatingFilters
+              ratingKeys={ratingKeys}
+              runsByRatingKey={runsByRatingKey}
+              selectedRatingKey={selectedRatingKey}
+              onRatingKeyChange={onRatingKeyChange}
+            />
+            <HistoryRangeFilters timeRange={timeRange} onTimeRangeChange={onTimeRangeChange} />
+            <ScrollView
+              contentContainerStyle={styles.historyQuickFilterRow}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              testID="history-quick-filters"
+            >
+              <HistoryQuickChip
+                active={unclearOnly}
+                accessibilityLabel="Unclear attempts"
+                controlTestID="history-filter-unclear"
+                label="Unclear"
+                onPress={onToggleUnclearOnly}
+              />
+              <HistoryQuickChip
+                active={wrongOnly}
+                accessibilityLabel="Wrong attempts"
+                controlTestID="history-filter-wrong-only"
+                label="Wrong"
+                onPress={onToggleWrongOnly}
+              />
+              <HistoryQuickChip
+                active={sprintOnly}
+                accessibilityLabel="Sprint attempts"
+                controlTestID="history-filter-sprint-only"
+                label="Sprint"
+                onPress={onToggleSprintOnly}
+              />
+            </ScrollView>
+          </>
+        )}
+      </View>
+
+      {selectedRatingKey ? (
+        <View style={styles.historyPerformanceCard} testID="history-performance-card">
+          <View style={styles.historyPerformanceHeader}>
+            <View>
+              <Text style={styles.panelTitle}>Rating Trend</Text>
+              <Text testID="history-performance-context" style={styles.helperText}>
+                {`${historyRatingKeyLabel(selectedRatingKey, selectedRun?.name, selectedRun?.perPuzzleSeconds)} · ${historyRangeLabel(timeRange)}`}
+              </Text>
+            </View>
+            <View style={styles.historyMetricSummary}>
+              <Text testID="history-chart-value" style={styles.historyAccuracy}>{latestRating ? String(latestRating) : "—"}</Text>
+              <Text testID="history-chart-label" style={styles.helperText}>Rating</Text>
+            </View>
+          </View>
+          <HistoryRatingTrendChart points={ratingPoints} />
+        </View>
+      ) : null}
+
       <HistoryActiveFilterStrip compact={Boolean(timingPreview)} labels={activeFilterLabels} />
 
       <View style={styles.historyPageRow}>
@@ -6829,10 +6831,22 @@ function HistoryAttentionFlagsFilter({
   return (
     <View style={styles.historyFilterGroup} testID="history-attention-flags">
       <Text style={styles.historyFilterGroupLabel}>Attention flags</Text>
-      <HistoryChipRow testID="history-attention-flag-options">
+      <HistoryChipRow
+        contentStyle={styles.historyAttentionFlagContent}
+        testID="history-attention-flag-options"
+      >
+        <HistoryQuickChip
+          accessibilityLabel="Filter by mistake attempts"
+          active={selectedFlags.includes("mistakes")}
+          compact
+          controlTestID="history-attention-flag-mistakes"
+          label="Mistakes"
+          onPress={() => onToggle("mistakes")}
+        />
         <HistoryQuickChip
           accessibilityLabel="Filter by unclear attempts"
           active={selectedFlags.includes("unclear")}
+          compact
           controlTestID="history-attention-flag-unclear"
           label="Unclear"
           onPress={() => onToggle("unclear")}
@@ -6840,6 +6854,7 @@ function HistoryAttentionFlagsFilter({
         <HistoryQuickChip
           accessibilityLabel="Filter by slow attempts"
           active={selectedFlags.includes("slow")}
+          compact
           controlTestID="history-attention-flag-slow"
           label="Slow"
           onPress={() => onToggle("slow")}
@@ -6847,6 +6862,7 @@ function HistoryAttentionFlagsFilter({
         <HistoryQuickChip
           accessibilityLabel="Filter by timed out attempts"
           active={selectedFlags.includes("timed_out")}
+          compact
           controlTestID="history-attention-flag-timed-out"
           label="Timed out"
           onPress={() => onToggle("timed_out")}
@@ -6977,7 +6993,11 @@ function historyActiveFilterLabels({
   }
   if (attentionFlags.length > 0) {
     const flagLabels = attentionFlags.map((flag) => (
-      flag === "unclear" ? "Unclear" : flag === "slow" ? "Slow" : "Timed out"
+      flag === "mistakes"
+        ? "Mistakes"
+        : flag === "unclear"
+          ? "Unclear"
+          : flag === "slow" ? "Slow" : "Timed out"
     ));
     labels.push(`Attention: ${flagLabels.join(" or ")}`);
   }
@@ -7316,9 +7336,11 @@ function ResultBadgeGlyph({ tone }: { tone: "correct" | "wrong" }): React.JSX.El
 
 function HistoryChipRow({
   children,
+  contentStyle,
   testID
 }: {
   children: React.ReactNode;
+  contentStyle?: StyleProp<ViewStyle>;
   testID: string;
 }): React.JSX.Element {
   return (
@@ -7327,7 +7349,7 @@ function HistoryChipRow({
       showsHorizontalScrollIndicator={false}
       testID={testID}
     >
-      <View style={styles.historyChipContent}>
+      <View style={[styles.historyChipContent, contentStyle]}>
         {children}
       </View>
     </ScrollView>
@@ -7428,7 +7450,7 @@ function HistoryAttentionFilter({
         </Text>
       </Pressable>
       <Pressable
-        accessibilityLabel="Needs attention: slow, wrong, unclear, or timed out"
+        accessibilityLabel="Needs attention: mistakes, unclear, slow, or timed out"
         accessibilityRole="radio"
         accessibilityState={{ checked: attentionOnly }}
         aria-checked={attentionOnly}
@@ -7455,12 +7477,14 @@ function HistoryAttentionFilter({
 function HistoryQuickChip({
   accessibilityLabel,
   active,
+  compact = false,
   controlTestID,
   label,
   onPress
 }: {
   accessibilityLabel: string;
   active: boolean;
+  compact?: boolean;
   controlTestID: string;
   label: string;
   onPress: () => void;
@@ -7475,7 +7499,11 @@ function HistoryQuickChip({
       onPress={onPress}
     >
       <View
-        style={[styles.historyQuickChip, active ? styles.historyQuickChipActive : null]}
+        style={[
+          styles.historyQuickChip,
+          compact ? styles.historyQuickChipCompact : null,
+          active ? styles.historyQuickChipActive : null
+        ]}
         testID={`${controlTestID}-surface`}
       >
         {active ? (
@@ -14594,6 +14622,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#2563EB",
     borderColor: "#2563EB"
   },
+  historyQuickChipCompact: {
+    paddingHorizontal: 6
+  },
   historyQuickChipCheck: {
     color: "#FFFFFF",
     fontSize: 11,
@@ -14644,7 +14675,12 @@ const styles = StyleSheet.create({
     transform: [{ translateX: 18 }]
   },
   historyAdvancedFilters: {
-    gap: 8
+    backgroundColor: "#FFFFFF",
+    borderColor: "#CBD5E1",
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 8,
+    padding: 10
   },
   historyFilterGroup: {
     gap: 4
@@ -14655,13 +14691,11 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     marginLeft: 2
   },
+  historyAttentionFlagContent: {
+    gap: 4
+  },
   historyThemeFilterSection: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 10,
-    padding: 10
+    gap: 8
   },
   historyThemeDisclosure: {
     alignItems: "center",
