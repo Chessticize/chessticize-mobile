@@ -78,14 +78,16 @@ result, commands, results, and clean-worktree confirmation in the PR. A later
 source-tree change invalidates that evidence. A failed required fast check,
 failed selected native scope, or known product failure remains a merge blocker.
 
-Nightly Android `main` builds the self-contained app and Detox APK once, then
-runs complete shared `flows` and `practice` on an API 36 x86_64 phone. Manual
-exact-head dispatch additionally runs the API 24 bounded smoke for launch,
-production SQLite persistence/migration, Standard practice, and packaged
-Stockfish; it also captures the representative tablet and foldable/resizable
-adaptive contract. The fail-closed runner is
-`pnpm mobile:validate:android:matrix`, and `docs/ANDROID_VALIDATION.md` defines
-its evidence schema and commands.
+Android native validation runs on the Android build machine at the risk-scoped
+layer selected for the change. The hosted `Mobile Android` workflow is a
+manual-only full diagnostic matrix, not a scheduled check or release gate. Its
+explicit dispatch builds the self-contained app and Detox APK once, runs the
+complete API 36 journeys, adds the bounded API 24 smoke for launch, production
+SQLite persistence/migration, Standard practice, and packaged Stockfish, and
+captures the representative tablet, foldable/resizable, and backup contracts.
+Use it only for full-scope changes or hosted-environment diagnosis. The
+fail-closed runner is `pnpm mobile:validate:android:matrix`, and
+`docs/ANDROID_VALIDATION.md` defines its evidence schema and commands.
 
 Before any release, run exact-head fast checks and select the same no-native,
 targeted, or full scope used for PRs. An ordinary delta does not rerun complete

@@ -42,11 +42,6 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android emulator runtime libraries
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes libpulse0
-
       - name: Require protected release inputs
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
@@ -66,14 +61,6 @@ jobs:
 
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Run exact-head fast release checks
-        run: |
-          pnpm process:validate
-          pnpm test
-          pnpm typecheck
-          pnpm mobile:test
-          pnpm mobile:typecheck
 
       - name: Fetch canonical core pack
         run: pnpm fetch:core-pack

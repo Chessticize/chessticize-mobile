@@ -8,7 +8,7 @@ function read(relativePath) {
 }
 
 describe('Android validation documentation', () => {
-  it('defines reproducible PR, nightly, API 24, adaptive, and exact-head evidence commands', () => {
+  it('defines reproducible PR, manual diagnostic, API 24, adaptive, and exact-head evidence commands', () => {
     const validation = read('docs/ANDROID_VALIDATION.md');
 
     expect(validation).toContain('pnpm mobile:doctor:android');
@@ -62,8 +62,8 @@ describe('Android validation documentation', () => {
     expect(devLoop).toContain('Targeted Android validation');
     expect(devLoop).toContain('Full Android validation');
     expect(devLoop).toContain('pnpm mobile:validate:android:matrix');
-    expect(architecture).toContain('Nightly Android `main`');
-    expect(architecture).toContain('API 24 bounded smoke');
+    expect(architecture).toContain('manual-only full diagnostic matrix');
+    expect(architecture).toContain('bounded API 24 smoke');
     expect(architecture).toContain('physical ARM64');
   });
 });
