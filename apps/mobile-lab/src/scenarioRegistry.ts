@@ -131,7 +131,16 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
   "history-filters": defineScenario("history-filters", "History", "Filters and active filters", "history--filters-and-active-filters", "Expanded History filters with the complete curated theme catalog in categorized horizontal rails.", "history", ["Advanced filters", "24-theme catalog", "Active filter summary", "Reset"], ["Replay puzzle"]),
   "history-attempt-detail": defineScenario("history-attempt-detail", "History", "Replay puzzle", "history--attempt-detail", "The real puzzle replay reached by tapping a History row, with every curated puzzle theme centered in a horizontally scrollable tag rail below the board.", "history", ["Puzzle replay", "Curated theme rail", "Review enrollment"], ["History"]),
   "history-replay-unavailable": defineScenario("history-replay-unavailable", "History", "Replay unavailable", "history--replay-unavailable", "Legacy Arrow Duel attempt whose candidate order cannot be reconstructed safely.", "history", ["Persisted details", "Replay-unavailable explanation"], ["History"]),
-  "settings-ios-sync": defineScenario("settings-ios-sync", "Settings", "iOS sync", "settings--ios-sync", "iOS capabilities with iCloud Sync controls, run ELO editing omitted, and no real account access.", "settings", ["iCloud Sync", "Notifications", "About"], ["Run editor", "Stockfish diagnostics"]),
+  "settings-ios-sync": defineScenario(
+    "settings-ios-sync",
+    "Settings",
+    "iOS sync",
+    "settings--ios-sync",
+    "The stable iOS Settings clone with iCloud Sync, Notifications, and the Issue #247 move-feedback design.",
+    "settings",
+    ["iCloud Sync", "Notifications", "Sound and haptic toggles", "Move and capture audio previews", "About"],
+    ["Run editor", "Native audio and haptic validation", "Stockfish diagnostics"]
+  ),
   "settings-android-backup": defineScenario("settings-android-backup", "Settings", "Android backup", "settings--android-backup", "Android managed-backup variant with iCloud controls omitted.", "settings", ["Android Progress Backup", "Notifications", "About"], ["Stockfish diagnostics"]),
   "settings-notifications-denied": defineScenario("settings-notifications-denied", "Settings", "Notifications denied", "settings--notifications-denied", "Denied notification permission with a public system-settings action.", "settings", ["Permission state", "Reminder preferences", "Open settings"], ["System settings"]),
   "settings-notifications-not-determined": defineScenario("settings-notifications-not-determined", "Settings", "Notifications not determined", "settings--notifications-not-determined", "Notification permission has not yet been requested.", "settings", ["Permission request", "Reminder preferences"], ["System permission prompt"]),

@@ -1,1 +1,10 @@
-{}
+{
+  "settings-ios-sync": {
+    "issues": [
+      {
+        "issueNumber": 247,
+        "changeNote": "Review separate sound and haptic controls plus Move and Capture audio samples."
+      }
+    ]
+  }
+}

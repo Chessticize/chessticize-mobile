@@ -116,6 +116,9 @@ describe("iOS App Store identity artifacts", () => {
     expect(lockedInstallScript).toContain("ios/Pods/Manifest.lock");
     expect(lockedInstallScript).toContain("cmp -s");
     expect(lockedInstallScript).toContain("rm -rf ios/Pods");
+    expect(lockedInstallScript).toContain("RUBY_VERSION.split");
+    expect(lockedInstallScript).toContain('[[ "$ruby_minor" != "3.3" ]]');
+    expect(lockedInstallScript).toContain("Ruby 3.3 must be active");
     expect(debugBuildScript).not.toContain("pod update");
     expect(releaseBuildScript).not.toContain("pod update");
     expect(lockedInstallScript).not.toContain("pod update");

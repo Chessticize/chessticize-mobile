@@ -19,6 +19,7 @@ import {
   configureMobilePracticePuzzleSource,
   type MobilePuzzleSource
 } from "./browserMobilePractice.ts";
+import { previewBrowserMoveFeedback } from "./browserMoveFeedbackPreview.ts";
 import { clearLabPracticeService, setLabPracticeService } from "./boardController.ts";
 import { ISSUE_272_LAB_PUZZLE, LAB_PUZZLES, PRIMARY_LAB_PUZZLE } from "./labPuzzles.ts";
 import { scenarioRegistry, type LabScenarioId } from "./scenarioRegistry.ts";
@@ -149,6 +150,7 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
   let progressProtection: MobilePlatformCapabilities["progressProtection"] = { kind: "icloud_sync" };
   const screenProps: ScreenProps = {
     currentTimeMs: () => LAB_NOW_MS,
+    moveFeedbackSettings: {},
     puzzleSelectionSeed: "interaction-lab",
     standardTargetCorrect: 1,
     arrowDuelTargetCorrect: 1,
@@ -203,6 +205,9 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
       break;
     case "settings-ios-sync":
       notificationStatus = "not_determined";
+      screenProps.moveFeedbackSettings = {
+        preview: previewBrowserMoveFeedback
+      };
       break;
     case "settings-notifications-denied":
       notificationStatus = "denied";
