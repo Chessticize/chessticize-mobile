@@ -167,6 +167,19 @@ function sprintRulesDesignPreviewFor(
   if (scenarioId === "practice-custom-setup") {
     return { showRunEditorSummary: true };
   }
+  if (
+    scenarioId === "practice-active-session-guide"
+    || scenarioId === "practice-arrow-duel-guide"
+  ) {
+    return {
+      initialSessionGuide: {
+        durationLabel: "5:00",
+        maxMistakes: 3,
+        mode: scenarioId === "practice-arrow-duel-guide" ? "arrow_duel" : "standard",
+        targetCorrect: 15
+      }
+    };
+  }
   if (scenarioId === "practice-sprint-result-goal") {
     return {
       initialResultState: sprintRulesResultState({
@@ -175,7 +188,11 @@ function sprintRulesDesignPreviewFor(
         mistakeCount: 1,
         ratingAfter: 1070,
         status: "failed"
-      })
+      }),
+      resultUnclearSummary: {
+        slowMarkedCount: 1,
+        userMarkedCount: 1
+      }
     };
   }
   if (scenarioId === "practice-sprint-result-extra-attempt") {
@@ -186,7 +203,11 @@ function sprintRulesDesignPreviewFor(
         mistakeCount: 1,
         ratingAfter: 1104,
         status: "won"
-      })
+      }),
+      resultUnclearSummary: {
+        slowMarkedCount: 1,
+        userMarkedCount: 0
+      }
     };
   }
   if (scenarioId === "settings-sprint-guidance") {
@@ -299,6 +320,13 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
       service = createIssue272Service(false);
       configurePuzzleSource = false;
       break;
+    case "practice-active-session-guide":
+    case "practice-arrow-duel-guide":
+      service = createSessionGuideService();
+      configurePuzzleSource = false;
+      screenProps.standardTargetCorrect = 15;
+      screenProps.arrowDuelTargetCorrect = 15;
+      break;
     case "practice-unclear-follow-up":
       screenProps.arrowDuelTargetCorrect = 2;
       break;
@@ -390,6 +418,18 @@ function isPuzzleEntryPreviewScenario(scenarioId: LabScenarioId): boolean {
 function createSeededService(): PracticeService {
   const store = new MemoryStore();
   store.seedPuzzles(LAB_PUZZLES);
+  return new PracticeService(store);
+}
+
+function createSessionGuideService(): PracticeService {
+  const store = new MemoryStore();
+  store.seedPuzzles(Array.from({ length: 18 }, (_, index) => {
+    const puzzle = LAB_PUZZLES[index % LAB_PUZZLES.length]!;
+    return {
+      ...puzzle,
+      id: `session-guide-${index + 1}`
+    };
+  }));
   return new PracticeService(store);
 }
 

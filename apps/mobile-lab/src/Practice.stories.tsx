@@ -159,6 +159,26 @@ export const ActiveSession: Story = {
   }
 };
 
+export const ActiveSessionGuide: Story = {
+  name: "First active-session guide",
+  args: { scenarioId: "practice-active-session-guide" },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "practice-active-session-guide");
+    await waitForTestId(canvasElement, "practice-session-guide-unclear");
+    expectTestIdAbsent(canvasElement, "session-board");
+  }
+};
+
+export const ArrowDuelGuide: Story = {
+  name: "First Arrow Duel guide",
+  args: { scenarioId: "practice-arrow-duel-guide" },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "practice-arrow-duel-guide");
+    await waitForTestId(canvasElement, "practice-arrow-duel-guide-candidates");
+    expectTestIdAbsent(canvasElement, "session-board");
+  }
+};
+
 export const SlowWarning: Story = {
   name: "Active session · Slow",
   args: { scenarioId: "practice-timing-warning" },

@@ -40,7 +40,7 @@ export const IosSync: Story = {
 };
 
 export const SprintGuideReset: Story = {
-  name: "Sprint guide reset",
+  name: "Sprint guides reset",
   args: { scenarioId: "settings-sprint-guidance" },
   play: async ({ canvasElement }) => {
     await openSettings(canvasElement);

@@ -1000,8 +1000,17 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "practice-sprint-rules-guide"))).toContain(
       "Example: 15 solved + 1 wrong = 16 attempted."
     );
+    expect(collectText(findByTestId(renderer, "practice-sprint-rules-guide"))).toContain(
+      "Slow warning"
+    );
+    expect(collectText(findByTestId(renderer, "practice-sprint-rules-guide"))).toContain(
+      "Automatically marks the puzzle as Unclear; it is not a mistake."
+    );
     expect(findByTestId(renderer, "practice-sprint-rules-guide").props.accessibilityLabel).toContain(
       "The Sprint ends after 3 mistakes."
+    );
+    expect(findByTestId(renderer, "practice-sprint-rules-guide").props.accessibilityLabel).toContain(
+      "A Slow warning automatically marks the puzzle as Unclear and does not count as a mistake."
     );
 
     press(renderer, "practice-sprint-rules-dismiss");
@@ -1012,6 +1021,34 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "practice-sprint-rules-open");
     expect(findByTestId(renderer, "practice-sprint-rules-guide")).toBeTruthy();
+  });
+
+  it("uses board-free first-session guides for shared Sprint controls and Arrow Duel", () => {
+    const activeSession = renderLabScenario("practice-active-session-guide");
+
+    expect(findByTestId(activeSession, "practice-active-session-guide")).toBeTruthy();
+    expect(() => findByTestId(activeSession, "session-board")).toThrow();
+    expect(collectText(findByTestId(activeSession, "practice-session-guide-slow"))).toContain(
+      "Slow saves the puzzle as Unclear"
+    );
+    expect(collectText(findByTestId(activeSession, "practice-session-guide-unclear"))).toContain(
+      "Mark as unclear"
+    );
+    expect(collectText(findByTestId(activeSession, "practice-session-guide-unclear"))).toContain(
+      "when the answer was correct but the solution still did not make sense"
+    );
+
+    press(activeSession, "practice-session-guide-start");
+    expect(findByTestId(activeSession, "session-board")).toBeTruthy();
+
+    const arrowDuel = renderLabScenario("practice-arrow-duel-guide");
+
+    expect(findByTestId(arrowDuel, "practice-arrow-duel-guide")).toBeTruthy();
+    expect(findByTestId(arrowDuel, "practice-arrow-duel-guide-candidates")).toBeTruthy();
+    expect(() => findByTestId(arrowDuel, "session-board")).toThrow();
+    expect(collectText(findByTestId(arrowDuel, "practice-arrow-duel-guide"))).toContain(
+      "Only the two shown candidates count; other moves are ignored."
+    );
   });
 
   it("summarizes dynamic pass rules in New Run and keeps the preview out of product defaults", () => {
@@ -1052,11 +1089,14 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "settings-show-sprint-guide"))).toContain(
       "Runs, ELO, and History stay unchanged."
     );
+    expect(collectText(findByTestId(renderer, "settings-show-sprint-guide"))).toContain(
+      "rules, active-session, and Arrow Duel guides"
+    );
     expect(() => findByTestId(renderer, "settings-sprint-guide-ready")).toThrow();
 
     press(renderer, "settings-show-sprint-guide");
     expect(collectText(findByTestId(renderer, "settings-sprint-guide-ready"))).toBe(
-      "Ready to show in Practice"
+      "Guides ready for your next Sprint"
     );
   });
 
@@ -3151,6 +3191,10 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(failed, "sprint-result-accuracy"))).toBe(
       "12 attempted · 92% Accuracy"
     );
+    expect(collectText(findByTestId(failed, "sprint-result-unclear-sources"))).toBe(
+      "1 marked by you · 1 marked after Slow"
+    );
+    expect(collectText(findByTestId(failed, "sprint-result-unclear-count"))).toBe("2");
 
     const passed = renderLabScenario("practice-sprint-result-extra-attempt");
 
@@ -3158,6 +3202,12 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(passed, "sprint-result-solved"))).toContain("15 / 15");
     expect(collectText(findByTestId(passed, "sprint-result-accuracy"))).toBe(
       "16 attempted · 94% Accuracy"
+    );
+    expect(collectText(findByTestId(passed, "sprint-result-unclear-sources"))).toBe(
+      "1 marked after Slow"
+    );
+    expect(collectText(findByTestId(passed, "sprint-result-unclear-summary"))).toContain(
+      "Does not affect your Sprint result"
     );
   });
 
