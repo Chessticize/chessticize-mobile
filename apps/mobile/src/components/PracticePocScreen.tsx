@@ -68,7 +68,6 @@ import type {
   HistoryAttemptReplayAvailability,
   HistoryPerformance,
   HistoryPerformancePoint,
-  HistoryReviewStatus,
   HistoryTimeRange,
   PuzzleSide,
   Puzzle,
@@ -230,6 +229,7 @@ type MobileBackPreview = MobileBackDestination & {
 type SessionFeedback = PuzzleFeedback | null;
 type AnalysisEngineStatus = "idle" | "thinking" | "stockfish" | "fallback" | "error";
 type HistoryRatingRangeFilter = "all" | "under1000" | "1000-1399" | "1400-plus";
+type HistoryAttentionReason = "unclear" | "in_review";
 type CustomThemeFilter = string;
 
 export type PracticeDebugTraceEvent = {
@@ -366,6 +366,10 @@ const BOARD_FILES = ["a", "b", "c", "d", "e", "f", "g", "h"] as const;
 const BOARD_FILES_FLIPPED = ["h", "g", "f", "e", "d", "c", "b", "a"] as const;
 const BOARD_RANKS = ["8", "7", "6", "5", "4", "3", "2", "1"] as const;
 const BOARD_RANKS_FLIPPED = ["1", "2", "3", "4", "5", "6", "7", "8"] as const;
+const ALL_HISTORY_ATTENTION_REASONS: readonly HistoryAttentionReason[] = [
+  "unclear",
+  "in_review"
+];
 const CHESS_PIECE_SPRITE = require("../assets/chess-pieces-sprite.png") as ImageSourcePropType;
 const LICHESS_PUZZLE_DATABASE_URL = "https://database.lichess.org/#puzzles";
 const ANALYSIS_DIAGNOSTIC_POSITIONS = [
@@ -488,8 +492,9 @@ export function PracticePocScreen({
   const [historyResultFilter, setHistoryResultFilter] = useState<"all" | "correct" | "wrong">("all");
   const [historySideFilter, setHistorySideFilter] = useState<"all" | PuzzleSide>("all");
   const [historyRatingRangeFilter, setHistoryRatingRangeFilter] = useState<HistoryRatingRangeFilter>("all");
-  const [historyReviewStatusFilter, setHistoryReviewStatusFilter] = useState<"all" | HistoryReviewStatus>("all");
-  const [historyAttentionOnly, setHistoryAttentionOnly] = useState(true);
+  const [historyAttentionReasons, setHistoryAttentionReasons] = useState<HistoryAttentionReason[]>(
+    () => [...ALL_HISTORY_ATTENTION_REASONS]
+  );
   const [historyPageOffset, setHistoryPageOffset] = useState(0);
   const [historyRatingKey, setHistoryRatingKey] = useState<string | null>(null);
   const [historyReviewEntries, setHistoryReviewEntries] = useState<ReviewEntry[]>([]);
@@ -1706,8 +1711,7 @@ export function PracticePocScreen({
       ...(historyResultFilter === "all" ? {} : { result: historyResultFilter }),
       ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
       ...(selectedHistoryThemes.length === 0 ? {} : { themes: selectedHistoryThemes }),
-      ...(historyReviewStatusFilter === "all" ? {} : { reviewStatus: historyReviewStatusFilter }),
-      ...(historyAttentionOnly ? { attentionOnly: true } : {})
+      ...historyAttentionQueryForSelection(historyAttentionReasons)
     }).attempts;
     const selectedAttempt = historyReviewAttempts.find((attempt) => attempt.id === attemptId);
     if (!selectedAttempt) {
@@ -2277,8 +2281,7 @@ export function PracticePocScreen({
         ...(historyResultFilter === "all" ? {} : { result: historyResultFilter }),
         ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
         ...(selectedHistoryThemes.length === 0 ? {} : { themes: selectedHistoryThemes }),
-        ...(historyReviewStatusFilter === "all" ? {} : { reviewStatus: historyReviewStatusFilter }),
-        ...(historyAttentionOnly ? { attentionOnly: true } : {}),
+        ...historyAttentionQueryForSelection(historyAttentionReasons),
         page: { limit: HISTORY_PAGE_LIMIT, offset: historyPageOffset }
       })
     : null;
@@ -2292,8 +2295,7 @@ export function PracticePocScreen({
         ...(historyResultFilter === "all" ? {} : { result: historyResultFilter }),
         ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
         ...(selectedHistoryThemes.length === 0 ? {} : { themes: selectedHistoryThemes }),
-        ...(historyReviewStatusFilter === "all" ? {} : { reviewStatus: historyReviewStatusFilter }),
-        ...(historyAttentionOnly ? { attentionOnly: true } : {})
+        ...historyAttentionQueryForSelection(historyAttentionReasons)
       })
     : null;
   const visibleHistoryAttempts = historyView?.attempts ?? [];
@@ -3078,8 +3080,7 @@ export function PracticePocScreen({
                   namedThemeFilters={historyThemeChoices.namedThemes}
                   availableThemes={historyView.availableThemes}
                   page={visibleHistoryPage ?? historyView.page}
-                  reviewStatusFilter={historyReviewStatusFilter}
-                  attentionOnly={historyAttentionOnly}
+                  attentionReasons={historyAttentionReasons}
                   themeCatalogPresentation={themeCatalogPresentation}
                   filtersExpanded={historyFiltersExpanded}
                   onFiltersExpandedChange={setHistoryFiltersExpanded}
@@ -3111,13 +3112,19 @@ export function PracticePocScreen({
                     historyThemeChoices.dispatch(intent);
                     setHistoryPageOffset(0);
                   }}
-                  onReviewStatusFilterChange={(status) => {
-                    setHistoryReviewStatusFilter(status);
+                  onAttentionReasonChange={(reason) => {
+                    setHistoryAttentionReasons((current) => current.includes(reason)
+                      ? current.filter((candidate) => candidate !== reason)
+                      : [...current, reason]);
                     setHistoryPageOffset(0);
                   }}
                   onAttentionOnlyChange={(attentionOnly) => {
                     setHistoryPageOffset(0);
-                    setHistoryAttentionOnly(attentionOnly);
+                    setHistoryAttentionReasons((current) => attentionOnly
+                      ? current.length > 0
+                        ? current
+                        : [...ALL_HISTORY_ATTENTION_REASONS]
+                      : []);
                   }}
                   onPageOffsetChange={setHistoryPageOffset}
                   onOpenAttempt={openHistoryReview}
@@ -3128,8 +3135,7 @@ export function PracticePocScreen({
                     setHistorySideFilter("all");
                     historyThemeChoices.dispatch({ type: "select-all-themes" });
                     setHistoryRatingRangeFilter("all");
-                    setHistoryReviewStatusFilter("all");
-                    setHistoryAttentionOnly(true);
+                    setHistoryAttentionReasons([...ALL_HISTORY_ATTENTION_REASONS]);
                     setHistoryPageOffset(0);
                     setHistoryRatingKey(null);
                   }}
@@ -6639,8 +6645,7 @@ function HistoryPanel({
   namedThemeFilters,
   availableThemes,
   page,
-  reviewStatusFilter,
-  attentionOnly,
+  attentionReasons,
   themeCatalogPresentation,
   onRatingKeyChange,
   onTimeRangeChange,
@@ -6649,7 +6654,7 @@ function HistoryPanel({
   onRatingRangeFilterChange,
   onSideFilterChange,
   onThemeFilterIntent,
-  onReviewStatusFilterChange,
+  onAttentionReasonChange,
   onPageOffsetChange,
   onOpenAttempt,
   onFiltersExpandedChange,
@@ -6672,8 +6677,7 @@ function HistoryPanel({
   namedThemeFilters: readonly string[];
   availableThemes: string[];
   page: { limit: number; offset: number; total: number; hasMore: boolean };
-  reviewStatusFilter: "all" | HistoryReviewStatus;
-  attentionOnly: boolean;
+  attentionReasons: readonly HistoryAttentionReason[];
   themeCatalogPresentation?: ThemeCatalogPresentation;
   onRatingKeyChange: (ratingKey: string | null) => void;
   onTimeRangeChange: (range: HistoryTimeRange) => void;
@@ -6682,7 +6686,7 @@ function HistoryPanel({
   onRatingRangeFilterChange: (ratingRange: HistoryRatingRangeFilter) => void;
   onSideFilterChange: (side: "all" | PuzzleSide) => void;
   onThemeFilterIntent: (intent: ThemeChoiceIntent) => void;
-  onReviewStatusFilterChange: (status: "all" | HistoryReviewStatus) => void;
+  onAttentionReasonChange: (reason: HistoryAttentionReason) => void;
   onPageOffsetChange: (offset: number) => void;
   onOpenAttempt: (attemptId: string) => void;
   onFiltersExpandedChange: (expanded: boolean) => void;
@@ -6690,6 +6694,7 @@ function HistoryPanel({
   onAttentionOnlyChange: (attentionOnly: boolean) => void;
 }): React.JSX.Element {
   const visibleAttempts = attempts;
+  const attentionOnly = attentionReasons.length > 0;
   const ratingPoints = performance.charts.rating;
   const latestRating = ratingPoints[ratingPoints.length - 1]?.value;
   const selectedRun = selectedRatingKey ? runsByRatingKey.get(selectedRatingKey) : undefined;
@@ -6699,7 +6704,7 @@ function HistoryPanel({
     runPerPuzzleSeconds: selectedRun?.perPuzzleSeconds,
     ratingRangeFilter,
     resultFilter,
-    reviewStatusFilter,
+    attentionReasons,
     sideFilter,
     sourceFilter,
     themeFilters: namedThemeFilters,
@@ -6764,12 +6769,25 @@ function HistoryPanel({
               />
             ))}
           </HistoryChipRow>
-          <View style={styles.historyFilterGroup} testID="history-review-status-filters">
-            <Text style={styles.historyFilterGroupLabel}>Review queue</Text>
-            <HistoryChipRow testID="history-review-status-options">
-              <FilterButton active={reviewStatusFilter === "all"} label="All" testID="history-review-status-all" onPress={() => onReviewStatusFilterChange("all")} />
-              <FilterButton active={reviewStatusFilter === "queued"} label="In queue" testID="history-review-status-queued" onPress={() => onReviewStatusFilterChange("queued")} />
-              <FilterButton active={reviewStatusFilter === "clear"} label="Not in queue" testID="history-review-status-clear" onPress={() => onReviewStatusFilterChange("clear")} />
+          <View
+            accessibilityLabel="Attention filters, match any"
+            style={styles.historyFilterGroup}
+            testID="history-attention-flags"
+          >
+            <Text style={styles.historyFilterGroupLabel}>Attention</Text>
+            <HistoryChipRow testID="history-attention-flag-options">
+              <FilterButton
+                active={attentionReasons.includes("unclear")}
+                label="Unclear"
+                testID="history-attention-flag-unclear"
+                onPress={() => onAttentionReasonChange("unclear")}
+              />
+              <FilterButton
+                active={attentionReasons.includes("in_review")}
+                label="In review"
+                testID="history-attention-flag-in-review"
+                onPress={() => onAttentionReasonChange("in_review")}
+              />
             </HistoryChipRow>
           </View>
           <HistoryChipRow testID="history-side-filters">
@@ -6960,12 +6978,12 @@ function HistoryThemeCatalogFilter({
 }
 
 type HistoryActiveFilterInput = {
+  attentionReasons: readonly HistoryAttentionReason[];
   ratingKey: string | null;
   runName?: string;
   runPerPuzzleSeconds?: number;
   ratingRangeFilter: HistoryRatingRangeFilter;
   resultFilter: "all" | "correct" | "wrong";
-  reviewStatusFilter: "all" | "queued" | "clear";
   sideFilter: "all" | PuzzleSide;
   sourceFilter: "all" | AttemptSource;
   themeFilters: readonly string[];
@@ -6973,12 +6991,12 @@ type HistoryActiveFilterInput = {
 };
 
 function historyActiveFilterLabels({
+  attentionReasons,
   ratingKey,
   runName,
   runPerPuzzleSeconds,
   ratingRangeFilter,
   resultFilter,
-  reviewStatusFilter,
   sideFilter,
   sourceFilter,
   themeFilters,
@@ -6997,8 +7015,12 @@ function historyActiveFilterLabels({
   if (ratingRangeFilter !== "all") {
     labels.push(HISTORY_RATING_RANGE_FILTERS.find((filter) => filter.id === ratingRangeFilter)?.label ?? ratingRangeFilter);
   }
-  if (reviewStatusFilter !== "all") {
-    labels.push(reviewStatusFilter === "queued" ? "Review: In queue" : "Review: Not in queue");
+  if (attentionReasons.length === 1) {
+    labels.push(
+      attentionReasons[0] === "unclear"
+        ? "Attention: Unclear"
+        : "Attention: In review"
+    );
   }
   if (sideFilter !== "all") {
     labels.push(sideFilter === "white" ? "White" : "Black");
@@ -7009,6 +7031,21 @@ function historyActiveFilterLabels({
     labels.push(`${themeFilters.length} themes selected`);
   }
   return labels;
+}
+
+function historyAttentionQueryForSelection(
+  attentionReasons: readonly HistoryAttentionReason[]
+): { attentionOnly?: true; reviewStatus?: "queued"; unclear?: true } {
+  if (attentionReasons.length === ALL_HISTORY_ATTENTION_REASONS.length) {
+    return { attentionOnly: true };
+  }
+  if (attentionReasons.includes("unclear")) {
+    return { unclear: true };
+  }
+  if (attentionReasons.includes("in_review")) {
+    return { reviewStatus: "queued" };
+  }
+  return {};
 }
 
 function HistoryActiveFilterStrip({

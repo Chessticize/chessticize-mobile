@@ -1464,7 +1464,7 @@ describe("PracticePocScreen", () => {
     expect(service.listHistory()).toHaveLength(0);
   });
 
-  it("defaults History to Needs attention and keeps every other filter in the menu", async () => {
+  it("defaults History to Needs attention and links its OR reason filters to the primary view", async () => {
     const renderer = renderLabScenario("history-populated");
     await flushMicrotasks();
 
@@ -1554,15 +1554,18 @@ describe("PracticePocScreen", () => {
       "#2563EB"
     )).toBe(true);
     expect(collectText(findByTestId(renderer, "history-source-filters"))).toContain("All sources");
-    expect(() => findByTestId(renderer, "history-attention-flags")).toThrow();
+    expect(collectText(findByTestId(renderer, "history-attention-flags"))).toBe(
+      "AttentionUnclearIn review"
+    );
+    expect(findByTestId(renderer, "history-attention-flags").props.accessibilityLabel).toBe(
+      "Attention filters, match any"
+    );
     expect(() => findByTestId(renderer, "history-attention-flag-mistakes")).toThrow();
-    expect(() => findByTestId(renderer, "history-attention-flag-unclear")).toThrow();
+    expect(historyFilterSelected(renderer, "history-attention-flag-unclear")).toBe(true);
+    expect(historyFilterSelected(renderer, "history-attention-flag-in-review")).toBe(true);
     expect(() => findByTestId(renderer, "history-attention-flag-slow")).toThrow();
     expect(() => findByTestId(renderer, "history-attention-flag-timed-out")).toThrow();
-
-    expect(collectText(findByTestId(renderer, "history-review-status-filters"))).toBe(
-      "Review queueAllIn queueNot in queue"
-    );
+    expect(() => findByTestId(renderer, "history-review-status-filters")).toThrow();
     expect(findByTestId(renderer, "history-theme-disclosure").props.accessibilityState).toEqual({
       expanded: false
     });
@@ -1583,6 +1586,51 @@ describe("PracticePocScreen", () => {
     });
     expect(findByTestId(renderer, "history-theme-all")).toBeTruthy();
 
+    press(renderer, "history-attention-flag-unclear");
+    expect(historyFilterSelected(renderer, "history-attention-flag-unclear")).toBe(false);
+    expect(historyFilterSelected(renderer, "history-attention-flag-in-review")).toBe(true);
+    expect(findByTestId(renderer, "history-attention-needs-attention").props.accessibilityState).toEqual({
+      checked: true
+    });
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain(
+      "Attention: In review"
+    );
+    expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-history-unclear")).toThrow();
+    expect(() => findByTestId(renderer, "history-attempt-history-clean")).toThrow();
+
+    press(renderer, "history-attention-flag-in-review");
+    expect(findByTestId(renderer, "history-attention-all").props.accessibilityState).toEqual({
+      checked: true
+    });
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain(
+      "Attention:"
+    );
+    expect(findByTestId(renderer, "history-attempt-history-clean")).toBeTruthy();
+
+    press(renderer, "history-attention-flag-unclear");
+    expect(historyFilterSelected(renderer, "history-attention-flag-unclear")).toBe(true);
+    expect(historyFilterSelected(renderer, "history-attention-flag-in-review")).toBe(false);
+    expect(findByTestId(renderer, "history-attention-needs-attention").props.accessibilityState).toEqual({
+      checked: true
+    });
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain(
+      "Attention: Unclear"
+    );
+    expect(findByTestId(renderer, "history-attempt-history-unclear")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-history-wrong")).toThrow();
+    expect(() => findByTestId(renderer, "history-attempt-history-clean")).toThrow();
+    press(renderer, "history-attention-needs-attention");
+    expect(historyFilterSelected(renderer, "history-attention-flag-unclear")).toBe(true);
+    expect(historyFilterSelected(renderer, "history-attention-flag-in-review")).toBe(false);
+
+    press(renderer, "history-attention-flag-in-review");
+    expect(historyFilterSelected(renderer, "history-attention-flag-unclear")).toBe(true);
+    expect(historyFilterSelected(renderer, "history-attention-flag-in-review")).toBe(true);
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain(
+      "Attention:"
+    );
+
     press(renderer, "history-result-correct");
     expect(findByTestId(renderer, "history-attempt-history-correct")).toBeTruthy();
     expect(findByTestId(renderer, "history-attempt-history-unclear")).toBeTruthy();
@@ -1597,6 +1645,8 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-attention-needs-attention").props.accessibilityState).toEqual({
       checked: true
     });
+    expect(historyFilterSelected(renderer, "history-attention-flag-unclear")).toBe(true);
+    expect(historyFilterSelected(renderer, "history-attention-flag-in-review")).toBe(true);
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toBe(
       "7 days·All puzzles"
     );
@@ -1616,7 +1666,14 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-attention-needs-attention").props.accessibilityState).toEqual({
       checked: false
     });
+    expect(historyFilterSelected(renderer, "history-attention-flag-unclear")).toBe(false);
+    expect(historyFilterSelected(renderer, "history-attention-flag-in-review")).toBe(false);
     expect(findByTestId(renderer, "history-attempt-history-clean")).toBeTruthy();
+
+    press(renderer, "history-attention-needs-attention");
+    expect(historyFilterSelected(renderer, "history-attention-flag-unclear")).toBe(true);
+    expect(historyFilterSelected(renderer, "history-attention-flag-in-review")).toBe(true);
+    expect(() => findByTestId(renderer, "history-attempt-history-clean")).toThrow();
   });
 
   it("shows direct ELO validation and disables Save outside 600-2200", () => {
@@ -4599,25 +4656,33 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "history-filter-arrow-duel-only")).toThrow();
     expect(() => findByTestId(renderer, "history-speed-filters")).toThrow();
     expect(() => findByTestId(renderer, "history-speed-20")).toThrow();
-    expect(findByTestId(renderer, "history-review-status-filters")).toBeTruthy();
-    expect(findByTestId(renderer, "history-review-status-queued")).toBeTruthy();
-    expect(findByTestId(renderer, "history-review-status-clear")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-review-status-filters")).toThrow();
+    expect(findByTestId(renderer, "history-attention-flags")).toBeTruthy();
+    expect(historyFilterSelected(renderer, "history-attention-flag-unclear")).toBe(false);
+    expect(historyFilterSelected(renderer, "history-attention-flag-in-review")).toBe(false);
     expectHistoryRowAccessibility(renderer, "Move e6f7");
     expectHistoryRowAccessibility(renderer, "Played g6g5 · Best f4g3");
 
-    expectHistoryRowAccessibility(renderer, "Move e6f7");
-    expectHistoryRowAccessibility(renderer, "Played g6g5 · Best f4g3");
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("20s pace");
-    press(renderer, "history-review-status-queued");
+    press(renderer, "history-attention-flag-in-review");
+    expect(findByTestId(renderer, "history-attention-needs-attention").props.accessibilityState).toEqual({
+      checked: true
+    });
     expect(collectText(findByTestId(renderer, "history-performance-card"))).not.toContain("Accuracy");
-    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Review: In queue");
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain(
+      "Attention: In review"
+    );
     expectHistoryRowAccessibility(renderer, "Played g6g5 · Best f4g3");
     expectNoHistoryRowAccessibility(renderer, "Move e6f7");
-    press(renderer, "history-review-status-clear");
-    expect(collectText(findByTestId(renderer, "history-performance-card"))).not.toContain("Correct");
+    press(renderer, "history-attention-flag-in-review");
+    expect(findByTestId(renderer, "history-attention-all").props.accessibilityState).toEqual({
+      checked: true
+    });
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain(
+      "Attention:"
+    );
     expectHistoryRowAccessibility(renderer, "Move e6f7");
-    expectNoHistoryRowAccessibility(renderer, "Played g6g5 · Best f4g3");
-    press(renderer, "history-review-status-all");
+    expectHistoryRowAccessibility(renderer, "Played g6g5 · Best f4g3");
 
     press(renderer, "history-result-wrong");
     expect(historyFilterSelected(renderer, "history-result-wrong")).toBe(true);
