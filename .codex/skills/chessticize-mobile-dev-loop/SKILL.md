@@ -60,9 +60,10 @@ restart the gate unless it materially changes the journey.
    - Mock only external/native rendering boundaries that Jest cannot host, such as the chessboard component. Keep assertions on public UI behavior, testIDs, accessibility labels, and user-visible text.
 
 4. **Native/simulator validation**
-   - Use iOS simulator only when validating real rendering, gestures, Safe Area behavior, native modules, Skia/chessboard rendering, animations, iOS build issues, or final acceptance.
+   - Required native validation is limited to release candidates and changes to native implementation, native integration/configuration, native dependencies, or native validation infrastructure.
+   - For JavaScript/TypeScript-only rendering, gestures, Safe Area behavior, chessboard presentation, animations, navigation, and adaptive layout, use component and Interaction Lab coverage. A simulator remains optional for visual acceptance but is not a merge gate.
    - Use Detox for repeatable GUI automation and screenshot capture.
-   - Use a focused simulator screenshot for one-off visual acceptance. Add or run Detox when a journey or native boundary needs repeatable regression coverage.
+   - Use a focused simulator screenshot for one-off visual acceptance. Add or run Detox when a native boundary or release journey needs repeatable regression coverage.
 
 ## Core And Storage Commands
 
@@ -116,7 +117,8 @@ Do not start the simulator for every UI text/layout/state change. If `react-nati
 
 ## iOS Simulator And Detox
 
-Use this when a change affects native or rendered behavior:
+Use this as a required gate for native-impacting changes and releases, or as an
+optional acceptance tool for non-native visual work:
 
 Before booting or creating a simulator, inspect the existing simulator devices
 and reuse a compatible device whenever it satisfies the required runtime,
@@ -146,7 +148,8 @@ pnpm --filter ChessticizeMobile exec detox clean-framework-cache
 pnpm --filter ChessticizeMobile exec detox build-framework-cache
 ```
 
-After JavaScript changes, rebuild the Detox app before trusting screenshots:
+When native validation is required after a JavaScript change to a tested release
+journey, rebuild the Detox app before trusting screenshots:
 
 ```sh
 pnpm mobile:e2e:build:ios
@@ -167,13 +170,17 @@ emulator -list-avds
 
 Choose the smallest proving Android layer:
 
-- **No Android Detox** for documentation/tooling, pure core/storage/CLI changes,
-  and ordinary shared UI behavior already proven below native.
-- **Targeted Android validation** for one bounded Android system surface,
-  persistence journey, real board/native module, or adaptive profile.
-- **Full Android validation** for startup, shared navigation/storage wiring,
-  launch fixtures, native build configuration, Detox infrastructure, or broad
-  native risk. Build once, then run complete shared `flows` and `practice`.
+- **No Android Detox** for every non-release change without an Android native
+  impact, including JavaScript/TypeScript navigation, persistence journeys,
+  board presentation, animations, and adaptive layout already proven below
+  native.
+- **Targeted Android validation** for one bounded Android platform surface,
+  native bridge/adapter, native dependency, platform project/configuration, or
+  a release candidate with one affected native journey.
+- **Full Android validation** for broad native startup, shared native
+  navigation/storage wiring, native launch fixtures, platform build
+  configuration, Detox infrastructure, or release risk that cannot be bounded.
+  Build once, then run complete shared `flows` and `practice`.
 
 For an already built app on an attached emulator, the CI-equivalent runner is:
 
@@ -188,18 +195,21 @@ pnpm mobile:validate:android:matrix -- --api-level 36 \
 ```
 
 API 24 is a bounded launch/storage/practice/native-engine smoke. API 36 owns the
-complete shared suites. Required evidence must come from the exact PR head and
-record build result, commands, device matrix, suite results, and clean tracked
-worktree confirmation. A later source change invalidates it. Physical ARM64
+complete shared suites. Required evidence records its tested commit, build
+result, commands, device matrix, suite results, and clean tracked worktree
+confirmation. It may be reused on a later head when a documented diff proves
+that validation-relevant development inputs are unchanged. Physical ARM64
 evidence is owner-recorded at #200/#188 and is not a routine feature-PR blocker.
 
 ## PR, Local Native, And Release Gates
 
-Choose the smallest PR scope that proves the changed boundary:
+Native validation is required only for a release candidate or a change to
+native implementation, native integration/configuration, native dependencies,
+or native validation infrastructure. Choose the smallest required scope:
 
-- **No mobile Detox** for documentation/tooling, pure core/storage/CLI changes, and ordinary React Native copy, state, styling, accessibility, or service wiring already covered by component tests.
-- **Targeted native validation** for navigation, multi-screen journeys, relaunch persistence, real board behavior/rendering, adaptive layout, or native-module boundaries. Run the affected spec or one affected suite (`flows` or `practice`). A focused simulator screenshot is enough for visual-only acceptance when no repeatable journey changed.
-- **Full native validation** only for broad native risk such as app startup, shared navigation/storage wiring, global launch fixtures, native build configuration, Detox infrastructure, or risk that cannot be bounded to one suite.
+- **No mobile Detox** for every non-release PR without a native impact, including JavaScript/TypeScript navigation, multi-screen journeys, relaunch state orchestration, board presentation, animations, adaptive layout, copy, state, styling, accessibility, and service wiring already covered by lower layers.
+- **Targeted native validation** for a bounded native bridge/adapter change, native dependency or platform-project change, native persistence/relaunch integration, or a release candidate with one affected native journey. Run the affected spec or one affected suite (`flows` or `practice`).
+- **Full native validation** only for broad native risk such as app startup, shared native navigation/storage wiring, global native launch fixtures, platform build configuration, Detox infrastructure, or a release candidate whose native risk cannot be bounded to one suite.
 
 Use the risk-scoped runner for suite-level evidence:
 
@@ -209,18 +219,24 @@ CHESSTICIZE_E2E_SCOPE=practice \
   .codex/skills/chessticize-mobile-local-e2e/scripts/run-local-e2e.sh
 ```
 
-Replace `practice` with `flows` or `full` as required. Record the scope, exact
-commit SHA and Git tree, build result, commands, results, and clean-worktree
-confirmation in the PR. Any later source-tree change invalidates native
-evidence. All relevant fast CI checks must still pass.
+Replace `practice` with `flows` or `full` as required. Record the scope, tested
+commit SHA, build result, commands, results, and clean-worktree confirmation in
+the PR. The evidence does not have to match the current PR head when a
+documented diff proves that validation-relevant development inputs are
+unchanged. Those inputs include mobile runtime sources, native/platform
+projects, dependency manifests, lockfiles and patches, build/release
+configuration, and the selected native specs and fixtures. Documentation,
+review metadata, and merge-parent changes alone do not invalidate evidence.
+All relevant fast CI checks must still pass on the current head.
 
 GitHub Actions does not run Xcode builds or iOS Detox. Local iOS native
-validation is the only iOS native release gate. Release candidates use the
-same risk scopes: a delta needs exact-head fast checks plus owner device smoke,
-targeted native risk needs the affected suite, and only broad native risk
-requires both suites. After a squash merge, reuse PR-head native evidence only
-when the tested Git tree exactly matches the release-candidate Git tree, and
-record both tree IDs.
+validation is required only for releases and native-impacting changes. Release
+candidates use the same risk scopes: a delta needs exact-head fast checks plus
+owner device smoke, targeted native risk needs the affected suite, and only
+broad native risk requires both suites. After a later commit or squash merge,
+reuse passing native evidence when a documented diff confirms that the
+validation-relevant development inputs are unchanged; record both SHAs and the
+comparison rather than requiring identical full Git trees.
 
 ### Prefer Incremental Review
 
@@ -243,9 +259,11 @@ materially changes, **Full native validation** is selected, release identity or
 signing changes, privacy/security or schema/migration behavior changes, global
 launch/test infrastructure changes, a serious finding invalidates earlier
 assumptions, or accumulated follow-ups no longer have a bounded semantic impact.
-Use semantic blast radius rather than line count. Reusing review does not reuse
-native evidence: all required fast checks and native evidence must still match
-the exact current head.
+Use semantic blast radius rather than line count. Reusing review does not make
+native evidence automatically reusable: required fast checks must pass on the
+current head, and any native evidence must either cover the current
+validation-relevant development inputs or include a documented unchanged-input
+comparison.
 
 ## Screenshot Verification
 
@@ -279,8 +297,10 @@ Before finalizing:
 - State which test layers were updated and why.
 - Run the focused tests that match the changed layer.
 - Run broader tests when touching shared core, storage, CLI, or native boundaries.
-- Record the selected native-validation scope and rationale in the PR.
-- When targeted or full native validation is required, record passing exact-head evidence.
+- Record whether native validation is required and the rationale in the PR.
+- When targeted or full native validation is required, record passing evidence
+  for the current validation-relevant development inputs or a documented reuse
+  comparison.
 - Keep iOS native validation local; GitHub CI runs only the fast non-native jobs.
 - Before release, require the selected local native scope or an identical-tree
   PR-head result recorded against the release candidate.

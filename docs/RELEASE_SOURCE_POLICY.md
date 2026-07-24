@@ -62,10 +62,14 @@ without another full native run:
    rejected the mismatch before the native matrix.
 6. Recheck the diff, clean tracked worktree, exact PR head, open PRs, and remote
    `main`. Resolve all known blockers before spending the full native retry.
-7. Run the required exact-head local iOS evidence once on the final PR head and
-   merge once. If the release candidate is squash-merged, compare the tested
-   and final Git trees and reuse the evidence only when they match exactly.
-   Android release workflows remain governed by the Android release runbook.
+7. Run the required local iOS evidence once after the last
+   validation-relevant development change and merge once. If the PR head or
+   squash-merged release candidate later differs only in documentation, review
+   metadata, or merge ancestry, record both SHAs and the diff proving that
+   mobile runtime, native/platform, dependency, build/release, and selected
+   native test/fixture inputs are unchanged; reuse the evidence without an
+   exact-head rerun. Android release workflows remain governed by the Android
+   release runbook.
 
 If that final run reveals a genuinely new deterministic failure, preserve it,
 extend the fast proving layer that missed it, and repeat this sweep. Never hide
@@ -84,7 +88,9 @@ an unexplained failure with a successful rerun.
 - Record the release validation scope from `docs/TESTING_ARCHITECTURE.md`.
   Ordinary deltas use exact-head fast checks plus owner physical-device smoke;
   targeted changes run the affected native suite, and only broad native changes
-  require both `flows` and `practice`.
+  require both `flows` and `practice`. Passing native evidence remains reusable
+  across later non-development changes when the unchanged-input comparison is
+  recorded.
 - Run `pnpm app-store:third-party-audit` from the final lockfile and resolve
   any stale package, Stockfish, NNUE, or puzzle-data notice.
 - When screenshots or store metadata changed, run
