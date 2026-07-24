@@ -11,7 +11,7 @@ const AUDIO_ASSET_URLS: Readonly<Record<MoveFeedbackCue, string>> = {
 
 const AUDIO_PLAYBACK_VOLUMES: Readonly<Record<MoveFeedbackCue, number>> = {
   move: 1,
-  capture: 0.4
+  capture: 0.3
 };
 
 type AudioLike = {

@@ -56,7 +56,7 @@ test("plays the selected Freesound move and capture assets", async () => {
     "./audio/issue-247/freesound-546119-piece-placement.mp3",
     "./audio/issue-247/freesound-546120-piece-capture.mp3"
   ]);
-  assert.deepEqual(volumes, [1, 0.4]);
+  assert.deepEqual(volumes, [1, 0.3]);
   assert.equal(playCount, 2);
 });
 
