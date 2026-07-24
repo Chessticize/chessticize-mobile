@@ -10,6 +10,10 @@ export function defaultPracticeSettings(): PracticeSettings {
       reviewReminder: {
         mode: "smart"
       }
+    },
+    moveFeedback: {
+      soundEnabled: true,
+      hapticsEnabled: true
     }
   };
 }
@@ -21,6 +25,10 @@ export function clonePracticeSettings(settings: PracticeSettings): PracticeSetti
     },
     notifications: {
       reviewReminder: settings.notifications.reviewReminder
+    },
+    moveFeedback: {
+      soundEnabled: settings.moveFeedback?.soundEnabled ?? true,
+      hapticsEnabled: settings.moveFeedback?.hapticsEnabled ?? true
     }
   });
 }
@@ -32,6 +40,10 @@ export function normalizePracticeSettings(settings: PracticeSettings): PracticeS
     },
     notifications: {
       reviewReminder: normalizeReviewReminderPreference(settings.notifications.reviewReminder)
+    },
+    moveFeedback: {
+      soundEnabled: settings.moveFeedback?.soundEnabled ?? true,
+      hapticsEnabled: settings.moveFeedback?.hapticsEnabled ?? true
     }
   };
 }

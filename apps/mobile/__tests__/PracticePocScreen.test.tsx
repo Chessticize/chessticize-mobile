@@ -23,6 +23,7 @@ import { MemoryStore } from "../../../packages/storage/src/memory-store";
 import { defaultSprintConfig, formatLocalCalendarDate, formatReviewDay, practiceRunSprintConfig, PRACTICE_RUN_NAME_MAX_LENGTH, type ArrowDuelState, type AttemptEvent, type Puzzle, type SprintState, type UciEngineTransport } from "../../../packages/core/src/index";
 import { FakeReviewReminderNotificationClient, FakeReviewReminderScheduler } from "../src/platform/reviewReminderScheduler";
 import { FakeICloudProgressSyncClient } from "../src/platform/iCloudProgressSync";
+import { FakeMoveFeedbackClient } from "../src/platform/moveFeedback";
 import type { MobilePlatformCapabilities } from "../src/platform/mobilePlatformCapabilities";
 import type { MobileSystemBackSource } from "../src/navigation/mobileSystemBack";
 import {
@@ -3222,8 +3223,9 @@ describe("PracticePocScreen", () => {
 
   it("shows a persistence failure and unlocks board input through the store boundary", async () => {
     const service = new PracticeService(new FailingAttemptStore("Practice write failed"));
+    const moveFeedbackClient = new FakeMoveFeedbackClient();
     configureMobilePracticePuzzleSource(service, "random1000");
-    const renderer = renderScreen({ practiceService: service });
+    const renderer = renderScreen({ practiceService: service, moveFeedbackClient });
 
     startStandardSprint(renderer);
 
@@ -3231,6 +3233,7 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
     expect(collectText(findByTestId(renderer, "error-panel"))).toContain("Practice write failed");
+    expect(moveFeedbackClient.requests).toEqual([]);
     abandonSprint(renderer);
     press(renderer, "history-tab");
     expect(findByTestId(renderer, "history-empty-state").props.accessibilityLabel).toBe("History has no attempts");
@@ -7082,10 +7085,10 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "settings-panel"))).not.toContain("›");
   });
 
-  it("places the Lab Move Feedback presentation after Notifications without formal preview controls", () => {
-    const renderer = renderScreen({
-      moveFeedbackSettings: {}
-    });
+  it("persists formal Move Feedback settings after Notifications without preview controls", async () => {
+    const service = createMobilePracticeService("random1000");
+    const moveFeedbackClient = new FakeMoveFeedbackClient();
+    const renderer = renderScreen({ practiceService: service, moveFeedbackClient });
 
     press(renderer, "settings-tab");
 
@@ -7106,6 +7109,54 @@ describe("PracticePocScreen", () => {
       )
     ).toBeLessThan(0);
     expect(() => findByTestId(renderer, "settings-move-feedback-previews")).toThrow();
+
+    press(renderer, "settings-move-sound-toggle");
+    expect(service.getSettings().moveFeedback).toEqual({
+      soundEnabled: false,
+      hapticsEnabled: true
+    });
+    press(renderer, "settings-move-haptics-toggle");
+    expect(service.getSettings().moveFeedback).toEqual({
+      soundEnabled: false,
+      hapticsEnabled: false
+    });
+
+    press(renderer, "practice-tab");
+    startStandardSprint(renderer);
+    await boardMove(renderer, "e2e6");
+    await settleFeedbackSnapshot();
+    expect(moveFeedbackClient.requests).toEqual([]);
+  });
+
+  it("emits feedback only after committed user and opponent moves", async () => {
+    const moveFeedbackClient = new FakeMoveFeedbackClient();
+    const renderer = renderStandardSequenceScreen({ moveFeedbackClient });
+
+    startStandardSprint(renderer);
+    await boardMove(renderer, "d8a8");
+    expect(moveFeedbackClient.requests).toEqual([]);
+    await boardMove(renderer, "e2e6");
+
+    expect(moveFeedbackClient.requests).toEqual([{
+      cue: "capture",
+      playSound: true,
+      playHaptic: true
+    }]);
+
+    await settleFeedbackSnapshot();
+
+    expect(moveFeedbackClient.requests).toEqual([
+      {
+        cue: "capture",
+        playSound: true,
+        playHaptic: true
+      },
+      {
+        cue: "move",
+        playSound: true,
+        playHaptic: false
+      }
+    ]);
   });
 
   it("routes feedback to GitHub only after an explicit privacy handoff", async () => {

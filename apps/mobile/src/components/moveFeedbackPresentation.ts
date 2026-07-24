@@ -1,9 +1,12 @@
-export type MoveFeedbackCue = "move" | "capture";
+export type {
+  MoveFeedbackCue,
+  MoveFeedbackPreferences
+} from "../platform/moveFeedback.ts";
 
-export type MoveFeedbackPreferences = {
-  hapticsEnabled: boolean;
-  soundEnabled: boolean;
-};
+import type {
+  MoveFeedbackCue,
+  MoveFeedbackPreferences
+} from "../platform/moveFeedback.ts";
 
 export type MoveFeedbackPreviewResult = {
   haptics: "off" | "requested" | "visual-only";

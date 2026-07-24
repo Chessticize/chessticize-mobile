@@ -84,6 +84,10 @@ export interface PracticeSettings {
   notifications: {
     reviewReminder: ReviewReminderPreference;
   };
+  moveFeedback: {
+    soundEnabled: boolean;
+    hapticsEnabled: boolean;
+  };
 }
 
 export type ReviewReminderPreference =

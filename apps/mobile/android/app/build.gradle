@@ -41,6 +41,14 @@ abstract class GenerateChessticizeAssets extends DefaultTask {
     @PathSensitive(PathSensitivity.RELATIVE)
     abstract RegularFileProperty getStockfishAuthors()
 
+    @InputFile
+    @PathSensitive(PathSensitivity.RELATIVE)
+    abstract RegularFileProperty getMoveFeedbackMoveSound()
+
+    @InputFile
+    @PathSensitive(PathSensitivity.RELATIVE)
+    abstract RegularFileProperty getMoveFeedbackCaptureSound()
+
     @OutputDirectory
     abstract DirectoryProperty getOutputDirectory()
 
@@ -79,6 +87,14 @@ abstract class GenerateChessticizeAssets extends DefaultTask {
             }
             spec.from(stockfishAuthors.get().asFile) {
                 into "licenses/stockfish"
+            }
+            spec.from(moveFeedbackMoveSound.get().asFile) {
+                into "move-feedback"
+                rename { "move.mp3" }
+            }
+            spec.from(moveFeedbackCaptureSound.get().asFile) {
+                into "move-feedback"
+                rename { "capture.mp3" }
             }
         }
     }
@@ -323,6 +339,12 @@ androidComponents {
             thirdPartyNotices.set(file("$rootDir/../../../THIRD_PARTY_NOTICES.md"))
             stockfishCopying.set(file("$stockfishRoot/Copying.txt"))
             stockfishAuthors.set(file("$stockfishRoot/AUTHORS"))
+            moveFeedbackMoveSound.set(file(
+                "$rootDir/../../mobile-lab/public/audio/issue-247/freesound-546119-piece-placement.mp3"
+            ))
+            moveFeedbackCaptureSound.set(file(
+                "$rootDir/../../mobile-lab/public/audio/issue-247/freesound-546120-piece-capture.mp3"
+            ))
             outputDirectory.set(
                 layout.buildDirectory.dir("generated/assets/chessticize/${variant.name}")
             )

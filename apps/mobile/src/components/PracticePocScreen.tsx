@@ -148,6 +148,12 @@ import {
   type MoveFeedbackPreferences,
   type MoveFeedbackPreviewer
 } from "./MoveFeedbackSettingsSection.tsx";
+import {
+  emitCommittedMoveFeedback,
+  moveFeedbackCueForMove,
+  type MoveFeedbackActor,
+  type MoveFeedbackClient
+} from "../platform/moveFeedback.ts";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Chess, type Move, type PieceSymbol, type Square } from "chess.js";
 import type {
@@ -183,7 +189,6 @@ interface Props {
   feedbackIssuesOpener?: (url: string) => Promise<void>;
   currentTimeMs?: () => number;
   moveFeedbackSettings?: {
-    initialPreferences?: MoveFeedbackPreferences;
     preview?: MoveFeedbackPreviewer;
   };
   puzzleSelectionId?: string;
@@ -420,6 +425,7 @@ export function PracticePocScreen({
   const scheduler = platformCapabilities.reminders.scheduler;
   const notificationClient = platformCapabilities.reminders.notificationClient;
   const reminderPlatform = platformCapabilities.reminders.platform;
+  const moveFeedbackClient = platformCapabilities.moveFeedback.client;
   const progressProtection = platformCapabilities.progressProtection;
   const iCloudSyncClient = platformCapabilities.progressSync.client;
   const boardRef = useRef<ChessboardRef | null>(null);
@@ -525,10 +531,7 @@ export function PracticePocScreen({
   const [iCloudSyncEnabled, setICloudSyncEnabled] = useState(() => service.getSettings().sync.iCloudEnabled);
   const [iCloudSyncStatus, setICloudSyncStatus] = useState(() => service.getSettings().sync.iCloudEnabled ? "Ready" : "Off");
   const [moveFeedbackPreferences, setMoveFeedbackPreferences] = useState<MoveFeedbackPreferences>(
-    () => moveFeedbackSettings?.initialPreferences ?? {
-      hapticsEnabled: true,
-      soundEnabled: true
-    }
+    () => service.getSettings().moveFeedback
   );
   const [, setSettingsRevision] = useState(0);
   const sessionTimingDesignState = useSessionTimingDesignPreview(sessionTimingPreview);
@@ -875,6 +878,36 @@ export function PracticePocScreen({
     if (iCloudSyncClient) {
       void runICloudProgressSync("settings-enabled");
     }
+  }
+
+  function saveMoveFeedbackPreferences(preferences: MoveFeedbackPreferences): void {
+    const saved = service.saveSettings({
+      ...service.getSettings(),
+      moveFeedback: preferences
+    });
+    setMoveFeedbackPreferences(saved.moveFeedback);
+    setSettingsRevision((current) => current + 1);
+  }
+
+  function playCommittedMoveFeedback(
+    actor: MoveFeedbackActor,
+    move: string,
+    preMoveFen: string | null
+  ): void {
+    if (!moveFeedbackClient || !preMoveFen) {
+      return;
+    }
+    const cue = moveFeedbackCueForMove(preMoveFen, move);
+    if (!cue) {
+      return;
+    }
+    void emitCommittedMoveFeedback(
+      moveFeedbackClient,
+      { actor, cue },
+      service.getSettings().moveFeedback
+    ).catch(() => {
+      // Feedback is nonessential and must never interrupt a chess move.
+    });
   }
 
   async function runICloudProgressSync(reason: string): Promise<string> {
@@ -1448,6 +1481,7 @@ export function PracticePocScreen({
   }): Promise<void> {
     try {
       const next = service.submitMove(move, nowIso());
+      playCommittedMoveFeedback("user", move, submittedFen);
       const nextFeedback = (next.feedback as SessionFeedback) ?? null;
       if (next.attempt) {
         setUnclearPrompt(isUnclearAttemptEligible(next.attempt)
@@ -2020,6 +2054,7 @@ export function PracticePocScreen({
 
     for (const move of parsedMoves) {
       const suppressedMove = boardMoveToUci(move);
+      const preMoveFen = boardRef.current.getState().fen;
       suppressedBoardMovesRef.current.push(suppressedMove);
       const playedMove = await boardRef.current.move({
         from: move.from as Square,
@@ -2029,6 +2064,8 @@ export function PracticePocScreen({
       if (!playedMove) {
         consumeSuppressedBoardMove(suppressedMove, suppressedBoardMovesRef.current);
         commitBoardFen(finalFen);
+      } else {
+        playCommittedMoveFeedback("opponent", suppressedMove, preMoveFen);
       }
       setLastBoardMove(move);
     }
@@ -2921,6 +2958,7 @@ export function PracticePocScreen({
                   deferBackRelevantTransition={deferBackRelevantTransition}
                   entries={historyReviewEntries}
                   initialIndex={historyReviewInitialIndex}
+                  moveFeedbackClient={moveFeedbackClient}
                   service={service}
                   systemBackCommand={reviewBackCommand}
                   onAnalysisActiveChange={setReviewAnalysisOpen}
@@ -3044,6 +3082,7 @@ export function PracticePocScreen({
                 reviewQueue={reviewQueue}
                 currentTimeMs={currentTimeMs}
                 deferBackRelevantTransition={deferBackRelevantTransition}
+                moveFeedbackClient={moveFeedbackClient}
                 service={service}
                 sessionMistakeReviewItems={sessionMistakeReviewItems}
                 onExitSessionReview={exitSessionReview}
@@ -3100,11 +3139,11 @@ export function PracticePocScreen({
                 showRatingControls={!ratingEditingMovedToHome}
                 iCloudSyncEnabled={iCloudSyncEnabled}
                 iCloudSyncStatus={iCloudSyncStatus}
-                moveFeedbackPreferences={moveFeedbackSettings ? moveFeedbackPreferences : undefined}
+                moveFeedbackPreferences={moveFeedbackPreferences}
                 moveFeedbackPreviewer={moveFeedbackSettings?.preview}
                 advancedRatingsOpen={settingsAdvancedRatingsOpen}
                 onAdvancedRatingsOpenChange={setSettingsAdvancedRatingsOpen}
-                onMoveFeedbackPreferencesChange={setMoveFeedbackPreferences}
+                onMoveFeedbackPreferencesChange={saveMoveFeedbackPreferences}
                 onOpenNotificationSettings={openReviewReminderSystemSettings}
                 onRequestReviewReminderPermission={() => requestReviewReminderPermission()}
                 onSaveReviewReminderPreference={saveReviewReminderPreference}
@@ -8084,6 +8123,7 @@ function ReviewPanel({
   deferBackRelevantTransition,
   dueReviewItems,
   filtersExpanded,
+  moveFeedbackClient,
   nowMs,
   onAnalysisActiveChange,
   onExitSessionReview,
@@ -8107,6 +8147,7 @@ function ReviewPanel({
   deferBackRelevantTransition: DeferBackRelevantTransition;
   dueReviewItems: ReviewQueueItem[];
   filtersExpanded: boolean;
+  moveFeedbackClient: MoveFeedbackClient | null;
   nowMs: number;
   onAnalysisActiveChange?: (active: boolean) => void;
   onExitSessionReview: () => void;
@@ -8248,6 +8289,7 @@ function ReviewPanel({
         deferBackRelevantTransition={deferBackRelevantTransition}
         entries={activeEntries}
         initialIndex={activeEntryInitialIndex}
+        moveFeedbackClient={moveFeedbackClient}
         scheduledReviewCompletedCount={completedReviews.length}
         scheduledReviewTotal={dailyReviewTotal}
         service={service}
@@ -8654,6 +8696,7 @@ function ReviewSession({
   deferBackRelevantTransition,
   entries,
   initialIndex = 0,
+  moveFeedbackClient,
   onAnalysisActiveChange,
   onAttemptClearUnclear,
   onComplete,
@@ -8673,6 +8716,7 @@ function ReviewSession({
   deferBackRelevantTransition: DeferBackRelevantTransition;
   entries: ReviewEntry[];
   initialIndex?: number;
+  moveFeedbackClient: MoveFeedbackClient | null;
   onAnalysisActiveChange?: (active: boolean) => void;
   onAttemptClearUnclear?: (attemptId: string) => void;
   onComplete: (source: ReviewEntry["source"]) => void;
@@ -8726,6 +8770,27 @@ function ReviewSession({
   useEffect(() => {
     return () => onAnalysisActiveChange?.(false);
   }, [onAnalysisActiveChange]);
+
+  function playReviewMoveFeedback(
+    actor: MoveFeedbackActor,
+    move: string,
+    preMoveFen: string
+  ): void {
+    if (!moveFeedbackClient) {
+      return;
+    }
+    const cue = moveFeedbackCueForMove(preMoveFen, move);
+    if (!cue) {
+      return;
+    }
+    void emitCommittedMoveFeedback(
+      moveFeedbackClient,
+      { actor, cue },
+      service.getSettings().moveFeedback
+    ).catch(() => {
+      // Feedback is nonessential and must never interrupt review progress.
+    });
+  }
 
   useEffect(() => {
     if (!systemBackCommand || handledBackCommandIdRef.current === systemBackCommand.id) {
@@ -9042,6 +9107,7 @@ function ReviewSession({
     setBoardLocked(true);
     try {
       const result = submitLineMove(reviewState.kind === "line" ? reviewState.line : beginLinePuzzle(currentEntry.puzzle), move);
+      playReviewMoveFeedback("user", move, submittedFen);
       setFeedback(result.feedback);
       if (result.feedback.result === "wrong") {
         recordCurrentReviewResult("wrong", {
@@ -9139,6 +9205,7 @@ function ReviewSession({
     }
     setBoardLocked(true);
     const result = submitArrowDuelChoice(reviewState.duel, move);
+    playReviewMoveFeedback("user", move, submittedFen);
     setFeedback(result.feedback);
     if (result.feedback.result === "correct") {
       await sleep(FEEDBACK_SNAPSHOT_MS);
@@ -9181,6 +9248,7 @@ function ReviewSession({
     setBoardLocked(true);
     try {
       const result = submitArrowDuelFollowUpMove(reviewState.line, move);
+      playReviewMoveFeedback("user", move, submittedFen);
       setFeedback(result.feedback);
       if (result.feedback.result === "wrong") {
         recordCurrentReviewResult("wrong", {
@@ -9225,6 +9293,7 @@ function ReviewSession({
 
     for (const move of parsedMoves) {
       const suppressedMove = boardMoveToUci(move);
+      const preMoveFen = boardRef.current.getState().fen;
       reviewSuppressedBoardMovesRef.current.push(suppressedMove);
       const playedMove = await boardRef.current.move({
         from: move.from as Square,
@@ -9234,6 +9303,8 @@ function ReviewSession({
       if (!playedMove) {
         consumeSuppressedBoardMove(suppressedMove, reviewSuppressedBoardMovesRef.current);
         boardRef.current?.resetBoard(finalFen);
+      } else {
+        playReviewMoveFeedback("opponent", suppressedMove, preMoveFen);
       }
       setLastMove(move);
     }
@@ -10250,7 +10321,7 @@ function SettingsPanel({
   onSyncICloudNow: () => Promise<string>;
   iCloudSyncEnabled: boolean;
   iCloudSyncStatus: string;
-  moveFeedbackPreferences?: MoveFeedbackPreferences;
+  moveFeedbackPreferences: MoveFeedbackPreferences;
   moveFeedbackPreviewer?: MoveFeedbackPreviewer;
   notificationPermissionStatus: ReviewReminderPermissionStatus;
   onMoveFeedbackPreferencesChange: (preferences: MoveFeedbackPreferences) => void;
@@ -10394,19 +10465,17 @@ function SettingsPanel({
         ) : null}
       </SettingsSection>
 
-      {moveFeedbackPreferences ? (
-        <SettingsSection
-          title="Move Feedback"
-          testID="settings-move-feedback-section"
-          wide={adaptiveLayout.usesWideContent}
-        >
-          <MoveFeedbackSettingsSection
-            preferences={moveFeedbackPreferences}
-            onPreferencesChange={onMoveFeedbackPreferencesChange}
-            onPreview={moveFeedbackPreviewer}
-          />
-        </SettingsSection>
-      ) : null}
+      <SettingsSection
+        title="Move Feedback"
+        testID="settings-move-feedback-section"
+        wide={adaptiveLayout.usesWideContent}
+      >
+        <MoveFeedbackSettingsSection
+          preferences={moveFeedbackPreferences}
+          onPreferencesChange={onMoveFeedbackPreferencesChange}
+          onPreview={moveFeedbackPreviewer}
+        />
+      </SettingsSection>
 
       {showRatingControls ? (
         <SettingsSection title="Profile" testID="settings-profile-section" wide={adaptiveLayout.usesWideContent}>

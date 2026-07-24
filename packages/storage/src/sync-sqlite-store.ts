@@ -199,6 +199,8 @@ interface AppSettingsRow {
   sync_upload_allowed: number;
   review_reminder_mode: PracticeSettings["notifications"]["reviewReminder"]["mode"];
   review_reminder_fixed_local_time: string | null;
+  move_feedback_sound_enabled: number;
+  move_feedback_haptics_enabled: number;
 }
 
 interface SprintSessionExportRow {
@@ -236,7 +238,7 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 8;
+export const CURRENT_SCHEMA_VERSION = 9;
 
 interface SQLiteMigration {
   from: number;
@@ -252,7 +254,8 @@ const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
   { from: 4, to: 5, apply: migrateV4ToV5 },
   { from: 5, to: 6, apply: migrateV5ToV6 },
   { from: 6, to: 7, apply: migrateV6ToV7 },
-  { from: 7, to: 8, apply: migrateV7ToV8 }
+  { from: 7, to: 8, apply: migrateV7ToV8 },
+  { from: 8, to: 9, apply: migrateV8ToV9 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
@@ -550,8 +553,10 @@ export class SyncSQLiteStore implements PracticeStore {
           sync_icloud_enabled,
           sync_upload_allowed,
           review_reminder_mode,
-          review_reminder_fixed_local_time
-        ) VALUES ('default', ?, ?, ?, ?)`
+          review_reminder_fixed_local_time,
+          move_feedback_sound_enabled,
+          move_feedback_haptics_enabled
+        ) VALUES ('default', ?, ?, ?, ?, ?, ?)`
       )
       .run(
         boolToInt(cloned.sync.iCloudEnabled),
@@ -559,7 +564,9 @@ export class SyncSQLiteStore implements PracticeStore {
         cloned.notifications.reviewReminder.mode,
         cloned.notifications.reviewReminder.mode === "fixed"
           ? cloned.notifications.reviewReminder.fixedLocalTime
-          : null
+          : null,
+        boolToInt(cloned.moveFeedback.soundEnabled),
+        boolToInt(cloned.moveFeedback.hapticsEnabled)
       );
   }
 
@@ -944,7 +951,8 @@ export class SyncSQLiteStore implements PracticeStore {
     this.transaction(() => {
       this.saveSettings({
         ...this.getSettings(),
-        notifications: clonePracticeSettings(data.settings).notifications
+        notifications: clonePracticeSettings(data.settings).notifications,
+        moveFeedback: clonePracticeSettings(data.settings).moveFeedback
       });
       const currentRuns = this.listPracticeRuns();
       const previousRuns = new Map(currentRuns.map((run) => [run.id, run]));
@@ -2063,6 +2071,21 @@ function migrateV7ToV8(db: SyncSqliteDatabase): void {
   }
 }
 
+function migrateV8ToV9(db: SyncSqliteDatabase): void {
+  ensureColumn(
+    db,
+    "app_settings",
+    "move_feedback_sound_enabled",
+    "ALTER TABLE app_settings ADD COLUMN move_feedback_sound_enabled INTEGER NOT NULL DEFAULT 1 CHECK (move_feedback_sound_enabled IN (0, 1))"
+  );
+  ensureColumn(
+    db,
+    "app_settings",
+    "move_feedback_haptics_enabled",
+    "ALTER TABLE app_settings ADD COLUMN move_feedback_haptics_enabled INTEGER NOT NULL DEFAULT 1 CHECK (move_feedback_haptics_enabled IN (0, 1))"
+  );
+}
+
 function readSchemaVersion(db: SyncSqliteDatabase): number {
   const row = db.prepare("PRAGMA user_version").get() as { user_version?: unknown } | undefined;
   const version = row?.user_version;
@@ -2199,6 +2222,10 @@ function settingsFromRow(row: AppSettingsRow): PracticeSettings {
     },
     notifications: {
       reviewReminder: reminder
+    },
+    moveFeedback: {
+      soundEnabled: intToBool(row.move_feedback_sound_enabled),
+      hapticsEnabled: intToBool(row.move_feedback_haptics_enabled)
     }
   };
 }
