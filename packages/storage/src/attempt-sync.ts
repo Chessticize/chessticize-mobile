@@ -114,7 +114,11 @@ function preferredClarity(
 }
 
 function normalizedClarity(attempt: AttemptHistoryRow): { unclear: boolean; updatedAt?: string } {
-  if (attempt.source !== "sprint" || attempt.result !== "correct" || !attempt.unclearUpdatedAt) {
+  if (
+    attempt.source !== "sprint" ||
+    (attempt.result !== "correct" && attempt.result !== "timed_out") ||
+    !attempt.unclearUpdatedAt
+  ) {
     return { unclear: false };
   }
   const updatedAt = new Date(attempt.unclearUpdatedAt);

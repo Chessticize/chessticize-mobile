@@ -193,13 +193,29 @@ test("history filters Unclear Attempts and keeps the count scoped outside the Un
   }).unclearCount, 1);
 });
 
-test("History attention flags use OR internally and AND with other facets", () => {
+test("Needs attention is Unclear or in Review and remains AND with other facets", () => {
   const attempts = [
     attempt({
-      id: "wrong",
-      puzzleId: "wrong-puzzle",
+      id: "wrong-in-review",
+      puzzleId: "review-puzzle",
       result: "wrong",
       completedAt: "2026-06-20T00:00:10.000Z",
+      themes: ["fork"]
+    }),
+    attempt({
+      id: "wrong-cleared",
+      puzzleId: "cleared-puzzle",
+      result: "wrong",
+      completedAt: "2026-06-20T00:00:15.000Z",
+      themes: ["fork"]
+    }),
+    attempt({
+      id: "correct-in-review",
+      puzzleId: "review-puzzle",
+      result: "correct",
+      completedAt: "2026-06-20T00:00:17.000Z",
+      unclear: false,
+      unclearUpdatedAt: "2026-06-20T00:00:18.000Z",
       themes: ["fork"]
     }),
     {
@@ -216,6 +232,7 @@ test("History attention flags use OR internally and AND with other facets", () =
         id: "timed-out",
         puzzleId: "timeout-puzzle",
         completedAt: "2026-06-20T00:00:30.000Z",
+        unclear: true,
         themes: ["pin"]
     }),
     attempt({
@@ -239,21 +256,32 @@ test("History attention flags use OR internally and AND with other facets", () =
     filterHistoryAttemptsForQuery({
       attempts,
       query: { attentionOnly: true },
-      reviews: []
+      reviews: [{
+        puzzleId: "review-puzzle",
+        mode: "standard",
+        ratingKey: "standard 5/20",
+        dueDay: "2026-06-21",
+        intervalDays: 1,
+        reviewCount: 1,
+        successStreak: 0,
+        lapseCount: 1,
+        lastResult: "wrong",
+        lastReviewedAt: "2026-06-20T00:00:10.000Z"
+      }]
     }).map((historyAttempt) => historyAttempt.id),
-    ["wrong", "slow-correct", "timed-out", "unclear-correct"]
+    ["wrong-in-review", "correct-in-review", "timed-out", "unclear-correct"]
   );
   assert.deepEqual(
     filterHistoryAttemptsForQuery({
       attempts,
       query: {
-        attentionFlags: ["mistakes", "slow"],
+        attentionOnly: true,
         result: "correct",
-        themes: ["pin"]
+        themes: ["fork"]
       },
       reviews: []
     }).map((historyAttempt) => historyAttempt.id),
-    ["slow-correct"]
+    ["unclear-correct"]
   );
 });
 
@@ -289,15 +317,6 @@ test("Timed out is excluded from Mistakes, Correct, Wrong, and performance", () 
       .map((historyAttempt) => historyAttempt.id),
     ["wrong"]
   );
-  assert.deepEqual(
-    filterHistoryAttemptsForQuery({
-      attempts,
-      query: { attentionFlags: ["mistakes"] },
-      reviews: []
-    }).map((historyAttempt) => historyAttempt.id),
-    ["wrong"]
-  );
-
   const view = buildHistoryView({
     query: { now: "2026-06-21T12:00:00.000Z", timeRange: "max" },
     ratingKeys: [],
@@ -857,6 +876,7 @@ type AttemptFixtureInput = {
   mode?: HistoryAttemptView["mode"];
   ratingKey?: string;
   unclear?: boolean;
+  unclearUpdatedAt?: string;
   themes?: string[];
 };
 
@@ -876,6 +896,7 @@ function attempt(input: AttemptFixtureInput): HistoryAttemptView {
     completedAt: input.completedAt,
     ratingBefore: 600,
     ...(input.unclear === undefined ? {} : { unclear: input.unclear }),
+    ...(input.unclearUpdatedAt === undefined ? {} : { unclearUpdatedAt: input.unclearUpdatedAt }),
     puzzleRating: 900,
     side: "white",
     themes,

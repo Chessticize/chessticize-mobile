@@ -70,6 +70,8 @@ test("CLI records an exact-boundary puzzle timeout without rating or review effe
   assert.equal(response.feedback, null);
   assert.equal(response.attempt.result, "timed_out");
   assert.equal(response.attempt.timingStatus, "timed_out");
+  assert.equal(response.attempt.unclear, true);
+  assert.equal(response.attempt.unclearUpdatedAt, "2026-07-24T00:01:00.000Z");
   assert.equal(response.state.status, "active");
   assert.equal(response.state.correctCount, 0);
   assert.equal(response.state.mistakeCount, 0);

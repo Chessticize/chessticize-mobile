@@ -301,6 +301,10 @@ function buildAttemptEvent(state: SprintState, feedback: PuzzleFeedback, now: st
     attempt.elapsedMs! >= slowAfterSeconds * 1000
   ) {
     attempt.timingStatus = "slow";
+    if (attempt.result === "correct") {
+      attempt.unclear = true;
+      attempt.unclearUpdatedAt = attempt.completedAt;
+    }
   }
   if (state.currentPuzzle.kind === "arrow_duel") {
     attempt.arrowDuelCandidateOrder = [...state.currentPuzzle.candidates];
@@ -326,7 +330,9 @@ function buildTimeoutAttempt(state: SprintState, now: string): AttemptEvent {
     completedAt: timedOutAt,
     elapsedMs: currentPuzzleElapsedMs(state, timedOutAt),
     timingStatus: "timed_out",
-    ratingBefore: state.ratingBefore
+    ratingBefore: state.ratingBefore,
+    unclear: true,
+    unclearUpdatedAt: timedOutAt
   };
   if (state.currentPuzzle.kind === "arrow_duel") {
     attempt.arrowDuelCandidateOrder = [...state.currentPuzzle.candidates];

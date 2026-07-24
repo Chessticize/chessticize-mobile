@@ -497,8 +497,7 @@ test("PracticeService builds MemoryStore history view for a required time range 
       minRating: 1485,
       maxRating: 1485,
       side: view.attempts[0]?.side,
-      reviewStatus: "queued",
-      attentionFlags: ["mistakes", "slow"]
+      reviewStatus: "queued"
     }).attempts.map((attempt) => attempt.id),
     view.attempts.map((attempt) => attempt.id)
   );

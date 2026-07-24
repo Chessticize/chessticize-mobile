@@ -52,6 +52,8 @@ test("sprint initializes a per-puzzle deadline and records Slow from the puzzle 
   assert.equal(solved.attempt?.startedAt, NOW);
   assert.equal(solved.attempt?.elapsedMs, 41_000);
   assert.equal(solved.attempt?.timingStatus, "slow");
+  assert.equal(solved.attempt?.unclear, true);
+  assert.equal(solved.attempt?.unclearUpdatedAt, solved.attempt?.completedAt);
   assert.equal(solved.state.currentPuzzleStartedAt, "2026-06-20T00:00:41.000Z");
   assert.equal(solved.state.currentPuzzleDeadlineAt, "2026-06-20T00:01:41.000Z");
   state = solved.state;
@@ -59,6 +61,7 @@ test("sprint initializes a per-puzzle deadline and records Slow from the puzzle 
   const wrong = submitSprintMove(state, "e6d6", "2026-06-20T00:01:22.000Z");
   assert.equal(wrong.attempt?.result, "wrong");
   assert.equal(wrong.attempt?.timingStatus, "slow");
+  assert.equal(wrong.attempt?.unclear, undefined);
 });
 
 test("advanceSprintTime times out once, advances without correctness or ELO effects, and is idempotent", () => {
@@ -80,6 +83,8 @@ test("advanceSprintTime times out once, advances without correctness or ELO effe
   assert.equal(timedOut.attempt?.submittedMove, undefined);
   assert.equal(timedOut.attempt?.timingStatus, "timed_out");
   assert.equal(timedOut.attempt?.elapsedMs, 60_000);
+  assert.equal(timedOut.attempt?.unclear, true);
+  assert.equal(timedOut.attempt?.unclearUpdatedAt, timedOut.attempt?.completedAt);
   assert.equal(timedOut.state.currentPuzzle?.puzzle.id, "p2");
   assert.equal(timedOut.state.currentPuzzleStartedAt, "2026-06-20T00:01:00.000Z");
   assert.equal(timedOut.state.currentPuzzleDeadlineAt, "2026-06-20T00:02:00.000Z");

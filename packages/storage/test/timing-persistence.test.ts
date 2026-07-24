@@ -234,6 +234,8 @@ test("a move submitted at the timeout boundary advances and records one timeout 
   const handoff = service.submitMove("e2e4", "2026-07-24T00:31:00.000Z");
 
   assert.equal(handoff.attempt?.result, "timed_out");
+  assert.equal(handoff.attempt?.unclear, true);
+  assert.equal(handoff.attempt?.unclearUpdatedAt, "2026-07-24T00:31:00.000Z");
   assert.equal(handoff.state.currentPuzzleIndex, 1);
   assert.notEqual(handoff.state.currentPuzzle?.puzzle.id, firstPuzzleId);
   assert.equal(store.listSprintSessions().length, 1);
@@ -330,6 +332,8 @@ for (const backend of ["memory", "sqlite"] as const) {
       assert.equal(timedOut.attempt?.submittedMove, undefined);
       assert.equal(timedOut.attempt?.elapsedMs, 60_000);
       assert.equal(timedOut.attempt?.timingStatus, "timed_out");
+      assert.equal(timedOut.attempt?.unclear, true);
+      assert.equal(timedOut.attempt?.unclearUpdatedAt, "2026-07-24T01:01:00.000Z");
       assert.notEqual(timedOut.state.currentPuzzle?.puzzle.id, timedOutPuzzleId);
       assert.equal(timedOut.state.correctCount, 0);
       assert.equal(timedOut.state.mistakeCount, 0);
@@ -353,6 +357,18 @@ for (const backend of ["memory", "sqlite"] as const) {
           netThisWeek: 0
         }
       );
+      const timedOutAttemptId = timedOut.attempt?.id ?? assert.fail("expected timeout attempt");
+      service.setAttemptUnclear(
+        timedOutAttemptId,
+        false,
+        "2026-07-24T01:01:01.000Z"
+      );
+      assert.equal(service.listHistory()[0]?.unclear, false);
+      assert.deepEqual(service.getHistoryView({
+        now: "2026-07-24T01:01:02.000Z",
+        timeRange: "max",
+        attentionOnly: true
+      }).attempts, []);
       assert.equal(
         service.advanceSprintTime("2026-07-24T01:01:00.000Z").attempt,
         undefined

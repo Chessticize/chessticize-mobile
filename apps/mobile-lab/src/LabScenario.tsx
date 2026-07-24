@@ -423,7 +423,8 @@ function createHistoryService(
       elapsedMs: 60_000,
       completedAt: "2026-07-17T15:00:12.000Z",
       ratingBefore: 910,
-      ratingAfter: 910
+      ratingAfter: 910,
+      unclear: true
     }),
     historyAttempt({
       id: "history-correct",
@@ -433,7 +434,8 @@ function createHistoryService(
       elapsedMs: 41_000,
       completedAt: "2026-07-16T13:00:07.000Z",
       ratingBefore: 900,
-      ratingAfter: 930
+      ratingAfter: 930,
+      unclear: true
     }),
     historyAttempt({
       id: "history-clean",

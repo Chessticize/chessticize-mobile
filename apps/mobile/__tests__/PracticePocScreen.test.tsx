@@ -1382,7 +1382,8 @@ describe("PracticePocScreen", () => {
     expect(service.listHistory()).toHaveLength(1);
     expect(service.listHistory()[0]).toMatchObject({
       result: "timed_out",
-      timingStatus: "timed_out"
+      timingStatus: "timed_out",
+      unclear: true
     });
 
     act(() => {
@@ -1390,6 +1391,43 @@ describe("PracticePocScreen", () => {
     });
     expect(() => findByTestId(renderer, "session-puzzle-timeout-overlay")).toThrow();
     expect(findByTestId(renderer, "mock-chessboard").props.fen).not.toBe(firstPuzzleFen);
+  });
+
+  it("automatically marks a Slow correct attempt Unclear without asking again", async () => {
+    let wallClockMs = Date.parse("2026-07-23T12:00:00.000Z");
+    const service = createMobilePracticeService("random1000");
+    startSprintWithPuzzleTiming(
+      service,
+      {
+        durationSeconds: 300,
+        perPuzzleSeconds: 20,
+        puzzleTiming: {
+          slowAfterSeconds: 40,
+          timeoutAfterSeconds: 60
+        },
+        targetCorrect: 15,
+        maxMistakes: 3
+      },
+      new Date(wallClockMs).toISOString()
+    );
+    const renderer = renderScreen({
+      currentTimeMs: () => wallClockMs,
+      practiceService: service
+    });
+
+    press(renderer, "practice-resume-card");
+    await settleEntryPreview();
+    await boardMove(renderer, "e2e6");
+    await settleFeedbackSnapshot();
+    wallClockMs += 41_000;
+    await boardMove(renderer, "e6f7");
+
+    expect(service.listHistory()[0]).toMatchObject({
+      result: "correct",
+      timingStatus: "slow",
+      unclear: true
+    });
+    expect(() => findByTestId(renderer, "sprint-unclear-prompt")).toThrow();
   });
 
   it("ends the sprint without a puzzle timeout overlay when both deadlines are reached together", () => {
@@ -1425,7 +1463,7 @@ describe("PracticePocScreen", () => {
     expect(service.listHistory()).toHaveLength(0);
   });
 
-  it("uses one All or Needs attention selector and keeps every other History filter in the menu", async () => {
+  it("defaults History to Needs attention and keeps every other filter in the menu", async () => {
     const renderer = renderLabScenario("history-populated");
     await flushMicrotasks();
 
@@ -1436,13 +1474,13 @@ describe("PracticePocScreen", () => {
     );
     expect(findByTestId(renderer, "history-attention-all").props.accessibilityRole).toBe("radio");
     expect(findByTestId(renderer, "history-attention-all").props.accessibilityState).toEqual({
-      checked: true
-    });
-    expect(findByTestId(renderer, "history-attention-needs-attention").props.accessibilityState).toEqual({
       checked: false
     });
+    expect(findByTestId(renderer, "history-attention-needs-attention").props.accessibilityState).toEqual({
+      checked: true
+    });
     expect(collectText(findByTestId(renderer, "history-attention-filter"))).toBe(
-      "AllNeeds attention"
+      "Needs attentionAll"
     );
     expect(() => findByTestId(renderer, "history-quick-filters")).toThrow();
     expect(() => findByTestId(renderer, "history-filter-sprint-only")).toThrow();
@@ -1472,17 +1510,9 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "result-badge-alert-glyph")).toThrow();
     expect(() => findByTestId(renderer, "history-attempt-history-timeout-timed_out")).toThrow();
     expect(findByTestId(renderer, "history-attempt-history-unclear")).toBeTruthy();
-    expect(findByTestId(renderer, "history-attempt-history-clean")).toBeTruthy();
-
-    press(renderer, "history-attention-needs-attention");
-    expect(findByTestId(renderer, "history-attention-all").props.accessibilityState).toEqual({
-      checked: false
-    });
-    expect(findByTestId(renderer, "history-attention-needs-attention").props.accessibilityState).toEqual({
-      checked: true
-    });
+    expect(() => findByTestId(renderer, "history-attempt-history-clean")).toThrow();
     expect(findByTestId(renderer, "history-attention-needs-attention").props.accessibilityLabel).toBe(
-      "Needs attention: mistakes, unclear, slow, or timed out"
+      "Needs attention: unclear or in Review"
     );
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toBe(
       "7 days·All puzzles"
@@ -1523,43 +1553,11 @@ describe("PracticePocScreen", () => {
       "#2563EB"
     )).toBe(true);
     expect(collectText(findByTestId(renderer, "history-source-filters"))).toContain("All sources");
-    expect(collectText(findByTestId(renderer, "history-attention-flags"))).toContain(
-      "Attention flags"
-    );
-    expect(findByTestId(renderer, "history-attention-flag-mistakes").props.accessibilityRole).toBe(
-      "checkbox"
-    );
-    expect(findByTestId(renderer, "history-attention-flag-mistakes").props.accessibilityState).toEqual({
-      checked: false
-    });
-    expect(findByTestId(renderer, "history-attention-flag-unclear").props.accessibilityRole).toBe(
-      "checkbox"
-    );
-    expect(findByTestId(renderer, "history-attention-flag-unclear").props.accessibilityState).toEqual({
-      checked: false
-    });
-    press(renderer, "history-attention-flag-mistakes");
-    expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
-    expect(() => findByTestId(renderer, "history-attempt-history-timeout")).toThrow();
-    expect(() => findByTestId(renderer, "history-attempt-history-unclear")).toThrow();
-    expect(() => findByTestId(renderer, "history-attempt-history-correct")).toThrow();
-    press(renderer, "history-attention-flag-unclear");
-    expect(findByTestId(renderer, "history-attempt-history-unclear")).toBeTruthy();
-    expect(() => findByTestId(renderer, "history-attempt-history-correct")).toThrow();
-    expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
-    press(renderer, "history-attention-flag-slow");
-    expect(findByTestId(renderer, "history-attempt-history-unclear")).toBeTruthy();
-    expect(findByTestId(renderer, "history-attempt-history-correct")).toBeTruthy();
-    expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain(
-      "Attention: Mistakes or Unclear or Slow"
-    );
-    press(renderer, "history-attention-flag-timed-out");
-    expect(findByTestId(renderer, "history-attempt-history-unclear")).toBeTruthy();
-    expect(findByTestId(renderer, "history-attempt-history-correct")).toBeTruthy();
-    expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
-    expect(findByTestId(renderer, "history-attempt-history-timeout")).toBeTruthy();
-    expect(() => findByTestId(renderer, "history-attempt-history-clean")).toThrow();
+    expect(() => findByTestId(renderer, "history-attention-flags")).toThrow();
+    expect(() => findByTestId(renderer, "history-attention-flag-mistakes")).toThrow();
+    expect(() => findByTestId(renderer, "history-attention-flag-unclear")).toThrow();
+    expect(() => findByTestId(renderer, "history-attention-flag-slow")).toThrow();
+    expect(() => findByTestId(renderer, "history-attention-flag-timed-out")).toThrow();
 
     expect(collectText(findByTestId(renderer, "history-review-status-filters"))).toBe(
       "Review queueAllIn queueNot in queue"
@@ -1593,6 +1591,9 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "history-filter-reset");
     expect(findByTestId(renderer, "history-attention-all").props.accessibilityState).toEqual({
+      checked: false
+    });
+    expect(findByTestId(renderer, "history-attention-needs-attention").props.accessibilityState).toEqual({
       checked: true
     });
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toBe(
@@ -1600,48 +1601,13 @@ describe("PracticePocScreen", () => {
     );
     expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
     expect(findByTestId(renderer, "history-attempt-history-timeout")).toBeTruthy();
-    expect(findByTestId(renderer, "history-attempt-history-clean")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-history-clean")).toThrow();
     expect(hasStyleEntry(
       findByTestId(renderer, "history-source-all"),
       "backgroundColor",
       "#2563EB"
     )).toBe(true);
 
-    press(renderer, "history-attention-flag-slow");
-    expect(findByTestId(renderer, "history-attention-all").props.accessibilityState).toEqual({
-      checked: false
-    });
-    expect(findByTestId(renderer, "history-attention-needs-attention").props.accessibilityState).toEqual({
-      checked: true
-    });
-    expect(findByTestId(renderer, "history-attention-flag-slow").props.accessibilityState).toEqual({
-      checked: true
-    });
-    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain(
-      "Attention: Slow"
-    );
-    expect(findByTestId(renderer, "history-attempt-history-correct")).toBeTruthy();
-    expect(() => findByTestId(renderer, "history-attempt-history-wrong")).toThrow();
-    expect(() => findByTestId(renderer, "history-attempt-history-unclear")).toThrow();
-    expect(() => findByTestId(renderer, "history-attempt-history-clean")).toThrow();
-
-    press(renderer, "history-attention-flag-slow");
-    expect(findByTestId(renderer, "history-attention-flag-slow").props.accessibilityState).toEqual({
-      checked: false
-    });
-    expect(findByTestId(renderer, "history-attention-needs-attention").props.accessibilityState).toEqual({
-      checked: true
-    });
-    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain(
-      "Attention:"
-    );
-    expect(findByTestId(renderer, "history-attempt-history-correct")).toBeTruthy();
-    expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
-    expect(findByTestId(renderer, "history-attempt-history-timeout")).toBeTruthy();
-    expect(findByTestId(renderer, "history-attempt-history-unclear")).toBeTruthy();
-    expect(() => findByTestId(renderer, "history-attempt-history-clean")).toThrow();
-
-    press(renderer, "history-attention-flag-slow");
     press(renderer, "history-attention-all");
     expect(findByTestId(renderer, "history-attention-all").props.accessibilityState).toEqual({
       checked: true
@@ -1649,12 +1615,6 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-attention-needs-attention").props.accessibilityState).toEqual({
       checked: false
     });
-    expect(findByTestId(renderer, "history-attention-flag-slow").props.accessibilityState).toEqual({
-      checked: false
-    });
-    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain(
-      "Attention:"
-    );
     expect(findByTestId(renderer, "history-attempt-history-clean")).toBeTruthy();
   });
 
@@ -1892,6 +1852,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-tab-icon")).toBeTruthy();
     expect(findByTestId(renderer, "settings-tab-icon")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "practice-tab-icon"))).toBe("");
+    expect(collectText(findByTestId(renderer, "history-tab-icon"))).toBe("🕙");
     expect(hasStyleEntry(findByTestId(renderer, "practice-tab-icon"), "backgroundColor", "#DBEAFE")).toBe(false);
     expect(findByTestId(renderer, "practice-tab-target-outer")).toBeTruthy();
     expect(findByTestId(renderer, "practice-tab-target-inner")).toBeTruthy();
@@ -3248,6 +3209,7 @@ describe("PracticePocScreen", () => {
 
     abandonSprint(renderer);
     press(renderer, "history-tab");
+    press(renderer, "history-attention-all");
     expectHistoryRowAccessibility(renderer, "Move c2b1");
   });
 
@@ -3350,6 +3312,7 @@ describe("PracticePocScreen", () => {
 
     abandonSprint(renderer);
     press(renderer, "history-tab");
+    press(renderer, "history-attention-all");
     expectHistoryRowAccessibility(renderer, "Move e6f7");
     expect(collectText(renderer.root)).not.toContain("000hf · standard");
   });
@@ -4537,6 +4500,7 @@ describe("PracticePocScreen", () => {
     abandonSprint(renderer);
 
     press(renderer, "history-tab");
+    press(renderer, "history-attention-all");
     expect(() => findByTestId(renderer, "app-shell-header")).toThrow();
     expect(collectText(findByTestId(renderer, "history-action-header"))).not.toContain("Filters");
     expect(collectText(findByTestId(renderer, "history-action-header"))).toContain("History");
@@ -4781,6 +4745,7 @@ describe("PracticePocScreen", () => {
     });
 
     press(renderer, "history-tab");
+    press(renderer, "history-attention-all");
     const themes = collectText(findByTestId(renderer, "history-attempt-curated-density-themes"));
     expect(themes).toContain("Advanced Pawn");
     expect(themes).toContain("Discovered Attack");
@@ -4860,7 +4825,7 @@ describe("PracticePocScreen", () => {
     );
   });
 
-  it("keeps unclear History review accessible through the attention flags menu", () => {
+  it("removes a record from Needs attention after both Unclear and Review are cleared", () => {
     const store = new MemoryStore();
     store.seedPuzzles([sharedHistoryPuzzle()]);
     store.recordAttempt({
@@ -4886,27 +4851,11 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "history-tab");
     expect(() => findByTestId(renderer, "history-quick-filters")).toThrow();
-    press(renderer, "history-filter-toggle");
-    expect(collectText(findByTestId(renderer, "history-attention-flag-unclear"))).toBe("Unclear");
-    expect(findByTestId(renderer, "history-attention-flag-unclear").props.accessibilityLabel).toBe(
-      "Filter by unclear attempts"
-    );
-    expect(findByTestId(renderer, "history-attention-flag-unclear").props.accessibilityRole).toBe("checkbox");
-    expect(hasStyleEntry(findByTestId(renderer, "history-attention-flag-unclear"), "minHeight", 44)).toBe(true);
-    expect(findByTestId(renderer, "history-attempt-unclear-history-attempt-unclear")).toBeTruthy();
-    expect(() => findByTestId(renderer, "bookmark-glyph")).toThrow();
-    press(renderer, "history-attention-flag-unclear");
     expect(findByTestId(renderer, "history-attention-needs-attention").props.accessibilityState).toEqual({
       checked: true
     });
-    expect(findByTestId(renderer, "history-attention-flag-unclear").props.accessibilityState).toEqual({ checked: true });
-    expect(findByTestId(renderer, "history-attention-flag-unclear-check")).toBeTruthy();
-    expect(hasStyleEntry(
-      findByTestId(renderer, "history-attention-flag-unclear-surface"),
-      "backgroundColor",
-      "#2563EB"
-    )).toBe(true);
-    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Unclear");
+    expect(findByTestId(renderer, "history-attempt-unclear-history-attempt-unclear")).toBeTruthy();
+    expect(() => findByTestId(renderer, "bookmark-glyph")).toThrow();
 
     press(renderer, "history-attempt-unclear-history-attempt");
     expect(findByTestId(renderer, "review-board")).toBeTruthy();
@@ -4925,12 +4874,17 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "history-attempt-unclear")).toThrow();
     expect((service.listHistory() as AttemptEvent[])[0]).toMatchObject({ unclear: false });
 
+    press(renderer, "review-exit");
+    expect(findByTestId(renderer, "history-attempt-unclear-history-attempt")).toBeTruthy();
+    press(renderer, "history-attempt-unclear-history-attempt");
     press(renderer, "review-schedule-remove");
     press(renderer, "review-schedule-removal-confirm");
     expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Not scheduled for Review");
 
     press(renderer, "review-exit");
-    expect(findByTestId(renderer, "history-attention-flag-unclear").props.accessibilityState).toEqual({ checked: true });
+    expect(findByTestId(renderer, "history-attention-needs-attention").props.accessibilityState).toEqual({
+      checked: true
+    });
     expect(findByTestId(renderer, "history-empty-state")).toBeTruthy();
   });
 
@@ -4963,6 +4917,7 @@ describe("PracticePocScreen", () => {
     });
 
     press(renderer, "history-tab");
+    press(renderer, "history-attention-all");
     press(renderer, "history-attempt-review-removal-failure");
     expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Due today");
     store.setRemovalFailure(new Error("delete failed"));
@@ -5013,6 +4968,7 @@ describe("PracticePocScreen", () => {
     await act(async () => {});
 
     press(renderer, "history-tab");
+    press(renderer, "history-attention-all");
     press(renderer, "history-attempt-review-reminder-failure");
     press(renderer, "review-schedule-remove");
     press(renderer, "review-schedule-removal-confirm");
@@ -5048,6 +5004,9 @@ describe("PracticePocScreen", () => {
 
     expect(historyFilterSelected(renderer, "history-result-wrong")).toBe(false);
     expect(historyFilterSelected(renderer, "history-source-all")).toBe(true);
+    expect(findByTestId(renderer, "history-attention-needs-attention").props.accessibilityState).toEqual({
+      checked: true
+    });
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("7 days");
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("All puzzles");
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain("Sprint");
@@ -5096,6 +5055,7 @@ describe("PracticePocScreen", () => {
     });
 
     press(renderer, "history-tab");
+    press(renderer, "history-attention-all");
     press(renderer, "history-filter-toggle");
 
     const filterTestIDs = [...new Set(
@@ -5126,6 +5086,7 @@ describe("PracticePocScreen", () => {
     const renderer = renderScreen({ practiceService: service });
 
     press(renderer, "history-tab");
+    press(renderer, "history-attention-all");
     press(renderer, "history-filter-toggle");
     press(renderer, "history-rating-standard 5/20");
     press(renderer, "history-source-review");
@@ -5156,7 +5117,7 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "20 / 22 · Standard");
   });
 
-  it("keeps Needs attention and selected Attention flags on History review navigation", () => {
+  it("keeps the Needs attention result set on History review navigation", () => {
     const store = new MemoryStore();
     store.seedPuzzles([sharedHistoryPuzzle()]);
     [
@@ -5190,26 +5151,35 @@ describe("PracticePocScreen", () => {
         startedAt: "2026-07-23T12:00:00.000Z",
         completedAt: attempt.completedAt,
         ratingBefore: 600,
-        ...("timingStatus" in attempt ? { timingStatus: attempt.timingStatus, elapsedMs: 41_000 } : {})
+        ...("timingStatus" in attempt
+          ? {
+              timingStatus: attempt.timingStatus,
+              elapsedMs: 41_000,
+              unclear: true,
+              unclearUpdatedAt: attempt.completedAt
+            }
+          : {})
       });
     });
+    store.scheduleMistakeReview({
+      puzzleId: "shared-history",
+      mode: "standard",
+      ratingKey: "standard 5/20"
+    }, "2026-07-23T12:00:30.000Z");
     const renderer = renderScreen({
       currentTimeMs: () => Date.parse("2026-07-23T12:01:00.000Z"),
       practiceService: new PracticeService(store)
     });
 
     press(renderer, "history-tab");
-    press(renderer, "history-attention-needs-attention");
     press(renderer, "history-attempt-attention-wrong");
     expectText(renderer, "1 / 2 · Standard");
     expect(findByTestId(renderer, "review-next").props.disabled).toBe(false);
 
     press(renderer, "review-exit");
-    press(renderer, "history-filter-toggle");
-    press(renderer, "history-attention-flag-slow");
     press(renderer, "history-attempt-attention-slow");
-    expectText(renderer, "1 / 1 · Standard");
-    expect(findByTestId(renderer, "review-previous").props.disabled).toBe(true);
+    expectText(renderer, "2 / 2 · Standard");
+    expect(findByTestId(renderer, "review-previous").props.disabled).toBe(false);
     expect(findByTestId(renderer, "review-next").props.disabled).toBe(true);
   });
 
@@ -5229,6 +5199,7 @@ describe("PracticePocScreen", () => {
     const renderer = renderScreen({ practiceService: service });
 
     press(renderer, "history-tab");
+    press(renderer, "history-attention-all");
     press(renderer, "history-filter-toggle");
     press(renderer, "history-rating-standard 5/20");
     press(renderer, "history-source-review");
@@ -5269,6 +5240,7 @@ describe("PracticePocScreen", () => {
     const renderer = renderScreen({ practiceService: new PracticeService(store) });
 
     press(renderer, "history-tab");
+    press(renderer, "history-attention-all");
     press(renderer, "history-filter-toggle");
     press(renderer, "history-range-max");
     expect(() => findByTestId(renderer, "history-performance-card")).toThrow();
@@ -5315,6 +5287,7 @@ describe("PracticePocScreen", () => {
     const renderer = renderScreen({ practiceService: service, runManagementEnabled: true });
 
     press(renderer, "history-tab");
+    press(renderer, "history-attention-all");
     press(renderer, "history-filter-toggle");
     press(renderer, "history-range-max");
     expect(() => findByTestId(renderer, `history-rating-${run.ratingKey}`)).toThrow();
@@ -5335,6 +5308,7 @@ describe("PracticePocScreen", () => {
     const renderer = renderScreen({ practiceService: new PracticeService(store) });
 
     press(renderer, "history-tab");
+    press(renderer, "history-attention-all");
     press(renderer, "history-filter-toggle");
     press(renderer, "history-range-max");
 
@@ -5424,6 +5398,7 @@ describe("PracticePocScreen", () => {
     const renderer = renderScreen({ practiceService: new PracticeService(store), systemBack });
 
     press(renderer, "history-tab");
+    press(renderer, "history-attention-all");
     press(renderer, "history-filter-toggle");
     press(renderer, "history-range-max");
     press(renderer, "history-source-all");
@@ -5506,6 +5481,7 @@ describe("PracticePocScreen", () => {
     const renderer = renderScreen({ practiceService: new PracticeService(store) });
 
     press(renderer, "history-tab");
+    press(renderer, "history-attention-all");
     press(renderer, "history-filter-toggle");
     press(renderer, "history-range-max");
 
@@ -5535,6 +5511,7 @@ describe("PracticePocScreen", () => {
     const firstRenderer = renderScreen({ practiceService: service, systemBack: firstSystemBack });
 
     press(firstRenderer, "history-tab");
+    press(firstRenderer, "history-attention-all");
     press(firstRenderer, "history-filter-toggle");
     press(firstRenderer, "history-range-max");
     press(firstRenderer, "history-rating-standard 5/20");
@@ -5556,6 +5533,9 @@ describe("PracticePocScreen", () => {
     press(secondRenderer, "history-tab");
 
     expect(findByTestId(secondRenderer, "history-panel")).toBeTruthy();
+    expect(findByTestId(secondRenderer, "history-attention-needs-attention").props.accessibilityState).toEqual({
+      checked: true
+    });
     expect(() => findByTestId(secondRenderer, "history-result-wrong")).toThrow();
     expect(collectText(findByTestId(secondRenderer, "history-active-filter-summary"))).toContain("7 days");
     expect(collectText(findByTestId(secondRenderer, "history-active-filter-summary"))).toContain("All puzzles");
@@ -5575,6 +5555,7 @@ describe("PracticePocScreen", () => {
     abandonSprint(renderer);
 
     press(renderer, "history-tab");
+    press(renderer, "history-attention-all");
     const historyAttemptRows = renderer.root.findAll(
       (node) => typeof node.props.testID === "string" && node.props.testID.startsWith("history-attempt-")
     );

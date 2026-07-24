@@ -65,7 +65,6 @@ import type {
   EngineAnalysisLine,
   HistoryAttemptView,
   HistoryAttemptReplayAvailability,
-  HistoryAttentionFlag,
   HistoryPerformance,
   HistoryPerformancePoint,
   HistoryReviewStatus,
@@ -483,9 +482,7 @@ export function PracticePocScreen({
   const [historySideFilter, setHistorySideFilter] = useState<"all" | PuzzleSide>("all");
   const [historyRatingRangeFilter, setHistoryRatingRangeFilter] = useState<HistoryRatingRangeFilter>("all");
   const [historyReviewStatusFilter, setHistoryReviewStatusFilter] = useState<"all" | HistoryReviewStatus>("all");
-  const [historyUnclearOnly, setHistoryUnclearOnly] = useState(false);
-  const [historyAttentionOnly, setHistoryAttentionOnly] = useState(false);
-  const [historyAttentionFlags, setHistoryAttentionFlags] = useState<HistoryAttentionFlag[]>([]);
+  const [historyAttentionOnly, setHistoryAttentionOnly] = useState(true);
   const [historyPageOffset, setHistoryPageOffset] = useState(0);
   const [historyRatingKey, setHistoryRatingKey] = useState<string | null>(null);
   const [historyReviewEntries, setHistoryReviewEntries] = useState<ReviewEntry[]>([]);
@@ -1484,10 +1481,10 @@ export function PracticePocScreen({
       const next = service.submitMove(move, captureLiveNowIso());
       const nextFeedback = (next.feedback as SessionFeedback) ?? null;
       if (next.attempt) {
-        setUnclearPrompt(isUnclearAttemptEligible(next.attempt)
+        setUnclearPrompt(isUnclearAttemptEligible(next.attempt) && !next.attempt.unclear
           ? {
               attemptId: next.attempt.id,
-              marked: Boolean(next.attempt.unclear),
+              marked: false,
               puzzleId: next.attempt.puzzleId
             }
           : null);
@@ -1675,9 +1672,7 @@ export function PracticePocScreen({
       ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
       ...(selectedHistoryThemes.length === 0 ? {} : { themes: selectedHistoryThemes }),
       ...(historyReviewStatusFilter === "all" ? {} : { reviewStatus: historyReviewStatusFilter }),
-      ...(historyUnclearOnly ? { unclear: true } : {}),
-      ...(historyAttentionOnly ? { attentionOnly: true } : {}),
-      ...(historyAttentionFlags.length === 0 ? {} : { attentionFlags: historyAttentionFlags })
+      ...(historyAttentionOnly ? { attentionOnly: true } : {})
     }).attempts;
     const selectedAttempt = historyReviewAttempts.find((attempt) => attempt.id === attemptId);
     if (!selectedAttempt) {
@@ -2242,9 +2237,7 @@ export function PracticePocScreen({
         ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
         ...(selectedHistoryThemes.length === 0 ? {} : { themes: selectedHistoryThemes }),
         ...(historyReviewStatusFilter === "all" ? {} : { reviewStatus: historyReviewStatusFilter }),
-        ...(historyUnclearOnly ? { unclear: true } : {}),
         ...(historyAttentionOnly ? { attentionOnly: true } : {}),
-        ...(historyAttentionFlags.length === 0 ? {} : { attentionFlags: historyAttentionFlags }),
         page: { limit: HISTORY_PAGE_LIMIT, offset: historyPageOffset }
       })
     : null;
@@ -2259,9 +2252,7 @@ export function PracticePocScreen({
         ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
         ...(selectedHistoryThemes.length === 0 ? {} : { themes: selectedHistoryThemes }),
         ...(historyReviewStatusFilter === "all" ? {} : { reviewStatus: historyReviewStatusFilter }),
-        ...(historyUnclearOnly ? { unclear: true } : {}),
-        ...(historyAttentionOnly ? { attentionOnly: true } : {}),
-        ...(historyAttentionFlags.length === 0 ? {} : { attentionFlags: historyAttentionFlags })
+        ...(historyAttentionOnly ? { attentionOnly: true } : {})
       })
     : null;
   const visibleHistoryAttempts = historyView?.attempts ?? [];
@@ -3046,9 +3037,7 @@ export function PracticePocScreen({
                   availableThemes={historyView.availableThemes}
                   page={visibleHistoryPage ?? historyView.page}
                   reviewStatusFilter={historyReviewStatusFilter}
-                  unclearOnly={historyUnclearOnly}
                   attentionOnly={historyAttentionOnly}
-                  attentionFlags={historyAttentionFlags}
                   themeCatalogPresentation={themeCatalogPresentation}
                   filtersExpanded={historyFiltersExpanded}
                   onFiltersExpandedChange={setHistoryFiltersExpanded}
@@ -3087,16 +3076,6 @@ export function PracticePocScreen({
                   onAttentionOnlyChange={(attentionOnly) => {
                     setHistoryPageOffset(0);
                     setHistoryAttentionOnly(attentionOnly);
-                    if (!attentionOnly) {
-                      setHistoryAttentionFlags([]);
-                    }
-                  }}
-                  onAttentionFlagToggle={(flag) => {
-                    setHistoryPageOffset(0);
-                    setHistoryAttentionOnly(true);
-                    setHistoryAttentionFlags((current) => current.includes(flag)
-                      ? current.filter((selectedFlag) => selectedFlag !== flag)
-                      : [...current, flag]);
                   }}
                   onPageOffsetChange={setHistoryPageOffset}
                   onOpenAttempt={openHistoryReview}
@@ -3108,9 +3087,7 @@ export function PracticePocScreen({
                     historyThemeChoices.dispatch({ type: "select-all-themes" });
                     setHistoryRatingRangeFilter("all");
                     setHistoryReviewStatusFilter("all");
-                    setHistoryUnclearOnly(false);
-                    setHistoryAttentionOnly(false);
-                    setHistoryAttentionFlags([]);
+                    setHistoryAttentionOnly(true);
                     setHistoryPageOffset(0);
                     setHistoryRatingKey(null);
                   }}
@@ -6620,9 +6597,7 @@ function HistoryPanel({
   availableThemes,
   page,
   reviewStatusFilter,
-  unclearOnly,
   attentionOnly,
-  attentionFlags,
   themeCatalogPresentation,
   onRatingKeyChange,
   onTimeRangeChange,
@@ -6636,8 +6611,7 @@ function HistoryPanel({
   onOpenAttempt,
   onFiltersExpandedChange,
   onResetFilters,
-  onAttentionOnlyChange,
-  onAttentionFlagToggle
+  onAttentionOnlyChange
 }: {
   adaptiveLayout: AdaptiveLayout;
   attempts: HistoryAttemptView[];
@@ -6656,9 +6630,7 @@ function HistoryPanel({
   availableThemes: string[];
   page: { limit: number; offset: number; total: number; hasMore: boolean };
   reviewStatusFilter: "all" | HistoryReviewStatus;
-  unclearOnly: boolean;
   attentionOnly: boolean;
-  attentionFlags: readonly HistoryAttentionFlag[];
   themeCatalogPresentation?: ThemeCatalogPresentation;
   onRatingKeyChange: (ratingKey: string | null) => void;
   onTimeRangeChange: (range: HistoryTimeRange) => void;
@@ -6673,7 +6645,6 @@ function HistoryPanel({
   onFiltersExpandedChange: (expanded: boolean) => void;
   onResetFilters: () => void;
   onAttentionOnlyChange: (attentionOnly: boolean) => void;
-  onAttentionFlagToggle: (flag: HistoryAttentionFlag) => void;
 }): React.JSX.Element {
   const visibleAttempts = attempts;
   const ratingPoints = performance.charts.rating;
@@ -6689,9 +6660,7 @@ function HistoryPanel({
     sideFilter,
     sourceFilter,
     themeFilters: namedThemeFilters,
-    timeRange,
-    unclearOnly,
-    attentionFlags
+    timeRange
   });
   return (
     <View style={[styles.historyPanel, adaptiveLayout.usesWideContent ? styles.historyPanelWide : null]} testID="history-panel">
@@ -6731,10 +6700,6 @@ function HistoryPanel({
             onRatingKeyChange={onRatingKeyChange}
           />
           <HistoryRangeFilters timeRange={timeRange} onTimeRangeChange={onTimeRangeChange} />
-          <HistoryAttentionFlagsFilter
-            selectedFlags={attentionFlags}
-            onToggle={onAttentionFlagToggle}
-          />
           <HistoryChipRow testID="history-source-filters">
             <FilterButton active={sourceFilter === "all"} label="All sources" testID="history-source-all" onPress={() => onSourceFilterChange("all")} />
             <FilterButton active={sourceFilter === "sprint"} label="Sprint" testID="history-source-sprint" onPress={() => onSourceFilterChange("sprint")} />
@@ -6873,57 +6838,6 @@ function HistoryPanel({
   );
 }
 
-function HistoryAttentionFlagsFilter({
-  onToggle,
-  selectedFlags
-}: {
-  onToggle: (flag: HistoryAttentionFlag) => void;
-  selectedFlags: readonly HistoryAttentionFlag[];
-}): React.JSX.Element {
-  return (
-    <View style={styles.historyFilterGroup} testID="history-attention-flags">
-      <Text style={styles.historyFilterGroupLabel}>Attention flags</Text>
-      <HistoryChipRow
-        contentStyle={styles.historyAttentionFlagContent}
-        testID="history-attention-flag-options"
-      >
-        <HistoryQuickChip
-          accessibilityLabel="Filter by mistake attempts"
-          active={selectedFlags.includes("mistakes")}
-          compact
-          controlTestID="history-attention-flag-mistakes"
-          label="Mistakes"
-          onPress={() => onToggle("mistakes")}
-        />
-        <HistoryQuickChip
-          accessibilityLabel="Filter by unclear attempts"
-          active={selectedFlags.includes("unclear")}
-          compact
-          controlTestID="history-attention-flag-unclear"
-          label="Unclear"
-          onPress={() => onToggle("unclear")}
-        />
-        <HistoryQuickChip
-          accessibilityLabel="Filter by slow attempts"
-          active={selectedFlags.includes("slow")}
-          compact
-          controlTestID="history-attention-flag-slow"
-          label="Slow"
-          onPress={() => onToggle("slow")}
-        />
-        <HistoryQuickChip
-          accessibilityLabel="Filter by timed out attempts"
-          active={selectedFlags.includes("timed_out")}
-          compact
-          controlTestID="history-attention-flag-timed-out"
-          label="Timed out"
-          onPress={() => onToggle("timed_out")}
-        />
-      </HistoryChipRow>
-    </View>
-  );
-}
-
 function HistoryThemeCatalogFilter({
   onThemeIntent,
   presentation,
@@ -7013,8 +6927,6 @@ type HistoryActiveFilterInput = {
   sourceFilter: "all" | AttemptSource;
   themeFilters: readonly string[];
   timeRange: HistoryTimeRange;
-  unclearOnly: boolean;
-  attentionFlags: readonly HistoryAttentionFlag[];
 };
 
 function historyActiveFilterLabels({
@@ -7027,9 +6939,7 @@ function historyActiveFilterLabels({
   sideFilter,
   sourceFilter,
   themeFilters,
-  timeRange,
-  unclearOnly,
-  attentionFlags
+  timeRange
 }: HistoryActiveFilterInput): string[] {
   const labels = [
     historyRangeLabel(timeRange),
@@ -7054,19 +6964,6 @@ function historyActiveFilterLabels({
     labels.push(customThemeLabel(themeFilters[0]!));
   } else if (themeFilters.length > 1) {
     labels.push(`${themeFilters.length} themes selected`);
-  }
-  if (unclearOnly) {
-    labels.push("Unclear");
-  }
-  if (attentionFlags.length > 0) {
-    const flagLabels = attentionFlags.map((flag) => (
-      flag === "mistakes"
-        ? "Mistakes"
-        : flag === "unclear"
-          ? "Unclear"
-          : flag === "slow" ? "Slow" : "Timed out"
-    ));
-    labels.push(`Attention: ${flagLabels.join(" or ")}`);
   }
   return labels;
 }
@@ -7496,6 +7393,27 @@ function HistoryAttentionFilter({
       testID="history-attention-filter"
     >
       <Pressable
+        accessibilityLabel="Needs attention: unclear or in Review"
+        accessibilityRole="radio"
+        accessibilityState={{ checked: attentionOnly }}
+        aria-checked={attentionOnly}
+        onPress={() => onChange(true)}
+        style={[
+          styles.historyAttentionOption,
+          attentionOnly ? styles.historyAttentionOptionActive : null
+        ]}
+        testID="history-attention-needs-attention"
+      >
+        <Text
+          style={[
+            styles.historyAttentionOptionText,
+            attentionOnly ? styles.historyAttentionOptionTextActive : null
+          ]}
+        >
+          Needs attention
+        </Text>
+      </Pressable>
+      <Pressable
         accessibilityLabel="All attempts"
         accessibilityRole="radio"
         accessibilityState={{ checked: !attentionOnly }}
@@ -7516,83 +7434,7 @@ function HistoryAttentionFilter({
           All
         </Text>
       </Pressable>
-      <Pressable
-        accessibilityLabel="Needs attention: mistakes, unclear, slow, or timed out"
-        accessibilityRole="radio"
-        accessibilityState={{ checked: attentionOnly }}
-        aria-checked={attentionOnly}
-        onPress={() => onChange(true)}
-        style={[
-          styles.historyAttentionOption,
-          attentionOnly ? styles.historyAttentionOptionActive : null
-        ]}
-        testID="history-attention-needs-attention"
-      >
-        <Text
-          style={[
-            styles.historyAttentionOptionText,
-            attentionOnly ? styles.historyAttentionOptionTextActive : null
-          ]}
-        >
-          Needs attention
-        </Text>
-      </Pressable>
     </View>
-  );
-}
-
-function HistoryQuickChip({
-  accessibilityLabel,
-  active,
-  compact = false,
-  controlTestID,
-  label,
-  onPress
-}: {
-  accessibilityLabel: string;
-  active: boolean;
-  compact?: boolean;
-  controlTestID: string;
-  label: string;
-  onPress: () => void;
-}): React.JSX.Element {
-  return (
-    <Pressable
-      accessibilityRole="checkbox"
-      accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ checked: active }}
-      testID={controlTestID}
-      style={styles.historyQuickChipTarget}
-      onPress={onPress}
-    >
-      <View
-        style={[
-          styles.historyQuickChip,
-          compact ? styles.historyQuickChipCompact : null,
-          active ? styles.historyQuickChipActive : null
-        ]}
-        testID={`${controlTestID}-surface`}
-      >
-        {active ? (
-          <Text
-            accessibilityElementsHidden
-            importantForAccessibility="no-hide-descendants"
-            style={styles.historyQuickChipCheck}
-            testID={`${controlTestID}-check`}
-          >
-            ✓
-          </Text>
-        ) : null}
-        <Text
-          style={[
-            styles.historyQuickChipText,
-            active ? styles.historyQuickChipTextActive : null
-          ]}
-        >
-          {label}
-        </Text>
-      </View>
-    </Pressable>
   );
 }
 
@@ -11708,10 +11550,14 @@ function TabGlyph({
   }
   if (tab === "history") {
     return (
-      <View style={[styles.tabClockGlyph, { borderColor: color }]}>
-        <View style={[styles.tabClockHandVertical, { backgroundColor: color }]} />
-        <View style={[styles.tabClockHandDiagonal, { backgroundColor: color }]} />
-      </View>
+      <Text
+        accessibilityElementsHidden
+        allowFontScaling={false}
+        importantForAccessibility="no-hide-descendants"
+        style={styles.tabHistoryEmoji}
+      >
+        🕙
+      </Text>
     );
   }
   return (
@@ -12256,29 +12102,9 @@ const styles = StyleSheet.create({
     transform: [{ rotate: "45deg" }],
     width: 12
   },
-  tabClockGlyph: {
-    alignItems: "center",
-    borderRadius: 999,
-    borderWidth: 2,
-    height: 15,
-    justifyContent: "center",
-    width: 15
-  },
-  tabClockHandVertical: {
-    borderRadius: 999,
-    height: 5,
-    position: "absolute",
-    top: 3,
-    width: 2
-  },
-  tabClockHandDiagonal: {
-    borderRadius: 999,
-    height: 2,
-    position: "absolute",
-    right: 3,
-    top: 7,
-    transform: [{ rotate: "25deg" }],
-    width: 5
+  tabHistoryEmoji: {
+    fontSize: 18,
+    lineHeight: 20
   },
   tabPackHandle: {
     borderBottomWidth: 0,
@@ -14755,9 +14581,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "900",
     marginLeft: 2
-  },
-  historyAttentionFlagContent: {
-    gap: 4
   },
   historyThemeFilterSection: {
     gap: 8
