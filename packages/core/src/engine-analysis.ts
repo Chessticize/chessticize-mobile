@@ -1,5 +1,5 @@
 import { Chess } from "chess.js";
-import type { CurrentPuzzleState, Puzzle } from "./types.ts";
+import type { CurrentPuzzleState, Puzzle, PuzzleFeedback } from "./types.ts";
 import { currentExpectedMove } from "./puzzle-session.ts";
 
 export type AnalysisScore =
@@ -46,6 +46,24 @@ export interface UciAnalysisOptions {
   onUpdate?: (lines: EngineAnalysisLine[]) => void;
   signal?: AbortSignal;
   timeoutMs?: number;
+}
+
+export function reviewAnalysisStartingFen({
+  currentPuzzle,
+  feedback
+}: {
+  currentPuzzle: CurrentPuzzleState;
+  feedback: PuzzleFeedback | null;
+}): string {
+  if (
+    currentPuzzle.kind !== "arrow_duel" ||
+    feedback?.result !== "correct" ||
+    feedback.submittedMove === "__illegal__"
+  ) {
+    return currentPuzzle.currentFen;
+  }
+
+  return fenAfterMove(currentPuzzle.currentFen, feedback.submittedMove) ?? currentPuzzle.currentFen;
 }
 
 export async function analyzeFenWithUciEngine(

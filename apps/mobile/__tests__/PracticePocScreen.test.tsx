@@ -6813,6 +6813,7 @@ describe("PracticePocScreen", () => {
     expect(terminalAnalysisLine.props.accessibilityState).toEqual({ disabled: true });
     expect(() => findByTestId(renderer, "review-analysis-line-1")).toThrow();
     expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(finalFen);
+    expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
     press(renderer, "review-close-analysis");
     await settleFeedbackSnapshot();
     press(renderer, "review-reset-puzzle");
@@ -6821,6 +6822,83 @@ describe("PracticePocScreen", () => {
     press(renderer, "review-exit");
     expect(findByTestId(renderer, "practice-mode-standard")).toBeTruthy();
     expect(() => findByTestId(renderer, "review-session")).toThrow();
+  });
+
+  it("opens Arrow Duel analysis from the solved review position without candidate arrows or an input lock", async () => {
+    const service = createMobilePracticeService("familiar15");
+    const renderer = renderScreen({ practiceService: service });
+    const firstPuzzle = firstArrowDuelPuzzleForTest();
+    const wrongMoves: string[] = [];
+
+    startArrowDuelSprint(renderer);
+    wrongMoves.push(currentArrowWrongMove(activeSprintForTest(service)));
+    await boardMove(renderer, wrongMoves[0] as string);
+    await settleFeedbackSnapshot();
+    wrongMoves.push(currentArrowWrongMove(activeSprintForTest(service)));
+    await boardMove(renderer, wrongMoves[1] as string);
+    await settleFeedbackSnapshot();
+    wrongMoves.push(currentArrowWrongMove(activeSprintForTest(service)));
+    await boardMove(renderer, wrongMoves[2] as string);
+    await settleFeedbackSnapshot();
+    press(renderer, "review-mistakes-button");
+
+    const reviewStartFen = findByTestId(renderer, "mock-chessboard").props.fen;
+    const solvedReviewFen = mustFenAfterMove(reviewStartFen, firstPuzzle.correctMove);
+    await boardMove(renderer, firstPuzzle.correctMove);
+    press(renderer, "review-analysis-button");
+
+    expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(solvedReviewFen);
+    expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
+    expect(countStyleEntry(findByTestId(renderer, "review-board"), "backgroundColor", "#16A34A")).toBe(0);
+    expect(countStyleEntry(findByTestId(renderer, "review-board"), "backgroundColor", "#DC2626")).toBe(0);
+
+    const analysisMove = firstLegalMoveNotIn(solvedReviewFen, []);
+    const expectedAnalysisFen = mustFenAfterMove(solvedReviewFen, analysisMove);
+    await boardMove(renderer, analysisMove);
+    expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(expectedAnalysisFen);
+  });
+
+  it("opens analysis from a nonterminal final review position without an input lock", async () => {
+    jest.setSystemTime(new Date("2026-06-21T12:00:00.000Z"));
+    const store = new MemoryStore();
+    const puzzle: Puzzle = {
+      ...sharedHistoryPuzzle(),
+      id: "final-position-analysis-puzzle",
+      initialFen: "4k3/8/8/8/8/8/4P3/4K3 b - - 0 1",
+      solutionMoves: ["e8e7", "e2e4"]
+    };
+    store.seedPuzzles([puzzle]);
+    store.recordAttempt({
+      id: "final-position-analysis",
+      source: "sprint",
+      sessionId: "final-position-analysis-session",
+      puzzleId: puzzle.id,
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      result: "wrong",
+      submittedMove: "e2e3",
+      expectedMove: "e2e4",
+      startedAt: "2026-06-21T11:00:00.000Z",
+      completedAt: "2026-06-21T11:00:05.000Z",
+      ratingBefore: 600
+    });
+    const renderer = renderScreen({ practiceService: new PracticeService(store) });
+
+    press(renderer, "history-tab");
+    press(renderer, "history-attempt-final-position-analysis");
+    await settleEntryPreview();
+    const reviewStartFen = findByTestId(renderer, "mock-chessboard").props.fen;
+    const finalFen = mustFenAfterMove(reviewStartFen, "e2e4");
+    await boardMove(renderer, "e2e4");
+    press(renderer, "review-analysis-button");
+
+    expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(finalFen);
+    expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
+
+    const analysisMove = firstLegalMoveNotIn(finalFen, []);
+    const expectedAnalysisFen = mustFenAfterMove(finalFen, analysisMove);
+    await boardMove(renderer, analysisMove);
+    expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(expectedAnalysisFen);
   });
 
   it.each([
