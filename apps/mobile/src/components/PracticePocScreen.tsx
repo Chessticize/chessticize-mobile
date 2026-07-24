@@ -205,6 +205,8 @@ export type HistoryTimingDesignPreview = {
   timedOutAttemptIds: readonly string[];
 };
 
+type HistoryAttentionFlag = "unclear" | "slow" | "timed_out";
+
 export type CustomThemeSelection = {
   selectedThemes: readonly CustomThemeFilter[];
   onChange: (selectedThemes: CustomThemeFilter[]) => void;
@@ -488,6 +490,7 @@ export function PracticePocScreen({
   const [historyReviewStatusFilter, setHistoryReviewStatusFilter] = useState<"all" | HistoryReviewStatus>("all");
   const [historyUnclearOnly, setHistoryUnclearOnly] = useState(false);
   const [historyAttentionOnly, setHistoryAttentionOnly] = useState(false);
+  const [historyAttentionFlags, setHistoryAttentionFlags] = useState<HistoryAttentionFlag[]>([]);
   const [historyPageOffset, setHistoryPageOffset] = useState(0);
   const [historyRatingKey, setHistoryRatingKey] = useState<string | null>(null);
   const [historyReviewEntries, setHistoryReviewEntries] = useState<ReviewEntry[]>([]);
@@ -2130,17 +2133,27 @@ export function PracticePocScreen({
       })
     : null;
   const visibleHistoryAttempts = historyView?.attempts.filter((attempt) => {
-    if (!historyTimingPreview || !historyAttentionOnly) {
+    if (!historyTimingPreview) {
       return true;
     }
-    return (
+    const matchesNeedsAttention = (
       attempt.unclear
       || attempt.result === "wrong"
       || historyTimingPreview.slowAttemptIds.includes(attempt.id)
       || historyTimingPreview.timedOutAttemptIds.includes(attempt.id)
     );
+    const matchesSelectedFlag = historyAttentionFlags.length === 0 || historyAttentionFlags.some((flag) => (
+      flag === "unclear"
+        ? Boolean(attempt.unclear)
+        : flag === "slow"
+          ? historyTimingPreview.slowAttemptIds.includes(attempt.id)
+          : historyTimingPreview.timedOutAttemptIds.includes(attempt.id)
+    ));
+    return (!historyAttentionOnly || matchesNeedsAttention) && matchesSelectedFlag;
   }) ?? [];
-  const visibleHistoryPage = historyView && historyTimingPreview && historyAttentionOnly
+  const visibleHistoryPage = historyView
+    && historyTimingPreview
+    && (historyAttentionOnly || historyAttentionFlags.length > 0)
     ? {
         ...historyView.page,
         hasMore: false,
@@ -2910,6 +2923,7 @@ export function PracticePocScreen({
                   sprintOnly={historySourceFilter === "sprint"}
                   wrongOnly={historyWrongOnly}
                   attentionOnly={historyAttentionOnly}
+                  attentionFlags={historyAttentionFlags}
                   timingPreview={historyTimingPreview}
                   themeCatalogPresentation={themeCatalogPresentation}
                   filtersExpanded={historyFiltersExpanded}
@@ -2954,6 +2968,12 @@ export function PracticePocScreen({
                     setHistoryPageOffset(0);
                     setHistoryAttentionOnly(attentionOnly);
                   }}
+                  onAttentionFlagToggle={(flag) => {
+                    setHistoryPageOffset(0);
+                    setHistoryAttentionFlags((current) => current.includes(flag)
+                      ? current.filter((selectedFlag) => selectedFlag !== flag)
+                      : [...current, flag]);
+                  }}
                   onPageOffsetChange={setHistoryPageOffset}
                   onOpenAttempt={openHistoryReview}
                   onResetFilters={() => {
@@ -2966,6 +2986,7 @@ export function PracticePocScreen({
                     setHistoryReviewStatusFilter("all");
                     setHistoryUnclearOnly(false);
                     setHistoryAttentionOnly(false);
+                    setHistoryAttentionFlags([]);
                     setHistoryPageOffset(0);
                     setHistoryRatingKey(null);
                   }}
@@ -6490,6 +6511,7 @@ function HistoryPanel({
   sprintOnly,
   wrongOnly,
   attentionOnly,
+  attentionFlags,
   timingPreview,
   themeCatalogPresentation,
   onRatingKeyChange,
@@ -6505,6 +6527,7 @@ function HistoryPanel({
   onFiltersExpandedChange,
   onResetFilters,
   onAttentionOnlyChange,
+  onAttentionFlagToggle,
   onToggleSprintOnly,
   onToggleUnclearOnly,
   onToggleWrongOnly
@@ -6530,6 +6553,7 @@ function HistoryPanel({
   sprintOnly: boolean;
   wrongOnly: boolean;
   attentionOnly: boolean;
+  attentionFlags: readonly HistoryAttentionFlag[];
   timingPreview?: HistoryTimingDesignPreview;
   themeCatalogPresentation?: ThemeCatalogPresentation;
   onRatingKeyChange: (ratingKey: string | null) => void;
@@ -6545,6 +6569,7 @@ function HistoryPanel({
   onFiltersExpandedChange: (expanded: boolean) => void;
   onResetFilters: () => void;
   onAttentionOnlyChange: (attentionOnly: boolean) => void;
+  onAttentionFlagToggle: (flag: HistoryAttentionFlag) => void;
   onToggleSprintOnly: () => void;
   onToggleUnclearOnly: () => void;
   onToggleWrongOnly: () => void;
@@ -6564,7 +6589,8 @@ function HistoryPanel({
     sourceFilter,
     themeFilters: namedThemeFilters,
     timeRange,
-    unclearOnly
+    unclearOnly,
+    attentionFlags
   });
   return (
     <View style={[styles.historyPanel, adaptiveLayout.usesWideContent ? styles.historyPanelWide : null]} testID="history-panel">
@@ -6671,6 +6697,10 @@ function HistoryPanel({
                 onRatingKeyChange={onRatingKeyChange}
               />
               <HistoryRangeFilters timeRange={timeRange} onTimeRangeChange={onTimeRangeChange} />
+              <HistoryAttentionFlagsFilter
+                selectedFlags={attentionFlags}
+                onToggle={onAttentionFlagToggle}
+              />
             </>
           ) : null}
           <HistoryChipRow testID="history-source-filters">
@@ -6694,11 +6724,14 @@ function HistoryPanel({
               />
             ))}
           </HistoryChipRow>
-          <HistoryChipRow testID="history-review-status-filters">
-            <FilterButton active={reviewStatusFilter === "all"} label="All review states" testID="history-review-status-all" onPress={() => onReviewStatusFilterChange("all")} />
-            <FilterButton active={reviewStatusFilter === "queued"} label="Queued" testID="history-review-status-queued" onPress={() => onReviewStatusFilterChange("queued")} />
-            <FilterButton active={reviewStatusFilter === "clear"} label="Clear" testID="history-review-status-clear" onPress={() => onReviewStatusFilterChange("clear")} />
-          </HistoryChipRow>
+          <View style={styles.historyFilterGroup} testID="history-review-status-filters">
+            <Text style={styles.historyFilterGroupLabel}>Review queue</Text>
+            <HistoryChipRow testID="history-review-status-options">
+              <FilterButton active={reviewStatusFilter === "all"} label="All" testID="history-review-status-all" onPress={() => onReviewStatusFilterChange("all")} />
+              <FilterButton active={reviewStatusFilter === "queued"} label="In queue" testID="history-review-status-queued" onPress={() => onReviewStatusFilterChange("queued")} />
+              <FilterButton active={reviewStatusFilter === "clear"} label="Not in queue" testID="history-review-status-clear" onPress={() => onReviewStatusFilterChange("clear")} />
+            </HistoryChipRow>
+          </View>
           <HistoryChipRow testID="history-side-filters">
             <FilterButton active={sideFilter === "all"} label="Both sides" testID="history-side-all" onPress={() => onSideFilterChange("all")} />
             <FilterButton active={sideFilter === "white"} label="White" testID="history-side-white" onPress={() => onSideFilterChange("white")} />
@@ -6786,6 +6819,43 @@ function HistoryPanel({
   );
 }
 
+function HistoryAttentionFlagsFilter({
+  onToggle,
+  selectedFlags
+}: {
+  onToggle: (flag: HistoryAttentionFlag) => void;
+  selectedFlags: readonly HistoryAttentionFlag[];
+}): React.JSX.Element {
+  return (
+    <View style={styles.historyFilterGroup} testID="history-attention-flags">
+      <Text style={styles.historyFilterGroupLabel}>Attention flags</Text>
+      <HistoryChipRow testID="history-attention-flag-options">
+        <HistoryQuickChip
+          accessibilityLabel="Filter by unclear attempts"
+          active={selectedFlags.includes("unclear")}
+          controlTestID="history-attention-flag-unclear"
+          label="Unclear"
+          onPress={() => onToggle("unclear")}
+        />
+        <HistoryQuickChip
+          accessibilityLabel="Filter by slow attempts"
+          active={selectedFlags.includes("slow")}
+          controlTestID="history-attention-flag-slow"
+          label="Slow"
+          onPress={() => onToggle("slow")}
+        />
+        <HistoryQuickChip
+          accessibilityLabel="Filter by timed out attempts"
+          active={selectedFlags.includes("timed_out")}
+          controlTestID="history-attention-flag-timed-out"
+          label="Timed out"
+          onPress={() => onToggle("timed_out")}
+        />
+      </HistoryChipRow>
+    </View>
+  );
+}
+
 function HistoryThemeCatalogFilter({
   onThemeIntent,
   presentation,
@@ -6795,39 +6865,60 @@ function HistoryThemeCatalogFilter({
   presentation: ThemeCatalogPresentation;
   selectedThemes: readonly string[];
 }): React.JSX.Element {
+  const [expanded, setExpanded] = useState(false);
+  const selectedThemeCount = selectedThemes.filter((theme) => theme !== ALL_THEMES_FILTER).length;
   return (
     <View style={styles.historyThemeFilterSection} testID="history-theme-filters">
-      <View style={styles.themeCatalogHeadingRow}>
-        <Text style={styles.themeCatalogTitle}>Themes</Text>
-        <FilterButton
-          active={selectedThemes.includes(ALL_THEMES_FILTER)}
-          label="All themes"
-          testID="history-theme-all"
-          onPress={() => onThemeIntent({ type: "select-all-themes" })}
-        />
-      </View>
-      {presentation.groups.map((group) => (
-        <View key={group.label} style={styles.themeCatalogGroup}>
-          <Text style={styles.themeCatalogGroupLabel}>{group.label}</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            testID={`history-theme-filter-rail-${safeTestId(group.label)}`}
-          >
-            <View style={styles.themeCatalogRailContent}>
-              {group.themes.map((theme) => (
-                <FilterButton
-                  key={theme}
-                  active={selectedThemes.includes(theme)}
-                  label={customThemeLabel(theme)}
-                  testID={`history-theme-${safeTestId(customThemeLabel(theme))}`}
-                  onPress={() => onThemeIntent({ type: "toggle-theme", theme })}
-                />
-              ))}
-            </View>
-          </ScrollView>
+      <Pressable
+        accessibilityLabel={expanded ? "Hide theme filters" : "Show theme filters"}
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+        style={styles.historyThemeDisclosure}
+        testID="history-theme-disclosure"
+        onPress={() => setExpanded((current) => !current)}
+      >
+        <View>
+          <Text style={styles.themeCatalogTitle}>Themes</Text>
+          <Text style={styles.historyThemeSummary}>
+            {selectedThemeCount === 0 ? "All themes" : `${selectedThemeCount} selected`}
+          </Text>
         </View>
-      ))}
+        <ChevronGlyph direction={expanded ? "up" : "down"} />
+      </Pressable>
+      {expanded ? (
+        <>
+          <View style={styles.historyThemeAllRow}>
+            <FilterButton
+              active={selectedThemes.includes(ALL_THEMES_FILTER)}
+              label="All themes"
+              testID="history-theme-all"
+              onPress={() => onThemeIntent({ type: "select-all-themes" })}
+            />
+          </View>
+          {presentation.groups.map((group) => (
+            <View key={group.label} style={styles.themeCatalogGroup}>
+              <Text style={styles.themeCatalogGroupLabel}>{group.label}</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                testID={`history-theme-filter-rail-${safeTestId(group.label)}`}
+              >
+                <View style={styles.themeCatalogRailContent}>
+                  {group.themes.map((theme) => (
+                    <FilterButton
+                      key={theme}
+                      active={selectedThemes.includes(theme)}
+                      label={customThemeLabel(theme)}
+                      testID={`history-theme-${safeTestId(customThemeLabel(theme))}`}
+                      onPress={() => onThemeIntent({ type: "toggle-theme", theme })}
+                    />
+                  ))}
+                </View>
+              </ScrollView>
+            </View>
+          ))}
+        </>
+      ) : null}
     </View>
   );
 }
@@ -6844,6 +6935,7 @@ type HistoryActiveFilterInput = {
   themeFilters: readonly string[];
   timeRange: HistoryTimeRange;
   unclearOnly: boolean;
+  attentionFlags: readonly HistoryAttentionFlag[];
 };
 
 function historyActiveFilterLabels({
@@ -6857,7 +6949,8 @@ function historyActiveFilterLabels({
   sourceFilter,
   themeFilters,
   timeRange,
-  unclearOnly
+  unclearOnly,
+  attentionFlags
 }: HistoryActiveFilterInput): string[] {
   const labels = [
     historyRangeLabel(timeRange),
@@ -6873,7 +6966,7 @@ function historyActiveFilterLabels({
     labels.push(HISTORY_RATING_RANGE_FILTERS.find((filter) => filter.id === ratingRangeFilter)?.label ?? ratingRangeFilter);
   }
   if (reviewStatusFilter !== "all") {
-    labels.push(reviewStatusFilter === "queued" ? "Queued" : "Clear");
+    labels.push(reviewStatusFilter === "queued" ? "Review: In queue" : "Review: Not in queue");
   }
   if (sideFilter !== "all") {
     labels.push(sideFilter === "white" ? "White" : "Black");
@@ -6881,6 +6974,12 @@ function historyActiveFilterLabels({
   labels.push(...themeFilters.map(customThemeLabel));
   if (unclearOnly) {
     labels.push("Unclear");
+  }
+  if (attentionFlags.length > 0) {
+    const flagLabels = attentionFlags.map((flag) => (
+      flag === "unclear" ? "Unclear" : flag === "slow" ? "Slow" : "Timed out"
+    ));
+    labels.push(`Attention: ${flagLabels.join(" or ")}`);
   }
   return labels;
 }
@@ -14547,6 +14646,15 @@ const styles = StyleSheet.create({
   historyAdvancedFilters: {
     gap: 8
   },
+  historyFilterGroup: {
+    gap: 4
+  },
+  historyFilterGroupLabel: {
+    color: "#64748B",
+    fontSize: 11,
+    fontWeight: "900",
+    marginLeft: 2
+  },
   historyThemeFilterSection: {
     backgroundColor: "#FFFFFF",
     borderColor: "#E2E8F0",
@@ -14554,6 +14662,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 10,
     padding: 10
+  },
+  historyThemeDisclosure: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    minHeight: 44
+  },
+  historyThemeSummary: {
+    color: "#64748B",
+    fontSize: 11,
+    fontWeight: "700",
+    marginTop: 2
+  },
+  historyThemeAllRow: {
+    alignItems: "flex-start"
   },
   historyPerformanceCard: {
     backgroundColor: "#FFFFFF",

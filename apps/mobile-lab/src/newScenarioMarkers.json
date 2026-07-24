@@ -51,11 +51,11 @@
     "issues": [
       {
         "issueNumber": 248,
-        "changeNote": "Include Slow in the existing History screen's Needs attention view and attempt labels."
+        "changeNote": "Include Slow in Needs attention and let Unclear or Slow narrow History through the Attention flags group."
       },
       {
         "issueNumber": 249,
-        "changeNote": "Include Timed out in the existing History screen's Needs attention view and attempt results."
+        "changeNote": "Include Timed out in Needs attention and its OR-based Attention flags filter."
       }
     ]
   }

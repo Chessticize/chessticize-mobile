@@ -39,7 +39,8 @@ export const FiltersAndActiveFilters: Story = {
   play: async ({ canvasElement }) => {
     await openHistory(canvasElement);
     await clickTestId(canvasElement, "history-filter-toggle");
-    await waitForTestId(canvasElement, "history-theme-filters");
+    await waitForTestId(canvasElement, "history-attention-flags");
+    await waitForTestId(canvasElement, "history-theme-disclosure");
   }
 };
 

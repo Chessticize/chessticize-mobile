@@ -1022,12 +1022,17 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "history-tab");
     press(renderer, "history-filter-toggle");
+    expect(findByTestId(renderer, "history-theme-disclosure").props.accessibilityState).toEqual({
+      expanded: false
+    });
+    press(renderer, "history-theme-disclosure");
 
     const themeTestIDs = new Set(
       collectTestIds(findByTestId(renderer, "history-theme-filters"))
         .filter((testID) => testID.startsWith("history-theme-")
           && testID !== "history-theme-filters"
           && testID !== "history-theme-all"
+          && testID !== "history-theme-disclosure"
           && !testID.startsWith("history-theme-filter-rail-"))
     );
     expect(themeTestIDs.size).toBe(24);
@@ -1342,6 +1347,45 @@ describe("PracticePocScreen", () => {
       "#2563EB"
     )).toBe(true);
     expect(collectText(findByTestId(renderer, "history-source-filters"))).toContain("All sources");
+    expect(collectText(findByTestId(renderer, "history-attention-flags"))).toContain(
+      "Attention flags"
+    );
+    expect(findByTestId(renderer, "history-attention-flag-unclear").props.accessibilityRole).toBe(
+      "checkbox"
+    );
+    expect(findByTestId(renderer, "history-attention-flag-unclear").props.accessibilityState).toEqual({
+      checked: false
+    });
+    press(renderer, "history-attention-flag-unclear");
+    expect(findByTestId(renderer, "history-attempt-history-unclear")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-history-correct")).toThrow();
+    expect(() => findByTestId(renderer, "history-attempt-history-wrong")).toThrow();
+    press(renderer, "history-attention-flag-slow");
+    expect(findByTestId(renderer, "history-attempt-history-unclear")).toBeTruthy();
+    expect(findByTestId(renderer, "history-attempt-history-correct")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-history-wrong")).toThrow();
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain(
+      "Attention: Unclear or Slow"
+    );
+    press(renderer, "history-attention-flag-timed-out");
+    expect(findByTestId(renderer, "history-attempt-history-unclear")).toBeTruthy();
+    expect(findByTestId(renderer, "history-attempt-history-correct")).toBeTruthy();
+    expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-history-clean")).toThrow();
+
+    expect(collectText(findByTestId(renderer, "history-review-status-filters"))).toBe(
+      "Review queueAllIn queueNot in queue"
+    );
+    expect(findByTestId(renderer, "history-theme-disclosure").props.accessibilityState).toEqual({
+      expanded: false
+    });
+    expect(() => findByTestId(renderer, "history-theme-all")).toThrow();
+    press(renderer, "history-theme-disclosure");
+    expect(findByTestId(renderer, "history-theme-disclosure").props.accessibilityState).toEqual({
+      expanded: true
+    });
+    expect(findByTestId(renderer, "history-theme-all")).toBeTruthy();
+
     press(renderer, "history-result-correct");
     expect(findByTestId(renderer, "history-attempt-history-correct")).toBeTruthy();
     expect(findByTestId(renderer, "history-attempt-history-unclear")).toBeTruthy();
@@ -4312,7 +4356,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("20s pace");
     press(renderer, "history-review-status-queued");
     expect(collectText(findByTestId(renderer, "history-performance-card"))).not.toContain("Accuracy");
-    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Queued");
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Review: In queue");
     expectHistoryRowAccessibility(renderer, "Played g6g5 · Best f4g3");
     expectNoHistoryRowAccessibility(renderer, "Move e6f7");
     press(renderer, "history-review-status-clear");
@@ -4469,6 +4513,8 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-attempt-curated-density-pace")).toBeTruthy();
 
     press(renderer, "history-filter-toggle");
+    expect(collectText(findByTestId(renderer, "history-theme-filters"))).not.toContain("Capturing Defender");
+    press(renderer, "history-theme-disclosure");
     expect(collectText(findByTestId(renderer, "history-theme-filters"))).toContain("Capturing Defender");
     expect(findByTestId(renderer, "history-theme-filter-rail-curated")).toBeTruthy();
     expect(findByTestId(renderer, "history-theme-mate-in-3")).toBeTruthy();
@@ -4506,6 +4552,10 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "review-theme-rail")).toThrow();
     expect(() => findByTestId(renderer, "review-theme-catalog")).toThrow();
     press(renderer, "review-exit");
+    expect(findByTestId(renderer, "history-theme-disclosure").props.accessibilityState).toEqual({
+      expanded: false
+    });
+    press(renderer, "history-theme-disclosure");
     expect(historyThemeSelected(renderer, "pin")).toBe(true);
     expect(historyThemeSelected(renderer, "promotion")).toBe(true);
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Pin");

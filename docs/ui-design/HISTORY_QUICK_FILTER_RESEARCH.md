@@ -14,8 +14,14 @@ Use one persistent, single-select segmented control:
 - Default to `All`.
 - Define `Needs attention` as `Slow OR Wrong OR Unclear OR Timed out`.
 - Default the advanced Source facet to `All sources`.
-- Move range, Run/rating bucket, source, result, review state, side, and theme
-  controls into the existing filter menu.
+- Move range, Run/rating bucket, source, result, Review queue, side, attention
+  flags, and theme controls into the existing filter menu.
+- Let `Unclear`, `Slow`, and `Timed out` be independently selectable
+  `Attention flags`. Multiple selected flags use OR. Keep `Wrong` in Result
+  rather than duplicating it in this group.
+- Label Review membership `Review queue: All / In queue / Not in queue`.
+- Keep the full Themes catalog collapsed when the menu opens. Its disclosure
+  summary shows `All themes` or the number selected.
 - Keep the filter-menu button, result count, and compact applied-filter
   summary. They communicate state; they are not additional quick filters.
 - Keep no second quick filter in this iteration. Date range is the only
@@ -72,6 +78,15 @@ internally. Every advanced facet then narrows that union with AND:
 Needs attention AND Source: Review AND Range: 30 days
 ```
 
+The `Attention flags` facet follows normal multi-select behavior:
+
+```text
+(Unclear OR Slow OR Timed out) AND Result: Correct
+```
+
+Selecting no attention flag places no restriction on that facet. The applied
+state summary uses plain language such as `Attention: Unclear or Slow`.
+
 Do not show the formula in the interface. Keep the selected view, result count,
 and category/value applied-state tokens close to the results.
 
@@ -95,6 +110,12 @@ filter token. It is equivalent to clearing that facet
 - An attempt matching multiple reasons appears once.
 - A normal correct, on-time, clear attempt is excluded.
 - Adding an advanced filter can only narrow the attention union.
+- `Unclear`, `Slow`, and `Timed out` can be selected independently; multiple
+  selections use OR and appear once in the applied-state summary.
+- Review membership reads `All / In queue / Not in queue`, not
+  `All review states / Queued / Clear`.
+- Themes is collapsed when filters open, retains a compact selection summary,
+  and reveals all 24 curated choices on demand.
 - Reset restores `All`, `All sources`, and the default range.
 - At 320-point width, both segments and the filter button remain visible
   without horizontal scrolling.
