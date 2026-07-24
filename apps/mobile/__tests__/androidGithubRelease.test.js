@@ -819,7 +819,9 @@ describe('Android GitHub release automation', () => {
 
     expect(candidateWorkflow).toContain('environment: android-production');
     expect(candidateWorkflow).toContain('contents: write');
-    expect(candidateWorkflow).toContain('Run exact-head fast release checks');
+    expect(candidateWorkflow).not.toContain('Run exact-head fast release checks');
+    expect(candidateWorkflow).not.toContain('pnpm mobile:test');
+    expect(candidateWorkflow).not.toContain('pnpm test');
     expect(candidateWorkflow).toContain('Build production-signed App Bundle');
     expect(candidateWorkflow).toContain('Publish exact corresponding source');
     expect(candidateWorkflow).toContain('GITHUB_TOKEN: $' + '{{ github.token }}');

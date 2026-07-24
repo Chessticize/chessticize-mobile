@@ -42,6 +42,46 @@ function stepId(step) {
   return step.suite ?? step.command;
 }
 
+function progressPathForEvidence(outputPath) {
+  return outputPath.endsWith('.json')
+    ? `${outputPath.slice(0, -'.json'.length)}.progress.json`
+    : `${outputPath}.progress.json`;
+}
+
+function writeProgress({
+  apiLevel,
+  commitSha,
+  currentStep,
+  outputPath,
+  result,
+  stepResults,
+  steps,
+}) {
+  const resultById = new Map(
+    stepResults.map((stepResult) => [stepResult.id, stepResult])
+  );
+  const progress = {
+    schemaVersion: 1,
+    commitSha,
+    apiLevel,
+    currentStep,
+    result,
+    steps: steps.map((step) => {
+      const id = stepId(step);
+      return {
+        id,
+        command: renderValidationCommand(step),
+        result: resultById.get(id)?.result ?? 'pending',
+        ...(resultById.get(id)?.exitCode === undefined
+          ? {}
+          : { exitCode: resultById.get(id).exitCode }),
+      };
+    }),
+  };
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(progressPathForEvidence(outputPath), `${JSON.stringify(progress, null, 2)}\n`);
+}
+
 function renderValidationCommand(step) {
   if (step.kind === 'detox') {
     const reusePrefix = step.reuseInstalledApp
@@ -113,6 +153,7 @@ function runAndroidValidationMatrix({
 }) {
   const steps = validationStepsForApiLevel(apiLevel);
   fs.rmSync(outputPath, { force: true });
+  fs.rmSync(progressPathForEvidence(outputPath), { force: true });
 
   if (!/^[0-9a-f]{40}$/i.test(expectedCommitSha ?? '')) {
     throw new Error('Android validation requires an explicit exact 40-character commit SHA.');
@@ -129,14 +170,53 @@ function runAndroidValidationMatrix({
   }
 
   const stepResults = [];
+  writeProgress({
+    apiLevel,
+    commitSha: initialHead,
+    currentStep: null,
+    outputPath,
+    result: 'running',
+    stepResults,
+    steps,
+  });
   for (const step of steps) {
+    const id = stepId(step);
+    stepResults.push({ id, result: 'running' });
+    writeProgress({
+      apiLevel,
+      commitSha: initialHead,
+      currentStep: id,
+      outputPath,
+      result: 'running',
+      stepResults,
+      steps,
+    });
     const exitCode = runStep(step);
     if (exitCode !== 0) {
+      stepResults[stepResults.length - 1] = { id, result: 'fail', exitCode };
+      writeProgress({
+        apiLevel,
+        commitSha: initialHead,
+        currentStep: id,
+        outputPath,
+        result: 'fail',
+        stepResults,
+        steps,
+      });
       throw new Error(
-        `Android validation step ${stepId(step)} failed with exit code ${exitCode}.`
+        `Android validation step ${id} failed with exit code ${exitCode}.`
       );
     }
-    stepResults.push({ id: stepId(step), result: 'pass' });
+    stepResults[stepResults.length - 1] = { id, result: 'pass' };
+    writeProgress({
+      apiLevel,
+      commitSha: initialHead,
+      currentStep: null,
+      outputPath,
+      result: 'running',
+      stepResults,
+      steps,
+    });
   }
 
   const finalHead = readGitHead();
@@ -156,6 +236,15 @@ function runAndroidValidationMatrix({
   });
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(outputPath, `${JSON.stringify(evidence, null, 2)}\n`);
+  writeProgress({
+    apiLevel,
+    commitSha: finalHead,
+    currentStep: null,
+    outputPath,
+    result: 'pass',
+    stepResults,
+    steps,
+  });
   return evidence;
 }
 
@@ -263,6 +352,7 @@ module.exports = {
   API36_SUITES,
   createAndroidValidationEvidence,
   parseCliArgs,
+  progressPathForEvidence,
   renderValidationCommand,
   runAndroidValidationMatrix,
   runCli,

@@ -1,5 +1,5 @@
 const { existsSync, readFileSync } = require("node:fs");
-const { join } = require("node:path");
+const { dirname, join } = require("node:path");
 const { renderIOSReleaseVersion } = require("../scripts/ios-release-version");
 
 const appRoot = process.cwd();
@@ -99,5 +99,58 @@ describe("iOS App Store identity artifacts", () => {
     expect(detoxBuildScript).toContain("ReactNativeDependencies/.last_build_configuration");
     expect(detoxBuildScript).toContain("ios/Pods/.last_build_configuration");
     expect(detoxBuildScript).toContain('[[ ! -f "$marker" ]]');
+  });
+
+  it("keeps both Detox build paths pinned to the committed CocoaPods lockfile", () => {
+    const debugBuildScript = readText(join(appRoot, "scripts", "ios-build-for-detox.sh"));
+    const releaseBuildScript = readText(join(appRoot, "scripts", "ios-build-release-for-detox.sh"));
+    const lockedInstallScript = readText(
+      join(appRoot, "scripts", "ios-install-pods-locked.sh")
+    );
+
+    expect(debugBuildScript).toContain("scripts/ios-install-pods-locked.sh");
+    expect(releaseBuildScript).toContain("scripts/ios-install-pods-locked.sh");
+    expect(lockedInstallScript).toContain(
+      "bundle exec pod install --deployment --project-directory=ios"
+    );
+    expect(lockedInstallScript).toContain("ios/Pods/Manifest.lock");
+    expect(lockedInstallScript).toContain("cmp -s");
+    expect(lockedInstallScript).toContain("rm -rf ios/Pods");
+    expect(debugBuildScript).not.toContain("pod update");
+    expect(releaseBuildScript).not.toContain("pod update");
+    expect(lockedInstallScript).not.toContain("pod update");
+  });
+
+  it("keeps GitHub iOS validation JS-only and leaves native release evidence local", () => {
+    const workflow = readText(join(appRoot, "..", "..", ".github", "workflows", "mobile-js.yml"));
+
+    expect(workflow).toContain("pull_request:");
+    expect(workflow).toContain("name: Mobile JS checks");
+    expect(workflow).toContain("runs-on: ubuntu-latest");
+    expect(workflow).not.toContain("workflow_dispatch:");
+    expect(workflow).not.toContain("schedule:");
+    expect(workflow).not.toContain("runs-on: macos-");
+    expect(workflow).not.toContain("xcodebuild");
+    expect(workflow).not.toContain("Detox iOS");
+    expect(workflow).not.toContain("mobile:e2e:build:ios");
+  });
+
+  it("keeps the Hermes CocoaPods checksum portable across workspace paths", () => {
+    const repositoryRoot = join(appRoot, "..", "..");
+    const workspace = readText(join(repositoryRoot, "pnpm-workspace.yaml"));
+    const reactNativeRoot = dirname(require.resolve("react-native/package.json"));
+    const hermesPodspec = readText(
+      join(reactNativeRoot, "sdks", "hermes-engine", "hermes-engine.podspec")
+    );
+
+    expect(workspace).toContain(
+      "react-native@0.86.0: patches/react-native@0.86.0.patch"
+    );
+    expect(hermesPodspec).toContain(
+      "'HERMES_CLI_PATH' => '${PODS_ROOT}/../../node_modules/hermes-compiler/hermesc/osx-bin/hermesc'"
+    );
+    expect(hermesPodspec).not.toContain(
+      'require.resolve(\\"hermes-compiler\\"'
+    );
   });
 });

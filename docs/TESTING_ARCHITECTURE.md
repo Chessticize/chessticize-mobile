@@ -43,15 +43,15 @@ real boundary is part of the risk.
 suite. The mobile GUI suite is built and run with
 `pnpm mobile:e2e:build:ios` and `pnpm mobile:e2e:test:ios`.
 
-## PR, Nightly Main, And Release Gates
+## PR, Local Native, And Release Gates
 
-Use three different gates instead of treating every PR as a release candidate:
+Use distinct gates instead of treating every PR as a release candidate:
 
 | Gate | Purpose | Required validation |
 | --- | --- | --- |
 | Pull request | Prove the changed behavior at the cheapest reliable layer | Path-scoped fast CI plus the risk-scoped native validation below |
-| Nightly `main` | Detect integration failures across a batch of merged work | One iOS build followed by complete `flows` and `practice` suites |
-| Release candidate | Prove the exact source intended for distribution | Exact-head fast checks, risk-scoped native validation, and owner physical-device smoke |
+| Local iOS native | Prove simulator and native behavior without a hosted Xcode build | One local build followed by the selected Detox scope |
+| Release candidate | Prove the exact source tree intended for distribution | Exact-head fast checks, risk-scoped local native validation, and owner physical-device smoke |
 
 Every PR must pass its relevant unit, integration, CLI E2E, component, and
 typecheck jobs. GitHub workflow path filters select the applicable fast jobs.
@@ -71,34 +71,33 @@ diff size or filename alone:
   launch fixtures, native build configuration, Detox infrastructure, or risk
   that cannot be bounded to one suite.
 
-CI Detox does not run automatically for routine PRs. When a PR requires native
-validation, record the selected scope, exact commit SHA, build result, commands,
-results, and clean-worktree confirmation in the PR. A later code change
-invalidates that evidence. A failed required fast check, failed selected native
-scope, or known product failure remains a merge blocker.
+GitHub Actions does not run Xcode builds or iOS Detox. Local iOS native
+validation is the only iOS native release gate. When a PR requires native
+validation, record the selected scope, exact commit SHA and Git tree, build
+result, commands, results, and clean-worktree confirmation in the PR. A later
+source-tree change invalidates that evidence. A failed required fast check,
+failed selected native scope, or known product failure remains a merge blocker.
 
-The scheduled iOS nightly workflow runs both suites against the latest `main`
-as a non-PR integration signal. Triage failures promptly so they do not
-accumulate, but a later nightly failure does not retroactively invalidate
-already merged PR evidence.
-
-Nightly Android `main` builds the self-contained app and Detox APK once, then
-runs complete shared `flows` and `practice` on an API 36 x86_64 phone. Manual
-exact-head dispatch additionally runs the API 24 bounded smoke for launch,
-production SQLite persistence/migration, Standard practice, and packaged
-Stockfish; it also captures the representative tablet and foldable/resizable
-adaptive contract. The fail-closed runner is
-`pnpm mobile:validate:android:matrix`, and `docs/ANDROID_VALIDATION.md` defines
-its evidence schema and commands.
+Android native validation runs on the Android build machine at the risk-scoped
+layer selected for the change. The hosted `Mobile Android` workflow is a
+manual-only full diagnostic matrix, not a scheduled check or release gate. Its
+explicit dispatch builds the self-contained app and Detox APK once, runs the
+complete API 36 journeys, adds the bounded API 24 smoke for launch, production
+SQLite persistence/migration, Standard practice, and packaged Stockfish, and
+captures the representative tablet, foldable/resizable, and backup contracts.
+Use it only for full-scope changes or hosted-environment diagnosis. The
+fail-closed runner is `pnpm mobile:validate:android:matrix`, and
+`docs/ANDROID_VALIDATION.md` defines its evidence schema and commands.
 
 Before any release, run exact-head fast checks and select the same no-native,
 targeted, or full scope used for PRs. An ordinary delta does not rerun complete
 Detox; the owner installs the candidate and performs the documented smoke on a
 physical device. Run one affected suite for targeted risk and both suites only
-for broad native risk. Real CloudKit, notification delivery, TestFlight
-upgrade, schema-upgrade, compatibility-matrix, and App Store screenshot checks
-remain conditional gates when that boundary changed or the store reports a
-problem.
+for broad native risk. After a squash merge, passing PR-head evidence may be
+reused only when the tested tree and release-candidate tree are identical;
+record both tree IDs. Real CloudKit, notification delivery, TestFlight upgrade,
+schema-upgrade, compatibility-matrix, and App Store screenshot checks remain
+conditional gates when that boundary changed or the store reports a problem.
 
 Android physical ARM64 checks are owner-recorded release evidence, not a
 routine feature-PR gate. They cover install, real board input, Stockfish
@@ -408,11 +407,11 @@ test both compatibility contracts deliberately.
 
 | Change | Minimum PR validation | Later gate |
 | --- | --- | --- |
-| Pure sprint/ELO/review/history rule | Focused core unit tests, `pnpm test:unit`, typecheck; no mobile Detox | Nightly integration; release native checks only if the boundary is targeted/full |
-| Repository/store behavior | Real SQLite integration tests, `pnpm test:integration`; targeted mobile persistence spec only when adapter wiring changed | Nightly integration; release persistence check when changed |
+| Pure sprint/ELO/review/history rule | Focused core unit tests, `pnpm test:unit`, typecheck; no mobile Detox | Release native checks only if the boundary is targeted/full |
+| Repository/store behavior | Real SQLite integration tests, `pnpm test:integration`; targeted mobile persistence spec only when adapter wiring changed | Release persistence check when changed |
 | SQLite schema or migration | Released-fixture migration matrix and rollback/idempotency checks | Native upgrade smoke before release |
 | CLI command or protocol | `pnpm test:e2e`; no mobile Detox | None unless a mobile boundary also changed |
-| React Native copy, state, styling, accessibility, or wiring | Focused component tests, `pnpm mobile:test`, `pnpm mobile:typecheck`; no mobile Detox by default | Nightly integration plus owner delta smoke |
+| React Native copy, state, styling, accessibility, or wiring | Focused component tests, `pnpm mobile:test`, `pnpm mobile:typecheck`; no mobile Detox by default | Owner delta smoke |
 | Navigation or cross-component journey | Component coverage plus the affected Detox spec or suite on the exact PR head | Same targeted suite for a release if changed afterward |
 | Real chessboard/native rendering or adaptive layout | Targeted Detox or focused simulator screenshot inspection | Targeted release/device check when changed |
 | App startup, shared native wiring, launch fixtures, build configuration, or Detox infrastructure | Exact-head full `flows` and `practice` | Full release scope while that risk is present |

@@ -320,6 +320,7 @@ describe("PracticePocScreen", () => {
   it("returns a completed Custom result through setup to idle Practice", async () => {
     const systemBack = createTestSystemBackSource("android");
     const service = createMobilePracticeService();
+    service.loadFixturePuzzles([androidPracticeFixture.puzzle as Puzzle]);
     const renderer = renderScreen({
       customTargetCorrect: 1,
       practiceServiceFactory: () => service,
@@ -331,7 +332,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "practice-mode-custom");
     press(renderer, "custom-duration-stepper-decrease");
     press(renderer, "custom-per-puzzle-stepper-increase");
-    press(renderer, "custom-theme-fork");
+    press(renderer, "custom-theme-back-rank-mate");
     press(renderer, "start-sprint-button");
     expect(service.getActiveSprint()?.currentPuzzle).toMatchObject({
       puzzle: {
@@ -2051,7 +2052,7 @@ describe("PracticePocScreen", () => {
     });
 
     press(firstRenderer, "practice-mode-custom");
-    press(firstRenderer, "custom-theme-fork");
+    press(firstRenderer, "custom-theme-back-rank-mate");
     press(firstRenderer, "custom-duration-stepper-decrease");
     press(firstRenderer, "custom-per-puzzle-stepper-increase");
     press(firstRenderer, "start-sprint-button");
@@ -2076,7 +2077,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "practice-progress-weekly-solved"))).toBe("0");
 
     press(renderer, "practice-mode-custom");
-    press(renderer, "custom-previous-custom-custom-180-30-fork");
+    press(renderer, "custom-previous-custom-custom-180-30-backrankmate");
 
     expect(findByTestId(renderer, "custom-sprint-setup")).toBeTruthy();
     expect(findByTestId(renderer, "practice-progress-summary").props.accessibilityLabel).toContain("ELO 775");
@@ -2676,16 +2677,18 @@ describe("PracticePocScreen", () => {
 
   it("keeps a deterministic Custom target inside the selected shared configuration", () => {
     const service = createMobilePracticeService();
+    service.loadFixturePuzzles([androidPracticeFixture.puzzle as Puzzle]);
     const renderer = renderScreen({
       customTargetCorrect: 1,
       practiceService: service,
+      puzzleSelectionId: androidPracticeFixture.puzzle.id,
       puzzleSelectionSeed: androidPracticeFixture.puzzleSelectionSeed
     });
 
     press(renderer, "practice-mode-custom");
     press(renderer, "custom-duration-stepper-decrease");
     press(renderer, "custom-per-puzzle-stepper-increase");
-    press(renderer, "custom-theme-fork");
+    press(renderer, "custom-theme-back-rank-mate");
     press(renderer, "start-sprint-button");
 
     expect(service.getActiveSprint()?.config).toMatchObject({
@@ -2693,9 +2696,9 @@ describe("PracticePocScreen", () => {
       maxMistakes: 3,
       mode: "custom",
       perPuzzleSeconds: 30,
-      ratingKey: "fork custom 3/30",
+      ratingKey: "backRankMate custom 3/30",
       targetCorrect: 1,
-      themes: ["fork"]
+      themes: ["backRankMate"]
     });
     expect(service.getActiveSprint()?.currentPuzzle?.puzzle).toMatchObject({
       id: androidPracticeFixture.puzzle.id,

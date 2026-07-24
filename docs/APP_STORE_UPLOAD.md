@@ -22,6 +22,7 @@ Run from a clean `main` checkout at the exact commit that will be uploaded:
 ```sh
 git status --short --branch
 pnpm install --frozen-lockfile
+(cd apps/mobile && scripts/ios-install-pods-locked.sh)
 pnpm app-store:preflight
 pnpm app-store:signing-readiness
 pnpm test
@@ -30,6 +31,30 @@ pnpm mobile:test
 pnpm mobile:typecheck
 pnpm mobile:doctor:ios
 ```
+
+GitHub Actions does not run Xcode builds or iOS Detox. Local iOS native
+validation is the only iOS native release gate. Select delta, targeted, or full
+scope under `docs/TESTING_ARCHITECTURE.md`, then record the tested commit SHA
+and Git tree, Xcode version, dedicated simulator, build result, suite results,
+and clean-worktree confirmation. A squash-merged candidate may reuse passing
+PR-head evidence only when these commands report the same tree:
+
+```sh
+git rev-parse <tested-sha>^{tree}
+git rev-parse HEAD^{tree}
+```
+
+Any tree difference requires a new local build and the selected local Detox
+scope. React Native's Hermes compiler setting is intentionally patched to use a
+stable `PODS_ROOT`-based path; an absolute checkout path in an evaluated
+podspec makes `Podfile.lock` non-portable and is a release blocker, regardless
+of whether the dependency versions are unchanged. The locked installer removes
+only a local `ios/Pods` sandbox whose `Manifest.lock` is missing or differs
+from the committed `Podfile.lock`, then runs CocoaPods in deployment mode.
+
+After any failed complete release validation pass, perform the cross-platform
+pre-retry convergence sweep in `docs/RELEASE_SOURCE_POLICY.md` before
+starting another full local native run.
 
 For first launch, a new App Store version, screenshot/metadata changes, or broad
 native risk, also generate the full evidence bundle:

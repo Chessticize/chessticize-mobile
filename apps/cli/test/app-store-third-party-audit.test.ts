@@ -29,6 +29,7 @@ test("third-party audit validates notices against the release lockfile", () => {
   assert.ok(checkNames.has("Runtime notice table matches direct runtime dependencies"));
   assert.ok(checkNames.has("Runtime notice versions match pnpm-lock.yaml"));
   assert.ok(checkNames.has("Patched chessboard package is disclosed"));
+  assert.ok(checkNames.has("Patched React Native package is disclosed"));
   assert.ok(checkNames.has("Stockfish notice matches bundled source and pod metadata"));
   assert.ok(checkNames.has("Stockfish NNUE files are disclosed and present"));
   assert.ok(checkNames.has("Lichess puzzle data notice matches bundled manifest"));

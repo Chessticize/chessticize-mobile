@@ -30,6 +30,47 @@ The public repository is:
 
 https://github.com/Chessticize/chessticize-mobile
 
+## Pre-Retry Convergence Sweep
+
+Do not immediately restart a complete release matrix after its first failure.
+Use one convergence pass to find and batch every issue that can be discovered
+without another full native run:
+
+1. Keep failed command output and local artifacts. Let independent fast checks
+   finish unless continuing them is unsafe, because they may expose additional
+   blockers without another native build.
+2. Record the exact commit and Git tree, then inspect every failed, cancelled,
+   or timed-out step. Classify each result as a product regression, stale
+   deterministic evidence or fixture, local infrastructure failure,
+   credential/signing gate, or store-console gate. A retry is not a substitute
+   for classification. For Android matrix failures, retain and inspect
+   `api-<level>.progress.json`; it identifies the last running step even when
+   the bounded matrix command is terminated.
+3. Audit both platform identities together: public version, iOS build number,
+   Android version code, proposed annotated tags, build-specific release-note
+   filenames and links, and the absence of an immutable tag or store build that
+   would be reused accidentally.
+4. Run the complete fast proving layer on the proposed fix head: core/storage
+   tests, root and mobile typechecks, mobile component tests, lint, App Store
+   preflight/signing/third-party checks, screenshot audit when applicable, and
+   Android doctor plus release-policy tests. Run focused real-adapter tests for
+   every changed fixture or native boundary. For iOS, run the locked CocoaPods
+   installer so a restored `Pods/Manifest.lock` is checked against the
+   committed `Podfile.lock` before another full native build.
+5. Put all coherent release-validation fixes in one release-fix PR. For every
+   stale fixture or assertion, add a fast consistency test that would have
+   rejected the mismatch before the native matrix.
+6. Recheck the diff, clean tracked worktree, exact PR head, open PRs, and remote
+   `main`. Resolve all known blockers before spending the full native retry.
+7. Run the required exact-head local iOS evidence once on the final PR head and
+   merge once. If the release candidate is squash-merged, compare the tested
+   and final Git trees and reuse the evidence only when they match exactly.
+   Android release workflows remain governed by the Android release runbook.
+
+If that final run reveals a genuinely new deterministic failure, preserve it,
+extend the fast proving layer that missed it, and repeat this sweep. Never hide
+an unexplained failure with a successful rerun.
+
 ## Release Checklist
 
 - Create the exact build-specific file from
@@ -97,7 +138,7 @@ for App Store Connect, TestFlight, or a public release tag.
 
 `pnpm app-store:third-party-audit` verifies the runtime package inventory in
 `THIRD_PARTY_NOTICES.md` against `pnpm-lock.yaml`, checks that the active
-`react-native-chessboard` patch is disclosed, and confirms that the Stockfish,
+runtime dependency patches are disclosed, and confirms that the Stockfish,
 NNUE, and Lichess puzzle-data notices match the bundled release artifacts.
 
 This audit is required before tagging a submitted App Store binary. It is still

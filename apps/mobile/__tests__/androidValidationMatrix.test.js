@@ -48,7 +48,7 @@ function workflowJob(workflow, jobName) {
 }
 
 describe('Android validation matrix', () => {
-  it('builds once and routes scheduled main to API 36 while manual exact-head runs include API 24', () => {
+  it('keeps the hosted full matrix manual and covers API 24 and API 36', () => {
     const workflow = fs.readFileSync(
       path.resolve(__dirname, '../../../.github/workflows/mobile-android.yml'),
       'utf8'
@@ -59,14 +59,12 @@ describe('Android validation matrix', () => {
       workflow.indexOf('  android-adaptive-layout:')
     );
 
-    expect(workflow).toContain('schedule:');
+    expect(workflow).not.toContain('schedule:');
     expect(workflow).toContain('node-version: 22.x');
     expect(workflow).not.toContain('node-version: 26.x');
     expect(workflow.match(/^ {2}android-build:/gm)).toHaveLength(1);
     expect(launchJob).toContain('needs: android-build');
-    expect(launchJob).toContain(
-      "api-level: ${{ fromJSON(github.event_name == 'schedule' && '[36]' || '[24,36]') }}"
-    );
+    expect(launchJob).toContain('api-level: [24, 36]');
     expect(launchJob).toContain(
       'pnpm mobile:validate:android:matrix -- --api-level "${{ matrix.api-level }}"'
     );
@@ -80,12 +78,14 @@ describe('Android validation matrix', () => {
     );
   });
 
-  it('keeps release-only adaptive and backup evidence out of the nightly integration gate', () => {
+  it('keeps full diagnostic jobs available only through the manual workflow', () => {
     const workflow = fs.readFileSync(
       path.resolve(__dirname, '../../../.github/workflows/mobile-android.yml'),
       'utf8'
     );
 
+    expect(workflow).toContain('workflow_dispatch:');
+    expect(workflow).not.toMatch(/^\s+schedule:/m);
     for (const jobName of [
       'android-adaptive-layout',
       'android-progress-backup',
@@ -93,8 +93,8 @@ describe('Android validation matrix', () => {
       'android-progress-backup-policy-api36',
       'android-progress-backup-policy-api30',
     ]) {
-      expect(workflowJob(workflow, jobName)).toContain(
-        "if: github.event_name == 'workflow_dispatch'"
+      expect(workflowJob(workflow, jobName)).not.toContain(
+        "if: github.event_name == 'workflow_dispatch'",
       );
     }
   });
@@ -189,6 +189,7 @@ describe('Android validation matrix', () => {
   it('executes the selected public matrix and writes auditable exact-head evidence', () => {
     const outputRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'android-matrix-'));
     const outputPath = path.join(outputRoot, 'api-24.json');
+    const progressPath = path.join(outputRoot, 'api-24.progress.json');
     const executed = [];
 
     const evidence = runAndroidValidationMatrix({
@@ -212,12 +213,34 @@ describe('Android validation matrix', () => {
 
     expect(executed).toEqual(validationStepsForApiLevel(24));
     expect(JSON.parse(fs.readFileSync(outputPath, 'utf8'))).toEqual(evidence);
+    expect(JSON.parse(fs.readFileSync(progressPath, 'utf8'))).toMatchObject({
+      schemaVersion: 1,
+      commitSha: EXACT_SHA,
+      apiLevel: 24,
+      currentStep: null,
+      result: 'pass',
+      steps: [
+        {
+          id: 'apps/mobile/scripts/prepare-android-offline-e2e.sh',
+          result: 'pass',
+        },
+        {
+          id: 'apps/mobile/scripts/install-android-detox-apks.sh',
+          result: 'pass',
+        },
+        {
+          id: 'android-api24-smoke',
+          result: 'pass',
+        },
+      ],
+    });
     expect(evidence.result).toBe('pass');
   });
 
-  it('stops at the first failed command and does not publish passing evidence', () => {
+  it('stops at the first failed command, preserves progress diagnostics, and does not publish passing evidence', () => {
     const outputRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'android-matrix-'));
     const outputPath = path.join(outputRoot, 'api-24.json');
+    const progressPath = path.join(outputRoot, 'api-24.progress.json');
     let calls = 0;
 
     expect(() => runAndroidValidationMatrix({
@@ -241,6 +264,19 @@ describe('Android validation matrix', () => {
 
     expect(calls).toBe(3);
     expect(fs.existsSync(outputPath)).toBe(false);
+    expect(JSON.parse(fs.readFileSync(progressPath, 'utf8'))).toMatchObject({
+      currentStep: 'android-api24-smoke',
+      result: 'fail',
+      steps: [
+        expect.objectContaining({ result: 'pass' }),
+        expect.objectContaining({ result: 'pass' }),
+        expect.objectContaining({
+          id: 'android-api24-smoke',
+          result: 'fail',
+          exitCode: 9,
+        }),
+      ],
+    });
   });
 
   it('rejects evidence when the requested SHA does not match the checkout', () => {

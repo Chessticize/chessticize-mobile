@@ -1,30 +1,37 @@
 {
   "puzzleSelectionSeed": "android-standard-practice",
   "targetCorrect": 1,
+  "customRunTheme": {
+    "id": "mate-in-2",
+    "label": "Mate in 2",
+    "puzzleTheme": "mateIn2"
+  },
   "puzzle": {
-    "id": "0CwCS",
-    "initialFen": "5rk1/3Q1ppp/p1p1p3/1p6/2P5/qP5P/P2R1PP1/6K1 w - - 0 24",
+    "id": "MRbdN",
+    "initialFen": "r3rk2/pnppqp2/1p4p1/6b1/3P4/2P4R/PP1B1PPP/RN1Q2K1 w - - 0 1",
     "solutionMoves": [
-      "d7c6",
-      "a3c1",
-      "d2d1",
-      "c1d1"
+      "d2g5",
+      "e7e1",
+      "d1e1",
+      "e8e1"
     ],
-    "rating": 600,
+    "rating": 607,
     "themes": [
-      "crushing",
-      "endgame",
-      "fork",
+      "backRankMate",
+      "mate",
+      "mateIn2",
+      "middlegame",
       "short"
     ],
     "source": "lichess",
-    "stockfishEval": -26,
-    "stockfishBestMove": "d7d6",
-    "stockfishEvalAfterFirstMove": -602
+    "stockfishEval": 162,
+    "stockfishBestMove": "f2f4",
+    "stockfishEvalAfterFirstMove": -10000
   },
   "userMoves": [
-    "a3c1",
-    "c1d1"
+    "e7e1",
+    "e8e1"
   ],
+  "expectedRatingBefore": 600,
   "expectedRatingAfter": 775
 }

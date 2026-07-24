@@ -1452,7 +1452,8 @@ describe('Detox suite configuration', () => {
     expect(evidence).toContain('restore_display_rotation');
     expect(evidence).toContain('git diff --quiet');
     expect(workflow).toContain('Android adaptive public UI');
-    expect(workflow).toContain("if: github.event_name == 'workflow_dispatch'");
+    expect(workflow).toContain('workflow_dispatch:');
+    expect(workflow).not.toContain('schedule:');
     expect(workflow).toContain('apps/mobile/scripts/android-adaptive-layout-evidence.sh');
     expect(workflow).toContain('android-adaptive-layout-evidence');
   });

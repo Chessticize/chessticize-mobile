@@ -131,7 +131,11 @@ const manifest = {
   },
   artifacts: [
     artifact("package.json", "root package manifest"),
+    artifact("pnpm-workspace.yaml", "pnpm workspace and dependency patch policy"),
     artifact("pnpm-lock.yaml", "dependency lockfile"),
+    artifact("patches/detox@20.51.4.patch", "applied Detox dependency patch"),
+    artifact("patches/react-native@0.86.0.patch", "applied React Native dependency patch"),
+    artifact("patches/react-native-chessboard@0.2.0.patch", "applied chessboard dependency patch"),
     artifact("apps/mobile/package.json", "mobile package manifest"),
     artifact("apps/mobile/release-version.json", "canonical mobile release version"),
     artifact("apps/mobile/Gemfile.lock", "mobile Ruby dependency lockfile"),

@@ -42,11 +42,6 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android emulator runtime libraries
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes libpulse0
-
       - name: Require protected release inputs
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
@@ -62,18 +57,10 @@ jobs:
           test -n "$UPLOAD_CERT_SHA256"
 
       - name: Install pinned Android packages
-        run: pnpm mobile:install:android-sdk
+        run: pnpm mobile:install:android-sdk -- --artifact-only
 
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Run exact-head fast release checks
-        run: |
-          pnpm process:validate
-          pnpm test
-          pnpm typecheck
-          pnpm mobile:test
-          pnpm mobile:typecheck
 
       - name: Fetch canonical core pack
         run: pnpm fetch:core-pack
@@ -91,7 +78,7 @@ jobs:
           CHESSTICIZE_ANDROID_RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_STORE_PASSWORD }}
           CHESSTICIZE_ANDROID_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
           CHESSTICIZE_ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
-        run: pnpm mobile:doctor:android
+        run: pnpm mobile:doctor:android -- --artifact-only
 
       - name: Build production-signed App Bundle
         working-directory: apps/mobile/android

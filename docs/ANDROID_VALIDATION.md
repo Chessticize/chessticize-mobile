@@ -8,6 +8,16 @@ modules, or test-only data-writing helpers directly.
 
 ## Local preflight and diagnostics
 
+Use a JDK 17 `JAVA_HOME` whose `java`, `jar`, `jarsigner`, and `keytool`
+binaries are on `PATH`. A Homebrew JDK may be installed without being
+registered with macOS, so `/usr/bin/java` can still report that no runtime is
+available. In that case, set the environment explicitly before the preflight:
+
+```sh
+export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
+export PATH="$JAVA_HOME/bin:$PATH"
+```
+
 Install the lockfile-pinned dependencies and puzzle pack before native work:
 
 ```sh
@@ -44,11 +54,15 @@ evidence invalidates that evidence.
 
 ## Automated matrix
 
-The `Mobile Android` workflow builds the self-contained app and Detox test APK
-once. A scheduled run uses the latest `main` commit and runs complete shared
-`flows` and `practice` on an API 36 x86_64 phone. A manual dispatch also runs
-the bounded API 24 compatibility smoke and the release-oriented backup and
-adaptive jobs.
+The `Mobile Android` workflow is a manually dispatched full diagnostic matrix.
+It builds the self-contained app and Detox test APK once, runs complete shared
+`flows` and `practice` on an API 36 x86_64 phone, and also runs the bounded API
+24 compatibility smoke plus the release-oriented backup and adaptive jobs.
+It has no scheduled trigger and is not a recurring release gate. Use it only
+when the selected scope is full or when diagnosing a boundary that needs its
+hosted Linux/Android evidence. Routine releases use exact-head fast checks,
+risk-scoped validation on the Android build machine, and owner physical-device
+smoke.
 
 The API 24 smoke contains only:
 
@@ -79,6 +93,16 @@ rejects an unsupported API, a missing or mismatched exact commit SHA, a dirty
 tracked worktree, a failed/missing step, or incomplete build/device data. It
 writes passing evidence only after every selected command succeeds and it has
 rechecked the checkout head and clean tracked worktree.
+
+CI gives the complete matrix command a 30-minute deadline inside a 40-minute
+job. This is deliberately much larger than the normal API 24 and API 36
+runtime, but shorter than an unproductive hosted-runner hang. The runner writes
+`api-<level>.progress.json` before and after every prepare, install, native, and
+Detox step. A failed or timed-out workflow uploads that progress file with any
+Android UI diagnostics, so classify the exact last running step before
+retrying. Only `api-<level>.json`, written after every step passes, is release
+evidence; the progress file is diagnostic evidence and never converts a
+partial run into a pass.
 
 ## Adaptive contract
 
