@@ -509,8 +509,9 @@ CI job downloads the Play-generated universal APK and attaches it with a
 SHA-256 checksum to the already-public corresponding-source Release. The job
 does not rebuild, rerun product tests, consume owner evidence, or use separate
 prepare/publish phases. A temporary GitHub token and additional publication
-environments are not release dependencies. Build 6 is the current candidate;
-the published build-1/build-4 releases and failed-validation build-2/build-3/
+environments are not release dependencies. Build 6 completed the current Play
+track, owner smoke, and Play-signed GitHub APK mirror on 2026-07-24; the
+published build-1/build-4 releases and failed-validation build-2/build-3/
 build-5 records remain immutable historical evidence.
 
 ### ANDROID-13 — Validate the release candidate and launch

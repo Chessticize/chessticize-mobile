@@ -63,7 +63,10 @@ Release was public, but the Play-signed APK mirror was left pending because the
 runbooks described it as an optional small step rather than a release-completion
 postcondition. The current standard keeps the mirror small and idempotent but
 does not call Android complete until owner smoke, exactly three public Release
-assets, and a retained mirror receipt are present.
+assets, and a retained mirror receipt are present. After owner confirmation,
+[mirror run 30118284864](https://github.com/Chessticize/chessticize-mobile/actions/runs/30118284864)
+closed that gap in 1m8s without Gradle, a rebuild, or repeated product
+validation.
 
 ## Four meanings of "delta"
 
