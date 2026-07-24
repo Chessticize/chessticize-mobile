@@ -150,6 +150,7 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
   let progressProtection: MobilePlatformCapabilities["progressProtection"] = { kind: "icloud_sync" };
   const screenProps: ScreenProps = {
     currentTimeMs: () => LAB_NOW_MS,
+    moveFeedbackSettings: {},
     puzzleSelectionSeed: "interaction-lab",
     standardTargetCorrect: 1,
     arrowDuelTargetCorrect: 1,
@@ -204,6 +205,9 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
       break;
     case "settings-ios-sync":
       notificationStatus = "not_determined";
+      screenProps.moveFeedbackSettings = {
+        preview: previewBrowserMoveFeedback
+      };
       break;
     case "settings-notifications-denied":
       notificationStatus = "denied";
@@ -211,11 +215,6 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     case "settings-feedback-entry-failure":
       screenProps.feedbackIssuesOpener = async () => {
         throw new Error("browser unavailable");
-      };
-      break;
-    case "settings-move-feedback":
-      screenProps.moveFeedbackPreview = {
-        preview: previewBrowserMoveFeedback
       };
       break;
     case "system-error":

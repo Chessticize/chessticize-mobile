@@ -6609,16 +6609,15 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "settings-panel"))).not.toContain("›");
   });
 
-  it("places the Storybook-only Move Feedback section after Notifications", () => {
+  it("places the Lab Move Feedback presentation after Notifications without formal preview controls", () => {
     const renderer = renderScreen({
-      moveFeedbackPreview: {
-        preview: async () => ({ haptics: "visual-only", sound: "played" })
-      }
+      moveFeedbackSettings: {}
     });
 
     press(renderer, "settings-tab");
 
-    expect(findByTestId(renderer, "settings-move-feedback-section")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "settings-move-feedback-section")))
+      .toContain("Move Feedback");
     expect(
       testIdOrder(
         renderer,
@@ -6633,6 +6632,7 @@ describe("PracticePocScreen", () => {
         "settings-profile-section"
       )
     ).toBeLessThan(0);
+    expect(() => findByTestId(renderer, "settings-move-feedback-previews")).toThrow();
   });
 
   it("routes feedback to GitHub only after an explicit privacy handoff", async () => {
@@ -7163,7 +7163,7 @@ function createScriptedStockfishTransport(
 }
 
 type RenderScreenOptions = TestMobilePlatformCapabilityOverrides &
-  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "moveFeedbackPreview" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEloEditingMovedToHome" | "runManagementEnabled" | "runManagementPresentation" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "themeCatalogPresentation"> & {
+  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "moveFeedbackSettings" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEloEditingMovedToHome" | "runManagementEnabled" | "runManagementPresentation" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "themeCatalogPresentation"> & {
     platformCapabilities?: MobilePlatformCapabilities;
   };
 
@@ -7261,7 +7261,7 @@ function renderScreen({
   currentTimeMs,
   customTargetCorrect,
   debugTrace,
-  moveFeedbackPreview,
+  moveFeedbackSettings,
   puzzleSelectionId,
   puzzleSelectionSeed,
   runEloEditingMovedToHome,
@@ -7282,7 +7282,7 @@ function renderScreen({
         currentTimeMs={currentTimeMs}
         customTargetCorrect={customTargetCorrect}
         debugTrace={debugTrace}
-        moveFeedbackPreview={moveFeedbackPreview}
+        moveFeedbackSettings={moveFeedbackSettings}
         puzzleSelectionId={puzzleSelectionId}
         puzzleSelectionSeed={puzzleSelectionSeed}
         runEloEditingMovedToHome={runEloEditingMovedToHome}

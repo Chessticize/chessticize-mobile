@@ -146,9 +146,10 @@ reserves ignoring user touch-feedback settings for privileged apps
 | Android DND | System interruption policy decides | System interruption and touch-feedback policies decide |
 | No supported haptic hardware | Unchanged | Silent no-op |
 
-The Settings helper copy should consequently avoid an absolute claim such as
-"Disabled by Do Not Disturb on every device." A safer statement is: **"Sound
-and haptics also follow your device settings."**
+The operating-system contract still applies, but product review removed the
+generic device-settings helper from Settings. The formal UI should not make an
+absolute DND claim or add replacement explanatory copy; the platform adapters
+must enforce the policy without relying on a note in the interface.
 
 ## React Native feasibility
 

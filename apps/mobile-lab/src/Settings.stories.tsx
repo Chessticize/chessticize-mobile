@@ -19,11 +19,23 @@ type Story = StoryObj<typeof meta>;
 export const IosSync: Story = {
   name: "iOS sync",
   args: { scenarioId: "settings-ios-sync" },
+  tags: ["new"],
   play: async ({ canvasElement }) => {
     await openSettings(canvasElement);
     await waitForTestId(canvasElement, "settings-sync-section");
     await waitForText(canvasElement, "Sign in to iCloud to sync");
     await waitForText(canvasElement, "Permission not requested");
+    await waitForTestId(canvasElement, "settings-move-feedback-section");
+    await waitForTestId(canvasElement, "settings-move-feedback-previews");
+    await waitForText(
+      canvasElement,
+      "Web demo only. Preview the proposed move and capture sounds; haptics require the native app. Check this tab and device volume if you do not hear them."
+    );
+    await waitForTestId(canvasElement, "settings-move-feedback-preview-move");
+    await waitForTestId(canvasElement, "settings-move-feedback-preview-capture");
+    expectTestIdAbsent(canvasElement, "settings-move-feedback-preview-success");
+    expectTestIdAbsent(canvasElement, "settings-move-feedback-preview-mistake");
+    expectTestIdAbsent(canvasElement, "settings-move-feedback-device-note");
   }
 };
 
@@ -33,6 +45,8 @@ export const AndroidBackup: Story = {
   play: async ({ canvasElement }) => {
     await openSettings(canvasElement);
     await waitForTestId(canvasElement, "settings-android-backup-section");
+    await waitForTestId(canvasElement, "settings-move-feedback-section");
+    expectTestIdAbsent(canvasElement, "settings-move-feedback-previews");
   }
 };
 
@@ -51,26 +65,6 @@ export const NotificationsNotDetermined: Story = {
   play: async ({ canvasElement }) => {
     await openSettings(canvasElement);
     await waitForTestId(canvasElement, "settings-review-reminder-enable");
-  }
-};
-
-export const MoveFeedback: Story = {
-  name: "Move feedback",
-  args: { scenarioId: "settings-move-feedback" },
-  tags: ["new"],
-  play: async ({ canvasElement }) => {
-    await openSettings(canvasElement);
-    await waitForTestId(canvasElement, "settings-move-feedback-section");
-    await waitForTestId(canvasElement, "settings-move-feedback-previews");
-    await waitForText(
-      canvasElement,
-      "Web demo only. Preview the proposed move and capture sounds; haptics require the native app. Check this tab and device volume if you do not hear them."
-    );
-    await waitForTestId(canvasElement, "settings-move-feedback-preview-move");
-    await waitForTestId(canvasElement, "settings-move-feedback-preview-capture");
-    expectTestIdAbsent(canvasElement, "settings-move-feedback-preview-success");
-    expectTestIdAbsent(canvasElement, "settings-move-feedback-preview-mistake");
-    expectTestIdAbsent(canvasElement, "settings-move-feedback-device-note");
   }
 };
 

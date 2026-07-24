@@ -55,16 +55,16 @@ describe("MoveFeedbackSettingsSection", () => {
     expect(text(find(renderer, "settings-move-feedback-previews"))).toContain(
       "Web demo only"
     );
-    expect(text(find(renderer, "settings-move-feedback-section"))).toContain(
+    expect(text(find(renderer, "settings-move-feedback-content"))).toContain(
       "Brief board sounds for moves and captures."
     );
-    expect(text(find(renderer, "settings-move-feedback-section"))).toContain(
+    expect(text(find(renderer, "settings-move-feedback-content"))).toContain(
       "Light touch feedback for moves and captures."
     );
-    expect(text(find(renderer, "settings-move-feedback-section"))).not.toContain(
+    expect(text(find(renderer, "settings-move-feedback-content"))).not.toContain(
       "puzzle results"
     );
-    expect(text(find(renderer, "settings-move-feedback-section"))).not.toContain(
+    expect(text(find(renderer, "settings-move-feedback-content"))).not.toContain(
       "success, and mistakes"
     );
     expect(find(renderer, "settings-move-feedback-preview-move")).toBeTruthy();
@@ -79,10 +79,10 @@ describe("MoveFeedbackSettingsSection", () => {
 
     expect(find(renderer, "settings-move-sound-toggle")).toBeTruthy();
     expect(find(renderer, "settings-move-haptics-toggle")).toBeTruthy();
-    expect(text(find(renderer, "settings-move-feedback-section"))).not.toContain(
+    expect(text(find(renderer, "settings-move-feedback-content"))).not.toContain(
       "Try feedback"
     );
-    expect(text(find(renderer, "settings-move-feedback-section"))).not.toContain(
+    expect(text(find(renderer, "settings-move-feedback-content"))).not.toContain(
       "Web demo only"
     );
     expect(() => find(renderer, "settings-move-feedback-previews")).toThrow();

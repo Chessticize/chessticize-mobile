@@ -31,13 +31,11 @@ const CUES: ReadonlyArray<{
 export function MoveFeedbackSettingsSection({
   onPreferencesChange,
   onPreview,
-  preferences,
-  wide = false
+  preferences
 }: {
   onPreferencesChange: (preferences: MoveFeedbackPreferences) => void;
   onPreview?: MoveFeedbackPreviewer;
   preferences: MoveFeedbackPreferences;
-  wide?: boolean;
 }): React.JSX.Element {
   const [previewMessage, setPreviewMessage] = useState<string | null>(null);
 
@@ -55,71 +53,65 @@ export function MoveFeedbackSettingsSection({
   }
 
   return (
-    <View
-      style={[styles.section, wide ? styles.sectionWide : null]}
-      testID="settings-move-feedback-section"
-    >
-      <Text style={styles.sectionLabel}>Move Feedback</Text>
-      <View style={styles.card}>
-        <FeedbackToggleRow
-          detail="Brief board sounds for moves and captures."
-          enabled={preferences.soundEnabled}
-          label="Sound effects"
-          controlTestID="settings-move-sound-toggle"
-          onChange={(soundEnabled) => {
-            onPreferencesChange({ ...preferences, soundEnabled });
-            setPreviewMessage(soundEnabled ? "Sound effects on" : "Sound effects off");
-          }}
-        />
-        <FeedbackToggleRow
-          detail="Light touch feedback for moves and captures."
-          enabled={preferences.hapticsEnabled}
-          label="Haptic feedback"
-          controlTestID="settings-move-haptics-toggle"
-          onChange={(hapticsEnabled) => {
-            onPreferencesChange({ ...preferences, hapticsEnabled });
-            setPreviewMessage(hapticsEnabled ? "Haptic feedback on" : "Haptic feedback off");
-          }}
-        />
-        {onPreview ? (
-          <View style={styles.previewBlock} testID="settings-move-feedback-previews">
-            <View style={styles.previewHeading}>
-              <Text style={styles.rowLabel}>Try feedback</Text>
-              <Text style={styles.helperText}>
-                Web demo only. Preview the proposed move and capture sounds;
-                haptics require the native app. Check this tab and device volume
-                if you do not hear them.
-              </Text>
-            </View>
-            <View style={styles.previewButtons}>
-              {CUES.map(({ cue, detail, label }) => (
-                <Pressable
-                  key={cue}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Preview ${cue} feedback`}
-                  testID={`settings-move-feedback-preview-${cue}`}
-                  style={styles.previewButton}
-                  onPress={() => {
-                    void preview(cue);
-                  }}
-                >
-                  <Text style={styles.previewButtonLabel}>{label}</Text>
-                  <Text style={styles.previewButtonDetail}>{detail}</Text>
-                </Pressable>
-              ))}
-            </View>
-            {previewMessage ? (
-              <Text
-                accessibilityLiveRegion="polite"
-                style={styles.previewStatus}
-                testID="settings-move-feedback-preview-status"
-              >
-                {previewMessage}
-              </Text>
-            ) : null}
+    <View testID="settings-move-feedback-content">
+      <FeedbackToggleRow
+        detail="Brief board sounds for moves and captures."
+        enabled={preferences.soundEnabled}
+        label="Sound effects"
+        controlTestID="settings-move-sound-toggle"
+        onChange={(soundEnabled) => {
+          onPreferencesChange({ ...preferences, soundEnabled });
+          setPreviewMessage(soundEnabled ? "Sound effects on" : "Sound effects off");
+        }}
+      />
+      <FeedbackToggleRow
+        detail="Light touch feedback for moves and captures."
+        enabled={preferences.hapticsEnabled}
+        label="Haptic feedback"
+        controlTestID="settings-move-haptics-toggle"
+        onChange={(hapticsEnabled) => {
+          onPreferencesChange({ ...preferences, hapticsEnabled });
+          setPreviewMessage(hapticsEnabled ? "Haptic feedback on" : "Haptic feedback off");
+        }}
+      />
+      {onPreview ? (
+        <View style={styles.previewBlock} testID="settings-move-feedback-previews">
+          <View style={styles.previewHeading}>
+            <Text style={styles.rowLabel}>Try feedback</Text>
+            <Text style={styles.helperText}>
+              Web demo only. Preview the proposed move and capture sounds;
+              haptics require the native app. Check this tab and device volume
+              if you do not hear them.
+            </Text>
           </View>
-        ) : null}
-      </View>
+          <View style={styles.previewButtons}>
+            {CUES.map(({ cue, detail, label }) => (
+              <Pressable
+                key={cue}
+                accessibilityRole="button"
+                accessibilityLabel={`Preview ${cue} feedback`}
+                testID={`settings-move-feedback-preview-${cue}`}
+                style={styles.previewButton}
+                onPress={() => {
+                  void preview(cue);
+                }}
+              >
+                <Text style={styles.previewButtonLabel}>{label}</Text>
+                <Text style={styles.previewButtonDetail}>{detail}</Text>
+              </Pressable>
+            ))}
+          </View>
+          {previewMessage ? (
+            <Text
+              accessibilityLiveRegion="polite"
+              style={styles.previewStatus}
+              testID="settings-move-feedback-preview-status"
+            >
+              {previewMessage}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -177,26 +169,6 @@ function capitalize(value: string): string {
 }
 
 const styles = StyleSheet.create({
-  section: {
-    gap: 8
-  },
-  sectionWide: {
-    flexBasis: "48%",
-    flexGrow: 1,
-    minWidth: 300
-  },
-  sectionLabel: {
-    color: "#111827",
-    fontSize: 15,
-    fontWeight: "800"
-  },
-  card: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    borderWidth: 1,
-    overflow: "hidden"
-  },
   toggleRow: {
     alignItems: "center",
     borderBottomColor: "#E2E8F0",

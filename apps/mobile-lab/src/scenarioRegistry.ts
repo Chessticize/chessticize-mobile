@@ -40,7 +40,6 @@ export type LabScenarioId =
   | "settings-android-backup"
   | "settings-notifications-denied"
   | "settings-notifications-not-determined"
-  | "settings-move-feedback"
   | "settings-advanced-ratings"
   | "settings-feedback-entry"
   | "settings-feedback-entry-failure"
@@ -132,20 +131,19 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
   "history-filters": defineScenario("history-filters", "History", "Filters and active filters", "history--filters-and-active-filters", "Expanded History filters with the complete curated theme catalog in categorized horizontal rails.", "history", ["Advanced filters", "24-theme catalog", "Active filter summary", "Reset"], ["Replay puzzle"]),
   "history-attempt-detail": defineScenario("history-attempt-detail", "History", "Replay puzzle", "history--attempt-detail", "The real puzzle replay reached by tapping a History row, with every curated puzzle theme centered in a horizontally scrollable tag rail below the board.", "history", ["Puzzle replay", "Curated theme rail", "Review enrollment"], ["History"]),
   "history-replay-unavailable": defineScenario("history-replay-unavailable", "History", "Replay unavailable", "history--replay-unavailable", "Legacy Arrow Duel attempt whose candidate order cannot be reconstructed safely.", "history", ["Persisted details", "Replay-unavailable explanation"], ["History"]),
-  "settings-ios-sync": defineScenario("settings-ios-sync", "Settings", "iOS sync", "settings--ios-sync", "iOS capabilities with iCloud Sync controls, run ELO editing omitted, and no real account access.", "settings", ["iCloud Sync", "Notifications", "About"], ["Run editor", "Stockfish diagnostics"]),
+  "settings-ios-sync": defineScenario(
+    "settings-ios-sync",
+    "Settings",
+    "iOS sync",
+    "settings--ios-sync",
+    "The stable iOS Settings clone with iCloud Sync, Notifications, and the Issue #247 move-feedback design.",
+    "settings",
+    ["iCloud Sync", "Notifications", "Sound and haptic toggles", "Move and capture audio previews", "About"],
+    ["Run editor", "Native audio and haptic validation", "Stockfish diagnostics"]
+  ),
   "settings-android-backup": defineScenario("settings-android-backup", "Settings", "Android backup", "settings--android-backup", "Android managed-backup variant with iCloud controls omitted.", "settings", ["Android Progress Backup", "Notifications", "About"], ["Stockfish diagnostics"]),
   "settings-notifications-denied": defineScenario("settings-notifications-denied", "Settings", "Notifications denied", "settings--notifications-denied", "Denied notification permission with a public system-settings action.", "settings", ["Permission state", "Reminder preferences", "Open settings"], ["System settings"]),
   "settings-notifications-not-determined": defineScenario("settings-notifications-not-determined", "Settings", "Notifications not determined", "settings--notifications-not-determined", "Notification permission has not yet been requested.", "settings", ["Permission request", "Reminder preferences"], ["System permission prompt"]),
-  "settings-move-feedback": defineScenario(
-    "settings-move-feedback",
-    "Settings",
-    "Move feedback",
-    "settings--move-feedback",
-    "Design-only sound and haptic preferences with browser-safe feedback samples.",
-    "settings",
-    ["Sound toggle", "Haptic toggle", "Move, capture, success, and mistake previews", "Device-setting precedence"],
-    ["Native audio and haptic validation"]
-  ),
   "settings-advanced-ratings": defineScenario("settings-advanced-ratings", "Settings", "ELO controls moved to runs", "settings--advanced-rating-editor", "Stable former ELO-editor URL now documents Settings without rating controls; current ELO lives in each run editor.", "settings", ["Settings without Profile ELO", "Run-editor ownership"], ["Built-in run editor", "Custom run editor"]),
   "settings-feedback-entry": defineScenario("settings-feedback-entry", "Settings", "Help & Feedback", "settings--feedback-entry-design", "Approved Support card in production-like Settings, with a privacy promise and an explicit confirmation before handing off to GitHub.", "settings", ["Approved Support card", "Privacy promise", "External-browser confirmation"], ["GitHub Issues in the external browser", "Email support"]),
   "settings-feedback-entry-failure": defineScenario("settings-feedback-entry-failure", "Settings", "Feedback handoff failure", "settings--feedback-entry-failure", "Deterministic failed browser handoff that keeps the confirmation open with an actionable retry.", "settings", ["External-browser confirmation", "Failed handoff message", "Retry action"], ["GitHub Issues in the external browser", "Settings"]),

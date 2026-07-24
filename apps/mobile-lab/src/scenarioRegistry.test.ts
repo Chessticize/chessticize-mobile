@@ -77,8 +77,15 @@ test("the issue #272 preview hands the board to White after the blunder", () => 
   assert.equal(chess.fen(), "8/3k4/8/8/8/8/4P3/4K3 w - - 1 2");
 });
 
-test("the active design review marks only Issue #247 move feedback as new", () => {
-  assert.deepEqual(newScenarios.map((scenario) => scenario.id), ["settings-move-feedback"]);
-  assert.deepEqual(storyTagsForScenario("settings-move-feedback"), ["new"]);
+test("Issue #247 stays on the existing Settings product clone with its approved scope", () => {
+  assert.deepEqual(newScenarios.map((scenario) => scenario.id), ["settings-ios-sync"]);
+  assert.deepEqual(storyTagsForScenario("settings-ios-sync"), ["new"]);
+  assert.deepEqual(scenarioRegistry["settings-ios-sync"].scope.includes, [
+    "iCloud Sync",
+    "Notifications",
+    "Sound and haptic toggles",
+    "Move and capture audio previews",
+    "About"
+  ]);
   assert.deepEqual(storyTagsForScenario("practice-home" as LabScenarioId), []);
 });

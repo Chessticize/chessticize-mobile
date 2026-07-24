@@ -186,9 +186,9 @@ interface Props {
   debugTrace?: (event: PracticeDebugTraceEvent) => void;
   feedbackIssuesOpener?: (url: string) => Promise<void>;
   currentTimeMs?: () => number;
-  moveFeedbackPreview?: {
+  moveFeedbackSettings?: {
     initialPreferences?: MoveFeedbackPreferences;
-    preview: MoveFeedbackPreviewer;
+    preview?: MoveFeedbackPreviewer;
   };
   puzzleSelectionId?: string;
   puzzleSelectionSeed?: string;
@@ -386,7 +386,7 @@ export function PracticePocScreen({
   debugTrace,
   feedbackIssuesOpener = openFeedbackIssuesInBrowser,
   currentTimeMs = Date.now,
-  moveFeedbackPreview,
+  moveFeedbackSettings,
   puzzleSelectionId,
   puzzleSelectionSeed,
   runManagementEnabled = false,
@@ -503,7 +503,7 @@ export function PracticePocScreen({
   const [iCloudSyncEnabled, setICloudSyncEnabled] = useState(() => service.getSettings().sync.iCloudEnabled);
   const [iCloudSyncStatus, setICloudSyncStatus] = useState(() => service.getSettings().sync.iCloudEnabled ? "Ready" : "Off");
   const [moveFeedbackPreferences, setMoveFeedbackPreferences] = useState<MoveFeedbackPreferences>(
-    () => moveFeedbackPreview?.initialPreferences ?? {
+    () => moveFeedbackSettings?.initialPreferences ?? {
       hapticsEnabled: true,
       soundEnabled: true
     }
@@ -2983,8 +2983,8 @@ export function PracticePocScreen({
                 showRatingControls={!ratingEditingMovedToHome}
                 iCloudSyncEnabled={iCloudSyncEnabled}
                 iCloudSyncStatus={iCloudSyncStatus}
-                moveFeedbackPreferences={moveFeedbackPreview ? moveFeedbackPreferences : undefined}
-                moveFeedbackPreviewer={moveFeedbackPreview?.preview}
+                moveFeedbackPreferences={moveFeedbackSettings ? moveFeedbackPreferences : undefined}
+                moveFeedbackPreviewer={moveFeedbackSettings?.preview}
                 advancedRatingsOpen={settingsAdvancedRatingsOpen}
                 onAdvancedRatingsOpenChange={setSettingsAdvancedRatingsOpen}
                 onMoveFeedbackPreferencesChange={setMoveFeedbackPreferences}
@@ -9756,12 +9756,17 @@ function SettingsPanel({
       </SettingsSection>
 
       {moveFeedbackPreferences ? (
-        <MoveFeedbackSettingsSection
-          preferences={moveFeedbackPreferences}
+        <SettingsSection
+          title="Move Feedback"
+          testID="settings-move-feedback-section"
           wide={adaptiveLayout.usesWideContent}
-          onPreferencesChange={onMoveFeedbackPreferencesChange}
-          onPreview={moveFeedbackPreviewer}
-        />
+        >
+          <MoveFeedbackSettingsSection
+            preferences={moveFeedbackPreferences}
+            onPreferencesChange={onMoveFeedbackPreferencesChange}
+            onPreview={moveFeedbackPreviewer}
+          />
+        </SettingsSection>
       ) : null}
 
       {showRatingControls ? (
