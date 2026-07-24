@@ -267,6 +267,26 @@ export class PracticeService {
     return this.store.listAttempts(filter);
   }
 
+  getHistoryAttempt(attemptId: string): AttemptHistoryRow | undefined {
+    return this.store.getAttempt(attemptId);
+  }
+
+  countHistory(filter: HistoryFilter = {}): number {
+    return this.store.countAttempts(filter);
+  }
+
+  getPracticeProgressSummary(nowMs: number, ratingKey: string) {
+    return this.store.getPracticeProgressSummary(nowMs, ratingKey);
+  }
+
+  listPracticeRatingActivity() {
+    return this.store.listPracticeRatingActivity();
+  }
+
+  hasPlayedRatingKey(ratingKey: string): boolean {
+    return this.store.hasPlayedRatingKey(ratingKey);
+  }
+
   setAttemptUnclear(attemptId: string, unclear: boolean, updatedAt = new Date().toISOString()): AttemptHistoryRow {
     return this.store.setAttemptUnclear(attemptId, unclear, updatedAt);
   }
