@@ -15,7 +15,10 @@ instead of depending on manually seeded app data.
 - Use a dedicated simulator such as `iPhone 17-Detox`. Never use a simulator
   that contains manual-test data; Detox launches with `delete: true`.
 - Commit the intended changes and require a clean tracked worktree before
-  producing exact-head evidence. Any later code change invalidates it.
+  producing exact-head evidence. Any later visual, runtime, native, dependency,
+  capture-fixture, or build-configuration change invalidates it. Documentation,
+  review metadata, and merge ancestry alone may reuse it when both SHAs and the
+  unchanged-input diff are recorded.
 - Capture Release, not Debug. Debug exposes puzzle-source and Review developer
   controls that must not appear in the product baseline.
 - Keep raw screenshots under ignored `scratch/` or `apps/mobile/artifacts/`.

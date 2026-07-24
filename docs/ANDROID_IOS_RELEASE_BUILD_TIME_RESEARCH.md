@@ -1,6 +1,6 @@
 # Android and iOS Release Build-Time Research
 
-Status date: 2026-07-19
+Status date: 2026-07-24
 
 ## Executive summary
 
@@ -11,10 +11,11 @@ them can be improved with a "delta build."
   the Gradle build cache, Gradle configuration cache, Xcode incremental builds,
   Metro's transform cache, and native compiler caches are the relevant
   mechanisms.
-- Validation can be risk-scoped during pull-request development, but exact-head
-  release evidence cannot be carried across a source change. The release
-  candidate should be built once, validated once, and promoted without a
-  rebuild.
+- Validation can be risk-scoped. Passing native evidence can be reused across a
+  later documentation, review-metadata, or merge-ancestry-only change when the
+  tested and candidate SHAs plus their validation-relevant unchanged-input
+  comparison are recorded. The release candidate should still be built once,
+  validated once, and promoted without a rebuild.
 - Google Play and the App Store optimize what users download. That is separate
   from building and uploading: each store release still starts from a new,
   complete signed AAB or Apple archive/build.
@@ -37,10 +38,32 @@ wall clock. The measured iOS critical path is dominated by simulator and Detox
 work after a 6m43s build, while Android's full validation is already parallel
 and spends 18m40s in the slowest post-build API 36 job. The clearest recurring
 build target is the cold signed Android candidate: `bundleRelease` consumed
-12m59s of its 14m54s job. A separate current problem is operational rather than
-computational: the GitHub source-release phase reuses the candidate and fails
-in about one minute, but repeated GitHub Release `POST` authorization failures
-have created a manual retry loop.
+12m59s of its 14m54s job. The earlier GitHub authorization retry loop was
+removed by the current built-in-token source publication and idempotent
+no-rebuild recovery workflows.
+
+### Android 1.2 build-6 recurring-release observation
+
+The 2026-07-23/24 Android 1.2 build-6 pass confirms where a recurring release
+still spends time:
+
+| Stage | Observed time or result |
+| --- | --- |
+| Protected artifact-only candidate build | About 15 minutes; one 440,381,305-byte AAB was retained |
+| Browser upload of the retained AAB to Play | About 34 minutes |
+| Play quick checks | About 10–15 minutes |
+| Source publication recovery | 52 seconds; reused artifact ID `8586432221` and did not rebuild |
+| Hosted full Android matrix | Not run; it is a manual diagnostic, not a recurring delta gate |
+
+The candidate source step initially failed because a repository-relative
+manifest path was resolved twice. The recovery workflow published the retained
+manifest without rebuilding, and the CLI path resolution now has regression
+coverage. The more important process miss was after Play submission: the source
+Release was public, but the Play-signed APK mirror was left pending because the
+runbooks described it as an optional small step rather than a release-completion
+postcondition. The current standard keeps the mirror small and idempotent but
+does not call Android complete until owner smoke, exactly three public Release
+assets, and a retained mirror receipt are present.
 
 ## Four meanings of "delta"
 
@@ -116,7 +139,7 @@ earlier in parallel. This does not include the separately owner-run iOS device
 archive, store processing, or physical acceptance, whose durations still need
 to be recorded.
 
-### Current non-build retry loop
+### Historical non-build retry loop and resolution
 
 The recent `prepare-source-draft` attempts
 [29673717647](https://github.com/Chessticize/chessticize-mobile/actions/runs/29673717647),
@@ -125,11 +148,12 @@ The recent `prepare-source-draft` attempts
 [29700946902](https://github.com/Chessticize/chessticize-mobile/actions/runs/29700946902),
 and
 [29702845774](https://github.com/Chessticize/chessticize-mobile/actions/runs/29702845774)
-each fail in roughly one minute while reusing the retained candidate. The
-latest failure is a GitHub Release creation `POST` returning 403 with the
-fine-grained PAT; earlier attempts also returned 403 with the built-in
-integration token. This does not justify rebuilding the AAB. It calls for an
-authorization preflight and a resumable release orchestration path.
+each failed in roughly one minute while reusing the retained candidate. The
+failures were GitHub Release authorization problems, not build failures, and
+did not justify rebuilding the AAB. The current protocol removed the temporary
+personal token and multi-phase publication path: the candidate uses the
+built-in token, and an exceptional recovery workflow can publish the retained
+source manifest without rebuilding.
 
 ## First release versus recurring releases
 
@@ -151,12 +175,11 @@ bootstrap unless credentials or policy change.
 
 Recurring release latency should therefore be reported separately as:
 
-1. exact-head validation;
+1. exact-head fast checks plus the selected release validation scope;
 2. one signed candidate build per platform;
 3. promotion of those retained candidates;
 4. store processing and required release acceptance;
-5. the small post-Play APK mirror, when the GitHub manual-download asset is
-   required.
+5. the small required post-Play APK mirror and receipt.
 
 That separation prevents a one-time Play eligibility gate or a current token
 misconfiguration from being misdiagnosed as an inherently slow compiler.
@@ -267,9 +290,11 @@ The following are repository observations, not measured timing results.
 - Local iOS validation runs `flows` and `practice` serially when full scope is
   required. Release validation uses delta, targeted, and full risk scopes; both
   suites are required only for broad native risk.
-- A source-tree change after validation changes the candidate identity. Cache
-  reuse is acceptable. A squash-merged commit may reuse evidence only when its
-  Git tree exactly matches the tested tree and both IDs are recorded.
+- A validation-relevant development change after validation invalidates that
+  native evidence. A candidate may reuse evidence when the tested and candidate
+  SHAs are recorded and their diff proves that runtime, native/platform,
+  dependency, build/release, and selected native test/fixture inputs are
+  unchanged.
 
 ### Distribution work
 
@@ -435,8 +460,9 @@ can remain pending. Prefer an always-created required workflow whose jobs
 select the justified scope. See
 [GitHub workflow path filters](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow).
 
-This saves development feedback time. It must not be used to carry old release
-evidence onto a different commit.
+This saves development feedback time. Evidence may cross a commit boundary only
+under the repository's recorded unchanged-validation-input rule; it must not be
+carried across a validation-relevant development change.
 
 ### 7. Build once and promote the same artifact
 
@@ -508,8 +534,10 @@ It should not be the first optimization.
 - An E2E APK is not the production AAB.
 - A Gradle or Xcode cache entry is not a release artifact and must not be
   published.
-- A prior commit's green Detox run is not exact-head evidence for a changed
-  candidate.
+- A prior commit's green Detox run is not evidence for a candidate whose
+  validation-relevant development inputs changed. Documentation,
+  review-metadata, or merge-ancestry-only differences may reuse it only with
+  the recorded SHA/diff proof required by the release policy.
 - Store-generated update packages are not partial artifacts that the developer
   can upload.
 - Building only the active Android ABI is safe for local development, not for

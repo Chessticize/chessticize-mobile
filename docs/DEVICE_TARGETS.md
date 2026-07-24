@@ -7,20 +7,22 @@ The permanent Android application ID, namespace, and Kotlin package are
 with compile and target API 36. Universal Android packages contain only
 `arm64-v8a` and `x86_64` native libraries.
 
-The scheduled Android CI workflow builds one self-contained E2E APK, verifies
-its native ABI contents, and runs the complete shared `flows` and `practice`
-suites on an API 36 x86_64 phone emulator. Manual exact-head dispatch reuses
-that build for the bounded API 24 launch/storage/practice/native-engine smoke
-and representative API 36 tablet and foldable/resizable evidence. See
-`docs/ANDROID_VALIDATION.md`. Production release packaging requires explicit
-release signing material and has no debug keystore fallback.
+The manually dispatched Android diagnostic workflow builds one self-contained
+E2E APK, verifies its native ABI contents, and can run the complete shared
+`flows` and `practice` suites on an API 36 x86_64 phone emulator. The same
+manual workflow reuses that build for the bounded API 24
+launch/storage/practice/native-engine smoke and representative API 36 tablet
+and foldable/resizable evidence. It has no scheduled trigger and is not a
+recurring release gate; select it only under `docs/ANDROID_VALIDATION.md`.
+Production release packaging requires explicit release signing material and
+has no debug keystore fallback.
 
 ## iOS Device Targets
 
-Chessticize Mobile 1.1 ships for adaptive iPhone portrait/landscape
+Chessticize Mobile 1.2 ships for adaptive iPhone portrait/landscape
 and adaptive iPad portrait, landscape, and multitasking layouts.
 
-## 1.1 Decision
+## Current Decision
 
 - Device family: iPhone and iPad (`TARGETED_DEVICE_FAMILY = "1,2"`)
 - Orientation: iPhone portrait and landscape; iPad portrait, upside-down
@@ -29,7 +31,7 @@ and adaptive iPad portrait, landscape, and multitasking layouts.
 
 ## Rationale
 
-The 1.1 design keeps the board as the primary surface while adapting the chrome
+The current design keeps the board as the primary surface while adapting the chrome
 and control placement to the measured viewport. Compact portrait keeps the
 bottom-tab, one-column phone flow. Compact landscape uses a fixed board lane and
 scrollable control rail so the board is not pushed below the fold. Regular-width

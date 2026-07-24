@@ -334,7 +334,7 @@ manualGate(
 );
 manualGate(
   "Execute the internal TestFlight physical-device pass",
-  `Upload the build to App Store Connect, distribute it to Internal ${iosReleaseIdentity.version} QA, install from TestFlight on physical iPhone and iPad hardware, and fill docs/TESTFLIGHT_QA.md evidence.`
+  `Upload the build to App Store Connect, distribute it to Internal ${iosReleaseIdentity.version} QA, install from TestFlight on the owner's physical iPhone, and fill docs/TESTFLIGHT_QA.md evidence. Add an iPad for first launch, adaptive-layout changes, or other broad native risk.`
 );
 
 const failed = checks.filter((entry) => entry.status === "fail");

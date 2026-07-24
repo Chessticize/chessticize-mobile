@@ -123,9 +123,17 @@ an unexplained failure with a successful rerun.
   `COPYING.txt`, and Stockfish `AUTHORS`, plus native debug symbols.
 - The Play candidate was built from the exact `android-v<version>-build-<code>`
   tagged commit and every Play track references the same AAB/version code.
-- Any GitHub APK is downloaded from Play only after that version is published
-  and owner-smoke-tested. It uses the same source Release and Play app-signing
-  certificate; CI never rebuilds a second APK for redistribution.
+- After a Play-delivered Android build passes owner smoke, finish the release by
+  downloading its universal APK from Play and mirroring it through
+  `docs/ANDROID_GITHUB_RELEASE.md`. The GitHub Release must then contain exactly
+  the source manifest, Play-signed APK, and checksum, and the mirror receipt
+  must be retained.
+- The source-only GitHub Release is the required pre-Play state, not the final
+  Android release state. A pending or failed mirror does not invalidate an
+  already accepted Play release and never triggers a rebuild, but release
+  status must remain `APK mirror pending` until the idempotent mirror succeeds.
+- The GitHub APK uses the same source Release and Play app-signing certificate;
+  CI never rebuilds a second APK for redistribution.
 
 ## Release Manifest
 

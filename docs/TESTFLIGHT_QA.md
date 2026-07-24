@@ -1,6 +1,6 @@
 # TestFlight QA Pass
 
-This document is the 1.1 TestFlight release checklist and evidence log. It is
+This document is the 1.2 TestFlight release checklist and evidence log. It is
 not complete until an App Store Connect build is distributed to an internal
 tester group and the physical-device checklist below is executed.
 
@@ -22,6 +22,8 @@ Recheck Apple's live documentation before the pass:
 3. Create or reuse an internal testing group.
 4. Add the build to that internal testing group.
 5. Install every build from TestFlight on the owner's physical device.
+   For a routine delta this is normally a physical iPhone; add an iPad when the
+   selected release scope requires it.
 6. For a delta, verify installed version, cold launch, one real Practice path,
    and the changed behavior. Use the full iPhone/iPad checklist only for first
    launch or broad native risk.
@@ -35,7 +37,7 @@ binary on real hardware.
 
 | Field | Value |
 | --- | --- |
-| Test group | `Internal 1.1 QA` |
+| Test group | `Internal 1.2 QA` |
 | Beta app description | `Offline chess tactics trainer for Puzzle Sprint, Arrow Duel, mistake review, local ratings, and on-device Stockfish analysis.` |
 | What to test | `Run a Standard sprint, run Arrow Duel, fail a sprint and review mistakes, verify History filters, complete a scheduled review, verify iCloud Sync and About links, relaunch the app, and test offline practice in airplane mode.` |
 | Feedback path | `https://github.com/Chessticize/chessticize-mobile/issues` |
@@ -183,9 +185,9 @@ while private; only commit sanitized screenshots or logs intentionally.
 
 Current source release candidate:
 
-- Source commit: the commit pointed to by the `ios-v1.1.0-build-2` tag
+- Source commit: the commit pointed to by the `ios-v1.2.0-build-1` tag
 - Release tag:
-  [`ios-v1.1.0-build-2`](https://github.com/Chessticize/chessticize-mobile/releases/tag/ios-v1.1.0-build-2)
+  [`ios-v1.2.0-build-1`](https://github.com/Chessticize/chessticize-mobile/releases/tag/ios-v1.2.0-build-1)
 - Rule: upload only a binary archived from the exact commit pointed to by this
   tag. If any source, dependency, puzzle, native, or notice file changes before
   upload, regenerate the release manifest and publish a new tag/release for the
@@ -193,8 +195,8 @@ Current source release candidate:
 
 | Field | Value |
 | --- | --- |
-| Source commit | Tag target for `ios-v1.1.0-build-2` |
-| Release tag | `ios-v1.1.0-build-2` |
+| Source commit | Tag target for `ios-v1.2.0-build-1` |
+| Release tag | `ios-v1.2.0-build-1` |
 | App Store Connect build | TBD |
 | TestFlight group | TBD |
 | Physical device and iOS version | TBD |
@@ -224,13 +226,15 @@ The command writes a timestamped folder under `scratch/testflight-qa/` with:
 
 The bundle is only local evidence for repository-controlled gates. It does not
 complete the TestFlight pass until the uploaded App Store Connect build is
-distributed, installed from TestFlight on physical iPhone and iPad hardware, and
-the manual checklist plus evidence log above are filled.
+distributed, installed from TestFlight on the owner's physical device, and the
+applicable risk-scoped manual checklist plus evidence log above are filled. Add
+the representative iPad pass for first launch, adaptive-layout changes, or
+other broad native risk.
 
 ## Archive And Upload
 
 Follow `docs/APP_STORE_UPLOAD.md` for the owner-executed archive and upload
-step. The 1.1 upload path uses `xcodebuild archive`, then
+step. The 1.2 upload path uses `xcodebuild archive`, then
 `xcodebuild -exportArchive` with
 `apps/mobile/ios/ExportOptions.app-store-connect.plist`. Do not count this step
 as complete until App Store Connect finishes processing the uploaded build.
@@ -243,7 +247,7 @@ Milestone 5 item 7 is complete only when:
 2. App Store Connect shows the build available to the internal testing group.
 3. At least one internal tester installs it through TestFlight on a physical
    iPhone.
-4. Every checklist item above is passed or has an explicitly accepted
-   release-blocker decision.
+4. Every checklist item selected by the recorded release scope is passed or has
+   an explicitly accepted release-blocker decision.
 5. The evidence log is filled with the exact build, device, tester, result, and
    evidence location.

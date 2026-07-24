@@ -49,8 +49,10 @@ inspection remains `pnpm mobile:verify:android:abis` after the APK exists.
   fixtures, native build configuration, Detox infrastructure, or an otherwise
   unbounded native risk.
 
-Record the chosen scope and rationale in the PR. A code change after native
-evidence invalidates that evidence.
+Record the chosen scope and rationale in the PR. A later
+validation-relevant development change invalidates that evidence; documentation,
+review metadata, and merge ancestry alone follow the recorded evidence-reuse
+rule below.
 
 ## Automated matrix
 
