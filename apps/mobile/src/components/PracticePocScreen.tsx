@@ -1684,7 +1684,9 @@ export function PracticePocScreen({
       ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
       ...(selectedHistoryThemes.length === 0 ? {} : { themes: selectedHistoryThemes }),
       ...(historyReviewStatusFilter === "all" ? {} : { reviewStatus: historyReviewStatusFilter }),
-      ...(historyUnclearOnly ? { unclear: true } : {})
+      ...(historyUnclearOnly ? { unclear: true } : {}),
+      ...(historyAttentionOnly ? { attentionOnly: true } : {}),
+      ...(historyAttentionFlags.length === 0 ? {} : { attentionFlags: historyAttentionFlags })
     }).attempts;
     const selectedAttempt = historyReviewAttempts.find((attempt) => attempt.id === attemptId);
     if (!selectedAttempt) {

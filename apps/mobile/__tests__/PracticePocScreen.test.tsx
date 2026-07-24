@@ -5156,6 +5156,63 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "20 / 22 · Standard");
   });
 
+  it("keeps Needs attention and selected Attention flags on History review navigation", () => {
+    const store = new MemoryStore();
+    store.seedPuzzles([sharedHistoryPuzzle()]);
+    [
+      {
+        id: "attention-wrong",
+        result: "wrong" as const,
+        completedAt: "2026-07-23T12:00:30.000Z"
+      },
+      {
+        id: "attention-clean",
+        result: "correct" as const,
+        completedAt: "2026-07-23T12:00:20.000Z"
+      },
+      {
+        id: "attention-slow",
+        result: "correct" as const,
+        completedAt: "2026-07-23T12:00:10.000Z",
+        timingStatus: "slow" as const
+      }
+    ].forEach((attempt) => {
+      store.recordAttempt({
+        id: attempt.id,
+        source: "sprint",
+        sessionId: `session-${attempt.id}`,
+        puzzleId: "shared-history",
+        mode: "standard",
+        ratingKey: "standard 5/20",
+        result: attempt.result,
+        submittedMove: "e2e4",
+        expectedMove: attempt.result === "wrong" ? "e2e3" : "e2e4",
+        startedAt: "2026-07-23T12:00:00.000Z",
+        completedAt: attempt.completedAt,
+        ratingBefore: 600,
+        ...("timingStatus" in attempt ? { timingStatus: attempt.timingStatus, elapsedMs: 41_000 } : {})
+      });
+    });
+    const renderer = renderScreen({
+      currentTimeMs: () => Date.parse("2026-07-23T12:01:00.000Z"),
+      practiceService: new PracticeService(store)
+    });
+
+    press(renderer, "history-tab");
+    press(renderer, "history-attention-needs-attention");
+    press(renderer, "history-attempt-attention-wrong");
+    expectText(renderer, "1 / 2 · Standard");
+    expect(findByTestId(renderer, "review-next").props.disabled).toBe(false);
+
+    press(renderer, "review-exit");
+    press(renderer, "history-filter-toggle");
+    press(renderer, "history-attention-flag-slow");
+    press(renderer, "history-attempt-attention-slow");
+    expectText(renderer, "1 / 1 · Standard");
+    expect(findByTestId(renderer, "review-previous").props.disabled).toBe(true);
+    expect(findByTestId(renderer, "review-next").props.disabled).toBe(true);
+  });
+
   it("keeps history row paging while the performance card stays rating-only", () => {
     const service = createMobilePracticeService("random1000");
     for (let index = 0; index < 22; index += 1) {
