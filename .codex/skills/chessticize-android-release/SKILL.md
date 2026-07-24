@@ -5,8 +5,9 @@ description: Audit, prepare, advance, recover, and complete Chessticize Mobile A
 
 # Chessticize Android Release
 
-Google Play distributes Android binaries first. GitHub publishes corresponding
-source and mirrors the exact Play-signed universal APK after Play publication.
+Google Play processes Android binaries first. GitHub publishes corresponding
+source and mirrors the exact Play-signed universal APK after the Generated APKs
+API exposes it.
 Treat the signed AAB, annotated tag, source manifest, Play version code, and
 mirrored APK as one release identity.
 
@@ -110,7 +111,7 @@ backup, or compatibility gates unless this is first launch, the boundary changed
 | Recover source | The manual recovery workflow authenticates the original candidate artifact and idempotently publishes the same source manifest; no rebuild or token substitution. |
 | Validate | Exact-head fast checks plus the selected delta, targeted, or full scope pass. |
 | Promote | The same retained AAB/version code advances through the selected Play track; applicable live Console errors are resolved. |
-| Mirror APK | After Play publication, one manual CI job downloads the Play-signed universal APK, verifies identity, and adds it plus SHA-256 to the source Release. |
+| Mirror APK | After Play processing exposes the universal APK, one manual CI job downloads it, verifies identity, and adds it plus SHA-256 to the source Release. Track review may continue independently. |
 
 Both GitHub mutations use the built-in `github.token` with `contents: write`.
 The mirror obtains a short-lived Play token through configured workload identity
@@ -119,7 +120,7 @@ token. Do not add prepare/publish phases or a second APK build.
 
 The Android release is not complete until the mirror workflow succeeds, the
 public Release has exactly the source manifest, Play-signed APK, and checksum,
-and its receipt is retained. A source-only Release remains a valid pre-Play
+and its receipt is retained. A source-only Release remains a valid pre-mirror
 state; report `APK mirror pending` whenever mirroring is still open.
 
 ## Preserve invariants
@@ -131,8 +132,8 @@ state; report `APK mirror pending` whenever mirroring is still open.
   and the direct exact-release details/source link.
 - Reuse one retained AAB across every Play track and Production; never rebuild
   between tracks.
-- Publish only the universal APK returned by Play after Play publishes the
-  release; never publish an upload-key or locally rebuilt APK.
+- Publish only the universal APK returned by the Play Generated APKs API; never
+  publish an upload-key or locally rebuilt APK.
 - Preserve package, versions, upload signing identity, ABIs, 16 KB result,
   license/source assets, symbols, and AAB digest.
 - Keep credentials, signing material, tester identities, private evidence, and
@@ -154,8 +155,7 @@ state; report `APK mirror pending` whenever mirroring is still open.
 - Preserve failed runs and report external waits as UNKNOWN or blocked; do not
   hand-edit evidence.
 - A failed APK mirror is retried idempotently against the same Play version
-  code. It does not invalidate the already accepted Play release or trigger a
-  rebuild.
+  code. It does not invalidate the Play candidate or trigger a rebuild.
 
 ## Report completion
 

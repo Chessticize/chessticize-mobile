@@ -9,11 +9,11 @@ This is a Play-first APK mirror, not a second build or an independent release
 channel. The GitHub APK has the same application ID, version code, and Play
 app-signing certificate as the APK generated from the released AAB.
 
-The source-only Release is the correct pre-Play state and satisfies the
-corresponding-source publication rule. It is not a complete Android release
-after Play publication. Release completion also requires a successful mirror
-receipt and exactly three public assets: the source manifest, Play-signed APK,
-and APK checksum.
+The source-only Release is the correct pre-mirror state and satisfies the
+corresponding-source publication rule. It is not a complete GitHub binary
+release. That publication is complete after a successful mirror receipt and
+exactly three public assets: the source manifest, Play-signed APK, and APK
+checksum. Play track review and publication remain a separate store state.
 
 ## Candidate and source publication
 
@@ -40,17 +40,17 @@ Release must be public before or with every Play-distributed candidate.
 
 After both conditions are true:
 
-- the retained AAB/version code has been published through the intended Play
-  track;
+- Play has processed the retained AAB/version code and the Generated APKs API
+  exposes its universal APK;
 - the matching corresponding-source Release is already public;
 
 manually dispatch `Publish Play-generated Android APK` with `public_version`
 and `version_code`.
 
-Do not stop the release handoff at Play upload, quick checks, review submission,
-or source publication. Until Play publication and this dispatch are complete,
-report the release as `Play submitted; APK mirror pending` or
-`Play published; APK mirror pending`, whichever is accurate.
+Do not stop the GitHub binary-release handoff at Play upload, quick checks,
+review submission, or source publication. Until the Generated APKs API exposes
+the artifact and this dispatch is complete, report `APK mirror pending`.
+Continue reporting the Play track's review/publication state separately.
 
 The workflow has one job and no protected publication environment. It:
 
@@ -70,7 +70,7 @@ The workflow has one job and no protected publication environment. It:
 The mirror does not run Gradle, install project dependencies, rebuild the AAB
 or APK, rerun product tests or Detox, validate ABIs or 16 KB alignment again,
 consume the full Play-ready/owner evidence contract, or wait for another human
-approval. Those boundaries were already proven before Play publication.
+approval. Those boundaries were already proven before mirror dispatch.
 
 The operation is idempotent. A retry accepts exact existing assets and fills in
 only missing state. Conflicting source, APK, checksum, tag, version, signer, or
@@ -109,8 +109,8 @@ operator does not supply or rotate a temporary token for each release.
 
 The commands below are the recurring operator path. Replace the example public
 version, version code, tag, commit, and run ID with the exact retained candidate.
-Do not dispatch the mirror until Play has published the version code and the
-matching source Release is public.
+Do not dispatch the mirror until Play has processed the version code, its
+Generated APK is available, and the matching source Release is public.
 
 ### 1. Check the one-time authentication setup
 
@@ -169,8 +169,8 @@ printf 'candidate commit: %s\n' "$tagged_commit_sha"
 The tag query must return an annotated tag object, the tag and manifest commits
 must match the retained candidate commit, the Release must be public, and
 `android-source-manifest.json` must be its only asset before mirroring.
-Separately record the active Play track and live Play publication state. An
-issue checkbox does not replace the Console or API result.
+Separately record the active Play track and live Play review/publication state.
+An issue checkbox does not replace the Console or API result.
 
 ### 3. Dispatch and monitor the mirror
 
@@ -274,7 +274,7 @@ ID. The workflow authenticates the retained artifact and idempotently publishes
 the same source without rebuilding.
 
 Do not use recovery to substitute a local lookalike, move a tag, reuse a
-version code, or publish an APK before Play publication.
+version code, or publish an APK before the Play Generated APKs API exposes it.
 
 ## Operator record
 

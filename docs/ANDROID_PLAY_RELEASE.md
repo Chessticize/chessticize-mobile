@@ -13,8 +13,8 @@ runtime library. Version code 6 completed the Android 1.2 release operation for
 the current Play track: corresponding source, Play delivery, owner
 physical-device smoke under the former policy, and the Play-signed GitHub APK
 mirror are complete. Version code 7 is the Android 1.2.1 ordinary-delta release
-currently in Play review with corresponding source published and the binary
-mirror pending.
+currently in Play review with corresponding source and the Play-signed GitHub
+binary release published.
 This runbook deliberately separates
 repository-owned checks from owner-only Play Console evidence. Missing signing material,
 protected-environment setup, or any console result is a blocker; never replace
@@ -154,7 +154,7 @@ Do not move the build-6 tag, rebuild its AAB, replace its public source
 manifest or mirrored assets, or reuse version code 6. The public Release has
 exactly the required source manifest, Play-signed APK, and checksum.
 
-Build 7 is the Android 1.2.1 ordinary-delta release in progress:
+Build 7 is the Android 1.2.1 ordinary-delta GitHub binary release:
 
 - annotated tag: `android-v1.2.1-build-7`, targeting
   `9028826447330d67ab4c34f64a3fb7d1b5b05229`;
@@ -168,8 +168,23 @@ Build 7 is the Android 1.2.1 ordinary-delta release in progress:
   `1267e260d0a77bddc11475aefb2a8dbc926347395793ca4e36db3ed9048e3f11`;
 - public corresponding-source release:
   [`android-v1.2.1-build-7`](https://github.com/Chessticize/chessticize-mobile/releases/tag/android-v1.2.1-build-7);
-- current state: Closed testing Alpha build `7 (1.2.1)` is in Play review;
-  the Play-signed APK mirror is pending Play publication.
+- public source-manifest SHA-256:
+  `f06491e90802fd38d4598fbe5dcf6e651ad6d9b8c029415d837b6e24f505139d`;
+- successful APK-mirror workflow run:
+  [`30126025819`](https://github.com/Chessticize/chessticize-mobile/actions/runs/30126025819);
+- Play-signed universal APK: 359,785,415 bytes, SHA-256
+  `ce756d365d42d8714a1841233dddcfb388c80dbb59e1c3a08d86f8509521afe9`,
+  asset ID `488818447`;
+- Play app-signing certificate SHA-256:
+  `318a4453d4052c90364d3abfe376dce9c06a04ab70db7ce1d5d43ba995cff900`;
+- checksum asset ID `488818430`, SHA-256
+  `c0c7fbcd1df6e90ec3052874f2e32eea67ae45e5d015d62bbe5ed21b75089327`;
+- retained receipt artifact ID `8609270415`, named
+  `android-apk-mirror-9028826447330d67ab4c34f64a3fb7d1b5b05229`;
+- current state: GitHub binary publication is complete with exactly the source
+  manifest, Play-signed APK, and checksum. Closed testing Alpha build
+  `7 (1.2.1)` was last observed in Play review; track review continues
+  independently and must not be reported as published until the Console says so.
 
 ## Canonical identity
 
@@ -258,9 +273,9 @@ cannot produce a `play-ready` verdict and is not enough to close #186.
 The candidate workflow publishes the exact corresponding source itself. Before
 Play distribution, its public Release contains only
 `android-source-manifest.json` and matches the annotated tag, commit,
-application ID, version, version code, and AAB SHA-256. After Play publication
-the separate one-job mirror must add only the exact Play-generated universal
-APK and its SHA-256 checksum.
+application ID, version, version code, and AAB SHA-256. After Play processing
+exposes the universal APK, the separate one-job mirror adds only that exact
+Play-generated file and its SHA-256 checksum.
 
 ### Release completion states
 
@@ -270,13 +285,13 @@ Use these states in status reports and handoffs:
 | --- | --- |
 | Candidate ready | Retained verified AAB, annotated tag, and public source Release containing only the matching source manifest. |
 | Play submitted | The same AAB/version code is saved or submitted to the intended track and all currently visible actionable Play errors are resolved. |
-| Play published | The intended track reports the version code as published and the Generated APKs API exposes the Play-signed universal APK. |
-| Release complete | The mirror workflow succeeds, the GitHub Release has exactly the source manifest, Play-signed APK, and checksum, and the mirror receipt is retained. |
+| APK available | Play has processed the AAB and the Generated APKs API exposes the Play-signed universal APK; track review may still be open. |
+| GitHub binary published | The mirror workflow succeeds, the GitHub Release has exactly the source manifest, Play-signed APK, and checksum, and the mirror receipt is retained. |
+| Play published | The intended track reports the version code as published. |
 
 A source-only GitHub Release satisfies the corresponding-source requirement
-before Play distribution, but it is not a complete Android release after a
-Play build has been published. If the mirror is still pending, report that
-state explicitly instead of reporting the release as complete.
+before Play distribution, but it is not a complete GitHub binary release. Report
+the mirror and Play track states independently until both are complete.
 
 ### Ordinary delta
 
@@ -300,7 +315,7 @@ manifest bytes, or incomplete source disclosure fails closed.
    `docs/ANDROID_VALIDATION.md` when the changed boundary requires them.
 3. Resolve any new Play Console error or actionable warning for this artifact,
    then promote the same version code.
-4. After Play publishes the version code, dispatch
+4. After Play processing exposes the version code's universal APK, dispatch
    `Publish Play-generated Android APK`. This required release
    finalizer downloads from Play, checks only package/version/signing identity
    and SHA-256, and appends the APK plus checksum to the existing source
