@@ -6612,6 +6612,32 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "settings-panel"))).not.toContain("›");
   });
 
+  it("places the Storybook-only Move Feedback section after Notifications", () => {
+    const renderer = renderScreen({
+      moveFeedbackPreview: {
+        preview: async () => ({ haptics: "visual-only", sound: "played" })
+      }
+    });
+
+    press(renderer, "settings-tab");
+
+    expect(findByTestId(renderer, "settings-move-feedback-section")).toBeTruthy();
+    expect(
+      testIdOrder(
+        renderer,
+        "settings-notifications-section",
+        "settings-move-feedback-section"
+      )
+    ).toBeLessThan(0);
+    expect(
+      testIdOrder(
+        renderer,
+        "settings-move-feedback-section",
+        "settings-profile-section"
+      )
+    ).toBeLessThan(0);
+  });
+
   it("routes feedback to GitHub only after an explicit privacy handoff", async () => {
     const renderer = renderScreen();
     const openURLSpy = jest.spyOn(ReactNative.Linking, "openURL").mockResolvedValue(undefined);
@@ -7140,7 +7166,7 @@ function createScriptedStockfishTransport(
 }
 
 type RenderScreenOptions = TestMobilePlatformCapabilityOverrides &
-  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEloEditingMovedToHome" | "runManagementEnabled" | "runManagementPresentation" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "themeCatalogPresentation"> & {
+  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "moveFeedbackPreview" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEloEditingMovedToHome" | "runManagementEnabled" | "runManagementPresentation" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "themeCatalogPresentation"> & {
     platformCapabilities?: MobilePlatformCapabilities;
   };
 
@@ -7238,6 +7264,7 @@ function renderScreen({
   currentTimeMs,
   customTargetCorrect,
   debugTrace,
+  moveFeedbackPreview,
   puzzleSelectionId,
   puzzleSelectionSeed,
   runEloEditingMovedToHome,
@@ -7258,6 +7285,7 @@ function renderScreen({
         currentTimeMs={currentTimeMs}
         customTargetCorrect={customTargetCorrect}
         debugTrace={debugTrace}
+        moveFeedbackPreview={moveFeedbackPreview}
         puzzleSelectionId={puzzleSelectionId}
         puzzleSelectionSeed={puzzleSelectionSeed}
         runEloEditingMovedToHome={runEloEditingMovedToHome}

@@ -54,6 +54,26 @@ export const NotificationsNotDetermined: Story = {
   }
 };
 
+export const MoveFeedback: Story = {
+  name: "Move feedback",
+  args: { scenarioId: "settings-move-feedback" },
+  tags: ["new"],
+  play: async ({ canvasElement }) => {
+    await openSettings(canvasElement);
+    await waitForTestId(canvasElement, "settings-move-feedback-section");
+    await waitForTestId(canvasElement, "settings-move-feedback-previews");
+    await waitForText(
+      canvasElement,
+      "Web demo only. Preview the proposed move and capture sounds; haptics require the native app. Check this tab and device volume if you do not hear them."
+    );
+    await waitForTestId(canvasElement, "settings-move-feedback-preview-move");
+    await waitForTestId(canvasElement, "settings-move-feedback-preview-capture");
+    expectTestIdAbsent(canvasElement, "settings-move-feedback-preview-success");
+    expectTestIdAbsent(canvasElement, "settings-move-feedback-preview-mistake");
+    expectTestIdAbsent(canvasElement, "settings-move-feedback-device-note");
+  }
+};
+
 export const AdvancedRatingEditor: Story = {
   name: "ELO controls moved to runs",
   args: { scenarioId: "settings-advanced-ratings" },

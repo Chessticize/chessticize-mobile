@@ -19,6 +19,7 @@ import {
   configureMobilePracticePuzzleSource,
   type MobilePuzzleSource
 } from "./browserMobilePractice.ts";
+import { previewBrowserMoveFeedback } from "./browserMoveFeedbackPreview.ts";
 import { clearLabPracticeService, setLabPracticeService } from "./boardController.ts";
 import { ISSUE_272_LAB_PUZZLE, LAB_PUZZLES, PRIMARY_LAB_PUZZLE } from "./labPuzzles.ts";
 import { scenarioRegistry, type LabScenarioId } from "./scenarioRegistry.ts";
@@ -210,6 +211,11 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     case "settings-feedback-entry-failure":
       screenProps.feedbackIssuesOpener = async () => {
         throw new Error("browser unavailable");
+      };
+      break;
+    case "settings-move-feedback":
+      screenProps.moveFeedbackPreview = {
+        preview: previewBrowserMoveFeedback
       };
       break;
     case "system-error":
