@@ -1,12 +1,14 @@
 const { execFileSync } = require('node:child_process');
 const {
-  boardPoint,
-  frameFor,
+  elementText,
   launchWithDisabledSynchronization,
+  openTab,
+  playBoardMove,
   selectTestPuzzleSource,
-  sleep,
   startPracticeMode,
-  waitForVisibleInPracticeScroll
+  waitForElementTextContaining,
+  waitForRunningStockfishDepth,
+  waitForVisibleInPracticeScroll,
 } = require('./helpers');
 const {
   FAMILIAR_15_PUZZLES,
@@ -14,122 +16,287 @@ const {
   familiar15UserMoves,
 } = require('./familiar15Fixture');
 
-const FIXED_USER_MOVES = FAMILIAR_15_PUZZLES.flatMap((puzzle) => {
-  const flipped = familiar15StartingPosition(puzzle).turn() === 'b';
-  return familiar15UserMoves(puzzle, { stopBeforePromotion: true }).map((move) => ({
-    flipped,
-    move,
-    puzzleId: puzzle.id,
-  }));
-});
+const COMPLETED_PUZZLE_TARGET = 50;
+const COMPLETED_PUZZLES_PER_SPRINT = 10;
+const RESOURCE_SAMPLE_INTERVAL = 5;
+const GAMEPLAY_PEAK_RSS_BUDGET_KB = 400 * 1024;
+const GAMEPLAY_FINAL_RSS_BUDGET_KB = 320 * 1024;
+const GAMEPLAY_TAIL_RSS_BUDGET_KB = 256 * 1024;
+const STOCKFISH_RUNS = 20;
+const STOCKFISH_PEAK_RSS_BUDGET_KB = 192 * 1024;
+const STOCKFISH_FINAL_RSS_BUDGET_KB = 128 * 1024;
+const THREAD_GROWTH_BUDGET = 8;
+const FIXTURE_BY_ID = new Map(FAMILIAR_15_PUZZLES.map((puzzle) => [puzzle.id, puzzle]));
+const STOCKFISH_POSITIONS = ['queen-capture', 'mate-net', 'middlegame'];
 
-describe('Sprint performance', () => {
-  beforeEach(async () => {
-    await launchWithDisabledSynchronization({
-      newInstance: true,
-      delete: process.env.CHESSTICIZE_PERF_PRESERVE_DATA !== '1'
+describe('Practice resource soak', () => {
+  beforeAll(() => {
+    requireSimulatorUdid();
+  });
+
+  it('keeps Standard feedback and resources bounded across 50 completed puzzles', async () => {
+    await launchResourceSoakApp({
+      chessticizeStandardTargetCorrect: String(COMPLETED_PUZZLES_PER_SPRINT),
+    });
+    const result = await runGameplaySoak('standard');
+
+    reportGameplayResult('standard', result);
+    assertLatencyBudget('Standard', result.latenciesMs);
+    assertGameplayResourceBudget('Standard', result.resourceSamples);
+  });
+
+  it('keeps Arrow Duel feedback and resources bounded across 50 completed puzzles', async () => {
+    await launchResourceSoakApp({
+      chessticizeArrowDuelTargetCorrect: String(COMPLETED_PUZZLES_PER_SPRINT),
+    });
+    const result = await runGameplaySoak('arrow-duel');
+
+    reportGameplayResult('arrow-duel', result);
+    assertLatencyBudget('Arrow Duel', result.latenciesMs);
+    assertGameplayResourceBudget('Arrow Duel', result.resourceSamples);
+  });
+
+  it('reuses native Stockfish resources across repeated completion and cancellation', async () => {
+    await launchResourceSoakApp();
+    await openTab('settings-tab', 'settings-stockfish-diagnostics');
+    await element(by.id('settings-stockfish-diagnostics')).tap();
+    await waitFor(element(by.id('stockfish-diagnostics-run'))).toBeVisible().withTimeout(10000);
+
+    // The panel's first complete depth-20 run absorbs the bounded NNUE and
+    // transposition-table initialization before the leak baseline.
+    await waitForElementTextContaining('stockfish-diagnostics-status', 'Done', 120000);
+    await waitFor(element(by.id('stockfish-diagnostics-line-0'))).toExist().withTimeout(10000);
+    const resourceSamples = [{ run: 0, ...readAppResourceSample() }];
+
+    for (let run = 1; run <= STOCKFISH_RUNS; run += 1) {
+      const position = STOCKFISH_POSITIONS[run % STOCKFISH_POSITIONS.length];
+      await element(by.id(`stockfish-diagnostics-position-${position}`)).tap();
+      await waitForRunningStockfishDepth('stockfish-diagnostics-status', 4, 90000);
+
+      if (run % 2 === 0) {
+        const replacement = STOCKFISH_POSITIONS[(run + 1) % STOCKFISH_POSITIONS.length];
+        await element(by.id(`stockfish-diagnostics-position-${replacement}`)).tap();
+        await waitForRunningStockfishDepth('stockfish-diagnostics-status', 4, 90000);
+      }
+
+      await waitForElementTextContaining('stockfish-diagnostics-status', 'Done', 120000, 50);
+      await waitFor(element(by.id('stockfish-diagnostics-line-0'))).toExist().withTimeout(10000);
+      if (run % RESOURCE_SAMPLE_INTERVAL === 0 || run === STOCKFISH_RUNS) {
+        resourceSamples.push({ run, ...readAppResourceSample() });
+      }
+    }
+
+    console.log(`[RESOURCE_SOAK_STOCKFISH] ${JSON.stringify(resourceSamples)}`);
+    assertResourceGrowth({
+      label: 'Stockfish',
+      samples: resourceSamples,
+      peakRssBudgetKb: STOCKFISH_PEAK_RSS_BUDGET_KB,
+      finalRssBudgetKb: STOCKFISH_FINAL_RSS_BUDGET_KB,
     });
   });
-
-  it('keeps late-sprint board feedback close to early-sprint latency', async () => {
-    await selectTestPuzzleSource('familiar15');
-    await startPracticeMode('standard');
-    await waitForVisibleInPracticeScroll('session-board');
-
-    if (process.env.CHESSTICIZE_PERF_SCENARIO === 'idle') {
-      const idleRssSamplesKb = [{ elapsedSeconds: 0, rssKb: readAppRssKb() }];
-      for (let sample = 1; sample <= 7; sample += 1) {
-        await sleep(10_000);
-        idleRssSamplesKb.push({ elapsedSeconds: sample * 10, rssKb: readAppRssKb() });
-      }
-      console.log(`[SPRINT_PERF_IDLE_RSS_KB] ${JSON.stringify(idleRssSamplesKb)}`);
-      return;
-    }
-
-    const configuredMoveLimit = Number(process.env.CHESSTICIZE_PERF_MOVE_LIMIT ?? FIXED_USER_MOVES.length);
-    const measuredSteps = FIXED_USER_MOVES.slice(0, configuredMoveLimit);
-    const latencies = [];
-    const rssSamplesKb = [{ move: 0, rssKb: readAppRssKb() }];
-    for (const [index, step] of measuredSteps.entries()) {
-      console.log(`[SPRINT_PERF_MOVE] ${index + 1}/${measuredSteps.length} ${step.puzzleId} ${step.move}`);
-      try {
-        latencies.push(await measureBoardFeedbackLatency(step.move, step.flipped));
-      } catch (error) {
-        const progress = await element(by.id('session-progress')).getAttributes();
-        const promptSide = await element(by.id('practice-prompt-side-glyph')).getAttributes();
-        const screenshot = await device.takeScreenshot(`sprint-perf-failure-${index + 1}-${step.move}`);
-        console.log(`[SPRINT_PERF_FAILURE] progress=${JSON.stringify(progress)} promptSide=${JSON.stringify(promptSide)} screenshot=${screenshot}`);
-        throw error;
-      }
-      await sleep(1200);
-      await waitFor(element(by.id('move-feedback-overlay'))).not.toExist().withTimeout(10000);
-      if ((index + 1) % 5 === 0 || index + 1 === measuredSteps.length) {
-        rssSamplesKb.push({ move: index + 1, rssKb: readAppRssKb() });
-      }
-    }
-
-    const early = latencies.slice(0, 5);
-    const late = latencies.slice(-5);
-    const earlyMedian = median(early);
-    const lateMedian = median(late);
-    const result = {
-      early,
-      earlyMedian,
-      late,
-      lateMedian,
-      ratio: lateMedian / earlyMedian
-    };
-    console.log(`[SPRINT_PERF] ${JSON.stringify(result)}`);
-    console.log(`[SPRINT_PERF_RSS_KB] ${JSON.stringify(rssSamplesKb)}`);
-
-    const allowedLateMedian = earlyMedian * 1.5 + 250;
-    if (lateMedian > allowedLateMedian) {
-      throw new Error(`Late-sprint feedback median ${lateMedian}ms exceeded allowed ${allowedLateMedian}ms from early ${earlyMedian}ms`);
-    }
-    const measuredRssKb = rssSamplesKb.map((sample) => sample.rssKb).filter(Number.isFinite);
-    if (measuredRssKb.length > 1) {
-      const initialRssKb = measuredRssKb[0];
-      const peakRssGrowthKb = Math.max(...measuredRssKb) - initialRssKb;
-      // The release-tag regression peaked above 500 MB. Keep enough headroom
-      // for Debug/Skia cache and GC scheduling noise while preserving a clear
-      // separation from the fixed full-sprint peak (roughly 225-305 MB).
-      const allowedPeakRssGrowthKb = 400 * 1024;
-      if (peakRssGrowthKb > allowedPeakRssGrowthKb) {
-        throw new Error(`Sprint interaction peak RSS grew ${peakRssGrowthKb} KB, exceeding the ${allowedPeakRssGrowthKb} KB budget`);
-      }
-    }
-  });
 });
 
-async function measureBoardFeedbackLatency(move, flipped) {
-  const board = element(by.id('session-board'));
-  const boardFrame = await frameFor(board);
-  const startedAt = Date.now();
-  await board.tapAtPoint(boardPoint(boardFrame, move.slice(0, 2), flipped));
-  await sleep(250);
-  await board.tapAtPoint(boardPoint(boardFrame, move.slice(2, 4), flipped));
-  await waitFor(element(by.id('move-feedback-overlay'))).toExist().withTimeout(10000);
-  return Date.now() - startedAt;
+async function launchResourceSoakApp(launchArgs = {}) {
+  await launchWithDisabledSynchronization({
+    newInstance: true,
+    delete: true,
+    launchArgs,
+  });
+  await waitFor(element(by.id('practice-home'))).toExist().withTimeout(180000);
+}
+
+async function runGameplaySoak(mode) {
+  await selectTestPuzzleSource('familiar15');
+  await startPracticeMode(mode);
+  await waitForVisibleInPracticeScroll('session-board');
+
+  const latenciesMs = [];
+  const resourceSamples = [];
+  for (let completed = 1; completed <= COMPLETED_PUZZLE_TARGET; completed += 1) {
+    const puzzleId = await elementText('session-current-puzzle-id');
+    const puzzle = FIXTURE_BY_ID.get(puzzleId);
+    if (!puzzle) {
+      throw new Error(`Unknown Familiar 15 puzzle ${puzzleId} at completed count ${completed - 1}`);
+    }
+
+    const flipped = familiar15StartingPosition(puzzle).turn() === 'b';
+    await waitFor(element(by.id('practice-prompt-side-glyph'))).toExist().withTimeout(10000);
+    await waitFor(element(by.text(
+      mode === 'arrow-duel'
+        ? `For ${flipped ? 'black' : 'white'}, between the two arrows.`
+        : `For ${flipped ? 'black' : 'white'}.`
+    ))).toExist().withTimeout(10000);
+    const moves = mode === 'arrow-duel'
+      ? [puzzle.stockfishBestMove]
+      : familiar15UserMoves(puzzle);
+    if (moves.length === 0 || moves.some((move) => !move)) {
+      throw new Error(`Fixture ${puzzleId} has no ${mode} answer`);
+    }
+
+    if (mode === 'arrow-duel') {
+      await waitFor(element(by.id('arrow-duel-candidate-overlay'))).toExist().withTimeout(15000);
+    }
+    for (const move of moves) {
+      await waitFor(element(by.id('board-input-blocker'))).not.toExist().withTimeout(15000);
+      const startedAt = Date.now();
+      await playBoardMove('session-board', move, flipped);
+      await waitFor(element(by.id('move-feedback-overlay'))).toExist().withTimeout(10000);
+      latenciesMs.push(Date.now() - startedAt);
+      await waitFor(element(by.id('move-feedback-overlay'))).not.toExist().withTimeout(15000);
+    }
+
+    const completedInSprint = ((completed - 1) % COMPLETED_PUZZLES_PER_SPRINT) + 1;
+    if (completedInSprint === COMPLETED_PUZZLES_PER_SPRINT) {
+      await waitFor(element(by.text('Sprint complete'))).toBeVisible().withTimeout(30000);
+    } else {
+      await waitFor(element(by.id('session-progress')))
+        .toHaveText(`${completedInSprint} / ${COMPLETED_PUZZLES_PER_SPRINT}`)
+        .withTimeout(15000);
+    }
+
+    if (completed % RESOURCE_SAMPLE_INTERVAL === 0) {
+      resourceSamples.push({ completed, ...readAppResourceSample() });
+    }
+
+    if (
+      completedInSprint === COMPLETED_PUZZLES_PER_SPRINT
+      && completed < COMPLETED_PUZZLE_TARGET
+    ) {
+      await element(by.id('play-again-button')).tap();
+      await waitFor(element(by.id('session-board'))).toExist().withTimeout(15000);
+      await waitFor(element(by.id('session-progress')))
+        .toHaveText(`0 / ${COMPLETED_PUZZLES_PER_SPRINT}`)
+        .withTimeout(15000);
+    }
+  }
+
+  return { latenciesMs, resourceSamples };
+}
+
+function reportGameplayResult(mode, result) {
+  const early = result.latenciesMs.slice(0, 5);
+  const late = result.latenciesMs.slice(-5);
+  console.log(`[RESOURCE_SOAK_${mode.toUpperCase().replace('-', '_')}] ${JSON.stringify({
+    early,
+    earlyMedian: median(early),
+    late,
+    lateMedian: median(late),
+    resourceSamples: result.resourceSamples,
+  })}`);
+}
+
+function assertLatencyBudget(label, latenciesMs) {
+  const earlyMedian = median(latenciesMs.slice(0, 5));
+  const lateMedian = median(latenciesMs.slice(-5));
+  const allowedLateMedian = earlyMedian * 1.5 + 250;
+  if (lateMedian > allowedLateMedian) {
+    throw new Error(
+      `${label} late feedback median ${lateMedian}ms exceeded ${allowedLateMedian}ms `
+      + `from early median ${earlyMedian}ms`
+    );
+  }
+}
+
+function assertGameplayResourceBudget(label, samples) {
+  if (samples[0]?.completed !== RESOURCE_SAMPLE_INTERVAL) {
+    throw new Error(`${label} resource baseline was not captured after warmup`);
+  }
+  assertResourceGrowth({
+    label,
+    samples,
+    peakRssBudgetKb: GAMEPLAY_PEAK_RSS_BUDGET_KB,
+    finalRssBudgetKb: GAMEPLAY_FINAL_RSS_BUDGET_KB,
+  });
+
+  const tailSamples = samples.filter((sample) => sample.completed >= COMPLETED_PUZZLE_TARGET / 2);
+  const tailBaseline = tailSamples[0];
+  if (!tailBaseline) {
+    throw new Error(`${label} resource soak did not capture a tail baseline`);
+  }
+  const tailPeakGrowthKb = Math.max(...tailSamples.map((sample) => sample.rssKb))
+    - tailBaseline.rssKb;
+  if (tailPeakGrowthKb > GAMEPLAY_TAIL_RSS_BUDGET_KB) {
+    throw new Error(
+      `${label} tail RSS grew ${tailPeakGrowthKb} KB, exceeding `
+      + `${GAMEPLAY_TAIL_RSS_BUDGET_KB} KB after ${tailBaseline.completed} puzzles`
+    );
+  }
+}
+
+function assertResourceGrowth({
+  label,
+  samples,
+  peakRssBudgetKb,
+  finalRssBudgetKb,
+}) {
+  if (samples.length < 2) {
+    throw new Error(`${label} resource soak needs at least two samples`);
+  }
+  const baseline = samples[0];
+  const final = samples[samples.length - 1];
+  const peakRssGrowthKb = Math.max(...samples.map((sample) => sample.rssKb)) - baseline.rssKb;
+  const finalRssGrowthKb = final.rssKb - baseline.rssKb;
+  const peakThreadGrowth = Math.max(...samples.map((sample) => sample.threads)) - baseline.threads;
+
+  if (peakRssGrowthKb > peakRssBudgetKb) {
+    throw new Error(
+      `${label} peak RSS grew ${peakRssGrowthKb} KB, exceeding ${peakRssBudgetKb} KB`
+    );
+  }
+  if (finalRssGrowthKb > finalRssBudgetKb) {
+    throw new Error(
+      `${label} final RSS grew ${finalRssGrowthKb} KB, exceeding ${finalRssBudgetKb} KB`
+    );
+  }
+  if (peakThreadGrowth > THREAD_GROWTH_BUDGET) {
+    throw new Error(
+      `${label} thread count grew by ${peakThreadGrowth}, exceeding ${THREAD_GROWTH_BUDGET}`
+    );
+  }
 }
 
 function median(values) {
+  if (values.length === 0) {
+    throw new Error('Cannot take the median of an empty sample');
+  }
   const sorted = [...values].sort((left, right) => left - right);
   return sorted[Math.floor(sorted.length / 2)];
 }
 
-function readAppRssKb() {
-  const simulatorUdid = process.env.CHESSTICIZE_PERF_SIMULATOR_UDID;
+function requireSimulatorUdid() {
+  const detoxDeviceUdid = typeof device === 'undefined' ? '' : String(device.id ?? '').trim();
+  const configuredUdid = process.env.CHESSTICIZE_PERF_SIMULATOR_UDID?.trim();
+  const simulatorUdid = detoxDeviceUdid || configuredUdid;
   if (!simulatorUdid) {
-    return null;
+    throw new Error(
+      'Detox did not expose an allocated simulator UDID for the resource soak; '
+      + 'RSS/thread assertions cannot be skipped'
+    );
   }
-  const rows = execFileSync('/bin/ps', ['-axo', 'pid=,rss=,command='], { encoding: 'utf8' }).split('\n');
-  const row = rows.find((candidate) => candidate.includes(`/CoreSimulator/Devices/${simulatorUdid}/`) && candidate.includes('/Chessticize.app/Chessticize'));
+  return simulatorUdid;
+}
+
+function readAppResourceSample() {
+  const simulatorUdid = requireSimulatorUdid();
+  const rows = execFileSync(
+    '/bin/ps',
+    ['-axo', 'pid=,rss=,thcount=,command='],
+    { encoding: 'utf8' }
+  ).split('\n');
+  const row = rows.find((candidate) =>
+    candidate.includes(`/CoreSimulator/Devices/${simulatorUdid}/`)
+    && candidate.includes('/Chessticize.app/Chessticize')
+  );
   if (!row) {
     throw new Error(`Could not find Chessticize process for simulator ${simulatorUdid}`);
   }
-  const match = row.trim().match(/^(\d+)\s+(\d+)\s+/);
+  const match = row.trim().match(/^(\d+)\s+(\d+)\s+(\d+)\s+/);
   if (!match) {
-    throw new Error(`Could not parse Chessticize RSS from ${row}`);
+    throw new Error(`Could not parse Chessticize resources from ${row}`);
   }
-  return Number(match[2]);
+  return {
+    pid: Number(match[1]),
+    rssKb: Number(match[2]),
+    threads: Number(match[3]),
+  };
 }

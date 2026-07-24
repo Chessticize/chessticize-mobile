@@ -428,7 +428,9 @@ export function PracticePocScreen({
     (intent: MobileBackIntent, resolvedState: MobileBackState) => boolean
   ) | null>(null);
   const reminderScheduleKeyRef = useRef<string | null>(null);
-  const scheduledReviewAttemptCountRef = useRef(scheduledReviewAttemptCount(service));
+  // Initialized once the service effect runs. Keeping this out of the useRef
+  // argument matters because React evaluates that argument on every render.
+  const scheduledReviewAttemptCountRef = useRef<number | null>(null);
   const reviewReminderPromptDismissedRef = useRef(false);
   const iCloudSyncInFlightRef = useRef<Promise<string> | null>(null);
   const stateRef = useRef<SprintState | null>(null);
@@ -1440,13 +1442,18 @@ export function PracticePocScreen({
       if (shouldAnimateSamePuzzleReply(next.state, nextFeedback, submittedPuzzleId)) {
         commitBoardFen(nextVisualFen);
         await animateSamePuzzleReply(next.state, nextFeedback);
-        refreshState();
         return;
       }
       syncFeedbackSnapshot(next.state, nextFeedback, submittedPuzzle, submittedFen, submittedPuzzleId);
       boardVisualFenRef.current = nextVisualFen;
       syncBoardAfterMove(next.state, nextFeedback, submittedPuzzleId);
-      refreshState();
+      // The submit result already contains every piece of live sprint UI state.
+      // Rebuilding aggregate History/Review/Home snapshots after each move is
+      // both redundant and O(total stored attempts); refresh them at the sprint
+      // boundary instead.
+      if (next.state.status !== "active") {
+        refreshState();
+      }
     } catch (caught) {
       setError(errorMessage(caught));
       boardSyncInProgressRef.current = false;
@@ -2938,7 +2945,10 @@ export function PracticePocScreen({
                     setNowMs(completedAtMs);
                   }
                   const nextScheduledReviewAttemptCount = scheduledReviewAttemptCount(service);
-                  if (nextScheduledReviewAttemptCount > scheduledReviewAttemptCountRef.current) {
+                  if (
+                    scheduledReviewAttemptCountRef.current !== null
+                    && nextScheduledReviewAttemptCount > scheduledReviewAttemptCountRef.current
+                  ) {
                     maybeShowReviewReminderPermissionPrompt();
                   }
                   scheduledReviewAttemptCountRef.current = nextScheduledReviewAttemptCount;
@@ -10716,6 +10726,7 @@ function StockfishDiagnosticsPanel({
     const transport = stockfish.createTransport();
     let cancelled = false;
     let firstUpdateSeen = false;
+    const analysisController = new AbortController();
     const startedAt = Date.now();
 
     setLines([]);
@@ -10746,27 +10757,33 @@ function StockfishDiagnosticsPanel({
       terminate: () => transport.terminate()
     };
 
-    void stockfish.prewarm().then((prewarmed) => analyzeFenWithUciEngine(tracedTransport, selectedPosition.fen, {
-      depth: ANALYSIS_DEPTH,
-      initialize: !prewarmed,
-      multiPv: 4,
-      newGame: !prewarmed,
-      onUpdate: (nextLines) => {
-        if (cancelled) {
-          return;
-        }
-        if (!firstUpdateSeen && nextLines.length > 0) {
-          firstUpdateSeen = true;
-          setFirstEvalMs(Date.now() - startedAt);
-        }
-        setLines(nextLines);
-        const depth = nextLines.reduce((maxDepth, line) => Math.max(maxDepth, line.depth), 0);
-        setStatus(depth > 0 ? `Depth ${depth}/${ANALYSIS_DEPTH}` : "Analyzing");
-      },
-      shallowDelayMs: 500,
-      shallowDepth: 8,
-      timeoutMs: 30000
-    })).then(
+    void stockfish.prewarm().then((prewarmed) => {
+      if (analysisController.signal.aborted) {
+        return [];
+      }
+      return analyzeFenWithUciEngine(tracedTransport, selectedPosition.fen, {
+        depth: ANALYSIS_DEPTH,
+        initialize: !prewarmed,
+        multiPv: 4,
+        newGame: !prewarmed,
+        onUpdate: (nextLines) => {
+          if (cancelled) {
+            return;
+          }
+          if (!firstUpdateSeen && nextLines.length > 0) {
+            firstUpdateSeen = true;
+            setFirstEvalMs(Date.now() - startedAt);
+          }
+          setLines(nextLines);
+          const depth = nextLines.reduce((maxDepth, line) => Math.max(maxDepth, line.depth), 0);
+          setStatus(depth > 0 ? `Depth ${depth}/${ANALYSIS_DEPTH}` : "Analyzing");
+        },
+        shallowDelayMs: 500,
+        shallowDepth: 8,
+        signal: analysisController.signal,
+        timeoutMs: 30000
+      });
+    }).then(
       (finalLines) => {
         if (cancelled) {
           return;
@@ -10784,7 +10801,7 @@ function StockfishDiagnosticsPanel({
 
     return () => {
       cancelled = true;
-      transport.send("stop");
+      analysisController.abort();
     };
   }, [runId, selectedPosition, stockfish]);
 

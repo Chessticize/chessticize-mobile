@@ -8,20 +8,41 @@ import { PracticePocScreen } from "../src/components/PracticePocScreen";
 import { createMobilePracticeService } from "../src/platform/mobilePractice";
 import { createTestMobilePlatformCapabilities } from "../src/testing/testMobilePlatformCapabilities";
 import type { PracticeService } from "../../../packages/storage/src/practice-service";
-import type { SprintState } from "../../../packages/core/src/index";
+import type { SprintMode, SprintState } from "../../../packages/core/src/index";
 
 jest.setTimeout(600000);
 
 const PUZZLES_TO_SOLVE = 60;
 const BUCKET = 10;
 
-const LONG_SPRINT_CONFIG = {
-  mode: "standard" as const,
-  durationSeconds: 3600,
-  perPuzzleSeconds: 20,
-  targetCorrect: 500,
-  maxMistakes: 50
+const ACTIVE_SPRINT_SCAN_METHODS = [
+  "getHistoryView",
+  "listHistory",
+  "listPlayedRatings",
+  "countEligibleSprintPuzzles",
+  "pruneOrphanedReviewQueue",
+  "listSprintSessions",
+  "getDueReviews",
+  "listReviewQueue",
+  "getDueReviewItems"
+] as const;
+
+type ServiceProbe = {
+  calls: number;
+  totalMs: number;
 };
+
+type ServiceProbes = Map<string, ServiceProbe>;
+
+function longSprintConfig(mode: Extract<SprintMode, "standard" | "arrow_duel">) {
+  return {
+    mode,
+    durationSeconds: 3600,
+    perPuzzleSeconds: mode === "arrow_duel" ? 30 : 20,
+    targetCorrect: 500,
+    maxMistakes: 50
+  };
+}
 
 const renderers: TestRenderer.ReactTestRenderer[] = [];
 
@@ -46,13 +67,13 @@ function requireActiveSprint(service: PracticeService): SprintState {
   return state;
 }
 
-function nextUserMove(state: SprintState): string {
+function nextCorrectMove(state: SprintState): string {
   const current = state.currentPuzzle;
   if (!current) {
     throw new Error("Expected a current puzzle");
   }
-  if (current.kind !== "line") {
-    throw new Error(`Expected a line puzzle, got ${current.kind}`);
+  if (current.kind === "arrow_duel") {
+    return current.correctMove;
   }
   const move = current.puzzle.solutionMoves[current.cursor];
   if (!move) {
@@ -77,19 +98,42 @@ function reportBuckets(label: string, samples: number[]): { first: number; last:
   return { first: averages[0], last: averages[averages.length - 1] };
 }
 
+function snapshotProbes(probes: ServiceProbes): ServiceProbes {
+  return new Map([...probes].map(([key, value]) => [key, { ...value }]));
+}
+
+function resetProbes(probes: ServiceProbes): void {
+  for (const probe of probes.values()) {
+    probe.calls = 0;
+    probe.totalMs = 0;
+  }
+}
+
+function nonZeroProbeDeltas(probes: ServiceProbes, before: ServiceProbes): string[] {
+  return [...probes].flatMap(([key, value]) => {
+    const previous = before.get(key);
+    if (!previous) {
+      throw new Error(`Missing probe snapshot for ${key}`);
+    }
+    const calls = value.calls - previous.calls;
+    return calls === 0 ? [] : [`${key}: ${calls}`];
+  });
+}
+
 describe("sprint late-game performance", () => {
   it("service-level: per-move cost does not grow across a long sprint", () => {
     const service = createMobilePracticeService("random1000");
-    let state = service.startSprint(LONG_SPRINT_CONFIG, new Date(Date.now()).toISOString());
+    let state = service.startSprint(longSprintConfig("standard"), new Date(Date.now()).toISOString());
 
     const perPuzzleMs: number[] = [];
     for (let solved = 0; solved < PUZZLES_TO_SOLVE; solved += 1) {
       const puzzleIndex = state.currentPuzzleIndex;
       const startedAt = performance.now();
       while (state.status === "active" && state.currentPuzzleIndex === puzzleIndex) {
-        const move = nextUserMove(state);
+        const move = nextCorrectMove(state);
         state = service.submitMove(move, new Date(Date.now()).toISOString()).state;
-        // Mirror the reads PracticePocScreen.refreshState() performs after every move.
+        // Keep a worst-case storage-growth benchmark independent of the component
+        // query-budget regression below.
         service.pruneOrphanedReviewQueue();
         service.listHistory();
         service.listSprintSessions();
@@ -108,13 +152,14 @@ describe("sprint late-game performance", () => {
     expect(last).toBeLessThan(Math.max(first * 2, first + 25));
   });
 
-  it("component-level: per-puzzle UI cost does not grow across a long sprint", async () => {
+  it.each(["standard", "arrow_duel"] as const)("component-level: %s active gameplay avoids growing storage scans", async (mode) => {
     const service = createMobilePracticeService("random1000");
-    service.startSprint(LONG_SPRINT_CONFIG, new Date(Date.now()).toISOString());
+    service.startSprint(longSprintConfig(mode), new Date(Date.now()).toISOString());
 
-    // Count the O(attempt-history) service reads issued while the sprint runs.
-    const probes = new Map<string, { calls: number; totalMs: number }>();
-    for (const method of ["getHistoryView", "listHistory", "listPlayedRatings", "countEligibleSprintPuzzles"] as const) {
+    // Count storage reads whose result size can grow with attempt history,
+    // completed sessions, or the review queue.
+    const probes: ServiceProbes = new Map();
+    for (const method of ACTIVE_SPRINT_SCAN_METHODS) {
       const original = (service as any)[method].bind(service);
       probes.set(method, { calls: 0, totalMs: 0 });
       (service as any)[method] = (...args: unknown[]) => {
@@ -128,15 +173,16 @@ describe("sprint late-game performance", () => {
         }
       };
     }
-    const snapshotProbes = () => new Map([...probes].map(([key, value]) => [key, { ...value }]));
-    let lastSnapshot = snapshotProbes();
+    let lastSnapshot = snapshotProbes(probes);
     const perBucketProbeReport: string[] = [];
 
     let renderer: TestRenderer.ReactTestRenderer | undefined;
     act(() => {
       renderer = TestRenderer.create(
         <PracticePocScreen
-          platformCapabilities={createTestMobilePlatformCapabilities({ practiceService: service })}
+          platformCapabilities={createTestMobilePlatformCapabilities({
+            practiceService: service
+          })}
         />
       );
     });
@@ -148,13 +194,17 @@ describe("sprint late-game performance", () => {
     press(renderer, "practice-resume-card");
     expect(findByTestId(renderer, "session-board")).toBeTruthy();
 
+    resetProbes(probes);
+    lastSnapshot = snapshotProbes(probes);
+
     const perPuzzleMs: number[] = [];
     for (let solved = 0; solved < PUZZLES_TO_SOLVE; solved += 1) {
       const puzzleIndex = requireActiveSprint(service).currentPuzzleIndex;
+      const transitionProbeSnapshot = snapshotProbes(probes);
       const startedAt = performance.now();
       let state = requireActiveSprint(service);
       while (state.status === "active" && state.currentPuzzleIndex === puzzleIndex) {
-        const move = nextUserMove(state);
+        const move = nextCorrectMove(state);
         await boardMove(renderer, move);
         await settleFeedbackSnapshot();
         const active = service.getActiveSprint();
@@ -163,9 +213,11 @@ describe("sprint late-game performance", () => {
         }
         state = active;
       }
+      expect(state.currentPuzzleIndex).toBe(puzzleIndex + 1);
+      expect(nonZeroProbeDeltas(probes, transitionProbeSnapshot)).toEqual([]);
       perPuzzleMs.push(performance.now() - startedAt);
       if ((solved + 1) % BUCKET === 0) {
-        const current = snapshotProbes();
+        const current = snapshotProbes(probes);
         const parts = [...current].map(([key, value]) => {
           const before = lastSnapshot.get(key)!;
           return `${key}: ${value.calls - before.calls} calls / ${(value.totalMs - before.totalMs).toFixed(1)}ms`;
@@ -175,13 +227,14 @@ describe("sprint late-game performance", () => {
       }
     }
 
-    console.log(`[perf-harness] service probes per bucket\n  ${perBucketProbeReport.join("\n  ")}`);
-    const { first, last } = reportBuckets("component-level per-puzzle ms", perPuzzleMs);
+    console.log(`[perf-harness] ${mode} service probes per bucket\n  ${perBucketProbeReport.join("\n  ")}`);
+    const { first, last } = reportBuckets(`${mode} component-level per-puzzle ms`, perPuzzleMs);
 
-    // Regression guard for the late-sprint lag bug: while a sprint is on screen,
-    // no render may rescan the full attempt history. This was the direct cause of
-    // per-puzzle UI cost growing ~4x over 60 puzzles (worse with days of history).
-    expect(probes.get("getHistoryView")!.calls).toBe(0);
+    // Regression guard for the late-sprint lag/resource bug: while a sprint is
+    // active, no transition may rescan storage collections whose size grows
+    // with play. Per-transition assertions above identify the first regression;
+    // this final assertion protects the complete long-session budget.
+    expect([...probes].filter(([, probe]) => probe.calls !== 0)).toEqual([]);
     // Loose wall-clock backstop for other O(history) work sneaking into renders.
     expect(last).toBeLessThan(Math.max(first * 2, first + 25));
   });

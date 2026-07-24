@@ -6220,6 +6220,52 @@ describe("PracticePocScreen", () => {
     });
   });
 
+  it("does not start deferred Stockfish diagnostics after leaving the panel", async () => {
+    const systemBack = createTestSystemBackSource("android");
+    const commands: string[] = [];
+    const listeners = new Set<(line: string) => void>();
+    let resolvePrewarm: ((ready: boolean) => void) | undefined;
+    const prewarm = jest.fn(() => new Promise<boolean>((resolve) => {
+      resolvePrewarm = resolve;
+    }));
+    const transport: UciEngineTransport = {
+      start: jest.fn(async () => {}),
+      send: jest.fn((command: string) => {
+        commands.push(command);
+      }),
+      onLine: (listener) => {
+        listeners.add(listener);
+        return () => {
+          listeners.delete(listener);
+        };
+      },
+      terminate: jest.fn()
+    };
+    const renderer = renderScreen({
+      stockfish: {
+        createTransport: () => transport,
+        prewarm
+      },
+      systemBack
+    });
+
+    press(renderer, "settings-tab");
+    press(renderer, "settings-stockfish-diagnostics");
+    expect(prewarm).toHaveBeenCalledTimes(1);
+    expect(systemBack.invoke()).toBe(true);
+    expect(findByTestId(renderer, "settings-panel")).toBeTruthy();
+
+    await act(async () => {
+      resolvePrewarm?.(true);
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(commands.some((command) => command.startsWith("go depth "))).toBe(false);
+    expect(listeners.size).toBe(0);
+  });
+
   it("reviews Arrow Duel mistakes with analysis blunder arrows and a forced punishment line", async () => {
     const preview = createMobilePracticeService("familiar15");
     const previewState = preview.startSprint({
