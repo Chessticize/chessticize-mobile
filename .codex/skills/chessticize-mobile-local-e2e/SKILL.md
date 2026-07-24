@@ -1,20 +1,31 @@
 ---
 name: chessticize-mobile-local-e2e
-description: Prepare and validate the Chessticize Mobile macOS/iOS environment and fresh Git worktrees, run risk-scoped exact-head local Detox evidence for flows, practice, or the full suite, diagnose Xcode, Ruby, CocoaPods, Git LFS, Simulator, or Detox failures, and record auditable results. Use when a PR crosses an iOS native boundary, when nightly or release validation needs the complete suite, when setting up a Mac or worktree for Detox, or when measuring local E2E duration.
+description: Prepare and validate the Chessticize Mobile macOS/iOS environment and fresh Git worktrees, run risk-scoped local Detox evidence for flows, practice, or the full suite, diagnose Xcode, Ruby, CocoaPods, Git LFS, Simulator, or Detox failures, and record auditable reusable results. Use when a PR changes an iOS native boundary, when release validation needs a native suite, when setting up a Mac or worktree for Detox, or when measuring local E2E duration.
 ---
 
 # Chessticize Mobile Local E2E
 
-Run the selected iOS Detox scope on a dedicated simulator and record evidence for the exact commit tested. Treat environment preparation, PR risk selection, and release validation as separate phases.
+Run the selected iOS Detox scope on a dedicated simulator and record the tested
+commit plus the validation-relevant development inputs. Treat environment
+preparation, PR native-impact selection, evidence reuse, and release validation
+as separate phases.
 
 ## Safety Rules
 
 - Run only on macOS with full Xcode and an installed iOS Simulator runtime.
 - Use a dedicated simulator such as `iPhone 17-Detox`. Never use the simulator that holds manual-test data: Detox launches with `delete: true` and wipes the app sandbox.
 - Commit the intended code first and require a clean worktree before producing merge evidence.
-- Rebuild and rerun the selected scope after any code change. Evidence from an older commit is invalid.
+- Rebuild and rerun the selected scope after a validation-relevant development
+  input changes. Those inputs include mobile runtime sources, native/platform
+  projects, dependency manifests, lockfiles and patches, build/release
+  configuration, and the selected native specs and fixtures. Documentation,
+  review metadata, and merge-parent changes alone do not force a rerun. A later
+  commit or squash merge may reuse evidence after a documented diff proves
+  these inputs are unchanged.
 - Choose `flows`, `practice`, or `full` from the repository risk matrix. Do not default a routine PR to `full` without a broad native reason.
-- Do not wait for nightly GitHub Detox before merging a routine PR. All relevant fast CI checks must still pass.
+- GitHub Actions does not run Xcode builds or iOS Detox. Local iOS native
+  validation is required only for releases and native-impacting changes. All
+  relevant fast CI checks must still pass on the current head.
 - Do not weaken Ruby, package-manager, signing, or certificate checks to make setup pass.
 
 ## Prepare the Mac
@@ -130,14 +141,23 @@ pnpm --filter ChessticizeMobile exec detox build-framework-cache
 
 ## Choose The Scope
 
-- Use `flows` for affected app-shell, navigation, History, Settings, Analysis, or other flows-suite journeys.
-- Use `practice` for affected Practice, Review, sprint, board, or practice-suite journeys.
-- Use `full` for nightly/release validation and PRs that change app startup, shared navigation/storage wiring, global launch fixtures, native build configuration, Detox infrastructure, or risk that cannot be bounded to one suite.
-- Use a focused simulator screenshot instead of this runner for a visual-only acceptance check when no repeatable journey changed.
+- **No mobile Detox** for every non-release PR without a native-impacting
+  change, including JavaScript/TypeScript navigation, persistence journeys,
+  board presentation, animations, and adaptive layout proven by lower layers.
+- **Targeted native validation** uses `flows` or `practice` for a bounded native
+  bridge/adapter, native dependency, platform project/configuration, native
+  persistence integration, or a release candidate with one affected native
+  journey.
+- **Full native validation** uses `full` for broad native startup, shared native
+  navigation/storage wiring, native launch fixtures, platform build
+  configuration, Detox infrastructure, or release risk that cannot be bounded
+  to one suite.
+- A focused simulator screenshot remains optional acceptance evidence for
+  non-native visual work; it is not a native-validation gate.
 
 Record the choice and rationale in the PR before running native validation.
 
-## Run Exact-Head Evidence
+## Run Native Evidence
 
 Prefer the bundled runner from the repository root:
 
@@ -201,9 +221,11 @@ Its presence proves the Detox app does not depend on Metro.
 
 ## Record PR Evidence
 
-When a PR requires native validation, add a PR comment containing:
+When a PR or release requires native validation, add a PR or release record
+containing:
 
 - Full tested commit SHA.
+- Full tested Git tree ID.
 - Selected scope and rationale.
 - Xcode version and simulator name.
 - Build command and success.
@@ -211,4 +233,10 @@ When a PR requires native validation, add a PR comment containing:
 - Total duration.
 - Confirmation that the worktree remained clean and `HEAD` did not change.
 
-Then verify all relevant fast checks before merging. Any code change after the recorded SHA invalidates the evidence. Nightly integration uses `full`; release runs use delta, targeted, or full scope, and require both suites only for broad native risk.
+Then verify all relevant fast checks on the current head. Later documentation,
+review metadata, or merge-parent changes do not invalidate native evidence.
+When the head differs from the tested commit, record both SHAs and the diff
+showing that validation-relevant development inputs are unchanged. Rerun after
+any mobile runtime, native/platform, dependency, build/release, or selected
+native test/fixture change. Release runs use delta, targeted, or full scope and
+require both suites only for broad native risk.

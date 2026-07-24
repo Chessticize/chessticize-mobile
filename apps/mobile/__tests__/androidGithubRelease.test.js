@@ -19,6 +19,9 @@ const {
   requireDigest,
   requireSafePositiveInteger,
 } = require('../scripts/android-release-validation');
+const {
+  resolveRepoPath,
+} = require('../scripts/android-github-release-cli');
 
 const crypto = require('node:crypto');
 const { spawnSync } = require('node:child_process');
@@ -819,7 +822,9 @@ describe('Android GitHub release automation', () => {
 
     expect(candidateWorkflow).toContain('environment: android-production');
     expect(candidateWorkflow).toContain('contents: write');
-    expect(candidateWorkflow).toContain('Run exact-head fast release checks');
+    expect(candidateWorkflow).not.toContain('Run exact-head fast release checks');
+    expect(candidateWorkflow).not.toContain('pnpm mobile:test');
+    expect(candidateWorkflow).not.toContain('pnpm test');
     expect(candidateWorkflow).toContain('Build production-signed App Bundle');
     expect(candidateWorkflow).toContain('Publish exact corresponding source');
     expect(candidateWorkflow).toContain('GITHUB_TOKEN: $' + '{{ github.token }}');
@@ -836,6 +841,18 @@ describe('Android GitHub release automation', () => {
     expect(runbook).toContain('github.token');
     expect(runbook).toContain('Generated APKs API');
     expect(runbook).not.toContain('ANDROID_GITHUB_RELEASE_TOKEN');
+  });
+
+  it('resolves candidate source-manifest paths from the repository root', () => {
+    const repoRoot = path.resolve(__dirname, '../../..');
+
+    expect(resolveRepoPath(
+      'apps/mobile/artifacts/android-release/android-source-manifest.json',
+      repoRoot,
+    )).toBe(path.join(
+      repoRoot,
+      'apps/mobile/artifacts/android-release/android-source-manifest.json',
+    ));
   });
 
   it('uses one source command and one post-Play mirror operation without legacy phases', () => {

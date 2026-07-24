@@ -102,7 +102,7 @@ and named by display group.
 
 ## Automated Capture
 
-The Detox capture spec is opt-in so normal Mobile iOS CI does not spend time on
+The Detox capture spec is opt-in so normal Mobile JS CI does not spend time on
 store-asset screenshots. Release screenshot capture must use the Release
 simulator app so development-only controls stay out of App Store assets. Build
 the Release app bundle, then run the capture flow for the simulator size you

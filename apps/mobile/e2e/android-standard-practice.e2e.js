@@ -60,7 +60,7 @@ describe(`Android Standard Practice offline persistence (${standardFixture.puzzl
     );
     await waitForElementTextContaining(
       'sprint-result-rating-range',
-      `${standardFixture.puzzle.rating} -> ${standardFixture.expectedRatingAfter}`,
+      `${standardFixture.expectedRatingBefore} -> ${standardFixture.expectedRatingAfter}`,
       10000
     );
 

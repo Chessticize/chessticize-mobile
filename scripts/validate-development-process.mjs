@@ -16,7 +16,7 @@ const read = (relativePath) => readFileSync(path.join(repoRoot, relativePath), "
 const count = (text, needle) => text.split(needle).length - 1;
 
 const coreWorkflow = read(".github/workflows/core.yml");
-const mobileWorkflow = read(".github/workflows/mobile-ios.yml");
+const mobileWorkflow = read(".github/workflows/mobile-js.yml");
 const mobileLabWorkflow = read(".github/workflows/mobile-lab.yml");
 const processWorkflow = read(".github/workflows/process.yml");
 const agents = read("AGENTS.md");
@@ -83,19 +83,31 @@ assert.equal(count(coreWorkflow, "run: pnpm test\n"), 0);
 assert.equal(count(coreWorkflow, "pnpm mobile:test"), 0);
 assert.equal(count(coreWorkflow, "pnpm mobile:typecheck"), 0);
 
-assert.match(mobileWorkflow, /schedule:\s*\n\s*#.*\n\s*- cron: "0 10 \* \* \*"/);
-assert.equal(count(mobileWorkflow, "run: pnpm mobile:e2e:build:ios"), 1);
-assert.equal(count(mobileWorkflow, "DETOX_ACTIVE_SUITE: flows"), 1);
-assert.equal(count(mobileWorkflow, "DETOX_ACTIVE_SUITE: practice"), 1);
+assert.match(mobileWorkflow, /pull_request:/);
+assert.match(mobileWorkflow, /name: Mobile JS checks/);
+assert.match(mobileWorkflow, /runs-on: ubuntu-latest/);
+assert.equal(count(mobileWorkflow, "workflow_dispatch:"), 0);
+assert.equal(count(mobileWorkflow, "schedule:"), 0);
+assert.equal(count(mobileWorkflow, "runs-on: macos-"), 0);
+assert.equal(count(mobileWorkflow, "xcodebuild"), 0);
+assert.equal(count(mobileWorkflow, "run: pnpm mobile:e2e:build:ios"), 0);
+assert.equal(count(mobileWorkflow, "DETOX_ACTIVE_SUITE: flows"), 0);
+assert.equal(count(mobileWorkflow, "DETOX_ACTIVE_SUITE: practice"), 0);
 assert.equal(count(mobileWorkflow, "matrix:"), 0);
-assert.match(mobileWorkflow, /github\.event_name == 'schedule'/);
 
-for (const policy of [agents, testingArchitecture, devLoopSkill]) {
+for (const policy of [agents, testingArchitecture, devLoopSkill, localE2eSkill]) {
   assert.match(policy, /No mobile Detox/);
   assert.match(policy, /Targeted native validation/);
   assert.match(policy, /Full native validation/);
-  assert.match(policy, /[Nn]ightly/);
+  assert.match(policy, /local iOS native\s+validation/i);
+  assert.match(policy, /only for (?:releases|release candidates) and native-impacting changes|only for a release candidate or a change to native/i);
+  assert.match(policy, /validation-relevant development inputs/);
 }
+
+assert.doesNotMatch(agents, /Any required Detox evidence must come from the exact PR head/);
+assert.doesNotMatch(testingArchitecture, /source-tree change invalidates that evidence/);
+assert.doesNotMatch(devLoopSkill, /Any later source-tree change invalidates native evidence/);
+assert.doesNotMatch(localE2eSkill, /same Git tree/);
 
 for (const agentDocPath of agentDocPaths) {
   assert.match(agents, new RegExp(agentDocPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
@@ -348,10 +360,12 @@ for (const option of [
   "- [ ] Targeted `flows` spec or suite",
   "- [ ] Targeted `practice` spec or suite",
   "- [ ] Full `flows` and `practice`",
-  "- [ ] Focused simulator screenshot only"
+  "- [ ] Optional focused simulator screenshot only"
 ]) {
   assert.match(prTemplate, new RegExp(option.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 }
+assert.match(prTemplate, /only for releases and native-impacting changes/i);
+assert.match(prTemplate, /unchanged validation-relevant development inputs/i);
 
 for (const releaseDoc of releaseDocs) {
   assert.match(releaseDoc, /exact/);
@@ -360,7 +374,7 @@ for (const releaseDoc of releaseDocs) {
 }
 
 assert.equal(releaseVersion.publicVersion, "1.2");
-assert.equal(releaseVersion.androidVersionCode, 5);
+assert.equal(releaseVersion.androidVersionCode, 6);
 assert.ok(
   androidPlayRunbook.includes(
     `Android version code: \`apps/mobile/release-version.json\` ` +

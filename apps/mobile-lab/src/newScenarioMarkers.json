@@ -58,5 +58,13 @@
         "changeNote": "Include Timed out in Needs attention and its OR-based Attention flags filter."
       }
     ]
+  },
+  "settings-ios-sync": {
+    "issues": [
+      {
+        "issueNumber": 247,
+        "changeNote": "Review separate sound and haptic controls plus Move and Capture audio samples."
+      }
+    ]
   }
 }

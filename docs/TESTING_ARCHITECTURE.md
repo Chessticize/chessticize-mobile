@@ -43,62 +43,74 @@ real boundary is part of the risk.
 suite. The mobile GUI suite is built and run with
 `pnpm mobile:e2e:build:ios` and `pnpm mobile:e2e:test:ios`.
 
-## PR, Nightly Main, And Release Gates
+## PR, Local Native, And Release Gates
 
-Use three different gates instead of treating every PR as a release candidate:
+Use distinct gates instead of treating every PR as a release candidate:
 
 | Gate | Purpose | Required validation |
 | --- | --- | --- |
-| Pull request | Prove the changed behavior at the cheapest reliable layer | Path-scoped fast CI plus the risk-scoped native validation below |
-| Nightly `main` | Detect integration failures across a batch of merged work | One iOS build followed by complete `flows` and `practice` suites |
-| Release candidate | Prove the exact source intended for distribution | Exact-head fast checks, risk-scoped native validation, and owner physical-device smoke |
+| Pull request | Prove the changed behavior at the cheapest reliable layer | Path-scoped fast CI; native validation only for native-impacting changes |
+| Local iOS native | Prove simulator and native behavior without a hosted Xcode build | One local build followed by the selected Detox scope |
+| Release candidate | Prove the exact source tree intended for distribution | Exact-head fast checks, risk-scoped local native validation, and owner physical-device smoke |
 
 Every PR must pass its relevant unit, integration, CLI E2E, component, and
 typecheck jobs. GitHub workflow path filters select the applicable fast jobs.
-The PR author selects one native-validation scope based on behavior rather than
-diff size or filename alone:
+Native validation is required only for a release candidate or a change to
+native implementation, native integration/configuration, native dependencies,
+or native validation infrastructure. Non-release JavaScript/TypeScript product
+changes remain at the lower proving layers even when they affect navigation,
+persistence journeys, board presentation, animations, or adaptive layout. The
+PR author selects one native-validation scope based on that boundary:
 
-- **No mobile Detox**: documentation and tooling; pure core, storage, or CLI
-  changes covered by their own suites; ordinary React Native copy, state,
-  styling, accessibility, and service wiring covered by component tests.
+- **No mobile Detox**: every non-release PR without a native-impacting change,
+  including React Native navigation, state, styling, accessibility, service
+  wiring, board presentation, animations, and adaptive layout. Documentation,
+  tooling, pure core, storage, and CLI changes also stay at their own lower
+  layers.
 - **Targeted native validation**: the affected Detox spec or one affected suite
-  (`flows` or `practice`) for navigation, multi-screen journeys, relaunch
-  persistence, real board behavior/rendering, adaptive layout, or native-module
-  boundaries. A focused simulator screenshot is sufficient for a visual-only
-  acceptance check when no repeatable journey changed.
+  (`flows` or `practice`) for a bounded native bridge/adapter change, native
+  dependency or platform-project change, native persistence/relaunch
+  integration, or a release candidate with one affected native journey.
 - **Full native validation**: build once and run both suites only for broad
-  native risk such as app startup, shared navigation or storage wiring, global
-  launch fixtures, native build configuration, Detox infrastructure, or risk
-  that cannot be bounded to one suite.
+  native risk such as app startup, shared native navigation or storage wiring,
+  global native launch fixtures, platform build configuration, Detox
+  infrastructure, or a release candidate whose native risk cannot be bounded
+  to one suite.
 
-CI Detox does not run automatically for routine PRs. When a PR requires native
-validation, record the selected scope, exact commit SHA, build result, commands,
-results, and clean-worktree confirmation in the PR. A later code change
-invalidates that evidence. A failed required fast check, failed selected native
-scope, or known product failure remains a merge blocker.
+GitHub Actions does not run Xcode builds or iOS Detox. Local iOS native
+validation is required only for releases and native-impacting changes. Record
+the selected scope, tested commit SHA, build result, commands, results, and
+clean-worktree confirmation. Native evidence may be reused on a later PR head
+or squash-merged commit when a documented diff proves that every
+validation-relevant development input is unchanged. Those inputs include
+mobile runtime sources, native/platform projects, dependency manifests,
+lockfiles and patches, build/release configuration, and the selected native
+specs and fixtures. Documentation, review metadata, and merge-parent changes
+alone do not invalidate evidence. A failed required fast check, failed selected
+native scope, or known product failure remains a merge blocker.
 
-The scheduled iOS nightly workflow runs both suites against the latest `main`
-as a non-PR integration signal. Triage failures promptly so they do not
-accumulate, but a later nightly failure does not retroactively invalidate
-already merged PR evidence.
-
-Nightly Android `main` builds the self-contained app and Detox APK once, then
-runs complete shared `flows` and `practice` on an API 36 x86_64 phone. Manual
-exact-head dispatch additionally runs the API 24 bounded smoke for launch,
-production SQLite persistence/migration, Standard practice, and packaged
-Stockfish; it also captures the representative tablet and foldable/resizable
-adaptive contract. The fail-closed runner is
-`pnpm mobile:validate:android:matrix`, and `docs/ANDROID_VALIDATION.md` defines
-its evidence schema and commands.
+Android native validation runs on the Android build machine at the risk-scoped
+layer selected for the change. The hosted `Mobile Android` workflow is a
+manual-only full diagnostic matrix, not a scheduled check or release gate. Its
+explicit dispatch builds the self-contained app and Detox APK once, runs the
+complete API 36 journeys, adds the bounded API 24 smoke for launch, production
+SQLite persistence/migration, Standard practice, and packaged Stockfish, and
+captures the representative tablet, foldable/resizable, and backup contracts.
+Use it only for full-scope changes or hosted-environment diagnosis. The
+fail-closed runner is `pnpm mobile:validate:android:matrix`, and
+`docs/ANDROID_VALIDATION.md` defines its evidence schema and commands.
 
 Before any release, run exact-head fast checks and select the same no-native,
 targeted, or full scope used for PRs. An ordinary delta does not rerun complete
 Detox; the owner installs the candidate and performs the documented smoke on a
 physical device. Run one affected suite for targeted risk and both suites only
-for broad native risk. Real CloudKit, notification delivery, TestFlight
-upgrade, schema-upgrade, compatibility-matrix, and App Store screenshot checks
-remain conditional gates when that boundary changed or the store reports a
-problem.
+for broad native risk. Passing native evidence may be reused after a later
+commit or squash merge when a documented diff confirms that the
+validation-relevant development inputs listed above are unchanged; the commit
+SHA and full Git tree may differ. Record the tested and candidate SHAs plus the
+comparison. Real CloudKit, notification delivery, TestFlight upgrade,
+schema-upgrade, compatibility-matrix, and App Store screenshot checks remain
+conditional gates when that boundary changed or the store reports a problem.
 
 Android physical ARM64 checks are owner-recorded release evidence, not a
 routine feature-PR gate. They cover install, real board input, Stockfish
@@ -408,14 +420,15 @@ test both compatibility contracts deliberately.
 
 | Change | Minimum PR validation | Later gate |
 | --- | --- | --- |
-| Pure sprint/ELO/review/history rule | Focused core unit tests, `pnpm test:unit`, typecheck; no mobile Detox | Nightly integration; release native checks only if the boundary is targeted/full |
-| Repository/store behavior | Real SQLite integration tests, `pnpm test:integration`; targeted mobile persistence spec only when adapter wiring changed | Nightly integration; release persistence check when changed |
+| Pure sprint/ELO/review/history rule | Focused core unit tests, `pnpm test:unit`, typecheck; no mobile Detox | Release native checks only if the boundary is targeted/full |
+| Repository/store behavior | Real SQLite integration tests, `pnpm test:integration`; targeted mobile persistence spec only when adapter wiring changed | Release persistence check when changed |
 | SQLite schema or migration | Released-fixture migration matrix and rollback/idempotency checks | Native upgrade smoke before release |
 | CLI command or protocol | `pnpm test:e2e`; no mobile Detox | None unless a mobile boundary also changed |
-| React Native copy, state, styling, accessibility, or wiring | Focused component tests, `pnpm mobile:test`, `pnpm mobile:typecheck`; no mobile Detox by default | Nightly integration plus owner delta smoke |
-| Navigation or cross-component journey | Component coverage plus the affected Detox spec or suite on the exact PR head | Same targeted suite for a release if changed afterward |
-| Real chessboard/native rendering or adaptive layout | Targeted Detox or focused simulator screenshot inspection | Targeted release/device check when changed |
-| App startup, shared native wiring, launch fixtures, build configuration, or Detox infrastructure | Exact-head full `flows` and `practice` | Full release scope while that risk is present |
+| React Native copy, state, styling, accessibility, or wiring | Focused component tests, `pnpm mobile:test`, `pnpm mobile:typecheck`; no mobile Detox by default | Owner delta smoke |
+| JavaScript/TypeScript navigation or cross-component journey | Component coverage plus applicable integration tests; no mobile Detox | Owner delta smoke; native suite only if the release has native risk |
+| JavaScript/TypeScript chessboard presentation, animation, or adaptive layout | Focused component/Interaction Lab coverage; optional simulator inspection, not a native gate | Owner delta smoke |
+| Native bridge/adapter, native dependency, platform project, or native persistence integration | Targeted native spec or suite | Reuse while validation-relevant development inputs are unchanged; otherwise rerun the targeted scope |
+| App startup, shared native wiring, native launch fixtures, platform build configuration, or Detox infrastructure | Full `flows` and `practice` | Full release scope while that risk is present |
 | CloudKit behavior | Fake transport integration; targeted native validation only when adapter wiring changed | Signed staging/manual release validation |
 | Notification scheduling/routing | Fake/native fixture tests; targeted native validation only when routing changed | Physical-device release smoke |
 
@@ -427,8 +440,8 @@ Before describing a change as complete:
 - Put every business-rule branch in core or storage tests.
 - Add component behavior coverage for changed visible states or actions.
 - Add or update a representative E2E journey only when a real boundary changed.
-- Record the selected PR native-validation scope and why broader layers were not
-  required.
+- Record whether native validation is required and, when it is, the selected
+  scope or the documented development-input comparison used to reuse evidence.
 - For schema changes, add the versioned migration and migration regression
   evidence before changing production reads/writes to require the new schema.
 - Run the focused commands for the changed layers.

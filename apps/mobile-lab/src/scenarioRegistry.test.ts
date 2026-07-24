@@ -76,3 +76,21 @@ test("the issue #272 preview hands the board to White after the blunder", () => 
   assert.equal(chess.turn(), "w");
   assert.equal(chess.fen(), "8/3k4/8/8/8/8/4P3/4K3 w - - 1 2");
 });
+
+test("Issue #247 stays on the existing Settings product clone with its approved scope", () => {
+  assert.deepEqual(
+    newScenarios
+      .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 247))
+      .map((scenario) => scenario.id),
+    ["settings-ios-sync"]
+  );
+  assert.deepEqual(storyTagsForScenario("settings-ios-sync"), ["new"]);
+  assert.deepEqual(scenarioRegistry["settings-ios-sync"].scope.includes, [
+    "iCloud Sync",
+    "Notifications",
+    "Sound and haptic toggles",
+    "Move and capture audio previews",
+    "About"
+  ]);
+  assert.deepEqual(storyTagsForScenario("practice-home" as LabScenarioId), []);
+});

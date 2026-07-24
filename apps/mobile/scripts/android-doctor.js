@@ -67,6 +67,7 @@ function inspectAndroidEnvironment(options = {}) {
   const repoRoot = options.repoRoot || path.resolve(appDir, '../..');
   const nodeVersion = options.nodeVersion || process.versions.node;
   const sdkRoot = environment.ANDROID_HOME || environment.ANDROID_SDK_ROOT;
+  const artifactOnly = options.artifactOnly === true;
   const checks = [];
 
   const add = (id, status, detail) => checks.push({ id, status, detail });
@@ -103,27 +104,29 @@ function inspectAndroidEnvironment(options = {}) {
   sdkPathCheck('platform', `platforms/android-${REQUIREMENTS.compileSdk}/android.jar`, `Android API ${REQUIREMENTS.compileSdk}`);
   sdkPathCheck('build-tools', `build-tools/${REQUIREMENTS.buildTools}`, `Build Tools ${REQUIREMENTS.buildTools}`);
   sdkPathCheck('ndk', `ndk/${REQUIREMENTS.ndk}/source.properties`, `NDK ${REQUIREMENTS.ndk}`);
-  const adb = sdkPathCheck('adb', 'platform-tools/adb', 'ADB');
-  const emulator = sdkPathCheck('emulator', 'emulator/emulator', 'Android emulator');
-  sdkPathCheck('sdkmanager', 'cmdline-tools/latest/bin/sdkmanager', 'SDK manager');
+  if (!artifactOnly) {
+    const adb = sdkPathCheck('adb', 'platform-tools/adb', 'ADB');
+    const emulator = sdkPathCheck('emulator', 'emulator/emulator', 'Android emulator');
+    sdkPathCheck('sdkmanager', 'cmdline-tools/latest/bin/sdkmanager', 'SDK manager');
 
-  if (adb && exists(adb)) {
-    const result = run(adb, ['version']);
-    add('adb-command', result.status === 0 ? 'pass' : 'fail', firstOutputLine(result));
-  }
+    if (adb && exists(adb)) {
+      const result = run(adb, ['version']);
+      add('adb-command', result.status === 0 ? 'pass' : 'fail', firstOutputLine(result));
+    }
 
-  if (emulator && exists(emulator)) {
-    const result = run(emulator, ['-version']);
-    add('emulator-command', result.status === 0 ? 'pass' : 'fail', firstOutputLine(result));
-    const avds = run(emulator, ['-list-avds']);
-    const avdNames = avds.status === 0
-      ? String(avds.stdout || '').split(/\r?\n/).map((name) => name.trim()).filter(Boolean)
-      : [];
-    add(
-      'avds',
-      avdNames.length > 0 ? 'pass' : 'warn',
-      avdNames.length > 0 ? `Installed AVDs: ${avdNames.join(', ')}` : 'No local AVDs found; CI provisions API 24 and API 36 images',
-    );
+    if (emulator && exists(emulator)) {
+      const result = run(emulator, ['-version']);
+      add('emulator-command', result.status === 0 ? 'pass' : 'fail', firstOutputLine(result));
+      const avds = run(emulator, ['-list-avds']);
+      const avdNames = avds.status === 0
+        ? String(avds.stdout || '').split(/\r?\n/).map((name) => name.trim()).filter(Boolean)
+        : [];
+      add(
+        'avds',
+        avdNames.length > 0 ? 'pass' : 'warn',
+        avdNames.length > 0 ? `Installed AVDs: ${avdNames.join(', ')}` : 'No local AVDs found; CI provisions API 24 and API 36 images',
+      );
+    }
   }
 
   const gradleWrapper = path.join(appDir, 'android', 'gradlew');
@@ -147,13 +150,15 @@ function inspectAndroidEnvironment(options = {}) {
       ? 'React Native, Codegen, and the Gradle plugin are installed'
       : 'Run pnpm install --frozen-lockfile before Android builds',
   );
-  add(
-    'detox',
-    exists(detoxPackage) ? 'pass' : 'fail',
-    exists(detoxPackage)
-      ? `Detox package: ${detoxPackage}`
-      : 'Detox is missing; run pnpm install --frozen-lockfile',
-  );
+  if (!artifactOnly) {
+    add(
+      'detox',
+      exists(detoxPackage) ? 'pass' : 'fail',
+      exists(detoxPackage)
+        ? `Detox package: ${detoxPackage}`
+        : 'Detox is missing; run pnpm install --frozen-lockfile',
+    );
+  }
 
   const releaseSigningNames = [
     'CHESSTICIZE_ANDROID_RELEASE_STORE_FILE',
@@ -259,6 +264,7 @@ function inspectAndroidEnvironment(options = {}) {
 
   return {
     ready: checks.every((check) => check.status !== 'fail'),
+    mode: artifactOnly ? 'artifact-only' : 'development',
     requirements: REQUIREMENTS,
     sdkRoot: sdkRoot || null,
     checks,
@@ -266,7 +272,9 @@ function inspectAndroidEnvironment(options = {}) {
 }
 
 function runDoctor(args = process.argv.slice(2)) {
-  const report = inspectAndroidEnvironment();
+  const report = inspectAndroidEnvironment({
+    artifactOnly: args.includes('--artifact-only'),
+  });
   if (args.includes('--json')) {
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
   } else {

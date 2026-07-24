@@ -5,21 +5,21 @@
     "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
     "applicationId": "com.chessticize.mobile",
     "versionName": "1.2",
-    "versionCode": 5
+    "versionCode": 6
   },
   "sourceRelease": {
     "status": "pending",
     "evidenceId": "REPLACE_WITH_GITHUB_RELEASE_EVIDENCE_ID",
-    "reference": "https://github.com/Chessticize/chessticize-mobile/releases/tag/android-v1.2.0-build-5",
+    "reference": "https://github.com/Chessticize/chessticize-mobile/releases/tag/android-v1.2.0-build-6",
     "candidate": {
       "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
       "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
       "applicationId": "com.chessticize.mobile",
       "versionName": "1.2",
-      "versionCode": 5
+      "versionCode": 6
     },
     "repositoryUrl": "https://github.com/Chessticize/chessticize-mobile",
-    "tagName": "android-v1.2.0-build-5",
+    "tagName": "android-v1.2.0-build-6",
     "tagCommitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
     "tagType": "pending",
     "releaseId": 0,
@@ -29,9 +29,9 @@
       "releaseAssetId": 0,
       "assetName": "android-source-manifest.json",
       "sha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
-      "reference": "https://github.com/Chessticize/chessticize-mobile/releases/download/android-v1.2.0-build-5/android-source-manifest.json",
+      "reference": "https://github.com/Chessticize/chessticize-mobile/releases/download/android-v1.2.0-build-6/android-source-manifest.json",
       "releaseId": 0,
-      "tagName": "android-v1.2.0-build-5",
+      "tagName": "android-v1.2.0-build-6",
       "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
       "workflowRunId": 0,
       "workflowRunReference": "REPLACE_WITH_HTTPS_WORKFLOW_REFERENCE",
@@ -44,11 +44,11 @@
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
         "versionName": "1.2",
-        "versionCode": 5
+        "versionCode": 6
       }
     },
     "sourceDisclosure": {
-      "releaseNotesReference": "https://github.com/Chessticize/chessticize-mobile/releases/tag/android-v1.2.0-build-5",
+      "releaseNotesReference": "https://github.com/Chessticize/chessticize-mobile/releases/tag/android-v1.2.0-build-6",
       "supportDocumentation": {
         "status": "pending",
         "evidenceId": "REPLACE_WITH_SOURCE_SUPPORT_EVIDENCE_ID",
@@ -59,7 +59,7 @@
           "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
           "applicationId": "com.chessticize.mobile",
           "versionName": "1.2",
-          "versionCode": 5
+          "versionCode": 6
         }
       }
     }
@@ -76,7 +76,7 @@
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
         "versionName": "1.2",
-        "versionCode": 5
+        "versionCode": 6
       },
       "workflowRunId": 0,
       "artifactId": 0
@@ -90,7 +90,7 @@
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
         "versionName": "1.2",
-        "versionCode": 5
+        "versionCode": 6
       }
     }
   },
@@ -104,7 +104,7 @@
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
         "versionName": "1.2",
-        "versionCode": 5
+        "versionCode": 6
       }
     },
     "storeListing": {
@@ -116,7 +116,7 @@
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
         "versionName": "1.2",
-        "versionCode": 5
+        "versionCode": 6
       }
     },
     "privacyPolicy": {
@@ -128,7 +128,7 @@
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
         "versionName": "1.2",
-        "versionCode": 5
+        "versionCode": 6
       }
     },
     "dataSafety": {
@@ -140,7 +140,7 @@
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
         "versionName": "1.2",
-        "versionCode": 5
+        "versionCode": 6
       }
     },
     "supportedDevices": {
@@ -152,7 +152,7 @@
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
         "versionName": "1.2",
-        "versionCode": 5
+        "versionCode": 6
       }
     }
   },
@@ -166,7 +166,7 @@
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
         "versionName": "1.2",
-        "versionCode": 5
+        "versionCode": 6
       },
       "track": "internal",
       "releaseId": "REPLACE_IF_RUN"
@@ -180,7 +180,7 @@
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
         "versionName": "1.2",
-        "versionCode": 5
+        "versionCode": 6
       },
       "track": "closed",
       "releaseId": "REPLACE_IF_RUN"
@@ -194,7 +194,7 @@
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
         "versionName": "1.2",
-        "versionCode": 5
+        "versionCode": 6
       },
       "reportId": "REPLACE_WITH_REPORT_ID"
     },
@@ -207,7 +207,7 @@
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
         "versionName": "1.2",
-        "versionCode": 5
+        "versionCode": 6
       },
       "runId": 0,
       "artifactIds": []
@@ -222,7 +222,7 @@
       "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
       "applicationId": "com.chessticize.mobile",
       "versionName": "1.2",
-      "versionCode": 5
+      "versionCode": 6
     },
     "rolloutPercentage": 0,
     "launched": false,
@@ -238,7 +238,7 @@
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
         "versionName": "1.2",
-        "versionCode": 5
+        "versionCode": 6
       },
       "universalApkBytes": 0,
       "arm64ApkBytes": 0,

@@ -1,6 +1,6 @@
 # Chessticize Android 1.2 (build 5)
 
-- Status: Approved
+- Status: Failed candidate; no AAB or Play release was produced
 - Locale: `en-US`
 - Platform: `Android`
 - Public version: `1.2`
@@ -46,3 +46,11 @@ Sprint result and on-device analysis score presentation.
 - [x] No issue numbers, internal code names, implementation details, or private
   evidence are included.
 - [x] The release owner approved the copy before the source tag was created.
+
+## Candidate outcome
+
+The protected candidate run stopped in the generic Android doctor before the
+AAB build because the hosted image lacked an emulator-only runtime library.
+No AAB, GitHub source Release, or Play upload was produced. The public annotated
+tag remains immutable; Android 1.2 advances to build 6 with an artifact-only
+doctor that excludes emulator readiness.

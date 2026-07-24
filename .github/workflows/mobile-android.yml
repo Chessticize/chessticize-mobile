@@ -2,8 +2,6 @@ name: Mobile Android
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "17 10 * * *"
 
 permissions:
   contents: read
@@ -141,11 +139,11 @@ jobs:
     name: Android offline practice API ${{ matrix.api-level }}
     needs: android-build
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
-        api-level: ${{ fromJSON(github.event_name == 'schedule' && '[36]' || '[24,36]') }}
+        api-level: [24, 36]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -193,6 +191,7 @@ jobs:
           disable-animations: true
           emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           script: >-
+            timeout --signal=TERM --kill-after=30s 30m
             pnpm mobile:validate:android:matrix -- --api-level "${{ matrix.api-level }}"
             --output "apps/mobile/artifacts/android-validation/api-${{ matrix.api-level }}.json"
         env:
@@ -216,7 +215,9 @@ jobs:
         with:
           name: android-launch-diagnostics-api-${{ matrix.api-level }}
           if-no-files-found: warn
-          path: apps/mobile/artifacts/android-ui/
+          path: |
+            apps/mobile/artifacts/android-ui/
+            apps/mobile/artifacts/android-validation/
 
       - name: Upload Android review reminder evidence
         if: always() && matrix.api-level == 36
@@ -228,7 +229,6 @@ jobs:
 
   android-adaptive-layout:
     name: Android adaptive public UI
-    if: github.event_name == 'workflow_dispatch'
     needs: android-build
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -299,7 +299,6 @@ jobs:
 
   android-progress-backup:
     name: Android Progress Backup restore evidence
-    if: github.event_name == 'workflow_dispatch'
     needs: android-build
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -375,7 +374,6 @@ jobs:
 
   android-progress-backup-policy-api24:
     name: Android Progress Backup policy API 24
-    if: github.event_name == 'workflow_dispatch'
     needs: android-build
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -418,7 +416,6 @@ jobs:
 
   android-progress-backup-policy-api36:
     name: Android Progress Backup policy API 36
-    if: github.event_name == 'workflow_dispatch'
     needs: android-build
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -461,7 +458,6 @@ jobs:
 
   android-progress-backup-policy-api30:
     name: Android Progress Backup policy API 30
-    if: github.event_name == 'workflow_dispatch'
     needs:
       - android-build
       - android-progress-backup-policy-api36

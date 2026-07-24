@@ -23,6 +23,7 @@ const {
 } = require('../scripts/verify-android-apk-abis');
 const {
   ANDROID_REQUIREMENTS,
+  androidArtifactSdkPackages,
   androidSdkPackages,
   parseGradleProperties,
 } = require('../scripts/android-requirements');
@@ -356,6 +357,11 @@ describe('Android launch baseline', () => {
       'build-tools;36.0.0',
       'ndk;27.1.12297006',
     ]);
+    expect(androidArtifactSdkPackages(ANDROID_REQUIREMENTS)).toEqual([
+      'platforms;android-36',
+      'build-tools;36.0.0',
+      'ndk;27.1.12297006',
+    ]);
     expect(parseGradleProperties('answer=42\n# ignored\nabis=x86_64,arm64-v8a\n')).toEqual({
       answer: '42',
       abis: 'x86_64,arm64-v8a',
@@ -366,6 +372,15 @@ describe('Android launch baseline', () => {
     expect(run).toHaveBeenCalledWith(
       'sdkmanager',
       androidSdkPackages(ANDROID_REQUIREMENTS),
+      { stdio: 'inherit' },
+    );
+    run.mockClear();
+    expect(installAndroidSdk(run, { artifactOnly: true })).toEqual(
+      androidArtifactSdkPackages(ANDROID_REQUIREMENTS),
+    );
+    expect(run).toHaveBeenCalledWith(
+      'sdkmanager',
+      androidArtifactSdkPackages(ANDROID_REQUIREMENTS),
       { stdio: 'inherit' },
     );
   });
@@ -500,7 +515,8 @@ describe('Android launch baseline', () => {
   it('keeps Android emulator Detox out of routine pull-request CI', () => {
     const workflow = read('../../.github/workflows/mobile-android.yml');
 
-    expect(workflow).toContain('schedule:');
+    expect(workflow).toContain('workflow_dispatch:');
+    expect(workflow).not.toContain('schedule:');
     expect(workflow).not.toMatch(/^\s+pull_request:/m);
   });
 
@@ -529,9 +545,7 @@ describe('Android launch baseline', () => {
       workflow.indexOf('  android-adaptive-layout:'),
     );
 
-    expect(launchJob).toContain(
-      "api-level: ${{ fromJSON(github.event_name == 'schedule' && '[36]' || '[24,36]') }}"
-    );
+    expect(launchJob).toContain('api-level: [24, 36]');
     expect(launchJob).toContain('ram-size: 4096M');
     expect(launchJob.match(/ram-size: 4096M/g)).toHaveLength(1);
     expect(launchJob).toContain('disk-size: 8192M');
@@ -683,7 +697,8 @@ describe('Android launch baseline', () => {
     ]));
     expect(workflow).toContain('pnpm mobile:validate:android:matrix');
     expect(workflow).not.toContain('DETOX_ACTIVE_SUITE=');
-    expect(workflow).toContain('timeout-minutes: 75');
+    expect(workflow).toContain('timeout-minutes: 40');
+    expect(workflow).toContain('timeout --signal=TERM --kill-after=30s 30m');
   });
 
   it('keeps emulator-runner control flow in the tested Node runner', () => {
@@ -755,6 +770,48 @@ describe('Android launch baseline', () => {
       expect.objectContaining({ id: 'native-library', status: 'pass' }),
       expect.objectContaining({ id: 'detox', status: 'pass' }),
     ]));
+  });
+
+  it('keeps artifact-only release readiness independent of emulator tooling', () => {
+    const sdkRoot = '/sdk';
+    const appDir = '/repo/apps/mobile';
+    const repoRoot = '/repo';
+    const present = completeAndroidFiles(sdkRoot, appDir, repoRoot);
+    present.delete(`${sdkRoot}/platform-tools/adb`);
+    present.delete(`${sdkRoot}/emulator/emulator`);
+    present.delete(`${sdkRoot}/cmdline-tools/latest/bin/sdkmanager`);
+    present.delete(`${appDir}/node_modules/detox/package.json`);
+    const run = jest.fn(successfulAndroidToolRun);
+
+    const report = inspectAndroidEnvironment({
+      artifactOnly: true,
+      environment: { ANDROID_HOME: sdkRoot },
+      exists: (file) => present.has(file),
+      canExecute: (file) => present.has(file),
+      run,
+      readFile: () => JSON.stringify(stockfishArtifacts),
+      nodeVersion: '22.14.0',
+      appDir,
+      repoRoot,
+    });
+
+    expect(report.ready).toBe(true);
+    expect(report.mode).toBe('artifact-only');
+    expect(report.checks.map((check) => check.id)).not.toEqual(
+      expect.arrayContaining([
+        'adb',
+        'adb-command',
+        'emulator',
+        'emulator-command',
+        'avds',
+        'sdkmanager',
+        'detox',
+      ]),
+    );
+    expect(run).not.toHaveBeenCalledWith(
+      `${sdkRoot}/emulator/emulator`,
+      expect.any(Array),
+    );
   });
 
   it('distinguishes partial release signing from simulator-ready development setup', () => {

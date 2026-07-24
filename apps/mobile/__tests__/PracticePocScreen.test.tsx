@@ -3647,7 +3647,7 @@ describe("PracticePocScreen", () => {
     expectHistoryRowAccessibility(renderer, "Played e6d7 · Best e6f7");
   });
 
-  it("uses neutral Arrow Duel board markers without separate A/B choice chips", () => {
+  it("waits for the Arrow Duel board to render before showing neutral markers", () => {
     const service = createMobilePracticeService("familiar15");
     const renderer = renderScreen({ practiceService: service });
 
@@ -3658,6 +3658,12 @@ describe("PracticePocScreen", () => {
     expect(arrowBoard.props.flipped).toBe(new Chess(arrow.currentFen).turn() === "b");
     expect(arrowBoard.props.gestureEnabled).toBe(true);
     expect(arrowBoard.props.mockImperativeMove).not.toHaveBeenCalled();
+    expect(renderer.root.findAllByProps({ testID: "arrow-duel-candidate-overlay" })).toHaveLength(0);
+
+    act(() => {
+      arrowBoard.props.onReady();
+    });
+
     expect(() => findByTestId(renderer, "board-input-blocker")).toThrow();
     expect(collectText(renderer.root)).not.toContain("Choose one candidate move");
     expect(() => findByTestId(renderer, "arrow-duel-candidates")).toThrow();
@@ -3691,6 +3697,10 @@ describe("PracticePocScreen", () => {
     const arrow = firstArrowDuelPuzzleForTest();
 
     startArrowDuelSprint(renderer);
+    act(() => {
+      findByTestId(renderer, "mock-chessboard").props.onReady();
+    });
+    expect(findByTestId(renderer, "arrow-duel-candidate-overlay")).toBeTruthy();
 
     await boardMove(renderer, arrow.correctMove);
 
@@ -3704,6 +3714,12 @@ describe("PracticePocScreen", () => {
     expect(countStyleEntry(findByTestId(renderer, "session-board"), "borderLeftColor", "#DC2626")).toBe(0);
     expect(() => findByTestId(renderer, "feedback-panel")).toThrow();
     await settleFeedbackSnapshot();
+
+    expect(renderer.root.findAllByProps({ testID: "arrow-duel-candidate-overlay" })).toHaveLength(0);
+    act(() => {
+      findByTestId(renderer, "mock-chessboard").props.onReady();
+    });
+    expect(findByTestId(renderer, "arrow-duel-candidate-overlay")).toBeTruthy();
   });
 
   it("ignores non-candidate Arrow Duel board moves without recording attempts", async () => {
@@ -6614,6 +6630,38 @@ describe("PracticePocScreen", () => {
     });
   });
 
+  it("does not start deferred Stockfish diagnostics after leaving the panel", async () => {
+    const systemBack = createTestSystemBackSource("android");
+    const stockfish = createScriptedStockfishTransport(() => {});
+    let resolvePrewarm: ((ready: boolean) => void) | undefined;
+    const prewarm = jest.fn(() => new Promise<boolean>((resolve) => {
+      resolvePrewarm = resolve;
+    }));
+    const renderer = renderScreen({
+      stockfish: {
+        createTransport: () => stockfish.transport,
+        prewarm
+      },
+      systemBack
+    });
+
+    press(renderer, "settings-tab");
+    press(renderer, "settings-stockfish-diagnostics");
+    expect(prewarm).toHaveBeenCalledTimes(1);
+    expect(systemBack.invoke()).toBe(true);
+    expect(findByTestId(renderer, "settings-panel")).toBeTruthy();
+
+    await act(async () => {
+      resolvePrewarm?.(true);
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(stockfish.commands.some((command) => command.startsWith("go depth "))).toBe(false);
+    expect(stockfish.listenerCount()).toBe(0);
+  });
+
   it("reviews Arrow Duel mistakes with analysis blunder arrows and a forced punishment line", async () => {
     const preview = createMobilePracticeService("familiar15");
     const previewState = preview.startSprint({
@@ -6765,9 +6813,9 @@ describe("PracticePocScreen", () => {
   });
 
   it.each([
-    { label: "iPhone bottom tabs", width: 430, height: 932, scale: 3, rail: false, badgeTop: -8 },
+    { label: "iPhone 17 Pro Max bottom tabs", width: 440, height: 956, scale: 3, rail: false, badgeTop: -8 },
     { label: "iPad expanded rail", width: 1180, height: 820, scale: 2, rail: true, badgeTop: -7 }
-  ])("keeps a two-digit review badge on one line at the icon's upper-right in $label", ({
+  ])("lets a two-digit review badge fit native font metrics at the icon's upper-right in $label", ({
     width,
     height,
     scale,
@@ -6779,12 +6827,12 @@ describe("PracticePocScreen", () => {
     }).__setWindowDimensions?.({ width, height, scale, fontScale: 1 });
     jest.setSystemTime(new Date("2026-06-21T12:00:00.000Z"));
 
-    const renderer = renderScreen({ practiceService: createDueReviewService(16) });
+    const renderer = renderScreen({ practiceService: createDueReviewService(18) });
     const badge = findByTestId(renderer, "review-tab-badge");
     const badgeStyle = flattenTestStyle(badge.props.style);
     const iconStyle = flattenTestStyle(findByTestId(renderer, "review-tab-icon").props.style);
 
-    expect(collectText(badge)).toBe("16");
+    expect(collectText(badge)).toBe("18");
     expect(badge.props.allowFontScaling).toBe(false);
     expect(badge.props.numberOfLines).toBe(1);
     expect(badgeStyle.left).toBe(24);
@@ -6792,7 +6840,8 @@ describe("PracticePocScreen", () => {
     expect(badgeStyle.top).toBe(badgeTop);
     expect(badgeStyle.minHeight).toBe(18);
     expect(badgeStyle.minWidth).toBe(18);
-    expect(badgeStyle.width).toBe(22);
+    expect(badgeStyle.width).toBeUndefined();
+    expect(badgeStyle.paddingHorizontal).toBe(4);
     expect(iconStyle.overflow).toBe("visible");
     expect(iconStyle.width).toBe(32);
     if (rail) {
@@ -6809,7 +6858,7 @@ describe("PracticePocScreen", () => {
 
     expect(collectText(badge)).toBe("99+");
     expect(badge.props.numberOfLines).toBe(1);
-    expect(flattenTestStyle(badge.props.style).width).toBe(28);
+    expect(flattenTestStyle(badge.props.style).width).toBeUndefined();
   });
 
   it("auto-advances a wrong due Arrow Duel review and keeps it in today's history", async () => {
@@ -7020,6 +7069,32 @@ describe("PracticePocScreen", () => {
     expect(openURLSpy).toHaveBeenNthCalledWith(5, "mailto:support@chessticize.com");
     openURLSpy.mockRestore();
     expect(collectText(findByTestId(renderer, "settings-panel"))).not.toContain("›");
+  });
+
+  it("places the Lab Move Feedback presentation after Notifications without formal preview controls", () => {
+    const renderer = renderScreen({
+      moveFeedbackSettings: {}
+    });
+
+    press(renderer, "settings-tab");
+
+    expect(collectText(findByTestId(renderer, "settings-move-feedback-section")))
+      .toContain("Move Feedback");
+    expect(
+      testIdOrder(
+        renderer,
+        "settings-notifications-section",
+        "settings-move-feedback-section"
+      )
+    ).toBeLessThan(0);
+    expect(
+      testIdOrder(
+        renderer,
+        "settings-move-feedback-section",
+        "settings-profile-section"
+      )
+    ).toBeLessThan(0);
+    expect(() => findByTestId(renderer, "settings-move-feedback-previews")).toThrow();
   });
 
   it("routes feedback to GitHub only after an explicit privacy handoff", async () => {
@@ -7516,7 +7591,7 @@ describe("PracticePocScreen", () => {
 
 function createScriptedStockfishTransport(
   onCommand: (command: string, emit: (line: string) => void) => void
-): { commands: string[]; transport: UciEngineTransport } {
+): { commands: string[]; listenerCount: () => number; transport: UciEngineTransport } {
   const commands: string[] = [];
   const listeners = new Set<(line: string) => void>();
   const emit = (line: string) => {
@@ -7527,6 +7602,7 @@ function createScriptedStockfishTransport(
 
   return {
     commands,
+    listenerCount: () => listeners.size,
     transport: {
       start: jest.fn(async () => {}),
       send: jest.fn((command: string) => {
@@ -7550,7 +7626,7 @@ function createScriptedStockfishTransport(
 }
 
 type RenderScreenOptions = TestMobilePlatformCapabilityOverrides &
-  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "historyTimingPreview" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEloEditingMovedToHome" | "runManagementEnabled" | "runManagementPresentation" | "runTimingEditorPreview" | "sessionTimingPreview" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "themeCatalogPresentation"> & {
+  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "historyTimingPreview" | "moveFeedbackSettings" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEloEditingMovedToHome" | "runManagementEnabled" | "runManagementPresentation" | "runTimingEditorPreview" | "sessionTimingPreview" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "themeCatalogPresentation"> & {
     platformCapabilities?: MobilePlatformCapabilities;
   };
 
@@ -7648,6 +7724,7 @@ function renderScreen({
   currentTimeMs,
   customTargetCorrect,
   debugTrace,
+  moveFeedbackSettings,
   puzzleSelectionId,
   puzzleSelectionSeed,
   runEloEditingMovedToHome,
@@ -7671,6 +7748,7 @@ function renderScreen({
         currentTimeMs={currentTimeMs}
         customTargetCorrect={customTargetCorrect}
         debugTrace={debugTrace}
+        moveFeedbackSettings={moveFeedbackSettings}
         puzzleSelectionId={puzzleSelectionId}
         puzzleSelectionSeed={puzzleSelectionSeed}
         runEloEditingMovedToHome={runEloEditingMovedToHome}

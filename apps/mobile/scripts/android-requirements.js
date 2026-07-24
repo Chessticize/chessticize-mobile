@@ -82,6 +82,12 @@ function androidSdkPackages(requirements) {
   return [
     'platform-tools',
     'emulator',
+    ...androidArtifactSdkPackages(requirements),
+  ];
+}
+
+function androidArtifactSdkPackages(requirements) {
+  return [
     `platforms;android-${requirements.compileSdk}`,
     `build-tools;${requirements.buildTools}`,
     `ndk;${requirements.ndk}`,
@@ -94,6 +100,7 @@ module.exports = {
   ANDROID_REQUIREMENTS,
   DEFAULT_PACKAGE_PATH,
   DEFAULT_PROPERTIES_PATH,
+  androidArtifactSdkPackages,
   androidSdkPackages,
   loadAndroidRequirements,
   loadNodeRequirement,

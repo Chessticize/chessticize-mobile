@@ -33,13 +33,15 @@ Design approval record:
 
 ## Validation scope
 
-Select exactly one native-validation scope and explain why it proves the changed boundary.
+Native validation is required only for releases and native-impacting changes.
+Select exactly one scope and explain why the change does or does not cross that
+boundary.
 
 - [ ] No mobile Detox
 - [ ] Targeted `flows` spec or suite
 - [ ] Targeted `practice` spec or suite
 - [ ] Full `flows` and `practice`
-- [ ] Focused simulator screenshot only
+- [ ] Optional focused simulator screenshot only
 
 Rationale:
 
@@ -47,7 +49,7 @@ Rationale:
 
 - [ ] Relevant focused regression test
 - [ ] Required path-scoped CI checks
-- [ ] Exact-head native evidence recorded when targeted or full validation is selected
+- [ ] Native evidence recorded when targeted/full is selected, or reuse documented with unchanged validation-relevant development inputs
 
 Commands and results:
 

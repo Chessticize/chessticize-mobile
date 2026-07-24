@@ -29,6 +29,7 @@ describe('Android Custom Practice release slice', () => {
     const spec = read('e2e/android-custom-practice.e2e.js');
     const suiteConfig = read('e2e/suiteConfig.js');
     const workflow = read('../../.github/workflows/mobile-android.yml');
+    const fixture = require('../../../fixtures/puzzles/android-standard-practice.fixture.json');
 
     expect(suiteConfig).toContain('android-custom-practice.e2e.js');
     expect(validationStepsForApiLevel(36))
@@ -38,6 +39,13 @@ describe('Android Custom Practice release slice', () => {
     expect(spec).toContain("by.id('practice-run-name-input')");
     expect(spec).toContain("by.id('practice-run-start')");
     expect(spec).toContain('android-standard-practice.fixture.json');
+    expect(fixture.customRunTheme).toEqual({
+      id: 'mate-in-2',
+      label: 'Mate in 2',
+      puzzleTheme: 'mateIn2',
+    });
+    expect(fixture.puzzle.themes).toContain(fixture.customRunTheme.puzzleTheme);
+    expect(spec).toContain('practiceFixture.customRunTheme.id');
     expect(spec).toContain('chessticizePuzzleSelectionId: practiceFixture.puzzle.id');
     expect(spec).toContain("by.id('session-board')");
     expect(spec).toContain("waitForVisibleInPracticeScroll('practice-prompt')");

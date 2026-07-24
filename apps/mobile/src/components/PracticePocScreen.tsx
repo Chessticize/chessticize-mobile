@@ -147,6 +147,11 @@ import type {
   MobileSystemBackEdge,
   MobileSystemBackSource
 } from "../navigation/mobileSystemBack.ts";
+import {
+  MoveFeedbackSettingsSection,
+  type MoveFeedbackPreferences,
+  type MoveFeedbackPreviewer
+} from "./MoveFeedbackSettingsSection.tsx";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Chess, type Move, type PieceSymbol, type Square } from "chess.js";
 import type {
@@ -181,6 +186,10 @@ interface Props {
   debugTrace?: (event: PracticeDebugTraceEvent) => void;
   feedbackIssuesOpener?: (url: string) => Promise<void>;
   currentTimeMs?: () => number;
+  moveFeedbackSettings?: {
+    initialPreferences?: MoveFeedbackPreferences;
+    preview?: MoveFeedbackPreviewer;
+  };
   puzzleSelectionId?: string;
   puzzleSelectionSeed?: string;
   runManagementEnabled?: boolean;
@@ -393,6 +402,7 @@ export function PracticePocScreen({
   debugTrace,
   feedbackIssuesOpener = openFeedbackIssuesInBrowser,
   currentTimeMs = Date.now,
+  moveFeedbackSettings,
   puzzleSelectionId,
   puzzleSelectionSeed,
   runManagementEnabled = false,
@@ -447,7 +457,9 @@ export function PracticePocScreen({
     (intent: MobileBackIntent, resolvedState: MobileBackState) => boolean
   ) | null>(null);
   const reminderScheduleKeyRef = useRef<string | null>(null);
-  const scheduledReviewAttemptCountRef = useRef(scheduledReviewAttemptCount(service));
+  // Initialized once the service effect runs. Keeping this out of the useRef
+  // argument matters because React evaluates that argument on every render.
+  const scheduledReviewAttemptCountRef = useRef<number | null>(null);
   const reviewReminderPromptDismissedRef = useRef(false);
   const iCloudSyncInFlightRef = useRef<Promise<string> | null>(null);
   const stateRef = useRef<SprintState | null>(null);
@@ -479,6 +491,7 @@ export function PracticePocScreen({
   const [unclearPrompt, setUnclearPrompt] = useState<UnclearPromptState | null>(null);
   const [boardInputLocked, setBoardInputLocked] = useState(false);
   const [boardInputLockMode, setBoardInputLockMode] = useState<BoardInputLockMode>("hard");
+  const [readyArrowDuelBoardKey, setReadyArrowDuelBoardKey] = useState<string | null>(null);
   const [chessboardDebugEvents, setChessboardDebugEvents] = useState<string[]>([]);
   const [historyTimeRange, setHistoryTimeRange] = useState<HistoryTimeRange>("7d");
   const [historySourceFilter, setHistorySourceFilter] = useState<"all" | AttemptSource>(
@@ -515,6 +528,12 @@ export function PracticePocScreen({
   const [mobileBackPreview, setMobileBackPreview] = useState<MobileBackPreview | null>(null);
   const [iCloudSyncEnabled, setICloudSyncEnabled] = useState(() => service.getSettings().sync.iCloudEnabled);
   const [iCloudSyncStatus, setICloudSyncStatus] = useState(() => service.getSettings().sync.iCloudEnabled ? "Ready" : "Off");
+  const [moveFeedbackPreferences, setMoveFeedbackPreferences] = useState<MoveFeedbackPreferences>(
+    () => moveFeedbackSettings?.initialPreferences ?? {
+      hapticsEnabled: true,
+      soundEnabled: true
+    }
+  );
   const [, setSettingsRevision] = useState(0);
   const sessionTimingDesignState = useSessionTimingDesignPreview(sessionTimingPreview);
   const internalRunManagement = usePracticeRunManagement({
@@ -1463,13 +1482,18 @@ export function PracticePocScreen({
       if (shouldAnimateSamePuzzleReply(next.state, nextFeedback, submittedPuzzleId)) {
         commitBoardFen(nextVisualFen);
         await animateSamePuzzleReply(next.state, nextFeedback);
-        refreshState();
         return;
       }
       syncFeedbackSnapshot(next.state, nextFeedback, submittedPuzzle, submittedFen, submittedPuzzleId);
       boardVisualFenRef.current = nextVisualFen;
       syncBoardAfterMove(next.state, nextFeedback, submittedPuzzleId);
-      refreshState();
+      // The submit result already contains every piece of live sprint UI state.
+      // Rebuilding aggregate History/Review/Home snapshots after each move is
+      // both redundant and O(total stored attempts); refresh them at the sprint
+      // boundary instead.
+      if (next.state.status !== "active") {
+        refreshState();
+      }
     } catch (caught) {
       setError(errorMessage(caught));
       boardSyncInProgressRef.current = false;
@@ -2072,6 +2096,15 @@ export function PracticePocScreen({
       ? arrowFromTo(boardFeedback.submittedMove)
       : null;
   const displayedLastBoardMove = feedbackSnapshot || boardFeedback ? null : lastBoardMove;
+  const arrowDuelBoardRenderKey =
+    displayedPuzzle?.kind === "arrow_duel" && state && displayedBoardFen
+      ? `${state.id}:${displayedPuzzle.puzzle.id}:${displayedBoardFen}`
+      : null;
+  const markArrowDuelBoardReady = useCallback(() => {
+    if (arrowDuelBoardRenderKey) {
+      setReadyArrowDuelBoardKey(arrowDuelBoardRenderKey);
+    }
+  }, [arrowDuelBoardRenderKey]);
   const historyRatingKeys = useMemo(
     () => activeRunManagementPresentation
       ? activeRunManagementPresentation.runs.flatMap((run) => run.ratingKey ? [run.ratingKey] : [])
@@ -2479,6 +2512,7 @@ export function PracticePocScreen({
             durations={CHESSBOARD_DURATIONS}
             spriteSource={CHESS_PIECE_SPRITE}
             colors={CHESSBOARD_COLORS}
+            onReady={arrowDuelBoardRenderKey ? markArrowDuelBoardReady : undefined}
           />
         ) : (
           <View style={[styles.emptyBoard, { width: boardSize, height: boardSize }]}>
@@ -2526,7 +2560,9 @@ export function PracticePocScreen({
           />
         ) : null}
 
-        {displayedPuzzle?.kind === "arrow_duel" && !boardFeedback ? (
+        {displayedPuzzle?.kind === "arrow_duel"
+          && !boardFeedback
+          && readyArrowDuelBoardKey === arrowDuelBoardRenderKey ? (
           <ArrowCandidateOverlay
             boardSize={boardSize}
             flipped={boardFlipped}
@@ -3027,7 +3063,10 @@ export function PracticePocScreen({
                     setNowMs(completedAtMs);
                   }
                   const nextScheduledReviewAttemptCount = scheduledReviewAttemptCount(service);
-                  if (nextScheduledReviewAttemptCount > scheduledReviewAttemptCountRef.current) {
+                  if (
+                    scheduledReviewAttemptCountRef.current !== null
+                    && nextScheduledReviewAttemptCount > scheduledReviewAttemptCountRef.current
+                  ) {
                     maybeShowReviewReminderPermissionPrompt();
                   }
                   scheduledReviewAttemptCountRef.current = nextScheduledReviewAttemptCount;
@@ -3069,8 +3108,11 @@ export function PracticePocScreen({
                 showRatingControls={!ratingEditingMovedToHome}
                 iCloudSyncEnabled={iCloudSyncEnabled}
                 iCloudSyncStatus={iCloudSyncStatus}
+                moveFeedbackPreferences={moveFeedbackSettings ? moveFeedbackPreferences : undefined}
+                moveFeedbackPreviewer={moveFeedbackSettings?.preview}
                 advancedRatingsOpen={settingsAdvancedRatingsOpen}
                 onAdvancedRatingsOpenChange={setSettingsAdvancedRatingsOpen}
+                onMoveFeedbackPreferencesChange={setMoveFeedbackPreferences}
                 onOpenNotificationSettings={openReviewReminderSystemSettings}
                 onRequestReviewReminderPermission={() => requestReviewReminderPermission()}
                 onSaveReviewReminderPreference={saveReviewReminderPreference}
@@ -10192,7 +10234,10 @@ function SettingsPanel({
   onSyncICloudNow,
   iCloudSyncEnabled,
   iCloudSyncStatus,
+  moveFeedbackPreferences,
+  moveFeedbackPreviewer,
   notificationPermissionStatus,
+  onMoveFeedbackPreferencesChange,
   reminderPlatform,
   ratings,
   reviewReminderScheduleStatus,
@@ -10215,7 +10260,10 @@ function SettingsPanel({
   onSyncICloudNow: () => Promise<string>;
   iCloudSyncEnabled: boolean;
   iCloudSyncStatus: string;
+  moveFeedbackPreferences?: MoveFeedbackPreferences;
+  moveFeedbackPreviewer?: MoveFeedbackPreviewer;
   notificationPermissionStatus: ReviewReminderPermissionStatus;
+  onMoveFeedbackPreferencesChange: (preferences: MoveFeedbackPreferences) => void;
   reminderPlatform: MobilePlatformCapabilities["reminders"]["platform"];
   ratings: Array<{ label: string; record: RatingRecord }>;
   reviewReminderScheduleStatus: string;
@@ -10355,6 +10403,20 @@ function SettingsPanel({
           </Text>
         ) : null}
       </SettingsSection>
+
+      {moveFeedbackPreferences ? (
+        <SettingsSection
+          title="Move Feedback"
+          testID="settings-move-feedback-section"
+          wide={adaptiveLayout.usesWideContent}
+        >
+          <MoveFeedbackSettingsSection
+            preferences={moveFeedbackPreferences}
+            onPreferencesChange={onMoveFeedbackPreferencesChange}
+            onPreview={moveFeedbackPreviewer}
+          />
+        </SettingsSection>
+      ) : null}
 
       {showRatingControls ? (
         <SettingsSection title="Profile" testID="settings-profile-section" wide={adaptiveLayout.usesWideContent}>
@@ -11329,6 +11391,7 @@ function StockfishDiagnosticsPanel({
     const transport = stockfish.createTransport();
     let cancelled = false;
     let firstUpdateSeen = false;
+    const analysisController = new AbortController();
     const startedAt = Date.now();
 
     setLines([]);
@@ -11359,27 +11422,33 @@ function StockfishDiagnosticsPanel({
       terminate: () => transport.terminate()
     };
 
-    void stockfish.prewarm().then((prewarmed) => analyzeFenWithUciEngine(tracedTransport, selectedPosition.fen, {
-      depth: ANALYSIS_DEPTH,
-      initialize: !prewarmed,
-      multiPv: 4,
-      newGame: !prewarmed,
-      onUpdate: (nextLines) => {
-        if (cancelled) {
-          return;
-        }
-        if (!firstUpdateSeen && nextLines.length > 0) {
-          firstUpdateSeen = true;
-          setFirstEvalMs(Date.now() - startedAt);
-        }
-        setLines(nextLines);
-        const depth = nextLines.reduce((maxDepth, line) => Math.max(maxDepth, line.depth), 0);
-        setStatus(depth > 0 ? `Depth ${depth}/${ANALYSIS_DEPTH}` : "Analyzing");
-      },
-      shallowDelayMs: 500,
-      shallowDepth: 8,
-      timeoutMs: 30000
-    })).then(
+    void stockfish.prewarm().then((prewarmed) => {
+      if (analysisController.signal.aborted) {
+        return [];
+      }
+      return analyzeFenWithUciEngine(tracedTransport, selectedPosition.fen, {
+        depth: ANALYSIS_DEPTH,
+        initialize: !prewarmed,
+        multiPv: 4,
+        newGame: !prewarmed,
+        onUpdate: (nextLines) => {
+          if (cancelled) {
+            return;
+          }
+          if (!firstUpdateSeen && nextLines.length > 0) {
+            firstUpdateSeen = true;
+            setFirstEvalMs(Date.now() - startedAt);
+          }
+          setLines(nextLines);
+          const depth = nextLines.reduce((maxDepth, line) => Math.max(maxDepth, line.depth), 0);
+          setStatus(depth > 0 ? `Depth ${depth}/${ANALYSIS_DEPTH}` : "Analyzing");
+        },
+        shallowDelayMs: 500,
+        shallowDepth: 8,
+        signal: analysisController.signal,
+        timeoutMs: 30000
+      });
+    }).then(
       (finalLines) => {
         if (cancelled) {
           return;
@@ -11397,7 +11466,7 @@ function StockfishDiagnosticsPanel({
 
     return () => {
       cancelled = true;
-      transport.send("stop");
+      analysisController.abort();
     };
   }, [runId, selectedPosition, stockfish]);
 
@@ -11571,7 +11640,6 @@ function TabButton({
 }): React.JSX.Element {
   const hasBadge = badgeCount > 0;
   const badgeText = badgeCount > 99 ? "99+" : `${badgeCount}`;
-  const badgeWidth = badgeText.length === 1 ? 18 : badgeText.length === 2 ? 22 : 28;
   return (
     <Pressable
       accessibilityRole="tab"
@@ -11598,7 +11666,6 @@ function TabButton({
             style={[
               styles.tabCountBadge,
               presentation === "rail" ? styles.tabCountBadgeRail : styles.tabCountBadgeBottom,
-              { width: badgeWidth },
               badgeTone === "danger" ? styles.tabCountBadgeDanger : null
             ]}
             testID={`${testID}-badge`}

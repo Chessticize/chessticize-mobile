@@ -99,7 +99,11 @@ test("App Store release manifest reports source identity and hashed release arti
 
   const artifactsByPath = new Map(manifest.artifacts.map((artifact) => [artifact.path, artifact]));
   for (const path of [
+    "pnpm-workspace.yaml",
     "pnpm-lock.yaml",
+    "patches/detox@20.51.4.patch",
+    "patches/react-native@0.86.0.patch",
+    "patches/react-native-chessboard@0.2.0.patch",
     "apps/mobile/release-version.json",
     "apps/mobile/Gemfile.lock",
     "apps/mobile/ios/Podfile.lock",
