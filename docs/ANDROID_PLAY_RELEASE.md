@@ -11,8 +11,10 @@ harness. Version code 4 became the published Android 1.1 release. Version code 5
 stopped before the AAB build because a generic doctor checked an emulator-only
 runtime library. Version code 6 completed the Android 1.2 release operation for
 the current Play track: corresponding source, Play delivery, owner
-physical-device smoke, and the Play-signed GitHub APK mirror are complete.
-Version code 7 is the proposed Android 1.2.1 ordinary-delta candidate.
+physical-device smoke under the former policy, and the Play-signed GitHub APK
+mirror are complete. Version code 7 is the Android 1.2.1 ordinary-delta release
+currently in Play review with corresponding source published and the binary
+mirror pending.
 This runbook deliberately separates
 repository-owned checks from owner-only Play Console evidence. Missing signing material,
 protected-environment setup, or any console result is a blocker; never replace
@@ -152,18 +154,22 @@ Do not move the build-6 tag, rebuild its AAB, replace its public source
 manifest or mirrored assets, or reuse version code 6. The public Release has
 exactly the required source manifest, Play-signed APK, and checksum.
 
-Build 7 is the proposed Android 1.2.1 ordinary-delta candidate:
+Build 7 is the Android 1.2.1 ordinary-delta release in progress:
 
-- annotated tag: `android-v1.2.1-build-7`;
+- annotated tag: `android-v1.2.1-build-7`, targeting
+  `9028826447330d67ab4c34f64a3fb7d1b5b05229`;
 - primary user-visible change: keep Practice, History, Review, and new Run
   startup responsive with large puzzle histories;
-- validation scope: exact-head fast checks, the protected signed-candidate and
-  corresponding-source job, and owner physical-device delta smoke;
-- current state: version preparation; tag, candidate workflow, Play upload,
-  owner smoke, and APK mirror pending.
-
-Do not create or publish the build-7 tag until its version PR is merged and the
-approved Android release-note file is present on the clean candidate commit.
+- validation scope: exact-head fast checks plus the protected signed-candidate
+  and corresponding-source job; no physical-device gate;
+- protected candidate workflow run:
+  [`30123127230`](https://github.com/Chessticize/chessticize-mobile/actions/runs/30123127230);
+- signed AAB SHA-256:
+  `1267e260d0a77bddc11475aefb2a8dbc926347395793ca4e36db3ed9048e3f11`;
+- public corresponding-source release:
+  [`android-v1.2.1-build-7`](https://github.com/Chessticize/chessticize-mobile/releases/tag/android-v1.2.1-build-7);
+- current state: Closed testing Alpha build `7 (1.2.1)` is in Play review;
+  the Play-signed APK mirror is pending Play publication.
 
 ## Canonical identity
 
@@ -247,14 +253,14 @@ pnpm mobile:verify:android:release -- --artifact-only \
 `--artifact-only` means only the repository and signed-AAB boundary passed. It
 cannot produce a `play-ready` verdict and is not enough to close #186.
 
-## Owner-only Play sequence
+## Play and publication sequence
 
 The candidate workflow publishes the exact corresponding source itself. Before
 Play distribution, its public Release contains only
 `android-source-manifest.json` and matches the annotated tag, commit,
 application ID, version, version code, and AAB SHA-256. After Play publication
-and owner smoke, the separate one-job mirror must add only the exact
-Play-generated universal APK and its SHA-256 checksum.
+the separate one-job mirror must add only the exact Play-generated universal
+APK and its SHA-256 checksum.
 
 ### Release completion states
 
@@ -264,14 +270,13 @@ Use these states in status reports and handoffs:
 | --- | --- |
 | Candidate ready | Retained verified AAB, annotated tag, and public source Release containing only the matching source manifest. |
 | Play submitted | The same AAB/version code is saved or submitted to the intended track and all currently visible actionable Play errors are resolved. |
-| Play accepted | The Play-delivered build is installed on the owner's physical device and its version/build, cold launch, one real Practice completion, and changed behavior pass are recorded. |
+| Play published | The intended track reports the version code as published and the Generated APKs API exposes the Play-signed universal APK. |
 | Release complete | The mirror workflow succeeds, the GitHub Release has exactly the source manifest, Play-signed APK, and checksum, and the mirror receipt is retained. |
 
 A source-only GitHub Release satisfies the corresponding-source requirement
 before Play distribution, but it is not a complete Android release after a
-Play-delivered build has been accepted. If owner smoke or the mirror is still
-pending, report that state explicitly instead of reporting the release as
-complete.
+Play build has been published. If the mirror is still pending, report that
+state explicitly instead of reporting the release as complete.
 
 ### Ordinary delta
 
@@ -291,24 +296,23 @@ manifest bytes, or incomplete source disclosure fails closed.
    three Android-only bullets, at most 300 Unicode characters in total, and the
    direct link to this exact GitHub Release. Save the submitted metadata with
    the release evidence.
-2. Install that Play-delivered build on the owner's physical device and record
-   the installed version/build, cold launch, one real Practice completion, and
-   the changed behavior.
-3. Run only the targeted native/manual checks selected by
+2. Run only the targeted CI simulator/emulator checks selected by
    `docs/ANDROID_VALIDATION.md` when the changed boundary requires them.
-4. Resolve any new Play Console error or actionable warning for this artifact,
+3. Resolve any new Play Console error or actionable warning for this artifact,
    then promote the same version code.
-5. Dispatch `Publish Play-generated Android APK`. This required release
+4. After Play publishes the version code, dispatch
+   `Publish Play-generated Android APK`. This required release
    finalizer downloads from Play, checks only package/version/signing identity
    and SHA-256, and appends the APK plus checksum to the existing source
    Release. It does not rebuild or repeat product validation.
-6. Verify that the public Release has exactly the three expected assets and
+5. Verify that the public Release has exactly the three expected assets and
    retain the workflow receipt described by `docs/ANDROID_GITHUB_RELEASE.md`.
 
-Fast exact-head checks, the protected production-signed AAB/source job, and the
-owner device smoke are the recurring release gates. The post-Play mirror is a
-small required publication finalizer, not another validation gate. A fresh
-full Detox matrix, unchanged listing review,
+Fast exact-head checks, the selected CI/simulator/emulator scope, and the
+protected production-signed AAB/source job are the recurring release gates.
+Physical-device testing is optional and never blocks Play submission or the
+post-Play mirror. The mirror is a small required publication finalizer, not
+another validation gate. A fresh full Detox matrix, unchanged listing review,
 generated-package size catalog, and repeated account setup are not recurring
 delta gates.
 
@@ -323,7 +327,7 @@ relevant declaration/configuration changed, or when Play flags a problem:
    and Data safety answers.
 3. Any Closed-testing tester/duration requirement shown by the live account.
 4. The exact artifact's pre-launch report and applicable compatibility review.
-5. Full Android suites, API 24/adaptive/backup evidence, physical ARM64 matrix,
+5. Full Android suites, API 24/adaptive/backup evidence, automated
    migration/upgrade checks, or native artifact size analysis when their
    boundary changed.
 
@@ -342,8 +346,7 @@ pnpm mobile:verify:android:release -- \
 
 Only `status: "play-ready"` proves that complete first-launch evidence contract.
 For every release scope, never move the canonical tag, reuse a version code,
-rebuild the retained AAB, or substitute debug/emulator evidence for the owner
-device smoke.
+rebuild the retained AAB, or bypass the selected automated validation scope.
 
 ## Official requirements checked on 2026-07-17
 

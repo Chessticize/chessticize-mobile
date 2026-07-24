@@ -124,11 +124,14 @@ test("TestFlight evidence CLI writes validator outputs and a release summary", (
       summary.commands.map((entry: { name: string }) => entry.name),
       ["preflight", "third-party-audit", "signing-readiness", "release-manifest", "screenshot-audit"]
     );
-    assert.ok(summary.manualGates.some((gate: string) => gate.includes("physical iPhone")));
+    assert.ok(summary.manualGates.some((gate: string) => gate.includes("App Store Connect processing")));
+    assert.ok(summary.manualGates.every((gate: string) => !gate.includes("physical")));
 
     const persisted = JSON.parse(readFileSync(join(output, "summary.json"), "utf8"));
     assert.equal(persisted.status, "pass");
-    assert.match(readFileSync(join(output, "README.md"), "utf8"), /automatable release evidence only/);
+    const evidenceReadme = readFileSync(join(output, "README.md"), "utf8");
+    assert.match(evidenceReadme, /automatable release evidence only/);
+    assert.match(evidenceReadme, /physical-device diagnostics.*not release gates/s);
     assert.equal(JSON.parse(readFileSync(join(output, "preflight.json"), "utf8")).status, "pass");
     assert.equal(JSON.parse(readFileSync(join(output, "third-party-audit.json"), "utf8")).status, "pass");
     assert.equal(JSON.parse(readFileSync(join(output, "signing-readiness.json"), "utf8")).status, "pass");

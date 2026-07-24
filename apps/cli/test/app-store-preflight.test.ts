@@ -32,7 +32,7 @@ test("App Store preflight CLI reports automatable checks and manual release gate
   assert.ok(checkNames.has("Release source rule is documented"));
   assert.ok(checkNames.has(`iOS release identity is fixed for ${releaseVersion.iosPublicVersion}`));
   assert.ok(checkNames.has("Store screenshot capture flow is wired"));
-  assert.ok(checkNames.has("TestFlight QA checklist is explicit about real-device execution"));
+  assert.ok(checkNames.has("TestFlight physical-device diagnostics are explicitly optional"));
   assert.ok(checkNames.has("App Store archive and upload path is documented"));
 
   const manualNames = new Set(payload.manual.map((entry: { name: string }) => entry.name));
@@ -40,7 +40,7 @@ test("App Store preflight CLI reports automatable checks and manual release gate
   assert.ok(manualNames.has("Create the public source release tag"));
   assert.ok(manualNames.has("Configure Apple signing team and Xcode account"));
   assert.ok(manualNames.has("Capture final sanitized App Store screenshots"));
-  assert.ok(manualNames.has("Execute the internal TestFlight physical-device pass"));
+  assert.ok(!manualNames.has("Execute the internal TestFlight physical-device pass"));
 
   const signingGate = payload.manual.find(
     (entry: { name: string; detail: string }) => entry.name === "Configure Apple signing team and Xcode account"

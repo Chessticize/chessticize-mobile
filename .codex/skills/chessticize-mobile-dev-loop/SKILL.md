@@ -160,7 +160,7 @@ Detox uses the built app bundle. It will not automatically pick up Metro-only ed
 ## Android Validation
 
 Use `docs/ANDROID_VALIDATION.md` for the reproducible commands, evidence schema,
-and physical ARM64 release checklist. Start with:
+and optional physical ARM64 diagnostic checklist. Start with:
 
 ```sh
 pnpm mobile:doctor:android
@@ -199,7 +199,8 @@ complete shared suites. Required evidence records its tested commit, build
 result, commands, device matrix, suite results, and clean tracked worktree
 confirmation. It may be reused on a later head when a documented diff proves
 that validation-relevant development inputs are unchanged. Physical ARM64
-evidence is owner-recorded at #200/#188 and is not a routine feature-PR blocker.
+execution is optional diagnostic evidence at #200/#188 and is not a release or
+feature-PR blocker.
 
 ## PR, Local Native, And Release Gates
 
@@ -232,8 +233,10 @@ All relevant fast CI checks must still pass on the current head.
 GitHub Actions does not run Xcode builds or iOS Detox. Local iOS native
 validation is required only for releases and native-impacting changes. Release
 candidates use the same risk scopes: a delta needs exact-head fast checks plus
-owner device smoke, targeted native risk needs the affected suite, and only
-broad native risk requires both suites. After a later commit or squash merge,
+the platform's signed-artifact checks, targeted native risk needs the affected
+simulator/emulator suite, and only broad native risk requires both suites.
+Physical-device testing is optional and does not block App Store or Play
+submission, or the post-Play APK mirror. After a later commit or squash merge,
 reuse passing native evidence when a documented diff confirms that the
 validation-relevant development inputs are unchanged; record both SHAs and the
 comparison rather than requiring identical full Git trees.

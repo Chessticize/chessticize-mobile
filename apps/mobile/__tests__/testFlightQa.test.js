@@ -13,18 +13,18 @@ const exportOptions = fs.readFileSync(
 );
 
 describe("TestFlight QA checklist", () => {
-  it("keeps TestFlight execution honest about external Apple/device requirements", () => {
-    expect(testFlightDoc).toContain("1.2.1 TestFlight release checklist");
+  it("keeps TestFlight physical-device diagnostics explicitly optional", () => {
+    expect(testFlightDoc).toContain("Optional TestFlight Diagnostics");
     expect(testFlightDoc).toContain("Internal 1.2.1 QA");
     expect(testFlightDoc).toContain("ios-v1.2.1-build-1");
     expect(testFlightDoc).toContain("App Store Connect build");
-    expect(testFlightDoc).toContain("internal testing group");
-    expect(testFlightDoc).toContain("physical iPhone");
+    expect(testFlightDoc).toContain("not an App Store release gate");
+    expect(testFlightDoc).toContain("not required");
     expect(testFlightDoc).toContain("TestFlight app");
-    expect(testFlightDoc).toContain("Do not count simulator-only testing");
+    expect(testFlightDoc).toContain("CI and simulator/Detox evidence");
   });
 
-  it("covers the required product flows for the physical-device pass", () => {
+  it("preserves optional diagnostic product flows without making them release gates", () => {
     const requiredSections = [
       "Install And Launch",
       "Standard Sprint",
@@ -40,6 +40,7 @@ describe("TestFlight QA checklist", () => {
     for (const section of requiredSections) {
       expect(testFlightDoc).toContain(`### ${section}`);
     }
+    expect(testFlightDoc).toContain("Unchecked items do not block App Store submission");
   });
 
   it("requires exact-candidate fast checks and reusable risk-scoped native validation before upload", () => {
@@ -70,10 +71,10 @@ describe("TestFlight QA checklist", () => {
     expect(testFlightDoc).toContain("affected Detox suite");
     expect(testFlightDoc).toMatch(/both suites only for\s+broad native risk/);
     expect(appStoreUploadDoc).toMatch(
-      /does not require\s+a fresh full Detox run/
+      /does not require\s+a\s+fresh\s+full\s+Detox\s+run/
     );
     expect(releasePolicy).toMatch(
-      /Ordinary deltas use exact-head fast checks plus owner physical-device smoke/
+      /Ordinary deltas use exact-head fast checks plus the platform's signed-artifact/
     );
     for (const document of [appStoreUploadDoc, releasePolicy]) {
       expect(document).toContain("validation-relevant development");
@@ -85,11 +86,11 @@ describe("TestFlight QA checklist", () => {
 
   it("requires evidence before the App Store plan item can be completed", () => {
     expect(testFlightDoc).toContain("## Evidence Log");
-    expect(testFlightDoc).toContain("## Completion Rule");
+    expect(testFlightDoc).toContain("## Release Rule");
     expect(testFlightDoc).toContain("Release tag");
     expect(testFlightDoc).toContain("Result | Pending");
     expect(appStorePlan).toContain("repo preparation complete; external execution pending");
-    expect(appStorePlan).toContain("filled evidence log before this item can be marked complete");
+    expect(appStorePlan).toContain("not an internal TestFlight group or physical-device pass");
   });
 
   it("documents the owner-executed App Store archive and upload path", () => {
@@ -105,7 +106,7 @@ describe("TestFlight QA checklist", () => {
     expect(appStoreUploadDoc).toContain("DEVELOPMENT_TEAM=\"$APPLE_DEVELOPMENT_TEAM\"");
     expect(appStoreUploadDoc).toContain("-exportArchive");
     expect(appStoreUploadDoc).toContain("apps/mobile/ios/ExportOptions.app-store-connect.plist");
-    expect(appStoreUploadDoc).toContain("Internal 1.2.1 QA");
+    expect(appStoreUploadDoc).toContain("do not wait for physical-device QA");
     expect(appStoreUploadDoc).toContain("Do not commit keys");
     expect(appStoreUploadDoc).toContain("Signing Troubleshooting");
     expect(appStoreUploadDoc).toContain("requires a development team");
@@ -127,6 +128,6 @@ describe("TestFlight QA checklist", () => {
   });
 
   it("links the QA document from the README", () => {
-    expect(readme).toContain("[TestFlight QA](docs/TESTFLIGHT_QA.md)");
+    expect(readme).toContain("[TestFlight Diagnostics](docs/TESTFLIGHT_QA.md)");
   });
 });

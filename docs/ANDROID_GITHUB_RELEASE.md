@@ -2,9 +2,8 @@
 
 Google Play is the primary Android binary channel. GitHub Releases first
 publishes the exact corresponding-source identity for the retained AAB. After
-the owner publishes and smoke-tests that version through Play, the Chessticize
-release process mirrors Google's Play-signed universal APK for manual
-installation.
+the owner publishes that version through Play, the Chessticize release process
+mirrors Google's Play-signed universal APK for manual installation.
 
 This is a Play-first APK mirror, not a second build or an independent release
 channel. The GitHub APK has the same application ID, version code, and Play
@@ -12,9 +11,9 @@ app-signing certificate as the APK generated from the released AAB.
 
 The source-only Release is the correct pre-Play state and satisfies the
 corresponding-source publication rule. It is not a complete Android release
-after the Play-delivered build has passed owner acceptance. Release completion
-also requires a successful mirror receipt and exactly three public assets: the
-source manifest, Play-signed APK, and APK checksum.
+after Play publication. Release completion also requires a successful mirror
+receipt and exactly three public assets: the source manifest, Play-signed APK,
+and APK checksum.
 
 ## Candidate and source publication
 
@@ -39,21 +38,19 @@ Release must be public before or with every Play-distributed candidate.
 
 ## Post-Play APK mirror
 
-After all three conditions are true:
+After both conditions are true:
 
 - the retained AAB/version code has been published through the intended Play
   track;
-- the owner installed the Play-delivered build and passed the selected physical
-  device smoke; and
 - the matching corresponding-source Release is already public;
 
 manually dispatch `Publish Play-generated Android APK` with `public_version`
 and `version_code`.
 
 Do not stop the release handoff at Play upload, quick checks, review submission,
-or source publication. Until owner smoke and this dispatch are complete, report
-the release as `Play submitted; APK mirror pending` or
-`Play accepted; APK mirror pending`, whichever is accurate.
+or source publication. Until Play publication and this dispatch are complete,
+report the release as `Play submitted; APK mirror pending` or
+`Play published; APK mirror pending`, whichever is accurate.
 
 The workflow has one job and no protected publication environment. It:
 
@@ -112,8 +109,8 @@ operator does not supply or rotate a temporary token for each release.
 
 The commands below are the recurring operator path. Replace the example public
 version, version code, tag, commit, and run ID with the exact retained candidate.
-Do not dispatch the mirror until the Play-delivered build has passed the owner
-device smoke and the matching source Release is public.
+Do not dispatch the mirror until Play has published the version code and the
+matching source Release is public.
 
 ### 1. Check the one-time authentication setup
 
@@ -172,9 +169,8 @@ printf 'candidate commit: %s\n' "$tagged_commit_sha"
 The tag query must return an annotated tag object, the tag and manifest commits
 must match the retained candidate commit, the Release must be public, and
 `android-source-manifest.json` must be its only asset before mirroring.
-Separately record the active Play track and the accepted owner device-smoke
-evidence. An issue checkbox or emulator result does not replace either live
-Play state or the physical-device result.
+Separately record the active Play track and live Play publication state. An
+issue checkbox does not replace the Console or API result.
 
 ### 3. Dispatch and monitor the mirror
 
@@ -278,7 +274,7 @@ ID. The workflow authenticates the retained artifact and idempotently publishes
 the same source without rebuilding.
 
 Do not use recovery to substitute a local lookalike, move a tag, reuse a
-version code, or publish an APK before Play and physical-device acceptance.
+version code, or publish an APK before Play publication.
 
 ## Operator record
 
@@ -287,7 +283,7 @@ Retain:
 - canonical tag and commit SHA;
 - candidate workflow URL, artifact ID, and AAB SHA-256;
 - GitHub Release URL and source-manifest SHA-256;
-- Play track/version code and owner smoke result;
+- Play track/version code and publication state;
 - APK mirror workflow URL, Play signing certificate, APK SHA-256, and asset ID.
 
 GitHub APK users update manually. Chessticize does not poll GitHub, download an

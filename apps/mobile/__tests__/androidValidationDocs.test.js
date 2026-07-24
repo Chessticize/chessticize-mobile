@@ -35,13 +35,13 @@ describe('Android validation documentation', () => {
     expect(validation).toContain('documentation, review metadata, and merge ancestry');
   });
 
-  it('keeps physical ARM64 evidence owner-recorded at the release gate', () => {
+  it('keeps physical ARM64 work optional and outside the release gate', () => {
     const validation = read('docs/ANDROID_VALIDATION.md');
 
-    expect(validation).toContain('owner-recorded');
+    expect(validation).toContain('optional owner-recorded');
     expect(validation).toContain('#200');
     expect(validation).toContain('#188');
-    expect(validation).toContain('not a routine feature-PR blocker');
+    expect(validation).toContain('not a feature-PR or release blocker');
     for (const check of [
       'Install and cold start',
       'board input',
@@ -66,6 +66,6 @@ describe('Android validation documentation', () => {
     expect(devLoop).toContain('pnpm mobile:validate:android:matrix');
     expect(architecture).toContain('manual-only full diagnostic matrix');
     expect(architecture).toContain('bounded API 24 smoke');
-    expect(architecture).toContain('physical ARM64');
+    expect(architecture).toContain('Physical-device checks are optional');
   });
 });
