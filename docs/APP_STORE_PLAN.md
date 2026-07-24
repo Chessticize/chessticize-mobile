@@ -1,10 +1,16 @@
-# App Store Readiness Plan
+# App Store Foundation Plan (Historical)
 
-Status date: 2026-07-03. This is the active goal document. The V1 behavioral
-work (2026-07-03) made every visible surface real within the v1 scope; a
-same-day audit of the merged result found the foundation gaps below. The goal:
-**ship Chessticize Mobile 1.1 to the App Store** — a truthful, durable,
-local-first training app.
+Status date: 2026-07-03. Status: archived first-release foundation record.
+Historical 1.0/1.1 version, build, and gate statements below are preserved as
+the implementation record and are not current release instructions. For the
+current release, use `docs/RELEASE_SOURCE_POLICY.md`,
+`docs/APP_STORE_UPLOAD.md`, `docs/TESTFLIGHT_QA.md`, `docs/STORE_ASSETS.md`, and
+the exact approved file under `docs/releases/`.
+
+The V1 behavioral work (2026-07-03) made every visible surface real within the
+v1 scope; a same-day audit of the merged result found the foundation gaps
+below. The original goal was to ship Chessticize Mobile 1.1 to the App Store as
+a truthful, durable, local-first training app.
 
 `docs/ui-design/MOBILE_UI_DESIGN.md` remains authoritative for screen behavior.
 Work milestone-by-milestone; within a milestone, one draft feature PR per

@@ -22,6 +22,8 @@ Run from a clean `main` checkout at the exact commit that will be uploaded:
 ```sh
 git status --short --branch
 pnpm install --frozen-lockfile
+export PATH="$(brew --prefix ruby@3.3)/bin:$PATH"
+ruby --version
 (cd apps/mobile && scripts/ios-install-pods-locked.sh)
 pnpm app-store:preflight
 pnpm app-store:signing-readiness
@@ -31,6 +33,12 @@ pnpm mobile:test
 pnpm mobile:typecheck
 pnpm mobile:doctor:ios
 ```
+
+The locked CocoaPods installer requires Homebrew Ruby 3.3. Do not run it with
+macOS system Ruby or a different Ruby/CocoaPods toolchain: Ruby-dependent local
+podspec evaluation can produce different lockfile checksums even when package
+versions are unchanged. The installer fails before mutating `Pods` when the
+active Ruby is unsupported.
 
 GitHub Actions does not run Xcode builds or iOS Detox. Local iOS native
 validation is the only iOS native release gate. Select delta, targeted, or full

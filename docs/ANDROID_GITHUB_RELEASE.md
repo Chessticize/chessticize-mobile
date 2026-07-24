@@ -2,12 +2,19 @@
 
 Google Play is the primary Android binary channel. GitHub Releases first
 publishes the exact corresponding-source identity for the retained AAB. After
-the owner publishes and smoke-tests that version through Play, GitHub may also
-mirror Google's Play-signed universal APK for manual installation.
+the owner publishes and smoke-tests that version through Play, the Chessticize
+release process mirrors Google's Play-signed universal APK for manual
+installation.
 
 This is a Play-first APK mirror, not a second build or an independent release
 channel. The GitHub APK has the same application ID, version code, and Play
 app-signing certificate as the APK generated from the released AAB.
+
+The source-only Release is the correct pre-Play state and satisfies the
+corresponding-source publication rule. It is not a complete Android release
+after the Play-delivered build has passed owner acceptance. Release completion
+also requires a successful mirror receipt and exactly three public assets: the
+source manifest, Play-signed APK, and APK checksum.
 
 ## Candidate and source publication
 
@@ -42,6 +49,11 @@ After all three conditions are true:
 
 manually dispatch `Publish Play-generated Android APK` with `public_version`
 and `version_code`.
+
+Do not stop the release handoff at Play upload, quick checks, review submission,
+or source publication. Until owner smoke and this dispatch are complete, report
+the release as `Play submitted; APK mirror pending` or
+`Play accepted; APK mirror pending`, whichever is accurate.
 
 The workflow has one job and no protected publication environment. It:
 

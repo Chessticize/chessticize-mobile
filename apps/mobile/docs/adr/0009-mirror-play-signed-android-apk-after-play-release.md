@@ -11,6 +11,12 @@ Play and passes the physical-device smoke, one manually dispatched CI job uses
 the Generated APKs API to download Google's universal APK and mirrors that
 exact Play-signed file plus its SHA-256 checksum in the same GitHub Release.
 
+Within the Chessticize release process this mirror is a required finalizer, not
+an additional product-validation gate. The source-only Release is the correct
+pre-Play state, but the Android release remains `APK mirror pending` after
+owner acceptance until the mirror receipt and all three public assets are
+verified.
+
 The mirror job verifies only immutable artifact identity: package name, public
 version, version code, Play app-signing certificate, non-empty bytes, and
 SHA-256. It does not rebuild Android, rerun product tests, repeat Detox, require

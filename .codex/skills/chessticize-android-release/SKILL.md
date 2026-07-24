@@ -6,7 +6,7 @@ description: Audit, prepare, advance, recover, and complete Chessticize Mobile A
 # Chessticize Android Release
 
 Google Play distributes Android binaries first. GitHub publishes corresponding
-source and may mirror the exact Play-signed universal APK after owner
+source and mirrors the exact Play-signed universal APK after owner
 acceptance. Treat the signed AAB, annotated tag, source manifest, Play version
 code, mirrored APK, and owner device result as one release identity.
 
@@ -118,6 +118,12 @@ The mirror obtains a short-lived Play token through configured workload identity
 or a least-privilege service account; it never asks the operator for a temporary
 token. Do not add prepare/publish phases or a second APK build.
 
+The Android release is not complete until the mirror workflow succeeds, the
+public Release has exactly the source manifest, Play-signed APK, and checksum,
+and its receipt is retained. A source-only Release remains a valid pre-Play
+state; report `APK mirror pending` whenever owner smoke or mirroring is still
+open.
+
 ## Preserve invariants
 
 - Publish matching source before or with every distributed binary, including
@@ -157,5 +163,6 @@ token. Do not add prepare/publish phases or a second APK build.
 
 Report the exact identity tuple, validation scope and rationale, fast-check
 results, workflow/artifact/source state, owner device result, Play state, and
-remaining owner-only gates. Stop when the requested release outcome is proven
-or the next action needs new owner authority or external waiting.
+remaining owner-only gates. Never report an Android release as complete while
+the required APK mirror is pending. Stop when the requested release outcome is
+proven or the next action needs new owner authority or external waiting.

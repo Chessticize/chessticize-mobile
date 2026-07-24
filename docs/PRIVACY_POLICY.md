@@ -2,7 +2,7 @@
 
 Effective date: 2026-07-14
 
-Chessticize Mobile is an offline-first chess training app. The 1.0 app does not
+Chessticize Mobile is an offline-first chess training app. The current app does not
 create Chessticize accounts, does not show ads, does not use analytics SDKs, and
 does not send your training activity to Chessticize. Private platform-managed
 copies are described below.
@@ -36,7 +36,7 @@ companies.
 
 ## Network Use
 
-The 1.0 app is designed to practice without a network connection. Puzzle data
+The current app is designed to practice without a network connection. Puzzle data
 and Stockfish analysis run on device. iCloud Sync uses Apple's iCloud and
 CloudKit network services only while it is enabled. Development builds can
 connect to local developer tooling, but release builds do not require Metro or a

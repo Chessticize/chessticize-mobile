@@ -9,13 +9,13 @@ The repository contains the React Native app shell (`apps/mobile`), the browser-
 - [Mobile UI Design](docs/ui-design/MOBILE_UI_DESIGN.md) — authoritative screen behavior and visual spec
 - [Core Library And CLI](docs/CORE_CLI.md) — backend package layout and CLI harness
 - [Testing Architecture](docs/TESTING_ARCHITECTURE.md) — test-layer responsibilities, critical E2E regression scope, and SQLite migration compatibility design
-- [App Store Plan](docs/APP_STORE_PLAN.md) — active goal and milestone plan toward the 1.1 submission
-- [App Store Assets](docs/STORE_ASSETS.md) — 1.1 App Store metadata and screenshot capture plan
+- [App Store Plan](docs/APP_STORE_PLAN.md) — historical first-release foundation plan
+- [App Store Assets](docs/STORE_ASSETS.md) — current App Store metadata and screenshot capture plan
 - [Release Notes](docs/RELEASE_NOTES.md) — per-binary customer-facing notes, review, and publication contract
 - [App Store Upload](docs/APP_STORE_UPLOAD.md) — owner-executed archive and App Store Connect upload runbook
 - [TestFlight QA](docs/TESTFLIGHT_QA.md) — internal TestFlight pass checklist and evidence log
-- [Privacy Policy](docs/PRIVACY_POLICY.md) — 1.1 data, user-controllable iCloud Sync, and tracking disclosure
-- [iOS Device Targets](docs/DEVICE_TARGETS.md) — 1.1 iPhone+iPad adaptive orientation release target
+- [Privacy Policy](docs/PRIVACY_POLICY.md) — current data, user-controllable iCloud Sync, Android backup, and tracking disclosure
+- [iOS Device Targets](docs/DEVICE_TARGETS.md) — iPhone+iPad adaptive orientation release target
 - [Android Validation](docs/ANDROID_VALIDATION.md) — exact-head API, adaptive, backup, and physical-device evidence contract
 - [UI Flow Design Gate](docs/agents/ui-flow-design.md) — required Storybook-first approval workflow for new UI flows
 - [Android Play Release](docs/ANDROID_PLAY_RELEASE.md) — signed AAB and owner-only Play readiness runbook

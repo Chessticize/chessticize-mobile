@@ -9,8 +9,9 @@ public control. Version code 3 fixed that stale UI dependency, but exact-tag API
 24 validation exposed a launch/package-manager state race in the evidence
 harness. Version code 4 became the published Android 1.1 release. Version code 5
 stopped before the AAB build because a generic doctor checked an emulator-only
-runtime library. The next candidate keeps public version 1.2 and advances the
-Android build number to 6.
+runtime library. Version code 6 is the current Android 1.2 Play candidate. Its
+AAB has been submitted to Play and its corresponding source is public, but its
+post-Play APK mirror remains an explicit release finalizer.
 This runbook deliberately separates
 repository-owned checks from owner-only Play Console evidence. Missing signing material,
 protected-environment setup, or any console result is a blocker; never replace
@@ -113,6 +114,32 @@ Build 5 is an immutable failed candidate and was never distributed:
 No build-5 GitHub source Release or Play upload was created. Do not move or
 reuse its tag or version code.
 
+Build 6 is the immutable Android 1.2 candidate currently completing release
+finalization:
+
+- annotated tag: `android-v1.2.0-build-6`, targeting
+  `9526eb1da16d043dcfbbdb2a903e927d1056f799`;
+- protected candidate workflow run:
+  [`30065810499`](https://github.com/Chessticize/chessticize-mobile/actions/runs/30065810499);
+- retained candidate artifact: ID `8586432221`;
+- signed AAB: 440,381,305 bytes, SHA-256
+  `af6ce299eaed4ce9c826378ec90c605bc0928e52261df9ee40ebee0e3a23e0ed`;
+- source-publication recovery run:
+  [`30066568119`](https://github.com/Chessticize/chessticize-mobile/actions/runs/30066568119);
+- public corresponding-source release:
+  [`android-v1.2.0-build-6`](https://github.com/Chessticize/chessticize-mobile/releases/tag/android-v1.2.0-build-6);
+- public source-manifest SHA-256:
+  `20882c243f53ba5962c18a3557463e04c2b0394e7c40bb224e714d42fdf906d7`;
+- Play Closed testing Alpha submission passed Play quick checks on 2026-07-24.
+  Recheck the live Console before relying on a later review or delivery state;
+- APK mirror: **pending** as of 2026-07-24. The public Release still contains
+  only `android-source-manifest.json`, and no build-6 APK-mirror workflow run
+  or owner physical-device smoke has been recorded.
+
+Do not move the build-6 tag, rebuild its AAB, replace its public source
+manifest, or reuse version code 6. Complete the owner Play-delivered smoke, then
+run and verify the post-Play mirror against this exact version code.
+
 ## Canonical identity
 
 - Application ID: `com.chessticize.mobile`
@@ -201,8 +228,25 @@ The candidate workflow publishes the exact corresponding source itself. Before
 Play distribution, its public Release contains only
 `android-source-manifest.json` and matches the annotated tag, commit,
 application ID, version, version code, and AAB SHA-256. After Play publication
-and owner smoke, the separate one-job mirror may add only the exact
+and owner smoke, the separate one-job mirror must add only the exact
 Play-generated universal APK and its SHA-256 checksum.
+
+### Release completion states
+
+Use these states in status reports and handoffs:
+
+| State | Required evidence |
+| --- | --- |
+| Candidate ready | Retained verified AAB, annotated tag, and public source Release containing only the matching source manifest. |
+| Play submitted | The same AAB/version code is saved or submitted to the intended track and all currently visible actionable Play errors are resolved. |
+| Play accepted | The Play-delivered build is installed on the owner's physical device and its version/build, cold launch, one real Practice completion, and changed behavior pass are recorded. |
+| Release complete | The mirror workflow succeeds, the GitHub Release has exactly the source manifest, Play-signed APK, and checksum, and the mirror receipt is retained. |
+
+A source-only GitHub Release satisfies the corresponding-source requirement
+before Play distribution, but it is not a complete Android release after a
+Play-delivered build has been accepted. If owner smoke or the mirror is still
+pending, report that state explicitly instead of reporting the release as
+complete.
 
 ### Ordinary delta
 
@@ -229,14 +273,17 @@ manifest bytes, or incomplete source disclosure fails closed.
    `docs/ANDROID_VALIDATION.md` when the changed boundary requires them.
 4. Resolve any new Play Console error or actionable warning for this artifact,
    then promote the same version code.
-5. Dispatch `Publish Play-generated Android APK`. This job downloads from Play,
-   checks only package/version/signing identity and SHA-256, and appends the APK
-   plus checksum to the existing source Release. It does not rebuild or repeat
-   product validation.
+5. Dispatch `Publish Play-generated Android APK`. This required release
+   finalizer downloads from Play, checks only package/version/signing identity
+   and SHA-256, and appends the APK plus checksum to the existing source
+   Release. It does not rebuild or repeat product validation.
+6. Verify that the public Release has exactly the three expected assets and
+   retain the workflow receipt described by `docs/ANDROID_GITHUB_RELEASE.md`.
 
 Fast exact-head checks, the protected production-signed AAB/source job, and the
 owner device smoke are the recurring release gates. The post-Play mirror is a
-small publication step. A fresh full Detox matrix, unchanged listing review,
+small required publication finalizer, not another validation gate. A fresh
+full Detox matrix, unchanged listing review,
 generated-package size catalog, and repeated account setup are not recurring
 delta gates.
 

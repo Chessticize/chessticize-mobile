@@ -292,6 +292,8 @@ assert.match(androidReleaseSkill, /\*\*Full:\*\*/);
 assert.match(androidReleaseSkill, /built-in `github\.token`/);
 assert.match(androidReleaseSkill, /Mirror APK/);
 assert.match(androidReleaseSkill, /Play-signed universal APK/);
+assert.match(androidReleaseSkill, /Android release is not complete/);
+assert.match(androidReleaseSkill, /APK mirror pending/);
 assert.match(androidReleaseSkill, /never publish an upload-key or locally rebuilt APK/);
 assert.match(androidReleaseSkill, /mobile-android-source-recovery\.yml/);
 assert.match(androidReleaseSkill, /physical device/);
@@ -305,6 +307,10 @@ assert.match(androidReleaseSkill, /published annotated canonical tag/);
 assert.match(androidReleaseSkill, /Internal and Closed tracks/);
 assert.match(androidReleaseSkill, /first\s+launch, the boundary changed, or Play reports a problem/);
 assert.match(agents, /\.codex\/skills\/chessticize-android-release\/SKILL\.md/);
+assert.match(androidPlayRelease, /APK mirror: \*\*pending\*\*/);
+assert.match(androidPlayRelease, /Release completion states/);
+assert.match(androidGitHubRelease, /exactly three public assets/);
+assert.match(releaseSourcePolicy, /release\s+status must remain `APK mirror pending`/);
 
 assert.match(rootReadme, /\[Release Notes\]\(docs\/RELEASE_NOTES\.md\)/);
 for (const releaseProcessDoc of [

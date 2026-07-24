@@ -19,6 +19,13 @@ function tableValue(field) {
 }
 
 describe("App Store assets document", () => {
+  it("tracks the current public release and its customer-facing additions", () => {
+    expect(storeAssetsDoc).toContain("1.2 source of truth");
+    expect(storeAssetsDoc).toContain("Customizable Home screen Practice Runs");
+    expect(storeAssetsDoc).toContain("Curated puzzle themes with multi-theme selection");
+    expect(storeAssetsDoc).toContain("Clear side-to-move");
+  });
+
   it("keeps required metadata inside App Store Connect limits", () => {
     expect(tableValue("App name")).toBe("Chessticize");
     expect(tableValue("Subtitle").length).toBeLessThanOrEqual(30);

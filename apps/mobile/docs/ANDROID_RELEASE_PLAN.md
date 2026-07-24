@@ -1,7 +1,13 @@
 # Android Local-First Release Plan
 
-Status date: 2026-07-13
-Status: approved design; implementation in progress
+Status date: 2026-07-24
+Status: historical implementation plan; Android 1.2 implementation shipped
+
+This file preserves the original Android work-package design and acceptance
+history. It is not the operational release checklist. Use
+`docs/ANDROID_PLAY_RELEASE.md`, `docs/ANDROID_GITHUB_RELEASE.md`,
+`docs/ANDROID_VALIDATION.md`, and the Android release skill for current status
+and release actions.
 
 The goal is to ship Chessticize Mobile on Android from the existing monorepo,
 with the same offline practice product as iOS and without introducing a second
@@ -131,9 +137,10 @@ flowchart TD
 ```
 
 After ANDROID-01, the dev-loop, capability, storage, and shared-Stockfish work
-can proceed in parallel. The release candidate remains blocked until every
-native capability and the complete Android evidence matrix converge on one
-exact commit.
+could proceed in parallel. The first-release implementation originally
+required the complete Android evidence matrix to converge with every native
+capability. Recurring releases now select delta, targeted, or full validation
+under `docs/ANDROID_VALIDATION.md`.
 
 ## Work packages
 
@@ -430,21 +437,21 @@ gates without duplicating product-journey intent.
   branches only where system surfaces genuinely differ.
 - Keep the current PR risk scopes: no native validation, targeted native
   validation, and full native validation.
-- Add API 36 `x86_64` phone nightly execution of complete `flows` and `practice`
-  suites after one build.
+- Add API 36 `x86_64` phone manual diagnostic execution of complete `flows` and
+  `practice` suites after one build.
 - Add an API 24 phone smoke for launch, practice, persistence, migration, and a
   bounded packaged native-engine check.
 - Add API 36 tablet and foldable adaptive-layout smoke and screenshots.
 - Require a physical ARM64 phone smoke for Stockfish, notifications, backup,
   and upgrade installation before release.
 - Record commit SHA, build result, commands, scope, results, artifact links, and
-  clean-worktree confirmation. Any later code change invalidates native
-  evidence.
+  clean-worktree confirmation. A later validation-relevant development change
+  invalidates native evidence.
 - Update `docs/TESTING_ARCHITECTURE.md`, the development-loop skill, and release
   checklists only when the corresponding commands actually exist.
 
 **Acceptance:** Routine shared changes retain cheap validation; Android native
-changes select the smallest proving scope; nightly main runs both complete
+changes select the smallest proving scope; a full manual diagnostic runs both complete
 suites; the release matrix can be reproduced from documentation on a clean
 worktree.
 
