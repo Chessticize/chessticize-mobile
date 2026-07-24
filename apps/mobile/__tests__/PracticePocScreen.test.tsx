@@ -6371,9 +6371,9 @@ describe("PracticePocScreen", () => {
   });
 
   it.each([
-    { label: "iPhone bottom tabs", width: 430, height: 932, scale: 3, rail: false, badgeTop: -8 },
+    { label: "iPhone 17 Pro Max bottom tabs", width: 440, height: 956, scale: 3, rail: false, badgeTop: -8 },
     { label: "iPad expanded rail", width: 1180, height: 820, scale: 2, rail: true, badgeTop: -7 }
-  ])("keeps a two-digit review badge on one line at the icon's upper-right in $label", ({
+  ])("lets a two-digit review badge fit native font metrics at the icon's upper-right in $label", ({
     width,
     height,
     scale,
@@ -6385,12 +6385,12 @@ describe("PracticePocScreen", () => {
     }).__setWindowDimensions?.({ width, height, scale, fontScale: 1 });
     jest.setSystemTime(new Date("2026-06-21T12:00:00.000Z"));
 
-    const renderer = renderScreen({ practiceService: createDueReviewService(16) });
+    const renderer = renderScreen({ practiceService: createDueReviewService(18) });
     const badge = findByTestId(renderer, "review-tab-badge");
     const badgeStyle = flattenTestStyle(badge.props.style);
     const iconStyle = flattenTestStyle(findByTestId(renderer, "review-tab-icon").props.style);
 
-    expect(collectText(badge)).toBe("16");
+    expect(collectText(badge)).toBe("18");
     expect(badge.props.allowFontScaling).toBe(false);
     expect(badge.props.numberOfLines).toBe(1);
     expect(badgeStyle.left).toBe(24);
@@ -6398,7 +6398,8 @@ describe("PracticePocScreen", () => {
     expect(badgeStyle.top).toBe(badgeTop);
     expect(badgeStyle.minHeight).toBe(18);
     expect(badgeStyle.minWidth).toBe(18);
-    expect(badgeStyle.width).toBe(22);
+    expect(badgeStyle.width).toBeUndefined();
+    expect(badgeStyle.paddingHorizontal).toBe(4);
     expect(iconStyle.overflow).toBe("visible");
     expect(iconStyle.width).toBe(32);
     if (rail) {
@@ -6415,7 +6416,7 @@ describe("PracticePocScreen", () => {
 
     expect(collectText(badge)).toBe("99+");
     expect(badge.props.numberOfLines).toBe(1);
-    expect(flattenTestStyle(badge.props.style).width).toBe(28);
+    expect(flattenTestStyle(badge.props.style).width).toBeUndefined();
   });
 
   it("auto-advances a wrong due Arrow Duel review and keeps it in today's history", async () => {
