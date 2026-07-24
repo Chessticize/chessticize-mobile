@@ -1180,9 +1180,9 @@ describe("PracticePocScreen", () => {
   it.each([
     {
       height: 932,
-      label: "portrait board overlay",
+      label: "portrait session header",
       scenarioId: "practice-active" as const,
-      styleEntry: ["position", "absolute"] as const,
+      styleEntry: ["borderWidth", 0] as const,
       width: 430
     },
     {
@@ -1216,6 +1216,16 @@ describe("PracticePocScreen", () => {
       styleEntry[0],
       styleEntry[1]
     )).toBe(true);
+    expect(
+      findByTestId(renderer, "session-board")
+        .findAllByProps({ testID: "session-puzzle-timing" })
+    ).toHaveLength(0);
+    if (scenarioId === "practice-active") {
+      expect(
+        findByTestId(renderer, "session-shell-nav")
+          .findByProps({ testID: "session-puzzle-timing" })
+      ).toBeTruthy();
+    }
     if (scenarioId === "practice-timing-warning") {
       expect(collectText(findByTestId(renderer, "session-puzzle-timing-label"))).toBe("Puzzle 0:41");
       expect(collectText(findByTestId(renderer, "session-puzzle-timing"))).not.toContain("Slow");
@@ -1239,6 +1249,10 @@ describe("PracticePocScreen", () => {
       jest.advanceTimersByTime(8_000);
     });
     expect(collectText(findByTestId(renderer, "session-puzzle-timing-label"))).toBe("Puzzle 1:00");
+    expect(
+      findByTestId(renderer, "session-board")
+        .findAllByProps({ testID: "session-puzzle-timing" })
+    ).toHaveLength(0);
     expect(collectText(findByTestId(renderer, "session-puzzle-timeout-overlay"))).toContain(
       "Timed out"
     );
@@ -1261,6 +1275,8 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-timing-filter-group").props.accessibilityLabel).toBe(
       "Timing filters, select any"
     );
+    expect(findByTestId(renderer, "history-timing-filter-boundary-start")).toBeTruthy();
+    expect(findByTestId(renderer, "history-timing-filter-boundary-end")).toBeTruthy();
     expect(testIdOrder(renderer, "history-filter-unclear", "history-timing-filter-group")).toBeLessThan(0);
     expect(testIdOrder(renderer, "history-timing-filter-group", "history-filter-wrong-only")).toBeLessThan(0);
     expect(findByTestId(renderer, "history-filter-slow-only")).toBeTruthy();

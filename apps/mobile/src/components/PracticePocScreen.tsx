@@ -2397,10 +2397,19 @@ export function PracticePocScreen({
     selectedConfig.targetCorrect,
     service
   ]);
+  const sessionPuzzleTimingNode = shouldShowSessionBoard && sessionTimingDesignState ? (
+    <PuzzleTimingIndicator
+      elapsedSeconds={sessionTimingDesignState.elapsedSeconds}
+      phase={sessionTimingDesignState.phase}
+      timeoutSeconds={sessionTimingPreview?.timeoutSeconds ?? 0}
+      placement={sessionUsesRail ? "rail" : "header"}
+    />
+  ) : null;
   const sessionStatusNode = state && (isOpenSession || isShowingFeedbackSnapshot) ? (
     <SessionStatusBar
       compactMetrics={sessionUsesRail}
       mode={mode}
+      puzzleTimingNode={sessionUsesRail ? null : sessionPuzzleTimingNode}
       state={state}
       timerText={timerText}
       confirmAbandon={practiceExitConfirmationVisible}
@@ -2408,14 +2417,6 @@ export function PracticePocScreen({
       onConfirmAbandonChange={setPracticeExitConfirmationVisible}
       onPause={isActive ? () => pauseActiveSprint("manual") : undefined}
       onResume={isPaused && state ? () => resumeSprint(state) : undefined}
-    />
-  ) : null;
-  const sessionPuzzleTimingNode = shouldShowSessionBoard && sessionTimingDesignState ? (
-    <PuzzleTimingIndicator
-      elapsedSeconds={sessionTimingDesignState.elapsedSeconds}
-      phase={sessionTimingDesignState.phase}
-      timeoutSeconds={sessionTimingPreview?.timeoutSeconds ?? 0}
-      placement={sessionUsesRail ? "rail" : "board"}
     />
   ) : null;
   const pausedSessionNode = isPaused && state ? (
@@ -2473,8 +2474,6 @@ export function PracticePocScreen({
             flipped={boardFlipped}
           />
         ) : null}
-
-        {!sessionUsesRail ? sessionPuzzleTimingNode : null}
 
         {!boardGestureEnabled || sessionTimingDesignState?.phase === "timed_out" ? (
           <BoardInputBlocker />
@@ -5455,7 +5454,7 @@ function PuzzleTimingIndicator({
 }: {
   elapsedSeconds: number;
   phase: SessionTimingDesignState["phase"];
-  placement: "board" | "rail";
+  placement: "header" | "rail";
   timeoutSeconds: number;
 }): React.JSX.Element {
   const label = `Puzzle ${formatCompactDuration(elapsedSeconds)}`;
@@ -5473,7 +5472,7 @@ function PuzzleTimingIndicator({
       style={[
         styles.puzzleTimingIndicator,
         phase !== "normal" ? styles.puzzleTimingIndicatorSlow : null,
-        placement === "board" ? styles.puzzleTimingIndicatorBoard : styles.puzzleTimingIndicatorRail
+        placement === "header" ? styles.puzzleTimingIndicatorHeader : styles.puzzleTimingIndicatorRail
       ]}
       testID="session-puzzle-timing"
     >
@@ -5504,6 +5503,7 @@ function SessionStatusBar({
   compactMetrics = false,
   confirmAbandon,
   mode,
+  puzzleTimingNode,
   state,
   timerText,
   onAbandon,
@@ -5514,6 +5514,7 @@ function SessionStatusBar({
   compactMetrics?: boolean;
   confirmAbandon: boolean;
   mode: SprintMode;
+  puzzleTimingNode?: React.ReactNode;
   state: SprintState;
   timerText: string;
   onAbandon?: () => void;
@@ -5537,7 +5538,10 @@ function SessionStatusBar({
         ) : (
           <View style={styles.sessionNavButton} />
         )}
-        <Text style={styles.sessionNavTitle}>{modeLabel(mode)}</Text>
+        <View style={styles.sessionNavTitleGroup}>
+          <Text numberOfLines={1} style={styles.sessionNavTitle}>{modeLabel(mode)}</Text>
+          {puzzleTimingNode}
+        </View>
         <View style={styles.sessionNavActions} testID="session-nav-actions">
           {onPause ? (
             <Pressable
@@ -6655,7 +6659,10 @@ function HistoryPanel({
               style={styles.historyQuickFacetGroup}
               testID="history-timing-filter-group"
             >
-              <View style={styles.historyQuickFacetDivider} />
+              <View
+                style={styles.historyQuickFacetDivider}
+                testID="history-timing-filter-boundary-start"
+              />
               <Text style={styles.historyQuickFacetLabel}>Timing</Text>
               <HistoryQuickChip
                 active={slowOnly}
@@ -6670,6 +6677,10 @@ function HistoryPanel({
                 controlTestID="history-filter-timed-out-only"
                 label="Timed out"
                 onPress={onToggleTimedOutOnly}
+              />
+              <View
+                style={styles.historyQuickFacetDivider}
+                testID="history-timing-filter-boundary-end"
               />
             </View>
           ) : null}
@@ -13017,9 +13028,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 48
   },
+  sessionNavTitleGroup: {
+    alignItems: "center",
+    flex: 1,
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "center",
+    minWidth: 0
+  },
   sessionNavTitle: {
     color: "#111827",
-    flex: 1,
+    flexShrink: 1,
     fontSize: 16,
     fontWeight: "800",
     textAlign: "center"
@@ -13118,11 +13137,11 @@ const styles = StyleSheet.create({
     minHeight: 26,
     paddingHorizontal: 9
   },
-  puzzleTimingIndicatorBoard: {
-    position: "absolute",
-    right: 7,
-    top: 7,
-    zIndex: 40
+  puzzleTimingIndicatorHeader: {
+    backgroundColor: "transparent",
+    borderWidth: 0,
+    minHeight: 24,
+    paddingHorizontal: 0
   },
   puzzleTimingIndicatorRail: {
     alignSelf: "center",
@@ -14368,7 +14387,7 @@ const styles = StyleSheet.create({
   historyQuickFilterRow: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 6,
+    gap: 4,
     paddingRight: 4
   },
   historyQuickChipTarget: {
@@ -14386,7 +14405,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 4,
     minHeight: 34,
-    paddingHorizontal: 10
+    paddingHorizontal: 8
   },
   historyQuickChipActive: {
     backgroundColor: "#2563EB",
@@ -14409,12 +14428,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     flexShrink: 0,
-    gap: 6
+    gap: 4
   },
   historyQuickFacetDivider: {
     backgroundColor: "#CBD5E1",
     height: 20,
-    marginHorizontal: 2,
+    marginHorizontal: 1,
     width: StyleSheet.hairlineWidth
   },
   historyQuickFacetLabel: {
