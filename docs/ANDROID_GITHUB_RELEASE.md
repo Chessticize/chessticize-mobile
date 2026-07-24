@@ -14,10 +14,16 @@ app-signing certificate as the APK generated from the released AAB.
 The `Mobile Android release candidate` workflow performs the recurring
 repository-owned candidate work in one protected job:
 
-1. Run exact-head fast checks.
+1. Materialize the protected upload-signing identity and verify the build
+   environment.
 2. Build and verify one upload-signed AAB.
 3. Retain the AAB and `android-source-manifest.json` for 30 days.
 4. Publish the matching annotated-tag GitHub Release with the source manifest.
+
+Exact-head fast checks and the selected risk-scoped native validation must pass
+before dispatch. The protected candidate job does not repeat product tests or
+launch an emulator; it owns only signing, artifact verification, retention, and
+corresponding-source publication.
 
 This job uses the built-in `github.token` with `contents: write`. It requires
 neither a temporary personal token nor a Play publisher credential. The source

@@ -500,7 +500,8 @@ describe('Android launch baseline', () => {
   it('keeps Android emulator Detox out of routine pull-request CI', () => {
     const workflow = read('../../.github/workflows/mobile-android.yml');
 
-    expect(workflow).toContain('schedule:');
+    expect(workflow).toContain('workflow_dispatch:');
+    expect(workflow).not.toContain('schedule:');
     expect(workflow).not.toMatch(/^\s+pull_request:/m);
   });
 
@@ -529,9 +530,7 @@ describe('Android launch baseline', () => {
       workflow.indexOf('  android-adaptive-layout:'),
     );
 
-    expect(launchJob).toContain(
-      "api-level: ${{ fromJSON(github.event_name == 'schedule' && '[36]' || '[24,36]') }}"
-    );
+    expect(launchJob).toContain('api-level: [24, 36]');
     expect(launchJob).toContain('ram-size: 4096M');
     expect(launchJob.match(/ram-size: 4096M/g)).toHaveLength(1);
     expect(launchJob).toContain('disk-size: 8192M');

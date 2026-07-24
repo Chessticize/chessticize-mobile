@@ -54,11 +54,15 @@ evidence invalidates that evidence.
 
 ## Automated matrix
 
-The `Mobile Android` workflow builds the self-contained app and Detox test APK
-once. A scheduled run uses the latest `main` commit and runs complete shared
-`flows` and `practice` on an API 36 x86_64 phone. A manual dispatch also runs
-the bounded API 24 compatibility smoke and the release-oriented backup and
-adaptive jobs.
+The `Mobile Android` workflow is a manually dispatched full diagnostic matrix.
+It builds the self-contained app and Detox test APK once, runs complete shared
+`flows` and `practice` on an API 36 x86_64 phone, and also runs the bounded API
+24 compatibility smoke plus the release-oriented backup and adaptive jobs.
+It has no scheduled trigger and is not a recurring release gate. Use it only
+when the selected scope is full or when diagnosing a boundary that needs its
+hosted Linux/Android evidence. Routine releases use exact-head fast checks,
+risk-scoped validation on the Android build machine, and owner physical-device
+smoke.
 
 The API 24 smoke contains only:
 

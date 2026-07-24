@@ -1816,7 +1816,9 @@ describe('Android Play release contract', () => {
     expect(workflow).not.toContain('push:');
     expect(workflow).toContain('environment: android-production');
     expect(workflow).toContain('contents: write');
-    expect(workflow).toContain('Run exact-head fast release checks');
+    expect(workflow).not.toContain('Run exact-head fast release checks');
+    expect(workflow).not.toContain('pnpm mobile:test');
+    expect(workflow).not.toContain('pnpm test');
     expect(workflow).toContain('ANDROID_RELEASE_KEYSTORE_BASE64');
     expect(workflow).toContain('ANDROID_UPLOAD_CERT_SHA256');
     expect(workflow).toContain('--artifact-only');
@@ -1843,16 +1845,15 @@ describe('Android Play release contract', () => {
     expect(listing).toContain('production manifest intentionally has no `INTERNET` permission');
   });
 
-  it('installs the Android emulator runtime libraries before running the release doctor', () => {
+  it('keeps emulator runtime setup out of the artifact-only candidate job', () => {
     const workflow = read(
       '.github/workflows/mobile-android-release-candidate.yml',
     );
     const runtimeInstall = 'sudo apt-get install --yes libpulse0';
     const doctor = 'run: pnpm mobile:doctor:android';
 
-    expect(workflow).toContain(runtimeInstall);
-    expect(workflow.indexOf(runtimeInstall)).toBeLessThan(
-      workflow.indexOf(doctor),
-    );
+    expect(workflow).not.toContain(runtimeInstall);
+    expect(workflow).toContain(doctor);
+    expect(workflow).toContain('Build production-signed App Bundle');
   });
 });

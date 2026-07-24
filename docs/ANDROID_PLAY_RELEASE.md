@@ -150,16 +150,19 @@ dispatching another full native run.
    `docs/RELEASE_NOTES.md`. Create and publish the annotated
    `android-v<version>-build-<code>` source tag before distributing the
    candidate through any Play testing track.
-2. Dispatch `Mobile Android release candidate` on that exact ref. The workflow
+2. Record passing exact-head fast checks and the selected risk-scoped Android
+   validation before dispatch. The protected candidate workflow deliberately
+   does not repeat product tests or run an emulator.
+3. Dispatch `Mobile Android release candidate` on that exact ref. The workflow
    materializes the upload keystore only in runner temp, builds one signed AAB,
    verifies every non-signature AAB entry is covered by exactly one approved
    JAR signer, and retains the AAB plus `android-source-manifest.json` for 30
    days.
-3. The verifier requires `com.chessticize.mobile`, the canonical version name
+4. The verifier requires `com.chessticize.mobile`, the canonical version name
    and version code, only the two approved ABIs, `PAGE_ALIGNMENT_16K`, at least
    16 KB ELF LOAD alignment for every packaged `.so`, native debug symbols,
    and packaged GPL/source notices.
-4. Retain the workflow URL, artifact ID, AAB SHA-256, byte size, largest AAB
+5. Retain the workflow URL, artifact ID, AAB SHA-256, byte size, largest AAB
    contributors, exact commit, and clean-worktree result. Do not rebuild after
    this step; every Play track and the Production draft must reference this
    exact AAB/version code.
