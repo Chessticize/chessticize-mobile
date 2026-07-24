@@ -2554,7 +2554,8 @@ describe("PracticePocScreen", () => {
 
   it("locks Standard input on the first rendered frame until the blunder animation completes", async () => {
     const service = createMobilePracticeService("familiar15");
-    const renderer = renderScreen({ practiceService: service });
+    const moveFeedbackClient = new FakeMoveFeedbackClient();
+    const renderer = renderScreen({ practiceService: service, moveFeedbackClient });
 
     press(renderer, "practice-mode-standard");
     press(renderer, "practice-start-button");
@@ -2583,6 +2584,11 @@ describe("PracticePocScreen", () => {
     await advanceEntryPreviewBy(1);
     expect(imperativeMove).toHaveBeenCalledTimes(1);
     expect(imperativeMove).toHaveBeenCalledWith(parseBoardMove(activePuzzle.puzzle.solutionMoves[0]!));
+    expect(moveFeedbackClient.requests).toEqual([{
+      cue: "move",
+      playSound: true,
+      playHaptic: false
+    }]);
     expect(() => findByTestId(renderer, "board-input-blocker")).toThrow();
     expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(activePuzzle.currentFen);
   });
@@ -3228,6 +3234,7 @@ describe("PracticePocScreen", () => {
     const renderer = renderScreen({ practiceService: service, moveFeedbackClient });
 
     startStandardSprint(renderer);
+    moveFeedbackClient.requests.length = 0;
 
     await boardMove(renderer, "e2d2");
 
@@ -7133,19 +7140,36 @@ describe("PracticePocScreen", () => {
     const renderer = renderStandardSequenceScreen({ moveFeedbackClient });
 
     startStandardSprint(renderer);
-    await boardMove(renderer, "d8a8");
-    expect(moveFeedbackClient.requests).toEqual([]);
-    await boardMove(renderer, "e2e6");
-
     expect(moveFeedbackClient.requests).toEqual([{
       cue: "capture",
       playSound: true,
-      playHaptic: true
+      playHaptic: false
     }]);
+    await boardMove(renderer, "d8a8");
+    expect(moveFeedbackClient.requests).toHaveLength(1);
+    await boardMove(renderer, "e2e6");
+
+    expect(moveFeedbackClient.requests).toEqual([
+      {
+        cue: "capture",
+        playSound: true,
+        playHaptic: false
+      },
+      {
+        cue: "capture",
+        playSound: true,
+        playHaptic: true
+      }
+    ]);
 
     await settleFeedbackSnapshot();
 
     expect(moveFeedbackClient.requests).toEqual([
+      {
+        cue: "capture",
+        playSound: true,
+        playHaptic: false
+      },
       {
         cue: "capture",
         playSound: true,
@@ -7157,6 +7181,31 @@ describe("PracticePocScreen", () => {
         playHaptic: false
       }
     ]);
+  });
+
+  it("does not emit due Review feedback when attempt persistence fails", async () => {
+    jest.setSystemTime(new Date("2026-06-21T12:00:00.000Z"));
+    const store = new FailingAttemptStore("Review write failed");
+    const service = new PracticeService(store);
+    configureMobilePracticePuzzleSource(service, "random1000");
+    store.scheduleMistakeReview({
+      puzzleId: "000hf",
+      mode: "standard",
+      ratingKey: "standard 5/20"
+    }, "2026-06-19T12:00:00.000Z");
+    const moveFeedbackClient = new FakeMoveFeedbackClient();
+    const renderer = renderScreen({ practiceService: service, moveFeedbackClient });
+
+    press(renderer, "review-tab");
+    press(renderer, "review-start-due");
+    await settleEntryPreview();
+    moveFeedbackClient.requests.length = 0;
+
+    await boardMove(renderer, "c4b5");
+
+    expect(moveFeedbackClient.requests).toEqual([]);
+    expect(service.listHistory({ source: "scheduled_review" })).toEqual([]);
+    expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
   });
 
   it("routes feedback to GitHub only after an explicit privacy handoff", async () => {

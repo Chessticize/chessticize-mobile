@@ -2084,6 +2084,9 @@ export function PracticePocScreen({
     entryKey: !feedbackSnapshot && isActive && state && currentPuzzle
       ? `${state.id}:${state.currentPuzzleIndex}:${currentPuzzle.puzzle.id}`
       : null,
+    onCommittedMove: (move, preMoveFen) => {
+      playCommittedMoveFeedback("opponent", move, preMoveFen);
+    },
     onLastMove: setLastBoardMove,
     suppressedMovesRef: suppressedBoardMovesRef
   });
@@ -8816,6 +8819,9 @@ function ReviewSession({
     entryKey: analysisEnabled
       ? null
       : `${currentEntry.source}:${entryIndex}:${currentEntry.puzzle.id}`,
+    onCommittedMove: (move, preMoveFen) => {
+      playReviewMoveFeedback("opponent", move, preMoveFen);
+    },
     onLastMove: setLastMove,
     suppressedMovesRef: reviewSuppressedBoardMovesRef
   });
@@ -9036,7 +9042,6 @@ function ReviewSession({
     if (reviewResultRecordedRef.current || reviewResultRecorded) {
       return;
     }
-    reviewResultRecordedRef.current = true;
     const completedAt = new Date(currentTimeMs()).toISOString();
     service.recordReviewAttempt({
       puzzleId: currentEntry.puzzle.id,
@@ -9048,6 +9053,7 @@ function ReviewSession({
       startedAt: new Date(reviewStartedAtMs).toISOString(),
       ...(currentPuzzle.kind === "arrow_duel" ? { arrowDuelCandidateOrder: [...currentPuzzle.candidates] } : {})
     }, completedAt);
+    reviewResultRecordedRef.current = true;
     onReviewRecorded?.(completedAt);
     setReviewResultRecorded(true);
   }
@@ -9107,13 +9113,18 @@ function ReviewSession({
     setBoardLocked(true);
     try {
       const result = submitLineMove(reviewState.kind === "line" ? reviewState.line : beginLinePuzzle(currentEntry.puzzle), move);
+      if (result.feedback.result === "wrong" || result.feedback.puzzleSolved) {
+        recordCurrentReviewResult(
+          result.feedback.result === "wrong" || wrongSeen ? "wrong" : "correct",
+          {
+            submittedMove: result.feedback.submittedMove,
+            expectedMove: result.feedback.expectedMove
+          }
+        );
+      }
       playReviewMoveFeedback("user", move, submittedFen);
       setFeedback(result.feedback);
       if (result.feedback.result === "wrong") {
-        recordCurrentReviewResult("wrong", {
-          submittedMove: result.feedback.submittedMove,
-          expectedMove: result.feedback.expectedMove
-        });
         setWrongSeen(true);
         await sleep(FEEDBACK_SNAPSHOT_MS);
         boardRef.current?.resetBoard(submittedFen);
@@ -9204,40 +9215,48 @@ function ReviewSession({
       return;
     }
     setBoardLocked(true);
-    const result = submitArrowDuelChoice(reviewState.duel, move);
-    playReviewMoveFeedback("user", move, submittedFen);
-    setFeedback(result.feedback);
-    if (result.feedback.result === "correct") {
-      await sleep(FEEDBACK_SNAPSHOT_MS);
-      advanceReview("correct", {
-        submittedMove: result.feedback.submittedMove,
-        expectedMove: result.feedback.expectedMove
-      });
-      return;
-    }
+    try {
+      const result = submitArrowDuelChoice(reviewState.duel, move);
+      recordCurrentReviewResult(
+        result.feedback.result === "wrong" ? "wrong" : "correct",
+        {
+          submittedMove: result.feedback.submittedMove,
+          expectedMove: result.feedback.expectedMove
+        }
+      );
+      playReviewMoveFeedback("user", move, submittedFen);
+      setFeedback(result.feedback);
+      if (result.feedback.result === "correct") {
+        await sleep(FEEDBACK_SNAPSHOT_MS);
+        advanceReview("correct", {
+          submittedMove: result.feedback.submittedMove,
+          expectedMove: result.feedback.expectedMove
+        });
+        return;
+      }
 
-    setWrongSeen(true);
-    recordCurrentReviewResult("wrong", {
-      submittedMove: result.feedback.submittedMove,
-      expectedMove: result.feedback.expectedMove
-    });
-    await sleep(FEEDBACK_SNAPSHOT_MS);
-    if (currentEntry.source === "due") {
-      goToNextDueReview();
-      return;
-    }
-    const replyMoves = result.feedback.autoPlayedMoves.slice(1);
-    const finalFen = fenAfterMoves(submittedFen, result.feedback.autoPlayedMoves) ?? submittedFen;
-    if (replyMoves.length > 0) {
-      await animateReviewBoardMoves(replyMoves, finalFen);
+      setWrongSeen(true);
       await sleep(FEEDBACK_SNAPSHOT_MS);
+      if (currentEntry.source === "due") {
+        goToNextDueReview();
+        return;
+      }
+      const replyMoves = result.feedback.autoPlayedMoves.slice(1);
+      const finalFen = fenAfterMoves(submittedFen, result.feedback.autoPlayedMoves) ?? submittedFen;
+      if (replyMoves.length > 0) {
+        await animateReviewBoardMoves(replyMoves, finalFen);
+        await sleep(FEEDBACK_SNAPSHOT_MS);
+      }
+      setReviewState({
+        kind: "line",
+        line: lineStateAfterMoves(currentEntry.puzzle, result.feedback.autoPlayedMoves)
+      });
+      setFeedback(null);
+      setBoardLocked(false);
+    } catch {
+      boardRef.current?.resetBoard(submittedFen);
+      setBoardLocked(false);
     }
-    setReviewState({
-      kind: "line",
-      line: lineStateAfterMoves(currentEntry.puzzle, result.feedback.autoPlayedMoves)
-    });
-    setFeedback(null);
-    setBoardLocked(false);
   }
 
   async function submitReviewArrowFollowUpMove(move: string, submittedFen: string): Promise<void> {
@@ -9248,13 +9267,15 @@ function ReviewSession({
     setBoardLocked(true);
     try {
       const result = submitArrowDuelFollowUpMove(reviewState.line, move);
-      playReviewMoveFeedback("user", move, submittedFen);
-      setFeedback(result.feedback);
-      if (result.feedback.result === "wrong") {
+      if (result.feedback.result === "wrong" || result.feedback.puzzleSolved) {
         recordCurrentReviewResult("wrong", {
           submittedMove: result.feedback.submittedMove,
           expectedMove: result.feedback.expectedMove
         });
+      }
+      playReviewMoveFeedback("user", move, submittedFen);
+      setFeedback(result.feedback);
+      if (result.feedback.result === "wrong") {
         await sleep(FEEDBACK_SNAPSHOT_MS);
         boardRef.current?.resetBoard(submittedFen);
         setFeedback(null);
