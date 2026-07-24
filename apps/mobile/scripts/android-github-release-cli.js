@@ -53,6 +53,10 @@ function requiredOption(options, name) {
   return value;
 }
 
+function resolveRepoPath(value, repoRoot) {
+  return path.resolve(repoRoot, value);
+}
+
 function requireDispatchIdentity(options, releaseVersion) {
   const identity = createAndroidReleaseIdentity(releaseVersion);
   if (requiredOption(options, 'public-version') !== identity.publicVersion ||
@@ -65,7 +69,7 @@ function requireDispatchIdentity(options, releaseVersion) {
 async function runCli(options, environment = process.env) {
   const repoRoot = path.resolve(__dirname, '../../..');
   const releaseVersionPath = options['release-version-file']
-    ? path.resolve(options['release-version-file'])
+    ? resolveRepoPath(options['release-version-file'], repoRoot)
     : path.join(repoRoot, 'apps/mobile/release-version.json');
   const releaseVersion = readJson(
     releaseVersionPath,
@@ -80,10 +84,16 @@ async function runCli(options, environment = process.env) {
     throw new Error('GITHUB_TOKEN with contents: write is required.');
   }
 
-  const sourceManifestPath = path.resolve(requiredOption(options, 'source-manifest'));
+  const sourceManifestPath = resolveRepoPath(
+    requiredOption(options, 'source-manifest'),
+    repoRoot,
+  );
   const sourceManifestBytes = fs.readFileSync(sourceManifestPath);
   const sourceManifest = readJson(sourceManifestPath, 'Source manifest');
-  const outputDirectory = path.resolve(requiredOption(options, 'output-dir'));
+  const outputDirectory = resolveRepoPath(
+    requiredOption(options, 'output-dir'),
+    repoRoot,
+  );
   const github = new GitHubReleasesClient({ token });
 
   const hasDispatchIdentity =
@@ -148,6 +158,7 @@ if (require.main === module) {
 
 module.exports = {
   parseArguments,
+  resolveRepoPath,
   requireDispatchIdentity,
   runCli,
 };
