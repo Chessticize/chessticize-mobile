@@ -86,11 +86,12 @@ an unexplained failure with a successful rerun.
   missing Apple Developer Team ID, Xcode, or Apple distribution identity before
   archiving.
 - Record the release validation scope from `docs/TESTING_ARCHITECTURE.md`.
-  Ordinary deltas use exact-head fast checks plus owner physical-device smoke;
-  targeted changes run the affected native suite, and only broad native changes
-  require both `flows` and `practice`. Passing native evidence remains reusable
-  across later non-development changes when the unchanged-input comparison is
-  recorded.
+  Ordinary deltas use exact-head fast checks plus the platform's signed-artifact
+  checks; targeted changes run the affected simulator/emulator suite, and only
+  broad native changes require both `flows` and `practice`. Physical-device
+  testing is optional and does not block App Store or Play submission, or APK
+  mirroring. Passing native evidence remains reusable across later
+  non-development changes when the unchanged-input comparison is recorded.
 - Run `pnpm app-store:third-party-audit` from the final lockfile and resolve
   any stale package, Stockfish, NNUE, or puzzle-data notice.
 - When screenshots or store metadata changed, run
@@ -123,8 +124,8 @@ an unexplained failure with a successful rerun.
   `COPYING.txt`, and Stockfish `AUTHORS`, plus native debug symbols.
 - The Play candidate was built from the exact `android-v<version>-build-<code>`
   tagged commit and every Play track references the same AAB/version code.
-- After a Play-delivered Android build passes owner smoke, finish the release by
-  downloading its universal APK from Play and mirroring it through
+- After Play publishes the Android build, finish the release by downloading its
+  universal APK from Play and mirroring it through
   `docs/ANDROID_GITHUB_RELEASE.md`. The GitHub Release must then contain exactly
   the source manifest, Play-signed APK, and checksum, and the mirror receipt
   must be retained.

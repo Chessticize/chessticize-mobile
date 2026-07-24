@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       version_code:
-        description: Canonical Android build number already verified on device
+        description: Canonical Android build number already published through Play
         required: true
         type: string
 

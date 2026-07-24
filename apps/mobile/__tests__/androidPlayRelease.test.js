@@ -1839,7 +1839,7 @@ describe('Android Play release contract', () => {
     expect(runbook).toContain('No temporary GitHub token');
     expect(runbook).toContain(expectedSourceTag);
     expect(runbook).toContain('https://github.com/Chessticize/chessticize-mobile');
-    expect(runbook).toContain('owner device smoke');
+    expect(runbook).toContain('Physical-device testing is optional');
     expect(verifier).toContain('{ repoRoot, run, environment },');
     expect(listing).toContain('Data collected: No');
     expect(listing).toContain('production manifest intentionally has no `INTERNET` permission');

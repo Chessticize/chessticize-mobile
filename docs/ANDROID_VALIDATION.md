@@ -62,9 +62,9 @@ It builds the self-contained app and Detox test APK once, runs complete shared
 24 compatibility smoke plus the release-oriented backup and adaptive jobs.
 It has no scheduled trigger and is not a recurring release gate. Use it only
 when the selected scope is full or when diagnosing a boundary that needs its
-hosted Linux/Android evidence. Routine releases use exact-head fast checks,
-risk-scoped validation on the Android build machine, and owner physical-device
-smoke.
+hosted Linux/Android evidence. Routine releases use exact-head fast checks and
+risk-scoped CI or emulator validation on the Android build machine. A physical
+device is not required for Play submission or the post-Play APK mirror.
 
 The API 24 smoke contains only:
 
@@ -148,22 +148,22 @@ unchanged. Record both SHAs and the comparison. Runtime, native/platform,
 dependency, build/release, or selected native spec/fixture changes require a
 rerun; documentation, review metadata, and merge ancestry alone do not.
 
-## Physical ARM64 release checklist
+## Optional physical ARM64 diagnostic checklist
 
-This is owner-recorded release evidence. The Stockfish lifecycle subset remains
-tracked by #200, and the complete checklist is approved with release issue
-#188. Physical hardware availability is not a routine feature-PR blocker.
+This is optional owner-recorded diagnostic evidence. The Stockfish lifecycle
+subset remains tracked by #200, and the complete checklist is preserved with
+release issue #188 for investigations that benefit from real hardware.
+Physical hardware availability is not a feature-PR or release blocker.
 
-For an ordinary delta, record only the exact installed version/build, cold
-launch, one real Practice completion, and the changed behavior. Add the
-applicable items below when the change touches them. Run the complete checklist
-for first launch or broad native risk; do not repeat unchanged items solely
-because the build number advanced.
+Do not run this checklist for an ordinary delta solely because the build number
+advanced. Use it when diagnosing device-specific behavior or when the owner
+wants extra confidence after publication. Automated CI/simulator/emulator
+evidence remains the release standard.
 
-Record the exact candidate SHA, AAB/APK identity and checksum, signing
-certificate, device model, Android version, `arm64-v8a` ABI, commands,
-timestamps, results, retries, and redacted evidence links before checking any
-item.
+If the checklist is run, record the exact candidate SHA, AAB/APK identity and
+checksum, signing certificate, device model, Android version, `arm64-v8a` ABI,
+commands, timestamps, results, retries, and redacted evidence links before
+checking any item.
 
 - [ ] **Install and cold start:** install the exact candidate without debug or
   test substitution, launch from a stopped state, and confirm the public
@@ -193,14 +193,15 @@ item.
   settings before making one new write. This is required for storage/schema,
   signing, or install-path changes, not for every bounded delta.
 
-Any physical failure blocks release approval. Fix it, rerun the complete
-affected scope on the exact replacement candidate, and retain both the failed
-and passing evidence.
+A physical-only failure is diagnostic input. Investigate it and add the
+smallest deterministic automated regression that can reproduce the affected
+boundary, but do not hold Play submission or APK mirroring solely for this
+optional checklist.
 
 ## Play-signed release boundary
 
 The selected automated scope proves source behavior; it does not prove upload
-signing, Play App Signing, store declarations, or Play-delivered installation.
+signing, Play App Signing, or store declarations.
 For an Android release candidate, also follow `docs/ANDROID_PLAY_RELEASE.md`.
 The signed-candidate job binds one exact AAB SHA-256 to its corresponding source
 manifest. Google Play distributes and signs the binary first. The later GitHub

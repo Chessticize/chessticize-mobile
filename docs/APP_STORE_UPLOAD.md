@@ -81,9 +81,9 @@ that is tagged and archived.
 
 Before archiving, record whether this is a delta, targeted, or full native
 release under `docs/TESTING_ARCHITECTURE.md`. A delta requires the exact-head
-fast checks above and the physical TestFlight smoke below; it does not require
-a fresh full Detox run. Record the affected suite for targeted risk, or both
-`flows` and `practice` for broad native risk.
+fast checks above and the signed archive checks. A delta does not require a fresh
+full Detox run or a physical TestFlight smoke. Record the affected simulator
+suite for targeted risk, or both `flows` and `practice` for broad native risk.
 
 When the evidence command is applicable, it must report `dirty: false`,
 `status: "pass"`, and `releaseReady: true`. A build-number-only delta with
@@ -208,23 +208,17 @@ valid while this signing-account gate is still incomplete.
 2. Confirm the uploaded build number is `1` for version `1.2.1`.
 3. Confirm export compliance is accepted for
    `ITSAppUsesNonExemptEncryption = false`.
-4. Configure the TestFlight test information from `docs/TESTFLIGHT_QA.md`.
-5. Add the build to the `Internal 1.2.1 QA` internal testing group.
-6. Install the build from the TestFlight app on the owner's physical device and
-   run the delta smoke: installed version, cold launch, one real Practice path,
-   and the changed behavior.
-7. Run only the applicable targeted checks in `docs/TESTFLIGHT_QA.md`. Repeat
-   the full iPhone/iPad checklist for first launch, broad native risk, or a
-   store/device compatibility concern.
-8. Fill the evidence log with the source commit, release tag, build, device,
-   tester, result, blocking issues, and evidence folder.
-9. For an App Store version update, copy the approved `Store copy` from the
+4. Optionally configure an internal TestFlight group or run the diagnostic
+   checklist in `docs/TESTFLIGHT_QA.md`; neither is a release prerequisite.
+5. For an App Store version update, copy the approved `Store copy` from the
    exact build-specific release-note file into **What’s New in this Version**.
    App Store Connect does not expose that field for the first App Store version;
    keep the checked-in and GitHub notes in that case.
-10. Before submission, recheck Apple’s live character limit, compare the saved
+6. Before submission, recheck Apple’s live character limit, compare the saved
     text byte-for-byte with the approved file, and retain a screenshot or
     exported metadata record with the release evidence.
-11. After release, compare the live App Store notes with the approved file and
+7. Submit the processed build after the selected CI/simulator scope and store
+   metadata checks pass; do not wait for physical-device QA.
+8. After release, compare the live App Store notes with the approved file and
     record the result. A mismatch blocks completion until corrected and
     reverified.
