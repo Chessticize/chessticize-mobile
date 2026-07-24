@@ -205,13 +205,15 @@ interface Props {
 
 export type SessionTimingDesignPreview = {
   initialElapsedSeconds: number;
+  nextPuzzleFen?: string;
   timeoutSeconds: number;
   warningSeconds: number;
 };
 
+type HistoryTimingStatus = "slow" | "timed_out";
+
 export type HistoryTimingDesignPreview = {
-  slowAttemptIds: readonly string[];
-  timedOutAttemptIds: readonly string[];
+  statusByAttemptId: Readonly<Record<string, HistoryTimingStatus>>;
 };
 
 type HistoryAttentionFlag = "mistakes" | "unclear" | "slow" | "timed_out";
@@ -2059,7 +2061,11 @@ export function PracticePocScreen({
     suppressedMovesRef: suppressedBoardMovesRef
   });
   puzzleEntryPreviewLockedRef.current = sessionEntryPreview.locked;
-  const displayedBoardFen = sessionEntryPreview.displayFen
+  const timingPreviewBoardFen = sessionTimingDesignState && sessionTimingDesignState.cycle > 0
+    ? sessionTimingPreview?.nextPuzzleFen
+    : undefined;
+  const displayedBoardFen = timingPreviewBoardFen
+    ?? sessionEntryPreview.displayFen
     ?? feedbackSnapshot?.boardFen
     ?? currentBoardFen;
   sessionBoardHandlersRef.current = {
@@ -2144,7 +2150,9 @@ export function PracticePocScreen({
         ...(activeHistoryRatingKey ? { ratingKey: activeHistoryRatingKey } : {}),
         ...historyRatingRangeQuery,
         ...(historySourceFilter === "all" ? {} : { source: historySourceFilter }),
-        ...(historyResultFilter === "all" ? {} : { result: historyResultFilter }),
+        ...(historyResultFilter === "all" || historyTimingPreview
+          ? {}
+          : { result: historyResultFilter }),
         ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
         ...(selectedHistoryThemes.length === 0 ? {} : { themes: selectedHistoryThemes }),
         ...(historyReviewStatusFilter === "all" ? {} : { reviewStatus: historyReviewStatusFilter }),
@@ -2169,22 +2177,28 @@ export function PracticePocScreen({
     if (!historyTimingPreview) {
       return true;
     }
+    const timingStatus = historyTimingPreview.statusByAttemptId[attempt.id] ?? null;
+    const isTimedOut = timingStatus === "timed_out";
     const matchesNeedsAttention = (
       attempt.unclear
-      || attempt.result === "wrong"
-      || historyTimingPreview.slowAttemptIds.includes(attempt.id)
-      || historyTimingPreview.timedOutAttemptIds.includes(attempt.id)
+      || (attempt.result === "wrong" && !isTimedOut)
+      || timingStatus === "slow"
+      || isTimedOut
     );
+    const matchesResult = historyResultFilter === "all"
+      || (!isTimedOut && attempt.result === historyResultFilter);
     const matchesSelectedFlag = historyAttentionFlags.length === 0 || historyAttentionFlags.some((flag) => (
       flag === "mistakes"
-        ? attempt.result === "wrong"
+        ? attempt.result === "wrong" && !isTimedOut
         : flag === "unclear"
         ? Boolean(attempt.unclear)
         : flag === "slow"
-          ? historyTimingPreview.slowAttemptIds.includes(attempt.id)
-          : historyTimingPreview.timedOutAttemptIds.includes(attempt.id)
+          ? timingStatus === "slow"
+          : isTimedOut
     ));
-    return (!historyAttentionOnly || matchesNeedsAttention) && matchesSelectedFlag;
+    return matchesResult
+      && (!historyAttentionOnly || matchesNeedsAttention)
+      && matchesSelectedFlag;
   }) ?? [];
   const visibleHistoryPage = historyView
     && historyTimingPreview
@@ -6857,9 +6871,7 @@ function HistoryPanel({
         <HistoryAttemptRow
           key={attempt.id}
           attempt={attempt}
-          timingStatus={timingPreview?.timedOutAttemptIds.includes(attempt.id)
-            ? "timed_out"
-            : timingPreview?.slowAttemptIds.includes(attempt.id) ? "slow" : null}
+          timingStatus={timingPreview?.statusByAttemptId[attempt.id] ?? null}
           onOpen={() => onOpenAttempt(attempt.id)}
         />
       ))}

@@ -95,6 +95,10 @@ Selecting no attention flag places no restriction on that facet. The applied
 state summary uses plain language such as
 `Attention: Mistakes or Unclear or Slow`.
 
+`Timed out` is its own result and does not also match `Mistakes`, `Correct`, or
+`Wrong`. Slow and Timed out do not automatically set Unclear or Review queue
+membership; all four attention reasons and Review membership remain independent.
+
 The view selector and Attention flags stay synchronized:
 
 - Selecting any Attention flag switches the view to `Needs attention`.
@@ -131,6 +135,8 @@ filter token. It is equivalent to clearing that facet
 - Selecting an Attention flag also selects `Needs attention`; clearing the last
   flag keeps `Needs attention`, while selecting `All` clears every flag.
 - `Mistakes` may overlap `Result: Wrong` without duplicating an attempt.
+- A Timed out attempt does not also match `Mistakes`, `Correct`, or `Wrong`.
+- Slow and Timed out do not automatically set Unclear or Review membership.
 - Review membership reads `All / In queue / Not in queue`, not
   `All review states / Queued / Clear`.
 - Themes is collapsed when filters open, retains a compact selection summary,

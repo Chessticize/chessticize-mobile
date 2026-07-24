@@ -83,8 +83,10 @@ function LabScenarioContent({
         sessionTimingPreview={sessionTimingPreviewFor(scenarioId)}
         historyTimingPreview={showsHistoryTimingPreview(scenarioId)
           ? {
-              slowAttemptIds: ["history-correct"],
-              timedOutAttemptIds: ["history-wrong"]
+              statusByAttemptId: {
+                "history-correct": "slow",
+                "history-timeout": "timed_out"
+              }
             }
           : undefined}
         {...runtime.screenProps}
@@ -118,6 +120,7 @@ function sessionTimingPreviewFor(
   if (scenarioId === "practice-timing-timeout") {
     return {
       initialElapsedSeconds: 52,
+      nextPuzzleFen: LAB_PUZZLES[4]!.initialFen,
       warningSeconds: 40,
       timeoutSeconds: 60
     };
@@ -413,6 +416,14 @@ function createHistoryService(
       ratingAfter: 910
     }),
     historyAttempt({
+      id: "history-timeout",
+      puzzleId: LAB_PUZZLES[4]!.id,
+      result: "correct",
+      completedAt: "2026-07-17T15:00:12.000Z",
+      ratingBefore: 910,
+      ratingAfter: 910
+    }),
+    historyAttempt({
       id: "history-correct",
       puzzleId: LAB_PUZZLES[2]!.id,
       result: "correct",
@@ -447,6 +458,13 @@ function createHistoryService(
     ratingAfter: 910
   }));
   store.createSprintSession(completedSprint({
+    id: "session-history-timeout",
+    mode: "standard",
+    completedAt: "2026-07-17T15:00:12.000Z",
+    ratingBefore: 910,
+    ratingAfter: 910
+  }));
+  store.createSprintSession(completedSprint({
     id: "session-history-unclear",
     mode: "standard",
     completedAt: "2026-07-18T15:00:08.000Z",
@@ -466,7 +484,7 @@ function createHistoryService(
     rating: 928,
     ratingDeviation: 160,
     volatility: 0.05,
-    games: 4
+    games: 5
   });
   store.scheduleMistakeReview({
     puzzleId: LAB_PUZZLES[1]!.id,

@@ -486,6 +486,9 @@ New Run behavior:
   overlaps `Result: Wrong` so all four Needs attention reasons can be composed
   in one group; keep Result as the independent `Correct / Wrong` facet. Label
   Review membership `Review queue: All / In queue / Not in queue`.
+- `Timed out` is a distinct result, not a Wrong mistake or a Correct attempt.
+  Slow and Timed out do not automatically mark an attempt Unclear or add it to
+  the Review queue; those dimensions remain independent.
 - Selecting any Attention flag switches the persistent view to
   `Needs attention`. Clearing the final flag keeps that broader view selected.
   Selecting `All` clears every Attention flag; Reset restores the same clean

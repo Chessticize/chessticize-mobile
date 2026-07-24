@@ -1277,6 +1277,7 @@ describe("PracticePocScreen", () => {
     const renderer = renderLabScenario("practice-timing-timeout");
 
     startStandardSprint(renderer);
+    const firstPuzzleFen = findByTestId(renderer, "mock-chessboard").props.fen;
     expect(collectText(findByTestId(renderer, "session-puzzle-timing-label"))).toBe("Puzzle 0:52");
     expect(collectText(findByTestId(renderer, "session-puzzle-countdown"))).toBe("8s");
 
@@ -1299,6 +1300,7 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "session-puzzle-timeout-overlay")).toThrow();
     expect(collectText(findByTestId(renderer, "session-puzzle-timing-label"))).toBe("Puzzle 0:00");
     expect(() => findByTestId(renderer, "session-puzzle-countdown")).toThrow();
+    expect(findByTestId(renderer, "mock-chessboard").props.fen).not.toBe(firstPuzzleFen);
   });
 
   it("uses one All or Needs attention selector and keeps every other History filter in the menu", async () => {
@@ -1331,19 +1333,22 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain("Sprint");
     expect(collectText(findByTestId(renderer, "history-attempt-history-correct-slow"))).toBe("Slow");
     expect(collectText(findByTestId(renderer, "history-attempt-history-wrong-result"))).toBe(
+      "Wrong move"
+    );
+    expect(collectText(findByTestId(renderer, "history-attempt-history-timeout-result"))).toBe(
       "Timed out"
     );
     expect(
-      findByTestId(renderer, "history-attempt-history-wrong-badge")
+      findByTestId(renderer, "history-attempt-history-timeout-badge")
         .findByProps({ testID: "result-badge-wrong-glyph" })
     ).toBeTruthy();
     expect(hasStyleEntry(
-      findByTestId(renderer, "history-attempt-history-wrong-badge"),
+      findByTestId(renderer, "history-attempt-history-timeout-badge"),
       "backgroundColor",
       "#DC2626"
     )).toBe(true);
     expect(() => findByTestId(renderer, "result-badge-alert-glyph")).toThrow();
-    expect(() => findByTestId(renderer, "history-attempt-history-wrong-timed_out")).toThrow();
+    expect(() => findByTestId(renderer, "history-attempt-history-timeout-timed_out")).toThrow();
     expect(findByTestId(renderer, "history-attempt-history-unclear")).toBeTruthy();
     expect(findByTestId(renderer, "history-attempt-history-clean")).toBeTruthy();
 
@@ -1362,6 +1367,7 @@ describe("PracticePocScreen", () => {
     );
     expect(findByTestId(renderer, "history-attempt-history-correct")).toBeTruthy();
     expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
+    expect(findByTestId(renderer, "history-attempt-history-timeout")).toBeTruthy();
     expect(findByTestId(renderer, "history-attempt-history-unclear")).toBeTruthy();
     expect(() => findByTestId(renderer, "history-attempt-history-clean")).toThrow();
 
@@ -1412,6 +1418,7 @@ describe("PracticePocScreen", () => {
     });
     press(renderer, "history-attention-flag-mistakes");
     expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-history-timeout")).toThrow();
     expect(() => findByTestId(renderer, "history-attempt-history-unclear")).toThrow();
     expect(() => findByTestId(renderer, "history-attempt-history-correct")).toThrow();
     press(renderer, "history-attention-flag-unclear");
@@ -1429,6 +1436,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-attempt-history-unclear")).toBeTruthy();
     expect(findByTestId(renderer, "history-attempt-history-correct")).toBeTruthy();
     expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
+    expect(findByTestId(renderer, "history-attempt-history-timeout")).toBeTruthy();
     expect(() => findByTestId(renderer, "history-attempt-history-clean")).toThrow();
 
     expect(collectText(findByTestId(renderer, "history-review-status-filters"))).toBe(
@@ -1458,6 +1466,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-attempt-history-correct")).toBeTruthy();
     expect(findByTestId(renderer, "history-attempt-history-unclear")).toBeTruthy();
     expect(() => findByTestId(renderer, "history-attempt-history-wrong")).toThrow();
+    expect(() => findByTestId(renderer, "history-attempt-history-timeout")).toThrow();
     expect(() => findByTestId(renderer, "history-attempt-history-clean")).toThrow();
 
     press(renderer, "history-filter-reset");
@@ -1468,6 +1477,7 @@ describe("PracticePocScreen", () => {
       "7 days·All puzzles"
     );
     expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
+    expect(findByTestId(renderer, "history-attempt-history-timeout")).toBeTruthy();
     expect(findByTestId(renderer, "history-attempt-history-clean")).toBeTruthy();
     expect(hasStyleEntry(
       findByTestId(renderer, "history-source-all"),
@@ -1505,6 +1515,7 @@ describe("PracticePocScreen", () => {
     );
     expect(findByTestId(renderer, "history-attempt-history-correct")).toBeTruthy();
     expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
+    expect(findByTestId(renderer, "history-attempt-history-timeout")).toBeTruthy();
     expect(findByTestId(renderer, "history-attempt-history-unclear")).toBeTruthy();
     expect(() => findByTestId(renderer, "history-attempt-history-clean")).toThrow();
 
