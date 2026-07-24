@@ -6222,28 +6222,14 @@ describe("PracticePocScreen", () => {
 
   it("does not start deferred Stockfish diagnostics after leaving the panel", async () => {
     const systemBack = createTestSystemBackSource("android");
-    const commands: string[] = [];
-    const listeners = new Set<(line: string) => void>();
+    const stockfish = createScriptedStockfishTransport(() => {});
     let resolvePrewarm: ((ready: boolean) => void) | undefined;
     const prewarm = jest.fn(() => new Promise<boolean>((resolve) => {
       resolvePrewarm = resolve;
     }));
-    const transport: UciEngineTransport = {
-      start: jest.fn(async () => {}),
-      send: jest.fn((command: string) => {
-        commands.push(command);
-      }),
-      onLine: (listener) => {
-        listeners.add(listener);
-        return () => {
-          listeners.delete(listener);
-        };
-      },
-      terminate: jest.fn()
-    };
     const renderer = renderScreen({
       stockfish: {
-        createTransport: () => transport,
+        createTransport: () => stockfish.transport,
         prewarm
       },
       systemBack
@@ -6262,8 +6248,8 @@ describe("PracticePocScreen", () => {
       await Promise.resolve();
     });
 
-    expect(commands.some((command) => command.startsWith("go depth "))).toBe(false);
-    expect(listeners.size).toBe(0);
+    expect(stockfish.commands.some((command) => command.startsWith("go depth "))).toBe(false);
+    expect(stockfish.listenerCount()).toBe(0);
   });
 
   it("reviews Arrow Duel mistakes with analysis blunder arrows and a forced punishment line", async () => {
@@ -7169,7 +7155,7 @@ describe("PracticePocScreen", () => {
 
 function createScriptedStockfishTransport(
   onCommand: (command: string, emit: (line: string) => void) => void
-): { commands: string[]; transport: UciEngineTransport } {
+): { commands: string[]; listenerCount: () => number; transport: UciEngineTransport } {
   const commands: string[] = [];
   const listeners = new Set<(line: string) => void>();
   const emit = (line: string) => {
@@ -7180,6 +7166,7 @@ function createScriptedStockfishTransport(
 
   return {
     commands,
+    listenerCount: () => listeners.size,
     transport: {
       start: jest.fn(async () => {}),
       send: jest.fn((command: string) => {

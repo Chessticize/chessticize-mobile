@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {
   FAMILIAR_15_PUZZLES,
+  familiar15ArrowDuelStartingPosition,
   familiar15StartingPosition,
   familiar15UserMoves,
 } = require('../e2e/familiar15Fixture');
@@ -28,12 +29,18 @@ describe('Familiar 15 shared E2E fixture', () => {
       })));
   });
 
-  it('derives user turns and board orientation from each shared solution line', () => {
-    for (const puzzle of FAMILIAR_15_PUZZLES.slice(1)) {
+  it('derives Standard and Arrow Duel orientation from their actual starting positions', () => {
+    for (const puzzle of FAMILIAR_15_PUZZLES) {
       expect(familiar15UserMoves(puzzle))
-        .toEqual(puzzle.solutionMoves.filter((_, moveIndex) => moveIndex % 2 === 1));
+        .toEqual(
+          puzzle.id === FAMILIAR_15_PUZZLES[0].id
+            ? ['c2b1']
+            : puzzle.solutionMoves.filter((_, moveIndex) => moveIndex % 2 === 1)
+        );
       expect(familiar15StartingPosition(puzzle).turn())
         .toBe(puzzle.initialFen.split(' ')[1] === 'w' ? 'b' : 'w');
+      const arrowDuelPosition = familiar15ArrowDuelStartingPosition(puzzle);
+      expect(arrowDuelPosition.turn()).toBe(puzzle.initialFen.split(' ')[1]);
     }
   });
 
@@ -61,10 +68,10 @@ describe('Familiar 15 shared E2E fixture', () => {
 
   it('keeps product and E2E consumers free of parallel identity and move tables', () => {
     const orientationSource = read('../e2e/android-board-orientation.e2e.js');
-    const performanceSource = read('../e2e/sprint-performance.e2e.js');
+    const resourceSoakSource = read('../e2e/resource-soak.e2e.js');
     const productSource = read('../src/platform/mobilePractice.ts');
 
-    for (const source of [orientationSource, performanceSource]) {
+    for (const source of [orientationSource, resourceSoakSource]) {
       expect(source).toContain("require('./familiar15Fixture')");
       expect(source).not.toContain('const USER_MOVES_BY_PUZZLE');
       expect(source).not.toContain('const PUZZLE_ORDER');
@@ -73,7 +80,7 @@ describe('Familiar 15 shared E2E fixture', () => {
     }
     expect(orientationSource).toContain("by.id('practice-prompt')");
     expect(orientationSource).toContain("'For black.' : 'For white.'");
-    expect(performanceSource).toContain("by.id('practice-prompt-side-glyph')");
+    expect(resourceSoakSource).toContain("by.id('practice-prompt-side-glyph')");
     expect(productSource).toContain('familiar-15-e2e.manifest.json');
     expect(productSource).not.toContain('const FAMILIAR_PUZZLE_IDS');
   });

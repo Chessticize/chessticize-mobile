@@ -5,13 +5,16 @@ const {
   openTab,
   playBoardMove,
   selectTestPuzzleSource,
+  sleep,
   startPracticeMode,
   waitForElementTextContaining,
   waitForRunningStockfishDepth,
   waitForVisibleInPracticeScroll,
 } = require('./helpers');
+const { sampleProcessFootprint } = require('./resourceFootprint');
 const {
   FAMILIAR_15_PUZZLES,
+  familiar15ArrowDuelStartingPosition,
   familiar15StartingPosition,
   familiar15UserMoves,
 } = require('./familiar15Fixture');
@@ -19,15 +22,20 @@ const {
 const COMPLETED_PUZZLE_TARGET = 50;
 const COMPLETED_PUZZLES_PER_SPRINT = 10;
 const RESOURCE_SAMPLE_INTERVAL = 5;
-const GAMEPLAY_PEAK_RSS_BUDGET_KB = 400 * 1024;
-const GAMEPLAY_FINAL_RSS_BUDGET_KB = 320 * 1024;
-const GAMEPLAY_TAIL_RSS_BUDGET_KB = 256 * 1024;
+const FEEDBACK_SETTLE_MS = 1_200;
+// Calibrated from the fixed 50-puzzle Standard/Arrow runs with at least
+// 64 MB of peak headroom and 32 MB over the observed second-half growth.
+const GAMEPLAY_PEAK_NON_CG_BUDGET_KB = 256 * 1024;
+const GAMEPLAY_FINAL_NON_CG_BUDGET_KB = 256 * 1024;
+const GAMEPLAY_TAIL_NON_CG_BUDGET_KB = 128 * 1024;
 const STOCKFISH_RUNS = 20;
-const STOCKFISH_PEAK_RSS_BUDGET_KB = 192 * 1024;
-const STOCKFISH_FINAL_RSS_BUDGET_KB = 128 * 1024;
+const STOCKFISH_PEAK_NON_CG_BUDGET_KB = 128 * 1024;
+const STOCKFISH_FINAL_NON_CG_BUDGET_KB = 128 * 1024;
 const THREAD_GROWTH_BUDGET = 8;
 const FIXTURE_BY_ID = new Map(FAMILIAR_15_PUZZLES.map((puzzle) => [puzzle.id, puzzle]));
 const STOCKFISH_POSITIONS = ['queen-capture', 'mate-net', 'middlegame'];
+
+jest.setTimeout(15 * 60 * 1000);
 
 describe('Practice resource soak', () => {
   beforeAll(() => {
@@ -62,25 +70,29 @@ describe('Practice resource soak', () => {
     await element(by.id('settings-stockfish-diagnostics')).tap();
     await waitFor(element(by.id('stockfish-diagnostics-run'))).toBeVisible().withTimeout(10000);
 
-    // The panel's first complete depth-20 run absorbs the bounded NNUE and
+    // The panel's first bounded depth-20 request absorbs NNUE and
     // transposition-table initialization before the leak baseline.
     await waitForElementTextContaining('stockfish-diagnostics-status', 'Done', 120000);
     await waitFor(element(by.id('stockfish-diagnostics-line-0'))).toExist().withTimeout(10000);
     const resourceSamples = [{ run: 0, ...readAppResourceSample() }];
+    let selectedPosition = STOCKFISH_POSITIONS[0];
 
     for (let run = 1; run <= STOCKFISH_RUNS; run += 1) {
       const position = STOCKFISH_POSITIONS[run % STOCKFISH_POSITIONS.length];
-      await element(by.id(`stockfish-diagnostics-position-${position}`)).tap();
-      await waitForRunningStockfishDepth('stockfish-diagnostics-status', 4, 90000);
+      console.log(`[RESOURCE_SOAK_STOCKFISH_RUN] ${run}/${STOCKFISH_RUNS} starting ${position}`);
+      selectedPosition = await startStockfishRun(position, selectedPosition);
 
       if (run % 2 === 0) {
         const replacement = STOCKFISH_POSITIONS[(run + 1) % STOCKFISH_POSITIONS.length];
-        await element(by.id(`stockfish-diagnostics-position-${replacement}`)).tap();
-        await waitForRunningStockfishDepth('stockfish-diagnostics-status', 4, 90000);
+        console.log(
+          `[RESOURCE_SOAK_STOCKFISH_RUN] ${run}/${STOCKFISH_RUNS} cancelling into ${replacement}`
+        );
+        selectedPosition = await startStockfishRun(replacement, selectedPosition);
       }
 
-      await waitForElementTextContaining('stockfish-diagnostics-status', 'Done', 120000, 50);
+      await waitForElementTextContaining('stockfish-diagnostics-status', 'Done', 120000);
       await waitFor(element(by.id('stockfish-diagnostics-line-0'))).toExist().withTimeout(10000);
+      console.log(`[RESOURCE_SOAK_STOCKFISH_RUN] ${run}/${STOCKFISH_RUNS} complete`);
       if (run % RESOURCE_SAMPLE_INTERVAL === 0 || run === STOCKFISH_RUNS) {
         resourceSamples.push({ run, ...readAppResourceSample() });
       }
@@ -90,11 +102,27 @@ describe('Practice resource soak', () => {
     assertResourceGrowth({
       label: 'Stockfish',
       samples: resourceSamples,
-      peakRssBudgetKb: STOCKFISH_PEAK_RSS_BUDGET_KB,
-      finalRssBudgetKb: STOCKFISH_FINAL_RSS_BUDGET_KB,
+      peakNonCgBudgetKb: STOCKFISH_PEAK_NON_CG_BUDGET_KB,
+      finalNonCgBudgetKb: STOCKFISH_FINAL_NON_CG_BUDGET_KB,
     });
   });
 });
+
+async function startStockfishRun(position, selectedPosition) {
+  if (position === selectedPosition) {
+    await element(by.id('stockfish-diagnostics-run')).tap();
+  } else {
+    await element(by.id(`stockfish-diagnostics-position-${position}`)).tap();
+  }
+  await sleep(150);
+  await waitForRunningStockfishDepth(
+    'stockfish-diagnostics-status',
+    4,
+    90000,
+    { pollIntervalMs: 500 }
+  );
+  return position;
+}
 
 async function launchResourceSoakApp(launchArgs = {}) {
   await launchWithDisabledSynchronization({
@@ -119,13 +147,11 @@ async function runGameplaySoak(mode) {
       throw new Error(`Unknown Familiar 15 puzzle ${puzzleId} at completed count ${completed - 1}`);
     }
 
-    const flipped = familiar15StartingPosition(puzzle).turn() === 'b';
+    const startingPosition = mode === 'arrow-duel'
+      ? familiar15ArrowDuelStartingPosition(puzzle)
+      : familiar15StartingPosition(puzzle);
+    const flipped = startingPosition.turn() === 'b';
     await waitFor(element(by.id('practice-prompt-side-glyph'))).toExist().withTimeout(10000);
-    await waitFor(element(by.text(
-      mode === 'arrow-duel'
-        ? `For ${flipped ? 'black' : 'white'}, between the two arrows.`
-        : `For ${flipped ? 'black' : 'white'}.`
-    ))).toExist().withTimeout(10000);
     const moves = mode === 'arrow-duel'
       ? [puzzle.stockfishBestMove]
       : familiar15UserMoves(puzzle);
@@ -137,11 +163,15 @@ async function runGameplaySoak(mode) {
       await waitFor(element(by.id('arrow-duel-candidate-overlay'))).toExist().withTimeout(15000);
     }
     for (const move of moves) {
-      await waitFor(element(by.id('board-input-blocker'))).not.toExist().withTimeout(15000);
       const startedAt = Date.now();
       await playBoardMove('session-board', move, flipped);
       await waitFor(element(by.id('move-feedback-overlay'))).toExist().withTimeout(10000);
       latenciesMs.push(Date.now() - startedAt);
+      // Do not poll visibility while the 800 ms feedback overlay is expected
+      // to remain on screen. EarlGrey rasterizes the hierarchy for each
+      // visibility poll, and those test-only CG buffers can dwarf app memory
+      // during a soak. One post-settle assertion still proves the transition.
+      await sleep(FEEDBACK_SETTLE_MS);
       await waitFor(element(by.id('move-feedback-overlay'))).not.toExist().withTimeout(15000);
     }
 
@@ -204,8 +234,8 @@ function assertGameplayResourceBudget(label, samples) {
   assertResourceGrowth({
     label,
     samples,
-    peakRssBudgetKb: GAMEPLAY_PEAK_RSS_BUDGET_KB,
-    finalRssBudgetKb: GAMEPLAY_FINAL_RSS_BUDGET_KB,
+    peakNonCgBudgetKb: GAMEPLAY_PEAK_NON_CG_BUDGET_KB,
+    finalNonCgBudgetKb: GAMEPLAY_FINAL_NON_CG_BUDGET_KB,
   });
 
   const tailSamples = samples.filter((sample) => sample.completed >= COMPLETED_PUZZLE_TARGET / 2);
@@ -213,12 +243,12 @@ function assertGameplayResourceBudget(label, samples) {
   if (!tailBaseline) {
     throw new Error(`${label} resource soak did not capture a tail baseline`);
   }
-  const tailPeakGrowthKb = Math.max(...tailSamples.map((sample) => sample.rssKb))
-    - tailBaseline.rssKb;
-  if (tailPeakGrowthKb > GAMEPLAY_TAIL_RSS_BUDGET_KB) {
+  const tailPeakGrowthKb = Math.max(...tailSamples.map((sample) => sample.nonCgDirtyKb))
+    - tailBaseline.nonCgDirtyKb;
+  if (tailPeakGrowthKb > GAMEPLAY_TAIL_NON_CG_BUDGET_KB) {
     throw new Error(
-      `${label} tail RSS grew ${tailPeakGrowthKb} KB, exceeding `
-      + `${GAMEPLAY_TAIL_RSS_BUDGET_KB} KB after ${tailBaseline.completed} puzzles`
+      `${label} tail non-CG footprint grew ${tailPeakGrowthKb} KB, exceeding `
+      + `${GAMEPLAY_TAIL_NON_CG_BUDGET_KB} KB after ${tailBaseline.completed} puzzles`
     );
   }
 }
@@ -226,26 +256,33 @@ function assertGameplayResourceBudget(label, samples) {
 function assertResourceGrowth({
   label,
   samples,
-  peakRssBudgetKb,
-  finalRssBudgetKb,
+  peakNonCgBudgetKb,
+  finalNonCgBudgetKb,
 }) {
   if (samples.length < 2) {
     throw new Error(`${label} resource soak needs at least two samples`);
   }
+  const processIds = new Set(samples.map((sample) => sample.pid));
+  if (processIds.size !== 1) {
+    throw new Error(`${label} process changed during the resource soak`);
+  }
   const baseline = samples[0];
   const final = samples[samples.length - 1];
-  const peakRssGrowthKb = Math.max(...samples.map((sample) => sample.rssKb)) - baseline.rssKb;
-  const finalRssGrowthKb = final.rssKb - baseline.rssKb;
+  const peakNonCgGrowthKb = Math.max(...samples.map((sample) => sample.nonCgDirtyKb))
+    - baseline.nonCgDirtyKb;
+  const finalNonCgGrowthKb = final.nonCgDirtyKb - baseline.nonCgDirtyKb;
   const peakThreadGrowth = Math.max(...samples.map((sample) => sample.threads)) - baseline.threads;
 
-  if (peakRssGrowthKb > peakRssBudgetKb) {
+  if (peakNonCgGrowthKb > peakNonCgBudgetKb) {
     throw new Error(
-      `${label} peak RSS grew ${peakRssGrowthKb} KB, exceeding ${peakRssBudgetKb} KB`
+      `${label} peak non-CG footprint grew ${peakNonCgGrowthKb} KB, exceeding `
+      + `${peakNonCgBudgetKb} KB`
     );
   }
-  if (finalRssGrowthKb > finalRssBudgetKb) {
+  if (finalNonCgGrowthKb > finalNonCgBudgetKb) {
     throw new Error(
-      `${label} final RSS grew ${finalRssGrowthKb} KB, exceeding ${finalRssBudgetKb} KB`
+      `${label} final non-CG footprint grew ${finalNonCgGrowthKb} KB, exceeding `
+      + `${finalNonCgBudgetKb} KB`
     );
   }
   if (peakThreadGrowth > THREAD_GROWTH_BUDGET) {
@@ -265,7 +302,7 @@ function median(values) {
 
 function requireSimulatorUdid() {
   const detoxDeviceUdid = typeof device === 'undefined' ? '' : String(device.id ?? '').trim();
-  const configuredUdid = process.env.CHESSTICIZE_PERF_SIMULATOR_UDID?.trim();
+  const configuredUdid = process.env.CHESSTICIZE_RESOURCE_SOAK_SIMULATOR_UDID?.trim();
   const simulatorUdid = detoxDeviceUdid || configuredUdid;
   if (!simulatorUdid) {
     throw new Error(
@@ -280,7 +317,7 @@ function readAppResourceSample() {
   const simulatorUdid = requireSimulatorUdid();
   const rows = execFileSync(
     '/bin/ps',
-    ['-axo', 'pid=,rss=,thcount=,command='],
+    ['-axo', 'pid=,rss=,command='],
     { encoding: 'utf8' }
   ).split('\n');
   const row = rows.find((candidate) =>
@@ -290,13 +327,27 @@ function readAppResourceSample() {
   if (!row) {
     throw new Error(`Could not find Chessticize process for simulator ${simulatorUdid}`);
   }
-  const match = row.trim().match(/^(\d+)\s+(\d+)\s+(\d+)\s+/);
+  const match = row.trim().match(/^(\d+)\s+(\d+)\s+/);
   if (!match) {
     throw new Error(`Could not parse Chessticize resources from ${row}`);
   }
+  const pid = Number(match[1]);
+  const threadRows = execFileSync(
+    '/bin/ps',
+    ['-M', '-p', String(pid)],
+    { encoding: 'utf8' }
+  ).trim().split('\n').slice(1);
+  const {
+    totalDirtyKb,
+    cgRasterDirtyKb,
+    nonCgDirtyKb,
+  } = sampleProcessFootprint(pid);
   return {
-    pid: Number(match[1]),
+    pid,
     rssKb: Number(match[2]),
-    threads: Number(match[3]),
+    threads: threadRows.length,
+    totalDirtyKb,
+    cgRasterDirtyKb,
+    nonCgDirtyKb,
   };
 }

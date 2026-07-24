@@ -13,7 +13,7 @@ const {
 } = require("../src/platform/testLaunchConfig");
 
 describe("test launch configuration", () => {
-  it("bridges the deterministic puzzle-selection seed from iOS launch arguments", () => {
+  it("bridges deterministic practice values from iOS launch arguments", () => {
     const iosModule = fs.readFileSync(
       path.resolve(__dirname, "../ios/ChessticizeMobile/ChessticizeTestLaunchConfig.m"),
       "utf8"
@@ -24,6 +24,18 @@ describe("test launch configuration", () => {
     );
     expect(iosModule).toContain(
       'constants[@"puzzleSelectionSeed"] = puzzleSelectionSeed;'
+    );
+    expect(iosModule).toContain(
+      'processArgumentValueForName:@"chessticizeStandardTargetCorrect"'
+    );
+    expect(iosModule).toContain(
+      'constants[@"standardTargetCorrect"] = standardTargetCorrect;'
+    );
+    expect(iosModule).toContain(
+      'processArgumentValueForName:@"chessticizeArrowDuelTargetCorrect"'
+    );
+    expect(iosModule).toContain(
+      'constants[@"arrowDuelTargetCorrect"] = arrowDuelTargetCorrect;'
     );
   });
 

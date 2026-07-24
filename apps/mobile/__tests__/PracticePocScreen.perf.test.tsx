@@ -5,9 +5,13 @@ import TestRenderer, { act } from "react-test-renderer";
 // (see the doNotFake option below).
 const performance = (globalThis as unknown as { performance: { now(): number } }).performance;
 import { PracticePocScreen } from "../src/components/PracticePocScreen";
-import { createMobilePracticeService } from "../src/platform/mobilePractice";
+import {
+  configureMobilePracticePuzzleSource,
+  createMobilePracticeService
+} from "../src/platform/mobilePractice";
 import { createTestMobilePlatformCapabilities } from "../src/testing/testMobilePlatformCapabilities";
-import type { PracticeService } from "../../../packages/storage/src/practice-service";
+import { MemoryStore } from "../../../packages/storage/src/memory-store";
+import { PracticeService } from "../../../packages/storage/src/practice-service";
 import type { SprintMode, SprintState } from "../../../packages/core/src/index";
 
 jest.setTimeout(600000);
@@ -17,9 +21,9 @@ const BUCKET = 10;
 
 const ACTIVE_SPRINT_SCAN_METHODS = [
   "getHistoryView",
-  "listHistory",
+  "listAttempts",
   "listPlayedRatings",
-  "countEligibleSprintPuzzles",
+  "countPuzzles",
   "pruneOrphanedReviewQueue",
   "listSprintSessions",
   "getDueReviews",
@@ -29,7 +33,6 @@ const ACTIVE_SPRINT_SCAN_METHODS = [
 
 type ServiceProbe = {
   calls: number;
-  totalMs: number;
 };
 
 type ServiceProbes = Map<string, ServiceProbe>;
@@ -105,7 +108,6 @@ function snapshotProbes(probes: ServiceProbes): ServiceProbes {
 function resetProbes(probes: ServiceProbes): void {
   for (const probe of probes.values()) {
     probe.calls = 0;
-    probe.totalMs = 0;
   }
 }
 
@@ -118,6 +120,65 @@ function nonZeroProbeDeltas(probes: ServiceProbes, before: ServiceProbes): strin
     const calls = value.calls - previous.calls;
     return calls === 0 ? [] : [`${key}: ${calls}`];
   });
+}
+
+class ScanCountingMemoryStore extends MemoryStore {
+  readonly probes: ServiceProbes = new Map(
+    ACTIVE_SPRINT_SCAN_METHODS.map((method) => [method, { calls: 0 }])
+  );
+
+  override getHistoryView(...args: Parameters<MemoryStore["getHistoryView"]>) {
+    this.record("getHistoryView");
+    return super.getHistoryView(...args);
+  }
+
+  override listAttempts(...args: Parameters<MemoryStore["listAttempts"]>) {
+    this.record("listAttempts");
+    return super.listAttempts(...args);
+  }
+
+  override listPlayedRatings(...args: Parameters<MemoryStore["listPlayedRatings"]>) {
+    this.record("listPlayedRatings");
+    return super.listPlayedRatings(...args);
+  }
+
+  override countPuzzles(...args: Parameters<MemoryStore["countPuzzles"]>) {
+    this.record("countPuzzles");
+    return super.countPuzzles(...args);
+  }
+
+  override pruneOrphanedReviewQueue(...args: Parameters<MemoryStore["pruneOrphanedReviewQueue"]>) {
+    this.record("pruneOrphanedReviewQueue");
+    return super.pruneOrphanedReviewQueue(...args);
+  }
+
+  override listSprintSessions(...args: Parameters<MemoryStore["listSprintSessions"]>) {
+    this.record("listSprintSessions");
+    return super.listSprintSessions(...args);
+  }
+
+  override getDueReviews(...args: Parameters<MemoryStore["getDueReviews"]>) {
+    this.record("getDueReviews");
+    return super.getDueReviews(...args);
+  }
+
+  override listReviewQueue(...args: Parameters<MemoryStore["listReviewQueue"]>) {
+    this.record("listReviewQueue");
+    return super.listReviewQueue(...args);
+  }
+
+  override getDueReviewItems(...args: Parameters<MemoryStore["getDueReviewItems"]>) {
+    this.record("getDueReviewItems");
+    return super.getDueReviewItems(...args);
+  }
+
+  private record(method: typeof ACTIVE_SPRINT_SCAN_METHODS[number]): void {
+    const probe = this.probes.get(method);
+    if (!probe) {
+      throw new Error(`Missing scan probe for ${method}`);
+    }
+    probe.calls += 1;
+  }
 }
 
 describe("sprint late-game performance", () => {
@@ -153,26 +214,15 @@ describe("sprint late-game performance", () => {
   });
 
   it.each(["standard", "arrow_duel"] as const)("component-level: %s active gameplay avoids growing storage scans", async (mode) => {
-    const service = createMobilePracticeService("random1000");
+    const store = new ScanCountingMemoryStore();
+    const service = new PracticeService(store);
+    configureMobilePracticePuzzleSource(service, "random1000");
     service.startSprint(longSprintConfig(mode), new Date(Date.now()).toISOString());
 
-    // Count storage reads whose result size can grow with attempt history,
-    // completed sessions, or the review queue.
-    const probes: ServiceProbes = new Map();
-    for (const method of ACTIVE_SPRINT_SCAN_METHODS) {
-      const original = (service as any)[method].bind(service);
-      probes.set(method, { calls: 0, totalMs: 0 });
-      (service as any)[method] = (...args: unknown[]) => {
-        const probe = probes.get(method)!;
-        probe.calls += 1;
-        const start = performance.now();
-        try {
-          return original(...args);
-        } finally {
-          probe.totalMs += performance.now() - start;
-        }
-      };
-    }
+    // Observe the real PracticeStore boundary instead of replacing service
+    // methods. These reads can grow with attempt history, completed sessions,
+    // or the review queue.
+    const probes = store.probes;
     let lastSnapshot = snapshotProbes(probes);
     const perBucketProbeReport: string[] = [];
 
@@ -220,7 +270,7 @@ describe("sprint late-game performance", () => {
         const current = snapshotProbes(probes);
         const parts = [...current].map(([key, value]) => {
           const before = lastSnapshot.get(key)!;
-          return `${key}: ${value.calls - before.calls} calls / ${(value.totalMs - before.totalMs).toFixed(1)}ms`;
+          return `${key}: ${value.calls - before.calls} calls`;
         });
         perBucketProbeReport.push(`puzzles ${solved + 2 - BUCKET}-${solved + 1}: ${parts.join(", ")}`);
         lastSnapshot = current;

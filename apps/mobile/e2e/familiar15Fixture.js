@@ -35,6 +35,10 @@ function familiar15StartingPosition(puzzle) {
   return position;
 }
 
+function familiar15ArrowDuelStartingPosition(puzzle) {
+  return new Chess(puzzle.initialFen);
+}
+
 function familiar15UserMoves(puzzle, { stopBeforePromotion = false } = {}) {
   const manifestEntry = manifestEntriesById.get(puzzle.id);
   if (!manifestEntry) {
@@ -63,6 +67,7 @@ const FIRST_STANDARD_FEEDBACK_MOVES = Object.freeze({
 module.exports = {
   FAMILIAR_15_PUZZLES,
   FIRST_STANDARD_FEEDBACK_MOVES,
+  familiar15ArrowDuelStartingPosition,
   familiar15StartingPosition,
   familiar15UserMoves,
 };

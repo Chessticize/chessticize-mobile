@@ -16,8 +16,16 @@ RCT_EXPORT_MODULE();
 {
   NSString *testNowMs = [self processArgumentValueForName:@"chessticizeTestNowMs"];
   NSString *puzzleSelectionSeed = [self processArgumentValueForName:@"chessticizePuzzleSelectionSeed"];
+  NSString *standardTargetCorrect = [self processArgumentValueForName:@"chessticizeStandardTargetCorrect"];
+  NSString *arrowDuelTargetCorrect = [self processArgumentValueForName:@"chessticizeArrowDuelTargetCorrect"];
   BOOL storeAssetCapture = [self hasProcessArgumentNamed:@"chessticizeStoreAssetCapture"];
-  if (testNowMs == nil && puzzleSelectionSeed == nil && !storeAssetCapture) {
+  if (
+    testNowMs == nil
+    && puzzleSelectionSeed == nil
+    && standardTargetCorrect == nil
+    && arrowDuelTargetCorrect == nil
+    && !storeAssetCapture
+  ) {
     return @{};
   }
   NSMutableDictionary *constants = [NSMutableDictionary dictionary];
@@ -26,6 +34,12 @@ RCT_EXPORT_MODULE();
   }
   if (puzzleSelectionSeed != nil) {
     constants[@"puzzleSelectionSeed"] = puzzleSelectionSeed;
+  }
+  if (standardTargetCorrect != nil) {
+    constants[@"standardTargetCorrect"] = standardTargetCorrect;
+  }
+  if (arrowDuelTargetCorrect != nil) {
+    constants[@"arrowDuelTargetCorrect"] = arrowDuelTargetCorrect;
   }
   if (storeAssetCapture) {
     constants[@"storeAssetCapture"] = @YES;

@@ -60,9 +60,12 @@ DETOX_IOS_DEVICE="iPhone 17-Detox" pnpm mobile:e2e:resource-soak:ios
 
 The soak completes 50 Standard puzzles, 50 Arrow Duel puzzles, and 20 repeated
 Stockfish completion/cancellation cycles in stable app processes. It samples
-RSS and thread count only after each scenario's warmup and fails if the
-allocated simulator UDID is unavailable, so missing resource evidence cannot
-silently pass.
+process footprint and thread count only after each scenario's warmup. The
+footprint gate excludes `CG raster data`, because Detox/EarlGrey's hit-testing
+rasterizes the full simulator window and charges those test-only buffers to the
+app process; raw RSS remains in the report for diagnosis. The soak fails if the
+allocated simulator UDID or footprint categories are unavailable, so missing
+resource evidence cannot silently pass.
 This is a targeted local diagnostic, not a routine GitHub Actions gate.
 
 ## Android Offline Practice Validation
