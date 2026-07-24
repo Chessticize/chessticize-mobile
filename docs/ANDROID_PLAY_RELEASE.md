@@ -12,6 +12,7 @@ stopped before the AAB build because a generic doctor checked an emulator-only
 runtime library. Version code 6 completed the Android 1.2 release operation for
 the current Play track: corresponding source, Play delivery, owner
 physical-device smoke, and the Play-signed GitHub APK mirror are complete.
+Version code 7 is the proposed Android 1.2.1 ordinary-delta candidate.
 This runbook deliberately separates
 repository-owned checks from owner-only Play Console evidence. Missing signing material,
 protected-environment setup, or any console result is a blocker; never replace
@@ -151,15 +152,28 @@ Do not move the build-6 tag, rebuild its AAB, replace its public source
 manifest or mirrored assets, or reuse version code 6. The public Release has
 exactly the required source manifest, Play-signed APK, and checksum.
 
+Build 7 is the proposed Android 1.2.1 ordinary-delta candidate:
+
+- annotated tag: `android-v1.2.1-build-7`;
+- primary user-visible change: keep Practice, History, Review, and new Run
+  startup responsive with large puzzle histories;
+- validation scope: exact-head fast checks, the protected signed-candidate and
+  corresponding-source job, and owner physical-device delta smoke;
+- current state: version preparation; tag, candidate workflow, Play upload,
+  owner smoke, and APK mirror pending.
+
+Do not create or publish the build-7 tag until its version PR is merged and the
+approved Android release-note file is present on the clean candidate commit.
+
 ## Canonical identity
 
 - Application ID: `com.chessticize.mobile`
-- Public version: `apps/mobile/release-version.json` (`1.2`)
-- Android version code: `apps/mobile/release-version.json` (`6`)
+- Public version: `apps/mobile/release-version.json` (`1.2.1`)
+- Android version code: `apps/mobile/release-version.json` (`7`)
 - iOS build number: `apps/mobile/release-version.json` (`1`, independent from Android)
 - Supported ABIs: `arm64-v8a`, `x86_64`
 - Target SDK: API 36
-- Required source tag before any Play track upload: `android-v1.2.0-build-6`
+- Required source tag before any Play track upload: `android-v1.2.1-build-7`
 
 Android `versionCode` must increase for every later Play upload. The public
 version must continue to match iOS. Settings reads `versionName` and
@@ -263,8 +277,8 @@ complete.
 
 For a bounded follow-up release:
 
-For Android version `1.2` build `6`, release notes and this support document must
-name the canonical source tag `android-v1.2.0-build-6` and the public source
+For Android version `1.2.1` build `7`, release notes and this support document must
+name the canonical source tag `android-v1.2.1-build-7` and the public source
 repository `https://github.com/Chessticize/chessticize-mobile`. The evidence
 must bind the annotated tag, commit, application ID, version, version code, and
 AAB SHA-256 before Play distribution. A missing or lightweight public tag, a
