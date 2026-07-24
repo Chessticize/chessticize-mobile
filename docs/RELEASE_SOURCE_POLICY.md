@@ -124,8 +124,8 @@ an unexplained failure with a successful rerun.
   `COPYING.txt`, and Stockfish `AUTHORS`, plus native debug symbols.
 - The Play candidate was built from the exact `android-v<version>-build-<code>`
   tagged commit and every Play track references the same AAB/version code.
-- After Play publishes the Android build, finish the release by downloading its
-  universal APK from Play and mirroring it through
+- After Play processes the Android build and exposes its universal APK, finish
+  the GitHub binary release by mirroring it through
   `docs/ANDROID_GITHUB_RELEASE.md`. The GitHub Release must then contain exactly
   the source manifest, Play-signed APK, and checksum, and the mirror receipt
   must be retained.

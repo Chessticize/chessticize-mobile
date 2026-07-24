@@ -840,7 +840,7 @@ describe('Android GitHub release automation', () => {
     expect(runbook).toContain('Play-first APK mirror');
     expect(runbook).toContain('github.token');
     expect(runbook).toContain('Generated APKs API');
-    expect(runbook).toContain('not a complete Android release');
+    expect(runbook).toContain('not a complete GitHub binary');
     expect(runbook).toContain('exactly three public assets');
     expect(runbook).toContain('APK mirror pending');
     expect(runbook).not.toContain('ANDROID_GITHUB_RELEASE_TOKEN');

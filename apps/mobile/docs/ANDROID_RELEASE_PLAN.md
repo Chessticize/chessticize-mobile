@@ -505,17 +505,20 @@ Pre-launch Report triage, Data Safety/privacy review, license/source checks,
 ### ANDROID-12 — Simplified post-Play APK mirror
 
 **Status:** Reframed by ADR-0009. Google Play remains the primary binary
-channel. After the owner publishes the Play build, one manual CI job downloads
-the Play-generated universal APK and attaches it with a
+channel. After Play processes the build and exposes its universal APK, one
+manual CI job downloads the Play-generated file and attaches it with a
 SHA-256 checksum to the already-public corresponding-source Release. The job
 does not rebuild, rerun product tests, consume owner evidence, or use separate
 prepare/publish phases. A temporary GitHub token and additional publication
 environments are not release dependencies. The current policy dispatches this
-job after Play publication without a physical-device prerequisite. Build 6
+job after Play processing without a physical-device prerequisite. Build 6
 completed the current Play track, its then-required owner smoke, and Play-signed
 GitHub APK mirror on 2026-07-24; the
 published build-1/build-4 releases and failed-validation build-2/build-3/
 build-5 records remain immutable historical evidence.
+Build 7 completed the GitHub binary mirror while its Closed testing review
+continued, proving that store review and binary mirroring are independent
+states once the Generated APKs API exposes the artifact.
 
 ### ANDROID-13 — Validate the release candidate and launch
 
@@ -539,8 +542,8 @@ source published on GitHub and proportionate evidence.
   first launch or when Play requires or the corresponding configuration changes.
 - Promote the validated AAB to Production at 100 percent.
 - Confirm the signed-candidate workflow published the matching source Release
-  using the built-in token. After Play publication, dispatch the single
-  post-Play APK mirror job.
+  using the built-in token. After Play processing exposes the generated APK,
+  dispatch the single post-Play APK mirror job without waiting for track review.
 - Record the final Play version code, GitHub source Release URL, AAB checksum,
   exact commit SHA, and selected validation scope.
 
