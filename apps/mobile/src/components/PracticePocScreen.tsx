@@ -3774,7 +3774,7 @@ function SprintRulesGuide({
 }): React.JSX.Element {
   return (
     <View
-      accessibilityLabel={`Your first Sprint. Solve ${presentation.targetCorrect} to pass before ${presentation.durationLabel} ends. ${presentation.maxMistakes} mistakes ends the Sprint. Wrong answers count as attempts, not solved puzzles.`}
+      accessibilityLabel={`Your first Sprint. Solve ${presentation.targetCorrect} puzzles to pass before ${presentation.durationLabel} ends. The Sprint ends after ${presentation.maxMistakes} mistakes. For example, solving ${presentation.targetCorrect} puzzles with one wrong answer means ${presentation.targetCorrect} solved and ${presentation.targetCorrect + 1} attempted.`}
       style={styles.sprintRulesGuide}
       testID="practice-sprint-rules-guide"
     >
@@ -3799,8 +3799,8 @@ function SprintRulesGuide({
       <View style={styles.sprintRulesList}>
         <SprintRuleRow
           badge={String(presentation.targetCorrect)}
-          detail="Only solved puzzles move this goal forward."
-          label="Puzzles solved"
+          detail={`Solve ${presentation.targetCorrect} puzzles to pass the Sprint.`}
+          label="Puzzles to pass"
         />
         <SprintRuleRow
           badge={presentation.durationLabel}
@@ -3816,7 +3816,7 @@ function SprintRulesGuide({
       </View>
 
       <Text style={styles.sprintRulesGuideFootnote}>
-        Wrong answers still count toward Accuracy and Attempts, but not toward the solved goal.
+        Example: {presentation.targetCorrect} solved + 1 wrong = {presentation.targetCorrect + 1} attempted.
       </Text>
     </View>
   );

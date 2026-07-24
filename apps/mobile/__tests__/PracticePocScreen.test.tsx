@@ -992,7 +992,16 @@ describe("PracticePocScreen", () => {
       "Solve 15 to pass"
     );
     expect(collectText(findByTestId(renderer, "practice-sprint-rules-guide"))).toContain(
-      "Wrong answers still count toward Accuracy and Attempts, but not toward the solved goal."
+      "Puzzles to pass"
+    );
+    expect(collectText(findByTestId(renderer, "practice-sprint-rules-guide"))).toContain(
+      "Solve 15 puzzles to pass the Sprint."
+    );
+    expect(collectText(findByTestId(renderer, "practice-sprint-rules-guide"))).toContain(
+      "Example: 15 solved + 1 wrong = 16 attempted."
+    );
+    expect(findByTestId(renderer, "practice-sprint-rules-guide").props.accessibilityLabel).toContain(
+      "The Sprint ends after 3 mistakes."
     );
 
     press(renderer, "practice-sprint-rules-dismiss");
