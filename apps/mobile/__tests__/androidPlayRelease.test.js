@@ -525,7 +525,7 @@ function signedAabFixture({ appendUnsigned = false, addUnexpectedSigner = false 
 }
 
 describe('Android Play release contract', () => {
-  it('pins the current Play release to public version 1.2 build 5', () => {
+  it('pins the current Play release to public version 1.2 build 6', () => {
     const sourceTag = canonicalAndroidSourceTag(
       releaseVersion.publicVersion,
       releaseVersion.androidVersionCode,
@@ -555,10 +555,10 @@ describe('Android Play release contract', () => {
     expect(releaseVersion).toEqual(
       expect.objectContaining({
         publicVersion: '1.2',
-        androidVersionCode: 5,
+        androidVersionCode: 6,
       }),
     );
-    expect(sourceTag).toBe('android-v1.2.0-build-5');
+    expect(sourceTag).toBe('android-v1.2.0-build-6');
     expect(ownerEvidenceExample.candidate).toEqual(
       expect.objectContaining(expectedIdentityBinding),
     );
@@ -571,7 +571,7 @@ describe('Android Play release contract', () => {
       ownerEvidenceExample.sourceRelease.reference.endsWith(sourceTag),
     ).toBe(true);
     expect(runbook).toContain(
-      'Android version code: `apps/mobile/release-version.json` (`5`)',
+      'Android version code: `apps/mobile/release-version.json` (`6`)',
     );
     for (const value of [
       'The build-1 source-publication gate is complete.',
@@ -1850,9 +1850,12 @@ describe('Android Play release contract', () => {
       '.github/workflows/mobile-android-release-candidate.yml',
     );
     const runtimeInstall = 'sudo apt-get install --yes libpulse0';
-    const doctor = 'run: pnpm mobile:doctor:android';
+    const doctor = 'run: pnpm mobile:doctor:android -- --artifact-only';
 
     expect(workflow).not.toContain(runtimeInstall);
+    expect(workflow).toContain(
+      'run: pnpm mobile:install:android-sdk -- --artifact-only',
+    );
     expect(workflow).toContain(doctor);
     expect(workflow).toContain('Build production-signed App Bundle');
   });

@@ -7,8 +7,10 @@ fixed. Version code 2 produced a valid signed candidate, but exact-tag Android
 validation found a stale adaptive E2E dependency on a deliberately removed
 public control. Version code 3 fixed that stale UI dependency, but exact-tag API
 24 validation exposed a launch/package-manager state race in the evidence
-harness. Version code 4 became the published Android 1.1 release. The next
-candidate advances the public version to 1.2 and the Android build number to 5.
+harness. Version code 4 became the published Android 1.1 release. Version code 5
+stopped before the AAB build because a generic doctor checked an emulator-only
+runtime library. The next candidate keeps public version 1.2 and advances the
+Android build number to 6.
 This runbook deliberately separates
 repository-owned checks from owner-only Play Console evidence. Missing signing material,
 protected-environment setup, or any console result is a blocker; never replace
@@ -99,15 +101,27 @@ Build 4 is the immutable published Android 1.1 release:
 Do not move the build-4 tag, rebuild its AAB, replace its public artifacts, or
 reuse version code 4.
 
+Build 5 is an immutable failed candidate and was never distributed:
+
+- annotated tag: `android-v1.2.0-build-5`, targeting
+  `f4c5c589309ab6c1fbd1e89227da26000ba7b5e9`;
+- failed protected candidate workflow run:
+  [`30065085901`](https://github.com/Chessticize/chessticize-mobile/actions/runs/30065085901);
+- the generic Android doctor stopped on missing emulator-only `libpulse.so.0`
+  before Gradle built an AAB.
+
+No build-5 GitHub source Release or Play upload was created. Do not move or
+reuse its tag or version code.
+
 ## Canonical identity
 
 - Application ID: `com.chessticize.mobile`
 - Public version: `apps/mobile/release-version.json` (`1.2`)
-- Android version code: `apps/mobile/release-version.json` (`5`)
+- Android version code: `apps/mobile/release-version.json` (`6`)
 - iOS build number: `apps/mobile/release-version.json` (`1`, independent from Android)
 - Supported ABIs: `arm64-v8a`, `x86_64`
 - Target SDK: API 36
-- Required source tag before any Play track upload: `android-v1.2.0-build-5`
+- Required source tag before any Play track upload: `android-v1.2.0-build-6`
 
 Android `versionCode` must increase for every later Play upload. The public
 version must continue to match iOS. Settings reads `versionName` and
@@ -152,12 +166,13 @@ dispatching another full native run.
    candidate through any Play testing track.
 2. Record passing exact-head fast checks and the selected risk-scoped Android
    validation before dispatch. The protected candidate workflow deliberately
-   does not repeat product tests or run an emulator.
+   does not repeat product tests or install, check, or run an emulator.
 3. Dispatch `Mobile Android release candidate` on that exact ref. The workflow
-   materializes the upload keystore only in runner temp, builds one signed AAB,
-   verifies every non-signature AAB entry is covered by exactly one approved
-   JAR signer, and retains the AAB plus `android-source-manifest.json` for 30
-   days.
+   installs only the pinned SDK packages required for the AAB, runs the
+   artifact-only build doctor, materializes the upload keystore only in runner
+   temp, builds one signed AAB, verifies every non-signature AAB entry is
+   covered by exactly one approved JAR signer, and retains the AAB plus
+   `android-source-manifest.json` for 30 days.
 4. The verifier requires `com.chessticize.mobile`, the canonical version name
    and version code, only the two approved ABIs, `PAGE_ALIGNMENT_16K`, at least
    16 KB ELF LOAD alignment for every packaged `.so`, native debug symbols,
@@ -193,8 +208,8 @@ Play-generated universal APK and its SHA-256 checksum.
 
 For a bounded follow-up release:
 
-For Android version `1.2` build `5`, release notes and this support document must
-name the canonical source tag `android-v1.2.0-build-5` and the public source
+For Android version `1.2` build `6`, release notes and this support document must
+name the canonical source tag `android-v1.2.0-build-6` and the public source
 repository `https://github.com/Chessticize/chessticize-mobile`. The evidence
 must bind the annotated tag, commit, application ID, version, version code, and
 AAB SHA-256 before Play distribution. A missing or lightweight public tag, a
