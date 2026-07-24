@@ -6220,6 +6220,38 @@ describe("PracticePocScreen", () => {
     });
   });
 
+  it("does not start deferred Stockfish diagnostics after leaving the panel", async () => {
+    const systemBack = createTestSystemBackSource("android");
+    const stockfish = createScriptedStockfishTransport(() => {});
+    let resolvePrewarm: ((ready: boolean) => void) | undefined;
+    const prewarm = jest.fn(() => new Promise<boolean>((resolve) => {
+      resolvePrewarm = resolve;
+    }));
+    const renderer = renderScreen({
+      stockfish: {
+        createTransport: () => stockfish.transport,
+        prewarm
+      },
+      systemBack
+    });
+
+    press(renderer, "settings-tab");
+    press(renderer, "settings-stockfish-diagnostics");
+    expect(prewarm).toHaveBeenCalledTimes(1);
+    expect(systemBack.invoke()).toBe(true);
+    expect(findByTestId(renderer, "settings-panel")).toBeTruthy();
+
+    await act(async () => {
+      resolvePrewarm?.(true);
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(stockfish.commands.some((command) => command.startsWith("go depth "))).toBe(false);
+    expect(stockfish.listenerCount()).toBe(0);
+  });
+
   it("reviews Arrow Duel mistakes with analysis blunder arrows and a forced punishment line", async () => {
     const preview = createMobilePracticeService("familiar15");
     const previewState = preview.startSprint({
@@ -7149,7 +7181,7 @@ describe("PracticePocScreen", () => {
 
 function createScriptedStockfishTransport(
   onCommand: (command: string, emit: (line: string) => void) => void
-): { commands: string[]; transport: UciEngineTransport } {
+): { commands: string[]; listenerCount: () => number; transport: UciEngineTransport } {
   const commands: string[] = [];
   const listeners = new Set<(line: string) => void>();
   const emit = (line: string) => {
@@ -7160,6 +7192,7 @@ function createScriptedStockfishTransport(
 
   return {
     commands,
+    listenerCount: () => listeners.size,
     transport: {
       start: jest.fn(async () => {}),
       send: jest.fn((command: string) => {

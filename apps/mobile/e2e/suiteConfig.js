@@ -32,7 +32,7 @@ const ANDROID_PROGRESS_BACKUP_RESTORE_TEST_MATCH = [
 ];
 const ANDROID_SYSTEM_BACK_TEST_MATCH = ['<rootDir>/e2e/android-system-back.e2e.js'];
 const ANDROID_REVIEW_REMINDERS_TEST_MATCH = ['<rootDir>/e2e/android-review-reminders.e2e.js'];
-const SPRINT_PERFORMANCE_TEST_MATCH = ['<rootDir>/e2e/sprint-performance.e2e.js'];
+const RESOURCE_SOAK_TEST_MATCH = ['<rootDir>/e2e/resource-soak.e2e.js'];
 // The practice suite waits on the real Stockfish bridge. Two concurrent iOS
 // simulators can make that analysis exceed the E2E timeout, so parallelism is
 // an explicit DETOX_MAX_WORKERS experiment rather than the default.
@@ -41,11 +41,11 @@ const DEFAULT_DETOX_MAX_WORKERS = 1;
 function resolveDetoxTestMatch(environment = process.env) {
   const captureStoreAssets = environment.CHESSTICIZE_CAPTURE_STORE_ASSETS === '1';
   const captureAdaptiveLayout = environment.CHESSTICIZE_CAPTURE_ADAPTIVE_LAYOUT === '1';
-  const captureSprintPerformance = environment.CHESSTICIZE_CAPTURE_SPRINT_PERFORMANCE === '1';
+  const runResourceSoak = environment.CHESSTICIZE_RUN_RESOURCE_SOAK === '1';
   const activeSuite = environment.DETOX_ACTIVE_SUITE;
 
-  if ([captureStoreAssets, captureAdaptiveLayout, captureSprintPerformance, Boolean(activeSuite)].filter(Boolean).length > 1) {
-    throw new Error('Active E2E and screenshot capture suites must run separately.');
+  if ([captureStoreAssets, captureAdaptiveLayout, runResourceSoak, Boolean(activeSuite)].filter(Boolean).length > 1) {
+    throw new Error('Active and opt-in E2E suites must run separately.');
   }
 
   if (captureStoreAssets) {
@@ -56,8 +56,8 @@ function resolveDetoxTestMatch(environment = process.env) {
     return ADAPTIVE_LAYOUT_TEST_MATCH;
   }
 
-  if (captureSprintPerformance) {
-    return SPRINT_PERFORMANCE_TEST_MATCH;
+  if (runResourceSoak) {
+    return RESOURCE_SOAK_TEST_MATCH;
   }
 
   if (activeSuite === 'all') {
@@ -165,7 +165,7 @@ module.exports = {
   ANDROID_PROGRESS_BACKUP_RESTORE_TEST_MATCH,
   ANDROID_SYSTEM_BACK_TEST_MATCH,
   ANDROID_REVIEW_REMINDERS_TEST_MATCH,
-  SPRINT_PERFORMANCE_TEST_MATCH,
+  RESOURCE_SOAK_TEST_MATCH,
   DEFAULT_DETOX_MAX_WORKERS,
   resolveDetoxTestMatch,
   resolveDetoxMaxWorkers

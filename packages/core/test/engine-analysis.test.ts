@@ -151,6 +151,62 @@ test("stops an active UCI search when analysis is cancelled", async () => {
   assert.equal(engine.listenerCount, 0);
 });
 
+test("repeated successful and cancelled analyses release every UCI listener", async () => {
+  const fen = "8/8/8/8/8/8/2Q5/k1K5 w - - 0 1";
+  const engine = new ControlledUciEngine();
+  let completedCount = 0;
+  let cancelledCount = 0;
+
+  for (let iteration = 0; iteration < 200; iteration += 1) {
+    const controller = new AbortController();
+    const commandOffset = engine.commands.length;
+    const analysis = analyzeFenWithUciEngine(engine, fen, {
+      depth: 8,
+      initialize: false,
+      multiPv: 1,
+      newGame: false,
+      shallowDepth: 0,
+      signal: controller.signal,
+      timeoutMs: 1000
+    });
+    await Promise.resolve();
+
+    assert.equal(engine.listenerCount, 1);
+    engine.emit("info depth 8 multipv 1 score cp 42 pv c2b1");
+
+    if (iteration % 2 === 0) {
+      engine.emit("bestmove c2b1");
+      const lines = await analysis;
+      completedCount += 1;
+
+      assert.equal(lines[0]?.move, "c2b1");
+      assert.deepEqual(engine.commands.slice(commandOffset), [
+        "stop",
+        `position fen ${fen}`,
+        "go depth 8"
+      ]);
+    } else {
+      controller.abort();
+      const lines = await analysis;
+      cancelledCount += 1;
+
+      assert.equal(lines[0]?.move, "c2b1");
+      assert.deepEqual(engine.commands.slice(commandOffset), [
+        "stop",
+        `position fen ${fen}`,
+        "go depth 8",
+        "stop"
+      ]);
+    }
+
+    assert.equal(engine.listenerCount, 0);
+  }
+
+  assert.equal(completedCount, 100);
+  assert.equal(cancelledCount, 100);
+  assert.ok(engine.maxListenerCount <= 1);
+});
+
 test("can analyze against an already warmed UCI engine without repeating initialization", async () => {
   const fen = "8/8/8/8/8/8/2Q5/k1K5 w - - 0 1";
   const engine = new FakeUciEngine([
@@ -541,9 +597,14 @@ class StagedFakeUciEngine implements UciEngineTransport {
 class ControlledUciEngine implements UciEngineTransport {
   readonly commands: string[] = [];
   private readonly listeners = new Set<(line: string) => void>();
+  private peakListenerCount = 0;
 
   get listenerCount(): number {
     return this.listeners.size;
+  }
+
+  get maxListenerCount(): number {
+    return this.peakListenerCount;
   }
 
   async start(): Promise<void> {}
@@ -554,6 +615,7 @@ class ControlledUciEngine implements UciEngineTransport {
 
   onLine(listener: (line: string) => void): () => void {
     this.listeners.add(listener);
+    this.peakListenerCount = Math.max(this.peakListenerCount, this.listeners.size);
     return () => {
       this.listeners.delete(listener);
     };

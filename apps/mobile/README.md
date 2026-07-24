@@ -50,6 +50,24 @@ pnpm mobile:e2e:test:ios
 
 The Detox build command runs `scripts/ios-build-for-detox.sh`. It checks Xcode simulator access, installs Ruby dependencies through Bundler when needed, runs CocoaPods, and then builds the iOS simulator app. Detox and simulator runs are final acceptance tools, not the default loop for ordinary UI state changes.
 
+For changes that can affect long-running Practice, the native board/storage
+boundary, or Stockfish lifecycle, run the opt-in resource soak against the
+dedicated Detox simulator after building:
+
+```sh
+DETOX_IOS_DEVICE="iPhone 17-Detox" pnpm mobile:e2e:resource-soak:ios
+```
+
+The soak completes 50 Standard puzzles, 50 Arrow Duel puzzles, and 20 repeated
+Stockfish completion/cancellation cycles in stable app processes. It samples
+process footprint and thread count only after each scenario's warmup. The
+footprint gate excludes `CG raster data`, because Detox/EarlGrey's hit-testing
+rasterizes the full simulator window and charges those test-only buffers to the
+app process; raw RSS remains in the report for diagnosis. The soak fails if the
+allocated simulator UDID or footprint categories are unavailable, so missing
+resource evidence cannot silently pass.
+This is a targeted local diagnostic, not a routine GitHub Actions gate.
+
 ## Android Offline Practice Validation
 
 Android builds support API 24 and newer, compile and target API 36, and package
