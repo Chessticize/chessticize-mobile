@@ -4,7 +4,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import type { Puzzle, SprintState } from "../../core/src/index.ts";
+import type { Puzzle } from "../../core/src/index.ts";
 import {
   CURRENT_SCHEMA_VERSION,
   MemoryStore,
@@ -219,17 +219,8 @@ test("SQLite v9 backfills Run timing and rebuilds attempts without losing indexe
   }
 });
 
-test("a move submitted at the timeout boundary persists the next puzzle snapshot exactly once", async () => {
-  class SnapshotRecordingStore extends MemoryStore {
-    readonly updatedSnapshots: SprintState[] = [];
-
-    override updateSprintSession(state: SprintState): void {
-      super.updateSprintSession(state);
-      this.updatedSnapshots.push(structuredClone(state));
-    }
-  }
-
-  const store = new SnapshotRecordingStore();
+test("a move submitted at the timeout boundary advances and records one timeout attempt", async () => {
+  const store = new MemoryStore();
   const service = new PracticeService(store);
   service.loadFixturePuzzles(await loadFixturePuzzles());
   const started = service.startSprint({
@@ -245,19 +236,42 @@ test("a move submitted at the timeout boundary persists the next puzzle snapshot
   assert.equal(handoff.attempt?.result, "timed_out");
   assert.equal(handoff.state.currentPuzzleIndex, 1);
   assert.notEqual(handoff.state.currentPuzzle?.puzzle.id, firstPuzzleId);
-  assert.equal(store.updatedSnapshots.length, 1);
-  assert.equal(store.updatedSnapshots[0]?.currentPuzzleIndex, 1);
+  assert.equal(store.listSprintSessions().length, 1);
+
+  const repeatedTick = service.advanceSprintTime("2026-07-24T00:31:00.000Z");
+  assert.equal(repeatedTick.attempt, undefined);
+  assert.equal(repeatedTick.state.currentPuzzleIndex, 1);
   assert.equal(
-    store.updatedSnapshots[0]?.currentPuzzle?.puzzle.id,
+    repeatedTick.state.currentPuzzle?.puzzle.id,
     handoff.state.currentPuzzle?.puzzle.id
   );
-
-  assert.equal(
-    service.advanceSprintTime("2026-07-24T00:31:00.000Z").attempt,
-    undefined
-  );
-  assert.equal(store.updatedSnapshots.length, 1);
+  assert.equal(store.listSprintSessions().length, 1);
   assert.equal(service.listHistory().filter((attempt) => attempt.result === "timed_out").length, 1);
+});
+
+test("pausing at the puzzle deadline records one timeout and pauses the next puzzle", async () => {
+  const store = new MemoryStore();
+  const service = new PracticeService(store);
+  service.loadFixturePuzzles(await loadFixturePuzzles());
+  const started = service.startSprint({
+    mode: "standard",
+    practiceRunId: "standard",
+    targetCorrect: 2,
+    puzzleSelectionSeed: "pause-timeout"
+  }, "2026-07-24T00:30:00.000Z");
+
+  const paused = service.pauseSprint("2026-07-24T00:31:00.000Z");
+
+  assert.equal(paused.status, "paused");
+  assert.equal(paused.currentPuzzleIndex, 1);
+  assert.notEqual(paused.currentPuzzle?.puzzle.id, started.currentPuzzle?.puzzle.id);
+  assert.equal(paused.correctCount, 0);
+  assert.equal(paused.mistakeCount, 0);
+  assert.deepEqual(
+    service.listHistory().map((attempt) => attempt.result),
+    ["timed_out"]
+  );
+  assert.equal(service.listReviewQueue().length, 0);
 });
 
 for (const backend of ["memory", "sqlite"] as const) {

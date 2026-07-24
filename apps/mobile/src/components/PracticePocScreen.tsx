@@ -46,6 +46,7 @@ import {
   normalizeHistoryAttemptDetail,
   PRACTICE_RUN_NAME_MAX_LENGTH,
   RATING_FLOOR,
+  resolvePuzzleTimingPolicy,
   reviewDueState,
   reviewDueLabel,
   reviewQueueForecast,
@@ -64,6 +65,7 @@ import type {
   EngineAnalysisLine,
   HistoryAttemptView,
   HistoryAttemptReplayAvailability,
+  HistoryAttentionFlag,
   HistoryPerformance,
   HistoryPerformancePoint,
   HistoryReviewStatus,
@@ -203,8 +205,6 @@ interface Props {
   standardTargetCorrect?: number;
   systemBack?: MobileSystemBackSource;
 }
-
-type HistoryAttentionFlag = "mistakes" | "unclear" | "slow" | "timed_out";
 
 export type CustomThemeSelection = {
   selectedThemes: readonly CustomThemeFilter[];
@@ -1489,7 +1489,7 @@ export function PracticePocScreen({
     submittedPuzzleId: string | null;
   }): Promise<void> {
     try {
-      const next = service.submitMove(move, nowIso());
+      const next = service.submitMove(move, captureLiveNowIso());
       const nextFeedback = (next.feedback as SessionFeedback) ?? null;
       if (next.attempt) {
         setUnclearPrompt(isUnclearAttemptEligible(next.attempt)
@@ -1513,6 +1513,33 @@ export function PracticePocScreen({
         samePuzzle: next.state.currentPuzzle?.puzzle.id === submittedPuzzleId,
         submittedFen
       });
+      if (
+        next.attempt?.result === "timed_out" &&
+        submittedPuzzle &&
+        submittedFen &&
+        next.state.status === "active" &&
+        next.state.currentPuzzle?.puzzle.id !== submittedPuzzleId
+      ) {
+        puzzleTimeoutInFlightRef.current = submittedPuzzleId;
+        resetBoardToFen(
+          submittedFen,
+          "puzzle-timeout-late-move",
+          submittedPuzzleId,
+          move
+        );
+        commitBoardFen(submittedFen);
+        boardVisualFenRef.current = submittedFen;
+        setFeedback(null);
+        setFeedbackPuzzleId(null);
+        showTimeoutSnapshot(
+          next.state,
+          submittedPuzzle,
+          submittedFen,
+          Math.floor((next.attempt.elapsedMs ?? 0) / 1000)
+        );
+        refreshState();
+        return;
+      }
       if (shouldAnimateSamePuzzleReply(next.state, nextFeedback, submittedPuzzleId)) {
         commitBoardFen(nextVisualFen);
         await animateSamePuzzleReply(next.state, nextFeedback);
@@ -2504,10 +2531,12 @@ export function PracticePocScreen({
     selectedConfig.targetCorrect,
     service
   ]);
-  const resolvedPuzzleTiming = state ? state.config.puzzleTiming ?? {
-    slowAfterSeconds: state.config.perPuzzleSeconds * 2,
-    timeoutAfterSeconds: state.config.perPuzzleSeconds * 3
-  } : null;
+  const resolvedPuzzleTiming = state
+    ? resolvePuzzleTimingPolicy(
+        state.config.puzzleTiming,
+        state.config.perPuzzleSeconds
+      )
+    : null;
   const currentPuzzleElapsedSeconds = state?.currentPuzzleStartedAt
     ? Math.max(0, Math.floor(
       (effectiveSessionNowMs - new Date(state.currentPuzzleStartedAt).getTime()) / 1000

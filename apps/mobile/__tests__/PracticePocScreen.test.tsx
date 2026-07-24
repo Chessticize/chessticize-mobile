@@ -1346,6 +1346,52 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "mock-chessboard").props.fen).not.toBe(firstPuzzleFen);
   });
 
+  it("uses the Timed out handoff when a board callback reaches the puzzle deadline first", async () => {
+    let wallClockMs = Date.parse("2026-07-23T12:00:00.000Z");
+    const service = createMobilePracticeService("random1000");
+    startSprintWithPuzzleTiming(
+      service,
+      {
+        durationSeconds: 300,
+        perPuzzleSeconds: 20,
+        puzzleTiming: {
+          slowAfterSeconds: 40,
+          timeoutAfterSeconds: 60
+        },
+        targetCorrect: 15,
+        maxMistakes: 3
+      },
+      new Date(wallClockMs).toISOString()
+    );
+    const renderer = renderScreen({
+      currentTimeMs: () => wallClockMs,
+      practiceService: service
+    });
+
+    press(renderer, "practice-resume-card");
+    await settleEntryPreview();
+    const firstPuzzleFen = findByTestId(renderer, "mock-chessboard").props.fen;
+    wallClockMs += 60_000;
+    await boardMove(renderer, "e2e6");
+
+    expect(collectText(findByTestId(renderer, "session-puzzle-timeout-overlay"))).toContain(
+      "Timed out"
+    );
+    expect(findByTestId(renderer, "board-input-blocker")).toBeTruthy();
+    expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(firstPuzzleFen);
+    expect(service.listHistory()).toHaveLength(1);
+    expect(service.listHistory()[0]).toMatchObject({
+      result: "timed_out",
+      timingStatus: "timed_out"
+    });
+
+    act(() => {
+      jest.advanceTimersByTime(800);
+    });
+    expect(() => findByTestId(renderer, "session-puzzle-timeout-overlay")).toThrow();
+    expect(findByTestId(renderer, "mock-chessboard").props.fen).not.toBe(firstPuzzleFen);
+  });
+
   it("ends the sprint without a puzzle timeout overlay when both deadlines are reached together", () => {
     let wallClockMs = Date.parse("2026-07-23T12:00:00.000Z");
     const service = createMobilePracticeService("random1000");

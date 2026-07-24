@@ -164,7 +164,7 @@ test("pause excludes paused time from puzzle timing and shifts its effective sta
     ratingBefore: 900,
     now: NOW
   });
-  const paused = pauseSprint(state, "2026-06-20T00:00:10.000Z");
+  const paused = pauseSprint(state, "2026-06-20T00:00:10.000Z").state;
   const resumed = resumeSprint(paused, "2026-06-20T00:00:40.000Z");
 
   assert.equal(resumed.currentPuzzleStartedAt, "2026-06-20T00:00:30.000Z");
@@ -172,6 +172,31 @@ test("pause excludes paused time from puzzle timing and shifts its effective sta
   assert.equal(advanceSprintTime(resumed, "2026-06-20T00:01:29.999Z").attempt, undefined);
   const timedOut = advanceSprintTime(resumed, "2026-06-20T00:01:30.000Z");
   assert.equal(timedOut.attempt?.elapsedMs, 60_000);
+});
+
+test("pausing at the puzzle deadline records the timeout before pausing the next puzzle", () => {
+  const state = startSprint({
+    config: buildSprintConfig({
+      mode: "standard",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      targetCorrect: 2
+    }),
+    puzzles: [oneMovePuzzle("p1"), oneMovePuzzle("p2")],
+    ratingBefore: 900,
+    now: NOW
+  });
+
+  const paused = pauseSprint(state, "2026-06-20T00:01:00.000Z");
+
+  assert.equal(paused.attempt?.result, "timed_out");
+  assert.equal(paused.attempt?.timingStatus, "timed_out");
+  assert.equal(paused.state.status, "paused");
+  assert.equal(paused.state.currentPuzzleIndex, 1);
+  assert.equal(paused.state.correctCount, 0);
+  assert.equal(paused.state.mistakeCount, 0);
+  assert.equal(paused.state.ratingBefore, 900);
+  assert.equal(paused.state.pausedAt, "2026-06-20T00:01:00.000Z");
 });
 
 test("timeout with no next puzzle terminates safely without rating or count changes", () => {
@@ -445,7 +470,7 @@ test("paused sprint ignores moves and resumes with the remaining time preserved"
     now: NOW
   });
 
-  const paused = pauseSprint(state, "2026-06-20T00:00:10.000Z");
+  const paused = pauseSprint(state, "2026-06-20T00:00:10.000Z").state;
   assert.equal(paused.status, "paused");
   assert.equal(paused.pausedAt, "2026-06-20T00:00:10.000Z");
 

@@ -120,15 +120,18 @@ export function advanceSprintTime(state: SprintState, now: string): SprintComman
   };
 }
 
-export function pauseSprint(state: SprintState, now: string): SprintState {
-  const timedState = failIfExpired(state, now);
-  if (timedState.status !== "active") {
-    return timedState;
+export function pauseSprint(state: SprintState, now: string): SprintCommandResult {
+  const advanced = advanceSprintTime(state, now);
+  if (advanced.state.status !== "active") {
+    return advanced;
   }
   return {
-    ...timedState,
-    status: "paused",
-    pausedAt: new Date(now).toISOString()
+    state: {
+      ...advanced.state,
+      status: "paused",
+      pausedAt: new Date(now).toISOString()
+    },
+    ...(advanced.attempt === undefined ? {} : { attempt: advanced.attempt })
   };
 }
 

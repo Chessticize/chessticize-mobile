@@ -48,6 +48,47 @@ test("CLI drives a multi-step sprint and exposes machine-readable history", asyn
   await cli.stop();
 });
 
+test("CLI records an exact-boundary puzzle timeout without rating or review effects", async (t) => {
+  const cli = await startCli(t);
+
+  const start = await cli.command({
+    command: "startSprint",
+    mode: "standard",
+    durationSeconds: 300,
+    perPuzzleSeconds: 20,
+    targetCorrect: 2,
+    maxMistakes: 3,
+    now: "2026-07-24T00:00:00.000Z"
+  });
+  const ratingBefore = start.state.ratingBefore;
+
+  const response = await cli.command({
+    command: "move",
+    move: "e6e7",
+    now: "2026-07-24T00:01:00.000Z"
+  });
+  assert.equal(response.feedback, null);
+  assert.equal(response.attempt.result, "timed_out");
+  assert.equal(response.attempt.timingStatus, "timed_out");
+  assert.equal(response.state.status, "active");
+  assert.equal(response.state.correctCount, 0);
+  assert.equal(response.state.mistakeCount, 0);
+  assert.equal(response.state.ratingBefore, ratingBefore);
+  assert.equal(response.state.ratingAfter, undefined);
+
+  const history = await cli.command({ command: "history" });
+  assert.equal(history.history.length, 1);
+  assert.equal(history.history[0].result, "timed_out");
+
+  const reviews = await cli.command({
+    command: "dueReviews",
+    now: "2026-07-25T00:00:00.000Z"
+  });
+  assert.equal(reviews.dueReviews.length, 0);
+
+  await cli.stop();
+});
+
 test("CLI accepts multiple themes as an OR-filtered sprint contract", async (t) => {
   const cli = await startCli(t);
 

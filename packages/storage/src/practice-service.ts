@@ -269,15 +269,19 @@ export class PracticeService {
     if (!this.activeSprint) {
       throw new Error("No active sprint");
     }
-    const paused = pauseSprintCore(this.activeSprint, now);
-    if (isOpenSprint(paused)) {
-      this.activeSprint = paused;
-      this.store.updateSprintSession(paused);
-    } else {
-      this.activeSprint = undefined;
-      this.persistCompletedSprint(paused);
-    }
-    return paused;
+    const result = pauseSprintCore(this.activeSprint, now);
+    this.store.transaction(() => {
+      if (result.attempt) {
+        this.store.recordAttempt(result.attempt);
+      }
+      if (isOpenSprint(result.state)) {
+        this.store.updateSprintSession(result.state);
+      } else {
+        this.persistCompletedSprint(result.state);
+      }
+    });
+    this.activeSprint = isOpenSprint(result.state) ? result.state : undefined;
+    return result.state;
   }
 
   resumeSprint(now = new Date().toISOString()): SprintState {
