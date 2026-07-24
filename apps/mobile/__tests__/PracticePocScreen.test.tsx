@@ -1180,9 +1180,9 @@ describe("PracticePocScreen", () => {
   it.each([
     {
       height: 932,
-      label: "portrait session header",
+      label: "portrait below-board row",
       scenarioId: "practice-active" as const,
-      styleEntry: ["borderWidth", 0] as const,
+      styleEntry: ["alignSelf", "center"] as const,
       width: 430
     },
     {
@@ -1222,9 +1222,15 @@ describe("PracticePocScreen", () => {
     ).toHaveLength(0);
     if (scenarioId === "practice-active") {
       expect(
-        findByTestId(renderer, "session-shell-nav")
+        findByTestId(renderer, "session-board-details")
           .findByProps({ testID: "session-puzzle-timing" })
       ).toBeTruthy();
+      expect(testIdOrder(renderer, "session-board", "session-puzzle-timing")).toBeLessThan(0);
+      expect(testIdOrder(renderer, "session-puzzle-timing", "session-score-strip")).toBeLessThan(0);
+      expect(
+        findByTestId(renderer, "session-shell-nav")
+          .findAllByProps({ testID: "session-puzzle-timing" })
+      ).toHaveLength(0);
     }
     if (scenarioId === "practice-timing-warning") {
       expect(collectText(findByTestId(renderer, "session-puzzle-timing-label"))).toBe("Puzzle 0:41");
@@ -1297,6 +1303,16 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "history-attempt-history-wrong-result"))).toBe(
       "Timed out"
     );
+    expect(
+      findByTestId(renderer, "history-attempt-history-wrong-badge")
+        .findByProps({ testID: "result-badge-wrong-glyph" })
+    ).toBeTruthy();
+    expect(hasStyleEntry(
+      findByTestId(renderer, "history-attempt-history-wrong-badge"),
+      "backgroundColor",
+      "#DC2626"
+    )).toBe(true);
+    expect(() => findByTestId(renderer, "result-badge-alert-glyph")).toThrow();
     expect(() => findByTestId(renderer, "history-attempt-history-wrong-timed_out")).toThrow();
 
     press(renderer, "history-filter-slow-only");

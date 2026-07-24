@@ -2402,14 +2402,12 @@ export function PracticePocScreen({
       elapsedSeconds={sessionTimingDesignState.elapsedSeconds}
       phase={sessionTimingDesignState.phase}
       timeoutSeconds={sessionTimingPreview?.timeoutSeconds ?? 0}
-      placement={sessionUsesRail ? "rail" : "header"}
     />
   ) : null;
   const sessionStatusNode = state && (isOpenSession || isShowingFeedbackSnapshot) ? (
     <SessionStatusBar
       compactMetrics={sessionUsesRail}
       mode={mode}
-      puzzleTimingNode={sessionUsesRail ? null : sessionPuzzleTimingNode}
       state={state}
       timerText={timerText}
       confirmAbandon={practiceExitConfirmationVisible}
@@ -2418,6 +2416,9 @@ export function PracticePocScreen({
       onPause={isActive ? () => pauseActiveSprint("manual") : undefined}
       onResume={isPaused && state ? () => resumeSprint(state) : undefined}
     />
+  ) : null;
+  const sessionScoreNode = state?.status === "active" ? (
+    <SessionScoreStrip state={state} />
   ) : null;
   const pausedSessionNode = isPaused && state ? (
     <PausedSessionPanel
@@ -2517,15 +2518,21 @@ export function PracticePocScreen({
           />
         ) : null}
       </View>
+      {!sessionUsesRail && (sessionPuzzleTimingNode || sessionScoreNode) ? (
+        <View
+          style={[styles.sessionBoardDetails, { width: boardSize }]}
+          testID="session-board-details"
+        >
+          {sessionPuzzleTimingNode}
+          {sessionScoreNode}
+        </View>
+      ) : null}
       {isPracticeDebugEnabled() && chessboardDebugEvents.length > 0 ? (
         <Text style={styles.debugLog} testID="chessboard-debug-log">
           {chessboardDebugEvents.join("\n")}
         </Text>
       ) : null}
     </View>
-  ) : null;
-  const sessionScoreNode = state?.status === "active" ? (
-    <SessionScoreStrip state={state} />
   ) : null;
   const practicePromptNode = shouldShowSessionBoard ? (
     <View
@@ -2707,7 +2714,6 @@ export function PracticePocScreen({
                       {!sessionUsesRail ? pausedSessionNode : null}
                       {!sessionUsesRail ? practicePromptNode : null}
                       {sessionBoardNode}
-                      {!sessionUsesRail ? sessionScoreNode : null}
                       {!sessionUsesRail ? errorNode : null}
                       {!sessionUsesRail ? sessionBottomFeedbackNode : null}
                     </View>
@@ -5449,12 +5455,10 @@ function useSessionTimingDesignPreview(
 function PuzzleTimingIndicator({
   elapsedSeconds,
   phase,
-  placement,
   timeoutSeconds
 }: {
   elapsedSeconds: number;
   phase: SessionTimingDesignState["phase"];
-  placement: "header" | "rail";
   timeoutSeconds: number;
 }): React.JSX.Element {
   const label = `Puzzle ${formatCompactDuration(elapsedSeconds)}`;
@@ -5472,7 +5476,7 @@ function PuzzleTimingIndicator({
       style={[
         styles.puzzleTimingIndicator,
         phase !== "normal" ? styles.puzzleTimingIndicatorSlow : null,
-        placement === "header" ? styles.puzzleTimingIndicatorHeader : styles.puzzleTimingIndicatorRail
+        styles.puzzleTimingIndicatorStandalone
       ]}
       testID="session-puzzle-timing"
     >
@@ -5503,7 +5507,6 @@ function SessionStatusBar({
   compactMetrics = false,
   confirmAbandon,
   mode,
-  puzzleTimingNode,
   state,
   timerText,
   onAbandon,
@@ -5514,7 +5517,6 @@ function SessionStatusBar({
   compactMetrics?: boolean;
   confirmAbandon: boolean;
   mode: SprintMode;
-  puzzleTimingNode?: React.ReactNode;
   state: SprintState;
   timerText: string;
   onAbandon?: () => void;
@@ -5538,10 +5540,7 @@ function SessionStatusBar({
         ) : (
           <View style={styles.sessionNavButton} />
         )}
-        <View style={styles.sessionNavTitleGroup}>
-          <Text numberOfLines={1} style={styles.sessionNavTitle}>{modeLabel(mode)}</Text>
-          {puzzleTimingNode}
-        </View>
+        <Text numberOfLines={1} style={styles.sessionNavTitle}>{modeLabel(mode)}</Text>
         <View style={styles.sessionNavActions} testID="session-nav-actions">
           {onPause ? (
             <Pressable
@@ -7240,7 +7239,7 @@ function historyRatingKeyLabel(
   return `${runName ?? ratingLabelFromKey(ratingKey)}${speedLabel}`;
 }
 
-function ResultBadgeGlyph({ tone }: { tone: "correct" | "wrong" | "alert" }): React.JSX.Element {
+function ResultBadgeGlyph({ tone }: { tone: "correct" | "wrong" }): React.JSX.Element {
   if (tone === "correct") {
     return (
       <View style={styles.resultBadgeGlyphCanvas} testID="result-badge-correct-glyph">
@@ -7250,19 +7249,10 @@ function ResultBadgeGlyph({ tone }: { tone: "correct" | "wrong" | "alert" }): Re
     );
   }
 
-  if (tone === "wrong") {
-    return (
-      <View style={styles.resultBadgeGlyphCanvas} testID="result-badge-wrong-glyph">
-        <View style={[styles.resultBadgeGlyphLine, styles.resultBadgeCrossForward]} />
-        <View style={[styles.resultBadgeGlyphLine, styles.resultBadgeCrossBackward]} />
-      </View>
-    );
-  }
-
   return (
-    <View style={styles.resultBadgeGlyphCanvas} testID="result-badge-alert-glyph">
-      <View style={styles.resultBadgeAlertBar} />
-      <View style={styles.resultBadgeAlertDot} />
+    <View style={styles.resultBadgeGlyphCanvas} testID="result-badge-wrong-glyph">
+      <View style={[styles.resultBadgeGlyphLine, styles.resultBadgeCrossForward]} />
+      <View style={[styles.resultBadgeGlyphLine, styles.resultBadgeCrossBackward]} />
     </View>
   );
 }
@@ -7392,14 +7382,14 @@ function HistoryAttemptRow({
       <View
         style={[
           styles.historyResultBadge,
-          isTimedOut
-            ? styles.historyResultTimedOut
-            : isWrong ? styles.historyResultWrong : isCorrect ? styles.historyResultCorrect : styles.historyResultUnknown
+          isTimedOut || isWrong
+            ? styles.historyResultWrong
+            : isCorrect ? styles.historyResultCorrect : styles.historyResultUnknown
         ]}
         testID={`history-attempt-${attempt.id}-badge`}
       >
         {isTimedOut || isWrong || isCorrect ? (
-          <ResultBadgeGlyph tone={isTimedOut ? "alert" : isWrong ? "wrong" : "correct"} />
+          <ResultBadgeGlyph tone={isTimedOut || isWrong ? "wrong" : "correct"} />
         ) : (
           <Text style={styles.historyResultUnknownText}>?</Text>
         )}
@@ -13028,16 +13018,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 48
   },
-  sessionNavTitleGroup: {
-    alignItems: "center",
-    flex: 1,
-    flexDirection: "row",
-    gap: 10,
-    justifyContent: "center",
-    minWidth: 0
-  },
   sessionNavTitle: {
     color: "#111827",
+    flex: 1,
     flexShrink: 1,
     fontSize: 16,
     fontWeight: "800",
@@ -13137,17 +13120,11 @@ const styles = StyleSheet.create({
     minHeight: 26,
     paddingHorizontal: 9
   },
-  puzzleTimingIndicatorHeader: {
-    backgroundColor: "transparent",
-    borderWidth: 0,
-    minHeight: 24,
-    paddingHorizontal: 0
-  },
-  puzzleTimingIndicatorRail: {
+  puzzleTimingIndicatorStandalone: {
     alignSelf: "center",
     backgroundColor: "transparent",
     borderWidth: 0,
-    minHeight: 24,
+    minHeight: 18,
     paddingHorizontal: 0
   },
   puzzleTimingIndicatorSlow: {
@@ -13192,7 +13169,11 @@ const styles = StyleSheet.create({
   },
   boardWrapper: {
     alignItems: "center",
+    gap: 3,
     justifyContent: "center"
+  },
+  sessionBoardDetails: {
+    gap: 3
   },
   boardSurface: {
     borderColor: "#E2E8F0",
@@ -14643,9 +14624,6 @@ const styles = StyleSheet.create({
   historyResultWrong: {
     backgroundColor: "#DC2626"
   },
-  historyResultTimedOut: {
-    backgroundColor: "#B91C1C"
-  },
   historyResultCorrect: {
     backgroundColor: "#16A34A"
   },
@@ -14692,20 +14670,6 @@ const styles = StyleSheet.create({
     height: 2,
     transform: [{ rotate: "-45deg" }],
     width: 11
-  },
-  resultBadgeAlertBar: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 999,
-    height: 11,
-    width: 3
-  },
-  resultBadgeAlertDot: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 999,
-    bottom: 1,
-    height: 3,
-    position: "absolute",
-    width: 3
   },
   historyAttemptCopy: {
     flex: 1,
