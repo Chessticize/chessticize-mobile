@@ -9,9 +9,9 @@ public control. Version code 3 fixed that stale UI dependency, but exact-tag API
 24 validation exposed a launch/package-manager state race in the evidence
 harness. Version code 4 became the published Android 1.1 release. Version code 5
 stopped before the AAB build because a generic doctor checked an emulator-only
-runtime library. Version code 6 is the current Android 1.2 Play candidate. Its
-AAB has been submitted to Play and its corresponding source is public, but its
-post-Play APK mirror remains an explicit release finalizer.
+runtime library. Version code 6 completed the Android 1.2 release operation for
+the current Play track: corresponding source, Play delivery, owner
+physical-device smoke, and the Play-signed GitHub APK mirror are complete.
 This runbook deliberately separates
 repository-owned checks from owner-only Play Console evidence. Missing signing material,
 protected-environment setup, or any console result is a blocker; never replace
@@ -114,8 +114,7 @@ Build 5 is an immutable failed candidate and was never distributed:
 No build-5 GitHub source Release or Play upload was created. Do not move or
 reuse its tag or version code.
 
-Build 6 is the immutable Android 1.2 candidate currently completing release
-finalization:
+Build 6 is the immutable Android 1.2 release for the current Play track:
 
 - annotated tag: `android-v1.2.0-build-6`, targeting
   `9526eb1da16d043dcfbbdb2a903e927d1056f799`;
@@ -130,15 +129,27 @@ finalization:
   [`android-v1.2.0-build-6`](https://github.com/Chessticize/chessticize-mobile/releases/tag/android-v1.2.0-build-6);
 - public source-manifest SHA-256:
   `20882c243f53ba5962c18a3557463e04c2b0394e7c40bb224e714d42fdf906d7`;
-- Play Closed testing Alpha submission passed Play quick checks on 2026-07-24.
-  Recheck the live Console before relying on a later review or delivery state;
-- APK mirror: **pending** as of 2026-07-24. The public Release still contains
-  only `android-source-manifest.json`, and no build-6 APK-mirror workflow run
-  or owner physical-device smoke has been recorded.
+- Play Closed testing Alpha submission passed Play quick checks, and the owner
+  installed the Play-delivered `1.2` build `6` on a physical device and
+  confirmed the required smoke on 2026-07-24. Recheck the live Console before
+  relying on a later review, promotion, or Production state;
+- successful APK-mirror workflow run:
+  [`30118284864`](https://github.com/Chessticize/chessticize-mobile/actions/runs/30118284864);
+- Play-signed universal APK: 359,752,647 bytes, SHA-256
+  `dc7e7f77ffd06ce7b4c109ca2a731e7575b1fe056201b2a667de4ee4e49f2746`,
+  asset ID `488711898`;
+- Play app-signing certificate SHA-256:
+  `318a4453d4052c90364d3abfe376dce9c06a04ab70db7ce1d5d43ba995cff900`;
+- checksum asset ID `488711885`, SHA-256
+  `8c42960d31b5f674fc4541c2b60560cbe02539128eb40ae587b9e22b0c305cac`;
+- retained receipt:
+  `android-apk-mirror-9526eb1da16d043dcfbbdb2a903e927d1056f799`,
+  recording phase `play-apk-mirrored` and the exact source, AAB, Play download,
+  signer, release, and public-asset identities.
 
 Do not move the build-6 tag, rebuild its AAB, replace its public source
-manifest, or reuse version code 6. Complete the owner Play-delivered smoke, then
-run and verify the post-Play mirror against this exact version code.
+manifest or mirrored assets, or reuse version code 6. The public Release has
+exactly the required source manifest, Play-signed APK, and checksum.
 
 ## Canonical identity
 
