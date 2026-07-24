@@ -39,7 +39,7 @@ describe("TestFlight QA checklist", () => {
     }
   });
 
-  it("requires fast preflight checks and risk-scoped exact-candidate native validation before upload", () => {
+  it("requires exact-candidate fast checks and reusable risk-scoped native validation before upload", () => {
     const requiredCommands = [
       "pnpm app-store:preflight",
       "pnpm test",
@@ -72,6 +72,12 @@ describe("TestFlight QA checklist", () => {
     expect(releasePolicy).toMatch(
       /Ordinary deltas use exact-head fast checks plus owner physical-device smoke/
     );
+    for (const document of [appStoreUploadDoc, releasePolicy]) {
+      expect(document).toContain("validation-relevant development");
+      expect(document).toMatch(
+        /documentation,\s+review\s+metadata,\s+(?:or|and)\s+merge/i
+      );
+    }
   });
 
   it("requires evidence before the App Store plan item can be completed", () => {

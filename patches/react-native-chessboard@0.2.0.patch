@@ -131,10 +131,10 @@ index de72beac3b9cda50edb7a8f34b1630cfdd2bd8cf..0bccb0fcd4305c749f11e01b738087a4
    }))));
  });
 diff --git a/lib/commonjs/components/skia/gesture-board.js b/lib/commonjs/components/skia/gesture-board.js
-index 7ddc0516545a4e1e16774f520123aaa883c235c0..748653cf34925669683bd41c868e191c7f31cf26 100644
+index 7ddc0516545a4e1e16774f520123aaa883c235c0..641120fe24f153f4638cab2579ee0fd54e31ad5c 100644
 --- a/lib/commonjs/components/skia/gesture-board.js
 +++ b/lib/commonjs/components/skia/gesture-board.js
-@@ -20,7 +20,8 @@ var _promotionDialog = require("../promotion-dialog");
+@@ -20,13 +20,16 @@ var _promotionDialog = require("../promotion-dialog");
  function _interopRequireWildcard(e, t) { if ("function" == typeof WeakMap) var r = new WeakMap(), n = new WeakMap(); return (_interopRequireWildcard = function (e, t) { if (!t && e && e.__esModule) return e; var o, i, f = { __proto__: null, default: e }; if (null === e || "object" != typeof e && "function" != typeof e) return f; if (o = t ? n : r) { if (o.has(e)) return o.get(e); o.set(e, f); } for (const t in e) "default" !== t && {}.hasOwnProperty.call(e, t) && ((i = (o = Object.defineProperty) && Object.getOwnPropertyDescriptor(e, t)) && (i.get || i.set) ? o(f, t, i) : f[t] = e[t]); return f; })(e, t); }
  const styles = _reactNative.StyleSheet.create({
    container: {
@@ -144,6 +144,36 @@ index 7ddc0516545a4e1e16774f520123aaa883c235c0..748653cf34925669683bd41c868e191c
    }
  });
  const GestureBoard = exports.GestureBoard = /*#__PURE__*/(0, _react.forwardRef)(({
+   onMove,
+   onIllegalMove,
+   renderEffect,
++  onReady,
++  positionKey,
+   spriteSource
+ }, ref) => {
+   const {
+@@ -37,6 +40,21 @@ const GestureBoard = exports.GestureBoard = /*#__PURE__*/(0, _react.forwardRef)(
+   const {
+     image: spriteImage
+   } = (0, _pieceImages.usePieceSpriteSheet)(spriteSource);
++  (0, _react.useEffect)(() => {
++    if (!spriteImage || !onReady) {
++      return;
++    }
++    let secondFrame = null;
++    const firstFrame = requestAnimationFrame(() => {
++      secondFrame = requestAnimationFrame(onReady);
++    });
++    return () => {
++      cancelAnimationFrame(firstFrame);
++      if (secondFrame !== null) {
++        cancelAnimationFrame(secondFrame);
++      }
++    };
++  }, [onReady, positionKey, spriteImage]);
+ 
+   // Effect state for shader effects (all SharedValues for reactivity)
+   const effectCenterX = (0, _reactNativeReanimated.useSharedValue)(0);
 diff --git a/lib/commonjs/components/skia/skia-dots.js b/lib/commonjs/components/skia/skia-dots.js
 index 99152d0e193c3ff32b49cb57c78a5b09799a8617..27bd528cb50e65fefa778afe525945ca29584669 100644
 --- a/lib/commonjs/components/skia/skia-dots.js
@@ -484,7 +514,7 @@ index 26deda8bb43c022624db07d6ea463a1028f082f9..ac8d79cbc8b97162d79bbd06ee463a29
  };
  exports.useBoardGesture = useBoardGesture;
 diff --git a/lib/commonjs/index.js b/lib/commonjs/index.js
-index 360d75d327324795ca72a43b37965b1ea2bc19d9..2071f0fe1352a0f48d3c72d9a05350274737c1bf 100644
+index 360d75d327324795ca72a43b37965b1ea2bc19d9..a474d52e74f449471c429a653e7dc17e7de39302 100644
 --- a/lib/commonjs/index.js
 +++ b/lib/commonjs/index.js
 @@ -12,6 +12,7 @@ const Chessboard = exports.Chessboard = /*#__PURE__*/(0, _react.forwardRef)(({
@@ -495,7 +525,15 @@ index 360d75d327324795ca72a43b37965b1ea2bc19d9..2071f0fe1352a0f48d3c72d9a0535027
    flipped,
    withLetters,
    withNumbers,
-@@ -27,6 +28,7 @@ const Chessboard = exports.Chessboard = /*#__PURE__*/(0, _react.forwardRef)(({
+@@ -20,6 +21,7 @@ const Chessboard = exports.Chessboard = /*#__PURE__*/(0, _react.forwardRef)(({
+   onMove,
+   onIllegalMove,
+   renderEffect,
++  onReady,
+   spriteSource,
+   fontSource
+ }, ref) => {
+@@ -27,6 +29,7 @@ const Chessboard = exports.Chessboard = /*#__PURE__*/(0, _react.forwardRef)(({
      fen: fen,
      boardSize: boardSize,
      gestureEnabled: gestureEnabled,
@@ -503,6 +541,15 @@ index 360d75d327324795ca72a43b37965b1ea2bc19d9..2071f0fe1352a0f48d3c72d9a0535027
      flipped: flipped,
      withLetters: withLetters,
      withNumbers: withNumbers,
+@@ -38,6 +41,8 @@ const Chessboard = exports.Chessboard = /*#__PURE__*/(0, _react.forwardRef)(({
+     onMove: onMove,
+     onIllegalMove: onIllegalMove,
+     renderEffect: renderEffect,
++    onReady: onReady,
++    positionKey: fen,
+     spriteSource: spriteSource
+   }));
+ });
 diff --git a/lib/commonjs/state/board-state-context.js b/lib/commonjs/state/board-state-context.js
 index cfd52d5394e32d3972be93c85977c62f4ad30885..297972ef10bbda6a19b00c88166ac3a916364387 100644
 --- a/lib/commonjs/state/board-state-context.js
@@ -670,7 +717,7 @@ index 983112b3bfd62a93c150077851c9cdc0e6fc5c48..f8fa26ab3fac55f953cd29f3e108dcba
  
      // Handle en passant - remove the captured pawn
 diff --git a/lib/commonjs/state/use-board-state.js b/lib/commonjs/state/use-board-state.js
-index 0a6faf6b1ec0b5ac518104d513f3e1a0a9c1a9b6..6b0b5b6fe5880f5f4f8299343dd3473487a140c1 100644
+index 0a6faf6b1ec0b5ac518104d513f3e1a0a9c1a9b6..4a9ba5a255d44f8f9a140019f6f351a2263f57c8 100644
 --- a/lib/commonjs/state/use-board-state.js
 +++ b/lib/commonjs/state/use-board-state.js
 @@ -125,8 +125,11 @@ const useBoardState = (initialFen, pieceSize, flipped = false) => {
@@ -842,10 +889,16 @@ index 5bf64b655079b16368383257bc53bc3bce4d8418..6313910ecd52f23830722b3bd69ceb29
    }))));
  });
 diff --git a/lib/module/components/skia/gesture-board.js b/lib/module/components/skia/gesture-board.js
-index 79598f3cce08d079d2a004ed0563f1194fd7d31c..e9c4b9b6c3e29dfef7523ed53015031bb7c655f7 100644
+index 79598f3cce08d079d2a004ed0563f1194fd7d31c..a77c63b2988f8d72851af87b8be00622c08c1f59 100644
 --- a/lib/module/components/skia/gesture-board.js
 +++ b/lib/module/components/skia/gesture-board.js
-@@ -13,7 +13,8 @@ import { SkiaBoard } from './skia-board';
+@@ -1,4 +1,4 @@
+-import React, { useMemo, useCallback, useState, forwardRef, useRef } from 'react';
++import React, { useMemo, useCallback, useState, useEffect, forwardRef, useRef } from 'react';
+ import { View, StyleSheet } from 'react-native';
+ import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+ import { useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
+@@ -13,13 +13,16 @@ import { SkiaBoard } from './skia-board';
  import { PromotionDialog } from '../promotion-dialog';
  const styles = StyleSheet.create({
    container: {
@@ -855,6 +908,36 @@ index 79598f3cce08d079d2a004ed0563f1194fd7d31c..e9c4b9b6c3e29dfef7523ed53015031b
    }
  });
  export const GestureBoard = /*#__PURE__*/forwardRef(({
+   onMove,
+   onIllegalMove,
+   renderEffect,
++  onReady,
++  positionKey,
+   spriteSource
+ }, ref) => {
+   const {
+@@ -30,6 +33,21 @@ export const GestureBoard = /*#__PURE__*/forwardRef(({
+   const {
+     image: spriteImage
+   } = usePieceSpriteSheet(spriteSource);
++  useEffect(() => {
++    if (!spriteImage || !onReady) {
++      return;
++    }
++    let secondFrame = null;
++    const firstFrame = requestAnimationFrame(() => {
++      secondFrame = requestAnimationFrame(onReady);
++    });
++    return () => {
++      cancelAnimationFrame(firstFrame);
++      if (secondFrame !== null) {
++        cancelAnimationFrame(secondFrame);
++      }
++    };
++  }, [onReady, positionKey, spriteImage]);
+ 
+   // Effect state for shader effects (all SharedValues for reactivity)
+   const effectCenterX = useSharedValue(0);
 diff --git a/lib/module/components/skia/skia-dots.js b/lib/module/components/skia/skia-dots.js
 index 120f116f938d6bf19ed350321959c9c5a860b48a..863f4f5380a90afb2c2f1ed1508efe197b54782b 100644
 --- a/lib/module/components/skia/skia-dots.js
@@ -1196,7 +1279,7 @@ index 504126e4dc0a469cf5b00913e176e360322a1194..fc26fec8d6204ea4c07e4c6978ccbacc
  //# sourceMappingURL=use-board-gesture.js.map
 \ No newline at end of file
 diff --git a/lib/module/index.js b/lib/module/index.js
-index 7cee33e75529b83bea5c7216e4b89be54c9fb520..589a0ec7e6083552dac8d5defbd2ff7d9940f04f 100644
+index 7cee33e75529b83bea5c7216e4b89be54c9fb520..a3ecb923b546782d8fb7952825f7e2969a9e50f2 100644
 --- a/lib/module/index.js
 +++ b/lib/module/index.js
 @@ -5,6 +5,7 @@ const Chessboard = /*#__PURE__*/forwardRef(({
@@ -1207,7 +1290,15 @@ index 7cee33e75529b83bea5c7216e4b89be54c9fb520..589a0ec7e6083552dac8d5defbd2ff7d
    flipped,
    withLetters,
    withNumbers,
-@@ -20,6 +21,7 @@ const Chessboard = /*#__PURE__*/forwardRef(({
+@@ -13,6 +14,7 @@ const Chessboard = /*#__PURE__*/forwardRef(({
+   onMove,
+   onIllegalMove,
+   renderEffect,
++  onReady,
+   spriteSource,
+   fontSource
+ }, ref) => {
+@@ -20,6 +22,7 @@ const Chessboard = /*#__PURE__*/forwardRef(({
      fen: fen,
      boardSize: boardSize,
      gestureEnabled: gestureEnabled,
@@ -1215,6 +1306,15 @@ index 7cee33e75529b83bea5c7216e4b89be54c9fb520..589a0ec7e6083552dac8d5defbd2ff7d
      flipped: flipped,
      withLetters: withLetters,
      withNumbers: withNumbers,
+@@ -31,6 +34,8 @@ const Chessboard = /*#__PURE__*/forwardRef(({
+     onMove: onMove,
+     onIllegalMove: onIllegalMove,
+     renderEffect: renderEffect,
++    onReady: onReady,
++    positionKey: fen,
+     spriteSource: spriteSource
+   }));
+ });
 diff --git a/lib/module/state/board-state-context.js b/lib/module/state/board-state-context.js
 index 9c5fc37c72a09fa6a338aba03bd0433d0c09573e..9c781af9859d91627effe7113c653689ad84ac7e 100644
 --- a/lib/module/state/board-state-context.js
@@ -1382,7 +1482,7 @@ index f2f179f71c94846c9cbe456e5889ac1b5c0714d9..480964882e0888e30a23534d29df5b95
  
      // Handle en passant - remove the captured pawn
 diff --git a/lib/module/state/use-board-state.js b/lib/module/state/use-board-state.js
-index 70c2cecb9088e81c71bbda522458e5602b3ccfe6..e6176c954853f394e9a1f7f5334fa51a52799ea1 100644
+index 70c2cecb9088e81c71bbda522458e5602b3ccfe6..5445a48d5e9faf642f4462debe9b09893f0a0c5f 100644
 --- a/lib/module/state/use-board-state.js
 +++ b/lib/module/state/use-board-state.js
 @@ -117,8 +117,11 @@ export const useBoardState = (initialFen, pieceSize, flipped = false) => {
@@ -1422,6 +1522,35 @@ index 70c2cecb9088e81c71bbda522458e5602b3ccfe6..e6176c954853f394e9a1f7f5334fa51a
      if (!initialFen) {
        chess.reset();
      } else {
+diff --git a/lib/typescript/components/skia/gesture-board.d.ts b/lib/typescript/components/skia/gesture-board.d.ts
+index 879929871b8cf9abe7953a6992f7c038f0592d5f..7df54abc3cec6977f8a1813bef09e8860fc2667b 100644
+--- a/lib/typescript/components/skia/gesture-board.d.ts
++++ b/lib/typescript/components/skia/gesture-board.d.ts
+@@ -8,6 +8,8 @@ export interface GestureBoardProps {
+     onMove?: (result: MoveResult) => void;
+     onIllegalMove?: (from: Square, to: Square) => void;
+     renderEffect?: (params: EffectParams) => React.ReactNode;
++    onReady?: () => void;
++    positionKey?: string;
+     spriteSource?: ImageSourcePropType;
+ }
+ export declare const GestureBoard: React.ForwardRefExoticComponent<GestureBoardProps & React.RefAttributes<ChessboardRef>>;
+diff --git a/lib/typescript/index.d.ts b/lib/typescript/index.d.ts
+index ac1a1357c8b5352dd97d856282ef96f056f45622..3b5cb5cb1739751552b97e7a7321474148bf898c 100644
+--- a/lib/typescript/index.d.ts
++++ b/lib/typescript/index.d.ts
+@@ -10,6 +10,11 @@ export interface ChessboardProps extends Omit<BoardStateProviderProps, 'children
+     onMove?: (result: MoveResult) => void;
+     onIllegalMove?: (from: Square, to: Square) => void;
+     renderEffect?: (params: EffectParams) => React.ReactNode;
++    /**
++     * Called after the current position and piece sprite have had a native frame
++     * to paint. Called again when the `fen` prop changes.
++     */
++    onReady?: () => void;
+     /**
+      * Optional custom piece sprite sheet. Must match the standard
+      * 6×2 / 128px-cell layout (row 0 = white p,n,b,r,q,k; row 1 =
 diff --git a/lib/typescript/state/board-state-context.d.ts b/lib/typescript/state/board-state-context.d.ts
 index 9df5d29a4e894d52f6ff4c7036342a60eb2529f7..a1179eda7258a44362521fceb030b5a2f3595fef 100644
 --- a/lib/typescript/state/board-state-context.d.ts
@@ -1626,7 +1755,7 @@ index a3f67bf02f45b674772813bdf03f4b25c56f070e..5771815c93dae8f4c11b4bef4599c37c
      );
    }
 diff --git a/src/components/skia/gesture-board.tsx b/src/components/skia/gesture-board.tsx
-index b4a278cc2ada84715a4916324b459952ab33c942..13084b25d8e9f36f52e24bbb4219db913fc2d941 100644
+index b4a278cc2ada84715a4916324b459952ab33c942..d383e6fb9c30b05a78d6fda0a0a354fa95b913c8 100644
 --- a/src/components/skia/gesture-board.tsx
 +++ b/src/components/skia/gesture-board.tsx
 @@ -2,6 +2,7 @@ import React, {
@@ -1658,7 +1787,58 @@ index b4a278cc2ada84715a4916324b459952ab33c942..13084b25d8e9f36f52e24bbb4219db91
  interface PromotionInfo {
    from: Square;
    to: Square;
-@@ -71,30 +83,46 @@ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
+@@ -53,16 +65,49 @@ export interface GestureBoardProps {
+   onMove?: (result: MoveResult) => void;
+   onIllegalMove?: (from: Square, to: Square) => void;
+   renderEffect?: (params: EffectParams) => React.ReactNode;
++  onReady?: () => void;
++  positionKey?: string;
+   spriteSource?: ImageSourcePropType;
+ }
+ 
+ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
+-  ({ onMove, onIllegalMove, renderEffect, spriteSource }, ref) => {
++  (
++    {
++      onMove,
++      onIllegalMove,
++      renderEffect,
++      onReady,
++      positionKey,
++      spriteSource,
++    },
++    ref
++  ) => {
+     const { chess } = useBoardContext();
+     const config = useBoardConfig();
+     const boardState = useBoardStateValues();
+     const { image: spriteImage } = usePieceSpriteSheet(spriteSource);
+ 
++    useEffect(() => {
++      if (!spriteImage || !onReady) {
++        return;
++      }
++
++      // The first frame lets Skia commit the newly loaded sprite/current FEN.
++      // The second runs only after that paint opportunity, so sibling overlays
++      // cannot become visible while the board still has missing pieces.
++      let secondFrame: number | null = null;
++      const firstFrame = requestAnimationFrame(() => {
++        secondFrame = requestAnimationFrame(onReady);
++      });
++
++      return () => {
++        cancelAnimationFrame(firstFrame);
++        if (secondFrame !== null) {
++          cancelAnimationFrame(secondFrame);
++        }
++      };
++    }, [onReady, positionKey, spriteImage]);
++
+     // Effect state for shader effects (all SharedValues for reactivity)
+     const effectCenterX = useSharedValue(0);
+     const effectCenterY = useSharedValue(0);
+@@ -71,30 +116,46 @@ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
        'checkmate' | 'check' | 'stalemate' | ''
      >('');
  
@@ -1710,7 +1890,7 @@ index b4a278cc2ada84715a4916324b459952ab33c942..13084b25d8e9f36f52e24bbb4219db91
        // The drag gesture animated the pawn into the back-rank target square
        // and raised its zIndex; chess.move() was deferred until the user picked
        // a promotion piece. Cancel means we never execute the move, so snap
-@@ -121,9 +149,19 @@ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
+@@ -121,9 +182,19 @@ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
          info.cancel();
        }
        promotionInfoRef.current = null;
@@ -1731,7 +1911,7 @@ index b4a278cc2ada84715a4916324b459952ab33c942..13084b25d8e9f36f52e24bbb4219db91
      // Trigger effect on game events
      const triggerEffect = useCallback(
        (trigger: EffectTrigger, kingColor: 'w' | 'b') => {
-@@ -244,25 +282,27 @@ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
+@@ -244,25 +315,27 @@ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
  
      return (
        <GestureHandlerRootView style={containerStyle}>
@@ -2148,10 +2328,22 @@ index 92df972f7ec3c671308e8cc0e6cd275469a7144d..8b7eaf249e2805d8ec5246da8ee69767
      handleSelectPiece,
      handleIllegalMove,
 diff --git a/src/index.tsx b/src/index.tsx
-index a50f36cba22769b8a484a1c4429a3135e661dcf3..5f73a26e0ac583683d28b039726ef8638bcf40ab 100644
+index a50f36cba22769b8a484a1c4429a3135e661dcf3..3bdd04eaceacc2e8b0cab630f823b89aad2ac4c0 100644
 --- a/src/index.tsx
 +++ b/src/index.tsx
-@@ -34,6 +34,7 @@ const Chessboard = forwardRef<ChessboardRef, ChessboardProps>(
+@@ -14,6 +14,11 @@ export interface ChessboardProps
+   onMove?: (result: MoveResult) => void;
+   onIllegalMove?: (from: Square, to: Square) => void;
+   renderEffect?: (params: EffectParams) => React.ReactNode;
++  /**
++   * Called after the current position and piece sprite have had a native frame
++   * to paint. Called again when the `fen` prop changes.
++   */
++  onReady?: () => void;
+   /**
+    * Optional custom piece sprite sheet. Must match the standard
+    * 6×2 / 128px-cell layout (row 0 = white p,n,b,r,q,k; row 1 =
+@@ -34,6 +39,7 @@ const Chessboard = forwardRef<ChessboardRef, ChessboardProps>(
        fen,
        boardSize,
        gestureEnabled,
@@ -2159,7 +2351,15 @@ index a50f36cba22769b8a484a1c4429a3135e661dcf3..5f73a26e0ac583683d28b039726ef863
        flipped,
        withLetters,
        withNumbers,
-@@ -52,6 +53,7 @@ const Chessboard = forwardRef<ChessboardRef, ChessboardProps>(
+@@ -42,6 +48,7 @@ const Chessboard = forwardRef<ChessboardRef, ChessboardProps>(
+       onMove,
+       onIllegalMove,
+       renderEffect,
++      onReady,
+       spriteSource,
+       fontSource,
+     },
+@@ -52,6 +59,7 @@ const Chessboard = forwardRef<ChessboardRef, ChessboardProps>(
          fen={fen}
          boardSize={boardSize}
          gestureEnabled={gestureEnabled}
@@ -2167,6 +2367,15 @@ index a50f36cba22769b8a484a1c4429a3135e661dcf3..5f73a26e0ac583683d28b039726ef863
          flipped={flipped}
          withLetters={withLetters}
          withNumbers={withNumbers}
+@@ -64,6 +72,8 @@ const Chessboard = forwardRef<ChessboardRef, ChessboardProps>(
+           onMove={onMove}
+           onIllegalMove={onIllegalMove}
+           renderEffect={renderEffect}
++          onReady={onReady}
++          positionKey={fen}
+           spriteSource={spriteSource}
+         />
+       </BoardStateProvider>
 diff --git a/src/state/board-state-context.tsx b/src/state/board-state-context.tsx
 index 2f2990b96a62e49047a101e225317ab1a01b20ae..222650a2f245f85e9f15eab121943056cf90668d 100644
 --- a/src/state/board-state-context.tsx

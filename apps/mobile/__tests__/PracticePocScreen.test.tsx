@@ -3272,7 +3272,7 @@ describe("PracticePocScreen", () => {
     expectHistoryRowAccessibility(renderer, "Played e6d7 · Best e6f7");
   });
 
-  it("uses neutral Arrow Duel board markers without separate A/B choice chips", () => {
+  it("waits for the Arrow Duel board to render before showing neutral markers", () => {
     const service = createMobilePracticeService("familiar15");
     const renderer = renderScreen({ practiceService: service });
 
@@ -3283,6 +3283,12 @@ describe("PracticePocScreen", () => {
     expect(arrowBoard.props.flipped).toBe(new Chess(arrow.currentFen).turn() === "b");
     expect(arrowBoard.props.gestureEnabled).toBe(true);
     expect(arrowBoard.props.mockImperativeMove).not.toHaveBeenCalled();
+    expect(renderer.root.findAllByProps({ testID: "arrow-duel-candidate-overlay" })).toHaveLength(0);
+
+    act(() => {
+      arrowBoard.props.onReady();
+    });
+
     expect(() => findByTestId(renderer, "board-input-blocker")).toThrow();
     expect(collectText(renderer.root)).not.toContain("Choose one candidate move");
     expect(() => findByTestId(renderer, "arrow-duel-candidates")).toThrow();
@@ -3316,6 +3322,10 @@ describe("PracticePocScreen", () => {
     const arrow = firstArrowDuelPuzzleForTest();
 
     startArrowDuelSprint(renderer);
+    act(() => {
+      findByTestId(renderer, "mock-chessboard").props.onReady();
+    });
+    expect(findByTestId(renderer, "arrow-duel-candidate-overlay")).toBeTruthy();
 
     await boardMove(renderer, arrow.correctMove);
 
@@ -3329,6 +3339,12 @@ describe("PracticePocScreen", () => {
     expect(countStyleEntry(findByTestId(renderer, "session-board"), "borderLeftColor", "#DC2626")).toBe(0);
     expect(() => findByTestId(renderer, "feedback-panel")).toThrow();
     await settleFeedbackSnapshot();
+
+    expect(renderer.root.findAllByProps({ testID: "arrow-duel-candidate-overlay" })).toHaveLength(0);
+    act(() => {
+      findByTestId(renderer, "mock-chessboard").props.onReady();
+    });
+    expect(findByTestId(renderer, "arrow-duel-candidate-overlay")).toBeTruthy();
   });
 
   it("ignores non-candidate Arrow Duel board moves without recording attempts", async () => {

@@ -123,12 +123,12 @@ fix time, permission state, or puzzle choice at maintained native boundaries;
 they must not inject attempts, ratings, review rows, or settings behind the
 public UI.
 
-## Exact-head evidence contract
+## Native evidence contract
 
 Every required native result must record the following fields and retain the
 workflow run plus artifacts with the PR or release record:
 
-- exact commit SHA and build result;
+- tested commit SHA and build result;
 - commands and selected validation scope;
 - device matrix, including API/OS, ABI, profile/model, and serial or redacted
   physical identifier;
@@ -139,6 +139,12 @@ workflow run plus artifacts with the PR or release record:
 The automated API evidence JSON uses schema version 1 and records `commitSha`,
 `buildResult`, `commands`, `deviceMatrix`, `suiteResults`, `worktreeClean`, and
 the overall `result`. A missing required field is not passing evidence.
+
+The tested SHA does not have to equal a later PR or release head when a
+documented diff proves that validation-relevant development inputs are
+unchanged. Record both SHAs and the comparison. Runtime, native/platform,
+dependency, build/release, or selected native spec/fixture changes require a
+rerun; documentation, review metadata, and merge ancestry alone do not.
 
 ## Physical ARM64 release checklist
 

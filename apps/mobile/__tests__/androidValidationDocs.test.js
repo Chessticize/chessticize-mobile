@@ -8,7 +8,7 @@ function read(relativePath) {
 }
 
 describe('Android validation documentation', () => {
-  it('defines reproducible PR, manual diagnostic, API 24, adaptive, and exact-head evidence commands', () => {
+  it('defines reproducible PR, manual diagnostic, API 24, adaptive, and reusable native evidence commands', () => {
     const validation = read('docs/ANDROID_VALIDATION.md');
 
     expect(validation).toContain('pnpm mobile:doctor:android');
@@ -31,6 +31,8 @@ describe('Android validation documentation', () => {
     expect(validation).toContain('production SQLite');
     expect(validation).toContain('public UI');
     expect(validation).toContain('small deterministic fixture');
+    expect(validation).toContain('validation-relevant development inputs');
+    expect(validation).toContain('documentation, review metadata, and merge ancestry');
   });
 
   it('keeps physical ARM64 evidence owner-recorded at the release gate', () => {
