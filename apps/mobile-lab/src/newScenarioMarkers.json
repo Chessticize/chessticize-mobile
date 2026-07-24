@@ -51,11 +51,11 @@
     "issues": [
       {
         "issueNumber": 248,
-        "changeNote": "Add Slow to the existing History quick filters and attempt labels."
+        "changeNote": "Include Slow in the existing History screen's Needs attention view and attempt labels."
       },
       {
         "issueNumber": 249,
-        "changeNote": "Add Timed out to the existing History quick filters and attempt results."
+        "changeNote": "Include Timed out in the existing History screen's Needs attention view and attempt results."
       }
     ]
   }

@@ -1,136 +1,101 @@
 # History Quick Filter Research
 
-Date: 2026-07-23  
+Date: 2026-07-24
 Scope: Storybook-only design for issues #248 and #249
 
 ## Decision
 
-Use one consistent faceted-filter rule:
-
-- Values selected inside the same facet use **OR**.
-- Different facets combine with **AND**.
-- Single-choice facets allow only one value, so no operator needs to be shown.
-
-Slow and Timed out are therefore not a special exception. They are the two
-values of the **Timing** facet. The existing Theme facet already follows the
-same within-facet OR rule.
-
-## Existing Baseline
-
-The current History clone renders five visually equal switch-style quick
-controls in one horizontal row: Unclear only, Slow, Timed out, Wrong only, and
-Sprint only. Only Slow and Timed out are evaluated together as an OR group;
-the visual treatment does not reveal that grouping.
-
-The existing active-filter strip also omits Slow and Timed out, so after the
-quick controls scroll out of view there is no persistent timing-state summary.
-
-This is slightly out of alignment with the existing mobile design direction:
-History filters should be horizontally scrollable **chips**, and the result
-list should remain the primary content on phones
-([local mobile UI design](./MOBILE_UI_DESIGN.md#history)).
-
-## Primary-source Findings
-
-- The UK Department for Work and Pensions filter research describes the
-  expected faceted model directly: separate criteria such as Date and Payment
-  status combine with AND, while selecting Paid and Missed inside Payment
-  status expands the matching records, which is OR
-  ([DWP Design System](https://design-system.dwp.gov.uk/contribute/filters/summary#adding-more-filters-should-reduce-the-number-of-results)).
-- The same DWP research recommends clear applied state near the results:
-  result count, applied filters expressed as category plus value, and a reset
-  action. This lets people understand the result set even when the controls
-  have scrolled out of view
-  ([DWP filter state](https://design-system.dwp.gov.uk/contribute/filters/design-notes#state)).
-- Material defines filter chips as compact controls for refining content and
-  says chips should appear in labelled sets. A selected filter chip can add a
-  checkmark as well as changing its container, avoiding reliance on color alone
-  ([Material Web chips](https://material-web.dev/components/chip/),
-  [Android filter-chip guidance](https://developer.android.com/develop/ui/compose/quick-guides/content/create-chip#create-filter-chip)).
-- GOV.UK uses a grouped checkbox set for multiple selections and warns not to
-  assume that visual appearance alone tells people how many choices are
-  allowed
-  ([GOV.UK checkboxes](https://design-system.service.gov.uk/components/checkboxes/)).
-- WAI-ARIA requires a logical checkbox group to have a group label and each
-  option to expose its checked state. The equivalent React Native presentation
-  should expose a labelled Timing group and selected state for each chip
-  ([WAI-ARIA checkbox pattern](https://www.w3.org/WAI/ARIA/apg/patterns/checkbox/)).
-
-## Recommended Incremental Design
-
-Keep the existing horizontal quick-filter row, but replace switch tracks with
-compact filter chips and make facet boundaries visible in the same row:
+Use one persistent, single-select segmented control:
 
 ```text
-[Unclear]   |   Timing  [Slow] [Timed out]   [Wrong]  [Sprint]
+[ All ] [ Needs attention ]
 ```
 
-- Keep `Timing` and its two chips in one non-breaking horizontal group.
-- Keep the Timing group immediately after Unclear, preserving the existing
-  quick-filter order and making the new values visible before the rail scrolls
-  on typical phone widths.
-- Use a short label plus a slightly larger inter-group gap or subtle divider;
-  do not add a new card, explanatory sentence, or second row.
-- Slow and Timed out remain independently selectable. Selecting the second
-  timing value may increase the result count, naturally reinforcing OR.
-- A selected chip uses fill plus a checkmark, not a miniature settings switch
-  and not color alone.
-- Preserve a 44-point touch target around a visually compact 32-36-point chip,
-  matching the repository's phone target guidance.
-- Keep the existing live result count and active-filter strip. Summarize timing
-  as one category-bearing token:
-  - `Timing: Slow`
-  - `Timing: Timed out`
-  - `Timing: Slow or timed out`
-- Prefix other applied tokens by facet where ambiguity is possible, for
-  example `Result: Wrong` and `Source: Sprint`. Separate applied tokens are
-  cumulative constraints; the word `or` appears only inside the Timing token.
-- Expose the Timing set to assistive technology as a labelled multi-select
-  group. Each chip should announce selected/not selected.
+- Default to `All`.
+- Define `Needs attention` as `Slow OR Wrong OR Unclear OR Timed out`.
+- Default the advanced Source facet to `All sources`.
+- Move range, Run/rating bucket, source, result, review state, side, and theme
+  controls into the existing filter menu.
+- Keep the filter-menu button, result count, and compact applied-filter
+  summary. They communicate state; they are not additional quick filters.
+- Keep no second quick filter in this iteration. Date range is the only
+  plausible future candidate, and should return only if usage evidence shows
+  that people repeatedly change it.
 
-This communicates the logic through grouping and current state, without a
-formula such as `Slow OR Timed out AND Wrong`, which adds noise and creates
-operator-precedence questions.
+This supersedes the earlier recommendation for separate `Slow` and `Timed out`
+quick chips. It remains an incremental change to the existing History clone.
 
-## Alternatives
+## Why This Control
 
-### One aggregate Timing chip
+Apple describes a segmented control as a way to present closely related choices
+that affect a view and preserve the current selection at a glance. A toggle
+instead represents opposing on/off states. `All` and `Needs attention` are two
+named result scopes, so a segmented control makes both meanings visible
+([Apple segmented controls](https://developer.apple.com/design/human-interface-guidelines/segmented-controls),
+[Apple toggles](https://developer.apple.com/design/human-interface-guidelines/toggles)).
 
-Show `Timing`, `Timing: Slow`, or `Timing (2)` in the quick row and open a small
-menu or sheet containing Slow and Timed out.
+Android's official guidance likewise defines a single-select segmented button
+as a side-by-side choice with one selected option
+([Android Developers](https://developer.android.com/develop/ui/compose/components/segmented-button)).
+For accessibility, the Storybook presentation uses a labelled radio group,
+matching the WAI-ARIA single-selection contract
+([W3C radio group pattern](https://www.w3.org/WAI/ARIA/apg/patterns/radio/)).
 
-- Advantage: smallest persistent footprint and scales to more timing values.
-- Cost: the most common timing filter becomes a two-tap action and introduces
-  a new transient surface.
-- Use later if the quick row grows beyond the current phone-friendly scope.
+Visible labels stay short. The full union is available in the accessible option
+label: `Needs attention: slow, wrong, unclear, or timed out`. No explanatory
+sentence or Boolean formula is added to the History screen.
 
-### Flat peer chips with an explicit logic summary
+## Naming
 
-Keep Slow and Timed out as ungrouped peers and render a summary such as
-`Slow OR Timed out AND Wrong`.
+Use **`All / Needs attention`**.
 
-- Advantage: mathematically explicit.
-- Cost: visually noisy, harder to localize, and ambiguous without parentheses.
-- Not recommended for a training-first mobile UI.
+`Needs attention` includes correct-but-slow and user-marked unclear attempts
+without colliding with other product concepts:
 
-### Joined segmented control
+- `Needs review` conflicts with the separate Scheduled Review queue.
+- `Training focus` or `Focus` belongs to the planned Training Focus project.
+- `Mistakes` and `Wrong` exclude slow and unclear attempts.
+- `Flagged` sounds manual and does not naturally include wrong or timed-out
+  attempts.
+- `Problems` overstates a correct-but-slow attempt.
+- `Attention` is shorter but less self-explanatory.
 
-Join Slow and Timed out into a conventional platform segmented control.
+These naming conclusions are product-language judgments rather than claims from
+the cited design systems.
 
-- Advantage: strong visual grouping.
-- Cost: on iOS, segmented controls normally communicate one selection at a
-  time, so the component can incorrectly suggest mutual exclusion
-  ([Apple segmented controls](https://developer.apple.com/design/human-interface-guidelines/segmented-controls)).
-- Use a labelled filter-chip set instead.
+## Filter Logic
+
+Treat `Needs attention` as one atomic view predicate. Its four reasons use OR
+internally. Every advanced facet then narrows that union with AND:
+
+```text
+Needs attention AND Source: Review AND Range: 30 days
+```
+
+Do not show the formula in the interface. Keep the selected view, result count,
+and category/value applied-state tokens close to the results.
+
+DWP's filter research recommends AND across different criteria, notes that
+multiple values inside one criterion naturally use OR, and recommends visible
+result count and applied state
+([DWP filter logic](https://design-system.dwp.gov.uk/contribute/filters/summary#adding-more-filters-should-reduce-the-number-of-results),
+[DWP filter state](https://design-system.dwp.gov.uk/contribute/filters/design-notes#state)).
+It also notes that expanded filters above mobile results consume the viewport,
+supporting the decision to keep only one high-value shortcut visible
+([DWP mobile filter layout](https://design-system.dwp.gov.uk/contribute/filters/design-notes#mobile-views)).
+
+`All sources` is the Source facet default and does not appear as an applied
+filter token. It is equivalent to clearing that facet
+([DWP All/any option](https://design-system.dwp.gov.uk/contribute/filters/design-notes#allany-option)).
 
 ## Storybook Acceptance Checks
 
-- With Slow selected, only slow attempts remain.
-- Selecting Timed out as well keeps both slow and timed-out attempts and can
-  increase the result count.
-- Selecting Wrong or Sprint additionally narrows that timing union.
-- The applied-state strip renders one Timing token, not two unrelated tokens.
-- At 320-point width, the row scrolls horizontally, each target remains
-  tappable, and the first result remains visible without new vertical chrome.
-- Screen readers announce a Timing multi-select group and each chip's selected
-  state.
+- Initial state selects `All` and `All sources`.
+- `Needs attention` includes slow, wrong, unclear, and timed-out attempts.
+- An attempt matching multiple reasons appears once.
+- A normal correct, on-time, clear attempt is excluded.
+- Adding an advanced filter can only narrow the attention union.
+- Reset restores `All`, `All sources`, and the default range.
+- At 320-point width, both segments and the filter button remain visible
+  without horizontal scrolling.
+- Assistive technology announces one selected option in a labelled radio group.

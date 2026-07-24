@@ -1272,33 +1272,34 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "session-puzzle-countdown")).toThrow();
   });
 
-  it("adds Slow and Timed out to the existing populated History controls and rows", async () => {
+  it("uses one All or Needs attention selector and keeps every other History filter in the menu", async () => {
     const renderer = renderLabScenario("history-populated");
     await flushMicrotasks();
 
     press(renderer, "history-tab");
-    expect(findByTestId(renderer, "history-timing-filter-group").props.role).toBe("group");
-    expect(findByTestId(renderer, "history-timing-filter-group").props.accessibilityLabel).toBe(
-      "Timing filters, select any"
+    expect(findByTestId(renderer, "history-attention-filter").props.role).toBe("radiogroup");
+    expect(findByTestId(renderer, "history-attention-filter").props.accessibilityLabel).toBe(
+      "History view"
     );
-    expect(findByTestId(renderer, "history-timing-filter-boundary-start")).toBeTruthy();
-    expect(findByTestId(renderer, "history-timing-filter-boundary-end")).toBeTruthy();
-    expect(testIdOrder(renderer, "history-filter-unclear", "history-timing-filter-group")).toBeLessThan(0);
-    expect(testIdOrder(renderer, "history-timing-filter-group", "history-filter-wrong-only")).toBeLessThan(0);
-    expect(findByTestId(renderer, "history-filter-slow-only")).toBeTruthy();
-    expect(findByTestId(renderer, "history-filter-timed-out-only")).toBeTruthy();
-    expect(findByTestId(renderer, "history-filter-slow-only").props.accessibilityRole).toBe(
-      "checkbox"
-    );
-    expect(findByTestId(renderer, "history-filter-slow-only").props.accessibilityState).toEqual({
+    expect(findByTestId(renderer, "history-attention-all").props.accessibilityRole).toBe("radio");
+    expect(findByTestId(renderer, "history-attention-all").props.accessibilityState).toEqual({
+      checked: true
+    });
+    expect(findByTestId(renderer, "history-attention-needs-attention").props.accessibilityState).toEqual({
       checked: false
     });
-    expect(findByTestId(renderer, "history-filter-timed-out-only").props.accessibilityState).toEqual({
-      checked: false
-    });
-    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain(
-      "Timing:"
+    expect(collectText(findByTestId(renderer, "history-attention-filter"))).toBe(
+      "AllNeeds attention"
     );
+    expect(() => findByTestId(renderer, "history-quick-filters")).toThrow();
+    expect(() => findByTestId(renderer, "history-filter-sprint-only")).toThrow();
+    expect(() => findByTestId(renderer, "history-filter-unclear")).toThrow();
+    expect(() => findByTestId(renderer, "history-filter-wrong-only")).toThrow();
+    expect(() => findByTestId(renderer, "history-filter-slow-only")).toThrow();
+    expect(() => findByTestId(renderer, "history-filter-timed-out-only")).toThrow();
+    expect(() => findByTestId(renderer, "history-rating-filters")).toThrow();
+    expect(() => findByTestId(renderer, "history-range-filters")).toThrow();
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain("Sprint");
     expect(collectText(findByTestId(renderer, "history-attempt-history-correct-slow"))).toBe("Slow");
     expect(collectText(findByTestId(renderer, "history-attempt-history-wrong-result"))).toBe(
       "Timed out"
@@ -1314,27 +1315,53 @@ describe("PracticePocScreen", () => {
     )).toBe(true);
     expect(() => findByTestId(renderer, "result-badge-alert-glyph")).toThrow();
     expect(() => findByTestId(renderer, "history-attempt-history-wrong-timed_out")).toThrow();
+    expect(findByTestId(renderer, "history-attempt-history-unclear")).toBeTruthy();
+    expect(findByTestId(renderer, "history-attempt-history-clean")).toBeTruthy();
 
-    press(renderer, "history-filter-slow-only");
-    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain(
-      "Timing: Slow"
+    press(renderer, "history-attention-needs-attention");
+    expect(findByTestId(renderer, "history-attention-all").props.accessibilityState).toEqual({
+      checked: false
+    });
+    expect(findByTestId(renderer, "history-attention-needs-attention").props.accessibilityState).toEqual({
+      checked: true
+    });
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toBe(
+      "7 days·All puzzles"
     );
     expect(findByTestId(renderer, "history-attempt-history-correct")).toBeTruthy();
+    expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
+    expect(findByTestId(renderer, "history-attempt-history-unclear")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-history-clean")).toThrow();
+
+    press(renderer, "history-filter-toggle");
+    expect(findByTestId(renderer, "history-rating-filters")).toBeTruthy();
+    expect(findByTestId(renderer, "history-range-filters")).toBeTruthy();
+    expect(hasStyleEntry(
+      findByTestId(renderer, "history-source-all"),
+      "backgroundColor",
+      "#2563EB"
+    )).toBe(true);
+    expect(collectText(findByTestId(renderer, "history-source-filters"))).toContain("All sources");
+    press(renderer, "history-result-correct");
+    expect(findByTestId(renderer, "history-attempt-history-correct")).toBeTruthy();
+    expect(findByTestId(renderer, "history-attempt-history-unclear")).toBeTruthy();
     expect(() => findByTestId(renderer, "history-attempt-history-wrong")).toThrow();
+    expect(() => findByTestId(renderer, "history-attempt-history-clean")).toThrow();
 
-    press(renderer, "history-filter-timed-out-only");
-    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain(
-      "Timing: Slow or timed out"
-    );
-    expect(findByTestId(renderer, "history-attempt-history-correct")).toBeTruthy();
-    expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
-
-    press(renderer, "history-filter-slow-only");
-    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain(
-      "Timing: Timed out"
+    press(renderer, "history-filter-reset");
+    expect(findByTestId(renderer, "history-attention-all").props.accessibilityState).toEqual({
+      checked: true
+    });
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toBe(
+      "7 days·All puzzles"
     );
     expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
-    expect(() => findByTestId(renderer, "history-attempt-history-correct")).toThrow();
+    expect(findByTestId(renderer, "history-attempt-history-clean")).toBeTruthy();
+    expect(hasStyleEntry(
+      findByTestId(renderer, "history-source-all"),
+      "backgroundColor",
+      "#2563EB"
+    )).toBe(true);
   });
 
   it("shows direct ELO validation and disables Save outside 600-2200", () => {

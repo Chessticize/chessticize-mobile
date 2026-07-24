@@ -50,7 +50,7 @@ Screen inventory:
 | Sprint Results | Win/loss status, solved count, rating change, mistakes, actions | Review mistakes, play again, done | Review Item, Practice Home |
 | Review Queue | Due/overdue summary, difficulty groups, start button | Start due review, filter queue | Review Item |
 | Analysis Review | Board, compact toolbar, Stockfish status, candidate line rows, guided arrows when applicable | Reset, flip, analyze, navigate, finish review | Review Complete, History |
-| History | All-puzzle attempt list, top-level rating bucket chips, range filters, conditional rating trend, expandable row filters | Filter wrong-only/source rows, inspect attempt context, open attempt | Attempt Detail, Review Item |
+| History | All-puzzle attempt list, All/Needs attention selector, conditional rating trend, expandable filters | Switch result scope, refine filters, inspect attempt context, open attempt | Attempt Detail, Review Item |
 | Custom Sprint Setup | Mode/theme/timing controls, editable ELO, estimate, start | Start sprint, save template | Active Sprint |
 | Settings | iCloud Sync, notifications, profile, about, puzzle-data source notes | Toggle sync, adjust reminders, inspect licenses and support contact | External license/source/data/support links |
 
@@ -60,8 +60,9 @@ Use a four-tab app shell:
 
 - Practice: quick start, active session, custom sprint setup, and Arrow Duel entry.
 - Review: due mistake reviews and spaced repetition queue.
-- History: attempts, sprint sessions, range filters, top-level rating bucket
-  filters, and expandable detailed filters including wrong-only/source filters.
+- History: attempts, sprint sessions, an All/Needs attention view selector, and
+  expandable range, rating-bucket, source, result, review-state, side, and
+  theme filters.
 - Settings: iCloud Sync, notification preferences, advanced rating adjustment,
   About links, support contact, and puzzle data attribution.
 
@@ -167,8 +168,9 @@ Analysis Review:
 
 History:
 
-- Compact portrait keeps rating bucket chips, range chips, optional trend, and
-  attempt rows stacked.
+- Compact portrait keeps the All/Needs attention selector, applied-filter
+  summary, optional trend, and attempt rows stacked. Detailed controls stay in
+  the expandable filter menu.
 - Compact landscape and regular width can use a split view: filters and chart on one side, attempt list/detail on the other.
 - Regular-width attempt detail may open beside the list rather than replacing the full screen, but Analysis Review still owns the full board surface when launched.
 
@@ -239,8 +241,9 @@ Core components:
 - `ChessboardSurface`: reused board component plus highlight/arrow overlay adapter.
 - `ModePicker`: compact list or segmented choice for Standard, Arrow Duel, Custom.
 - `ReviewQueueHeader`: due count, overdue count, and next review estimate.
-- `HistoryFilterBar`: All Puzzles and rating bucket chips, date-range chips,
-  compact filter toggle, and expandable result/source filters.
+- `HistoryFilterBar`: persistent All/Needs attention segmented view, compact
+  filter toggle, applied-filter summary, and expandable range, rating,
+  result/source, review-state, side, and theme filters.
 - `RatingTrendChart`: rating-only line chart over the selected ELO bucket and
   time range; hidden in the default All Puzzles view.
 - `SettingsRow`: label, value, status, and disclosure or switch.
@@ -466,15 +469,18 @@ New Run behavior:
 
 ### History
 
-- Quick range filters include 7 days, 30 days, 90 days, 1 year, and all time.
+- The only persistent History view selector is a compact, single-select
+  `All / Needs attention` segmented control. `Needs attention` is the union of
+  Slow, Wrong, Unclear, and Timed out attempts.
 - History data must be pageable, including the all-time range.
 - The default History surface shows all puzzle attempts across rating buckets.
-  Top-level chips include All Puzzles plus each played rating bucket so the user
-  can quickly focus a sprint type without opening the filter panel.
-- Quick content filters include wrong-only and source type. Source type and
-  detailed filters live behind the compact filter toggle; wrong-only remains in
-  the top filter stack for fast triage.
-- "Wrong only" is a result filter shortcut that does not change the active time range. It toggles the attempt rows between all results and wrong results and should appear in the active filter summary when enabled.
+  Source defaults to All sources rather than Sprint.
+- Time range, rating bucket, source, result, review state, side, and theme
+  controls live behind the compact filter toggle. No separate Sprint, Wrong,
+  Unclear, Slow, or Timed out quick control remains.
+- The four Needs attention reasons use OR. Every advanced facet combines with
+  that union using AND. Keep the result count and category/value applied-filter
+  summary near the list without displaying a Boolean formula.
 - Selecting an ELO bucket supplies the mode, sprint config, and sprint-speed
   context for rating history. Do not show separate History mode or speed chips
   while the view can be focused through rating bucket chips.
@@ -490,7 +496,9 @@ New Run behavior:
 - Tapping a row opens Analysis Review with original attempt context.
 - Analysis Review launched from History supports retry, Stockfish analysis, and previous/next navigation through the current filtered History result set.
 - Previous/next navigation from History follows the active filter result order, not just the currently visible page.
-- History filters should be horizontally scrollable chips on phones.
+- Expanded History menu filters may use horizontally scrollable chip groups on
+  phones. The persistent `All / Needs attention` selector itself must fit
+  without horizontal scrolling.
 - History theme filters use multi-select OR semantics: an attempt matches when
   it has any selected curated theme. `All` represents no named-theme constraint,
   clears named selections, and is restored when the last named theme is removed.

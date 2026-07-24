@@ -125,7 +125,13 @@ function sessionTimingPreviewFor(
 }
 
 function showsHistoryTimingPreview(scenarioId: LabScenarioId): boolean {
-  return scenarioId === "history-populated";
+  return [
+    "history-empty",
+    "history-populated",
+    "history-filters",
+    "history-attempt-detail",
+    "history-replay-unavailable"
+  ].includes(scenarioId);
 }
 
 function isRunManagementScenario(scenarioId: LabScenarioId): boolean {
@@ -408,6 +414,14 @@ function createHistoryService(
       completedAt: "2026-07-16T13:00:07.000Z",
       ratingBefore: 900,
       ratingAfter: 930
+    }),
+    historyAttempt({
+      id: "history-clean",
+      puzzleId: LAB_PUZZLES[3]!.id,
+      result: "correct",
+      completedAt: "2026-07-15T12:00:06.000Z",
+      ratingBefore: 884,
+      ratingAfter: 900
     })
   ];
   for (const attempt of attempts) {
@@ -434,13 +448,20 @@ function createHistoryService(
     ratingBefore: 910,
     ratingAfter: 928
   }));
+  store.createSprintSession(completedSprint({
+    id: "session-history-clean",
+    mode: "standard",
+    completedAt: "2026-07-15T12:00:06.000Z",
+    ratingBefore: 884,
+    ratingAfter: 900
+  }));
   store.saveRating({
     key: "standard 5/20",
     generation: 0,
     rating: 928,
     ratingDeviation: 160,
     volatility: 0.05,
-    games: 3
+    games: 4
   });
   store.scheduleMistakeReview({
     puzzleId: LAB_PUZZLES[1]!.id,

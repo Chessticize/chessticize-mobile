@@ -479,14 +479,15 @@ export function PracticePocScreen({
   const [boardInputLockMode, setBoardInputLockMode] = useState<BoardInputLockMode>("hard");
   const [chessboardDebugEvents, setChessboardDebugEvents] = useState<string[]>([]);
   const [historyTimeRange, setHistoryTimeRange] = useState<HistoryTimeRange>("7d");
-  const [historySourceFilter, setHistorySourceFilter] = useState<"all" | AttemptSource>("sprint");
+  const [historySourceFilter, setHistorySourceFilter] = useState<"all" | AttemptSource>(
+    historyTimingPreview ? "all" : "sprint"
+  );
   const [historyResultFilter, setHistoryResultFilter] = useState<"all" | "correct" | "wrong">("all");
   const [historySideFilter, setHistorySideFilter] = useState<"all" | PuzzleSide>("all");
   const [historyRatingRangeFilter, setHistoryRatingRangeFilter] = useState<HistoryRatingRangeFilter>("all");
   const [historyReviewStatusFilter, setHistoryReviewStatusFilter] = useState<"all" | HistoryReviewStatus>("all");
   const [historyUnclearOnly, setHistoryUnclearOnly] = useState(false);
-  const [historySlowOnly, setHistorySlowOnly] = useState(false);
-  const [historyTimedOutOnly, setHistoryTimedOutOnly] = useState(false);
+  const [historyAttentionOnly, setHistoryAttentionOnly] = useState(false);
   const [historyPageOffset, setHistoryPageOffset] = useState(0);
   const [historyRatingKey, setHistoryRatingKey] = useState<string | null>(null);
   const [historyReviewEntries, setHistoryReviewEntries] = useState<ReviewEntry[]>([]);
@@ -2129,16 +2130,17 @@ export function PracticePocScreen({
       })
     : null;
   const visibleHistoryAttempts = historyView?.attempts.filter((attempt) => {
-    if (!historyTimingPreview || (!historySlowOnly && !historyTimedOutOnly)) {
+    if (!historyTimingPreview || !historyAttentionOnly) {
       return true;
     }
     return (
-      historySlowOnly && historyTimingPreview.slowAttemptIds.includes(attempt.id)
-    ) || (
-      historyTimedOutOnly && historyTimingPreview.timedOutAttemptIds.includes(attempt.id)
+      attempt.unclear
+      || attempt.result === "wrong"
+      || historyTimingPreview.slowAttemptIds.includes(attempt.id)
+      || historyTimingPreview.timedOutAttemptIds.includes(attempt.id)
     );
   }) ?? [];
-  const visibleHistoryPage = historyView && historyTimingPreview && (historySlowOnly || historyTimedOutOnly)
+  const visibleHistoryPage = historyView && historyTimingPreview && historyAttentionOnly
     ? {
         ...historyView.page,
         hasMore: false,
@@ -2907,8 +2909,7 @@ export function PracticePocScreen({
                   unclearOnly={historyUnclearOnly}
                   sprintOnly={historySourceFilter === "sprint"}
                   wrongOnly={historyWrongOnly}
-                  slowOnly={historySlowOnly}
-                  timedOutOnly={historyTimedOutOnly}
+                  attentionOnly={historyAttentionOnly}
                   timingPreview={historyTimingPreview}
                   themeCatalogPresentation={themeCatalogPresentation}
                   filtersExpanded={historyFiltersExpanded}
@@ -2949,27 +2950,22 @@ export function PracticePocScreen({
                     setHistoryPageOffset(0);
                     setHistoryUnclearOnly((current) => !current);
                   }}
-                  onToggleSlowOnly={() => {
+                  onAttentionOnlyChange={(attentionOnly) => {
                     setHistoryPageOffset(0);
-                    setHistorySlowOnly((current) => !current);
-                  }}
-                  onToggleTimedOutOnly={() => {
-                    setHistoryPageOffset(0);
-                    setHistoryTimedOutOnly((current) => !current);
+                    setHistoryAttentionOnly(attentionOnly);
                   }}
                   onPageOffsetChange={setHistoryPageOffset}
                   onOpenAttempt={openHistoryReview}
                   onResetFilters={() => {
                     setHistoryTimeRange("7d");
-                    setHistorySourceFilter("sprint");
+                    setHistorySourceFilter(historyTimingPreview ? "all" : "sprint");
                     setHistoryResultFilter("all");
                     setHistorySideFilter("all");
                     historyThemeChoices.dispatch({ type: "select-all-themes" });
                     setHistoryRatingRangeFilter("all");
                     setHistoryReviewStatusFilter("all");
                     setHistoryUnclearOnly(false);
-                    setHistorySlowOnly(false);
-                    setHistoryTimedOutOnly(false);
+                    setHistoryAttentionOnly(false);
                     setHistoryPageOffset(0);
                     setHistoryRatingKey(null);
                   }}
@@ -6493,8 +6489,7 @@ function HistoryPanel({
   unclearOnly,
   sprintOnly,
   wrongOnly,
-  slowOnly,
-  timedOutOnly,
+  attentionOnly,
   timingPreview,
   themeCatalogPresentation,
   onRatingKeyChange,
@@ -6509,11 +6504,10 @@ function HistoryPanel({
   onOpenAttempt,
   onFiltersExpandedChange,
   onResetFilters,
+  onAttentionOnlyChange,
   onToggleSprintOnly,
   onToggleUnclearOnly,
-  onToggleWrongOnly,
-  onToggleSlowOnly,
-  onToggleTimedOutOnly
+  onToggleWrongOnly
 }: {
   adaptiveLayout: AdaptiveLayout;
   attempts: HistoryAttemptView[];
@@ -6535,8 +6529,7 @@ function HistoryPanel({
   unclearOnly: boolean;
   sprintOnly: boolean;
   wrongOnly: boolean;
-  slowOnly: boolean;
-  timedOutOnly: boolean;
+  attentionOnly: boolean;
   timingPreview?: HistoryTimingDesignPreview;
   themeCatalogPresentation?: ThemeCatalogPresentation;
   onRatingKeyChange: (ratingKey: string | null) => void;
@@ -6551,11 +6544,10 @@ function HistoryPanel({
   onOpenAttempt: (attemptId: string) => void;
   onFiltersExpandedChange: (expanded: boolean) => void;
   onResetFilters: () => void;
+  onAttentionOnlyChange: (attentionOnly: boolean) => void;
   onToggleSprintOnly: () => void;
   onToggleUnclearOnly: () => void;
   onToggleWrongOnly: () => void;
-  onToggleSlowOnly: () => void;
-  onToggleTimedOutOnly: () => void;
 }): React.JSX.Element {
   const visibleAttempts = attempts;
   const ratingPoints = performance.charts.rating;
@@ -6572,9 +6564,7 @@ function HistoryPanel({
     sourceFilter,
     themeFilters: namedThemeFilters,
     timeRange,
-    unclearOnly,
-    slowOnly,
-    timedOutOnly
+    unclearOnly
   });
   return (
     <View style={[styles.historyPanel, adaptiveLayout.usesWideContent ? styles.historyPanelWide : null]} testID="history-panel">
@@ -6606,98 +6596,50 @@ function HistoryPanel({
       </View>
 
       <View style={styles.historyTopFilterStack} testID="history-primary-filters">
-        <HistoryChipRow testID="history-rating-filters">
-          <FilterButton
-            active={selectedRatingKey === null}
-            label="All Puzzles"
-            testID="history-rating-all"
-            onPress={() => onRatingKeyChange(null)}
+        {timingPreview ? (
+          <HistoryAttentionFilter
+            attentionOnly={attentionOnly}
+            onChange={onAttentionOnlyChange}
           />
-          {ratingKeys.map((ratingKey) => (
-            <FilterButton
-              key={ratingKey}
-              active={selectedRatingKey === ratingKey}
-              label={historyRatingKeyLabel(
-                ratingKey,
-                runsByRatingKey.get(ratingKey)?.name,
-                runsByRatingKey.get(ratingKey)?.perPuzzleSeconds
-              )}
-              testID={`history-rating-${ratingKey}`}
-              onPress={() => onRatingKeyChange(ratingKey)}
+        ) : (
+          <>
+            <HistoryRatingFilters
+              ratingKeys={ratingKeys}
+              runsByRatingKey={runsByRatingKey}
+              selectedRatingKey={selectedRatingKey}
+              onRatingKeyChange={onRatingKeyChange}
             />
-          ))}
-        </HistoryChipRow>
-        <HistoryChipRow testID="history-range-filters">
-          {(["7d", "30d", "90d", "1y", "max"] as const).map((range) => (
-            <FilterButton
-              key={range}
-              active={timeRange === range}
-              label={historyRangeLabel(range)}
-              testID={`history-range-${range}`}
-              onPress={() => onTimeRangeChange(range)}
-            />
-          ))}
-        </HistoryChipRow>
-        <ScrollView
-          contentContainerStyle={styles.historyQuickFilterRow}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          testID="history-quick-filters"
-        >
-          <HistoryQuickChip
-            active={unclearOnly}
-            accessibilityLabel="Unclear attempts"
-            controlTestID="history-filter-unclear"
-            label="Unclear"
-            onPress={onToggleUnclearOnly}
-          />
-          {timingPreview ? (
-            <View
-              accessibilityLabel="Timing filters, select any"
-              role="group"
-              style={styles.historyQuickFacetGroup}
-              testID="history-timing-filter-group"
+            <HistoryRangeFilters timeRange={timeRange} onTimeRangeChange={onTimeRangeChange} />
+            <ScrollView
+              contentContainerStyle={styles.historyQuickFilterRow}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              testID="history-quick-filters"
             >
-              <View
-                style={styles.historyQuickFacetDivider}
-                testID="history-timing-filter-boundary-start"
-              />
-              <Text style={styles.historyQuickFacetLabel}>Timing</Text>
               <HistoryQuickChip
-                active={slowOnly}
-                accessibilityLabel="Slow attempts"
-                controlTestID="history-filter-slow-only"
-                label="Slow"
-                onPress={onToggleSlowOnly}
+                active={unclearOnly}
+                accessibilityLabel="Unclear attempts"
+                controlTestID="history-filter-unclear"
+                label="Unclear"
+                onPress={onToggleUnclearOnly}
               />
               <HistoryQuickChip
-                active={timedOutOnly}
-                accessibilityLabel="Timed out attempts"
-                controlTestID="history-filter-timed-out-only"
-                label="Timed out"
-                onPress={onToggleTimedOutOnly}
+                active={wrongOnly}
+                accessibilityLabel="Wrong attempts"
+                controlTestID="history-filter-wrong-only"
+                label="Wrong"
+                onPress={onToggleWrongOnly}
               />
-              <View
-                style={styles.historyQuickFacetDivider}
-                testID="history-timing-filter-boundary-end"
+              <HistoryQuickChip
+                active={sprintOnly}
+                accessibilityLabel="Sprint attempts"
+                controlTestID="history-filter-sprint-only"
+                label="Sprint"
+                onPress={onToggleSprintOnly}
               />
-            </View>
-          ) : null}
-          <HistoryQuickChip
-            active={wrongOnly}
-            accessibilityLabel="Wrong attempts"
-            controlTestID="history-filter-wrong-only"
-            label="Wrong"
-            onPress={onToggleWrongOnly}
-          />
-          <HistoryQuickChip
-            active={sprintOnly}
-            accessibilityLabel="Sprint attempts"
-            controlTestID="history-filter-sprint-only"
-            label="Sprint"
-            onPress={onToggleSprintOnly}
-          />
-        </ScrollView>
+            </ScrollView>
+          </>
+        )}
       </View>
 
       {selectedRatingKey ? (
@@ -6720,8 +6662,19 @@ function HistoryPanel({
 
       {filtersExpanded ? (
         <View style={styles.historyAdvancedFilters} testID="history-advanced-filters">
+          {timingPreview ? (
+            <>
+              <HistoryRatingFilters
+                ratingKeys={ratingKeys}
+                runsByRatingKey={runsByRatingKey}
+                selectedRatingKey={selectedRatingKey}
+                onRatingKeyChange={onRatingKeyChange}
+              />
+              <HistoryRangeFilters timeRange={timeRange} onTimeRangeChange={onTimeRangeChange} />
+            </>
+          ) : null}
           <HistoryChipRow testID="history-source-filters">
-            <FilterButton active={sourceFilter === "all"} label="All" testID="history-source-all" onPress={() => onSourceFilterChange("all")} />
+            <FilterButton active={sourceFilter === "all"} label={timingPreview ? "All sources" : "All"} testID="history-source-all" onPress={() => onSourceFilterChange("all")} />
             <FilterButton active={sourceFilter === "sprint"} label="Sprint" testID="history-source-sprint" onPress={() => onSourceFilterChange("sprint")} />
             <FilterButton active={sourceFilter === "scheduled_review"} label="Review" testID="history-source-review" onPress={() => onSourceFilterChange("scheduled_review")} />
           </HistoryChipRow>
@@ -6779,7 +6732,7 @@ function HistoryPanel({
         </View>
       ) : null}
 
-      <HistoryActiveFilterStrip labels={activeFilterLabels} />
+      <HistoryActiveFilterStrip compact={Boolean(timingPreview)} labels={activeFilterLabels} />
 
       <View style={styles.historyPageRow}>
         <Text style={styles.helperText}>
@@ -6891,8 +6844,6 @@ type HistoryActiveFilterInput = {
   themeFilters: readonly string[];
   timeRange: HistoryTimeRange;
   unclearOnly: boolean;
-  slowOnly: boolean;
-  timedOutOnly: boolean;
 };
 
 function historyActiveFilterLabels({
@@ -6906,21 +6857,12 @@ function historyActiveFilterLabels({
   sourceFilter,
   themeFilters,
   timeRange,
-  unclearOnly,
-  slowOnly,
-  timedOutOnly
+  unclearOnly
 }: HistoryActiveFilterInput): string[] {
   const labels = [
     historyRangeLabel(timeRange),
     ratingKey ? historyRatingKeyLabel(ratingKey, runName, runPerPuzzleSeconds) : "All puzzles"
   ];
-  if (slowOnly && timedOutOnly) {
-    labels.push("Timing: Slow or timed out");
-  } else if (slowOnly) {
-    labels.push("Timing: Slow");
-  } else if (timedOutOnly) {
-    labels.push("Timing: Timed out");
-  }
   if (sourceFilter !== "all") {
     labels.push(sourceFilter === "scheduled_review" ? "Source: Review" : "Source: Sprint");
   }
@@ -6943,18 +6885,34 @@ function historyActiveFilterLabels({
   return labels;
 }
 
-function HistoryActiveFilterStrip({ labels }: { labels: string[] }): React.JSX.Element {
+function HistoryActiveFilterStrip({
+  compact = false,
+  labels
+}: {
+  compact?: boolean;
+  labels: string[];
+}): React.JSX.Element {
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
       testID="history-active-filter-summary"
     >
-      <View style={styles.historyChipContent}>
+      <View style={compact ? styles.historyCompactFilterSummary : styles.historyChipContent}>
         {labels.map((label, index) => (
-          <View key={`${label}-${index}`} style={styles.historyActiveFilterChip} testID={`history-active-filter-${index}`}>
-            <Text style={styles.historyActiveFilterText}>{label}</Text>
-          </View>
+          <React.Fragment key={`${label}-${index}`}>
+            {compact && index > 0 ? (
+              <Text style={styles.historyCompactFilterSeparator}>·</Text>
+            ) : null}
+            <View
+              style={compact ? styles.historyCompactFilterLabel : styles.historyActiveFilterChip}
+              testID={`history-active-filter-${index}`}
+            >
+              <Text style={compact ? styles.historyCompactFilterText : styles.historyActiveFilterText}>
+                {label}
+              </Text>
+            </View>
+          </React.Fragment>
         ))}
       </View>
     </ScrollView>
@@ -7274,6 +7232,124 @@ function HistoryChipRow({
         {children}
       </View>
     </ScrollView>
+  );
+}
+
+function HistoryRatingFilters({
+  onRatingKeyChange,
+  ratingKeys,
+  runsByRatingKey,
+  selectedRatingKey
+}: {
+  onRatingKeyChange: (ratingKey: string | null) => void;
+  ratingKeys: string[];
+  runsByRatingKey: ReadonlyMap<string, { name: string; perPuzzleSeconds: number }>;
+  selectedRatingKey: string | null;
+}): React.JSX.Element {
+  return (
+    <HistoryChipRow testID="history-rating-filters">
+      <FilterButton
+        active={selectedRatingKey === null}
+        label="All Puzzles"
+        testID="history-rating-all"
+        onPress={() => onRatingKeyChange(null)}
+      />
+      {ratingKeys.map((ratingKey) => (
+        <FilterButton
+          key={ratingKey}
+          active={selectedRatingKey === ratingKey}
+          label={historyRatingKeyLabel(
+            ratingKey,
+            runsByRatingKey.get(ratingKey)?.name,
+            runsByRatingKey.get(ratingKey)?.perPuzzleSeconds
+          )}
+          testID={`history-rating-${ratingKey}`}
+          onPress={() => onRatingKeyChange(ratingKey)}
+        />
+      ))}
+    </HistoryChipRow>
+  );
+}
+
+function HistoryRangeFilters({
+  onTimeRangeChange,
+  timeRange
+}: {
+  onTimeRangeChange: (range: HistoryTimeRange) => void;
+  timeRange: HistoryTimeRange;
+}): React.JSX.Element {
+  return (
+    <HistoryChipRow testID="history-range-filters">
+      {(["7d", "30d", "90d", "1y", "max"] as const).map((range) => (
+        <FilterButton
+          key={range}
+          active={timeRange === range}
+          label={historyRangeLabel(range)}
+          testID={`history-range-${range}`}
+          onPress={() => onTimeRangeChange(range)}
+        />
+      ))}
+    </HistoryChipRow>
+  );
+}
+
+function HistoryAttentionFilter({
+  attentionOnly,
+  onChange
+}: {
+  attentionOnly: boolean;
+  onChange: (attentionOnly: boolean) => void;
+}): React.JSX.Element {
+  return (
+    <View
+      accessibilityLabel="History view"
+      role="radiogroup"
+      style={styles.historyAttentionFilter}
+      testID="history-attention-filter"
+    >
+      <Pressable
+        accessibilityLabel="All attempts"
+        accessibilityRole="radio"
+        accessibilityState={{ checked: !attentionOnly }}
+        aria-checked={!attentionOnly}
+        onPress={() => onChange(false)}
+        style={[
+          styles.historyAttentionOption,
+          !attentionOnly ? styles.historyAttentionOptionActive : null
+        ]}
+        testID="history-attention-all"
+      >
+        <Text
+          style={[
+            styles.historyAttentionOptionText,
+            !attentionOnly ? styles.historyAttentionOptionTextActive : null
+          ]}
+        >
+          All
+        </Text>
+      </Pressable>
+      <Pressable
+        accessibilityLabel="Needs attention: slow, wrong, unclear, or timed out"
+        accessibilityRole="radio"
+        accessibilityState={{ checked: attentionOnly }}
+        aria-checked={attentionOnly}
+        onPress={() => onChange(true)}
+        style={[
+          styles.historyAttentionOption,
+          attentionOnly ? styles.historyAttentionOptionActive : null
+        ]}
+        testID="history-attention-needs-attention"
+      >
+        <Text
+          style={[
+            styles.historyAttentionOptionText,
+            attentionOnly ? styles.historyAttentionOptionTextActive : null
+          ]}
+        >
+          Needs attention
+        </Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -14365,6 +14441,33 @@ const styles = StyleSheet.create({
   historyTopFilterStack: {
     gap: 8
   },
+  historyAttentionFilter: {
+    backgroundColor: "#E2E8F0",
+    borderColor: "#CBD5E1",
+    borderRadius: 9,
+    borderWidth: 1,
+    flexDirection: "row",
+    padding: 2
+  },
+  historyAttentionOption: {
+    alignItems: "center",
+    borderRadius: 7,
+    flex: 1,
+    justifyContent: "center",
+    minHeight: 40,
+    paddingHorizontal: 10
+  },
+  historyAttentionOptionActive: {
+    backgroundColor: "#FFFFFF"
+  },
+  historyAttentionOptionText: {
+    color: "#64748B",
+    fontSize: 13,
+    fontWeight: "800"
+  },
+  historyAttentionOptionTextActive: {
+    color: "#1D4ED8"
+  },
   historyQuickFilterRow: {
     alignItems: "center",
     flexDirection: "row",
@@ -14601,6 +14704,26 @@ const styles = StyleSheet.create({
     color: "#475569",
     fontSize: 12,
     fontWeight: "800"
+  },
+  historyCompactFilterSummary: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 6,
+    minHeight: 20,
+    paddingRight: 2
+  },
+  historyCompactFilterLabel: {
+    justifyContent: "center"
+  },
+  historyCompactFilterSeparator: {
+    color: "#94A3B8",
+    fontSize: 12,
+    fontWeight: "700"
+  },
+  historyCompactFilterText: {
+    color: "#64748B",
+    fontSize: 12,
+    fontWeight: "700"
   },
   historyAttemptCard: {
     alignItems: "center",
