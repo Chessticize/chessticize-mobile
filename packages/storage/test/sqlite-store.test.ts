@@ -185,7 +185,7 @@ test("SQLite migration adds server-compatible Glicko fields to existing ratings 
   }
 });
 
-test("SQLite migration preserves legacy settings while adding the sync upload safety flag", async () => {
+test("SQLite migration preserves legacy settings while adding current safety and feedback defaults", async () => {
   const dir = await mkdtemp(join(tmpdir(), "chessticize-settings-migration-"));
   const dbPath = join(dir, "practice.sqlite");
   try {
@@ -210,12 +210,14 @@ test("SQLite migration preserves legacy settings while adding the sync upload sa
     store.migrate();
     assert.deepEqual(store.getSettings(), {
       sync: { iCloudEnabled: false },
-      notifications: { reviewReminder: { mode: "fixed", fixedLocalTime: "19:00" } }
+      notifications: { reviewReminder: { mode: "fixed", fixedLocalTime: "19:00" } },
+      moveFeedback: { soundEnabled: true, hapticsEnabled: true }
     });
 
     store.saveSettings({
       sync: { iCloudEnabled: true },
-      notifications: { reviewReminder: { mode: "off" } }
+      notifications: { reviewReminder: { mode: "off" } },
+      moveFeedback: { soundEnabled: false, hapticsEnabled: true }
     });
     store.migrate();
     store.close();
@@ -228,17 +230,23 @@ test("SQLite migration preserves legacy settings while adding the sync upload sa
       sync_upload_allowed: number;
       review_reminder_mode: string;
       review_reminder_fixed_local_time: string | null;
+      move_feedback_sound_enabled: number;
+      move_feedback_haptics_enabled: number;
     };
     const integrity = migratedDb.prepare("PRAGMA integrity_check").get() as { integrity_check: string };
     migratedDb.close();
 
     assert.ok(columns.some((column) => column.name === "sync_upload_allowed"));
+    assert.ok(columns.some((column) => column.name === "move_feedback_sound_enabled"));
+    assert.ok(columns.some((column) => column.name === "move_feedback_haptics_enabled"));
     assert.deepEqual({ ...settings }, {
       id: "default",
       sync_icloud_enabled: 1,
       sync_upload_allowed: 0,
       review_reminder_mode: "off",
-      review_reminder_fixed_local_time: null
+      review_reminder_fixed_local_time: null,
+      move_feedback_sound_enabled: 0,
+      move_feedback_haptics_enabled: 1
     });
     assert.equal(integrity.integrity_check, "ok");
   } finally {
@@ -830,6 +838,10 @@ test("PracticeService persists SQLite settings across store reopen", async () =>
             reviewReminder: {
               mode: "smart"
             }
+          },
+          moveFeedback: {
+            soundEnabled: true,
+            hapticsEnabled: true
           }
         });
 
@@ -842,6 +854,10 @@ test("PracticeService persists SQLite settings across store reopen", async () =>
               mode: "fixed",
               fixedLocalTime: "20:30"
             }
+          },
+          moveFeedback: {
+            soundEnabled: false,
+            hapticsEnabled: true
           }
         });
 
@@ -869,6 +885,10 @@ test("PracticeService persists SQLite settings across store reopen", async () =>
               mode: "fixed",
               fixedLocalTime: "08:15"
             }
+          },
+          moveFeedback: {
+            soundEnabled: false,
+            hapticsEnabled: true
           }
         });
         assert.deepEqual(service.getReviewReminderPreference(), { mode: "fixed", fixedLocalTime: "08:15" });

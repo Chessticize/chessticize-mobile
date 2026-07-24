@@ -148,6 +148,12 @@ import {
   type MoveFeedbackPreferences,
   type MoveFeedbackPreviewer
 } from "./MoveFeedbackSettingsSection.tsx";
+import {
+  emitCommittedMoveFeedback,
+  moveFeedbackCueForMove,
+  type MoveFeedbackActor,
+  type MoveFeedbackClient
+} from "../platform/moveFeedback.ts";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Chess, type Move, type PieceSymbol, type Square } from "chess.js";
 import type {
@@ -183,7 +189,6 @@ interface Props {
   feedbackIssuesOpener?: (url: string) => Promise<void>;
   currentTimeMs?: () => number;
   moveFeedbackSettings?: {
-    initialPreferences?: MoveFeedbackPreferences;
     preview?: MoveFeedbackPreviewer;
   };
   puzzleSelectionId?: string;
@@ -420,6 +425,7 @@ export function PracticePocScreen({
   const scheduler = platformCapabilities.reminders.scheduler;
   const notificationClient = platformCapabilities.reminders.notificationClient;
   const reminderPlatform = platformCapabilities.reminders.platform;
+  const moveFeedbackClient = platformCapabilities.moveFeedback.client;
   const progressProtection = platformCapabilities.progressProtection;
   const iCloudSyncClient = platformCapabilities.progressSync.client;
   const boardRef = useRef<ChessboardRef | null>(null);
@@ -525,10 +531,7 @@ export function PracticePocScreen({
   const [iCloudSyncEnabled, setICloudSyncEnabled] = useState(() => service.getSettings().sync.iCloudEnabled);
   const [iCloudSyncStatus, setICloudSyncStatus] = useState(() => service.getSettings().sync.iCloudEnabled ? "Ready" : "Off");
   const [moveFeedbackPreferences, setMoveFeedbackPreferences] = useState<MoveFeedbackPreferences>(
-    () => moveFeedbackSettings?.initialPreferences ?? {
-      hapticsEnabled: true,
-      soundEnabled: true
-    }
+    () => service.getSettings().moveFeedback
   );
   const [, setSettingsRevision] = useState(0);
   const sessionTimingDesignState = useSessionTimingDesignPreview(sessionTimingPreview);
@@ -875,6 +878,36 @@ export function PracticePocScreen({
     if (iCloudSyncClient) {
       void runICloudProgressSync("settings-enabled");
     }
+  }
+
+  function saveMoveFeedbackPreferences(preferences: MoveFeedbackPreferences): void {
+    const saved = service.saveSettings({
+      ...service.getSettings(),
+      moveFeedback: preferences
+    });
+    setMoveFeedbackPreferences(saved.moveFeedback);
+    setSettingsRevision((current) => current + 1);
+  }
+
+  function playCommittedMoveFeedback(
+    actor: MoveFeedbackActor,
+    move: string,
+    preMoveFen: string | null
+  ): void {
+    if (!moveFeedbackClient || !preMoveFen) {
+      return;
+    }
+    const cue = moveFeedbackCueForMove(preMoveFen, move);
+    if (!cue) {
+      return;
+    }
+    void emitCommittedMoveFeedback(
+      moveFeedbackClient,
+      { actor, cue },
+      service.getSettings().moveFeedback
+    ).catch(() => {
+      // Feedback is nonessential and must never interrupt a chess move.
+    });
   }
 
   async function runICloudProgressSync(reason: string): Promise<string> {
@@ -1448,6 +1481,7 @@ export function PracticePocScreen({
   }): Promise<void> {
     try {
       const next = service.submitMove(move, nowIso());
+      playCommittedMoveFeedback("user", move, submittedFen);
       const nextFeedback = (next.feedback as SessionFeedback) ?? null;
       if (next.attempt) {
         setUnclearPrompt(isUnclearAttemptEligible(next.attempt)
@@ -2020,6 +2054,7 @@ export function PracticePocScreen({
 
     for (const move of parsedMoves) {
       const suppressedMove = boardMoveToUci(move);
+      const preMoveFen = boardRef.current.getState().fen;
       suppressedBoardMovesRef.current.push(suppressedMove);
       const playedMove = await boardRef.current.move({
         from: move.from as Square,
@@ -2029,6 +2064,8 @@ export function PracticePocScreen({
       if (!playedMove) {
         consumeSuppressedBoardMove(suppressedMove, suppressedBoardMovesRef.current);
         commitBoardFen(finalFen);
+      } else {
+        playCommittedMoveFeedback("opponent", suppressedMove, preMoveFen);
       }
       setLastBoardMove(move);
     }
@@ -2047,6 +2084,9 @@ export function PracticePocScreen({
     entryKey: !feedbackSnapshot && isActive && state && currentPuzzle
       ? `${state.id}:${state.currentPuzzleIndex}:${currentPuzzle.puzzle.id}`
       : null,
+    onCommittedMove: (move, preMoveFen) => {
+      playCommittedMoveFeedback("opponent", move, preMoveFen);
+    },
     onLastMove: setLastBoardMove,
     suppressedMovesRef: suppressedBoardMovesRef
   });
@@ -2921,6 +2961,7 @@ export function PracticePocScreen({
                   deferBackRelevantTransition={deferBackRelevantTransition}
                   entries={historyReviewEntries}
                   initialIndex={historyReviewInitialIndex}
+                  moveFeedbackClient={moveFeedbackClient}
                   service={service}
                   systemBackCommand={reviewBackCommand}
                   onAnalysisActiveChange={setReviewAnalysisOpen}
@@ -3044,6 +3085,7 @@ export function PracticePocScreen({
                 reviewQueue={reviewQueue}
                 currentTimeMs={currentTimeMs}
                 deferBackRelevantTransition={deferBackRelevantTransition}
+                moveFeedbackClient={moveFeedbackClient}
                 service={service}
                 sessionMistakeReviewItems={sessionMistakeReviewItems}
                 onExitSessionReview={exitSessionReview}
@@ -3100,11 +3142,11 @@ export function PracticePocScreen({
                 showRatingControls={!ratingEditingMovedToHome}
                 iCloudSyncEnabled={iCloudSyncEnabled}
                 iCloudSyncStatus={iCloudSyncStatus}
-                moveFeedbackPreferences={moveFeedbackSettings ? moveFeedbackPreferences : undefined}
+                moveFeedbackPreferences={moveFeedbackPreferences}
                 moveFeedbackPreviewer={moveFeedbackSettings?.preview}
                 advancedRatingsOpen={settingsAdvancedRatingsOpen}
                 onAdvancedRatingsOpenChange={setSettingsAdvancedRatingsOpen}
-                onMoveFeedbackPreferencesChange={setMoveFeedbackPreferences}
+                onMoveFeedbackPreferencesChange={saveMoveFeedbackPreferences}
                 onOpenNotificationSettings={openReviewReminderSystemSettings}
                 onRequestReviewReminderPermission={() => requestReviewReminderPermission()}
                 onSaveReviewReminderPreference={saveReviewReminderPreference}
@@ -8084,6 +8126,7 @@ function ReviewPanel({
   deferBackRelevantTransition,
   dueReviewItems,
   filtersExpanded,
+  moveFeedbackClient,
   nowMs,
   onAnalysisActiveChange,
   onExitSessionReview,
@@ -8107,6 +8150,7 @@ function ReviewPanel({
   deferBackRelevantTransition: DeferBackRelevantTransition;
   dueReviewItems: ReviewQueueItem[];
   filtersExpanded: boolean;
+  moveFeedbackClient: MoveFeedbackClient | null;
   nowMs: number;
   onAnalysisActiveChange?: (active: boolean) => void;
   onExitSessionReview: () => void;
@@ -8248,6 +8292,7 @@ function ReviewPanel({
         deferBackRelevantTransition={deferBackRelevantTransition}
         entries={activeEntries}
         initialIndex={activeEntryInitialIndex}
+        moveFeedbackClient={moveFeedbackClient}
         scheduledReviewCompletedCount={completedReviews.length}
         scheduledReviewTotal={dailyReviewTotal}
         service={service}
@@ -8654,6 +8699,7 @@ function ReviewSession({
   deferBackRelevantTransition,
   entries,
   initialIndex = 0,
+  moveFeedbackClient,
   onAnalysisActiveChange,
   onAttemptClearUnclear,
   onComplete,
@@ -8673,6 +8719,7 @@ function ReviewSession({
   deferBackRelevantTransition: DeferBackRelevantTransition;
   entries: ReviewEntry[];
   initialIndex?: number;
+  moveFeedbackClient: MoveFeedbackClient | null;
   onAnalysisActiveChange?: (active: boolean) => void;
   onAttemptClearUnclear?: (attemptId: string) => void;
   onComplete: (source: ReviewEntry["source"]) => void;
@@ -8727,6 +8774,27 @@ function ReviewSession({
     return () => onAnalysisActiveChange?.(false);
   }, [onAnalysisActiveChange]);
 
+  function playReviewMoveFeedback(
+    actor: MoveFeedbackActor,
+    move: string,
+    preMoveFen: string
+  ): void {
+    if (!moveFeedbackClient) {
+      return;
+    }
+    const cue = moveFeedbackCueForMove(preMoveFen, move);
+    if (!cue) {
+      return;
+    }
+    void emitCommittedMoveFeedback(
+      moveFeedbackClient,
+      { actor, cue },
+      service.getSettings().moveFeedback
+    ).catch(() => {
+      // Feedback is nonessential and must never interrupt review progress.
+    });
+  }
+
   useEffect(() => {
     if (!systemBackCommand || handledBackCommandIdRef.current === systemBackCommand.id) {
       return;
@@ -8751,6 +8819,9 @@ function ReviewSession({
     entryKey: analysisEnabled
       ? null
       : `${currentEntry.source}:${entryIndex}:${currentEntry.puzzle.id}`,
+    onCommittedMove: (move, preMoveFen) => {
+      playReviewMoveFeedback("opponent", move, preMoveFen);
+    },
     onLastMove: setLastMove,
     suppressedMovesRef: reviewSuppressedBoardMovesRef
   });
@@ -8971,7 +9042,6 @@ function ReviewSession({
     if (reviewResultRecordedRef.current || reviewResultRecorded) {
       return;
     }
-    reviewResultRecordedRef.current = true;
     const completedAt = new Date(currentTimeMs()).toISOString();
     service.recordReviewAttempt({
       puzzleId: currentEntry.puzzle.id,
@@ -8983,6 +9053,7 @@ function ReviewSession({
       startedAt: new Date(reviewStartedAtMs).toISOString(),
       ...(currentPuzzle.kind === "arrow_duel" ? { arrowDuelCandidateOrder: [...currentPuzzle.candidates] } : {})
     }, completedAt);
+    reviewResultRecordedRef.current = true;
     onReviewRecorded?.(completedAt);
     setReviewResultRecorded(true);
   }
@@ -9042,12 +9113,18 @@ function ReviewSession({
     setBoardLocked(true);
     try {
       const result = submitLineMove(reviewState.kind === "line" ? reviewState.line : beginLinePuzzle(currentEntry.puzzle), move);
+      if (result.feedback.result === "wrong" || result.feedback.puzzleSolved) {
+        recordCurrentReviewResult(
+          result.feedback.result === "wrong" || wrongSeen ? "wrong" : "correct",
+          {
+            submittedMove: result.feedback.submittedMove,
+            expectedMove: result.feedback.expectedMove
+          }
+        );
+      }
+      playReviewMoveFeedback("user", move, submittedFen);
       setFeedback(result.feedback);
       if (result.feedback.result === "wrong") {
-        recordCurrentReviewResult("wrong", {
-          submittedMove: result.feedback.submittedMove,
-          expectedMove: result.feedback.expectedMove
-        });
         setWrongSeen(true);
         await sleep(FEEDBACK_SNAPSHOT_MS);
         boardRef.current?.resetBoard(submittedFen);
@@ -9138,39 +9215,48 @@ function ReviewSession({
       return;
     }
     setBoardLocked(true);
-    const result = submitArrowDuelChoice(reviewState.duel, move);
-    setFeedback(result.feedback);
-    if (result.feedback.result === "correct") {
-      await sleep(FEEDBACK_SNAPSHOT_MS);
-      advanceReview("correct", {
-        submittedMove: result.feedback.submittedMove,
-        expectedMove: result.feedback.expectedMove
-      });
-      return;
-    }
+    try {
+      const result = submitArrowDuelChoice(reviewState.duel, move);
+      recordCurrentReviewResult(
+        result.feedback.result === "wrong" ? "wrong" : "correct",
+        {
+          submittedMove: result.feedback.submittedMove,
+          expectedMove: result.feedback.expectedMove
+        }
+      );
+      playReviewMoveFeedback("user", move, submittedFen);
+      setFeedback(result.feedback);
+      if (result.feedback.result === "correct") {
+        await sleep(FEEDBACK_SNAPSHOT_MS);
+        advanceReview("correct", {
+          submittedMove: result.feedback.submittedMove,
+          expectedMove: result.feedback.expectedMove
+        });
+        return;
+      }
 
-    setWrongSeen(true);
-    recordCurrentReviewResult("wrong", {
-      submittedMove: result.feedback.submittedMove,
-      expectedMove: result.feedback.expectedMove
-    });
-    await sleep(FEEDBACK_SNAPSHOT_MS);
-    if (currentEntry.source === "due") {
-      goToNextDueReview();
-      return;
-    }
-    const replyMoves = result.feedback.autoPlayedMoves.slice(1);
-    const finalFen = fenAfterMoves(submittedFen, result.feedback.autoPlayedMoves) ?? submittedFen;
-    if (replyMoves.length > 0) {
-      await animateReviewBoardMoves(replyMoves, finalFen);
+      setWrongSeen(true);
       await sleep(FEEDBACK_SNAPSHOT_MS);
+      if (currentEntry.source === "due") {
+        goToNextDueReview();
+        return;
+      }
+      const replyMoves = result.feedback.autoPlayedMoves.slice(1);
+      const finalFen = fenAfterMoves(submittedFen, result.feedback.autoPlayedMoves) ?? submittedFen;
+      if (replyMoves.length > 0) {
+        await animateReviewBoardMoves(replyMoves, finalFen);
+        await sleep(FEEDBACK_SNAPSHOT_MS);
+      }
+      setReviewState({
+        kind: "line",
+        line: lineStateAfterMoves(currentEntry.puzzle, result.feedback.autoPlayedMoves)
+      });
+      setFeedback(null);
+      setBoardLocked(false);
+    } catch {
+      boardRef.current?.resetBoard(submittedFen);
+      setBoardLocked(false);
     }
-    setReviewState({
-      kind: "line",
-      line: lineStateAfterMoves(currentEntry.puzzle, result.feedback.autoPlayedMoves)
-    });
-    setFeedback(null);
-    setBoardLocked(false);
   }
 
   async function submitReviewArrowFollowUpMove(move: string, submittedFen: string): Promise<void> {
@@ -9181,12 +9267,15 @@ function ReviewSession({
     setBoardLocked(true);
     try {
       const result = submitArrowDuelFollowUpMove(reviewState.line, move);
-      setFeedback(result.feedback);
-      if (result.feedback.result === "wrong") {
+      if (result.feedback.result === "wrong" || result.feedback.puzzleSolved) {
         recordCurrentReviewResult("wrong", {
           submittedMove: result.feedback.submittedMove,
           expectedMove: result.feedback.expectedMove
         });
+      }
+      playReviewMoveFeedback("user", move, submittedFen);
+      setFeedback(result.feedback);
+      if (result.feedback.result === "wrong") {
         await sleep(FEEDBACK_SNAPSHOT_MS);
         boardRef.current?.resetBoard(submittedFen);
         setFeedback(null);
@@ -9225,6 +9314,7 @@ function ReviewSession({
 
     for (const move of parsedMoves) {
       const suppressedMove = boardMoveToUci(move);
+      const preMoveFen = boardRef.current.getState().fen;
       reviewSuppressedBoardMovesRef.current.push(suppressedMove);
       const playedMove = await boardRef.current.move({
         from: move.from as Square,
@@ -9234,6 +9324,8 @@ function ReviewSession({
       if (!playedMove) {
         consumeSuppressedBoardMove(suppressedMove, reviewSuppressedBoardMovesRef.current);
         boardRef.current?.resetBoard(finalFen);
+      } else {
+        playReviewMoveFeedback("opponent", suppressedMove, preMoveFen);
       }
       setLastMove(move);
     }
@@ -10250,7 +10342,7 @@ function SettingsPanel({
   onSyncICloudNow: () => Promise<string>;
   iCloudSyncEnabled: boolean;
   iCloudSyncStatus: string;
-  moveFeedbackPreferences?: MoveFeedbackPreferences;
+  moveFeedbackPreferences: MoveFeedbackPreferences;
   moveFeedbackPreviewer?: MoveFeedbackPreviewer;
   notificationPermissionStatus: ReviewReminderPermissionStatus;
   onMoveFeedbackPreferencesChange: (preferences: MoveFeedbackPreferences) => void;
@@ -10394,19 +10486,17 @@ function SettingsPanel({
         ) : null}
       </SettingsSection>
 
-      {moveFeedbackPreferences ? (
-        <SettingsSection
-          title="Move Feedback"
-          testID="settings-move-feedback-section"
-          wide={adaptiveLayout.usesWideContent}
-        >
-          <MoveFeedbackSettingsSection
-            preferences={moveFeedbackPreferences}
-            onPreferencesChange={onMoveFeedbackPreferencesChange}
-            onPreview={moveFeedbackPreviewer}
-          />
-        </SettingsSection>
-      ) : null}
+      <SettingsSection
+        title="Move Feedback"
+        testID="settings-move-feedback-section"
+        wide={adaptiveLayout.usesWideContent}
+      >
+        <MoveFeedbackSettingsSection
+          preferences={moveFeedbackPreferences}
+          onPreferencesChange={onMoveFeedbackPreferencesChange}
+          onPreview={moveFeedbackPreviewer}
+        />
+      </SettingsSection>
 
       {showRatingControls ? (
         <SettingsSection title="Profile" testID="settings-profile-section" wide={adaptiveLayout.usesWideContent}>

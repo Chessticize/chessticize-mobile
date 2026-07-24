@@ -310,7 +310,8 @@ export class MemoryStore implements PracticeStore {
     };
     this.saveSettings({
       ...this.getSettings(),
-      notifications: clonePracticeSettings(data.settings).notifications
+      notifications: clonePracticeSettings(data.settings).notifications,
+      moveFeedback: clonePracticeSettings(data.settings).moveFeedback
     });
     const previousRuns = new Map(this.listPracticeRuns().map((run) => [run.id, run]));
     for (const run of mergePracticeRunCatalogs(this.listPracticeRuns(), data.practiceRuns ?? [])) {

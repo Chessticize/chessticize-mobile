@@ -17,12 +17,14 @@ export function usePuzzleEntryPreview({
   boardRef,
   currentPuzzle,
   entryKey,
+  onCommittedMove,
   onLastMove,
   suppressedMovesRef
 }: {
   boardRef: { current: ChessboardRef | null };
   currentPuzzle: CurrentPuzzleState | undefined;
   entryKey: string | null;
+  onCommittedMove?: (move: string, preMoveFen: string) => void;
   onLastMove: (move: UciBoardMove | null) => void;
   suppressedMovesRef: { current: string[] };
 }): {
@@ -32,6 +34,8 @@ export function usePuzzleEntryPreview({
 } {
   const [completedKey, setCompletedKey] = useState<string | null>(null);
   const [replayToken, setReplayToken] = useState(0);
+  const onCommittedMoveRef = useRef(onCommittedMove);
+  onCommittedMoveRef.current = onCommittedMove;
   const onLastMoveRef = useRef(onLastMove);
   onLastMoveRef.current = onLastMove;
   const plan = useMemo(
@@ -77,6 +81,8 @@ export function usePuzzleEntryPreview({
       onComplete: (played) => {
         if (!played) {
           boardRef.current?.resetBoard(plan.finalFen);
+        } else {
+          onCommittedMoveRef.current?.(plan.moveUci, plan.initialFen);
         }
         onLastMoveRef.current(plan.move);
         setCompletedKey(previewKey);

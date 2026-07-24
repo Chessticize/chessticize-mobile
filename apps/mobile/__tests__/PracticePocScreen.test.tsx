@@ -23,6 +23,7 @@ import { MemoryStore } from "../../../packages/storage/src/memory-store";
 import { defaultSprintConfig, formatLocalCalendarDate, formatReviewDay, practiceRunSprintConfig, PRACTICE_RUN_NAME_MAX_LENGTH, type ArrowDuelState, type AttemptEvent, type Puzzle, type SprintState, type UciEngineTransport } from "../../../packages/core/src/index";
 import { FakeReviewReminderNotificationClient, FakeReviewReminderScheduler } from "../src/platform/reviewReminderScheduler";
 import { FakeICloudProgressSyncClient } from "../src/platform/iCloudProgressSync";
+import { FakeMoveFeedbackClient } from "../src/platform/moveFeedback";
 import type { MobilePlatformCapabilities } from "../src/platform/mobilePlatformCapabilities";
 import type { MobileSystemBackSource } from "../src/navigation/mobileSystemBack";
 import {
@@ -2553,7 +2554,8 @@ describe("PracticePocScreen", () => {
 
   it("locks Standard input on the first rendered frame until the blunder animation completes", async () => {
     const service = createMobilePracticeService("familiar15");
-    const renderer = renderScreen({ practiceService: service });
+    const moveFeedbackClient = new FakeMoveFeedbackClient();
+    const renderer = renderScreen({ practiceService: service, moveFeedbackClient });
 
     press(renderer, "practice-mode-standard");
     press(renderer, "practice-start-button");
@@ -2582,6 +2584,11 @@ describe("PracticePocScreen", () => {
     await advanceEntryPreviewBy(1);
     expect(imperativeMove).toHaveBeenCalledTimes(1);
     expect(imperativeMove).toHaveBeenCalledWith(parseBoardMove(activePuzzle.puzzle.solutionMoves[0]!));
+    expect(moveFeedbackClient.requests).toEqual([{
+      cue: "move",
+      playSound: true,
+      playHaptic: false
+    }]);
     expect(() => findByTestId(renderer, "board-input-blocker")).toThrow();
     expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(activePuzzle.currentFen);
   });
@@ -3222,15 +3229,18 @@ describe("PracticePocScreen", () => {
 
   it("shows a persistence failure and unlocks board input through the store boundary", async () => {
     const service = new PracticeService(new FailingAttemptStore("Practice write failed"));
+    const moveFeedbackClient = new FakeMoveFeedbackClient();
     configureMobilePracticePuzzleSource(service, "random1000");
-    const renderer = renderScreen({ practiceService: service });
+    const renderer = renderScreen({ practiceService: service, moveFeedbackClient });
 
     startStandardSprint(renderer);
+    moveFeedbackClient.requests.length = 0;
 
     await boardMove(renderer, "e2d2");
 
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
     expect(collectText(findByTestId(renderer, "error-panel"))).toContain("Practice write failed");
+    expect(moveFeedbackClient.requests).toEqual([]);
     abandonSprint(renderer);
     press(renderer, "history-tab");
     expect(findByTestId(renderer, "history-empty-state").props.accessibilityLabel).toBe("History has no attempts");
@@ -7082,10 +7092,10 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "settings-panel"))).not.toContain("›");
   });
 
-  it("places the Lab Move Feedback presentation after Notifications without formal preview controls", () => {
-    const renderer = renderScreen({
-      moveFeedbackSettings: {}
-    });
+  it("persists formal Move Feedback settings after Notifications without preview controls", async () => {
+    const service = createMobilePracticeService("random1000");
+    const moveFeedbackClient = new FakeMoveFeedbackClient();
+    const renderer = renderScreen({ practiceService: service, moveFeedbackClient });
 
     press(renderer, "settings-tab");
 
@@ -7106,6 +7116,96 @@ describe("PracticePocScreen", () => {
       )
     ).toBeLessThan(0);
     expect(() => findByTestId(renderer, "settings-move-feedback-previews")).toThrow();
+
+    press(renderer, "settings-move-sound-toggle");
+    expect(service.getSettings().moveFeedback).toEqual({
+      soundEnabled: false,
+      hapticsEnabled: true
+    });
+    press(renderer, "settings-move-haptics-toggle");
+    expect(service.getSettings().moveFeedback).toEqual({
+      soundEnabled: false,
+      hapticsEnabled: false
+    });
+
+    press(renderer, "practice-tab");
+    startStandardSprint(renderer);
+    await boardMove(renderer, "e2e6");
+    await settleFeedbackSnapshot();
+    expect(moveFeedbackClient.requests).toEqual([]);
+  });
+
+  it("emits feedback only after committed user and opponent moves", async () => {
+    const moveFeedbackClient = new FakeMoveFeedbackClient();
+    const renderer = renderStandardSequenceScreen({ moveFeedbackClient });
+
+    startStandardSprint(renderer);
+    expect(moveFeedbackClient.requests).toEqual([{
+      cue: "capture",
+      playSound: true,
+      playHaptic: false
+    }]);
+    await boardMove(renderer, "d8a8");
+    expect(moveFeedbackClient.requests).toHaveLength(1);
+    await boardMove(renderer, "e2e6");
+
+    expect(moveFeedbackClient.requests).toEqual([
+      {
+        cue: "capture",
+        playSound: true,
+        playHaptic: false
+      },
+      {
+        cue: "capture",
+        playSound: true,
+        playHaptic: true
+      }
+    ]);
+
+    await settleFeedbackSnapshot();
+
+    expect(moveFeedbackClient.requests).toEqual([
+      {
+        cue: "capture",
+        playSound: true,
+        playHaptic: false
+      },
+      {
+        cue: "capture",
+        playSound: true,
+        playHaptic: true
+      },
+      {
+        cue: "move",
+        playSound: true,
+        playHaptic: false
+      }
+    ]);
+  });
+
+  it("does not emit due Review feedback when attempt persistence fails", async () => {
+    jest.setSystemTime(new Date("2026-06-21T12:00:00.000Z"));
+    const store = new FailingAttemptStore("Review write failed");
+    const service = new PracticeService(store);
+    configureMobilePracticePuzzleSource(service, "random1000");
+    store.scheduleMistakeReview({
+      puzzleId: "000hf",
+      mode: "standard",
+      ratingKey: "standard 5/20"
+    }, "2026-06-19T12:00:00.000Z");
+    const moveFeedbackClient = new FakeMoveFeedbackClient();
+    const renderer = renderScreen({ practiceService: service, moveFeedbackClient });
+
+    press(renderer, "review-tab");
+    press(renderer, "review-start-due");
+    await settleEntryPreview();
+    moveFeedbackClient.requests.length = 0;
+
+    await boardMove(renderer, "c4b5");
+
+    expect(moveFeedbackClient.requests).toEqual([]);
+    expect(service.listHistory({ source: "scheduled_review" })).toEqual([]);
+    expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
   });
 
   it("routes feedback to GitHub only after an explicit privacy handoff", async () => {

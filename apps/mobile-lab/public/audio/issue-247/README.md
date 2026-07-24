@@ -1,7 +1,7 @@
 # Issue #247 Storybook Audio
 
-These files are design-review assets for the Issue #247 Interaction Lab story.
-They are not yet wired into the native product.
+These files are the documented source assets for the Issue #247 Interaction
+Lab story and the native move-feedback feature.
 
 ## Move
 
@@ -34,8 +34,7 @@ Puzzle Blitz. Freesound lists each individual asset as CC0. CC0 does not require
 attribution, but the source details are retained here for a reproducible rights
 and provenance record.
 
-The original files remain unmodified. The Storybook browser preview plays Move
-at `1.0` and Capture at `0.3` linear volume (approximately -10.5 dB) because
-the downloaded Capture recording measures roughly 8.3 dB higher in mean level
-and 9.9 dB higher at peak. This is design-preview calibration, not a native
-product mixing decision.
+The original files remain unmodified. Both the Storybook browser preview and
+the native product play Move at `1.0` and Capture at `0.3` linear volume
+(approximately -10.5 dB) because the downloaded Capture recording measures
+roughly 8.3 dB higher in mean level and 9.9 dB higher at peak.

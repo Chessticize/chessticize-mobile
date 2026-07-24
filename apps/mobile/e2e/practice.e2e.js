@@ -232,7 +232,7 @@ describe('Practice POC', () => {
     await openStandardHistoryTrend();
     await waitForElementAccessibilityLabelContaining(
       'history-filter-unclear',
-      'Unclear attempts only',
+      'Unclear attempts',
       10000
     );
     await element(by.id('history-filter-unclear')).tap();
@@ -316,7 +316,7 @@ describe('Practice POC', () => {
     await openStandardHistoryTrend();
     await waitForElementAccessibilityLabelContaining(
       'history-filter-unclear',
-      'Unclear attempts only',
+      'Unclear attempts',
       10000
     );
     await element(by.id('history-filter-unclear')).tap();

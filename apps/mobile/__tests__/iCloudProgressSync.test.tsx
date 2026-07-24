@@ -102,6 +102,10 @@ function sampleSnapshot(): ProgressSyncSnapshot {
           reviewReminder: {
             mode: "smart"
           }
+        },
+        moveFeedback: {
+          soundEnabled: true,
+          hapticsEnabled: true
         }
       },
       ratings: [],

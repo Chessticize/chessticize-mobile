@@ -18,6 +18,10 @@
 		8F4D4A4B2D1A4BEF8A9C1001 /* ReviewReminderNotifications.m in Sources */ = {isa = PBXBuildFile; fileRef = 8F4D4A4A2D1A4BEF8A9C1001 /* ReviewReminderNotifications.m */; };
 		9D2E4F5A2D2C400100A00001 /* ICloudProgressSync.m in Sources */ = {isa = PBXBuildFile; fileRef = 9D2E4F5C2D2C400100A00001 /* ICloudProgressSync.m */; };
 		9D2E4F5B2D2C400100A00001 /* CloudKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9D2E4F5E2D2C400100A00001 /* CloudKit.framework */; };
+		A24700012E70000100A00001 /* MoveFeedback.m in Sources */ = {isa = PBXBuildFile; fileRef = A24700022E70000100A00001 /* MoveFeedback.m */; };
+		A24700032E70000100A00001 /* freesound-546119-piece-placement.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = A24700042E70000100A00001 /* freesound-546119-piece-placement.mp3 */; };
+		A24700052E70000100A00001 /* freesound-546120-piece-capture.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = A24700062E70000100A00001 /* freesound-546120-piece-capture.mp3 */; };
+		A24700072E70000100A00001 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A24700082E70000100A00001 /* AVFoundation.framework */; };
 		D3C7E4DB20DDEF6FD16890C3 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 
@@ -41,6 +45,10 @@
 		9D2E4F5E2D2C400100A00001 /* CloudKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CloudKit.framework; path = System/Library/Frameworks/CloudKit.framework; sourceTree = SDKROOT; };
 		A10000012E60000100A00001 /* Config/Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Config/Debug.xcconfig; path = Config/Debug.xcconfig; sourceTree = "<group>"; };
 		A10000022E60000100A00001 /* Config/Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Config/Release.xcconfig; path = Config/Release.xcconfig; sourceTree = "<group>"; };
+		A24700022E70000100A00001 /* MoveFeedback.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = MoveFeedback.m; path = ChessticizeMobile/MoveFeedback.m; sourceTree = "<group>"; };
+		A24700042E70000100A00001 /* freesound-546119-piece-placement.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; name = "freesound-546119-piece-placement.mp3"; path = "../../mobile-lab/public/audio/issue-247/freesound-546119-piece-placement.mp3"; sourceTree = SOURCE_ROOT; };
+		A24700062E70000100A00001 /* freesound-546120-piece-capture.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; name = "freesound-546120-piece-capture.mp3"; path = "../../mobile-lab/public/audio/issue-247/freesound-546120-piece-capture.mp3"; sourceTree = SOURCE_ROOT; };
+		A24700082E70000100A00001 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
@@ -49,6 +57,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A24700072E70000100A00001 /* AVFoundation.framework in Frameworks */,
 				9D2E4F5B2D2C400100A00001 /* CloudKit.framework in Frameworks */,
 				0C80B921A6F3F58F76C31292 /* libPods-ChessticizeMobile.a in Frameworks */,
 			);
@@ -62,6 +71,9 @@
 			children = (
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				2A7D186A2E50000100A00001 /* ApplicationMetadata.m */,
+				A24700022E70000100A00001 /* MoveFeedback.m */,
+				A24700042E70000100A00001 /* freesound-546119-piece-placement.mp3 */,
+				A24700062E70000100A00001 /* freesound-546120-piece-capture.mp3 */,
 				761780EC2CA45674006654EE /* AppDelegate.swift */,
 				761780EE2CA45674006654EE /* SceneDelegate.swift */,
 				8B2F1D992D420E4A00A00001 /* ChessticizeTestLaunchConfig.m */,
@@ -79,6 +91,7 @@
 		2D16E6871FA4F8E400B85C8A /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				A24700082E70000100A00001 /* AVFoundation.framework */,
 				9D2E4F5E2D2C400100A00001 /* CloudKit.framework */,
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
 				5DCACB8F33CDC322A6C60F78 /* libPods-ChessticizeMobile.a */,
@@ -191,6 +204,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A24700032E70000100A00001 /* freesound-546119-piece-placement.mp3 in Resources */,
+				A24700052E70000100A00001 /* freesound-546120-piece-capture.mp3 in Resources */,
 				81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				58A3D47B2D58A00100A00001 /* bundled-core-pack.sqlite in Resources */,
@@ -281,6 +296,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				2A7D186B2E50000100A00001 /* ApplicationMetadata.m in Sources */,
+				A24700012E70000100A00001 /* MoveFeedback.m in Sources */,
 				761780ED2CA45674006654EE /* AppDelegate.swift in Sources */,
 				761780EF2CA45674006654EE /* SceneDelegate.swift in Sources */,
 				8B2F1D9A2D420E4A00A00001 /* ChessticizeTestLaunchConfig.m in Sources */,

@@ -16,6 +16,7 @@ import type {
   ReviewReminderNotificationClient,
   ReviewReminderScheduler,
 } from '../platform/reviewReminderScheduler.ts';
+import type { MoveFeedbackClient } from '../platform/moveFeedback.ts';
 
 export interface TestMobilePlatformCapabilityOverrides {
   practiceService?: PracticeService;
@@ -31,6 +32,7 @@ export interface TestMobilePlatformCapabilityOverrides {
   iCloudProgressSyncClient?: ICloudProgressSyncClient | null;
   progressProtection?: MobileProgressProtectionCapabilities;
   applicationMetadata?: Partial<MobileApplicationMetadata>;
+  moveFeedbackClient?: MoveFeedbackClient | null;
 }
 
 export function createTestMobilePlatformCapabilities(
@@ -65,6 +67,9 @@ export function createTestMobilePlatformCapabilities(
       platform: overrides.reminderPlatform ?? 'ios',
       scheduler: overrides.reviewReminderScheduler ?? null,
       notificationClient: overrides.reviewReminderNotificationClient ?? null,
+    },
+    moveFeedback: {
+      client: overrides.moveFeedbackClient ?? null,
     },
     applicationMetadata: {
       ...MOBILE_APPLICATION_METADATA_LINKS,
