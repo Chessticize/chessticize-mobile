@@ -464,7 +464,7 @@ export function filterHistoryAttemptsForQuery(input: {
       if (input.query.reviewStatus === undefined || queuedReviewKeys === null) {
         return true;
       }
-      const queued = normalizeHistoryOutcome(attempt.result) === "wrong" &&
+      const queued = historyAttemptCanRepresentReviewAttention(attempt) &&
         historyAttemptReviewQueuedFromKeys(attempt, queuedReviewKeys);
       return input.query.reviewStatus === "queued" ? queued : !queued;
     });
@@ -503,12 +503,12 @@ export function collectHistorySpeeds(
 }
 
 export function historyAttemptHasReviewQueued(
-  attempt: Pick<HistoryAttemptView, "puzzleId" | "mode" | "ratingKey" | "result">,
+  attempt: Pick<HistoryAttemptView, "puzzleId" | "mode" | "ratingKey" | "result" | "unclearUpdatedAt">,
   reviews: ReviewQueueState[]
 ): boolean {
   const mode = normalizeHistoryMode(attempt.mode);
   const ratingKey = normalizeHistoryRatingKey(attempt.ratingKey);
-  if (normalizeHistoryOutcome(attempt.result) !== "wrong" || mode === null || ratingKey === null) {
+  if (!historyAttemptCanRepresentReviewAttention(attempt) || mode === null || ratingKey === null) {
     return false;
   }
   return reviews.some((review) =>

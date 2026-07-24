@@ -251,23 +251,24 @@ test("Needs attention is Unclear or in Review and remains AND with other facets"
       themes: ["pin"]
     })
   ];
+  const reviews = [{
+    puzzleId: "review-puzzle",
+    mode: "standard" as const,
+    ratingKey: "standard 5/20",
+    dueDay: "2026-06-21",
+    intervalDays: 1,
+    reviewCount: 1,
+    successStreak: 0,
+    lapseCount: 1,
+    lastResult: "wrong" as const,
+    lastReviewedAt: "2026-06-20T00:00:10.000Z"
+  }];
 
   assert.deepEqual(
     filterHistoryAttemptsForQuery({
       attempts,
       query: { attentionOnly: true },
-      reviews: [{
-        puzzleId: "review-puzzle",
-        mode: "standard",
-        ratingKey: "standard 5/20",
-        dueDay: "2026-06-21",
-        intervalDays: 1,
-        reviewCount: 1,
-        successStreak: 0,
-        lapseCount: 1,
-        lastResult: "wrong",
-        lastReviewedAt: "2026-06-20T00:00:10.000Z"
-      }]
+      reviews
     }).map((historyAttempt) => historyAttempt.id),
     ["wrong-in-review", "correct-in-review", "timed-out", "unclear-correct"]
   );
@@ -282,6 +283,35 @@ test("Needs attention is Unclear or in Review and remains AND with other facets"
       reviews: []
     }).map((historyAttempt) => historyAttempt.id),
     ["unclear-correct"]
+  );
+  assert.deepEqual(
+    filterHistoryAttemptsForQuery({
+      attempts,
+      query: {
+        attentionOnly: true,
+        reviewStatus: "queued"
+      },
+      reviews
+    }).map((historyAttempt) => historyAttempt.id),
+    ["wrong-in-review", "correct-in-review"]
+  );
+  assert.deepEqual(
+    filterHistoryAttemptsForQuery({
+      attempts,
+      query: {
+        attentionOnly: true,
+        reviewStatus: "clear"
+      },
+      reviews
+    }).map((historyAttempt) => historyAttempt.id),
+    ["timed-out", "unclear-correct"]
+  );
+  assert.equal(
+    historyAttemptHasReviewQueued(
+      attempts.find((historyAttempt) => historyAttempt.id === "correct-in-review")!,
+      reviews
+    ),
+    true
   );
 });
 

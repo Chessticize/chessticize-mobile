@@ -381,6 +381,59 @@ for (const backend of ["memory", "sqlite"] as const) {
   });
 }
 
+for (const backend of ["memory", "sqlite"] as const) {
+  test(`${backend} keeps a completed attempt Slow after its Run timing policy changes`, async () => {
+    const store = backend === "memory" ? new MemoryStore() : new SQLiteStore(":memory:");
+    if (store instanceof SQLiteStore) {
+      store.migrate();
+    }
+    try {
+      const service = new PracticeService(store);
+      service.loadFixturePuzzles(await loadFixturePuzzles());
+      const run = service.createPracticeRun({
+        id: `persisted-slow-${backend}`,
+        name: `Persisted Slow ${backend}`,
+        mode: "custom",
+        durationSeconds: 300,
+        perPuzzleSeconds: 20,
+        puzzleTiming: {
+          slowAfterSeconds: 10,
+          timeoutAfterSeconds: null
+        },
+        initialRating: 1800,
+        themes: ["hangingPiece"]
+      }, "2026-07-24T03:00:00.000Z");
+
+      service.startSprint({
+        mode: "custom",
+        practiceRunId: run.id,
+        targetCorrect: 1,
+        puzzleSelectionSeed: `persisted-slow-${backend}`
+      }, "2026-07-24T03:01:00.000Z");
+      service.submitMove("e6e7", "2026-07-24T03:01:05.000Z");
+      service.submitMove("b3c1", "2026-07-24T03:01:08.000Z");
+      const completed = service.submitMove("h6c1", "2026-07-24T03:01:10.000Z");
+      assert.equal(completed.attempt?.timingStatus, "slow");
+
+      service.updatePracticeRun(run.id, {
+        name: run.name,
+        rating: 1800,
+        puzzleTiming: {
+          slowAfterSeconds: null,
+          timeoutAfterSeconds: null
+        }
+      }, "2026-07-24T03:02:00.000Z");
+
+      assert.equal(service.listHistory()[0]?.timingStatus, "slow");
+      assert.equal(service.exportLocalData().attempts[0]?.timingStatus, "slow");
+    } finally {
+      if (store instanceof SQLiteStore) {
+        store.close();
+      }
+    }
+  });
+}
+
 test("SQLite reopens custom Run timing and a Timed out attempt", async () => {
   const directory = await mkdtemp(join(tmpdir(), "chessticize-timing-reopen-"));
   const databasePath = join(directory, "practice.sqlite");

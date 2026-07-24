@@ -1,3 +1,4 @@
+import { isUnclearAttemptEligible } from "../../core/src/index.ts";
 import type { AttemptHistoryRow } from "./query-types.ts";
 
 export function cloneAttemptHistoryRow(attempt: AttemptHistoryRow): AttemptHistoryRow {
@@ -115,8 +116,7 @@ function preferredClarity(
 
 function normalizedClarity(attempt: AttemptHistoryRow): { unclear: boolean; updatedAt?: string } {
   if (
-    attempt.source !== "sprint" ||
-    (attempt.result !== "correct" && attempt.result !== "timed_out") ||
+    !isUnclearAttemptEligible(attempt) ||
     !attempt.unclearUpdatedAt
   ) {
     return { unclear: false };
