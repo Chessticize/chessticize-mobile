@@ -2,12 +2,15 @@ import { NativeModules } from "react-native";
 import {
   createNativeReviewReminderNotificationClient,
   createNativeReviewReminderScheduler,
+  computeReviewReminderDecision,
   FakeReviewReminderNotificationClient,
   FakeReviewReminderScheduler,
   reminderScheduleKey,
   rescheduleReviewReminder
 } from "../src/platform/reviewReminderScheduler";
 import { createMobilePracticeService } from "../src/platform/mobilePractice";
+import { MemoryStore } from "../../../packages/storage/src/memory-store";
+import { PracticeService } from "../../../packages/storage/src/practice-service";
 
 describe("review reminder scheduler", () => {
   afterEach(() => {
@@ -53,6 +56,17 @@ describe("review reminder scheduler", () => {
     expect(scheduler.currentReminder).toBeUndefined();
     expect(scheduler.calls).toEqual([undefined]);
     expect(reminderScheduleKey(decision)).toBe("none");
+  });
+
+  it("limits smart reminder usage reads to the 14-day decision window", () => {
+    const store = new HistoryFilterRecordingMemoryStore();
+    const service = new PracticeService(store);
+
+    computeReviewReminderDecision(service, "2026-06-20T12:00:00.000Z");
+
+    expect(store.attemptFilters).toEqual([{
+      since: "2026-06-06T12:00:00.000Z"
+    }]);
   });
 
   it("wraps the native notification module without requesting permission", async () => {
@@ -152,6 +166,15 @@ describe("review reminder scheduler", () => {
     expect(routed).toEqual(["review"]);
   });
 });
+
+class HistoryFilterRecordingMemoryStore extends MemoryStore {
+  readonly attemptFilters: Array<Parameters<MemoryStore["listAttempts"]>[0]> = [];
+
+  override listAttempts(...args: Parameters<MemoryStore["listAttempts"]>) {
+    this.attemptFilters.push(args[0]);
+    return super.listAttempts(...args);
+  }
+}
 
 function localTime(iso: string | undefined): { hour: number; minute: number } {
   if (!iso) {

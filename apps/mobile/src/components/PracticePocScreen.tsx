@@ -88,16 +88,12 @@ import type {
 } from "../../../../packages/core/src/index.ts";
 import type { CompletedReviewItem, PracticeService } from "../../../../packages/storage/src/practice-service.ts";
 import type {
-  ExportedSprintSession,
   ReviewQueueDuePromotionResult,
   ReviewReminderPreference
 } from "../../../../packages/storage/src/practice-store.ts";
 import { syncPracticeProgress } from "../../../../packages/storage/src/progress-sync.ts";
 import type { ProgressSyncResult } from "../../../../packages/storage/src/progress-sync.ts";
-import {
-  buildPracticeProgressSummary,
-  type PracticeProgressSummary
-} from "../../../../packages/storage/src/rating-history.ts";
+import type { PracticeProgressSummary } from "../../../../packages/storage/src/rating-history.ts";
 import {
   getBundledCorePackManifest,
   seededPuzzleCount,
@@ -456,9 +452,7 @@ export function PracticePocScreen({
   const [tab, setTab] = useState<Tab>("practice");
   const [state, setState] = useState<SprintState | null>(null);
   const [feedback, setFeedback] = useState<SessionFeedback>(null);
-  const [attempts, setAttempts] = useState<AttemptEvent[]>([]);
-  const [sprintSessions, setSprintSessions] = useState<ExportedSprintSession[]>([]);
-  const [, setReviews] = useState<ReviewQueueState[]>([]);
+  const [aggregateRevision, setAggregateRevision] = useState(0);
   const [reviewQueue, setReviewQueue] = useState<ReviewQueueState[]>([]);
   const [dueReviewItems, setDueReviewItems] = useState<ReviewQueueItem[]>([]);
   const [sessionMistakeReviewItems, setSessionMistakeReviewItems] = useState<SessionMistakeReviewItem[]>([]);
@@ -558,9 +552,10 @@ export function PracticePocScreen({
   );
   const selectedRatingRecord = service.getRating(selectedConfig.ratingKey);
   const currentRating = selectedRatingRecord.rating;
-  const customRatingPlayed = selectedRatingRecord.games > 0 ||
-    sprintSessions.some((session) => session.ratingKey === selectedConfig.ratingKey && session.ratingAfter !== undefined) ||
-    attempts.some((attempt) => attempt.ratingKey === selectedConfig.ratingKey && attempt.source === "sprint");
+  const customRatingPlayed = useMemo(() => {
+    void aggregateRevision;
+    return selectedRatingRecord.games > 0 || service.hasPlayedRatingKey(selectedConfig.ratingKey);
+  }, [aggregateRevision, selectedConfig.ratingKey, selectedRatingRecord.games, service]);
   const displayedCustomInitialRating = customRatingPlayed ? selectedRatingRecord.rating : customInitialRating;
   stateRef.current = state;
   boardFenRef.current = boardFen;
@@ -579,17 +574,11 @@ export function PracticePocScreen({
   useEffect(() => {
     if (configurePuzzleSource) {
       configurePuzzleSource(puzzleSource);
-      refreshState();
     }
+    refreshState();
     // refreshState reads mutable service state; rerunning for its render-local identity would loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [configurePuzzleSource, puzzleSource, service]);
-
-  useEffect(() => {
-    refreshState();
-    // refreshState reads mutable service state; this effect intentionally tracks service replacement only.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [service]);
 
   useEffect(() => {
     const enabled = service.getSettings().sync.iCloudEnabled;
@@ -785,12 +774,10 @@ export function PracticePocScreen({
 
   function refreshState(): void {
     service.pruneOrphanedReviewQueue();
-    setAttempts(service.listHistory() as AttemptEvent[]);
-    setSprintSessions(service.listSprintSessions());
-    setReviews(service.getDueReviews(nowIso()));
     setReviewQueue(service.listReviewQueue());
     setDueReviewItems(service.getDueReviewItems(nowIso()));
     internalRunManagement.refresh();
+    setAggregateRevision((current) => current + 1);
     setReviewReminderPreference(service.getReviewReminderPreference());
     const activeSprint = service.getActiveSprint();
     setResumableSprint(
@@ -1223,7 +1210,10 @@ export function PracticePocScreen({
       commitBoardInputLocked(false, "start", started.currentPuzzle?.puzzle.id ?? null);
       clearFeedbackSnapshot();
       navigateToTab("practice");
-      refreshState();
+      // Starting a run changes the managed-run presentation but not History or
+      // Review aggregates. Avoid pulling every persisted attempt/session back
+      // into the UI at this latency-sensitive boundary.
+      internalRunManagement.refresh();
     } catch (caught) {
       setError(errorMessage(caught));
     } finally {
@@ -1680,7 +1670,7 @@ export function PracticePocScreen({
 
   function reviewScheduleChanged(clearedAttemptId?: string): void {
     if (clearedAttemptId) {
-      const updated = service.listHistory().find((attempt) => attempt.id === clearedAttemptId);
+      const updated = service.getHistoryAttempt(clearedAttemptId);
       if (updated) {
         setHistoryReviewEntries((entries) => entries.map((entry) => entry.attempt?.id === clearedAttemptId
           ? { ...entry, attempt: withAttemptClarity(entry.attempt, updated) }
@@ -2081,19 +2071,12 @@ export function PracticePocScreen({
       setReadyArrowDuelBoardKey(arrowDuelBoardRenderKey);
     }
   }, [arrowDuelBoardRenderKey]);
-  const historyRatingKeys = useMemo(
-    () => activeRunManagementPresentation
+  const historyRatingKeys = useMemo(() => {
+    void aggregateRevision;
+    return activeRunManagementPresentation
       ? activeRunManagementPresentation.runs.flatMap((run) => run.ratingKey ? [run.ratingKey] : [])
-      : sortHistoryRatingKeys(
-        collectHistoryRatingKeys([
-          ...service.listPlayedRatings().map((rating) => rating.key),
-          ...attempts.map((attempt) => attempt.ratingKey)
-        ]),
-        attempts,
-        sprintSessions
-      ),
-    [activeRunManagementPresentation, attempts, service, sprintSessions]
-  );
+      : collectHistoryRatingKeys(service.listPracticeRatingActivity().map((activity) => activity.ratingKey));
+  }, [activeRunManagementPresentation, aggregateRevision, service]);
   const historyRunsByRatingKey = new Map(
     (activeRunManagementPresentation?.runs ?? service.listPracticeRuns()).flatMap((run) => run.ratingKey
       ? [[run.ratingKey, {
@@ -2354,15 +2337,10 @@ export function PracticePocScreen({
     (run) => run.id === activeRunManagementPresentation.selectedRunId
   );
   const practiceProgressRatingKey = selectedManagedRun?.ratingKey ?? selectedConfig.ratingKey;
-  const practiceProgress = useMemo(
-    () => buildPracticeProgressSummary(
-      attempts,
-      sprintSessions,
-      practiceProgressNowMs,
-      practiceProgressRatingKey
-    ),
-    [attempts, sprintSessions, practiceProgressNowMs, practiceProgressRatingKey]
-  );
+  const practiceProgress = useMemo(() => {
+    void aggregateRevision;
+    return service.getPracticeProgressSummary(practiceProgressNowMs, practiceProgressRatingKey);
+  }, [aggregateRevision, practiceProgressNowMs, practiceProgressRatingKey, service]);
   const dueTodayCount = dueReviewItems.length;
   const overdueCount = dueReviewItems.filter((item) => isReviewOverdue(item.review, nowMs)).length;
   const customEligiblePuzzleCount = useMemo(() => {
@@ -10228,7 +10206,7 @@ function reviewReminderPermissionStatusMessage(
 }
 
 function scheduledReviewAttemptCount(service: PracticeService): number {
-  return (service.listHistory({ source: "scheduled_review" }) as AttemptEvent[]).length;
+  return service.countHistory({ source: "scheduled_review" });
 }
 
 function AdvancedRatingsPanel({
@@ -11224,33 +11202,6 @@ function previousCustomConfigRowModel(
     ratingKey: config.ratingKey,
     rating
   };
-}
-
-function sortHistoryRatingKeys(
-  ratingKeys: string[],
-  attempts: AttemptEvent[],
-  sessions: ExportedSprintSession[]
-): string[] {
-  const latestPlayedAt = new Map<string, number>();
-  for (const attempt of attempts) {
-    latestPlayedAt.set(
-      attempt.ratingKey,
-      Math.max(latestPlayedAt.get(attempt.ratingKey) ?? 0, new Date(attempt.completedAt).getTime() || 0)
-    );
-  }
-  for (const session of sessions) {
-    latestPlayedAt.set(
-      session.ratingKey,
-      Math.max(
-        latestPlayedAt.get(session.ratingKey) ?? 0,
-        new Date(session.completedAt ?? session.startedAt).getTime() || 0
-      )
-    );
-  }
-  return [...ratingKeys].sort((left, right) => {
-    return (latestPlayedAt.get(right) ?? 0) - (latestPlayedAt.get(left) ?? 0)
-      || historyRatingKeyLabel(left).localeCompare(historyRatingKeyLabel(right));
-  });
 }
 
 function customThemesFromStoredValue(

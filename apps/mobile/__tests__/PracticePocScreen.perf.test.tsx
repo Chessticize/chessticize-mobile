@@ -182,6 +182,67 @@ class ScanCountingMemoryStore extends MemoryStore {
 }
 
 describe("sprint late-game performance", () => {
+  it("component-level: opening Practice avoids materializing all attempts and sessions", () => {
+    const store = new ScanCountingMemoryStore();
+    const service = new PracticeService(store);
+    configureMobilePracticePuzzleSource(service, "random1000");
+    resetProbes(store.probes);
+
+    let renderer: TestRenderer.ReactTestRenderer | undefined;
+    act(() => {
+      renderer = TestRenderer.create(
+        <PracticePocScreen
+          platformCapabilities={createTestMobilePlatformCapabilities({
+            practiceService: service
+          })}
+        />
+      );
+    });
+    if (!renderer) {
+      throw new Error("PracticePocScreen did not render");
+    }
+    renderers.push(renderer);
+
+    expect(store.probes.get("listAttempts")?.calls).toBe(0);
+    expect(store.probes.get("listSprintSessions")?.calls).toBe(0);
+  });
+
+  it.each(["standard", "arrow_duel"] as const)(
+    "component-level: starting a new %s run avoids aggregate history and Review scans",
+    (mode) => {
+      const store = new ScanCountingMemoryStore();
+      const service = new PracticeService(store);
+      configureMobilePracticePuzzleSource(service, "random1000");
+
+      let renderer: TestRenderer.ReactTestRenderer | undefined;
+      act(() => {
+        renderer = TestRenderer.create(
+          <PracticePocScreen
+            platformCapabilities={createTestMobilePlatformCapabilities({
+              practiceService: service
+            })}
+          />
+        );
+      });
+      if (!renderer) {
+        throw new Error("PracticePocScreen did not render");
+      }
+      renderers.push(renderer);
+
+      if (mode === "arrow_duel") {
+        press(renderer, "practice-mode-arrow-duel");
+      }
+      resetProbes(store.probes);
+      press(renderer, "practice-start-button");
+      act(() => {
+        jest.advanceTimersByTime(200);
+      });
+
+      expect(findByTestId(renderer, "session-board")).toBeTruthy();
+      expect([...store.probes].filter(([, probe]) => probe.calls !== 0)).toEqual([]);
+    }
+  );
+
   it("service-level: per-move cost does not grow across a long sprint", () => {
     const service = createMobilePracticeService("random1000");
     let state = service.startSprint(longSprintConfig("standard"), new Date(Date.now()).toISOString());

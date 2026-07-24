@@ -2,6 +2,7 @@
 import { NativeEventEmitter, NativeModules } from "react-native";
 import {
   computeNextReminder,
+  reviewReminderUsageWindowStart,
   type AttemptEvent,
   type ReviewReminderDecision,
   type ReviewReminderUsageEntry
@@ -198,7 +199,9 @@ export function computeReviewReminderDecision(
 ): ReviewReminderDecision | undefined {
   return computeNextReminder(
     service.listReviewQueue(),
-    reminderUsageFromHistory(service.listHistory() as AttemptEvent[]),
+    reminderUsageFromHistory(service.listHistory({
+      since: reviewReminderUsageWindowStart(now)
+    }) as AttemptEvent[]),
     service.getReviewReminderSettings(),
     now
   );

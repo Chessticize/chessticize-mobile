@@ -43,8 +43,19 @@ import type {
   SprintState
 } from "../../core/src/index.ts";
 import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./query-types.ts";
-import type { ClearLocalHistoryResult, ExportedSprintSession, LocalDataImport, LocalDataImportResult, LocalDataExport, PracticeSettings, PracticeStore, ReviewQueueDuePromotionResult } from "./practice-store.ts";
+import type {
+  ClearLocalHistoryResult,
+  ExportedSprintSession,
+  LocalDataImport,
+  LocalDataImportResult,
+  LocalDataExport,
+  PracticeRatingActivity,
+  PracticeSettings,
+  PracticeStore,
+  ReviewQueueDuePromotionResult
+} from "./practice-store.ts";
 import { exportReviewQueueState, normalizeImportedReviewQueueState } from "./practice-store.ts";
+import { buildPracticeProgressSummary } from "./rating-history.ts";
 import { clonePracticeSettings, defaultPracticeSettings, reviewReminderPreferenceToSettings } from "./practice-settings.ts";
 import type { ReviewReminderPreference } from "./practice-store.ts";
 import type { ReviewReminderSettings } from "../../core/src/index.ts";
@@ -211,40 +222,63 @@ export class MemoryStore implements PracticeStore {
     return cloneAttemptHistoryRow(next);
   }
 
+  getAttempt(attemptId: string): AttemptHistoryRow | undefined {
+    const attempt = this.attempts.find((candidate) => candidate.id === attemptId);
+    return attempt ? this.attemptHistoryRow(attempt) : undefined;
+  }
+
+  countAttempts(filter: HistoryFilter = {}): number {
+    return this.attempts.filter((attempt) => attemptMatchesHistoryFilter(attempt, filter)).length;
+  }
+
   listAttempts(filter: HistoryFilter = {}): AttemptHistoryRow[] {
     return this.attempts
-      .filter((attempt) => !filter.source || attempt.source === filter.source)
-      .filter((attempt) => !filter.result || attempt.result === filter.result)
-      .filter((attempt) => !filter.mode || attempt.mode === filter.mode)
-      .filter((attempt) => !filter.since || attempt.completedAt >= filter.since)
-      .filter((attempt) => !filter.puzzleId || attempt.puzzleId === filter.puzzleId)
-      .filter((attempt) => !filter.sessionId || attempt.sessionId === filter.sessionId)
-      .map((attempt) => ({
-        ...(this.sessions.get(attempt.sessionId)?.run === undefined
-          ? {}
-          : {
-              runId: this.sessions.get(attempt.sessionId)!.run!.id,
-              runName: this.sessions.get(attempt.sessionId)!.run!.name
-            }),
-        id: attempt.id,
-        source: attempt.source,
-        sessionId: attempt.sessionId,
-        puzzleId: attempt.puzzleId,
-        mode: attempt.mode,
-        ratingKey: attempt.ratingKey,
-        result: attempt.result,
-        submittedMove: attempt.submittedMove,
-        expectedMove: attempt.expectedMove,
-        startedAt: attempt.startedAt,
-        completedAt: attempt.completedAt,
-        ratingBefore: attempt.ratingBefore,
-        ...(attempt.ratingAfter === undefined ? {} : { ratingAfter: attempt.ratingAfter }),
-        ...(attempt.arrowDuelCandidateOrder === undefined ? {} : { arrowDuelCandidateOrder: [...attempt.arrowDuelCandidateOrder] }),
-        ...(attempt.unclearUpdatedAt === undefined
-          ? {}
-          : { unclear: Boolean(attempt.unclear), unclearUpdatedAt: attempt.unclearUpdatedAt })
-      }))
+      .filter((attempt) => attemptMatchesHistoryFilter(attempt, filter))
+      .map((attempt) => this.attemptHistoryRow(attempt))
       .sort((left, right) => right.completedAt.localeCompare(left.completedAt) || right.id.localeCompare(left.id));
+  }
+
+  getPracticeProgressSummary(nowMs: number, ratingKey: string) {
+    return buildPracticeProgressSummary(
+      this.attempts,
+      [...this.sessions.values()].map(exportedSprintSessionFromState),
+      nowMs,
+      ratingKey
+    );
+  }
+
+  listPracticeRatingActivity(): PracticeRatingActivity[] {
+    const latestByRatingKey = new Map<string, string>();
+    for (const rating of this.ratings.values()) {
+      if (rating.games > 0) {
+        latestByRatingKey.set(rating.key, "");
+      }
+    }
+    for (const attempt of this.attempts) {
+      const previous = latestByRatingKey.get(attempt.ratingKey);
+      if (!previous || attempt.completedAt > previous) {
+        latestByRatingKey.set(attempt.ratingKey, attempt.completedAt);
+      }
+    }
+    for (const session of this.sessions.values()) {
+      const playedAt = session.completedAt ?? session.startedAt;
+      const previous = latestByRatingKey.get(session.config.ratingKey);
+      if (!previous || playedAt > previous) {
+        latestByRatingKey.set(session.config.ratingKey, playedAt);
+      }
+    }
+    return [...latestByRatingKey]
+      .map(([ratingKey, lastPlayedAt]) => ({ ratingKey, lastPlayedAt }))
+      .sort((left, right) =>
+        right.lastPlayedAt.localeCompare(left.lastPlayedAt) || left.ratingKey.localeCompare(right.ratingKey)
+      );
+  }
+
+  hasPlayedRatingKey(ratingKey: string): boolean {
+    return this.attempts.some((attempt) => attempt.source === "sprint" && attempt.ratingKey === ratingKey)
+      || [...this.sessions.values()].some((session) =>
+        session.config.ratingKey === ratingKey && session.ratingAfter !== undefined
+      );
   }
 
   exportLocalData(): LocalDataExport {
@@ -521,13 +555,16 @@ export class MemoryStore implements PracticeStore {
     const range = resolveHistoryRange(query.now, query.timeRange);
     const allAttempts = this.historyAttemptsForRange(query.ratingKey, range.since, range.until);
     const reviews = [...this.reviewQueue.values()];
-    const attempts = filterHistoryAttemptsForQuery({ attempts: allAttempts, query, reviews });
     const { unclear: _unclear, ...queryWithoutUnclear } = query;
-    const unclearCount = filterHistoryAttemptsForQuery({
+    const attemptsIgnoringUnclear = filterHistoryAttemptsForQuery({
       attempts: allAttempts,
       query: queryWithoutUnclear,
       reviews
-    }).filter((attempt) => Boolean(attempt.unclear)).length;
+    });
+    const attempts = query.unclear === undefined
+      ? attemptsIgnoringUnclear
+      : attemptsIgnoringUnclear.filter((attempt) => Boolean(attempt.unclear) === query.unclear);
+    const unclearCount = attemptsIgnoringUnclear.filter((attempt) => Boolean(attempt.unclear)).length;
     return buildHistoryView({
       query,
       ratingKeys: this.listPlayedRatings(),
@@ -547,6 +584,32 @@ export class MemoryStore implements PracticeStore {
     return [...this.reviewRemovals.values()]
       .map((removal) => ({ ...removal }))
       .sort((left, right) => reviewQueueKey(left).localeCompare(reviewQueueKey(right)));
+  }
+
+  private attemptHistoryRow(attempt: AttemptEvent): AttemptHistoryRow {
+    const run = this.sessions.get(attempt.sessionId)?.run;
+    return {
+      ...(run === undefined ? {} : { runId: run.id, runName: run.name }),
+      id: attempt.id,
+      source: attempt.source,
+      sessionId: attempt.sessionId,
+      puzzleId: attempt.puzzleId,
+      mode: attempt.mode,
+      ratingKey: attempt.ratingKey,
+      result: attempt.result,
+      submittedMove: attempt.submittedMove,
+      expectedMove: attempt.expectedMove,
+      startedAt: attempt.startedAt,
+      completedAt: attempt.completedAt,
+      ratingBefore: attempt.ratingBefore,
+      ...(attempt.ratingAfter === undefined ? {} : { ratingAfter: attempt.ratingAfter }),
+      ...(attempt.arrowDuelCandidateOrder === undefined
+        ? {}
+        : { arrowDuelCandidateOrder: [...attempt.arrowDuelCandidateOrder] }),
+      ...(attempt.unclearUpdatedAt === undefined
+        ? {}
+        : { unclear: Boolean(attempt.unclear), unclearUpdatedAt: attempt.unclearUpdatedAt })
+    };
   }
 
   private assertScheduledReviewWins(review: ReviewQueueState): void {
@@ -679,6 +742,15 @@ function normalizedImportedSprintSession(session: ExportedSprintSession): Export
     status: "failed",
     completedAt: session.completedAt ?? session.startedAt
   };
+}
+
+function attemptMatchesHistoryFilter(attempt: AttemptEvent, filter: HistoryFilter): boolean {
+  return (!filter.source || attempt.source === filter.source)
+    && (!filter.result || attempt.result === filter.result)
+    && (!filter.mode || attempt.mode === filter.mode)
+    && (!filter.since || attempt.completedAt >= filter.since)
+    && (!filter.puzzleId || attempt.puzzleId === filter.puzzleId)
+    && (!filter.sessionId || attempt.sessionId === filter.sessionId);
 }
 
 function reviewQueueKey(context: ReviewContext): string {
