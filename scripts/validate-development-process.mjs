@@ -100,7 +100,14 @@ for (const policy of [agents, testingArchitecture, devLoopSkill, localE2eSkill])
   assert.match(policy, /Targeted native validation/);
   assert.match(policy, /Full native validation/);
   assert.match(policy, /local iOS native\s+validation/i);
+  assert.match(policy, /only for (?:releases|release candidates) and native-impacting changes|only for a release candidate or a change to native/i);
+  assert.match(policy, /validation-relevant development inputs/);
 }
+
+assert.doesNotMatch(agents, /Any required Detox evidence must come from the exact PR head/);
+assert.doesNotMatch(testingArchitecture, /source-tree change invalidates that evidence/);
+assert.doesNotMatch(devLoopSkill, /Any later source-tree change invalidates native evidence/);
+assert.doesNotMatch(localE2eSkill, /same Git tree/);
 
 for (const agentDocPath of agentDocPaths) {
   assert.match(agents, new RegExp(agentDocPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
@@ -353,10 +360,12 @@ for (const option of [
   "- [ ] Targeted `flows` spec or suite",
   "- [ ] Targeted `practice` spec or suite",
   "- [ ] Full `flows` and `practice`",
-  "- [ ] Focused simulator screenshot only"
+  "- [ ] Optional focused simulator screenshot only"
 ]) {
   assert.match(prTemplate, new RegExp(option.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 }
+assert.match(prTemplate, /only for releases and native-impacting changes/i);
+assert.match(prTemplate, /unchanged validation-relevant development inputs/i);
 
 for (const releaseDoc of releaseDocs) {
   assert.match(releaseDoc, /exact/);

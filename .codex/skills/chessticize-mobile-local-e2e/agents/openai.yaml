@@ -1,4 +1,4 @@
 interface:
   display_name: "Chessticize Risk-Scoped E2E"
-  short_description: "Run risk-scoped exact-head iOS Detox evidence"
-  default_prompt: "Use $chessticize-mobile-local-e2e to choose and run the smallest exact-head iOS Detox scope that proves this change."
+  short_description: "Run risk-scoped reusable iOS Detox evidence"
+  default_prompt: "Use $chessticize-mobile-local-e2e only for a release or native-impacting change, and choose the smallest iOS Detox scope that proves it."
