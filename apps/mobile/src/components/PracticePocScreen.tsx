@@ -147,6 +147,11 @@ import type {
   MobileSystemBackEdge,
   MobileSystemBackSource
 } from "../navigation/mobileSystemBack.ts";
+import {
+  MoveFeedbackSettingsSection,
+  type MoveFeedbackPreferences,
+  type MoveFeedbackPreviewer
+} from "./MoveFeedbackSettingsSection.tsx";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Chess, type Move, type PieceSymbol, type Square } from "chess.js";
 import type {
@@ -181,6 +186,10 @@ interface Props {
   debugTrace?: (event: PracticeDebugTraceEvent) => void;
   feedbackIssuesOpener?: (url: string) => Promise<void>;
   currentTimeMs?: () => number;
+  moveFeedbackSettings?: {
+    initialPreferences?: MoveFeedbackPreferences;
+    preview?: MoveFeedbackPreviewer;
+  };
   puzzleSelectionId?: string;
   puzzleSelectionSeed?: string;
   runManagementEnabled?: boolean;
@@ -377,6 +386,7 @@ export function PracticePocScreen({
   debugTrace,
   feedbackIssuesOpener = openFeedbackIssuesInBrowser,
   currentTimeMs = Date.now,
+  moveFeedbackSettings,
   puzzleSelectionId,
   puzzleSelectionSeed,
   runManagementEnabled = false,
@@ -493,6 +503,12 @@ export function PracticePocScreen({
   const [mobileBackPreview, setMobileBackPreview] = useState<MobileBackPreview | null>(null);
   const [iCloudSyncEnabled, setICloudSyncEnabled] = useState(() => service.getSettings().sync.iCloudEnabled);
   const [iCloudSyncStatus, setICloudSyncStatus] = useState(() => service.getSettings().sync.iCloudEnabled ? "Ready" : "Off");
+  const [moveFeedbackPreferences, setMoveFeedbackPreferences] = useState<MoveFeedbackPreferences>(
+    () => moveFeedbackSettings?.initialPreferences ?? {
+      hapticsEnabled: true,
+      soundEnabled: true
+    }
+  );
   const [, setSettingsRevision] = useState(0);
   const internalRunManagement = usePracticeRunManagement({
     enabled: runManagementEnabled && runManagementPresentation === undefined,
@@ -2980,8 +2996,11 @@ export function PracticePocScreen({
                 showRatingControls={!ratingEditingMovedToHome}
                 iCloudSyncEnabled={iCloudSyncEnabled}
                 iCloudSyncStatus={iCloudSyncStatus}
+                moveFeedbackPreferences={moveFeedbackSettings ? moveFeedbackPreferences : undefined}
+                moveFeedbackPreviewer={moveFeedbackSettings?.preview}
                 advancedRatingsOpen={settingsAdvancedRatingsOpen}
                 onAdvancedRatingsOpenChange={setSettingsAdvancedRatingsOpen}
+                onMoveFeedbackPreferencesChange={setMoveFeedbackPreferences}
                 onOpenNotificationSettings={openReviewReminderSystemSettings}
                 onRequestReviewReminderPermission={() => requestReviewReminderPermission()}
                 onSaveReviewReminderPreference={saveReviewReminderPreference}
@@ -9579,7 +9598,10 @@ function SettingsPanel({
   onSyncICloudNow,
   iCloudSyncEnabled,
   iCloudSyncStatus,
+  moveFeedbackPreferences,
+  moveFeedbackPreviewer,
   notificationPermissionStatus,
+  onMoveFeedbackPreferencesChange,
   reminderPlatform,
   ratings,
   reviewReminderScheduleStatus,
@@ -9602,7 +9624,10 @@ function SettingsPanel({
   onSyncICloudNow: () => Promise<string>;
   iCloudSyncEnabled: boolean;
   iCloudSyncStatus: string;
+  moveFeedbackPreferences?: MoveFeedbackPreferences;
+  moveFeedbackPreviewer?: MoveFeedbackPreviewer;
   notificationPermissionStatus: ReviewReminderPermissionStatus;
+  onMoveFeedbackPreferencesChange: (preferences: MoveFeedbackPreferences) => void;
   reminderPlatform: MobilePlatformCapabilities["reminders"]["platform"];
   ratings: Array<{ label: string; record: RatingRecord }>;
   reviewReminderScheduleStatus: string;
@@ -9742,6 +9767,20 @@ function SettingsPanel({
           </Text>
         ) : null}
       </SettingsSection>
+
+      {moveFeedbackPreferences ? (
+        <SettingsSection
+          title="Move Feedback"
+          testID="settings-move-feedback-section"
+          wide={adaptiveLayout.usesWideContent}
+        >
+          <MoveFeedbackSettingsSection
+            preferences={moveFeedbackPreferences}
+            onPreferencesChange={onMoveFeedbackPreferencesChange}
+            onPreview={moveFeedbackPreviewer}
+          />
+        </SettingsSection>
+      ) : null}
 
       {showRatingControls ? (
         <SettingsSection title="Profile" testID="settings-profile-section" wide={adaptiveLayout.usesWideContent}>
