@@ -112,6 +112,7 @@ test("reorder, archive, and restore retain stable Run identity and ELO", () => {
   assert.equal(controller.getSnapshot().hiddenRuns.some((run) => run.id === "standard"), false);
   assert.equal(controller.getSnapshot().runs.at(-1)?.id, "standard");
   assert.equal(controller.getSnapshot().runs.at(-1)?.elo, 925);
+  assert.equal(controller.getSnapshot().selectedRunId, "standard");
 });
 
 test("previous configurations, start effects, and refresh stay outside React", () => {
