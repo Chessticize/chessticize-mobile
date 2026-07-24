@@ -57,7 +57,7 @@ jobs:
           test -n "$UPLOAD_CERT_SHA256"
 
       - name: Install pinned Android packages
-        run: pnpm mobile:install:android-sdk
+        run: pnpm mobile:install:android-sdk -- --artifact-only
 
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
@@ -78,7 +78,7 @@ jobs:
           CHESSTICIZE_ANDROID_RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_STORE_PASSWORD }}
           CHESSTICIZE_ANDROID_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
           CHESSTICIZE_ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
-        run: pnpm mobile:doctor:android
+        run: pnpm mobile:doctor:android -- --artifact-only
 
       - name: Build production-signed App Bundle
         working-directory: apps/mobile/android

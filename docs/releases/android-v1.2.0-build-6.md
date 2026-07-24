@@ -1,11 +1,11 @@
-# Chessticize Android 1.2 (build 5)
+# Chessticize Android 1.2 (build 6)
 
-- Status: Failed candidate; no AAB or Play release was produced
+- Status: Approved
 - Locale: `en-US`
 - Platform: `Android`
 - Public version: `1.2`
-- Build or version code: `5`
-- Source tag: `android-v1.2.0-build-5`
+- Build or version code: `6`
+- Source tag: `android-v1.2.0-build-6`
 - Previous public source tag: `android-v1.1.0-build-4`
 
 ## Customer-facing changes
@@ -21,7 +21,7 @@
 • See at a glance which side moves next in each puzzle.
 • Choose curated themes and combine multiple themes in one Run.
 
-Details and source: https://github.com/Chessticize/chessticize-mobile/releases/tag/android-v1.2.0-build-5
+Details and source: https://github.com/Chessticize/chessticize-mobile/releases/tag/android-v1.2.0-build-6
 ```
 
 ## GitHub customer summary
@@ -46,11 +46,3 @@ Sprint result and on-device analysis score presentation.
 - [x] No issue numbers, internal code names, implementation details, or private
   evidence are included.
 - [x] The release owner approved the copy before the source tag was created.
-
-## Candidate outcome
-
-The protected candidate run stopped in the generic Android doctor before the
-AAB build because the hosted image lacked an emulator-only runtime library.
-No AAB, GitHub source Release, or Play upload was produced. The public annotated
-tag remains immutable; Android 1.2 advances to build 6 with an artifact-only
-doctor that excludes emulator readiness.
