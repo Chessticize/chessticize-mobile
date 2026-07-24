@@ -847,7 +847,7 @@ export class SyncSQLiteStore implements PracticeStore {
       .prepare(
         `SELECT
           SUM(CASE WHEN result = 'correct' THEN 1 ELSE 0 END) AS correct_count,
-          SUM(CASE WHEN result = 'correct' THEN 0 ELSE 1 END) AS wrong_count
+          SUM(CASE WHEN result = 'wrong' THEN 1 ELSE 0 END) AS wrong_count
          FROM attempts
          WHERE rating_key = ? AND completed_at >= ? AND completed_at <= ?`
       )

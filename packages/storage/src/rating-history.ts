@@ -30,7 +30,7 @@ export function buildPracticeProgressSummary(
     }
     if (attempt.result === "correct") {
       correctThisWeek += 1;
-    } else {
+    } else if (attempt.result === "wrong") {
       wrongThisWeek += 1;
     }
   }
