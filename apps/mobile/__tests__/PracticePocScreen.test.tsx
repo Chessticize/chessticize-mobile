@@ -985,6 +985,72 @@ describe("PracticePocScreen", () => {
     expect(themeTestIDs).toContain("custom-theme-zugzwang");
   });
 
+  it("teaches first-use Sprint rules and retains a rediscovery entry after dismissal", () => {
+    const renderer = renderLabScenario("practice-first-sprint-guide");
+
+    expect(collectText(findByTestId(renderer, "practice-sprint-rules-guide"))).toContain(
+      "Solve 15 to pass"
+    );
+    expect(collectText(findByTestId(renderer, "practice-sprint-rules-guide"))).toContain(
+      "Wrong answers still count toward Accuracy and Attempts, but not toward the solved goal."
+    );
+
+    press(renderer, "practice-sprint-rules-dismiss");
+    expect(() => findByTestId(renderer, "practice-sprint-rules-guide")).toThrow();
+    expect(collectText(findByTestId(renderer, "practice-sprint-rules-open"))).toContain(
+      "How Sprint works"
+    );
+
+    press(renderer, "practice-sprint-rules-open");
+    expect(findByTestId(renderer, "practice-sprint-rules-guide")).toBeTruthy();
+  });
+
+  it("summarizes dynamic pass rules in New Run and keeps the preview out of product defaults", () => {
+    const productionLike = renderScreen({
+      runManagementPresentation: runManagementPresentation({
+        draft: {
+          name: "",
+          kind: "custom",
+          mode: "custom",
+          elo: 900,
+          durationSeconds: 300,
+          perPuzzleSeconds: 20,
+          themes: ["mixed"]
+        },
+        screen: "create"
+      })
+    });
+    expect(() => findByTestId(productionLike, "practice-run-pass-rules")).toThrow();
+    expect(() => findByTestId(productionLike, "practice-sprint-rules-guide")).toThrow();
+    expect(() => findByTestId(productionLike, "practice-sprint-rules-open")).toThrow();
+
+    const preview = renderLabScenario("practice-custom-setup");
+    press(preview, "practice-add-run");
+
+    expect(collectText(findByTestId(preview, "practice-run-pass-rules"))).toContain(
+      "Solve 15 before 5 min ends"
+    );
+    press(preview, "practice-run-duration-stepper-decrease");
+    expect(collectText(findByTestId(preview, "practice-run-pass-rules"))).toContain(
+      "Solve 9 before 3 min ends"
+    );
+  });
+
+  it("lets Settings make the Sprint guide available again without a confirmation step", () => {
+    const renderer = renderLabScenario("settings-sprint-guidance");
+
+    press(renderer, "settings-tab");
+    expect(collectText(findByTestId(renderer, "settings-show-sprint-guide"))).toContain(
+      "Runs, ELO, and History stay unchanged."
+    );
+    expect(() => findByTestId(renderer, "settings-sprint-guide-ready")).toThrow();
+
+    press(renderer, "settings-show-sprint-guide");
+    expect(collectText(findByTestId(renderer, "settings-sprint-guide-ready"))).toBe(
+      "Ready to show in Practice"
+    );
+  });
+
   it("keeps the seven curated puzzle tags in the Populated History story", async () => {
     const renderer = renderLabScenario("history-populated");
     await flushMicrotasks();
@@ -3066,6 +3132,24 @@ describe("PracticePocScreen", () => {
 
     expectText(renderer, "Sprint complete");
     expect(collectText(findByTestId(renderer, "sprint-result-solved"))).toContain("1 / 2");
+  });
+
+  it("separates the fixed pass goal from actual attempts in the Storybook result designs", () => {
+    const failed = renderLabScenario("practice-sprint-result-goal");
+
+    expect(collectText(findByTestId(failed, "sprint-result-goal-label"))).toBe("Solve 15 to pass");
+    expect(collectText(findByTestId(failed, "sprint-result-solved"))).toContain("11 / 15");
+    expect(collectText(findByTestId(failed, "sprint-result-accuracy"))).toBe(
+      "12 attempted · 92% Accuracy"
+    );
+
+    const passed = renderLabScenario("practice-sprint-result-extra-attempt");
+
+    expect(collectText(findByTestId(passed, "sprint-result-goal-label"))).toBe("Solve 15 to pass");
+    expect(collectText(findByTestId(passed, "sprint-result-solved"))).toContain("15 / 15");
+    expect(collectText(findByTestId(passed, "sprint-result-accuracy"))).toBe(
+      "16 attempted · 94% Accuracy"
+    );
   });
 
   it("keeps a deterministic Custom target inside the selected shared configuration", () => {
@@ -7815,7 +7899,7 @@ function createScriptedStockfishTransport(
 }
 
 type RenderScreenOptions = TestMobilePlatformCapabilityOverrides &
-  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "historyTimingPreview" | "moveFeedbackSettings" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEloEditingMovedToHome" | "runManagementEnabled" | "runManagementPresentation" | "runTimingEditorPreview" | "sessionTimingPreview" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "themeCatalogPresentation"> & {
+  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "historyTimingPreview" | "moveFeedbackSettings" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEloEditingMovedToHome" | "runManagementEnabled" | "runManagementPresentation" | "runTimingEditorPreview" | "sessionTimingPreview" | "sprintRulesDesignPreview" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "themeCatalogPresentation"> & {
     platformCapabilities?: MobilePlatformCapabilities;
   };
 
@@ -7921,6 +8005,7 @@ function renderScreen({
   runManagementPresentation,
   runTimingEditorPreview,
   sessionTimingPreview,
+  sprintRulesDesignPreview,
   historyTimingPreview,
   sprintStartDelayMs,
   standardTargetCorrect,
@@ -7945,6 +8030,7 @@ function renderScreen({
         runManagementPresentation={runManagementPresentation}
         runTimingEditorPreview={runTimingEditorPreview}
         sessionTimingPreview={sessionTimingPreview}
+        sprintRulesDesignPreview={sprintRulesDesignPreview}
         historyTimingPreview={historyTimingPreview}
         sprintStartDelayMs={sprintStartDelayMs}
         standardTargetCorrect={standardTargetCorrect}

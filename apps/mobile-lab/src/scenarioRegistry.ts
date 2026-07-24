@@ -8,6 +8,7 @@ import newScenarioMarkerData from "./newScenarioMarkers.json" with { type: "json
 
 export type LabScenarioId =
   | "practice-home"
+  | "practice-first-sprint-guide"
   | "practice-home-edit"
   | "practice-custom-setup"
   | "practice-run-name-validation"
@@ -25,6 +26,8 @@ export type LabScenarioId =
   | "practice-paused"
   | "practice-exit-confirmation"
   | "practice-summary"
+  | "practice-sprint-result-goal"
+  | "practice-sprint-result-extra-attempt"
   | "practice-reminder-prompt"
   | "review-empty"
   | "review-due"
@@ -39,6 +42,7 @@ export type LabScenarioId =
   | "history-attempt-detail"
   | "history-replay-unavailable"
   | "settings-ios-sync"
+  | "settings-sprint-guidance"
   | "settings-android-backup"
   | "settings-notifications-denied"
   | "settings-notifications-not-determined"
@@ -87,6 +91,7 @@ export const newScenarioMarkers = newScenarioMarkerData as Partial<
 
 const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
   "practice-home": defineScenario("practice-home", "Practice", "Home", "practice--home", "Practice home with vertically centered bordered Run cards, named reusable runs, deterministic ELO, and no persisted mutations.", "practice", ["Centered bordered Run cards", "Saved run selection", "Add Run entry", "Edit mode entry", "Progress summary", "Review workload strip"], ["Run editor", "Review", "History", "Settings"]),
+  "practice-first-sprint-guide": defineScenario("practice-first-sprint-guide", "Practice", "First Sprint guide", "practice--first-sprint-guide", "First-use Practice Home with an automatically expanded rule card that teaches the pass goal, time limit, mistake limit, and the difference between solved puzzles and attempts.", "practice", ["First-use guidance", "Solve 15 to pass", "Time and mistake limits", "Dismiss to persistent help entry"], ["Production onboarding state", "Persistence", "Active Sprint"], "contained"),
   "practice-home-edit": defineScenario("practice-home-edit", "Practice", "Edit and reorder runs", "practice--edit-and-reorder-runs", "Home edit mode with whole-card drag, real-time animated insertion, arrow-button fallbacks, Run edit actions, and removal actions.", "practice", ["Whole-card drag", "Real-time insertion animation", "Arrow-button fallback", "Run edit actions", "Format-specific icons", "Removal entry"], ["Run editor", "Removal confirmation", "Practice home"]),
   "practice-custom-setup": defineScenario(
     "practice-custom-setup",
@@ -122,6 +127,8 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
   "practice-paused": defineScenario("practice-paused", "Practice", "Paused session", "practice--paused-session", "Paused sprint with resume and abandon actions.", "practice", ["Paused state", "Resume", "Abandon"], ["Active sprint", "Sprint result"]),
   "practice-exit-confirmation": defineScenario("practice-exit-confirmation", "Practice", "Exit confirmation", "practice--exit-confirmation", "Guarded abandon confirmation over an active sprint.", "practice", ["Confirmation", "Cancel", "Confirm abandon"], ["Active sprint", "Sprint result"]),
   "practice-summary": defineScenario("practice-summary", "Practice", "Sprint summary", "practice--sprint-summary", "Completed one-puzzle sprint summary reached through the public board callback.", "practice", ["Result", "Rating change", "History and review actions"], ["Practice home", "History", "Review"]),
+  "practice-sprint-result-goal": defineScenario("practice-sprint-result-goal", "Practice", "Sprint result · Goal clarity", "practice--sprint-result-goal-clarity", "Failed Sprint Result that keeps the pass target fixed at 15 while separately reporting 12 attempts and 92% accuracy.", "practice", ["11 of 15 solved", "Solve 15 to pass", "12 attempted", "Accuracy", "Existing result actions"], ["Production result wiring", "History", "Review"], "contained"),
+  "practice-sprint-result-extra-attempt": defineScenario("practice-sprint-result-extra-attempt", "Practice", "Sprint result · Extra attempt", "practice--sprint-result-extra-attempt", "Passed Sprint Result that keeps 15 of 15 as the goal while explicitly reporting the user's 16 actual attempts.", "practice", ["15 of 15 solved", "Solve 15 to pass", "16 attempted", "Accuracy", "Existing result actions"], ["Production result wiring", "History", "Review"], "contained"),
   "practice-reminder-prompt": defineScenario("practice-reminder-prompt", "Practice", "Review reminder prompt", "practice--review-reminder-prompt", "First-mistake notification-permission prompt driven by a maintained fake client.", "practice", ["Permission rationale", "Enable", "Dismiss"], ["Active sprint"]),
   "review-empty": defineScenario("review-empty", "Review", "Empty queue", "review--empty-queue", "Review with no due or future items.", "review", ["Empty state", "Practice return"], ["Practice"]),
   "review-due": defineScenario("review-due", "Review", "Due queue", "review--due-queue", "Deterministic due workload with multiple contexts.", "review", ["Due metrics", "Forecast", "Queue rows", "Start review"], ["Review session", "Practice"]),
@@ -145,6 +152,7 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
     ["iCloud Sync", "Notifications", "Sound and haptic toggles", "Move and capture audio previews", "About"],
     ["Run editor", "Native audio and haptic validation", "Stockfish diagnostics"]
   ),
+  "settings-sprint-guidance": defineScenario("settings-sprint-guidance", "Settings", "Sprint guide reset", "settings--sprint-guide-reset", "Settings guidance action that makes the first-Sprint tips available again without changing Runs, ELO, or History.", "settings", ["Show Sprint guide again", "No confirmation for a reversible action", "Inline ready state", "Progress safety copy"], ["Production onboarding persistence", "Practice"], "contained"),
   "settings-android-backup": defineScenario("settings-android-backup", "Settings", "Android backup", "settings--android-backup", "Android managed-backup variant with iCloud controls omitted.", "settings", ["Android Progress Backup", "Notifications", "About"], ["Stockfish diagnostics"]),
   "settings-notifications-denied": defineScenario("settings-notifications-denied", "Settings", "Notifications denied", "settings--notifications-denied", "Denied notification permission with a public system-settings action.", "settings", ["Permission state", "Reminder preferences", "Open settings"], ["System settings"]),
   "settings-notifications-not-determined": defineScenario("settings-notifications-not-determined", "Settings", "Notifications not determined", "settings--notifications-not-determined", "Notification permission has not yet been requested.", "settings", ["Permission request", "Reminder preferences"], ["System permission prompt"]),

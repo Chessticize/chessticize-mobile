@@ -39,6 +39,18 @@ export const IosSync: Story = {
   }
 };
 
+export const SprintGuideReset: Story = {
+  name: "Sprint guide reset",
+  args: { scenarioId: "settings-sprint-guidance" },
+  play: async ({ canvasElement }) => {
+    await openSettings(canvasElement);
+    await waitForTestId(canvasElement, "settings-guidance-section");
+    await clickTestId(canvasElement, "settings-show-sprint-guide");
+    await waitForTestId(canvasElement, "settings-sprint-guide-ready");
+    (canvasElement.querySelector('[data-testid="settings-show-sprint-guide"]') as HTMLElement | null)?.blur();
+  }
+};
+
 export const AndroidBackup: Story = {
   name: "Android backup",
   args: { scenarioId: "settings-android-backup" },

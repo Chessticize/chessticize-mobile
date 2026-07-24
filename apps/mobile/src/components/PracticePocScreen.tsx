@@ -198,6 +198,7 @@ interface Props {
   runManagementPresentation?: PracticeRunManagementPresentation;
   runEloEditingMovedToHome?: boolean;
   runTimingEditorPreview?: boolean;
+  sprintRulesDesignPreview?: SprintRulesDesignPreview;
   sessionTimingPreview?: SessionTimingDesignPreview;
   historyTimingPreview?: HistoryTimingDesignPreview;
   sprintStartDelayMs?: number;
@@ -210,6 +211,19 @@ export type SessionTimingDesignPreview = {
   nextPuzzleFen?: string;
   timeoutSeconds: number;
   warningSeconds: number;
+};
+
+export type SprintRulesGuidePresentation = {
+  durationLabel: string;
+  maxMistakes: number;
+  targetCorrect: number;
+};
+
+export type SprintRulesDesignPreview = {
+  firstRunGuide?: SprintRulesGuidePresentation;
+  initialResultState?: SprintState;
+  showRunEditorSummary?: boolean;
+  showSettingsReset?: boolean;
 };
 
 type HistoryTimingStatus = "slow" | "timed_out";
@@ -413,6 +427,7 @@ export function PracticePocScreen({
   runManagementPresentation,
   runEloEditingMovedToHome = false,
   runTimingEditorPreview = false,
+  sprintRulesDesignPreview,
   sessionTimingPreview,
   historyTimingPreview,
   sprintStartDelayMs = ARROW_DUEL_LOADING_TRANSITION_MS,
@@ -478,7 +493,9 @@ export function PracticePocScreen({
   const [mode, setMode] = useState<SprintMode>("standard");
   const [startingMode, setStartingMode] = useState<SprintMode | null>(null);
   const [tab, setTab] = useState<Tab>("practice");
-  const [state, setState] = useState<SprintState | null>(null);
+  const [state, setState] = useState<SprintState | null>(
+    () => sprintRulesDesignPreview?.initialResultState ?? null
+  );
   const [feedback, setFeedback] = useState<SessionFeedback>(null);
   const [aggregateRevision, setAggregateRevision] = useState(0);
   const [reviewQueue, setReviewQueue] = useState<ReviewQueueState[]>([]);
@@ -522,6 +539,9 @@ export function PracticePocScreen({
   const [reviewReminderScheduleStatus, setReviewReminderScheduleStatus] = useState("unavailable");
   const [reviewReminderPermissionPromptVisible, setReviewReminderPermissionPromptVisible] = useState(false);
   const [practiceExitConfirmationVisible, setPracticeExitConfirmationVisible] = useState(false);
+  const [sprintRulesGuideVisible, setSprintRulesGuideVisible] = useState(
+    () => sprintRulesDesignPreview?.firstRunGuide !== undefined
+  );
   const [historyFiltersExpanded, setHistoryFiltersExpanded] = useState(false);
   const [reviewFiltersExpanded, setReviewFiltersExpanded] = useState(false);
   const [settingsAdvancedRatingsOpen, setSettingsAdvancedRatingsOpen] = useState(false);
@@ -2858,7 +2878,11 @@ export function PracticePocScreen({
                     overdueReviewCount={overdueCount}
                     progress={practiceProgress}
                     runManagement={activeRunManagementPresentation}
+                    sprintRulesGuide={sprintRulesDesignPreview?.firstRunGuide}
+                    sprintRulesGuideVisible={sprintRulesGuideVisible}
                     resumableSprint={resumableSprint}
+                    onDismissSprintRulesGuide={() => setSprintRulesGuideVisible(false)}
+                    onOpenSprintRulesGuide={() => setSprintRulesGuideVisible(true)}
                     onSelectMode={setMode}
                     onStartMode={(nextMode) => startSprint(nextMode)}
                     onResumeSprint={resumeSprint}
@@ -2869,6 +2893,7 @@ export function PracticePocScreen({
                 {!isOpenSession && state === null && activeRunManagementPresentation && activeRunManagementPresentation.screen !== "home" ? (
                   <PracticeRunEditor
                     presentation={activeRunManagementPresentation}
+                    showSprintRulesSummary={sprintRulesDesignPreview?.showRunEditorSummary === true}
                     showTimingPreview={runTimingEditorPreview}
                     themeCatalogPresentation={themeCatalogPresentation}
                   />
@@ -2917,6 +2942,7 @@ export function PracticePocScreen({
                   <>
                     <SprintSummary
                       state={state}
+                      clarifyGoal={sprintRulesDesignPreview?.initialResultState !== undefined}
                       elapsedMs={Math.min(sprintElapsedMs, state ? state.config.durationSeconds * 1000 : sprintElapsedMs)}
                       unclearPrompt={unclearPrompt}
                       onToggleUnclear={toggleUnclearPrompt}
@@ -3145,6 +3171,7 @@ export function PracticePocScreen({
                 iCloudSyncStatus={iCloudSyncStatus}
                 moveFeedbackPreferences={moveFeedbackPreferences}
                 moveFeedbackPreviewer={moveFeedbackSettings?.preview}
+                showSprintGuideReset={sprintRulesDesignPreview?.showSettingsReset === true}
                 advancedRatingsOpen={settingsAdvancedRatingsOpen}
                 onAdvancedRatingsOpenChange={setSettingsAdvancedRatingsOpen}
                 onMoveFeedbackPreferencesChange={saveMoveFeedbackPreferences}
@@ -3282,7 +3309,11 @@ function PracticeHome({
   overdueReviewCount,
   progress,
   runManagement,
+  sprintRulesGuide,
+  sprintRulesGuideVisible,
   resumableSprint,
+  onDismissSprintRulesGuide,
+  onOpenSprintRulesGuide,
   onSelectMode,
   onStartMode,
   onResumeSprint,
@@ -3296,7 +3327,11 @@ function PracticeHome({
   overdueReviewCount: number;
   progress: PracticeProgressSummary;
   runManagement?: PracticeRunManagementPresentation;
+  sprintRulesGuide?: SprintRulesGuidePresentation;
+  sprintRulesGuideVisible: boolean;
   resumableSprint: SprintState | null;
+  onDismissSprintRulesGuide: () => void;
+  onOpenSprintRulesGuide: () => void;
   onSelectMode: (next: SprintMode) => void;
   onStartMode: (next: SprintMode) => void;
   onResumeSprint: (sprint: SprintState) => void;
@@ -3328,7 +3363,13 @@ function PracticeHome({
           !adaptiveLayout.usesWideContent ? styles.practiceHomeColumnStacked : null
         ]}>
           {runManagement ? (
-            <PracticeRunHome presentation={runManagement} />
+            <PracticeRunHome
+              presentation={runManagement}
+              sprintRulesGuide={sprintRulesGuide}
+              sprintRulesGuideVisible={sprintRulesGuideVisible}
+              onDismissSprintRulesGuide={onDismissSprintRulesGuide}
+              onOpenSprintRulesGuide={onOpenSprintRulesGuide}
+            />
           ) : (
             <>
               <SprintStartHeader
@@ -3416,9 +3457,17 @@ function PracticeHome({
 }
 
 function PracticeRunHome({
-  presentation
+  presentation,
+  sprintRulesGuide,
+  sprintRulesGuideVisible,
+  onDismissSprintRulesGuide,
+  onOpenSprintRulesGuide
 }: {
   presentation: PracticeRunManagementPresentation;
+  sprintRulesGuide?: SprintRulesGuidePresentation;
+  sprintRulesGuideVisible: boolean;
+  onDismissSprintRulesGuide: () => void;
+  onOpenSprintRulesGuide: () => void;
 }): React.JSX.Element {
   const [draggedRunId, setDraggedRunId] = useState<string | null>(null);
   const [dropTargetRunId, setDropTargetRunId] = useState<string | null>(null);
@@ -3604,6 +3653,28 @@ function PracticeRunHome({
         </View>
       </View>
 
+      {sprintRulesGuide ? (
+        sprintRulesGuideVisible ? (
+          <SprintRulesGuide
+            presentation={sprintRulesGuide}
+            onDismiss={onDismissSprintRulesGuide}
+          />
+        ) : (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="How Sprint works"
+            style={styles.sprintRulesHelpLink}
+            testID="practice-sprint-rules-open"
+            onPress={onOpenSprintRulesGuide}
+          >
+            <View style={styles.sprintRulesHelpIcon}>
+              <Text style={styles.sprintRulesHelpIconText}>?</Text>
+            </View>
+            <Text style={styles.sprintRulesHelpLinkText}>How Sprint works</Text>
+          </Pressable>
+        )
+      ) : null}
+
       {presentation.notice ? (
         <View
           accessibilityLiveRegion="polite"
@@ -3690,6 +3761,95 @@ function PracticeRunHome({
           </View>
         </View>
       ) : null}
+    </View>
+  );
+}
+
+function SprintRulesGuide({
+  presentation,
+  onDismiss
+}: {
+  presentation: SprintRulesGuidePresentation;
+  onDismiss: () => void;
+}): React.JSX.Element {
+  return (
+    <View
+      accessibilityLabel={`Your first Sprint. Solve ${presentation.targetCorrect} to pass before ${presentation.durationLabel} ends. ${presentation.maxMistakes} mistakes ends the Sprint. Wrong answers count as attempts, not solved puzzles.`}
+      style={styles.sprintRulesGuide}
+      testID="practice-sprint-rules-guide"
+    >
+      <View style={styles.sprintRulesGuideHeader}>
+        <View style={styles.sprintRulesGuideTitleBlock}>
+          <Text style={styles.sprintRulesEyebrow}>YOUR FIRST SPRINT</Text>
+          <Text style={styles.sprintRulesGuideTitle}>
+            Solve {presentation.targetCorrect} to pass
+          </Text>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss Sprint rules"
+          style={styles.sprintRulesDismissButton}
+          testID="practice-sprint-rules-dismiss"
+          onPress={onDismiss}
+        >
+          <Text style={styles.sprintRulesDismissText}>Got it</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.sprintRulesList}>
+        <SprintRuleRow
+          badge={String(presentation.targetCorrect)}
+          detail="Only solved puzzles move this goal forward."
+          label="Puzzles solved"
+        />
+        <SprintRuleRow
+          badge={presentation.durationLabel}
+          detail="Reach the goal before the Sprint timer ends."
+          label="Time limit"
+        />
+        <SprintRuleRow
+          badge={String(presentation.maxMistakes)}
+          detail={`Mistake ${presentation.maxMistakes} ends the Sprint.`}
+          label="Mistakes max"
+          tone="danger"
+        />
+      </View>
+
+      <Text style={styles.sprintRulesGuideFootnote}>
+        Wrong answers still count toward Accuracy and Attempts, but not toward the solved goal.
+      </Text>
+    </View>
+  );
+}
+
+function SprintRuleRow({
+  badge,
+  detail,
+  label,
+  tone = "default"
+}: {
+  badge: string;
+  detail: string;
+  label: string;
+  tone?: "default" | "danger";
+}): React.JSX.Element {
+  return (
+    <View style={styles.sprintRuleRow}>
+      <View style={[
+        styles.sprintRuleBadge,
+        tone === "danger" ? styles.sprintRuleBadgeDanger : null
+      ]}>
+        <Text style={[
+          styles.sprintRuleBadgeText,
+          tone === "danger" ? styles.sprintRuleBadgeTextDanger : null
+        ]}>
+          {badge}
+        </Text>
+      </View>
+      <View style={styles.sprintRuleCopy}>
+        <Text style={styles.sprintRuleLabel}>{label}</Text>
+        <Text style={styles.sprintRuleDetail}>{detail}</Text>
+      </View>
     </View>
   );
 }
@@ -4192,10 +4352,12 @@ function RunRemovalConfirmation({
 
 function PracticeRunEditor({
   presentation,
+  showSprintRulesSummary,
   showTimingPreview,
   themeCatalogPresentation
 }: {
   presentation: PracticeRunManagementPresentation;
+  showSprintRulesSummary: boolean;
   showTimingPreview: boolean;
   themeCatalogPresentation?: ThemeCatalogPresentation;
 }): React.JSX.Element | null {
@@ -4212,6 +4374,11 @@ function PracticeRunEditor({
     config,
     row: previousCustomConfigRowModel(config, rating)
   })) ?? [];
+  const sprintRules = buildSprintConfig({
+    durationSeconds: draft.durationSeconds,
+    mode: draft.mode,
+    perPuzzleSeconds: draft.perPuzzleSeconds
+  });
 
   return (
     <View style={styles.customSetupPanel} testID="practice-run-editor">
@@ -4402,6 +4569,10 @@ function PracticeRunEditor({
         )}
       </View>
 
+      {showSprintRulesSummary && isCreate ? (
+        <SprintPassRulesSummary config={sprintRules} />
+      ) : null}
+
       {!isCreate && directRunEditing && showTimingPreview ? <PracticeRunTimingPreview /> : null}
 
       {isCreate && isCustom && previousRows.length > 0 ? (
@@ -4419,6 +4590,39 @@ function PracticeRunEditor({
           ))}
         </View>
       ) : null}
+    </View>
+  );
+}
+
+function SprintPassRulesSummary({
+  config
+}: {
+  config: SprintConfig;
+}): React.JSX.Element {
+  return (
+    <View
+      accessibilityLabel={`Pass rules. Solve ${config.targetCorrect} before ${formatSprintDurationLabel(config.durationSeconds)} ends. Mistake ${config.maxMistakes} ends the Sprint. Wrong answers count as attempts, not solved puzzles.`}
+      style={styles.sprintPassRulesCard}
+      testID="practice-run-pass-rules"
+    >
+      <View style={styles.sprintPassRulesHeading}>
+        <View>
+          <Text style={styles.sectionLabel}>Pass rules</Text>
+          <Text style={styles.sprintPassRulesHeadline}>
+            Solve {config.targetCorrect} before {formatSprintDurationLabel(config.durationSeconds)} ends
+          </Text>
+        </View>
+        <View style={styles.sprintPassRulesTarget}>
+          <Text style={styles.sprintPassRulesTargetValue}>{config.targetCorrect}</Text>
+          <Text style={styles.sprintPassRulesTargetLabel}>TO PASS</Text>
+        </View>
+      </View>
+      <Text style={styles.helperText}>
+        Wrong answers count as attempts, not solved puzzles. Mistake {config.maxMistakes} ends the Sprint.
+      </Text>
+      <Text style={styles.sprintPassRulesHint}>
+        The goal updates with Duration and Time per puzzle.
+      </Text>
     </View>
   );
 }
@@ -5808,6 +6012,7 @@ function UnclearAttemptPrompt({
 
 function SprintSummary({
   state,
+  clarifyGoal,
   elapsedMs,
   unclearPrompt,
   onToggleUnclear,
@@ -5817,6 +6022,7 @@ function SprintSummary({
   onReview
 }: {
   state: SprintState;
+  clarifyGoal: boolean;
   elapsedMs: number;
   unclearPrompt: UnclearPromptState | null;
   onToggleUnclear: () => void;
@@ -5859,26 +6065,45 @@ function SprintSummary({
         </Pressable>
       </View>
 
-      <View style={styles.resultHero} testID="sprint-result-hero">
-        <View style={[styles.resultIcon, state.status === "won" ? styles.resultIconWon : styles.resultIconFailed]}>
-          <SprintResultStatusGlyph status={state.status === "won" ? "won" : "failed"} />
+      <View
+        style={[styles.resultHero, clarifyGoal ? styles.resultHeroClarified : null]}
+        testID="sprint-result-hero"
+      >
+        <View style={styles.resultStatusBlock}>
+          <View style={[styles.resultIcon, state.status === "won" ? styles.resultIconWon : styles.resultIconFailed]}>
+            <SprintResultStatusGlyph status={state.status === "won" ? "won" : "failed"} />
+          </View>
+          <View style={styles.resultTitleBlock}>
+            <Text style={styles.summaryTitle}>{state.status === "won" ? "Sprint complete" : "Sprint failed"}</Text>
+            <Text
+              accessibilityLabel={`Result: ${reason}`}
+              style={styles.summaryText}
+              testID="sprint-result-reason"
+            >
+              {reason}
+            </Text>
+          </View>
         </View>
-        <View style={styles.resultTitleBlock}>
-          <Text style={styles.summaryTitle}>{state.status === "won" ? "Sprint complete" : "Sprint failed"}</Text>
-          <Text
-            accessibilityLabel={`Result: ${reason}`}
-            style={styles.summaryText}
-            testID="sprint-result-reason"
-          >
-            {reason}
-          </Text>
-        </View>
-        <View style={styles.resultScoreBlock}>
+        <View style={[
+          styles.resultScoreBlock,
+          clarifyGoal ? styles.resultGoalScoreBlock : null
+        ]}>
+          {clarifyGoal ? (
+            <Text style={styles.resultGoalLabel} testID="sprint-result-goal-label">
+              Solve {state.config.targetCorrect} to pass
+            </Text>
+          ) : null}
           <Text style={styles.resultSolvedCount} testID="sprint-result-solved">
             {state.correctCount}
-            <Text style={styles.resultSolvedTarget}> / {attemptCount}</Text>
+            <Text style={styles.resultSolvedTarget}>
+              {" / "}
+              {clarifyGoal ? state.config.targetCorrect : attemptCount}
+            </Text>
           </Text>
-          <Text style={styles.resultAccuracy} testID="sprint-result-accuracy">{accuracy}% Accuracy</Text>
+          <Text style={styles.resultAccuracy} testID="sprint-result-accuracy">
+            {clarifyGoal ? `${attemptCount} attempted · ` : ""}
+            {accuracy}% Accuracy
+          </Text>
         </View>
       </View>
 
@@ -10328,6 +10553,7 @@ function SettingsPanel({
   ratings,
   reviewReminderScheduleStatus,
   reviewReminderPreference,
+  showSprintGuideReset,
   showRatingControls,
   standardRating
 }: {
@@ -10354,10 +10580,12 @@ function SettingsPanel({
   ratings: Array<{ label: string; record: RatingRecord }>;
   reviewReminderScheduleStatus: string;
   reviewReminderPreference: ReviewReminderPreference;
+  showSprintGuideReset: boolean;
   showRatingControls: boolean;
   standardRating: number;
 }): React.JSX.Element {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [sprintGuideReady, setSprintGuideReady] = useState(false);
   const bundledCoreManifest = getBundledCorePackManifest();
   const releasePageUrl = applicationMetadata.releasePageUrl;
 
@@ -10519,6 +10747,26 @@ function SettingsPanel({
                 setStatusMessage(`${ratingLabelFromKey(ratingKey)} rating set to ${next.rating}`);
               }}
             />
+          ) : null}
+        </SettingsSection>
+      ) : null}
+
+      {showSprintGuideReset ? (
+        <SettingsSection title="Guidance" testID="settings-guidance-section" wide={adaptiveLayout.usesWideContent}>
+          <SettingsActionRow
+            label="Show Sprint guide again"
+            detail="Reopen the first-Sprint tips next time you visit Practice. Runs, ELO, and History stay unchanged."
+            testID="settings-show-sprint-guide"
+            onPress={() => setSprintGuideReady(true)}
+          />
+          {sprintGuideReady ? (
+            <View
+              accessibilityLiveRegion="polite"
+              style={styles.sprintGuideReadyStatus}
+              testID="settings-sprint-guide-ready"
+            >
+              <Text style={styles.sprintGuideReadyStatusText}>Ready to show in Practice</Text>
+            </View>
           ) : null}
         </SettingsSection>
       ) : null}
@@ -12460,6 +12708,130 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8
   },
+  sprintRulesHelpLink: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    gap: 7,
+    minHeight: 44,
+    paddingHorizontal: 2
+  },
+  sprintRulesHelpIcon: {
+    alignItems: "center",
+    backgroundColor: "#EFF6FF",
+    borderColor: "#93C5FD",
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 24,
+    justifyContent: "center",
+    width: 24
+  },
+  sprintRulesHelpIconText: {
+    color: "#1D4ED8",
+    fontSize: 13,
+    fontWeight: "900"
+  },
+  sprintRulesHelpLinkText: {
+    color: "#1D4ED8",
+    fontSize: 13,
+    fontWeight: "800"
+  },
+  sprintRulesGuide: {
+    backgroundColor: "#EFF6FF",
+    borderColor: "#93C5FD",
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 12,
+    padding: 14
+  },
+  sprintRulesGuideHeader: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: 12,
+    justifyContent: "space-between"
+  },
+  sprintRulesGuideTitleBlock: {
+    flex: 1,
+    gap: 2,
+    minWidth: 0
+  },
+  sprintRulesEyebrow: {
+    color: "#1D4ED8",
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.8
+  },
+  sprintRulesGuideTitle: {
+    color: "#111827",
+    fontSize: 19,
+    fontWeight: "900",
+    lineHeight: 24
+  },
+  sprintRulesDismissButton: {
+    alignItems: "center",
+    backgroundColor: "#2563EB",
+    borderRadius: 8,
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: 12
+  },
+  sprintRulesDismissText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "900"
+  },
+  sprintRulesList: {
+    gap: 8
+  },
+  sprintRuleRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10
+  },
+  sprintRuleBadge: {
+    alignItems: "center",
+    backgroundColor: "#DBEAFE",
+    borderRadius: 8,
+    height: 36,
+    justifyContent: "center",
+    minWidth: 50,
+    paddingHorizontal: 8
+  },
+  sprintRuleBadgeDanger: {
+    backgroundColor: "#FEE2E2"
+  },
+  sprintRuleBadgeText: {
+    color: "#1D4ED8",
+    fontFamily: "menlo",
+    fontSize: 13,
+    fontWeight: "900"
+  },
+  sprintRuleBadgeTextDanger: {
+    color: "#B91C1C"
+  },
+  sprintRuleCopy: {
+    flex: 1,
+    gap: 1,
+    minWidth: 0
+  },
+  sprintRuleLabel: {
+    color: "#111827",
+    fontSize: 13,
+    fontWeight: "800"
+  },
+  sprintRuleDetail: {
+    color: "#475569",
+    fontSize: 11,
+    lineHeight: 15
+  },
+  sprintRulesGuideFootnote: {
+    borderTopColor: "#BFDBFE",
+    borderTopWidth: StyleSheet.hairlineWidth,
+    color: "#334155",
+    fontSize: 11,
+    lineHeight: 16,
+    paddingTop: 10
+  },
   primaryCompactButton: {
     alignItems: "center",
     backgroundColor: "#2563EB",
@@ -12640,6 +13012,52 @@ const styles = StyleSheet.create({
     gap: 3,
     paddingHorizontal: 12,
     paddingVertical: 9
+  },
+  sprintPassRulesCard: {
+    backgroundColor: "#F8FAFC",
+    borderColor: "#CBD5E1",
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 7,
+    padding: 12
+  },
+  sprintPassRulesHeading: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12,
+    justifyContent: "space-between"
+  },
+  sprintPassRulesHeadline: {
+    color: "#334155",
+    fontSize: 12,
+    fontWeight: "700",
+    lineHeight: 17,
+    marginTop: 2
+  },
+  sprintPassRulesTarget: {
+    alignItems: "center",
+    backgroundColor: "#EFF6FF",
+    borderRadius: 8,
+    minWidth: 58,
+    paddingHorizontal: 9,
+    paddingVertical: 6
+  },
+  sprintPassRulesTargetValue: {
+    color: "#1D4ED8",
+    fontFamily: "menlo",
+    fontSize: 18,
+    fontWeight: "900"
+  },
+  sprintPassRulesTargetLabel: {
+    color: "#1D4ED8",
+    fontSize: 8,
+    fontWeight: "900",
+    letterSpacing: 0.6
+  },
+  sprintPassRulesHint: {
+    color: "#64748B",
+    fontSize: 10,
+    fontWeight: "700"
   },
   runEditorDetailsLabel: {
     marginBottom: -4
@@ -14178,6 +14596,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 12
   },
+  resultHeroClarified: {
+    alignItems: "stretch",
+    flexDirection: "column",
+    gap: 10
+  },
+  resultStatusBlock: {
+    alignItems: "center",
+    flex: 1,
+    flexDirection: "row",
+    gap: 12,
+    minWidth: 0
+  },
   resultIcon: {
     alignItems: "center",
     borderRadius: 999,
@@ -14260,6 +14690,20 @@ const styles = StyleSheet.create({
   resultScoreBlock: {
     alignItems: "flex-end",
     gap: 2
+  },
+  resultGoalScoreBlock: {
+    backgroundColor: "#F8FAFC",
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 9
+  },
+  resultGoalLabel: {
+    color: "#1D4ED8",
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.2
   },
   resultSolvedCount: {
     color: "#111827",
@@ -15313,6 +15757,18 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     overflow: "hidden"
+  },
+  sprintGuideReadyStatus: {
+    backgroundColor: "#ECFDF5",
+    borderTopColor: "#A7F3D0",
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 12,
+    paddingVertical: 9
+  },
+  sprintGuideReadyStatusText: {
+    color: "#047857",
+    fontSize: 12,
+    fontWeight: "800"
   },
   feedbackSupportSectionCard: {
     borderColor: "#BFDBFE",

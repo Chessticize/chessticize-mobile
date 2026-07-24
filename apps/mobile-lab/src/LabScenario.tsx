@@ -141,6 +141,7 @@ function showsHistoryTimingPreview(scenarioId: LabScenarioId): boolean {
 function isRunManagementScenario(scenarioId: LabScenarioId): boolean {
   return [
     "practice-home",
+    "practice-first-sprint-guide",
     "practice-home-edit",
     "practice-custom-setup",
     "practice-run-name-validation",
@@ -149,6 +150,84 @@ function isRunManagementScenario(scenarioId: LabScenarioId): boolean {
     "practice-run-remove-confirmation",
     "practice-runs-empty"
   ].includes(scenarioId);
+}
+
+function sprintRulesDesignPreviewFor(
+  scenarioId: LabScenarioId
+): React.ComponentProps<typeof PracticePocScreen>["sprintRulesDesignPreview"] {
+  if (scenarioId === "practice-first-sprint-guide") {
+    return {
+      firstRunGuide: {
+        durationLabel: "5:00",
+        maxMistakes: 3,
+        targetCorrect: 15
+      }
+    };
+  }
+  if (scenarioId === "practice-custom-setup") {
+    return { showRunEditorSummary: true };
+  }
+  if (scenarioId === "practice-sprint-result-goal") {
+    return {
+      initialResultState: sprintRulesResultState({
+        correctCount: 11,
+        endReason: "time_expired",
+        mistakeCount: 1,
+        ratingAfter: 1070,
+        status: "failed"
+      })
+    };
+  }
+  if (scenarioId === "practice-sprint-result-extra-attempt") {
+    return {
+      initialResultState: sprintRulesResultState({
+        correctCount: 15,
+        endReason: "target_reached",
+        mistakeCount: 1,
+        ratingAfter: 1104,
+        status: "won"
+      })
+    };
+  }
+  if (scenarioId === "settings-sprint-guidance") {
+    return { showSettingsReset: true };
+  }
+  return undefined;
+}
+
+function sprintRulesResultState({
+  correctCount,
+  endReason,
+  mistakeCount,
+  ratingAfter,
+  status
+}: {
+  correctCount: number;
+  endReason: "target_reached" | "time_expired";
+  mistakeCount: number;
+  ratingAfter: number;
+  status: "failed" | "won";
+}): SprintState {
+  const startedAt = new Date(LAB_NOW_MS - 5 * 60 * 1000).toISOString();
+  const completedAt = new Date(LAB_NOW_MS).toISOString();
+  return {
+    bestStreak: 6,
+    completedAt,
+    config: defaultSprintConfig("standard"),
+    correctCount,
+    currentPuzzleIndex: correctCount + mistakeCount,
+    currentStreak: status === "won" ? 6 : 0,
+    deadlineAt: completedAt,
+    endReason,
+    hasUserSubmittedMove: true,
+    id: `sprint-rules-${status}`,
+    mistakeCount,
+    puzzles: [],
+    ratingAfter,
+    ratingBefore: 1087,
+    startedAt,
+    status
+  };
 }
 
 export function LabScenarioShell({
@@ -205,6 +284,7 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     currentTimeMs: () => LAB_NOW_MS,
     moveFeedbackSettings: {},
     puzzleSelectionSeed: "interaction-lab",
+    sprintRulesDesignPreview: sprintRulesDesignPreviewFor(scenarioId),
     standardTargetCorrect: 1,
     arrowDuelTargetCorrect: 1,
     customTargetCorrect: 1

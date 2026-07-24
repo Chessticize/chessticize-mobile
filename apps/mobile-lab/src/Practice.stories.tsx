@@ -26,6 +26,14 @@ export const Home: Story = {
   args: { scenarioId: "practice-home" }
 };
 
+export const FirstSprintGuide: Story = {
+  name: "First Sprint guide",
+  args: { scenarioId: "practice-first-sprint-guide" },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "practice-sprint-rules-guide");
+  }
+};
+
 export const EditAndReorderRuns: Story = {
   name: "Edit and reorder runs",
   args: { scenarioId: "practice-home-edit" },
@@ -64,6 +72,7 @@ export const CustomSetup: Story = {
     await waitForTestId(canvasElement, "practice-run-editor");
     await clickTestId(canvasElement, "custom-theme-fork");
     await clickTestId(canvasElement, "custom-theme-pin");
+    await waitForTestId(canvasElement, "practice-run-pass-rules");
   }
 };
 
@@ -230,6 +239,24 @@ export const SprintSummary: Story = {
     await openPracticeSession(canvasElement);
     await clickTestId(canvasElement, "lab-board-correct");
     await waitForTestId(canvasElement, "sprint-summary-panel");
+  }
+};
+
+export const SprintResultGoalClarity: Story = {
+  name: "Sprint result · Goal clarity",
+  args: { scenarioId: "practice-sprint-result-goal" },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "sprint-result-goal-label");
+    await waitForTestId(canvasElement, "sprint-result-solved");
+  }
+};
+
+export const SprintResultExtraAttempt: Story = {
+  name: "Sprint result · Extra attempt",
+  args: { scenarioId: "practice-sprint-result-extra-attempt" },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "sprint-result-goal-label");
+    await waitForTestId(canvasElement, "sprint-result-solved");
   }
 };
 
