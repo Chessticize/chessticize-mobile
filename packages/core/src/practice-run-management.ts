@@ -321,7 +321,7 @@ export function createPracticeRunManagementController(
         commit({
           ...view,
           notice: `${restored.name} restored with ELO ${restored.elo}.`,
-          selectedRunId: view.selectedRunId ?? restored.id
+          selectedRunId: restored.id
         }, result.catalog);
         return;
       }
