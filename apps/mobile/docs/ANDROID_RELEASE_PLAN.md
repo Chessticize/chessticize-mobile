@@ -518,7 +518,7 @@ build-5 records remain immutable historical evidence.
 
 **Depends on:** ANDROID-11 plus the validation scope selected from ANDROID-10
 
-- Current release tag: `android-v1.2.0-build-6`
+- Current release tag: `android-v1.2.1-build-7`
 
 **Outcome:** One exact commit is distributed through Play with its matching
 source published on GitHub and proportionate evidence.

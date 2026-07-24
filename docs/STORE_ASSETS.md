@@ -1,7 +1,8 @@
 # App Store Assets
 
 This document is the 1.2 source of truth for App Store Connect metadata and
-store screenshot capture. Recheck Apple's live documentation before upload:
+store screenshot capture, and remains the approved baseline for the 1.2.1
+patch. Recheck Apple's live documentation before upload:
 
 - Screenshot specifications:
   https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications
@@ -68,6 +69,11 @@ Release rule:
    6.1" assets preview correctly.
 5. Do not upload debug screenshots that expose the development puzzle-source
    switch, Metro overlays, local paths, or user-private data.
+
+The 1.2.1 patch release adds no feature, navigation, copy, or store-scene
+change. Reuse the approved 1.2 screenshot set after confirming the files still
+pass `pnpm app-store:screenshot-audit`; a fresh capture is not required for
+this patch.
 
 ## Bundled Puzzle Pack Measurement
 
