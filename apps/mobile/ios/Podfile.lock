@@ -2365,7 +2365,7 @@ SPEC CHECKSUMS:
   ChessticizeStockfish: 28943656ac8d5615a21cfa42dde25712db37c0a2
   FBLazyVector: b3e7ad108f0d882e30445c5527d774e3fd432f3d
   hermes-engine: 4749bc1144addfa799bc34648e721fc85989901d
-  op-sqlite: 0047505fc20d4fa3a9e462fe113721d7fb836c46
+  op-sqlite: 245e3f31cdb38aab00a8385dbd75b471132e3ac6
   RCTDeprecation: 2a74a2c57675e64419bd89078efde81f7c1de90b
   RCTRequired: 30451112e6fef4e6f31b4e7eee0845156e35e4b0
   RCTSwiftUI: 5aaf0b07e747ba749dc6acc94d8bd41eea4b570f
@@ -2443,7 +2443,7 @@ SPEC CHECKSUMS:
   RNGestureHandler: ef19613372e4c87374fe9494862e366d82d1852c
   RNReanimated: afd8554d3b14c7a27308a0e997e9c3b5c40ca3ed
   RNWorklets: aaf3e1818da283ccf54e35bc87f72fdb6f02fefe
-  Yoga: 94172d87dd5d83fc929bf1ee53121b5d4490b5f2
+  Yoga: fe50ab299e578f397fef753cf309c6703a4db29b
 
 PODFILE CHECKSUM: bc5edb5427ecfd3f69d13895c5b0f197527d622e
 
