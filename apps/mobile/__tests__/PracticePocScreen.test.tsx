@@ -1072,7 +1072,7 @@ describe("PracticePocScreen", () => {
     ]);
   });
 
-  it("renders the Storybook-only Edit Run design with editable name and direct bounded ELO input", () => {
+  it("adds compact timing controls to the existing Storybook Edit Run design", () => {
     const onIntent = jest.fn();
     const home = renderScreen({
       runManagementPresentation: runManagementPresentation({
@@ -1083,6 +1083,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(home, "practice-run-edit-tactics-focus"))).toBe("Edit");
 
     const renderer = renderScreen({
+      runTimingEditorPreview: true,
       runManagementPresentation: runManagementPresentation({
         directRunEditing: true,
         draft: {
@@ -1105,7 +1106,7 @@ describe("PracticePocScreen", () => {
 
     expect(collectText(findByTestId(renderer, "practice-run-editor-title"))).toBe("Edit Run");
     expect(collectText(findByTestId(renderer, "practice-run-editor"))).toContain(
-      "Change the name or current ELO. Format and training settings stay fixed."
+      "Change this Run's name, ELO, and puzzle timing."
     );
     expect(findByTestId(renderer, "practice-run-name-input").props.value).toBe("Standard");
     expect(findByTestId(renderer, "practice-run-name-input").props.maxLength).toBe(
@@ -1125,15 +1126,41 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "practice-run-elo-row"))).toContain(
       "600–2200 · ±100 buttons"
     );
+    expect(collectText(findByTestId(renderer, "practice-run-details-section"))).toBe(
+      "Run details"
+    );
+    expect(collectText(findByTestId(renderer, "practice-run-editor-fields"))).not.toContain(
+      "Puzzle timing"
+    );
+    expect(collectText(findByTestId(renderer, "practice-run-puzzle-timing-card"))).not.toContain(
+      "Puzzle timing"
+    );
     expect(findByTestId(renderer, "practice-run-elo-decrease").props.accessibilityLabel).toBe(
       "Decrease run ELO by 100"
     );
     expect(findByTestId(renderer, "practice-run-elo-increase").props.accessibilityLabel).toBe(
       "Increase run ELO by 100"
     );
+    expect(collectText(findByTestId(renderer, "practice-run-puzzle-timing"))).toContain(
+      "Typical time 0:20 · no ELO impact"
+    );
+    expect(collectText(findByTestId(renderer, "practice-run-slow-warning"))).toContain(
+      "Turns the puzzle clock yellow; play continues."
+    );
+    expect(collectText(findByTestId(renderer, "practice-run-puzzle-timeout"))).toContain(
+      "Marks Timed out and moves on."
+    );
+    expect(collectText(findByTestId(renderer, "practice-run-slow-warning-value"))).toBe("0:40");
+    expect(collectText(findByTestId(renderer, "practice-run-puzzle-timeout-value"))).toBe("1:00");
 
     press(renderer, "practice-run-elo-decrease");
     press(renderer, "practice-run-elo-increase");
+    press(renderer, "practice-run-slow-warning-decrease");
+    press(renderer, "practice-run-puzzle-timeout-toggle");
+
+    expect(collectText(findByTestId(renderer, "practice-run-slow-warning-value"))).toBe("0:35");
+    expect(findByTestId(renderer, "practice-run-puzzle-timeout-toggle").props.accessibilityState)
+      .toEqual({ checked: false });
 
     act(() => {
       findByTestId(renderer, "practice-run-name-input").props.onChangeText("Morning Warm-up");
@@ -1148,6 +1175,166 @@ describe("PracticePocScreen", () => {
       { type: "change-elo-input", value: "1375" },
       { type: "save-run" }
     ]);
+  });
+
+  it.each([
+    {
+      height: 932,
+      label: "portrait below-board row",
+      scenarioId: "practice-active" as const,
+      styleEntry: ["alignSelf", "center"] as const,
+      width: 430
+    },
+    {
+      height: 390,
+      label: "landscape right rail",
+      scenarioId: "practice-timing-warning" as const,
+      styleEntry: ["alignSelf", "center"] as const,
+      width: 844
+    }
+  ])("keeps puzzle timing compact in the existing $label", ({
+    height,
+    scenarioId,
+    styleEntry,
+    width
+  }) => {
+    (ReactNative as unknown as {
+      __setWindowDimensions?: (dimensions: {
+        fontScale: number;
+        height: number;
+        scale: number;
+        width: number;
+      }) => void;
+    }).__setWindowDimensions?.({ width, height, scale: 3, fontScale: 1 });
+    const renderer = renderLabScenario(scenarioId);
+
+    startStandardSprint(renderer);
+
+    expect(findByTestId(renderer, "session-puzzle-timing")).toBeTruthy();
+    expect(hasStyleEntry(
+      findByTestId(renderer, "session-puzzle-timing"),
+      styleEntry[0],
+      styleEntry[1]
+    )).toBe(true);
+    expect(
+      findByTestId(renderer, "session-board")
+        .findAllByProps({ testID: "session-puzzle-timing" })
+    ).toHaveLength(0);
+    if (scenarioId === "practice-active") {
+      expect(
+        findByTestId(renderer, "session-board-details")
+          .findByProps({ testID: "session-puzzle-timing" })
+      ).toBeTruthy();
+      expect(testIdOrder(renderer, "session-board", "session-puzzle-timing")).toBeLessThan(0);
+      expect(testIdOrder(renderer, "session-puzzle-timing", "session-score-strip")).toBeLessThan(0);
+      expect(
+        findByTestId(renderer, "session-shell-nav")
+          .findAllByProps({ testID: "session-puzzle-timing" })
+      ).toHaveLength(0);
+    }
+    if (scenarioId === "practice-timing-warning") {
+      expect(collectText(findByTestId(renderer, "session-puzzle-timing-label"))).toBe("Puzzle 0:41");
+      expect(collectText(findByTestId(renderer, "session-puzzle-timing"))).not.toContain("Slow");
+      expect(hasStyleEntry(
+        findByTestId(renderer, "session-puzzle-timing-label"),
+        "color",
+        "#B45309"
+      )).toBe(true);
+      expect(findByTestId(renderer, "active-session-control-rail-content")).toBeTruthy();
+    }
+  });
+
+  it("counts down, locks the board under Timed out, then resets for the next puzzle", () => {
+    const renderer = renderLabScenario("practice-timing-timeout");
+
+    startStandardSprint(renderer);
+    expect(collectText(findByTestId(renderer, "session-puzzle-timing-label"))).toBe("Puzzle 0:52");
+    expect(collectText(findByTestId(renderer, "session-puzzle-countdown"))).toBe("8s");
+
+    act(() => {
+      jest.advanceTimersByTime(8_000);
+    });
+    expect(collectText(findByTestId(renderer, "session-puzzle-timing-label"))).toBe("Puzzle 1:00");
+    expect(
+      findByTestId(renderer, "session-board")
+        .findAllByProps({ testID: "session-puzzle-timing" })
+    ).toHaveLength(0);
+    expect(collectText(findByTestId(renderer, "session-puzzle-timeout-overlay"))).toContain(
+      "Timed out"
+    );
+    expect(findByTestId(renderer, "board-input-blocker")).toBeTruthy();
+
+    act(() => {
+      jest.advanceTimersByTime(800);
+    });
+    expect(() => findByTestId(renderer, "session-puzzle-timeout-overlay")).toThrow();
+    expect(collectText(findByTestId(renderer, "session-puzzle-timing-label"))).toBe("Puzzle 0:00");
+    expect(() => findByTestId(renderer, "session-puzzle-countdown")).toThrow();
+  });
+
+  it("adds Slow and Timed out to the existing populated History controls and rows", async () => {
+    const renderer = renderLabScenario("history-populated");
+    await flushMicrotasks();
+
+    press(renderer, "history-tab");
+    expect(findByTestId(renderer, "history-timing-filter-group").props.role).toBe("group");
+    expect(findByTestId(renderer, "history-timing-filter-group").props.accessibilityLabel).toBe(
+      "Timing filters, select any"
+    );
+    expect(findByTestId(renderer, "history-timing-filter-boundary-start")).toBeTruthy();
+    expect(findByTestId(renderer, "history-timing-filter-boundary-end")).toBeTruthy();
+    expect(testIdOrder(renderer, "history-filter-unclear", "history-timing-filter-group")).toBeLessThan(0);
+    expect(testIdOrder(renderer, "history-timing-filter-group", "history-filter-wrong-only")).toBeLessThan(0);
+    expect(findByTestId(renderer, "history-filter-slow-only")).toBeTruthy();
+    expect(findByTestId(renderer, "history-filter-timed-out-only")).toBeTruthy();
+    expect(findByTestId(renderer, "history-filter-slow-only").props.accessibilityRole).toBe(
+      "checkbox"
+    );
+    expect(findByTestId(renderer, "history-filter-slow-only").props.accessibilityState).toEqual({
+      checked: false
+    });
+    expect(findByTestId(renderer, "history-filter-timed-out-only").props.accessibilityState).toEqual({
+      checked: false
+    });
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain(
+      "Timing:"
+    );
+    expect(collectText(findByTestId(renderer, "history-attempt-history-correct-slow"))).toBe("Slow");
+    expect(collectText(findByTestId(renderer, "history-attempt-history-wrong-result"))).toBe(
+      "Timed out"
+    );
+    expect(
+      findByTestId(renderer, "history-attempt-history-wrong-badge")
+        .findByProps({ testID: "result-badge-wrong-glyph" })
+    ).toBeTruthy();
+    expect(hasStyleEntry(
+      findByTestId(renderer, "history-attempt-history-wrong-badge"),
+      "backgroundColor",
+      "#DC2626"
+    )).toBe(true);
+    expect(() => findByTestId(renderer, "result-badge-alert-glyph")).toThrow();
+    expect(() => findByTestId(renderer, "history-attempt-history-wrong-timed_out")).toThrow();
+
+    press(renderer, "history-filter-slow-only");
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain(
+      "Timing: Slow"
+    );
+    expect(findByTestId(renderer, "history-attempt-history-correct")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-history-wrong")).toThrow();
+
+    press(renderer, "history-filter-timed-out-only");
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain(
+      "Timing: Slow or timed out"
+    );
+    expect(findByTestId(renderer, "history-attempt-history-correct")).toBeTruthy();
+    expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
+
+    press(renderer, "history-filter-slow-only");
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain(
+      "Timing: Timed out"
+    );
+    expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-history-correct")).toThrow();
   });
 
   it("shows direct ELO validation and disables Save outside 600-2200", () => {
@@ -4012,14 +4199,14 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("7 days");
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("All puzzles");
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Sprint");
-    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain("Wrong only");
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain("Result: Wrong");
     expect(findByTestId(renderer, "history-filter-sprint-only").props.accessibilityState).toEqual({ checked: true });
     expect(findByTestId(renderer, "history-filter-wrong-only").props.accessibilityState).toEqual({ checked: false });
     expectHistoryRowAccessibility(renderer, "Played g6g5 · Best f4g3");
     expectHistoryRowAccessibility(renderer, "Move e6f7");
     press(renderer, "history-filter-wrong-only");
     expect(findByTestId(renderer, "history-filter-wrong-only").props.accessibilityState).toEqual({ checked: true });
-    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Wrong only");
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Result: Wrong");
     expectHistoryRowAccessibility(renderer, "Played g6g5 · Best f4g3");
     expectNoHistoryRowAccessibility(renderer, "Move e6f7");
     press(renderer, "history-filter-wrong-only");
@@ -4108,24 +4295,24 @@ describe("PracticePocScreen", () => {
     press(renderer, "history-review-status-all");
 
     press(renderer, "history-filter-wrong-only");
-    expect(findByTestId(renderer, "history-filter-wrong-only").props.accessibilityLabel).toBe("Wrong puzzles only");
-    expect(findByTestId(renderer, "history-filter-wrong-only").props.accessibilityRole).toBe("switch");
+    expect(findByTestId(renderer, "history-filter-wrong-only").props.accessibilityLabel).toBe("Wrong attempts");
+    expect(findByTestId(renderer, "history-filter-wrong-only").props.accessibilityRole).toBe("checkbox");
     expect(findByTestId(renderer, "history-filter-wrong-only").props.accessibilityState).toEqual({ checked: true });
-    expect(findByTestId(renderer, "history-filter-wrong-only").props.accessibilityValue).toEqual({ text: "On" });
-    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Wrong only");
+    expect(findByTestId(renderer, "history-filter-wrong-only").props.accessibilityValue).toBeUndefined();
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Result: Wrong");
     expect(collectText(findByTestId(renderer, "history-performance-card"))).not.toContain("Wrong");
     expectHistoryRowAccessibility(renderer, "Played g6g5 · Best f4g3");
     expectNoHistoryRowAccessibility(renderer, "Move e6f7");
     press(renderer, "history-range-30d");
     expect(findByTestId(renderer, "history-filter-wrong-only").props.accessibilityState).toEqual({ checked: true });
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("30 days");
-    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Wrong only");
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Result: Wrong");
     press(renderer, "history-range-7d");
     expect(findByTestId(renderer, "history-filter-wrong-only").props.accessibilityState).toEqual({ checked: true });
     press(renderer, "history-result-correct");
     expect(findByTestId(renderer, "history-filter-wrong-only").props.accessibilityState).toEqual({ checked: false });
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Correct");
-    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain("Wrong only");
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain("Result: Wrong");
     press(renderer, "history-result-wrong");
     expect(findByTestId(renderer, "history-filter-wrong-only").props.accessibilityState).toEqual({ checked: true });
     press(renderer, "history-filter-wrong-only");
@@ -4298,7 +4485,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Promotion");
   });
 
-  it("puts Unclear only first in a scrollable three-toggle History row without a count or icon", () => {
+  it("renders the compact History quick filters as accessible selectable chips", () => {
     const store = new MemoryStore();
     store.seedPuzzles([sharedHistoryPuzzle()]);
     store.recordAttempt({
@@ -4324,16 +4511,24 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "history-tab");
     expect(findByTestId(renderer, "history-quick-filters").props.horizontal).toBe(true);
-    expect(collectText(findByTestId(renderer, "history-filter-unclear"))).toBe("Unclear only");
+    expect(collectText(findByTestId(renderer, "history-filter-unclear"))).toBe("Unclear");
     expect(findByTestId(renderer, "history-filter-unclear").props.accessibilityLabel).toBe(
-      "Unclear attempts only"
+      "Unclear attempts"
     );
+    expect(findByTestId(renderer, "history-filter-unclear").props.accessibilityRole).toBe("checkbox");
+    expect(hasStyleEntry(findByTestId(renderer, "history-filter-unclear"), "minHeight", 44)).toBe(true);
     expect(testIdOrder(renderer, "history-filter-unclear", "history-filter-wrong-only")).toBeLessThan(0);
     expect(testIdOrder(renderer, "history-filter-wrong-only", "history-filter-sprint-only")).toBeLessThan(0);
     expect(findByTestId(renderer, "history-attempt-unclear-history-attempt-unclear")).toBeTruthy();
     expect(() => findByTestId(renderer, "bookmark-glyph")).toThrow();
     press(renderer, "history-filter-unclear");
     expect(findByTestId(renderer, "history-filter-unclear").props.accessibilityState).toEqual({ checked: true });
+    expect(findByTestId(renderer, "history-filter-unclear-check")).toBeTruthy();
+    expect(hasStyleEntry(
+      findByTestId(renderer, "history-filter-unclear-surface"),
+      "backgroundColor",
+      "#2563EB"
+    )).toBe(true);
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Unclear");
 
     press(renderer, "history-attempt-unclear-history-attempt");
@@ -4479,7 +4674,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("7 days");
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("All puzzles");
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Sprint");
-    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain("Wrong only");
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain("Result: Wrong");
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain("All Time");
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain("Black");
     expect(renderer.root.findAllByProps({ testID: "history-source-sprint" }).some(
@@ -7140,7 +7335,7 @@ function createScriptedStockfishTransport(
 }
 
 type RenderScreenOptions = TestMobilePlatformCapabilityOverrides &
-  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEloEditingMovedToHome" | "runManagementEnabled" | "runManagementPresentation" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "themeCatalogPresentation"> & {
+  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "historyTimingPreview" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEloEditingMovedToHome" | "runManagementEnabled" | "runManagementPresentation" | "runTimingEditorPreview" | "sessionTimingPreview" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "themeCatalogPresentation"> & {
     platformCapabilities?: MobilePlatformCapabilities;
   };
 
@@ -7243,6 +7438,9 @@ function renderScreen({
   runEloEditingMovedToHome,
   runManagementEnabled,
   runManagementPresentation,
+  runTimingEditorPreview,
+  sessionTimingPreview,
+  historyTimingPreview,
   sprintStartDelayMs,
   standardTargetCorrect,
   systemBack,
@@ -7263,6 +7461,9 @@ function renderScreen({
         runEloEditingMovedToHome={runEloEditingMovedToHome}
         runManagementEnabled={runManagementEnabled}
         runManagementPresentation={runManagementPresentation}
+        runTimingEditorPreview={runTimingEditorPreview}
+        sessionTimingPreview={sessionTimingPreview}
+        historyTimingPreview={historyTimingPreview}
         sprintStartDelayMs={sprintStartDelayMs}
         standardTargetCorrect={standardTargetCorrect}
         systemBack={systemBack}

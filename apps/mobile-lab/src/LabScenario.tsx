@@ -78,10 +78,54 @@ function LabScenarioContent({
           ? SERVER_CURATED_THEME_PRESENTATION
           : undefined}
         runEloEditingMovedToHome
+        runTimingEditorPreview={showsRunTimingEditorPreview(scenarioId)}
+        sessionTimingPreview={sessionTimingPreviewFor(scenarioId)}
+        historyTimingPreview={showsHistoryTimingPreview(scenarioId)
+          ? {
+              slowAttemptIds: ["history-correct"],
+              timedOutAttemptIds: ["history-wrong"]
+            }
+          : undefined}
         {...runtime.screenProps}
       />
     </LabScenarioShell>
   );
+}
+
+function showsRunTimingEditorPreview(scenarioId: LabScenarioId): boolean {
+  return scenarioId === "practice-run-standard-editor"
+    || scenarioId === "practice-custom-rating-editor";
+}
+
+function sessionTimingPreviewFor(
+  scenarioId: LabScenarioId
+): React.ComponentProps<typeof PracticePocScreen>["sessionTimingPreview"] {
+  if (scenarioId === "practice-active") {
+    return {
+      initialElapsedSeconds: 24,
+      warningSeconds: 40,
+      timeoutSeconds: 60
+    };
+  }
+  if (scenarioId === "practice-timing-warning") {
+    return {
+      initialElapsedSeconds: 41,
+      warningSeconds: 40,
+      timeoutSeconds: 60
+    };
+  }
+  if (scenarioId === "practice-timing-timeout") {
+    return {
+      initialElapsedSeconds: 52,
+      warningSeconds: 40,
+      timeoutSeconds: 60
+    };
+  }
+  return undefined;
+}
+
+function showsHistoryTimingPreview(scenarioId: LabScenarioId): boolean {
+  return scenarioId === "history-populated";
 }
 
 function isRunManagementScenario(scenarioId: LabScenarioId): boolean {

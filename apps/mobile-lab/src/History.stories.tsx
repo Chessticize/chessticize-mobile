@@ -22,9 +22,15 @@ export const EmptyHistory: Story = {
 export const PopulatedHistory: Story = {
   name: "Populated history",
   args: { scenarioId: "history-populated" },
+  tags: ["new"],
   play: async ({ canvasElement }) => {
     await openHistory(canvasElement);
     await waitForTestId(canvasElement, "history-attempt-history-unclear");
+    await waitForTestId(canvasElement, "history-timing-filter-group");
+    await clickTestId(canvasElement, "history-filter-slow-only");
+    await clickTestId(canvasElement, "history-filter-timed-out-only");
+    await waitForTestId(canvasElement, "history-active-filter-summary");
+    (canvasElement.querySelector('[data-testid="history-filter-timed-out-only"]') as HTMLElement | null)?.blur();
   }
 };
 

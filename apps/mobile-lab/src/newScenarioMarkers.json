@@ -1,1 +1,62 @@
-{}
+{
+  "practice-run-standard-editor": {
+    "issues": [
+      {
+        "issueNumber": 248,
+        "changeNote": "Add the Slow warning to the existing Edit Run screen."
+      },
+      {
+        "issueNumber": 249,
+        "changeNote": "Add puzzle timeout to the existing Edit Run screen without changing ELO."
+      }
+    ]
+  },
+  "practice-custom-rating-editor": {
+    "issues": [
+      {
+        "issueNumber": 248,
+        "changeNote": "Keep the timing controls consistent in the existing Custom Run editor."
+      },
+      {
+        "issueNumber": 249,
+        "changeNote": "Keep puzzle timeout consistent in the existing Custom Run editor."
+      }
+    ]
+  },
+  "practice-active": {
+    "issues": [
+      {
+        "issueNumber": 248,
+        "changeNote": "Run a compact puzzle elapsed timer without adding another layout bar."
+      }
+    ]
+  },
+  "practice-timing-warning": {
+    "issues": [
+      {
+        "issueNumber": 248,
+        "changeNote": "Turn the existing compact puzzle clock amber after the Slow threshold."
+      }
+    ]
+  },
+  "practice-timing-timeout": {
+    "issues": [
+      {
+        "issueNumber": 249,
+        "changeNote": "Show the final countdown, lock the board under brief Timed out feedback, then reset for the next puzzle."
+      }
+    ]
+  },
+  "history-populated": {
+    "issues": [
+      {
+        "issueNumber": 248,
+        "changeNote": "Add Slow to the existing History quick filters and attempt labels."
+      },
+      {
+        "issueNumber": 249,
+        "changeNote": "Add Timed out to the existing History quick filters and attempt results."
+      }
+    ]
+  }
+}
