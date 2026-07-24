@@ -9,10 +9,16 @@ const AUDIO_ASSET_URLS: Readonly<Record<MoveFeedbackCue, string>> = {
   capture: "./audio/issue-247/freesound-546120-piece-capture.mp3"
 };
 
+const AUDIO_PLAYBACK_VOLUMES: Readonly<Record<MoveFeedbackCue, number>> = {
+  move: 1,
+  capture: 0.5
+};
+
 type AudioLike = {
   currentTime: number;
   play: () => Promise<void> | void;
   preload: string;
+  volume: number;
 };
 
 type AudioConstructor = new (source?: string) => AudioLike;
@@ -44,6 +50,7 @@ async function playRecordedCue(
     const audio = new AudioClass(AUDIO_ASSET_URLS[cue]);
     audio.preload = "auto";
     audio.currentTime = 0;
+    audio.volume = AUDIO_PLAYBACK_VOLUMES[cue];
     await Promise.resolve(audio.play());
     return "played";
   } catch {

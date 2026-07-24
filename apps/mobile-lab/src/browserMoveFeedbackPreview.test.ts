@@ -14,11 +14,13 @@ afterEach(() => {
 
 test("plays the selected Freesound move and capture assets", async () => {
   const sources: string[] = [];
+  const volumes: number[] = [];
   let playCount = 0;
 
   class FakeAudio {
     currentTime = -1;
     preload = "";
+    volume = 1;
 
     constructor(source?: string) {
       sources.push(source ?? "");
@@ -26,6 +28,7 @@ test("plays the selected Freesound move and capture assets", async () => {
 
     play(): Promise<void> {
       playCount += 1;
+      volumes.push(this.volume);
       return Promise.resolve();
     }
   }
@@ -53,6 +56,7 @@ test("plays the selected Freesound move and capture assets", async () => {
     "./audio/issue-247/freesound-546119-piece-placement.mp3",
     "./audio/issue-247/freesound-546120-piece-capture.mp3"
   ]);
+  assert.deepEqual(volumes, [1, 0.5]);
   assert.equal(playCount, 2);
 });
 

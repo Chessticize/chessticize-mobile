@@ -33,3 +33,9 @@ The creator describes both sounds as recordings made on a wood board for Chess
 Puzzle Blitz. Freesound lists each individual asset as CC0. CC0 does not require
 attribution, but the source details are retained here for a reproducible rights
 and provenance record.
+
+The original files remain unmodified. The Storybook browser preview plays Move
+at `1.0` and Capture at `0.5` linear volume (approximately -6 dB) because the
+downloaded Capture recording measures roughly 8.3 dB higher in mean level and
+9.9 dB higher at peak. This is design-preview calibration, not a native product
+mixing decision.
