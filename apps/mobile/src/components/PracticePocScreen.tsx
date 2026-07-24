@@ -46,6 +46,7 @@ import {
   normalizeHistoryAttemptDetail,
   PRACTICE_RUN_NAME_MAX_LENGTH,
   RATING_FLOOR,
+  reviewAnalysisStartingFen,
   reviewDueState,
   reviewDueLabel,
   reviewQueueForecast,
@@ -9337,15 +9338,18 @@ function ReviewSession({
   }
 
   function openAnalysis(): void {
+    const startingFen = reviewAnalysisStartingFen({ currentPuzzle, feedback });
     recordCurrentReviewResult("wrong");
     setWrongSeen(true);
     setFeedback(null);
+    setBoardLocked(false);
     setAnalysisEnabled(true);
-    setAnalysisFen(currentFen);
+    setAnalysisFen(startingFen);
     setEngineAnalysisLines([]);
     setAnalysisEngineStatus("thinking");
     setAnalysisBackStack([]);
     setAnalysisForwardStack([]);
+    boardRef.current?.resetBoard(startingFen);
   }
 
   function closeAnalysis(): void {

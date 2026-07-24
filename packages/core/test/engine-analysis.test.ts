@@ -6,11 +6,14 @@ import { Chess } from "chess.js";
 import {
   analyzeFenWithUciEngine,
   applyMovesToFen,
+  beginArrowDuelPuzzle,
   beginLinePuzzle,
   buildArrowDuelCandidateAnalysisLines,
   buildCurrentPositionEvaluationLine,
   buildPuzzleGuidedAnalysisLines,
-  parseStockfishInfoLine
+  parseStockfishInfoLine,
+  reviewAnalysisStartingFen,
+  submitArrowDuelChoice
 } from "../src/index.ts";
 import type { EngineAnalysisLine, Puzzle, UciEngineTransport } from "../src/index.ts";
 
@@ -65,6 +68,28 @@ test("keeps live Stockfish display scores on the white perspective when the acti
 
   assert.equal(whiteToMove.score, "+3.5");
   assert.equal(blackToMove.score, "+3.5");
+});
+
+test("starts review analysis after an accepted Arrow Duel move", () => {
+  const currentPuzzle = beginArrowDuelPuzzle(samplePuzzle("00008"));
+  const result = submitArrowDuelChoice(currentPuzzle, currentPuzzle.correctMove);
+
+  assert.equal(
+    reviewAnalysisStartingFen({ currentPuzzle, feedback: result.feedback }),
+    applyMovesToFen(currentPuzzle.currentFen, [currentPuzzle.correctMove])
+  );
+});
+
+test("keeps the current review position when no accepted Arrow Duel move is pending", () => {
+  const arrowDuel = beginArrowDuelPuzzle(samplePuzzle("00008"));
+  const wrongResult = submitArrowDuelChoice(arrowDuel, arrowDuel.wrongMove);
+  const line = beginLinePuzzle(samplePuzzle("00008"));
+
+  assert.equal(
+    reviewAnalysisStartingFen({ currentPuzzle: arrowDuel, feedback: wrongResult.feedback }),
+    arrowDuel.currentFen
+  );
+  assert.equal(reviewAnalysisStartingFen({ currentPuzzle: line, feedback: null }), line.currentFen);
 });
 
 test("analyzes UCI output through a maintained fake transport", async () => {
