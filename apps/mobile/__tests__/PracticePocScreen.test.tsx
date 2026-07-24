@@ -1474,6 +1474,55 @@ describe("PracticePocScreen", () => {
       "backgroundColor",
       "#2563EB"
     )).toBe(true);
+
+    press(renderer, "history-attention-flag-slow");
+    expect(findByTestId(renderer, "history-attention-all").props.accessibilityState).toEqual({
+      checked: false
+    });
+    expect(findByTestId(renderer, "history-attention-needs-attention").props.accessibilityState).toEqual({
+      checked: true
+    });
+    expect(findByTestId(renderer, "history-attention-flag-slow").props.accessibilityState).toEqual({
+      checked: true
+    });
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain(
+      "Attention: Slow"
+    );
+    expect(findByTestId(renderer, "history-attempt-history-correct")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-history-wrong")).toThrow();
+    expect(() => findByTestId(renderer, "history-attempt-history-unclear")).toThrow();
+    expect(() => findByTestId(renderer, "history-attempt-history-clean")).toThrow();
+
+    press(renderer, "history-attention-flag-slow");
+    expect(findByTestId(renderer, "history-attention-flag-slow").props.accessibilityState).toEqual({
+      checked: false
+    });
+    expect(findByTestId(renderer, "history-attention-needs-attention").props.accessibilityState).toEqual({
+      checked: true
+    });
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain(
+      "Attention:"
+    );
+    expect(findByTestId(renderer, "history-attempt-history-correct")).toBeTruthy();
+    expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
+    expect(findByTestId(renderer, "history-attempt-history-unclear")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-history-clean")).toThrow();
+
+    press(renderer, "history-attention-flag-slow");
+    press(renderer, "history-attention-all");
+    expect(findByTestId(renderer, "history-attention-all").props.accessibilityState).toEqual({
+      checked: true
+    });
+    expect(findByTestId(renderer, "history-attention-needs-attention").props.accessibilityState).toEqual({
+      checked: false
+    });
+    expect(findByTestId(renderer, "history-attention-flag-slow").props.accessibilityState).toEqual({
+      checked: false
+    });
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain(
+      "Attention:"
+    );
+    expect(findByTestId(renderer, "history-attempt-history-clean")).toBeTruthy();
   });
 
   it("shows direct ELO validation and disables Save outside 600-2200", () => {

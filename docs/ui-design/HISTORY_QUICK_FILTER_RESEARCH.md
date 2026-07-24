@@ -95,6 +95,13 @@ Selecting no attention flag places no restriction on that facet. The applied
 state summary uses plain language such as
 `Attention: Mistakes or Unclear or Slow`.
 
+The view selector and Attention flags stay synchronized:
+
+- Selecting any Attention flag switches the view to `Needs attention`.
+- Clearing the final Attention flag keeps the broader `Needs attention` view.
+- Selecting `All` clears every Attention flag.
+- Reset restores `All` with no Attention flags selected.
+
 Do not show the formula in the interface. Keep the selected view, result count,
 and category/value applied-state tokens close to the results.
 
@@ -121,6 +128,8 @@ filter token. It is equivalent to clearing that facet
 - `Mistakes`, `Unclear`, `Slow`, and `Timed out` can be selected
   independently; multiple selections use OR and appear once in the
   applied-state summary.
+- Selecting an Attention flag also selects `Needs attention`; clearing the last
+  flag keeps `Needs attention`, while selecting `All` clears every flag.
 - `Mistakes` may overlap `Result: Wrong` without duplicating an attempt.
 - Review membership reads `All / In queue / Not in queue`, not
   `All review states / Queued / Clear`.

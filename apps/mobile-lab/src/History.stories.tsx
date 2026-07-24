@@ -40,6 +40,8 @@ export const FiltersAndActiveFilters: Story = {
     await openHistory(canvasElement);
     await clickTestId(canvasElement, "history-filter-toggle");
     await waitForTestId(canvasElement, "history-attention-flags");
+    await clickTestId(canvasElement, "history-attention-flag-slow");
+    await waitForTestId(canvasElement, "history-attention-needs-attention");
     await waitForTestId(canvasElement, "history-theme-disclosure");
     await clickTestId(canvasElement, "history-theme-disclosure");
     await clickTestId(canvasElement, "history-theme-pin");

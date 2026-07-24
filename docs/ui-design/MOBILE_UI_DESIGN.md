@@ -486,6 +486,10 @@ New Run behavior:
   overlaps `Result: Wrong` so all four Needs attention reasons can be composed
   in one group; keep Result as the independent `Correct / Wrong` facet. Label
   Review membership `Review queue: All / In queue / Not in queue`.
+- Selecting any Attention flag switches the persistent view to
+  `Needs attention`. Clearing the final flag keeps that broader view selected.
+  Selecting `All` clears every Attention flag; Reset restores the same clean
+  `All` state.
 - Keep the full Themes facet collapsed when the History filter menu opens.
   Its disclosure names the selected themes in one ellipsized line before
   expanding. In the applied-filter summary below the view selector, show the

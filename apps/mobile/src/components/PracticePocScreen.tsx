@@ -2969,9 +2969,13 @@ export function PracticePocScreen({
                   onAttentionOnlyChange={(attentionOnly) => {
                     setHistoryPageOffset(0);
                     setHistoryAttentionOnly(attentionOnly);
+                    if (!attentionOnly) {
+                      setHistoryAttentionFlags([]);
+                    }
                   }}
                   onAttentionFlagToggle={(flag) => {
                     setHistoryPageOffset(0);
+                    setHistoryAttentionOnly(true);
                     setHistoryAttentionFlags((current) => current.includes(flag)
                       ? current.filter((selectedFlag) => selectedFlag !== flag)
                       : [...current, flag]);
