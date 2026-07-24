@@ -10958,7 +10958,6 @@ function TabButton({
 }): React.JSX.Element {
   const hasBadge = badgeCount > 0;
   const badgeText = badgeCount > 99 ? "99+" : `${badgeCount}`;
-  const badgeWidth = badgeText.length === 1 ? 18 : badgeText.length === 2 ? 22 : 28;
   return (
     <Pressable
       accessibilityRole="tab"
@@ -10985,7 +10984,6 @@ function TabButton({
             style={[
               styles.tabCountBadge,
               presentation === "rail" ? styles.tabCountBadgeRail : styles.tabCountBadgeBottom,
-              { width: badgeWidth },
               badgeTone === "danger" ? styles.tabCountBadgeDanger : null
             ]}
             testID={`${testID}-badge`}
