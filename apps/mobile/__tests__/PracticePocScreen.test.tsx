@@ -1702,9 +1702,32 @@ describe("PracticePocScreen", () => {
     expect(service.getRating("standard 5/20").rating).toBe(600);
   });
 
-  it("archives a Run from its inline confirmation and restores the same ELO", () => {
-    const service = createMobilePracticeService("random1000");
-    const renderer = renderScreen({ practiceService: service, runManagementEnabled: true });
+  it("archives a Run and restores its ELO and weekly progress as the active selection", () => {
+    const store = new MemoryStore();
+    store.saveRating({ key: "standard 5/20", generation: 0, rating: 1000, games: 1 });
+    store.saveRating({ key: "arrow_duel 5/30", generation: 0, rating: 900, games: 1 });
+    store.createSprintSession(completedRatingSprintState({
+      id: "standard-weekly-progress",
+      mode: "standard",
+      completedAt: "2026-07-24T11:00:00.000Z",
+      ratingBefore: 900,
+      ratingAfter: 1000
+    }));
+    store.createSprintSession(completedRatingSprintState({
+      id: "arrow-duel-weekly-progress",
+      mode: "arrow_duel",
+      completedAt: "2026-07-24T11:01:00.000Z",
+      ratingBefore: 900,
+      ratingAfter: 900
+    }));
+    const service = new PracticeService(store);
+    const renderer = renderScreen({
+      currentTimeMs: () => Date.parse("2026-07-24T12:00:00.000Z"),
+      practiceService: service,
+      runManagementEnabled: true
+    });
+
+    expect(collectText(findByTestId(renderer, "practice-progress-rating-delta"))).toBe("+100 this week");
 
     press(renderer, "practice-run-home-edit");
     press(renderer, "practice-run-remove-standard");
@@ -1713,12 +1736,14 @@ describe("PracticePocScreen", () => {
 
     expect(() => findByTestId(renderer, "practice-run-standard")).toThrow();
     expect(service.listPracticeRuns().find((run) => run.id === "standard")?.archived).toBe(true);
-    expect(service.getRating("standard 5/20").rating).toBe(600);
+    expect(service.getRating("standard 5/20").rating).toBe(1000);
+    expect(collectText(findByTestId(renderer, "practice-progress-rating-delta"))).toBe("+0 this week");
     press(renderer, "practice-run-restore-standard");
 
     expect(findByTestId(renderer, "practice-run-standard")).toBeTruthy();
     expect(service.listPracticeRuns().filter((run) => !run.archived).at(-1)?.id).toBe("standard");
-    expect(service.getRating("standard 5/20").rating).toBe(600);
+    expect(service.getRating("standard 5/20").rating).toBe(1000);
+    expect(collectText(findByTestId(renderer, "practice-progress-rating-delta"))).toBe("+100 this week");
   });
 
   it("starts the selected saved Run with its stable identity snapshot", () => {
