@@ -1,4 +1,9 @@
-import type { AttemptResult, AttemptSource, SprintMode } from "../../core/src/index.ts";
+import type {
+  AttemptOutcome,
+  AttemptSource,
+  AttemptTimingStatus,
+  SprintMode
+} from "../../core/src/index.ts";
 
 export interface PuzzleSelectionFilter {
   mode: SprintMode;
@@ -14,7 +19,7 @@ export interface PuzzleSelectionFilter {
 
 export interface HistoryFilter {
   source?: AttemptSource;
-  result?: AttemptResult;
+  result?: AttemptOutcome;
   mode?: SprintMode;
   since?: string;
   puzzleId?: string;
@@ -28,11 +33,13 @@ export interface AttemptHistoryRow {
   puzzleId: string;
   mode: SprintMode;
   ratingKey: string;
-  result: AttemptResult;
-  submittedMove: string;
+  result: AttemptOutcome;
+  submittedMove?: string;
   expectedMove: string;
   startedAt: string;
   completedAt: string;
+  elapsedMs?: number;
+  timingStatus?: AttemptTimingStatus;
   ratingBefore: number;
   ratingAfter?: number;
   arrowDuelCandidateOrder?: string[];

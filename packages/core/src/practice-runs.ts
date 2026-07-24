@@ -1,7 +1,15 @@
-import { defaultSprintConfig } from "./sprint-config.ts";
+import {
+  defaultSprintConfig,
+  resolvePuzzleTimingPolicy
+} from "./sprint-config.ts";
 import { normalizeThemeSelection } from "./theme-catalog.ts";
 import { assertValidManualRating, RATING_FLOOR } from "./ratings.ts";
-import type { CustomSprintConfigRecord, PracticeRunRecord, SprintConfig } from "./types.ts";
+import type {
+  CustomSprintConfigRecord,
+  PracticeRunRecord,
+  PuzzleTimingPolicy,
+  SprintConfig
+} from "./types.ts";
 
 export const STANDARD_PRACTICE_RUN_ID = "standard";
 export const ARROW_DUEL_PRACTICE_RUN_ID = "arrow-duel";
@@ -49,6 +57,7 @@ export function createCustomPracticeRun(input: {
   mode: "custom" | "arrow_duel";
   durationSeconds: number;
   perPuzzleSeconds: number;
+  puzzleTiming?: PuzzleTimingPolicy;
   targetCorrect: number;
   maxMistakes: number;
   themes?: readonly string[];
@@ -78,6 +87,7 @@ export function createCustomPracticeRun(input: {
     ratingKey: `${PRACTICE_RUN_RATING_KEY_PREFIX}${input.id}`,
     durationSeconds: input.durationSeconds,
     perPuzzleSeconds: input.perPuzzleSeconds,
+    puzzleTiming: resolvePuzzleTimingPolicy(input.puzzleTiming, input.perPuzzleSeconds),
     targetCorrect: input.targetCorrect,
     maxMistakes: input.maxMistakes,
     ...(normalizedRunThemes(input.themes).length === 0
@@ -175,6 +185,7 @@ export function practiceRunsFromLegacyCustomConfigs(
       ratingKey: config.ratingKey,
       durationSeconds: config.durationSeconds,
       perPuzzleSeconds: config.perPuzzleSeconds,
+      puzzleTiming: resolvePuzzleTimingPolicy(undefined, config.perPuzzleSeconds),
       targetCorrect: config.targetCorrect,
       maxMistakes: config.maxMistakes,
       ...(themes.length === 0 ? {} : { themes }),
@@ -196,6 +207,7 @@ export function practiceRunSprintConfig(run: PracticeRunRecord): SprintConfig {
     mode: run.mode,
     durationSeconds: run.durationSeconds,
     perPuzzleSeconds: run.perPuzzleSeconds,
+    puzzleTiming: resolvePuzzleTimingPolicy(run.puzzleTiming, run.perPuzzleSeconds),
     targetCorrect: run.targetCorrect,
     maxMistakes: run.maxMistakes,
     ratingKey: run.ratingKey,
@@ -274,7 +286,13 @@ export function mergePracticeRunCatalogs(
 }
 
 export function clonePracticeRun(run: PracticeRunRecord): PracticeRunRecord {
-  return { ...run, ...(run.themes === undefined ? {} : { themes: [...run.themes] }) };
+  return {
+    ...run,
+    ...(run.puzzleTiming === undefined
+      ? {}
+      : { puzzleTiming: { ...run.puzzleTiming } }),
+    ...(run.themes === undefined ? {} : { themes: [...run.themes] })
+  };
 }
 
 export function samePracticeRun(
@@ -305,6 +323,7 @@ function builtInPracticeRun(
     ratingKey: config.ratingKey,
     durationSeconds: config.durationSeconds,
     perPuzzleSeconds: config.perPuzzleSeconds,
+    puzzleTiming: resolvePuzzleTimingPolicy(config.puzzleTiming, config.perPuzzleSeconds),
     targetCorrect: config.targetCorrect,
     maxMistakes: config.maxMistakes,
     ...(config.themes === undefined ? {} : { themes: [...config.themes] }),
@@ -322,6 +341,7 @@ function canonicalizeBuiltInPracticeRun(run: PracticeRunRecord): PracticeRunReco
   return {
     ...canonical,
     name: run.name,
+    puzzleTiming: resolvePuzzleTimingPolicy(run.puzzleTiming, canonical.perPuzzleSeconds),
     archived: run.archived,
     homeOrder: run.homeOrder,
     updatedAt: run.updatedAt

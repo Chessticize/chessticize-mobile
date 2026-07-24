@@ -470,36 +470,35 @@ New Run behavior:
 ### History
 
 - The only persistent History view selector is a compact, single-select
-  `All / Needs attention` segmented control. `Needs attention` is the union of
-  Slow, Wrong, Unclear, and Timed out attempts.
+  `Needs attention / All` segmented control. History opens with
+  `Needs attention` selected.
 - History data must be pageable, including the all-time range.
-- The default History surface shows all puzzle attempts across rating buckets.
-  Source defaults to All sources rather than Sprint.
+- `Needs attention` is current state rather than a reason filter: it contains
+  attempts marked Unclear or represented by an active Review queue entry.
+  Clearing Unclear or removing the matching Review entry removes the attempt
+  from this view when no other attention state remains.
+- A correct attempt that reaches the Slow threshold is automatically marked
+  Unclear and does not show the follow-up Unclear question. A Timed out attempt
+  is also marked Unclear. Both markers remain reversible.
+- Slow and Timed out remain visible attempt labels. They are not History filter
+  options and do not independently keep an attempt in Needs attention after its
+  Unclear marker is cleared.
+- Source defaults to All sources rather than Sprint.
 - Time range, rating bucket, source, result, review state, side, and theme
   controls live behind the compact filter toggle. No separate Sprint, Wrong,
   Unclear, Slow, or Timed out quick control remains.
-- The four Needs attention reasons use OR. Every advanced facet combines with
-  that union using AND. Keep the result count and category/value applied-filter
-  summary near the list without displaying a Boolean formula.
-- The advanced `Attention flags` facet contains `Mistakes`, `Unclear`, `Slow`,
-  and `Timed out`. Its selected values use OR. `Mistakes` intentionally
-  overlaps `Result: Wrong` so all four Needs attention reasons can be composed
-  in one group; keep Result as the independent `Correct / Wrong` facet. Label
-  Review membership `Review queue: All / In queue / Not in queue`.
+- Every advanced facet combines with the selected History view using AND. Keep
+  the result count and category/value applied-filter summary near the list.
+  Label Review membership `Review queue: All / In queue / Not in queue`.
 - `Timed out` is a distinct result, not a Wrong mistake or a Correct attempt.
-  Slow and Timed out do not automatically mark an attempt Unclear or add it to
-  the Review queue; those dimensions remain independent.
-- Selecting any Attention flag switches the persistent view to
-  `Needs attention`. Clearing the final flag keeps that broader view selected.
-  Selecting `All` clears every Attention flag; Reset restores the same clean
-  `All` state.
+- Reset restores `Needs attention`, All sources, and the default range.
 - Keep the full Themes facet collapsed when the History filter menu opens.
   Its disclosure names the selected themes in one ellipsized line before
   expanding. In the applied-filter summary below the view selector, show the
   theme name for one selection or `{n} themes selected` for multiple
   selections, including `24 themes selected` when every named theme is checked.
 - Place the expanded advanced-filter region in one bordered container above
-  `All / Needs attention`. Keep Themes visually lightweight inside that
+  `Needs attention / All`. Keep Themes visually lightweight inside that
   container, without its own full-width card border or background.
 - Selecting an ELO bucket supplies the mode, sprint config, and sprint-speed
   context for rating history. Do not show separate History mode or speed chips
@@ -517,7 +516,7 @@ New Run behavior:
 - Analysis Review launched from History supports retry, Stockfish analysis, and previous/next navigation through the current filtered History result set.
 - Previous/next navigation from History follows the active filter result order, not just the currently visible page.
 - Expanded History menu filters may use horizontally scrollable chip groups on
-  phones. The persistent `All / Needs attention` selector itself must fit
+  phones. The persistent `Needs attention / All` selector itself must fit
   without horizontal scrolling.
 - History theme filters use multi-select OR semantics: an attempt matches when
   it has any selected curated theme. `All` represents no named-theme constraint,

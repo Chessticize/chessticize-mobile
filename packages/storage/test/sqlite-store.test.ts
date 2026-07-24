@@ -1622,8 +1622,14 @@ function reviewContext(puzzleId: string): ReviewContext {
   };
 }
 
-interface LegacyAttemptRow extends Omit<AttemptHistoryRow, "ratingAfter" | "arrowDuelCandidateOrder"> {
+interface LegacyAttemptRow extends Omit<
+  AttemptHistoryRow,
+  "ratingAfter" | "submittedMove" | "elapsedMs" | "timingStatus" | "arrowDuelCandidateOrder"
+> {
   ratingAfter: number | null;
+  submittedMove: string | null;
+  elapsedMs: number | null;
+  timingStatus: NonNullable<AttemptHistoryRow["timingStatus"]> | null;
   arrowDuelCandidateOrderJson: string | null;
 }
 
@@ -1642,6 +1648,8 @@ function legacyListAttempts(store: SQLiteStore, filter: HistoryFilter): AttemptH
         expected_move AS expectedMove,
         started_at AS startedAt,
         completed_at AS completedAt,
+        elapsed_ms AS elapsedMs,
+        timing_status AS timingStatus,
         rating_before AS ratingBefore,
         rating_after AS ratingAfter,
         arrow_duel_candidate_order_json AS arrowDuelCandidateOrderJson
@@ -1670,9 +1678,19 @@ function legacyListAttempts(store: SQLiteStore, filter: HistoryFilter): AttemptH
     ) as LegacyAttemptRow[];
 
   return rows.map((row) => {
-    const { ratingAfter, arrowDuelCandidateOrderJson, ...attempt } = row;
+    const {
+      ratingAfter,
+      submittedMove,
+      elapsedMs,
+      timingStatus,
+      arrowDuelCandidateOrderJson,
+      ...attempt
+    } = row;
     return {
       ...attempt,
+      ...(submittedMove === null ? {} : { submittedMove }),
+      ...(elapsedMs === null ? {} : { elapsedMs }),
+      ...(timingStatus === null ? {} : { timingStatus }),
       ...(ratingAfter === null ? {} : { ratingAfter }),
       ...(arrowDuelCandidateOrderJson === null
         ? {}

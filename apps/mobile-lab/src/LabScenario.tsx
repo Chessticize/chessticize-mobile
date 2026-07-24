@@ -79,63 +79,10 @@ function LabScenarioContent({
           ? SERVER_CURATED_THEME_PRESENTATION
           : undefined}
         runEloEditingMovedToHome
-        runTimingEditorPreview={showsRunTimingEditorPreview(scenarioId)}
-        sessionTimingPreview={sessionTimingPreviewFor(scenarioId)}
-        historyTimingPreview={showsHistoryTimingPreview(scenarioId)
-          ? {
-              statusByAttemptId: {
-                "history-correct": "slow",
-                "history-timeout": "timed_out"
-              }
-            }
-          : undefined}
         {...runtime.screenProps}
       />
     </LabScenarioShell>
   );
-}
-
-function showsRunTimingEditorPreview(scenarioId: LabScenarioId): boolean {
-  return scenarioId === "practice-run-standard-editor"
-    || scenarioId === "practice-custom-rating-editor";
-}
-
-function sessionTimingPreviewFor(
-  scenarioId: LabScenarioId
-): React.ComponentProps<typeof PracticePocScreen>["sessionTimingPreview"] {
-  if (scenarioId === "practice-active") {
-    return {
-      initialElapsedSeconds: 24,
-      warningSeconds: 40,
-      timeoutSeconds: 60
-    };
-  }
-  if (scenarioId === "practice-timing-warning") {
-    return {
-      initialElapsedSeconds: 41,
-      warningSeconds: 40,
-      timeoutSeconds: 60
-    };
-  }
-  if (scenarioId === "practice-timing-timeout") {
-    return {
-      initialElapsedSeconds: 52,
-      nextPuzzleFen: LAB_PUZZLES[4]!.initialFen,
-      warningSeconds: 40,
-      timeoutSeconds: 60
-    };
-  }
-  return undefined;
-}
-
-function showsHistoryTimingPreview(scenarioId: LabScenarioId): boolean {
-  return [
-    "history-empty",
-    "history-populated",
-    "history-filters",
-    "history-attempt-detail",
-    "history-replay-unavailable"
-  ].includes(scenarioId);
 }
 
 function isRunManagementScenario(scenarioId: LabScenarioId): boolean {
@@ -278,6 +225,15 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
       break;
   }
 
+  const initialPuzzleElapsedSeconds = timingScenarioInitialElapsedSeconds(scenarioId);
+  if (initialPuzzleElapsedSeconds !== null) {
+    screenProps.currentTimeMs = createLivePuzzleClock(
+      service,
+      initialPuzzleElapsedSeconds
+    );
+    screenProps.standardTargetCorrect = 2;
+  }
+
   const notificationClient = new LabNotificationClient(notificationStatus);
   const capabilityOverrides: TestMobilePlatformCapabilityOverrides = {
     practiceService: service,
@@ -299,6 +255,50 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     service,
     screenProps,
     platformCapabilities: createTestMobilePlatformCapabilities(capabilityOverrides)
+  };
+}
+
+function timingScenarioInitialElapsedSeconds(scenarioId: LabScenarioId): number | null {
+  if (scenarioId === "practice-active") {
+    return 24;
+  }
+  if (scenarioId === "practice-timing-warning") {
+    return 41;
+  }
+  if (scenarioId === "practice-timing-timeout") {
+    return 52;
+  }
+  return null;
+}
+
+function createLivePuzzleClock(
+  service: PracticeService,
+  initialPuzzleElapsedSeconds: number
+): () => number {
+  let activePuzzleKey: string | null = null;
+  let activePuzzleObservedAtMs = 0;
+
+  return () => {
+    const active = service.getActiveSprint();
+    if (
+      !active ||
+      active.status !== "active" ||
+      !active.currentPuzzle ||
+      !active.currentPuzzleStartedAt
+    ) {
+      return LAB_NOW_MS;
+    }
+    const puzzleKey = `${active.id}:${active.currentPuzzleIndex}:${active.currentPuzzle.puzzle.id}`;
+    if (puzzleKey !== activePuzzleKey) {
+      activePuzzleKey = puzzleKey;
+      activePuzzleObservedAtMs = Date.now();
+    }
+    const scenarioOffsetMs = active.currentPuzzleIndex === 0
+      ? initialPuzzleElapsedSeconds * 1000
+      : 0;
+    return new Date(active.currentPuzzleStartedAt).getTime()
+      + scenarioOffsetMs
+      + Math.max(0, Date.now() - activePuzzleObservedAtMs);
   };
 }
 
@@ -418,18 +418,24 @@ function createHistoryService(
     historyAttempt({
       id: "history-timeout",
       puzzleId: LAB_PUZZLES[4]!.id,
-      result: "correct",
+      result: "timed_out",
+      timingStatus: "timed_out",
+      elapsedMs: 60_000,
       completedAt: "2026-07-17T15:00:12.000Z",
       ratingBefore: 910,
-      ratingAfter: 910
+      ratingAfter: 910,
+      unclear: true
     }),
     historyAttempt({
       id: "history-correct",
       puzzleId: LAB_PUZZLES[2]!.id,
       result: "correct",
+      timingStatus: "slow",
+      elapsedMs: 41_000,
       completedAt: "2026-07-16T13:00:07.000Z",
       ratingBefore: 900,
-      ratingAfter: 930
+      ratingAfter: 930,
+      unclear: true
     }),
     historyAttempt({
       id: "history-clean",
@@ -501,6 +507,8 @@ function historyAttempt({
   ratingAfter,
   ratingBefore,
   result,
+  elapsedMs = 8_000,
+  timingStatus,
   unclear = false
 }: {
   completedAt: string;
@@ -509,6 +517,8 @@ function historyAttempt({
   ratingAfter: number;
   ratingBefore: number;
   result: AttemptEvent["result"];
+  elapsedMs?: number;
+  timingStatus?: AttemptEvent["timingStatus"];
   unclear?: boolean;
 }): AttemptEvent {
   return {
@@ -519,10 +529,14 @@ function historyAttempt({
     mode: "standard",
     ratingKey: "standard 5/20",
     result,
-    submittedMove: result === "correct" ? "e2e4" : "e2e3",
+    ...(result === "timed_out"
+      ? {}
+      : { submittedMove: result === "correct" ? "e2e4" : "e2e3" }),
     expectedMove: "e2e4",
-    startedAt: new Date(new Date(completedAt).getTime() - 8_000).toISOString(),
+    startedAt: new Date(new Date(completedAt).getTime() - elapsedMs).toISOString(),
     completedAt,
+    elapsedMs,
+    ...(timingStatus === undefined ? {} : { timingStatus }),
     ratingBefore,
     ratingAfter,
     ...(unclear ? { unclear: true, unclearUpdatedAt: completedAt } : {})

@@ -51,11 +51,11 @@
     "issues": [
       {
         "issueNumber": 248,
-        "changeNote": "Include Slow in Needs attention and let Unclear or Slow narrow History through the Attention flags group."
+        "changeNote": "Automatically mark Slow correct attempts Unclear without prompting, and default History to Needs attention."
       },
       {
         "issueNumber": 249,
-        "changeNote": "Include Timed out in Needs attention and its OR-based Attention flags filter."
+        "changeNote": "Mark Timed out attempts Unclear so Needs attention stays based only on Unclear or Review membership."
       }
     ]
   },

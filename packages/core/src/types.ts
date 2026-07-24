@@ -4,6 +4,10 @@ export type SprintStatus = "active" | "paused" | "won" | "failed" | "abandoned";
 
 export type AttemptResult = "correct" | "wrong";
 
+export type AttemptOutcome = AttemptResult | "timed_out";
+
+export type AttemptTimingStatus = "slow" | "timed_out";
+
 export type AttemptSource = "sprint" | "scheduled_review";
 
 export type SprintEndReason =
@@ -34,10 +38,17 @@ export interface SprintConfig {
   mode: SprintMode;
   durationSeconds: number;
   perPuzzleSeconds: number;
+  /** Optional only for persisted legacy configs; new configs always populate it. */
+  puzzleTiming?: PuzzleTimingPolicy;
   targetCorrect: number;
   maxMistakes: number;
   ratingKey: string;
   themes?: string[];
+}
+
+export interface PuzzleTimingPolicy {
+  slowAfterSeconds: number | null;
+  timeoutAfterSeconds: number | null;
 }
 
 export interface CustomSprintConfigRecord {
@@ -63,6 +74,8 @@ export interface PracticeRunRecord {
   ratingKey: string;
   durationSeconds: number;
   perPuzzleSeconds: number;
+  /** Optional only for imported legacy Runs; current Runs always populate it. */
+  puzzleTiming?: PuzzleTimingPolicy;
   targetCorrect: number;
   maxMistakes: number;
   themes?: string[];
@@ -170,11 +183,13 @@ export interface AttemptEvent {
   puzzleId: string;
   mode: SprintMode;
   ratingKey: string;
-  result: AttemptResult;
-  submittedMove: string;
+  result: AttemptOutcome;
+  submittedMove?: string;
   expectedMove: string;
   startedAt: string;
   completedAt: string;
+  elapsedMs?: number;
+  timingStatus?: AttemptTimingStatus;
   ratingBefore: number;
   ratingAfter?: number;
   arrowDuelCandidateOrder?: string[];

@@ -11,7 +11,8 @@ import {
   openPracticeSession,
   replaceTextTestId,
   waitForEnabledTestId,
-  waitForTestId
+  waitForTestId,
+  waitForText
 } from "./storyPlay.ts";
 
 const meta = {
@@ -147,6 +148,7 @@ export const ActiveSession: Story = {
   play: async ({ canvasElement }) => {
     await openPracticeSession(canvasElement);
     await waitForTestId(canvasElement, "session-puzzle-timing");
+    await waitForText(canvasElement, "Puzzle 0:24");
   }
 };
 
@@ -157,6 +159,7 @@ export const SlowWarning: Story = {
   play: async ({ canvasElement }) => {
     await openPracticeSession(canvasElement);
     await waitForTestId(canvasElement, "session-puzzle-timing");
+    await waitForText(canvasElement, "Puzzle 0:41");
   }
 };
 
@@ -168,6 +171,7 @@ export const PuzzleTimeout: Story = {
     await openPracticeSession(canvasElement);
     await waitForTestId(canvasElement, "session-puzzle-timing");
     await waitForTestId(canvasElement, "session-puzzle-countdown");
+    await waitForText(canvasElement, "8s");
   }
 };
 

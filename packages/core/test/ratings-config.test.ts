@@ -11,6 +11,7 @@ import {
   createDefaultRating,
   DEFAULT_RATING_DEVIATION,
   DEFAULT_VOLATILITY,
+  defaultPuzzleTimingPolicy,
   normalizeThemeSelection,
   ratingKeyForConfig,
   resetRating,
@@ -62,6 +63,10 @@ test("ratingKeyForConfig and buildSprintConfig keep custom sprint buckets separa
       mode: "custom",
       durationSeconds: 180,
       perPuzzleSeconds: 15,
+      puzzleTiming: {
+        slowAfterSeconds: 30,
+        timeoutAfterSeconds: 45
+      },
       targetCorrect: 12,
       maxMistakes: 3,
       ratingKey: "fork+pin custom 3/15",
@@ -81,11 +86,73 @@ test("ratingKeyForConfig and buildSprintConfig keep custom sprint buckets separa
       mode: "custom",
       durationSeconds: 95,
       perPuzzleSeconds: 10,
+      puzzleTiming: {
+        slowAfterSeconds: 20,
+        timeoutAfterSeconds: 30
+      },
       targetCorrect: 8,
       maxMistakes: 2,
       ratingKey: "custom 95s/10"
     }
   );
+});
+
+test("puzzle timing defaults to 2x and 3x Typical time without changing the rating key", () => {
+  const defaults = buildSprintConfig({
+    mode: "standard",
+    durationSeconds: 300,
+    perPuzzleSeconds: 20
+  });
+  const customized = buildSprintConfig({
+    mode: "standard",
+    durationSeconds: 300,
+    perPuzzleSeconds: 20,
+    puzzleTiming: {
+      slowAfterSeconds: null,
+      timeoutAfterSeconds: 90
+    }
+  });
+
+  assert.deepEqual(defaults.puzzleTiming, {
+    slowAfterSeconds: 40,
+    timeoutAfterSeconds: 60
+  });
+  assert.deepEqual(customized.puzzleTiming, {
+    slowAfterSeconds: null,
+    timeoutAfterSeconds: 90
+  });
+  assert.equal(customized.ratingKey, defaults.ratingKey);
+});
+
+test("puzzle timing defaults remain valid at the supported pace domain boundaries", () => {
+  assert.deepEqual(buildSprintConfig({
+    mode: "standard",
+    durationSeconds: 300,
+    perPuzzleSeconds: 1
+  }).puzzleTiming, {
+    slowAfterSeconds: 10,
+    timeoutAfterSeconds: 15
+  });
+  assert.deepEqual(buildSprintConfig({
+    mode: "standard",
+    durationSeconds: 300,
+    perPuzzleSeconds: 13
+  }).puzzleTiming, {
+    slowAfterSeconds: 30,
+    timeoutAfterSeconds: 40
+  });
+  assert.deepEqual(buildSprintConfig({
+    mode: "standard",
+    durationSeconds: 300,
+    perPuzzleSeconds: 180
+  }).puzzleTiming, {
+    slowAfterSeconds: 175,
+    timeoutAfterSeconds: 180
+  });
+  assert.deepEqual(defaultPuzzleTimingPolicy(10_000), {
+    slowAfterSeconds: 175,
+    timeoutAfterSeconds: 180
+  });
 });
 
 test("All theme selection shares the unrestricted config and rating bucket", () => {
@@ -149,6 +216,33 @@ test("buildSprintConfig rejects invalid timing and target inputs", () => {
   assert.throws(
     () => buildSprintConfig({ mode: "custom", durationSeconds: 180, perPuzzleSeconds: 30, maxMistakes: 1.5 }),
     /maxMistakes/
+  );
+  assert.throws(
+    () => buildSprintConfig({
+      mode: "standard",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      puzzleTiming: { slowAfterSeconds: 40, timeoutAfterSeconds: 40 }
+    }),
+    /at least 5 seconds/
+  );
+  assert.throws(
+    () => buildSprintConfig({
+      mode: "standard",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      puzzleTiming: { slowAfterSeconds: 41, timeoutAfterSeconds: 60 }
+    }),
+    /5-second increments/
+  );
+  assert.throws(
+    () => buildSprintConfig({
+      mode: "standard",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      puzzleTiming: { slowAfterSeconds: 40, timeoutAfterSeconds: 185 }
+    }),
+    /between 10 and 180/
   );
 });
 

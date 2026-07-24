@@ -1,3 +1,4 @@
+import { isUnclearAttemptEligible } from "../../core/src/index.ts";
 import type { AttemptHistoryRow } from "./query-types.ts";
 
 export function cloneAttemptHistoryRow(attempt: AttemptHistoryRow): AttemptHistoryRow {
@@ -18,10 +19,9 @@ export function preferredAttemptHistoryRow(
   local: AttemptHistoryRow,
   incoming: AttemptHistoryRow
 ): AttemptHistoryRow {
-  const completedComparison = incoming.completedAt.localeCompare(local.completedAt);
-  const preferredBase = completedComparison === 0
-    ? (incoming.startedAt >= local.startedAt ? incoming : local)
-    : (completedComparison > 0 ? incoming : local);
+  const preferredBase = compareAttemptVersions(local, incoming) >= 0
+    ? local
+    : incoming;
   const clarity = preferredClarity(local, incoming);
   const { unclear: _unclear, unclearUpdatedAt: _unclearUpdatedAt, ...base } = cloneAttemptHistoryRow(preferredBase);
   return {
@@ -30,6 +30,53 @@ export function preferredAttemptHistoryRow(
       ? {}
       : { unclear: clarity.unclear, unclearUpdatedAt: clarity.updatedAt })
   };
+}
+
+function compareAttemptVersions(left: AttemptHistoryRow, right: AttemptHistoryRow): number {
+  const completedComparison = left.completedAt.localeCompare(right.completedAt);
+  if (completedComparison !== 0) {
+    return completedComparison;
+  }
+  const startedComparison = left.startedAt.localeCompare(right.startedAt);
+  if (startedComparison !== 0) {
+    return startedComparison;
+  }
+  const completenessComparison = attemptCompleteness(left) - attemptCompleteness(right);
+  if (completenessComparison !== 0) {
+    return completenessComparison;
+  }
+  return stableAttemptValue(left).localeCompare(stableAttemptValue(right));
+}
+
+function attemptCompleteness(attempt: AttemptHistoryRow): number {
+  return Number(attempt.submittedMove !== undefined) +
+    Number(attempt.elapsedMs !== undefined) +
+    Number(attempt.timingStatus !== undefined) +
+    Number(attempt.ratingAfter !== undefined) +
+    Number(attempt.arrowDuelCandidateOrder !== undefined) +
+    Number(attempt.runId !== undefined) +
+    Number(attempt.runName !== undefined);
+}
+
+function stableAttemptValue(attempt: AttemptHistoryRow): string {
+  return JSON.stringify([
+    attempt.id,
+    attempt.source,
+    attempt.sessionId,
+    attempt.puzzleId,
+    attempt.mode,
+    attempt.ratingKey,
+    attempt.result,
+    attempt.submittedMove ?? null,
+    attempt.expectedMove,
+    attempt.elapsedMs ?? null,
+    attempt.timingStatus ?? null,
+    attempt.ratingBefore,
+    attempt.ratingAfter ?? null,
+    attempt.arrowDuelCandidateOrder ?? null,
+    attempt.runId ?? null,
+    attempt.runName ?? null
+  ]);
 }
 
 export function sameAttemptHistoryRow(
@@ -68,7 +115,10 @@ function preferredClarity(
 }
 
 function normalizedClarity(attempt: AttemptHistoryRow): { unclear: boolean; updatedAt?: string } {
-  if (attempt.source !== "sprint" || attempt.result !== "correct" || !attempt.unclearUpdatedAt) {
+  if (
+    !isUnclearAttemptEligible(attempt) ||
+    !attempt.unclearUpdatedAt
+  ) {
     return { unclear: false };
   }
   const updatedAt = new Date(attempt.unclearUpdatedAt);

@@ -42,6 +42,10 @@ test("Run management creates a uniquely named multi-theme Run through its public
     elo: 900,
     durationSeconds: 300,
     perPuzzleSeconds: 20,
+    puzzleTiming: {
+      slowAfterSeconds: 40,
+      timeoutAfterSeconds: 60
+    },
     themes: ["fork", "pin"]
   });
   assert.equal(adapter.commands.at(-1)?.type, "create-run");
@@ -62,6 +66,14 @@ test("editing preserves fixed Run settings while validating direct ELO input", (
   controller.dispatch({ type: "change-per-puzzle", perPuzzleSeconds: 10 });
   assert.deepEqual(controller.getSnapshot().draft, original);
 
+  controller.dispatch({
+    type: "change-puzzle-timing",
+    puzzleTiming: {
+      slowAfterSeconds: 45,
+      timeoutAfterSeconds: 75
+    }
+  });
+
   controller.dispatch({ type: "change-name", name: "Calculation Focus" });
   controller.dispatch({ type: "change-elo-input", value: "2201" });
   assert.equal(
@@ -78,10 +90,23 @@ test("editing preserves fixed Run settings while validating direct ELO input", (
     ...original,
     id: "tactics-focus",
     name: "Calculation Focus",
-    elo: 1375
+    elo: 1375,
+    puzzleTiming: {
+      slowAfterSeconds: 45,
+      timeoutAfterSeconds: 75
+    }
   });
   assert.equal(controller.getSnapshot().homeEditing, true);
-  assert.equal(adapter.commands.at(-1)?.type, "update-run");
+  assert.deepEqual(adapter.commands.at(-1), {
+    type: "update-run",
+    runId: "tactics-focus",
+    name: "Calculation Focus",
+    elo: 1375,
+    puzzleTiming: {
+      slowAfterSeconds: 45,
+      timeoutAfterSeconds: 75
+    }
+  });
 });
 
 test("reorder, archive, and restore retain stable Run identity and ELO", () => {
@@ -128,6 +153,10 @@ test("previous configurations, start effects, and refresh stay outside React", (
     elo: 1110,
     durationSeconds: 180,
     perPuzzleSeconds: 10,
+    puzzleTiming: {
+      slowAfterSeconds: 20,
+      timeoutAfterSeconds: 30
+    },
     themes: ["fork", "pin"]
   });
   controller.dispatch({ type: "cancel-edit" });
@@ -189,7 +218,12 @@ class FakeRunManagementAdapter implements PracticeRunManagementAdapter {
       case "update-run":
         changedRunId = command.runId;
         this.catalog.runs = this.catalog.runs.map((run) => run.id === command.runId
-          ? { ...run, name: command.name.trim(), elo: command.elo }
+          ? {
+            ...run,
+            name: command.name.trim(),
+            elo: command.elo,
+            puzzleTiming: { ...command.puzzleTiming }
+          }
           : run);
         break;
       case "reorder-run": {
@@ -275,6 +309,10 @@ function run(
     elo,
     durationSeconds,
     perPuzzleSeconds,
+    puzzleTiming: {
+      slowAfterSeconds: perPuzzleSeconds * 2,
+      timeoutAfterSeconds: perPuzzleSeconds * 3
+    },
     themes
   };
 }
@@ -292,5 +330,9 @@ function uniqueRunId(name: string, catalog: MutableCatalog): string {
 }
 
 function cloneRun(run: PracticeRunManagementRun): PracticeRunManagementRun {
-  return { ...run, themes: [...run.themes] };
+  return {
+    ...run,
+    puzzleTiming: { ...run.puzzleTiming },
+    themes: [...run.themes]
+  };
 }
