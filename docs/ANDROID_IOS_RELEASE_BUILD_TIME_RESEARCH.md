@@ -62,8 +62,8 @@ coverage. The more important process miss was after Play submission: the source
 Release was public, but the Play-signed APK mirror was left pending because the
 runbooks described it as an optional small step rather than a release-completion
 postcondition. The current standard keeps the mirror small and idempotent but
-does not call Android complete until owner smoke, exactly three public Release
-assets, and a retained mirror receipt are present. After owner confirmation,
+does not call Android complete until exactly three public Release assets and a
+retained mirror receipt are present. Under the former device-smoke policy,
 [mirror run 30118284864](https://github.com/Chessticize/chessticize-mobile/actions/runs/30118284864)
 closed that gap in 1m8s without Gradle, a rebuild, or repeated product
 validation.
@@ -166,7 +166,8 @@ in the expected duration of every later delta release:
 - production signing and protected-environment setup;
 - Play App Signing and publisher/service-account authorization;
 - initial source publication and one-time Play API authentication setup;
-- physical ARM64 evidence and the Play-console owner evidence chain;
+- the one-time Play-console owner evidence chain; optional physical ARM64
+  diagnostics are not a release gate;
 - the one-time 12-testers-for-14-days external testing requirement tracked by
   [issue #186](https://github.com/Chessticize/chessticize-mobile/issues/186).
 
@@ -313,7 +314,7 @@ The following are repository observations, not measured timing results.
   [Android App Bundle delivery](https://developer.android.com/topic/performance/reduce-apk-size)
   and
   [Play Console app bundles](https://support.google.com/googleplay/android-developer/answer/9844279).
-- Physical-device QA, TestFlight installation, Play track operations, and store
+- Optional physical-device QA, Play track operations, and store
   review/processing are external elapsed time. No compiler cache removes them.
 
 ## Recommended simplification sequence
@@ -323,9 +324,9 @@ The following are repository observations, not measured timing results.
 Implemented decision: Google Play remains the primary Android binary channel.
 The protected signed-candidate job builds and verifies the AAB once, retains it,
 and publishes the exact corresponding-source manifest using the built-in
-`github.token`. After Play publication and owner device smoke, one small manual
-job downloads the Play-signed universal APK and mirrors it plus SHA-256 to the
-same Release. It checks only package, version, signing identity, and digest.
+`github.token`. After Play publication, one small manual job downloads the
+Play-signed universal APK and mirrors it plus SHA-256 to the same Release. It
+checks only package, version, signing identity, and digest.
 
 The former temporary personal token, four manual dispatches, extra publication
 environments, separate prepare/publish approvals, repeated Play-ready evidence,
@@ -456,7 +457,8 @@ Continue the repository's existing model:
 - targeted native validation for navigation, persistence, real board,
   adaptive layout, and native-module boundaries;
 - full native scope only for broad native risk. An ordinary exact-head delta
-  uses fast checks plus the owner's installed-device smoke.
+  uses fast checks plus the protected signed-artifact job. Physical-device
+  testing is optional.
 
 GitHub supports path filters, but required workflows skipped by path filtering
 can remain pending. Prefer an always-created required workflow whose jobs
@@ -558,9 +560,9 @@ Adopt a two-lane model:
    smallest risk-scoped tests, and local single-ABI Android builds where
    appropriate.
 2. **Immutable release lane:** one exact commit; cached but complete Android and
-   iOS builds; one developer-built signed artifact per platform; exact-head fast checks plus
-   delta/targeted/full validation and owner device smoke; then artifact
-   promotion without rebuilding.
+   iOS builds; one developer-built signed artifact per platform; exact-head fast
+   checks plus delta/targeted/full CI or simulator/emulator validation; then
+   artifact promotion without rebuilding.
 
 The protocol reduction is implemented first because it removes human and
 authorization latency without changing store requirements. Cache pilots remain

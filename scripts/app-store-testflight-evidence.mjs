@@ -164,10 +164,8 @@ function main() {
 
   const manualGates = [
     "Upload the build to App Store Connect.",
-    "Distribute the uploaded build to the Internal 1.1 QA TestFlight group.",
-    "Install the TestFlight build on physical iPhone and iPad hardware.",
-    "Run the physical-device checklist in docs/TESTFLIGHT_QA.md.",
-    "Fill docs/TESTFLIGHT_QA.md with exact build, device, tester, result, and evidence location."
+    "Wait for App Store Connect processing and resolve any store validation errors.",
+    "Attach the processed build to the App Store version and submit it when metadata is complete."
   ];
 
   const summary = {
@@ -196,9 +194,9 @@ function main() {
       `Release-ready local evidence: ${summary.releaseReady ? "yes" : "no"}`,
       "",
       "This bundle contains automatable release evidence only. It does not prove",
-      "the App Store Connect upload, TestFlight distribution, or physical-device",
-      "QA pass until those manual gates are completed and recorded in",
-      "`docs/TESTFLIGHT_QA.md`.",
+      "the external App Store Connect upload, processing, or submission. Optional",
+      "TestFlight and physical-device diagnostics are documented in",
+      "`docs/TESTFLIGHT_QA.md` but are not release gates.",
       "",
       "## Files",
       "",
@@ -223,7 +221,7 @@ function main() {
       console.log(`${entry.status === "pass" ? "PASS" : "FAIL"} ${entry.name}`);
     }
     console.log(`Release-ready local evidence: ${summary.releaseReady ? "yes" : "no"}`);
-    console.log("Manual gates still required: App Store Connect upload, TestFlight distribution, physical-device QA.");
+    console.log("Manual gates still required: App Store Connect upload, processing, and submission.");
   }
 
   if (failed.length > 0) {

@@ -322,7 +322,8 @@ test("SQLite migrates the released iOS 1.0.0 database without losing user semant
       });
       assert.deepEqual(service.getSettings(), {
         sync: { iCloudEnabled: true },
-        notifications: { reviewReminder: { mode: "fixed", fixedLocalTime: "20:30" } }
+        notifications: { reviewReminder: { mode: "fixed", fixedLocalTime: "20:30" } },
+        moveFeedback: { soundEnabled: true, hapticsEnabled: true }
       });
       assert.deepEqual(
         service.listSprintSessions().filter((session) => session.status === "active" || session.status === "paused").map((session) => ({
@@ -414,7 +415,8 @@ test("SQLite migrates the released iOS 1.0.0 database without losing user semant
 
       service.saveSettings({
         sync: { iCloudEnabled: false },
-        notifications: { reviewReminder: { mode: "off" } }
+        notifications: { reviewReminder: { mode: "off" } },
+        moveFeedback: { soundEnabled: false, hapticsEnabled: true }
       });
       service.recordReviewAttempt(
         {

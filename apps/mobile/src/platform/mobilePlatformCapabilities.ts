@@ -7,6 +7,7 @@ import type {
   ReviewReminderNotificationClient,
   ReviewReminderScheduler,
 } from './reviewReminderScheduler.ts';
+import type { MoveFeedbackClient } from './moveFeedback.ts';
 
 export interface MobileStorageCapabilities {
   practiceService: PracticeService;
@@ -30,6 +31,10 @@ export interface MobileReminderCapabilities {
   platform: 'android' | 'ios';
   scheduler: ReviewReminderScheduler | null;
   notificationClient: ReviewReminderNotificationClient | null;
+}
+
+export interface MobileMoveFeedbackCapabilities {
+  client: MoveFeedbackClient | null;
 }
 
 export interface MobileApplicationMetadata {
@@ -67,5 +72,6 @@ export interface MobilePlatformCapabilities {
   progressSync: MobileProgressSyncCapabilities;
   stockfish: MobileStockfishCapabilities;
   reminders: MobileReminderCapabilities;
+  moveFeedback: MobileMoveFeedbackCapabilities;
   applicationMetadata: MobileApplicationMetadata;
 }

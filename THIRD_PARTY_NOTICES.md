@@ -42,7 +42,7 @@ the complete license texts shipped in this repository.
 - Notes: Chessticize Mobile's bundled puzzle pack is derived from Lichess
   puzzle data and Chessticize presolve metadata for offline play.
 
-## Freesound Issue #247 Storybook demo audio
+## Freesound move feedback audio
 
 - Files:
   - `apps/mobile-lab/public/audio/issue-247/freesound-546119-piece-placement.mp3`
@@ -53,9 +53,10 @@ the complete license texts shipped in this repository.
 - Sources:
   - https://freesound.org/people/el_boss/sounds/546119/
   - https://freesound.org/people/el_boss/sounds/546120/
-- Notes: These are development-only design-review assets for the Issue #247
-  Interaction Lab story and are not yet wired into the native product. The
-  exact download URLs and file hashes are recorded beside the assets.
+- Notes: These assets are bundled for the native Move and Capture feedback and
+  are also used by the Issue #247 Interaction Lab story. Capture playback uses
+  `0.3` linear volume. The exact download URLs and file hashes are recorded
+  beside the assets.
 
 ## react-native-chessboard
 

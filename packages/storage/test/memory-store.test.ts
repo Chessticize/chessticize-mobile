@@ -290,6 +290,10 @@ test("PracticeService persists settings through the store boundary", () => {
       reviewReminder: {
         mode: "smart"
       }
+    },
+    moveFeedback: {
+      soundEnabled: true,
+      hapticsEnabled: true
     }
   });
 
@@ -302,11 +306,16 @@ test("PracticeService persists settings through the store boundary", () => {
         mode: "fixed",
         fixedLocalTime: "20:30"
       }
+    },
+    moveFeedback: {
+      soundEnabled: false,
+      hapticsEnabled: true
     }
   });
 
   saved.sync.iCloudEnabled = false;
   saved.notifications.reviewReminder = { mode: "off" };
+  saved.moveFeedback.hapticsEnabled = false;
   assert.deepEqual(service.getSettings().sync, { iCloudEnabled: true });
   assert.deepEqual(service.getSettings().notifications.reviewReminder, { mode: "fixed", fixedLocalTime: "20:30" });
   assert.deepEqual(service.exportLocalData().settings, {
@@ -318,6 +327,10 @@ test("PracticeService persists settings through the store boundary", () => {
         mode: "fixed",
         fixedLocalTime: "20:30"
       }
+    },
+    moveFeedback: {
+      soundEnabled: false,
+      hapticsEnabled: true
     }
   });
 });

@@ -284,7 +284,7 @@ for (const releaseContract of [
   assert.match(androidReleaseSkill, new RegExp(releaseContract.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 }
 
-assert.match(androidReleaseSkill, /Google Play distributes Android binaries/);
+assert.match(androidReleaseSkill, /Google Play processes Android binaries/);
 assert.match(androidReleaseSkill, /GitHub publishes corresponding\s+source/);
 assert.match(androidReleaseSkill, /\*\*Delta:\*\*/);
 assert.match(androidReleaseSkill, /\*\*Targeted:\*\*/);
@@ -294,9 +294,10 @@ assert.match(androidReleaseSkill, /Mirror APK/);
 assert.match(androidReleaseSkill, /Play-signed universal APK/);
 assert.match(androidReleaseSkill, /Android release is not complete/);
 assert.match(androidReleaseSkill, /APK mirror pending/);
-assert.match(androidReleaseSkill, /never publish an upload-key or locally rebuilt APK/);
+assert.match(androidReleaseSkill, /never\s+publish an upload-key or locally rebuilt APK/);
 assert.match(androidReleaseSkill, /mobile-android-source-recovery\.yml/);
-assert.match(androidReleaseSkill, /physical device/);
+assert.match(androidReleaseSkill, /Physical-device execution is optional/);
+assert.match(androidReleaseSkill, /never a recurring release gate/);
 assert.match(androidReleaseSkill, /never move its\s+tag, rebuild it, or reuse its code/);
 assert.match(androidReleaseSkill, /strict read-only audit/);
 assert.match(androidReleaseSkill, /canonicalAndroidSourceTag/);

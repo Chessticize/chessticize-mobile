@@ -313,15 +313,14 @@ Design approved 2026-07-03; the "Review Reminder Notifications" section of
    portrait dimensions. Release-time execution still requires final sanitized
    screenshots from a release or production-like build before uploading to App
    Store Connect.
-7. **TestFlight pass**: internal build, manual QA checklist covering the E2E
-   flow list below on a physical device, including kill-and-relaunch
-   persistence and offline (airplane-mode) practice.
+7. **App Store release validation**: exact-head fast checks, risk-scoped
+   simulator/Detox evidence, signed archive verification, and App Store Connect
+   processing.
    Status: repo preparation complete; external execution pending.
-   `docs/TESTFLIGHT_QA.md` now defines the TestFlight setup inputs, preflight
-   gates, physical-device matrix, manual QA checklist, evidence log, and
-   completion rule. The actual pass still requires an App Store Connect upload,
-   an internal TestFlight group, a physical iPhone install through TestFlight,
-   and a filled evidence log before this item can be marked complete. The
+   `docs/TESTFLIGHT_QA.md` preserves optional TestFlight setup inputs,
+   physical-device diagnostics, and an evidence log without making them release
+   gates. The actual release still requires an App Store Connect upload and
+   processing, but not an internal TestFlight group or physical-device pass. The
    current replacement source release tag is `ios-v1.1.0-build-2`, so the
    uploaded build must be archived from the exact commit that tag points to or
    the source release must be regenerated.
@@ -330,13 +329,13 @@ Design approved 2026-07-03; the "Review Reminder Notifications" section of
    cannot be completed from the repository. `pnpm app-store:testflight-evidence`
    collects the automatable preflight, notice-audit, local signing-readiness,
    release-manifest, and final screenshot-audit outputs under
-   `scratch/testflight-qa/` for the physical-device pass evidence bundle.
+   `scratch/testflight-qa/` for the release evidence bundle.
    `pnpm app-store:signing-readiness` reports the current upload machine's
    Apple Developer Team ID, Xcode command line tools, and Apple distribution
    signing identity readiness before archive/upload.
-   This full matrix is the first-launch 1.1 gate. Later bounded build-number
-   deltas use exact-head fast checks plus the owner's installed TestFlight smoke
-   and repeat only the manual/native checks affected by the change.
+   CI and simulator/Detox validation are the release gates. Later bounded
+   build-number deltas use exact-head fast checks and repeat only the automated
+   native checks affected by the change.
 
 ## Milestone 6 — Automated coverage of key user flows
 

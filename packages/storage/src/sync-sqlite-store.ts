@@ -223,6 +223,8 @@ interface AppSettingsRow {
   sync_upload_allowed: number;
   review_reminder_mode: PracticeSettings["notifications"]["reviewReminder"]["mode"];
   review_reminder_fixed_local_time: string | null;
+  move_feedback_sound_enabled: number;
+  move_feedback_haptics_enabled: number;
 }
 
 interface SprintSessionExportRow {
@@ -260,7 +262,7 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 9;
+export const CURRENT_SCHEMA_VERSION = 10;
 
 interface SQLiteMigration {
   from: number;
@@ -277,7 +279,8 @@ const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
   { from: 5, to: 6, apply: migrateV5ToV6 },
   { from: 6, to: 7, apply: migrateV6ToV7 },
   { from: 7, to: 8, apply: migrateV7ToV8 },
-  { from: 8, to: 9, apply: migrateV8ToV9 }
+  { from: 8, to: 9, apply: migrateV8ToV9 },
+  { from: 9, to: 10, apply: migrateV9ToV10 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
@@ -581,8 +584,10 @@ export class SyncSQLiteStore implements PracticeStore {
           sync_icloud_enabled,
           sync_upload_allowed,
           review_reminder_mode,
-          review_reminder_fixed_local_time
-        ) VALUES ('default', ?, ?, ?, ?)`
+          review_reminder_fixed_local_time,
+          move_feedback_sound_enabled,
+          move_feedback_haptics_enabled
+        ) VALUES ('default', ?, ?, ?, ?, ?, ?)`
       )
       .run(
         boolToInt(cloned.sync.iCloudEnabled),
@@ -590,7 +595,9 @@ export class SyncSQLiteStore implements PracticeStore {
         cloned.notifications.reviewReminder.mode,
         cloned.notifications.reviewReminder.mode === "fixed"
           ? cloned.notifications.reviewReminder.fixedLocalTime
-          : null
+          : null,
+        boolToInt(cloned.moveFeedback.soundEnabled),
+        boolToInt(cloned.moveFeedback.hapticsEnabled)
       );
   }
 
@@ -983,7 +990,8 @@ export class SyncSQLiteStore implements PracticeStore {
     this.transaction(() => {
       this.saveSettings({
         ...this.getSettings(),
-        notifications: clonePracticeSettings(data.settings).notifications
+        notifications: clonePracticeSettings(data.settings).notifications,
+        moveFeedback: clonePracticeSettings(data.settings).moveFeedback
       });
       const currentRuns = this.listPracticeRuns();
       const previousRuns = new Map(currentRuns.map((run) => [run.id, run]));
@@ -2155,6 +2163,21 @@ function migrateV7ToV8(db: SyncSqliteDatabase): void {
 function migrateV8ToV9(db: SyncSqliteDatabase): void {
   ensureColumn(
     db,
+    "app_settings",
+    "move_feedback_sound_enabled",
+    "ALTER TABLE app_settings ADD COLUMN move_feedback_sound_enabled INTEGER NOT NULL DEFAULT 1 CHECK (move_feedback_sound_enabled IN (0, 1))"
+  );
+  ensureColumn(
+    db,
+    "app_settings",
+    "move_feedback_haptics_enabled",
+    "ALTER TABLE app_settings ADD COLUMN move_feedback_haptics_enabled INTEGER NOT NULL DEFAULT 1 CHECK (move_feedback_haptics_enabled IN (0, 1))"
+  );
+}
+
+function migrateV9ToV10(db: SyncSqliteDatabase): void {
+  ensureColumn(
+    db,
     "practice_runs",
     "slow_after_seconds",
     "ALTER TABLE practice_runs ADD COLUMN slow_after_seconds INTEGER " +
@@ -2190,7 +2213,7 @@ function migrateV8ToV9(db: SyncSqliteDatabase): void {
 
   const attemptCount = countRows(db, "attempts");
   db.exec(`
-    CREATE TABLE attempts_v9 (
+    CREATE TABLE attempts_v10 (
       id TEXT PRIMARY KEY,
       source TEXT NOT NULL DEFAULT 'sprint',
       session_id TEXT NOT NULL,
@@ -2226,7 +2249,7 @@ function migrateV8ToV9(db: SyncSqliteDatabase): void {
       CHECK (timing_status IS NULL OR elapsed_ms IS NOT NULL)
     );
 
-    INSERT INTO attempts_v9 (
+    INSERT INTO attempts_v10 (
       id,
       source,
       session_id,
@@ -2267,12 +2290,12 @@ function migrateV8ToV9(db: SyncSqliteDatabase): void {
       unclear_updated_at
     FROM attempts;
   `);
-  if (countRows(db, "attempts_v9") !== attemptCount) {
-    throw new Error("SQLite v9 attempt rebuild changed the attempt row count");
+  if (countRows(db, "attempts_v10") !== attemptCount) {
+    throw new Error("SQLite v10 attempt rebuild changed the attempt row count");
   }
   db.exec(`
     DROP TABLE attempts;
-    ALTER TABLE attempts_v9 RENAME TO attempts;
+    ALTER TABLE attempts_v10 RENAME TO attempts;
 
     CREATE INDEX attempts_completed_at_id_idx
       ON attempts(completed_at DESC, id DESC);
@@ -2423,6 +2446,10 @@ function settingsFromRow(row: AppSettingsRow): PracticeSettings {
     },
     notifications: {
       reviewReminder: reminder
+    },
+    moveFeedback: {
+      soundEnabled: intToBool(row.move_feedback_sound_enabled),
+      hapticsEnabled: intToBool(row.move_feedback_haptics_enabled)
     }
   };
 }

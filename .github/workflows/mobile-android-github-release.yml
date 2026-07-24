@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       public_version:
-        description: Canonical public version already published through Play
+        description: Canonical public version already processed by Play
         required: true
         type: string
       version_code:
-        description: Canonical Android build number already verified on device
+        description: Canonical Android build number exposed by the Play Generated APKs API
         required: true
         type: string
 

@@ -1,8 +1,9 @@
-# TestFlight QA Pass
+# Optional TestFlight Diagnostics
 
-This document is the 1.2.1 TestFlight release checklist and evidence log. It is
-not complete until an App Store Connect build is distributed to an internal
-tester group and the physical-device checklist below is executed.
+This document preserves an optional 1.2.1 TestFlight diagnostic checklist and
+evidence log. It is not an App Store release gate. Exact-head fast checks,
+risk-scoped simulator/Detox evidence, the signed archive, and App Store Connect
+processing are sufficient to submit a build.
 
 Recheck Apple's live documentation before the pass:
 
@@ -13,25 +14,19 @@ Recheck Apple's live documentation before the pass:
 - Add internal testers:
   https://developer.apple.com/help/app-store-connect/test-a-beta-version/add-internal-testers
 
-## Scope
+## Optional Scope
 
 1. Upload one iOS build to App Store Connect from the exact public source commit
    that will be tagged per `docs/RELEASE_SOURCE_POLICY.md`.
-2. Configure TestFlight test information, including the features to test and a
-   feedback email or support path.
-3. Create or reuse an internal testing group.
-4. Add the build to that internal testing group.
-5. Install every build from TestFlight on the owner's physical device.
-   For a routine delta this is normally a physical iPhone; add an iPad when the
-   selected release scope requires it.
-6. For a delta, verify installed version, cold launch, one real Practice path,
-   and the changed behavior. Use the full iPhone/iPad checklist only for first
-   launch or broad native risk.
-7. Record the result in the evidence log.
+2. If a device-specific problem needs investigation, configure TestFlight test
+   information and create or reuse an internal testing group.
+3. Add the processed build to that group and install it on the relevant device.
+4. Run only the checklist items that help diagnose the problem.
+5. Record the optional result in the evidence log.
 
-Do not count simulator-only testing as the TestFlight pass. Simulator and Detox
-checks are preflight evidence; this milestone requires the installed TestFlight
-binary on real hardware.
+Do not treat TestFlight distribution or physical-device execution as a release
+prerequisite. The release decision uses CI and simulator/Detox evidence selected
+under `docs/TESTING_ARCHITECTURE.md`.
 
 ## App Store Connect Inputs
 
@@ -68,20 +63,22 @@ Run these before uploading the build:
 - [ ] Follow `docs/APP_STORE_UPLOAD.md` to create the Release archive and upload
       it with `apps/mobile/ios/ExportOptions.app-store-connect.plist`.
 
-## Physical Device Matrix
+## Optional Physical Device Matrix
 
-Record the owner's physical device for every delta. Add a representative iPad
-for first launch, adaptive-layout changes, or other broad native risk.
+Fill this matrix only when investigating a device-specific concern. It is not
+required for a delta, first launch, adaptive-layout change, or broad native
+risk.
 
 | Device | iOS version | Apple ID role | Network state | Result |
 | --- | --- | --- | --- | --- |
 | TBD iPhone | TBD | Internal tester | Online and airplane mode | Pending |
 | TBD iPad | TBD | Internal tester | Online and airplane mode | Pending |
 
-## Manual QA Checklist
+## Optional Manual QA Checklist
 
-Each item must be run from the TestFlight-installed app. Record a note for every
-failure, retry, or unclear result.
+Select only items relevant to the diagnostic question and run them from the
+TestFlight-installed app. Record a note for every failure, retry, or unclear
+result. Unchecked items do not block App Store submission.
 
 ### Install And Launch
 
@@ -199,7 +196,7 @@ Current source release candidate:
 | Release tag | `ios-v1.2.1-build-1` |
 | App Store Connect build | TBD |
 | TestFlight group | TBD |
-| Physical device and iOS version | TBD |
+| Optional physical device and iOS version | Not run |
 | Tester | TBD |
 | Started at | TBD |
 | Completed at | TBD |
@@ -224,12 +221,10 @@ The command writes a timestamped folder under `scratch/testflight-qa/` with:
 - `screenshot-audit.json`
 - `summary.json`
 
-The bundle is only local evidence for repository-controlled gates. It does not
-complete the TestFlight pass until the uploaded App Store Connect build is
-distributed, installed from TestFlight on the owner's physical device, and the
-applicable risk-scoped manual checklist plus evidence log above are filled. Add
-the representative iPad pass for first launch, adaptive-layout changes, or
-other broad native risk.
+The bundle is local evidence for repository-controlled gates. App Store Connect
+upload and processing still happen externally, but TestFlight distribution,
+physical-device installation, and the optional checklist above are not required
+before submission.
 
 ## Archive And Upload
 
@@ -239,15 +234,14 @@ step. The 1.2.1 upload path uses `xcodebuild archive`, then
 `apps/mobile/ios/ExportOptions.app-store-connect.plist`. Do not count this step
 as complete until App Store Connect finishes processing the uploaded build.
 
-## Completion Rule
+## Release Rule
 
-Milestone 5 item 7 is complete only when:
+The App Store release may proceed when:
 
 1. The uploaded build is tied to a public source commit and release tag.
-2. App Store Connect shows the build available to the internal testing group.
-3. At least one internal tester installs it through TestFlight on a physical
-   iPhone.
-4. Every checklist item selected by the recorded release scope is passed or has
-   an explicitly accepted release-blocker decision.
-5. The evidence log is filled with the exact build, device, tester, result, and
-   evidence location.
+2. Exact-head fast checks and the selected simulator/Detox scope pass.
+3. The signed archive passes repository checks and App Store Connect processing.
+4. Required store metadata and release notes are complete.
+
+The optional diagnostic pass is complete when its selected checklist items and
+evidence log are filled. Its absence does not block submission.

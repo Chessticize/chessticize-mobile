@@ -73,6 +73,13 @@
         "primaryKeyIndex": 0
       },
       {
+        "name": "elapsed_ms",
+        "type": "INTEGER",
+        "notNull": false,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
         "name": "expected_move",
         "type": "TEXT",
         "notNull": true,
@@ -152,7 +159,14 @@
       {
         "name": "submitted_move",
         "type": "TEXT",
-        "notNull": true,
+        "notNull": false,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "timing_status",
+        "type": "TEXT",
+        "notNull": false,
         "defaultValue": null,
         "primaryKeyIndex": 0
       },
@@ -394,6 +408,13 @@
         "primaryKeyIndex": 0
       },
       {
+        "name": "slow_after_seconds",
+        "type": "INTEGER",
+        "notNull": false,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
         "name": "target_correct",
         "type": "INTEGER",
         "notNull": true,
@@ -403,6 +424,13 @@
       {
         "name": "themes_json",
         "type": "TEXT",
+        "notNull": false,
+        "defaultValue": null,
+        "primaryKeyIndex": 0
+      },
+      {
+        "name": "timeout_after_seconds",
+        "type": "INTEGER",
         "notNull": false,
         "defaultValue": null,
         "primaryKeyIndex": 0

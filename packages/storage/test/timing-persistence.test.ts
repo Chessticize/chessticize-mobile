@@ -16,8 +16,8 @@ import {
 process.env.TZ = "UTC";
 const PUZZLE_FIXTURE = resolve("fixtures/puzzles/presolved-sample.json");
 
-test("SQLite v9 backfills Run timing and rebuilds attempts without losing indexes or foreign keys", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "chessticize-v9-timing-"));
+test("SQLite v10 preserves v9 settings while backfilling Run timing and rebuilding attempts", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "chessticize-v10-timing-"));
   const databasePath = join(directory, "practice.sqlite");
   try {
     const legacy = new DatabaseSync(databasePath);
@@ -32,6 +32,16 @@ test("SQLite v9 backfills Run timing and rebuilds attempts without losing indexe
         id TEXT PRIMARY KEY,
         run_id TEXT,
         run_name TEXT
+      );
+
+      CREATE TABLE app_settings (
+        id TEXT PRIMARY KEY,
+        sync_icloud_enabled INTEGER NOT NULL,
+        sync_upload_allowed INTEGER NOT NULL,
+        review_reminder_mode TEXT NOT NULL,
+        review_reminder_fixed_local_time TEXT,
+        move_feedback_sound_enabled INTEGER NOT NULL DEFAULT 1,
+        move_feedback_haptics_enabled INTEGER NOT NULL DEFAULT 1
       );
 
       CREATE TABLE practice_runs (
@@ -127,9 +137,9 @@ test("SQLite v9 backfills Run timing and rebuilds attempts without losing indexe
     try {
       assert.equal(
         (store.db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version,
-        9
+        10
       );
-      assert.equal(CURRENT_SCHEMA_VERSION, 9);
+      assert.equal(CURRENT_SCHEMA_VERSION, 10);
       assert.deepEqual(
         store.listPracticeRuns().map((run) => ({
           id: run.id,

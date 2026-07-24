@@ -6,16 +6,17 @@ status: accepted
 
 Google Play is the primary Android release channel. The protected candidate
 workflow builds the AAB once and publishes its corresponding source before the
-binary is distributed. After the owner publishes that version code through
-Play and passes the physical-device smoke, one manually dispatched CI job uses
-the Generated APKs API to download Google's universal APK and mirrors that
-exact Play-signed file plus its SHA-256 checksum in the same GitHub Release.
+binary is distributed. After Play processes that version code and the Generated
+APKs API exposes it, one manually dispatched CI job downloads Google's
+universal APK and mirrors that exact Play-signed file plus its SHA-256 checksum
+in the same GitHub Release. Track review may continue independently.
 
 Within the Chessticize release process this mirror is a required finalizer, not
 an additional product-validation gate. The source-only Release is the correct
-pre-Play state, but the Android release remains `APK mirror pending` after
-owner acceptance until the mirror receipt and all three public assets are
-verified.
+pre-mirror state, but the GitHub binary release remains `APK mirror pending`
+until the mirror receipt and all three public assets are verified.
+Physical-device testing is optional diagnostic work and is not a prerequisite
+for this finalizer.
 
 The mirror job verifies only immutable artifact identity: package name, public
 version, version code, Play app-signing certificate, non-empty bytes, and

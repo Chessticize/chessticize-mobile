@@ -37,7 +37,7 @@ real boundary is part of the risk.
 | Mobile component | Rendered public UI behavior with native rendering boundaries replaced | Navigation, timers, filters, settings, injected sync/notification clients, board callback wiring | `pnpm mobile:test` |
 | Interaction Lab | Browser design alignment and living UI documentation using real shared React Native components | Responsive layout, copy, hierarchy, deterministic page/state flows, Board Placeholder callbacks | `pnpm mobile:storybook` |
 | Mobile Detox | Full app, real simulator, real writable SQLite, real native rendering/modules | Critical journeys, relaunch persistence, chessboard gestures, Stockfish, screenshots | `pnpm mobile:e2e:test:ios` |
-| Release/manual native | External account and physical-device acceptance | Real iCloud account/container, delivered notification taps, TestFlight upgrade, device-specific behavior | Release runbook |
+| Release/manual native | Optional external-account or hardware diagnosis | Real iCloud account/container, delivered notification taps, TestFlight upgrade, device-specific behavior | Platform runbook |
 
 `pnpm test:e2e` runs the CLI process tests. It does not run the mobile GUI
 suite. The mobile GUI suite is built and run with
@@ -51,7 +51,7 @@ Use distinct gates instead of treating every PR as a release candidate:
 | --- | --- | --- |
 | Pull request | Prove the changed behavior at the cheapest reliable layer | Path-scoped fast CI; native validation only for native-impacting changes |
 | Local iOS native | Prove simulator and native behavior without a hosted Xcode build | One local build followed by the selected Detox scope |
-| Release candidate | Prove the exact source tree intended for distribution | Exact-head fast checks, risk-scoped local native validation, and owner physical-device smoke |
+| Release candidate | Prove the exact source tree intended for distribution | Exact-head fast checks, risk-scoped CI/simulator/emulator validation, and signed-artifact checks |
 
 Every PR must pass its relevant unit, integration, CLI E2E, component, and
 typecheck jobs. GitHub workflow path filters select the applicable fast jobs.
@@ -102,20 +102,22 @@ fail-closed runner is `pnpm mobile:validate:android:matrix`, and
 
 Before any release, run exact-head fast checks and select the same no-native,
 targeted, or full scope used for PRs. An ordinary delta does not rerun complete
-Detox; the owner installs the candidate and performs the documented smoke on a
-physical device. Run one affected suite for targeted risk and both suites only
-for broad native risk. Passing native evidence may be reused after a later
-commit or squash merge when a documented diff confirms that the
+Detox and does not require physical-device installation. Run one
+affected simulator/emulator suite for targeted risk and both suites only for
+broad native risk. Passing native evidence may be reused after a later commit
+or squash merge when a documented diff confirms that the
 validation-relevant development inputs listed above are unchanged; the commit
 SHA and full Git tree may differ. Record the tested and candidate SHAs plus the
 comparison. Real CloudKit, notification delivery, TestFlight upgrade,
 schema-upgrade, compatibility-matrix, and App Store screenshot checks remain
-conditional gates when that boundary changed or the store reports a problem.
+conditional platform checks when that boundary changed or the store reports a
+problem.
 
-Android physical ARM64 checks are owner-recorded release evidence, not a
-routine feature-PR gate. They cover install, real board input, Stockfish
-lifecycle, background/resume, reminders, backup-sensitive storage, and upgrade
-behavior for the exact release candidate.
+Physical-device checks are optional diagnostic evidence, not a feature-PR or
+release gate. They may help diagnose install, real board input, Stockfish
+lifecycle, background/resume, reminders, backup-sensitive storage, CloudKit,
+notification delivery, or upgrade behavior, but store submission and APK
+mirroring do not wait for them.
 
 ## What Must Be Exhaustive
 
@@ -236,11 +238,12 @@ branch when those behaviors are already proven below the native boundary.
 
 - CI must use maintained deterministic fakes or native launch fixtures for
   notification and CloudKit states.
-- Real iCloud account/container behavior must be checked in staging or on a
-  signed physical/TestFlight build. Simulator CI must not depend on a logged-in
-  personal account.
-- Real notification delivery and tap routing should receive a physical-device
-  release smoke check. CI should not wait for wall-clock notification delivery
+- Real iCloud account/container behavior may receive an optional staging or
+  signed physical/TestFlight diagnostic check. Simulator CI must not depend on
+  a logged-in personal account and remains the release gate.
+- Real notification delivery and tap routing may receive an optional
+  physical-device diagnostic check, but deterministic CI/native fixtures are
+  the release gate. CI should not wait for wall-clock notification delivery
   when the scheduling and routing ports can be tested deterministically.
 
 ## Deterministic E2E Data
@@ -424,13 +427,13 @@ test both compatibility contracts deliberately.
 | Repository/store behavior | Real SQLite integration tests, `pnpm test:integration`; targeted mobile persistence spec only when adapter wiring changed | Release persistence check when changed |
 | SQLite schema or migration | Released-fixture migration matrix and rollback/idempotency checks | Native upgrade smoke before release |
 | CLI command or protocol | `pnpm test:e2e`; no mobile Detox | None unless a mobile boundary also changed |
-| React Native copy, state, styling, accessibility, or wiring | Focused component tests, `pnpm mobile:test`, `pnpm mobile:typecheck`; no mobile Detox by default | Owner delta smoke |
-| JavaScript/TypeScript navigation or cross-component journey | Component coverage plus applicable integration tests; no mobile Detox | Owner delta smoke; native suite only if the release has native risk |
-| JavaScript/TypeScript chessboard presentation, animation, or adaptive layout | Focused component/Interaction Lab coverage; optional simulator inspection, not a native gate | Owner delta smoke |
+| React Native copy, state, styling, accessibility, or wiring | Focused component tests, `pnpm mobile:test`, `pnpm mobile:typecheck`; no mobile Detox by default | Exact-head fast release checks |
+| JavaScript/TypeScript navigation or cross-component journey | Component coverage plus applicable integration tests; no mobile Detox | Targeted simulator/emulator suite only if the release has native risk |
+| JavaScript/TypeScript chessboard presentation, animation, or adaptive layout | Focused component/Interaction Lab coverage; optional simulator inspection, not a native gate | Risk-scoped simulator/emulator evidence |
 | Native bridge/adapter, native dependency, platform project, or native persistence integration | Targeted native spec or suite | Reuse while validation-relevant development inputs are unchanged; otherwise rerun the targeted scope |
 | App startup, shared native wiring, native launch fixtures, platform build configuration, or Detox infrastructure | Full `flows` and `practice` | Full release scope while that risk is present |
 | CloudKit behavior | Fake transport integration; targeted native validation only when adapter wiring changed | Signed staging/manual release validation |
-| Notification scheduling/routing | Fake/native fixture tests; targeted native validation only when routing changed | Physical-device release smoke |
+| Notification scheduling/routing | Fake/native fixture tests; targeted native validation only when routing changed | Optional physical-device diagnosis after automated validation |
 
 ## Completion Checklist
 

@@ -273,13 +273,13 @@ check(
 );
 
 check(
-  "TestFlight QA checklist is explicit about real-device execution",
-  testFlightQa.includes("Do not count simulator-only testing") &&
-    testFlightQa.includes("physical iPhone") &&
+  "TestFlight physical-device diagnostics are explicitly optional",
+  testFlightQa.includes("not an App Store release gate") &&
+    testFlightQa.includes("not required") &&
     testFlightQa.includes("App Store Connect build") &&
     testFlightQa.includes("Result | Pending") &&
-    testFlightQa.includes("Completion Rule"),
-  "TESTFLIGHT_QA.md must keep the real TestFlight pass separate from simulator preflight evidence."
+    testFlightQa.includes("Release Rule"),
+  "TESTFLIGHT_QA.md must keep physical-device diagnostics optional and CI/simulator validation release-authoritative."
 );
 
 check(
@@ -332,11 +332,6 @@ manualGate(
   "Capture final sanitized App Store screenshots",
   "Use a release or production-like build for the 6.9-inch, 6.1-inch, and required iPad screenshot sets in docs/STORE_ASSETS.md, then run pnpm app-store:screenshot-audit before upload."
 );
-manualGate(
-  "Execute the internal TestFlight physical-device pass",
-  `Upload the build to App Store Connect, distribute it to Internal ${iosReleaseIdentity.version} QA, install from TestFlight on the owner's physical iPhone, and fill docs/TESTFLIGHT_QA.md evidence. Add an iPad for first launch, adaptive-layout changes, or other broad native risk.`
-);
-
 const failed = checks.filter((entry) => entry.status === "fail");
 const result = {
   status: failed.length === 0 ? "pass" : "fail",

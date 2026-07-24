@@ -13,10 +13,10 @@ The repository contains the React Native app shell (`apps/mobile`), the browser-
 - [App Store Assets](docs/STORE_ASSETS.md) — current App Store metadata and screenshot capture plan
 - [Release Notes](docs/RELEASE_NOTES.md) — per-binary customer-facing notes, review, and publication contract
 - [App Store Upload](docs/APP_STORE_UPLOAD.md) — owner-executed archive and App Store Connect upload runbook
-- [TestFlight QA](docs/TESTFLIGHT_QA.md) — internal TestFlight pass checklist and evidence log
+- [TestFlight Diagnostics](docs/TESTFLIGHT_QA.md) — optional post-build device diagnostics and evidence log
 - [Privacy Policy](docs/PRIVACY_POLICY.md) — current data, user-controllable iCloud Sync, Android backup, and tracking disclosure
 - [iOS Device Targets](docs/DEVICE_TARGETS.md) — iPhone+iPad adaptive orientation release target
-- [Android Validation](docs/ANDROID_VALIDATION.md) — exact-head API, adaptive, backup, and physical-device evidence contract
+- [Android Validation](docs/ANDROID_VALIDATION.md) — exact-head API, adaptive, backup, and optional hardware-diagnostic evidence contract
 - [UI Flow Design Gate](docs/agents/ui-flow-design.md) — required Storybook-first approval workflow for new UI flows
 - [Android Play Release](docs/ANDROID_PLAY_RELEASE.md) — signed AAB and owner-only Play readiness runbook
 - [Android Play Listing](docs/ANDROID_PLAY_LISTING.md) — truthful English listing, device, permission, privacy, and Data safety contract
@@ -116,7 +116,7 @@ pnpm app-store:release-manifest
 ```
 
 The preflight command reports repository checks that must pass and the manual
-App Store gates that still require owner or device execution. The signing
+App Store gates that still require external account execution. The signing
 readiness command checks the local Apple Developer Team ID, Xcode command line
 tools, and available Apple distribution signing identities before archive. The
 third-party audit checks that `THIRD_PARTY_NOTICES.md` matches the final

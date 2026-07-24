@@ -312,8 +312,8 @@ JavaScript contract with the shared engine source.
 - Prevent engine work or native callbacks from blocking the React Native UI
   thread or surviving a destroyed bridge.
 - Record fixed-position parity and practical analysis latency on the API 36
-  emulator and a physical ARM64 phone; investigate material platform drift
-  rather than encoding an arbitrary benchmark target.
+  emulator; an optional physical ARM64 run may diagnose material platform drift
+  without becoming a release gate.
 
 **Acceptance:** The shared native-engine behavior suite passes on iOS and
 Android; Analysis and Review use the real engine; cancellation and repeated
@@ -321,8 +321,9 @@ open/close cycles leak neither workers nor callbacks; the 16 KB release image
 launches without compatibility mode.
 
 **Validation:** Native unit/integration tests, Android fixed-position and
-cancellation tests, targeted `practice` Detox, one physical-device engine
-smoke, release artifact ABI/alignment inspection, and an iOS regression build.
+cancellation tests, targeted `practice` Detox, release artifact ABI/alignment
+inspection, and an iOS regression build. Physical-device engine testing is
+optional diagnostics.
 
 ### ANDROID-07 — Implement Android review reminders
 
@@ -351,9 +352,9 @@ reboot/timezone rescheduling does not duplicate notifications; tapping a
 notification opens the intended Review surface.
 
 **Validation:** Core reminder tests, fake scheduler/client behavior tests,
-Android native fixture tests, targeted `flows` Detox for routing, and a physical
-device scheduling/permission smoke. Doze delay is recorded as expected platform
-behavior, not a failure of exact delivery.
+Android native fixture tests, and targeted `flows` Detox for routing. An
+optional physical-device scheduling/permission diagnostic may record Doze delay
+as expected platform behavior, not a failure of exact delivery.
 
 ### ANDROID-08 — Enable restricted Android backup and device transfer
 
@@ -423,8 +424,8 @@ screenshot inspection.
 ### ANDROID-10 — Complete the Android E2E and release-validation matrix
 
 **Status:** Automated in `Mobile Android` and documented in
-`docs/ANDROID_VALIDATION.md`. Physical ARM64 execution remains owner-recorded
-release evidence at #200 and #188.
+`docs/ANDROID_VALIDATION.md`. Physical ARM64 execution remains optional
+diagnostic evidence at #200 and #188.
 
 **Depends on:** ANDROID-04, ANDROID-06, ANDROID-07, ANDROID-08, and ANDROID-09
 
@@ -442,8 +443,8 @@ gates without duplicating product-journey intent.
 - Add an API 24 phone smoke for launch, practice, persistence, migration, and a
   bounded packaged native-engine check.
 - Add API 36 tablet and foldable adaptive-layout smoke and screenshots.
-- Require a physical ARM64 phone smoke for Stockfish, notifications, backup,
-  and upgrade installation before release.
+- Preserve an optional physical ARM64 diagnostic checklist for Stockfish,
+  notifications, backup, and upgrade investigations without blocking release.
 - Record commit SHA, build result, commands, scope, results, artifact links, and
   clean-worktree confirmation. A later validation-relevant development change
   invalidates native evidence.
@@ -504,15 +505,20 @@ Pre-launch Report triage, Data Safety/privacy review, license/source checks,
 ### ANDROID-12 — Simplified post-Play APK mirror
 
 **Status:** Reframed by ADR-0009. Google Play remains the primary binary
-channel. After the owner publishes and smoke-tests the Play build, one manual
-CI job downloads the Play-generated universal APK and attaches it with a
+channel. After Play processes the build and exposes its universal APK, one
+manual CI job downloads the Play-generated file and attaches it with a
 SHA-256 checksum to the already-public corresponding-source Release. The job
 does not rebuild, rerun product tests, consume owner evidence, or use separate
 prepare/publish phases. A temporary GitHub token and additional publication
-environments are not release dependencies. Build 6 completed the current Play
-track, owner smoke, and Play-signed GitHub APK mirror on 2026-07-24; the
+environments are not release dependencies. The current policy dispatches this
+job after Play processing without a physical-device prerequisite. Build 6
+completed the current Play track, its then-required owner smoke, and Play-signed
+GitHub APK mirror on 2026-07-24; the
 published build-1/build-4 releases and failed-validation build-2/build-3/
 build-5 records remain immutable historical evidence.
+Build 7 completed the GitHub binary mirror while its Closed testing review
+continued, proving that store review and binary mirroring are independent
+states once the Generated APKs API exposes the artifact.
 
 ### ANDROID-13 — Validate the release candidate and launch
 
@@ -530,21 +536,20 @@ source published on GitHub and proportionate evidence.
 - Run exact-head fast checks and the delta, targeted, or broad native scope for
   the changed boundary. Full Detox, API 24, and adaptive jobs are not automatic
   delta gates.
-- Run the owner physical-device smoke every time; add Stockfish, notification,
-  backup/restore, migration, and upgrade checks only when those boundaries
-  changed.
+- Use CI/simulator/emulator evidence for release approval. Physical-device
+  checks are optional diagnostics and never a recurring gate.
 - Complete Internal/Closed, pre-launch, listing, privacy, and account checks for
   first launch or when Play requires or the corresponding configuration changes.
 - Promote the validated AAB to Production at 100 percent.
 - Confirm the signed-candidate workflow published the matching source Release
-  using the built-in token. After Play publication and device smoke, dispatch
-  the single post-Play APK mirror job.
+  using the built-in token. After Play processing exposes the generated APK,
+  dispatch the single post-Play APK mirror job without waiting for track review.
 - Record the final Play version code, GitHub source Release URL, AAB checksum,
-  exact commit SHA, selected validation scope, and owner device-smoke result.
+  exact commit SHA, and selected validation scope.
 
 **Acceptance:** All risk-scoped gates are green on the exact released commit;
 Play distributes the signed Android build, GitHub publishes its corresponding
-source, the owner device smoke passes, and no known relevant blocker remains.
+source and Play-signed APK, and no known relevant automated blocker remains.
 
 This work package is a release operation and evidence issue, not a feature PR.
 
@@ -556,13 +561,14 @@ This work package is a release operation and evidence issue, not a feature PR.
 | Targeted native PR | Affected Android spec or one affected suite on the exact PR head |
 | Broad native PR | One build plus complete Android `flows` and `practice` on the exact PR head |
 | Nightly `main` | API 36 `x86_64` phone, complete `flows` and `practice` |
-| Delta release candidate | Exact-head fast checks, production-signed AAB/source publication job, and owner physical-device smoke |
-| Targeted release candidate | Delta gates plus the affected Android suite or native/manual boundary |
-| Broad native or first launch | API 36 complete suites; relevant API 24/adaptive/backup checks; full physical ARM64 checklist; applicable Play console evidence |
+| Delta release candidate | Exact-head fast checks and production-signed AAB/source publication job |
+| Targeted release candidate | Delta gates plus the affected Android simulator/emulator suite |
+| Broad native or first launch | API 36 complete suites; relevant API 24/adaptive/backup checks; applicable Play console evidence |
 
 SQLite schema changes still require the released-fixture migration matrix and a
-native upgrade smoke. Android backup rule changes require a real restore. Native
-library changes require ABI, 16 KB, symbol, and physical-device checks.
+simulator/emulator upgrade smoke. Android backup rule changes require
+deterministic restore evidence. Native library changes require ABI, 16 KB, and
+symbol checks. Physical-device execution is optional diagnostic work.
 
 ## Early risk checks
 

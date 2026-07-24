@@ -1,14 +1,15 @@
 ---
 name: chessticize-android-release
-description: Audit, prepare, advance, recover, and complete Chessticize Mobile Android releases across exact source tags, protected signed AABs, Google Play tracks, post-Play APK mirroring, risk-scoped validation, and owner physical-device smoke. Use for release status, local or CI builds, Play readiness, versionCode bumps, source-publication recovery, and launch evidence.
+description: Audit, prepare, advance, recover, and complete Chessticize Mobile Android releases across exact source tags, protected signed AABs, Google Play tracks, post-Play APK mirroring, and risk-scoped CI or emulator validation. Use for release status, local or CI builds, Play readiness, versionCode bumps, source-publication recovery, and launch evidence.
 ---
 
 # Chessticize Android Release
 
-Google Play distributes Android binaries first. GitHub publishes corresponding
-source and mirrors the exact Play-signed universal APK after owner
-acceptance. Treat the signed AAB, annotated tag, source manifest, Play version
-code, mirrored APK, and owner device result as one release identity.
+Google Play processes Android binaries first. GitHub publishes corresponding
+source and mirrors the exact Play-signed universal APK after the Generated APKs
+API exposes it.
+Treat the signed AAB, annotated tag, source manifest, Play version code, and
+mirrored APK as one release identity.
 
 ## Load the authoritative contracts
 
@@ -78,28 +79,28 @@ setup during a strict read-only audit.
    or version change is not a candidate until its own signed AAB exists.
 3. Record commit, annotated tag, package, public version, version code,
    candidate workflow/run/artifact ID, AAB digest, source Release, Play track,
-   and owner device-smoke state.
+   and selected CI or emulator validation state.
 4. Never infer Play state from issue checkboxes. Mark unobserved Console gates
    UNKNOWN.
 
 ## Select the release scope
 
 - **Delta:** bounded JavaScript, copy, styling, test, documentation, or release
-  metadata changes. Require exact-head fast checks, the protected signed
-  AAB/source job, and owner physical-device smoke.
+  metadata changes. Require exact-head fast checks and the protected signed
+  AAB/source job. Do not add a physical-device release gate.
 - **Targeted:** navigation, one multi-screen journey, relaunch persistence,
   board rendering/input, adaptive layout, or one native-module boundary. Add
-  the affected suite or manual native check.
+  the affected CI simulator/emulator suite or deterministic native check.
 - **Full:** startup, shared navigation/storage wiring, schema/migration, global
   fixtures, native build configuration/dependencies, signing/release
   infrastructure, backup, Stockfish, notifications, or unbounded native risk.
-  Run both suites and the applicable compatibility/manual matrix.
+  Run both suites and the applicable automated compatibility matrix.
 
-Every release is installed on the owner's physical device. A delta smoke records
-installed version/build, cold launch, one real Practice completion, and the
-changed behavior. Do not repeat unchanged listing, account, screenshot, closed
-test, pre-launch, size, backup, or compatibility gates unless this is first
-launch, the boundary changed, or Play reports a problem.
+Physical-device execution is optional diagnostic work for this hobby project.
+It is never a recurring release gate, never a prerequisite for the APK mirror,
+and never required solely because a version or build number changed. Do not
+repeat unchanged listing, account, screenshot, closed-test, pre-launch, size,
+backup, or compatibility gates unless this is first launch, the boundary changed, or Play reports a problem.
 
 ## Route the release
 
@@ -109,9 +110,8 @@ launch, the boundary changed, or Play reports a problem.
 | Build candidate | One `android-production` approval produces a verified production-signed AAB, retained source manifest, and public matching source-first Release. |
 | Recover source | The manual recovery workflow authenticates the original candidate artifact and idempotently publishes the same source manifest; no rebuild or token substitution. |
 | Validate | Exact-head fast checks plus the selected delta, targeted, or full scope pass. |
-| Test on device | The Play-delivered candidate passes owner smoke and any changed-boundary checks. |
 | Promote | The same retained AAB/version code advances through the selected Play track; applicable live Console errors are resolved. |
-| Mirror APK | After Play publication and owner smoke, one manual CI job downloads the Play-signed universal APK, verifies identity, and adds it plus SHA-256 to the source Release. |
+| Mirror APK | After Play processing exposes the universal APK, one manual CI job downloads it, verifies identity, and adds it plus SHA-256 to the source Release. Track review may continue independently. |
 
 Both GitHub mutations use the built-in `github.token` with `contents: write`.
 The mirror obtains a short-lived Play token through configured workload identity
@@ -120,9 +120,8 @@ token. Do not add prepare/publish phases or a second APK build.
 
 The Android release is not complete until the mirror workflow succeeds, the
 public Release has exactly the source manifest, Play-signed APK, and checksum,
-and its receipt is retained. A source-only Release remains a valid pre-Play
-state; report `APK mirror pending` whenever owner smoke or mirroring is still
-open.
+and its receipt is retained. A source-only Release remains a valid pre-mirror
+state; report `APK mirror pending` whenever mirroring is still open.
 
 ## Preserve invariants
 
@@ -133,14 +132,14 @@ open.
   and the direct exact-release details/source link.
 - Reuse one retained AAB across every Play track and Production; never rebuild
   between tracks.
-- Publish only the universal APK returned by Play after the owner accepts the
-  Play-delivered release; never publish an upload-key or locally rebuilt APK.
+- Publish only the universal APK returned by the Play Generated APKs API; never
+  publish an upload-key or locally rebuilt APK.
 - Preserve package, versions, upload signing identity, ABIs, 16 KB result,
   license/source assets, symbols, and AAB digest.
 - Keep credentials, signing material, tester identities, private evidence, and
   Console screenshots out of commits and public comments.
-- Do not weaken Google requirements, GPL disclosure, changed-boundary tests, or
-  physical-device acceptance.
+- Do not weaken Google requirements, GPL disclosure, artifact identity, or the
+  selected automated changed-boundary tests.
 
 ## Recover without broadening the protocol
 
@@ -156,13 +155,12 @@ open.
 - Preserve failed runs and report external waits as UNKNOWN or blocked; do not
   hand-edit evidence.
 - A failed APK mirror is retried idempotently against the same Play version
-  code. It does not invalidate the already accepted Play release or trigger a
-  rebuild.
+  code. It does not invalidate the Play candidate or trigger a rebuild.
 
 ## Report completion
 
 Report the exact identity tuple, validation scope and rationale, fast-check
-results, workflow/artifact/source state, owner device result, Play state, and
-remaining owner-only gates. Never report an Android release as complete while
-the required APK mirror is pending. Stop when the requested release outcome is
-proven or the next action needs new owner authority or external waiting.
+results, workflow/artifact/source state, Play state, and remaining external
+gates. Never report an Android release as complete while the required APK
+mirror is pending. Stop when the requested release outcome is proven or the
+next action needs new owner authority or external waiting.
