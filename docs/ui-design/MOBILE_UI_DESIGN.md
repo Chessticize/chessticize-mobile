@@ -487,7 +487,10 @@ New Run behavior:
   in one group; keep Result as the independent `Correct / Wrong` facet. Label
   Review membership `Review queue: All / In queue / Not in queue`.
 - Keep the full Themes facet collapsed when the History filter menu opens.
-  Its disclosure shows `All themes` or the selected count before expanding.
+  Its disclosure names the selected themes in one ellipsized line before
+  expanding. In the applied-filter summary below the view selector, show the
+  theme name for one selection or `{n} themes selected` for multiple
+  selections, including `24 themes selected` when every named theme is checked.
 - Place the expanded advanced-filter region in one bordered container above
   `All / Needs attention`. Keep Themes visually lightweight inside that
   container, without its own full-width card border or background.

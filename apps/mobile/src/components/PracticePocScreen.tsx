@@ -6882,7 +6882,12 @@ function HistoryThemeCatalogFilter({
   selectedThemes: readonly string[];
 }): React.JSX.Element {
   const [expanded, setExpanded] = useState(false);
-  const selectedThemeCount = selectedThemes.filter((theme) => theme !== ALL_THEMES_FILTER).length;
+  const selectedThemeLabels = selectedThemes
+    .filter((theme) => theme !== ALL_THEMES_FILTER)
+    .map(customThemeLabel);
+  const selectedThemeDetail = selectedThemeLabels.length === 0
+    ? "All themes"
+    : selectedThemeLabels.join(" · ");
   return (
     <View style={styles.historyThemeFilterSection} testID="history-theme-filters">
       <Pressable
@@ -6893,10 +6898,16 @@ function HistoryThemeCatalogFilter({
         testID="history-theme-disclosure"
         onPress={() => setExpanded((current) => !current)}
       >
-        <View>
+        <View style={styles.historyThemeDisclosureCopy}>
           <Text style={styles.themeCatalogTitle}>Themes</Text>
-          <Text style={styles.historyThemeSummary}>
-            {selectedThemeCount === 0 ? "All themes" : `${selectedThemeCount} selected`}
+          <Text
+            accessibilityLabel={`Selected themes: ${selectedThemeDetail}`}
+            ellipsizeMode="tail"
+            numberOfLines={1}
+            style={styles.historyThemeSummary}
+            testID="history-theme-selection-detail"
+          >
+            {selectedThemeDetail}
           </Text>
         </View>
         <ChevronGlyph direction={expanded ? "up" : "down"} />
@@ -6987,7 +6998,11 @@ function historyActiveFilterLabels({
   if (sideFilter !== "all") {
     labels.push(sideFilter === "white" ? "White" : "Black");
   }
-  labels.push(...themeFilters.map(customThemeLabel));
+  if (themeFilters.length === 1) {
+    labels.push(customThemeLabel(themeFilters[0]!));
+  } else if (themeFilters.length > 1) {
+    labels.push(`${themeFilters.length} themes selected`);
+  }
   if (unclearOnly) {
     labels.push("Unclear");
   }
@@ -14702,6 +14717,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     minHeight: 44
+  },
+  historyThemeDisclosureCopy: {
+    flex: 1,
+    minWidth: 0,
+    paddingRight: 8
   },
   historyThemeSummary: {
     color: "#64748B",

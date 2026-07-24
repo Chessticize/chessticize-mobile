@@ -23,7 +23,9 @@ Use one persistent, single-select segmented control:
   independent `Correct / Wrong` dimension.
 - Label Review membership `Review queue: All / In queue / Not in queue`.
 - Keep the full Themes catalog collapsed when the menu opens. Its disclosure
-  summary shows `All themes` or the number selected.
+  summary names the selected themes in one ellipsized line. Keep the applied
+  filter summary below the view selector compact: show the theme name for one
+  selection or `{n} themes selected` for multiple selections.
 - When expanded, present all advanced filters inside one bordered region above
   `All / Needs attention`. Themes remains a plain disclosure subsection inside
   that region rather than a second full-width card.
@@ -124,6 +126,9 @@ filter token. It is equivalent to clearing that facet
   `All review states / Queued / Clear`.
 - Themes is collapsed when filters open, retains a compact selection summary,
   and reveals all 24 curated choices on demand.
+- One selected theme appears by name in the applied summary; multiple themes
+  appear once as `{n} themes selected`. Selecting all 24 named themes keeps the
+  disclosure to one line and reads `24 themes selected` below.
 - The expanded filter region has one visible outer boundary and appears above
   the primary History view selector; Themes does not add a nested card boundary.
 - Reset restores `All`, `All sources`, and the default range.

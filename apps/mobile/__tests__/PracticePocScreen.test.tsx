@@ -1033,9 +1033,33 @@ describe("PracticePocScreen", () => {
           && testID !== "history-theme-filters"
           && testID !== "history-theme-all"
           && testID !== "history-theme-disclosure"
+          && testID !== "history-theme-selection-detail"
           && !testID.startsWith("history-theme-filter-rail-"))
     );
     expect(themeTestIDs.size).toBe(24);
+    expect(collectText(findByTestId(renderer, "history-theme-selection-detail"))).toBe(
+      "All themes"
+    );
+
+    for (const themeTestID of themeTestIDs) {
+      press(renderer, themeTestID);
+      expect(historyThemeSelected(
+        renderer,
+        themeTestID.slice("history-theme-".length)
+      )).toBe(true);
+    }
+
+    const selectedThemeDetail = collectText(
+      findByTestId(renderer, "history-theme-selection-detail")
+    );
+    expect(selectedThemeDetail).toContain("Mate in 1");
+    expect(selectedThemeDetail).toContain("Zugzwang");
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain(
+      "24 themes selected"
+    );
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain(
+      "Mate in 1"
+    );
   });
 
   it("limits an existing Custom Run editor to Current ELO", () => {
@@ -4568,10 +4592,27 @@ describe("PracticePocScreen", () => {
     expect(historyThemeSelected(renderer, "all")).toBe(false);
     expect(historyThemeSelected(renderer, "pin")).toBe(true);
     expect(historyThemeSelected(renderer, "promotion")).toBe(true);
-    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Pin");
-    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Promotion");
+    expect(collectText(findByTestId(renderer, "history-theme-selection-detail"))).toBe(
+      "Pin · Promotion"
+    );
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain(
+      "2 themes selected"
+    );
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain("Pin");
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain(
+      "Promotion"
+    );
     press(renderer, "history-theme-pin");
     expect(historyThemeSelected(renderer, "promotion")).toBe(true);
+    expect(collectText(findByTestId(renderer, "history-theme-selection-detail"))).toBe(
+      "Promotion"
+    );
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain(
+      "Promotion"
+    );
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain(
+      "themes selected"
+    );
     press(renderer, "history-theme-promotion");
     expect(historyThemeSelected(renderer, "all")).toBe(true);
     press(renderer, "history-theme-pin");
@@ -4602,8 +4643,12 @@ describe("PracticePocScreen", () => {
     press(renderer, "history-theme-disclosure");
     expect(historyThemeSelected(renderer, "pin")).toBe(true);
     expect(historyThemeSelected(renderer, "promotion")).toBe(true);
-    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Pin");
-    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Promotion");
+    expect(collectText(findByTestId(renderer, "history-theme-selection-detail"))).toBe(
+      "Pin · Promotion"
+    );
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain(
+      "2 themes selected"
+    );
   });
 
   it("renders the compact History quick filters as accessible selectable chips", () => {

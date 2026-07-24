@@ -41,6 +41,13 @@ export const FiltersAndActiveFilters: Story = {
     await clickTestId(canvasElement, "history-filter-toggle");
     await waitForTestId(canvasElement, "history-attention-flags");
     await waitForTestId(canvasElement, "history-theme-disclosure");
+    await clickTestId(canvasElement, "history-theme-disclosure");
+    await clickTestId(canvasElement, "history-theme-pin");
+    await clickTestId(canvasElement, "history-theme-skewer");
+    await clickTestId(canvasElement, "history-theme-promotion");
+    await clickTestId(canvasElement, "history-theme-disclosure");
+    await waitForTestId(canvasElement, "history-theme-selection-detail");
+    (canvasElement.querySelector('[data-testid="history-theme-disclosure"]') as HTMLElement | null)?.blur();
   }
 };
 
