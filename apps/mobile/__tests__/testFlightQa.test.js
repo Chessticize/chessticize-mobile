@@ -14,9 +14,9 @@ const exportOptions = fs.readFileSync(
 
 describe("TestFlight QA checklist", () => {
   it("keeps TestFlight execution honest about external Apple/device requirements", () => {
-    expect(testFlightDoc).toContain("1.2 TestFlight release checklist");
-    expect(testFlightDoc).toContain("Internal 1.2 QA");
-    expect(testFlightDoc).toContain("ios-v1.2.0-build-1");
+    expect(testFlightDoc).toContain("1.2.1 TestFlight release checklist");
+    expect(testFlightDoc).toContain("Internal 1.2.1 QA");
+    expect(testFlightDoc).toContain("ios-v1.2.1-build-1");
     expect(testFlightDoc).toContain("App Store Connect build");
     expect(testFlightDoc).toContain("internal testing group");
     expect(testFlightDoc).toContain("physical iPhone");
@@ -105,7 +105,7 @@ describe("TestFlight QA checklist", () => {
     expect(appStoreUploadDoc).toContain("DEVELOPMENT_TEAM=\"$APPLE_DEVELOPMENT_TEAM\"");
     expect(appStoreUploadDoc).toContain("-exportArchive");
     expect(appStoreUploadDoc).toContain("apps/mobile/ios/ExportOptions.app-store-connect.plist");
-    expect(appStoreUploadDoc).toContain("Internal 1.2 QA");
+    expect(appStoreUploadDoc).toContain("Internal 1.2.1 QA");
     expect(appStoreUploadDoc).toContain("Do not commit keys");
     expect(appStoreUploadDoc).toContain("Signing Troubleshooting");
     expect(appStoreUploadDoc).toContain("requires a development team");

@@ -458,6 +458,26 @@ test("PracticeService builds MemoryStore history view for a required time range 
       nextReviewDay: "2026-06-21"
     }
   ]);
+  assert.equal(service.countHistory({ source: "sprint" }), 1);
+  assert.equal(service.getHistoryAttempt(view.attempts[0]!.id)?.id, view.attempts[0]!.id);
+  assert.equal(service.hasPlayedRatingKey("standard 5/20"), true);
+  assert.deepEqual(service.listPracticeRatingActivity(), [{
+    ratingKey: "standard 5/20",
+    lastPlayedAt: "2026-06-20T12:00:05.000Z"
+  }]);
+  assert.deepEqual(
+    service.getPracticeProgressSummary(
+      new Date("2026-06-21T00:00:00.000Z").getTime(),
+      "standard 5/20"
+    ),
+    {
+      correctThisWeek: 0,
+      accuracyThisWeek: 0,
+      ratingDeltaThisWeek: view.elo[0]!.ratingAfter - view.elo[0]!.ratingBefore,
+      wrongThisWeek: 1,
+      netThisWeek: -1
+    }
+  );
 
   assert.deepEqual(
     service.listPlayedRatings().map((rating) => rating.key),

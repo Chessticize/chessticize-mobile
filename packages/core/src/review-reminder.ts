@@ -26,6 +26,11 @@ const SMART_MIN_SESSIONS = 5;
 const FALLBACK_REMINDER_HOUR = 19;
 const FALLBACK_REMINDER_MINUTE = 0;
 
+export function reviewReminderUsageWindowStart(now: string | number | Date): string {
+  const nowDate = parseDate(now, "now");
+  return new Date(nowDate.getTime() - SMART_HISTORY_DAYS * 24 * 60 * 60 * 1000).toISOString();
+}
+
 export function computeNextReminder(
   queue: Pick<ReviewQueueState, "dueDay">[],
   usageHistory: ReviewReminderUsageEntry[],
@@ -96,7 +101,7 @@ function reminderLocalTime(
 }
 
 function smartReminderHour(usageHistory: ReviewReminderUsageEntry[], now: Date): number | undefined {
-  const windowStartMs = now.getTime() - SMART_HISTORY_DAYS * 24 * 60 * 60 * 1000;
+  const windowStartMs = new Date(reviewReminderUsageWindowStart(now)).getTime();
   const startsBySession = new Map<string, Date>();
 
   usageHistory.forEach((entry, index) => {

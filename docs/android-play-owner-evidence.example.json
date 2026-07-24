@@ -4,22 +4,22 @@
     "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
     "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
     "applicationId": "com.chessticize.mobile",
-    "versionName": "1.2",
-    "versionCode": 6
+    "versionName": "1.2.1",
+    "versionCode": 7
   },
   "sourceRelease": {
     "status": "pending",
     "evidenceId": "REPLACE_WITH_GITHUB_RELEASE_EVIDENCE_ID",
-    "reference": "https://github.com/Chessticize/chessticize-mobile/releases/tag/android-v1.2.0-build-6",
+    "reference": "https://github.com/Chessticize/chessticize-mobile/releases/tag/android-v1.2.1-build-7",
     "candidate": {
       "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
       "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
       "applicationId": "com.chessticize.mobile",
-      "versionName": "1.2",
-      "versionCode": 6
+      "versionName": "1.2.1",
+      "versionCode": 7
     },
     "repositoryUrl": "https://github.com/Chessticize/chessticize-mobile",
-    "tagName": "android-v1.2.0-build-6",
+    "tagName": "android-v1.2.1-build-7",
     "tagCommitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
     "tagType": "pending",
     "releaseId": 0,
@@ -29,9 +29,9 @@
       "releaseAssetId": 0,
       "assetName": "android-source-manifest.json",
       "sha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
-      "reference": "https://github.com/Chessticize/chessticize-mobile/releases/download/android-v1.2.0-build-6/android-source-manifest.json",
+      "reference": "https://github.com/Chessticize/chessticize-mobile/releases/download/android-v1.2.1-build-7/android-source-manifest.json",
       "releaseId": 0,
-      "tagName": "android-v1.2.0-build-6",
+      "tagName": "android-v1.2.1-build-7",
       "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
       "workflowRunId": 0,
       "workflowRunReference": "REPLACE_WITH_HTTPS_WORKFLOW_REFERENCE",
@@ -43,12 +43,12 @@
         "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
-        "versionName": "1.2",
-        "versionCode": 6
+        "versionName": "1.2.1",
+        "versionCode": 7
       }
     },
     "sourceDisclosure": {
-      "releaseNotesReference": "https://github.com/Chessticize/chessticize-mobile/releases/tag/android-v1.2.0-build-6",
+      "releaseNotesReference": "https://github.com/Chessticize/chessticize-mobile/releases/tag/android-v1.2.1-build-7",
       "supportDocumentation": {
         "status": "pending",
         "evidenceId": "REPLACE_WITH_SOURCE_SUPPORT_EVIDENCE_ID",
@@ -58,8 +58,8 @@
           "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
           "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
           "applicationId": "com.chessticize.mobile",
-          "versionName": "1.2",
-          "versionCode": 6
+          "versionName": "1.2.1",
+          "versionCode": 7
         }
       }
     }
@@ -75,8 +75,8 @@
         "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
-        "versionName": "1.2",
-        "versionCode": 6
+        "versionName": "1.2.1",
+        "versionCode": 7
       },
       "workflowRunId": 0,
       "artifactId": 0
@@ -89,8 +89,8 @@
         "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
-        "versionName": "1.2",
-        "versionCode": 6
+        "versionName": "1.2.1",
+        "versionCode": 7
       }
     }
   },
@@ -103,8 +103,8 @@
         "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
-        "versionName": "1.2",
-        "versionCode": 6
+        "versionName": "1.2.1",
+        "versionCode": 7
       }
     },
     "storeListing": {
@@ -115,8 +115,8 @@
         "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
-        "versionName": "1.2",
-        "versionCode": 6
+        "versionName": "1.2.1",
+        "versionCode": 7
       }
     },
     "privacyPolicy": {
@@ -127,8 +127,8 @@
         "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
-        "versionName": "1.2",
-        "versionCode": 6
+        "versionName": "1.2.1",
+        "versionCode": 7
       }
     },
     "dataSafety": {
@@ -139,8 +139,8 @@
         "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
-        "versionName": "1.2",
-        "versionCode": 6
+        "versionName": "1.2.1",
+        "versionCode": 7
       }
     },
     "supportedDevices": {
@@ -151,8 +151,8 @@
         "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
-        "versionName": "1.2",
-        "versionCode": 6
+        "versionName": "1.2.1",
+        "versionCode": 7
       }
     }
   },
@@ -165,8 +165,8 @@
         "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
-        "versionName": "1.2",
-        "versionCode": 6
+        "versionName": "1.2.1",
+        "versionCode": 7
       },
       "track": "internal",
       "releaseId": "REPLACE_IF_RUN"
@@ -179,8 +179,8 @@
         "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
-        "versionName": "1.2",
-        "versionCode": 6
+        "versionName": "1.2.1",
+        "versionCode": 7
       },
       "track": "closed",
       "releaseId": "REPLACE_IF_RUN"
@@ -193,8 +193,8 @@
         "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
-        "versionName": "1.2",
-        "versionCode": 6
+        "versionName": "1.2.1",
+        "versionCode": 7
       },
       "reportId": "REPLACE_WITH_REPORT_ID"
     },
@@ -206,8 +206,8 @@
         "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
-        "versionName": "1.2",
-        "versionCode": 6
+        "versionName": "1.2.1",
+        "versionCode": 7
       },
       "runId": 0,
       "artifactIds": []
@@ -221,8 +221,8 @@
       "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
       "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
       "applicationId": "com.chessticize.mobile",
-      "versionName": "1.2",
-      "versionCode": 6
+      "versionName": "1.2.1",
+      "versionCode": 7
     },
     "rolloutPercentage": 0,
     "launched": false,
@@ -237,8 +237,8 @@
         "commitSha": "REPLACE_WITH_EXACT_40_CHARACTER_SHA",
         "aabSha256": "REPLACE_WITH_EXACT_64_CHARACTER_SHA256",
         "applicationId": "com.chessticize.mobile",
-        "versionName": "1.2",
-        "versionCode": 6
+        "versionName": "1.2.1",
+        "versionCode": 7
       },
       "universalApkBytes": 0,
       "arm64ApkBytes": 0,

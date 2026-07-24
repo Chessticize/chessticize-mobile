@@ -13,7 +13,7 @@ import {
   sideToMoveForHistoryPuzzle,
   validateHistoryQuery
 } from "../src/index.ts";
-import type { HistoryAttemptView, Puzzle } from "../src/index.ts";
+import type { HistoryAttemptView, Puzzle, ReviewQueueState } from "../src/index.ts";
 
 test("history query accepts optional ratingKey and resolves supported time ranges", () => {
   assert.deepEqual(resolveHistoryRange("2026-06-21T12:00:00.000Z", "7d"), {
@@ -396,6 +396,52 @@ test("history performance and puzzle stats use the full filtered range, not the 
   );
 });
 
+test("history performance keeps exact summaries while bounding display series", () => {
+  const attemptCount = 600;
+  const chronologicalAttempts = Array.from({ length: attemptCount }, (_, index) => attempt({
+    id: `a${index}`,
+    puzzleId: `p${index}`,
+    result: index % 2 === 0 ? "correct" : "wrong",
+    completedAt: new Date(Date.UTC(2026, 0, 1, 0, 0, index)).toISOString()
+  }));
+  const view = buildHistoryView({
+    query: {
+      now: "2026-06-21T12:00:00.000Z",
+      timeRange: "max",
+      ratingKey: "standard 5/20",
+      page: { limit: 20 }
+    },
+    ratingKeys: [],
+    attempts: [...chronologicalAttempts].reverse(),
+    elo: chronologicalAttempts.map((attemptView, index) => ({
+      sessionId: `s${index}`,
+      completedAt: attemptView.completedAt,
+      ratingBefore: 600 + index,
+      ratingAfter: 601 + index
+    })),
+    reviews: []
+  });
+
+  assert.equal(view.performance.correctCount, 300);
+  assert.equal(view.performance.wrongCount, 300);
+  assert.equal(view.performance.accuracyPercent, 50);
+  for (const points of Object.values(view.performance.charts)) {
+    assert.equal(points.length, 512);
+  }
+  assert.deepEqual(view.performance.charts.rating[0], {
+    key: `s0-${chronologicalAttempts[0]!.completedAt}-0`,
+    value: 601,
+    completedAt: chronologicalAttempts[0]!.completedAt
+  });
+  assert.deepEqual(view.performance.charts.rating.at(-1), {
+    key: `s599-${chronologicalAttempts[599]!.completedAt}-599`,
+    value: 1200,
+    completedAt: chronologicalAttempts[599]!.completedAt
+  });
+  assert.equal(view.performance.charts.solved[0]?.value, 1);
+  assert.equal(view.performance.charts.solved.at(-1)?.value, 300);
+});
+
 test("unknown persisted results remain readable but stay out of filters, stats, and performance charts", () => {
   const wrong = attempt({ id: "wrong", puzzleId: "wrong-puzzle", result: "wrong", completedAt: "2026-06-20T00:00:00.000Z" });
   const correct = attempt({ id: "correct", puzzleId: "correct-puzzle", result: "correct", completedAt: "2026-06-20T00:01:00.000Z" });
@@ -486,6 +532,42 @@ test("history view filters speed and review status before paging", () => {
   );
   assert.equal(historyAttemptHasReviewQueued(attempts[0] as HistoryAttemptView, reviews), false);
   assert.equal(historyAttemptHasReviewQueued(attempts[2] as HistoryAttemptView, reviews), true);
+});
+
+test("history review-status filtering indexes a large queue once", () => {
+  const itemCount = 400;
+  let reviewPuzzleIdReads = 0;
+  const reviews: ReviewQueueState[] = Array.from({ length: itemCount }, (_, index) => ({
+    get puzzleId() {
+      reviewPuzzleIdReads += 1;
+      return `p${index}`;
+    },
+    mode: "standard",
+    ratingKey: "standard 5/20",
+    dueDay: "2026-06-21",
+    intervalDays: 1,
+    reviewCount: 1,
+    successStreak: 0,
+    lapseCount: 1,
+    lastResult: "wrong",
+    lastReviewedAt: "2026-06-20T00:00:00.000Z"
+  }));
+  const attempts = Array.from({ length: itemCount }, (_, index) => attempt({
+    id: `a${index}`,
+    puzzleId: `p${itemCount - 1}`,
+    result: "wrong",
+    completedAt: new Date(Date.UTC(2026, 0, 1, 0, 0, index)).toISOString()
+  }));
+
+  assert.equal(
+    filterHistoryAttemptsForQuery({
+      attempts,
+      query: { reviewStatus: "queued" },
+      reviews
+    }).length,
+    itemCount
+  );
+  assert.equal(reviewPuzzleIdReads, itemCount);
 });
 
 test("history query validates optional puzzle rating bounds", () => {

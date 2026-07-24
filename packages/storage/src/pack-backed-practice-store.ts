@@ -139,8 +139,28 @@ export class PackBackedPracticeStore implements PracticeStore {
     return this.userStore.setAttemptUnclear(attemptId, unclear, updatedAt);
   }
 
+  getAttempt(attemptId: string): AttemptHistoryRow | undefined {
+    return this.userStore.getAttempt(attemptId);
+  }
+
+  countAttempts(filter?: HistoryFilter): number {
+    return this.userStore.countAttempts(filter);
+  }
+
   listAttempts(filter?: HistoryFilter): AttemptHistoryRow[] {
     return this.userStore.listAttempts(filter);
+  }
+
+  getPracticeProgressSummary(nowMs: number, ratingKey: string) {
+    return this.userStore.getPracticeProgressSummary(nowMs, ratingKey);
+  }
+
+  listPracticeRatingActivity() {
+    return this.userStore.listPracticeRatingActivity();
+  }
+
+  hasPlayedRatingKey(ratingKey: string): boolean {
+    return this.userStore.hasPlayedRatingKey(ratingKey);
   }
 
   listSprintSessions(): ExportedSprintSession[] {

@@ -120,6 +120,8 @@ export interface HistoryPerformance {
   charts: Record<HistoryPerformanceMetric, HistoryPerformancePoint[]>;
 }
 
+const HISTORY_PERFORMANCE_POINT_LIMIT = 512;
+
 export interface HistoryView {
   query: HistoryQuery;
   range: HistoryResolvedRange;
@@ -444,6 +446,13 @@ export function filterHistoryAttemptsForQuery(input: {
     : input.query.attentionOnly
       ? ALL_HISTORY_ATTENTION_FLAGS
       : [];
+  const queuedReviewKeys = input.query.reviewStatus === undefined
+    ? null
+    : new Set(
+        input.reviews
+          .filter((review) => review.dueDay.length > 0)
+          .map(historyAttemptReviewKey)
+      );
   return input.attempts
     .filter((attempt) => !input.query.result || normalizeHistoryOutcome(attempt.result) === input.query.result)
     .filter((attempt) => !input.query.source || normalizeHistorySource(attempt.source) === input.query.source)
@@ -459,10 +468,17 @@ export function filterHistoryAttemptsForQuery(input: {
       effectiveAttentionFlags.some((flag) => historyAttemptMatchesAttentionFlag(attempt, flag))
     )
     .filter((attempt) => {
-      if (input.query.reviewStatus === undefined) {
+      if (input.query.reviewStatus === undefined || queuedReviewKeys === null) {
         return true;
       }
-      const queued = historyAttemptHasReviewQueued(attempt, input.reviews);
+      const detail = normalizeHistoryAttemptDetail(attempt);
+      const queued = detail.result === "wrong" && detail.mode !== null && detail.ratingKey !== null
+        ? queuedReviewKeys.has(historyAttemptReviewKey({
+            puzzleId: attempt.puzzleId,
+            mode: detail.mode,
+            ratingKey: detail.ratingKey
+          }))
+        : false;
       return input.query.reviewStatus === "queued" ? queued : !queued;
     });
 }
@@ -583,15 +599,22 @@ export function buildHistoryPerformance(
   puzzleStats: HistoryPuzzleStats[]
 ): HistoryPerformance {
   const classifiedAttempts = partitionHistoryAttemptsByResult(attempts);
-  const correctCount = classifiedAttempts.filter(({ result }) => result === "correct").length;
-  const wrongCount = classifiedAttempts.filter(({ result }) => result === "wrong").length;
+  let correctCount = 0;
+  let wrongCount = 0;
+  for (const { result } of classifiedAttempts) {
+    if (result === "correct") {
+      correctCount += 1;
+    } else {
+      wrongCount += 1;
+    }
+  }
   const total = Math.max(1, correctCount + wrongCount);
   return {
     correctCount,
     wrongCount,
     accuracyPercent: Math.round((correctCount / total) * 100),
     charts: {
-      rating: elo.map((point, index) => ({
+      rating: sampleHistoryPerformancePoints(elo, (point, index) => ({
         key: `${point.sessionId}-${point.completedAt}-${index}`,
         value: point.ratingAfter,
         completedAt: point.completedAt
@@ -600,7 +623,7 @@ export function buildHistoryPerformance(
       accuracy: buildAttemptPerformanceChart(classifiedAttempts, "accuracy"),
       solved: buildAttemptPerformanceChart(classifiedAttempts, "solved"),
       "mistake-rate": buildAttemptPerformanceChart(classifiedAttempts, "mistake-rate"),
-      "review-due": puzzleStats.map((stats, index) => ({
+      "review-due": sampleHistoryPerformancePoints(puzzleStats, (stats, index) => ({
         key: `${historyAttemptReviewKey(stats)}-${index}`,
         value: (stats.nextReviewDay ? 1 : 0) + Math.max(0, stats.wrongCount - stats.correctCount)
       }))
@@ -668,11 +691,18 @@ function buildAttemptPerformanceChart(
 ): HistoryPerformancePoint[] {
   let correct = 0;
   let wrong = 0;
-  return [...attempts].reverse().map(({ attempt, result }, index) => {
+  const chronologicalAttempts = [...attempts].reverse();
+  const sampleIndexes = historyPerformanceSampleIndexes(chronologicalAttempts.length);
+  const points: HistoryPerformancePoint[] = [];
+  let sampleCursor = 0;
+  chronologicalAttempts.forEach(({ attempt, result }, index) => {
     if (result === "correct") {
       correct += 1;
     } else {
       wrong += 1;
+    }
+    if (sampleIndexes[sampleCursor] !== index) {
+      return;
     }
     const total = Math.max(1, correct + wrong);
     const value = metric === "wins-losses"
@@ -682,11 +712,36 @@ function buildAttemptPerformanceChart(
         : metric === "mistake-rate"
           ? Math.round((wrong / total) * 100)
           : correct;
-    return {
+    points.push({
       key: `${attempt.id}-${index}`,
       value
-    };
+    });
+    sampleCursor += 1;
   });
+  return points;
+}
+
+function sampleHistoryPerformancePoints<T>(
+  items: T[],
+  pointFor: (item: T, index: number) => HistoryPerformancePoint
+): HistoryPerformancePoint[] {
+  return historyPerformanceSampleIndexes(items.length).map((index) => pointFor(items[index]!, index));
+}
+
+function historyPerformanceSampleIndexes(length: number): number[] {
+  if (length <= HISTORY_PERFORMANCE_POINT_LIMIT) {
+    return Array.from({ length }, (_, index) => index);
+  }
+  const indexes: number[] = [];
+  let previous = -1;
+  for (let sample = 0; sample < HISTORY_PERFORMANCE_POINT_LIMIT; sample += 1) {
+    const index = Math.round(sample * (length - 1) / (HISTORY_PERFORMANCE_POINT_LIMIT - 1));
+    if (index !== previous) {
+      indexes.push(index);
+      previous = index;
+    }
+  }
+  return indexes;
 }
 
 function collectThemes(attempts: HistoryAttemptView[]): string[] {

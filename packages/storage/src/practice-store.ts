@@ -18,6 +18,7 @@ import type {
 import { isReviewDay, reviewDayFor } from "../../core/src/index.ts";
 import type { HistoryQuery, HistoryView, ReviewReminderSettings } from "../../core/src/index.ts";
 import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./query-types.ts";
+import type { PracticeProgressSummary } from "./rating-history.ts";
 
 export interface ClearLocalHistoryResult {
   attempts: number;
@@ -96,6 +97,11 @@ export interface ReviewQueueDuePromotionResult {
   dueDay?: string;
 }
 
+export interface PracticeRatingActivity {
+  ratingKey: string;
+  lastPlayedAt: string;
+}
+
 export interface PracticeStore {
   seedPuzzles(puzzles: Puzzle[]): void;
   countPuzzles(filter?: PuzzleSelectionFilter): number;
@@ -119,7 +125,12 @@ export interface PracticeStore {
   updateSprintSession(state: SprintState): void;
   recordAttempt(attempt: AttemptEvent): void;
   setAttemptUnclear(attemptId: string, unclear: boolean, updatedAt: string): AttemptHistoryRow;
+  getAttempt(attemptId: string): AttemptHistoryRow | undefined;
+  countAttempts(filter?: HistoryFilter): number;
   listAttempts(filter?: HistoryFilter): AttemptHistoryRow[];
+  getPracticeProgressSummary(nowMs: number, ratingKey: string): PracticeProgressSummary;
+  listPracticeRatingActivity(): PracticeRatingActivity[];
+  hasPlayedRatingKey(ratingKey: string): boolean;
   listSprintSessions(): ExportedSprintSession[];
   exportLocalData(): LocalDataExport;
   importLocalData(data: LocalDataImport): LocalDataImportResult;

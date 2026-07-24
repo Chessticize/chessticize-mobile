@@ -54,6 +54,7 @@ import type {
   LocalDataImport,
   LocalDataImportResult,
   LocalDataExport,
+  PracticeRatingActivity,
   PracticeSettings,
   PracticeStore,
   ReviewQueueDuePromotionResult
@@ -63,6 +64,7 @@ import { clonePracticeSettings, defaultPracticeSettings, normalizeReviewReminder
 import { selectUniquePuzzles } from "./puzzle-selection.ts";
 import { preferredSprintSession, sameSprintSession } from "./sprint-session-sync.ts";
 import { assignLegacyRatingGenerations } from "./rating-history.ts";
+import type { PracticeProgressSummary } from "./rating-history.ts";
 import type { ReviewReminderPreference } from "./practice-store.ts";
 import type { ReviewReminderSettings } from "../../core/src/index.ts";
 import { cloneAttemptHistoryRow, preferredAttemptHistoryRow, sameAttemptHistoryRow } from "./attempt-sync.ts";
@@ -161,6 +163,20 @@ interface ReviewRow {
   last_result: AttemptResult | null;
   last_reviewed_at: string | null;
   enrolled_at: string | null;
+}
+
+interface DueReviewItemDbRow extends PuzzleRow {
+  review_puzzle_id: string;
+  review_mode: SprintMode;
+  review_rating_key: string;
+  review_due_day: string;
+  review_interval_days: number;
+  review_count: number;
+  review_success_streak: number;
+  review_lapse_count: number;
+  review_last_result: AttemptResult | null;
+  review_last_reviewed_at: string | null;
+  review_enrolled_at: string | null;
 }
 
 interface ReviewRemovalRow {
@@ -726,6 +742,43 @@ export class SyncSQLiteStore implements PracticeStore {
     return cloneAttemptHistoryRow(next);
   }
 
+  getAttempt(attemptId: string): AttemptHistoryRow | undefined {
+    return this.attemptById(attemptId);
+  }
+
+  countAttempts(filter: HistoryFilter = {}): number {
+    const clauses: string[] = [];
+    const params: SyncSqliteValue[] = [];
+    if (filter.source !== undefined) {
+      clauses.push("source = ?");
+      params.push(filter.source);
+    }
+    if (filter.result !== undefined) {
+      clauses.push("result = ?");
+      params.push(filter.result);
+    }
+    if (filter.mode !== undefined) {
+      clauses.push("mode = ?");
+      params.push(filter.mode);
+    }
+    if (filter.since !== undefined) {
+      clauses.push("completed_at >= ?");
+      params.push(filter.since);
+    }
+    if (filter.puzzleId !== undefined) {
+      clauses.push("puzzle_id = ?");
+      params.push(filter.puzzleId);
+    }
+    if (filter.sessionId !== undefined) {
+      clauses.push("session_id = ?");
+      params.push(filter.sessionId);
+    }
+    const where = clauses.length === 0 ? "" : `WHERE ${clauses.join(" AND ")}`;
+    return (
+      this.db.prepare(`SELECT COUNT(*) AS count FROM attempts ${where}`).get(...params) as { count: number }
+    ).count;
+  }
+
   listAttempts(filter: HistoryFilter = {}): AttemptHistoryRow[] {
     const clauses: string[] = [];
     const params: SyncSqliteValue[] = [];
@@ -785,6 +838,93 @@ export class SyncSQLiteStore implements PracticeStore {
       .all(...params) as AttemptHistoryDbRow[];
 
     return rows.map(attemptHistoryRowFromDbRow);
+  }
+
+  getPracticeProgressSummary(nowMs: number, ratingKey: string): PracticeProgressSummary {
+    const until = new Date(nowMs).toISOString();
+    const since = new Date(nowMs - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const attemptSummary = this.db
+      .prepare(
+        `SELECT
+          SUM(CASE WHEN result = 'correct' THEN 1 ELSE 0 END) AS correct_count,
+          SUM(CASE WHEN result = 'correct' THEN 0 ELSE 1 END) AS wrong_count
+         FROM attempts
+         WHERE rating_key = ? AND completed_at >= ? AND completed_at <= ?`
+      )
+      .get(ratingKey, since, until) as { correct_count: number | null; wrong_count: number | null };
+    const sessionSummary = this.db
+      .prepare(
+        `SELECT
+          COUNT(*) AS rated_sprint_count,
+          SUM(rating_after - rating_before) AS rating_delta
+         FROM sprint_sessions
+         WHERE rating_key = ?
+           AND completed_at >= ?
+           AND completed_at <= ?
+           AND rating_after IS NOT NULL`
+      )
+      .get(ratingKey, since, until) as { rated_sprint_count: number; rating_delta: number | null };
+    const correctThisWeek = attemptSummary.correct_count ?? 0;
+    const wrongThisWeek = attemptSummary.wrong_count ?? 0;
+    return {
+      correctThisWeek,
+      accuracyThisWeek: correctThisWeek + wrongThisWeek === 0
+        ? null
+        : Math.round((correctThisWeek / (correctThisWeek + wrongThisWeek)) * 100),
+      ratingDeltaThisWeek: sessionSummary.rated_sprint_count === 0
+        ? null
+        : sessionSummary.rating_delta ?? 0,
+      wrongThisWeek,
+      netThisWeek: correctThisWeek - wrongThisWeek
+    };
+  }
+
+  listPracticeRatingActivity(): PracticeRatingActivity[] {
+    return this.db
+      .prepare(
+        `SELECT rating_key AS ratingKey, MAX(played_at) AS lastPlayedAt
+         FROM (
+           SELECT COALESCE(a.rating_key, s.rating_key) AS rating_key, a.completed_at AS played_at
+           FROM attempts a
+           LEFT JOIN sprint_sessions s ON s.id = a.session_id
+           UNION ALL
+           SELECT rating_key, COALESCE(completed_at, started_at) AS played_at
+           FROM sprint_sessions
+           UNION ALL
+           SELECT key AS rating_key, '' AS played_at
+           FROM ratings
+           GROUP BY key
+           HAVING SUM(games) > 0
+         )
+         WHERE rating_key IS NOT NULL
+         GROUP BY rating_key
+         ORDER BY lastPlayedAt DESC, ratingKey ASC`
+      )
+      .all() as PracticeRatingActivity[];
+  }
+
+  hasPlayedRatingKey(ratingKey: string): boolean {
+    const row = this.db
+      .prepare(
+        `SELECT (
+           EXISTS(
+             SELECT 1
+             FROM attempts a
+             JOIN sprint_sessions s ON s.id = a.session_id
+             WHERE a.source = 'sprint'
+               AND (a.rating_key = ? OR (a.rating_key IS NULL AND s.rating_key = ?))
+             LIMIT 1
+           )
+           OR EXISTS(
+             SELECT 1
+             FROM sprint_sessions
+             WHERE rating_key = ? AND rating_after IS NOT NULL
+             LIMIT 1
+           )
+         ) AS played`
+      )
+      .get(ratingKey, ratingKey, ratingKey) as { played: number };
+    return row.played === 1;
   }
 
   private attemptById(attemptId: string): AttemptHistoryRow | undefined {
@@ -1062,25 +1202,60 @@ export class SyncSQLiteStore implements PracticeStore {
   }
 
   getDueReviewItems(now: string): ReviewQueueItem[] {
-    return this.getDueReviews(now)
-      .map((review) => {
-        const puzzle = this.getPuzzle(review.puzzleId);
-        return puzzle ? { puzzle, review } : undefined;
+    const today = reviewDayFor(now);
+    const rows = this.db
+      .prepare(
+        `SELECT
+          p.*,
+          r.puzzle_id AS review_puzzle_id,
+          r.mode AS review_mode,
+          r.rating_key AS review_rating_key,
+          r.due_day AS review_due_day,
+          r.interval_days AS review_interval_days,
+          r.review_count,
+          r.success_streak AS review_success_streak,
+          r.lapse_count AS review_lapse_count,
+          r.last_result AS review_last_result,
+          r.last_reviewed_at AS review_last_reviewed_at,
+          r.enrolled_at AS review_enrolled_at
+         FROM review_queue r
+         JOIN puzzles p ON p.id = r.puzzle_id
+         WHERE r.due_day <= ?
+         ORDER BY r.due_day ASC, r.puzzle_id ASC, r.mode ASC, r.rating_key ASC`
+      )
+      .all(today) as DueReviewItemDbRow[];
+    return rows.map((row) => ({
+      puzzle: puzzleFromRow(row),
+      review: reviewFromRow({
+        puzzle_id: row.review_puzzle_id,
+        mode: row.review_mode,
+        rating_key: row.review_rating_key,
+        due_day: row.review_due_day,
+        interval_days: row.review_interval_days,
+        review_count: row.review_count,
+        success_streak: row.review_success_streak,
+        lapse_count: row.review_lapse_count,
+        last_result: row.review_last_result,
+        last_reviewed_at: row.review_last_reviewed_at,
+        enrolled_at: row.review_enrolled_at
       })
-      .filter((item): item is ReviewQueueItem => Boolean(item));
+    }));
   }
 
   getHistoryView(query: HistoryQuery): HistoryView {
     const range = resolveHistoryRange(query.now, query.timeRange);
     const allAttempts = this.selectHistoryAttempts(query.ratingKey, range.since, range.until);
     const reviews = this.listAllReviewQueueStates();
-    const attempts = filterHistoryAttemptsForQuery({ attempts: allAttempts, query, reviews });
     const { unclear: _unclear, ...queryWithoutUnclear } = query;
-    const unclearCount = filterHistoryAttemptsForQuery({
+    const attemptsIgnoringUnclear = filterHistoryAttemptsForQuery({
       attempts: allAttempts,
       query: queryWithoutUnclear,
       reviews
-    }).filter((attempt) => Boolean(attempt.unclear)).length;
+    });
+    const attempts = query.unclear === undefined
+      ? attemptsIgnoringUnclear
+      : attemptsIgnoringUnclear.filter((attempt) => Boolean(attempt.unclear) === query.unclear);
+    const unclearCount = attemptsIgnoringUnclear.filter((attempt) => Boolean(attempt.unclear)).length;
     return buildHistoryView({
       query,
       ratingKeys: this.listPlayedRatings(),
@@ -1236,10 +1411,27 @@ export class SyncSQLiteStore implements PracticeStore {
       )
       .all(...params) as HistoryAttemptDbRow[];
 
+    const puzzlesById = new Map<string, Puzzle>();
+    const sidesByPuzzleAndMode = new Map<string, HistoryAttemptView["side"]>();
+    const perPuzzleSecondsBySession = new Map<string, number | undefined>();
     return rows.map((row) => {
-      const puzzle = puzzleFromRow(row);
+      let puzzle = puzzlesById.get(row.id);
+      if (!puzzle) {
+        puzzle = puzzleFromRow(row);
+        puzzlesById.set(row.id, puzzle);
+      }
       const candidateOrder = optionalHistoryStringArrayFromJson(row.arrow_duel_candidate_order_json);
-      const perPuzzleSeconds = positivePerPuzzleSecondsFromConfigJson(row.session_config_json);
+      let perPuzzleSeconds = perPuzzleSecondsBySession.get(row.session_id);
+      if (!perPuzzleSecondsBySession.has(row.session_id)) {
+        perPuzzleSeconds = positivePerPuzzleSecondsFromConfigJson(row.session_config_json);
+        perPuzzleSecondsBySession.set(row.session_id, perPuzzleSeconds);
+      }
+      const sideKey = `${puzzle.id}\u0000${row.mode}`;
+      let side = sidesByPuzzleAndMode.get(sideKey);
+      if (!side) {
+        side = sideToMoveForHistoryPuzzle({ puzzle, mode: row.mode });
+        sidesByPuzzleAndMode.set(sideKey, side);
+      }
       return {
         id: row.attempt_id,
         source: row.attempt_source,
@@ -1266,7 +1458,7 @@ export class SyncSQLiteStore implements PracticeStore {
           : { runId: row.run_id, runName: row.run_name }),
         ...(perPuzzleSeconds === undefined ? {} : { perPuzzleSeconds }),
         puzzleRating: puzzle.rating,
-        side: sideToMoveForHistoryPuzzle({ puzzle, mode: row.mode }),
+        side,
         themes: puzzle.themes,
         curatedThemes: curatedPuzzleThemes(puzzle.themes)
       };

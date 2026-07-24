@@ -1,7 +1,20 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { computeNextReminder, type ReviewReminderUsageEntry, type ReviewQueueState } from "../src/index.ts";
+import {
+  computeNextReminder,
+  reviewReminderUsageWindowStart,
+  type ReviewReminderUsageEntry,
+  type ReviewQueueState
+} from "../src/index.ts";
+
+test("review reminder usage queries share the 14-day smart-history window", () => {
+  assert.equal(
+    reviewReminderUsageWindowStart("2026-07-03T12:00:00.000Z"),
+    "2026-06-19T12:00:00.000Z"
+  );
+  assert.throws(() => reviewReminderUsageWindowStart("invalid"), /now must be a valid date/);
+});
 
 test("computeNextReminder uses the median local session-start hour from recent history", () => {
   const now = localIso(2026, 7, 3, 12);

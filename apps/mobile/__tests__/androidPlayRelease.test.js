@@ -525,7 +525,7 @@ function signedAabFixture({ appendUnsigned = false, addUnexpectedSigner = false 
 }
 
 describe('Android Play release contract', () => {
-  it('pins the current Play release to public version 1.2 build 6', () => {
+  it('pins the proposed Play release to public version 1.2.1 build 7', () => {
     const sourceTag = canonicalAndroidSourceTag(
       releaseVersion.publicVersion,
       releaseVersion.androidVersionCode,
@@ -554,11 +554,11 @@ describe('Android Play release contract', () => {
 
     expect(releaseVersion).toEqual(
       expect.objectContaining({
-        publicVersion: '1.2',
-        androidVersionCode: 6,
+        publicVersion: '1.2.1',
+        androidVersionCode: 7,
       }),
     );
-    expect(sourceTag).toBe('android-v1.2.0-build-6');
+    expect(sourceTag).toBe('android-v1.2.1-build-7');
     expect(ownerEvidenceExample.candidate).toEqual(
       expect.objectContaining(expectedIdentityBinding),
     );
@@ -571,7 +571,7 @@ describe('Android Play release contract', () => {
       ownerEvidenceExample.sourceRelease.reference.endsWith(sourceTag),
     ).toBe(true);
     expect(runbook).toContain(
-      'Android version code: `apps/mobile/release-version.json` (`6`)',
+      'Android version code: `apps/mobile/release-version.json` (`7`)',
     );
     for (const value of [
       'The build-1 source-publication gate is complete.',
