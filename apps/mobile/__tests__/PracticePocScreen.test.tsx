@@ -2612,7 +2612,7 @@ describe("PracticePocScreen", () => {
       { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 15, maxMistakes: 3 },
       new Date(Date.now() - 120_000).toISOString()
     );
-    service.submitMove("c4b5", new Date(Date.now() - 60_000).toISOString());
+    service.submitMove("c4b5", new Date(Date.now() - 110_000).toISOString());
 
     const renderer = renderScreen({ practiceService: service });
 
