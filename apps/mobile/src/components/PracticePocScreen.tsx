@@ -195,10 +195,28 @@ interface Props {
   runManagementEnabled?: boolean;
   runManagementPresentation?: PracticeRunManagementPresentation;
   runEloEditingMovedToHome?: boolean;
+  runTimingEditorPreview?: boolean;
+  sessionTimingPreview?: SessionTimingDesignPreview;
+  historyTimingPreview?: HistoryTimingDesignPreview;
   sprintStartDelayMs?: number;
   standardTargetCorrect?: number;
   systemBack?: MobileSystemBackSource;
 }
+
+export type SessionTimingDesignPreview = {
+  initialElapsedSeconds: number;
+  nextPuzzleFen?: string;
+  timeoutSeconds: number;
+  warningSeconds: number;
+};
+
+type HistoryTimingStatus = "slow" | "timed_out";
+
+export type HistoryTimingDesignPreview = {
+  statusByAttemptId: Readonly<Record<string, HistoryTimingStatus>>;
+};
+
+type HistoryAttentionFlag = "mistakes" | "unclear" | "slow" | "timed_out";
 
 export type CustomThemeSelection = {
   selectedThemes: readonly CustomThemeFilter[];
@@ -392,6 +410,9 @@ export function PracticePocScreen({
   runManagementEnabled = false,
   runManagementPresentation,
   runEloEditingMovedToHome = false,
+  runTimingEditorPreview = false,
+  sessionTimingPreview,
+  historyTimingPreview,
   sprintStartDelayMs = ARROW_DUEL_LOADING_TRANSITION_MS,
   standardTargetCorrect,
   systemBack
@@ -475,12 +496,16 @@ export function PracticePocScreen({
   const [readyArrowDuelBoardKey, setReadyArrowDuelBoardKey] = useState<string | null>(null);
   const [chessboardDebugEvents, setChessboardDebugEvents] = useState<string[]>([]);
   const [historyTimeRange, setHistoryTimeRange] = useState<HistoryTimeRange>("7d");
-  const [historySourceFilter, setHistorySourceFilter] = useState<"all" | AttemptSource>("sprint");
+  const [historySourceFilter, setHistorySourceFilter] = useState<"all" | AttemptSource>(
+    historyTimingPreview ? "all" : "sprint"
+  );
   const [historyResultFilter, setHistoryResultFilter] = useState<"all" | "correct" | "wrong">("all");
   const [historySideFilter, setHistorySideFilter] = useState<"all" | PuzzleSide>("all");
   const [historyRatingRangeFilter, setHistoryRatingRangeFilter] = useState<HistoryRatingRangeFilter>("all");
   const [historyReviewStatusFilter, setHistoryReviewStatusFilter] = useState<"all" | HistoryReviewStatus>("all");
   const [historyUnclearOnly, setHistoryUnclearOnly] = useState(false);
+  const [historyAttentionOnly, setHistoryAttentionOnly] = useState(false);
+  const [historyAttentionFlags, setHistoryAttentionFlags] = useState<HistoryAttentionFlag[]>([]);
   const [historyPageOffset, setHistoryPageOffset] = useState(0);
   const [historyRatingKey, setHistoryRatingKey] = useState<string | null>(null);
   const [historyReviewEntries, setHistoryReviewEntries] = useState<ReviewEntry[]>([]);
@@ -512,6 +537,7 @@ export function PracticePocScreen({
     }
   );
   const [, setSettingsRevision] = useState(0);
+  const sessionTimingDesignState = useSessionTimingDesignPreview(sessionTimingPreview);
   const internalRunManagement = usePracticeRunManagement({
     enabled: runManagementEnabled && runManagementPresentation === undefined,
     onStartRun: startPracticeRun,
@@ -2035,7 +2061,11 @@ export function PracticePocScreen({
     suppressedMovesRef: suppressedBoardMovesRef
   });
   puzzleEntryPreviewLockedRef.current = sessionEntryPreview.locked;
-  const displayedBoardFen = sessionEntryPreview.displayFen
+  const timingPreviewBoardFen = sessionTimingDesignState && sessionTimingDesignState.cycle > 0
+    ? sessionTimingPreview?.nextPuzzleFen
+    : undefined;
+  const displayedBoardFen = timingPreviewBoardFen
+    ?? sessionEntryPreview.displayFen
     ?? feedbackSnapshot?.boardFen
     ?? currentBoardFen;
   sessionBoardHandlersRef.current = {
@@ -2120,7 +2150,9 @@ export function PracticePocScreen({
         ...(activeHistoryRatingKey ? { ratingKey: activeHistoryRatingKey } : {}),
         ...historyRatingRangeQuery,
         ...(historySourceFilter === "all" ? {} : { source: historySourceFilter }),
-        ...(historyResultFilter === "all" ? {} : { result: historyResultFilter }),
+        ...(historyResultFilter === "all" || historyTimingPreview
+          ? {}
+          : { result: historyResultFilter }),
         ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
         ...(selectedHistoryThemes.length === 0 ? {} : { themes: selectedHistoryThemes }),
         ...(historyReviewStatusFilter === "all" ? {} : { reviewStatus: historyReviewStatusFilter }),
@@ -2141,6 +2173,43 @@ export function PracticePocScreen({
         ...(historyUnclearOnly ? { unclear: true } : {})
       })
     : null;
+  const visibleHistoryAttempts = historyView?.attempts.filter((attempt) => {
+    if (!historyTimingPreview) {
+      return true;
+    }
+    const timingStatus = historyTimingPreview.statusByAttemptId[attempt.id] ?? null;
+    const isTimedOut = timingStatus === "timed_out";
+    const matchesNeedsAttention = (
+      attempt.unclear
+      || (attempt.result === "wrong" && !isTimedOut)
+      || timingStatus === "slow"
+      || isTimedOut
+    );
+    const matchesResult = historyResultFilter === "all"
+      || (!isTimedOut && attempt.result === historyResultFilter);
+    const matchesSelectedFlag = historyAttentionFlags.length === 0 || historyAttentionFlags.some((flag) => (
+      flag === "mistakes"
+        ? attempt.result === "wrong" && !isTimedOut
+        : flag === "unclear"
+        ? Boolean(attempt.unclear)
+        : flag === "slow"
+          ? timingStatus === "slow"
+          : isTimedOut
+    ));
+    return matchesResult
+      && (!historyAttentionOnly || matchesNeedsAttention)
+      && matchesSelectedFlag;
+  }) ?? [];
+  const visibleHistoryPage = historyView
+    && historyTimingPreview
+    && (historyAttentionOnly || historyAttentionFlags.length > 0)
+    ? {
+        ...historyView.page,
+        hasMore: false,
+        offset: 0,
+        total: visibleHistoryAttempts.length
+      }
+    : historyView?.page;
   const contentOwnsHeader = tab === "review" || tab === "history";
   const reviewSurfaceOpen = reviewSessionSource !== null || historyReviewEntries.length > 0 || historyUnavailableAttempt !== null;
   const topBackTransient: MobileBackTransient | null = startingMode
@@ -2392,6 +2461,13 @@ export function PracticePocScreen({
     selectedConfig.targetCorrect,
     service
   ]);
+  const sessionPuzzleTimingNode = shouldShowSessionBoard && sessionTimingDesignState ? (
+    <PuzzleTimingIndicator
+      elapsedSeconds={sessionTimingDesignState.elapsedSeconds}
+      phase={sessionTimingDesignState.phase}
+      timeoutSeconds={sessionTimingPreview?.timeoutSeconds ?? 0}
+    />
+  ) : null;
   const sessionStatusNode = state && (isOpenSession || isShowingFeedbackSnapshot) ? (
     <SessionStatusBar
       compactMetrics={sessionUsesRail}
@@ -2404,6 +2480,9 @@ export function PracticePocScreen({
       onPause={isActive ? () => pauseActiveSprint("manual") : undefined}
       onResume={isPaused && state ? () => resumeSprint(state) : undefined}
     />
+  ) : null;
+  const sessionScoreNode = state?.status === "active" ? (
+    <SessionScoreStrip state={state} />
   ) : null;
   const pausedSessionNode = isPaused && state ? (
     <PausedSessionPanel
@@ -2428,7 +2507,7 @@ export function PracticePocScreen({
       >
         {displayedBoardFen ? (
           <Chessboard
-            key={state?.id ?? "idle"}
+            key={`${state?.id ?? "idle"}:${sessionTimingDesignState?.cycle ?? 0}`}
             ref={boardRef}
             fen={displayedBoardFen}
             onMove={sessionBoardCallbacks.onMove}
@@ -2462,8 +2541,19 @@ export function PracticePocScreen({
           />
         ) : null}
 
-        {!boardGestureEnabled ? (
+        {!boardGestureEnabled || sessionTimingDesignState?.phase === "timed_out" ? (
           <BoardInputBlocker />
+        ) : null}
+
+        {sessionTimingDesignState?.phase === "timed_out" ? (
+          <View
+            accessibilityLiveRegion="assertive"
+            accessibilityRole="alert"
+            style={styles.puzzleTimeoutOverlay}
+            testID="session-puzzle-timeout-overlay"
+          >
+            <Text style={styles.puzzleTimeoutOverlayTitle}>Timed out</Text>
+          </View>
         ) : null}
 
         {displayedLastBoardMove ? (
@@ -2495,15 +2585,21 @@ export function PracticePocScreen({
           />
         ) : null}
       </View>
+      {!sessionUsesRail && (sessionPuzzleTimingNode || sessionScoreNode) ? (
+        <View
+          style={[styles.sessionBoardDetails, { width: boardSize }]}
+          testID="session-board-details"
+        >
+          {sessionPuzzleTimingNode}
+          {sessionScoreNode}
+        </View>
+      ) : null}
       {isPracticeDebugEnabled() && chessboardDebugEvents.length > 0 ? (
         <Text style={styles.debugLog} testID="chessboard-debug-log">
           {chessboardDebugEvents.join("\n")}
         </Text>
       ) : null}
     </View>
-  ) : null;
-  const sessionScoreNode = state?.status === "active" ? (
-    <SessionScoreStrip state={state} />
   ) : null;
   const practicePromptNode = shouldShowSessionBoard ? (
     <View
@@ -2685,7 +2781,6 @@ export function PracticePocScreen({
                       {!sessionUsesRail ? pausedSessionNode : null}
                       {!sessionUsesRail ? practicePromptNode : null}
                       {sessionBoardNode}
-                      {!sessionUsesRail ? sessionScoreNode : null}
                       {!sessionUsesRail ? errorNode : null}
                       {!sessionUsesRail ? sessionBottomFeedbackNode : null}
                     </View>
@@ -2719,6 +2814,7 @@ export function PracticePocScreen({
                         >
                           {sessionStatusNode}
                           {practicePromptNode}
+                          {sessionPuzzleTimingNode}
                           {sessionScoreNode}
                           {errorNode}
                           {sessionBottomFeedbackNode}
@@ -2754,6 +2850,7 @@ export function PracticePocScreen({
                 {!isOpenSession && state === null && activeRunManagementPresentation && activeRunManagementPresentation.screen !== "home" ? (
                   <PracticeRunEditor
                     presentation={activeRunManagementPresentation}
+                    showTimingPreview={runTimingEditorPreview}
                     themeCatalogPresentation={themeCatalogPresentation}
                   />
                 ) : null}
@@ -2859,7 +2956,7 @@ export function PracticePocScreen({
               ) : historyView ? (
                 <HistoryPanel
                   adaptiveLayout={adaptiveLayout}
-                  attempts={historyView.attempts}
+                  attempts={visibleHistoryAttempts}
                   performance={historyPerformanceView?.performance ?? emptyHistoryPerformance()}
                   ratingKeys={historyRatingKeys}
                   runsByRatingKey={historyRunsByRatingKey}
@@ -2872,11 +2969,14 @@ export function PracticePocScreen({
                   themeFilters={historyThemeChoices.selection}
                   namedThemeFilters={historyThemeChoices.namedThemes}
                   availableThemes={historyView.availableThemes}
-                  page={historyView.page}
+                  page={visibleHistoryPage ?? historyView.page}
                   reviewStatusFilter={historyReviewStatusFilter}
                   unclearOnly={historyUnclearOnly}
                   sprintOnly={historySourceFilter === "sprint"}
                   wrongOnly={historyWrongOnly}
+                  attentionOnly={historyAttentionOnly}
+                  attentionFlags={historyAttentionFlags}
+                  timingPreview={historyTimingPreview}
                   themeCatalogPresentation={themeCatalogPresentation}
                   filtersExpanded={historyFiltersExpanded}
                   onFiltersExpandedChange={setHistoryFiltersExpanded}
@@ -2916,17 +3016,33 @@ export function PracticePocScreen({
                     setHistoryPageOffset(0);
                     setHistoryUnclearOnly((current) => !current);
                   }}
+                  onAttentionOnlyChange={(attentionOnly) => {
+                    setHistoryPageOffset(0);
+                    setHistoryAttentionOnly(attentionOnly);
+                    if (!attentionOnly) {
+                      setHistoryAttentionFlags([]);
+                    }
+                  }}
+                  onAttentionFlagToggle={(flag) => {
+                    setHistoryPageOffset(0);
+                    setHistoryAttentionOnly(true);
+                    setHistoryAttentionFlags((current) => current.includes(flag)
+                      ? current.filter((selectedFlag) => selectedFlag !== flag)
+                      : [...current, flag]);
+                  }}
                   onPageOffsetChange={setHistoryPageOffset}
                   onOpenAttempt={openHistoryReview}
                   onResetFilters={() => {
                     setHistoryTimeRange("7d");
-                    setHistorySourceFilter("sprint");
+                    setHistorySourceFilter(historyTimingPreview ? "all" : "sprint");
                     setHistoryResultFilter("all");
                     setHistorySideFilter("all");
                     historyThemeChoices.dispatch({ type: "select-all-themes" });
                     setHistoryRatingRangeFilter("all");
                     setHistoryReviewStatusFilter("all");
                     setHistoryUnclearOnly(false);
+                    setHistoryAttentionOnly(false);
+                    setHistoryAttentionFlags([]);
                     setHistoryPageOffset(0);
                     setHistoryRatingKey(null);
                   }}
@@ -4055,9 +4171,11 @@ function RunRemovalConfirmation({
 
 function PracticeRunEditor({
   presentation,
+  showTimingPreview,
   themeCatalogPresentation
 }: {
   presentation: PracticeRunManagementPresentation;
+  showTimingPreview: boolean;
   themeCatalogPresentation?: ThemeCatalogPresentation;
 }): React.JSX.Element | null {
   const draft = presentation.draft;
@@ -4102,7 +4220,9 @@ function PracticeRunEditor({
           {isCreate
             ? "Saving adds this run to Home. It does not start a sprint."
             : directRunEditing
-              ? "Change the name or current ELO. Format and training settings stay fixed."
+              ? showTimingPreview
+                ? "Change this Run's name, ELO, and puzzle timing."
+                : "Change the name or current ELO. Format and training settings stay fixed."
               : "Adjust the current ELO. Run settings stay fixed."}
         </Text>
       </View>
@@ -4118,6 +4238,15 @@ function PracticeRunEditor({
             Choose different themes or settings before adding this Run to Home.
           </Text>
         </View>
+      ) : null}
+
+      {!isCreate && directRunEditing && showTimingPreview ? (
+        <Text
+          style={[styles.sectionLabel, styles.runEditorDetailsLabel]}
+          testID="practice-run-details-section"
+        >
+          Run details
+        </Text>
       ) : null}
 
       <View style={styles.customConfigCard} testID="practice-run-editor-fields">
@@ -4252,6 +4381,8 @@ function PracticeRunEditor({
         )}
       </View>
 
+      {!isCreate && directRunEditing && showTimingPreview ? <PracticeRunTimingPreview /> : null}
+
       {isCreate && isCustom && previousRows.length > 0 ? (
         <View style={styles.previousConfigList} testID="custom-previous-configs">
           <Text style={styles.sectionLabel}>Previous configs</Text>
@@ -4267,6 +4398,109 @@ function PracticeRunEditor({
           ))}
         </View>
       ) : null}
+    </View>
+  );
+}
+
+function PracticeRunTimingPreview(): React.JSX.Element {
+  const [warningEnabled, setWarningEnabled] = useState(true);
+  const [timeoutEnabled, setTimeoutEnabled] = useState(true);
+  const [warningSeconds, setWarningSeconds] = useState(40);
+  const [timeoutSeconds, setTimeoutSeconds] = useState(60);
+
+  return (
+    <View style={styles.settingsSection} testID="practice-run-puzzle-timing">
+      <View style={styles.runTimingSectionCopy}>
+        <Text style={styles.sectionLabel}>Puzzle timing</Text>
+        <Text style={styles.helperText}>Typical time 0:20 · no ELO impact</Text>
+      </View>
+      <View style={styles.customConfigCard} testID="practice-run-puzzle-timing-card">
+        <RunTimingSettingRow
+          detail="Turns the puzzle clock yellow; play continues."
+          enabled={warningEnabled}
+          label="Slow warning"
+          seconds={warningSeconds}
+          testID="practice-run-slow-warning"
+          onChange={(seconds) => setWarningSeconds(Math.min(seconds, timeoutSeconds - 5))}
+          onToggle={() => setWarningEnabled((current) => !current)}
+        />
+        <RunTimingSettingRow
+          detail="Marks Timed out and moves on."
+          enabled={timeoutEnabled}
+          label="Puzzle timeout"
+          seconds={timeoutSeconds}
+          testID="practice-run-puzzle-timeout"
+          onChange={(seconds) => setTimeoutSeconds(Math.max(seconds, warningSeconds + 5))}
+          onToggle={() => setTimeoutEnabled((current) => !current)}
+        />
+      </View>
+    </View>
+  );
+}
+
+function RunTimingSettingRow({
+  detail,
+  enabled,
+  label,
+  seconds,
+  testID,
+  onChange,
+  onToggle
+}: {
+  detail: string;
+  enabled: boolean;
+  label: string;
+  seconds: number;
+  testID: string;
+  onChange: (seconds: number) => void;
+  onToggle: () => void;
+}): React.JSX.Element {
+  return (
+    <View style={styles.runTimingRow} testID={testID}>
+      <View style={styles.runTimingRowCopy}>
+        <Text style={styles.listText}>{label}</Text>
+        <Text style={styles.helperText}>{detail}</Text>
+      </View>
+      <View style={styles.runTimingControls}>
+        <View style={[styles.runTimingStepper, !enabled ? styles.runTimingControlDisabled : null]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Decrease ${label.toLowerCase()}`}
+            disabled={!enabled || seconds <= 10}
+            style={styles.runTimingStepButton}
+            testID={`${testID}-decrease`}
+            onPress={() => onChange(Math.max(10, seconds - 5))}
+          >
+            <Text style={styles.runTimingStepText}>−</Text>
+          </Pressable>
+          <Text style={styles.runTimingValue} testID={`${testID}-value`}>
+            {formatCompactDuration(seconds)}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Increase ${label.toLowerCase()}`}
+            disabled={!enabled || seconds >= 180}
+            style={styles.runTimingStepButton}
+            testID={`${testID}-increase`}
+            onPress={() => onChange(Math.min(180, seconds + 5))}
+          >
+            <Text style={styles.runTimingStepText}>+</Text>
+          </Pressable>
+        </View>
+        <Pressable
+          accessibilityRole="switch"
+          accessibilityLabel={label}
+          accessibilityState={{ checked: enabled }}
+          accessibilityValue={{ text: enabled ? "On" : "Off" }}
+          style={styles.runTimingToggle}
+          testID={`${testID}-toggle`}
+          onPress={onToggle}
+        >
+          <View style={[styles.historyToggleTrack, enabled ? styles.historyToggleTrackActive : null]}>
+            <View style={[styles.historyToggleThumb, enabled ? styles.historyToggleThumbActive : null]} />
+          </View>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -5234,6 +5468,120 @@ function TestPuzzleSourceControl({
   );
 }
 
+type SessionTimingDesignState = {
+  cycle: number;
+  elapsedSeconds: number;
+  phase: "normal" | "slow" | "timed_out";
+};
+
+function useSessionTimingDesignPreview(
+  preview: SessionTimingDesignPreview | undefined
+): SessionTimingDesignState | null {
+  const initialElapsedSeconds = preview?.initialElapsedSeconds ?? 0;
+  const timeoutSeconds = preview?.timeoutSeconds ?? 0;
+  const warningSeconds = preview?.warningSeconds ?? 0;
+  const previewEnabled = preview !== undefined;
+  const [state, setState] = useState<SessionTimingDesignState>(() => ({
+    cycle: 0,
+    elapsedSeconds: initialElapsedSeconds,
+    phase: initialElapsedSeconds >= warningSeconds ? "slow" : "normal"
+  }));
+
+  useEffect(() => {
+    if (!previewEnabled) {
+      return undefined;
+    }
+    setState({
+      cycle: 0,
+      elapsedSeconds: initialElapsedSeconds,
+      phase: initialElapsedSeconds >= warningSeconds ? "slow" : "normal"
+    });
+    const interval = setInterval(() => {
+      setState((current) => {
+        if (current.phase === "timed_out") {
+          return current;
+        }
+        const elapsedSeconds = Math.min(current.elapsedSeconds + 1, timeoutSeconds);
+        return {
+          ...current,
+          elapsedSeconds,
+          phase: elapsedSeconds >= timeoutSeconds
+            ? "timed_out"
+            : elapsedSeconds >= warningSeconds ? "slow" : "normal"
+        };
+      });
+    }, 1_000);
+    return () => clearInterval(interval);
+  }, [initialElapsedSeconds, previewEnabled, timeoutSeconds, warningSeconds]);
+
+  useEffect(() => {
+    if (!previewEnabled || state.phase !== "timed_out") {
+      return undefined;
+    }
+    const handoff = setTimeout(() => {
+      setState((current) => ({
+        cycle: current.cycle + 1,
+        elapsedSeconds: 0,
+        phase: "normal"
+      }));
+    }, FEEDBACK_SNAPSHOT_MS);
+    return () => clearTimeout(handoff);
+  }, [previewEnabled, state.phase]);
+
+  return previewEnabled ? state : null;
+}
+
+function PuzzleTimingIndicator({
+  elapsedSeconds,
+  phase,
+  timeoutSeconds
+}: {
+  elapsedSeconds: number;
+  phase: SessionTimingDesignState["phase"];
+  timeoutSeconds: number;
+}): React.JSX.Element {
+  const label = `Puzzle ${formatCompactDuration(elapsedSeconds)}`;
+  const remainingSeconds = timeoutSeconds - elapsedSeconds;
+  const countdownSeconds = phase !== "timed_out" && remainingSeconds <= 10
+    ? Math.max(remainingSeconds, 1)
+    : null;
+  const accessibilityLabel = countdownSeconds === null
+    ? label
+    : `${label}, ${countdownSeconds} seconds until timeout`;
+
+  return (
+    <View
+      accessibilityLabel={accessibilityLabel}
+      style={[
+        styles.puzzleTimingIndicator,
+        phase !== "normal" ? styles.puzzleTimingIndicatorSlow : null,
+        styles.puzzleTimingIndicatorStandalone
+      ]}
+      testID="session-puzzle-timing"
+    >
+      <Text
+        numberOfLines={1}
+        style={[
+          styles.puzzleTimingIndicatorText,
+          phase !== "normal" ? styles.puzzleTimingIndicatorTextSlow : null
+        ]}
+        testID="session-puzzle-timing-label"
+      >
+        {label}
+      </Text>
+      {countdownSeconds === null ? null : (
+        <Text
+          accessibilityElementsHidden
+          style={styles.puzzleTimingCountdown}
+          testID="session-puzzle-countdown"
+        >
+          {countdownSeconds}s
+        </Text>
+      )}
+    </View>
+  );
+}
+
 function SessionStatusBar({
   compactMetrics = false,
   confirmAbandon,
@@ -5271,7 +5619,7 @@ function SessionStatusBar({
         ) : (
           <View style={styles.sessionNavButton} />
         )}
-        <Text style={styles.sessionNavTitle}>{modeLabel(mode)}</Text>
+        <Text numberOfLines={1} style={styles.sessionNavTitle}>{modeLabel(mode)}</Text>
         <View style={styles.sessionNavActions} testID="session-nav-actions">
           {onPause ? (
             <Pressable
@@ -6224,6 +6572,9 @@ function HistoryPanel({
   unclearOnly,
   sprintOnly,
   wrongOnly,
+  attentionOnly,
+  attentionFlags,
+  timingPreview,
   themeCatalogPresentation,
   onRatingKeyChange,
   onTimeRangeChange,
@@ -6237,6 +6588,8 @@ function HistoryPanel({
   onOpenAttempt,
   onFiltersExpandedChange,
   onResetFilters,
+  onAttentionOnlyChange,
+  onAttentionFlagToggle,
   onToggleSprintOnly,
   onToggleUnclearOnly,
   onToggleWrongOnly
@@ -6261,6 +6614,9 @@ function HistoryPanel({
   unclearOnly: boolean;
   sprintOnly: boolean;
   wrongOnly: boolean;
+  attentionOnly: boolean;
+  attentionFlags: readonly HistoryAttentionFlag[];
+  timingPreview?: HistoryTimingDesignPreview;
   themeCatalogPresentation?: ThemeCatalogPresentation;
   onRatingKeyChange: (ratingKey: string | null) => void;
   onTimeRangeChange: (range: HistoryTimeRange) => void;
@@ -6274,6 +6630,8 @@ function HistoryPanel({
   onOpenAttempt: (attemptId: string) => void;
   onFiltersExpandedChange: (expanded: boolean) => void;
   onResetFilters: () => void;
+  onAttentionOnlyChange: (attentionOnly: boolean) => void;
+  onAttentionFlagToggle: (flag: HistoryAttentionFlag) => void;
   onToggleSprintOnly: () => void;
   onToggleUnclearOnly: () => void;
   onToggleWrongOnly: () => void;
@@ -6293,7 +6651,8 @@ function HistoryPanel({
     sourceFilter,
     themeFilters: namedThemeFilters,
     timeRange,
-    unclearOnly
+    unclearOnly,
+    attentionFlags
   });
   return (
     <View style={[styles.historyPanel, adaptiveLayout.usesWideContent ? styles.historyPanelWide : null]} testID="history-panel">
@@ -6324,91 +6683,25 @@ function HistoryPanel({
         </View>
       </View>
 
-      <View style={styles.historyTopFilterStack} testID="history-primary-filters">
-        <HistoryChipRow testID="history-rating-filters">
-          <FilterButton
-            active={selectedRatingKey === null}
-            label="All Puzzles"
-            testID="history-rating-all"
-            onPress={() => onRatingKeyChange(null)}
-          />
-          {ratingKeys.map((ratingKey) => (
-            <FilterButton
-              key={ratingKey}
-              active={selectedRatingKey === ratingKey}
-              label={historyRatingKeyLabel(
-                ratingKey,
-                runsByRatingKey.get(ratingKey)?.name,
-                runsByRatingKey.get(ratingKey)?.perPuzzleSeconds
-              )}
-              testID={`history-rating-${ratingKey}`}
-              onPress={() => onRatingKeyChange(ratingKey)}
-            />
-          ))}
-        </HistoryChipRow>
-        <HistoryChipRow testID="history-range-filters">
-          {(["7d", "30d", "90d", "1y", "max"] as const).map((range) => (
-            <FilterButton
-              key={range}
-              active={timeRange === range}
-              label={historyRangeLabel(range)}
-              testID={`history-range-${range}`}
-              onPress={() => onTimeRangeChange(range)}
-            />
-          ))}
-        </HistoryChipRow>
-        <ScrollView
-          contentContainerStyle={styles.historyQuickFilterRow}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          testID="history-quick-filters"
-        >
-          <HistoryQuickToggle
-            active={unclearOnly}
-            accessibilityLabel="Unclear attempts only"
-            controlTestID="history-filter-unclear"
-            label="Unclear only"
-            onPress={onToggleUnclearOnly}
-          />
-          <HistoryQuickToggle
-            active={wrongOnly}
-            accessibilityLabel="Wrong puzzles only"
-            controlTestID="history-filter-wrong-only"
-            label="Wrong only"
-            onPress={onToggleWrongOnly}
-          />
-          <HistoryQuickToggle
-            active={sprintOnly}
-            accessibilityLabel="Sprint attempts only"
-            controlTestID="history-filter-sprint-only"
-            label="Sprint only"
-            onPress={onToggleSprintOnly}
-          />
-        </ScrollView>
-      </View>
-
-      {selectedRatingKey ? (
-        <View style={styles.historyPerformanceCard} testID="history-performance-card">
-          <View style={styles.historyPerformanceHeader}>
-            <View>
-              <Text style={styles.panelTitle}>Rating Trend</Text>
-              <Text testID="history-performance-context" style={styles.helperText}>
-                {`${historyRatingKeyLabel(selectedRatingKey, selectedRun?.name, selectedRun?.perPuzzleSeconds)} · ${historyRangeLabel(timeRange)}`}
-              </Text>
-            </View>
-            <View style={styles.historyMetricSummary}>
-              <Text testID="history-chart-value" style={styles.historyAccuracy}>{latestRating ? String(latestRating) : "—"}</Text>
-              <Text testID="history-chart-label" style={styles.helperText}>Rating</Text>
-            </View>
-          </View>
-          <HistoryRatingTrendChart points={ratingPoints} />
-        </View>
-      ) : null}
-
       {filtersExpanded ? (
         <View style={styles.historyAdvancedFilters} testID="history-advanced-filters">
+          {timingPreview ? (
+            <>
+              <HistoryRatingFilters
+                ratingKeys={ratingKeys}
+                runsByRatingKey={runsByRatingKey}
+                selectedRatingKey={selectedRatingKey}
+                onRatingKeyChange={onRatingKeyChange}
+              />
+              <HistoryRangeFilters timeRange={timeRange} onTimeRangeChange={onTimeRangeChange} />
+              <HistoryAttentionFlagsFilter
+                selectedFlags={attentionFlags}
+                onToggle={onAttentionFlagToggle}
+              />
+            </>
+          ) : null}
           <HistoryChipRow testID="history-source-filters">
-            <FilterButton active={sourceFilter === "all"} label="All" testID="history-source-all" onPress={() => onSourceFilterChange("all")} />
+            <FilterButton active={sourceFilter === "all"} label={timingPreview ? "All sources" : "All"} testID="history-source-all" onPress={() => onSourceFilterChange("all")} />
             <FilterButton active={sourceFilter === "sprint"} label="Sprint" testID="history-source-sprint" onPress={() => onSourceFilterChange("sprint")} />
             <FilterButton active={sourceFilter === "scheduled_review"} label="Review" testID="history-source-review" onPress={() => onSourceFilterChange("scheduled_review")} />
           </HistoryChipRow>
@@ -6428,11 +6721,14 @@ function HistoryPanel({
               />
             ))}
           </HistoryChipRow>
-          <HistoryChipRow testID="history-review-status-filters">
-            <FilterButton active={reviewStatusFilter === "all"} label="All review states" testID="history-review-status-all" onPress={() => onReviewStatusFilterChange("all")} />
-            <FilterButton active={reviewStatusFilter === "queued"} label="Queued" testID="history-review-status-queued" onPress={() => onReviewStatusFilterChange("queued")} />
-            <FilterButton active={reviewStatusFilter === "clear"} label="Clear" testID="history-review-status-clear" onPress={() => onReviewStatusFilterChange("clear")} />
-          </HistoryChipRow>
+          <View style={styles.historyFilterGroup} testID="history-review-status-filters">
+            <Text style={styles.historyFilterGroupLabel}>Review queue</Text>
+            <HistoryChipRow testID="history-review-status-options">
+              <FilterButton active={reviewStatusFilter === "all"} label="All" testID="history-review-status-all" onPress={() => onReviewStatusFilterChange("all")} />
+              <FilterButton active={reviewStatusFilter === "queued"} label="In queue" testID="history-review-status-queued" onPress={() => onReviewStatusFilterChange("queued")} />
+              <FilterButton active={reviewStatusFilter === "clear"} label="Not in queue" testID="history-review-status-clear" onPress={() => onReviewStatusFilterChange("clear")} />
+            </HistoryChipRow>
+          </View>
           <HistoryChipRow testID="history-side-filters">
             <FilterButton active={sideFilter === "all"} label="Both sides" testID="history-side-all" onPress={() => onSideFilterChange("all")} />
             <FilterButton active={sideFilter === "white"} label="White" testID="history-side-white" onPress={() => onSideFilterChange("white")} />
@@ -6466,7 +6762,72 @@ function HistoryPanel({
         </View>
       ) : null}
 
-      <HistoryActiveFilterStrip labels={activeFilterLabels} />
+      <View style={styles.historyTopFilterStack} testID="history-primary-filters">
+        {timingPreview ? (
+          <HistoryAttentionFilter
+            attentionOnly={attentionOnly}
+            onChange={onAttentionOnlyChange}
+          />
+        ) : (
+          <>
+            <HistoryRatingFilters
+              ratingKeys={ratingKeys}
+              runsByRatingKey={runsByRatingKey}
+              selectedRatingKey={selectedRatingKey}
+              onRatingKeyChange={onRatingKeyChange}
+            />
+            <HistoryRangeFilters timeRange={timeRange} onTimeRangeChange={onTimeRangeChange} />
+            <ScrollView
+              contentContainerStyle={styles.historyQuickFilterRow}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              testID="history-quick-filters"
+            >
+              <HistoryQuickChip
+                active={unclearOnly}
+                accessibilityLabel="Unclear attempts"
+                controlTestID="history-filter-unclear"
+                label="Unclear"
+                onPress={onToggleUnclearOnly}
+              />
+              <HistoryQuickChip
+                active={wrongOnly}
+                accessibilityLabel="Wrong attempts"
+                controlTestID="history-filter-wrong-only"
+                label="Wrong"
+                onPress={onToggleWrongOnly}
+              />
+              <HistoryQuickChip
+                active={sprintOnly}
+                accessibilityLabel="Sprint attempts"
+                controlTestID="history-filter-sprint-only"
+                label="Sprint"
+                onPress={onToggleSprintOnly}
+              />
+            </ScrollView>
+          </>
+        )}
+      </View>
+
+      {selectedRatingKey ? (
+        <View style={styles.historyPerformanceCard} testID="history-performance-card">
+          <View style={styles.historyPerformanceHeader}>
+            <View>
+              <Text style={styles.panelTitle}>Rating Trend</Text>
+              <Text testID="history-performance-context" style={styles.helperText}>
+                {`${historyRatingKeyLabel(selectedRatingKey, selectedRun?.name, selectedRun?.perPuzzleSeconds)} · ${historyRangeLabel(timeRange)}`}
+              </Text>
+            </View>
+            <View style={styles.historyMetricSummary}>
+              <Text testID="history-chart-value" style={styles.historyAccuracy}>{latestRating ? String(latestRating) : "—"}</Text>
+              <Text testID="history-chart-label" style={styles.helperText}>Rating</Text>
+            </View>
+          </View>
+          <HistoryRatingTrendChart points={ratingPoints} />
+        </View>
+      ) : null}
+
+      <HistoryActiveFilterStrip compact={Boolean(timingPreview)} labels={activeFilterLabels} />
 
       <View style={styles.historyPageRow}>
         <Text style={styles.helperText}>
@@ -6510,9 +6871,61 @@ function HistoryPanel({
         <HistoryAttemptRow
           key={attempt.id}
           attempt={attempt}
+          timingStatus={timingPreview?.statusByAttemptId[attempt.id] ?? null}
           onOpen={() => onOpenAttempt(attempt.id)}
         />
       ))}
+    </View>
+  );
+}
+
+function HistoryAttentionFlagsFilter({
+  onToggle,
+  selectedFlags
+}: {
+  onToggle: (flag: HistoryAttentionFlag) => void;
+  selectedFlags: readonly HistoryAttentionFlag[];
+}): React.JSX.Element {
+  return (
+    <View style={styles.historyFilterGroup} testID="history-attention-flags">
+      <Text style={styles.historyFilterGroupLabel}>Attention flags</Text>
+      <HistoryChipRow
+        contentStyle={styles.historyAttentionFlagContent}
+        testID="history-attention-flag-options"
+      >
+        <HistoryQuickChip
+          accessibilityLabel="Filter by mistake attempts"
+          active={selectedFlags.includes("mistakes")}
+          compact
+          controlTestID="history-attention-flag-mistakes"
+          label="Mistakes"
+          onPress={() => onToggle("mistakes")}
+        />
+        <HistoryQuickChip
+          accessibilityLabel="Filter by unclear attempts"
+          active={selectedFlags.includes("unclear")}
+          compact
+          controlTestID="history-attention-flag-unclear"
+          label="Unclear"
+          onPress={() => onToggle("unclear")}
+        />
+        <HistoryQuickChip
+          accessibilityLabel="Filter by slow attempts"
+          active={selectedFlags.includes("slow")}
+          compact
+          controlTestID="history-attention-flag-slow"
+          label="Slow"
+          onPress={() => onToggle("slow")}
+        />
+        <HistoryQuickChip
+          accessibilityLabel="Filter by timed out attempts"
+          active={selectedFlags.includes("timed_out")}
+          compact
+          controlTestID="history-attention-flag-timed-out"
+          label="Timed out"
+          onPress={() => onToggle("timed_out")}
+        />
+      </HistoryChipRow>
     </View>
   );
 }
@@ -6526,39 +6939,71 @@ function HistoryThemeCatalogFilter({
   presentation: ThemeCatalogPresentation;
   selectedThemes: readonly string[];
 }): React.JSX.Element {
+  const [expanded, setExpanded] = useState(false);
+  const selectedThemeLabels = selectedThemes
+    .filter((theme) => theme !== ALL_THEMES_FILTER)
+    .map(customThemeLabel);
+  const selectedThemeDetail = selectedThemeLabels.length === 0
+    ? "All themes"
+    : selectedThemeLabels.join(" · ");
   return (
     <View style={styles.historyThemeFilterSection} testID="history-theme-filters">
-      <View style={styles.themeCatalogHeadingRow}>
-        <Text style={styles.themeCatalogTitle}>Themes</Text>
-        <FilterButton
-          active={selectedThemes.includes(ALL_THEMES_FILTER)}
-          label="All themes"
-          testID="history-theme-all"
-          onPress={() => onThemeIntent({ type: "select-all-themes" })}
-        />
-      </View>
-      {presentation.groups.map((group) => (
-        <View key={group.label} style={styles.themeCatalogGroup}>
-          <Text style={styles.themeCatalogGroupLabel}>{group.label}</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            testID={`history-theme-filter-rail-${safeTestId(group.label)}`}
+      <Pressable
+        accessibilityLabel={expanded ? "Hide theme filters" : "Show theme filters"}
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+        style={styles.historyThemeDisclosure}
+        testID="history-theme-disclosure"
+        onPress={() => setExpanded((current) => !current)}
+      >
+        <View style={styles.historyThemeDisclosureCopy}>
+          <Text style={styles.themeCatalogTitle}>Themes</Text>
+          <Text
+            accessibilityLabel={`Selected themes: ${selectedThemeDetail}`}
+            ellipsizeMode="tail"
+            numberOfLines={1}
+            style={styles.historyThemeSummary}
+            testID="history-theme-selection-detail"
           >
-            <View style={styles.themeCatalogRailContent}>
-              {group.themes.map((theme) => (
-                <FilterButton
-                  key={theme}
-                  active={selectedThemes.includes(theme)}
-                  label={customThemeLabel(theme)}
-                  testID={`history-theme-${safeTestId(customThemeLabel(theme))}`}
-                  onPress={() => onThemeIntent({ type: "toggle-theme", theme })}
-                />
-              ))}
-            </View>
-          </ScrollView>
+            {selectedThemeDetail}
+          </Text>
         </View>
-      ))}
+        <ChevronGlyph direction={expanded ? "up" : "down"} />
+      </Pressable>
+      {expanded ? (
+        <>
+          <View style={styles.historyThemeAllRow}>
+            <FilterButton
+              active={selectedThemes.includes(ALL_THEMES_FILTER)}
+              label="All themes"
+              testID="history-theme-all"
+              onPress={() => onThemeIntent({ type: "select-all-themes" })}
+            />
+          </View>
+          {presentation.groups.map((group) => (
+            <View key={group.label} style={styles.themeCatalogGroup}>
+              <Text style={styles.themeCatalogGroupLabel}>{group.label}</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                testID={`history-theme-filter-rail-${safeTestId(group.label)}`}
+              >
+                <View style={styles.themeCatalogRailContent}>
+                  {group.themes.map((theme) => (
+                    <FilterButton
+                      key={theme}
+                      active={selectedThemes.includes(theme)}
+                      label={customThemeLabel(theme)}
+                      testID={`history-theme-${safeTestId(customThemeLabel(theme))}`}
+                      onPress={() => onThemeIntent({ type: "toggle-theme", theme })}
+                    />
+                  ))}
+                </View>
+              </ScrollView>
+            </View>
+          ))}
+        </>
+      ) : null}
     </View>
   );
 }
@@ -6575,6 +7020,7 @@ type HistoryActiveFilterInput = {
   themeFilters: readonly string[];
   timeRange: HistoryTimeRange;
   unclearOnly: boolean;
+  attentionFlags: readonly HistoryAttentionFlag[];
 };
 
 function historyActiveFilterLabels({
@@ -6588,46 +7034,77 @@ function historyActiveFilterLabels({
   sourceFilter,
   themeFilters,
   timeRange,
-  unclearOnly
+  unclearOnly,
+  attentionFlags
 }: HistoryActiveFilterInput): string[] {
   const labels = [
     historyRangeLabel(timeRange),
     ratingKey ? historyRatingKeyLabel(ratingKey, runName, runPerPuzzleSeconds) : "All puzzles"
   ];
   if (sourceFilter !== "all") {
-    labels.push(sourceFilter === "scheduled_review" ? "Review" : "Sprint");
+    labels.push(sourceFilter === "scheduled_review" ? "Source: Review" : "Source: Sprint");
   }
   if (resultFilter !== "all") {
-    labels.push(resultFilter === "correct" ? "Correct" : "Wrong only");
+    labels.push(resultFilter === "correct" ? "Result: Correct" : "Result: Wrong");
   }
   if (ratingRangeFilter !== "all") {
     labels.push(HISTORY_RATING_RANGE_FILTERS.find((filter) => filter.id === ratingRangeFilter)?.label ?? ratingRangeFilter);
   }
   if (reviewStatusFilter !== "all") {
-    labels.push(reviewStatusFilter === "queued" ? "Queued" : "Clear");
+    labels.push(reviewStatusFilter === "queued" ? "Review: In queue" : "Review: Not in queue");
   }
   if (sideFilter !== "all") {
     labels.push(sideFilter === "white" ? "White" : "Black");
   }
-  labels.push(...themeFilters.map(customThemeLabel));
+  if (themeFilters.length === 1) {
+    labels.push(customThemeLabel(themeFilters[0]!));
+  } else if (themeFilters.length > 1) {
+    labels.push(`${themeFilters.length} themes selected`);
+  }
   if (unclearOnly) {
     labels.push("Unclear");
+  }
+  if (attentionFlags.length > 0) {
+    const flagLabels = attentionFlags.map((flag) => (
+      flag === "mistakes"
+        ? "Mistakes"
+        : flag === "unclear"
+          ? "Unclear"
+          : flag === "slow" ? "Slow" : "Timed out"
+    ));
+    labels.push(`Attention: ${flagLabels.join(" or ")}`);
   }
   return labels;
 }
 
-function HistoryActiveFilterStrip({ labels }: { labels: string[] }): React.JSX.Element {
+function HistoryActiveFilterStrip({
+  compact = false,
+  labels
+}: {
+  compact?: boolean;
+  labels: string[];
+}): React.JSX.Element {
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
       testID="history-active-filter-summary"
     >
-      <View style={styles.historyChipContent}>
+      <View style={compact ? styles.historyCompactFilterSummary : styles.historyChipContent}>
         {labels.map((label, index) => (
-          <View key={`${label}-${index}`} style={styles.historyActiveFilterChip} testID={`history-active-filter-${index}`}>
-            <Text style={styles.historyActiveFilterText}>{label}</Text>
-          </View>
+          <React.Fragment key={`${label}-${index}`}>
+            {compact && index > 0 ? (
+              <Text style={styles.historyCompactFilterSeparator}>·</Text>
+            ) : null}
+            <View
+              style={compact ? styles.historyCompactFilterLabel : styles.historyActiveFilterChip}
+              testID={`history-active-filter-${index}`}
+            >
+              <Text style={compact ? styles.historyCompactFilterText : styles.historyActiveFilterText}>
+                {label}
+              </Text>
+            </View>
+          </React.Fragment>
         ))}
       </View>
     </ScrollView>
@@ -6912,7 +7389,7 @@ function historyRatingKeyLabel(
   return `${runName ?? ratingLabelFromKey(ratingKey)}${speedLabel}`;
 }
 
-function ResultBadgeGlyph({ tone }: { tone: "correct" | "wrong" | "alert" }): React.JSX.Element {
+function ResultBadgeGlyph({ tone }: { tone: "correct" | "wrong" }): React.JSX.Element {
   if (tone === "correct") {
     return (
       <View style={styles.resultBadgeGlyphCanvas} testID="result-badge-correct-glyph">
@@ -6922,28 +7399,21 @@ function ResultBadgeGlyph({ tone }: { tone: "correct" | "wrong" | "alert" }): Re
     );
   }
 
-  if (tone === "wrong") {
-    return (
-      <View style={styles.resultBadgeGlyphCanvas} testID="result-badge-wrong-glyph">
-        <View style={[styles.resultBadgeGlyphLine, styles.resultBadgeCrossForward]} />
-        <View style={[styles.resultBadgeGlyphLine, styles.resultBadgeCrossBackward]} />
-      </View>
-    );
-  }
-
   return (
-    <View style={styles.resultBadgeGlyphCanvas} testID="result-badge-alert-glyph">
-      <View style={styles.resultBadgeAlertBar} />
-      <View style={styles.resultBadgeAlertDot} />
+    <View style={styles.resultBadgeGlyphCanvas} testID="result-badge-wrong-glyph">
+      <View style={[styles.resultBadgeGlyphLine, styles.resultBadgeCrossForward]} />
+      <View style={[styles.resultBadgeGlyphLine, styles.resultBadgeCrossBackward]} />
     </View>
   );
 }
 
 function HistoryChipRow({
   children,
+  contentStyle,
   testID
 }: {
   children: React.ReactNode;
+  contentStyle?: StyleProp<ViewStyle>;
   testID: string;
 }): React.JSX.Element {
   return (
@@ -6952,39 +7422,181 @@ function HistoryChipRow({
       showsHorizontalScrollIndicator={false}
       testID={testID}
     >
-      <View style={styles.historyChipContent}>
+      <View style={[styles.historyChipContent, contentStyle]}>
         {children}
       </View>
     </ScrollView>
   );
 }
 
-function HistoryQuickToggle({
+function HistoryRatingFilters({
+  onRatingKeyChange,
+  ratingKeys,
+  runsByRatingKey,
+  selectedRatingKey
+}: {
+  onRatingKeyChange: (ratingKey: string | null) => void;
+  ratingKeys: string[];
+  runsByRatingKey: ReadonlyMap<string, { name: string; perPuzzleSeconds: number }>;
+  selectedRatingKey: string | null;
+}): React.JSX.Element {
+  return (
+    <HistoryChipRow testID="history-rating-filters">
+      <FilterButton
+        active={selectedRatingKey === null}
+        label="All Puzzles"
+        testID="history-rating-all"
+        onPress={() => onRatingKeyChange(null)}
+      />
+      {ratingKeys.map((ratingKey) => (
+        <FilterButton
+          key={ratingKey}
+          active={selectedRatingKey === ratingKey}
+          label={historyRatingKeyLabel(
+            ratingKey,
+            runsByRatingKey.get(ratingKey)?.name,
+            runsByRatingKey.get(ratingKey)?.perPuzzleSeconds
+          )}
+          testID={`history-rating-${ratingKey}`}
+          onPress={() => onRatingKeyChange(ratingKey)}
+        />
+      ))}
+    </HistoryChipRow>
+  );
+}
+
+function HistoryRangeFilters({
+  onTimeRangeChange,
+  timeRange
+}: {
+  onTimeRangeChange: (range: HistoryTimeRange) => void;
+  timeRange: HistoryTimeRange;
+}): React.JSX.Element {
+  return (
+    <HistoryChipRow testID="history-range-filters">
+      {(["7d", "30d", "90d", "1y", "max"] as const).map((range) => (
+        <FilterButton
+          key={range}
+          active={timeRange === range}
+          label={historyRangeLabel(range)}
+          testID={`history-range-${range}`}
+          onPress={() => onTimeRangeChange(range)}
+        />
+      ))}
+    </HistoryChipRow>
+  );
+}
+
+function HistoryAttentionFilter({
+  attentionOnly,
+  onChange
+}: {
+  attentionOnly: boolean;
+  onChange: (attentionOnly: boolean) => void;
+}): React.JSX.Element {
+  return (
+    <View
+      accessibilityLabel="History view"
+      role="radiogroup"
+      style={styles.historyAttentionFilter}
+      testID="history-attention-filter"
+    >
+      <Pressable
+        accessibilityLabel="All attempts"
+        accessibilityRole="radio"
+        accessibilityState={{ checked: !attentionOnly }}
+        aria-checked={!attentionOnly}
+        onPress={() => onChange(false)}
+        style={[
+          styles.historyAttentionOption,
+          !attentionOnly ? styles.historyAttentionOptionActive : null
+        ]}
+        testID="history-attention-all"
+      >
+        <Text
+          style={[
+            styles.historyAttentionOptionText,
+            !attentionOnly ? styles.historyAttentionOptionTextActive : null
+          ]}
+        >
+          All
+        </Text>
+      </Pressable>
+      <Pressable
+        accessibilityLabel="Needs attention: mistakes, unclear, slow, or timed out"
+        accessibilityRole="radio"
+        accessibilityState={{ checked: attentionOnly }}
+        aria-checked={attentionOnly}
+        onPress={() => onChange(true)}
+        style={[
+          styles.historyAttentionOption,
+          attentionOnly ? styles.historyAttentionOptionActive : null
+        ]}
+        testID="history-attention-needs-attention"
+      >
+        <Text
+          style={[
+            styles.historyAttentionOptionText,
+            attentionOnly ? styles.historyAttentionOptionTextActive : null
+          ]}
+        >
+          Needs attention
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function HistoryQuickChip({
   accessibilityLabel,
   active,
+  compact = false,
   controlTestID,
   label,
   onPress
 }: {
   accessibilityLabel: string;
   active: boolean;
+  compact?: boolean;
   controlTestID: string;
   label: string;
   onPress: () => void;
 }): React.JSX.Element {
   return (
     <Pressable
-      accessibilityRole="switch"
+      accessibilityRole="checkbox"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ checked: active }}
-      accessibilityValue={{ text: active ? "On" : "Off" }}
       testID={controlTestID}
-      style={styles.historyQuickToggle}
+      style={styles.historyQuickChipTarget}
       onPress={onPress}
     >
-      <Text style={styles.filterButtonText}>{label}</Text>
-      <View style={[styles.historyToggleTrack, active ? styles.historyToggleTrackActive : null]}>
-        <View style={[styles.historyToggleThumb, active ? styles.historyToggleThumbActive : null]} />
+      <View
+        style={[
+          styles.historyQuickChip,
+          compact ? styles.historyQuickChipCompact : null,
+          active ? styles.historyQuickChipActive : null
+        ]}
+        testID={`${controlTestID}-surface`}
+      >
+        {active ? (
+          <Text
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={styles.historyQuickChipCheck}
+            testID={`${controlTestID}-check`}
+          >
+            ✓
+          </Text>
+        ) : null}
+        <Text
+          style={[
+            styles.historyQuickChipText,
+            active ? styles.historyQuickChipTextActive : null
+          ]}
+        >
+          {label}
+        </Text>
       </View>
     </Pressable>
   );
@@ -6992,13 +7604,16 @@ function HistoryQuickToggle({
 
 function HistoryAttemptRow({
   attempt,
+  timingStatus,
   onOpen
 }: {
   attempt: HistoryAttemptView;
+  timingStatus: "slow" | "timed_out" | null;
   onOpen: () => void;
 }): React.JSX.Element {
   const detail = normalizeHistoryAttemptDetail(attempt);
-  const isWrong = detail.result === "wrong";
+  const isTimedOut = timingStatus === "timed_out";
+  const isWrong = detail.result === "wrong" && !isTimedOut;
   const isCorrect = detail.result === "correct";
   const completedAtMs = detail.completedAt === null ? null : new Date(detail.completedAt).getTime();
   const dateLabel = completedAtMs === null || detail.completedAt === null
@@ -7007,8 +7622,10 @@ function HistoryAttemptRow({
   const visibleThemes = attempt.curatedThemes;
   const pace = historyAttemptSpeedSeconds(attempt);
   const paceLabel = pace === null ? null : `${pace}s pace`;
-  const resultLabel = isWrong ? "Wrong move" : isCorrect ? "Correct" : "Result unavailable";
-  const submittedMoveLabel = detail.submittedMove === null || detail.expectedMove === null
+  const resultLabel = isTimedOut ? "Timed out" : isWrong ? "Wrong move" : isCorrect ? "Correct" : "Result unavailable";
+  const submittedMoveLabel = isTimedOut
+    ? "No move submitted"
+    : detail.submittedMove === null || detail.expectedMove === null
     ? "Moves unavailable"
     : isWrong
       ? `Played ${detail.submittedMove} · Best ${detail.expectedMove}`
@@ -7024,6 +7641,7 @@ function HistoryAttemptRow({
     resultLabel,
     submittedMoveLabel,
     attempt.unclear ? "Marked unclear" : null,
+    timingStatus === "slow" ? "Slow" : isTimedOut ? "Timed out" : null,
     puzzleIdentity,
     compactContext,
     compactMeta
@@ -7040,12 +7658,14 @@ function HistoryAttemptRow({
       <View
         style={[
           styles.historyResultBadge,
-          isWrong ? styles.historyResultWrong : isCorrect ? styles.historyResultCorrect : styles.historyResultUnknown
+          isTimedOut || isWrong
+            ? styles.historyResultWrong
+            : isCorrect ? styles.historyResultCorrect : styles.historyResultUnknown
         ]}
         testID={`history-attempt-${attempt.id}-badge`}
       >
-        {isWrong || isCorrect ? (
-          <ResultBadgeGlyph tone={isWrong ? "wrong" : "correct"} />
+        {isTimedOut || isWrong || isCorrect ? (
+          <ResultBadgeGlyph tone={isTimedOut || isWrong ? "wrong" : "correct"} />
         ) : (
           <Text style={styles.historyResultUnknownText}>?</Text>
         )}
@@ -7069,6 +7689,24 @@ function HistoryAttemptRow({
       {attempt.unclear ? (
         <View style={styles.historyUnclearBadge} testID={`history-attempt-${attempt.id}-unclear`}>
           <Text style={styles.historyUnclearBadgeText}>Unclear</Text>
+        </View>
+      ) : null}
+      {timingStatus === "slow" ? (
+        <View
+          style={[
+            styles.historyTimingBadge,
+            styles.historyTimingBadgeSlow
+          ]}
+          testID={`history-attempt-${attempt.id}-${timingStatus}`}
+        >
+          <Text
+            style={[
+              styles.historyTimingBadgeText,
+              styles.historyTimingBadgeTextSlow
+            ]}
+          >
+            Slow
+          </Text>
         </View>
       ) : null}
       <View style={styles.historyAttemptChevron} testID={`history-attempt-${attempt.id}-chevron`}>
@@ -11115,6 +11753,10 @@ function formatDuration(seconds: number): string {
   return `${mins}:${secs}`;
 }
 
+function formatCompactDuration(seconds: number): string {
+  return `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, "0")}`;
+}
+
 function formatDurationLabel(seconds: number): string {
   if (seconds % 60 === 0) {
     return `${seconds / 60}m`;
@@ -11954,6 +12596,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 9
   },
+  runEditorDetailsLabel: {
+    marginBottom: -4
+  },
   runEditorRunName: {
     color: "#111827",
     fontSize: 15,
@@ -12677,6 +13322,7 @@ const styles = StyleSheet.create({
   sessionNavTitle: {
     color: "#111827",
     flex: 1,
+    flexShrink: 1,
     fontSize: 16,
     fontWeight: "800",
     textAlign: "center"
@@ -12763,9 +13409,72 @@ const styles = StyleSheet.create({
     fontVariant: ["tabular-nums"],
     letterSpacing: 0.2
   },
+  puzzleTimingIndicator: {
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.94)",
+    borderColor: "#CBD5E1",
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 6,
+    justifyContent: "center",
+    minHeight: 26,
+    paddingHorizontal: 9
+  },
+  puzzleTimingIndicatorStandalone: {
+    alignSelf: "center",
+    backgroundColor: "transparent",
+    borderWidth: 0,
+    minHeight: 18,
+    paddingHorizontal: 0
+  },
+  puzzleTimingIndicatorSlow: {
+    backgroundColor: "#FFFBEB",
+    borderColor: "#F59E0B"
+  },
+  puzzleTimingIndicatorText: {
+    color: "#475569",
+    fontFamily: "menlo",
+    fontSize: 11,
+    fontWeight: "800",
+    fontVariant: ["tabular-nums"]
+  },
+  puzzleTimingIndicatorTextSlow: {
+    color: "#B45309"
+  },
+  puzzleTimingCountdown: {
+    backgroundColor: "#F59E0B",
+    borderRadius: 999,
+    color: "#FFFFFF",
+    fontFamily: "menlo",
+    fontSize: 10,
+    fontWeight: "900",
+    fontVariant: ["tabular-nums"],
+    minWidth: 25,
+    overflow: "hidden",
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    textAlign: "center"
+  },
+  puzzleTimeoutOverlay: {
+    ...StyleSheet.absoluteFill,
+    alignItems: "center",
+    backgroundColor: "rgba(15, 23, 42, 0.90)",
+    justifyContent: "center",
+    zIndex: 60
+  },
+  puzzleTimeoutOverlayTitle: {
+    color: "#FFFFFF",
+    fontSize: 22,
+    fontWeight: "900"
+  },
   boardWrapper: {
     alignItems: "center",
+    gap: 3,
     justifyContent: "center"
+  },
+  sessionBoardDetails: {
+    gap: 3
   },
   boardSurface: {
     borderColor: "#E2E8F0",
@@ -13035,6 +13744,69 @@ const styles = StyleSheet.create({
     minHeight: 58,
     paddingHorizontal: 12,
     paddingVertical: 10
+  },
+  runTimingSectionCopy: {
+    gap: 2
+  },
+  runTimingRow: {
+    alignItems: "center",
+    borderBottomColor: "#E2E8F0",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "space-between",
+    minHeight: 66,
+    paddingHorizontal: 12,
+    paddingVertical: 8
+  },
+  runTimingRowCopy: {
+    flex: 1,
+    gap: 2,
+    minWidth: 0
+  },
+  runTimingControls: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexShrink: 0,
+    gap: 6
+  },
+  runTimingStepper: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 4
+  },
+  runTimingControlDisabled: {
+    opacity: 0.38
+  },
+  runTimingStepButton: {
+    alignItems: "center",
+    backgroundColor: "#F8FAFC",
+    borderColor: "#CBD5E1",
+    borderRadius: 7,
+    borderWidth: 1,
+    height: 30,
+    justifyContent: "center",
+    width: 30
+  },
+  runTimingStepText: {
+    color: "#334155",
+    fontSize: 17,
+    fontWeight: "800",
+    lineHeight: 19
+  },
+  runTimingValue: {
+    color: "#334155",
+    fontFamily: "menlo",
+    fontSize: 12,
+    fontWeight: "800",
+    fontVariant: ["tabular-nums"],
+    minWidth: 34,
+    textAlign: "center"
+  },
+  runTimingToggle: {
+    alignItems: "center",
+    height: 36,
+    justifyContent: "center"
   },
   customChoiceCopy: {
     flex: 1,
@@ -13894,19 +14666,92 @@ const styles = StyleSheet.create({
   historyTopFilterStack: {
     gap: 8
   },
+  historyAttentionFilter: {
+    backgroundColor: "#E2E8F0",
+    borderColor: "#CBD5E1",
+    borderRadius: 9,
+    borderWidth: 1,
+    flexDirection: "row",
+    padding: 2
+  },
+  historyAttentionOption: {
+    alignItems: "center",
+    borderRadius: 7,
+    flex: 1,
+    justifyContent: "center",
+    minHeight: 40,
+    paddingHorizontal: 10
+  },
+  historyAttentionOptionActive: {
+    backgroundColor: "#FFFFFF"
+  },
+  historyAttentionOptionText: {
+    color: "#64748B",
+    fontSize: 13,
+    fontWeight: "800"
+  },
+  historyAttentionOptionTextActive: {
+    color: "#1D4ED8"
+  },
   historyQuickFilterRow: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 10,
+    gap: 4,
     paddingRight: 4
   },
-  historyQuickToggle: {
+  historyQuickChipTarget: {
+    alignItems: "center",
+    flexShrink: 0,
+    justifyContent: "center",
+    minHeight: 44
+  },
+  historyQuickChip: {
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderColor: "#CBD5E1",
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 4,
+    minHeight: 34,
+    paddingHorizontal: 8
+  },
+  historyQuickChipActive: {
+    backgroundColor: "#2563EB",
+    borderColor: "#2563EB"
+  },
+  historyQuickChipCompact: {
+    paddingHorizontal: 6
+  },
+  historyQuickChipCheck: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "900"
+  },
+  historyQuickChipText: {
+    color: "#334155",
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  historyQuickChipTextActive: {
+    color: "#FFFFFF"
+  },
+  historyQuickFacetGroup: {
     alignItems: "center",
     flexDirection: "row",
     flexShrink: 0,
-    gap: 10,
-    minHeight: 36,
-    paddingHorizontal: 8
+    gap: 4
+  },
+  historyQuickFacetDivider: {
+    backgroundColor: "#CBD5E1",
+    height: 20,
+    marginHorizontal: 1,
+    width: StyleSheet.hairlineWidth
+  },
+  historyQuickFacetLabel: {
+    color: "#64748B",
+    fontSize: 11,
+    fontWeight: "800"
   },
   historyToggleTrack: {
     backgroundColor: "#CBD5E1",
@@ -13928,15 +14773,47 @@ const styles = StyleSheet.create({
     transform: [{ translateX: 18 }]
   },
   historyAdvancedFilters: {
-    gap: 8
+    backgroundColor: "#FFFFFF",
+    borderColor: "#CBD5E1",
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 8,
+    padding: 10
+  },
+  historyFilterGroup: {
+    gap: 4
+  },
+  historyFilterGroupLabel: {
+    color: "#64748B",
+    fontSize: 11,
+    fontWeight: "900",
+    marginLeft: 2
+  },
+  historyAttentionFlagContent: {
+    gap: 4
   },
   historyThemeFilterSection: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 10,
-    padding: 10
+    gap: 8
+  },
+  historyThemeDisclosure: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    minHeight: 44
+  },
+  historyThemeDisclosureCopy: {
+    flex: 1,
+    minWidth: 0,
+    paddingRight: 8
+  },
+  historyThemeSummary: {
+    color: "#64748B",
+    fontSize: 11,
+    fontWeight: "700",
+    marginTop: 2
+  },
+  historyThemeAllRow: {
+    alignItems: "flex-start"
   },
   historyPerformanceCard: {
     backgroundColor: "#FFFFFF",
@@ -14088,6 +14965,26 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "800"
   },
+  historyCompactFilterSummary: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 6,
+    minHeight: 20,
+    paddingRight: 2
+  },
+  historyCompactFilterLabel: {
+    justifyContent: "center"
+  },
+  historyCompactFilterSeparator: {
+    color: "#94A3B8",
+    fontSize: 12,
+    fontWeight: "700"
+  },
+  historyCompactFilterText: {
+    color: "#64748B",
+    fontSize: 12,
+    fontWeight: "700"
+  },
   historyAttemptCard: {
     alignItems: "center",
     backgroundColor: "#FFFFFF",
@@ -14157,20 +15054,6 @@ const styles = StyleSheet.create({
     transform: [{ rotate: "-45deg" }],
     width: 11
   },
-  resultBadgeAlertBar: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 999,
-    height: 11,
-    width: 3
-  },
-  resultBadgeAlertDot: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 999,
-    bottom: 1,
-    height: 3,
-    position: "absolute",
-    width: 3
-  },
   historyAttemptCopy: {
     flex: 1,
     gap: 3
@@ -14225,6 +15108,24 @@ const styles = StyleSheet.create({
     color: "#B45309",
     fontSize: 10,
     fontWeight: "900"
+  },
+  historyTimingBadge: {
+    alignItems: "center",
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 6,
+    paddingVertical: 4
+  },
+  historyTimingBadgeSlow: {
+    backgroundColor: "#FFFBEB",
+    borderColor: "#F59E0B"
+  },
+  historyTimingBadgeText: {
+    fontSize: 10,
+    fontWeight: "900"
+  },
+  historyTimingBadgeTextSlow: {
+    color: "#B45309"
   },
   historyAttemptUnclearBanner: {
     alignItems: "center",

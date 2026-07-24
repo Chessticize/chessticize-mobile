@@ -79,10 +79,63 @@ function LabScenarioContent({
           ? SERVER_CURATED_THEME_PRESENTATION
           : undefined}
         runEloEditingMovedToHome
+        runTimingEditorPreview={showsRunTimingEditorPreview(scenarioId)}
+        sessionTimingPreview={sessionTimingPreviewFor(scenarioId)}
+        historyTimingPreview={showsHistoryTimingPreview(scenarioId)
+          ? {
+              statusByAttemptId: {
+                "history-correct": "slow",
+                "history-timeout": "timed_out"
+              }
+            }
+          : undefined}
         {...runtime.screenProps}
       />
     </LabScenarioShell>
   );
+}
+
+function showsRunTimingEditorPreview(scenarioId: LabScenarioId): boolean {
+  return scenarioId === "practice-run-standard-editor"
+    || scenarioId === "practice-custom-rating-editor";
+}
+
+function sessionTimingPreviewFor(
+  scenarioId: LabScenarioId
+): React.ComponentProps<typeof PracticePocScreen>["sessionTimingPreview"] {
+  if (scenarioId === "practice-active") {
+    return {
+      initialElapsedSeconds: 24,
+      warningSeconds: 40,
+      timeoutSeconds: 60
+    };
+  }
+  if (scenarioId === "practice-timing-warning") {
+    return {
+      initialElapsedSeconds: 41,
+      warningSeconds: 40,
+      timeoutSeconds: 60
+    };
+  }
+  if (scenarioId === "practice-timing-timeout") {
+    return {
+      initialElapsedSeconds: 52,
+      nextPuzzleFen: LAB_PUZZLES[4]!.initialFen,
+      warningSeconds: 40,
+      timeoutSeconds: 60
+    };
+  }
+  return undefined;
+}
+
+function showsHistoryTimingPreview(scenarioId: LabScenarioId): boolean {
+  return [
+    "history-empty",
+    "history-populated",
+    "history-filters",
+    "history-attempt-detail",
+    "history-replay-unavailable"
+  ].includes(scenarioId);
 }
 
 function isRunManagementScenario(scenarioId: LabScenarioId): boolean {
@@ -363,12 +416,28 @@ function createHistoryService(
       ratingAfter: 910
     }),
     historyAttempt({
+      id: "history-timeout",
+      puzzleId: LAB_PUZZLES[4]!.id,
+      result: "correct",
+      completedAt: "2026-07-17T15:00:12.000Z",
+      ratingBefore: 910,
+      ratingAfter: 910
+    }),
+    historyAttempt({
       id: "history-correct",
       puzzleId: LAB_PUZZLES[2]!.id,
       result: "correct",
       completedAt: "2026-07-16T13:00:07.000Z",
       ratingBefore: 900,
       ratingAfter: 930
+    }),
+    historyAttempt({
+      id: "history-clean",
+      puzzleId: LAB_PUZZLES[3]!.id,
+      result: "correct",
+      completedAt: "2026-07-15T12:00:06.000Z",
+      ratingBefore: 884,
+      ratingAfter: 900
     })
   ];
   for (const attempt of attempts) {
@@ -389,11 +458,25 @@ function createHistoryService(
     ratingAfter: 910
   }));
   store.createSprintSession(completedSprint({
+    id: "session-history-timeout",
+    mode: "standard",
+    completedAt: "2026-07-17T15:00:12.000Z",
+    ratingBefore: 910,
+    ratingAfter: 910
+  }));
+  store.createSprintSession(completedSprint({
     id: "session-history-unclear",
     mode: "standard",
     completedAt: "2026-07-18T15:00:08.000Z",
     ratingBefore: 910,
     ratingAfter: 928
+  }));
+  store.createSprintSession(completedSprint({
+    id: "session-history-clean",
+    mode: "standard",
+    completedAt: "2026-07-15T12:00:06.000Z",
+    ratingBefore: 884,
+    ratingAfter: 900
   }));
   store.saveRating({
     key: "standard 5/20",
@@ -401,7 +484,7 @@ function createHistoryService(
     rating: 928,
     ratingDeviation: 160,
     volatility: 0.05,
-    games: 3
+    games: 5
   });
   store.scheduleMistakeReview({
     puzzleId: LAB_PUZZLES[1]!.id,

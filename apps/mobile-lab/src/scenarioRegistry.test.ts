@@ -78,7 +78,12 @@ test("the issue #272 preview hands the board to White after the blunder", () => 
 });
 
 test("Issue #247 stays on the existing Settings product clone with its approved scope", () => {
-  assert.deepEqual(newScenarios.map((scenario) => scenario.id), ["settings-ios-sync"]);
+  assert.deepEqual(
+    newScenarios
+      .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 247))
+      .map((scenario) => scenario.id),
+    ["settings-ios-sync"]
+  );
   assert.deepEqual(storyTagsForScenario("settings-ios-sync"), ["new"]);
   assert.deepEqual(scenarioRegistry["settings-ios-sync"].scope.includes, [
     "iCloud Sync",

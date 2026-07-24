@@ -80,23 +80,28 @@ export const RunNameValidation: Story = {
 export const BuiltInRunEditor: Story = {
   name: "Built-in Run editor",
   args: { scenarioId: "practice-run-standard-editor" },
+  tags: ["new"],
   play: async ({ canvasElement }) => {
     await clickTestId(canvasElement, "practice-run-home-edit");
     await clickTestId(canvasElement, "practice-run-edit-standard");
     await waitForTestId(canvasElement, "practice-run-name-input");
     await waitForTestId(canvasElement, "practice-run-elo-input");
-    expectTestIdAbsent(canvasElement, "practice-run-elo-increase");
+    await waitForTestId(canvasElement, "practice-run-slow-warning");
+    await waitForTestId(canvasElement, "practice-run-puzzle-timeout");
   }
 };
 
 export const CustomRatingEditor: Story = {
   name: "Custom Run editor and validation",
   args: { scenarioId: "practice-custom-rating-editor" },
+  tags: ["new"],
   play: async ({ canvasElement }) => {
     await clickTestId(canvasElement, "practice-run-home-edit");
     await clickTestId(canvasElement, "practice-run-edit-tactics-focus");
     await waitForTestId(canvasElement, "practice-run-name-input");
     await waitForTestId(canvasElement, "practice-run-elo-input");
+    await waitForTestId(canvasElement, "practice-run-slow-warning");
+    await waitForTestId(canvasElement, "practice-run-puzzle-timeout");
     expectTestIdAbsent(canvasElement, "practice-run-mode-row");
     expectTestIdAbsent(canvasElement, "practice-run-theme-row");
     expectTestIdAbsent(canvasElement, "practice-run-duration-stepper");
@@ -138,8 +143,31 @@ export const Preparing: Story = {
 export const ActiveSession: Story = {
   name: "Active session",
   args: { scenarioId: "practice-active" },
+  tags: ["new"],
   play: async ({ canvasElement }) => {
     await openPracticeSession(canvasElement);
+    await waitForTestId(canvasElement, "session-puzzle-timing");
+  }
+};
+
+export const SlowWarning: Story = {
+  name: "Active session · Slow",
+  args: { scenarioId: "practice-timing-warning" },
+  tags: ["new"],
+  play: async ({ canvasElement }) => {
+    await openPracticeSession(canvasElement);
+    await waitForTestId(canvasElement, "session-puzzle-timing");
+  }
+};
+
+export const PuzzleTimeout: Story = {
+  name: "Active session · Timed out handoff",
+  args: { scenarioId: "practice-timing-timeout" },
+  tags: ["new"],
+  play: async ({ canvasElement }) => {
+    await openPracticeSession(canvasElement);
+    await waitForTestId(canvasElement, "session-puzzle-timing");
+    await waitForTestId(canvasElement, "session-puzzle-countdown");
   }
 };
 

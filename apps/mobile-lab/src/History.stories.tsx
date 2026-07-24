@@ -22,9 +22,14 @@ export const EmptyHistory: Story = {
 export const PopulatedHistory: Story = {
   name: "Populated history",
   args: { scenarioId: "history-populated" },
+  tags: ["new"],
   play: async ({ canvasElement }) => {
     await openHistory(canvasElement);
     await waitForTestId(canvasElement, "history-attempt-history-unclear");
+    await waitForTestId(canvasElement, "history-attention-filter");
+    await clickTestId(canvasElement, "history-attention-needs-attention");
+    await waitForTestId(canvasElement, "history-active-filter-summary");
+    (canvasElement.querySelector('[data-testid="history-attention-needs-attention"]') as HTMLElement | null)?.blur();
   }
 };
 
@@ -34,7 +39,17 @@ export const FiltersAndActiveFilters: Story = {
   play: async ({ canvasElement }) => {
     await openHistory(canvasElement);
     await clickTestId(canvasElement, "history-filter-toggle");
-    await waitForTestId(canvasElement, "history-theme-filters");
+    await waitForTestId(canvasElement, "history-attention-flags");
+    await clickTestId(canvasElement, "history-attention-flag-slow");
+    await waitForTestId(canvasElement, "history-attention-needs-attention");
+    await waitForTestId(canvasElement, "history-theme-disclosure");
+    await clickTestId(canvasElement, "history-theme-disclosure");
+    await clickTestId(canvasElement, "history-theme-pin");
+    await clickTestId(canvasElement, "history-theme-skewer");
+    await clickTestId(canvasElement, "history-theme-promotion");
+    await clickTestId(canvasElement, "history-theme-disclosure");
+    await waitForTestId(canvasElement, "history-theme-selection-detail");
+    (canvasElement.querySelector('[data-testid="history-theme-disclosure"]') as HTMLElement | null)?.blur();
   }
 };
 
