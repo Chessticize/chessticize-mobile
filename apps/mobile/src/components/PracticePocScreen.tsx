@@ -760,7 +760,9 @@ export function PracticePocScreen({
           );
           commitBoardFen(advanced.state.currentPuzzle?.currentFen ?? null);
         }
-        refreshState();
+        if (advanced.state.status !== "active") {
+          refreshState();
+        }
       } catch (caught) {
         puzzleTimeoutInFlightRef.current = null;
         commitBoardInputLocked(false, "time-advance-error", submittedPuzzleId);
@@ -1527,7 +1529,6 @@ export function PracticePocScreen({
           submittedFen,
           Math.floor((next.attempt.elapsedMs ?? 0) / 1000)
         );
-        refreshState();
         return;
       }
       if (shouldAnimateSamePuzzleReply(next.state, nextFeedback, submittedPuzzleId)) {
