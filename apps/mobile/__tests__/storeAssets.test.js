@@ -95,7 +95,15 @@ describe("App Store assets document", () => {
       "'app-store-08-review-session',\n    assertReviewLandscapeLayout"
     );
     expect(storeAssetsE2e).toContain("frameFor(element(by.id('review-session-adaptive-layout')))");
-    expect(storeAssetsE2e).toContain("expectFrameContained(boardFrame, layoutFrame");
+    expect(storeAssetsE2e).toContain("frameFor(element(by.id('review-session-board-lane')))");
+    expect(storeAssetsE2e).toContain("frameFor(element(by.id('board-coordinate-overlay')))");
+    expect(storeAssetsE2e).toContain("element(by.id('review-arrow-duel-candidate-overlay'))");
+    expect(storeAssetsE2e).toContain("frameFor(element(by.id('review-exit')))");
+    expect(storeAssetsE2e).toContain("frameFor(element(by.id('review-progress')))");
+    expect(storeAssetsE2e).toContain("frameFor(element(by.id('review-timer')))");
+    expect(storeAssetsE2e).toContain("expectFrameContained(boardFrame, boardLaneFrame");
+    expect(storeAssetsE2e).toContain("expectFrameContained(coordinateFrame, boardFrame");
+    expect(storeAssetsE2e).toContain("expectFrameContained(candidateArrowFrame, boardFrame");
     expect(storeAssetsE2e).toContain("boardRight > controlRailFrame.x + 1");
     expect(storeAssetsE2e).toContain("takePortraitScreenshotAtTop('app-store-05-standard-sprint')");
     expect(storeAssetsE2e).toContain("takePortraitScreenshotAtTop('app-store-06-arrow-duel')");

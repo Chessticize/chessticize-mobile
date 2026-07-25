@@ -2411,12 +2411,12 @@ export function PracticePocScreen({
   const feedbackForCurrentPuzzle = feedbackPuzzleId && currentPuzzle?.puzzle.id === feedbackPuzzleId ? feedback : null;
   const boardFeedback = feedbackSnapshot?.feedback ?? feedbackForCurrentPuzzle;
   const boardPremoveWindow = boardInputLocked && boardInputLockMode === "premove";
-  // While the session board is on screen, drags aimed at the board must pan
-  // pieces, never the page. Fast drags can start on the padding, and a touch
-  // that begins during a lock window can survive into an unlocked turn and
-  // feed the scroll view, so freeze the surrounding scroll for the whole
-  // session, not just the lock windows.
-  const practiceScrollLocked = shouldShowSessionBoard;
+  // Drags aimed at an active board must pan pieces, never the page. Freeze the
+  // surrounding Sprint scroll for the whole session, and freeze it around the
+  // fixed Review board whenever the landscape control rail owns overflow.
+  const reviewBoardVisible = reviewSessionSource !== null || historyReviewEntries.length > 0;
+  const practiceScrollLocked = shouldShowSessionBoard
+    || (adaptiveLayout.usesSessionRail && reviewBoardVisible);
   const boardGestureEnabled = Boolean(
     isActive
       && !isShowingFeedbackSnapshot
@@ -2492,7 +2492,7 @@ export function PracticePocScreen({
   const visibleHistoryAttempts = historyView?.attempts ?? [];
   const visibleHistoryPage = historyView?.page;
   const contentOwnsHeader = tab === "review" || tab === "history";
-  const reviewSurfaceOpen = reviewSessionSource !== null || historyReviewEntries.length > 0 || historyUnavailableAttempt !== null;
+  const reviewSurfaceOpen = reviewBoardVisible || historyUnavailableAttempt !== null;
   const topBackTransient: MobileBackTransient | null = isSessionGuideVisible
     ? "sprint-session-guide"
     : startingMode

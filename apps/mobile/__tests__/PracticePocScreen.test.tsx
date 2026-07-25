@@ -3180,17 +3180,7 @@ describe("PracticePocScreen", () => {
     scale: number;
     width: number;
   }) => {
-    (ReactNative as unknown as {
-      __setWindowDimensions?: (dimensions: {
-        fontScale: number;
-        height: number;
-        scale: number;
-        width: number;
-      }) => void;
-    }).__setWindowDimensions?.({ width, height, scale, fontScale: 1 });
-    (SafeAreaContext as unknown as {
-      __setSafeAreaInsets?: (nextInsets: PracticeSafeAreaInsets) => void;
-    }).__setSafeAreaInsets?.(insets);
+    setPracticeViewport({ width, height, scale, insets });
 
     const expectedLayout = buildPracticeAdaptiveLayout({
       fontScale: 1,
@@ -3230,6 +3220,7 @@ describe("PracticePocScreen", () => {
     expect(controlRailStyle.height).toBe(sprintBoardSize);
     expect(sprintBoardSize + 2 * PRACTICE_UI_PADDING)
       .toBeLessThanOrEqual(expectedLayout.contentHeight);
+    expect(findByTestId(reviewRenderer, "practice-main-scroll").props.scrollEnabled).toBe(false);
     expect(controlRail.findByProps({ testID: "review-header" })).toBeTruthy();
     expect(controlRail.findByProps({ testID: "review-context-strip" })).toBeTruthy();
     expect(controlRail.findByProps({ testID: "practice-prompt" })).toBeTruthy();
@@ -3239,25 +3230,13 @@ describe("PracticePocScreen", () => {
     expect(boardLane.findByProps({ testID: "review-board" })).toBeTruthy();
   });
 
-  it("keeps the native Review board mounted while rotating into its unobstructed landscape lane", () => {
-    const windowDimensions = ReactNative as unknown as {
-      __setWindowDimensions?: (dimensions: {
-        fontScale: number;
-        height: number;
-        scale: number;
-        width: number;
-      }) => void;
-    };
-    const safeArea = SafeAreaContext as unknown as {
-      __setSafeAreaInsets?: (insets: PracticeSafeAreaInsets) => void;
-    };
-    windowDimensions.__setWindowDimensions?.({
+  it("keeps the Review board fixed while rotating into its unobstructed landscape lane", () => {
+    setPracticeViewport({
       width: 402,
       height: 874,
       scale: 3,
-      fontScale: 1
+      insets: { top: 62, right: 0, bottom: 34, left: 0 }
     });
-    safeArea.__setSafeAreaInsets?.({ top: 62, right: 0, bottom: 34, left: 0 });
 
     const renderer = renderScreen({
       currentTimeMs: () => Date.parse("2026-06-20T12:00:00.000Z"),
@@ -3266,38 +3245,32 @@ describe("PracticePocScreen", () => {
     press(renderer, "review-tab");
     press(renderer, "review-start-due");
 
-    const portraitReviewBoard = findByTestId(renderer, "review-board");
-    const portraitChessboard = findByTestId(renderer, "mock-chessboard");
-    const portraitCoordinateOverlay = findByTestId(renderer, "board-coordinate-overlay");
-    const portraitHandlers = {
-      mockResetBoard: portraitChessboard.props.mockResetBoard
-    };
+    const portraitBoardLabel = findByTestId(renderer, "review-board").props.accessibilityLabel;
+    const portraitCoordinates = collectText(findByTestId(renderer, "board-coordinate-overlay"));
 
     expect(findByTestId(renderer, "review-session-stacked-layout")).toBeTruthy();
     expect(() => findByTestId(renderer, "review-session-control-rail")).toThrow();
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
     expect(testIdOrder(renderer, "review-header", "review-board")).toBeLessThan(0);
     expect(testIdOrder(renderer, "practice-prompt", "review-board")).toBeLessThan(0);
 
     act(() => {
-      windowDimensions.__setWindowDimensions?.({
+      setPracticeViewport({
         width: 874,
         height: 402,
         scale: 3,
-        fontScale: 1
+        insets: { top: 0, right: 62, bottom: 21, left: 62 }
       });
-      safeArea.__setSafeAreaInsets?.({ top: 0, right: 62, bottom: 21, left: 62 });
     });
 
-    const landscapeReviewBoard = findByTestId(renderer, "review-board");
-    const landscapeChessboard = findByTestId(renderer, "mock-chessboard");
-    const landscapeCoordinateOverlay = findByTestId(renderer, "board-coordinate-overlay");
     expect(findByTestId(renderer, "adaptive-layout").props.accessibilityLabel)
       .toBe("Layout compactLandscape");
     expect(findByTestId(renderer, "review-session-adaptive-layout")).toBeTruthy();
-    expect(landscapeReviewBoard).toBe(portraitReviewBoard);
-    expect(landscapeChessboard).toBe(portraitChessboard);
-    expect(landscapeCoordinateOverlay).toBe(portraitCoordinateOverlay);
-    expect(landscapeChessboard.props.mockResetBoard).toBe(portraitHandlers.mockResetBoard);
+    expect(renderedTestIdCount(renderer, "review-board")).toBe(1);
+    expect(renderedTestIdCount(renderer, "board-coordinate-overlay")).toBe(1);
+    expect(findByTestId(renderer, "review-board").props.accessibilityLabel).toBe(portraitBoardLabel);
+    expect(collectText(findByTestId(renderer, "board-coordinate-overlay"))).toBe(portraitCoordinates);
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(false);
     expect(findByTestId(renderer, "review-session-board-lane").findByProps({
       testID: "review-board"
     })).toBeTruthy();
@@ -9843,6 +9816,34 @@ async function waitForAssertion(assertion: () => void, attempts = 10): Promise<v
 
 function findByTestId(renderer: TestRenderer.ReactTestRenderer, testID: string): TestRenderer.ReactTestInstance {
   return renderer.root.findByProps({ testID });
+}
+
+function setPracticeViewport({
+  fontScale = 1,
+  height,
+  insets,
+  scale,
+  width
+}: {
+  fontScale?: number;
+  height: number;
+  insets?: PracticeSafeAreaInsets;
+  scale: number;
+  width: number;
+}): void {
+  (ReactNative as unknown as {
+    __setWindowDimensions?: (dimensions: {
+      fontScale: number;
+      height: number;
+      scale: number;
+      width: number;
+    }) => void;
+  }).__setWindowDimensions?.({ width, height, scale, fontScale });
+  if (insets) {
+    (SafeAreaContext as unknown as {
+      __setSafeAreaInsets?: (nextInsets: PracticeSafeAreaInsets) => void;
+    }).__setSafeAreaInsets?.(insets);
+  }
 }
 
 function expectNoSessionLayoutResidue(renderer: TestRenderer.ReactTestRenderer): void {

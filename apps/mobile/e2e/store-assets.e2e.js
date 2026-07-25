@@ -212,15 +212,29 @@ async function takeLandscapeScreenshot(name, assertLayout) {
 async function assertReviewLandscapeLayout() {
   const screenFrame = await frameFor(element(by.id('adaptive-layout')));
   const layoutFrame = await frameFor(element(by.id('review-session-adaptive-layout')));
+  const boardLaneFrame = await frameFor(element(by.id('review-session-board-lane')));
   const boardFrame = await frameFor(element(by.id('review-board')));
+  const coordinateFrame = await frameFor(element(by.id('board-coordinate-overlay')));
+  const candidateArrowFrame = await frameFor(
+    element(by.id('review-arrow-duel-candidate-overlay'))
+  );
   const controlRailFrame = await frameFor(element(by.id('review-session-control-rail')));
   const headerFrame = await frameFor(element(by.id('review-header')));
+  const exitFrame = await frameFor(element(by.id('review-exit')));
+  const progressFrame = await frameFor(element(by.id('review-progress')));
+  const timerFrame = await frameFor(element(by.id('review-timer')));
   const promptFrame = await frameFor(element(by.id('practice-prompt')));
 
   expectFrameContained(layoutFrame, screenFrame, 'Review landscape layout');
-  expectFrameContained(boardFrame, layoutFrame, 'Review landscape board');
+  expectFrameContained(boardLaneFrame, layoutFrame, 'Review landscape board lane');
+  expectFrameContained(boardFrame, boardLaneFrame, 'Review landscape board');
+  expectFrameContained(coordinateFrame, boardFrame, 'Review landscape coordinates');
+  expectFrameContained(candidateArrowFrame, boardFrame, 'Review landscape candidate arrows');
   expectFrameContained(controlRailFrame, layoutFrame, 'Review landscape control rail');
   expectFrameContained(headerFrame, controlRailFrame, 'Review landscape header');
+  expectFrameContained(exitFrame, controlRailFrame, 'Review landscape exit action');
+  expectFrameContained(progressFrame, controlRailFrame, 'Review landscape progress');
+  expectFrameContained(timerFrame, controlRailFrame, 'Review landscape timer');
   expectFrameContained(promptFrame, controlRailFrame, 'Review landscape instruction');
 
   if (Math.abs(boardFrame.width - boardFrame.height) > 1) {
