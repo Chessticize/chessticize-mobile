@@ -4291,19 +4291,42 @@ function ActiveSessionGuide({
         timerCopy={timerCopy}
       />
 
-      <View style={styles.sessionGuideCoachNavigation}>
+      <View
+        style={[
+          styles.sessionGuideCoachNavigation,
+          adaptiveLayout.usesSessionRail
+            ? [
+                styles.sessionGuideCoachNavigationRail,
+                { width: adaptiveLayout.sessionRailWidth }
+              ]
+            : null
+        ]}
+        testID="practice-session-guide-navigation"
+      >
         {hasPreviousCoachStep ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Previous guide step"
-            style={styles.sessionGuideCoachBackButton}
+            style={[
+              styles.sessionGuideCoachBackButton,
+              adaptiveLayout.usesSessionRail
+                ? styles.sessionGuideCoachBackButtonRail
+                : null
+            ]}
             testID="practice-session-guide-back"
             onPress={onBack}
           >
             <Text style={styles.sessionGuideCoachBackText}>Back</Text>
           </Pressable>
         ) : (
-          <View style={styles.sessionGuideCoachBackSpacer} />
+          <View
+            style={[
+              styles.sessionGuideCoachBackSpacer,
+              adaptiveLayout.usesSessionRail
+                ? styles.sessionGuideCoachBackSpacerRail
+                : null
+            ]}
+          />
         )}
         <Text
           accessibilityLabel={`Step ${unifiedCoachStep} of ${unifiedCoachTotal}`}
@@ -4315,7 +4338,12 @@ function ActiveSessionGuide({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={continueLabel}
-          style={styles.sessionGuideCoachNextButton}
+          style={[
+            styles.sessionGuideCoachNextButton,
+            adaptiveLayout.usesSessionRail
+              ? styles.sessionGuideCoachNextButtonRail
+              : null
+          ]}
           testID="practice-session-guide-start"
           onPress={onContinue}
         >
@@ -4768,6 +4796,7 @@ function SessionCoachmarkDemo({
             ]}
             contentContainerStyle={[
               styles.activeSessionControlRailScrollContent,
+              styles.sessionGuideControlRailScrollContent,
               {
                 minHeight: boardSize,
                 width: adaptiveLayout.sessionRailWidth
@@ -13809,6 +13838,7 @@ const styles = StyleSheet.create({
   sessionGuideCalibrated: {
     alignSelf: "center",
     gap: 12,
+    position: "relative",
     width: "100%"
   },
   sessionGuideCoachFrame: {
@@ -13926,6 +13956,14 @@ const styles = StyleSheet.create({
     padding: 8,
     width: "100%"
   },
+  sessionGuideCoachNavigationRail: {
+    bottom: 0,
+    gap: 6,
+    padding: 4,
+    position: "absolute",
+    right: 0,
+    zIndex: 6
+  },
   sessionGuideCoachBackButton: {
     alignItems: "center",
     borderColor: "#CBD5E1",
@@ -13936,8 +13974,16 @@ const styles = StyleSheet.create({
     minWidth: 76,
     paddingHorizontal: 10
   },
+  sessionGuideCoachBackButtonRail: {
+    minHeight: 36,
+    minWidth: 64,
+    paddingHorizontal: 8
+  },
   sessionGuideCoachBackSpacer: {
     minWidth: 76
+  },
+  sessionGuideCoachBackSpacerRail: {
+    minWidth: 64
   },
   sessionGuideCoachBackText: {
     color: "#334155",
@@ -13960,6 +14006,11 @@ const styles = StyleSheet.create({
     minHeight: 44,
     minWidth: 96,
     paddingHorizontal: 12
+  },
+  sessionGuideCoachNextButtonRail: {
+    minHeight: 36,
+    minWidth: 92,
+    paddingHorizontal: 8
   },
   sessionGuideInfoTitle: {
     color: "#111827",
@@ -14891,6 +14942,9 @@ const styles = StyleSheet.create({
   },
   activeSessionControlRailScrollContent: {
     paddingBottom: 4
+  },
+  sessionGuideControlRailScrollContent: {
+    paddingBottom: 64
   },
   activeSessionControlRail: {
     flexGrow: 1,

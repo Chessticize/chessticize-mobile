@@ -1515,6 +1515,21 @@ describe("PracticePocScreen", () => {
     expect(
       flattenTestStyle(findByTestId(landscape, "practice-session-guide-demo-board").props.style).opacity
     ).toBe(0.34);
+    expect(
+      flattenTestStyle(findByTestId(
+        landscape,
+        "practice-session-guide-navigation"
+      ).props.style)
+    ).toMatchObject({
+      bottom: 0,
+      position: "absolute"
+    });
+    expect(
+      flattenTestStyle(findByTestId(
+        landscape,
+        "active-session-control-rail"
+      ).props.contentContainerStyle).paddingBottom
+    ).toBeGreaterThanOrEqual(64);
 
     const landscapeArrowDuel = renderLabScenario("practice-arrow-duel-guide-only");
     expect(findByTestId(
