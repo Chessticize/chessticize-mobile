@@ -175,6 +175,10 @@ export const ActiveSessionGuide: Story = {
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "practice-active-session-guide");
     await waitForTestId(canvasElement, "practice-session-guide-unclear");
+    await waitForText(
+      canvasElement,
+      "Use this after a correct answer when you did not fully understand the solution."
+    );
     expectTestIdAbsent(canvasElement, "session-board");
   }
 };

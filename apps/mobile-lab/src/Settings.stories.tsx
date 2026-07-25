@@ -44,6 +44,8 @@ export const SprintGuideReset: Story = {
   args: { scenarioId: "settings-sprint-guidance" },
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "settings-guidance-section");
+    await waitForTestId(canvasElement, "settings-show-sprint-guide");
+    await waitForText(canvasElement, "Reset guides");
   }
 };
 

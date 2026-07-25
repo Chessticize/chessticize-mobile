@@ -4053,7 +4053,7 @@ function ActiveSessionGuide({
     <View
       accessibilityLabel={isArrowDuel
         ? `${accessibilityStepCopy}Your first Arrow Duel. Compare the two candidate arrows, then play the stronger move. Only the shown candidates count. ${timerCopy}`
-        : `${accessibilityStepCopy}Your first active Sprint. Solve ${presentation.targetCorrect} puzzles to pass in ${presentation.durationLabel}. A Slow warning automatically marks the puzzle as Unclear without adding a mistake. A timeout marks the puzzle Timed out and Unclear, adds it to Review, then moves on. After a correct puzzle, use Mark as unclear when the solution still did not make sense. ${timerCopy}`}
+        : `${accessibilityStepCopy}Your first active Sprint. Solve ${presentation.targetCorrect} puzzles to pass in ${presentation.durationLabel}. A Slow warning automatically marks the puzzle as Unclear without adding a mistake. A timeout marks the puzzle Timed out and Unclear, adds it to Review, then moves on. After a correct puzzle, use Mark as unclear when you did not fully understand the solution. ${timerCopy}`}
       style={styles.sessionGuide}
       testID={isArrowDuel ? "practice-arrow-duel-guide" : "practice-active-session-guide"}
     >
@@ -4130,7 +4130,7 @@ function ActiveSessionGuide({
               </View>
             </View>
             <Text style={styles.sessionGuideInfoText}>
-              Use this when the answer was correct but the solution still did not make sense.
+              Use this after a correct answer when you did not fully understand the solution.
             </Text>
           </View>
         </>
@@ -10799,12 +10799,35 @@ function SettingsPanel({
     <View style={[styles.settingsPanel, adaptiveLayout.usesWideContent ? styles.settingsPanelWide : null]} testID="settings-panel">
       {showSprintGuideReset ? (
         <SettingsSection title="Guidance" testID="settings-guidance-section" wide={adaptiveLayout.usesWideContent}>
-          <SettingsActionRow
-            label="Show Sprint guides again"
-            detail="Replay the rules, active-session, and Arrow Duel guides. Runs, ratings, and History stay unchanged."
-            testID="settings-show-sprint-guide"
-            onPress={() => setSprintGuideReady(true)}
-          />
+          <View style={styles.settingsGuidanceResetCard} testID="settings-guidance-reset-card">
+            <View style={styles.settingsRowCopy}>
+              <Text style={styles.listText}>Replay practice guides</Text>
+              <Text style={styles.helperText}>
+                Reset the Sprint rules, active-session, and Arrow Duel guides so they appear again when each applies. Runs, ratings, and History stay unchanged.
+              </Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={sprintGuideReady ? "Practice guides reset" : "Reset practice guides"}
+              accessibilityState={{ disabled: sprintGuideReady }}
+              disabled={sprintGuideReady}
+              style={[
+                styles.settingsGuidanceResetButton,
+                sprintGuideReady ? styles.settingsGuidanceResetButtonComplete : null
+              ]}
+              testID="settings-show-sprint-guide"
+              onPress={() => setSprintGuideReady(true)}
+            >
+              <Text
+                style={[
+                  styles.settingsGuidanceResetButtonText,
+                  sprintGuideReady ? styles.settingsGuidanceResetButtonTextComplete : null
+                ]}
+              >
+                {sprintGuideReady ? "Guides reset" : "Reset guides"}
+              </Text>
+            </Pressable>
+          </View>
           {sprintGuideReady ? (
             <View
               accessibilityLiveRegion="polite"
@@ -10812,7 +10835,7 @@ function SettingsPanel({
               testID="settings-sprint-guide-ready"
             >
               <Text style={styles.sprintGuideReadyStatusText}>
-                Sprint rules, active-session, and Arrow Duel guides will replay in their next matching session
+                Guides reset. Each guide will replay the next time it applies.
               </Text>
             </View>
           ) : null}
@@ -16236,6 +16259,33 @@ const styles = StyleSheet.create({
     color: "#047857",
     fontSize: 12,
     fontWeight: "800"
+  },
+  settingsGuidanceResetCard: {
+    gap: 12,
+    padding: 12
+  },
+  settingsGuidanceResetButton: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: "#2563EB",
+    borderColor: "#2563EB",
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 42,
+    paddingHorizontal: 16
+  },
+  settingsGuidanceResetButtonComplete: {
+    backgroundColor: "#ECFDF5",
+    borderColor: "#6EE7B7"
+  },
+  settingsGuidanceResetButtonText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "800"
+  },
+  settingsGuidanceResetButtonTextComplete: {
+    color: "#047857"
   },
   feedbackSupportSectionCard: {
     borderColor: "#BFDBFE",

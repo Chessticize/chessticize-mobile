@@ -1085,7 +1085,12 @@ describe("PracticePocScreen", () => {
       "Mark as unclear"
     );
     expect(collectText(findByTestId(activeSession, "practice-session-guide-unclear"))).toContain(
-      "when the answer was correct but the solution still did not make sense"
+      "after a correct answer when you did not fully understand the solution"
+    );
+    expect(
+      findByTestId(activeSession, "practice-active-session-guide").props.accessibilityLabel
+    ).toContain(
+      "use Mark as unclear when you did not fully understand the solution"
     );
 
     press(activeSession, "practice-session-guide-start");
@@ -1175,17 +1180,28 @@ describe("PracticePocScreen", () => {
     const renderer = renderLabScenario("settings-sprint-guidance");
 
     expect(findByTestId(renderer, "settings-panel")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "settings-show-sprint-guide"))).toContain(
+    expect(collectText(findByTestId(renderer, "settings-guidance-reset-card"))).toContain(
       "Runs, ratings, and History stay unchanged."
     );
-    expect(collectText(findByTestId(renderer, "settings-show-sprint-guide"))).toContain(
+    expect(collectText(findByTestId(renderer, "settings-guidance-reset-card"))).toContain(
       "rules, active-session, and Arrow Duel guides"
     );
+    expect(collectText(findByTestId(renderer, "settings-show-sprint-guide"))).toBe(
+      "Reset guides"
+    );
+    expect(
+      findByTestId(renderer, "settings-guidance-reset-card").findAllByProps({
+        testID: "chevron-right-glyph"
+      })
+    ).toHaveLength(0);
     expect(() => findByTestId(renderer, "settings-sprint-guide-ready")).toThrow();
 
     press(renderer, "settings-show-sprint-guide");
+    expect(collectText(findByTestId(renderer, "settings-show-sprint-guide"))).toBe(
+      "Guides reset"
+    );
     expect(collectText(findByTestId(renderer, "settings-sprint-guide-ready"))).toBe(
-      "Sprint rules, active-session, and Arrow Duel guides will replay in their next matching session"
+      "Guides reset. Each guide will replay the next time it applies."
     );
   });
 
