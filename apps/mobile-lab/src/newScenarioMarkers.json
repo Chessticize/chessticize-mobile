@@ -7,6 +7,14 @@
       }
     ]
   },
+  "practice-home-edit": {
+    "issues": [
+      {
+        "issueNumber": 328,
+        "changeNote": "Use Rating consistently on Run cards while editing and reordering."
+      }
+    ]
+  },
   "practice-first-sprint-guide": {
     "issues": [
       {
@@ -28,6 +36,14 @@
       {
         "issueNumber": 328,
         "changeNote": "Explain the dynamic pass goal and timing consequences in New Run."
+      }
+    ]
+  },
+  "practice-run-name-validation": {
+    "issues": [
+      {
+        "issueNumber": 328,
+        "changeNote": "Use Rating consistently in the New Run validation state."
       }
     ]
   },
