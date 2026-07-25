@@ -19,7 +19,9 @@ Allowed results:
 
 A visual row is `pass` only after a person or visual agent opens the PNG and
 records what was inspected. A successful capture command or green component
-test is not sufficient.
+test is not sufficient. The file's pixel dimensions or observed app frame must
+also match the claimed orientation; a filename containing `landscape` is not
+orientation evidence.
 
 Classify every failure before acting:
 

@@ -27,6 +27,12 @@ Read these repo-local skills before acting:
 Follow `AGENTS.md`. A release-delta audit does not waive its clean-worktree,
 native-evidence, issue-tracker, or Storybook rules.
 
+This skill narrows the calibration workflow's repair loop. If the calibration
+skill says to fix a visual mismatch and repeat the capture, treat that as
+authorization to repair only validation infrastructure during a release-delta
+audit. A mismatch in product rendering or behavior remains a product finding:
+file an issue and leave product code unchanged.
+
 ## 1. Pin Exact Identities
 
 1. Determine the requested platform. If the user asks for an iOS build or iOS
@@ -124,6 +130,15 @@ DETOX_IOS_DEVICE="iPhone 17-Detox" \
 
 For each additional required device family, rerun the same journey with that
 installed dedicated simulator name and archive its screenshots separately.
+Preserve each device's output directory before starting another capture so a
+later run cannot overwrite the evidence.
+
+Verify orientation from the app's observed adaptive-layout frame or the
+captured image dimensions before accepting each portrait or landscape file.
+The requested orientation, screenshot filename, and a successful capture
+command are not proof. If simulator rotation is ignored or the observed frame
+never reaches the requested orientation, fail the capture row as blocked and
+do not accept or relabel the image.
 
 Open every captured PNG. Do not infer visual success from the screenshot
 command exiting zero. Inspect:
