@@ -954,6 +954,32 @@ describe('Detox suite configuration', () => {
     expect(requireUnclearVisible).toBeGreaterThan(scrollControlRail);
   });
 
+  it('checks the visible Sprint result boundary after first-use guidance', () => {
+    const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
+    const caseStart = practiceSpec.indexOf(
+      "it('persists first-use Sprint guidance and replays it after Settings reset'"
+    );
+    const caseEnd = practiceSpec.indexOf(
+      "it('renders the standard sprint board'",
+      caseStart
+    );
+    const firstUseCase = practiceSpec.slice(caseStart, caseEnd);
+    const requireResultExists = firstUseCase.indexOf(
+      "waitFor(element(by.id('sprint-summary-panel'))).toExist()"
+    );
+    const normalizeResultScroll = firstUseCase.indexOf(
+      "element(by.id('practice-main-scroll')).scrollTo('top')",
+      requireResultExists
+    );
+    const requireResultTopBarVisible = firstUseCase.indexOf(
+      "waitFor(element(by.id('sprint-result-top-bar'))).toBeVisible()"
+    );
+
+    expect(requireResultExists).toBeGreaterThan(0);
+    expect(normalizeResultScroll).toBeGreaterThan(requireResultExists);
+    expect(requireResultTopBarVisible).toBeGreaterThan(normalizeResultScroll);
+  });
+
   it('pins the Arrow Duel screenshot to the exact runtime-selected long-arrow fixture', () => {
     const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
     const renderCaseStart = practiceSpec.indexOf("it('renders Arrow Duel candidate arrows on the board'");
