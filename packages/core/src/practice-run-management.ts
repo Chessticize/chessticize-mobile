@@ -117,7 +117,7 @@ type RunManagementViewState = Omit<
 
 const PRACTICE_RUN_ELO_STEP = 100;
 export const PRACTICE_RUN_ELO_ERROR =
-  `Enter a whole-number ELO from ${PRACTICE_RUN_RATING_MIN} to ${PRACTICE_RUN_RATING_MAX}.`;
+  `Enter a whole-number rating from ${PRACTICE_RUN_RATING_MIN} to ${PRACTICE_RUN_RATING_MAX}.`;
 
 export function createPracticeRunManagementController(
   adapter: PracticeRunManagementAdapter

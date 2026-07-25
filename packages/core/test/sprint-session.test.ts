@@ -27,7 +27,7 @@ test("default sprint configs model minutes, target count, and max mistakes", () 
   assert.equal(defaultSprintConfig("arrow_duel").targetCorrect, 10);
 });
 
-test("a multi-step solved puzzle can win a target-one sprint and raise ELO", () => {
+test("a multi-step solved puzzle can win a target-one sprint and raise its rating", () => {
   const state = startSprint({
     config: buildSprintConfig({ mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 1 }),
     puzzles: [samplePuzzle("00008")],

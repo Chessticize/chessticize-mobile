@@ -7,7 +7,7 @@
       },
       {
         "issueNumber": 249,
-        "changeNote": "Add puzzle timeout to the existing Edit Run screen without changing ELO."
+        "changeNote": "Add puzzle timeout to the existing Edit Run screen without changing the Run's rating."
       }
     ]
   },

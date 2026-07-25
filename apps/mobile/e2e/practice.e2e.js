@@ -120,7 +120,7 @@ describe('Practice POC', () => {
     await device.terminateApp();
     await launchWithDisabledSynchronization({ newInstance: true, delete: false });
     await waitFor(element(by.text('Calculation Focus'))).toExist().withTimeout(180000);
-    await waitFor(element(by.text('ELO 1000'))).toExist().withTimeout(10000);
+    await waitFor(element(by.text('Rating 1000'))).toExist().withTimeout(10000);
   });
 
   it('renders the standard sprint board', async () => {

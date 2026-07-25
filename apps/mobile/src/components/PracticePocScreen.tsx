@@ -42,7 +42,6 @@ import {
   historyAttemptSpeedSeconds,
   isUnclearAttemptEligible,
   isReviewOverdue,
-  MANUAL_RATING_STEP,
   normalizeHistoryAttemptDetail,
   PRACTICE_RUN_NAME_MAX_LENGTH,
   RATING_FLOOR,
@@ -3728,7 +3727,7 @@ function PracticeRunHome({
         <View style={styles.runEmptyState} testID="practice-runs-empty">
           <Text style={styles.sectionLabel}>No runs on Home</Text>
           <Text style={styles.helperText}>
-            Add a new run or restore one below. Saved ELO and history are still available.
+            Add a new run or restore one below. Saved ratings and history are still available.
           </Text>
           <Pressable
             accessibilityRole="button"
@@ -3778,13 +3777,13 @@ function PracticeRunHome({
       {showRestore ? (
         <View style={styles.runRestoreSection} testID="practice-run-restore-section">
           <Text style={styles.sectionLabel}>Restore to Home</Text>
-          <Text style={styles.helperText}>Restoring a run keeps its existing ELO and history.</Text>
+          <Text style={styles.helperText}>Restoring a run keeps its existing rating and history.</Text>
           <View style={styles.runRestoreList}>
             {presentation.hiddenRuns.map((run) => (
               <View key={run.id} style={styles.runRestoreRow}>
                 <View style={styles.runRestoreCopy}>
                   <Text style={styles.listText}>{run.name}</Text>
-                  <Text style={styles.helperText}>ELO {run.elo}</Text>
+                  <Text style={styles.helperText}>Rating {run.elo}</Text>
                 </View>
                 <Pressable
                   accessibilityRole="button"
@@ -4091,8 +4090,8 @@ function PracticeRunCard({
         accessibilityRole="button"
         accessibilityState={{ selected: active && !editing }}
         accessibilityLabel={editing
-          ? directRunEditing ? `Edit ${run.name}` : `Edit ${run.name} ELO`
-          : `Select ${run.name}, ELO ${run.elo}, ${details}`}
+          ? directRunEditing ? `Edit ${run.name}` : `Edit ${run.name} rating`
+          : `Select ${run.name}, rating ${run.elo}, ${details}`}
         style={styles.practiceModeSelectArea}
         testID={`practice-run-select-${safeTestId(run.id)}`}
         onPress={() => presentationRunPress(editing, run.id, onIntent)}
@@ -4124,7 +4123,7 @@ function PracticeRunCard({
               ? "practice-mode-arrow-duel-rating"
               : undefined}
         >
-          ELO {run.elo}
+          Rating {run.elo}
         </Text>
         {editing ? (
           <View style={styles.runEditActions}>
@@ -4152,12 +4151,12 @@ function PracticeRunCard({
             </Pressable>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={directRunEditing ? `Edit ${run.name}` : `Edit ${run.name} ELO`}
+              accessibilityLabel={directRunEditing ? `Edit ${run.name}` : `Edit ${run.name} rating`}
               style={styles.runEditButton}
               testID={`practice-run-edit-${safeTestId(run.id)}`}
               onPress={() => onIntent({ type: "edit-run", runId: run.id })}
             >
-              <Text style={styles.runEditButtonText}>{directRunEditing ? "Edit" : "Edit ELO"}</Text>
+              <Text style={styles.runEditButtonText}>{directRunEditing ? "Edit" : "Edit rating"}</Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
@@ -4484,7 +4483,7 @@ function RunRemovalConfirmation({
       <View style={styles.runRemovalCopy}>
         <Text style={styles.listText}>Remove {run.name} from Home?</Text>
         <Text style={styles.helperText}>
-          Its ELO and history will be kept. You can restore this run later.
+          Its rating and history will be kept. You can restore this run later.
         </Text>
       </View>
       <View style={styles.runRemovalActions}>
@@ -4550,10 +4549,10 @@ function PracticeRunEditor({
         headerTestID="practice-run-editor-header"
         startAccessibilityLabel={isCreate
           ? "Add run to Home"
-          : directRunEditing ? `Save ${draft.name} run` : `Save ${draft.name} ELO`}
+          : directRunEditing ? `Save ${draft.name} run` : `Save ${draft.name} rating`}
         startDisabled={presentation.canSave === false}
         startTestID="practice-run-save"
-        title={isCreate ? "New Run" : directRunEditing ? "Edit Run" : "Edit ELO"}
+        title={isCreate ? "New Run" : directRunEditing ? "Edit Run" : "Edit rating"}
         titleTestID="practice-run-editor-title"
         onClose={() => presentation.onIntent({ type: "cancel-edit" })}
         onStart={() => presentation.onIntent({ type: "save-run" })}
@@ -4570,9 +4569,9 @@ function PracticeRunEditor({
             ? "Saving adds this run to Home. It does not start a sprint."
             : directRunEditing
               ? showTimingPreview
-                ? "Change this Run's name, ELO, and puzzle timing."
-                : "Change the name or current ELO. Format and training settings stay fixed."
-              : "Adjust the current ELO. Run settings stay fixed."}
+                ? "Change this Run's name, rating, and puzzle timing."
+                : "Change the name or current rating. Format and training settings stay fixed."
+              : "Adjust the current rating. Run settings stay fixed."}
         </Text>
       </View>
 
@@ -4798,7 +4797,7 @@ function PracticeRunTimingPreview(): React.JSX.Element {
     <View style={styles.settingsSection} testID="practice-run-puzzle-timing">
       <View style={styles.runTimingSectionCopy}>
         <Text style={styles.sectionLabel}>Puzzle timing</Text>
-        <Text style={styles.helperText}>Typical time 0:20 · no ELO impact</Text>
+        <Text style={styles.helperText}>Typical time 0:20 · no rating impact</Text>
       </View>
       <View style={styles.customConfigCard} testID="practice-run-puzzle-timing-card">
         <RunTimingSettingRow
@@ -4921,15 +4920,17 @@ function PracticeRunEloRow({
       <>
         <View style={styles.customConfigRow} testID="practice-run-elo-row">
           <View style={styles.customChoiceCopy}>
-            <Text style={styles.listText}>{isCreate ? "Starting ELO" : "Current ELO"}</Text>
+            <Text style={styles.listText}>{isCreate ? "Starting rating" : "Current rating"}</Text>
             <Text style={styles.requiredFieldLabel}>
-              {CUSTOM_INITIAL_RATING_MIN}–{CUSTOM_INITIAL_RATING_MAX} · ±100 buttons
+              {isCreate
+                ? `Sets initial puzzle difficulty · ${CUSTOM_INITIAL_RATING_MIN}–${CUSTOM_INITIAL_RATING_MAX}`
+                : `${CUSTOM_INITIAL_RATING_MIN}–${CUSTOM_INITIAL_RATING_MAX} · ±100 buttons`}
             </Text>
           </View>
           <View style={styles.runEloStepper} testID="practice-run-elo-stepper">
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Decrease run ELO by 100"
+              accessibilityLabel="Decrease run rating by 100"
               accessibilityState={{ disabled: !canDecrease }}
               disabled={!canDecrease}
               style={[styles.customStepperButton, !canDecrease ? styles.disabledButton : null]}
@@ -4943,7 +4944,7 @@ function PracticeRunEloRow({
               testID="practice-run-elo-input-shell"
             >
               <TextInput
-                accessibilityLabel={isCreate ? "Starting ELO" : "Current ELO"}
+                accessibilityLabel={isCreate ? "Starting rating" : "Current rating"}
                 inputMode="numeric"
                 keyboardType="number-pad"
                 maxLength={4}
@@ -4956,7 +4957,7 @@ function PracticeRunEloRow({
             </View>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Increase run ELO by 100"
+              accessibilityLabel="Increase run rating by 100"
               accessibilityState={{ disabled: !canIncrease }}
               disabled={!canIncrease}
               style={[styles.customStepperButton, !canIncrease ? styles.disabledButton : null]}
@@ -4983,15 +4984,17 @@ function PracticeRunEloRow({
   return (
     <View style={styles.customConfigRow} testID="practice-run-elo-row">
       <View style={styles.customChoiceCopy}>
-        <Text style={styles.listText}>{isCreate ? "Starting ELO" : "Current ELO"}</Text>
+        <Text style={styles.listText}>{isCreate ? "Starting rating" : "Current rating"}</Text>
         <Text style={styles.requiredFieldLabel}>
-          Adjusts by {MANUAL_RATING_STEP} · minimum {RATING_FLOOR}
+          {isCreate
+            ? `Sets initial puzzle difficulty · minimum ${RATING_FLOOR}`
+            : `Adjusts puzzle difficulty · minimum ${RATING_FLOOR}`}
         </Text>
       </View>
       <View style={styles.advancedRatingControls}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Decrease run ELO"
+          accessibilityLabel="Decrease run rating"
           accessibilityState={{ disabled: !canDecrease }}
           disabled={!canDecrease}
           style={[styles.customStepperButton, !canDecrease ? styles.disabledButton : null]}
@@ -5000,10 +5003,10 @@ function PracticeRunEloRow({
         >
           <MinusGlyph />
         </Pressable>
-        <Text style={styles.settingsRowValue} testID="practice-run-elo-value">ELO {value}</Text>
+        <Text style={styles.settingsRowValue} testID="practice-run-elo-value">Rating {value}</Text>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Increase run ELO"
+          accessibilityLabel="Increase run rating"
           style={styles.customStepperButton}
           testID="practice-run-elo-increase"
           onPress={() => onChange(stepManualRating(value, 1))}
@@ -5050,12 +5053,12 @@ function PracticeProgressCard({
     <>
       <Text style={styles.sectionLabel}>Progress</Text>
       <View
-        accessibilityLabel={`Progress summary, ELO ${currentRating}, rating ${ratingDeltaLabel}, this week ${progress.correctThisWeek}, ${progressDelta}, ${progressContext}`}
+        accessibilityLabel={`Progress summary, ${ratingContextLabel ?? modeLabel(mode)} rating ${currentRating}, ${ratingDeltaLabel}, this week ${progress.correctThisWeek}, ${progressDelta}, ${progressContext}`}
         style={styles.practiceProgressCard}
         testID="practice-progress-summary"
       >
         <View style={styles.progressMetric} testID="practice-progress-rating-metric">
-          <Text style={styles.progressMetricLabel}>ELO ({ratingContextLabel ?? modeLabel(mode)})</Text>
+          <Text style={styles.progressMetricLabel}>{ratingContextLabel ?? modeLabel(mode)} rating</Text>
           <Text style={styles.progressValue}>{currentRating}</Text>
           <Text testID="practice-progress-rating-delta" style={[styles.progressDelta, ratingDeltaTone]}>{ratingDeltaLabel}</Text>
         </View>
@@ -5077,7 +5080,7 @@ function PracticeNoRunProgressCard(): React.JSX.Element {
       <Text style={styles.sectionLabel}>Progress</Text>
       <View style={styles.runNoSelectionCard} testID="practice-progress-no-run">
         <Text style={styles.listText}>No run selected</Text>
-        <Text style={styles.helperText}>Add or restore a run to see its current ELO.</Text>
+        <Text style={styles.helperText}>Add or restore a run to see its current rating.</Text>
       </View>
     </>
   );
@@ -5170,7 +5173,7 @@ function PracticeModeCard({
 }): React.JSX.Element {
   const label = modeLabel(item.mode);
   const detail = practiceModeDetailLabel(item);
-  const ratingLabel = item.rating === undefined ? null : `ELO ${item.rating}`;
+  const ratingLabel = item.rating === undefined ? null : `Rating ${item.rating}`;
   const modeTestId = item.mode.replace("_", "-");
   return (
     <Pressable
@@ -5223,7 +5226,7 @@ function practiceModeDetailLabel(item: PracticeModeSummary): string {
   if (item.mode === "custom") {
     return "Configure time, theme, and rating";
   }
-  return `${formatSprintTimingLabel(item.config)} · ELO ${item.rating ?? 600}`;
+  return `${formatSprintTimingLabel(item.config)} · Rating ${item.rating ?? 600}`;
 }
 
 function formatSprintTimingLabel(config: SprintConfig): string {
@@ -5467,15 +5470,16 @@ function CustomInitialRatingRow({
   if (!played) {
     return (
       <View
-        accessibilityLabel={`Initial ELO, ELO ${value}`}
+        accessibilityLabel={`Starting rating, rating ${value}. Sets the initial puzzle difficulty for this Run.`}
         style={styles.customConfigRow}
         testID="custom-initial-rating-row"
       >
         <View style={styles.customChoiceCopy}>
-          <Text style={styles.listText}>Initial ELO</Text>
+          <Text style={styles.listText}>Starting rating</Text>
+          <Text style={styles.requiredFieldLabel}>Sets initial puzzle difficulty</Text>
         </View>
         <View style={styles.customStepperGroup}>
-          <Text style={styles.customConfigValue} testID="custom-initial-rating-value">ELO {value}</Text>
+          <Text style={styles.customConfigValue} testID="custom-initial-rating-value">Rating {value}</Text>
           <CustomRatingStepper onChange={onChange} value={value} />
         </View>
       </View>
@@ -5487,17 +5491,17 @@ function CustomInitialRatingRow({
       <Pressable
         accessible
         accessibilityRole="button"
-        accessibilityLabel={`Edit ELO, ELO ${value}`}
+        accessibilityLabel={`Edit rating, rating ${value}`}
         accessibilityState={{ expanded: editOpen }}
         style={styles.customConfigRow}
         testID="custom-initial-rating-row"
         onPress={() => onEditOpenChange(!editOpen)}
       >
         <View style={styles.customChoiceCopy}>
-          <Text style={styles.listText}>Edit ELO</Text>
+          <Text style={styles.listText}>Edit rating</Text>
         </View>
         <View style={styles.customStepperGroup}>
-          <Text style={styles.customConfigValue} testID="custom-initial-rating-value">ELO {value}</Text>
+          <Text style={styles.customConfigValue} testID="custom-initial-rating-value">Rating {value}</Text>
           <ChevronGlyph direction="right" />
         </View>
       </Pressable>
@@ -5534,7 +5538,7 @@ function CustomRatingStepper({
     <View style={styles.customStepperCompact} testID="custom-initial-rating-stepper">
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Decrease ELO"
+        accessibilityLabel="Decrease rating"
         accessibilityState={{ disabled: !canDecrease }}
         disabled={!canDecrease}
         testID="custom-initial-rating-stepper-decrease"
@@ -5545,7 +5549,7 @@ function CustomRatingStepper({
       </Pressable>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Increase ELO"
+        accessibilityLabel="Increase rating"
         accessibilityState={{ disabled: !canIncrease }}
         disabled={!canIncrease}
         testID="custom-initial-rating-stepper-increase"
@@ -5799,7 +5803,7 @@ function PreviousCustomConfigRow({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Use ${ratingLabel} custom sprint, ${config.mode}, ${metaLabel}, ELO ${config.rating}`}
+      accessibilityLabel={`Use ${ratingLabel} custom sprint, ${config.mode}, ${metaLabel}, rating ${config.rating}`}
       style={styles.previousConfigRow}
       testID={`custom-previous-${config.id}`}
       onPress={onPress}
@@ -5818,7 +5822,7 @@ function PreviousCustomConfigRow({
       </View>
       <View style={styles.previousConfigTrailing}>
         <View style={styles.previousConfigRating}>
-          <Text style={styles.helperText}>ELO</Text>
+          <Text style={styles.helperText}>Rating</Text>
           <Text style={styles.practiceModeRating}>{config.rating}</Text>
         </View>
         <View style={styles.previousConfigChevron} testID={`custom-previous-${config.id}-chevron`}>
@@ -10926,8 +10930,8 @@ function SettingsPanel({
       {showRatingControls ? (
         <SettingsSection title="Profile" testID="settings-profile-section" wide={adaptiveLayout.usesWideContent}>
           <SettingsRow
-            label="Edit ELO"
-            value={`ELO ${standardRating}`}
+            label="Edit rating"
+            value={`Rating ${standardRating}`}
             detail="Standard and Arrow Duel difficulty"
             testID="settings-standard-elo-row"
             onPress={() => onAdvancedRatingsOpenChange(!advancedRatingsOpen)}
@@ -10948,7 +10952,7 @@ function SettingsPanel({
         <SettingsSection title="Guidance" testID="settings-guidance-section" wide={adaptiveLayout.usesWideContent}>
           <SettingsActionRow
             label="Show Sprint guides again"
-            detail="Replay the rules, active-session, and Arrow Duel guides. Runs, ELO, and History stay unchanged."
+            detail="Replay the rules, active-session, and Arrow Duel guides. Runs, ratings, and History stay unchanged."
             testID="settings-show-sprint-guide"
             onPress={() => setSprintGuideReady(true)}
           />
@@ -11393,7 +11397,7 @@ function AdvancedRatingsPanel({
     <View style={styles.advancedRatingsPanel} testID="settings-advanced-ratings-panel">
       <Text style={styles.sectionLabel}>Difficulty controls</Text>
       <Text style={styles.helperText}>
-        Set each ELO to curate your preferred puzzle difficulty.
+        Each rating helps Chessticize choose the right puzzle difficulty.
       </Text>
       <View style={styles.advancedRatingRows}>
         {ratings.map(({ label, record }) => (
@@ -11440,7 +11444,7 @@ function AdvancedRatingRow({
         >
           <MinusGlyph />
         </Pressable>
-        <Text style={styles.settingsRowValue} testID={`${testID}-value`}>ELO {record.rating}</Text>
+        <Text style={styles.settingsRowValue} testID={`${testID}-value`}>Rating {record.rating}</Text>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Increase ${label} rating`}

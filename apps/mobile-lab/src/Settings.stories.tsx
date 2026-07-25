@@ -81,7 +81,7 @@ export const NotificationsNotDetermined: Story = {
 };
 
 export const AdvancedRatingEditor: Story = {
-  name: "ELO controls moved to runs",
+  name: "Rating controls moved to runs",
   args: { scenarioId: "settings-advanced-ratings" },
   play: async ({ canvasElement }) => {
     await openSettings(canvasElement);

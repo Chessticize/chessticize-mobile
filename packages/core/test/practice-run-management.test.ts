@@ -47,7 +47,7 @@ test("Run management creates a uniquely named multi-theme Run through its public
   assert.equal(adapter.commands.at(-1)?.type, "create-run");
 });
 
-test("editing preserves fixed Run settings while validating direct ELO input", () => {
+test("editing preserves fixed Run settings while validating direct rating input", () => {
   const adapter = new FakeRunManagementAdapter();
   const controller = createPracticeRunManagementController(adapter);
 
@@ -66,7 +66,7 @@ test("editing preserves fixed Run settings while validating direct ELO input", (
   controller.dispatch({ type: "change-elo-input", value: "2201" });
   assert.equal(
     controller.getSnapshot().eloError,
-    "Enter a whole-number ELO from 600 to 2200."
+    "Enter a whole-number rating from 600 to 2200."
   );
   assert.equal(controller.getSnapshot().canSave, false);
 
@@ -84,7 +84,7 @@ test("editing preserves fixed Run settings while validating direct ELO input", (
   assert.equal(adapter.commands.at(-1)?.type, "update-run");
 });
 
-test("reorder, archive, and restore retain stable Run identity and ELO", () => {
+test("reorder, archive, and restore retain stable Run identity and rating", () => {
   const adapter = new FakeRunManagementAdapter();
   const controller = createPracticeRunManagementController(adapter);
 

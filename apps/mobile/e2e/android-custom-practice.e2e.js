@@ -148,12 +148,12 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
 
       await openTab('practice-tab', 'practice-action-header');
       await waitFor(element(by.text(CUSTOM_RUN_NAME))).toExist().withTimeout(10000);
-      await waitFor(element(by.text(`ELO ${practiceFixture.expectedRatingAfter}`))).toExist().withTimeout(10000);
+      await waitFor(element(by.text(`Rating ${practiceFixture.expectedRatingAfter}`))).toExist().withTimeout(10000);
       await element(by.text(CUSTOM_RUN_NAME)).tap();
       await waitForVisibleInPracticeScroll('practice-progress-summary');
       await waitForElementAccessibilityLabelContaining(
         'practice-progress-summary',
-        `ELO ${practiceFixture.expectedRatingAfter}`,
+        `Rating ${practiceFixture.expectedRatingAfter}`,
         10000,
         50
       );

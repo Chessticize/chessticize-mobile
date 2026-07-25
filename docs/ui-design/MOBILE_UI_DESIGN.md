@@ -9,8 +9,8 @@ This document captures the current Chessticize Mobile implementation shape and t
 - Standard Sprint session shows Abandon, success progress, timer, turn prompt, and a large chessboard.
 - Arrow Duel session shows Abandon, success progress, timer, a short instruction card, a chessboard, and two candidate arrows.
 - Custom Sprint setup includes mode, theme, duration, time per puzzle, editable
-  ELO, computed puzzle count, and previous custom configs.
-- Settings includes chess platform connections and ELO editing. Mobile v1 should keep advanced rating management but not prioritize chess.com or Lichess account import.
+  rating, computed puzzle count, and previous custom configs.
+- Settings includes chess platform connections and rating editing. Mobile v1 should keep advanced rating management but not prioritize chess.com or Lichess account import.
 
 ### Current UI Issues To Avoid
 
@@ -18,7 +18,7 @@ This document captures the current Chessticize Mobile implementation shape and t
 - The tan/brown board dominates the screen and makes the product feel warmer and heavier than desired.
 - Arrow Duel uses decorative emoji in instructional text; mobile should avoid emoji and rely on concise labels and state colors.
 - The web dashboard mixes summary stats, mode selection, and recent configs in one broad page. Mobile needs a tighter task-first hierarchy.
-- Settings exposes many ELO fields as editable inputs. Mobile should prefer explicit advanced adjustment flows and avoid a dense form by default.
+- Settings exposes many rating fields as editable inputs. Mobile should prefer explicit advanced adjustment flows and avoid a dense form by default.
 
 ## Complete App Design Board
 
@@ -51,7 +51,7 @@ Screen inventory:
 | Review Queue | Due/overdue summary, difficulty groups, start button | Start due review, filter queue | Review Item |
 | Analysis Review | Board, compact toolbar, Stockfish status, candidate line rows, guided arrows when applicable | Reset, flip, analyze, navigate, finish review | Review Complete, History |
 | History | All-puzzle attempt list, All/Needs attention selector, conditional rating trend, expandable filters | Switch result scope, refine filters, inspect attempt context, open attempt | Attempt Detail, Review Item |
-| Custom Sprint Setup | Mode/theme/timing controls, editable ELO, estimate, start | Start sprint, save template | Active Sprint |
+| Custom Sprint Setup | Mode/theme/timing controls, editable rating, estimate, start | Start sprint, save template | Active Sprint |
 | Settings | iCloud Sync, notifications, profile, about, puzzle-data source notes | Toggle sync, adjust reminders, inspect licenses and support contact | External license/source/data/support links |
 
 ## Mobile Information Architecture
@@ -237,14 +237,14 @@ Spacing and shape:
 
 Core components:
 
-- `SessionStatusBar`: mode, ELO, progress, timer, mistakes, pause/abandon affordance.
+- `SessionStatusBar`: mode, rating, progress, timer, mistakes, pause/abandon affordance.
 - `ChessboardSurface`: reused board component plus highlight/arrow overlay adapter.
 - `ModePicker`: compact list or segmented choice for Standard, Arrow Duel, Custom.
 - `ReviewQueueHeader`: due count, overdue count, and next review estimate.
 - `HistoryFilterBar`: persistent All/Needs attention segmented view, compact
   filter toggle, applied-filter summary, and expandable range, rating,
   result/source, review-state, side, and theme filters.
-- `RatingTrendChart`: rating-only line chart over the selected ELO bucket and
+- `RatingTrendChart`: rating-only line chart over the selected rating bucket and
   time range; hidden in the default All Puzzles view.
 - `SettingsRow`: label, value, status, and disclosure or switch.
 - `SettingsExternalLinkRow`: label, short value, readable detail, and a
@@ -260,7 +260,7 @@ Core components:
 
 Practice session layout:
 
-- Top session bar: mode, ELO, progress, timer, mistakes, and exit.
+- Top session bar: mode, rating, progress, timer, mistakes, and exit.
 - Board gets most of the screen and remains visually stable.
 - Prompt and action area live below the board.
 - Regular puzzles use board moves as the primary input.
@@ -295,13 +295,13 @@ Sprint scoring rules:
 - Custom Sprint target count is `floor(durationSeconds / perPuzzleSeconds)`.
 - A sprint is won only when the target correct count is reached before time expires and before mistake failure.
 - A sprint is failed when time expires, the user abandons, or the user reaches 3 mistakes.
-- Winning a sprint increases that sprint ELO type.
-- Failing a sprint lowers that sprint ELO type.
-- Abandoning after the first submitted move, whether that move was correct or wrong, is a failed rated run and lowers that sprint ELO type. Abandoning before any submitted move remains an unrated cancel.
-- Each sprint mode and custom speed has its own ELO/statistics bucket.
-- A manual ELO edit starts a new rating generation, clears the rated-game count,
+- Winning a sprint increases that sprint rating.
+- Failing a sprint lowers that sprint rating.
+- Abandoning after the first submitted move, whether that move was correct or wrong, is a failed rated run and lowers that sprint rating. Abandoning before any submitted move remains an unrated cancel.
+- Each sprint mode and custom speed has its own rating/statistics bucket.
+- A manual rating edit starts a new rating generation, clears the rated-game count,
   caps rating deviation at 100 without increasing an already lower value, and
-  preserves volatility. This treats the chosen ELO as a deliberate difficulty
+  preserves volatility. This treats the chosen rating as a deliberate difficulty
   anchor while allowing later sprints to recalibrate it.
 
 Practice controls:
@@ -372,7 +372,7 @@ Engine line list:
 - Every live Stockfish row should have an engine evaluation. Do not fill the list with unscored legal moves.
 - Rows are tappable. Tapping a row makes that move on the analysis board, adds the previous position to the back stack, clears the forward stack, and starts fresh analysis from the new position.
 - The row order and eval values may change as Stockfish searches deeper. The UI should stream updates rather than wait for final depth.
-- Back, forward, and reset affect only the analysis board and never create History rows, review attempts, ELO changes, or review schedule updates.
+- Back, forward, and reset affect only the analysis board and never create History rows, review attempts, rating changes, or review schedule updates.
 - Reset returns to the puzzle's initial review position, not the current Stockfish line's start if the user has navigated away.
 
 Terminal and guided-line states:
@@ -388,12 +388,12 @@ New Run layout:
 
 - Use a focused New Run screen or bottom sheet rather than a desktop-style page.
 - Keep name, practice format, themes, duration, and per-puzzle time as compact controls.
-- Show computed puzzle count and ELO as a live summary.
+- Show computed puzzle count and rating as a live summary.
 - Saving creates a persistent named Run on Practice Home and does not start a Sprint.
 - Do not show a separate Previous configs list. During the schema v8 upgrade,
   promote every legacy Previous config into a visible named Home Run in its
   existing last-used order. Number Regular Puzzle and Arrow Duel names
-  independently, preserve the legacy rating key, ELO, themes, timing, and
+  independently, preserve the legacy rating key, rating, themes, timing, and
   History grouping, and keep the old config row for a non-destructive,
   idempotent migration.
 
@@ -405,20 +405,20 @@ New Run controls:
   themes use OR eligibility.
 - Duration: use allowed sprint durations from the domain config.
 - Per-puzzle time: use allowed per-puzzle times from the domain config.
-- ELO: default to 600 for unplayed custom buckets. Show the `Initial ELO`
+- Rating: default to 600 for unplayed custom buckets. Show the `Starting rating`
   stepper directly before play. After play, replace it with a collapsed
-  `Edit ELO` disclosure row so changing an established rating remains possible
+  `Edit rating` disclosure row so changing an established rating remains possible
   but is not presented as a routine action.
 - Max mistakes: default from domain config; do not expose in the current Custom
   Sprint setup.
 - Summary: target puzzle count only; avoid repeating mode, rating range, current
-  rating, ELO type, or mistake limit as non-editable rows.
+  rating bucket, or mistake limit as non-editable rows.
 
 New Run behavior:
 
 - Changing any control updates the summary immediately.
 - Add to Home is disabled only when the Run is invalid or no eligible puzzles exist locally.
-- Once a Run has rated games, its current ELO remains editable from that Run's
+- Once a Run has rated games, its current rating remains editable from that Run's
   editor without changing its stable Run identity or History linkage.
 - If the selected puzzle pack lacks enough eligible puzzles, show a local pack
   warning and offer a broader theme.
@@ -430,7 +430,7 @@ New Run behavior:
 - Default entry opens Practice, not a landing page.
 - Practice Home lists persistent named Runs, including the built-in Standard and
   Arrow Duel Runs, plus a separate Add Run action.
-- Current ELO appears on each Run and is edited from that Run's editor rather
+- Current rating appears on each Run and is edited from that Run's editor rather
   than from a separate Settings rating surface.
 - The active session should remain readable at small phone widths.
 - The active session should remain playable in compact landscape without requiring vertical scrolling of the board lane.
@@ -501,7 +501,7 @@ New Run behavior:
 - Place the expanded advanced-filter region in one bordered container above
   `All / Needs attention`. Keep Themes visually lightweight inside that
   container, without its own full-width card border or background.
-- Selecting an ELO bucket supplies the mode, sprint config, and sprint-speed
+- Selecting a rating bucket supplies the mode, sprint config, and sprint-speed
   context for rating history. Do not show separate History mode or speed chips
   while the view can be focused through rating bucket chips.
 - Source type distinguishes sprint attempts from official Scheduled Review attempts.
@@ -511,7 +511,7 @@ New Run behavior:
 - Each row should show result, source type, mode, puzzle rating, elapsed time, date, and review status.
 - Row review status and difficulty must be resolved by the full attempt context
   (`puzzleId + mode + ratingKey`), not by `puzzleId` alone. The same puzzle can
-  appear in multiple sprint modes or ELO buckets, and a queued review date from
+  appear in multiple sprint modes or rating buckets, and a queued review date from
   one bucket must never appear on another bucket's row.
 - Tapping a row opens Analysis Review with original attempt context.
 - Analysis Review launched from History supports retry, Stockfish analysis, and previous/next navigation through the current filtered History result set.
@@ -531,14 +531,14 @@ New Run behavior:
   after a rating bucket is selected.
 - Failed attempts should clearly show whether they are already in the review queue.
 - The rating trend chart belongs in History, not primarily in Sprint Results.
-- History must show only the selected ELO bucket's rating trend as a line chart
+- History must show only the selected rating bucket's rating trend as a line chart
   connecting rating-change points. Do not show a rating trend in the default All
   Puzzles view.
 - Do not show alternate History performance chart modes such as wins/losses, accuracy, solved count, mistake rate, or review due volume.
 - The rating trend chart series uses the full filtered time range.
   Pagination affects only the visible attempt rows, never the chart inputs.
 - The rating trend chart intentionally ignores the correct/wrong result filter. That filter is for narrowing attempt rows, not for redefining the rating series.
-- Statistics are grouped separately by the selected ELO bucket for Standard,
+- Statistics are grouped separately by the selected rating bucket for Standard,
   legacy Blitz data, Arrow Duel, theme sprint, and custom sprint speeds.
 - Mistake statistics are also grouped separately by sprint type, speed, theme, and review state.
 
@@ -554,7 +554,7 @@ New Run behavior:
   and current account/sync status, and exposes a manual Sync Now action while
   sync is enabled.
 - On regular-width iPad, Settings should use grouped navigation plus a detail panel; do not make each settings row stretch across the full display.
-- ELO difficulty controls should be hidden behind an `Edit ELO` row to keep the
+- Rating difficulty controls should be hidden behind an `Edit rating` row to keep the
   default Settings surface compact.
 - Settings must not expose incomplete local data actions. Do not show local
   storage copy, export, local-history deletion, or rating-reset rows unless a
@@ -666,7 +666,7 @@ Accessibility rules:
 
 - Every core screen must expose stable accessibility labels for Detox.
 - Component tests should verify user-visible behavior, not component internals.
-- UI should receive view models from backend/domain packages; React components must not compute sprint outcomes, ELO updates, review scheduling, or Arrow Duel correctness.
+- UI should receive view models from backend/domain packages; React components must not compute sprint outcomes, rating updates, review scheduling, or Arrow Duel correctness.
 - E2E flows should cover Practice start, Arrow Duel choice, wrong-answer review, custom sprint setup, history filtering, Settings iCloud Sync, and About link attribution.
 - Design QA should include iPhone SE-sized portrait, modern iPhone portrait, compact iPhone landscape, iPad portrait, iPad landscape, and iPad split-view widths.
 - Adaptive component tests should render the app shell with explicit width/height pairs and assert chrome placement, board sizing, rail visibility, and absence of overlapping controls.
