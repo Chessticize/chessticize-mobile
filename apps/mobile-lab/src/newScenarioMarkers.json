@@ -159,6 +159,14 @@
       }
     ]
   },
+  "review-session": {
+    "issues": [
+      {
+        "issueNumber": 332,
+        "changeNote": "Keep the Review board fixed and unobstructed in the Sprint-style landscape layout."
+      }
+    ]
+  },
   "history-populated": {
     "issues": [
       {

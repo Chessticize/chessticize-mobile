@@ -10,6 +10,11 @@ import {
   type PracticeDebugTraceEvent,
   type PracticeRunManagementPresentation
 } from "../src/components/PracticePocScreen";
+import {
+  buildPracticeAdaptiveLayout,
+  PRACTICE_UI_PADDING,
+  type PracticeSafeAreaInsets
+} from "../src/components/adaptivePracticeLayout";
 import { LabScenario } from "../../mobile-lab/src/LabScenario";
 import {
   createMobilePracticeService,
@@ -3146,6 +3151,132 @@ describe("PracticePocScreen", () => {
       .toBe("Mistakes 0");
     expect(controlRail.findByProps({ testID: "session-score-left" }).props.accessibilityLabel)
       .toBe("Left 15");
+  });
+
+  it.each([
+    {
+      height: 402,
+      insets: { top: 0, right: 62, bottom: 21, left: 62 },
+      label: "iPhone 17 landscape",
+      scale: 3,
+      width: 874
+    },
+    {
+      height: 834,
+      insets: { top: 0, right: 0, bottom: 20, left: 0 },
+      label: "11-inch iPad landscape",
+      scale: 2,
+      width: 1210
+    }
+  ])("keeps active Review in the Sprint board-left layout on $label", ({
+    height,
+    insets,
+    scale,
+    width
+  }: {
+    height: number;
+    insets: PracticeSafeAreaInsets;
+    label: string;
+    scale: number;
+    width: number;
+  }) => {
+    setPracticeViewport({ width, height, scale, insets });
+
+    const expectedLayout = buildPracticeAdaptiveLayout({
+      fontScale: 1,
+      height,
+      insets,
+      width
+    });
+    const sprintRenderer = renderScreen({
+      practiceService: createMobilePracticeService("familiar15")
+    });
+    startStandardSprint(sprintRenderer);
+    const sprintBoardSize = Number(
+      flattenTestStyle(findByTestId(sprintRenderer, "session-board").props.style).width
+    );
+
+    const reviewRenderer = renderScreen({
+      currentTimeMs: () => Date.parse("2026-06-20T12:00:00.000Z"),
+      practiceService: createDueReviewService(1)
+    });
+    press(reviewRenderer, "review-tab");
+    press(reviewRenderer, "review-start-due");
+
+    const reviewLayout = findByTestId(reviewRenderer, "review-session-adaptive-layout");
+    const boardLane = findByTestId(reviewRenderer, "review-session-board-lane");
+    const controlRail = findByTestId(reviewRenderer, "review-session-control-rail");
+    const boardStyle = flattenTestStyle(findByTestId(reviewRenderer, "review-board").props.style);
+    const layoutStyle = flattenTestStyle(reviewLayout.props.style);
+    const boardLaneStyle = flattenTestStyle(boardLane.props.style);
+    const controlRailStyle = flattenTestStyle(controlRail.props.style);
+
+    expect(boardStyle.width).toBe(sprintBoardSize);
+    expect(boardStyle.height).toBe(sprintBoardSize);
+    expect(layoutStyle.width).toBe(expectedLayout.sessionPackedRowWidth);
+    expect(layoutStyle.gap).toBe(expectedLayout.sessionRailGap);
+    expect(boardLaneStyle.width).toBe(sprintBoardSize);
+    expect(controlRailStyle.width).toBe(expectedLayout.sessionRailWidth);
+    expect(controlRailStyle.height).toBe(sprintBoardSize);
+    expect(sprintBoardSize + 2 * PRACTICE_UI_PADDING)
+      .toBeLessThanOrEqual(expectedLayout.contentHeight);
+    expect(findByTestId(reviewRenderer, "practice-main-scroll").props.scrollEnabled).toBe(false);
+    expect(controlRail.findByProps({ testID: "review-header" })).toBeTruthy();
+    expect(controlRail.findByProps({ testID: "review-context-strip" })).toBeTruthy();
+    expect(controlRail.findByProps({ testID: "practice-prompt" })).toBeTruthy();
+    expect(() => boardLane.findByProps({ testID: "review-header" })).toThrow();
+    expect(() => boardLane.findByProps({ testID: "review-context-strip" })).toThrow();
+    expect(() => boardLane.findByProps({ testID: "practice-prompt" })).toThrow();
+    expect(boardLane.findByProps({ testID: "review-board" })).toBeTruthy();
+  });
+
+  it("keeps the Review board fixed while rotating into its unobstructed landscape lane", () => {
+    setPracticeViewport({
+      width: 402,
+      height: 874,
+      scale: 3,
+      insets: { top: 62, right: 0, bottom: 34, left: 0 }
+    });
+
+    const renderer = renderScreen({
+      currentTimeMs: () => Date.parse("2026-06-20T12:00:00.000Z"),
+      practiceService: createDueReviewService(1)
+    });
+    press(renderer, "review-tab");
+    press(renderer, "review-start-due");
+
+    const portraitBoardLabel = findByTestId(renderer, "review-board").props.accessibilityLabel;
+    const portraitCoordinates = collectText(findByTestId(renderer, "board-coordinate-overlay"));
+
+    expect(findByTestId(renderer, "review-session-stacked-layout")).toBeTruthy();
+    expect(() => findByTestId(renderer, "review-session-control-rail")).toThrow();
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
+    expect(testIdOrder(renderer, "review-header", "review-board")).toBeLessThan(0);
+    expect(testIdOrder(renderer, "practice-prompt", "review-board")).toBeLessThan(0);
+
+    act(() => {
+      setPracticeViewport({
+        width: 874,
+        height: 402,
+        scale: 3,
+        insets: { top: 0, right: 62, bottom: 21, left: 62 }
+      });
+    });
+
+    expect(findByTestId(renderer, "adaptive-layout").props.accessibilityLabel)
+      .toBe("Layout compactLandscape");
+    expect(findByTestId(renderer, "review-session-adaptive-layout")).toBeTruthy();
+    expect(renderedTestIdCount(renderer, "review-board")).toBe(1);
+    expect(renderedTestIdCount(renderer, "board-coordinate-overlay")).toBe(1);
+    expect(findByTestId(renderer, "review-board").props.accessibilityLabel).toBe(portraitBoardLabel);
+    expect(collectText(findByTestId(renderer, "board-coordinate-overlay"))).toBe(portraitCoordinates);
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(false);
+    expect(findByTestId(renderer, "review-session-board-lane").findByProps({
+      testID: "review-board"
+    })).toBeTruthy();
+    expect(findByTestId(renderer, "review-session-control-rail").findByProps({
+      testID: "review-header"
+    })).toBeTruthy();
   });
 
   it.each([
@@ -9685,6 +9816,34 @@ async function waitForAssertion(assertion: () => void, attempts = 10): Promise<v
 
 function findByTestId(renderer: TestRenderer.ReactTestRenderer, testID: string): TestRenderer.ReactTestInstance {
   return renderer.root.findByProps({ testID });
+}
+
+function setPracticeViewport({
+  fontScale = 1,
+  height,
+  insets,
+  scale,
+  width
+}: {
+  fontScale?: number;
+  height: number;
+  insets?: PracticeSafeAreaInsets;
+  scale: number;
+  width: number;
+}): void {
+  (ReactNative as unknown as {
+    __setWindowDimensions?: (dimensions: {
+      fontScale: number;
+      height: number;
+      scale: number;
+      width: number;
+    }) => void;
+  }).__setWindowDimensions?.({ width, height, scale, fontScale });
+  if (insets) {
+    (SafeAreaContext as unknown as {
+      __setSafeAreaInsets?: (nextInsets: PracticeSafeAreaInsets) => void;
+    }).__setSafeAreaInsets?.(insets);
+  }
 }
 
 function expectNoSessionLayoutResidue(renderer: TestRenderer.ReactTestRenderer): void {
