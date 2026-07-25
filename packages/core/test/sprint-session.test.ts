@@ -61,7 +61,8 @@ test("sprint initializes a per-puzzle deadline and records Slow from the puzzle 
   const wrong = submitSprintMove(state, "e6d6", "2026-06-20T00:01:22.000Z");
   assert.equal(wrong.attempt?.result, "wrong");
   assert.equal(wrong.attempt?.timingStatus, "slow");
-  assert.equal(wrong.attempt?.unclear, undefined);
+  assert.equal(wrong.attempt?.unclear, true);
+  assert.equal(wrong.attempt?.unclearUpdatedAt, wrong.attempt?.completedAt);
 });
 
 test("advanceSprintTime times out once, advances without correctness or ELO effects, and is idempotent", () => {

@@ -6,6 +6,7 @@ import {
   assertValidManualRating,
   assertValidPracticeRunRating,
   buildSprintConfig,
+  buildSprintResultSummary,
   clonePracticeRun,
   createCustomPracticeRun,
   createDefaultRating,
@@ -43,6 +44,7 @@ import type {
   SessionMistakeReviewItem,
   SprintConfig,
   SprintMode,
+  SprintResultSummary,
   SprintState
 } from "../../core/src/index.ts";
 import type { AttemptHistoryRow, HistoryFilter } from "./query-types.ts";
@@ -191,10 +193,7 @@ export class PracticeService {
 
     this.store.transaction(() => {
       if (attemptToReturn) {
-        this.store.recordAttempt(attemptToReturn);
-        if (attemptAddsToReview(attemptToReturn)) {
-          this.store.scheduleMistakeReview(reviewContextFromAttempt(attemptToReturn), attemptToReturn.completedAt);
-        }
+        this.recordSprintAttemptAndReviewImpact(attemptToReturn);
       }
 
       if (!isOpenSprint(result.state)) {
@@ -236,13 +235,7 @@ export class PracticeService {
     const result = advanceSprintTimeCore(this.activeSprint, now);
     this.store.transaction(() => {
       if (result.attempt) {
-        this.store.recordAttempt(result.attempt);
-        if (attemptAddsToReview(result.attempt)) {
-          this.store.scheduleMistakeReview(
-            reviewContextFromAttempt(result.attempt),
-            result.attempt.completedAt
-          );
-        }
+        this.recordSprintAttemptAndReviewImpact(result.attempt);
       }
       if (isOpenSprint(result.state)) {
         if (result.attempt) {
@@ -278,13 +271,7 @@ export class PracticeService {
     const result = pauseSprintCore(this.activeSprint, now);
     this.store.transaction(() => {
       if (result.attempt) {
-        this.store.recordAttempt(result.attempt);
-        if (attemptAddsToReview(result.attempt)) {
-          this.store.scheduleMistakeReview(
-            reviewContextFromAttempt(result.attempt),
-            result.attempt.completedAt
-          );
-        }
+        this.recordSprintAttemptAndReviewImpact(result.attempt);
       }
       if (isOpenSprint(result.state)) {
         this.store.updateSprintSession(result.state);
@@ -324,6 +311,15 @@ export class PracticeService {
 
   countHistory(filter: HistoryFilter = {}): number {
     return this.store.countAttempts(filter);
+  }
+
+  getSprintResultSummary(
+    state: Pick<SprintState, "id" | "correctCount" | "mistakeCount">
+  ): SprintResultSummary {
+    return buildSprintResultSummary(
+      state,
+      this.store.listAttempts({ sessionId: state.id })
+    );
   }
 
   getPracticeProgressSummary(nowMs: number, ratingKey: string) {
@@ -369,6 +365,16 @@ export class PracticeService {
 
   clearLocalHistory(): ClearLocalHistoryResult {
     return this.store.transaction(() => this.store.clearLocalHistory());
+  }
+
+  private recordSprintAttemptAndReviewImpact(attempt: AttemptEvent): void {
+    this.store.recordAttempt(attempt);
+    if (attemptAddsToReview(attempt)) {
+      this.store.scheduleMistakeReview(
+        reviewContextFromAttempt(attempt),
+        attempt.completedAt
+      );
+    }
   }
 
   getDueReviews(now = new Date().toISOString()): ReviewQueueState[] {

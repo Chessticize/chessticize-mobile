@@ -375,6 +375,20 @@ for (const backend of ["memory", "sqlite"] as const) {
         runName: "Standard"
       }]);
       assert.deepEqual(service.exportLocalData().attempts, service.listHistory());
+      assert.deepEqual(service.getSprintResultSummary(timedOut.state), {
+        accuracyPercent: 0,
+        attemptCount: 1,
+        unclear: {
+          slowMarkedCount: 0,
+          timedOutMarkedCount: 1,
+          userMarkedCount: 0
+        },
+        review: {
+          addedCount: 1,
+          mistakeCount: 0,
+          timedOutCount: 1
+        }
+      });
       assert.deepEqual(
         service.getPracticeProgressSummary(
           Date.parse("2026-07-24T01:01:00.000Z"),

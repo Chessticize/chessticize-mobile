@@ -72,7 +72,7 @@ function App() {
           arrowDuelTargetCorrect={arrowDuelTargetCorrect}
           currentTimeMs={currentTimeMs}
           customTargetCorrect={customTargetCorrect}
-          firstUseGuidanceEnabled
+          sprintGuidanceEnabled
           puzzleSelectionId={puzzleSelectionId}
           puzzleSelectionSeed={puzzleSelectionSeed}
           runManagementEnabled

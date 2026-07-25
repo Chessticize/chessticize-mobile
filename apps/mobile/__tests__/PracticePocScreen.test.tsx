@@ -1072,7 +1072,7 @@ describe("PracticePocScreen", () => {
   it("persists the production rules and shared Active Session guides before starting the real timer", () => {
     const service = createMobilePracticeService("random1000");
     const renderer = renderScreen({
-      firstUseGuidanceEnabled: true,
+      sprintGuidanceEnabled: true,
       practiceService: service,
       runManagementEnabled: true
     });
@@ -1096,7 +1096,7 @@ describe("PracticePocScreen", () => {
 
     act(() => renderer.unmount());
     const relaunched = renderScreen({
-      firstUseGuidanceEnabled: true,
+      sprintGuidanceEnabled: true,
       practiceService: service,
       runManagementEnabled: true
     });
@@ -1107,7 +1107,7 @@ describe("PracticePocScreen", () => {
     const service = createMobilePracticeService("random1000");
     const systemBack = createTestSystemBackSource("android");
     const renderer = renderScreen({
-      firstUseGuidanceEnabled: true,
+      sprintGuidanceEnabled: true,
       practiceService: service,
       runManagementEnabled: true,
       systemBack
@@ -1126,7 +1126,7 @@ describe("PracticePocScreen", () => {
   it("shows both guides for a first Arrow Duel, then only its own guide after shared guidance", () => {
     const freshService = createMobilePracticeService("random1000");
     const firstArrowDuel = renderScreen({
-      firstUseGuidanceEnabled: true,
+      sprintGuidanceEnabled: true,
       practiceService: freshService,
       runManagementEnabled: true
     });
@@ -1162,7 +1162,7 @@ describe("PracticePocScreen", () => {
       }
     });
     const returningArrowDuel = renderScreen({
-      firstUseGuidanceEnabled: true,
+      sprintGuidanceEnabled: true,
       practiceService: returningService,
       runManagementEnabled: true
     });
@@ -1185,7 +1185,7 @@ describe("PracticePocScreen", () => {
       }
     });
     const renderer = renderScreen({
-      firstUseGuidanceEnabled: true,
+      sprintGuidanceEnabled: true,
       initialTab: "settings",
       practiceService: service,
       runManagementEnabled: true
@@ -1537,7 +1537,7 @@ describe("PracticePocScreen", () => {
 
   it("summarizes dynamic pass rules and timeout Review behavior in production New and Edit Run", () => {
     const productionLike = renderScreen({
-      firstUseGuidanceEnabled: true,
+      sprintGuidanceEnabled: true,
       runManagementPresentation: runManagementPresentation({
         draft: {
           name: "",
@@ -2039,6 +2039,75 @@ describe("PracticePocScreen", () => {
       unclear: true
     });
     expect(() => findByTestId(renderer, "sprint-unclear-prompt")).toThrow();
+  });
+
+  it("shows a Slow wrong attempt as already marked Unclear", async () => {
+    let wallClockMs = Date.parse("2026-07-23T12:00:00.000Z");
+    const service = createMobilePracticeService("familiar15");
+    service.saveSettings({
+      ...service.getSettings(),
+      sprintGuides: {
+        rulesSeen: true,
+        activeSessionSeen: true,
+        arrowDuelSeen: true
+      }
+    });
+    const renderer = renderScreen({
+      currentTimeMs: () => wallClockMs,
+      practiceService: service,
+      sprintGuidanceEnabled: true
+    });
+
+    startStandardSprint(renderer);
+    wallClockMs += 41_000;
+    await boardMove(renderer, "c2b3");
+
+    expect(service.listHistory()[0]).toMatchObject({
+      result: "wrong",
+      timingStatus: "slow",
+      unclear: true
+    });
+    expect(collectText(findByTestId(renderer, "sprint-unclear-question"))).toBe(
+      "Was it clear why your last move was wrong?"
+    );
+    expect(collectText(findByTestId(renderer, "sprint-unclear-marked"))).toBe("Marked");
+    expect(() => findByTestId(renderer, "sprint-unclear-toggle")).toThrow();
+  });
+
+  it("reports timeout Review impact separately from a zero Mistakes count", () => {
+    const service = createMobilePracticeService("random1000");
+    service.saveSettings({
+      ...service.getSettings(),
+      sprintGuides: {
+        rulesSeen: true,
+        activeSessionSeen: true,
+        arrowDuelSeen: true
+      }
+    });
+    const renderer = renderScreen({
+      practiceService: service,
+      sprintGuidanceEnabled: true
+    });
+
+    startStandardSprint(renderer);
+    act(() => {
+      jest.advanceTimersByTime(60_000);
+    });
+    expect(findByTestId(renderer, "session-puzzle-timeout-overlay")).toBeTruthy();
+    act(() => {
+      jest.advanceTimersByTime(800);
+    });
+    press(renderer, "session-abandon");
+    press(renderer, "session-abandon-confirm");
+
+    expect(collectText(findByTestId(renderer, "sprint-result-mistakes"))).toBe("0");
+    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain(
+      "1 timed out added to Review"
+    );
+    expect(collectText(findByTestId(renderer, "sprint-result-unclear-sources"))).toContain(
+      "1 marked after Timed out"
+    );
+    expect(service.listReviewQueue()).toHaveLength(1);
   });
 
   it("ends the sprint without a puzzle timeout overlay when both deadlines are reached together", () => {
@@ -3681,7 +3750,7 @@ describe("PracticePocScreen", () => {
       }
     });
     const renderer = renderScreen({
-      firstUseGuidanceEnabled: true,
+      sprintGuidanceEnabled: true,
       practiceService: service
     });
 
@@ -3926,7 +3995,7 @@ describe("PracticePocScreen", () => {
       }
     });
     const renderer = renderScreen({
-      firstUseGuidanceEnabled: true,
+      sprintGuidanceEnabled: true,
       practiceService: service,
       standardTargetCorrect: 1
     });
@@ -8827,7 +8896,7 @@ function createScriptedStockfishTransport(
 }
 
 type RenderScreenOptions = TestMobilePlatformCapabilityOverrides &
-  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "firstUseGuidanceEnabled" | "initialTab" | "moveFeedbackSettings" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEloEditingMovedToHome" | "runManagementEnabled" | "runManagementPresentation" | "sprintRulesDesignPreview" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "themeCatalogPresentation"> & {
+  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "initialTab" | "moveFeedbackSettings" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEloEditingMovedToHome" | "runManagementEnabled" | "runManagementPresentation" | "sprintGuidanceEnabled" | "sprintRulesDesignPreview" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "themeCatalogPresentation"> & {
     platformCapabilities?: MobilePlatformCapabilities;
   };
 
@@ -8937,7 +9006,7 @@ function renderScreen({
   currentTimeMs,
   customTargetCorrect,
   debugTrace,
-  firstUseGuidanceEnabled,
+  sprintGuidanceEnabled,
   initialTab,
   moveFeedbackSettings,
   puzzleSelectionId,
@@ -8961,7 +9030,7 @@ function renderScreen({
         currentTimeMs={currentTimeMs}
         customTargetCorrect={customTargetCorrect}
         debugTrace={debugTrace}
-        firstUseGuidanceEnabled={firstUseGuidanceEnabled}
+        sprintGuidanceEnabled={sprintGuidanceEnabled}
         initialTab={initialTab}
         moveFeedbackSettings={moveFeedbackSettings}
         puzzleSelectionId={puzzleSelectionId}
