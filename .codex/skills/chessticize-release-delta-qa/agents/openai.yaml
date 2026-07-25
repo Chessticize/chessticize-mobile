@@ -1,0 +1,4 @@
+interface:
+  display_name: "Chessticize Release Delta QA"
+  short_description: "Visually audit simulator changes since the last release"
+  default_prompt: "Use $chessticize-release-delta-qa to audit changes since the last mobile release through exact-head Release simulator screenshots, inspect every affected state and viewport, file visual or functional product issues without fixing them, and immediately repair proven test drift."

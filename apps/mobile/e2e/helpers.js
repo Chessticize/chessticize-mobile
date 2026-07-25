@@ -809,6 +809,8 @@ async function openTab(tabTestID, contentTestID) {
 
 async function openStandardHistoryTrend() {
   await openTab('history-tab', 'history-action-header');
+  await waitFor(element(by.id('history-filter-toggle'))).toBeVisible().withTimeout(10000);
+  await element(by.id('history-filter-toggle')).tap();
   await waitFor(element(by.id('history-rating-standard 5/20'))).toBeVisible().withTimeout(10000);
   await element(by.id('history-rating-standard 5/20')).tap();
   await waitFor(element(by.id('history-performance-card'))).toExist().withTimeout(10000);

@@ -10,6 +10,13 @@ eight-scene UI baseline, use
 
 For Android release orchestration, use the repo-local skill at `.codex/skills/chessticize-android-release/SKILL.md`. It governs clean-machine preflight, exact-artifact Play and GitHub publication, protected recovery, risk-scoped CI/emulator validation, and final issue closure.
 
+For audits of all product changes since a released mobile source commit, use
+the repo-local skill at
+`.codex/skills/chessticize-release-delta-qa/SKILL.md`. It governs exact source
+identity, exact-head Release simulator captures, per-scene visual inspection,
+supporting interaction evidence, validation-drift repair, and GitHub issue
+grouping.
+
 ## Agent wayfinding
 
 ### Storybook-first UI flow gate
