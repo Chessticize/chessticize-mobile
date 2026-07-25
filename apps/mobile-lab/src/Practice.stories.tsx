@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-native-web-vite";
 import { LabScenario } from "./LabScenario.tsx";
 import {
+  centerTestId,
   clickTestId,
   dragTestId,
   expectReorderAnimation,
@@ -202,6 +203,7 @@ export const ArrowDuelGuide: Story = {
     await waitForTestId(canvasElement, "practice-arrow-duel-guide-demo-board");
     await waitForTestId(canvasElement, "practice-arrow-duel-guide-candidates");
     await waitForText(canvasElement, "5 of 5");
+    await centerTestId(canvasElement, "practice-arrow-duel-guide-candidate-spotlight");
     expectTestIdAbsent(canvasElement, "session-board");
   }
 };
@@ -215,6 +217,7 @@ export const ArrowDuelGuideOnly: Story = {
     await waitForTestId(canvasElement, "practice-arrow-duel-guide-demo-board");
     await waitForTestId(canvasElement, "practice-arrow-duel-guide-candidates");
     await waitForText(canvasElement, "1 of 1");
+    await centerTestId(canvasElement, "practice-arrow-duel-guide-candidate-spotlight");
     expectTestIdAbsent(canvasElement, "practice-active-session-guide");
     expectTestIdAbsent(canvasElement, "session-board");
   }
