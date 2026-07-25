@@ -203,7 +203,7 @@ export const ArrowDuelGuide: Story = {
     await waitForTestId(canvasElement, "practice-arrow-duel-guide-demo-board");
     await waitForTestId(canvasElement, "practice-arrow-duel-guide-candidates");
     await waitForText(canvasElement, "5 of 5");
-    await centerTestId(canvasElement, "practice-arrow-duel-guide-candidate-spotlight");
+    await centerTestId(canvasElement, "practice-arrow-duel-guide-demo-board");
     expectTestIdAbsent(canvasElement, "session-board");
   }
 };
@@ -217,7 +217,7 @@ export const ArrowDuelGuideOnly: Story = {
     await waitForTestId(canvasElement, "practice-arrow-duel-guide-demo-board");
     await waitForTestId(canvasElement, "practice-arrow-duel-guide-candidates");
     await waitForText(canvasElement, "1 of 1");
-    await centerTestId(canvasElement, "practice-arrow-duel-guide-candidate-spotlight");
+    await centerTestId(canvasElement, "practice-arrow-duel-guide-demo-board");
     expectTestIdAbsent(canvasElement, "practice-active-session-guide");
     expectTestIdAbsent(canvasElement, "session-board");
   }

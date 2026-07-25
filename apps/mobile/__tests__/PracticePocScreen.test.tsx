@@ -1254,6 +1254,15 @@ describe("PracticePocScreen", () => {
     const portraitBoardSize = Number(
       flattenTestStyle(findByTestId(portrait, "practice-session-guide-demo-board").props.style).width
     );
+    expect(
+      flattenTestStyle(findByTestId(portrait, "practice-session-guide-metrics").props.style).opacity
+    ).not.toBe(0.34);
+    expect(
+      flattenTestStyle(findByTestId(portrait, "practice-session-guide-metrics").props.style).borderWidth
+    ).toBeUndefined();
+    expect(
+      flattenTestStyle(findByTestId(portrait, "practice-session-guide-demo-board").props.style).opacity
+    ).toBe(0.34);
 
     press(portrait, "practice-session-guide-start");
     expect(findByTestId(portrait, "practice-session-guide-coach-pointer-slow-bottom")).toBeTruthy();
@@ -1263,13 +1272,25 @@ describe("PracticePocScreen", () => {
       "practice-session-guide-coach-pointer-slow-bottom"
     )).toBeLessThan(0);
     expect(
-      flattenTestStyle(findByTestId(portrait, "practice-session-guide-demo-timer").props.style).borderColor
-    ).toBe("#F59E0B");
+      flattenTestStyle(findByTestId(portrait, "practice-session-guide-demo-timer").props.style).opacity
+    ).not.toBe(0.34);
+    expect(
+      flattenTestStyle(findByTestId(portrait, "practice-session-guide-demo-timer").props.style).borderWidth
+    ).toBeUndefined();
+    expect(
+      flattenTestStyle(findByTestId(portrait, "practice-session-guide-demo-board").props.style).opacity
+    ).toBe(0.34);
 
     press(portrait, "practice-session-guide-start");
     expect(
+      flattenTestStyle(findByTestId(portrait, "practice-session-guide-demo-board").props.style).opacity
+    ).not.toBe(0.34);
+    expect(
       flattenTestStyle(findByTestId(portrait, "practice-session-guide-demo-board").props.style).borderColor
-    ).toBe("#EF4444");
+    ).not.toBe("#60A5FA");
+    expect(
+      flattenTestStyle(findByTestId(portrait, "practice-session-guide-demo-timer").props.style).opacity
+    ).toBe(0.34);
 
     press(portrait, "practice-session-guide-start");
     expect(findByTestId(portrait, "practice-session-guide-coach-pointer-unclear-bottom")).toBeTruthy();
@@ -1277,14 +1298,30 @@ describe("PracticePocScreen", () => {
       flattenTestStyle(findByTestId(portrait, "practice-session-guide-coach-unclear").props.style).top
     ).toBe(portraitBoardSize + 150);
     expect(
-      flattenTestStyle(findByTestId(portrait, "practice-session-guide-demo-unclear").props.style).borderColor
-    ).toBe("#F59E0B");
+      flattenTestStyle(findByTestId(portrait, "practice-session-guide-demo-unclear").props.style).opacity
+    ).not.toBe(0.34);
+    expect(
+      flattenTestStyle(findByTestId(portrait, "practice-session-guide-demo-unclear").props.style).borderWidth
+    ).toBeUndefined();
+    expect(
+      flattenTestStyle(findByTestId(portrait, "practice-session-guide-demo-board").props.style).opacity
+    ).toBe(0.34);
 
     const portraitArrowDuel = renderLabScenario("practice-arrow-duel-guide-only");
-    expect(findByTestId(
+    expect(() => findByTestId(
       portraitArrowDuel,
       "practice-arrow-duel-guide-candidate-spotlight"
-    )).toBeTruthy();
+    )).toThrow();
+    expect(
+      flattenTestStyle(
+        findByTestId(portraitArrowDuel, "practice-arrow-duel-guide-demo-board").props.style
+      ).opacity
+    ).not.toBe(0.34);
+    expect(
+      flattenTestStyle(
+        findByTestId(portraitArrowDuel, "practice-arrow-duel-guide-demo-board").props.style
+      ).borderColor
+    ).not.toBe("#60A5FA");
     expect(
       flattenTestStyle(findByTestId(portraitArrowDuel, "practice-arrow-duel-guide-coach").props.style).top
     ).toBe(portraitBoardSize / 8 * 3.15 + 4);
@@ -1299,14 +1336,20 @@ describe("PracticePocScreen", () => {
     });
 
     const landscape = renderLabScenario("practice-active-session-guide");
+    expect(
+      flattenTestStyle(findByTestId(landscape, "practice-session-guide-coach-overview").props.style).top
+    ).toBe(112);
     press(landscape, "practice-session-guide-start");
     expect(findByTestId(landscape, "practice-session-guide-coach-pointer-slow-top")).toBeTruthy();
     expect(
       flattenTestStyle(findByTestId(landscape, "practice-session-guide-coach-slow").props.style).top
     ).toBe(220);
     expect(
-      flattenTestStyle(findByTestId(landscape, "practice-session-guide-demo-timer").props.style).borderColor
-    ).toBe("#F59E0B");
+      flattenTestStyle(findByTestId(landscape, "practice-session-guide-demo-timer").props.style).opacity
+    ).not.toBe(0.34);
+    expect(
+      flattenTestStyle(findByTestId(landscape, "practice-session-guide-demo-board").props.style).opacity
+    ).toBe(0.34);
 
     press(landscape, "practice-session-guide-start");
     expect(findByTestId(
@@ -1317,15 +1360,24 @@ describe("PracticePocScreen", () => {
       flattenTestStyle(findByTestId(landscape, "practice-session-guide-coach-timeout").props.style).top
     ).toBe(122);
     expect(
-      flattenTestStyle(findByTestId(landscape, "practice-session-guide-demo-board").props.style).borderColor
-    ).toBe("#EF4444");
+      flattenTestStyle(findByTestId(landscape, "practice-session-guide-demo-board").props.style).opacity
+    ).not.toBe(0.34);
+    expect(
+      flattenTestStyle(findByTestId(landscape, "practice-session-guide-demo-timer").props.style).opacity
+    ).toBe(0.34);
     press(landscape, "practice-session-guide-start");
     expect(
       flattenTestStyle(findByTestId(landscape, "practice-session-guide-coach-unclear").props.style).top
-    ).toBe(188);
+    ).toBe(156);
     expect(
-      flattenTestStyle(findByTestId(landscape, "practice-session-guide-demo-unclear").props.style).borderColor
-    ).toBe("#F59E0B");
+      flattenTestStyle(findByTestId(landscape, "practice-session-guide-demo-unclear").props.style).opacity
+    ).not.toBe(0.34);
+    expect(
+      flattenTestStyle(findByTestId(landscape, "practice-session-guide-demo-unclear").props.style).borderWidth
+    ).toBeUndefined();
+    expect(
+      flattenTestStyle(findByTestId(landscape, "practice-session-guide-demo-board").props.style).opacity
+    ).toBe(0.34);
 
     const landscapeArrowDuel = renderLabScenario("practice-arrow-duel-guide-only");
     expect(findByTestId(
@@ -1335,10 +1387,15 @@ describe("PracticePocScreen", () => {
     expect(
       flattenTestStyle(findByTestId(landscapeArrowDuel, "practice-arrow-duel-guide-coach").props.style).top
     ).toBe(92);
-    expect(findByTestId(
+    expect(() => findByTestId(
       landscapeArrowDuel,
       "practice-arrow-duel-guide-candidate-spotlight"
-    )).toBeTruthy();
+    )).toThrow();
+    expect(
+      flattenTestStyle(
+        findByTestId(landscapeArrowDuel, "practice-arrow-duel-guide-demo-board").props.style
+      ).opacity
+    ).not.toBe(0.34);
   });
 
   it("summarizes dynamic pass rules in New Run and keeps the preview out of product defaults", () => {
