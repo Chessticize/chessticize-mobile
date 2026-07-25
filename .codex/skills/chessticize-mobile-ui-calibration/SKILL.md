@@ -60,7 +60,10 @@ DETOX_IOS_DEVICE="iPad Pro 11-inch (M5)" \
 ```
 
 If more than one available runtime has the same device name, also set the exact
-`DETOX_IOS_DEVICE_UDID`.
+`DETOX_IOS_DEVICE_UDID`. The resolver rejects duplicate name-only matches and
+name/UDID mismatches. The resolved UDID is then shared by Xcode, Detox, host
+rotation, and artifact identity so the workflow cannot build one runtime and
+capture another.
 
 The script:
 
@@ -70,11 +73,14 @@ The script:
 4. Runs the deterministic portrait journey, rotates the exact host Simulator
    window, then runs the separate landscape journey with one worker.
 5. Copies the eight portrait and four landscape PNGs to
-   `scratch/rendering-checks/<short-sha>/release-<device-name>/`.
+   `scratch/rendering-checks/<short-sha>/release-<device>-<runtime>-<udid>/`.
 6. Requires the React Native adaptive-layout frame to remain in the requested
    orientation for three observations before each capture. A stale portrait
    framebuffer fails instead of being relabeled as landscape.
-7. Restores the Simulator to portrait and confirms that `HEAD` and the tracked
+7. Independently reads every copied PNG header and requires portrait
+   `height > width` or landscape `width > height`.
+8. Arms portrait restoration before the landscape rotation attempt, then
+   restores the Simulator to portrait and confirms that `HEAD` and the tracked
    worktree did not change.
 
 Set `CHESSTICIZE_IOS_PREPARE=1` only when the CocoaPods workspace or locked
@@ -123,7 +129,7 @@ assertions automatic and visual judgment explicit.
 
 Change `DETOX_IOS_DEVICE` (and `DETOX_IOS_DEVICE_UDID` when the name is
 ambiguous) to reuse the same journey on another dedicated simulator. Captures
-remain isolated in device-specific directories so evidence from different
+remain isolated by device, runtime, and full UDID so evidence from different
 frames cannot overwrite or masquerade as another device. Before App Store
 upload, capture and inspect the required 6.9-inch iPhone, 6.1-inch iPhone, and
 13-inch iPad sets, then run:
@@ -146,6 +152,8 @@ dimensions are not an accepted App Store upload size.
   unrelated `Podfile.lock` rewrite to make calibration pass.
 - If the screenshot command passes but fewer than twelve PNGs are found, inspect
   the Detox artifact directory and the first failing scene before rerunning.
+- If a copied PNG fails its orientation check, reject the entire capture. Do
+  not rename or manually move it into the claimed orientation set.
 - If host rotation fails, unlock the Mac, open exactly one Simulator window
   whose title starts with the configured device name, and grant Accessibility
   control to the invoking terminal. Treat a frame-orientation timeout as a

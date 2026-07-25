@@ -4,6 +4,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 ORIENTATION_RUNNER="$SCRIPT_DIR/set-simulator-orientation.sh"
+SIMULATOR_TARGET_RESOLVER="$REPO_ROOT/apps/mobile/scripts/resolve-ios-simulator-target.js"
+PNG_ORIENTATION_VALIDATOR="$REPO_ROOT/apps/mobile/scripts/assert-png-orientation.js"
 DEVICE_NAME="${DETOX_IOS_DEVICE:-iPhone 17-Detox}"
 WORKER_COUNT="${DETOX_MAX_WORKERS:-1}"
 PORTRAIT_SCENES=(
@@ -36,6 +38,10 @@ command -v brew >/dev/null 2>&1 || fail "Homebrew is required to select the lock
 command -v node >/dev/null 2>&1 || fail "Node.js is required to resolve the exact Simulator."
 command -v xcrun >/dev/null 2>&1 || fail "Xcode command-line tools are required."
 [[ -x "$ORIENTATION_RUNNER" ]] || fail "Missing executable orientation runner: $ORIENTATION_RUNNER"
+[[ -x "$SIMULATOR_TARGET_RESOLVER" ]] || \
+  fail "Missing executable Simulator target resolver: $SIMULATOR_TARGET_RESOLVER"
+[[ -x "$PNG_ORIENTATION_VALIDATOR" ]] || \
+  fail "Missing executable PNG orientation validator: $PNG_ORIENTATION_VALIDATOR"
 
 RUBY_PREFIX="$(brew --prefix ruby@3.3 2>/dev/null)" || \
   fail "Install Homebrew ruby@3.3 before running UI calibration."
@@ -47,35 +53,34 @@ SHORT_SHA="$(git rev-parse --short=7 HEAD)"
 STATUS_BEFORE="$(git status --porcelain --untracked-files=normal)"
 [[ -z "$STATUS_BEFORE" ]] || fail "Commit or remove worktree changes before exact-head calibration."
 
+TARGET_RESOLVER_ARGS=(--device-name "$DEVICE_NAME")
 if [[ -n "${DETOX_IOS_DEVICE_UDID:-}" ]]; then
-  SIMULATOR_UDID="$DETOX_IOS_DEVICE_UDID"
-else
-  SIMULATOR_UDID="$(
-    xcrun simctl list devices available -j | node -e '
-      const fs = require("node:fs");
-      const deviceName = process.argv[1];
-      const runtimes = Object.values(JSON.parse(fs.readFileSync(0, "utf8")).devices);
-      const matches = runtimes.flat().filter((device) => device.name === deviceName);
-      if (matches.length !== 1) {
-        console.error(
-          `Expected exactly one available Simulator named ${deviceName}, found ${matches.length}. `
-          + "Set DETOX_IOS_DEVICE_UDID to disambiguate."
-        );
-        process.exit(2);
-      }
-      process.stdout.write(matches[0].udid);
-    ' "$DEVICE_NAME"
-  )" || fail "Could not resolve the exact Simulator UDID."
+  TARGET_RESOLVER_ARGS+=(--device-udid "$DETOX_IOS_DEVICE_UDID")
 fi
+SIMULATOR_TARGET_JSON="$("$SIMULATOR_TARGET_RESOLVER" "${TARGET_RESOLVER_ARGS[@]}")" || \
+  fail "Could not resolve the exact Simulator target."
+SIMULATOR_UDID="$(
+  node -e 'process.stdout.write(JSON.parse(process.argv[1]).udid)' "$SIMULATOR_TARGET_JSON"
+)"
+RUNTIME_IDENTIFIER="$(
+  node -e 'process.stdout.write(JSON.parse(process.argv[1]).runtimeIdentifier)' \
+    "$SIMULATOR_TARGET_JSON"
+)"
 
-DEVICE_SLUG="$(
-  printf '%s' "$DEVICE_NAME" \
+slugify() {
+  printf '%s' "$1" \
     | tr '[:upper:]' '[:lower:]' \
     | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//'
-)"
-[[ -n "$DEVICE_SLUG" ]] || fail "Could not derive a destination slug from $DEVICE_NAME."
+}
+
+DEVICE_SLUG="$(slugify "$DEVICE_NAME")"
+RUNTIME_SLUG="$(slugify "$RUNTIME_IDENTIFIER")"
+UDID_SLUG="$(slugify "$SIMULATOR_UDID")"
+[[ -n "$DEVICE_SLUG" && -n "$RUNTIME_SLUG" && -n "$UDID_SLUG" ]] || \
+  fail "Could not derive collision-proof Simulator artifact identity."
 
 export DETOX_IOS_DEVICE="$DEVICE_NAME"
+export DETOX_IOS_DEVICE_UDID="$SIMULATOR_UDID"
 export DETOX_MAX_WORKERS="$WORKER_COUNT"
 
 PORTRAIT_MARKER=""
@@ -121,6 +126,7 @@ copy_capture() {
     local source_path="$source_dir/$scene.png"
     [[ -f "$source_path" ]] || fail "Missing expected $orientation screenshot: $scene.png"
     cp "$source_path" "$DESTINATION/$scene.png"
+    "$PNG_ORIENTATION_VALIDATOR" "$DESTINATION/$scene.png" "$orientation"
   done
 }
 
@@ -128,7 +134,7 @@ echo "Calibrating commit $HEAD_BEFORE on $DEVICE_NAME ($SIMULATOR_UDID)"
 pnpm mobile:doctor:ios
 pnpm mobile:e2e:build:ios:release
 
-DESTINATION="$REPO_ROOT/scratch/rendering-checks/$SHORT_SHA/release-$DEVICE_SLUG"
+DESTINATION="$REPO_ROOT/scratch/rendering-checks/$SHORT_SHA/release-$DEVICE_SLUG-$RUNTIME_SLUG-$UDID_SLUG"
 [[ ! -e "$DESTINATION" ]] || fail "Move or remove the existing capture directory: $DESTINATION"
 mkdir -p "$DESTINATION"
 
@@ -142,8 +148,8 @@ touch "$PORTRAIT_MARKER"
 CHESSTICIZE_STORE_ASSET_ORIENTATION=portrait pnpm mobile:e2e:store-assets:ios:release
 copy_capture portrait "$PORTRAIT_MARKER" "${PORTRAIT_SCENES[@]}"
 
-"$ORIENTATION_RUNNER" "$SIMULATOR_UDID" "$DEVICE_NAME" landscape
 RESTORE_PORTRAIT=1
+"$ORIENTATION_RUNNER" "$SIMULATOR_UDID" "$DEVICE_NAME" landscape
 LANDSCAPE_MARKER="$(mktemp -t chessticize-ui-calibration-landscape)"
 touch "$LANDSCAPE_MARKER"
 CHESSTICIZE_STORE_ASSET_ORIENTATION=landscape pnpm mobile:e2e:store-assets:ios:release

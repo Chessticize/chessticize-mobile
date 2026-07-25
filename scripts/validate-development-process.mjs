@@ -56,6 +56,14 @@ const simulatorOrientationRunner = path.join(
   repoRoot,
   ".codex/skills/chessticize-mobile-ui-calibration/scripts/set-simulator-orientation.sh"
 );
+const simulatorTargetResolver = path.join(
+  repoRoot,
+  "apps/mobile/scripts/resolve-ios-simulator-target.js"
+);
+const pngOrientationValidator = path.join(
+  repoRoot,
+  "apps/mobile/scripts/assert-png-orientation.js"
+);
 const prTemplate = read(".github/pull_request_template.md");
 const releaseNotes = read("docs/RELEASE_NOTES.md");
 const releaseNotesTemplate = read("docs/releases/RELEASE_NOTES_TEMPLATE.md");
@@ -362,7 +370,19 @@ assert.match(uiCalibrationRunnerSource, /brew --prefix ruby@3\.3/);
 assert.match(uiCalibrationRunnerSource, /CHESSTICIZE_STORE_ASSET_ORIENTATION=portrait/);
 assert.match(uiCalibrationRunnerSource, /CHESSTICIZE_STORE_ASSET_ORIENTATION=landscape/);
 assert.match(uiCalibrationRunnerSource, /set-simulator-orientation\.sh/);
-assert.match(uiCalibrationRunnerSource, /release-\$DEVICE_SLUG/);
+assert.match(uiCalibrationRunnerSource, /resolve-ios-simulator-target\.js/);
+assert.match(uiCalibrationRunnerSource, /assert-png-orientation\.js/);
+assert.match(uiCalibrationRunnerSource, /export DETOX_IOS_DEVICE_UDID="\$SIMULATOR_UDID"/);
+assert.match(
+  uiCalibrationRunnerSource,
+  /release-\$DEVICE_SLUG-\$RUNTIME_SLUG-\$UDID_SLUG/
+);
+assert.ok(
+  uiCalibrationRunnerSource.indexOf("\nRESTORE_PORTRAIT=1\n")
+    < uiCalibrationRunnerSource.indexOf(
+      '"$ORIENTATION_RUNNER" "$SIMULATOR_UDID" "$DEVICE_NAME" landscape'
+    )
+);
 
 const simulatorOrientationRunnerSource = read(
   ".codex/skills/chessticize-mobile-ui-calibration/scripts/set-simulator-orientation.sh"
@@ -460,6 +480,10 @@ const simulatorOrientationSyntaxCheck = spawnSync("bash", ["-n", simulatorOrient
   encoding: "utf8"
 });
 assert.equal(simulatorOrientationSyntaxCheck.status, 0, simulatorOrientationSyntaxCheck.stderr);
+for (const scriptPath of [simulatorTargetResolver, pngOrientationValidator]) {
+  const nodeSyntaxCheck = spawnSync(process.execPath, ["--check", scriptPath], { encoding: "utf8" });
+  assert.equal(nodeSyntaxCheck.status, 0, nodeSyntaxCheck.stderr);
+}
 
 const invalidScope = spawnSync(localE2eRunner, [], {
   encoding: "utf8",

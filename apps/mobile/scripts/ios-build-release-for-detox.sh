@@ -18,7 +18,17 @@ fi
 export FORCE_BUNDLING=1
 
 destination_args=()
-if [[ -n "${DETOX_IOS_DEVICE:-}" ]]; then
+if [[ -n "${DETOX_IOS_DEVICE_UDID:-}" ]]; then
+  [[ -n "${DETOX_IOS_DEVICE:-}" ]] || {
+    echo "DETOX_IOS_DEVICE_UDID requires DETOX_IOS_DEVICE." >&2
+    exit 72
+  }
+  node scripts/resolve-ios-simulator-target.js \
+    --device-name "$DETOX_IOS_DEVICE" \
+    --device-udid "$DETOX_IOS_DEVICE_UDID" \
+    >/dev/null
+  destination_args=(-destination "platform=iOS Simulator,id=${DETOX_IOS_DEVICE_UDID}")
+elif [[ -n "${DETOX_IOS_DEVICE:-}" ]]; then
   destination_args=(-destination "platform=iOS Simulator,name=${DETOX_IOS_DEVICE}")
 fi
 
