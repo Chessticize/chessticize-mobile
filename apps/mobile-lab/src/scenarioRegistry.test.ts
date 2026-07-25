@@ -110,6 +110,10 @@ test("Issue #337 keeps semantic Sprint guidance on the existing responsive Lab s
   assert.ok(activeSessionGuide.scope.includes.includes(
     "Current-guide-only accessibility announcement"
   ));
+  assert.ok(activeSessionGuide.scope.includes.includes(
+    "Measured landscape connectors to the amber timer and Mark as unclear control"
+  ));
+  assert.match(activeSessionGuide.description, /terminate at the amber timer and Mark as unclear control/);
   assert.ok(arrowDuelGuide.scope.includes.includes("ARROW DUEL semantic callout"));
   assert.match(arrowDuelGuide.description, /single-line 5 of 5 guide progress/);
   assert.doesNotMatch(

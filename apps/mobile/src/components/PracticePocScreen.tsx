@@ -4257,6 +4257,30 @@ type SessionGuideCallout = {
   tone: "danger" | "info" | "warning";
 };
 
+type SessionGuideMeasuredLayout = {
+  height: number;
+  width: number;
+  x: number;
+  y: number;
+};
+
+type SessionGuideMeasuredLayoutKey =
+  | "slow-callout"
+  | "slow-target"
+  | "unclear-callout"
+  | "unclear-control"
+  | "unclear-prompt";
+
+function sameSessionGuideMeasuredLayout(
+  current: SessionGuideMeasuredLayout | undefined,
+  next: SessionGuideMeasuredLayout
+): boolean {
+  return current?.height === next.height
+    && current.width === next.width
+    && current.x === next.x
+    && current.y === next.y;
+}
+
 function sessionGuideCallout(
   mode: "standard" | "arrow_duel",
   coachStep: number
@@ -4509,6 +4533,19 @@ function SessionCoachmarkDemo({
   presentation: SprintSessionGuidePresentation;
 }): React.JSX.Element {
   const isArrowDuel = mode === "arrow_duel";
+  const [measuredLayouts, setMeasuredLayouts] = useState<
+    Partial<Record<SessionGuideMeasuredLayoutKey, SessionGuideMeasuredLayout>>
+  >({});
+  const rememberMeasuredLayout = useCallback((
+    key: SessionGuideMeasuredLayoutKey,
+    event: LayoutChangeEvent
+  ) => {
+    const { height, width, x, y } = event.nativeEvent.layout;
+    const next = { height, width, x, y };
+    setMeasuredLayouts((current) => sameSessionGuideMeasuredLayout(current[key], next)
+      ? current
+      : { ...current, [key]: next });
+  }, []);
   const boardSquareSize = boardSize / 8;
   const currentPuzzle = isArrowDuel
     ? ARROW_DUEL_GUIDE_DEMO_CURRENT_PUZZLE
@@ -4551,11 +4588,43 @@ function SessionCoachmarkDemo({
   const calloutUsesBoard = adaptiveLayout.usesSessionRail
     && !isArrowDuel
     && (coachStep === 1 || coachStep === 3);
+  const measuredCallout = callout.id === "slow"
+    ? measuredLayouts["slow-callout"]
+    : callout.id === "unclear"
+      ? measuredLayouts["unclear-callout"]
+      : undefined;
+  const measuredRailTarget = callout.id === "slow"
+    ? measuredLayouts["slow-target"]
+    : callout.id === "unclear"
+      && measuredLayouts["unclear-prompt"]
+      && measuredLayouts["unclear-control"]
+      ? {
+          height: measuredLayouts["unclear-control"].height,
+          width: measuredLayouts["unclear-control"].width,
+          x: measuredLayouts["unclear-prompt"].x
+            + measuredLayouts["unclear-control"].x,
+          y: measuredLayouts["unclear-prompt"].y
+            + measuredLayouts["unclear-control"].y
+        }
+      : undefined;
+  const measuredBoardCalloutTop = calloutUsesBoard
+    && measuredCallout
+    && measuredRailTarget
+    ? Math.round(Math.min(
+        Math.max(12, boardSize - measuredCallout.height - 12),
+        Math.max(
+          12,
+          measuredRailTarget.y
+            + measuredRailTarget.height / 2
+            - measuredCallout.height / 2
+        )
+      ))
+    : undefined;
   const calloutPlacement = adaptiveLayout.usesSessionRail
     ? calloutUsesBoard
       ? {
           left: 12,
-          top: coachStep === 1 ? 108 : 146,
+          top: measuredBoardCalloutTop ?? (coachStep === 1 ? 108 : 146),
           width: Math.max(0, boardSize - 24)
         }
       : {
@@ -4584,6 +4653,17 @@ function SessionCoachmarkDemo({
                 ? 92
                 : boardSize + 150
       };
+  const measuredConnectorWidth = calloutUsesBoard && measuredRailTarget
+    ? Math.max(
+        18,
+        Math.round(
+          adaptiveLayout.sessionRailGap
+            + measuredRailTarget.x
+            + measuredRailTarget.width / 2
+            + 12
+        )
+      )
+    : undefined;
   const coachPointer = calloutUsesBoard
     ? "→"
     : adaptiveLayout.usesSessionRail && (isArrowDuel || coachStep === 2)
@@ -4598,7 +4678,28 @@ function SessionCoachmarkDemo({
       : coachPointer === "→"
         ? "right"
       : "top";
-  const pointerNode = (
+  const pointerNode = pointerPlacement === "right" && measuredConnectorWidth ? (
+    <View
+      accessibilityElementsHidden
+      style={[
+        styles.sessionGuideCoachTargetConnector,
+        { right: -measuredConnectorWidth, width: measuredConnectorWidth },
+        callout.tone === "warning" ? styles.sessionGuideCoachTargetConnectorWarning : null,
+        callout.tone === "danger" ? styles.sessionGuideCoachTargetConnectorDanger : null
+      ]}
+      testID={`practice-session-guide-coach-pointer-${callout.id}-${pointerPlacement}`}
+    >
+      <Text
+        style={[
+          styles.sessionGuideCoachTargetConnectorHead,
+          callout.tone === "warning" ? styles.sessionGuideCoachPointerWarning : null,
+          callout.tone === "danger" ? styles.sessionGuideCoachPointerDanger : null
+        ]}
+      >
+        ▶
+      </Text>
+    </View>
+  ) : (
     <Text
       accessibilityElementsHidden
       style={[
@@ -4624,6 +4725,11 @@ function SessionCoachmarkDemo({
       testID={isArrowDuel
         ? "practice-arrow-duel-guide-coach"
         : `practice-session-guide-coach-${callout.id}`}
+      onLayout={callout.id === "slow"
+        ? (event) => rememberMeasuredLayout("slow-callout", event)
+        : callout.id === "unclear"
+          ? (event) => rememberMeasuredLayout("unclear-callout", event)
+          : undefined}
     >
       {pointerPlacement !== "bottom" ? pointerNode : null}
       <View
@@ -4924,6 +5030,9 @@ function SessionCoachmarkDemo({
                 testID={isArrowDuel
                   ? "practice-arrow-duel-guide-demo-timer"
                   : "practice-session-guide-demo-timer"}
+                onLayout={!isArrowDuel
+                  ? (event) => rememberMeasuredLayout("slow-target", event)
+                  : undefined}
               >
                 <PuzzleTimingIndicator
                   elapsedSeconds={elapsedSeconds}
@@ -4947,11 +5056,13 @@ function SessionCoachmarkDemo({
                     { width: adaptiveLayout.sessionRailWidth }
                   ]}
                   testID="practice-session-guide-demo-unclear"
+                  onLayout={(event) => rememberMeasuredLayout("unclear-prompt", event)}
                 >
                   <UnclearAttemptPrompt
                     marked={false}
                     question="Was the previous puzzle clear?"
                     onToggle={() => undefined}
+                    onTargetLayout={(event) => rememberMeasuredLayout("unclear-control", event)}
                   />
                 </View>
               ) : null}
@@ -7090,10 +7201,12 @@ function ActiveMistakeIndicator({
 function UnclearAttemptPrompt({
   marked,
   onToggle,
+  onTargetLayout,
   question
 }: {
   marked: boolean;
   onToggle: () => void;
+  onTargetLayout?: (event: LayoutChangeEvent) => void;
   question: string;
 }): React.JSX.Element {
   return (
@@ -7116,6 +7229,7 @@ function UnclearAttemptPrompt({
           style={styles.unclearPromptButton}
           testID="sprint-unclear-toggle"
           onPress={onToggle}
+          onLayout={onTargetLayout}
         >
           <Text style={styles.unclearPromptButtonText}>Mark as unclear</Text>
         </Pressable>
@@ -14123,6 +14237,27 @@ const styles = StyleSheet.create({
   },
   sessionGuideCoachPointerDanger: {
     color: "#DC2626"
+  },
+  sessionGuideCoachTargetConnector: {
+    backgroundColor: "#2563EB",
+    height: 2,
+    position: "absolute",
+    top: "50%",
+    transform: [{ translateY: -1 }]
+  },
+  sessionGuideCoachTargetConnectorWarning: {
+    backgroundColor: "#D97706"
+  },
+  sessionGuideCoachTargetConnectorDanger: {
+    backgroundColor: "#DC2626"
+  },
+  sessionGuideCoachTargetConnectorHead: {
+    color: "#2563EB",
+    fontSize: 14,
+    lineHeight: 14,
+    position: "absolute",
+    right: -2,
+    top: -6
   },
   sessionGuideCoachBadge: {
     color: "#1D4ED8",

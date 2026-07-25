@@ -1755,14 +1755,21 @@ describe("PracticePocScreen", () => {
   });
 
   it("keeps Slow and Unclear guide content beside their visible landscape targets", () => {
+    const insets = { top: 0, right: 62, bottom: 21, left: 62 };
     setPracticeViewport({
       width: 874,
       height: 402,
       scale: 3,
-      insets: { top: 0, right: 62, bottom: 21, left: 62 }
+      insets
     });
 
     const renderer = renderLabScenario("practice-active-session-guide");
+    const adaptiveLayout = buildPracticeAdaptiveLayout({
+      width: 874,
+      height: 402,
+      fontScale: 1,
+      insets
+    });
     const boardSize = Number(
       flattenTestStyle(
         findByTestId(renderer, "practice-session-guide-demo-board").props.style
@@ -1770,6 +1777,22 @@ describe("PracticePocScreen", () => {
     );
 
     press(renderer, "practice-session-guide-start");
+    expect(findByTestId(
+      renderer,
+      "practice-session-guide-coach-slow"
+    ).props.onLayout).toEqual(expect.any(Function));
+    expect(findByTestId(
+      renderer,
+      "practice-session-guide-demo-timer"
+    ).props.onLayout).toEqual(expect.any(Function));
+    act(() => {
+      findByTestId(renderer, "practice-session-guide-coach-slow").props.onLayout({
+        nativeEvent: { layout: { x: 12, y: 108, width: boardSize - 24, height: 100 } }
+      });
+      findByTestId(renderer, "practice-session-guide-demo-timer").props.onLayout({
+        nativeEvent: { layout: { x: 40, y: 210, width: 112, height: 20 } }
+      });
+    });
     expect(
       Number(
         flattenTestStyle(
@@ -1777,9 +1800,45 @@ describe("PracticePocScreen", () => {
         ).left
       )
     ).toBeLessThan(boardSize);
+    expect(
+      flattenTestStyle(
+        findByTestId(renderer, "practice-session-guide-coach-slow").props.style
+      ).top
+    ).toBe(170);
+    expect(
+      flattenTestStyle(
+        findByTestId(
+          renderer,
+          "practice-session-guide-coach-pointer-slow-right"
+        ).props.style
+      ).width
+    ).toBe(adaptiveLayout.sessionRailGap + 108);
 
     press(renderer, "practice-session-guide-start");
     press(renderer, "practice-session-guide-start");
+    expect(findByTestId(
+      renderer,
+      "practice-session-guide-coach-unclear"
+    ).props.onLayout).toEqual(expect.any(Function));
+    expect(findByTestId(
+      renderer,
+      "practice-session-guide-demo-unclear"
+    ).props.onLayout).toEqual(expect.any(Function));
+    expect(findByTestId(
+      renderer,
+      "sprint-unclear-toggle"
+    ).props.onLayout).toEqual(expect.any(Function));
+    act(() => {
+      findByTestId(renderer, "practice-session-guide-coach-unclear").props.onLayout({
+        nativeEvent: { layout: { x: 12, y: 146, width: boardSize - 24, height: 80 } }
+      });
+      findByTestId(renderer, "practice-session-guide-demo-unclear").props.onLayout({
+        nativeEvent: { layout: { x: 0, y: 270, width: adaptiveLayout.sessionRailWidth, height: 44 } }
+      });
+      findByTestId(renderer, "sprint-unclear-toggle").props.onLayout({
+        nativeEvent: { layout: { x: 170, y: 7, width: 80, height: 30 } }
+      });
+    });
     expect(
       Number(
         flattenTestStyle(
@@ -1787,6 +1846,19 @@ describe("PracticePocScreen", () => {
         ).left
       )
     ).toBeLessThan(boardSize);
+    expect(
+      flattenTestStyle(
+        findByTestId(renderer, "practice-session-guide-coach-unclear").props.style
+      ).top
+    ).toBe(252);
+    expect(
+      flattenTestStyle(
+        findByTestId(
+          renderer,
+          "practice-session-guide-coach-pointer-unclear-right"
+        ).props.style
+      ).width
+    ).toBe(adaptiveLayout.sessionRailGap + 222);
     expect(
       flattenTestStyle(
         findByTestId(renderer, "practice-session-guide-demo-unclear").props.style
