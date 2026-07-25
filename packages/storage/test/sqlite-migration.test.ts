@@ -609,6 +609,79 @@ test("SQLite schema at the current version matches the committed golden snapshot
   }
 });
 
+test("SQLite repairs divergent timing schemas that omitted move feedback columns", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "chessticize-divergent-timing-schema-"));
+  try {
+    for (const divergentVersion of [CURRENT_SCHEMA_VERSION - 1, CURRENT_SCHEMA_VERSION]) {
+      const databasePath = join(directory, `practice-v${divergentVersion}.sqlite`);
+      const initialStore = new SQLiteStore(databasePath);
+      initialStore.migrate();
+      const initialService = new PracticeService(initialStore);
+      initialService.getSettings();
+      initialStore.close();
+
+      const divergentDatabase = new DatabaseSync(databasePath);
+      divergentDatabase.exec(`
+        ALTER TABLE app_settings DROP COLUMN move_feedback_sound_enabled;
+        ALTER TABLE app_settings DROP COLUMN move_feedback_haptics_enabled;
+        PRAGMA user_version = ${divergentVersion};
+      `);
+      divergentDatabase.close();
+
+      const repairedStore = new SQLiteStore(databasePath);
+      repairedStore.migrate();
+      const repairedService = new PracticeService(repairedStore);
+      try {
+        assert.deepEqual(repairedService.getSettings().moveFeedback, {
+          soundEnabled: true,
+          hapticsEnabled: true
+        });
+        assert.doesNotThrow(() => {
+          repairedService.saveSettings({
+            ...repairedService.getSettings(),
+            moveFeedback: {
+              soundEnabled: false,
+              hapticsEnabled: true
+            }
+          });
+        });
+        assert.deepEqual(repairedService.getSettings().moveFeedback, {
+          soundEnabled: false,
+          hapticsEnabled: true
+        });
+      } finally {
+        repairedStore.close();
+      }
+
+      const repairedDatabase = new DatabaseSync(databasePath);
+      try {
+        assert.equal(schemaVersion(repairedDatabase), CURRENT_SCHEMA_VERSION);
+        assert.equal(integrityResult(repairedDatabase), "ok");
+        assert.deepEqual(repairedDatabase.prepare("PRAGMA foreign_key_check").all(), []);
+        const columns = repairedDatabase.prepare("PRAGMA table_info(app_settings)").all() as Array<{ name: string }>;
+        assert.ok(columns.some((column) => column.name === "move_feedback_sound_enabled"));
+        assert.ok(columns.some((column) => column.name === "move_feedback_haptics_enabled"));
+      } finally {
+        repairedDatabase.close();
+      }
+
+      const reopenedStore = new SQLiteStore(databasePath);
+      reopenedStore.migrate();
+      const reopenedService = new PracticeService(reopenedStore);
+      try {
+        assert.deepEqual(reopenedService.getSettings().moveFeedback, {
+          soundEnabled: false,
+          hapticsEnabled: true
+        });
+      } finally {
+        reopenedStore.close();
+      }
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("SQLite schema after migrating the released iOS 1.0.0 database matches the fresh-install golden snapshot", async () => {
   const directory = await mkdtemp(join(tmpdir(), "chessticize-schema-snapshot-legacy-"));
   const databasePath = join(directory, "practice.sqlite");
