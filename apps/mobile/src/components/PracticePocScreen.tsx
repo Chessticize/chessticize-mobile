@@ -4147,7 +4147,7 @@ function SprintRulesGuide({
 
   return (
     <View
-      accessibilityLabel={`Your first Sprint. Puzzles to pass: Solve ${presentation.targetCorrect} puzzles to pass the Sprint. Time limit: Solve the required puzzles before the Sprint clock reaches zero. Mistake limit: ${mistakeLimitDetail} Slow puzzle: The puzzle timer turns amber. If you solve after that, it is marked Unclear for another look, not as a mistake. Puzzle timeout: When the puzzle timer runs out, it counts as a mistake, is marked Unclear, is added to Review, and the Sprint moves on. For example, solving ${presentation.targetCorrect} puzzles with one mistake means ${presentation.targetCorrect} solved and ${presentation.targetCorrect + 1} attempted.`}
+      accessibilityLabel={`Your first Sprint. Solve ${presentation.targetCorrect} puzzles to pass. Time limit: Solve the required puzzles before the Sprint clock reaches zero. Mistake limit: ${mistakeLimitDetail} Slow warning: The puzzle timer turns amber when you are taking too long. If you solve after that, it is marked Unclear for another look, not as a mistake. Puzzle timeout: When the puzzle timer runs out, it counts as a mistake, is marked Unclear, is added to Review, and the Sprint moves on. For example, solving ${presentation.targetCorrect} puzzles with one mistake means ${presentation.targetCorrect} solved and ${presentation.targetCorrect + 1} attempted.`}
       style={styles.sprintRulesGuide}
       testID="practice-sprint-rules-guide"
     >
@@ -4155,7 +4155,7 @@ function SprintRulesGuide({
         <View style={styles.sprintRulesGuideTitleBlock}>
           <Text style={styles.sprintRulesEyebrow}>YOUR FIRST SPRINT</Text>
           <Text style={styles.sprintRulesGuideTitle}>
-            Solve {presentation.targetCorrect} to pass
+            Solve {presentation.targetCorrect} puzzles to pass
           </Text>
         </View>
         <Pressable
@@ -4171,11 +4171,6 @@ function SprintRulesGuide({
 
       <View style={styles.sprintRulesList}>
         <SprintRuleRow
-          badge={String(presentation.targetCorrect)}
-          detail={`Solve ${presentation.targetCorrect} puzzles to pass the Sprint.`}
-          label="Puzzles to pass"
-        />
-        <SprintRuleRow
           badge={presentation.durationLabel}
           detail="Solve the required puzzles before the Sprint clock reaches zero."
           label="Time limit"
@@ -4188,8 +4183,8 @@ function SprintRulesGuide({
         />
         <SprintRuleRow
           badge="SLOW"
-          detail="The puzzle timer turns amber. If you solve after that, it is marked Unclear for another look, not as a mistake."
-          label="Slow puzzle"
+          detail="The puzzle timer turns amber when you are taking too long. If you solve after that, it is marked Unclear for another look, not as a mistake."
+          label="Slow warning"
           tone="warning"
         />
         <SprintRuleRow
@@ -4306,9 +4301,9 @@ function sessionGuideCallout(
   if (coachStep === 1) {
     return {
       badge: "SLOW",
-      detail: "When the puzzle timer turns amber, keep solving. A correct answer is marked Unclear for another look, but it is not a mistake.",
+      detail: "Keep solving. A correct answer will be marked Unclear because you took too long, but it will not count as a mistake.",
       id: "slow",
-      title: "Amber means this puzzle is slow",
+      title: "Amber means you’re taking too long",
       tone: "warning"
     };
   }
@@ -4988,7 +4983,7 @@ function SessionCoachmarkDemo({
             style={[
               styles.activeSessionBottomFeedback,
               styles.sessionGuideCoachLayer,
-              { width: boardSize }
+              { width: adaptiveLayout.boardSize }
             ]}
             testID="practice-session-guide-demo-unclear"
           >
@@ -14123,7 +14118,8 @@ const styles = StyleSheet.create({
   sprintRuleRow: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 10
+    gap: 10,
+    minHeight: 54
   },
   sprintRuleBadge: {
     alignItems: "center",

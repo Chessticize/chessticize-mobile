@@ -1034,14 +1034,9 @@ describe("PracticePocScreen", () => {
     const renderer = renderLabScenario("practice-first-sprint-guide");
 
     expect(collectText(findByTestId(renderer, "practice-sprint-rules-guide"))).toContain(
-      "Solve 15 to pass"
+      "Solve 15 puzzles to pass"
     );
-    expect(collectText(findByTestId(renderer, "practice-sprint-rules-guide"))).toContain(
-      "Puzzles to pass"
-    );
-    expect(collectText(findByTestId(renderer, "practice-sprint-rules-guide"))).toContain(
-      "Solve 15 puzzles to pass the Sprint."
-    );
+    expect(() => findByTestId(renderer, "practice-sprint-rule-puzzles-to-pass")).toThrow();
     expect(collectText(findByTestId(renderer, "practice-sprint-rules-guide"))).toContain(
       "Example: 15 solved + 1 mistake = 16 attempted."
     );
@@ -1052,7 +1047,7 @@ describe("PracticePocScreen", () => {
       "The third mistake ends the Sprint."
     );
     expect(collectText(findByTestId(renderer, "practice-sprint-rules-guide"))).toContain(
-      "The puzzle timer turns amber. If you solve after that, it is marked Unclear for another look, not as a mistake."
+      "The puzzle timer turns amber when you are taking too long. If you solve after that, it is marked Unclear for another look, not as a mistake."
     );
     expect(collectText(findByTestId(renderer, "practice-sprint-rules-guide"))).toContain(
       "When the puzzle timer runs out, it counts as a mistake, is marked Unclear, is added to Review, and the Sprint moves on."
@@ -1061,7 +1056,7 @@ describe("PracticePocScreen", () => {
       "Mistake limit: The third mistake ends the Sprint."
     );
     expect(findByTestId(renderer, "practice-sprint-rules-guide").props.accessibilityLabel).toContain(
-      "Slow puzzle: The puzzle timer turns amber."
+      "Slow warning: The puzzle timer turns amber when you are taking too long."
     );
     expect(findByTestId(renderer, "practice-sprint-rules-guide").props.accessibilityLabel).toContain(
       "Puzzle timeout: When the puzzle timer runs out, it counts as a mistake"
@@ -1077,7 +1072,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "practice-sprint-rules-guide")).toBeTruthy();
   });
 
-  it("keeps every first-use Sprint rule in one fixed badge and copy column", () => {
+  it("keeps every supporting first-use Sprint rule in one fixed badge and copy column", () => {
     const viewports = [
       {
         height: 874,
@@ -1091,10 +1086,9 @@ describe("PracticePocScreen", () => {
       }
     ];
     const ruleIds = [
-      "puzzles-to-pass",
       "time-limit",
       "mistake-limit",
-      "slow-puzzle",
+      "slow-warning",
       "puzzle-timeout"
     ];
 
@@ -1120,6 +1114,20 @@ describe("PracticePocScreen", () => {
         });
       }
     }
+  });
+
+  it("uses the selected saved Run to calculate the first Sprint pass target", () => {
+    const renderer = renderScreen({
+      runManagementEnabled: true,
+      runManagementPresentation: runManagementPresentation({
+        selectedRunId: "tactics-focus"
+      }),
+      sprintGuidanceEnabled: true
+    });
+
+    expect(collectText(findByTestId(renderer, "practice-sprint-rules-guide"))).toContain(
+      "Solve 20 puzzles to pass"
+    );
   });
 
   it("persists the production rules and shared Active Session guides before starting the real timer", () => {
@@ -1295,10 +1303,10 @@ describe("PracticePocScreen", () => {
       "2 of 4"
     );
     expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-slow"))).toContain(
-      "Amber means this puzzle is slow"
+      "Amber means you’re taking too long"
     );
     expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-slow"))).toContain(
-      "When the puzzle timer turns amber, keep solving. A correct answer is marked Unclear for another look, but it is not a mistake."
+      "Keep solving. A correct answer will be marked Unclear because you took too long, but it will not count as a mistake."
     );
     expect(collectText(findByTestId(activeSession, "practice-session-guide-demo-timer"))).toContain(
       "Puzzle 0:40"
@@ -1447,13 +1455,13 @@ describe("PracticePocScreen", () => {
       activeSession,
       "practice-active-session-guide"
     ).props.accessibilityLabel).toBe(
-      "Guide 2 of 4. Amber means this puzzle is slow. When the puzzle timer turns amber, keep solving. A correct answer is marked Unclear for another look, but it is not a mistake."
+      "Guide 2 of 4. Amber means you’re taking too long. Keep solving. A correct answer will be marked Unclear because you took too long, but it will not count as a mistake."
     );
     expect(findByTestId(activeSession, "practice-session-guide-demo-timer")).toBeTruthy();
     expect(collectText(
       findByTestId(activeSession, "practice-session-guide-coach-copy-slow")
     )).toBe(
-      "SLOWAmber means this puzzle is slowWhen the puzzle timer turns amber, keep solving. A correct answer is marked Unclear for another look, but it is not a mistake."
+      "SLOWAmber means you’re taking too longKeep solving. A correct answer will be marked Unclear because you took too long, but it will not count as a mistake."
     );
 
     press(activeSession, "practice-session-guide-start");
@@ -1505,7 +1513,7 @@ describe("PracticePocScreen", () => {
     const rules = renderLabScenario("practice-first-sprint-guide");
     const rulesText = collectText(findByTestId(rules, "practice-sprint-rules-guide"));
     expect(rulesText).toContain(
-      "The puzzle timer turns amber. If you solve after that, it is marked Unclear for another look, not as a mistake."
+      "The puzzle timer turns amber when you are taking too long. If you solve after that, it is marked Unclear for another look, not as a mistake."
     );
     expect(rulesText).toContain(
       "When the puzzle timer runs out, it counts as a mistake, is marked Unclear, is added to Review, and the Sprint moves on."
@@ -1750,8 +1758,43 @@ describe("PracticePocScreen", () => {
     expect(
       flattenTestStyle(
         findByTestId(renderer, "practice-session-guide-navigation").props.style
-      ).position
+    ).position
     ).toBeUndefined();
+  });
+
+  it("keeps the portrait guide Unclear prompt as wide and flat as the real Sprint prompt", () => {
+    const insets = { top: 62, right: 0, bottom: 34, left: 0 };
+    setPracticeViewport({
+      width: 402,
+      height: 874,
+      scale: 3,
+      insets
+    });
+
+    const renderer = renderLabScenario("practice-active-session-guide");
+    const adaptiveLayout = buildPracticeAdaptiveLayout({
+      width: 402,
+      height: 874,
+      fontScale: 1,
+      insets
+    });
+    const guideBoardWidth = Number(
+      flattenTestStyle(
+        findByTestId(renderer, "practice-session-guide-demo-board").props.style
+      ).width
+    );
+
+    for (let index = 0; index < 3; index += 1) {
+      press(renderer, "practice-session-guide-start");
+    }
+
+    const unclearPromptWidth = Number(
+      flattenTestStyle(
+        findByTestId(renderer, "practice-session-guide-demo-unclear").props.style
+      ).width
+    );
+    expect(guideBoardWidth).toBeLessThan(adaptiveLayout.boardSize);
+    expect(unclearPromptWidth).toBe(adaptiveLayout.boardSize);
   });
 
   it("keeps Slow and Unclear guide content beside their visible landscape targets", () => {
