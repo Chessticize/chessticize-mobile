@@ -88,6 +88,13 @@ describe("App Store assets document", () => {
     expect(storeAssetsE2e).toContain("app-store-06-arrow-duel");
     expect(storeAssetsE2e).toContain("app-store-07-custom-setup");
     expect(storeAssetsE2e).toContain("app-store-08-review-session");
+    expect(storeAssetsE2e).toContain("app-store-09-sprint-rules-guide");
+    expect(storeAssetsE2e).toContain("app-store-10-active-session-guide-header");
+    expect(storeAssetsE2e).toContain("app-store-11-active-session-guide-slow");
+    expect(storeAssetsE2e).toContain("app-store-12-active-session-guide-timeout");
+    expect(storeAssetsE2e).toContain("app-store-13-active-session-guide-unclear");
+    expect(storeAssetsE2e).toContain("app-store-14-arrow-duel-guide");
+    expect(storeAssetsE2e).toContain("app-store-15-sprint-result");
     expect(storeAssetsE2e).toContain("takeLandscapeScreenshot('app-store-01-practice-tab')");
     expect(storeAssetsE2e).toContain("takeLandscapeScreenshot('app-store-05-standard-sprint')");
     expect(storeAssetsE2e).toContain("takeLandscapeScreenshot('app-store-06-arrow-duel')");
@@ -95,6 +102,11 @@ describe("App Store assets document", () => {
     expect(storeAssetsE2e).toContain("takePortraitScreenshotAtTop('app-store-05-standard-sprint')");
     expect(storeAssetsE2e).toContain("takePortraitScreenshotAtTop('app-store-06-arrow-duel')");
     expect(storeAssetsE2e).toContain("takePortraitScreenshotAtTop('app-store-08-review-session')");
+    expect(storeAssetsE2e).toContain("by.id('practice-sprint-rules-dismiss')");
+    expect(storeAssetsE2e).toContain("by.id('practice-active-session-guide')");
+    expect(storeAssetsE2e).toContain("by.id('practice-arrow-duel-guide')");
+    expect(storeAssetsE2e).toContain("by.id('practice-session-guide-start')");
+    expect(storeAssetsE2e).toContain("takeLandscapeScreenshot('app-store-15-sprint-result')");
     expect(storeAssetsE2e).toContain("device.setOrientation(orientation)");
     expect(storeAssetsE2e).toContain("frameFor(element(by.id('adaptive-layout')))");
     expect(storeAssetsE2e).toContain("Timed out waiting for ${orientation} store-asset layout");
@@ -112,6 +124,11 @@ describe("App Store assets document", () => {
     expect(storeAssetsDoc).toContain("app-store-05-standard-sprint");
     expect(storeAssetsDoc).toContain("app-store-07-custom-setup");
     expect(storeAssetsDoc).toContain("app-store-08-review-session");
+    expect(storeAssetsDoc).toContain("app-store-09-sprint-rules-guide");
+    expect(storeAssetsDoc).toContain("app-store-14-arrow-duel-guide");
+    expect(storeAssetsDoc).toContain("app-store-15-sprint-result");
+    expect(storeAssetsDoc).toContain("does not install or launch a");
+    expect(storeAssetsDoc).toContain("physical-device build");
   });
 
   it("marks the App Store plan store-assets item implementation complete", () => {

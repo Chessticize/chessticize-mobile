@@ -6,14 +6,17 @@ description: Capture and visually calibrate Chessticize Mobile's Storybook Inter
 # Chessticize Mobile UI Calibration
 
 Compare the Storybook presentation contract with product-accurate Release
-simulator rendering. Use the maintained eight-scene Detox journey plus its four
-adaptive-layout landscape captures so future calibration stays repeatable
-instead of depending on manually seeded app data.
+simulator rendering. Use the maintained fifteen-scene Detox journey plus its
+eleven adaptive-layout landscape captures so future calibration stays
+repeatable instead of depending on manually seeded app data.
 
 ## Safety And Scope
 
 - Use a dedicated simulator such as `iPhone 17-Detox`. Never use a simulator
   that contains manual-test data; Detox launches with `delete: true`.
+- Do not install or launch this workflow's build on a physical device. Real
+  device checks are a separate, explicitly requested workflow and are never
+  accepted as substitutes for the named simulator evidence.
 - Commit the intended changes and require a clean tracked worktree before
   producing exact-head evidence. Any later visual, runtime, native, dependency,
   capture-fixture, or build-configuration change invalidates it. Documentation,
@@ -58,9 +61,9 @@ The script:
 1. Requires macOS, a clean worktree, and a fixed Git `HEAD`.
 2. Runs `pnpm mobile:doctor:ios`.
 3. Builds the Release simulator app with bundled JavaScript.
-4. Runs the deterministic eight-scene store-assets journey with one worker,
-   capturing four layout-sensitive scenes in both orientations.
-5. Copies the eight portrait and four landscape PNGs to
+4. Runs the deterministic fifteen-scene store-assets journey with one worker,
+   capturing eleven layout-sensitive scenes in both orientations.
+5. Copies the fifteen portrait and eleven landscape PNGs to
    `scratch/rendering-checks/<short-sha>/release/`.
 6. Confirms that `HEAD` and the tracked worktree did not change.
 
@@ -68,7 +71,7 @@ Set `CHESSTICIZE_IOS_PREPARE=1` only when the CocoaPods workspace or locked
 bundle genuinely needs preparation. Environment preparation must not update
 tracked lockfiles unintentionally.
 
-### 3. Inspect all twelve captures
+### 3. Inspect all twenty-six captures
 
 Open every PNG, not only the flow that originally changed:
 
@@ -82,10 +85,18 @@ Open every PNG, not only the flow that originally changed:
 | `app-store-06-arrow-duel` | Both candidate arrows render on the real board without clipping. |
 | `app-store-07-custom-setup` | The theme chips wrap cleanly and the theme row has no `Theme` heading. |
 | `app-store-08-review-session` | Review progress, timer, real board, arrows, and instruction are visible without overlap. |
+| `app-store-09-sprint-rules-guide` | First-use rules clearly distinguish target, duration, mistakes, Slow, and timeout before a Sprint starts. |
+| `app-store-10-active-session-guide-header` | Guide step 1 preserves the real Sprint header hierarchy and keeps its callout legible. |
+| `app-store-11-active-session-guide-slow` | Guide step 2 makes the amber Slow timing state readable without implying a user control. |
+| `app-store-12-active-session-guide-timeout` | Guide step 3 shows the automatic timeout overlay and its mistake, Unclear, and Review consequences without clipping. |
+| `app-store-13-active-session-guide-unclear` | Guide step 4 presents the manual Unclear action as the sole clarity control. |
+| `app-store-14-arrow-duel-guide` | The fifth guide step shows both candidate arrows, bounded copy, and the delayed timer start. |
+| `app-store-15-sprint-result` | The failed result clearly reports reason, solved/attempted accuracy, rating, mistakes, Review impact, and history action. |
 
 The `practice-tab`, `standard-sprint`, `arrow-duel`, and `review-session`
-landscape variants must preserve the native Safe Area, adaptive board/rail
-geometry, readable controls, and unclipped content at the same simulator size.
+landscape variants, plus every first-use guide and Sprint-result landscape
+variant, must preserve the native Safe Area, adaptive board/rail geometry,
+readable controls, and unclipped content at the same simulator size.
 
 Compare hierarchy, copy, wrapping, disabled states, Safe Area, board geometry,
 and bottom-tab overlap against Storybook. Treat Storybook as the design
@@ -100,7 +111,8 @@ When a mismatch is real:
 2. Fix the shared production component rather than adding a Storybook-only
    imitation.
 3. Run focused component tests and `pnpm mobile:typecheck`.
-4. Commit the change, rerun the capture script, and inspect all eight images.
+4. Commit the change, rerun the capture script, and inspect all twenty-six
+   images.
 
 Do not add pixel-perfect native snapshot diffs by default. System fonts,
 rendering versions, and antialiasing create noisy changes; keep semantic
@@ -128,7 +140,7 @@ dimensions are not an accepted App Store upload size.
 - If CocoaPods reports `pathname contains null byte`, treat it as an environment
   preparation problem involving pnpm-linked pod paths. Do not commit an
   unrelated `Podfile.lock` rewrite to make calibration pass.
-- If the screenshot command passes but fewer than twelve PNGs are found, inspect
+- If the screenshot command passes but fewer than twenty-six PNGs are found, inspect
   the Detox artifact directory and the first failing scene before rerunning.
 - If Debug controls appear, confirm the build configuration is
   `ios.sim.release`; do not accept the images as a production baseline.

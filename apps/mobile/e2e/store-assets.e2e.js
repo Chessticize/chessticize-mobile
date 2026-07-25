@@ -20,6 +20,7 @@ const reviewNowMs = Date.parse('2026-07-09T18:00:00.000Z');
 describeStoreAssets('App Store screenshot capture', () => {
   it('captures a coherent active-player story across all store scenes', async () => {
     await launchStoreAssetApp(sprintNowMs, true);
+    await captureFirstUseSprintRulesGuide();
     await setStoreAssetRatings({ standard: 800, arrowDuel: 850 });
     await failArrowDuelSprint();
 
@@ -33,6 +34,14 @@ describeStoreAssets('App Store screenshot capture', () => {
     await captureSprintScenes();
   });
 });
+
+async function captureFirstUseSprintRulesGuide() {
+  await waitFor(element(by.id('practice-sprint-rules-guide'))).toExist().withTimeout(180000);
+  await takePortraitScreenshotAtTop('app-store-09-sprint-rules-guide');
+  await takeLandscapeScreenshot('app-store-09-sprint-rules-guide');
+  await element(by.id('practice-sprint-rules-dismiss')).tap();
+  await waitFor(element(by.id('practice-run-home-edit'))).toBeVisible().withTimeout(10000);
+}
 
 async function launchStoreAssetApp(nowMs, deleteData) {
   await launchWithDisabledSynchronization({
@@ -72,7 +81,28 @@ async function setStoreAssetRatings({ standard, arrowDuel }) {
 
 async function failArrowDuelSprint() {
   await openTab('practice-tab', 'practice-run-arrow-duel');
-  await startPracticeMode('arrow-duel');
+  await waitForVisibleInPracticeScroll('practice-run-arrow-duel');
+  await element(by.id('practice-run-select-arrow-duel')).tap();
+  await element(by.id('practice-main-scroll')).scrollTo('top');
+  await waitFor(element(by.id('practice-run-start'))).toBeVisible().withTimeout(10000);
+  await element(by.id('practice-run-start')).tap();
+
+  for (const scene of [
+    'app-store-10-active-session-guide-header',
+    'app-store-11-active-session-guide-slow',
+    'app-store-12-active-session-guide-timeout',
+    'app-store-13-active-session-guide-unclear'
+  ]) {
+    await waitFor(element(by.id('practice-active-session-guide'))).toExist().withTimeout(10000);
+    await takePortraitScreenshotAtTop(scene);
+    await takeLandscapeScreenshot(scene);
+    await element(by.id('practice-session-guide-start')).tap();
+  }
+
+  await waitFor(element(by.id('practice-arrow-duel-guide'))).toExist().withTimeout(10000);
+  await takePortraitScreenshotAtTop('app-store-14-arrow-duel-guide');
+  await takeLandscapeScreenshot('app-store-14-arrow-duel-guide');
+  await element(by.id('practice-session-guide-start')).tap();
   await waitForVisibleInPracticeScroll('session-board');
 
   for (let mistakeCount = 1; mistakeCount <= 3; mistakeCount += 1) {
@@ -92,6 +122,8 @@ async function failArrowDuelSprint() {
 
   await waitFor(element(by.text('Sprint failed'))).toBeVisible().withTimeout(30000);
   await waitFor(element(by.id('sprint-result-mistakes'))).toHaveText('3').withTimeout(10000);
+  await takePortraitScreenshotAtTop('app-store-15-sprint-result');
+  await takeLandscapeScreenshot('app-store-15-sprint-result');
 }
 
 async function completeOneWrongReview() {

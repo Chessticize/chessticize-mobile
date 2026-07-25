@@ -18,7 +18,8 @@ Read these repo-local skills before acting:
 
 - `../chessticize-mobile-dev-loop/SKILL.md` for validation-layer selection.
 - `../chessticize-mobile-ui-calibration/SKILL.md` for exact-head Release
-  capture, the maintained twelve-image baseline, and visual inspection rules.
+  capture, the maintained twenty-six-image baseline, and visual inspection
+  rules.
 - `../chessticize-mobile-local-e2e/SKILL.md` when the accumulated delta or
   requested build crosses an iOS native, persistence, release, or Detox
   boundary.
@@ -94,8 +95,8 @@ do not invent interaction tests for them.
 Choose simulator scenes, device profiles, orientations, and supporting test
 scope from the union of changes since the release, not only the newest PR.
 
-- Always capture and inspect the maintained eight Release scenes plus the four
-  layout-sensitive landscape scenes on a dedicated iPhone simulator.
+- Always capture and inspect the maintained fifteen Release scenes plus the
+  eleven layout-sensitive landscape scenes on a dedicated iPhone simulator.
 - Add another device family when the delta touches adaptive layout, Safe Area,
   board/rail geometry, navigation geometry, text wrapping, or screen-size
   branching. Use installed named simulators; do not invent a nonexistent
@@ -114,6 +115,9 @@ scope from the union of changes since the release, not only the newest PR.
   when SQLite schema or repair behavior changed.
 - Keep physical-device sound, haptic, notification, CloudKit, and similar
   owner checks explicit; simulator success cannot prove them.
+- Do not install or launch the audit build on physical hardware. A real-device
+  check is outside this workflow unless the user separately and explicitly
+  requests it.
 
 Build only from a clean exact application head. Do not build from a workflow
 documentation branch. Confirm the bundled `main.jsbundle` exists before using
