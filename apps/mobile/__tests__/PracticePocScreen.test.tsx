@@ -1067,36 +1067,72 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "practice-sprint-rules-guide")).toBeTruthy();
   });
 
-  it("uses a non-interactive timing example before the real Sprint board and Arrow Duel", () => {
+  it("walks through a frozen puzzle spotlight tour before the real Sprint board and Arrow Duel", () => {
     const activeSession = renderLabScenario("practice-active-session-guide");
 
     expect(findByTestId(activeSession, "practice-active-session-guide")).toBeTruthy();
     expect(() => findByTestId(activeSession, "session-board")).toThrow();
     expect(findByTestId(activeSession, "practice-session-guide-demo-board")).toBeTruthy();
-    expect(collectText(findByTestId(activeSession, "practice-session-guide-timing-demo"))).toContain(
-      "These are automatic timing states, not controls."
+    expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-progress"))).toBe(
+      "1 of 4"
     );
-    expect(collectText(findByTestId(activeSession, "practice-session-guide-slow"))).toContain(
+    expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-overview"))).toContain(
+      "Solved tracks progress toward 15"
+    );
+    expect(() => findByTestId(activeSession, "practice-session-guide-coach-slow")).toThrow();
+    expect(collectText(findByTestId(activeSession, "practice-session-guide-start"))).toBe("Next");
+
+    press(activeSession, "practice-session-guide-start");
+    expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-progress"))).toBe(
+      "2 of 4"
+    );
+    expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-slow"))).toContain(
       "The puzzle timer turns amber automatically after the target pace."
     );
-    expect(collectText(findByTestId(activeSession, "practice-session-guide-slow"))).toContain(
+    expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-slow"))).toContain(
       "If you solve after that, the completed attempt is saved as Unclear without adding a mistake."
     );
-    expect(collectText(findByTestId(activeSession, "practice-session-guide-timeout"))).toContain(
+    expect(collectText(findByTestId(activeSession, "practice-session-guide-demo-timer"))).toContain(
+      "Puzzle 0:40"
+    );
+
+    press(activeSession, "practice-session-guide-start");
+    expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-progress"))).toBe(
+      "3 of 4"
+    );
+    expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-timeout"))).toContain(
       "Timed out appears over the board automatically at the time limit."
     );
-    expect(collectText(findByTestId(activeSession, "practice-session-guide-timeout"))).toContain(
+    expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-timeout"))).toContain(
       "The attempt is marked Unclear, added to Review, and the Sprint moves to the next puzzle."
     );
     expect(collectText(findByTestId(activeSession, "practice-session-guide-demo-board"))).toContain(
       "Added to Review · Moving on"
     );
-    expect(collectText(findByTestId(activeSession, "practice-session-guide-unclear"))).toContain(
+
+    press(activeSession, "practice-session-guide-start");
+    expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-progress"))).toBe(
+      "4 of 4"
+    );
+    expect(() => findByTestId(activeSession, "practice-session-guide-timeout-overlay")).toThrow();
+    expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-unclear"))).toContain(
+      "Mark as unclear is the only control in this tour."
+    );
+    expect(collectText(findByTestId(activeSession, "practice-session-guide-demo-unclear"))).toContain(
       "Mark as unclear"
     );
-    expect(collectText(findByTestId(activeSession, "practice-session-guide-unclear"))).toContain(
+    expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-unclear"))).toContain(
       "after a correct answer when you did not fully understand the solution"
     );
+    expect(collectText(findByTestId(activeSession, "practice-session-guide-start"))).toBe(
+      "Start Sprint"
+    );
+
+    press(activeSession, "practice-session-guide-back");
+    expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-progress"))).toBe(
+      "3 of 4"
+    );
+    press(activeSession, "practice-session-guide-start");
     expect(
       findByTestId(activeSession, "practice-active-session-guide").props.accessibilityLabel
     ).toContain(
@@ -1115,10 +1151,12 @@ describe("PracticePocScreen", () => {
       "GUIDE 1 OF 2 · YOUR FIRST ACTIVE SPRINT"
     );
     expect(collectText(findByTestId(firstEverArrowDuel, "practice-session-guide-start"))).toBe(
-      "Next: Arrow Duel"
+      "Next"
     );
 
-    press(firstEverArrowDuel, "practice-session-guide-start");
+    for (let index = 0; index < 4; index += 1) {
+      press(firstEverArrowDuel, "practice-session-guide-start");
+    }
     expect(() => findByTestId(firstEverArrowDuel, "practice-active-session-guide")).toThrow();
     expect(findByTestId(firstEverArrowDuel, "practice-arrow-duel-guide")).toBeTruthy();
     expect(findByTestId(firstEverArrowDuel, "practice-arrow-duel-guide-candidates")).toBeTruthy();

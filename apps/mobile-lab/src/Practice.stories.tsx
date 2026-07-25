@@ -176,18 +176,10 @@ export const ActiveSessionGuide: Story = {
     await waitForTestId(canvasElement, "practice-active-session-guide");
     await waitForTestId(canvasElement, "practice-session-guide-timing-demo");
     await waitForTestId(canvasElement, "practice-session-guide-demo-board");
+    await waitForTestId(canvasElement, "practice-session-guide-coach-overview");
     await waitForText(
       canvasElement,
-      "These are automatic timing states, not controls. There is nothing to tap."
-    );
-    await waitForText(
-      canvasElement,
-      "Timed out appears over the board automatically at the time limit."
-    );
-    await waitForTestId(canvasElement, "practice-session-guide-unclear");
-    await waitForText(
-      canvasElement,
-      "Use this after a correct answer when you did not fully understand the solution."
+      "Solved tracks progress toward 15. Sprint shows the overall 5:00 clock. The Sprint ends after 3 mistakes."
     );
     expectTestIdAbsent(canvasElement, "session-board");
   }
