@@ -8,6 +8,17 @@ const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
 const rootPackage = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
 const mobilePackage = JSON.parse(fs.readFileSync(path.join(repoRoot, "apps/mobile/package.json"), "utf8"));
 const storeAssetsE2e = fs.readFileSync(path.join(repoRoot, "apps/mobile/e2e/store-assets.e2e.js"), "utf8");
+const uiCalibrationRunner = fs.readFileSync(
+  path.join(
+    repoRoot,
+    ".codex/skills/chessticize-mobile-ui-calibration/scripts/capture-release-baseline.sh"
+  ),
+  "utf8"
+);
+const simulatorOrientationRunnerPath = path.join(
+  repoRoot,
+  ".codex/skills/chessticize-mobile-ui-calibration/scripts/set-simulator-orientation.sh"
+);
 
 function tableValue(field) {
   const escapedField = field.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -72,7 +83,7 @@ describe("App Store assets document", () => {
     expect(mobilePackage.scripts["e2e:store-assets:ios"]).toContain("artifacts/store-assets");
     expect(storeAssetsE2e).toContain("describe.skip");
     expect(storeAssetsE2e).toContain("CHESSTICIZE_CAPTURE_STORE_ASSETS");
-    expect(storeAssetsE2e).toContain("CHESSTICIZE_CAPTURE_LANDSCAPE_ASSETS");
+    expect(storeAssetsE2e).toContain("CHESSTICIZE_STORE_ASSET_ORIENTATION");
     expect(storeAssetsE2e).toContain("chessticizeStoreAssetCapture");
     expect(storeAssetsE2e).toContain("setStoreAssetRatings({ standard: 800, arrowDuel: 850 })");
     expect(storeAssetsE2e).toContain("openTab('practice-tab', 'practice-run-home-edit')");
@@ -108,14 +119,18 @@ describe("App Store assets document", () => {
     expect(storeAssetsE2e).toContain("takePortraitScreenshotAtTop('app-store-05-standard-sprint')");
     expect(storeAssetsE2e).toContain("takePortraitScreenshotAtTop('app-store-06-arrow-duel')");
     expect(storeAssetsE2e).toContain("takePortraitScreenshotAtTop('app-store-08-review-session')");
-    expect(storeAssetsE2e).toContain("device.setOrientation('landscape')");
-    expect(storeAssetsE2e).toContain("device.setOrientation('portrait')");
+    expect(storeAssetsE2e).not.toContain("device.setOrientation(");
     expect(storeAssetsE2e).toContain("waitForScreenOrientation('landscape')");
     expect(storeAssetsE2e).toContain("waitForScreenOrientation('portrait')");
     expect(storeAssetsE2e).toContain("last observed frame=${JSON.stringify(lastFrame)}");
     expect(storeAssetsE2e).toContain("stableFrameCount >= 3");
-    expect(storeAssetsE2e).toContain("Portrait restoration failed after ${name}");
     expect(storeAssetsE2e).toContain("last frame error=${lastFrameError");
+    expect(uiCalibrationRunner).toContain("CHESSTICIZE_STORE_ASSET_ORIENTATION=portrait");
+    expect(uiCalibrationRunner).toContain("CHESSTICIZE_STORE_ASSET_ORIENTATION=landscape");
+    expect(uiCalibrationRunner).toContain("set-simulator-orientation.sh");
+    expect(uiCalibrationRunner).toContain('DEVICE_NAME="${DETOX_IOS_DEVICE:-iPhone 17-Detox}"');
+    expect(uiCalibrationRunner).toContain('release-$DEVICE_SLUG');
+    expect(fs.existsSync(simulatorOrientationRunnerPath)).toBe(true);
     expect(storeAssetsE2e).toContain("expect(element(by.text('Themes'))).toExist()");
     expect(storeAssetsDoc).toContain("pnpm mobile:e2e:build:ios:release");
     expect(storeAssetsDoc).toContain("pnpm mobile:e2e:store-assets:ios:release");

@@ -13,7 +13,14 @@ const {
 const { expectFrameContained } = require('./screenshotAssertions');
 
 const describeStoreAssets = process.env.CHESSTICIZE_CAPTURE_STORE_ASSETS === '1' ? describe : describe.skip;
-const captureLandscapeAssets = process.env.CHESSTICIZE_CAPTURE_LANDSCAPE_ASSETS === '1';
+const captureOrientation = process.env.CHESSTICIZE_STORE_ASSET_ORIENTATION ?? 'portrait';
+if (!['portrait', 'landscape'].includes(captureOrientation)) {
+  throw new Error(
+    `CHESSTICIZE_STORE_ASSET_ORIENTATION must be portrait or landscape, received ${captureOrientation}`
+  );
+}
+const capturePortraitAssets = captureOrientation === 'portrait';
+const captureLandscapeAssets = captureOrientation === 'landscape';
 const puzzlePackPath = resolve(__dirname, '../../../fixtures/puzzles/bundled-core-pack.sqlite');
 const sprintNowMs = Date.parse('2026-07-08T18:00:00.000Z');
 const reviewNowMs = Date.parse('2026-07-09T18:00:00.000Z');
@@ -44,6 +51,7 @@ async function launchStoreAssetApp(nowMs, deleteData) {
       chessticizeTestNowMs: String(nowMs)
     }
   });
+  await waitForScreenOrientation(captureOrientation);
 }
 
 async function setStoreAssetRatings({ standard, arrowDuel }) {
@@ -132,8 +140,12 @@ async function captureMainTabScenes() {
     throw new Error('Expected the Practice screenshot to show a populated Arrow Duel rating');
   }
   await sleep(1200);
-  await device.takeScreenshot('app-store-01-practice-tab');
+  await takePortraitScreenshot('app-store-01-practice-tab');
   await takeLandscapeScreenshot('app-store-01-practice-tab');
+
+  if (captureLandscapeAssets) {
+    return;
+  }
 
   await waitForVisibleInPracticeScroll('practice-add-run');
   await element(by.id('practice-add-run')).tap();
@@ -143,7 +155,7 @@ async function captureMainTabScenes() {
   await waitFor(element(by.id('practice-run-theme-row'))).toExist().withTimeout(10000);
   await expect(element(by.text('Themes'))).toExist();
   await sleep(1200);
-  await device.takeScreenshot('app-store-07-custom-setup');
+  await takePortraitScreenshot('app-store-07-custom-setup');
   await element(by.id('practice-run-editor-close')).tap();
   await waitFor(element(by.id('practice-run-arrow-duel'))).toBeVisible().withTimeout(10000);
 
@@ -152,18 +164,18 @@ async function captureMainTabScenes() {
   await waitFor(element(by.id('review-due-count'))).toHaveText('1 / 3').withTimeout(10000);
   await waitFor(element(by.id('review-today-history'))).toExist().withTimeout(10000);
   await sleep(1200);
-  await device.takeScreenshot('app-store-02-review-tab');
+  await takePortraitScreenshot('app-store-02-review-tab');
 
   await openTab('history-tab', 'history-action-header');
   await waitFor(element(by.text('1-4 of 4'))).toExist().withTimeout(10000);
   await element(by.id('practice-main-scroll')).scrollTo('top');
   await sleep(1200);
-  await device.takeScreenshot('app-store-03-history-tab');
+  await takePortraitScreenshot('app-store-03-history-tab');
 
   await openTab('settings-tab', 'settings-app-version');
   await element(by.id('practice-main-scroll')).scrollTo('top');
   await sleep(1200);
-  await device.takeScreenshot('app-store-04-settings-tab');
+  await takePortraitScreenshot('app-store-04-settings-tab');
 }
 
 async function captureSprintScenes() {
@@ -189,6 +201,15 @@ async function captureSprintScenes() {
 
 async function takePortraitScreenshotAtTop(name) {
   await element(by.id('practice-main-scroll')).scrollTo('top');
+  await takePortraitScreenshot(name);
+}
+
+async function takePortraitScreenshot(name) {
+  if (!capturePortraitAssets) {
+    return;
+  }
+
+  await waitForScreenOrientation('portrait');
   await sleep(500);
   await device.takeScreenshot(name);
 }
@@ -198,28 +219,11 @@ async function takeLandscapeScreenshot(name, assertLayout) {
     return;
   }
 
-  let captureError = null;
-  await device.setOrientation('landscape');
-  try {
-    await waitForScreenOrientation('landscape');
-    await assertLayout?.();
-    await device.takeScreenshot(`${name}-landscape`);
-  } catch (error) {
-    captureError = error;
-    throw error;
-  } finally {
-    try {
-      await device.setOrientation('portrait');
-      await waitForScreenOrientation('portrait');
-    } catch (restoreError) {
-      if (!captureError) {
-        throw restoreError;
-      }
-      console.error(
-        `[store-assets] Portrait restoration failed after ${name}: ${errorMessage(restoreError)}`
-      );
-    }
-  }
+  await element(by.id('practice-main-scroll')).scrollTo('top');
+  await waitForScreenOrientation('landscape');
+  await assertLayout?.();
+  await sleep(500);
+  await device.takeScreenshot(`${name}-landscape`);
 }
 
 async function waitForScreenOrientation(orientation) {

@@ -12,8 +12,14 @@ instead of depending on manually seeded app data.
 
 ## Safety And Scope
 
-- Use a dedicated simulator such as `iPhone 17-Detox`. Never use a simulator
-  that contains manual-test data; Detox launches with `delete: true`.
+- Use a dedicated simulator such as `iPad Pro 11-inch (M5)` or
+  `iPhone 17-Detox`. Never use a simulator that contains manual-test data;
+  Detox launches with `delete: true`.
+- Keep the Mac unlocked and the exact target device window open in Simulator.
+  The calibration script uses Simulator's host Rotate control because current
+  iPadOS windowing modes can reject programmatic app orientation requests.
+  Never add product lifecycle or native geometry code only to make calibration
+  rotate.
 - Commit the intended changes and require a clean tracked worktree before
   producing exact-head evidence. Any later visual, runtime, native, dependency,
   capture-fixture, or build-configuration change invalidates it. Documentation,
@@ -49,20 +55,27 @@ changing the product UI.
 Run from the repository root:
 
 ```sh
-DETOX_IOS_DEVICE="iPhone 17-Detox" \
+DETOX_IOS_DEVICE="iPad Pro 11-inch (M5)" \
   .codex/skills/chessticize-mobile-ui-calibration/scripts/capture-release-baseline.sh
 ```
+
+If more than one available runtime has the same device name, also set the exact
+`DETOX_IOS_DEVICE_UDID`.
 
 The script:
 
 1. Requires macOS, a clean worktree, and a fixed Git `HEAD`.
 2. Runs `pnpm mobile:doctor:ios`.
 3. Builds the Release simulator app with bundled JavaScript.
-4. Runs the deterministic eight-scene store-assets journey with one worker,
-   capturing four layout-sensitive scenes in both orientations.
+4. Runs the deterministic portrait journey, rotates the exact host Simulator
+   window, then runs the separate landscape journey with one worker.
 5. Copies the eight portrait and four landscape PNGs to
-   `scratch/rendering-checks/<short-sha>/release/`.
-6. Confirms that `HEAD` and the tracked worktree did not change.
+   `scratch/rendering-checks/<short-sha>/release-<device-name>/`.
+6. Requires the React Native adaptive-layout frame to remain in the requested
+   orientation for three observations before each capture. A stale portrait
+   framebuffer fails instead of being relabeled as landscape.
+7. Restores the Simulator to portrait and confirms that `HEAD` and the tracked
+   worktree did not change.
 
 Set `CHESSTICIZE_IOS_PREPARE=1` only when the CocoaPods workspace or locked
 bundle genuinely needs preparation. Environment preparation must not update
@@ -100,7 +113,7 @@ When a mismatch is real:
 2. Fix the shared production component rather than adding a Storybook-only
    imitation.
 3. Run focused component tests and `pnpm mobile:typecheck`.
-4. Commit the change, rerun the capture script, and inspect all eight images.
+4. Commit the change, rerun the capture script, and inspect all twelve images.
 
 Do not add pixel-perfect native snapshot diffs by default. System fonts,
 rendering versions, and antialiasing create noisy changes; keep semantic
@@ -108,9 +121,12 @@ assertions automatic and visual judgment explicit.
 
 ## Other Device Families
 
-Change only `DETOX_IOS_DEVICE` to reuse the same journey on another dedicated
-simulator. Before App Store upload, capture and inspect the required 6.9-inch
-iPhone, 6.1-inch iPhone, and 13-inch iPad sets, then run:
+Change `DETOX_IOS_DEVICE` (and `DETOX_IOS_DEVICE_UDID` when the name is
+ambiguous) to reuse the same journey on another dedicated simulator. Captures
+remain isolated in device-specific directories so evidence from different
+frames cannot overwrite or masquerade as another device. Before App Store
+upload, capture and inspect the required 6.9-inch iPhone, 6.1-inch iPhone, and
+13-inch iPad sets, then run:
 
 ```sh
 pnpm app-store:screenshot-audit
@@ -130,6 +146,10 @@ dimensions are not an accepted App Store upload size.
   unrelated `Podfile.lock` rewrite to make calibration pass.
 - If the screenshot command passes but fewer than twelve PNGs are found, inspect
   the Detox artifact directory and the first failing scene before rerunning.
+- If host rotation fails, unlock the Mac, open exactly one Simulator window
+  whose title starts with the configured device name, and grant Accessibility
+  control to the invoking terminal. Treat a frame-orientation timeout as a
+  blocked calibration, not acceptable visual evidence.
 - If Debug controls appear, confirm the build configuration is
   `ios.sim.release`; do not accept the images as a production baseline.
 
