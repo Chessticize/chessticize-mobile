@@ -230,12 +230,6 @@ describe('Practice POC', () => {
       delete: false
     });
     await openStandardHistoryTrend();
-    await waitForElementAccessibilityLabelContaining(
-      'history-filter-unclear',
-      'Unclear attempts',
-      10000
-    );
-    await element(by.id('history-filter-unclear')).tap();
     await waitFor(element(by.text('Correct')).atIndex(0)).toExist().withTimeout(10000);
     const resultAttributes = await element(by.text('Correct')).atIndex(0).getAttributes();
     const resultIdentifier = (Array.isArray(resultAttributes) ? resultAttributes[0] : resultAttributes).identifier;
@@ -314,12 +308,6 @@ describe('Practice POC', () => {
       delete: false
     });
     await openStandardHistoryTrend();
-    await waitForElementAccessibilityLabelContaining(
-      'history-filter-unclear',
-      'Unclear attempts',
-      10000
-    );
-    await element(by.id('history-filter-unclear')).tap();
     await waitFor(element(by.id('history-empty-state'))).toExist().withTimeout(10000);
   });
 

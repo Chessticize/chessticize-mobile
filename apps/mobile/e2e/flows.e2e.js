@@ -232,10 +232,7 @@ describe('Key user flows', () => {
     await waitForVisibleInPracticeScroll('history-theme-mate-in-3');
     await element(by.id('history-theme-mate-in-3')).tap();
     await waitFor(element(
-      by.text('Mate in 2').withAncestor(by.id('history-active-filter-summary'))
-    )).toExist().withTimeout(10000);
-    await waitFor(element(
-      by.text('Mate in 3').withAncestor(by.id('history-active-filter-summary'))
+      by.text('2 themes selected').withAncestor(by.id('history-active-filter-summary'))
     )).toExist().withTimeout(10000);
     await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
 
@@ -264,10 +261,7 @@ describe('Key user flows', () => {
       by.text('Source: Sprint').withAncestor(by.id('history-active-filter-summary'))
     )).toExist();
     await expect(element(
-      by.text('Mate in 2').withAncestor(by.id('history-active-filter-summary'))
-    )).toExist();
-    await expect(element(
-      by.text('Mate in 3').withAncestor(by.id('history-active-filter-summary'))
+      by.text('2 themes selected').withAncestor(by.id('history-active-filter-summary'))
     )).toExist();
     await waitFor(element(by.id('history-filter-reset'))).toBeVisible().withTimeout(10000);
     await expect(element(by.text('Reset filters'))).toExist();
@@ -277,6 +271,9 @@ describe('Key user flows', () => {
     )).not.toExist().withTimeout(10000);
     await waitFor(element(
       by.text('Source: Sprint').withAncestor(by.id('history-active-filter-summary'))
+    )).not.toExist().withTimeout(10000);
+    await waitFor(element(
+      by.text('2 themes selected').withAncestor(by.id('history-active-filter-summary'))
     )).not.toExist().withTimeout(10000);
   });
 
