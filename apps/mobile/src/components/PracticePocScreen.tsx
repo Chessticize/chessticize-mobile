@@ -7027,7 +7027,6 @@ function UnclearAttemptPrompt({
 
 function SprintSummary({
   state,
-  attemptCount: storedAttemptCount,
   clarifyGoal,
   elapsedMs,
   includePromptInUnclearSummary,
@@ -7041,7 +7040,6 @@ function SprintSummary({
   onReview
 }: {
   state: SprintState;
-  attemptCount?: number;
   clarifyGoal: boolean;
   elapsedMs: number;
   includePromptInUnclearSummary: boolean;
@@ -7058,7 +7056,6 @@ function SprintSummary({
   const reason = formatEndReason(state.endReason);
   const shouldPrioritizeReview = Boolean(onReview);
   const attemptCount = resultSummary?.attemptCount
-    ?? storedAttemptCount
     ?? state.correctCount + state.mistakeCount;
   const accuracy = resultSummary?.accuracyPercent
     ?? Math.round((state.correctCount / Math.max(1, attemptCount)) * 100);
