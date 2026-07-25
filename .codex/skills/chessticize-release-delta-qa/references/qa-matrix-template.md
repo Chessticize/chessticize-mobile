@@ -5,9 +5,9 @@ Release simulator scenes with an explicit device and orientation; supporting
 automation may use separate rows. Keep release-only and documentation-only work
 in the inventory but out of the interaction matrix.
 
-| ID | Surface/state | Final visual or behavior contract | Simulator/device | Orientation | Storybook or design reference | Supporting automation | Priority | Result | Classification | Screenshot, observation, or disposition |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| VIS-01 | Practice Home |  | iPhone 17-Detox | portrait |  |  |  | pending | pending |  |
+| ID | Surface/state | Final visual or behavior contract | Simulator/device | Orientation | Storybook or design reference | Supporting automation | Priority | Functional result | Copy result | Presentation result | Classification | Screenshot, observation, or disposition |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| VIS-01 | Practice Home |  | iPhone 17-Detox | portrait |  |  |  | pending | pending | pending | pending |  |
 
 Allowed results:
 
@@ -17,11 +17,27 @@ Allowed results:
   check.
 - `not-applicable`: the row does not apply to the selected platform or build.
 
-A visual row is `pass` only after a person or visual agent opens the PNG and
-records what was inspected. A successful capture command or green component
-test is not sufficient. The file's pixel dimensions or observed app frame must
-also match the claimed orientation; a filename containing `landscape` is not
-orientation evidence.
+A visual row is complete only after a person or visual agent opens the PNG and
+records both judgments:
+
+- `Functional result`: interaction state, content, reachability, clipping, and
+  expected behavior.
+- `Copy result`: novice clarity, accuracy, grammar, concision, tone, product
+  terminology, and consistency with the visible control and behavior.
+- `Presentation result`: hierarchy, alignment, spacing rhythm, typography,
+  whitespace balance, density, consistency, and overall polish.
+
+A successful capture command or green component test is not sufficient. The
+file's pixel dimensions or observed app frame must also match the claimed
+orientation; a filename containing `landscape` is not orientation evidence.
+Record the exact visible defect and its effect on comprehension, scanability,
+balance, consistency, or trust. Do not fail a row for taste alone without an
+observable rationale.
+
+Evaluate text as a first-time user who can only see the current UI. Text fails
+when it is misleading, ambiguous, awkward, repetitive, inconsistent, overly
+internal, or does not explain the visible element or consequence. Fully visible
+text is not automatically good copy.
 
 Classify every failure before acting:
 
@@ -52,6 +68,17 @@ Classify every failure before acting:
 ### Actual
 
 ...
+
+### Copy impact
+
+Describe any clarity, accuracy, grammar, terminology, tone, repetition, or
+novice-comprehension problem. Write `None` when the copy passes.
+
+### Presentation impact
+
+Describe any hierarchy, alignment, spacing, typography, balance, consistency,
+or polish problem and how it affects the user. Write `None` for a purely
+functional finding.
 
 ### Impact and frequency
 

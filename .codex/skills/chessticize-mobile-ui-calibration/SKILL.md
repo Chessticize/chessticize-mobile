@@ -1,6 +1,6 @@
 ---
 name: chessticize-mobile-ui-calibration
-description: Capture and visually calibrate Chessticize Mobile's Storybook Interaction Lab against an exact-head iOS Release simulator build across the maintained portrait and landscape baseline scenes, archive local screenshots, enforce production-only UI, and record PR evidence. Use when UI work needs native screenshot parity, when Storybook may differ from the real app, when Custom Setup or Review controls need verification, when refreshing the project's foundational UI screenshots, or before preparing App Store screenshot sets.
+description: Capture and visually calibrate Chessticize Mobile's Storybook Interaction Lab against an exact-head iOS Release simulator build across the maintained portrait and landscape baseline scenes, judge functional rendering, copy quality, and presentation quality including hierarchy, alignment, typography, spacing, balance, and polish, archive local screenshots, enforce production-only UI, and record PR evidence. Use when UI work needs native screenshot parity, copy review, or aesthetic and layout review, when Storybook may differ from the real app, when Custom Setup or Review controls need verification, when refreshing the project's foundational UI screenshots, or before preparing App Store screenshot sets.
 ---
 
 # Chessticize Mobile UI Calibration
@@ -86,11 +86,11 @@ Open every PNG, not only the flow that originally changed:
 | `app-store-07-custom-setup` | The theme chips wrap cleanly and the theme row has no `Theme` heading. |
 | `app-store-08-review-session` | Review progress, timer, real board, arrows, and instruction are visible without overlap. |
 | `app-store-09-sprint-rules-guide` | First-use rules clearly distinguish target, duration, mistakes, Slow, and timeout before a Sprint starts. |
-| `app-store-10-active-session-guide-header` | Guide step 1 preserves the real Sprint header hierarchy and keeps its callout legible. |
-| `app-store-11-active-session-guide-slow` | Guide step 2 makes the amber Slow timing state readable without implying a user control. |
-| `app-store-12-active-session-guide-timeout` | Guide step 3 shows the automatic timeout overlay and its mistake, Unclear, and Review consequences without clipping. |
-| `app-store-13-active-session-guide-unclear` | Guide step 4 presents the manual Unclear action as the sole clarity control. |
-| `app-store-14-arrow-duel-guide` | The fifth guide step shows both candidate arrows, bounded copy, and the delayed timer start. |
+| `app-store-10-active-session-guide-header` | The Sprint header guide preserves the real hierarchy and keeps its callout legible. |
+| `app-store-11-active-session-guide-slow` | The Slow guide makes the amber timing state readable without implying a user control. |
+| `app-store-12-active-session-guide-timeout` | The Timed Out guide shows the automatic timeout overlay and its mistake, Unclear, and Review consequences without clipping. |
+| `app-store-13-active-session-guide-unclear` | The Unclear guide explains the manual action and points to the visible control. |
+| `app-store-14-arrow-duel-guide` | The Arrow Duel guide shows both candidate arrows, bounded copy, and the delayed timer start. |
 | `app-store-15-sprint-result` | The failed result clearly reports reason, solved/attempted accuracy, rating, mistakes, Review impact, and history action. |
 
 The `practice-tab`, `standard-sprint`, `arrow-duel`, and `review-session`
@@ -101,6 +101,34 @@ readable controls, and unclipped content at the same simulator size.
 Compare hierarchy, copy, wrapping, disabled states, Safe Area, board geometry,
 and bottom-tab overlap against Storybook. Treat Storybook as the design
 contract and Release simulator screenshots as native acceptance evidence.
+
+Judge functional rendering and presentation quality separately. Functional
+containment is necessary but not sufficient for a visual pass. For every image,
+also inspect:
+
+- Focal hierarchy and whether the reading order is obvious.
+- Shared edges, columns, baselines, and alignment consistency.
+- Padding, margins, spacing rhythm, density, and whitespace balance.
+- Type scale, weight, line length, wrapping, and readability.
+- Copy clarity, accuracy, grammar, concision, tone, product terminology, and
+  consistency with the visible behavior.
+- Visual balance between the board, rail, callouts, navigation, and screen
+  edges.
+- Consistency of colors, borders, radii, icons, and sibling-screen patterns.
+- Whether guidance visually points to and plainly explains the UI element to a
+  first-time user, without internal tour language, unexplained jargon, or
+  redundant instructions.
+- Overall polish at the tested viewport and orientation.
+
+Treat an observable aesthetic or layout defect as a real mismatch when it
+reduces scanability, comprehension, balance, consistency, or perceived quality,
+even if the flow remains usable. Record the screenshot, visible symptom, and
+user impact instead of reporting a vague personal preference.
+
+Treat misleading, ambiguous, awkward, repetitive, inconsistent, or
+novice-hostile copy as a real mismatch even when it renders without clipping.
+The text must describe the UI and consequence the user can actually observe,
+not merely mirror an internal implementation name.
 
 ### 4. Fix and repeat
 
@@ -154,6 +182,8 @@ Update the PR validation record with:
 - Capture command and Detox pass count.
 - Local screenshot directory.
 - The Storybook URL reviewed.
-- Visual findings, especially Custom Setup heading removal, Review CTA/debug
+- Separate functional, copy, and presentation findings, including hierarchy,
+  alignment, spacing, typography, whitespace balance, overall polish, novice
+  clarity, terminology, Custom Setup heading removal, Review CTA/debug
   isolation, board arrows, clipping, wrapping, and Safe Area behavior.
 - Any required device families or final App Store assets still outstanding.

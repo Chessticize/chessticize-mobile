@@ -1,6 +1,6 @@
 ---
 name: chessticize-release-delta-qa
-description: Audit Chessticize Mobile changes since an exact published release with simulator visual verification as the primary acceptance layer. Identify changed screens and states, capture and inspect the exact-head Release app across relevant viewports and orientations, use automated tests as supporting evidence, file visual or functional product defects without fixing them, and repair proven test or workflow drift. Use for post-release regression sweeps, pre-release visual QA, requests to summarize fixes since a version, or requests to have a subagent validate changed mobile journeys.
+description: Audit Chessticize Mobile changes since an exact published release with simulator visual verification as the primary acceptance layer. Identify changed screens and states, capture and inspect the exact-head Release app across relevant viewports and orientations, judge functional correctness, copy quality, and presentation quality such as hierarchy, alignment, typography, spacing, and visual balance, use automated tests as supporting evidence, file visual, copy, aesthetic, layout, or functional product defects without fixing them, and repair proven test or workflow drift. Use for post-release regression sweeps, pre-release visual QA, requests to summarize fixes since a version, or requests to have a subagent validate changed mobile journeys.
 ---
 
 # Chessticize Release Delta QA
@@ -154,14 +154,41 @@ never reaches the requested orientation, fail the capture row as blocked and
 do not accept or relabel the image.
 
 Open every captured PNG. Do not infer visual success from the screenshot
-command exiting zero. Inspect:
+command exiting zero. Treat functional correctness and presentation quality as
+separate judgments. A screen can be usable and unclipped while still failing
+visual QA. Inspect:
 
-- Hierarchy, copy, wrapping, truncation, and disabled states.
+- Visual hierarchy and whether the intended focal order is immediately clear.
+- Alignment grids, shared edges, column consistency, and control baselines.
+- Spacing rhythm, padding, margins, density, and balanced use of whitespace.
+- Typography scale, weight, line length, wrapping, truncation, and readability.
+- Copy clarity, grammar, concision, tone, terminology, and consistency with the
+  behavior the user can actually observe.
+- Visual weight and balance between the board, control rail, callouts,
+  navigation, and surrounding edges.
+- Consistency of color, borders, corner radii, icon treatment, and sibling
+  screen patterns.
+- Whether guidance copy names and explains the visible UI element a novice is
+  being asked to understand, without tour mechanics, internal implementation
+  language, unexplained jargon, or redundant instructions.
 - Native Safe Area and edge padding.
 - Board size, coordinates, arrows, rail geometry, and board-to-copy balance.
 - Portrait and landscape clipping, scrolling, and whitespace.
 - Bottom-tab or overlay obstruction.
 - Release-only presentation and absence of developer controls.
+
+Fail the presentation judgment when an observable aesthetic or layout problem
+reduces scanability, comprehension, balance, consistency, or perceived polish.
+Do not dismiss such a defect as subjective merely because every element fits.
+Record the exact screenshot, the visible defect, and its user impact; do not
+file an issue for an unsupported personal preference.
+
+Judge copy from the perspective of a first-time user who only knows what is
+visible on the screen. Fail the copy judgment when wording is misleading,
+ambiguous, grammatically awkward, needlessly repetitive, inconsistent with
+other product terms, or unable to explain the visible control or consequence.
+Do not treat text as correct solely because it matches an implementation name
+or fits within its container.
 
 For changed interactions, also play the transition before and after the
 captured state through public controls. Confirm that the visible target remains
@@ -186,10 +213,11 @@ visual sweep and its supporting interaction checks. Give it:
 
 Do not give it suspected answers or ask it to implement fixes. Do not let the
 subagent create GitHub issues directly. It returns one result per matrix row:
-`pass`, `fail`, `blocked`, or `not-applicable`, with reproduction steps and
-evidence. For every visual row it must open the PNG and record explicit visual
-observations; a capture count alone is not a pass. The primary agent verifies
-failures and owns deduplication, grouping, triage, and tracker writes.
+`pass`, `fail`, `blocked`, or `not-applicable`, with separate functional and
+presentation judgments, reproduction steps, and evidence. For every visual row
+it must open the PNG and record explicit observations about correctness, copy,
+and aesthetics/layout; a capture count alone is not a pass. The primary agent
+verifies failures and owns deduplication, grouping, triage, and tracker writes.
 
 Use a dedicated Detox simulator. Never run destructive Detox launches against
 the user's manual-testing simulator.
@@ -205,6 +233,14 @@ During this workflow:
   - A reproducible visual mismatch in the Release simulator is a product
     finding even when automated assertions pass. File an issue and do not fix
     it during this sweep.
+  - A reproducible aesthetic or layout defect is also a product finding when
+    evidence shows weak hierarchy, inconsistent alignment or typography,
+    awkward spacing, unbalanced whitespace, cramped density, or reduced
+    readability or polish. File an issue even when the flow remains usable.
+  - Misleading, ambiguous, awkward, inconsistent, overly internal, or
+    novice-hostile copy is a product finding when the wording can reasonably
+    impair comprehension or set the wrong expectation. File an issue even when
+    the text is technically rendered in full.
   - Any other mismatch in current product behavior is also a product finding.
     File an issue and do not fix it during this sweep.
   - A test, fixture, or workflow that still asserts a superseded contract is
@@ -250,8 +286,8 @@ Report:
 - Pages requiring owner attention.
 - Release build and capture commands, screenshot directories, Xcode, simulator
   profiles, orientations, and clean-worktree evidence.
-- Per-scene visual result and explicit observation, including every maintained
-  portrait and landscape image.
+- Per-scene functional, copy, and presentation results with explicit
+  observations, including every maintained portrait and landscape image.
 - Matrix totals for pass, fail, blocked, and not-applicable.
 - Validation-drift repairs, their original failure evidence, exact changed
   artifacts, and passing rerun evidence.
