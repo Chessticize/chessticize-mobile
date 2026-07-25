@@ -202,47 +202,29 @@ describe('Key user flows', () => {
     await waitForElementTextContaining('settings-review-reminder-schedule-status', 'none', 10000);
   });
 
-  it('shows failed attempts in history with the wrong-only toggle', async () => {
+  it('shows failed attempts in History and preserves current filters through replay', async () => {
     await failStandardSprint();
     await dismissSprintSummary();
 
     await openStandardHistoryTrend();
 
-    await waitFor(element(by.id('history-filter-wrong-only')))
-      .toBeVisible()
-      .whileElement(by.id('history-range-filters'))
-      .scroll(120, 'right');
-    await expect(element(by.id('history-filter-reset'))).not.toExist();
-    await expect(element(by.id('history-filter-wrong-only')))
-      .toHaveValue(historyToggleValue('Wrong puzzles only', false));
-    await expect(element(by.id('history-filter-sprint-only')))
-      .toHaveValue(historyToggleValue('Sprint attempts only', true));
-    await element(by.id('history-filter-wrong-only')).tap();
-    await waitFor(element(by.id('history-filter-wrong-only')))
-      .toHaveValue(historyToggleValue('Wrong puzzles only', true))
-      .withTimeout(10000);
+    await waitFor(element(by.id('history-filter-reset'))).toBeVisible().withTimeout(10000);
+    await element(by.id('history-result-wrong')).tap();
+    await waitFor(element(
+      by.text('Result: Wrong').withAncestor(by.id('history-active-filter-summary'))
+    )).toExist().withTimeout(10000);
     await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
-    await element(by.id('history-filter-wrong-only')).tap();
-    await waitFor(element(by.id('history-filter-wrong-only')))
-      .toHaveValue(historyToggleValue('Wrong puzzles only', false))
-      .withTimeout(10000);
+    await element(by.id('history-result-all')).tap();
+    await waitFor(element(
+      by.text('Result: Wrong').withAncestor(by.id('history-active-filter-summary'))
+    )).not.toExist().withTimeout(10000);
 
-    // Replay round trip must preserve the toggles' non-default state: turn the
-    // wrong-only filter on and sprint-only filter off, open a wrong attempt's
-    // replay, exit, and require both choices to remain unchanged.
-    await element(by.id('history-filter-wrong-only')).tap();
-    await waitFor(element(by.id('history-filter-wrong-only')))
-      .toHaveValue(historyToggleValue('Wrong puzzles only', true))
-      .withTimeout(10000);
-    await waitFor(element(by.id('history-filter-sprint-only')))
-      .toBeVisible()
-      .whileElement(by.id('history-quick-filters'))
-      .scroll(120, 'right');
-    await element(by.id('history-filter-sprint-only')).tap();
-    await waitFor(element(by.id('history-filter-sprint-only')))
-      .toHaveValue(historyToggleValue('Sprint attempts only', false))
-      .withTimeout(10000);
-    await element(by.id('history-filter-toggle')).tap();
+    // Replay round trip must preserve the current non-default filters.
+    await element(by.id('history-result-wrong')).tap();
+    await element(by.id('history-source-sprint')).tap();
+    await waitFor(element(
+      by.text('Source: Sprint').withAncestor(by.id('history-active-filter-summary'))
+    )).toExist().withTimeout(10000);
     await waitForVisibleInPracticeScroll('history-theme-mate-in-2');
     await element(by.id('history-theme-mate-in-2')).tap();
     await waitForVisibleInPracticeScroll('history-theme-mate-in-3');
@@ -273,12 +255,12 @@ describe('Key user flows', () => {
     await element(by.id('practice-main-scroll')).scrollTo('top');
     await waitFor(element(by.id('review-exit'))).toBeVisible().withTimeout(10000);
     await element(by.id('review-exit')).tap();
-    await waitFor(element(by.id('history-filter-wrong-only')))
-      .toHaveValue(historyToggleValue('Wrong puzzles only', true))
-      .withTimeout(10000);
-    await waitFor(element(by.id('history-filter-sprint-only')))
-      .toHaveValue(historyToggleValue('Sprint attempts only', false))
-      .withTimeout(10000);
+    await waitFor(element(
+      by.text('Result: Wrong').withAncestor(by.id('history-active-filter-summary'))
+    )).toExist().withTimeout(10000);
+    await expect(element(
+      by.text('Source: Sprint').withAncestor(by.id('history-active-filter-summary'))
+    )).toExist();
     await expect(element(
       by.text('Mate in 2').withAncestor(by.id('history-active-filter-summary'))
     )).toExist();
@@ -288,12 +270,12 @@ describe('Key user flows', () => {
     await waitFor(element(by.id('history-filter-reset'))).toBeVisible().withTimeout(10000);
     await expect(element(by.text('Reset filters'))).toExist();
     await element(by.id('history-filter-reset')).tap();
-    await waitFor(element(by.id('history-filter-wrong-only')))
-      .toHaveValue(historyToggleValue('Wrong puzzles only', false))
-      .withTimeout(10000);
-    await waitFor(element(by.id('history-filter-sprint-only')))
-      .toHaveValue(historyToggleValue('Sprint attempts only', true))
-      .withTimeout(10000);
+    await waitFor(element(
+      by.text('Result: Wrong').withAncestor(by.id('history-active-filter-summary'))
+    )).not.toExist().withTimeout(10000);
+    await waitFor(element(
+      by.text('Source: Sprint').withAncestor(by.id('history-active-filter-summary'))
+    )).not.toExist().withTimeout(10000);
   });
 
   it('adds and starts a saved custom Run', async () => {
@@ -406,13 +388,6 @@ function expectedInstalledPublicVersion() {
   return device.getPlatform() === 'android'
     ? releaseVersion.publicVersion
     : releaseVersion.iosPublicVersion;
-}
-
-function historyToggleValue(label, active) {
-  if (device.getPlatform() === 'android') {
-    return `${label}, ${active ? 'On' : 'Off'}`;
-  }
-  return active ? '1' : '0';
 }
 
 async function dismissSprintSummary() {
