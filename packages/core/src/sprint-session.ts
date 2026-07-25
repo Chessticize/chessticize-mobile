@@ -11,6 +11,7 @@ import type {
 } from "./types.ts";
 import { calculateSprintRatingChange, DEFAULT_RATING_DEVIATION, DEFAULT_VOLATILITY } from "./ratings.ts";
 import { beginArrowDuelPuzzle, beginLinePuzzle, submitArrowDuelChoice, submitLineMove } from "./puzzle-session.ts";
+import { resolvePuzzleTimingPolicy } from "./sprint-config.ts";
 
 export function startSprint(input: {
   id?: string;
@@ -24,15 +25,21 @@ export function startSprint(input: {
     throw new Error("Cannot start a sprint without puzzles");
   }
   const startedAt = new Date(input.now);
-  const deadlineAt = new Date(startedAt.getTime() + input.config.durationSeconds * 1000).toISOString();
+  const config: SprintConfig = {
+    ...input.config,
+    puzzleTiming: resolvePuzzleTimingPolicy(
+      input.config.puzzleTiming,
+      input.config.perPuzzleSeconds
+    )
+  };
+  const deadlineAt = new Date(startedAt.getTime() + config.durationSeconds * 1000).toISOString();
   const state: SprintState = {
     id: input.id ?? generateId(),
-    config: input.config,
+    config,
     ratingGeneration: input.ratingBeforeRecord?.generation ?? 0,
     status: "active",
     startedAt: startedAt.toISOString(),
     deadlineAt,
-    currentPuzzleStartedAt: startedAt.toISOString(),
     correctCount: 0,
     mistakeCount: 0,
     currentStreak: 0,
@@ -45,17 +52,15 @@ export function startSprint(input: {
     ratingDeviationBefore: input.ratingBeforeRecord?.ratingDeviation ?? DEFAULT_RATING_DEVIATION,
     volatilityBefore: input.ratingBeforeRecord?.volatility ?? DEFAULT_VOLATILITY
   };
-  return {
-    ...state,
-    currentPuzzle: buildCurrentPuzzle(input.config.mode, input.puzzles[0], candidateSeed(state, 0))
-  };
+  return beginCurrentPuzzle(state, 0, startedAt.toISOString());
 }
 
 export function submitSprintMove(state: SprintState, move: string, now: string): SprintCommandResult {
-  const timedState = failIfExpired(state, now);
-  if (timedState.status !== "active") {
-    return { state: timedState };
+  const timeAdvance = advanceSprintTime(state, now);
+  if (timeAdvance.attempt || timeAdvance.state.status !== "active") {
+    return timeAdvance;
   }
+  const timedState = timeAdvance.state;
   if (!timedState.currentPuzzle) {
     throw new Error("Sprint has no current puzzle");
   }
@@ -82,15 +87,51 @@ export function submitSprintMove(state: SprintState, move: string, now: string):
   );
 }
 
-export function pauseSprint(state: SprintState, now: string): SprintState {
-  const timedState = failIfExpired(state, now);
-  if (timedState.status !== "active") {
-    return timedState;
+export function advanceSprintTime(state: SprintState, now: string): SprintCommandResult {
+  const sprintTimedState = failIfExpired(state, now);
+  if (sprintTimedState.status !== "active") {
+    return { state: sprintTimedState };
+  }
+  if (
+    !sprintTimedState.currentPuzzleDeadlineAt ||
+    new Date(now).getTime() < new Date(sprintTimedState.currentPuzzleDeadlineAt).getTime()
+  ) {
+    return { state: sprintTimedState };
+  }
+  if (!sprintTimedState.currentPuzzle) {
+    throw new Error("Sprint has no current puzzle");
+  }
+
+  const attempt = buildTimeoutAttempt(sprintTimedState, now);
+  const nextPuzzleIndex = sprintTimedState.currentPuzzleIndex + 1;
+  const withoutStreak: SprintState = {
+    ...sprintTimedState,
+    currentStreak: 0
+  };
+  if (nextPuzzleIndex >= sprintTimedState.puzzles.length) {
+    return {
+      state: completeSprint(withoutStreak, "failed", "puzzles_exhausted", now),
+      attempt
+    };
   }
   return {
-    ...timedState,
-    status: "paused",
-    pausedAt: new Date(now).toISOString()
+    state: beginCurrentPuzzle(withoutStreak, nextPuzzleIndex, new Date(now).toISOString()),
+    attempt
+  };
+}
+
+export function pauseSprint(state: SprintState, now: string): SprintCommandResult {
+  const advanced = advanceSprintTime(state, now);
+  if (advanced.state.status !== "active") {
+    return advanced;
+  }
+  return {
+    state: {
+      ...advanced.state,
+      status: "paused",
+      pausedAt: new Date(now).toISOString()
+    },
+    ...(advanced.attempt === undefined ? {} : { attempt: advanced.attempt })
   };
 }
 
@@ -109,6 +150,9 @@ export function resumeSprint(state: SprintState, now: string): SprintState {
     ...withoutPausedAt,
     status: "active",
     deadlineAt: shiftIso(state.deadlineAt, pausedMs),
+    ...(state.currentPuzzleStartedAt
+      ? { currentPuzzleStartedAt: shiftIso(state.currentPuzzleStartedAt, pausedMs) }
+      : {}),
     ...(state.currentPuzzleDeadlineAt ? { currentPuzzleDeadlineAt: shiftIso(state.currentPuzzleDeadlineAt, pausedMs) } : {}),
     totalPausedMs: (state.totalPausedMs ?? 0) + pausedMs
   };
@@ -225,12 +269,7 @@ function applyPuzzleFeedback(state: SprintState, feedback: PuzzleFeedback, now: 
   }
 
   return {
-    state: {
-      ...updated,
-      currentPuzzleIndex: nextPuzzleIndex,
-      currentPuzzleStartedAt: new Date(now).toISOString(),
-      currentPuzzle: buildCurrentPuzzle(state.config.mode, state.puzzles[nextPuzzleIndex], candidateSeed(state, nextPuzzleIndex))
-    },
+    state: beginCurrentPuzzle(updated, nextPuzzleIndex, new Date(now).toISOString()),
     feedback,
     attempt
   };
@@ -250,9 +289,50 @@ function buildAttemptEvent(state: SprintState, feedback: PuzzleFeedback, now: st
     result: feedback.result,
     submittedMove: feedback.submittedMove,
     expectedMove: feedback.expectedMove,
-    startedAt: state.startedAt,
+    startedAt: state.currentPuzzleStartedAt ?? state.startedAt,
     completedAt: new Date(now).toISOString(),
+    elapsedMs: currentPuzzleElapsedMs(state, now),
     ratingBefore: state.ratingBefore
+  };
+  const slowAfterSeconds = state.config.puzzleTiming?.slowAfterSeconds;
+  if (
+    slowAfterSeconds !== null &&
+    slowAfterSeconds !== undefined &&
+    attempt.elapsedMs! >= slowAfterSeconds * 1000
+  ) {
+    attempt.timingStatus = "slow";
+    if (attempt.result === "correct") {
+      attempt.unclear = true;
+      attempt.unclearUpdatedAt = attempt.completedAt;
+    }
+  }
+  if (state.currentPuzzle.kind === "arrow_duel") {
+    attempt.arrowDuelCandidateOrder = [...state.currentPuzzle.candidates];
+  }
+  return attempt;
+}
+
+function buildTimeoutAttempt(state: SprintState, now: string): AttemptEvent {
+  if (!state.currentPuzzle) {
+    throw new Error("Cannot build timeout attempt without current puzzle");
+  }
+  const timedOutAt = state.currentPuzzleDeadlineAt ?? new Date(now).toISOString();
+  const attempt: AttemptEvent = {
+    id: generateId(),
+    source: "sprint",
+    sessionId: state.id,
+    puzzleId: state.currentPuzzle.puzzle.id,
+    mode: state.config.mode,
+    ratingKey: state.config.ratingKey,
+    result: "timed_out",
+    expectedMove: expectedMoveForCurrentPuzzle(state.currentPuzzle),
+    startedAt: state.currentPuzzleStartedAt ?? state.startedAt,
+    completedAt: timedOutAt,
+    elapsedMs: currentPuzzleElapsedMs(state, timedOutAt),
+    timingStatus: "timed_out",
+    ratingBefore: state.ratingBefore,
+    unclear: true,
+    unclearUpdatedAt: timedOutAt
   };
   if (state.currentPuzzle.kind === "arrow_duel") {
     attempt.arrowDuelCandidateOrder = [...state.currentPuzzle.candidates];
@@ -264,10 +344,55 @@ function failIfExpired(state: SprintState, now: string): SprintState {
   if (state.status !== "active") {
     return state;
   }
-  if (new Date(now).getTime() <= new Date(state.deadlineAt).getTime()) {
+  if (new Date(now).getTime() < new Date(state.deadlineAt).getTime()) {
     return state;
   }
   return completeSprintWithRating(state, "failed", "time_expired", now);
+}
+
+function beginCurrentPuzzle(
+  state: SprintState,
+  puzzleIndex: number,
+  startedAt: string
+): SprintState {
+  const timeoutAfterSeconds = state.config.puzzleTiming?.timeoutAfterSeconds;
+  const {
+    currentPuzzleDeadlineAt: _currentPuzzleDeadlineAt,
+    ...withoutCurrentPuzzleDeadline
+  } = state;
+  return {
+    ...withoutCurrentPuzzleDeadline,
+    currentPuzzleIndex: puzzleIndex,
+    currentPuzzleStartedAt: startedAt,
+    ...(timeoutAfterSeconds === null || timeoutAfterSeconds === undefined
+      ? {}
+      : {
+          currentPuzzleDeadlineAt: new Date(
+            new Date(startedAt).getTime() + timeoutAfterSeconds * 1000
+          ).toISOString()
+        }),
+    currentPuzzle: buildCurrentPuzzle(
+      state.config.mode,
+      state.puzzles[puzzleIndex],
+      candidateSeed(state, puzzleIndex)
+    )
+  };
+}
+
+function currentPuzzleElapsedMs(state: SprintState, now: string): number {
+  const startedAt = state.currentPuzzleStartedAt ?? state.startedAt;
+  return Math.max(0, new Date(now).getTime() - new Date(startedAt).getTime());
+}
+
+function expectedMoveForCurrentPuzzle(currentPuzzle: CurrentPuzzleState): string {
+  if (currentPuzzle.kind === "arrow_duel") {
+    return currentPuzzle.correctMove;
+  }
+  const expectedMove = currentPuzzle.puzzle.solutionMoves[currentPuzzle.cursor];
+  if (!expectedMove) {
+    throw new Error("Timed out puzzle has no expected move");
+  }
+  return expectedMove;
 }
 
 function completeSprintWithRating(

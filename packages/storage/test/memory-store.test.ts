@@ -504,6 +504,17 @@ test("PracticeService builds MemoryStore history view for a required time range 
   assert.equal(service.getHistoryView({ ...view.query, side: view.attempts[0]?.side === "white" ? "black" : "white" }).attempts.length, 0);
   assert.equal(service.getDueReviewItems("2026-06-21T12:00:05.000Z")[0]?.puzzle.id, "000hf");
   assert.deepEqual(
+    service.getHistoryView({
+      ...view.query,
+      source: "sprint",
+      minRating: 1485,
+      maxRating: 1485,
+      side: view.attempts[0]?.side,
+      reviewStatus: "queued"
+    }).attempts.map((attempt) => attempt.id),
+    view.attempts.map((attempt) => attempt.id)
+  );
+  assert.deepEqual(
     service.getHistoryView({ ...view.query, reviewStatus: "queued" }).attempts.map((attempt) => attempt.id),
     view.attempts.map((attempt) => attempt.id)
   );

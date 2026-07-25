@@ -349,6 +349,58 @@ describe("sprint late-game performance", () => {
     // Loose wall-clock backstop for other O(history) work sneaking into renders.
     expect(last).toBeLessThan(Math.max(first * 2, first + 25));
   });
+
+  it.each(["timer", "late-move"] as const)(
+    "component-level: active %s timeout handoff avoids aggregate history and Review scans",
+    async (handoff) => {
+      let wallClockMs = Date.parse("2026-07-24T12:00:00.000Z");
+      const store = new ScanCountingMemoryStore();
+      const service = new PracticeService(store);
+      configureMobilePracticePuzzleSource(service, "random1000");
+      service.startSprint(
+        longSprintConfig("standard"),
+        new Date(wallClockMs).toISOString()
+      );
+
+      let renderer: TestRenderer.ReactTestRenderer | undefined;
+      act(() => {
+        renderer = TestRenderer.create(
+          <PracticePocScreen
+            currentTimeMs={() => wallClockMs}
+            platformCapabilities={createTestMobilePlatformCapabilities({
+              practiceService: service
+            })}
+          />
+        );
+      });
+      if (!renderer) {
+        throw new Error("PracticePocScreen did not render");
+      }
+      renderers.push(renderer);
+
+      press(renderer, "practice-resume-card");
+      await act(async () => {
+        jest.advanceTimersByTime(350);
+        await Promise.resolve();
+      });
+      const firstPuzzleIndex = requireActiveSprint(service).currentPuzzleIndex;
+      resetProbes(store.probes);
+      wallClockMs += 60_000;
+
+      if (handoff === "late-move") {
+        await boardMove(renderer, nextCorrectMove(requireActiveSprint(service)));
+      } else {
+        await act(async () => {
+          jest.advanceTimersByTime(500);
+          await Promise.resolve();
+        });
+      }
+
+      expect(requireActiveSprint(service).currentPuzzleIndex).toBe(firstPuzzleIndex + 1);
+      expect(findByTestId(renderer, "session-puzzle-timeout-overlay")).toBeTruthy();
+      expect([...store.probes].filter(([, probe]) => probe.calls !== 0)).toEqual([]);
+    }
+  );
 });
 
 function findByTestId(renderer: TestRenderer.ReactTestRenderer, testID: string): TestRenderer.ReactTestInstance {

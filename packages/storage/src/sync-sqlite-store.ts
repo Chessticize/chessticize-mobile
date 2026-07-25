@@ -4,6 +4,7 @@ import {
   clonePracticeRun,
   buildSessionMistakeReview,
   createDefaultRating,
+  defaultPuzzleTimingPolicy,
   enrollReviewContext,
   filterHistoryAttemptsForQuery,
   normalizeThemeSelection,
@@ -25,7 +26,9 @@ import {
 } from "../../core/src/index.ts";
 import type {
   AttemptEvent,
+  AttemptOutcome,
   AttemptResult,
+  AttemptTimingStatus,
   CustomSprintConfigRecord,
   HistoryAttemptView,
   HistoryEloPoint,
@@ -65,9 +68,26 @@ import type { PracticeProgressSummary } from "./rating-history.ts";
 import type { ReviewReminderPreference } from "./practice-store.ts";
 import type { ReviewReminderSettings } from "../../core/src/index.ts";
 import { cloneAttemptHistoryRow, preferredAttemptHistoryRow, sameAttemptHistoryRow } from "./attempt-sync.ts";
+import {
+  compatiblePracticeRunMergeInputs
+} from "./practice-run-sync.ts";
 
-interface AttemptHistoryDbRow extends Omit<AttemptHistoryRow, "ratingAfter" | "arrowDuelCandidateOrder" | "unclear" | "unclearUpdatedAt" | "runId" | "runName"> {
+interface AttemptHistoryDbRow extends Omit<
+  AttemptHistoryRow,
+  | "ratingAfter"
+  | "submittedMove"
+  | "elapsedMs"
+  | "timingStatus"
+  | "arrowDuelCandidateOrder"
+  | "unclear"
+  | "unclearUpdatedAt"
+  | "runId"
+  | "runName"
+> {
   ratingAfter: number | null;
+  submittedMove: string | null;
+  elapsedMs: number | null;
+  timingStatus: AttemptTimingStatus | null;
   arrowDuelCandidateOrderJson: string | null;
   unclear: number;
   unclearUpdatedAt: string | null;
@@ -80,11 +100,13 @@ interface HistoryAttemptDbRow extends PuzzleRow {
   attempt_source: "sprint" | "scheduled_review";
   session_id: string;
   mode: SprintMode;
-  result: AttemptResult;
-  submitted_move: string;
+  result: AttemptOutcome;
+  submitted_move: string | null;
   expected_move: string;
   attempt_started_at: string;
   completed_at: string;
+  elapsed_ms: number | null;
+  timing_status: AttemptTimingStatus | null;
   rating_before: number;
   rating_after: number | null;
   arrow_duel_candidate_order_json: string | null;
@@ -185,6 +207,8 @@ interface PracticeRunRow {
   rating_key: string;
   duration_seconds: number;
   per_puzzle_seconds: number;
+  slow_after_seconds?: number | null;
+  timeout_after_seconds?: number | null;
   target_correct: number;
   max_mistakes: number;
   themes_json: string | null;
@@ -238,7 +262,7 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 9;
+export const CURRENT_SCHEMA_VERSION = 10;
 
 interface SQLiteMigration {
   from: number;
@@ -255,7 +279,8 @@ const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
   { from: 5, to: 6, apply: migrateV5ToV6 },
   { from: 6, to: 7, apply: migrateV6ToV7 },
   { from: 7, to: 8, apply: migrateV7ToV8 },
-  { from: 8, to: 9, apply: migrateV8ToV9 }
+  { from: 8, to: 9, apply: migrateV8ToV9 },
+  { from: 9, to: 10, apply: migrateV9ToV10 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
@@ -275,7 +300,10 @@ export class SyncSQLiteStore implements PracticeStore {
         `SQLite schema version ${startingVersion} is newer than supported version ${CURRENT_SCHEMA_VERSION}`
       );
     }
-    if (startingVersion === CURRENT_SCHEMA_VERSION) {
+    if (
+      startingVersion === CURRENT_SCHEMA_VERSION &&
+      hasMoveFeedbackColumns(this.db)
+    ) {
       return;
     }
 
@@ -294,6 +322,8 @@ export class SyncSQLiteStore implements PracticeStore {
       if (version !== CURRENT_SCHEMA_VERSION) {
         throw new Error(`SQLite migration stopped at schema version ${version}`);
       }
+      repairKnownSchemaDrift(this.db);
+      assertForeignKeyIntegrity(this.db);
     });
   }
 
@@ -492,11 +522,13 @@ export class SyncSQLiteStore implements PracticeStore {
   }
 
   savePracticeRun(run: PracticeRunRecord): void {
+    const puzzleTiming = normalizedRunPuzzleTiming(run);
     this.db.prepare(
       `INSERT INTO practice_runs (
         id, kind, name, mode, rating_key, duration_seconds, per_puzzle_seconds,
-        target_correct, max_mistakes, themes_json, home_order, archived, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        slow_after_seconds, timeout_after_seconds, target_correct, max_mistakes,
+        themes_json, home_order, archived, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         kind = excluded.kind,
         name = excluded.name,
@@ -504,6 +536,8 @@ export class SyncSQLiteStore implements PracticeStore {
         rating_key = excluded.rating_key,
         duration_seconds = excluded.duration_seconds,
         per_puzzle_seconds = excluded.per_puzzle_seconds,
+        slow_after_seconds = excluded.slow_after_seconds,
+        timeout_after_seconds = excluded.timeout_after_seconds,
         target_correct = excluded.target_correct,
         max_mistakes = excluded.max_mistakes,
         themes_json = excluded.themes_json,
@@ -518,6 +552,8 @@ export class SyncSQLiteStore implements PracticeStore {
       run.ratingKey,
       run.durationSeconds,
       run.perPuzzleSeconds,
+      puzzleTiming.slowAfterSeconds,
+      puzzleTiming.timeoutAfterSeconds,
       run.targetCorrect,
       run.maxMistakes,
       run.themes === undefined ? null : JSON.stringify(run.themes),
@@ -672,12 +708,14 @@ export class SyncSQLiteStore implements PracticeStore {
           expected_move,
           started_at,
           completed_at,
+          elapsed_ms,
+          timing_status,
           rating_before,
           rating_after,
           arrow_duel_candidate_order_json,
           unclear,
           unclear_updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         storedAttempt.id,
@@ -687,10 +725,12 @@ export class SyncSQLiteStore implements PracticeStore {
         storedAttempt.mode,
         storedAttempt.ratingKey,
         storedAttempt.result,
-        storedAttempt.submittedMove,
+        storedAttempt.submittedMove ?? null,
         storedAttempt.expectedMove,
         storedAttempt.startedAt,
         storedAttempt.completedAt,
+        storedAttempt.elapsedMs ?? null,
+        storedAttempt.timingStatus ?? null,
         storedAttempt.ratingBefore,
         storedAttempt.ratingAfter ?? null,
         storedAttempt.arrowDuelCandidateOrder ? JSON.stringify(storedAttempt.arrowDuelCandidateOrder) : null,
@@ -793,6 +833,8 @@ export class SyncSQLiteStore implements PracticeStore {
           a.expected_move AS expectedMove,
           a.started_at AS startedAt,
           a.completed_at AS completedAt,
+          a.elapsed_ms AS elapsedMs,
+          a.timing_status AS timingStatus,
           a.rating_before AS ratingBefore,
           a.rating_after AS ratingAfter,
           a.arrow_duel_candidate_order_json AS arrowDuelCandidateOrderJson,
@@ -817,7 +859,7 @@ export class SyncSQLiteStore implements PracticeStore {
       .prepare(
         `SELECT
           SUM(CASE WHEN result = 'correct' THEN 1 ELSE 0 END) AS correct_count,
-          SUM(CASE WHEN result = 'correct' THEN 0 ELSE 1 END) AS wrong_count
+          SUM(CASE WHEN result = 'wrong' THEN 1 ELSE 0 END) AS wrong_count
          FROM attempts
          WHERE rating_key = ? AND completed_at >= ? AND completed_at <= ?`
       )
@@ -912,6 +954,8 @@ export class SyncSQLiteStore implements PracticeStore {
           a.expected_move AS expectedMove,
           a.started_at AS startedAt,
           a.completed_at AS completedAt,
+          a.elapsed_ms AS elapsedMs,
+          a.timing_status AS timingStatus,
           a.rating_before AS ratingBefore,
           a.rating_after AS ratingAfter,
           a.arrow_duel_candidate_order_json AS arrowDuelCandidateOrderJson,
@@ -956,7 +1000,14 @@ export class SyncSQLiteStore implements PracticeStore {
       });
       const currentRuns = this.listPracticeRuns();
       const previousRuns = new Map(currentRuns.map((run) => [run.id, run]));
-      const mergedRuns = mergePracticeRunCatalogs(currentRuns, data.practiceRuns ?? []);
+      const compatibleRuns = compatiblePracticeRunMergeInputs(
+        currentRuns,
+        data.practiceRuns ?? []
+      );
+      const mergedRuns = mergePracticeRunCatalogs(
+        compatibleRuns.localRuns,
+        compatibleRuns.incomingRuns
+      );
       const changedRunCount = mergedRuns.filter((run) => !samePracticeRun(previousRuns.get(run.id), run)).length;
       if (changedRunCount > 0) {
         // The catalog owns no incoming foreign keys, so replacing it inside
@@ -1353,6 +1404,8 @@ export class SyncSQLiteStore implements PracticeStore {
           a.expected_move,
           a.started_at AS attempt_started_at,
           a.completed_at,
+          a.elapsed_ms,
+          a.timing_status,
           a.rating_before,
           a.rating_after,
           a.arrow_duel_candidate_order_json,
@@ -1400,10 +1453,12 @@ export class SyncSQLiteStore implements PracticeStore {
         mode: row.mode,
         ratingKey: row.rating_key,
         result: row.result,
-        submittedMove: row.submitted_move,
+        ...(row.submitted_move === null ? {} : { submittedMove: row.submitted_move }),
         expectedMove: row.expected_move,
         startedAt: row.attempt_started_at,
         completedAt: row.completed_at,
+        ...(row.elapsed_ms === null ? {} : { elapsedMs: row.elapsed_ms }),
+        ...(row.timing_status === null ? {} : { timingStatus: row.timing_status }),
         ratingBefore: row.rating_before,
         ...(row.rating_after === null ? {} : { ratingAfter: row.rating_after }),
         ...(candidateOrder.status === "valid" ? { arrowDuelCandidateOrder: candidateOrder.value } : {}),
@@ -1612,8 +1667,47 @@ export class SyncSQLiteStore implements PracticeStore {
         return false;
       }
       this.db
-        .prepare("UPDATE attempts SET unclear = ?, unclear_updated_at = ? WHERE id = ?")
-        .run(next.unclear ? 1 : 0, next.unclearUpdatedAt ?? null, attempt.id);
+        .prepare(
+          `UPDATE attempts
+           SET source = ?,
+               session_id = ?,
+               puzzle_id = ?,
+               mode = ?,
+               rating_key = ?,
+               result = ?,
+               submitted_move = ?,
+               expected_move = ?,
+               started_at = ?,
+               completed_at = ?,
+               elapsed_ms = ?,
+               timing_status = ?,
+               rating_before = ?,
+               rating_after = ?,
+               arrow_duel_candidate_order_json = ?,
+               unclear = ?,
+               unclear_updated_at = ?
+           WHERE id = ?`
+        )
+        .run(
+          next.source,
+          next.sessionId,
+          next.puzzleId,
+          next.mode,
+          next.ratingKey,
+          next.result,
+          next.submittedMove ?? null,
+          next.expectedMove,
+          next.startedAt,
+          next.completedAt,
+          next.elapsedMs ?? null,
+          next.timingStatus ?? null,
+          next.ratingBefore,
+          next.ratingAfter ?? null,
+          next.arrowDuelCandidateOrder ? JSON.stringify(next.arrowDuelCandidateOrder) : null,
+          next.unclear ? 1 : 0,
+          next.unclearUpdatedAt ?? null,
+          next.id
+        );
       return true;
     }
     if (!this.getPuzzle(attempt.puzzleId)) {
@@ -1908,10 +2002,14 @@ function migrateV3ToV4(db: SyncSqliteDatabase): void {
 }
 
 function ensureColumn(db: SyncSqliteDatabase, table: string, column: string, alterSql: string): void {
-  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
-  if (!columns.some((candidate) => candidate.name === column)) {
+  if (!hasColumn(db, table, column)) {
     db.exec(alterSql);
   }
+}
+
+function hasColumn(db: SyncSqliteDatabase, table: string, column: string): boolean {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  return columns.some((candidate) => candidate.name === column);
 }
 
 function migrateV4ToV5(db: SyncSqliteDatabase): void {
@@ -2072,6 +2170,22 @@ function migrateV7ToV8(db: SyncSqliteDatabase): void {
 }
 
 function migrateV8ToV9(db: SyncSqliteDatabase): void {
+  ensureMoveFeedbackColumns(db);
+}
+
+function repairKnownSchemaDrift(db: SyncSqliteDatabase): void {
+  // The timing and move-feedback branches both used schema v9 before they were
+  // merged. Devices that ran the timing build can therefore report the current
+  // version while still lacking these columns.
+  ensureMoveFeedbackColumns(db);
+}
+
+function hasMoveFeedbackColumns(db: SyncSqliteDatabase): boolean {
+  return hasColumn(db, "app_settings", "move_feedback_sound_enabled") &&
+    hasColumn(db, "app_settings", "move_feedback_haptics_enabled");
+}
+
+function ensureMoveFeedbackColumns(db: SyncSqliteDatabase): void {
   ensureColumn(
     db,
     "app_settings",
@@ -2084,6 +2198,141 @@ function migrateV8ToV9(db: SyncSqliteDatabase): void {
     "move_feedback_haptics_enabled",
     "ALTER TABLE app_settings ADD COLUMN move_feedback_haptics_enabled INTEGER NOT NULL DEFAULT 1 CHECK (move_feedback_haptics_enabled IN (0, 1))"
   );
+}
+
+function migrateV9ToV10(db: SyncSqliteDatabase): void {
+  ensureColumn(
+    db,
+    "practice_runs",
+    "slow_after_seconds",
+    "ALTER TABLE practice_runs ADD COLUMN slow_after_seconds INTEGER " +
+      "CHECK (slow_after_seconds IS NULL OR slow_after_seconds > 0)"
+  );
+  ensureColumn(
+    db,
+    "practice_runs",
+    "timeout_after_seconds",
+    "ALTER TABLE practice_runs ADD COLUMN timeout_after_seconds INTEGER " +
+      "CHECK (timeout_after_seconds IS NULL OR timeout_after_seconds > 0)"
+  );
+  const legacyRuns = db.prepare(
+    `SELECT id, per_puzzle_seconds
+     FROM practice_runs
+     WHERE slow_after_seconds IS NULL
+       AND timeout_after_seconds IS NULL`
+  ).all() as Array<{ id: string; per_puzzle_seconds: number }>;
+  const updateRunTiming = db.prepare(
+    `UPDATE practice_runs
+     SET slow_after_seconds = ?,
+         timeout_after_seconds = ?
+     WHERE id = ?`
+  );
+  for (const run of legacyRuns) {
+    const defaults = defaultPuzzleTimingPolicy(run.per_puzzle_seconds);
+    updateRunTiming.run(
+      defaults.slowAfterSeconds,
+      defaults.timeoutAfterSeconds,
+      run.id
+    );
+  }
+
+  const attemptCount = countRows(db, "attempts");
+  db.exec(`
+    CREATE TABLE attempts_v10 (
+      id TEXT PRIMARY KEY,
+      source TEXT NOT NULL DEFAULT 'sprint',
+      session_id TEXT NOT NULL,
+      puzzle_id TEXT NOT NULL,
+      mode TEXT NOT NULL,
+      rating_key TEXT,
+      result TEXT NOT NULL,
+      submitted_move TEXT,
+      expected_move TEXT NOT NULL,
+      started_at TEXT NOT NULL,
+      completed_at TEXT NOT NULL,
+      elapsed_ms INTEGER CHECK (elapsed_ms IS NULL OR elapsed_ms >= 0),
+      timing_status TEXT CHECK (
+        timing_status IS NULL OR timing_status IN ('slow', 'timed_out')
+      ),
+      rating_before INTEGER NOT NULL,
+      rating_after INTEGER,
+      arrow_duel_candidate_order_json TEXT,
+      unclear INTEGER NOT NULL DEFAULT 0 CHECK (unclear IN (0, 1)),
+      unclear_updated_at TEXT,
+      FOREIGN KEY (session_id) REFERENCES sprint_sessions(id),
+      FOREIGN KEY (puzzle_id) REFERENCES puzzles(id),
+      CHECK (
+        (result = 'timed_out' AND timing_status = 'timed_out')
+        OR
+        (result <> 'timed_out' AND (timing_status IS NULL OR timing_status = 'slow'))
+      ),
+      CHECK (
+        (result = 'timed_out' AND submitted_move IS NULL)
+        OR
+        (result <> 'timed_out' AND submitted_move IS NOT NULL)
+      ),
+      CHECK (timing_status IS NULL OR elapsed_ms IS NOT NULL)
+    );
+
+    INSERT INTO attempts_v10 (
+      id,
+      source,
+      session_id,
+      puzzle_id,
+      mode,
+      rating_key,
+      result,
+      submitted_move,
+      expected_move,
+      started_at,
+      completed_at,
+      elapsed_ms,
+      timing_status,
+      rating_before,
+      rating_after,
+      arrow_duel_candidate_order_json,
+      unclear,
+      unclear_updated_at
+    )
+    SELECT
+      id,
+      source,
+      session_id,
+      puzzle_id,
+      mode,
+      rating_key,
+      result,
+      submitted_move,
+      expected_move,
+      started_at,
+      completed_at,
+      NULL,
+      NULL,
+      rating_before,
+      rating_after,
+      arrow_duel_candidate_order_json,
+      unclear,
+      unclear_updated_at
+    FROM attempts;
+  `);
+  if (countRows(db, "attempts_v10") !== attemptCount) {
+    throw new Error("SQLite v10 attempt rebuild changed the attempt row count");
+  }
+  db.exec(`
+    DROP TABLE attempts;
+    ALTER TABLE attempts_v10 RENAME TO attempts;
+
+    CREATE INDEX attempts_completed_at_id_idx
+      ON attempts(completed_at DESC, id DESC);
+    CREATE INDEX attempts_rating_key_completed_at_id_idx
+      ON attempts(rating_key, completed_at DESC, id DESC);
+    CREATE INDEX attempts_session_result_completed_at_id_idx
+      ON attempts(session_id, result, completed_at DESC, id DESC);
+    CREATE INDEX attempts_puzzle_id_completed_at_id_idx
+      ON attempts(puzzle_id, completed_at DESC, id DESC);
+    CREATE INDEX attempts_unclear_completed_at_idx
+      ON attempts(unclear, completed_at DESC);
+  `);
 }
 
 function readSchemaVersion(db: SyncSqliteDatabase): number {
@@ -2289,6 +2538,9 @@ function attemptHistoryRowFromDbRow(row: AttemptHistoryDbRow): AttemptHistoryRow
   const candidateOrder = optionalStringArrayFromJson(row.arrowDuelCandidateOrderJson);
   const {
     ratingAfter,
+    submittedMove,
+    elapsedMs,
+    timingStatus,
     arrowDuelCandidateOrderJson: _arrowDuelCandidateOrderJson,
     unclear,
     unclearUpdatedAt,
@@ -2299,6 +2551,9 @@ function attemptHistoryRowFromDbRow(row: AttemptHistoryDbRow): AttemptHistoryRow
   return {
     ...attempt,
     ...(ratingAfter === null ? {} : { ratingAfter }),
+    ...(submittedMove === null ? {} : { submittedMove }),
+    ...(elapsedMs === null ? {} : { elapsedMs }),
+    ...(timingStatus === null ? {} : { timingStatus }),
     ...(candidateOrder === undefined ? {} : { arrowDuelCandidateOrder: candidateOrder }),
     ...(unclearUpdatedAt === null ? {} : { unclear: unclear === 1, unclearUpdatedAt }),
     ...(runId === null || runId === undefined ? {} : { runId }),
@@ -2315,10 +2570,12 @@ function attemptEventFromHistoryRow(row: AttemptHistoryRow): AttemptEvent {
     mode: row.mode,
     ratingKey: row.ratingKey,
     result: row.result,
-    submittedMove: row.submittedMove,
+    ...(row.submittedMove === undefined ? {} : { submittedMove: row.submittedMove }),
     expectedMove: row.expectedMove,
     startedAt: row.startedAt,
     completedAt: row.completedAt,
+    ...(row.elapsedMs === undefined ? {} : { elapsedMs: row.elapsedMs }),
+    ...(row.timingStatus === undefined ? {} : { timingStatus: row.timingStatus }),
     ratingBefore: row.ratingBefore,
     ...(row.ratingAfter === undefined ? {} : { ratingAfter: row.ratingAfter }),
     ...(row.arrowDuelCandidateOrder === undefined ? {} : { arrowDuelCandidateOrder: row.arrowDuelCandidateOrder }),
@@ -2396,6 +2653,12 @@ function exportedSprintSessionFromRow(row: SprintSessionExportRow): ExportedSpri
 
 function practiceRunFromRow(row: PracticeRunRow): PracticeRunRecord {
   const themes = optionalStringArrayFromJson(row.themes_json);
+  const puzzleTiming = row.slow_after_seconds === undefined || row.timeout_after_seconds === undefined
+    ? defaultRunPuzzleTiming(row.per_puzzle_seconds)
+    : {
+        slowAfterSeconds: row.slow_after_seconds,
+        timeoutAfterSeconds: row.timeout_after_seconds
+      };
   return {
     id: row.id,
     kind: row.kind,
@@ -2404,6 +2667,7 @@ function practiceRunFromRow(row: PracticeRunRow): PracticeRunRecord {
     ratingKey: row.rating_key,
     durationSeconds: row.duration_seconds,
     perPuzzleSeconds: row.per_puzzle_seconds,
+    puzzleTiming,
     targetCorrect: row.target_correct,
     maxMistakes: row.max_mistakes,
     ...(themes === undefined ? {} : { themes }),
@@ -2411,6 +2675,20 @@ function practiceRunFromRow(row: PracticeRunRow): PracticeRunRecord {
     archived: intToBool(row.archived),
     updatedAt: row.updated_at
   };
+}
+
+function normalizedRunPuzzleTiming(run: PracticeRunRecord): {
+  slowAfterSeconds: number | null;
+  timeoutAfterSeconds: number | null;
+} {
+  return run.puzzleTiming ?? defaultRunPuzzleTiming(run.perPuzzleSeconds);
+}
+
+function defaultRunPuzzleTiming(perPuzzleSeconds: number): {
+  slowAfterSeconds: number | null;
+  timeoutAfterSeconds: number | null;
+} {
+  return defaultPuzzleTimingPolicy(perPuzzleSeconds);
 }
 
 function normalizedImportedSprintSession(session: ExportedSprintSession): ExportedSprintSession {

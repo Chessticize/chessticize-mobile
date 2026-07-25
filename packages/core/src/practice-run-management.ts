@@ -11,11 +11,17 @@ import {
   validatePracticeRunName
 } from "./practice-runs.ts";
 import { clampManualRating } from "./ratings.ts";
-import { defaultSprintConfig } from "./sprint-config.ts";
+import {
+  defaultPuzzleTimingPolicy,
+  defaultSprintConfig,
+  resolvePuzzleTimingPolicy,
+  validatePuzzleTimingPolicy
+} from "./sprint-config.ts";
 import type {
   CustomSprintConfigRecord,
   PracticeRunKind,
-  PracticeRunRecord
+  PracticeRunRecord,
+  PuzzleTimingPolicy
 } from "./types.ts";
 
 export type PracticeRunManagementRun = {
@@ -27,6 +33,7 @@ export type PracticeRunManagementRun = {
   elo: number;
   durationSeconds: number;
   perPuzzleSeconds: number;
+  puzzleTiming: PuzzleTimingPolicy;
   themes: readonly string[];
 };
 
@@ -43,6 +50,7 @@ export type PracticeRunManagementIntent =
   | { type: "change-mode"; mode: "custom" | "arrow_duel" }
   | { type: "change-name"; name: string }
   | { type: "change-per-puzzle"; perPuzzleSeconds: number }
+  | { type: "change-puzzle-timing"; puzzleTiming: PuzzleTimingPolicy }
   | { type: "step-elo-input"; direction: -1 | 1 }
   | { type: "toggle-theme"; theme: string }
   | { type: "confirm-remove" }
@@ -71,7 +79,13 @@ export type PracticeRunManagementCommand =
   | { type: "create-run"; draft: PracticeRunManagementDraft }
   | { type: "reorder-run"; runId: string; targetRunId: string }
   | { type: "restore-run"; runId: string }
-  | { type: "update-run"; runId: string; name: string; elo: number };
+  | {
+    type: "update-run";
+    runId: string;
+    name: string;
+    elo: number;
+    puzzleTiming: PuzzleTimingPolicy;
+  };
 
 export type PracticeRunManagementCommandResult = {
   catalog: PracticeRunManagementCatalog;
@@ -195,7 +209,17 @@ export function createPracticeRunManagementController(
         return;
       case "change-per-puzzle":
         if (view.screen === "create") {
-          commit(updateDraft(view, { perPuzzleSeconds: intent.perPuzzleSeconds }));
+          commit(updateDraft(view, {
+            perPuzzleSeconds: intent.perPuzzleSeconds,
+            puzzleTiming: defaultPuzzleTimingPolicy(intent.perPuzzleSeconds)
+          }));
+        }
+        return;
+      case "change-puzzle-timing":
+        if (view.screen === "create" || view.screen === "edit") {
+          commit(updateDraft(view, {
+            puzzleTiming: validatePuzzleTimingPolicy(intent.puzzleTiming)
+          }));
         }
         return;
       case "toggle-theme":
@@ -250,6 +274,9 @@ export function createPracticeRunManagementController(
               elo: previous.rating,
               durationSeconds: previous.config.durationSeconds,
               perPuzzleSeconds: previous.config.perPuzzleSeconds,
+              puzzleTiming: defaultPuzzleTimingPolicy(
+                previous.config.perPuzzleSeconds
+              ),
               themes: normalizeThemeChoiceSelection(previous.config.themes)
             },
             eloError: null,
@@ -294,7 +321,7 @@ export function createPracticeRunManagementController(
         commit({
           ...view,
           notice: `${restored.name} restored with ELO ${restored.elo}.`,
-          selectedRunId: view.selectedRunId ?? restored.id
+          selectedRunId: restored.id
         }, result.catalog);
         return;
       }
@@ -351,7 +378,8 @@ export function createPracticeRunManagementController(
           type: "update-run",
           runId: draft.id,
           name: draft.name,
-          elo: draft.elo
+          elo: draft.elo,
+          puzzleTiming: { ...draft.puzzleTiming }
         });
         const saved = result.catalog.runs.find((run) => run.id === result.changedRunId);
         if (!saved) {
@@ -414,6 +442,10 @@ function newRunDraft(): PracticeRunManagementDraft {
     elo: DEFAULT_NEW_PRACTICE_RUN_RATING,
     durationSeconds: config.durationSeconds,
     perPuzzleSeconds: config.perPuzzleSeconds,
+    puzzleTiming: resolvePuzzleTimingPolicy(
+      config.puzzleTiming,
+      config.perPuzzleSeconds
+    ),
     themes: config.themes ?? [ALL_THEME_SELECTION]
   };
 }
@@ -540,9 +572,20 @@ function cloneView(view: RunManagementViewState): RunManagementViewState {
 function cloneDraft(
   draft: PracticeRunManagementDraft
 ): PracticeRunManagementDraft {
-  return { ...draft, themes: [...draft.themes] };
+  return {
+    ...draft,
+    puzzleTiming: { ...draft.puzzleTiming },
+    themes: [...draft.themes]
+  };
 }
 
 function cloneRun(run: PracticeRunManagementRun): PracticeRunManagementRun {
-  return { ...run, themes: [...run.themes] };
+  return {
+    ...run,
+    puzzleTiming: resolvePuzzleTimingPolicy(
+      run.puzzleTiming,
+      run.perPuzzleSeconds
+    ),
+    themes: [...run.themes]
+  };
 }

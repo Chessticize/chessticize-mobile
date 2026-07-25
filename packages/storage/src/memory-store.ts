@@ -62,6 +62,10 @@ import type { ReviewReminderSettings } from "../../core/src/index.ts";
 import { selectUniquePuzzles } from "./puzzle-selection.ts";
 import { preferredSprintSession, sameSprintSession } from "./sprint-session-sync.ts";
 import { cloneAttemptHistoryRow, preferredAttemptHistoryRow, sameAttemptHistoryRow } from "./attempt-sync.ts";
+import {
+  compatiblePracticeRun,
+  compatiblePracticeRunMergeInputs
+} from "./practice-run-sync.ts";
 
 export class MemoryStore implements PracticeStore {
   private readonly puzzles = new Map<string, Puzzle>();
@@ -161,7 +165,7 @@ export class MemoryStore implements PracticeStore {
   }
 
   savePracticeRun(run: PracticeRunRecord): void {
-    this.practiceRuns.set(run.id, clonePracticeRun(run));
+    this.practiceRuns.set(run.id, compatiblePracticeRun(run));
   }
 
   listPracticeRuns(): PracticeRunRecord[] {
@@ -313,8 +317,16 @@ export class MemoryStore implements PracticeStore {
       notifications: clonePracticeSettings(data.settings).notifications,
       moveFeedback: clonePracticeSettings(data.settings).moveFeedback
     });
-    const previousRuns = new Map(this.listPracticeRuns().map((run) => [run.id, run]));
-    for (const run of mergePracticeRunCatalogs(this.listPracticeRuns(), data.practiceRuns ?? [])) {
+    const currentRuns = this.listPracticeRuns();
+    const previousRuns = new Map(currentRuns.map((run) => [run.id, run]));
+    const compatibleRuns = compatiblePracticeRunMergeInputs(
+      currentRuns,
+      data.practiceRuns ?? []
+    );
+    for (const run of mergePracticeRunCatalogs(
+      compatibleRuns.localRuns,
+      compatibleRuns.incomingRuns
+    )) {
       if (!samePracticeRun(previousRuns.get(run.id), run)) {
         this.savePracticeRun(run);
         result.practiceRuns += 1;
@@ -598,10 +610,12 @@ export class MemoryStore implements PracticeStore {
       mode: attempt.mode,
       ratingKey: attempt.ratingKey,
       result: attempt.result,
-      submittedMove: attempt.submittedMove,
+      ...(attempt.submittedMove === undefined ? {} : { submittedMove: attempt.submittedMove }),
       expectedMove: attempt.expectedMove,
       startedAt: attempt.startedAt,
       completedAt: attempt.completedAt,
+      ...(attempt.elapsedMs === undefined ? {} : { elapsedMs: attempt.elapsedMs }),
+      ...(attempt.timingStatus === undefined ? {} : { timingStatus: attempt.timingStatus }),
       ratingBefore: attempt.ratingBefore,
       ...(attempt.ratingAfter === undefined ? {} : { ratingAfter: attempt.ratingAfter }),
       ...(attempt.arrowDuelCandidateOrder === undefined
@@ -729,6 +743,9 @@ function exportedSprintSessionFromState(session: SprintState): ExportedSprintSes
     ...(session.run === undefined ? {} : { run: { ...session.run } }),
     config: {
       ...session.config,
+      ...(session.config.puzzleTiming === undefined
+        ? {}
+        : { puzzleTiming: { ...session.config.puzzleTiming } }),
       ...(session.config.themes === undefined ? {} : { themes: [...session.config.themes] })
     }
   };

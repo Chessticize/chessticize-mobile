@@ -23,6 +23,14 @@ test("built-in Runs preserve the existing Standard and Arrow Duel rating keys", 
   assert.equal(standard?.ratingKey, "standard 5/20");
   assert.equal(arrowDuel?.id, "arrow-duel");
   assert.equal(arrowDuel?.ratingKey, "arrow_duel 5/30");
+  assert.deepEqual(standard?.puzzleTiming, {
+    slowAfterSeconds: 40,
+    timeoutAfterSeconds: 60
+  });
+  assert.deepEqual(arrowDuel?.puzzleTiming, {
+    slowAfterSeconds: 60,
+    timeoutAfterSeconds: 90
+  });
 });
 
 test("Custom Runs use stable independent rating keys even with identical configurations", () => {
@@ -82,6 +90,10 @@ test("Custom Runs use stable independent rating keys even with identical configu
     mode: "custom",
     durationSeconds: 600,
     perPuzzleSeconds: 30,
+    puzzleTiming: {
+      slowAfterSeconds: 60,
+      timeoutAfterSeconds: 90
+    },
     targetCorrect: 20,
     maxMistakes: 3,
     ratingKey: "run:run-a",
@@ -247,6 +259,10 @@ test("sync merge preserves renamed built-in Runs while canonicalizing their fixe
     name: "Morning Warm-up",
     mode: "custom" as const,
     ratingKey: "tampered-rating-key",
+    puzzleTiming: {
+      slowAfterSeconds: null,
+      timeoutAfterSeconds: 75
+    },
     updatedAt: NOW
   };
 
@@ -256,6 +272,10 @@ test("sync merge preserves renamed built-in Runs while canonicalizing their fixe
   assert.equal(saved?.name, "Morning Warm-up");
   assert.equal(saved?.mode, "standard");
   assert.equal(saved?.ratingKey, "standard 5/20");
+  assert.deepEqual(saved?.puzzleTiming, {
+    slowAfterSeconds: null,
+    timeoutAfterSeconds: 75
+  });
   assert.equal(saved?.updatedAt, NOW);
 });
 

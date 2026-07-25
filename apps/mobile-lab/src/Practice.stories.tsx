@@ -11,7 +11,8 @@ import {
   openPracticeSession,
   replaceTextTestId,
   waitForEnabledTestId,
-  waitForTestId
+  waitForTestId,
+  waitForText
 } from "./storyPlay.ts";
 
 const meta = {
@@ -73,6 +74,14 @@ export const CustomSetup: Story = {
     await clickTestId(canvasElement, "custom-theme-fork");
     await clickTestId(canvasElement, "custom-theme-pin");
     await waitForTestId(canvasElement, "practice-run-pass-rules");
+    await waitForTestId(canvasElement, "practice-run-slow-warning");
+    await waitForTestId(canvasElement, "practice-run-puzzle-timeout");
+    await clickTestId(canvasElement, "practice-run-per-puzzle-stepper-increase");
+    await waitForText(canvasElement, "1:00");
+    await waitForText(canvasElement, "1:30");
+    await clickTestId(canvasElement, "practice-run-slow-warning-decrease");
+    await waitForText(canvasElement, "0:55");
+    await clickTestId(canvasElement, "practice-run-puzzle-timeout-toggle");
   }
 };
 
@@ -156,6 +165,7 @@ export const ActiveSession: Story = {
   play: async ({ canvasElement }) => {
     await openPracticeSession(canvasElement);
     await waitForTestId(canvasElement, "session-puzzle-timing");
+    await waitForText(canvasElement, "Puzzle 0:24");
   }
 };
 
@@ -186,6 +196,7 @@ export const SlowWarning: Story = {
   play: async ({ canvasElement }) => {
     await openPracticeSession(canvasElement);
     await waitForTestId(canvasElement, "session-puzzle-timing");
+    await waitForText(canvasElement, "Puzzle 0:41");
   }
 };
 
@@ -197,6 +208,7 @@ export const PuzzleTimeout: Story = {
     await openPracticeSession(canvasElement);
     await waitForTestId(canvasElement, "session-puzzle-timing");
     await waitForTestId(canvasElement, "session-puzzle-countdown");
+    await waitForText(canvasElement, "8s");
   }
 };
 

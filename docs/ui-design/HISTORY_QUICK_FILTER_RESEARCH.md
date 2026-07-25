@@ -1,48 +1,56 @@
 # History Quick Filter Research
 
 Date: 2026-07-24
-Scope: Storybook-only design for issues #248 and #249
+Scope: Issues #248 and #249
 
 ## Decision
 
 Use one persistent, single-select segmented control:
 
 ```text
-[ All ] [ Needs attention ]
+[ Needs attention ] [ All ]
 ```
 
-- Default to `All`.
-- Define `Needs attention` as `Slow OR Wrong OR Unclear OR Timed out`.
+- Default to `Needs attention`.
+- Define `Needs attention` by current user-managed state: `Unclear OR in
+  Review`.
 - Default the advanced Source facet to `All sources`.
-- Move range, Run/rating bucket, source, result, Review queue, side, attention
-  flags, and theme controls into the existing filter menu.
-- Let `Mistakes`, `Unclear`, `Slow`, and `Timed out` be independently
-  selectable `Attention flags`. Multiple selected flags use OR. `Mistakes`
-  intentionally overlaps `Result: Wrong` so that every reason behind
-  `Needs attention` can be composed inside one group; keep Result as the
-  independent `Correct / Wrong` dimension.
-- Label Review membership `Review queue: All / In queue / Not in queue`.
+- Keep range, Run/rating bucket, source, result, Review queue, side, and theme
+  controls in the existing filter menu.
+- Remove the `Attention flags` facet. Slow, Timed out, Wrong, and the original
+  reason for entering Review are not useful secondary filter dimensions in this
+  iteration.
 - Keep the full Themes catalog collapsed when the menu opens. Its disclosure
-  summary names the selected themes in one ellipsized line. Keep the applied
-  filter summary below the view selector compact: show the theme name for one
-  selection or `{n} themes selected` for multiple selections.
-- When expanded, present all advanced filters inside one bordered region above
-  `All / Needs attention`. Themes remains a plain disclosure subsection inside
-  that region rather than a second full-width card.
-- Keep the filter-menu button, result count, and compact applied-filter
-  summary. They communicate state; they are not additional quick filters.
-- Keep no second quick filter in this iteration. Date range is the only
-  plausible future candidate, and should return only if usage evidence shows
-  that people repeatedly change it.
+  names selected themes in one ellipsized line. The applied summary below the
+  view selector shows one theme name or `{n} themes selected`.
+- Keep all advanced filters inside one bordered region above the view selector.
+  Themes remains a lightweight disclosure subsection rather than a nested card.
+- Keep no second quick filter. The filter button, result count, and compact
+  applied-filter summary already communicate the rest of the state.
 
-This supersedes the earlier recommendation for separate `Slow` and `Timed out`
-quick chips. It remains an incremental change to the existing History clone.
+This supersedes both the earlier separate Slow/Timed out quick-chip proposal
+and the later four-value Attention flags proposal.
+
+## Behavior
+
+- A Slow correct attempt is automatically marked Unclear.
+- A Timed out attempt is automatically marked Unclear.
+- The app does not ask whether a Slow attempt was unclear after it has already
+  set that marker.
+- Slow and Timed out remain visible History labels, not filtering reasons.
+- Wrong attempts qualify through their active Review state.
+- If a user clears Unclear or removes the matching Review entry, the attempt
+  leaves `Needs attention` once neither state remains.
+- Advanced facets narrow the selected view with AND. Multiple selected themes
+  keep their existing OR behavior inside the Themes facet.
+- Reset restores `Needs attention`, `All sources`, the default seven-day range,
+  and no optional advanced filters.
 
 ## Why This Control
 
 Apple describes a segmented control as a way to present closely related choices
 that affect a view and preserve the current selection at a glance. A toggle
-instead represents opposing on/off states. `All` and `Needs attention` are two
+instead represents opposing on/off states. `Needs attention` and `All` are two
 named result scopes, so a segmented control makes both meanings visible
 ([Apple segmented controls](https://developer.apple.com/design/human-interface-guidelines/segmented-controls),
 [Apple toggles](https://developer.apple.com/design/human-interface-guidelines/toggles)).
@@ -50,103 +58,33 @@ named result scopes, so a segmented control makes both meanings visible
 Android's official guidance likewise defines a single-select segmented button
 as a side-by-side choice with one selected option
 ([Android Developers](https://developer.android.com/develop/ui/compose/components/segmented-button)).
-For accessibility, the Storybook presentation uses a labelled radio group,
-matching the WAI-ARIA single-selection contract
+The presentation uses a labelled radio group for the WAI-ARIA single-selection
+contract
 ([W3C radio group pattern](https://www.w3.org/WAI/ARIA/apg/patterns/radio/)).
-
-Visible labels stay short. The full union is available in the accessible option
-label: `Needs attention: mistakes, unclear, slow, or timed out`. No explanatory
-sentence or Boolean formula is added to the History screen.
-
-## Naming
-
-Use **`All / Needs attention`**.
-
-`Needs attention` includes correct-but-slow and user-marked unclear attempts
-without colliding with other product concepts:
-
-- `Needs review` conflicts with the separate Scheduled Review queue.
-- `Training focus` or `Focus` belongs to the planned Training Focus project.
-- `Mistakes` and `Wrong` exclude slow and unclear attempts.
-- `Flagged` sounds manual and does not naturally include wrong or timed-out
-  attempts.
-- `Problems` overstates a correct-but-slow attempt.
-- `Attention` is shorter but less self-explanatory.
-
-These naming conclusions are product-language judgments rather than claims from
-the cited design systems.
-
-## Filter Logic
-
-Treat `Needs attention` as one atomic view predicate. Its four reasons use OR
-internally. Every advanced facet then narrows that union with AND:
-
-```text
-Needs attention AND Source: Review AND Range: 30 days
-```
-
-The `Attention flags` facet follows normal multi-select behavior:
-
-```text
-(Mistakes OR Unclear OR Slow OR Timed out) AND Result: Correct
-```
-
-Selecting no attention flag places no restriction on that facet. The applied
-state summary uses plain language such as
-`Attention: Mistakes or Unclear or Slow`.
-
-`Timed out` is its own result and does not also match `Mistakes`, `Correct`, or
-`Wrong`. Slow and Timed out do not automatically set Unclear or Review queue
-membership; all four attention reasons and Review membership remain independent.
-
-The view selector and Attention flags stay synchronized:
-
-- Selecting any Attention flag switches the view to `Needs attention`.
-- Clearing the final Attention flag keeps the broader `Needs attention` view.
-- Selecting `All` clears every Attention flag.
-- Reset restores `All` with no Attention flags selected.
-
-Do not show the formula in the interface. Keep the selected view, result count,
-and category/value applied-state tokens close to the results.
 
 DWP's filter research recommends AND across different criteria, notes that
 multiple values inside one criterion naturally use OR, and recommends visible
 result count and applied state
 ([DWP filter logic](https://design-system.dwp.gov.uk/contribute/filters/summary#adding-more-filters-should-reduce-the-number-of-results),
 [DWP filter state](https://design-system.dwp.gov.uk/contribute/filters/design-notes#state)).
-It also notes that expanded filters above mobile results consume the viewport,
-supporting the decision to keep only one high-value shortcut visible
+It also notes that expanded mobile filters consume the viewport, supporting one
+high-value persistent selector
 ([DWP mobile filter layout](https://design-system.dwp.gov.uk/contribute/filters/design-notes#mobile-views)).
-
-`All sources` is the Source facet default and does not appear as an applied
-filter token. It is equivalent to clearing that facet
-([DWP All/any option](https://design-system.dwp.gov.uk/contribute/filters/design-notes#allany-option)).
 
 ## Storybook Acceptance Checks
 
-- Initial state selects `All` and `All sources`.
-- `Needs attention` includes slow, wrong, unclear, and timed-out attempts.
-- An attempt matching multiple reasons appears once.
-- A normal correct, on-time, clear attempt is excluded.
-- Adding an advanced filter can only narrow the attention union.
-- `Mistakes`, `Unclear`, `Slow`, and `Timed out` can be selected
-  independently; multiple selections use OR and appear once in the
-  applied-state summary.
-- Selecting an Attention flag also selects `Needs attention`; clearing the last
-  flag keeps `Needs attention`, while selecting `All` clears every flag.
-- `Mistakes` may overlap `Result: Wrong` without duplicating an attempt.
-- A Timed out attempt does not also match `Mistakes`, `Correct`, or `Wrong`.
-- Slow and Timed out do not automatically set Unclear or Review membership.
-- Review membership reads `All / In queue / Not in queue`, not
-  `All review states / Queued / Clear`.
-- Themes is collapsed when filters open, retains a compact selection summary,
-  and reveals all 24 curated choices on demand.
-- One selected theme appears by name in the applied summary; multiple themes
-  appear once as `{n} themes selected`. Selecting all 24 named themes keeps the
-  disclosure to one line and reads `24 themes selected` below.
-- The expanded filter region has one visible outer boundary and appears above
-  the primary History view selector; Themes does not add a nested card boundary.
-- Reset restores `All`, `All sources`, and the default range.
+- Initial state selects `Needs attention` and `All sources`.
+- The segmented order is `Needs attention`, then `All`.
+- Needs attention includes an Unclear attempt and a wrong attempt still in
+  Review.
+- A Slow or Timed out fixture appears because it is auto-marked Unclear, not
+  because of its timing label.
+- A normal clear attempt and a wrong attempt removed from Review are excluded.
+- The filter menu has no Attention flags group.
+- Advanced facets only narrow the selected view.
+- Themes is collapsed by default, retains a compact selection summary, and
+  reveals all curated choices on demand.
+- Reset restores `Needs attention`.
 - At 320-point width, both segments and the filter button remain visible
   without horizontal scrolling.
 - Assistive technology announces one selected option in a labelled radio group.
