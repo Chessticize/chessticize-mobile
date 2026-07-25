@@ -20,6 +20,10 @@
       {
         "issueNumber": 328,
         "changeNote": "Teach the pass goal, attempts, Slow, and Timed out rules before the first Sprint."
+      },
+      {
+        "issueNumber": 337,
+        "changeNote": "Align every first-use Sprint rule to fixed badge and copy columns, and clarify the novice-facing timing language."
       }
     ]
   },
@@ -127,7 +131,7 @@
       },
       {
         "issueNumber": 337,
-        "changeNote": "Keep the first-use Sprint guide and its navigation visible in maintained portrait and landscape layouts."
+        "changeNote": "Keep semantic first-use Sprint guidance and navigation visible in maintained portrait and landscape layouts."
       }
     ]
   },
@@ -139,7 +143,7 @@
       },
       {
         "issueNumber": 337,
-        "changeNote": "Keep the shared responsive guide and Arrow Duel progress readable in maintained layouts."
+        "changeNote": "Keep the shared semantic guidance and Arrow Duel progress readable in maintained layouts."
       }
     ]
   },
@@ -151,7 +155,7 @@
       },
       {
         "issueNumber": 337,
-        "changeNote": "Keep the Arrow Duel-only guide progress on one line in maintained landscape widths."
+        "changeNote": "Keep the Arrow Duel semantic callout and guide progress readable in maintained layouts."
       }
     ]
   },
@@ -204,6 +208,10 @@
       {
         "issueNumber": 328,
         "changeNote": "Replay all Sprint guides from a direct reversible Settings button."
+      },
+      {
+        "issueNumber": 337,
+        "changeNote": "Place Guidance immediately before Feedback, after Profile whenever Profile is available."
       }
     ]
   },

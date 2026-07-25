@@ -4143,9 +4143,11 @@ function SprintRulesGuide({
   presentation: SprintRulesGuidePresentation;
   onDismiss: () => void;
 }): React.JSX.Element {
+  const mistakeLimitDetail = `The ${ordinalWord(presentation.maxMistakes)} mistake ends the Sprint.`;
+
   return (
     <View
-      accessibilityLabel={`Your first Sprint. Solve ${presentation.targetCorrect} puzzles to pass before ${presentation.durationLabel} ends. The Sprint ends after ${presentation.maxMistakes} mistakes. A Slow warning automatically marks the puzzle as Unclear and does not count as a mistake. A timeout marks the puzzle Timed out and Unclear, counts as a mistake, adds it to Review, then moves on. For example, solving ${presentation.targetCorrect} puzzles with one wrong answer means ${presentation.targetCorrect} solved and ${presentation.targetCorrect + 1} attempted.`}
+      accessibilityLabel={`Your first Sprint. Puzzles to pass: Solve ${presentation.targetCorrect} puzzles to pass the Sprint. Time limit: Solve the required puzzles before the Sprint clock reaches zero. Mistake limit: ${mistakeLimitDetail} Slow puzzle: The puzzle timer turns amber. If you solve after that, it is marked Unclear for another look, not as a mistake. Puzzle timeout: When the puzzle timer runs out, it counts as a mistake, is marked Unclear, is added to Review, and the Sprint moves on. For example, solving ${presentation.targetCorrect} puzzles with one mistake means ${presentation.targetCorrect} solved and ${presentation.targetCorrect + 1} attempted.`}
       style={styles.sprintRulesGuide}
       testID="practice-sprint-rules-guide"
     >
@@ -4175,31 +4177,31 @@ function SprintRulesGuide({
         />
         <SprintRuleRow
           badge={presentation.durationLabel}
-          detail="Reach the goal before the Sprint timer ends."
+          detail="Solve the required puzzles before the Sprint clock reaches zero."
           label="Time limit"
         />
         <SprintRuleRow
           badge={String(presentation.maxMistakes)}
-          detail={`Mistake ${presentation.maxMistakes} ends the Sprint.`}
-          label="Mistakes max"
+          detail={mistakeLimitDetail}
+          label="Mistake limit"
           tone="danger"
         />
         <SprintRuleRow
           badge="SLOW"
-          detail="Automatically marks the puzzle as Unclear; it is not a mistake."
-          label="Slow warning"
+          detail="The puzzle timer turns amber. If you solve after that, it is marked Unclear for another look, not as a mistake."
+          label="Slow puzzle"
           tone="warning"
         />
         <SprintRuleRow
           badge="TIMEOUT"
-          detail="Marks it Timed out and Unclear, counts as a mistake, adds it to Review, then moves on."
+          detail="When the puzzle timer runs out, it counts as a mistake, is marked Unclear, is added to Review, and the Sprint moves on."
           label="Puzzle timeout"
           tone="danger"
         />
       </View>
 
       <Text style={styles.sprintRulesGuideFootnote}>
-        Example: {presentation.targetCorrect} solved + 1 wrong = {presentation.targetCorrect + 1} attempted.
+        Example: {presentation.targetCorrect} solved + 1 mistake = {presentation.targetCorrect + 1} attempted.
       </Text>
     </View>
   );
@@ -4216,27 +4218,92 @@ function SprintRuleRow({
   label: string;
   tone?: "default" | "danger" | "warning";
 }): React.JSX.Element {
+  const ruleTestId = safeTestId(label);
+
   return (
-    <View style={styles.sprintRuleRow}>
+    <View style={styles.sprintRuleRow} testID={`practice-sprint-rule-${ruleTestId}`}>
       <View style={[
         styles.sprintRuleBadge,
         tone === "danger" ? styles.sprintRuleBadgeDanger : null,
         tone === "warning" ? styles.sprintRuleBadgeWarning : null
-      ]}>
-        <Text style={[
-          styles.sprintRuleBadgeText,
-          tone === "danger" ? styles.sprintRuleBadgeTextDanger : null,
-          tone === "warning" ? styles.sprintRuleBadgeTextWarning : null
-        ]}>
+      ]} testID={`practice-sprint-rule-${ruleTestId}-badge`}>
+        <Text
+          numberOfLines={1}
+          style={[
+            styles.sprintRuleBadgeText,
+            tone === "danger" ? styles.sprintRuleBadgeTextDanger : null,
+            tone === "warning" ? styles.sprintRuleBadgeTextWarning : null
+          ]}
+        >
           {badge}
         </Text>
       </View>
-      <View style={styles.sprintRuleCopy}>
+      <View
+        style={styles.sprintRuleCopy}
+        testID={`practice-sprint-rule-${ruleTestId}-copy`}
+      >
         <Text style={styles.sprintRuleLabel}>{label}</Text>
         <Text style={styles.sprintRuleDetail}>{detail}</Text>
       </View>
     </View>
   );
+}
+
+type SessionGuideCallout = {
+  badge: string;
+  detail: string;
+  id: "arrow-duel" | "overview" | "slow" | "timeout" | "unclear";
+  title: string;
+  tone: "danger" | "info" | "warning";
+};
+
+function sessionGuideCallout(
+  mode: "standard" | "arrow_duel",
+  coachStep: number
+): SessionGuideCallout {
+  if (mode === "arrow_duel") {
+    return {
+      badge: "ARROW DUEL",
+      detail: "Each arrow is a possible move. Play the stronger one on the board; other moves are ignored.",
+      id: "arrow-duel",
+      title: "Choose one of the two arrows",
+      tone: "info"
+    };
+  }
+  if (coachStep === 0) {
+    return {
+      badge: "SPRINT HEADER",
+      detail: "The top row shows puzzles solved, Sprint time left, and mistakes remaining. The Sprint begins when you finish this guide.",
+      id: "overview",
+      title: "Track your Sprint",
+      tone: "info"
+    };
+  }
+  if (coachStep === 1) {
+    return {
+      badge: "SLOW",
+      detail: "When the timer below the board turns amber, keep solving. A correct answer is marked Unclear for another look, but it is not a mistake.",
+      id: "slow",
+      title: "Amber means this puzzle is slow",
+      tone: "warning"
+    };
+  }
+  if (coachStep === 2) {
+    return {
+      badge: "TIMED OUT",
+      detail: "It is also marked Unclear and added to Review. The Sprint then shows the next puzzle.",
+      id: "timeout",
+      title: "This puzzle counts as a mistake",
+      tone: "danger"
+    };
+  }
+  return {
+    badge: "UNCLEAR",
+    detail: "Tap it when your move was correct but the solution still does not make sense to you.",
+    id: "unclear",
+    title: "Use Mark as unclear after a correct answer",
+    tone: "warning"
+  };
 }
 
 function ActiveSessionGuide({
@@ -4280,15 +4347,11 @@ function ActiveSessionGuide({
     : isArrowDuel
       ? "Start Arrow Duel"
       : "Start Sprint";
-  const timerCopy = totalSteps > 1
-    ? "Your timer starts after this five-step tour."
-    : "Your timer starts after this guide.";
+  const callout = sessionGuideCallout(presentation.mode, coachStep);
 
   return (
     <View
-      accessibilityLabel={isArrowDuel
-        ? `Your first Arrow Duel. Step ${unifiedCoachStep} of ${unifiedCoachTotal} freezes the same layout used by the real Arrow Duel. Compare the two arrows, then play the stronger move. Only these two moves count; any other move is ignored. ${timerCopy}`
-        : `Your first active Sprint. This ${unifiedCoachTotal === 5 ? "five" : "four"}-step tour freezes the same layout used by the real Sprint. Solve ${presentation.targetCorrect} puzzles to pass in ${presentation.durationLabel}. Slow and Timed out are automatic timing states, not controls. After the target pace, the puzzle timer turns amber. If you solve after that, the completed attempt is saved as Unclear without adding a mistake. At the time limit, Timed out appears over the board, the attempt is marked Unclear, counts as a mistake, is added to Review, and the Sprint moves to the next puzzle. After a correct puzzle, use Mark as unclear when you did not fully understand the solution. ${timerCopy}`}
+      accessibilityLabel={`Guide ${unifiedCoachStep} of ${unifiedCoachTotal}. ${callout.title}. ${callout.detail}`}
       style={styles.sessionGuideCalibrated}
       testID={isArrowDuel ? "practice-arrow-duel-guide" : "practice-active-session-guide"}
     >
@@ -4298,16 +4361,15 @@ function ActiveSessionGuide({
         style={FABRIC_SAFE_HIDDEN_TEXT_STYLE}
         testID="practice-session-guide-progress"
       >
-        STEP {unifiedCoachStep} OF {unifiedCoachTotal} · YOUR FIRST {isArrowDuel ? "ARROW DUEL" : "ACTIVE SPRINT"}
+        GUIDE {unifiedCoachStep} OF {unifiedCoachTotal} · YOUR FIRST {isArrowDuel ? "ARROW DUEL" : "ACTIVE SPRINT"}
       </Text>
       <SessionCoachmarkDemo
         adaptiveLayout={adaptiveLayout}
         boardSize={guideBoardSize}
         coachStep={coachStep}
-        guideStepNumber={unifiedCoachStep}
+        guideNumber={unifiedCoachStep}
         mode={presentation.mode}
         presentation={presentation}
-        timerCopy={timerCopy}
       />
 
       <View
@@ -4325,7 +4387,7 @@ function ActiveSessionGuide({
         {hasPreviousCoachStep ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Previous guide step"
+            accessibilityLabel="Previous guide"
             style={[
               styles.sessionGuideCoachBackButton,
               adaptiveLayout.usesSessionRail
@@ -4348,7 +4410,7 @@ function ActiveSessionGuide({
           />
         )}
         <Text
-          accessibilityLabel={`Step ${unifiedCoachStep} of ${unifiedCoachTotal}`}
+          accessibilityLabel={`Guide ${unifiedCoachStep} of ${unifiedCoachTotal}`}
           numberOfLines={1}
           style={styles.sessionGuideCoachProgress}
           testID="practice-session-guide-coach-progress"
@@ -4435,18 +4497,16 @@ function SessionCoachmarkDemo({
   adaptiveLayout,
   boardSize,
   coachStep,
-  guideStepNumber,
+  guideNumber,
   mode,
-  presentation,
-  timerCopy
+  presentation
 }: {
   adaptiveLayout: AdaptiveLayout;
   boardSize: number;
   coachStep: number;
-  guideStepNumber: number;
+  guideNumber: number;
   mode: "standard" | "arrow_duel";
   presentation: SprintSessionGuidePresentation;
-  timerCopy: string;
 }): React.JSX.Element {
   const isArrowDuel = mode === "arrow_duel";
   const boardSquareSize = boardSize / 8;
@@ -4487,45 +4547,7 @@ function SessionCoachmarkDemo({
         : coachStep === 3
           ? 24
           : 0;
-  const callout = isArrowDuel
-    ? {
-        badge: `STEP ${guideStepNumber} · ARROW DUEL`,
-        detail: "Play the stronger move on the board. Only these two moves count; any other move is ignored.",
-        id: "arrow-duel",
-        title: "Compare the two arrows",
-        tone: "info" as const
-      }
-    : coachStep === 0
-    ? {
-        badge: "STEP 1 · SESSION AT A GLANCE",
-        detail: `Solved tracks progress toward ${presentation.targetCorrect}. The center clock shows the whole ${presentation.durationLabel} Sprint. The Sprint ends after ${presentation.maxMistakes} mistakes. ${timerCopy}`,
-        id: "overview",
-        title: "This is the same header you will use next",
-        tone: "info" as const
-      }
-    : coachStep === 1
-      ? {
-          badge: "STEP 2 · SLOW · AUTOMATIC",
-          detail: "If you solve after that, the completed attempt is saved as Unclear without adding a mistake.",
-          id: "slow",
-          title: "The puzzle timer turns amber automatically after the target pace.",
-          tone: "warning" as const
-        }
-    : coachStep === 2
-        ? {
-            badge: "STEP 3 · TIMED OUT · AUTOMATIC",
-            detail: "The attempt is marked Unclear, counts as a mistake, is added to Review, and the Sprint moves to the next puzzle.",
-            id: "timeout",
-            title: "Timed out appears over the board automatically at the time limit.",
-            tone: "danger" as const
-          }
-        : {
-            badge: "STEP 4 · AFTER A CORRECT PUZZLE",
-            detail: "Use it after a correct answer when you did not fully understand the solution.",
-            id: "unclear",
-            title: "Mark as unclear is the only control in this tour.",
-            tone: "warning" as const
-          };
+  const callout = sessionGuideCallout(mode, coachStep);
   const calloutUsesBoard = adaptiveLayout.usesSessionRail
     && !isArrowDuel
     && (coachStep === 1 || coachStep === 3);
@@ -4626,7 +4648,7 @@ function SessionCoachmarkDemo({
 
   return (
     <View
-      accessibilityLabel={`Frozen copy of the real ${isArrowDuel ? "Arrow Duel" : "Sprint"} screen with a non-interactive example puzzle. Step ${guideStepNumber}. ${callout.title} ${callout.detail}`}
+      accessibilityLabel={`Guide ${guideNumber}. ${callout.title}. ${callout.detail}`}
       style={styles.sessionGuideCoachFrame}
       testID={isArrowDuel
         ? "practice-arrow-duel-guide-timing-demo"
@@ -11680,54 +11702,6 @@ function SettingsPanel({
 
   return (
     <View style={[styles.settingsPanel, adaptiveLayout.usesWideContent ? styles.settingsPanelWide : null]} testID="settings-panel">
-      {showSprintGuideReset ? (
-        <SettingsSection title="Guidance" testID="settings-guidance-section" wide={adaptiveLayout.usesWideContent}>
-          <View style={styles.settingsGuidanceResetCard} testID="settings-guidance-reset-card">
-            <View style={styles.settingsRowCopy}>
-              <Text style={styles.listText}>Replay practice guides</Text>
-              <Text style={styles.helperText}>
-                Reset the Sprint rules, active-session, and Arrow Duel guides so they appear again when each applies. Runs, ratings, and History stay unchanged.
-              </Text>
-            </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={sprintGuideReady ? "Practice guides reset" : "Reset practice guides"}
-              accessibilityState={{ disabled: sprintGuideReady }}
-              disabled={sprintGuideReady}
-              style={[
-                styles.settingsGuidanceResetButton,
-                sprintGuideReady ? styles.settingsGuidanceResetButtonComplete : null
-              ]}
-              testID="settings-show-sprint-guide"
-              onPress={() => {
-                onResetSprintGuides();
-                setSprintGuideReady(true);
-              }}
-            >
-              <Text
-                style={[
-                  styles.settingsGuidanceResetButtonText,
-                  sprintGuideReady ? styles.settingsGuidanceResetButtonTextComplete : null
-                ]}
-              >
-                {sprintGuideReady ? "Guides reset" : "Reset guides"}
-              </Text>
-            </Pressable>
-          </View>
-          {sprintGuideReady ? (
-            <View
-              accessibilityLiveRegion="polite"
-              style={styles.sprintGuideReadyStatus}
-              testID="settings-sprint-guide-ready"
-            >
-              <Text style={styles.sprintGuideReadyStatusText}>
-                Guides reset. Each guide will replay the next time it applies.
-              </Text>
-            </View>
-          ) : null}
-        </SettingsSection>
-      ) : null}
-
       {progressProtection.kind === "icloud_sync" ? (
         <SettingsSection title="iCloud Sync" testID="settings-sync-section" wide={adaptiveLayout.usesWideContent}>
           <SettingsRow
@@ -11884,6 +11858,54 @@ function SettingsPanel({
                 setStatusMessage(`${ratingLabelFromKey(ratingKey)} rating set to ${next.rating}`);
               }}
             />
+          ) : null}
+        </SettingsSection>
+      ) : null}
+
+      {showSprintGuideReset ? (
+        <SettingsSection title="Guidance" testID="settings-guidance-section" wide={adaptiveLayout.usesWideContent}>
+          <View style={styles.settingsGuidanceResetCard} testID="settings-guidance-reset-card">
+            <View style={styles.settingsRowCopy}>
+              <Text style={styles.listText}>Replay practice guides</Text>
+              <Text style={styles.helperText}>
+                Reset the Sprint rules, active-session, and Arrow Duel guides so they appear again when each applies. Runs, ratings, and History stay unchanged.
+              </Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={sprintGuideReady ? "Practice guides reset" : "Reset practice guides"}
+              accessibilityState={{ disabled: sprintGuideReady }}
+              disabled={sprintGuideReady}
+              style={[
+                styles.settingsGuidanceResetButton,
+                sprintGuideReady ? styles.settingsGuidanceResetButtonComplete : null
+              ]}
+              testID="settings-show-sprint-guide"
+              onPress={() => {
+                onResetSprintGuides();
+                setSprintGuideReady(true);
+              }}
+            >
+              <Text
+                style={[
+                  styles.settingsGuidanceResetButtonText,
+                  sprintGuideReady ? styles.settingsGuidanceResetButtonTextComplete : null
+                ]}
+              >
+                {sprintGuideReady ? "Guides reset" : "Reset guides"}
+              </Text>
+            </Pressable>
+          </View>
+          {sprintGuideReady ? (
+            <View
+              accessibilityLiveRegion="polite"
+              style={styles.sprintGuideReadyStatus}
+              testID="settings-sprint-guide-ready"
+            >
+              <Text style={styles.sprintGuideReadyStatusText}>
+                Guides reset. Each guide will replay the next time it applies.
+              </Text>
+            </View>
           ) : null}
         </SettingsSection>
       ) : null}
@@ -13207,6 +13229,37 @@ function formatDurationLabel(seconds: number): string {
   return `${seconds}s`;
 }
 
+function ordinalWord(value: number): string {
+  const words: Readonly<Record<number, string>> = {
+    1: "first",
+    2: "second",
+    3: "third",
+    4: "fourth",
+    5: "fifth",
+    6: "sixth",
+    7: "seventh",
+    8: "eighth",
+    9: "ninth",
+    10: "tenth"
+  };
+  const word = words[value];
+  if (word) {
+    return word;
+  }
+
+  const modulo100 = value % 100;
+  const suffix = modulo100 >= 11 && modulo100 <= 13
+    ? "th"
+    : value % 10 === 1
+      ? "st"
+      : value % 10 === 2
+        ? "nd"
+        : value % 10 === 3
+          ? "rd"
+          : "th";
+  return `${value}${suffix}`;
+}
+
 function historyRangeLabel(range: HistoryTimeRange): string {
   if (range === "7d") {
     return "7 days";
@@ -13925,8 +13978,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     height: 36,
     justifyContent: "center",
-    minWidth: 50,
-    paddingHorizontal: 8
+    paddingHorizontal: 6,
+    width: 72
   },
   sprintRuleBadgeDanger: {
     backgroundColor: "#FEE2E2"

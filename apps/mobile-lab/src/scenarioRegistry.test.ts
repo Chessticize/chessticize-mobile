@@ -97,3 +97,29 @@ test("Issue #247 stays on the existing Settings product clone with its approved 
     false
   );
 });
+
+test("Issue #337 keeps semantic Sprint guidance on the existing responsive Lab scenarios", () => {
+  const activeSessionGuide = scenarioRegistry["practice-active-session-guide"];
+  const arrowDuelGuide = scenarioRegistry["practice-arrow-duel-guide"];
+  const firstSprintGuide = scenarioRegistry["practice-first-sprint-guide"];
+  const settingsGuidance = scenarioRegistry["settings-sprint-guidance"];
+
+  assert.ok(activeSessionGuide.scope.includes.includes(
+    "SPRINT HEADER, SLOW, TIMED OUT, and UNCLEAR guidance"
+  ));
+  assert.ok(activeSessionGuide.scope.includes.includes(
+    "Current-guide-only accessibility announcement"
+  ));
+  assert.ok(arrowDuelGuide.scope.includes.includes("ARROW DUEL semantic callout"));
+  assert.match(arrowDuelGuide.description, /single-line 5 of 5 guide progress/);
+  assert.doesNotMatch(
+    `${activeSessionGuide.description} ${arrowDuelGuide.description}`,
+    /\b(?:step|tour)\b/i
+  );
+  assert.ok(firstSprintGuide.issues?.some(
+    (issue) => issue.issueNumber === 337 && issue.changeNote.includes("fixed badge and copy columns")
+  ));
+  assert.ok(settingsGuidance.issues?.some(
+    (issue) => issue.issueNumber === 337 && issue.changeNote.includes("immediately before Feedback")
+  ));
+});

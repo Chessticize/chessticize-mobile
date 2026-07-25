@@ -1043,25 +1043,28 @@ describe("PracticePocScreen", () => {
       "Solve 15 puzzles to pass the Sprint."
     );
     expect(collectText(findByTestId(renderer, "practice-sprint-rules-guide"))).toContain(
-      "Example: 15 solved + 1 wrong = 16 attempted."
+      "Example: 15 solved + 1 mistake = 16 attempted."
     );
     expect(collectText(findByTestId(renderer, "practice-sprint-rules-guide"))).toContain(
-      "Slow warning"
+      "Mistake limit"
     );
     expect(collectText(findByTestId(renderer, "practice-sprint-rules-guide"))).toContain(
-      "Automatically marks the puzzle as Unclear; it is not a mistake."
+      "The third mistake ends the Sprint."
     );
     expect(collectText(findByTestId(renderer, "practice-sprint-rules-guide"))).toContain(
-      "Marks it Timed out and Unclear, counts as a mistake, adds it to Review, then moves on."
+      "The puzzle timer turns amber. If you solve after that, it is marked Unclear for another look, not as a mistake."
+    );
+    expect(collectText(findByTestId(renderer, "practice-sprint-rules-guide"))).toContain(
+      "When the puzzle timer runs out, it counts as a mistake, is marked Unclear, is added to Review, and the Sprint moves on."
     );
     expect(findByTestId(renderer, "practice-sprint-rules-guide").props.accessibilityLabel).toContain(
-      "The Sprint ends after 3 mistakes."
+      "Mistake limit: The third mistake ends the Sprint."
     );
     expect(findByTestId(renderer, "practice-sprint-rules-guide").props.accessibilityLabel).toContain(
-      "A Slow warning automatically marks the puzzle as Unclear and does not count as a mistake."
+      "Slow puzzle: The puzzle timer turns amber."
     );
     expect(findByTestId(renderer, "practice-sprint-rules-guide").props.accessibilityLabel).toContain(
-      "A timeout marks the puzzle Timed out and Unclear, counts as a mistake, adds it to Review, then moves on."
+      "Puzzle timeout: When the puzzle timer runs out, it counts as a mistake"
     );
 
     press(renderer, "practice-sprint-rules-dismiss");
@@ -1072,6 +1075,51 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "practice-sprint-rules-open");
     expect(findByTestId(renderer, "practice-sprint-rules-guide")).toBeTruthy();
+  });
+
+  it("keeps every first-use Sprint rule in one fixed badge and copy column", () => {
+    const viewports = [
+      {
+        height: 874,
+        insets: { top: 62, right: 0, bottom: 34, left: 0 },
+        width: 402
+      },
+      {
+        height: 402,
+        insets: { top: 0, right: 62, bottom: 21, left: 62 },
+        width: 874
+      }
+    ];
+    const ruleIds = [
+      "puzzles-to-pass",
+      "time-limit",
+      "mistake-limit",
+      "slow-puzzle",
+      "puzzle-timeout"
+    ];
+
+    for (const viewport of viewports) {
+      setPracticeViewport({ ...viewport, scale: 3 });
+      const renderer = renderLabScenario("practice-first-sprint-guide");
+      const badgeWidths = ruleIds.map((ruleId) => Number(
+        flattenTestStyle(
+          findByTestId(renderer, `practice-sprint-rule-${ruleId}-badge`).props.style
+        ).width
+      ));
+
+      expect(badgeWidths.every(Number.isFinite)).toBe(true);
+      expect(new Set(badgeWidths).size).toBe(1);
+      for (const ruleId of ruleIds) {
+        expect(
+          flattenTestStyle(
+            findByTestId(renderer, `practice-sprint-rule-${ruleId}-copy`).props.style
+          )
+        ).toMatchObject({
+          flex: 1,
+          minWidth: 0
+        });
+      }
+    }
   });
 
   it("persists the production rules and shared Active Session guides before starting the real timer", () => {
@@ -1209,7 +1257,7 @@ describe("PracticePocScreen", () => {
     );
   });
 
-  it("calibrates the frozen spotlight tour to the real Sprint layout before Sprint and Arrow Duel", () => {
+  it("calibrates the frozen first-use guides to the real Sprint layout before Sprint and Arrow Duel", () => {
     const activeSession = renderLabScenario("practice-active-session-guide");
     const realSprint = renderLabScenario("practice-active");
     startStandardSprint(realSprint);
@@ -1237,7 +1285,7 @@ describe("PracticePocScreen", () => {
       "1 of 4"
     );
     expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-overview"))).toContain(
-      "Solved tracks progress toward 15"
+      "The top row shows puzzles solved, Sprint time left, and mistakes remaining."
     );
     expect(() => findByTestId(activeSession, "practice-session-guide-coach-slow")).toThrow();
     expect(collectText(findByTestId(activeSession, "practice-session-guide-start"))).toBe("Next");
@@ -1247,10 +1295,10 @@ describe("PracticePocScreen", () => {
       "2 of 4"
     );
     expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-slow"))).toContain(
-      "The puzzle timer turns amber automatically after the target pace."
+      "Amber means this puzzle is slow"
     );
     expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-slow"))).toContain(
-      "If you solve after that, the completed attempt is saved as Unclear without adding a mistake."
+      "When the timer below the board turns amber, keep solving. A correct answer is marked Unclear for another look, but it is not a mistake."
     );
     expect(collectText(findByTestId(activeSession, "practice-session-guide-demo-timer"))).toContain(
       "Puzzle 0:40"
@@ -1261,10 +1309,10 @@ describe("PracticePocScreen", () => {
       "3 of 4"
     );
     expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-timeout"))).toContain(
-      "Timed out appears over the board automatically at the time limit."
+      "This puzzle counts as a mistake"
     );
     expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-timeout"))).toContain(
-      "The attempt is marked Unclear, counts as a mistake, is added to Review, and the Sprint moves to the next puzzle."
+      "It is also marked Unclear and added to Review. The Sprint then shows the next puzzle."
     );
     expect(collectText(findByTestId(activeSession, "practice-session-guide-demo-board"))).toContain(
       "Mistake · Marked Unclear · Added to Review · Moving on"
@@ -1276,13 +1324,13 @@ describe("PracticePocScreen", () => {
     );
     expect(() => findByTestId(activeSession, "practice-session-guide-timeout-overlay")).toThrow();
     expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-unclear"))).toContain(
-      "Mark as unclear is the only control in this tour."
+      "Use Mark as unclear after a correct answer"
     );
     expect(collectText(findByTestId(activeSession, "practice-session-guide-demo-unclear"))).toContain(
       "Mark as unclear"
     );
     expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-unclear"))).toContain(
-      "after a correct answer when you did not fully understand the solution"
+      "Tap it when your move was correct but the solution still does not make sense to you."
     );
     expect(collectText(findByTestId(activeSession, "practice-session-guide-start"))).toBe(
       "Start Sprint"
@@ -1295,8 +1343,8 @@ describe("PracticePocScreen", () => {
     press(activeSession, "practice-session-guide-start");
     expect(
       findByTestId(activeSession, "practice-active-session-guide").props.accessibilityLabel
-    ).toContain(
-      "use Mark as unclear when you did not fully understand the solution"
+    ).toBe(
+      "Guide 4 of 4. Use Mark as unclear after a correct answer. Tap it when your move was correct but the solution still does not make sense to you."
     );
 
     press(activeSession, "practice-session-guide-start");
@@ -1336,7 +1384,7 @@ describe("PracticePocScreen", () => {
     expect(testIdOrder(firstEverArrowDuel, "practice-prompt", "practice-arrow-duel-guide-demo-board")).toBeLessThan(0);
     expect(testIdOrder(firstEverArrowDuel, "practice-arrow-duel-guide-demo-board", "session-score-strip")).toBeLessThan(0);
     expect(collectText(findByTestId(firstEverArrowDuel, "practice-arrow-duel-guide-coach"))).toContain(
-      "Only these two moves count; any other move is ignored."
+      "Each arrow is a possible move. Play the stronger one on the board; other moves are ignored."
     );
     expect(collectText(findByTestId(firstEverArrowDuel, "practice-session-guide-coach-progress"))).toBe(
       "5 of 5"
@@ -1374,6 +1422,93 @@ describe("PracticePocScreen", () => {
     );
     expect(collectText(findByTestId(returningArrowDuel, "practice-session-guide-start"))).toBe(
       "Start Arrow Duel"
+    );
+  });
+
+  it("uses semantic first-use guidance without visible tour-step meta copy", () => {
+    const activeSession = renderLabScenario("practice-active-session-guide");
+    const guide = findByTestId(activeSession, "practice-active-session-guide");
+    const progress = findByTestId(activeSession, "practice-session-guide-coach-progress");
+
+    expect(guide.props.accessibilityLabel).not.toMatch(/\b(?:step|tour)\b/i);
+    expect(guide.props.accessibilityLabel).toBe(
+      "Guide 1 of 4. Track your Sprint. The top row shows puzzles solved, Sprint time left, and mistakes remaining. The Sprint begins when you finish this guide."
+    );
+    expect(progress.props.accessibilityLabel).toBe("Guide 1 of 4");
+    expect(findByTestId(activeSession, "practice-session-guide-metrics")).toBeTruthy();
+    expect(collectText(
+      findByTestId(activeSession, "practice-session-guide-coach-copy-overview")
+    )).toBe(
+      "SPRINT HEADERTrack your SprintThe top row shows puzzles solved, Sprint time left, and mistakes remaining. The Sprint begins when you finish this guide."
+    );
+
+    press(activeSession, "practice-session-guide-start");
+    expect(findByTestId(
+      activeSession,
+      "practice-active-session-guide"
+    ).props.accessibilityLabel).toBe(
+      "Guide 2 of 4. Amber means this puzzle is slow. When the timer below the board turns amber, keep solving. A correct answer is marked Unclear for another look, but it is not a mistake."
+    );
+    expect(findByTestId(activeSession, "practice-session-guide-demo-timer")).toBeTruthy();
+    expect(collectText(
+      findByTestId(activeSession, "practice-session-guide-coach-copy-slow")
+    )).toBe(
+      "SLOWAmber means this puzzle is slowWhen the timer below the board turns amber, keep solving. A correct answer is marked Unclear for another look, but it is not a mistake."
+    );
+
+    press(activeSession, "practice-session-guide-start");
+    expect(findByTestId(
+      activeSession,
+      "practice-active-session-guide"
+    ).props.accessibilityLabel).toBe(
+      "Guide 3 of 4. This puzzle counts as a mistake. It is also marked Unclear and added to Review. The Sprint then shows the next puzzle."
+    );
+    expect(findByTestId(activeSession, "practice-session-guide-demo-board")).toBeTruthy();
+    expect(collectText(
+      findByTestId(activeSession, "practice-session-guide-coach-copy-timeout")
+    )).toBe(
+      "TIMED OUTThis puzzle counts as a mistakeIt is also marked Unclear and added to Review. The Sprint then shows the next puzzle."
+    );
+
+    press(activeSession, "practice-session-guide-start");
+    expect(findByTestId(
+      activeSession,
+      "practice-active-session-guide"
+    ).props.accessibilityLabel).toBe(
+      "Guide 4 of 4. Use Mark as unclear after a correct answer. Tap it when your move was correct but the solution still does not make sense to you."
+    );
+    expect(findByTestId(activeSession, "practice-session-guide-demo-unclear")).toBeTruthy();
+    expect(collectText(
+      findByTestId(activeSession, "practice-session-guide-coach-copy-unclear")
+    )).toBe(
+      "UNCLEARUse Mark as unclear after a correct answerTap it when your move was correct but the solution still does not make sense to you."
+    );
+
+    const arrowDuel = renderLabScenario("practice-arrow-duel-guide-only");
+    expect(findByTestId(arrowDuel, "practice-arrow-duel-guide-candidates")).toBeTruthy();
+    expect(findByTestId(
+      arrowDuel,
+      "practice-session-guide-coach-pointer-arrow-duel-top"
+    )).toBeTruthy();
+    expect(collectText(
+      findByTestId(arrowDuel, "practice-session-guide-coach-copy-arrow-duel")
+    )).toBe(
+      "ARROW DUELChoose one of the two arrowsEach arrow is a possible move. Play the stronger one on the board; other moves are ignored."
+    );
+    expect(findByTestId(
+      arrowDuel,
+      "practice-arrow-duel-guide"
+    ).props.accessibilityLabel).toBe(
+      "Guide 1 of 1. Choose one of the two arrows. Each arrow is a possible move. Play the stronger one on the board; other moves are ignored."
+    );
+
+    const rules = renderLabScenario("practice-first-sprint-guide");
+    const rulesText = collectText(findByTestId(rules, "practice-sprint-rules-guide"));
+    expect(rulesText).toContain(
+      "The puzzle timer turns amber. If you solve after that, it is marked Unclear for another look, not as a mistake."
+    );
+    expect(rulesText).toContain(
+      "When the puzzle timer runs out, it counts as a mistake, is marked Unclear, is added to Review, and the Sprint moves on."
     );
   });
 
@@ -8708,6 +8843,54 @@ describe("PracticePocScreen", () => {
         playHaptic: false
       }
     ]);
+  });
+
+  it("places guide reset after Profile and immediately before Feedback", () => {
+    const sectionCandidates = [
+      "settings-guidance-section",
+      "settings-sync-section",
+      "settings-notifications-section",
+      "settings-move-feedback-section",
+      "settings-profile-section",
+      "settings-feedback-section",
+      "settings-about-section"
+    ];
+    const topLevelSettingsIds = (
+      renderer: TestRenderer.ReactTestRenderer
+    ): string[] => sectionCandidates.filter((testID) => {
+      try {
+        findByTestId(renderer, testID);
+        return true;
+      } catch {
+        return false;
+      }
+    }).sort((left, right) => testIdOrder(renderer, left, right));
+    const expectGuidanceImmediatelyBeforeFeedback = (
+      ids: string[],
+      profileExpected: boolean
+    ): void => {
+      const guidanceIndex = ids.indexOf("settings-guidance-section");
+      const feedbackIndex = ids.indexOf("settings-feedback-section");
+
+      expect(guidanceIndex).toBeGreaterThanOrEqual(0);
+      expect(feedbackIndex).toBe(guidanceIndex + 1);
+      if (profileExpected) {
+        expect(guidanceIndex).toBe(ids.indexOf("settings-profile-section") + 1);
+      } else {
+        expect(ids).not.toContain("settings-profile-section");
+      }
+    };
+
+    const withProfile = renderScreen({ sprintGuidanceEnabled: true });
+    press(withProfile, "settings-tab");
+    expectGuidanceImmediatelyBeforeFeedback(topLevelSettingsIds(withProfile), true);
+
+    const withoutProfile = renderScreen({
+      runEloEditingMovedToHome: true,
+      sprintGuidanceEnabled: true
+    });
+    press(withoutProfile, "settings-tab");
+    expectGuidanceImmediatelyBeforeFeedback(topLevelSettingsIds(withoutProfile), false);
   });
 
   it("does not emit due Review feedback when attempt persistence fails", async () => {
