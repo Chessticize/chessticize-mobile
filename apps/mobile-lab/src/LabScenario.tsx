@@ -111,7 +111,7 @@ function sprintRulesDesignPreviewFor(
     return {
       firstRunGuide,
       firstRunGuideInitiallyVisible: true,
-      timeoutAddsToReview: true
+      timeoutCountsAsMistake: true
     };
   }
   if (
@@ -122,7 +122,7 @@ function sprintRulesDesignPreviewFor(
     return {
       firstRunGuide,
       showRunEditorSummary: true,
-      timeoutAddsToReview: true
+      timeoutCountsAsMistake: true
     };
   }
   if (
@@ -144,11 +144,11 @@ function sprintRulesDesignPreviewFor(
       initialSessionGuides: scenarioId === "practice-arrow-duel-guide"
         ? [sharedGuide, arrowDuelGuide]
         : [scenarioId === "practice-arrow-duel-guide-only" ? arrowDuelGuide : sharedGuide],
-      timeoutAddsToReview: true
+      timeoutCountsAsMistake: true
     };
   }
   if (scenarioId === "practice-timing-timeout") {
-    return { timeoutAddsToReview: true };
+    return { timeoutCountsAsMistake: true };
   }
   if (scenarioId === "practice-sprint-result-goal") {
     return {
@@ -188,7 +188,7 @@ function sprintRulesDesignPreviewFor(
     return { showSettingsReset: true };
   }
   if (isRunManagementScenario(scenarioId)) {
-    return { firstRunGuide, timeoutAddsToReview: true };
+    return { firstRunGuide, timeoutCountsAsMistake: true };
   }
   return undefined;
 }

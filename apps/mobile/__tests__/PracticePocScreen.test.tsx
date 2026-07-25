@@ -1045,7 +1045,7 @@ describe("PracticePocScreen", () => {
       "Automatically marks the puzzle as Unclear; it is not a mistake."
     );
     expect(collectText(findByTestId(renderer, "practice-sprint-rules-guide"))).toContain(
-      "Marks it Timed out and Unclear, adds it to Review, then moves on."
+      "Marks it Timed out and Unclear, counts as a mistake, adds it to Review, then moves on."
     );
     expect(findByTestId(renderer, "practice-sprint-rules-guide").props.accessibilityLabel).toContain(
       "The Sprint ends after 3 mistakes."
@@ -1054,7 +1054,7 @@ describe("PracticePocScreen", () => {
       "A Slow warning automatically marks the puzzle as Unclear and does not count as a mistake."
     );
     expect(findByTestId(renderer, "practice-sprint-rules-guide").props.accessibilityLabel).toContain(
-      "A timeout marks the puzzle Timed out and Unclear, adds it to Review, then moves on."
+      "A timeout marks the puzzle Timed out and Unclear, counts as a mistake, adds it to Review, then moves on."
     );
 
     press(renderer, "practice-sprint-rules-dismiss");
@@ -1119,10 +1119,10 @@ describe("PracticePocScreen", () => {
       "Timed out appears over the board automatically at the time limit."
     );
     expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-timeout"))).toContain(
-      "The attempt is marked Unclear, added to Review, and the Sprint moves to the next puzzle."
+      "The attempt is marked Unclear, counts as a mistake, is added to Review, and the Sprint moves to the next puzzle."
     );
     expect(collectText(findByTestId(activeSession, "practice-session-guide-demo-board"))).toContain(
-      "Added to Review · Moving on"
+      "Mistake · Marked Unclear · Moving on"
     );
 
     press(activeSession, "practice-session-guide-start");
@@ -1431,7 +1431,7 @@ describe("PracticePocScreen", () => {
       "Solve 15 before 5 min ends"
     );
     expect(collectText(findByTestId(preview, "practice-run-puzzle-timeout"))).toContain(
-      "Marks it Timed out and Unclear, adds it to Review, and moves on."
+      "Marks it Timed out and Unclear, counts as a mistake, adds it to Review, and moves on."
     );
     press(preview, "practice-run-duration-stepper-decrease");
     expect(collectText(findByTestId(preview, "practice-run-pass-rules"))).toContain(
@@ -1804,9 +1804,10 @@ describe("PracticePocScreen", () => {
       "Timed out"
     );
     expect(collectText(findByTestId(renderer, "session-puzzle-timeout-overlay"))).toContain(
-      "Added to Review · Moving on"
+      "Mistake · Marked Unclear · Moving on"
     );
     expect(findByTestId(renderer, "board-input-blocker")).toBeTruthy();
+    expectSessionMistakes(renderer, 1);
 
     act(() => {
       jest.advanceTimersByTime(800);
@@ -1815,6 +1816,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "session-puzzle-timing-label"))).toBe("Puzzle 0:00");
     expect(() => findByTestId(renderer, "session-puzzle-countdown")).toThrow();
     expect(findByTestId(renderer, "mock-chessboard").props.fen).not.toBe(firstPuzzleFen);
+    expectSessionMistakes(renderer, 1);
   });
 
   it("uses the Timed out handoff when a board callback reaches the puzzle deadline first", async () => {
@@ -1864,7 +1866,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "mock-chessboard").props.fen).not.toBe(firstPuzzleFen);
   });
 
-  it("automatically marks a Slow correct attempt Unclear without asking again", async () => {
+  it("automatically marks a Slow correct attempt Unclear and explains why", async () => {
     let wallClockMs = Date.parse("2026-07-23T12:00:00.000Z");
     const service = createMobilePracticeService("random1000");
     startSprintWithPuzzleTiming(
@@ -1898,7 +1900,11 @@ describe("PracticePocScreen", () => {
       timingStatus: "slow",
       unclear: true
     });
-    expect(() => findByTestId(renderer, "sprint-unclear-prompt")).toThrow();
+    expect(collectText(findByTestId(renderer, "sprint-unclear-prompt"))).toContain(
+      "Marked unclear because the previous puzzle was slow."
+    );
+    expect(findByTestId(renderer, "sprint-unclear-marked")).toBeTruthy();
+    expect(() => findByTestId(renderer, "sprint-unclear-toggle")).toThrow();
   });
 
   it("ends the sprint without a puzzle timeout overlay when both deadlines are reached together", () => {
@@ -2143,6 +2149,23 @@ describe("PracticePocScreen", () => {
     press(renderer, "history-attention-needs-attention");
     expect(historyFilterSelected(renderer, "history-attention-flag-unclear")).toBe(true);
     expect(historyFilterSelected(renderer, "history-attention-flag-in-review")).toBe(true);
+    expect(() => findByTestId(renderer, "history-attempt-history-clean")).toThrow();
+  });
+
+  it("includes Timed out attempts in the History Wrong filter while preserving their label", async () => {
+    const renderer = renderLabScenario("history-populated");
+    await flushMicrotasks();
+
+    press(renderer, "history-tab");
+    press(renderer, "history-filter-toggle");
+    press(renderer, "history-result-wrong");
+
+    expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
+    expect(findByTestId(renderer, "history-attempt-history-timeout")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "history-attempt-history-timeout-result"))).toBe(
+      "Timed out"
+    );
+    expect(() => findByTestId(renderer, "history-attempt-history-correct")).toThrow();
     expect(() => findByTestId(renderer, "history-attempt-history-clean")).toThrow();
   });
 
@@ -5492,6 +5515,49 @@ describe("PracticePocScreen", () => {
     );
   });
 
+  it("shows a clean correct attempt in Needs attention after manual Review enrollment", () => {
+    const store = new MemoryStore();
+    store.seedPuzzles([sharedHistoryPuzzle()]);
+    store.recordAttempt({
+      id: "clean-manual-review-attempt",
+      source: "sprint",
+      sessionId: "clean-manual-review-session",
+      puzzleId: "shared-history",
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      result: "correct",
+      submittedMove: "e2e4",
+      expectedMove: "e2e4",
+      startedAt: "2026-07-17T11:59:55.000Z",
+      completedAt: "2026-07-17T12:00:00.000Z",
+      ratingBefore: 600
+    });
+    const service = new PracticeService(store);
+    const renderer = renderScreen({
+      currentTimeMs: () => Date.parse("2026-07-17T12:02:00.000Z"),
+      practiceService: service
+    });
+
+    press(renderer, "history-tab");
+    expect(findByTestId(renderer, "history-empty-state")).toBeTruthy();
+    press(renderer, "history-attention-all");
+    expect(findByTestId(renderer, "history-attempt-clean-manual-review-attempt")).toBeTruthy();
+
+    press(renderer, "history-attempt-clean-manual-review-attempt");
+    expect(collectText(findByTestId(renderer, "review-schedule-add"))).toBe("Add to Review");
+    press(renderer, "review-schedule-add");
+    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Due tomorrow");
+    press(renderer, "review-exit");
+
+    press(renderer, "history-attention-needs-attention");
+    expect(findByTestId(renderer, "history-attempt-clean-manual-review-attempt")).toBeTruthy();
+    press(renderer, "history-filter-toggle");
+    press(renderer, "history-attention-flag-unclear");
+    expect(historyFilterSelected(renderer, "history-attention-flag-unclear")).toBe(false);
+    expect(historyFilterSelected(renderer, "history-attention-flag-in-review")).toBe(true);
+    expect(findByTestId(renderer, "history-attempt-clean-manual-review-attempt")).toBeTruthy();
+  });
+
   it("removes a record from Needs attention after both Unclear and Review are cleared", () => {
     const store = new MemoryStore();
     store.seedPuzzles([sharedHistoryPuzzle()]);
@@ -5840,12 +5906,12 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "history-tab");
     press(renderer, "history-attempt-attention-wrong");
-    expectText(renderer, "1 / 2 · Standard");
+    expectText(renderer, "1 / 3 · Standard");
     expect(findByTestId(renderer, "review-next").props.disabled).toBe(false);
 
     press(renderer, "review-exit");
     press(renderer, "history-attempt-attention-slow");
-    expectText(renderer, "2 / 2 · Standard");
+    expectText(renderer, "3 / 3 · Standard");
     expect(findByTestId(renderer, "review-previous").props.disabled).toBe(false);
     expect(findByTestId(renderer, "review-next").props.disabled).toBe(true);
   });
@@ -6316,6 +6382,35 @@ describe("PracticePocScreen", () => {
     expect(collectText(reviewButton)).toContain("Review Mistakes");
     expect(hasStyleEntry(reviewButton, "backgroundColor", "#2563EB")).toBe(true);
     expect(hasStyleEntry(playAgainButton, "backgroundColor", "#2563EB")).toBe(false);
+  });
+
+  it("opens a one-shot mistake review after a timeout-only sprint failure", async () => {
+    const service = createMobilePracticeService("random1000");
+    startSprintWithPuzzleTiming(service, {
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      puzzleTiming: {
+        slowAfterSeconds: null,
+        timeoutAfterSeconds: 10
+      },
+      targetCorrect: 15,
+      maxMistakes: 1
+    });
+    const timedOutPuzzleId = activeSprintForTest(service).currentPuzzle?.puzzle.id;
+    const renderer = renderScreen({ practiceService: service });
+
+    press(renderer, "practice-resume-card");
+    await settleEntryPreview();
+    act(() => {
+      jest.advanceTimersByTime(10_000);
+    });
+
+    expectText(renderer, "Sprint failed");
+    expect(collectText(findByTestId(renderer, "sprint-result-mistakes"))).toBe("1");
+    press(renderer, "review-mistakes-button");
+
+    expect(findByTestId(renderer, "review-session")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "review-current-puzzle-id"))).toBe(timedOutPuzzleId);
   });
 
   it("reviews missed puzzles from the completed sprint using the solving board", async () => {

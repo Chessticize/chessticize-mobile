@@ -1,5 +1,6 @@
 import {
   DEFAULT_RATING_DEVIATION,
+  isAttemptMistake,
   normalizeRatingRecord,
   RATING_FLOOR
 } from "../../core/src/index.ts";
@@ -30,7 +31,7 @@ export function buildPracticeProgressSummary(
     }
     if (attempt.result === "correct") {
       correctThisWeek += 1;
-    } else if (attempt.result === "wrong") {
+    } else if (isAttemptMistake(attempt.result)) {
       wrongThisWeek += 1;
     }
   }

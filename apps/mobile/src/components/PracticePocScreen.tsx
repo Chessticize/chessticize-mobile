@@ -237,7 +237,7 @@ export type SprintRulesDesignPreview = {
   resultUnclearSummary?: SprintResultUnclearSummaryPresentation;
   showRunEditorSummary?: boolean;
   showSettingsReset?: boolean;
-  timeoutAddsToReview?: boolean;
+  timeoutCountsAsMistake?: boolean;
 };
 
 export type CustomThemeSelection = {
@@ -324,6 +324,7 @@ type FeedbackBoardSnapshot = {
 
 type UnclearPromptState = {
   attemptId: string;
+  autoMarkedReason?: "slow";
   marked: boolean;
   puzzleId: string;
   question: string;
@@ -1595,12 +1596,18 @@ export function PracticePocScreen({
       playCommittedMoveFeedback("user", move, submittedFen);
       const nextFeedback = (next.feedback as SessionFeedback) ?? null;
       if (next.attempt) {
-        setUnclearPrompt(isUnclearAttemptEligible(next.attempt) && !next.attempt.unclear
+        const isSlowAutoMarked = next.attempt.timingStatus === "slow" &&
+          next.attempt.unclear === true;
+        setUnclearPrompt(isUnclearAttemptEligible(next.attempt) &&
+          (!next.attempt.unclear || isSlowAutoMarked)
           ? {
               attemptId: next.attempt.id,
-              marked: false,
+              ...(isSlowAutoMarked ? { autoMarkedReason: "slow" as const } : {}),
+              marked: Boolean(next.attempt.unclear),
               puzzleId: next.attempt.puzzleId,
-              question: "Was it clear why the last correct move worked?"
+              question: isSlowAutoMarked
+                ? "Marked unclear because the last puzzle was slow."
+                : "Was it clear why the last correct move worked?"
             }
           : null);
       }
@@ -2747,8 +2754,10 @@ export function PracticePocScreen({
             testID="session-puzzle-timeout-overlay"
           >
             <Text style={styles.puzzleTimeoutOverlayTitle}>Timed out</Text>
-            {sprintRulesDesignPreview?.timeoutAddsToReview === true ? (
-              <Text style={styles.puzzleTimeoutOverlayDetail}>Added to Review · Moving on</Text>
+            {sprintRulesDesignPreview?.timeoutCountsAsMistake === true ? (
+              <Text style={styles.puzzleTimeoutOverlayDetail}>
+                Mistake · Marked Unclear · Moving on
+              </Text>
             ) : null}
           </View>
         ) : null}
@@ -2825,7 +2834,9 @@ export function PracticePocScreen({
     >
       <UnclearAttemptPrompt
         marked={unclearPrompt.marked}
-        question="Was the previous puzzle clear?"
+        question={unclearPrompt.autoMarkedReason === "slow"
+          ? "Marked unclear because the previous puzzle was slow."
+          : "Was the previous puzzle clear?"}
         onToggle={toggleUnclearPrompt}
       />
     </View>
@@ -3096,7 +3107,7 @@ export function PracticePocScreen({
                     presentation={activeRunManagementPresentation}
                     showSprintRulesSummary={sprintRulesDesignPreview?.showRunEditorSummary === true}
                     themeCatalogPresentation={themeCatalogPresentation}
-                    timeoutAddsToReview={sprintRulesDesignPreview?.timeoutAddsToReview === true}
+                    timeoutCountsAsMistake={sprintRulesDesignPreview?.timeoutCountsAsMistake === true}
                   />
                 ) : null}
 
@@ -3954,7 +3965,7 @@ function SprintRulesGuide({
 }): React.JSX.Element {
   return (
     <View
-      accessibilityLabel={`Your first Sprint. Solve ${presentation.targetCorrect} puzzles to pass before ${presentation.durationLabel} ends. The Sprint ends after ${presentation.maxMistakes} mistakes. A Slow warning automatically marks the puzzle as Unclear and does not count as a mistake. A timeout marks the puzzle Timed out and Unclear, adds it to Review, then moves on. For example, solving ${presentation.targetCorrect} puzzles with one wrong answer means ${presentation.targetCorrect} solved and ${presentation.targetCorrect + 1} attempted.`}
+      accessibilityLabel={`Your first Sprint. Solve ${presentation.targetCorrect} puzzles to pass before ${presentation.durationLabel} ends. The Sprint ends after ${presentation.maxMistakes} mistakes. A Slow warning automatically marks the puzzle as Unclear and does not count as a mistake. A timeout marks the puzzle Timed out and Unclear, counts as a mistake, adds it to Review, then moves on. For example, solving ${presentation.targetCorrect} puzzles with one wrong answer means ${presentation.targetCorrect} solved and ${presentation.targetCorrect + 1} attempted.`}
       style={styles.sprintRulesGuide}
       testID="practice-sprint-rules-guide"
     >
@@ -4001,7 +4012,7 @@ function SprintRulesGuide({
         />
         <SprintRuleRow
           badge="TIMEOUT"
-          detail="Marks it Timed out and Unclear, adds it to Review, then moves on."
+          detail="Marks it Timed out and Unclear, counts as a mistake, adds it to Review, then moves on."
           label="Puzzle timeout"
           tone="danger"
         />
@@ -4089,7 +4100,7 @@ function ActiveSessionGuide({
     <View
       accessibilityLabel={isArrowDuel
         ? `Your first Arrow Duel. Step ${unifiedCoachStep} of ${unifiedCoachTotal} freezes the same layout used by the real Arrow Duel. Compare the two arrows, then play the stronger move. Only these two moves count; any other move is ignored. ${timerCopy}`
-        : `Your first active Sprint. This ${unifiedCoachTotal === 5 ? "five" : "four"}-step tour freezes the same layout used by the real Sprint. Solve ${presentation.targetCorrect} puzzles to pass in ${presentation.durationLabel}. Slow and Timed out are automatic timing states, not controls. After the target pace, the puzzle timer turns amber. If you solve after that, the completed attempt is saved as Unclear without adding a mistake. At the time limit, Timed out appears over the board, the attempt is marked Unclear and added to Review, and the Sprint moves to the next puzzle. After a correct puzzle, use Mark as unclear when you did not fully understand the solution. ${timerCopy}`}
+        : `Your first active Sprint. This ${unifiedCoachTotal === 5 ? "five" : "four"}-step tour freezes the same layout used by the real Sprint. Solve ${presentation.targetCorrect} puzzles to pass in ${presentation.durationLabel}. Slow and Timed out are automatic timing states, not controls. After the target pace, the puzzle timer turns amber. If you solve after that, the completed attempt is saved as Unclear without adding a mistake. At the time limit, Timed out appears over the board, the attempt is marked Unclear, counts as a mistake, is added to Review, and the Sprint moves to the next puzzle. After a correct puzzle, use Mark as unclear when you did not fully understand the solution. ${timerCopy}`}
       style={styles.sessionGuideCalibrated}
       testID={isArrowDuel ? "practice-arrow-duel-guide" : "practice-active-session-guide"}
     >
@@ -4274,7 +4285,7 @@ function SessionCoachmarkDemo({
     : coachStep === 2
         ? {
             badge: "STEP 3 · TIMED OUT · AUTOMATIC",
-            detail: "The attempt is marked Unclear, added to Review, and the Sprint moves to the next puzzle.",
+            detail: "The attempt is marked Unclear, counts as a mistake, is added to Review, and the Sprint moves to the next puzzle.",
             id: "timeout",
             title: "Timed out appears over the board automatically at the time limit.",
             tone: "danger" as const
@@ -4525,7 +4536,9 @@ function SessionCoachmarkDemo({
                 testID="practice-session-guide-timeout-overlay"
               >
                 <Text style={styles.puzzleTimeoutOverlayTitle}>Timed out</Text>
-                <Text style={styles.puzzleTimeoutOverlayDetail}>Added to Review · Moving on</Text>
+                <Text style={styles.puzzleTimeoutOverlayDetail}>
+                  Mistake · Marked Unclear · Moving on
+                </Text>
               </View>
             ) : null}
           </View>
@@ -5186,12 +5199,12 @@ function PracticeRunEditor({
   presentation,
   showSprintRulesSummary,
   themeCatalogPresentation,
-  timeoutAddsToReview
+  timeoutCountsAsMistake
 }: {
   presentation: PracticeRunManagementPresentation;
   showSprintRulesSummary: boolean;
   themeCatalogPresentation?: ThemeCatalogPresentation;
-  timeoutAddsToReview: boolean;
+  timeoutCountsAsMistake: boolean;
 }): React.JSX.Element | null {
   const draft = presentation.draft;
   if (!draft) {
@@ -5407,7 +5420,7 @@ function PracticeRunEditor({
         <PracticeRunTimingSettings
           perPuzzleSeconds={draft.perPuzzleSeconds}
           puzzleTiming={draft.puzzleTiming}
-          timeoutAddsToReview={timeoutAddsToReview}
+          timeoutCountsAsMistake={timeoutCountsAsMistake}
           onChange={(puzzleTiming) => presentation.onIntent({
             type: "change-puzzle-timing",
             puzzleTiming
@@ -5471,7 +5484,7 @@ function PracticeRunTimingSettings({
   onChange,
   perPuzzleSeconds,
   puzzleTiming,
-  timeoutAddsToReview
+  timeoutCountsAsMistake
 }: {
   onChange: (puzzleTiming: {
     slowAfterSeconds: number | null;
@@ -5482,7 +5495,7 @@ function PracticeRunTimingSettings({
     slowAfterSeconds: number | null;
     timeoutAfterSeconds: number | null;
   } | undefined;
-  timeoutAddsToReview: boolean;
+  timeoutCountsAsMistake: boolean;
 }): React.JSX.Element {
   const editor = puzzleTimingEditorState(puzzleTiming, perPuzzleSeconds);
   const currentTiming = editor.policy;
@@ -5520,8 +5533,8 @@ function PracticeRunTimingSettings({
           ))}
         />
         <RunTimingSettingRow
-          detail={timeoutAddsToReview
-            ? "Marks it Timed out and Unclear, adds it to Review, and moves on."
+          detail={timeoutCountsAsMistake
+            ? "Marks it Timed out and Unclear, counts as a mistake, adds it to Review, and moves on."
             : "Marks Timed out and moves on."}
           enabled={timeoutEnabled}
           label="Puzzle timeout"

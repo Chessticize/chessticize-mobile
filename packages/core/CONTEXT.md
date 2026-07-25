@@ -21,5 +21,9 @@ An explicit user decision to create a Review Schedule for one Review Context wit
 _Avoid_: Fake mistake, Automatic Review enrollment
 
 **Unclear Attempt**:
-A specific completed attempt that the user marked as not understood. It remains distinct from other attempts for the same Review Context, is cleared only explicitly or by Manual Review Enrollment initiated from that attempt, and is not restored by later Review Schedule Removal.
+A specific completed attempt whose explanation needs attention. It may be
+marked explicitly by the user or automatically by a qualifying timing rule. It
+remains distinct from other attempts for the same Review Context, is cleared
+only explicitly or by Manual Review Enrollment initiated from that attempt,
+and is not restored by later Review Schedule Removal.
 _Avoid_: Unclear puzzle, Review candidate

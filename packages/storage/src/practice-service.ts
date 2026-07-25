@@ -11,6 +11,7 @@ import {
   createDefaultRating,
   DEFAULT_RATING_DEVIATION,
   DEFAULT_VOLATILITY,
+  isAttemptMistake,
   normalizeThemeSelection,
   practiceRunSprintConfig,
   renamePracticeRun,
@@ -191,10 +192,7 @@ export class PracticeService {
 
     this.store.transaction(() => {
       if (attemptToReturn) {
-        this.store.recordAttempt(attemptToReturn);
-        if (attemptToReturn.result === "wrong") {
-          this.store.scheduleMistakeReview(reviewContextFromAttempt(attemptToReturn), attemptToReturn.completedAt);
-        }
+        this.recordSprintAttempt(attemptToReturn);
       }
 
       if (!isOpenSprint(result.state)) {
@@ -236,7 +234,7 @@ export class PracticeService {
     const result = advanceSprintTimeCore(this.activeSprint, now);
     this.store.transaction(() => {
       if (result.attempt) {
-        this.store.recordAttempt(result.attempt);
+        this.recordSprintAttempt(result.attempt);
       }
       if (isOpenSprint(result.state)) {
         if (result.attempt) {
@@ -272,7 +270,7 @@ export class PracticeService {
     const result = pauseSprintCore(this.activeSprint, now);
     this.store.transaction(() => {
       if (result.attempt) {
-        this.store.recordAttempt(result.attempt);
+        this.recordSprintAttempt(result.attempt);
       }
       if (isOpenSprint(result.state)) {
         this.store.updateSprintSession(result.state);
@@ -647,6 +645,13 @@ export class PracticeService {
 
   recordReviewResult(context: ReviewContext, result: AttemptResult, now = new Date().toISOString()): ReviewQueueState {
     return this.store.recordReviewResult(context, result, now);
+  }
+
+  private recordSprintAttempt(attempt: AttemptEvent): void {
+    this.store.recordAttempt(attempt);
+    if (isAttemptMistake(attempt.result)) {
+      this.store.scheduleMistakeReview(reviewContextFromAttempt(attempt), attempt.completedAt);
+    }
   }
 
   loadFixturePuzzles(puzzles: Puzzle[]): void {
