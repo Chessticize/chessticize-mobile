@@ -13975,7 +13975,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10
   },
   sessionGuideCoachBackButtonRail: {
-    minHeight: 36,
+    minHeight: 44,
     minWidth: 64,
     paddingHorizontal: 8
   },
@@ -14008,7 +14008,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12
   },
   sessionGuideCoachNextButtonRail: {
-    minHeight: 36,
+    minHeight: 44,
     minWidth: 92,
     paddingHorizontal: 8
   },

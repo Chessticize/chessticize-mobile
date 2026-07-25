@@ -1527,6 +1527,18 @@ describe("PracticePocScreen", () => {
     expect(
       flattenTestStyle(findByTestId(
         landscape,
+        "practice-session-guide-back"
+      ).props.style).minHeight
+    ).toBeGreaterThanOrEqual(44);
+    expect(
+      flattenTestStyle(findByTestId(
+        landscape,
+        "practice-session-guide-start"
+      ).props.style).minHeight
+    ).toBeGreaterThanOrEqual(44);
+    expect(
+      flattenTestStyle(findByTestId(
+        landscape,
         "practice-session-guide-demo-unclear"
       ).props.style).marginBottom
     ).toBeGreaterThanOrEqual(64);
