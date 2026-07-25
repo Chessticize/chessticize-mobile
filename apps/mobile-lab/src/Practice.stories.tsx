@@ -189,22 +189,32 @@ export const ActiveSessionGuide: Story = {
 };
 
 export const ArrowDuelGuide: Story = {
-  name: "Arrow Duel · first-ever entry (both guides)",
+  name: "Arrow Duel · step 5 after shared guide",
   args: { scenarioId: "practice-arrow-duel-guide" },
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "practice-active-session-guide");
-    await waitForText(canvasElement, "GUIDE 1 OF 2 · YOUR FIRST ACTIVE SPRINT");
-    expectTestIdAbsent(canvasElement, "practice-arrow-duel-guide");
+    await waitForText(canvasElement, "1 of 5");
+    for (let index = 0; index < 4; index += 1) {
+      await clickTestId(canvasElement, "practice-session-guide-start");
+    }
+    await waitForTestId(canvasElement, "practice-arrow-duel-guide");
+    await waitForTestId(canvasElement, "practice-arrow-duel-guide-timing-demo");
+    await waitForTestId(canvasElement, "practice-arrow-duel-guide-demo-board");
+    await waitForTestId(canvasElement, "practice-arrow-duel-guide-candidates");
+    await waitForText(canvasElement, "5 of 5");
     expectTestIdAbsent(canvasElement, "session-board");
   }
 };
 
 export const ArrowDuelGuideOnly: Story = {
-  name: "Arrow Duel · guide only (Sprint guide seen)",
+  name: "Arrow Duel · single first-use step",
   args: { scenarioId: "practice-arrow-duel-guide-only" },
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "practice-arrow-duel-guide");
+    await waitForTestId(canvasElement, "practice-arrow-duel-guide-timing-demo");
+    await waitForTestId(canvasElement, "practice-arrow-duel-guide-demo-board");
     await waitForTestId(canvasElement, "practice-arrow-duel-guide-candidates");
+    await waitForText(canvasElement, "1 of 1");
     expectTestIdAbsent(canvasElement, "practice-active-session-guide");
     expectTestIdAbsent(canvasElement, "session-board");
   }

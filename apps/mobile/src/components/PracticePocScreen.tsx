@@ -576,6 +576,7 @@ export function PracticePocScreen({
   const [sessionGuideIndex, setSessionGuideIndex] = useState<number | null>(
     () => sprintRulesDesignPreview?.initialSessionGuides?.length ? 0 : null
   );
+  const [sessionGuideCoachStep, setSessionGuideCoachStep] = useState(0);
   const [historyFiltersExpanded, setHistoryFiltersExpanded] = useState(false);
   const [reviewFiltersExpanded, setReviewFiltersExpanded] = useState(false);
   const [settingsAdvancedRatingsOpen, setSettingsAdvancedRatingsOpen] = useState(false);
@@ -2955,17 +2956,38 @@ export function PracticePocScreen({
                   <ActiveSessionGuide
                     adaptiveLayout={adaptiveLayout}
                     boardSize={boardSize}
+                    coachStep={sessionGuideCoachStep}
                     presentation={sessionGuidePresentation}
                     stepNumber={sessionGuideIndex + 1}
                     totalSteps={sessionGuidePresentations.length}
+                    onBack={() => {
+                      if (sessionGuideCoachStep > 0) {
+                        setSessionGuideCoachStep((current) => Math.max(current - 1, 0));
+                        return;
+                      }
+                      const previousIndex = sessionGuideIndex - 1;
+                      if (previousIndex >= 0 && sessionGuidePresentations[previousIndex]) {
+                        setSessionGuideIndex(previousIndex);
+                        setSessionGuideCoachStep(3);
+                      }
+                    }}
                     onContinue={() => {
+                      if (
+                        sessionGuidePresentation.mode === "standard"
+                        && sessionGuideCoachStep < 3
+                      ) {
+                        setSessionGuideCoachStep((current) => Math.min(current + 1, 3));
+                        return;
+                      }
                       const nextIndex = sessionGuideIndex + 1;
                       if (sessionGuidePresentations[nextIndex]) {
                         setSessionGuideIndex(nextIndex);
+                        setSessionGuideCoachStep(0);
                         return;
                       }
 
                       setSessionGuideIndex(null);
+                      setSessionGuideCoachStep(0);
                       startSprint(sessionGuidePresentation.mode);
                     }}
                   />
@@ -4029,6 +4051,8 @@ function SprintRuleRow({
 function ActiveSessionGuide({
   adaptiveLayout,
   boardSize,
+  coachStep,
+  onBack,
   onContinue,
   presentation,
   stepNumber,
@@ -4036,135 +4060,88 @@ function ActiveSessionGuide({
 }: {
   adaptiveLayout: AdaptiveLayout;
   boardSize: number;
+  coachStep: number;
+  onBack: () => void;
   onContinue: () => void;
   presentation: SprintSessionGuidePresentation;
   stepNumber: number;
   totalSteps: number;
 }): React.JSX.Element {
-  const [coachStep, setCoachStep] = useState(0);
   const isArrowDuel = presentation.mode === "arrow_duel";
   const hasNextGuide = stepNumber < totalSteps;
-  const title = isArrowDuel ? "How Arrow Duel works" : "Know what happens while you solve";
-  const finalLabel = hasNextGuide
-    ? "Next: Arrow Duel"
+  const unifiedCoachTotal = totalSteps > 1 ? 5 : isArrowDuel ? 1 : 4;
+  const unifiedCoachStep = isArrowDuel && totalSteps > 1
+    ? 5
+    : isArrowDuel
+      ? 1
+      : coachStep + 1;
+  const hasPreviousCoachStep = coachStep > 0 || stepNumber > 1;
+  const continueLabel = !isArrowDuel && (coachStep < 3 || hasNextGuide)
+    ? "Next"
     : isArrowDuel
       ? "Start Arrow Duel"
       : "Start Sprint";
-  const continueLabel = !isArrowDuel && coachStep < 3 ? "Next" : finalLabel;
-  const timerCopy = totalSteps > 1 && stepNumber === 1
-    ? "Your timer starts after both guides."
+  const timerCopy = totalSteps > 1
+    ? "Your timer starts after this five-step tour."
     : "Your timer starts after this guide.";
-  const stepCopy = totalSteps > 1 ? `GUIDE ${stepNumber} OF ${totalSteps} · ` : "";
-  const accessibilityStepCopy = totalSteps > 1 ? `Guide ${stepNumber} of ${totalSteps}. ` : "";
 
   return (
     <View
       accessibilityLabel={isArrowDuel
-        ? `${accessibilityStepCopy}Your first Arrow Duel. Compare the two candidate arrows, then play the stronger move. Only the shown candidates count. ${timerCopy}`
-        : `${accessibilityStepCopy}Your first active Sprint. This four-step tour freezes the same layout used by the real Sprint. Solve ${presentation.targetCorrect} puzzles to pass in ${presentation.durationLabel}. Slow and Timed out are automatic timing states, not controls. After the target pace, the puzzle timer turns amber. If you solve after that, the completed attempt is saved as Unclear without adding a mistake. At the time limit, Timed out appears over the board, the attempt is marked Unclear and added to Review, and the Sprint moves to the next puzzle. After a correct puzzle, use Mark as unclear when you did not fully understand the solution. ${timerCopy}`}
-      style={isArrowDuel ? styles.sessionGuide : styles.sessionGuideCalibrated}
+        ? `Your first Arrow Duel. Step ${unifiedCoachStep} of ${unifiedCoachTotal} freezes the same layout used by the real Arrow Duel. Compare the two arrows, then play the stronger move. Only these two moves count; any other move is ignored. ${timerCopy}`
+        : `Your first active Sprint. This ${unifiedCoachTotal === 5 ? "five" : "four"}-step tour freezes the same layout used by the real Sprint. Solve ${presentation.targetCorrect} puzzles to pass in ${presentation.durationLabel}. Slow and Timed out are automatic timing states, not controls. After the target pace, the puzzle timer turns amber. If you solve after that, the completed attempt is saved as Unclear without adding a mistake. At the time limit, Timed out appears over the board, the attempt is marked Unclear and added to Review, and the Sprint moves to the next puzzle. After a correct puzzle, use Mark as unclear when you did not fully understand the solution. ${timerCopy}`}
+      style={styles.sessionGuideCalibrated}
       testID={isArrowDuel ? "practice-arrow-duel-guide" : "practice-active-session-guide"}
     >
-      {isArrowDuel ? (
-        <>
-          <View style={styles.sessionGuideHeader}>
-            <Text style={styles.sessionGuideEyebrow} testID="practice-session-guide-progress">
-              {stepCopy}YOUR FIRST ARROW DUEL
-            </Text>
-            <Text style={styles.sessionGuideTitle}>{title}</Text>
-            <Text style={styles.sessionGuideIntro}>{timerCopy}</Text>
-          </View>
-          <View
-            accessibilityLabel="Two candidate move illustration, no puzzle position shown"
-            style={styles.arrowDuelGuideCandidates}
-            testID="practice-arrow-duel-guide-candidates"
-          >
-            <View style={styles.arrowDuelGuideCandidate}>
-              <Text style={styles.arrowDuelGuideCandidateLabel}>CANDIDATE A</Text>
-              <Text style={styles.arrowDuelGuideArrow}>↗</Text>
-            </View>
-            <Text style={styles.arrowDuelGuideVersus}>OR</Text>
-            <View style={styles.arrowDuelGuideCandidate}>
-              <Text style={styles.arrowDuelGuideCandidateLabel}>CANDIDATE B</Text>
-              <Text style={styles.arrowDuelGuideArrow}>↖</Text>
-            </View>
-          </View>
-          <View style={styles.sessionGuideInfoCard}>
-            <Text style={styles.sessionGuideInfoTitle}>Compare both arrows</Text>
-            <Text style={styles.sessionGuideInfoText}>
-              Play the stronger move on the board. Only the two shown candidates count; other moves are ignored.
-            </Text>
-          </View>
-        </>
-      ) : (
-        <>
-          <Text
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-            style={FABRIC_SAFE_HIDDEN_TEXT_STYLE}
-            testID="practice-session-guide-progress"
-          >
-            {stepCopy}YOUR FIRST ACTIVE SPRINT
-          </Text>
-          <SessionCoachmarkDemo
-            adaptiveLayout={adaptiveLayout}
-            boardSize={boardSize}
-            coachStep={coachStep}
-            presentation={presentation}
-            timerCopy={timerCopy}
-          />
-        </>
-      )}
+      <Text
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+        style={FABRIC_SAFE_HIDDEN_TEXT_STYLE}
+        testID="practice-session-guide-progress"
+      >
+        STEP {unifiedCoachStep} OF {unifiedCoachTotal} · YOUR FIRST {isArrowDuel ? "ARROW DUEL" : "ACTIVE SPRINT"}
+      </Text>
+      <SessionCoachmarkDemo
+        adaptiveLayout={adaptiveLayout}
+        boardSize={boardSize}
+        coachStep={coachStep}
+        guideStepNumber={unifiedCoachStep}
+        mode={presentation.mode}
+        presentation={presentation}
+        timerCopy={timerCopy}
+      />
 
-      {isArrowDuel ? (
+      <View style={styles.sessionGuideCoachNavigation}>
+        {hasPreviousCoachStep ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Previous guide step"
+            style={styles.sessionGuideCoachBackButton}
+            testID="practice-session-guide-back"
+            onPress={onBack}
+          >
+            <Text style={styles.sessionGuideCoachBackText}>Back</Text>
+          </Pressable>
+        ) : (
+          <View style={styles.sessionGuideCoachBackSpacer} />
+        )}
+        <Text
+          accessibilityLabel={`Step ${unifiedCoachStep} of ${unifiedCoachTotal}`}
+          style={styles.sessionGuideCoachProgress}
+          testID="practice-session-guide-coach-progress"
+        >
+          {unifiedCoachStep} of {unifiedCoachTotal}
+        </Text>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={continueLabel}
-          style={styles.sessionGuideStartButton}
-          testID="practice-arrow-duel-guide-start"
+          style={styles.sessionGuideCoachNextButton}
+          testID="practice-session-guide-start"
           onPress={onContinue}
         >
           <Text style={styles.sessionGuideStartButtonText}>{continueLabel}</Text>
         </Pressable>
-      ) : (
-        <View style={styles.sessionGuideCoachNavigation}>
-          {coachStep > 0 ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Previous guide step"
-              style={styles.sessionGuideCoachBackButton}
-              testID="practice-session-guide-back"
-              onPress={() => setCoachStep((current) => Math.max(current - 1, 0))}
-            >
-              <Text style={styles.sessionGuideCoachBackText}>Back</Text>
-            </Pressable>
-          ) : (
-            <View style={styles.sessionGuideCoachBackSpacer} />
-          )}
-          <Text
-            accessibilityLabel={`Step ${coachStep + 1} of 4`}
-            style={styles.sessionGuideCoachProgress}
-            testID="practice-session-guide-coach-progress"
-          >
-            {coachStep + 1} of 4
-          </Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={continueLabel}
-            style={styles.sessionGuideCoachNextButton}
-            testID="practice-session-guide-start"
-            onPress={() => {
-              if (coachStep < 3) {
-                setCoachStep((current) => Math.min(current + 1, 3));
-                return;
-              }
-              onContinue();
-            }}
-          >
-            <Text style={styles.sessionGuideStartButtonText}>{continueLabel}</Text>
-          </Pressable>
-        </View>
-      )}
+      </View>
     </View>
   );
 }
@@ -4194,48 +4171,91 @@ const SESSION_GUIDE_DEMO_CURRENT_PUZZLE: CurrentPuzzleState = {
   },
   solved: false
 };
+const ARROW_DUEL_GUIDE_DEMO_CURRENT_PUZZLE: CurrentPuzzleState = {
+  candidates: ["g6g7", "g6e6"],
+  correctMove: "g6g7",
+  currentFen: SESSION_GUIDE_DEMO_FEN,
+  kind: "arrow_duel",
+  puzzle: {
+    id: "arrow-duel-guide-qg7-mate",
+    initialFen: SESSION_GUIDE_DEMO_FEN,
+    rating: 800,
+    solutionMoves: ["g6e6"],
+    source: "synthetic",
+    stockfishBestMove: "g6g7",
+    stockfishEval: 900,
+    stockfishEvalAfterFirstMove: 120,
+    themes: ["mateIn1"]
+  },
+  solved: false,
+  wrongMove: "g6e6"
+};
 
 function SessionCoachmarkDemo({
   adaptiveLayout,
   boardSize,
   coachStep,
+  guideStepNumber,
+  mode,
   presentation,
   timerCopy
 }: {
   adaptiveLayout: AdaptiveLayout;
   boardSize: number;
   coachStep: number;
+  guideStepNumber: number;
+  mode: "standard" | "arrow_duel";
   presentation: SprintSessionGuidePresentation;
   timerCopy: string;
 }): React.JSX.Element {
+  const isArrowDuel = mode === "arrow_duel";
   const boardSquareSize = boardSize / 8;
+  const currentPuzzle = isArrowDuel
+    ? ARROW_DUEL_GUIDE_DEMO_CURRENT_PUZZLE
+    : SESSION_GUIDE_DEMO_CURRENT_PUZZLE;
   const guideState: SprintState = {
     bestStreak: 0,
     config: {
-      ...defaultSprintConfig("standard"),
+      ...defaultSprintConfig(mode),
       maxMistakes: presentation.maxMistakes,
       targetCorrect: presentation.targetCorrect
     },
     correctCount: 0,
-    currentPuzzle: SESSION_GUIDE_DEMO_CURRENT_PUZZLE,
+    currentPuzzle,
     currentPuzzleIndex: 0,
     currentStreak: 0,
     deadlineAt: "2026-01-01T00:05:00.000Z",
     hasUserSubmittedMove: false,
     id: "session-guide-demo",
     mistakeCount: 0,
-    puzzles: [SESSION_GUIDE_DEMO_CURRENT_PUZZLE.puzzle],
+    puzzles: [currentPuzzle.puzzle],
     ratingBefore: RATING_FLOOR,
     startedAt: "2026-01-01T00:00:00.000Z",
     status: "active"
   };
-  const timingPhase: SessionTimingState["phase"] = coachStep === 1
+  const timingPhase: SessionTimingState["phase"] = !isArrowDuel && coachStep === 1
     ? "slow"
-    : coachStep === 2
+    : !isArrowDuel && coachStep === 2
       ? "timed_out"
       : "normal";
-  const elapsedSeconds = coachStep === 1 ? 40 : coachStep === 2 ? 60 : coachStep === 3 ? 24 : 0;
-  const callout = coachStep === 0
+  const elapsedSeconds = isArrowDuel
+    ? 12
+    : coachStep === 1
+      ? 40
+      : coachStep === 2
+        ? 60
+        : coachStep === 3
+          ? 24
+          : 0;
+  const callout = isArrowDuel
+    ? {
+        badge: `STEP ${guideStepNumber} · ARROW DUEL`,
+        detail: "Play the stronger move on the board. Only these two moves count; any other move is ignored.",
+        id: "arrow-duel",
+        title: "Compare the two arrows",
+        tone: "info" as const
+      }
+    : coachStep === 0
     ? {
         badge: "STEP 1 · SESSION AT A GLANCE",
         detail: `Solved tracks progress toward ${presentation.targetCorrect}. The center clock shows the whole ${presentation.durationLabel} Sprint. The Sprint ends after ${presentation.maxMistakes} mistakes. ${timerCopy}`,
@@ -4269,7 +4289,9 @@ function SessionCoachmarkDemo({
   const calloutPlacement = adaptiveLayout.usesSessionRail
     ? {
         left: boardSize + adaptiveLayout.sessionRailGap,
-        top: coachStep === 0
+        top: isArrowDuel
+          ? 92
+          : coachStep === 0
           ? 72
           : coachStep === 1
             ? 154
@@ -4281,13 +4303,15 @@ function SessionCoachmarkDemo({
     : {
         left: 0,
         right: 0,
-        top: coachStep === 0 || coachStep === 2
+        top: isArrowDuel
+          ? boardSize + 60
+          : coachStep === 0 || coachStep === 2
           ? 113
           : boardSize + (coachStep === 1 ? 71 : 60)
       };
-  const coachPointer = adaptiveLayout.usesSessionRail && coachStep === 2
+  const coachPointer = adaptiveLayout.usesSessionRail && (isArrowDuel || coachStep === 2)
     ? "←"
-    : coachStep === 0
+    : isArrowDuel || coachStep === 0
       ? "↑"
       : "↓";
   const calloutNode = (
@@ -4298,7 +4322,9 @@ function SessionCoachmarkDemo({
         callout.tone === "danger" ? styles.sessionGuideCoachCalloutDanger : null,
         calloutPlacement
       ]}
-      testID={`practice-session-guide-coach-${callout.id}`}
+      testID={isArrowDuel
+        ? "practice-arrow-duel-guide-coach"
+        : `practice-session-guide-coach-${callout.id}`}
     >
       <Text
         accessibilityElementsHidden
@@ -4326,22 +4352,24 @@ function SessionCoachmarkDemo({
 
   return (
     <View
-      accessibilityLabel={`Frozen copy of the real Sprint screen with a non-interactive example puzzle. Step ${coachStep + 1} of 4. ${callout.title} ${callout.detail}`}
+      accessibilityLabel={`Frozen copy of the real ${isArrowDuel ? "Arrow Duel" : "Sprint"} screen with a non-interactive example puzzle. Step ${guideStepNumber}. ${callout.title} ${callout.detail}`}
       style={styles.sessionGuideCoachFrame}
-      testID="practice-session-guide-timing-demo"
+      testID={isArrowDuel
+        ? "practice-arrow-duel-guide-timing-demo"
+        : "practice-session-guide-timing-demo"}
     >
       {!adaptiveLayout.usesSessionRail ? (
         <>
           <View
             style={[
               styles.sessionGuideCoachLayer,
-              coachStep === 0 ? styles.sessionGuideCoachTarget : null
+              !isArrowDuel && coachStep === 0 ? styles.sessionGuideCoachTarget : null
             ]}
             testID="practice-session-guide-metrics"
           >
             <SessionStatusBar
               confirmAbandon={false}
-              mode="standard"
+              mode={mode}
               state={guideState}
               timerText={presentation.durationLabel}
               onAbandon={() => undefined}
@@ -4351,9 +4379,9 @@ function SessionCoachmarkDemo({
           </View>
           <View style={[styles.practicePromptStack, { width: boardSize }]}>
             <PracticePrompt
-              currentPuzzle={SESSION_GUIDE_DEMO_CURRENT_PUZZLE}
+              currentPuzzle={currentPuzzle}
               kingPieceSize={kingGlyphSizeForBoard(boardSize)}
-              mode="standard"
+              mode={mode}
             />
           </View>
         </>
@@ -4381,16 +4409,20 @@ function SessionCoachmarkDemo({
         >
           <View
             accessible
-            accessibilityLabel="Fixed example chess puzzle, White to move, not interactive"
+            accessibilityLabel={isArrowDuel
+              ? "Fixed example Arrow Duel puzzle, White to move, two candidate arrows, not interactive"
+              : "Fixed example chess puzzle, White to move, not interactive"}
             accessibilityRole="image"
             style={[
               styles.boardSurface,
               styles.sessionGuideCoachBoardSurface,
               styles.sessionGuideCoachLayer,
-              coachStep === 2 ? styles.sessionGuideCoachTarget : null,
+              isArrowDuel || coachStep === 2 ? styles.sessionGuideCoachTarget : null,
               { height: boardSize, width: boardSize }
             ]}
-            testID="practice-session-guide-demo-board"
+            testID={isArrowDuel
+              ? "practice-arrow-duel-guide-demo-board"
+              : "practice-session-guide-demo-board"}
           >
             <View
               style={[
@@ -4450,7 +4482,15 @@ function SessionCoachmarkDemo({
               flipped={false}
             />
             <BoardInputBlocker />
-            {coachStep === 2 ? (
+            {isArrowDuel && currentPuzzle.kind === "arrow_duel" ? (
+              <ArrowCandidateOverlay
+                boardSize={boardSize}
+                candidates={currentPuzzle.candidates}
+                flipped={false}
+                testID="practice-arrow-duel-guide-candidates"
+              />
+            ) : null}
+            {!isArrowDuel && coachStep === 2 ? (
               <View
                 accessibilityRole="alert"
                 style={styles.puzzleTimeoutOverlay}
@@ -4470,9 +4510,11 @@ function SessionCoachmarkDemo({
                 style={[
                   styles.sessionGuideCoachTimerTarget,
                   styles.sessionGuideCoachLayer,
-                  coachStep === 1 ? styles.sessionGuideCoachTarget : null
+                  !isArrowDuel && coachStep === 1 ? styles.sessionGuideCoachTarget : null
                 ]}
-                testID="practice-session-guide-demo-timer"
+                testID={isArrowDuel
+                  ? "practice-arrow-duel-guide-demo-timer"
+                  : "practice-session-guide-demo-timer"}
               >
                 <PuzzleTimingIndicator
                   elapsedSeconds={elapsedSeconds}
@@ -4485,7 +4527,7 @@ function SessionCoachmarkDemo({
           ) : null}
         </View>
 
-        {!adaptiveLayout.usesSessionRail && coachStep === 3 ? (
+        {!isArrowDuel && !adaptiveLayout.usesSessionRail && coachStep === 3 ? (
           <View
             style={[
               styles.activeSessionBottomFeedback,
@@ -4534,14 +4576,14 @@ function SessionCoachmarkDemo({
               <View
                 style={[
                   styles.sessionGuideCoachLayer,
-                  coachStep === 0 ? styles.sessionGuideCoachTarget : null
+                  !isArrowDuel && coachStep === 0 ? styles.sessionGuideCoachTarget : null
                 ]}
                 testID="practice-session-guide-metrics"
               >
                 <SessionStatusBar
                   compactMetrics
                   confirmAbandon={false}
-                  mode="standard"
+                  mode={mode}
                   state={guideState}
                   timerText={presentation.durationLabel}
                   onAbandon={() => undefined}
@@ -4551,18 +4593,20 @@ function SessionCoachmarkDemo({
               </View>
               <View style={[styles.practicePromptStack, { width: adaptiveLayout.sessionRailWidth }]}>
                 <PracticePrompt
-                  currentPuzzle={SESSION_GUIDE_DEMO_CURRENT_PUZZLE}
+                  currentPuzzle={currentPuzzle}
                   kingPieceSize={kingGlyphSizeForBoard(boardSize)}
-                  mode="standard"
+                  mode={mode}
                 />
               </View>
               <View
                 style={[
                   styles.sessionGuideCoachTimerTarget,
                   styles.sessionGuideCoachLayer,
-                  coachStep === 1 ? styles.sessionGuideCoachTarget : null
+                  !isArrowDuel && coachStep === 1 ? styles.sessionGuideCoachTarget : null
                 ]}
-                testID="practice-session-guide-demo-timer"
+                testID={isArrowDuel
+                  ? "practice-arrow-duel-guide-demo-timer"
+                  : "practice-session-guide-demo-timer"}
               >
                 <PuzzleTimingIndicator
                   elapsedSeconds={elapsedSeconds}
@@ -4571,7 +4615,7 @@ function SessionCoachmarkDemo({
                 />
               </View>
               <SessionScoreStrip state={guideState} />
-              {coachStep === 3 ? (
+              {!isArrowDuel && coachStep === 3 ? (
                 <View
                   style={[
                     styles.activeSessionBottomFeedback,
@@ -13493,41 +13537,10 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     paddingTop: 10
   },
-  sessionGuide: {
-    alignSelf: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#DBEAFE",
-    borderRadius: 16,
-    borderWidth: 1,
-    gap: 14,
-    maxWidth: 520,
-    padding: 16,
-    width: "100%"
-  },
   sessionGuideCalibrated: {
     alignSelf: "center",
     gap: 12,
     width: "100%"
-  },
-  sessionGuideHeader: {
-    gap: 4
-  },
-  sessionGuideEyebrow: {
-    color: "#1D4ED8",
-    fontSize: 10,
-    fontWeight: "900",
-    letterSpacing: 0.8
-  },
-  sessionGuideTitle: {
-    color: "#111827",
-    fontSize: 21,
-    fontWeight: "900",
-    lineHeight: 27
-  },
-  sessionGuideIntro: {
-    color: "#475569",
-    fontSize: 12,
-    lineHeight: 17
   },
   sessionGuideCoachFrame: {
     alignSelf: "center",
@@ -13683,14 +13696,6 @@ const styles = StyleSheet.create({
     minWidth: 96,
     paddingHorizontal: 12
   },
-  sessionGuideInfoCard: {
-    backgroundColor: "#EFF6FF",
-    borderColor: "#BFDBFE",
-    borderRadius: 10,
-    borderWidth: 1,
-    gap: 3,
-    padding: 12
-  },
   sessionGuideInfoTitle: {
     color: "#111827",
     fontSize: 13,
@@ -13701,51 +13706,9 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 16
   },
-  sessionGuideStartButton: {
-    alignItems: "center",
-    backgroundColor: "#2563EB",
-    borderRadius: 10,
-    justifyContent: "center",
-    minHeight: 48,
-    paddingHorizontal: 16
-  },
   sessionGuideStartButtonText: {
     color: "#FFFFFF",
     fontSize: 14,
-    fontWeight: "900"
-  },
-  arrowDuelGuideCandidates: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 9
-  },
-  arrowDuelGuideCandidate: {
-    alignItems: "center",
-    backgroundColor: "#EFF6FF",
-    borderColor: "#93C5FD",
-    borderRadius: 12,
-    borderWidth: 1,
-    flex: 1,
-    gap: 4,
-    justifyContent: "center",
-    minHeight: 112,
-    padding: 12
-  },
-  arrowDuelGuideCandidateLabel: {
-    color: "#1D4ED8",
-    fontSize: 9,
-    fontWeight: "900",
-    letterSpacing: 0.5
-  },
-  arrowDuelGuideArrow: {
-    color: "#2563EB",
-    fontSize: 42,
-    fontWeight: "700",
-    lineHeight: 48
-  },
-  arrowDuelGuideVersus: {
-    color: "#64748B",
-    fontSize: 10,
     fontWeight: "900"
   },
   primaryCompactButton: {
