@@ -83,7 +83,7 @@ describe("App Store assets document", () => {
     expect(storeAssetsE2e).toContain("by.id('practice-run-theme-row')");
     expect(storeAssetsE2e).not.toContain("by.id('custom-theme-row')");
     expect(storeAssetsE2e).toContain("toHaveText('1 / 3')");
-    expect(storeAssetsE2e).toContain("by.text('1-3 of 3')");
+    expect(storeAssetsE2e).toContain("by.text('1-4 of 4')");
     expect(storeAssetsE2e).toContain("app-store-01-practice-tab");
     expect(storeAssetsE2e).toContain("app-store-06-arrow-duel");
     expect(storeAssetsE2e).toContain("app-store-07-custom-setup");
@@ -95,8 +95,9 @@ describe("App Store assets document", () => {
     expect(storeAssetsE2e).toContain("takePortraitScreenshotAtTop('app-store-05-standard-sprint')");
     expect(storeAssetsE2e).toContain("takePortraitScreenshotAtTop('app-store-06-arrow-duel')");
     expect(storeAssetsE2e).toContain("takePortraitScreenshotAtTop('app-store-08-review-session')");
-    expect(storeAssetsE2e).toContain("device.setOrientation('landscape')");
-    expect(storeAssetsE2e).toContain("device.setOrientation('portrait')");
+    expect(storeAssetsE2e).toContain("device.setOrientation(orientation)");
+    expect(storeAssetsE2e).toContain("frameFor(element(by.id('adaptive-layout')))");
+    expect(storeAssetsE2e).toContain("Timed out waiting for ${orientation} store-asset layout");
     expect(storeAssetsE2e).toContain("expect(element(by.text('Themes'))).toExist()");
     expect(storeAssetsDoc).toContain("pnpm mobile:e2e:build:ios:release");
     expect(storeAssetsDoc).toContain("pnpm mobile:e2e:store-assets:ios:release");

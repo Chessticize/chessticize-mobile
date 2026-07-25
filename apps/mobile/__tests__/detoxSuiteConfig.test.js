@@ -1250,7 +1250,7 @@ describe('Detox suite configuration', () => {
       "it('handles review reminders through the platform capability'"
     );
     const reminderCaseEnd = flowsSpec.indexOf(
-      "it('shows failed attempts in history with the wrong-only toggle'"
+      "it('shows failed attempts in History and preserves current filters through replay'"
     );
     const reminderCase = flowsSpec.slice(reminderCaseStart, reminderCaseEnd);
 
@@ -1271,10 +1271,13 @@ describe('Detox suite configuration', () => {
     expect(flowsSpec).toContain('releaseVersion.iosPublicVersion');
     expect(flowsSpec).toContain('releaseVersion.androidVersionCode');
     expect(flowsSpec).toContain('releaseVersion.iosBuildNumber');
-    expect(flowsSpec).toContain("historyToggleValue('Wrong puzzles only', false)");
-    expect(flowsSpec).toContain("historyToggleValue('Sprint attempts only', true)");
-    expect(flowsSpec).toContain("return `${label}, ${active ? 'On' : 'Off'}`");
-    expect(flowsSpec).toContain("return active ? '1' : '0'");
+    expect(flowsSpec).toContain("by.id('history-result-wrong')");
+    expect(flowsSpec).toContain("by.id('history-source-sprint')");
+    expect(flowsSpec).toContain("by.text('2 themes selected')");
+    expect(flowsSpec).toContain("historyAttemptRowTestIDForResult('Wrong move')");
+    expect(flowsSpec).not.toContain("history-filter-wrong-only");
+    expect(flowsSpec).not.toContain("history-filter-sprint-only");
+    expect(flowsSpec).not.toContain('historyToggleValue');
     expect(flowsSpec).not.toContain('toHaveToggleValue');
   });
 
