@@ -4796,7 +4796,6 @@ function SessionCoachmarkDemo({
             ]}
             contentContainerStyle={[
               styles.activeSessionControlRailScrollContent,
-              styles.sessionGuideControlRailScrollContent,
               {
                 minHeight: boardSize,
                 width: adaptiveLayout.sessionRailWidth
@@ -4873,6 +4872,7 @@ function SessionCoachmarkDemo({
                   style={[
                     styles.activeSessionBottomFeedback,
                     styles.activeSessionRailBottomFeedback,
+                    styles.sessionGuideRailBottomFeedback,
                     styles.sessionGuideCoachLayer,
                     { width: adaptiveLayout.sessionRailWidth }
                   ]}
@@ -14943,9 +14943,6 @@ const styles = StyleSheet.create({
   activeSessionControlRailScrollContent: {
     paddingBottom: 4
   },
-  sessionGuideControlRailScrollContent: {
-    paddingBottom: 64
-  },
   activeSessionControlRail: {
     flexGrow: 1,
     gap: 10
@@ -14955,6 +14952,9 @@ const styles = StyleSheet.create({
   },
   activeSessionRailBottomFeedback: {
     marginTop: "auto"
+  },
+  sessionGuideRailBottomFeedback: {
+    marginBottom: 64
   },
   activeSessionShell: {
     gap: 8
