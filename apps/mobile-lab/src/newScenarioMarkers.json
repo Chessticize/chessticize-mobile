@@ -1,4 +1,16 @@
 {
+  "practice-custom-setup": {
+    "issues": [
+      {
+        "issueNumber": 248,
+        "changeNote": "Add configurable Slow warning defaults to the existing Add Run editor."
+      },
+      {
+        "issueNumber": 249,
+        "changeNote": "Add configurable puzzle timeout defaults to the existing Add Run editor."
+      }
+    ]
+  },
   "practice-run-standard-editor": {
     "issues": [
       {
