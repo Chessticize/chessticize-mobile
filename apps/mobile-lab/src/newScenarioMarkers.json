@@ -124,6 +124,10 @@
       {
         "issueNumber": 328,
         "changeNote": "Guide metrics, Slow, Timed out, and Mark as unclear in the frozen real Sprint layout."
+      },
+      {
+        "issueNumber": 337,
+        "changeNote": "Keep the first-use Sprint guide and its navigation visible in maintained portrait and landscape layouts."
       }
     ]
   },
@@ -132,6 +136,10 @@
       {
         "issueNumber": 328,
         "changeNote": "Append the Arrow Duel candidate explanation to the shared first-session guide."
+      },
+      {
+        "issueNumber": 337,
+        "changeNote": "Keep the shared responsive guide and Arrow Duel progress readable in maintained layouts."
       }
     ]
   },
@@ -140,6 +148,10 @@
       {
         "issueNumber": 328,
         "changeNote": "Show only the Arrow Duel-specific step after shared guidance has been seen."
+      },
+      {
+        "issueNumber": 337,
+        "changeNote": "Keep the Arrow Duel-only guide progress on one line in maintained landscape widths."
       }
     ]
   },

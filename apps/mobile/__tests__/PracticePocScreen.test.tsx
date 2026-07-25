@@ -1222,10 +1222,13 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(activeSession, "practice-prompt")).toBeTruthy();
     expect(findByTestId(activeSession, "session-puzzle-timing")).toBeTruthy();
     expect(findByTestId(activeSession, "session-score-strip")).toBeTruthy();
-    expect(
-      flattenTestStyle(findByTestId(activeSession, "practice-session-guide-demo-board").props.style).width
-    ).toBe(
-      flattenTestStyle(findByTestId(realSprint, "session-board").props.style).width
+    const activeGuideBoardSize = Number(
+      flattenTestStyle(
+        findByTestId(activeSession, "practice-session-guide-demo-board").props.style
+      ).width
+    );
+    expect(activeGuideBoardSize).toBeLessThan(
+      Number(flattenTestStyle(findByTestId(realSprint, "session-board").props.style).width)
     );
     expect(testIdOrder(activeSession, "active-session-shell", "practice-prompt")).toBeLessThan(0);
     expect(testIdOrder(activeSession, "practice-prompt", "practice-session-guide-demo-board")).toBeLessThan(0);
@@ -1300,8 +1303,6 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(activeSession, "session-board")).toBeTruthy();
 
     const firstEverArrowDuel = renderLabScenario("practice-arrow-duel-guide");
-    const realArrowDuel = renderLabScenario("practice-active");
-    startArrowDuelSprint(realArrowDuel);
 
     expect(findByTestId(firstEverArrowDuel, "practice-active-session-guide")).toBeTruthy();
     expect(() => findByTestId(firstEverArrowDuel, "practice-arrow-duel-guide")).toThrow();
@@ -1327,10 +1328,10 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(firstEverArrowDuel, "session-score-strip")).toBeTruthy();
     expect(() => findByTestId(firstEverArrowDuel, "session-board")).toThrow();
     expect(
-      flattenTestStyle(findByTestId(firstEverArrowDuel, "practice-arrow-duel-guide-demo-board").props.style).width
-    ).toBe(
-      flattenTestStyle(findByTestId(realArrowDuel, "session-board").props.style).width
-    );
+      flattenTestStyle(
+        findByTestId(firstEverArrowDuel, "practice-arrow-duel-guide-demo-board").props.style
+      ).width
+    ).toBe(activeGuideBoardSize);
     expect(testIdOrder(firstEverArrowDuel, "active-session-shell", "practice-prompt")).toBeLessThan(0);
     expect(testIdOrder(firstEverArrowDuel, "practice-prompt", "practice-arrow-duel-guide-demo-board")).toBeLessThan(0);
     expect(testIdOrder(firstEverArrowDuel, "practice-arrow-duel-guide-demo-board", "session-score-strip")).toBeLessThan(0);
@@ -1482,10 +1483,10 @@ describe("PracticePocScreen", () => {
       flattenTestStyle(findByTestId(landscape, "practice-session-guide-coach-overview").props.style).top
     ).toBe(112);
     press(landscape, "practice-session-guide-start");
-    expect(findByTestId(landscape, "practice-session-guide-coach-pointer-slow-top")).toBeTruthy();
+    expect(findByTestId(landscape, "practice-session-guide-coach-pointer-slow-right")).toBeTruthy();
     expect(
       flattenTestStyle(findByTestId(landscape, "practice-session-guide-coach-slow").props.style).top
-    ).toBe(220);
+    ).toBe(108);
     expect(
       flattenTestStyle(findByTestId(landscape, "practice-session-guide-demo-timer").props.style).opacity
     ).not.toBe(0.34);
@@ -1509,8 +1510,11 @@ describe("PracticePocScreen", () => {
     ).toBe(0.34);
     press(landscape, "practice-session-guide-start");
     expect(
+      findByTestId(landscape, "practice-session-guide-coach-pointer-unclear-right")
+    ).toBeTruthy();
+    expect(
       flattenTestStyle(findByTestId(landscape, "practice-session-guide-coach-unclear").props.style).top
-    ).toBe(156);
+    ).toBe(146);
     expect(
       flattenTestStyle(findByTestId(landscape, "practice-session-guide-demo-unclear").props.style).opacity
     ).not.toBe(0.34);
@@ -1545,8 +1549,11 @@ describe("PracticePocScreen", () => {
       flattenTestStyle(findByTestId(
         landscape,
         "practice-session-guide-demo-unclear"
-      ).props.style).marginBottom
-    ).toBeGreaterThanOrEqual(64);
+      ).props.style)
+    ).toMatchObject({
+      bottom: 60,
+      position: "absolute"
+    });
 
     const landscapeArrowDuel = renderLabScenario("practice-arrow-duel-guide-only");
     expect(findByTestId(
@@ -1565,6 +1572,111 @@ describe("PracticePocScreen", () => {
         findByTestId(landscapeArrowDuel, "practice-arrow-duel-guide-demo-board").props.style
       ).opacity
     ).not.toBe(0.34);
+  });
+
+  it("fits the complete first-use guide in the maintained iPhone portrait viewport", () => {
+    const insets = { top: 62, right: 0, bottom: 34, left: 0 };
+    setPracticeViewport({
+      width: 402,
+      height: 874,
+      scale: 3,
+      insets
+    });
+
+    const renderer = renderLabScenario("practice-active-session-guide");
+    const adaptiveLayout = buildPracticeAdaptiveLayout({
+      width: 402,
+      height: 874,
+      fontScale: 1,
+      insets
+    });
+    const guideBoardSize = Number(
+      flattenTestStyle(
+        findByTestId(renderer, "practice-session-guide-demo-board").props.style
+      ).width
+    );
+
+    expect(guideBoardSize).toBeLessThanOrEqual(
+      Math.floor(adaptiveLayout.contentHeight * 0.34)
+    );
+    for (let index = 0; index < 3; index += 1) {
+      press(renderer, "practice-session-guide-start");
+    }
+    expect(findByTestId(renderer, "practice-session-guide-demo-unclear")).toBeTruthy();
+    expect(
+      flattenTestStyle(
+        findByTestId(renderer, "practice-session-guide-navigation").props.style
+      ).position
+    ).toBeUndefined();
+  });
+
+  it("keeps Slow and Unclear guide content beside their visible landscape targets", () => {
+    setPracticeViewport({
+      width: 874,
+      height: 402,
+      scale: 3,
+      insets: { top: 0, right: 62, bottom: 21, left: 62 }
+    });
+
+    const renderer = renderLabScenario("practice-active-session-guide");
+    const boardSize = Number(
+      flattenTestStyle(
+        findByTestId(renderer, "practice-session-guide-demo-board").props.style
+      ).width
+    );
+
+    press(renderer, "practice-session-guide-start");
+    expect(
+      Number(
+        flattenTestStyle(
+          findByTestId(renderer, "practice-session-guide-coach-slow").props.style
+        ).left
+      )
+    ).toBeLessThan(boardSize);
+
+    press(renderer, "practice-session-guide-start");
+    press(renderer, "practice-session-guide-start");
+    expect(
+      Number(
+        flattenTestStyle(
+          findByTestId(renderer, "practice-session-guide-coach-unclear").props.style
+        ).left
+      )
+    ).toBeLessThan(boardSize);
+    expect(
+      flattenTestStyle(
+        findByTestId(renderer, "practice-session-guide-demo-unclear").props.style
+      )
+    ).toMatchObject({
+      bottom: 60,
+      position: "absolute"
+    });
+    expect(
+      flattenTestStyle(
+        findByTestId(renderer, "practice-session-guide-navigation").props.style
+      )
+    ).toMatchObject({
+      bottom: 0,
+      position: "absolute"
+    });
+  });
+
+  it("keeps Arrow Duel guide progress on one line in maintained landscape widths", () => {
+    setPracticeViewport({
+      width: 874,
+      height: 402,
+      scale: 3,
+      insets: { top: 0, right: 62, bottom: 21, left: 62 }
+    });
+
+    const renderer = renderLabScenario("practice-arrow-duel-guide");
+    for (let index = 0; index < 4; index += 1) {
+      press(renderer, "practice-session-guide-start");
+    }
+
+    const progress = findByTestId(renderer, "practice-session-guide-coach-progress");
+    expect(collectText(progress)).toBe("5 of 5");
+    expect(progress.props.numberOfLines).toBe(1);
   });
 
   it("summarizes dynamic pass rules and timeout Review behavior in production New and Edit Run", () => {

@@ -4259,6 +4259,14 @@ function ActiveSessionGuide({
   totalSteps: number;
 }): React.JSX.Element {
   const isArrowDuel = presentation.mode === "arrow_duel";
+  const guideBoardSize = adaptiveLayout.usesSessionRail
+    ? boardSize
+    : Math.min(
+        boardSize,
+        Math.floor(
+          adaptiveLayout.contentHeight * (adaptiveLayout.isRegularWidth ? 0.42 : 0.34)
+        )
+      );
   const hasNextGuide = stepNumber < totalSteps;
   const unifiedCoachTotal = totalSteps > 1 ? 5 : isArrowDuel ? 1 : 4;
   const unifiedCoachStep = isArrowDuel && totalSteps > 1
@@ -4294,7 +4302,7 @@ function ActiveSessionGuide({
       </Text>
       <SessionCoachmarkDemo
         adaptiveLayout={adaptiveLayout}
-        boardSize={boardSize}
+        boardSize={guideBoardSize}
         coachStep={coachStep}
         guideStepNumber={unifiedCoachStep}
         mode={presentation.mode}
@@ -4341,6 +4349,7 @@ function ActiveSessionGuide({
         )}
         <Text
           accessibilityLabel={`Step ${unifiedCoachStep} of ${unifiedCoachTotal}`}
+          numberOfLines={1}
           style={styles.sessionGuideCoachProgress}
           testID="practice-session-guide-coach-progress"
         >
@@ -4358,7 +4367,19 @@ function ActiveSessionGuide({
           testID="practice-session-guide-start"
           onPress={onContinue}
         >
-          <Text style={styles.sessionGuideStartButtonText}>{continueLabel}</Text>
+          <Text
+            adjustsFontSizeToFit={adaptiveLayout.usesSessionRail}
+            minimumFontScale={0.8}
+            numberOfLines={1}
+            style={[
+              styles.sessionGuideStartButtonText,
+              adaptiveLayout.usesSessionRail
+                ? styles.sessionGuideStartButtonTextRail
+                : null
+            ]}
+          >
+            {continueLabel}
+          </Text>
         </Pressable>
       </View>
     </View>
@@ -4505,8 +4526,17 @@ function SessionCoachmarkDemo({
             title: "Mark as unclear is the only control in this tour.",
             tone: "warning" as const
           };
+  const calloutUsesBoard = adaptiveLayout.usesSessionRail
+    && !isArrowDuel
+    && (coachStep === 1 || coachStep === 3);
   const calloutPlacement = adaptiveLayout.usesSessionRail
-    ? {
+    ? calloutUsesBoard
+      ? {
+          left: 12,
+          top: coachStep === 1 ? 108 : 146,
+          width: Math.max(0, boardSize - 24)
+        }
+      : {
         left: boardSize + adaptiveLayout.sessionRailGap,
         top: isArrowDuel
           ? 92
@@ -4532,7 +4562,9 @@ function SessionCoachmarkDemo({
                 ? 92
                 : boardSize + 150
       };
-  const coachPointer = adaptiveLayout.usesSessionRail && (isArrowDuel || coachStep === 2)
+  const coachPointer = calloutUsesBoard
+    ? "→"
+    : adaptiveLayout.usesSessionRail && (isArrowDuel || coachStep === 2)
     ? "←"
     : isArrowDuel || coachStep === 0 || (adaptiveLayout.usesSessionRail && coachStep === 1)
       ? "↑"
@@ -4541,6 +4573,8 @@ function SessionCoachmarkDemo({
     ? "bottom"
     : coachPointer === "←"
       ? "left"
+      : coachPointer === "→"
+        ? "right"
       : "top";
   const pointerNode = (
     <Text
@@ -4548,6 +4582,7 @@ function SessionCoachmarkDemo({
       style={[
         styles.sessionGuideCoachPointer,
         pointerPlacement === "left" ? styles.sessionGuideCoachPointerLeft : null,
+        pointerPlacement === "right" ? styles.sessionGuideCoachPointerRight : null,
         callout.tone === "warning" ? styles.sessionGuideCoachPointerWarning : null,
         callout.tone === "danger" ? styles.sessionGuideCoachPointerDanger : null
       ]}
@@ -4885,8 +4920,8 @@ function SessionCoachmarkDemo({
                   style={[
                     styles.activeSessionBottomFeedback,
                     styles.activeSessionRailBottomFeedback,
-                    styles.sessionGuideRailBottomFeedback,
                     styles.sessionGuideCoachLayer,
+                    styles.sessionGuideRailBottomFeedback,
                     { width: adaptiveLayout.sessionRailWidth }
                   ]}
                   testID="practice-session-guide-demo-unclear"
@@ -14023,6 +14058,13 @@ const styles = StyleSheet.create({
     transform: [{ translateY: -9 }],
     width: 18
   },
+  sessionGuideCoachPointerRight: {
+    position: "absolute",
+    right: -20,
+    top: "50%",
+    transform: [{ translateY: -9 }],
+    width: 18
+  },
   sessionGuideCoachPointerWarning: {
     color: "#D97706"
   },
@@ -14092,9 +14134,11 @@ const styles = StyleSheet.create({
   sessionGuideCoachProgress: {
     color: "#64748B",
     flex: 1,
+    flexShrink: 0,
     fontFamily: "menlo",
     fontSize: 10,
     fontWeight: "900",
+    minWidth: 42,
     textAlign: "center"
   },
   sessionGuideCoachNextButton: {
@@ -14107,8 +14151,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12
   },
   sessionGuideCoachNextButtonRail: {
+    flexShrink: 1,
     minHeight: 44,
-    minWidth: 92,
+    minWidth: 0,
     paddingHorizontal: 8
   },
   sessionGuideInfoTitle: {
@@ -14125,6 +14170,9 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "900"
+  },
+  sessionGuideStartButtonTextRail: {
+    fontSize: 12
   },
   primaryCompactButton: {
     alignItems: "center",
@@ -15053,7 +15101,10 @@ const styles = StyleSheet.create({
     marginTop: "auto"
   },
   sessionGuideRailBottomFeedback: {
-    marginBottom: 64
+    bottom: 60,
+    position: "absolute",
+    right: 0,
+    zIndex: 4
   },
   activeSessionShell: {
     gap: 8
