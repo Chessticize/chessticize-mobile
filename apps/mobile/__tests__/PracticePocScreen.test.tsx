@@ -3196,19 +3196,32 @@ describe("PracticePocScreen", () => {
     const failed = renderLabScenario("practice-sprint-result-goal");
 
     expect(collectText(findByTestId(failed, "sprint-result-goal-label"))).toBe("Solve 15 to pass");
-    expect(collectText(findByTestId(failed, "sprint-result-solved"))).toContain("11 / 15");
+    expect(collectText(findByTestId(failed, "sprint-result-solved"))).toBe("Solved 11");
     expect(collectText(findByTestId(failed, "sprint-result-accuracy"))).toBe(
       "12 attempted · 92% Accuracy"
     );
+    expect(collectText(findByTestId(failed, "sprint-unclear-prompt"))).toContain(
+      "Was it clear why your last move was wrong?"
+    );
+    expect(collectText(findByTestId(failed, "sprint-unclear-toggle"))).toBe("Mark as unclear");
     expect(collectText(findByTestId(failed, "sprint-result-unclear-sources"))).toBe(
       "1 marked by you · 1 marked after Slow"
     );
     expect(collectText(findByTestId(failed, "sprint-result-unclear-count"))).toBe("2");
+    expect(findByTestId(failed, "sprint-result-unclear-count-column")).toBeTruthy();
+    expect(findByTestId(failed, "sprint-result-mistakes-count-column")).toBeTruthy();
+
+    press(failed, "sprint-unclear-toggle");
+    expect(collectText(findByTestId(failed, "sprint-unclear-marked"))).toBe("Marked");
+    expect(collectText(findByTestId(failed, "sprint-result-unclear-sources"))).toBe(
+      "2 marked by you · 1 marked after Slow"
+    );
+    expect(collectText(findByTestId(failed, "sprint-result-unclear-count"))).toBe("3");
 
     const passed = renderLabScenario("practice-sprint-result-extra-attempt");
 
     expect(collectText(findByTestId(passed, "sprint-result-goal-label"))).toBe("Solve 15 to pass");
-    expect(collectText(findByTestId(passed, "sprint-result-solved"))).toContain("15 / 15");
+    expect(collectText(findByTestId(passed, "sprint-result-solved"))).toBe("Solved 15");
     expect(collectText(findByTestId(passed, "sprint-result-accuracy"))).toBe(
       "16 attempted · 94% Accuracy"
     );

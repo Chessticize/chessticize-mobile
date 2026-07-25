@@ -182,6 +182,10 @@ function sprintRulesDesignPreviewFor(
   }
   if (scenarioId === "practice-sprint-result-goal") {
     return {
+      initialResultUnclearPrompt: {
+        marked: false,
+        question: "Was it clear why your last move was wrong?"
+      },
       initialResultState: sprintRulesResultState({
         correctCount: 11,
         endReason: "time_expired",

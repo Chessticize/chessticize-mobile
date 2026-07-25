@@ -227,9 +227,15 @@ export type SprintResultUnclearSummaryPresentation = {
   userMarkedCount: number;
 };
 
+export type SprintResultUnclearPromptPresentation = {
+  marked: boolean;
+  question: string;
+};
+
 export type SprintRulesDesignPreview = {
   firstRunGuide?: SprintRulesGuidePresentation;
   initialSessionGuide?: SprintSessionGuidePresentation;
+  initialResultUnclearPrompt?: SprintResultUnclearPromptPresentation;
   initialResultState?: SprintState;
   resultUnclearSummary?: SprintResultUnclearSummaryPresentation;
   showRunEditorSummary?: boolean;
@@ -327,7 +333,10 @@ type UnclearPromptState = {
   attemptId: string;
   marked: boolean;
   puzzleId: string;
+  question: string;
 };
+
+const SPRINT_RULES_PREVIEW_UNCLEAR_ATTEMPT_ID = "sprint-rules-preview-final-attempt";
 
 type ReviewBackCommand = {
   id: number;
@@ -518,7 +527,16 @@ export function PracticePocScreen({
   const [lastBoardMove, setLastBoardMove] = useState<BoardMove | null>(null);
   const [feedbackPuzzleId, setFeedbackPuzzleId] = useState<string | null>(null);
   const [feedbackSnapshot, setFeedbackSnapshot] = useState<FeedbackBoardSnapshot | null>(null);
-  const [unclearPrompt, setUnclearPrompt] = useState<UnclearPromptState | null>(null);
+  const [unclearPrompt, setUnclearPrompt] = useState<UnclearPromptState | null>(() => (
+    sprintRulesDesignPreview?.initialResultUnclearPrompt
+      ? {
+          attemptId: SPRINT_RULES_PREVIEW_UNCLEAR_ATTEMPT_ID,
+          marked: sprintRulesDesignPreview.initialResultUnclearPrompt.marked,
+          puzzleId: SPRINT_RULES_PREVIEW_UNCLEAR_ATTEMPT_ID,
+          question: sprintRulesDesignPreview.initialResultUnclearPrompt.question
+        }
+      : null
+  ));
   const [boardInputLocked, setBoardInputLocked] = useState(false);
   const [boardInputLockMode, setBoardInputLockMode] = useState<BoardInputLockMode>("hard");
   const [readyArrowDuelBoardKey, setReadyArrowDuelBoardKey] = useState<string | null>(null);
@@ -1528,7 +1546,8 @@ export function PracticePocScreen({
           ? {
               attemptId: next.attempt.id,
               marked: Boolean(next.attempt.unclear),
-              puzzleId: next.attempt.puzzleId
+              puzzleId: next.attempt.puzzleId,
+              question: "Was it clear why the last correct move worked?"
             }
           : null);
       }
@@ -1736,6 +1755,12 @@ export function PracticePocScreen({
 
   function toggleUnclearPrompt(): void {
     if (!unclearPrompt) {
+      return;
+    }
+    if (unclearPrompt.attemptId === SPRINT_RULES_PREVIEW_UNCLEAR_ATTEMPT_ID) {
+      setUnclearPrompt((current) => current
+        ? { ...current, marked: !current.marked }
+        : current);
       return;
     }
     try {
@@ -2983,6 +3008,9 @@ export function PracticePocScreen({
                       elapsedMs={Math.min(sprintElapsedMs, state ? state.config.durationSeconds * 1000 : sprintElapsedMs)}
                       unclearPrompt={unclearPrompt}
                       unclearSummary={sprintRulesDesignPreview?.resultUnclearSummary}
+                      includePromptInUnclearSummary={
+                        sprintRulesDesignPreview?.initialResultUnclearPrompt !== undefined
+                      }
                       onToggleUnclear={toggleUnclearPrompt}
                       onReplay={() => startSprint(mode)}
                       onBack={resetToIdle}
@@ -6179,6 +6207,7 @@ function SprintSummary({
   state,
   clarifyGoal,
   elapsedMs,
+  includePromptInUnclearSummary,
   unclearPrompt,
   unclearSummary,
   onToggleUnclear,
@@ -6190,6 +6219,7 @@ function SprintSummary({
   state: SprintState;
   clarifyGoal: boolean;
   elapsedMs: number;
+  includePromptInUnclearSummary: boolean;
   unclearPrompt: UnclearPromptState | null;
   unclearSummary?: SprintResultUnclearSummaryPresentation;
   onToggleUnclear: () => void;
@@ -6207,13 +6237,15 @@ function SprintSummary({
   const reviewImpact = state.mistakeCount > 0
     ? `${state.mistakeCount} ${state.mistakeCount === 1 ? "mistake" : "mistakes"} queued`
     : "No new review items";
+  const promptMarkedCount = includePromptInUnclearSummary && unclearPrompt?.marked ? 1 : 0;
+  const userMarkedCount = (unclearSummary?.userMarkedCount ?? 0) + promptMarkedCount;
   const unclearCount = unclearSummary
-    ? unclearSummary.userMarkedCount + unclearSummary.slowMarkedCount
+    ? userMarkedCount + unclearSummary.slowMarkedCount
     : 0;
   const unclearSources = unclearSummary
     ? [
-        unclearSummary.userMarkedCount > 0
-          ? `${unclearSummary.userMarkedCount} marked by you`
+        userMarkedCount > 0
+          ? `${userMarkedCount} marked by you`
           : null,
         unclearSummary.slowMarkedCount > 0
           ? `${unclearSummary.slowMarkedCount} marked after Slow`
@@ -6273,13 +6305,23 @@ function SprintSummary({
               Solve {state.config.targetCorrect} to pass
             </Text>
           ) : null}
-          <Text style={styles.resultSolvedCount} testID="sprint-result-solved">
-            {state.correctCount}
-            <Text style={styles.resultSolvedTarget}>
-              {" / "}
-              {clarifyGoal ? state.config.targetCorrect : attemptCount}
+          {clarifyGoal ? (
+            <Text
+              accessibilityLabel={`Solved ${state.correctCount}`}
+              style={styles.resultSolvedCount}
+              testID="sprint-result-solved"
+            >
+              Solved {state.correctCount}
             </Text>
-          </Text>
+          ) : (
+            <Text style={styles.resultSolvedCount} testID="sprint-result-solved">
+              {state.correctCount}
+              <Text style={styles.resultSolvedTarget}>
+                {" / "}
+                {attemptCount}
+              </Text>
+            </Text>
+          )}
           <Text style={styles.resultAccuracy} testID="sprint-result-accuracy">
             {clarifyGoal ? `${attemptCount} attempted · ` : ""}
             {accuracy}% Accuracy
@@ -6290,7 +6332,7 @@ function SprintSummary({
       {unclearPrompt ? (
         <UnclearAttemptPrompt
           marked={unclearPrompt.marked}
-          question="Was it clear why the last correct move worked?"
+          question={unclearPrompt.question}
           onToggle={onToggleUnclear}
         />
       ) : null}
@@ -6334,25 +6376,33 @@ function SprintSummary({
             <Text style={styles.helperText} testID="sprint-result-unclear-sources">{unclearSources}</Text>
             <Text style={styles.resultUnclearNote}>Saved in History · Does not affect your Sprint result</Text>
           </View>
-          <View style={styles.resultUnclearCountBadge}>
+          <View
+            style={[styles.resultSummaryCountColumn, styles.resultUnclearCountBadge]}
+            testID="sprint-result-unclear-count-column"
+          >
             <Text style={styles.resultUnclearCount} testID="sprint-result-unclear-count">{unclearCount}</Text>
           </View>
         </View>
       ) : null}
 
       <View style={styles.resultReviewRow} testID="sprint-result-review-impact">
-        <View>
+        <View style={styles.resultReviewCopy}>
           <Text style={styles.listText}>Mistakes</Text>
           <Text style={styles.helperText}>
             {state.mistakeCount > 0 ? `Review your mistakes · ${reviewImpact}` : reviewImpact}
           </Text>
         </View>
-        <Text
-          testID="sprint-result-mistakes"
-          style={[styles.resultReviewCount, state.mistakeCount > 0 ? styles.errorText : styles.positive]}
+        <View
+          style={styles.resultSummaryCountColumn}
+          testID="sprint-result-mistakes-count-column"
         >
-          {state.mistakeCount}
-        </Text>
+          <Text
+            testID="sprint-result-mistakes"
+            style={[styles.resultReviewCount, state.mistakeCount > 0 ? styles.errorText : styles.positive]}
+          >
+            {state.mistakeCount}
+          </Text>
+        </View>
       </View>
 
       {onReview && shouldPrioritizeReview ? (
@@ -15241,6 +15291,15 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "900"
   },
+  resultReviewCopy: {
+    flex: 1,
+    minWidth: 0
+  },
+  resultSummaryCountColumn: {
+    alignItems: "center",
+    justifyContent: "center",
+    width: 38
+  },
   resultUnclearRow: {
     alignItems: "center",
     backgroundColor: "#FFFBEB",
@@ -15266,13 +15325,9 @@ const styles = StyleSheet.create({
     lineHeight: 14
   },
   resultUnclearCountBadge: {
-    alignItems: "center",
     backgroundColor: "#FEF3C7",
     borderRadius: 999,
     height: 38,
-    justifyContent: "center",
-    minWidth: 38,
-    paddingHorizontal: 10
   },
   resultUnclearCount: {
     color: "#B45309",

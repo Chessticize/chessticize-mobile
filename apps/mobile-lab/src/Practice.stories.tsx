@@ -268,6 +268,9 @@ export const SprintResultGoalClarity: Story = {
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "sprint-result-goal-label");
     await waitForTestId(canvasElement, "sprint-result-solved");
+    await waitForTestId(canvasElement, "sprint-unclear-toggle");
+    await waitForTestId(canvasElement, "sprint-result-unclear-count-column");
+    await waitForTestId(canvasElement, "sprint-result-mistakes-count-column");
   }
 };
 
@@ -277,6 +280,8 @@ export const SprintResultExtraAttempt: Story = {
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "sprint-result-goal-label");
     await waitForTestId(canvasElement, "sprint-result-solved");
+    await waitForTestId(canvasElement, "sprint-result-unclear-count-column");
+    await waitForTestId(canvasElement, "sprint-result-mistakes-count-column");
   }
 };
 
