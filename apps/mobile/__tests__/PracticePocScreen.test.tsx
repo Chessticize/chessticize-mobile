@@ -1984,10 +1984,11 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-tab-icon")).toBeTruthy();
     expect(findByTestId(renderer, "settings-tab-icon")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "practice-tab-icon"))).toBe("");
-    expect(collectText(findByTestId(renderer, "history-tab-icon"))).toBe("🕙");
+    expect(collectText(findByTestId(renderer, "history-tab-icon"))).toBe("");
     expect(hasStyleEntry(findByTestId(renderer, "practice-tab-icon"), "backgroundColor", "#DBEAFE")).toBe(false);
     expect(findByTestId(renderer, "practice-tab-target-outer")).toBeTruthy();
     expect(findByTestId(renderer, "practice-tab-target-inner")).toBeTruthy();
+    expect(findByTestId(renderer, "history-tab-clock-outline")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "settings-tab-icon"))).toBe("");
     expect(collectText(renderer.root)).not.toContain("⚙");
     expect(() => findByTestId(renderer, "analysis-tab")).toThrow();

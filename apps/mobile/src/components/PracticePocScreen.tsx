@@ -11691,14 +11691,16 @@ function TabGlyph({
   }
   if (tab === "history") {
     return (
-      <Text
-        accessibilityElementsHidden
-        allowFontScaling={false}
-        importantForAccessibility="no-hide-descendants"
-        style={styles.tabHistoryEmoji}
-      >
-        🕙
-      </Text>
+      <View style={styles.tabGlyphCanvas}>
+        <View
+          style={[styles.tabClockGlyph, { borderColor: color }]}
+          testID="history-tab-clock-outline"
+        >
+          <View style={[styles.tabClockMinuteHand, { backgroundColor: color }]} />
+          <View style={[styles.tabClockHourHand, { backgroundColor: color }]} />
+          <View style={[styles.tabClockCenter, { backgroundColor: color }]} />
+        </View>
+      </View>
     );
   }
   return (
@@ -12243,9 +12245,37 @@ const styles = StyleSheet.create({
     transform: [{ rotate: "45deg" }],
     width: 12
   },
-  tabHistoryEmoji: {
-    fontSize: 18,
-    lineHeight: 20
+  tabClockGlyph: {
+    alignItems: "center",
+    borderRadius: 999,
+    borderWidth: 2,
+    height: 15,
+    justifyContent: "center",
+    width: 15
+  },
+  tabClockMinuteHand: {
+    borderRadius: 999,
+    height: 5,
+    left: 4.5,
+    position: "absolute",
+    top: 1,
+    width: 2
+  },
+  tabClockHourHand: {
+    borderRadius: 999,
+    height: 2,
+    left: 6.5,
+    position: "absolute",
+    top: 5,
+    width: 4
+  },
+  tabClockCenter: {
+    borderRadius: 999,
+    height: 2,
+    left: 4.5,
+    position: "absolute",
+    top: 5,
+    width: 2
   },
   tabPackHandle: {
     borderBottomWidth: 0,
