@@ -225,6 +225,8 @@ describe('Key user flows', () => {
     await waitFor(element(
       by.text('Source: Sprint').withAncestor(by.id('history-active-filter-summary'))
     )).toExist().withTimeout(10000);
+    await waitForVisibleInPracticeScroll('history-theme-disclosure');
+    await element(by.id('history-theme-disclosure')).tap();
     await waitForVisibleInPracticeScroll('history-theme-mate-in-2');
     await element(by.id('history-theme-mate-in-2')).tap();
     await waitForVisibleInPracticeScroll('history-theme-mate-in-3');
