@@ -102,10 +102,7 @@ Regenerate the feature graphic with:
 
 The renderer directly emits the required 1024 x 500, 8-bit RGB PNG without an
 alpha channel. The release regression executes the renderer, checks its IHDR,
-and compares decoded RGB output with the checked-in candidate. The comparison
-allows only a tightly bounded amount of system-font antialiasing drift so that
-macOS rendering-stack updates do not require replacing a visually unchanged
-approved asset; broader pixel changes still fail the release contract.
+and compares decoded RGB output with the checked-in candidate.
 
 The release owner must approve these assets in the same review that approves
 the exact-build screenshots; file presence alone is not approval evidence.

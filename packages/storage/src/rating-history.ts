@@ -30,7 +30,7 @@ export function buildPracticeProgressSummary(
     }
     if (attempt.result === "correct") {
       correctThisWeek += 1;
-    } else if (attempt.result === "wrong") {
+    } else if (attempt.result === "wrong" || attempt.result === "timed_out") {
       wrongThisWeek += 1;
     }
   }

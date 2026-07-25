@@ -107,8 +107,7 @@ export function advanceSprintTime(state: SprintState, now: string): SprintComman
   const afterTimeout: SprintState = {
     ...sprintTimedState,
     mistakeCount: sprintTimedState.mistakeCount + 1,
-    currentStreak: 0,
-    hasUserSubmittedMove: true
+    currentStreak: 0
   };
   if (afterTimeout.mistakeCount >= afterTimeout.config.maxMistakes) {
     return {
@@ -167,7 +166,7 @@ export function resumeSprint(state: SprintState, now: string): SprintState {
 }
 
 export function abandonSprint(state: SprintState, now: string): SprintState {
-  if (!state.hasUserSubmittedMove) {
+  if (!state.hasUserSubmittedMove && state.mistakeCount === 0) {
     return completeSprint(state, "abandoned", "abandoned", now);
   }
   return completeSprintWithRating(state, "failed", "abandoned", now);

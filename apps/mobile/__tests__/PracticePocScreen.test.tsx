@@ -1045,7 +1045,7 @@ describe("PracticePocScreen", () => {
       "Automatically marks the puzzle as Unclear; it is not a mistake."
     );
     expect(collectText(findByTestId(renderer, "practice-sprint-rules-guide"))).toContain(
-      "Marks it Timed out and Unclear, adds it to Review, then moves on."
+      "Marks it Timed out and Unclear, counts as a mistake, then moves on."
     );
     expect(findByTestId(renderer, "practice-sprint-rules-guide").props.accessibilityLabel).toContain(
       "The Sprint ends after 3 mistakes."
@@ -1054,7 +1054,7 @@ describe("PracticePocScreen", () => {
       "A Slow warning automatically marks the puzzle as Unclear and does not count as a mistake."
     );
     expect(findByTestId(renderer, "practice-sprint-rules-guide").props.accessibilityLabel).toContain(
-      "A timeout marks the puzzle Timed out and Unclear, adds it to Review, then moves on."
+      "A timeout marks the puzzle Timed out and Unclear, counts as a mistake, then moves on."
     );
 
     press(renderer, "practice-sprint-rules-dismiss");
@@ -1119,10 +1119,10 @@ describe("PracticePocScreen", () => {
       "Timed out appears over the board automatically at the time limit."
     );
     expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-timeout"))).toContain(
-      "The attempt is marked Unclear, added to Review, and the Sprint moves to the next puzzle."
+      "The attempt is marked Unclear, counts as a mistake, and the Sprint moves to the next puzzle."
     );
     expect(collectText(findByTestId(activeSession, "practice-session-guide-demo-board"))).toContain(
-      "Added to Review · Moving on"
+      "Mistake · Marked Unclear · Moving on"
     );
 
     press(activeSession, "practice-session-guide-start");
@@ -1431,7 +1431,7 @@ describe("PracticePocScreen", () => {
       "Solve 15 before 5 min ends"
     );
     expect(collectText(findByTestId(preview, "practice-run-puzzle-timeout"))).toContain(
-      "Marks it Timed out and Unclear, adds it to Review, and moves on."
+      "Marks it Timed out and Unclear, counts as a mistake, and moves on."
     );
     press(preview, "practice-run-duration-stepper-decrease");
     expect(collectText(findByTestId(preview, "practice-run-pass-rules"))).toContain(
@@ -1804,7 +1804,7 @@ describe("PracticePocScreen", () => {
       "Timed out"
     );
     expect(collectText(findByTestId(renderer, "session-puzzle-timeout-overlay"))).toContain(
-      "Added to Review · Moving on"
+      "Mistake · Marked Unclear · Moving on"
     );
     expect(findByTestId(renderer, "board-input-blocker")).toBeTruthy();
     expectSessionMistakes(renderer, 1);

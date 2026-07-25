@@ -361,10 +361,10 @@ for (const backend of ["memory", "sqlite"] as const) {
         ),
         {
           correctThisWeek: 0,
-          accuracyThisWeek: null,
+          accuracyThisWeek: 0,
           ratingDeltaThisWeek: null,
-          wrongThisWeek: 0,
-          netThisWeek: 0
+          wrongThisWeek: 1,
+          netThisWeek: -1
         }
       );
       const timedOutAttemptId = timedOut.attempt?.id ?? assert.fail("expected timeout attempt");

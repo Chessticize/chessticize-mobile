@@ -137,7 +137,7 @@ test("abandoning after a timeout rates the unfinished sprint as failed", () => {
 
   const timedOut = advanceSprintTime(started, "2026-06-20T00:01:00.000Z");
   const abandoned = abandonSprint(timedOut.state, "2026-06-20T00:01:01.000Z");
-  assert.equal(timedOut.state.hasUserSubmittedMove, true);
+  assert.equal(timedOut.state.hasUserSubmittedMove, false);
   assert.equal(abandoned.status, "failed");
   assert.equal(abandoned.endReason, "abandoned");
   assert.ok(abandoned.ratingAfter !== undefined);
