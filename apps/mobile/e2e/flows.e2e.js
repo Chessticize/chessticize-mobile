@@ -1,6 +1,7 @@
 const {
   openTab,
   openStandardHistoryTrend,
+  historyAttemptRowTestIDForResult,
   launchWithDisabledSynchronization,
   playBoardMove,
   sleep,
@@ -236,12 +237,7 @@ describe('Key user flows', () => {
     )).toExist().withTimeout(10000);
     await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
 
-    const resultAttributes = await element(by.text('Wrong move')).atIndex(0).getAttributes();
-    const resultIdentifier = (Array.isArray(resultAttributes) ? resultAttributes[0] : resultAttributes).identifier;
-    if (typeof resultIdentifier !== 'string' || !resultIdentifier.endsWith('-result')) {
-      throw new Error(`Could not resolve history attempt row from ${String(resultIdentifier)}`);
-    }
-    const resultRowIdentifier = resultIdentifier.replace(/-result$/, '');
+    const resultRowIdentifier = await historyAttemptRowTestIDForResult('Wrong move');
     await waitForVisibleInPracticeScroll(resultRowIdentifier);
     await element(by.id(resultRowIdentifier)).tap();
     await waitFor(element(by.id('review-session'))).toExist().withTimeout(10000);

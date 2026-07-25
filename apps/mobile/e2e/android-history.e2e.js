@@ -1,6 +1,7 @@
 const {
   elementText,
   failStandardSprint,
+  historyAttemptRowTestIDForResult,
   launchWithDisabledSynchronization,
   openTab,
   playBoardMove,
@@ -42,12 +43,9 @@ describe('Android Practice History', () => {
       await waitForElementTextContaining('history-active-filter-summary', 'Result: Wrong', 10000);
 
       await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
-      const resultAttributes = await element(by.text('Wrong move')).atIndex(0).getAttributes();
-      const resultIdentifier = (Array.isArray(resultAttributes) ? resultAttributes[0] : resultAttributes).identifier;
-      if (typeof resultIdentifier !== 'string' || !resultIdentifier.endsWith('-result')) {
-        throw new Error(`Could not resolve persisted History row from ${String(resultIdentifier)}`);
-      }
-      await element(by.id(resultIdentifier.replace(/-result$/, ''))).tap();
+      const resultRowIdentifier = await historyAttemptRowTestIDForResult('Wrong move');
+      await waitForVisibleInPracticeScroll(resultRowIdentifier);
+      await element(by.id(resultRowIdentifier)).tap();
 
       await waitForVisibleInPracticeScroll('review-board');
       await expect(element(by.id('history-attempt-detail'))).not.toExist();
@@ -100,14 +98,9 @@ describe('Android Practice History', () => {
       await element(by.id('history-filter-toggle')).tap();
       await element(by.id('history-source-review')).tap();
       await waitFor(element(by.text('Correct')).atIndex(0)).toExist().withTimeout(10000);
-      const reviewResultAttributes = await element(by.text('Correct')).atIndex(0).getAttributes();
-      const reviewResultIdentifier = (Array.isArray(reviewResultAttributes)
-        ? reviewResultAttributes[0]
-        : reviewResultAttributes).identifier;
-      if (typeof reviewResultIdentifier !== 'string' || !reviewResultIdentifier.endsWith('-result')) {
-        throw new Error(`Could not resolve persisted Review History row from ${String(reviewResultIdentifier)}`);
-      }
-      await element(by.id(reviewResultIdentifier.replace(/-result$/, ''))).tap();
+      const reviewResultRowIdentifier = await historyAttemptRowTestIDForResult('Correct');
+      await waitForVisibleInPracticeScroll(reviewResultRowIdentifier);
+      await element(by.id(reviewResultRowIdentifier)).tap();
 
       await waitForVisibleInPracticeScroll('review-board');
       await expect(element(by.id('history-attempt-detail'))).not.toExist();

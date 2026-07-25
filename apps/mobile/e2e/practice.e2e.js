@@ -4,6 +4,7 @@ const {
   elementText,
   sleep,
   frameFor,
+  historyAttemptRowTestIDForResult,
   launchWithDisabledSynchronization,
   openStandardHistoryTrend,
   playBoardMove,
@@ -231,12 +232,9 @@ describe('Practice POC', () => {
     });
     await openStandardHistoryTrend();
     await waitFor(element(by.text('Correct')).atIndex(0)).toExist().withTimeout(10000);
-    const resultAttributes = await element(by.text('Correct')).atIndex(0).getAttributes();
-    const resultIdentifier = (Array.isArray(resultAttributes) ? resultAttributes[0] : resultAttributes).identifier;
-    if (typeof resultIdentifier !== 'string' || !resultIdentifier.endsWith('-result')) {
-      throw new Error(`Could not resolve unclear History row from ${String(resultIdentifier)}`);
-    }
-    await element(by.id(resultIdentifier.replace(/-result$/, ''))).tap();
+    const resultRowIdentifier = await historyAttemptRowTestIDForResult('Correct');
+    await waitForVisibleInPracticeScroll(resultRowIdentifier);
+    await element(by.id(resultRowIdentifier)).tap();
     await waitForVisibleInPracticeScroll('review-schedule-add');
     await waitForVisibleInPracticeScroll('history-attempt-unclear');
     await expect(element(by.id('history-attempt-detail'))).not.toExist();
@@ -385,12 +383,9 @@ describe('Practice POC', () => {
     });
     await openStandardHistoryTrend();
     await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
-    const resultAttributes = await element(by.text('Wrong move')).atIndex(0).getAttributes();
-    const resultIdentifier = (Array.isArray(resultAttributes) ? resultAttributes[0] : resultAttributes).identifier;
-    if (typeof resultIdentifier !== 'string' || !resultIdentifier.endsWith('-result')) {
-      throw new Error(`Could not resolve persisted history attempt row from ${String(resultIdentifier)}`);
-    }
-    await element(by.id(resultIdentifier.replace(/-result$/, ''))).tap();
+    const resultRowIdentifier = await historyAttemptRowTestIDForResult('Wrong move');
+    await waitForVisibleInPracticeScroll(resultRowIdentifier);
+    await element(by.id(resultRowIdentifier)).tap();
     await waitFor(element(by.id('review-session'))).toExist().withTimeout(10000);
     await waitForVisibleInPracticeScroll('review-analysis-button');
     await element(by.id('review-analysis-button')).tap();

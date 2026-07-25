@@ -817,6 +817,26 @@ async function openStandardHistoryTrend() {
   await waitFor(element(by.id('history-chart-line'))).toExist().withTimeout(10000);
 }
 
+async function historyAttemptRowTestIDForResult(resultLabel) {
+  const matches = element(by.text(resultLabel));
+  for (let index = 0; index < 20; index += 1) {
+    let attributes;
+    try {
+      attributes = await matches.atIndex(index).getAttributes();
+    } catch {
+      break;
+    }
+    const candidates = Array.isArray(attributes) ? attributes : [attributes];
+    for (const candidate of candidates) {
+      const identifier = candidate?.identifier;
+      if (typeof identifier === 'string' && /^history-attempt-.+-result$/.test(identifier)) {
+        return identifier.replace(/-result$/, '');
+      }
+    }
+  }
+  throw new Error(`Could not resolve a History attempt row with result "${resultLabel}"`);
+}
+
 async function failStandardSprint() {
   await selectTestPuzzleSource('familiar15');
   await startPracticeMode('standard');
@@ -839,6 +859,7 @@ module.exports = {
   bringAndroidAppToForeground,
   collectAndroidUiDiagnostics,
   elementText,
+  historyAttemptRowTestIDForResult,
   openTab,
   openStandardHistoryTrend,
   launchWithDisabledSynchronization,
