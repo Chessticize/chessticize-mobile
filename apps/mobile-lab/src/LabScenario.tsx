@@ -110,11 +110,16 @@ function sprintRulesDesignPreviewFor(
   if (scenarioId === "practice-first-sprint-guide") {
     return {
       firstRunGuide,
-      firstRunGuideInitiallyVisible: true
+      firstRunGuideInitiallyVisible: true,
+      timeoutAddsToReview: true
     };
   }
   if (scenarioId === "practice-custom-setup") {
-    return { firstRunGuide, showRunEditorSummary: true };
+    return {
+      firstRunGuide,
+      showRunEditorSummary: true,
+      timeoutAddsToReview: true
+    };
   }
   if (
     scenarioId === "practice-active-session-guide"
@@ -126,8 +131,12 @@ function sprintRulesDesignPreviewFor(
         maxMistakes: 3,
         mode: scenarioId === "practice-arrow-duel-guide" ? "arrow_duel" : "standard",
         targetCorrect: 15
-      }
+      },
+      timeoutAddsToReview: true
     };
+  }
+  if (scenarioId === "practice-timing-timeout") {
+    return { timeoutAddsToReview: true };
   }
   if (scenarioId === "practice-sprint-result-goal") {
     return {
@@ -167,7 +176,7 @@ function sprintRulesDesignPreviewFor(
     return { showSettingsReset: true };
   }
   if (isRunManagementScenario(scenarioId)) {
-    return { firstRunGuide };
+    return { firstRunGuide, timeoutAddsToReview: true };
   }
   return undefined;
 }

@@ -1044,11 +1044,17 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "practice-sprint-rules-guide"))).toContain(
       "Automatically marks the puzzle as Unclear; it is not a mistake."
     );
+    expect(collectText(findByTestId(renderer, "practice-sprint-rules-guide"))).toContain(
+      "Marks it Timed out and Unclear, adds it to Review, then moves on."
+    );
     expect(findByTestId(renderer, "practice-sprint-rules-guide").props.accessibilityLabel).toContain(
       "The Sprint ends after 3 mistakes."
     );
     expect(findByTestId(renderer, "practice-sprint-rules-guide").props.accessibilityLabel).toContain(
       "A Slow warning automatically marks the puzzle as Unclear and does not count as a mistake."
+    );
+    expect(findByTestId(renderer, "practice-sprint-rules-guide").props.accessibilityLabel).toContain(
+      "A timeout marks the puzzle Timed out and Unclear, adds it to Review, then moves on."
     );
 
     press(renderer, "practice-sprint-rules-dismiss");
@@ -1068,6 +1074,12 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(activeSession, "session-board")).toThrow();
     expect(collectText(findByTestId(activeSession, "practice-session-guide-slow"))).toContain(
       "Slow saves the puzzle as Unclear"
+    );
+    expect(collectText(findByTestId(activeSession, "practice-session-guide-timeout"))).toContain(
+      "Timeout adds the puzzle to Review"
+    );
+    expect(collectText(findByTestId(activeSession, "practice-session-guide-timeout"))).toContain(
+      "The puzzle is marked Timed out and Unclear, added to Review, and the Sprint moves on."
     );
     expect(collectText(findByTestId(activeSession, "practice-session-guide-unclear"))).toContain(
       "Mark as unclear"
@@ -1111,12 +1123,18 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(productionLike, "practice-run-pass-rules")).toThrow();
     expect(() => findByTestId(productionLike, "practice-sprint-rules-guide")).toThrow();
     expect(() => findByTestId(productionLike, "practice-sprint-rules-open")).toThrow();
+    expect(collectText(findByTestId(productionLike, "practice-run-puzzle-timeout"))).not.toContain(
+      "Adds it to Review"
+    );
 
     const preview = renderLabScenario("practice-custom-setup");
     press(preview, "practice-add-run");
 
     expect(collectText(findByTestId(preview, "practice-run-pass-rules"))).toContain(
       "Solve 15 before 5 min ends"
+    );
+    expect(collectText(findByTestId(preview, "practice-run-puzzle-timeout"))).toContain(
+      "Marks it Timed out and Unclear, adds it to Review, and moves on."
     );
     press(preview, "practice-run-duration-stepper-decrease");
     expect(collectText(findByTestId(preview, "practice-run-pass-rules"))).toContain(
@@ -1469,6 +1487,9 @@ describe("PracticePocScreen", () => {
     ).toHaveLength(0);
     expect(collectText(findByTestId(renderer, "session-puzzle-timeout-overlay"))).toContain(
       "Timed out"
+    );
+    expect(collectText(findByTestId(renderer, "session-puzzle-timeout-overlay"))).toContain(
+      "Added to Review · Moving on"
     );
     expect(findByTestId(renderer, "board-input-blocker")).toBeTruthy();
 
