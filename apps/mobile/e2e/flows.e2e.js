@@ -275,8 +275,9 @@ describe('Key user flows', () => {
   });
 
   it('adds and starts a saved custom Run', async () => {
-    await createSavedCustomRun('Flow Focus', { shorterDuration: true });
-    await element(by.text('Flow Focus')).tap();
+    const flowFocusSelectTestID = await createSavedCustomRun('Flow Focus', { shorterDuration: true });
+    await waitForVisibleInPracticeScroll(flowFocusSelectTestID);
+    await element(by.id(flowFocusSelectTestID)).tap();
     await element(by.id('practice-main-scroll')).scrollTo('top');
     await element(by.id('practice-run-start')).tap();
     await completeFirstUseSessionGuides();
@@ -293,11 +294,12 @@ describe('Key user flows', () => {
     await dismissSprintSummary();
 
     await openTab('practice-tab', 'practice-add-run');
-    await createSavedCustomRun('Persistent Focus', {
+    const persistentFocusSelectTestID = await createSavedCustomRun('Persistent Focus', {
       shorterDuration: true,
       themes: ['mate-in-2', 'fork']
     });
-    await element(by.text('Persistent Focus')).tap();
+    await waitForVisibleInPracticeScroll(persistentFocusSelectTestID);
+    await element(by.id(persistentFocusSelectTestID)).tap();
     await element(by.id('practice-main-scroll')).scrollTo('top');
     await element(by.id('practice-run-start')).tap();
     await completeFirstUseSessionGuides();
@@ -365,7 +367,17 @@ async function createSavedCustomRun(name, { shorterDuration = false, themes = []
   await element(by.id('practice-main-scroll')).scrollTo('top');
   await element(by.id('practice-run-save')).tap();
   await waitFor(element(by.id('practice-run-home-edit'))).toBeVisible().withTimeout(10000);
-  await waitFor(element(by.text(name))).toExist().withTimeout(10000);
+  const runName = element(by.text(name));
+  await waitFor(runName).toExist().withTimeout(10000);
+  const attributes = await runName.getAttributes();
+  const candidates = Array.isArray(attributes) ? attributes : [attributes];
+  const nameTestID = candidates
+    .map((candidate) => candidate?.identifier)
+    .find((identifier) => typeof identifier === 'string' && identifier.startsWith('practice-run-name-'));
+  if (!nameTestID) {
+    throw new Error(`Could not resolve selectable Run card for "${name}"`);
+  }
+  return nameTestID.replace('practice-run-name-', 'practice-run-select-');
 }
 
 function durationTextToSeconds(value) {
