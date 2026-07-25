@@ -1,6 +1,7 @@
 const { execFileSync } = require('node:child_process');
 const { resolve } = require('node:path');
 const {
+  frameFor,
   launchWithDisabledSynchronization,
   openTab,
   playBoardMove,
@@ -193,14 +194,34 @@ async function takeLandscapeScreenshot(name) {
     return;
   }
 
-  await device.setOrientation('landscape');
+  await setStoreAssetOrientation('landscape');
   try {
-    await sleep(500);
     await device.takeScreenshot(`${name}-landscape`);
   } finally {
-    await device.setOrientation('portrait');
-    await sleep(500);
+    await setStoreAssetOrientation('portrait');
   }
+}
+
+async function setStoreAssetOrientation(orientation) {
+  await device.setOrientation(orientation);
+  let lastFrame = null;
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    try {
+      lastFrame = await frameFor(element(by.id('adaptive-layout')));
+      const isLandscape = lastFrame.width > lastFrame.height;
+      if ((orientation === 'landscape') === isLandscape) {
+        await sleep(500);
+        return;
+      }
+    } catch {
+      lastFrame = null;
+    }
+    await sleep(250);
+  }
+  throw new Error(
+    `Timed out waiting for ${orientation} store-asset layout; `
+    + `last observed frame=${JSON.stringify(lastFrame)}`
+  );
 }
 
 async function resolveDisplayedArrowDuelFixture(overlayTestID, puzzleIDTestID) {
