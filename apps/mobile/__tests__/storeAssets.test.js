@@ -110,6 +110,12 @@ describe("App Store assets document", () => {
     expect(storeAssetsE2e).toContain("takePortraitScreenshotAtTop('app-store-08-review-session')");
     expect(storeAssetsE2e).toContain("device.setOrientation('landscape')");
     expect(storeAssetsE2e).toContain("device.setOrientation('portrait')");
+    expect(storeAssetsE2e).toContain("waitForScreenOrientation('landscape')");
+    expect(storeAssetsE2e).toContain("waitForScreenOrientation('portrait')");
+    expect(storeAssetsE2e).toContain("last observed frame=${JSON.stringify(lastFrame)}");
+    expect(storeAssetsE2e).toContain("stableFrameCount >= 3");
+    expect(storeAssetsE2e).toContain("Portrait restoration failed after ${name}");
+    expect(storeAssetsE2e).toContain("last frame error=${lastFrameError");
     expect(storeAssetsE2e).toContain("expect(element(by.text('Themes'))).toExist()");
     expect(storeAssetsDoc).toContain("pnpm mobile:e2e:build:ios:release");
     expect(storeAssetsDoc).toContain("pnpm mobile:e2e:store-assets:ios:release");

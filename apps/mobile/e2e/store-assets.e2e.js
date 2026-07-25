@@ -198,15 +198,71 @@ async function takeLandscapeScreenshot(name, assertLayout) {
     return;
   }
 
+  let captureError = null;
   await device.setOrientation('landscape');
   try {
-    await sleep(500);
+    await waitForScreenOrientation('landscape');
     await assertLayout?.();
     await device.takeScreenshot(`${name}-landscape`);
+  } catch (error) {
+    captureError = error;
+    throw error;
   } finally {
-    await device.setOrientation('portrait');
-    await sleep(500);
+    try {
+      await device.setOrientation('portrait');
+      await waitForScreenOrientation('portrait');
+    } catch (restoreError) {
+      if (!captureError) {
+        throw restoreError;
+      }
+      console.error(
+        `[store-assets] Portrait restoration failed after ${name}: ${errorMessage(restoreError)}`
+      );
+    }
   }
+}
+
+async function waitForScreenOrientation(orientation) {
+  let lastFrame = null;
+  let lastFrameError = null;
+  let previousExpectedFrame = null;
+  let stableFrameCount = 0;
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    try {
+      lastFrame = await frameFor(element(by.id('adaptive-layout')));
+      lastFrameError = null;
+      const hasExpectedOrientation = orientation === 'landscape'
+        ? lastFrame.width > lastFrame.height
+        : lastFrame.height > lastFrame.width;
+      const matchesPreviousFrame = previousExpectedFrame !== null
+        && ['x', 'y', 'width', 'height'].every(
+          (key) => Math.abs(lastFrame[key] - previousExpectedFrame[key]) <= 1
+        );
+      stableFrameCount = hasExpectedOrientation
+        ? matchesPreviousFrame
+          ? stableFrameCount + 1
+          : 1
+        : 0;
+      previousExpectedFrame = hasExpectedOrientation ? lastFrame : null;
+      if (stableFrameCount >= 3) {
+        return;
+      }
+    } catch (error) {
+      lastFrameError = error;
+      previousExpectedFrame = null;
+      stableFrameCount = 0;
+    }
+    await sleep(250);
+  }
+  throw new Error(
+    `Timed out waiting for ${orientation} store-asset layout; `
+    + `last observed frame=${JSON.stringify(lastFrame)}; `
+    + `last frame error=${lastFrameError === null ? 'none' : errorMessage(lastFrameError)}`
+  );
+}
+
+function errorMessage(error) {
+  return error instanceof Error ? `${error.name}: ${error.message}` : String(error);
 }
 
 async function assertReviewLandscapeLayout() {
