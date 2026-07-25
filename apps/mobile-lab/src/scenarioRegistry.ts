@@ -93,9 +93,9 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
     "Practice",
     "New Run",
     "practice--custom-setup",
-    "New named run editor that defaults to All themes, exposes the grouped server-curated 24-theme catalog, and saves to Home without starting.",
+    "New named run editor that defaults to All themes, exposes the grouped server-curated 24-theme catalog, matches the web timing range, and lets linked warning and timeout defaults be adjusted before saving to Home without starting.",
     "practice",
-    ["Required unique name", "Custom configuration", "24 curated themes", "Deterministic All-to-multiple selection", "All exclusivity", "Direct 600-2200 Starting ELO", "Add to Home"],
+    ["Required unique name", "Custom configuration", "Web timing range", "Linked timing defaults", "Independent warning and timeout controls", "24 curated themes", "Deterministic All-to-multiple selection", "All exclusivity", "Direct 600-2200 Starting ELO", "Add to Home"],
     ["Practice home", "Native run persistence", "Scored practice session"]
   ),
   "practice-run-name-validation": defineScenario("practice-run-name-validation", "Practice", "Run name validation", "practice--run-name-validation", "New Run with inline required-name validation; entering an existing name exposes the unique-name error.", "practice", ["Required-name error", "Unique-name rule", "Accessible field feedback"], ["Practice home", "Saved run"]),

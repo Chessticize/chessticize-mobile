@@ -318,6 +318,16 @@ const BOARD_MOVE_ANIMATION_MS = 200;
 const ANALYSIS_DEPTH = 20;
 const CUSTOM_DURATION_OPTIONS = [3 * 60, 5 * 60, 10 * 60] as const;
 const CUSTOM_PER_PUZZLE_OPTIONS = [10, 20, 30] as const;
+const PRACTICE_RUN_DURATION_OPTIONS = [
+  3 * 60,
+  5 * 60,
+  10 * 60,
+  15 * 60,
+  20 * 60,
+  25 * 60,
+  30 * 60
+] as const;
+const PRACTICE_RUN_PER_PUZZLE_OPTIONS = [5, 10, 15, 20, 30, 60] as const;
 const CUSTOM_INITIAL_RATING_MIN = 600;
 const CUSTOM_INITIAL_RATING_MAX = 2200;
 const CUSTOM_INITIAL_RATING_STEP = 100;
@@ -4397,24 +4407,24 @@ function PracticeRunEditor({
                   label="Duration"
                   value={formatDurationLabel(draft.durationSeconds)}
                   stepperTestID="practice-run-duration-stepper"
-                  options={CUSTOM_DURATION_OPTIONS.map((option) => ({
+                  options={PRACTICE_RUN_DURATION_OPTIONS.map((option) => ({
                     value: option,
                     label: formatDurationLabel(option),
                     testID: `practice-run-duration-${option}`
                   }))}
-                  selected={draft.durationSeconds as (typeof CUSTOM_DURATION_OPTIONS)[number]}
+                  selected={draft.durationSeconds as (typeof PRACTICE_RUN_DURATION_OPTIONS)[number]}
                   onChange={(durationSeconds) => presentation.onIntent({ type: "change-duration", durationSeconds })}
                 />
                 <CustomOptionRow
                   label="Time per puzzle"
                   value={`${draft.perPuzzleSeconds} sec`}
                   stepperTestID="practice-run-per-puzzle-stepper"
-                  options={CUSTOM_PER_PUZZLE_OPTIONS.map((option) => ({
+                  options={PRACTICE_RUN_PER_PUZZLE_OPTIONS.map((option) => ({
                     value: option,
                     label: `${option}s`,
                     testID: `practice-run-per-puzzle-${option}`
                   }))}
-                  selected={draft.perPuzzleSeconds as (typeof CUSTOM_PER_PUZZLE_OPTIONS)[number]}
+                  selected={draft.perPuzzleSeconds as (typeof PRACTICE_RUN_PER_PUZZLE_OPTIONS)[number]}
                   onChange={(perPuzzleSeconds) => presentation.onIntent({ type: "change-per-puzzle", perPuzzleSeconds })}
                 />
               </>
@@ -4463,7 +4473,7 @@ function PracticeRunEditor({
         )}
       </View>
 
-      {!isCreate && directRunEditing ? (
+      {isCreate || directRunEditing ? (
         <PracticeRunTimingSettings
           perPuzzleSeconds={draft.perPuzzleSeconds}
           puzzleTiming={draft.puzzleTiming}
