@@ -65,6 +65,14 @@ export const CustomSetup: Story = {
     await waitForTestId(canvasElement, "practice-run-editor");
     await clickTestId(canvasElement, "custom-theme-fork");
     await clickTestId(canvasElement, "custom-theme-pin");
+    await waitForTestId(canvasElement, "practice-run-slow-warning");
+    await waitForTestId(canvasElement, "practice-run-puzzle-timeout");
+    await clickTestId(canvasElement, "practice-run-per-puzzle-stepper-increase");
+    await waitForText(canvasElement, "1:00");
+    await waitForText(canvasElement, "1:30");
+    await clickTestId(canvasElement, "practice-run-slow-warning-decrease");
+    await waitForText(canvasElement, "0:55");
+    await clickTestId(canvasElement, "practice-run-puzzle-timeout-toggle");
   }
 };
 

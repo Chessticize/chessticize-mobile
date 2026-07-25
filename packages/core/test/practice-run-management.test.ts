@@ -51,6 +51,40 @@ test("Run management creates a uniquely named multi-theme Run through its public
   assert.equal(adapter.commands.at(-1)?.type, "create-run");
 });
 
+test("changing New Run pace refreshes linked timing defaults before manual overrides", () => {
+  const controller = createPracticeRunManagementController(new FakeRunManagementAdapter());
+
+  controller.dispatch({ type: "add-run" });
+  assert.deepEqual(controller.getSnapshot().draft?.puzzleTiming, {
+    slowAfterSeconds: 40,
+    timeoutAfterSeconds: 60
+  });
+
+  controller.dispatch({ type: "change-per-puzzle", perPuzzleSeconds: 60 });
+  assert.deepEqual(controller.getSnapshot().draft?.puzzleTiming, {
+    slowAfterSeconds: 120,
+    timeoutAfterSeconds: 180
+  });
+
+  controller.dispatch({
+    type: "change-puzzle-timing",
+    puzzleTiming: {
+      slowAfterSeconds: 115,
+      timeoutAfterSeconds: null
+    }
+  });
+  assert.deepEqual(controller.getSnapshot().draft?.puzzleTiming, {
+    slowAfterSeconds: 115,
+    timeoutAfterSeconds: null
+  });
+
+  controller.dispatch({ type: "change-per-puzzle", perPuzzleSeconds: 15 });
+  assert.deepEqual(controller.getSnapshot().draft?.puzzleTiming, {
+    slowAfterSeconds: 30,
+    timeoutAfterSeconds: 45
+  });
+});
+
 test("editing preserves fixed Run settings while validating direct ELO input", () => {
   const adapter = new FakeRunManagementAdapter();
   const controller = createPracticeRunManagementController(adapter);

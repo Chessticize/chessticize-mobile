@@ -1745,6 +1745,55 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "settings-standard-elo-row")).toThrow();
   });
 
+  it("offers the web timing range and customizable linked defaults when adding a Run", () => {
+    const service = createMobilePracticeService("random1000");
+    const renderer = renderScreen({ practiceService: service, runManagementEnabled: true });
+
+    press(renderer, "practice-add-run");
+    expect(collectText(findByTestId(renderer, "practice-run-slow-warning-value"))).toBe("0:40");
+    expect(collectText(findByTestId(renderer, "practice-run-puzzle-timeout-value"))).toBe("1:00");
+    expect(findByTestId(renderer, "practice-run-slow-warning-toggle").props.accessibilityState)
+      .toEqual({ checked: true });
+    expect(findByTestId(renderer, "practice-run-puzzle-timeout-toggle").props.accessibilityState)
+      .toEqual({ checked: true });
+
+    for (let step = 0; step < 5; step += 1) {
+      press(renderer, "practice-run-duration-stepper-increase");
+    }
+    expect(collectText(findByTestId(renderer, "practice-run-editor-fields"))).toContain("30m");
+
+    for (let step = 0; step < 3; step += 1) {
+      press(renderer, "practice-run-per-puzzle-stepper-decrease");
+    }
+    expect(collectText(findByTestId(renderer, "practice-run-editor-fields"))).toContain("5 sec");
+    expect(collectText(findByTestId(renderer, "practice-run-slow-warning-value"))).toBe("0:10");
+    expect(collectText(findByTestId(renderer, "practice-run-puzzle-timeout-value"))).toBe("0:15");
+
+    for (let step = 0; step < 5; step += 1) {
+      press(renderer, "practice-run-per-puzzle-stepper-increase");
+    }
+    expect(collectText(findByTestId(renderer, "practice-run-editor-fields"))).toContain("60 sec");
+    expect(collectText(findByTestId(renderer, "practice-run-slow-warning-value"))).toBe("2:00");
+    expect(collectText(findByTestId(renderer, "practice-run-puzzle-timeout-value"))).toBe("3:00");
+
+    press(renderer, "practice-run-slow-warning-decrease");
+    press(renderer, "practice-run-puzzle-timeout-toggle");
+    act(() => {
+      findByTestId(renderer, "practice-run-name-input").props.onChangeText("Long Calculation");
+    });
+    press(renderer, "practice-run-save");
+
+    expect(service.listPracticeRuns().find((run) => run.name === "Long Calculation"))
+      .toMatchObject({
+        durationSeconds: 30 * 60,
+        perPuzzleSeconds: 60,
+        puzzleTiming: {
+          slowAfterSeconds: 115,
+          timeoutAfterSeconds: null
+        }
+      });
+  });
+
   it("blocks a New Run with no matching local puzzles and keeps its setup editable", () => {
     const service = new PracticeService(new MemoryStore());
     const renderer = renderScreen({ practiceService: service, runManagementEnabled: true });
