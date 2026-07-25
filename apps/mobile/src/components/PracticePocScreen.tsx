@@ -4282,7 +4282,7 @@ function sessionGuideCallout(
   if (coachStep === 1) {
     return {
       badge: "SLOW",
-      detail: "When the timer below the board turns amber, keep solving. A correct answer is marked Unclear for another look, but it is not a mistake.",
+      detail: "When the puzzle timer turns amber, keep solving. A correct answer is marked Unclear for another look, but it is not a mistake.",
       id: "slow",
       title: "Amber means this puzzle is slow",
       tone: "warning"

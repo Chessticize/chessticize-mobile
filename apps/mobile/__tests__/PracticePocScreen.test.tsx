@@ -1298,7 +1298,7 @@ describe("PracticePocScreen", () => {
       "Amber means this puzzle is slow"
     );
     expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-slow"))).toContain(
-      "When the timer below the board turns amber, keep solving. A correct answer is marked Unclear for another look, but it is not a mistake."
+      "When the puzzle timer turns amber, keep solving. A correct answer is marked Unclear for another look, but it is not a mistake."
     );
     expect(collectText(findByTestId(activeSession, "practice-session-guide-demo-timer"))).toContain(
       "Puzzle 0:40"
@@ -1447,13 +1447,13 @@ describe("PracticePocScreen", () => {
       activeSession,
       "practice-active-session-guide"
     ).props.accessibilityLabel).toBe(
-      "Guide 2 of 4. Amber means this puzzle is slow. When the timer below the board turns amber, keep solving. A correct answer is marked Unclear for another look, but it is not a mistake."
+      "Guide 2 of 4. Amber means this puzzle is slow. When the puzzle timer turns amber, keep solving. A correct answer is marked Unclear for another look, but it is not a mistake."
     );
     expect(findByTestId(activeSession, "practice-session-guide-demo-timer")).toBeTruthy();
     expect(collectText(
       findByTestId(activeSession, "practice-session-guide-coach-copy-slow")
     )).toBe(
-      "SLOWAmber means this puzzle is slowWhen the timer below the board turns amber, keep solving. A correct answer is marked Unclear for another look, but it is not a mistake."
+      "SLOWAmber means this puzzle is slowWhen the puzzle timer turns amber, keep solving. A correct answer is marked Unclear for another look, but it is not a mistake."
     );
 
     press(activeSession, "practice-session-guide-start");
