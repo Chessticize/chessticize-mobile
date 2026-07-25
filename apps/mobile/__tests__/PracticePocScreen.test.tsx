@@ -1234,6 +1234,113 @@ describe("PracticePocScreen", () => {
     );
   });
 
+  it("keeps guide callouts attached to visibly highlighted targets in portrait and landscape", () => {
+    const windowDimensions = ReactNative as unknown as {
+      __setWindowDimensions?: (dimensions: {
+        fontScale: number;
+        height: number;
+        scale: number;
+        width: number;
+      }) => void;
+    };
+    windowDimensions.__setWindowDimensions?.({
+      width: 390,
+      height: 844,
+      scale: 3,
+      fontScale: 1
+    });
+
+    const portrait = renderLabScenario("practice-active-session-guide");
+    const portraitBoardSize = Number(
+      flattenTestStyle(findByTestId(portrait, "practice-session-guide-demo-board").props.style).width
+    );
+
+    press(portrait, "practice-session-guide-start");
+    expect(findByTestId(portrait, "practice-session-guide-coach-pointer-slow-bottom")).toBeTruthy();
+    expect(testIdOrder(
+      portrait,
+      "practice-session-guide-coach-copy-slow",
+      "practice-session-guide-coach-pointer-slow-bottom"
+    )).toBeLessThan(0);
+    expect(
+      flattenTestStyle(findByTestId(portrait, "practice-session-guide-demo-timer").props.style).borderColor
+    ).toBe("#F59E0B");
+
+    press(portrait, "practice-session-guide-start");
+    expect(
+      flattenTestStyle(findByTestId(portrait, "practice-session-guide-demo-board").props.style).borderColor
+    ).toBe("#EF4444");
+
+    press(portrait, "practice-session-guide-start");
+    expect(findByTestId(portrait, "practice-session-guide-coach-pointer-unclear-bottom")).toBeTruthy();
+    expect(
+      flattenTestStyle(findByTestId(portrait, "practice-session-guide-coach-unclear").props.style).top
+    ).toBe(portraitBoardSize + 150);
+    expect(
+      flattenTestStyle(findByTestId(portrait, "practice-session-guide-demo-unclear").props.style).borderColor
+    ).toBe("#F59E0B");
+
+    const portraitArrowDuel = renderLabScenario("practice-arrow-duel-guide-only");
+    expect(findByTestId(
+      portraitArrowDuel,
+      "practice-arrow-duel-guide-candidate-spotlight"
+    )).toBeTruthy();
+    expect(
+      flattenTestStyle(findByTestId(portraitArrowDuel, "practice-arrow-duel-guide-coach").props.style).top
+    ).toBe(portraitBoardSize / 8 * 3.15 + 4);
+
+    act(() => {
+      windowDimensions.__setWindowDimensions?.({
+        width: 844,
+        height: 390,
+        scale: 3,
+        fontScale: 1
+      });
+    });
+
+    const landscape = renderLabScenario("practice-active-session-guide");
+    press(landscape, "practice-session-guide-start");
+    expect(findByTestId(landscape, "practice-session-guide-coach-pointer-slow-top")).toBeTruthy();
+    expect(
+      flattenTestStyle(findByTestId(landscape, "practice-session-guide-coach-slow").props.style).top
+    ).toBe(220);
+    expect(
+      flattenTestStyle(findByTestId(landscape, "practice-session-guide-demo-timer").props.style).borderColor
+    ).toBe("#F59E0B");
+
+    press(landscape, "practice-session-guide-start");
+    expect(findByTestId(
+      landscape,
+      "practice-session-guide-coach-pointer-timeout-left"
+    )).toBeTruthy();
+    expect(
+      flattenTestStyle(findByTestId(landscape, "practice-session-guide-coach-timeout").props.style).top
+    ).toBe(122);
+    expect(
+      flattenTestStyle(findByTestId(landscape, "practice-session-guide-demo-board").props.style).borderColor
+    ).toBe("#EF4444");
+    press(landscape, "practice-session-guide-start");
+    expect(
+      flattenTestStyle(findByTestId(landscape, "practice-session-guide-coach-unclear").props.style).top
+    ).toBe(188);
+    expect(
+      flattenTestStyle(findByTestId(landscape, "practice-session-guide-demo-unclear").props.style).borderColor
+    ).toBe("#F59E0B");
+
+    const landscapeArrowDuel = renderLabScenario("practice-arrow-duel-guide-only");
+    expect(findByTestId(
+      landscapeArrowDuel,
+      "practice-session-guide-coach-pointer-arrow-duel-left"
+    )).toBeTruthy();
+    expect(
+      flattenTestStyle(findByTestId(landscapeArrowDuel, "practice-arrow-duel-guide-coach").props.style).top
+    ).toBe(92);
+    expect(findByTestId(
+      landscapeArrowDuel,
+      "practice-arrow-duel-guide-candidate-spotlight"
+    )).toBeTruthy();
+  });
+
   it("summarizes dynamic pass rules in New Run and keeps the preview out of product defaults", () => {
     const productionLike = renderScreen({
       runManagementPresentation: runManagementPresentation({

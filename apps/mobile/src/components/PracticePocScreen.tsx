@@ -4294,26 +4294,54 @@ function SessionCoachmarkDemo({
           : coachStep === 0
           ? 72
           : coachStep === 1
-            ? 154
+            ? 220
             : coachStep === 2
-              ? 20
-              : 92,
+              ? 122
+              : 188,
         width: adaptiveLayout.sessionRailWidth
       }
     : {
         left: 0,
         right: 0,
         top: isArrowDuel
-          ? boardSize + 60
-          : coachStep === 0 || coachStep === 2
-          ? 113
-          : boardSize + (coachStep === 1 ? 71 : 60)
+          ? boardSquareSize * 3.15 + 4
+          : coachStep === 0
+            ? 113
+            : coachStep === 1
+              ? boardSize + 71
+              : coachStep === 2
+                ? 92
+                : boardSize + 150
       };
   const coachPointer = adaptiveLayout.usesSessionRail && (isArrowDuel || coachStep === 2)
     ? "←"
-    : isArrowDuel || coachStep === 0
+    : isArrowDuel || coachStep === 0 || (adaptiveLayout.usesSessionRail && coachStep === 1)
       ? "↑"
       : "↓";
+  const pointerPlacement = coachPointer === "↓"
+    ? "bottom"
+    : coachPointer === "←"
+      ? "left"
+      : "top";
+  const spotlightTargetStyle = [
+    styles.sessionGuideCoachTarget,
+    callout.tone === "warning" ? styles.sessionGuideCoachTargetWarning : null,
+    callout.tone === "danger" ? styles.sessionGuideCoachTargetDanger : null
+  ];
+  const pointerNode = (
+    <Text
+      accessibilityElementsHidden
+      style={[
+        styles.sessionGuideCoachPointer,
+        pointerPlacement === "left" ? styles.sessionGuideCoachPointerLeft : null,
+        callout.tone === "warning" ? styles.sessionGuideCoachPointerWarning : null,
+        callout.tone === "danger" ? styles.sessionGuideCoachPointerDanger : null
+      ]}
+      testID={`practice-session-guide-coach-pointer-${callout.id}-${pointerPlacement}`}
+    >
+      {coachPointer}
+    </Text>
+  );
   const calloutNode = (
     <View
       style={[
@@ -4326,27 +4354,24 @@ function SessionCoachmarkDemo({
         ? "practice-arrow-duel-guide-coach"
         : `practice-session-guide-coach-${callout.id}`}
     >
-      <Text
-        accessibilityElementsHidden
-        style={[
-          styles.sessionGuideCoachPointer,
-          callout.tone === "warning" ? styles.sessionGuideCoachPointerWarning : null,
-          callout.tone === "danger" ? styles.sessionGuideCoachPointerDanger : null
-        ]}
+      {pointerPlacement !== "bottom" ? pointerNode : null}
+      <View
+        style={styles.sessionGuideCoachCopy}
+        testID={`practice-session-guide-coach-copy-${callout.id}`}
       >
-        {coachPointer}
-      </Text>
-      <Text
-        style={[
-          styles.sessionGuideCoachBadge,
-          callout.tone === "warning" ? styles.sessionGuideCoachBadgeWarning : null,
-          callout.tone === "danger" ? styles.sessionGuideCoachBadgeDanger : null
-        ]}
-      >
-        {callout.badge}
-      </Text>
-      <Text style={styles.sessionGuideInfoTitle}>{callout.title}</Text>
-      <Text style={styles.sessionGuideInfoText}>{callout.detail}</Text>
+        <Text
+          style={[
+            styles.sessionGuideCoachBadge,
+            callout.tone === "warning" ? styles.sessionGuideCoachBadgeWarning : null,
+            callout.tone === "danger" ? styles.sessionGuideCoachBadgeDanger : null
+          ]}
+        >
+          {callout.badge}
+        </Text>
+        <Text style={styles.sessionGuideInfoTitle}>{callout.title}</Text>
+        <Text style={styles.sessionGuideInfoText}>{callout.detail}</Text>
+      </View>
+      {pointerPlacement === "bottom" ? pointerNode : null}
     </View>
   );
 
@@ -4363,7 +4388,7 @@ function SessionCoachmarkDemo({
           <View
             style={[
               styles.sessionGuideCoachLayer,
-              !isArrowDuel && coachStep === 0 ? styles.sessionGuideCoachTarget : null
+              !isArrowDuel && coachStep === 0 ? spotlightTargetStyle : null
             ]}
             testID="practice-session-guide-metrics"
           >
@@ -4417,7 +4442,7 @@ function SessionCoachmarkDemo({
               styles.boardSurface,
               styles.sessionGuideCoachBoardSurface,
               styles.sessionGuideCoachLayer,
-              isArrowDuel || coachStep === 2 ? styles.sessionGuideCoachTarget : null,
+              isArrowDuel || coachStep === 2 ? spotlightTargetStyle : null,
               { height: boardSize, width: boardSize }
             ]}
             testID={isArrowDuel
@@ -4482,6 +4507,21 @@ function SessionCoachmarkDemo({
               flipped={false}
             />
             <BoardInputBlocker />
+            {isArrowDuel ? (
+              <View
+                pointerEvents="none"
+                style={[
+                  styles.sessionGuideCandidateSpotlight,
+                  {
+                    height: boardSquareSize * 2.1,
+                    left: boardSquareSize * 4.1,
+                    top: boardSquareSize * 1.05,
+                    width: boardSquareSize * 2.8
+                  }
+                ]}
+                testID="practice-arrow-duel-guide-candidate-spotlight"
+              />
+            ) : null}
             {isArrowDuel && currentPuzzle.kind === "arrow_duel" ? (
               <ArrowCandidateOverlay
                 boardSize={boardSize}
@@ -4490,6 +4530,7 @@ function SessionCoachmarkDemo({
                 testID="practice-arrow-duel-guide-candidates"
               />
             ) : null}
+            {isArrowDuel && !adaptiveLayout.usesSessionRail ? calloutNode : null}
             {!isArrowDuel && coachStep === 2 ? (
               <View
                 accessibilityRole="alert"
@@ -4510,7 +4551,7 @@ function SessionCoachmarkDemo({
                 style={[
                   styles.sessionGuideCoachTimerTarget,
                   styles.sessionGuideCoachLayer,
-                  !isArrowDuel && coachStep === 1 ? styles.sessionGuideCoachTarget : null
+                  !isArrowDuel && coachStep === 1 ? spotlightTargetStyle : null
                 ]}
                 testID={isArrowDuel
                   ? "practice-arrow-duel-guide-demo-timer"
@@ -4532,7 +4573,7 @@ function SessionCoachmarkDemo({
             style={[
               styles.activeSessionBottomFeedback,
               styles.sessionGuideCoachLayer,
-              styles.sessionGuideCoachTarget,
+              spotlightTargetStyle,
               { width: boardSize }
             ]}
             testID="practice-session-guide-demo-unclear"
@@ -4576,7 +4617,7 @@ function SessionCoachmarkDemo({
               <View
                 style={[
                   styles.sessionGuideCoachLayer,
-                  !isArrowDuel && coachStep === 0 ? styles.sessionGuideCoachTarget : null
+                  !isArrowDuel && coachStep === 0 ? spotlightTargetStyle : null
                 ]}
                 testID="practice-session-guide-metrics"
               >
@@ -4602,7 +4643,7 @@ function SessionCoachmarkDemo({
                 style={[
                   styles.sessionGuideCoachTimerTarget,
                   styles.sessionGuideCoachLayer,
-                  !isArrowDuel && coachStep === 1 ? styles.sessionGuideCoachTarget : null
+                  !isArrowDuel && coachStep === 1 ? spotlightTargetStyle : null
                 ]}
                 testID={isArrowDuel
                   ? "practice-arrow-duel-guide-demo-timer"
@@ -4621,7 +4662,7 @@ function SessionCoachmarkDemo({
                     styles.activeSessionBottomFeedback,
                     styles.activeSessionRailBottomFeedback,
                     styles.sessionGuideCoachLayer,
-                    styles.sessionGuideCoachTarget,
+                    spotlightTargetStyle,
                     { width: adaptiveLayout.sessionRailWidth }
                   ]}
                   testID="practice-session-guide-demo-unclear"
@@ -4638,7 +4679,7 @@ function SessionCoachmarkDemo({
         ) : null}
       </View>
 
-      {calloutNode}
+      {!isArrowDuel || adaptiveLayout.usesSessionRail ? calloutNode : null}
       <View
         accessibilityElementsHidden
         importantForAccessibility="no"
@@ -13565,6 +13606,16 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     zIndex: 3
   },
+  sessionGuideCoachTargetWarning: {
+    backgroundColor: "#FFFBEB",
+    borderColor: "#F59E0B",
+    shadowColor: "#D97706"
+  },
+  sessionGuideCoachTargetDanger: {
+    backgroundColor: "#FEF2F2",
+    borderColor: "#EF4444",
+    shadowColor: "#DC2626"
+  },
   sessionGuideCoachTimerTarget: {
     alignItems: "center",
     alignSelf: "center",
@@ -13597,6 +13648,18 @@ const styles = StyleSheet.create({
   sessionGuideStaticPieceSprite: {
     position: "absolute"
   },
+  sessionGuideCandidateSpotlight: {
+    backgroundColor: "rgba(37, 99, 235, 0.14)",
+    borderColor: "#2563EB",
+    borderRadius: 10,
+    borderWidth: 3,
+    position: "absolute",
+    shadowColor: "#1D4ED8",
+    shadowOffset: { height: 0, width: 0 },
+    shadowOpacity: 0.52,
+    shadowRadius: 10,
+    zIndex: 1
+  },
   sessionGuideCoachScrim: {
     ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(15, 23, 42, 0.62)",
@@ -13614,6 +13677,9 @@ const styles = StyleSheet.create({
     position: "absolute",
     zIndex: 4
   },
+  sessionGuideCoachCopy: {
+    gap: 3
+  },
   sessionGuideCoachCalloutWarning: {
     backgroundColor: "#FFFBEB",
     borderColor: "#F59E0B"
@@ -13628,6 +13694,13 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     lineHeight: 18,
     textAlign: "center"
+  },
+  sessionGuideCoachPointerLeft: {
+    left: -20,
+    position: "absolute",
+    top: "50%",
+    transform: [{ translateY: -9 }],
+    width: 18
   },
   sessionGuideCoachPointerWarning: {
     color: "#D97706"
