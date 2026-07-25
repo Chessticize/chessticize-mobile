@@ -1,4 +1,5 @@
 import type { AttemptEvent, Puzzle, SessionMistakeReviewItem } from "./types.ts";
+import { isAttemptMistake } from "./attempt-outcome.ts";
 
 export function buildSessionMistakeReview(input: {
   sessionId: string;
@@ -14,7 +15,11 @@ export function buildSessionMistakeReview(input: {
   );
 
   for (const attempt of attempts) {
-    if (attempt.sessionId !== input.sessionId || attempt.result !== "wrong" || seenPuzzleIds.has(attempt.puzzleId)) {
+    if (
+      attempt.sessionId !== input.sessionId ||
+      !isAttemptMistake(attempt.result) ||
+      seenPuzzleIds.has(attempt.puzzleId)
+    ) {
       continue;
     }
     const puzzle = puzzleById.get(attempt.puzzleId);

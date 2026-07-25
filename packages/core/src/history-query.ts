@@ -5,6 +5,7 @@ import {
   puzzleMatchesAnyTheme
 } from "./theme-catalog.ts";
 import { isPracticeRunRatingKey } from "./practice-runs.ts";
+import { isAttemptMistake } from "./attempt-outcome.ts";
 import type {
   AttemptEvent,
   AttemptOutcome,
@@ -653,7 +654,11 @@ function partitionHistoryAttemptsByResult(attempts: HistoryAttemptView[]): Class
 
 function historyResultForMistakeSemantics(value: unknown): AttemptResult | null {
   const result = normalizeHistoryOutcome(value);
-  return result === "timed_out" ? "wrong" : result;
+  return result === null
+    ? null
+    : isAttemptMistake(result)
+      ? "wrong"
+      : "correct";
 }
 
 function buildAttemptPerformanceChart(

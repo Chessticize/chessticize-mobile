@@ -37,7 +37,8 @@ only `Unclear` and `In review`.
 
 - A Slow correct attempt is automatically marked Unclear.
 - A Timed out attempt counts as a Sprint mistake and is automatically marked
-  Unclear. It keeps its distinct `Timed out` History result and label.
+  Unclear. Like a submitted wrong move, it also creates a Review Schedule. It
+  keeps its distinct `Timed out` History result and label.
 - The `Wrong` result filter includes both submitted wrong moves and Timed out
   attempts.
 - The app does not ask whether a Slow attempt was unclear after it has already
@@ -88,8 +89,8 @@ high-value persistent selector
 - The segmented order is `Needs attention`, then `All`.
 - Needs attention includes an Unclear attempt, a wrong attempt still in Review,
   and a clean correct attempt enrolled manually in Review.
-- A Slow or Timed out fixture appears because it is auto-marked Unclear, not
-  because of its timing label.
+- A Slow fixture appears through Unclear. A Timed out fixture appears through
+  both Unclear and In review, never merely because of its timing label.
 - A normal clear attempt and a wrong attempt removed from Review are excluded.
 - The filter menu exposes only `Unclear` and `In review` in its Attention group
   and has no separate Review queue facet.

@@ -449,7 +449,7 @@ New Run behavior:
 - Arrow Duel review items use the Arrow Duel choice flow.
 - Correct reviews advance through 1, 3, 7, 14, 30, and 60 calendar-day
   intervals. Failed scheduled reviews reset to the next review day.
-- The original sprint mistake creates a Scheduled Review queue item but is not itself a review-time lapse. Queue items start with `lapseCount = 0`; failed Scheduled Review attempts increment lapses; successful Scheduled Review attempts reduce lapses toward zero.
+- Every Sprint mistake, whether a submitted wrong move or a timeout without a submitted move, creates a Scheduled Review queue item but is not itself a review-time lapse. Queue items start with `lapseCount = 0`; failed Scheduled Review attempts increment lapses; successful Scheduled Review attempts reduce lapses toward zero.
 - The "Failed again" filter matches review-time lapses only. It must not match every item that originated from a sprint mistake.
 - Due and overdue are different calendar-day states. A review is due when
   `dueDay <= today` and overdue when `dueDay < today`. The local review day
@@ -465,7 +465,7 @@ New Run behavior:
 - Scheduled Review and replay hide puzzle tags while the user is solving so that tags cannot act as hints. The complete server-curated tag set appears only while Analysis is active and disappears again when Analysis closes.
 - After a Scheduled Review batch, the user may open Analysis Review for missed items. That follow-up inspection does not create history rows and does not update the schedule.
 - Post-sprint Analysis Review is also unrecorded. It is for same-day exploration only; the scheduled memory-curve review still starts from the stored due date, normally the next day after the miss.
-- Post-sprint mistake review is a one-shot immediate action from Sprint Results. If the user leaves the result screen, starts another sprint, or exits that immediate review, the Review tab must show only the scheduled review queue and must not auto-start those session mistakes again.
+- Post-sprint mistake review includes submitted wrong moves and timed-out puzzles. It is a one-shot immediate action from Sprint Results. If the user leaves the result screen, starts another sprint, or exits that immediate review, the Review tab must show only the scheduled review queue and must not auto-start those session mistakes again.
 
 ### History
 
@@ -499,8 +499,9 @@ New Run behavior:
   both switches the primary selector to `All`; selecting `Needs attention`
   from `All` restores both reasons.
 - `Timed out` remains a distinct History result and label, but it counts as a
-  Sprint mistake for the mistake limit and failed-Run ELO outcome. The
-  `Wrong` result filter includes Timed out attempts.
+  Sprint mistake for the mistake limit and failed-Run ELO outcome, and creates
+  the same Review Schedule as a submitted wrong move. The `Wrong` result
+  filter includes Timed out attempts.
 - Reset restores `Needs attention`, both Attention reasons, All sources, and
   the default range.
 - Keep the full Themes facet collapsed when the History filter menu opens.

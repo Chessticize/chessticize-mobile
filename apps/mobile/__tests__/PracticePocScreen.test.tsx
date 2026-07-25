@@ -1045,7 +1045,7 @@ describe("PracticePocScreen", () => {
       "Automatically marks the puzzle as Unclear; it is not a mistake."
     );
     expect(collectText(findByTestId(renderer, "practice-sprint-rules-guide"))).toContain(
-      "Marks it Timed out and Unclear, counts as a mistake, then moves on."
+      "Marks it Timed out and Unclear, counts as a mistake, adds it to Review, then moves on."
     );
     expect(findByTestId(renderer, "practice-sprint-rules-guide").props.accessibilityLabel).toContain(
       "The Sprint ends after 3 mistakes."
@@ -1054,7 +1054,7 @@ describe("PracticePocScreen", () => {
       "A Slow warning automatically marks the puzzle as Unclear and does not count as a mistake."
     );
     expect(findByTestId(renderer, "practice-sprint-rules-guide").props.accessibilityLabel).toContain(
-      "A timeout marks the puzzle Timed out and Unclear, counts as a mistake, then moves on."
+      "A timeout marks the puzzle Timed out and Unclear, counts as a mistake, adds it to Review, then moves on."
     );
 
     press(renderer, "practice-sprint-rules-dismiss");
@@ -1119,7 +1119,7 @@ describe("PracticePocScreen", () => {
       "Timed out appears over the board automatically at the time limit."
     );
     expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-timeout"))).toContain(
-      "The attempt is marked Unclear, counts as a mistake, and the Sprint moves to the next puzzle."
+      "The attempt is marked Unclear, counts as a mistake, is added to Review, and the Sprint moves to the next puzzle."
     );
     expect(collectText(findByTestId(activeSession, "practice-session-guide-demo-board"))).toContain(
       "Mistake · Marked Unclear · Moving on"
@@ -1431,7 +1431,7 @@ describe("PracticePocScreen", () => {
       "Solve 15 before 5 min ends"
     );
     expect(collectText(findByTestId(preview, "practice-run-puzzle-timeout"))).toContain(
-      "Marks it Timed out and Unclear, counts as a mistake, and moves on."
+      "Marks it Timed out and Unclear, counts as a mistake, adds it to Review, and moves on."
     );
     press(preview, "practice-run-duration-stepper-decrease");
     expect(collectText(findByTestId(preview, "practice-run-pass-rules"))).toContain(
@@ -6382,6 +6382,35 @@ describe("PracticePocScreen", () => {
     expect(collectText(reviewButton)).toContain("Review Mistakes");
     expect(hasStyleEntry(reviewButton, "backgroundColor", "#2563EB")).toBe(true);
     expect(hasStyleEntry(playAgainButton, "backgroundColor", "#2563EB")).toBe(false);
+  });
+
+  it("opens a one-shot mistake review after a timeout-only sprint failure", async () => {
+    const service = createMobilePracticeService("random1000");
+    startSprintWithPuzzleTiming(service, {
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      puzzleTiming: {
+        slowAfterSeconds: null,
+        timeoutAfterSeconds: 10
+      },
+      targetCorrect: 15,
+      maxMistakes: 1
+    });
+    const timedOutPuzzleId = activeSprintForTest(service).currentPuzzle?.puzzle.id;
+    const renderer = renderScreen({ practiceService: service });
+
+    press(renderer, "practice-resume-card");
+    await settleEntryPreview();
+    act(() => {
+      jest.advanceTimersByTime(10_000);
+    });
+
+    expectText(renderer, "Sprint failed");
+    expect(collectText(findByTestId(renderer, "sprint-result-mistakes"))).toBe("1");
+    press(renderer, "review-mistakes-button");
+
+    expect(findByTestId(renderer, "review-session")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "review-current-puzzle-id"))).toBe(timedOutPuzzleId);
   });
 
   it("reviews missed puzzles from the completed sprint using the solving board", async () => {
