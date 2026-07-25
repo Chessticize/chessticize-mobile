@@ -9,9 +9,16 @@ import type { Puzzle } from "../../core/src/index.ts";
 const RELEASED_V0_FIXTURE = resolve(
   "packages/storage/test/fixtures/migrations/schema-v0-ios-1.0.0.sqlite"
 );
+const RELEASED_IOS_121_FIXTURE = resolve(
+  "packages/storage/test/fixtures/migrations/schema-v8-ios-1.2.1.sqlite"
+);
 
 // Every test below runs once per label, against the exact same PracticeService contract.
-const STORE_LABELS = ["fresh-install", "migrated-legacy-v0"] as const;
+const STORE_LABELS = [
+  "fresh-install",
+  "migrated-legacy-v0",
+  "migrated-ios-1.2.1-v8"
+] as const;
 type StoreLabel = (typeof STORE_LABELS)[number];
 
 interface OpenStore {
@@ -22,8 +29,13 @@ interface OpenStore {
 async function openStore(label: StoreLabel): Promise<OpenStore> {
   const directory = await mkdtemp(join(tmpdir(), `chessticize-shared-behavior-${label}-`));
   const databasePath = join(directory, "practice.sqlite");
-  if (label === "migrated-legacy-v0") {
-    await copyFile(RELEASED_V0_FIXTURE, databasePath);
+  const releasedFixture = label === "migrated-legacy-v0"
+    ? RELEASED_V0_FIXTURE
+    : label === "migrated-ios-1.2.1-v8"
+      ? RELEASED_IOS_121_FIXTURE
+      : undefined;
+  if (releasedFixture) {
+    await copyFile(releasedFixture, databasePath);
   }
   const store = new SQLiteStore(databasePath);
   store.migrate();
