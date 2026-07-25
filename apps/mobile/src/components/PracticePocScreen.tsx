@@ -5399,7 +5399,7 @@ function PracticeRunEditor({
         )}
       </View>
 
-      {showSprintRulesSummary && isCreate ? (
+      {showSprintRulesSummary ? (
         <SprintPassRulesSummary config={sprintRules} />
       ) : null}
 

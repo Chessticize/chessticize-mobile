@@ -300,7 +300,7 @@ export function createPracticeRunManagementController(
         const result = execute({ type: "archive-run", runId: run.id });
         commit({
           ...view,
-          notice: `${run.name} removed from Home. Its ELO and history were kept.`,
+          notice: `${run.name} removed from Home. Its rating and history were kept.`,
           removeCandidateId: null,
           selectedRunId: selectedRunId(
             result.catalog.runs,
@@ -320,7 +320,7 @@ export function createPracticeRunManagementController(
         ) ?? run;
         commit({
           ...view,
-          notice: `${restored.name} restored with ELO ${restored.elo}.`,
+          notice: `${restored.name} restored with Rating ${restored.elo}.`,
           selectedRunId: restored.id
         }, result.catalog);
         return;

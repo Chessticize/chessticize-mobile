@@ -105,6 +105,7 @@ export const BuiltInRunEditor: Story = {
     await clickTestId(canvasElement, "practice-run-edit-standard");
     await waitForTestId(canvasElement, "practice-run-name-input");
     await waitForTestId(canvasElement, "practice-run-elo-input");
+    await waitForTestId(canvasElement, "practice-run-pass-rules");
     await waitForTestId(canvasElement, "practice-run-slow-warning");
     await waitForTestId(canvasElement, "practice-run-puzzle-timeout");
   }
@@ -119,6 +120,7 @@ export const CustomRatingEditor: Story = {
     await clickTestId(canvasElement, "practice-run-edit-tactics-focus");
     await waitForTestId(canvasElement, "practice-run-name-input");
     await waitForTestId(canvasElement, "practice-run-elo-input");
+    await waitForTestId(canvasElement, "practice-run-pass-rules");
     await waitForTestId(canvasElement, "practice-run-slow-warning");
     await waitForTestId(canvasElement, "practice-run-puzzle-timeout");
     expectTestIdAbsent(canvasElement, "practice-run-mode-row");

@@ -92,5 +92,8 @@ test("Issue #247 stays on the existing Settings product clone with its approved 
     "Move and capture audio previews",
     "About"
   ]);
-  assert.deepEqual(storyTagsForScenario("practice-home" as LabScenarioId), []);
+  assert.equal(
+    scenarioRegistry["practice-home"].issues?.some((issue) => issue.issueNumber === 247) ?? false,
+    false
+  );
 });

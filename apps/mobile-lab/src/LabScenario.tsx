@@ -114,7 +114,11 @@ function sprintRulesDesignPreviewFor(
       timeoutAddsToReview: true
     };
   }
-  if (scenarioId === "practice-custom-setup") {
+  if (
+    scenarioId === "practice-custom-setup"
+    || scenarioId === "practice-run-standard-editor"
+    || scenarioId === "practice-custom-rating-editor"
+  ) {
     return {
       firstRunGuide,
       showRunEditorSummary: true,

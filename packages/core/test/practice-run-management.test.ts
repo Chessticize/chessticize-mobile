@@ -163,6 +163,10 @@ test("reorder, archive, and restore retain stable Run identity and rating", () =
   controller.dispatch({ type: "confirm-remove" });
   assert.equal(controller.getSnapshot().runs.some((run) => run.id === "standard"), false);
   assert.equal(
+    controller.getSnapshot().notice,
+    "Standard removed from Home. Its rating and history were kept."
+  );
+  assert.equal(
     controller.getSnapshot().hiddenRuns.find((run) => run.id === "standard")?.elo,
     925
   );
@@ -172,6 +176,7 @@ test("reorder, archive, and restore retain stable Run identity and rating", () =
   assert.equal(controller.getSnapshot().runs.at(-1)?.id, "standard");
   assert.equal(controller.getSnapshot().runs.at(-1)?.elo, 925);
   assert.equal(controller.getSnapshot().selectedRunId, "standard");
+  assert.equal(controller.getSnapshot().notice, "Standard restored with Rating 925.");
 });
 
 test("previous configurations, start effects, and refresh stay outside React", () => {

@@ -1437,6 +1437,13 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(preview, "practice-run-pass-rules"))).toContain(
       "Solve 9 before 3 min ends"
     );
+
+    const editRun = renderLabScenario("practice-run-standard-editor");
+    press(editRun, "practice-run-home-edit");
+    press(editRun, "practice-run-edit-standard");
+    expect(collectText(findByTestId(editRun, "practice-run-pass-rules"))).toContain(
+      "Solve 15 before 5 min ends"
+    );
   });
 
   it("opens the Settings guidance story directly and resets both Sprint guides without confirmation", () => {
