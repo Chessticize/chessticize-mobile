@@ -67,6 +67,10 @@ async function completeFirstUseSessionGuides() {
       return;
     }
     if (await detoxElementExists('practice-session-guide-start')) {
+      await waitFor(element(by.id('practice-session-guide-start')))
+        .toBeVisible()
+        .whileElement(by.id('practice-main-scroll'))
+        .scroll(100, 'down', 0.5, 0.5);
       await element(by.id('practice-session-guide-start')).tap();
       await sleep(250);
       continue;

@@ -915,6 +915,20 @@ describe('Detox suite configuration', () => {
     expect(scrollDown).toBeGreaterThan(requireVisible);
   });
 
+  it('scrolls first-use guide actions into view before tapping them on taller devices', () => {
+    const helpers = fs.readFileSync(path.resolve(__dirname, '../e2e/helpers.js'), 'utf8');
+    const helperStart = helpers.indexOf('async function completeFirstUseSessionGuides');
+    const helperEnd = helpers.indexOf('async function detoxElementExists', helperStart);
+    const helper = helpers.slice(helperStart, helperEnd);
+    const requireVisible = helper.indexOf('.toBeVisible()');
+    const scrollDown = helper.indexOf(".scroll(100, 'down', 0.5, 0.5)");
+    const tapGuideAction = helper.indexOf("element(by.id('practice-session-guide-start')).tap()");
+
+    expect(requireVisible).toBeGreaterThan(0);
+    expect(scrollDown).toBeGreaterThan(requireVisible);
+    expect(tapGuideAction).toBeGreaterThan(scrollDown);
+  });
+
   it('pins the Arrow Duel screenshot to the exact runtime-selected long-arrow fixture', () => {
     const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
     const renderCaseStart = practiceSpec.indexOf("it('renders Arrow Duel candidate arrows on the board'");

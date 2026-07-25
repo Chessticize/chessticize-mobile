@@ -98,7 +98,20 @@ describe("App Store assets document", () => {
     expect(storeAssetsE2e).toContain("takeLandscapeScreenshot('app-store-01-practice-tab')");
     expect(storeAssetsE2e).toContain("takeLandscapeScreenshot('app-store-05-standard-sprint')");
     expect(storeAssetsE2e).toContain("takeLandscapeScreenshot('app-store-06-arrow-duel')");
-    expect(storeAssetsE2e).toContain("takeLandscapeScreenshot('app-store-08-review-session')");
+    expect(storeAssetsE2e).toContain(
+      "'app-store-08-review-session',\n    assertReviewLandscapeLayout"
+    );
+    expect(storeAssetsE2e).toContain("frameFor(element(by.id('review-session-adaptive-layout')))");
+    expect(storeAssetsE2e).toContain("frameFor(element(by.id('review-session-board-lane')))");
+    expect(storeAssetsE2e).toContain("frameFor(element(by.id('board-coordinate-overlay')))");
+    expect(storeAssetsE2e).toContain("element(by.id('review-arrow-duel-candidate-overlay'))");
+    expect(storeAssetsE2e).toContain("frameFor(element(by.id('review-exit')))");
+    expect(storeAssetsE2e).toContain("frameFor(element(by.id('review-progress')))");
+    expect(storeAssetsE2e).toContain("frameFor(element(by.id('review-timer')))");
+    expect(storeAssetsE2e).toContain("expectFrameContained(boardFrame, boardLaneFrame");
+    expect(storeAssetsE2e).toContain("expectFrameContained(coordinateFrame, boardFrame");
+    expect(storeAssetsE2e).toContain("expectFrameContained(candidateArrowFrame, boardFrame");
+    expect(storeAssetsE2e).toContain("boardRight > controlRailFrame.x + 1");
     expect(storeAssetsE2e).toContain("takePortraitScreenshotAtTop('app-store-05-standard-sprint')");
     expect(storeAssetsE2e).toContain("takePortraitScreenshotAtTop('app-store-06-arrow-duel')");
     expect(storeAssetsE2e).toContain("takePortraitScreenshotAtTop('app-store-08-review-session')");
@@ -107,9 +120,14 @@ describe("App Store assets document", () => {
     expect(storeAssetsE2e).toContain("by.id('practice-arrow-duel-guide')");
     expect(storeAssetsE2e).toContain("by.id('practice-session-guide-start')");
     expect(storeAssetsE2e).toContain("takeLandscapeScreenshot('app-store-15-sprint-result')");
-    expect(storeAssetsE2e).toContain("device.setOrientation(orientation)");
-    expect(storeAssetsE2e).toContain("frameFor(element(by.id('adaptive-layout')))");
-    expect(storeAssetsE2e).toContain("Timed out waiting for ${orientation} store-asset layout");
+    expect(storeAssetsE2e).toContain("device.setOrientation('landscape')");
+    expect(storeAssetsE2e).toContain("device.setOrientation('portrait')");
+    expect(storeAssetsE2e).toContain("waitForScreenOrientation('landscape')");
+    expect(storeAssetsE2e).toContain("waitForScreenOrientation('portrait')");
+    expect(storeAssetsE2e).toContain("last observed frame=${JSON.stringify(lastFrame)}");
+    expect(storeAssetsE2e).toContain("stableFrameCount >= 3");
+    expect(storeAssetsE2e).toContain("Portrait restoration failed after ${name}");
+    expect(storeAssetsE2e).toContain("last frame error=${lastFrameError");
     expect(storeAssetsE2e).toContain("expect(element(by.text('Themes'))).toExist()");
     expect(storeAssetsDoc).toContain("pnpm mobile:e2e:build:ios:release");
     expect(storeAssetsDoc).toContain("pnpm mobile:e2e:store-assets:ios:release");

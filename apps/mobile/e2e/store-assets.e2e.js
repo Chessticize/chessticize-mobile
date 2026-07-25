@@ -10,6 +10,7 @@ const {
   textFromAttributes,
   waitForVisibleInPracticeScroll
 } = require('./helpers');
+const { expectFrameContained } = require('./screenshotAssertions');
 
 const describeStoreAssets = process.env.CHESSTICIZE_CAPTURE_STORE_ASSETS === '1' ? describe : describe.skip;
 const captureLandscapeAssets = process.env.CHESSTICIZE_CAPTURE_LANDSCAPE_ASSETS === '1';
@@ -139,7 +140,10 @@ async function completeOneWrongReview() {
     'review-current-puzzle-id'
   );
   await takePortraitScreenshotAtTop('app-store-08-review-session');
-  await takeLandscapeScreenshot('app-store-08-review-session');
+  await takeLandscapeScreenshot(
+    'app-store-08-review-session',
+    assertReviewLandscapeLayout
+  );
   await playBoardMove('review-board', fixture.wrongMove, fixture.flipped);
   await waitFor(element(by.id('review-reminder-permission-prompt'))).toExist().withTimeout(10000);
   await element(by.id('review-reminder-permission-dismiss')).tap();
@@ -154,8 +158,7 @@ async function completeOneWrongReview() {
 async function captureMainTabScenes() {
   await openTab('practice-tab', 'practice-run-arrow-duel');
   await element(by.id('practice-run-select-arrow-duel')).tap();
-  await element(by.id('practice-main-scroll')).scrollTo('top');
-  await waitFor(element(by.id('practice-review-due-count'))).toBeVisible().withTimeout(10000);
+  await waitForVisibleInPracticeScroll('practice-review-due-count');
   const ratingText = textFromAttributes(await element(by.id('practice-mode-arrow-duel-rating')).getAttributes());
   if (ratingText === 'Rating 600') {
     throw new Error('Expected the Practice screenshot to show a populated Arrow Duel rating');
@@ -164,6 +167,7 @@ async function captureMainTabScenes() {
   await device.takeScreenshot('app-store-01-practice-tab');
   await takeLandscapeScreenshot('app-store-01-practice-tab');
 
+  await waitForVisibleInPracticeScroll('practice-add-run');
   await element(by.id('practice-add-run')).tap();
   await waitFor(element(by.id('practice-run-editor'))).toExist().withTimeout(10000);
   await element(by.id('practice-main-scroll')).scrollTo('top');
@@ -221,39 +225,116 @@ async function takePortraitScreenshotAtTop(name) {
   await device.takeScreenshot(name);
 }
 
-async function takeLandscapeScreenshot(name) {
+async function takeLandscapeScreenshot(name, assertLayout) {
   if (!captureLandscapeAssets) {
     return;
   }
 
-  await setStoreAssetOrientation('landscape');
+  let captureError = null;
+  await device.setOrientation('landscape');
   try {
+    await waitForScreenOrientation('landscape');
+    await assertLayout?.();
     await device.takeScreenshot(`${name}-landscape`);
+  } catch (error) {
+    captureError = error;
+    throw error;
   } finally {
-    await setStoreAssetOrientation('portrait');
+    try {
+      await device.setOrientation('portrait');
+      await waitForScreenOrientation('portrait');
+    } catch (restoreError) {
+      if (!captureError) {
+        throw restoreError;
+      }
+      console.error(
+        `[store-assets] Portrait restoration failed after ${name}: ${errorMessage(restoreError)}`
+      );
+    }
   }
 }
 
-async function setStoreAssetOrientation(orientation) {
-  await device.setOrientation(orientation);
+async function waitForScreenOrientation(orientation) {
   let lastFrame = null;
+  let lastFrameError = null;
+  let previousExpectedFrame = null;
+  let stableFrameCount = 0;
   for (let attempt = 0; attempt < 40; attempt += 1) {
     try {
       lastFrame = await frameFor(element(by.id('adaptive-layout')));
-      const isLandscape = lastFrame.width > lastFrame.height;
-      if ((orientation === 'landscape') === isLandscape) {
-        await sleep(500);
+      lastFrameError = null;
+      const hasExpectedOrientation = orientation === 'landscape'
+        ? lastFrame.width > lastFrame.height
+        : lastFrame.height > lastFrame.width;
+      const matchesPreviousFrame = previousExpectedFrame !== null
+        && ['x', 'y', 'width', 'height'].every(
+          (key) => Math.abs(lastFrame[key] - previousExpectedFrame[key]) <= 1
+        );
+      stableFrameCount = hasExpectedOrientation
+        ? matchesPreviousFrame
+          ? stableFrameCount + 1
+          : 1
+        : 0;
+      previousExpectedFrame = hasExpectedOrientation ? lastFrame : null;
+      if (stableFrameCount >= 3) {
         return;
       }
-    } catch {
-      lastFrame = null;
+    } catch (error) {
+      lastFrameError = error;
+      previousExpectedFrame = null;
+      stableFrameCount = 0;
     }
     await sleep(250);
   }
   throw new Error(
     `Timed out waiting for ${orientation} store-asset layout; `
-    + `last observed frame=${JSON.stringify(lastFrame)}`
+    + `last observed frame=${JSON.stringify(lastFrame)}; `
+    + `last frame error=${lastFrameError === null ? 'none' : errorMessage(lastFrameError)}`
   );
+}
+
+function errorMessage(error) {
+  return error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+}
+
+async function assertReviewLandscapeLayout() {
+  const screenFrame = await frameFor(element(by.id('adaptive-layout')));
+  const layoutFrame = await frameFor(element(by.id('review-session-adaptive-layout')));
+  const boardLaneFrame = await frameFor(element(by.id('review-session-board-lane')));
+  const boardFrame = await frameFor(element(by.id('review-board')));
+  const coordinateFrame = await frameFor(element(by.id('board-coordinate-overlay')));
+  const candidateArrowFrame = await frameFor(
+    element(by.id('review-arrow-duel-candidate-overlay'))
+  );
+  const controlRailFrame = await frameFor(element(by.id('review-session-control-rail')));
+  const headerFrame = await frameFor(element(by.id('review-header')));
+  const exitFrame = await frameFor(element(by.id('review-exit')));
+  const progressFrame = await frameFor(element(by.id('review-progress')));
+  const timerFrame = await frameFor(element(by.id('review-timer')));
+  const promptFrame = await frameFor(element(by.id('practice-prompt')));
+
+  expectFrameContained(layoutFrame, screenFrame, 'Review landscape layout');
+  expectFrameContained(boardLaneFrame, layoutFrame, 'Review landscape board lane');
+  expectFrameContained(boardFrame, boardLaneFrame, 'Review landscape board');
+  expectFrameContained(coordinateFrame, boardFrame, 'Review landscape coordinates');
+  expectFrameContained(candidateArrowFrame, boardFrame, 'Review landscape candidate arrows');
+  expectFrameContained(controlRailFrame, layoutFrame, 'Review landscape control rail');
+  expectFrameContained(headerFrame, controlRailFrame, 'Review landscape header');
+  expectFrameContained(exitFrame, controlRailFrame, 'Review landscape exit action');
+  expectFrameContained(progressFrame, controlRailFrame, 'Review landscape progress');
+  expectFrameContained(timerFrame, controlRailFrame, 'Review landscape timer');
+  expectFrameContained(promptFrame, controlRailFrame, 'Review landscape instruction');
+
+  if (Math.abs(boardFrame.width - boardFrame.height) > 1) {
+    throw new Error(`Review landscape board must stay square: ${JSON.stringify(boardFrame)}`);
+  }
+  const boardRight = boardFrame.x + boardFrame.width;
+  if (boardFrame.x >= controlRailFrame.x || boardRight > controlRailFrame.x + 1) {
+    throw new Error(
+      'Review landscape board must stay left of and separate from the control rail: '
+      + `board=${JSON.stringify(boardFrame)}, rail=${JSON.stringify(controlRailFrame)}`
+    );
+  }
 }
 
 async function resolveDisplayedArrowDuelFixture(overlayTestID, puzzleIDTestID) {
