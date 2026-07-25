@@ -18,3 +18,5 @@ export * from "./review-reminder.ts";
 export * from "./accessible-chess-moves.ts";
 export * from "./practice-runs.ts";
 export * from "./practice-run-management.ts";
+export * from "./sprint-guidance.ts";
+export * from "./sprint-result-summary.ts";

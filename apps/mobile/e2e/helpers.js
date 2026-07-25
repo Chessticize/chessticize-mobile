@@ -56,7 +56,36 @@ async function startPracticeMode(mode) {
   await element(by.id(`practice-run-select-${mode}`)).tap();
   await element(by.id('practice-main-scroll')).scrollTo('top');
   await waitFor(element(by.id('practice-run-start'))).toBeVisible().withTimeout(10000);
-  await tapUntilExists('practice-run-start', 'session-board', 3);
+  await element(by.id('practice-run-start')).tap();
+  await completeFirstUseSessionGuides();
+  await waitFor(element(by.id('session-board'))).toExist().withTimeout(15000);
+}
+
+async function completeFirstUseSessionGuides() {
+  for (let step = 0; step < 5; step += 1) {
+    if (await detoxElementExists('session-board')) {
+      return;
+    }
+    if (await detoxElementExists('practice-session-guide-start')) {
+      await element(by.id('practice-session-guide-start')).tap();
+      await sleep(150);
+      continue;
+    }
+    if (await detoxElementExists('sprint-loading-overlay')) {
+      await waitFor(element(by.id('session-board'))).toExist().withTimeout(15000);
+      return;
+    }
+    await sleep(150);
+  }
+}
+
+async function detoxElementExists(testID) {
+  try {
+    await element(by.id(testID)).getAttributes();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function bringAndroidAppToForeground(
@@ -858,6 +887,7 @@ module.exports = {
   beginAndroidPredictiveBackGesture,
   bringAndroidAppToForeground,
   collectAndroidUiDiagnostics,
+  completeFirstUseSessionGuides,
   elementText,
   historyAttemptRowTestIDForResult,
   openTab,

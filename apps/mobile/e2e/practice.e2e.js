@@ -6,6 +6,7 @@ const {
   frameFor,
   historyAttemptRowTestIDForResult,
   launchWithDisabledSynchronization,
+  openTab,
   openStandardHistoryTrend,
   playBoardMove,
   setAndroidDisplayOrientation,
@@ -122,6 +123,38 @@ describe('Practice POC', () => {
     await launchWithDisabledSynchronization({ newInstance: true, delete: false });
     await waitFor(element(by.text('Calculation Focus'))).toExist().withTimeout(180000);
     await waitFor(element(by.text('Rating 1000'))).toExist().withTimeout(10000);
+  });
+
+  it('persists first-use Sprint guidance and replays it after Settings reset', async () => {
+    await waitFor(element(by.id('practice-sprint-rules-guide'))).toExist().withTimeout(180000);
+    await element(by.id('practice-sprint-rules-dismiss')).tap();
+    await waitFor(element(by.id('practice-sprint-rules-open'))).toExist().withTimeout(10000);
+
+    await waitForVisibleInPracticeScroll('practice-run-standard');
+    await element(by.id('practice-run-select-standard')).tap();
+    await element(by.id('practice-main-scroll')).scrollTo('top');
+    await element(by.id('practice-run-start')).tap();
+
+    await waitFor(element(by.id('practice-active-session-guide'))).toExist().withTimeout(10000);
+    await expect(element(by.id('session-board'))).not.toExist();
+    for (let step = 0; step < 4; step += 1) {
+      await element(by.id('practice-session-guide-start')).tap();
+    }
+    await waitForVisibleInPracticeScroll('session-board');
+
+    await element(by.id('session-abandon')).tap();
+    await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(5000);
+    await element(by.id('session-abandon-confirm')).tap();
+    await waitFor(element(by.id('sprint-summary-panel'))).toBeVisible().withTimeout(10000);
+    await element(by.id('back-practice-button')).tap();
+
+    await openTab('settings-tab', 'settings-guidance-section');
+    await element(by.id('settings-show-sprint-guide')).tap();
+    await waitFor(element(by.id('settings-sprint-guide-ready'))).toExist().withTimeout(10000);
+
+    await device.terminateApp();
+    await launchWithDisabledSynchronization({ newInstance: true, delete: false });
+    await waitFor(element(by.id('practice-sprint-rules-guide'))).toExist().withTimeout(180000);
   });
 
   it('renders the standard sprint board', async () => {

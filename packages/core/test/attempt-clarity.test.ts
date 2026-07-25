@@ -18,7 +18,7 @@ const CORRECT_SPRINT_ATTEMPT: AttemptEvent = {
   ratingBefore: 1200
 };
 
-test("correct and timed-out sprint attempts are eligible to be marked unclear", () => {
+test("completed Sprint attempts are eligible to be marked unclear", () => {
   for (const mode of ["standard", "arrow_duel", "custom"] as const) {
     assert.equal(isUnclearAttemptEligible({ ...CORRECT_SPRINT_ATTEMPT, mode }), true);
     assert.equal(
@@ -30,7 +30,7 @@ test("correct and timed-out sprint attempts are eligible to be marked unclear", 
       true
     );
   }
-  assert.equal(isUnclearAttemptEligible({ ...CORRECT_SPRINT_ATTEMPT, result: "wrong" }), false);
+  assert.equal(isUnclearAttemptEligible({ ...CORRECT_SPRINT_ATTEMPT, result: "wrong" }), true);
   assert.equal(isUnclearAttemptEligible({ ...CORRECT_SPRINT_ATTEMPT, source: "scheduled_review" }), false);
 });
 
@@ -47,8 +47,8 @@ test("unclear changes are reversible and repeated writes are idempotent", () => 
 
 test("unclear updates reject ineligible attempts and invalid timestamps", () => {
   assert.throws(
-    () => updateAttemptUnclearState({ ...CORRECT_SPRINT_ATTEMPT, result: "wrong" }, true, "2026-07-17T12:01:00.000Z"),
-    /Only correct or timed-out sprint attempts/
+    () => updateAttemptUnclearState({ ...CORRECT_SPRINT_ATTEMPT, source: "scheduled_review" }, true, "2026-07-17T12:01:00.000Z"),
+    /Only Sprint attempts/
   );
   assert.throws(
     () => updateAttemptUnclearState(CORRECT_SPRINT_ATTEMPT, true, "not-a-date"),

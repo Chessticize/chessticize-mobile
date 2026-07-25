@@ -1,4 +1,7 @@
-import type { ReviewReminderSettings } from "../../core/src/index.ts";
+import {
+  defaultSprintGuideProgress,
+  type ReviewReminderSettings
+} from "../../core/src/index.ts";
 import type { PracticeSettings, ReviewReminderPreference } from "./practice-store.ts";
 
 export function defaultPracticeSettings(): PracticeSettings {
@@ -14,7 +17,8 @@ export function defaultPracticeSettings(): PracticeSettings {
     moveFeedback: {
       soundEnabled: true,
       hapticsEnabled: true
-    }
+    },
+    sprintGuides: defaultSprintGuideProgress()
   };
 }
 
@@ -29,6 +33,11 @@ export function clonePracticeSettings(settings: PracticeSettings): PracticeSetti
     moveFeedback: {
       soundEnabled: settings.moveFeedback?.soundEnabled ?? true,
       hapticsEnabled: settings.moveFeedback?.hapticsEnabled ?? true
+    },
+    sprintGuides: {
+      rulesSeen: settings.sprintGuides?.rulesSeen ?? false,
+      activeSessionSeen: settings.sprintGuides?.activeSessionSeen ?? false,
+      arrowDuelSeen: settings.sprintGuides?.arrowDuelSeen ?? false
     }
   });
 }
@@ -44,6 +53,11 @@ export function normalizePracticeSettings(settings: PracticeSettings): PracticeS
     moveFeedback: {
       soundEnabled: settings.moveFeedback?.soundEnabled ?? true,
       hapticsEnabled: settings.moveFeedback?.hapticsEnabled ?? true
+    },
+    sprintGuides: {
+      rulesSeen: settings.sprintGuides?.rulesSeen ?? false,
+      activeSessionSeen: settings.sprintGuides?.activeSessionSeen ?? false,
+      arrowDuelSeen: settings.sprintGuides?.arrowDuelSeen ?? false
     }
   };
 }
