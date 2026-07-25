@@ -148,7 +148,7 @@ describe('Practice POC', () => {
     await waitFor(element(by.id('sprint-summary-panel'))).toBeVisible().withTimeout(10000);
     await element(by.id('back-practice-button')).tap();
 
-    await openTab('settings-tab', 'settings-guidance-section');
+    await openTab('settings-tab', 'settings-show-sprint-guide');
     await element(by.id('settings-show-sprint-guide')).tap();
     await waitFor(element(by.id('settings-sprint-guide-ready'))).toExist().withTimeout(10000);
 

@@ -62,21 +62,22 @@ async function startPracticeMode(mode) {
 }
 
 async function completeFirstUseSessionGuides() {
-  for (let step = 0; step < 5; step += 1) {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
     if (await detoxElementExists('session-board')) {
       return;
     }
     if (await detoxElementExists('practice-session-guide-start')) {
       await element(by.id('practice-session-guide-start')).tap();
-      await sleep(150);
+      await sleep(250);
       continue;
     }
     if (await detoxElementExists('sprint-loading-overlay')) {
       await waitFor(element(by.id('session-board'))).toExist().withTimeout(15000);
       return;
     }
-    await sleep(150);
+    await sleep(250);
   }
+  await waitFor(element(by.id('session-board'))).toExist().withTimeout(15000);
 }
 
 async function detoxElementExists(testID) {
