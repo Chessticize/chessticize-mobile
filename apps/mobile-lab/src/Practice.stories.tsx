@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-native-web-vite";
 import { LabScenario } from "./LabScenario.tsx";
 import {
+  centerTestId,
   clickTestId,
   dragTestId,
   expectReorderAnimation,
@@ -25,6 +26,14 @@ type Story = StoryObj<typeof meta>;
 
 export const Home: Story = {
   args: { scenarioId: "practice-home" }
+};
+
+export const FirstSprintGuide: Story = {
+  name: "First Sprint guide",
+  args: { scenarioId: "practice-first-sprint-guide" },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "practice-sprint-rules-guide");
+  }
 };
 
 export const EditAndReorderRuns: Story = {
@@ -65,6 +74,7 @@ export const CustomSetup: Story = {
     await waitForTestId(canvasElement, "practice-run-editor");
     await clickTestId(canvasElement, "custom-theme-fork");
     await clickTestId(canvasElement, "custom-theme-pin");
+    await waitForTestId(canvasElement, "practice-run-pass-rules");
     await waitForTestId(canvasElement, "practice-run-slow-warning");
     await waitForTestId(canvasElement, "practice-run-puzzle-timeout");
     await clickTestId(canvasElement, "practice-run-per-puzzle-stepper-increase");
@@ -95,6 +105,7 @@ export const BuiltInRunEditor: Story = {
     await clickTestId(canvasElement, "practice-run-edit-standard");
     await waitForTestId(canvasElement, "practice-run-name-input");
     await waitForTestId(canvasElement, "practice-run-elo-input");
+    await waitForTestId(canvasElement, "practice-run-pass-rules");
     await waitForTestId(canvasElement, "practice-run-slow-warning");
     await waitForTestId(canvasElement, "practice-run-puzzle-timeout");
   }
@@ -109,6 +120,7 @@ export const CustomRatingEditor: Story = {
     await clickTestId(canvasElement, "practice-run-edit-tactics-focus");
     await waitForTestId(canvasElement, "practice-run-name-input");
     await waitForTestId(canvasElement, "practice-run-elo-input");
+    await waitForTestId(canvasElement, "practice-run-pass-rules");
     await waitForTestId(canvasElement, "practice-run-slow-warning");
     await waitForTestId(canvasElement, "practice-run-puzzle-timeout");
     expectTestIdAbsent(canvasElement, "practice-run-mode-row");
@@ -157,6 +169,59 @@ export const ActiveSession: Story = {
     await openPracticeSession(canvasElement);
     await waitForTestId(canvasElement, "session-puzzle-timing");
     await waitForText(canvasElement, "Puzzle 0:24");
+  }
+};
+
+export const ActiveSessionGuide: Story = {
+  name: "Active session · first-use guide",
+  args: { scenarioId: "practice-active-session-guide" },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "practice-active-session-guide");
+    await waitForTestId(canvasElement, "practice-session-guide-timing-demo");
+    await waitForTestId(canvasElement, "practice-session-guide-demo-board");
+    await waitForTestId(canvasElement, "active-session-shell");
+    await waitForTestId(canvasElement, "practice-prompt");
+    await waitForTestId(canvasElement, "session-score-strip");
+    await waitForTestId(canvasElement, "practice-session-guide-coach-overview");
+    await waitForText(
+      canvasElement,
+      "This is the same header you will use next"
+    );
+    expectTestIdAbsent(canvasElement, "session-board");
+  }
+};
+
+export const ArrowDuelGuide: Story = {
+  name: "Arrow Duel · step 5 after shared guide",
+  args: { scenarioId: "practice-arrow-duel-guide" },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "practice-active-session-guide");
+    await waitForText(canvasElement, "1 of 5");
+    for (let index = 0; index < 4; index += 1) {
+      await clickTestId(canvasElement, "practice-session-guide-start");
+    }
+    await waitForTestId(canvasElement, "practice-arrow-duel-guide");
+    await waitForTestId(canvasElement, "practice-arrow-duel-guide-timing-demo");
+    await waitForTestId(canvasElement, "practice-arrow-duel-guide-demo-board");
+    await waitForTestId(canvasElement, "practice-arrow-duel-guide-candidates");
+    await waitForText(canvasElement, "5 of 5");
+    await centerTestId(canvasElement, "practice-arrow-duel-guide-demo-board");
+    expectTestIdAbsent(canvasElement, "session-board");
+  }
+};
+
+export const ArrowDuelGuideOnly: Story = {
+  name: "Arrow Duel · single first-use step",
+  args: { scenarioId: "practice-arrow-duel-guide-only" },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "practice-arrow-duel-guide");
+    await waitForTestId(canvasElement, "practice-arrow-duel-guide-timing-demo");
+    await waitForTestId(canvasElement, "practice-arrow-duel-guide-demo-board");
+    await waitForTestId(canvasElement, "practice-arrow-duel-guide-candidates");
+    await waitForText(canvasElement, "1 of 1");
+    await centerTestId(canvasElement, "practice-arrow-duel-guide-demo-board");
+    expectTestIdAbsent(canvasElement, "practice-active-session-guide");
+    expectTestIdAbsent(canvasElement, "session-board");
   }
 };
 
@@ -242,6 +307,29 @@ export const SprintSummary: Story = {
     await openPracticeSession(canvasElement);
     await clickTestId(canvasElement, "lab-board-correct");
     await waitForTestId(canvasElement, "sprint-summary-panel");
+  }
+};
+
+export const SprintResultGoalClarity: Story = {
+  name: "Sprint result · Goal clarity",
+  args: { scenarioId: "practice-sprint-result-goal" },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "sprint-result-goal-label");
+    await waitForTestId(canvasElement, "sprint-result-solved");
+    await waitForTestId(canvasElement, "sprint-unclear-toggle");
+    await waitForTestId(canvasElement, "sprint-result-unclear-count-column");
+    await waitForTestId(canvasElement, "sprint-result-mistakes-count-column");
+  }
+};
+
+export const SprintResultExtraAttempt: Story = {
+  name: "Sprint result · Extra attempt",
+  args: { scenarioId: "practice-sprint-result-extra-attempt" },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "sprint-result-goal-label");
+    await waitForTestId(canvasElement, "sprint-result-solved");
+    await waitForTestId(canvasElement, "sprint-result-unclear-count-column");
+    await waitForTestId(canvasElement, "sprint-result-mistakes-count-column");
   }
 };
 

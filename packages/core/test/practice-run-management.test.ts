@@ -85,7 +85,7 @@ test("changing New Run pace refreshes linked timing defaults before manual overr
   });
 });
 
-test("editing preserves fixed Run settings while validating direct ELO input", () => {
+test("editing preserves fixed Run settings while validating direct rating input", () => {
   const adapter = new FakeRunManagementAdapter();
   const controller = createPracticeRunManagementController(adapter);
 
@@ -112,7 +112,7 @@ test("editing preserves fixed Run settings while validating direct ELO input", (
   controller.dispatch({ type: "change-elo-input", value: "2201" });
   assert.equal(
     controller.getSnapshot().eloError,
-    "Enter a whole-number ELO from 600 to 2200."
+    "Enter a whole-number rating from 600 to 2200."
   );
   assert.equal(controller.getSnapshot().canSave, false);
 
@@ -143,7 +143,7 @@ test("editing preserves fixed Run settings while validating direct ELO input", (
   });
 });
 
-test("reorder, archive, and restore retain stable Run identity and ELO", () => {
+test("reorder, archive, and restore retain stable Run identity and rating", () => {
   const adapter = new FakeRunManagementAdapter();
   const controller = createPracticeRunManagementController(adapter);
 
@@ -163,6 +163,10 @@ test("reorder, archive, and restore retain stable Run identity and ELO", () => {
   controller.dispatch({ type: "confirm-remove" });
   assert.equal(controller.getSnapshot().runs.some((run) => run.id === "standard"), false);
   assert.equal(
+    controller.getSnapshot().notice,
+    "Standard removed from Home. Its rating and history were kept."
+  );
+  assert.equal(
     controller.getSnapshot().hiddenRuns.find((run) => run.id === "standard")?.elo,
     925
   );
@@ -172,6 +176,7 @@ test("reorder, archive, and restore retain stable Run identity and ELO", () => {
   assert.equal(controller.getSnapshot().runs.at(-1)?.id, "standard");
   assert.equal(controller.getSnapshot().runs.at(-1)?.elo, 925);
   assert.equal(controller.getSnapshot().selectedRunId, "standard");
+  assert.equal(controller.getSnapshot().notice, "Standard restored with Rating 925.");
 });
 
 test("previous configurations, start effects, and refresh stay outside React", () => {

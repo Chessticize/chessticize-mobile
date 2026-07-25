@@ -131,7 +131,7 @@ type RunManagementViewState = Omit<
 
 const PRACTICE_RUN_ELO_STEP = 100;
 export const PRACTICE_RUN_ELO_ERROR =
-  `Enter a whole-number ELO from ${PRACTICE_RUN_RATING_MIN} to ${PRACTICE_RUN_RATING_MAX}.`;
+  `Enter a whole-number rating from ${PRACTICE_RUN_RATING_MIN} to ${PRACTICE_RUN_RATING_MAX}.`;
 
 export function createPracticeRunManagementController(
   adapter: PracticeRunManagementAdapter
@@ -300,7 +300,7 @@ export function createPracticeRunManagementController(
         const result = execute({ type: "archive-run", runId: run.id });
         commit({
           ...view,
-          notice: `${run.name} removed from Home. Its ELO and history were kept.`,
+          notice: `${run.name} removed from Home. Its rating and history were kept.`,
           removeCandidateId: null,
           selectedRunId: selectedRunId(
             result.catalog.runs,
@@ -320,7 +320,7 @@ export function createPracticeRunManagementController(
         ) ?? run;
         commit({
           ...view,
-          notice: `${restored.name} restored with ELO ${restored.elo}.`,
+          notice: `${restored.name} restored with Rating ${restored.elo}.`,
           selectedRunId: restored.id
         }, result.catalog);
         return;

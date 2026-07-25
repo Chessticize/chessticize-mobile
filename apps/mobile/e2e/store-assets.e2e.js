@@ -124,7 +124,7 @@ async function captureMainTabScenes() {
   await element(by.id('practice-main-scroll')).scrollTo('top');
   await waitFor(element(by.id('practice-review-due-count'))).toBeVisible().withTimeout(10000);
   const ratingText = textFromAttributes(await element(by.id('practice-mode-arrow-duel-rating')).getAttributes());
-  if (ratingText === 'ELO 600') {
+  if (ratingText === 'Rating 600') {
     throw new Error('Expected the Practice screenshot to show a populated Arrow Duel rating');
   }
   await sleep(1200);

@@ -39,6 +39,16 @@ export const IosSync: Story = {
   }
 };
 
+export const SprintGuideReset: Story = {
+  name: "Guidance · replay Sprint and Arrow Duel guides",
+  args: { scenarioId: "settings-sprint-guidance" },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "settings-guidance-section");
+    await waitForTestId(canvasElement, "settings-show-sprint-guide");
+    await waitForText(canvasElement, "Reset guides");
+  }
+};
+
 export const AndroidBackup: Story = {
   name: "Android backup",
   args: { scenarioId: "settings-android-backup" },
@@ -69,7 +79,7 @@ export const NotificationsNotDetermined: Story = {
 };
 
 export const AdvancedRatingEditor: Story = {
-  name: "ELO controls moved to runs",
+  name: "Rating controls moved to runs",
   args: { scenarioId: "settings-advanced-ratings" },
   play: async ({ canvasElement }) => {
     await openSettings(canvasElement);

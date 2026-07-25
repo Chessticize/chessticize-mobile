@@ -8,6 +8,7 @@ import newScenarioMarkerData from "./newScenarioMarkers.json" with { type: "json
 
 export type LabScenarioId =
   | "practice-home"
+  | "practice-first-sprint-guide"
   | "practice-home-edit"
   | "practice-custom-setup"
   | "practice-run-name-validation"
@@ -19,12 +20,17 @@ export type LabScenarioId =
   | "practice-timing-timeout"
   | "practice-preparing"
   | "practice-active"
+  | "practice-active-session-guide"
+  | "practice-arrow-duel-guide"
+  | "practice-arrow-duel-guide-only"
   | "practice-unclear-follow-up"
   | "practice-arrow-duel-prompt"
   | "practice-blunder-move-preview"
   | "practice-paused"
   | "practice-exit-confirmation"
   | "practice-summary"
+  | "practice-sprint-result-goal"
+  | "practice-sprint-result-extra-attempt"
   | "practice-reminder-prompt"
   | "review-empty"
   | "review-due"
@@ -39,6 +45,7 @@ export type LabScenarioId =
   | "history-attempt-detail"
   | "history-replay-unavailable"
   | "settings-ios-sync"
+  | "settings-sprint-guidance"
   | "settings-android-backup"
   | "settings-notifications-denied"
   | "settings-notifications-not-determined"
@@ -86,7 +93,8 @@ export const newScenarioMarkers = newScenarioMarkerData as Partial<
 >;
 
 const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
-  "practice-home": defineScenario("practice-home", "Practice", "Home", "practice--home", "Practice home with vertically centered bordered Run cards, named reusable runs, deterministic ELO, and no persisted mutations.", "practice", ["Centered bordered Run cards", "Saved run selection", "Add Run entry", "Edit mode entry", "Progress summary", "Review workload strip"], ["Run editor", "Review", "History", "Settings"]),
+  "practice-home": defineScenario("practice-home", "Practice", "Home", "practice--home", "Practice home with vertically centered bordered Run cards, named reusable runs, deterministic ratings, and no persisted mutations.", "practice", ["Centered bordered Run cards", "Saved run selection", "Add Run entry", "Edit mode entry", "Progress summary", "Review workload strip"], ["Run editor", "Review", "History", "Settings"]),
+  "practice-first-sprint-guide": defineScenario("practice-first-sprint-guide", "Practice", "First Sprint guide", "practice--first-sprint-guide", "First-use Practice Home with an automatically expanded rule card that teaches the pass goal, time limit, mistake limit, solved-versus-attempted example, and the Slow-to-Unclear rule.", "practice", ["First-use guidance", "Solve 15 to pass", "Time and mistake limits", "Slow marks Unclear without a mistake", "Dismiss to persistent help entry"], ["Production onboarding state", "Persistence", "Active Sprint"], "contained"),
   "practice-home-edit": defineScenario("practice-home-edit", "Practice", "Edit and reorder runs", "practice--edit-and-reorder-runs", "Home edit mode with whole-card drag, real-time animated insertion, arrow-button fallbacks, Run edit actions, and removal actions.", "practice", ["Whole-card drag", "Real-time insertion animation", "Arrow-button fallback", "Run edit actions", "Format-specific icons", "Removal entry"], ["Run editor", "Removal confirmation", "Practice home"]),
   "practice-custom-setup": defineScenario(
     "practice-custom-setup",
@@ -95,18 +103,21 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
     "practice--custom-setup",
     "New named run editor that defaults to All themes, exposes the grouped server-curated 24-theme catalog, matches the web timing range, and lets linked warning and timeout defaults be adjusted before saving to Home without starting.",
     "practice",
-    ["Required unique name", "Custom configuration", "Web timing range", "Linked timing defaults", "Independent warning and timeout controls", "24 curated themes", "Deterministic All-to-multiple selection", "All exclusivity", "Direct 600-2200 Starting ELO", "Add to Home"],
+    ["Required unique name", "Custom configuration", "Web timing range", "Linked timing defaults", "Independent warning and timeout controls", "24 curated themes", "Deterministic All-to-multiple selection", "All exclusivity", "Direct 600-2200 starting rating", "Add to Home"],
     ["Practice home", "Native run persistence", "Scored practice session"]
   ),
   "practice-run-name-validation": defineScenario("practice-run-name-validation", "Practice", "Run name validation", "practice--run-name-validation", "New Run with inline required-name validation; entering an existing name exposes the unique-name error.", "practice", ["Required-name error", "Unique-name rule", "Accessible field feedback"], ["Practice home", "Saved run"]),
-  "practice-run-standard-editor": defineScenario("practice-run-standard-editor", "Practice", "Built-in Run editor", "practice--built-in-run-editor", "Existing Standard Run editor with compact per-Run Slow warning and puzzle timeout settings below Name, Format, and ELO.", "practice", ["Editable unique name", "Direct 600-2200 ELO entry", "Fixed Run format", "Slow warning", "Puzzle timeout", "Independent on/off controls", "No ELO impact"], ["Practice home edit mode", "Production persistence"]),
-  "practice-custom-rating-editor": defineScenario("practice-custom-rating-editor", "Practice", "Custom Run editor and validation", "practice--custom-rating-editor", "Existing Custom Run editor adds the same compact timing controls while retaining its inline ELO validation.", "practice", ["Editable unique name", "Direct ELO entry", "600-2200 validation", "Slow warning", "Puzzle timeout", "Fixed creation settings"], ["Practice home edit mode", "Production persistence"]),
-  "practice-run-remove-confirmation": defineScenario("practice-run-remove-confirmation", "Practice", "Remove run confirmation", "practice--remove-run-confirmation", "Inline warning directly below the selected Run before it is removed from Home, explicitly retaining its ELO and history for later restoration.", "practice", ["Inline removal warning", "Selected Run context", "Retained ELO and history", "Cancel", "Confirm removal"], ["Edit runs", "Restore run"]),
-  "practice-runs-empty": defineScenario("practice-runs-empty", "Practice", "Empty Home and restore", "practice--empty-home-and-restore", "Home after every run is hidden, with clear Add Run and restore paths that preserve prior ELO.", "practice", ["Empty state", "Add Run", "Retained run list", "Restore to Home"], ["New Run", "Practice home"]),
+  "practice-run-standard-editor": defineScenario("practice-run-standard-editor", "Practice", "Built-in Run editor", "practice--built-in-run-editor", "Existing Standard Run editor with compact per-Run Slow warning and puzzle timeout settings below Name, Format, and rating.", "practice", ["Editable unique name", "Direct 600-2200 rating entry", "Fixed Run format", "Slow warning", "Puzzle timeout", "Independent on/off controls", "No rating impact"], ["Practice home edit mode", "Production persistence"]),
+  "practice-custom-rating-editor": defineScenario("practice-custom-rating-editor", "Practice", "Custom Run editor and validation", "practice--custom-rating-editor", "Existing Custom Run editor adds the same compact timing controls while retaining its inline rating validation.", "practice", ["Editable unique name", "Direct rating entry", "600-2200 validation", "Slow warning", "Puzzle timeout", "Fixed creation settings"], ["Practice home edit mode", "Production persistence"]),
+  "practice-run-remove-confirmation": defineScenario("practice-run-remove-confirmation", "Practice", "Remove run confirmation", "practice--remove-run-confirmation", "Inline warning directly below the selected Run before it is removed from Home, explicitly retaining its rating and history for later restoration.", "practice", ["Inline removal warning", "Selected Run context", "Retained rating and history", "Cancel", "Confirm removal"], ["Edit runs", "Restore run"]),
+  "practice-runs-empty": defineScenario("practice-runs-empty", "Practice", "Empty Home and restore", "practice--empty-home-and-restore", "Home after every run is hidden, with clear Add Run and restore paths that preserve prior ratings.", "practice", ["Empty state", "Add Run", "Retained run list", "Restore to Home"], ["New Run", "Practice home"]),
   "practice-timing-warning": defineScenario("practice-timing-warning", "Practice", "Active session · Slow", "practice--slow-warning", "The existing active-session baseline runs a real puzzle clock with the compact elapsed time changing to amber after the Slow threshold.", "practice", ["Existing active session", "Live puzzle clock", "Compact amber elapsed time", "Portrait below-board placement", "Landscape right rail"], ["Production timer", "History persistence"], "contained"),
   "practice-timing-timeout": defineScenario("practice-timing-timeout", "Practice", "Active session · Timed out handoff", "practice--puzzle-timeout", "The existing active-session baseline starts eight seconds before timeout, shows a compact countdown, locks the board under brief Timed out feedback, then resets the live puzzle clock.", "practice", ["Existing active session", "Live final countdown", "Locked board overlay", "Automatic next-puzzle reset", "Portrait below-board placement", "Landscape right rail"], ["Production sprint rule", "History persistence"], "contained"),
   "practice-preparing": defineScenario("practice-preparing", "Practice", "Preparing", "practice--preparing", "Stable preparing overlay before an Arrow Duel sprint starts.", "practice", ["Preparing overlay", "Cancel through Back intent"], ["Active sprint", "Practice home"]),
   "practice-active": defineScenario("practice-active", "Practice", "Active session", "practice--active-session", "Existing active Standard sprint with a live compact puzzle elapsed-time indicator that does not add another layout bar.", "practice", ["Sprint timer", "Live compact puzzle elapsed time", "Progress", "Board state", "Portrait below-board placement", "Landscape right rail"], ["Sprint result"]),
+  "practice-active-session-guide": defineScenario("practice-active-session-guide", "Practice", "Active session · first-use guide", "practice--active-session-guide", "Four-step spotlight tour shown before the timer starts. The frozen demonstration is calibrated to the real Sprint composition: the same header, progress metrics, prompt, board size, puzzle timer, score strip, timeout overlay, and Unclear prompt appear in the same order without revealing the real session position.", "practice", ["No real session chessboard during guidance", "Frozen real-Sprint composition", "Same responsive board size as the active Sprint", "Shared session header, prompt, timer, score, and Unclear components", "Four-step Back and Next tour", "Current target stays bright while unrelated UI is dimmed", "Slow timer turns amber automatically", "Timed out appears over the board and adds to Review", "Start Sprint only on the final step"], ["Production onboarding persistence", "Active Sprint"], "contained"),
+  "practice-arrow-duel-guide": defineScenario("practice-arrow-duel-guide", "Practice", "Arrow Duel · step 5 after shared guide", "practice--arrow-duel-guide", "First-ever app entry through Arrow Duel becomes one continuous five-step tour: the four shared Active Session explanations come first, then a frozen real Arrow Duel composition explains the two candidate arrows as step 5 of 5.", "practice", ["Steps 1–4: shared Active Session guide", "Step 5: frozen real Arrow Duel composition", "Same responsive board size and shared session components", "Real candidate-arrow overlay", "Back returns from step 5 to step 4", "No real session position during guidance", "Start Arrow Duel after step 5"], ["Production onboarding persistence", "Arrow Duel Sprint"], "contained"),
+  "practice-arrow-duel-guide-only": defineScenario("practice-arrow-duel-guide-only", "Practice", "Arrow Duel · single first-use step", "practice--arrow-duel-guide-only", "A user who already knows the shared Active Session controls sees one Arrow Duel-specific step the first time they enter the mode. The frozen real session composition explains the only two candidate moves before the timer starts.", "practice", ["One step: 1 of 1", "Frozen real Arrow Duel composition", "Same responsive board size and shared session components", "Real candidate-arrow overlay", "Only the two shown moves count", "No real session position during guidance", "Start Arrow Duel"], ["Production onboarding persistence", "Arrow Duel Sprint"], "contained"),
   "practice-unclear-follow-up": defineScenario(
     "practice-unclear-follow-up",
     "Practice",
@@ -122,6 +133,8 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
   "practice-paused": defineScenario("practice-paused", "Practice", "Paused session", "practice--paused-session", "Paused sprint with resume and abandon actions.", "practice", ["Paused state", "Resume", "Abandon"], ["Active sprint", "Sprint result"]),
   "practice-exit-confirmation": defineScenario("practice-exit-confirmation", "Practice", "Exit confirmation", "practice--exit-confirmation", "Guarded abandon confirmation over an active sprint.", "practice", ["Confirmation", "Cancel", "Confirm abandon"], ["Active sprint", "Sprint result"]),
   "practice-summary": defineScenario("practice-summary", "Practice", "Sprint summary", "practice--sprint-summary", "Completed one-puzzle sprint summary reached through the public board callback.", "practice", ["Result", "Rating change", "History and review actions"], ["Practice home", "History", "Review"]),
+  "practice-sprint-result-goal": defineScenario("practice-sprint-result-goal", "Practice", "Sprint result · Goal clarity", "practice--sprint-result-goal-clarity", "Failed Sprint Result that shows Solved 11 beside the fixed pass target, separately reports 12 attempts and 92% accuracy, and still offers Mark as unclear after a final wrong move.", "practice", ["Solved 11", "Solve 15 to pass", "12 attempted", "Final-wrong Unclear prompt", "Aligned summary counts", "Existing result actions"], ["Production result wiring", "Wrong-attempt Unclear eligibility", "History", "Review"], "contained"),
+  "practice-sprint-result-extra-attempt": defineScenario("practice-sprint-result-extra-attempt", "Practice", "Sprint result · Extra attempt", "practice--sprint-result-extra-attempt", "Passed Sprint Result that shows Solved 15 beside the fixed pass target while explicitly reporting the user's 16 actual attempts.", "practice", ["Solved 15", "Solve 15 to pass", "16 attempted", "Accuracy", "Aligned summary counts", "Existing result actions"], ["Production result wiring", "History", "Review"], "contained"),
   "practice-reminder-prompt": defineScenario("practice-reminder-prompt", "Practice", "Review reminder prompt", "practice--review-reminder-prompt", "First-mistake notification-permission prompt driven by a maintained fake client.", "practice", ["Permission rationale", "Enable", "Dismiss"], ["Active sprint"]),
   "review-empty": defineScenario("review-empty", "Review", "Empty queue", "review--empty-queue", "Review with no due or future items.", "review", ["Empty state", "Practice return"], ["Practice"]),
   "review-due": defineScenario("review-due", "Review", "Due queue", "review--due-queue", "Deterministic due workload with multiple contexts.", "review", ["Due metrics", "Forecast", "Queue rows", "Start review"], ["Review session", "Practice"]),
@@ -145,10 +158,11 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
     ["iCloud Sync", "Notifications", "Sound and haptic toggles", "Move and capture audio previews", "About"],
     ["Run editor", "Native audio and haptic validation", "Stockfish diagnostics"]
   ),
+  "settings-sprint-guidance": defineScenario("settings-sprint-guidance", "Settings", "Guidance · replay Sprint and Arrow Duel guides", "settings--sprint-guide-reset", "Settings guidance action that makes the rules, active-session, and Arrow Duel guides available again without changing Runs, ratings, or History.", "settings", ["Direct Settings entry", "Guidance focused in the phone viewport", "Explicit Reset guides button", "Reset the full guidance set", "No confirmation for a reversible action", "Inline completed state", "Progress safety copy"], ["Production onboarding persistence", "Practice"], "contained"),
   "settings-android-backup": defineScenario("settings-android-backup", "Settings", "Android backup", "settings--android-backup", "Android managed-backup variant with iCloud controls omitted.", "settings", ["Android Progress Backup", "Notifications", "About"], ["Stockfish diagnostics"]),
   "settings-notifications-denied": defineScenario("settings-notifications-denied", "Settings", "Notifications denied", "settings--notifications-denied", "Denied notification permission with a public system-settings action.", "settings", ["Permission state", "Reminder preferences", "Open settings"], ["System settings"]),
   "settings-notifications-not-determined": defineScenario("settings-notifications-not-determined", "Settings", "Notifications not determined", "settings--notifications-not-determined", "Notification permission has not yet been requested.", "settings", ["Permission request", "Reminder preferences"], ["System permission prompt"]),
-  "settings-advanced-ratings": defineScenario("settings-advanced-ratings", "Settings", "ELO controls moved to runs", "settings--advanced-rating-editor", "Stable former ELO-editor URL now documents Settings without rating controls; current ELO lives in each run editor.", "settings", ["Settings without Profile ELO", "Run-editor ownership"], ["Built-in run editor", "Custom run editor"]),
+  "settings-advanced-ratings": defineScenario("settings-advanced-ratings", "Settings", "Rating controls moved to runs", "settings--advanced-rating-editor", "Stable former rating-editor URL now documents Settings without rating controls; the current rating lives in each run editor.", "settings", ["Settings without Profile rating", "Run-editor ownership"], ["Built-in run editor", "Custom run editor"]),
   "settings-feedback-entry": defineScenario("settings-feedback-entry", "Settings", "Help & Feedback", "settings--feedback-entry-design", "Approved Support card in production-like Settings, with a privacy promise and an explicit confirmation before handing off to GitHub.", "settings", ["Approved Support card", "Privacy promise", "External-browser confirmation"], ["GitHub Issues in the external browser", "Email support"]),
   "settings-feedback-entry-failure": defineScenario("settings-feedback-entry-failure", "Settings", "Feedback handoff failure", "settings--feedback-entry-failure", "Deterministic failed browser handoff that keeps the confirmation open with an actionable retry.", "settings", ["External-browser confirmation", "Failed handoff message", "Retry action"], ["GitHub Issues in the external browser", "Settings"]),
   "settings-stockfish-diagnostics": defineScenario("settings-stockfish-diagnostics", "Settings", "Stockfish diagnostics", "settings--stockfish-diagnostics", "Development diagnostics with the engine boundary unavailable in the browser.", "settings", ["Diagnostic positions", "Unavailable engine state"], ["Settings"]),
@@ -184,7 +198,7 @@ export const navigationCoverage = {
     "review-reminder-prompt": coveredBy("practice-reminder-prompt"),
     "history-filters": coveredBy("history-filters"),
     "review-filters": coveredBy("review-filters"),
-    "settings-advanced-ratings": notCataloged("Issue 253 moves name and Current ELO editing into each Run editor."),
+    "settings-advanced-ratings": notCataloged("Issue 253 moves name and current rating editing into each Run editor."),
     "custom-rating-editor": coveredBy("practice-custom-rating-editor"),
     "starting-practice": coveredBy("practice-preparing")
   } satisfies Record<MobileBackTransient, CatalogCoverage>,

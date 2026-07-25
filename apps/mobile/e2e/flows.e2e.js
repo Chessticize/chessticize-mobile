@@ -341,7 +341,7 @@ describe('Key user flows', () => {
     await element(by.id('practice-main-scroll')).scrollTo('top');
     await waitFor(element(by.id('practice-run-home-done'))).toBeVisible().withTimeout(10000);
     await element(by.id('practice-run-home-done')).tap();
-    await waitForElementTextContaining('practice-mode-standard-rating', 'ELO 700', 5000);
+    await waitForElementTextContaining('practice-mode-standard-rating', 'Rating 700', 5000);
 
     await device.terminateApp();
     await launchWithDisabledSynchronization({
@@ -364,7 +364,7 @@ describe('Key user flows', () => {
     await waitFor(element(by.text('Fork + Mate in 2 · 3 min · 20s pace')))
       .toExist()
       .withTimeout(10000);
-    await waitForElementTextContaining('practice-mode-standard-rating', 'ELO 700', 5000);
+    await waitForElementTextContaining('practice-mode-standard-rating', 'Rating 700', 5000);
   });
 });
 

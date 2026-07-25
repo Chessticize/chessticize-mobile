@@ -228,7 +228,7 @@ test("timeout with no next puzzle terminates safely without rating or count chan
   assert.equal(advanceSprintTime(timedOut.state, "2026-06-20T00:02:00.000Z").attempt, undefined);
 });
 
-test("a multi-step solved puzzle can win a target-one sprint and raise ELO", () => {
+test("a multi-step solved puzzle can win a target-one sprint and raise its rating", () => {
   const state = startSprint({
     config: buildSprintConfig({ mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 1 }),
     puzzles: [samplePuzzle("00008")],

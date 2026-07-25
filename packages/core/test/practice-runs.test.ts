@@ -132,7 +132,7 @@ test("renaming a Run preserves stable identity and fixed training settings", () 
   );
 });
 
-test("legacy Custom Sprint configs become named Home Runs without changing their ELO buckets", () => {
+test("legacy Custom Sprint configs become named Home Runs without changing their rating buckets", () => {
   const existing = defaultPracticeRuns();
   const migrated = practiceRunsFromLegacyCustomConfigs([
     {

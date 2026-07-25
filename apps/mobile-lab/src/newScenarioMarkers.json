@@ -1,4 +1,28 @@
 {
+  "practice-home": {
+    "issues": [
+      {
+        "issueNumber": 328,
+        "changeNote": "Keep How Sprint works discoverable and use Rating in the Practice home."
+      }
+    ]
+  },
+  "practice-home-edit": {
+    "issues": [
+      {
+        "issueNumber": 328,
+        "changeNote": "Use Rating consistently on Run cards while editing and reordering."
+      }
+    ]
+  },
+  "practice-first-sprint-guide": {
+    "issues": [
+      {
+        "issueNumber": 328,
+        "changeNote": "Teach the pass goal, attempts, Slow, and Timed out rules before the first Sprint."
+      }
+    ]
+  },
   "practice-custom-setup": {
     "issues": [
       {
@@ -8,6 +32,18 @@
       {
         "issueNumber": 249,
         "changeNote": "Add configurable puzzle timeout defaults to the existing Add Run editor."
+      },
+      {
+        "issueNumber": 328,
+        "changeNote": "Explain the dynamic pass goal and timing consequences in New Run."
+      }
+    ]
+  },
+  "practice-run-name-validation": {
+    "issues": [
+      {
+        "issueNumber": 328,
+        "changeNote": "Use Rating consistently in the New Run validation state."
       }
     ]
   },
@@ -19,7 +55,11 @@
       },
       {
         "issueNumber": 249,
-        "changeNote": "Add puzzle timeout to the existing Edit Run screen without changing ELO."
+        "changeNote": "Add puzzle timeout to the existing Edit Run screen without changing the Run's rating."
+      },
+      {
+        "issueNumber": 328,
+        "changeNote": "Use Rating and explain the dynamic pass goal in the built-in Run editor."
       }
     ]
   },
@@ -32,6 +72,26 @@
       {
         "issueNumber": 249,
         "changeNote": "Keep puzzle timeout consistent in the existing Custom Run editor."
+      },
+      {
+        "issueNumber": 328,
+        "changeNote": "Use Rating and explain the dynamic pass goal in the Custom Run editor."
+      }
+    ]
+  },
+  "practice-run-remove-confirmation": {
+    "issues": [
+      {
+        "issueNumber": 328,
+        "changeNote": "Explain retained rating and History with user-facing Rating terminology."
+      }
+    ]
+  },
+  "practice-runs-empty": {
+    "issues": [
+      {
+        "issueNumber": 328,
+        "changeNote": "Use Rating terminology for retained Run progress."
       }
     ]
   },
@@ -59,6 +119,46 @@
       }
     ]
   },
+  "practice-active-session-guide": {
+    "issues": [
+      {
+        "issueNumber": 328,
+        "changeNote": "Guide metrics, Slow, Timed out, and Mark as unclear in the frozen real Sprint layout."
+      }
+    ]
+  },
+  "practice-arrow-duel-guide": {
+    "issues": [
+      {
+        "issueNumber": 328,
+        "changeNote": "Append the Arrow Duel candidate explanation to the shared first-session guide."
+      }
+    ]
+  },
+  "practice-arrow-duel-guide-only": {
+    "issues": [
+      {
+        "issueNumber": 328,
+        "changeNote": "Show only the Arrow Duel-specific step after shared guidance has been seen."
+      }
+    ]
+  },
+  "practice-sprint-result-goal": {
+    "issues": [
+      {
+        "issueNumber": 328,
+        "changeNote": "Separate solved progress, pass target, attempts, Mistakes, and Unclear after a failed Sprint."
+      }
+    ]
+  },
+  "practice-sprint-result-extra-attempt": {
+    "issues": [
+      {
+        "issueNumber": 328,
+        "changeNote": "Show Solved 15 and the actual 16 attempts without changing the fixed pass goal."
+      }
+    ]
+  },
   "history-populated": {
     "issues": [
       {
@@ -76,6 +176,22 @@
       {
         "issueNumber": 247,
         "changeNote": "Review separate sound and haptic controls plus Move and Capture audio samples."
+      }
+    ]
+  },
+  "settings-sprint-guidance": {
+    "issues": [
+      {
+        "issueNumber": 328,
+        "changeNote": "Replay all Sprint guides from a direct reversible Settings button."
+      }
+    ]
+  },
+  "settings-advanced-ratings": {
+    "issues": [
+      {
+        "issueNumber": 328,
+        "changeNote": "Use Rating consistently while keeping rating controls owned by each Run."
       }
     ]
   }

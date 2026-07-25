@@ -88,6 +88,7 @@ function LabScenarioContent({
 function isRunManagementScenario(scenarioId: LabScenarioId): boolean {
   return [
     "practice-home",
+    "practice-first-sprint-guide",
     "practice-home-edit",
     "practice-custom-setup",
     "practice-run-name-validation",
@@ -96,6 +97,135 @@ function isRunManagementScenario(scenarioId: LabScenarioId): boolean {
     "practice-run-remove-confirmation",
     "practice-runs-empty"
   ].includes(scenarioId);
+}
+
+function sprintRulesDesignPreviewFor(
+  scenarioId: LabScenarioId
+): React.ComponentProps<typeof PracticePocScreen>["sprintRulesDesignPreview"] {
+  const firstRunGuide = {
+    durationLabel: "5:00",
+    maxMistakes: 3,
+    targetCorrect: 15
+  };
+  if (scenarioId === "practice-first-sprint-guide") {
+    return {
+      firstRunGuide,
+      firstRunGuideInitiallyVisible: true,
+      timeoutAddsToReview: true
+    };
+  }
+  if (
+    scenarioId === "practice-custom-setup"
+    || scenarioId === "practice-run-standard-editor"
+    || scenarioId === "practice-custom-rating-editor"
+  ) {
+    return {
+      firstRunGuide,
+      showRunEditorSummary: true,
+      timeoutAddsToReview: true
+    };
+  }
+  if (
+    scenarioId === "practice-active-session-guide"
+    || scenarioId === "practice-arrow-duel-guide"
+    || scenarioId === "practice-arrow-duel-guide-only"
+  ) {
+    const sharedGuide = {
+      durationLabel: "5:00",
+      maxMistakes: 3,
+      mode: "standard" as const,
+      targetCorrect: 15
+    };
+    const arrowDuelGuide = {
+      ...sharedGuide,
+      mode: "arrow_duel" as const
+    };
+    return {
+      initialSessionGuides: scenarioId === "practice-arrow-duel-guide"
+        ? [sharedGuide, arrowDuelGuide]
+        : [scenarioId === "practice-arrow-duel-guide-only" ? arrowDuelGuide : sharedGuide],
+      timeoutAddsToReview: true
+    };
+  }
+  if (scenarioId === "practice-timing-timeout") {
+    return { timeoutAddsToReview: true };
+  }
+  if (scenarioId === "practice-sprint-result-goal") {
+    return {
+      initialResultUnclearPrompt: {
+        marked: false,
+        question: "Was it clear why your last move was wrong?"
+      },
+      initialResultState: sprintRulesResultState({
+        correctCount: 11,
+        endReason: "time_expired",
+        mistakeCount: 1,
+        ratingAfter: 1070,
+        status: "failed"
+      }),
+      resultUnclearSummary: {
+        slowMarkedCount: 1,
+        userMarkedCount: 1
+      }
+    };
+  }
+  if (scenarioId === "practice-sprint-result-extra-attempt") {
+    return {
+      initialResultState: sprintRulesResultState({
+        correctCount: 15,
+        endReason: "target_reached",
+        mistakeCount: 1,
+        ratingAfter: 1104,
+        status: "won"
+      }),
+      resultUnclearSummary: {
+        slowMarkedCount: 1,
+        userMarkedCount: 0
+      }
+    };
+  }
+  if (scenarioId === "settings-sprint-guidance") {
+    return { showSettingsReset: true };
+  }
+  if (isRunManagementScenario(scenarioId)) {
+    return { firstRunGuide, timeoutAddsToReview: true };
+  }
+  return undefined;
+}
+
+function sprintRulesResultState({
+  correctCount,
+  endReason,
+  mistakeCount,
+  ratingAfter,
+  status
+}: {
+  correctCount: number;
+  endReason: "target_reached" | "time_expired";
+  mistakeCount: number;
+  ratingAfter: number;
+  status: "failed" | "won";
+}): SprintState {
+  const startedAt = new Date(LAB_NOW_MS - 5 * 60 * 1000).toISOString();
+  const completedAt = new Date(LAB_NOW_MS).toISOString();
+  return {
+    bestStreak: 6,
+    completedAt,
+    config: defaultSprintConfig("standard"),
+    correctCount,
+    currentPuzzleIndex: correctCount + mistakeCount,
+    currentStreak: status === "won" ? 6 : 0,
+    deadlineAt: completedAt,
+    endReason,
+    hasUserSubmittedMove: true,
+    id: `sprint-rules-${status}`,
+    mistakeCount,
+    puzzles: [],
+    ratingAfter,
+    ratingBefore: 1087,
+    startedAt,
+    status
+  };
 }
 
 export function LabScenarioShell({
@@ -152,6 +282,7 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     currentTimeMs: () => LAB_NOW_MS,
     moveFeedbackSettings: {},
     puzzleSelectionSeed: "interaction-lab",
+    sprintRulesDesignPreview: sprintRulesDesignPreviewFor(scenarioId),
     standardTargetCorrect: 1,
     arrowDuelTargetCorrect: 1,
     customTargetCorrect: 1
@@ -165,6 +296,17 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     case "practice-blunder-move-preview":
       service = createIssue272Service(false);
       configurePuzzleSource = false;
+      break;
+    case "practice-active-session-guide":
+    case "practice-arrow-duel-guide":
+    case "practice-arrow-duel-guide-only":
+      service = createSessionGuideService();
+      configurePuzzleSource = false;
+      screenProps.standardTargetCorrect = 15;
+      screenProps.arrowDuelTargetCorrect = 15;
+      break;
+    case "settings-sprint-guidance":
+      screenProps.initialTab = "settings";
       break;
     case "practice-unclear-follow-up":
       screenProps.arrowDuelTargetCorrect = 2;
@@ -310,6 +452,18 @@ function isPuzzleEntryPreviewScenario(scenarioId: LabScenarioId): boolean {
 function createSeededService(): PracticeService {
   const store = new MemoryStore();
   store.seedPuzzles(LAB_PUZZLES);
+  return new PracticeService(store);
+}
+
+function createSessionGuideService(): PracticeService {
+  const store = new MemoryStore();
+  store.seedPuzzles(Array.from({ length: 18 }, (_, index) => {
+    const puzzle = LAB_PUZZLES[index % LAB_PUZZLES.length]!;
+    return {
+      ...puzzle,
+      id: `session-guide-${index + 1}`
+    };
+  }));
   return new PracticeService(store);
 }
 

@@ -29,6 +29,12 @@ create a standalone prototype page that repeats existing product context. The
 full Storybook should show the expected post-implementation product, while the
 issue-owned `new` marker identifies the changed scenario.
 
+Treat Sprint onboarding as part of the Sprint UI contract: whenever a Sprint
+screen, rule, term, status, timing behavior, or control changes, update the
+corresponding first-use guidance and Interaction Lab guide scenarios in the same
+change, including shared Active Session guidance and Arrow Duel guidance when
+applicable.
+
 Each feedback issue owns its Storybook design track. Every feature branch also
 owns a dedicated full-catalog Storybook site and Sites project; never deploy a
 different branch through that project or overwrite another branch's review URL.

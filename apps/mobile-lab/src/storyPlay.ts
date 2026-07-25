@@ -10,6 +10,12 @@ export async function waitForTestId(canvasElement: HTMLElement, testID: string):
   await page.findByTestId(testID, {}, { timeout: 4_000 });
 }
 
+export async function centerTestId(canvasElement: HTMLElement, testID: string): Promise<void> {
+  const page = within(canvasElement.ownerDocument.body);
+  const element = await page.findByTestId(testID, {}, { timeout: 4_000 });
+  element.scrollIntoView({ block: "center", inline: "nearest" });
+}
+
 export async function waitForEnabledTestId(
   canvasElement: HTMLElement,
   testID: string
