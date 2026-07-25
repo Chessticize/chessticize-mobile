@@ -1067,19 +1067,29 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "practice-sprint-rules-guide")).toBeTruthy();
   });
 
-  it("uses board-free first-session guides for shared Sprint controls and Arrow Duel", () => {
+  it("uses a non-interactive timing example before the real Sprint board and Arrow Duel", () => {
     const activeSession = renderLabScenario("practice-active-session-guide");
 
     expect(findByTestId(activeSession, "practice-active-session-guide")).toBeTruthy();
     expect(() => findByTestId(activeSession, "session-board")).toThrow();
+    expect(findByTestId(activeSession, "practice-session-guide-demo-board")).toBeTruthy();
+    expect(collectText(findByTestId(activeSession, "practice-session-guide-timing-demo"))).toContain(
+      "These are automatic timing states, not controls."
+    );
     expect(collectText(findByTestId(activeSession, "practice-session-guide-slow"))).toContain(
-      "Slow saves the puzzle as Unclear"
+      "The puzzle timer turns amber automatically after the target pace."
+    );
+    expect(collectText(findByTestId(activeSession, "practice-session-guide-slow"))).toContain(
+      "If you solve after that, the completed attempt is saved as Unclear without adding a mistake."
     );
     expect(collectText(findByTestId(activeSession, "practice-session-guide-timeout"))).toContain(
-      "Timeout adds the puzzle to Review"
+      "Timed out appears over the board automatically at the time limit."
     );
     expect(collectText(findByTestId(activeSession, "practice-session-guide-timeout"))).toContain(
-      "The puzzle is marked Timed out and Unclear, added to Review, and the Sprint moves on."
+      "The attempt is marked Unclear, added to Review, and the Sprint moves to the next puzzle."
+    );
+    expect(collectText(findByTestId(activeSession, "practice-session-guide-demo-board"))).toContain(
+      "Added to Review · Moving on"
     );
     expect(collectText(findByTestId(activeSession, "practice-session-guide-unclear"))).toContain(
       "Mark as unclear"

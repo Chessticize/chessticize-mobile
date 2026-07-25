@@ -4053,7 +4053,7 @@ function ActiveSessionGuide({
     <View
       accessibilityLabel={isArrowDuel
         ? `${accessibilityStepCopy}Your first Arrow Duel. Compare the two candidate arrows, then play the stronger move. Only the shown candidates count. ${timerCopy}`
-        : `${accessibilityStepCopy}Your first active Sprint. Solve ${presentation.targetCorrect} puzzles to pass in ${presentation.durationLabel}. A Slow warning automatically marks the puzzle as Unclear without adding a mistake. A timeout marks the puzzle Timed out and Unclear, adds it to Review, then moves on. After a correct puzzle, use Mark as unclear when you did not fully understand the solution. ${timerCopy}`}
+        : `${accessibilityStepCopy}Your first active Sprint. Solve ${presentation.targetCorrect} puzzles to pass in ${presentation.durationLabel}. Slow and Timed out are automatic timing states, not controls. After the target pace, the puzzle timer turns amber. If you solve after that, the completed attempt is saved as Unclear without adding a mistake. At the time limit, Timed out appears over the board, the attempt is marked Unclear and added to Review, and the Sprint moves to the next puzzle. After a correct puzzle, use Mark as unclear when you did not fully understand the solution. ${timerCopy}`}
       style={styles.sessionGuide}
       testID={isArrowDuel ? "practice-arrow-duel-guide" : "practice-active-session-guide"}
     >
@@ -4097,29 +4097,7 @@ function ActiveSessionGuide({
             <SessionGuideMetric label="Mistakes" value={`0 / ${presentation.maxMistakes}`} />
           </View>
 
-          <View style={styles.sessionGuideSlowCard} testID="practice-session-guide-slow">
-            <View style={styles.sessionGuideSlowBadge}>
-              <Text style={styles.sessionGuideSlowBadgeText}>SLOW</Text>
-            </View>
-            <View style={styles.sessionGuideInfoCopy}>
-              <Text style={styles.sessionGuideInfoTitle}>Slow saves the puzzle as Unclear</Text>
-              <Text style={styles.sessionGuideInfoText}>
-                It will appear in History for later attention. Slow does not add a mistake.
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.sessionGuideTimeoutCard} testID="practice-session-guide-timeout">
-            <View style={styles.sessionGuideTimeoutBadge}>
-              <Text style={styles.sessionGuideTimeoutBadgeText}>TIMEOUT</Text>
-            </View>
-            <View style={styles.sessionGuideInfoCopy}>
-              <Text style={styles.sessionGuideInfoTitle}>Timeout adds the puzzle to Review</Text>
-              <Text style={styles.sessionGuideInfoText}>
-                The puzzle is marked Timed out and Unclear, added to Review, and the Sprint moves on.
-              </Text>
-            </View>
-          </View>
+          <SessionTimingGuideDemo />
 
           <View style={styles.sessionGuideUnclearCard} testID="practice-session-guide-unclear">
             <Text style={styles.sessionGuideDemoLabel}>AFTER A CORRECT PUZZLE</Text>
@@ -4145,6 +4123,86 @@ function ActiveSessionGuide({
       >
         <Text style={styles.sessionGuideStartButtonText}>{startLabel}</Text>
       </Pressable>
+    </View>
+  );
+}
+
+const SESSION_GUIDE_DEMO_PIECES: Readonly<Record<number, string>> = {
+  7: "♚",
+  21: "♔",
+  22: "♕"
+};
+
+function SessionTimingGuideDemo(): React.JSX.Element {
+  return (
+    <View
+      accessibilityLabel="Fixed example puzzle. The timer is not running. Slow and Timed out are automatic timing states, not controls. After the target pace, the puzzle timer turns amber. Solving after that saves the completed attempt as Unclear without adding a mistake. At the time limit, Timed out appears over the board. The attempt is marked Unclear, added to Review, and the Sprint moves to the next puzzle."
+      style={styles.sessionGuideTimingDemo}
+      testID="practice-session-guide-timing-demo"
+    >
+      <View style={styles.sessionGuideTimingDemoHeader}>
+        <Text style={styles.sessionGuideTimingDemoEyebrow}>EXAMPLE · TIMER NOT STARTED</Text>
+        <Text style={styles.sessionGuideInfoTitle}>See where timing appears</Text>
+        <Text style={styles.sessionGuideInfoText}>
+          These are automatic timing states, not controls. There is nothing to tap.
+        </Text>
+      </View>
+
+      <View style={styles.sessionGuideSlowCallout} testID="practice-session-guide-slow">
+        <Text style={styles.sessionGuideTimingStateLabel}>SLOW · AUTOMATIC</Text>
+        <Text style={styles.sessionGuideInfoTitle}>
+          The puzzle timer turns amber automatically after the target pace.
+        </Text>
+        <Text style={styles.sessionGuideInfoText}>
+          If you solve after that, the completed attempt is saved as Unclear without adding a mistake.
+        </Text>
+        <Text accessibilityElementsHidden style={styles.sessionGuidePointerDown}>↓</Text>
+      </View>
+
+      <View style={styles.sessionGuideDemoTimer}>
+        <Text style={styles.sessionGuideDemoTimerLabel}>PUZZLE</Text>
+        <Text style={styles.sessionGuideDemoTimerValue}>1:00</Text>
+      </View>
+
+      <View style={styles.sessionGuideDemoBoard} testID="practice-session-guide-demo-board">
+        {Array.from({ length: 64 }, (_, index) => (
+          <View
+            key={index}
+            style={[
+              styles.sessionGuideDemoSquare,
+              (Math.floor(index / 8) + index % 8) % 2 === 0
+                ? styles.sessionGuideDemoSquareLight
+                : styles.sessionGuideDemoSquareDark,
+              index === 14 ? styles.sessionGuideDemoTargetSquare : null,
+              index === 22 ? styles.sessionGuideDemoSourceSquare : null
+            ]}
+          >
+            {SESSION_GUIDE_DEMO_PIECES[index] ? (
+              <Text style={styles.sessionGuideDemoPiece}>{SESSION_GUIDE_DEMO_PIECES[index]}</Text>
+            ) : index === 14 ? (
+              <Text accessibilityElementsHidden style={styles.sessionGuideDemoMoveArrow}>↑</Text>
+            ) : null}
+          </View>
+        ))}
+        <View style={styles.sessionGuideDemoTimeoutOverlay}>
+          <Text style={styles.sessionGuideDemoTimeoutTitle}>Timed out</Text>
+          <Text style={styles.sessionGuideDemoTimeoutDetail}>Added to Review · Moving on</Text>
+        </View>
+      </View>
+      <Text style={styles.sessionGuideDemoCaption}>
+        Fixed example puzzle · White to move, Qg7# · not interactive
+      </Text>
+
+      <View style={styles.sessionGuideTimeoutCallout} testID="practice-session-guide-timeout">
+        <Text accessibilityElementsHidden style={styles.sessionGuidePointerUp}>↑</Text>
+        <Text style={styles.sessionGuideTimeoutStateLabel}>TIMED OUT · AUTOMATIC</Text>
+        <Text style={styles.sessionGuideInfoTitle}>
+          Timed out appears over the board automatically at the time limit.
+        </Text>
+        <Text style={styles.sessionGuideInfoText}>
+          The attempt is marked Unclear, added to Review, and the Sprint moves to the next puzzle.
+        </Text>
+      </View>
     </View>
   );
 }
@@ -13114,55 +13172,158 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     textAlign: "center"
   },
-  sessionGuideSlowCard: {
-    alignItems: "center",
+  sessionGuideTimingDemo: {
+    backgroundColor: "#F8FAFC",
+    borderColor: "#CBD5E1",
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 9,
+    padding: 11
+  },
+  sessionGuideTimingDemoHeader: {
+    gap: 3
+  },
+  sessionGuideTimingDemoEyebrow: {
+    color: "#475569",
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 0.6
+  },
+  sessionGuideSlowCallout: {
     backgroundColor: "#FFFBEB",
     borderColor: "#FDE68A",
-    borderRadius: 10,
+    borderRadius: 9,
     borderWidth: 1,
-    flexDirection: "row",
-    gap: 10,
-    padding: 11
+    gap: 3,
+    padding: 10,
+    paddingBottom: 4
   },
-  sessionGuideSlowBadge: {
-    alignItems: "center",
-    backgroundColor: "#FEF3C7",
-    borderRadius: 8,
-    justifyContent: "center",
-    minHeight: 38,
-    minWidth: 52,
-    paddingHorizontal: 8
-  },
-  sessionGuideSlowBadgeText: {
+  sessionGuideTimingStateLabel: {
     color: "#B45309",
     fontFamily: "menlo",
-    fontSize: 12,
-    fontWeight: "900"
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 0.4
   },
-  sessionGuideTimeoutCard: {
+  sessionGuidePointerDown: {
+    color: "#D97706",
+    fontSize: 18,
+    fontWeight: "900",
+    lineHeight: 18,
+    textAlign: "center"
+  },
+  sessionGuideDemoTimer: {
     alignItems: "center",
-    backgroundColor: "#FEF2F2",
-    borderColor: "#FECACA",
-    borderRadius: 10,
+    alignSelf: "center",
+    backgroundColor: "#FFFBEB",
+    borderColor: "#F59E0B",
+    borderRadius: 999,
     borderWidth: 1,
     flexDirection: "row",
-    gap: 10,
-    padding: 11
+    gap: 6,
+    minHeight: 28,
+    paddingHorizontal: 11
   },
-  sessionGuideTimeoutBadge: {
-    alignItems: "center",
-    backgroundColor: "#FEE2E2",
+  sessionGuideDemoTimerLabel: {
+    color: "#92400E",
+    fontSize: 8,
+    fontWeight: "900",
+    letterSpacing: 0.6
+  },
+  sessionGuideDemoTimerValue: {
+    color: "#B45309",
+    fontFamily: "menlo",
+    fontSize: 11,
+    fontWeight: "900",
+    fontVariant: ["tabular-nums"]
+  },
+  sessionGuideDemoBoard: {
+    alignSelf: "center",
+    borderColor: "#94A3B8",
     borderRadius: 8,
-    justifyContent: "center",
-    minHeight: 38,
-    minWidth: 66,
-    paddingHorizontal: 8
+    borderWidth: 1,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    height: 160,
+    overflow: "hidden",
+    position: "relative",
+    width: 160
   },
-  sessionGuideTimeoutBadgeText: {
+  sessionGuideDemoSquare: {
+    alignItems: "center",
+    height: "12.5%",
+    justifyContent: "center",
+    width: "12.5%"
+  },
+  sessionGuideDemoSquareLight: {
+    backgroundColor: "#E6E8EB"
+  },
+  sessionGuideDemoSquareDark: {
+    backgroundColor: "#7B8794"
+  },
+  sessionGuideDemoTargetSquare: {
+    backgroundColor: "#BFDBFE"
+  },
+  sessionGuideDemoSourceSquare: {
+    backgroundColor: "#93C5FD"
+  },
+  sessionGuideDemoPiece: {
+    color: "#0F172A",
+    fontSize: 18,
+    lineHeight: 20,
+    textAlign: "center"
+  },
+  sessionGuideDemoMoveArrow: {
+    color: "#1D4ED8",
+    fontSize: 16,
+    fontWeight: "900",
+    lineHeight: 18
+  },
+  sessionGuideDemoTimeoutOverlay: {
+    ...StyleSheet.absoluteFill,
+    alignItems: "center",
+    backgroundColor: "rgba(15, 23, 42, 0.78)",
+    justifyContent: "center"
+  },
+  sessionGuideDemoTimeoutTitle: {
+    color: "#FFFFFF",
+    fontSize: 17,
+    fontWeight: "900"
+  },
+  sessionGuideDemoTimeoutDetail: {
+    color: "#E2E8F0",
+    fontSize: 9,
+    fontWeight: "800",
+    marginTop: 2
+  },
+  sessionGuideDemoCaption: {
+    color: "#64748B",
+    fontSize: 9,
+    fontWeight: "700",
+    textAlign: "center"
+  },
+  sessionGuideTimeoutCallout: {
+    backgroundColor: "#FEF2F2",
+    borderColor: "#FECACA",
+    borderRadius: 9,
+    borderWidth: 1,
+    gap: 3,
+    padding: 10,
+    paddingTop: 4
+  },
+  sessionGuidePointerUp: {
+    color: "#DC2626",
+    fontSize: 18,
+    fontWeight: "900",
+    lineHeight: 18,
+    textAlign: "center"
+  },
+  sessionGuideTimeoutStateLabel: {
     color: "#B91C1C",
     fontFamily: "menlo",
-    fontSize: 10,
-    fontWeight: "900"
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 0.4
   },
   sessionGuideInfoCard: {
     backgroundColor: "#EFF6FF",
@@ -13171,11 +13332,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 3,
     padding: 12
-  },
-  sessionGuideInfoCopy: {
-    flex: 1,
-    gap: 2,
-    minWidth: 0
   },
   sessionGuideInfoTitle: {
     color: "#111827",

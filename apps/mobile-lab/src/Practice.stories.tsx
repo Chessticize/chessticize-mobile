@@ -174,6 +174,13 @@ export const ActiveSessionGuide: Story = {
   args: { scenarioId: "practice-active-session-guide" },
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "practice-active-session-guide");
+    await waitForTestId(canvasElement, "practice-session-guide-timing-demo");
+    await waitForTestId(canvasElement, "practice-session-guide-demo-board");
+    await waitForText(canvasElement, "These are automatic timing states, not controls.");
+    await waitForText(
+      canvasElement,
+      "Timed out appears over the board automatically at the time limit."
+    );
     await waitForTestId(canvasElement, "practice-session-guide-unclear");
     await waitForText(
       canvasElement,
