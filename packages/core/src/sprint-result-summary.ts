@@ -1,4 +1,5 @@
 import type { AttemptEvent } from "./types.ts";
+import { isAttemptMistake } from "./attempt-outcome.ts";
 
 export interface SprintResultSummary {
   accuracyPercent: number;
@@ -33,6 +34,9 @@ export function buildSprintResultSummary(
   const timedOutCount = sprintAttempts.filter(
     (attempt) => attempt.result === "timed_out"
   ).length;
+  const mistakeCount = sprintAttempts.filter(
+    (attempt) => isAttemptMistake(attempt.result)
+  ).length;
 
   return {
     accuracyPercent: Math.round(
@@ -45,8 +49,8 @@ export function buildSprintResultSummary(
       userMarkedCount: unclearAttempts.length - slowMarkedCount - timedOutMarkedCount
     },
     review: {
-      addedCount: result.mistakeCount + timedOutCount,
-      mistakeCount: result.mistakeCount,
+      addedCount: mistakeCount,
+      mistakeCount,
       timedOutCount
     }
   };

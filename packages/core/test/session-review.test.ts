@@ -25,11 +25,32 @@ test("buildSessionMistakeReview returns unique wrong puzzles for one session in 
   );
 });
 
+test("buildSessionMistakeReview includes a timed-out puzzle without a submitted move", () => {
+  const items = buildSessionMistakeReview({
+    sessionId: "s1",
+    attempts: [
+      attempt({
+        id: "timeout",
+        sessionId: "s1",
+        puzzleId: "p1",
+        result: "timed_out",
+        completedAt: "2026-06-20T00:00:10.000Z"
+      })
+    ],
+    puzzles: [puzzle("p1")]
+  });
+
+  assert.deepEqual(
+    items.map((item) => [item.puzzle.id, item.attempt.id, item.attempt.submittedMove]),
+    [["p1", "timeout", undefined]]
+  );
+});
+
 function attempt(input: {
   id: string;
   sessionId: string;
   puzzleId: string;
-  result: "correct" | "wrong";
+  result: "correct" | "wrong" | "timed_out";
   completedAt: string;
 }): AttemptEvent {
   return {
@@ -40,7 +61,7 @@ function attempt(input: {
     mode: "standard",
     ratingKey: "standard 5/20",
     result: input.result,
-    submittedMove: "a1a2",
+    ...(input.result === "timed_out" ? {} : { submittedMove: "a1a2" }),
     expectedMove: "a1a3",
     startedAt: "2026-06-20T00:00:00.000Z",
     completedAt: input.completedAt,

@@ -1,5 +1,6 @@
 import {
   buildHistoryView,
+  ATTEMPT_MISTAKE_OUTCOMES,
   curatedPuzzleThemes,
   clonePracticeRun,
   buildSessionMistakeReview,
@@ -22,6 +23,7 @@ import {
   samePracticeRun,
   sameReviewContext,
   sideToMoveForHistoryPuzzle,
+  isAttemptMistake,
   updateAttemptUnclearState
 } from "../../core/src/index.ts";
 import type {
@@ -869,11 +871,14 @@ export class SyncSQLiteStore implements PracticeStore {
       .prepare(
         `SELECT
           SUM(CASE WHEN result = 'correct' THEN 1 ELSE 0 END) AS correct_count,
-          SUM(CASE WHEN result = 'wrong' THEN 1 ELSE 0 END) AS wrong_count
+          SUM(CASE WHEN result IN (?, ?) THEN 1 ELSE 0 END) AS wrong_count
          FROM attempts
          WHERE rating_key = ? AND completed_at >= ? AND completed_at <= ?`
       )
-      .get(ratingKey, since, until) as { correct_count: number | null; wrong_count: number | null };
+      .get(...ATTEMPT_MISTAKE_OUTCOMES, ratingKey, since, until) as {
+        correct_count: number | null;
+        wrong_count: number | null;
+      };
     const sessionSummary = this.db
       .prepare(
         `SELECT
@@ -1082,7 +1087,7 @@ export class SyncSQLiteStore implements PracticeStore {
   }
 
   getSessionMistakeReview(sessionId: string): SessionMistakeReviewItem[] {
-    const attempts = this.listAttempts({ sessionId, result: "wrong" }).map(attemptEventFromHistoryRow);
+    const attempts = this.listAttempts({ sessionId }).map(attemptEventFromHistoryRow);
     const puzzles = attempts
       .map((attempt) => this.getPuzzle(attempt.puzzleId))
       .filter((puzzle): puzzle is Puzzle => Boolean(puzzle));
@@ -1760,7 +1765,7 @@ export class SyncSQLiteStore implements PracticeStore {
         attempt.completedAt,
         attempt.result === "correct" ? "won" : "failed",
         attempt.result === "correct" ? 1 : 0,
-        attempt.result === "wrong" ? 1 : 0,
+        isAttemptMistake(attempt.result) ? 1 : 0,
         attempt.ratingBefore,
         attempt.ratingAfter ?? null
       );
@@ -1794,7 +1799,7 @@ export class SyncSQLiteStore implements PracticeStore {
         attempt.completedAt,
         "won",
         attempt.result === "correct" ? 1 : 0,
-        attempt.result === "wrong" ? 1 : 0,
+        isAttemptMistake(attempt.result) ? 1 : 0,
         attempt.ratingBefore,
         null
       );

@@ -37,7 +37,9 @@ The local target time after which the mobile operating system may deliver a revi
 _Avoid_: Exact reminder time, alarm time
 
 **Unclear Attempt**:
-A correct completed sprint attempt the user marks at completion because they do not yet understand why the move worked. It can later be cleared from History.
+A completed Sprint attempt whose explanation needs attention. The user may mark
+an eligible correct attempt manually; Slow correct and Timed out attempts are
+marked automatically. The marker can later be cleared from History.
 _Avoid_: Unclear puzzle, mistake, Review item
 
 **Manual Review Enrollment**:

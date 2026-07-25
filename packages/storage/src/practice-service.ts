@@ -12,6 +12,7 @@ import {
   createDefaultRating,
   DEFAULT_RATING_DEVIATION,
   DEFAULT_VOLATILITY,
+  isAttemptMistake,
   normalizeThemeSelection,
   practiceRunSprintConfig,
   renamePracticeRun,
@@ -193,7 +194,7 @@ export class PracticeService {
 
     this.store.transaction(() => {
       if (attemptToReturn) {
-        this.recordSprintAttemptAndReviewImpact(attemptToReturn);
+        this.recordSprintAttempt(attemptToReturn);
       }
 
       if (!isOpenSprint(result.state)) {
@@ -235,7 +236,7 @@ export class PracticeService {
     const result = advanceSprintTimeCore(this.activeSprint, now);
     this.store.transaction(() => {
       if (result.attempt) {
-        this.recordSprintAttemptAndReviewImpact(result.attempt);
+        this.recordSprintAttempt(result.attempt);
       }
       if (isOpenSprint(result.state)) {
         if (result.attempt) {
@@ -271,7 +272,7 @@ export class PracticeService {
     const result = pauseSprintCore(this.activeSprint, now);
     this.store.transaction(() => {
       if (result.attempt) {
-        this.recordSprintAttemptAndReviewImpact(result.attempt);
+        this.recordSprintAttempt(result.attempt);
       }
       if (isOpenSprint(result.state)) {
         this.store.updateSprintSession(result.state);
@@ -365,16 +366,6 @@ export class PracticeService {
 
   clearLocalHistory(): ClearLocalHistoryResult {
     return this.store.transaction(() => this.store.clearLocalHistory());
-  }
-
-  private recordSprintAttemptAndReviewImpact(attempt: AttemptEvent): void {
-    this.store.recordAttempt(attempt);
-    if (attemptAddsToReview(attempt)) {
-      this.store.scheduleMistakeReview(
-        reviewContextFromAttempt(attempt),
-        attempt.completedAt
-      );
-    }
   }
 
   getDueReviews(now = new Date().toISOString()): ReviewQueueState[] {
@@ -667,6 +658,13 @@ export class PracticeService {
     return this.store.recordReviewResult(context, result, now);
   }
 
+  private recordSprintAttempt(attempt: AttemptEvent): void {
+    this.store.recordAttempt(attempt);
+    if (isAttemptMistake(attempt.result)) {
+      this.store.scheduleMistakeReview(reviewContextFromAttempt(attempt), attempt.completedAt);
+    }
+  }
+
   loadFixturePuzzles(puzzles: Puzzle[]): void {
     this.store.seedPuzzles(puzzles);
   }
@@ -889,10 +887,6 @@ function reviewContextFromAttempt(attempt: AttemptEvent): ReviewContext {
     mode: attempt.mode,
     ratingKey: attempt.ratingKey
   };
-}
-
-function attemptAddsToReview(attempt: AttemptEvent): boolean {
-  return attempt.result === "wrong" || attempt.result === "timed_out";
 }
 
 function generateReviewAttemptId(puzzleId: string, completedAt: string): string {

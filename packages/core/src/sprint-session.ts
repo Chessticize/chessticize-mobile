@@ -104,18 +104,25 @@ export function advanceSprintTime(state: SprintState, now: string): SprintComman
 
   const attempt = buildTimeoutAttempt(sprintTimedState, now);
   const nextPuzzleIndex = sprintTimedState.currentPuzzleIndex + 1;
-  const withoutStreak: SprintState = {
+  const afterTimeout: SprintState = {
     ...sprintTimedState,
+    mistakeCount: sprintTimedState.mistakeCount + 1,
     currentStreak: 0
   };
+  if (afterTimeout.mistakeCount >= afterTimeout.config.maxMistakes) {
+    return {
+      state: completeSprintWithRating(afterTimeout, "failed", "max_mistakes", now),
+      attempt
+    };
+  }
   if (nextPuzzleIndex >= sprintTimedState.puzzles.length) {
     return {
-      state: completeSprint(withoutStreak, "failed", "puzzles_exhausted", now),
+      state: completeSprintWithRating(afterTimeout, "failed", "puzzles_exhausted", now),
       attempt
     };
   }
   return {
-    state: beginCurrentPuzzle(withoutStreak, nextPuzzleIndex, new Date(now).toISOString()),
+    state: beginCurrentPuzzle(afterTimeout, nextPuzzleIndex, new Date(now).toISOString()),
     attempt
   };
 }
@@ -159,7 +166,7 @@ export function resumeSprint(state: SprintState, now: string): SprintState {
 }
 
 export function abandonSprint(state: SprintState, now: string): SprintState {
-  if (!state.hasUserSubmittedMove) {
+  if (!state.hasUserSubmittedMove && state.mistakeCount === 0) {
     return completeSprint(state, "abandoned", "abandoned", now);
   }
   return completeSprintWithRating(state, "failed", "abandoned", now);

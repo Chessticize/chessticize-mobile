@@ -10,6 +10,7 @@ export * from "./puzzle-selection-strategy.ts";
 export * from "./session-review.ts";
 export * from "./history-query.ts";
 export * from "./attempt-clarity.ts";
+export * from "./attempt-outcome.ts";
 export * from "./engine-analysis.ts";
 export * from "./puzzle-pack.ts";
 export * from "./local-date.ts";

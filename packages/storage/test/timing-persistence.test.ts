@@ -264,6 +264,7 @@ test("a move submitted at the timeout boundary advances and records one timeout 
   );
   assert.equal(store.listSprintSessions().length, 1);
   assert.equal(service.listHistory().filter((attempt) => attempt.result === "timed_out").length, 1);
+  assert.deepEqual(service.listReviewQueue().map((review) => review.puzzleId), [firstPuzzleId]);
 });
 
 test("pausing at the puzzle deadline records one timeout and pauses the next puzzle", async () => {
@@ -283,15 +284,14 @@ test("pausing at the puzzle deadline records one timeout and pauses the next puz
   assert.equal(paused.currentPuzzleIndex, 1);
   assert.notEqual(paused.currentPuzzle?.puzzle.id, started.currentPuzzle?.puzzle.id);
   assert.equal(paused.correctCount, 0);
-  assert.equal(paused.mistakeCount, 0);
+  assert.equal(paused.mistakeCount, 1);
   assert.deepEqual(
     service.listHistory().map((attempt) => attempt.result),
     ["timed_out"]
   );
-  assert.equal(service.listReviewQueue().length, 1);
-  assert.equal(
-    service.listReviewQueue()[0]?.puzzleId,
-    service.listHistory()[0]?.puzzleId
+  assert.deepEqual(
+    service.listReviewQueue().map((review) => review.puzzleId),
+    [started.currentPuzzle?.puzzle.id]
   );
 });
 
@@ -355,20 +355,15 @@ for (const backend of ["memory", "sqlite"] as const) {
       assert.equal(timedOut.attempt?.unclearUpdatedAt, "2026-07-24T01:01:00.000Z");
       assert.notEqual(timedOut.state.currentPuzzle?.puzzle.id, timedOutPuzzleId);
       assert.equal(timedOut.state.correctCount, 0);
-      assert.equal(timedOut.state.mistakeCount, 0);
-      assert.equal(service.listReviewQueue().length, 1);
-      assert.deepEqual(service.listReviewQueue()[0], {
-        puzzleId: timedOutPuzzleId,
-        mode: "standard",
-        ratingKey: started.config.ratingKey,
-        intervalDays: 1,
-        dueDay: "2026-07-24",
-        reviewCount: 0,
-        successStreak: 0,
-        lapseCount: 0,
-        lastResult: "wrong",
-        lastReviewedAt: "2026-07-24T01:01:00.000Z"
-      });
+      assert.equal(timedOut.state.mistakeCount, 1);
+      assert.deepEqual(
+        service.listReviewQueue().map((review) => review.puzzleId),
+        [timedOutPuzzleId]
+      );
+      assert.deepEqual(
+        service.getSessionMistakeReview(started.id).map((item) => item.puzzle.id),
+        [timedOutPuzzleId]
+      );
       assert.deepEqual(service.listHistory(), [{
         ...timedOut.attempt,
         runId: "standard",
@@ -385,7 +380,7 @@ for (const backend of ["memory", "sqlite"] as const) {
         },
         review: {
           addedCount: 1,
-          mistakeCount: 0,
+          mistakeCount: 1,
           timedOutCount: 1
         }
       });
@@ -396,10 +391,10 @@ for (const backend of ["memory", "sqlite"] as const) {
         ),
         {
           correctThisWeek: 0,
-          accuracyThisWeek: null,
+          accuracyThisWeek: 0,
           ratingDeltaThisWeek: null,
-          wrongThisWeek: 0,
-          netThisWeek: 0
+          wrongThisWeek: 1,
+          netThisWeek: -1
         }
       );
       const timedOutAttemptId = timedOut.attempt?.id ?? assert.fail("expected timeout attempt");

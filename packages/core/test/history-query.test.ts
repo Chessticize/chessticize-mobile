@@ -315,7 +315,46 @@ test("Needs attention is Unclear or in Review and remains AND with other facets"
   );
 });
 
-test("Timed out is excluded from Mistakes, Correct, Wrong, and performance", () => {
+test("active Review includes a clean correct attempt without prior Unclear state", () => {
+  const cleanCorrect = attempt({
+    id: "clean-correct-in-review",
+    puzzleId: "manual-review-puzzle",
+    result: "correct",
+    completedAt: "2026-06-20T00:00:17.000Z"
+  });
+  const reviews = [{
+    puzzleId: "manual-review-puzzle",
+    mode: "standard" as const,
+    ratingKey: "standard 5/20",
+    dueDay: "2026-06-21",
+    intervalDays: 1,
+    reviewCount: 0,
+    successStreak: 0,
+    lapseCount: 0,
+    lastResult: "wrong" as const,
+    lastReviewedAt: "2026-06-20T00:00:18.000Z"
+  }];
+
+  assert.deepEqual(
+    filterHistoryAttemptsForQuery({
+      attempts: [cleanCorrect],
+      query: { attentionOnly: true },
+      reviews
+    }).map((historyAttempt) => historyAttempt.id),
+    ["clean-correct-in-review"]
+  );
+  assert.deepEqual(
+    filterHistoryAttemptsForQuery({
+      attempts: [cleanCorrect],
+      query: { reviewStatus: "queued" },
+      reviews
+    }).map((historyAttempt) => historyAttempt.id),
+    ["clean-correct-in-review"]
+  );
+  assert.equal(historyAttemptHasReviewQueued(cleanCorrect, reviews), true);
+});
+
+test("Timed out appears in Wrong and mistake performance while remaining distinct from Correct", () => {
   const timedOut = timedOutAttempt({
       id: "timed-out",
       puzzleId: "timeout-puzzle",
@@ -345,7 +384,7 @@ test("Timed out is excluded from Mistakes, Correct, Wrong, and performance", () 
   assert.deepEqual(
     filterHistoryAttemptsForQuery({ attempts, query: { result: "wrong" }, reviews: [] })
       .map((historyAttempt) => historyAttempt.id),
-    ["wrong"]
+    ["timed-out", "wrong"]
   );
   const view = buildHistoryView({
     query: { now: "2026-06-21T12:00:00.000Z", timeRange: "max" },
@@ -355,9 +394,10 @@ test("Timed out is excluded from Mistakes, Correct, Wrong, and performance", () 
     reviews: []
   });
   assert.equal(view.performance.correctCount, 1);
-  assert.equal(view.performance.wrongCount, 1);
+  assert.equal(view.performance.wrongCount, 2);
   assert.deepEqual(view.puzzleStats.map((stats) => stats.puzzleId), [
     "correct-puzzle",
+    "timeout-puzzle",
     "wrong-puzzle"
   ]);
 });

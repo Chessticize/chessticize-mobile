@@ -16,7 +16,7 @@ const baseAttempt = {
   ratingBefore: 600
 } as const;
 
-test("Sprint result summary keeps mistakes separate while including timeout Review impact", () => {
+test("Sprint result summary counts wrong and timed-out attempts once as mistakes", () => {
   const attempts: AttemptEvent[] = [
     {
       ...baseAttempt,
@@ -57,7 +57,7 @@ test("Sprint result summary keeps mistakes separate while including timeout Revi
   ];
 
   assert.deepEqual(
-    buildSprintResultSummary({ correctCount: 2, mistakeCount: 1 }, attempts),
+    buildSprintResultSummary({ correctCount: 2, mistakeCount: 2 }, attempts),
     {
       accuracyPercent: 50,
       attemptCount: 4,
@@ -68,7 +68,7 @@ test("Sprint result summary keeps mistakes separate while including timeout Revi
       },
       review: {
         addedCount: 2,
-        mistakeCount: 1,
+        mistakeCount: 2,
         timedOutCount: 1
       }
     }
