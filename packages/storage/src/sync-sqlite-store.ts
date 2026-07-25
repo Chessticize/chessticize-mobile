@@ -300,7 +300,10 @@ export class SyncSQLiteStore implements PracticeStore {
         `SQLite schema version ${startingVersion} is newer than supported version ${CURRENT_SCHEMA_VERSION}`
       );
     }
-    if (startingVersion === CURRENT_SCHEMA_VERSION) {
+    if (
+      startingVersion === CURRENT_SCHEMA_VERSION &&
+      hasMoveFeedbackColumns(this.db)
+    ) {
       return;
     }
 
@@ -319,6 +322,8 @@ export class SyncSQLiteStore implements PracticeStore {
       if (version !== CURRENT_SCHEMA_VERSION) {
         throw new Error(`SQLite migration stopped at schema version ${version}`);
       }
+      repairKnownSchemaDrift(this.db);
+      assertForeignKeyIntegrity(this.db);
     });
   }
 
@@ -1997,10 +2002,14 @@ function migrateV3ToV4(db: SyncSqliteDatabase): void {
 }
 
 function ensureColumn(db: SyncSqliteDatabase, table: string, column: string, alterSql: string): void {
-  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
-  if (!columns.some((candidate) => candidate.name === column)) {
+  if (!hasColumn(db, table, column)) {
     db.exec(alterSql);
   }
+}
+
+function hasColumn(db: SyncSqliteDatabase, table: string, column: string): boolean {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  return columns.some((candidate) => candidate.name === column);
 }
 
 function migrateV4ToV5(db: SyncSqliteDatabase): void {
@@ -2161,6 +2170,22 @@ function migrateV7ToV8(db: SyncSqliteDatabase): void {
 }
 
 function migrateV8ToV9(db: SyncSqliteDatabase): void {
+  ensureMoveFeedbackColumns(db);
+}
+
+function repairKnownSchemaDrift(db: SyncSqliteDatabase): void {
+  // The timing and move-feedback branches both used schema v9 before they were
+  // merged. Devices that ran the timing build can therefore report the current
+  // version while still lacking these columns.
+  ensureMoveFeedbackColumns(db);
+}
+
+function hasMoveFeedbackColumns(db: SyncSqliteDatabase): boolean {
+  return hasColumn(db, "app_settings", "move_feedback_sound_enabled") &&
+    hasColumn(db, "app_settings", "move_feedback_haptics_enabled");
+}
+
+function ensureMoveFeedbackColumns(db: SyncSqliteDatabase): void {
   ensureColumn(
     db,
     "app_settings",
