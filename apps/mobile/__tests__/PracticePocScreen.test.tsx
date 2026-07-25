@@ -1259,7 +1259,7 @@ describe("PracticePocScreen", () => {
       "The attempt is marked Unclear, counts as a mistake, is added to Review, and the Sprint moves to the next puzzle."
     );
     expect(collectText(findByTestId(activeSession, "practice-session-guide-demo-board"))).toContain(
-      "Mistake · Marked Unclear · Moving on"
+      "Mistake · Marked Unclear · Added to Review · Moving on"
     );
 
     press(activeSession, "practice-session-guide-start");
@@ -1627,6 +1627,9 @@ describe("PracticePocScreen", () => {
       "Reset guides"
     );
     expect(
+      hasStyleEntry(findByTestId(renderer, "settings-show-sprint-guide"), "minHeight", 44)
+    ).toBe(true);
+    expect(
       findByTestId(renderer, "settings-guidance-reset-card").findAllByProps({
         testID: "chevron-right-glyph"
       })
@@ -1971,7 +1974,7 @@ describe("PracticePocScreen", () => {
       "Timed out"
     );
     expect(collectText(findByTestId(renderer, "session-puzzle-timeout-overlay"))).toContain(
-      "Mistake · Marked Unclear · Moving on"
+      "Mistake · Marked Unclear · Added to Review · Moving on"
     );
     expect(findByTestId(renderer, "board-input-blocker")).toBeTruthy();
     expectSessionMistakes(renderer, 1);

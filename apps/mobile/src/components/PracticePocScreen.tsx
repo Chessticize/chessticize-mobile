@@ -2881,7 +2881,7 @@ export function PracticePocScreen({
             <Text style={styles.puzzleTimeoutOverlayTitle}>Timed out</Text>
             {sprintGuidanceEnabled || sprintRulesDesignPreview?.timeoutCountsAsMistake === true ? (
               <Text style={styles.puzzleTimeoutOverlayDetail}>
-                Mistake · Marked Unclear · Moving on
+                Mistake · Marked Unclear · Added to Review · Moving on
               </Text>
             ) : null}
           </View>
@@ -4745,7 +4745,7 @@ function SessionCoachmarkDemo({
               >
                 <Text style={styles.puzzleTimeoutOverlayTitle}>Timed out</Text>
                 <Text style={styles.puzzleTimeoutOverlayDetail}>
-                  Mistake · Marked Unclear · Moving on
+                  Mistake · Marked Unclear · Added to Review · Moving on
                 </Text>
               </View>
             ) : null}
@@ -17040,7 +17040,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     justifyContent: "center",
-    minHeight: 42,
+    minHeight: 44,
     paddingHorizontal: 16
   },
   settingsGuidanceResetButtonComplete: {
