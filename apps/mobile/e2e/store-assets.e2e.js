@@ -135,6 +135,7 @@ async function captureMainTabScenes() {
   await device.takeScreenshot('app-store-01-practice-tab');
   await takeLandscapeScreenshot('app-store-01-practice-tab');
 
+  await waitForVisibleInPracticeScroll('practice-add-run');
   await element(by.id('practice-add-run')).tap();
   await waitFor(element(by.id('practice-run-editor'))).toExist().withTimeout(10000);
   await element(by.id('practice-main-scroll')).scrollTo('top');
