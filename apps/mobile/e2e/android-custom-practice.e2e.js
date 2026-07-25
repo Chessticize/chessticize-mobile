@@ -99,7 +99,7 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
       await playBoardMove('session-board', practiceFixture.userMoves[1], true);
 
       await waitFor(element(by.text('Sprint complete'))).toBeVisible().withTimeout(30000);
-      await waitForElementTextContaining('sprint-result-solved', '1 / 1', 10000);
+      await waitForElementTextContaining('sprint-result-solved', 'Solved 1', 10000);
       await waitForElementTextContaining(
         'sprint-result-rating-range',
         `600 -> ${practiceFixture.expectedRatingAfter}`,

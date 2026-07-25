@@ -68,7 +68,7 @@ describe(`Android Arrow Duel offline journey (${fixture.puzzle.id})`, () => {
       await playBoardMove('session-board', fixture.correctMove);
 
       await waitFor(element(by.text('Sprint complete'))).toBeVisible().withTimeout(30000);
-      await waitFor(element(by.id('sprint-result-solved'))).toHaveText('1 / 1').withTimeout(10000);
+      await waitFor(element(by.id('sprint-result-solved'))).toHaveText('Solved 1').withTimeout(10000);
       await waitForElementTextContaining(
         'sprint-result-rating-range',
         `${fixture.puzzle.rating} -> ${fixture.expectedRatingAfter}`,
