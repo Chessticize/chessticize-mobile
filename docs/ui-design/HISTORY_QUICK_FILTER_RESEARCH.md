@@ -15,11 +15,12 @@ Use one persistent, single-select segmented control:
 - Define `Needs attention` by current user-managed state: `Unclear OR in
   Review`.
 - Default the advanced Source facet to `All sources`.
-- Keep range, Run/rating bucket, source, result, Review queue, side, and theme
+- Keep range, Run/rating bucket, source, result, Attention, side, and theme
   controls in the existing filter menu.
-- Remove the `Attention flags` facet. Slow, Timed out, Wrong, and the original
-  reason for entering Review are not useful secondary filter dimensions in this
-  iteration.
+- Expose `Unclear` and `In review` as the two Attention reasons. Combine them
+  with OR; both are selected when the user enters `Needs attention`.
+- Remove the separate Review queue facet. Active Review membership is represented
+  by the `In review` Attention reason instead.
 - Keep the full Themes catalog collapsed when the menu opens. Its disclosure
   names selected themes in one ellipsized line. The applied summary below the
   view selector shows one theme name or `{n} themes selected`.
@@ -29,22 +30,31 @@ Use one persistent, single-select segmented control:
   applied-filter summary already communicate the rest of the state.
 
 This supersedes both the earlier separate Slow/Timed out quick-chip proposal
-and the later four-value Attention flags proposal.
+and the four-value Attention proposal. The retained Attention group contains
+only `Unclear` and `In review`.
 
 ## Behavior
 
 - A Slow correct attempt is automatically marked Unclear.
-- A Timed out attempt is automatically marked Unclear.
+- A Timed out attempt counts as a Sprint mistake and is automatically marked
+  Unclear. It keeps its distinct `Timed out` History result and label.
+- The `Wrong` result filter includes both submitted wrong moves and Timed out
+  attempts.
 - The app does not ask whether a Slow attempt was unclear after it has already
-  set that marker.
+  set that marker. It shows a non-actionable notice explaining that the attempt
+  was marked Unclear because it was Slow.
 - Slow and Timed out remain visible History labels, not filtering reasons.
-- Wrong attempts qualify through their active Review state.
+- Any attempt represented by an active Review Schedule qualifies through
+  `In review`, including a clean correct attempt enrolled manually.
+- Selecting either Attention reason keeps the primary selector on
+  `Needs attention`. Clearing both switches it to `All`; entering
+  `Needs attention` from `All` selects both reasons.
 - If a user clears Unclear or removes the matching Review entry, the attempt
   leaves `Needs attention` once neither state remains.
-- Advanced facets narrow the selected view with AND. Multiple selected themes
-  keep their existing OR behavior inside the Themes facet.
+- Advanced facets narrow the selected view with AND. Attention reasons and
+  multiple selected themes each keep OR behavior inside their own facet.
 - Reset restores `Needs attention`, `All sources`, the default seven-day range,
-  and no optional advanced filters.
+  both Attention reasons, and no other optional advanced filters.
 
 ## Why This Control
 
@@ -73,18 +83,22 @@ high-value persistent selector
 
 ## Storybook Acceptance Checks
 
-- Initial state selects `Needs attention` and `All sources`.
+- Initial state selects `Needs attention`, `All sources`, `Unclear`, and
+  `In review`.
 - The segmented order is `Needs attention`, then `All`.
-- Needs attention includes an Unclear attempt and a wrong attempt still in
-  Review.
+- Needs attention includes an Unclear attempt, a wrong attempt still in Review,
+  and a clean correct attempt enrolled manually in Review.
 - A Slow or Timed out fixture appears because it is auto-marked Unclear, not
   because of its timing label.
 - A normal clear attempt and a wrong attempt removed from Review are excluded.
-- The filter menu has no Attention flags group.
+- The filter menu exposes only `Unclear` and `In review` in its Attention group
+  and has no separate Review queue facet.
+- Selecting one Attention reason keeps `Needs attention` selected. Clearing
+  both switches to `All`; selecting `Needs attention` again restores both.
 - Advanced facets only narrow the selected view.
 - Themes is collapsed by default, retains a compact selection summary, and
   reveals all curated choices on demand.
-- Reset restores `Needs attention`.
+- Reset restores `Needs attention` with both Attention reasons selected.
 - At 320-point width, both segments and the filter button remain visible
   without horizontal scrolling.
 - Assistive technology announces one selected option in a labelled radio group.

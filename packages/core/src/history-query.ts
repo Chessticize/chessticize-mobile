@@ -443,7 +443,7 @@ export function filterHistoryAttemptsForQuery(input: {
           .map(historyAttemptReviewKey)
       );
   return input.attempts
-    .filter((attempt) => !input.query.result || normalizeHistoryOutcome(attempt.result) === input.query.result)
+    .filter((attempt) => !input.query.result || historyResultForMistakeSemantics(attempt.result) === input.query.result)
     .filter((attempt) => !input.query.source || normalizeHistorySource(attempt.source) === input.query.source)
     .filter((attempt) => !input.query.mode || normalizeHistoryMode(attempt.mode) === input.query.mode)
     .filter((attempt) => !input.query.side || attempt.side === input.query.side)
@@ -456,7 +456,6 @@ export function filterHistoryAttemptsForQuery(input: {
       Boolean(attempt.unclear) ||
       (
         queuedReviewKeys !== null &&
-        historyAttemptCanRepresentReviewAttention(attempt) &&
         historyAttemptReviewQueuedFromKeys(attempt, queuedReviewKeys)
       )
     )
@@ -464,8 +463,7 @@ export function filterHistoryAttemptsForQuery(input: {
       if (input.query.reviewStatus === undefined || queuedReviewKeys === null) {
         return true;
       }
-      const queued = historyAttemptCanRepresentReviewAttention(attempt) &&
-        historyAttemptReviewQueuedFromKeys(attempt, queuedReviewKeys);
+      const queued = historyAttemptReviewQueuedFromKeys(attempt, queuedReviewKeys);
       return input.query.reviewStatus === "queued" ? queued : !queued;
     });
 }
@@ -503,12 +501,12 @@ export function collectHistorySpeeds(
 }
 
 export function historyAttemptHasReviewQueued(
-  attempt: Pick<HistoryAttemptView, "puzzleId" | "mode" | "ratingKey" | "result" | "unclearUpdatedAt">,
+  attempt: Pick<HistoryAttemptView, "puzzleId" | "mode" | "ratingKey">,
   reviews: ReviewQueueState[]
 ): boolean {
   const mode = normalizeHistoryMode(attempt.mode);
   const ratingKey = normalizeHistoryRatingKey(attempt.ratingKey);
-  if (!historyAttemptCanRepresentReviewAttention(attempt) || mode === null || ratingKey === null) {
+  if (mode === null || ratingKey === null) {
     return false;
   }
   return reviews.some((review) =>
@@ -536,13 +534,6 @@ function historyAttemptReviewQueuedFromKeys(
   }));
 }
 
-function historyAttemptCanRepresentReviewAttention(
-  attempt: Pick<HistoryAttemptView, "result" | "unclearUpdatedAt">
-): boolean {
-  return normalizeHistoryOutcome(attempt.result) === "wrong" ||
-    attempt.unclearUpdatedAt !== undefined;
-}
-
 export function buildHistoryPuzzleStats(
   attempts: HistoryAttemptView[],
   reviews: ReviewQueueState[]
@@ -552,9 +543,10 @@ export function buildHistoryPuzzleStats(
 
   for (const attempt of attempts) {
     const detail = normalizeHistoryAttemptDetail(attempt);
+    const result = historyResultForMistakeSemantics(detail.result);
     if (
       detail.source === null ||
-      (detail.result !== "correct" && detail.result !== "wrong") ||
+      result === null ||
       detail.mode === null ||
       detail.ratingKey === null
     ) {
@@ -576,7 +568,7 @@ export function buildHistoryPuzzleStats(
         wrongCount: 0
       };
 
-    if (detail.result === "correct") {
+    if (result === "correct") {
       current.correctCount += 1;
     } else {
       current.wrongCount += 1;
@@ -646,16 +638,22 @@ function partitionHistoryAttemptsByResult(attempts: HistoryAttemptView[]): Class
   const classified: ClassifiedHistoryAttempt[] = [];
   for (const attempt of attempts) {
     const detail = normalizeHistoryAttemptDetail(attempt);
+    const result = historyResultForMistakeSemantics(detail.result);
     if (
       detail.source !== null &&
       detail.mode !== null &&
       detail.ratingKey !== null &&
-      (detail.result === "correct" || detail.result === "wrong")
+      result !== null
     ) {
-      classified.push({ attempt, result: detail.result });
+      classified.push({ attempt, result });
     }
   }
   return classified;
+}
+
+function historyResultForMistakeSemantics(value: unknown): AttemptResult | null {
+  const result = normalizeHistoryOutcome(value);
+  return result === "timed_out" ? "wrong" : result;
 }
 
 function buildAttemptPerformanceChart(

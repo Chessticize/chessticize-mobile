@@ -324,6 +324,7 @@ type FeedbackBoardSnapshot = {
 
 type UnclearPromptState = {
   attemptId: string;
+  autoMarkedReason?: "slow";
   marked: boolean;
   puzzleId: string;
   question: string;
@@ -1595,12 +1596,18 @@ export function PracticePocScreen({
       playCommittedMoveFeedback("user", move, submittedFen);
       const nextFeedback = (next.feedback as SessionFeedback) ?? null;
       if (next.attempt) {
-        setUnclearPrompt(isUnclearAttemptEligible(next.attempt) && !next.attempt.unclear
+        const isSlowAutoMarked = next.attempt.timingStatus === "slow" &&
+          next.attempt.unclear === true;
+        setUnclearPrompt(isUnclearAttemptEligible(next.attempt) &&
+          (!next.attempt.unclear || isSlowAutoMarked)
           ? {
               attemptId: next.attempt.id,
-              marked: false,
+              ...(isSlowAutoMarked ? { autoMarkedReason: "slow" as const } : {}),
+              marked: Boolean(next.attempt.unclear),
               puzzleId: next.attempt.puzzleId,
-              question: "Was it clear why the last correct move worked?"
+              question: isSlowAutoMarked
+                ? "Marked unclear because the last puzzle was slow."
+                : "Was it clear why the last correct move worked?"
             }
           : null);
       }
@@ -2825,7 +2832,9 @@ export function PracticePocScreen({
     >
       <UnclearAttemptPrompt
         marked={unclearPrompt.marked}
-        question="Was the previous puzzle clear?"
+        question={unclearPrompt.autoMarkedReason === "slow"
+          ? "Marked unclear because the previous puzzle was slow."
+          : "Was the previous puzzle clear?"}
         onToggle={toggleUnclearPrompt}
       />
     </View>

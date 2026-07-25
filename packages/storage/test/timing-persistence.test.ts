@@ -278,7 +278,7 @@ test("pausing at the puzzle deadline records one timeout and pauses the next puz
   assert.equal(paused.currentPuzzleIndex, 1);
   assert.notEqual(paused.currentPuzzle?.puzzle.id, started.currentPuzzle?.puzzle.id);
   assert.equal(paused.correctCount, 0);
-  assert.equal(paused.mistakeCount, 0);
+  assert.equal(paused.mistakeCount, 1);
   assert.deepEqual(
     service.listHistory().map((attempt) => attempt.result),
     ["timed_out"]
@@ -346,7 +346,7 @@ for (const backend of ["memory", "sqlite"] as const) {
       assert.equal(timedOut.attempt?.unclearUpdatedAt, "2026-07-24T01:01:00.000Z");
       assert.notEqual(timedOut.state.currentPuzzle?.puzzle.id, timedOutPuzzleId);
       assert.equal(timedOut.state.correctCount, 0);
-      assert.equal(timedOut.state.mistakeCount, 0);
+      assert.equal(timedOut.state.mistakeCount, 1);
       assert.equal(service.listReviewQueue().length, 0);
       assert.deepEqual(service.listHistory(), [{
         ...timedOut.attempt,

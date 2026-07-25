@@ -48,7 +48,7 @@ test("CLI drives a multi-step sprint and exposes machine-readable history", asyn
   await cli.stop();
 });
 
-test("CLI records an exact-boundary puzzle timeout without rating or review effects", async (t) => {
+test("CLI records an exact-boundary puzzle timeout as a mistake without immediate rating or review effects", async (t) => {
   const cli = await startCli(t);
 
   const start = await cli.command({
@@ -74,7 +74,7 @@ test("CLI records an exact-boundary puzzle timeout without rating or review effe
   assert.equal(response.attempt.unclearUpdatedAt, "2026-07-24T00:01:00.000Z");
   assert.equal(response.state.status, "active");
   assert.equal(response.state.correctCount, 0);
-  assert.equal(response.state.mistakeCount, 0);
+  assert.equal(response.state.mistakeCount, 1);
   assert.equal(response.state.ratingBefore, ratingBefore);
   assert.equal(response.state.ratingAfter, undefined);
 

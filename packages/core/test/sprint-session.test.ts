@@ -64,7 +64,7 @@ test("sprint initializes a per-puzzle deadline and records Slow from the puzzle 
   assert.equal(wrong.attempt?.unclear, undefined);
 });
 
-test("advanceSprintTime times out once, advances without correctness or ELO effects, and is idempotent", () => {
+test("advanceSprintTime counts a timeout as one mistake and advances idempotently", () => {
   const started = startSprint({
     config: buildSprintConfig({
       mode: "standard",
@@ -89,12 +89,59 @@ test("advanceSprintTime times out once, advances without correctness or ELO effe
   assert.equal(timedOut.state.currentPuzzleStartedAt, "2026-06-20T00:01:00.000Z");
   assert.equal(timedOut.state.currentPuzzleDeadlineAt, "2026-06-20T00:02:00.000Z");
   assert.equal(timedOut.state.correctCount, 0);
-  assert.equal(timedOut.state.mistakeCount, 0);
+  assert.equal(timedOut.state.mistakeCount, 1);
   assert.equal(timedOut.state.ratingAfter, undefined);
 
   const repeated = advanceSprintTime(timedOut.state, "2026-06-20T00:01:00.000Z");
   assert.equal(repeated.attempt, undefined);
   assert.equal(repeated.state.currentPuzzle?.puzzle.id, "p2");
+});
+
+test("a timeout that reaches the mistake limit fails the sprint with an ELO result", () => {
+  const started = startSprint({
+    config: buildSprintConfig({
+      mode: "standard",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      targetCorrect: 2,
+      maxMistakes: 1
+    }),
+    puzzles: [oneMovePuzzle("p1"), oneMovePuzzle("p2")],
+    ratingBefore: 900,
+    now: NOW
+  });
+
+  const timedOut = advanceSprintTime(started, "2026-06-20T00:01:00.000Z");
+  assert.equal(timedOut.attempt?.result, "timed_out");
+  assert.equal(timedOut.state.status, "failed");
+  assert.equal(timedOut.state.endReason, "max_mistakes");
+  assert.equal(timedOut.state.mistakeCount, 1);
+  assert.ok(timedOut.state.ratingAfter !== undefined);
+  assert.ok(timedOut.state.ratingAfter < timedOut.state.ratingBefore);
+  assert.equal(timedOut.state.currentPuzzle, undefined);
+});
+
+test("abandoning after a timeout rates the unfinished sprint as failed", () => {
+  const started = startSprint({
+    config: buildSprintConfig({
+      mode: "standard",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      targetCorrect: 2,
+      maxMistakes: 3
+    }),
+    puzzles: [oneMovePuzzle("p1"), oneMovePuzzle("p2")],
+    ratingBefore: 900,
+    now: NOW
+  });
+
+  const timedOut = advanceSprintTime(started, "2026-06-20T00:01:00.000Z");
+  const abandoned = abandonSprint(timedOut.state, "2026-06-20T00:01:01.000Z");
+  assert.equal(timedOut.state.hasUserSubmittedMove, true);
+  assert.equal(abandoned.status, "failed");
+  assert.equal(abandoned.endReason, "abandoned");
+  assert.ok(abandoned.ratingAfter !== undefined);
+  assert.ok(abandoned.ratingAfter < abandoned.ratingBefore);
 });
 
 test("a delayed timeout tick records the deadline while starting the next puzzle at processing time", () => {
@@ -135,7 +182,7 @@ test("a move at the puzzle deadline returns only the timeout transition", () => 
   assert.equal(result.feedback, undefined);
   assert.equal(result.state.currentPuzzle?.puzzle.id, "p2");
   assert.equal(result.state.correctCount, 0);
-  assert.equal(result.state.mistakeCount, 0);
+  assert.equal(result.state.mistakeCount, 1);
 });
 
 test("sprint deadline wins over the puzzle deadline", () => {
@@ -199,12 +246,12 @@ test("pausing at the puzzle deadline records the timeout before pausing the next
   assert.equal(paused.state.status, "paused");
   assert.equal(paused.state.currentPuzzleIndex, 1);
   assert.equal(paused.state.correctCount, 0);
-  assert.equal(paused.state.mistakeCount, 0);
+  assert.equal(paused.state.mistakeCount, 1);
   assert.equal(paused.state.ratingBefore, 900);
   assert.equal(paused.state.pausedAt, "2026-06-20T00:01:00.000Z");
 });
 
-test("timeout with no next puzzle terminates safely without rating or count changes", () => {
+test("timeout with no next puzzle records a mistake and a failed ELO result", () => {
   const state = startSprint({
     config: buildSprintConfig({
       mode: "standard",
@@ -222,9 +269,10 @@ test("timeout with no next puzzle terminates safely without rating or count chan
   assert.equal(timedOut.state.status, "failed");
   assert.equal(timedOut.state.endReason, "puzzles_exhausted");
   assert.equal(timedOut.state.currentPuzzle, undefined);
-  assert.equal(timedOut.state.ratingAfter, undefined);
+  assert.ok(timedOut.state.ratingAfter !== undefined);
+  assert.ok(timedOut.state.ratingAfter < timedOut.state.ratingBefore);
   assert.equal(timedOut.state.correctCount, 0);
-  assert.equal(timedOut.state.mistakeCount, 0);
+  assert.equal(timedOut.state.mistakeCount, 1);
   assert.equal(advanceSprintTime(timedOut.state, "2026-06-20T00:02:00.000Z").attempt, undefined);
 });
 
