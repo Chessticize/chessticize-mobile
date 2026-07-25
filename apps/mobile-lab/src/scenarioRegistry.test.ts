@@ -116,9 +116,14 @@ test("Issue #337 keeps semantic Sprint guidance on the existing responsive Lab s
   assert.ok(activeSessionGuide.scope.includes.includes(
     "Full-width production Unclear prompt in portrait"
   ));
+  assert.ok(activeSessionGuide.scope.includes.includes(
+    "Portrait arrows outside callout borders"
+  ));
   assert.match(activeSessionGuide.description, /terminate at the amber timer and Mark as unclear control/);
   assert.ok(arrowDuelGuide.scope.includes.includes("ARROW DUEL semantic callout"));
-  assert.match(arrowDuelGuide.description, /single-line 5 of 5 guide progress/);
+  assert.ok(arrowDuelGuide.scope.includes.includes("The arrows show your two choices"));
+  assert.ok(arrowDuelGuide.scope.includes.includes("Landscape callout in the empty board lane"));
+  assert.match(arrowDuelGuide.description, /two arrows are the user's two choices/);
   assert.doesNotMatch(
     `${activeSessionGuide.description} ${arrowDuelGuide.description}`,
     /\b(?:step|tour)\b/i
@@ -129,4 +134,11 @@ test("Issue #337 keeps semantic Sprint guidance on the existing responsive Lab s
   assert.ok(settingsGuidance.issues?.some(
     (issue) => issue.issueNumber === 337 && issue.changeNote.includes("immediately before Feedback")
   ));
+});
+
+test("Timed out handoff explains its mistake and Review result on the next puzzle", () => {
+  const timedOut = scenarioRegistry["practice-timing-timeout"];
+
+  assert.ok(timedOut.scope.includes.includes("Post-timeout mistake and Review notice"));
+  assert.match(timedOut.description, /explains the Review handoff on the next puzzle/);
 });

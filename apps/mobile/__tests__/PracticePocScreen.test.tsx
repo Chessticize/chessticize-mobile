@@ -1392,7 +1392,7 @@ describe("PracticePocScreen", () => {
     expect(testIdOrder(firstEverArrowDuel, "practice-prompt", "practice-arrow-duel-guide-demo-board")).toBeLessThan(0);
     expect(testIdOrder(firstEverArrowDuel, "practice-arrow-duel-guide-demo-board", "session-score-strip")).toBeLessThan(0);
     expect(collectText(findByTestId(firstEverArrowDuel, "practice-arrow-duel-guide-coach"))).toContain(
-      "Each arrow is a possible move. Play the stronger one on the board; other moves are ignored."
+      "Compare the two moves, then play the stronger one on the board. Other moves are ignored."
     );
     expect(collectText(findByTestId(firstEverArrowDuel, "practice-session-guide-coach-progress"))).toBe(
       "5 of 5"
@@ -1501,13 +1501,13 @@ describe("PracticePocScreen", () => {
     expect(collectText(
       findByTestId(arrowDuel, "practice-session-guide-coach-copy-arrow-duel")
     )).toBe(
-      "ARROW DUELChoose one of the two arrowsEach arrow is a possible move. Play the stronger one on the board; other moves are ignored."
+      "ARROW DUELThe arrows show your two choicesCompare the two moves, then play the stronger one on the board. Other moves are ignored."
     );
     expect(findByTestId(
       arrowDuel,
       "practice-arrow-duel-guide"
     ).props.accessibilityLabel).toBe(
-      "Guide 1 of 1. Choose one of the two arrows. Each arrow is a possible move. Play the stronger one on the board; other moves are ignored."
+      "Guide 1 of 1. The arrows show your two choices. Compare the two moves, then play the stronger one on the board. Other moves are ignored."
     );
 
     const rules = renderLabScenario("practice-first-sprint-guide");
@@ -1708,13 +1708,37 @@ describe("PracticePocScreen", () => {
     });
 
     const landscapeArrowDuel = renderLabScenario("practice-arrow-duel-guide-only");
+    const landscapeArrowBoardSize = Number(
+      flattenTestStyle(
+        findByTestId(landscapeArrowDuel, "practice-arrow-duel-guide-demo-board").props.style
+      ).width
+    );
     expect(findByTestId(
       landscapeArrowDuel,
-      "practice-session-guide-coach-pointer-arrow-duel-left"
+      "practice-session-guide-coach-pointer-arrow-duel-top"
     )).toBeTruthy();
     expect(
-      flattenTestStyle(findByTestId(landscapeArrowDuel, "practice-arrow-duel-guide-coach").props.style).top
-    ).toBe(92);
+      flattenTestStyle(
+        findByTestId(
+          landscapeArrowDuel,
+          "practice-session-guide-coach-pointer-arrow-duel-top"
+        ).props.style
+      )
+    ).toMatchObject({
+      left: Math.round(landscapeArrowBoardSize * 0.79),
+      position: "absolute",
+      top: -22,
+      width: 24
+    });
+    expect(
+      flattenTestStyle(
+        findByTestId(landscapeArrowDuel, "practice-arrow-duel-guide-coach").props.style
+      )
+    ).toMatchObject({
+      left: 12,
+      top: Math.round(landscapeArrowBoardSize * 0.58),
+      width: landscapeArrowBoardSize - 24
+    });
     expect(() => findByTestId(
       landscapeArrowDuel,
       "practice-arrow-duel-guide-candidate-spotlight"
@@ -1724,6 +1748,55 @@ describe("PracticePocScreen", () => {
         findByTestId(landscapeArrowDuel, "practice-arrow-duel-guide-demo-board").props.style
       ).opacity
     ).not.toBe(0.34);
+  });
+
+  it("keeps portrait Active Session guide arrows outside their callout cards", () => {
+    setPracticeViewport({
+      width: 402,
+      height: 874,
+      scale: 3,
+      insets: { top: 62, right: 0, bottom: 34, left: 0 }
+    });
+
+    const renderer = renderLabScenario("practice-active-session-guide");
+    expect(
+      flattenTestStyle(
+        findByTestId(renderer, "practice-session-guide-coach-pointer-overview-top").props.style
+      )
+    ).toMatchObject({
+      position: "absolute",
+      top: -22
+    });
+
+    press(renderer, "practice-session-guide-start");
+    expect(
+      flattenTestStyle(
+        findByTestId(renderer, "practice-session-guide-coach-pointer-slow-bottom").props.style
+      )
+    ).toMatchObject({
+      bottom: -22,
+      position: "absolute"
+    });
+
+    press(renderer, "practice-session-guide-start");
+    expect(
+      flattenTestStyle(
+        findByTestId(renderer, "practice-session-guide-coach-pointer-timeout-bottom").props.style
+      )
+    ).toMatchObject({
+      bottom: -22,
+      position: "absolute"
+    });
+
+    press(renderer, "practice-session-guide-start");
+    expect(
+      flattenTestStyle(
+        findByTestId(renderer, "practice-session-guide-coach-pointer-unclear-bottom").props.style
+      )
+    ).toMatchObject({
+      bottom: -22,
+      position: "absolute"
+    });
   });
 
   it("fits the complete first-use guide in the maintained iPhone portrait viewport", () => {
@@ -2370,6 +2443,11 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "session-puzzle-timing-label"))).toBe("Puzzle 0:00");
     expect(() => findByTestId(renderer, "session-puzzle-countdown")).toThrow();
     expect(findByTestId(renderer, "mock-chessboard").props.fen).not.toBe(firstPuzzleFen);
+    expect(collectText(findByTestId(renderer, "sprint-previous-attempt-notice"))).toBe(
+      "Previous puzzle timed outIt was already marked Unclear, counted as a mistake, and added to Review.In Review"
+    );
+    expect(() => findByTestId(renderer, "sprint-unclear-prompt")).toThrow();
+    expect(() => findByTestId(renderer, "sprint-unclear-toggle")).toThrow();
     expectSessionMistakes(renderer, 1);
   });
 
@@ -2528,6 +2606,43 @@ describe("PracticePocScreen", () => {
       "1 marked after Timed out"
     );
     expect(service.listReviewQueue()).toHaveLength(1);
+  });
+
+  it("summarizes a timeout that ends the Sprint instead of showing a next-puzzle notice", () => {
+    let wallClockMs = Date.parse("2026-07-23T12:00:00.000Z");
+    const service = createMobilePracticeService("random1000");
+    startSprintWithPuzzleTiming(
+      service,
+      {
+        durationSeconds: 300,
+        perPuzzleSeconds: 20,
+        puzzleTiming: {
+          slowAfterSeconds: 40,
+          timeoutAfterSeconds: 60
+        },
+        targetCorrect: 15,
+        maxMistakes: 1
+      },
+      new Date(wallClockMs).toISOString()
+    );
+    const renderer = renderScreen({
+      currentTimeMs: () => wallClockMs,
+      practiceService: service,
+      sprintGuidanceEnabled: true
+    });
+
+    press(renderer, "practice-resume-card");
+    act(() => {
+      wallClockMs += 60_000;
+      jest.advanceTimersByTime(60_000);
+    });
+
+    expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
+    expect(() => findByTestId(renderer, "sprint-previous-attempt-notice")).toThrow();
+    expect(collectText(findByTestId(renderer, "sprint-result-mistakes"))).toBe("1");
+    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain(
+      "1 timed out added to Review"
+    );
   });
 
   it("ends the sprint without a puzzle timeout overlay when both deadlines are reached together", () => {

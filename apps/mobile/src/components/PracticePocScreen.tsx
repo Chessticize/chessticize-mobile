@@ -337,6 +337,12 @@ type UnclearPromptState = {
   question: string;
 };
 
+type PreviousAttemptNoticeState = {
+  attemptId: string;
+  puzzleId: string;
+  reason: "timed_out";
+};
+
 type PendingGuidedStart = {
   nextMode: SprintMode;
   practiceRunId?: string;
@@ -559,6 +565,8 @@ export function PracticePocScreen({
         }
       : null
   ));
+  const [previousAttemptNotice, setPreviousAttemptNotice] =
+    useState<PreviousAttemptNoticeState | null>(null);
   const [boardInputLocked, setBoardInputLocked] = useState(false);
   const [boardInputLockMode, setBoardInputLockMode] = useState<BoardInputLockMode>("hard");
   const [readyArrowDuelBoardKey, setReadyArrowDuelBoardKey] = useState<string | null>(null);
@@ -843,6 +851,15 @@ export function PracticePocScreen({
         setFeedback(null);
         setFeedbackPuzzleId(null);
         setUnclearPrompt(null);
+        setPreviousAttemptNotice(
+          advanced.attempt?.result === "timed_out" && advanced.state.status === "active"
+            ? {
+                attemptId: advanced.attempt.id,
+                puzzleId: advanced.attempt.puzzleId,
+                reason: "timed_out"
+              }
+            : null
+        );
         if (
           advanced.attempt?.timingStatus === "timed_out" &&
           submittedPuzzle &&
@@ -1475,6 +1492,7 @@ export function PracticePocScreen({
       setFeedback(null);
       setFeedbackPuzzleId(null);
       setUnclearPrompt(null);
+      setPreviousAttemptNotice(null);
       pendingPremoveRef.current = null;
       commitBoardInputLocked(false, "start", started.currentPuzzle?.puzzle.id ?? null);
       clearFeedbackSnapshot();
@@ -1693,6 +1711,15 @@ export function PracticePocScreen({
       const next = service.submitMove(move, captureLiveNowIso());
       playCommittedMoveFeedback("user", move, submittedFen);
       const nextFeedback = (next.feedback as SessionFeedback) ?? null;
+      setPreviousAttemptNotice(
+        next.attempt?.result === "timed_out" && next.state.status === "active"
+          ? {
+              attemptId: next.attempt.id,
+              puzzleId: next.attempt.puzzleId,
+              reason: "timed_out"
+            }
+          : null
+      );
       if (next.attempt) {
         const isSlowAutoMarked = next.attempt.timingStatus === "slow" &&
           next.attempt.unclear === true;
@@ -1834,6 +1861,7 @@ export function PracticePocScreen({
     setFeedback(null);
     setFeedbackPuzzleId(null);
     setUnclearPrompt(null);
+    setPreviousAttemptNotice(null);
     clearFeedbackSnapshot();
     setError(null);
     pendingPremoveRef.current = null;
@@ -1857,6 +1885,7 @@ export function PracticePocScreen({
       setLastBoardMove(null);
       setFeedback(null);
       setFeedbackPuzzleId(null);
+      setPreviousAttemptNotice(null);
       clearFeedbackSnapshot();
       commitBoardInputLocked(false, "resume", resumed.currentPuzzle?.puzzle.id ?? null);
       navigateToTab("practice");
@@ -2946,7 +2975,8 @@ export function PracticePocScreen({
       />
     </View>
   ) : null;
-  const sessionBottomFeedbackNode = shouldShowSessionBoard && unclearPrompt ? (
+  const sessionBottomFeedbackNode = shouldShowSessionBoard
+    && (unclearPrompt || previousAttemptNotice) ? (
     // Fabric must keep this wrapper as a native flex child so the landscape
     // auto margin can pin feedback to the rail bottom instead of flattening it.
     <View
@@ -2957,15 +2987,19 @@ export function PracticePocScreen({
         { width: sessionUsesRail ? adaptiveLayout.sessionRailWidth : boardSize }
       ]}
     >
-      <UnclearAttemptPrompt
-        marked={unclearPrompt.marked}
-        question={unclearPrompt.autoMarkedReason === "slow"
-          ? "Marked unclear because the previous puzzle was slow."
-          : unclearPrompt.question.includes("wrong")
-            ? unclearPrompt.question
-            : "Was the previous puzzle clear?"}
-        onToggle={toggleUnclearPrompt}
-      />
+      {previousAttemptNotice ? (
+        <PreviousAttemptNotice />
+      ) : unclearPrompt ? (
+        <UnclearAttemptPrompt
+          marked={unclearPrompt.marked}
+          question={unclearPrompt.autoMarkedReason === "slow"
+            ? "Marked unclear because the previous puzzle was slow."
+            : unclearPrompt.question.includes("wrong")
+              ? unclearPrompt.question
+              : "Was the previous puzzle clear?"}
+          onToggle={toggleUnclearPrompt}
+        />
+      ) : null}
     </View>
   ) : null;
   const errorNode = error ? <ErrorPanel error={error} /> : null;
@@ -4283,9 +4317,9 @@ function sessionGuideCallout(
   if (mode === "arrow_duel") {
     return {
       badge: "ARROW DUEL",
-      detail: "Each arrow is a possible move. Play the stronger one on the board; other moves are ignored.",
+      detail: "Compare the two moves, then play the stronger one on the board. Other moves are ignored.",
       id: "arrow-duel",
-      title: "Choose one of the two arrows",
+      title: "The arrows show your two choices",
       tone: "info"
     };
   }
@@ -4637,11 +4671,15 @@ function SessionCoachmarkDemo({
           top: measuredBoardCalloutTop ?? (coachStep === 1 ? 108 : 146),
           width: Math.max(0, boardSize - 24)
         }
+      : isArrowDuel
+        ? {
+            left: 12,
+            top: Math.round(boardSize * 0.58),
+            width: Math.max(0, boardSize - 24)
+          }
       : {
         left: boardSize + adaptiveLayout.sessionRailGap,
-        top: isArrowDuel
-          ? 92
-          : coachStep === 0
+        top: coachStep === 0
           ? 112
           : coachStep === 1
             ? 220
@@ -4676,7 +4714,7 @@ function SessionCoachmarkDemo({
     : undefined;
   const coachPointer = calloutUsesBoard
     ? "→"
-    : adaptiveLayout.usesSessionRail && (isArrowDuel || coachStep === 2)
+    : adaptiveLayout.usesSessionRail && coachStep === 2
     ? "←"
     : isArrowDuel || coachStep === 0 || (adaptiveLayout.usesSessionRail && coachStep === 1)
       ? "↑"
@@ -4738,8 +4776,17 @@ function SessionCoachmarkDemo({
       accessibilityElementsHidden
       style={[
         styles.sessionGuideCoachPointer,
+        pointerPlacement === "top" ? styles.sessionGuideCoachPointerTop : null,
+        pointerPlacement === "bottom" ? styles.sessionGuideCoachPointerBottom : null,
         pointerPlacement === "left" ? styles.sessionGuideCoachPointerLeft : null,
         pointerPlacement === "right" ? styles.sessionGuideCoachPointerRight : null,
+        isArrowDuel && adaptiveLayout.usesSessionRail && pointerPlacement === "top"
+          ? {
+              left: Math.round(boardSize * 0.79),
+              right: undefined,
+              width: 24
+            }
+          : null,
         callout.tone === "warning" ? styles.sessionGuideCoachPointerWarning : null,
         callout.tone === "danger" ? styles.sessionGuideCoachPointerDanger : null
       ]}
@@ -7227,6 +7274,27 @@ function ActiveMistakeIndicator({
             testID={`session-mistake-dot-${index}`}
           />
         ))}
+      </View>
+    </View>
+  );
+}
+
+function PreviousAttemptNotice(): React.JSX.Element {
+  return (
+    <View
+      accessibilityLabel="Previous puzzle timed out. It was already marked Unclear, counted as a mistake, and added to Review. In Review."
+      accessibilityLiveRegion="polite"
+      style={styles.unclearPrompt}
+      testID="sprint-previous-attempt-notice"
+    >
+      <View style={styles.previousAttemptNoticeCopy}>
+        <Text style={styles.previousAttemptNoticeTitle}>Previous puzzle timed out</Text>
+        <Text style={styles.previousAttemptNoticeDetail}>
+          It was already marked Unclear, counted as a mistake, and added to Review.
+        </Text>
+      </View>
+      <View style={styles.previousAttemptNoticeStatus}>
+        <Text style={styles.previousAttemptNoticeStatusText}>In Review</Text>
       </View>
     </View>
   );
@@ -14253,6 +14321,18 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     textAlign: "center"
   },
+  sessionGuideCoachPointerTop: {
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: -22
+  },
+  sessionGuideCoachPointerBottom: {
+    bottom: -22,
+    left: 0,
+    position: "absolute",
+    right: 0
+  },
   sessionGuideCoachPointerLeft: {
     left: -20,
     position: "absolute",
@@ -15628,6 +15708,36 @@ const styles = StyleSheet.create({
   },
   unclearPromptButtonText: {
     color: "#B45309",
+    fontSize: 11,
+    fontWeight: "900"
+  },
+  previousAttemptNoticeCopy: {
+    flex: 1,
+    gap: 1,
+    minWidth: 0
+  },
+  previousAttemptNoticeTitle: {
+    color: "#334155",
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  previousAttemptNoticeDetail: {
+    color: "#64748B",
+    fontSize: 11,
+    fontWeight: "600"
+  },
+  previousAttemptNoticeStatus: {
+    alignItems: "center",
+    backgroundColor: "#EFF6FF",
+    borderColor: "#93C5FD",
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 30,
+    paddingHorizontal: 8
+  },
+  previousAttemptNoticeStatusText: {
+    color: "#1D4ED8",
     fontSize: 11,
     fontWeight: "900"
   },
