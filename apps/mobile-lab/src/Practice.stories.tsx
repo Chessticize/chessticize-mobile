@@ -176,7 +176,10 @@ export const ActiveSessionGuide: Story = {
     await waitForTestId(canvasElement, "practice-active-session-guide");
     await waitForTestId(canvasElement, "practice-session-guide-timing-demo");
     await waitForTestId(canvasElement, "practice-session-guide-demo-board");
-    await waitForText(canvasElement, "These are automatic timing states, not controls.");
+    await waitForText(
+      canvasElement,
+      "These are automatic timing states, not controls. There is nothing to tap."
+    );
     await waitForText(
       canvasElement,
       "Timed out appears over the board automatically at the time limit."
