@@ -1067,12 +1067,27 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "practice-sprint-rules-guide")).toBeTruthy();
   });
 
-  it("walks through a frozen puzzle spotlight tour before the real Sprint board and Arrow Duel", () => {
+  it("calibrates the frozen spotlight tour to the real Sprint layout before Sprint and Arrow Duel", () => {
     const activeSession = renderLabScenario("practice-active-session-guide");
+    const realSprint = renderLabScenario("practice-active");
+    startStandardSprint(realSprint);
 
     expect(findByTestId(activeSession, "practice-active-session-guide")).toBeTruthy();
     expect(() => findByTestId(activeSession, "session-board")).toThrow();
     expect(findByTestId(activeSession, "practice-session-guide-demo-board")).toBeTruthy();
+    expect(findByTestId(activeSession, "active-session-shell")).toBeTruthy();
+    expect(findByTestId(activeSession, "session-status-metrics")).toBeTruthy();
+    expect(findByTestId(activeSession, "practice-prompt")).toBeTruthy();
+    expect(findByTestId(activeSession, "session-puzzle-timing")).toBeTruthy();
+    expect(findByTestId(activeSession, "session-score-strip")).toBeTruthy();
+    expect(
+      flattenTestStyle(findByTestId(activeSession, "practice-session-guide-demo-board").props.style).width
+    ).toBe(
+      flattenTestStyle(findByTestId(realSprint, "session-board").props.style).width
+    );
+    expect(testIdOrder(activeSession, "active-session-shell", "practice-prompt")).toBeLessThan(0);
+    expect(testIdOrder(activeSession, "practice-prompt", "practice-session-guide-demo-board")).toBeLessThan(0);
+    expect(testIdOrder(activeSession, "practice-session-guide-demo-board", "session-score-strip")).toBeLessThan(0);
     expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-progress"))).toBe(
       "1 of 4"
     );

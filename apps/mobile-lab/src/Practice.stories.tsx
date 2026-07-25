@@ -176,10 +176,13 @@ export const ActiveSessionGuide: Story = {
     await waitForTestId(canvasElement, "practice-active-session-guide");
     await waitForTestId(canvasElement, "practice-session-guide-timing-demo");
     await waitForTestId(canvasElement, "practice-session-guide-demo-board");
+    await waitForTestId(canvasElement, "active-session-shell");
+    await waitForTestId(canvasElement, "practice-prompt");
+    await waitForTestId(canvasElement, "session-score-strip");
     await waitForTestId(canvasElement, "practice-session-guide-coach-overview");
     await waitForText(
       canvasElement,
-      "Solved tracks progress toward 15. Sprint shows the overall 5:00 clock. The Sprint ends after 3 mistakes."
+      "This is the same header you will use next"
     );
     expectTestIdAbsent(canvasElement, "session-board");
   }

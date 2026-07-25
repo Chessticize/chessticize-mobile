@@ -2953,6 +2953,8 @@ export function PracticePocScreen({
               <>
                 {isSessionGuideVisible && sessionGuidePresentation ? (
                   <ActiveSessionGuide
+                    adaptiveLayout={adaptiveLayout}
+                    boardSize={boardSize}
                     presentation={sessionGuidePresentation}
                     stepNumber={sessionGuideIndex + 1}
                     totalSteps={sessionGuidePresentations.length}
@@ -4025,11 +4027,15 @@ function SprintRuleRow({
 }
 
 function ActiveSessionGuide({
+  adaptiveLayout,
+  boardSize,
   onContinue,
   presentation,
   stepNumber,
   totalSteps
 }: {
+  adaptiveLayout: AdaptiveLayout;
+  boardSize: number;
   onContinue: () => void;
   presentation: SprintSessionGuidePresentation;
   stepNumber: number;
@@ -4055,20 +4061,19 @@ function ActiveSessionGuide({
     <View
       accessibilityLabel={isArrowDuel
         ? `${accessibilityStepCopy}Your first Arrow Duel. Compare the two candidate arrows, then play the stronger move. Only the shown candidates count. ${timerCopy}`
-        : `${accessibilityStepCopy}Your first active Sprint. This four-step tour uses a fixed, non-interactive example puzzle. Solve ${presentation.targetCorrect} puzzles to pass in ${presentation.durationLabel}. Slow and Timed out are automatic timing states, not controls. After the target pace, the puzzle timer turns amber. If you solve after that, the completed attempt is saved as Unclear without adding a mistake. At the time limit, Timed out appears over the board, the attempt is marked Unclear and added to Review, and the Sprint moves to the next puzzle. After a correct puzzle, use Mark as unclear when you did not fully understand the solution. ${timerCopy}`}
-      style={styles.sessionGuide}
+        : `${accessibilityStepCopy}Your first active Sprint. This four-step tour freezes the same layout used by the real Sprint. Solve ${presentation.targetCorrect} puzzles to pass in ${presentation.durationLabel}. Slow and Timed out are automatic timing states, not controls. After the target pace, the puzzle timer turns amber. If you solve after that, the completed attempt is saved as Unclear without adding a mistake. At the time limit, Timed out appears over the board, the attempt is marked Unclear and added to Review, and the Sprint moves to the next puzzle. After a correct puzzle, use Mark as unclear when you did not fully understand the solution. ${timerCopy}`}
+      style={isArrowDuel ? styles.sessionGuide : styles.sessionGuideCalibrated}
       testID={isArrowDuel ? "practice-arrow-duel-guide" : "practice-active-session-guide"}
     >
-      <View style={styles.sessionGuideHeader}>
-        <Text style={styles.sessionGuideEyebrow} testID="practice-session-guide-progress">
-          {stepCopy}{isArrowDuel ? "YOUR FIRST ARROW DUEL" : "YOUR FIRST ACTIVE SPRINT"}
-        </Text>
-        <Text style={styles.sessionGuideTitle}>{title}</Text>
-        <Text style={styles.sessionGuideIntro}>{timerCopy}</Text>
-      </View>
-
       {isArrowDuel ? (
         <>
+          <View style={styles.sessionGuideHeader}>
+            <Text style={styles.sessionGuideEyebrow} testID="practice-session-guide-progress">
+              {stepCopy}YOUR FIRST ARROW DUEL
+            </Text>
+            <Text style={styles.sessionGuideTitle}>{title}</Text>
+            <Text style={styles.sessionGuideIntro}>{timerCopy}</Text>
+          </View>
           <View
             accessibilityLabel="Two candidate move illustration, no puzzle position shown"
             style={styles.arrowDuelGuideCandidates}
@@ -4092,10 +4097,23 @@ function ActiveSessionGuide({
           </View>
         </>
       ) : (
-        <SessionCoachmarkDemo
-          coachStep={coachStep}
-          presentation={presentation}
-        />
+        <>
+          <Text
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+            style={FABRIC_SAFE_HIDDEN_TEXT_STYLE}
+            testID="practice-session-guide-progress"
+          >
+            {stepCopy}YOUR FIRST ACTIVE SPRINT
+          </Text>
+          <SessionCoachmarkDemo
+            adaptiveLayout={adaptiveLayout}
+            boardSize={boardSize}
+            coachStep={coachStep}
+            presentation={presentation}
+            timerCopy={timerCopy}
+          />
+        </>
       )}
 
       {isArrowDuel ? (
@@ -4151,8 +4169,7 @@ function ActiveSessionGuide({
   );
 }
 
-const SESSION_GUIDE_DEMO_BOARD_SIZE = 224;
-const SESSION_GUIDE_DEMO_SQUARE_SIZE = SESSION_GUIDE_DEMO_BOARD_SIZE / 8;
+const SESSION_GUIDE_DEMO_FEN = "7k/8/5KQ1/8/8/8/8/8 w - - 0 1";
 const SESSION_GUIDE_DEMO_PIECES: Readonly<Record<number, {
   spriteColumn: number;
   spriteRow: number;
@@ -4161,14 +4178,57 @@ const SESSION_GUIDE_DEMO_PIECES: Readonly<Record<number, {
   21: { spriteColumn: 5, spriteRow: 0 },
   22: { spriteColumn: 4, spriteRow: 0 }
 };
+const SESSION_GUIDE_DEMO_CURRENT_PUZZLE: CurrentPuzzleState = {
+  autoPlayedMoves: [],
+  currentFen: SESSION_GUIDE_DEMO_FEN,
+  cursor: 0,
+  kind: "line",
+  playedMoves: [],
+  puzzle: {
+    id: "session-guide-qg7-mate",
+    initialFen: SESSION_GUIDE_DEMO_FEN,
+    rating: 800,
+    solutionMoves: ["g6g7"],
+    source: "synthetic",
+    themes: ["mateIn1"]
+  },
+  solved: false
+};
 
 function SessionCoachmarkDemo({
+  adaptiveLayout,
+  boardSize,
   coachStep,
-  presentation
+  presentation,
+  timerCopy
 }: {
+  adaptiveLayout: AdaptiveLayout;
+  boardSize: number;
   coachStep: number;
   presentation: SprintSessionGuidePresentation;
+  timerCopy: string;
 }): React.JSX.Element {
+  const boardSquareSize = boardSize / 8;
+  const guideState: SprintState = {
+    bestStreak: 0,
+    config: {
+      ...defaultSprintConfig("standard"),
+      maxMistakes: presentation.maxMistakes,
+      targetCorrect: presentation.targetCorrect
+    },
+    correctCount: 0,
+    currentPuzzle: SESSION_GUIDE_DEMO_CURRENT_PUZZLE,
+    currentPuzzleIndex: 0,
+    currentStreak: 0,
+    deadlineAt: "2026-01-01T00:05:00.000Z",
+    hasUserSubmittedMove: false,
+    id: "session-guide-demo",
+    mistakeCount: 0,
+    puzzles: [SESSION_GUIDE_DEMO_CURRENT_PUZZLE.puzzle],
+    ratingBefore: RATING_FLOOR,
+    startedAt: "2026-01-01T00:00:00.000Z",
+    status: "active"
+  };
   const timingPhase: SessionTimingState["phase"] = coachStep === 1
     ? "slow"
     : coachStep === 2
@@ -4177,41 +4237,66 @@ function SessionCoachmarkDemo({
   const elapsedSeconds = coachStep === 1 ? 40 : coachStep === 2 ? 60 : coachStep === 3 ? 24 : 0;
   const callout = coachStep === 0
     ? {
-        badge: "SESSION AT A GLANCE",
-        detail: `Solved tracks progress toward ${presentation.targetCorrect}. Sprint shows the overall ${presentation.durationLabel} clock. The Sprint ends after ${presentation.maxMistakes} mistakes.`,
+        badge: "STEP 1 · SESSION AT A GLANCE",
+        detail: `Solved tracks progress toward ${presentation.targetCorrect}. The center clock shows the whole ${presentation.durationLabel} Sprint. The Sprint ends after ${presentation.maxMistakes} mistakes. ${timerCopy}`,
         id: "overview",
-        title: "Know the three numbers",
+        title: "This is the same header you will use next",
         tone: "info" as const
       }
     : coachStep === 1
       ? {
-          badge: "SLOW · AUTOMATIC",
+          badge: "STEP 2 · SLOW · AUTOMATIC",
           detail: "If you solve after that, the completed attempt is saved as Unclear without adding a mistake.",
           id: "slow",
           title: "The puzzle timer turns amber automatically after the target pace.",
           tone: "warning" as const
         }
-      : coachStep === 2
+    : coachStep === 2
         ? {
-            badge: "TIMED OUT · AUTOMATIC",
+            badge: "STEP 3 · TIMED OUT · AUTOMATIC",
             detail: "The attempt is marked Unclear, added to Review, and the Sprint moves to the next puzzle.",
             id: "timeout",
             title: "Timed out appears over the board automatically at the time limit.",
             tone: "danger" as const
           }
         : {
-            badge: "AFTER A CORRECT PUZZLE",
+            badge: "STEP 4 · AFTER A CORRECT PUZZLE",
             detail: "Use it after a correct answer when you did not fully understand the solution.",
             id: "unclear",
             title: "Mark as unclear is the only control in this tour.",
             tone: "warning" as const
           };
+  const calloutPlacement = adaptiveLayout.usesSessionRail
+    ? {
+        left: boardSize + adaptiveLayout.sessionRailGap,
+        top: coachStep === 0
+          ? 72
+          : coachStep === 1
+            ? 154
+            : coachStep === 2
+              ? 20
+              : 92,
+        width: adaptiveLayout.sessionRailWidth
+      }
+    : {
+        left: 0,
+        right: 0,
+        top: coachStep === 0 || coachStep === 2
+          ? 113
+          : boardSize + (coachStep === 1 ? 71 : 60)
+      };
+  const coachPointer = adaptiveLayout.usesSessionRail && coachStep === 2
+    ? "←"
+    : coachStep === 0
+      ? "↑"
+      : "↓";
   const calloutNode = (
     <View
       style={[
         styles.sessionGuideCoachCallout,
         callout.tone === "warning" ? styles.sessionGuideCoachCalloutWarning : null,
-        callout.tone === "danger" ? styles.sessionGuideCoachCalloutDanger : null
+        callout.tone === "danger" ? styles.sessionGuideCoachCalloutDanger : null,
+        calloutPlacement
       ]}
       testID={`practice-session-guide-coach-${callout.id}`}
     >
@@ -4223,7 +4308,7 @@ function SessionCoachmarkDemo({
           callout.tone === "danger" ? styles.sessionGuideCoachPointerDanger : null
         ]}
       >
-        ↑
+        {coachPointer}
       </Text>
       <Text
         style={[
@@ -4241,151 +4326,280 @@ function SessionCoachmarkDemo({
 
   return (
     <View
-      accessibilityLabel={`Fixed, non-interactive example puzzle. Step ${coachStep + 1} of 4. ${callout.title} ${callout.detail}`}
+      accessibilityLabel={`Frozen copy of the real Sprint screen with a non-interactive example puzzle. Step ${coachStep + 1} of 4. ${callout.title} ${callout.detail}`}
       style={styles.sessionGuideCoachFrame}
       testID="practice-session-guide-timing-demo"
     >
-      <View style={styles.sessionGuideCoachExampleHeader}>
-        <Text style={styles.sessionGuideTimingDemoEyebrow}>FIXED EXAMPLE · TIMER NOT STARTED</Text>
-        <Text style={styles.sessionGuideCoachExampleHint}>
-          The real puzzle stays hidden until the tour ends.
-        </Text>
-      </View>
-
-      <View
-        style={[
-          styles.sessionGuideMetrics,
-          styles.sessionGuideCoachLayer,
-          coachStep === 0 ? styles.sessionGuideCoachTarget : null
-        ]}
-        testID="practice-session-guide-metrics"
-      >
-        <SessionGuideMetric label="Solved" value={`0 / ${presentation.targetCorrect}`} />
-        <SessionGuideMetric label="Sprint" value={presentation.durationLabel} />
-        <SessionGuideMetric label="Mistakes" value={`0 / ${presentation.maxMistakes}`} />
-      </View>
-      {coachStep === 0 ? calloutNode : null}
-
-      <View
-        style={[
-          styles.sessionGuideCoachTimerTarget,
-          styles.sessionGuideCoachLayer,
-          coachStep === 1 ? styles.sessionGuideCoachTarget : null
-        ]}
-        testID="practice-session-guide-demo-timer"
-      >
-        <PuzzleTimingIndicator
-          elapsedSeconds={elapsedSeconds}
-          phase={timingPhase}
-          timeoutSeconds={60}
-        />
-      </View>
-      {coachStep === 1 ? calloutNode : null}
-
-      <View
-        accessible
-        accessibilityLabel="Fixed example chess puzzle, White to move, not interactive"
-        accessibilityRole="image"
-        style={[
-          styles.sessionGuideCoachBoardSurface,
-          styles.sessionGuideCoachLayer,
-          coachStep === 2 ? styles.sessionGuideCoachTarget : null
-        ]}
-        testID="practice-session-guide-demo-board"
-      >
-        <View style={styles.sessionGuideStaticBoardSquares}>
-          {Array.from({ length: 64 }, (_, index) => {
-            const piece = SESSION_GUIDE_DEMO_PIECES[index];
-            return (
-              <View
-                key={index}
-                style={[
-                  styles.sessionGuideStaticBoardSquare,
-                  (Math.floor(index / 8) + index % 8) % 2 === 0
-                    ? styles.sessionGuideStaticBoardSquareLight
-                    : styles.sessionGuideStaticBoardSquareDark
-                ]}
-              >
-                {piece ? (
-                  <View style={styles.sessionGuideStaticPieceViewport}>
-                    <Image
-                      accessible={false}
-                      accessibilityIgnoresInvertColors
-                      resizeMode="stretch"
-                      source={CHESS_PIECE_SPRITE}
-                      style={[
-                        styles.sessionGuideStaticPieceSprite,
-                        {
-                          left: -SESSION_GUIDE_DEMO_SQUARE_SIZE * piece.spriteColumn,
-                          top: -SESSION_GUIDE_DEMO_SQUARE_SIZE * piece.spriteRow
-                        }
-                      ]}
-                    />
-                  </View>
-                ) : null}
-              </View>
-            );
-          })}
-        </View>
-        <BoardCoordinateOverlay
-          boardSize={SESSION_GUIDE_DEMO_BOARD_SIZE}
-          flipped={false}
-        />
-        <BoardInputBlocker />
-        {coachStep === 2 ? (
+      {!adaptiveLayout.usesSessionRail ? (
+        <>
           <View
-            accessibilityRole="alert"
-            style={styles.puzzleTimeoutOverlay}
-            testID="practice-session-guide-timeout-overlay"
+            style={[
+              styles.sessionGuideCoachLayer,
+              coachStep === 0 ? styles.sessionGuideCoachTarget : null
+            ]}
+            testID="practice-session-guide-metrics"
           >
-            <Text style={styles.puzzleTimeoutOverlayTitle}>Timed out</Text>
-            <Text style={styles.puzzleTimeoutOverlayDetail}>Added to Review · Moving on</Text>
+            <SessionStatusBar
+              confirmAbandon={false}
+              mode="standard"
+              state={guideState}
+              timerText={presentation.durationLabel}
+              onAbandon={() => undefined}
+              onConfirmAbandonChange={() => undefined}
+              onPause={() => undefined}
+            />
+          </View>
+          <View style={[styles.practicePromptStack, { width: boardSize }]}>
+            <PracticePrompt
+              currentPuzzle={SESSION_GUIDE_DEMO_CURRENT_PUZZLE}
+              kingPieceSize={kingGlyphSizeForBoard(boardSize)}
+              mode="standard"
+            />
+          </View>
+        </>
+      ) : null}
+
+      <View
+        style={adaptiveLayout.usesSessionRail
+          ? [
+              styles.activeSessionAdaptiveLayout,
+              {
+                gap: adaptiveLayout.sessionRailGap,
+                width: adaptiveLayout.sessionPackedRowWidth
+              }
+            ]
+          : styles.activeSessionStack}
+        testID={adaptiveLayout.usesSessionRail
+          ? "active-session-adaptive-layout"
+          : "stacked-session-layout"}
+      >
+        <View
+          style={adaptiveLayout.usesSessionRail
+            ? [styles.activeSessionBoardLane, { width: boardSize }]
+            : styles.boardWrapper}
+          testID={adaptiveLayout.usesSessionRail ? "active-session-board-lane" : undefined}
+        >
+          <View
+            accessible
+            accessibilityLabel="Fixed example chess puzzle, White to move, not interactive"
+            accessibilityRole="image"
+            style={[
+              styles.boardSurface,
+              styles.sessionGuideCoachBoardSurface,
+              styles.sessionGuideCoachLayer,
+              coachStep === 2 ? styles.sessionGuideCoachTarget : null,
+              { height: boardSize, width: boardSize }
+            ]}
+            testID="practice-session-guide-demo-board"
+          >
+            <View
+              style={[
+                styles.sessionGuideStaticBoardSquares,
+                { height: boardSize, width: boardSize }
+              ]}
+            >
+              {Array.from({ length: 64 }, (_, index) => {
+                const piece = SESSION_GUIDE_DEMO_PIECES[index];
+                return (
+                  <View
+                    key={index}
+                    style={[
+                      styles.sessionGuideStaticBoardSquare,
+                      {
+                        height: boardSquareSize,
+                        width: boardSquareSize
+                      },
+                      (Math.floor(index / 8) + index % 8) % 2 === 0
+                        ? styles.sessionGuideStaticBoardSquareLight
+                        : styles.sessionGuideStaticBoardSquareDark
+                    ]}
+                  >
+                    {piece ? (
+                      <View
+                        style={[
+                          styles.sessionGuideStaticPieceViewport,
+                          {
+                            height: boardSquareSize,
+                            width: boardSquareSize
+                          }
+                        ]}
+                      >
+                        <Image
+                          accessible={false}
+                          accessibilityIgnoresInvertColors
+                          resizeMode="stretch"
+                          source={CHESS_PIECE_SPRITE}
+                          style={[
+                            styles.sessionGuideStaticPieceSprite,
+                            {
+                              height: boardSquareSize * 2,
+                              left: -boardSquareSize * piece.spriteColumn,
+                              top: -boardSquareSize * piece.spriteRow,
+                              width: boardSquareSize * 6
+                            }
+                          ]}
+                        />
+                      </View>
+                    ) : null}
+                  </View>
+                );
+              })}
+            </View>
+            <BoardCoordinateOverlay
+              boardSize={boardSize}
+              flipped={false}
+            />
+            <BoardInputBlocker />
+            {coachStep === 2 ? (
+              <View
+                accessibilityRole="alert"
+                style={styles.puzzleTimeoutOverlay}
+                testID="practice-session-guide-timeout-overlay"
+              >
+                <Text style={styles.puzzleTimeoutOverlayTitle}>Timed out</Text>
+                <Text style={styles.puzzleTimeoutOverlayDetail}>Added to Review · Moving on</Text>
+              </View>
+            ) : null}
+          </View>
+          {!adaptiveLayout.usesSessionRail ? (
+            <View
+              style={[styles.sessionBoardDetails, { width: boardSize }]}
+              testID="session-board-details"
+            >
+              <View
+                style={[
+                  styles.sessionGuideCoachTimerTarget,
+                  styles.sessionGuideCoachLayer,
+                  coachStep === 1 ? styles.sessionGuideCoachTarget : null
+                ]}
+                testID="practice-session-guide-demo-timer"
+              >
+                <PuzzleTimingIndicator
+                  elapsedSeconds={elapsedSeconds}
+                  phase={timingPhase}
+                  timeoutSeconds={60}
+                />
+              </View>
+              <SessionScoreStrip state={guideState} />
+            </View>
+          ) : null}
+        </View>
+
+        {!adaptiveLayout.usesSessionRail && coachStep === 3 ? (
+          <View
+            style={[
+              styles.activeSessionBottomFeedback,
+              styles.sessionGuideCoachLayer,
+              styles.sessionGuideCoachTarget,
+              { width: boardSize }
+            ]}
+            testID="practice-session-guide-demo-unclear"
+          >
+            <UnclearAttemptPrompt
+              marked={false}
+              question="Was the previous puzzle clear?"
+              onToggle={() => undefined}
+            />
           </View>
         ) : null}
-      </View>
-      <Text style={styles.sessionGuideDemoCaption}>
-        White to move · fixed example · not interactive
-      </Text>
-      {coachStep === 2 ? calloutNode : null}
 
-      <View
-        style={[
-          styles.sessionGuideUnclearCard,
-          styles.sessionGuideCoachLayer,
-          coachStep === 3 ? styles.sessionGuideCoachTarget : null
-        ]}
-        testID="practice-session-guide-demo-unclear"
-      >
-        <Text style={styles.sessionGuideDemoLabel}>AFTER A CORRECT PUZZLE</Text>
-        <View style={styles.sessionGuideUnclearDemo}>
-          <Text style={styles.sessionGuideUnclearQuestion}>Was the previous puzzle clear?</Text>
-          <View style={styles.sessionGuideUnclearButton}>
-            <Text style={styles.sessionGuideUnclearButtonText}>Mark as unclear</Text>
-          </View>
-        </View>
+        {adaptiveLayout.usesSessionRail ? (
+          <ScrollView
+            style={[
+              styles.activeSessionControlRailScroll,
+              {
+                height: boardSize,
+                width: adaptiveLayout.sessionRailWidth
+              }
+            ]}
+            contentContainerStyle={[
+              styles.activeSessionControlRailScrollContent,
+              {
+                minHeight: boardSize,
+                width: adaptiveLayout.sessionRailWidth
+              }
+            ]}
+            testID="active-session-control-rail"
+          >
+            <View
+              style={[
+                styles.activeSessionControlRail,
+                {
+                  minHeight: boardSize,
+                  width: adaptiveLayout.sessionRailWidth
+                }
+              ]}
+              testID="active-session-control-rail-content"
+            >
+              <View
+                style={[
+                  styles.sessionGuideCoachLayer,
+                  coachStep === 0 ? styles.sessionGuideCoachTarget : null
+                ]}
+                testID="practice-session-guide-metrics"
+              >
+                <SessionStatusBar
+                  compactMetrics
+                  confirmAbandon={false}
+                  mode="standard"
+                  state={guideState}
+                  timerText={presentation.durationLabel}
+                  onAbandon={() => undefined}
+                  onConfirmAbandonChange={() => undefined}
+                  onPause={() => undefined}
+                />
+              </View>
+              <View style={[styles.practicePromptStack, { width: adaptiveLayout.sessionRailWidth }]}>
+                <PracticePrompt
+                  currentPuzzle={SESSION_GUIDE_DEMO_CURRENT_PUZZLE}
+                  kingPieceSize={kingGlyphSizeForBoard(boardSize)}
+                  mode="standard"
+                />
+              </View>
+              <View
+                style={[
+                  styles.sessionGuideCoachTimerTarget,
+                  styles.sessionGuideCoachLayer,
+                  coachStep === 1 ? styles.sessionGuideCoachTarget : null
+                ]}
+                testID="practice-session-guide-demo-timer"
+              >
+                <PuzzleTimingIndicator
+                  elapsedSeconds={elapsedSeconds}
+                  phase={timingPhase}
+                  timeoutSeconds={60}
+                />
+              </View>
+              <SessionScoreStrip state={guideState} />
+              {coachStep === 3 ? (
+                <View
+                  style={[
+                    styles.activeSessionBottomFeedback,
+                    styles.activeSessionRailBottomFeedback,
+                    styles.sessionGuideCoachLayer,
+                    styles.sessionGuideCoachTarget,
+                    { width: adaptiveLayout.sessionRailWidth }
+                  ]}
+                  testID="practice-session-guide-demo-unclear"
+                >
+                  <UnclearAttemptPrompt
+                    marked={false}
+                    question="Was the previous puzzle clear?"
+                    onToggle={() => undefined}
+                  />
+                </View>
+              ) : null}
+            </View>
+          </ScrollView>
+        ) : null}
       </View>
-      {coachStep === 3 ? calloutNode : null}
 
+      {calloutNode}
       <View
         accessibilityElementsHidden
         importantForAccessibility="no"
         style={styles.sessionGuideCoachScrim}
       />
-    </View>
-  );
-}
-
-function SessionGuideMetric({
-  label,
-  value
-}: {
-  label: string;
-  value: string;
-}): React.JSX.Element {
-  return (
-    <View style={styles.sessionGuideMetric}>
-      <Text style={styles.sessionGuideMetricValue}>{value}</Text>
-      <Text style={styles.sessionGuideMetricLabel}>{label}</Text>
     </View>
   );
 }
@@ -13290,6 +13504,11 @@ const styles = StyleSheet.create({
     padding: 16,
     width: "100%"
   },
+  sessionGuideCalibrated: {
+    alignSelf: "center",
+    gap: 12,
+    width: "100%"
+  },
   sessionGuideHeader: {
     gap: 4
   },
@@ -13310,68 +13529,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 17
   },
-  sessionGuideMetrics: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
-    borderRadius: 10,
-    borderWidth: 1,
-    flexDirection: "row",
-    overflow: "hidden"
-  },
-  sessionGuideMetric: {
-    alignItems: "center",
-    borderRightColor: "#E2E8F0",
-    borderRightWidth: StyleSheet.hairlineWidth,
-    flex: 1,
-    gap: 3,
-    justifyContent: "center",
-    minHeight: 58,
-    paddingHorizontal: 5,
-    paddingVertical: 8
-  },
-  sessionGuideMetricValue: {
-    color: "#111827",
-    fontFamily: "menlo",
-    fontSize: 14,
-    fontWeight: "900"
-  },
-  sessionGuideMetricLabel: {
-    color: "#64748B",
-    fontSize: 9,
-    fontWeight: "800",
-    textAlign: "center"
-  },
   sessionGuideCoachFrame: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#CBD5E1",
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 10,
+    alignSelf: "center",
+    gap: 12,
     overflow: "hidden",
-    padding: 12,
     pointerEvents: "none",
-    position: "relative"
-  },
-  sessionGuideCoachExampleHeader: {
-    gap: 3
-  },
-  sessionGuideTimingDemoEyebrow: {
-    color: "#475569",
-    fontSize: 9,
-    fontWeight: "900",
-    letterSpacing: 0.6
-  },
-  sessionGuideCoachExampleHint: {
-    color: "#64748B",
-    fontSize: 10,
-    lineHeight: 14
+    position: "relative",
+    width: "100%"
   },
   sessionGuideCoachLayer: {
     position: "relative",
     zIndex: 1
   },
   sessionGuideCoachTarget: {
+    backgroundColor: "#F8FAFC",
     borderColor: "#60A5FA",
+    borderRadius: 10,
     borderWidth: 2,
     shadowColor: "#1D4ED8",
     shadowOffset: { height: 0, width: 0 },
@@ -13382,36 +13555,21 @@ const styles = StyleSheet.create({
   sessionGuideCoachTimerTarget: {
     alignItems: "center",
     alignSelf: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "transparent",
-    borderRadius: 999,
-    borderWidth: 2,
     justifyContent: "center",
-    minHeight: 34,
-    minWidth: 112,
-    paddingHorizontal: 5
+    minWidth: 112
   },
   sessionGuideCoachBoardSurface: {
     alignSelf: "center",
-    borderColor: "#94A3B8",
-    borderRadius: 8,
-    borderWidth: 1,
-    height: SESSION_GUIDE_DEMO_BOARD_SIZE,
     overflow: "hidden",
-    position: "relative",
-    width: SESSION_GUIDE_DEMO_BOARD_SIZE
+    position: "relative"
   },
   sessionGuideStaticBoardSquares: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    height: SESSION_GUIDE_DEMO_BOARD_SIZE,
-    width: SESSION_GUIDE_DEMO_BOARD_SIZE
+    flexWrap: "wrap"
   },
   sessionGuideStaticBoardSquare: {
     alignItems: "center",
-    height: SESSION_GUIDE_DEMO_SQUARE_SIZE,
-    justifyContent: "center",
-    width: SESSION_GUIDE_DEMO_SQUARE_SIZE
+    justifyContent: "center"
   },
   sessionGuideStaticBoardSquareLight: {
     backgroundColor: BOARD_COLOR_TOKENS.white
@@ -13420,26 +13578,15 @@ const styles = StyleSheet.create({
     backgroundColor: BOARD_COLOR_TOKENS.black
   },
   sessionGuideStaticPieceViewport: {
-    height: SESSION_GUIDE_DEMO_SQUARE_SIZE,
     overflow: "hidden",
-    position: "relative",
-    width: SESSION_GUIDE_DEMO_SQUARE_SIZE
+    position: "relative"
   },
   sessionGuideStaticPieceSprite: {
-    height: SESSION_GUIDE_DEMO_SQUARE_SIZE * 2,
-    position: "absolute",
-    width: SESSION_GUIDE_DEMO_SQUARE_SIZE * 6
-  },
-  sessionGuideDemoCaption: {
-    color: "#64748B",
-    fontSize: 9,
-    fontWeight: "700",
-    textAlign: "center"
+    position: "absolute"
   },
   sessionGuideCoachScrim: {
     ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(15, 23, 42, 0.62)",
-    borderRadius: 11,
     pointerEvents: "none",
     zIndex: 2
   },
@@ -13451,7 +13598,7 @@ const styles = StyleSheet.create({
     gap: 3,
     padding: 11,
     paddingTop: 5,
-    position: "relative",
+    position: "absolute",
     zIndex: 4
   },
   sessionGuideCoachCalloutWarning: {
@@ -13490,9 +13637,16 @@ const styles = StyleSheet.create({
   },
   sessionGuideCoachNavigation: {
     alignItems: "center",
+    alignSelf: "center",
+    backgroundColor: "#FFFFFF",
+    borderColor: "#CBD5E1",
+    borderRadius: 12,
+    borderWidth: 1,
     flexDirection: "row",
     gap: 9,
-    justifyContent: "space-between"
+    justifyContent: "space-between",
+    padding: 8,
+    width: "100%"
   },
   sessionGuideCoachBackButton: {
     alignItems: "center",
@@ -13546,48 +13700,6 @@ const styles = StyleSheet.create({
     color: "#475569",
     fontSize: 11,
     lineHeight: 16
-  },
-  sessionGuideUnclearCard: {
-    backgroundColor: "#FFFBEB",
-    borderColor: "#FDE68A",
-    borderRadius: 10,
-    borderWidth: 1,
-    gap: 8,
-    padding: 11
-  },
-  sessionGuideDemoLabel: {
-    color: "#92400E",
-    fontSize: 9,
-    fontWeight: "900",
-    letterSpacing: 0.6
-  },
-  sessionGuideUnclearDemo: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 8,
-    justifyContent: "space-between"
-  },
-  sessionGuideUnclearQuestion: {
-    color: "#111827",
-    flex: 1,
-    fontSize: 12,
-    fontWeight: "800",
-    lineHeight: 16
-  },
-  sessionGuideUnclearButton: {
-    alignItems: "center",
-    backgroundColor: "#FFFBEB",
-    borderColor: "#F59E0B",
-    borderRadius: 8,
-    borderWidth: 1,
-    justifyContent: "center",
-    minHeight: 36,
-    paddingHorizontal: 9
-  },
-  sessionGuideUnclearButtonText: {
-    color: "#92400E",
-    fontSize: 10,
-    fontWeight: "900"
   },
   sessionGuideStartButton: {
     alignItems: "center",
